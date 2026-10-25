@@ -38,7 +38,6 @@ mod stations;
 pub mod ui;
 mod ui_host;
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -54,9 +53,15 @@ use opence_sim::{FreeCamera, Simulation};
 use render_level::{RenderDraw, RenderLevel, RenderMaterial, RenderTexture, VERTEX_STRIDE};
 use render_model::{RenderModel, MODEL_VERTEX_STRIDE};
 use render_sky::RenderSky;
+use rustc_hash::FxHashMap;
 use snapshot::{CameraSnapshot, NodeSnapshot, ObjectSnapshot, SnapshotBuffers, SnapshotWriter};
 
 uniffi::setup_scaffolding!();
+
+/// A map across UniFFI, which lowers std's map (a Swift `Dictionary`).
+/// Nothing in the engine iterates one: it is copied into an ordered map.
+#[expect(clippy::disallowed_types, reason = "UniFFI lowers only std's HashMap")]
+pub type Dictionary<K, V> = std::collections::HashMap<K, V>;
 
 /// The engine's version, as the app shows it.
 #[uniffi::export]
@@ -731,8 +736,8 @@ pub(crate) struct Running {
 /// shared by every object of a tag.
 #[derive(Default)]
 struct Wardrobe {
-    models: HashMap<usize, Arc<opence_content::Model>>,
-    graphs: HashMap<opence_content::TagRef, Option<Arc<opence_content::AnimationGraph>>>,
+    models: FxHashMap<usize, Arc<opence_content::Model>>,
+    graphs: FxHashMap<opence_content::TagRef, Option<Arc<opence_content::AnimationGraph>>>,
 }
 
 impl Wardrobe {
@@ -1376,13 +1381,13 @@ impl Engine {
 
     /// The saved shell variables not at their default, as text, for the
     /// settings file.
-    pub fn saved_shell_variables(&self) -> HashMap<String, String> {
+    pub fn saved_shell_variables(&self) -> Dictionary<String, String> {
         self.lock_registry().saved().into_iter().collect()
     }
 
     /// Sets the saved shell variables from the settings file; returns the
     /// names it refused.
-    pub fn load_shell_variables(&self, saved: HashMap<String, String>) -> Vec<String> {
+    pub fn load_shell_variables(&self, saved: Dictionary<String, String>) -> Vec<String> {
         let mut registry = self.lock_registry();
         let refused = registry.load_saved(&saved.into_iter().collect());
         // (loading tells no listener: the state is counted changed here)

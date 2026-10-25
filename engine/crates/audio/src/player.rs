@@ -5,11 +5,11 @@
 
 mod looping;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use libm::sqrtf;
 use opence_content::{Level, LoopingSound, Sound};
+use rustc_hash::FxHashMap;
 
 use crate::census::{Census, Dropped, Playing};
 use crate::choice::{
@@ -97,14 +97,14 @@ impl Default for Source {
 /// Plays a level's sounds through a [`Mixer`].
 pub struct SoundPlayer {
     bank: Arc<dyn SoundBank>,
-    paths: HashMap<String, usize>,
-    looping_paths: HashMap<String, usize>,
-    loops: HashMap<u64, looping::Loop>,
+    paths: FxHashMap<String, usize>,
+    looping_paths: FxHashMap<String, usize>,
+    loops: FxHashMap<u64, looping::Loop>,
     /// The voices of loops that ended or changed, fading out.
     retired: Vec<looping::Component>,
-    decoded: HashMap<(usize, usize, u16), Option<Arc<Decoded>>>,
-    ranges: HashMap<(usize, usize), RangeState>,
-    promotions: HashMap<usize, Promotion>,
+    decoded: FxHashMap<(usize, usize, u16), Option<Arc<Decoded>>>,
+    ranges: FxHashMap<(usize, usize), RangeState>,
+    promotions: FxHashMap<usize, Promotion>,
     classes: ClassGains,
     random: LocalRandom,
     effects_volume: f32,
@@ -136,11 +136,11 @@ impl SoundPlayer {
             bank,
             paths,
             looping_paths,
-            loops: HashMap::new(),
+            loops: FxHashMap::default(),
             retired: Vec::new(),
-            decoded: HashMap::new(),
-            ranges: HashMap::new(),
-            promotions: HashMap::new(),
+            decoded: FxHashMap::default(),
+            ranges: FxHashMap::default(),
+            promotions: FxHashMap::default(),
             classes: ClassGains::default(),
             random: LocalRandom::default(),
             effects_volume: 1.0,

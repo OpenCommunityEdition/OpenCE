@@ -3,7 +3,7 @@
 //! made-up animations, written by `tools/engine_animation_reference.py`.
 //! Every value must be the same to the bit.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::error::Error;
 
 use opence_content::{Animation, AnimationKind, AnimationNode, ScreenBounds};
@@ -142,9 +142,9 @@ fn check(what: &str, found: &[u32], expected: &[u32]) -> Result<()> {
 
 #[test]
 fn the_engines_animation_is_the_games() -> Result<()> {
-    let mut animations: HashMap<String, Animation> = HashMap::new();
-    let mut poses: HashMap<String, Vec<Orientation>> = HashMap::new();
-    let mut graphs: HashMap<String, Vec<AnimationNode>> = HashMap::new();
+    let mut animations: BTreeMap<String, Animation> = BTreeMap::new();
+    let mut poses: BTreeMap<String, Vec<Orientation>> = BTreeMap::new();
+    let mut graphs: BTreeMap<String, Vec<AnimationNode>> = BTreeMap::new();
     let mut checked = 0;
 
     for line in REFERENCE.lines().filter(|line| !line.starts_with('#')) {

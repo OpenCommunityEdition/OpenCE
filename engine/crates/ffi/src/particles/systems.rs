@@ -5,7 +5,7 @@
 //! Effects make the systems that go free; objects carry the systems their
 //! definitions attach, at a marker, for as long as they are there.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use opence_content::{
     Level, ParticleState, ParticleSystem, ParticleSystemType, ParticleTypeVariables, TagRef,
@@ -16,6 +16,7 @@ use opence_sim::particle_collision::PointHit;
 use opence_sim::point_physics;
 use opence_sim::seats::default_pose;
 use opence_sim::{Simulation, Vec3};
+use rustc_hash::FxHashMap;
 
 use super::{blend, mix, rgba, Pictures, Random, TICK};
 use crate::lights::marker_frames;
@@ -656,7 +657,7 @@ pub(super) struct Systems {
     /// on.
     carried: BTreeMap<TagRef, (Vec<CarriedSystem>, Option<usize>)>,
     /// Each system's index in the level's.
-    index: HashMap<TagRef, usize>,
+    index: FxHashMap<TagRef, usize>,
     /// The systems effects made, oldest first.
     free: Vec<Running>,
     /// The systems objects carry, by the object and the attachment's slot.
@@ -665,7 +666,7 @@ pub(super) struct Systems {
 
 impl Systems {
     pub(super) fn new(level: &Level) -> Self {
-        let index: HashMap<TagRef, usize> = level
+        let index: FxHashMap<TagRef, usize> = level
             .particle_systems
             .iter()
             .enumerate()
@@ -767,7 +768,7 @@ impl Systems {
         if self.carried.is_empty() {
             return;
         }
-        let handles: HashMap<u32, ObjectHandle> = simulation
+        let handles: FxHashMap<u32, ObjectHandle> = simulation
             .objects()
             .into_iter()
             .map(|handle| (handle.index, handle))

@@ -4,7 +4,7 @@
 //! and facing the same ways, those of the structure BSP a mission's scripts
 //! switched to as well. It passes without assets/maps or the traces.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use opence_ffi::{Engine, LevelGeometry};
@@ -194,7 +194,7 @@ fn angle(a: [f64; 3], b: [f64; 3]) -> f64 {
 /// Each way the world differs from the trace: an object it lacks or has
 /// over, or one placed or turned differently.
 fn differences(map: &str, expected: &[Placed], got: &[Placed]) -> Vec<String> {
-    let mut left: HashMap<&str, Vec<&Placed>> = HashMap::new();
+    let mut left: BTreeMap<&str, Vec<&Placed>> = BTreeMap::new();
     for object in got {
         left.entry(object.tag.as_str()).or_default().push(object);
     }

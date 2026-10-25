@@ -16,9 +16,8 @@
 //! [`stock_steps`] measure the step left across each, on the baked and the
 //! stock pages.
 
-use std::collections::HashMap;
-
 use opence_content::level::StructureBsp;
+use rustc_hash::FxHashMap;
 
 use crate::chart::{Atlas, Chart, EMPTY};
 use crate::mood::{brightness, shown, StockPage};
@@ -86,7 +85,7 @@ struct Edge {
 impl Seam {
     /// The seams of `structure` on `atlas`'s charts (laid out from it).
     pub fn find(structure: &StructureBsp, atlas: &Atlas) -> Vec<Self> {
-        let mut edges: HashMap<[[i64; 3]; 2], Vec<Edge>> = HashMap::new();
+        let mut edges: FxHashMap<[[i64; 3]; 2], Vec<Edge>> = FxHashMap::default();
         for (chart_index, chart) in atlas.charts.iter().enumerate() {
             let Some(lightmap) = structure.lightmaps.get(chart.page as usize) else {
                 continue;

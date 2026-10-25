@@ -16,13 +16,13 @@ use crate::level::{
     Bsp2dReference, Bsp3dNode, CollisionEdge, CollisionLeaf, CollisionMaterial, CollisionSurface,
     CollisionVertex, EnvironmentVertex, Lightmap, LightmapVertex, Material,
 };
-use std::collections::HashSet;
 
 use crate::{
     AtmosphericFog, Bitmap, BitmapImage, CollisionBsp, EnvironmentShader, GameTypes, Globals,
     Group, Level, ObjectDefinition, ObjectKind, ObjectPlacement, Pixels, PlayerStart, Scenario,
     Shader, ShaderClass, Sky, StructureBsp, TagRef, Texture, TextureFormat,
 };
+use rustc_hash::FxHashSet;
 
 /// The map's name: `--map devmap`, `map devmap`.
 pub const NAME: &str = "devmap";
@@ -361,7 +361,7 @@ fn scenario() -> Scenario {
 
 /// Adds to `into` each of `from` whose tag it does not hold yet.
 fn merge<T: Clone>(into: &mut Vec<T>, from: &[T], tag: impl Fn(&T) -> &TagRef) {
-    let mut held: HashSet<TagRef> = into.iter().map(|item| tag(item).clone()).collect();
+    let mut held: FxHashSet<TagRef> = into.iter().map(|item| tag(item).clone()).collect();
     for item in from {
         if held.insert(tag(item).clone()) {
             into.push(item.clone());

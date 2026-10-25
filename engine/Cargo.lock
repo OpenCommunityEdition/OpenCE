@@ -951,6 +951,7 @@ dependencies = [
  "libm",
  "opence_content",
  "opence_import",
+ "rustc-hash 2.1.3",
  "thiserror",
 ]
 
@@ -961,6 +962,7 @@ dependencies = [
  "libm",
  "opence_content",
  "opence_import",
+ "rustc-hash 2.1.3",
 ]
 
 [[package]]
@@ -993,6 +995,7 @@ version = "0.1.0"
 dependencies = [
  "libm",
  "rkyv",
+ "rustc-hash 2.1.3",
  "thiserror",
 ]
 
@@ -1021,6 +1024,7 @@ dependencies = [
  "opence_script",
  "opence_sim",
  "opence_ui",
+ "rustc-hash 2.1.3",
  "serde",
  "serde_json",
  "thiserror",

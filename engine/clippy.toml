@@ -33,3 +33,12 @@ disallowed-methods = [
     { path = "f64::powi", reason = "use libm::pow" },
     { path = "f64::mul_add", reason = "a fused multiply-add rounds differently" },
 ]
+
+# std's hash maps take a random seed each run, so what iterates one comes
+# out in another order each run (a contrail drew the game's random numbers
+# so). Look up with rustc_hash's maps, which have a fixed seed; iterate a
+# BTreeMap or a slot array.
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "a random seed each run: use rustc_hash::FxHashMap, or a BTreeMap where it is iterated" },
+    { path = "std::collections::HashSet", reason = "a random seed each run: use rustc_hash::FxHashSet, or a BTreeSet where it is iterated" },
+]

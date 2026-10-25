@@ -3,11 +3,11 @@
 //! one atlas of the glyphs' distance fields, laid out by `opence_ui` on
 //! the 640×480 screen scaled into the window.
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use opence_content::{Level, TagRef};
 use opence_ui::{DrawItem, Key, Layout, MouseButton, Shell, NONE};
+use rustc_hash::FxHashMap;
 
 use crate::ui_host::MenuHost;
 pub use crate::ui_host::{MenuAction, MenuEntry};
@@ -87,7 +87,7 @@ pub struct UiGlyphAtlas {
 #[derive(Debug, Default)]
 pub(crate) struct GlyphAtlas {
     pub(crate) atlas: UiGlyphAtlas,
-    places: HashMap<(TagRef, usize), [f32; 4]>,
+    places: FxHashMap<(TagRef, usize), [f32; 4]>,
 }
 
 impl GlyphAtlas {
@@ -115,7 +115,7 @@ impl GlyphAtlas {
         }
         let height = (y + row).max(1).next_power_of_two();
         let mut texels = vec![0u8; width * height];
-        let mut places = HashMap::new();
+        let mut places = FxHashMap::default();
         for ((font, index), [x, y, w, h]) in placed {
             let Some(glyph) = level.ui.font(&font).and_then(|font| font.glyphs.get(index)) else {
                 continue;
@@ -187,7 +187,7 @@ pub(crate) fn pack_color(color: [f32; 4]) -> u32 {
 /// left out.
 pub(crate) fn quads(
     items: &[DrawItem],
-    textures: &HashMap<(TagRef, u16), u32>,
+    textures: &FxHashMap<(TagRef, u16), u32>,
     atlas: &GlyphAtlas,
 ) -> Vec<UiQuad> {
     items

@@ -3,13 +3,12 @@
 //! the object struck, fading at the end of their lives and recycled oldest first
 //! (`decals.c`'s `decal_new_from_collision` and `decals_update`).
 
-use std::collections::HashMap;
-
 use opence_content::{Bitmap, Level, TagRef};
 use opence_sim::effects::FiredPart;
 use opence_sim::objects::ObjectHandle;
 use opence_sim::projectile::Impact;
 use opence_sim::{Simulation, Transform, Vec3};
+use rustc_hash::FxHashMap;
 
 use crate::decals::{first_hit, lay, seed, triangles, Laid, RenderDecal, Triangle};
 use crate::snapshot::{
@@ -84,7 +83,7 @@ pub(crate) fn decal_images(level: &Level) -> Vec<(TagRef, u16)> {
 pub(crate) struct DynamicDecals {
     marks: Vec<Mark>,
     /// The snapshot's picture of each decal image.
-    pictures: HashMap<(TagRef, u16), u32>,
+    pictures: FxHashMap<(TagRef, u16), u32>,
     /// Each BSP's triangles, found when a decal is first laid on it.
     triangles: Vec<Option<Vec<Triangle>>>,
 }

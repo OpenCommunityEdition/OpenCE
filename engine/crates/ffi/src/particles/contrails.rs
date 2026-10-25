@@ -7,7 +7,7 @@
 //! through its points, its picture scrolling and stepping through its
 //! sequence's frames.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 use opence_content::{Contrail, ContrailState, Level, TagRef};
 use opence_sim::damage::transition;
@@ -17,7 +17,9 @@ use opence_sim::particle_collision::PointHit;
 use opence_sim::point_physics;
 use opence_sim::seats::default_pose;
 use opence_sim::{Simulation, Vec3};
+use rustc_hash::FxHashMap;
 
+use super::slots::Slots;
 use super::wind::Air;
 use super::{blend, Pictures, Random, TICK};
 use crate::lights::marker_frames;
@@ -530,8 +532,9 @@ type CarriedBy = BTreeMap<TagRef, (Vec<Carried>, Option<usize>)>;
 #[derive(Clone, Debug, Default)]
 pub(super) struct Contrails {
     carried: CarriedBy,
-    /// Each object's trails, by its slot and the attachment's.
-    trails: HashMap<(ObjectHandle, usize), Trail>,
+    /// Each object's trails, by its slot and the attachment's, in the
+    /// slots of the original's contrail data array.
+    trails: Slots<(ObjectHandle, usize), Trail>,
 }
 
 impl Contrails {
@@ -565,7 +568,7 @@ impl Contrails {
         }
         Self {
             carried,
-            trails: HashMap::new(),
+            trails: Slots::default(),
         }
     }
 
@@ -583,7 +586,7 @@ impl Contrails {
         }
         self.carry(level, simulation, random);
         let world: &Simulation = simulation;
-        self.trails.retain(|_, trail| {
+        self.trails.retain(|trail| {
             let Some(contrail) = level.contrails.get(trail.contrail) else {
                 return false;
             };
@@ -605,7 +608,7 @@ impl Contrails {
         if self.carried.is_empty() {
             return;
         }
-        let handles: HashMap<u32, ObjectHandle> = simulation
+        let handles: FxHashMap<u32, ObjectHandle> = simulation
             .objects()
             .into_iter()
             .map(|handle| (handle.index, handle))
@@ -643,7 +646,7 @@ impl Contrails {
                         [16, 8, 0].map(|shift| ((color >> shift) & 0xFF) as f32 / 255.0)
                     });
                 let mut made = false;
-                let trail = trails.entry((handle, carried.slot)).or_insert_with(|| {
+                let trail = trails.get_or_insert_with((handle, carried.slot), || {
                     made = true;
                     Trail::new(carried.contrail, contrail, level, random)
                 });
@@ -681,9 +684,8 @@ impl Contrails {
         camera: Vec3,
         out: &mut Vec<ParticleSnapshot>,
     ) {
-        let mut trails: Vec<_> = self.trails.iter().collect();
-        trails.sort_by_key(|((handle, slot), _)| (handle.index, *slot));
-        for (_, trail) in trails {
+        // (in slot order, as the original draws them)
+        for trail in self.trails.values() {
             let Some(contrail) = level.contrails.get(trail.contrail) else {
                 continue;
             };
@@ -1134,6 +1136,77 @@ mod tests {
             contrails.tick(&level, &mut simulation, &Air::still(), &mut random);
         }
         assert_eq!(contrails.len(), 0, "its points died");
+    }
+
+    /// `carriers` rockets trailing a contrail whose points' lifetimes and
+    /// speeds are drawn at random, stepped `ticks` ticks: each tick's strips.
+    fn trailed(carriers: usize, ticks: usize) -> Vec<Vec<ParticleSnapshot>> {
+        let mut level = level();
+        let mut aging = state(1.0, 0.0, 0.5, red());
+        aging.duration = [0.2, 1.5];
+        let mut definition = contrail(Contrail::HORIZONTAL, vec![aging]);
+        definition.velocity = [1.0, 5.0];
+        definition.velocity_cone_angle = 0.5;
+        level.contrails.push(definition);
+        carrier(
+            &mut level,
+            Attachment {
+                tag: Some(tag(b"cont", "trail")),
+                marker: String::new(),
+                primary_scale: 0,
+                change_color: 0,
+            },
+        );
+        let mut contrails = Contrails::new(&level);
+        let mut simulation = Simulation::empty();
+        for _ in 0..carriers {
+            spawn(&mut simulation);
+        }
+        let mut random = Random::default();
+        (0..ticks)
+            .map(|_| {
+                contrails.tick(&level, &mut simulation, &Air::still(), &mut random);
+                let mut out = Vec::new();
+                contrails.gather(
+                    &level,
+                    &Pictures::default(),
+                    Vec3::new(0.0, 0.0, 10.0),
+                    &mut out,
+                );
+                out
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_same_start_trails_the_same_each_tick() {
+        // (each run's maps hash by their own seed; the draws must not follow it)
+        let first = trailed(8, 40);
+        assert!(
+            first.iter().any(|strips| strips.len() > 8),
+            "the rockets trail"
+        );
+        for run in 1..4 {
+            assert!(trailed(8, 40) == first, "run {run} trailed otherwise");
+        }
+    }
+
+    #[test]
+    fn a_trail_takes_the_lowest_free_slot_and_they_age_in_slot_order() {
+        let mut slots = Slots::default();
+        for key in [30, 10, 20] {
+            slots.get_or_insert_with(key, || key * 2);
+        }
+        assert_eq!(slots.values().copied().collect::<Vec<_>>(), [60, 20, 40]);
+        slots.retain(|value| *value != 20);
+        slots.get_or_insert_with(5, || 5);
+        assert_eq!(slots.values().copied().collect::<Vec<_>>(), [60, 5, 40]);
+        assert_eq!(
+            *slots.get_or_insert_with(30, || 0),
+            60,
+            "a held key is not made again"
+        );
+        assert_eq!(slots.len(), 3);
     }
 
     #[test]

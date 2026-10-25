@@ -7,7 +7,7 @@ use std::panic::catch_unwind;
 
 #[test]
 fn debug_assertions_are_on() {
-    assert!(cfg!(debug_assertions));
+    assert!(black_box(cfg!(debug_assertions)));
 }
 
 #[test]

@@ -4,7 +4,7 @@
 //! markers. The parts made each tick are handed to the lights and decals.
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 use opence_content::{Level, TagRef};
 use opence_sim::animation::NodeMatrix;
@@ -12,6 +12,7 @@ use opence_sim::effects::{Effects, FiredPart, Running};
 use opence_sim::objects::ObjectHandle;
 use opence_sim::seats::default_pose;
 use opence_sim::{Mat3, Quat, Simulation, Vec3};
+use rustc_hash::FxHashMap;
 
 use crate::dynamic_decals::DynamicDecals;
 use crate::lights::marker_frames;
@@ -135,13 +136,13 @@ impl LevelEffects {
                 |point| decals.borrow_mut().ground(level, bsp, point),
             );
         }
-        let handles: HashMap<u32, ObjectHandle> = simulation
+        let handles: FxHashMap<u32, ObjectHandle> = simulation
             .objects()
             .into_iter()
             .map(|handle| (handle.index, handle))
             .collect();
         // (each object's markers its effects are at, where they are now)
-        let mut wanted: HashMap<u32, Vec<String>> = HashMap::new();
+        let mut wanted: FxHashMap<u32, Vec<String>> = FxHashMap::default();
         for running in self.effects.running() {
             let Some((handle, marker)) = &running.origin.on else {
                 continue;
@@ -152,7 +153,7 @@ impl LevelEffects {
                 markers.extend(effect.locations.iter().cloned());
             }
         }
-        let mut placed: HashMap<(ObjectHandle, String), (Vec3, Quat)> = HashMap::new();
+        let mut placed: FxHashMap<(ObjectHandle, String), (Vec3, Quat)> = FxHashMap::default();
         let effects = &mut self.effects;
         let carried = &self.carried;
         simulation.visit_lit(|object| {

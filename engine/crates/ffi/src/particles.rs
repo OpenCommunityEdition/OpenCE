@@ -3,15 +3,17 @@
 //! that fills a box about the camera where its cluster has some, and the
 //! detail objects (grass and the like) a BSP scatters over its ground.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::BTreeSet;
 
 use opence_content::{EffectParticles, Level, Particle, StructureBsp, TagRef};
 use opence_sim::effects::{FiredPart, Running};
 use opence_sim::particle_collision::PointHit;
 use opence_sim::point_physics;
 use opence_sim::{Simulation, Vec3};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 mod contrails;
+mod slots;
 mod systems;
 mod weather;
 mod wind;
@@ -272,7 +274,7 @@ impl ParticleEvents {
 
 /// The level's sprites' pictures: each bitmap's images, one after another.
 #[derive(Clone, Debug, Default)]
-struct Pictures(HashMap<TagRef, u32>);
+struct Pictures(FxHashMap<TagRef, u32>);
 
 /// The bitmaps the level's sprites draw, each once, in order.
 fn sprite_bitmaps(level: &Level) -> Vec<&TagRef> {
@@ -331,7 +333,7 @@ struct Frame {
 impl Pictures {
     fn new(level: &Level) -> Self {
         let mut first = 0u32;
-        let mut out = HashMap::new();
+        let mut out = FxHashMap::default();
         for tag in sprite_bitmaps(level) {
             let count = level.bitmap(tag).map_or(0, |bitmap| bitmap.images.len());
             out.insert(tag.clone(), first);
@@ -704,13 +706,13 @@ pub(crate) struct Census {
 pub(crate) struct LevelParticles {
     pictures: Pictures,
     /// Each particle's index in the level's.
-    particles: HashMap<TagRef, usize>,
+    particles: FxHashMap<TagRef, usize>,
     live: Vec<Live>,
     /// What they made in the last tick.
     events: ParticleEvents,
     /// Each running effect's event's emitters: how many they emit, and how
     /// many they have.
-    emitted: HashMap<(u32, usize, usize), (u16, u16)>,
+    emitted: FxHashMap<(u32, usize, usize), (u16, u16)>,
     census: Census,
     weather: weather::Weather,
     /// The winds blowing.
@@ -760,7 +762,7 @@ impl LevelParticles {
     ) {
         self.seconds += TICK;
         self.emit(level, emitting);
-        let origins: HashMap<u32, Vec3> = running
+        let origins: FxHashMap<u32, Vec3> = running
             .iter()
             .map(|effect| (effect.number, effect.origin.position))
             .collect();
@@ -838,7 +840,7 @@ impl LevelParticles {
     }
 
     fn emit(&mut self, level: &Level, emitting: &[Running]) {
-        let mut seen = HashSet::new();
+        let mut seen = FxHashSet::default();
         for effect in emitting {
             let Some(event) = level
                 .effect(&effect.tag)

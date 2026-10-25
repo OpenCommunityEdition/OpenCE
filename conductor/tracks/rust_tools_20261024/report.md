@@ -164,3 +164,31 @@ the cache folder, so that costs a pack read (a second or two), not an
 import, and running tests from every binary at once more than pays it
 back. A deny.toml with MIT removed fails the check
 (`test_a_forbidden_licence_fails_the_check`), so the check is not a no-op.
+
+## Deterministic maps (2026-10-25)
+
+std's `HashMap` and `HashSet` take a random seed each run, so whatever
+iterates one goes in another order each run. One did matter: the
+contrails were kept in a `HashMap` and aged with `retain`, each trail
+drawing the game's random numbers as it went, so the same start trailed
+differently from run to run (`the_same_start_trails_the_same_each_tick`,
+four runs of 40 ticks, failed: "run 1 trailed otherwise"). They are now
+kept as the original keeps them (`source/memory/data.c`): in slots, a
+new trail in the lowest free slot, updated and drawn in slot order
+(`particles/slots.rs`; `a_trail_takes_the_lowest_free_slot_and_they_age_in_slot_order`).
+
+The rest of the workspace's 14 files of hash maps use `rustc_hash`'s maps,
+whose seed is fixed, and the two test files that keyed by name use a
+`BTreeMap`. `engine/clippy.toml` now bans std's two types (a use of one
+fails clippy: checked with a test function added and removed); UniFFI
+lowers only std's map, so the two shell-variable methods take it by a
+`Dictionary` alias, which is copied into an ordered map at once.
+
+| check | result |
+|---|---|
+| clippy, workspace, all targets, `-D warnings` | clean |
+| nextest, all tests (`test-opt`) | 1028 passed, 75.8 s |
+| contrail tests | 13 passed (the determinism test failed before) |
+
+(Clippy also found `assert!(cfg!(debug_assertions))` in `sim/tests/checks.rs`,
+a constant to it; the value goes through `black_box` now.)

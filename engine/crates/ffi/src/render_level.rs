@@ -3,10 +3,9 @@
 //! the textures they sample. Built once when a level loads; the app makes
 //! its Metal buffers and textures from it and draws it every frame.
 
-use std::collections::HashMap;
-
 use crate::render_model::{model_animation, model_material, RenderModel};
 use crate::render_transparent::{plasma_animation, RenderTransparent};
+use rustc_hash::FxHashMap;
 
 use opence_content::{
     EnvironmentAnimation, EnvironmentShader, Level, Lightmap, Material, Pixels, ShaderClass,
@@ -361,15 +360,15 @@ pub struct RenderLevel {
     pub detail_objects: Vec<crate::snapshot::ParticleSnapshot>,
     /// The textures of the images the UI's widgets draw, by bitmap and
     /// image.
-    pub ui_textures: HashMap<(TagRef, u16), u32>,
+    pub ui_textures: FxHashMap<(TagRef, u16), u32>,
 }
 
 /// Gathers the level's textures and materials, each once.
 pub(crate) struct Builder<'a> {
     level: &'a Level,
     pub(crate) out: RenderLevel,
-    textures: HashMap<(TagRef, u16, u8), Option<u32>>,
-    materials: HashMap<TagRef, Option<u32>>,
+    textures: FxHashMap<(TagRef, u16, u8), Option<u32>>,
+    materials: FxHashMap<TagRef, Option<u32>>,
 }
 
 impl RenderLevel {
@@ -392,8 +391,8 @@ impl RenderLevel {
                     .map(|start| (start.position, start.facing)),
                 ..Self::default()
             },
-            textures: HashMap::new(),
-            materials: HashMap::new(),
+            textures: FxHashMap::default(),
+            materials: FxHashMap::default(),
         };
         let mut blended = Vec::new();
         for (number, lightmap) in structure.lightmaps.iter().enumerate() {

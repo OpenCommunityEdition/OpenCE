@@ -10,7 +10,6 @@
 //! [`Engine::control_frame_requests`], and answers each frame with
 //! [`Engine::finish_frame`].
 
-use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -23,6 +22,7 @@ use opence_dev::control::{
     RequestError, MAX_CONNECTIONS, MAX_REQUEST,
 };
 use opence_dev::logbook::{self, Level};
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde_json::{json, Map, Value};
 
 use crate::devtools::{ShellAction, ShellOutput};
@@ -107,9 +107,9 @@ pub(crate) struct Control {
     path: Mutex<Option<PathBuf>>,
     actions: Mutex<Vec<ShellAction>>,
     frames: Mutex<Vec<FrameRequest>>,
-    finished: Mutex<HashMap<u64, Option<String>>>,
+    finished: Mutex<FxHashMap<u64, Option<String>>>,
     /// The frames the shell queued, whose answers nobody waits for.
-    unclaimed: Mutex<HashSet<u64>>,
+    unclaimed: Mutex<FxHashSet<u64>>,
     drawn: Condvar,
     next_frame: AtomicU64,
     /// The times the app has served the queues (taken the actions, acted
