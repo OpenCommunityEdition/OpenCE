@@ -3339,6 +3339,15 @@ static void biped_update_turning(
 			biped->unit.player_index!=NONE &&
 			biped->unit.animation.state==_unit_state_throw_grenade &&
 			unit_animation_enhanced(biped_index);
+		/* port: and a player in the air turns with the aim, as one running
+		does: the original never turned the airborne state, and clipped the
+		aim to its aiming screen about the body left facing where the jump
+		began, so a shot after a turn in the air missed the crosshair
+		(game.enhanced_animations: unit_animation_enhanced) */
+		boolean airborne_turn =
+			biped->unit.player_index!=NONE &&
+			biped->unit.animation.state==_unit_state_airborne &&
+			unit_animation_enhanced(biped_index);
 		real_vector3d turn_axis;
 		real turn_error;
 		real facing_alignment;
@@ -3403,7 +3412,8 @@ static void biped_update_turning(
 
 		if (biped->biped.state==biped_state_moving ||
 			TEST_FLAG(flags, _biped_turns_without_animating_bit) ||
-			throwing_turn)
+			throwing_turn ||
+			airborne_turn)
 		{
 			if (!TEST_FLAG(biped->unit.control_flags, _unit_control_look_dont_turn_bit))
 			{
