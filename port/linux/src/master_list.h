@@ -3,8 +3,9 @@ MASTER_LIST.H
 
 The server browser's master servers (master_list.c; docs/master_protocol.md,
 "The list"): while the browser is open, each master of masters.txt is asked
-for its list every 30 seconds (and on Refresh), on a thread of its own; a
-list whose signature by the master's key (pinned in masters.txt) checks, and
+for its list every 30 seconds (and on Refresh), on a thread of its own (the
+official masters, built in, when masters.txt names none); a list whose
+signature by the master's key (pinned in masters.txt, or built in) checks, and
 that is fresh, gives its dedicated servers' host-signed listings to the
 browser's games (p2p_lobby.c), each checked again there. network.listings
 says whether the masters are asked at all.
@@ -30,8 +31,15 @@ enum
 
 /* the masters of a masters.txt (the setting's file: beside config.toml
 unless a full path, else beside the executable): their URLs and Ed25519
-keys, up to maximum; how many. A dedicated server's publisher reads it too */
+keys, up to maximum; how many (none: no file, or one with no master) */
 int master_list_read_file(const char *setting, char (*urls)[MASTER_LIST_URL_SIZE],
+	unsigned char (*keys)[MASTER_LIST_KEY_SIZE], int maximum);
+/* ... the official master servers (built in): how many */
+int master_list_read_defaults(char (*urls)[MASTER_LIST_URL_SIZE], unsigned char (*keys)[MASTER_LIST_KEY_SIZE],
+	int maximum);
+/* ... masters.txt's masters, else (it names none) the official ones. The
+server browser and a dedicated server's publisher ask these */
+int master_list_read(const char *setting, char (*urls)[MASTER_LIST_URL_SIZE],
 	unsigned char (*keys)[MASTER_LIST_KEY_SIZE], int maximum);
 
 /* ... the same of a masters.json ({"masters":[{"url":…,"key":"ed25519:…"}]},

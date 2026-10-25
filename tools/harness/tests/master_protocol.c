@@ -878,6 +878,34 @@ int main(int argc, char **argv)
 			"masters read from no file");
 		return 0;
 	}
+	/* the official master, built in: asked when masters.txt names none */
+	CASE("masters-default")
+	{
+		char urls[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_URL_SIZE];
+		unsigned char keys[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_KEY_SIZE];
+		unsigned char official[32];
+		static const char *const none[] = { NULL, "", "# comments alone\n\n#https://master1.example.org\n",
+			"https://master1.example.org ed25519:abc\n" };
+		static char named[256];
+		int index;
+
+		key_of("89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225aa", official);
+		for (index = 0; index < (int)(sizeof(none) / sizeof(none[0])); index++)
+		{
+			file_masters = none[index];
+			memset(urls, 0, sizeof(urls));
+			CHECK(master_list_read("masters.txt", urls, keys, MASTER_LIST_MAXIMUM_MASTERS) == 1 &&
+				!strcmp(urls[0], "https://master.opencommunityedition.com"),
+				"masters.txt %d naming none: %s", index, urls[0]);
+			CHECK(!memcmp(keys[0], official, 32), "the official master's key is %s", hex_of(keys[0], 32));
+		}
+		snprintf(named, sizeof(named), "https://master1.example.org %s\n", VECTOR_MASTER_PUBLIC_KEY_TEXT);
+		file_masters = named;
+		CHECK(master_list_read("masters.txt", urls, keys, MASTER_LIST_MAXIMUM_MASTERS) == 1 &&
+			!strcmp(urls[0], "https://master1.example.org"), "masters.txt's master was not alone: %s", urls[0]);
+		file_masters = NULL;
+		return 0;
+	}
 	/* the web site's masters.json */
 	CASE("masters-json")
 	{

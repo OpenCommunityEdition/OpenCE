@@ -1585,7 +1585,7 @@ static void master_servers_show(struct widget_instance *list)
 		static char urls[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_URL_SIZE];
 		static unsigned char keys[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_KEY_SIZE];
 
-		listed = master_list_read_file(config_string("network.masters_file"), urls, keys, MASTER_LIST_MAXIMUM_MASTERS);
+		listed = master_list_read(config_string("network.masters_file"), urls, keys, MASTER_LIST_MAXIMUM_MASTERS);
 		read_time = system_milliseconds();
 		read = TRUE;
 	}

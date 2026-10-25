@@ -693,7 +693,7 @@ static void master_start(int quiet)
 
 	master.lock = SDL_CreateMutex();
 	master.wake = SDL_CreateCondition();
-	master.master_count = master_list_read_file(config_string("server.masters_file"), urls, keys,
+	master.master_count = master_list_read(config_string("server.masters_file"), urls, keys,
 		SERVER_MASTER_MAXIMUM_MASTERS);
 	for (index = 0; index < master.master_count; index++)
 	{

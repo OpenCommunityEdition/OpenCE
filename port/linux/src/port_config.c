@@ -660,9 +660,10 @@ static const struct config_setting config_settings[] =
 		"alone)." },
 	{ "network.masters_file", _config_string, "\"masters.txt\"", "HALO_NET_MASTERS_FILE", _environment_value,
 		_platform_all,
-		"The file of the official master servers the server browser asks for\n"
-		"dedicated servers, beside this file unless a full path: an https:// URL\n"
-		"and its key (ed25519:<hex>) on each line, up to 4." },
+		"The file of the master servers the server browser asks for dedicated\n"
+		"servers, beside this file unless a full path: an https:// URL and its\n"
+		"key (ed25519:<hex>) on each line, up to 4. None named (no file, or\n"
+		"comments alone): the official master, built in." },
 	{ "network.browser_source", _config_string, "\"dedicated\"", "HALO_NET_BROWSER_SOURCE", _environment_value,
 		_platform_all,
 		"The server browser's games: \"dedicated\" (the master servers'\n"
@@ -827,7 +828,8 @@ static const struct config_setting config_settings[] =
 	{ "server.masters_file", _config_string, "\"masters.txt\"", "HALO_SERVER_MASTERS_FILE", _environment_value,
 		_platform_server,
 		"The master servers published to, beside this file unless a full path:\n"
-		"an https:// URL and its key (ed25519:<hex>) on each line." },
+		"an https:// URL and its key (ed25519:<hex>) on each line. None named:\n"
+		"the official master, built in." },
 	{ "server.publisher_key_file", _config_string, "\"publisher.key\"", "HALO_SERVER_PUBLISHER_KEY_FILE",
 		_environment_value, _platform_server,
 		"The operator's Ed25519 key for the master servers (halo --server\n"

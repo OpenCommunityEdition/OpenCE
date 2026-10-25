@@ -542,7 +542,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.client_timeout_seconds` | `15` | `HALO_NET_CLIENT_TIMEOUT_SECONDS` | Hosting: the seconds the host waits for a machine it hears nothing from before it drops it (5 to 300; the stock game waits 15). The same seconds are how long each machine's reliable stream waits for its peer to read before it gives up, and how long a host in a game waits for its own network to come back (an address renewed, a wifi drop) before it ends the game; each machine reads its own setting. A longer wait keeps players whose connection stalls (a browser tab in the background), but a machine that is really gone leaves its players frozen for longer. |
 | `network.public_address` | `""` | `HALO_NET_PUBLIC_ADDRESS` | Hosting: the internet address the joiners reach this machine at, `host[:port]` (the port forwarded to `network.tunnel_port`), for a server behind a NAT with one forwarded port. It is offered first, and its name is looked up again every 5 minutes. Empty: what STUN and UPnP find. |
 | `network.listings` | `"both"` | `HALO_NET_LISTINGS` | What the server browser lists. `"both"`: the dedicated servers of the master servers first, then the games players host (from the brokers). `"masters"`: the master servers' only. `"brokers"`: the brokers' only. Refer to "Server browser". |
-| `network.masters_file` | `"masters.txt"` | `HALO_NET_MASTERS_FILE` | The file of the master servers the server browser asks for dedicated servers, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`), 4 at most. Refer to "Dedicated server". |
+| `network.masters_file` | `"masters.txt"` | `HALO_NET_MASTERS_FILE` | The file of the master servers the server browser asks for dedicated servers, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`), 4 at most. A file that names none (missing, or comments alone, as the release's) leaves the official master, built in (`https://master.opencommunityedition.com`). Refer to "Dedicated server". |
 | `network.browser_source` | `"dedicated"` | `HALO_NET_BROWSER_SOURCE` | The server browser's games. `"dedicated"`: the dedicated servers of the master servers; `"players"` (P2P GAMES): the games players host; `"all"`. The tab at the top left of the server browser changes it. |
 | `network.browser_show_empty`, `network.browser_show_full` | `true` | `HALO_NET_BROWSER_SHOW_EMPTY`, `HALO_NET_BROWSER_SHOW_FULL` | `false`: the server browser does not list the games with no player, the full games. The server browser's Filters screen sets them. |
 | `network.browser_maps` | `"yes"` | `HALO_NET_BROWSER_MAPS` | `"yes"`: the server browser lists the games on maps this computer does not have. `"no"`: it does not. `"downloadable"`: only those of a Custom Edition map that the host shares. |
@@ -580,7 +580,7 @@ the setting for one start of the game. It has priority over the file.
 | `server.coop_difficulty` | `"normal"` | `HALO_SERVER_COOP_DIFFICULTY` | The difficulty of co-op entries of the rotation (`<level>:coop`): `"easy"`, `"normal"`, `"hard"` or `"impossible"`. |
 | `server.list_on_brokers` | `false` | `HALO_SERVER_LIST_ON_BROKERS` | `true`: the server is also listed with the games players host (through the brokers), for server browsers without master servers. |
 | `server.master_publish` | `true` | `HALO_SERVER_MASTER_PUBLISH` | `true`: a public server is published to the master servers, signed with the publisher key. |
-| `server.masters_file` | `"masters.txt"` | `HALO_SERVER_MASTERS_FILE` | The master servers the server is published to, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`). |
+| `server.masters_file` | `"masters.txt"` | `HALO_SERVER_MASTERS_FILE` | The master servers the server is published to, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`). None named: the official master, built in. |
 | `server.publisher_key_file` | `"publisher.key"` | `HALO_SERVER_PUBLISHER_KEY_FILE` | The operator's Ed25519 key for the master servers (`halo --server --keygen` makes it), next to `config.toml` unless a full path. In a container, `HALO_SERVER_PUBLISHER_KEY` can hold the key itself. |
 | `server.instance` | `""` | `HALO_SERVER_INSTANCE` | A short name that tells this server from the operator's other servers on the master servers (letters, digits, `-` and `_`). Empty: made from `server.name`. |
 | `server.region` | `""` | `HALO_SERVER_REGION` | A region the server browser shows (`eu`, `na-east`...): 16 characters. Empty: none. |
@@ -1032,7 +1032,9 @@ engine's (SLAYER, CTF, KING OF THE HILL). The browser of LAN games, and the
 preview of a game before joining it, name it the same way.
 
 The browser lists two kinds of games: the dedicated servers that the
-master servers list (`masters.txt`, `network.masters_file`), and the games
+master servers list (`masters.txt`, `network.masters_file`; the official
+master, `https://master.opencommunityedition.com`, built in, when the file
+names none), and the games
 that players host, which come through the brokers. `network.listings`
 chooses the kinds that the browser asks for: both (the default), only the
 master servers, or only the brokers.

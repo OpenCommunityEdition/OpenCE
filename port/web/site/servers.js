@@ -2,7 +2,8 @@
 SERVERS.JS
 
 The launcher's Servers panel: the games the official master servers list
-(masters.json names them, each with its Ed25519 key), fetched every 30
+(masters.json names them, each with its Ed25519 key; the official ones,
+built in, when it names none), fetched every 30
 seconds while the page shows, and joined with Play here (the page's ?join=).
 
 - A master's list (GET /v1/servers) is signed over the exact bytes of its
@@ -35,6 +36,11 @@ seconds while the page shows, and joined with Play here (the page's ?join=).
   const MAXIMUM_AGE = 300;
   const MAXIMUM_ENTRIES = 512;
   const MAXIMUM_MASTERS = 4;
+  // the official master servers, asked when masters.json names none (as
+  // master_list.c's master_list_read_defaults)
+  const DEFAULT_MASTERS = [
+    { url: 'https://master.opencommunityedition.com', key: 'ed25519:89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225aa' },
+  ];
   const LISTING_LABEL = 'hceu-lobby-1';
   // a listing (p2p_lobby.c listing_make): HL, format 1, network version, flags,
   // sequence, time, the host's key, its token (sealed: 56 bytes), counts,
@@ -64,6 +70,17 @@ seconds while the page shows, and joined with Play here (the page's ?join=).
   // slashes dropped
   function parseMasters(json) {
     const masters = json && Array.isArray(json.masters) ? json.masters : [];
+    return checkMasters(masters);
+  }
+
+  // masters.json's masters, else (it names none, or cannot be read) the
+  // official ones
+  function mastersOrDefault(json) {
+    const masters = parseMasters(json);
+    return masters.length ? masters : checkMasters(DEFAULT_MASTERS);
+  }
+
+  function checkMasters(masters) {
     return masters.filter((master) => master && typeof master.url === 'string' && typeof master.key === 'string' &&
       master.url.length < 256 &&
       /^(https:\/\/[^\s/?#]+|http:\/\/(127\.0\.0\.1|localhost)(:\d+)?)(\/[^\s?#]*)?$/.test(master.url) &&
@@ -358,9 +375,9 @@ seconds while the page shows, and joined with Play here (the page's ?join=).
 
     (async () => {
       try {
-        masters = parseMasters(await (await root.fetch('masters.json', { cache: 'no-cache' })).json());
+        masters = mastersOrDefault(await (await root.fetch('masters.json', { cache: 'no-cache' })).json());
       } catch {
-        masters = [];
+        masters = mastersOrDefault(null);
       }
       if (!masters.length) {
         $('servers-status').textContent = 'No master servers are listed yet: games hosted for the internet are found ' +
@@ -376,7 +393,7 @@ seconds while the page shows, and joined with Play here (the page's ?join=).
     return { refresh, stop: () => clearInterval(timer) };
   }
 
-  const api = { parseMasters, verifyList, readEntry, mergeServers, edwardsToX25519, decodeListing, fetchMaster, serverRow,
+  const api = { parseMasters, mastersOrDefault, verifyList, readEntry, mergeServers, edwardsToX25519, decodeListing, fetchMaster, serverRow,
     start, MAXIMUM_AGE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.HaloServers = api;

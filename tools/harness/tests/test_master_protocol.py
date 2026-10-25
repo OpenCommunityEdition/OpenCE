@@ -24,7 +24,7 @@ VECTORS_PATH = CHECKOUT_VECTORS if CHECKOUT_VECTORS.exists() else COPIED_VECTORS
 
 CASES = ["crypto", "listing-signatures", "proof", "server-id", "key-file", "instance", "publish-request",
          "me-request", "probe", "probe-refusals", "list-verify", "list-refusals", "list-body", "masters-file",
-         "masters-json", "listing-read", "listing-bounds", "publish-body", "publish-answers", "take-list", "list-large",
+         "masters-default", "masters-json", "listing-read", "listing-bounds", "publish-body", "publish-answers", "take-list", "list-large",
          "probe-nonces", "probe-sources"]
 
 # the functions taken, in their files' order (each is defined before what calls it)
@@ -32,7 +32,7 @@ SOURCES = {
     "port/linux/src/p2p.c": ["p2p_hex"],
     "port/linux/src/p2p_lobby.c": ["sanitize", "get_long", "get_text", "listing_read", "listing_signed"],
     "port/linux/src/master_list.c": ["hex_digit", "master_url_allowed", "masters_file", "master_list_read_file", "master_keep",
-                                     "master_list_read_json", "master_list_verify", "take_list"],
+                                     "master_list_read_defaults", "master_list_read", "master_list_read_json", "master_list_verify", "take_list"],
     "port/linux/src/server_master.c": ["hex_value", "seed_from_text", "key_file_path", "publisher_seed", "key_id_of",
                                        "server_master_publisher", "publisher_sign", "instance_name", "hex_text",
                                        "sign_request", "publish_body", "header_number", "logged_each_minute",
@@ -75,6 +75,14 @@ NEGATIVE_CONTROLS = {
     "loopback-by-prefix": (("(!url[length] || url[length] == ':' || url[length] == '/')", "1"), "master_url_allowed",
                            "masters-file"),
     "masters-file-any-url": (("if (!master_url_allowed(url) ||", "if ("), "master_list_read_file", "masters-file"),
+    "masters-file-not-default": (("return count ? count : master_list_read_defaults(urls, keys, maximum);",
+                                  "return master_list_read_defaults(urls, keys, maximum);"), "master_list_read",
+                                 "masters-default"),
+    "masters-never-default": (("return count ? count : master_list_read_defaults(urls, keys, maximum);",
+                               "return count;"), "master_list_read", "masters-default"),
+    "masters-default-key": (('"ed25519:89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225aa"',
+                             '"ed25519:89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225ab"'),
+                            "master_list_read_defaults", "masters-default"),
     "masters-json-unbounded": (("for (index = 0; count < maximum && server_json_element",
                                 "for (index = 0; server_json_element"), "master_list_read_json", "masters-json"),
     "list-taken-unchecked": (("p2p_sha256(key, MASTER_LIST_KEY_SIZE, digest);\n\tp2p_hex(digest, 8, key_id);",

@@ -7,4 +7,6 @@
 # dedicated server's server.masters_file. An update replaces it; keep a list
 # of your own under another name.)
 #
-# No official master server runs yet.
+# A file that names no master, as this one, leaves the game the official
+# master, built in: https://master.opencommunityedition.com. A file that
+# names one or more is asked instead of it.

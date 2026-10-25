@@ -196,6 +196,35 @@ static int master_keep(const char *url, const char *key, char (*urls)[MASTER_LIS
 	return 1;
 }
 
+/* the official master servers, asked when masters.txt names none (it is
+missing, empty or has comments alone) */
+int master_list_read_defaults(char (*urls)[MASTER_LIST_URL_SIZE], unsigned char (*keys)[MASTER_LIST_KEY_SIZE],
+	int maximum)
+{
+	static const struct
+	{
+		const char *url;
+		const char *key;
+	} masters[] =
+	{
+		{ "https://master.opencommunityedition.com",
+			"ed25519:89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225aa" },
+	};
+	int index, count = 0;
+
+	for (index = 0; index < (int)(sizeof(masters) / sizeof(masters[0])) && count < maximum; index++)
+		count += master_keep(masters[index].url, masters[index].key, urls, keys, count);
+	return count;
+}
+
+int master_list_read(const char *setting, char (*urls)[MASTER_LIST_URL_SIZE],
+	unsigned char (*keys)[MASTER_LIST_KEY_SIZE], int maximum)
+{
+	int count = master_list_read_file(setting, urls, keys, maximum);
+
+	return count ? count : master_list_read_defaults(urls, keys, maximum);
+}
+
 int master_list_read_json(const char *text, unsigned long size, char (*urls)[MASTER_LIST_URL_SIZE],
 	unsigned char (*keys)[MASTER_LIST_KEY_SIZE], int maximum)
 {
@@ -470,9 +499,9 @@ static int fetch(const char *url, struct fetched *fetched)
 }
 #endif
 
-/* the masters to ask (the list thread's: the web build fetches its
-site's masters.json, the page's list of them, which its Servers panel
-reads too) */
+/* the masters to ask (the list thread's): masters.txt's; else, in the web
+build, its site's masters.json (the page's list of them, which its Servers
+panel reads too); else the official ones */
 static void read_masters(void)
 {
 	char urls[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_URL_SIZE];
@@ -490,6 +519,8 @@ static void read_masters(void)
 		free(fetched.body);
 	}
 #endif
+	if (!count)
+		count = master_list_read_defaults(urls, keys, MASTER_LIST_MAXIMUM_MASTERS);
 	pthread_mutex_lock(&list.lock);
 	memcpy(list.urls, urls, sizeof(urls));
 	memcpy(list.keys, keys, sizeof(keys));

@@ -86,6 +86,19 @@ test("masters.json: https masters (with a path or none) with an Ed25519 key, fou
   assert.deepStrictEqual(require('../site/masters.json'), { masters: [] });
 });
 
+test("the official master is asked when masters.json names none", () => {
+  const official = ['https://master.opencommunityedition.com'];
+  const key = 'ed25519:' + 'ab'.repeat(32);
+  assert.deepStrictEqual(servers.mastersOrDefault({ masters: [] }).map((item) => item.url), official);
+  assert.deepStrictEqual(servers.mastersOrDefault(null).map((item) => item.url), official);
+  assert.deepStrictEqual(servers.mastersOrDefault({ masters: [{ url: 'http://master2.example.org', key }] })
+    .map((item) => item.url), official);
+  assert.deepStrictEqual(Buffer.from(servers.mastersOrDefault(null)[0].key).toString('hex'),
+    '89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225aa');
+  assert.deepStrictEqual(servers.mastersOrDefault({ masters: [{ url: 'https://a.example', key }] })
+    .map((item) => item.url), ['https://a.example']);
+});
+
 test('a signed list is read; a changed, stale or misnamed one is refused', async () => {
   const good = signedList([entry('8c1e0001')]);
   const checked = await servers.verifyList(subtle, masterEntry, good.bytes, good.headers, NOW + 30);
