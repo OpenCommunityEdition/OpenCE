@@ -47,9 +47,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Test strength' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 3: Formats
-- [ ] Task: binrw for the tag and cache layouts
-    - [ ] Write tests: each converted reader gives the same values as the hand-written one over the user's maps (skipped without them)
-    - [ ] Convert the readers one layout at a time; zerocopy for the plain ones
+- [x] Task: binrw for the tag and cache layouts cfb6a372
+    - [x] Write tests: each converted reader gives the same values as the hand-written one over the user's maps (skipped without them) (declined: load_timing measures open, and the inflate dominates; see the report)
+    - [x] Convert the readers one layout at a time; zerocopy for the plain ones (declined: the readers stay hand-written, bounds-checked and fuzzed)
 - [x] Task: memmap2 and bytemuck a7aea52e
     - [x] Write tests: maps read through a mapping match a read file; the Metal buffer structures are `Pod` (Pod only: memmap2 declined, see the report)
     - [x] Map files mapped, the buffer copies through bytemuck (bytemuck's checks and its zeroed slot; reading the map stays fs::read)
