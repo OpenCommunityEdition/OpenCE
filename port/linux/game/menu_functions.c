@@ -5464,6 +5464,9 @@ static struct gametype_option const gametype_options[] =
 		{ _friendly_fire_off, _friendly_fire_on, _friendly_fire_shields_only, _friendly_fire_explosives_only } },
 	{ "friendly_fire_penalty_spinner", _option_short, OPTIONS_FIELD(friendly_fire_penalty), 0, 4, { 0, 5, 10, 15 } },
 	{ "autobalance_spinner", _option_option_byte, OPTIONS_FIELD(auto_team_balance), 0, 2, { 0, 1 } },
+	/* (port: spawns as CTF's, game_engine.c; the first of
+	tools/port_settings.py's TEAMPLAY_ROWS, the gametype's own) */
+	{ "force_team_spawns_spinner", _option_option_byte, OPTIONS_FIELD(force_team_spawns), 0, 2, { 0, 1 } },
 	/* (the host's voice chat, below them: port/linux/game/network_voice.c;
 	tools/port_settings.py's TEAMPLAY_ROWS) */
 	{ "voice_mode_spinner", _option_setting, 0, 0, 5, { 0 }, "network.voice_mode",

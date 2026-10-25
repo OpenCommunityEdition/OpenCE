@@ -1066,6 +1066,8 @@
 		<string text="Players who kill a teammate will be assessed\na fifteen-second respawn penalty the next time\nthey die." map="7"/>
 		<string text="Team autobalancing will be disabled.  Players will\nbe free to change teams as they wish." map="8"/>
 		<string text="Team autobalancing will be enabled.  Players will\nnot be able to change to a more full team." map="9"/>
+		<string text="Players will spawn at any spawn point the\ngametype allows."/>
+		<string text="Players will only spawn at their own team's\nCapture the Flag spawn points."/>
 		<string text="No voice chat during the game."/>
 		<string text="Players hear their teammates who are near them."/>
 		<string text="Players hear everyone who is near them."/>
@@ -1096,6 +1098,7 @@
 		<string text="FRIENDLY FIRE:" map="0"/>
 		<string text="FRIENDLY FIRE PENALTY:" map="1"/>
 		<string text="AUTO TEAM BALANCE:" map="2"/>
+		<string text="FORCE TEAM SPAWNS:"/>
 		<string text="VOICE CHAT:"/>
 		<string text="LOBBY VOICE CHAT:"/>
 		<string text="VOICE QUALITY:"/>

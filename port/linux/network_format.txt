@@ -291,4 +291,4 @@ struct distributed_voice_down e3751d692f16
 struct distributed_voice_up 3d74ee44e4cb
 struct distributed_votekick_request d5f913f22d81
 struct distributed_votekick_status 966041386843
-struct game_variant_options 04868b5f4064
+struct game_variant_options 0e258e4cf85b

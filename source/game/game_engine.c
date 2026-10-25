@@ -3548,6 +3548,50 @@ static real game_engine_get_friendly_bonus(
 	return rating * 3.0f + 1.0f;
 }
 
+/* port: Teamplay Options' FORCE TEAM SPAWNS (game_variant_options): a team
+game other than CTF spawns a red or blue player as CTF does, only at the
+map's CTF starting locations, and only at his own team's. Not on a map with
+no CTF starting location for one of the teams, where his team would have
+nowhere to spawn */
+static long game_engine_get_type(
+	void);
+
+static boolean game_engine_force_team_spawns(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	boolean team_has_spawn[2] = { FALSE, FALSE };
+	short starting_location_count;
+	short starting_location_index;
+
+	if (!game_engine_running() ||
+		!game_engine_has_teams() ||
+		game_engine_get_type() == game_engine_ctf ||
+		!game_variant_options_get()->force_team_spawns ||
+		(player->team_index != _team_red && player->team_index != _team_blue))
+	{
+		return FALSE;
+	}
+
+	starting_location_count = player_get_starting_location_count();
+	for (starting_location_index = 0;
+		starting_location_index < starting_location_count;
+		starting_location_index++)
+	{
+		struct player_starting_location const *starting_location =
+			player_get_starting_location(starting_location_index);
+
+		if ((starting_location->team_index == _team_red ||
+				starting_location->team_index == _team_blue) &&
+			match_game_type(game_engine_ctf, 4, starting_location->game_types))
+		{
+			team_has_spawn[starting_location->team_index] = TRUE;
+		}
+	}
+
+	return team_has_spawn[_team_red] && team_has_spawn[_team_blue];
+}
+
 static real default_starting_location_rate_function(
 	long player_index,
 	struct player_starting_location const *starting_location)
@@ -3556,7 +3600,7 @@ static real default_starting_location_rate_function(
 	real rating = 1.0f;
 
 	if (game_engine_running() &&
-		game_engine_test_flag(0) &&
+		(game_engine_test_flag(0) || game_engine_force_team_spawns(player_index)) &&
 		player->team_index != starting_location->team_index)
 	{
 		rating = 0.0f;
@@ -7644,8 +7688,14 @@ real game_engine_get_starting_location_rating(
 	long player_index,
 	struct player_starting_location const *starting_location)
 {
-	if (!match_game_type(game_engine_get_type(), 4, starting_location->game_types))
+	/* port: (or CTF's: game_engine_force_team_spawns) */
+	if (!match_game_type(
+		game_engine_force_team_spawns(player_index) ? game_engine_ctf : game_engine_get_type(),
+		4,
+		starting_location->game_types))
+	{
 		return 0.0f;
+	}
 
 	if (nearby_vehicle(player_index, starting_location))
 		return 0.0f;

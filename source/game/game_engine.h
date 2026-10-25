@@ -281,7 +281,12 @@ struct game_variant_options
 	kill takes the victim back a weapon */
 	byte gun_game_order;
 	boolean gun_game_melee_demotes;
-	byte reserved[6];
+	/* port: Teamplay Options' FORCE TEAM SPAWNS: a team game other than CTF
+	spawns its players as CTF does, only at the map's CTF starting locations
+	of their own team (game_engine_get_starting_location_rating). Taken from
+	reserved, which older builds zero and ignore: the host alone picks spawns */
+	boolean force_team_spawns;
+	byte reserved[5];
 };
 
 typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x2C ? 1 : -1];
