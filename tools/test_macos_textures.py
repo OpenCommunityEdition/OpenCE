@@ -32,8 +32,9 @@ APP = ROOT / "build/macos/OpenCE.app/Contents/MacOS/OpenCE"
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
-    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
-                       reason="needs `ninja macos` in nix develop"),
+    pytest.mark.skipif(
+        not macos_guest_image.available() or shutil.which("ninja") is None, reason="needs `ninja macos` in nix develop"
+    ),
     pytest.mark.skipif(not APP.is_file(), reason="needs `ninja macos_app`"),
 ]
 
@@ -45,24 +46,40 @@ BC_TOLERANCE = 3
 def vm_textures(tmp_path_factory):
     work = tmp_path_factory.mktemp("vm_textures")
     return macos_guest_image.build_guest_image(
-        [ROOT / "port/macos/tests/vm_textures.c", ROOT / "port/macos/tests/vm_textures_stubs.c",
-         ROOT / "port/macos/tests/vm_nv2a_stubs.c", ROOT / "port/macos/tests/vm_hires_stubs.c",
-         ROOT / "port/linux/src/xbox_textures.c",
-         ROOT / "port/macos/guest/d3d8_metal.c", ROOT / "port/macos/guest/opence_render_writer.c"],
-        work, "vm_textures", ["-DHALO_METAL", f"-I{ROOT / 'port/macos/include'}"],
-        like="port/linux/src/xgpu_text.c")
+        [
+            ROOT / "port/macos/tests/vm_textures.c",
+            ROOT / "port/macos/tests/vm_textures_stubs.c",
+            ROOT / "port/macos/tests/vm_nv2a_stubs.c",
+            ROOT / "port/macos/tests/vm_hires_stubs.c",
+            ROOT / "port/linux/src/xbox_textures.c",
+            ROOT / "port/macos/guest/d3d8_metal.c",
+            ROOT / "port/macos/guest/opence_render_writer.c",
+        ],
+        work,
+        "vm_textures",
+        ["-DHALO_METAL", f"-I{ROOT / 'port/macos/include'}"],
+        like="port/linux/src/xgpu_text.c",
+    )
 
 
 def run(image, tmp_path, *arguments):
     """the guest's output, run in the app's place off the screen"""
     (tmp_path / "home").mkdir(exist_ok=True)
-    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(tmp_path),
-                       HALO_HOST_GUEST_IMAGE=str(image), HALO_HOST_CAPTURE=str(tmp_path / "frame.png"),
-                       HALO_HOST_CAPTURE_FRAME="1", HALO_HOST_CAPTURE_SIZE="64x64")
-    result = subprocess.run([str(APP), *arguments], cwd=tmp_path, env=environment, capture_output=True, text=True,
-                            timeout=300)
-    assert result.returncode == 0 and result.stdout.strip().endswith("ok"), \
+    environment = dict(
+        os.environ,
+        HOME=str(tmp_path / "home"),
+        HALO_DATA_ROOT=str(tmp_path),
+        HALO_HOST_GUEST_IMAGE=str(image),
+        HALO_HOST_CAPTURE=str(tmp_path / "frame.png"),
+        HALO_HOST_CAPTURE_FRAME="1",
+        HALO_HOST_CAPTURE_SIZE="64x64",
+    )
+    result = subprocess.run(
+        [str(APP), *arguments], cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=300
+    )
+    assert result.returncode == 0 and result.stdout.strip().endswith("ok"), (
         result.stdout[-3000:] + result.stderr[-3000:]
+    )
     assert "log:" not in result.stdout, result.stdout
     return result.stdout
 
@@ -82,6 +99,7 @@ def readbacks(output):
 
 # ---------- the texels
 
+
 def xorshift_bytes(size, seed):
     state = seed or 1
     out = bytearray()
@@ -95,19 +113,46 @@ def xorshift_bytes(size, seed):
 
 # format: (kind, bytes a texel or block, linear)
 FORMATS = {
-    0x00: ("l8", 1, False), 0x01: ("al8", 1, False), 0x02: ("a1r5g5b5", 2, False),
-    0x03: ("x1r5g5b5", 2, False), 0x04: ("a4r4g4b4", 2, False), 0x05: ("r5g6b5", 2, False),
-    0x06: ("a8r8g8b8", 4, False), 0x07: ("x8r8g8b8", 4, False), 0x0B: ("p8", 1, False),
-    0x0C: ("dxt1", 8, False), 0x0E: ("dxt3", 16, False), 0x0F: ("dxt5", 16, False),
-    0x10: ("a1r5g5b5", 2, True), 0x11: ("r5g6b5", 2, True), 0x12: ("a8r8g8b8", 4, True),
-    0x13: ("l8", 1, True), 0x16: ("r8b8", 2, True), 0x17: ("g8b8", 2, True), 0x19: ("a8", 1, False),
-    0x1A: ("a8l8", 2, False), 0x1B: ("al8", 1, True), 0x1C: ("x1r5g5b5", 2, True),
-    0x1D: ("a4r4g4b4", 2, True), 0x1E: ("x8r8g8b8", 4, True), 0x1F: ("a8", 1, True),
-    0x20: ("a8l8", 2, True), 0x24: ("yuy2", 2, True), 0x25: ("uyvy", 2, True),
-    0x27: ("r6g5b5", 2, False), 0x28: ("g8b8", 2, False), 0x29: ("r8b8", 2, False),
-    0x2A: ("d24s8", 4, False), 0x2C: ("d16", 2, False), 0x32: ("l16", 2, False),
-    0x33: ("v16u16", 4, False), 0x38: ("r5g5b5a1", 2, False), 0x39: ("r4g4b4a4", 2, False),
-    0x3A: ("a8b8g8r8", 4, False), 0x3B: ("b8g8r8a8", 4, False), 0x3C: ("r8g8b8a8", 4, False),
+    0x00: ("l8", 1, False),
+    0x01: ("al8", 1, False),
+    0x02: ("a1r5g5b5", 2, False),
+    0x03: ("x1r5g5b5", 2, False),
+    0x04: ("a4r4g4b4", 2, False),
+    0x05: ("r5g6b5", 2, False),
+    0x06: ("a8r8g8b8", 4, False),
+    0x07: ("x8r8g8b8", 4, False),
+    0x0B: ("p8", 1, False),
+    0x0C: ("dxt1", 8, False),
+    0x0E: ("dxt3", 16, False),
+    0x0F: ("dxt5", 16, False),
+    0x10: ("a1r5g5b5", 2, True),
+    0x11: ("r5g6b5", 2, True),
+    0x12: ("a8r8g8b8", 4, True),
+    0x13: ("l8", 1, True),
+    0x16: ("r8b8", 2, True),
+    0x17: ("g8b8", 2, True),
+    0x19: ("a8", 1, False),
+    0x1A: ("a8l8", 2, False),
+    0x1B: ("al8", 1, True),
+    0x1C: ("x1r5g5b5", 2, True),
+    0x1D: ("a4r4g4b4", 2, True),
+    0x1E: ("x8r8g8b8", 4, True),
+    0x1F: ("a8", 1, True),
+    0x20: ("a8l8", 2, True),
+    0x24: ("yuy2", 2, True),
+    0x25: ("uyvy", 2, True),
+    0x27: ("r6g5b5", 2, False),
+    0x28: ("g8b8", 2, False),
+    0x29: ("r8b8", 2, False),
+    0x2A: ("d24s8", 4, False),
+    0x2C: ("d16", 2, False),
+    0x32: ("l16", 2, False),
+    0x33: ("v16u16", 4, False),
+    0x38: ("r5g5b5a1", 2, False),
+    0x39: ("r4g4b4a4", 2, False),
+    0x3A: ("a8b8g8r8", 4, False),
+    0x3B: ("b8g8r8a8", 4, False),
+    0x3C: ("r8g8b8a8", 4, False),
 }
 COMPRESSED = ("dxt1", "dxt3", "dxt5")
 CUBE_FACE_ALIGNMENT = 128
@@ -117,8 +162,15 @@ CHANNEL_SOURCES = [(0, 1, 2, 3), (2, 1, 3, 0), (3, 3, 3, 0)]
 
 def swizzled(code, width_log, height_log, levels=1, depth_log=0, cube=False):
     """a swizzled texture's format word"""
-    return ((code << 8) | ((3 if depth_log else 2) << 4) | (4 if cube else 0) | (levels << 16) |
-            (width_log << 20) | (height_log << 24) | (depth_log << 28))
+    return (
+        (code << 8)
+        | ((3 if depth_log else 2) << 4)
+        | (4 if cube else 0)
+        | (levels << 16)
+        | (width_log << 20)
+        | (height_log << 24)
+        | (depth_log << 28)
+    )
 
 
 def linear(code, width, height, pitch):
@@ -154,8 +206,11 @@ class Texture:
         return max(base >> level, 1)
 
     def level_size(self, level):
-        width, height, depth = (self.side(self.width, level), self.side(self.height, level),
-                                self.side(self.depth, level))
+        width, height, depth = (
+            self.side(self.width, level),
+            self.side(self.height, level),
+            self.side(self.depth, level),
+        )
         if self.compressed:
             return ((width + 3) // 4) * ((height + 3) // 4) * self.bytes * depth
         if self.linear:
@@ -177,6 +232,7 @@ class Texture:
 
 # ---------- decoding, independently of xbox_textures.c
 
+
 def e5(value):
     return (value << 3) | (value >> 2)
 
@@ -195,20 +251,24 @@ def clamp(value):
 
 def yuv(y, u, v):
     c, d, e = y - 16, u - 128, v - 128
-    return (clamp((298 * c + 409 * e + 128) >> 8), clamp((298 * c - 100 * d - 208 * e + 128) >> 8),
-            clamp((298 * c + 516 * d + 128) >> 8), 255)
+    return (
+        clamp((298 * c + 409 * e + 128) >> 8),
+        clamp((298 * c - 100 * d - 208 * e + 128) >> 8),
+        clamp((298 * c + 516 * d + 128) >> 8),
+        255,
+    )
 
 
 def palette_colour(palette, index):
     if palette is None:
         return (index, index, index, 255)
-    word = int.from_bytes(palette[index * 4:index * 4 + 4], "little")
+    word = int.from_bytes(palette[index * 4 : index * 4 + 4], "little")
     return ((word >> 16) & 0xFF, (word >> 8) & 0xFF, word & 0xFF, word >> 24)
 
 
 def texel(kind, data, at, palette, row, x):
     """one texel's (r, g, b, a)"""
-    b = data[at:at + 4].ljust(4, b"\0")
+    b = data[at : at + 4].ljust(4, b"\0")
     w16 = b[0] | (b[1] << 8)
     if kind == "a8r8g8b8":
         return (b[2], b[1], b[0], b[3])
@@ -258,7 +318,7 @@ def texel(kind, data, at, palette, row, x):
         return (b[1], b[1], b[1], 255)
     if kind in ("yuy2", "uyvy"):
         pair = row + (x & ~1) * 2
-        p = data[pair:pair + 4]
+        p = data[pair : pair + 4]
         if kind == "yuy2":
             return yuv(p[2 if x & 1 else 0], p[1], p[3])
         return yuv(p[3 if x & 1 else 1], p[0], p[2])
@@ -330,8 +390,11 @@ def dxt_block(kind, block):
 
 def decode_level(texture, data, base, level, palette):
     """the level's slices, each a list of rows of (r, g, b, a)"""
-    width, height, depth = (texture.side(texture.width, level), texture.side(texture.height, level),
-                            texture.side(texture.depth, level))
+    width, height, depth = (
+        texture.side(texture.width, level),
+        texture.side(texture.height, level),
+        texture.side(texture.depth, level),
+    )
     source = base + texture.level_offset(level)
     slices = []
     if texture.compressed:
@@ -341,7 +404,7 @@ def decode_level(texture, data, base, level, palette):
             for by in range(blocks_y):
                 for bx in range(blocks_x):
                     at = source + ((z * blocks_y + by) * blocks_x + bx) * texture.bytes
-                    colours = dxt_block(texture.kind, data[at:at + texture.bytes])
+                    colours = dxt_block(texture.kind, data[at : at + texture.bytes])
                     for y in range(4):
                         for x in range(4):
                             if bx * 4 + x < width and by * 4 + y < height:
@@ -354,8 +417,14 @@ def decode_level(texture, data, base, level, palette):
         rows = []
         for y in range(height):
             row = source + y * texture.pitch
-            rows.append([texel(texture.kind, data, row + x * texture.bytes, palette, row, x)
-                         if x < row_texels else (0, 0, 0, 0) for x in range(width)])
+            rows.append(
+                [
+                    texel(texture.kind, data, row + x * texture.bytes, palette, row, x)
+                    if x < row_texels
+                    else (0, 0, 0, 0)
+                    for x in range(width)
+                ]
+            )
         slices.append(rows)
     else:
         mask_x, mask_y, mask_z = morton_masks(width, height, depth)
@@ -387,8 +456,9 @@ def expected(texture, data, palette, order):
 def gpu_decoded(texture, order):
     """whether the renderer takes the texels as BC1 to BC3 (xbox_textures.c,
     metal_upload)"""
-    return (texture.compressed and texture.depth == 1 and texture.width % 4 == 0 and texture.height % 4 == 0
-            and order == 0)
+    return (
+        texture.compressed and texture.depth == 1 and texture.width % 4 == 0 and texture.height % 4 == 0 and order == 0
+    )
 
 
 # ---------- the cases
@@ -457,8 +527,10 @@ def compare(name, got, want, tolerance):
     for index, (a, b) in enumerate(zip(pixels, want)):
         if abs(a - b) > tolerance:
             pixel = index // 4
-            raise AssertionError(f"{name}: pixel ({pixel % width}, {pixel // width}) is "
-                                 f"{pixels[pixel * 4:pixel * 4 + 4].hex()}, expected {want[pixel * 4:pixel * 4 + 4].hex()}")
+            raise AssertionError(
+                f"{name}: pixel ({pixel % width}, {pixel // width}) is "
+                f"{pixels[pixel * 4 : pixel * 4 + 4].hex()}, expected {want[pixel * 4 : pixel * 4 + 4].hex()}"
+            )
 
 
 def test_every_format_reads_back_as_decoded(vm_textures, tmp_path):
@@ -475,8 +547,12 @@ def test_every_format_reads_back_as_decoded(vm_textures, tmp_path):
             for (face, level, index), pixels in want.items():
                 key = f"texture {number} {name} face {face} level {level} slice {index}"
                 assert key in found, f"{key} was not read back (case {arguments[number]})"
-                compare(f"{key} ({texture.kind} {texture.width}x{texture.height}x{texture.depth})", found[key],
-                        pixels, tolerance)
+                compare(
+                    f"{key} ({texture.kind} {texture.width}x{texture.height}x{texture.depth})",
+                    found[key],
+                    pixels,
+                    tolerance,
+                )
                 checked += 1
     assert checked == sum(1 for key in found if key.startswith("texture "))
 
@@ -493,7 +569,12 @@ def test_the_mirror_and_the_stream_hold_the_words_given(vm_textures, tmp_path):
     # three rewrites in consecutive frames are uploaded again, the fourth
     # makes the page volatile: drawn through the stream instead
     assert [line for line in output.splitlines() if line.startswith("rewrite")] == [
-        "rewrite 1 mirrored", "rewrite 2 mirrored", "rewrite 3 mirrored", "rewrite 4 refused", "rewrite 5 refused"]
+        "rewrite 1 mirrored",
+        "rewrite 2 mirrored",
+        "rewrite 3 mirrored",
+        "rewrite 4 refused",
+        "rewrite 5 refused",
+    ]
 
 
 def test_render_targets_are_found_again(vm_textures, tmp_path):

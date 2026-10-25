@@ -41,8 +41,9 @@ def test_the_setting_is_off_by_default(name):
 @pytest.mark.parametrize("name", sorted(SETTINGS))
 def test_the_setting_is_documented(name):
     table = (ROOT / "port/linux/README.md").read_text()
-    row = next((line for line in table.splitlines() if line.startswith("| ") and f"`{name}`" in line.split(" | ")[0]),
-               None)
+    row = next(
+        (line for line in table.splitlines() if line.startswith("| ") and f"`{name}`" in line.split(" | ")[0]), None
+    )
     assert row, f"{name} is not in the settings table"
     assert SETTINGS[name][2] in row and f"`{SETTINGS[name][1]}`" in row
 
@@ -51,8 +52,12 @@ def test_the_physics_screen_lists_them():
     files = port_settings.settings_files()
     assert SCREEN in files
     screen = "\n".join(files[SCREEN])
-    assert set(re.findall(r'setting="([^"]+)"', screen)) == {"game.ragdolls", "game.dismemberment", "game.physics_debris",
-                                                              "game.physics_debris_max"}
+    assert set(re.findall(r'setting="([^"]+)"', screen)) == {
+        "game.ragdolls",
+        "game.dismemberment",
+        "game.physics_debris",
+        "game.physics_debris_max",
+    }
     video = "\n".join(files[SCREEN.replace(".physics.xml", ".xml")])
     assert "physics_settings_screen" in video
     # the generator's files are those checked in, and the game embeds the new one
@@ -73,24 +78,42 @@ def test_they_are_read_from_config_and_environment(tmp_path):
         shutil.copy(ROOT / "port/linux/src" / name, stubs / name)
     (tmp_path / "main.c").write_text(CONFIG_PROGRAM)
     program = tmp_path / "config_program"
-    subprocess.run([compiler, "-DHALO_ANDROID=1", "-DHALO_ARM64_GUEST=1", f"-I{stubs}",
-                    f"-I{ROOT}/port/third_party/tomlc17", "-o", str(program), str(tmp_path / "main.c"),
-                    str(stubs / "port_config.c"), str(ROOT / "port/third_party/tomlc17/tomlc17.c"), "-lpthread"],
-                   check=True)
+    subprocess.run(
+        [
+            compiler,
+            "-DHALO_ANDROID=1",
+            "-DHALO_ARM64_GUEST=1",
+            f"-I{stubs}",
+            f"-I{ROOT}/port/third_party/tomlc17",
+            "-o",
+            str(program),
+            str(tmp_path / "main.c"),
+            str(stubs / "port_config.c"),
+            str(ROOT / "port/third_party/tomlc17/tomlc17.c"),
+            "-lpthread",
+        ],
+        check=True,
+    )
     data = tmp_path / "data"
     data.mkdir()
     clean = {key: value for key, value in os.environ.items() if key not in {v[2] for v in SETTINGS.values()}}
 
     def get(name, **environment):
-        result = subprocess.run([str(program), "get", name], capture_output=True, text=True,
-                                env={**clean, "HALO_DATA_ROOT": str(data), **environment})
+        result = subprocess.run(
+            [str(program), "get", name],
+            capture_output=True,
+            text=True,
+            env={**clean, "HALO_DATA_ROOT": str(data), **environment},
+        )
         assert result.returncode == 0, result.stderr
         return result.stdout.strip()
 
     for name, (_, default, _) in SETTINGS.items():
         assert get(name) == default, name
-    (data / "config.toml").write_text("[game]\nragdolls = true\ndismemberment = true\nphysics_debris = true\nphysics_debris_max = 64\n\n"
-                                      "[debug]\nphysics_draw = true\n")
+    (data / "config.toml").write_text(
+        "[game]\nragdolls = true\ndismemberment = true\nphysics_debris = true\nphysics_debris_max = 64\n\n"
+        "[debug]\nphysics_draw = true\n"
+    )
     assert [get(name) for name in SETTINGS] == ["true", "true", "true", "64", "true"]
     assert get("game.ragdolls", HALO_RAGDOLLS="false") == "false"
     assert get("game.physics_debris_max", HALO_PHYSICS_DEBRIS_MAX="512") == "512"

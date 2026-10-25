@@ -20,8 +20,9 @@ final class ShadowEdgeTests: XCTestCase {
         XCTAssertGreaterThan(edges.stockPairs, 1000, "and so do its stock pages")
         let baked = Float(edges.hard) / Float(edges.pairs)
         let stock = Float(edges.stockHard) / Float(edges.stockPairs)
-        print("edges: baked \(edges.hard)/\(edges.pairs) hard (\(baked)), mean \(edges.mean); "
-            + "stock \(edges.stockHard)/\(edges.stockPairs) hard (\(stock)), mean \(edges.stockMean)")
+        print(
+            "edges: baked \(edges.hard)/\(edges.pairs) hard (\(baked)), mean \(edges.mean); "
+                + "stock \(edges.stockHard)/\(edges.stockPairs) hard (\(stock)), mean \(edges.stockMean)")
         XCTAssertLessThanOrEqual(baked, stock, "the share of neighbours that step hard")
     }
 }

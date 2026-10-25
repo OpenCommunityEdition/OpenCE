@@ -30,7 +30,7 @@ def image_layout(executable: Path) -> tuple:
     optional header's ImageBase and SizeOfImage)"""
     data = executable.read_bytes()
     pe = struct.unpack_from("<I", data, 0x3C)[0]
-    if data[pe:pe + 4] != b"PE\0\0" or struct.unpack_from("<H", data, pe + 24)[0] != 0x10B:
+    if data[pe : pe + 4] != b"PE\0\0" or struct.unpack_from("<H", data, pe + 24)[0] != 0x10B:
         sys.exit(f"{executable} is not a 32-bit Windows executable")
     return struct.unpack_from("<I", data, pe + 24 + 28)[0], struct.unpack_from("<I", data, pe + 24 + 56)[0]
 
@@ -42,7 +42,10 @@ def symbolize(symbolizer: str, executable: Path, addresses: list) -> dict:
     output = subprocess.run(
         [symbolizer, f"--obj={executable}", "--inlines", "--functions=linkage", "--relative-address"]
         + [hex(address) for address in addresses],
-        capture_output=True, text=True, check=True).stdout
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
     answers = output.strip("\n").split("\n\n")
     return {address: answer.splitlines() for address, answer in zip(addresses, answers)}
 
@@ -81,7 +84,9 @@ def main() -> int:
     if not wanted:
         print(f"{args.log} has no crash lines")
         return 1
-    answers = symbolize(symbolizer, args.executable, sorted({offset for offset in wanted.values() if 0 <= offset < size}))
+    answers = symbolize(
+        symbolizer, args.executable, sorted({offset for offset in wanted.values() if 0 <= offset < size})
+    )
 
     for index, line in enumerate(lines):
         print(line)

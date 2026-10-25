@@ -28,7 +28,9 @@ def test_configuration_defines():
     assert linux_build.configuration_defines(SimpleNamespace()) == []
     assert linux_build.configuration_defines(SimpleNamespace(port_release=True)) == ["-DHALO_RELEASE"]
     assert linux_build.configuration_defines(SimpleNamespace(port_release=True, port_profile=True)) == [
-        "-DHALO_RELEASE", "-DHALO_PROFILE"]
+        "-DHALO_RELEASE",
+        "-DHALO_PROFILE",
+    ]
 
 
 def test_every_native_build_takes_the_configuration_defines():
@@ -51,13 +53,24 @@ def test_profile_refuses_pgo_training():
 def test_linux_build_compiles_with_the_profile_define(monkeypatch):
     monkeypatch.chdir(ROOT)
     out = io.StringIO()
-    linux_build.generate_linux_build(ninja_syntax.Writer(out), SimpleNamespace(
-        build_dir=Path("build"), linux_cc="clang", compiler_launcher=None, port_release=False, port_lto="off",
-        port_portable=True, port_pgo="off", port_pgo_profile=None, port_profile=True))
+    linux_build.generate_linux_build(
+        ninja_syntax.Writer(out),
+        SimpleNamespace(
+            build_dir=Path("build"),
+            linux_cc="clang",
+            compiler_launcher=None,
+            port_release=False,
+            port_lto="off",
+            port_portable=True,
+            port_pgo="off",
+            port_pgo_profile=None,
+            port_profile=True,
+        ),
+    )
     # (ninja_syntax wraps long lines with " $"; Windows paths have backslashes)
     text = re.sub(r" \$\n *", " ", out.getvalue()).replace("\\", "/")
     for obj in ("build/linux/obj/source/game/game.o", "build/linux/obj/port/linux/src/p2p.o"):
-        block = text[text.index(f"build {obj}:"):]
+        block = text[text.index(f"build {obj}:") :]
         cflags = next(line for line in block.splitlines() if line.strip().startswith("cflags = "))
         assert "-DHALO_PROFILE" in cflags, obj
 
@@ -85,11 +98,29 @@ def build_check(tmp_path, sanitizers):
         pytest.skip("needs a C compiler with POSIX threads (Linux, WSL)")
     program = tmp_path / ("profile_check" + "".join(f"_{name}" for name in sanitizers))
     flags = [f"-fsanitize={','.join(sanitizers)}", "-fno-omit-frame-pointer"] if sanitizers else []
-    built = subprocess.run([compiler, "-std=gnu11", "-Wall", "-Werror", "-DHALO_PROFILE", "-pthread", "-g", "-O1",
-                            *flags, "-idirafter", "port/linux/include", "-Iport/linux/src",
-                            "-o", str(program),
-                            "tools/profile_check.c", *PROFILE_SOURCES],
-                           cwd=ROOT, capture_output=True, text=True)
+    built = subprocess.run(
+        [
+            compiler,
+            "-std=gnu11",
+            "-Wall",
+            "-Werror",
+            "-DHALO_PROFILE",
+            "-pthread",
+            "-g",
+            "-O1",
+            *flags,
+            "-idirafter",
+            "port/linux/include",
+            "-Iport/linux/src",
+            "-o",
+            str(program),
+            "tools/profile_check.c",
+            *PROFILE_SOURCES,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
     if built.returncode != 0 and sanitizers and "sanitize" in built.stderr:
         pytest.skip(f"{compiler} cannot build with {sanitizers}")
     assert built.returncode == 0, built.stderr[-4000:]
@@ -98,8 +129,13 @@ def build_check(tmp_path, sanitizers):
 
 def run_check(program, folder):
     folder.mkdir(exist_ok=True)
-    result = subprocess.run([str(program), str(folder)], capture_output=True, text=True, timeout=300,
-                            env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1", "TSAN_OPTIONS": "halt_on_error=1"})
+    result = subprocess.run(
+        [str(program), str(folder)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1", "TSAN_OPTIONS": "halt_on_error=1"},
+    )
     assert result.returncode == 0, result.stdout + result.stderr[-4000:]
     assert "PASS" in result.stdout
 
@@ -144,13 +180,12 @@ def test_written_parts_are_traces(written_parts):
         assert text.startswith('{"halo": {\n"header": {')
         assert trace["halo"]["header"]["last_part"] == (path == written_parts[-1])
         header = trace["halo"]["header"]
-        assert (header["role"], header["own_machine"], header["players"], header["players_most"]) == (
-            "host", -1, 2, 5)
+        assert (header["role"], header["own_machine"], header["players"], header["players_most"]) == ("host", -1, 2, 5)
         assert (header["map_name"], header["gametype"]) == ("b30", "campaign")
         lines = text.splitlines()
         events = lines.index('"traceEvents": [')
         # one event a line, the scopes in order of their start
-        starts = [json.loads(line.rstrip(","))["ts"] for line in lines[events + 1:-2] if '"ph":"X"' in line]
+        starts = [json.loads(line.rstrip(","))["ts"] for line in lines[events + 1 : -2] if '"ph":"X"' in line]
         assert starts == sorted(starts)
         assert '"quote\\"back\\\\slash"' in text or path != written_parts[0]
 
@@ -161,7 +196,9 @@ def test_written_parts_nest_on_tracks(written_parts):
     assert {"game", "p2p"} <= names
     scopes = [event for event in trace["traceEvents"] if event["ph"] == "X" and event["tid"] == 1]
     frame = next(event for event in scopes if event["name"] == "frame")
-    inside = [event for event in scopes if frame["ts"] <= event["ts"] < frame["ts"] + frame["dur"] and event is not frame]
+    inside = [
+        event for event in scopes if frame["ts"] <= event["ts"] < frame["ts"] + frame["dur"] and event is not frame
+    ]
     assert inside and all(event["ts"] + event["dur"] <= frame["ts"] + frame["dur"] + 0.001 for event in inside)
 
 
@@ -178,17 +215,23 @@ def test_written_parts_import_in_perfetto(written_parts):
 def test_written_parts_read_by_the_report(written_parts):
     recording = net_report.Recording(written_parts[0])
     assert recording.complete and not recording.warnings
-    cpu_rows = [dict(zip(summary["columns"], row)) for summary in
-                [json.loads(path.read_text(encoding="utf-8"))["cpu_summary"] for path in written_parts]
-                for row in summary["rows"]]
+    cpu_rows = [
+        dict(zip(summary["columns"], row))
+        for summary in [json.loads(path.read_text(encoding="utf-8"))["cpu_summary"] for path in written_parts]
+        for row in summary["rows"]
+    ]
     totals = {}
     for row in cpu_rows:
         totals[row["name"]] = totals.get(row["name"], 0) + row["count"]
     assert totals["texture"] == 2400
     assert totals["render_model"] == 2400
     assert totals["aggregate_child"] == 2400
-    frames = sum(1 for path in written_parts for event in json.loads(path.read_text(encoding="utf-8"))["traceEvents"]
-                 if event["ph"] == "X" and event["name"] == "frame")
+    frames = sum(
+        1
+        for path in written_parts
+        for event in json.loads(path.read_text(encoding="utf-8"))["traceEvents"]
+        if event["ph"] == "X" and event["name"] == "frame"
+    )
     assert recording.cpu["frames"] == frames
 
 
@@ -211,7 +254,6 @@ def test_cpu_only_duration_comes_from_each_part_header(tmp_path):
     assert recording.select() == 4.0
     assert recording.select(0.5, 3.0) == 2.5
     assert recording.select(5.0, 6.0) == 0.0
-
 
 
 def test_cpu_report_prints_and_exports_only_cpu_measurements(tmp_path, capsys):
@@ -336,13 +378,22 @@ def test_report_names_the_broken_part(host, capsys):
 
 
 def test_windows_compile_command_parser_preserves_quoted_define_and_paths():
-    command = ('clang -I"source/saved films" -include port\\windows\\include\\prefix.h '
-               '-I"C:\\Program Files\\LLVM\\include" '
-               '-DHALO_BUILD_FLAVOR=\\"release\\" source\\game.c -o build\\game.o')
+    command = (
+        'clang -I"source/saved films" -include port\\windows\\include\\prefix.h '
+        '-I"C:\\Program Files\\LLVM\\include" '
+        '-DHALO_BUILD_FLAVOR=\\"release\\" source\\game.c -o build\\game.o'
+    )
     assert parse_compile_command(command, windows=True) == [
-        "clang", "-Isource/saved films", "-include", "port/windows/include/prefix.h",
-        "-IC:/Program Files/LLVM/include", '-DHALO_BUILD_FLAVOR="release"',
-        "source/game.c", "-o", "build/game.o"]
+        "clang",
+        "-Isource/saved films",
+        "-include",
+        "port/windows/include/prefix.h",
+        "-IC:/Program Files/LLVM/include",
+        '-DHALO_BUILD_FLAVOR="release"',
+        "source/game.c",
+        "-o",
+        "build/game.o",
+    ]
 
 
 def test_console_words_and_record_seconds_use_the_real_parser(tmp_path):
@@ -350,12 +401,13 @@ def test_console_words_and_record_seconds_use_the_real_parser(tmp_path):
     if not compiler:
         pytest.skip("needs a C compiler (Linux, WSL)")
     text = (ROOT / "port/linux/game/profile_console.c").read_text()
-    word = text[text.index("static char const *profile_console_word("):text.index("/* ---------- public code */")]
-    command = text[text.index("boolean profile_console_command("):text.rindex("\n#endif")]
+    word = text[text.index("static char const *profile_console_word(") : text.index("/* ---------- public code */")]
+    command = text[text.index("boolean profile_console_command(") : text.rindex("\n#endif")]
     program = tmp_path / "console_check"
     code = tmp_path / "console_check.c"
     # Compile the game's actual parsing functions; only their external game effects are stubbed.
-    code.write_text(r'''
+    code.write_text(
+        r'''
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -374,7 +426,10 @@ int profile_trace_request_start(double seconds, int when, long memory) {
 }
 int profile_trace_request_stop(void) { return _profile_trace_answer_not_recording; }
 void profile_trace_status(struct profile_trace_status *status) { memset(status, 0, sizeof(*status)); }
-''' + word + command + r'''
+'''
+        + word
+        + command
+        + r'''
 int main(void) {
     assert(strcmp(profile_console_word(" (PROFILE_RECORD 1.5)", "profile_record"), "1.5)") == 0);
     assert(profile_console_word("profile_record_extra", "profile_record") == NULL);
@@ -389,9 +444,23 @@ int main(void) {
     assert(!profile_console_command("profile_record_extra 1"));
     return 0;
 }
-''')
-    subprocess.run([compiler, "-std=gnu11", "-Wall", "-Werror", "-DHALO_PROFILE",
-                    "-I", str(ROOT / "port/linux/include"), str(code), "-o", str(program)], check=True)
+'''
+    )
+    subprocess.run(
+        [
+            compiler,
+            "-std=gnu11",
+            "-Wall",
+            "-Werror",
+            "-DHALO_PROFILE",
+            "-I",
+            str(ROOT / "port/linux/include"),
+            str(code),
+            "-o",
+            str(program),
+        ],
+        check=True,
+    )
     subprocess.run([str(program)], check=True)
 
 
@@ -436,7 +505,7 @@ def preprocess_flags():
         while words and not words[0].startswith("-"):
             words = words[1:]
         # (the Android guest's command is a pipeline whose first compile makes assembly)
-        words = words[:words.index("&&")] if "&&" in words else words
+        words = words[: words.index("&&")] if "&&" in words else words
         kept, skip = [], False
         for word in words:
             if skip:
@@ -461,11 +530,18 @@ def preprocess_flags():
         "port_game": flags(f"{objects}/port/linux/game/network_coop.o"),
     }
     # (only a missing 32-bit C library is "no build here"; any other error is a wrong command, which must not hide)
-    probe = subprocess.run(["clang", *flag_sets["game"], "-E", "-P", "-x", "c", "-"], cwd=ROOT,
-                           input="#include <stddef.h>\n#include <stdio.h>\n",
-                           capture_output=True, text=True)
+    probe = subprocess.run(
+        ["clang", *flag_sets["game"], "-E", "-P", "-x", "c", "-"],
+        cwd=ROOT,
+        input="#include <stddef.h>\n#include <stdio.h>\n",
+        capture_output=True,
+        text=True,
+    )
     if probe.returncode != 0:
-        reason = "the game's flags do not preprocess: " + next((line for line in probe.stderr.splitlines() if "error" in line), "")[:200]
+        reason = (
+            "the game's flags do not preprocess: "
+            + next((line for line in probe.stderr.splitlines() if "error" in line), "")[:200]
+        )
         if "bits/libc-header-start.h" in probe.stderr:
             pytest.skip("needs a 32-bit C library (gcc-multilib); " + reason)
         pytest.fail(reason)
@@ -485,9 +561,13 @@ def preprocessed(tree, path, flags):
     arguments = ["-x", "c", "-"] if path is None else [path]
     # (__DATE__ and __TIME__ pinned: main.c prints them, and the two trees can be preprocessed a second apart)
     pinned = ["-Wno-builtin-macro-redefined", '-D__DATE__="Jan  1 2000"', '-D__TIME__="00:00:00"']
-    result = subprocess.run(["clang", *flags, *pinned, "-E", "-P", *arguments], cwd=tree,
-                            input="" if path is None else None,
-                            capture_output=True, text=True)
+    result = subprocess.run(
+        ["clang", *flags, *pinned, "-E", "-P", *arguments],
+        cwd=tree,
+        input="" if path is None else None,
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode == 0, f"{path}: {result.stderr[-2000:]}"
     # (only the tokens: blank lines and layout differ where #ifdef blocks were)
     return " ".join(result.stdout.split())
@@ -495,6 +575,7 @@ def preprocessed(tree, path, flags):
 
 def includers_of_changed_headers(base, already):
     """the C files that include a header that changed since the base: a header's #ifdef can change them too"""
+
     def names(*arguments):
         return subprocess.run([GIT, *arguments], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
 
@@ -513,8 +594,13 @@ def includers_of_changed_headers(base, already):
 def test_normal_build_preprocesses_as_before(tmp_path):
     base = os.environ["HALO_PROFILE_BASE"]
     flag_sets = preprocess_flags()
-    changed = subprocess.run([GIT, "diff", "--name-only", "--diff-filter=M", base, "HEAD", "--", "*.c"], cwd=ROOT,
-                             capture_output=True, text=True, check=True).stdout.split()
+    changed = subprocess.run(
+        [GIT, "diff", "--name-only", "--diff-filter=M", base, "HEAD", "--", "*.c"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
     assert changed, "no C file changed since the base"
     changed += includers_of_changed_headers(base, changed)
     tree = tmp_path / "base"
@@ -530,9 +616,11 @@ def test_normal_build_preprocesses_as_before(tmp_path):
 def test_new_files_are_empty_in_a_normal_build():
     flag_sets = preprocess_flags()
     # (found, not listed: a new profile_*.c that forgets its #ifdef shows up here)
-    paths = sorted(str(path.relative_to(ROOT)).replace("\\", "/")
-                   for directory in ("port/linux/src", "port/linux/game")
-                   for path in (ROOT / directory).glob("profile_*.c"))
+    paths = sorted(
+        str(path.relative_to(ROOT)).replace("\\", "/")
+        for directory in ("port/linux/src", "port/linux/game")
+        for path in (ROOT / directory).glob("profile_*.c")
+    )
     assert set(paths) == {*PROFILE_SOURCES, "port/linux/game/profile_console.c"}, paths
     for path in paths:
         flags = flags_for(path, flag_sets)
@@ -554,10 +642,12 @@ def test_normal_build_has_no_profiling_symbols():
     if not nm:
         unavailable("needs nm")
     if not objects:
-        unavailable("needs a built normal build (build/windows/obj/**/*.o, build/linux/halo, or the objects in HALO_PROFILE_OBJECTS)")
+        unavailable(
+            "needs a built normal build (build/windows/obj/**/*.o, build/linux/halo, or the objects in HALO_PROFILE_OBJECTS)"
+        )
     found, words, defined = set(), set(), 0
     for start in range(0, len(objects), 200):
-        listing = subprocess.run([nm, "--defined-only", *objects[start:start + 200]], capture_output=True, text=True)
+        listing = subprocess.run([nm, "--defined-only", *objects[start : start + 200]], capture_output=True, text=True)
         # (an nm that cannot read the objects, such as bitcode from --lto, lists nothing and would pass)
         assert listing.returncode == 0, listing.stderr[-1000:]
         words |= {word.lstrip("_") for word in listing.stdout.split()}

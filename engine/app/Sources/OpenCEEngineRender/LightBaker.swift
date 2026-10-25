@@ -30,37 +30,47 @@ public enum LightBaker {
 
     /// The light of `bake`, traced by `tracer`; `progress` is told how far
     /// it has come (0 to 1) after each of its three traces.
-    public static func bake(_ bake: LevelBake, tracer: PathTracer,
-                            progress: ((Float) -> Void)? = nil) throws -> BakedLight {
+    public static func bake(
+        _ bake: LevelBake, tracer: PathTracer,
+        progress: ((Float) -> Void)? = nil
+    ) throws -> BakedLight {
         let scene = bake.scene()
         let distance = bake.occlusionDistance()
         let lightmapPoints = Array(bake.lightmapPointBytes())
         let probePoints = Array(bake.probePointBytes())
         let reflectionPoints = Array(bake.reflectionPointBytes())
         // (each trace's share of the whole: its points times their samples)
-        let work = [Float(lightmapPoints.count) * Float(bake.lightmapSamples()),
-                    Float(probePoints.count) * Float(bake.probeSamples()),
-                    Float(reflectionPoints.count) * Float(bake.reflectionSamples())]
+        let work = [
+            Float(lightmapPoints.count) * Float(bake.lightmapSamples()),
+            Float(probePoints.count) * Float(bake.probeSamples()),
+            Float(reflectionPoints.count) * Float(bake.reflectionSamples()),
+        ]
         let total = max(work.reduce(0, +), 1)
-        let (irradiance, directions) = try tracer.run(.irradiance, scene, points: lightmapPoints,
-                                                      samples: bake.lightmapSamples(), seed: 1,
-                                                      occlusionDistance: distance)
+        let (irradiance, directions) = try tracer.run(
+            .irradiance, scene, points: lightmapPoints,
+            samples: bake.lightmapSamples(), seed: 1,
+            occlusionDistance: distance)
         progress?(work[0] / total)
         // (the probes leave the sun out: the renderer adds it, shadowed)
-        let (probes, _) = try tracer.run(.irradiance, scene, points: probePoints,
-                                         samples: bake.probeSamples(), seed: 2, occlusionDistance: distance,
-                                         sun: scene.sunLight())
+        let (probes, _) = try tracer.run(
+            .irradiance, scene, points: probePoints,
+            samples: bake.probeSamples(), seed: 2, occlusionDistance: distance,
+            sun: scene.sunLight())
         progress?((work[0] + work[1]) / total)
-        let (radiance, _) = try tracer.run(.radiance, scene, points: reflectionPoints,
-                                           samples: bake.reflectionSamples(), seed: 3, occlusionDistance: 0)
+        let (radiance, _) = try tracer.run(
+            .radiance, scene, points: reflectionPoints,
+            samples: bake.reflectionSamples(), seed: 3, occlusionDistance: 0)
         progress?(1)
-        return bake.finish(irradiance: bytes(irradiance), directions: bytes(directions), probes: bytes(probes),
-                           radiance: bytes(radiance))
+        return bake.finish(
+            irradiance: bytes(irradiance), directions: bytes(directions), probes: bytes(probes),
+            radiance: bytes(radiance))
     }
 
     /// The light of `bake`: the cached file's, or traced and then kept.
-    public static func light(_ bake: LevelBake, folder: String, tracer: PathTracer,
-                             progress: ((Float) -> Void)? = nil) throws -> BakedLight {
+    public static func light(
+        _ bake: LevelBake, folder: String, tracer: PathTracer,
+        progress: ((Float) -> Void)? = nil
+    ) throws -> BakedLight {
         if let light = cached(bake, folder: folder) {
             progress?(1)
             return light

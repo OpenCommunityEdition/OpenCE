@@ -78,8 +78,9 @@ func hudPass(device: MTLDevice) -> HudPass? {
             FileHandle.standardError.write(Data("OpenCE Engine: no HUD art\n".utf8))
             return nil
         }
-        return try HudPass(device: device, art: HudArt.load(folder: folder, device: device, queue: queue),
-                           outputFormat: .bgra8Unorm)
+        return try HudPass(
+            device: device, art: HudArt.load(folder: folder, device: device, queue: queue),
+            outputFormat: .bgra8Unorm)
     } catch {
         FileHandle.standardError.write(Data("OpenCE Engine: the HUD: \(error)\n".utf8))
         return nil
@@ -99,7 +100,8 @@ func argument(_ name: String) -> String? {
 
 /// Where imported maps are kept between runs.
 func cacheFolder() -> String {
-    let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+    let caches =
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
         ?? URL(fileURLWithPath: NSTemporaryDirectory())
     let folder = caches.appendingPathComponent("OpenCE Engine", isDirectory: true)
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -156,15 +158,18 @@ func playControls(_ controls: ControlSettings) -> PlayControls {
     var bindings = KeyBindings(settings: controls.bindings)
     let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
     let saved = support?.appendingPathComponent("OpenCE Engine/bindings.json")
-    if let path = argument("--bindings") ?? saved.flatMap({ FileManager.default.fileExists(atPath: $0.path) ? $0.path : nil }) {
+    if let path = argument("--bindings")
+        ?? saved.flatMap({ FileManager.default.fileExists(atPath: $0.path) ? $0.path : nil })
+    {
         do {
             bindings = try KeyBindings.read(Data(contentsOf: URL(fileURLWithPath: path)))
         } catch {
             fail("\(path): \(error)")
         }
     }
-    return PlayControls(bindings: bindings, sensitivity: mouseSensitivity(controls),
-                        invertPitch: invertsMouse(controls))
+    return PlayControls(
+        bindings: bindings, sensitivity: mouseSensitivity(controls),
+        invertPitch: invertsMouse(controls))
 }
 
 func fail(_ message: String) -> Never {
@@ -178,19 +183,22 @@ func mainMenu() -> NSMenu {
     let menu = NSMenu()
     let appItem = NSMenuItem()
     appItem.submenu = NSMenu()
-    appItem.submenu?.addItem(withTitle: "Quit OpenCE Engine", action: #selector(NSApplication.terminate(_:)),
-                             keyEquivalent: "q")
+    appItem.submenu?.addItem(
+        withTitle: "Quit OpenCE Engine", action: #selector(NSApplication.terminate(_:)),
+        keyEquivalent: "q")
     menu.addItem(appItem)
     let viewItem = NSMenuItem()
     let view = NSMenu(title: "View")
-    let fullScreen = view.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)),
-                                  keyEquivalent: "f")
+    let fullScreen = view.addItem(
+        withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)),
+        keyEquivalent: "f")
     fullScreen.keyEquivalentModifierMask = [.command, .control]
     viewItem.submenu = view
     menu.addItem(viewItem)
     let gameItem = NSMenuItem()
     let game = NSMenu(title: "Game")
-    let main = game.addItem(withTitle: "Main Menu", action: #selector(AppDelegate.showMenu(_:)), keyEquivalent: "\u{1b}")
+    let main = game.addItem(
+        withTitle: "Main Menu", action: #selector(AppDelegate.showMenu(_:)), keyEquivalent: "\u{1b}")
     main.keyEquivalentModifierMask = [.command]
     let leave = game.addItem(withTitle: "Leave the Game", action: #selector(AppDelegate.leave(_:)), keyEquivalent: "")
     leave.keyEquivalentModifierMask = []
@@ -240,7 +248,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let root = MapLibrary.dataRoot
     /// The data folders: --maps's, else the settings' (read once the
     /// launcher has closed).
-    lazy var folders = argument("--maps") != nil ? MapLibrary.folders(named: argument("--maps"), root: root)
+    lazy var folders =
+        argument("--maps") != nil
+        ? MapLibrary.folders(named: argument("--maps"), root: root)
         : MapLibrary.folders(data: saved.settings.data, root: root)
     lazy var maps = MapLibrary.maps(in: folders)
     lazy var menu = HaloMenu(maps: maps, settings: saved, servers: ServerListModel())
@@ -270,8 +280,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// its chant (made with the first).
     var loadingScreen: LoadingScreenModel?
     var loadingPass: LoadingPass?
-    lazy var chant = ChantPlayer(wave: ChantPlayer.wave(executables: ChantPlayer.executables(folders: folders, root: root),
-                                                        cacheFolder: cacheFolder()))
+    lazy var chant = ChantPlayer(
+        wave: ChantPlayer.wave(
+            executables: ChantPlayer.executables(folders: folders, root: root),
+            cacheFolder: cacheFolder()))
     /// The level's sounds, heard from the first level on.
     lazy var sound = SoundOutput(output: engine.audioOutput())
     /// Where the loading screen was at the last frame.
@@ -293,11 +305,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The launcher: Play starts the game on its main menu, Exit quits.
     func showLauncher() {
         MenuFonts.register()
-        let model = LauncherModel(settings: saved, displays: NSScreen.screens.map(\.localizedName), root: root,
-                                  variables: engine.shellVariables(), tuning: engine.tuneControls())
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                              backing: .buffered, defer: false)
+        let model = LauncherModel(
+            settings: saved, displays: NSScreen.screens.map(\.localizedName), root: root,
+            variables: engine.shellVariables(), tuning: engine.tuneControls())
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 640),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered, defer: false)
         window.title = "OpenCE"
         window.contentMinSize = NSSize(width: 460, height: 380)
         window.isReleasedWhenClosed = false
@@ -328,7 +342,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.onMessage = { [weak self] text in self?.showMessage(text) }
         menu.onClosed = { [weak self] in self?.hideMenu() }
         let controller = EngineWindowController()
-        controller.showsFrameTimes = launchArguments.contains("--frame-times")
+        controller.showsFrameTimes =
+            launchArguments.contains("--frame-times")
             || saved.settings.video.showFrameTimes
         self.controller = controller
         if let folder = folders.first {
@@ -336,7 +351,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let map = argument("--map") {
             do {
-                try load(map: MapLibrary.path(of: map, folders: folders), bsp: argument("--bsp").flatMap { UInt32($0) } ?? 0)
+                try load(
+                    map: MapLibrary.path(of: map, folders: folders), bsp: argument("--bsp").flatMap { UInt32($0) } ?? 0)
             } catch {
                 fail("\(map): \(error)")
             }
@@ -355,8 +371,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.window.engineView.keepsRunning = servesControl
         let screens = NSScreen.screens
         let display = Int(saved.settings.video.display)
-        controller.show(fullScreen: launchArguments.contains("--full-screen") || saved.settings.video.fullScreen,
-                        on: screens.indices.contains(display) ? screens[display] : nil)
+        controller.show(
+            fullScreen: launchArguments.contains("--full-screen") || saved.settings.video.fullScreen,
+            on: screens.indices.contains(display) ? screens[display] : nil)
         controller.window.engineView.startDisplayLink()
         if level == nil {
             showMenu(nil)
@@ -374,8 +391,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         if let capture = launch.capture {
-            try? FileManager.default.createDirectory(at: URL(fileURLWithPath: capture).deletingLastPathComponent(),
-                                                     withIntermediateDirectories: true)
+            try? FileManager.default.createDirectory(
+                at: URL(fileURLWithPath: capture).deletingLastPathComponent(),
+                withIntermediateDirectories: true)
         }
         for line in launch.commands {
             appLog("info", "\(line): \(engine.runCommand(line: line).text)")
@@ -476,7 +494,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controls = flyControls(saved.settings.controls)
         play = playControls(saved.settings.controls)
         settings = videoSettings(saved.settings.video)
-        controller?.showsFrameTimes = launchArguments.contains("--frame-times")
+        controller?.showsFrameTimes =
+            launchArguments.contains("--frame-times")
             || saved.settings.video.showFrameTimes
         // (the dev panel keeps the mouse free)
         controller?.capturesMouse = devPanelHost == nil
@@ -513,8 +532,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// A command's `bsp`: draws another structure of the level loaded.
     func reloadStructure(_ bsp: UInt32) throws {
         guard let level, let device = controller?.window.engineView.device else { return }
-        let switched = try LoadedLevel(map: level.map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
-                                       settings: settings)
+        let switched = try LoadedLevel(
+            map: level.map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
+            settings: settings)
         switched.renderer.hud = hud
         switched.renderer.ui = level.renderer.ui
         self.level = switched
@@ -642,8 +662,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func loadCampaign(map: String, difficulty: UInt8) throws {
         guard let controller else { return }
         guard let device = controller.window.engineView.device else { fail("no Metal device") }
-        let loaded = try LoadedLevel(map: map, bsp: 0, cacheFolder: cacheFolder(), device: device,
-                                     settings: settings)
+        let loaded = try LoadedLevel(
+            map: map, bsp: 0, cacheFolder: cacheFolder(), device: device,
+            settings: settings)
         try startCampaign(loaded, map: map, difficulty: difficulty)
     }
 
@@ -659,8 +680,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         inShellScene = false
         level = nil
         let size = controller?.window.engineView.metalLayer.drawableSize ?? .zero
-        let job = LevelJob(map: map, cacheFolder: cacheFolder(), device: device, settings: settings,
-                           width: Int(size.width), height: Int(size.height))
+        let job = LevelJob(
+            map: map, cacheFolder: cacheFolder(), device: device, settings: settings,
+            width: Int(size.width), height: Int(size.height))
         Task { @MainActor [weak self] in
             let result = await Task.detached { job.run { screen.setProgress(progress: $0) } }.value
             guard let self, self.loadingScreen === screen else { return }
@@ -689,17 +711,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         thirdPerson = false
         level = loaded
         followStructure()
-        controller.window.title = "OpenCE Engine — \(URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent)"
+        controller.window.title =
+            "OpenCE Engine — \(URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent)"
     }
 
     /// Draws the structure the mission plays in, once its scripts switch
     /// to another (Halo pauses for it too).
     func followStructure() {
         guard let state = engine.campaignState(), let level, UInt32(state.bsp) != level.bsp,
-              let device = controller?.window.engineView.device else { return }
+            let device = controller?.window.engineView.device
+        else { return }
         do {
-            let switched = try LoadedLevel(map: level.map, bsp: UInt32(state.bsp), cacheFolder: cacheFolder(),
-                                           device: device, settings: settings)
+            let switched = try LoadedLevel(
+                map: level.map, bsp: UInt32(state.bsp), cacheFolder: cacheFolder(),
+                device: device, settings: settings)
             switched.renderer.hud = hud
             switched.renderer.ui = level.renderer.ui
             self.level = switched
@@ -713,8 +738,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func load(map: String, bsp: UInt32 = 0, player: Bool = true) throws {
         guard let controller else { return }
         guard let device = controller.window.engineView.device else { fail("no Metal device") }
-        let loaded = try LoadedLevel(map: map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
-                                     settings: settings)
+        let loaded = try LoadedLevel(
+            map: map, bsp: bsp, cacheFolder: cacheFolder(), device: device,
+            settings: settings)
         if hud == nil {
             hud = hudPass(device: device)
         }
@@ -746,7 +772,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             thirdPerson = false
         }
         level = loaded
-        controller.window.title = "OpenCE Engine — \(URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent)"
+        controller.window.title =
+            "OpenCE Engine — \(URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent)"
     }
 
     /// The Map menu: the maps of the data folders, and Open Map… for any.
@@ -759,8 +786,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(.separator())
         }
         for (index, map) in maps.enumerated() {
-            let entry = menu.addItem(withTitle: map.deletingPathExtension().lastPathComponent,
-                                     action: #selector(choose(_:)), keyEquivalent: "")
+            let entry = menu.addItem(
+                withTitle: map.deletingPathExtension().lastPathComponent,
+                action: #selector(choose(_:)), keyEquivalent: "")
             entry.target = self
             entry.tag = index
         }
@@ -810,7 +838,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastShaderPoll = now
         for reload in shaders.poll(level: level?.renderer, hud: hud, text: textPass, loading: loadingPass) {
             if let error = reload.error {
-                engineLog(level: "error", target: "shaders", text: "\(reload.shader.file) kept its old pipelines: \(error)")
+                engineLog(
+                    level: "error", target: "shaders", text: "\(reload.shader.file) kept its old pipelines: \(error)")
             } else {
                 engineLog(level: "info", target: "shaders", text: "\(reload.shader.file) reloaded")
             }
@@ -823,7 +852,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let loadingScreen, let device = controller?.window.engineView.device else { return nil }
         if loadingPass == nil {
             do {
-                loadingPass = try LoadingPass(device: device, mask: loadingScreen.maskPixels(), outputFormat: .bgra8Unorm)
+                loadingPass = try LoadingPass(
+                    device: device, mask: loadingScreen.maskPixels(), outputFormat: .bgra8Unorm)
             } catch {
                 appLog("error", "the loading screen's pass: \(error)")
             }
@@ -842,7 +872,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Loads the next mission once the one played is won.
     private func nextMissionIfWon() {
         guard loadingScreen == nil, !inShellScene, let level, let lastCampaign, level.map == lastCampaign.map,
-              wonMission != level.map, engine.campaignState()?.won == true else { return }
+            wonMission != level.map, engine.campaignState()?.won == true
+        else { return }
         wonMission = level.map
         guard let next = HaloMenu.nextMission(after: level.map, in: maps) else {
             showMenu(nil)
@@ -863,8 +894,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         frameTimes.add(seconds)
         // (hitches count only while a level plays, not while one loads)
         HitchLog.shared.playing = level != nil && loadingScreen == nil
-        perfLog?.frame(cpuMilliseconds: seconds * 1000, now: tick.timestamp, gpu: GpuTimings.shared.lastFrame,
-                       hitches: HitchLog.shared.take)
+        perfLog?.frame(
+            cpuMilliseconds: seconds * 1000, now: tick.timestamp, gpu: GpuTimings.shared.lastFrame,
+            hitches: HitchLog.shared.take)
         // (the keys and mouse fly the camera only while the mouse is captured)
         let mouse = controller.takeMouseMotion()
         let held = controller.capture.captured ? controller.keys.codes : []
@@ -896,7 +928,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // (four times a second, so that it can be read)
             if tick.timestamp - lastOverlay >= 0.25 {
                 let gpu = GpuTimings.shared.lastFrame.reduce(0) { $0 + $1.milliseconds }
-                controller.window.engineView.overlayText = frameTimes.text
+                controller.window.engineView.overlayText =
+                    frameTimes.text
                     + (gpu > 0 ? String(format: "  gpu %.2f ms", gpu) : "")
                 lastOverlay = tick.timestamp
             }
@@ -936,16 +969,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         renderer.lights = frame.drawnLights()
         renderer.laidDecals = Array(frame.decals)
         renderer.laidParticles = Array(frame.particles)
-        let devState = dev.update(generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
-                                  value: { engine.shellValue(name: $0) })
+        let devState = dev.update(
+            generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
+            value: { engine.shellValue(name: $0) })
         renderer.switches = devState.switches
         renderer.tuning = devState.tuning
         showDevPanel(devState.panel)
         if devState.panel {
             devPanel.update(now: tick.timestamp)
         }
-        renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
-                                                widgets: renderer.switches.glows)
+        renderer.sprites = engine.cameraSprites(
+            camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
+            widgets: renderer.switches.glows)
         let objects = profiled("objects", engine) { frame.drawnObjects() }
         var hudQuads = profiled("hud", engine) { engine.hud(width: UInt32(width), height: UInt32(height)) }
         let debugLines = frame.debugSegments()
@@ -961,15 +996,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // (the labels under the shell)
         var labels: [TextItem] = []
         if let textPass, frame.debugLabels.count > 0 {
-            labels = DebugPass.labels(frame.debugMarks(),
-                                      viewProjection: camera.viewProjection(aspect: Float(width) / Float(max(height, 1))),
-                                      width: width, height: height, cellWidth: textPass.atlas.cellWidth,
-                                      cellHeight: textPass.atlas.cellHeight)
+            labels = DebugPass.labels(
+                frame.debugMarks(),
+                viewProjection: camera.viewProjection(aspect: Float(width) / Float(max(height, 1))),
+                width: width, height: height, cellWidth: textPass.atlas.cellWidth,
+                cellHeight: textPass.atlas.cellHeight)
         }
         controller.window.engineView.render { commands, target in
             profiled("encode", self.engine) {
-                renderer.encode(into: commands, target: target, camera: camera, objects: objects,
-                                hudQuads: inShellScene ? [] : hudQuads, uiQuads: uiQuads, debugLines: debugLines)
+                renderer.encode(
+                    into: commands, target: target, camera: camera, objects: objects,
+                    hudQuads: inShellScene ? [] : hudQuads, uiQuads: uiQuads, debugLines: debugLines)
             }
             if let loading, let loadingPass = self.loadingPass {
                 loadingPass.encode(loading, into: commands, target: target, clear: false)
@@ -998,8 +1035,10 @@ struct LevelJob: @unchecked Sendable {
 
     func run(progress: @escaping (Float) -> Void) -> Result<Loaded, Error> {
         Result {
-            Loaded(level: try LoadedLevel(map: map, bsp: 0, cacheFolder: cacheFolder, device: device,
-                                          settings: settings, prepare: (width, height), progress: progress))
+            Loaded(
+                level: try LoadedLevel(
+                    map: map, bsp: 0, cacheFolder: cacheFolder, device: device,
+                    settings: settings, prepare: (width, height), progress: progress))
         }
     }
 }
@@ -1025,8 +1064,9 @@ extension ShellKey {
         if flags.contains(.control) { modifiers.insert(.control) }
         if flags.contains(.option) { modifiers.insert(.option) }
         if flags.contains(.command) { modifiers.insert(.command) }
-        self.init(code: event.keyCode, characters: event.characters ?? "",
-                  ignoringModifiers: event.charactersIgnoringModifiers ?? "", modifiers: modifiers)
+        self.init(
+            code: event.keyCode, characters: event.characters ?? "",
+            ignoringModifiers: event.charactersIgnoringModifiers ?? "", modifiers: modifiers)
     }
 }
 
@@ -1042,8 +1082,9 @@ extension AppDelegate: GameActions {
         engine.leaveGame()
         try load(map: map.path)
         guard let level else { return }
-        _ = try engine.hostGame(geometry: level.geometry, kind: setup.kind, port: port, name: setup.name,
-                                maxPlayers: UInt8(setup.maxPlayers))
+        _ = try engine.hostGame(
+            geometry: level.geometry, kind: setup.kind, port: port, name: setup.name,
+            maxPlayers: UInt8(setup.maxPlayers))
     }
 
     func join(address: String, map: URL, name: String) throws {
@@ -1113,9 +1154,10 @@ func benchmark(seconds: String) -> Never {
         fail("no Metal device")
     }
     do {
-        let level = try LoadedLevel(map: map, bsp: argument("--bsp").flatMap { UInt32($0) } ?? 0,
-                                    cacheFolder: argument("--cache") ?? cacheFolder(), device: device,
-                                    settings: videoSettings())
+        let level = try LoadedLevel(
+            map: map, bsp: argument("--bsp").flatMap { UInt32($0) } ?? 0,
+            cacheFolder: argument("--cache") ?? cacheFolder(), device: device,
+            settings: videoSettings())
         // (the switches named by --off off, the rest as they start)
         let off = Set((argument("--off") ?? "").split(separator: ",").map(String.init))
         level.renderer.switches = RenderSwitches(flag: { !off.contains($0) }, value: { _ in "" })
@@ -1126,8 +1168,9 @@ func benchmark(seconds: String) -> Never {
         let objects = snapshots.acquire().drawnObjects()
         let start = level.start
         let path = BenchmarkPath(centre: SIMD3(start.x, start.y, start.z))
-        let result = try level.renderer.benchmark(width: size[0], height: size[1], path: path, seconds: time,
-                                                  objects: objects, queue: queue)
+        let result = try level.renderer.benchmark(
+            width: size[0], height: size[1], path: path, seconds: time,
+            objects: objects, queue: queue)
         print(result.json)
         exit(0)
     } catch {
@@ -1147,8 +1190,10 @@ func captureUi() -> Never {
         fail("no Metal device")
     }
     let capture = UiCapture(device: device, queue: queue)
-    let menus = [("ui", mainMenuWidget()), ("a10", pauseMenuWidget(multiplayer: false)),
-                 ("bloodgulch", pauseMenuWidget(multiplayer: true))]
+    let menus = [
+        ("ui", mainMenuWidget()), ("a10", pauseMenuWidget(multiplayer: false)),
+        ("bloodgulch", pauseMenuWidget(multiplayer: true)),
+    ]
     for (map, widget) in menus {
         let path = maps.appendingPathComponent("\(map).map").path
         guard FileManager.default.fileExists(atPath: path) else {

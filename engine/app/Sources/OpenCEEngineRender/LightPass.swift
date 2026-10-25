@@ -80,10 +80,14 @@ final class LightPass {
         let state = MTLDepthStencilDescriptor()
         state.depthCompareFunction = .less
         state.isDepthWriteEnabled = true
-        guard let none = device.makeBuffer(length: max(2 * Self.cells * 4,
-                                                       MemoryLayout<GPULight>.stride), options: .storageModeShared),
-              let depthState = device.makeDepthStencilState(descriptor: state),
-              let shadows = Self.cubes(device, size: 1) else {
+        guard
+            let none = device.makeBuffer(
+                length: max(
+                    2 * Self.cells * 4,
+                    MemoryLayout<GPULight>.stride), options: .storageModeShared),
+            let depthState = device.makeDepthStencilState(descriptor: state),
+            let shadows = Self.cubes(device, size: 1)
+        else {
             throw LevelRendererError.resources("lights")
         }
         self.none = none
@@ -108,10 +112,11 @@ final class LightPass {
         let fov = min(max(camera.verticalFov, 0.01), Float.pi - 0.01)
         let tangentY = tan(fov / 2)
         let rotation = camera.rotation.vector
-        return OCEClusterView(position: OCEVec3(x: camera.position.x, y: camera.position.y, z: camera.position.z),
-                              tangent_x: tangentY * max(aspect, 0.01),
-                              rotation: OCEQuat(x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w),
-                              tangent_y: tangentY, near: near, far: far, reserved: 0)
+        return OCEClusterView(
+            position: OCEVec3(x: camera.position.x, y: camera.position.y, z: camera.position.z),
+            tangent_x: tangentY * max(aspect, 0.01),
+            rotation: OCEQuat(x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w),
+            tangent_y: tangentY, near: near, far: far, reserved: 0)
     }
 
     /// World to the face `face` (+x, -x, +y, -y, +z, -z, as a cube map's
@@ -143,8 +148,9 @@ final class LightPass {
     func prepare(_ lights: [OCELightSnapshot], camera: ViewCamera, aspect: Float) -> Frame {
         let lights = Array(lights.prefix(Int(OCE_MAX_LIGHTS)))
         lastLightCount = lights.count
-        var frame = Frame(lights: none, cells: none, indices: none, cluster: LightClusterUniforms(),
-                          gels: Array(repeating: whiteCube, count: Self.gelSlots), shadowed: [])
+        var frame = Frame(
+            lights: none, cells: none, indices: none, cluster: LightClusterUniforms(),
+            gels: Array(repeating: whiteCube, count: Self.gelSlots), shadowed: [])
         guard !lights.isEmpty else {
             lastShadowCount = 0
             return frame
@@ -155,16 +161,18 @@ final class LightPass {
         let written = lights.withUnsafeBufferPointer { lights in
             cells.withUnsafeMutableBufferPointer { cells in
                 indices.withUnsafeMutableBufferPointer { indices in
-                    opence_cluster_lights(lights.baseAddress, UInt32(lights.count), &view, cells.baseAddress,
-                                          indices.baseAddress, UInt32(indices.count))
+                    opence_cluster_lights(
+                        lights.baseAddress, UInt32(lights.count), &view, cells.baseAddress,
+                        indices.baseAddress, UInt32(indices.count))
                 }
             }
         }
         var shadowed = [UInt32](repeating: 0, count: Self.shadowCount)
         let shadowedCount = lights.withUnsafeBufferPointer { lights in
             shadowed.withUnsafeMutableBufferPointer { out in
-                opence_shadowed_lights(lights.baseAddress, UInt32(lights.count), view.position, out.baseAddress,
-                                       UInt32(out.count))
+                opence_shadowed_lights(
+                    lights.baseAddress, UInt32(lights.count), view.position, out.baseAddress,
+                    UInt32(out.count))
             }
         }
         var shadowOf: [Int: UInt32] = [:]
@@ -185,26 +193,39 @@ final class LightPass {
                     frame.gels[Int(slot)] = gel
                 }
             }
-            return GPULight(positionRadius: SIMD4(light.position.x, light.position.y, light.position.z,
-                                                  light.radius),
-                            forwardCutoff: SIMD4(light.forward.x, light.forward.y, light.forward.z,
-                                                 light.cosine_cutoff),
-                            upFalloff: SIMD4(light.up.x, light.up.y, light.up.z, light.cosine_falloff),
-                            colorSpecular: SIMD4(light.color.x, light.color.y, light.color.z,
-                                                 light.specular_radius),
-                            flags: SIMD4(light.flags, slot, shadowOf[index] ?? UInt32.max, 0))
+            return GPULight(
+                positionRadius: SIMD4(
+                    light.position.x, light.position.y, light.position.z,
+                    light.radius),
+                forwardCutoff: SIMD4(
+                    light.forward.x, light.forward.y, light.forward.z,
+                    light.cosine_cutoff),
+                upFalloff: SIMD4(light.up.x, light.up.y, light.up.z, light.cosine_falloff),
+                colorSpecular: SIMD4(
+                    light.color.x, light.color.y, light.color.z,
+                    light.specular_radius),
+                flags: SIMD4(light.flags, slot, shadowOf[index] ?? UInt32.max, 0))
         }
         lastShadowCount = frame.shadowed.count
         // (made each frame: Phase 10 keeps them)
-        guard let (lightBuffer, cellBuffer, indexBuffer) = HitchLog.shared.note(.allocation, "light lists", {
-            () -> (MTLBuffer, MTLBuffer, MTLBuffer)? in
-            guard let lights = device.makeBuffer(bytes: records, length: records.count * MemoryLayout<GPULight>.stride,
-                                                 options: .storageModeShared),
-                  let cells = device.makeBuffer(bytes: cells, length: cells.count * 4, options: .storageModeShared),
-                  let indices = device.makeBuffer(bytes: indices, length: max(Int(written), 1) * 2,
-                                                  options: .storageModeShared) else { return nil }
-            return (lights, cells, indices)
-        }) else {
+        guard
+            let (lightBuffer, cellBuffer, indexBuffer) = HitchLog.shared.note(
+                .allocation, "light lists",
+                {
+                    () -> (MTLBuffer, MTLBuffer, MTLBuffer)? in
+                    guard
+                        let lights = device.makeBuffer(
+                            bytes: records, length: records.count * MemoryLayout<GPULight>.stride,
+                            options: .storageModeShared),
+                        let cells = device.makeBuffer(
+                            bytes: cells, length: cells.count * 4, options: .storageModeShared),
+                        let indices = device.makeBuffer(
+                            bytes: indices, length: max(Int(written), 1) * 2,
+                            options: .storageModeShared)
+                    else { return nil }
+                    return (lights, cells, indices)
+                })
+        else {
             return frame
         }
         frame.lights = lightBuffer
@@ -223,8 +244,10 @@ final class LightPass {
     /// Draws the shadowed lights' cubes: each face's casters by `casters`,
     /// called with the encoder (the face's matrix at vertex buffer 1,
     /// `wrap` at sampler 0) and the sun's shadow pipelines.
-    func encodeShadows(_ frame: Frame, into commands: MTLCommandBuffer, wrap: MTLSamplerState,
-                       casters: (MTLRenderCommandEncoder) -> Void) {
+    func encodeShadows(
+        _ frame: Frame, into commands: MTLCommandBuffer, wrap: MTLSamplerState,
+        casters: (MTLRenderCommandEncoder) -> Void
+    ) {
         guard !frame.shadowed.isEmpty else { return }
         if shadows.width != Self.shadowResolution {
             guard let made = Self.cubes(device, size: Self.shadowResolution) else { return }

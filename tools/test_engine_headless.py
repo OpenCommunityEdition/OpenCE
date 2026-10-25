@@ -49,9 +49,21 @@ def test_headless_answers_and_draws(executable: Path) -> None:
     cache = OUT / "cache"
     cache.mkdir(parents=True, exist_ok=True)
     process = subprocess.Popen(
-        [str(executable), "--headless", "--socket", str(path), "--map", str(MAP), "--cache", str(cache),
-         "--tick-rate", "60"],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        [
+            str(executable),
+            "--headless",
+            "--socket",
+            str(path),
+            "--map",
+            str(MAP),
+            "--cache",
+            str(cache),
+            "--tick-rate",
+            "60",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     try:
         assert process.stdout is not None

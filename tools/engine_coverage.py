@@ -32,8 +32,17 @@ def coverage_command(output: Path, profile: str = "test-opt") -> list[str]:
     """The workspace's tests under nextest, instrumented, writing llvm-cov's
     summary of each file to `output`."""
     return [
-        "cargo", "llvm-cov", "nextest", "--locked", "--workspace", "--cargo-profile", profile,
-        "--json", "--summary-only", "--output-path", str(output),
+        "cargo",
+        "llvm-cov",
+        "nextest",
+        "--locked",
+        "--workspace",
+        "--cargo-profile",
+        profile,
+        "--json",
+        "--summary-only",
+        "--output-path",
+        str(output),
     ]
 
 

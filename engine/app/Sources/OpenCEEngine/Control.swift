@@ -18,8 +18,10 @@ func appLog(_ level: String, _ text: String) {
 
 /// Does a command's `action` (the socket's or the shell's) with the app's
 /// loading; false for quit.
-func performAction(_ action: ShellAction, loadMap: (String, UInt32) throws -> Void,
-                   reloadBsp: (UInt32) throws -> Void) -> Bool {
+func performAction(
+    _ action: ShellAction, loadMap: (String, UInt32) throws -> Void,
+    reloadBsp: (UInt32) throws -> Void
+) -> Bool {
     switch action {
     case .none:
         break
@@ -59,9 +61,11 @@ final class ControlServant {
     /// The developer state, read again only when the shell's variables change.
     private let dev = DevStateReader()
 
-    init(engine: Engine, device: MTLDevice, queue: MTLCommandQueue, snapshots: SnapshotReader,
-         loadMap: @escaping (String, UInt32) throws -> Void, reloadBsp: @escaping (UInt32) throws -> Void,
-         renderer: @escaping () -> LevelRenderer?) {
+    init(
+        engine: Engine, device: MTLDevice, queue: MTLCommandQueue, snapshots: SnapshotReader,
+        loadMap: @escaping (String, UInt32) throws -> Void, reloadBsp: @escaping (UInt32) throws -> Void,
+        renderer: @escaping () -> LevelRenderer?
+    ) {
         self.engine = engine
         self.device = device
         self.queue = queue
@@ -94,18 +98,21 @@ final class ControlServant {
         renderer.lights = frame.drawnLights()
         renderer.laidDecals = Array(frame.decals)
         renderer.laidParticles = Array(frame.particles)
-        let devState = dev.update(generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
-                                  value: { engine.shellValue(name: $0) })
+        let devState = dev.update(
+            generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
+            value: { engine.shellValue(name: $0) })
         renderer.switches = devState.switches
         renderer.tuning = devState.tuning
-        renderer.sprites = engine.cameraSprites(camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
-                                                widgets: renderer.switches.glows)
+        renderer.sprites = engine.cameraSprites(
+            camera: camera.spriteCamera, flares: renderer.switches.lensFlares,
+            widgets: renderer.switches.glows)
         let width = Int(request.width), height = Int(request.height)
         do {
-            let captured = try renderer.capture(width: width, height: height, camera: camera,
-                                                objects: frame.drawnObjects(),
-                                                hudQuads: engine.hud(width: request.width, height: request.height),
-                                                debugLines: frame.debugSegments(), queue: queue)
+            let captured = try renderer.capture(
+                width: width, height: height, camera: camera,
+                objects: frame.drawnObjects(),
+                hudQuads: engine.hud(width: request.width, height: request.height),
+                debugLines: frame.debugSegments(), queue: queue)
             try captured.writePNG(to: URL(fileURLWithPath: request.path))
             return nil
         } catch {
@@ -152,17 +159,20 @@ func headless() -> Never {
         },
         reloadBsp: { bsp in
             guard let current = level else { return }
-            let loaded = try LoadedLevel(map: current.map, bsp: bsp, cacheFolder: cache, device: device,
-                                         settings: settings)
+            let loaded = try LoadedLevel(
+                map: current.map, bsp: bsp, cacheFolder: cache, device: device,
+                settings: settings)
             loaded.renderer.hud = hud
             level = loaded
         },
         renderer: { level?.renderer })
     if let map = argument("--map") {
         do {
-            let folders = MapLibrary.folders(named: argument("--maps"),
-                                             root: MapLibrary.dataRoot)
-            try servant.loadMap(MapLibrary.path(of: map, folders: folders), argument("--bsp").flatMap { UInt32($0) } ?? 0)
+            let folders = MapLibrary.folders(
+                named: argument("--maps"),
+                root: MapLibrary.dataRoot)
+            try servant.loadMap(
+                MapLibrary.path(of: map, folders: folders), argument("--bsp").flatMap { UInt32($0) } ?? 0)
         } catch {
             fail("\(map): \(error)")
         }

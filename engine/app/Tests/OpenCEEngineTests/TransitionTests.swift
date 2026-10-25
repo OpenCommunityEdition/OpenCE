@@ -42,8 +42,9 @@ final class TransitionTests: XCTestCase {
     static let frameInterval = 1.0 / 60
 
     func camera(_ level: LoadedLevel) -> ViewCamera {
-        ViewCamera(position: [level.start.x, level.start.y, level.start.z], yaw: level.start.yaw,
-                   pitch: level.start.pitch, verticalFov: 70 * .pi / 180)
+        ViewCamera(
+            position: [level.start.x, level.start.y, level.start.z], yaw: level.start.yaw,
+            pitch: level.start.pitch, verticalFov: 70 * .pi / 180)
     }
 
     func testNoFrameFromTheEndOfA10ToA30TakesOver33Ms() throws {
@@ -60,13 +61,15 @@ final class TransitionTests: XCTestCase {
         try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
         let settings = VideoSettings()
         // (the light as the cache has it: the bake's own tests bake at load)
-        let first = try LoadedLevel(map: a10, cacheFolder: cache.path, device: device, settings: settings,
-                                    bakeAtLoad: .cachedOnly)
+        let first = try LoadedLevel(
+            map: a10, cacheFolder: cache.path, device: device, settings: settings,
+            bakeAtLoad: .cachedOnly)
         let screen = LoadingScreenModel(enabled: true)
         let pass = try LoadingPass(device: device, mask: screen.maskPixels(), outputFormat: .bgra8Unorm)
         let (width, height) = (1920, 1080)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width,
-                                                                  height: height, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: width,
+            height: height, mipmapped: false)
         descriptor.usage = [.renderTarget]
         descriptor.storageMode = .private
         let target = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
@@ -100,10 +103,13 @@ final class TransitionTests: XCTestCase {
         let load = Load()
         let job = Job(map: a30, cache: cache.path, device: device, width: width, height: height)
         let thread = Thread {
-            load.finish(Result {
-                try LoadedLevel(map: job.map, cacheFolder: job.cache, device: job.device, settings: settings,
-                                bakeAtLoad: .cachedOnly, prepare: (job.width, job.height), progress: { screen.setProgress(progress: $0) })
-            })
+            load.finish(
+                Result {
+                    try LoadedLevel(
+                        map: job.map, cacheFolder: job.cache, device: job.device, settings: settings,
+                        bakeAtLoad: .cachedOnly, prepare: (job.width, job.height),
+                        progress: { screen.setProgress(progress: $0) })
+                })
         }
         thread.stackSize = 16 << 20
         thread.start()
@@ -144,7 +150,8 @@ final class TransitionTests: XCTestCase {
         }
         print("transition: " + stages.joined(separator: "; "))
         XCTAssertGreaterThan(measured.filter { $0.0 == "crossfade" }.count, 0, "the screen faded")
-        XCTAssertLessThan(worst.1, Self.longestFrame,
-                          String(format: "a %@ frame took %.2f ms", worst.0, worst.1 * 1000))
+        XCTAssertLessThan(
+            worst.1, Self.longestFrame,
+            String(format: "a %@ frame took %.2f ms", worst.0, worst.1 * 1000))
     }
 }

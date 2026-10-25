@@ -25,10 +25,23 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
-from test_ragdoll_profiles import (BSP_VERTICES, COLLISION_MODEL_NODES, COLLISION_NODE_BSPS,  # noqa: E402
-                                   COLLISION_NODE_SIZE, MODEL_NODE_SIZE, MODEL_NODES, OBJECT_COLLISION_MODEL,
-                                   OBJECT_MODEL, TAG_BASE, VERTEX_SIZE, bodies, maps, needs_maps, profiles,
-                                   tags_of)
+from test_ragdoll_profiles import (
+    BSP_VERTICES,
+    COLLISION_MODEL_NODES,
+    COLLISION_NODE_BSPS,  # noqa: E402
+    COLLISION_NODE_SIZE,
+    MODEL_NODE_SIZE,
+    MODEL_NODES,
+    OBJECT_COLLISION_MODEL,
+    OBJECT_MODEL,
+    TAG_BASE,
+    VERTEX_SIZE,
+    bodies,
+    maps,
+    needs_maps,
+    profiles,
+    tags_of,
+)
 
 PHYSICS_LIBRARY = ROOT / "build/macos/libhalo_physics.a"
 PROGRAM = "host_ragdoll_profiles_test"
@@ -58,8 +71,12 @@ POINT_PHYSICS_DENSITY = 32
 POINT_PHYSICS_CONTACT_FRICTION = 44
 POINT_PHYSICS_ELASTICITY = 48
 # the bipeds the pushes are measured on, each its model's name too
-PUSHED = ("characters\\marine\\marine", "characters\\elite\\elite", "characters\\grunt\\grunt",
-          "characters\\hunter\\hunter")
+PUSHED = (
+    "characters\\marine\\marine",
+    "characters\\elite\\elite",
+    "characters\\grunt\\grunt",
+    "characters\\hunter\\hunter",
+)
 
 
 class Map:
@@ -102,8 +119,13 @@ def stock():
                 nodes = []
                 for node in range(node_count):
                     element = node_address + MODEL_NODE_SIZE * node
-                    nodes.append((tags.at(element + 36, "h")[0], tags.at(element + 40, "fff"),
-                                  tags.at(element + MODEL_NODE_ROTATION, "ffff")))
+                    nodes.append(
+                        (
+                            tags.at(element + 36, "h")[0],
+                            tags.at(element + 40, "fff"),
+                            tags.at(element + MODEL_NODE_ROTATION, "ffff"),
+                        )
+                    )
                 models[model[1]] = (tags.at(address + OBJECT_ACCELERATION_SCALE, "f")[0], nodes)
             elif (group, name) == ("jpt!", FRAG) and frag is None:
                 frag = tags.at(address + DAMAGE_INSTANTANEOUS_ACCELERATION, "f")[0]
@@ -128,9 +150,13 @@ def stock():
                             ejected = tags.at(element + EFFECT_PARTICLE_RADIUS_UPPER_BOUND, "f")[0]
             elif (group, name) == ("part", CASING) and casing is None:
                 physics = tags.reference(address + PARTICLE_PHYSICS)
-                casing = (tags.at(address + PARTICLE_RADIUS_UPPER_BOUND, "f")[0],
-                          *(tags.at(physics[2] + offset, "f")[0] for offset in
-                            (POINT_PHYSICS_DENSITY, POINT_PHYSICS_CONTACT_FRICTION, POINT_PHYSICS_ELASTICITY)))
+                casing = (
+                    tags.at(address + PARTICLE_RADIUS_UPPER_BOUND, "f")[0],
+                    *(
+                        tags.at(physics[2] + offset, "f")[0]
+                        for offset in (POINT_PHYSICS_DENSITY, POINT_PHYSICS_CONTACT_FRICTION, POINT_PHYSICS_ELASTICITY)
+                    ),
+                )
     # (the particle's radius is the effect's times its own: particle_get_radius)
     casing = (ejected * casing[0], *casing[1:])
     return models, frag, hull, casing
@@ -139,8 +165,12 @@ def stock():
 def multiply(a, b):
     ax, ay, az, aw = a
     bx, by, bz, bw = b
-    return (aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
-            aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz)
+    return (
+        aw * bx + ax * bw + ay * bz - az * by,
+        aw * by - ax * bz + ay * bw + az * bx,
+        aw * bz + ax * by - ay * bx + az * bw,
+        aw * bw - ax * bx - ay * by - az * bz,
+    )
 
 
 def rotate(q, v):
@@ -192,29 +222,55 @@ def profiles_include():
         words, poses = [], []
         for part in parts:
             words += [part["parent"] & 0xFFFFFFFF, {"sphere": 0, "capsule": 1, "box": 2}[part["shape"]]]
-            words += [word(v) for v in (*part["size"], *part["center"], 0, 0, 0, 1, part["mass"], 1, 0, 0, 0, 0, 1,
-                                        *part["twist"], *part["swing"])]
+            words += [
+                word(v)
+                for v in (
+                    *part["size"],
+                    *part["center"],
+                    0,
+                    0,
+                    0,
+                    1,
+                    part["mass"],
+                    1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    *part["twist"],
+                    *part["swing"],
+                )
+            ]
             position, rotation = frames[part["node"]]
             poses += [*position, *rotation]
-        entries.append(f"\t{{\"{name.replace(chr(92), '/')}\", {len(parts)}, {mass!r}f, {scale!r}f,\n"
-                       f"\t\t{{{', '.join(f'0x{w:08x}u' for w in words)}}},\n\t\t{{{floats(poses)}}}}},")
-    return "\n".join([
-        f"#define RAGDOLL_FRICTION {define(jolt, 'PHYSICS_JOLT_RAGDOLL_FRICTION')!r}f",
-        f"#define RAGDOLL_RESTITUTION {define(jolt, 'PHYSICS_JOLT_RAGDOLL_RESTITUTION')!r}f",
-        f"#define STAND_IN_FRICTION {define(jolt, 'PHYSICS_JOLT_STAND_IN_FRICTION')!r}f",
-        f"#define STAND_IN_RESTITUTION {define(jolt, 'PHYSICS_JOLT_STAND_IN_RESTITUTION')!r}f",
-        f"#define PUSH_LIFT {define(ragdolls, 'RAGDOLL_PUSH_LIFT')!r}f",
-        f"#define FRAG_ACCELERATION {frag!r}f",
-        f"#define CASING_RADIUS {casing[0]!r}f",
-        f"#define CASING_DENSITY {casing[1]!r}f",
-        f"#define CASING_FRICTION {casing[2]!r}f",
-        f"#define CASING_ELASTICITY {casing[3]!r}f",
-        f"#define REST_SPEED {define(debris, 'PHYSICS_DEBRIS_REST_SPEED')!r}f",
-        f"#define REST_TICKS {int(define(debris, 'PHYSICS_DEBRIS_REST_TICKS'))}",
-        f"static const float warthog_center[3] = {{{floats(hull[0])}}};",
-        f"static const float warthog_half_extents[3] = {{{floats(hull[1])}}};",
-        "static const char *const pushed[] = {" + ", ".join(f'"{n.replace(chr(92), "/")}"' for n in PUSHED) + "};",
-        "static const struct profile profiles[] = {", *entries, "};", ""])
+        entries.append(
+            f"\t{{\"{name.replace(chr(92), '/')}\", {len(parts)}, {mass!r}f, {scale!r}f,\n"
+            f"\t\t{{{', '.join(f'0x{w:08x}u' for w in words)}}},\n\t\t{{{floats(poses)}}}}},"
+        )
+    return "\n".join(
+        [
+            f"#define RAGDOLL_FRICTION {define(jolt, 'PHYSICS_JOLT_RAGDOLL_FRICTION')!r}f",
+            f"#define RAGDOLL_RESTITUTION {define(jolt, 'PHYSICS_JOLT_RAGDOLL_RESTITUTION')!r}f",
+            f"#define STAND_IN_FRICTION {define(jolt, 'PHYSICS_JOLT_STAND_IN_FRICTION')!r}f",
+            f"#define STAND_IN_RESTITUTION {define(jolt, 'PHYSICS_JOLT_STAND_IN_RESTITUTION')!r}f",
+            f"#define PUSH_LIFT {define(ragdolls, 'RAGDOLL_PUSH_LIFT')!r}f",
+            f"#define FRAG_ACCELERATION {frag!r}f",
+            f"#define CASING_RADIUS {casing[0]!r}f",
+            f"#define CASING_DENSITY {casing[1]!r}f",
+            f"#define CASING_FRICTION {casing[2]!r}f",
+            f"#define CASING_ELASTICITY {casing[3]!r}f",
+            f"#define REST_SPEED {define(debris, 'PHYSICS_DEBRIS_REST_SPEED')!r}f",
+            f"#define REST_TICKS {int(define(debris, 'PHYSICS_DEBRIS_REST_TICKS'))}",
+            f"static const float warthog_center[3] = {{{floats(hull[0])}}};",
+            f"static const float warthog_half_extents[3] = {{{floats(hull[1])}}};",
+            "static const char *const pushed[] = {" + ", ".join(f'"{n.replace(chr(92), "/")}"' for n in PUSHED) + "};",
+            "static const struct profile profiles[] = {",
+            *entries,
+            "};",
+            "",
+        ]
+    )
 
 
 @pytest.fixture(scope="module")
@@ -223,11 +279,28 @@ def program(tmp_path_factory):
     assert built.returncode == 0, built.stdout + built.stderr
     folder = tmp_path_factory.mktemp("ragdoll_physics")
     (folder / "ragdoll_profiles.inc").write_text(profiles_include(), encoding="utf-8")
-    build = subprocess.run([
-        os.environ.get("CC", "cc"), "-std=gnu11", "-O1", "-Wall", "-Werror", "-mmacosx-version-min=26.0",
-        "-Iport/macos/host", "-Iport/macos/include", "-I", str(folder), f"port/macos/tests/{PROGRAM}.c",
-        str(PHYSICS_LIBRARY), "-lc++", "-o", str(folder / PROGRAM),
-    ], cwd=ROOT, capture_output=True, text=True)
+    build = subprocess.run(
+        [
+            os.environ.get("CC", "cc"),
+            "-std=gnu11",
+            "-O1",
+            "-Wall",
+            "-Werror",
+            "-mmacosx-version-min=26.0",
+            "-Iport/macos/host",
+            "-Iport/macos/include",
+            "-I",
+            str(folder),
+            f"port/macos/tests/{PROGRAM}.c",
+            str(PHYSICS_LIBRARY),
+            "-lc++",
+            "-o",
+            str(folder / PROGRAM),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
     assert build.returncode == 0, build.stderr
     return folder / PROGRAM
 
@@ -254,8 +327,12 @@ def test_the_marine_stands():
     assert head > pelvis + 0.1 > foot + 0.1
 
 
-CASES = ["every_body_comes_to_rest", "a_frag_grenade_pushes_as_the_game_does", "a_warthog_shoves_a_marine",
-         "the_casings_come_to_rest"]
+CASES = [
+    "every_body_comes_to_rest",
+    "a_frag_grenade_pushes_as_the_game_does",
+    "a_warthog_shoves_a_marine",
+    "the_casings_come_to_rest",
+]
 
 
 @needs_maps

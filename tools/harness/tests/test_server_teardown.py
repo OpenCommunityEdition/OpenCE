@@ -1,4 +1,5 @@
 """Real menu and server teardown, including native/legacy platform guards."""
+
 import re
 import sys
 from pathlib import Path
@@ -16,8 +17,10 @@ PLATFORMS = {
     'other-port': ('#define HALO_UNEXAMINED_PORT 1', 1000),
 }
 CASES = [(platform, case) for platform in PLATFORMS for case in ('back', 'reopen')]
-CASES += [('windows', case) for case in ('postgame', 'ingame', 'message-failure',
-                                       'send-failure', 'machine-failure', 'no-server')]
+CASES += [
+    ('windows', case)
+    for case in ('postgame', 'ingame', 'message-failure', 'send-failure', 'machine-failure', 'no-server')
+]
 CASES += [('xbox', case) for case in ('postgame', 'ingame')]
 GUARD = '#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(__linux__)'
 CONTROLS = {
@@ -44,10 +47,14 @@ def generated(platform, control=None):
     defines, sleep = PLATFORMS[platform]
     # The harness runs on Linux; each compiled variant selects its own target.
     config = '#undef __linux__\n#define xbox 1\n' + defines + f'\n#define EXPECTED_SLEEP {sleep}\n'
-    config += f'#define MILLISECONDS_PER_SECOND {constant(read("source/cseries/cseries.h"), "MILLISECONDS_PER_SECOND")}\n'
+    config += (
+        f'#define MILLISECONDS_PER_SECOND {constant(read("source/cseries/cseries.h"), "MILLISECONDS_PER_SECOND")}\n'
+    )
     for member in ('_network_game_server_state_pregame', '_network_game_server_game_open_bit'):
         config += enum_with(server, member) + '\n'
-    config += enum_with(read('source/networking/network_messages.h'), '_message_server_graceful_game_exit_pregame') + '\n'
+    config += (
+        enum_with(read('source/networking/network_messages.h'), '_message_server_graceful_game_exit_pregame') + '\n'
+    )
     for name in ('message_server_graceful_game_exit_pregame', 'message_server_graceful_game_exit_postgame'):
         config += re.search(r'struct ' + name + r'\s*\{[^}]+\};', server).group() + '\n'
     return (('config.inc', config), ('under_test.inc', code))

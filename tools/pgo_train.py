@@ -75,8 +75,9 @@ def data_root(assets: Path, root: Path) -> None:
         if not WINDOWS:
             target.symlink_to(entry.resolve())
         elif entry.is_dir():
-            subprocess.run(["cmd", "/c", "mklink", "/J", str(target), str(entry.resolve())],
-                           check=True, stdout=subprocess.DEVNULL)
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(target), str(entry.resolve())], check=True, stdout=subprocess.DEVNULL
+            )
         else:
             shutil.copy2(entry, target)
 
@@ -96,8 +97,13 @@ def without_desktop() -> bool:
 
 def run_directly(binary: Path, settings: Dict[str, str], timeout: int) -> int:
     try:
-        return subprocess.run([str(binary)], env=dict(os.environ, **settings), stdout=subprocess.DEVNULL,
-                              stderr=subprocess.DEVNULL, timeout=timeout).returncode
+        return subprocess.run(
+            [str(binary)],
+            env=dict(os.environ, **settings),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+        ).returncode
     except subprocess.TimeoutExpired:
         return -1
 
@@ -115,23 +121,41 @@ def run_on_desktop(binary: Path, settings: Dict[str, str], timeout: int, work: P
     script.write_text("\r\n".join(lines) + "\r\n", encoding="ascii")
     if done.exists():
         done.unlink()
-    subprocess.run(["schtasks", "/create", "/tn", TASK_NAME, "/tr", str(script.resolve()), "/sc", "once",
-                    "/st", "23:59", "/it", "/f"], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(
+        [
+            "schtasks",
+            "/create",
+            "/tn",
+            TASK_NAME,
+            "/tr",
+            str(script.resolve()),
+            "/sc",
+            "once",
+            "/st",
+            "23:59",
+            "/it",
+            "/f",
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
     try:
         subprocess.run(["schtasks", "/run", "/tn", TASK_NAME], check=True, stdout=subprocess.DEVNULL)
         deadline = time.monotonic() + timeout
         while not done.exists():
             if time.monotonic() > deadline:
-                subprocess.run(["schtasks", "/end", "/tn", TASK_NAME], stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL)
+                subprocess.run(
+                    ["schtasks", "/end", "/tn", TASK_NAME], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
                 return -1
             time.sleep(1)
         time.sleep(1)
         text = done.read_text(encoding="ascii", errors="replace").strip()
         return int(text) if text.lstrip("-").isdigit() else -1
     finally:
-        subprocess.run(["schtasks", "/delete", "/tn", TASK_NAME, "/f"], stdout=subprocess.DEVNULL,
-                       stderr=subprocess.DEVNULL)
+        subprocess.run(
+            ["schtasks", "/delete", "/tn", TASK_NAME, "/f"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
 
 
 def main() -> None:
@@ -161,8 +185,9 @@ def main() -> None:
     saves.mkdir(parents=True, exist_ok=True)
     data_root(args.assets, root)
 
-    levels = sorted(path.stem for path in (args.assets / "maps").glob("*.map")
-                    if CAMPAIGN_LEVEL.fullmatch(path.stem.lower()))
+    levels = sorted(
+        path.stem for path in (args.assets / "maps").glob("*.map") if CAMPAIGN_LEVEL.fullmatch(path.stem.lower())
+    )
     if not levels:
         sys.exit(f"pgo: no campaign levels in {args.assets / 'maps'}")
     scenes = [("menu", None, MENU_SECONDS)] + [(level, level, LEVEL_SECONDS) for level in levels]

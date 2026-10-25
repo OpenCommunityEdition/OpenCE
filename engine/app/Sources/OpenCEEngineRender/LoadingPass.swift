@@ -38,11 +38,14 @@ public final class LoadingPass {
     /// Whether the last frame is empty (the first of a screen).
     private var fresh = true
 
-    public init(device: MTLDevice, mask pixels: Data, outputFormat: MTLPixelFormat,
-                source: String? = nil) throws {
+    public init(
+        device: MTLDevice, mask pixels: Data, outputFormat: MTLPixelFormat,
+        source: String? = nil
+    ) throws {
         self.outputFormat = outputFormat
-        (trail, light, composite) = try Self.pipelines(device: device, source: source ?? ShaderSources.source(.loading),
-                                                       outputFormat: outputFormat)
+        (trail, light, composite) = try Self.pipelines(
+            device: device, source: source ?? ShaderSources.source(.loading),
+            outputFormat: outputFormat)
         func sampler(across: MTLSamplerAddressMode) -> MTLSamplerState? {
             let descriptor = MTLSamplerDescriptor()
             descriptor.minFilter = .linear
@@ -57,8 +60,9 @@ public final class LoadingPass {
         self.linear = linear
         self.border = border
         func texture(_ format: MTLPixelFormat, _ width: Int, _ height: Int, target: Bool) throws -> MTLTexture {
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width,
-                                                                      height: height, mipmapped: false)
+            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: format, width: width,
+                height: height, mipmapped: false)
             descriptor.usage = target ? [.shaderRead, .renderTarget] : .shaderRead
             descriptor.storageMode = .private
             if !target {
@@ -74,8 +78,9 @@ public final class LoadingPass {
         if pixels.count >= maskWidth * maskHeight {
             pixels.withUnsafeBytes { raw in
                 if let base = raw.baseAddress {
-                    mask.replace(region: MTLRegionMake2D(0, 0, maskWidth, maskHeight), mipmapLevel: 0,
-                                 withBytes: base, bytesPerRow: maskWidth)
+                    mask.replace(
+                        region: MTLRegionMake2D(0, 0, maskWidth, maskHeight), mipmapLevel: 0,
+                        withBytes: base, bytesPerRow: maskWidth)
                 }
             }
         }
@@ -92,11 +97,14 @@ public final class LoadingPass {
     }
 
     private static func pipelines(device: MTLDevice, source: String, outputFormat: MTLPixelFormat) throws
-        -> (MTLRenderPipelineState, MTLRenderPipelineState, MTLRenderPipelineState) {
+        -> (MTLRenderPipelineState, MTLRenderPipelineState, MTLRenderPipelineState)
+    {
         do {
             let library = try device.makeLibrary(source: source, options: nil)
-            func make(_ vertex: String, _ fragment: String, format: MTLPixelFormat,
-                      blend: (MTLBlendFactor, MTLBlendFactor)?) throws -> MTLRenderPipelineState {
+            func make(
+                _ vertex: String, _ fragment: String, format: MTLPixelFormat,
+                blend: (MTLBlendFactor, MTLBlendFactor)?
+            ) throws -> MTLRenderPipelineState {
                 let descriptor = MTLRenderPipelineDescriptor()
                 descriptor.vertexFunction = try library.required(vertex)
                 descriptor.fragmentFunction = try library.required(fragment)
@@ -111,10 +119,13 @@ public final class LoadingPass {
                 }
                 return try device.makeRenderPipelineState(descriptor: descriptor)
             }
-            return (try make("loading_trail_vertex", "loading_trail", format: .rgba16Float, blend: nil),
-                    try make("loading_vertex", "loading_light", format: .rgba16Float, blend: (.one, .one)),
-                    try make("loading_vertex", "loading_composite", format: outputFormat,
-                             blend: (.one, .oneMinusSourceAlpha)))
+            return (
+                try make("loading_trail_vertex", "loading_trail", format: .rgba16Float, blend: nil),
+                try make("loading_vertex", "loading_light", format: .rgba16Float, blend: (.one, .one)),
+                try make(
+                    "loading_vertex", "loading_composite", format: outputFormat,
+                    blend: (.one, .oneMinusSourceAlpha))
+            )
         } catch {
             throw LevelRendererError.shaders("loading: \(error)")
         }
@@ -132,8 +143,9 @@ public final class LoadingPass {
 
     /// The uniforms of `view`.
     static func uniforms(_ view: LoadingView, fresh: Bool) -> LoadingUniforms {
-        LoadingUniforms(frame: SIMD4(view.color, view.maskPosition, fresh ? 0 : view.fadeAlpha, view.screenAlpha),
-                        trail: SIMD4(zoom, blur / Float(width), blur / Float(height), 0))
+        LoadingUniforms(
+            frame: SIMD4(view.color, view.maskPosition, fresh ? 0 : view.fadeAlpha, view.screenAlpha),
+            trail: SIMD4(zoom, blur / Float(width), blur / Float(height), 0))
     }
 
     /// The next frame of the screen `view` describes, laid over `target`
@@ -170,7 +182,8 @@ public final class LoadingPass {
         over.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         over.colorAttachments[0].storeAction = .store
         guard view.screenAlpha > 0 || clear,
-              let encoder = commands.timedRenderEncoder("loading screen over the frame", descriptor: over) else {
+            let encoder = commands.timedRenderEncoder("loading screen over the frame", descriptor: over)
+        else {
             return
         }
         encoder.setRenderPipelineState(composite)

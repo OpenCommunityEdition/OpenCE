@@ -40,7 +40,12 @@ rec {
     src = fs.toSource {
       inherit root;
       fileset = fs.unions [
-        (fs.difference (root + /engine) (fs.unions [ (root + /engine/app) (root + /engine/fuzz) ]))
+        (fs.difference (root + /engine) (
+          fs.unions [
+            (root + /engine/app)
+            (root + /engine/fuzz)
+          ]
+        ))
         (root + /engine/fuzz/Cargo.toml)
         (root + /engine/fuzz/fuzz_targets)
         (root + /port/third_party/jolt)
@@ -64,24 +69,30 @@ rec {
   # every dependency, for the library, the bindings' generator (the
   # bindgen feature) and the tests; its version is fixed, since the
   # commit's would rename it, and so build it again, at every commit
-  cargoArtifacts = craneLib.buildDepsOnly (commonArgs // {
-    version = "locked";
-    buildPhaseCargoCommand = ''
-      cargoWithProfile check --locked --workspace --all-targets
-      cargoWithProfile build --locked --workspace
-      cargoWithProfile build --locked -p opence_ffi --features bindgen --bin uniffi-bindgen
-      cargoWithProfile test --locked --workspace --no-run
-    '';
-  });
+  cargoArtifacts = craneLib.buildDepsOnly (
+    commonArgs
+    // {
+      version = "locked";
+      buildPhaseCargoCommand = ''
+        cargoWithProfile check --locked --workspace --all-targets
+        cargoWithProfile build --locked --workspace
+        cargoWithProfile build --locked -p opence_ffi --features bindgen --bin uniffi-bindgen
+        cargoWithProfile test --locked --workspace --no-run
+      '';
+    }
+  );
 
   # the tests' dependencies, in the profile the suite tests in (test-opt:
   # optimised, with debug assertions and overflow checks, which the sim's
   # checks tests look for)
-  testArtifacts = craneLib.buildDepsOnly (commonArgs // {
-    version = "locked";
-    CARGO_PROFILE = "test-opt";
-    buildPhaseCargoCommand = ''
-      cargoWithProfile test --locked --workspace --no-run
-    '';
-  });
+  testArtifacts = craneLib.buildDepsOnly (
+    commonArgs
+    // {
+      version = "locked";
+      CARGO_PROFILE = "test-opt";
+      buildPhaseCargoCommand = ''
+        cargoWithProfile test --locked --workspace --no-run
+      '';
+    }
+  );
 }

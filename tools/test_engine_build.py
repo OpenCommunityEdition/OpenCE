@@ -38,7 +38,10 @@ def test_the_bundle_holds_the_executable_and_its_plist(app: Path) -> None:
 def test_the_executable_links_the_rust_library(app: Path) -> None:
     result = subprocess.run(
         [str(app / "Contents" / "MacOS" / "OpenCEEngine"), "--version"],
-        capture_output=True, text=True, check=True, timeout=30,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
     )
     assert result.stdout.strip() == "OpenCE Engine 0.1.0"
 
@@ -49,8 +52,10 @@ def test_the_bundle_is_signed(app: Path) -> None:
 
 def test_the_swift_contract_tests_pass(app: Path, tmp_path: Path) -> None:
     # (after the app fixture, which has checked the tools are there)
-    subprocess.run(["python3", str(ROOT / "tools" / "engine_build.py"), "--out", str(tmp_path), "--test",
-                    "--suite", "swift"], check=True)
+    subprocess.run(
+        ["python3", str(ROOT / "tools" / "engine_build.py"), "--out", str(tmp_path), "--test", "--suite", "swift"],
+        check=True,
+    )
 
 
 def test_the_dependencies_licences_are_permissive() -> None:
@@ -78,4 +83,3 @@ def test_the_test_step_checks_the_licences_then_runs_nextest_optimised() -> None
     assert nextest[:3] == ["cargo", "nextest", "run"]
     assert "--workspace" in nextest
     assert nextest[nextest.index("--cargo-profile") + 1] == "test-opt"
-

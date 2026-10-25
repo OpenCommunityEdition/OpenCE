@@ -39,7 +39,8 @@ public final class HaloMenu {
         let name = URL(fileURLWithPath: map).deletingPathExtension().lastPathComponent.lowercased()
         guard let index = missions.firstIndex(where: { $0.map == name }) else { return nil }
         for mission in missions[(index + 1)...] {
-            if let file = maps.first(where: { $0.deletingPathExtension().lastPathComponent.lowercased() == mission.map }) {
+            if let file = maps.first(where: { $0.deletingPathExtension().lastPathComponent.lowercased() == mission.map }
+            ) {
                 return file
             }
         }

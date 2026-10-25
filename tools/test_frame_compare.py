@@ -34,7 +34,7 @@ def changed(image, change):
     for y in range(image.height):
         for x in range(image.width):
             at = (y * image.width + x) * 4
-            pixels[at:at + 4] = bytes(change(x, y, tuple(pixels[at:at + 4])))
+            pixels[at : at + 4] = bytes(change(x, y, tuple(pixels[at : at + 4])))
     return Image(image.width, image.height, bytes(pixels))
 
 
@@ -43,6 +43,7 @@ def clamp(value):
 
 
 # ---------- the tolerance
+
 
 def test_an_identical_frame_matches():
     result = compare(gradient(), gradient())
@@ -58,8 +59,10 @@ def test_rounding_within_the_threshold_matches():
 
 def test_a_few_edge_pixels_beyond_the_threshold_match():
     # (an edge rasterised a pixel over: 3 of 3072 pixels, within 0.5%)
-    edge = changed(gradient(), lambda x, y, p: (clamp(p[0] + 40), p[1], p[2], p[3]) if (x, y) in
-                   {(10, 10), (11, 10), (12, 10)} else p)
+    edge = changed(
+        gradient(),
+        lambda x, y, p: (clamp(p[0] + 40), p[1], p[2], p[3]) if (x, y) in {(10, 10), (11, 10), (12, 10)} else p,
+    )
     result = compare(edge, gradient())
     assert result.matches and result.differing == 3 and result.largest == 40
 
@@ -109,6 +112,7 @@ def test_the_difference_image_marks_what_differs():
 
 # ---------- PNGs
 
+
 def test_a_png_round_trips(tmp_path):
     frame_compare.write_png(tmp_path / "frame.png", gradient())
     assert frame_compare.read_png(tmp_path / "frame.png") == gradient()
@@ -116,11 +120,17 @@ def test_a_png_round_trips(tmp_path):
 
 def png(width, height, colour_type, rows):
     """a PNG of 8-bit rows, each (filter, bytes), as other writers make them"""
+
     def chunk(kind, data):
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
     raw = b"".join(bytes((kind,)) + data for kind, data in rows)
-    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, colour_type, 0, 0, 0))
-            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, colour_type, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw))
+        + chunk(b"IEND", b"")
+    )
 
 
 def paeth(left, up, corner):
@@ -146,7 +156,7 @@ def test_each_filter_and_rgb_are_read(tmp_path, colour_type, size):
     image = gradient(8, 10)
     rows, previous = [], bytes(8 * size)
     for y in range(10):
-        row = b"".join(image.pixels[(y * 8 + x) * 4:(y * 8 + x) * 4 + size] for x in range(8))
+        row = b"".join(image.pixels[(y * 8 + x) * 4 : (y * 8 + x) * 4 + size] for x in range(8))
         rows.append((y % 5, filtered(y % 5, row, previous, size)))
         previous = row
     (tmp_path / "frame.png").write_bytes(png(8, 10, colour_type, rows))
@@ -166,17 +176,27 @@ def test_what_is_not_an_8_bit_png_is_refused(tmp_path):
 
 # ---------- the command
 
+
 def test_the_command_says_whether_a_frame_matches(tmp_path):
     frame_compare.write_png(tmp_path / "reference.png", gradient())
     frame_compare.write_png(tmp_path / "same.png", gradient())
     stripe = changed(gradient(), lambda x, y, p: (p[0], p[1] + 20, p[2], p[3]) if y == 5 else p)
     frame_compare.write_png(tmp_path / "stripe.png", stripe)
     tool = [sys.executable, str(ROOT / "tools/frame_compare.py")]
-    same = subprocess.run(tool + [str(tmp_path / "same.png"), str(tmp_path / "reference.png")],
-                          capture_output=True, text=True)
+    same = subprocess.run(
+        tool + [str(tmp_path / "same.png"), str(tmp_path / "reference.png")], capture_output=True, text=True
+    )
     assert same.returncode == 0 and "matches" in same.stdout
-    stripe_run = subprocess.run(tool + [str(tmp_path / "stripe.png"), str(tmp_path / "reference.png"),
-                                        "--difference", str(tmp_path / "difference.png")],
-                                capture_output=True, text=True)
+    stripe_run = subprocess.run(
+        tool
+        + [
+            str(tmp_path / "stripe.png"),
+            str(tmp_path / "reference.png"),
+            "--difference",
+            str(tmp_path / "difference.png"),
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert stripe_run.returncode == 1 and "64 of 3072 pixels" in stripe_run.stdout
     assert frame_compare.read_png(tmp_path / "difference.png").pixel(0, 5) == (255, 0, 0, 255)

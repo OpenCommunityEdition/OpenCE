@@ -29,13 +29,22 @@ REFERENCE_OBJECT = OBJECTS / "port/android/guest/runtime/guest_misc.o"
 
 def available() -> bool:
     """whether `ninja macos` has built what a guest image needs"""
-    return (HOST.is_file() and (GUEST / "libguestc.a").is_file() and (OBJECTS / "gen/imports.o").is_file()
-            and REFERENCE_OBJECT.is_file())
+    return (
+        HOST.is_file()
+        and (GUEST / "libguestc.a").is_file()
+        and (OBJECTS / "gen/imports.o").is_file()
+        and REFERENCE_OBJECT.is_file()
+    )
 
 
 def _compile_command(reference: Path) -> str:
-    listing = subprocess.run(["ninja", "-t", "commands", str(reference.relative_to(ROOT))], cwd=ROOT,
-                             capture_output=True, text=True, check=True)
+    listing = subprocess.run(
+        ["ninja", "-t", "commands", str(reference.relative_to(ROOT))],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     return listing.stdout.strip().splitlines()[-1]
 
 
@@ -51,7 +60,9 @@ def compile_guest(source: Path, obj: Path, extra_flags: Iterable[str] = (), like
     if reference_source not in command:
         raise RuntimeError("the guest's compile command is not as expected: " + command)
     obj.parent.mkdir(parents=True, exist_ok=True)
-    command = command.replace(reference_source, shlex.quote(str(source)) + " " + " ".join(map(shlex.quote, extra_flags)))
+    command = command.replace(
+        reference_source, shlex.quote(str(source)) + " " + " ".join(map(shlex.quote, extra_flags))
+    )
     command = command.replace(reference, shlex.quote(str(obj)))
     # (no dependency file wanted)
     command = command.replace(f"-MMD -MF {shlex.quote(str(obj))}.d", "")
@@ -66,15 +77,34 @@ def link_guest(objects: Iterable[Path], image: Path) -> None:
     # the guest sides of the platform layer's POSIX helpers (port/linux/src/posix.h)
     # and of OpenGL ES (which the SDL bridge refers to)
     runtime += [OBJECTS / "guest/gen/guest_posix.o", OBJECTS / "guest/gen/guest_gl.o"]
-    command = [lld, "-m", "aarch64linux", "-static", "-nostdlib", "-T", str(LINKER_SCRIPT), "-o", str(image),
-               *map(str, objects), *map(str, runtime), str(OBJECTS / "gen/imports.o"), str(GUEST / "libguestc.a")]
+    command = [
+        lld,
+        "-m",
+        "aarch64linux",
+        "-static",
+        "-nostdlib",
+        "-T",
+        str(LINKER_SCRIPT),
+        "-o",
+        str(image),
+        *map(str, objects),
+        *map(str, runtime),
+        str(OBJECTS / "gen/imports.o"),
+        str(GUEST / "libguestc.a"),
+    ]
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"the guest image {image} does not link:\n{result.stderr}")
 
 
-def build_guest_image(sources: Iterable[Path], work: Path, name: str, extra_flags: Iterable[str] = (),
-                      like: Optional[str] = None, objects: Iterable[Path] = ()) -> Path:
+def build_guest_image(
+    sources: Iterable[Path],
+    work: Path,
+    name: str,
+    extra_flags: Iterable[str] = (),
+    like: Optional[str] = None,
+    objects: Iterable[Path] = (),
+) -> Path:
     """the guest image of these C files (compiled `like` a guest file, as
     compile_guest), and of objects the build made, in work"""
     objects = list(objects)
@@ -93,15 +123,18 @@ def guest_environment(folder: Path, environment: Optional[dict] = None) -> dict:
     output unless it fails (HALO_HOST_QUIET)"""
     folder.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
-    env.update({"HOME": str(folder), "XDG_DATA_HOME": str(folder), "HALO_DATA_ROOT": str(folder),
-                "HALO_HOST_QUIET": "1"})
+    env.update(
+        {"HOME": str(folder), "XDG_DATA_HOME": str(folder), "HALO_DATA_ROOT": str(folder), "HALO_HOST_QUIET": "1"}
+    )
     env.update(environment or {})
     return env
 
 
-def run_guest(image: Path, arguments: Iterable[str], folder: Path, environment: Optional[dict] = None,
-              timeout: int = 60) -> subprocess.CompletedProcess:
+def run_guest(
+    image: Path, arguments: Iterable[str], folder: Path, environment: Optional[dict] = None, timeout: int = 60
+) -> subprocess.CompletedProcess:
     """runs the image in the host, in `folder` (guest_environment)"""
     env = guest_environment(folder, environment)
-    return subprocess.run([str(HOST), str(image), *arguments], cwd=folder, env=env, capture_output=True, text=True,
-                          timeout=timeout)
+    return subprocess.run(
+        [str(HOST), str(image), *arguments], cwd=folder, env=env, capture_output=True, text=True, timeout=timeout
+    )

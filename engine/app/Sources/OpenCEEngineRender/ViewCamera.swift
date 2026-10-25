@@ -31,9 +31,10 @@ public struct ViewCamera: Equatable, Sendable {
     /// snapshots, drawn between them).
     public static func interpolated(from: ViewCamera, to: ViewCamera, alpha: Float) -> ViewCamera {
         let alpha = min(max(alpha.isFinite ? alpha : 1, 0), 1)
-        return ViewCamera(position: simd_mix(from.position, to.position, SIMD3(repeating: alpha)),
-                          rotation: simd_slerp(from.rotation, to.rotation, alpha),
-                          verticalFov: to.verticalFov)
+        return ViewCamera(
+            position: simd_mix(from.position, to.position, SIMD3(repeating: alpha)),
+            rotation: simd_slerp(from.rotation, to.rotation, alpha),
+            verticalFov: to.verticalFov)
     }
 
     /// The nearest distance drawn, in world units (a world unit is about

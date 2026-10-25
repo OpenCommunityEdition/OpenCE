@@ -92,9 +92,11 @@ public final class PathTracer {
     /// makes no empty buffers).
     private func buffer(_ bytes: [UInt8]) throws -> MTLBuffer {
         let bytes = bytes.isEmpty ? [UInt8](repeating: 0, count: 48) : bytes
-        guard let buffer = bytes.withUnsafeBytes({ raw in
-            device.makeBuffer(bytes: raw.baseAddress!, length: raw.count, options: .storageModeShared)
-        }) else {
+        guard
+            let buffer = bytes.withUnsafeBytes({ raw in
+                device.makeBuffer(bytes: raw.baseAddress!, length: raw.count, options: .storageModeShared)
+            })
+        else {
             throw PathTracerError.trace("no buffer of \(bytes.count) bytes")
         }
         return buffer
@@ -103,23 +105,31 @@ public final class PathTracer {
     /// The light at each of `points` in `scene`, from `samples` paths each;
     /// with `sun` (a light's index), the probes' light: without that
     /// light's direct light, and the share of it seen as the occlusion.
-    public func trace(_ scene: BakeScene, points: [BakePoint], samples: UInt32, seed: UInt32 = 1,
-                      occlusionDistance: Float, sun: UInt32? = nil) throws -> [BakeLight] {
-        let (light, direction) = try run(.irradiance, scene, points: Self.pack(points), samples: samples,
-                                         seed: seed, occlusionDistance: occlusionDistance, sun: sun)
+    public func trace(
+        _ scene: BakeScene, points: [BakePoint], samples: UInt32, seed: UInt32 = 1,
+        occlusionDistance: Float, sun: UInt32? = nil
+    ) throws -> [BakeLight] {
+        let (light, direction) = try run(
+            .irradiance, scene, points: Self.pack(points), samples: samples,
+            seed: seed, occlusionDistance: occlusionDistance, sun: sun)
         return (0..<points.count).map { index in
-            BakeLight(irradiance: SIMD3(light[index].x, light[index].y, light[index].z),
-                      direction: SIMD3(direction[index].x, direction[index].y, direction[index].z),
-                      directionality: direction[index].w, occlusion: light[index].w)
+            BakeLight(
+                irradiance: SIMD3(light[index].x, light[index].y, light[index].z),
+                direction: SIMD3(direction[index].x, direction[index].y, direction[index].z),
+                directionality: direction[index].w, occlusion: light[index].w)
         }
     }
 
     /// The light arriving at each of `points` along the way it faces (its
     /// "normal"), from `samples` paths each: what is seen from there.
-    public func radiance(_ scene: BakeScene, points: [BakePoint], samples: UInt32,
-                         seed: UInt32 = 1) throws -> [SIMD3<Float>] {
-        try run(.radiance, scene, points: Self.pack(points), samples: samples, seed: seed,
-                occlusionDistance: 0).0.map { SIMD3($0.x, $0.y, $0.z) }
+    public func radiance(
+        _ scene: BakeScene, points: [BakePoint], samples: UInt32,
+        seed: UInt32 = 1
+    ) throws -> [SIMD3<Float>] {
+        try run(
+            .radiance, scene, points: Self.pack(points), samples: samples, seed: seed,
+            occlusionDistance: 0
+        ).0.map { SIMD3($0.x, $0.y, $0.z) }
     }
 
     /// What a kernel finds.
@@ -136,8 +146,10 @@ public final class PathTracer {
         var packed: [Float] = []
         packed.reserveCapacity(points.count * 8)
         for point in points {
-            packed += [point.position.x, point.position.y, point.position.z, 0,
-                       point.normal.x, point.normal.y, point.normal.z, 0]
+            packed += [
+                point.position.x, point.position.y, point.position.z, 0,
+                point.normal.x, point.normal.y, point.normal.z, 0,
+            ]
         }
         return packed.withUnsafeBytes { Array($0) }
     }
@@ -145,8 +157,10 @@ public final class PathTracer {
     /// `kernel`'s two results at each of `points` (32 bytes each, as
     /// opence_bake's point_bytes writes them) in `scene`: a float4 each.
     /// With `sun`, the irradiance kernel leaves that light out (`trace`).
-    public func run(_ kernel: Kernel, _ scene: BakeScene, points: [UInt8], samples: UInt32, seed: UInt32 = 1,
-                    occlusionDistance: Float, sun: UInt32? = nil) throws -> ([SIMD4<Float>], [SIMD4<Float>]) {
+    public func run(
+        _ kernel: Kernel, _ scene: BakeScene, points: [UInt8], samples: UInt32, seed: UInt32 = 1,
+        occlusionDistance: Float, sun: UInt32? = nil
+    ) throws -> ([SIMD4<Float>], [SIMD4<Float>]) {
         let count = points.count / 32
         if count == 0 {
             return ([], [])
@@ -169,18 +183,19 @@ public final class PathTracer {
         while start < count {
             let size = min(batch, count - start)
             // (each batch's paths its own: the seed mixed with its first point)
-            var parameters = Parameters(sky: (sky[0], sky[1], sky[2]), lightCount: UInt32(lightBytes.count / 32),
-                                        triangleCount: scene.triangleCount(), samples: samples,
-                                        seed: seed &+ UInt32(truncatingIfNeeded: start) &* 0x9E37_79B9,
-                                        occlusionDistance: occlusionDistance, pointCount: UInt32(size),
-                                        emitterCount: UInt32(emitterBytes.count / 64),
-                                        sun: sun.map { $0 + 1 } ?? 0)
+            var parameters = Parameters(
+                sky: (sky[0], sky[1], sky[2]), lightCount: UInt32(lightBytes.count / 32),
+                triangleCount: scene.triangleCount(), samples: samples,
+                seed: seed &+ UInt32(truncatingIfNeeded: start) &* 0x9E37_79B9,
+                occlusionDistance: occlusionDistance, pointCount: UInt32(size),
+                emitterCount: UInt32(emitterBytes.count / 64),
+                sun: sun.map { $0 + 1 } ?? 0)
             let pointBuffer = try buffer(Array(points[(start * 32)..<((start + size) * 32)]))
             let length = size * MemoryLayout<SIMD4<Float>>.stride
             guard let results = device.makeBuffer(length: length, options: .storageModeShared),
-                  let directions = device.makeBuffer(length: length, options: .storageModeShared),
-                  let commands = queue.makeCommandBuffer(),
-                  let encoder = commands.makeComputeCommandEncoder()
+                let directions = device.makeBuffer(length: length, options: .storageModeShared),
+                let commands = queue.makeCommandBuffer(),
+                let encoder = commands.makeComputeCommandEncoder()
             else {
                 throw PathTracerError.trace("no buffers or encoder")
             }
@@ -194,16 +209,18 @@ public final class PathTracer {
             encoder.setBuffer(directions, offset: 0, index: 7)
             encoder.setBuffer(emitters, offset: 0, index: 8)
             let width = min(pipeline.maxTotalThreadsPerThreadgroup, 64)
-            encoder.dispatchThreads(MTLSize(width: size, height: 1, depth: 1),
-                                    threadsPerThreadgroup: MTLSize(width: width, height: 1, depth: 1))
+            encoder.dispatchThreads(
+                MTLSize(width: size, height: 1, depth: 1),
+                threadsPerThreadgroup: MTLSize(width: width, height: 1, depth: 1))
             encoder.endEncoding()
             commands.commit()
             commands.waitUntilCompleted()
             if let error = commands.error {
                 throw PathTracerError.trace("\(error)")
             }
-            first += UnsafeBufferPointer(start: results.contents().bindMemory(to: SIMD4<Float>.self, capacity: size),
-                                         count: size)
+            first += UnsafeBufferPointer(
+                start: results.contents().bindMemory(to: SIMD4<Float>.self, capacity: size),
+                count: size)
             second += UnsafeBufferPointer(
                 start: directions.contents().bindMemory(to: SIMD4<Float>.self, capacity: size), count: size)
             start += size

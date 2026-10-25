@@ -2,43 +2,58 @@
 { inputs, cell }:
 let
   pkgs = inputs.cells.repo.pkgs;
-  inherit (inputs.cells.repo.toolchain) root buildEnvironment tools libraries musl version;
+  inherit (inputs.cells.repo.toolchain)
+    root
+    buildEnvironment
+    tools
+    libraries
+    musl
+    version
+    ;
 
   # configure.py and ninja in the sandbox, building target (a ninja
   # target) and installing what install says
-  macosBuild = { pname, target, install }:
-    pkgs.stdenv.mkDerivation (buildEnvironment // {
-      inherit pname version;
-      src = inputs.self;
-      nativeBuildInputs = tools ++ [ pkgs.rustPlatform.cargoSetupHook ];
-      buildInputs = libraries;
-      # the runtime crate's dependencies, from its Cargo.lock (the
-      # sandbox has no network)
-      cargoDeps = pkgs.rustPlatform.importCargoLock {
-        lockFile = root + /port/macos/runtime/Cargo.lock;
-      };
-      cargoRoot = "port/macos/runtime";
-      configurePhase = ''
-        runHook preConfigure
-        mkdir -p build/macos/third_party
-        tar xzf ${musl} -C build/macos/third_party
-        python configure.py
-        runHook postConfigure
-      '';
-      buildPhase = ''
-        runHook preBuild
-        ninja -j $NIX_BUILD_CORES ${target}
-        runHook postBuild
-      '';
-      installPhase = ''
-        runHook preInstall
-        ${install}
-        runHook postInstall
-      '';
-      # the fixup phase strips and signs binaries again ad hoc, which
-      # would drop the host's hypervisor entitlement
-      dontFixup = true;
-    });
+  macosBuild =
+    {
+      pname,
+      target,
+      install,
+    }:
+    pkgs.stdenv.mkDerivation (
+      buildEnvironment
+      // {
+        inherit pname version;
+        src = inputs.self;
+        nativeBuildInputs = tools ++ [ pkgs.rustPlatform.cargoSetupHook ];
+        buildInputs = libraries;
+        # the runtime crate's dependencies, from its Cargo.lock (the
+        # sandbox has no network)
+        cargoDeps = pkgs.rustPlatform.importCargoLock {
+          lockFile = root + /port/macos/runtime/Cargo.lock;
+        };
+        cargoRoot = "port/macos/runtime";
+        configurePhase = ''
+          runHook preConfigure
+          mkdir -p build/macos/third_party
+          tar xzf ${musl} -C build/macos/third_party
+          python configure.py
+          runHook postConfigure
+        '';
+        buildPhase = ''
+          runHook preBuild
+          ninja -j $NIX_BUILD_CORES ${target}
+          runHook postBuild
+        '';
+        installPhase = ''
+          runHook preInstall
+          ${install}
+          runHook postInstall
+        '';
+        # the fixup phase strips and signs binaries again ad hoc, which
+        # would drop the host's hypervisor entitlement
+        dontFixup = true;
+      }
+    );
 in
 {
   guest = macosBuild {

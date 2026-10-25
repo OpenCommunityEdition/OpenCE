@@ -10,49 +10,97 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["restart-forgets", "have-of-another-size", "choose-within", "refuse-within", "finish-playable",
-         "finish-unplayable", "finish-refused"]
+CASES = [
+    "restart-forgets",
+    "have-of-another-size",
+    "choose-within",
+    "refuse-within",
+    "finish-playable",
+    "finish-unplayable",
+    "finish-refused",
+]
 
 # a fault in map_share.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
-    "kept-across-downloads": (("\t\t\tremote_pieces_forget(connection, file);\n", ""), "download_end",
-                              "restart-forgets"),
-    "stale-bitmap-written": (("\tif (connection->remote_pieces[index] && connection->remote_piece_count[index] != "
-                              "file->piece_count)\n\t\tremote_pieces_forget(connection, index);\n", ""),
-                             "frame_have", "have-of-another-size"),
-    "bitmap-not-counted": (("\t\tconnection->remote_piece_count[index] = file->piece_count;\n", ""), "frame_have",
-                           "have-of-another-size"),
-    "read-beyond-bitmap": (("piece < connection->remote_piece_count[index] &&", ""), "remote_piece_had",
-                           "choose-within"),
-    "state-not-counted": (("\t\t\t\tconnection->remote_piece_count[index] = piece_count;\n", ""), "frame_state",
-                          "choose-within"),
-    "cleared-beyond-bitmap": (("else if (remote_piece_had(connection, body[0], piece))",
-                               "else if (connection->remote_pieces[body[0]])"), "frame_refuse", "refuse-within"),
-    "unplayable-left": (("\t\tdownload_unfinish(download->file_count);\n", ""), "download_finish",
-                        "finish-unplayable"),
+    "kept-across-downloads": (
+        ("\t\t\tremote_pieces_forget(connection, file);\n", ""),
+        "download_end",
+        "restart-forgets",
+    ),
+    "stale-bitmap-written": (
+        (
+            "\tif (connection->remote_pieces[index] && connection->remote_piece_count[index] != "
+            "file->piece_count)\n\t\tremote_pieces_forget(connection, index);\n",
+            "",
+        ),
+        "frame_have",
+        "have-of-another-size",
+    ),
+    "bitmap-not-counted": (
+        ("\t\tconnection->remote_piece_count[index] = file->piece_count;\n", ""),
+        "frame_have",
+        "have-of-another-size",
+    ),
+    "read-beyond-bitmap": (
+        ("piece < connection->remote_piece_count[index] &&", ""),
+        "remote_piece_had",
+        "choose-within",
+    ),
+    "state-not-counted": (
+        ("\t\t\t\tconnection->remote_piece_count[index] = piece_count;\n", ""),
+        "frame_state",
+        "choose-within",
+    ),
+    "cleared-beyond-bitmap": (
+        ("else if (remote_piece_had(connection, body[0], piece))", "else if (connection->remote_pieces[body[0]])"),
+        "frame_refuse",
+        "refuse-within",
+    ),
+    "unplayable-left": (("\t\tdownload_unfinish(download->file_count);\n", ""), "download_finish", "finish-unplayable"),
     "put-there-left": (("\t\t\tdownload_unfinish(index);\n", ""), "download_finish", "finish-refused"),
     "deleted-what-was-there": (("index < count", "index <= count"), "download_unfinish", "finish-refused"),
 }
 
-FUNCTIONS = ("get_long", "remote_piece_had", "remote_pieces_forget", "download_file_close", "request_remove",
-             "download_end", "download_unfinish", "download_finish", "piece_choose", "frame_state", "frame_have",
-             "frame_refuse")
+FUNCTIONS = (
+    "get_long",
+    "remote_piece_had",
+    "remote_pieces_forget",
+    "download_file_close",
+    "request_remove",
+    "download_end",
+    "download_unfinish",
+    "download_finish",
+    "piece_choose",
+    "frame_state",
+    "frame_have",
+    "frame_refuse",
+)
 
 
 def generated(fault=None, faulty_function=None):
     header = read("port/linux/game/map_share.h")
     source = read("port/linux/game/map_share.c")
     config = "#define P2P_MAP_SHARE_PORT %d\n" % constant(read("port/linux/src/p2p.h"), "P2P_MAP_SHARE_PORT")
-    config += "#define P2P_PLAYER_KEY_HASH_SIZE %d\n" % constant(read("port/linux/src/p2p.h"),
-                                                                 "P2P_PLAYER_KEY_HASH_SIZE")
+    config += "#define P2P_PLAYER_KEY_HASH_SIZE %d\n" % constant(
+        read("port/linux/src/p2p.h"), "P2P_PLAYER_KEY_HASH_SIZE"
+    )
     config += "#define HALO_PORT_MAXIMUM_NETWORK_MACHINES %d\n" % constant(
-        read("port/linux/include/halo_port_limits.h"), "HALO_PORT_MAXIMUM_NETWORK_MACHINES")
+        read("port/linux/include/halo_port_limits.h"), "HALO_PORT_MAXIMUM_NETWORK_MACHINES"
+    )
     config += enum_with(header, "MAP_SHARE_HASH_BYTES") + "\n"
-    for member in ("OFFER_TIMEOUT", "_have_none", "_download_none", "_file_awaiting_hashes",
-                   "_connection_connecting"):
+    for member in ("OFFER_TIMEOUT", "_have_none", "_download_none", "_file_awaiting_hashes", "_connection_connecting"):
         config += enum_with(source, member) + "\n"
-    for name in ("distributed_map_share_request", "download_file", "source", "download", "request", "serving",
-                 "connection", "host_machine", "map_share_globals"):
+    for name in (
+        "distributed_map_share_request",
+        "download_file",
+        "source",
+        "download",
+        "request",
+        "serving",
+        "connection",
+        "host_machine",
+        "map_share_globals",
+    ):
         config += structure(source, name) + "\n"
     text = ""
     for name in FUNCTIONS:

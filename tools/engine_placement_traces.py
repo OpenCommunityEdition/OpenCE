@@ -27,11 +27,38 @@ HOST = ROOT / "build" / "macos" / "halo_host"
 IMAGE = ROOT / "build" / "macos" / "halo_guest.elf"
 MAPS = ROOT / "assets" / "maps"
 TRACES = ROOT / "build" / "placement_traces"
-MULTIPLAYER = ("beavercreek", "bloodgulch", "boardingaction", "carousel", "chillout", "damnation", "hangemhigh",
-               "longest", "prisoner", "putput", "ratrace", "sidewinder", "wizard")
+MULTIPLAYER = (
+    "beavercreek",
+    "bloodgulch",
+    "boardingaction",
+    "carousel",
+    "chillout",
+    "damnation",
+    "hangemhigh",
+    "longest",
+    "prisoner",
+    "putput",
+    "ratrace",
+    "sidewinder",
+    "wizard",
+)
 CAMPAIGN = ("a10", "a30", "a50", "b30", "b40", "c10", "c20", "c40", "d20", "d40")
-COLUMNS = ("type", "block_index", "x", "y", "z", "forward_i", "forward_j", "forward_k", "up_i", "up_j", "up_k",
-           "regions", "parent", "tag")
+COLUMNS = (
+    "type",
+    "block_index",
+    "x",
+    "y",
+    "z",
+    "forward_i",
+    "forward_j",
+    "forward_k",
+    "up_i",
+    "up_j",
+    "up_k",
+    "regions",
+    "parent",
+    "tag",
+)
 NUMBER = r"-?[\d.]+(?:e[-+]?\d+)?"
 LINE = re.compile(r"placement trace: (\d+) (-?\d+)((?: " + NUMBER + r"){9}) ([\d.]+) (-?\d+) (.+)$")
 BEGIN = re.compile(r"placement trace: begin (.+)$")
@@ -71,16 +98,26 @@ def parse(output: str, scenario: str) -> tuple[list[list[str]], dict[str, int]]:
             return rows, {"bsp": bsp, "difficulty": difficulty, "count": count}
         match = LINE.search(line)
         if match:
-            rows.append([match.group(1), match.group(2), *match.group(3).split(), match.group(4), match.group(5),
-                         match.group(6)])
+            rows.append(
+                [
+                    match.group(1),
+                    match.group(2),
+                    *match.group(3).split(),
+                    match.group(4),
+                    match.group(5),
+                    match.group(6),
+                ]
+            )
     raise ValueError("the trace did not finish")
 
 
 def write(path: Path, rows: list[list[str]], bsp: int = 0) -> None:
     """A trace's rows as a CSV file (the tags quoted: some have spaces), and
     the structure BSP it ended in beside it, in a .bsp file."""
+
     def cell(value: str) -> str:
         return '"' + value.replace('"', '""') + '"' if any(c in value for c in ',"') else value
+
     path.write_text(",".join(COLUMNS) + "\n" + "".join(",".join(cell(value) for value in row) + "\n" for row in rows))
     path.with_suffix(".bsp").write_text(f"{bsp}\n")
 
@@ -94,15 +131,31 @@ def record(name: str, exit_after: int = 60, timeout: int = 300) -> tuple[list[li
         (data_root / "maps").symlink_to(MAPS)
         home = folder_path / "home"
         environment = dict(os.environ)
-        environment.update({
-            "HOME": str(home), "XDG_DATA_HOME": str(home / "saves"), "HALO_DATA_ROOT": str(data_root),
-            "HALO_EXIT_AFTER": str(exit_after), "HALO_NULL_RENDERER": "1", "HALO_HIDDEN_WINDOW": "1",
-            "SDL_VIDEO_DRIVER": "dummy", "SDL_AUDIO_DRIVER": "dummy",
-            "HALO_NETWORK_TEST": network_test(name), "HALO_NET_ADDRESS": "127.0.0.1",
-            "HALO_NET_ONLINE": "false", "HALO_PLACEMENT_TRACE": "true",
-        })
-        process = subprocess.Popen([str(HOST), str(IMAGE)], cwd=data_root, env=environment,
-                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+        environment.update(
+            {
+                "HOME": str(home),
+                "XDG_DATA_HOME": str(home / "saves"),
+                "HALO_DATA_ROOT": str(data_root),
+                "HALO_EXIT_AFTER": str(exit_after),
+                "HALO_NULL_RENDERER": "1",
+                "HALO_HIDDEN_WINDOW": "1",
+                "SDL_VIDEO_DRIVER": "dummy",
+                "SDL_AUDIO_DRIVER": "dummy",
+                "HALO_NETWORK_TEST": network_test(name),
+                "HALO_NET_ADDRESS": "127.0.0.1",
+                "HALO_NET_ONLINE": "false",
+                "HALO_PLACEMENT_TRACE": "true",
+            }
+        )
+        process = subprocess.Popen(
+            [str(HOST), str(IMAGE)],
+            cwd=data_root,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+        )
         output = ""
         try:
             assert process.stdout is not None
@@ -119,7 +172,9 @@ def record(name: str, exit_after: int = 60, timeout: int = 300) -> tuple[list[li
     try:
         return parse(output, scenario(name))
     except ValueError as error:
-        traced = "\n".join(line for line in output.splitlines() if "trace" in line or "crash" in line or "error" in line)
+        traced = "\n".join(
+            line for line in output.splitlines() if "trace" in line or "crash" in line or "error" in line
+        )
         raise RuntimeError(f"{name}: {error}\n{traced[-4000:]}") from None
 
 

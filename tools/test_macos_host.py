@@ -46,23 +46,31 @@ pytestmark = [
 def host_environment(data_root, home, exit_after, extra=None):
     environment = dict(os.environ)
     (home / "saves").mkdir(parents=True, exist_ok=True)
-    environment.update({
-        "HOME": str(home),
-        "XDG_DATA_HOME": str(home / "saves"),
-        "HALO_DATA_ROOT": str(data_root),
-        "HALO_EXIT_AFTER": str(exit_after),
-        "HALO_NULL_RENDERER": "1",
-        "HALO_HIDDEN_WINDOW": "1",
-        "SDL_VIDEO_DRIVER": "dummy",
-        "SDL_AUDIO_DRIVER": "dummy",
-        **(extra or {}),
-    })
+    environment.update(
+        {
+            "HOME": str(home),
+            "XDG_DATA_HOME": str(home / "saves"),
+            "HALO_DATA_ROOT": str(data_root),
+            "HALO_EXIT_AFTER": str(exit_after),
+            "HALO_NULL_RENDERER": "1",
+            "HALO_HIDDEN_WINDOW": "1",
+            "SDL_VIDEO_DRIVER": "dummy",
+            "SDL_AUDIO_DRIVER": "dummy",
+            **(extra or {}),
+        }
+    )
     return environment
 
 
 def run_host(data_root, home, exit_after=2, timeout=120, extra=None):
-    return subprocess.run([str(HOST), str(IMAGE)], cwd=data_root, env=host_environment(data_root, home, exit_after, extra),
-                          capture_output=True, text=True, timeout=timeout)
+    return subprocess.run(
+        [str(HOST), str(IMAGE)],
+        cwd=data_root,
+        env=host_environment(data_root, home, exit_after, extra),
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
 
 
 def test_the_guest_runs_its_main_and_exits_by_itself(tmp_path):
@@ -100,9 +108,18 @@ def game_data(tmp_path):
 
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game data in assets/maps")
 def test_a_hosted_network_game_plays_headless(tmp_path):
-    result = run_host(game_data(tmp_path), tmp_path / "home", exit_after=30, timeout=180,
-                      extra={"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ADDRESS": "127.0.0.1",
-                             "HALO_HOST_IMPORT_COUNTS": "1", "HALO_HOST_SAMPLE": "10"})
+    result = run_host(
+        game_data(tmp_path),
+        tmp_path / "home",
+        exit_after=30,
+        timeout=180,
+        extra={
+            "HALO_NETWORK_TEST": "host:bloodgulch",
+            "HALO_NET_ADDRESS": "127.0.0.1",
+            "HALO_HOST_IMPORT_COUNTS": "1",
+            "HALO_HOST_SAMPLE": "10",
+        },
+    )
     output = result.stdout + result.stderr
     assert result.returncode == 0, output[-4000:]
     assert "halo_host: guest crash" not in output, output[-4000:]
@@ -116,7 +133,7 @@ def test_a_hosted_network_game_plays_headless(tmp_path):
     exits = re.search(r"halo_host: exits: (\d+) in ([\d.]+) s, (\d+)/s", output)
     assert exits and int(exits[1]) > 0 and float(exits[2]) >= 25, output[-4000:]
     imports = re.findall(r"halo_host: import (\w+): (\d+), (\d+)/s", output)
-    assert ("host_syscall" in {name for name, _, _ in imports}), output[-4000:]
+    assert "host_syscall" in {name for name, _, _ in imports}, output[-4000:]
     assert sum(int(count) for _, count, _ in imports) <= int(exits[1])
     # the sampler (HALO_HOST_SAMPLE): where each vCPU's guest code was
     assert re.search(r"halo_host: sample: vCPU \d+ at 0x8[89ab][0-9a-f]{6}", output), output[-4000:]
@@ -137,15 +154,32 @@ HOSTING, JOINING = "127.0.0.2", "127.0.0.3"
 def two_copies(tmp_path, extra=None):
     """one copy hosting bloodgulch and one joining it, on loopback addresses
     of their own, with system link only; the output of each"""
+
     def start(name, test, address, other, exit_after):
         folder = tmp_path / name
         folder.mkdir()
         data_root = game_data(folder)
-        environment = host_environment(data_root, folder / "home", exit_after, {
-            "HALO_NETWORK_TEST": test, "HALO_NET_ADDRESS": address, "HALO_NET_BROADCAST": other,
-            "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false", **(extra or {})})
-        return subprocess.Popen([str(HOST), str(IMAGE)], cwd=data_root, env=environment, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True)
+        environment = host_environment(
+            data_root,
+            folder / "home",
+            exit_after,
+            {
+                "HALO_NETWORK_TEST": test,
+                "HALO_NET_ADDRESS": address,
+                "HALO_NET_BROADCAST": other,
+                "HALO_NET_ONLINE": "false",
+                "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+                **(extra or {}),
+            },
+        )
+        return subprocess.Popen(
+            [str(HOST), str(IMAGE)],
+            cwd=data_root,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
 
     host = start("host", "host:bloodgulch", HOSTING, JOINING, 60)
     client = start("client", "join", JOINING, HOSTING, 50)
@@ -168,9 +202,12 @@ def two_copies_available():
     return (MAPS / "bloodgulch.map").is_file() and bindable(HOSTING) and bindable(JOINING)
 
 
-TWO_COPIES = pytest.mark.skipif(not two_copies_available(), reason=(
-    f"needs the game data in assets/maps, and {HOSTING} and {JOINING} on lo0 "
-    "(sudo ifconfig lo0 alias <address> up)"))
+TWO_COPIES = pytest.mark.skipif(
+    not two_copies_available(),
+    reason=(
+        f"needs the game data in assets/maps, and {HOSTING} and {JOINING} on lo0 (sudo ifconfig lo0 alias <address> up)"
+    ),
+)
 # game.ragdolls and game.physics_debris on: each machine's own, cosmetic
 PHYSICS = {"HALO_RAGDOLLS": "true", "HALO_PHYSICS_DEBRIS": "true"}
 
@@ -192,10 +229,21 @@ def test_a_hosted_game_plays_with_ragdolls_and_debris_on(tmp_path):
     # (one copy, on 127.0.0.1: debug.network_test_crowd's thirty bipeds shot
     # dead and two hundred casings thrown, with the host's physics stepping
     # them, headless)
-    result = run_host(game_data(tmp_path), tmp_path / "home", exit_after=40, timeout=240,
-                      extra={"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ADDRESS": "127.0.0.1",
-                             "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
-                             "HALO_NETWORK_TEST_CROWD": "15", "HALO_HOST_PHYSICS_LOG": "1", **PHYSICS})
+    result = run_host(
+        game_data(tmp_path),
+        tmp_path / "home",
+        exit_after=40,
+        timeout=240,
+        extra={
+            "HALO_NETWORK_TEST": "host:bloodgulch",
+            "HALO_NET_ADDRESS": "127.0.0.1",
+            "HALO_NET_ONLINE": "false",
+            "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+            "HALO_NETWORK_TEST_CROWD": "15",
+            "HALO_HOST_PHYSICS_LOG": "1",
+            **PHYSICS,
+        },
+    )
     output = result.stdout + result.stderr
     assert result.returncode == 0, output[-4000:]
     assert "halo_host: guest crash" not in output, output[-4000:]
@@ -213,8 +261,9 @@ def test_the_network_version_is_unchanged():
     """the settings change nothing the machines send each other: the version is main's"""
     pattern = r"#define HALO_PORT_NETWORK_VERSION (\d+)"
     here = re.search(pattern, (ROOT / "port/linux/include/halo_port_limits.h").read_text())[1]
-    main = subprocess.run(["git", "show", "main:port/linux/include/halo_port_limits.h"], cwd=ROOT,
-                          capture_output=True, text=True)
+    main = subprocess.run(
+        ["git", "show", "main:port/linux/include/halo_port_limits.h"], cwd=ROOT, capture_output=True, text=True
+    )
     if main.returncode != 0:
         pytest.skip("no main branch to compare with")
     assert re.search(pattern, main.stdout)[1] == here

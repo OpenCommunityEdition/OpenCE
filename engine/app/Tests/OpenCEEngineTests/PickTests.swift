@@ -12,8 +12,9 @@ final class PickTests: XCTestCase {
     /// one pixel.
     func testTheNarrowedViewCentresThePixel() {
         let (width, height, x, y) = (480, 270, 100, 40)
-        let middle = SIMD4<Float>((2 * (Float(x) + 0.5)) / Float(width) - 1,
-                                  1 - (2 * (Float(y) + 0.5)) / Float(height), 0.5, 1)
+        let middle = SIMD4<Float>(
+            (2 * (Float(x) + 0.5)) / Float(width) - 1,
+            1 - (2 * (Float(y) + 0.5)) / Float(height), 0.5, 1)
         let narrowed = PickPass.narrowing(x: x, y: y, width: width, height: height) * (middle * 2)
         XCTAssertEqual(narrowed.x / narrowed.w, 0, accuracy: 1e-4)
         XCTAssertEqual(narrowed.y / narrowed.w, 0, accuracy: 1e-4)
@@ -27,10 +28,12 @@ final class PickTests: XCTestCase {
         let level = try StockLevel(map: "bloodgulch")
         let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
         let (width, height) = (480, 270)
-        XCTAssertNil(renderer.pick(x: 10, y: 10, width: width, height: height),
-                     "a pick before a frame")
-        _ = try renderer.capture(width: width, height: height, camera: level.camera, objects: level.objects,
-                                 queue: level.queue)
+        XCTAssertNil(
+            renderer.pick(x: 10, y: 10, width: width, height: height),
+            "a pick before a frame")
+        _ = try renderer.capture(
+            width: width, height: height, camera: level.camera, objects: level.objects,
+            queue: level.queue)
         let viewProjection = level.camera.viewProjection(aspect: Float(width) / Float(height))
         let ids = Set(level.objects.map(\.id))
         var picked = 0

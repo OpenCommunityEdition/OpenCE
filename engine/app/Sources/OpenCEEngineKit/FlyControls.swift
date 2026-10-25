@@ -43,11 +43,12 @@ public struct FlyControls: Equatable, Sendable {
         }
         let sprint = [Key.leftShift, Key.rightShift].contains(where: held.contains)
         // (the mouse right turns right, which is a negative yaw)
-        return InputState(buttons: sprint ? inputButtons().sprint : 0,
-                          forward: axis([Key.w], [Key.s]),
-                          right: axis([Key.d], [Key.a]),
-                          up: axis([Key.space], [Key.leftControl, Key.rightControl]),
-                          yaw: -turn(mouse.dx),
-                          pitch: invertPitch ? -turn(mouse.dy) : turn(mouse.dy))
+        return InputState(
+            buttons: sprint ? inputButtons().sprint : 0,
+            forward: axis([Key.w], [Key.s]),
+            right: axis([Key.d], [Key.a]),
+            up: axis([Key.space], [Key.leftControl, Key.rightControl]),
+            yaw: -turn(mouse.dx),
+            pitch: invertPitch ? -turn(mouse.dy) : turn(mouse.dy))
     }
 }

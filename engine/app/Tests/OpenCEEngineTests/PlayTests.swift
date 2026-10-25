@@ -9,8 +9,9 @@ final class PlayControlsTests: XCTestCase {
     func testTheBoundKeysAndMouseAreTheInput() {
         let controls = PlayControls(sensitivity: 0.001)
         let buttons = inputButtons()
-        XCTAssertEqual(controls.input(held: [], mouse: (0, 0)),
-                       InputState(buttons: 0, forward: 0, right: 0, up: 0, yaw: 0, pitch: 0))
+        XCTAssertEqual(
+            controls.input(held: [], mouse: (0, 0)),
+            InputState(buttons: 0, forward: 0, right: 0, up: 0, yaw: 0, pitch: 0))
         // W, D, Space and the left Control: forward, right, jump, crouch
         let held = controls.input(held: [13, 2, 49, 59], mouse: (250, -100))
         XCTAssertEqual([held.forward, held.right, held.up], [127, 127, 0])
@@ -53,8 +54,11 @@ final class PlayControlsTests: XCTestCase {
         for (code, button) in cases {
             XCTAssertEqual(controls.input(held: [code], mouse: (0, 0)).buttons, button, "\(code)")
         }
-        XCTAssertEqual([buttons.reload, buttons.swap, buttons.action, buttons.melee, buttons.grenade,
-                        buttons.zoom, buttons.switchGrenade], [16, 32, 64, 128, 256, 512, 1024])
+        XCTAssertEqual(
+            [
+                buttons.reload, buttons.swap, buttons.action, buttons.melee, buttons.grenade,
+                buttons.zoom, buttons.switchGrenade,
+            ], [16, 32, 64, 128, 256, 512, 1024])
     }
 
     func testTheViewTogglesOncePerPress() {
@@ -95,8 +99,9 @@ final class PlayControlsTests: XCTestCase {
         XCTAssertTrue(engine.setThirdPerson(thirdPerson: true))
         let behind = reader.acquire()
         XCTAssertEqual(behind.objects.count, drawn + 1)
-        let back = SIMD3<Float>(ran.position.x - behind.camera.current.position.x,
-                                ran.position.y - behind.camera.current.position.y, 0)
+        let back = SIMD3<Float>(
+            ran.position.x - behind.camera.current.position.x,
+            ran.position.y - behind.camera.current.position.y, 0)
         XCTAssertGreaterThan(simd_dot(back, simd_normalize(SIMD3(facing.x, facing.y, 0))), 0.5)
     }
 }

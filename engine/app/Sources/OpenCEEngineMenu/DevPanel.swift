@@ -21,9 +21,11 @@ public final class DevPanelModel {
         public var hitches: () -> [HitchLog.Entry]
         public var sounds: () -> [SoundClassCount]
 
-        public init(inspect: @escaping (UInt32) -> ShellOutput, gpu: @escaping () -> [PassTime],
-                    cpu: @escaping () -> [ScopeTime], hitches: @escaping () -> [HitchLog.Entry],
-                    sounds: @escaping () -> [SoundClassCount]) {
+        public init(
+            inspect: @escaping (UInt32) -> ShellOutput, gpu: @escaping () -> [PassTime],
+            cpu: @escaping () -> [ScopeTime], hitches: @escaping () -> [HitchLog.Entry],
+            sounds: @escaping () -> [SoundClassCount]
+        ) {
             self.inspect = inspect
             self.gpu = gpu
             self.cpu = cpu
@@ -33,9 +35,10 @@ public final class DevPanelModel {
 
         /// The engine's, the GPU timings' and the hitch log's.
         public static func engine(_ engine: Engine) -> Sources {
-            Sources(inspect: { engine.runCommand(line: "inspect object=\($0)") },
-                    gpu: { GpuTimings.shared.lastFrame }, cpu: { engine.frameScopes() },
-                    hitches: { HitchLog.shared.entries }, sounds: { engine.audioCensus() })
+            Sources(
+                inspect: { engine.runCommand(line: "inspect object=\($0)") },
+                gpu: { GpuTimings.shared.lastFrame }, cpu: { engine.frameScopes() },
+                hitches: { HitchLog.shared.entries }, sounds: { engine.audioCensus() })
         }
     }
 
@@ -121,12 +124,14 @@ public struct DevPanelView: View {
                     }
                     Text("CPU").padding(.top, 4)
                     ForEach(Array(model.cpu.enumerated()), id: \.offset) { _, scope in
-                        row(String(repeating: "  ", count: Int(min(scope.depth, 8)) + 1) + scope.name,
+                        row(
+                            String(repeating: "  ", count: Int(min(scope.depth, 8)) + 1) + scope.name,
                             String(format: "%.2f", scope.milliseconds))
                     }
                     Text(model.hitches.isEmpty ? "No hitches" : "Hitches").padding(.top, 4)
                     ForEach(Array(model.hitches.enumerated()), id: \.offset) { _, hitch in
-                        row("  \(hitch.kind.rawValue) \(hitch.cause) ×\(hitch.count)",
+                        row(
+                            "  \(hitch.kind.rawValue) \(hitch.cause) ×\(hitch.count)",
                             String(format: "%.1f", hitch.longestMilliseconds))
                     }
                 }

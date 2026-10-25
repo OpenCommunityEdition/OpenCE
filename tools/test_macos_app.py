@@ -48,9 +48,18 @@ def test_app_graph(monkeypatch):
     from tools.macos_build import generate_macos_build
 
     monkeypatch.chdir(ROOT)
-    sln = SimpleNamespace(build_dir=Path("build"), linux_cc=None, compiler_launcher=None, port_release=False,
-                          port_profile=False, port_lto="full", port_portable=False, port_pgo="off",
-                          port_pgo_profile=None, macos_guest_cc=None)
+    sln = SimpleNamespace(
+        build_dir=Path("build"),
+        linux_cc=None,
+        compiler_launcher=None,
+        port_release=False,
+        port_profile=False,
+        port_lto="full",
+        port_portable=False,
+        port_pgo="off",
+        port_pgo_profile=None,
+        macos_guest_cc=None,
+    )
     out = io.StringIO()
     n = ninja_syntax.Writer(out)
     n.variable("python", f'"{sys.executable}"')
@@ -70,8 +79,12 @@ def test_app_graph(monkeypatch):
     assert command and command.group(1).startswith("rm -f build/macos/swift/release/OpenCE && "), command
     # and with the runtime's Swift bindings, generated from its library
     assert "port/macos/app/Sources/OpenCERuntime/opence_runtime.swift" in inputs
-    bindings = re.search(r"^build (port/macos/app/Sources/OpenCERuntime/opence_runtime\.swift .*): "
-                         r"macos_swift_bindings (.*)$", flat, re.MULTILINE)
+    bindings = re.search(
+        r"^build (port/macos/app/Sources/OpenCERuntime/opence_runtime\.swift .*): "
+        r"macos_swift_bindings (.*)$",
+        flat,
+        re.MULTILINE,
+    )
     assert bindings and "port/macos/app/Sources/opence_runtimeFFI/module.modulemap" in bindings.group(1)
     assert bindings.group(2).startswith("build/macos/cargo/release/libopence_runtime.a")
     assert re.search(r"^build macos_app_test: macos_app_test .*port/macos/app/Tests/", flat, re.MULTILINE)
@@ -98,8 +111,7 @@ def test_bundle_signature_has_the_hypervisor_entitlement():
     # (Apple's codesign: the Nix shell's, sigtool's, signs only executables)
     verify = subprocess.run([CODESIGN, "--verify", "--strict", str(APP)], capture_output=True, text=True)
     assert verify.returncode == 0, verify.stderr
-    entitlements = subprocess.run([CODESIGN, "-d", "--entitlements", "-", "--xml", str(APP)],
-                                  capture_output=True)
+    entitlements = subprocess.run([CODESIGN, "-d", "--entitlements", "-", "--xml", str(APP)], capture_output=True)
     assert entitlements.returncode == 0, entitlements.stderr
     assert plistlib.loads(entitlements.stdout).get("com.apple.security.hypervisor") is True
 
@@ -112,19 +124,29 @@ def test_app_runs_the_guest_beside_appkit(tmp_path):
     # AppKit has the main thread; the host ends the process at exit_after
     (tmp_path / "maps").symlink_to(ROOT / "assets/maps")
     (tmp_path / "home").mkdir()
-    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(tmp_path), HALO_EXIT_AFTER="3",
-                       HALO_NULL_RENDERER="1", HALO_HIDDEN_WINDOW="1", SDL_VIDEO_DRIVER="dummy",
-                       SDL_AUDIO_DRIVER="dummy")
-    run = subprocess.run([str(APP / "Contents/MacOS/OpenCE")], cwd=tmp_path, env=environment, capture_output=True,
-                         text=True, timeout=120)
+    environment = dict(
+        os.environ,
+        HOME=str(tmp_path / "home"),
+        HALO_DATA_ROOT=str(tmp_path),
+        HALO_EXIT_AFTER="3",
+        HALO_NULL_RENDERER="1",
+        HALO_HIDDEN_WINDOW="1",
+        SDL_VIDEO_DRIVER="dummy",
+        SDL_AUDIO_DRIVER="dummy",
+    )
+    run = subprocess.run(
+        [str(APP / "Contents/MacOS/OpenCE")], cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=120
+    )
     assert run.returncode == 0, run.stderr[-2000:]
     assert "exiting after debug.exit_after" in run.stderr + run.stdout
     assert "starting main menu music" in (tmp_path / "debug.txt").read_text(errors="replace")
 
 
 @on_macos
-@pytest.mark.skipif(shutil.which("ninja") is None or not (ROOT / "build.ninja").is_file(),
-                    reason="needs ninja and a configured build (nix develop)")
+@pytest.mark.skipif(
+    shutil.which("ninja") is None or not (ROOT / "build.ninja").is_file(),
+    reason="needs ninja and a configured build (nix develop)",
+)
 def test_swift_tests_pass():
     # the package's tests, incl. the runtime's guest memory view through
     # its bindings (port/macos/app/Tests)

@@ -33,8 +33,10 @@ final class TextTests: XCTestCase {
         XCTAssertGreaterThan(ratio, 2.5)
         XCTAssertLessThan(ratio, 6)
         XCTAssertThrowsError(try GlyphAtlas(url: url, scale: 0, device: try device()))
-        XCTAssertThrowsError(try GlyphAtlas(url: URL(fileURLWithPath: "/nonexistent.ttf"), scale: 1,
-                                            device: try device()))
+        XCTAssertThrowsError(
+            try GlyphAtlas(
+                url: URL(fileURLWithPath: "/nonexistent.ttf"), scale: 1,
+                device: try device()))
     }
 
     func testTheFontsLicenceAndChecksumArePresent() throws {
@@ -54,8 +56,9 @@ final class TextTests: XCTestCase {
         let atlas = try GlyphAtlas(url: try XCTUnwrap(GlyphAtlas.url()), scale: 2, device: device)
         let pass = try TextPass(device: device, atlas: atlas, outputFormat: .bgra8Unorm)
         let (width, height) = (256, 64)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width,
-                                                                  height: height, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: width,
+            height: height, mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .shared
         let target = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
@@ -72,8 +75,9 @@ final class TextTests: XCTestCase {
             commands.commit()
             commands.waitUntilCompleted()
             var bytes = [UInt8](repeating: 0, count: width * height * 4)
-            target.getBytes(&bytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height),
-                            mipmapLevel: 0)
+            target.getBytes(
+                &bytes, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height),
+                mipmapLevel: 0)
             return bytes
         }
         func lit(_ bytes: [UInt8], x: Range<Int>, y: Range<Int>) -> Int {

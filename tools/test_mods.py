@@ -99,22 +99,25 @@ class MapTags:
         data = path.read_bytes()
         data = data[:0x800] + zlib.decompress(data[0x800:])
         offset, size = struct.unpack_from("<ii", data, 0x10)
-        self.tags = data[offset:offset + size]
+        self.tags = data[offset : offset + size]
         instances, _, _, count = struct.unpack_from("<IiIi", self.tags, 0)
         self.instances = {}
         for index in range(count):
-            group, _, _, tag_index, name, definition, _, _ = struct.unpack_from("<4sIIiIIII", self.tags,
-                                                                                 instances - TAG_BASE + index * 0x20)
+            group, _, _, tag_index, name, definition, _, _ = struct.unpack_from(
+                "<4sIIiIIII", self.tags, instances - TAG_BASE + index * 0x20
+            )
             self.instances[tag_index] = (group[::-1], self.string(name), definition)
 
     def string(self, address: int) -> str:
         start = address - TAG_BASE
-        return self.tags[start:self.tags.index(b"\0", start)].decode()
+        return self.tags[start : self.tags.index(b"\0", start)].decode()
 
     def block(self, address: int, offset: int, size: int) -> list:
         """a block's elements (the bytes of each) of the structure at `address`"""
         count, elements = struct.unpack_from("<iI", self.tags, address - TAG_BASE + offset)
-        return [(elements + size * index, self.tags[elements - TAG_BASE + size * index:][:size]) for index in range(count)]
+        return [
+            (elements + size * index, self.tags[elements - TAG_BASE + size * index :][:size]) for index in range(count)
+        ]
 
     def find(self, group: bytes, name: str) -> int:
         for group_found, name_found, definition in self.instances.values():
@@ -123,15 +126,16 @@ class MapTags:
         raise LookupError(name)
 
 
-def model_file(tags: MapTags, name: str, move_marker: bool = False, rename_node: bool = False,
-               gbxmodel: bool = False) -> bytes:
+def model_file(
+    tags: MapTags, name: str, move_marker: bool = False, rename_node: bool = False, gbxmodel: bool = False
+) -> bytes:
     """A model tag file (the Xbox's .model, as invader-extract writes one, or Halo PC's .gbxmodel) of the map's model
     `name`: its nodes, regions, permutations and markers (on its permutations, as the tool keeps them), its detail
     levels' cutoffs (from super high to super low, as a tag file has them), one shader of the map's, and geometry of
     its own, one triangle on its first node, its links to other parts the tool's none (0 and 0); its first marker
     moved, or its first node renamed."""
     model = tags.find(b"mode", name)
-    root = tags.tags[model - TAG_BASE:][:0xE8]
+    root = tags.tags[model - TAG_BASE :][:0xE8]
     nodes = tags.block(model, 0xB8, 0x9C)
     regions = tags.block(model, 0xC4, 0x4C)
     shader = tags.block(model, 0xDC, 0x20)[0][1]
@@ -154,8 +158,11 @@ def model_file(tags: MapTags, name: str, move_marker: bool = False, rename_node:
         out += struct.pack(">I", count) + bytes(8)
     for index, (_, node) in enumerate(nodes):
         node_name = (b"renamed" if rename_node and index == 0 else node[:32].split(b"\0")[0]).ljust(32, b"\0")
-        out += node_name + struct.pack(">3h2x3f4ff", *struct.unpack_from("<3h", node, 32),
-                                       *struct.unpack_from("<3f4ff", node, 40)) + bytes(0x9C - 0x48)
+        out += (
+            node_name
+            + struct.pack(">3h2x3f4ff", *struct.unpack_from("<3h", node, 32), *struct.unpack_from("<3f4ff", node, 40))
+            + bytes(0x9C - 0x48)
+        )
     permutations = []
     for region_index, (address, region) in enumerate(regions):
         perms = tags.block(address, 0x40, 0x58)
@@ -164,9 +171,14 @@ def model_file(tags: MapTags, name: str, move_marker: bool = False, rename_node:
     for region_index, perms in enumerate(permutations):
         for permutation_index, (_, permutation) in enumerate(perms):
             geometries = [0 if index != -1 else -1 for index in struct.unpack_from("<5h", permutation, 0x40)]
-            out += (permutation[:0x20] + struct.pack(">I", struct.unpack_from("<I", permutation, 0x20)[0]) +
-                    bytes(0x40 - 0x24) + struct.pack(">5h2x", *geometries) +
-                    struct.pack(">I", len(markers.get((region_index, permutation_index), []))) + bytes(8))
+            out += (
+                permutation[:0x20]
+                + struct.pack(">I", struct.unpack_from("<I", permutation, 0x20)[0])
+                + bytes(0x40 - 0x24)
+                + struct.pack(">5h2x", *geometries)
+                + struct.pack(">I", len(markers.get((region_index, permutation_index), [])))
+                + bytes(8)
+            )
         for permutation_index in range(len(perms)):
             for name_bytes, node, rotation, translation in markers.get((region_index, permutation_index), []):
                 out += name_bytes + struct.pack(">h2x4f3f", node, *rotation, *translation) + bytes(16)
@@ -206,14 +218,29 @@ def run_game(game: Path, data: Path, saves: Path) -> str:
     # (a window, hidden on a display of its own: debug.exit_after ends a
     # game that has one, and the textures are loaded, a bitmap's from its
     # file; such a run is never asked about mods that conflict)
-    environment = {**os.environ, "HALO_DATA_ROOT": str(data), "HALO_SAVE_ROOT": str(saves),
-                   "HALO_EXIT_AFTER": "25", "HALO_HIDDEN_WINDOW": "1", "SDL_VIDEO_DRIVER": "x11",
-                   "HALO_DISPLAY_MODE": "windowed", "HALO_WINDOW_SIZE": "640x480",
-                   "HALO_RESOLUTION_SCALING": "original", "HALO_VOLUME": "0", "HALO_NET_ONLINE": "0"}
+    environment = {
+        **os.environ,
+        "HALO_DATA_ROOT": str(data),
+        "HALO_SAVE_ROOT": str(saves),
+        "HALO_EXIT_AFTER": "25",
+        "HALO_HIDDEN_WINDOW": "1",
+        "SDL_VIDEO_DRIVER": "x11",
+        "HALO_DISPLAY_MODE": "windowed",
+        "HALO_WINDOW_SIZE": "640x480",
+        "HALO_RESOLUTION_SCALING": "original",
+        "HALO_VOLUME": "0",
+        "HALO_NET_ONLINE": "0",
+    }
     environment.pop("WAYLAND_DISPLAY", None)
-    process = subprocess.Popen(["xvfb-run", "-a", "-s", "-screen 0 640x480x24", str(game)], cwd=game.parent,
-                            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                            start_new_session=True)
+    process = subprocess.Popen(
+        ["xvfb-run", "-a", "-s", "-screen 0 640x480x24", str(game)],
+        cwd=game.parent,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        start_new_session=True,
+    )
     try:
         output, _ = process.communicate(timeout=180)
     except subprocess.TimeoutExpired:
@@ -240,11 +267,14 @@ def test_a_mod_plays_over_the_map(game, tmp_path):
     data, saves = tmp_path / "data", tmp_path / "saves"
     data.mkdir()
     saves.mkdir()
-    write_mod(data, {
-        f"{SOUND}.sound": sound_file(),
-        f"{BITMAP}.bitmap": bitmap_file(),
-        f"{STRINGS}.unicode_string_list": strings_file(["MOD TEXT"] * 4),
-    })
+    write_mod(
+        data,
+        {
+            f"{SOUND}.sound": sound_file(),
+            f"{BITMAP}.bitmap": bitmap_file(),
+            f"{STRINGS}.unicode_string_list": strings_file(["MOD TEXT"] * 4),
+        },
+    )
     lines = run_game(game, data, saves)
     assert "1 string lists from their files (1 new)" in lines, lines
     assert "1 bitmaps from their files (1 new)" in lines, lines
@@ -260,11 +290,14 @@ def test_damaged_files_are_left_out(game, tmp_path):
     struct.pack_into(">I", sound, 0x40 + 0x98, 0x7FFFFFFF)  # more pitch ranges than the file holds
     strings = bytearray(strings_file(["MOD TEXT"]))
     struct.pack_into(">I", strings, 0x4C, 0x10000)  # a string past the file's end
-    write_mod(data, {
-        f"{SOUND}.sound": bytes(sound),
-        f"{BITMAP}.bitmap": bitmap_file()[:-8],  # cut short
-        f"{STRINGS}.unicode_string_list": bytes(strings),
-    })
+    write_mod(
+        data,
+        {
+            f"{SOUND}.sound": bytes(sound),
+            f"{BITMAP}.bitmap": bitmap_file()[:-8],  # cut short
+            f"{STRINGS}.unicode_string_list": bytes(strings),
+        },
+    )
     lines = run_game(game, data, saves)
     assert "0 string lists from their files (0 new), 0 given back, 1 left out" in lines, lines
     assert "0 bitmaps from their files (0 new), 0 given back, 1 left out" in lines, lines
@@ -319,9 +352,14 @@ def test_models(game, tmp_path):
     # (the Xbox's .model), it changes what the machines agree on, and is left out
     data, saves = folders(tmp_path)
     tags = MapTags(MAPS / "bloodgulch.map")
-    write_mod(data, {f"{FP_MODEL}.gbxmodel": model_file(tags, FP_MODEL, gbxmodel=True),
-                     f"{MODEL}.model": model_file(tags, MODEL, move_marker=True),
-                     f"{VEHICLE_MODEL}.model": model_file(tags, VEHICLE_MODEL, rename_node=True)})
+    write_mod(
+        data,
+        {
+            f"{FP_MODEL}.gbxmodel": model_file(tags, FP_MODEL, gbxmodel=True),
+            f"{MODEL}.model": model_file(tags, MODEL, move_marker=True),
+            f"{VEHICLE_MODEL}.model": model_file(tags, VEHICLE_MODEL, rename_node=True),
+        },
+    )
     lines = run_game(game, data, saves)
     assert "its markers are not the map's" in lines, lines
     assert "its nodes are not the map's" in lines, lines

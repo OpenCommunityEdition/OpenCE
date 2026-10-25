@@ -14,19 +14,27 @@ CASES = ["drawn-in-the-game", "not-over-a-menu", "time-goes-on-under-a-menu"]
 # a fault in cinematic_render and the case that must catch it
 NEGATIVE_CONTROLS = {
     "drawn-over-a-menu": (("if (!ui_widgets_active())", "if (TRUE)"), "not-over-a-menu"),
-    "time-stops-under-a-menu": (("active_title->time += game_time_get_paused()",
-                                 "active_title->time += ui_widgets_active() || game_time_get_paused()"),
-                                "time-goes-on-under-a-menu"),
+    "time-stops-under-a-menu": (
+        (
+            "active_title->time += game_time_get_paused()",
+            "active_title->time += ui_widgets_active() || game_time_get_paused()",
+        ),
+        "time-goes-on-under-a-menu",
+    ),
 }
 
 
 def generated(fault=None):
     cinematics = read("source/cutscene/cinematics.c")
     header = read("source/cutscene/cinematics.h")
-    config = "enum { MAXIMUM_QUEUED_CINEMATIC_TITLES = %d };\n" % constant(cinematics,
-                                                                          "MAXIMUM_QUEUED_CINEMATIC_TITLES")
-    for source, name in ((cinematics, "scenario_cutscene_title"), (header, "cinematic_title"),
-                         (header, "cinematic_global_data")):
+    config = "enum { MAXIMUM_QUEUED_CINEMATIC_TITLES = %d };\n" % constant(
+        cinematics, "MAXIMUM_QUEUED_CINEMATIC_TITLES"
+    )
+    for source, name in (
+        (cinematics, "scenario_cutscene_title"),
+        (header, "cinematic_title"),
+        (header, "cinematic_global_data"),
+    ):
         config += structure(source, name) + "\n"
     code = function(cinematics, "cinematic_render")
     if fault:

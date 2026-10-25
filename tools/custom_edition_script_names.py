@@ -57,15 +57,20 @@ CONSTANT_TYPES = (BOOLEAN, REAL, SHORT, LONG, STRING)
 C_STRING = r'(?:(?:"(?:[^"\\]|\\.)*"\s*)+|NULL)'
 FUNCTION_DEFINITION = re.compile(
     r'_definition\s*=\s*\{\s*\{?\s*(_hs_\w+),\s*\w+,\s*"([^"]+)",\s*(\w+),\s*\w+,\s*'
-    + C_STRING + r',\s*' + C_STRING + r',\s*(\d+)\s*,?\s*(?:\{([^}]*)\})?'
+    + C_STRING
+    + r',\s*'
+    + C_STRING
+    + r',\s*(\d+)\s*,?\s*(?:\{([^}]*)\})?'
     # (the parameters past the first, in the definition's own array)
-    r'(?:\s*,?\s*\},?\s*\{([^}]*)\})?', re.S)
+    r'(?:\s*,?\s*\},?\s*\{([^}]*)\})?',
+    re.S,
+)
 
 
 def build_types():
     """hs.h's value types, by name, numbered as in the enumeration"""
     body = (SOURCE / "hs.h").read_text(encoding="latin-1")
-    body = body[body.index("_hs_unparsed = 0"):body.index("NUMBER_OF_HS_TYPES")]
+    body = body[body.index("_hs_unparsed = 0") : body.index("NUMBER_OF_HS_TYPES")]
     return {name: number for number, name in enumerate(re.findall(r'(_hs_\w+)', body))}
 
 
@@ -75,11 +80,17 @@ def build_names():
     types = build_types()
     functions = {}
     for return_type, name, parser, count, first, rest in FUNCTION_DEFINITION.findall(
-            (SOURCE / "hs.c").read_text(encoding="latin-1")):
-        parameters = [types.get(parameter.strip()) for parameter in (first + "," + rest).split(",") if parameter.strip()]
-        functions[name.lower()] = (types.get(return_type), parser, parameters[:int(count)])
-    globals_ = set(re.findall(r'definition\s*=\s*\{\s*"([a-z0-9_]+)"',
-                              (SOURCE / "hs_globals_external.c").read_text(encoding="latin-1")))
+        (SOURCE / "hs.c").read_text(encoding="latin-1")
+    ):
+        parameters = [
+            types.get(parameter.strip()) for parameter in (first + "," + rest).split(",") if parameter.strip()
+        ]
+        functions[name.lower()] = (types.get(return_type), parser, parameters[: int(count)])
+    globals_ = set(
+        re.findall(
+            r'definition\s*=\s*\{\s*"([a-z0-9_]+)"', (SOURCE / "hs_globals_external.c").read_text(encoding="latin-1")
+        )
+    )
     return functions, {name.lower() for name in globals_}
 
 
@@ -97,7 +108,7 @@ class MapScripts:
         self.nodes = []
         if len(syntax) >= DATA_ARRAY_BYTES:
             maximum, size = struct.unpack_from("<hh", syntax, 32)
-            count, = struct.unpack_from("<h", syntax, 46)
+            (count,) = struct.unpack_from("<h", syntax, 46)
             if size != SYNTAX_NODE_BYTES:
                 raise ValueError(f"{path}: syntax nodes of {size} bytes")
             for index in range(count):
@@ -115,22 +126,22 @@ class MapScripts:
                 self.globals[name] += 1
 
     def data(self, offset):
-        size, = struct.unpack_from("<I", self.cache.tag_data, self.scenario + offset)
-        address, = struct.unpack_from("<I", self.cache.tag_data, self.scenario + offset + TAG_DATA_ADDRESS)
+        (size,) = struct.unpack_from("<I", self.cache.tag_data, self.scenario + offset)
+        (address,) = struct.unpack_from("<I", self.cache.tag_data, self.scenario + offset + TAG_DATA_ADDRESS)
         start = address - self.cache.base
         if not size or not 0 <= start <= len(self.cache.tag_data) - size:
             return b""
-        return self.cache.tag_data[start:start + size]
+        return self.cache.tag_data[start : start + size]
 
     def block(self, offset, element_bytes):
         count, address = struct.unpack_from("<iI", self.cache.tag_data, self.scenario + offset)
         start = address - self.cache.base
-        return [self.cache.tag_data[start + i * element_bytes:start + (i + 1) * element_bytes] for i in range(count)]
+        return [self.cache.tag_data[start + i * element_bytes : start + (i + 1) * element_bytes] for i in range(count)]
 
     def string(self, offset):
         if not 0 <= offset < len(self.strings):
             return None
-        return self.strings[offset:self.strings.index(b"\0", offset)].decode("latin-1").lower()
+        return self.strings[offset : self.strings.index(b"\0", offset)].decode("latin-1").lower()
 
     def uses(self, node):
         """("function" or "global", name) for a call or an engine global
@@ -222,8 +233,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--all", action="store_true", help="list every name used, not only the missing ones")
     parser.add_argument("--scripts", action="store_true", help="list each map's scripts")
-    parser.add_argument("--source", metavar="SCRIPT", action="append", default=[],
-                        help="write out a script's source (any number; * for every script)")
+    parser.add_argument(
+        "--source",
+        metavar="SCRIPT",
+        action="append",
+        default=[],
+        help="write out a script's source (any number; * for every script)",
+    )
     parser.add_argument("paths", nargs="+")
     arguments = parser.parse_args(argv)
 
@@ -250,8 +266,13 @@ def main(argv=None):
         if arguments.scripts:
             print(f"{path.stem}: {len(scripts.nodes)} nodes")
             for name, script_type, root in scripts.scripts():
-                missing = sorted({used for kind, used in map(scripts.uses, (scripts.nodes[i] for i in scripts.reached(root)))
-                                  if kind and used and used not in (functions if kind == "function" else globals_)})
+                missing = sorted(
+                    {
+                        used
+                        for kind, used in map(scripts.uses, (scripts.nodes[i] for i in scripts.reached(root)))
+                        if kind and used and used not in (functions if kind == "function" else globals_)
+                    }
+                )
                 print(f"  {script_type:<10} {name}" + (f"  (missing: {', '.join(missing)})" if missing else ""))
         for name, script_type, root in scripts.scripts():
             if name in arguments.source or "*" in arguments.source:
@@ -270,8 +291,10 @@ def main(argv=None):
 
     print(f"\ncalls whose arguments differ from this build's parameters: {len(mismatches)}")
     for (name, arguments_types), maps in sorted(mismatches.items(), key=lambda item: (-len(item[1]), item[0])):
-        print(f"  {name}({signature(arguments_types)}), here ({signature(functions[name][2])})"
-              f"  ({len(maps)}: {', '.join(sorted(maps)[:6])})")
+        print(
+            f"  {name}({signature(arguments_types)}), here ({signature(functions[name][2])})"
+            f"  ({len(maps)}: {', '.join(sorted(maps)[:6])})"
+        )
 
 
 if __name__ == "__main__":

@@ -8,14 +8,35 @@ def part(number, intervals, last, frames_before, ticks_before):
     frames = 60 * len(intervals)
     ticks = 30 * len(intervals)
     header = {
-        "format": 1, "build": "0 debug profile", "platform": "windows", "role": "host", "own_machine": -1,
-        "map": "levels\\a30\\a30", "map_name": "a30", "gametype": "campaign",
-        "players": 3 if number == 1 else 4, "players_most": 4, "start_utc": "2026-10-05 14:22:33",
-        "recording": "profile_20261005-142233_host", "part": number, "last_part": last,
-        "first_frame": frames_before, "frames": frames,
-        "first_tick": ticks_before, "ticks": ticks, "start_s": float(intervals[0]), "duration_s": float(len(intervals)),
-        "stop_reason": "command" if last else "", "clock_read_ns": 21.5, "memory_used": 1000, "memory_limit": 16777216,
-        "writer_wait_ms": 0.0, "foreign_scopes": 0, "deep_scopes": 0, "unbalanced_scopes": 0, "dropped_scopes": 0,
+        "format": 1,
+        "build": "0 debug profile",
+        "platform": "windows",
+        "role": "host",
+        "own_machine": -1,
+        "map": "levels\\a30\\a30",
+        "map_name": "a30",
+        "gametype": "campaign",
+        "players": 3 if number == 1 else 4,
+        "players_most": 4,
+        "start_utc": "2026-10-05 14:22:33",
+        "recording": "profile_20261005-142233_host",
+        "part": number,
+        "last_part": last,
+        "first_frame": frames_before,
+        "frames": frames,
+        "first_tick": ticks_before,
+        "ticks": ticks,
+        "start_s": float(intervals[0]),
+        "duration_s": float(len(intervals)),
+        "stop_reason": "command" if last else "",
+        "clock_read_ns": 21.5,
+        "memory_used": 1000,
+        "memory_limit": 16777216,
+        "writer_wait_ms": 0.0,
+        "foreign_scopes": 0,
+        "deep_scopes": 0,
+        "unbalanced_scopes": 0,
+        "dropped_scopes": 0,
         "dropped_scopes": 0,
     }
     halo = {"header": header}
@@ -26,12 +47,22 @@ def part(number, intervals, last, frames_before, ticks_before):
         ["network_distributed_tick", ticks, 0.6 * ticks, 0.6, 4.0, 0.5, 0.6],
         ["render", frames, 4.0 * frames, 4.0, 9.8, 1.0, None],
     ]
-    worst = [[frames_before + 12, frames_before / 60.0 + 0.2, 41.2 - number, 2,
-              [["game_tick.objects", 12.1], ["render", 9.8], ["network_distributed_tick", 4.0]]]]
-    cpu = {"frames": frames, "ticks": ticks,
-           "columns": ["name", "count", "total_ms", "mean_ms", "max_ms", "per_frame", "per_tick_ms"],
-           "rows": cpu_rows, "worst_frames": {"columns": ["frame", "at_s", "frame_ms", "ticks", "longest"],
-                                              "rows": worst}}
+    worst = [
+        [
+            frames_before + 12,
+            frames_before / 60.0 + 0.2,
+            41.2 - number,
+            2,
+            [["game_tick.objects", 12.1], ["render", 9.8], ["network_distributed_tick", 4.0]],
+        ]
+    ]
+    cpu = {
+        "frames": frames,
+        "ticks": ticks,
+        "columns": ["name", "count", "total_ms", "mean_ms", "max_ms", "per_frame", "per_tick_ms"],
+        "rows": cpu_rows,
+        "worst_frames": {"columns": ["frame", "at_s", "frame_ms", "ticks", "longest"], "rows": worst},
+    }
     return halo, cpu
 
 
@@ -43,8 +74,9 @@ def write_part(path, halo, cpu):
             continue
         lines[-1] += ","
         lines.append(f'"{name}": {{"columns": {json.dumps(table["columns"])}, "rows": [')
-        lines.extend(json.dumps(row) + ("," if index < len(table["rows"]) - 1 else "")
-                     for index, row in enumerate(table["rows"]))
+        lines.extend(
+            json.dumps(row) + ("," if index < len(table["rows"]) - 1 else "") for index, row in enumerate(table["rows"])
+        )
         lines.append("]}")
     lines[-1] += "},"
     lines.append('"cpu_summary": ' + json.dumps(cpu) + ",")

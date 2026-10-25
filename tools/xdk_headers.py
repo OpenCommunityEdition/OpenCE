@@ -29,9 +29,24 @@ from typing import Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pdb200_types import (  # noqa: E402
-    BASIC, LF_ARRAY, LF_BITFIELD, LF_CLASS, LF_ENUM, LF_MODIFIER,
-    LF_POINTER, LF_PROCEDURE, LF_STRUCTURE, LF_UNION, Aggregate, Member, Pdb, PdbError, numeric,
-    u8, u16, u32,
+    BASIC,
+    LF_ARRAY,
+    LF_BITFIELD,
+    LF_CLASS,
+    LF_ENUM,
+    LF_MODIFIER,
+    LF_POINTER,
+    LF_PROCEDURE,
+    LF_STRUCTURE,
+    LF_UNION,
+    Aggregate,
+    Member,
+    Pdb,
+    PdbError,
+    numeric,
+    u8,
+    u16,
+    u32,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -103,17 +118,20 @@ class Writer:
         """A typedef's types, best first: where units disagree, a C unit's
         (not a C++ class's, nor an unrelated structure that took the same
         name)."""
+
         def rank(index: int) -> Tuple[bool, bool]:
             item = self.pdb.aggregates.get(index)
             return (bool(item and item.cplusplus), bool(item and item.name == name))
+
         return sorted(self.pdb.typedefs[name], key=rank)
 
     def _typedef_type(self, name: str) -> int:
         choices = self._typedef_choices(name)
         rendered = {self.declaration(t, name) for t in choices}
         if len(rendered) > 1:
-            self.warnings.append(f"typedef {name} has {len(rendered)} definitions; using "
-                                 f"{self.declaration(choices[0], name)}")
+            self.warnings.append(
+                f"typedef {name} has {len(rendered)} definitions; using {self.declaration(choices[0], name)}"
+            )
         return choices[0]
 
     def _procedure_type(self, name: str) -> int:
@@ -133,9 +151,10 @@ class Writer:
             # a static copy's convention can differ where a unit took the
             # function's address; the most common (then stdcall) wins
             conventions = [self.pdb.procedure(p.type)[1] for p in chosen]
-            best = max(by_prototype.values(),
-                       key=lambda t: (conventions.count(self.pdb.procedure(t)[1]),
-                                      self.pdb.procedure(t)[1] == "__stdcall"))
+            best = max(
+                by_prototype.values(),
+                key=lambda t: (conventions.count(self.pdb.procedure(t)[1]), self.pdb.procedure(t)[1] == "__stdcall"),
+            )
             self.warnings.append(f"{name} has {len(by_prototype)} prototypes; using {self.prototype(name, best)}")
             return best
         return next(iter(by_prototype.values()))
@@ -505,8 +524,10 @@ class Writer:
             for member in self.pdb.members(item):
                 if not member.name or self.bitfield(member):
                     continue
-                lines.append(f"_Static_assert(__builtin_offsetof({kind} {name}, {member.name}) == {member.offset}, "
-                             f"\"{name} {member.name}\");")
+                lines.append(
+                    f"_Static_assert(__builtin_offsetof({kind} {name}, {member.name}) == {member.offset}, "
+                    f"\"{name} {member.name}\");"
+                )
             checks[key] = lines
         return checks
 
@@ -515,10 +536,28 @@ class Writer:
         with tempfile.TemporaryDirectory() as work:
             source = Path(work) / "layout.c"
             defaults = "".join(f"#define {macro} {default}\n" for macro, default in MACRO_BOUNDS.values())
-            source.write_text(defaults + header + "\n" + "\n".join(line for lines in checks.values() for line in lines) + "\n")
-            result = subprocess.run(["clang", *target, "-fms-extensions", "-std=gnu11", "-w", "-fsyntax-only",
-                                     "-ferror-limit=0", str(source)], capture_output=True, text=True)
-        if result.returncode and "static assertion failed" not in result.stderr and "static_assert" not in result.stderr:
+            source.write_text(
+                defaults + header + "\n" + "\n".join(line for lines in checks.values() for line in lines) + "\n"
+            )
+            result = subprocess.run(
+                [
+                    "clang",
+                    *target,
+                    "-fms-extensions",
+                    "-std=gnu11",
+                    "-w",
+                    "-fsyntax-only",
+                    "-ferror-limit=0",
+                    str(source),
+                ],
+                capture_output=True,
+                text=True,
+            )
+        if (
+            result.returncode
+            and "static assertion failed" not in result.stderr
+            and "static_assert" not in result.stderr
+        ):
             raise PdbError("the generated declarations do not compile:\n" + result.stderr[:4000])
         names = set(re.findall(r'static assertion failed[^"]*"([^" ]+)', result.stderr))
         return {key for key in checks if key[1] in names}
@@ -570,9 +609,11 @@ def main() -> int:
     args.output.write_text(writer.write(), encoding="utf-8")
     for warning in writer.warnings:
         print("note:", warning, file=sys.stderr)
-    print(f"{args.output}: {len(writer.enums)} enumerations, {len(writer.definitions)} structures and unions, "
-          f"{len(writer.typedefs)} types, {len(writer.prototypes)} functions "
-          f"({len(writer.inline_in_sdk)} the SDK defined inline), {len(writer.data)} data")
+    print(
+        f"{args.output}: {len(writer.enums)} enumerations, {len(writer.definitions)} structures and unions, "
+        f"{len(writer.typedefs)} types, {len(writer.prototypes)} functions "
+        f"({len(writer.inline_in_sdk)} the SDK defined inline), {len(writer.data)} data"
+    )
     return 0
 
 

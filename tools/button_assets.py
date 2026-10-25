@@ -63,8 +63,16 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hud_assets import (FORMATS, XboxMap, bleed, decode_bitmap, level0_size, overlap,  # noqa: E402
-                        pixel_rectangle, render_svg)
+from hud_assets import (
+    FORMATS,
+    XboxMap,
+    bleed,
+    decode_bitmap,
+    level0_size,
+    overlap,  # noqa: E402
+    pixel_rectangle,
+    render_svg,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "port/assets/buttons"
@@ -89,34 +97,83 @@ MESSAGE_ICONS = "ui\\hud\\bitmaps\\hud_msg_icons_sm"
 MESSAGE_BUTTONS = {0: "a_butn.svg", 1: "b_butn.svg", 2: "x_butn.svg", 3: "y_butn.svg"}
 
 # Standalone Xbox faces for gameplay prompts, using the existing redraws.
-HUD_BUTTONS = [dict(name=f"{button}_butn__0", tag=BITMAPS + f"{button}_butn",
-                   bitmap=0, width=32, height=32, format="dxt3", scale=8,
-                   crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0])
-               for button in ("black", "white")]
+HUD_BUTTONS = [
+    dict(
+        name=f"{button}_butn__0",
+        tag=BITMAPS + f"{button}_butn",
+        bitmap=0,
+        width=32,
+        height=32,
+        format="dxt3",
+        scale=8,
+        crc=0,
+        svg=f"{button}_butn.svg",
+        place=[1, 0, 0],
+    )
+    for button in ("black", "white")
+]
 
 # Plain gameplay faces use the same hand-drawn oval and letter as the
 # message stencils, with solid colour and no rim or shadow.
-CLASSIC_BUTTONS = [dict(name=f"classic_{button}__0", tag=f"ui\\hud\\buttons\\classic_{button}",
-                       bitmap=0, width=32, height=32, format="dxt3", scale=8,
-                       crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0], classic=color)
-                   for button, color in (("a", "#40eb40"), ("b", "#fa5946"),
-                                         ("x", "#3998fa"), ("y", "#f9e928"),
-                                         ("black", "#000000"), ("white", "#ffffff"))]
+CLASSIC_BUTTONS = [
+    dict(
+        name=f"classic_{button}__0",
+        tag=f"ui\\hud\\buttons\\classic_{button}",
+        bitmap=0,
+        width=32,
+        height=32,
+        format="dxt3",
+        scale=8,
+        crc=0,
+        svg=f"{button}_butn.svg",
+        place=[1, 0, 0],
+        classic=color,
+    )
+    for button, color in (
+        ("a", "#40eb40"),
+        ("b", "#fa5946"),
+        ("x", "#3998fa"),
+        ("y", "#f9e928"),
+        ("black", "#000000"),
+        ("white", "#ffffff"),
+    )
+]
 
 # Supplied Xbox gameplay gems, fitted to the existing 21x26 gameplay cell.
 # Black and White retain the existing gem redraws in both gem styles.
-GEM_BUTTONS = [dict(name=f"gem_{button}__0", tag=f"ui\\hud\\buttons\\gem_{button}",
-                   bitmap=0, width=32, height=32, format="dxt3", scale=8, crc=0,
-                   source_png=f"source/{button}_gem.png") for button in "abxy"]
+GEM_BUTTONS = [
+    dict(
+        name=f"gem_{button}__0",
+        tag=f"ui\\hud\\buttons\\gem_{button}",
+        bitmap=0,
+        width=32,
+        height=32,
+        format="dxt3",
+        scale=8,
+        crc=0,
+        source_png=f"source/{button}_gem.png",
+    )
+    for button in "abxy"
+]
 
 
 # Supplied Xbox trigger and three thumbstick press states, shared by every style.
-CONTROL_BUTTONS = [dict(name=f"{name}__0", tag=f"ui\\hud\\buttons\\{name}",
-                        bitmap=0, width=64, height=64, format="a8r8g8b8", scale=8,
-                        crc=0, source_png=f"source/{name}.png", control_cell=cell)
-                   for name, cell in [("trigger_left", [50,35]), ("trigger_right", [50,35])] +
-                   [(f"thumbstick{state}_{side}", [36,40])
-                    for state in ("", "-halfway", "-full") for side in ("left", "right")]]
+CONTROL_BUTTONS = [
+    dict(
+        name=f"{name}__0",
+        tag=f"ui\\hud\\buttons\\{name}",
+        bitmap=0,
+        width=64,
+        height=64,
+        format="a8r8g8b8",
+        scale=8,
+        crc=0,
+        source_png=f"source/{name}.png",
+        control_cell=cell,
+    )
+    for name, cell in [("trigger_left", [50, 35]), ("trigger_right", [50, 35])]
+    + [(f"thumbstick{state}_{side}", [36, 40]) for state in ("", "-halfway", "-full") for side in ("left", "right")]
+]
 
 
 def gameplay_control(entry: dict) -> np.ndarray:
@@ -136,8 +193,10 @@ def gameplay_control(entry: dict) -> np.ndarray:
 
 
 def document(width: int, height: int, body: str) -> str:
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
-            f'viewBox="0 0 {width} {height}">\n{body}\n</svg>\n')
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}">\n{body}\n</svg>\n'
+    )
 
 
 # the redraws' letter, and the shadow Y's letter casts, which move together
@@ -154,8 +213,9 @@ def placed(svg: Path, width: int, height: int, place: list, letter: list = (0, 0
     scale, x, y = place
     for element in root.iter():
         if element.get("id") in LETTER_IDS:
-            element.set("transform",
-                        f"translate({letter[0] / scale} {letter[1] / scale}) {element.get('transform', '')}")
+            element.set(
+                "transform", f"translate({letter[0] / scale} {letter[1] / scale}) {element.get('transform', '')}"
+            )
     body = "".join(ElementTree.tostring(child, encoding="unicode") for child in root)
     return document(width, height, f'<g transform="translate({x} {y}) scale({scale})">{body}</g>')
 
@@ -173,13 +233,15 @@ def stencil(svg: str, cell: list, place: list, index: int, letter: list = (0, 0)
     scale, x, y = place
     moved = f"translate({left + x} {top + y}) scale({scale})"
     area = f'x="{left}" y="{top}" width="{right - left}" height="{bottom - top}"'
-    return (f'<defs><clipPath id="cell{index}"><rect {area}/></clipPath>\n'
-            f'<mask id="letter{index}" maskUnits="userSpaceOnUse" {area}><rect {area} fill="#ffffff"/>\n'
-            f'<path transform="{moved} translate({letter[0] / scale} {letter[1] / scale}) {cut.get("transform")}" '
-            f'fill="#000000" d="{cut.get("d")}"/></mask></defs>\n'
-            f'<g clip-path="url(#cell{index})" mask="url(#letter{index})">'
-            f'<ellipse transform="{moved} {parents[oval].get("transform")}" rx="{oval.get("rx")}" '
-            f'ry="{oval.get("ry")}" fill="#ffffff"/></g>')
+    return (
+        f'<defs><clipPath id="cell{index}"><rect {area}/></clipPath>\n'
+        f'<mask id="letter{index}" maskUnits="userSpaceOnUse" {area}><rect {area} fill="#ffffff"/>\n'
+        f'<path transform="{moved} translate({letter[0] / scale} {letter[1] / scale}) {cut.get("transform")}" '
+        f'fill="#000000" d="{cut.get("d")}"/></mask></defs>\n'
+        f'<g clip-path="url(#cell{index})" mask="url(#letter{index})">'
+        f'<ellipse transform="{moved} {parents[oval].get("transform")}" rx="{oval.get("rx")}" '
+        f'ry="{oval.get("ry")}" fill="#ffffff"/></g>'
+    )
 
 
 def classic(svg: str, color: str, letter_move: list = (0, 0)) -> str:
@@ -239,10 +301,9 @@ def shape(alpha: np.ndarray, scale: int = 1) -> tuple:
     """The area and centre of a shape, in texels, from its alpha drawn at
     scale times the texels."""
     alpha = alpha.astype(float) / 255
-    ys, xs = np.mgrid[0:alpha.shape[0], 0:alpha.shape[1]]
+    ys, xs = np.mgrid[0 : alpha.shape[0], 0 : alpha.shape[1]]
     area = alpha.sum()
-    return (area / scale ** 2, ((xs + 0.5) * alpha).sum() / area / scale,
-            ((ys + 0.5) * alpha).sum() / area / scale)
+    return (area / scale**2, ((xs + 0.5) * alpha).sum() / area / scale, ((ys + 0.5) * alpha).sum() / area / scale)
 
 
 def stencil_place(svg: str, alpha: np.ndarray) -> list:
@@ -263,8 +324,12 @@ def stencil_place(svg: str, alpha: np.ndarray) -> list:
         reduced = drawn[..., 3].astype(float).reshape(height, SCALE, width, SCALE).mean(axis=(1, 3)) / 255
         return float(((reduced - target) ** 2).sum())
 
-    best = optimize.minimize(error, [scale, sprite_x - scale * x, sprite_y - scale * y], method="Powell",
-                             options={"xtol": 1e-3, "ftol": 1e-7}).x
+    best = optimize.minimize(
+        error,
+        [scale, sprite_x - scale * x, sprite_y - scale * y],
+        method="Powell",
+        options={"xtol": 1e-3, "ftol": 1e-7},
+    ).x
     return [round(float(best[0]), 4), round(float(best[1]), 3), round(float(best[2]), 3)]
 
 
@@ -279,8 +344,9 @@ def best_letter(error) -> list:
     """The letter's move (texels) with the least error, from none."""
     from scipy import optimize
 
-    best = optimize.minimize(lambda move: error(list(move)), [0.0, 0.0], method="Powell",
-                             options={"xtol": 1e-3, "ftol": 1e-8}).x
+    best = optimize.minimize(
+        lambda move: error(list(move)), [0.0, 0.0], method="Powell", options={"xtol": 1e-3, "ftol": 1e-8}
+    ).x
     return [round(float(best[0]), 3), round(float(best[1]), 3)]
 
 
@@ -338,14 +404,16 @@ def layout(arguments) -> None:
             "scale": SCALE,
             # (the map's, which the game checks before drawing this in its
             # place: other languages' maps and modified ones may differ)
-            "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]),
+            "crc": zlib.crc32(bitmap["pixels"][: level0_size(bitmap)]),
             "svg": svg,
             "place": place,
         }
         entry["letter"] = button_letter(entry, bitmap)
         entries.append(entry)
-        print(f"{tag}: {width}x{height} {FORMATS[bitmap['format']]}, {svg} at {place[0]}x, moved {place[1]}, "
-              f"{place[2]}; its letter moved {entry['letter'][0]}, {entry['letter'][1]}")
+        print(
+            f"{tag}: {width}x{height} {FORMATS[bitmap['format']]}, {svg} at {place[0]}x, moved {place[1]}, "
+            f"{place[2]}; its letter moved {entry['letter'][0]}, {entry['letter'][1]}"
+        )
     # the message icons' buttons
     if ("bitm", MESSAGE_ICONS) not in xbox_map.tags:
         sys.exit(f"{MESSAGE_ICONS}: not in this map")
@@ -359,28 +427,34 @@ def layout(arguments) -> None:
         if len(cells) != 1 or cells[0][0] != 0:
             sys.exit(f"{MESSAGE_ICONS}: sequence {sequence} is not one sprite of its first bitmap")
         cell = pixel_rectangle(cells[0], width, height)
-        place = stencil_place(svg, alpha[cell[1]:cell[3], cell[0]:cell[2]])
+        place = stencil_place(svg, alpha[cell[1] : cell[3], cell[0] : cell[2]])
         sprite = {"sequence": sequence, "cell": cell, "svg": svg, "place": place}
-        sprite["letter"] = sprite_letter(sprite, alpha[cell[1]:cell[3], cell[0]:cell[2]])
+        sprite["letter"] = sprite_letter(sprite, alpha[cell[1] : cell[3], cell[0] : cell[2]])
         sprites.append(sprite)
-        print(f"{MESSAGE_ICONS} sequence {sequence}: cell {cell}, {svg} at {place[0]}x, moved {place[1]}, "
-              f"{place[2]}; its letter moved {sprite['letter'][0]}, {sprite['letter'][1]}")
-    entries.append({
-        "name": MESSAGE_ICONS.split("\\")[-1] + "__0",
-        "tag": MESSAGE_ICONS,
-        "bitmap": 0,
-        "width": width,
-        "height": height,
-        "format": FORMATS[bitmap["format"]],
-        "scale": SCALE,
-        "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]),
-        # (the sprites it stands for, not the whole bitmap)
-        "sprites": sprites,
-    })
+        print(
+            f"{MESSAGE_ICONS} sequence {sequence}: cell {cell}, {svg} at {place[0]}x, moved {place[1]}, "
+            f"{place[2]}; its letter moved {sprite['letter'][0]}, {sprite['letter'][1]}"
+        )
+    entries.append(
+        {
+            "name": MESSAGE_ICONS.split("\\")[-1] + "__0",
+            "tag": MESSAGE_ICONS,
+            "bitmap": 0,
+            "width": width,
+            "height": height,
+            "format": FORMATS[bitmap["format"]],
+            "scale": SCALE,
+            "crc": zlib.crc32(bitmap["pixels"][: level0_size(bitmap)]),
+            # (the sprites it stands for, not the whole bitmap)
+            "sprites": sprites,
+        }
+    )
     classic_buttons = [dict(entry) for entry in CLASSIC_BUTTONS]
     for entry, sprite in zip(classic_buttons, sprites):
         entry["letter"] = [round(n / sprite["place"][0], 4) for n in sprite["letter"]]
-    LIST.write_text(json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS}, indent=1) + "\n")
+    LIST.write_text(
+        json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS}, indent=1) + "\n"
+    )
 
 
 def build(arguments) -> None:
@@ -397,15 +471,24 @@ def build(arguments) -> None:
         elif "classic" in entry:
             image = bleed(render(classic(entry["svg"], entry["classic"], entry.get("letter", (0, 0))), entry["scale"]))
         elif "sprites" in entry:
-            body = "\n".join(stencil(sprite["svg"], sprite["cell"], sprite["place"], index,
-                                     sprite.get("letter", (0, 0)))
-                             for index, sprite in enumerate(entry["sprites"]))
+            body = "\n".join(
+                stencil(sprite["svg"], sprite["cell"], sprite["place"], index, sprite.get("letter", (0, 0)))
+                for index, sprite in enumerate(entry["sprites"])
+            )
             image = render(document(entry["width"], entry["height"], body), entry["scale"])
             # (grey the same as alpha, as the sheet's)
             image[..., :3] = image[..., 3:4]
         else:
-            image = render(placed(ASSETS / "svg" / entry["svg"], entry["width"], entry["height"], entry["place"],
-                                  entry.get("letter", (0, 0))), entry["scale"])
+            image = render(
+                placed(
+                    ASSETS / "svg" / entry["svg"],
+                    entry["width"],
+                    entry["height"],
+                    entry["place"],
+                    entry.get("letter", (0, 0)),
+                ),
+                entry["scale"],
+            )
             # (the colour carried into the transparent texels, so that
             # filtering and the mip levels keep it at the oval's edge)
             image = bleed(image)
@@ -422,7 +505,7 @@ def check(arguments) -> None:
             print(f"{entry['name']}: not in this map")
             continue
         bitmap = xbox_map.bitmap_group(entry["tag"])["bitmaps"][entry["bitmap"]]
-        if zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]) != entry["crc"]:
+        if zlib.crc32(bitmap["pixels"][: level0_size(bitmap)]) != entry["crc"]:
             print(f"{entry['name']}: this map's bitmap is not the one laid out")
         xbox = decode_bitmap(bitmap)
         image = Image.open(ASSETS / f"{entry['name']}.png").convert("RGBA")
@@ -431,13 +514,19 @@ def check(arguments) -> None:
         # (each sprite's cell, or the whole bitmap)
         cells = [sprite["cell"] for sprite in entry.get("sprites", [])] or [[0, 0, entry["width"], entry["height"]]]
         for index, (left, top, right, bottom) in enumerate(cells):
-            score = overlap(reduced[top:bottom, left:right, 3].astype(float), xbox[top:bottom, left:right, 3].astype(float))
+            score = overlap(
+                reduced[top:bottom, left:right, 3].astype(float), xbox[top:bottom, left:right, 3].astype(float)
+            )
             name = entry["name"] + (f"__sprite{index}" if "sprites" in entry else "")
             print(f"{name}: alpha overlap {score:.2f}")
             # the map's | ours reduced | ours, over the menus' dark blue
             ours = image.crop((left * scale, top * scale, right * scale, bottom * scale))
-            panels = [Image.fromarray(np.ascontiguousarray(picture[top:bottom, left:right]), "RGBA").resize(
-                ours.size, Image.NEAREST) for picture in (xbox, reduced)]
+            panels = [
+                Image.fromarray(np.ascontiguousarray(picture[top:bottom, left:right]), "RGBA").resize(
+                    ours.size, Image.NEAREST
+                )
+                for picture in (xbox, reduced)
+            ]
             panels.append(ours)
             width, height = ours.size
             sheet = Image.new("RGB", (width * 3 + 16, height), (255, 0, 0))

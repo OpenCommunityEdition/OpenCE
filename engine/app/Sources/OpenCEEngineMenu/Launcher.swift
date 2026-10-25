@@ -48,8 +48,10 @@ public final class LauncherModel {
 
     /// `variables` are the shell's, whose drawing switches the Developer
     /// tab sets, and `tuning` its lighting controls.
-    public init(settings: SettingsModel, displays: [String], root: URL, variables: [ShellVariable] = [],
-                tuning: [TuneControl] = []) {
+    public init(
+        settings: SettingsModel, displays: [String], root: URL, variables: [ShellVariable] = [],
+        tuning: [TuneControl] = []
+    ) {
         self.settings = settings
         self.displays = displays.isEmpty ? ["Main Display"] : displays
         self.root = root
@@ -144,8 +146,9 @@ public struct LauncherView: View {
             if model.showsSettings {
                 LauncherSettings(model: model)
             } else if model.showsDeveloper {
-                DeveloperTab(model: model.developer, onLaunch: { model.launch($0) },
-                             onDone: { model.showsDeveloper = false })
+                DeveloperTab(
+                    model: model.developer, onLaunch: { model.launch($0) },
+                    onDone: { model.showsDeveloper = false })
             } else {
                 ForEach(LauncherChoice.allCases, id: \.self) { choice in
                     Button(choice.title) { model.choose(choice) }

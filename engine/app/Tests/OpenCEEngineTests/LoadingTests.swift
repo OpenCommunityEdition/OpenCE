@@ -17,8 +17,9 @@ final class LoadingTests: XCTestCase {
 
     /// A shared target cleared to `color`.
     func target(_ device: MTLDevice, width: Int, height: Int) throws -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width,
-                                                                  height: height, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: width,
+            height: height, mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .shared
         return try XCTUnwrap(device.makeTexture(descriptor: descriptor))
@@ -39,8 +40,9 @@ final class LoadingTests: XCTestCase {
     /// Each pixel's BGRA.
     func pixels(_ texture: MTLTexture) -> [UInt8] {
         var bytes = [UInt8](repeating: 0, count: texture.width * texture.height * 4)
-        texture.getBytes(&bytes, bytesPerRow: texture.width * 4,
-                         from: MTLRegionMake2D(0, 0, texture.width, texture.height), mipmapLevel: 0)
+        texture.getBytes(
+            &bytes, bytesPerRow: texture.width * 4,
+            from: MTLRegionMake2D(0, 0, texture.width, texture.height), mipmapLevel: 0)
         return bytes
     }
 
@@ -51,8 +53,9 @@ final class LoadingTests: XCTestCase {
     }
 
     func view(color: Float, mask: Float, fade: Float = 0, alpha: Float = 1) -> LoadingView {
-        LoadingView(color: color, maskPosition: mask, fadeAlpha: fade, gains: [0, 0, 0, 0], rates: [1, 1, 1, 1],
-                    screenAlpha: alpha, stage: .loading, skippable: false)
+        LoadingView(
+            color: color, maskPosition: mask, fadeAlpha: fade, gains: [0, 0, 0, 0], rates: [1, 1, 1, 1],
+            screenAlpha: alpha, stage: .loading, skippable: false)
     }
 
     func testTheModelGoesThroughItsStages() {
@@ -99,8 +102,9 @@ final class LoadingTests: XCTestCase {
     func testTheTrailIsLeftBehindAndFades() throws {
         let device = try device()
         let queue = try XCTUnwrap(device.makeCommandQueue())
-        let pass = try LoadingPass(device: device, mask: LoadingScreenModel(enabled: true).maskPixels(),
-                                   outputFormat: .bgra8Unorm)
+        let pass = try LoadingPass(
+            device: device, mask: LoadingScreenModel(enabled: true).maskPixels(),
+            outputFormat: .bgra8Unorm)
         let (width, height) = (320, 240)
         let texture = try target(device, width: width, height: height)
         func draw(_ frame: LoadingView) throws -> [UInt8] {
@@ -125,8 +129,9 @@ final class LoadingTests: XCTestCase {
     func testTheScreenFadesIntoTheFrameUnderIt() throws {
         let device = try device()
         let queue = try XCTUnwrap(device.makeCommandQueue())
-        let pass = try LoadingPass(device: device, mask: LoadingScreenModel(enabled: true).maskPixels(),
-                                   outputFormat: .bgra8Unorm)
+        let pass = try LoadingPass(
+            device: device, mask: LoadingScreenModel(enabled: true).maskPixels(),
+            outputFormat: .bgra8Unorm)
         let texture = try target(device, width: 64, height: 48)
         for (alpha, red) in [(Float(0), 255), (1, 0)] {
             try clear(texture, queue, red: 1)
@@ -151,7 +156,8 @@ final class LoadingTests: XCTestCase {
         let pass = try LoadingPass(device: device, mask: Data(), outputFormat: .bgra8Unorm)
         XCTAssertNoThrow(try pass.reloadShaders(source: ShaderSources.source(.loading)))
         XCTAssertThrowsError(try pass.reloadShaders(source: "not metal"))
-        XCTAssertThrowsError(try LoadingPass(device: device, mask: Data(), outputFormat: .bgra8Unorm, source: "#include"))
+        XCTAssertThrowsError(
+            try LoadingPass(device: device, mask: Data(), outputFormat: .bgra8Unorm, source: "#include"))
     }
 
     func testTheChantIsSilentWithoutTheExecutable() throws {
@@ -165,8 +171,9 @@ final class LoadingTests: XCTestCase {
         XCTAssertNil(ChantPlayer.wave(executables: [], cacheFolder: cache.path))
         let player = ChantPlayer(wave: nil)
         XCTAssertFalse(player.hasTone)
-        let loud = LoadingView(color: 1, maskPosition: 0, fadeAlpha: 0.9, gains: [1, 1, 1, 1],
-                               rates: [0.5, 0.5, 0.5, 0.5], screenAlpha: 1, stage: .loading, skippable: false)
+        let loud = LoadingView(
+            color: 1, maskPosition: 0, fadeAlpha: 0.9, gains: [1, 1, 1, 1],
+            rates: [0.5, 0.5, 0.5, 0.5], screenAlpha: 1, stage: .loading, skippable: false)
         player.apply(loud)
         XCTAssertFalse(player.isPlaying)
     }
@@ -177,11 +184,14 @@ final class LoadingTests: XCTestCase {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let url = folder.appendingPathComponent("chant.wav")
-        let format = try XCTUnwrap(AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 22_050, channels: 1,
-                                                 interleaved: true))
+        let format = try XCTUnwrap(
+            AVAudioFormat(
+                commonFormat: .pcmFormatInt16, sampleRate: 22_050, channels: 1,
+                interleaved: true))
         do {
-            let file = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: .pcmFormatInt16,
-                                       interleaved: true)
+            let file = try AVAudioFile(
+                forWriting: url, settings: format.settings, commonFormat: .pcmFormatInt16,
+                interleaved: true)
             let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 2205))
             buffer.frameLength = 2205
             let samples = try XCTUnwrap(buffer.int16ChannelData)[0]
@@ -192,8 +202,9 @@ final class LoadingTests: XCTestCase {
         }
         let player = ChantPlayer(wave: url)
         XCTAssertTrue(player.hasTone)
-        var loud = LoadingView(color: 1, maskPosition: 0, fadeAlpha: 0.9, gains: [0, 0, 0, 0],
-                               rates: [0.3, 0.3, 0.5, 0.2], screenAlpha: 1, stage: .loading, skippable: false)
+        var loud = LoadingView(
+            color: 1, maskPosition: 0, fadeAlpha: 0.9, gains: [0, 0, 0, 0],
+            rates: [0.3, 0.3, 0.5, 0.2], screenAlpha: 1, stage: .loading, skippable: false)
         player.apply(loud)
         XCTAssertFalse(player.isPlaying, "not before a voice is heard")
         loud.gains = [0.1, 0.1, 0.1, 0.1]
@@ -207,8 +218,9 @@ final class LoadingTests: XCTestCase {
 
     func testTheNextMissionIsTheNextWhoseMapIsThere() {
         let maps = ["a10", "a50", "b30", "ui"].map { URL(fileURLWithPath: "/maps/\($0).map") }
-        XCTAssertEqual(HaloMenu.nextMission(after: "/maps/a10.map", in: maps)?.lastPathComponent, "a50.map",
-                       "a30 is not there")
+        XCTAssertEqual(
+            HaloMenu.nextMission(after: "/maps/a10.map", in: maps)?.lastPathComponent, "a50.map",
+            "a30 is not there")
         XCTAssertEqual(HaloMenu.nextMission(after: "/maps/A50.map", in: maps)?.lastPathComponent, "b30.map")
         XCTAssertNil(HaloMenu.nextMission(after: "/maps/b30.map", in: maps), "the last one there")
         XCTAssertNil(HaloMenu.nextMission(after: "/maps/d40.map", in: maps))

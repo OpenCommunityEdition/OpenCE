@@ -83,19 +83,33 @@ TEXTS = {
     MENU + "multiplayer_type_select\\header_multiplayer": ["MULTIPLAYER"],
     MENU + "multiplayer_type_select\\mp_map_select\\header_select_map": ["SELECT MAP"],
     MENU + "player_profiles_select\\header_select_profile": ["SELECT PROFILE"],
-    MENU + "settings_select\\multiplayer_setup\\indicator_options_edit\\header_indicator_options": ["INDICATOR OPTIONS"],
+    MENU + "settings_select\\multiplayer_setup\\indicator_options_edit\\header_indicator_options": [
+        "INDICATOR OPTIONS"
+    ],
     MENU + "settings_select\\multiplayer_setup\\item_options_edit\\header_item_options": ["ITEM OPTIONS"],
     MENU + "settings_select\\multiplayer_setup\\name_edit\\header_gametype_name": ["GAMETYPE NAME"],
     MENU + "settings_select\\multiplayer_setup\\player_options_edit\\header_player_options": ["PLAYER OPTIONS"],
     MENU + "settings_select\\multiplayer_setup\\playlist_edit\\game_type_select\\header_rules": ["STEP 1: SELECT GAME"],
-    MENU + "settings_select\\multiplayer_setup\\playlist_edit\\header_edit_multiplayer_gametype": ["EDIT MULTIPLAYER GAMETYPE"],
+    MENU + "settings_select\\multiplayer_setup\\playlist_edit\\header_edit_multiplayer_gametype": [
+        "EDIT MULTIPLAYER GAMETYPE"
+    ],
     MENU + "settings_select\\multiplayer_setup\\playlist_edit\\header_set_options": ["STEP 2: SET GAME RULES"],
-    MENU + "settings_select\\multiplayer_setup\\playlist_select\\header_select_gametype_to_edit": ["SELECT GAMETYPE TO EDIT"],
+    MENU + "settings_select\\multiplayer_setup\\playlist_select\\header_select_gametype_to_edit": [
+        "SELECT GAMETYPE TO EDIT"
+    ],
     MENU + "settings_select\\player_setup\\header_select_profile_to_edit": ["SELECT PROFILE TO EDIT"],
-    MENU + "settings_select\\player_setup\\player_profile_edit\\advanced_controls\\header_advanced_controls": ["ADVANCED CONTROLS"],
-    MENU + "settings_select\\player_setup\\player_profile_edit\\color_edit\\header_profile_color": ["MULTIPLAYER COLOR"],
-    MENU + "settings_select\\player_setup\\player_profile_edit\\controller_edit\\header_profile_controller_setting": ["CONTROLLER SETUP"],
-    MENU + "settings_select\\player_setup\\player_profile_edit\\header_edit_profile_settings": ["EDIT PROFILE SETTINGS"],
+    MENU + "settings_select\\player_setup\\player_profile_edit\\advanced_controls\\header_advanced_controls": [
+        "ADVANCED CONTROLS"
+    ],
+    MENU + "settings_select\\player_setup\\player_profile_edit\\color_edit\\header_profile_color": [
+        "MULTIPLAYER COLOR"
+    ],
+    MENU + "settings_select\\player_setup\\player_profile_edit\\controller_edit\\header_profile_controller_setting": [
+        "CONTROLLER SETUP"
+    ],
+    MENU + "settings_select\\player_setup\\player_profile_edit\\header_edit_profile_settings": [
+        "EDIT PROFILE SETTINGS"
+    ],
     MENU + "settings_select\\player_setup\\player_profile_edit\\name_edit\\header_profile_name": ["PROFILE NAME"],
     MENU + "solo_level_select\\header_load_level": ["LOAD LEVEL"],
     # (in every map: the multiplayer maps show it after a game)
@@ -175,10 +189,17 @@ def enlarge(image: np.ndarray, scale: int, smoothing: float) -> np.ndarray:
     alpha = image[..., 3:4] / 255
     premultiplied = np.concatenate([image[..., :3] * alpha, image[..., 3:4]], axis=-1)
     if smoothing > 0:
-        premultiplied = np.stack([ndimage.gaussian_filter(premultiplied[..., c], smoothing, mode="nearest")
-                                  for c in range(4)], axis=-1)
-    channels = [np.asarray(Image.fromarray(premultiplied[..., c].astype(np.float32), "F").resize(
-        (image.shape[1] * scale, image.shape[0] * scale), Image.BICUBIC)) for c in range(4)]
+        premultiplied = np.stack(
+            [ndimage.gaussian_filter(premultiplied[..., c], smoothing, mode="nearest") for c in range(4)], axis=-1
+        )
+    channels = [
+        np.asarray(
+            Image.fromarray(premultiplied[..., c].astype(np.float32), "F").resize(
+                (image.shape[1] * scale, image.shape[0] * scale), Image.BICUBIC
+            )
+        )
+        for c in range(4)
+    ]
     big = np.clip(np.stack(channels, axis=-1), 0, 255)
     big_alpha = big[..., 3:4] / 255
     rgb = np.where(big_alpha > 1e-4, big[..., :3] / np.maximum(big_alpha, 1e-4), 0)
@@ -234,7 +255,7 @@ class Layout:
                 pens.append(pen)
             pen += self.font.getlength(character)
             if index + 1 < len(text):
-                pair = text[index:index + 2]
+                pair = text[index : index + 2]
                 pen += self.font.getlength(pair) - self.font.getlength(pair[0]) - self.font.getlength(pair[1])
         glyphs = self.glyphs
         natural_left = pens[0] + glyphs[0][1]
@@ -285,11 +306,15 @@ class Layout:
             x1, y1 = x0 + ink.shape[1], y0 + ink.shape[0]
             cx0, cy0, cx1, cy1 = max(0, x0), max(0, y0), min(canvas.shape[1], x1), min(canvas.shape[0], y1)
             if cx1 > cx0 and cy1 > cy0:
-                np.maximum(canvas[cy0:cy1, cx0:cx1], ink[cy0 - y0:cy1 - y0, cx0 - x0:cx1 - x0], out=canvas[cy0:cy1, cx0:cx1])
+                np.maximum(
+                    canvas[cy0:cy1, cx0:cx1],
+                    ink[cy0 - y0 : cy1 - y0, cx0 - x0 : cx1 - x0],
+                    out=canvas[cy0:cy1, cx0:cx1],
+                )
         return canvas.reshape(bottom - top, SUPER, last - first, SUPER).mean(axis=(1, 3))
 
     def sums(self, first: int, last: int, letters: np.ndarray) -> tuple:
-        old = self.coverage[self.rows[0]:self.rows[1], first:last]
+        old = self.coverage[self.rows[0] : self.rows[1], first:last]
         return float(np.minimum(old, letters).sum()), float(np.maximum(old, letters).sum())
 
     def overlap(self) -> float:
@@ -311,7 +336,9 @@ class Layout:
             while True:
                 current = self.overlap()
                 offset, track = self.offset, self.track
-                trials = [(offset + d * step * 2, track) for d in (-1, 1)] + [(offset, track + d * step) for d in (-1, 1)]
+                trials = [(offset + d * step * 2, track) for d in (-1, 1)] + [
+                    (offset, track + d * step) for d in (-1, 1)
+                ]
                 scored = []
                 for candidate in trials:
                     self.spread(*candidate)
@@ -336,7 +363,9 @@ class Layout:
                         both, either = self.sums(a, b, self.compose(a, b))
                         best = (both / max(either, 1e-9), pen)
                         for candidate in (pen - step, pen + step):
-                            if abs(candidate - self.natural[index]) > MAXIMUM_MOVE or not self.in_order(index, candidate):
+                            if abs(candidate - self.natural[index]) > MAXIMUM_MOVE or not self.in_order(
+                                index, candidate
+                            ):
                                 continue
                             both, either = self.sums(a, b, self.compose(a, b, index, candidate))
                             if both / max(either, 1e-9) > best[0] + 1e-6:
@@ -385,7 +414,7 @@ class Layout:
                 break
         if start is None or stop is None or stop <= start:
             return None
-        return float((1 - row[start:stop + 1]).sum())
+        return float((1 - row[start : stop + 1]).sum())
 
     def gaps(self, letters: np.ndarray) -> list:
         """For each two letters not parted by a space, the narrowest gap
@@ -394,7 +423,7 @@ class Layout:
         by row the same way in both (gap), in the rows where both letters
         have solid texels (None if there are none)."""
         first, last = self.columns
-        old = self.coverage[self.rows[0]:self.rows[1], first:last]
+        old = self.coverage[self.rows[0] : self.rows[1], first:last]
         result = []
         for index in range(len(self.glyphs) - 1):
             if self.spaced[index + 1]:
@@ -467,7 +496,9 @@ class Layout:
             x0, y0 = round(pen / SUPER * factor) + left, baseline + glyph_top
             x1, y1 = x0 + ink.shape[1], y0 + ink.shape[0]
             cx0, cy0, cx1, cy1 = max(0, x0), max(0, y0), min(canvas.shape[1], x1), min(canvas.shape[0], y1)
-            np.maximum(canvas[cy0:cy1, cx0:cx1], ink[cy0 - y0:cy1 - y0, cx0 - x0:cx1 - x0], out=canvas[cy0:cy1, cx0:cx1])
+            np.maximum(
+                canvas[cy0:cy1, cx0:cx1], ink[cy0 - y0 : cy1 - y0, cx0 - x0 : cx1 - x0], out=canvas[cy0:cy1, cx0:cx1]
+            )
         return canvas.reshape(size[0], 2, size[1], 2).mean(axis=(1, 3))
 
     def in_order(self, index: int, pen: int) -> bool:
@@ -582,28 +613,33 @@ def main() -> None:
             # (a selected menu item's text is its unselected picture's, which
             # is read more surely: flat, where the selected one's white blurs
             # into its glow)
-            image, layout = build_title(bitmap, text, scale, layouts.get((tag, text)), TEXT_BOXES.get(tag),
-                                        BACKGROUNDS.get(tag))
+            image, layout = build_title(
+                bitmap, text, scale, layouts.get((tag, text)), TEXT_BOXES.get(tag), BACKGROUNDS.get(tag)
+            )
             layouts.setdefault((tag, text), layout)
             Image.fromarray(image, "RGBA").save(TITLES / f"{name}.png", optimize=True)
-            entries.append({
-                "name": name,
-                "tag": tag,
-                "bitmap": index,
-                "width": width,
-                "height": height,
-                "format": FORMATS[bitmap["format"]],
-                "scale": scale,
-                "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]),
-                "text": text,
-                # where each letter's ink starts, and the capitals' height (texels):
-                # tools/title_font.py --measure reads them
-                "lefts": layout.lefts(),
-                "cap": layout.cap / SUPER,
-            })
+            entries.append(
+                {
+                    "name": name,
+                    "tag": tag,
+                    "bitmap": index,
+                    "width": width,
+                    "height": height,
+                    "format": FORMATS[bitmap["format"]],
+                    "scale": scale,
+                    "crc": zlib.crc32(bitmap["pixels"][: level0_size(bitmap)]),
+                    "text": text,
+                    # where each letter's ink starts, and the capitals' height (texels):
+                    # tools/title_font.py --measure reads them
+                    "lefts": layout.lefts(),
+                    "cap": layout.cap / SUPER,
+                }
+            )
             moved = np.abs(layout.corrections())
-            print(f"{name}: '{text}' {width}x{height} at {scale}x, covers {layout.overlap():.3f}; "
-                  f"letters moved {moved.mean():.2f} texels on average, {moved.max():.2f} at most")
+            print(
+                f"{name}: '{text}' {width}x{height} at {scale}x, covers {layout.overlap():.3f}; "
+                f"letters moved {moved.mean():.2f} texels on average, {moved.max():.2f} at most"
+            )
     (TITLES / "titles.json").write_text(json.dumps({"font": FONT.name, "assets": entries}, indent=1) + "\n")
 
 

@@ -34,13 +34,16 @@ final class HudTests: XCTestCase {
         let quads = engine.hud(width: UInt32(width), height: UInt32(height))
         XCTAssertGreaterThan(quads.count, 10)
 
-        let bare = try renderer.capture(width: width, height: height, camera: camera,
-                                        objects: objects.filter { !$0.firstPerson }, queue: level.queue)
-        let armed = try renderer.capture(width: width, height: height, camera: camera, objects: objects,
-                                         queue: level.queue)
+        let bare = try renderer.capture(
+            width: width, height: height, camera: camera,
+            objects: objects.filter { !$0.firstPerson }, queue: level.queue)
+        let armed = try renderer.capture(
+            width: width, height: height, camera: camera, objects: objects,
+            queue: level.queue)
         XCTAssertGreaterThan(renderer.lastFirstPersonPartCount, 0)
-        let drawn = try renderer.capture(width: width, height: height, camera: camera, objects: objects,
-                                         hudQuads: quads, queue: level.queue)
+        let drawn = try renderer.capture(
+            width: width, height: height, camera: camera, objects: objects,
+            hudQuads: quads, queue: level.queue)
         let hud = try XCTUnwrap(renderer.hud)
         XCTAssertEqual(hud.lastMissing, [], "quads without a redraw")
         XCTAssertEqual(hud.lastDrawn, quads.count)

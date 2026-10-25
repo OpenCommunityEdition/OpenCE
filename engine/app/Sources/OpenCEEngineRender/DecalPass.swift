@@ -72,8 +72,10 @@ public final class DecalPass {
     /// The pass for `decals`, whose `texture` numbers are made textures by
     /// `texture` (nil: none, drawn as its colour alone), and for the decals
     /// the snapshot gives, whose pictures are `pictures`.
-    public init(device: MTLDevice, source: String, decals: [RenderDecal],
-                texture: (UInt32) -> MTLTexture?, pictures: [MTLTexture?] = []) throws {
+    public init(
+        device: MTLDevice, source: String, decals: [RenderDecal],
+        texture: (UInt32) -> MTLTexture?, pictures: [MTLTexture?] = []
+    ) throws {
         self.device = device
         self.pictures = pictures
         pipeline = try Self.pipeline(device: device, source: source)
@@ -83,14 +85,17 @@ public final class DecalPass {
         samplerDescriptor.mipFilter = .linear
         samplerDescriptor.sAddressMode = .clampToEdge
         samplerDescriptor.tAddressMode = .clampToEdge
-        let whiteDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 1, height: 1,
-                                                                       mipmapped: false)
+        let whiteDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm, width: 1, height: 1,
+            mipmapped: false)
         guard let sampler = device.makeSamplerState(descriptor: samplerDescriptor),
-              let white = device.makeTexture(descriptor: whiteDescriptor) else {
+            let white = device.makeTexture(descriptor: whiteDescriptor)
+        else {
             throw LevelRendererError.resources("decal sampler")
         }
-        white.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: [UInt8](repeating: 255, count: 4),
-                      bytesPerRow: 4)
+        white.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: [UInt8](repeating: 255, count: 4),
+            bytesPerRow: 4)
         self.sampler = sampler
         self.white = white
         var gpu: [GPUDecal] = []
@@ -105,9 +110,12 @@ public final class DecalPass {
             }
         }
         self.runs = runs
-        buffer = gpu.isEmpty ? nil
-            : device.makeBuffer(bytes: gpu, length: gpu.count * MemoryLayout<GPUDecal>.stride,
-                                options: .storageModeShared)
+        buffer =
+            gpu.isEmpty
+            ? nil
+            : device.makeBuffer(
+                bytes: gpu, length: gpu.count * MemoryLayout<GPUDecal>.stride,
+                options: .storageModeShared)
         if !gpu.isEmpty && buffer == nil {
             throw LevelRendererError.resources("decal buffer")
         }
@@ -140,9 +148,13 @@ public final class DecalPass {
         guard count > 0 else { return nil }
         if laidBuffers.count < Self.inFlight {
             let length = Int(OCE_MAX_DECALS) * MemoryLayout<OCEDecalSnapshot>.stride
-            guard let made = HitchLog.shared.note(.allocation, "decals", {
-                device.makeBuffer(length: length, options: .storageModeShared)
-            }) else { return nil }
+            guard
+                let made = HitchLog.shared.note(
+                    .allocation, "decals",
+                    {
+                        device.makeBuffer(length: length, options: .storageModeShared)
+                    })
+            else { return nil }
             laidBuffers.append(made)
         }
         let buffer = laidBuffers[nextBuffer % laidBuffers.count]
@@ -169,8 +181,10 @@ public final class DecalPass {
     /// Lays the decals, the level's and the snapshot's `laid`, on `frame`,
     /// where the opaque pass left `depth` and `surface` (its normals and
     /// what each pixel is).
-    public func encode(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, surface: MTLTexture,
-                       viewProjection: simd_float4x4, eye: SIMD3<Float>, laid: [OCEDecalSnapshot] = []) {
+    public func encode(
+        into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, surface: MTLTexture,
+        viewProjection: simd_float4x4, eye: SIMD3<Float>, laid: [OCEDecalSnapshot] = []
+    ) {
         let dynamic = prepare(laid)
         laidCount = dynamic?.1.reduce(0) { $0 + $1.count } ?? 0
         let passes = [buffer.map { ($0, runs) }, dynamic].compactMap { $0 }
@@ -180,9 +194,10 @@ public final class DecalPass {
         pass.colorAttachments[0].loadAction = .load
         pass.colorAttachments[0].storeAction = .store
         guard let encoder = commands.timedRenderEncoder("decals", descriptor: pass) else { return }
-        var uniforms = DecalFrameUniforms(clipToWorld: viewProjection.inverse, worldToClip: viewProjection,
-                                          eye: SIMD4(eye, 1),
-                                          size: SIMD4(Float(frame.width), Float(frame.height), 0, 0))
+        var uniforms = DecalFrameUniforms(
+            clipToWorld: viewProjection.inverse, worldToClip: viewProjection,
+            eye: SIMD4(eye, 1),
+            size: SIMD4(Float(frame.width), Float(frame.height), 0, 0))
         encoder.setRenderPipelineState(pipeline)
         encoder.setCullMode(.none)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<DecalFrameUniforms>.stride, index: 0)

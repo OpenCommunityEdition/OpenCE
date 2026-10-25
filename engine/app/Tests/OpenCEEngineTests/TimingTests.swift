@@ -32,7 +32,8 @@ final class TimingTests: XCTestCase {
 
     func renderer() throws -> (LevelRenderer, MTLCommandQueue) {
         let device = try XCTUnwrap(MTLCreateSystemDefaultDevice(), "no Metal device")
-        let renderer = try LevelRenderer(device: device, geometry: try LevelGeometry.devmap(donor: nil, cacheFolder: ""))
+        let renderer = try LevelRenderer(
+            device: device, geometry: try LevelGeometry.devmap(donor: nil, cacheFolder: ""))
         return (renderer, try XCTUnwrap(device.makeCommandQueue()))
     }
 
@@ -117,8 +118,9 @@ final class TimingTests: XCTestCase {
         profiled("outer", engine) { profiled("inner", engine) {} }
         _ = try engine.advance(frameSeconds: 1.0 / 30.0)
         let shown = engine.runCommand(line: "stat frame")
-        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(shown.json.utf8)) as? [[String: Any]],
-                                 shown.json)
+        let rows = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(shown.json.utf8)) as? [[String: Any]],
+            shown.json)
         let outer = try XCTUnwrap(rows.first { $0["name"] as? String == "outer" }?["depth"] as? Int, shown.json)
         let inner = try XCTUnwrap(rows.first { $0["name"] as? String == "inner" }?["depth"] as? Int, shown.json)
         XCTAssertEqual(inner, outer + 1)
@@ -141,8 +143,9 @@ final class TimingTests: XCTestCase {
         }
         XCTAssertTrue(logged(.compile, "level shaders"), "\(entries)")
         // (the frame's targets, or the temporal scaler's when it scales)
-        XCTAssertTrue(entries.contains { $0.kind == .allocation && $0.cause.hasSuffix("targets 80×40") }
-                      || logged(.allocation, "temporal scaler 80×40"), "\(entries)")
+        XCTAssertTrue(
+            entries.contains { $0.kind == .allocation && $0.cause.hasSuffix("targets 80×40") }
+                || logged(.allocation, "temporal scaler 80×40"), "\(entries)")
         XCTAssertTrue(logged(.upload, "baked light"), "\(entries)")
         XCTAssertTrue(entries.allSatisfy { $0.totalMilliseconds >= $0.longestMilliseconds })
         XCTAssertEqual(HitchLog.shared.take().count, entries.count)
@@ -163,10 +166,13 @@ final class TimingTests: XCTestCase {
             .appendingPathComponent("perf-\(UUID().uuidString)/perf.log")
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let log = try XCTUnwrap(PerfLog(url: url))
-        let gpu = [PassTime(name: "level opaque", milliseconds: 2), PassTime(name: "light shadows 0.1", milliseconds: 1),
-                   PassTime(name: "light shadows 0.2", milliseconds: 1)]
-        let hitch = HitchLog.Entry(kind: .allocation, cause: "light lists", count: 3, totalMilliseconds: 0.3,
-                                   longestMilliseconds: 0.2)
+        let gpu = [
+            PassTime(name: "level opaque", milliseconds: 2), PassTime(name: "light shadows 0.1", milliseconds: 1),
+            PassTime(name: "light shadows 0.2", milliseconds: 1),
+        ]
+        let hitch = HitchLog.Entry(
+            kind: .allocation, cause: "light lists", count: 3, totalMilliseconds: 0.3,
+            longestMilliseconds: 0.2)
         log.frame(cpuMilliseconds: 8, now: 10, gpu: gpu, hitches: { [hitch] })
         log.frame(cpuMilliseconds: 12, now: 10.5, gpu: gpu, hitches: { [hitch] })
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "")

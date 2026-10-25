@@ -26,7 +26,7 @@ def function(source, name):
     while depth:
         depth += (source[end] == "{") - (source[end] == "}")
         end += 1
-    return source[match.start():end]
+    return source[match.start() : end]
 
 
 def inline(source, name):
@@ -38,7 +38,7 @@ def enum_with(source, member):
     """The whole enum that declares a member."""
     at = source.index(member)
     start = source.rindex("enum", 0, at)
-    return source[start:source.index("};", at) + 2]
+    return source[start : source.index("};", at) + 2]
 
 
 def structure(source, name):
@@ -51,13 +51,14 @@ def structure(source, name):
     while depth:
         depth += (source[end] == "{") - (source[end] == "}")
         end += 1
-    return source[match.start():source.index(";", end) + 1]
+    return source[match.start() : source.index(";", end) + 1]
 
 
 def constant(source, name):
     """An enum constant's or #define's integer value, following a name it is set to (as the port's capacities are)."""
-    match = re.search(r"\b" + re.escape(name) + r"\s*=\s*(\w+)", source) or \
-        re.search(r"#define\s+" + re.escape(name) + r"\s+(\w+)", source)
+    match = re.search(r"\b" + re.escape(name) + r"\s*=\s*(\w+)", source) or re.search(
+        r"#define\s+" + re.escape(name) + r"\s+(\w+)", source
+    )
     if not match:
         raise LookupError(f"constant not found in the sources: {name}")
     value = match.group(1)
@@ -85,6 +86,7 @@ def _in_macos_vm():
     macos` in `nix develop`): the ILP32 AArch64 code the game runs as there."""
     import platform
     import sys
+
     return sys.platform == "darwin" and platform.machine() == "arm64"
 
 
@@ -98,9 +100,24 @@ def build(test, generated):
     if _in_macos_vm():
         return _build_for_macos_vm(test, work)
     executable = work / test
-    command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function",
-               "-Wno-unused-variable", "-I", str(HARNESS / "include"), "-I", str(work),
-               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable), "-lm"]
+    command = [
+        os.environ.get("CC", "clang"),
+        "-m32",
+        "-std=gnu99",
+        "-O2",
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-function",
+        "-Wno-unused-variable",
+        "-I",
+        str(HARNESS / "include"),
+        "-I",
+        str(work),
+        str(HARNESS / "tests" / f"{test}.c"),
+        "-o",
+        str(executable),
+        "-lm",
+    ]
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{test}.c does not compile:\n{result.stderr}")
@@ -110,16 +127,33 @@ def build(test, generated):
 def _build_for_macos_vm(test, work):
     import pytest
     import sys
+
     sys.path.insert(0, str(ROOT))
     from tools import macos_guest_image
+
     if not macos_guest_image.available():
         pytest.skip("on macOS the harness runs in the host's VM: needs `ninja macos` in `nix develop`")
     # (the Linux harness's flags, and its configuration: without the guest
     # build's MSVC extensions or port platform macros, which a test sets
     # itself where it needs them)
-    flags = ["-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function", "-Wno-unused-variable",
-             "-Wno-incompatible-sysroot", "-fno-ms-extensions", "-UHALO_ANDROID", "-UHALO_GLES",
-             "-UHALO_ARM64_GUEST", "-UHALO_GUEST_VM", "-I", str(HARNESS / "include"), "-I", str(work)]
+    flags = [
+        "-std=gnu99",
+        "-O2",
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-function",
+        "-Wno-unused-variable",
+        "-Wno-incompatible-sysroot",
+        "-fno-ms-extensions",
+        "-UHALO_ANDROID",
+        "-UHALO_GLES",
+        "-UHALO_ARM64_GUEST",
+        "-UHALO_GUEST_VM",
+        "-I",
+        str(HARNESS / "include"),
+        "-I",
+        str(work),
+    ]
     try:
         return macos_guest_image.build_guest_image([HARNESS / "tests" / f"{test}.c"], work, test, flags)
     except RuntimeError as error:
@@ -131,8 +165,10 @@ def process(executable, arguments, **options):
     macOS, where the test is a guest image, in the host's VM"""
     if Path(executable).suffix == ".elf":
         import sys
+
         sys.path.insert(0, str(ROOT))
         from tools import macos_guest_image
+
         folder = Path(executable).parent / "run"
         options.setdefault("env", macos_guest_image.guest_environment(folder))
         options.setdefault("cwd", folder)

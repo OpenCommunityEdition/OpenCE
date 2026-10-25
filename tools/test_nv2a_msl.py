@@ -34,37 +34,56 @@ CHECK = ROOT / "tools/msl_check.swift"
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
-    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
-                       reason="needs `ninja macos` in nix develop"),
+    pytest.mark.skipif(
+        not macos_guest_image.available() or shutil.which("ninja") is None, reason="needs `ninja macos` in nix develop"
+    ),
     pytest.mark.skipif(shutil.which("xcrun") is None, reason="needs Xcode's swift"),
 ]
 
 # the attributes as the game's vertex types feed them: (packed, present)
-ATTRIBUTES = [(0x0000, 0xffff), (0x000c, 0x001f), (0x0000, 0x0001)]
+ATTRIBUTES = [(0x0000, 0xFFFF), (0x000C, 0x001F), (0x0000, 0x0001)]
 
-PIXEL_CASES = ["plain", "diffuse", "texture", "fog", "fog_exp2", "mux", "mux_lsb", "alpha_test",
-               "alpha_test_samples", "alpha_test_never", "alpha_kill", "lighting", "point_lighting", "meter",
-               "blend", "count_samples"]
+PIXEL_CASES = [
+    "plain",
+    "diffuse",
+    "texture",
+    "fog",
+    "fog_exp2",
+    "mux",
+    "mux_lsb",
+    "alpha_test",
+    "alpha_test_samples",
+    "alpha_test_never",
+    "alpha_kill",
+    "lighting",
+    "point_lighting",
+    "meter",
+    "blend",
+    "count_samples",
+]
 
 # (stage, PSTextureModes' mode, sampler): every mode, each with the samplers
 # it is drawn with (_xgpu_sampler_2d 1, 3d 2, cube 3)
-TEXTURE_MODES = [(0, mode, sampler) for mode, sampler in ((0x01, 1), (0x02, 2), (0x03, 3), (0x04, 1), (0x05, 1))] + \
-    [(1, mode, sampler) for mode in (0x06, 0x07, 0x08, 0x09, 0x0f) for sampler in (1,)] + \
-    [(2, 0x0a, 1), (2, 0x0b, 1), (2, 0x0e, 1), (2, 0x10, 1), (2, 0x11, 1), (2, 0x12, 1)] + \
-    [(3, 0x0c, 3), (3, 0x0d, 3), (3, 0x0d, 2), (3, 0x01, 2), (3, 0x03, 3)]
+TEXTURE_MODES = (
+    [(0, mode, sampler) for mode, sampler in ((0x01, 1), (0x02, 2), (0x03, 3), (0x04, 1), (0x05, 1))]
+    + [(1, mode, sampler) for mode in (0x06, 0x07, 0x08, 0x09, 0x0F) for sampler in (1,)]
+    + [(2, 0x0A, 1), (2, 0x0B, 1), (2, 0x0E, 1), (2, 0x10, 1), (2, 0x11, 1), (2, 0x12, 1)]
+    + [(3, 0x0C, 3), (3, 0x0D, 3), (3, 0x0D, 2), (3, 0x01, 2), (3, 0x03, 3)]
+)
 
 
 def vertex_programs():
     """[(index, instruction words)] of the game's vertex shader table"""
     words = [int(word, 16) for word in re.findall(r"0x([0-9A-Fa-f]{8})", DATA.read_text().split("*/", 1)[1])]
     programs = []
-    for index, (offset, size) in enumerate(re.findall(r"VERTEX_SHADER_ENTRY\((0x[0-9A-Fa-f]+), (0x[0-9A-Fa-f]+)\)",
-                                                      TABLE.read_text())):
+    for index, (offset, size) in enumerate(
+        re.findall(r"VERTEX_SHADER_ENTRY\((0x[0-9A-Fa-f]+), (0x[0-9A-Fa-f]+)\)", TABLE.read_text())
+    ):
         start = int(offset, 16) // 4
         header = words[start]
         count = header >> 16
-        assert header & 0xffff == 0x2078 and 4 + count * 16 == int(size, 16), index
-        programs.append((index, words[start + 1:start + 1 + count * 4]))
+        assert header & 0xFFFF == 0x2078 and 4 + count * 16 == int(size, 16), index
+        programs.append((index, words[start + 1 : start + 1 + count * 4]))
     return programs
 
 
@@ -75,8 +94,12 @@ def vm_nv2a(tmp_path_factory):
         pytest.skip("needs `ninja macos`: " + ", ".join(missing))
     work = tmp_path_factory.mktemp("vm_nv2a")
     return macos_guest_image.build_guest_image(
-        [ROOT / "port/macos/tests/vm_nv2a.c", ROOT / "port/macos/tests/vm_nv2a_stubs.c"], work, "vm_nv2a",
-        like="port/linux/src/xgpu_text.c", objects=TRANSLATORS)
+        [ROOT / "port/macos/tests/vm_nv2a.c", ROOT / "port/macos/tests/vm_nv2a_stubs.c"],
+        work,
+        "vm_nv2a",
+        like="port/linux/src/xgpu_text.c",
+        objects=TRANSLATORS,
+    )
 
 
 def translate(image, folder, *arguments):
@@ -95,8 +118,9 @@ def shaders(vm_nv2a, tmp_path_factory):
             name = f"vertex_{index}_{packed:x}_{present:x}"
             outputs = []
             for language in ("glsl", "msl"):
-                code, out, err = translate(vm_nv2a, folder, "vertex", language, "%x" % packed, "%x" % present,
-                                           "unlit", *hex_words)
+                code, out, err = translate(
+                    vm_nv2a, folder, "vertex", language, "%x" % packed, "%x" % present, "unlit", *hex_words
+                )
                 assert code == 0, f"{name} {language}: {err}"
                 outputs.append(out)
             cases[name] = ("vertex", *outputs)
@@ -126,10 +150,18 @@ def shaders(vm_nv2a, tmp_path_factory):
 def metal_compile(paths):
     # Xcode's Swift, outside the Nix toolchain, as the app is built
     # (tools/macos_build.py)
-    environment = {key: value for key, value in os.environ.items()
-                   if key not in ("SDKROOT", "DEVELOPER_DIR", "MACOSX_DEPLOYMENT_TARGET", "CC", "CXX", "LD")}
-    run = subprocess.run(["/usr/bin/xcrun", "swift", str(CHECK), *map(str, paths)], capture_output=True, text=True,
-                         timeout=600, env=environment)
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in ("SDKROOT", "DEVELOPER_DIR", "MACOSX_DEPLOYMENT_TARGET", "CC", "CXX", "LD")
+    }
+    run = subprocess.run(
+        ["/usr/bin/xcrun", "swift", str(CHECK), *map(str, paths)],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        env=environment,
+    )
     results = {}
     for line in run.stdout.splitlines():
         if line.startswith("/"):
@@ -229,7 +261,7 @@ def test_metal_refuses_a_mismatched_uniform_layout(shaders, tmp_path):
     size = re.search(r"static_assert\(sizeof\(nv2a_pixel_uniforms\) == (\d+)", msl)
     assert size
     path = tmp_path / "mismatched.fragment.metal"
-    path.write_text(msl.replace(size.group(0), size.group(0)[:-len(size.group(1))] + str(int(size.group(1)) + 16)))
+    path.write_text(msl.replace(size.group(0), size.group(0)[: -len(size.group(1))] + str(int(size.group(1)) + 16)))
     code, results = metal_compile([path])
     assert code == 1 and results["mismatched.fragment.metal"] != "ok"
 

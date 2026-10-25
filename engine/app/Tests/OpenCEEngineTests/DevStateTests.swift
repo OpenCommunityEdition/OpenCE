@@ -18,8 +18,9 @@ final class DevStateTests: XCTestCase {
         let engine = Engine()
         XCTAssertEqual(read(engine), DevState())
         XCTAssertTrue(read(engine).tuning.isStock)
-        XCTAssertEqual(Set(engine.tuneControls().map(\.name)), Set(LightingTuning.names),
-                       "the app reads every control the shell has")
+        XCTAssertEqual(
+            Set(engine.tuneControls().map(\.name)), Set(LightingTuning.names),
+            "the app reads every control the shell has")
         try engine.setShellVariable(name: "tune.exposure", value: "-1.5")
         try engine.setShellVariable(name: "tune.sun_green", value: "0.25")
         XCTAssertTrue(engine.runCommand(line: "set tune.tone_curve 1.5").ok)
@@ -41,9 +42,14 @@ final class DevStateTests: XCTestCase {
         let reader = DevStateReader()
         var asked = 0
         func update() -> DevState {
-            reader.update(generation: engine.devGeneration(),
-                          flag: { asked += 1; return engine.shellFlag(name: $0) },
-                          value: { asked += 1; return engine.shellValue(name: $0) })
+            reader.update(
+                generation: engine.devGeneration(),
+                flag: {
+                    asked += 1; return engine.shellFlag(name: $0)
+                },
+                value: {
+                    asked += 1; return engine.shellValue(name: $0)
+                })
         }
         XCTAssertEqual(update(), DevState())
         XCTAssertEqual(reader.reads, 1)
@@ -81,8 +87,9 @@ final class DevStateTests: XCTestCase {
             return try renderer.capture(width: 96, height: 54, camera: camera, queue: queue)
         }
         let engine = Engine()
-        let state = DevStateReader().update(generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
-                                            value: { engine.shellValue(name: $0) })
+        let state = DevStateReader().update(
+            generation: engine.devGeneration(), flag: { engine.shellFlag(name: $0) },
+            value: { engine.shellValue(name: $0) })
         XCTAssertEqual(state, DevState())
         XCTAssertEqual(try capture(state.switches).bytes, try capture(nil).bytes)
     }
@@ -90,8 +97,9 @@ final class DevStateTests: XCTestCase {
     @MainActor
     func testTheDeveloperTabLaunchesTheLightingControls() throws {
         let engine = Engine()
-        let model = DeveloperModel(variables: engine.shellVariables(), tuning: engine.tuneControls(),
-                                   root: FileManager.default.temporaryDirectory)
+        let model = DeveloperModel(
+            variables: engine.shellVariables(), tuning: engine.tuneControls(),
+            root: FileManager.default.temporaryDirectory)
         XCTAssertEqual(model.tuning.map(\.name), engine.tuneControls().map(\.name))
         let sun = try XCTUnwrap(model.tuning.first { $0.name == "tune.sun" })
         let exposure = try XCTUnwrap(model.tuning.first { $0.name == "tune.exposure" })

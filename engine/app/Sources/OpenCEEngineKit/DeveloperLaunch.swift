@@ -17,8 +17,10 @@ public struct DeveloperLaunch: Equatable, Sendable {
     /// Where the first frame is drawn to (`frame <path>`).
     public var capture: String?
 
-    public init(level: String = MapLibrary.developerMaps[0], station: String? = nil, view: RenderView = .frame,
-                variables: [String: String] = [:], capture: String? = nil) {
+    public init(
+        level: String = MapLibrary.developerMaps[0], station: String? = nil, view: RenderView = .frame,
+        variables: [String: String] = [:], capture: String? = nil
+    ) {
         self.level = level
         self.station = station
         self.view = view

@@ -40,7 +40,7 @@ def main():
             for param in params.split(","):
                 m = re.search(r"(\w+)\s*$", param.strip())
                 args.append(m.group(1))
-        host_name = "hostposix_" + name[len("posix_"):]
+        host_name = "hostposix_" + name[len("posix_") :]
         names.append(host_name)
         out.append(f"{ret} {host_name}({params});")
         out.append(f"{ret} {name}({params})")

@@ -17,7 +17,8 @@ public final class PerfLog {
     public init?(url: URL) {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard FileManager.default.createFile(atPath: url.path, contents: nil),
-              let file = try? FileHandle(forWritingTo: url) else { return nil }
+            let file = try? FileHandle(forWritingTo: url)
+        else { return nil }
         self.url = url
         self.file = file
     }
@@ -46,8 +47,9 @@ public final class PerfLog {
     /// `12.0 s  cpu 8.31 mean 12.40 max (60 frames)  gpu 6.20: level opaque 2.10, …  hitches: allocation light lists 60× 0.02 (longest 0.05)`
     static func line(seconds: Double, frames: [Double], gpu: [PassTime], hitches: [HitchLog.Entry]) -> String {
         let mean = frames.isEmpty ? 0 : frames.reduce(0, +) / Double(frames.count)
-        var line = String(format: "%.1f s  cpu %.2f mean %.2f max (%d frames)", seconds, mean, frames.max() ?? 0,
-                          frames.count)
+        var line = String(
+            format: "%.1f s  cpu %.2f mean %.2f max (%d frames)", seconds, mean, frames.max() ?? 0,
+            frames.count)
         if !gpu.isEmpty {
             // (the passes of one name, each of a light's faces say, added)
             var named: [(name: String, milliseconds: Double)] = []
@@ -65,10 +67,13 @@ public final class PerfLog {
             line += String(format: "  gpu %.2f: ", total) + costliest.joined(separator: ", ")
         }
         if !hitches.isEmpty {
-            line += "  hitches: " + hitches.map {
-                String(format: "%@ %@ %d× %.2f (longest %.2f)", $0.kind.rawValue, $0.cause, $0.count,
-                       $0.totalMilliseconds, $0.longestMilliseconds)
-            }.joined(separator: ", ")
+            line +=
+                "  hitches: "
+                + hitches.map {
+                    String(
+                        format: "%@ %@ %d× %.2f (longest %.2f)", $0.kind.rawValue, $0.cause, $0.count,
+                        $0.totalMilliseconds, $0.longestMilliseconds)
+                }.joined(separator: ", ")
         }
         return line
     }

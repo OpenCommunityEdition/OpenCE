@@ -60,10 +60,11 @@ public final class GameControllerMouse: RawMouse {
 
     public init() {
         for name in [NSNotification.Name.GCMouseDidBecomeCurrent, .GCMouseDidStopBeingCurrent] {
-            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) {
-                [weak self] _ in
-                MainActor.assumeIsolated { self?.follow(GCMouse.current) }
-            })
+            observers.append(
+                NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) {
+                    [weak self] _ in
+                    MainActor.assumeIsolated { self?.follow(GCMouse.current) }
+                })
         }
         follow(GCMouse.current)
     }
@@ -85,8 +86,9 @@ public final class EngineWindow: NSWindow {
     public init(title: String, contentSize: CGSize) {
         let frame = NSRect(origin: .zero, size: contentSize)
         engineView = EngineView(frame: frame)
-        super.init(contentRect: frame, styleMask: [.titled, .closable, .miniaturizable, .resizable],
-                   backing: .buffered, defer: false)
+        super.init(
+            contentRect: frame, styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered, defer: false)
         self.title = title
         isReleasedWhenClosed = false
         collectionBehavior = [.fullScreenPrimary, .managed]
@@ -122,8 +124,10 @@ public final class EngineWindowController {
     private let rawMouse: RawMouse
     private var observers: [NSObjectProtocol] = []
 
-    public init(title: String = "OpenCE Engine", contentSize: CGSize = CGSize(width: 1280, height: 720),
-                pointer: PointerControl = SystemPointer(), rawMouse: RawMouse = GameControllerMouse()) {
+    public init(
+        title: String = "OpenCE Engine", contentSize: CGSize = CGSize(width: 1280, height: 720),
+        pointer: PointerControl = SystemPointer(), rawMouse: RawMouse = GameControllerMouse()
+    ) {
         window = EngineWindow(title: title, contentSize: contentSize)
         self.pointer = pointer
         self.rawMouse = rawMouse
@@ -136,12 +140,15 @@ public final class EngineWindowController {
             self.moved(dx: dx, dy: -dy)
         }
         rawMouse.onMotion = { [weak self] dx, dy in self?.moved(dx: dx, dy: dy) }
-        for (name, event) in [(NSWindow.didBecomeKeyNotification, MouseCapture.Event.focused),
-                              (NSWindow.didResignKeyNotification, .unfocused)] {
-            observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: nil) {
-                [weak self] _ in
-                MainActor.assumeIsolated { self?.handle(event) }
-            })
+        for (name, event) in [
+            (NSWindow.didBecomeKeyNotification, MouseCapture.Event.focused),
+            (NSWindow.didResignKeyNotification, .unfocused),
+        ] {
+            observers.append(
+                NotificationCenter.default.addObserver(forName: name, object: window, queue: nil) {
+                    [weak self] _ in
+                    MainActor.assumeIsolated { self?.handle(event) }
+                })
         }
         // (the display link idles behind other windows and stops out of sight)
         let window = window
@@ -152,18 +159,20 @@ public final class EngineWindowController {
             (NSApplication.didResignActiveNotification, nil),
         ]
         for (name, object) in changes {
-            observers.append(NotificationCenter.default.addObserver(forName: name, object: object, queue: nil) {
-                [weak self] _ in
-                MainActor.assumeIsolated { self?.followActivity() }
-            })
+            observers.append(
+                NotificationCenter.default.addObserver(forName: name, object: object, queue: nil) {
+                    [weak self] _ in
+                    MainActor.assumeIsolated { self?.followActivity() }
+                })
         }
     }
 
     /// The view's activity from the window's state.
     private func followActivity() {
-        window.engineView.activity = WindowActivity(key: window.isKeyWindow, appActive: NSApp?.isActive ?? false,
-                                                    visible: window.occlusionState.contains(.visible),
-                                                    miniaturised: window.isMiniaturized)
+        window.engineView.activity = WindowActivity(
+            key: window.isKeyWindow, appActive: NSApp?.isActive ?? false,
+            visible: window.occlusionState.contains(.visible),
+            miniaturised: window.isMiniaturized)
     }
 
     isolated deinit {

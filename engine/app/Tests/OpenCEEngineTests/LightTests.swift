@@ -30,12 +30,14 @@ final class LightTests: XCTestCase {
         let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
         // (above the largest object, looking down on it and the ground around)
         let object = try XCTUnwrap(level.objects.max { $0.radius < $1.radius })
-        let camera = ViewCamera(position: object.center + SIMD3(0, 0, object.radius * 5 + 2), yaw: 0, pitch: -1.45,
-                                verticalFov: 70 * .pi / 180)
+        let camera = ViewCamera(
+            position: object.center + SIMD3(0, 0, object.radius * 5 + 2), yaw: 0, pitch: -1.45,
+            verticalFov: 70 * .pi / 180)
         func capture(_ lights: [OCELightSnapshot]) throws -> CapturedFrame {
             renderer.lights = lights
-            return try renderer.capture(width: 320, height: 180, camera: camera, objects: level.objects,
-                                        queue: level.queue)
+            return try renderer.capture(
+                width: 320, height: 180, camera: camera, objects: level.objects,
+                queue: level.queue)
         }
         func brighter(_ a: CapturedFrame, than b: CapturedFrame) -> Int {
             var count = 0

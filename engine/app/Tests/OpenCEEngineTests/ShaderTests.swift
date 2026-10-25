@@ -23,11 +23,13 @@ final class ShaderTests: XCTestCase {
     func testTheSourcesAreReadFromTheCheckout() throws {
         let checkout = try XCTUnwrap(ShaderSources.checkout, "no engine/app/Shaders")
         XCTAssertEqual(ShaderSources.folder(), checkout)
-        let functions: [Shader: String] = [.level: "level_fragment", .hud: "hud_vertex", .text: "text_fragment",
-                                           .debug: "debug_vertex", .screen: "screen_occlusion",
-                                           .bake: "bake_irradiance", .camera: "camera_occlusion",
-                                           .decal: "decal_fragment", .particle: "particle_fragment",
-                                           .ui: "ui_fragment", .loading: "loading_light"]
+        let functions: [Shader: String] = [
+            .level: "level_fragment", .hud: "hud_vertex", .text: "text_fragment",
+            .debug: "debug_vertex", .screen: "screen_occlusion",
+            .bake: "bake_irradiance", .camera: "camera_occlusion",
+            .decal: "decal_fragment", .particle: "particle_fragment",
+            .ui: "ui_fragment", .loading: "loading_light",
+        ]
         for shader in Shader.allCases {
             let source = try ShaderSources.source(shader)
             XCTAssertTrue(source.contains(try XCTUnwrap(functions[shader])), shader.file)
@@ -42,12 +44,18 @@ final class ShaderTests: XCTestCase {
     /// An object's change colours reach the model shader as colours, white
     /// for those the snapshot lacks.
     func testChangeColoursAreUnpackedForTheModelShader() {
-        let object = DrawnObject(model: 0, transform: matrix_identity_float4x4, center: .zero, radius: 1,
-                                 regions: [], nodes: [], changeColors: [0xFFFF_0000, 0xFF00_80FF])
-        XCTAssertEqual(object.changeColorUniforms, [SIMD4(1, 0, 0, 1), SIMD4(0, Float(0x80) / 255, 1, 1),
-                                                    SIMD4(1, 1, 1, 1), SIMD4(1, 1, 1, 1)])
-        let plain = DrawnObject(model: 0, transform: matrix_identity_float4x4, center: .zero, radius: 1,
-                                regions: [], nodes: [])
+        let object = DrawnObject(
+            model: 0, transform: matrix_identity_float4x4, center: .zero, radius: 1,
+            regions: [], nodes: [], changeColors: [0xFFFF_0000, 0xFF00_80FF])
+        XCTAssertEqual(
+            object.changeColorUniforms,
+            [
+                SIMD4(1, 0, 0, 1), SIMD4(0, Float(0x80) / 255, 1, 1),
+                SIMD4(1, 1, 1, 1), SIMD4(1, 1, 1, 1),
+            ])
+        let plain = DrawnObject(
+            model: 0, transform: matrix_identity_float4x4, center: .zero, radius: 1,
+            regions: [], nodes: [])
         XCTAssertEqual(plain.changeColorUniforms, Array(repeating: SIMD4<Float>(1, 1, 1, 1), count: 4))
     }
 
@@ -69,8 +77,9 @@ final class ShaderTests: XCTestCase {
 
     /// The text pass drawing a green box on black: its pixels' channels.
     func drawBox(_ pass: TextPass, device: MTLDevice, queue: MTLCommandQueue) throws -> SIMD4<UInt8> {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 16, height: 16,
-                                                                  mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: 16, height: 16,
+            mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .shared
         let target = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
@@ -81,8 +90,9 @@ final class ShaderTests: XCTestCase {
         clear.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         clear.colorAttachments[0].storeAction = .store
         commands.makeRenderCommandEncoder(descriptor: clear)?.endEncoding()
-        pass.encode([.box(x: 0, y: 0, width: 16, height: 16, color: SIMD4(0, 1, 0, 1))], into: commands,
-                    target: target)
+        pass.encode(
+            [.box(x: 0, y: 0, width: 16, height: 16, color: SIMD4(0, 1, 0, 1))], into: commands,
+            target: target)
         commands.commit()
         commands.waitUntilCompleted()
         var bytes = [UInt8](repeating: 0, count: 4)
@@ -100,8 +110,9 @@ final class ShaderTests: XCTestCase {
 
         // (the same quads, drawn blue)
         let source = try ShaderSources.source(.text)
-        let blue = source.replacingOccurrences(of: "return float4(in.color.rgb * alpha, alpha);",
-                                               with: "return float4(0, 0, alpha, alpha);")
+        let blue = source.replacingOccurrences(
+            of: "return float4(in.color.rgb * alpha, alpha);",
+            with: "return float4(0, 0, alpha, alpha);")
         XCTAssertNotEqual(blue, source)
         try pass.reloadShaders(source: blue)
         XCTAssertEqual(try drawBox(pass, device: device, queue: queue), SIMD4(0, 0, 255, 255))
@@ -110,8 +121,10 @@ final class ShaderTests: XCTestCase {
         XCTAssertThrowsError(try pass.reloadShaders(source: source + "\nthis is not metal")) { error in
             XCTAssertTrue("\(error)".contains("error"), "\(error)")
         }
-        XCTAssertThrowsError(try pass.reloadShaders(source: source.replacingOccurrences(
-            of: "text_fragment", with: "other_fragment")))
+        XCTAssertThrowsError(
+            try pass.reloadShaders(
+                source: source.replacingOccurrences(
+                    of: "text_fragment", with: "other_fragment")))
         XCTAssertEqual(try drawBox(pass, device: device, queue: queue), SIMD4(0, 0, 255, 255))
     }
 
@@ -119,8 +132,9 @@ final class ShaderTests: XCTestCase {
         let device = try device()
         let folder = try folder()
         for shader in Shader.allCases {
-            try ShaderSources.source(shader).write(to: folder.appendingPathComponent(shader.file), atomically: true,
-                                                   encoding: .utf8)
+            try ShaderSources.source(shader).write(
+                to: folder.appendingPathComponent(shader.file), atomically: true,
+                encoding: .utf8)
         }
         let reloader = ShaderReloader(folder: folder)
         let atlas = try GlyphAtlas(url: try XCTUnwrap(GlyphAtlas.url()), scale: 1, device: device)
@@ -131,8 +145,9 @@ final class ShaderTests: XCTestCase {
         let source = try String(contentsOf: file, encoding: .utf8)
         try (source + "\nbroken").write(to: file, atomically: true, encoding: .utf8)
         // (the level's shader changed too, but there is no level: skipped)
-        try (try ShaderSources.source(.level) + "\n").write(to: folder.appendingPathComponent(Shader.level.file),
-                                                            atomically: true, encoding: .utf8)
+        try (try ShaderSources.source(.level) + "\n").write(
+            to: folder.appendingPathComponent(Shader.level.file),
+            atomically: true, encoding: .utf8)
         let broken = reloader.poll(level: nil, hud: nil, text: text)
         XCTAssertEqual(broken.map(\.shader), [.text])
         XCTAssertNotNil(broken.first?.error)
@@ -151,17 +166,21 @@ final class ShaderTests: XCTestCase {
         let before = try renderer.capture(width: 160, height: 90, camera: level.camera, queue: level.queue)
         let source = try ShaderSources.source(.level)
         // (the tone map writing magenta: every pixel)
-        let toned = source.replacingOccurrences(of: "float3 color = max(frame.sample(nearest, in.texcoord).rgb, 0);",
-                                                with: "float3 color = float3(1, 0, 1);")
+        let toned = source.replacingOccurrences(
+            of: "float3 color = max(frame.sample(nearest, in.texcoord).rgb, 0);",
+            with: "float3 color = float3(1, 0, 1);")
         XCTAssertNotEqual(toned, source)
         try renderer.reloadShaders(source: toned)
         // (eased by the tone map's shoulder: 1 is 236)
         let magenta = try renderer.capture(width: 160, height: 90, camera: level.camera, queue: level.queue)
         XCTAssertEqual(magenta.rgb(x: 80, y: 45), SIMD3(236, 0, 236))
-        XCTAssertThrowsError(try renderer.reloadShaders(source: source.replacingOccurrences(
-            of: "model_fragment", with: "other_fragment")), "the objects' functions are checked too")
-        XCTAssertEqual(try renderer.capture(width: 160, height: 90, camera: level.camera, queue: level.queue)
-            .rgb(x: 80, y: 45), SIMD3(236, 0, 236))
+        XCTAssertThrowsError(
+            try renderer.reloadShaders(
+                source: source.replacingOccurrences(
+                    of: "model_fragment", with: "other_fragment")), "the objects' functions are checked too")
+        XCTAssertEqual(
+            try renderer.capture(width: 160, height: 90, camera: level.camera, queue: level.queue)
+                .rgb(x: 80, y: 45), SIMD3(236, 0, 236))
         try renderer.reloadShaders(source: source)
         let after = try renderer.capture(width: 160, height: 90, camera: level.camera, queue: level.queue)
         XCTAssertEqual(try XCTUnwrap(after.difference(from: before)).share, 0)

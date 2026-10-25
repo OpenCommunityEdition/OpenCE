@@ -34,7 +34,7 @@ def _blocks(text, opener):
             end += 1
             if not depth:
                 break
-        yield text[match.start():text.index(";", end) + 1]
+        yield text[match.start() : text.index(";", end) + 1]
 
 
 def _hash(text):
@@ -61,7 +61,7 @@ def items():
             if "_distributed_" not in block and "network_game_message_type" not in block:
                 continue
             value = -1
-            for member in filter(None, map(str.strip, block[block.index("{") + 1:block.rindex("}")].split(","))):
+            for member in filter(None, map(str.strip, block[block.index("{") + 1 : block.rindex("}")].split(","))):
                 name, _, expression = (part.strip() for part in member.partition("="))
                 value = int(expression, 0) if expression else value + 1
                 if not name.startswith("NUMBER_OF_"):
@@ -85,7 +85,8 @@ def items():
         for size in re.findall(r"\[([^\]]+)\]", structs[name].split("{", 1)[1]):
             bounds |= set(re.findall(r"\b[A-Z_][A-Z0-9_]*\b", size))
     bounds |= set(re.findall(r"^\s*(DISTRIBUTED_\w+)\s*=", everything, re.M)) - {
-        key.split(" ", 1)[1] for key in result if key.startswith("enum ")}
+        key.split(" ", 1)[1] for key in result if key.startswith("enum ")
+    }
     headers = None
     pending, done = sorted(bounds), set()
     while pending:
@@ -97,15 +98,20 @@ def items():
         found = re.findall(pattern, everything, re.M)
         if not found:
             if headers is None:
-                headers = "\n".join(re.sub(r"/\*.*?\*/|//[^\n]*", " ", path.read_text(encoding="latin-1"), flags=re.S)
-                                    for root in ("source", "port/linux/include", "port/linux/game", "port/linux/src")
-                                    for path in sorted((ROOT / root).rglob("*.h")))
+                headers = "\n".join(
+                    re.sub(r"/\*.*?\*/|//[^\n]*", " ", path.read_text(encoding="latin-1"), flags=re.S)
+                    for root in ("source", "port/linux/include", "port/linux/game", "port/linux/src")
+                    for path in sorted((ROOT / root).rglob("*.h"))
+                )
             found = re.findall(pattern, headers, re.M)
         if not found:
             # (an enum's member counted, NUMBER_OF_ at its end: the enum)
-            found = [("enum " + _hash(block), "") for text in (everything, headers)
-                     for block in _blocks(text, r"\benum\b[^;{]*\{")
-                     if re.search(rf"\b{name}\s*[,}}]", block)][:1]
+            found = [
+                ("enum " + _hash(block), "")
+                for text in (everything, headers)
+                for block in _blocks(text, r"\benum\b[^;{]*\{")
+                if re.search(rf"\b{name}\s*[,}}]", block)
+            ][:1]
         if not found:
             assert name not in bounds, f"{name}: a size of the wire format with no definition found"
             continue
@@ -140,8 +146,10 @@ def check():
     problems = []
     recorded_version, old = recorded()
     breaking, added = changes(old, items())
-    for names, what in ((breaking, "changed or removed (older builds cannot read them: raise the version)"),
-                        (added, "added (raise the version unless older builds ignore them)")):
+    for names, what in (
+        (breaking, "changed or removed (older builds cannot read them: raise the version)"),
+        (added, "added (raise the version unless older builds ignore them)"),
+    ):
         problems += [what + ":"] + [f"  {name}" for name in names] if names else []
     if recorded_version != version():
         problems.append(f"recorded for version {recorded_version}, the sources' is {version()}")

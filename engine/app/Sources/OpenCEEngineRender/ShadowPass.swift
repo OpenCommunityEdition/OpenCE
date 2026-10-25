@@ -56,13 +56,15 @@ final class ShadowPass {
 
     init(device: MTLDevice, library: MTLLibrary, levelStride: Int, modelStride: Int) throws {
         self.device = device
-        pipelines = try Self.pipelines(device: device, library: library, levelStride: levelStride,
-                                       modelStride: modelStride)
+        pipelines = try Self.pipelines(
+            device: device, library: library, levelStride: levelStride,
+            modelStride: modelStride)
         let state = MTLDepthStencilDescriptor()
         state.depthCompareFunction = .less
         state.isDepthWriteEnabled = true
         guard let depthState = device.makeDepthStencilState(descriptor: state),
-              let none = Self.maps(device, size: 1) else {
+            let none = Self.maps(device, size: 1)
+        else {
             throw LevelRendererError.resources("shadow maps")
         }
         self.depthState = depthState
@@ -70,8 +72,10 @@ final class ShadowPass {
         maps = none
     }
 
-    static func pipelines(device: MTLDevice, library: MTLLibrary, levelStride: Int,
-                          modelStride: Int) throws -> Pipelines {
+    static func pipelines(
+        device: MTLDevice, library: MTLLibrary, levelStride: Int,
+        modelStride: Int
+    ) throws -> Pipelines {
         func casting(vertex: String, descriptor vertices: MTLVertexDescriptor) throws -> Casting {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = try library.required(vertex)
@@ -83,10 +87,12 @@ final class ShadowPass {
         }
         do {
             return Pipelines(
-                level: try casting(vertex: "shadow_level_vertex",
-                                   descriptor: LevelRenderer.vertexDescriptor(stride: levelStride)),
-                model: try casting(vertex: "shadow_model_vertex",
-                                   descriptor: ModelPass.vertexDescriptor(stride: modelStride)))
+                level: try casting(
+                    vertex: "shadow_level_vertex",
+                    descriptor: LevelRenderer.vertexDescriptor(stride: levelStride)),
+                model: try casting(
+                    vertex: "shadow_model_vertex",
+                    descriptor: ModelPass.vertexDescriptor(stride: modelStride)))
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
@@ -124,8 +130,11 @@ final class ShadowPass {
         }
         let matrices = cascades.map { cascade in
             let m = cascade.viewProjection
-            return simd_float4x4(columns: (SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
-                                           SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])))
+            return simd_float4x4(
+                columns: (
+                    SIMD4(m[0], m[1], m[2], m[3]), SIMD4(m[4], m[5], m[6], m[7]),
+                    SIMD4(m[8], m[9], m[10], m[11]), SIMD4(m[12], m[13], m[14], m[15])
+                ))
         }
         uniforms.cascades = (matrices[0], matrices[1], matrices[2], matrices[3])
         uniforms.far = SIMD4(cascades.map(\.far))
@@ -139,14 +148,17 @@ final class ShadowPass {
     /// with the encoder (its light at vertex buffer 1, `wrap` at sampler
     /// 0) and the pipelines for its kind; with no sun, only clears the
     /// uniforms.
-    func encode(into commands: MTLCommandBuffer, camera: ViewCamera, aspect: Float, towards: SIMD3<Float>?,
-                wrap: MTLSamplerState, level: (MTLRenderCommandEncoder, Casting) -> Void,
-                objects: (MTLRenderCommandEncoder, Casting) -> Void) {
+    func encode(
+        into commands: MTLCommandBuffer, camera: ViewCamera, aspect: Float, towards: SIMD3<Float>?,
+        wrap: MTLSamplerState, level: (MTLRenderCommandEncoder, Casting) -> Void,
+        objects: (MTLRenderCommandEncoder, Casting) -> Void
+    ) {
         uniforms = Self.uniforms(camera: camera, aspect: aspect, towards: towards)
         guard uniforms.forward.w > 0 else { return }
         if maps.width != Self.resolution {
             guard let levelMaps = Self.maps(device, size: Self.resolution),
-                  let maps = Self.maps(device, size: Self.resolution) else {
+                let maps = Self.maps(device, size: Self.resolution)
+            else {
                 uniforms = ShadowUniforms()
                 return
             }
@@ -154,8 +166,10 @@ final class ShadowPass {
             self.maps = maps
         }
         let matrices = [uniforms.cascades.0, uniforms.cascades.1, uniforms.cascades.2, uniforms.cascades.3]
-        func draw(into target: MTLTexture, clear: Bool, label: String, casting: Casting,
-                  casters: (MTLRenderCommandEncoder, Casting) -> Void) {
+        func draw(
+            into target: MTLTexture, clear: Bool, label: String, casting: Casting,
+            casters: (MTLRenderCommandEncoder, Casting) -> Void
+        ) {
             for (slice, matrix) in matrices.enumerated() {
                 let pass = MTLRenderPassDescriptor()
                 pass.depthAttachment.texture = target

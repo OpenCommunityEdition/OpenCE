@@ -46,9 +46,17 @@ FLOATS = {"float", "double"}
 # (not the OpenGL context's imports, which are bound to the thread that
 # makes the context current)
 MAIN_THREAD = {
-    "host_sdl_init", "host_sdl_create_window", "host_sdl_window_size_in_pixels", "host_sdl_set_relative_mouse",
-    "host_sdl_poll_event", "host_sdl_set_clipboard_text", "host_sdl_get_clipboard_text", "host_sdl_show_toast",
-    "host_sdl_show_simple_message_box", "host_sdl_show_message_box", "host_sdl_gl_create_context",
+    "host_sdl_init",
+    "host_sdl_create_window",
+    "host_sdl_window_size_in_pixels",
+    "host_sdl_set_relative_mouse",
+    "host_sdl_poll_event",
+    "host_sdl_set_clipboard_text",
+    "host_sdl_get_clipboard_text",
+    "host_sdl_show_toast",
+    "host_sdl_show_simple_message_box",
+    "host_sdl_show_message_box",
+    "host_sdl_gl_create_context",
 }
 
 # imports whose host function is the macOS host's own, with the same
@@ -82,7 +90,8 @@ def parse_prototypes(paths):
         text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
         text = re.sub(r"__attribute__\s*\(\(.*?\)\)", "", text)
         for result, name, parameters in re.findall(
-                r"^([A-Za-z_][\w \*]*?)\b((?:host|posix)_\w+)\s*\(([^;{]*?)\)\s*;", text, re.M | re.S):
+            r"^([A-Za-z_][\w \*]*?)\b((?:host|posix)_\w+)\s*\(([^;{]*?)\)\s*;", text, re.M | re.S
+        ):
             parameters = " ".join(parameters.split())
             parsed = []
             if parameters not in ("", "void"):
@@ -137,10 +146,12 @@ def stack_offset(position, size):
 
 def case(index, name, prototypes, functions=None):
     if name.startswith("hostgl_"):
-        return [f"\tcase {index}: /* {name}: no OpenGL ES while headless */",
-                f'\t\thost_dispatch_unsupported(call, {index}, "{name}");',
-                "\t\treturn 1;"]
-    function = "posix_" + name[len("hostposix_"):] if name.startswith("hostposix_") else name
+        return [
+            f"\tcase {index}: /* {name}: no OpenGL ES while headless */",
+            f'\t\thost_dispatch_unsupported(call, {index}, "{name}");',
+            "\t\treturn 1;",
+        ]
+    function = "posix_" + name[len("hostposix_") :] if name.startswith("hostposix_") else name
     if function not in prototypes:
         raise ValueError(f"no prototype for the import {name}")
     result, parameters = prototypes[function]
@@ -166,12 +177,20 @@ def case(index, name, prototypes, functions=None):
     if name in MAIN_THREAD:
         if functions is None:
             raise ValueError(f"{name} needs the main thread")
-        functions += [f"/* {name}, on the main thread */",
-                      f"static void main_thread_{index}(struct host_call *call)", "{",
-                      *(line[1:] for line in lines[1:]), "\tcall->error = errno;", "}", ""]
-        return [f"\tcase {index}: /* {name}, on the main thread */",
-                f'\t\thost_call_on_main_thread(call, "{name}", main_thread_{index});',
-                "\t\treturn 1;"]
+        functions += [
+            f"/* {name}, on the main thread */",
+            f"static void main_thread_{index}(struct host_call *call)",
+            "{",
+            *(line[1:] for line in lines[1:]),
+            "\tcall->error = errno;",
+            "}",
+            "",
+        ]
+        return [
+            f"\tcase {index}: /* {name}, on the main thread */",
+            f'\t\thost_call_on_main_thread(call, "{name}", main_thread_{index});',
+            "\t\treturn 1;",
+        ]
     if function != "host_errno":
         lines.append("\t\thost_saved_errno = errno;")
     lines.append("\t\treturn 1;")

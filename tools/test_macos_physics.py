@@ -55,16 +55,30 @@ PROGRAMS = ["host_physics_test", "host_physics_bridge_test"]
 
 @pytest.fixture(scope="module")
 def programs(tmp_path_factory):
-    built = subprocess.run(["ninja", str(PHYSICS_LIBRARY.relative_to(ROOT))], cwd=ROOT,
-                           capture_output=True, text=True)
+    built = subprocess.run(["ninja", str(PHYSICS_LIBRARY.relative_to(ROOT))], cwd=ROOT, capture_output=True, text=True)
     assert built.returncode == 0, built.stdout + built.stderr
     folder = tmp_path_factory.mktemp("physics")
     for name in PROGRAMS:
-        build = subprocess.run([
-            os.environ.get("CC", "cc"), "-std=gnu11", "-O1", "-Wall", "-Werror", "-mmacosx-version-min=26.0",
-            "-Iport/macos/host", "-Iport/macos/include", f"port/macos/tests/{name}.c",
-            str(PHYSICS_LIBRARY), "-lc++", "-o", str(folder / name),
-        ], cwd=ROOT, capture_output=True, text=True)
+        build = subprocess.run(
+            [
+                os.environ.get("CC", "cc"),
+                "-std=gnu11",
+                "-O1",
+                "-Wall",
+                "-Werror",
+                "-mmacosx-version-min=26.0",
+                "-Iport/macos/host",
+                "-Iport/macos/include",
+                f"port/macos/tests/{name}.c",
+                str(PHYSICS_LIBRARY),
+                "-lc++",
+                "-o",
+                str(folder / name),
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
         assert build.returncode == 0, build.stderr
     return folder
 

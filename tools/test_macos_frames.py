@@ -40,8 +40,9 @@ GAME_SIZE = (640, 480)
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
-    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
-                       reason="needs `ninja macos` in nix develop"),
+    pytest.mark.skipif(
+        not macos_guest_image.available() or shutil.which("ninja") is None, reason="needs `ninja macos` in nix develop"
+    ),
     pytest.mark.skipif(not APP.is_file(), reason="needs `ninja macos_app`"),
 ]
 
@@ -50,19 +51,27 @@ pytestmark = [
 def vm_render(tmp_path_factory):
     work = tmp_path_factory.mktemp("vm_render")
     return macos_guest_image.build_guest_image(
-        [ROOT / "port/macos/tests/vm_render.c", ROOT / "port/macos/guest/opence_render_writer.c"], work,
-        "vm_render", [f"-I{ROOT / 'port/macos/include'}"])
+        [ROOT / "port/macos/tests/vm_render.c", ROOT / "port/macos/guest/opence_render_writer.c"],
+        work,
+        "vm_render",
+        [f"-I{ROOT / 'port/macos/include'}"],
+    )
 
 
 def capture(image, case, tmp_path, frame=1):
     """the frame the app drew of the guest's `case`"""
     (tmp_path / "home").mkdir()
     path = tmp_path / f"{case}.png"
-    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(tmp_path),
-                       HALO_HOST_GUEST_IMAGE=str(image), HALO_HOST_CAPTURE=str(path),
-                       HALO_HOST_CAPTURE_FRAME=str(frame), HALO_HOST_CAPTURE_SIZE="%dx%d" % SIZE)
-    run = subprocess.run([str(APP), case], cwd=tmp_path, env=environment, capture_output=True, text=True,
-                         timeout=60)
+    environment = dict(
+        os.environ,
+        HOME=str(tmp_path / "home"),
+        HALO_DATA_ROOT=str(tmp_path),
+        HALO_HOST_GUEST_IMAGE=str(image),
+        HALO_HOST_CAPTURE=str(path),
+        HALO_HOST_CAPTURE_FRAME=str(frame),
+        HALO_HOST_CAPTURE_SIZE="%dx%d" % SIZE,
+    )
+    run = subprocess.run([str(APP), case], cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=60)
     assert run.returncode == 0 and run.stdout.strip().endswith("ok"), run.stdout[-2000:] + run.stderr[-2000:]
     assert path.is_file(), "no frame was captured: " + run.stderr[-2000:]
     return frame_compare.read_png(path)
@@ -72,13 +81,21 @@ def run_game(tmp_path, frame, settings=None, seconds=30, data_root=None, size=GA
     """runs the app offscreen for `seconds`, capturing its `frame`th PRESENT
     at `size` to game.png; returns the finished process"""
     (tmp_path / "home").mkdir()
-    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(data_root or ROOT / "assets"),
-                       HALO_FRAME_CLOCK="1", HALO_HOST_CAPTURE=str(tmp_path / "game.png"),
-                       HALO_HOST_CAPTURE_FRAME=str(frame), HALO_HOST_CAPTURE_SIZE="%dx%d" % size,
-                       HALO_EXIT_AFTER=str(seconds), **(settings or {}))
+    environment = dict(
+        os.environ,
+        HOME=str(tmp_path / "home"),
+        HALO_DATA_ROOT=str(data_root or ROOT / "assets"),
+        HALO_FRAME_CLOCK="1",
+        HALO_HOST_CAPTURE=str(tmp_path / "game.png"),
+        HALO_HOST_CAPTURE_FRAME=str(frame),
+        HALO_HOST_CAPTURE_SIZE="%dx%d" % size,
+        HALO_EXIT_AFTER=str(seconds),
+        **(settings or {}),
+    )
     environment.pop("HALO_HOST_GUEST_IMAGE", None)
-    return subprocess.run([str(APP)], cwd=tmp_path, env=environment, capture_output=True, text=True,
-                          timeout=seconds + 60)
+    return subprocess.run(
+        [str(APP)], cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=seconds + 60
+    )
 
 
 def capture_game(tmp_path, frame, settings=None, seconds=30, data_root=None, size=GAME_SIZE):
@@ -102,8 +119,10 @@ def check(frame, name, tolerance=frame_compare.Tolerance(), other=None):
         frame_compare.write_png(reference, frame)
         pytest.skip(f"approved {reference.relative_to(ROOT)}")
     FAILED.mkdir(parents=True, exist_ok=True)
-    assert reference.is_file(), (f"{name} has no reference: look at the frame, then approve it with "
-                                 f"HALO_APPROVE_FRAMES=1 (this file's docstring)")
+    assert reference.is_file(), (
+        f"{name} has no reference: look at the frame, then approve it with "
+        f"HALO_APPROVE_FRAMES=1 (this file's docstring)"
+    )
     result = frame_compare.compare(frame, frame_compare.read_png(reference), tolerance)
     if not result.matches:
         frame_compare.write_png(FAILED / f"{name}.png", frame)
@@ -146,8 +165,7 @@ def test_the_frame_time_draws_when_on(tmp_path):
     frame = capture_game(tmp_path, 600, {"HALO_FRAME_TIME": "true"})
     reference = frame_compare.read_png(REFERENCES / "main_menu.png")
     corner = [(x, y) for y in range(30, 60) for x in range(440, 600)]
-    text = [point for point in corner
-            if min(frame.pixel(*point)[:3]) > 200 and min(reference.pixel(*point)[:3]) < 150]
+    text = [point for point in corner if min(frame.pixel(*point)[:3]) > 200 and min(reference.pixel(*point)[:3]) < 150]
     assert len(text) > 50, "no white text in the corner"
     # (the background's ship moves by the real time when the machine is
     # busy: under 2% of the frame; the text does not)
@@ -180,9 +198,14 @@ def test_the_hud_draws_at_native_resolution(tmp_path):
     root = tmp_path / "root"
     root.mkdir()
     (root / "maps").symlink_to(MAPS)
-    frame = capture_game(tmp_path, 1500, {"HALO_NETWORK_TEST": "host:bloodgulch",
-                                          "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false"},
-                         seconds=75, data_root=root, size=NATIVE_SIZE)
+    frame = capture_game(
+        tmp_path,
+        1500,
+        {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false"},
+        seconds=75,
+        data_root=root,
+        size=NATIVE_SIZE,
+    )
     assert (frame.width, frame.height) == NATIVE_SIZE
     # (the motion sensor is not the blank white of a target sampled while
     # drawn: its middle is darker than white)
@@ -207,9 +230,17 @@ def test_the_game_answers_its_hottest_imports_itself(tmp_path):
     # write tracking (port/macos/host/host_watch.c) is read from the table it
     # shares, never asked for, and pages are protected again only after the
     # game writes them
-    run = run_game(tmp_path, 1500, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ONLINE": "false",
-                                    "HALO_NET_JOIN_FROM_CLIPBOARD": "false", "HALO_HOST_IMPORT_COUNTS": "1"},
-                   seconds=20)
+    run = run_game(
+        tmp_path,
+        1500,
+        {
+            "HALO_NETWORK_TEST": "host:bloodgulch",
+            "HALO_NET_ONLINE": "false",
+            "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+            "HALO_HOST_IMPORT_COUNTS": "1",
+        },
+        seconds=20,
+    )
     assert run.returncode == 0, run.stderr[-2000:]
     rate = re.search(r"halo_host: exits: \d+ in [\d.]+ s, (\d+)/s", run.stderr)
     assert rate, run.stderr[-2000:]
@@ -233,9 +264,18 @@ def test_bloodgulch_draws_as_approved(tmp_path):
     root.mkdir()
     (root / "maps").symlink_to(MAPS)
     (root / "camera.txt").write_text(BLOODGULCH_CAMERA)
-    frame = capture_game(tmp_path, 1500, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
-                                          "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false"},
-                         seconds=75, data_root=root)
+    frame = capture_game(
+        tmp_path,
+        1500,
+        {
+            "HALO_NETWORK_TEST": "host:bloodgulch",
+            "HALO_NETWORK_TEST_CAMERA": "1",
+            "HALO_NET_ONLINE": "false",
+            "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+        },
+        seconds=75,
+        data_root=root,
+    )
     assert (frame.width, frame.height) == GAME_SIZE
     # (the sky blue at the top left, the grass green below the middle)
     red, green, blue, _ = frame.pixel(20, 10)
@@ -258,10 +298,19 @@ def test_bloodgulch_draws_anti_aliased(tmp_path, anti_aliasing):
     root.mkdir()
     (root / "maps").symlink_to(MAPS)
     (root / "camera.txt").write_text(BLOODGULCH_CAMERA)
-    frame = capture_game(tmp_path, 1500, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
-                                          "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
-                                          "HALO_ANTI_ALIASING": anti_aliasing},
-                         seconds=75, data_root=root)
+    frame = capture_game(
+        tmp_path,
+        1500,
+        {
+            "HALO_NETWORK_TEST": "host:bloodgulch",
+            "HALO_NETWORK_TEST_CAMERA": "1",
+            "HALO_NET_ONLINE": "false",
+            "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+            "HALO_ANTI_ALIASING": anti_aliasing,
+        },
+        seconds=75,
+        data_root=root,
+    )
     assert (frame.width, frame.height) == GAME_SIZE
     red, green, blue, _ = frame.pixel(20, 10)
     assert blue > red and blue > 150
@@ -302,14 +351,17 @@ def ragdoll_tolerance(name):
 
 
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
-@pytest.mark.parametrize("name, frame, camera", [
-    # (thrown from the grenade's smoke; lying limp on the slope; pushed before
-    # the Warthog's bumper; at rest between its front wheels)
-    ("ragdoll_falling", 2430, RAGDOLL_CAMERA),
-    ("ragdoll_at_rest", 2850, RAGDOLL_CAMERA),
-    ("ragdoll_shoved", 2930, RAGDOLL_SHOVE_CAMERA),
-    ("ragdoll_shoved_at_rest", 3100, RAGDOLL_SHOVE_CAMERA),
-])
+@pytest.mark.parametrize(
+    "name, frame, camera",
+    [
+        # (thrown from the grenade's smoke; lying limp on the slope; pushed before
+        # the Warthog's bumper; at rest between its front wheels)
+        ("ragdoll_falling", 2430, RAGDOLL_CAMERA),
+        ("ragdoll_at_rest", 2850, RAGDOLL_CAMERA),
+        ("ragdoll_shoved", 2930, RAGDOLL_SHOVE_CAMERA),
+        ("ragdoll_shoved_at_rest", 3100, RAGDOLL_SHOVE_CAMERA),
+    ],
+)
 def test_ragdolls_draw_as_approved(tmp_path, name, frame, camera):
     # game.ragdolls on; the frames above it, with the setting at its default,
     # are unchanged
@@ -317,10 +369,20 @@ def test_ragdolls_draw_as_approved(tmp_path, name, frame, camera):
     root.mkdir()
     (root / "maps").symlink_to(MAPS)
     (root / "camera.txt").write_text(camera)
-    frame = capture_game(tmp_path, frame, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
-                                           "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
-                                           "HALO_RAGDOLLS": "true", "HALO_NETWORK_TEST_RAGDOLL": "40"},
-                         seconds=75, data_root=root)
+    frame = capture_game(
+        tmp_path,
+        frame,
+        {
+            "HALO_NETWORK_TEST": "host:bloodgulch",
+            "HALO_NETWORK_TEST_CAMERA": "1",
+            "HALO_NET_ONLINE": "false",
+            "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+            "HALO_RAGDOLLS": "true",
+            "HALO_NETWORK_TEST_RAGDOLL": "40",
+        },
+        seconds=75,
+        data_root=root,
+    )
     assert (frame.width, frame.height) == GAME_SIZE
     # (the scene is keyed to frames shown, the physics stepped with the
     # game's ticks; the smoke and the trees far off move by the game's time)
@@ -336,24 +398,37 @@ DISMEMBERMENT_CAMERA = "95.0 -150.0 4.0\n-0.6 0.78 -0.30\n0 0 1\n0.35\n"
 
 
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
-@pytest.mark.parametrize("name, frame, camera, bullet", [
-    # (the torso in the air above the limbs; at rest, apart, the blood on the
-    # ground; shot, lying whole)
-    ("dismemberment_flying", 2445, DISMEMBERMENT_CAMERA, False),
-    ("dismemberment_at_rest", 2850, DISMEMBERMENT_CAMERA, False),
-    ("dismemberment_bullet_whole", 2850, RAGDOLL_CAMERA, True),
-])
+@pytest.mark.parametrize(
+    "name, frame, camera, bullet",
+    [
+        # (the torso in the air above the limbs; at rest, apart, the blood on the
+        # ground; shot, lying whole)
+        ("dismemberment_flying", 2445, DISMEMBERMENT_CAMERA, False),
+        ("dismemberment_at_rest", 2850, DISMEMBERMENT_CAMERA, False),
+        ("dismemberment_bullet_whole", 2850, RAGDOLL_CAMERA, True),
+    ],
+)
 def test_dismemberment_draws_as_approved(tmp_path, name, frame, camera, bullet):
     root = tmp_path / "root"
     root.mkdir()
     (root / "maps").symlink_to(MAPS)
     (root / "camera.txt").write_text(camera)
-    frame = capture_game(tmp_path, frame, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
-                                           "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
-                                           "HALO_RAGDOLLS": "true", "HALO_DISMEMBERMENT": "true",
-                                           "HALO_NETWORK_TEST_RAGDOLL": "40",
-                                           "HALO_NETWORK_TEST_RAGDOLL_BULLET": "true" if bullet else "false"},
-                         seconds=75, data_root=root)
+    frame = capture_game(
+        tmp_path,
+        frame,
+        {
+            "HALO_NETWORK_TEST": "host:bloodgulch",
+            "HALO_NETWORK_TEST_CAMERA": "1",
+            "HALO_NET_ONLINE": "false",
+            "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+            "HALO_RAGDOLLS": "true",
+            "HALO_DISMEMBERMENT": "true",
+            "HALO_NETWORK_TEST_RAGDOLL": "40",
+            "HALO_NETWORK_TEST_RAGDOLL_BULLET": "true" if bullet else "false",
+        },
+        seconds=75,
+        data_root=root,
+    )
     assert (frame.width, frame.height) == GAME_SIZE
     check(frame, name, ragdoll_tolerance(name), RAGDOLL_OTHER_ENDINGS.get(name))
 
@@ -372,23 +447,36 @@ DEBRIS_CAMERA = "95.0 -150.0 4.0\n-0.645 0.681 -0.349\n0 0 1\n0.5\n"
 
 
 @pytest.mark.skipif(not (MAPS / "bloodgulch.map").is_file(), reason="needs the game's maps in assets/maps")
-@pytest.mark.parametrize("name, frame, debris", [
-    # (the casings in the air and on the ground mid-burst; all at rest, Jolt's
-    # and the game's)
-    ("debris_flying", 2430, True),
-    ("debris_at_rest", 2700, True),
-    ("debris_off_at_rest", 2700, False),
-])
+@pytest.mark.parametrize(
+    "name, frame, debris",
+    [
+        # (the casings in the air and on the ground mid-burst; all at rest, Jolt's
+        # and the game's)
+        ("debris_flying", 2430, True),
+        ("debris_at_rest", 2700, True),
+        ("debris_off_at_rest", 2700, False),
+    ],
+)
 def test_debris_draws_as_approved(tmp_path, name, frame, debris):
     root = tmp_path / "root"
     root.mkdir()
     (root / "maps").symlink_to(MAPS)
     (root / "camera.txt").write_text(DEBRIS_CAMERA)
-    run = run_game(tmp_path, frame, {"HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NETWORK_TEST_CAMERA": "1",
-                                     "HALO_NET_ONLINE": "false", "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
-                                     "HALO_PHYSICS_DEBRIS": "true" if debris else "false",
-                                     "HALO_NETWORK_TEST_DEBRIS": "40"},
-                   seconds=frame // 60 + 6, data_root=root, size=NATIVE_SIZE)
+    run = run_game(
+        tmp_path,
+        frame,
+        {
+            "HALO_NETWORK_TEST": "host:bloodgulch",
+            "HALO_NETWORK_TEST_CAMERA": "1",
+            "HALO_NET_ONLINE": "false",
+            "HALO_NET_JOIN_FROM_CLIPBOARD": "false",
+            "HALO_PHYSICS_DEBRIS": "true" if debris else "false",
+            "HALO_NETWORK_TEST_DEBRIS": "40",
+        },
+        seconds=frame // 60 + 6,
+        data_root=root,
+        size=NATIVE_SIZE,
+    )
     log = run.stdout + run.stderr
     burst = re.search(r"fired twenty rounds, (\d+) casings left, (\d+) of them Jolt's bodies", log)
     later = re.search(r"network test: (\d+) casings left, (\d+) of them at rest, (\d+) Jolt's bodies", log)

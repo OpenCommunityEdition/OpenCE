@@ -1,6 +1,7 @@
 """Tests of tools/wsl_sync_tree.sh, which copies a Windows working tree into
 WSL for the Android build (tools/wsl_build_android.sh). Needs bash and
 rsync, so it runs on Linux (WSL) only."""
+
 import os
 import shutil
 import subprocess
@@ -12,13 +13,12 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "tools" / "wsl_sync_tree.sh"
 
 pytestmark = pytest.mark.skipif(
-    os.name != "posix" or not shutil.which("rsync") or not shutil.which("bash"),
-    reason="needs bash and rsync (Linux)")
+    os.name != "posix" or not shutil.which("rsync") or not shutil.which("bash"), reason="needs bash and rsync (Linux)"
+)
 
 
 def sync(source, mirror, work):
-    return subprocess.run(["bash", str(SCRIPT), str(source), str(mirror), str(work)],
-                          capture_output=True, text=True)
+    return subprocess.run(["bash", str(SCRIPT), str(source), str(mirror), str(work)], capture_output=True, text=True)
 
 
 @pytest.fixture

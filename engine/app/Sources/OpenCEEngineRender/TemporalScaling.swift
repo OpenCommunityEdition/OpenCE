@@ -64,8 +64,10 @@ public enum Jitter {
 
     /// `viewProjection` moved by `offset` pixels of a `width` by `height`
     /// target.
-    public static func apply(_ offset: SIMD2<Float>, to viewProjection: simd_float4x4, width: Int,
-                             height: Int) -> simd_float4x4 {
+    public static func apply(
+        _ offset: SIMD2<Float>, to viewProjection: simd_float4x4, width: Int,
+        height: Int
+    ) -> simd_float4x4 {
         var shift = matrix_identity_float4x4
         // (clip space's y is up; a pixel's is down)
         shift.columns.3.x = 2 * offset.x / Float(max(width, 1))
@@ -117,18 +119,24 @@ final class TemporalScaling {
         scaler.inputContentWidth = input.width
         scaler.inputContentHeight = input.height
 
-        func texture(_ format: MTLPixelFormat, _ size: (width: Int, height: Int),
-                     _ usage: MTLTextureUsage) -> MTLTexture? {
-            let made = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: size.width,
-                                                                height: size.height, mipmapped: false)
+        func texture(
+            _ format: MTLPixelFormat, _ size: (width: Int, height: Int),
+            _ usage: MTLTextureUsage
+        ) -> MTLTexture? {
+            let made = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: format, width: size.width,
+                height: size.height, mipmapped: false)
             made.usage = usage
             made.storageMode = .private
             return device.makeTexture(descriptor: made)
         }
-        guard let color = texture(LevelRenderer.frameFormat, input, scaler.colorTextureUsage.union([.renderTarget, .shaderRead])),
-              let depth = texture(LevelRenderer.depthFormat, input, scaler.depthTextureUsage.union([.renderTarget, .shaderRead])),
-              let motion = texture(Self.motionFormat, input, scaler.motionTextureUsage.union(.renderTarget)),
-              let out = texture(LevelRenderer.frameFormat, output, scaler.outputTextureUsage.union(.shaderRead))
+        guard
+            let color = texture(
+                LevelRenderer.frameFormat, input, scaler.colorTextureUsage.union([.renderTarget, .shaderRead])),
+            let depth = texture(
+                LevelRenderer.depthFormat, input, scaler.depthTextureUsage.union([.renderTarget, .shaderRead])),
+            let motion = texture(Self.motionFormat, input, scaler.motionTextureUsage.union(.renderTarget)),
+            let out = texture(LevelRenderer.frameFormat, output, scaler.outputTextureUsage.union(.shaderRead))
         else { return nil }
         self.scaler = scaler
         self.color = color
@@ -147,16 +155,22 @@ final class TemporalScaling {
     func motionUniforms(current: simd_float4x4) -> MotionUniforms {
         // (in doubles: the infinite projection's inverse is large)
         func double(_ matrix: simd_float4x4) -> simd_double4x4 {
-            simd_double4x4(columns: (SIMD4<Double>(matrix.columns.0), SIMD4<Double>(matrix.columns.1),
-                                     SIMD4<Double>(matrix.columns.2), SIMD4<Double>(matrix.columns.3)))
+            simd_double4x4(
+                columns: (
+                    SIMD4<Double>(matrix.columns.0), SIMD4<Double>(matrix.columns.1),
+                    SIMD4<Double>(matrix.columns.2), SIMD4<Double>(matrix.columns.3)
+                ))
         }
         let previous = self.previous ?? current
         let reprojection = double(previous) * double(current).inverse
         self.previous = current
-        let float = simd_float4x4(columns: (SIMD4<Float>(reprojection.columns.0),
-                                            SIMD4<Float>(reprojection.columns.1),
-                                            SIMD4<Float>(reprojection.columns.2),
-                                            SIMD4<Float>(reprojection.columns.3)))
+        let float = simd_float4x4(
+            columns: (
+                SIMD4<Float>(reprojection.columns.0),
+                SIMD4<Float>(reprojection.columns.1),
+                SIMD4<Float>(reprojection.columns.2),
+                SIMD4<Float>(reprojection.columns.3)
+            ))
         return MotionUniforms(reprojection: float, size: SIMD2(Float(inputWidth), Float(inputHeight)))
     }
 

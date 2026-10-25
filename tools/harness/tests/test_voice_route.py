@@ -9,24 +9,51 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run  # noqa: E402
 
-CASES = ["lobby", "off", "team-proximity", "team-enemy-proximity", "team-global", "team-global-enemy-proximity",
-         "packet-limit"]
+CASES = [
+    "lobby",
+    "off",
+    "team-proximity",
+    "team-enemy-proximity",
+    "team-global",
+    "team-global-enemy-proximity",
+    "packet-limit",
+]
 
 # a fault in network_voice.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
-    "lobby-ignores-setting": (("return lobby_voice ? _voice_route_global : _voice_route_none;",
-                               "return _voice_route_global;"), "voice_route", "lobby"),
-    "proximity-ignores-death": (("boolean near = both_alive && distance <= range;",
-                                 "boolean near = distance <= range;"), "voice_route", "team-proximity"),
-    "proximity-ignores-range": (("boolean near = both_alive && distance <= range;", "boolean near = both_alive;"),
-                                "voice_route", "team-enemy-proximity"),
-    "team-hears-enemies": (("return teammates ? _voice_route_global : _voice_route_none;",
-                            "return _voice_route_global;"), "voice_route", "team-global"),
-    "enemies-heard-anywhere": (("\t\treturn near ? _voice_route_proximity : _voice_route_none;\n\tdefault:",
-                                "\t\treturn _voice_route_proximity;\n\tdefault:"),
-                               "voice_route", "team-global-enemy-proximity"),
-    "no-packet-cap": (("return MIN(limit, VOICE_MAXIMUM_PACKET);", "return limit * 4;"), "voice_packet_limit",
-                      "packet-limit"),
+    "lobby-ignores-setting": (
+        ("return lobby_voice ? _voice_route_global : _voice_route_none;", "return _voice_route_global;"),
+        "voice_route",
+        "lobby",
+    ),
+    "proximity-ignores-death": (
+        ("boolean near = both_alive && distance <= range;", "boolean near = distance <= range;"),
+        "voice_route",
+        "team-proximity",
+    ),
+    "proximity-ignores-range": (
+        ("boolean near = both_alive && distance <= range;", "boolean near = both_alive;"),
+        "voice_route",
+        "team-enemy-proximity",
+    ),
+    "team-hears-enemies": (
+        ("return teammates ? _voice_route_global : _voice_route_none;", "return _voice_route_global;"),
+        "voice_route",
+        "team-global",
+    ),
+    "enemies-heard-anywhere": (
+        (
+            "\t\treturn near ? _voice_route_proximity : _voice_route_none;\n\tdefault:",
+            "\t\treturn _voice_route_proximity;\n\tdefault:",
+        ),
+        "voice_route",
+        "team-global-enemy-proximity",
+    ),
+    "no-packet-cap": (
+        ("return MIN(limit, VOICE_MAXIMUM_PACKET);", "return limit * 4;"),
+        "voice_packet_limit",
+        "packet-limit",
+    ),
 }
 
 

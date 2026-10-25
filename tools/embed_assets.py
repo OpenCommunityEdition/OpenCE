@@ -44,8 +44,11 @@ MENU_ASSETS = Path("port/assets/menus")
 MENU_LIST = MENU_ASSETS / "menus.json"
 # SMAA's files and the names port/linux/src/xgpu_post.c declares them by
 SMAA_ASSETS = Path("port/third_party/smaa")
-SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
-              ("search_tex.zlib", "xgpu_smaa_search_texture"))
+SMAA_FILES = (
+    ("SMAA.hlsl", "xgpu_smaa_shader"),
+    ("area_tex.zlib", "xgpu_smaa_area_texture"),
+    ("search_tex.zlib", "xgpu_smaa_search_texture"),
+)
 # the desktop windows' icon (tools/app_icon.py; port/linux/src/sdl_platform.c)
 RAGDOLL_OVERRIDES = Path("port/assets/ragdolls/ragdolls.txt")
 WINDOW_ICON = Path("port/assets/icon/opence-icon-256.png")
@@ -65,8 +68,11 @@ def textures() -> List[tuple]:
     it is the menus' (a title or a button icon, drawn with the high-res
     text)."""
     result = []
-    for folder, listing, title in ((HUD_ASSETS, LAYOUT, False), (TITLE_ASSETS, TITLE_LIST, True),
-                                   (BUTTON_ASSETS, BUTTON_LIST, True)):
+    for folder, listing, title in (
+        (HUD_ASSETS, LAYOUT, False),
+        (TITLE_ASSETS, TITLE_LIST, True),
+        (BUTTON_ASSETS, BUTTON_LIST, True),
+    ):
         if (ROOT / listing).is_file():
             result += [(folder, asset, title) for asset in json.loads((ROOT / listing).read_text())["assets"]]
     return result
@@ -86,13 +92,18 @@ def smaa_files() -> List[tuple]:
 
 def hud_asset_inputs() -> List[Path]:
     """The files the generated source is made from."""
-    inputs = [listing for listing in (LAYOUT, TITLE_LIST, BUTTON_LIST, FONT_LIST, MENU_LIST)
-              if (ROOT / listing).is_file()]
-    return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
-            *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
-            *(SMAA_ASSETS / name for name, _ in smaa_files()),
-            *([RAGDOLL_OVERRIDES] if (ROOT / RAGDOLL_OVERRIDES).is_file() else []),
-            *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else [])]
+    inputs = [
+        listing for listing in (LAYOUT, TITLE_LIST, BUTTON_LIST, FONT_LIST, MENU_LIST) if (ROOT / listing).is_file()
+    ]
+    return [
+        *inputs,
+        *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
+        *(FONT_ASSETS / name for name in font_files()),
+        *(MENU_ASSETS / name for name in menu_files()),
+        *(SMAA_ASSETS / name for name, _ in smaa_files()),
+        *([RAGDOLL_OVERRIDES] if (ROOT / RAGDOLL_OVERRIDES).is_file() else []),
+        *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else []),
+    ]
 
 
 def hud_configure_inputs() -> List[Path]:
@@ -100,8 +111,13 @@ def hud_configure_inputs() -> List[Path]:
     folders, for files added or removed), not each file, which a change of a
     list may rename or remove."""
     inputs = []
-    for folder, listing in ((HUD_ASSETS, LAYOUT), (TITLE_ASSETS, TITLE_LIST), (BUTTON_ASSETS, BUTTON_LIST),
-                            (FONT_ASSETS, FONT_LIST), (MENU_ASSETS, MENU_LIST)):
+    for folder, listing in (
+        (HUD_ASSETS, LAYOUT),
+        (TITLE_ASSETS, TITLE_LIST),
+        (BUTTON_ASSETS, BUTTON_LIST),
+        (FONT_ASSETS, FONT_LIST),
+        (MENU_ASSETS, MENU_LIST),
+    ):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
     if (ROOT / SMAA_ASSETS).is_dir():
@@ -113,8 +129,10 @@ def words(data: bytes) -> List[str]:
     """data as lines of 32-bit words (padded with zeros)."""
     padded = data + b"\0" * (-len(data) % 4)
     values = struct.unpack(f"<{len(padded) // 4}I", padded)
-    return ["\t" + ", ".join(f"0x{word:08x}" for word in values[start:start + 8]) + ","
-            for start in range(0, len(values), 8)]
+    return [
+        "\t" + ", ".join(f"0x{word:08x}" for word in values[start : start + 8]) + ","
+        for start in range(0, len(values), 8)
+    ]
 
 
 def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
@@ -171,8 +189,10 @@ def main() -> None:
         if any(not 0 <= sequence < 32 for sequence in sequences):
             sys.exit(f"{name}: sprite sequences must be 0 to 31 (hud_hires.h: sprites)")
         sprites = sum(1 << sequence for sequence in sequences)
-        table.append(f'\t{{ "{tag}", {asset["bitmap"]}, {width}, {height}, 0x{asset["crc"]:08x}u, {coverage}, '
-                     f'{point_threshold}, {int(title)}, 0x{sprites:x}u, asset{index}, {len(data)} }},')
+        table.append(
+            f'\t{{ "{tag}", {asset["bitmap"]}, {width}, {height}, 0x{asset["crc"]:08x}u, {coverage}, '
+            f'{point_threshold}, {int(title)}, 0x{sprites:x}u, asset{index}, {len(data)} }},'
+        )
     lines.append("const struct hud_hires_embedded hud_hires_embedded[] =")
     lines.append("{")
     lines.extend(table)

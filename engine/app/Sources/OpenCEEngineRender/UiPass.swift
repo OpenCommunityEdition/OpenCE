@@ -35,11 +35,14 @@ public final class UiPass {
     public private(set) var lastDrawn = 0
     public private(set) var lastMissing = 0
 
-    public init(device: MTLDevice, atlas glyphs: UiGlyphAtlas, outputFormat: MTLPixelFormat,
-                source: String? = nil) throws {
+    public init(
+        device: MTLDevice, atlas glyphs: UiGlyphAtlas, outputFormat: MTLPixelFormat,
+        source: String? = nil
+    ) throws {
         self.outputFormat = outputFormat
-        pipeline = try Self.pipeline(device: device, source: source ?? ShaderSources.source(.ui),
-                                     outputFormat: outputFormat)
+        pipeline = try Self.pipeline(
+            device: device, source: source ?? ShaderSources.source(.ui),
+            outputFormat: outputFormat)
         func sampler(_ address: MTLSamplerAddressMode) -> MTLSamplerState? {
             let descriptor = MTLSamplerDescriptor()
             descriptor.minFilter = .linear
@@ -55,8 +58,9 @@ public final class UiPass {
         self.wrap = wrap
         self.clamp = clamp
         let width = max(Int(glyphs.width), 1), height = max(Int(glyphs.height), 1)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r8Unorm, width: width,
-                                                                  height: height, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .r8Unorm, width: width,
+            height: height, mipmapped: false)
         descriptor.usage = .shaderRead
         guard let atlas = device.makeTexture(descriptor: descriptor) else {
             throw LevelRendererError.resources("UI glyph atlas")
@@ -64,16 +68,19 @@ public final class UiPass {
         if glyphs.texels.count >= width * height {
             glyphs.texels.withUnsafeBytes { raw in
                 if let base = raw.baseAddress {
-                    atlas.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: base,
-                                  bytesPerRow: width)
+                    atlas.replace(
+                        region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: base,
+                        bytesPerRow: width)
                 }
             }
         }
         self.atlas = atlas
     }
 
-    private static func pipeline(device: MTLDevice, source: String,
-                                 outputFormat: MTLPixelFormat) throws -> MTLRenderPipelineState {
+    private static func pipeline(
+        device: MTLDevice, source: String,
+        outputFormat: MTLPixelFormat
+    ) throws -> MTLRenderPipelineState {
         do {
             let library = try device.makeLibrary(source: source, options: nil)
             let descriptor = MTLRenderPipelineDescriptor()
@@ -99,8 +106,10 @@ public final class UiPass {
 
     /// `quads` over a target `width` by `height`, in order, their bitmaps
     /// from `textures` (the level's, by their index).
-    func encode(_ quads: [UiQuad], textures: [MTLTexture?], width: Int, height: Int,
-                into encoder: MTLRenderCommandEncoder) {
+    func encode(
+        _ quads: [UiQuad], textures: [MTLTexture?], width: Int, height: Int,
+        into encoder: MTLRenderCommandEncoder
+    ) {
         lastDrawn = 0
         lastMissing = 0
         guard !quads.isEmpty, width > 0, height > 0 else { return }
@@ -114,16 +123,18 @@ public final class UiPass {
             if quad.glyph {
                 texture = atlas
             } else if Int(quad.texture) < textures.count, let found = textures[Int(quad.texture)],
-                      found.textureType == .type2D {
+                found.textureType == .type2D
+            {
                 texture = found
             } else {
                 lastMissing += 1
                 continue
             }
-            instances.append(UiInstance(
-                rect: SIMD4(x(quad.left), y(quad.top), x(quad.right), y(quad.bottom)),
-                uv: SIMD4(quad.u0, quad.v0, quad.u1, quad.v1), color: HudPass.color(quad.color),
-                parameters: SIMD4(quad.glyph ? 1 : 0, 0, 0, 0)))
+            instances.append(
+                UiInstance(
+                    rect: SIMD4(x(quad.left), y(quad.top), x(quad.right), y(quad.bottom)),
+                    uv: SIMD4(quad.u0, quad.v0, quad.u1, quad.v1), color: HudPass.color(quad.color),
+                    parameters: SIMD4(quad.glyph ? 1 : 0, 0, 0, 0)))
             if let last = runs.last, last.texture === texture {
                 runs[runs.count - 1].count += 1
             } else {
@@ -148,8 +159,9 @@ public final class UiPass {
         for run in runs {
             encoder.setFragmentSamplerState(run.texture === atlas ? clamp : wrap, index: 0)
             encoder.setFragmentTexture(run.texture, index: 0)
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: run.count,
-                                   baseInstance: run.first)
+            encoder.drawPrimitives(
+                type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: run.count,
+                baseInstance: run.first)
         }
         lastDrawn = instances.count
     }

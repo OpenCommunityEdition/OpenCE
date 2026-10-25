@@ -73,8 +73,10 @@ final class FakeMenu: MenuProtocol, @unchecked Sendable {
     func wheel(steps: Int32) {}
 }
 
-func server(_ name: String, _ address: String, level: String = "bloodgulch", players: UInt8 = 1,
-            capacity: UInt8 = 16) -> ServerInfo {
+func server(
+    _ name: String, _ address: String, level: String = "bloodgulch", players: UInt8 = 1,
+    capacity: UInt8 = 16
+) -> ServerInfo {
     ServerInfo(address: address, name: name, level: level, gameType: 2, players: players, capacity: capacity)
 }
 
@@ -103,7 +105,8 @@ final class MenuTests: XCTestCase {
 
     func testTheListsAreTheMissionsInOrderAndTheOtherMaps() {
         let (halo, fake, _, _) = menu()
-        XCTAssertEqual(fake.levels, [MenuEntry(map: "a10", name: "The Pillar of Autumn"), MenuEntry(map: "a30", name: "Halo")])
+        XCTAssertEqual(
+            fake.levels, [MenuEntry(map: "a10", name: "The Pillar of Autumn"), MenuEntry(map: "a30", name: "Halo")])
         XCTAssertEqual(fake.maps.map(\.map), ["bloodgulch", "boardingaction"], "no missions, no ui")
         XCTAssertEqual(fake.profile, "Spartan")
         XCTAssertTrue(halo.isOpen)
@@ -140,8 +143,10 @@ final class MenuTests: XCTestCase {
         let (halo, fake, actions, _) = menu(source: source)
         var said: [String] = []
         halo.onMessage = { said.append($0) }
-        source.answers = [server("zeta", "10.0.0.2:2302"), server("Alpha", "10.0.0.3:2302", players: 16),
-                          server("beta", "10.0.0.4:2302", level: "levels\\test\\icefields\\icefields")]
+        source.answers = [
+            server("zeta", "10.0.0.2:2302"), server("Alpha", "10.0.0.3:2302", players: 16),
+            server("beta", "10.0.0.4:2302", level: "levels\\test\\icefields\\icefields"),
+        ]
         halo.update(now: 0)
         XCTAssertEqual(fake.servers, ["Alpha  bloodgulch  16/16", "beta  icefields  1/16", "zeta  bloodgulch  1/16"])
         fake.asks = [.joinServer(index: 0), .joinServer(index: 1), .joinServer(index: 2), .joinServer(index: 7)]
@@ -157,12 +162,18 @@ final class MenuTests: XCTestCase {
 
     func testHostingSavesTheMapAndThePauseMenusChoicesAreDone() throws {
         let (halo, fake, actions, _) = menu()
-        fake.asks = [.hostGame(map: "boardingaction"), .restartCheckpoint, .restartLevel, .returnToMainMenu,
-                     .leaveGame, .quit]
+        fake.asks = [
+            .hostGame(map: "boardingaction"), .restartCheckpoint, .restartLevel, .returnToMainMenu,
+            .leaveGame, .quit,
+        ]
         halo.update(now: 0)
         let setup = HostSetup(game: halo.settings.settings.game)
-        XCTAssertEqual(actions.done, ["host boardingaction.map \(setup.kind.setting) \(setup.maxPlayers) \(setup.name) 2302",
-                                      "checkpoint", "restart", "main menu", "main menu", "quit"])
+        XCTAssertEqual(
+            actions.done,
+            [
+                "host boardingaction.map \(setup.kind.setting) \(setup.maxPlayers) \(setup.name) 2302",
+                "checkpoint", "restart", "main menu", "main menu", "quit",
+            ])
         XCTAssertEqual(loadSettings(path: halo.settings.path).game.map, "boardingaction")
     }
 
@@ -204,7 +215,7 @@ final class MenuTests: XCTestCase {
         settings.antiAliasing = "fxaa"
         XCTAssertEqual(settings.antiAliasing, "temporal")
         XCTAssertEqual(settings.settings.controls.bindings, [], "the stock keys are not written")
-        settings.bind(.jump, to: 13) // (W, forward's)
+        settings.bind(.jump, to: 13)  // (W, forward's)
         XCTAssertEqual(settings.bindings.keys[.jump], [13])
         XCTAssertEqual(settings.bindings.keys[.forward], [])
         XCTAssertEqual(Set(settings.settings.controls.bindings.map(\.action)), ["jump", "forward"])

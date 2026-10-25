@@ -58,8 +58,11 @@ JOLT_DEFINES = ["-DJPH_CROSS_PLATFORM_DETERMINISTIC", "-DNDEBUG"]
 
 def jolt_sources() -> List[Path]:
     skipped = {"CPU", "DX12", "VK", "MTL", "Shaders"}
-    return sorted(source for source in (JOLT_DIR / "Jolt").rglob("*.cpp")
-                  if not skipped.intersection(source.relative_to(JOLT_DIR / "Jolt").parts[:-1]))
+    return sorted(
+        source
+        for source in (JOLT_DIR / "Jolt").rglob("*.cpp")
+        if not skipped.intersection(source.relative_to(JOLT_DIR / "Jolt").parts[:-1])
+    )
 
 
 def is_macos_host() -> bool:
@@ -67,10 +70,19 @@ def is_macos_host() -> bool:
 
 
 def macos_configure_inputs() -> List[Path]:
-    inputs = [Path(__file__), PORT_DIR / "host", PORT_DIR / "cli", APP_DIR / "Sources" / "OpenCE",
-              APP_DIR / "Sources" / "OpenCEShell", APP_DIR / "Sources" / "OpenCEWindow",
-              APP_DIR / "Sources" / "OpenCEAudio", APP_DIR / "Sources" / "OpenCERender", APP_DIR / "Tests",
-              PORT_DIR / "runtime" / "src", Path("tools/macos_dispatch.py")]
+    inputs = [
+        Path(__file__),
+        PORT_DIR / "host",
+        PORT_DIR / "cli",
+        APP_DIR / "Sources" / "OpenCE",
+        APP_DIR / "Sources" / "OpenCEShell",
+        APP_DIR / "Sources" / "OpenCEWindow",
+        APP_DIR / "Sources" / "OpenCEAudio",
+        APP_DIR / "Sources" / "OpenCERender",
+        APP_DIR / "Tests",
+        PORT_DIR / "runtime" / "src",
+        Path("tools/macos_dispatch.py"),
+    ]
     return inputs + [folder for folder in [PORT_DIR / "host" / "physics"] if folder.is_dir()]
 
 
@@ -105,14 +117,26 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
 
     host_dir = BUILD / "host"
     names_c = host_dir / "host_import_names.c"
-    image = guest_image_build(n, sln, config, rule_prefix="macos", build=BUILD, guest_cc=guest_cc,
-                              musl_dir=MUSL_DIR, sdl_include=Path(sdl_include), gl_headers=Path(gles_include),
-                              ar=ar, lld=lld, builtins="", imports_options=f"--svc --host-names {names_c}",
-                              imports_outputs=[names_c],
-                              # the guest's code paths for the VM (the thread
-                              # pointer in TPIDR_EL0, port/android/guest/runtime) and
-                              # its Metal renderer (port/macos/guest)
-                              defines=["-DHALO_GUEST_VM=1", "-DHALO_METAL"])
+    image = guest_image_build(
+        n,
+        sln,
+        config,
+        rule_prefix="macos",
+        build=BUILD,
+        guest_cc=guest_cc,
+        musl_dir=MUSL_DIR,
+        sdl_include=Path(sdl_include),
+        gl_headers=Path(gles_include),
+        ar=ar,
+        lld=lld,
+        builtins="",
+        imports_options=f"--svc --host-names {names_c}",
+        imports_outputs=[names_c],
+        # the guest's code paths for the VM (the thread
+        # pointer in TPIDR_EL0, port/android/guest/runtime) and
+        # its Metal renderer (port/macos/guest)
+        defines=["-DHALO_GUEST_VM=1", "-DHALO_METAL"],
+    )
 
     # ---------- the host
 
@@ -142,56 +166,111 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     prototype_headers = [ANDROID_DIR / "guest" / "runtime" / "guest_host.h", LINUX_DIR / "src" / "posix.h"]
     n.rule(
         name="macos_dispatch",
-        command=("$python tools/macos_dispatch.py "
-                 + " ".join(f"--prototypes {header}" for header in prototype_headers)
-                 + " $out $in"),
+        command=(
+            "$python tools/macos_dispatch.py "
+            + " ".join(f"--prototypes {header}" for header in prototype_headers)
+            + " $out $in"
+        ),
         description="MACOS DISPATCH $out",
     )
-    n.build(outputs=dispatch_c, rule="macos_dispatch", inputs=import_lists,
-            implicit=[Path("tools/macos_dispatch.py"), *prototype_headers])
+    n.build(
+        outputs=dispatch_c,
+        rule="macos_dispatch",
+        inputs=import_lists,
+        implicit=[Path("tools/macos_dispatch.py"), *prototype_headers],
+    )
 
-    host_cflags = " ".join([
-        "-O2", "-g", "-Wall", "-Werror", "-std=gnu11", "-D_DARWIN_C_SOURCE", f"-mmacosx-version-min={MACOS_MINIMUM}",
-        f"-I{PORT_DIR}/host", f"-I{runtime_header.parent}", f"-I{ANDROID_DIR}/include",
-        f"-I{ANDROID_DIR}/guest/runtime", f"-I{ANDROID_DIR}/guest/libc/arch/arm64_32", f"-I{LINUX_DIR}/src",
-        f"-I{sdl_include}",
-    ])
+    host_cflags = " ".join(
+        [
+            "-O2",
+            "-g",
+            "-Wall",
+            "-Werror",
+            "-std=gnu11",
+            "-D_DARWIN_C_SOURCE",
+            f"-mmacosx-version-min={MACOS_MINIMUM}",
+            f"-I{PORT_DIR}/host",
+            f"-I{runtime_header.parent}",
+            f"-I{ANDROID_DIR}/include",
+            f"-I{ANDROID_DIR}/guest/runtime",
+            f"-I{ANDROID_DIR}/guest/libc/arch/arm64_32",
+            f"-I{LINUX_DIR}/src",
+            f"-I{sdl_include}",
+        ]
+    )
     # the files the Android host shares: its SDL bridge, and the platform
     # layer's POSIX helpers (with UPnP and DTLS, as there)
     shared_cflags = host_cflags.replace("-Werror", "") + " -Wno-unused-function"
     host_objects: List[Path] = []
     for source in [*sorted((PORT_DIR / "host").glob("*.c")), names_c, dispatch_c]:
         obj = host_dir / "obj" / (source.name + ".o")
-        n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": host_cflags},
-                order_only=[runtime_header])
+        n.build(
+            outputs=obj,
+            rule="macos_host_cc",
+            inputs=source,
+            variables={"cflags": host_cflags},
+            order_only=[runtime_header],
+        )
         host_objects.append(obj)
-    for source in [ANDROID_DIR / "host" / "host_sdl.c", LINUX_DIR / "src" / "posix_files.c",
-                   LINUX_DIR / "src" / "posix_net.c"]:
+    for source in [
+        ANDROID_DIR / "host" / "host_sdl.c",
+        LINUX_DIR / "src" / "posix_files.c",
+        LINUX_DIR / "src" / "posix_net.c",
+    ]:
         obj = host_dir / "obj" / (source.name + ".o")
-        n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": shared_cflags},
-                order_only=[runtime_header])
+        n.build(
+            outputs=obj,
+            rule="macos_host_cc",
+            inputs=source,
+            variables={"cflags": shared_cflags},
+            order_only=[runtime_header],
+        )
         host_objects.append(obj)
-    miniupnpc_cflags = " ".join([shared_cflags, f"-I{MINIUPNPC_DIR / 'include'}", f"-I{MINIUPNPC_DIR / 'src'}",
-                                 *MINIUPNPC_DEFINES])
+    miniupnpc_cflags = " ".join(
+        [shared_cflags, f"-I{MINIUPNPC_DIR / 'include'}", f"-I{MINIUPNPC_DIR / 'src'}", *MINIUPNPC_DEFINES]
+    )
     for source in [LINUX_DIR / "src" / "posix_upnp.c", *miniupnpc_sources()]:
-        obj = host_dir / "obj" / ("miniupnpc_" + source.name + ".o" if source.parent.parent == MINIUPNPC_DIR
-                                  else source.name + ".o")
-        n.build(outputs=obj, rule="macos_host_cc", inputs=source,
-                variables={"cflags": miniupnpc_cflags + (" -w" if source.name != "posix_upnp.c" else "")})
+        obj = (
+            host_dir
+            / "obj"
+            / ("miniupnpc_" + source.name + ".o" if source.parent.parent == MINIUPNPC_DIR else source.name + ".o")
+        )
+        n.build(
+            outputs=obj,
+            rule="macos_host_cc",
+            inputs=source,
+            variables={"cflags": miniupnpc_cflags + (" -w" if source.name != "posix_upnp.c" else "")},
+        )
         host_objects.append(obj)
     mbedtls_cflags = " ".join([shared_cflags, f"-I{MBEDTLS_DIR / 'include'}", f"-I{MBEDTLS_DIR / 'library'}"])
     for source in [LINUX_DIR / "src" / "posix_dtls.c", *sorted((MBEDTLS_DIR / "library").glob("*.c"))]:
-        obj = host_dir / "obj" / ("mbedtls_" + source.name + ".o" if source.parent.parent == MBEDTLS_DIR
-                                  else source.name + ".o")
-        n.build(outputs=obj, rule="macos_host_cc", inputs=source,
-                variables={"cflags": mbedtls_cflags + (" -w" if source.name != "posix_dtls.c" else "")})
+        obj = (
+            host_dir
+            / "obj"
+            / ("mbedtls_" + source.name + ".o" if source.parent.parent == MBEDTLS_DIR else source.name + ".o")
+        )
+        n.build(
+            outputs=obj,
+            rule="macos_host_cc",
+            inputs=source,
+            variables={"cflags": mbedtls_cflags + (" -w" if source.name != "posix_dtls.c" else "")},
+        )
         host_objects.append(obj)
     # Jolt and its C interface (port/macos/host/physics): C++17, without
     # fused multiply-add, so that every run computes the same results
-    jolt_cflags = " ".join([
-        "-O2", "-g", "-std=c++17", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti",
-        f"-mmacosx-version-min={MACOS_MINIMUM}", f"-I{JOLT_DIR}", *JOLT_DEFINES,
-    ])
+    jolt_cflags = " ".join(
+        [
+            "-O2",
+            "-g",
+            "-std=c++17",
+            "-ffp-contract=off",
+            "-fno-exceptions",
+            "-fno-rtti",
+            f"-mmacosx-version-min={MACOS_MINIMUM}",
+            f"-I{JOLT_DIR}",
+            *JOLT_DEFINES,
+        ]
+    )
     physics_objects: List[Path] = []
     for source in jolt_sources():
         relative = source.relative_to(JOLT_DIR).with_suffix("").as_posix().replace("/", "_")
@@ -204,10 +283,19 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         n.build(outputs=obj, rule="macos_host_cxx", inputs=source, variables={"cflags": physics_cflags})
         physics_objects.append(obj)
     # the bridge to the guest's batches (port/macos/include/host_physics.h), in C
-    bridge_cflags = " ".join([
-        "-O2", "-g", "-Wall", "-Werror", "-std=gnu11", "-ffp-contract=off", f"-mmacosx-version-min={MACOS_MINIMUM}",
-        f"-I{PORT_DIR}/host", f"-I{PORT_DIR}/include",
-    ])
+    bridge_cflags = " ".join(
+        [
+            "-O2",
+            "-g",
+            "-Wall",
+            "-Werror",
+            "-std=gnu11",
+            "-ffp-contract=off",
+            f"-mmacosx-version-min={MACOS_MINIMUM}",
+            f"-I{PORT_DIR}/host",
+            f"-I{PORT_DIR}/include",
+        ]
+    )
     for source in sorted((PORT_DIR / "host" / "physics").glob("*.c")):
         obj = host_dir / "obj" / "physics" / (source.name + ".o")
         n.build(outputs=obj, rule="macos_host_cc", inputs=source, variables={"cflags": bridge_cflags})
@@ -224,8 +312,9 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     # (and the physics alone, for tools/test_macos_physics.py)
     n.build(outputs=BUILD / "libhalo_physics.a", rule="macos_host_archive", inputs=physics_objects)
     cli_object = BUILD / "cli" / "obj" / "main.c.o"
-    n.build(outputs=cli_object, rule="macos_host_cc", inputs=PORT_DIR / "cli" / "main.c",
-            variables={"cflags": host_cflags})
+    n.build(
+        outputs=cli_object, rule="macos_host_cc", inputs=PORT_DIR / "cli" / "main.c", variables={"cflags": host_cflags}
+    )
 
     host = BUILD / "halo_host"
     libraries = " ".join(f"-framework {name}" for name in HOST_FRAMEWORKS)
@@ -237,12 +326,18 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     # the entitlement it cannot create its VM
     n.rule(
         name="macos_host_link",
-        command=(f"$macos_host_cc -mmacosx-version-min={MACOS_MINIMUM} -o $out $in {libraries} && "
-                 f"{codesign} -s - -f --entitlements {ENTITLEMENTS} $out"),
+        command=(
+            f"$macos_host_cc -mmacosx-version-min={MACOS_MINIMUM} -o $out $in {libraries} && "
+            f"{codesign} -s - -f --entitlements {ENTITLEMENTS} $out"
+        ),
         description="MACOS HOST LINK $out",
     )
-    n.build(outputs=host, rule="macos_host_link", inputs=[cli_object, host_library],
-            implicit=[ENTITLEMENTS, runtime_library])
+    n.build(
+        outputs=host,
+        rule="macos_host_link",
+        inputs=[cli_object, host_library],
+        implicit=[ENTITLEMENTS, runtime_library],
+    )
 
     # ---------- the app
 
@@ -262,17 +357,21 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     if sdl_lib:
         linker_flags += f" -Xlinker -L{sdl_lib} -Xlinker -rpath -Xlinker {sdl_lib}"
     linker_flags += " -Xlinker -lSDL3 -Xlinker -lc++"
-    swift_package = (f"env -u SDKROOT -u DEVELOPER_DIR -u MACOSX_DEPLOYMENT_TARGET -u CC -u CXX -u LD "
-                     f"{swift} %s --quiet --disable-sandbox --package-path {APP_DIR} "
-                     f"--scratch-path {swift_build} --cache-path {swift_build}/cache "
-                     f"--config-path {swift_build}/config --security-path {swift_build}/security {linker_flags}")
+    swift_package = (
+        f"env -u SDKROOT -u DEVELOPER_DIR -u MACOSX_DEPLOYMENT_TARGET -u CC -u CXX -u LD "
+        f"{swift} %s --quiet --disable-sandbox --package-path {APP_DIR} "
+        f"--scratch-path {swift_build} --cache-path {swift_build}/cache "
+        f"--config-path {swift_build}/config --security-path {swift_build}/security {linker_flags}"
+    )
     # (SwiftPM does not count the libraries given to its linker as inputs: its
     # product is removed first, so that a changed host library is linked)
     n.rule(
         name="macos_app",
-        command=(f"rm -f {swift_build}/release/OpenCE && {swift_package % 'build -c release'} && "
-                 f"$python tools/macos_app.py {swift_build}/release/OpenCE {image} {ENTITLEMENTS} {app_codesign} "
-                 f"{APP_VERSION} {app}"),
+        command=(
+            f"rm -f {swift_build}/release/OpenCE && {swift_package % 'build -c release'} && "
+            f"$python tools/macos_app.py {swift_build}/release/OpenCE {image} {ENTITLEMENTS} {app_codesign} "
+            f"{APP_VERSION} {app}"
+        ),
         description="MACOS APP $out",
     )
     # The runtime's Swift bindings, generated from its library (whose
@@ -280,32 +379,47 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
     # uniffi-bindgen is built in a target folder of its own: its features
     # would otherwise rebuild the library the hosts link.
     bindings_dir = BUILD / "swift_bindings"
-    bindings = [APP_DIR / "Sources" / "OpenCERuntime" / "opence_runtime.swift",
-                APP_DIR / "Sources" / "opence_runtimeFFI" / "opence_runtimeFFI.h",
-                APP_DIR / "Sources" / "opence_runtimeFFI" / "module.modulemap"]
+    bindings = [
+        APP_DIR / "Sources" / "OpenCERuntime" / "opence_runtime.swift",
+        APP_DIR / "Sources" / "opence_runtimeFFI" / "opence_runtimeFFI.h",
+        APP_DIR / "Sources" / "opence_runtimeFFI" / "module.modulemap",
+    ]
     n.rule(
         name="macos_swift_bindings",
-        command=(f"cargo run --quiet --release --features bindgen --bin uniffi-bindgen "
-                 f"--manifest-path {runtime_dir}/Cargo.toml --target-dir {BUILD / 'cargo_bindgen'} -- "
-                 f"generate --library {runtime_library} --language swift --out-dir {bindings_dir} && "
-                 f"mkdir -p {bindings[0].parent} {bindings[1].parent} && "
-                 f"cp {bindings_dir}/opence_runtime.swift {bindings[0]} && "
-                 f"cp {bindings_dir}/opence_runtimeFFI.h {bindings[1]} && "
-                 f"cp {bindings_dir}/opence_runtimeFFI.modulemap {bindings[2]}"),
+        command=(
+            f"cargo run --quiet --release --features bindgen --bin uniffi-bindgen "
+            f"--manifest-path {runtime_dir}/Cargo.toml --target-dir {BUILD / 'cargo_bindgen'} -- "
+            f"generate --library {runtime_library} --language swift --out-dir {bindings_dir} && "
+            f"mkdir -p {bindings[0].parent} {bindings[1].parent} && "
+            f"cp {bindings_dir}/opence_runtime.swift {bindings[0]} && "
+            f"cp {bindings_dir}/opence_runtimeFFI.h {bindings[1]} && "
+            f"cp {bindings_dir}/opence_runtimeFFI.modulemap {bindings[2]}"
+        ),
         description="MACOS UNIFFI $out",
     )
-    n.build(outputs=bindings, rule="macos_swift_bindings", inputs=[runtime_library],
-            implicit=[runtime_dir / "src" / "bin" / "uniffi-bindgen.rs"])
-    swift_sources = [APP_DIR / "Package.swift", *sorted((APP_DIR / "Sources" / "OpenCE").glob("*.swift")),
-                     *sorted((APP_DIR / "Sources" / "OpenCEShell").glob("*.swift")),
-                     *sorted((APP_DIR / "Sources" / "OpenCEWindow").glob("*.swift")),
-                     *sorted((APP_DIR / "Sources" / "OpenCEAudio").glob("*.swift")),
-                     *sorted((APP_DIR / "Sources" / "OpenCERender").glob("*.swift")),
-                     APP_DIR / "Sources" / "CHaloHost" / "module.modulemap", PORT_DIR / "host" / "halo_host.h",
-                     *bindings]
-    n.build(outputs=app_executable, rule="macos_app",
-            inputs=[*swift_sources, host_library, runtime_library, image, ENTITLEMENTS],
-            implicit=[Path("tools/macos_app.py")])
+    n.build(
+        outputs=bindings,
+        rule="macos_swift_bindings",
+        inputs=[runtime_library],
+        implicit=[runtime_dir / "src" / "bin" / "uniffi-bindgen.rs"],
+    )
+    swift_sources = [
+        APP_DIR / "Package.swift",
+        *sorted((APP_DIR / "Sources" / "OpenCE").glob("*.swift")),
+        *sorted((APP_DIR / "Sources" / "OpenCEShell").glob("*.swift")),
+        *sorted((APP_DIR / "Sources" / "OpenCEWindow").glob("*.swift")),
+        *sorted((APP_DIR / "Sources" / "OpenCEAudio").glob("*.swift")),
+        *sorted((APP_DIR / "Sources" / "OpenCERender").glob("*.swift")),
+        APP_DIR / "Sources" / "CHaloHost" / "module.modulemap",
+        PORT_DIR / "host" / "halo_host.h",
+        *bindings,
+    ]
+    n.build(
+        outputs=app_executable,
+        rule="macos_app",
+        inputs=[*swift_sources, host_library, runtime_library, image, ENTITLEMENTS],
+        implicit=[Path("tools/macos_app.py")],
+    )
     n.build(outputs="macos_app", rule="phony", inputs=[app_executable])
     # the package's tests (port/macos/app/Tests), run each time they are asked for
     swift_tests = sorted((APP_DIR / "Tests").rglob("*.swift"))
@@ -315,13 +429,19 @@ def generate_macos_build(n: Writer, sln: Any) -> None:
         description="MACOS SWIFT TEST",
         pool="console",
     )
-    n.build(outputs="macos_app_test", rule="macos_app_test",
-            inputs=[*swift_sources, *swift_tests, host_library, runtime_library])
+    n.build(
+        outputs="macos_app_test",
+        rule="macos_app_test",
+        inputs=[*swift_sources, *swift_tests, host_library, runtime_library],
+    )
 
     # ---------- the runtime crate
 
-    runtime_inputs = [runtime_dir / "Cargo.toml", runtime_dir / "Cargo.lock",
-                      *sorted((runtime_dir / "src").glob("*.rs"))]
+    runtime_inputs = [
+        runtime_dir / "Cargo.toml",
+        runtime_dir / "Cargo.lock",
+        *sorted((runtime_dir / "src").glob("*.rs")),
+    ]
     n.rule(
         name="macos_cargo",
         # (cargo reads .cargo/config.toml from the folder it runs in, not the

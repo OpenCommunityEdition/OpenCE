@@ -13,8 +13,11 @@ CASES = ["finds-the-type", "fills-and-refuses", "frees-and-reuses", "failed-widg
 
 # a fault in widgets.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
-    "keeps-a-failed-widgets-slot": (("datum_delete(widget_data, widget_index);", ";"), "widgets_new",
-                                    "failed-widget-frees-its-slot"),
+    "keeps-a-failed-widgets-slot": (
+        ("datum_delete(widget_data, widget_index);", ";"),
+        "widgets_new",
+        "failed-widget-frees-its-slot",
+    ),
     "never-frees-on-delete": (("datum_delete(widget_data, widget_index);", ";"), "widgets_delete", "frees-and-reuses"),
 }
 
@@ -45,4 +48,3 @@ def test_negative_control(control):
     fault, faulty_function, case = NEGATIVE_CONTROLS[control]
     status, output = run(build("widget_pool", generated(fault, faulty_function)), case)
     assert status == CHECK_FAILED, f"widgets.c with a fault ({control}) passed '{case}': the test cannot see it"
-

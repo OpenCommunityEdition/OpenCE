@@ -23,16 +23,18 @@ final class DeveloperTests: XCTestCase {
 
     func launcher() -> LauncherModel {
         let settings = SettingsModel(path: folder.appendingPathComponent("settings.toml").path)
-        return LauncherModel(settings: settings, displays: ["Built-in"], root: folder,
-                             variables: Engine().shellVariables())
+        return LauncherModel(
+            settings: settings, displays: ["Built-in"], root: folder,
+            variables: Engine().shellVariables())
     }
 
     func testTheTabListsDevgulchItsStationsTheViewsAndTheSwitches() {
         let model = launcher().developer
         XCTAssertEqual(model.levels, ["devgulch"], "devmap is the tests'")
         XCTAssertEqual(model.level, "devgulch", "devgulch by default")
-        XCTAssertEqual(model.stations.map(\.name),
-                       ["weapons", "vehicles", "ai", "effects", "sounds", "shaders", "animation", "hud", "physics"])
+        XCTAssertEqual(
+            model.stations.map(\.name),
+            ["weapons", "vehicles", "ai", "effects", "sounds", "shaders", "animation", "hud", "physics"])
         XCTAssertTrue(model.stations.allSatisfy { !$0.help.isEmpty })
         XCTAssertEqual(model.views.first, .frame)
         XCTAssertTrue(model.views.contains(.normals))
@@ -92,8 +94,14 @@ final class DeveloperTests: XCTestCase {
         // (a station's own Launch starts straight at it)
         launcher.launch(model.arguments(at: "vehicles"))
         let capture = folder.appendingPathComponent("assets/captures/devgulch-vehicles.png").path
-        XCTAssertEqual(launched, [["--map", "devgulch", "--station", "vehicles", "--view", "normals",
-                                   "--set", "render.gtao=false", "--capture", capture]])
+        XCTAssertEqual(
+            launched,
+            [
+                [
+                    "--map", "devgulch", "--station", "vehicles", "--view", "normals",
+                    "--set", "render.gtao=false", "--capture", capture,
+                ]
+            ])
         XCTAssertTrue(FileManager.default.fileExists(atPath: launcher.settings.path), "saved before the game starts")
         // the game reads it back
         let read = try XCTUnwrap(DeveloperLaunch(arguments: ["OpenCE Engine", "--frame-times"] + launched[0]))

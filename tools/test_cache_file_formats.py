@@ -12,6 +12,7 @@ When real maps are present (HALO_CUSTOM_EDITION_MAPS, or the gitignored
 assets/custom_edition), test_real_maps_* also check the results recorded in
 docs/custom_edition_caches.md.
 """
+
 import os
 from pathlib import Path
 import random
@@ -69,8 +70,20 @@ def report_tool(tmp_path_factory):
     output = folder / ("cache_file_report.exe" if sys.platform == "win32" else "cache_file_report")
     errors = []
     for target in target_flag_sets():
-        command = [clang, *target, "-std=c99", *STRICT_FLAGS, *UB_TRAP_FLAGS, "-O1", "-g",
-                   f"-I{MODULE.parent}", str(MODULE), str(TOOL), "-o", str(output)]
+        command = [
+            clang,
+            *target,
+            "-std=c99",
+            *STRICT_FLAGS,
+            *UB_TRAP_FLAGS,
+            "-O1",
+            "-g",
+            f"-I{MODULE.parent}",
+            str(MODULE),
+            str(TOOL),
+            "-o",
+            str(output),
+        ]
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode == 0:
             return output
@@ -86,8 +99,17 @@ def test_module_compiles_as_game_code_without_warnings(tmp_path):
     if clang is None:
         pytest.skip("clang is needed")
     for target in target_flag_sets():
-        command = [clang, *target, "-std=gnu89", *STRICT_FLAGS, "-Wno-long-long", "-c", str(MODULE),
-                   "-o", str(tmp_path / "cache_file_formats.o")]
+        command = [
+            clang,
+            *target,
+            "-std=gnu89",
+            *STRICT_FLAGS,
+            "-Wno-long-long",
+            "-c",
+            str(MODULE),
+            "-o",
+            str(tmp_path / "cache_file_formats.o"),
+        ]
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode == 0:
             return
@@ -140,7 +162,7 @@ class Blob:
 
     def put(self, address, data):
         offset = address - self.base
-        self.bytes[offset:offset + len(data)] = data
+        self.bytes[offset : offset + len(data)] = data
 
     def u16(self, address, value):
         struct.pack_into("<H", self.bytes, address - self.base, value & 0xFFFF)
@@ -268,8 +290,15 @@ def hud_message_text_item():
     return bytes(item.bytes)
 
 
-GBXMODEL_PART = {"vertex_count": 3, "vertex_offset": 0, "strip_triangle_count": 1, "strip_offset": 0,
-                 "triangle_type": 1, "vertex_type": 4, "local_node_count": 0}
+GBXMODEL_PART = {
+    "vertex_count": 3,
+    "vertex_offset": 0,
+    "strip_triangle_count": 1,
+    "strip_offset": 0,
+    "triangle_type": 1,
+    "vertex_type": 4,
+    "local_node_count": 0,
+}
 
 
 def add_gbxmodel(blob, part_options):
@@ -296,8 +325,17 @@ def add_gbxmodel(blob, part_options):
 
 
 # the type Custom Edition gives each shader group, and the one this build does
-SHADER_TYPES = {"senv": (3, 3), "soso": (4, 4), "sotr": (5, 5), "schi": (6, 6), "scex": (7, 6),
-                "swat": (8, 7), "sgla": (9, 8), "smet": (10, 9), "spla": (11, 10)}
+SHADER_TYPES = {
+    "senv": (3, 3),
+    "soso": (4, 4),
+    "sotr": (5, 5),
+    "schi": (6, 6),
+    "scex": (7, 6),
+    "swat": (8, 7),
+    "sgla": (9, 8),
+    "smet": (10, 9),
+    "spla": (11, 10),
+}
 
 
 def add_shader(blob, group, options):
@@ -351,8 +389,15 @@ def add_animation_graph(blob, overlay_animation_index):
     return graph
 
 
-BSP_MATERIAL = {"vertex_count": 3, "lightmap_vertex_count": 3, "bitmap_index": 0, "vertex_type": 0,
-                "vertices_size": None, "vertices_offset": 0x3C0, "normal": (0.0, 0.0, 1.0)}
+BSP_MATERIAL = {
+    "vertex_count": 3,
+    "lightmap_vertex_count": 3,
+    "bitmap_index": 0,
+    "vertex_type": 0,
+    "vertices_size": None,
+    "vertices_offset": 0x3C0,
+    "normal": (0.0, 0.0, 1.0),
+}
 BSP_MATERIAL_OFFSET = 0x2C0
 
 
@@ -392,12 +437,30 @@ class Map:
     Every option changes one thing from the valid default, and `where`
     records the file offsets of the fields tests corrupt afterwards."""
 
-    def __init__(self, opensauce_flags=None, trailing=b"",
-                 extra_tags=(), bsp_gap=None, bitmap_pixels_size=16, sound_samples_size=32,
-                 font_style_reference=NONE, pitch_ranges=1, bsp_sizes=(0x1000,), sound_compression=1,
-                 model=None, bsp_material=None, shaders=(), animation_overlay=None,
-                 weapon_hud=None, hud_bitmap_flags=None, in_map_bitmap=None, strings_name="test\\strings",
-                 strings=("hello", "world!"), name=b"test", tags_checksum=0):
+    def __init__(
+        self,
+        opensauce_flags=None,
+        trailing=b"",
+        extra_tags=(),
+        bsp_gap=None,
+        bitmap_pixels_size=16,
+        sound_samples_size=32,
+        font_style_reference=NONE,
+        pitch_ranges=1,
+        bsp_sizes=(0x1000,),
+        sound_compression=1,
+        model=None,
+        bsp_material=None,
+        shaders=(),
+        animation_overlay=None,
+        weapon_hud=None,
+        hud_bitmap_flags=None,
+        in_map_bitmap=None,
+        strings_name="test\\strings",
+        strings=("hello", "world!"),
+        name=b"test",
+        tags_checksum=0,
+    ):
         self.bsp_sizes = bsp_sizes
         # the header's name and the tag data's checksum, by which Chimera's
         # map list knows a map
@@ -431,21 +494,32 @@ class Map:
     def resource_maps(self):
         # each map's first item sits right after its 16-byte header
         pixels_offset = 16
-        bitmaps, _ = resource_map_file(1, [
-            ("test\\external bitmap__pixels", bytes(range(16))),
-            ("test\\external bitmap", bitmap_item(pixels_offset, self.bitmap_pixels_size)),
-        ])
+        bitmaps, _ = resource_map_file(
+            1,
+            [
+                ("test\\external bitmap__pixels", bytes(range(16))),
+                ("test\\external bitmap", bitmap_item(pixels_offset, self.bitmap_pixels_size)),
+            ],
+        )
         samples_offset = 16
-        sounds, _ = resource_map_file(2, [
-            ("test\\sound__permutations", bytes(32)),
-            ("test\\sound", sound_item(samples_offset, self.sound_samples_size, self.pitch_ranges,
-                                       self.sound_compression)),
-        ])
-        loc, _ = resource_map_file(3, [
-            (self.strings_name, string_list_item(self.strings)),
-            ("test\\font", font_item(self.font_style_reference)),
-            ("test\\hud messages", hud_message_text_item()),
-        ])
+        sounds, _ = resource_map_file(
+            2,
+            [
+                ("test\\sound__permutations", bytes(32)),
+                (
+                    "test\\sound",
+                    sound_item(samples_offset, self.sound_samples_size, self.pitch_ranges, self.sound_compression),
+                ),
+            ],
+        )
+        loc, _ = resource_map_file(
+            3,
+            [
+                (self.strings_name, string_list_item(self.strings)),
+                ("test\\font", font_item(self.font_style_reference)),
+                ("test\\hud messages", hud_message_text_item()),
+            ],
+        )
         return {"bitmaps": bitmaps, "sounds": sounds, "loc": loc}
 
     def build(self):
@@ -470,8 +544,7 @@ class Map:
         # further structure BSPs go last, so the indices above never move
         bsp_tag_indices = [1] + [len(tags) + extra for extra in range(len(self.bsp_sizes) - 1)]
         tags += [("sbsp", f"test\\bsp {extra + 2}", False) for extra in range(len(self.bsp_sizes) - 1)]
-        resource_indices = {"test\\external bitmap": 1, self.strings_name: 0, "test\\font": 1,
-                            "test\\hud messages": 2}
+        resource_indices = {"test\\external bitmap": 1, self.strings_name: 0, "test\\font": 1, "test\\hud messages": 2}
         salt = 0xE174
 
         # the file before the tag data: header, structure BSPs one after
@@ -572,15 +645,14 @@ class Map:
         file_length = len(data)
         data += self.trailing
         header = data
-        struct.pack_into("<IiIIII", header, 0, code("head"), 609, file_length, 0,
-                         tag_data_offset, len(tag_data.bytes))
-        header[0x20:0x20 + len(self.name) + 1] = self.name + b"\0"
-        header[0x40:0x40 + 14] = b"01.00.00.0609\0"
+        struct.pack_into("<IiIIII", header, 0, code("head"), 609, file_length, 0, tag_data_offset, len(tag_data.bytes))
+        header[0x20 : 0x20 + len(self.name) + 1] = self.name + b"\0"
+        header[0x40 : 0x40 + 14] = b"01.00.00.0609\0"
         struct.pack_into("<h", header, 0x60, 1)
         struct.pack_into("<I", header, 0x7FC, code("foot"))
         if self.opensauce_flags is not None:
             struct.pack_into("<IhH", header, 0x70, code("yelo"), 1, self.opensauce_flags)
-        checksum = zlib.crc32(bytes(data[bsp_offset:bsp_offset + sum(self.bsp_sizes)]))
+        checksum = zlib.crc32(bytes(data[bsp_offset : bsp_offset + sum(self.bsp_sizes)]))
         checksum = zlib.crc32(model_data, checksum)
         checksum = zlib.crc32(bytes(tag_data.bytes), checksum)
         struct.pack_into("<I", header, 0x64, ~checksum & 0xFFFFFFFF)
@@ -727,8 +799,9 @@ def test_several_structure_bsps_share_the_top_of_the_tag_cache(report_tool, tmp_
 
 def test_resource_maps_are_recognized_by_type(report_tool, tmp_path):
     Map().write(tmp_path)
-    returncode, blocks = run_report(report_tool, tmp_path / "bitmaps.map", tmp_path / "sounds.map",
-                                    tmp_path / "loc.map")
+    returncode, blocks = run_report(
+        report_tool, tmp_path / "bitmaps.map", tmp_path / "sounds.map", tmp_path / "loc.map"
+    )
     assert returncode == 0
     assert [(b["format"], b["resource_map_type"], b["resource_map"]) for b in blocks] == [
         ("Custom Edition resource map", "bitmaps", "ok"),
@@ -739,7 +812,7 @@ def test_resource_maps_are_recognized_by_type(report_tool, tmp_path):
 
 
 def test_trailing_data_is_reported_not_rejected(report_tool, tmp_path):
-    path = Map(trailing=b"\xAA" * 100).write(tmp_path)
+    path = Map(trailing=b"\xaa" * 100).write(tmp_path)
     returncode, report = report_one(report_tool, path)
     assert returncode == 0
     assert report["trailing_bytes"] == "0x64"
@@ -754,8 +827,10 @@ def test_checksum_mismatch_is_reported_not_rejected(report_tool, tmp_path):
     assert report["warnings"] == "checksum mismatch"
 
 
-OPENSAUCE_REFUSED = ("an OpenSauce map that needs OpenSauce (its header asks for memory upgrades, mod data files or "
-                     "the like), which this build does not run")
+OPENSAUCE_REFUSED = (
+    "an OpenSauce map that needs OpenSauce (its header asks for memory upgrades, mod data files or "
+    "the like), which this build does not run"
+)
 
 
 @pytest.mark.parametrize("flags", [1, 2, 4, 1 << 15])
@@ -774,8 +849,10 @@ def test_caches_that_only_carry_opensauce_data_load(report_tool, tmp_path):
     """A cache with OpenSauce's header asking for nothing, and its
     project_yellow and project_yellow_globals tags, runs as stock Custom
     Edition runs it: neither is read (SPV3's backwards-compatible a50.map)."""
-    path = Map(opensauce_flags=0, extra_tags=[("yelo", "test\\project yellow", False),
-                                              ("gelo", "test\\project yellow globals", False)]).write(tmp_path)
+    path = Map(
+        opensauce_flags=0,
+        extra_tags=[("yelo", "test\\project yellow", False), ("gelo", "test\\project yellow globals", False)],
+    ).write(tmp_path)
     returncode, report = report_one(report_tool, path)
     assert returncode == 0
     assert report["identify"] == "ok" and report["load"] == "ok"
@@ -828,7 +905,9 @@ def test_a_material_without_a_lightmap_has_no_lightmap_vertices(report_tool, tmp
     assert returncode == 0 and report["structure_bsp_materials_checked"] == "1"
 
 
-BAD_MODEL_PART = "a model part's strip or vertices lie outside the model data or are not of the kind Custom Edition writes"
+BAD_MODEL_PART = (
+    "a model part's strip or vertices lie outside the model data or are not of the kind Custom Edition writes"
+)
 MALFORMED_MODEL_PARTS = {
     "vertices beyond the vertex data": {"vertex_offset": 0x1C0},
     "vertices unaligned": {"vertex_offset": 2},
@@ -912,8 +991,12 @@ def test_shaders_are_renumbered_as_this_build_numbers_them(report_tool, tmp_path
 
 
 def test_chicago_extended_shaders_become_chicago_shaders(report_tool, tmp_path):
-    cache = Map(shaders=[("scex", {"four_stage": 2, "two_stage": 1, "extra_flags": 0x5}),
-                         ("scex", {"four_stage": 0, "two_stage": 1, "extra_flags": 0x2})])
+    cache = Map(
+        shaders=[
+            ("scex", {"four_stage": 2, "two_stage": 1, "extra_flags": 0x5}),
+            ("scex", {"four_stage": 0, "two_stage": 1, "extra_flags": 0x2}),
+        ]
+    )
     returncode, report, tags = converted(report_tool, cache, tmp_path)
     assert returncode == 0
     assert report["chicago_extended_shaders_converted"] == "2"
@@ -925,7 +1008,7 @@ def test_chicago_extended_shaders_become_chicago_shaders(report_tool, tmp_path):
         # the four-stage maps, or the two-stage ones when there are no others
         assert u32_at(tags, shader + 0x54) == maps_count
         assert u32_at(tags, shader + 0x60) == extra_flags
-        assert tags[shader - BASE + 0x64:shader - BASE + 0x6C] == bytes(8)
+        assert tags[shader - BASE + 0x64 : shader - BASE + 0x6C] == bytes(8)
 
 
 def test_a_shader_with_another_groups_type_is_given_its_groups(report_tool, tmp_path):
@@ -937,14 +1020,18 @@ def test_a_shader_with_another_groups_type_is_given_its_groups(report_tool, tmp_
     assert u16_at(tags, shader + 0x24) == SHADER_TYPES["swat"][1]
 
 
-@pytest.mark.parametrize("bitmap, made_linear, flags", [
-    ((3840, 64, 0, 11, 0x81), 1, 0x90),  # birdcage's needler plasma: linear, no longer "power of two"
-    ((256, 64, 0, 11, 0x01), 0, 0x01),   # powers of two: swizzled as before
-    ((96, 96, 0, 14, 0x03), 0, 0x03),    # DXT1: linear ones cannot be compressed, so it stays
-    ((96, 96, 0, 17, 0x04), 0, 0x04),    # P8: nor palettized
-    ((96, 96, 2, 11, 0x00), 0, 0x00),    # a cube map: only 2D bitmaps can be linear
-    ((100, 50, 0, 11, 0x10), 0, 0x10),   # linear already
-], ids=["npot", "power of two", "dxt1", "p8", "cube map", "linear"])
+@pytest.mark.parametrize(
+    "bitmap, made_linear, flags",
+    [
+        ((3840, 64, 0, 11, 0x81), 1, 0x90),  # birdcage's needler plasma: linear, no longer "power of two"
+        ((256, 64, 0, 11, 0x01), 0, 0x01),  # powers of two: swizzled as before
+        ((96, 96, 0, 14, 0x03), 0, 0x03),  # DXT1: linear ones cannot be compressed, so it stays
+        ((96, 96, 0, 17, 0x04), 0, 0x04),  # P8: nor palettized
+        ((96, 96, 2, 11, 0x00), 0, 0x00),  # a cube map: only 2D bitmaps can be linear
+        ((100, 50, 0, 11, 0x10), 0, 0x10),  # linear already
+    ],
+    ids=["npot", "power of two", "dxt1", "p8", "cube map", "linear"],
+)
 def test_bitmaps_of_sides_only_halo_pc_draws_are_made_linear(report_tool, tmp_path, bitmap, made_linear, flags):
     cache = Map(in_map_bitmap=bitmap)
     returncode, report, tags = converted(report_tool, cache, tmp_path)
@@ -1054,22 +1141,31 @@ def test_hud_elements_drawing_a_halo_pc_half_scale_bitmap_are_halved(report_tool
     assert (f32_at(tags, items + 4), f32_at(tags, items + 8)) == (1.0, 1.0)
 
 
-@pytest.mark.parametrize("name, tags_checksum, listed", [
-    (b"rev_snowcast_cavebeta", 1683840640, True),
-    (b"Rev_Snowcast_CaveBeta", 1683840640, True),
-    (b"rev_snowcast_cavebeta", 1683840641, False),
-], ids=["listed", "name in another case", "another checksum"])
+@pytest.mark.parametrize(
+    "name, tags_checksum, listed",
+    [
+        (b"rev_snowcast_cavebeta", 1683840640, True),
+        (b"Rev_Snowcast_CaveBeta", 1683840640, True),
+        (b"rev_snowcast_cavebeta", 1683840641, False),
+    ],
+    ids=["listed", "name in another case", "another checksum"],
+)
 def test_maps_chimera_lists_get_halo_pc_behaviours(report_tool, tmp_path, name, tags_checksum, listed):
     """Chimera's map list knows a map by its name in lower case and its tag
     data checksum. This one relies on, among others, bitmaps' half HUD scale
     flags being ignored, so the static drawing a bitmap with one keeps its
     scale."""
-    cache = Map(weapon_hud=[((1.0, 0.5), 1), ((1.0, 1.0), 1), ((2.0, 2.0), 0)], hud_bitmap_flags=1 << 4,
-                name=name, tags_checksum=tags_checksum)
+    cache = Map(
+        weapon_hud=[((1.0, 0.5), 1), ((1.0, 1.0), 1), ((2.0, 2.0), 0)],
+        hud_bitmap_flags=1 << 4,
+        name=name,
+        tags_checksum=tags_checksum,
+    )
     returncode, report, tags = converted(report_tool, cache, tmp_path)
     assert returncode == 0
     assert report["halo_pc_behaviours"] == (
-        "gearbox_chicago_multiply gearbox_meters hud_number_scale disable_bitmap_hud_scale_flags" if listed else "none")
+        "gearbox_chicago_multiply gearbox_meters hud_number_scale disable_bitmap_hud_scale_flags" if listed else "none"
+    )
     assert report["hud_placements_rescaled"] == ("0" if listed else "2")
 
 
@@ -1087,8 +1183,10 @@ def test_the_score_hint_names_the_back_button(report_tool, tmp_path):
 
 
 def test_other_strings_keep_their_placeholders(report_tool, tmp_path):
-    for strings_name, strings in (("test\\strings", [""] * 100 + [SCORE_HINT]),
-                                  ("ui\\multiplayer_game_text", [SCORE_HINT] * 100)):
+    for strings_name, strings in (
+        ("test\\strings", [""] * 100 + [SCORE_HINT]),
+        ("ui\\multiplayer_game_text", [SCORE_HINT] * 100),
+    ):
         cache = Map(strings_name=strings_name, strings=strings)
         returncode, report, tags = converted(report_tool, cache, tmp_path / str(len(strings_name)))
         assert returncode == 0 and report["score_hint_converted"] == "0"
@@ -1102,8 +1200,8 @@ def xbox_header(build=b"01.01.14.2342", version=5, file_length=0x4000, name=b"b3
     header = bytearray(0x4000)
     struct.pack_into("<IiI", header, 0, code("head"), version, file_length)
     struct.pack_into("<II", header, 0x10, HEADER_BYTES, 0x100)
-    header[0x20:0x20 + len(name)] = name
-    header[0x40:0x40 + len(build)] = build
+    header[0x20 : 0x20 + len(name)] = name
+    header[0x40 : 0x40 + len(build)] = build
     struct.pack_into("<I", header, 0x7FC, code("foot"))
     return bytes(header)
 
@@ -1164,88 +1262,204 @@ def instance_case(tag_index, delta, fmt, value):
 
 MALFORMED_CACHES = {
     "bad footer": (header_case(0x7FC, "<I", 0), "identify", "the header or footer signature is wrong"),
-    "unterminated name": (header_case(0x20, "32s", b"N" * 32), "identify",
-                          "a name or build string in the header is not terminated"),
-    "unterminated build": (header_case(0x40, "32s", b"9" * 32), "identify",
-                           "a name or build string in the header is not terminated"),
-    "file length beyond file": (header_case(0x08, "<I", 0x7FFFFFFF), "identify",
-                                "the file length in the header does not fit the file or the size limit"),
-    "file length inside header": (header_case(0x08, "<I", 0x10), "identify",
-                                  "the file length in the header does not fit the file or the size limit"),
-    "compressed": (header_case(0x0C, "<I", 0x1000), "identify",
-                   "the cache is compressed, which Custom Edition caches never are"),
-    "tag data in header": (header_case(0x10, "<I", 0x100), "identify",
-                           "the tag data range in the header does not fit the file or the tag cache"),
-    "tag data beyond file": (header_case(0x14, "<I", 0x7FFFFFF0), "identify",
-                             "the tag data range in the header does not fit the file or the tag cache"),
-    "tag data too small": (header_case(0x14, "<I", 0x10), "identify",
-                           "the tag data range in the header does not fit the file or the tag cache"),
-    "tag index signature": (tag_data_case("index", 0x24, "<I", code("sgat")), "load",
-                            "the tag index signature is not 'tags'"),
+    "unterminated name": (
+        header_case(0x20, "32s", b"N" * 32),
+        "identify",
+        "a name or build string in the header is not terminated",
+    ),
+    "unterminated build": (
+        header_case(0x40, "32s", b"9" * 32),
+        "identify",
+        "a name or build string in the header is not terminated",
+    ),
+    "file length beyond file": (
+        header_case(0x08, "<I", 0x7FFFFFFF),
+        "identify",
+        "the file length in the header does not fit the file or the size limit",
+    ),
+    "file length inside header": (
+        header_case(0x08, "<I", 0x10),
+        "identify",
+        "the file length in the header does not fit the file or the size limit",
+    ),
+    "compressed": (
+        header_case(0x0C, "<I", 0x1000),
+        "identify",
+        "the cache is compressed, which Custom Edition caches never are",
+    ),
+    "tag data in header": (
+        header_case(0x10, "<I", 0x100),
+        "identify",
+        "the tag data range in the header does not fit the file or the tag cache",
+    ),
+    "tag data beyond file": (
+        header_case(0x14, "<I", 0x7FFFFFF0),
+        "identify",
+        "the tag data range in the header does not fit the file or the tag cache",
+    ),
+    "tag data too small": (
+        header_case(0x14, "<I", 0x10),
+        "identify",
+        "the tag data range in the header does not fit the file or the tag cache",
+    ),
+    "tag index signature": (
+        tag_data_case("index", 0x24, "<I", code("sgat")),
+        "load",
+        "the tag index signature is not 'tags'",
+    ),
     "no tags": (tag_data_case("index", 0x0C, "<i", 0), "load", "the tag instances do not fit in the tag data"),
-    "negative tag count": (tag_data_case("index", 0x0C, "<i", -5), "load",
-                           "the tag instances do not fit in the tag data"),
-    "too many tags": (tag_data_case("index", 0x0C, "<i", 0x7FFFFFF), "load",
-                      "the tag instances do not fit in the tag data"),
-    "instances outside": (tag_data_case("index", 0x00, "<I", 0x10000000), "load",
-                          "the tag instances do not fit in the tag data"),
-    "instances over index": (tag_data_case("index", 0x00, "<I", BASE + 4), "load",
-                             "the tag instances do not fit in the tag data"),
-    "instances unaligned": (tag_data_case("index", 0x00, "<I", BASE + 0x29), "load",
-                            "the tag instances do not fit in the tag data"),
-    "model data beyond file": (tag_data_case("index", 0x20, "<I", 0x7FFFFFFF), "load",
-                               "the model vertex and index data do not fit in the file"),
-    "index data beyond model data": (tag_data_case("index", 0x1C, "<I", 0x10000), "load",
-                                     "the model vertex and index data do not fit in the file"),
-    "model data in header": (tag_data_case("index", 0x14, "<I", 0x10), "load",
-                             "the model vertex and index data do not fit in the file"),
-    "handle": (instance_case(3, 0x0C, "<I", 0xE1770009), "load",
-               "a tag handle does not match its position in the index"),
-    "name outside": (instance_case(2, 0x10, "<I", 0x3FFFFFFF), "load",
-                     "a tag name lies outside the tag data or is not terminated"),
-    "tag address outside": (instance_case(8, 0x14, "<I", BASE + 0x1000000), "load",
-                            "a tag's address lies outside the tag data"),
+    "negative tag count": (
+        tag_data_case("index", 0x0C, "<i", -5),
+        "load",
+        "the tag instances do not fit in the tag data",
+    ),
+    "too many tags": (
+        tag_data_case("index", 0x0C, "<i", 0x7FFFFFF),
+        "load",
+        "the tag instances do not fit in the tag data",
+    ),
+    "instances outside": (
+        tag_data_case("index", 0x00, "<I", 0x10000000),
+        "load",
+        "the tag instances do not fit in the tag data",
+    ),
+    "instances over index": (
+        tag_data_case("index", 0x00, "<I", BASE + 4),
+        "load",
+        "the tag instances do not fit in the tag data",
+    ),
+    "instances unaligned": (
+        tag_data_case("index", 0x00, "<I", BASE + 0x29),
+        "load",
+        "the tag instances do not fit in the tag data",
+    ),
+    "model data beyond file": (
+        tag_data_case("index", 0x20, "<I", 0x7FFFFFFF),
+        "load",
+        "the model vertex and index data do not fit in the file",
+    ),
+    "index data beyond model data": (
+        tag_data_case("index", 0x1C, "<I", 0x10000),
+        "load",
+        "the model vertex and index data do not fit in the file",
+    ),
+    "model data in header": (
+        tag_data_case("index", 0x14, "<I", 0x10),
+        "load",
+        "the model vertex and index data do not fit in the file",
+    ),
+    "handle": (
+        instance_case(3, 0x0C, "<I", 0xE1770009),
+        "load",
+        "a tag handle does not match its position in the index",
+    ),
+    "name outside": (
+        instance_case(2, 0x10, "<I", 0x3FFFFFFF),
+        "load",
+        "a tag name lies outside the tag data or is not terminated",
+    ),
+    "tag address outside": (
+        instance_case(8, 0x14, "<I", BASE + 0x1000000),
+        "load",
+        "a tag's address lies outside the tag data",
+    ),
     "null tag address": (instance_case(8, 0x14, "<I", 0), "load", "a tag's address lies outside the tag data"),
-    "external weapon": (instance_case(8, 0x18, "<I", 1), "load",
-                        "a tag of a group that resource maps never hold is marked as held by one"),
-    "external sound header outside": (instance_case(4, 0x14, "<I", BASE - 0x100), "load",
-                                      "a tag's address lies outside the tag data"),
-    "scenario index": (tag_data_case("index", 0x04, "<I", 0xE17400FF), "load",
-                       "the scenario tag is missing, misplaced or not a scenario"),
-    "scenario salt": (tag_data_case("index", 0x04, "<I", 0x12340000), "load",
-                      "the scenario tag is missing, misplaced or not a scenario"),
-    "external scenario": (instance_case(0, 0x18, "<I", 1), "load",
-                          "a tag of a group that resource maps never hold is marked as held by one"),
-    "bsp count": (tag_data_case("scenario", 0x5A4, "<i", 33), "load",
-                  "the scenario's structure BSP block is not valid"),
-    "bsp block outside": (tag_data_case("scenario", 0x5A8, "<I", 0x10), "load",
-                          "the scenario's structure BSP block is not valid"),
-    "bsp reference to a weapon": (tag_data_case("reference", 0x1C, "<I", (0xE174 + 8) << 16 | 8), "load",
-                                  "the scenario's structure BSP block is not valid"),
-    "bsp beyond file": (tag_data_case("reference", 0x04, "<i", 0x7FFFFF00), "load",
-                        "a structure BSP does not fit in the file or in the tag cache"),
-    "bsp in header": (tag_data_case("reference", 0x00, "<i", 0x10), "load",
-                      "a structure BSP does not fit in the file or in the tag cache"),
-    "bsp over tag data": (tag_data_case("reference", 0x08, "<I", BASE + 0x100), "load",
-                          "a structure BSP does not fit in the file or in the tag cache"),
-    "bsp beyond tag cache": (tag_data_case("reference", 0x08, "<I", BASE + TAG_CACHE_BYTES - 0x800), "load",
-                             "a structure BSP does not fit in the file or in the tag cache"),
-    "bsp signature": (lambda cache, path: patched(path, cache.where["bsp"] + 0x14, "<I", code("psbs")), "load",
-                      "a structure BSP header is not valid"),
-    "bsp xbox vertex buffers": (lambda cache, path: patched(path, cache.where["bsp"] + 0x04, "<i", 12), "load",
-                                "a structure BSP header is not valid"),
-    "bsp pointer": (lambda cache, path: patched(path, cache.where["bsp"], "<I", BASE), "load",
-                    "a structure BSP header is not valid"),
-    "bitmap resource index": (instance_case(3, 0x14, "<I", 7), "load",
-                              "a tag's entry is missing from its resource map"),
-    "bitmap resource name": (instance_case(3, 0x14, "<I", 0), "load",
-                             "a tag's entry is missing from its resource map"),
-    "string resource index": (instance_case(5, 0x14, "<I", 0xFFFFFFFF), "load",
-                              "a tag's entry is missing from its resource map"),
-    "in-map pixels beyond file": (tag_data_case("in_map_bitmap", 0x1C, "<I", 0x7FFFFFFF), "load",
-                                  "bitmap pixels or sound samples lie outside their file"),
-    "in-map bitmaps block outside": (tag_data_case("in_map_bitmap", -0x6C + 0x64, "<I", 0x10), "load",
-                                     "a tag block or tag data field lies outside the loaded tags"),
+    "external weapon": (
+        instance_case(8, 0x18, "<I", 1),
+        "load",
+        "a tag of a group that resource maps never hold is marked as held by one",
+    ),
+    "external sound header outside": (
+        instance_case(4, 0x14, "<I", BASE - 0x100),
+        "load",
+        "a tag's address lies outside the tag data",
+    ),
+    "scenario index": (
+        tag_data_case("index", 0x04, "<I", 0xE17400FF),
+        "load",
+        "the scenario tag is missing, misplaced or not a scenario",
+    ),
+    "scenario salt": (
+        tag_data_case("index", 0x04, "<I", 0x12340000),
+        "load",
+        "the scenario tag is missing, misplaced or not a scenario",
+    ),
+    "external scenario": (
+        instance_case(0, 0x18, "<I", 1),
+        "load",
+        "a tag of a group that resource maps never hold is marked as held by one",
+    ),
+    "bsp count": (
+        tag_data_case("scenario", 0x5A4, "<i", 33),
+        "load",
+        "the scenario's structure BSP block is not valid",
+    ),
+    "bsp block outside": (
+        tag_data_case("scenario", 0x5A8, "<I", 0x10),
+        "load",
+        "the scenario's structure BSP block is not valid",
+    ),
+    "bsp reference to a weapon": (
+        tag_data_case("reference", 0x1C, "<I", (0xE174 + 8) << 16 | 8),
+        "load",
+        "the scenario's structure BSP block is not valid",
+    ),
+    "bsp beyond file": (
+        tag_data_case("reference", 0x04, "<i", 0x7FFFFF00),
+        "load",
+        "a structure BSP does not fit in the file or in the tag cache",
+    ),
+    "bsp in header": (
+        tag_data_case("reference", 0x00, "<i", 0x10),
+        "load",
+        "a structure BSP does not fit in the file or in the tag cache",
+    ),
+    "bsp over tag data": (
+        tag_data_case("reference", 0x08, "<I", BASE + 0x100),
+        "load",
+        "a structure BSP does not fit in the file or in the tag cache",
+    ),
+    "bsp beyond tag cache": (
+        tag_data_case("reference", 0x08, "<I", BASE + TAG_CACHE_BYTES - 0x800),
+        "load",
+        "a structure BSP does not fit in the file or in the tag cache",
+    ),
+    "bsp signature": (
+        lambda cache, path: patched(path, cache.where["bsp"] + 0x14, "<I", code("psbs")),
+        "load",
+        "a structure BSP header is not valid",
+    ),
+    "bsp xbox vertex buffers": (
+        lambda cache, path: patched(path, cache.where["bsp"] + 0x04, "<i", 12),
+        "load",
+        "a structure BSP header is not valid",
+    ),
+    "bsp pointer": (
+        lambda cache, path: patched(path, cache.where["bsp"], "<I", BASE),
+        "load",
+        "a structure BSP header is not valid",
+    ),
+    "bitmap resource index": (
+        instance_case(3, 0x14, "<I", 7),
+        "load",
+        "a tag's entry is missing from its resource map",
+    ),
+    "bitmap resource name": (instance_case(3, 0x14, "<I", 0), "load", "a tag's entry is missing from its resource map"),
+    "string resource index": (
+        instance_case(5, 0x14, "<I", 0xFFFFFFFF),
+        "load",
+        "a tag's entry is missing from its resource map",
+    ),
+    "in-map pixels beyond file": (
+        tag_data_case("in_map_bitmap", 0x1C, "<I", 0x7FFFFFFF),
+        "load",
+        "bitmap pixels or sound samples lie outside their file",
+    ),
+    "in-map bitmaps block outside": (
+        tag_data_case("in_map_bitmap", -0x6C + 0x64, "<I", 0x10),
+        "load",
+        "a tag block or tag data field lies outside the loaded tags",
+    ),
 }
 
 
@@ -1305,6 +1519,7 @@ def resource_map_case(name, mutate):
         data = bytearray(path.read_bytes())
         mutate(data)
         path.write_bytes(data)
+
     return corrupt
 
 
@@ -1313,18 +1528,36 @@ def index_entry(data, item_index):
 
 
 MALFORMED_RESOURCE_MAPS = {
-    "index beyond file": (resource_map_case("bitmaps", lambda d: struct.pack_into("<i", d, 8, len(d))),
-                          "resource_map.bitmaps", "a resource map header is not valid"),
-    "names after index": (resource_map_case("bitmaps", lambda d: struct.pack_into("<i", d, 4, len(d) - 4)),
-                          "resource_map.bitmaps", "a resource map header is not valid"),
-    "count beyond file": (resource_map_case("loc", lambda d: struct.pack_into("<i", d, 12, 0x10000000)),
-                          "resource_map.loc", "a resource map header is not valid"),
-    "item data beyond names": (resource_map_case("sounds", lambda d: struct.pack_into("<i", d, index_entry(d, 1) + 4, 0x100000)),
-                               "resource_map.sounds", "a resource map entry lies outside the file or its name is not terminated"),
-    "item name beyond names": (resource_map_case("loc", lambda d: struct.pack_into("<i", d, index_entry(d, 0), 0x100000)),
-                               "resource_map.loc", "a resource map entry lies outside the file or its name is not terminated"),
-    "item data in header": (resource_map_case("loc", lambda d: struct.pack_into("<i", d, index_entry(d, 2) + 8, 4)),
-                            "resource_map.loc", "a resource map entry lies outside the file or its name is not terminated"),
+    "index beyond file": (
+        resource_map_case("bitmaps", lambda d: struct.pack_into("<i", d, 8, len(d))),
+        "resource_map.bitmaps",
+        "a resource map header is not valid",
+    ),
+    "names after index": (
+        resource_map_case("bitmaps", lambda d: struct.pack_into("<i", d, 4, len(d) - 4)),
+        "resource_map.bitmaps",
+        "a resource map header is not valid",
+    ),
+    "count beyond file": (
+        resource_map_case("loc", lambda d: struct.pack_into("<i", d, 12, 0x10000000)),
+        "resource_map.loc",
+        "a resource map header is not valid",
+    ),
+    "item data beyond names": (
+        resource_map_case("sounds", lambda d: struct.pack_into("<i", d, index_entry(d, 1) + 4, 0x100000)),
+        "resource_map.sounds",
+        "a resource map entry lies outside the file or its name is not terminated",
+    ),
+    "item name beyond names": (
+        resource_map_case("loc", lambda d: struct.pack_into("<i", d, index_entry(d, 0), 0x100000)),
+        "resource_map.loc",
+        "a resource map entry lies outside the file or its name is not terminated",
+    ),
+    "item data in header": (
+        resource_map_case("loc", lambda d: struct.pack_into("<i", d, index_entry(d, 2) + 8, 4)),
+        "resource_map.loc",
+        "a resource map entry lies outside the file or its name is not terminated",
+    ),
 }
 
 
@@ -1378,7 +1611,7 @@ def test_missing_sound_entry_is_named(report_tool, tmp_path):
     data = bytearray((tmp_path / "sounds.map").read_bytes())
     names_offset = struct.unpack_from("<i", data, 4)[0]
     at = data.index(b"test\\sound\0", names_offset + 1)
-    data[at:at + 10] = b"test\\sounx"
+    data[at : at + 10] = b"test\\sounx"
     (tmp_path / "sounds.map").write_bytes(data)
     _, report = report_one(report_tool, path)
     assert report["load"] == "a tag's entry is missing from its resource map"
@@ -1423,9 +1656,26 @@ def real_maps_directory():
 
 
 STOCK_CUSTOM_EDITION_MAPS = [
-    "beavercreek", "bloodgulch", "boardingaction", "carousel", "chillout", "damnation", "dangercanyon",
-    "deathisland", "gephyrophobia", "hangemhigh", "icefields", "infinity", "longest", "prisoner",
-    "putput", "ratrace", "sidewinder", "timberland", "ui", "wizard",
+    "beavercreek",
+    "bloodgulch",
+    "boardingaction",
+    "carousel",
+    "chillout",
+    "damnation",
+    "dangercanyon",
+    "deathisland",
+    "gephyrophobia",
+    "hangemhigh",
+    "icefields",
+    "infinity",
+    "longest",
+    "prisoner",
+    "putput",
+    "ratrace",
+    "sidewinder",
+    "timberland",
+    "ui",
+    "wizard",
 ]
 
 
@@ -1450,8 +1700,9 @@ def test_real_maps_every_stock_map_loads_with_a_matching_checksum(report_tool, r
 
 
 def test_real_maps_resource_maps_are_valid(report_tool, real_maps):
-    returncode, blocks = run_report(report_tool, real_maps / "bitmaps.map", real_maps / "sounds.map",
-                                    real_maps / "loc.map")
+    returncode, blocks = run_report(
+        report_tool, real_maps / "bitmaps.map", real_maps / "sounds.map", real_maps / "loc.map"
+    )
     assert returncode == 0
     assert [b["resource_map"] for b in blocks] == ["ok", "ok", "ok"]
 
@@ -1472,11 +1723,16 @@ def test_real_maps_convert_as_recorded(report_tool, real_maps):
     """The map run in the native build (docs/custom_edition_caches.md)
     converts as recorded there."""
     recorded = {
-        "bloodgulch.map": {"structure_bsp_materials_checked": "79", "shaders_renumbered": "21",
-                           "chicago_extended_shaders_converted": "10", "bitmaps_prepared": "676",
-                           "animation_overlays_disabled": "0",
-                           "sounds_undecodable": "39", "hud_placements_rescaled": "32",
-                           "score_hint_converted": "1"},
+        "bloodgulch.map": {
+            "structure_bsp_materials_checked": "79",
+            "shaders_renumbered": "21",
+            "chicago_extended_shaders_converted": "10",
+            "bitmaps_prepared": "676",
+            "animation_overlays_disabled": "0",
+            "sounds_undecodable": "39",
+            "hud_placements_rescaled": "32",
+            "score_hint_converted": "1",
+        },
     }
     present = [real_maps / name for name in recorded if (real_maps / name).is_file()]
     if not present:

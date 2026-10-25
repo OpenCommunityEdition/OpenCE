@@ -16,10 +16,13 @@ final class CameraTests: XCTestCase {
         try XCTUnwrap(MTLCreateSystemDefaultDevice(), "no Metal device")
     }
 
-    private func texture(_ device: MTLDevice, _ format: MTLPixelFormat, usage: MTLTextureUsage,
-                         storage: MTLStorageMode = .private) throws -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: size, height: size,
-                                                                  mipmapped: false)
+    private func texture(
+        _ device: MTLDevice, _ format: MTLPixelFormat, usage: MTLTextureUsage,
+        storage: MTLStorageMode = .private
+    ) throws -> MTLTexture {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: format, width: size, height: size,
+            mipmapped: false)
         descriptor.usage = usage
         descriptor.storageMode = storage
         return try XCTUnwrap(device.makeTexture(descriptor: descriptor))
@@ -32,10 +35,11 @@ final class CameraTests: XCTestCase {
         let buffer = try XCTUnwrap(device.makeBuffer(length: length, options: .storageModeShared))
         let commands = try XCTUnwrap(queue.makeCommandBuffer())
         let blit = try XCTUnwrap(commands.makeBlitCommandEncoder())
-        blit.copy(from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
-                  sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1), to: buffer,
-                  destinationOffset: 0, destinationBytesPerRow: texture.width * 8,
-                  destinationBytesPerImage: length)
+        blit.copy(
+            from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+            sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1), to: buffer,
+            destinationOffset: 0, destinationBytesPerRow: texture.width * 8,
+            destinationBytesPerImage: length)
         blit.endEncoding()
         commands.commit()
         commands.waitUntilCompleted()
@@ -46,9 +50,13 @@ final class CameraTests: XCTestCase {
     /// A flare's disk in front of the camera, and a soft white sprite on
     /// it that its share seen scales.
     private func flare(at distance: Float) -> CameraSprites {
-        CameraSprites(sprites: [CameraSprite(x: distance, y: 0, z: 0, width: 1, height: 1, rotation: 0, red: 1,
-                                             green: 1, blue: 1, image: UInt32.max, occluder: 0, flags: 0)],
-                      occluders: [FlareOccluder(x: distance, y: 0, z: 0, radius: 0.2)])
+        CameraSprites(
+            sprites: [
+                CameraSprite(
+                    x: distance, y: 0, z: 0, width: 1, height: 1, rotation: 0, red: 1,
+                    green: 1, blue: 1, image: UInt32.max, occluder: 0, flags: 0)
+            ],
+            occluders: [FlareOccluder(x: distance, y: 0, z: 0, radius: 0.2)])
     }
 
     func testAFlareIsHiddenByWhatIsNearerAndItsSpriteWithIt() throws {
@@ -70,8 +78,10 @@ final class CameraTests: XCTestCase {
             clear.depthAttachment.storeAction = .store
             clear.depthAttachment.clearDepth = clearDepth
             try XCTUnwrap(commands.makeRenderCommandEncoder(descriptor: clear)).endEncoding()
-            let frame = try XCTUnwrap(pass.encodeOcclusion(flare(at: 10), into: commands, depth: depth,
-                                                           viewProjection: viewProjection, camera: camera))
+            let frame = try XCTUnwrap(
+                pass.encodeOcclusion(
+                    flare(at: 10), into: commands, depth: depth,
+                    viewProjection: viewProjection, camera: camera))
             XCTAssertEqual(frame.spriteCount, 1)
             let draw = MTLRenderPassDescriptor()
             draw.colorAttachments[0].texture = color
@@ -95,9 +105,11 @@ final class CameraTests: XCTestCase {
         let hidden = try draw(clearDepth: 0.5)
         XCTAssertEqual(hidden.seen, [0], "the wall does not hide the flare")
         XCTAssertEqual(hidden.centre, 0, "a hidden flare's sprite was drawn")
-        XCTAssertNil(pass.encodeOcclusion(CameraSprites(sprites: [], occluders: []),
-                                          into: try XCTUnwrap(queue.makeCommandBuffer()), depth: depth,
-                                          viewProjection: viewProjection, camera: camera))
+        XCTAssertNil(
+            pass.encodeOcclusion(
+                CameraSprites(sprites: [], occluders: []),
+                into: try XCTUnwrap(queue.makeCommandBuffer()), depth: depth,
+                viewProjection: viewProjection, camera: camera))
     }
 
     func testTheBloomSpreadsWhatIsBrighterThanWhite() throws {
@@ -112,8 +124,9 @@ final class CameraTests: XCTestCase {
                     for channel in 0..<3 { texels[(y * size + x) * 4 + channel] = Float16(bright) }
                 }
             }
-            frame.replace(region: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0, withBytes: texels,
-                          bytesPerRow: size * 8)
+            frame.replace(
+                region: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0, withBytes: texels,
+                bytesPerRow: size * 8)
         }
         func bloom() throws -> [Float] {
             let commands = try XCTUnwrap(queue.makeCommandBuffer())
@@ -145,8 +158,9 @@ final class CameraTests: XCTestCase {
         XCTAssertNil(pass.logLuminance(age: 0), "a brightness before any frame")
         for value: Float in [0.25, 4] {
             let texels = [Float16](repeating: Float16(value), count: size * size * 4)
-            frame.replace(region: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0, withBytes: texels,
-                          bytesPerRow: size * 8)
+            frame.replace(
+                region: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0, withBytes: texels,
+                bytesPerRow: size * 8)
             let commands = try XCTUnwrap(queue.makeCommandBuffer())
             pass.encodeLuminance(into: commands, frame: frame)
             commands.commit()
@@ -188,8 +202,11 @@ final class CameraTests: XCTestCase {
         let camera = level.camera
         let ahead = camera.position + camera.rotation.act(SIMD3<Float>(1, 0, 0)) * 30
         renderer.sprites = CameraSprites(
-            sprites: [CameraSprite(x: ahead.x, y: ahead.y, z: ahead.z, width: 4, height: 4, rotation: 0, red: 4,
-                                   green: 4, blue: 4, image: UInt32.max, occluder: UInt32.max, flags: 0)],
+            sprites: [
+                CameraSprite(
+                    x: ahead.x, y: ahead.y, z: ahead.z, width: 4, height: 4, rotation: 0, red: 4,
+                    green: 4, blue: 4, image: UInt32.max, occluder: UInt32.max, flags: 0)
+            ],
             occluders: [])
         let with = try renderer.capture(width: 160, height: 90, camera: camera, objects: [], queue: level.queue)
         XCTAssertEqual(renderer.lastSpriteCount, 1)

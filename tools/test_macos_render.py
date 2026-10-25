@@ -24,8 +24,9 @@ from tools import macos_guest_image  # noqa: E402
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
-    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
-                       reason="needs `ninja macos` in nix develop"),
+    pytest.mark.skipif(
+        not macos_guest_image.available() or shutil.which("ninja") is None, reason="needs `ninja macos` in nix develop"
+    ),
 ]
 
 LOGGING = {"HALO_HOST_RENDER_LOG": "1", "HALO_HOST_IMPORT_COUNTS": "1"}
@@ -35,8 +36,11 @@ LOGGING = {"HALO_HOST_RENDER_LOG": "1", "HALO_HOST_IMPORT_COUNTS": "1"}
 def image(tmp_path_factory):
     work = tmp_path_factory.mktemp("vm_render")
     return macos_guest_image.build_guest_image(
-        [ROOT / "port/macos/tests/vm_render.c", ROOT / "port/macos/guest/opence_render_writer.c"], work,
-        "vm_render", [f"-I{ROOT / 'port/macos/include'}"])
+        [ROOT / "port/macos/tests/vm_render.c", ROOT / "port/macos/guest/opence_render_writer.c"],
+        work,
+        "vm_render",
+        [f"-I{ROOT / 'port/macos/include'}"],
+    )
 
 
 def run_case(image, tmp_path, case):
@@ -47,8 +51,12 @@ def run_case(image, tmp_path, case):
 
 def decoded(stderr):
     """(commands, refused, fnv) of each batch the host decoded"""
-    return [(int(commands), int(refused), int(fnv, 16)) for commands, refused, fnv in
-            re.findall(r"halo_host: render batch: (\d+) commands, (\d+) refused, fnv (0x[0-9a-f]+)", stderr)]
+    return [
+        (int(commands), int(refused), int(fnv, 16))
+        for commands, refused, fnv in re.findall(
+            r"halo_host: render batch: (\d+) commands, (\d+) refused, fnv (0x[0-9a-f]+)", stderr
+        )
+    ]
 
 
 def import_counts(stderr):

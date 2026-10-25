@@ -29,27 +29,65 @@ from harness import function, inline, read, structure  # noqa: E402
 OUTPUT = ROOT / "engine" / "crates" / "sim" / "tests" / "animation_reference.txt"
 
 MATH_FUNCTIONS = [
-    ("source/math/real_math.h", ["square_root", "reciprocal_square_root", "cross_product3d",
-                                 "set_real_quaternion", "set_real_point3d"], True),
-    ("source/math/real_math.c", ["quaternions_multiply", "quaternions_interpolate", "quaternion_normalize",
-                                 "quaternions_interpolate_and_normalize", "points_interpolate", "scalars_interpolate"], False),
-    ("source/math/matrix_math.c", ["matrix4x3_rotation_from_quaternion", "matrix4x3_from_orientation",
-                                   "matrix4x3_rotation_from_vectors", "matrix4x3_from_point_and_vectors",
-                                   "matrix4x3_multiply"], False),
+    (
+        "source/math/real_math.h",
+        ["square_root", "reciprocal_square_root", "cross_product3d", "set_real_quaternion", "set_real_point3d"],
+        True,
+    ),
+    (
+        "source/math/real_math.c",
+        [
+            "quaternions_multiply",
+            "quaternions_interpolate",
+            "quaternion_normalize",
+            "quaternions_interpolate_and_normalize",
+            "points_interpolate",
+            "scalars_interpolate",
+        ],
+        False,
+    ),
+    (
+        "source/math/matrix_math.c",
+        [
+            "matrix4x3_rotation_from_quaternion",
+            "matrix4x3_from_orientation",
+            "matrix4x3_rotation_from_vectors",
+            "matrix4x3_from_point_and_vectors",
+            "matrix4x3_multiply",
+        ],
+        False,
+    ),
 ]
 
 ANIMATION_FUNCTIONS = [
     ("source/models/model_animation_definitions.c", ["animation_get_frame_data"]),
     ("source/models/models.c", ["model_get_node_orientations"]),
-    ("source/models/model_animations.c", [
-        "quaternion_decompress_8byte", "quaternion_decompress_6byte", "animation_is_compressed",
-        "animation_keyframe_search", "animation_get_keyframe_rotation", "animation_get_keyframe_translation",
-        "animation_get_keyframe_scale", "animation_frame_data_offset", "animation_data_contains",
-        "animation_node_flag_count", "animation_frame_valid", "animation_data_error",
-        "animation_set_rest_orientations", "animation_get_node_orientations", "replacement_animation_apply",
-        "overlay_animation_apply", "overlay_animation_apply_scaled", "overlay_animation_apply_continuous",
-        "aiming_screen_apply", "interpolate_node_orientations",
-        "animation_graph_node_matrices_from_orientations"]),
+    (
+        "source/models/model_animations.c",
+        [
+            "quaternion_decompress_8byte",
+            "quaternion_decompress_6byte",
+            "animation_is_compressed",
+            "animation_keyframe_search",
+            "animation_get_keyframe_rotation",
+            "animation_get_keyframe_translation",
+            "animation_get_keyframe_scale",
+            "animation_frame_data_offset",
+            "animation_data_contains",
+            "animation_node_flag_count",
+            "animation_frame_valid",
+            "animation_data_error",
+            "animation_set_rest_orientations",
+            "animation_get_node_orientations",
+            "replacement_animation_apply",
+            "overlay_animation_apply",
+            "overlay_animation_apply_scaled",
+            "overlay_animation_apply_continuous",
+            "aiming_screen_apply",
+            "interpolate_node_orientations",
+            "animation_graph_node_matrices_from_orientations",
+        ],
+    ),
 ]
 
 FAKE_WORLD = r"""
@@ -542,33 +580,50 @@ int main(void)
 
 
 def _prototype(definition):
-    return definition[:definition.index("{")].rstrip() + ";"
+    return definition[: definition.index("{")].rstrip() + ";"
 
 
 def source_file():
     """The fake world, the game's functions and the cases, as one C file."""
     real_math_h = read("source/math/real_math.h")
-    types = [re.search(r"^union " + name + r"\s*\{.*?^\};\ntypedef union " + name + r" " + name + r";", real_math_h,
-                       re.M | re.S).group(0) for name in ("real_vector2d", "real_point3d", "real_vector3d")]
-    types += [structure(real_math_h, name) + f"\ntypedef struct {name} {name};"
-              for name in ("real_quaternion", "real_orientation", "real_matrix4x3")]
+    types = [
+        re.search(
+            r"^union " + name + r"\s*\{.*?^\};\ntypedef union " + name + r" " + name + r";", real_math_h, re.M | re.S
+        ).group(0)
+        for name in ("real_vector2d", "real_point3d", "real_vector3d")
+    ]
+    types += [
+        structure(real_math_h, name) + f"\ntypedef struct {name} {name};"
+        for name in ("real_quaternion", "real_orientation", "real_matrix4x3")
+    ]
     animations_c = read("source/models/model_animations.c")
     definitions_h = read("source/models/model_animation_definitions.h")
     model_definitions_h = read("source/models/model_definitions.h")
-    types += [structure(animations_c, name) for name in
-              ("compressed_animation_header", "compressed_quaternion_8byte", "compressed_quaternion_6byte",
-               "animation_graph_node")]
-    types += [structure(definitions_h, "animation"), structure(definitions_h, "animation_aiming_screen_bounds"),
-              structure(model_definitions_h, "model_node"),
-              structure(model_definitions_h, "model")]
-    types.append("struct animation_graph { struct tag_block nodes; };\n"
-                  "static struct animation_graph fake_graph;\n"
-                  "#define animation_graph_definition_get(index) (&fake_graph)\n"
-                  "#define animation_get_default_data(animation) ((animation)->default_data.address)\n"
-                  "static real_quaternion const identity_quaternion = { { { 0.f, 0.f, 0.f } }, 1.f };\n"
-                  "static real_point3d const origin3d = { { 0.f, 0.f, 0.f } };\n"
-                  "#define global_identity_quaternion (&identity_quaternion)\n"
-                  "#define global_origin3d (&origin3d)\n")
+    types += [
+        structure(animations_c, name)
+        for name in (
+            "compressed_animation_header",
+            "compressed_quaternion_8byte",
+            "compressed_quaternion_6byte",
+            "animation_graph_node",
+        )
+    ]
+    types += [
+        structure(definitions_h, "animation"),
+        structure(definitions_h, "animation_aiming_screen_bounds"),
+        structure(model_definitions_h, "model_node"),
+        structure(model_definitions_h, "model"),
+    ]
+    types.append(
+        "struct animation_graph { struct tag_block nodes; };\n"
+        "static struct animation_graph fake_graph;\n"
+        "#define animation_graph_definition_get(index) (&fake_graph)\n"
+        "#define animation_get_default_data(animation) ((animation)->default_data.address)\n"
+        "static real_quaternion const identity_quaternion = { { { 0.f, 0.f, 0.f } }, 1.f };\n"
+        "static real_point3d const origin3d = { { 0.f, 0.f, 0.f } };\n"
+        "#define global_identity_quaternion (&identity_quaternion)\n"
+        "#define global_origin3d (&origin3d)\n"
+    )
     definitions = []
     for path, names, header in MATH_FUNCTIONS:
         text = read(path)
@@ -577,8 +632,9 @@ def source_file():
         text = read(path)
         definitions += [function(text, name) for name in names]
     # (every one static, and declared before any is defined)
-    definitions = [definition if definition.startswith("static ") else "static " + definition
-                   for definition in definitions]
+    definitions = [
+        definition if definition.startswith("static ") else "static " + definition for definition in definitions
+    ]
     prototypes = [_prototype(definition) for definition in definitions]
     return "\n\n".join([FAKE_WORLD, *types, *prototypes, *definitions, MAIN])
 
@@ -590,15 +646,27 @@ def reference():
         executable = Path(work) / "animation_reference"
         source.write_text(source_file())
         compiler = os.environ.get("CC", "clang")
-        command = [compiler, "-std=gnu99", "-O1", "-ffp-contract=off", "-fno-fast-math", "-w", str(source),
-                   "-o", str(executable), "-lm"]
+        command = [
+            compiler,
+            "-std=gnu99",
+            "-O1",
+            "-ffp-contract=off",
+            "-fno-fast-math",
+            "-w",
+            str(source),
+            "-o",
+            str(executable),
+            "-lm",
+        ]
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode:
             raise SystemExit(f"the reference does not compile:\n{result.stderr}")
         output = subprocess.run([str(executable)], capture_output=True, text=True, check=True).stdout
-    return ("# The game's animation code on made-up animations (tools/engine_animation_reference.py).\n"
-            "# Values are f32 bits; an orientation is i j k w x y z scale, a matrix forward left up position scale.\n"
-            + output)
+    return (
+        "# The game's animation code on made-up animations (tools/engine_animation_reference.py).\n"
+        "# Values are f32 bits; an orientation is i j k w x y z scale, a matrix forward left up position scale.\n"
+        + output
+    )
 
 
 def main():

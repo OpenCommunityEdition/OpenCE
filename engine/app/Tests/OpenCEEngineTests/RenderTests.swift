@@ -93,16 +93,21 @@ final class JitterTests: XCTestCase {
     }
 
     func testTheRenderScaleSizesTheInput() {
-        XCTAssertTrue(VideoSettings(antiAliasing: .native, renderScale: 0.5).inputSize(width: 1920, height: 1080)
-            == (1920, 1080))
-        XCTAssertTrue(VideoSettings(antiAliasing: .temporal, renderScale: 0.5).inputSize(width: 1920, height: 1080)
-            == (960, 540))
-        XCTAssertTrue(VideoSettings(antiAliasing: .temporal, renderScale: 0.1).inputSize(width: 1920, height: 1080)
-            == (960, 540))
-        XCTAssertTrue(VideoSettings(antiAliasing: .temporal, renderScale: 2).inputSize(width: 1920, height: 1080)
-            == (1920, 1080))
-        XCTAssertTrue(VideoSettings(antiAliasing: .temporal, renderScale: .nan).inputSize(width: 1920, height: 1080)
-            == (1920, 1080))
+        XCTAssertTrue(
+            VideoSettings(antiAliasing: .native, renderScale: 0.5).inputSize(width: 1920, height: 1080)
+                == (1920, 1080))
+        XCTAssertTrue(
+            VideoSettings(antiAliasing: .temporal, renderScale: 0.5).inputSize(width: 1920, height: 1080)
+                == (960, 540))
+        XCTAssertTrue(
+            VideoSettings(antiAliasing: .temporal, renderScale: 0.1).inputSize(width: 1920, height: 1080)
+                == (960, 540))
+        XCTAssertTrue(
+            VideoSettings(antiAliasing: .temporal, renderScale: 2).inputSize(width: 1920, height: 1080)
+                == (1920, 1080))
+        XCTAssertTrue(
+            VideoSettings(antiAliasing: .temporal, renderScale: .nan).inputSize(width: 1920, height: 1080)
+                == (1920, 1080))
     }
 }
 
@@ -133,8 +138,9 @@ struct StockLevel {
         self.queue = queue
         geometry = try LevelGeometry.load(map: mapURL.path, cacheFolder: cache.path, bsp: 0)
         let start = geometry.startView()
-        camera = ViewCamera(position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
-                            verticalFov: 70 * .pi / 180)
+        camera = ViewCamera(
+            position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
+            verticalFov: 70 * .pi / 180)
         let engine = Engine()
         let reader = SnapshotReader(engine: engine)
         _ = try engine.startLevel(geometry: geometry, difficulty: 1)
@@ -169,8 +175,9 @@ final class GoldenFrameTests: XCTestCase {
             let frames = antiAliasing == .temporal ? Jitter.length : 1
             for (width, height) in Self.sizes {
                 let name = "\(map)_\(antiAliasing.rawValue)_\(width)x\(height).png"
-                let frame = try renderer.capture(width: width, height: height, camera: level.camera, frames: frames,
-                                                 objects: level.objects, queue: level.queue)
+                let frame = try renderer.capture(
+                    width: width, height: height, camera: level.camera, frames: frames,
+                    objects: level.objects, queue: level.queue)
                 try frame.writePNG(to: out.appendingPathComponent(name))
                 check(frame, name: name)
             }
@@ -180,8 +187,9 @@ final class GoldenFrameTests: XCTestCase {
     func check(_ frame: CapturedFrame, name: String) {
         // drawn: many colours, and most of the frame not the sky's clear colour
         XCTAssertGreaterThan(frame.distinctColors, 256, name)
-        let sky = SIMD3<UInt8>(UInt8(LevelRenderer.skyColor.red * 255), UInt8(LevelRenderer.skyColor.green * 255),
-                               UInt8(LevelRenderer.skyColor.blue * 255))
+        let sky = SIMD3<UInt8>(
+            UInt8(LevelRenderer.skyColor.red * 255), UInt8(LevelRenderer.skyColor.green * 255),
+            UInt8(LevelRenderer.skyColor.blue * 255))
         var level = 0
         for y in stride(from: 0, to: frame.height, by: 16) {
             for x in stride(from: 0, to: frame.width, by: 16) {
@@ -221,13 +229,16 @@ final class TemporalTests: XCTestCase {
     func testAStillCameraConverges() throws {
         let level = try StockLevel(map: "bloodgulch")
         let renderer = try level.renderer(VideoSettings(antiAliasing: .temporal, renderScale: 0.67))
-        let settled = try renderer.capture(width: Self.width, height: Self.height, camera: level.camera,
-                                           frames: Jitter.length, queue: level.queue)
+        let settled = try renderer.capture(
+            width: Self.width, height: Self.height, camera: level.camera,
+            frames: Jitter.length, queue: level.queue)
         XCTAssertTrue(renderer.lastInputSize == (858, 482), "\(renderer.lastInputSize)")
-        let next = try renderer.capture(width: Self.width, height: Self.height, camera: level.camera,
-                                        frames: 1, queue: level.queue)
-        let later = try renderer.capture(width: Self.width, height: Self.height, camera: level.camera,
-                                         frames: Jitter.length / 2, queue: level.queue)
+        let next = try renderer.capture(
+            width: Self.width, height: Self.height, camera: level.camera,
+            frames: 1, queue: level.queue)
+        let later = try renderer.capture(
+            width: Self.width, height: Self.height, camera: level.camera,
+            frames: Jitter.length / 2, queue: level.queue)
         let step = try XCTUnwrap(next.difference(from: settled))
         let drift = try XCTUnwrap(later.difference(from: settled))
         print("temporal: a frame on, \(step.share) differ; half a sequence on, \(drift.share)")
@@ -249,8 +260,9 @@ final class TemporalTests: XCTestCase {
         let level = try StockLevel(map: "bloodgulch")
         for scale: Float in [1, 0.5] {
             let renderer = try level.renderer(VideoSettings(antiAliasing: .temporal, renderScale: scale))
-            let frame = try renderer.capture(width: Self.width, height: Self.height, camera: level.camera,
-                                             frames: Jitter.length, queue: level.queue)
+            let frame = try renderer.capture(
+                width: Self.width, height: Self.height, camera: level.camera,
+                frames: Jitter.length, queue: level.queue)
             let share = try departure(frame, level: level, camera: level.camera)
             print("temporal at \(scale): \(share) of texels far from native")
             // (about 0.001 and 0.0025; 0.007 at half scale with the jitter wrong)
@@ -264,16 +276,18 @@ final class TemporalTests: XCTestCase {
         let forward = start.rotation.act([1, 0, 0])
         // (about ten pixels a frame of turn, and a step forward)
         let path = (0..<48).map { step in
-            ViewCamera(position: start.position + forward * Float(step) * 0.03,
-                       rotation: simd_quatf(angle: Float(step) * 0.02, axis: [0, 0, 1]) * start.rotation,
-                       verticalFov: start.verticalFov)
+            ViewCamera(
+                position: start.position + forward * Float(step) * 0.03,
+                rotation: simd_quatf(angle: Float(step) * 0.02, axis: [0, 0, 1]) * start.rotation,
+                verticalFov: start.verticalFov)
         }
         let moving = try level.renderer(VideoSettings(antiAliasing: .temporal, renderScale: 1))
         let frame = try moving.capture(width: Self.width, height: Self.height, cameras: path, queue: level.queue)
         // what the scaler gathers when the camera has stood there all along
         let still = try level.renderer(VideoSettings(antiAliasing: .temporal, renderScale: 1))
-        let settled = try still.capture(width: Self.width, height: Self.height, camera: path[path.count - 1],
-                                        frames: Jitter.length, queue: level.queue)
+        let settled = try still.capture(
+            width: Self.width, height: Self.height, camera: path[path.count - 1],
+            frames: Jitter.length, queue: level.queue)
         let share = try XCTUnwrap(frame.difference(from: settled, tolerance: 16)).share
         print("temporal, moving: \(share) of texels far from the settled frame")
         // (MetalFX drops history it cannot match, so motion that is wrong
@@ -286,9 +300,10 @@ final class TemporalTests: XCTestCase {
         let level = try StockLevel(map: "bloodgulch")
         let renderer = try level.renderer(VideoSettings(antiAliasing: .temporal, renderScale: 0.5))
         let before = level.camera
-        let after = ViewCamera(position: before.position,
-                               rotation: simd_quatf(angle: 0.05, axis: [0, 0, 1]) * before.rotation,
-                               verticalFov: before.verticalFov)
+        let after = ViewCamera(
+            position: before.position,
+            rotation: simd_quatf(angle: 0.05, axis: [0, 0, 1]) * before.rotation,
+            verticalFov: before.verticalFov)
         _ = try renderer.capture(width: Self.width, height: Self.height, cameras: [before, after], queue: level.queue)
         let read = try XCTUnwrap(renderer.readMotion(queue: level.queue))
         XCTAssertTrue((read.width, read.height) == (640, 360))
@@ -300,7 +315,8 @@ final class TemporalTests: XCTestCase {
         for (x, y) in [(320, 180), (100, 60), (600, 300), (40, 340)] {
             let uv = (SIMD2<Float>(Float(x), Float(y)) + 0.5) / SIMD2(Float(read.width), Float(read.height))
             let ndc = SIMD2(uv.x * 2 - 1, 1 - uv.y * 2)
-            let direction = after.rotation.act([1, 0, 0]) - after.rotation.act([0, 1, 0]) * (ndc.x / focalX)
+            let direction =
+                after.rotation.act([1, 0, 0]) - after.rotation.act([0, 1, 0]) * (ndc.x / focalX)
                 + after.rotation.act([0, 0, 1]) * (ndc.y / focalY)
             let clip = before.viewProjection(aspect: aspect) * SIMD4(direction, 0)
             let was = SIMD2(clip.x / clip.w * 0.5 + 0.5, 0.5 - clip.y / clip.w * 0.5)
@@ -316,8 +332,9 @@ final class TemporalTests: XCTestCase {
 /// their nodes and drawn at the level of detail their size chooses.
 final class ModelTests: XCTestCase {
     func testTheGamesMatrixIsAFourByFour() {
-        let matrix = DrawnObject.matrix(forward: [0, 1, 0], left: [-1, 0, 0], up: [0, 0, 1], position: [5, 6, 7],
-                                        scale: 2)
+        let matrix = DrawnObject.matrix(
+            forward: [0, 1, 0], left: [-1, 0, 0], up: [0, 0, 1], position: [5, 6, 7],
+            scale: 2)
         let point = matrix * SIMD4<Float>(1, 0, 0, 1)
         XCTAssertEqual(SIMD3(point.x, point.y, point.z), [5, 8, 7])
         let along = matrix * SIMD4<Float>(0, 1, 0, 0)
@@ -335,8 +352,9 @@ final class ModelTests: XCTestCase {
         XCTAssertGreaterThan(renderer.modelCount, 0)
         let without = try renderer.capture(width: 640, height: 360, camera: level.camera, queue: level.queue)
         XCTAssertEqual(renderer.lastModelPartCount, 0)
-        let with = try renderer.capture(width: 640, height: 360, camera: level.camera, objects: level.objects,
-                                        queue: level.queue)
+        let with = try renderer.capture(
+            width: 640, height: 360, camera: level.camera, objects: level.objects,
+            queue: level.queue)
         XCTAssertGreaterThan(renderer.lastModelPartCount, 0)
         let difference = try XCTUnwrap(with.difference(from: without))
         XCTAssertGreaterThan(difference.share, 0, "the objects changed nothing in the frame")
@@ -363,7 +381,8 @@ final class SkyTests: XCTestCase {
         let fog = RenderFog(color: [0.5, 0.6, 0.7], maximumDensity: 0.75, startDistance: 10, endDistance: 110)
         let frame = FrameUniforms(viewProjection: matrix_identity_float4x4, camera: camera, fog: fog)
         let amount = { (point: SIMD3<Float>) in
-            min(max(dot(SIMD3(frame.fogPlane.x, frame.fogPlane.y, frame.fogPlane.z), point) + frame.fogPlane.w, 0),
+            min(
+                max(dot(SIMD3(frame.fogPlane.x, frame.fogPlane.y, frame.fogPlane.z), point) + frame.fogPlane.w, 0),
                 1) * frame.fogColor.w
         }
         XCTAssertEqual(amount([15, 0, 0]), 0)
@@ -399,7 +418,8 @@ final class BenchmarkTests: XCTestCase {
         let start = path.camera(at: 0)
         let around = path.camera(at: path.period)
         XCTAssertLessThan(simd_distance(start.position, around.position), 1e-3)
-        XCTAssertEqual(simd_distance(path.camera(at: 17).position * [1, 1, 0], [10, 20, 0]), path.radius,
-                       accuracy: 1e-3)
+        XCTAssertEqual(
+            simd_distance(path.camera(at: 17).position * [1, 1, 0], [10, 20, 0]), path.radius,
+            accuracy: 1e-3)
     }
 }

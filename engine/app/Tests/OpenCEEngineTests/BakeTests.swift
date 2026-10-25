@@ -20,13 +20,15 @@ final class BakeTests: XCTestCase {
             let scene = try BakeScene.layout(name: name)
             let expected = try XCTUnwrap(bakeLayoutExpected(name: name))
             // (many points at the same place: their mean converges)
-            let lights = try tracer.trace(scene, points: Array(repeating: up, count: 256), samples: 64,
-                                          occlusionDistance: bakeLayoutOcclusionDistance())
+            let lights = try tracer.trace(
+                scene, points: Array(repeating: up, count: 256), samples: 64,
+                occlusionDistance: bakeLayoutOcclusionDistance())
             let mean = lights.map(\.irradiance).reduce(.zero, +) / Float(lights.count)
             let open = lights.map(\.occlusion).reduce(0, +) / Float(lights.count)
             for channel in 0..<3 {
-                XCTAssertEqual(mean[channel], expected.irradiance, accuracy: expected.irradiance * 0.04 + 1e-3,
-                               "\(name)")
+                XCTAssertEqual(
+                    mean[channel], expected.irradiance, accuracy: expected.irradiance * 0.04 + 1e-3,
+                    "\(name)")
             }
             XCTAssertEqual(open, expected.occlusion, accuracy: 0.03, "\(name)")
         }
@@ -43,14 +45,17 @@ final class BakeTests: XCTestCase {
             BakePoint(position: SIMD3(middle.x + 3, middle.y - 2, bounds[5] + 0.01), normal: SIMD3(0, 0, 1)),
         ]
         for point in points {
-            let gpu = try tracer.trace(scene, points: Array(repeating: point, count: 256), samples: 32,
-                                       occlusionDistance: 10)
+            let gpu = try tracer.trace(
+                scene, points: Array(repeating: point, count: 256), samples: 32,
+                occlusionDistance: 10)
             let mean = gpu.map(\.irradiance).reduce(.zero, +) / Float(gpu.count)
-            let cpu = scene.reference(point: [point.position.x, point.position.y, point.position.z],
-                                      normal: [0, 0, 1], samples: 8192, seed: 5, occlusionDistance: 10)
+            let cpu = scene.reference(
+                point: [point.position.x, point.position.y, point.position.z],
+                normal: [0, 0, 1], samples: 8192, seed: 5, occlusionDistance: 10)
             for channel in 0..<3 {
-                XCTAssertEqual(mean[channel], cpu.irradiance[channel],
-                               accuracy: max(cpu.irradiance[channel] * 0.05, 1e-3))
+                XCTAssertEqual(
+                    mean[channel], cpu.irradiance[channel],
+                    accuracy: max(cpu.irradiance[channel] * 0.05, 1e-3))
             }
             XCTAssertGreaterThan(gpu[0].direction.z, 0)
         }
@@ -62,8 +67,9 @@ final class BakeTests: XCTestCase {
         for (name, seen) in [("sun", Float(1)), ("roof", Float(0))] {
             let scene = try BakeScene.layout(name: name)
             let sun = try XCTUnwrap(scene.sunLight(), name)
-            let lights = try tracer.trace(scene, points: Array(repeating: up, count: 64), samples: 16,
-                                          occlusionDistance: bakeLayoutOcclusionDistance(), sun: sun)
+            let lights = try tracer.trace(
+                scene, points: Array(repeating: up, count: 64), samples: 16,
+                occlusionDistance: bakeLayoutOcclusionDistance(), sun: sun)
             XCTAssertEqual(lights.map(\.irradiance).reduce(.zero, +), .zero, name)
             XCTAssertEqual(lights.map(\.occlusion).reduce(0, +) / Float(lights.count), seen, name)
         }
@@ -74,14 +80,17 @@ final class BakeTests: XCTestCase {
         let sun = try XCTUnwrap(scene.sunLight())
         for normal in [SIMD3<Float>(0, 0, -1), SIMD3<Float>(1, 0, 0)] {
             let point = BakePoint(position: middle, normal: normal)
-            let gpu = try tracer.trace(scene, points: Array(repeating: point, count: 256), samples: 32,
-                                       occlusionDistance: 10, sun: sun)
+            let gpu = try tracer.trace(
+                scene, points: Array(repeating: point, count: 256), samples: 32,
+                occlusionDistance: 10, sun: sun)
             let mean = gpu.map(\.irradiance).reduce(.zero, +) / Float(gpu.count)
-            let cpu = scene.referenceProbe(point: [middle.x, middle.y, middle.z], normal: [normal.x, normal.y, normal.z],
-                                           samples: 8192, seed: 5, sun: sun)
+            let cpu = scene.referenceProbe(
+                point: [middle.x, middle.y, middle.z], normal: [normal.x, normal.y, normal.z],
+                samples: 8192, seed: 5, sun: sun)
             for channel in 0..<3 {
-                XCTAssertEqual(mean[channel], cpu.irradiance[channel],
-                               accuracy: max(cpu.irradiance[channel] * 0.05, 1e-3), "\(normal)")
+                XCTAssertEqual(
+                    mean[channel], cpu.irradiance[channel],
+                    accuracy: max(cpu.irradiance[channel] * 0.05, 1e-3), "\(normal)")
             }
             XCTAssertEqual(gpu.map(\.occlusion).reduce(0, +) / Float(gpu.count), cpu.occlusion, accuracy: 0.03)
         }
@@ -89,8 +98,10 @@ final class BakeTests: XCTestCase {
 
     func testNoPointsIsNoWorkAndABrokenSourceIsAnError() throws {
         let tracer = try tracer()
-        XCTAssertEqual(try tracer.trace(try BakeScene.layout(name: "open"), points: [], samples: 1,
-                                        occlusionDistance: 1), [])
+        XCTAssertEqual(
+            try tracer.trace(
+                try BakeScene.layout(name: "open"), points: [], samples: 1,
+                occlusionDistance: 1), [])
         XCTAssertThrowsError(try PathTracer(device: tracer.device, source: "broken"))
         XCTAssertThrowsError(try PathTracer(device: tracer.device, source: "kernel void other() {}"))
     }
@@ -112,8 +123,9 @@ final class BakeTests: XCTestCase {
         tracer.pathsPerBatch = 1
         let scene = try BakeScene.layout(name: "furnace")
         let up = BakePoint(position: .zero, normal: SIMD3(0, 0, 1))
-        let lights = try tracer.trace(scene, points: Array(repeating: up, count: 2500), samples: 4,
-                                      occlusionDistance: 1)
+        let lights = try tracer.trace(
+            scene, points: Array(repeating: up, count: 2500), samples: 4,
+            occlusionDistance: 1)
         XCTAssertEqual(lights.count, 2500)
         // (the batches' first points are not traced alike)
         XCTAssertNotEqual(lights[0].irradiance, lights[1024].irradiance)
@@ -174,33 +186,39 @@ final class BakeTests: XCTestCase {
         let tracer = try tracer()
         let folder = try folder()
         var progress: [Float] = []
-        let level = try LoadedLevel(geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
-                                    device: tracer.device, settings: VideoSettings(), bakeAtLoad: .quick,
-                                    progress: { progress.append($0) })
+        let level = try LoadedLevel(
+            geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
+            device: tracer.device, settings: VideoSettings(), bakeAtLoad: .quick,
+            progress: { progress.append($0) })
         XCTAssertEqual(level.light, .traced)
         XCTAssertTrue(level.renderer.baked, "lit before its first frame")
         let bake = try XCTUnwrap(level.bake)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(LightBaker.file(bake, folder: folder.path)).path))
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: try XCTUnwrap(LightBaker.file(bake, folder: folder.path)).path))
         XCTAssertEqual(progress, progress.sorted(), "it only goes forward")
         XCTAssertEqual(progress.last, 1)
-        XCTAssertTrue(progress.contains { $0 > LoadedLevel.drawnProgress && $0 < LoadedLevel.bakedProgress },
-                      "the bake reports its own progress: \(progress)")
+        XCTAssertTrue(
+            progress.contains { $0 > LoadedLevel.drawnProgress && $0 < LoadedLevel.bakedProgress },
+            "the bake reports its own progress: \(progress)")
     }
 
     /// A level baked before loads with its kept light, tracing nothing.
     func testACachedBakeLoadsAlreadyLit() throws {
         let device = try tracer().device
         let folder = try folder()
-        let first = try LoadedLevel(geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
-                                    device: device, settings: VideoSettings(), bakeAtLoad: .quick)
+        let first = try LoadedLevel(
+            geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
+            device: device, settings: VideoSettings(), bakeAtLoad: .quick)
         let file = try XCTUnwrap(LightBaker.file(try XCTUnwrap(first.bake), folder: folder.path))
         let written = try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date
-        let again = try LoadedLevel(geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
-                                    device: device, settings: VideoSettings(), bakeAtLoad: .quick)
+        let again = try LoadedLevel(
+            geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
+            device: device, settings: VideoSettings(), bakeAtLoad: .quick)
         XCTAssertEqual(again.light, .cached)
         XCTAssertTrue(again.renderer.baked)
-        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date,
-                       written, "not baked again")
+        XCTAssertEqual(
+            try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date,
+            written, "not baked again")
     }
 
     /// Without the bake at load (the tests that do not look at the light),
@@ -208,12 +226,14 @@ final class BakeTests: XCTestCase {
     func testALoadThatDoesNotBakeTracesNothing() throws {
         let device = try tracer().device
         let folder = try folder()
-        let level = try LoadedLevel(geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
-                                    device: device, settings: VideoSettings(), bakeAtLoad: .cachedOnly)
+        let level = try LoadedLevel(
+            geometry: try devmap(), map: "devmap", cacheFolder: folder.path,
+            device: device, settings: VideoSettings(), bakeAtLoad: .cachedOnly)
         XCTAssertEqual(level.light, .stock)
         XCTAssertFalse(level.renderer.baked)
         let bake = try XCTUnwrap(level.bake)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(LightBaker.file(bake, folder: folder.path)).path))
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: try XCTUnwrap(LightBaker.file(bake, folder: folder.path)).path))
     }
 
     /// The bake's progress: each structure's three traces in turn, ending
@@ -249,21 +269,26 @@ final class BakeTests: XCTestCase {
         let level = try StockLevel(map: "bloodgulch")
         let bake = try level.geometry.bakePlan(quick: true)
         func dark(_ points: Data) -> Data { Data(count: points.count / 32 * 16) }
-        let light = bake.finish(irradiance: dark(bake.lightmapPointBytes()),
-                                directions: dark(bake.lightmapPointBytes()),
-                                probes: dark(bake.probePointBytes()),
-                                radiance: dark(bake.reflectionPointBytes()))
+        let light = bake.finish(
+            irradiance: dark(bake.lightmapPointBytes()),
+            directions: dark(bake.lightmapPointBytes()),
+            probes: dark(bake.probePointBytes()),
+            radiance: dark(bake.reflectionPointBytes()))
         XCTAssertEqual(light.lightAt(point: [0, 0, 0], normal: [0, 0, 1]), [0, 0, 0, 0])
         XCTAssertEqual(light.sunTowards().count, 3, "Blood Gulch has a sun")
         let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
         // (near the largest object, looking at it from behind along x, out of the fog)
         let object = try XCTUnwrap(level.objects.max { $0.radius < $1.radius })
-        let camera = ViewCamera(position: object.center - SIMD3(object.radius * 2 + 1, 0, 0), yaw: 0, pitch: 0,
-                                verticalFov: 70 * .pi / 180)
+        let camera = ViewCamera(
+            position: object.center - SIMD3(object.radius * 2 + 1, 0, 0), yaw: 0, pitch: 0,
+            verticalFov: 70 * .pi / 180)
         func frames() throws -> (without: CapturedFrame, with: CapturedFrame) {
-            (try renderer.capture(width: 320, height: 180, camera: camera, queue: level.queue),
-             try renderer.capture(width: 320, height: 180, camera: camera, objects: level.objects,
-                                  queue: level.queue))
+            (
+                try renderer.capture(width: 320, height: 180, camera: camera, queue: level.queue),
+                try renderer.capture(
+                    width: 320, height: 180, camera: camera, objects: level.objects,
+                    queue: level.queue)
+            )
         }
         let stock = try frames()
         try renderer.useBakedLighting(light)
@@ -294,21 +319,24 @@ final class BakeTests: XCTestCase {
             let floats = [Float](repeating: value, count: points.count / 32 * 4)
             return floats.withUnsafeBytes { Data($0) }
         }
-        let light = bake.finish(irradiance: even(bake.lightmapPointBytes(), 1),
-                                directions: even(bake.lightmapPointBytes(), 0),
-                                probes: even(bake.probePointBytes(), 0.5),
-                                radiance: even(bake.reflectionPointBytes(), 0))
+        let light = bake.finish(
+            irradiance: even(bake.lightmapPointBytes(), 1),
+            directions: even(bake.lightmapPointBytes(), 0),
+            probes: even(bake.probePointBytes(), 0.5),
+            radiance: even(bake.reflectionPointBytes(), 0))
         XCTAssertEqual(light.sunTowards().count, 3, "Blood Gulch has a sun")
         let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
         try renderer.useBakedLighting(light)
         // (above the largest object, looking down on it and the ground around)
         let object = try XCTUnwrap(level.objects.max { $0.radius < $1.radius })
-        let camera = ViewCamera(position: object.center + SIMD3(0, 0, object.radius * 5 + 2), yaw: 0, pitch: -1.45,
-                                verticalFov: 70 * .pi / 180)
+        let camera = ViewCamera(
+            position: object.center + SIMD3(0, 0, object.radius * 5 + 2), yaw: 0, pitch: -1.45,
+            verticalFov: 70 * .pi / 180)
         func capture(objects: Bool, shadows: Bool) throws -> CapturedFrame {
             renderer.sunShadows = shadows
-            return try renderer.capture(width: 320, height: 180, camera: camera,
-                                        objects: objects ? level.objects : [], queue: level.queue)
+            return try renderer.capture(
+                width: 320, height: 180, camera: camera,
+                objects: objects ? level.objects : [], queue: level.queue)
         }
         let bare = try capture(objects: false, shadows: false)
         let bareShadowed = try capture(objects: false, shadows: true)
@@ -361,8 +389,9 @@ final class BakeTests: XCTestCase {
         var report: [String] = []
         var outside: [String] = []
         for name in names {
-            let geometry = try LevelGeometry.load(map: maps.appendingPathComponent("\(name).map").path,
-                                                  cacheFolder: cache.path, bsp: 0)
+            let geometry = try LevelGeometry.load(
+                map: maps.appendingPathComponent("\(name).map").path,
+                cacheFolder: cache.path, bsp: 0)
             for bake in geometry.bakePlans(quick: true) {
                 let light = try LightBaker.bake(bake, tracer: tracer)
                 let moods = bake.moods(light: light)
@@ -374,15 +403,19 @@ final class BakeTests: XCTestCase {
                     }
                 }
                 let failing = Float(moods.filter { !$0.within }.reduce(0) { $0 + Int($1.texels) }) / max(texels, 1)
-                let line = String(format: "%@ bsp %d: %d pages, exposure %.2f, failing %.2f, stock %.3f %.3f %.3f, baked %.3f %.3f %.3f",
-                                  name, bake.bsp(), moods.count, light.exposure(), failing,
-                                  mean(\.stock)[0], mean(\.stock)[1], mean(\.stock)[2],
-                                  mean(\.baked)[0], mean(\.baked)[1], mean(\.baked)[2])
+                let line = String(
+                    format:
+                        "%@ bsp %d: %d pages, exposure %.2f, failing %.2f, stock %.3f %.3f %.3f, baked %.3f %.3f %.3f",
+                    name, bake.bsp(), moods.count, light.exposure(), failing,
+                    mean(\.stock)[0], mean(\.stock)[1], mean(\.stock)[2],
+                    mean(\.baked)[0], mean(\.baked)[1], mean(\.baked)[2])
                 report.append(line)
                 guard let bsp = bake.bspMood(light: light) else { continue }
                 if !bsp.within && !known.contains("\(name) bsp \(bake.bsp())") {
-                    outside.append(String(format: "%@ bsp %d: ratio %.2f, hue %.3f, failing %.2f", name,
-                                          bake.bsp(), bsp.ratio, bsp.hueDifference, bsp.failing))
+                    outside.append(
+                        String(
+                            format: "%@ bsp %d: ratio %.2f, hue %.3f, failing %.2f", name,
+                            bake.bsp(), bsp.ratio, bsp.hueDifference, bsp.failing))
                 }
             }
         }

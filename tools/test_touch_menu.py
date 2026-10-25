@@ -1,6 +1,7 @@
 """Runs the C tests of the menus' touch gestures (port/linux/src/touch_menu.c)
 with the build machine's C compiler. The unit has no SDL or game
 dependency, so it compiles anywhere."""
+
 import shutil
 import subprocess
 from pathlib import Path
@@ -29,11 +30,21 @@ def test_touch_menu(tmp_path):
         pytest.skip("no C compiler")
     binary = tmp_path / "touch_menu_test"
     build = subprocess.run(
-        [cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-O1",
-         str(ROOT / "port" / "linux" / "tests" / "touch_menu_test.c"),
-         str(ROOT / "port" / "linux" / "src" / "touch_menu.c"),
-         "-lm", "-o", str(binary)],
-        capture_output=True, text=True,
+        [
+            cc,
+            "-std=c11",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-O1",
+            str(ROOT / "port" / "linux" / "tests" / "touch_menu_test.c"),
+            str(ROOT / "port" / "linux" / "src" / "touch_menu.c"),
+            "-lm",
+            "-o",
+            str(binary),
+        ],
+        capture_output=True,
+        text=True,
     )
     assert build.returncode == 0, build.stdout + build.stderr
     result = subprocess.run([str(binary)], capture_output=True, text=True)

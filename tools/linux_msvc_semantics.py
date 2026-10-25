@@ -44,18 +44,14 @@ def source_files(roots: Iterable[Path]) -> List[Path]:
     files: List[Path] = []
     for root in roots:
         files.extend(
-            path
-            for path in sorted(root.rglob("*"))
-            if path.suffix.lower() in SOURCE_SUFFIXES and path.is_file()
+            path for path in sorted(root.rglob("*")) if path.suffix.lower() in SOURCE_SUFFIXES and path.is_file()
         )
     return files
 
 
 # Conditions that are never true for this build: C++ and 64-bit Windows.
 UNUSED_CONDITION = r"(?:__cplusplus|_WIN64)\b"
-CPLUSPLUS_IF = re.compile(
-    r"#\s*if(?:def\s+" + UNUSED_CONDITION + r"|\s+defined\s*\(?\s*" + UNUSED_CONDITION + r")"
-)
+CPLUSPLUS_IF = re.compile(r"#\s*if(?:def\s+" + UNUSED_CONDITION + r"|\s+defined\s*\(?\s*" + UNUSED_CONDITION + r")")
 CPLUSPLUS_IFNDEF = re.compile(
     r"#\s*if(?:ndef\s+" + UNUSED_CONDITION + r"|\s+!\s*defined\s*\(?\s*" + UNUSED_CONDITION + r")"
 )
@@ -126,11 +122,7 @@ def scan_inline_functions(files: Iterable[Path], all_inlines: bool) -> Set[str]:
     if all_inlines:
         return inline_names
     everything = "\n".join(texts)
-    return {
-        name
-        for name in inline_names
-        if re.search(r"\b" + re.escape(name) + r"\s*\([^;{}]*\)\s*;", everything)
-    }
+    return {name for name in inline_names if re.search(r"\b" + re.escape(name) + r"\s*\([^;{}]*\)\s*;", everything)}
 
 
 def render(tags: Dict[str, Set[str]], inline_functions: Set[str]) -> str:
@@ -160,15 +152,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
-        "--tags", type=Path, action="append", default=[],
+        "--tags",
+        type=Path,
+        action="append",
+        default=[],
         help="directory whose struct/union tags are forward-declared",
     )
     parser.add_argument(
-        "--inlines", type=Path, action="append", default=[],
+        "--inlines",
+        type=Path,
+        action="append",
+        default=[],
         help="directory whose inline functions get COMDAT-like linkage",
     )
     parser.add_argument(
-        "--all-inlines", action="store_true",
+        "--all-inlines",
+        action="store_true",
         help="mark every inline function weak, not just prototyped ones",
     )
     args = parser.parse_args()

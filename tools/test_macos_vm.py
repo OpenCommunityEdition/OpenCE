@@ -22,8 +22,9 @@ from tools import macos_guest_image  # noqa: E402
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
-    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
-                       reason="needs `ninja macos` in nix develop"),
+    pytest.mark.skipif(
+        not macos_guest_image.available() or shutil.which("ninja") is None, reason="needs `ninja macos` in nix develop"
+    ),
 ]
 
 
@@ -98,12 +99,28 @@ def test_the_hosts_system_calls_natively(tmp_path):
 
     exe = tmp_path / "host_syscall_test"
     sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
-    build = subprocess.run([
-        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
-        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
-        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
-        "port/macos/tests/host_syscall_test.c", "port/macos/host/host_syscall.c", "-o", str(exe),
-    ], cwd=ROOT, capture_output=True, text=True)
+    build = subprocess.run(
+        [
+            "cc",
+            "-std=gnu11",
+            "-Wall",
+            "-Werror",
+            "-D_DARWIN_C_SOURCE",
+            "-mmacosx-version-min=26.0",
+            "-Iport/macos/host",
+            "-Ibuild/macos/runtime",
+            "-Iport/android/include",
+            "-Iport/android/guest/libc/arch/arm64_32",
+            f"-I{sdl_include}",
+            "port/macos/tests/host_syscall_test.c",
+            "port/macos/host/host_syscall.c",
+            "-o",
+            str(exe),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
     assert build.returncode == 0, build.stderr
     folder = tmp_path / "files"
     folder.mkdir()
@@ -121,13 +138,30 @@ def test_the_main_threads_queue_natively(tmp_path):
 
     exe = tmp_path / "host_main_thread_test"
     sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
-    build = subprocess.run([
-        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
-        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
-        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
-        "port/macos/tests/host_main_thread_test.c", "port/macos/host/host_main_thread.c",
-        "-framework", "CoreFoundation", "-o", str(exe),
-    ], cwd=ROOT, capture_output=True, text=True)
+    build = subprocess.run(
+        [
+            "cc",
+            "-std=gnu11",
+            "-Wall",
+            "-Werror",
+            "-D_DARWIN_C_SOURCE",
+            "-mmacosx-version-min=26.0",
+            "-Iport/macos/host",
+            "-Ibuild/macos/runtime",
+            "-Iport/android/include",
+            "-Iport/android/guest/libc/arch/arm64_32",
+            f"-I{sdl_include}",
+            "port/macos/tests/host_main_thread_test.c",
+            "port/macos/host/host_main_thread.c",
+            "-framework",
+            "CoreFoundation",
+            "-o",
+            str(exe),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
     assert build.returncode == 0, build.stderr
     result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60)
     assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
@@ -141,12 +175,28 @@ def test_the_window_imports_use_the_apps_windows_natively(tmp_path):
 
     exe = tmp_path / "host_window_test"
     sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
-    build = subprocess.run([
-        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
-        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
-        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
-        "port/macos/tests/host_window_test.c", "port/macos/host/host_window.c", "-o", str(exe),
-    ], cwd=ROOT, capture_output=True, text=True)
+    build = subprocess.run(
+        [
+            "cc",
+            "-std=gnu11",
+            "-Wall",
+            "-Werror",
+            "-D_DARWIN_C_SOURCE",
+            "-mmacosx-version-min=26.0",
+            "-Iport/macos/host",
+            "-Ibuild/macos/runtime",
+            "-Iport/android/include",
+            "-Iport/android/guest/libc/arch/arm64_32",
+            f"-I{sdl_include}",
+            "port/macos/tests/host_window_test.c",
+            "port/macos/host/host_window.c",
+            "-o",
+            str(exe),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
     assert build.returncode == 0, build.stderr
     result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
     assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
@@ -162,13 +212,32 @@ def test_the_apps_keyboard_and_mouse_become_sdl_events_natively(tmp_path):
     exe = tmp_path / "host_input_test"
     sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
     sdl_lib = os.environ.get("HALO_MACOS_SDL_LIB", "")
-    build = subprocess.run([
-        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
-        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
-        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
-        "port/macos/tests/host_input_test.c", "port/macos/host/host_input.c", "port/macos/host/host_window.c",
-        f"-L{sdl_lib}", f"-Wl,-rpath,{sdl_lib}", "-lSDL3", "-o", str(exe),
-    ], cwd=ROOT, capture_output=True, text=True)
+    build = subprocess.run(
+        [
+            "cc",
+            "-std=gnu11",
+            "-Wall",
+            "-Werror",
+            "-D_DARWIN_C_SOURCE",
+            "-mmacosx-version-min=26.0",
+            "-Iport/macos/host",
+            "-Ibuild/macos/runtime",
+            "-Iport/android/include",
+            "-Iport/android/guest/libc/arch/arm64_32",
+            f"-I{sdl_include}",
+            "port/macos/tests/host_input_test.c",
+            "port/macos/host/host_input.c",
+            "port/macos/host/host_window.c",
+            f"-L{sdl_lib}",
+            f"-Wl,-rpath,{sdl_lib}",
+            "-lSDL3",
+            "-o",
+            str(exe),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
     assert build.returncode == 0, build.stderr
     result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
     assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
@@ -185,12 +254,28 @@ def test_the_apps_audio_streams_are_converted_buffered_and_fed_natively(tmp_path
 
     exe = tmp_path / "host_audio_test"
     sdl_include = os.environ.get("HALO_MACOS_SDL_INCLUDE", "")
-    build = subprocess.run([
-        "cc", "-std=gnu11", "-Wall", "-Werror", "-D_DARWIN_C_SOURCE", "-mmacosx-version-min=26.0",
-        "-Iport/macos/host", "-Ibuild/macos/runtime", "-Iport/android/include",
-        "-Iport/android/guest/libc/arch/arm64_32", f"-I{sdl_include}",
-        "port/macos/tests/host_audio_test.c", "port/macos/host/host_audio.c", "-o", str(exe),
-    ], cwd=ROOT, capture_output=True, text=True)
+    build = subprocess.run(
+        [
+            "cc",
+            "-std=gnu11",
+            "-Wall",
+            "-Werror",
+            "-D_DARWIN_C_SOURCE",
+            "-mmacosx-version-min=26.0",
+            "-Iport/macos/host",
+            "-Ibuild/macos/runtime",
+            "-Iport/android/include",
+            "-Iport/android/guest/libc/arch/arm64_32",
+            f"-I{sdl_include}",
+            "port/macos/tests/host_audio_test.c",
+            "port/macos/host/host_audio.c",
+            "-o",
+            str(exe),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
     assert build.returncode == 0, build.stderr
     result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
     assert (result.returncode, result.stdout.strip()) == (0, "ok"), result.stdout + result.stderr
@@ -215,8 +300,9 @@ def test_sdl(sdl_image, tmp_path, case):
 
 def test_the_audio_callback_is_guest_code_on_a_vcpu_of_its_own(sdl_image, tmp_path):
     # (the callback's calls into the host: its SDL_PutAudioStreamData)
-    status, stdout, stderr = run_case(sdl_image, tmp_path, "audio",
-                                      environment={**SDL_DRIVERS, "HALO_HOST_IMPORT_COUNTS": "1"})
+    status, stdout, stderr = run_case(
+        sdl_image, tmp_path, "audio", environment={**SDL_DRIVERS, "HALO_HOST_IMPORT_COUNTS": "1"}
+    )
     assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
     assert import_counts(stderr).get("host_sdl_put_audio_stream_data", 0) >= 3, stderr
 
@@ -230,9 +316,12 @@ def test_opengl_es_is_refused_while_headless(sdl_image, tmp_path):
 def test_window_imports_run_on_the_hosts_main_thread(sdl_image, tmp_path):
     # with the host's main thread running its run loop (as the app's does),
     # a guest thread's SDL_Init and SDL_CreateWindow are carried out there
-    status, stdout, stderr = run_case(sdl_image, tmp_path, "window_from_thread",
-                                      environment={**SDL_DRIVERS, "HALO_HOST_MAIN_LOOP": "1",
-                                                   "HALO_HOST_TRACE_MAIN_THREAD": "1"})
+    status, stdout, stderr = run_case(
+        sdl_image,
+        tmp_path,
+        "window_from_thread",
+        environment={**SDL_DRIVERS, "HALO_HOST_MAIN_LOOP": "1", "HALO_HOST_TRACE_MAIN_THREAD": "1"},
+    )
     assert (status, stdout.strip()) == (0, "ok"), stdout + stderr
     assert "halo_host: host_sdl_init ran on the main thread" in stderr
     assert "halo_host: host_sdl_create_window ran on the main thread" in stderr

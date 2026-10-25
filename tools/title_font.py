@@ -37,16 +37,37 @@ OUTPUT = ROOT / "port/assets/fonts/OpenCE-Regular.ttf"
 TITLES = ROOT / "port/assets/titles/titles.json"
 FAMILY = "OpenCE"
 VERSION = "2.000"
-COPYRIGHT = ("OpenCE: Newtown, by Roger White (1994), released by its author into the public domain; "
-             "respaced by The OpenCE Project Authors (2026)")
+COPYRIGHT = (
+    "OpenCE: Newtown, by Roger White (1994), released by its author into the public domain; "
+    "respaced by The OpenCE Project Authors (2026)"
+)
 
 # the space beside each respaced character (left, right of its ink), in font
 # units (1000 to the em, capitals 719 tall)
 SPACING = {
-    "1": (60, 71), "2": (25, 34), ":": (26, 58), "A": (-31, -29), "C": (35, 25), "D": (68, 26),
-    "E": (29, 46), "F": (57, 29), "G": (24, 46), "H": (59, 50), "I": (68, 68), "K": (74, -31),
-    "L": (56, -2), "M": (69, 63), "N": (67, 69), "O": (22, 24), "P": (72, 24), "R": (67, 10),
-    "S": (28, 24), "T": (2, -12), "U": (58, 67), "V": (-36, -27), "Y": (-42, -43),
+    "1": (60, 71),
+    "2": (25, 34),
+    ":": (26, 58),
+    "A": (-31, -29),
+    "C": (35, 25),
+    "D": (68, 26),
+    "E": (29, 46),
+    "F": (57, 29),
+    "G": (24, 46),
+    "H": (59, 50),
+    "I": (68, 68),
+    "K": (74, -31),
+    "L": (56, -2),
+    "M": (69, 63),
+    "N": (67, 69),
+    "O": (22, 24),
+    "P": (72, 24),
+    "R": (67, 10),
+    "S": (28, 24),
+    "T": (2, -12),
+    "U": (58, 67),
+    "V": (-36, -27),
+    "Y": (-42, -43),
 }
 
 # the width of a space
@@ -54,7 +75,14 @@ SPACE = 379
 
 # pairs set closer (negative) or further apart than their spacing gives
 KERNING = {
-    "AP": -12, "CU": 18, "MA": 14, "MS": 11, "NL": -14, "NT": -10, "OA": 11, "OO": 36,
+    "AP": -12,
+    "CU": 18,
+    "MA": 14,
+    "MS": 11,
+    "NL": -14,
+    "NT": -10,
+    "OA": 11,
+    "OO": 36,
     "OS": -12,
 }
 
@@ -81,8 +109,9 @@ def build(output: Path = OUTPUT) -> Path:
     space = cmap[ord(" ")]
     hmtx[space] = (SPACE, hmtx[space][1])
     table = font["kern"].kernTables[0]
-    pairs = {pair: value for pair, value in table.kernTable.items()
-             if pair[0] not in respaced and pair[1] not in respaced}
+    pairs = {
+        pair: value for pair, value in table.kernTable.items() if pair[0] not in respaced and pair[1] not in respaced
+    }
     for pair, value in KERNING.items():
         pairs[cmap[ord(pair[0])], cmap[ord(pair[1])]] = value
     table.kernTable = pairs
@@ -119,7 +148,7 @@ def measure():
     observations, seen = [], set()
     for title in json.loads(TITLES.read_text())["assets"]:
         if (title["tag"], title["text"]) in seen:
-            continue    # (a selected item's text is placed as its other frame's)
+            continue  # (a selected item's text is placed as its other frame's)
         seen.add((title["tag"], title["text"]))
         units = cap / title["cap"]
         letters, spaced, space = [], [], False
@@ -170,8 +199,9 @@ def measure():
         if not space:
             residuals.setdefault(a + b, []).append(gap - row @ solution)
     kerning = {pair: round(float(np.median(r))) for pair, r in sorted(residuals.items()) if abs(np.median(r)) >= 10}
-    spacing = {c: (round(float(solution[column["left", c]])), round(float(solution[column["right", c]])))
-               for c in characters}
+    spacing = {
+        c: (round(float(solution[column["left", c]])), round(float(solution[column["right", c]]))) for c in characters
+    }
     print("SPACE =", round(float(solution[column["space"]])))
     print("SPACING =", spacing)
     print("KERNING =", kerning)

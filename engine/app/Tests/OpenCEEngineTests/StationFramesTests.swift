@@ -34,15 +34,17 @@ final class StationFramesTests: XCTestCase {
         _ = try engine.startLevel(geometry: geometry, difficulty: 1)
         try engine.spawnPlayer(start: 0)
         _ = try engine.advance(frameSeconds: 1.0 / 30)
-        let renderer = try LevelRenderer(device: device, geometry: geometry,
-                                         settings: VideoSettings(antiAliasing: .native, renderScale: 1))
+        let renderer = try LevelRenderer(
+            device: device, geometry: geometry,
+            settings: VideoSettings(antiAliasing: .native, renderScale: 1))
         // (a renderer's first frame with particles differs from its second
         // by a level in a few pixels, so one is drawn and thrown away first)
         do {
             let frame = reader.acquire()
             renderer.laidParticles = Array(frame.particles)
-            _ = try renderer.capture(width: 480, height: 270, camera: ViewCamera(frame.camera, alpha: frame.alpha),
-                                     objects: frame.drawnObjects(), queue: queue)
+            _ = try renderer.capture(
+                width: 480, height: 270, camera: ViewCamera(frame.camera, alpha: frame.alpha),
+                objects: frame.drawnObjects(), queue: queue)
         }
         let out = StockLevel.root.appendingPathComponent("build/engine/golden")
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
@@ -59,12 +61,15 @@ final class StationFramesTests: XCTestCase {
             let camera = ViewCamera(frame.camera, alpha: frame.alpha)
             renderer.time = Float((Double(frame.tick) + Double(frame.alpha)) / 60)
             renderer.laidParticles = Array(frame.particles)
-            let shot = try renderer.capture(width: 480, height: 270, camera: camera,
-                                            objects: frame.drawnObjects(), queue: queue)
-            let again = try renderer.capture(width: 480, height: 270, camera: camera,
-                                             objects: frame.drawnObjects(), queue: queue)
-            XCTAssertEqual(shot.difference(from: again, tolerance: 0)?.largest, 0,
-                           "\(name): the same frame drawn twice differs")
+            let shot = try renderer.capture(
+                width: 480, height: 270, camera: camera,
+                objects: frame.drawnObjects(), queue: queue)
+            let again = try renderer.capture(
+                width: 480, height: 270, camera: camera,
+                objects: frame.drawnObjects(), queue: queue)
+            XCTAssertEqual(
+                shot.difference(from: again, tolerance: 0)?.largest, 0,
+                "\(name): the same frame drawn twice differs")
             let file = "devgulch_station_\(name)_480x270.png"
             try shot.writePNG(to: out.appendingPathComponent(file))
             let approved = StockLevel.root.appendingPathComponent("assets/golden/engine/\(file)")

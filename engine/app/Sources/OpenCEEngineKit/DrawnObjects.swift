@@ -10,9 +10,10 @@ extension ViewCamera {
         func camera(_ transform: OCETransform) -> ViewCamera {
             let position = transform.position
             let rotation = transform.rotation
-            return ViewCamera(position: SIMD3(position.x, position.y, position.z),
-                              rotation: simd_quatf(ix: rotation.x, iy: rotation.y, iz: rotation.z, r: rotation.w),
-                              verticalFov: snapshot.vertical_fov_radians)
+            return ViewCamera(
+                position: SIMD3(position.x, position.y, position.z),
+                rotation: simd_quatf(ix: rotation.x, iy: rotation.y, iz: rotation.z, r: rotation.w),
+                verticalFov: snapshot.vertical_fov_radians)
         }
         self = .interpolated(from: camera(snapshot.previous), to: camera(snapshot.current), alpha: alpha)
     }
@@ -29,14 +30,17 @@ extension FrameView {
             let regions = withUnsafeBytes(of: object.regions) { Array($0) }
             let nodes = nodes(of: object).map { Self.between($0.previous, $0.current, alpha) }
             let radius = object.bounding_radius.isFinite ? max(object.bounding_radius, 0) : 0
-            drawn.append(DrawnObject(model: Int(object.model), transform: transform,
-                                     center: SIMD3(transform.columns.3.x, transform.columns.3.y,
-                                                   transform.columns.3.z),
-                                     radius: radius, regions: regions, nodes: nodes,
-                                     firstPerson: object.flags & UInt16(OCE_OBJECT_FIRST_PERSON) != 0,
-                                     changeColors: withUnsafeBytes(of: object.change_colors) {
-                                         Array($0.bindMemory(to: UInt32.self))
-                                     }, id: object.id))
+            drawn.append(
+                DrawnObject(
+                    model: Int(object.model), transform: transform,
+                    center: SIMD3(
+                        transform.columns.3.x, transform.columns.3.y,
+                        transform.columns.3.z),
+                    radius: radius, regions: regions, nodes: nodes,
+                    firstPerson: object.flags & UInt16(OCE_OBJECT_FIRST_PERSON) != 0,
+                    changeColors: withUnsafeBytes(of: object.change_colors) {
+                        Array($0.bindMemory(to: UInt32.self))
+                    }, id: object.id))
         }
         return drawn
     }
@@ -62,8 +66,9 @@ extension FrameView {
         let rotation = simd_slerp(quaternion(from.rotation), quaternion(to.rotation), alpha)
         let position = simd_mix(vector(from.position), vector(to.position), SIMD3(repeating: alpha))
         let scale = from.scale + (to.scale - from.scale) * alpha
-        return DrawnObject.matrix(forward: rotation.act([1, 0, 0]), left: rotation.act([0, 1, 0]),
-                                  up: rotation.act([0, 0, 1]), position: position, scale: scale)
+        return DrawnObject.matrix(
+            forward: rotation.act([1, 0, 0]), left: rotation.act([0, 1, 0]),
+            up: rotation.act([0, 0, 1]), position: position, scale: scale)
     }
 
     /// A node's matrix, `alpha` of the way from `from` to `to`: its
@@ -75,7 +80,8 @@ extension FrameView {
         let turned = simd_slerp(rotation(from), rotation(to), alpha)
         let position = simd_mix(vector(from.position), vector(to.position), SIMD3(repeating: alpha))
         let scale = from.scale + (to.scale - from.scale) * alpha
-        return DrawnObject.matrix(forward: turned.act([1, 0, 0]), left: turned.act([0, 1, 0]),
-                                  up: turned.act([0, 0, 1]), position: position, scale: scale)
+        return DrawnObject.matrix(
+            forward: turned.act([1, 0, 0]), left: turned.act([0, 1, 0]),
+            up: turned.act([0, 0, 1]), position: position, scale: scale)
     }
 }

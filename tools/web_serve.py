@@ -112,8 +112,9 @@ def main(argv=None) -> int:
     parser.add_argument("root", nargs="?", type=Path, default=ROOT / "build/web/site", help="the site's folder")
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--as-github-pages", action="store_true",
-                        help="no isolation headers: the service worker isolates the page")
+    parser.add_argument(
+        "--as-github-pages", action="store_true", help="no isolation headers: the service worker isolates the page"
+    )
     args = parser.parse_args(argv)
     root = args.root.resolve()
     if not (root / "index.html").is_file():

@@ -78,9 +78,11 @@ struct MaterialUniforms {
     /// `material`'s glass, meter, plasma or water parameters set, and its
     /// four maps' textures and its reflection cube (white where it has
     /// none), or nil for a material of another class.
-    mutating func transparent(_ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
-                              cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
-                              whiteCube: MTLTexture) -> (maps: [MTLTexture], cube: MTLTexture)? {
+    mutating func transparent(
+        _ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
+        cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
+        whiteCube: MTLTexture
+    ) -> (maps: [MTLTexture], cube: MTLTexture)? {
         guard let shader = material.transparent else { return nil }
         func four(_ values: [Float]) -> SIMD4<Float> {
             values.count == 4 ? SIMD4(values[0], values[1], values[2], values[3]) : .zero
@@ -108,9 +110,11 @@ struct MaterialUniforms {
     /// `material`'s model shader parameters set (if it is a model shader),
     /// and its multipurpose map and an unused map's textures and its
     /// reflection cube, white where it has none.
-    mutating func model(_ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
-                        cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
-                        whiteCube: MTLTexture) -> (maps: [MTLTexture], cube: MTLTexture) {
+    mutating func model(
+        _ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
+        cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
+        whiteCube: MTLTexture
+    ) -> (maps: [MTLTexture], cube: MTLTexture) {
         guard let shader = material.model else { return ([white, white], whiteCube) }
         func four(_ values: [Float]) -> SIMD4<Float> {
             values.count == 4 ? SIMD4(values[0], values[1], values[2], values[3]) : .zero
@@ -122,17 +126,20 @@ struct MaterialUniforms {
         specularPerpendicular = four(shader.perpendicular)
         specularParallel = four(shader.parallel)
         environmentScales = SIMD4(shader.reflectionFalloffDistance, shader.reflectionCutoffDistance, 0, 0)
-        model = SIMD4(bits, UInt32(material.detailMask), UInt32(material.changeColorSource),
-                      UInt32(shader.selfIlluminationColorSource))
+        model = SIMD4(
+            bits, UInt32(material.detailMask), UInt32(material.changeColorSource),
+            UInt32(shader.selfIlluminationColorSource))
         return ([texture(material.multipurposeMap) ?? white, white], reflection ?? whiteCube)
     }
 
     /// `environment`'s parameters set, and its four maps' textures (micro
     /// detail, bump or specular mask, self-illumination, the cube), white
     /// where it has none.
-    mutating func environment(_ environment: RenderEnvironment, texture: (UInt32?) -> MTLTexture?,
-                              cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
-                              whiteCube: MTLTexture) -> [MTLTexture] {
+    mutating func environment(
+        _ environment: RenderEnvironment, texture: (UInt32?) -> MTLTexture?,
+        cube: (UInt32?) -> MTLTexture?, white: MTLTexture,
+        whiteCube: MTLTexture
+    ) -> [MTLTexture] {
         func rgb(_ values: [Float], _ fallback: Float) -> SIMD3<Float> {
             values.count == 3 ? SIMD3(values[0], values[1], values[2]) : SIMD3(repeating: fallback)
         }
@@ -153,15 +160,18 @@ struct MaterialUniforms {
         materialColor = SIMD4(rgb(environment.materialColor, 1), 1)
         plasmaOn = SIMD4(rgb(environment.plasmaOnColor, 0), 0)
         plasmaOff = SIMD4(rgb(environment.plasmaOffColor, 0), 0)
-        specularPerpendicular = SIMD4(rgb(environment.specularPerpendicularColor, 0),
-                                      environment.specularBrightness)
+        specularPerpendicular = SIMD4(
+            rgb(environment.specularPerpendicularColor, 0),
+            environment.specularBrightness)
         specularParallel = SIMD4(rgb(environment.specularParallelColor, 0), environment.lightmapBrightnessScale)
-        environmentScales = SIMD4(scale(environment.microDetailScale), scale(environment.bumpScale),
-                                  scale(environment.selfIlluminationScale),
-                                  environment.reflectionPerpendicularBrightness)
+        environmentScales = SIMD4(
+            scale(environment.microDetailScale), scale(environment.bumpScale),
+            scale(environment.selfIlluminationScale),
+            environment.reflectionPerpendicularBrightness)
         reflectionParallel = SIMD4(environment.reflectionParallelBrightness, 0, 0, 0)
-        self.environment = SIMD4(UInt32(environment.microDetailFunction), UInt32(environment.specularFlags),
-                                 UInt32(environment.reflectionKind), bits)
+        self.environment = SIMD4(
+            UInt32(environment.microDetailFunction), UInt32(environment.specularFlags),
+            UInt32(environment.reflectionKind), bits)
         return [micro ?? white, bump ?? mask ?? white, glow ?? white, reflection ?? whiteCube]
     }
 
@@ -178,15 +188,18 @@ struct MaterialUniforms {
 
     /// `material`'s chicago maps set, and their textures (four, white
     /// where a map has none), or nil for a material of another class.
-    mutating func chicago(_ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
-                          white: MTLTexture) -> [MTLTexture]? {
+    mutating func chicago(
+        _ material: RenderMaterial, texture: (UInt32?) -> MTLTexture?,
+        white: MTLTexture
+    ) -> [MTLTexture]? {
         let maps = material.chicagoMaps.prefix(4)
         guard !maps.isEmpty else { return nil }
         chicagoCount = UInt32(maps.count)
         var transforms = [SIMD4<Float>](repeating: .zero, count: 4)
         var textures = [MTLTexture](repeating: white, count: 4)
         for (stage, map) in maps.enumerated() {
-            chicagoFunctions[stage] = UInt32(map.colorFunction) | UInt32(map.alphaFunction) << 8
+            chicagoFunctions[stage] =
+                UInt32(map.colorFunction) | UInt32(map.alphaFunction) << 8
                 | (map.alphaReplicate ? 1 << 16 : 0)
             let scale = map.scale.count == 2 ? SIMD2(map.scale[0], map.scale[1]) : SIMD2<Float>(1, 1)
             let offset = map.offset.count == 2 ? SIMD2(map.offset[0], map.offset[1]) : SIMD2<Float>(0, 0)
@@ -482,8 +495,10 @@ public final class LevelRenderer {
     /// The level's fog (none without a sky), for tests.
     public var fog: RenderFog? { sky?.fog }
 
-    public init(device: MTLDevice, geometry: LevelGeometry, outputFormat: MTLPixelFormat = .bgra8Unorm,
-                settings: VideoSettings = VideoSettings(), source: String? = nil) throws {
+    public init(
+        device: MTLDevice, geometry: LevelGeometry, outputFormat: MTLPixelFormat = .bgra8Unorm,
+        settings: VideoSettings = VideoSettings(), source: String? = nil
+    ) throws {
         self.device = device
         self.outputFormat = outputFormat
         self.settings = settings
@@ -503,7 +518,8 @@ public final class LevelRenderer {
         textureCount = textures.compactMap { $0 }.count
         levelTextures = textures
         guard let white = Self.white(device), let whiteCube = Self.white(device, cube: true),
-              let whiteVolume = Self.whiteVolume(device) else {
+            let whiteVolume = Self.whiteVolume(device)
+        else {
             throw LevelRendererError.resources("textures")
         }
         self.white = white
@@ -526,10 +542,13 @@ public final class LevelRenderer {
         let indexCount = indexBytes.count / 4
         for draw in geometry.draws() {
             guard Int(draw.material) < materials.count,
-                  Int(draw.firstIndex) + Int(draw.indexCount) <= indexCount else { continue }
+                Int(draw.firstIndex) + Int(draw.indexCount) <= indexCount
+            else { continue }
             let material = materials[Int(draw.material)]
-            let maps = [texture(material.baseMap), texture(material.primaryDetailMap),
-                        texture(material.secondaryDetailMap), texture(draw.lightmap)]
+            let maps = [
+                texture(material.baseMap), texture(material.primaryDetailMap),
+                texture(material.secondaryDetailMap), texture(draw.lightmap),
+            ]
             var bits: UInt32 = 0
             for (bit, map) in zip([MapBit.base, MapBit.primary, MapBit.secondary, MapBit.lightmap], maps)
             where map != nil {
@@ -550,20 +569,24 @@ public final class LevelRenderer {
                 alphaTested: material.kind == .alphaTested ? 1 : 0, fogMode: FrameUniforms.fogMode(blend))
             let center = draw.center.count == 3 ? SIMD3(draw.center[0], draw.center[1], draw.center[2]) : .zero
             var bound: [MTLTexture]
-            if let shaded = uniforms.transparent(material, texture: texture, cube: cube, white: white,
-                                                 whiteCube: whiteCube) {
+            if let shaded = uniforms.transparent(
+                material, texture: texture, cube: cube, white: white,
+                whiteCube: whiteCube)
+            {
                 bound = shaded.maps + [white, white, white, shaded.cube]
             } else if let chicago = uniforms.chicago(material, texture: texture, white: white) {
                 bound = chicago + [white, white, white, whiteCube]
             } else {
                 bound = maps.map { $0 ?? white }
-                bound += material.environment.map {
-                    uniforms.environment($0, texture: texture, cube: cube, white: white, whiteCube: whiteCube)
-                } ?? [white, white, white, whiteCube]
+                bound +=
+                    material.environment.map {
+                        uniforms.environment($0, texture: texture, cube: cube, white: white, whiteCube: whiteCube)
+                    } ?? [white, white, white, whiteCube]
             }
-            let made = Draw(firstIndex: Int(draw.firstIndex), indexCount: Int(draw.indexCount),
-                            blend: blend, uniforms: uniforms, textures: bound + [white], center: center,
-                            material: Int(draw.material), lightmapPage: draw.lightmapPage)
+            let made = Draw(
+                firstIndex: Int(draw.firstIndex), indexCount: Int(draw.indexCount),
+                blend: blend, uniforms: uniforms, textures: bound + [white], center: center,
+                material: Int(draw.material), lightmapPage: draw.lightmapPage)
             if made.blend == nil {
                 opaqueDraws.append(made)
             } else {
@@ -575,24 +598,31 @@ public final class LevelRenderer {
 
         let library = try Self.library(device: device, source: source ?? ShaderSources.source(.level))
         vertexStride = Int(geometry.vertexStride())
-        (opaque, blended, tone, motion) = try Self.pipelines(device: device, library: library,
-                                                              stride: vertexStride, outputFormat: outputFormat)
+        (opaque, blended, tone, motion) = try Self.pipelines(
+            device: device, library: library,
+            stride: vertexStride, outputFormat: outputFormat)
         debug = try DebugPass(device: device, colorFormat: Self.frameFormat, depthFormat: Self.depthFormat)
-        models = try ModelPass(device: device, library: library, geometry: geometry, textures: textures, white: white,
-                               whiteCube: whiteCube)
-        shadows = try ShadowPass(device: device, library: library, levelStride: vertexStride,
-                                 modelStride: Int(geometry.modelVertexStride()))
-        picking = try PickPass(device: device, library: library, levelStride: vertexStride,
-                               modelStride: Int(geometry.modelVertexStride()))
+        models = try ModelPass(
+            device: device, library: library, geometry: geometry, textures: textures, white: white,
+            whiteCube: whiteCube)
+        shadows = try ShadowPass(
+            device: device, library: library, levelStride: vertexStride,
+            modelStride: Int(geometry.modelVertexStride()))
+        picking = try PickPass(
+            device: device, library: library, levelStride: vertexStride,
+            modelStride: Int(geometry.modelVertexStride()))
         lightPass = try LightPass(device: device, gels: geometry.lightGels().map(cube), whiteCube: whiteCube)
         screen = try ScreenPass(device: device, source: ShaderSources.source(.screen))
-        cameraPass = try CameraPass(device: device, source: ShaderSources.source(.camera),
-                                    images: geometry.cameraTextures().map { texture($0) })
-        decals = try DecalPass(device: device, source: ShaderSources.source(.decal), decals: geometry.decals(),
-                               texture: { texture($0) }, pictures: geometry.decalTextures().map { texture($0) })
+        cameraPass = try CameraPass(
+            device: device, source: ShaderSources.source(.camera),
+            images: geometry.cameraTextures().map { texture($0) })
+        decals = try DecalPass(
+            device: device, source: ShaderSources.source(.decal), decals: geometry.decals(),
+            texture: { texture($0) }, pictures: geometry.decalTextures().map { texture($0) })
         let details = geometry.detailObjects().withUnsafeBytes { Array($0.bindMemory(to: OCEParticleSnapshot.self)) }
-        particles = try ParticlePass(device: device, source: ShaderSources.source(.particle),
-                                     pictures: geometry.particleTextures().map { texture($0) }, details: details)
+        particles = try ParticlePass(
+            device: device, source: ShaderSources.source(.particle),
+            pictures: geometry.particleTextures().map { texture($0) }, details: details)
         exposureLimits = geometry.exposureLimits()
         sky = geometry.sky()
 
@@ -619,10 +649,11 @@ public final class LevelRenderer {
         nearestDescriptor.sAddressMode = .repeat
         nearestDescriptor.tAddressMode = .repeat
         guard let depthWrite = device.makeDepthStencilState(descriptor: write),
-              let depthTest = device.makeDepthStencilState(descriptor: test),
-              let wrap = device.makeSamplerState(descriptor: wrapDescriptor),
-              let clamp = device.makeSamplerState(descriptor: clampDescriptor),
-              let nearest = device.makeSamplerState(descriptor: nearestDescriptor) else {
+            let depthTest = device.makeDepthStencilState(descriptor: test),
+            let wrap = device.makeSamplerState(descriptor: wrapDescriptor),
+            let clamp = device.makeSamplerState(descriptor: clampDescriptor),
+            let nearest = device.makeSamplerState(descriptor: nearestDescriptor)
+        else {
             throw LevelRendererError.resources("depth and sampler states")
         }
         self.depthWrite = depthWrite
@@ -641,12 +672,15 @@ public final class LevelRenderer {
     }
 
     private static func pipelines(device: MTLDevice, library: MTLLibrary, stride: Int, outputFormat: MTLPixelFormat)
-        throws -> (MTLRenderPipelineState, [MTLRenderPipelineState], MTLRenderPipelineState, MTLRenderPipelineState) {
+        throws -> (MTLRenderPipelineState, [MTLRenderPipelineState], MTLRenderPipelineState, MTLRenderPipelineState)
+    {
         func pipeline(_ blend: BlendFunction?) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = try library.required("level_vertex")
-            descriptor.fragmentFunction = try library.required(blend == .tintAndAdd ? "transparent_fragment"
-                                                                                    : "level_fragment")
+            descriptor.fragmentFunction = try library.required(
+                blend == .tintAndAdd
+                    ? "transparent_fragment"
+                    : "level_fragment")
             descriptor.vertexDescriptor = Self.vertexDescriptor(stride: stride)
             descriptor.colorAttachments[0].pixelFormat = Self.frameFormat
             descriptor.depthAttachmentPixelFormat = Self.depthFormat
@@ -688,13 +722,16 @@ public final class LevelRenderer {
 
     private func compileShaders(source: String) throws {
         let library = try Self.library(device: device, source: source)
-        let level = try Self.pipelines(device: device, library: library, stride: vertexStride,
-                                       outputFormat: outputFormat)
+        let level = try Self.pipelines(
+            device: device, library: library, stride: vertexStride,
+            outputFormat: outputFormat)
         let objects = try models.pipelines(library: library)
-        let casting = try ShadowPass.pipelines(device: device, library: library, levelStride: vertexStride,
-                                               modelStride: Int(geometry.modelVertexStride()))
-        let pick = try PickPass.pipelines(device: device, library: library, levelStride: vertexStride,
-                                          modelStride: Int(geometry.modelVertexStride()))
+        let casting = try ShadowPass.pipelines(
+            device: device, library: library, levelStride: vertexStride,
+            modelStride: Int(geometry.modelVertexStride()))
+        let pick = try PickPass.pipelines(
+            device: device, library: library, levelStride: vertexStride,
+            modelStride: Int(geometry.modelVertexStride()))
         (opaque, blended, tone, motion) = level
         models.use(objects)
         shadows.use(casting)
@@ -733,25 +770,32 @@ public final class LevelRenderer {
     /// Draws the level and `objects` from `camera` into `target` (of
     /// `outputFormat`), `debugLines` in the world, and `hudQuads` and
     /// `uiQuads` over them.
-    public func encode(into commands: MTLCommandBuffer, target: MTLTexture, camera: ViewCamera,
-                       objects: [DrawnObject] = [], hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [],
-                       debugLines: [DebugSegment] = []) {
+    public func encode(
+        into commands: MTLCommandBuffer, target: MTLTexture, camera: ViewCamera,
+        objects: [DrawnObject] = [], hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [],
+        debugLines: [DebugSegment] = []
+    ) {
         let aspect = Float(target.width) / Float(max(target.height, 1))
         let viewProjection = camera.viewProjection(aspect: aspect)
         adaptExposure()
         let shown: MTLTexture
-        if settings.antiAliasing == .temporal, let temporal = temporalScaling(width: target.width,
-                                                                               height: target.height) {
+        if settings.antiAliasing == .temporal,
+            let temporal = temporalScaling(
+                width: target.width,
+                height: target.height)
+        {
             let jitter = Jitter.offset(frame: temporal.frame)
-            let jittered = Jitter.apply(jitter, to: viewProjection, width: temporal.inputWidth,
-                                        height: temporal.inputHeight)
+            let jittered = Jitter.apply(
+                jitter, to: viewProjection, width: temporal.inputWidth,
+                height: temporal.inputHeight)
             // (the scaler's input samples its maps as the output would, as
             // MetalFX asks: log2 of the scale, a level sharper at half)
             let mipBias = log2(Float(temporal.inputWidth) / Float(max(target.width, 1)))
             profiled("level", scopes) {
-                drawLevel(into: commands, frame: temporal.color, depth: temporal.depth, keepDepth: true,
-                          viewProjection: jittered, camera: camera, objects: objects, debugLines: debugLines,
-                          mipBias: mipBias)
+                drawLevel(
+                    into: commands, frame: temporal.color, depth: temporal.depth, keepDepth: true,
+                    viewProjection: jittered, camera: camera, objects: objects, debugLines: debugLines,
+                    mipBias: mipBias)
             }
             var uniforms = temporal.motionUniforms(current: viewProjection)
             let motionPass = MTLRenderPassDescriptor()
@@ -770,8 +814,9 @@ public final class LevelRenderer {
         } else {
             guard let (frame, depth) = targets(width: target.width, height: target.height) else { return }
             profiled("level", scopes) {
-                drawLevel(into: commands, frame: frame, depth: depth, keepDepth: false,
-                          viewProjection: viewProjection, camera: camera, objects: objects, debugLines: debugLines)
+                drawLevel(
+                    into: commands, frame: frame, depth: depth, keepDepth: false,
+                    viewProjection: viewProjection, camera: camera, objects: objects, debugLines: debugLines)
             }
             lastInputSize = (target.width, target.height)
             shown = frame
@@ -780,12 +825,14 @@ public final class LevelRenderer {
         if switches.exposure || switches.view == .luminance {
             cameraPass.encodeLuminance(into: commands, frame: shown)
         }
-        let bloom = switches.bloom || switches.view == .bloom
+        let bloom =
+            switches.bloom || switches.view == .bloom
             ? cameraPass.encodeBloom(into: commands, frame: shown) : nil
-        var toneUniforms = ToneUniforms(exposure: exp2(tuning.exposure - exposure),
-                                        bloom: switches.bloom ? CameraPass.bloomStrength * tuning.bloom : 0,
-                                        view: switches.view == .luminance ? 1 : switches.view == .bloom ? 2 : 0,
-                                        curve: tuning.toneCurve)
+        var toneUniforms = ToneUniforms(
+            exposure: exp2(tuning.exposure - exposure),
+            bloom: switches.bloom ? CameraPass.bloomStrength * tuning.bloom : 0,
+            view: switches.view == .luminance ? 1 : switches.view == .bloom ? 2 : 0,
+            curve: tuning.toneCurve)
 
         let tonePass = MTLRenderPassDescriptor()
         tonePass.colorAttachments[0].texture = target
@@ -815,21 +862,26 @@ public final class LevelRenderer {
         }
         guard let average = cameraPass.logLuminance(age: 1) else { return }
         let seconds = exposureTime.map { time - $0 } ?? 0
-        exposure = OpenCEEngineCore.adaptExposure(current: exposure, logLuminance: average, limits: exposureLimits,
-                                                  seconds: seconds)
+        exposure = OpenCEEngineCore.adaptExposure(
+            current: exposure, logLuminance: average, limits: exposureLimits,
+            seconds: seconds)
     }
 
     /// The level's opaque draws and the objects' then the blended ones of
     /// both into `frame`.
-    private func drawLevel(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, keepDepth: Bool,
-                           viewProjection: simd_float4x4, camera: ViewCamera, objects: [DrawnObject],
-                           debugLines: [DebugSegment], mipBias: Float = 0) {
+    private func drawLevel(
+        into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture, keepDepth: Bool,
+        viewProjection: simd_float4x4, camera: ViewCamera, objects: [DrawnObject],
+        debugLines: [DebugSegment], mipBias: Float = 0
+    ) {
         let skyObject = sky?.model.map { model in
-            DrawnObject(model: Int(model), transform: simd_float4x4(translation: camera.position),
-                        center: camera.position, radius: 1, regions: [], nodes: [])
+            DrawnObject(
+                model: Int(model), transform: simd_float4x4(translation: camera.position),
+                center: camera.position, radius: 1, regions: [], nodes: [])
         }
-        let prepared = models.prepare(switches.objects ? objects : [], sky: skyObject, camera: camera, viewportHeight: frame.height,
-                                      device: device)
+        let prepared = models.prepare(
+            switches.objects ? objects : [], sky: skyObject, camera: camera, viewportHeight: frame.height,
+            device: device)
         lastDrawn = (prepared, camera, Float(frame.width) / Float(max(frame.height, 1)))
         let animation = geometry.materialAnimation(seconds: time)
         var uniforms = FrameUniforms(viewProjection: viewProjection, camera: camera, fog: sky?.fog, mipBias: mipBias)
@@ -837,8 +889,9 @@ public final class LevelRenderer {
         uniforms.probeCounts = probeGrid.counts
         uniforms.sunTowards = sun.towards
         uniforms.sunColor = sun.color
-        uniforms.debug = SIMD4(switches.view == .albedo ? 1 : switches.view == .light ? 2 : 0,
-                               switches.lightmaps ? 0 : 1, 0, 0)
+        uniforms.debug = SIMD4(
+            switches.view == .albedo ? 1 : switches.view == .light ? 2 : 0,
+            switches.lightmaps ? 0 : 1, 0, 0)
         if !tuning.isStock {
             uniforms.tuneSun = SIMD4(tuning.sunColor * tuning.sun, 1)
             uniforms.tune = SIMD4(tuning.bounce, tuning.probes, tuning.emissive, 0)
@@ -851,20 +904,23 @@ public final class LevelRenderer {
             uniforms.sunTowards = .zero
             uniforms.sunColor = .zero
         }
-        let towards = sunShadows && uniforms.sunTowards.w > 0
+        let towards =
+            sunShadows && uniforms.sunTowards.w > 0
             ? SIMD3(sun.towards.x, sun.towards.y, sun.towards.z) : nil
         profiled("shadows", scopes) {
-            shadows.encode(into: commands, camera: camera, aspect: Float(frame.width) / Float(max(frame.height, 1)),
-                           towards: towards, wrap: wrap,
-                           level: { encoder, casting in self.encodeShadowCasters(encoder, casting) },
-                           objects: { encoder, casting in
-                               self.models.encodeShadowCasters(prepared, casting, into: encoder)
-                           })
+            shadows.encode(
+                into: commands, camera: camera, aspect: Float(frame.width) / Float(max(frame.height, 1)),
+                towards: towards, wrap: wrap,
+                level: { encoder, casting in self.encodeShadowCasters(encoder, casting) },
+                objects: { encoder, casting in
+                    self.models.encodeShadowCasters(prepared, casting, into: encoder)
+                })
         }
         var shadowUniforms = shadows.uniforms
         let lightFrame = profiled("lights", scopes) {
-            let lightFrame = lightPass.prepare(switches.lights ? lights : [], camera: camera,
-                                               aspect: Float(frame.width) / Float(max(frame.height, 1)))
+            let lightFrame = lightPass.prepare(
+                switches.lights ? lights : [], camera: camera,
+                aspect: Float(frame.width) / Float(max(frame.height, 1)))
             let casting = shadows.pipelines
             lightPass.encodeShadows(lightFrame, into: commands, wrap: wrap) { encoder in
                 self.encodeShadowCasters(encoder, casting.level)
@@ -873,13 +929,15 @@ public final class LevelRenderer {
             return lightFrame
         }
         let screenTargets = screen.targets(width: frame.width, height: frame.height)
-        let fullViewport = MTLViewport(originX: 0, originY: 0, width: Double(frame.width),
-                                       height: Double(frame.height), znear: 0, zfar: 1)
+        let fullViewport = MTLViewport(
+            originX: 0, originY: 0, width: Double(frame.width),
+            height: Double(frame.height), znear: 0, zfar: 1)
         // the first-person weapon and hands over the world: in the nearer
         // half of the depth range (reversed: 0.5 to 1), which the world
         // reaches only nearer the eye than twice the near plane
-        let nearViewport = MTLViewport(originX: 0, originY: 0, width: Double(frame.width),
-                                       height: Double(frame.height), znear: 0.5, zfar: 1)
+        let nearViewport = MTLViewport(
+            originX: 0, originY: 0, width: Double(frame.width),
+            height: Double(frame.height), znear: 0.5, zfar: 1)
         func bind(_ encoder: MTLRenderCommandEncoder) {
             encoder.setCullMode(.none)
             encoder.setTriangleFillMode(switches.wireframe ? .lines : .fill)
@@ -903,9 +961,11 @@ public final class LevelRenderer {
         pass.colorAttachments[0].texture = frame
         pass.colorAttachments[0].loadAction = .clear
         pass.colorAttachments[0].storeAction = .store
-        pass.colorAttachments[0].clearColor = uniforms.fogColor.w > 0
-            ? MTLClearColor(red: Double(uniforms.fogColor.x), green: Double(uniforms.fogColor.y),
-                            blue: Double(uniforms.fogColor.z), alpha: 1)
+        pass.colorAttachments[0].clearColor =
+            uniforms.fogColor.w > 0
+            ? MTLClearColor(
+                red: Double(uniforms.fogColor.x), green: Double(uniforms.fogColor.y),
+                blue: Double(uniforms.fogColor.z), alpha: 1)
             : Self.skyColor
         for (index, texture) in (screenTargets?.attachments ?? []).enumerated() {
             pass.colorAttachments[index + 1].texture = texture
@@ -918,7 +978,8 @@ public final class LevelRenderer {
         pass.depthAttachment.storeAction = .store
         pass.depthAttachment.clearDepth = 0
         guard screenTargets != nil,
-              let encoder = commands.timedRenderEncoder("level opaque", descriptor: pass) else { return }
+            let encoder = commands.timedRenderEncoder("level opaque", descriptor: pass)
+        else { return }
         bind(encoder)
         models.encodeSky(prepared, into: encoder)
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
@@ -939,17 +1000,20 @@ public final class LevelRenderer {
         // reflections from what the opaque pass left
         guard let screenTargets else { return }
         if switches.decals {
-            decals.encode(into: commands, frame: frame, depth: depth, surface: screenTargets.surface,
-                          viewProjection: viewProjection, eye: camera.position, laid: laidDecals)
+            decals.encode(
+                into: commands, frame: frame, depth: depth, surface: screenTargets.surface,
+                viewProjection: viewProjection, eye: camera.position, laid: laidDecals)
         }
-        let screenUniforms = ScreenUniforms(viewProjection: viewProjection, eye: camera.position,
-                                            sunTowards: towards == nil ? .zero : sun.towards, width: frame.width,
-                                            height: frame.height, switches: switches,
-                                            ambientOcclusion: tuning.ambientOcclusion)
+        let screenUniforms = ScreenUniforms(
+            viewProjection: viewProjection, eye: camera.position,
+            sunTowards: towards == nil ? .zero : sun.towards, width: frame.width,
+            height: frame.height, switches: switches,
+            ambientOcclusion: tuning.ambientOcclusion)
         let cameraFrame = profiled("screen", scopes) {
             screen.encode(into: commands, targets: screenTargets, frame: frame, depth: depth, uniforms: screenUniforms)
-            return cameraPass.encodeOcclusion(sprites, into: commands, depth: depth,
-                                              viewProjection: viewProjection, camera: camera)
+            return cameraPass.encodeOcclusion(
+                sprites, into: commands, depth: depth,
+                viewProjection: viewProjection, camera: camera)
         }
         lastSpriteCount = cameraFrame?.spriteCount ?? 0
 
@@ -990,21 +1054,24 @@ public final class LevelRenderer {
         if !prepared.firstPerson.isEmpty {
             blendedEncoder.setViewport(nearViewport)
             blendedEncoder.setDepthStencilState(depthTest)
-            models.encode(prepared, blendedParts: true, firstPerson: true, animation: animation,
-                          into: blendedEncoder)
+            models.encode(
+                prepared, blendedParts: true, firstPerson: true, animation: animation,
+                into: blendedEncoder)
             blendedEncoder.setViewport(fullViewport)
         }
         screen.view(screenTargets, uniforms: screenUniforms, into: blendedEncoder)
         blendedEncoder.endEncoding()
         if switches.particles {
             profiled("particles", scopes) {
-                particles.encode(into: commands, frame: frame, depth: depth, worldToClip: viewProjection,
-                                 eye: camera.position, right: camera.rotation.act([0, -1, 0]),
-                                 up: camera.rotation.act([0, 0, 1]), sprites: laidParticles,
-                                 lighting: ParticleLighting(probes: probes, probeOrigin: uniforms.probeOrigin,
-                                                            probeCounts: uniforms.probeCounts,
-                                                            sunTowards: uniforms.sunTowards,
-                                                            sunColor: uniforms.sunColor))
+                particles.encode(
+                    into: commands, frame: frame, depth: depth, worldToClip: viewProjection,
+                    eye: camera.position, right: camera.rotation.act([0, -1, 0]),
+                    up: camera.rotation.act([0, 0, 1]), sprites: laidParticles,
+                    lighting: ParticleLighting(
+                        probes: probes, probeOrigin: uniforms.probeOrigin,
+                        probeCounts: uniforms.probeCounts,
+                        sunTowards: uniforms.sunTowards,
+                        sunColor: uniforms.sunColor))
             }
         }
     }
@@ -1015,7 +1082,8 @@ public final class LevelRenderer {
         guard width > 0, height > 0 else { return nil }
         let input = settings.inputSize(width: width, height: height)
         if let temporal, temporal.outputWidth == width, temporal.outputHeight == height,
-           temporal.inputWidth == input.width, temporal.inputHeight == input.height {
+            temporal.inputWidth == input.width, temporal.inputHeight == input.height
+        {
             return temporal
         }
         guard supportsTemporal else { return nil }
@@ -1038,9 +1106,9 @@ public final class LevelRenderer {
         for page in light.pages() {
             let width = Int(page.width), height = Int(page.height)
             guard width > 0, height > 0, page.irradiance.count == width * height * 8,
-                  page.directions.count == width * height * 4,
-                  let irradiance = Self.texture2D(device, .rgba16Float, width, height, Array(page.irradiance), 8),
-                  let directions = Self.texture2D(device, .rgba8Unorm, width, height, Array(page.directions), 4)
+                page.directions.count == width * height * 4,
+                let irradiance = Self.texture2D(device, .rgba16Float, width, height, Array(page.irradiance), 8),
+                let directions = Self.texture2D(device, .rgba8Unorm, width, height, Array(page.directions), 4)
             else {
                 throw LevelRendererError.resources("baked lightmap \(page.page)")
             }
@@ -1057,8 +1125,10 @@ public final class LevelRenderer {
                 volumes.append(volume)
             }
             probes = volumes
-            probeGrid = (SIMD4(origin[0], origin[1], origin[2], 1 / max(light.probeSpacing(), 1e-3)),
-                         SIMD4(Float(counts[0]), Float(counts[1]), Float(counts[2]), 1))
+            probeGrid = (
+                SIMD4(origin[0], origin[1], origin[2], 1 / max(light.probeSpacing(), 1e-3)),
+                SIMD4(Float(counts[0]), Float(counts[1]), Float(counts[2]), 1)
+            )
         }
         let towards = light.sunTowards(), color = light.sunIrradiance()
         if towards.count == 3, color.count == 3 {
@@ -1068,8 +1138,11 @@ public final class LevelRenderer {
         let positions = light.reflectionPositions()
         let probeCount = positions.count / 3
         if probeCount > 0 {
-            guard let cubes = Self.cubeArray(device, size: size, count: probeCount,
-                                             bytes: Array(light.reflectionBytes())) else {
+            guard
+                let cubes = Self.cubeArray(
+                    device, size: size, count: probeCount,
+                    bytes: Array(light.reflectionBytes()))
+            else {
                 throw LevelRendererError.resources("baked reflection probes")
             }
             reflections = cubes
@@ -1079,7 +1152,8 @@ public final class LevelRenderer {
         }
         func bake(_ draw: inout Draw) {
             guard let page = draw.lightmapPage.flatMap({ pages[$0] }), draw.uniforms.maps & MapBit.lightmap != 0,
-                  draw.uniforms.chicagoCount == 0, draw.uniforms.transparent.x == 0 else { return }
+                draw.uniforms.chicagoCount == 0, draw.uniforms.transparent.x == 0
+            else { return }
             draw.stockLightmap = draw.stockLightmap ?? draw.textures[3]
             draw.textures[3] = page.irradiance
             draw.textures[8] = page.directions
@@ -1100,14 +1174,18 @@ public final class LevelRenderer {
     }
 
     /// A shared 2D texture of `bytes`, `texel` bytes a texel.
-    static func texture2D(_ device: MTLDevice, _ format: MTLPixelFormat, _ width: Int, _ height: Int,
-                          _ bytes: [UInt8], _ texel: Int) -> MTLTexture? {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width, height: height,
-                                                                  mipmapped: false)
+    static func texture2D(
+        _ device: MTLDevice, _ format: MTLPixelFormat, _ width: Int, _ height: Int,
+        _ bytes: [UInt8], _ texel: Int
+    ) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: format, width: width, height: height,
+            mipmapped: false)
         descriptor.usage = .shaderRead
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
-        texture.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: bytes,
-                        bytesPerRow: width * texel)
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: bytes,
+            bytesPerRow: width * texel)
         return texture
     }
 
@@ -1120,8 +1198,9 @@ public final class LevelRenderer {
         (descriptor.width, descriptor.height, descriptor.depth) = (counts[0], counts[1], counts[2])
         descriptor.usage = .shaderRead
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
-        texture.replace(region: MTLRegionMake3D(0, 0, 0, counts[0], counts[1], counts[2]), mipmapLevel: 0, slice: 0,
-                        withBytes: bytes, bytesPerRow: counts[0] * 8, bytesPerImage: counts[0] * counts[1] * 8)
+        texture.replace(
+            region: MTLRegionMake3D(0, 0, 0, counts[0], counts[1], counts[2]), mipmapLevel: 0, slice: 0,
+            withBytes: bytes, bytesPerRow: counts[0] * 8, bytesPerImage: counts[0] * counts[1] * 8)
         return texture
     }
 
@@ -1139,8 +1218,9 @@ public final class LevelRenderer {
         bytes.withUnsafeBytes { raw in
             guard let base = raw.baseAddress else { return }
             for slice in 0..<(count * 6) {
-                texture.replace(region: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0, slice: slice,
-                                withBytes: base + slice * face, bytesPerRow: size * 8, bytesPerImage: face)
+                texture.replace(
+                    region: MTLRegionMake2D(0, 0, size, size), mipmapLevel: 0, slice: slice,
+                    withBytes: base + slice * face, bytesPerRow: size * 8, bytesPerImage: face)
             }
         }
         return texture
@@ -1165,15 +1245,19 @@ public final class LevelRenderer {
         guard let (prepared, camera, aspect) = lastDrawn, (0..<width).contains(x), (0..<height).contains(y) else {
             return nil
         }
-        let matrix = PickPass.narrowing(x: x, y: y, width: width, height: height)
+        let matrix =
+            PickPass.narrowing(x: x, y: y, width: width, height: height)
             * camera.viewProjection(aspect: aspect)
-        return picking.pick(matrix: matrix, level: { encoder in
-            encoder.setVertexBuffer(self.vertices, offset: 0, index: 0)
-            for draw in self.opaqueDraws {
-                encoder.drawIndexedPrimitives(type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
-                                              indexBuffer: self.indices, indexBufferOffset: draw.firstIndex * 4)
-            }
-        }, objects: { encoder in self.models.encodePick(prepared, into: encoder) })
+        return picking.pick(
+            matrix: matrix,
+            level: { encoder in
+                encoder.setVertexBuffer(self.vertices, offset: 0, index: 0)
+                for draw in self.opaqueDraws {
+                    encoder.drawIndexedPrimitives(
+                        type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
+                        indexBuffer: self.indices, indexBufferOffset: draw.firstIndex * 4)
+                }
+            }, objects: { encoder in self.models.encodePick(prepared, into: encoder) })
     }
 
     /// The level's opaque and alpha-tested surfaces, as the sun's
@@ -1193,8 +1277,9 @@ public final class LevelRenderer {
                 encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
                 encoder.setFragmentTexture(draw.textures.first, index: 0)
             }
-            encoder.drawIndexedPrimitives(type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
-                                          indexBuffer: indices, indexBufferOffset: draw.firstIndex * 4)
+            encoder.drawIndexedPrimitives(
+                type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
+                indexBuffer: indices, indexBufferOffset: draw.firstIndex * 4)
         }
     }
 
@@ -1210,8 +1295,9 @@ public final class LevelRenderer {
         }
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
         encoder.setFragmentTextures(textures, range: 0..<textures.count)
-        encoder.drawIndexedPrimitives(type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
-                                      indexBuffer: indices, indexBufferOffset: draw.firstIndex * 4)
+        encoder.drawIndexedPrimitives(
+            type: .triangle, indexCount: draw.indexCount, indexType: .uint32,
+            indexBuffer: indices, indexBufferOffset: draw.firstIndex * 4)
     }
 
     /// The half-float frame and the depth buffer, made again when the
@@ -1221,19 +1307,25 @@ public final class LevelRenderer {
             return targets
         }
         guard width > 0, height > 0 else { return nil }
-        let frame = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Self.frameFormat, width: width,
-                                                             height: height, mipmapped: false)
+        let frame = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: Self.frameFormat, width: width,
+            height: height, mipmapped: false)
         frame.usage = [.renderTarget, .shaderRead]
         frame.storageMode = .private
-        let depth = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Self.depthFormat, width: width,
-                                                             height: height, mipmapped: false)
+        let depth = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: Self.depthFormat, width: width,
+            height: height, mipmapped: false)
         depth.usage = [.renderTarget, .shaderRead]
         depth.storageMode = .private
-        guard let (frameTexture, depthTexture) = HitchLog.shared.note(.allocation, "frame targets \(width)×\(height)", {
-            device.makeTexture(descriptor: frame).flatMap { made in
-                device.makeTexture(descriptor: depth).map { (made, $0) }
-            }
-        }) else { return nil }
+        guard
+            let (frameTexture, depthTexture) = HitchLog.shared.note(
+                .allocation, "frame targets \(width)×\(height)",
+                {
+                    device.makeTexture(descriptor: frame).flatMap { made in
+                        device.makeTexture(descriptor: depth).map { (made, $0) }
+                    }
+                })
+        else { return nil }
         targets = (frameTexture, depthTexture)
         return targets
     }
@@ -1252,8 +1344,10 @@ public final class LevelRenderer {
         let descriptor = MTLVertexDescriptor()
         // position, normal, texcoord, lightmap texcoord, tangent, binormal
         // and the incident light (RenderLevel's VERTEX_STRIDE)
-        let attributes: [(MTLVertexFormat, Int)] = [(.float3, 0), (.float3, 12), (.float2, 24), (.float2, 32),
-                                                    (.float3, 40), (.float3, 52), (.float3, 64)]
+        let attributes: [(MTLVertexFormat, Int)] = [
+            (.float3, 0), (.float3, 12), (.float2, 24), (.float2, 32),
+            (.float3, 40), (.float3, 52), (.float3, 64),
+        ]
         for (index, (format, offset)) in attributes.enumerated() {
             descriptor.attributes[index].format = format
             descriptor.attributes[index].offset = offset
@@ -1276,8 +1370,10 @@ public final class LevelRenderer {
 
     /// A texture with its levels, or nil if the GPU cannot take its format
     /// or a level's bytes are short.
-    static func texture(_ device: MTLDevice, _ texture: RenderTexture,
-                        level bytes: (UInt32) -> Data) -> MTLTexture? {
+    static func texture(
+        _ device: MTLDevice, _ texture: RenderTexture,
+        level bytes: (UInt32) -> Data
+    ) -> MTLTexture? {
         let format: MTLPixelFormat
         switch texture.format {
         case .bc1: format = .bc1_rgba
@@ -1294,10 +1390,12 @@ public final class LevelRenderer {
         }
         let fullChain = Int(log2(Double(max(width, height)))) + 1
         let levels = min(Int(texture.levelCount), fullChain)
-        let descriptor = faces == 6
+        let descriptor =
+            faces == 6
             ? MTLTextureDescriptor.textureCubeDescriptor(pixelFormat: format, size: width, mipmapped: levels > 1)
-            : MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: width, height: height,
-                                                       mipmapped: levels > 1)
+            : MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: format, width: width, height: height,
+                mipmapped: levels > 1)
         descriptor.mipmapLevelCount = levels
         descriptor.usage = .shaderRead
         descriptor.storageMode = .shared
@@ -1313,9 +1411,10 @@ public final class LevelRenderer {
                 guard let base = raw.baseAddress else { return }
                 // (a cube's faces in turn, +x, -x, +y, -y, +z, -z: Metal's slices)
                 for face in 0..<faces {
-                    made.replace(region: MTLRegionMake2D(0, 0, levelWidth, levelHeight), mipmapLevel: level,
-                                 slice: face, withBytes: base + face * faceBytes, bytesPerRow: rowBytes,
-                                 bytesPerImage: faceBytes)
+                    made.replace(
+                        region: MTLRegionMake2D(0, 0, levelWidth, levelHeight), mipmapLevel: level,
+                        slice: face, withBytes: base + face * faceBytes, bytesPerRow: rowBytes,
+                        bytesPerImage: faceBytes)
                 }
             }
         }
@@ -1325,17 +1424,20 @@ public final class LevelRenderer {
     /// One white texel (on each face of a cube), bound where a map is
     /// missing.
     static func white(_ device: MTLDevice, cube: Bool = false) -> MTLTexture? {
-        let descriptor = cube
+        let descriptor =
+            cube
             ? MTLTextureDescriptor.textureCubeDescriptor(pixelFormat: .rgba8Unorm, size: 1, mipmapped: false)
-            : MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 1, height: 1,
-                                                       mipmapped: false)
+            : MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .rgba8Unorm, width: 1, height: 1,
+                mipmapped: false)
         descriptor.usage = .shaderRead
         descriptor.storageMode = .shared
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
         let white: [UInt8] = [255, 255, 255, 255]
         for face in 0..<(cube ? 6 : 1) {
-            texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, slice: face, withBytes: white,
-                            bytesPerRow: 4, bytesPerImage: 4)
+            texture.replace(
+                region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, slice: face, withBytes: white,
+                bytesPerRow: 4, bytesPerImage: 4)
         }
         return texture
     }

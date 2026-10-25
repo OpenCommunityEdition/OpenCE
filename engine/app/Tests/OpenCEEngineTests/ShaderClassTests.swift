@@ -37,8 +37,9 @@ final class ShaderClassTests: XCTestCase {
         let normal = -simd_normalize(cross)
         let middle = (corners[0] + corners[1] + corners[2]) / 3
         let look = -normal
-        return ViewCamera(position: middle + normal * distance, yaw: atan2(look.y, look.x),
-                          pitch: asin(min(max(look.z, -0.999), 0.999)), verticalFov: 70 * .pi / 180)
+        return ViewCamera(
+            position: middle + normal * distance, yaw: atan2(look.y, look.x),
+            pitch: asin(min(max(look.z, -0.999), 0.999)), verticalFov: 70 * .pi / 180)
     }
 
     /// Each class's largest draw, seen in front of its largest triangle
@@ -49,9 +50,10 @@ final class ShaderClassTests: XCTestCase {
         func position(_ vertex: UInt32) -> SIMD3<Float> {
             vertices.withUnsafeBytes { raw in
                 let at = Int(vertex) * stride
-                return SIMD3(raw.loadUnaligned(fromByteOffset: at, as: Float.self),
-                             raw.loadUnaligned(fromByteOffset: at + 4, as: Float.self),
-                             raw.loadUnaligned(fromByteOffset: at + 8, as: Float.self))
+                return SIMD3(
+                    raw.loadUnaligned(fromByteOffset: at, as: Float.self),
+                    raw.loadUnaligned(fromByteOffset: at + 4, as: Float.self),
+                    raw.loadUnaligned(fromByteOffset: at + 8, as: Float.self))
             }
         }
         func index(_ at: Int) -> UInt32 {
@@ -86,8 +88,10 @@ final class ShaderClassTests: XCTestCase {
         bytes.withUnsafeBytes { raw in
             for at in Swift.stride(from: 0, to: raw.count - 63, by: 64) {
                 func word(_ index: Int) -> Float { raw.loadUnaligned(fromByteOffset: at + index * 4, as: Float.self) }
-                let corners = [SIMD3(word(0), word(1), word(2)), SIMD3(word(4), word(5), word(6)),
-                               SIMD3(word(8), word(9), word(10))]
+                let corners = [
+                    SIMD3(word(0), word(1), word(2)), SIMD3(word(4), word(5), word(6)),
+                    SIMD3(word(8), word(9), word(10)),
+                ]
                 let power = (0.2126 * word(12) + 0.7152 * word(13) + 0.0722 * word(14)) * word(7)
                 emitters.append((power, corners))
             }
@@ -99,7 +103,8 @@ final class ShaderClassTests: XCTestCase {
 
     func testNoShaderClassOrGlowDrawsBlack() throws {
         let level = try StockLevel(map: "bloodgulch")
-        let light = try LightBaker.bake(try level.geometry.bakePlan(quick: false), tracer: PathTracer(device: level.device))
+        let light = try LightBaker.bake(
+            try level.geometry.bakePlan(quick: false), tracer: PathTracer(device: level.device))
         let views = classViews(level.geometry) + emitterViews(try level.geometry.bakeScene(), count: 3)
         XCTAssertGreaterThanOrEqual(views.filter { !$0.0.hasPrefix("emitter") }.count, 2, "\(views.map(\.0))")
         XCTAssertEqual(views.filter { $0.0.hasPrefix("emitter") }.count, 3, "Blood Gulch's cave fungus glows")
@@ -112,13 +117,15 @@ final class ShaderClassTests: XCTestCase {
                 let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
                 try renderer.useBakedLighting(light)
                 renderer.switches.view = stock ? .stock : .frame
-                shots[stock] = try renderer.capture(width: 480, height: 270, camera: camera, frames: 8,
-                                                    objects: level.objects, queue: level.queue)
+                shots[stock] = try renderer.capture(
+                    width: 480, height: 270, camera: camera, frames: 8,
+                    objects: level.objects, queue: level.queue)
             }
             let baked = exposure.stats(shots[false]!), stock = exposure.stats(shots[true]!)
             let glow = name.hasPrefix("emitter")
-            XCTAssertLessThanOrEqual(baked.black, stock.black + (glow ? 0.005 : 0.0005),
-                                     "\(name): \(baked.black) black against \(stock.black)")
+            XCTAssertLessThanOrEqual(
+                baked.black, stock.black + (glow ? 0.005 : 0.0005),
+                "\(name): \(baked.black) black against \(stock.black)")
             if glow {
                 XCTAssertGreaterThan(baked.mean, stock.mean / 2, "\(name): mean \(baked.mean) against \(stock.mean)")
             }

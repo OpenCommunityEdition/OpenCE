@@ -79,8 +79,9 @@ public struct HudArt {
             guard let texture = Self.texture(url, device: device) else {
                 throw HudArtError.layout("\(asset.name).png could not be read")
             }
-            entries[key(asset.tag, asset.bitmap)] = Entry(texture: texture,
-                                                          kind: HudTextureKind(cells: asset.cells.map(\.kind)))
+            entries[key(asset.tag, asset.bitmap)] = Entry(
+                texture: texture,
+                kind: HudTextureKind(cells: asset.cells.map(\.kind)))
             made.append(texture)
         }
         // (the redraws are 8x the size they are drawn at in a 1080p window)
@@ -100,13 +101,15 @@ public struct HudArt {
     /// alpha as Core Graphics would draw them).
     static func texture(_ url: URL, device: MTLDevice) -> MTLTexture? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil), image.bitsPerComponent == 8,
-              let pixels = image.dataProvider?.data as Data? else { return nil }
+            let image = CGImageSourceCreateImageAtIndex(source, 0, nil), image.bitsPerComponent == 8,
+            let pixels = image.dataProvider?.data as Data?
+        else { return nil }
         let width = image.width, height = image.height
         let channels = image.bitsPerPixel / 8
         let alphaFirst = [.first, .premultipliedFirst, .noneSkipFirst].contains(image.alphaInfo)
         guard (1...4).contains(channels), image.bytesPerRow >= width * channels,
-              pixels.count >= image.bytesPerRow * height else { return nil }
+            pixels.count >= image.bytesPerRow * height
+        else { return nil }
         var rgba = [UInt8](repeating: 255, count: width * height * 4)
         pixels.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
             for y in 0..<height {
@@ -129,12 +132,14 @@ public struct HudArt {
                 }
             }
         }
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: width,
-                                                                  height: height, mipmapped: true)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm, width: width,
+            height: height, mipmapped: true)
         descriptor.usage = .shaderRead
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
-        texture.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: rgba,
-                        bytesPerRow: width * 4)
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: rgba,
+            bytesPerRow: width * 4)
         return texture
     }
 }
@@ -167,12 +172,15 @@ public final class HudPass {
     public private(set) var lastDrawn = 0
     public private(set) var lastMissing: Set<String> = []
 
-    public init(device: MTLDevice, art: HudArt, outputFormat: MTLPixelFormat,
-                source: String? = nil) throws {
+    public init(
+        device: MTLDevice, art: HudArt, outputFormat: MTLPixelFormat,
+        source: String? = nil
+    ) throws {
         self.art = art
         self.outputFormat = outputFormat
-        pipeline = try Self.pipeline(device: device, source: source ?? ShaderSources.source(.hud),
-                                     outputFormat: outputFormat)
+        pipeline = try Self.pipeline(
+            device: device, source: source ?? ShaderSources.source(.hud),
+            outputFormat: outputFormat)
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .linear
         samplerDescriptor.magFilter = .linear
@@ -185,8 +193,10 @@ public final class HudPass {
         self.sampler = sampler
     }
 
-    private static func pipeline(device: MTLDevice, source: String,
-                                 outputFormat: MTLPixelFormat) throws -> MTLRenderPipelineState {
+    private static func pipeline(
+        device: MTLDevice, source: String,
+        outputFormat: MTLPixelFormat
+    ) throws -> MTLRenderPipelineState {
         do {
             let library = try device.makeLibrary(source: source, options: nil)
             let descriptor = MTLRenderPipelineDescriptor()
@@ -230,12 +240,13 @@ public final class HudPass {
             let x = { (pixels: Float) in pixels / Float(width) * 2 - 1 }
             let y = { (pixels: Float) in 1 - pixels / Float(height) * 2 }
             let meter = quad.meter
-            instances.append(HudInstance(
-                rect: SIMD4(x(quad.left), y(quad.top), x(quad.right), y(quad.bottom)),
-                uv: SIMD4(quad.u0, quad.v0, quad.u1, quad.v1), color: Self.color(quad.color),
-                minColor: Self.color(meter?.minColor ?? 0), maxColor: Self.color(meter?.maxColor ?? 0),
-                emptyColor: Self.color(meter?.emptyColor ?? 0),
-                parameters: SIMD4(meter.map { min(max($0.threshold, 0), 1) } ?? -1, entry.kind.rawValue, 0, 0)))
+            instances.append(
+                HudInstance(
+                    rect: SIMD4(x(quad.left), y(quad.top), x(quad.right), y(quad.bottom)),
+                    uv: SIMD4(quad.u0, quad.v0, quad.u1, quad.v1), color: Self.color(quad.color),
+                    minColor: Self.color(meter?.minColor ?? 0), maxColor: Self.color(meter?.maxColor ?? 0),
+                    emptyColor: Self.color(meter?.emptyColor ?? 0),
+                    parameters: SIMD4(meter.map { min(max($0.threshold, 0), 1) } ?? -1, entry.kind.rawValue, 0, 0)))
             if let last = runs.last, last.texture === entry.texture {
                 runs[runs.count - 1].count += 1
             } else {
@@ -260,8 +271,9 @@ public final class HudPass {
         encoder.setFragmentSamplerState(sampler, index: 0)
         for run in runs {
             encoder.setFragmentTexture(run.texture, index: 0)
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: run.count,
-                                   baseInstance: run.first)
+            encoder.drawPrimitives(
+                type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: run.count,
+                baseInstance: run.first)
         }
         lastDrawn = instances.count
     }

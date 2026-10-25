@@ -23,5 +23,7 @@ def test_the_setting_is_documented():
 def test_the_game_draws_it_once_a_frame():
     # after the game's frame statistics, once for all the windows
     source = (ROOT / "source/rasterizer/xbox/rasterizer_xbox.c").read_text()
-    assert "rasterizer_frame_statistics_draw();\n\t\t/* port: display.frame_time's overlay */\n\t\tframe_time_draw();" \
+    assert (
+        "rasterizer_frame_statistics_draw();\n\t\t/* port: display.frame_time's overlay */\n\t\tframe_time_draw();"
         in source
+    )

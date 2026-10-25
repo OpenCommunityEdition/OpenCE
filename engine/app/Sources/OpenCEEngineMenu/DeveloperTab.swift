@@ -151,18 +151,24 @@ struct DeveloperTab: View {
             }
             Section("Switches") {
                 ForEach(model.switches, id: \.name) { variable in
-                    Toggle(variable.name, isOn: Binding(get: { model.isOn(variable) },
-                                                        set: { model.set(variable, on: $0) }))
-                        .help(variable.help)
+                    Toggle(
+                        variable.name,
+                        isOn: Binding(
+                            get: { model.isOn(variable) },
+                            set: { model.set(variable, on: $0) })
+                    )
+                    .help(variable.help)
                 }
             }
             Section("Lighting") {
                 ForEach(model.tuning, id: \.name) { control in
                     HStack {
                         Text(control.name).frame(width: 120, alignment: .leading)
-                        Slider(value: Binding(get: { model.value(control) },
-                                              set: { model.set(control, to: ($0 * 100).rounded() / 100) }),
-                               in: control.minimum...control.maximum)
+                        Slider(
+                            value: Binding(
+                                get: { model.value(control) },
+                                set: { model.set(control, to: ($0 * 100).rounded() / 100) }),
+                            in: control.minimum...control.maximum)
                         Text(String(format: "%.2f", model.value(control)))
                             .monospacedDigit().frame(width: 44, alignment: .trailing)
                         Button("Reset") { model.set(control, to: control.defaultValue) }

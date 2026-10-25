@@ -40,7 +40,9 @@ def symbol_table(objects: List[str]) -> Dict[str, Set[str]]:
     """Map each object symbol name to the set of nm type letters seen."""
     output = subprocess.run(
         [NM, "--format=posix", *objects],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout
     symbols: Dict[str, Set[str]] = {}
     for line in output.splitlines():
@@ -61,26 +63,26 @@ def main() -> None:
     missing = sorted(
         name
         for name, types in symbols.items()
-        if types & {"w", "v"}
-        and not types & defined_types
-        and name not in RUNTIME_WEAK_REFERENCES
+        if types & {"w", "v"} and not types & defined_types and name not in RUNTIME_WEAK_REFERENCES
     )
     if len(sys.argv) > 2:
         imports = subprocess.run(
             [NM, "--undefined-only", sys.argv[2]],
-            check=True, capture_output=True, text=True,
+            check=True,
+            capture_output=True,
+            text=True,
         ).stdout.split()
         wide = sorted(
-            name for name in imports
-            if re.match(r"(wcs|wmem|[a-z]*wprintf|towlower|towupper|isw)", name.split("@")[0])
+            name for name in imports if re.match(r"(wcs|wmem|[a-z]*wprintf|towlower|towupper|isw)", name.split("@")[0])
         )
         if wide:
-            print("the executable imports glibc wide character functions, which assume "
-                  "a 32-bit wchar_t: " + ", ".join(wide))
+            print(
+                "the executable imports glibc wide character functions, which assume "
+                "a 32-bit wchar_t: " + ", ".join(wide)
+            )
             sys.exit(1)
     if missing:
-        print(f"{len(missing)} weak reference(s) that no object defines "
-              "(they would silently resolve to address 0):")
+        print(f"{len(missing)} weak reference(s) that no object defines (they would silently resolve to address 0):")
         for name in missing:
             print(f"  {name}")
         sys.exit(1)

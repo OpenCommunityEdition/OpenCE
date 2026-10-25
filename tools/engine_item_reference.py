@@ -29,8 +29,12 @@ from harness import function, read  # noqa: E402
 OUTPUT = ROOT / "engine" / "crates" / "sim" / "tests" / "item_reference.txt"
 
 ITEM_FUNCTIONS = [
-    "item_rested_surface_index", "item_rested_surface", "item_set_rested_surface",
-    "item_adjust_for_angular_velocity_change", "item_accelerate", "item_align_to_normal_and_point",
+    "item_rested_surface_index",
+    "item_rested_surface",
+    "item_set_rested_surface",
+    "item_adjust_for_angular_velocity_change",
+    "item_accelerate",
+    "item_align_to_normal_and_point",
     "item_update",
 ]
 
@@ -502,18 +506,22 @@ def source_file():
     items_c = read("source/items/items.c")
     real_math_c = read("source/math/real_math.c")
     random_math_c = read("source/math/random_math.c")
-    gravity = items_c[items_c.index("static real const item_maximum_impact_velocity"):]
-    gravity = gravity[:gravity.index(";") + 1]
-    helpers = [function(real_math_c, "rotate_vector_about_axis"),
-               function(real_math_c, "quaternion_transform_point"),
-               function(random_math_c, "real_seed_random")]
-    prototypes = "\n".join([
-        "void item_accelerate(long item_index, real_vector3d const *acceleration, boolean detonates_explosives);",
-        "static void item_align_to_normal_and_point(long item_index, real_vector3d const *normal,"
-        " real_point3d const *position, real_point3d *new_position);",
-        "static void item_adjust_for_angular_velocity_change(long item_index);",
-        "static struct profile_section item_update_section;",
-    ])
+    gravity = items_c[items_c.index("static real const item_maximum_impact_velocity") :]
+    gravity = gravity[: gravity.index(";") + 1]
+    helpers = [
+        function(real_math_c, "rotate_vector_about_axis"),
+        function(real_math_c, "quaternion_transform_point"),
+        function(random_math_c, "real_seed_random"),
+    ]
+    prototypes = "\n".join(
+        [
+            "void item_accelerate(long item_index, real_vector3d const *acceleration, boolean detonates_explosives);",
+            "static void item_align_to_normal_and_point(long item_index, real_vector3d const *normal,"
+            " real_point3d const *position, real_point3d *new_position);",
+            "static void item_adjust_for_angular_velocity_change(long item_index);",
+            "static struct profile_section item_update_section;",
+        ]
+    )
     definitions = [function(items_c, name) for name in ITEM_FUNCTIONS]
     return "\n\n".join([FAKE_WORLD, *helpers, gravity, prototypes, *definitions, MAIN])
 
@@ -525,20 +533,20 @@ def reference():
         executable = Path(work) / "item_reference"
         source.write_text(source_file())
         compiler = os.environ.get("CC", "clang")
-        command = [compiler, "-std=gnu99", "-O1", "-ffp-contract=off", "-w", str(source), "-o", str(executable),
-                   "-lm"]
+        command = [compiler, "-std=gnu99", "-O1", "-ffp-contract=off", "-w", str(source), "-o", str(executable), "-lm"]
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode:
             raise SystemExit(f"the reference does not compile:\n{result.stderr}")
         output = subprocess.run([str(executable)], capture_output=True, text=True, check=True).stdout
-    item = ("<position> <velocity> <forward> <up> <angular velocity> <at rest> <detonation ticks>")
-    return ("# The game's item motion (tools/engine_item_reference.py): one item over the plane through the\n"
-            "# origin, its ground point marker its own frame, the seed 0xdeadbeef. Each line ends with the item\n"
-            f"# after it: | {item}\n"
-            "# case <name> <definition flags> <plane normal> | ...\n"
-            "# tick [impact <point> <scale>] [sound <position>] [detonated] | ...\n"
-            "# push <acceleration> | ...\n"
-            + output)
+    item = "<position> <velocity> <forward> <up> <angular velocity> <at rest> <detonation ticks>"
+    return (
+        "# The game's item motion (tools/engine_item_reference.py): one item over the plane through the\n"
+        "# origin, its ground point marker its own frame, the seed 0xdeadbeef. Each line ends with the item\n"
+        f"# after it: | {item}\n"
+        "# case <name> <definition flags> <plane normal> | ...\n"
+        "# tick [impact <point> <scale>] [sound <position>] [detonated] | ...\n"
+        "# push <acceleration> | ...\n" + output
+    )
 
 
 def main():

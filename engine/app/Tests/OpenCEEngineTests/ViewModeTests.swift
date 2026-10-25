@@ -13,22 +13,26 @@ import XCTest
 final class ViewModeTests: XCTestCase {
     /// The frame of a new renderer (a frame drawn after another carries its
     /// history), with `change` made to the stock switches.
-    func capture(_ level: StockLevel, bake: BakedLight? = nil, hud: [HudQuad] = [], objects: [DrawnObject]? = nil,
-                 _ change: (inout RenderSwitches) -> Void = { _ in }) throws -> CapturedFrame {
+    func capture(
+        _ level: StockLevel, bake: BakedLight? = nil, hud: [HudQuad] = [], objects: [DrawnObject]? = nil,
+        _ change: (inout RenderSwitches) -> Void = { _ in }
+    ) throws -> CapturedFrame {
         let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
         if let bake {
             try renderer.useBakedLighting(bake)
         }
         if !hud.isEmpty {
-            let art = try HudArt.load(folder: StockLevel.root.appendingPathComponent("port/assets/hud"),
-                                      device: level.device, queue: level.queue)
+            let art = try HudArt.load(
+                folder: StockLevel.root.appendingPathComponent("port/assets/hud"),
+                device: level.device, queue: level.queue)
             renderer.hud = try HudPass(device: level.device, art: art, outputFormat: .bgra8Unorm)
         }
         var switches = RenderSwitches()
         change(&switches)
         renderer.switches = switches
-        return try renderer.capture(width: 480, height: 270, camera: level.camera, objects: objects ?? level.objects,
-                                    hudQuads: hud, queue: level.queue)
+        return try renderer.capture(
+            width: 480, height: 270, camera: level.camera, objects: objects ?? level.objects,
+            hudQuads: hud, queue: level.queue)
     }
 
     func share(_ a: CapturedFrame, _ b: CapturedFrame) throws -> Double {
@@ -55,8 +59,9 @@ final class ViewModeTests: XCTestCase {
         for (name, drawn) in frames {
             try write(drawn, name)
             // (few objects stand in the start view)
-            XCTAssertGreaterThan(try share(drawn, frame), name == "no_objects" ? 0.0005 : 0.01,
-                                 "\(name) draws the stock frame")
+            XCTAssertGreaterThan(
+                try share(drawn, frame), name == "no_objects" ? 0.0005 : 0.01,
+                "\(name) draws the stock frame")
         }
         for (index, (name, drawn)) in frames.enumerated() {
             for (other, otherDrawn) in frames[(index + 1)...] {
@@ -79,10 +84,11 @@ final class ViewModeTests: XCTestCase {
             let floats = [Float](repeating: value, count: points.count / 32 * 4)
             return floats.withUnsafeBytes { Data($0) }
         }
-        let bake = plan.finish(irradiance: even(plan.lightmapPointBytes(), 2),
-                               directions: even(plan.lightmapPointBytes(), 0),
-                               probes: even(plan.probePointBytes(), 0.5),
-                               radiance: even(plan.reflectionPointBytes(), 0))
+        let bake = plan.finish(
+            irradiance: even(plan.lightmapPointBytes(), 2),
+            directions: even(plan.lightmapPointBytes(), 0),
+            probes: even(plan.probePointBytes(), 0.5),
+            radiance: even(plan.reflectionPointBytes(), 0))
         let stockFrame = try capture(level, objects: [])
         let baked = try capture(level, bake: bake, objects: [])
         let stock = try capture(level, bake: bake, objects: []) { $0.view = .stock }

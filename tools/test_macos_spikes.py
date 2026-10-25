@@ -32,14 +32,16 @@ def build_and_run(directory, source, flags=(), entitlements=None):
     exe = directory / Path(source).stem
     build = subprocess.run(
         ["clang", "-O1", "-Wall", "-Werror", str(SPIKES / source), "-o", str(exe), *flags],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if build.returncode != 0:
         return False, "build failed:\n" + build.stderr
     if entitlements:
         sign = subprocess.run(
             ["codesign", "-s", "-", "-f", "--entitlements", str(SPIKES / entitlements), str(exe)],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         if sign.returncode != 0:
             return False, "codesign failed:\n" + sign.stderr
@@ -58,8 +60,7 @@ def test_low_memory(tmp_path):
     # default page-zero cannot allocate below 4 GB even after freeing it.
     small = build_and_run(tmp_path / "small", "low_memory.c", ["-Wl,-pagezero_size,0x4000"])
     default = build_and_run(tmp_path / "default", "low_memory.c")
-    assert small[0] or default[0], (
-        "small page-zero:\n" + small[1] + "\n\ndefault page-zero:\n" + default[1])
+    assert small[0] or default[0], "small page-zero:\n" + small[1] + "\n\ndefault page-zero:\n" + default[1]
 
 
 @pytest.mark.xfail(strict=True, reason="the macOS kernel overwrites TPIDR_EL0 on a context switch")
@@ -71,6 +72,7 @@ def test_thread_pointer(tmp_path):
 def test_hypervisor(tmp_path):
     # The guest's address space inside a VM: code runs at 0x80000000 and
     # each hvc returns to the host.
-    ok, output = build_and_run(tmp_path, "hypervisor.c", ["-framework", "Hypervisor"],
-                               entitlements="hypervisor.entitlements")
+    ok, output = build_and_run(
+        tmp_path, "hypervisor.c", ["-framework", "Hypervisor"], entitlements="hypervisor.entitlements"
+    )
     assert ok, output

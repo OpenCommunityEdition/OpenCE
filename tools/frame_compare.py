@@ -29,13 +29,14 @@ SIGNATURE = b"\x89PNG\r\n\x1a\n"
 @dataclass(frozen=True)
 class Image:
     """RGBA, 8 bits a channel, rows from the top"""
+
     width: int
     height: int
     pixels: bytes
 
     def pixel(self, x, y):
         at = (y * self.width + x) * 4
-        return tuple(self.pixels[at:at + 4])
+        return tuple(self.pixels[at : at + 4])
 
 
 @dataclass(frozen=True)
@@ -59,28 +60,37 @@ class Comparison:
 
     @property
     def matches(self):
-        return (self.same_size and self.differing <= self.tolerance.fraction * self.frame.width * self.frame.height
-                and self.largest <= self.tolerance.largest)
+        return (
+            self.same_size
+            and self.differing <= self.tolerance.fraction * self.frame.width * self.frame.height
+            and self.largest <= self.tolerance.largest
+        )
 
     def describe(self):
         if not self.same_size:
-            return (f"the frame is {self.frame.width}x{self.frame.height}, "
-                    f"its reference {self.reference.width}x{self.reference.height}")
+            return (
+                f"the frame is {self.frame.width}x{self.frame.height}, "
+                f"its reference {self.reference.width}x{self.reference.height}"
+            )
         verdict = "matches" if self.matches else "does not match"
-        return (f"{verdict}: {self.differing} of {self.frame.width * self.frame.height} pixels differ by more than "
-                f"{self.tolerance.threshold}, the most by {self.largest}")
+        return (
+            f"{verdict}: {self.differing} of {self.frame.width * self.frame.height} pixels differ by more than "
+            f"{self.tolerance.threshold}, the most by {self.largest}"
+        )
 
     def difference(self):
         """the reference at a quarter of its brightness, the differing pixels red"""
         out = bytearray(len(self.reference.pixels))
         threshold = self.tolerance.threshold
         for at in range(0, len(out), 4):
-            if max(abs(a - b) for a, b in zip(self.frame.pixels[at:at + 4], self.reference.pixels[at:at + 4])) \
-                    > threshold:
-                out[at:at + 4] = b"\xff\x00\x00\xff"
+            if (
+                max(abs(a - b) for a, b in zip(self.frame.pixels[at : at + 4], self.reference.pixels[at : at + 4]))
+                > threshold
+            ):
+                out[at : at + 4] = b"\xff\x00\x00\xff"
             else:
-                red, green, blue, _ = self.reference.pixels[at:at + 4]
-                out[at:at + 4] = bytes((red // 4, green // 4, blue // 4, 255))
+                red, green, blue, _ = self.reference.pixels[at : at + 4]
+                out[at : at + 4] = bytes((red // 4, green // 4, blue // 4, 255))
         return Image(self.reference.width, self.reference.height, bytes(out))
 
 
@@ -90,7 +100,7 @@ def compare(frame, reference, tolerance=Tolerance()):
     differing = 0
     largest = 0
     for at in range(0, len(frame.pixels), 4):
-        worst = max(abs(a - b) for a, b in zip(frame.pixels[at:at + 4], reference.pixels[at:at + 4]))
+        worst = max(abs(a - b) for a, b in zip(frame.pixels[at : at + 4], reference.pixels[at : at + 4]))
         largest = max(largest, worst)
         if worst > tolerance.threshold:
             differing += 1
@@ -99,13 +109,14 @@ def compare(frame, reference, tolerance=Tolerance()):
 
 # ---------- PNGs
 
+
 def _chunks(data):
     at = len(SIGNATURE)
     while at + 8 <= len(data):
-        length, kind = struct.unpack(">I4s", data[at:at + 8])
+        length, kind = struct.unpack(">I4s", data[at : at + 8])
         if at + 12 + length > len(data):
             raise ValueError("a PNG chunk runs past the file")
-        yield kind, data[at + 8:at + 8 + length]
+        yield kind, data[at + 8 : at + 8 + length]
         at += 12 + length
 
 
@@ -144,7 +155,7 @@ def read_png(path):
     previous = bytearray(stride)
     for y in range(height):
         kind = raw[y * (stride + 1)]
-        row = bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        row = bytearray(raw[y * (stride + 1) + 1 : (y + 1) * (stride + 1)])
         for at in range(stride):
             left = row[at - size] if at >= size else 0
             up = previous[at]
@@ -162,7 +173,7 @@ def read_png(path):
             pixels += row
         else:
             for at in range(0, stride, 3):
-                pixels += row[at:at + 3] + b"\xff"
+                pixels += row[at : at + 3] + b"\xff"
         previous = row
     return Image(width, height, bytes(pixels))
 
@@ -170,10 +181,15 @@ def read_png(path):
 def write_png(path, image):
     def chunk(kind, body):
         return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+
     stride = image.width * 4
-    raw = b"".join(b"\x00" + image.pixels[y * stride:(y + 1) * stride] for y in range(image.height))
-    Path(path).write_bytes(SIGNATURE + chunk(b"IHDR", struct.pack(">IIBBBBB", image.width, image.height, 8, 6, 0, 0, 0))
-                           + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
+    raw = b"".join(b"\x00" + image.pixels[y * stride : (y + 1) * stride] for y in range(image.height))
+    Path(path).write_bytes(
+        SIGNATURE
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", image.width, image.height, 8, 6, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw, 9))
+        + chunk(b"IEND", b"")
+    )
 
 
 def main(arguments=None):
@@ -185,8 +201,11 @@ def main(arguments=None):
     parser.add_argument("--fraction", type=float, default=Tolerance.fraction)
     parser.add_argument("--largest", type=int, default=Tolerance.largest)
     options = parser.parse_args(arguments)
-    result = compare(read_png(options.frame), read_png(options.reference),
-                     Tolerance(options.threshold, options.fraction, options.largest))
+    result = compare(
+        read_png(options.frame),
+        read_png(options.reference),
+        Tolerance(options.threshold, options.fraction, options.largest),
+    )
     print(f"{options.frame}: {result.describe()}")
     if options.difference and result.same_size:
         write_png(options.difference, result.difference())

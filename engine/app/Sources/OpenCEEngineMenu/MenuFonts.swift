@@ -34,9 +34,9 @@ public enum MenuFonts {
         for file in [files.body, files.heading, files.title] where names[file] == nil {
             let url = folder.appendingPathComponent(file)
             guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
-                  let name = descriptors.first.flatMap({
-                      CTFontDescriptorCopyAttribute($0, kCTFontNameAttribute) as? String
-                  })
+                let name = descriptors.first.flatMap({
+                    CTFontDescriptorCopyAttribute($0, kCTFontNameAttribute) as? String
+                })
             else { continue }
             // (already registered by an earlier call is as good)
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)

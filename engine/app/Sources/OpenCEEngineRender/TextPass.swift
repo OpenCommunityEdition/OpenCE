@@ -59,7 +59,7 @@ public final class GlyphAtlas {
     /// display of `scale` pixels a point.
     public init(url: URL, pointSize: Double = 13, scale: Double, device: MTLDevice) throws {
         guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor],
-              let descriptor = descriptors.first
+            let descriptor = descriptors.first
         else { throw TextError.font("no font in \(url.path)") }
         guard scale > 0, scale <= 8, pointSize > 0, pointSize <= 96 else {
             throw TextError.font("size \(pointSize) at scale \(scale)")
@@ -99,9 +99,11 @@ public final class GlyphAtlas {
 
         var bytes = [UInt8](repeating: 0, count: width * height)
         try bytes.withUnsafeMutableBytes { raw in
-            guard let context = CGContext(data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                                          bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
-                                          bitmapInfo: CGImageAlphaInfo.none.rawValue)
+            guard
+                let context = CGContext(
+                    data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                    bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                    bitmapInfo: CGImageAlphaInfo.none.rawValue)
             else { throw TextError.resources("a bitmap of \(width)x\(height)") }
             context.setAllowsFontSmoothing(false)
             context.setShouldAntialias(true)
@@ -125,16 +127,18 @@ public final class GlyphAtlas {
         }
         self.cells = cells
 
-        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r8Unorm, width: width,
-                                                                         height: height, mipmapped: false)
+        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .r8Unorm, width: width,
+            height: height, mipmapped: false)
         textureDescriptor.usage = .shaderRead
         guard let texture = device.makeTexture(descriptor: textureDescriptor) else {
             throw TextError.resources("the atlas's texture")
         }
         bytes.withUnsafeBytes { raw in
             if let base = raw.baseAddress {
-                texture.replace(region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: base,
-                                bytesPerRow: width)
+                texture.replace(
+                    region: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0, withBytes: base,
+                    bytesPerRow: width)
             }
         }
         self.texture = texture
@@ -167,8 +171,9 @@ public final class GlyphAtlas {
     func uv(_ cell: Int) -> SIMD4<Float> {
         let width = Float(texture.width), height = Float(texture.height)
         let left = Float(cell % columns * cellWidth), top = Float(cell / columns * cellHeight)
-        return SIMD4(left / width, top / height, (left + Float(cellWidth)) / width,
-                     (top + Float(cellHeight)) / height)
+        return SIMD4(
+            left / width, top / height, (left + Float(cellWidth)) / width,
+            (top + Float(cellHeight)) / height)
     }
 }
 
@@ -197,12 +202,15 @@ public final class TextPass {
     /// The quads drawn in the last frame, for tests.
     public private(set) var lastDrawn = 0
 
-    public init(device: MTLDevice, atlas: GlyphAtlas, outputFormat: MTLPixelFormat,
-                source: String? = nil) throws {
+    public init(
+        device: MTLDevice, atlas: GlyphAtlas, outputFormat: MTLPixelFormat,
+        source: String? = nil
+    ) throws {
         self.atlas = atlas
         self.outputFormat = outputFormat
-        pipeline = try Self.pipeline(device: device, source: source ?? ShaderSources.source(.text),
-                                     outputFormat: outputFormat)
+        pipeline = try Self.pipeline(
+            device: device, source: source ?? ShaderSources.source(.text),
+            outputFormat: outputFormat)
         let samplerDescriptor = MTLSamplerDescriptor()
         samplerDescriptor.minFilter = .nearest
         samplerDescriptor.magFilter = .nearest
@@ -214,8 +222,10 @@ public final class TextPass {
         self.sampler = sampler
     }
 
-    private static func pipeline(device: MTLDevice, source: String,
-                                 outputFormat: MTLPixelFormat) throws -> MTLRenderPipelineState {
+    private static func pipeline(
+        device: MTLDevice, source: String,
+        outputFormat: MTLPixelFormat
+    ) throws -> MTLRenderPipelineState {
         do {
             let library = try device.makeLibrary(source: source, options: nil)
             let descriptor = MTLRenderPipelineDescriptor()
@@ -245,15 +255,18 @@ public final class TextPass {
         let y = { (pixels: Int) in 1 - Float(pixels) / Float(height) * 2 }
         let solid = atlas.uv(GlyphAtlas.solid)
         // (the solid cell's middle, so that a box's edges never sample a neighbour)
-        let middle = SIMD4((solid.x + solid.z) / 2, (solid.y + solid.w) / 2, (solid.x + solid.z) / 2,
-                           (solid.y + solid.w) / 2)
+        let middle = SIMD4(
+            (solid.x + solid.z) / 2, (solid.y + solid.w) / 2, (solid.x + solid.z) / 2,
+            (solid.y + solid.w) / 2)
         var out: [TextInstance] = []
         for item in items {
             switch item {
             case let .box(left, top, boxWidth, boxHeight, color):
                 guard boxWidth > 0, boxHeight > 0 else { continue }
-                out.append(TextInstance(rect: SIMD4(x(left), y(top), x(left + boxWidth), y(top + boxHeight)),
-                                        uv: middle, color: color))
+                out.append(
+                    TextInstance(
+                        rect: SIMD4(x(left), y(top), x(left + boxWidth), y(top + boxHeight)),
+                        uv: middle, color: color))
             case let .text(text, left, top, color):
                 var column = 0
                 for scalar in text.unicodeScalars {
@@ -261,9 +274,10 @@ public final class TextPass {
                     if scalar == " " { continue }
                     let cellLeft = left + column * atlas.cellWidth
                     if cellLeft >= width { break }
-                    out.append(TextInstance(
-                        rect: SIMD4(x(cellLeft), y(top), x(cellLeft + atlas.cellWidth), y(top + atlas.cellHeight)),
-                        uv: atlas.uv(atlas.cell(scalar)), color: color))
+                    out.append(
+                        TextInstance(
+                            rect: SIMD4(x(cellLeft), y(top), x(cellLeft + atlas.cellWidth), y(top + atlas.cellHeight)),
+                            uv: atlas.uv(atlas.cell(scalar)), color: color))
                 }
             }
         }

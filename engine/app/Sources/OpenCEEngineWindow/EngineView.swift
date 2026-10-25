@@ -175,8 +175,9 @@ public final class EngineView: NSView {
 
     /// The frames a second drawn now, nil for none.
     public var pacedRate: Int? {
-        FramePacing.rate(display: maximumFramesPerSecond, cap: frameCap, activity: activity,
-                         keepsRunning: keepsRunning)
+        FramePacing.rate(
+            display: maximumFramesPerSecond, cap: frameCap, activity: activity,
+            keepsRunning: keepsRunning)
     }
 
     /// Sets the link's rate, or pauses it.
@@ -221,7 +222,8 @@ public final class EngineView: NSView {
     /// the link runs) the layer's next.
     private func nextDrawable() -> CAMetalDrawable? {
         guard window?.isVisible == true, metalLayer.drawableSize.width > 0,
-              metalLayer.drawableSize.height > 0 else { return nil }
+            metalLayer.drawableSize.height > 0
+        else { return nil }
         if displayLink != nil {
             defer { drawable = nil }
             return drawable

@@ -22,14 +22,16 @@ from tools.test_nv2a_msl import metal_compile  # noqa: E402
 
 PASSES = ("fxaa", "edges", "weights", "blend")
 ZLIB = ["zutil", "inftrees", "uncompr", "inffast", "adler32", "inflate", "crc32"]
-OBJECTS = ([macos_guest_image.OBJECTS / "port/linux/src/xgpu_text.o",
-            macos_guest_image.OBJECTS / "guest/gen/hud_hires_assets.o"]
-           + [macos_guest_image.OBJECTS / f"port/third_party/zlib/{name}.o" for name in ZLIB])
+OBJECTS = [
+    macos_guest_image.OBJECTS / "port/linux/src/xgpu_text.o",
+    macos_guest_image.OBJECTS / "guest/gen/hud_hires_assets.o",
+] + [macos_guest_image.OBJECTS / f"port/third_party/zlib/{name}.o" for name in ZLIB]
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
-    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
-                       reason="needs `ninja macos` in nix develop"),
+    pytest.mark.skipif(
+        not macos_guest_image.available() or shutil.which("ninja") is None, reason="needs `ninja macos` in nix develop"
+    ),
 ]
 
 
@@ -37,10 +39,17 @@ pytestmark = [
 def vm_post(tmp_path_factory):
     work = tmp_path_factory.mktemp("vm_post")
     return macos_guest_image.build_guest_image(
-        [ROOT / "port/macos/tests/vm_post.c", ROOT / "port/macos/tests/vm_nv2a_stubs.c",
-         ROOT / "port/macos/guest/d3d8_metal_post.c"], work, "vm_post",
-        ["-DHALO_METAL", f"-I{ROOT / 'port/third_party/zlib'}"], like="port/linux/src/xgpu_text.c",
-        objects=OBJECTS)
+        [
+            ROOT / "port/macos/tests/vm_post.c",
+            ROOT / "port/macos/tests/vm_nv2a_stubs.c",
+            ROOT / "port/macos/guest/d3d8_metal_post.c",
+        ],
+        work,
+        "vm_post",
+        ["-DHALO_METAL", f"-I{ROOT / 'port/third_party/zlib'}"],
+        like="port/linux/src/xgpu_text.c",
+        objects=OBJECTS,
+    )
 
 
 def run(image, folder, *arguments):

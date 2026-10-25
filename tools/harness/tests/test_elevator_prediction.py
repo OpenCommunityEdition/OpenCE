@@ -17,11 +17,16 @@ FUNCTIONS = ("distributed_riding_moving_elevator", "distributed_take_prediction"
 
 # a fault in network_distributed.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
-    "height-taken-riding": (("if (distributed_riding_moving_elevator(unit_index))\n\t\tposition.z",
-                             "if (0)\n\t\tposition.z"), "distributed_take_prediction", "riding-up"),
-    "elevator-at-rest-rides": (("return elevator && elevator->device.position_velocity != 0.0f;",
-                                "return elevator != NULL;"), "distributed_riding_moving_elevator",
-                               "elevator-at-rest"),
+    "height-taken-riding": (
+        ("if (distributed_riding_moving_elevator(unit_index))\n\t\tposition.z", "if (0)\n\t\tposition.z"),
+        "distributed_take_prediction",
+        "riding-up",
+    ),
+    "elevator-at-rest-rides": (
+        ("return elevator && elevator->device.position_velocity != 0.0f;", "return elevator != NULL;"),
+        "distributed_riding_moving_elevator",
+        "elevator-at-rest",
+    ),
 }
 
 
@@ -50,5 +55,6 @@ def test_case(case):
 def test_negative_control(control):
     fault, faulty_function, case = NEGATIVE_CONTROLS[control]
     status, output = run(build("elevator_prediction", generated(fault, faulty_function)), case)
-    assert status == CHECK_FAILED, \
+    assert status == CHECK_FAILED, (
         f"network_distributed.c with a fault ({control}) passed '{case}': the test cannot see it"
+    )

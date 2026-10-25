@@ -36,10 +36,24 @@ def test_bloodgulch_at_4k_holds_120_frames_a_second(executable: Path) -> None:
     cache.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         [
-            str(executable), "--benchmark", str(seconds), "--map", str(MAP), "--size", "3840x2160",
-            "--anti-aliasing", "temporal", "--render-scale", "1", "--cache", str(cache),
+            str(executable),
+            "--benchmark",
+            str(seconds),
+            "--map",
+            str(MAP),
+            "--size",
+            "3840x2160",
+            "--anti-aliasing",
+            "temporal",
+            "--render-scale",
+            "1",
+            "--cache",
+            str(cache),
         ],
-        capture_output=True, text=True, check=True, timeout=seconds + 300,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=seconds + 300,
     )
     report = json.loads(result.stdout.strip().splitlines()[-1])
     print(f"\nbenchmark: {report}")

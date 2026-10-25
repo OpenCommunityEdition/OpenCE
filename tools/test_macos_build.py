@@ -32,8 +32,11 @@ def write_stubs(tmp_path, names, *options):
     listing = tmp_path / "imports.list"
     listing.write_text("# a comment\n" + "\n".join(names) + "\n")
     stubs = tmp_path / "imports.s"
-    subprocess.run([sys.executable, str(ROOT / "tools/android_imports.py"), *options, str(stubs), str(listing)],
-                   check=True, cwd=ROOT)
+    subprocess.run(
+        [sys.executable, str(ROOT / "tools/android_imports.py"), *options, str(stubs), str(listing)],
+        check=True,
+        cwd=ROOT,
+    )
     return stubs.read_text()
 
 
@@ -53,8 +56,17 @@ def test_svc_stubs_exit_with_the_import_index(tmp_path):
     # result in x0 across the call that stores it
     text = write_stubs(tmp_path, ["host_log", "hostposix_stat"], "--svc", "--host-names", str(names_c))
     assert stub_body(text, "hostposix_stat") == [
-        "mov w16, #1", "svc #0", "stp x29, x30, [sp, #-32]!", "mov x29, sp", "str x0, [sp, #16]",
-        "mov w0, w1", "bl guest_import_set_errno", "ldr x0, [sp, #16]", "ldp x29, x30, [sp], #32", "ret"]
+        "mov w16, #1",
+        "svc #0",
+        "stp x29, x30, [sp, #-32]!",
+        "mov x29, sp",
+        "str x0, [sp, #16]",
+        "mov w0, w1",
+        "bl guest_import_set_errno",
+        "ldr x0, [sp, #16]",
+        "ldp x29, x30, [sp], #32",
+        "ret",
+    ]
     assert stub_body(text, "host_log") == ["mov w16, #0", "svc #0", "ret"]
     text = write_stubs(tmp_path, names, "--svc", "--host-names", str(names_c))
     # the image still names its imports in order, which the host checks
@@ -81,9 +93,18 @@ def test_macos_graph(tmp_path, monkeypatch):
     from tools.macos_build import generate_macos_build
 
     monkeypatch.chdir(ROOT)
-    sln = SimpleNamespace(build_dir=Path("build"), linux_cc=None, compiler_launcher=None, port_release=False,
-                          port_profile=False, port_lto="full", port_portable=False, port_pgo="off",
-                          port_pgo_profile=None, macos_guest_cc=None)
+    sln = SimpleNamespace(
+        build_dir=Path("build"),
+        linux_cc=None,
+        compiler_launcher=None,
+        port_release=False,
+        port_profile=False,
+        port_lto="full",
+        port_portable=False,
+        port_pgo="off",
+        port_pgo_profile=None,
+        macos_guest_cc=None,
+    )
     out = io.StringIO()
     n = ninja_syntax.Writer(out)
     n.variable("python", f'"{sys.executable}"')
@@ -125,12 +146,24 @@ def test_host_refuses_what_is_not_a_guest_image(tmp_path):
     # (tools/test_macos_host.py runs the guest; these never start it, and run
     # in a folder and home of their own)
     environment = dict(os.environ, HOME=str(tmp_path), HALO_DATA_ROOT=str(tmp_path))
-    missing = subprocess.run([str(HOST), str(tmp_path / "missing.elf")], cwd=tmp_path, env=environment,
-                             capture_output=True, text=True, timeout=30)
+    missing = subprocess.run(
+        [str(HOST), str(tmp_path / "missing.elf")],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
     assert missing.returncode == 71 and "cannot read the guest image" in missing.stderr, missing.stderr
     (tmp_path / "not_an_image.elf").write_bytes(b"not an image")
-    bad = subprocess.run([str(HOST), str(tmp_path / "not_an_image.elf")], cwd=tmp_path, env=environment,
-                         capture_output=True, text=True, timeout=30)
+    bad = subprocess.run(
+        [str(HOST), str(tmp_path / "not_an_image.elf")],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
     assert bad.returncode == 71 and "not a 64-bit little-endian AArch64 executable" in bad.stderr, bad.stderr
     assert sorted(path.name for path in tmp_path.iterdir()) == ["not_an_image.elf"]
 
@@ -142,11 +175,11 @@ def test_guest_image_is_the_vm_guest():
     data = IMAGE.read_bytes()
     # an AArch64 ELF executable entered at the guest's fixed address
     assert data[:4] == b"\x7fELF" and data[4] == 2
-    machine, = struct.unpack_from("<H", data, 18)
-    entry, = struct.unpack_from("<Q", data, 24)
+    (machine,) = struct.unpack_from("<H", data, 18)
+    (entry,) = struct.unpack_from("<Q", data, 24)
     assert machine == 183 and entry == 0x88000000
     # its loaded segments end below the guest's range's end
-    phoff, = struct.unpack_from("<Q", data, 32)
+    (phoff,) = struct.unpack_from("<Q", data, 32)
     phentsize, phnum = struct.unpack_from("<HH", data, 54)
     for index in range(phnum):
         kind, _, _, vaddr, _, _, memsz = struct.unpack_from("<IIQQQQQ", data, phoff + index * phentsize)
@@ -178,11 +211,26 @@ def test_the_runtime_is_usable_from_c(tmp_path):
         "\t\t&& opence_guest_host_pointer(guest, 0x1000u, 4) == NULL;\n"
         "\topence_guest_destroy(guest);\n"
         "\treturn ok ? 0 : 1;\n"
-        "}\n")
+        "}\n"
+    )
     exe = tmp_path / "abi_check"
-    build = subprocess.run(["cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-                            f"-I{RUNTIME_HEADER.parent}", str(program), str(RUNTIME_LIBRARY), "-o", str(exe)],
-                           capture_output=True, text=True)
+    build = subprocess.run(
+        [
+            "cc",
+            "-std=gnu11",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-pedantic",
+            f"-I{RUNTIME_HEADER.parent}",
+            str(program),
+            str(RUNTIME_LIBRARY),
+            "-o",
+            str(exe),
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert build.returncode == 0, build.stderr
     assert subprocess.run([str(exe)]).returncode == 0
 
@@ -198,16 +246,28 @@ def test_configure_emits_macos_here(tmp_path):
 
 # ---------- the host's import dispatcher (tools/macos_dispatch.py)
 
+
 def generate_dispatcher(tmp_path):
     lists = [ROOT / "port/android/host_imports.list", tmp_path / "posix_imports.list", tmp_path / "gl_imports.list"]
-    lists[1].write_text("hostposix_directory_open\nhostposix_directory_next\nhostposix_socket_last_error\n"
-                        "hostposix_socket_select\n")
+    lists[1].write_text(
+        "hostposix_directory_open\nhostposix_directory_next\nhostposix_socket_last_error\nhostposix_socket_select\n"
+    )
     lists[2].write_text("hostgl_glClear\n")
     output = tmp_path / "host_dispatch.c"
-    subprocess.run([sys.executable, str(ROOT / "tools/macos_dispatch.py"),
-                    "--prototypes", str(ROOT / "port/android/guest/runtime/guest_host.h"),
-                    "--prototypes", str(ROOT / "port/linux/src/posix.h"),
-                    str(output), *map(str, lists)], check=True, cwd=ROOT)
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools/macos_dispatch.py"),
+            "--prototypes",
+            str(ROOT / "port/android/guest/runtime/guest_host.h"),
+            "--prototypes",
+            str(ROOT / "port/linux/src/posix.h"),
+            str(output),
+            *map(str, lists),
+        ],
+        check=True,
+        cwd=ROOT,
+    )
     return output.read_text()
 
 
@@ -219,7 +279,9 @@ def dispatch_case(text, name):
 
 def test_the_dispatcher_numbers_imports_as_the_stubs_do(tmp_path):
     text = generate_dispatcher(tmp_path)
-    host_names = [line.split("#")[0].strip() for line in (ROOT / "port/android/host_imports.list").read_text().splitlines()]
+    host_names = [
+        line.split("#")[0].strip() for line in (ROOT / "port/android/host_imports.list").read_text().splitlines()
+    ]
     host_names = [name for name in host_names if name]
     assert dispatch_case(text, "host_syscall")[0] == 0
     assert dispatch_case(text, "host_log")[0] == 1
@@ -268,8 +330,7 @@ def test_the_dispatcher_runs_window_imports_on_the_main_thread(tmp_path):
     assert window == f'host_call_on_main_thread(call, "host_sdl_create_window", main_thread_{index});'
     # the call itself is in a function of its own, which keeps its errno in
     # the request (errno is the main thread's own there)
-    function = re.search(rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n",
-                         text, re.S)
+    function = re.search(rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n", text, re.S)
     assert function, "no function for host_sdl_create_window"
     body = " ".join(function.group(1).split())
     # (the host's windows, the app's or else SDL's: host_window.c)
@@ -281,17 +342,21 @@ def test_the_dispatcher_runs_window_imports_on_the_main_thread(tmp_path):
     _, events = dispatch_case(text, "host_sdl_poll_event")
     assert "host_call_on_main_thread(" in events
     # (the input, the app's or else SDL's: host_input.c)
-    for name, host in (("host_sdl_poll_event", "host_input_poll_event"),
-                       ("host_sdl_set_relative_mouse", "host_input_set_relative_mouse")):
+    for name, host in (
+        ("host_sdl_poll_event", "host_input_poll_event"),
+        ("host_sdl_set_relative_mouse", "host_input_set_relative_mouse"),
+    ):
         index, _ = dispatch_case(text, name)
-        function = re.search(rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n",
-                             text, re.S)
+        function = re.search(
+            rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n", text, re.S
+        )
         assert function and f"{host}(" in function.group(1), name
     # (the app's windows' stand-in OpenGL context, else SDL's: host_window.c)
     for name in ("create_context", "make_current", "set_swap_interval", "swap_window"):
         index, body = dispatch_case(text, f"host_sdl_gl_{name}")
-        function = re.search(rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n",
-                             text, re.S)
+        function = re.search(
+            rf"static void main_thread_{index}\(struct host_call \*call\)\n\{{\n(.*?)\n\}}\n", text, re.S
+        )
         called = body + (function.group(1) if function else "")
         assert f"host_window_gl_{name}(" in called and f"host_sdl_gl_{name}(" not in called, name
     # (making one asks the app about its window, which AppKit answers on the
@@ -299,8 +364,14 @@ def test_the_dispatcher_runs_window_imports_on_the_main_thread(tmp_path):
     _, body = dispatch_case(text, "host_sdl_gl_create_context")
     assert "host_call_on_main_thread(" in body
     # (the sound, the app's or else SDL's: host_audio.c)
-    for name in ("open_audio_stream", "put_audio_stream_data", "resume_audio_stream_device",
-                 "get_audio_stream_data", "get_audio_stream_available", "destroy_audio_stream"):
+    for name in (
+        "open_audio_stream",
+        "put_audio_stream_data",
+        "resume_audio_stream_device",
+        "get_audio_stream_data",
+        "get_audio_stream_available",
+        "destroy_audio_stream",
+    ):
         _, body = dispatch_case(text, f"host_sdl_{name}")
         host = "host_audio_" + name.replace("audio_", "", 1)
         assert f"{host}(" in body and f"host_sdl_{name}(" not in body, name
@@ -313,9 +384,19 @@ def test_the_dispatcher_runs_window_imports_on_the_main_thread(tmp_path):
 def test_the_dispatcher_refuses_imports_it_cannot_pass(tmp_path):
     lists = [tmp_path / "imports.list"]
     lists[0].write_text("host_unknown_function\n")
-    result = subprocess.run([sys.executable, str(ROOT / "tools/macos_dispatch.py"),
-                             "--prototypes", str(ROOT / "port/android/guest/runtime/guest_host.h"),
-                             str(tmp_path / "out.c"), str(lists[0])], capture_output=True, text=True, cwd=ROOT)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools/macos_dispatch.py"),
+            "--prototypes",
+            str(ROOT / "port/android/guest/runtime/guest_host.h"),
+            str(tmp_path / "out.c"),
+            str(lists[0]),
+        ],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
     assert result.returncode != 0 and "host_unknown_function" in result.stderr
 
 
@@ -323,10 +404,19 @@ def test_the_posix_wrappers_leave_errno_to_the_vms_stubs(tmp_path):
     # in the VM, the hostposix_* stub has set errno already: the wrapper
     # asks host_errno only elsewhere (the Android app)
     output, imports = tmp_path / "posix_stubs.c", tmp_path / "posix.list"
-    subprocess.run([sys.executable, str(ROOT / "tools/android_posix_stubs.py"), str(ROOT / "port/linux/src/posix.h"),
-                    str(output), str(imports)], check=True, cwd=ROOT)
+    subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "tools/android_posix_stubs.py"),
+            str(ROOT / "port/linux/src/posix.h"),
+            str(output),
+            str(imports),
+        ],
+        check=True,
+        cwd=ROOT,
+    )
     text = output.read_text()
-    body = text[text.index("int posix_stat(const char *path"):]
-    body = body[:body.index("\n}\n")]
+    body = text[text.index("int posix_stat(const char *path") :]
+    body = body[: body.index("\n}\n")]
     assert "\tint host_result = hostposix_stat(path, information);" in body
     assert "#ifndef HALO_GUEST_VM\n\terrno = host_errno();\n#endif\n\treturn host_result;" in body

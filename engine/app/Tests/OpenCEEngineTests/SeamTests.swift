@@ -33,31 +33,38 @@ final class SeamTests: XCTestCase {
         let visible: Float = 0.05
         let baked = summary(seams, { $0.baked! }, over: visible)
         let stock = summary(seams, { $0.stock! }, over: visible)
-        print("seams: \(seams.count), baked mean \(baked.mean) over \(baked.over), stock mean \(stock.mean) over \(stock.over)")
+        print(
+            "seams: \(seams.count), baked mean \(baked.mean) over \(baked.over), stock mean \(stock.mean) over \(stock.over)"
+        )
         XCTAssertLessThanOrEqual(baked.mean, stock.mean, "the mean step across a seam")
         XCTAssertLessThanOrEqual(baked.over, stock.over, "the share of seams that show")
 
         // the longest seam on a floor, seen from above and to one side
         let floor = try XCTUnwrap(seams.filter { $0.normal[2] > 0.9 }.max { $0.length < $1.length })
-        let ends = [SIMD3(floor.ends[0], floor.ends[1], floor.ends[2]), SIMD3(floor.ends[3], floor.ends[4], floor.ends[5])]
+        let ends = [
+            SIMD3(floor.ends[0], floor.ends[1], floor.ends[2]), SIMD3(floor.ends[3], floor.ends[4], floor.ends[5]),
+        ]
         let middle = (ends[0] + ends[1]) / 2, normal = SIMD3(floor.normal[0], floor.normal[1], floor.normal[2])
         let across = simd_normalize(simd_cross(ends[1] - ends[0], normal))
         let position = middle + normal * 1.2 + across * 1.2
         let look = simd_normalize(middle - position)
-        let camera = ViewCamera(position: position, yaw: atan2(look.y, look.x),
-                                pitch: asin(min(max(look.z, -0.999), 0.999)), verticalFov: 70 * .pi / 180)
+        let camera = ViewCamera(
+            position: position, yaw: atan2(look.y, look.x),
+            pitch: asin(min(max(look.z, -0.999), 0.999)), verticalFov: 70 * .pi / 180)
         var shots: [Bool: CapturedFrame] = [:]
         for stock in [false, true] {
             let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
             try renderer.useBakedLighting(light)
             renderer.switches.view = stock ? .stock : .frame
-            shots[stock] = try renderer.capture(width: 480, height: 270, camera: camera, frames: 8,
-                                                objects: level.objects, queue: level.queue)
+            shots[stock] = try renderer.capture(
+                width: 480, height: 270, camera: camera, frames: 8,
+                objects: level.objects, queue: level.queue)
         }
         let exposure = ExposureTests()
         let bakedStats = exposure.stats(shots[false]!), stockStats = exposure.stats(shots[true]!)
-        XCTAssertLessThanOrEqual(bakedStats.black, stockStats.black + 0.0005,
-                                 "\(bakedStats.black) black against \(stockStats.black)")
+        XCTAssertLessThanOrEqual(
+            bakedStats.black, stockStats.black + 0.0005,
+            "\(bakedStats.black) black against \(stockStats.black)")
         let out = StockLevel.root.appendingPathComponent("build/engine/golden")
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         let file = "devgulch_seam_480x270.png"

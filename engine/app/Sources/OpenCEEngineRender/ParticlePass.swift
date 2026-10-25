@@ -19,8 +19,10 @@ public struct ParticleLighting {
     public var sunTowards: SIMD4<Float>
     public var sunColor: SIMD4<Float>
 
-    public init(probes: [MTLTexture], probeOrigin: SIMD4<Float>, probeCounts: SIMD4<Float>,
-                sunTowards: SIMD4<Float>, sunColor: SIMD4<Float>) {
+    public init(
+        probes: [MTLTexture], probeOrigin: SIMD4<Float>, probeCounts: SIMD4<Float>,
+        sunTowards: SIMD4<Float>, sunColor: SIMD4<Float>
+    ) {
         self.probes = probes
         self.probeOrigin = probeOrigin
         self.probeCounts = probeCounts
@@ -77,14 +79,15 @@ public final class ParticlePass {
         volumeDescriptor.height = 1
         volumeDescriptor.depth = 1
         guard let depthState = device.makeDepthStencilState(descriptor: depth),
-              let sampler = device.makeSamplerState(descriptor: samplerDescriptor),
-              let white = device.makeTexture(descriptor: whiteDescriptor),
-              let whiteVolume = device.makeTexture(descriptor: volumeDescriptor)
+            let sampler = device.makeSamplerState(descriptor: samplerDescriptor),
+            let white = device.makeTexture(descriptor: whiteDescriptor),
+            let whiteVolume = device.makeTexture(descriptor: volumeDescriptor)
         else { throw LevelRendererError.resources("particle states") }
         var texel: UInt32 = 0xFFFF_FFFF
         white.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &texel, bytesPerRow: 4)
-        whiteVolume.replace(region: MTLRegionMake3D(0, 0, 0, 1, 1, 1), mipmapLevel: 0, slice: 0, withBytes: &texel,
-                            bytesPerRow: 4, bytesPerImage: 4)
+        whiteVolume.replace(
+            region: MTLRegionMake3D(0, 0, 0, 1, 1, 1), mipmapLevel: 0, slice: 0, withBytes: &texel,
+            bytesPerRow: 4, bytesPerImage: 4)
         self.depthState = depthState
         self.sampler = sampler
         self.white = white
@@ -129,24 +132,34 @@ public final class ParticlePass {
 
     /// Draws `sprites` and the level's detail objects into `frame`, the lit
     /// ones by `lighting` (white without it).
-    public func encode(into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture,
-                       worldToClip: simd_float4x4, eye: SIMD3<Float>, right: SIMD3<Float>, up: SIMD3<Float>,
-                       sprites: [OCEParticleSnapshot], lighting: ParticleLighting? = nil) {
+    public func encode(
+        into commands: MTLCommandBuffer, frame: MTLTexture, depth: MTLTexture,
+        worldToClip: simd_float4x4, eye: SIMD3<Float>, right: SIMD3<Float>, up: SIMD3<Float>,
+        sprites: [OCEParticleSnapshot], lighting: ParticleLighting? = nil
+    ) {
         let rows = details + sprites
         guard !rows.isEmpty else { return }
         let size = rows.count * MemoryLayout<OCEParticleSnapshot>.stride
         if buffers.count < Self.framesInFlight {
-            guard let buffer = HitchLog.shared.note(.allocation, "particles \(size) bytes", {
-                device.makeBuffer(length: max(size, 4096), options: .storageModeShared)
-            }) else { return }
+            guard
+                let buffer = HitchLog.shared.note(
+                    .allocation, "particles \(size) bytes",
+                    {
+                        device.makeBuffer(length: max(size, 4096), options: .storageModeShared)
+                    })
+            else { return }
             buffers.append(buffer)
             slot = buffers.count - 1
         } else {
             slot = (slot + 1) % Self.framesInFlight
             if buffers[slot].length < size {
-                guard let buffer = HitchLog.shared.note(.allocation, "particles \(size) bytes", {
-                    device.makeBuffer(length: size * 2, options: .storageModeShared)
-                }) else { return }
+                guard
+                    let buffer = HitchLog.shared.note(
+                        .allocation, "particles \(size) bytes",
+                        {
+                            device.makeBuffer(length: size * 2, options: .storageModeShared)
+                        })
+                else { return }
                 buffers[slot] = buffer
             }
         }

@@ -34,9 +34,11 @@ public final class ChantPlayer {
     /// A player of the tone in `wave` (silent without one).
     public init(wave: URL?) {
         guard let wave, let file = try? AVAudioFile(forReading: wave),
-              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
-                                            frameCapacity: AVAudioFrameCount(file.length)),
-              (try? file.read(into: buffer)) != nil else {
+            let buffer = AVAudioPCMBuffer(
+                pcmFormat: file.processingFormat,
+                frameCapacity: AVAudioFrameCount(file.length)),
+            (try? file.read(into: buffer)) != nil
+        else {
             return
         }
         self.buffer = buffer
@@ -70,7 +72,7 @@ public final class ChantPlayer {
         do {
             try engine.start()
         } catch {
-            return // (no output device: the screen is silent)
+            return  // (no output device: the screen is silent)
         }
         for voice in voices {
             voice.player.scheduleBuffer(buffer, at: nil, options: .loops)

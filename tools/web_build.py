@@ -43,10 +43,29 @@ from typing import Any, Dict, List, Optional
 
 from .android_build import VARIADIC_PROTOTYPE_FILES
 from .embed_assets import hud_assets_build, hud_configure_inputs
-from .linux_build import (EXPAT_DIR, EXPAT_SOURCES, KCP_DIR, MONOCYPHER_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, TOML_DIR,
-                          XDK_INCLUDE, ZLIB_DEFINES, ZLIB_DIR, ZLIB_SOURCES, compile_launcher, configuration_defines,
-                          game_defines_and_includes, game_sources, musl_math_cflags, musl_math_sources,
-                          opus_cflags, opus_sources, updater_defines, xdk_headers)
+from .linux_build import (
+    EXPAT_DIR,
+    EXPAT_SOURCES,
+    KCP_DIR,
+    MONOCYPHER_DIR,
+    MUSL_MATH_DIR,
+    STB_VORBIS_SOURCE,
+    TOML_DIR,
+    XDK_INCLUDE,
+    ZLIB_DEFINES,
+    ZLIB_DIR,
+    ZLIB_SOURCES,
+    compile_launcher,
+    configuration_defines,
+    game_defines_and_includes,
+    game_sources,
+    musl_math_cflags,
+    musl_math_sources,
+    opus_cflags,
+    opus_sources,
+    updater_defines,
+    xdk_headers,
+)
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/web")
@@ -93,11 +112,26 @@ WEB_CODE_FLAGS = [
     "-fno-delete-null-pointer-checks",
     # Emscripten's C library has a 32-bit wchar_t: no loop turned into a call
     # to its wide string functions
-    *(f"-fno-builtin-{name}" for name in (
-        "wcslen", "wcsnlen", "wcschr", "wcsrchr", "wcscmp", "wcsncmp", "wcscpy",
-        "wcsncpy", "wcscat", "wcsncat", "wmemchr", "wmemcmp", "wmemcpy",
-        "wmemmove", "wmemset",
-    )),
+    *(
+        f"-fno-builtin-{name}"
+        for name in (
+            "wcslen",
+            "wcsnlen",
+            "wcschr",
+            "wcsrchr",
+            "wcscmp",
+            "wcsncmp",
+            "wcscpy",
+            "wcsncpy",
+            "wcscat",
+            "wcsncat",
+            "wmemchr",
+            "wmemcmp",
+            "wmemcpy",
+            "wmemmove",
+            "wmemset",
+        )
+    ),
 ]
 
 GAME_FLAGS = [
@@ -121,13 +155,13 @@ PROTOTYPE_FILES = {
 # platform units a browser does without (updater.c and xiso.c compile to
 # nothing there: the site updates itself, and the page reads the disc image)
 WEB_EXCLUDE = {
-    "memory_watch.c",       # page protection: port/web/src/web_memory_watch.c
-    "posix_net.c",          # sockets: port/web/src/web_net.c
-    "posix_update.c",       # the self-updater's downloads
-    "posix_upnp.c",         # internet play's router (port/web/src/web_stubs.c)
-    "posix_trace_marker.c", # a Linux GPU driver's trace markers
-    "posix_dtls.c",         # internet play's WebRTC: the browser's own
-    "p2p_webrtc.c",         # (port/web/src/web_p2p.c)
+    "memory_watch.c",  # page protection: port/web/src/web_memory_watch.c
+    "posix_net.c",  # sockets: port/web/src/web_net.c
+    "posix_update.c",  # the self-updater's downloads
+    "posix_upnp.c",  # internet play's router (port/web/src/web_stubs.c)
+    "posix_trace_marker.c",  # a Linux GPU driver's trace markers
+    "posix_dtls.c",  # internet play's WebRTC: the browser's own
+    "p2p_webrtc.c",  # (port/web/src/web_p2p.c)
 }
 
 # the web runtime's units that, like posix_*.c, are the C library's side of
@@ -160,8 +194,14 @@ def site_sources() -> List[Path]:
 
 
 def web_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "src", PORT_DIR / "site", PORT_DIR / "site" / "icons", SDL_PORT,
-            *hud_configure_inputs()]
+    return [
+        Path(__file__),
+        PORT_DIR / "src",
+        PORT_DIR / "site",
+        PORT_DIR / "site" / "icons",
+        SDL_PORT,
+        *hud_configure_inputs(),
+    ]
 
 
 def generate_web_build(n: Writer, sln: Any) -> None:
@@ -201,8 +241,8 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     n.rule(
         name="web_sdl3",
         command=f"echo '#include <SDL3/SDL.h>' > $out.c && $web_emcc {sdl_flag} -pthread -c $out.c -o $out.o && "
-                f"rm -f $out.c $out.o && cp \"$$({_quote(em_config)} CACHE)/ports/halo_sdl3/SDL-{SDL_TAG}/LICENSE.txt\" "
-                f"{sdl_license} && touch $out",
+        f"rm -f $out.c $out.o && cp \"$$({_quote(em_config)} CACHE)/ports/halo_sdl3/SDL-{SDL_TAG}/LICENSE.txt\" "
+        f"{sdl_license} && touch $out",
         description="WEB SDL3 (Emscripten port, fetched and built once)",
         pool="console",
     )
@@ -221,14 +261,20 @@ def generate_web_build(n: Writer, sln: Any) -> None:
 
     # ---------- the game
 
-    game_cflags = " ".join([
-        abi, code, " ".join(GAME_FLAGS),
-        f"-include {prefix_header}", f"-include {semantics_header}",
-        f"-I{LINUX_DIR}/include",
-        # the headers of the port's own game units (port/linux/game)
-        f"-iquote {Path(config['game_sources'])}",
-        game_defines_and_includes(config), f"-idirafter {XDK_INCLUDE}",
-    ])
+    game_cflags = " ".join(
+        [
+            abi,
+            code,
+            " ".join(GAME_FLAGS),
+            f"-include {prefix_header}",
+            f"-include {semantics_header}",
+            f"-I{LINUX_DIR}/include",
+            # the headers of the port's own game units (port/linux/game)
+            f"-iquote {Path(config['game_sources'])}",
+            game_defines_and_includes(config),
+            f"-idirafter {XDK_INCLUDE}",
+        ]
+    )
     for source in game_sources(config):
         name = source.as_posix()
         cflags = game_cflags
@@ -250,17 +296,41 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     # ---------- the platform layer and the web runtime
 
     platform_dir = Path(config["platform_sources"])
-    platform_cflags = " ".join([
-        abi, code, sdl_flag, "-std=gnu11", "-D_GNU_SOURCE", "-DHALO_LINUX_PLATFORM_LAYER", "-w",
-        f"-include {prefix_header}", f"-include {platform_semantics_header}",
-        f"-I{platform_dir}", f"-I{LINUX_DIR}/include", f"-I{PORT_DIR}/src", f"-I{ANDROID_DIR}/host",
-        f"-I{TOML_DIR}", f"-I{EXPAT_DIR}", f"-I{KCP_DIR}", f"-I{MONOCYPHER_DIR}", f"-I{ZLIB_DIR}",
-        "-Isource -Isource/cseries", f"-idirafter {XDK_INCLUDE}",
-    ])
+    platform_cflags = " ".join(
+        [
+            abi,
+            code,
+            sdl_flag,
+            "-std=gnu11",
+            "-D_GNU_SOURCE",
+            "-DHALO_LINUX_PLATFORM_LAYER",
+            "-w",
+            f"-include {prefix_header}",
+            f"-include {platform_semantics_header}",
+            f"-I{platform_dir}",
+            f"-I{LINUX_DIR}/include",
+            f"-I{PORT_DIR}/src",
+            f"-I{ANDROID_DIR}/host",
+            f"-I{TOML_DIR}",
+            f"-I{EXPAT_DIR}",
+            f"-I{KCP_DIR}",
+            f"-I{MONOCYPHER_DIR}",
+            f"-I{ZLIB_DIR}",
+            "-Isource -Isource/cseries",
+            f"-idirafter {XDK_INCLUDE}",
+        ]
+    )
     # posix_*.c talk to the C library only, with its own ABI (as on Linux)
-    posix_cflags = " ".join([
-        abi, "-std=gnu11", "-D_GNU_SOURCE", "-D_FILE_OFFSET_BITS=64", "-w", f"-I{platform_dir}",
-    ])
+    posix_cflags = " ".join(
+        [
+            abi,
+            "-std=gnu11",
+            "-D_GNU_SOURCE",
+            "-D_FILE_OFFSET_BITS=64",
+            "-w",
+            f"-I{platform_dir}",
+        ]
+    )
     for source in sorted(platform_dir.glob("*.c")):
         if source.name in WEB_EXCLUDE:
             continue
@@ -293,7 +363,10 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     halo_js = site_dir / "halo.js"
     halo_wasm = site_dir / "halo.wasm"
     link_flags = [
-        "-O2", "-g2", "-pthread", sdl_flag,
+        "-O2",
+        "-g2",
+        "-pthread",
+        sdl_flag,
         # a call that does not match its callee's type is an error, not a
         # trap when it runs
         "-Wl,--fatal-warnings",
@@ -337,8 +410,14 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
     )
-    n.build(outputs=halo_js, implicit_outputs=[halo_wasm], rule="web_link", inputs=objects,
-            implicit=[library_js, pre_js, SDL_PORT, sdl_stamp], variables={"ldflags": " ".join(link_flags)})
+    n.build(
+        outputs=halo_js,
+        implicit_outputs=[halo_wasm],
+        rule="web_link",
+        inputs=objects,
+        implicit=[library_js, pre_js, SDL_PORT, sdl_stamp],
+        variables={"ldflags": " ".join(link_flags)},
+    )
 
     # ---------- the site: the page, its service worker and the importer
 
@@ -366,7 +445,11 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         description="WEB VERSION $out",
     )
     version_file = site_dir / "version.json"
-    n.build(outputs=version_file, rule="web_version", inputs=[halo_js, halo_wasm, *site_files],
-            implicit=[PORT_DIR / "stamp_version.py", Path("port/linux/include/halo_port_limits.h")])
+    n.build(
+        outputs=version_file,
+        rule="web_version",
+        inputs=[halo_js, halo_wasm, *site_files],
+        implicit=[PORT_DIR / "stamp_version.py", Path("port/linux/include/halo_port_limits.h")],
+    )
     n.build(outputs="web", rule="phony", inputs=[halo_js, halo_wasm, version_file, *site_files])
     n.newline()

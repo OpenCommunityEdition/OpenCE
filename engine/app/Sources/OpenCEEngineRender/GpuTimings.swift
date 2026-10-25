@@ -89,7 +89,8 @@ public final class GpuTimings: @unchecked Sendable {
     /// the first time the command buffer is seen; nil when timing is off,
     /// unsupported, or every slot is in use.
     private func begin(_ commands: MTLCommandBuffer, _ name: String, _ kind: Kind)
-        -> (samples: MTLCounterSampleBuffer, first: Int)? {
+        -> (samples: MTLCounterSampleBuffer, first: Int)?
+    {
         withState { state -> (MTLCounterSampleBuffer, Int)? in
             guard state.enabled, !state.unsupported else { return nil }
             if state.device !== commands.device {
@@ -125,7 +126,7 @@ public final class GpuTimings: @unchecked Sendable {
 
     private static func makeSlots(_ device: MTLDevice) -> [Slot] {
         guard supported(device),
-              let set = device.counterSets?.first(where: { $0.name == MTLCommonCounterSet.timestamp.rawValue })
+            let set = device.counterSets?.first(where: { $0.name == MTLCommonCounterSet.timestamp.rawValue })
         else { return [] }
         let descriptor = MTLCounterSampleBufferDescriptor()
         descriptor.counterSet = set
@@ -148,7 +149,7 @@ public final class GpuTimings: @unchecked Sendable {
             state.slots[index].busy = false
             state.slots[index].commands = nil
             guard !slot.passes.isEmpty,
-                  let data = try? slot.samples.resolveCounterRange(0..<(slot.passes.count * 4))
+                let data = try? slot.samples.resolveCounterRange(0..<(slot.passes.count * 4))
             else { return }
             if let device = state.device, let first = state.first {
                 let (cpu, gpu) = device.sampleTimestamps()
@@ -161,8 +162,9 @@ public final class GpuTimings: @unchecked Sendable {
             state.lastFrame = slot.passes.enumerated().map { pass, entry in
                 let first = pass * 4
                 let taken = entry.kind == .render ? ticks[first..<(first + 4)] : ticks[first..<(first + 2)]
-                return PassTime(name: entry.name,
-                                milliseconds: Self.milliseconds(Array(taken), state.nanosecondsPerTick))
+                return PassTime(
+                    name: entry.name,
+                    milliseconds: Self.milliseconds(Array(taken), state.nanosecondsPerTick))
             }
             state.frames += 1
         }
@@ -177,10 +179,12 @@ public final class GpuTimings: @unchecked Sendable {
         return milliseconds < 1000 ? milliseconds : 0
     }
 
-    fileprivate func render(_ commands: MTLCommandBuffer, _ name: String,
-                            _ descriptor: MTLRenderPassDescriptor) -> MTLRenderCommandEncoder? {
+    fileprivate func render(
+        _ commands: MTLCommandBuffer, _ name: String,
+        _ descriptor: MTLRenderPassDescriptor
+    ) -> MTLRenderCommandEncoder? {
         guard let (samples, first) = begin(commands, name, .render),
-              let attachment = descriptor.sampleBufferAttachments[0]
+            let attachment = descriptor.sampleBufferAttachments[0]
         else {
             return commands.makeRenderCommandEncoder(descriptor: descriptor)
         }

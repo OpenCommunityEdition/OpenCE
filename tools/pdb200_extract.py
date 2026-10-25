@@ -143,9 +143,7 @@ class Msf2:
         if not data.startswith(MAGIC) or len(data) < 60:
             raise PdbError("not a PDB 2.00 JG file")
         self.data = data
-        self.block_size, free, block_count, toc_size, toc_unknown = struct.unpack_from(
-            "<IHHII", data, len(MAGIC)
-        )
+        self.block_size, free, block_count, toc_size, toc_unknown = struct.unpack_from("<IHHII", data, len(MAGIC))
         if free >= block_count or self.block_size < 64 or self.block_size & (self.block_size - 1):
             raise PdbError("invalid MSF block geometry")
         if block_count * self.block_size > len(data) or not toc_size:
@@ -218,8 +216,15 @@ def _numeric(data: bytes, offset: int) -> tuple[int, int]:
     leaf = _u16(data, offset)
     if leaf < 0x8000:
         return leaf, offset + 2
-    formats = {0x8000: ("<b", 1), 0x8001: ("<h", 2), 0x8002: ("<H", 2),
-               0x8003: ("<i", 4), 0x8004: ("<I", 4), 0x8009: ("<q", 8), 0x800A: ("<Q", 8)}
+    formats = {
+        0x8000: ("<b", 1),
+        0x8001: ("<h", 2),
+        0x8002: ("<H", 2),
+        0x8003: ("<i", 4),
+        0x8004: ("<I", 4),
+        0x8009: ("<q", 8),
+        0x800A: ("<Q", 8),
+    }
     if leaf not in formats:
         raise PdbError("unsupported numeric leaf")
     fmt, size = formats[leaf]
@@ -347,14 +352,41 @@ def _basic_width(type_index: int) -> int | None:
     mode = (type_index >> 8) & 0x7
     if mode:
         return 4
-    return {0x03: 4, 0x10: 1, 0x11: 2, 0x12: 4, 0x13: 8, 0x20: 1, 0x21: 2,
-            0x22: 4, 0x23: 8, 0x30: 1, 0x31: 2, 0x32: 4, 0x40: 4, 0x41: 8,
-            0x68: 1, 0x69: 1, 0x72: 2, 0x73: 2, 0x74: 4, 0x75: 4, 0x76: 8,
-            0x77: 8}.get(base)
+    return {
+        0x03: 4,
+        0x10: 1,
+        0x11: 2,
+        0x12: 4,
+        0x13: 8,
+        0x20: 1,
+        0x21: 2,
+        0x22: 4,
+        0x23: 8,
+        0x30: 1,
+        0x31: 2,
+        0x32: 4,
+        0x40: 4,
+        0x41: 8,
+        0x68: 1,
+        0x69: 1,
+        0x72: 2,
+        0x73: 2,
+        0x74: 4,
+        0x75: 4,
+        0x76: 8,
+        0x77: 8,
+    }.get(base)
 
 
-def parse_symbols(data: bytes, pe: PeImage, widths: dict[int, int], stats: Counter,
-                  start: int = 0, end: int | None = None, pascal: bool = False) -> list[dict]:
+def parse_symbols(
+    data: bytes,
+    pe: PeImage,
+    widths: dict[int, int],
+    stats: Counter,
+    start: int = 0,
+    end: int | None = None,
+    pascal: bool = False,
+) -> list[dict]:
     result = []
     try:
         iterable = _records(data, start, end)
@@ -364,17 +396,31 @@ def parse_symbols(data: bytes, pe: PeImage, widths: dict[int, int], stats: Count
             try:
                 symbol = None
                 if kind in (S_LPROC_V3, S_GPROC_V3):
-                    length, type_index, offset, segment = _u32(record, 16), _u32(record, 28), _u32(record, 32), _u16(record, 36)
+                    length, type_index, offset, segment = (
+                        _u32(record, 16),
+                        _u32(record, 28),
+                        _u32(record, 32),
+                        _u16(record, 36),
+                    )
                     symbol = _make_symbol(record, 39, segment, offset, length, "FUNC", pe, False)
                 elif kind in (S_LPROC_V2, S_GPROC_V2):
-                    length, type_index, offset, segment = _u32(record, 16), _u32(record, 28), _u32(record, 32), _u16(record, 36)
+                    length, type_index, offset, segment = (
+                        _u32(record, 16),
+                        _u32(record, 28),
+                        _u32(record, 32),
+                        _u16(record, 36),
+                    )
                     symbol = _make_symbol(record, 39, segment, offset, length, "FUNC", pe, True)
                 elif kind in (S_LDATA_V3, S_GDATA_V3):
                     type_index, offset, segment = _u32(record, 4), _u32(record, 8), _u16(record, 12)
-                    symbol = _make_symbol(record, 14, segment, offset, widths.get(type_index, _basic_width(type_index)), "DATA", pe, False)
+                    symbol = _make_symbol(
+                        record, 14, segment, offset, widths.get(type_index, _basic_width(type_index)), "DATA", pe, False
+                    )
                 elif kind in (S_LDATA_V2, S_GDATA_V2):
                     type_index, offset, segment = _u32(record, 4), _u32(record, 8), _u16(record, 12)
-                    symbol = _make_symbol(record, 14, segment, offset, widths.get(type_index, _basic_width(type_index)), "DATA", pe, True)
+                    symbol = _make_symbol(
+                        record, 14, segment, offset, widths.get(type_index, _basic_width(type_index)), "DATA", pe, True
+                    )
                 elif kind == S_LABEL_V3:
                     offset, segment = _u32(record, 4), _u16(record, 8)
                     symbol = _make_symbol(record, 11, segment, offset, 0, "LABEL", pe, False)
@@ -394,8 +440,9 @@ def parse_symbols(data: bytes, pe: PeImage, widths: dict[int, int], stats: Count
     return result
 
 
-def _make_symbol(record: bytes, name_at: int, segment: int, offset: int, length: int | None,
-                 kind: str, pe: PeImage, pascal: bool) -> dict:
+def _make_symbol(
+    record: bytes, name_at: int, segment: int, offset: int, length: int | None, kind: str, pe: PeImage, pascal: bool
+) -> dict:
     if length is None or length < 0 or (length == 0 and kind != "LABEL"):
         raise PdbError("symbol has no authoritative length")
     name = _pname(record, name_at) if pascal else _zname(record, name_at)
@@ -403,8 +450,7 @@ def _make_symbol(record: bytes, name_at: int, segment: int, offset: int, length:
     if resolved is None:
         raise PdbError("symbol outside image")
     section, rva = resolved
-    return {"name": name, "rva": rva, "section": section.name, "length": length,
-            "kind": kind, "source": "PDB2.00"}
+    return {"name": name, "rva": rva, "section": section.name, "length": length, "kind": kind, "source": "PDB2.00"}
 
 
 def _mark_ambiguities(symbols: list[dict], stats: Counter) -> None:
@@ -417,8 +463,11 @@ def _mark_ambiguities(symbols: list[dict], stats: Counter) -> None:
             for item in group:
                 item["ambiguous"] = True
             stats["ambiguous_duplicate_symbols"] += len(group)
-    ranges = [(item["rva"], item["rva"] + item["length"], index, item)
-              for index, item in enumerate(symbols) if item["kind"] != "LABEL"]
+    ranges = [
+        (item["rva"], item["rva"] + item["length"], index, item)
+        for index, item in enumerate(symbols)
+        if item["kind"] != "LABEL"
+    ]
     ranges.sort(key=lambda entry: (entry[0], entry[1], entry[2]))
     active: list[tuple[int, dict]] = []
     for start, stop, index, item in ranges:
@@ -477,10 +526,15 @@ def _delta(symbols: list[dict], config_path: Path, pe: PeImage) -> dict:
             if matching:
                 confirmations.append({"name": name, "rvas": matching})
             if nonmatching:
-                conflicts.append({"name": name, "pdb_rvas": nonmatching,
-                                  "config_rvas": sorted(set(known[name])), "ambiguous": bool(matching)})
-    return {"advisory_only": True, "confirmations": confirmations, "conflicts": conflicts,
-            "additions": additions}
+                conflicts.append(
+                    {
+                        "name": name,
+                        "pdb_rvas": nonmatching,
+                        "config_rvas": sorted(set(known[name])),
+                        "ambiguous": bool(matching),
+                    }
+                )
+    return {"advisory_only": True, "confirmations": confirmations, "conflicts": conflicts, "additions": additions}
 
 
 def extract(pdb_path: Path, exe_path: Path, config_path: Path, output: Path) -> dict:

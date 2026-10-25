@@ -30,9 +30,12 @@ from harness import enum_with, function, read  # noqa: E402
 OUTPUT = ROOT / "engine" / "crates" / "sim" / "tests" / "first_person_reference.txt"
 
 FUNCTIONS = [
-    "first_person_weapon_state_from_weapon_message", "first_person_animation_type_from_weapon_state",
-    "first_person_weapon_start_interpolation", "first_person_weapon_set_state",
-    "first_person_weapon_message", "first_person_weapon_next_state",
+    "first_person_weapon_state_from_weapon_message",
+    "first_person_animation_type_from_weapon_state",
+    "first_person_weapon_start_interpolation",
+    "first_person_weapon_set_state",
+    "first_person_weapon_message",
+    "first_person_weapon_next_state",
 ]
 
 FAKE_WORLD = r"""
@@ -253,13 +256,24 @@ def source_file():
     weapons_h = read("source/items/weapons.h")
     flags_h = read("source/items/weapon_datum_flags.h")
     first_person_c = read("source/interface/first_person_weapons.c")
-    enums = [enum_with(weapons_h, member) for member in
-             ("_first_person_weapon_message_primary_fire", "_weapon_type_undefined",
-              "_shotgun_reload_type_first_round", "_first_person_weapon_animation_idle")]
-    enums += [enum_with(flags_h, "_weapon_overheated_bit"),
-              enum_with(first_person_c, "_first_person_weapon_state_idle")]
-    push_back = next(line for line in first_person_c.splitlines()
-                     if line.startswith("#define FIRST_PERSON_WEAPON_FIRING_PUSH_BACK_VELOCITY"))
+    enums = [
+        enum_with(weapons_h, member)
+        for member in (
+            "_first_person_weapon_message_primary_fire",
+            "_weapon_type_undefined",
+            "_shotgun_reload_type_first_round",
+            "_first_person_weapon_animation_idle",
+        )
+    ]
+    enums += [
+        enum_with(flags_h, "_weapon_overheated_bit"),
+        enum_with(first_person_c, "_first_person_weapon_state_idle"),
+    ]
+    push_back = next(
+        line
+        for line in first_person_c.splitlines()
+        if line.startswith("#define FIRST_PERSON_WEAPON_FIRING_PUSH_BACK_VELOCITY")
+    )
     definitions = [function(first_person_c, name) for name in FUNCTIONS]
     return "\n\n".join([*enums, push_back, FAKE_WORLD, *definitions, MAIN])
 
@@ -276,17 +290,20 @@ def reference():
         if result.returncode:
             raise SystemExit(f"the reference does not compile:\n{result.stderr}")
         output = subprocess.run([str(executable)], capture_output=True, text=True, check=True).stdout
-    weapon = ("<state> <animation> <frame> <interpolation frames> <sounds stopped>"
-              " <shotgun reload type> <shells to reload> <shotgun empty>")
-    return ("# The game's first-person weapon state rules (tools/engine_first_person_reference.py).\n"
-            "# Animation n of the weapon's first-person block is the graph's animation 100+n; graph 1 has\n"
-            "# only the first 17, graph 2 has every one but posing. Each line ends with the weapon after it:\n"
-            f"# {weapon}\n"
-            "# set <weapon type> <overheated> <graph> <state> <new state> ...\n"
-            "# next <weapon type> <overheated> <state> <shotgun reload type> <shotgun empty> ...\n"
-            "# message <weapon type> <overheated> <rounds loaded> <rounds total> <rounds maximum>"
-            " <magazine state> <state> <message> <forgot> <switched> <unzoomed> <pushed back> ...\n"
-            + output)
+    weapon = (
+        "<state> <animation> <frame> <interpolation frames> <sounds stopped>"
+        " <shotgun reload type> <shells to reload> <shotgun empty>"
+    )
+    return (
+        "# The game's first-person weapon state rules (tools/engine_first_person_reference.py).\n"
+        "# Animation n of the weapon's first-person block is the graph's animation 100+n; graph 1 has\n"
+        "# only the first 17, graph 2 has every one but posing. Each line ends with the weapon after it:\n"
+        f"# {weapon}\n"
+        "# set <weapon type> <overheated> <graph> <state> <new state> ...\n"
+        "# next <weapon type> <overheated> <state> <shotgun reload type> <shotgun empty> ...\n"
+        "# message <weapon type> <overheated> <rounds loaded> <rounds total> <rounds maximum>"
+        " <magazine state> <state> <message> <forgot> <switched> <unzoomed> <pushed back> ...\n" + output
+    )
 
 
 def main():

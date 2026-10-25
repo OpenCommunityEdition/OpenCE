@@ -97,8 +97,10 @@ struct ScreenUniforms {
     /// How much the occlusion darkens, scaled (`tune.ao`).
     var tune: SIMD4<Float>
 
-    init(viewProjection: simd_float4x4, eye: SIMD3<Float>, sunTowards: SIMD4<Float>, width: Int, height: Int,
-         switches: RenderSwitches, ambientOcclusion: Float = 1) {
+    init(
+        viewProjection: simd_float4x4, eye: SIMD3<Float>, sunTowards: SIMD4<Float>, width: Int, height: Int,
+        switches: RenderSwitches, ambientOcclusion: Float = 1
+    ) {
         clipToWorld = viewProjection.inverse
         worldToClip = viewProjection
         self.eye = SIMD4(eye, ViewCamera.near)
@@ -107,8 +109,9 @@ struct ScreenUniforms {
         // vertical scale over half the height)
         let up = SIMD3(viewProjection.columns.0.y, viewProjection.columns.1.y, viewProjection.columns.2.y)
         size = SIMD4(Float(width), Float(height), 0, length(up) * Float(height) / 2)
-        passes = SIMD4(switches.gtao ? 1 : 0, switches.contactShadows ? 1 : 0, switches.ssr ? 1 : 0,
-                       switches.view.index)
+        passes = SIMD4(
+            switches.gtao ? 1 : 0, switches.contactShadows ? 1 : 0, switches.ssr ? 1 : 0,
+            switches.view.index)
         quality = SIMD4(switches.halfOcclusion ? 1 : 0, 0, 0, 0)
         tune = SIMD4(ambientOcclusion, 0, 0, 0)
     }
@@ -217,25 +220,31 @@ final class ScreenPass {
         }
         let attached: MTLTextureUsage = [.renderTarget, .shaderRead]
         guard let surface = texture(Self.attachmentFormats[0], attached),
-              let reflection = texture(Self.attachmentFormats[1], attached),
-              let reflectance = texture(Self.attachmentFormats[2], attached),
-              let occlusion = texture(.rgba16Float, [.shaderRead, .shaderWrite]),
-              let halfOcclusion = texture(.rgba16Float, [.shaderRead, .shaderWrite], halved: true),
-              let reflected = texture(.rgba16Float, [.shaderRead, .shaderWrite]) else { return nil }
-        targets = Targets(surface: surface, reflection: reflection, reflectance: reflectance, occlusion: occlusion,
-                          halfOcclusion: halfOcclusion, reflected: reflected)
+            let reflection = texture(Self.attachmentFormats[1], attached),
+            let reflectance = texture(Self.attachmentFormats[2], attached),
+            let occlusion = texture(.rgba16Float, [.shaderRead, .shaderWrite]),
+            let halfOcclusion = texture(.rgba16Float, [.shaderRead, .shaderWrite], halved: true),
+            let reflected = texture(.rgba16Float, [.shaderRead, .shaderWrite])
+        else { return nil }
+        targets = Targets(
+            surface: surface, reflection: reflection, reflectance: reflectance, occlusion: occlusion,
+            halfOcclusion: halfOcclusion, reflected: reflected)
         return targets
     }
 
     /// The occlusion and the traced reflections, from the opaque frame and
     /// its depth (each pass only when it is on or shown).
-    func encode(into commands: MTLCommandBuffer, targets: Targets, frame: MTLTexture, depth: MTLTexture,
-                uniforms: ScreenUniforms) {
-        let occlusionNeeded = uniforms.passes.x != 0 || uniforms.passes.y != 0
+    func encode(
+        into commands: MTLCommandBuffer, targets: Targets, frame: MTLTexture, depth: MTLTexture,
+        uniforms: ScreenUniforms
+    ) {
+        let occlusionNeeded =
+            uniforms.passes.x != 0 || uniforms.passes.y != 0
             || [RenderView.depth, .ao, .contact].map(\.index).contains(uniforms.passes.w)
         let reflectionNeeded = uniforms.passes.z != 0 || uniforms.passes.w == RenderView.ssr.index
         guard occlusionNeeded || reflectionNeeded,
-              let encoder = commands.timedComputeEncoder("screen") else { return }
+            let encoder = commands.timedComputeEncoder("screen")
+        else { return }
         let threads = MTLSize(width: 8, height: 8, depth: 1)
         let groups = MTLSize(width: (frame.width + 7) / 8, height: (frame.height + 7) / 8, depth: 1)
         if occlusionNeeded {
@@ -251,8 +260,10 @@ final class ScreenPass {
                 let half = targets.halfOcclusion
                 encoder.setComputePipelineState(pipelines.halfOcclusion)
                 encoder.setTexture(half, index: 2)
-                encoder.dispatchThreadgroups(MTLSize(width: (half.width + 7) / 8, height: (half.height + 7) / 8,
-                                                     depth: 1), threadsPerThreadgroup: threads)
+                encoder.dispatchThreadgroups(
+                    MTLSize(
+                        width: (half.width + 7) / 8, height: (half.height + 7) / 8,
+                        depth: 1), threadsPerThreadgroup: threads)
                 encoder.memoryBarrier(resources: [half])
             }
             encoder.setComputePipelineState(pipelines.occlusion)

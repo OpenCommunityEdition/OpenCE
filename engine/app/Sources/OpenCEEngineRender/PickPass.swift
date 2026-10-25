@@ -25,24 +25,28 @@ final class PickPass {
     private let queue: MTLCommandQueue
 
     init(device: MTLDevice, library: MTLLibrary, levelStride: Int, modelStride: Int) throws {
-        pipelines = try Self.pipelines(device: device, library: library, levelStride: levelStride,
-                                       modelStride: modelStride)
+        pipelines = try Self.pipelines(
+            device: device, library: library, levelStride: levelStride,
+            modelStride: modelStride)
         // reversed depth, as the frame's: nearer is greater
         let state = MTLDepthStencilDescriptor()
         state.depthCompareFunction = .greater
         state.isDepthWriteEnabled = true
-        let color = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Self.format, width: 1, height: 1,
-                                                             mipmapped: false)
+        let color = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: Self.format, width: 1, height: 1,
+            mipmapped: false)
         color.usage = [.renderTarget]
         color.storageMode = .shared
-        let depthDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: LevelRenderer.depthFormat,
-                                                                       width: 1, height: 1, mipmapped: false)
+        let depthDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: LevelRenderer.depthFormat,
+            width: 1, height: 1, mipmapped: false)
         depthDescriptor.usage = [.renderTarget]
         depthDescriptor.storageMode = .private
         guard let depthState = device.makeDepthStencilState(descriptor: state),
-              let target = device.makeTexture(descriptor: color),
-              let depth = device.makeTexture(descriptor: depthDescriptor),
-              let queue = device.makeCommandQueue() else {
+            let target = device.makeTexture(descriptor: color),
+            let depth = device.makeTexture(descriptor: depthDescriptor),
+            let queue = device.makeCommandQueue()
+        else {
             throw LevelRendererError.resources("pick target")
         }
         self.depthState = depthState
@@ -51,8 +55,10 @@ final class PickPass {
         self.queue = queue
     }
 
-    static func pipelines(device: MTLDevice, library: MTLLibrary, levelStride: Int,
-                          modelStride: Int) throws -> Pipelines {
+    static func pipelines(
+        device: MTLDevice, library: MTLLibrary, levelStride: Int,
+        modelStride: Int
+    ) throws -> Pipelines {
         func pipeline(vertex: String, descriptor vertices: MTLVertexDescriptor) throws -> MTLRenderPipelineState {
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = try library.required(vertex)
@@ -64,10 +70,12 @@ final class PickPass {
         }
         do {
             return Pipelines(
-                level: try pipeline(vertex: "shadow_level_vertex",
-                                    descriptor: LevelRenderer.vertexDescriptor(stride: levelStride)),
-                model: try pipeline(vertex: "shadow_model_vertex",
-                                    descriptor: ModelPass.vertexDescriptor(stride: modelStride)))
+                level: try pipeline(
+                    vertex: "shadow_level_vertex",
+                    descriptor: LevelRenderer.vertexDescriptor(stride: levelStride)),
+                model: try pipeline(
+                    vertex: "shadow_model_vertex",
+                    descriptor: ModelPass.vertexDescriptor(stride: modelStride)))
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
@@ -86,16 +94,21 @@ final class PickPass {
         // (the pixel's middle in the view's normalized coordinates)
         let middleX = (2 * (Float(x) + 0.5)) / scaleX - 1
         let middleY = 1 - (2 * (Float(y) + 0.5)) / scaleY
-        return simd_float4x4(columns: (SIMD4(scaleX, 0, 0, 0), SIMD4(0, scaleY, 0, 0), SIMD4(0, 0, 1, 0),
-                                       SIMD4(-scaleX * middleX, -scaleY * middleY, 0, 1)))
+        return simd_float4x4(
+            columns: (
+                SIMD4(scaleX, 0, 0, 0), SIMD4(0, scaleY, 0, 0), SIMD4(0, 0, 1, 0),
+                SIMD4(-scaleX * middleX, -scaleY * middleY, 0, 1)
+            ))
     }
 
     /// The id drawn at the pixel `matrix` narrows the view to, nil for
     /// none: `level` draws the level's surfaces and `objects` the objects
     /// (each binding its own id at fragment buffer 1), with the matrix at
     /// vertex buffer 1.
-    func pick(matrix: simd_float4x4,
-              level: (MTLRenderCommandEncoder) -> Void, objects: (MTLRenderCommandEncoder) -> Void) -> UInt32? {
+    func pick(
+        matrix: simd_float4x4,
+        level: (MTLRenderCommandEncoder) -> Void, objects: (MTLRenderCommandEncoder) -> Void
+    ) -> UInt32? {
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = target
         pass.colorAttachments[0].loadAction = .clear
@@ -106,7 +119,8 @@ final class PickPass {
         pass.depthAttachment.clearDepth = 0
         pass.depthAttachment.storeAction = .dontCare
         guard let commands = queue.makeCommandBuffer(),
-              let encoder = commands.timedRenderEncoder("pick", descriptor: pass) else { return nil }
+            let encoder = commands.timedRenderEncoder("pick", descriptor: pass)
+        else { return nil }
         encoder.setDepthStencilState(depthState)
         encoder.setCullMode(.none)
         var narrowed = matrix
@@ -121,8 +135,9 @@ final class PickPass {
         commands.commit()
         commands.waitUntilCompleted()
         var picked = Self.none
-        target.getBytes(&picked, bytesPerRow: MemoryLayout<UInt32>.stride, from: MTLRegionMake2D(0, 0, 1, 1),
-                        mipmapLevel: 0)
+        target.getBytes(
+            &picked, bytesPerRow: MemoryLayout<UInt32>.stride, from: MTLRegionMake2D(0, 0, 1, 1),
+            mipmapLevel: 0)
         return picked == Self.none ? nil : picked
     }
 }

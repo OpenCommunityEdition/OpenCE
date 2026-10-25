@@ -61,8 +61,10 @@ def test_binaries(lines: list[str]) -> list[Suite]:
         suites.append(Suite(name, Path(message["executable"]), Path(message["manifest_path"]).parent))
     # (two crates' suites of one name would share a key in the timings)
     counts = Counter(suite.name for suite in suites)
-    return [replace(suite, name=f"{suite.name} ({suite.package.name})") if counts[suite.name] > 1 else suite
-            for suite in suites]
+    return [
+        replace(suite, name=f"{suite.name} ({suite.package.name})") if counts[suite.name] > 1 else suite
+        for suite in suites
+    ]
 
 
 def table(timings: dict, slowest: int = 10) -> str:
@@ -119,24 +121,48 @@ def main() -> None:
         (ENGINE / "crates" / "sim" / "src" / "lib.rs").touch()
         record("build_dev_touch", ["cargo", "build", "--locked", "--workspace"], dev, cold=False)
     if "build_tests" in steps:
-        record("build_tests", ["cargo", "test", "--locked", "--workspace", "--profile", arguments.profile,
-                               "--no-run"], dev, cold=False)
+        record(
+            "build_tests",
+            ["cargo", "test", "--locked", "--workspace", "--profile", arguments.profile, "--no-run"],
+            dev,
+            cold=False,
+        )
     if "build_release_cold" in steps:
-        record("build_release_cold", ["cargo", "build", "--locked", "--release", "-p", "opence_ffi", "--lib"],
-               release, cold=True)
+        record(
+            "build_release_cold",
+            ["cargo", "build", "--locked", "--release", "-p", "opence_ffi", "--lib"],
+            release,
+            cold=True,
+        )
     if "suites" in steps:
         listing = subprocess.run(
-            ["cargo", "test", "--locked", "--workspace", "--profile", arguments.profile, "--no-run",
-             "--message-format=json"],
-            cwd=ENGINE, env=environment | {"CARGO_TARGET_DIR": str(dev)},
-            capture_output=True, text=True, check=True,
+            [
+                "cargo",
+                "test",
+                "--locked",
+                "--workspace",
+                "--profile",
+                arguments.profile,
+                "--no-run",
+                "--message-format=json",
+            ],
+            cwd=ENGINE,
+            env=environment | {"CARGO_TARGET_DIR": str(dev)},
+            capture_output=True,
+            text=True,
+            check=True,
         )
         timings["suites"] = {}
         for suite in test_binaries(listing.stdout.splitlines()):
             start = time.monotonic()
-            run = subprocess.run([str(suite.executable)], cwd=suite.package,
-                                 env=environment | {"CARGO_MANIFEST_DIR": str(suite.package)},
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            run = subprocess.run(
+                [str(suite.executable)],
+                cwd=suite.package,
+                env=environment | {"CARGO_MANIFEST_DIR": str(suite.package)},
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
             seconds = time.monotonic() - start
             timings["suites"][suite.name] = {"seconds": seconds, "passed": run.returncode == 0}
             print(f"  {suite.name}: {seconds:.1f} s{'' if run.returncode == 0 else ' (failed)'}", flush=True)
@@ -152,12 +178,15 @@ def main() -> None:
         start = time.monotonic()
         result = subprocess.run(
             [str(executable), "--benchmark", str(seconds), "--map", str(devgulch), "--cache", str(cache)],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         wall = time.monotonic() - start
         report = json.loads(result.stdout.strip().splitlines()[-1])
         timings["benchmark"] = {
-            "p50": f"{report['p50_ms']:.2f} ms", "p99": f"{report['p99_ms']:.2f} ms",
+            "p50": f"{report['p50_ms']:.2f} ms",
+            "p99": f"{report['p99_ms']:.2f} ms",
             "gpu p99": f"{report['gpu_p99_ms']:.2f} ms",
             "start and load (cached)": f"{wall - seconds:.1f} s",
         }

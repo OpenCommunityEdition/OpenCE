@@ -25,12 +25,52 @@ IMAGE = ROOT / "build" / "macos" / "halo_guest.elf"
 MAPS = ROOT / "assets" / "maps"
 TRACES = ROOT / "engine" / "tests" / "traces"
 SCRIPTS = ("run", "strafe", "jump", "runjump", "crouch", "fall", "ramp")
-VEHICLE_SCRIPTS = ("warthog_drive", "warthog_turn", "warthog_brake", "warthog_ramp", "ghost_drive", "ghost_turn",
-                   "ghost_brake")
-COLUMNS = ("tick", "x", "y", "z", "vx", "vy", "vz", "yaw", "airborne", "airborne_ticks", "crouch", "landing",
-           "body", "shield")
-VEHICLE_COLUMNS = ("tick", "x", "y", "z", "vx", "vy", "vz", "forward_i", "forward_j", "forward_k", "up_i", "up_j",
-                   "up_k", "wx", "wy", "wz", "speed", "turn", "airborne_ticks")
+VEHICLE_SCRIPTS = (
+    "warthog_drive",
+    "warthog_turn",
+    "warthog_brake",
+    "warthog_ramp",
+    "ghost_drive",
+    "ghost_turn",
+    "ghost_brake",
+)
+COLUMNS = (
+    "tick",
+    "x",
+    "y",
+    "z",
+    "vx",
+    "vy",
+    "vz",
+    "yaw",
+    "airborne",
+    "airborne_ticks",
+    "crouch",
+    "landing",
+    "body",
+    "shield",
+)
+VEHICLE_COLUMNS = (
+    "tick",
+    "x",
+    "y",
+    "z",
+    "vx",
+    "vy",
+    "vz",
+    "forward_i",
+    "forward_j",
+    "forward_k",
+    "up_i",
+    "up_j",
+    "up_k",
+    "wx",
+    "wy",
+    "wz",
+    "speed",
+    "turn",
+    "airborne_ticks",
+)
 LINE = re.compile(r"movement trace: (\w+) (-?\d+(?: -?[\d.]+(?:e[-+]?\d+)?){13})$")
 VEHICLE_LINE = re.compile(r"vehicle trace: (\w+) (-?\d+(?: -?[\d.]+(?:e[-+]?\d+)?){18})$")
 
@@ -44,15 +84,25 @@ def record(script: str, exit_after: int = 45, timeout: int = 240) -> list[list[s
         (data_root / "maps").symlink_to(MAPS)
         home = folder_path / "home"
         environment = dict(os.environ)
-        environment.update({
-            "HOME": str(home), "XDG_DATA_HOME": str(home / "saves"), "HALO_DATA_ROOT": str(data_root),
-            "HALO_EXIT_AFTER": str(exit_after), "HALO_NULL_RENDERER": "1", "HALO_HIDDEN_WINDOW": "1",
-            "SDL_VIDEO_DRIVER": "dummy", "SDL_AUDIO_DRIVER": "dummy",
-            "HALO_NETWORK_TEST": "host:bloodgulch", "HALO_NET_ADDRESS": "127.0.0.1",
-            "HALO_NET_ONLINE": "false", "HALO_MOVEMENT_TRACE": script,
-        })
-        result = subprocess.run([str(HOST), str(IMAGE)], cwd=data_root, env=environment, capture_output=True,
-                                text=True, timeout=timeout)
+        environment.update(
+            {
+                "HOME": str(home),
+                "XDG_DATA_HOME": str(home / "saves"),
+                "HALO_DATA_ROOT": str(data_root),
+                "HALO_EXIT_AFTER": str(exit_after),
+                "HALO_NULL_RENDERER": "1",
+                "HALO_HIDDEN_WINDOW": "1",
+                "SDL_VIDEO_DRIVER": "dummy",
+                "SDL_AUDIO_DRIVER": "dummy",
+                "HALO_NETWORK_TEST": "host:bloodgulch",
+                "HALO_NET_ADDRESS": "127.0.0.1",
+                "HALO_NET_ONLINE": "false",
+                "HALO_MOVEMENT_TRACE": script,
+            }
+        )
+        result = subprocess.run(
+            [str(HOST), str(IMAGE)], cwd=data_root, env=environment, capture_output=True, text=True, timeout=timeout
+        )
         output = result.stdout + result.stderr
         log = data_root / "debug.txt"
         if log.exists():

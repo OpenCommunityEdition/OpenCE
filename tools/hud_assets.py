@@ -67,8 +67,20 @@ MAXIMUM_SIZE = 2048
 # the Xbox maps' tag data is loaded here (cache_files.c)
 XBOX_TAG_BASE = 0x803A6000
 BITMAP_LINEAR_FLAG = 0x10
-FORMATS = {0: "a8", 1: "y8", 2: "ay8", 3: "a8y8", 6: "r5g6b5", 8: "a1r5g5b5", 9: "a4r4g4b4",
-           10: "x8r8g8b8", 11: "a8r8g8b8", 14: "dxt1", 15: "dxt3", 16: "dxt5"}
+FORMATS = {
+    0: "a8",
+    1: "y8",
+    2: "ay8",
+    3: "a8y8",
+    6: "r5g6b5",
+    8: "a1r5g5b5",
+    9: "a4r4g4b4",
+    10: "x8r8g8b8",
+    11: "a8r8g8b8",
+    14: "dxt1",
+    15: "dxt3",
+    16: "dxt5",
+}
 
 HUD = "ui\\hud\\bitmaps\\"
 # the folders of the HUD's bitmaps: the HUD's own, and the sniper rifle's
@@ -77,10 +89,14 @@ FOLDERS = (HUD, "weapons\\sniper rifle\\bitmaps\\")
 # the meter sheets: their redraws in the Xbox channel order (the fill
 # threshold the meter shader reads in the grey, the art in the alpha)
 METERS = {
-    HUD + "combined\\hud_unit_meters": ("hud_xbox_order/bitmaps/combined/hud_unit_meters.svg",
-                                       "extra/xbox_order_hud_meters/tags/ui/hud/bitmaps/combined/hud_unit_meters.bitmap"),
-    HUD + "combined\\hud_ammo_meters": ("hud_xbox_order/bitmaps/combined/hud_ammo_meters.svg",
-                                       "extra/xbox_order_hud_meters/tags/ui/hud/bitmaps/combined/hud_ammo_meters.bitmap"),
+    HUD + "combined\\hud_unit_meters": (
+        "hud_xbox_order/bitmaps/combined/hud_unit_meters.svg",
+        "extra/xbox_order_hud_meters/tags/ui/hud/bitmaps/combined/hud_unit_meters.bitmap",
+    ),
+    HUD + "combined\\hud_ammo_meters": (
+        "hud_xbox_order/bitmaps/combined/hud_ammo_meters.svg",
+        "extra/xbox_order_hud_meters/tags/ui/hud/bitmaps/combined/hud_ammo_meters.bitmap",
+    ),
 }
 # redraws not used: those with English text (other languages' maps have
 # their own; the Xbox message icons all have some), the sniper's zoom labels
@@ -112,8 +128,20 @@ UNUSED = {
 # value in every channel (the HUD blends premultiplied), A8Y8 grey and alpha,
 # A8 white with alpha, Y8 grey and opaque, colour formats as drawn; DXT ones
 # as drawn with the colour carried into the transparent texels, as theirs is
-KINDS = {0: "a8", 1: "y8", 2: "alpha", 3: "grey", 6: "colour", 8: "colour", 9: "colour", 10: "colour", 11: "colour",
-         14: "dxt", 15: "dxt", 16: "dxt"}
+KINDS = {
+    0: "a8",
+    1: "y8",
+    2: "alpha",
+    3: "grey",
+    6: "colour",
+    8: "colour",
+    9: "colour",
+    10: "colour",
+    11: "colour",
+    14: "dxt",
+    15: "dxt",
+    16: "dxt",
+}
 
 # how far (in Xbox texels) a redrawn cell may sit from its Xbox one, and how
 # much it must overlap it (the overlap of their shapes over their union: thin
@@ -127,22 +155,22 @@ MATCH = 0.25
 # the PC HUD sheet's drawing, each at that drawing's own scale
 RETICLES = {
     HUD + "combined\\hud_reticles": {
-        0: "reticle_20.svg",   # assault rifle
-        1: "reticle_17.svg",   # banshee gun
-        3: "reticle_06.svg",   # plasma pistol
-        4: "reticle_07.svg",   # plasma rifle
-        5: "reticle_14.svg",   # (no weapon's; probably the flamethrower's)
-        6: "reticle_08.svg",   # needler
-        7: "reticle_28.svg",   # no weapon
-        8: "reticle_19.svg",   # pistol
-        9: "reticle_27.svg",   # rocket launcher, wraith mortar
+        0: "reticle_20.svg",  # assault rifle
+        1: "reticle_17.svg",  # banshee gun
+        3: "reticle_06.svg",  # plasma pistol
+        4: "reticle_07.svg",  # plasma rifle
+        5: "reticle_14.svg",  # (no weapon's; probably the flamethrower's)
+        6: "reticle_08.svg",  # needler
+        7: "reticle_28.svg",  # no weapon
+        8: "reticle_19.svg",  # pistol
+        9: "reticle_27.svg",  # rocket launcher, wraith mortar
         10: "reticle_23.svg",  # shotgun
         12: "reticle_25.svg",  # covenant gun turret
         13: "reticle_16.svg",  # ghost gun
         14: "reticle_30.svg",  # (no weapon's; a small chevron)
     },
     HUD + "sniper\\hud_reticles_scope": {
-        0: "sniper_diamond.svg",   # Xbox sniper rifle, local redraw
+        0: "sniper_diamond.svg",  # Xbox sniper rifle, local redraw
     },
 }
 # the zoom labels beside the sniper's reticle, by sequence and sprite: no
@@ -170,9 +198,9 @@ class XboxMap:
         raw = path.read_bytes()
         self.data = raw[:0x800] + zlib.decompressobj().decompress(raw[0x800:])
         offset, size = struct.unpack_from("<ii", self.data, 0x10)
-        self.tags_data = self.data[offset:offset + size]
-        instances, = struct.unpack_from("<I", self.tags_data, 0)
-        count, = struct.unpack_from("<I", self.tags_data, 0xC)
+        self.tags_data = self.data[offset : offset + size]
+        (instances,) = struct.unpack_from("<I", self.tags_data, 0)
+        (count,) = struct.unpack_from("<I", self.tags_data, 0xC)
         self.tags = {}
         for index in range(count):
             group, _, _, _, name, address, _, _ = struct.unpack("<4sIIIIIII", self.read(instances + index * 0x20, 0x20))
@@ -181,7 +209,7 @@ class XboxMap:
 
     def read(self, address: int, size: int) -> bytes:
         offset = address - XBOX_TAG_BASE
-        return self.tags_data[offset:offset + size]
+        return self.tags_data[offset : offset + size]
 
     def bitmap_group(self, name: str) -> dict:
         address = self.tags[("bitm", name)]
@@ -193,17 +221,26 @@ class XboxMap:
             bitmap = self.read(bitmaps + index * 0x30, 0x30)
             width, height, _, _, format, flags = struct.unpack_from("<hhhhhH", bitmap, 4)
             offset, size = struct.unpack_from("<ii", bitmap, 0x18)
-            group["bitmaps"].append({"width": width, "height": height, "format": format, "flags": flags,
-                                     "pixels": self.data[offset:offset + size]})
+            group["bitmaps"].append(
+                {
+                    "width": width,
+                    "height": height,
+                    "format": format,
+                    "flags": flags,
+                    "pixels": self.data[offset : offset + size],
+                }
+            )
         for index in range(sequence_count):
             sequence = self.read(sequences + index * 0x40, 0x40)
             sprite_count, sprites = struct.unpack_from("<II", sequence, 0x34)
-            group["sequences"].append([sprite_from(self.read(sprites + j * 0x20, 0x20), "<") for j in range(sprite_count)])
+            group["sequences"].append(
+                [sprite_from(self.read(sprites + j * 0x20, 0x20), "<") for j in range(sprite_count)]
+            )
         return group
 
 
 def sprite_from(data: bytes, order: str) -> tuple:
-    bitmap, = struct.unpack_from(order + "h", data, 0)
+    (bitmap,) = struct.unpack_from(order + "h", data, 0)
     left, right, top, bottom = struct.unpack_from(order + "4f", data, 8)
     return bitmap, left, top, right, bottom
 
@@ -243,23 +280,30 @@ def decode_dxt(kind: str, data: bytes, width: int, height: int) -> np.ndarray:
     blocks_wide = max(1, width // 4)
     for block in range(max(1, width // 4) * max(1, height // 4)):
         bx, by = block % blocks_wide * 4, block // blocks_wide * 4
-        chunk = data[block * block_size:(block + 1) * block_size]
+        chunk = data[block * block_size : (block + 1) * block_size]
         colour = chunk[-8:]
         c0, c1, bits = struct.unpack("<HHI", colour)
+
         def rgb(value):
             return [((value >> 11) & 31) * 255 // 31, ((value >> 5) & 63) * 255 // 63, (value & 31) * 255 // 31]
+
         palette = [rgb(c0) + [255], rgb(c1) + [255]]
         if kind != "dxt1" or c0 > c1:
-            palette += [[(2 * a + b) // 3 for a, b in zip(palette[0][:3], palette[1][:3])] + [255],
-                        [(a + 2 * b) // 3 for a, b in zip(palette[0][:3], palette[1][:3])] + [255]]
+            palette += [
+                [(2 * a + b) // 3 for a, b in zip(palette[0][:3], palette[1][:3])] + [255],
+                [(a + 2 * b) // 3 for a, b in zip(palette[0][:3], palette[1][:3])] + [255],
+            ]
         else:
             palette += [[(a + b) // 2 for a, b in zip(palette[0][:3], palette[1][:3])] + [255], [0, 0, 0, 0]]
         if kind == "dxt3":
             alphas = [((int.from_bytes(chunk[:8], "little") >> (4 * i)) & 15) * 17 for i in range(16)]
         elif kind == "dxt5":
             a0, a1 = chunk[0], chunk[1]
-            table = [a0, a1] + ([((7 - i) * a0 + i * a1) // 7 for i in range(1, 7)] if a0 > a1 else
-                                [((5 - i) * a0 + i * a1) // 5 for i in range(1, 5)] + [0, 255])
+            table = [a0, a1] + (
+                [((7 - i) * a0 + i * a1) // 7 for i in range(1, 7)]
+                if a0 > a1
+                else [((5 - i) * a0 + i * a1) // 5 for i in range(1, 5)] + [0, 255]
+            )
             codes = int.from_bytes(chunk[2:8], "little")
             alphas = [table[(codes >> (3 * i)) & 7] for i in range(16)]
         else:
@@ -277,11 +321,14 @@ def decode_dxt(kind: str, data: bytes, width: int, height: int) -> np.ndarray:
 def decode_bitmap(bitmap: dict) -> np.ndarray:
     """An Xbox HUD bitmap's level 0 as RGBA, as xbox_textures.c decodes it."""
     width, height, kind = bitmap["width"], bitmap["height"], FORMATS[bitmap["format"]]
-    pixels = np.frombuffer(bitmap["pixels"][:level0_size(bitmap)], np.uint8)
+    pixels = np.frombuffer(bitmap["pixels"][: level0_size(bitmap)], np.uint8)
     if kind.startswith("dxt"):
         return decode_dxt(kind, bitmap["pixels"], width, height)
-    order = (np.arange(width * height).reshape(height, width) if bitmap["flags"] & BITMAP_LINEAR_FLAG else
-             morton_order(width, height))
+    order = (
+        np.arange(width * height).reshape(height, width)
+        if bitmap["flags"] & BITMAP_LINEAR_FLAG
+        else morton_order(width, height)
+    )
     texel = level0_size(bitmap) // (width * height)
     raw = pixels.reshape(-1, texel)[order]
     image = np.zeros((height, width, 4), np.uint8)
@@ -313,18 +360,19 @@ def hek_bitmap_group(path: Path) -> dict:
     its blocks follow the 0x40-byte file header and the 0x6C-byte tag in
     order: data, sequences with their sprites, bitmaps)."""
     data = path.read_bytes()
-    header = data[0x40:0x40 + 0x6C]
-    compressed_size, = struct.unpack_from(">I", header, 0x1C)
-    pixels_size, = struct.unpack_from(">I", header, 0x30)
-    sequence_count, = struct.unpack_from(">I", header, 0x54)
-    bitmap_count, = struct.unpack_from(">I", header, 0x60)
+    header = data[0x40 : 0x40 + 0x6C]
+    (compressed_size,) = struct.unpack_from(">I", header, 0x1C)
+    (pixels_size,) = struct.unpack_from(">I", header, 0x30)
+    (sequence_count,) = struct.unpack_from(">I", header, 0x54)
+    (bitmap_count,) = struct.unpack_from(">I", header, 0x60)
     position = 0x40 + 0x6C + compressed_size + pixels_size
     counts = [struct.unpack_from(">I", data, position + index * 0x40 + 0x34)[0] for index in range(sequence_count)]
     position += sequence_count * 0x40
     group = {"sequences": [], "bitmaps": []}
     for count in counts:
-        group["sequences"].append([sprite_from(data[position + j * 0x20:position + (j + 1) * 0x20], ">")
-                                   for j in range(count)])
+        group["sequences"].append(
+            [sprite_from(data[position + j * 0x20 : position + (j + 1) * 0x20], ">") for j in range(count)]
+        )
         position += count * 0x20
     for index in range(bitmap_count):
         width, height, _, _, format = struct.unpack_from(">HHHhh", data, position + index * 0x30 + 4)
@@ -353,7 +401,7 @@ def window(image: np.ndarray, left: int, top: int, width: int, height: int) -> n
     x0, y0 = max(left, 0), max(top, 0)
     x1, y1 = min(left + width, image.shape[1]), min(top + height, image.shape[0])
     if x0 < x1 and y0 < y1:
-        result[y0 - top:y1 - top, x0 - left:x1 - left] = image[y0:y1, x0:x1]
+        result[y0 - top : y1 - top, x0 - left : x1 - left] = image[y0:y1, x0:x1]
     return result
 
 
@@ -384,13 +432,21 @@ def match(alpha: np.ndarray, render: np.ndarray, clip: list, scale: int) -> tupl
     for dy in range(-SEARCH, SEARCH + 1):
         for dx in range(-SEARCH, SEARCH + 1):
             at = [corner[0] + dx * scale, corner[1] + dy * scale]
-            reduced = window(source, at[0], at[1], width * scale, height * scale).reshape(
-                height, scale, width, scale).mean(axis=(1, 3))
+            reduced = (
+                window(source, at[0], at[1], width * scale, height * scale)
+                .reshape(height, scale, width, scale)
+                .mean(axis=(1, 3))
+            )
             score = overlap(reduced, alpha)
             if score > best[0]:
                 best = (score, at)
-    target = np.asarray(Image.fromarray((alpha * 255).astype(np.uint8)).resize(
-        (width * scale, height * scale), Image.BILINEAR), float) / 255
+    target = (
+        np.asarray(
+            Image.fromarray((alpha * 255).astype(np.uint8)).resize((width * scale, height * scale), Image.BILINEAR),
+            float,
+        )
+        / 255
+    )
     coarse = best[1]
     best = (-1.0, coarse)
     for dy in range(-scale + 1, scale):
@@ -441,8 +497,11 @@ def layout(arguments) -> None:
             width, height = bitmap["width"], bitmap["height"]
             # (the combined sheets by their own names, as before the others;
             # the weapon's by its name and theirs)
-            stem = tag[len(HUD):].replace("combined\\", "") if tag.startswith(HUD) else \
-                tag.split("\\", 1)[1].replace("\\bitmaps\\", "\\")
+            stem = (
+                tag[len(HUD) :].replace("combined\\", "")
+                if tag.startswith(HUD)
+                else tag.split("\\", 1)[1].replace("\\bitmaps\\", "\\")
+            )
             name = stem.replace("\\", "__").replace(" ", "_") + f"__{index}"
             xbox = decode_bitmap(bitmap)
             # (each cell with the sprites, as sequence and sprite numbers, it is)
@@ -451,7 +510,8 @@ def layout(arguments) -> None:
                 for sprite_index, sprite in enumerate(sequence):
                     if sprite[0] == index:
                         cells.setdefault(tuple(pixel_rectangle(sprite, width, height)), set()).add(
-                            (sequence_index, sprite_index))
+                            (sequence_index, sprite_index)
+                        )
             cells = cells or {(0, 0, width, height): set()}
             matched = []
             for cell, numbers in sorted(cells.items()):
@@ -474,17 +534,23 @@ def layout(arguments) -> None:
                     if svg not in renders:
                         renders[svg] = render_svg(svg_root / svg)
                     render = renders[svg]
-                    pc_cells = [(pixel_rectangle(sprite, render.shape[1], render.shape[0]), (sequence_index, sprite_index))
-                                for sequence_index, sequence in enumerate(pc_group["sequences"])
-                                for sprite_index, sprite in enumerate(sequence) if sprite[0] == pc_index]
+                    pc_cells = [
+                        (pixel_rectangle(sprite, render.shape[1], render.shape[0]), (sequence_index, sprite_index))
+                        for sequence_index, sequence in enumerate(pc_group["sequences"])
+                        for sprite_index, sprite in enumerate(sequence)
+                        if sprite[0] == pc_index
+                    ]
                     for clip, pc_numbers in pc_cells or [([0, 0, render.shape[1], render.shape[0]], None)]:
                         # (about the same size)
-                        if not (0.6 < (clip[2] - clip[0]) / ((right - left) * scale) < 1.6 and
-                                0.6 < (clip[3] - clip[1]) / ((bottom - top) * scale) < 1.6):
+                        if not (
+                            0.6 < (clip[2] - clip[0]) / ((right - left) * scale) < 1.6
+                            and 0.6 < (clip[3] - clip[1]) / ((bottom - top) * scale) < 1.6
+                        ):
                             continue
                         score, corner = match(alpha, render, clip, scale)
-                        scored.append((score, svg, scale, corner, clip, KINDS.get(pc_bitmap["format"]),
-                                       pc_numbers in numbers))
+                        scored.append(
+                            (score, svg, scale, corner, clip, KINDS.get(pc_bitmap["format"]), pc_numbers in numbers)
+                        )
                 # the best match; but the sprite of the same numbers where the
                 # sheets agree and it matches nearly as well (small glyphs, a
                 # dot or a colon, overlap others as much as their own)
@@ -494,16 +560,25 @@ def layout(arguments) -> None:
                     best = same
                 if best is None or best[0] < MATCH or best[5] is None:
                     matched = None
-                    print(f"{name}: left out, cell {cell} " +
-                          ("has no redraw" if best is None else f"matches best {best[1]} at {best[0]:.2f}"))
+                    print(
+                        f"{name}: left out, cell {cell} "
+                        + ("has no redraw" if best is None else f"matches best {best[1]} at {best[0]:.2f}")
+                    )
                     break
                 score, svg, scale, corner, clip, kind, _ = best
                 if tag in METERS:
                     kind = "meter"
                 flat = svg.replace("/", "__").replace(" ", "_")
                 sources[flat] = svg
-                laid = {"xbox": cell, "svg": flat, "source_scale": scale,
-                        "source": corner, "clip": clip, "kind": kind, "score": round(score, 3)}
+                laid = {
+                    "xbox": cell,
+                    "svg": flat,
+                    "source_scale": scale,
+                    "source": corner,
+                    "clip": clip,
+                    "kind": kind,
+                    "score": round(score, 3),
+                }
                 if tag == HUD + "combined\\hud_unit_meters":
                     original = xbox[top:bottom, left:right]
                     values = set(np.unique(original[..., 2][original[..., 3] > 0]))
@@ -518,21 +593,25 @@ def layout(arguments) -> None:
             scale = SCALE
             while max(width, height) * scale > MAXIMUM_SIZE:
                 scale //= 2
-            entries.append({
-                "name": name,
-                "tag": tag,
-                "bitmap": index,
-                "width": width,
-                "height": height,
-                "format": FORMATS[bitmap["format"]],
-                "scale": scale,
-                # (the Xbox bitmap's, which the game checks before drawing this
-                # in its place: other languages' maps and modified ones differ)
-                "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]),
-                "cells": matched,
-            })
-            print(f"{name}: {width}x{height} {FORMATS[bitmap['format']]} at {scale}x, {len(matched)} cells, "
-                  f"worst match {min(cell['score'] for cell in matched):.2f}")
+            entries.append(
+                {
+                    "name": name,
+                    "tag": tag,
+                    "bitmap": index,
+                    "width": width,
+                    "height": height,
+                    "format": FORMATS[bitmap["format"]],
+                    "scale": scale,
+                    # (the Xbox bitmap's, which the game checks before drawing this
+                    # in its place: other languages' maps and modified ones differ)
+                    "crc": zlib.crc32(bitmap["pixels"][: level0_size(bitmap)]),
+                    "cells": matched,
+                }
+            )
+            print(
+                f"{name}: {width}x{height} {FORMATS[bitmap['format']]} at {scale}x, {len(matched)} cells, "
+                f"worst match {min(cell['score'] for cell in matched):.2f}"
+            )
     if (ASSETS / "svg").exists():
         shutil.rmtree(ASSETS / "svg")
     (ASSETS / "svg").mkdir(parents=True)
@@ -584,11 +663,14 @@ def text_svg(font: Path, text: str, spacing: float = 0) -> str:
         x += face["hmtx"][name][0] + (spacing / scale if index + 1 < len(text) else 0)
     ascent, descent = face["hhea"].ascent, face["hhea"].descent
     width, height = x * scale, (ascent - descent) * scale
-    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.2f}" height="{height:.2f}" '
-            f'viewBox="0 0 {width:.2f} {height:.2f}">\n'
-            f'<!-- "{text}" in {font.name} -->\n'
-            f'<g fill="#ffffff" transform="scale({scale:g} {-scale:g}) translate(0 {-ascent})">\n'
-            + "\n".join(paths) + "\n</g>\n</svg>\n")
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.2f}" height="{height:.2f}" '
+        f'viewBox="0 0 {width:.2f} {height:.2f}">\n'
+        f'<!-- "{text}" in {font.name} -->\n'
+        f'<g fill="#ffffff" transform="scale({scale:g} {-scale:g}) translate(0 {-ascent})">\n'
+        + "\n".join(paths)
+        + "\n</g>\n</svg>\n"
+    )
 
 
 def fit_reticle(svg: Path, alpha: np.ndarray) -> tuple:
@@ -605,8 +687,10 @@ def fit_reticle(svg: Path, alpha: np.ndarray) -> tuple:
     svg_box = [value / FIT_TEXELS for value in extent(base)]
     xbox_box = extent(alpha)
     # (the Xbox's extent with its blur's texel taken off each side)
-    units = max((svg_box[2] - svg_box[0]) / max(xbox_box[2] - xbox_box[0] - 1, 1),
-                (svg_box[3] - svg_box[1]) / max(xbox_box[3] - xbox_box[1] - 1, 1))
+    units = max(
+        (svg_box[2] - svg_box[0]) / max(xbox_box[2] - xbox_box[0] - 1, 1),
+        (svg_box[3] - svg_box[1]) / max(xbox_box[3] - xbox_box[1] - 1, 1),
+    )
     best = (-2.0, units, [0.0, 0.0])
     for factor in FIT_SCALES:
         per_texel = units * factor
@@ -614,13 +698,18 @@ def fit_reticle(svg: Path, alpha: np.ndarray) -> tuple:
         render = drawn(zoom)
         box = extent(render)
         # (centred on the Xbox shape's centre, then moved by eighths of a texel)
-        centre = ((box[0] + box[2]) / 2 - (xbox_box[0] + xbox_box[2]) / 2 * FIT_TEXELS,
-                  (box[1] + box[3]) / 2 - (xbox_box[1] + xbox_box[3]) / 2 * FIT_TEXELS)
+        centre = (
+            (box[0] + box[2]) / 2 - (xbox_box[0] + xbox_box[2]) / 2 * FIT_TEXELS,
+            (box[1] + box[3]) / 2 - (xbox_box[1] + xbox_box[3]) / 2 * FIT_TEXELS,
+        )
         for dy in range(-FIT_TEXELS * 3 // 2, FIT_TEXELS * 3 // 2 + 1):
             for dx in range(-FIT_TEXELS * 3 // 2, FIT_TEXELS * 3 // 2 + 1):
                 at = (round(centre[0]) + dx, round(centre[1]) + dy)
-                reduced = window(render, at[0], at[1], width * FIT_TEXELS, height * FIT_TEXELS).reshape(
-                    height, FIT_TEXELS, width, FIT_TEXELS).mean(axis=(1, 3))
+                reduced = (
+                    window(render, at[0], at[1], width * FIT_TEXELS, height * FIT_TEXELS)
+                    .reshape(height, FIT_TEXELS, width, FIT_TEXELS)
+                    .mean(axis=(1, 3))
+                )
                 score = likeness(soften(reduced), target)
                 if score > best[0]:
                     best = (score, per_texel, [at[0] / zoom, at[1] / zoom])
@@ -639,14 +728,15 @@ def reticles(arguments) -> None:
             width, height = bitmap["width"], bitmap["height"]
             xbox = decode_bitmap(bitmap)
             # (named as layout names them)
-            name = tag[len(HUD):].replace("combined\\", "").replace("\\", "__").replace(" ", "_") + f"__{index}"
+            name = tag[len(HUD) :].replace("combined\\", "").replace("\\", "__").replace(" ", "_") + f"__{index}"
             old = next((entry for entry in entries if entry["name"] == name), None)
             cells = {}
             for sequence_index, sequence in enumerate(group["sequences"]):
                 for sprite_index, sprite in enumerate(sequence):
                     if sprite[0] == index:
                         cells.setdefault(tuple(pixel_rectangle(sprite, width, height)), set()).add(
-                            (sequence_index, sprite_index))
+                            (sequence_index, sprite_index)
+                        )
             laid = []
             for cell, numbers in sorted(cells.items()):
                 left, top, right, bottom = cell
@@ -681,16 +771,34 @@ def reticles(arguments) -> None:
                         laid.append(kept)
                     continue
                 size = render_svg(ASSETS / "svg" / svg)[..., 3].shape
-                laid.append({"xbox": list(cell), "svg": svg, "source_scale": round(per_texel, 5),
-                             "source": [round(corner[0], 4), round(corner[1], 4)],
-                             "clip": [0, 0, size[1], size[0]], "kind": "alpha", "score": round(score, 3)})
-                print(f"{name} {list(cell)} (sequence, sprite {sorted(numbers)}): {what} at "
-                      f"{per_texel:.4f} units a texel, likeness {score:.3f}")
+                laid.append(
+                    {
+                        "xbox": list(cell),
+                        "svg": svg,
+                        "source_scale": round(per_texel, 5),
+                        "source": [round(corner[0], 4), round(corner[1], 4)],
+                        "clip": [0, 0, size[1], size[0]],
+                        "kind": "alpha",
+                        "score": round(score, 3),
+                    }
+                )
+                print(
+                    f"{name} {list(cell)} (sequence, sprite {sorted(numbers)}): {what} at "
+                    f"{per_texel:.4f} units a texel, likeness {score:.3f}"
+                )
             if not laid or all(not c["svg"].startswith(("hud2_left_reticles__", "label__")) for c in laid):
                 continue
-            entry = {"name": name, "tag": tag, "bitmap": index, "width": width, "height": height,
-                     "format": FORMATS[bitmap["format"]], "scale": SCALE,
-                     "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]), "cells": laid}
+            entry = {
+                "name": name,
+                "tag": tag,
+                "bitmap": index,
+                "width": width,
+                "height": height,
+                "format": FORMATS[bitmap["format"]],
+                "scale": SCALE,
+                "crc": zlib.crc32(bitmap["pixels"][: level0_size(bitmap)]),
+                "cells": laid,
+            }
             if old is not None:
                 entries[entries.index(old)] = entry
             else:
@@ -836,9 +944,14 @@ def build_asset(entry: dict, renders: dict) -> np.ndarray:
             renders[key] = render_svg(ASSETS / "svg" / cell["svg"], zoom)
         left, top, right, bottom = cell["xbox"]
         width, height = (right - left) * scale, (bottom - top) * scale
-        texels = window(clipped(renders[key], [round(value * zoom) for value in cell["clip"]]),
-                        round(cell["source"][0] * zoom), round(cell["source"][1] * zoom), width, height)
-        image[top * scale:top * scale + height, left * scale:left * scale + width] = recipe(texels, cell["kind"])
+        texels = window(
+            clipped(renders[key], [round(value * zoom) for value in cell["clip"]]),
+            round(cell["source"][0] * zoom),
+            round(cell["source"][1] * zoom),
+            width,
+            height,
+        )
+        image[top * scale : top * scale + height, left * scale : left * scale + width] = recipe(texels, cell["kind"])
     if any(cell["kind"] in ("meter", "dxt") for cell in entry["cells"]):
         image = bleed(image)
     if any(cell["kind"] == "meter" for cell in entry["cells"]):
@@ -879,7 +992,7 @@ def check(arguments) -> None:
     description = json.loads(LAYOUT.read_text())
     for entry in description["assets"]:
         bitmap = xbox_map.bitmap_group(entry["tag"])["bitmaps"][entry["bitmap"]]
-        if zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]) != entry["crc"]:
+        if zlib.crc32(bitmap["pixels"][: level0_size(bitmap)]) != entry["crc"]:
             print(f"{entry['name']}: this map's bitmap is not the one laid out")
         xbox = decode_bitmap(bitmap)
         image = Image.open(ASSETS / f"{entry['name']}.png").convert("RGBA")
@@ -914,8 +1027,9 @@ def main() -> None:
     command.add_argument("--map", required=True)
     command.add_argument("--out", required=True)
     arguments = parser.parse_args()
-    {"layout": layout, "reticles": reticles, "build": build, "thresholds": thresholds,
-     "check": check}[arguments.command](arguments)
+    {"layout": layout, "reticles": reticles, "build": build, "thresholds": thresholds, "check": check}[
+        arguments.command
+    ](arguments)
 
 
 if __name__ == "__main__":

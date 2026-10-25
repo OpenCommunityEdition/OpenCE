@@ -27,14 +27,24 @@ public func checkSnapshotLayout() throws {
         ("CameraSnapshot size", layout.cameraSize, MemoryLayout<OCECameraSnapshot>.size),
         ("ObjectSnapshot size", layout.objectSize, MemoryLayout<OCEObjectSnapshot>.size),
         ("ObjectSnapshot.current", layout.objectCurrentOffset, MemoryLayout<OCEObjectSnapshot>.offset(of: \.current)),
-        ("ObjectSnapshot.first_node", layout.objectFirstNodeOffset, MemoryLayout<OCEObjectSnapshot>.offset(of: \.first_node)),
-        ("ObjectSnapshot.bounding_radius", layout.objectBoundingRadiusOffset, MemoryLayout<OCEObjectSnapshot>.offset(of: \.bounding_radius)),
+        (
+            "ObjectSnapshot.first_node", layout.objectFirstNodeOffset,
+            MemoryLayout<OCEObjectSnapshot>.offset(of: \.first_node)
+        ),
+        (
+            "ObjectSnapshot.bounding_radius", layout.objectBoundingRadiusOffset,
+            MemoryLayout<OCEObjectSnapshot>.offset(of: \.bounding_radius)
+        ),
         ("Transform size", layout.transformSize, MemoryLayout<OCETransform>.size),
         ("NodeSnapshot size", layout.nodeSize, MemoryLayout<OCENodeSnapshot>.size),
-        ("FrameSnapshot.debug_lines", layout.frameDebugLinesOffset,
-         MemoryLayout<OCEFrameSnapshot>.offset(of: \.debug_lines)),
-        ("FrameSnapshot.debug_labels", layout.frameDebugLabelsOffset,
-         MemoryLayout<OCEFrameSnapshot>.offset(of: \.debug_labels)),
+        (
+            "FrameSnapshot.debug_lines", layout.frameDebugLinesOffset,
+            MemoryLayout<OCEFrameSnapshot>.offset(of: \.debug_lines)
+        ),
+        (
+            "FrameSnapshot.debug_labels", layout.frameDebugLabelsOffset,
+            MemoryLayout<OCEFrameSnapshot>.offset(of: \.debug_labels)
+        ),
         ("DebugLine size", layout.debugLineSize, MemoryLayout<OCEDebugLine>.size),
         ("DebugLabel size", layout.debugLabelSize, MemoryLayout<OCEDebugLabel>.size),
         ("max_lights", layout.maxLights, Int(OCE_MAX_LIGHTS)),
@@ -44,7 +54,10 @@ public func checkSnapshotLayout() throws {
         ("FrameSnapshot.decals", layout.frameDecalsOffset, MemoryLayout<OCEFrameSnapshot>.offset(of: \.decals)),
         ("DecalSnapshot size", layout.decalSize, MemoryLayout<OCEDecalSnapshot>.size),
         ("max_particles", layout.maxParticles, Int(OCE_MAX_PARTICLES)),
-        ("FrameSnapshot.particles", layout.frameParticlesOffset, MemoryLayout<OCEFrameSnapshot>.offset(of: \.particles)),
+        (
+            "FrameSnapshot.particles", layout.frameParticlesOffset,
+            MemoryLayout<OCEFrameSnapshot>.offset(of: \.particles)
+        ),
         ("ParticleSnapshot size", layout.particleSize, MemoryLayout<OCEParticleSnapshot>.size),
         ("max_effects", layout.maxEffects, Int(OCE_MAX_EFFECTS)),
         ("FrameSnapshot.effects", layout.frameEffectsOffset, MemoryLayout<OCEFrameSnapshot>.offset(of: \.effects)),

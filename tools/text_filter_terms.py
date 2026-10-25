@@ -65,11 +65,17 @@ ENGLISH = ROOT / "port/third_party/english-words/words_alpha.txt.gz"
 KEY = 0x5A
 
 GROUPS = {
-    "racial / ethnic slurs": "slurs", "sexual orientation / gender": "slurs", "mental disability": "slurs",
-    "physical disability": "slurs", "political": "slurs",
-    "sexual anatomy / sexual acts": "swearing", "bodily fluids / excrement": "swearing",
+    "racial / ethnic slurs": "slurs",
+    "sexual orientation / gender": "slurs",
+    "mental disability": "slurs",
+    "physical disability": "slurs",
+    "political": "slurs",
+    "sexual anatomy / sexual acts": "swearing",
+    "bodily fluids / excrement": "swearing",
     "religious offense": "swearing",
-    "other / general insult": "insults", "animal references": "insults", "physical attributes": "insults",
+    "other / general insult": "insults",
+    "animal references": "insults",
+    "physical attributes": "insults",
 }
 GROUP_NAMES = {"slurs": "_text_filter_slurs", "swearing": "_text_filter_swearing", "insults": "_text_filter_insults"}
 SEVERITIES = {"Mild": 1, "Strong": 2, "Severe": 3}
@@ -112,8 +118,11 @@ def read_review(path):
             known_severity = severity == "-" or severity in SEVERITY_NAMES.values()
             if not known_group or not known_severity or (rule != "-" and rule not in RULES):
                 sys.exit(f"{path}:{number}: a group, severity or rule this does not know")
-            entry = (None if group == "-" else group, None if severity == "-" else
-                     {name: value for value, name in SEVERITY_NAMES.items()}[severity], None if rule == "-" else rule)
+            entry = (
+                None if group == "-" else group,
+                None if severity == "-" else {name: value for value, name in SEVERITY_NAMES.items()}[severity],
+                None if rule == "-" else rule,
+            )
             review[kind][rot13(word)] = entry
         else:
             sys.exit(f"{path}:{number}: not a review line")
@@ -121,8 +130,7 @@ def read_review(path):
 
 
 def read_allowed(path):
-    return [line.strip().lower() for line in path.read_text().splitlines()
-            if line.strip() and not line.startswith("#")]
+    return [line.strip().lower() for line in path.read_text().splitlines() if line.strip() and not line.startswith("#")]
 
 
 class English:
@@ -157,8 +165,10 @@ class English:
             own = {variant + form for form in FORMS}
             found += [(word, word.startswith(variant)) for word in self._find(self.text, variant, own)]
             short = collapse(variant)
-            found += [(word, word.startswith(short)) for word in self._find(self.collapsed, short,
-                                                                          {collapse(word) for word in own})]
+            found += [
+                (word, word.startswith(short))
+                for word in self._find(self.collapsed, short, {collapse(word) for word in own})
+            ]
         return found
 
     def rule(self, key):
@@ -187,13 +197,17 @@ def build(csv_path, review, english):
             unreviewed.append(base)
             continue
         own = [row for row, _ in base_rows if row["text"].lower() == base]
-        category = own[0]["category_1"] if own else \
-            Counter(row["category_1"] for row, _ in base_rows).most_common(1)[0][0]
+        category = (
+            own[0]["category_1"] if own else Counter(row["category_1"] for row, _ in base_rows).most_common(1)[0][0]
+        )
         alone = [row for row, single in base_rows if single] or [row for row, _ in base_rows]
         group, severity, rule = review["keep"][base]
-        kept[base] = (group or GROUPS[category],
-                      severity or max(SEVERITIES[row["severity_description"]] for row in alone),
-                      rule, [row["text"] for row, single in base_rows if single])
+        kept[base] = (
+            group or GROUPS[category],
+            severity or max(SEVERITIES[row["severity_description"]] for row in alone),
+            rule,
+            [row["text"] for row, single in base_rows if single],
+        )
     terms = {}
     dropped = {letters(word) for word in review["drop"]}
     for base, (group, severity, rule, spellings) in kept.items():
@@ -216,9 +230,18 @@ def build(csv_path, review, english):
         if rule is None:
             terms[key] = (group, severity, english.rule(key))
     # (a spelling another term finds: left out)
-    found = {key for key, (group, severity, rule) in terms.items()
-             if any(other != key and other in key and terms[other][2] == "anywhere" and terms[other][0] == group and
-                    terms[other][1] >= severity for other in terms)}
+    found = {
+        key
+        for key, (group, severity, rule) in terms.items()
+        if any(
+            other != key
+            and other in key
+            and terms[other][2] == "anywhere"
+            and terms[other][0] == group
+            and terms[other][1] >= severity
+            for other in terms
+        )
+    }
     result = sorted((group, severity, rule, key) for key, (group, severity, rule) in terms.items() if key not in found)
     return result, unreviewed, bases
 
@@ -237,12 +260,17 @@ def c_string(key):
 
 def write_terms(terms, allowed, csv_path):
     digest = hashlib.sha256(Path(csv_path).read_bytes()).hexdigest() if csv_path else None
-    lines = ["/* port/linux/game/text_filter_terms.inc: streamer mode's words, written by",
-             "tools/text_filter_terms.py from Surge AI's profanity_en.csv",
-             f"(sha256 {digest}) and port/assets/text_filter/review.txt and allow.txt.",
-             "Each term's letters are xor'd with TEXT_FILTER_TERM_KEY. Do not edit. */", "",
-             f"#define TEXT_FILTER_TERM_KEY 0x{KEY:02X}", "",
-             "static struct text_filter_term_definition const text_filter_term_definitions[] =", "{"]
+    lines = [
+        "/* port/linux/game/text_filter_terms.inc: streamer mode's words, written by",
+        "tools/text_filter_terms.py from Surge AI's profanity_en.csv",
+        f"(sha256 {digest}) and port/assets/text_filter/review.txt and allow.txt.",
+        "Each term's letters are xor'd with TEXT_FILTER_TERM_KEY. Do not edit. */",
+        "",
+        f"#define TEXT_FILTER_TERM_KEY 0x{KEY:02X}",
+        "",
+        "static struct text_filter_term_definition const text_filter_term_definitions[] =",
+        "{",
+    ]
     for group, severity, rule, key in terms:
         lines.append(f'\t{{ {GROUP_NAMES[group]}, {severity}, {RULES[rule]}, "{c_string(key)}" }},')
     lines += ["};", "", "static char const *const text_filter_allowed_words[] =", "{"]
@@ -267,20 +295,106 @@ def read_terms():
 
 # Greek and Cyrillic letters that look like Latin ones
 LOOK_ALIKES = {
-    "α": "a", "β": "b", "γ": "y", "ε": "e", "η": "n", "ι": "i", "κ": "k", "ν": "v", "ο": "o", "ρ": "p", "τ": "t",
-    "υ": "u", "χ": "x", "ω": "w", "Α": "a", "Β": "b", "Ε": "e", "Ζ": "z", "Η": "h", "Ι": "i", "Κ": "k", "Μ": "m",
-    "Ν": "n", "Ο": "o", "Ρ": "p", "Τ": "t", "Υ": "y", "Χ": "x",
-    "а": "a", "в": "b", "е": "e", "ё": "e", "ѕ": "s", "і": "i", "ї": "i", "ј": "j", "к": "k", "м": "m", "н": "h",
-    "о": "o", "п": "n", "р": "p", "с": "c", "т": "t", "у": "y", "х": "x", "ь": "b", "ԁ": "d", "ӏ": "l", "г": "r",
-    "А": "a", "В": "b", "Е": "e", "Ё": "e", "Ѕ": "s", "І": "i", "Ї": "i", "Ј": "j", "К": "k", "М": "m", "Н": "h",
-    "О": "o", "Р": "p", "С": "c", "Т": "t", "У": "y", "Х": "x", "Ь": "b", "Ԁ": "d", "Ӏ": "l",
-    "µ": "u", "ß": "sb", "ſ": "sf", "ı": "i", "ȷ": "j", "ł": "l", "Ł": "l", "ø": "o", "Ø": "o", "đ": "d", "Đ": "d",
-    "ħ": "h", "Ħ": "h", "ŧ": "t", "Ŧ": "t", "æ": "a", "Æ": "a", "œ": "o", "Œ": "o", "þ": "p", "Þ": "p",
+    "α": "a",
+    "β": "b",
+    "γ": "y",
+    "ε": "e",
+    "η": "n",
+    "ι": "i",
+    "κ": "k",
+    "ν": "v",
+    "ο": "o",
+    "ρ": "p",
+    "τ": "t",
+    "υ": "u",
+    "χ": "x",
+    "ω": "w",
+    "Α": "a",
+    "Β": "b",
+    "Ε": "e",
+    "Ζ": "z",
+    "Η": "h",
+    "Ι": "i",
+    "Κ": "k",
+    "Μ": "m",
+    "Ν": "n",
+    "Ο": "o",
+    "Ρ": "p",
+    "Τ": "t",
+    "Υ": "y",
+    "Χ": "x",
+    "а": "a",
+    "в": "b",
+    "е": "e",
+    "ё": "e",
+    "ѕ": "s",
+    "і": "i",
+    "ї": "i",
+    "ј": "j",
+    "к": "k",
+    "м": "m",
+    "н": "h",
+    "о": "o",
+    "п": "n",
+    "р": "p",
+    "с": "c",
+    "т": "t",
+    "у": "y",
+    "х": "x",
+    "ь": "b",
+    "ԁ": "d",
+    "ӏ": "l",
+    "г": "r",
+    "А": "a",
+    "В": "b",
+    "Е": "e",
+    "Ё": "e",
+    "Ѕ": "s",
+    "І": "i",
+    "Ї": "i",
+    "Ј": "j",
+    "К": "k",
+    "М": "m",
+    "Н": "h",
+    "О": "o",
+    "Р": "p",
+    "С": "c",
+    "Т": "t",
+    "У": "y",
+    "Х": "x",
+    "Ь": "b",
+    "Ԁ": "d",
+    "Ӏ": "l",
+    "µ": "u",
+    "ß": "sb",
+    "ſ": "sf",
+    "ı": "i",
+    "ȷ": "j",
+    "ł": "l",
+    "Ł": "l",
+    "ø": "o",
+    "Ø": "o",
+    "đ": "d",
+    "Đ": "d",
+    "ħ": "h",
+    "Ħ": "h",
+    "ŧ": "t",
+    "Ŧ": "t",
+    "æ": "a",
+    "Æ": "a",
+    "œ": "o",
+    "Œ": "o",
+    "þ": "p",
+    "Þ": "p",
 }
-NAME = re.compile(r"^(?:LATIN|CIRCLED LATIN|PARENTHESIZED LATIN|LATIN SUBSCRIPT|SUPERSCRIPT LATIN) "
-                  r"(?:SMALL|CAPITAL) LETTER (?:SMALL CAPITAL )?([A-Z])(?: WITH .*| BAR| STROKE)?$")
-OTHER_NAMES = [re.compile(r"^LATIN LETTER SMALL CAPITAL ([A-Z])$"),
-               re.compile(r"^MODIFIER LETTER (?:SMALL|CAPITAL) ([A-Z])$")]
+NAME = re.compile(
+    r"^(?:LATIN|CIRCLED LATIN|PARENTHESIZED LATIN|LATIN SUBSCRIPT|SUPERSCRIPT LATIN) "
+    r"(?:SMALL|CAPITAL) LETTER (?:SMALL CAPITAL )?([A-Z])(?: WITH .*| BAR| STROKE)?$"
+)
+OTHER_NAMES = [
+    re.compile(r"^LATIN LETTER SMALL CAPITAL ([A-Z])$"),
+    re.compile(r"^MODIFIER LETTER (?:SMALL|CAPITAL) ([A-Z])$"),
+]
 
 
 def fold_letters(code):
@@ -300,10 +414,14 @@ def fold_letters(code):
 
 
 def write_fold():
-    lines = ["/* port/linux/game/text_filter_fold.inc: the characters above ASCII that",
-             "streamer mode reads as letters (a-z bits), written by tools/text_filter_terms.py",
-             f"--fold from Unicode {unicodedata.unidata_version}'s names and its look-alikes. Do not edit. */", "",
-             "static struct text_filter_fold const text_filter_folds[] =", "{"]
+    lines = [
+        "/* port/linux/game/text_filter_fold.inc: the characters above ASCII that",
+        "streamer mode reads as letters (a-z bits), written by tools/text_filter_terms.py",
+        f"--fold from Unicode {unicodedata.unidata_version}'s names and its look-alikes. Do not edit. */",
+        "",
+        "static struct text_filter_fold const text_filter_folds[] =",
+        "{",
+    ]
     for code in range(0x80, 0x10000):
         if 0xD800 <= code <= 0xDFFF or 0xFF01 <= code <= 0xFF5E:
             continue
@@ -322,9 +440,15 @@ def check(texts):
     sys.path.insert(0, str(ROOT / "tools" / "harness" / "tests"))
     from harness import build  # noqa: E402
     from test_text_filter import generated  # noqa: E402
+
     executable = build("text_filter", generated(real=True))
-    result = subprocess.run([str(executable), "--censor", "1", "1", "1"], input="\n".join(texts) + "\n",
-                            capture_output=True, text=True, check=True)
+    result = subprocess.run(
+        [str(executable), "--censor", "1", "1", "1"],
+        input="\n".join(texts) + "\n",
+        capture_output=True,
+        text=True,
+        check=True,
+    )
     return result.stdout.splitlines()
 
 
@@ -352,8 +476,10 @@ def main():
                 print(template_line(base, bases[base], english), file=sys.stderr)
             sys.exit(1)
         write_terms(terms, read_allowed(ALLOW), arguments.surge)
-        print(f"{len(terms)} terms: " + ", ".join(f"{count} {group}" for group, count in
-                                                  sorted(Counter(term[0] for term in terms).items())))
+        print(
+            f"{len(terms)} terms: "
+            + ", ".join(f"{count} {group}" for group, count in sorted(Counter(term[0] for term in terms).items()))
+        )
     if arguments.list:
         for group, severity, rule, key in read_terms():
             if arguments.list in ("all", group):

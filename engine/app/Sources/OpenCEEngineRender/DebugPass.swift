@@ -33,8 +33,9 @@ public struct DebugMark: Equatable {
 
 /// A packed colour's channels, from 0 to 1.
 public func debugColor(_ packed: UInt32) -> SIMD4<Float> {
-    SIMD4(Float((packed >> 24) & 0xff), Float((packed >> 16) & 0xff), Float((packed >> 8) & 0xff),
-          Float(packed & 0xff)) / 255
+    SIMD4(
+        Float((packed >> 24) & 0xff), Float((packed >> 16) & 0xff), Float((packed >> 8) & 0xff),
+        Float(packed & 0xff)) / 255
 }
 
 /// Draws debug lines into the level's frame.
@@ -47,16 +48,21 @@ public final class DebugPass {
     /// The lines drawn in the last frame, for tests.
     public private(set) var lastDrawn = 0
 
-    public init(device: MTLDevice, colorFormat: MTLPixelFormat, depthFormat: MTLPixelFormat,
-                source: String? = nil) throws {
+    public init(
+        device: MTLDevice, colorFormat: MTLPixelFormat, depthFormat: MTLPixelFormat,
+        source: String? = nil
+    ) throws {
         self.colorFormat = colorFormat
         self.depthFormat = depthFormat
-        pipeline = try Self.pipeline(device: device, source: source ?? ShaderSources.source(.debug),
-                                     colorFormat: colorFormat, depthFormat: depthFormat)
+        pipeline = try Self.pipeline(
+            device: device, source: source ?? ShaderSources.source(.debug),
+            colorFormat: colorFormat, depthFormat: depthFormat)
     }
 
-    private static func pipeline(device: MTLDevice, source: String, colorFormat: MTLPixelFormat,
-                                 depthFormat: MTLPixelFormat) throws -> MTLRenderPipelineState {
+    private static func pipeline(
+        device: MTLDevice, source: String, colorFormat: MTLPixelFormat,
+        depthFormat: MTLPixelFormat
+    ) throws -> MTLRenderPipelineState {
         do {
             let library = try device.makeLibrary(source: source, options: nil)
             let descriptor = MTLRenderPipelineDescriptor()
@@ -72,8 +78,9 @@ public final class DebugPass {
 
     /// Compiles `source` again; the pipeline is replaced only if it builds.
     public func reloadShaders(source: String) throws {
-        pipeline = try Self.pipeline(device: pipeline.device, source: source, colorFormat: colorFormat,
-                                     depthFormat: depthFormat)
+        pipeline = try Self.pipeline(
+            device: pipeline.device, source: source, colorFormat: colorFormat,
+            depthFormat: depthFormat)
     }
 
     /// The vertices of `segments`: each end's point, its colour's bits last.
@@ -118,8 +125,10 @@ public final class DebugPass {
 
     /// The labels in front of the camera as text on a target `width` by
     /// `height`, each centred on its point, a dark box behind it.
-    public static func labels(_ marks: [DebugMark], viewProjection: simd_float4x4, width: Int, height: Int,
-                              cellWidth: Int, cellHeight: Int) -> [TextItem] {
+    public static func labels(
+        _ marks: [DebugMark], viewProjection: simd_float4x4, width: Int, height: Int,
+        cellWidth: Int, cellHeight: Int
+    ) -> [TextItem] {
         var items: [TextItem] = []
         for mark in marks where !mark.text.isEmpty {
             let clip = viewProjection * SIMD4(mark.at, 1)
@@ -130,8 +139,10 @@ public final class DebugPass {
             let columns = mark.text.unicodeScalars.count
             let x = Int((ndc.x + 1) / 2 * Float(width)) - columns * cellWidth / 2
             let y = Int((1 - ndc.y) / 2 * Float(height)) - cellHeight / 2
-            items.append(.box(x: x - 2, y: y, width: columns * cellWidth + 4, height: cellHeight,
-                              color: SIMD4(0, 0, 0, 0.6)))
+            items.append(
+                .box(
+                    x: x - 2, y: y, width: columns * cellWidth + 4, height: cellHeight,
+                    color: SIMD4(0, 0, 0, 0.6)))
             items.append(.text(mark.text, x: x, y: y, color: debugColor(mark.color)))
         }
         return items

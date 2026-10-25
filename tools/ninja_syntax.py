@@ -44,9 +44,7 @@ class Writer(object):
         self.output.write("\n")
 
     def comment(self, text: str) -> None:
-        for line in textwrap.wrap(
-            text, self.width - 2, break_long_words=False, break_on_hyphens=False
-        ):
+        for line in textwrap.wrap(text, self.width - 2, break_long_words=False, break_on_hyphens=False):
             self.output.write("# " + line + "\n")
 
     def variable(
@@ -124,15 +122,11 @@ class Writer(object):
             all_inputs.append("||")
             all_inputs.extend(map(str, order_only))
         if implicit_outputs:
-            implicit_outputs = [
-                escape_path(x) for x in serialize_paths(implicit_outputs)
-            ]
+            implicit_outputs = [escape_path(x) for x in serialize_paths(implicit_outputs)]
             out_outputs.append("|")
             out_outputs.extend(map(str, implicit_outputs))
 
-        self._line(
-            "build %s: %s" % (" ".join(out_outputs), " ".join([rule] + all_inputs))
-        )
+        self._line("build %s: %s" % (" ".join(out_outputs), " ".join([rule] + all_inputs)))
         if pool is not None:
             self._line("  pool = %s" % pool)
         if dyndep is not None:
@@ -187,10 +181,7 @@ class Writer(object):
                 space = available_space - 1
                 while True:
                     space = text.find(" ", space + 1)
-                    if (
-                        space < 0
-                        or self._count_dollars_before_index(text, space) % 2 == 0
-                    ):
+                    if space < 0 or self._count_dollars_before_index(text, space) % 2 == 0:
                         break
             if space < 0:
                 # Give up on breaking.

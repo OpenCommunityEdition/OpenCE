@@ -16,15 +16,36 @@ from tools import linux_build, linux_link_check, linux_msvc_semantics
 
 
 def test_strip_cplusplus_keeps_c_branches_only():
-    text = "\n".join([
-        "a",
-        "#ifdef __cplusplus", "cpp1", "#else", "c1", "#endif",
-        "#if FOO", "b", "#else", "c", "#endif",
-        "#ifndef __cplusplus", "c2", "#else", "cpp2", "#endif",
-        "#if defined(__cplusplus)", "cpp3", "#if X", "cpp4", "#endif", "#endif",
-        "#ifdef _WIN64", "win64", "#endif",
-        "end",
-    ])
+    text = "\n".join(
+        [
+            "a",
+            "#ifdef __cplusplus",
+            "cpp1",
+            "#else",
+            "c1",
+            "#endif",
+            "#if FOO",
+            "b",
+            "#else",
+            "c",
+            "#endif",
+            "#ifndef __cplusplus",
+            "c2",
+            "#else",
+            "cpp2",
+            "#endif",
+            "#if defined(__cplusplus)",
+            "cpp3",
+            "#if X",
+            "cpp4",
+            "#endif",
+            "#endif",
+            "#ifdef _WIN64",
+            "win64",
+            "#endif",
+            "end",
+        ]
+    )
     assert linux_msvc_semantics.strip_cplusplus(text).split() == ["a", "c1", "b", "c", "c2", "end"]
 
 
@@ -35,7 +56,9 @@ def write(path: Path, text: str) -> Path:
 
 
 def test_scan_finds_prototype_scope_tags_and_inline_functions(tmp_path):
-    header = write(tmp_path / "a.h", """
+    header = write(
+        tmp_path / "a.h",
+        """
         struct location;
         void f(struct scenario *s, union color *c);
         /* struct commented_out */
@@ -45,20 +68,20 @@ def test_scan_finds_prototype_scope_tags_and_inline_functions(tmp_path):
         #ifdef __cplusplus
         __inline long cpp_only(long x) { return x; }
         #endif
-    """)
+    """,
+    )
     files = [header]
     tags = linux_msvc_semantics.scan_tags(files)
     assert tags == {"location": {"struct"}, "scenario": {"struct"}, "color": {"union"}}
     assert linux_msvc_semantics.scan_inline_functions(files, all_inlines=False) == {"prototyped"}
     assert linux_msvc_semantics.scan_inline_functions(files, all_inlines=True) == {
-        "prototyped", "private_helper",
+        "prototyped",
+        "private_helper",
     }
 
 
 def test_render_skips_tags_used_as_both_struct_and_union():
-    text = linux_msvc_semantics.render(
-        {"a": {"struct"}, "b": {"union"}, "mixed": {"struct", "union"}}, {"f"}
-    )
+    text = linux_msvc_semantics.render({"a": {"struct"}, "b": {"union"}, "mixed": {"struct", "union"}}, {"f"})
     assert "struct a;" in text
     assert "union b;" in text
     assert "mixed" not in text
@@ -83,15 +106,26 @@ def test_xdk_headers_use_the_sdk_spellings():
 @pytest.mark.skipif(shutil.which("clang") is None, reason="clang is needed to compile the headers")
 def test_xdk_headers_compile_for_the_game(tmp_path):
     root = XDK_INCLUDE.parent.parent.parent
-    source = write(tmp_path / "unit.c", "".join(
-        f"#include <{name}>\n" for name in ("xtl.h", "xbdm.h", "xkbd.h", "d3d8perf.h")
-    ))
+    source = write(
+        tmp_path / "unit.c", "".join(f"#include <{name}>\n" for name in ("xtl.h", "xbdm.h", "xkbd.h", "d3d8perf.h"))
+    )
     flags = [flag for flag in linux_build.LINUX_ABI_FLAGS + linux_build.GAME_FLAGS if flag != "-w"]
     for defines in ([], ["-DDEBUG_KEYBOARD"], ["-DNOD3D", "-DNODSOUND"]):
         subprocess.run(
-            ["clang", *flags, *defines, "-Werror", "-fsyntax-only",
-             "-include", str(root / "port/linux/include/halo_linux_prefix.h"),
-             "-I", str(root / "port/linux/include"), "-idirafter", str(XDK_INCLUDE), str(source)],
+            [
+                "clang",
+                *flags,
+                *defines,
+                "-Werror",
+                "-fsyntax-only",
+                "-include",
+                str(root / "port/linux/include/halo_linux_prefix.h"),
+                "-I",
+                str(root / "port/linux/include"),
+                "-idirafter",
+                str(XDK_INCLUDE),
+                str(source),
+            ],
             check=True,
         )
 
@@ -99,6 +133,7 @@ def test_xdk_headers_compile_for_the_game(tmp_path):
 def pdb_writer():
     """An xdk_headers Writer over an empty type table: basic types only."""
     from tools import pdb200_types, xdk_headers
+
     pdb = object.__new__(pdb200_types.Pdb)
     pdb.types, pdb.aggregates = {}, {}
     return xdk_headers, xdk_headers.Writer(pdb)
@@ -110,23 +145,45 @@ def test_xdk_headers_regroups_anonymous_members():
     xdk_headers, writer = pdb_writer()
     member = xdk_headers.Member
     ulong, int64 = 0x22, 0x13
-    union = writer.render(writer.group(
-        [member("LowPart", ulong, 0), member("HighPart", ulong, 4), member("QuadPart", int64, 0)], True), "", "u")
-    assert union == ["struct {", "    unsigned long LowPart;", "    unsigned long HighPart;", "};",
-                     "__int64 QuadPart;"]
-    structure = writer.render(writer.group(
-        [member("Tag", ulong, 0), member("Low", ulong, 4), member("High", ulong, 8),
-         member("Whole", int64, 4), member("After", ulong, 12)], False), "", "s")
-    assert structure == ["unsigned long Tag;", "union {", "    struct {", "        unsigned long Low;",
-                         "        unsigned long High;", "    };", "    __int64 Whole;", "};",
-                         "unsigned long After;"]
+    union = writer.render(
+        writer.group([member("LowPart", ulong, 0), member("HighPart", ulong, 4), member("QuadPart", int64, 0)], True),
+        "",
+        "u",
+    )
+    assert union == ["struct {", "    unsigned long LowPart;", "    unsigned long HighPart;", "};", "__int64 QuadPart;"]
+    structure = writer.render(
+        writer.group(
+            [
+                member("Tag", ulong, 0),
+                member("Low", ulong, 4),
+                member("High", ulong, 8),
+                member("Whole", int64, 4),
+                member("After", ulong, 12),
+            ],
+            False,
+        ),
+        "",
+        "s",
+    )
+    assert structure == [
+        "unsigned long Tag;",
+        "union {",
+        "    struct {",
+        "        unsigned long Low;",
+        "        unsigned long High;",
+        "    };",
+        "    __int64 Whole;",
+        "};",
+        "unsigned long After;",
+    ]
 
 
 # ---------- weak reference link check
 
 
-@pytest.mark.skipif(shutil.which("clang") is None or shutil.which("nm") is None,
-                    reason="clang and nm are needed to build test objects")
+@pytest.mark.skipif(
+    shutil.which("clang") is None or shutil.which("nm") is None, reason="clang and nm are needed to build test objects"
+)
 def test_link_check_rejects_undefined_weak_references(tmp_path):
     def compile_object(name: str, text: str) -> Path:
         source = write(tmp_path / f"{name}.c", text)
@@ -162,8 +219,14 @@ def test_game_sources_leave_out_the_excluded(tmp_path, monkeypatch):
     write(tmp_path / "source" / "a.h", "")
     monkeypatch.chdir(tmp_path)
     # (a folder is a name ending in "/": not a file that only starts like it)
-    config = {"game": {"root": "source", "exclude": ["source/zlib/example.c", "source/tiff/"],
-                       "defines": ["DEBUG"], "include_dirs": ["source", "source/saved games"]}}
+    config = {
+        "game": {
+            "root": "source",
+            "exclude": ["source/zlib/example.c", "source/tiff/"],
+            "defines": ["DEBUG"],
+            "include_dirs": ["source", "source/saved games"],
+        }
+    }
     assert linux_build.game_sources(config) == [Path("source/a.c"), Path("source/tiffx.c"), Path("source/zlib/b.c")]
     assert linux_build.game_defines_and_includes(config) == '-DDEBUG -Isource -I"source/saved games"'
 
@@ -178,13 +241,59 @@ MENU_ATTRIBUTES = {
     "frame": {"png", "map", "index", "width", "height", "x", "y", "platform"},
     "strings": {"name", "platform"},
     "string": {"text", "platform"},
-    "widget": {"name", "type", "controller", "flags", "bitmap", "text", "strings", "values", "setting", "font",
-               "color", "align", "description", "string_list", "list_flags", "text_flags", "header_bitmap",
-               "footer_bitmap", "header_bounds", "footer_bounds", "child_controller", "x", "y", "left", "top",
-               "width", "height", "text_x", "text_y", "auto_close", "auto_close_fade", "string_index", "platform"},
+    "widget": {
+        "name",
+        "type",
+        "controller",
+        "flags",
+        "bitmap",
+        "text",
+        "strings",
+        "values",
+        "setting",
+        "font",
+        "color",
+        "align",
+        "description",
+        "string_list",
+        "list_flags",
+        "text_flags",
+        "header_bitmap",
+        "footer_bitmap",
+        "header_bounds",
+        "footer_bounds",
+        "child_controller",
+        "x",
+        "y",
+        "left",
+        "top",
+        "width",
+        "height",
+        "text_x",
+        "text_y",
+        "auto_close",
+        "auto_close_fade",
+        "string_index",
+        "platform",
+    },
     "child": {"widget", "controller", "x", "y", "platform"},
-    "on": {"event", "run", "script", "open", "replace", "close", "widget", "focus", "reload", "sound", "otherwise",
-           "label", "back", "branch", "platform"},
+    "on": {
+        "event",
+        "run",
+        "script",
+        "open",
+        "replace",
+        "close",
+        "widget",
+        "focus",
+        "reload",
+        "sound",
+        "otherwise",
+        "label",
+        "back",
+        "branch",
+        "platform",
+    },
     "data": {"input", "platform"},
     "conditional": {"widget", "if_failed", "platform"},
     "replace": {"search", "function", "platform"},
@@ -194,13 +303,25 @@ MENU_ATTRIBUTES = {
 def c_strings(path: Path, start: str, end: str) -> list:
     """the string literals of a C file between two markers"""
     text = path.read_text(encoding="latin-1")
-    text = text[text.index(start):]
-    return re.findall(r'"([^"\\]*)"', text[:text.index(end)])
+    text = text[text.index(start) :]
+    return re.findall(r'"([^"\\]*)"', text[: text.index(end)])
 
 
 # menu_files.c's attributes read as whole numbers (its tables' { name, NULL, &long })
-MENU_INTEGER_ATTRIBUTES = {"auto_close", "auto_close_fade", "height", "index", "left", "string_index", "text_x",
-                           "text_y", "top", "width", "x", "y"}
+MENU_INTEGER_ATTRIBUTES = {
+    "auto_close",
+    "auto_close_fade",
+    "height",
+    "index",
+    "left",
+    "string_index",
+    "text_x",
+    "text_y",
+    "top",
+    "width",
+    "x",
+    "y",
+}
 
 
 def test_menus_are_well_formed():
@@ -220,8 +341,9 @@ def test_menus_are_well_formed():
     inputs |= set(c_strings(tags, "port_game_data_input_names[] =", "};"))
     listed = json.loads((MENUS / "menus.json").read_text())["files"]
     files = sorted(MENUS.rglob("*.xml"))
-    assert sorted(path.relative_to(MENUS).as_posix() for path in files) == \
-        sorted(name for name in listed if name.endswith(".xml"))
+    assert sorted(path.relative_to(MENUS).as_posix() for path in files) == sorted(
+        name for name in listed if name.endswith(".xml")
+    )
     widgets, bitmaps, strings, references, roots = {}, {}, {}, [], []
     for path in files:
         tree = ElementTree.parse(path)
@@ -233,8 +355,11 @@ def test_menus_are_well_formed():
             assert element.tag in MENU_ATTRIBUTES, where
             assert set(element.attrib) <= MENU_ATTRIBUTES[element.tag], where
             # (the platforms that show it: menu_files.c's MENU_PLATFORM)
-            assert element.get("platform") is None or \
-                set(element.get("platform").split()) <= {"desktop", "android", "web"}, where
+            assert element.get("platform") is None or set(element.get("platform").split()) <= {
+                "desktop",
+                "android",
+                "web",
+            }, where
             # (menu_files.c's whole numbers, which the tags keep in shorts,
             # its true/false attributes, and no text but whitespace outside
             # <string>s)
@@ -319,8 +444,16 @@ def test_p2p_signatures_and_listings(tmp_path):
 
     if not shutil.which("clang") or not shutil.which("ninja") or not Path("build.ninja").is_file():
         pytest.skip("needs clang, ninja and a configured build")
-    command = subprocess.run(["ninja", "-t", "commands", "build/linux/obj/port/linux/src/p2p_crypto.o"],
-                             capture_output=True, text=True, check=True).stdout.strip().splitlines()[-1]
+    command = (
+        subprocess.run(
+            ["ninja", "-t", "commands", "build/linux/obj/port/linux/src/p2p_crypto.o"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        .stdout.strip()
+        .splitlines()[-1]
+    )
     words = shlex.split(command)
     # (the compiler, and whatever runs it, ccache in CI: up to the first flag)
     while words and not words[0].startswith("-"):
@@ -337,16 +470,28 @@ def test_p2p_signatures_and_listings(tmp_path):
         else:
             flags.append(word)
     program = tmp_path / "p2p_lobby_check"
-    built = subprocess.run(["clang", *flags, "-O1", "-no-pie", "-Wl,--unresolved-symbols=ignore-all", "-o",
-                            str(program), "tools/p2p_lobby_check.c", "port/linux/src/p2p_crypto.c",
-                            "port/linux/src/p2p_lobby.c", "port/third_party/monocypher/monocypher.c",
-                            "port/third_party/monocypher/monocypher-ed25519.c"],
-                           capture_output=True, text=True)
+    built = subprocess.run(
+        [
+            "clang",
+            *flags,
+            "-O1",
+            "-no-pie",
+            "-Wl,--unresolved-symbols=ignore-all",
+            "-o",
+            str(program),
+            "tools/p2p_lobby_check.c",
+            "port/linux/src/p2p_crypto.c",
+            "port/linux/src/p2p_lobby.c",
+            "port/third_party/monocypher/monocypher.c",
+            "port/third_party/monocypher/monocypher-ed25519.c",
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert built.returncode == 0, built.stderr[-4000:]
     result = subprocess.run([str(program)], capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout
     assert "PASS" in result.stdout
-
 
 
 # port_config.c on its own, with the app's file paths (HALO_DATA_ROOT) and C
@@ -397,17 +542,30 @@ def test_config_has_each_section_once(tmp_path):
         shutil.copy(root / "port/linux/src" / name, stubs / name)
     (tmp_path / "main.c").write_text(CONFIG_PROGRAM)
     program = tmp_path / "config_program"
-    subprocess.run([compiler, "-DHALO_ANDROID=1", "-DHALO_ARM64_GUEST=1", f"-I{stubs}",
-                    f"-I{root}/port/third_party/tomlc17", "-o", str(program),
-                    str(tmp_path / "main.c"), str(stubs / "port_config.c"),
-                    str(root / "port/third_party/tomlc17/tomlc17.c"), "-lpthread"], check=True)
+    subprocess.run(
+        [
+            compiler,
+            "-DHALO_ANDROID=1",
+            "-DHALO_ARM64_GUEST=1",
+            f"-I{stubs}",
+            f"-I{root}/port/third_party/tomlc17",
+            "-o",
+            str(program),
+            str(tmp_path / "main.c"),
+            str(stubs / "port_config.c"),
+            str(root / "port/third_party/tomlc17/tomlc17.c"),
+            "-lpthread",
+        ],
+        check=True,
+    )
     data = tmp_path / "data"
     data.mkdir()
     config = data / "config.toml"
 
     def run(*command):
-        result = subprocess.run([str(program), *command], capture_output=True, text=True,
-                                env={**os.environ, "HALO_DATA_ROOT": str(data)})
+        result = subprocess.run(
+            [str(program), *command], capture_output=True, text=True, env={**os.environ, "HALO_DATA_ROOT": str(data)}
+        )
         assert result.returncode == 0, result.stderr
         assert "using the defaults" not in result.stderr, result.stderr
         return result.stdout.strip(), result.stderr
@@ -422,8 +580,9 @@ def test_config_has_each_section_once(tmp_path):
     assert run("get", "display.first_person_legs")[0] == "true"
 
     # an older version's
-    config.write_text("[display]\nvsync = false\n\n[game]\nconsole_log = \"all\"\n\n"
-                      "[display]\nfirst_person_legs = true\n")
+    config.write_text(
+        "[display]\nvsync = false\n\n[game]\nconsole_log = \"all\"\n\n[display]\nfirst_person_legs = true\n"
+    )
     value, log = run("get", "display.first_person_legs")
     assert value == "true" and "joined" in log
     assert sections().count("display") == 1
@@ -445,16 +604,18 @@ def test_system_link_bots_messages_are_the_games():
 
     root = Path(__file__).resolve().parents[1]
     header = (root / "source/networking/network_messages.h").read_text()
-    enum = header[header.index("enum network_game_message_type"):]
-    names = re.findall(r"\t_message_(\w+)", enum[:enum.index("};")])
+    enum = header[header.index("enum network_game_message_type") :]
+    names = re.findall(r"\t_message_(\w+)", enum[: enum.index("};")])
     for name, value in vars(bots).items():
         if name.lower() in names:
             assert names.index(name.lower()) == value, name
     sizes = {}
     source = (root / "source/networking/network_messages.c").read_text()
     for fields, name in re.findall(r"\t\{\n((?:\t\t.*\n)*?)\t\},\n\tNETWORK_GAME_MESSAGE_DEFINITION\((\w+),", source):
-        sizes[name] = sum(int(count) * {"pad": 0, "bytes": 1, "shorts": 2, "longs": 4}.get(kind, 0) + (kind == "array")
-                          for kind, count in re.findall(r"_data_packet_field_(\w+), (\d+)", fields))
+        sizes[name] = sum(
+            int(count) * {"pad": 0, "bytes": 1, "shorts": 2, "longs": 4}.get(kind, 0) + (kind == "array")
+            for kind, count in re.findall(r"_data_packet_field_(\w+), (\d+)", fields)
+        )
 
     sent = []
     machine = bots.Machine(1, "127.0.0.2", "127.0.0.1", print)
@@ -507,8 +668,9 @@ def test_retail_maps_need_no_corrections():
     structure bsps too, with no correction: the schemas (tag_schema_*.c)
     say what the game's own maps hold"""
     maps = _retail_maps()
-    result = subprocess.run([str(MAP_VALIDATE), "--strict", *map(str, maps)], capture_output=True, text=True,
-                            timeout=1800)
+    result = subprocess.run(
+        [str(MAP_VALIDATE), "--strict", *map(str, maps)], capture_output=True, text=True, timeout=1800
+    )
     assert result.returncode == 0, result.stdout[-6000:]
 
 
@@ -518,12 +680,17 @@ def test_tag_validator_survives_damaged_maps():
     when checked again"""
     maps = _retail_maps()
     chosen = [path for path in maps if path.stem in ("bloodgulch", "a10", "ui")] or maps[:1]
-    result = subprocess.run([str(MAP_VALIDATE), "--fuzz", "300", "--seed", "1", *map(str, chosen)],
-                            capture_output=True, text=True, timeout=1800)
+    result = subprocess.run(
+        [str(MAP_VALIDATE), "--fuzz", "300", "--seed", "1", *map(str, chosen)],
+        capture_output=True,
+        text=True,
+        timeout=1800,
+    )
     assert result.returncode == 0, (result.stdout + result.stderr)[-6000:]
 
 
 # ---------- Custom Edition maps (port/linux/game/cache_file_formats.c, custom_edition_cache.c)
+
 
 def _custom_edition_maps():
     """the Custom Edition maps (HALO_CUSTOM_EDITION_MAPS, or the gitignored
@@ -531,11 +698,12 @@ def _custom_edition_maps():
     they need beside them"""
     configured = os.environ.get("HALO_CUSTOM_EDITION_MAPS")
     folder = Path(configured) if configured else Path("assets/custom_edition")
-    maps = [path for path in sorted(folder.glob("*.map"))
-            if path.stem.lower() not in ("bitmaps", "sounds", "loc")]
+    maps = [path for path in sorted(folder.glob("*.map")) if path.stem.lower() not in ("bitmaps", "sounds", "loc")]
     if not maps or not (folder / "bitmaps.map").is_file() or not MAP_VALIDATE.is_file():
-        pytest.skip("needs Custom Edition maps (HALO_CUSTOM_EDITION_MAPS or assets/custom_edition) and "
-                    "ninja linux's build/linux/map_validate")
+        pytest.skip(
+            "needs Custom Edition maps (HALO_CUSTOM_EDITION_MAPS or assets/custom_edition) and "
+            "ninja linux's build/linux/map_validate"
+        )
     return maps
 
 
@@ -555,6 +723,10 @@ def test_custom_edition_loader_and_validator_survive_damaged_maps():
     map they let through is clean when checked again"""
     maps = _custom_edition_maps()
     chosen = [path for path in maps if path.stem.lower() in ("bloodgulch", "hugeass", "ui")] or maps[:2]
-    result = subprocess.run([str(MAP_VALIDATE), "--fuzz", "100", "--seed", "1", *map(str, chosen)],
-                            capture_output=True, text=True, timeout=3600)
+    result = subprocess.run(
+        [str(MAP_VALIDATE), "--fuzz", "100", "--seed", "1", *map(str, chosen)],
+        capture_output=True,
+        text=True,
+        timeout=3600,
+    )
     assert result.returncode == 0, (result.stdout + result.stderr)[-6000:]

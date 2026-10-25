@@ -89,8 +89,9 @@ public struct ShellHistory: Equatable, Sendable {
     /// unreadable, or larger than a history is).
     public static func load(from url: URL) -> ShellHistory {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let size = attributes[.size] as? Int, size <= capacity * (LineEditor.maxLength + 1),
-              let data = try? Data(contentsOf: url) else { return ShellHistory() }
+            let size = attributes[.size] as? Int, size <= capacity * (LineEditor.maxLength + 1),
+            let data = try? Data(contentsOf: url)
+        else { return ShellHistory() }
         let text = String(decoding: data, as: UTF8.self)
         return ShellHistory(text.split(whereSeparator: \.isNewline).map { LineEditor.printable(String($0)) })
     }

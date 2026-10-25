@@ -44,19 +44,24 @@ public struct LoadedLevel {
     /// Why it could not be baked, when it could not.
     public let bakeFailure: String?
 
-    public init(map: String, bsp: UInt32 = 0, cacheFolder: String, device: MTLDevice,
-                settings: VideoSettings, bakeAtLoad: BakeAtLoad = .full,
-                prepare size: (width: Int, height: Int)? = nil, progress: ((Float) -> Void)? = nil) throws {
+    public init(
+        map: String, bsp: UInt32 = 0, cacheFolder: String, device: MTLDevice,
+        settings: VideoSettings, bakeAtLoad: BakeAtLoad = .full,
+        prepare size: (width: Int, height: Int)? = nil, progress: ((Float) -> Void)? = nil
+    ) throws {
         progress?(0)
         let geometry = try LevelGeometry.load(map: map, cacheFolder: cacheFolder, bsp: bsp)
-        try self.init(geometry: geometry, map: map, bsp: bsp, cacheFolder: cacheFolder, device: device,
-                      settings: settings, bakeAtLoad: bakeAtLoad, prepare: size, progress: progress)
+        try self.init(
+            geometry: geometry, map: map, bsp: bsp, cacheFolder: cacheFolder, device: device,
+            settings: settings, bakeAtLoad: bakeAtLoad, prepare: size, progress: progress)
     }
 
     /// The load from `geometry`, already imported, of `map`'s structure `bsp`.
-    public init(geometry: LevelGeometry, map: String, bsp: UInt32 = 0, cacheFolder: String, device: MTLDevice,
-                settings: VideoSettings, bakeAtLoad: BakeAtLoad = .full,
-                prepare size: (width: Int, height: Int)? = nil, progress: ((Float) -> Void)? = nil) throws {
+    public init(
+        geometry: LevelGeometry, map: String, bsp: UInt32 = 0, cacheFolder: String, device: MTLDevice,
+        settings: VideoSettings, bakeAtLoad: BakeAtLoad = .full,
+        prepare size: (width: Int, height: Int)? = nil, progress: ((Float) -> Void)? = nil
+    ) throws {
         self.map = map
         self.bsp = bsp
         self.geometry = geometry
@@ -119,18 +124,20 @@ public struct LoadedLevel {
     /// that its first frame is no longer than the rest).
     static func prepare(_ renderer: LevelRenderer, width: Int, height: Int, from start: CameraPlacement) throws {
         guard width > 0, height > 0 else { return }
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: renderer.outputFormat, width: width,
-                                                                  height: height, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: renderer.outputFormat, width: width,
+            height: height, mipmapped: false)
         descriptor.usage = [.renderTarget]
         descriptor.storageMode = .private
         guard let queue = renderer.device.makeCommandQueue(),
-              let target = renderer.device.makeTexture(descriptor: descriptor),
-              let commands = queue.makeCommandBuffer()
+            let target = renderer.device.makeTexture(descriptor: descriptor),
+            let commands = queue.makeCommandBuffer()
         else {
             throw LevelRendererError.resources("the first frame's target")
         }
-        let camera = ViewCamera(position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
-                                verticalFov: 70 * .pi / 180)
+        let camera = ViewCamera(
+            position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
+            verticalFov: 70 * .pi / 180)
         renderer.encode(into: commands, target: target, camera: camera)
         commands.commit()
         commands.waitUntilCompleted()

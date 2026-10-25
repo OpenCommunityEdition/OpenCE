@@ -119,7 +119,8 @@ def main() -> None:
         directory.mkdir(parents=True, exist_ok=True)
         for name, layer in (("ic_launcher_foreground", render), ("ic_launcher_monochrome", themed)):
             carried_out(layer.resize((visible, visible), Image.LANCZOS), size).save(
-                directory / f"{name}.png", optimize=True)
+                directory / f"{name}.png", optimize=True
+            )
         print(f"{directory.relative_to(ROOT)}: {size}x{size}")
 
     top, bottom = background_gradient(icon, render)
@@ -130,8 +131,10 @@ def main() -> None:
         "<!-- the launcher icon's background (tools/app_icon.py) -->\n"
         '<shape xmlns:android="http://schemas.android.com/apk/res/android">\n'
         '    <gradient android:angle="270" android:startColor="#{:02X}{:02X}{:02X}"'
-        ' android:endColor="#{:02X}{:02X}{:02X}" />\n'.format(*top, *bottom) +
-        "</shape>\n", encoding="utf-8")
+        ' android:endColor="#{:02X}{:02X}{:02X}" />\n'.format(*top, *bottom)
+        + "</shape>\n",
+        encoding="utf-8",
+    )
     adaptive = RESOURCES / "mipmap-anydpi-v26"
     adaptive.mkdir(parents=True, exist_ok=True)
     (adaptive / "ic_launcher.xml").write_text(
@@ -141,7 +144,9 @@ def main() -> None:
         '    <background android:drawable="@drawable/ic_launcher_background" />\n'
         '    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n'
         '    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />\n'
-        "</adaptive-icon>\n", encoding="utf-8")
+        "</adaptive-icon>\n",
+        encoding="utf-8",
+    )
     print("background #{:02X}{:02X}{:02X} to #{:02X}{:02X}{:02X}".format(*top, *bottom))
 
 

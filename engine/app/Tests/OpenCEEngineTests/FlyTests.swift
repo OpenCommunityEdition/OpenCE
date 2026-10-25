@@ -52,8 +52,9 @@ final class FlyControlsTests: XCTestCase {
         // opposite keys cancel; other keys do nothing
         let both = controls.input(held: [Key.w, Key.s, Key.a, Key.d, 31], mouse: (.nan, .infinity))
         XCTAssertEqual(both, still)
-        XCTAssertEqual(FlyControls(sensitivity: 0.001, invertPitch: true).input(held: [], mouse: (0, 10)).pitch,
-                       -(Float(10) * 0.001))
+        XCTAssertEqual(
+            FlyControls(sensitivity: 0.001, invertPitch: true).input(held: [], mouse: (0, 10)).pitch,
+            -(Float(10) * 0.001))
     }
 
     func testTheButtonsAreTheSimulations() {
@@ -63,7 +64,8 @@ final class FlyControlsTests: XCTestCase {
 
     func testRecordedKeysFlyTheCameraExactly() throws {
         // a second ahead, half a second up, then a second ahead sprinting
-        let frames = Array(repeating: RecordedFrame(held: [Key.w]), count: 60)
+        let frames =
+            Array(repeating: RecordedFrame(held: [Key.w]), count: 60)
             + Array(repeating: RecordedFrame(held: [Key.space]), count: 30)
             + Array(repeating: RecordedFrame(held: [Key.w, Key.leftShift]), count: 60)
         let cameras = try fly(frames)
@@ -91,7 +93,8 @@ final class FlyControlsTests: XCTestCase {
         // a quarter turn left over 10 frames, then 30 frames ahead; then a
         // look up past straight, which stops just short of it
         let left = Double.pi / 2 / 10 / 0.001
-        let frames = Array(repeating: RecordedFrame(dx: -left), count: 10)
+        let frames =
+            Array(repeating: RecordedFrame(dx: -left), count: 10)
             + Array(repeating: RecordedFrame(held: [Key.w]), count: 30)
             + [RecordedFrame(dy: 4000)]
         let cameras = try fly(frames, controls: controls)
@@ -115,8 +118,9 @@ final class FlyControlsTests: XCTestCase {
         let second = try fly(frames)
         for (a, b) in zip(first, second) {
             XCTAssertEqual([a.position.x, a.position.y, a.position.z], [b.position.x, b.position.y, b.position.z])
-            XCTAssertEqual([a.rotation.x, a.rotation.y, a.rotation.z, a.rotation.w],
-                           [b.rotation.x, b.rotation.y, b.rotation.z, b.rotation.w])
+            XCTAssertEqual(
+                [a.rotation.x, a.rotation.y, a.rotation.z, a.rotation.w],
+                [b.rotation.x, b.rotation.y, b.rotation.z, b.rotation.w])
         }
     }
 
@@ -146,8 +150,9 @@ final class FlyControlsTests: XCTestCase {
 @MainActor
 final class FlyWindowTests: XCTestCase {
     func testShiftAndControlAreHeldAndF3ShowsTheFrameTimes() throws {
-        let controller = EngineWindowController(contentSize: CGSize(width: 320, height: 200), pointer: FakePointer(),
-                                                rawMouse: FakeMouse())
+        let controller = EngineWindowController(
+            contentSize: CGSize(width: 320, height: 200), pointer: FakePointer(),
+            rawMouse: FakeMouse())
         defer { controller.window.close() }
         NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: controller.window)
         func flags(_ code: UInt16, _ flags: CGEventFlags) throws {
@@ -163,10 +168,12 @@ final class FlyWindowTests: XCTestCase {
         XCTAssertEqual(controller.keys.codes, [FlyControls.Key.leftControl])
 
         XCTAssertFalse(controller.showsFrameTimes)
-        let f3 = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
-                                                windowNumber: 0, context: nil, characters: "",
-                                                charactersIgnoringModifiers: "", isARepeat: false,
-                                                keyCode: KeyCode.frameTimes))
+        let f3 = try XCTUnwrap(
+            NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                windowNumber: 0, context: nil, characters: "",
+                charactersIgnoringModifiers: "", isARepeat: false,
+                keyCode: KeyCode.frameTimes))
         controller.window.engineView.keyDown(with: f3)
         XCTAssertTrue(controller.showsFrameTimes)
         XCTAssertFalse(controller.keys.isHeld(KeyCode.frameTimes))
@@ -180,19 +187,24 @@ final class FlyWindowTests: XCTestCase {
 final class MapLibraryTests: XCTestCase {
     func testTheLevelsAreListedWithoutTheResourceMaps() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: folder.appendingPathComponent("folder.map"),
-                                                withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: folder.appendingPathComponent("folder.map"),
+            withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        for name in ["bloodgulch.map", "a30.MAP", "Bitmaps.map", "sounds.map", "loc.map", "notes.txt", "map10.map",
-                     "map2.map"] {
+        for name in [
+            "bloodgulch.map", "a30.MAP", "Bitmaps.map", "sounds.map", "loc.map", "notes.txt", "map10.map",
+            "map2.map",
+        ] {
             try Data().write(to: folder.appendingPathComponent(name))
         }
-        XCTAssertEqual(MapLibrary.maps(in: folder).map(\.lastPathComponent),
-                       ["a30.MAP", "bloodgulch.map", "map2.map", "map10.map"])
+        XCTAssertEqual(
+            MapLibrary.maps(in: folder).map(\.lastPathComponent),
+            ["a30.MAP", "bloodgulch.map", "map2.map", "map10.map"])
         XCTAssertEqual(MapLibrary.maps(in: folder.appendingPathComponent("none")), [])
         let root = URL(fileURLWithPath: "/data")
-        XCTAssertEqual(MapLibrary.folders(named: nil, root: root).map(\.path),
-                       ["/data/assets/maps", "/data/assets/custom_maps"])
+        XCTAssertEqual(
+            MapLibrary.folders(named: nil, root: root).map(\.path),
+            ["/data/assets/maps", "/data/assets/custom_maps"])
         XCTAssertEqual(MapLibrary.folders(named: "/elsewhere", root: root).map(\.path), ["/elsewhere"])
         // (the test maps are found in the first folder; others are as given)
         let folders = MapLibrary.folders(named: nil, root: root)
@@ -207,16 +219,21 @@ final class MapLibraryTests: XCTestCase {
     func testTheDataRootIsFoundAboveTheApp() throws {
         let checkout = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let bundle = checkout.appendingPathComponent("build/engine/OpenCE Engine.app")
-        try FileManager.default.createDirectory(at: checkout.appendingPathComponent("assets/maps"),
-                                                withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: checkout.appendingPathComponent("assets/maps"),
+            withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: bundle, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: checkout) }
         let slash = URL(fileURLWithPath: "/")
-        XCTAssertEqual(MapLibrary.dataRoot(environment: [:], current: slash, bundle: bundle).standardizedFileURL.path,
-                       checkout.standardizedFileURL.path)
+        XCTAssertEqual(
+            MapLibrary.dataRoot(environment: [:], current: slash, bundle: bundle).standardizedFileURL.path,
+            checkout.standardizedFileURL.path)
         XCTAssertEqual(MapLibrary.dataRoot(environment: [:], current: checkout, bundle: slash).path, checkout.path)
-        XCTAssertEqual(MapLibrary.dataRoot(environment: ["OPENCE_ROOT": "/games/halo"], current: checkout,
-                                           bundle: bundle).path, "/games/halo")
+        XCTAssertEqual(
+            MapLibrary.dataRoot(
+                environment: ["OPENCE_ROOT": "/games/halo"], current: checkout,
+                bundle: bundle
+            ).path, "/games/halo")
         XCTAssertEqual(MapLibrary.dataRoot(environment: [:], current: slash, bundle: slash).path, "/")
     }
 
@@ -230,15 +247,18 @@ final class MapLibraryTests: XCTestCase {
         guard let device = MTLCreateSystemDefaultDevice() else { throw XCTSkip("no Metal device") }
         let cache = StockLevel.root.appendingPathComponent("build/engine/cache")
         try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
-        let level = try LoadedLevel(map: map.path, cacheFolder: cache.path, device: device,
-                                    settings: VideoSettings(antiAliasing: .native), bakeAtLoad: .cachedOnly)
+        let level = try LoadedLevel(
+            map: map.path, cacheFolder: cache.path, device: device,
+            settings: VideoSettings(antiAliasing: .native), bakeAtLoad: .cachedOnly)
         XCTAssertEqual(level.map, map.path)
         XCTAssertGreaterThan(level.geometry.draws().count, 0)
         XCTAssertTrue([level.start.x, level.start.y, level.start.z].allSatisfy(\.isFinite))
         let engine = Engine()
         engine.startEmptyWorld()
         XCTAssertNoThrow(try engine.placeCamera(placement: level.start))
-        XCTAssertThrowsError(try LoadedLevel(map: "/no/such.map", cacheFolder: cache.path, device: device,
-                                             settings: VideoSettings()))
+        XCTAssertThrowsError(
+            try LoadedLevel(
+                map: "/no/such.map", cacheFolder: cache.path, device: device,
+                settings: VideoSettings()))
     }
 }

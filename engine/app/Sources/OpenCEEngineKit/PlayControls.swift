@@ -32,22 +32,22 @@ public struct KeyBindings: Equatable, Sendable {
 
     /// Halo PC's.
     public static let stock = KeyBindings(keys: [
-        .forward: [13], // W
-        .back: [1], // S
-        .left: [0], // A
-        .right: [2], // D
-        .jump: [49], // Space
-        .crouch: [59, 62], // the Controls
+        .forward: [13],  // W
+        .back: [1],  // S
+        .left: [0],  // A
+        .right: [2],  // D
+        .jump: [49],  // Space
+        .crouch: [59, 62],  // the Controls
         .fire: [MouseButtonCode.left],
-        .toggleView: [9], // V
-        .reload: [15], // R
-        .swap: [48], // Tab
-        .action: [14], // E
-        .melee: [3], // F
+        .toggleView: [9],  // V
+        .reload: [15],  // R
+        .swap: [48],  // Tab
+        .action: [14],  // E
+        .melee: [3],  // F
         .grenade: [MouseButtonCode.right],
-        .zoom: [6], // Z
-        .switchGrenade: [5], // G
-        .flashlight: [12], // Q
+        .zoom: [6],  // Z
+        .switchGrenade: [5],  // G
+        .flashlight: [12],  // Q
     ])
 
     /// Bindings read from JSON (`{"jump": [49], ...}`): the actions it
@@ -122,12 +122,13 @@ public struct PlayControls: Equatable, Sendable {
             buttons |= button
         }
         // (the mouse right turns right, which is a negative yaw)
-        return InputState(buttons: buttons,
-                          forward: axis(.forward, .back),
-                          right: axis(.right, .left),
-                          up: 0,
-                          yaw: -turn(mouse.dx),
-                          pitch: invertPitch ? -turn(mouse.dy) : turn(mouse.dy))
+        return InputState(
+            buttons: buttons,
+            forward: axis(.forward, .back),
+            right: axis(.right, .left),
+            up: 0,
+            yaw: -turn(mouse.dx),
+            pitch: invertPitch ? -turn(mouse.dy) : turn(mouse.dy))
     }
 
     /// Whether the view changes this frame: a toggle key pressed since the

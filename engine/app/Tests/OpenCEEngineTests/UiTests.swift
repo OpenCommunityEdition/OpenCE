@@ -34,15 +34,17 @@ final class UiTests: XCTestCase {
 
         var camera: ViewCamera {
             let start = geometry.startView()
-            return ViewCamera(position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
-                              verticalFov: 70 * .pi / 180)
+            return ViewCamera(
+                position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
+                verticalFov: 70 * .pi / 180)
         }
     }
 
     func testTheMainMenuIsDrawnOverItsScene() throws {
         let level = try UiLevel()
-        let renderer = try LevelRenderer(device: level.device, geometry: level.geometry,
-                                         settings: VideoSettings(antiAliasing: .native, renderScale: 1))
+        let renderer = try LevelRenderer(
+            device: level.device, geometry: level.geometry,
+            settings: VideoSettings(antiAliasing: .native, renderScale: 1))
         renderer.ui = try UiPass(device: level.device, atlas: level.menu.glyphAtlas(), outputFormat: .bgra8Unorm)
         let (width, height) = (1920, 1080)
         level.menu.update(nowMs: 0)
@@ -51,8 +53,9 @@ final class UiTests: XCTestCase {
         XCTAssertGreaterThan(quads.filter { !$0.glyph }.count, 0, "the menu's panels")
 
         let scene = try renderer.capture(width: width, height: height, camera: level.camera, queue: level.queue)
-        let drawn = try renderer.capture(width: width, height: height, camera: level.camera, uiQuads: quads,
-                                         queue: level.queue)
+        let drawn = try renderer.capture(
+            width: width, height: height, camera: level.camera, uiQuads: quads,
+            queue: level.queue)
         let ui = try XCTUnwrap(renderer.ui)
         XCTAssertEqual(ui.lastMissing, 0, "quads whose bitmap is not among the level's textures")
         XCTAssertEqual(ui.lastDrawn, quads.count)
@@ -104,8 +107,9 @@ final class UiTests: XCTestCase {
         let renderer = try LevelRenderer(device: level.device, geometry: level.geometry)
         let pass = try UiPass(device: level.device, atlas: level.menu.glyphAtlas(), outputFormat: .bgra8Unorm)
         let (width, height) = (3840, 2160)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width,
-                                                                  height: height, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: width,
+            height: height, mipmapped: false)
         descriptor.usage = [.renderTarget]
         descriptor.storageMode = .private
         let target = try XCTUnwrap(level.device.makeTexture(descriptor: descriptor))

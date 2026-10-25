@@ -37,16 +37,20 @@ def graph(release=False, emcc="/opt/emsdk/upstream/emscripten/emcc"):
     """build.ninja's web part, as configure.py writes it, its long lines
     joined again"""
     out = io.StringIO()
-    sln = SimpleNamespace(build_dir=Path("build"), web_emcc=emcc, port_release=release, port_profile=False,
-                          compiler_launcher=None)
+    sln = SimpleNamespace(
+        build_dir=Path("build"), web_emcc=emcc, port_release=release, port_profile=False, compiler_launcher=None
+    )
     web_build.generate_web_build(ninja_syntax.Writer(out), sln)
     return re.sub(r" \$\n +", " ", out.getvalue())
 
 
 def compile_flags(text, source):
     """the cflags of the unit compiled from source"""
-    match = re.search(r"^build [^\n]*: web_cc " + re.escape(source.replace(" ", "$ ")) + r"[ \n].*?\n  cflags = ([^\n]*)",
-                      text, re.M | re.S)
+    match = re.search(
+        r"^build [^\n]*: web_cc " + re.escape(source.replace(" ", "$ ")) + r"[ \n].*?\n  cflags = ([^\n]*)",
+        text,
+        re.M | re.S,
+    )
     assert match, f"{source} is not compiled"
     return match.group(1)
 
@@ -71,8 +75,18 @@ def test_without_emscripten_the_graph_says_so():
 def test_the_game_is_compiled_as_the_web_port():
     text = graph()
     flags = compile_flags(text, "source/main/main.c")
-    for flag in ("-DHALO_GLES=1", "-DHALO_WEB=1", "-fshort-wchar", "-ffp-contract=off", "-pthread", "-std=gnu89",
-                 "-fms-extensions", "-fwrapv", "-fno-delete-null-pointer-checks", "-fno-builtin-wcslen"):
+    for flag in (
+        "-DHALO_GLES=1",
+        "-DHALO_WEB=1",
+        "-fshort-wchar",
+        "-ffp-contract=off",
+        "-pthread",
+        "-std=gnu89",
+        "-fms-extensions",
+        "-fwrapv",
+        "-fno-delete-null-pointer-checks",
+        "-fno-builtin-wcslen",
+    ):
         assert flag in flags.split(), flag
     # the browser is not the Android app, and calls must keep their types at
     # the link (no link-time optimisation: tools/web_build.py)
@@ -98,9 +112,18 @@ def test_the_platform_layer_leaves_out_what_a_browser_has_not():
 
 def test_the_link_makes_the_memory_the_window_needs():
     flags = link_flags(graph()).split()
-    for flag in ("-sPROXY_TO_PTHREAD=1", "-sOFFSCREENCANVASES_TO_PTHREAD=#canvas", "-sMIN_WEBGL_VERSION=2",
-                 "-sMAX_WEBGL_VERSION=2", "-sWASMFS=1", "-lopfs.js", "-sALLOW_MEMORY_GROWTH=0",
-                 "-Wl,--fatal-warnings", "-sASSERTIONS=1", "--profiling-funcs"):
+    for flag in (
+        "-sPROXY_TO_PTHREAD=1",
+        "-sOFFSCREENCANVASES_TO_PTHREAD=#canvas",
+        "-sMIN_WEBGL_VERSION=2",
+        "-sMAX_WEBGL_VERSION=2",
+        "-sWASMFS=1",
+        "-lopfs.js",
+        "-sALLOW_MEMORY_GROWTH=0",
+        "-Wl,--fatal-warnings",
+        "-sASSERTIONS=1",
+        "--profiling-funcs",
+    ):
         assert flag in flags, flag
     assert f"-sINITIAL_MEMORY={0x88000000}" in flags
     release = graph(release=True)
@@ -111,8 +134,12 @@ def test_the_link_makes_the_memory_the_window_needs():
 def test_the_memory_layout_agrees_with_the_sources():
     platform = (ROOT / "port/linux/src/platform.h").read_text()
     base = int(re.search(r"#define PLATFORM_CONTIGUOUS_BASE (0x[0-9A-Fa-f]+)", platform).group(1), 16)
-    sizes = re.search(r"#if defined\(HALO_ARM64_GUEST\) \|\| defined\(HALO_WEB\).*?#define PLATFORM_CONTIGUOUS_SIZE "
-                      r"(0x[0-9A-Fa-f]+)", platform, re.S)
+    sizes = re.search(
+        r"#if defined\(HALO_ARM64_GUEST\) \|\| defined\(HALO_WEB\).*?#define PLATFORM_CONTIGUOUS_SIZE "
+        r"(0x[0-9A-Fa-f]+)",
+        platform,
+        re.S,
+    )
     assert sizes, "platform.h gives the web build the 128 MB window"
     assert web_build.WEB_MEMORY_BYTES == base + int(sizes.group(1), 16)
     main = (ROOT / "port/web/src/web_main.c").read_text()
@@ -125,8 +152,15 @@ def test_the_site_holds_the_page_its_fonts_licences_and_version():
     text = graph()
     phony = re.search(r"^build web: phony ([^\n]*)", text, re.M).group(1)
     outputs = set(phony.split())
-    for name in ("halo.js", "halo.wasm", "version.json", "licenses.txt", "fonts/OpenCE-Regular.ttf",
-                 "fonts/Overpass-750.ttf", "fonts/Overpass-900.ttf"):
+    for name in (
+        "halo.js",
+        "halo.wasm",
+        "version.json",
+        "licenses.txt",
+        "fonts/OpenCE-Regular.ttf",
+        "fonts/Overpass-750.ttf",
+        "fonts/Overpass-900.ttf",
+    ):
         assert f"build/web/site/{name}" in outputs, name
     for source in web_build.site_sources():
         assert f"build/web/site/{source.relative_to(Path('port/web/site')).as_posix()}" in outputs, source
@@ -143,8 +177,9 @@ def test_version_json_names_the_build_and_its_files(tmp_path, monkeypatch):
     (site / ".nojekyll").write_text("")
     monkeypatch.setenv("HALO_BUILD_NUMBER", "321")
     monkeypatch.setenv("GITHUB_SHA", "0123abc")
-    version = stamp_version.stamp(site / "version.json", [site / "halo.js", site / "icons" / "icon.png",
-                                                          site / ".nojekyll"], "release")
+    version = stamp_version.stamp(
+        site / "version.json", [site / "halo.js", site / "icons" / "icon.png", site / ".nojekyll"], "release"
+    )
     written = json.loads((site / "version.json").read_text())
     assert written == version
     assert written["build"] == 321 and written["commit"] == "0123abc" and written["flavor"] == "release"
@@ -168,9 +203,21 @@ def test_licenses_txt_has_every_notice():
 def test_the_sockets_inside_the_page(tmp_path):
     compiler = shutil.which("cc") or shutil.which("clang")
     program = tmp_path / "web_net_test"
-    subprocess.run([compiler, "-std=gnu11", "-Wall", "-g", "-pthread", f"-I{ROOT / 'port/linux/src'}",
-                    str(ROOT / "port/web/tests/web_net_test.c"), str(ROOT / "port/web/src/web_net.c"),
-                    "-o", str(program)], check=True)
+    subprocess.run(
+        [
+            compiler,
+            "-std=gnu11",
+            "-Wall",
+            "-g",
+            "-pthread",
+            f"-I{ROOT / 'port/linux/src'}",
+            str(ROOT / "port/web/tests/web_net_test.c"),
+            str(ROOT / "port/web/src/web_net.c"),
+            "-o",
+            str(program),
+        ],
+        check=True,
+    )
     result = subprocess.run([str(program)], capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stderr
     assert "web_net: ok" in result.stdout
@@ -186,8 +233,9 @@ def test_the_menus_name_known_platforms_and_match_their_generator():
         assert (ROOT / "port/assets/menus/ce" / name).read_text() == "\n".join(lines), name
     # the rows a browser has no use for are not on its screens; internet
     # play's is (port/web/src/web_p2p.c)
-    network = (ROOT / "port/assets/menus/ce/main_menu.settings_select.player_setup.player_profile_edit."
-               "network_setup.xml").read_text()
+    network = (
+        ROOT / "port/assets/menus/ce/main_menu.settings_select.player_setup.player_profile_edit.network_setup.xml"
+    ).read_text()
     for row in ("op_allow_upnp", "op_join_from_clipboard", "op_auto"):
         assert re.search(rf'<child widget="[^"]*/{row}"[^>]*platform="desktop android"', network), row
     assert re.search(r'<child widget="[^"]*/op_online"[^>]*platform="desktop android web"', network)

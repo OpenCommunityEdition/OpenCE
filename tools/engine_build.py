@@ -71,14 +71,35 @@ def rust_half(rust: Path) -> None:
     library = rust / "lib" / LIBRARY
     shutil.copy(target / "release" / LIBRARY, library)
     cargo(
-        "run", "--release", "--locked", "-p", "opence_ffi", "--features", "bindgen",
-        "--bin", "uniffi-bindgen", "--",
-        "generate", "--library", str(library), "--language", "swift", "--out-dir", str(bindings),
+        "run",
+        "--release",
+        "--locked",
+        "-p",
+        "opence_ffi",
+        "--features",
+        "bindgen",
+        "--bin",
+        "uniffi-bindgen",
+        "--",
+        "generate",
+        "--library",
+        str(library),
+        "--language",
+        "swift",
+        "--out-dir",
+        str(bindings),
     )
     subprocess.run(
         [
-            "cbindgen", "--quiet", "--config", str(ENGINE / "crates" / "ffi" / "cbindgen.toml"),
-            "--crate", "opence_ffi", "--output", str(bindings / SNAPSHOT_HEADER), str(ENGINE / "crates" / "ffi"),
+            "cbindgen",
+            "--quiet",
+            "--config",
+            str(ENGINE / "crates" / "ffi" / "cbindgen.toml"),
+            "--crate",
+            "opence_ffi",
+            "--output",
+            str(bindings / SNAPSHOT_HEADER),
+            str(ENGINE / "crates" / "ffi"),
         ],
         check=True,
     )
@@ -120,8 +141,13 @@ def metal_compiler(environment: dict[str, str]) -> list[str]:
     mounted = sorted(Path(CRYPTEXES).glob("com.apple.MobileAsset.MetalToolchain-*/Metal.xctoolchain/usr/bin/metal"))
     if not mounted:
         raise SystemExit("Xcode's Metal toolchain is not installed: xcodebuild -downloadComponent MetalToolchain")
-    sdk = subprocess.run(["/usr/bin/xcrun", "-sdk", "macosx", "--show-sdk-path"], env=environment,
-                         capture_output=True, text=True, check=True).stdout.strip()
+    sdk = subprocess.run(
+        ["/usr/bin/xcrun", "-sdk", "macosx", "--show-sdk-path"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
     return [str(mounted[-1]), "-isysroot", sdk]
 
 
@@ -135,7 +161,9 @@ def check_shaders(out: Path) -> None:
     for shader in sorted((PACKAGE / "Shaders").glob("*.metal")):
         made = subprocess.run(
             [*compiler, "-c", str(shader), "-o", str(folder / f"{shader.stem}.air")],
-            env=environment, capture_output=True, text=True,
+            env=environment,
+            capture_output=True,
+            text=True,
         )
         if made.returncode != 0:
             raise SystemExit(f"{shader.name} does not compile:\n{made.stderr}")
@@ -148,14 +176,28 @@ def swift(command: str, library: Path, out: Path, extra: tuple[str, ...] = ()) -
     environment = xcode_environment()
     subprocess.run(
         [
-            "/usr/bin/xcrun", "swift", command, "-c", "release", "--quiet", "--disable-sandbox",
-            "--package-path", str(PACKAGE),
-            "--scratch-path", str(scratch),
-            "--cache-path", str(scratch / "cache"),
-            "--config-path", str(scratch / "config"),
-            "--security-path", str(scratch / "security"),
+            "/usr/bin/xcrun",
+            "swift",
+            command,
+            "-c",
+            "release",
+            "--quiet",
+            "--disable-sandbox",
+            "--package-path",
+            str(PACKAGE),
+            "--scratch-path",
+            str(scratch),
+            "--cache-path",
+            str(scratch / "cache"),
+            "--config-path",
+            str(scratch / "config"),
+            "--security-path",
+            str(scratch / "security"),
             # (and the C++ library Jolt, the physics, needs)
-            "-Xlinker", str(library), "-Xlinker", "-lc++",
+            "-Xlinker",
+            str(library),
+            "-Xlinker",
+            "-lc++",
             *extra,
         ],
         env=environment,
@@ -198,8 +240,15 @@ def bundle(executable: Path, codesign: str, version: str, app: Path) -> None:
     # TextPass.swift): Overpass and OpenCE only
     fonts = staging / "Contents" / "Resources" / "fonts"
     fonts.mkdir()
-    for name in ("Overpass-750.ttf", "Overpass-900.ttf", "Overpass-OFL.txt", "OpenCE-Regular.ttf", "OpenCE-OFL.txt",
-                 "OverpassMono-Regular.ttf", "OverpassMono-OFL.txt"):
+    for name in (
+        "Overpass-750.ttf",
+        "Overpass-900.ttf",
+        "Overpass-OFL.txt",
+        "OpenCE-Regular.ttf",
+        "OpenCE-OFL.txt",
+        "OverpassMono-Regular.ttf",
+        "OverpassMono-OFL.txt",
+    ):
         shutil.copy(ROOT / "port" / "assets" / "fonts" / name, fonts / name)
     subprocess.run([codesign, "-s", "-", "-f", str(staging)], check=True)
     shutil.rmtree(app, ignore_errors=True)
@@ -215,8 +264,12 @@ def main() -> None:
     parser.add_argument("--version", default="0.1.0")
     parser.add_argument("--test", action="store_true", help="run the package's XCTests instead of making the app")
     parser.add_argument("--filter", help="with --test, only the tests whose names match this")
-    parser.add_argument("--suite", choices=("all", "rust", "swift"), default="all",
-                        help="with --test, the Rust half's tests (cargo deny and nextest), the XCTests, or both")
+    parser.add_argument(
+        "--suite",
+        choices=("all", "rust", "swift"),
+        default="all",
+        help="with --test, the Rust half's tests (cargo deny and nextest), the XCTests, or both",
+    )
     parser.add_argument("--rust", type=Path, help="the Rust half built already, instead of running cargo")
     parser.add_argument("--rust-only", type=Path, help="build only the Rust half, into this folder")
     arguments = parser.parse_args()

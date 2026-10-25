@@ -30,8 +30,9 @@ final class DebugDrawTests: XCTestCase {
             DebugMark(at: [10, 100, 0], color: 0xffff_ffff, text: "aside"),
             DebugMark(at: [10, 0, 0], color: 0xffff_ffff, text: ""),
         ]
-        let items = DebugPass.labels(marks, viewProjection: viewProjection, width: 800, height: 400,
-                                     cellWidth: 10, cellHeight: 20)
+        let items = DebugPass.labels(
+            marks, viewProjection: viewProjection, width: 800, height: 400,
+            cellWidth: 10, cellHeight: 20)
         XCTAssertEqual(items.count, 2)
         guard case let .text(text, x, y, color) = items[1] else { return XCTFail("no text") }
         XCTAssertEqual(text, "ahead")
@@ -51,8 +52,13 @@ final class DebugDrawTests: XCTestCase {
         let segments = frame.debugSegments()
         XCTAssertEqual(segments.count, 1)
         XCTAssertEqual(segments.first?.to, [1, 2, 3])
-        XCTAssertEqual(frame.debugMarks(), [DebugMark(at: [4, 5, 6], color: frame.debugMarks().first?.color ?? 0,
-                                                      text: "hello there")])
+        XCTAssertEqual(
+            frame.debugMarks(),
+            [
+                DebugMark(
+                    at: [4, 5, 6], color: frame.debugMarks().first?.color ?? 0,
+                    text: "hello there")
+            ])
         XCTAssertTrue(engine.runCommand(line: "debug_clear").ok)
         _ = try engine.step()
         XCTAssertTrue(reader.acquire().debugSegments().isEmpty)
@@ -68,8 +74,9 @@ final class DebugDrawTests: XCTestCase {
         let ahead = level.camera.position + level.camera.rotation.act([0.25, 0, 0])
         let side = level.camera.rotation.act([0, 0.1, 0])
         let line = DebugSegment(from: ahead - side, to: ahead + side, color: 0xff00_ffff)
-        let with = try renderer.capture(width: 640, height: 360, camera: level.camera, debugLines: [line],
-                                        queue: level.queue)
+        let with = try renderer.capture(
+            width: 640, height: 360, camera: level.camera, debugLines: [line],
+            queue: level.queue)
         XCTAssertEqual(renderer.debug.lastDrawn, 1)
         let difference = try XCTUnwrap(with.difference(from: without))
         XCTAssertGreaterThan(difference.share, 0, "the line changed nothing in the frame")

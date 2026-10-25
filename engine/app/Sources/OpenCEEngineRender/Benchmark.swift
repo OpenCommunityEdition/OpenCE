@@ -96,10 +96,13 @@ extension LevelRenderer {
     /// Flies `path` for `seconds`, drawing at `width` by `height`, after
     /// `warmUp` frames that are not counted (the pipelines' and the
     /// temporal history's first use).
-    public func benchmark(width: Int, height: Int, path: BenchmarkPath, seconds: Double, objects: [DrawnObject] = [],
-                          warmUp: Int = 60, queue: MTLCommandQueue) throws -> BenchmarkResult {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: outputFormat, width: width,
-                                                                  height: height, mipmapped: false)
+    public func benchmark(
+        width: Int, height: Int, path: BenchmarkPath, seconds: Double, objects: [DrawnObject] = [],
+        warmUp: Int = 60, queue: MTLCommandQueue
+    ) throws -> BenchmarkResult {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: outputFormat, width: width,
+            height: height, mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .private
         let inFlight = 3
@@ -133,8 +136,9 @@ extension LevelRenderer {
                 }
                 slots.signal()
             }
-            encode(into: commands, target: targets[frame % inFlight], camera: path.camera(at: elapsed),
-                   objects: objects)
+            encode(
+                into: commands, target: targets[frame % inFlight], camera: path.camera(at: elapsed),
+                objects: objects)
             commands.commit()
             last = commands
             frame += 1
@@ -144,7 +148,8 @@ extension LevelRenderer {
         for _ in 0..<inFlight { slots.wait() }
         for _ in 0..<inFlight { slots.signal() }
         let (frameTimes, gpuTimes) = clock.results
-        return BenchmarkResult(width: width, height: height, seconds: seconds, frameTimes: frameTimes,
-                               gpuTimes: gpuTimes)
+        return BenchmarkResult(
+            width: width, height: height, seconds: seconds, frameTimes: frameTimes,
+            gpuTimes: gpuTimes)
     }
 }

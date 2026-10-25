@@ -57,19 +57,56 @@ CALLING_CONVENTIONS = {0x00: "__cdecl", 0x04: "__fastcall", 0x07: "__stdcall"}
 
 # the basic types' C names (CodeView "special" type indices, low byte)
 BASIC = {
-    0x03: "void", 0x08: "long",  # HRESULT
-    0x10: "signed char", 0x11: "short", 0x12: "long", 0x13: "__int64",
-    0x20: "unsigned char", 0x21: "unsigned short", 0x22: "unsigned long",
-    0x23: "unsigned __int64", 0x30: "unsigned char",
-    0x40: "float", 0x41: "double", 0x42: "long double",
-    0x68: "signed char", 0x69: "unsigned char", 0x70: "char", 0x71: "wchar_t",
-    0x72: "short", 0x73: "unsigned short", 0x74: "int", 0x75: "unsigned int",
-    0x76: "__int64", 0x77: "unsigned __int64",
+    0x03: "void",
+    0x08: "long",  # HRESULT
+    0x10: "signed char",
+    0x11: "short",
+    0x12: "long",
+    0x13: "__int64",
+    0x20: "unsigned char",
+    0x21: "unsigned short",
+    0x22: "unsigned long",
+    0x23: "unsigned __int64",
+    0x30: "unsigned char",
+    0x40: "float",
+    0x41: "double",
+    0x42: "long double",
+    0x68: "signed char",
+    0x69: "unsigned char",
+    0x70: "char",
+    0x71: "wchar_t",
+    0x72: "short",
+    0x73: "unsigned short",
+    0x74: "int",
+    0x75: "unsigned int",
+    0x76: "__int64",
+    0x77: "unsigned __int64",
 }
 BASIC_SIZE = {
-    0x03: 0, 0x08: 4, 0x10: 1, 0x11: 2, 0x12: 4, 0x13: 8, 0x20: 1, 0x21: 2, 0x22: 4,
-    0x23: 8, 0x30: 1, 0x40: 4, 0x41: 8, 0x42: 8, 0x68: 1, 0x69: 1, 0x70: 1, 0x71: 2,
-    0x72: 2, 0x73: 2, 0x74: 4, 0x75: 4, 0x76: 8, 0x77: 8,
+    0x03: 0,
+    0x08: 4,
+    0x10: 1,
+    0x11: 2,
+    0x12: 4,
+    0x13: 8,
+    0x20: 1,
+    0x21: 2,
+    0x22: 4,
+    0x23: 8,
+    0x30: 1,
+    0x40: 4,
+    0x41: 8,
+    0x42: 8,
+    0x68: 1,
+    0x69: 1,
+    0x70: 1,
+    0x71: 2,
+    0x72: 2,
+    0x73: 2,
+    0x74: 4,
+    0x75: 4,
+    0x76: 8,
+    0x77: 8,
 }
 
 
@@ -90,8 +127,7 @@ def numeric(data: bytes, offset: int) -> Tuple[int, int]:
     leaf = u16(data, offset)
     if leaf < 0x8000:
         return leaf, offset + 2
-    formats = {0x8000: "<b", 0x8001: "<h", 0x8002: "<H", 0x8003: "<i", 0x8004: "<I",
-               0x8009: "<q", 0x800A: "<Q"}
+    formats = {0x8000: "<b", 0x8001: "<h", 0x8002: "<H", 0x8003: "<i", 0x8004: "<I", 0x8009: "<q", 0x800A: "<Q"}
     if leaf not in formats:
         raise PdbError(f"unsupported numeric leaf {leaf:#x}")
     fmt = formats[leaf]
@@ -101,7 +137,7 @@ def numeric(data: bytes, offset: int) -> Tuple[int, int]:
 def pascal(data: bytes, offset: int) -> Tuple[str, int]:
     """A length-prefixed name: (name, offset after it)."""
     size = data[offset]
-    return data[offset + 1:offset + 1 + size].decode("latin-1"), offset + 1 + size
+    return data[offset + 1 : offset + 1 + size].decode("latin-1"), offset + 1 + size
 
 
 def records(data: bytes, start: int, end: int) -> Iterator[bytes]:
@@ -111,7 +147,7 @@ def records(data: bytes, start: int, end: int) -> Iterator[bytes]:
         size = u16(data, cursor)
         if size < 2 or cursor + 2 + size > end:
             return
-        yield data[cursor:cursor + 2 + size]
+        yield data[cursor : cursor + 2 + size]
         cursor += 2 + size
 
 
@@ -125,6 +161,7 @@ class Member:
 @dataclass
 class Aggregate:
     """A structure, union or enumeration."""
+
     index: int
     kind: str  # "struct", "union", "enum"
     name: str
@@ -182,8 +219,14 @@ class Pdb:
         if leaf == LF_ENUM:
             underlying, fields = u32(record, 8), u32(record, 12)
             name, _ = pascal(record, 16)
-            item = Aggregate(index, "enum", name, BASIC_SIZE.get(underlying & 0xFF, 4), bool(props & PROP_FORWARD),
-                             underlying=underlying)
+            item = Aggregate(
+                index,
+                "enum",
+                name,
+                BASIC_SIZE.get(underlying & 0xFF, 4),
+                bool(props & PROP_FORWARD),
+                underlying=underlying,
+            )
         else:
             fields = u32(record, 8)
             if leaf == LF_UNION:
@@ -191,8 +234,7 @@ class Pdb:
             else:
                 size, at = numeric(record, 20)
             name, _ = pascal(record, at)
-            item = Aggregate(index, "union" if leaf == LF_UNION else "struct", name, size,
-                             bool(props & PROP_FORWARD))
+            item = Aggregate(index, "union" if leaf == LF_UNION else "struct", name, size, bool(props & PROP_FORWARD))
         if not item.forward and fields:
             self._fields(item, self.types.get(fields, b""))
         return item

@@ -17,8 +17,10 @@ NEGATIVE_CONTROLS = {
     "no-turning": (("flipped = (facing < 0.0f)", "flipped = (facing < 0.0f && FALSE)"), "floor"),
     "no-sign-bit": (("!= ((surface->plane_designator & LONG_MIN) != 0);", "!= FALSE;"), "wall"),
     "one-side": (("short sides = two_sided ? 2 : 1;", "short sides = 1;"), "counted"),
-    "no-vertex-check": (("if (vertex_index < 0 || vertex_index >= bsp->vertices.count)\n\t\t\treturn 0;", ""),
-                        "counted"),
+    "no-vertex-check": (
+        ("if (vertex_index < 0 || vertex_index >= bsp->vertices.count)\n\t\t\treturn 0;", ""),
+        "counted",
+    ),
     "no-capacity": (("if (triangle_count >= triangle_capacity)\n\t\t\t\t\t\treturn triangle_count;", ""), "capacity"),
 }
 

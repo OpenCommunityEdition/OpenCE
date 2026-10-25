@@ -408,7 +408,8 @@ public final class ShellOverlay {
     /// Whether a reply's data is `{"clear": true}`.
     static func clears(_ json: String) -> Bool {
         guard json.contains("clear"),
-              let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] else { return false }
+            let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+        else { return false }
         return object["clear"] as? Bool == true
     }
 
@@ -444,8 +445,9 @@ public final class ShellOverlay {
 
     private func scrollPage(_ direction: Int) {
         guard let layout else { return }
-        scrollback.scroll(by: direction * max(1, layout.visibleRows - 1), columns: layout.columns,
-                          visible: layout.visibleRows)
+        scrollback.scroll(
+            by: direction * max(1, layout.visibleRows - 1), columns: layout.columns,
+            visible: layout.visibleRows)
     }
 
     // ---------- the pointer
@@ -512,8 +514,10 @@ public final class ShellOverlay {
         let top = Int((Double(-panel) * (1 - openness)).rounded())
         if openness > 0 {
             items.append(.box(x: 0, y: top, width: width, height: panel, color: Colors.background))
-            items.append(.box(x: 0, y: top + panel - metrics.scale, width: width, height: metrics.scale,
-                              color: Colors.rule))
+            items.append(
+                .box(
+                    x: 0, y: top + panel - metrics.scale, width: width, height: metrics.scale,
+                    color: Colors.rule))
             let inputTop = top + panel - metrics.scale - cell - pad / 2
             var rowsBottom = inputTop - pad / 2
             if !completions.isEmpty {
@@ -528,9 +532,11 @@ public final class ShellOverlay {
             for (index, row) in rows.enumerated() {
                 let y = firstTop + index * cell
                 if let selected = scrollback.selectedColumns(row) {
-                    items.append(.box(x: pad + selected.lowerBound * metrics.cellWidth, y: y,
-                                      width: selected.count * metrics.cellWidth, height: cell,
-                                      color: Colors.selection))
+                    items.append(
+                        .box(
+                            x: pad + selected.lowerBound * metrics.cellWidth, y: y,
+                            width: selected.count * metrics.cellWidth, height: cell,
+                            color: Colors.selection))
                 }
                 if !row.text.isEmpty {
                     items.append(.text(row.text, x: pad, y: y, color: Colors.of(row.kind)))
@@ -538,18 +544,23 @@ public final class ShellOverlay {
             }
             if scrollback.scroll > 0 {
                 let mark = "↓ \(scrollback.scroll)"
-                items.append(.text(mark, x: width - pad - mark.count * metrics.cellWidth, y: inputTop,
-                                   color: Colors.hint))
+                items.append(
+                    .text(
+                        mark, x: width - pad - mark.count * metrics.cellWidth, y: inputTop,
+                        color: Colors.hint))
             }
             items.append(contentsOf: inputRow(y: inputTop, left: pad, columns: columns, metrics: metrics))
-            layout = Layout(rows: rows, rowsTop: firstTop, left: pad, bottom: top + panel, metrics: metrics,
-                            visibleRows: visible, columns: columns)
+            layout = Layout(
+                rows: rows, rowsTop: firstTop, left: pad, bottom: top + panel, metrics: metrics,
+                visibleRows: visible, columns: columns)
         } else {
             layout = nil
         }
         if !watchValues.isEmpty {
-            items.append(contentsOf: watchRow(y: max(0, top + panel), width: width, left: pad, columns: columns,
-                                              metrics: metrics))
+            items.append(
+                contentsOf: watchRow(
+                    y: max(0, top + panel), width: width, left: pad, columns: columns,
+                    metrics: metrics))
         }
         return items
     }
@@ -572,8 +583,10 @@ public final class ShellOverlay {
             items.append(.text(shown, x: left + prompt.count * metrics.cellWidth, y: y, color: Colors.output))
         }
         let cursorX = left + (prompt.count + cursor - first) * metrics.cellWidth
-        items.append(.box(x: cursorX, y: y, width: 2 * metrics.scale, height: metrics.cellHeight,
-                          color: Colors.cursor))
+        items.append(
+            .box(
+                x: cursorX, y: y, width: 2 * metrics.scale, height: metrics.cellHeight,
+                color: Colors.cursor))
         return items
     }
 
@@ -591,16 +604,21 @@ public final class ShellOverlay {
     }
 
     private func watchRow(y: Int, width: Int, left: Int, columns: Int, metrics: ShellMetrics) -> [TextItem] {
-        var items: [TextItem] = [.box(x: 0, y: y, width: width, height: metrics.cellHeight + metrics.scale * 2,
-                                      color: Colors.watchBackground)]
+        var items: [TextItem] = [
+            .box(
+                x: 0, y: y, width: width, height: metrics.cellHeight + metrics.scale * 2,
+                color: Colors.watchBackground)
+        ]
         var column = 0
         for (index, watch) in watchValues.enumerated() {
             let entry = (index > 0 ? "  │  " : "") + "\(watch.expression) = \(watch.value)"
             let room = columns - column
             guard room > 1 else { break }
             let shown = entry.count > room ? String(entry.prefix(room - 1)) + "…" : entry
-            items.append(.text(shown, x: left + column * metrics.cellWidth, y: y + metrics.scale,
-                               color: watch.ok ? Colors.output : Colors.error))
+            items.append(
+                .text(
+                    shown, x: left + column * metrics.cellWidth, y: y + metrics.scale,
+                    color: watch.ok ? Colors.output : Colors.error))
             column += shown.count
         }
         return items

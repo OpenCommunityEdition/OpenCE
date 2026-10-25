@@ -14,8 +14,10 @@ CASES = ["counts-real-parts", "refuses-before-wrapping", "refuses-huge-counts", 
 # a fault in geometry_bytes_add and the case that must catch it
 NEGATIVE_CONTROLS = {
     "no-limit": (("if (added > MAXIMUM_GEOMETRY_BYTES - *bytes)", "if (0)"), "refuses-before-wrapping"),
-    "no-count-check": (("if (vertex_count > MAXIMUM_GEOMETRY_BYTES / vertex_size ||", "if (0 &&"),
-                       "refuses-huge-counts"),
+    "no-count-check": (
+        ("if (vertex_count > MAXIMUM_GEOMETRY_BYTES / vertex_size ||", "if (0 &&"),
+        "refuses-huge-counts",
+    ),
 }
 
 
@@ -38,4 +40,6 @@ def test_case(case):
 def test_negative_control(control):
     fault, case = NEGATIVE_CONTROLS[control]
     status, output = run(build("geometry_bytes", generated(fault)), case)
-    assert status == CHECK_FAILED, f"geometry_bytes_add with a fault ({control}) passed '{case}': the test cannot see it"
+    assert status == CHECK_FAILED, (
+        f"geometry_bytes_add with a fault ({control}) passed '{case}': the test cannot see it"
+    )

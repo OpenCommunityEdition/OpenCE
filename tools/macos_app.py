@@ -20,21 +20,23 @@ MINIMUM_SYSTEM = "26.0"
 
 
 def info_plist(version: str) -> bytes:
-    return plistlib.dumps({
-        "CFBundleDevelopmentRegion": "en",
-        "CFBundleExecutable": "OpenCE",
-        "CFBundleIdentifier": "org.opence.OpenCE",
-        "CFBundleInfoDictionaryVersion": "6.0",
-        "CFBundleName": "OpenCE",
-        "CFBundleDisplayName": "OpenCE",
-        "CFBundlePackageType": "APPL",
-        "CFBundleShortVersionString": version,
-        "CFBundleVersion": version,
-        "LSApplicationCategoryType": "public.app-category.action-games",
-        "LSMinimumSystemVersion": MINIMUM_SYSTEM,
-        "NSHighResolutionCapable": True,
-        "NSPrincipalClass": "NSApplication",
-    })
+    return plistlib.dumps(
+        {
+            "CFBundleDevelopmentRegion": "en",
+            "CFBundleExecutable": "OpenCE",
+            "CFBundleIdentifier": "org.opence.OpenCE",
+            "CFBundleInfoDictionaryVersion": "6.0",
+            "CFBundleName": "OpenCE",
+            "CFBundleDisplayName": "OpenCE",
+            "CFBundlePackageType": "APPL",
+            "CFBundleShortVersionString": version,
+            "CFBundleVersion": version,
+            "LSApplicationCategoryType": "public.app-category.action-games",
+            "LSMinimumSystemVersion": MINIMUM_SYSTEM,
+            "NSHighResolutionCapable": True,
+            "NSPrincipalClass": "NSApplication",
+        }
+    )
 
 
 def assemble(executable: Path, image: Path, entitlements: Path, codesign: str, version: str, app: Path) -> None:

@@ -264,7 +264,8 @@ final class ShellTests: XCTestCase {
         shell.handle(.backTab)
         XCTAssertEqual(shell.editor.text, "step")
         let listed = shell.items(width: 640, height: 480, metrics: metrics)
-        XCTAssertTrue(listed.contains { if case let .text(text, _, _, _) = $0 { text.contains("▸step") } else { false } })
+        XCTAssertTrue(
+            listed.contains { if case let .text(text, _, _, _) = $0 { text.contains("▸step") } else { false } })
         shell.handle(.text(" "))
         XCTAssertTrue(shell.completions.isEmpty, "another key ends it")
 
@@ -373,13 +374,14 @@ final class ShellTests: XCTestCase {
         shell.handle(.copy)
         XCTAssertEqual(pasteboard.text, "ran")
         let drawn = shell.items(width: 640, height: 480, metrics: metrics)
-        XCTAssertTrue(drawn.contains { item in
-            if case let .box(x, y, width, _, color) = item {
-                return color == ShellOverlay.Colors.selection && x == output.1 && y == output.2
-                    && width == 3 * metrics.cellWidth
-            }
-            return false
-        })
+        XCTAssertTrue(
+            drawn.contains { item in
+                if case let .box(x, y, width, _, color) = item {
+                    return color == ShellOverlay.Colors.selection && x == output.1 && y == output.2
+                        && width == 3 * metrics.cellWidth
+                }
+                return false
+            })
         // Command-V types the clipboard's text
         pasteboard.text = "pasted\ntwo"
         shell.handle(.paste)
@@ -421,9 +423,11 @@ final class ShellTests: XCTestCase {
     func testTheLogIsFollowedWhileOpen() {
         let engine = FakeEngine()
         let shell = ShellOverlay(engine: engine)
-        engine.log = [LogEntry(sequence: 1, level: "info", target: "sim", text: "spawned"),
-                      LogEntry(sequence: 2, level: "warn", target: "ai", text: "no path"),
-                      LogEntry(sequence: 3, level: "bogus", target: "x", text: "y")]
+        engine.log = [
+            LogEntry(sequence: 1, level: "info", target: "sim", text: "spawned"),
+            LogEntry(sequence: 2, level: "warn", target: "ai", text: "no path"),
+            LogEntry(sequence: 3, level: "bogus", target: "x", text: "y"),
+        ]
         shell.update(seconds: 0.016, now: 0)
         XCTAssertEqual(engine.logPolls, 0, "not while shut")
         shell.open()
@@ -448,8 +452,10 @@ final class ShellTests: XCTestCase {
         XCTAssertEqual(shell.items(width: 640, height: 480, metrics: metrics), [])
         XCTAssertFalse(shell.isVisible)
 
-        engine.watched = [WatchValue(expression: "(game_difficulty_get)", value: "normal", ok: true),
-                          WatchValue(expression: "(nope)", value: "no such function", ok: false)]
+        engine.watched = [
+            WatchValue(expression: "(game_difficulty_get)", value: "normal", ok: true),
+            WatchValue(expression: "(nope)", value: "no such function", ok: false),
+        ]
         shell.update(seconds: 1.0 / 60, now: 3)
         XCTAssertTrue(shell.isVisible)
         let polls = engine.watchPolls
@@ -502,10 +508,16 @@ final class ShellTests: XCTestCase {
             return XCTFail("the background at the top")
         }
         XCTAssertTrue(items.contains(.text("] ", x: 8, y: panel - 1 - 16 - 4, color: ShellOverlay.Colors.input)))
-        XCTAssertTrue(items.contains(.text("spawn warthog", x: 8 + 16, y: panel - 1 - 16 - 4,
-                                           color: ShellOverlay.Colors.output)))
-        XCTAssertTrue(items.contains(.box(x: 8 + 16 + 6 * 8, y: panel - 1 - 16 - 4, width: 2, height: 16,
-                                          color: ShellOverlay.Colors.cursor)), "the cursor before warthog")
+        XCTAssertTrue(
+            items.contains(
+                .text(
+                    "spawn warthog", x: 8 + 16, y: panel - 1 - 16 - 4,
+                    color: ShellOverlay.Colors.output)))
+        XCTAssertTrue(
+            items.contains(
+                .box(
+                    x: 8 + 16 + 6 * 8, y: panel - 1 - 16 - 4, width: 2, height: 16,
+                    color: ShellOverlay.Colors.cursor)), "the cursor before warthog")
         // (a line longer than the width scrolls to the cursor)
         shell.handle(.end)
         type(String(repeating: "z", count: 200), into: shell)
@@ -529,14 +541,16 @@ final class ShellTests: XCTestCase {
         shell.update(seconds: 1, now: 0)
         type("help", into: shell)
         shell.handle(.enter)
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 320, height: 240,
-                                                                  mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: 320, height: 240,
+            mipmapped: false)
         descriptor.usage = [.renderTarget]
         let target = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
         let queue = try XCTUnwrap(device.makeCommandQueue())
         let commands = try XCTUnwrap(queue.makeCommandBuffer())
-        pass.encode(shell.items(width: 320, height: 240, metrics: ShellMetrics(atlas: atlas)), into: commands,
-                    target: target)
+        pass.encode(
+            shell.items(width: 320, height: 240, metrics: ShellMetrics(atlas: atlas)), into: commands,
+            target: target)
         commands.commit()
         commands.waitUntilCompleted()
         XCTAssertNil(commands.error)

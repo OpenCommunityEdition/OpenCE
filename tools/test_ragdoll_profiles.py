@@ -32,8 +32,19 @@ BSP_VERTICES, VERTEX_SIZE = 84, 16
 
 SHAPES = {0: "sphere", 1: "capsule", 2: "box"}
 # bones a ragdoll bends at, where a model has them and their pieces
-LIMBS = ("pelvis", "spine", "head", "l thigh", "r thigh", "l calf", "r calf", "l upperarm", "r upperarm",
-         "l forearm", "r forearm")
+LIMBS = (
+    "pelvis",
+    "spine",
+    "head",
+    "l thigh",
+    "r thigh",
+    "l calf",
+    "r calf",
+    "l upperarm",
+    "r upperarm",
+    "l forearm",
+    "r forearm",
+)
 
 
 def maps():
@@ -44,7 +55,7 @@ def tags_of(path):
     raw = path.read_bytes()
     data = raw[:2048] + zlib.decompress(raw[2048:])
     offset, size = struct.unpack_from("<II", data, 0x10)
-    return data[offset:offset + size]
+    return data[offset : offset + size]
 
 
 def profiles_of(path):
@@ -119,12 +130,22 @@ def profiles_include(found):
             for point in points:
                 vertices.extend(point)
     floats = ", ".join(f"{v!r}f" if math.isfinite(v) else "NAN" for v in vertices) or "0"
-    return "\n".join([
-        "static struct profile_model const profile_models[] = {", *models, "};",
-        "static struct profile_node const profile_nodes[] = {", *nodes, "};",
-        "static struct profile_piece const profile_pieces[] = {", *pieces, "};",
-        f"static real const profile_vertices[] = {{{floats}}};",
-        f"static char const profile_overrides[] = {c_string(read('port/assets/ragdolls/ragdolls.txt'))};", ""])
+    return "\n".join(
+        [
+            "static struct profile_model const profile_models[] = {",
+            *models,
+            "};",
+            "static struct profile_node const profile_nodes[] = {",
+            *nodes,
+            "};",
+            "static struct profile_piece const profile_pieces[] = {",
+            *pieces,
+            "};",
+            f"static real const profile_vertices[] = {{{floats}}};",
+            f"static char const profile_overrides[] = {c_string(read('port/assets/ragdolls/ragdolls.txt'))};",
+            "",
+        ]
+    )
 
 
 @functools.lru_cache(maxsize=None)
@@ -138,17 +159,27 @@ def bodies():
     for line in output.splitlines():
         words = line.split(" ")
         if words[0] == "MODEL":
-            body = line[len("MODEL "):]
+            body = line[len("MODEL ") :]
             if body.endswith(" NONE"):
-                result[body[:-len(" NONE")]] = current = None
+                result[body[: -len(" NONE")]] = current = None
                 continue
             name, rest = body.rsplit(" BODY ", 1)
             current = result[name] = (float(rest.split()[1]), [], [])
         elif words[0] == "PART":
             values = [float(word) for word in words[1:]]
-            current[1].append({"node": int(values[1]), "parent": int(values[2]), "shape": SHAPES[int(values[3])],
-                               "size": values[4:7], "center": values[7:10], "mass": values[10],
-                               "twist": values[11:13], "swing": values[13:15], "break": values[15]})
+            current[1].append(
+                {
+                    "node": int(values[1]),
+                    "parent": int(values[2]),
+                    "shape": SHAPES[int(values[3])],
+                    "size": values[4:7],
+                    "center": values[7:10],
+                    "mass": values[10],
+                    "twist": values[11:13],
+                    "swing": values[13:15],
+                    "break": values[15],
+                }
+            )
         elif words[0] == "NODE":
             current[2].append(int(words[2]))
     return result
@@ -160,7 +191,7 @@ def sections():
     for line in read("port/assets/ragdolls/ragdolls.txt").splitlines():
         line = line.split("#", 1)[0].strip()
         if line.startswith("model "):
-            current = found.setdefault(line[len("model "):].lower(), [])
+            current = found.setdefault(line[len("model ") :].lower(), [])
         elif line and current is not None:
             current.append(line)
     return found
@@ -172,9 +203,16 @@ needs_maps = pytest.mark.skipif(not maps(), reason="needs the stock maps in asse
 @needs_maps
 def test_every_biped_is_found():
     found = profiles()
-    for name in ("characters\\marine\\marine", "characters\\elite\\elite", "characters\\grunt\\grunt",
-                 "characters\\jackal\\jackal", "characters\\hunter\\hunter", "characters\\cyborg\\cyborg",
-                 "characters\\floodcombat_human\\floodcombat_human", "characters\\flood_infection\\flood_infection"):
+    for name in (
+        "characters\\marine\\marine",
+        "characters\\elite\\elite",
+        "characters\\grunt\\grunt",
+        "characters\\jackal\\jackal",
+        "characters\\hunter\\hunter",
+        "characters\\cyborg\\cyborg",
+        "characters\\floodcombat_human\\floodcombat_human",
+        "characters\\flood_infection\\flood_infection",
+    ):
         assert name in found, sorted(found)
 
 
@@ -302,7 +340,7 @@ def test_breaks_are_their_limbs():
         for line in lines:
             if not line.startswith("break "):
                 continue
-            node, damage = line[len("break "):].rsplit(":", 1)
+            node, damage = line[len("break ") :].rsplit(":", 1)
             model = next(model for model in built if model.lower() == name)
             nodes = found[model][0]
             named = {nodes[part["node"]][0].lower(): part for part in built[model][1]}
@@ -343,5 +381,7 @@ def test_profiles_report():
         print(f"{name}: {len(body[1])} parts, {body[0]:g} kg")
         for part in body[1]:
             parent = nodes[body[1][part['parent']]['node']][0] if part["parent"] >= 0 else "-"
-            print(f"    {nodes[part['node']][0]:<24} on {parent:<24} {part['shape']:<8} "
-                  f"{' '.join(f'{s:.3f}' for s in part['size'])}  {part['mass']:.1f} kg")
+            print(
+                f"    {nodes[part['node']][0]:<24} on {parent:<24} {part['shape']:<8} "
+                f"{' '.join(f'{s:.3f}' for s in part['size'])}  {part['mass']:.1f} kg"
+            )

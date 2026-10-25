@@ -58,7 +58,8 @@ pytestmark = pytest.mark.skipif(
 def importer() -> Path:
     subprocess.run(
         ["cargo", "build", "--release", "--quiet", "-p", "opence_import", "--bin", "opence-import"],
-        cwd=ENGINE, check=True,
+        cwd=ENGINE,
+        check=True,
     )
     return ENGINE / "target" / "release" / "opence-import"
 
@@ -66,7 +67,9 @@ def importer() -> Path:
 def run(importer: Path, maps: list[Path], *options: str) -> dict[str, dict]:
     result = subprocess.run(
         [str(importer), *options, *map(str, maps)],
-        capture_output=True, text=True, timeout=600,
+        capture_output=True,
+        text=True,
+        timeout=600,
     )
     lines = [json.loads(line) for line in result.stdout.splitlines()]
     return {line["map"]: line for line in lines}

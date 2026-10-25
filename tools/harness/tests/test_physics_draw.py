@@ -12,33 +12,63 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["off", "off without the host", "setting changed", "capsule", "sphere", "box", "colours", "unposed",
-         "every debris id"]
+CASES = [
+    "off",
+    "off without the host",
+    "setting changed",
+    "capsule",
+    "sphere",
+    "box",
+    "colours",
+    "unposed",
+    "every debris id",
+]
 
 FUNCTIONS = ["physics_draw_enabled", "physics_draw_point", "physics_draw_shape", "physics_draw_render"]
 
 # a fault in the drawing and the case that must catch it
 NEGATIVE_CONTROLS = {
     "always-drawn": (("\tif (!physics_draw_enabled())\n\t\treturn;\n", ""), "off"),
-    "without-the-host": (("return physics_draw_on && physics_jolt_enabled();", "return physics_draw_on;"),
-                         "off without the host"),
-    "read-once": (("if (config_changes() != physics_draw_changes)", "if (physics_draw_changes == (unsigned long)-1)"),
-                  "setting changed"),
+    "without-the-host": (
+        ("return physics_draw_on && physics_jolt_enabled();", "return physics_draw_on;"),
+        "off without the host",
+    ),
+    "read-once": (
+        ("if (config_changes() != physics_draw_changes)", "if (physics_draw_changes == (unsigned long)-1)"),
+        "setting changed",
+    ),
     "capsule-from-its-middle": (("base.y = 2.0f * middle.y - end.y;", "base.y = middle.y;"), "capsule"),
     "capsule-along-y": (("end.x += size[1];", "end.y += size[1];"), "capsule"),
-    "unturned": (("result->y = pose->position.y + point->y + q->w * t.j + (q->v.k * t.i - q->v.i * t.k);",
-                  "result->y = pose->position.y + point->y;"), "sphere"),
+    "unturned": (
+        (
+            "result->y = pose->position.y + point->y + q->w * t.j + (q->v.k * t.i - q->v.i * t.k);",
+            "result->y = pose->position.y + point->y;",
+        ),
+        "sphere",
+    ),
     "off-centre": (("physics_draw_point(pose, center, &middle);", "middle = pose->position;"), "sphere"),
     "box-diagonals": (("if (!(index & bit))", "if (index == 0)"), "box"),
-    "box-half-size": (("corner.y = center->y + ((index & 2) ? size[1] : -size[1]);",
-                       "corner.y = center->y + ((index & 2) ? size[1] : 0.0f);"), "box"),
+    "box-half-size": (
+        (
+            "corner.y = center->y + ((index & 2) ? size[1] : -size[1]);",
+            "corner.y = center->y + ((index & 2) ? size[1] : 0.0f);",
+        ),
+        "box",
+    ),
     "asleep-torn": (("!ragdoll->awake ? &physics_draw_asleep :\n\t\t\t\t", ""), "colours"),
     "nothing-torn": (("ragdoll_part_piece(ragdoll, part_index) != 0 ? &physics_draw_torn : ", ""), "colours"),
-    "debris-always-awake": (("awake ? &physics_draw_debris_awake : &physics_draw_asleep", "&physics_draw_debris_awake"),
-                            "colours"),
+    "debris-always-awake": (
+        ("awake ? &physics_draw_debris_awake : &physics_draw_asleep", "&physics_draw_debris_awake"),
+        "colours",
+    ),
     "unposed-drawn": (("if (!ragdoll || !ragdoll->posed)", "if (!ragdoll)"), "unposed"),
-    "last-debris-skipped": (("id < PHYSICS_DEBRIS_FIRST_ID + PHYSICS_DEBRIS_MAX;", "id < PHYSICS_DEBRIS_FIRST_ID + PHYSICS_DEBRIS_MAX - 1;"),
-                            "every debris id"),
+    "last-debris-skipped": (
+        (
+            "id < PHYSICS_DEBRIS_FIRST_ID + PHYSICS_DEBRIS_MAX;",
+            "id < PHYSICS_DEBRIS_FIRST_ID + PHYSICS_DEBRIS_MAX - 1;",
+        ),
+        "every debris id",
+    ),
 }
 
 
@@ -47,20 +77,28 @@ def generated(fault=None):
     bodies = read("port/linux/game/ragdoll_bodies.h")
     ragdolls = read("port/linux/game/ragdolls.h")
     debris = read("port/linux/game/physics_debris.h")
-    state = draw[draw.index("static unsigned long physics_draw_changes"):draw.index("boolean physics_draw_enabled(void)")]
-    config = "\n".join([
-        enum_with(bodies, "RAGDOLL_BODY_PARTS_MAX"),
-        enum_with(bodies, "_ragdoll_shape_capsule"),
-        enum_with(ragdolls, "RAGDOLLS_MAX"),
-        "#define PHYSICS_DEBRIS_FIRST_ID " + re.search(r"#define PHYSICS_DEBRIS_FIRST_ID (\S+)", debris)[1],
-        "#define PHYSICS_DEBRIS_MAX " + re.search(r"#define PHYSICS_DEBRIS_MAX (\S+)", debris)[1],
-        "\n".join(re.findall(r"#define HOST_PHYSICS_SHAPE_\w+ \d+", draw)[:3]),
-        structure(bodies, "ragdoll_part"),
-        structure(bodies, "ragdoll_body"),
-        structure(ragdolls, "ragdoll_pose"),
-        structure(ragdolls, "ragdoll"),
-        structure(debris, "physics_debris_body"),
-        state]) + "\n"
+    state = draw[
+        draw.index("static unsigned long physics_draw_changes") : draw.index("boolean physics_draw_enabled(void)")
+    ]
+    config = (
+        "\n".join(
+            [
+                enum_with(bodies, "RAGDOLL_BODY_PARTS_MAX"),
+                enum_with(bodies, "_ragdoll_shape_capsule"),
+                enum_with(ragdolls, "RAGDOLLS_MAX"),
+                "#define PHYSICS_DEBRIS_FIRST_ID " + re.search(r"#define PHYSICS_DEBRIS_FIRST_ID (\S+)", debris)[1],
+                "#define PHYSICS_DEBRIS_MAX " + re.search(r"#define PHYSICS_DEBRIS_MAX (\S+)", debris)[1],
+                "\n".join(re.findall(r"#define HOST_PHYSICS_SHAPE_\w+ \d+", draw)[:3]),
+                structure(bodies, "ragdoll_part"),
+                structure(bodies, "ragdoll_body"),
+                structure(ragdolls, "ragdoll_pose"),
+                structure(ragdolls, "ragdoll"),
+                structure(debris, "physics_debris_body"),
+                state,
+            ]
+        )
+        + "\n"
+    )
     code = "\n".join(function(draw, name) for name in FUNCTIONS)
     if fault:
         code = mutated(code, *fault)

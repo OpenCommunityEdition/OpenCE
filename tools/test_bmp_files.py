@@ -7,6 +7,7 @@ behaviour trapping, so a crash or an undefined operation on a malformed file
 fails the test that caused it. The module is also compiled as the game
 compiles it (gnu89).
 """
+
 from pathlib import Path
 import random
 import shutil
@@ -59,8 +60,20 @@ def report_tool(tmp_path_factory):
     output = folder / ("bmp_file_report.exe" if sys.platform == "win32" else "bmp_file_report")
     errors = []
     for target in target_flag_sets():
-        command = [clang, *target, "-std=c99", *STRICT_FLAGS, *UB_TRAP_FLAGS, "-O1", "-g",
-                   f"-I{MODULE.parent}", str(MODULE), str(TOOL), "-o", str(output)]
+        command = [
+            clang,
+            *target,
+            "-std=c99",
+            *STRICT_FLAGS,
+            *UB_TRAP_FLAGS,
+            "-O1",
+            "-g",
+            f"-I{MODULE.parent}",
+            str(MODULE),
+            str(TOOL),
+            "-o",
+            str(output),
+        ]
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode == 0:
             return output
@@ -76,8 +89,17 @@ def test_module_compiles_as_game_code_without_warnings(tmp_path):
     if clang is None:
         pytest.skip("clang is needed")
     for target in target_flag_sets():
-        command = [clang, *target, "-std=gnu89", *STRICT_FLAGS, "-Wno-long-long", "-c", str(MODULE),
-                   "-o", str(tmp_path / "bmp_files.o")]
+        command = [
+            clang,
+            *target,
+            "-std=gnu89",
+            *STRICT_FLAGS,
+            "-Wno-long-long",
+            "-c",
+            str(MODULE),
+            "-o",
+            str(tmp_path / "bmp_files.o"),
+        ]
         result = subprocess.run(command, capture_output=True, text=True)
         if result.returncode == 0:
             return
@@ -112,7 +134,7 @@ def fit(tool, tmp_path, data, width, height, shape=(0, 0)):
     values = struct.unpack(f"<{width * height}I", output.read_bytes())
     assert all(value >> 24 == 0xFF for value in values)
     pixels = [((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF) for value in values]
-    return [pixels[row * width:(row + 1) * width] for row in range(height)]
+    return [pixels[row * width : (row + 1) * width] for row in range(height)]
 
 
 # ---------- synthetic files
@@ -125,13 +147,25 @@ def bmp(rows, bits=24, top_down=False, header_size=40, compression=0, masks=BLUE
     width, height = len(rows[0]), len(rows)
     row_bytes = (width * bits + 31) // 32 * 4
     pixels = bytearray()
-    for row in (rows if top_down else rows[::-1]):
+    for row in rows if top_down else rows[::-1]:
         stored = bytearray()
         for red, green, blue in row:
             stored += bytes((blue, green, red)) + (b"\x00" if bits == 32 else b"")
         pixels += stored + bytes(row_bytes - len(stored))
-    information = struct.pack("<IiiHHIIiiII", header_size, width, -height if top_down else height, 1, bits,
-                              compression, len(pixels), 2835, 2835, 0, 0)
+    information = struct.pack(
+        "<IiiHHIIiiII",
+        header_size,
+        width,
+        -height if top_down else height,
+        1,
+        bits,
+        compression,
+        len(pixels),
+        2835,
+        2835,
+        0,
+        0,
+    )
     if header_size > 40:
         # the later versions start with the bit masks; the rest stays zero
         information += struct.pack("<III", *masks) + bytes(header_size - 52)
@@ -148,8 +182,7 @@ def patched(data, offset, value, form="<I"):
 
 
 # a picture whose every pixel differs
-PICTURE = [[(10, 20, 30), (40, 50, 60), (70, 80, 90)],
-           [(100, 110, 120), (130, 140, 150), (160, 170, 180)]]
+PICTURE = [[(10, 20, 30), (40, 50, 60), (70, 80, 90)], [(100, 110, 120), (130, 140, 150), (160, 170, 180)]]
 
 
 # ---------- what is read
@@ -159,29 +192,41 @@ def test_reads_bottom_up_24_bit_rows_with_their_padding(report_tool, tmp_path):
     data = bmp(PICTURE)
     returncode, fields = report(report_tool, tmp_path, data)
     assert returncode == 0
-    assert fields == {"file": str(tmp_path / "picture.bmp"), "status": OK, "width": "3", "height": "2",
-                      "bits_per_pixel": "24", "top_down": "0"}
+    assert fields == {
+        "file": str(tmp_path / "picture.bmp"),
+        "status": OK,
+        "width": "3",
+        "height": "2",
+        "bits_per_pixel": "24",
+        "top_down": "0",
+    }
     assert fit(report_tool, tmp_path, data, 3, 2) == PICTURE
 
 
-@pytest.mark.parametrize("options", [
-    {"top_down": True},
-    {"bits": 32},
-    {"bits": 32, "compression": 3},
-    {"bits": 32, "compression": 3, "header_size": 52},
-    {"bits": 32, "compression": 3, "header_size": 108},
-    {"bits": 32, "header_size": 124, "top_down": True},
-    {"header_size": 56, "gap": 16},
-], ids=["top-down", "32-bit", "bit-fields", "v2-header", "v4-header", "v5-header", "color-table"])
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"top_down": True},
+        {"bits": 32},
+        {"bits": 32, "compression": 3},
+        {"bits": 32, "compression": 3, "header_size": 52},
+        {"bits": 32, "compression": 3, "header_size": 108},
+        {"bits": 32, "header_size": 124, "top_down": True},
+        {"header_size": 56, "gap": 16},
+    ],
+    ids=["top-down", "32-bit", "bit-fields", "v2-header", "v4-header", "v5-header", "color-table"],
+)
 def test_reads_every_kind_of_uncompressed_color(report_tool, tmp_path, options):
     assert fit(report_tool, tmp_path, bmp(PICTURE, **options), 3, 2) == PICTURE
 
 
 def test_averages_the_pixels_a_smaller_picture_covers(report_tool, tmp_path):
-    rows = [[(0, 0, 0), (2, 4, 8), (200, 0, 0), (201, 0, 0)],
-            [(4, 8, 16), (6, 12, 24), (202, 0, 0), (203, 0, 0)],
-            [(0, 255, 0), (0, 255, 0), (1, 1, 1), (2, 2, 2)],
-            [(0, 255, 0), (0, 254, 0), (3, 3, 3), (4, 4, 4)]]
+    rows = [
+        [(0, 0, 0), (2, 4, 8), (200, 0, 0), (201, 0, 0)],
+        [(4, 8, 16), (6, 12, 24), (202, 0, 0), (203, 0, 0)],
+        [(0, 255, 0), (0, 255, 0), (1, 1, 1), (2, 2, 2)],
+        [(0, 255, 0), (0, 254, 0), (3, 3, 3), (4, 4, 4)],
+    ]
     assert fit(report_tool, tmp_path, bmp(rows), 2, 2) == [
         [(3, 6, 12), (202, 0, 0)],
         [(0, 255, 0), (3, 3, 3)],
@@ -190,21 +235,27 @@ def test_averages_the_pixels_a_smaller_picture_covers(report_tool, tmp_path):
 
 def test_repeats_the_pixels_of_a_larger_picture(report_tool, tmp_path):
     rows = [[(10, 20, 30), (40, 50, 60)]]
-    assert fit(report_tool, tmp_path, bmp(rows), 4, 2) == [
-        [(10, 20, 30), (10, 20, 30), (40, 50, 60), (40, 50, 60)],
-    ] * 2
+    assert (
+        fit(report_tool, tmp_path, bmp(rows), 4, 2)
+        == [
+            [(10, 20, 30), (10, 20, 30), (40, 50, 60), (40, 50, 60)],
+        ]
+        * 2
+    )
 
 
 def test_takes_the_middle_of_a_wider_picture(report_tool, tmp_path):
     rows = [[(x * 20, y * 40, 7) for x in range(8)] for y in range(4)]
     assert fit(report_tool, tmp_path, bmp(rows), 4, 4, shape=(1, 1)) == [
-        [((2 + x) * 20, y * 40, 7) for x in range(4)] for y in range(4)]
+        [((2 + x) * 20, y * 40, 7) for x in range(4)] for y in range(4)
+    ]
 
 
 def test_takes_the_middle_of_a_taller_picture(report_tool, tmp_path):
     rows = [[(x * 50, y * 30, 1) for x in range(2)] for y in range(6)]
     assert fit(report_tool, tmp_path, bmp(rows), 2, 2, shape=(1, 1)) == [
-        [(x * 50, (2 + y) * 30, 1) for x in range(2)] for y in range(2)]
+        [(x * 50, (2 + y) * 30, 1) for x in range(2)] for y in range(2)
+    ]
 
 
 def test_reads_the_largest_picture_it_accepts(report_tool, tmp_path):
@@ -219,33 +270,36 @@ VALID = bmp(PICTURE)
 BIT_FIELDS = bmp(PICTURE, bits=32, compression=3)
 
 
-@pytest.mark.parametrize("data, expected", [
-    pytest.param(b"", NOT_BMP, id="empty"),
-    pytest.param(VALID[:53], NOT_BMP, id="short"),
-    pytest.param(b"MB" + VALID[2:], NOT_BMP, id="signature"),
-    pytest.param(patched(VALID, 14, 12), UNSUPPORTED_HEADER, id="core-header"),
-    pytest.param(patched(VALID, 14, 64), UNSUPPORTED_HEADER, id="os2-header"),
-    pytest.param(patched(VALID, 18, 0), BAD_DIMENSIONS, id="no-width"),
-    pytest.param(patched(VALID, 18, -3, "<i"), BAD_DIMENSIONS, id="negative-width"),
-    pytest.param(patched(VALID, 18, 8193), BAD_DIMENSIONS, id="too-wide"),
-    pytest.param(patched(VALID, 22, 0), BAD_DIMENSIONS, id="no-height"),
-    pytest.param(patched(VALID, 22, 8193), BAD_DIMENSIONS, id="too-tall"),
-    pytest.param(patched(VALID, 22, -8193, "<i"), BAD_DIMENSIONS, id="too-tall-top-down"),
-    pytest.param(patched(VALID, 22, 0x80000000), BAD_DIMENSIONS, id="most-negative-height"),
-    pytest.param(patched(VALID, 26, 2, "<H"), UNSUPPORTED_PIXELS, id="planes"),
-    pytest.param(patched(VALID, 28, 8, "<H"), UNSUPPORTED_PIXELS, id="8-bit"),
-    pytest.param(patched(VALID, 28, 16, "<H"), UNSUPPORTED_PIXELS, id="16-bit"),
-    pytest.param(patched(VALID, 30, 1), UNSUPPORTED_PIXELS, id="run-length"),
-    pytest.param(patched(VALID, 30, 3), UNSUPPORTED_PIXELS, id="24-bit-bit-fields"),
-    pytest.param(patched(VALID, 30, 4), UNSUPPORTED_PIXELS, id="jpeg"),
-    pytest.param(patched(VALID, 30, 5), UNSUPPORTED_PIXELS, id="png"),
-    pytest.param(patched(BIT_FIELDS, 54, 0xFF000000), UNSUPPORTED_PIXELS, id="other-masks"),
-    pytest.param(BIT_FIELDS[:60], NOT_BMP, id="short-masks"),
-    pytest.param(patched(VALID, 10, 20), BAD_PIXEL_RANGE, id="pixels-in-headers"),
-    pytest.param(patched(VALID, 10, len(VALID)), BAD_PIXEL_RANGE, id="pixels-after-end"),
-    pytest.param(VALID[:-1], BAD_PIXEL_RANGE, id="short-last-row"),
-    pytest.param(patched(patched(VALID, 18, 8192), 22, 8192), BAD_PIXEL_RANGE, id="rows-beyond-file"),
-])
+@pytest.mark.parametrize(
+    "data, expected",
+    [
+        pytest.param(b"", NOT_BMP, id="empty"),
+        pytest.param(VALID[:53], NOT_BMP, id="short"),
+        pytest.param(b"MB" + VALID[2:], NOT_BMP, id="signature"),
+        pytest.param(patched(VALID, 14, 12), UNSUPPORTED_HEADER, id="core-header"),
+        pytest.param(patched(VALID, 14, 64), UNSUPPORTED_HEADER, id="os2-header"),
+        pytest.param(patched(VALID, 18, 0), BAD_DIMENSIONS, id="no-width"),
+        pytest.param(patched(VALID, 18, -3, "<i"), BAD_DIMENSIONS, id="negative-width"),
+        pytest.param(patched(VALID, 18, 8193), BAD_DIMENSIONS, id="too-wide"),
+        pytest.param(patched(VALID, 22, 0), BAD_DIMENSIONS, id="no-height"),
+        pytest.param(patched(VALID, 22, 8193), BAD_DIMENSIONS, id="too-tall"),
+        pytest.param(patched(VALID, 22, -8193, "<i"), BAD_DIMENSIONS, id="too-tall-top-down"),
+        pytest.param(patched(VALID, 22, 0x80000000), BAD_DIMENSIONS, id="most-negative-height"),
+        pytest.param(patched(VALID, 26, 2, "<H"), UNSUPPORTED_PIXELS, id="planes"),
+        pytest.param(patched(VALID, 28, 8, "<H"), UNSUPPORTED_PIXELS, id="8-bit"),
+        pytest.param(patched(VALID, 28, 16, "<H"), UNSUPPORTED_PIXELS, id="16-bit"),
+        pytest.param(patched(VALID, 30, 1), UNSUPPORTED_PIXELS, id="run-length"),
+        pytest.param(patched(VALID, 30, 3), UNSUPPORTED_PIXELS, id="24-bit-bit-fields"),
+        pytest.param(patched(VALID, 30, 4), UNSUPPORTED_PIXELS, id="jpeg"),
+        pytest.param(patched(VALID, 30, 5), UNSUPPORTED_PIXELS, id="png"),
+        pytest.param(patched(BIT_FIELDS, 54, 0xFF000000), UNSUPPORTED_PIXELS, id="other-masks"),
+        pytest.param(BIT_FIELDS[:60], NOT_BMP, id="short-masks"),
+        pytest.param(patched(VALID, 10, 20), BAD_PIXEL_RANGE, id="pixels-in-headers"),
+        pytest.param(patched(VALID, 10, len(VALID)), BAD_PIXEL_RANGE, id="pixels-after-end"),
+        pytest.param(VALID[:-1], BAD_PIXEL_RANGE, id="short-last-row"),
+        pytest.param(patched(patched(VALID, 18, 8192), 22, 8192), BAD_PIXEL_RANGE, id="rows-beyond-file"),
+    ],
+)
 def test_refuses_what_it_does_not_read(report_tool, tmp_path, data, expected):
     returncode, fields = report(report_tool, tmp_path, data)
     assert returncode == 1

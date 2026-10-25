@@ -41,8 +41,9 @@ final class EffectsRowTests: XCTestCase {
         _ = try engine.startLevel(geometry: geometry, difficulty: 1)
         try engine.spawnPlayer(start: 0)
         _ = try engine.advance(frameSeconds: 1.0 / 30)
-        let renderer = try LevelRenderer(device: device, geometry: geometry,
-                                         settings: VideoSettings(antiAliasing: .native, renderScale: 1))
+        let renderer = try LevelRenderer(
+            device: device, geometry: geometry,
+            settings: VideoSettings(antiAliasing: .native, renderScale: 1))
         let started = engine.runCommand(line: "station effects")
         XCTAssertTrue(started.ok, started.text)
         let out = StockLevel.root.appendingPathComponent("build/engine/golden")
@@ -53,12 +54,15 @@ final class EffectsRowTests: XCTestCase {
             let frame = reader.acquire()
             let camera = ViewCamera(frame.camera, alpha: frame.alpha)
             renderer.laidParticles = []
-            let first = try renderer.capture(width: 480, height: 270, camera: camera,
-                                             objects: frame.drawnObjects(), queue: queue)
-            let second = try renderer.capture(width: 480, height: 270, camera: camera,
-                                              objects: frame.drawnObjects(), queue: queue)
-            XCTAssertEqual(first.difference(from: second, tolerance: 0)?.largest, 0,
-                           "the same frame drawn twice differs")
+            let first = try renderer.capture(
+                width: 480, height: 270, camera: camera,
+                objects: frame.drawnObjects(), queue: queue)
+            let second = try renderer.capture(
+                width: 480, height: 270, camera: camera,
+                objects: frame.drawnObjects(), queue: queue)
+            XCTAssertEqual(
+                first.difference(from: second, tolerance: 0)?.largest, 0,
+                "the same frame drawn twice differs")
         }
         // (an effect lasts three seconds; it is drawn a tenth, a quarter and
         // half a second in, for sparks that are gone by the half second)
@@ -70,8 +74,10 @@ final class EffectsRowTests: XCTestCase {
                 if laid > 0 {
                     alive += 1
                     if largest == 0 { unchanged.append(finished) }
-                    print(String(format: "effects row: %03d share %.5f largest %d laid %d",
-                                 finished, share, largest, laid))
+                    print(
+                        String(
+                            format: "effects row: %03d share %.5f largest %d laid %d",
+                            finished, share, largest, laid))
                 }
                 finished = run.results.count
                 frames = 0
@@ -85,11 +91,13 @@ final class EffectsRowTests: XCTestCase {
             let camera = ViewCamera(frame.camera, alpha: frame.alpha)
             renderer.time = Float((Double(frame.tick) + Double(frame.alpha)) / 60)
             renderer.laidParticles = []
-            let without = try renderer.capture(width: 480, height: 270, camera: camera,
-                                               objects: frame.drawnObjects(), queue: queue)
+            let without = try renderer.capture(
+                width: 480, height: 270, camera: camera,
+                objects: frame.drawnObjects(), queue: queue)
             renderer.laidParticles = Array(frame.particles)
-            let with = try renderer.capture(width: 480, height: 270, camera: camera,
-                                            objects: frame.drawnObjects(), queue: queue)
+            let with = try renderer.capture(
+                width: 480, height: 270, camera: camera,
+                objects: frame.drawnObjects(), queue: queue)
             laid = max(laid, renderer.laidParticles.count)
             share = max(share, with.difference(from: without)?.share ?? 0)
             largest = max(largest, with.difference(from: without, tolerance: 0)?.largest ?? 0)

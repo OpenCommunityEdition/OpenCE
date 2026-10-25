@@ -102,18 +102,22 @@ public final class CameraPass {
         let tested = MTLDepthStencilDescriptor()
         tested.depthCompareFunction = .greaterEqual
         tested.isDepthWriteEnabled = false
-        let whiteDescriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: 1, height: 1,
-                                                                       mipmapped: false)
+        let whiteDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm, width: 1, height: 1,
+            mipmapped: false)
         guard sprites.count == Self.slots, occluders.count == Self.slots, seen.count == Self.slots,
-              let luminance = device.makeBuffer(length: Self.slots * MemoryLayout<Float>.stride,
-                                                options: .storageModeShared),
-              let always = device.makeDepthStencilState(descriptor: descriptor),
-              let test = device.makeDepthStencilState(descriptor: tested),
-              let white = device.makeTexture(descriptor: whiteDescriptor) else {
+            let luminance = device.makeBuffer(
+                length: Self.slots * MemoryLayout<Float>.stride,
+                options: .storageModeShared),
+            let always = device.makeDepthStencilState(descriptor: descriptor),
+            let test = device.makeDepthStencilState(descriptor: tested),
+            let white = device.makeTexture(descriptor: whiteDescriptor)
+        else {
             throw LevelRendererError.resources("camera buffers")
         }
-        white.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: [UInt8](repeating: 255, count: 4),
-                      bytesPerRow: 4)
+        white.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: [UInt8](repeating: 255, count: 4),
+            bytesPerRow: 4)
         self.luminance = luminance
         self.always = always
         self.test = test
@@ -136,10 +140,11 @@ public final class CameraPass {
             descriptor.colorAttachments[0].sourceAlphaBlendFactor = .zero
             descriptor.colorAttachments[0].destinationAlphaBlendFactor = .one
             descriptor.depthAttachmentPixelFormat = LevelRenderer.depthFormat
-            return Pipelines(occlusion: try compute("camera_occlusion"),
-                             sprite: try device.makeRenderPipelineState(descriptor: descriptor),
-                             luminance: try compute("camera_luminance"), bloomDown: try compute("camera_bloom_down"),
-                             bloomUp: try compute("camera_bloom_up"))
+            return Pipelines(
+                occlusion: try compute("camera_occlusion"),
+                sprite: try device.makeRenderPipelineState(descriptor: descriptor),
+                luminance: try compute("camera_luminance"), bloomDown: try compute("camera_bloom_down"),
+                bloomUp: try compute("camera_bloom_up"))
         } catch let error as LevelRendererError {
             throw error
         } catch {
@@ -156,8 +161,10 @@ public final class CameraPass {
     /// Writes `sprites` into the next slot's buffers and tests their
     /// flares' disks against `depth` (drawn from `viewProjection` by
     /// `camera`); nil if there is nothing to draw.
-    public func encodeOcclusion(_ drawn: CameraSprites, into commands: MTLCommandBuffer, depth: MTLTexture,
-                                viewProjection: simd_float4x4, camera: ViewCamera) -> Frame? {
+    public func encodeOcclusion(
+        _ drawn: CameraSprites, into commands: MTLCommandBuffer, depth: MTLTexture,
+        viewProjection: simd_float4x4, camera: ViewCamera
+    ) -> Frame? {
         guard !drawn.sprites.isEmpty else { return nil }
         let slot = frameCount % Self.slots
         frameCount += 1
@@ -181,10 +188,11 @@ public final class CameraPass {
             let picture = image(sprite)
             let texture = picture >= 0 ? images[picture] : nil
             let occluder = Int(sprite.occluder) < occluderCount ? sprite.occluder : UInt32.max
-            written[index] = GPUSprite(center: SIMD4(sprite.x, sprite.y, sprite.z, sprite.rotation),
-                                       extent: SIMD4(sprite.width, sprite.height, 0, 0),
-                                       color: SIMD4(sprite.red, sprite.green, sprite.blue, 0),
-                                       refs: SIMD4(occluder, sprite.flags, texture == nil ? 1 : 0, 0))
+            written[index] = GPUSprite(
+                center: SIMD4(sprite.x, sprite.y, sprite.z, sprite.rotation),
+                extent: SIMD4(sprite.width, sprite.height, 0, 0),
+                color: SIMD4(sprite.red, sprite.green, sprite.blue, 0),
+                refs: SIMD4(occluder, sprite.flags, texture == nil ? 1 : 0, 0))
             let key = (sprite.flags & Self.depthTested, picture)
             if let lastKey, lastKey == key, let last = groups.indices.last {
                 groups[last].count += 1
@@ -195,17 +203,19 @@ public final class CameraPass {
         }
         let right = -camera.rotation.act([0, 1, 0])
         let up = camera.rotation.act([0, 0, 1])
-        var uniforms = CameraUniforms(worldToClip: viewProjection, right: SIMD4(right, 0), up: SIMD4(up, 0),
-                                      size: SIMD4(Float(depth.width), Float(depth.height), 0, 0),
-                                      counts: SIMD4(UInt32(occluderCount), 0, 0, 0))
+        var uniforms = CameraUniforms(
+            worldToClip: viewProjection, right: SIMD4(right, 0), up: SIMD4(up, 0),
+            size: SIMD4(Float(depth.width), Float(depth.height), 0, 0),
+            counts: SIMD4(UInt32(occluderCount), 0, 0, 0))
         if occluderCount > 0, let encoder = commands.timedComputeEncoder("flare occlusion") {
             encoder.setComputePipelineState(pipelines.occlusion)
             encoder.setBuffer(occluders[slot], offset: 0, index: 0)
             encoder.setBuffer(seen[slot], offset: 0, index: 1)
             encoder.setBytes(&uniforms, length: MemoryLayout<CameraUniforms>.stride, index: 2)
             encoder.setTexture(depth, index: 0)
-            encoder.dispatchThreadgroups(MTLSize(width: (occluderCount + 63) / 64, height: 1, depth: 1),
-                                         threadsPerThreadgroup: MTLSize(width: 64, height: 1, depth: 1))
+            encoder.dispatchThreadgroups(
+                MTLSize(width: (occluderCount + 63) / 64, height: 1, depth: 1),
+                threadsPerThreadgroup: MTLSize(width: 64, height: 1, depth: 1))
             encoder.endEncoding()
         }
         return Frame(slot: slot, occluders: occluderCount, uniforms: uniforms, groups: groups)
@@ -243,8 +253,9 @@ public final class CameraPass {
         encoder.setTexture(frame, index: 0)
         encoder.setBuffer(luminance, offset: 0, index: 0)
         encoder.setBytes(&slot, length: MemoryLayout<UInt32>.stride, index: 1)
-        encoder.dispatchThreadgroups(MTLSize(width: 1, height: 1, depth: 1),
-                                     threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
+        encoder.dispatchThreadgroups(
+            MTLSize(width: 1, height: 1, depth: 1),
+            threadsPerThreadgroup: MTLSize(width: 16, height: 16, depth: 1))
         encoder.endEncoding()
     }
 
@@ -263,20 +274,26 @@ public final class CameraPass {
         if let bloom, bloom.down.width == half.0, bloom.down.height == half.1 {
             return bloom
         }
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: half.0,
-                                                                  height: half.1, mipmapped: true)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba16Float, width: half.0,
+            height: half.1, mipmapped: true)
         descriptor.mipmapLevelCount = min(Self.bloomLevels, descriptor.mipmapLevelCount)
         descriptor.usage = [.shaderRead, .shaderWrite]
         descriptor.storageMode = .private
-        guard let (down, up) = HitchLog.shared.note(.allocation, "bloom targets \(half.0)×\(half.1)", {
-            device.makeTexture(descriptor: descriptor).flatMap { down in
-                device.makeTexture(descriptor: descriptor).map { (down, $0) }
-            }
-        }) else { return nil }
+        guard
+            let (down, up) = HitchLog.shared.note(
+                .allocation, "bloom targets \(half.0)×\(half.1)",
+                {
+                    device.makeTexture(descriptor: descriptor).flatMap { down in
+                        device.makeTexture(descriptor: descriptor).map { (down, $0) }
+                    }
+                })
+        else { return nil }
         func levels(_ texture: MTLTexture) -> [MTLTexture] {
             (0..<texture.mipmapLevelCount).compactMap {
-                texture.makeTextureView(pixelFormat: .rgba16Float, textureType: .type2D, levels: $0..<($0 + 1),
-                                        slices: 0..<1)
+                texture.makeTextureView(
+                    pixelFormat: .rgba16Float, textureType: .type2D, levels: $0..<($0 + 1),
+                    slices: 0..<1)
             }
         }
         bloom = Bloom(down: down, up: up, downLevels: levels(down), upLevels: levels(up))
@@ -287,8 +304,9 @@ public final class CameraPass {
     /// its size); nil if it could not be made.
     public func encodeBloom(into commands: MTLCommandBuffer, frame: MTLTexture) -> MTLTexture? {
         guard let bloom = bloomTargets(width: frame.width, height: frame.height),
-              bloom.downLevels.count == bloom.upLevels.count, !bloom.downLevels.isEmpty,
-              let encoder = commands.timedComputeEncoder("bloom") else { return nil }
+            bloom.downLevels.count == bloom.upLevels.count, !bloom.downLevels.isEmpty,
+            let encoder = commands.timedComputeEncoder("bloom")
+        else { return nil }
         let threads = MTLSize(width: 8, height: 8, depth: 1)
         func groups(_ texture: MTLTexture) -> MTLSize {
             MTLSize(width: (texture.width + 7) / 8, height: (texture.height + 7) / 8, depth: 1)
@@ -320,12 +338,14 @@ public final class CameraPass {
     /// the tone map's bloom when there is none).
     func blackLevel() -> MTLTexture? {
         if let black { return black }
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: 1, height: 1,
-                                                                  mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba16Float, width: 1, height: 1,
+            mipmapped: false)
         HitchLog.shared.note(.upload, "black level") {
             black = device.makeTexture(descriptor: descriptor)
-            black?.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0,
-                           withBytes: [UInt16](repeating: 0, count: 4), bytesPerRow: 8)
+            black?.replace(
+                region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0,
+                withBytes: [UInt16](repeating: 0, count: 4), bytesPerRow: 8)
         }
         return black
     }
@@ -336,7 +356,8 @@ extension ViewCamera {
     public var spriteCamera: SpriteCamera {
         let forward = rotation.act(SIMD3<Float>(1, 0, 0))
         let up = rotation.act(SIMD3<Float>(0, 0, 1))
-        return SpriteCamera(position: [position.x, position.y, position.z],
-                            forward: [forward.x, forward.y, forward.z], up: [up.x, up.y, up.z])
+        return SpriteCamera(
+            position: [position.x, position.y, position.z],
+            forward: [forward.x, forward.y, forward.z], up: [up.x, up.y, up.z])
     }
 }

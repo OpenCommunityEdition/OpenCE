@@ -10,9 +10,12 @@ public enum MapLibrary {
 
     /// The levels in `folder`, by name.
     public static func maps(in folder: URL) -> [URL] {
-        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey],
-                                                                 options: [.skipsHiddenFiles])) ?? []
-        return files
+        let files =
+            (try? FileManager.default.contentsOfDirectory(
+                at: folder, includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles])) ?? []
+        return
+            files
             .filter { $0.pathExtension.lowercased() == "map" }
             .filter { !resourceMaps.contains($0.deletingPathExtension().lastPathComponent.lowercased()) }
             .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
@@ -35,8 +38,9 @@ public enum MapLibrary {
         }
         let found = ([current] + above).first { candidate in
             var directory: ObjCBool = false
-            return FileManager.default.fileExists(atPath: candidate.appendingPathComponent("assets/maps").path,
-                                                  isDirectory: &directory) && directory.boolValue
+            return FileManager.default.fileExists(
+                atPath: candidate.appendingPathComponent("assets/maps").path,
+                isDirectory: &directory) && directory.boolValue
         }
         return found ?? current
     }
@@ -44,9 +48,10 @@ public enum MapLibrary {
     /// The data root of this process (`dataRoot` with its environment,
     /// working folder and bundle).
     public static var dataRoot: URL {
-        dataRoot(environment: ProcessInfo.processInfo.environment,
-                 current: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
-                 bundle: Bundle.main.bundleURL)
+        dataRoot(
+            environment: ProcessInfo.processInfo.environment,
+            current: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
+            bundle: Bundle.main.bundleURL)
     }
 
     /// The folders searched: `named` alone if given, otherwise the data

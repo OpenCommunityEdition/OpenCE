@@ -92,8 +92,9 @@ final class WindowModelTests: XCTestCase {
     }
 
     func testTheWindowIdlesUnfocusedAndStopsWhenItCannotBeSeen() {
-        XCTAssertEqual(FramePacing.rate(display: 120, cap: 60, activity: .unfocused, keepsRunning: false),
-                       FramePacing.idleRate)
+        XCTAssertEqual(
+            FramePacing.rate(display: 120, cap: 60, activity: .unfocused, keepsRunning: false),
+            FramePacing.idleRate)
         XCTAssertNil(FramePacing.rate(display: 120, cap: 60, activity: .hidden, keepsRunning: false))
         // (a network game or the control socket keeps the rate: others wait on it)
         XCTAssertEqual(FramePacing.rate(display: 120, cap: 60, activity: .hidden, keepsRunning: true), 60)
@@ -143,8 +144,9 @@ final class EngineWindowTests: XCTestCase {
     override func setUp() async throws {
         pointer = FakePointer()
         mouse = FakeMouse()
-        controller = EngineWindowController(contentSize: CGSize(width: 640, height: 360), pointer: pointer,
-                                            rawMouse: mouse)
+        controller = EngineWindowController(
+            contentSize: CGSize(width: 640, height: 360), pointer: pointer,
+            rawMouse: mouse)
     }
 
     override func tearDown() async throws {
@@ -153,18 +155,26 @@ final class EngineWindowTests: XCTestCase {
     }
 
     func key(_ code: UInt16, down: Bool) {
-        let event = NSEvent.keyEvent(with: down ? .keyDown : .keyUp, location: .zero, modifierFlags: [],
-                                     timestamp: 0, windowNumber: controller.window.windowNumber, context: nil,
-                                     characters: "", charactersIgnoringModifiers: "", isARepeat: false,
-                                     keyCode: code)
+        let event = NSEvent.keyEvent(
+            with: down ? .keyDown : .keyUp, location: .zero, modifierFlags: [],
+            timestamp: 0, windowNumber: controller.window.windowNumber, context: nil,
+            characters: "", charactersIgnoringModifiers: "", isARepeat: false,
+            keyCode: code)
         guard let event else { return XCTFail("no key event") }
-        if down { controller.window.engineView.keyDown(with: event) } else { controller.window.engineView.keyUp(with: event) }
+        if down {
+            controller.window.engineView.keyDown(with: event)
+        } else {
+            controller.window.engineView.keyUp(with: event)
+        }
     }
 
     func mouseEvent(_ type: NSEvent.EventType) -> NSEvent {
-        guard let event = NSEvent.mouseEvent(with: type, location: .zero, modifierFlags: [], timestamp: 0,
-                                             windowNumber: controller.window.windowNumber, context: nil,
-                                             eventNumber: 0, clickCount: 1, pressure: 1) else {
+        guard
+            let event = NSEvent.mouseEvent(
+                with: type, location: .zero, modifierFlags: [], timestamp: 0,
+                windowNumber: controller.window.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 1)
+        else {
             preconditionFailure("no mouse event")
         }
         return event
@@ -194,8 +204,9 @@ final class EngineWindowTests: XCTestCase {
         for scale in [1.0, 2.0, 1.0] {
             view.layout(scale: scale)
             XCTAssertEqual(view.metalLayer.contentsScale, scale)
-            XCTAssertEqual(view.metalLayer.drawableSize,
-                           CGSize(width: view.bounds.width * scale, height: view.bounds.height * scale))
+            XCTAssertEqual(
+                view.metalLayer.drawableSize,
+                CGSize(width: view.bounds.width * scale, height: view.bounds.height * scale))
         }
         XCTAssertEqual(Array(resized.suffix(2)), [1280, 640])
     }
@@ -253,7 +264,7 @@ final class EngineWindowTests: XCTestCase {
     func testKeysAreHeldUntilLetGoOrTheFocusIsLost() {
         post(NSWindow.didBecomeKeyNotification)
         key(13, down: true)  // W
-        key(1, down: true)   // S
+        key(1, down: true)  // S
         key(13, down: false)
         XCTAssertEqual(controller.keys.codes, [1])
         post(NSWindow.didResignKeyNotification)

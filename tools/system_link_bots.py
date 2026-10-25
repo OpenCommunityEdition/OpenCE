@@ -71,13 +71,20 @@ SERVER_GRACEFUL_GAME_EXIT_POSTGAME = 31
 COUNTDOWN_EVENT_START_IMMEDIATELY = 3
 
 MESSAGE_NAMES = {
-    SERVER_GAME_ADVERTISE: "advertise", SERVER_MACHINE_ACCEPTED: "machine_accepted",
-    SERVER_MACHINE_REJECTED: "machine_rejected", SERVER_GAME_SETTINGS_UPDATE: "settings",
-    SERVER_PREGAME_COUNTDOWN: "countdown", SERVER_BEGIN_GAME: "begin_game",
-    SERVER_GRACEFUL_GAME_EXIT_PREGAME: "exit_pregame", SERVER_PREGAME_KEEP_ALIVE: "keep_alive",
-    SERVER_POSTGAME_KEEP_ALIVE: "postgame_keep_alive", SERVER_GAME_UPDATE: "game_update",
-    SERVER_ADD_PLAYER_INGAME: "add_player_ingame", SERVER_REMOVE_PLAYER_INGAME: "remove_player_ingame",
-    SERVER_GAME_OVER: "game_over", SERVER_SWITCH_TO_PREGAME: "switch_to_pregame",
+    SERVER_GAME_ADVERTISE: "advertise",
+    SERVER_MACHINE_ACCEPTED: "machine_accepted",
+    SERVER_MACHINE_REJECTED: "machine_rejected",
+    SERVER_GAME_SETTINGS_UPDATE: "settings",
+    SERVER_PREGAME_COUNTDOWN: "countdown",
+    SERVER_BEGIN_GAME: "begin_game",
+    SERVER_GRACEFUL_GAME_EXIT_PREGAME: "exit_pregame",
+    SERVER_PREGAME_KEEP_ALIVE: "keep_alive",
+    SERVER_POSTGAME_KEEP_ALIVE: "postgame_keep_alive",
+    SERVER_GAME_UPDATE: "game_update",
+    SERVER_ADD_PLAYER_INGAME: "add_player_ingame",
+    SERVER_REMOVE_PLAYER_INGAME: "remove_player_ingame",
+    SERVER_GAME_OVER: "game_over",
+    SERVER_SWITCH_TO_PREGAME: "switch_to_pregame",
     SERVER_GRACEFUL_GAME_EXIT_POSTGAME: "exit_postgame",
 }
 
@@ -87,12 +94,17 @@ def network_game_layout(machines, players):
     player_count = 0x114 + machines * 0x44
     players_offset = player_count + 2
     size = players_offset + players * 0x20 + 0xE
-    return {"map_name": 0x24, "machine_count": 0x112, "player_count": player_count,
-            "players": players_offset, "size": size}
+    return {
+        "map_name": 0x24,
+        "machine_count": 0x112,
+        "player_count": player_count,
+        "players": players_offset,
+        "size": size,
+    }
 
 
 def wide(text, count):
-    units = [ord(c) for c in text[:count - 1]]
+    units = [ord(c) for c in text[: count - 1]]
     units += [0] * (count - len(units))
     return struct.pack(">%dH" % count, *units)
 
@@ -106,8 +118,7 @@ def message(packet_type, payload):
 
 def network_player(name, machine_index, color):
     # shorts 12 (name), shorts 2 (colour, icon), bytes 4 (machine, controller, team, list index)
-    return (wide(name, 12) + struct.pack(">hh", color, 0) +
-            struct.pack("bbbb", machine_index, 0, NONE, NONE))
+    return wide(name, 12) + struct.pack(">hh", color, 0) + struct.pack("bbbb", machine_index, 0, NONE, NONE)
 
 
 def player_action(yaw):
@@ -233,19 +244,20 @@ class Machine:
             self.state = "rejected"
         elif packet_type == SERVER_GAME_SETTINGS_UPDATE:
             total, offset, length = struct.unpack(">HHH", payload[:6])
-            data = payload[6:6 + length]
+            data = payload[6 : 6 + length]
             if offset == 0:
                 self.settings = bytearray()
             if offset == len(self.settings):
                 self.settings += data
             if len(self.settings) == total:
                 self.settings_complete = bytes(self.settings)
-                self.map_name = self.settings_complete[0x24:0x24 + 0x80].split(b"\0")[0]
+                self.map_name = self.settings_complete[0x24 : 0x24 + 0x80].split(b"\0")[0]
                 if not self.player_added and self.machine_index is not None:
                     self.player_added = True
                     color = self.index % 18
-                    self.send(message(CLIENT_ADD_PLAYER_REQUEST_PREGAME,
-                                      network_player(self.name, self.machine_index, color)))
+                    self.send(
+                        message(CLIENT_ADD_PLAYER_REQUEST_PREGAME, network_player(self.name, self.machine_index, color))
+                    )
         elif packet_type == SERVER_BEGIN_GAME:
             self.state = "loading"
             self.loaded_at = time.monotonic() + self.load_seconds
@@ -277,8 +289,7 @@ class Machine:
             # has), then an array of its players' actions: a count byte and one
             # action
             yaw = (now * 0.5 + self.index) % (2 * math.pi)
-            payload = (struct.pack(">I", (self.last_update_number + 1) & 0x7FFFFFFF) + bytes([1]) +
-                       player_action(yaw))
+            payload = struct.pack(">I", (self.last_update_number + 1) & 0x7FFFFFFF) + bytes([1]) + player_action(yaw)
             try:
                 self.udp.sendto(message(CLIENT_GAME_UPDATE, payload), (self.host, SERVER_PORT))
             except OSError:
@@ -289,16 +300,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--machines", type=int, default=8)
-    parser.add_argument("--first-address", default="127.0.0.2",
-                        help="each machine binds this address plus its number")
-    parser.add_argument("--start", action="store_true",
-                        help="ask the host to start as soon as every machine has a player")
+    parser.add_argument("--first-address", default="127.0.0.2", help="each machine binds this address plus its number")
+    parser.add_argument(
+        "--start", action="store_true", help="ask the host to start as soon as every machine has a player"
+    )
     parser.add_argument("--start-delay", type=float, default=3.0)
     parser.add_argument("--seconds", type=float, default=0, help="leave after this long (0: until Ctrl+C)")
     parser.add_argument("--rate", type=float, default=30.0, help="input messages per second per machine")
     parser.add_argument("--join-rate", type=float, default=20.0, help="machines connecting per second")
-    parser.add_argument("--load-seconds", type=float, default=1.0,
-                        help="how long each machine takes to load the map once the game begins")
+    parser.add_argument(
+        "--load-seconds",
+        type=float,
+        default=1.0,
+        help="how long each machine takes to load the map once the game begins",
+    )
     parser.add_argument("--status-every", type=float, default=5.0)
     options = parser.parse_args()
 
@@ -313,7 +328,9 @@ def main():
     except ValueError as error:
         parser.error("--first-address: %s" % error)
     if first_address.is_loopback and not last_address.is_loopback:
-        parser.error("--first-address: %d machines from %s run past 127.255.255.255" % (options.machines, first_address))
+        parser.error(
+            "--first-address: %d machines from %s run past 127.255.255.255" % (options.machines, first_address)
+        )
     if not first_address.is_loopback:
         log("warning: %s is not a loopback address; the machines bind real addresses" % first_address)
     machines = []
@@ -387,8 +404,9 @@ def main():
                     start_requested = True
                     log("asking the host to start the game")
                     try:
-                        machines[0].send(message(CLIENT_GAME_START_REQUEST,
-                                                 struct.pack(">h", COUNTDOWN_EVENT_START_IMMEDIATELY)))
+                        machines[0].send(
+                            message(CLIENT_GAME_START_REQUEST, struct.pack(">h", COUNTDOWN_EVENT_START_IMMEDIATELY))
+                        )
                     except OSError as error:
                         log("%s: %s" % (machines[0].name, error))
                         machines[0].close(selector)
@@ -403,12 +421,21 @@ def main():
                     for machine_slots in (128, 4):
                         layout = network_game_layout(machine_slots, 128 if machine_slots == 128 else 16)
                         if len(sample.settings_complete) == layout["size"]:
-                            machines_in_game = struct.unpack_from("<h", sample.settings_complete, layout["machine_count"])[0]
+                            machines_in_game = struct.unpack_from(
+                                "<h", sample.settings_complete, layout["machine_count"]
+                            )[0]
                             players = struct.unpack_from("<h", sample.settings_complete, layout["player_count"])[0]
                 updates = [m.last_update_number for m in machines if m.last_update_number is not None]
-                log("states %s; host game: %s machines, %s players; latest update %s; received %.1f MB" % (
-                    states, machines_in_game, players, max(updates) if updates else None,
-                    sum(m.bytes_received for m in machines) / 1e6))
+                log(
+                    "states %s; host game: %s machines, %s players; latest update %s; received %.1f MB"
+                    % (
+                        states,
+                        machines_in_game,
+                        players,
+                        max(updates) if updates else None,
+                        sum(m.bytes_received for m in machines) / 1e6,
+                    )
+                )
             if options.seconds and now - started >= options.seconds:
                 break
             if all(m.state in ("closed", "rejected") for m in machines):

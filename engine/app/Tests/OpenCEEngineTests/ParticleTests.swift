@@ -14,8 +14,9 @@ final class ParticleTests: XCTestCase {
     private let size = 64
 
     private func texture(_ device: MTLDevice, _ format: MTLPixelFormat) throws -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: size, height: size,
-                                                                  mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: format, width: size, height: size,
+            mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .private
         return try XCTUnwrap(device.makeTexture(descriptor: descriptor))
@@ -27,10 +28,11 @@ final class ParticleTests: XCTestCase {
         let buffer = try XCTUnwrap(queue.device.makeBuffer(length: length, options: .storageModeShared))
         let commands = try XCTUnwrap(queue.makeCommandBuffer())
         let blit = try XCTUnwrap(commands.makeBlitCommandEncoder())
-        blit.copy(from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
-                  sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1), to: buffer,
-                  destinationOffset: 0, destinationBytesPerRow: texture.width * 8,
-                  destinationBytesPerImage: length)
+        blit.copy(
+            from: texture, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+            sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1), to: buffer,
+            destinationOffset: 0, destinationBytesPerRow: texture.width * 8,
+            destinationBytesPerImage: length)
         blit.endEncoding()
         commands.commit()
         commands.waitUntilCompleted()
@@ -39,9 +41,11 @@ final class ParticleTests: XCTestCase {
     }
 
     /// A white sprite of half width 1, ten units ahead of the camera.
-    private func sprite(blend: UInt32 = 3, alpha: Float = 1, facing: UInt32 = UInt32(OCE_PARTICLE_FACING_SCREEN),
-                        axis: SIMD4<Float> = .zero, fade: (Float, Float) = (0, 0),
-                        picture: UInt32 = UInt32(OCE_PARTICLE_NO_PICTURE)) -> OCEParticleSnapshot {
+    private func sprite(
+        blend: UInt32 = 3, alpha: Float = 1, facing: UInt32 = UInt32(OCE_PARTICLE_FACING_SCREEN),
+        axis: SIMD4<Float> = .zero, fade: (Float, Float) = (0, 0),
+        picture: UInt32 = UInt32(OCE_PARTICLE_NO_PICTURE)
+    ) -> OCEParticleSnapshot {
         var row = OCEParticleSnapshot()
         row.position = (10, 0, 0, 1)
         row.axis = (axis.x, axis.y, axis.z, axis.w)
@@ -54,12 +58,15 @@ final class ParticleTests: XCTestCase {
 
     /// The frame's red at its centre and corner after `rows` are drawn over
     /// a frame of red 0.25, with `details` as the level's detail objects.
-    private func draw(_ rows: [OCEParticleSnapshot], details: [OCEParticleSnapshot] = [],
-                      eye: SIMD3<Float> = .zero, probes: UInt32? = nil) throws -> (centre: Float, corner: Float) {
+    private func draw(
+        _ rows: [OCEParticleSnapshot], details: [OCEParticleSnapshot] = [],
+        eye: SIMD3<Float> = .zero, probes: UInt32? = nil
+    ) throws -> (centre: Float, corner: Float) {
         let device = try XCTUnwrap(MTLCreateSystemDefaultDevice(), "no Metal device")
         let queue = try XCTUnwrap(device.makeCommandQueue())
-        let pass = try ParticlePass(device: device, source: try ShaderSources.source(.particle), pictures: [],
-                                    details: details)
+        let pass = try ParticlePass(
+            device: device, source: try ShaderSources.source(.particle), pictures: [],
+            details: details)
         let frame = try texture(device, LevelRenderer.frameFormat)
         let depth = try texture(device, LevelRenderer.depthFormat)
         let commands = try XCTUnwrap(queue.makeCommandBuffer())
@@ -86,13 +93,16 @@ final class ParticleTests: XCTestCase {
             descriptor.depth = 1
             let volume = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
             var texel = probes
-            volume.replace(region: MTLRegionMake3D(0, 0, 0, 1, 1, 1), mipmapLevel: 0, slice: 0, withBytes: &texel,
-                           bytesPerRow: 4, bytesPerImage: 4)
-            lighting = ParticleLighting(probes: Array(repeating: volume, count: 6), probeOrigin: [0, 0, 0, 1],
-                                        probeCounts: [1, 1, 1, 1], sunTowards: .zero, sunColor: .zero)
+            volume.replace(
+                region: MTLRegionMake3D(0, 0, 0, 1, 1, 1), mipmapLevel: 0, slice: 0, withBytes: &texel,
+                bytesPerRow: 4, bytesPerImage: 4)
+            lighting = ParticleLighting(
+                probes: Array(repeating: volume, count: 6), probeOrigin: [0, 0, 0, 1],
+                probeCounts: [1, 1, 1, 1], sunTowards: .zero, sunColor: .zero)
         }
-        pass.encode(into: commands, frame: frame, depth: depth, worldToClip: camera.viewProjection(aspect: 1),
-                    eye: eye, right: [0, -1, 0], up: [0, 0, 1], sprites: rows, lighting: lighting)
+        pass.encode(
+            into: commands, frame: frame, depth: depth, worldToClip: camera.viewProjection(aspect: 1),
+            eye: eye, right: [0, -1, 0], up: [0, 0, 1], sprites: rows, lighting: lighting)
         commands.commit()
         commands.waitUntilCompleted()
         let red = try reds(frame, queue: queue)
@@ -110,8 +120,9 @@ final class ParticleTests: XCTestCase {
         // greatest, alpha multiply add)
         let expected: [Float] = [0.625, 0.25, 0.375, 0.75, 0, 0.25, 0.625, 1.125]
         for (blend, value) in expected.enumerated() {
-            XCTAssertEqual(try draw([sprite(blend: UInt32(blend), alpha: 0.5)]).centre, value, accuracy: 0.01,
-                           "blend function \(blend)")
+            XCTAssertEqual(
+                try draw([sprite(blend: UInt32(blend), alpha: 0.5)]).centre, value, accuracy: 0.01,
+                "blend function \(blend)")
         }
     }
 

@@ -62,14 +62,18 @@ public struct CapturedFrame {
     /// Writes the frame as a PNG.
     public func writePNG(to url: URL) throws {
         let space = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
-        let info = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue
-            | CGBitmapInfo.byteOrder32Little.rawValue)
+        let info = CGBitmapInfo(
+            rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue
+                | CGBitmapInfo.byteOrder32Little.rawValue)
         guard let provider = CGDataProvider(data: Data(bytes) as CFData),
-              let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
-                                  bytesPerRow: width * 4, space: space, bitmapInfo: info, provider: provider,
-                                  decode: nil, shouldInterpolate: false, intent: .defaultIntent),
-              let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString,
-                                                                1, nil) else {
+            let image = CGImage(
+                width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                bytesPerRow: width * 4, space: space, bitmapInfo: info, provider: provider,
+                decode: nil, shouldInterpolate: false, intent: .defaultIntent),
+            let destination = CGImageDestinationCreateWithURL(
+                url as CFURL, UTType.png.identifier as CFString,
+                1, nil)
+        else {
             throw FrameCaptureError.image(url.path)
         }
         CGImageDestinationAddImage(destination, image, nil)
@@ -79,15 +83,19 @@ public struct CapturedFrame {
     /// A PNG read back (as `writePNG` writes them), or nil.
     public static func readPNG(at url: URL) -> CapturedFrame? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+            let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+        else { return nil }
         let width = image.width
         let height = image.height
         var bytes = [UInt8](repeating: 0, count: width * height * 4)
         let space = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         let info = CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         let drawn = bytes.withUnsafeMutableBytes { raw -> Bool in
-            guard let context = CGContext(data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8,
-                                          bytesPerRow: width * 4, space: space, bitmapInfo: info) else { return false }
+            guard
+                let context = CGContext(
+                    data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                    bytesPerRow: width * 4, space: space, bitmapInfo: info)
+            else { return false }
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }
@@ -99,27 +107,35 @@ extension LevelRenderer {
     /// Draws the level from `camera` at `width` by `height` offscreen
     /// `frames` times (for the temporal history) and reads the last frame
     /// back (the renderer's output format must be bgra8Unorm).
-    public func capture(width: Int, height: Int, camera: ViewCamera, frames: Int = 1, objects: [DrawnObject] = [],
-                        hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [], debugLines: [DebugSegment] = [],
-                        queue: MTLCommandQueue) throws -> CapturedFrame {
-        try capture(width: width, height: height, cameras: Array(repeating: camera, count: max(frames, 1)),
-                    objects: objects, hudQuads: hudQuads, uiQuads: uiQuads, debugLines: debugLines, queue: queue)
+    public func capture(
+        width: Int, height: Int, camera: ViewCamera, frames: Int = 1, objects: [DrawnObject] = [],
+        hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [], debugLines: [DebugSegment] = [],
+        queue: MTLCommandQueue
+    ) throws -> CapturedFrame {
+        try capture(
+            width: width, height: height, cameras: Array(repeating: camera, count: max(frames, 1)),
+            objects: objects, hudQuads: hudQuads, uiQuads: uiQuads, debugLines: debugLines, queue: queue)
     }
 
     /// Draws a frame from each of `cameras` in turn and reads the last back.
-    public func capture(width: Int, height: Int, cameras: [ViewCamera], objects: [DrawnObject] = [],
-                        hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [], debugLines: [DebugSegment] = [],
-                        queue: MTLCommandQueue) throws -> CapturedFrame {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: outputFormat, width: width,
-                                                                  height: height, mipmapped: false)
+    public func capture(
+        width: Int, height: Int, cameras: [ViewCamera], objects: [DrawnObject] = [],
+        hudQuads: [HudQuad] = [], uiQuads: [UiQuad] = [], debugLines: [DebugSegment] = [],
+        queue: MTLCommandQueue
+    ) throws -> CapturedFrame {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: outputFormat, width: width,
+            height: height, mipmapped: false)
         descriptor.usage = [.renderTarget, .shaderRead]
         descriptor.storageMode = .shared
         guard outputFormat == .bgra8Unorm, !cameras.isEmpty,
-              let target = device.makeTexture(descriptor: descriptor) else { throw FrameCaptureError.resources }
+            let target = device.makeTexture(descriptor: descriptor)
+        else { throw FrameCaptureError.resources }
         for camera in cameras {
             guard let commands = queue.makeCommandBuffer() else { throw FrameCaptureError.resources }
-            encode(into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads,
-                   uiQuads: uiQuads, debugLines: debugLines)
+            encode(
+                into: commands, target: target, camera: camera, objects: objects, hudQuads: hudQuads,
+                uiQuads: uiQuads, debugLines: debugLines)
             commands.commit()
             commands.waitUntilCompleted()
         }
@@ -137,11 +153,13 @@ extension LevelRenderer {
     public func readMotion(queue: MTLCommandQueue) throws -> (width: Int, height: Int, motion: [SIMD2<Float>])? {
         guard let temporal else { return nil }
         let source = temporal.motion
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: source.pixelFormat, width: source.width,
-                                                                  height: source.height, mipmapped: false)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: source.pixelFormat, width: source.width,
+            height: source.height, mipmapped: false)
         descriptor.storageMode = .shared
         guard let copy = device.makeTexture(descriptor: descriptor), let commands = queue.makeCommandBuffer(),
-              let blit = commands.makeBlitCommandEncoder() else { throw FrameCaptureError.resources }
+            let blit = commands.makeBlitCommandEncoder()
+        else { throw FrameCaptureError.resources }
         blit.copy(from: source, to: copy)
         blit.endEncoding()
         commands.commit()
@@ -149,8 +167,9 @@ extension LevelRenderer {
         var halves = [Float16](repeating: 0, count: source.width * source.height * 2)
         halves.withUnsafeMutableBytes { raw in
             guard let base = raw.baseAddress else { return }
-            copy.getBytes(base, bytesPerRow: source.width * 4, from: MTLRegionMake2D(0, 0, source.width, source.height),
-                          mipmapLevel: 0)
+            copy.getBytes(
+                base, bytesPerRow: source.width * 4, from: MTLRegionMake2D(0, 0, source.width, source.height),
+                mipmapLevel: 0)
         }
         let motion = stride(from: 0, to: halves.count, by: 2).map { SIMD2(Float(halves[$0]), Float(halves[$0 + 1])) }
         return (source.width, source.height, motion)

@@ -27,17 +27,19 @@ APP = ROOT / "build/macos/OpenCE.app/Contents/MacOS/OpenCE"
 TRANSLATORS = [macos_guest_image.OBJECTS / f"port/linux/src/{name}.o" for name in ("nv2a_vsh", "nv2a_psh", "xgpu_text")]
 # the post passes' (d3d8_metal_post.c): SMAA's text and lookup textures, and
 # zlib to inflate them
-POST = ([macos_guest_image.OBJECTS / "guest/gen/hud_hires_assets.o"]
-        + [macos_guest_image.OBJECTS / f"port/third_party/zlib/{name}.o"
-           for name in ("zutil", "inftrees", "uncompr", "inffast", "adler32", "inflate", "crc32")])
+POST = [macos_guest_image.OBJECTS / "guest/gen/hud_hires_assets.o"] + [
+    macos_guest_image.OBJECTS / f"port/third_party/zlib/{name}.o"
+    for name in ("zutil", "inftrees", "uncompr", "inffast", "adler32", "inflate", "crc32")
+]
 
 RED = (255, 0, 0, 255)
 BLUE = (0, 0, 255, 255)
 
 pytestmark = [
     pytest.mark.skipif(sys.platform != "darwin" or platform.machine() != "arm64", reason="arm64 macOS only"),
-    pytest.mark.skipif(not macos_guest_image.available() or shutil.which("ninja") is None,
-                       reason="needs `ninja macos` in nix develop"),
+    pytest.mark.skipif(
+        not macos_guest_image.available() or shutil.which("ninja") is None, reason="needs `ninja macos` in nix develop"
+    ),
     pytest.mark.skipif(not APP.is_file(), reason="needs `ninja macos_app`"),
 ]
 
@@ -46,27 +48,44 @@ pytestmark = [
 def vm_draw(tmp_path_factory):
     work = tmp_path_factory.mktemp("vm_draw")
     return macos_guest_image.build_guest_image(
-        [ROOT / "port/macos/tests/vm_draw.c", ROOT / "port/macos/tests/vm_draw_stubs.c",
-         ROOT / "port/macos/tests/vm_hires_stubs.c",
-         ROOT / "port/macos/guest/d3d8_metal_device.c", ROOT / "port/macos/guest/d3d8_metal.c",
-         ROOT / "port/macos/guest/d3d8_metal_post.c",
-         ROOT / "port/linux/src/d3d8_resources.c", ROOT / "port/linux/src/xbox_textures.c",
-         ROOT / "port/macos/guest/opence_render_writer.c"],
-        work, "vm_draw", ["-DHALO_METAL", f"-I{ROOT / 'port/macos/include'}", f"-I{ROOT / 'port/third_party/zlib'}"],
-        like="port/linux/src/xgpu_text.c", objects=TRANSLATORS + POST)
+        [
+            ROOT / "port/macos/tests/vm_draw.c",
+            ROOT / "port/macos/tests/vm_draw_stubs.c",
+            ROOT / "port/macos/tests/vm_hires_stubs.c",
+            ROOT / "port/macos/guest/d3d8_metal_device.c",
+            ROOT / "port/macos/guest/d3d8_metal.c",
+            ROOT / "port/macos/guest/d3d8_metal_post.c",
+            ROOT / "port/linux/src/d3d8_resources.c",
+            ROOT / "port/linux/src/xbox_textures.c",
+            ROOT / "port/macos/guest/opence_render_writer.c",
+        ],
+        work,
+        "vm_draw",
+        ["-DHALO_METAL", f"-I{ROOT / 'port/macos/include'}", f"-I{ROOT / 'port/third_party/zlib'}"],
+        like="port/linux/src/xgpu_text.c",
+        objects=TRANSLATORS + POST,
+    )
 
 
 def frame(image, tmp_path, case):
     """the captured frame of a case, run in the app's place off the screen"""
     (tmp_path / "home").mkdir(exist_ok=True)
     capture = tmp_path / "frame.png"
-    environment = dict(os.environ, HOME=str(tmp_path / "home"), HALO_DATA_ROOT=str(tmp_path),
-                       HALO_HOST_GUEST_IMAGE=str(image), HALO_HOST_CAPTURE=str(capture),
-                       HALO_HOST_CAPTURE_FRAME="1", HALO_HOST_CAPTURE_SIZE="64x64")
-    result = subprocess.run([str(APP), case], cwd=tmp_path, env=environment, capture_output=True, text=True,
-                            timeout=300)
-    assert result.returncode == 0 and result.stdout.strip().endswith("ok"), \
+    environment = dict(
+        os.environ,
+        HOME=str(tmp_path / "home"),
+        HALO_DATA_ROOT=str(tmp_path),
+        HALO_HOST_GUEST_IMAGE=str(image),
+        HALO_HOST_CAPTURE=str(capture),
+        HALO_HOST_CAPTURE_FRAME="1",
+        HALO_HOST_CAPTURE_SIZE="64x64",
+    )
+    result = subprocess.run(
+        [str(APP), case], cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=300
+    )
+    assert result.returncode == 0 and result.stdout.strip().endswith("ok"), (
         result.stdout[-3000:] + result.stderr[-3000:]
+    )
     assert "log:" not in result.stdout, result.stdout
     picture = read_png(capture)
     assert (picture.width, picture.height) == (64, 64)

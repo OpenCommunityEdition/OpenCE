@@ -33,9 +33,12 @@ def game_sources(config: Dict[str, Any]) -> List[Path]:
     game = config["game"]
     excluded = game.get("exclude", [])
     return sorted(
-        source for source in Path(game["root"]).rglob("*.c")
-        if not any(source.as_posix() == name or (name.endswith("/") and source.as_posix().startswith(name))
-                   for name in excluded)
+        source
+        for source in Path(game["root"]).rglob("*.c")
+        if not any(
+            source.as_posix() == name or (name.endswith("/") and source.as_posix().startswith(name))
+            for name in excluded
+        )
     )
 
 
@@ -53,6 +56,7 @@ def compile_launcher(sln: Any) -> str:
     --compiler-launcher (ccache, say) and a space, or nothing"""
     launcher = getattr(sln, "compiler_launcher", None)
     return f"{launcher} " if launcher else ""
+
 
 # The optimisation level of every unit, and of link-time optimisation.
 OPTIMISATION = "-O2"
@@ -92,11 +96,26 @@ LINUX_ABI_FLAGS = [
     # glibc's wide string functions assume a 32-bit wchar_t; stop clang from
     # turning loops into calls to them (it rewrites a counting loop as
     # wcslen even under -fshort-wchar)
-    *(f"-fno-builtin-{name}" for name in (
-        "wcslen", "wcsnlen", "wcschr", "wcsrchr", "wcscmp", "wcsncmp", "wcscpy",
-        "wcsncpy", "wcscat", "wcsncat", "wmemchr", "wmemcmp", "wmemcpy",
-        "wmemmove", "wmemset",
-    )),
+    *(
+        f"-fno-builtin-{name}"
+        for name in (
+            "wcslen",
+            "wcsnlen",
+            "wcschr",
+            "wcsrchr",
+            "wcscmp",
+            "wcsncmp",
+            "wcscpy",
+            "wcsncpy",
+            "wcscat",
+            "wcsncat",
+            "wmemchr",
+            "wmemcmp",
+            "wmemcpy",
+            "wmemmove",
+            "wmemset",
+        )
+    ),
 ]
 
 # The game is compiled with glibc restricted to ISO C so that POSIX names
@@ -136,8 +155,13 @@ MINIUPNPC_DIR = Path("port/third_party/miniupnpc")
 # compiled as the port's game units are
 STB_VORBIS_SOURCE = Path("port/third_party/stb_vorbis/stb_vorbis.c")
 # miniupnpc's own build's definitions (its Makefile), and a static library
-MINIUPNPC_DEFINES = ["-DMINIUPNP_STATICLIB", "-DMINIUPNPC_SET_SOCKET_TIMEOUT", "-DMINIUPNPC_GET_SRC_ADDR",
-                     "-D_BSD_SOURCE", "-D_DEFAULT_SOURCE"]
+MINIUPNPC_DEFINES = [
+    "-DMINIUPNP_STATICLIB",
+    "-DMINIUPNPC_SET_SOCKET_TIMEOUT",
+    "-DMINIUPNPC_GET_SRC_ADDR",
+    "-D_BSD_SOURCE",
+    "-D_DEFAULT_SOURCE",
+]
 
 
 def miniupnpc_sources() -> List[Path]:
@@ -154,6 +178,7 @@ def updater_defines(release: bool) -> str:
         number = "0"
     flavor = "release" if release else "debug"
     return f'-DHALO_BUILD_NUMBER={number} -DHALO_BUILD_FLAVOR=\\"{flavor}\\"'
+
 
 def configuration_defines(sln: Any) -> List[str]:
     """what configure.py's options define for every unit of a native build:
@@ -228,8 +253,16 @@ def opus_sources() -> List[Path]:
 
 def opus_cflags(abi: str) -> str:
     """the flags Opus's sources build with, on the platform layer's ABI"""
-    return " ".join([abi, "-std=gnu11", "-O2", *OPUS_DEFINES, *(f"-I{OPUS_DIR / name}" for name in
-                                                            ("include", "celt", "silk", "silk/float")), "-w"])
+    return " ".join(
+        [
+            abi,
+            "-std=gnu11",
+            "-O2",
+            *OPUS_DEFINES,
+            *(f"-I{OPUS_DIR / name}" for name in ("include", "celt", "silk", "silk/float")),
+            "-w",
+        ]
+    )
 
 
 def musl_math_sources() -> List[Path]:
@@ -239,8 +272,7 @@ def musl_math_sources() -> List[Path]:
 
 def musl_math_cflags(abi: str) -> str:
     """their flags: the game's ABI, and the headers standing in for musl's"""
-    return " ".join([abi, "-std=gnu11", "-w", f"-I{MUSL_MATH_DIR}/include",
-                     f"-include {MUSL_MATH_DIR}/include/libm.h"])
+    return " ".join([abi, "-std=gnu11", "-w", f"-I{MUSL_MATH_DIR}/include", f"-include {MUSL_MATH_DIR}/include/libm.h"])
 
 
 def march_flag(sln: Any) -> str:
@@ -269,10 +301,23 @@ SYSROOT_TOOLCHAIN = Path("tools/linux_sysroot.cmake")
 # use (KMS/DRM without a desktop, input methods, libusb, JACK, sndio,
 # io_uring) and SDL's own tests
 SDL_OPTIONS = [
-    "-DCMAKE_BUILD_TYPE=Release", "-DSDL_SHARED=ON", "-DSDL_STATIC=OFF", "-DSDL_TEST_LIBRARY=OFF",
-    "-DSDL_TESTS=OFF", "-DSDL_EXAMPLES=OFF", "-DSDL_KMSDRM=OFF", "-DSDL_WAYLAND_LIBDECOR=ON",
-    "-DSDL_WAYLAND_LIBDECOR_SHARED=ON", "-DSDL_IBUS=OFF", "-DSDL_HIDAPI_LIBUSB=OFF", "-DSDL_JACK=OFF",
-    "-DSDL_SNDIO=OFF", "-DSDL_LIBURING=OFF", "-DSDL_FRIBIDI=OFF", "-DSDL_LIBTHAI=OFF", "-DSDL_X11_XTEST=OFF",
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DSDL_SHARED=ON",
+    "-DSDL_STATIC=OFF",
+    "-DSDL_TEST_LIBRARY=OFF",
+    "-DSDL_TESTS=OFF",
+    "-DSDL_EXAMPLES=OFF",
+    "-DSDL_KMSDRM=OFF",
+    "-DSDL_WAYLAND_LIBDECOR=ON",
+    "-DSDL_WAYLAND_LIBDECOR_SHARED=ON",
+    "-DSDL_IBUS=OFF",
+    "-DSDL_HIDAPI_LIBUSB=OFF",
+    "-DSDL_JACK=OFF",
+    "-DSDL_SNDIO=OFF",
+    "-DSDL_LIBURING=OFF",
+    "-DSDL_FRIBIDI=OFF",
+    "-DSDL_LIBTHAI=OFF",
+    "-DSDL_X11_XTEST=OFF",
 ]
 
 
@@ -300,12 +345,14 @@ def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[st
     options = SDL_OPTIONS + ([f"-DCMAKE_C_COMPILER_LAUNCHER={launcher}"] if launcher else [])
     n.rule(
         name="linux_sdl3",
-        command=(f"cmake -S {sdl_source} -B {sdl_build} -G Ninja --fresh "
-                 f"-DCMAKE_TOOLCHAIN_FILE=$$PWD/{SYSROOT_TOOLCHAIN} -DHALO_SYSROOT=$$PWD/{sysroot} "
-                 f"-DCMAKE_C_COMPILER={cc} {' '.join(options)} > {build_dir}/sdl3-configure.log && "
-                 f"ninja -C {sdl_build} > {build_dir}/sdl3-build.log && "
-                 f"$python {SYSROOT_SCRIPT} --check-sdl "
-                 f"{sdl_build}/include-config-release/build_config/SDL_build_config.h"),
+        command=(
+            f"cmake -S {sdl_source} -B {sdl_build} -G Ninja --fresh "
+            f"-DCMAKE_TOOLCHAIN_FILE=$$PWD/{SYSROOT_TOOLCHAIN} -DHALO_SYSROOT=$$PWD/{sysroot} "
+            f"-DCMAKE_C_COMPILER={cc} {' '.join(options)} > {build_dir}/sdl3-configure.log && "
+            f"ninja -C {sdl_build} > {build_dir}/sdl3-build.log && "
+            f"$python {SYSROOT_SCRIPT} --check-sdl "
+            f"{sdl_build}/include-config-release/build_config/SDL_build_config.h"
+        ),
         description="LINUX SDL3",
         pool="console",
         restat=True,
@@ -315,8 +362,12 @@ def portable_sdl(n: Writer, sln: Any, build_dir: Path, cc: str) -> Tuple[List[st
     # (DT_RPATH rather than DT_RUNPATH: it comes before LD_LIBRARY_PATH,
     # which Steam sets for the games it starts, so that the SDL beside the
     # executable is the one loaded, whatever other SDL that path holds)
-    ldflags = [f"--sysroot={_quote(sysroot)}", f"-L{_quote(sdl_build)}", "'-Wl,-rpath,$$ORIGIN'",
-               "-Wl,--disable-new-dtags"]
+    ldflags = [
+        f"--sysroot={_quote(sysroot)}",
+        f"-L{_quote(sdl_build)}",
+        "'-Wl,-rpath,$$ORIGIN'",
+        "-Wl,--disable-new-dtags",
+    ]
     sdl_license = build_dir / "SDL3-LICENSE.txt"
     n.build(outputs=sdl_license, rule="linux_copy", inputs=sdl_license_source)
     return cflags, ldflags, stamp, libsdl, sdl_license
@@ -380,8 +431,11 @@ def pgo_profile(sln: Any, own: Optional[Path], others: Sequence[Path], cc: str) 
         return None
     major = clang_major(cc)
     if major is not None and major < PROFILE_LLVM_MAJOR:
-        print(f"{cc} is clang {major}; the profiles in {PGO_DIR} need clang {PROFILE_LLVM_MAJOR}: "
-              "building without profile-guided optimisation", file=sys.stderr)
+        print(
+            f"{cc} is clang {major}; the profiles in {PGO_DIR} need clang {PROFILE_LLVM_MAJOR}: "
+            "building without profile-guided optimisation",
+            file=sys.stderr,
+        )
         return None
     if mode == "train" and own is not None:
         return own
@@ -407,8 +461,15 @@ def linux_configure_inputs() -> List[Path]:
     # (the folders of the game's sources, so that adding or removing one
     # re-runs it)
     game_folders = sorted({source.parent for source in game_sources(_load_port_config())})
-    return [PORT_CONFIG, Path(__file__), PORT_DIR / "src", PORT_DIR / "game", XDK_INCLUDE, *game_folders,
-            *hud_configure_inputs()]
+    return [
+        PORT_CONFIG,
+        Path(__file__),
+        PORT_DIR / "src",
+        PORT_DIR / "game",
+        XDK_INCLUDE,
+        *game_folders,
+        *hud_configure_inputs(),
+    ]
 
 
 def _quote(path: Any) -> str:
@@ -437,9 +498,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         description="LINUX MSVC SEMANTICS $out",
         restat=True,
     )
-    game_headers = sorted(
-        p for p in Path("source").rglob("*") if p.suffix in (".c", ".h")
-    )
+    game_headers = sorted(p for p in Path("source").rglob("*") if p.suffix in (".c", ".h"))
     # The game sees its own tags and inline functions and those of the SDK
     # declarations (port/include/xdk); the platform layer only includes the
     # SDK declarations and so only needs their inline functions.
@@ -447,9 +506,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         outputs=semantics_header,
         rule="linux_msvc_semantics",
         implicit=[Path("tools/linux_msvc_semantics.py"), *xdk_headers(), *game_headers],
-        variables={
-            "scan": f"--all-inlines --tags source --inlines source --inlines {XDK_INCLUDE}"
-        },
+        variables={"scan": f"--all-inlines --tags source --inlines source --inlines {XDK_INCLUDE}"},
     )
     n.build(
         outputs=platform_semantics_header,
@@ -466,10 +523,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     )
     n.rule(
         name="linux_link",
-        command=(
-            "$linux_cc $ldflags -o $out @$out.rsp $libs"
-            " && $python tools/linux_link_check.py $out.rsp $out"
-        ),
+        command=("$linux_cc $ldflags -o $out @$out.rsp $libs && $python tools/linux_link_check.py $out.rsp $out"),
         description="LINUX LINK $out",
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
@@ -507,14 +561,24 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # (a debug build checks its stack frames, and stops at the first one
     # overrun, as it stops at the first failed assertion; a release build
     # does not, so that an overrun nobody has met cannot end a game)
-    abi = " ".join(LINUX_ABI_FLAGS + target + configuration_defines(sln)
-                   + ([] if getattr(sln, "port_release", False) else ["-fstack-protector-strong"]))
+    abi = " ".join(
+        LINUX_ABI_FLAGS
+        + target
+        + configuration_defines(sln)
+        + ([] if getattr(sln, "port_release", False) else ["-fstack-protector-strong"])
+    )
     port_include = PORT_DIR / "include"
     sdk_flags = f"-idirafter {XDK_INCLUDE}"
     libs = " ".join(f"-l{lib}" for lib in config.get("libraries", []))
 
-    def emit(obj_dir: Path, output: Path, extra_cflags: List[str], extra_ldflags: List[str],
-             implicit_inputs: List[Path], validator: Optional[Path] = None) -> None:
+    def emit(
+        obj_dir: Path,
+        output: Path,
+        extra_cflags: List[str],
+        extra_ldflags: List[str],
+        implicit_inputs: List[Path],
+        validator: Optional[Path] = None,
+    ) -> None:
         """the objects and the executable, with the given extra flags (and
         the tag validator alone, tools/map_validate.c, as validator)"""
         extra = " ".join(extra_cflags)
@@ -533,23 +597,31 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 inputs=source,
                 # (the SDK declarations are system headers, which the depfile
                 # leaves out)
-                implicit=[*xdk_headers(), prefix_header, semantics_header, platform_semantics_header,
-                          *sysroot_inputs, *implicit_inputs],
+                implicit=[
+                    *xdk_headers(),
+                    prefix_header,
+                    semantics_header,
+                    platform_semantics_header,
+                    *sysroot_inputs,
+                    *implicit_inputs,
+                ],
                 variables={"cflags": f"{cflags} {posix_extra if posix else extra}"},
             )
 
-        game_cflags = " ".join([
-            abi,
-            " ".join(GAME_FLAGS),
-            f"-include {prefix_header}",
-            f"-include {semantics_header}",
-            f"-I{port_include}",
-            # the headers of the port's own game units (port/linux/game), for
-            # the game sources that call them
-            f"-iquote {Path(config['game_sources'])}",
-            game_defines_and_includes(config),
-            sdk_flags,
-        ])
+        game_cflags = " ".join(
+            [
+                abi,
+                " ".join(GAME_FLAGS),
+                f"-include {prefix_header}",
+                f"-include {semantics_header}",
+                f"-I{port_include}",
+                # the headers of the port's own game units (port/linux/game), for
+                # the game sources that call them
+                f"-iquote {Path(config['game_sources'])}",
+                game_defines_and_includes(config),
+                sdk_flags,
+            ]
+        )
         for source in game_sources(config):
             # The halt screen and version command identify this native build.
             flags = game_cflags
@@ -563,21 +635,23 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         add_object(STB_VORBIS_SOURCE, game_cflags)
 
         platform_dir = Path(config["platform_sources"])
-        platform_cflags = " ".join([
-            abi,
-            " ".join(PLATFORM_FLAGS),
-            f"-include {prefix_header}",
-            f"-include {platform_semantics_header}",
-            f"-I{platform_dir}",
-            f"-I{port_include}",
-            f"-I{TOML_DIR}",
-            f"-I{EXPAT_DIR}",
-            f"-I{KCP_DIR}",
-            f"-I{MONOCYPHER_DIR}",
-            f"-I{ZLIB_DIR}",
-            "-Isource -Isource/cseries",
-            sdk_flags,
-        ])
+        platform_cflags = " ".join(
+            [
+                abi,
+                " ".join(PLATFORM_FLAGS),
+                f"-include {prefix_header}",
+                f"-include {platform_semantics_header}",
+                f"-I{platform_dir}",
+                f"-I{port_include}",
+                f"-I{TOML_DIR}",
+                f"-I{EXPAT_DIR}",
+                f"-I{KCP_DIR}",
+                f"-I{MONOCYPHER_DIR}",
+                f"-I{ZLIB_DIR}",
+                "-Isource -Isource/cseries",
+                sdk_flags,
+            ]
+        )
         posix_cflags = " ".join(POSIX_FLAGS + target + [f"-I{platform_dir}"])
         mbedtls_include = f"-I{MBEDTLS_DIR / 'include'}"
         for source in sorted(platform_dir.glob("*.c")):
@@ -599,16 +673,33 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # wcslen, which linux_link_check.py rejects: the game's wchar_t is
         # 16-bit)
         for source in sorted((MBEDTLS_DIR / "library").glob("*.c")):
-            add_object(source, " ".join(POSIX_FLAGS + target + [mbedtls_include,
-                                                                f"-I{MBEDTLS_DIR / 'library'}", "-fno-builtin-wcslen",
-                                                                "-w"]), posix=True)
+            add_object(
+                source,
+                " ".join(
+                    POSIX_FLAGS
+                    + target
+                    + [mbedtls_include, f"-I{MBEDTLS_DIR / 'library'}", "-fno-builtin-wcslen", "-w"]
+                ),
+                posix=True,
+            )
         # internet play's UPnP (port/third_party/miniupnpc), with the host's
         # ABI as posix_upnp.c, which uses it
         for source in miniupnpc_sources():
-            add_object(source, " ".join(POSIX_FLAGS + target + [*MINIUPNPC_DEFINES,
-                                                                f"-I{MINIUPNPC_DIR / 'include'}",
-                                                                f"-I{MINIUPNPC_DIR / 'src'}",
-                                                                "-fno-builtin-wcslen", "-w"]), posix=True)
+            add_object(
+                source,
+                " ".join(
+                    POSIX_FLAGS
+                    + target
+                    + [
+                        *MINIUPNPC_DEFINES,
+                        f"-I{MINIUPNPC_DIR / 'include'}",
+                        f"-I{MINIUPNPC_DIR / 'src'}",
+                        "-fno-builtin-wcslen",
+                        "-w",
+                    ]
+                ),
+                posix=True,
+            )
         # the settings file's parser (port/third_party/tomlc17), with the
         # platform layer's ABI (its structs hold doubles) and nothing else
         add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
@@ -637,11 +728,18 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             rule="linux_link",
             inputs=objects,
             variables={
-                "ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *sysroot_ldflags,
-                                     *extra_ldflags,
-                                     # (posix_trace_marker.c's, which the GPU driver's calls must reach)
-                                     *(f"-Wl,--export-dynamic-symbol={name}"
-                                       for name in ("open", "open64", "openat", "openat64"))]),
+                "ldflags": " ".join(
+                    [
+                        "--target=i686-linux-gnu",
+                        "-m32",
+                        "-no-pie",
+                        "-g",
+                        *sysroot_ldflags,
+                        *extra_ldflags,
+                        # (posix_trace_marker.c's, which the GPU driver's calls must reach)
+                        *(f"-Wl,--export-dynamic-symbol={name}" for name in ("open", "open64", "openat", "openat64")),
+                    ]
+                ),
                 "libs": libs,
             },
             implicit=[Path("tools/linux_link_check.py"), *([libsdl] if libsdl else [])],
@@ -665,16 +763,22 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 variables={"cflags": " ".join([posix_cflags, f"-I{ZLIB_DIR}", *ZLIB_DEFINES, posix_extra])},
             )
             # (and the Custom Edition maps' loader, cache_file_formats.c)
-            tool_objects = [tool_object, obj_dir / (game_dir / "tag_validate.o"),
-                            obj_dir / (game_dir / "cache_file_formats.o"),
-                            *(obj_dir / source.with_suffix(".o") for source in sorted(game_dir.glob("tag_schema*.c"))),
-                            *(obj_dir / (ZLIB_DIR / name).with_suffix(".o") for name in ZLIB_SOURCES)]
+            tool_objects = [
+                tool_object,
+                obj_dir / (game_dir / "tag_validate.o"),
+                obj_dir / (game_dir / "cache_file_formats.o"),
+                *(obj_dir / source.with_suffix(".o") for source in sorted(game_dir.glob("tag_schema*.c"))),
+                *(obj_dir / (ZLIB_DIR / name).with_suffix(".o") for name in ZLIB_SOURCES),
+            ]
             n.build(
                 outputs=validator,
                 rule="linux_tool_link",
                 inputs=tool_objects,
-                variables={"ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *sysroot_ldflags,
-                                                *extra_ldflags])},
+                variables={
+                    "ldflags": " ".join(
+                        ["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *sysroot_ldflags, *extra_ldflags]
+                    )
+                },
             )
 
     # Profile-guided optimisation: with the committed profile, or with
@@ -702,6 +806,5 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = build_dir / "brokers.txt"
     n.build(outputs=brokers, rule="linux_copy", inputs=Path("port/assets/network/brokers.txt"))
-    n.build(outputs="linux", rule="phony",
-            inputs=[output, brokers, validator, *sdl_outputs])
+    n.build(outputs="linux", rule="phony", inputs=[output, brokers, validator, *sdl_outputs])
     n.newline()

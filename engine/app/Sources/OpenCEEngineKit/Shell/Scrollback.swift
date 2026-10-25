@@ -130,8 +130,10 @@ public struct Scrollback: Equatable, Sendable {
                 } else {
                     let start = row * columns
                     let end = min(line.text.count, start + columns)
-                    rows.append(Row(line: dropped + index, start: start, text: String(line.text[start..<end]),
-                                    length: end - start, kind: line.kind))
+                    rows.append(
+                        Row(
+                            line: dropped + index, start: start, text: String(line.text[start..<end]),
+                            length: end - start, kind: line.kind))
                 }
                 row -= 1
             }
@@ -190,8 +192,9 @@ public struct Scrollback: Equatable, Sendable {
     /// The columns of `row` that are selected, or nil.
     public func selectedColumns(_ row: Row) -> Range<Int>? {
         guard let (start, end) = selectedRange,
-              Position(line: row.line, offset: row.start + row.length) >= start,
-              Position(line: row.line, offset: row.start) <= end else { return nil }
+            Position(line: row.line, offset: row.start + row.length) >= start,
+            Position(line: row.line, offset: row.start) <= end
+        else { return nil }
         let from = start.line == row.line ? max(0, start.offset - row.start) : 0
         let to = end.line == row.line ? min(row.length, end.offset - row.start) : row.length
         // (a line break selected shows as a cell past the end)

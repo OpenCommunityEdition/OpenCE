@@ -24,19 +24,45 @@ IDENT = re.compile(r'"(?:[^"\\]|\\.)*"|[A-Za-z_.$][\w.$]*')
 STRING_DIRECTIVES = {".ascii", ".asciz", ".string"}
 
 DROP_DIRECTIVES = {
-    ".subsections_via_symbols", ".build_version", ".watchos_version_min",
-    ".ios_version_min", ".macosx_version_min", ".tvos_version_min", ".loh",
-    ".data_region", ".end_data_region", ".linker_option", ".indirect_symbol",
-    ".addrsig", ".addrsig_sym", ".no_dead_strip", ".alt_entry", ".ident",
-    ".desc", ".cfi_startproc", ".cfi_endproc", ".cfi_def_cfa",
-    ".cfi_offset", ".cfi_def_cfa_offset", ".cfi_def_cfa_register",
-    ".cfi_personality", ".cfi_lsda", ".cfi_remember_state",
-    ".cfi_restore_state", ".cfi_restore", ".cfi_adjust_cfa_offset",
-    ".cfi_same_value", ".cfi_escape",
+    ".subsections_via_symbols",
+    ".build_version",
+    ".watchos_version_min",
+    ".ios_version_min",
+    ".macosx_version_min",
+    ".tvos_version_min",
+    ".loh",
+    ".data_region",
+    ".end_data_region",
+    ".linker_option",
+    ".indirect_symbol",
+    ".addrsig",
+    ".addrsig_sym",
+    ".no_dead_strip",
+    ".alt_entry",
+    ".ident",
+    ".desc",
+    ".cfi_startproc",
+    ".cfi_endproc",
+    ".cfi_def_cfa",
+    ".cfi_offset",
+    ".cfi_def_cfa_offset",
+    ".cfi_def_cfa_register",
+    ".cfi_personality",
+    ".cfi_lsda",
+    ".cfi_remember_state",
+    ".cfi_restore_state",
+    ".cfi_restore",
+    ".cfi_adjust_cfa_offset",
+    ".cfi_same_value",
+    ".cfi_escape",
 }
 
 RODATA_SECTIONS = {
-    "__cstring", "__const", "__literal4", "__literal8", "__literal16",
+    "__cstring",
+    "__const",
+    "__literal4",
+    "__literal8",
+    "__literal16",
     "__ustring",
 }
 
@@ -108,6 +134,7 @@ class Converter:
             if tok.startswith("lo12"):
                 return tok
             return self.sym(tok)
+
         # rename identifiers outside :lo12: markers
         parts = re.split(r'(:lo12:)', text)
         return "".join(p if p == ":lo12:" else IDENT.sub(repl, p) for p in parts)
@@ -183,11 +210,16 @@ class Converter:
             self.section(seg.strip(), name)
             return
         shorthand = {
-            ".text": ("__TEXT", "__text"), ".data": ("__DATA", "__data"),
-            ".const": ("__TEXT", "__const"), ".cstring": ("__TEXT", "__cstring"),
-            ".literal4": ("__TEXT", "__literal4"), ".literal8": ("__TEXT", "__literal8"),
-            ".literal16": ("__TEXT", "__literal16"), ".const_data": ("__DATA", "__const"),
-            ".static_data": ("__DATA", "__data"), ".mod_init_func": ("__DATA", "__mod_init_func"),
+            ".text": ("__TEXT", "__text"),
+            ".data": ("__DATA", "__data"),
+            ".const": ("__TEXT", "__const"),
+            ".cstring": ("__TEXT", "__cstring"),
+            ".literal4": ("__TEXT", "__literal4"),
+            ".literal8": ("__TEXT", "__literal8"),
+            ".literal16": ("__TEXT", "__literal16"),
+            ".const_data": ("__DATA", "__const"),
+            ".static_data": ("__DATA", "__data"),
+            ".mod_init_func": ("__DATA", "__mod_init_func"),
             ".mod_term_func": ("__DATA", "__mod_term_func"),
         }
         if op in shorthand:
@@ -249,8 +281,7 @@ class Converter:
                 raise ConvertError(f"line {i + 1}: {e}") from None
         # a weak symbol is already global; a second directive only warns
         weak = {line.split(None, 1)[1] for line in self.out if line.startswith("\t.weak ")}
-        out = [line for line in self.out
-               if not (line.startswith("\t.globl ") and line.split(None, 1)[1] in weak)]
+        out = [line for line in self.out if not (line.startswith("\t.globl ") and line.split(None, 1)[1] in weak)]
         return "\n".join(out) + "\n"
 
 

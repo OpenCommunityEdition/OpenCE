@@ -10,8 +10,10 @@ import XCTest
 final class UiCaptureTests: XCTestCase {
     /// A frame of `width` by `height` in one colour, with the texels
     /// `painted` says in another.
-    func frame(width: Int, height: Int, _ base: SIMD3<UInt8>, _ other: SIMD3<UInt8>,
-               painted: (Int, Int) -> Bool) -> CapturedFrame {
+    func frame(
+        width: Int, height: Int, _ base: SIMD3<UInt8>, _ other: SIMD3<UInt8>,
+        painted: (Int, Int) -> Bool
+    ) -> CapturedFrame {
         var bytes = [UInt8](repeating: 255, count: width * height * 4)
         for y in 0..<height {
             for x in 0..<width {
@@ -66,14 +68,16 @@ final class UiCaptureTests: XCTestCase {
         try git.run()
         git.waitUntilExit()
         XCTAssertEqual(git.terminationStatus, 0, "assets/ui_reference must never be committed")
-        XCTAssertEqual(UiCapture.defaultFolder(root: StockLevel.root).path,
-                       StockLevel.root.appendingPathComponent("assets/ui_reference").path)
+        XCTAssertEqual(
+            UiCapture.defaultFolder(root: StockLevel.root).path,
+            StockLevel.root.appendingPathComponent("assets/ui_reference").path)
     }
 
     func testAScreensFileIsNamedByItsPathUnderTheShell() {
         XCTAssertEqual(UiCapture.fileName(screen: "ui\\shell\\main_menu\\main_menu"), "main_menu-main_menu.png")
-        XCTAssertEqual(UiCapture.fileName(screen: "ui\\shell\\solo_game\\pause_game\\pause_game"),
-                       "solo_game-pause_game-pause_game.png")
+        XCTAssertEqual(
+            UiCapture.fileName(screen: "ui\\shell\\solo_game\\pause_game\\pause_game"),
+            "solo_game-pause_game-pause_game.png")
         XCTAssertEqual(UiCapture.fileName(screen: "ui/odd name"), "ui-odd_name.png")
     }
 
@@ -91,8 +95,10 @@ final class UiCaptureTests: XCTestCase {
         let capture = UiCapture(device: device, queue: queue, width: 640, height: 480)
         let report = try capture.capture(geometry: geometry, widget: mainMenuWidget(), into: out)
         let files = try FileManager.default.contentsOfDirectory(atPath: out.path)
-        for leaf in ["main_menu", "difficulty_select_list_screen", "multiplayer_type_select_screen",
-                     "server_list_screen", "player_profile_select_screen"] {
+        for leaf in [
+            "main_menu", "difficulty_select_list_screen", "multiplayer_type_select_screen",
+            "server_list_screen", "player_profile_select_screen",
+        ] {
             XCTAssertTrue(files.contains { $0.hasSuffix("\(leaf).png") }, "\(leaf) not captured: \(files)")
         }
         XCTAssertEqual(report.screens.count, files.filter { $0.hasSuffix(".png") }.count)

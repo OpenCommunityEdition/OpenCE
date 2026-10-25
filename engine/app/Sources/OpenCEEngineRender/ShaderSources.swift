@@ -82,8 +82,9 @@ public final class ShaderWatcher {
     private func stamp(_ shader: Shader) -> (Date, Int)? {
         let path = folder.appendingPathComponent(shader.file).path
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: path),
-              let date = attributes[.modificationDate] as? Date,
-              let size = attributes[.size] as? Int else { return nil }
+            let date = attributes[.modificationDate] as? Date,
+            let size = attributes[.size] as? Int
+        else { return nil }
         return (date, size)
     }
 
@@ -129,8 +130,10 @@ public final class ShaderReloader {
 
     /// Compiles each shader that changed into the passes given (one that
     /// is nil is skipped: it reads the new source when it is made).
-    public func poll(level: LevelRenderer?, hud: HudPass?, text: TextPass?,
-                     loading: LoadingPass? = nil) -> [Reload] {
+    public func poll(
+        level: LevelRenderer?, hud: HudPass?, text: TextPass?,
+        loading: LoadingPass? = nil
+    ) -> [Reload] {
         var out: [Reload] = []
         for shader in watcher.changed() {
             let reload: ((String) throws -> Void)?

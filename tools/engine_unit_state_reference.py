@@ -28,9 +28,11 @@ from harness import enum_with, function, read  # noqa: E402
 OUTPUT = ROOT / "engine" / "crates" / "sim" / "tests" / "unit_state_reference.txt"
 
 FUNCTIONS = [
-    "unit_animation_state_interruptable", "unit_animation_state_loops",
+    "unit_animation_state_interruptable",
+    "unit_animation_state_loops",
     "unit_animation_state_can_be_entered_without_animation",
-    "unit_animation_compute_interpolation_frame_count", "unit_animation_state_get_aiming_screen_index",
+    "unit_animation_compute_interpolation_frame_count",
+    "unit_animation_state_get_aiming_screen_index",
     "unit_animation_overlay_action_loops",
 ]
 
@@ -82,8 +84,7 @@ def source_file():
     """The fake world, the game's functions and the cases, as one C file."""
     units_h = read("source/units/units.h")
     units_c = read("source/units/units.c")
-    enums = [enum_with(units_h, member) for member in
-             ("_unit_state_idle", "_unit_weapon_class_animation_idle")]
+    enums = [enum_with(units_h, member) for member in ("_unit_state_idle", "_unit_weapon_class_animation_idle")]
     definitions = [function(units_c, name) for name in FUNCTIONS]
     return "\n\n".join([FAKE_WORLD, *enums, *definitions, MAIN])
 
@@ -100,10 +101,11 @@ def reference():
         if result.returncode:
             raise SystemExit(f"the reference does not compile:\n{result.stderr}")
         output = subprocess.run([str(executable)], capture_output=True, text=True, check=True).stdout
-    return ("# The game's unit animation state rules (tools/engine_unit_state_reference.py).\n"
-            "# state <state> <loops> <entered without animation> <overlay action loops> <aiming screen>\n"
-            "# pair <current> <desired> <interruptable> <interpolation frames>\n"
-            + output)
+    return (
+        "# The game's unit animation state rules (tools/engine_unit_state_reference.py).\n"
+        "# state <state> <loops> <entered without animation> <overlay action loops> <aiming screen>\n"
+        "# pair <current> <desired> <interruptable> <interpolation frames>\n" + output
+    )
 
 
 def main():

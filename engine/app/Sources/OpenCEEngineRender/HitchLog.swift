@@ -92,8 +92,10 @@ public final class HitchLog: Sendable {
             entries[index].totalMilliseconds += milliseconds
             entries[index].longestMilliseconds = max(entries[index].longestMilliseconds, milliseconds)
         } else {
-            entries.append(Entry(kind: kind, cause: cause, count: 1, totalMilliseconds: milliseconds,
-                                 longestMilliseconds: milliseconds))
+            entries.append(
+                Entry(
+                    kind: kind, cause: cause, count: 1, totalMilliseconds: milliseconds,
+                    longestMilliseconds: milliseconds))
         }
     }
 }

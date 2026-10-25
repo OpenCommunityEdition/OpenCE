@@ -1,4 +1,5 @@
 """Production fades and voice creation at multiple frame rates, including negative controls."""
+
 import re
 import sys
 from pathlib import Path
@@ -9,8 +10,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run
 from harness.audio import manager_types
 
-CASES = ["fresh-loop", "fresh-impulse", "pending", "restart", "intro-loop",
-         "rapid", "other-owner", "other-track", "stop-cue", "fake-impulse", "repeated-stop", "four-tracks"]
+CASES = [
+    "fresh-loop",
+    "fresh-impulse",
+    "pending",
+    "restart",
+    "intro-loop",
+    "rapid",
+    "other-owner",
+    "other-track",
+    "stop-cue",
+    "fake-impulse",
+    "repeated-stop",
+    "four-tracks",
+]
 NEGATIVE_CONTROLS = {
     "keeps-replaced-voice": (("sound_index != except_sound_index &&", "FALSE &&"), "restart"),
     "cancels-other-owner": (("sound->source_identifier == looping_sound_index &&", "TRUE &&"), "other-owner"),
@@ -20,19 +33,27 @@ NEGATIVE_CONTROLS = {
 
 def generated(fault=None, case=None):
     manager = read("source/sound/sound_manager.c")
-    names = ["update_potentially_audible_looping_sound", "sound_new_impulse", "sound_calculate_fade",
-             "sound_start_fade", "sound_fade_looping_track_components", "sound_refresh_looping"]
+    names = [
+        "update_potentially_audible_looping_sound",
+        "sound_new_impulse",
+        "sound_calculate_fade",
+        "sound_start_fade",
+        "sound_fade_looping_track_components",
+        "sound_refresh_looping",
+    ]
     code = []
     for name in names:
         text = function(manager, name)
-        if fault and ((case == "fresh-loop" and name == names[0]) or
-                      (case == "fresh-impulse" and name == names[1]) or
-                      (case not in ("fresh-loop", "fresh-impulse") and name in names[2:])):
+        if fault and (
+            (case == "fresh-loop" and name == names[0])
+            or (case == "fresh-impulse" and name == names[1])
+            or (case not in ("fresh-loop", "fresh-impulse") and name in names[2:])
+        ):
             if fault[0] in text:
                 text = mutated(text, *fault)
         code.append(text)
     enums = manager_types()
-    constants_section = manager[manager.index("/* ---------- constants */"):]
+    constants_section = manager[manager.index("/* ---------- constants */") :]
     for member in ["_sound_promotion_dont", "_sound_compression_xbox_adpcm", "_sound_encoding_mono"]:
         enums += enum_with(constants_section, member) + "\n"
     enums += enum_with(read("source/sound/sound_classes.h"), "_sound_class_unit_dialog") + "\n"

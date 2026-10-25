@@ -74,22 +74,36 @@ LEFT_OUT = {
 # below Co-op, keeping its 32-unit highlight inside the description panel's
 # bottom curve (port_settings.WIDGET_PATCHES)
 CHILD_OFFSETS = {
-    ("ui\\shell\\main_menu\\main_menu_select_list", "ui\\shell\\main_menu\\main_menu_item_quit_game"):
-        port_settings.QUIT_ITEM_PLACE,
-    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
-     "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_gametypes_item"): (0, 358),
-    ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_screen",
-     "ui\\shell\\main_menu\\blueline"): (64, 349),
+    (
+        "ui\\shell\\main_menu\\main_menu_select_list",
+        "ui\\shell\\main_menu\\main_menu_item_quit_game",
+    ): port_settings.QUIT_ITEM_PLACE,
+    (
+        "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+        "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_gametypes_item",
+    ): (0, 358),
+    (
+        "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_screen",
+        "ui\\shell\\main_menu\\blueline",
+    ): (64, 349),
     # the browser's rows up under the column titles, into the place of the
     # scroll up button (hidden: the list does not scroll)
-    **{("ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\join_game_items_list",
-        f"ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\server_item_{row}"): (10, 102 + 17 * (row - 1))
-       for row in range(1, 16)},
+    **{
+        (
+            "ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\join_game_items_list",
+            f"ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\server_item_{row}",
+        ): (10, 102 + 17 * (row - 1))
+        for row in range(1, 16)
+    },
     # the map lists' first row, the SINGLEPLAYER or MULTIPLAYER chooser
     # (port_settings.MAP_KIND_CHOOSER), where the gametype list has its own
-    **{(f"ui\\shell\\main_menu\\{list_tag}", "ui\\shell\\main_menu\\new_select\\list_item_0"): (82, 73)
-       for list_tag in ("multiplayer_type_select\\mp_map_select\\mp_map_select_list_2",
-                        "solo_level_select\\solo_level_select_list")},
+    **{
+        (f"ui\\shell\\main_menu\\{list_tag}", "ui\\shell\\main_menu\\new_select\\list_item_0"): (82, 73)
+        for list_tag in (
+            "multiplayer_type_select\\mp_map_select\\mp_map_select_list_2",
+            "solo_level_select\\solo_level_select_list",
+        )
+    },
 }
 SCALE = 4
 MAXIMUM_SIZE = 2048
@@ -97,16 +111,61 @@ MAXIMUM_SIZE = 2048
 FONTS = {"ui\\gamespy": "ui\\small_ui", "ui\\ticker": "ui\\small_ui"}
 
 # the XML's names of the tags' values (menu_tags.c has the same)
-EVENTS = ["a", "b", "x", "y", "black", "white", "left_trigger", "right_trigger", "up", "down", "left", "right",
-          "start", "back", "left_thumb", "right_thumb", "stick_up", "stick_down", "stick_left", "stick_right",
-          "right_stick_up", "right_stick_down", "right_stick_left", "right_stick_right", "created", "deleted",
-          "get_focus", "lose_focus", "left_mouse", "middle_mouse", "right_mouse", "double_click",
-          "custom_activation", "post_render"]
-WIDGET_FLAGS = ["pass_unhandled_to_focused_child", "pause_game", "flash_bitmap", "up_down_tabs_children",
-                "left_right_tabs_children", "up_down_tabs_items", "left_right_tabs_items", "no_focused_child",
-                "pass_unhandled_to_all_children", "render_any_controller", "pass_handled_to_all_children",
-                "main_menu_if_no_history", "tag_controller_index", "nifty_fx", "no_history", "force_handle_mouse",
-                "no_widescreen_fill"]
+EVENTS = [
+    "a",
+    "b",
+    "x",
+    "y",
+    "black",
+    "white",
+    "left_trigger",
+    "right_trigger",
+    "up",
+    "down",
+    "left",
+    "right",
+    "start",
+    "back",
+    "left_thumb",
+    "right_thumb",
+    "stick_up",
+    "stick_down",
+    "stick_left",
+    "stick_right",
+    "right_stick_up",
+    "right_stick_down",
+    "right_stick_left",
+    "right_stick_right",
+    "created",
+    "deleted",
+    "get_focus",
+    "lose_focus",
+    "left_mouse",
+    "middle_mouse",
+    "right_mouse",
+    "double_click",
+    "custom_activation",
+    "post_render",
+]
+WIDGET_FLAGS = [
+    "pass_unhandled_to_focused_child",
+    "pause_game",
+    "flash_bitmap",
+    "up_down_tabs_children",
+    "left_right_tabs_children",
+    "up_down_tabs_items",
+    "left_right_tabs_items",
+    "no_focused_child",
+    "pass_unhandled_to_all_children",
+    "render_any_controller",
+    "pass_handled_to_all_children",
+    "main_menu_if_no_history",
+    "tag_controller_index",
+    "nifty_fx",
+    "no_history",
+    "force_handle_mouse",
+    "no_widescreen_fill",
+]
 TEXT_FLAGS = ["editable", "password", "flashing", "no_focus_test"]
 LIST_FLAGS = ["items_in_code", "items_from_strings", "one_tooltip", "single_preview"]
 TYPES = ["container", "text", "spinner", "column_list"]
@@ -119,9 +178,12 @@ REPLACE = [None, "controller", "build_number", "pid"]
 # first 13, and its "?" after them; the PC version's other 8 are its own
 # maps', which the Xbox's game has not.)
 XBOX_BITMAPS = {
-    "ui\\shell\\bitmaps\\colors_sm", "ui\\shell\\bitmaps\\mp_map_grafix", "ui\\shell\\bitmaps\\sp_levels",
+    "ui\\shell\\bitmaps\\colors_sm",
+    "ui\\shell\\bitmaps\\mp_map_grafix",
+    "ui\\shell\\bitmaps\\sp_levels",
     "ui\\shell\\main_menu\\difficulty_select\\difficulty_options",
-    "ui\\shell\\main_menu\\difficulty_select\\difficulty_options_small", "ui\\shell\\main_menu\\halo_logo",
+    "ui\\shell\\main_menu\\difficulty_select\\difficulty_options_small",
+    "ui\\shell\\main_menu\\halo_logo",
     "ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\color_edit\\player_color_marine_large",
 }
 # the frames with no redraw that are drawn from a frame of the Xbox map's
@@ -147,15 +209,38 @@ INCOMPATIBLE = set()
 # (and its campaign's: the Xbox's of those names, which take the Xbox's
 # widgets, menu_functions.c's for ours)
 WIRED = {
-    "main menu quit game", "profile set edit begin", "mouse emit accept event", "mouse emit back event",
-    "mouse emit x event", "emit custom activation event", "single prev cl item activated", "controls back handler",
-    "gamespy back handler", "gamespy dismiss error", "gamespy dismiss filters", "gamespy screen init",
-    "gamespy screen dispose", "mp type set mode",
-    "campaign menu init", "campaign menu continue", "difficulty item select", "solo map list update",
-    "load game menu init", "load game menu dispose", "load game menu activated", "load game list update",
-    "load game menu delete request", "load game menu delete finish",
-    "controls screen init", "controls begin binding", "controls screen change set", "controls screen defaults",
-    "controls update menu", "profile manager select", "direct ip connect go", "ss edit server password",
+    "main menu quit game",
+    "profile set edit begin",
+    "mouse emit accept event",
+    "mouse emit back event",
+    "mouse emit x event",
+    "emit custom activation event",
+    "single prev cl item activated",
+    "controls back handler",
+    "gamespy back handler",
+    "gamespy dismiss error",
+    "gamespy dismiss filters",
+    "gamespy screen init",
+    "gamespy screen dispose",
+    "mp type set mode",
+    "campaign menu init",
+    "campaign menu continue",
+    "difficulty item select",
+    "solo map list update",
+    "load game menu init",
+    "load game menu dispose",
+    "load game menu activated",
+    "load game list update",
+    "load game menu delete request",
+    "load game menu delete finish",
+    "controls screen init",
+    "controls begin binding",
+    "controls screen change set",
+    "controls screen defaults",
+    "controls update menu",
+    "profile manager select",
+    "direct ip connect go",
+    "ss edit server password",
 }
 
 # ---------- HEK tags
@@ -164,12 +249,35 @@ WIRED = {
 class Tags:
     """HEK tags (big-endian), read with invader's definitions"""
 
-    BASIC = {"int8": 1, "uint8": 1, "int16": 2, "uint16": 2, "int32": 4, "uint32": 4, "float": 4, "Fraction": 4,
-             "Angle": 4, "TagFourCC": 4, "TagID": 4, "Pointer": 4, "Index": 2, "Point2D": 8, "Point2DInt": 4,
-             "Rectangle2D": 8, "ColorARGB": 16, "ColorRGB": 12, "TagString": 32, "TagDependency": 16,
-             "TagReflexive": 12, "TagDataOffset": 20}
-    STRUCTS = {"ui_widget_definition": "UIWidgetDefinition", "bitmap": "Bitmap",
-               "unicode_string_list": "UnicodeStringList"}
+    BASIC = {
+        "int8": 1,
+        "uint8": 1,
+        "int16": 2,
+        "uint16": 2,
+        "int32": 4,
+        "uint32": 4,
+        "float": 4,
+        "Fraction": 4,
+        "Angle": 4,
+        "TagFourCC": 4,
+        "TagID": 4,
+        "Pointer": 4,
+        "Index": 2,
+        "Point2D": 8,
+        "Point2DInt": 4,
+        "Rectangle2D": 8,
+        "ColorARGB": 16,
+        "ColorRGB": 12,
+        "TagString": 32,
+        "TagDependency": 16,
+        "TagReflexive": 12,
+        "TagDataOffset": 20,
+    }
+    STRUCTS = {
+        "ui_widget_definition": "UIWidgetDefinition",
+        "bitmap": "Bitmap",
+        "unicode_string_list": "UnicodeStringList",
+    }
 
     def __init__(self, tags: Path, definitions: Path):
         self.root = tags
@@ -200,7 +308,7 @@ class Tags:
         result, position, later = {}, base, []
         for field in self.types[name]["fields"]:
             kind, key, size = field["type"], field.get("name"), self.size(field)
-            raw = data[position:position + size]
+            raw = data[position : position + size]
             position += size
             if kind == "pad" or not key:
                 continue
@@ -234,17 +342,18 @@ class Tags:
         for kind, key, count, element in later:
             if kind == "dependency":
                 if count > 0:
-                    result[key] = data[cursor[0]:cursor[0] + count].decode("latin-1")
+                    result[key] = data[cursor[0] : cursor[0] + count].decode("latin-1")
                     cursor[0] += count + 1
             elif kind == "data":
-                result[key] = data[cursor[0]:cursor[0] + count]
+                result[key] = data[cursor[0] : cursor[0] + count]
                 cursor[0] += count
             else:
                 element_size = self.types[element]["size"]
                 start = cursor[0]
                 cursor[0] += element_size * count
-                result[key] = [self.parse(element, data, start + index * element_size, cursor)
-                               for index in range(count)]
+                result[key] = [
+                    self.parse(element, data, start + index * element_size, cursor) for index in range(count)
+                ]
         return result
 
     def path(self, tag: str, group: str) -> Path:
@@ -263,7 +372,7 @@ def our_name(tag: str) -> str:
     """a tag's name in our files: its path below ui\\shell, with slashes"""
     for prefix in ("ui\\shell\\", "ui\\"):
         if tag.startswith(prefix):
-            return tag[len(prefix):].replace("\\", "/")
+            return tag[len(prefix) :].replace("\\", "/")
     return tag.replace("\\", "/")
 
 
@@ -303,6 +412,7 @@ class Art:
         port's titles are: tools/title_assets.py) over the PC headers'
         backdrop"""
         from PIL import ImageDraw, ImageFont
+
         scale = SCALE
         probe = ImageFont.truetype(str(TITLE_FONT), 1000)
         left, top, right, bottom = probe.getbbox("H")
@@ -314,15 +424,23 @@ class Art:
         image = Image.fromarray(render_svg(svg, scale), "RGBA")
         draw = ImageDraw.Draw(image)
         cap_top = font.getbbox("H")[1]
-        draw.text((port_settings.TITLE_LEFT * scale, port_settings.TITLE_TOP * scale - cap_top), text,
-                  font=font, fill=port_settings.TITLE_COLOR)
+        draw.text(
+            (port_settings.TITLE_LEFT * scale, port_settings.TITLE_TOP * scale - cap_top),
+            text,
+            font=font,
+            fill=port_settings.TITLE_COLOR,
+        )
         png = f"ce/port/{name}.png"
         (MENUS / png).parent.mkdir(parents=True, exist_ok=True)
         image.save(MENUS / png, optimize=True)
         self.pngs.append(png)
-        return "\n".join([f"\t<bitmap{attributes([('name', name)])}>",
-                          f"\t\t<frame{attributes([('png', png), ('width', 512), ('height', 64)])}/>",
-                          "\t</bitmap>"])
+        return "\n".join(
+            [
+                f"\t<bitmap{attributes([('name', name)])}>",
+                f"\t\t<frame{attributes([('png', png), ('width', 512), ('height', 64)])}/>",
+                "\t</bitmap>",
+            ]
+        )
 
     def port_picture(self, name: str, frames: list) -> str:
         """a <bitmap> of this port's own drawing: each frame an SVG (text,
@@ -359,8 +477,9 @@ class Art:
         for index in indices:
             width, height = data[index]["width"], data[index]["height"]
             name = self.frame_sources(relative, index, len(data))[-1]
-            if name in XBOX_FRAMES and not any((self.redraws / f"{source}.svg").is_file()
-                                               for source in self.frame_sources(relative, index, len(data))):
+            if name in XBOX_FRAMES and not any(
+                (self.redraws / f"{source}.svg").is_file() for source in self.frame_sources(relative, index, len(data))
+            ):
                 self.xbox_frames.append((name, tag, XBOX_FRAMES[name]))
                 lines.append(f"\t\t<frame{attributes([('map', tag), ('index', XBOX_FRAMES[name])])}/>")
                 continue
@@ -371,12 +490,13 @@ class Art:
         # (the port's frames after them: the Xbox map's, scaled)
         for source, index, width, height, x, y in port_settings.BITMAP_FRAMES.get(our_name(tag), []):
             self.added_frames.append((our_name(tag), source, index))
-            lines.append(f"\t\t<frame{attributes([('map', source), ('index', index), ('width', width), ('height', height), ('x', x or None), ('y', y or None)])}/>")
+            lines.append(
+                f"\t\t<frame{attributes([('map', source), ('index', index), ('width', width), ('height', height), ('x', x or None), ('y', y or None)])}/>"
+            )
         lines.append("\t</bitmap>")
         return "\n".join(lines)
 
-    def draw(self, relative: str, index: int, count: int, width: int, height: int, output: Path,
-             shown: list) -> None:
+    def draw(self, relative: str, index: int, count: int, width: int, height: int, output: Path, shown: list) -> None:
         output.parent.mkdir(parents=True, exist_ok=True)
         for name in self.frame_sources(relative, index, count):
             svg = self.redraws / f"{name}.svg"
@@ -402,7 +522,9 @@ class Art:
         if original and original.is_file():
             with Image.open(original) as picture:
                 if picture.size == (width, height):
-                    bounds = picture.convert("RGBA").getchannel("A").point(lambda value: 255 if value > 16 else 0).getbbox()
+                    bounds = (
+                        picture.convert("RGBA").getchannel("A").point(lambda value: 255 if value > 16 else 0).getbbox()
+                    )
                     if bounds:
                         area = (bounds[0], bounds[1], min(bounds[2], area[2]), min(bounds[3], area[3]))
         area = tuple(value * PLACEHOLDER_SCALE for value in area)
@@ -424,10 +546,12 @@ def reachable(tags: Tags) -> dict:
             continue
         widget = tags.load(tag, "ui_widget_definition")
         widgets[tag] = widget
-        for reference in ([child["widget tag"] for child in widget["child widgets"]] +
-                          [handler["widget tag"] for handler in widget["event handlers"]] +
-                          [conditional["widget tag"] for conditional in widget["conditional widgets"]] +
-                          [widget["extended description widget"]]):
+        for reference in (
+            [child["widget tag"] for child in widget["child widgets"]]
+            + [handler["widget tag"] for handler in widget["event handlers"]]
+            + [conditional["widget tag"] for conditional in widget["conditional widgets"]]
+            + [widget["extended description widget"]]
+        ):
             if reference and reference not in LEFT_OUT:
                 queue.append(reference)
     return widgets
@@ -438,8 +562,9 @@ def bitmap_name(tag: str) -> str:
     return tag if tag in XBOX_BITMAPS else our_name(tag)
 
 
-def widget_xml(tag: str, widget: dict, tags: Tags, functions: list, inputs: list, fonts: Counter,
-               children_of: dict, depth: int = 1) -> list:
+def widget_xml(
+    tag: str, widget: dict, tags: Tags, functions: list, inputs: list, fonts: Counter, children_of: dict, depth: int = 1
+) -> list:
     """the <widget>, and its children's where it is their only parent"""
     indent = "\t" * depth
     bounds = widget["bounds"]
@@ -448,7 +573,10 @@ def widget_xml(tag: str, widget: dict, tags: Tags, functions: list, inputs: list
         ("name", our_name(tag)),
         ("type", TYPES[widget["widget type"]] if widget["widget type"] else None),
         ("controller", None if widget["controller index"] == 4 else str(widget["controller index"] + 1)),
-        ("left", left or None), ("top", top or None), ("width", right - left), ("height", bottom - top),
+        ("left", left or None),
+        ("top", top or None),
+        ("width", right - left),
+        ("height", bottom - top),
         ("flags", flag_names(widget["flags"], WIDGET_FLAGS)),
         ("auto_close", widget["milliseconds to auto close"] or None),
         ("auto_close_fade", widget["milliseconds auto close fade time"] or None),
@@ -467,14 +595,17 @@ def widget_xml(tag: str, widget: dict, tags: Tags, functions: list, inputs: list
     pairs += [
         ("align", ALIGN[widget["justification"]] if widget["justification"] else None),
         ("text_flags", flag_names(widget["flags 1"], TEXT_FLAGS)),
-        ("text_x", widget["horiz offset"] or None), ("text_y", widget["vert offset"] or None),
+        ("text_x", widget["horiz offset"] or None),
+        ("text_y", widget["vert offset"] or None),
         ("list_flags", flag_names(widget["flags 2"], LIST_FLAGS)),
         ("header_bitmap", bitmap_name(widget["list header bitmap"]) if widget["list header bitmap"] else None),
         ("footer_bitmap", bitmap_name(widget["list footer bitmap"]) if widget["list footer bitmap"] else None),
         ("header_bounds", bounds_text(widget["header bounds"]) if any(widget["header bounds"]) else None),
         ("footer_bounds", bounds_text(widget["footer bounds"]) if any(widget["footer bounds"]) else None),
-        ("description", our_name(widget["extended description widget"])
-         if widget["extended description widget"] else None),
+        (
+            "description",
+            our_name(widget["extended description widget"]) if widget["extended description widget"] else None,
+        ),
     ]
     patch = port_settings.WIDGET_PATCHES.get(our_name(tag), {})
     for key, value in patch.get("set", {}).items():
@@ -504,8 +635,13 @@ def widget_xml(tag: str, widget: dict, tags: Tags, functions: list, inputs: list
             handler_pairs += [("close", "other"), ("widget", target)]
         if flags >> 5 & 1:
             handler_pairs += [("reload", "other"), ("widget", target)]
-        for bit, pair in ((0, ("close", "current")), (2, ("close", "all")), (4, ("reload", "self")),
-                          (9, ("back", "true")), (11, ("branch", "true"))):
+        for bit, pair in (
+            (0, ("close", "current")),
+            (2, ("close", "all")),
+            (4, ("reload", "self")),
+            (9, ("back", "true")),
+            (11, ("branch", "true")),
+        ):
             if flags >> bit & 1:
                 handler_pairs.append(pair)
         if handler["sound effect"]:
@@ -520,7 +656,9 @@ def widget_xml(tag: str, widget: dict, tags: Tags, functions: list, inputs: list
         function = REPLACE[item["replace function"]] if item["replace function"] < len(REPLACE) else None
         lines.append(f"{inner}<replace{attributes([('search', item['search string']), ('function', function)])}/>")
     for conditional in widget["conditional widgets"]:
-        lines.append(f"{inner}<conditional{attributes([('widget', our_name(conditional['widget tag'])), ('if_failed', 'true' if conditional['flags'] & 1 else None)])}/>")
+        lines.append(
+            f"{inner}<conditional{attributes([('widget', our_name(conditional['widget tag'])), ('if_failed', 'true' if conditional['flags'] & 1 else None)])}/>"
+        )
     for child in widget["child widgets"]:
         child_tag = child["widget tag"]
         if child_tag in LEFT_OUT:
@@ -528,8 +666,12 @@ def widget_xml(tag: str, widget: dict, tags: Tags, functions: list, inputs: list
         x, y = CHILD_OFFSETS.get((tag, child_tag), (child["horizontal offset"], child["vertical offset"]))
         name = patch.get("swap", {}).get(our_name(child_tag), our_name(child_tag))
         lines += [f"{inner}{line}" for line in patch.get("insert_before", {}).get(our_name(child_tag), [])]
-        pairs = [("widget", name), ("x", x or None), ("y", y or None),
-                 ("controller", str(child["custom controller index"] + 1) if child["flags"] & 1 else None)]
+        pairs = [
+            ("widget", name),
+            ("x", x or None),
+            ("y", y or None),
+            ("controller", str(child["custom controller index"] + 1) if child["flags"] & 1 else None),
+        ]
         lines.append(f"{inner}<child{attributes(pairs)}/>")
     lines += [f"{inner}{line}" for line in patch.get("children", [])]
     lines.append(f"{indent}</widget>")
@@ -539,9 +681,10 @@ def widget_xml(tag: str, widget: dict, tags: Tags, functions: list, inputs: list
 def engine_names(source: Path, start: str, count: int) -> list:
     """the names a table of the game's functions gives them, in order"""
     import re
+
     text = source.read_text(encoding="latin-1")
-    text = text[text.index(start):]
-    return re.findall(r'"([^"\\]*)"', text[:text.index("}")])[:count]
+    text = text[text.index(start) :]
+    return re.findall(r'"([^"\\]*)"', text[: text.index("}")])[:count]
 
 
 def pause_art(art):
@@ -549,11 +692,22 @@ def pause_art(art):
     for piece in ("left", "center", "right"):
         heights = [port_settings.pause_box_height(buttons) for buttons in port_settings.PAUSE_BOX_BUTTONS]
         heights += list(port_settings.PAUSE_BOX_EXTRA_HEIGHTS)
-        lines.append(art.port_picture(f"pause/pausebox_{piece}", [
-            (port_settings.pause_box_svg(piece, height), 4 if piece == "center" else 16, 256) for height in heights]))
+        lines.append(
+            art.port_picture(
+                f"pause/pausebox_{piece}",
+                [
+                    (port_settings.pause_box_svg(piece, height), 4 if piece == "center" else 16, 256)
+                    for height in heights
+                ],
+            )
+        )
     for piece in ("left", "center", "right"):
-        lines.append(art.port_picture(f"pause/objectives_{piece}", [
-            (port_settings.pause_box_svg(piece, 195, header=True), 4 if piece == "center" else 16, 256)]))
+        lines.append(
+            art.port_picture(
+                f"pause/objectives_{piece}",
+                [(port_settings.pause_box_svg(piece, 195, header=True), 4 if piece == "center" else 16, 256)],
+            )
+        )
     return lines
 
 
@@ -563,16 +717,20 @@ def main() -> None:
     parser.add_argument("--definitions", type=Path, required=True)
     parser.add_argument("--redraws", type=Path, required=True)
     parser.add_argument("--placeholder", type=Path, required=True, help="the picture for frames with no redraw")
-    parser.add_argument("--pictures", type=Path,
-                        help="the PC version's pictures, as PNGs by tag path: only where each is, to place its placeholder")
+    parser.add_argument(
+        "--pictures",
+        type=Path,
+        help="the PC version's pictures, as PNGs by tag path: only where each is, to place its placeholder",
+    )
     arguments = parser.parse_args()
     tags = Tags(arguments.tags, arguments.definitions)
     # (the names of the Xbox's own as the game has them, which the tags' own
     # names give a little differently: "create&edit", "NULL")
     functions = tags.options("UIEventHandlerReferenceFunction")
     inputs = tags.options("UIGameDataInputReferenceFunction")
-    functions[:102] = engine_names(ROOT / "source/interface/ui_widget_event_handler_functions.c",
-                                   '\t{\n\t\t"NULL",', 102)
+    functions[:102] = engine_names(
+        ROOT / "source/interface/ui_widget_event_handler_functions.c", '\t{\n\t\t"NULL",', 102
+    )
     inputs[:41] = engine_names(ROOT / "port/linux/game/menu_tags.c", "game_data_input_names[] =", 41)
     for folder in (CE, SVG_COPIES, MENUS / "port_svg"):
         if folder.exists():
@@ -589,8 +747,9 @@ def main() -> None:
         for kind in ("header", "footer"):
             if widget[f"list {kind} bitmap"]:
                 top, left, bottom, right = widget[f"{kind} bounds"]
-                shown[widget[f"list {kind} bitmap"]].append((right - left, bottom - top) if any(widget[f"{kind} bounds"])
-                                                            else size)
+                shown[widget[f"list {kind} bitmap"]].append(
+                    (right - left, bottom - top) if any(widget[f"{kind} bounds"]) else size
+                )
     art = Art(tags, arguments.redraws, arguments.placeholder, shown, arguments.pictures)
     fonts = Counter()
     # the widgets, a file for each folder of their tags
@@ -608,8 +767,10 @@ def main() -> None:
             if widget[key] and widget[key] not in XBOX_BITMAPS:
                 bitmaps.add(widget[key])
     for folder, members in sorted(folders.items()):
-        lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-                 f"<!-- The PC version's menus: ui\\shell\\{folder.replace('/', chr(92))} (tools/ce_menus.py) -->"]
+        lines = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            f"<!-- The PC version's menus: ui\\shell\\{folder.replace('/', chr(92))} (tools/ce_menus.py) -->",
+        ]
         lines.append("<menus>" if MAIN_MENU not in members else f"<menus{attributes([('root', our_name(MAIN_MENU))])}>")
         for tag in members:
             lines += widget_xml(tag, widgets[tag], tags, functions, inputs, fonts, {})
@@ -618,8 +779,11 @@ def main() -> None:
     for name, lines in [*port_settings.settings_files().items(), *port_settings.multiplayer_files().items()]:
         (CE / name).write_text("\n".join(lines))
     # their strings
-    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-             "<!-- The PC version's menus' text (tools/ce_menus.py) -->", "<menus>"]
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        "<!-- The PC version's menus' text (tools/ce_menus.py) -->",
+        "<menus>",
+    ]
     for tag in sorted(string_lists):
         strings = [text_value(item["string"]) for item in tags.load(tag, "unicode_string_list")["strings"]]
         strings = port_settings.STRING_OVERRIDES.get(our_name(tag), strings)
@@ -631,28 +795,46 @@ def main() -> None:
     lines.append("</menus>")
     (CE / "strings.xml").write_text("\n".join(lines) + "\n")
     # their bitmaps
-    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-             "<!-- The PC version's menus' bitmaps, drawn from the redraws, else the PC version's own pictures"
-             " (NON_HANDDRAWN.md; tools/ce_menus.py) -->", "<menus>"]
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        "<!-- The PC version's menus' bitmaps, drawn from the redraws, else the PC version's own pictures"
+        " (NON_HANDDRAWN.md; tools/ce_menus.py) -->",
+        "<menus>",
+    ]
     lines += [art.bitmap(tag) for tag in sorted(bitmaps)]
     lines += [art.title(name, text) for name, text in sorted(port_settings.TITLES.items())]
     lines += pause_art(art)
     # (voice chat's speaker, of a player who talks and of one muted: Lucide's
     # icons, port/assets/icons/lucide, white for network_voice.c to tint)
-    lines.append(art.port_picture("voice/speaker", [
-        ((ROOT / "port/assets/icons/lucide" / f"{icon}.svg").read_text().replace('stroke="currentColor"',
-                                                                                 'stroke="#FFFFFF"'), 24, 24)
-        for icon in ("volume-2", "volume-x")]))
+    lines.append(
+        art.port_picture(
+            "voice/speaker",
+            [
+                (
+                    (ROOT / "port/assets/icons/lucide" / f"{icon}.svg")
+                    .read_text()
+                    .replace('stroke="currentColor"', 'stroke="#FFFFFF"'),
+                    24,
+                    24,
+                )
+                for icon in ("volume-2", "volume-x")
+            ],
+        )
+    )
     # (the main menu's MODS, in the redraws' own letters, and the mods'
     # status icons: Lucide's, port/assets/icons/lucide)
     lines.append(art.port_picture("main_menu/menu_mods", port_settings.menu_item_frames("MODS", art.redraws)))
     lines.append(art.port_picture("mods/status", port_settings.mod_status_frames(ROOT / "port/assets/icons/lucide")))
-    lines.append(art.port_picture("mods/status_small",
-                                  port_settings.mod_status_frames(ROOT / "port/assets/icons/lucide", 16)))
+    lines.append(
+        art.port_picture("mods/status_small", port_settings.mod_status_frames(ROOT / "port/assets/icons/lucide", 16))
+    )
     # (nothing: what a game map draws for a frame of ui.map's it has not,
     # menu_tags.c)
-    lines.append(art.port_picture("blank", [
-        ('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4" viewBox="0 0 4 4"/>\n', 4, 4)]))
+    lines.append(
+        art.port_picture(
+            "blank", [('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4" viewBox="0 0 4 4"/>\n', 4, 4)]
+        )
+    )
     lines.append("</menus>")
     (CE / "bitmaps.xml").write_text("\n".join(lines) + "\n")
     # what is not hand-drawn
@@ -700,19 +882,28 @@ def main() -> None:
         "| --- | --- | --- |",
     ]
     report += [f"| `{png}` | {w}x{h} | `{source}` |" for png, w, h, source in sorted(art.pictures)]
-    report += ["", f"{len(art.pictures)} of {len(art.pngs)} frames are placeholders.",
-               "", "The PC version's `ui\\gamespy` and `ui\\ticker` fonts are drawn with `ui\\small_ui`, which",
-               "the Xbox's map has.", ""]
+    report += [
+        "",
+        f"{len(art.pictures)} of {len(art.pngs)} frames are placeholders.",
+        "",
+        "The PC version's `ui\\gamespy` and `ui\\ticker` fonts are drawn with `ui\\small_ui`, which",
+        "the Xbox's map has.",
+        "",
+    ]
     (MENUS / "NON_HANDDRAWN.md").write_text("\n".join(report))
     # what is not wired
     used = Counter()
     for path in CE.glob("*.xml"):
         import re
+
         for name in re.findall(r'(?:run|input)="([^"]*)"', path.read_text()):
             used[name] += 1
     pc_functions = set(functions[102:]) | set(inputs[41:])
-    unwired = sorted((name[8:] if name.startswith("unwired ") else name, count) for name, count in used.items()
-                     if name.startswith("unwired ") or (name in pc_functions and name not in WIRED))
+    unwired = sorted(
+        (name[8:] if name.startswith("unwired ") else name, count)
+        for name, count in used.items()
+        if name.startswith("unwired ") or (name in pc_functions and name not in WIRED)
+    )
     report = [
         "# Menu functions that are not wired yet",
         "",
@@ -727,19 +918,29 @@ def main() -> None:
         "| Function | Uses | |",
         "| --- | --- | --- |",
     ]
-    report += [f"| `{name}` | {count} | {'Xbox function, PC widgets' if name in INCOMPATIBLE else 'PC function'} |"
-               for name, count in unwired]
+    report += [
+        f"| `{name}` | {count} | {'Xbox function, PC widgets' if name in INCOMPATIBLE else 'PC function'} |"
+        for name, count in unwired
+    ]
     report += ["", "Wired: " + ", ".join(f"`{name}`" for name in sorted(WIRED)) + ".", ""]
     (MENUS / "UNWIRED.md").write_text("\n".join(report))
     files = sorted(path.relative_to(MENUS).as_posix() for path in MENUS.rglob("*.xml"))
     files += sorted(art.pngs)
-    (MENUS / "menus.json").write_text(json.dumps({
-        "comment": "The menus' files the game embeds (tools/ce_menus.py, tools/embed_assets.py).",
-        "files": files,
-    }, indent=1) + "\n")
+    (MENUS / "menus.json").write_text(
+        json.dumps(
+            {
+                "comment": "The menus' files the game embeds (tools/ce_menus.py, tools/embed_assets.py).",
+                "files": files,
+            },
+            indent=1,
+        )
+        + "\n"
+    )
     size = sum((MENUS / name).stat().st_size for name in files)
-    print(f"{len(widgets)} widgets in {len(folders)} files, {len(string_lists)} string lists, {len(bitmaps)} bitmaps "
-          f"({len(art.pngs)} frames, {len(art.pictures)} not redrawn); {size // 1024} KB; fonts {dict(fonts)}")
+    print(
+        f"{len(widgets)} widgets in {len(folders)} files, {len(string_lists)} string lists, {len(bitmaps)} bitmaps "
+        f"({len(art.pngs)} frames, {len(art.pictures)} not redrawn); {size // 1024} KB; fonts {dict(fonts)}"
+    )
 
 
 if __name__ == "__main__":

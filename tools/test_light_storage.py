@@ -37,9 +37,8 @@ def run(cc):
     common = (ROOT / "port/linux/src/halo_linker_common.c").read_text()
     lights = (ROOT / "source/objects/object_lights.c").read_text()
     partitions = (ROOT / "source/structures/cluster_partitions.c").read_text()
-    macro = common[common.index("#define HALO_COMMON"):common.index("HALO_COMMON(ai_globals")]
-    fallbacks = "\n".join(re.findall(
-        r"^HALO_COMMON\((?:light_cluster_partition|light_data),[^\n]+", common, re.M))
+    macro = common[common.index("#define HALO_COMMON") : common.index("HALO_COMMON(ai_globals")]
+    fallbacks = "\n".join(re.findall(r"^HALO_COMMON\((?:light_cluster_partition|light_data),[^\n]+", common, re.M))
     header = (ROOT / "source/structures/cluster_partitions.h").as_posix()
     prefix = f'''
 /* Suppress header dependencies unrelated to the partition's layout. */
@@ -88,7 +87,9 @@ void initialize_partition(void) {
     cluster_partition_port_forget(&light_cluster_partition);
 }
 '''
-    caller = prefix + r'''
+    caller = (
+        prefix
+        + r'''
 extern struct cluster_partition light_cluster_partition;
 extern struct data_array *light_data;
 void initialize_partition(void);
@@ -110,19 +111,24 @@ __attribute__((noinline,optnone)) static int check(void) {
     return 0;
 }
 '''
-    caller += 'int mainCRTStartup(void) { return check(); }\n' if windows else r'''
+    )
+    caller += (
+        'int mainCRTStartup(void) { return check(); }\n'
+        if windows
+        else r'''
 void _start(void) {
     int result = check();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(result) : "memory");
     __builtin_unreachable();
 }
 '''
+    )
     with tempfile.TemporaryDirectory(prefix='halo-light-storage-') as directory:
         work = Path(directory)
         (work / 'owner.c').write_text(owner)
         (work / 'caller.c').write_text(caller)
         for lto in (False, True):
-            for legacy in ((False, True) if windows and lto else (False,)):
+            for legacy in (False, True) if windows and lto else (False,):
                 fallback = fallbacks
                 if legacy:
                     fallback = re.sub(r'^HALO_COMMON\(light_cluster_partition,[^\n]+\n?', '', fallback, flags=re.M)
@@ -130,10 +136,24 @@ void _start(void) {
                 (work / 'fallback.c').write_text(macro + fallback + '\n')
                 executable = work / ('probe.exe' if windows else 'probe')
                 abi = ['--target=i686-pc-windows-msvc'] if windows else ['-m32']
-                link = ['-Wl,/entry:mainCRTStartup', '-Wl,/subsystem:console'] if windows else [
-                    '-Wl,-e,_start', '-Wl,--export-dynamic', '-no-pie', '-static']
-                command = [cc, *abi, '-std=gnu99', '-O2', '-fcommon', '-ffreestanding',
-                           '-fno-builtin', '-nostdlib', '-fuse-ld=lld', '-I' + str(ROOT / 'source'), *link]
+                link = (
+                    ['-Wl,/entry:mainCRTStartup', '-Wl,/subsystem:console']
+                    if windows
+                    else ['-Wl,-e,_start', '-Wl,--export-dynamic', '-no-pie', '-static']
+                )
+                command = [
+                    cc,
+                    *abi,
+                    '-std=gnu99',
+                    '-O2',
+                    '-fcommon',
+                    '-ffreestanding',
+                    '-fno-builtin',
+                    '-nostdlib',
+                    '-fuse-ld=lld',
+                    '-I' + str(ROOT / 'source'),
+                    *link,
+                ]
                 if lto:
                     command.append('-flto=full')
                 command += [str(work / name) for name in ('owner.c', 'caller.c', 'fallback.c')]
@@ -142,8 +162,10 @@ void _start(void) {
                 result = subprocess.run([str(executable)], timeout=10)
                 expected = 71 if legacy else 0
                 assert result.returncode == expected, (command, result.returncode, expected)
-                print(f'PASS: {"COFF" if windows else "ELF"} {"full LTO" if lto else "ordinary"}: '
-                      f'{"legacy pointer corruption detected" if legacy else "light data and native caches preserved"}')
+                print(
+                    f'PASS: {"COFF" if windows else "ELF"} {"full LTO" if lto else "ordinary"}: '
+                    f'{"legacy pointer corruption detected" if legacy else "light data and native caches preserved"}'
+                )
 
 
 if __name__ == '__main__':

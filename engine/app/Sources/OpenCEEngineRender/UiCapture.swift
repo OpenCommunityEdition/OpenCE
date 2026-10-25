@@ -43,13 +43,16 @@ public enum UiPalette {
                 total += 1
             }
         }
-        return buckets.sorted { $0.value.texels != $1.value.texels ? $0.value.texels > $1.value.texels : $0.key < $1.key }
-            .prefix(max(count, 0))
-            .map { _, bucket in
-                let mean = bucket.sum / bucket.texels
-                return Swatch(red: UInt8(mean.x), green: UInt8(mean.y), blue: UInt8(mean.z),
-                              share: Double(bucket.texels) / Double(total))
-            }
+        return buckets.sorted {
+            $0.value.texels != $1.value.texels ? $0.value.texels > $1.value.texels : $0.key < $1.key
+        }
+        .prefix(max(count, 0))
+        .map { _, bucket in
+            let mean = bucket.sum / bucket.texels
+            return Swatch(
+                red: UInt8(mean.x), green: UInt8(mean.y), blue: UInt8(mean.z),
+                share: Double(bucket.texels) / Double(total))
+        }
     }
 }
 
@@ -157,21 +160,24 @@ public final class UiCapture {
     @discardableResult
     public func capture(geometry: LevelGeometry, widget: String, into folder: URL) throws -> Report {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let renderer = try LevelRenderer(device: device, geometry: geometry,
-                                         settings: VideoSettings(antiAliasing: .native, renderScale: 1))
+        let renderer = try LevelRenderer(
+            device: device, geometry: geometry,
+            settings: VideoSettings(antiAliasing: .native, renderScale: 1))
         let atlas = Menu(geometry: geometry).glyphAtlas()
         renderer.ui = try UiPass(device: device, atlas: atlas, outputFormat: .bgra8Unorm)
         let start = geometry.startView()
-        let camera = ViewCamera(position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
-                                verticalFov: 70 * .pi / 180)
+        let camera = ViewCamera(
+            position: [start.x, start.y, start.z], yaw: start.yaw, pitch: start.pitch,
+            verticalFov: 70 * .pi / 180)
         let scene = try renderer.capture(width: width, height: height, camera: camera, queue: queue)
         var files = [String]()
         var frames = [(drawn: CapturedFrame, scene: CapturedFrame?)]()
         for (screen, steps) in walk(geometry, widget: widget) {
             guard let menu = replay(geometry, widget: widget, steps: steps) else { continue }
             let quads = menu.draw(width: UInt32(width), height: UInt32(height))
-            let drawn = try renderer.capture(width: width, height: height, camera: camera, uiQuads: quads,
-                                             queue: queue)
+            let drawn = try renderer.capture(
+                width: width, height: height, camera: camera, uiQuads: quads,
+                queue: queue)
             let name = Self.fileName(screen: screen)
             try drawn.writePNG(to: folder.appendingPathComponent(name))
             files.append(name)

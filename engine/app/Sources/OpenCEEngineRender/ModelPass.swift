@@ -34,10 +34,12 @@ public struct DrawnObject {
     /// multipurpose maps and self-illumination take.
     public var changeColors: [UInt32]
 
-    public init(model: Int, transform: simd_float4x4, center: SIMD3<Float>, radius: Float, regions: [UInt8],
-                nodes: [simd_float4x4], firstPerson: Bool = false,
-                changeColors: [UInt32] = [0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF],
-                id: UInt32 = .max) {
+    public init(
+        model: Int, transform: simd_float4x4, center: SIMD3<Float>, radius: Float, regions: [UInt8],
+        nodes: [simd_float4x4], firstPerson: Bool = false,
+        changeColors: [UInt32] = [0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF, 0xFFFF_FFFF],
+        id: UInt32 = .max
+    ) {
         self.id = id
         self.firstPerson = firstPerson
         self.changeColors = changeColors
@@ -51,10 +53,15 @@ public struct DrawnObject {
 
     /// The game's matrix (a point `p` is `scale * (p.x * forward + p.y *
     /// left + p.z * up) + position`) as a 4x4 one.
-    public static func matrix(forward: SIMD3<Float>, left: SIMD3<Float>, up: SIMD3<Float>,
-                              position: SIMD3<Float>, scale: Float) -> simd_float4x4 {
-        simd_float4x4(columns: (SIMD4(forward * scale, 0), SIMD4(left * scale, 0), SIMD4(up * scale, 0),
-                                SIMD4(position, 1)))
+    public static func matrix(
+        forward: SIMD3<Float>, left: SIMD3<Float>, up: SIMD3<Float>,
+        position: SIMD3<Float>, scale: Float
+    ) -> simd_float4x4 {
+        simd_float4x4(
+            columns: (
+                SIMD4(forward * scale, 0), SIMD4(left * scale, 0), SIMD4(up * scale, 0),
+                SIMD4(position, 1)
+            ))
     }
 
     /// Its change colours as the model fragment shader's four colours
@@ -124,10 +131,13 @@ final class ModelPass {
     /// The first-person parts drawn in the last frame, for tests.
     private(set) var lastFirstPersonPartCount = 0
 
-    init(device: MTLDevice, library: MTLLibrary, geometry: LevelGeometry, textures: [MTLTexture?],
-         white: MTLTexture, whiteCube: MTLTexture) throws {
+    init(
+        device: MTLDevice, library: MTLLibrary, geometry: LevelGeometry, textures: [MTLTexture?],
+        white: MTLTexture, whiteCube: MTLTexture
+    ) throws {
         guard let vertices = LevelRenderer.buffer(device, geometry.modelVertices()),
-              let indices = LevelRenderer.buffer(device, geometry.modelIndices()) else {
+            let indices = LevelRenderer.buffer(device, geometry.modelIndices())
+        else {
             throw LevelRendererError.resources("model buffers")
         }
         self.vertices = vertices
@@ -151,7 +161,8 @@ final class ModelPass {
                 var draws: [Draw] = []
                 for part in made.parts {
                     guard Int(part.material) < materials.count,
-                          Int(part.firstIndex) + Int(part.indexCount) <= indexCount else { continue }
+                        Int(part.firstIndex) + Int(part.indexCount) <= indexCount
+                    else { continue }
                     let material = materials[Int(part.material)]
                     let maps = [texture(material.baseMap), texture(material.primaryDetailMap)]
                     var bits: UInt32 = 0
@@ -167,19 +178,24 @@ final class ModelPass {
                         alphaTested: material.kind == .alphaTested ? 1 : 0,
                         fogMode: FrameUniforms.fogMode(material.kind == .blended ? material.blend : nil))
                     let bound: [MTLTexture]
-                    if let transparent = uniforms.transparent(material, texture: texture, cube: cube, white: white,
-                                                              whiteCube: whiteCube) {
+                    if let transparent = uniforms.transparent(
+                        material, texture: texture, cube: cube, white: white,
+                        whiteCube: whiteCube)
+                    {
                         bound = transparent.maps + [transparent.cube]
                     } else {
                         let chicagoTextures = uniforms.chicago(material, texture: texture, white: white)
-                        let shaded = uniforms.model(material, texture: texture, cube: cube, white: white,
-                                                    whiteCube: whiteCube)
+                        let shaded = uniforms.model(
+                            material, texture: texture, cube: cube, white: white,
+                            whiteCube: whiteCube)
                         bound = (chicagoTextures ?? maps.map { $0 ?? white } + shaded.maps) + [shaded.cube]
                     }
-                    draws.append(Draw(firstIndex: Int(part.firstIndex), indexCount: Int(part.indexCount),
-                                      blended: material.kind == .blended, blend: material.blend,
-                                      plain: material.kind == .plain, material: Int(part.material),
-                                      uniforms: uniforms, textures: bound))
+                    draws.append(
+                        Draw(
+                            firstIndex: Int(part.firstIndex), indexCount: Int(part.indexCount),
+                            blended: material.kind == .blended, blend: material.blend,
+                            plain: material.kind == .plain, material: Int(part.material),
+                            uniforms: uniforms, textures: bound))
                 }
                 geometries.append(draws)
             }
@@ -193,11 +209,15 @@ final class ModelPass {
                 }
             }
             let inverses = stride(from: 0, to: model.defaultInverses.count - 12, by: 13).map { at in
-                let value = { (index: Int) in SIMD3(model.defaultInverses[at + index],
-                                                    model.defaultInverses[at + index + 1],
-                                                    model.defaultInverses[at + index + 2]) }
-                return DrawnObject.matrix(forward: value(1), left: value(4), up: value(7), position: value(10),
-                                          scale: model.defaultInverses[at])
+                let value = { (index: Int) in
+                    SIMD3(
+                        model.defaultInverses[at + index],
+                        model.defaultInverses[at + index + 1],
+                        model.defaultInverses[at + index + 2])
+                }
+                return DrawnObject.matrix(
+                    forward: value(1), left: value(4), up: value(7), position: value(10),
+                    scale: model.defaultInverses[at])
             }
             models.append(Model(cutoffs: model.detailCutoffs, defaultInverses: inverses, regions: regions))
         }
@@ -246,10 +266,11 @@ final class ModelPass {
             return try device.makeRenderPipelineState(descriptor: descriptor)
         }
         do {
-            return Pipelines(opaque: try pipeline(nil),
-                             blended: try LevelRenderer.blendFunctions.map { try pipeline($0) },
-                             skyOpaque: try pipeline(nil, sky: true),
-                             skyBlended: try pipeline(.alphaBlend, sky: true))
+            return Pipelines(
+                opaque: try pipeline(nil),
+                blended: try LevelRenderer.blendFunctions.map { try pipeline($0) },
+                skyOpaque: try pipeline(nil, sky: true),
+                skyBlended: try pipeline(.alphaBlend, sky: true))
         } catch {
             throw LevelRendererError.shaders("\(error)")
         }
@@ -261,8 +282,10 @@ final class ModelPass {
     }
 
     func use(_ pipelines: Pipelines) {
-        (opaque, blended, skyOpaque, skyBlended) = (pipelines.opaque, pipelines.blended, pipelines.skyOpaque,
-                                                    pipelines.skyBlended)
+        (opaque, blended, skyOpaque, skyBlended) = (
+            pipelines.opaque, pipelines.blended, pipelines.skyOpaque,
+            pipelines.skyBlended
+        )
     }
 
     /// A permutation's geometry at `level`, or the nearest below it, or
@@ -275,8 +298,10 @@ final class ModelPass {
 
     static func vertexDescriptor(stride: Int) -> MTLVertexDescriptor {
         let descriptor = MTLVertexDescriptor()
-        let attributes: [(MTLVertexFormat, Int)] = [(.float3, 0), (.float3, 12), (.float2, 24), (.ushort2, 32),
-                                                    (.float2, 36)]
+        let attributes: [(MTLVertexFormat, Int)] = [
+            (.float3, 0), (.float3, 12), (.float2, 24), (.ushort2, 32),
+            (.float2, 36),
+        ]
         for (index, (format, offset)) in attributes.enumerated() {
             descriptor.attributes[index].format = format
             descriptor.attributes[index].offset = offset
@@ -325,8 +350,10 @@ final class ModelPass {
     /// The highest level of detail, which the sky is always drawn at.
     static let highestLevel = 4
 
-    func prepare(_ objects: [DrawnObject], sky: DrawnObject? = nil, camera: ViewCamera, viewportHeight: Int,
-                 device: MTLDevice) -> Prepared {
+    func prepare(
+        _ objects: [DrawnObject], sky: DrawnObject? = nil, camera: ViewCamera, viewportHeight: Int,
+        device: MTLDevice
+    ) -> Prepared {
         let forward = camera.rotation.act([1, 0, 0])
         var matrices: [simd_float4x4] = []
         var drawn: [Prepared.Object] = []
@@ -350,9 +377,10 @@ final class ModelPass {
                         continue
                     }
                 }
-                let pixels = sphereDiameterPixels(depth: depth, radius: object.radius,
-                                                  verticalFov: camera.verticalFov,
-                                                  viewportHeight: Float(viewportHeight))
+                let pixels = sphereDiameterPixels(
+                    depth: depth, radius: object.radius,
+                    verticalFov: camera.verticalFov,
+                    viewportHeight: Float(viewportHeight))
                 guard let chosen = modelLevelOfDetail(detailCutoffs: model.cutoffs, pixels: pixels) else { continue }
                 level = Int(chosen)
             }
@@ -374,8 +402,9 @@ final class ModelPass {
                     matrices.append(object.transform)
                 }
             }
-            let uniforms = ModelObjectUniforms(firstNode: UInt32(first), nodeCount: UInt32(nodeCount),
-                                               reflectionProbe: isSky ? -1 : nearestReflection(object.center))
+            let uniforms = ModelObjectUniforms(
+                firstNode: UInt32(first), nodeCount: UInt32(nodeCount),
+                reflectionProbe: isSky ? -1 : nearestReflection(object.center))
             let colors = object.changeColorUniforms
             if isSky {
                 skyDrawn = (uniforms, parts, colors)
@@ -403,8 +432,9 @@ final class ModelPass {
         lastPartCount = drawn.reduce(0) { $0 + $1.parts.count }
         lastSkyPartCount = skyDrawn?.parts.count ?? 0
         lastFirstPersonPartCount = firstPerson.reduce(0) { $0 + $1.parts.count }
-        return Prepared(skins: skins[frame], objects: drawn, ids: ids, sky: skyDrawn, firstPerson: firstPerson,
-                        shadowCasters: shadowCasters)
+        return Prepared(
+            skins: skins[frame], objects: drawn, ids: ids, sky: skyDrawn, firstPerson: firstPerson,
+            shadowCasters: shadowCasters)
     }
 
     /// The prepared sky, its opaque parts then its blended ones, behind
@@ -430,14 +460,17 @@ final class ModelPass {
         material.animate(animation, material: part.material)
         encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
         encoder.setFragmentTextures(part.textures, range: 0..<part.textures.count)
-        encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
-                                      indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
+        encoder.drawIndexedPrimitives(
+            type: .triangle, indexCount: part.indexCount, indexType: .uint32,
+            indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
     }
 
     /// The prepared objects' opaque and alpha-tested parts (those in view
     /// and those behind it), as the sun's shadows' casters.
-    func encodeShadowCasters(_ prepared: Prepared, _ casting: ShadowPass.Casting,
-                             into encoder: MTLRenderCommandEncoder) {
+    func encodeShadowCasters(
+        _ prepared: Prepared, _ casting: ShadowPass.Casting,
+        into encoder: MTLRenderCommandEncoder
+    ) {
         guard let skins = prepared.skins else { return }
         encoder.setVertexBuffer(vertices, offset: 0, index: 0)
         encoder.setVertexBuffer(skins, offset: 0, index: 2)
@@ -457,8 +490,9 @@ final class ModelPass {
                     encoder.setFragmentBytes(&material, length: MemoryLayout<MaterialUniforms>.stride, index: 0)
                     encoder.setFragmentTexture(part.textures.first, index: 0)
                 }
-                encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
-                                              indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
+                encoder.drawIndexedPrimitives(
+                    type: .triangle, indexCount: part.indexCount, indexType: .uint32,
+                    indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
             }
         }
     }
@@ -475,8 +509,9 @@ final class ModelPass {
             encoder.setVertexBytes(&object, length: MemoryLayout<ModelObjectUniforms>.stride, index: 3)
             encoder.setFragmentBytes(&picked, length: MemoryLayout<UInt32>.stride, index: 1)
             for part in parts where !part.blended && !part.plain {
-                encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: .uint32,
-                                              indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
+                encoder.drawIndexedPrimitives(
+                    type: .triangle, indexCount: part.indexCount, indexType: .uint32,
+                    indexBuffer: indices, indexBufferOffset: part.firstIndex * 4)
             }
         }
     }
@@ -484,8 +519,10 @@ final class ModelPass {
     /// The prepared objects' opaque and alpha-tested parts, or their
     /// blended ones (or the first-person objects'), their materials
     /// animated by `animation` (the level's for every material).
-    func encode(_ prepared: Prepared, blendedParts: Bool, firstPerson: Bool = false, animation: [Float] = [],
-                into encoder: MTLRenderCommandEncoder) {
+    func encode(
+        _ prepared: Prepared, blendedParts: Bool, firstPerson: Bool = false, animation: [Float] = [],
+        into encoder: MTLRenderCommandEncoder
+    ) {
         let objects = firstPerson ? prepared.firstPerson : prepared.objects
         guard let skins = prepared.skins, !objects.isEmpty else { return }
         var pipeline = blendedParts ? nil : opaque

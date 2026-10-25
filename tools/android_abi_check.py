@@ -26,10 +26,12 @@ ATTRIBUTES = re.compile(
     r"\b(noundef|signext|zeroext|nocapture|readonly|writeonly|nonnull|"
     r"dereferenceable(_or_null)?\(\d+\)|align \d+|noalias|returned|nofree|inreg|"
     r"byval\([^)]*\)|sret\([^)]*\)|captures\([^)]*\)|initializes\([^)]*\)|"
-    r"range\([^)]*\)|nofpclass\([^)]*\)|dead_on_unwind|writable)\b")
+    r"range\([^)]*\)|nofpclass\([^)]*\)|dead_on_unwind|writable)\b"
+)
 LINKAGE = re.compile(
     r"\b(dso_local|internal|private|weak|linkonce_odr|hidden|available_externally|"
-    r"extern_weak|protected|local_unnamed_addr|unnamed_addr|common)\b")
+    r"extern_weak|protected|local_unnamed_addr|unnamed_addr|common)\b"
+)
 FUNCTION = re.compile(r"^(declare|define)\s+(.*?)@(\"?[\w.$]+\"?)\((.*)\)(.*)$")
 
 
@@ -111,9 +113,12 @@ def main():
                 shared = min(len(declared_parameters), len(defined_parameters))
                 risky = any(
                     (a in floats or b in floats) and a != b
-                    for a, b in zip(declared_parameters[:shared], defined_parameters[:shared]))
-                risky |= (declared_return in ("f", "d")) != (defined_return in ("f", "d")) and \
-                    "v" not in (declared_return, defined_return)
+                    for a, b in zip(declared_parameters[:shared], defined_parameters[:shared])
+                )
+                risky |= (declared_return in ("f", "d")) != (defined_return in ("f", "d")) and "v" not in (
+                    declared_return,
+                    defined_return,
+                )
             if risky:
                 dangerous += 1
             if risky or show_all:

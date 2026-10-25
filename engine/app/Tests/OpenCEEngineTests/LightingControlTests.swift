@@ -12,8 +12,10 @@ final class LightingControlTests: XCTestCase {
     /// The frame of a new renderer (a frame drawn after another carries its
     /// history), lit by `bake` if one is given, with `change` made to the
     /// stock controls.
-    func capture(_ level: StockLevel, bake: BakedLight? = nil,
-                 _ change: (inout LightingTuning) -> Void = { _ in }) throws -> CapturedFrame {
+    func capture(
+        _ level: StockLevel, bake: BakedLight? = nil,
+        _ change: (inout LightingTuning) -> Void = { _ in }
+    ) throws -> CapturedFrame {
         let renderer = try level.renderer(VideoSettings(antiAliasing: .native, renderScale: 1))
         if let bake {
             try renderer.useBakedLighting(bake)
@@ -21,8 +23,9 @@ final class LightingControlTests: XCTestCase {
         var tuning = LightingTuning()
         change(&tuning)
         renderer.tuning = tuning
-        return try renderer.capture(width: 480, height: 270, camera: level.camera, objects: level.objects,
-                                    queue: level.queue)
+        return try renderer.capture(
+            width: 480, height: 270, camera: level.camera, objects: level.objects,
+            queue: level.queue)
     }
 
     /// A bake lit evenly, as the sun's shadows split it.
@@ -32,10 +35,11 @@ final class LightingControlTests: XCTestCase {
             let floats = [Float](repeating: value, count: points.count / 32 * 4)
             return floats.withUnsafeBytes { Data($0) }
         }
-        return plan.finish(irradiance: even(plan.lightmapPointBytes(), 2),
-                           directions: even(plan.lightmapPointBytes(), 0),
-                           probes: even(plan.probePointBytes(), 0.5),
-                           radiance: even(plan.reflectionPointBytes(), 0))
+        return plan.finish(
+            irradiance: even(plan.lightmapPointBytes(), 2),
+            directions: even(plan.lightmapPointBytes(), 0),
+            probes: even(plan.probePointBytes(), 0.5),
+            radiance: even(plan.reflectionPointBytes(), 0))
     }
 
     func testEachControlMovesTheFrameItsWay() throws {
@@ -58,8 +62,9 @@ final class LightingControlTests: XCTestCase {
         try darker("no bloom", by: 0.02) { $0.bloom = 0 }
         try brighter("no occlusion", by: 0.001) { $0.ambientOcclusion = 0 }
         try darker("more occlusion", by: 0.001) { $0.ambientOcclusion = 2 }
-        XCTAssertLessThan(try capture(level) { $0.emissive = 0 }.meanBrightness, stock + 1e-9,
-                          "without their own light no surface is brighter")
+        XCTAssertLessThan(
+            try capture(level) { $0.emissive = 0 }.meanBrightness, stock + 1e-9,
+            "without their own light no surface is brighter")
         XCTAssertLessThan(try capture(level) { $0.probes = 0 }.meanBrightness, stock, "the objects unlit")
         let curved = try capture(level) { $0.toneCurve = 2 }
         XCTAssertGreaterThan(try XCTUnwrap(curved.difference(from: frame)).share, 0.01, "the tone curve")
@@ -69,8 +74,9 @@ final class LightingControlTests: XCTestCase {
         // it, less red for less red in it)
         let bake = try evenBake(level)
         let baked = try capture(level, bake: bake)
-        XCTAssertGreaterThan(try capture(level, bake: bake) { $0.sun = 2 }.meanBrightness,
-                             baked.meanBrightness + 0.5, "more sun")
+        XCTAssertGreaterThan(
+            try capture(level, bake: bake) { $0.sun = 2 }.meanBrightness,
+            baked.meanBrightness + 0.5, "more sun")
         let blue = try capture(level, bake: bake) { $0.sunColor = SIMD3(0, 1, 1) }
         XCTAssertLessThan(blue.channelMean(0), baked.channelMean(0) - 0.5, "no red in the sun")
         XCTAssertGreaterThan(blue.channelMean(2), baked.channelMean(2) - 0.1, "its blue kept")
@@ -93,7 +99,10 @@ final class LightingControlTests: XCTestCase {
         let reset = read()
         XCTAssertTrue(reset.isStock)
         XCTAssertEqual(try capture(level) { $0 = reset }.bytes, frame.bytes, "reset: the stock frame")
-        XCTAssertEqual(try capture(level) { $0.exposure = 0; $0.bloom = 1; $0.toneCurve = 1 }.bytes, frame.bytes)
+        XCTAssertEqual(
+            try capture(level) {
+                $0.exposure = 0; $0.bloom = 1; $0.toneCurve = 1
+            }.bytes, frame.bytes)
     }
 }
 

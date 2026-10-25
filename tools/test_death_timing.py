@@ -1,4 +1,5 @@
 """Compile actual death handlers, co-op respawn and camera code against a fake world."""
+
 import argparse
 import os
 import re
@@ -20,7 +21,7 @@ def function(source, name):
     while depth:
         depth += (source[end] == '{') - (source[end] == '}')
         end += 1
-    return source[match.start():end]
+    return source[match.start() : end]
 
 
 PRELUDE = r'''
@@ -223,7 +224,7 @@ int main(void) {
 
 def structure(source, name):
     start = source.index('struct ' + name + '\n{')
-    return source[start:source.index('\n};', start) + 4] + '\n'
+    return source[start : source.index('\n};', start) + 4] + '\n'
 
 
 def main():
@@ -242,8 +243,15 @@ def main():
     unit += '#define players_respawn_coop players_respawn_coop_real\n'
     unit += function(players_source, 'players_respawn_coop')
     unit += '\n#undef players_respawn_coop\nstatic boolean players_respawn_coop(void) {attempts++;return players_respawn_coop_real();}\n'
-    for name in ('main_lost_map', 'main_respawn', 'main_reset_map', 'main_revert_map', 'main_death_timer_expired',
-                 'main_lost_map_private', 'main_respawn_private'):
+    for name in (
+        'main_lost_map',
+        'main_respawn',
+        'main_reset_map',
+        'main_revert_map',
+        'main_death_timer_expired',
+        'main_lost_map_private',
+        'main_respawn_private',
+    ):
         unit += function(main_source, name)
     for name in ('player_has_allies', 'player_get_next_player_with_a_unit', 'dead_camera_update'):
         unit += function(camera_source, name)

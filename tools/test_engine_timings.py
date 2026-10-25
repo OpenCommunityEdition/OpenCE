@@ -13,13 +13,15 @@ import engine_timings  # noqa: E402
 
 
 def artifact(name: str, kind: str, executable: str | None, manifest: str, test: bool = True) -> str:
-    return json.dumps({
-        "reason": "compiler-artifact",
-        "target": {"name": name, "kind": [kind]},
-        "profile": {"test": test},
-        "executable": executable,
-        "manifest_path": manifest,
-    })
+    return json.dumps(
+        {
+            "reason": "compiler-artifact",
+            "target": {"name": name, "kind": [kind]},
+            "profile": {"test": test},
+            "executable": executable,
+            "manifest_path": manifest,
+        }
+    )
 
 
 def test_the_test_binaries_are_read_from_cargos_messages() -> None:

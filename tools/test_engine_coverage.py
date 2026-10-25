@@ -18,21 +18,30 @@ import engine_coverage  # noqa: E402
 
 def report(*files: tuple[str, int, int]) -> dict:
     """A report of llvm-cov's JSON form: (file, lines, covered) each."""
-    return {"data": [{"files": [
-        {"filename": name, "summary": {"lines": {"count": count, "covered": covered}}}
-        for name, count, covered in files
-    ]}]}
+    return {
+        "data": [
+            {
+                "files": [
+                    {"filename": name, "summary": {"lines": {"count": count, "covered": covered}}}
+                    for name, count, covered in files
+                ]
+            }
+        ]
+    }
 
 
 def test_lines_are_counted_by_the_crate_whose_src_holds_them() -> None:
-    coverage = engine_coverage.per_crate(report(
-        (f"{ENGINE}/crates/sim/src/lib.rs", 100, 80),
-        (f"{ENGINE}/crates/sim/src/unit/biped.rs", 50, 10),
-        (f"{ENGINE}/crates/physics/src/lib.rs", 40, 40),
-        # (a test's own lines, and a dependency's, are no crate's)
-        (f"{ENGINE}/crates/sim/tests/player.rs", 70, 70),
-        ("/nix/store/glam/src/vec3.rs", 30, 0),
-    ), ENGINE)
+    coverage = engine_coverage.per_crate(
+        report(
+            (f"{ENGINE}/crates/sim/src/lib.rs", 100, 80),
+            (f"{ENGINE}/crates/sim/src/unit/biped.rs", 50, 10),
+            (f"{ENGINE}/crates/physics/src/lib.rs", 40, 40),
+            # (a test's own lines, and a dependency's, are no crate's)
+            (f"{ENGINE}/crates/sim/tests/player.rs", 70, 70),
+            ("/nix/store/glam/src/vec3.rs", 30, 0),
+        ),
+        ENGINE,
+    )
     assert coverage == {"sim": (90, 150), "physics": (40, 40)}
 
 
