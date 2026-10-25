@@ -10,6 +10,8 @@ thiserror.workspace = true
 rkyv.workspace = true
 libm.workspace = true
 rustc-hash.workspace = true
+blake3.workspace = true
+lz4_flex.workspace = true
 
 [lints]
 workspace = true

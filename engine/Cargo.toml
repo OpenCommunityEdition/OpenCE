@@ -42,6 +42,9 @@ log = "0.4"
 sha2 = { version = "0.10", default-features = false }
 # (decodes Custom Edition's Ogg Vorbis sounds)
 lewton = { version = "0.10", default-features = false, features = ["ogg"] }
+# (the packs' fingerprints, and their compression)
+blake3 = { version = "1.8", default-features = false, features = ["std"] }
+lz4_flex = { version = "0.11", default-features = false, features = ["std", "safe-encode", "safe-decode"] }
 # (inflates the Xbox caches)
 miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
 

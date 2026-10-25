@@ -223,9 +223,10 @@ fn mutated_packs_are_read_or_refused() {
         let mut mutated = packed.clone();
         mutate(random, &mut mutated, 0);
         // a pack whose fingerprint is mended, so that bytecheck is reached
-        if random.below(2) == 0 && mutated.len() >= 0x28 {
-            let archive = pack::fingerprint(&mutated[0x28..]);
-            let length = (mutated.len() - 0x28) as u64;
+        let header = pack::HEADER_SIZE;
+        if random.below(2) == 0 && mutated.len() >= header {
+            let archive = pack::fingerprint(&mutated[header..]);
+            let length = (mutated.len() - header) as u64;
             mutated[0x18..0x20].copy_from_slice(&length.to_le_bytes());
             mutated[0x20..0x28].copy_from_slice(&archive.to_le_bytes());
         }

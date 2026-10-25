@@ -219,6 +219,28 @@ mod tests {
     }
 
     #[test]
+    fn a_changed_map_leaves_the_other_maps_packs_alone() {
+        let folder = folder("others");
+        let cache = folder.join("cache");
+        let one = folder.join("one.map");
+        let other = folder.join("other.map");
+        let _ = fs::write(&one, level(CacheKind::Xbox, &Breaks::default()).build());
+        let _ = fs::write(
+            &other,
+            level(CacheKind::CustomEdition, &Breaks::default()).build(),
+        );
+        load(&one, &cache, 1);
+        let kept = load(&other, &cache, 1).pack.ok();
+        let mut file = fs::read(&one).unwrap_or_default();
+        file.push(0);
+        let _ = fs::write(&one, file);
+        assert_eq!(load(&one, &cache, 1).from, LoadedFrom::Map);
+        let again = load(&other, &cache, 1);
+        assert_eq!(again.from, LoadedFrom::Pack);
+        assert_eq!(again.pack.ok(), kept);
+    }
+
+    #[test]
     fn a_missing_or_broken_map_is_an_error() {
         let folder = folder("missing");
         let missing = load_level_with(&folder.join("none.map"), &folder, 1);

@@ -438,3 +438,50 @@ goes on the fidelity bugs list.
 | sim | not run: `include_str!` outside the workspace |
 | `cargo clippy --workspace --all-targets -D warnings` | clean |
 | `tools/engine_build.py --test --suite rust` | 1103 passed, 3 skipped |
+
+## blake3 and lz4 for the packs (2026-10-25)
+
+A level's pack is the rkyv archive of its imported level, keyed by the
+map's fingerprint. Two things change:
+- The fingerprint is now the first eight bytes of blake3, in place of
+  SHA-256's. It is used both for the map, as the cache key, and for the
+  archive, as its check.
+- The archive is compressed with lz4_flex, in its safe encoder and
+  decoder. The header grows from 0x28 to 0x30 bytes to hold the
+  unpacked length, and a pack whose archive does not decompress to that
+  length is refused before rkyv's bytecheck runs.
+
+`FORMAT_VERSION` goes from 50 to 51, so every existing pack is imported
+again once. The bake key includes the version, so the bakes are redone
+too.
+
+`tests/load_timing.rs` (in import) times each step over the user's maps,
+in the `test-opt` profile. The table has the numbers measured before the
+change, then after it. They were measured again on a quiet machine before
+this commit:
+
+| map | | fingerprint | pack | check and unpack | load from the pack |
+|---|---|---|---|---|---|
+| bloodgulch (22.6 MB) | before | 36.2 ms | 49.4 MB | 280.8 ms | 361.3 ms |
+| | after | 12.7 ms | 28.3 MB | 40.5 ms | 59.2 ms |
+| a10 (173.9 MB) | before | 577 ms | 333.4 MB | 1220.7 ms | 1687.8 ms |
+| | after | 97.0 ms | 225.3 MB | 267.1 ms | 397.8 ms |
+
+Loading from a pack is now 6.1 times as fast on bloodgulch and 4.2 times
+on a10, and the packs are 43% and 32% smaller.
+
+The tests:
+- the fingerprint is blake3's first eight bytes;
+- a pack is its archive compressed;
+- an archive that decompresses to the wrong length is refused;
+- a changed map is imported again and leaves the other maps' packs alone;
+- the pack fuzz smoke test now mends the fingerprint behind the new
+  header.
+
+| check | result |
+|---|---|
+| `content::pack` tests | pass |
+| `import::level_cache` `a_changed_map_leaves_the_other_maps_packs_alone` | pass |
+| `import::fuzz_smoke` `mutated_packs_are_read_or_refused` | pass |
+| `load_timing`, bloodgulch and a10 | a pack loads as the level imported |
+| `tools/engine_build.py --test --suite rust` | 1103 passed, 3 skipped |

@@ -1,7 +1,8 @@
 //! `.ocpak`: a level in the engine's own format, as the importer writes it
 //! to the cache folder and the engine reads it back.
 //!
-//! A pack is a 40-byte header and then an rkyv archive of the [`Level`]:
+//! A pack is a 48-byte header and then an rkyv archive of the [`Level`],
+//! compressed (LZ4's block format):
 //!
 //! | Offset | Size | Field |
 //! | --- | --- | --- |
@@ -10,12 +11,14 @@
 //! | 0x08 | 4 | the importer's version, which wrote it |
 //! | 0x0C | 4 | zero |
 //! | 0x10 | 8 | the source map's fingerprint ([`fingerprint`]) |
-//! | 0x18 | 8 | the archive's length |
-//! | 0x20 | 8 | the archive's fingerprint |
+//! | 0x18 | 8 | the compressed archive's length |
+//! | 0x20 | 8 | the compressed archive's fingerprint |
+//! | 0x28 | 8 | the archive's length, uncompressed |
 //!
 //! Everything is little-endian. A pack is checked before any of it is
 //! used: its header, its length, its fingerprint (any one byte changed
-//! changes it), and then the archive itself, by bytecheck, so that reading
+//! changes it), its uncompressed length (no longer than [`LONGEST_ARCHIVE`])
+//! and then the archive itself, by bytecheck, so that reading
 //! a damaged or hostile pack is an error, never a crash.
 
 use rkyv::rancor;
@@ -24,10 +27,13 @@ use rkyv::util::AlignedVec;
 use crate::Level;
 
 /// The version of this format; a pack of another is not read.
-pub const FORMAT_VERSION: u32 = 50;
+pub const FORMAT_VERSION: u32 = 51;
 
 const MAGIC: [u8; 4] = *b"OCPK";
-const HEADER_SIZE: usize = 0x28;
+/// The header's size; the compressed archive follows it.
+pub const HEADER_SIZE: usize = 0x30;
+/// The longest archive read (a campaign level's is some 330 MB).
+pub const LONGEST_ARCHIVE: u64 = 1 << 31;
 
 /// What a pack says about where it came from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,32 +64,42 @@ pub enum PackError {
     /// Its archive's fingerprint is not the one its header gives.
     #[error("damaged: its archive's fingerprint is not its header's")]
     Fingerprint,
+    /// Its archive is longer than [`LONGEST_ARCHIVE`].
+    #[error("its archive is {0} bytes, longer than any read")]
+    TooLong(u64),
+    /// Its archive does not decompress to the length its header gives.
+    #[error("its archive does not decompress to {0} bytes")]
+    Compression(u64),
     /// Its archive does not check, or could not be written.
     #[error("its archive: {0}")]
     Archive(String),
 }
 
-/// A fingerprint of some bytes (FNV-1a, 64-bit): changing any one byte
-/// changes it.
+/// A fingerprint of some bytes: the first eight of their BLAKE3 hash,
+/// little-endian. Changing any byte changes it, and it is quick to take
+/// over a whole map (some 3 GB a second, against FNV's 0.3).
 pub fn fingerprint(bytes: &[u8]) -> u64 {
-    bytes.iter().fold(0xCBF2_9CE4_8422_2325, |hash, &byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01B3)
-    })
+    let hash = blake3::hash(bytes);
+    let mut first = [0; 8];
+    first.copy_from_slice(&hash.as_bytes()[..8]);
+    u64::from_le_bytes(first)
 }
 
 /// Writes a level as a pack.
 pub fn write_pack(level: &Level, header: PackHeader) -> Result<Vec<u8>, PackError> {
     let archive = rkyv::to_bytes::<rancor::Error>(level)
         .map_err(|error| PackError::Archive(error.to_string()))?;
-    let mut pack = Vec::with_capacity(HEADER_SIZE + archive.len());
+    let compressed = lz4_flex::block::compress(&archive);
+    let mut pack = Vec::with_capacity(HEADER_SIZE + compressed.len());
     pack.extend_from_slice(&MAGIC);
     pack.extend_from_slice(&FORMAT_VERSION.to_le_bytes());
     pack.extend_from_slice(&header.importer_version.to_le_bytes());
     pack.extend_from_slice(&0u32.to_le_bytes());
     pack.extend_from_slice(&header.source.to_le_bytes());
+    pack.extend_from_slice(&(compressed.len() as u64).to_le_bytes());
+    pack.extend_from_slice(&fingerprint(&compressed).to_le_bytes());
     pack.extend_from_slice(&(archive.len() as u64).to_le_bytes());
-    pack.extend_from_slice(&fingerprint(&archive).to_le_bytes());
-    pack.extend_from_slice(&archive);
+    pack.extend_from_slice(&compressed);
     Ok(pack)
 }
 
@@ -124,13 +140,22 @@ pub fn read_pack(pack: &[u8]) -> Result<(PackHeader, Level), PackError> {
             expected,
         });
     }
-    let archive = &pack[HEADER_SIZE..];
-    if fingerprint(archive) != u64_at(pack, 0x20) {
+    let compressed = &pack[HEADER_SIZE..];
+    if fingerprint(compressed) != u64_at(pack, 0x20) {
         return Err(PackError::Fingerprint);
     }
-    // (an archive is read in place only at its alignment)
-    let mut aligned = AlignedVec::<16>::with_capacity(archive.len());
-    aligned.extend_from_slice(archive);
+    let unpacked = u64_at(pack, 0x28);
+    if unpacked > LONGEST_ARCHIVE {
+        return Err(PackError::TooLong(unpacked));
+    }
+    // (an archive is read in place only at its alignment, so it is
+    // decompressed into an aligned buffer)
+    let mut aligned = AlignedVec::<16>::with_capacity(unpacked as usize);
+    aligned.resize(unpacked as usize, 0);
+    match lz4_flex::block::decompress_into(compressed, &mut aligned) {
+        Ok(written) if written as u64 == unpacked => {}
+        _ => return Err(PackError::Compression(unpacked)),
+    }
     let level = rkyv::from_bytes::<Level, rancor::Error>(&aligned)
         .map_err(|error| PackError::Archive(error.to_string()))?;
     Ok((header, level))
@@ -380,6 +405,9 @@ mod tests {
             if (0x0C..0x10).contains(&at) {
                 continue; // (the unused word)
             }
+            // (a flip in the compressed archive may leave it decompressing
+            // to the same bytes, which is no damage: only the fingerprint
+            // says, and it is checked first)
             let mut flipped = pack.clone();
             flipped[at] ^= 0x40;
             if (0x08..0x0C).contains(&at) || (0x10..0x18).contains(&at) {
@@ -394,12 +422,71 @@ mod tests {
     #[test]
     fn an_archive_that_does_not_check_is_refused() {
         // a header that holds, over an archive of junk
-        let junk = [0xA5u8; 64];
+        let junk = lz4_flex::block::compress(&[0xA5u8; 64]);
+        assert!(matches!(
+            read_pack(&over(&junk, 64)),
+            Err(PackError::Archive(_))
+        ));
+    }
+
+    /// A pack's header over `compressed`, which decompresses to `unpacked`
+    /// bytes, its length and fingerprint mended.
+    fn over(compressed: &[u8], unpacked: u64) -> Vec<u8> {
         let mut pack = pack()[..HEADER_SIZE].to_vec();
-        pack[0x18..0x20].copy_from_slice(&(junk.len() as u64).to_le_bytes());
-        pack[0x20..0x28].copy_from_slice(&fingerprint(&junk).to_le_bytes());
-        pack.extend_from_slice(&junk);
-        assert!(matches!(read_pack(&pack), Err(PackError::Archive(_))));
+        pack[0x18..0x20].copy_from_slice(&(compressed.len() as u64).to_le_bytes());
+        pack[0x20..0x28].copy_from_slice(&fingerprint(compressed).to_le_bytes());
+        pack[0x28..0x30].copy_from_slice(&unpacked.to_le_bytes());
+        pack.extend_from_slice(compressed);
+        pack
+    }
+
+    #[test]
+    fn an_archive_that_does_not_decompress_to_its_length_is_refused() {
+        let archive = [7u8; 256];
+        let compressed = lz4_flex::block::compress(&archive);
+        assert!(matches!(
+            read_pack(&over(&compressed, 255)),
+            Err(PackError::Compression(255))
+        ));
+        assert!(matches!(
+            read_pack(&over(&compressed, 257)),
+            Err(PackError::Compression(257))
+        ));
+        assert!(matches!(
+            read_pack(&over(&[0xF0, 1, 2], 64)),
+            Err(PackError::Compression(64))
+        ));
+        // (and a length past the longest is refused before anything is
+        // made room for)
+        assert_eq!(
+            read_pack(&over(&compressed, LONGEST_ARCHIVE + 1)),
+            Err(PackError::TooLong(LONGEST_ARCHIVE + 1))
+        );
+    }
+
+    #[test]
+    fn a_pack_is_its_archive_compressed() -> Result<(), PackError> {
+        // (a level of repeated pixels: what most of a pack is)
+        let mut level = level();
+        if let Pixels::Texture(texture) = &mut level.bitmaps[0].images[0].pixels {
+            texture.levels[0] = vec![0x5A; 64 * 1024];
+        }
+        let pack = write_pack(&level, HEADER)?;
+        let unpacked = u64_at(&pack, 0x28);
+        assert!(
+            (pack.len() as u64) * 8 < unpacked,
+            "{} bytes for an archive of {unpacked}",
+            pack.len()
+        );
+        assert_eq!(read_pack(&pack)?.1, level);
+        Ok(())
+    }
+
+    #[test]
+    fn the_fingerprint_is_the_first_eight_bytes_of_blake3() {
+        // (BLAKE3 of nothing is af1349b9f5f9a1a6...)
+        assert_eq!(fingerprint(b""), 0xA6A1_F9F5_B949_13AF);
+        assert_ne!(fingerprint(b"a"), fingerprint(b"b"));
     }
 
     #[test]
