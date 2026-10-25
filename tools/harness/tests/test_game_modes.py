@@ -32,7 +32,9 @@ def generated(fault=None):
     code = '\n'.join([
         defaults, function(modes, 'game_modes_option'), function(modes, 'game_modes_options_default'),
         function(modes, 'game_modes_options_sanitize'), function(modes, 'game_modes_player_killed'),
-        function(modes, 'game_modes_variant_mode'), function(infection, 'infection_round_result'),
+        function(modes, 'game_modes_variant_mode'), '#define GAME_MODES_KIND_HARDCORE 0x80',
+        function(modes, 'game_modes_kind'), function(modes, 'game_modes_kind_name'),
+        function(infection, 'infection_round_result'),
         function(infection, 'infection_state_valid'), order,
         '#define GUN_GAME_MAXIMUM_LEVELS NUMBEROF(gun_game_strongest_first)',
         function(gun_game, 'gun_game_levels_build')])
@@ -43,7 +45,7 @@ def generated(fault=None):
 
 CASES = ['options_default', 'hardcore_restore', 'hardcore_no_restore', 'sanitize_defaults', 'sanitize_range',
          'sanitize_keeps', 'variant_mode', 'round_result', 'state_valid', 'gun_game_order', 'gun_game_missing',
-         'gun_game_random']
+         'gun_game_random', 'kind', 'kind_untrusted']
 
 
 @pytest.mark.parametrize('case', CASES)
@@ -63,6 +65,9 @@ def test_case(case):
     (('player->reserved[0] || player->reserved[1] || player->reserved[2]', 'player->reserved[0]'), 'state_valid'),
     (('if (game_engine_loadout_weapon_definition(weapon) != NONE)', 'if (TRUE)'), 'gun_game_missing'),
     (('&& !network_game_distributed_client()', ''), 'gun_game_random'),
+    (('game_engine_index == game_engine_slayer && mode > _game_mode_none', 'mode > _game_mode_none'),
+     'kind_untrusted'),
+    (('if (!hardcore || game_engine_index', 'if (game_engine_index'), 'kind_untrusted'),
 ])
 def test_negative_control(fault, case):
     status, output = run(build('game_modes', generated(fault)), case)

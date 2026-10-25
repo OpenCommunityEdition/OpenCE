@@ -262,7 +262,15 @@ before taking it. Then version 36 sends the host's shield effects (distributed
 message 91, `network_shield_effects.c`: the shield glow, its Light Show reach
 and the overshield effect, Server Setup's SHIELD EFFECTS), which every client
 draws in place of its player's own, so that a build that would draw its own
-cannot join.
+cannot join. Then version 37 sends with a game's LAN advertisement (the fourth
+of its reserved bytes) and internet listing (the first byte of its stamp) the
+game's kind: an OpenCE gametype's mode and Hardcore
+(`port/linux/game/game_modes.h`'s `game_modes_kind`), which the server
+browser names in its gametype column ("SWAT", "HC CTF"); a browser takes a
+mode for a Slayer game only, and one it does not know as none. Then version 38
+lets the host's shield effects be `players` (SHIELD EFFECTS' PLAYERS' OWN), a
+value of distributed message 91 that tells each client to draw its own
+settings', not synced.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -639,7 +647,10 @@ its name alone beside it, has its name given back as the map lists find it.
      players' ammunition and grenade counts from the host only once a
      round trip has passed since it last fired, reloaded or threw (what
      the host says before then is from before). How old what a unit
-     carries is travels in 16 bits.
+     carries is travels in 16 bits. A client keeps an inventory whose
+     unit or weapons have not come yet (the stream can trail the datagram)
+     and applies it in full once they have, the newest of a unit's winning;
+     one is dropped `EMPTY_INVENTORY_TICKS` after the newest came.
    - Players take the units the host spawns them with, seats are the
      host's (a client's own player's once it has ridden otherwise for
      longer than a round trip), and the CTF flags and oddballs are the same

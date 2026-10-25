@@ -1,4 +1,5 @@
 #include "harness.h"
+#include <wchar.h>
 #include "enums.inc"
 /* OpenCE's gametypes (port/linux/game/game_modes.c, infection.c, gun_game.c):
 a gametype's options kept in range, the modes each game engine and teams
@@ -209,6 +210,30 @@ int main(int argc,char **argv)
   gun_game_levels_build();
   CHECK(draws==0&&gun_game.level_count==8,"a client draws nothing, its list as long");
   client=FALSE;
+ } else CASE("kind") {
+  struct game_variant variant;
+  memset(&variant,0,sizeof(variant));memset(&options,0,sizeof(options));
+  variant.game_engine_index=game_engine_slayer;variant.universal_variant.teams=TRUE;
+  CHECK(game_modes_kind(&variant,&options)==0,"a stock gametype has no kind");
+  CHECK(game_modes_kind_name(game_engine_slayer,0,TRUE)==NULL,"named by its engine");
+  options.mode=_game_mode_infection;options.hardcore=TRUE;
+  CHECK(game_modes_kind(&variant,&options)==(_game_mode_infection|0x80),"Infection, Hardcore");
+  CHECK(!wcscmp(game_modes_kind_name(game_engine_slayer,game_modes_kind(&variant,&options),FALSE),
+   L"HARDCORE INFECTION"),"in full");
+  CHECK(!wcscmp(game_modes_kind_name(game_engine_slayer,game_modes_kind(&variant,&options),TRUE),L"HC INFECTION"),
+   "abbreviated");
+  options.mode=_game_mode_gun_game;
+  CHECK(game_modes_kind(&variant,&options)==0x80,"a mode the teams do not allow is none");
+  variant.game_engine_index=game_engine_ctf;options.mode=_game_mode_none;
+  CHECK(!wcscmp(game_modes_kind_name(game_engine_ctf,game_modes_kind(&variant,&options),TRUE),L"HC CTF"),"HC CTF");
+  CHECK(!wcscmp(game_modes_kind_name(game_engine_slayer,_game_mode_swat,TRUE),L"SWAT"),"SWAT");
+ } else CASE("kind_untrusted") {
+  CHECK(game_modes_kind_name(game_engine_ctf,_game_mode_swat,TRUE)==NULL,"a mode of CTF is none");
+  CHECK(!wcscmp(game_modes_kind_name(game_engine_oddball,_game_mode_infection|0x80,TRUE),L"HC ODDBALL"),
+   "Hardcore kept, the mode not");
+  CHECK(game_modes_kind_name(game_engine_slayer,0x7F,TRUE)==NULL,"a mode this build does not know");
+  CHECK(game_modes_kind_name(game_engine_none,0x80,TRUE)==NULL,"no engine (co-op)");
+  CHECK(game_modes_kind_name(99,0x80,TRUE)==NULL,"an engine this build does not know");
  } else return 2;
  return 0;
 }
