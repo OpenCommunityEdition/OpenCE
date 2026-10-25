@@ -20,6 +20,9 @@ report at the end.
 - [ ] Task: A faster debug loop
     - [ ] Write tests: the dev profile's opt-level for dependencies is set; sccache is in the shell
     - [ ] `[profile.dev.package."*"] opt-level = 2`, sccache; measure again
+- [ ] Task: Optimised game-data tests
+    - [ ] Write tests: the test step builds with an optimised test profile that keeps debug assertions and overflow checks; the reference traces match under it
+    - [ ] A `[profile.test-opt]` (inherits release, `debug-assertions` and `overflow-checks` on, incremental) used by nextest for the workspace run; time each suite before and after (on 2026-10-25 the debug run took about 40 minutes, the slowest suites 984 s, 739 s and four of 200–275 s, all stepping the sim on Blood Gulch)
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Quick wins' (Protocol in workflow.md)
 
 ## Phase 2: Test strength

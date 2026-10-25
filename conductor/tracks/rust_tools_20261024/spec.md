@@ -53,6 +53,11 @@ that the engine does not have. None is taken for its own sake.
   with different hasher seeds and compares the state.
 - `[profile.dev.package."*"] opt-level = 2` so that dependencies are fast
   in debug builds, and `sccache` in the dev shell.
+- An optimised test profile for the workspace's test run: the suites that
+  step the simulation on the user's maps are the engine's own crates, which
+  the dependency opt-level does not reach, and in debug they take most of
+  a 40-minute run. The profile keeps debug assertions and overflow checks,
+  and the clippy lints stay as they are (they are checked when compiling).
 
 ### 2. Test strength
 - `cargo-mutants` over `sim`, `physics` and `script`, with its survivors
