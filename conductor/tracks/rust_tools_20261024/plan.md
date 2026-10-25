@@ -12,9 +12,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Ready caches for the tests acdd596
     - [x] Write tests: the shared loader gives the same level as `import_level`; a second load in one process reads no file; a pack of another importer version is imported again
     - [x] One test loader for the user's maps, through `load_level` and the shared cache folder (`build/engine/cache`, or `OPENCE_CACHE`), held once per process; the game-data suites use it instead of importing the map each (on 2026-10-25, 33 suites imported Blood Gulch from the map); the importer's own tests still import
-- [ ] Task: Optimised game-data tests
-    - [ ] Write tests: the test step builds with an optimised test profile that keeps debug assertions and overflow checks; the reference traces match under it
-    - [ ] A `[profile.test-opt]` (inherits release, `debug-assertions` and `overflow-checks` on, incremental) used by nextest for the workspace run; time each suite before and after (on 2026-10-25 the debug run took about 40 minutes, the slowest suites 984 s, 739 s and four of 200–275 s, all stepping the sim on Blood Gulch)
+- [x] Task: Optimised game-data tests 095a54d
+    - [x] Write tests: the test step builds with an optimised test profile that keeps debug assertions and overflow checks; the reference traces match under it
+    - [x] A `[profile.test-opt]` (inherits release, `debug-assertions` and `overflow-checks` on, incremental) used by nextest for the workspace run; time each suite before and after (on 2026-10-25 the debug run took about 40 minutes, the slowest suites 984 s, 739 s and four of 200–275 s, all stepping the sim on Blood Gulch)
 - [ ] Task: A faster debug loop
     - [ ] Write tests: the dev profile's opt-level for dependencies is set; sccache is in the shell
     - [ ] `[profile.dev.package."*"] opt-level = 2`, sccache; measure again
