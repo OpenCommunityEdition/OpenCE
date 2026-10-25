@@ -14,4 +14,7 @@ enum talking_timer_line
 	NUMBER_OF_TALKING_TIMER_LINES = TALKING_TIMER_MINUTE_1 + 30
 };
 
+void talking_timer_audio_play(int line, float volume);
+void talking_timer_audio_mix(float *output, unsigned long frames);
+
 #endif

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 # what each notice is for, and its file
 NOTICES = [
     ("Expat (the menus' XML)", "port/third_party/expat/COPYING"),
-    ("Opus (voice chat's codec)", "port/third_party/opus/COPYING"),
+    ("Opus (voice chat's and the talking timer's codec)", "port/third_party/opus/COPYING"),
     ("zlib", "port/third_party/zlib/LICENSE"),
     ("KCP (internet play's streams)", "port/third_party/kcp/LICENSE"),
     ("Monocypher (internet play's signatures)", "port/third_party/monocypher/LICENCE.md"),

@@ -62,6 +62,12 @@ static void voice_audio_mix(float *output, unsigned long frames)
 	(void)frames;
 }
 
+static void talking_timer_audio_mix(float *output, unsigned long frames)
+{
+	(void)output;
+	(void)frames;
+}
+
 #include "under_test.inc"
 
 #define PI 3.14159265358979323846

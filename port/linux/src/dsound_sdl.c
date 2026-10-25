@@ -52,6 +52,7 @@ skips opening a device; audio.channels chooses stereo or 5.1
 #include "platform.h"
 #include "sdl_platform.h"
 #include "port_config.h"
+#include "talking_timer_audio.h"
 #include "voice_audio.h"
 
 #include <SDL3/SDL.h>
@@ -1518,8 +1519,9 @@ static void mix(float *output, unsigned long frames)
 		if ((!enabled && reverb.level <= 0.0f) || reverb.quiet > REVERB_QUIET_FRAMES)
 			reverb_clear();
 	}
-	/* the players' voices (voice_audio.c), dry, under the limiter; on 5.1
-	from the front pair */
+	/* the players' voices (voice_audio.c) and the talking timer's
+	(talking_timer_audio.c), dry, under the limiter; on 5.1 from the front
+	pair */
 	if (output_channels == 6)
 	{
 		float voices[MIX_CHUNK_FRAMES * OUTPUT_CHANNELS];
@@ -1527,6 +1529,7 @@ static void mix(float *output, unsigned long frames)
 
 		memset(voices, 0, frames * OUTPUT_CHANNELS * sizeof(float));
 		voice_audio_mix(voices, frames);
+		talking_timer_audio_mix(voices, frames);
 		for (frame = 0; frame < frames; frame++)
 		{
 			output[frame * 6] += voices[frame * 2];
@@ -1536,6 +1539,7 @@ static void mix(float *output, unsigned long frames)
 	else
 	{
 		voice_audio_mix(output, frames);
+		talking_timer_audio_mix(output, frames);
 	}
 	limit(output, frames);
 }
