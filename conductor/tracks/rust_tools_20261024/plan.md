@@ -30,9 +30,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Quick wins' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 2: Test strength
-- [ ] Task: Mutation testing
-    - [ ] Run `cargo mutants` over `sim`, `physics` and `script`; list the survivors
-    - [ ] Write tests that kill the survivors that matter; record the rest with a reason
+- [x] Task: Mutation testing 8847ba03
+    - [x] Run `cargo mutants` over `sim`, `physics` and `script`; list the survivors
+    - [x] Write tests that kill the survivors that matter; record the rest with a reason
 - [x] Task: Property tests 2fb6670e
     - [x] Write tests (proptest): the tag and cache readers never panic and round-trip; the script compiler rejects or compiles; physics keeps its invariants (no tunnelling at the tested speeds, energy not gained)
 - [x] Task: Coverage floors 40d4f953
