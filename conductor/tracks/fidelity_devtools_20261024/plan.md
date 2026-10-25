@@ -81,10 +81,10 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
 - [x] Task: Conductor - User Manual Verification 'Phase 6: Animation' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 7: Sound
-- [~] Task: The sound emitters
-    - [ ] Write tests: each sound class's emitter on devgulch produces a voice; none fail; the audio view's counts match
-    - [ ] The fixes
-- [ ] Task: Sounds of play
+- [x] Task: The sound emitters 8e6ba2b
+    - [x] Write tests: each sound class's emitter on devgulch produces a voice; none fail; the audio view's counts match
+    - [x] The fixes
+- [~] Task: Sounds of play
     - [ ] Write tests: firing, impacts, footsteps, vehicles, pickups and the UI make their sounds
     - [ ] The fixes
 - [ ] Task: Conductor - User Manual Verification 'Phase 7: Sound' (Protocol in workflow.md)
