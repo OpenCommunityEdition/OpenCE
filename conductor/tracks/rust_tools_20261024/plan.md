@@ -76,7 +76,7 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
     - [x] LTO, codegen-units, cargo-pgo profiles recorded on devgulch; cargo-show-asm in the shell (LTO and PGO measured slower and declined; cargo-show-asm deferred to the Nix restructure, see the report)
 - [x] Task: Conductor - User Manual Verification 'Phase 4: Performance' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
-## Phase 5: Nix tooling (after the crane packages build)
+## Phase 5: Nix tooling (after the crane packages build) [checkpoint: 20ebe3ed]
 - [x] Task: Formatting and hooks c1778fd5
     - [x] Write tests: `nix fmt` formats Rust, Swift, Nix and Python; the hook refuses an unformatted commit
     - [x] treefmt-nix, git-hooks.nix (the tree formatted once in 41e8fdba)
@@ -87,4 +87,4 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
     - [x] The crane checks
 - [x] Task: The report 9e1fc515
     - [x] Build, test, frame and load times before and after; crates adopted and declined, each with its measurement
-- [ ] Task: Conductor - User Manual Verification 'Phase 5: Nix tooling' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 5: Nix tooling' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
