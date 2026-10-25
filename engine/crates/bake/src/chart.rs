@@ -161,7 +161,8 @@ impl Atlas {
                         edge(at[0], at[1], p) / area,
                     ];
                     if weights.iter().all(|weight| *weight >= -1e-5) {
-                        claimed |= self.claim(chart, x as u32, y as u32, &corners, weights, footprint);
+                        claimed |=
+                            self.claim(chart, x as u32, y as u32, &corners, weights, footprint);
                     }
                 }
             }
@@ -170,7 +171,14 @@ impl Atlas {
             let middle = |axis: usize| (at[0][axis] + at[1][axis] + at[2][axis]) / 3.0;
             let (x, y) = (libm::roundf(middle(0)), libm::roundf(middle(1)));
             if (0.0..width).contains(&x) && (0.0..height).contains(&y) {
-                self.claim(chart, x as u32, y as u32, &corners, [1.0 / 3.0; 3], footprint);
+                self.claim(
+                    chart,
+                    x as u32,
+                    y as u32,
+                    &corners,
+                    [1.0 / 3.0; 3],
+                    footprint,
+                );
             }
         }
     }
