@@ -27,9 +27,11 @@ static pthread_mutex_t config_lock = PTHREAD_MUTEX_INITIALIZER;
 static volatile unsigned long config_change_count;
 static int config_answer_only;
 
-/* config.toml: what it holds, and how many times it was written */
+/* config.toml: what it holds, how many times it was written, and how many
+of those by a run that only answers its command line */
 static char *file_text;
 static int file_writes;
+static int answering_writes;
 
 static long config_setting_index(const char *name);
 
@@ -57,6 +59,7 @@ static int config_write_file(const char *path, const char *text)
 	free(file_text);
 	file_text = strdup(text);
 	file_writes++;
+	answering_writes += config_answer_only != 0;
 	return 1;
 }
 
@@ -150,7 +153,7 @@ int main(int argc, char **argv)
 		config_answer_only = 1;
 		CHECK(config_write("server.rotation", "prisoner"), "the write was refused");
 		CHECK(!strcmp(config_values[1].string, "prisoner"), "the value was not set");
-		CHECK(file_writes == 0 && strstr(file_text, "bloodgulch"), "config.toml was written");
+		CHECK(file_writes == 0 && answering_writes == 0 && strstr(file_text, "bloodgulch"), "config.toml was written");
 		return 0;
 	}
 	fprintf(stderr, "unknown case: %s\n", case_name);
