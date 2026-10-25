@@ -10,5 +10,9 @@ thiserror.workspace = true
 opence_content.workspace = true
 miniz_oxide.workspace = true
 
+[dev-dependencies]
+insta.workspace = true
+pretty_assertions.workspace = true
+
 [lints]
 workspace = true

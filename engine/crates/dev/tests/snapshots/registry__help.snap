@@ -1,0 +1,13 @@
+---
+source: crates/dev/tests/registry.rs
+expression: "registry.run(&mut world, \"help\")?.text"
+---
+bind         Runs a command when a key is pressed.
+exec         Runs a file's commands, a line at a time.
+help         Shows the commands, or a command's or variable's help.
+reset        Sets a variable back to its default.
+set          Sets a variable.
+spawn        Spawns objects of a tag in front of the player.
+time         Sets the game's speed.
+unbind       Takes a key's command away.
+vars         Shows the variables whose names have the filter in them.

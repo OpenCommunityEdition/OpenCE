@@ -1,0 +1,6 @@
+---
+source: crates/dev/tests/registry.rs
+expression: "registry.run(&mut world, \"help spawn\")?.text"
+---
+spawn <tag> [count]
+  Spawns objects of a tag in front of the player.

@@ -1,7 +1,9 @@
 //! The registry: commands with typed arguments, variables, the
 //! fall-through to HaloScript, and completion.
 
+use insta::assert_snapshot;
 use opence_dev::{Arg, ArgKind, CommandError, Output, Param, Registry, VarKind, VarValue};
+use pretty_assertions::assert_eq;
 use std::error::Error;
 
 #[derive(Default)]
@@ -209,7 +211,11 @@ fn several_commands_on_a_line() -> Result<(), Box<dyn Error>> {
     let output = registry.run(&mut world, "spawn a; spawn \"b; c\" 2 ; (print \"x;y\")")?;
     assert_eq!(world.spawned, vec![("a".into(), 1), ("b; c".into(), 2)]);
     assert_eq!(world.scripts, vec!["(print \"x;y\")"]);
-    assert_eq!(output.text, "spawned 1 a\nspawned 2 b; c\nran");
+    assert_snapshot!(output.text, @r"
+    spawned 1 a
+    spawned 2 b; c
+    ran
+    ");
     Ok(())
 }
 
@@ -217,13 +223,16 @@ fn several_commands_on_a_line() -> Result<(), Box<dyn Error>> {
 fn help_and_listing() -> Result<(), Box<dyn Error>> {
     let mut registry = registry();
     let mut world = World::default();
-    let output = registry.run(&mut world, "help spawn")?;
-    assert_eq!(
-        output.text,
-        "spawn <tag> [count]\n  Spawns objects of a tag in front of the player."
+    // (the listing, every command's help and a variable's: their text is
+    // the shell's, kept in tests/snapshots)
+    assert_snapshot!("help", registry.run(&mut world, "help")?.text);
+    assert_snapshot!("help_spawn", registry.run(&mut world, "help spawn")?.text);
+    assert_snapshot!(
+        "help_render_view",
+        registry.run(&mut world, "help render.view")?.text
     );
     let output = registry.run(&mut world, "vars render.")?;
-    assert_eq!(output.text, "render.view = final\nrender.wireframe = false");
+    assert_snapshot!("vars_render", output.text);
     assert_eq!(output.data["render.wireframe"], serde_json::json!(false));
     let error = failure(registry.run(&mut world, "help nothing"))?;
     assert!(matches!(error, CommandError::Unknown(ref name) if name == "nothing"));

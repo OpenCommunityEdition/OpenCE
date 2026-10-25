@@ -3228,4 +3228,38 @@ pub(crate) mod tests {
         }
         assert!(failures.is_empty(), "{failures:#?}");
     }
+
+    /// The tag index as text, a tag a line: its group and the groups it
+    /// derives from, its handle, its path, and whether it is in the
+    /// resource maps.
+    fn tag_dump(cache: &Cache) -> String {
+        cache
+            .tags()
+            .iter()
+            .map(|tag| {
+                let shared = if tag.in_resource_map {
+                    " (resource map)"
+                } else {
+                    ""
+                };
+                format!(
+                    "{} {} {} {:08x} {}{shared}",
+                    tag.group, tag.parents[0], tag.parents[1], tag.handle, tag.name
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn the_test_levels_tag_index() {
+        for (kind, name) in [
+            (CacheKind::Xbox, "tags_xbox"),
+            (CacheKind::CustomEdition, "tags_custom_edition"),
+        ] {
+            let cache = Cache::open(level(kind, &Breaks::default()).build())
+                .unwrap_or_else(|error| panic!("{error}"));
+            insta::assert_snapshot!(name, tag_dump(&cache));
+        }
+    }
 }

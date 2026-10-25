@@ -192,3 +192,28 @@ lowers only std's map, so the two shell-variable methods take it by a
 
 (Clippy also found `assert!(cfg!(debug_assertions))` in `sim/tests/checks.rs`,
 a constant to it; the value goes through `black_box` now.)
+
+## insta and pretty_assertions (2026-10-25)
+
+The shell's text is kept as insta snapshots (`crates/dev/tests/snapshots`):
+the command listing, a command's help, a variable's help and a variable
+listing, where the tests had held two of them as hand-written strings and
+the listing not at all. The import's tag index is kept the same way, a
+tag a line, for the Xbox and Custom Edition test levels
+(`crates/import/src/snapshots`; the test levels are the crate's own
+made-up ones, so no game data is in them). A changed text now fails with
+a diff and a `.snap.new` to accept with `cargo insta review`; a missing
+snapshot fails too (checked before the snapshots were written). The
+registry's other comparisons go through `pretty_assertions`, which prints
+a diff in place of two long values.
+
+The dev state's and the bake report's snapshots are left for now: their
+code (`ffi/src/dev_state.rs`, `ffi/src/bake.rs`) has another session's
+uncommitted changes, and a snapshot of it now would fail when they land.
+
+| check | result |
+|---|---|
+| a missing snapshot | fails |
+| clippy, workspace, `-D warnings` | clean |
+| cargo deny | ok (insta, similar, pretty_assertions, yansi, diff: MIT or Apache-2.0) |
+| nextest, all tests (`test-opt`) | 1029 passed, 75.7 s |

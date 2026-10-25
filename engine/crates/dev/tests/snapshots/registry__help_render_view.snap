@@ -1,0 +1,6 @@
+---
+source: crates/dev/tests/registry.rs
+expression: "registry.run(&mut world, \"help render.view\")?.text"
+---
+render.view <final|albedo|normal> = final (default final)
+  Shows one of the renderer's buffers alone.

@@ -1,0 +1,20 @@
+---
+source: crates/import/src/level.rs
+expression: tag_dump(&cache)
+---
+scnr none none e1740000 levels\fake\fake
+bitm none none e1740001 levels\fake\bitmaps\lightmap
+schi shdr none e1740002 levels\fake\shaders\glass
+senv shdr none e1740003 levels\fake\shaders\ground
+fog  none none e1740004 fog\fake\water
+fog  none none e1740005 fog\fake\mist
+lsnd none none e1740006 sound\fake\wind
+snde none none e1740007 sound\fake\hall
+sbsp none none e1740008 levels\fake\fake
+scen obje none e1740009 scenery\rock
+eqip obje none e174000a powerups\pack
+itmc none none e174000b powerups\packs
+lens none none e174000c sky\fake\sun
+sky  none none e174000d sky\fake\fake
+deca none none e174000e decals\fake\glow
+deca none none e174000f decals\fake\scorch

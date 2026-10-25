@@ -1,0 +1,6 @@
+---
+source: crates/dev/tests/registry.rs
+expression: output.text
+---
+render.view = final
+render.wireframe = false
