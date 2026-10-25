@@ -62,9 +62,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: tracing and benchmarks d2a62812
     - [x] Write tests: spans nest and the JSON log parses; the benchmarks run (dev/tests/tracing.rs; `cargo test --bench` runs each once)
     - [x] `tracing` in place of `log`, `tracing-tracy` behind a feature, `divan` benchmarks for collision, the AI tick, animation blending and the bake (the log book is a layer; `OPENCE_LOG_JSON` adds the JSON log; the blend and AI benches need assets/maps)
-- [ ] Task: Allocation in the frame
-    - [ ] Write tests: a counting allocator shows how many allocations a frame makes on devgulch, and the count goes down
-    - [ ] mimalloc; bumpalo frame arenas; smallvec and arrayvec in the hot paths
+- [x] Task: Allocation in the frame 1269e227
+    - [x] Write tests: a counting allocator shows how many allocations a frame makes on devgulch, and the count goes down
+    - [x] mimalloc; bumpalo frame arenas; smallvec and arrayvec in the hot paths (mimalloc adopted; the rest declined, see the report)
 - [ ] Task: The audio thread
     - [ ] Write tests: the audio thread's queue never blocks; resampled 22 kHz sounds match a reference within a tolerance
     - [ ] rtrb, rubato
