@@ -515,3 +515,33 @@ cache inflates all of it whether it is mapped or not.
 | `the_layout_is_fixed` | unchanged, passes |
 | map read share of a pack load | bloodgulch 2.9 of 59.2 ms, a10 19.8 of 397.8 ms |
 | `tools/engine_build.py --test --suite rust` | 1103 passed, 3 skipped |
+
+## binrw and zerocopy declined (2026-10-25)
+
+The plan was to rewrite the tag and cache readers declaratively, with
+binrw for the layouts that branch and zerocopy for the plain ones. We
+measured first, and the rewrite has nothing to speed up.
+
+Opening a cache takes 137.1 ms for bloodgulch and 974.4 ms for a10
+(3357 tags). Nearly all of that is zlib inflating the Xbox cache. The
+part a declarative reader would replace is the header and the tag index,
+which is about 107 KB on a10, a few milliseconds at most. Play also
+never opens a cache: a level loads from its pack (59 ms and 398 ms), and
+the pack's checks and unpacking are blake3 and lz4, not the readers.
+
+Safety does not argue for the change either. The hand-written readers
+already go through the bounds-checked `Reader`, and the fuzz targets from
+Phase 2 run them on every test pass. binrw would add a proc-macro crate
+to every build of import without removing a single check.
+
+If inflating is ever worth speeding up, the lever is the inflater
+(zlib-rs, or flate2's other backends), not the layouts. That belongs to
+a later fast-loop track, measured the same way.
+
+| check | result |
+|---|---|
+| `Cache::open`, bloodgulch | 137.1 ms |
+| `Cache::open`, a10 (3357 tags) | 974.4 ms, mostly inflate |
+| a10's tag index | about 107 KB |
+| a level loaded from its pack | bloodgulch 59.2 ms, a10 397.8 ms; no cache opened |
+| the readers' fuzz targets | run on every test pass (Phase 2) |
