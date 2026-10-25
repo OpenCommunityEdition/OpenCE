@@ -255,6 +255,10 @@ int hud_hires_sprites_drawable(long asset, unsigned long address, unsigned long 
 	{
 		return 0;
 	}
+	/* (the GL functions are loaded only for a window's context: without one,
+	debug.null_renderer or a failed context, glGenTextures is NULL) */
+	if (!glGenTextures)
+		return 0;
 	if (crc32(0L, (const Bytef *)address, (uInt)level0_size) != hud_hires_embedded[asset].crc)
 	{
 		if (!textures[asset].other_pixels_logged)
