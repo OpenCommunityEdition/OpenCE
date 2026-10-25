@@ -15,9 +15,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Optimised game-data tests 095a54d
     - [x] Write tests: the test step builds with an optimised test profile that keeps debug assertions and overflow checks; the reference traces match under it
     - [x] A `[profile.test-opt]` (inherits release, `debug-assertions` and `overflow-checks` on, incremental) used by nextest for the workspace run; time each suite before and after (on 2026-10-25 the debug run took about 40 minutes, the slowest suites 984 s, 739 s and four of 200–275 s, all stepping the sim on Blood Gulch)
-- [ ] Task: A faster debug loop
-    - [ ] Write tests: the dev profile's opt-level for dependencies is set; sccache is in the shell
-    - [ ] `[profile.dev.package."*"] opt-level = 2`, sccache; measure again
+- [x] Task: A faster debug loop 74539a1a
+    - [x] Write tests: the dev profile's opt-level for dependencies is set; sccache judged (left out: no incremental caching)
+    - [x] `[profile.dev.package."*"] opt-level = 2`, sccache; measure again
 - [ ] Task: cargo-nextest and cargo-deny in the test step
     - [ ] Write tests: `tools/engine_build.py` runs nextest and `cargo deny check`; a forbidden licence fails the step
     - [ ] `deny.toml` for the workspace; nextest's profile; the build script's test step
