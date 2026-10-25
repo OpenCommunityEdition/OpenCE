@@ -1,0 +1,12 @@
+# cargo nextest's profiles for the workspace (tools/engine_build.py's test
+# step runs them with --cargo-profile test-opt)
+
+[profile.default]
+# (a test that steps a campaign level for a minute is slow, not stuck)
+slow-timeout = { period = "60s", terminate-after = 10 }
+fail-fast = false
+
+# the net session's UDP games time out when the machine is loaded
+[[profile.default.overrides]]
+filter = "package(opence_net) & binary(session)"
+retries = 2

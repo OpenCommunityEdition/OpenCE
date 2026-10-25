@@ -8,8 +8,9 @@ its UniFFI bindings are written into the Swift package in engine/app, Xcode's
 Swift builds the package against the library, and the executable is laid out
 in a bundle signed ad hoc. The shaders are compiled first with Xcode's Metal
 toolchain (xcodebuild -downloadComponent MetalToolchain), so that an error in
-one stops the build rather than the app's start. With --test, the package's
-XCTests run instead.
+one stops the build rather than the app's start. With --test, the tests run
+instead: cargo deny and the workspace's tests under nextest, then the
+package's XCTests (--suite picks one).
 Run it inside nix develop, or from the flake's engine package.
 """
 
@@ -36,6 +37,22 @@ CRYPTEXES = "/private/var/run/com.apple.security.cryptexd/mnt"
 
 def cargo(*args: str) -> None:
     subprocess.run(["cargo", *args], cwd=ENGINE, check=True)
+
+
+def deny_command(config: Path = ENGINE / "deny.toml") -> list[str]:
+    """cargo deny's licence, ban and source checks (the advisories need the
+    network)."""
+    return ["cargo", "deny", "--offline", "--config", str(config), "check", "licenses", "bans", "sources"]
+
+
+def rust_test_commands(profile: str = "test-opt") -> list[list[str]]:
+    """The Rust half's test step: the dependencies' licences, then the
+    workspace's tests under nextest (engine/.config/nextest.toml), built
+    optimised with the debug checks kept."""
+    return [
+        deny_command(),
+        ["cargo", "nextest", "run", "--locked", "--workspace", "--cargo-profile", profile],
+    ]
 
 
 def rust_library() -> Path:
@@ -186,7 +203,14 @@ def main() -> None:
     parser.add_argument("--version", default="0.1.0")
     parser.add_argument("--test", action="store_true", help="run the package's XCTests instead of making the app")
     parser.add_argument("--filter", help="with --test, only the tests whose names match this")
+    parser.add_argument("--suite", choices=("all", "rust", "swift"), default="all",
+                        help="with --test, the Rust half's tests (cargo deny and nextest), the XCTests, or both")
     arguments = parser.parse_args()
+    if arguments.test and arguments.suite != "swift":
+        for command in rust_test_commands():
+            subprocess.run(command, cwd=ENGINE, check=True)
+        if arguments.suite == "rust":
+            return
     out = arguments.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     check_shaders(out)

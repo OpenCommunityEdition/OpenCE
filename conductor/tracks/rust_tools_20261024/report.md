@@ -141,3 +141,26 @@ loaded machine; alone it took 69 s.)
 sccache is left out: it cannot cache crates built incrementally, which
 is every crate an edit rebuilds, and the dependencies are already kept
 by the target folder and, for `nix build`, by crane.
+
+## nextest and cargo deny in the test step (2026-10-25)
+
+`engine_build.py --test` now runs `cargo deny` (licences, bans and
+sources, offline) and then the workspace under `cargo nextest` in the
+`test-opt` profile, before the XCTests; `--suite rust` or `--suite swift`
+picks one half. `engine/.config/nextest.toml` marks a test slow after 60 s
+(a campaign level stepped to its end is slow, not stuck), runs every test
+when one fails, and retries the net session's UDP suite twice.
+
+| run | time |
+|---|---|
+| the suites one after another (`test-opt`) | 290.8 s |
+| **nextest, all 1026 tests (`test-opt`)** | **74.0 s** |
+
+All 1026 passed, none retried; two were slow (`halo_plays_to_its_end`,
+68 s, and `an_enemy_before_the_player_shoots_it`, 62 s), and they set the
+whole run's length. nextest runs each test in its own process, so the
+level a suite held once is loaded by each test; the packs are read from
+the cache folder, so that costs a pack read (a second or two), not an
+import, and running tests from every binary at once more than pays it
+back. A deny.toml with MIT removed fails the check
+(`test_a_forbidden_licence_fails_the_check`), so the check is not a no-op.
