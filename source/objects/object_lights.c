@@ -1213,7 +1213,13 @@ void lights_preprocess_scene(
 
 					light->rasterizer_light_index = rasterizer_light_submit(
 						&light_parameters);
-					debug_rasterizer_light_count = light->rasterizer_light_index + 1;
+					/* (port: the lights submitted so far: not a light the
+					window had no room for (MAXIMUM_LIGHTS_PER_WINDOW), whose
+					index is NONE: that made the count 0, and every object
+					lit by the ones before it failed render_objects.c's
+					check of their indices against it) */
+					if (light->rasterizer_light_index != NONE)
+						debug_rasterizer_light_count = (short)(light->rasterizer_light_index + 1);
 				}
 			}
 			else
@@ -2313,10 +2319,20 @@ void lights_prepare_for_object_dynamic(
 			MAXIMUM_RENDERED_POINT_LIGHTS);
 	}
 	light_marker_end();
-	for (light_index = 0; light_index < lighting->point_light_count; light_index++)
+	/* (port: and a light the window had no room for, with no rasterizer
+	index, lights nothing: left out) */
 	{
-		lighting->point_light_indices[light_index] =
-			light_get(lighting->point_light_indices[light_index])->rasterizer_light_index;
+		short kept = 0;
+
+		for (light_index = 0; light_index < lighting->point_light_count; light_index++)
+		{
+			long rasterizer_light_index =
+				light_get(lighting->point_light_indices[light_index])->rasterizer_light_index;
+
+			if (rasterizer_light_index != NONE)
+				lighting->point_light_indices[kept++] = rasterizer_light_index;
+		}
+		lighting->point_light_count = kept;
 	}
 
 	return;
