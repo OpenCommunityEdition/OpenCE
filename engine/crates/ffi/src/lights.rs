@@ -382,7 +382,7 @@ pub const MAX_CLUSTER_INDICES: usize = 1 << 16;
 
 /// The view the lights are sorted into cells of.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ClusterView {
     /// The camera's position.
     pub position: snapshot::Vec3,

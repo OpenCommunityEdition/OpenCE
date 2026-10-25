@@ -45,6 +45,8 @@ lewton = { version = "0.10", default-features = false, features = ["ogg"] }
 # (the packs' fingerprints, and their compression)
 blake3 = { version = "1.8", default-features = false, features = ["std"] }
 lz4_flex = { version = "0.11", default-features = false, features = ["std", "safe-encode", "safe-decode"] }
+# (the snapshot's plain types, checked for padding, and allocated zeroed)
+bytemuck = { version = "1.25", features = ["derive", "extern_crate_alloc", "min_const_generics"] }
 # (inflates the Xbox caches)
 miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
 

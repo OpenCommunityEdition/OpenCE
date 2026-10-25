@@ -1095,6 +1095,7 @@ dependencies = [
 name = "opence_ffi"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "libm",
  "opence_audio",
  "opence_bake",

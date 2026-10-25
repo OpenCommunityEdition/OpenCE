@@ -485,3 +485,33 @@ The tests:
 | `import::fuzz_smoke` `mutated_packs_are_read_or_refused` | pass |
 | `load_timing`, bloodgulch and a10 | a pack loads as the level imported |
 | `tools/engine_build.py --test --suite rust` | 1103 passed, 3 skipped |
+
+## bytemuck adopted, memmap2 declined (2026-10-25)
+
+The structures the snapshot hands to Metal now derive `Pod` and
+`Zeroable`. These are the vectors, transforms, camera, nodes, objects,
+lights, decals, effects, particles, debug lines and labels, and the
+lights' `ClusterView`. Pod's derive refuses a type with padding, so a
+layout with a hole in it no longer compiles. Before, only the hand-kept
+offsets in `the_layout_is_fixed` caught one.
+
+The snapshot's slot was made by an `unsafe` `Box::new_zeroed().assume_init()`.
+It is now made by `bytemuck::zeroed_box`, whose `Zeroable` derive checks
+the claim that the SAFETY comment made by hand. That removes one of
+snapshot.rs's 17 `unsafe` uses. The rest are the slot handoff's
+`UnsafeCell` and the C interface's pointers.
+
+memmap2 is declined. A mapping is `unsafe` to make, because another
+process may change the file under it, and the workspace denies
+`unsafe_code` outside the FFI. The measurements also leave it nothing to
+win. Reading the whole map with `fs::read` takes 2.9 ms of bloodgulch's
+59 ms load from its pack, and 19.8 ms of a10's 398 ms. Opening an Xbox
+cache inflates all of it whether it is mapped or not.
+
+| check | result |
+|---|---|
+| `the_buffer_structures_are_plain_data_with_no_padding` | 14 types are `Pod`; `Vec3`'s bytes are its fields, little-endian |
+| `a_new_slot_is_zeroed_but_for_its_version_and_pointers` | pass |
+| `the_layout_is_fixed` | unchanged, passes |
+| map read share of a pack load | bloodgulch 2.9 of 59.2 ms, a10 19.8 of 397.8 ms |
+| `tools/engine_build.py --test --suite rust` | 1103 passed, 3 skipped |

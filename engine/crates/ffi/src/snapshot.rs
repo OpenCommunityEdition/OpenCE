@@ -8,6 +8,8 @@
 //! waits, nothing is copied, and a slot is never written while it is read.
 
 use std::cell::UnsafeCell;
+
+use bytemuck::{Pod, Zeroable};
 use std::sync::atomic::{AtomicU8, Ordering};
 
 /// The most objects one snapshot holds.
@@ -48,7 +50,7 @@ pub const OBJECT_FIRST_PERSON: u16 = 1;
 
 /// A vector in world units.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct Vec3 {
     /// X.
     pub x: f32,
@@ -60,7 +62,7 @@ pub struct Vec3 {
 
 /// A unit quaternion.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct Quat {
     /// X.
     pub x: f32,
@@ -74,7 +76,7 @@ pub struct Quat {
 
 /// A position, a uniform scale and an orientation.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct Transform {
     /// The position, in world units.
     pub position: Vec3,
@@ -86,7 +88,7 @@ pub struct Transform {
 
 /// The camera at the last two ticks; the renderer interpolates between them.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct CameraSnapshot {
     /// At the tick before the last.
     pub previous: Transform,
@@ -102,7 +104,7 @@ pub struct CameraSnapshot {
 /// A node's matrix in the world, the game's: a point `p` of the node is
 /// `scale * (p.x * forward + p.y * left + p.z * up) + position`.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct NodeMatrix {
     /// Where its x goes.
     pub forward: Vec3,
@@ -118,7 +120,7 @@ pub struct NodeMatrix {
 
 /// An animated node at the last two ticks.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct NodeSnapshot {
     /// At the tick before the last.
     pub previous: NodeMatrix,
@@ -128,7 +130,7 @@ pub struct NodeSnapshot {
 
 /// One object to draw.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct ObjectSnapshot {
     /// The object's id, the same from tick to tick.
     pub id: u32,
@@ -166,7 +168,7 @@ pub const LIGHT_FIRST_PERSON: u32 = 1 << 2;
 /// A dynamic light: a weapon's, a projectile's, an effect's, the
 /// flashlight, a piece of scenery's.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct LightSnapshot {
     /// Where it is at the last tick.
     pub position: Vec3,
@@ -206,7 +208,7 @@ pub const DECAL_ON_OBJECT: u32 = 2;
 /// A dynamic decal: a mark an impact or an explosion left, laid as the
 /// level's decals are (laid out as the app's decal shader reads it).
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct DecalSnapshot {
     /// Its centre, then how far above and below its surface it reaches.
     pub center: [f32; 4],
@@ -231,7 +233,7 @@ pub struct DecalSnapshot {
 
 /// An effect running: where it is and which of its events it is in.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct EffectSnapshot {
     /// Where it is, then the seconds it has run.
     pub position: [f32; 4],
@@ -267,7 +269,7 @@ pub const PARTICLE_LIT: u32 = 0xFF00_0000;
 /// A sprite: a particle, a piece of a contrail, a weather particle or a
 /// detail object (laid out as the app's particle shader reads it).
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct ParticleSnapshot {
     /// Its centre, then its half width (for `PARTICLE_FACING_QUAD`, its
     /// near edge's first corner and the far edge's second corner's x).
@@ -295,7 +297,7 @@ pub struct ParticleSnapshot {
 
 /// A debug line, drawn after the world.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Pod, Zeroable)]
 pub struct DebugLine {
     /// Its start.
     pub from: Vec3,
@@ -307,7 +309,7 @@ pub struct DebugLine {
 
 /// A debug label at a point, drawn after the world.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
 pub struct DebugLabel {
     /// Where it is.
     pub at: Vec3,
@@ -329,7 +331,7 @@ impl Default for DebugLabel {
 
 /// One frame of the world.
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Zeroable)]
 pub struct FrameSnapshot {
     /// `SNAPSHOT_VERSION`.
     pub version: u32,
@@ -498,6 +500,7 @@ pub fn snapshot_layout() -> SnapshotLayout {
 /// One slot of the triple buffer: the header and the objects and nodes it
 /// points to.
 #[repr(C)]
+#[derive(Zeroable)]
 struct Slot {
     frame: FrameSnapshot,
     objects: [ObjectSnapshot; MAX_OBJECTS],
@@ -512,9 +515,9 @@ struct Slot {
 
 impl Slot {
     fn new() -> Box<Self> {
-        // SAFETY: every field of Slot is a number, a pointer or an array of
-        // them, for which all zero bits are a valid value (a null pointer).
-        let mut slot = unsafe { Box::<Self>::new_zeroed().assume_init() };
+        // (every field is a number, a pointer or an array of them, which
+        // Zeroable checks; allocated zeroed, never on the stack)
+        let mut slot: Box<Self> = bytemuck::zeroed_box();
         slot.frame.version = SNAPSHOT_VERSION;
         // (the slot is boxed and never moves, so the pointer stays valid)
         slot.frame.objects = slot.objects.as_ptr();
@@ -744,6 +747,52 @@ pub unsafe extern "C" fn opence_snapshot_acquire(
 mod tests {
     use super::*;
     use std::mem::{align_of, offset_of, size_of};
+
+    fn plain<T: Pod>() {}
+
+    #[test]
+    fn the_buffer_structures_are_plain_data_with_no_padding() {
+        // (Pod's derive refuses a type with padding, so this is checked as
+        // it compiles; the bytes are the fields, little-endian, in order)
+        plain::<Vec3>();
+        plain::<Quat>();
+        plain::<Transform>();
+        plain::<CameraSnapshot>();
+        plain::<NodeMatrix>();
+        plain::<NodeSnapshot>();
+        plain::<ObjectSnapshot>();
+        plain::<LightSnapshot>();
+        plain::<DecalSnapshot>();
+        plain::<EffectSnapshot>();
+        plain::<ParticleSnapshot>();
+        plain::<DebugLine>();
+        plain::<DebugLabel>();
+        plain::<crate::lights::ClusterView>();
+        let bytes = bytemuck::bytes_of(&Vec3 {
+            x: 1.0,
+            y: -2.0,
+            z: 0.5,
+        });
+        let fields: Vec<u8> = [1.0f32, -2.0, 0.5]
+            .iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
+        assert_eq!(bytes, &fields[..]);
+    }
+
+    #[test]
+    fn a_new_slot_is_zeroed_but_for_its_version_and_pointers() {
+        let slot = Slot::new();
+        assert_eq!(slot.frame.version, SNAPSHOT_VERSION);
+        assert_eq!(slot.frame.object_count, 0);
+        assert_eq!(slot.frame.objects, slot.objects.as_ptr());
+        assert!(bytemuck::cast_slice::<_, u8>(&slot.nodes[..])
+            .iter()
+            .all(|&b| b == 0));
+        assert!(bytemuck::cast_slice::<_, u8>(&slot.particles[..])
+            .iter()
+            .all(|&b| b == 0));
+    }
 
     #[test]
     fn the_layout_is_fixed() {
