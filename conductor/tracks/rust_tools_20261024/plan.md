@@ -46,7 +46,7 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
     - [x] The headless capture and the recorded images (made from the user's map, kept out of the repository)
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Test strength' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
-## Phase 3: Formats
+## Phase 3: Formats [checkpoint: 11778c82]
 - [x] Task: binrw for the tag and cache layouts cfb6a372
     - [x] Write tests: each converted reader gives the same values as the hand-written one over the user's maps (skipped without them) (declined: load_timing measures open, and the inflate dominates; see the report)
     - [x] Convert the readers one layout at a time; zerocopy for the plain ones (declined: the readers stay hand-written, bounds-checked and fuzzed)
@@ -56,7 +56,7 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: blake3 and lz4_flex for the bake cache 35faf08d
     - [x] Write tests: a changed input invalidates its baked asset and only it; compressed caches round-trip; load time measured (the level packs, whose key the bakes share)
     - [x] The cache key and the compression
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Formats' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Formats' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 4: Performance
 - [ ] Task: tracing and benchmarks
