@@ -98,12 +98,12 @@ Scope: the systems on devgulch and Blood Gulch only. Campaign levels are ported 
     - [x] The fixes
 - [x] Task: Conductor - User Manual Verification 'Phase 8: Particles and effects' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
-## Phase 9: The HUD
+## Phase 9: The HUD [checkpoint: 749261c]
 The menus and the rest of the UI are left to the UI rewrite's own track.
 - [x] Task: The HUD 25adc28
     - [x] Write tests: no two HUD elements overlap at any supported resolution; the HUD reacts to ammo, shields, grenades and prompts
     - [x] The fixes
-- [ ] Task: Conductor - User Manual Verification 'Phase 9: The HUD' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 9: The HUD' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 10: Lightmap resolution and interiors
 Found in play: shadows on the far hills break into large blocky triangles across the cliffs and ground, and the bunker interiors are lit coarsely, with leaks and blotches on the walls.
