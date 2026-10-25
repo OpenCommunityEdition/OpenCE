@@ -7,8 +7,8 @@ report at the end.
 
 ## Phase 1: Quick wins
 In the order of the user's goal (2026-10-25): caches ready, debug builds and tests faster, then the rest.
-- [ ] Task: Measure the starting point
-    - [ ] Debug and release build times, the test suite's time, devgulch's release frame time and load time, written to the track's report
+- [x] Task: Measure the starting point 9ca9137
+    - [x] Debug and release build times, the test suite's time, devgulch's release frame time and load time, written to the track's report
 - [ ] Task: Ready caches for the tests
     - [ ] Write tests: the shared loader gives the same level as `import_level`; a second load in one process reads no file; a pack of another importer version is imported again
     - [ ] One test loader for the user's maps, through `load_level` and the shared cache folder (`build/engine/cache`, or `OPENCE_CACHE`), held once per process; the game-data suites use it instead of importing the map each (on 2026-10-25, 33 suites imported Blood Gulch from the map); the importer's own tests still import
