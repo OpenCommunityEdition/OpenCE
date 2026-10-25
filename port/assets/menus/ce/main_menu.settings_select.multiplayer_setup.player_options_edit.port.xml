@@ -10,8 +10,26 @@
 	<widget name="main_menu/settings_select/multiplayer_setup/player_options_edit/aim_assist_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/player_options_edit/var_aim_assist" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/player_options_edit/op_shield_effects" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/shield_effects_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/player_options_edit/shield_effects_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/player_options_edit/shield_effects_label" type="text" controller="1" width="280" height="22" string_list="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/player_options_edit/shield_effects_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/player_options_edit/var_shield_effects" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
 	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_aim_assist">
 		<string text="ALLOWED"/>
 		<string text="BLOCK M+KB"/>
+	</strings>
+	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_shield_effects">
+		<string text="STOCK"/>
+		<string text="GLOW"/>
+		<string text="LIGHT SHOW"/>
+		<string text="OVERSHIELD"/>
+		<string text="GLOW+OVERSHIELD"/>
+		<string text="SHOW+OVERSHIELD"/>
+		<string text="PLAYERS' OWN"/>
 	</strings>
 </menus>

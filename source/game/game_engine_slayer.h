@@ -15,6 +15,11 @@ GAME_ENGINE_SLAYER.H
 void update_speed_for_score(
 	long dead_player_index,
 	long killing_player_index);
+/* port: a player's score (and their team's) changed by the host
+(port/linux/game/gun_game.c's melee demotion) */
+void game_engine_slayer_adjust_score(
+	long player_index,
+	long score_delta);
 
 /* ---------- globals */
 

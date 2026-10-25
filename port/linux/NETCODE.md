@@ -47,6 +47,11 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
+  Script actions naming player0 also reach the players beyond player1.
+  They use the same reverse datum order as the script's `(players)` list,
+  skipping players without units, so a scripted BSP transition does not
+  leave the extra players in the unloaded part of the level.
+
   Every machine follows the host's structure BSP: a switch is sent at once
   and reliably, and each client's input says which BSP it has loaded.
   Until a client has the host's, the host takes none of its players'
@@ -233,7 +238,39 @@ from, so that a second copy of the game on one computer, on a port of its
 own, plays too; version 32 sends the host's mouse aim assist policy
 (distributed message 90, `network_aim_assist.c`), which a client must not
 ignore, and has a client's input say whether its player plays co-op with
-friendly fire.
+friendly fire; version 33 sends with the game's settings whether co-op's
+players hurt their AI allies (Server Setup's ALLY FRIENDLY FIRE: the host
+then deals the players' hits of them no damage); version 34 takes clients'
+hits on, and sends the host's damage to, the map's scenery and devices
+whose shield is all damage can break (Rat Race's energy shields, a Custom
+Edition map's tripmines), which version 17 left out as having no body to
+destroy, and has every machine run those shields' stun and recharge itself;
+and the host deals what such an object deals itself (its shield or body
+breaking: a tripmine a client's player threw going off under the host's
+vehicle), which a client no longer reports and the host took from no one.
+One made in the game, a tripmine, is at an index of its own on each machine:
+the host takes a client's hit on its copy as one on the host's nearest where
+the client had it, and a client the host's damage to one as damage to its own
+copy nearest the damage. Then version 35 sends with the game's settings the
+options of OpenCE's gametypes (SWAT, Infection, Gun Game and Hardcore:
+`port/linux/game/game_modes.c`), which make the gametype's PC options 0x2C
+bytes where they were 0x1C, and the game settings record 16 bytes longer; and
+in an Infection game the host sends its round in the game type's state
+(`struct distributed_infection_state`: each player's role and score, the
+round's phase and winner) in place of Slayer's, which each client checks whole
+before taking it. Then version 36 sends the host's shield effects (distributed
+message 91, `network_shield_effects.c`: the shield glow, its Light Show reach
+and the overshield effect, Server Setup's SHIELD EFFECTS), which every client
+draws in place of its player's own, so that a build that would draw its own
+cannot join. Then version 37 sends with a game's LAN advertisement (the fourth
+of its reserved bytes) and internet listing (the first byte of its stamp) the
+game's kind: an OpenCE gametype's mode and Hardcore
+(`port/linux/game/game_modes.h`'s `game_modes_kind`), which the server
+browser names in its gametype column ("SWAT", "HC CTF"); a browser takes a
+mode for a Slayer game only, and one it does not know as none. Then version 38
+lets the host's shield effects be `players` (SHIELD EFFECTS' PLAYERS' OWN), a
+value of distributed message 91 that tells each client to draw its own
+settings', not synced.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -610,7 +647,10 @@ its name alone beside it, has its name given back as the map lists find it.
      players' ammunition and grenade counts from the host only once a
      round trip has passed since it last fired, reloaded or threw (what
      the host says before then is from before). How old what a unit
-     carries is travels in 16 bits.
+     carries is travels in 16 bits. A client keeps an inventory whose
+     unit or weapons have not come yet (the stream can trail the datagram)
+     and applies it in full once they have, the newest of a unit's winning;
+     one is dropped `EMPTY_INVENTORY_TICKS` after the newest came.
    - Players take the units the host spawns them with, seats are the
      host's (a client's own player's once it has ridden otherwise for
      longer than a round trip), and the CTF flags and oddballs are the same

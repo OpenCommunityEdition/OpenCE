@@ -221,6 +221,7 @@
 	</strings>
 	<strings name="main_menu/gametype_select/var_gametype_banks" map="ui\shell\main_menu\gametype_select\var_gametype_banks">
 		<string text="STANDARD" map="0"/>
+		<string text="OPENCE"/>
 		<string text="CUSTOM" map="2"/>
 	</strings>
 	<strings name="main_menu/main_menu_options" map="ui\shell\main_menu\main_menu_options">
@@ -591,6 +592,13 @@
 		<string text="When you suicide, you must wait fifteen seconds \nbefore you can respawn. This will give you an idea of \nwhat eternity is like." map="27"/>
 		<string text="Players keep their current mouse aim assist setting."/>
 		<string text="Disable mouse aim assist for mouse/keyboard players.\nController and touch aim assist are unchanged."/>
+		<string text="Everyone sees the stock game's shields and\novershield, whatever their own settings."/>
+		<string text="Everyone's shields light their surroundings as\nthey flare."/>
+		<string text="Everyone's shields light their surroundings as\nthey flare, three times as far (Light Show)."/>
+		<string text="For everyone, the overshield rises up the body\nand stays lit, in its own color."/>
+		<string text="For everyone, shields light their surroundings,\nand the overshield rises and stays lit."/>
+		<string text="For everyone, Light Show's shield glow, and the\novershield rising and staying lit."/>
+		<string text="Not synced: each player sees the shield effects\nof their own Video Setup settings."/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/player_options_labels" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\player_options_labels">
 		<string text="NUMBER OF LIVES:" map="0"/>
@@ -602,6 +610,7 @@
 		<string text="INVISIBLE PLAYERS:" map="6"/>
 		<string text="SUICIDE PENALTY:" map="7"/>
 		<string text="AIM ASSIST:"/>
+		<string text="SHIELD EFFECTS:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/player_options_edit/var_invisible_players" map="ui\shell\main_menu\settings_select\multiplayer_setup\player_options_edit\var_invisible_players">
 		<string text="YES" map="0"/>
@@ -893,6 +902,7 @@
 		<string text="Choose which interface indica-\ntors are available while playing \nthis gametype.\nThis gametype:" map="5"/>
 		<string text="Modify gameplay options and\nrules used by teamplay game\nmodes.\nThis gametype:" map="6"/>
 		<string text="Save changes you've made to\nthis gametype and return to\nthe previous screen.\nThis gametype:" map="7"/>
+		<string text="Choose the rules of OpenCE's\ngametypes: SWAT, Infection,\nGun Game and Hardcore.\nThis gametype:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/playlist_edit_options" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\playlist_edit_options">
 		<string text="CHANGE NAME" map="0"/>
@@ -1093,6 +1103,7 @@
 		<string text="You'll traverse the map in the Rocket Warthog, a\nhardy jeep with a rocket launcher mounted in the back." map="14"/>
 		<string text="Command the skies in the Banshee." map="15"/>
 		<string text="Defend the lands with the powerful Covenant Gun\nTurret." map="16"/>
+		<string text="Every vehicle the map places will spawn, as in\nHalo PC."/>
 		<string text="Customize the set of vehicles which will spawn\nin the map." map="17"/>
 		<string text="No Warthogs will spawn in the map." map="18"/>
 		<string text="Up to one Warthog will spawn in the map." map="19"/>
@@ -1145,6 +1156,7 @@
 		<string text="ROCKET WARTHOGS" map="5"/>
 		<string text="BANSHEES" map="6"/>
 		<string text="GUN TURRETS" map="7"/>
+		<string text="PC"/>
 		<string text="CUSTOM" map="8"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/var_vehicles_respawn" map="ui\shell\main_menu\settings_select\multiplayer_setup\vehicle_options_edit\var_vehicles_respawn">
