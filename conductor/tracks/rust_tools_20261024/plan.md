@@ -21,9 +21,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: cargo-nextest and cargo-deny in the test step 7b4d5a3
     - [x] Write tests: `tools/engine_build.py` runs nextest and `cargo deny check`; a forbidden licence fails the step
     - [x] `deny.toml` for the workspace; nextest's profile; the build script's test step
-- [ ] Task: Deterministic maps
-    - [ ] Write tests: one sim run twice in one process with differently seeded hashers gives the same state each tick
-    - [ ] `indexmap` where the sim iterates a map, `rustc-hash` for the hot lookups; clippy's `disallowed_types` forbids std `HashMap` in `sim`
+- [x] Task: Deterministic maps eb85df8
+    - [x] Write tests: one sim run twice in one process with differently seeded hashers gives the same state each tick (the contrails, run four times: the one map iterated with the game's random numbers)
+    - [x] `indexmap` where the sim iterates a map, `rustc-hash` for the hot lookups; clippy's `disallowed_types` forbids std `HashMap` in `sim` (the original's slot order in place of `indexmap`; the ban covers the workspace)
 - [ ] Task: insta and pretty_assertions
     - [ ] Write tests: snapshots of the dev state, the bake report, the import's tag dumps and the shell's command output
     - [ ] Move the hand-written expected texts to snapshots
