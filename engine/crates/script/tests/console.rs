@@ -14,13 +14,26 @@ use opence_script::{ConsoleError, Registry, Runtime, Sleep, Value, World};
 struct Fake {
     flag: bool,
     killed: Vec<i32>,
+    listed: Vec<i32>,
     tags: Vec<String>,
     printed: Vec<String>,
 }
 
 impl World for Fake {
     fn object_of_name(&mut self, name: i32) -> i32 {
-        name + 100
+        if name < 0 {
+            -1
+        } else {
+            name + 100
+        }
+    }
+
+    fn object_list_of(&mut self, objects: &[i32]) -> i32 {
+        objects.first().map_or(-1, |object| object + 1000)
+    }
+
+    fn object_list_of_ai(&mut self, ai: i32) -> i32 {
+        ai + 2000
     }
 
     fn print(&mut self, text: &str) {
@@ -31,6 +44,9 @@ impl World for Fake {
         match (value_type, name) {
             (ValueType::UnitName, "marine") => 7,
             (ValueType::TriggerVolume, "landing") => 2,
+            (ValueType::TriggerVolume, "start") => 0,
+            (ValueType::ObjectName, "warthog") => 3,
+            (ValueType::Ai, "x30") => 4,
             _ => -1,
         }
     }
@@ -59,6 +75,11 @@ fn kill(world: &mut Fake, arguments: &[Value]) -> Value {
     Value::Void
 }
 
+fn objects(world: &mut Fake, arguments: &[Value]) -> Value {
+    world.listed.push(arguments[0].as_index());
+    Value::Void
+}
+
 fn place(world: &mut Fake, arguments: &[Value]) -> Value {
     if let Value::Tag(Some(tag)) = &arguments[0] {
         world.tags.push(tag.path.clone());
@@ -75,6 +96,12 @@ fn runtime(world: &mut Fake) -> Runtime<Fake> {
     registry.function("flag", ValueType::Boolean, &[], flag);
     registry.function("set_flag", ValueType::Void, &[ValueType::Boolean], set_flag);
     registry.function("unit_kill", ValueType::Void, &[ValueType::Unit], kill);
+    registry.function(
+        "objects",
+        ValueType::Void,
+        &[ValueType::ObjectList],
+        objects,
+    );
     registry.function(
         "place",
         ValueType::Void,
@@ -273,5 +300,123 @@ fn the_scripts_are_left_as_they_were() -> Result<(), Box<dyn Error>> {
     );
     runtime.tick(&mut world);
     assert!(runtime.faults().is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_line_is_taken_to_its_limits_and_no_further() -> Result<(), Box<dyn Error>> {
+    let mut world = Fake::default();
+    let mut runtime = runtime(&mut world);
+    let longest = format!("(+ 1 2){}", " ".repeat(opence_script::MAX_TEXT - 7));
+    assert_eq!(
+        runtime.evaluate_text(&longest, &mut world)?,
+        (Value::Real(3.0), ValueType::Real)
+    );
+    let syntax = |text: &str| ConsoleError::Syntax(text.to_owned());
+    for (text, expected) in [
+        ("", syntax("nothing to evaluate")),
+        ("   ", syntax("nothing to evaluate")),
+        ("(+ 1 2) (+ 3 4)", syntax("more than one expression")),
+        ("(+ 1 2) 3", syntax("more than one expression")),
+    ] {
+        assert_eq!(
+            runtime.evaluate_text(text, &mut world),
+            Err(expected),
+            "{text:?}"
+        );
+    }
+    // (a lone word naming a script is a call of it, as a function's is)
+    assert_eq!(
+        runtime.evaluate_text("five", &mut world)?,
+        (Value::Short(5), ValueType::Short)
+    );
+    Ok(())
+}
+
+#[test]
+fn a_wrong_count_names_the_bound_it_passed() {
+    let mut world = Fake::default();
+    let mut runtime = runtime(&mut world);
+    for (text, expected, given) in [("(sleep)", 1, 0), ("(sleep 1 later 3)", 2, 3)] {
+        assert_eq!(
+            runtime.evaluate_text(text, &mut world),
+            Err(ConsoleError::Arguments {
+                function: "sleep".into(),
+                expected,
+                given,
+            }),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn a_begin_gives_its_last_expressions_value() -> Result<(), Box<dyn Error>> {
+    let mut world = Fake::default();
+    let mut runtime = runtime(&mut world);
+    assert_eq!(
+        runtime.evaluate_text("(begin (set_flag true) (five))", &mut world)?,
+        (Value::Short(5), ValueType::Short)
+    );
+    assert!(world.flag);
+    Ok(())
+}
+
+#[test]
+fn the_special_forms_of_waiting_and_units_compile() -> Result<(), Box<dyn Error>> {
+    let mut world = Fake::default();
+    let mut runtime = runtime(&mut world);
+    // (a console expression may not sleep: it ends at once)
+    assert_eq!(
+        runtime.evaluate_text("(sleep_until true)", &mut world)?,
+        (Value::Void, ValueType::Void)
+    );
+    assert_eq!(
+        runtime.evaluate_text("(unit none)", &mut world)?.1,
+        ValueType::Unit
+    );
+    assert_eq!(
+        runtime
+            .evaluate_text("(object_to_unit none)", &mut world)?
+            .1,
+        ValueType::Unit
+    );
+    Ok(())
+}
+
+#[test]
+fn names_are_looked_up_as_the_parameter_takes_them() -> Result<(), Box<dyn Error>> {
+    let mut world = Fake::default();
+    let mut runtime = runtime(&mut world);
+    // (`none` is no object; an object list takes an object's name or an
+    // encounter)
+    runtime.evaluate_text("(unit_kill none)", &mut world)?;
+    assert_eq!(world.killed, [-1]);
+    runtime.evaluate_text("(objects warthog)", &mut world)?;
+    runtime.evaluate_text("(objects x30)", &mut world)?;
+    assert_eq!(world.listed, [1103, 2004]);
+    assert_eq!(
+        runtime.evaluate_text("(unit_kill x30)", &mut world),
+        Err(ConsoleError::UnknownName {
+            value_type: ValueType::UnitName,
+            name: "x30".into(),
+        })
+    );
+    // (any other name: its index, `none` for -1, or an error)
+    assert_eq!(
+        runtime.evaluate_text("(volume start)", &mut world)?,
+        (Value::Short(0), ValueType::Short)
+    );
+    assert_eq!(
+        runtime.evaluate_text("(volume none)", &mut world)?,
+        (Value::Short(-1), ValueType::Short)
+    );
+    assert_eq!(
+        runtime.evaluate_text("(volume nowhere)", &mut world),
+        Err(ConsoleError::UnknownName {
+            value_type: ValueType::TriggerVolume,
+            name: "nowhere".into(),
+        })
+    );
     Ok(())
 }

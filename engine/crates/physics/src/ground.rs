@@ -194,6 +194,38 @@ fn closest_point(point: Vec3, [a, b, c]: [Vec3; 3]) -> Vec3 {
 mod tests {
     use super::*;
 
+    #[test]
+    fn the_nearest_point_of_a_triangle_is_found_in_each_of_its_regions() {
+        let triangle = [
+            Vec3::ZERO,
+            Vec3::new(4.0, 0.0, 0.0),
+            Vec3::new(0.0, 4.0, 0.0),
+        ];
+        let nearest = |point: [f32; 3]| closest_point(Vec3::from_array(point), triangle);
+        let cases = [
+            // its corners
+            ([-1.0, -1.0, 1.0], [0.0, 0.0, 0.0]),
+            ([5.0, -1.0, 0.0], [4.0, 0.0, 0.0]),
+            ([-1.0, 5.0, 0.0], [0.0, 4.0, 0.0]),
+            // its edges: along x, along y, and the long one
+            ([2.0, -1.0, 3.0], [2.0, 0.0, 0.0]),
+            ([-1.0, 1.0, 0.0], [0.0, 1.0, 0.0]),
+            ([5.0, 2.0, 0.0], [3.5, 0.5, 0.0]),
+            // its face
+            ([1.0, 1.5, 5.0], [1.0, 1.5, 0.0]),
+        ];
+        for (point, expected) in cases {
+            let found = nearest(point);
+            assert!(
+                found.abs_diff_eq(Vec3::from_array(expected), 1.0e-5),
+                "{point:?}: {found}"
+            );
+        }
+        // (one with no area: its first corner)
+        let flat = [Vec3::ONE, Vec3::ONE, Vec3::ONE];
+        assert_eq!(closest_point(Vec3::ZERO, flat), Vec3::ONE);
+    }
+
     /// Two squares of floor side by side, of materials 0 and 1, and a
     /// wall of material 2 standing at x = 2.
     fn mesh() -> LevelMesh {
@@ -284,5 +316,76 @@ mod tests {
         assert!(surfaces.columns <= CELLS_MOST && surfaces.rows <= CELLS_MOST);
         assert_eq!(surfaces.at(Vec3::new(100.0, 100.0, 0.0)), 4);
         assert_eq!(surfaces.at(Vec3::new(4000.0, 4000.0, 0.0)), -1);
+    }
+
+    #[test]
+    fn the_grid_covers_the_level_in_cells_of_the_least_side() {
+        // (a strip 100 by 40, its two triangles at either end)
+        let mesh = LevelMesh {
+            vertices: vec![
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [99.0, 39.0, 0.0],
+                [100.0, 39.0, 0.0],
+                [100.0, 40.0, 0.0],
+            ],
+            triangles: vec![[0, 1, 2], [3, 4, 5]],
+            materials: vec![Some(0), Some(1)],
+        };
+        let surfaces = SurfaceMaterials::new(&mesh, &[5, 6]);
+        // (100.1 by 40.1 with the reach, in cells of 2)
+        assert_eq!((surfaces.columns, surfaces.rows), (51, 21));
+        assert_eq!(surfaces.origin, [-SURFACE_REACH, -SURFACE_REACH]);
+        assert_eq!(surfaces.cell_of(Vec3::new(0.5, 0.5, 0.0)), (0, 0));
+        assert_eq!(surfaces.cell_of(Vec3::new(4.0, 7.0, 0.0)), (2, 3));
+        assert_eq!(surfaces.cell_of(Vec3::new(99.5, 39.5, 0.0)), (49, 19));
+        // (held to the grid: before it, past it, and nowhere)
+        assert_eq!(surfaces.cell_of(Vec3::new(-50.0, -50.0, 0.0)), (0, 0));
+        assert_eq!(surfaces.cell_of(Vec3::new(500.0, 500.0, 0.0)), (50, 20));
+        assert_eq!(surfaces.cell_of(Vec3::NAN), (0, 0));
+        // each triangle is only in the cells it reaches (the second, with
+        // the reach, crosses into the next column and row)
+        let held: Vec<usize> = surfaces.cells.iter().map(Vec::len).collect();
+        assert_eq!(held.iter().sum::<usize>(), 5);
+        assert_eq!(surfaces.cells[0], vec![0]);
+        for (column, row) in [(49, 19), (50, 19), (49, 20), (50, 20)] {
+            assert_eq!(
+                surfaces.cells[row * 51 + column],
+                vec![1],
+                "{column}, {row}"
+            );
+        }
+        assert_eq!(surfaces.at(Vec3::new(0.2, 0.2, 0.0)), 5);
+        assert_eq!(surfaces.at(Vec3::new(99.9, 39.5, 0.0)), 6);
+        assert_eq!(surfaces.at(Vec3::new(50.0, 20.0, 0.0)), -1);
+    }
+
+    #[test]
+    fn the_cells_along_a_side_are_at_least_one_and_at_most_the_most() {
+        assert_eq!(cells_along(10.0, 2.0), 5);
+        assert_eq!(cells_along(10.5, 2.0), 6);
+        assert_eq!(cells_along(0.0, 2.0), 1);
+        assert_eq!(cells_along(-3.0, 2.0), 1);
+        assert_eq!(cells_along(f32::NAN, 2.0), 1);
+        assert_eq!(cells_along(1.0e9, 2.0), CELLS_MOST);
+    }
+
+    #[test]
+    fn a_surface_just_within_reach_is_found_and_of_two_as_near_the_first() {
+        let floor = |material| LevelMesh {
+            vertices: vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            triangles: vec![[0, 1, 2], [0, 1, 2]],
+            materials: vec![Some(material), Some(1 - material)],
+        };
+        let surfaces = SurfaceMaterials::new(&floor(0), &[4, 8]);
+        assert_eq!(surfaces.at(Vec3::new(0.2, 0.2, 0.0)), 4);
+        assert_eq!(
+            SurfaceMaterials::new(&floor(1), &[4, 8]).at(Vec3::new(0.2, 0.2, 0.0)),
+            8
+        );
+        // (exactly the reach away counts; a little more does not)
+        assert_eq!(surfaces.at(Vec3::new(0.2, 0.2, SURFACE_REACH)), 4);
+        assert_eq!(surfaces.at(Vec3::new(0.2, 0.2, SURFACE_REACH * 1.01)), -1);
     }
 }

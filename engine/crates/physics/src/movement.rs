@@ -433,6 +433,7 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use opence_content::PlayerPhysics;
 
     fn cyborg() -> Biped {
         Biped {
@@ -446,6 +447,168 @@ mod tests {
         }
     }
 
+    /// A biped standing in an empty world, with landings, a crouch and a
+    /// jump to recover from.
+    fn mover(biped: Biped, player: PlayerPhysics) -> Result<(World, Mover), PhysicsError> {
+        let biped = Biped {
+            collision_radius: 0.2,
+            collision_height_standing: 0.7,
+            collision_height_crouching: 0.5,
+            standing_camera_height: 0.62,
+            crouching_camera_height: 0.35,
+            crouch_transition_time: 0.25,
+            minimum_normal_k: 0.7,
+            minimum_soft_landing_velocity: 3.0,
+            minimum_hard_landing_velocity: 6.0,
+            maximum_hard_landing_velocity: 30.0,
+            maximum_soft_landing_time: 1.0,
+            maximum_hard_landing_time: 2.0,
+            jump_velocity: 2.5,
+            ..biped
+        };
+        let mut world = World::new(crate::WorldSettings::default())?;
+        let settings = MoverSettings {
+            biped,
+            player,
+            gravity: 10.0,
+        };
+        let mover = Mover::new(&mut world, settings, Vec3::new(0.0, 0.0, 1.0))?;
+        Ok((world, mover))
+    }
+
+    /// A floor 40 units square at z = 0 under the mover's world.
+    fn floor(world: &mut World) -> Result<(), PhysicsError> {
+        world.set_level(&crate::LevelMesh {
+            vertices: vec![
+                [-20.0, -20.0, 0.0],
+                [20.0, -20.0, 0.0],
+                [20.0, 20.0, 0.0],
+                [-20.0, 20.0, 0.0],
+            ],
+            triangles: vec![[0, 1, 2], [0, 2, 3]],
+            materials: vec![None, None],
+        })
+    }
+
+    /// The mover on the floor, settled: grounded and still.
+    fn grounded() -> Result<(World, Mover), PhysicsError> {
+        let player = PlayerPhysics {
+            run_forward: 3.0,
+            run_sideways: 2.5,
+            run_acceleration: 20.0,
+            ..PlayerPhysics::default()
+        };
+        let (mut world, mut mover) = mover(cyborg(), player)?;
+        floor(&mut world)?;
+        mover.teleport(&mut world, Vec3::ZERO)?;
+        for _ in 0..10 {
+            mover.step(&mut world, &MovementInput::default())?;
+        }
+        assert!(!mover.airborne);
+        assert_eq!(mover.landing, None);
+        assert!(mover.velocity.length() < 1.0e-3, "{}", mover.velocity);
+        Ok((world, mover))
+    }
+
+    /// Forward and half left, facing along y.
+    fn walking() -> MovementInput {
+        MovementInput {
+            throttle: Vec2::new(1.0, 0.5),
+            yaw: core::f32::consts::FRAC_PI_2,
+            ..MovementInput::default()
+        }
+    }
+
+    fn near_by(a: Vec2, b: Vec2, by: f32) -> bool {
+        (a - b).length() < by
+    }
+
+    #[test]
+    fn on_the_ground_it_gathers_speed_by_its_acceleration_to_its_run() -> Result<(), PhysicsError> {
+        let (mut world, mut mover) = grounded()?;
+        // (forward is +y, left is -x: a tick's acceleration, 20 / 60,
+        // toward (-1.25, 3))
+        mover.step(&mut world, &walking())?;
+        let first = mover.velocity.truncate();
+        assert!(
+            near_by(first, Vec2::new(-0.128_205, 0.307_692), 2.0e-3),
+            "{first}"
+        );
+        assert!(mover.velocity.z.abs() < 1.0e-2, "{}", mover.velocity);
+        for _ in 0..30 {
+            mover.step(&mut world, &walking())?;
+        }
+        let run = mover.velocity.truncate();
+        assert!(near_by(run, Vec2::new(-1.25, 3.0), 1.0e-2), "{run}");
+        assert!(!mover.airborne);
+        Ok(())
+    }
+
+    #[test]
+    fn in_the_air_it_falls_and_steers_by_its_airborne_acceleration() -> Result<(), PhysicsError> {
+        let (mut world, mut mover) = grounded()?;
+        mover.teleport(&mut world, Vec3::new(0.0, 0.0, 3.0))?;
+        mover.airborne = true;
+        mover.step(&mut world, &walking())?;
+        let steer = mover.velocity.truncate();
+        assert!(
+            near_by(steer, Vec2::new(-0.061_538, 0.147_692), 1.0e-3),
+            "{steer}"
+        );
+        assert!(
+            (mover.velocity.z + 10.0 / 60.0).abs() < 1.0e-3,
+            "{}",
+            mover.velocity
+        );
+        assert!(mover.airborne);
+        // (three units down at 10 a second squared: some 7.7 a second, past
+        // the hard landing's 6)
+        for _ in 0..120 {
+            mover.step(&mut world, &MovementInput::default())?;
+            if !mover.airborne {
+                break;
+            }
+        }
+        assert!(!mover.airborne);
+        assert!(mover.landing_velocity > 6.0, "{}", mover.landing_velocity);
+        assert_eq!(mover.landing, Some(Landing::Hard));
+        Ok(())
+    }
+
+    #[test]
+    fn against_a_walls_normal_it_walks_along_the_wall_and_five_times_as_steep(
+    ) -> Result<(), PhysicsError> {
+        let (mut world, mut mover) = grounded()?;
+        // (an overhang's normal, facing down: forward along it and left
+        // across it, the climb made five times as steep, and the speed of
+        // the slope down it)
+        mover.ground_normal = Vec3::new(0.6, 0.0, -0.8);
+        mover.step(&mut world, &walking())?;
+        let along = mover.velocity.truncate();
+        assert!(
+            near_by(along, Vec2::new(-0.202_390, 0.231_621), 2.0e-3),
+            "{along}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_landing_with_no_range_to_recover_over_is_none() -> Result<(), PhysicsError> {
+        let even = Biped {
+            maximum_hard_landing_velocity: 6.0,
+            ..Biped::default()
+        };
+        let (_world, mut mover) = mover(even, PlayerPhysics::default())?;
+        mover.settings.biped.maximum_hard_landing_velocity = 6.0;
+        mover.start_landing(7.0);
+        assert_eq!(mover.landing, None);
+        Ok(())
+    }
+
+    fn near(a: f32, b: f32) -> bool {
+        (a - b).abs() < 1.0e-5
+    }
+
     #[test]
     fn slopes_scale_the_speed() {
         let biped = cyborg();
@@ -454,5 +617,160 @@ mod tests {
         assert_eq!(slope_scale(&biped, 0.9), 0.65);
         let halfway = slope_scale(&biped, (0.342 + 0.707) / 2.0);
         assert!((halfway - 0.825).abs() < 1.0e-4, "{halfway}");
+        // a quarter of the way up each ramp, and its ends
+        let quarter = |from: f32, to: f32| from + (to - from) * 0.25;
+        let down = slope_scale(&biped, quarter(-0.342, -0.707));
+        assert!((down - 1.0625).abs() < 1.0e-4, "{down}");
+        let up = slope_scale(&biped, quarter(0.342, 0.707));
+        assert!((up - 0.9125).abs() < 1.0e-4, "{up}");
+        assert_eq!(slope_scale(&biped, -0.707), 1.25);
+        assert_eq!(slope_scale(&biped, 0.707), 0.65);
+        assert_eq!(slope_scale(&biped, -0.342), 1.0);
+        assert_eq!(slope_scale(&biped, 0.342), 1.0);
+    }
+
+    #[test]
+    fn a_long_vector_is_clamped_to_the_longest_and_a_short_one_kept() {
+        assert_eq!(clamp_length(Vec2::new(3.0, 4.0), 2.5), Vec2::new(1.5, 2.0));
+        assert_eq!(clamp_length(Vec2::new(3.0, 4.0), 10.0), Vec2::new(3.0, 4.0));
+        assert_eq!(clamp_length(Vec2::new(3.0, 4.0), 5.0), Vec2::new(3.0, 4.0));
+    }
+
+    #[test]
+    fn its_radius_and_eye_follow_its_tag_and_its_crouch() -> Result<(), PhysicsError> {
+        let (_world, mut mover) = mover(Biped::default(), PlayerPhysics::default())?;
+        assert_eq!(mover.radius(), 0.2);
+        assert!(near(mover.camera_height(), 0.62));
+        mover.crouch = 0.5;
+        assert!(near(mover.camera_height(), 0.485));
+        Ok(())
+    }
+
+    #[test]
+    fn a_landing_is_soft_or_hard_by_its_speed_and_recovered_from_in_its_ticks(
+    ) -> Result<(), PhysicsError> {
+        let (_world, mut mover) = mover(Biped::default(), PlayerPhysics::default())?;
+        mover.start_landing(2.9);
+        assert_eq!(mover.landing, None);
+        // at the softest a landing is soft, and over at once
+        mover.start_landing(3.0);
+        assert_eq!(mover.landing, Some(Landing::Soft));
+        assert_eq!(mover.landing_recovery_ticks, 0);
+        mover.update_landing();
+        assert_eq!(mover.landing, None);
+        // a quarter of the way to hard: a quarter of the soft time, in
+        // Halo's ticks (7.5, truncated), doubled
+        mover.start_landing(3.75);
+        assert_eq!(mover.landing, Some(Landing::Soft));
+        assert_eq!(mover.landing_recovery_ticks, 14);
+        for _ in 0..13 {
+            mover.update_landing();
+        }
+        assert_eq!(mover.landing, Some(Landing::Soft));
+        mover.update_landing();
+        assert_eq!(mover.landing, None);
+        // hard from the hardest's start, by the whole speed over its range
+        mover.start_landing(6.0);
+        assert_eq!(mover.landing, Some(Landing::Hard));
+        assert_eq!(mover.landing_recovery_ticks, 30);
+        mover.start_landing(12.0);
+        assert_eq!(mover.landing_recovery_ticks, 60);
+        mover.start_landing(100.0);
+        assert_eq!(mover.landing_recovery_ticks, 120);
+        Ok(())
+    }
+
+    #[test]
+    fn a_crouch_takes_its_transition_time_and_keeps_the_head_still_in_the_air(
+    ) -> Result<(), PhysicsError> {
+        let (mut world, mut mover) = mover(Biped::default(), PlayerPhysics::default())?;
+        assert!(mover.airborne);
+        // (a quarter second: a fifteenth a tick, the pill shrinking 0.2 over
+        // it, so its feet rise 0.2 / 15 a tick)
+        let lift = mover.update_crouch(&mut world, true)?;
+        assert!(near(mover.crouch, 1.0 / 15.0), "{}", mover.crouch);
+        assert!(near(mover.height, 0.7 - 0.2 / 15.0), "{}", mover.height);
+        assert!(near(lift, 0.2 / 15.0 * TICKS_PER_SECOND), "{lift}");
+        let lowered = mover.update_crouch(&mut world, false)?;
+        assert!(near(mover.crouch, 0.0), "{}", mover.crouch);
+        assert!(near(lowered, -0.2 / 15.0 * TICKS_PER_SECOND), "{lowered}");
+        // on the ground the feet stay where they are
+        mover.airborne = false;
+        assert_eq!(mover.update_crouch(&mut world, true)?, 0.0);
+        // a crouch too slow to pass Halo's least change a tick is no lift
+        let slow = Biped {
+            crouch_transition_time: 10.0,
+            ..Biped::default()
+        };
+        let (mut world, mut mover) = self::mover(slow, PlayerPhysics::default())?;
+        mover.settings.biped.crouch_transition_time = 10.0;
+        assert_eq!(mover.update_crouch(&mut world, true)?, 0.0);
+        assert!(near(mover.crouch, 1.0 / 600.0), "{}", mover.crouch);
+        // (two seconds: 1/120 a tick, past Halo's 0.01 a 30 Hz tick)
+        mover.settings.biped.crouch_transition_time = 2.0;
+        let lift = mover.update_crouch(&mut world, true)?;
+        assert!(near(lift, 0.2 / 120.0 * TICKS_PER_SECOND), "{lift}");
+        Ok(())
+    }
+
+    #[test]
+    fn a_jump_waits_for_its_recovery_on_the_ground() -> Result<(), PhysicsError> {
+        let (_world, mut mover) = mover(Biped::default(), PlayerPhysics::default())?;
+        mover.airborne = false;
+        // (more than five of Halo's ticks: the eleventh of the engine's)
+        for _ in 0..10 {
+            mover.update_jump(true);
+            assert!(!mover.airborne);
+        }
+        mover.update_jump(true);
+        assert!(mover.airborne);
+        assert_eq!(mover.velocity.z, 2.5);
+        // in the air, or landing hard, it cannot jump again
+        mover.velocity.z = 0.0;
+        mover.jump_recovery_ticks = 100;
+        mover.update_jump(true);
+        assert_eq!(mover.velocity.z, 0.0);
+        mover.airborne = false;
+        mover.landing = Some(Landing::Hard);
+        mover.update_jump(true);
+        assert!(!mover.airborne);
+        Ok(())
+    }
+
+    #[test]
+    fn the_controls_ask_for_the_players_speeds() -> Result<(), PhysicsError> {
+        let player = PlayerPhysics {
+            run_forward: 3.0,
+            run_sideways: 2.5,
+            run_acceleration: 20.0,
+            ..PlayerPhysics::default()
+        };
+        let (_world, mut mover) = mover(Biped::default(), player)?;
+        let input = |x: f32, y: f32| MovementInput {
+            throttle: Vec2::new(x, y),
+            ..MovementInput::default()
+        };
+        let (wanted, acceleration, third, fourth) = mover.desired(&input(1.0, 0.0));
+        assert_eq!(
+            (wanted, acceleration, fourth),
+            (Vec2::new(3.0, 0.0), 20.0, 0.0)
+        );
+        assert!(near(third, 9.6), "{third}");
+        // (at the dead zone's edge a throttle counts)
+        assert_eq!(mover.desired(&input(0.0, 0.1)).0, Vec2::new(0.0, 0.25));
+        assert_eq!(mover.desired(&input(0.0, 0.09)).0, Vec2::ZERO);
+        // a biped on the old physics takes the old speeds
+        mover.settings.biped.flags = Biped::USES_OLD_PLAYER_PHYSICS;
+        let (wanted, acceleration, _, _) = mover.desired(&input(1.0, 0.0));
+        assert_eq!(wanted, Vec2::new(2.25, 0.0));
+        assert!(near(acceleration, 9.6), "{acceleration}");
+        // and its other flags leave the player's
+        mover.settings.biped.flags = !Biped::USES_OLD_PLAYER_PHYSICS;
+        assert_eq!(mover.desired(&input(1.0, 0.0)).0, Vec2::new(3.0, 0.0));
+        mover.landing = Some(Landing::Hard);
+        let (wanted, acceleration, third, fourth) = mover.desired(&input(1.0, 0.0));
+        assert_eq!((wanted, acceleration, fourth), (Vec2::ZERO, 0.0, 1.0));
+        assert!(near(third, 9.6), "{third}");
+        Ok(())
     }
 }

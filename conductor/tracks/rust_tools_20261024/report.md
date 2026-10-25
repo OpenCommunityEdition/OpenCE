@@ -368,3 +368,73 @@ level only.
 | `StationFramesTests`, nine stations | each drawn twice: identical |
 | a second run against the approved frames | all nine: share 0.00000, largest 0 |
 | `tools/test_engine_golden.py` | 4 passed |
+
+## Mutation testing (2026-10-25)
+
+`cargo mutants` (with nextest, the `test-opt` profile, four jobs) was run
+over `physics` and `script`, and then again with `--iterate` after the new
+tests, so the second run tests only the first run's survivors. `sim`
+cannot be mutated yet. `ragdoll.rs` includes
+`port/assets/ragdolls/ragdolls.txt` from outside the workspace, so the
+copy cargo-mutants builds in has no such file, and its unmutated baseline
+fails. The fix is to move the file under `engine/`. That also changes the
+old port's tools and `nix/engine/rust.nix`, so it is left for the merge,
+or for the next tools pass.
+
+**physics.** 240 mutants survived at first, and 44 now. The new tests
+cover the mover's step, crouch and jump, the ground's material cells, and
+the world's contacts and ragdolls. Equivalents among the 44:
+- the layer masks' `|` → `^` (the bits are disjoint);
+- `from_raw`'s unit conversions and its `GROUND_UNSUPPORTED` arm, which
+  Jolt does not report for a character on the ground;
+- `World::drop`, whose leak no test can observe;
+- the boundary comparisons in `cell_of`, `cells_along`, `slope_scale`,
+  `clamp_length` and the mover's thresholds, where an equal value gives
+  the same result either way;
+- `closest_point`'s and the mesh's index arithmetic on the shapes the
+  tests use.
+
+The rest are float boundaries that a test could hit only with an exact
+value.
+
+**script.** 164 of 414 mutants survived at first, and 10 now. The new
+tests are in `tests/runtime.rs`, `tests/console.rs` and `tests/values.rs`.
+They cover:
+- each type's default, and the casts between numbers, booleans, objects,
+  their names, lists and encounters;
+- arithmetic folding and comparisons;
+- `begin_random`'s order from the runtime's xorshift;
+- sleeps of other scripts, and `sleep_until` with constant and changing
+  conditions;
+- runaway scripts and globals;
+- each special form given the wrong number of arguments;
+- the console line's length limit and its errors, and how a name is looked
+  up for each parameter type.
+
+All 10 survivors are equivalent:
+- `run`'s `>` → `>=` and `==`: every evaluation takes an odd number of
+  steps, so the limit is never met exactly;
+- `evaluate`'s `<` → `<=`, and `resolve`'s two `<` → `<=` (at 1017 and
+  1060): the index one past the end gives the default, or nothing;
+- `step`'s `frame.step == 0` guard: always true where it is reached;
+- `ObjectToUnit`'s `-1` (860): the index is replaced before it is read;
+- `slot`'s `<` → `<=`: the slot one past the globals is read through `get`
+  and gives the default;
+- `count`'s `<` → `<=`: this differs only when the count is both the least
+  and above the most;
+- `cast`'s `Void` arm: without it, the cast falls to the default, which is
+  `Void`.
+
+One finding is for the fidelity track. A startup or continuous script
+whose root expression is a `sleep` (not inside a `begin`) ends at once,
+since its stack is empty after the sleep returns. Whether
+`hs_thread_main` does the same has to be checked against `source/`. It
+goes on the fidelity bugs list.
+
+| check | result |
+|---|---|
+| physics, first run → `--iterate` | 240 → 44 survived (5 of 49 caught on the rerun) |
+| script, first run → `--iterate` | 164 → 10 survived (154 caught, 1 timeout), all 10 equivalent |
+| sim | not run: `include_str!` outside the workspace |
+| `cargo clippy --workspace --all-targets -D warnings` | clean |
+| `tools/engine_build.py --test --suite rust` | 1103 passed, 3 skipped |

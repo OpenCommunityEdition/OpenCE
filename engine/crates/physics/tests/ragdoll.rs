@@ -8,7 +8,8 @@ use glam::Vec3;
 use opence_content::level::{CollisionEdge, CollisionSurface, CollisionVertex};
 use opence_content::CollisionBsp;
 use opence_physics::{
-    LevelMesh, Material, PhysicsError, Pose, RagdollId, RagdollPart, Shape, World, WorldSettings,
+    shape_volume, LevelMesh, Material, PhysicsError, Pose, RagdollId, RagdollPart, Shape, World,
+    WorldSettings, METRES_PER_UNIT, METRES_PER_UNIT_CUBED,
 };
 
 const TICK: f32 = 1.0 / 30.0;
@@ -166,4 +167,58 @@ fn bad_parts_are_refused() -> Result<(), PhysicsError> {
         .add_ragdoll(&[part(None)], &poses, &poses[..1], Material::default())
         .is_err());
     Ok(())
+}
+
+#[test]
+fn a_ragdoll_wakes_and_once_removed_is_refused() -> Result<(), Box<dyn Error>> {
+    let mut world = world()?;
+    let (ragdoll, poses) = two_parts(&mut world, 3.0)?;
+    assert!(world.ragdoll_awake(ragdoll)?);
+    assert!(world.ragdoll_limit_error(ragdoll)? >= 0.0);
+    world.set_ragdoll_velocity(ragdoll, Vec3::new(0.0, 0.0, 5.0))?;
+    world.remove_ragdoll(ragdoll);
+    assert_eq!(world.ragdoll_awake(ragdoll), Err(PhysicsError::Refused));
+    assert_eq!(
+        world.ragdoll_limit_error(ragdoll),
+        Err(PhysicsError::Refused)
+    );
+    assert_eq!(
+        world.drive_ragdoll(ragdoll, &poses, 4.0),
+        Err(PhysicsError::Refused)
+    );
+    assert_eq!(world.ragdoll_go_limp(ragdoll), Err(PhysicsError::Refused));
+    assert_eq!(
+        world.set_ragdoll_velocity(ragdoll, Vec3::ZERO),
+        Err(PhysicsError::Refused)
+    );
+    Ok(())
+}
+
+#[test]
+fn each_shapes_volume_is_its_solids() {
+    let near = |a: f32, b: f32| (a - b).abs() < 1e-4 * b;
+    let pi = std::f32::consts::PI;
+    assert!(near(
+        shape_volume(&Shape::Sphere { radius: 2.0 }),
+        32.0 / 3.0 * pi
+    ));
+    // (a cylinder 3 high and the two halves of a sphere of radius 2)
+    assert!(near(
+        shape_volume(&Shape::Capsule {
+            radius: 2.0,
+            height: 3.0
+        }),
+        pi * 4.0 * 3.0 + 32.0 / 3.0 * pi
+    ));
+    assert!(near(
+        shape_volume(&Shape::Box {
+            half_extents: Vec3::new(2.0, 3.0, 4.0)
+        }),
+        192.0
+    ));
+    assert!(near(
+        METRES_PER_UNIT_CUBED,
+        METRES_PER_UNIT * METRES_PER_UNIT * METRES_PER_UNIT
+    ));
+    assert!(near(METRES_PER_UNIT_CUBED, 28.316_846));
 }
