@@ -58,7 +58,7 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
     - [x] The cache key and the compression
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Formats' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
-## Phase 4: Performance
+## Phase 4: Performance [checkpoint: 3046fac1]
 - [x] Task: tracing and benchmarks d2a62812
     - [x] Write tests: spans nest and the JSON log parses; the benchmarks run (dev/tests/tracing.rs; `cargo test --bench` runs each once)
     - [x] `tracing` in place of `log`, `tracing-tracy` behind a feature, `divan` benchmarks for collision, the AI tick, animation blending and the bake (the log book is a layer; `OPENCE_LOG_JSON` adds the JSON log; the blend and AI benches need assets/maps)
@@ -74,7 +74,7 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: The release build 63e99d02
     - [x] Write tests: the release profile has fat LTO and one codegen unit; the PGO build gives the same reference traces (the profile test holds the measured decision, abort and no LTO; the PGO build's traces are identical)
     - [x] LTO, codegen-units, cargo-pgo profiles recorded on devgulch; cargo-show-asm in the shell (LTO and PGO measured slower and declined; cargo-show-asm deferred to the Nix restructure, see the report)
-- [ ] Task: Conductor - User Manual Verification 'Phase 4: Performance' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Performance' (Protocol in workflow.md) (superseded: automated verification only, at the user's instruction)
 
 ## Phase 5: Nix tooling (after the crane packages build)
 - [ ] Task: Formatting and hooks
