@@ -37,6 +37,16 @@ def test_the_test_binaries_are_read_from_cargos_messages() -> None:
     assert suites[1].package == Path("/e/crates/sim")
 
 
+def test_suites_of_the_same_name_are_told_apart_by_their_crate() -> None:
+    lines = [
+        artifact("scenarios", "test", "/t/debug/deps/scenarios-1", "/e/crates/campaign/Cargo.toml"),
+        artifact("scenarios", "test", "/t/debug/deps/scenarios-2", "/e/crates/script/Cargo.toml"),
+        artifact("levels", "test", "/t/debug/deps/levels-3", "/e/crates/campaign/Cargo.toml"),
+    ]
+    names = [suite.name for suite in engine_timings.test_binaries(lines)]
+    assert names == ["scenarios (campaign)", "scenarios (script)", "levels"]
+
+
 def test_the_table_lists_each_step_and_the_slowest_suites() -> None:
     timings = {
         "steps": {"build_dev_cold": 101.25, "build_dev_touch": 9.5},

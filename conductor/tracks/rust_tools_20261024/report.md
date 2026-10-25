@@ -52,3 +52,31 @@ a path that climbs out of crane's links) and the ragdolls' overrides were
 in the source. The dependencies' derivation now has a fixed version: before,
 each commit renamed it and built every dependency again (3–4 minutes);
 after a new commit only the workspace and the app rebuild.
+
+## Ready caches (2026-10-25)
+
+The game-data suites load their maps through `opence_import::testing`:
+Blood Gulch held once per test binary, the campaign levels read from their
+packs one at a time (held, ten 300 MB levels would sit in memory at once),
+all through the game's cache folder (`build/engine/cache`, or
+`OPENCE_CACHE`). The devgulch, control, cli and effects suites, which kept
+their own cache folders (two of them wiped each run), use it too.
+
+| suite | before | after |
+|---|---|---|
+| placements | 188.9 s | 89.9 s |
+| stock_sounds | 267.5 s | 200.0 s |
+| actors | 736.7 s | 688.4 s |
+| stock_scenes | 72.0 s | 46.1 s |
+| cutscenes | 46.7 s | 27.3 s |
+| devices | 50.0 s | 31.1 s |
+| sounds (ffi) | 25.0 s | 3.8 s |
+| ui_walk | 21.0 s | 9.4 s |
+| levels | 986.6 s | 983.0 s |
+| **all suites** | **3349.6 s** | **3184.1 s** |
+
+Importing was 5% of the run. The rest is the debug sim stepping the
+levels (`levels` and `actors` alone are 52%), which is the optimised test
+profile's task. The baseline's `scenarios` (8.3 s) was the script crate's:
+two crates have a suite of that name and one overwrote the other; the
+timings now name such suites by their crate, and campaign's takes 224.7 s.

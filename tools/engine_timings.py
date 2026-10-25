@@ -23,7 +23,8 @@ import os
 import shutil
 import subprocess
 import time
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,7 +58,10 @@ def test_binaries(lines: list[str]) -> list[Suite]:
         kind = target["kind"][0]
         name = target["name"] if kind == "test" else f"{target['name']} ({kind})"
         suites.append(Suite(name, Path(message["executable"]), Path(message["manifest_path"]).parent))
-    return suites
+    # (two crates' suites of one name would share a key in the timings)
+    counts = Counter(suite.name for suite in suites)
+    return [replace(suite, name=f"{suite.name} ({suite.package.name})") if counts[suite.name] > 1 else suite
+            for suite in suites]
 
 
 def table(timings: dict, slowest: int = 10) -> str:

@@ -3,19 +3,17 @@
 //! the cap takes the oldest. Passes without assets/maps/bloodgulch.map.
 
 use std::error::Error;
-use std::path::Path;
 
 use opence_content::Level;
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_sim::input::{Buttons, TickInput};
 use opence_sim::{clock, Simulation};
 
 fn bloodgulch() -> Result<Option<Level>, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(None); // (no game data here)
     };
-    Ok(Some(import_level(&Cache::open(file)?)?))
+    Ok(Some(Level::clone(&stock)))
 }
 
 /// The player settled at the first start, holding the assault rifle.

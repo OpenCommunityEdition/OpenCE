@@ -3,10 +3,9 @@
 //! assets/maps/bloodgulch.map pass without it.
 
 use std::error::Error;
-use std::path::Path;
 
 use opence_ffi::{Engine, LevelGeometry};
-use opence_import::{import_level, Cache};
+use opence_import::testing::{cache_folder, maps_folder, stock_level};
 
 type Result = std::result::Result<(), Box<dyn Error>>;
 
@@ -18,16 +17,17 @@ fn a_level_sound_reaches_the_output() -> Result {
     assert!(engine.audio_census().is_empty());
     assert!(output.pull(128).iter().all(|sample| *sample == 0.0));
 
-    let map = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&map) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(()); // (no game data here)
     };
-    let level = import_level(&Cache::open(file)?)?;
-    let cache = Path::new(env!("CARGO_TARGET_TMPDIR")).join("sounds_cache");
-    std::fs::create_dir_all(&cache)?;
+    let level = stock;
+    // (the game's own cache folder, where the map's pack is)
     let geometry = LevelGeometry::load(
-        map.to_string_lossy().into_owned(),
-        cache.to_string_lossy().into_owned(),
+        maps_folder()
+            .join("bloodgulch.map")
+            .to_string_lossy()
+            .into_owned(),
+        cache_folder().to_string_lossy().into_owned(),
         0,
     )?;
     engine.start_level(geometry, 1)?;

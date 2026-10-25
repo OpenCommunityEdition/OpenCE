@@ -114,7 +114,8 @@ pub(crate) fn load_level_with(
 }
 
 /// Writes a pack beside where it goes, then moves it there, so that a
-/// pack is never seen half written.
+/// pack is never seen half written (the partial file is this process's,
+/// for test runs that write the same pack at once).
 fn write(
     level: &Level,
     header: PackHeader,
@@ -122,7 +123,7 @@ fn write(
     path: &Path,
 ) -> Result<PathBuf, String> {
     let bytes = pack::write_pack(level, header).map_err(|error| error.to_string())?;
-    let partial = path.with_extension("ocpak.partial");
+    let partial = path.with_extension(format!("ocpak.{}.partial", std::process::id()));
     fs::create_dir_all(cache_folder)
         .and_then(|()| fs::write(&partial, &bytes))
         .and_then(|()| fs::rename(&partial, path))

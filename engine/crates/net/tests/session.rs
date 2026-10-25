@@ -4,10 +4,9 @@
 
 use std::error::Error;
 use std::net::SocketAddr;
-use std::path::Path;
 
 use opence_content::Level;
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_net::client::{Joining, TOLERANCE};
 use opence_net::MAX_PLAYERS;
 use opence_net::{decode, encode, Client, Discovery, Host, Link, Packet, Refusal, Transport, Udp};
@@ -22,11 +21,10 @@ type Result<T = ()> = std::result::Result<T, Box<dyn Error>>;
 const LEVEL: &str = "levels\\test\\bloodgulch\\bloodgulch";
 
 fn bloodgulch() -> Result<Option<Level>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(None); // (no game data here)
     };
-    Ok(Some(import_level(&Cache::open(file)?)?))
+    Ok(Some(Level::clone(&stock)))
 }
 
 /// Walking forward and turning slowly: a wide circle.

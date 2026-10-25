@@ -208,8 +208,7 @@ fn bloodgulch() -> Option<Arc<opence_ffi::LevelGeometry>> {
     if !map.exists() {
         return None;
     }
-    let cache = Path::new(env!("CARGO_TARGET_TMPDIR")).join("cli_cache");
-    std::fs::create_dir_all(&cache).ok()?;
+    let cache = opence_import::testing::cache_folder();
     opence_ffi::LevelGeometry::load(
         map.to_string_lossy().into_owned(),
         cache.to_string_lossy().into_owned(),

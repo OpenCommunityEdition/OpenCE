@@ -7,7 +7,7 @@ use std::path::Path;
 
 use opence_audio::decode;
 use opence_content::SoundCompression;
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level_unheld;
 
 #[test]
 fn every_stock_sound_decodes() -> Result<(), Box<dyn Error>> {
@@ -24,9 +24,7 @@ fn every_stock_sound_decodes() -> Result<(), Box<dyn Error>> {
     names.sort();
     let mut failures = Vec::new();
     for name in &names {
-        let level = import_level(&Cache::open(std::fs::read(
-            maps.join(format!("{name}.map")),
-        )?)?)?;
+        let level = stock_level_unheld(name)?.ok_or_else(|| format!("{name}: no map"))?;
         assert!(!level.sounds.is_empty(), "{name}: no sounds");
         let mut permutations = 0usize;
         for sound in &level.sounds {

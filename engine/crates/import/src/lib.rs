@@ -23,6 +23,7 @@ pub mod script;
 pub mod shader;
 pub mod sound;
 pub mod tags;
+pub mod testing;
 mod texture;
 pub mod ui;
 mod vector_palette;

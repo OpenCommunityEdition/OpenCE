@@ -75,7 +75,8 @@ fn devgulch(name: &str) -> Result<Option<Arc<Engine>>> {
     for name in names {
         std::os::unix::fs::symlink(maps.join(name).canonicalize()?, folder.join(name))?;
     }
-    let cache = text(&folder.join("cache"));
+    // (the game's cache: its packs are named by their maps' contents)
+    let cache = text(&opence_import::testing::cache_folder());
     let geometry = LevelGeometry::load(text(&folder.join("devgulch.map")), cache, 0)?;
     let engine = Engine::new();
     engine.start_level(geometry, 1)?;

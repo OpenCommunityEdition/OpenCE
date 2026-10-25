@@ -3,10 +3,9 @@
 //! and equipment.
 
 use std::error::Error;
-use std::path::Path;
 
 use opence_content::{GameType, Level};
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_sim::clock::TICKS_PER_SECOND;
 use opence_sim::game::{
     FlagState, Game, GameEvent, Rules, Variant, FLAG_RETURN_TICKS, MINIMUM_RESPAWN_TICKS,
@@ -176,11 +175,10 @@ fn the_flag_must_be_home_to_score_when_the_variant_says() {
 }
 
 fn bloodgulch() -> Result<Option<Level>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(None); // (no game data here)
     };
-    Ok(Some(import_level(&Cache::open(file)?)?))
+    Ok(Some(Level::clone(&stock)))
 }
 
 #[test]

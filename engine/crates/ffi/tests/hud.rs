@@ -5,21 +5,19 @@
 //! reserve, the shield and the grenades. Passes without assets/maps/bloodgulch.map.
 
 use std::error::Error;
-use std::path::Path;
 
 use opence_content::Level;
 use opence_ffi::hud::{hud_quads, HudQuad};
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_sim::hud::HudState;
 use opence_sim::input::{Buttons, TickInput};
 use opence_sim::Simulation;
 
 fn bloodgulch() -> Result<Option<Level>, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(None); // (no game data here)
     };
-    Ok(Some(import_level(&Cache::open(file)?)?))
+    Ok(Some(Level::clone(&stock)))
 }
 
 /// The player at the first start, two seconds on.

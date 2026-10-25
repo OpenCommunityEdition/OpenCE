@@ -6,7 +6,7 @@ use std::error::Error;
 use std::path::Path;
 
 use opence_bake::{Bvh, Ray, Scene};
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level_unheld;
 
 #[test]
 fn every_stock_bsp_makes_a_scene() -> Result<(), Box<dyn Error>> {
@@ -18,9 +18,7 @@ fn every_stock_bsp_makes_a_scene() -> Result<(), Box<dyn Error>> {
         .collect();
     names.sort();
     for name in &names {
-        let level = import_level(&Cache::open(std::fs::read(
-            maps.join(format!("{name}.map")),
-        )?)?)?;
+        let level = stock_level_unheld(name)?.ok_or_else(|| format!("{name}: no map"))?;
         for (bsp, structure) in level.structure_bsps.iter().enumerate() {
             // (the six BSPs shipped with no lightmaps have no lit geometry)
             if structure.lightmap_bitmap.is_none() {

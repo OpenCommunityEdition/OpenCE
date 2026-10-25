@@ -9,7 +9,7 @@ use std::path::Path;
 
 use glam::{Vec2, Vec3};
 use opence_content::Level;
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_physics::{LevelMesh, MovementInput, Mover, MoverSettings, World, WorldSettings};
 
 /// Where the traces start, before the biped settles.
@@ -73,11 +73,10 @@ type Bloodgulch = (Level, World, Mover);
 /// bloodgulch, its world and the player's biped standing settled at the
 /// traces' start; none without the map.
 fn bloodgulch() -> Result<Option<Bloodgulch>, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(None); // (no game data here)
     };
-    let level = import_level(&Cache::open(file)?)?;
+    let level = Level::clone(&stock);
     let settings = WorldSettings::default();
     let mut world = World::new(settings)?;
     let bsp = level.structure_bsps.first().ok_or("no structure bsp")?;

@@ -14,7 +14,7 @@ use std::path::Path;
 
 use glam::{Vec2, Vec3};
 use opence_content::{Level, Physics, Vehicle};
-use opence_import::{import_level, Cache};
+use opence_import::testing::{stock_level, stock_level_unheld};
 use opence_physics::{LevelMesh, SurfaceMaterials, World, WorldSettings};
 use opence_sim::vehicle::{game_tick, VehicleControls, VehicleLevel, VehicleState};
 
@@ -24,11 +24,10 @@ type Result = std::result::Result<(), Box<dyn Error>>;
 const START_YAW: f32 = 1.895099;
 
 fn bloodgulch() -> std::result::Result<Option<(Level, World)>, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(None); // (no game data here)
     };
-    let level = import_level(&Cache::open(file)?)?;
+    let level = Level::clone(&stock);
     let mut world = World::new(WorldSettings::default())?;
     let bsp = level.structure_bsps.first().ok_or("no structure bsp")?;
     world.set_level(&LevelMesh::from_collision(&bsp.collision))?;
@@ -339,12 +338,9 @@ fn the_scorpion_answers_its_controls_as_its_tag_says() -> Result {
 
 #[test]
 fn the_banshee_answers_its_controls_as_its_tag_says() -> Result {
-    let Ok(file) =
-        std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/b40.map"))
-    else {
+    let Some(level) = stock_level_unheld("b40")? else {
         return Ok(()); // (no game data here)
     };
-    let level = import_level(&Cache::open(file)?)?;
     let Ok((vehicle, physics)) = vehicle(&level, "vehicles\\banshee\\banshee") else {
         return Err("b40 has no Banshee".into());
     };

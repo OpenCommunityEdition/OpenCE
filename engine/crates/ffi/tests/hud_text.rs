@@ -5,13 +5,12 @@
 //! assets/maps/bloodgulch.map.
 
 use std::error::Error;
-use std::path::Path;
 
 use opence_content::{Font, Level, TagRef};
 use opence_ffi::hud::{hud_quads, HudQuad};
 use opence_ffi::hud_text::{prompt_text_of, prompt_words};
 use opence_ffi::ui::UiQuad;
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_sim::hud::ActionPrompt;
 use opence_sim::input::TickInput;
 use opence_sim::Simulation;
@@ -31,11 +30,10 @@ fn keys() -> Vec<String> {
 }
 
 fn bloodgulch() -> Result<Option<Level>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(None); // (no game data here)
     };
-    Ok(Some(import_level(&Cache::open(file)?)?))
+    Ok(Some(Level::clone(&stock)))
 }
 
 fn tag(level: &Level, path: &str) -> Result<TagRef> {

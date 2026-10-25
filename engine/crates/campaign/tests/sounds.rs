@@ -5,12 +5,11 @@
 //! (skipped where there is no game data).
 
 use std::error::Error;
-use std::path::Path;
 use std::sync::Arc;
 
 use opence_campaign::Mission;
 use opence_content::{Constant, Level, NodeKind, TagRef};
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_script::{Value, TICKS_PER_SECOND as GAME_TICKS_PER_SECOND};
 use opence_sim::clock::TICKS_PER_SECOND;
 use opence_sim::input::TickInput;
@@ -22,13 +21,10 @@ const MAPS: [&str; 2] = ["a10", "a30"];
 const SIM_TICKS_PER_GAME_TICK: u32 = TICKS_PER_SECOND / GAME_TICKS_PER_SECOND;
 
 fn level(map: &str) -> Result<Option<Arc<Level>>, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../assets/maps")
-        .join(format!("{map}.map"));
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level(map)? else {
         return Ok(None); // (no game data here)
     };
-    Ok(Some(Arc::new(import_level(&Cache::open(file)?)?)))
+    Ok(Some(stock))
 }
 
 /// The sounds the scripts call `function` with, as its first argument.

@@ -3,11 +3,10 @@
 //! game data).
 
 use std::error::Error;
-use std::path::Path;
 use std::sync::Arc;
 
 use opence_campaign::{Mission, MissionScripts};
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level_unheld;
 use opence_script::TICKS_PER_SECOND;
 use opence_sim::input::TickInput;
 use opence_sim::objects::Difficulty;
@@ -20,13 +19,10 @@ const MAPS: [&str; 10] = [
 #[test]
 fn every_campaign_scenarios_scripts_find_their_functions() -> Result<(), Box<dyn Error>> {
     for map in MAPS {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../assets/maps")
-            .join(format!("{map}.map"));
-        let Ok(file) = std::fs::read(&path) else {
+        let Some(stock) = stock_level_unheld(map)? else {
             continue; // (no game data here)
         };
-        let level = Arc::new(import_level(&Cache::open(file)?)?);
+        let level = Arc::new(stock);
         let mut sim = Simulation::empty();
         sim.spawn_player(&level, 0)?;
         let mission = Mission::new(sim, level, Difficulty::Normal);

@@ -4,12 +4,11 @@
 //! bloodgulch's collision BSP, and passes without assets/maps/bloodgulch.map.
 
 use std::error::Error;
-use std::path::Path;
 
 use glam::{Quat, Vec3};
 use opence_content::level::{CollisionEdge, CollisionSurface, CollisionVertex};
 use opence_content::CollisionBsp;
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_physics::{
     Layers, LevelMesh, Material, Motion, PhysicsError, Pose, Shape, Struck, World, WorldSettings,
 };
@@ -318,11 +317,10 @@ fn two_runs_are_identical() -> Result<(), PhysicsError> {
 
 #[test]
 fn bloodgulchs_ground_is_under_the_trace_start() -> Result<(), Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../assets/maps/bloodgulch.map");
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level("bloodgulch")? else {
         return Ok(()); // (no game data here)
     };
-    let level = import_level(&Cache::open(file)?)?;
+    let level = stock;
     let bsp = level.structure_bsps.first().ok_or("no structure bsp")?;
     let mesh = LevelMesh::from_collision(&bsp.collision);
     assert!(

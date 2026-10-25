@@ -17,6 +17,7 @@ rustyline = { version = "17", default-features = false, features = ["with-file-h
 
 [dev-dependencies]
 opence_ffi = { path = "../ffi" }
+opence_import.workspace = true
 
 [lints]
 workspace = true

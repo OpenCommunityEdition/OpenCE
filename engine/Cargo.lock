@@ -982,6 +982,7 @@ version = "0.1.0"
 dependencies = [
  "opence_dev",
  "opence_ffi",
+ "opence_import",
  "rustyline",
  "serde_json",
 ]

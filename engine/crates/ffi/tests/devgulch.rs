@@ -30,7 +30,8 @@ fn linked(name: &str, names: &[&str]) -> std::io::Result<Option<(PathBuf, String
     for name in names {
         std::os::unix::fs::symlink(maps.join(name).canonicalize()?, folder.join(name))?;
     }
-    let cache = text(&folder.join("cache"));
+    // (the game's cache: its packs are named by their maps' contents)
+    let cache = text(&opence_import::testing::cache_folder());
     Ok(Some((folder, cache)))
 }
 
@@ -61,13 +62,14 @@ fn devgulch_is_blood_gulch_with_the_other_maps_definitions() -> Result {
     let (made, stock) = (devgulch.start_view(), blood_gulch.start_view());
     assert_eq!([made.x, made.y, made.z], [stock.x, stock.y, stock.z]);
     assert_eq!(devgulch.draws().len(), blood_gulch.draws().len());
-    // nothing of it is written: the folder has only its links and the cache
+    // nothing of it is written: the folder has only its links (the packs
+    // are in the game's cache)
     let mut written: Vec<_> = std::fs::read_dir(&folder)?
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .collect();
     written.sort();
-    assert_eq!(written, ["bloodgulch.map", "cache", "wizard.map"]);
+    assert_eq!(written, ["bloodgulch.map", "wizard.map"]);
     // and the player spawns on it
     let engine = Engine::new();
     engine.start_level(devgulch, 1)?;

@@ -7,12 +7,11 @@
 //! (skipped where there is no game data).
 
 use std::error::Error;
-use std::path::Path;
 use std::sync::Arc;
 
 use opence_campaign::MissionScripts;
 use opence_content::{Constant, Level, NodeKind, Scripts, TriggerVolume};
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level_unheld;
 use opence_script::Value;
 use opence_sim::clock::TICKS_PER_SECOND;
 use opence_sim::input::{Buttons, TickInput};
@@ -31,13 +30,10 @@ const VOLUME_TESTS: [&str; 3] = [
 ];
 
 fn level(map: &str) -> Result<Option<Arc<Level>>, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../assets/maps")
-        .join(format!("{map}.map"));
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level_unheld(map)? else {
         return Ok(None); // (no game data here)
     };
-    Ok(Some(Arc::new(import_level(&Cache::open(file)?)?)))
+    Ok(Some(Arc::new(stock)))
 }
 
 /// The trigger volumes a condition tests.

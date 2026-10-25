@@ -96,8 +96,7 @@ fn blood_gulch() -> Result<Option<Arc<Engine>>> {
     if !map.exists() {
         return Ok(None);
     }
-    let cache = Path::new(env!("CARGO_TARGET_TMPDIR")).join("effects_of_play");
-    std::fs::create_dir_all(&cache)?;
+    let cache = opence_import::testing::cache_folder();
     let geometry = LevelGeometry::load(
         map.to_string_lossy().into(),
         cache.to_string_lossy().into(),

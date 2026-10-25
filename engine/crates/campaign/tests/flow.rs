@@ -4,12 +4,11 @@
 //! map's globals say (skipped where there is no game data).
 
 use std::error::Error;
-use std::path::Path;
 use std::sync::Arc;
 
 use opence_campaign::{Checkpoint, MissionScripts};
 use opence_content::Level;
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level;
 use opence_script::TICKS_PER_SECOND;
 use opence_sim::damage::DifficultyScale;
 use opence_sim::input::{Buttons, TickInput};
@@ -19,13 +18,10 @@ use opence_sim::Simulation;
 
 /// The level of `map`, if the map is here.
 fn level(map: &str) -> Result<Option<Arc<Level>>, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../assets/maps")
-        .join(format!("{map}.map"));
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level(map)? else {
         return Ok(None);
     };
-    Ok(Some(Arc::new(import_level(&Cache::open(file)?)?)))
+    Ok(Some(stock))
 }
 
 /// A tick's input that walks, turns and now and then fires.

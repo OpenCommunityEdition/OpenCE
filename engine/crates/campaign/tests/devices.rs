@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use opence_campaign::Mission;
 use opence_content::Machine;
-use opence_import::{import_level, Cache};
+use opence_import::testing::stock_level_unheld;
 use opence_sim::input::TickInput;
 use opence_sim::objects::Difficulty;
 use opence_sim::{Simulation, Vec3};
@@ -18,13 +18,10 @@ const MAPS: [&str; 4] = ["a10", "a30", "b30", "c10"];
 
 /// The mission of `map`, if the map is here.
 fn mission(map: &str) -> Result<Option<Mission>, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../assets/maps")
-        .join(format!("{map}.map"));
-    let Ok(file) = std::fs::read(&path) else {
+    let Some(stock) = stock_level_unheld(map)? else {
         return Ok(None);
     };
-    let level = Arc::new(import_level(&Cache::open(file)?)?);
+    let level = Arc::new(stock);
     let mut sim = Simulation::empty();
     sim.spawn_player(&level, 0)?;
     Ok(Some(Mission::new(sim, level, Difficulty::Normal)))
