@@ -31,7 +31,7 @@ const SEQUENCE_NAME_LONGEST: usize = 31;
 pub(crate) const IN_RESOURCE_MAP_FLAG: u16 = 1 << 8;
 
 /// Reads a bitmap tag, its sequences, its images and their pixels.
-pub(crate) fn import_bitmap(cache: &Cache, index: usize) -> Result<Bitmap, ImportError> {
+pub fn import_bitmap(cache: &Cache, index: usize) -> Result<Bitmap, ImportError> {
     let bitmap = cache.tag(index, BITM, BITMAP_SIZE)?;
     let block = bitmap.block(IMAGES_OFFSET, "bitmaps", IMAGE_SIZE, MAX_IMAGES)?;
     let mut images = Vec::with_capacity(block.len());

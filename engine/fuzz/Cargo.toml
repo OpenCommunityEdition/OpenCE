@@ -1,6 +1,8 @@
 # The importer's fuzz targets (cargo fuzz), outside the workspace: they
 # need a nightly compiler. Run them in `nix develop .#fuzz`:
 #   cd engine/fuzz && cargo fuzz run cache_file -- -max_total_time=600
+# Seed the corpora from the importer's fakes first (once):
+#   OPENCE_FUZZ_SEEDS=1 cargo nextest run -p opence_import the_seeds
 # The suite runs the same entry points for a fixed time on the stable
 # compiler (crates/import/src/fuzz_smoke.rs).
 [package]
@@ -46,6 +48,20 @@ bench = false
 [[bin]]
 name = "ui"
 path = "fuzz_targets/ui.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sound"
+path = "fuzz_targets/sound.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bitmap"
+path = "fuzz_targets/bitmap.rs"
 test = false
 doc = false
 bench = false

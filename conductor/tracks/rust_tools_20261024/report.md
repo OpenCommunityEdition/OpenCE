@@ -258,3 +258,79 @@ function: the test now nests the console's own one-argument `and`.
 | clippy, three crates, `-D warnings` | clean |
 | cargo deny | ok (proptest and rand: MIT or Apache-2.0) |
 | nextest, all tests (`test-opt`) | 1042 passed, 3 skipped (212 s, beside a mutants run) |
+
+## Coverage floors (2026-10-25)
+
+`tools/engine_coverage.py` runs the workspace's tests under
+`cargo llvm-cov nextest` (the `test-opt` profile) and counts each crate's
+own `src/` lines; `--write-floors` writes `engine/coverage.toml`, a floor a
+point or so under the day's share (rounded down). Measured with the user's maps
+(without them the tests that need them skip, and the script prints the
+numbers without checking):
+
+| crate | lines covered | share | floor |
+|---|---|---|---|
+| audio | 2856 of 2930 | 97.5% | 96 |
+| bake | 4225 of 4356 | 97.0% | 95 |
+| campaign | 2919 of 3326 | 87.8% | 86 |
+| cli | 267 of 371 | 72.0% | 70 |
+| content | 2552 of 2624 | 97.3% | 96 |
+| dev | 2234 of 2297 | 97.3% | 96 |
+| ffi | 17438 of 18466 | 94.4% | 93 |
+| import | 10661 of 11153 | 95.6% | 94 |
+| net | 954 of 1001 | 95.3% | 94 |
+| physics | 1030 of 1104 | 93.3% | 92 |
+| script | 1051 of 1164 | 90.3% | 89 |
+| sim | 18007 of 18837 | 95.6% | 94 |
+| ui | 1981 of 2110 | 93.9% | 92 |
+
+The instrumented run took 396 s of testing against 212–280 s for the plain
+one (both beside a mutants run), so coverage is not in every test step: it
+is its own check, run at each phase's end (`python tools/engine_coverage.py`,
+which exits non-zero below a floor), and its numbers go in that phase's
+report. `cli` is the weakest: its line editor's loop is driven by a
+terminal the tests do not have.
+
+| check | result |
+|---|---|
+| `tools/test_engine_coverage.py` | 6 passed (the command, per-crate counting, shortfalls, floors from numbers, the written file, every crate has a floor) |
+| the check against the written floors | passes |
+
+## Fuzz targets (2026-10-25)
+
+Six `cargo fuzz` targets, each with the same entry in the suite's smoke
+tests (`crates/import/src/fuzz_smoke.rs`, two seconds each):
+`cache_file`, `xbox_cache`, `pack`, `ui`, and new for this task `sound`
+(an Xbox cache's sounds, given as its header and inflated body, as
+`xbox_cache` is) and `bitmap` (each of a cache's bitmaps).
+`import_sounds` and `import_bitmap` are public for them.
+
+Two tests tie the targets to the suite: `every_fuzz_target_has_an_entry`
+(engine/fuzz/Cargo.toml's bins against the entries) and
+`the_saved_fuzz_inputs_are_read_or_refused`, which replays every input
+`cargo fuzz` kept on this machine (its corpus and any crash) through its
+target's entry, so a crash found in a long run stays fixed. The corpora
+are never committed.
+
+No target had seeds: random bytes never passed the cache header's checks
+(a first minute of `sound` and `bitmap` reached 42 coverage points with a
+one-byte corpus). `the_seeds_are_each_targets_fake` writes each target's
+fake (made by the tests, not from the game's files) to its corpus when
+`OPENCE_FUZZ_SEEDS` is set. A minute of each, from the seeds:
+
+| target | runs | coverage (start → end) | corpus | crashes |
+|---|---|---|---|---|
+| cache_file | 609,604 | 3053 → 5794 | 619 | 0 |
+| xbox_cache | 91,315 | 3748 → 5698 | 615 | 0 |
+| pack | 1,675,983 | 2490 → 2589 | 30 | 0 |
+| ui | 604,364 | 894 → 1924 | 439 | 0 |
+| sound | 367,400 | 1080 → 1727 | 424 | 0 |
+| bitmap | 1,093,820 | 403 → 888 | 210 | 0 |
+
+The 2,337 saved inputs replay in 0.25 s in the suite.
+
+| check | result |
+|---|---|
+| clippy `-D warnings`, the workspace | clean |
+| the fuzz crate on nightly (`cargo check --bins`) | builds |
+| nextest, all tests (`test-opt`) | 1047 passed, 3 skipped (280 s) |

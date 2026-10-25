@@ -10,6 +10,8 @@ use opence_content::pack::{self, PackHeader};
 use crate::cache::{CacheKind, HEADER_SIZE};
 use crate::fake::FakeCache;
 use crate::level::tests::{level, Breaks};
+use crate::level::BITM;
+use crate::sound::tests::sound_cache;
 use crate::ui::tests::{add_font, add_shell};
 use crate::{import_level, Cache};
 
@@ -72,7 +74,7 @@ fn mutate(random: &mut Random, bytes: &mut Vec<u8>, from: usize) {
     }
 }
 
-/// The fuzz targets' entry: a cache file, imported or refused.
+/// The cache fuzz targets' entry: a cache file, imported or refused.
 pub(crate) fn import_file(file: &[u8]) {
     if let Ok(cache) = Cache::open(file.to_vec()) {
         let _ = import_level(&cache);
@@ -86,6 +88,25 @@ pub(crate) fn import_ui_file(file: &[u8]) {
     }
 }
 
+/// The sound fuzz target's entry: a cache file's sounds, read or refused.
+pub(crate) fn import_sound_file(file: &[u8]) {
+    if let Ok(cache) = Cache::open(file.to_vec()) {
+        let _ = crate::sound::import_sounds(&cache);
+    }
+}
+
+/// The bitmap fuzz target's entry: each of a cache file's bitmaps, read or
+/// refused.
+pub(crate) fn import_bitmap_file(file: &[u8]) {
+    if let Ok(cache) = Cache::open(file.to_vec()) {
+        for (index, instance) in cache.tags().iter().enumerate() {
+            if instance.group == BITM && !instance.in_resource_map {
+                let _ = crate::bitmap::import_bitmap(&cache, index);
+            }
+        }
+    }
+}
+
 /// An Xbox cache from its header and its inflated body (so that the
 /// mutations reach the tags, not just the stream).
 pub(crate) fn xbox_file(header: &[u8], body: &[u8]) -> Vec<u8> {
@@ -94,6 +115,34 @@ pub(crate) fn xbox_file(header: &[u8], body: &[u8]) -> Vec<u8> {
     file[8..12].copy_from_slice(&length.to_le_bytes());
     file.extend_from_slice(&miniz_oxide::deflate::compress_to_vec_zlib(body, 1));
     file
+}
+
+/// A fuzz target's entry: its input, read or refused.
+pub(crate) type Entry = fn(&[u8]);
+
+/// Each `cargo fuzz` target (engine/fuzz/Cargo.toml's bins) and the entry
+/// it runs.
+pub(crate) const TARGETS: [(&str, Entry); 6] = [
+    ("cache_file", import_file),
+    ("xbox_cache", |input| xbox_input(input, import_file)),
+    ("pack", read_pack_file),
+    ("ui", import_ui_file),
+    ("sound", |input| xbox_input(input, import_sound_file)),
+    ("bitmap", import_bitmap_file),
+];
+
+/// An Xbox target's input, its header and inflated body, made a cache
+/// file for `entry` (as engine/fuzz/fuzz_targets/xbox_cache.rs does).
+fn xbox_input(input: &[u8], entry: Entry) {
+    if input.len() >= HEADER_SIZE {
+        let (header, body) = input.split_at(HEADER_SIZE);
+        entry(&xbox_file(header, body));
+    }
+}
+
+/// The pack fuzz target's entry: a pack, read or refused.
+fn read_pack_file(file: &[u8]) {
+    let _ = pack::read_pack(file);
 }
 
 fn budget() -> Duration {
@@ -197,4 +246,124 @@ fn mutated_ui_tags_are_read_or_refused() {
         import_ui_file(&mutated);
     });
     println!("{cases} UI caches");
+}
+
+#[test]
+fn mutated_sounds_are_read_or_refused() {
+    let (cache, _) = sound_cache(1, 1).unwrap_or_else(|error| panic!("{error}"));
+    let body = cache.file()[HEADER_SIZE..].to_vec();
+    let header = cache.file()[..HEADER_SIZE].to_vec();
+    // (the rebuilt cache, unmutated, has its sound: the cases reach it)
+    let rebuilt = Cache::open(xbox_file(&header, &body)).unwrap_or_else(|error| panic!("{error}"));
+    match crate::sound::import_sounds(&rebuilt) {
+        Ok((sounds, _)) => assert_eq!(sounds.len(), 1),
+        Err(error) => panic!("{error}"),
+    }
+    let cases = fuzz(0x0C0C_0005, |random| {
+        let mut mutated = body.clone();
+        mutate(random, &mut mutated, 0);
+        import_sound_file(&xbox_file(&header, &mutated));
+    });
+    println!("{cases} sound caches");
+}
+
+#[test]
+fn mutated_bitmaps_are_read_or_refused() {
+    let file = level(CacheKind::CustomEdition, &Breaks::default()).build();
+    let cases = fuzz(0x0C0C_0006, |random| {
+        let mut mutated = file.clone();
+        mutate(random, &mut mutated, HEADER_SIZE);
+        import_bitmap_file(&mutated);
+    });
+    // (the fake has its lightmap's bitmap: the cases reach it)
+    assert!(Cache::open(file).is_ok_and(|cache| cache.tags().iter().any(|tag| tag.group == BITM)));
+    println!("{cases} bitmap caches");
+}
+
+/// The inputs `cargo fuzz` kept on this machine (its corpus, and any
+/// crash it saved), each run through its target's entry again: a crash
+/// found in a long run stays fixed. (They are never committed; without
+/// them the test has nothing to run.)
+#[test]
+fn the_saved_fuzz_inputs_are_read_or_refused() {
+    let fuzz = crate::testing::root().join("engine/fuzz");
+    let mut inputs = 0;
+    for (target, entry) in TARGETS {
+        for folder in ["corpus", "artifacts"] {
+            let Ok(files) = std::fs::read_dir(fuzz.join(folder).join(target)) else {
+                continue;
+            };
+            for file in files.flatten() {
+                if let Ok(bytes) = std::fs::read(file.path()) {
+                    entry(&bytes);
+                    inputs += 1;
+                }
+            }
+        }
+    }
+    println!("{inputs} saved inputs");
+}
+
+#[test]
+fn every_fuzz_target_has_an_entry() {
+    let manifest = crate::testing::root().join("engine/fuzz/Cargo.toml");
+    let manifest = std::fs::read_to_string(&manifest).unwrap_or_else(|error| panic!("{error}"));
+    let bins: Vec<&str> = manifest
+        .lines()
+        .filter_map(|line| line.strip_prefix("name = \""))
+        .filter_map(|name| name.strip_suffix('"'))
+        .filter(|name| *name != "opence_fuzz")
+        .collect();
+    let entries: Vec<&str> = TARGETS.iter().map(|(target, _)| *target).collect();
+    assert_eq!(bins, entries);
+}
+
+/// Each target's seed: the fake it starts from, as its input. Written to
+/// engine/fuzz/corpus/<target> when OPENCE_FUZZ_SEEDS is set (the corpus
+/// is never committed, and these are made here, not from the game's
+/// files), for `cargo fuzz` to start past the header checks.
+#[test]
+fn the_seeds_are_each_targets_fake() {
+    let custom = level(CacheKind::CustomEdition, &Breaks::default()).build();
+    let xbox = level(CacheKind::Xbox, &Breaks::default()).build();
+    let opened = |file: Vec<u8>| Cache::open(file).unwrap_or_else(|error| panic!("{error}"));
+    let xbox_cache = opened(xbox);
+    let level_pack = import_level(&xbox_cache)
+        .and_then(|level| {
+            pack::write_pack(
+                &level,
+                PackHeader {
+                    importer_version: 1,
+                    source: 2,
+                },
+            )
+            .map_err(|error| panic!("{error}"))
+        })
+        .unwrap_or_else(|error| panic!("{error}"));
+    let (sound, _) = sound_cache(1, 1).unwrap_or_else(|error| panic!("{error}"));
+    let mut ui = FakeCache::new(CacheKind::CustomEdition);
+    add_shell(&mut ui);
+    add_font(&mut ui, false);
+    let seeds: [(&str, Vec<u8>); 6] = [
+        ("cache_file", custom.clone()),
+        ("xbox_cache", xbox_cache.file().to_vec()),
+        ("pack", level_pack),
+        ("ui", ui.build()),
+        ("sound", sound.file().to_vec()),
+        ("bitmap", custom),
+    ];
+    let names: Vec<&str> = seeds.iter().map(|(target, _)| *target).collect();
+    let targets: Vec<&str> = TARGETS.iter().map(|(target, _)| *target).collect();
+    assert_eq!(names, targets);
+    for ((target, seed), (_, entry)) in seeds.iter().zip(TARGETS) {
+        entry(seed);
+        if std::env::var_os("OPENCE_FUZZ_SEEDS").is_some() {
+            let folder = crate::testing::root()
+                .join("engine/fuzz/corpus")
+                .join(target);
+            std::fs::create_dir_all(&folder)
+                .and_then(|()| std::fs::write(folder.join("seed"), seed))
+                .unwrap_or_else(|error| panic!("{target}: {error}"));
+        }
+    }
 }

@@ -219,7 +219,7 @@ pub(crate) fn import_looping_sound(
 
 /// Every sound and looping sound in the map's own tag data (Custom
 /// Edition's in the resource maps are not here, and are not imported).
-pub(crate) fn import_sounds(cache: &Cache) -> Result<(Vec<Sound>, Vec<LoopingSound>), ImportError> {
+pub fn import_sounds(cache: &Cache) -> Result<(Vec<Sound>, Vec<LoopingSound>), ImportError> {
     let mut sounds = Vec::new();
     let mut looping = Vec::new();
     for (index, instance) in cache.tags().iter().enumerate() {
@@ -269,7 +269,7 @@ pub(crate) fn import_material_effects(cache: &Cache) -> Result<Vec<MaterialEffec
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::fake::FakeCache;
     use crate::level::tests::{block, empty, put, reference as put_reference};
@@ -294,7 +294,7 @@ mod tests {
 
     /// A sound of one pitch range and two linked permutations, its samples
     /// in the file.
-    fn sound_cache(rate: i16, next: i16) -> Result<(Cache, usize)> {
+    pub(crate) fn sound_cache(rate: i16, next: i16) -> Result<(Cache, usize)> {
         let mut fake = FakeCache::new(CacheKind::Xbox);
         let samples = fake.add_file_data(&[1, 2, 3, 4, 5, 6, 7, 8]);
         let mouth = fake.add_data(&[0, 128, 255]);
