@@ -71,9 +71,9 @@ In the order of the user's goal (2026-10-25): caches ready, debug builds and tes
 - [x] Task: Bake and import in parallel ab55e7c1
     - [x] Write tests: the bake's output is the same with one thread and with many
     - [x] rayon in bake and import; meshopt at bake time (rayon in the bake's firefly hold and exposure fit, BLAKE3 hashing on all cores; the import kept serial and meshopt declined, see the report)
-- [ ] Task: The release build
-    - [ ] Write tests: the release profile has fat LTO and one codegen unit; the PGO build gives the same reference traces
-    - [ ] LTO, codegen-units, cargo-pgo profiles recorded on devgulch; cargo-show-asm in the shell
+- [x] Task: The release build 63e99d02
+    - [x] Write tests: the release profile has fat LTO and one codegen unit; the PGO build gives the same reference traces (the profile test holds the measured decision, abort and no LTO; the PGO build's traces are identical)
+    - [x] LTO, codegen-units, cargo-pgo profiles recorded on devgulch; cargo-show-asm in the shell (LTO and PGO measured slower and declined; cargo-show-asm deferred to the Nix restructure, see the report)
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Performance' (Protocol in workflow.md)
 
 ## Phase 5: Nix tooling (after the crane packages build)
