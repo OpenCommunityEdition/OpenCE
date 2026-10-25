@@ -31,13 +31,20 @@ libm = "0.2"
 # (the tests' snapshots of text, and their diffs)
 insta = { version = "1.43", default-features = false }
 pretty_assertions = "1.4"
+# (the benchmarks: `cargo bench`, and `cargo test --benches` runs each once)
+divan = { version = "0.1", default-features = false }
 proptest = { version = "1.7", default-features = false, features = ["std"] }
 # (hash maps with a fixed seed: the same each run, unlike std's)
 rustc-hash = { version = "2.1", default-features = false, features = ["std"] }
 # (libm: its functions, not the platform's, for determinism)
 glam = { version = "0.34", default-features = false, features = ["libm"] }
 uniffi = { version = "0.32", default-features = false }
-log = "0.4"
+# (the engine's spans and events: the log book, the JSON log, and Tracy
+# with the dev crate's `tracy` feature; the dependencies' `log` records
+# come in through tracing-log)
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "registry", "fmt", "json", "tracing-log"] }
+tracing-tracy = { version = "0.11", default-features = false, features = ["enable", "ondemand", "only-localhost"] }
 # (checks the chant found in the player's default.xbe)
 sha2 = { version = "0.10", default-features = false }
 # (decodes Custom Edition's Ogg Vorbis sounds)

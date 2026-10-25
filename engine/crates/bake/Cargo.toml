@@ -15,4 +15,9 @@ opence_content.workspace = true
 workspace = true
 
 [dev-dependencies]
+divan.workspace = true
 opence_import.workspace = true
+
+[[bench]]
+name = "bake"
+harness = false

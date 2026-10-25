@@ -1,13 +1,98 @@
-//! The engine's log, kept for the shell and the control socket: the `log`
-//! crate's records from Rust and the lines Swift adds, the last
-//! [`CAPACITY`] of them, each numbered so that a reader can ask for what
-//! came after the last it saw. A filter (`render=debug,warn`) chooses what
-//! is kept.
+//! The engine's log, kept for the shell and the control socket: the
+//! `tracing` events from Rust (and the `log` records of the dependencies,
+//! through tracing-log) and the lines Swift adds, the last [`CAPACITY`] of
+//! them, each numbered so that a reader can ask for what came after the
+//! last it saw. A filter (`render=debug,warn`) chooses what is kept.
+//!
+//! [`install`] makes the book the process's subscriber, with a JSON log of
+//! every span and event in a file when `OPENCE_LOG_JSON` names one, and
+//! with the `tracy` feature, Tracy's.
 
 use std::collections::VecDeque;
+use std::fmt::Write as _;
 use std::sync::{Mutex, MutexGuard, OnceLock, PoisonError};
 
-pub use log::Level;
+use tracing::field::{Field, Visit};
+use tracing::subscriber::Interest;
+use tracing::{Event, Metadata, Subscriber};
+use tracing_subscriber::fmt::MakeWriter;
+use tracing_subscriber::layer::{Context, Filter as LayerFilter, Layer, SubscriberExt};
+use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::util::SubscriberInitExt;
+
+/// A line's level, from the most to the least severe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Level {
+    /// Something failed.
+    Error,
+    /// Something is wrong but went on.
+    Warn,
+    /// What happened.
+    Info,
+    /// More of what happened.
+    Debug,
+    /// Everything.
+    Trace,
+}
+
+impl Level {
+    /// Its name, upper case (`INFO`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => "ERROR",
+            Self::Warn => "WARN",
+            Self::Info => "INFO",
+            Self::Debug => "DEBUG",
+            Self::Trace => "TRACE",
+        }
+    }
+}
+
+impl From<tracing::Level> for Level {
+    fn from(level: tracing::Level) -> Self {
+        match level {
+            tracing::Level::ERROR => Self::Error,
+            tracing::Level::WARN => Self::Warn,
+            tracing::Level::INFO => Self::Info,
+            tracing::Level::DEBUG => Self::Debug,
+            _ => Self::Trace,
+        }
+    }
+}
+
+impl std::str::FromStr for Level {
+    type Err = String;
+
+    fn from_str(name: &str) -> Result<Self, Self::Err> {
+        match parse_threshold(name)? {
+            Some(level) => Ok(level),
+            None => Err("`off` is not a line's level".into()),
+        }
+    }
+}
+
+/// The least severe level kept, or none (`off`).
+type Threshold = Option<Level>;
+
+fn parse_threshold(name: &str) -> Result<Threshold, String> {
+    Ok(Some(match name.to_ascii_lowercase().as_str() {
+        "off" => return Ok(None),
+        "error" => Level::Error,
+        "warn" => Level::Warn,
+        "info" => Level::Info,
+        "debug" => Level::Debug,
+        "trace" => Level::Trace,
+        _ => {
+            return Err(format!(
+                "`{name}` is not a level (off, error, warn, info, debug, trace)"
+            ))
+        }
+    }))
+}
+
+fn threshold_name(threshold: Threshold) -> String {
+    threshold.map_or_else(|| "off".into(), |level| level.as_str().to_lowercase())
+}
 
 /// The lines kept.
 pub const CAPACITY: usize = 2000;
@@ -32,14 +117,14 @@ pub struct LogLine {
 /// matching prefix wins), and the level for the rest.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Filter {
-    default: log::LevelFilter,
-    targets: Vec<(String, log::LevelFilter)>,
+    default: Threshold,
+    targets: Vec<(String, Threshold)>,
 }
 
 impl Default for Filter {
     fn default() -> Self {
         Self {
-            default: log::LevelFilter::Info,
+            default: Some(Level::Info),
             targets: Vec::new(),
         }
     }
@@ -60,9 +145,7 @@ impl Filter {
                 Some((target, level)) => (Some(target.trim()), level.trim()),
                 None => (None, part),
             };
-            let level: log::LevelFilter = level.parse().map_err(|_| {
-                format!("`{level}` is not a level (off, error, warn, info, debug, trace)")
-            })?;
+            let level = parse_threshold(level)?;
             match target {
                 Some("") => return Err(format!("`{part}` names no target")),
                 Some(target) => filter.targets.push((target.to_owned(), level)),
@@ -80,16 +163,16 @@ impl Filter {
             .filter(|(prefix, _)| target.starts_with(prefix.as_str()))
             .max_by_key(|(prefix, _)| prefix.len())
             .map_or(self.default, |(_, level)| *level);
-        level <= chosen
+        chosen.is_some_and(|chosen| level <= chosen)
     }
 }
 
 impl std::fmt::Display for Filter {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (target, level) in &self.targets {
-            write!(formatter, "{target}={},", level.as_str().to_lowercase())?;
+            write!(formatter, "{target}={},", threshold_name(*level))?;
         }
-        write!(formatter, "{}", self.default.as_str().to_lowercase())
+        write!(formatter, "{}", threshold_name(self.default))
     }
 }
 
@@ -166,27 +249,102 @@ pub fn filter() -> Filter {
     book().filter.clone()
 }
 
-struct Logger;
+/// An event's text: its message, then its other fields as `name=value`.
+#[derive(Default)]
+struct Text(String);
 
-impl log::Log for Logger {
-    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
-        book().filter.allows(metadata.level(), metadata.target())
+impl Text {
+    fn separate(&mut self) {
+        if !self.0.is_empty() {
+            self.0.push(' ');
+        }
     }
-
-    fn log(&self, entry: &log::Record<'_>) {
-        record(entry.level(), entry.target(), &entry.args().to_string());
-    }
-
-    fn flush(&self) {}
 }
 
-/// Makes the log book the `log` crate's logger (once; false if another
-/// logger was set first).
-pub fn install() -> bool {
-    static LOGGER: Logger = Logger;
-    let installed = log::set_logger(&LOGGER).is_ok();
-    if installed {
-        log::set_max_level(log::LevelFilter::Trace);
+impl Visit for Text {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.separate();
+        if field.name() == "message" {
+            self.0.push_str(value);
+        } else {
+            let _ = write!(self.0, "{}={value}", field.name());
+        }
     }
-    installed
+
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        self.separate();
+        if field.name() == "message" {
+            let _ = write!(self.0, "{value:?}");
+        } else {
+            let _ = write!(self.0, "{}={value:?}", field.name());
+        }
+    }
+}
+
+/// The layer that writes events into the book.
+struct BookLayer;
+
+impl<S: Subscriber> Layer<S> for BookLayer {
+    fn on_event(&self, event: &Event<'_>, _context: Context<'_, S>) {
+        let mut text = Text::default();
+        event.record(&mut text);
+        let metadata = event.metadata();
+        record((*metadata.level()).into(), metadata.target(), &text.0);
+    }
+}
+
+/// The book's filter: events its [`Filter`] keeps, and no spans (so that
+/// with nothing else listening a span costs nothing).
+struct BookFilter;
+
+impl<S> LayerFilter<S> for BookFilter {
+    fn enabled(&self, metadata: &Metadata<'_>, _context: &Context<'_, S>) -> bool {
+        metadata.is_event()
+            && book()
+                .filter
+                .allows((*metadata.level()).into(), metadata.target())
+    }
+
+    fn callsite_enabled(&self, metadata: &'static Metadata<'static>) -> Interest {
+        if metadata.is_event() {
+            Interest::sometimes()
+        } else {
+            Interest::never()
+        }
+    }
+}
+
+/// The layer that keeps events in the book, as its filter chooses.
+pub fn layer<S>() -> impl Layer<S>
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
+    BookLayer.with_filter(BookFilter)
+}
+
+/// A layer that writes every span's close and every event to `writer` as
+/// JSON, an object a line, each event with the spans it was in.
+pub fn json_layer<S, W>(writer: W) -> impl Layer<S>
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    W: for<'w> MakeWriter<'w> + Send + Sync + 'static,
+{
+    tracing_subscriber::fmt::layer()
+        .json()
+        .with_current_span(false)
+        .with_span_list(true)
+        .with_writer(writer)
+}
+
+/// Makes the book the process's `tracing` subscriber (once; false if
+/// another was set first), with the JSON log when `OPENCE_LOG_JSON` names
+/// a file it can make, and Tracy's layer with the `tracy` feature.
+pub fn install() -> bool {
+    let json = std::env::var_os("OPENCE_LOG_JSON")
+        .and_then(|path| std::fs::File::create(path).ok())
+        .map(|file| json_layer(Mutex::new(file)));
+    let subscriber = tracing_subscriber::registry().with(layer()).with(json);
+    #[cfg(feature = "tracy")]
+    let subscriber = subscriber.with(tracing_tracy::TracyLayer::default());
+    subscriber.try_init().is_ok()
 }

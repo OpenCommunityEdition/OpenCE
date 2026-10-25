@@ -106,9 +106,15 @@ pub fn profiler() -> &'static Profiler {
 }
 
 /// Times the rest of the block as a scope `name` (an expression giving
-/// `&str`, read only when the profiler is on).
+/// `&str`, read only when the profiler is on). A name written as a literal
+/// is also a `tracing` span, for the JSON log and Tracy; one made at run
+/// time is only the profiler's, as a span's name must be fixed.
 #[macro_export]
 macro_rules! profile_scope {
+    ($name:literal) => {
+        let _profile_scope = $crate::profile::profiler().scope(|| $name);
+        let _profile_span = $crate::tracing::trace_span!($name).entered();
+    };
     ($name:expr) => {
         let _profile_scope = $crate::profile::profiler().scope(|| $name);
     };

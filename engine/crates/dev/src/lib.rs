@@ -22,6 +22,8 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 pub use serde_json::Value as Data;
+/// (for [`profile_scope!`]'s spans)
+pub use tracing;
 pub use words::{parse_words, split_commands};
 
 /// The files `exec` may run inside one another.

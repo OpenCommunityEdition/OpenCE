@@ -545,3 +545,45 @@ a later fast-loop track, measured the same way.
 | a10's tag index | about 107 KB |
 | a level loaded from its pack | bloodgulch 59.2 ms, a10 397.8 ms; no cache opened |
 | the readers' fuzz targets | run on every test pass (Phase 2) |
+
+## tracing and benchmarks (2026-10-25)
+
+The log book now sits on `tracing` in place of `log`. It is one layer of a
+`tracing-subscriber` registry, with its own filter (`render=debug,warn`, as
+before) and its own `Level`, so the control socket and the shell read it as
+they did. The dependencies that still log through `log` (bevy_ecs, goblin)
+come in through tracing-log. `OPENCE_LOG_JSON=<file>` adds a JSON log, one
+object a line, each event with the spans it was in. The `tracy` feature of
+the dev crate adds Tracy's layer (on demand, localhost only). A
+`profile_scope!` named by a literal is now a span as well as a profiler
+scope, so the frame's `advance` > `ticks` > `tick` nesting shows in the JSON
+log and in Tracy. A scope named at run time (the ones Swift sends) stays the
+profiler's only, as a span's name must be fixed. With no JSON log and no
+Tracy, the book's filter turns spans off at their callsites, so they cost
+nothing.
+
+divan benchmarks, `cargo bench -p <crate>` (`cargo test --benches` runs each
+once). Medians on this machine:
+
+| benchmark | median |
+| --- | --- |
+| collision: a ray across a room | 162 ns |
+| collision: a character walks into a wall, a tick | 2.08 µs |
+| bake: the furnace's hierarchy built | 1.71 µs |
+| bake: a texel traced, 16 / 64 paths | 19.9 / 75.7 µs |
+| animation: a biped's base pose blended (bloodgulch) | 448 ns |
+| AI: a tick of a10 with every encounter placed | 691 µs |
+
+The first blend measured 62 ns, too fast for a biped, because animation 0
+moved none of its nodes. The benchmark now picks a base animation of all
+the graph's nodes and checks that the pose has them. At 691 µs, a10's tick
+is 4% of the 16.7 ms frame.
+
+| check | result |
+| --- | --- |
+| spans nest, and the JSON log parses with them (`dev/tests/tracing.rs`) | pass |
+| a scope named at run time is no span | pass |
+| events reach the log book through its layer | pass |
+| the benchmarks run (`cargo test --bench`, each crate) | pass, 4 of 4 |
+| clippy `-D warnings`, the whole workspace, with and without `tracy` | clean |
+| the whole suite | 1106 passed, 3 skipped |

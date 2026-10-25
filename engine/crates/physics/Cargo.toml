@@ -18,5 +18,10 @@ workspace = true
 cc = { version = "1", features = ["parallel"] }
 
 [dev-dependencies]
+divan.workspace = true
 proptest.workspace = true
 opence_import.workspace = true
+
+[[bench]]
+name = "collision"
+harness = false

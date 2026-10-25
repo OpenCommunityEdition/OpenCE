@@ -18,4 +18,9 @@ thiserror.workspace = true
 workspace = true
 
 [dev-dependencies]
+divan.workspace = true
 opence_import.workspace = true
+
+[[bench]]
+name = "animation_blend"
+harness = false

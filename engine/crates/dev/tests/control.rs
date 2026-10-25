@@ -156,8 +156,8 @@ fn the_log_book_keeps_numbered_lines() -> Result<(), Box<dyn Error>> {
     let start = logbook::next_sequence() - 1;
     assert!(logbook::install());
     assert!(!logbook::install());
-    log::info!(target: "sim", "a tick");
-    log::debug!(target: "sim", "not kept at info");
+    tracing::info!(target: "sim", "a tick");
+    tracing::debug!(target: "sim", "not kept at info");
     let swift = logbook::record(Level::Warn, "swift", "from the app").ok_or("not kept")?;
     let lines = logbook::since(start, 10);
     assert_eq!(
