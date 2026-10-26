@@ -34,6 +34,7 @@
         <a href="#data-panel">Game data</a>
         <a href="#mods-panel">Mods</a>
         <a href="#room-panel">Play together</a>
+        <a href="#servers-panel">Servers</a>
         <a href="#checks-panel">This browser</a>
         <a href="#settings-panel">Settings and data</a>
         <a href="#about-panel">About</a>
@@ -108,6 +109,20 @@
             <button id="room-create">Create a room</button>
             <button id="room-copy" hidden>Copy the room's link</button>
             <button id="room-leave" hidden>Leave the room</button>
+          </div>
+        </section>
+
+        <section class="screen" id="servers-panel" aria-labelledby="servers-title">
+          <h2 id="servers-title">Servers</h2>
+          <p id="servers-status" class="help">Looking…</p>
+          <div class="rows">
+            <ul id="servers-list" class="servers"></ul>
+          </div>
+          <p class="help note">The official master servers list dedicated servers and the games players host for the
+            internet. Each list is signed, and this page checks it before it shows a game. The listed servers are not
+            contacted: Play here starts the game and joins the one you choose.</p>
+          <div class="button-bar">
+            <button id="servers-refresh">Refresh</button>
           </div>
         </section>
 
@@ -213,6 +228,7 @@
 <script src="touch.js"></script>
 <script src="net.js"></script>
 <script src="p2p.js"></script>
+<script src="servers.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

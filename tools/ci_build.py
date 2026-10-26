@@ -21,9 +21,18 @@ The web build (port/web/README.md) needs Emscripten (emcc on the PATH, as
 emsdk_env.sh puts it); dist/halo-web-<config>/ is the whole site, which a
 static host serves as it is: the workflow publishes the release build's to
 GitHub Pages.
+
+    python tools/ci_build.py sums release/
+
+writes release/SHA256SUMS: a line for each file of the folder (the
+release's assets: the workflow zips each build there), "<sha256 hex>  <name>",
+as sha256sum writes it and `sha256sum -c` reads it. The workflow signs it
+with the release key (tools/release_sign.sh: SHA256SUMS.sig) and publishes
+both with the release.
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
@@ -52,7 +61,29 @@ def run(command, cwd=ROOT):
     subprocess.run([str(part) for part in command], cwd=cwd, check=True)
 
 
+def write_sums(folder: Path) -> int:
+    """folder/SHA256SUMS: each file's SHA-256 and name, in name order (the
+    sums file itself and its signature left out)"""
+    lines = []
+    for path in sorted(folder.iterdir(), key=lambda item: item.name):
+        if not path.is_file() or path.name in ("SHA256SUMS", "SHA256SUMS.sig"):
+            continue
+        digest = hashlib.sha256()
+        with path.open("rb") as file:
+            for chunk in iter(lambda: file.read(1 << 20), b""):
+                digest.update(chunk)
+        lines.append(f"{digest.hexdigest()}  {path.name}\n")
+    if not lines:
+        print(f"{folder}: no files to sum", file=sys.stderr)
+        return 1
+    (folder / "SHA256SUMS").write_text("".join(lines), encoding="utf-8", newline="\n")
+    print(f"{folder / 'SHA256SUMS'}: {len(lines)} files", flush=True)
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) == 3 and sys.argv[1] == "sums":
+        return write_sums(Path(sys.argv[2]))
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("platform", choices=sorted(OUTPUTS))
     parser.add_argument("config", choices=["debug", "release", "profile"])
@@ -135,6 +166,10 @@ def main() -> int:
     # voice chat's codec (port/third_party/opus), in every build, whose BSD
     # license asks binaries to carry its notice
     shutil.copy2(ROOT / "port/third_party/opus/COPYING", dist / "opus-COPYING.txt")
+    # the JSON tokenizer (port/third_party/jsmn) of the server browser's
+    # lists and the dedicated server's API, in every build, whose MIT
+    # license asks copies to carry its notice
+    shutil.copy2(ROOT / "port/third_party/jsmn/LICENSE", dist / "jsmn-LICENSE.txt")
     # voice chat's speaker icons and the Mods menu's warning icons
     # (port/assets/icons/lucide, drawn into the menus' bitmaps), whose ISC
     # license asks copies to carry its notice
@@ -143,6 +178,22 @@ def main() -> int:
     # Android's APK has its own copy)
     if args.platform != "android":
         shutil.copy2(ROOT / "port/assets/network/brokers.txt", dist / "brokers.txt")
+        # the master servers that list dedicated servers, for the server
+        # browser and the dedicated server (network.masters_file and
+        # server.masters_file, docs/dedicated_server.md)
+        masters = ROOT / "port/assets/network/masters.txt"
+        if masters.exists():
+            shutil.copy2(masters, dist / "masters.txt")
+    if args.platform in ("linux", "windows"):
+        # the dedicated server's examples: init.txt's commands and gametype
+        # files (docs/dedicated_server.md, "Files")
+        shutil.copy2(ROOT / "deploy/init.txt.example", dist / "init.txt.example")
+        shutil.copytree(ROOT / "deploy/gametypes", dist / "gametypes")
+    if args.platform == "linux":
+        # halo --server's script, and the ways to deploy a server
+        # (deploy/: systemd, Docker, Pterodactyl, Kubernetes, other panels)
+        shutil.copy2(ROOT / "deploy/halo-server", dist / "halo-server")
+        shutil.copytree(ROOT / "deploy", dist / "deploy", ignore=shutil.ignore_patterns("*.zip", "__pycache__"))
     return 0
 
 

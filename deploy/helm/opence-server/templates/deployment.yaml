@@ -1,0 +1,198 @@
+{{- if not (include "opence-server.hasGameData" .) }}
+{{- fail "gameData: set existingClaim, nfs.server and nfs.path, or volume - the server needs the game's maps, which are never in the image" }}
+{{- end }}
+{{- $fullname := include "opence-server.fullname" . }}
+{{- $secret := include "opence-server.secretName" . }}
+{{- $webPort := int .Values.web.port }}
+{{- $env := list }}
+{{- $env = append $env (dict "name" "HALO_SERVER" "value" "1") }}
+{{- $env = append $env (dict "name" "HALO_CONFIG_FILE" "value" "/state/config.toml") }}
+{{- $env = append $env (dict "name" "HALO_DATA_ROOT" "value" "/data") }}
+{{- $env = append $env (dict "name" "HALO_SAVE_ROOT" "value" "/state/saves") }}
+{{- $env = append $env (dict "name" "HALO_LOG_ROOT" "value" "/state/logs") }}
+{{- if include "opence-server.hasCustomMaps" . }}
+{{- $env = append $env (dict "name" "HALO_CUSTOM_MAPS_ROOT" "value" "/custom_maps") }}
+{{- end }}
+{{- /* (a pod has no standard input to read commands from) */}}
+{{- $env = append $env (dict "name" "HALO_SERVER_CONSOLE" "value" "false") }}
+{{- $env = append $env (dict "name" "HALO_NET_TUNNEL_PORT" "value" (toString (int .Values.network.tunnelPort))) }}
+{{- with .Values.network.publicAddress }}
+{{- $env = append $env (dict "name" "HALO_NET_PUBLIC_ADDRESS" "value" .) }}
+{{- end }}
+{{- with .Values.server.name }}
+{{- if gt (len .) 15 }}
+{{- fail "server.name: 15 characters at most" }}
+{{- end }}
+{{- $env = append $env (dict "name" "HALO_SERVER_NAME" "value" .) }}
+{{- end }}
+{{- with .Values.server.rotation }}
+{{- $env = append $env (dict "name" "HALO_SERVER_ROTATION" "value" (join ", " .)) }}
+{{- end }}
+{{- /* (a value left null is not set, so that config.toml, sv_set and the web page's settings can
+change it) */}}
+{{- if not (kindIs "invalid" .Values.server.maxPlayers) }}
+{{- $env = append $env (dict "name" "HALO_SERVER_MAX_PLAYERS" "value" (toString (int .Values.server.maxPlayers))) }}
+{{- end }}
+{{- if not (kindIs "invalid" .Values.server.public) }}
+{{- $env = append $env (dict "name" "HALO_SERVER_PUBLIC" "value" (toString .Values.server.public)) }}
+{{- end }}
+{{- if not (kindIs "invalid" .Values.server.lobbySeconds) }}
+{{- $env = append $env (dict "name" "HALO_SERVER_LOBBY_SECONDS" "value" (toString (int .Values.server.lobbySeconds))) }}
+{{- end }}
+{{- with .Values.server.motd }}
+{{- $env = append $env (dict "name" "HALO_SERVER_MOTD" "value" .) }}
+{{- end }}
+{{- with .Values.server.logFormat }}
+{{- $env = append $env (dict "name" "HALO_SERVER_LOG_FORMAT" "value" .) }}
+{{- end }}
+{{- with .Values.server.instance }}
+{{- $env = append $env (dict "name" "HALO_SERVER_INSTANCE" "value" .) }}
+{{- end }}
+{{- with .Values.server.region }}
+{{- $env = append $env (dict "name" "HALO_SERVER_REGION" "value" .) }}
+{{- end }}
+{{- if not (kindIs "invalid" .Values.server.masterPublish) }}
+{{- $env = append $env (dict "name" "HALO_SERVER_MASTER_PUBLISH" "value" (toString .Values.server.masterPublish)) }}
+{{- end }}
+{{- if .Values.server.password.existingSecret }}
+{{- $env = append $env (dict "name" "HALO_SERVER_PASSWORD" "valueFrom" (dict "secretKeyRef" (dict "name" .Values.server.password.existingSecret "key" .Values.server.password.key))) }}
+{{- else if .Values.server.password.value }}
+{{- $env = append $env (dict "name" "HALO_SERVER_PASSWORD" "valueFrom" (dict "secretKeyRef" (dict "name" $secret "key" .Values.server.password.key))) }}
+{{- end }}
+{{- if .Values.publisherKey.existingSecret }}
+{{- $env = append $env (dict "name" "HALO_SERVER_PUBLISHER_KEY" "valueFrom" (dict "secretKeyRef" (dict "name" .Values.publisherKey.existingSecret "key" .Values.publisherKey.key))) }}
+{{- else if .Values.publisherKey.value }}
+{{- $env = append $env (dict "name" "HALO_SERVER_PUBLISHER_KEY" "valueFrom" (dict "secretKeyRef" (dict "name" $secret "key" .Values.publisherKey.key))) }}
+{{- end }}
+{{- $env = append $env (dict "name" "HALO_SERVER_WEB_PORT" "value" (toString $webPort)) }}
+{{- if gt $webPort 0 }}
+{{- /* (the kubelet's probes reach the pod's own address, not its loopback) */}}
+{{- $env = append $env (dict "name" "HALO_SERVER_WEB_BIND" "value" "0.0.0.0") }}
+{{- $env = append $env (dict "name" "HALO_SERVER_WEB_PASSWORD" "valueFrom" (dict "secretKeyRef" (dict "name" (include "opence-server.webSecret" .) "key" .Values.web.key))) }}
+{{- if .Values.web.existingSecret }}
+{{- $env = append $env (dict "name" "HALO_SERVER_WEB_MODERATOR_PASSWORD" "valueFrom" (dict "secretKeyRef" (dict "name" .Values.web.existingSecret "key" .Values.web.moderatorKey "optional" true))) }}
+{{- else if .Values.web.moderatorPassword }}
+{{- $env = append $env (dict "name" "HALO_SERVER_WEB_MODERATOR_PASSWORD" "valueFrom" (dict "secretKeyRef" (dict "name" $secret "key" .Values.web.moderatorKey))) }}
+{{- end }}
+{{- end }}
+{{- $probe := dict "httpGet" (dict "path" "/healthz" "port" "web") }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "opence-server.labels" . | nindent 4 }}
+spec:
+  # One server owns the tunnel port and the address players reach it at.
+  replicas: 1
+  strategy:
+    {{- toYaml .Values.strategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "opence-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "opence-server.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      # The server never calls the Kubernetes API.
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: opence-server
+          image: {{ include "opence-server.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- toYaml $env | nindent 12 }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: tunnel
+              containerPort: {{ .Values.network.tunnelPort }}
+              protocol: UDP
+            {{- if gt $webPort 0 }}
+            - name: web
+              containerPort: {{ $webPort }}
+              protocol: TCP
+            {{- end }}
+          {{- if gt $webPort 0 }}
+          {{- range $name := list "startup" "readiness" "liveness" }}
+          {{- $p := index $.Values.probes $name }}
+          {{- if $p.enabled }}
+          {{ $name }}Probe:
+            {{- toYaml (merge (omit $p "enabled") $probe) | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: game-data
+              mountPath: /data
+              readOnly: true
+              {{- with .Values.gameData.subPath }}
+              subPath: {{ . }}
+              {{- end }}
+            # config.toml, publisher.key, the save root and its map cache, the logs
+            - name: state
+              mountPath: /state
+            {{- if include "opence-server.hasCustomMaps" . }}
+            - name: custom-maps
+              mountPath: /custom_maps
+              readOnly: true
+              {{- with .Values.customMaps.subPath }}
+              subPath: {{ . }}
+              {{- end }}
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: game-data
+          {{- include "opence-server.volumeSource" .Values.gameData | trim | nindent 10 }}
+        - name: state
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "opence-server.stateClaim" . }}
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.persistence.emptyDirSizeLimit }}
+          {{- end }}
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        {{- if include "opence-server.hasCustomMaps" . }}
+        - name: custom-maps
+          {{- include "opence-server.volumeSource" .Values.customMaps | trim | nindent 10 }}
+        {{- end }}

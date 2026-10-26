@@ -15,19 +15,20 @@ end.
 | Path | Contents |
 | --- | --- |
 | `source/` | The game: 466 C files of the decompilation, compiled as they are with few changes (each marked, below) |
-| `port/linux/src/` | The platform layer the three ports share: Direct3D 8 on OpenGL (`d3d8_gl.c`), DirectSound and XInput on SDL3, files, threads, memory, sockets, settings (`port_config.c`), the mods folder (`port_mods.c`), internet play (`p2p*.c`) |
-| `port/linux/game/` | The port's game-side code, compiled as the game's sources are: the distributed netcode (`network_*.c`), co-op, OpenCE's gametypes (`game_modes.c`, `infection.c`, `gun_game.c`), map sharing (`map_share*.c`), the menus (`menu_tags.c`, `menu_functions.c`), Custom Edition maps (`custom_edition_*.c`, `cache_file_formats.c`), the tag validator (`tag_validate.c`, `tag_schema_*.c`), mods (`mods.c`, `mod_*.c`), streamer mode's word filter (`text_filter*.c`), touch, FOV and more |
+| `port/linux/src/` | The platform layer the three ports share: Direct3D 8 on OpenGL (`d3d8_gl.c`), DirectSound and XInput on SDL3, files, threads, memory, sockets, settings (`port_config.c`), the mods folder (`port_mods.c`), internet play (`p2p*.c`), the dedicated server's platform side (`server_*.c`: the mode, the log, the rotation's grammar, HTTP, RCON, the master servers' publisher) and the master servers' list (`master_list.c`) |
+| `port/linux/game/` | The port's game-side code, compiled as the game's sources are: the distributed netcode (`network_*.c`), co-op, OpenCE's gametypes (`game_modes.c`, `infection.c`, `gun_game.c`), map sharing (`map_share*.c`), the menus (`menu_tags.c`, `menu_functions.c`), Custom Edition maps (`custom_edition_*.c`, `cache_file_formats.c`), the tag validator (`tag_validate.c`, `tag_schema_*.c`), mods (`mods.c`, `mod_*.c`), streamer mode's word filter (`text_filter*.c`), the dedicated server's director, commands, gametypes and status (`server_*.c`), touch, FOV and more |
 | `port/linux/include/` | The port's headers: the limits (`halo_port_limits.h`, with `HALO_PORT_NETWORK_VERSION`), capacities (`halo_port_capacity.h`), the prefix header, `halo_linux_source_fixups.h` (port functions the game's sources call) |
 | `port/include/xdk/` | Stand-ins for the Xbox SDK's headers (declarations only) |
 | `port/windows/` | The Windows build's own files (`win32_*.c`, headers) |
 | `port/android/` | The Android app: the guest runtime, the host library (`host/`), the Java app (`app/`), host imports (`host_imports.list`) |
 | `port/web/` | The web build: its runtime (`src/`: entry, sockets inside the page, memory watch), the page and its service worker (`site/`), the SDL port, tests |
-| `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers |
+| `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers and master servers, the dedicated server's web page (`server_ui/`) |
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
 | `port/tools/` | Stand-alone tools (`cache_file_report.c`) |
-| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `xdk_headers.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
-| `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`) |
+| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `server_ui_embed.py`, `xdk_headers.py`), the dedicated server's protocol simulator and remote console (`server_sim.py`, `opence_rcon.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
+| `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`, `dedicated_server.md`, `master_protocol.md`) |
 | `pgo/` | Profile-guided optimisation profiles |
+| `deploy/` | Running a dedicated server: systemd, Docker, Pterodactyl, Helm, PufferPanel, MCSManager, example gametypes |
 | `assets/` | Game data for local runs (gitignored: `maps/`, `custom_maps/`) |
 | `.github/workflows/` | CI: builds every platform on each push, publishes releases from `main` |
 
@@ -94,6 +95,8 @@ python tools/test_death_timing.py
 python -m pytest -q tools/test_web_build.py                 # the web build's graph, sockets, menus
 node --test "port/web/tests/*.test.js"                      # the web page's importer and service worker
 node port/web/tests/webrtc_native.mjs chromium firefox      # the native builds' WebRTC with browsers (Playwright)
+python -m pytest -q tools/test_dedicated_server.py          # the dedicated server with clients (needs assets/maps)
+python -m pytest -q tools/test_server_sim.py tools/test_egg.py   # the server's web page and protocol simulator, the egg
 python -m pytest -q tools/test_net_compare.py               # net_compare.py's judging of logs, its copies and their processes
 python tools/net_compare.py --a build/linux/halo --b <other build> --data <game data> --swap
                                                             # two builds in one network game, in step (retail maps: local only)
@@ -110,6 +113,9 @@ Running the game without a person at it:
   several copies play on one machine on different loopback addresses
   (`HALO_NET_ADDRESS`, `HALO_NET_BROADCAST`). `NETCODE.md` describes the
   test settings.
+- `halo --server` is a dedicated server (`docs/dedicated_server.md`), and
+  `halo --probe [<invite>]` prints a game's advertisement as JSON and exits;
+  `tools/test_dedicated_server.py` runs both with clients.
 - `debug.exit_after`, `debug.hidden_window`, `debug.null_renderer`,
   `debug.menu_open` (start on one menu screen), `debug.telnet_console`.
 - Use a virtual display (Xvfb, with `SDL_VIDEO_DRIVER=x11`) for windowed
@@ -231,6 +237,8 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [port/web/README.md](port/web/README.md) | The web build, the page, the game data in the browser, limits, how it operates, hosting on GitHub Pages |
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |
+| [docs/dedicated_server.md](docs/dedicated_server.md) | The dedicated server: its command line, exit codes, commands, HTTP API, RCON, events and files |
+| [docs/master_protocol.md](docs/master_protocol.md) | The master servers' protocol: publishing, the probe, the signed list |
 | [docs/mods.md](docs/mods.md) | Mods: folders of Halo PC tag files whose sounds, bitmaps, text and models play over a map's on one machine |
 | [port/assets/text_filter/README.md](port/assets/text_filter/README.md) | Streamer mode's words: Surge AI's list, the review, the allowed words |
 | [port/assets/menus/README.md](port/assets/menus/README.md) | The menu files' format and how to write them again |
