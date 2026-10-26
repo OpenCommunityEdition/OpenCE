@@ -16,7 +16,11 @@ Like the real server: --trusted-proxy <address> believes that proxy's
 X-Forwarded-For (its last entry), -Host and -Proto (and only then marks the
 cookie Secure); --request-limit counts each address's requests (60 a minute
 without a session, 600 with one, WebSocket upgrades too: off by default, as
-the tests sign in often).
+the tests sign in often). --owner-password signs in as the owner from
+loopback alone (a connection's own address in 127.0.0.0/8, not the trusted
+proxy's), as server.web_owner_password does. A stop (quit, sv_stop,
+sv_restart, a drain's end) is said (the shutdown event) and the simulator
+goes on, unless --exit-on-stop: then it exits with the stop's code.
 
 Fault injection: --slow-consumer (each WebSocket is written slowly and a
 burst follows a subscription, so its queue overflows), --drop (WebSockets
@@ -36,6 +40,7 @@ import hmac
 import http
 import ipaddress
 import json
+import os
 import random
 import re
 import secrets
@@ -72,6 +77,11 @@ ROTATION_TEXT = 4096
 ENTRY_TEXT = 255
 NOTICE_SIZE = 128
 NETWORK_VERSION = 38
+# the RCON's hello's capabilities, and the status's (server_http.c's server_http_capabilities)
+CAPABILITIES = ["events", "status", "rotation", "settings", "bans", "owner_web", "ban_address", "stop",
+                "event_addresses", "identity"]
+PUBLISHER_KEY_ID = "3f9a2c7d1e5b8a04"
+DRAINS = ("now", "game", "empty", "cancel")
 
 CSP = "default-src 'self'; frame-ancestors 'none'"
 SECURITY_HEADERS = [
@@ -699,6 +709,8 @@ COMMANDS = [
     ("ban", "sv_ban", "moderator", "<player> [30m|2h|7d|forever] [reason]",
      "drops a player's machine and bans its address and hardware id (a moderator's: a day at most)"),
     ("unban", "sv_unban", "admin", "<number|address|hardware id>", "takes a ban out of bans.txt"),
+    ("sv_ban_address", None, "admin", "<address|hardware id> [30m|2h|7d|forever] [reason]",
+     "bans an address or hardware id, its player here or not"),
     ("mute", None, "moderator", "<player> [minutes]", "mutes a player's chat and voice for everyone"),
     ("unmute", None, "moderator", "<player>", "unmutes a player"),
     ("sv_map", None, "moderator", "<map> [gametype]", "plays that game now (the rotation goes on after)"),
@@ -715,7 +727,9 @@ COMMANDS = [
     ("sv_public", None, "admin", "<0|1>", "listed in the server browser, or by invite only"),
     ("sv_motd", None, "admin", "<text>", "the notice each machine sees as it joins"),
     ("sv_reload", None, "admin", "", "reads the server's settings and the rotation again"),
-    ("sv_restart", None, "owner", "", "stops with exit code 5 (to be started again)"),
+    ("sv_stop", None, "owner", "[now|game|empty|cancel] [notice]",
+     "stops the server now, once the game is over, or once it is empty"),
+    ("sv_restart", None, "owner", "[now|game|empty|cancel] [notice]", "as sv_stop, with exit code 5 (to be started again)"),
     ("quit", "exit", "owner", "", "stops the server"),
 ]
 SETTING_ALIASES = {"sv_name": "server.name", "sv_maxplayers": "server.max_players", "sv_password": "server.password",
@@ -792,6 +806,8 @@ class Sim:
         ]
         self.invite = "halo://join/" + secrets.token_hex(32)
         self.script_tick = 0
+        # a stop that waits (sv_stop, sv_restart: game or empty): {"after", "restart", "since"}, or None
+        self.drain = None
 
     # ----- the parts
 
@@ -800,6 +816,22 @@ class Sim:
 
     def value(self, name):
         return self.setting(name)["value"]
+
+    def owner_password(self):
+        return getattr(self.options, "owner_password", "") or ""
+
+    def instance(self):
+        """server.instance as the masters get it: else a slug of the server's name"""
+        name = getattr(self.options, "instance", "") or self.value("server.name")
+        slug = re.sub(r"-+", "-", re.sub(r"[ .]", "-", "".join(character for character in name.lower()
+                                                                  if character.isalnum() or character in " .-_")))
+        return slug.strip("-_")[:32].strip("-") or "main"
+
+    def identity(self):
+        """the status's and server_started's identity (server_status.c's server_status_identity)"""
+        return {"pid": os.getpid(), "started": int(self.started), "instance": self.instance(),
+                "region": self.value("server.region"), "tunnel_port": 2302, "publisher_key_id": PUBLISHER_KEY_ID,
+                "web_port": getattr(self.options, "port", 0)}
 
     def addresses_for(self, role):
         return ROLES.index(role) >= ROLES.index("owner") or self.value("server.log_addresses") or \
@@ -821,15 +853,19 @@ class Sim:
             for connection in list(self.connections):
                 connection.offer("chat" if cat == "chat" else "log", event)
 
-    def emit(self, _event, _group, **fields):
-        """an event to the ring and to every subscriber"""
+    def emit(self, _event, _group, _addressed=None, **fields):
+        """an event to the ring and to every subscriber; _addressed, the fields
+        the readers who see players' addresses get besides (the owner, or
+        every role with server.log_addresses)"""
         with self.lock:
             self.seq += 1
             event = {"type": "event", "seq": self.seq, "time": now_ms(), "event": _event}
             event.update(fields)
-            self.events.append((_group, event))
+            addressed = dict(event, **_addressed) if _addressed else None
+            self.events.append((_group, event, addressed))
             for connection in list(self.connections):
-                connection.offer(_group, event)
+                connection.offer(_group, addressed if addressed and self.addresses_for(connection.role or "viewer")
+                                 else event)
             return event
 
     def playing(self):
@@ -875,6 +911,9 @@ class Sim:
             "frame_ms_max": frame, "frame_ms_avg": mean, "tick_ms_avg": mean,
             "masters": [dict(master) for master in self.masters],
             "update": {"available": False, "build": ""},
+            "drain": dict(self.drain) if self.drain else None,
+            **self.identity(),
+            "capabilities": list(CAPABILITIES),
         }
 
     # ----- the rotation (server_rotation.c's grammar)
@@ -1044,7 +1083,8 @@ class Sim:
         return slot
 
     def add_player(self, name=None):
-        if len(self.players) >= self.value("server.max_players"):
+        # (a drain refuses new machines: the game is closed)
+        if len(self.players) >= self.value("server.max_players") or self.drain:
             return None
         if name is None:
             taken = {player.name for player in self.players.values()}
@@ -1062,14 +1102,16 @@ class Sim:
         self.next_machine += 1
         self.players[slot] = player
         self.log("info", "player", f"{name} joined (slot {slot}, machine {player.machine})")
-        self.emit("player_joined", "player", slot=slot, name=name, team=player.team, machine=player.machine)
+        self.emit("player_joined", "player", {"address": player.address, "hwid": player.hwid}, slot=slot, name=name,
+                  team=player.team, machine=player.machine)
         return player
 
     def remove_player(self, player, reason):
         """a player gone: reason left, kicked or banned"""
         self.players.pop(player.slot, None)
         self.log("info", "player", f"{player.name} left (slot {player.slot})")
-        self.emit("player_left", "player", slot=player.slot, name=player.name, reason=reason)
+        self.emit("player_left", "player", {"address": player.address, "hwid": player.hwid}, slot=player.slot,
+                  name=player.name, reason=reason)
 
     def find_player(self, command, text):
         """a player by slot or the start of their name, or Failed"""
@@ -1175,7 +1217,8 @@ class Sim:
         if self.state == "starting":
             self.state = "waiting"
             self.emit("server_started", "server", name=self.value("server.name"), build=BUILD,
-                      network_version=NETWORK_VERSION, rotation=[entry["text"] for entry in self.rotation])
+                      network_version=NETWORK_VERSION, **self.identity(),
+                      rotation=[entry["text"] for entry in self.rotation])
             self.log("info", "server", f"ready (tunnel 2302/udp, web 127.0.0.1:{self.options.port}, listing public)")
             for entry in self.rotation:
                 if entry["rejected"]:
@@ -1190,6 +1233,9 @@ class Sim:
                 for _ in range(3):
                     self.add_player()
                 self.open_lobby(self.rotation[self.rotation_index])
+            return
+        if self.drain and self.drain_due():
+            self.stop(5 if self.drain["restart"] else 0, "drained")
             return
         if self.state == "lobby":
             minimum = self.value("server.min_players")
@@ -1489,6 +1535,58 @@ class Sim:
                 return [f"unbanned: {self.ban_line(ban)}"]
         raise Failed(f"unban: no ban {target} (sv_bans lists them)")
 
+    def ban_address(self, ip, hwid, names, seconds, reason, role):
+        """server_commands.c's ban_address: a line of bans.txt for an address,
+        a hardware id or both, and each player present of them dropped as ban
+        drops one; the new ban's number, or CommandError (400)"""
+        ip, hwid = ip or "", hwid or ""
+        if not ip and not hwid:
+            raise CommandError("schema", "give an address (a.b.c.d) or a hardware id")
+        if ip:
+            match = re.fullmatch(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", ip)
+            if not match or any(int(part) > 255 for part in match.groups()) or \
+                    all(int(part) == 0 for part in match.groups()):
+                raise CommandError("schema", f"{ip} is not an IPv4 address (a.b.c.d)")
+            ip = ".".join(str(int(part)) for part in match.groups())
+        if hwid:
+            if not re.fullmatch(r"[0-9A-Fa-f]{1,32}", hwid):
+                raise CommandError("schema", "a hardware id is up to 32 hex digits")
+            hwid = hwid.lower()
+        names = printable_text(names or "", 64)
+        reason = printable_text(reason or "", 96)
+        until = int(time.time()) + seconds if seconds else None
+        shown = (reason or "banned by the server") + ("" if role == "owner" else f" (by the {role})")
+        self.bans.append({"when": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), "ip": ip or "none",
+                          "hwid": hwid or "none", "players": names, "reason": shown, "until": until})
+        number = len(self.bans) - 1
+        dropped = [player for player in self.players.values() if (ip and player.address == ip) or
+                   (hwid and player.hwid == hwid)]
+        self.log("info", "moderation", f"ban {number} added ({role})")
+        self.moderation_event("ban", names or ", ".join(player.name for player in dropped), role, reason or None,
+                              until)
+        for player in dropped:
+            self.remove_player(player, "banned")
+        return number
+
+    def c_sv_ban_address(self, line, words, role):
+        if len(words) < 2:
+            raise Failed("sv_ban_address: give an address (a.b.c.d) or a hardware id, then a duration (30m, 2h, 7d, "
+                         "forever) and a reason")
+        seconds, reason_words = 0, 2
+        if len(words) >= 3:
+            seconds = parse_duration(words[2])
+            if seconds >= 0:
+                reason_words = 3
+            else:
+                seconds = 0
+        address = "." in words[1]
+        try:
+            number = self.ban_address(words[1] if address else "", "" if address else words[1], "", seconds,
+                                      rest_after_words(line, reason_words), role)
+        except CommandError as failure:
+            raise Failed(f"sv_ban_address: {failure.message}") from None
+        return [f"ban {number} added" + (f", for {seconds // 60} minutes" if seconds else "")]
+
     def c_mute(self, line, words, role):
         mute = words[0].lower() != "unmute"
         command = "mute" if mute else "unmute"
@@ -1615,10 +1713,65 @@ class Sim:
         self.log("info", "server", "reloaded")
         return []
 
-    def c_sv_restart(self, line, words, role):
-        return ["(simulated: the server would stop with exit code 5)"]
+    def stop(self, code, reason):
+        """the server stops (server_director.c's server_director_quit): the
+        shutdown event; the simulator then exits with the code
+        (--exit-on-stop), else goes on as before"""
+        self.drain = None
+        self.log("info", "server", f"stopping ({reason})")
+        self.emit("shutdown", "server", reason=reason, code=code)
+        if getattr(self.options, "exit_on_stop", False):
+            self.state = "stopping"
+            timer = threading.Timer(0.5, lambda: os._exit(code))
+            timer.daemon = True
+            timer.start()
+
+    def drain_due(self):
+        """a drain's moment (server_director.c's server_drain_update): for
+        empty, nobody on the server; for game, no game played nor coming (a
+        lobby with nobody, or no countdown)"""
+        if self.drain["after"] == "empty":
+            return not self.players
+        return self.state in ("waiting", "starting") or (self.state == "lobby" and (not self.players or
+                                                                                   self.countdown < 0))
+
+    def c_sv_stop(self, line, words, role):
+        restart = words[0].lower() == "sv_restart"
+        after, notice_words = "now", 1
+        if len(words) >= 2:
+            after = words[1].lower()
+            if after not in DRAINS:
+                raise Failed(f"{words[0].lower()}: now, game, empty or cancel, then a notice for the players")
+            notice_words = 2
+        notice = printable_text(rest_after_words(line, notice_words), NOTICE_SIZE)
+        lines = []
+        if notice:
+            lines += self.notice(notice)
+            self.log("info", "chat", f"server: {notice}")
+        code = 5 if restart else 0
+        if after == "cancel":
+            if not self.drain:
+                raise Failed(f"{words[0].lower()}: no stop is waiting")
+            self.emit("drain", "server", after="cancel", restart=self.drain["restart"], notice=notice)
+            self.drain = None
+            self.log("info", "server", "the stop is cancelled: listed (as server.public says) and open again")
+            return lines + ["the stop is cancelled: the server is listed and open again"]
+        self.emit("drain", "server", after=after, restart=restart, notice=notice)
+        if after == "now":
+            self.stop(code, "sv_restart" if restart else "sv_stop")
+            return lines + [f"stopping (exit code {code})"]
+        since = self.drain["since"] if self.drain else int(time.time())
+        self.drain = {"after": after, "restart": restart, "since": since}
+        self.log("info", "server", f"stopping (exit code {code}) once "
+                 f"{'the game is over' if after == 'game' else 'nobody plays'}: the listings withdrawn, new players "
+                 "refused")
+        return lines + [f"stopping once {'this game is over' if after == 'game' else 'nobody plays'} (exit code {code}); "
+                        "the listings withdrawn, new players refused"]
+
+    c_sv_restart = c_sv_stop
 
     def c_quit(self, line, words, role):
+        self.stop(0, "quit")
         return ["(simulated: the server would stop)"]
 
     # ----- settings
@@ -1696,13 +1849,21 @@ class Sim:
 
     # ----- sign-in
 
-    def password_role(self, password):
+    def password_role(self, password, local=True):
+        """the role a password gives: the owner's from loopback alone ("forbidden"
+        from elsewhere), else the admin's, the moderator's or the viewer's"""
+        owner = self.owner_password()
+        forbidden = False
+        if owner and password and hmac.compare_digest(password.encode(), owner.encode()):
+            if local:
+                return "owner"
+            forbidden = True
         role = None
         for candidate, wanted in (("admin", self.options.password), ("moderator", self.options.moderator_password),
                                   ("viewer", self.options.viewer_password)):
             if wanted and hmac.compare_digest(password.encode(), wanted.encode()):
                 role = role or candidate
-        return role
+        return role or ("forbidden" if forbidden else None)
 
     def address_record(self, address):
         return self.addresses.setdefault(address, {"window": 0.0, "requests": 0, "failures": [], "locked": 0.0})
@@ -1720,9 +1881,10 @@ class Sim:
             record["requests"] += 1
             return record["requests"] <= (600 if authenticated else 60)
 
-    def check_password(self, address, password):
+    def check_password(self, address, password, local=True):
         """the role a password gives, or CommandError (denied, locked,
-        rate_limited); counts failures and locks an address out"""
+        rate_limited, forbidden: the owner's password from beyond loopback,
+        counted as a wrong one); counts failures and locks an address out"""
         with self.lock:
             at = time.time()
             record = self.address_record(address)
@@ -1734,8 +1896,8 @@ class Sim:
                 raise CommandError("rate_limited", "too many tries: wait", 429,
                                    retry_after=int(self.checks[0] + 60 - at) + 1)
             self.checks.append(at)
-            role = self.password_role(password if isinstance(password, str) else "")
-            if role:
+            role = self.password_role(password if isinstance(password, str) else "", local)
+            if role and role != "forbidden":
                 record["failures"] = []
                 return role
             record["failures"] = [stamp for stamp in record["failures"] if stamp > at - 600] + [at]
@@ -1743,6 +1905,11 @@ class Sim:
                 record["locked"] = at + 600
                 record["failures"] = []
                 self.log("warn", "server", f"web: {address} locked out for 10 minutes after 5 wrong passwords")
+            if role == "forbidden":
+                self.log("warn", "server", "web: the owner's password was given from another address: refused (it "
+                         "signs in from this machine alone)")
+                raise CommandError("forbidden", "the owner's password signs in from the server's own machine alone",
+                                   403)
             raise CommandError("denied", "wrong password", 401)
 
     def new_session(self, role, by):
@@ -1796,6 +1963,7 @@ class Request:
         self.headers = headers
         self.body = body
         self.address = address
+        self.trusted_proxy = trusted_proxy
         # (behind a trusted proxy, the client's address is its word: the entry it appended)
         self.real_address = address
         if trusted_proxy and self.header("x-forwarded-for") and address == trusted_proxy:
@@ -1818,6 +1986,16 @@ class Request:
 
     def behind_proxy(self):
         return self.real_address != self.address
+
+    @property
+    def local(self):
+        """the connection is this machine's: its own address in 127.0.0.0/8, and
+        not the trusted proxy's (the owner's role is never given through it)"""
+        try:
+            loopback = ipaddress.ip_address(self.address) in ipaddress.ip_network("127.0.0.0/8")
+        except ValueError:
+            loopback = False
+        return loopback and not (self.trusted_proxy and self.address == self.trusted_proxy)
 
     def host(self):
         if self.header("x-forwarded-host") and self.behind_proxy():
@@ -1965,10 +2143,16 @@ class Api:
         return error(404, "not_found", "nothing is there")
 
     def find_session(self, request):
+        """the request's session and how it came (an owner's session is used
+        from this machine alone, where it was begun)"""
         bearer = re.match(r"Bearer\s+(\S+)", request.header("authorization"))
         if bearer:
-            return self.sim.session(bearer.group(1)), "bearer"
-        return self.sim.session(request.cookie("opence_session")), "cookie"
+            session, kind = self.sim.session(bearer.group(1)), "bearer"
+        else:
+            session, kind = self.sim.session(request.cookie("opence_session")), "cookie"
+        if session and session.role == "owner" and not request.local:
+            session = None
+        return session, kind
 
     def call(self, request, method, role, game, function, groups, session=None, kind=None):
         sim = self.sim
@@ -2055,7 +2239,7 @@ def h_login(api, request, session, body):
     if not isinstance(password, str):
         raise CommandError("schema", "password is needed", field="password")
     by = body.get("by") if isinstance(body.get("by"), str) else ""
-    role = sim.check_password(request.real_address, password)
+    role = sim.check_password(request.real_address, password, request.local)
     session = sim.new_session(role, by[:32] or f"web {role}")
     sim.log("info", "server", f"web: {session.by} signed in ({role})")
     cookie = f"opence_session={session.token}; HttpOnly; SameSite=Strict; Path=/"
@@ -2221,6 +2405,45 @@ def h_ban_delete(api, request, session, body, number):
     return command_answer(*api.sim.run(f"unban {int(number)}", session.role, session.by))
 
 
+@route("POST", r"/api/bans", "admin")
+def h_ban_add(api, request, session, body):
+    """a ban of an address or hardware id (sv_ban_address): {"ok":true,"n":…}"""
+    sim = api.sim
+    fields = {}
+    for name in ("ip", "hwid", "names", "duration", "reason"):
+        value = body.get(name)
+        if value is not None and not isinstance(value, str):
+            raise CommandError("schema", f"{name} is a text", field=name)
+        fields[name] = value or ""
+    seconds = 0
+    if fields["duration"]:
+        seconds = parse_duration(fields["duration"])
+        if seconds < 0:
+            raise CommandError("schema", "duration is 30m, 2h, 7d, 1w or forever (ten years at most)",
+                               field="duration")
+    sim.log("info", "console", f"{session.by}: (a ban of an address or hardware id)")
+    number = sim.ban_address(fields["ip"], fields["hwid"], fields["names"], seconds, fields["reason"], session.role)
+    return Response(200, {"ok": True, "n": number})
+
+
+@route("POST", r"/api/stop", "owner")
+def h_stop(api, request, session, body):
+    """sv_stop or sv_restart, now, after the game or once empty, or the stop
+    waiting cancelled: {"ok":true,"lines":[…]}"""
+    for name in ("cancel", "restart"):
+        if name in body and not isinstance(body[name], bool):
+            raise CommandError("schema", "cancel and restart are true or false, notice a text", field=name)
+    if "notice" in body and not isinstance(body["notice"], str):
+        raise CommandError("schema", "cancel and restart are true or false, notice a text", field="notice")
+    if body.get("cancel"):
+        return command_answer(*api.sim.run("sv_stop cancel", session.role, session.by))
+    after = body.get("after")
+    if after not in ("now", "game", "empty"):
+        raise CommandError("schema", "after is now, game or empty", field="after")
+    line = f"{'sv_restart' if body.get('restart') else 'sv_stop'} {after} {line_text(body.get('notice') or '')}"
+    return command_answer(*api.sim.run(line.rstrip(), session.role, session.by))
+
+
 @route("GET", r"/api/settings", "admin")
 def h_settings(api, request, session, body):
     return Response(200, {"ok": True, "settings": api.sim.settings_json()})
@@ -2229,7 +2452,8 @@ def h_settings(api, request, session, body):
 @route("PUT", r"/api/settings", "admin")
 def h_settings_put(api, request, session, body):
     """each setting from its JSON value (a string's text, else the JSON's own:
-    true, 16, null for empty), as the web's admin: owner-only ones refused"""
+    true, 16, null for empty), as the session's role: the owner's settings
+    refused to an admin"""
     applied, errors = [], []
     for name, value in body.items():
         if isinstance(value, str):
@@ -2239,7 +2463,7 @@ def h_settings_put(api, request, session, body):
         else:
             text = json.dumps(value)
         try:
-            api.sim.set_setting(name, text, "admin")
+            api.sim.set_setting(name, text, session.role)
             applied.append(name)
             api.sim.log("info", "server", f"{name} changed by {session.by}")
         except CommandError as failure:
@@ -2294,7 +2518,9 @@ def h_events(api, request, session, body):
     ring = list(sim.events)
     oldest = ring[0][1]["seq"] if ring else sim.seq + 1
     admin = ROLES.index(session.role) >= ROLES.index("admin")
-    taken = [(group, event) for group, event in ring if event["seq"] > after][:limit]
+    addresses = sim.addresses_for(session.role)
+    taken = [(group, addressed if addressed and addresses else event) for group, event, addressed in ring
+             if event["seq"] > after][:limit]
     chosen = [event for group, event in taken if group != "chat" or admin]
     missed = max(0, oldest - after - 1) if after else 0
     return Response(200, {"ok": True, "events": chosen, "next": taken[-1][1]["seq"] if taken else after,
@@ -2315,11 +2541,13 @@ class WsClose(Exception):
 
 
 class WsConnection:
-    def __init__(self, sim, sock, buffer, address):
+    def __init__(self, sim, sock, buffer, address, local=False):
         self.sim = sim
         self.sock = sock
         self.buffer = buffer
         self.address = address
+        # (the connection is this machine's: the owner's password and sessions are taken)
+        self.local = local
         self.role = None
         self.by = ""
         self.groups = set()
@@ -2483,8 +2711,7 @@ class WsConnection:
         if sim.options.drop:
             threading.Timer(sim.options.drop_after, self.cut).start()
         self.put({"type": "hello", "protocol": 1, "server": sim.value("server.name"), "build": BUILD,
-                  "network_version": NETWORK_VERSION, "capabilities": ["events", "status", "rotation", "settings",
-                                                                       "bans"]})
+                  "network_version": NETWORK_VERSION, "capabilities": list(CAPABILITIES)})
         if auto_session:
             self.role, self.by = auto_session.role, auto_session.by
             self.put({"type": "auth", "ok": True, "role": self.role})
@@ -2548,11 +2775,11 @@ class WsConnection:
             try:
                 if isinstance(message.get("token"), str):
                     session = sim.session(message["token"])
-                    if not session:
+                    if not session or (session.role == "owner" and not self.local):
                         raise CommandError("denied", "no such session", 401)
                     role, by = session.role, session.by
                 else:
-                    role = sim.check_password(self.address, message.get("password"))
+                    role = sim.check_password(self.address, message.get("password"), self.local)
                     by = message.get("by") if isinstance(message.get("by"), str) else ""
                     by = by[:32] or f"rcon {role}"
             except CommandError as failure:
@@ -2583,10 +2810,11 @@ class WsConnection:
                 self.groups = set(groups)
                 if isinstance(after, (int, float)) and not isinstance(after, bool) and after >= 0:
                     admin = ROLES.index(self.role) >= ROLES.index("admin")
-                    for group, event in list(sim.events):
+                    addresses = sim.addresses_for(self.role)
+                    for group, event, addressed in list(sim.events):
                         if event["seq"] > after and (group in self.groups or group == "server") and \
                                 (group != "chat" or admin):
-                            self.put(dict(event, replay=True))
+                            self.put(dict(addressed if addressed and addresses else event, replay=True))
                 if "status" in self.groups:
                     self.put(sim.emit_status_for(self))
                 if sim.options.slow_consumer:
@@ -2816,7 +3044,9 @@ class Handler(socketserver.BaseRequestHandler):
             session = sim.session(bearer.group(1))
         elif origin and request.cookie("opence_session"):
             session = sim.session(request.cookie("opence_session"))
-        connection = WsConnection(sim, sock, buffer, request.real_address)
+        if session and session.role == "owner" and not request.local:
+            session = None
+        connection = WsConnection(sim, sock, buffer, request.real_address, request.local)
         with sim.lock:
             if len(sim.connections) >= WS_CONNECTIONS:
                 return refuse(error(503, "busy", f"{WS_CONNECTIONS} remote consoles at once at most", retry_after=5))
@@ -2840,6 +3070,12 @@ def main(argv=None):
     parser.add_argument("--password", default="opence-admin", help="the admin password")
     parser.add_argument("--moderator-password", default="opence-mod", help="the moderator password")
     parser.add_argument("--viewer-password", default="", help="a viewer password (the simulator's own)")
+    parser.add_argument("--owner-password", default="opence-owner",
+                        help="the owner's password (server.web_owner_password): signs in from loopback alone; "
+                        "empty for none")
+    parser.add_argument("--instance", default="", help="server.instance (else a slug of the server's name)")
+    parser.add_argument("--exit-on-stop", action="store_true",
+                        help="a stop (quit, sv_stop, sv_restart, a drain's end) exits with its code (0 or 5)")
     parser.add_argument("--ui-dir", type=Path, default=UI_DIR, help="where the page's files are")
     parser.add_argument("--no-web-ui", dest="web_ui", action="store_false", help="no page (server.web_ui = false)")
     parser.add_argument("--tick", type=float, default=1.0, help="real seconds a simulated second takes")
@@ -2862,7 +3098,8 @@ def main(argv=None):
     options = parser.parse_args(argv)
     if options.bind not in ("127.0.0.1", "::1", "localhost"):
         short = [name for name, password in (("admin", options.password), ("moderator", options.moderator_password),
-                                             ("viewer", options.viewer_password)) if password and len(password) < 8]
+                                             ("viewer", options.viewer_password), ("owner", options.owner_password))
+                 if password and len(password) < 8]
         if short or not options.password:
             print("server_sim: beyond loopback every web password is 8 characters or more", file=sys.stderr)
             return 3
@@ -2880,6 +3117,8 @@ def main(argv=None):
     print(f"admin password: {options.password}", flush=True)
     if options.moderator_password:
         print(f"moderator password: {options.moderator_password}", flush=True)
+    if options.owner_password:
+        print(f"owner password (from loopback): {options.owner_password}", flush=True)
     try:
         server.serve_forever(poll_interval=0.2)
     except KeyboardInterrupt:

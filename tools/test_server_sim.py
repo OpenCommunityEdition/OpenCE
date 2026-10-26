@@ -484,6 +484,163 @@ def test_the_log_and_events_cursors(sim):
     assert [event["event"] for event in later["events"]] == ["reloaded"]
 
 
+# ---------- what fleets use: the owner's role from loopback, bans of addresses, drains, addresses in events,
+# the server's identity
+
+
+def test_the_owner_signs_in_from_loopback(fresh):
+    sim = fresh("--still", "--tick", "0.05")
+    owner, cookie = sim.login("opence-owner")
+    assert owner["role"] == "owner"
+    headers = {"Authorization": "Bearer " + owner["token"]}
+    # (the addresses, the owner's settings, the game's own console, quit)
+    assert "address" in sim.request("GET", "/api/players", headers=headers)[2]["players"][0]
+    status, _, body = sim.request("PUT", "/api/settings", {"server.log_addresses": True, "server.auto_update": "check"},
+                                  headers=headers)
+    assert status == 200 and body["applied"] == ["server.log_addresses", "server.auto_update"] and not body["errors"]
+    status, _, body = sim.request("POST", "/api/command", {"line": "game_speed 1"}, headers=headers)
+    assert status == 200 and body["ok"], body
+    assert sim.request("POST", "/api/command", {"line": "sv_set server.status_file /tmp/x"}, headers=headers)[0] == 200
+    after = sim.request("GET", "/api/events?after=0", headers=headers)[2]["next"]
+    status, _, body = sim.request("POST", "/api/command", {"line": "quit"}, headers=headers)
+    assert status == 200 and body["ok"]
+    events = sim.request("GET", f"/api/events?after={after}", headers=headers)[2]["events"]
+    assert [(event["event"], event["reason"], event["code"]) for event in events] == [("shutdown", "quit", 0)]
+    # (the RCON's sign-in with it)
+    assert opence_rcon.Rcon(sim.url, password="opence-owner").role == "owner"
+
+
+def test_the_owner_password_from_elsewhere_is_forbidden(fresh):
+    # (through the trusted proxy on this machine: not the server's own machine's request)
+    sim = fresh("--still", "--tick", "0.05", "--trusted-proxy", "127.0.0.1")
+    for _ in range(5):
+        status, _, body = sim.request("POST", "/api/login", {"password": "opence-owner"})
+        assert (status, body["error"]["code"]) == (403, "forbidden")
+    # (counted as wrong passwords are)
+    status, _, body = sim.request("POST", "/api/login", {"password": "opence-admin"})
+    assert (status, body["error"]["code"]) == (429, "locked")
+    with pytest.raises(opence_rcon.RconError):
+        opence_rcon.Rcon(sim.url, password="opence-owner")
+
+
+def test_a_ban_of_an_address_needs_no_player(fresh):
+    sim = fresh("--still", "--tick", "0.05")
+    admin = sim.browser()
+    moderator = sim.browser("opence-mod")
+    owner = {"Authorization": "Bearer " + sim.login("opence-owner")[0]["token"]}
+    present = sim.request("GET", "/api/players", headers=owner)[2]["players"][0]
+    before = len(sim.request("GET", "/api/bans", headers=admin)[2]["bans"])
+    status, _, body = sim.request("POST", "/api/bans", {"ip": "198.51.100.9"}, headers=moderator)
+    assert (status, body["error"]["code"]) == (403, "forbidden")
+    status, _, body = sim.request("POST", "/api/bans", {"ip": "198.51.100.9", "names": "Ghost", "duration": "1d",
+                                                        "reason": "griefing"}, headers=admin)
+    assert (status, body) == (200, {"ok": True, "n": before})
+    bans = sim.request("GET", "/api/bans", headers=admin)[2]["bans"]
+    assert (bans[before]["ip"], bans[before]["hwid"], bans[before]["players"]) == ("198.51.100.9", "none", "Ghost")
+    assert bans[before]["reason"] == "griefing (by the admin)" and 86000 < bans[before]["until"] - time.time() <= 86400
+    # (a present player's hardware id: dropped at once, banned)
+    status, _, body = sim.request("POST", "/api/bans", {"hwid": present["hwid"].upper()}, headers=admin)
+    assert (status, body["n"]) == (200, before + 1)
+    assert present["slot"] not in [player["slot"] for player in sim.request("GET", "/api/players", headers=admin)[2]
+                                   ["players"]]
+    events = sim.request("GET", "/api/events?after=0", headers=admin)[2]["events"]
+    assert any(event["event"] == "player_left" and event["name"] == present["name"] and event["reason"] == "banned"
+               for event in events)
+    assert any(event["event"] == "ban" and event["name"] == present["name"] and event["by"] == "admin"
+               for event in events)
+    for bad in ({}, {"ip": "300.1.1.1"}, {"hwid": "xyz"}, {"ip": "198.51.100.9", "duration": "soon"}, {"ip": 5}):
+        status, _, body = sim.request("POST", "/api/bans", bad, headers=admin)
+        assert (status, body["error"]["code"]) == (400, "schema"), bad
+    status, _, body = sim.request("POST", "/api/command", {"line": "sv_ban_address 203.0.113.250 2h spam"},
+                                  headers=admin)
+    assert status == 200 and body["lines"] == [f"ban {before + 2} added, for 120 minutes"]
+    assert sim.request("DELETE", f"/api/bans/{before + 2}", headers=admin)[0] == 200
+
+
+def test_a_drain_until_empty_and_its_cancel(fresh):
+    sim = fresh("--still", "--tick", "0.05")
+    admin = sim.browser()
+    owner = {"Authorization": "Bearer " + sim.login("opence-owner")[0]["token"]}
+    assert sim.request("GET", "/api/status", headers=owner)[2]["drain"] is None
+    status, _, body = sim.request("POST", "/api/stop", {"after": "empty"}, headers=admin)
+    assert (status, body["error"]["code"]) == (403, "forbidden")
+    for bad in ({"after": "later"}, {"after": "game", "restart": "yes"}, {}):
+        status, _, body = sim.request("POST", "/api/stop", bad, headers=owner)
+        assert (status, body["error"]["code"]) == (400, "schema"), bad
+    status, _, body = sim.request("POST", "/api/stop", {"cancel": True}, headers=owner)
+    assert (status, body["error"]["code"]) == (400, "failed")
+    after = sim.request("GET", "/api/events?after=0", headers=owner)[2]["next"]
+    status, _, body = sim.request("POST", "/api/stop", {"after": "game", "notice": "a restart soon", "restart": True},
+                                  headers=owner)
+    assert status == 200 and body["ok"] and body["lines"]
+    drain = sim.request("GET", "/api/status", headers=owner)[2]["drain"]
+    assert drain["after"] == "game" and drain["restart"] is True and abs(drain["since"] - time.time()) < 10
+    status, _, body = sim.request("POST", "/api/stop", {"cancel": True}, headers=owner)
+    assert status == 200 and sim.request("GET", "/api/status", headers=owner)[2]["drain"] is None
+    status, _, body = sim.request("POST", "/api/stop", {"after": "empty"}, headers=owner)
+    assert status == 200
+    for player in sim.request("GET", "/api/players", headers=admin)[2]["players"]:
+        assert sim.request("POST", f"/api/players/{player['slot']}/kick", {"name": player["name"]}, headers=admin)[0] == 200
+    deadline = time.monotonic() + 10
+    while True:
+        events = sim.request("GET", f"/api/events?after={after}", headers=owner)[2]["events"]
+        if any(event["event"] == "shutdown" for event in events) or time.monotonic() > deadline:
+            break
+        time.sleep(0.05)
+    drains = [(event["after"], event["restart"], event["notice"]) for event in events if event["event"] == "drain"]
+    assert drains == [("game", True, "a restart soon"), ("cancel", True, ""), ("empty", False, "")]
+    assert [(event["reason"], event["code"]) for event in events if event["event"] == "shutdown"] == [("drained", 0)]
+    assert sim.request("GET", "/api/status", headers=owner)[2]["drain"] is None
+
+
+def test_a_stop_exits_with_its_code(fresh):
+    sim = fresh("--still", "--tick", "0.05", "--exit-on-stop")
+    owner = opence_rcon.Rcon(sim.url, password="opence-owner")
+    reply = owner.command("sv_restart now")
+    assert reply["ok"] and reply["lines"] == ["stopping (exit code 5)"]
+    assert sim.process.wait(10) == 5
+
+
+def test_addresses_in_the_player_events(fresh):
+    sim = fresh("--still", "--tick", "0.05")
+    owner = {"Authorization": "Bearer " + sim.login("opence-owner")[0]["token"]}
+    admin = {"Authorization": "Bearer " + sim.login()[0]["token"]}
+    joined = [event for event in sim.request("GET", "/api/events?after=0", headers=owner)[2]["events"]
+              if event["event"] == "player_joined"]
+    assert joined and all(re.fullmatch(r"\d+\.\d+\.\d+\.\d+", event["address"]) and event["hwid"] for event in joined)
+    assert not any("address" in event for event in sim.request("GET", "/api/events?after=0", headers=admin)[2]["events"])
+    rcon = opence_rcon.Rcon(sim.url, password="opence-owner")
+    rcon.subscribe(["player"], after=0)
+    message = rcon.receive(5)
+    while message.get("event") != "player_joined":
+        message = rcon.receive(5)
+    assert message["replay"] and "address" in message and "hwid" in message
+    players = sim.request("GET", "/api/players", headers=admin)[2]["players"]
+    sim.request("POST", f"/api/players/{players[0]['slot']}/kick", {"name": players[0]["name"]}, headers=admin)
+    message = rcon.receive(5)
+    while message.get("event") != "player_left":
+        message = rcon.receive(5)
+    assert message["name"] == players[0]["name"] and "address" in message and "replay" not in message
+    # (with server.log_addresses, every role's)
+    logged = fresh("--still", "--tick", "0.05", "--log-addresses")
+    viewer = {"Authorization": "Bearer " + logged.login("opence-mod")[0]["token"]}
+    assert all("address" in event for event in logged.request("GET", "/api/events?after=0", headers=viewer)[2]["events"]
+               if event["event"] == "player_joined")
+
+
+def test_the_identity_in_the_status_and_server_started(fresh):
+    sim = fresh("--still", "--tick", "0.05", "--instance", "eu-1")
+    headers = {"Authorization": "Bearer " + sim.login("opence-mod")[0]["token"]}
+    status = sim.request("GET", "/api/status", headers=headers)[2]
+    identity = {key: status[key] for key in ("pid", "started", "instance", "region", "tunnel_port", "publisher_key_id",
+                                             "web_port")}
+    assert identity["pid"] == sim.process.pid and identity["instance"] == "eu-1" and identity["web_port"] == sim.port
+    assert re.fullmatch(r"[0-9a-f]{16}", identity["publisher_key_id"]) and abs(identity["started"] - time.time()) < 60
+    assert status["capabilities"] == opence_rcon.Rcon(sim.url, password="opence-admin").hello["capabilities"]
+    started = sim.request("GET", "/api/events?after=0", headers=headers)[2]["events"][0]
+    assert started["event"] == "server_started" and {key: started[key] for key in identity} == identity
+
+
 # ---------- the RCON
 
 
@@ -494,7 +651,8 @@ def connect(sim, **headers):
 def test_rcon_hello_auth_commands_and_events(sim):
     rcon = opence_rcon.Rcon(sim.url, password="opence-admin", by="tests")
     assert rcon.hello["type"] == "hello" and rcon.hello["protocol"] == 1
-    assert rcon.hello["capabilities"] == ["events", "status", "rotation", "settings", "bans"]
+    assert rcon.hello["capabilities"] == ["events", "status", "rotation", "settings", "bans", "owner_web", "ban_address",
+                                          "stop", "event_addresses", "identity"]
     assert rcon.role == "admin"
     reply = rcon.command("sv_status")
     assert reply["ok"] and reply["id"] == 1 and reply["lines"][0].startswith("OpenCE Server: playing")

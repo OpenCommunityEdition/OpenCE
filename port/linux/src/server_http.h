@@ -20,4 +20,10 @@ int server_http_start(void);
 snapshots refreshed */
 void server_http_main_thread(void);
 
+struct server_json;
+
+/* the server's capabilities (the RCON's hello's, the status's) as an array
+of the key */
+void server_http_capabilities(struct server_json *json, const char *key);
+
 #endif

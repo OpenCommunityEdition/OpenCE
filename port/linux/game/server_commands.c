@@ -1030,12 +1030,14 @@ boolean server_commands_set_setting(
 	return TRUE;
 }
 
-/* (the web's: server_http.c) as server_commands_set_setting, with an HTTP
-status for a refusal: 409 for a setting its environment variable sets, 404
-for none sv_set changes, else 400 */
+/* (the web's: server_http.c) as server_commands_set_setting, with the
+session's role (an admin's at most, but from this machine an owner's), and
+an HTTP status for a refusal: 409 for a setting its environment variable
+sets, 404 for none sv_set changes, 403 for the owner's, else 400 */
 int server_commands_set_setting_text(
 	char const *name,
 	char const *value,
+	int role,
 	char *reason,
 	long reason_size,
 	int *code)
@@ -1051,16 +1053,15 @@ int server_commands_set_setting_text(
 		*code = 404;
 	else if (info.pinned)
 		*code = 409;
-	else if (setting_owners(name))
+	else if (setting_owners(name) && role < _server_role_owner)
 		*code = 403;
-	/* (as the web's admin, its highest role: never the owner's) */
 	{
-		int role = server_commands.role;
+		int previous_role = server_commands.role;
 		boolean set;
 
-		server_commands.role = _server_role_admin;
+		server_commands.role = MIN(role, _server_role_owner);
 		set = server_commands_set_setting(name, !strcmp(value, "null") ? "" : value, reason, reason_size);
-		server_commands.role = role;
+		server_commands.role = previous_role;
 		return set;
 	}
 }
@@ -1413,6 +1414,230 @@ static boolean command_unban(char const *line, long count, char **words)
 	return TRUE;
 }
 
+/* an address's text (a.b.c.d) checked: TRUE with the address (host byte
+order) and its text again, written plainly */
+static boolean parse_ipv4(
+	char const *text,
+	unsigned long *address,
+	char *kept,
+	long size)
+{
+	unsigned int bytes[4];
+	char end;
+
+	if (strspn(text, "0123456789.") != strlen(text) ||
+		sscanf(text, "%3u.%3u.%3u.%3u%c", &bytes[0], &bytes[1], &bytes[2], &bytes[3], &end) != 4 ||
+		bytes[0] > 255 || bytes[1] > 255 || bytes[2] > 255 || bytes[3] > 255)
+	{
+		return FALSE;
+	}
+	*address = (unsigned long)bytes[0] << 24 | (unsigned long)bytes[1] << 16 | (unsigned long)bytes[2] << 8 | bytes[3];
+	snprintf(kept, (size_t)size, "%u.%u.%u.%u", bytes[0], bytes[1], bytes[2], bytes[3]);
+	return *address != 0;
+}
+
+/* a hardware id's text checked: hex digits (in either case), 32 at most;
+TRUE with it in lower case */
+static boolean parse_hardware_id(
+	char const *text,
+	char *kept,
+	long size)
+{
+	long length = (long)strlen(text);
+	long index;
+
+	if (!length || length > 2 * P2P_HARDWARE_ID_BYTES || length >= size ||
+		(long)strspn(text, "0123456789abcdefABCDEF") != length)
+	{
+		return FALSE;
+	}
+	for (index = 0; index <= length; index++)
+		kept[index] = (char)tolower((unsigned char)text[index]);
+	return TRUE;
+}
+
+/* a ban of an address, a hardware id or both, with no player needed
+(sv_ban_address, POST /api/bans): its line in bans.txt as ban writes one
+(so that sv_bans, unban and the joins read it), and each machine present of
+that address or hardware id dropped as ban drops it. 200 with the new ban's
+number (sv_bans'), else 400 (a part that will not do) or 500 (bans.txt not
+written) and why */
+static int ban_address(
+	char const *ip,
+	char const *hwid,
+	char const *names,
+	long seconds,
+	char const *reason,
+	char *why,
+	long why_size,
+	long *number)
+{
+	struct network_game *game = server_game();
+	char address_text[32] = "none";
+	char hardware_id[2 * P2P_HARDWARE_ID_BYTES + 1] = "";
+	char kept_names[64];
+	char kept_reason[96];
+	char full_reason[sizeof(kept_reason) + 32];
+	char dropped[96] = "";
+	boolean done[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	unsigned long address = 0, until = 0;
+	boolean whole;
+	long slot, index;
+
+	if ((!ip || !ip[0]) && (!hwid || !hwid[0]))
+	{
+		snprintf(why, (size_t)why_size, "give an address (a.b.c.d) or a hardware id");
+		return 400;
+	}
+	if (ip && ip[0] && !parse_ipv4(ip, &address, address_text, sizeof(address_text)))
+	{
+		snprintf(why, (size_t)why_size, "%s is not an IPv4 address (a.b.c.d)", ip);
+		return 400;
+	}
+	if (hwid && hwid[0] && !parse_hardware_id(hwid, hardware_id, sizeof(hardware_id)))
+	{
+		snprintf(why, (size_t)why_size, "a hardware id is up to %d hex digits", 2 * P2P_HARDWARE_ID_BYTES);
+		return 400;
+	}
+	printable_text(kept_names, sizeof(kept_names), names);
+	printable_text(kept_reason, sizeof(kept_reason), reason);
+	/* (the reason, and who gave it, as ban writes it) */
+	if (server_commands.role < _server_role_owner)
+	{
+		snprintf(full_reason, sizeof(full_reason), "%s (by the %s)", kept_reason[0] ? kept_reason :
+			"banned by the server", server_role_name(server_commands.role));
+	}
+	else
+	{
+		snprintf(full_reason, sizeof(full_reason), "%s", kept_reason[0] ? kept_reason : "banned by the server");
+	}
+	if (seconds > 0)
+		until = posix_server_unix_seconds() + (unsigned long)seconds;
+	if (!network_distributed_ban_record(address_text, hardware_id, kept_names, full_reason, until))
+	{
+		snprintf(why, (size_t)why_size, "bans.txt cannot be written");
+		return 500;
+	}
+	*number = read_bans(&whole) - 1;
+	/* (each machine present of the address or the hardware id: dropped and
+	kept out as ban does, its line written already) */
+	csmemset(done, 0, sizeof(done));
+	for (slot = 0; game && slot < MAXIMUM_SLOTS; slot++)
+	{
+		long machine_index;
+		char const *machine_hardware_id;
+		char name[16];
+
+		if (!network_player_is_valid(&game->players[slot]))
+			continue;
+		machine_index = game->players[slot].machine_index;
+		if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES || done[machine_index])
+			continue;
+		machine_hardware_id = network_game_server_machine_hardware_id(machine_index);
+		if (!(address && distributed_machine_real_address(machine_index) == address) &&
+			!(hardware_id[0] && machine_hardware_id && !strcmp(machine_hardware_id, hardware_id)))
+		{
+			continue;
+		}
+		done[machine_index] = TRUE;
+		/* (its players' names, for the event, before they go) */
+		for (index = 0; index < MAXIMUM_SLOTS; index++)
+		{
+			if (network_player_is_valid(&game->players[index]) && game->players[index].machine_index == machine_index &&
+				server_status_player_name(index, name, sizeof(name)))
+			{
+				snprintf(dropped + strlen(dropped), sizeof(dropped) - strlen(dropped), "%s%s", dropped[0] ? ", " : "",
+					name);
+			}
+		}
+		network_distributed_ban_details(full_reason, until);
+		network_distributed_ban_unrecorded(TRUE);
+		if (network_game_server_kick_machine_of_player(machine_index, TRUE))
+		{
+			server_director_player_removed(machine_index, "banned");
+		}
+		else
+		{
+			network_distributed_ban_details(NULL, 0);
+			network_distributed_ban_unrecorded(FALSE);
+		}
+	}
+	server_log(_server_log_info, "moderation", "ban %ld added: %s%s%s (%s)", *number,
+		config_boolean("server.log_addresses") ? (address ? address_text : "") : address ? "an address" : "",
+		address && hardware_id[0] ? " and " : "",
+		hardware_id[0] ? (config_boolean("server.log_addresses") ? hardware_id : "a hardware id") : "",
+		server_role_name(server_commands.role));
+	moderation_event("ban", kept_names[0] ? kept_names : dropped, kept_reason[0] ? kept_reason : NULL, until);
+	return 200;
+}
+
+static boolean command_ban_address(char const *line, long count, char **words)
+{
+	char why[128];
+	long seconds = 0, reason_words = 2, number = 0;
+	boolean address;
+
+	if (count < 2)
+	{
+		say("sv_ban_address: give an address (a.b.c.d) or a hardware id, then a duration (30m, 2h, 7d, forever) and "
+			"a reason");
+		return FALSE;
+	}
+	if (count >= 3)
+	{
+		seconds = parse_duration(words[2]);
+		if (seconds >= 0)
+			reason_words = 3;
+		else
+			seconds = 0;
+	}
+	address = strchr(words[1], '.') != NULL;
+	if (ban_address(address ? words[1] : "", address ? "" : words[1], "", seconds, rest_after_words(line, reason_words),
+		why, sizeof(why), &number) != 200)
+	{
+		say("sv_ban_address: %s", why);
+		return FALSE;
+	}
+	if (seconds > 0)
+		say("ban %ld added, for %ld minutes", number, seconds / 60);
+	else
+		say("ban %ld added", number);
+	return TRUE;
+}
+
+/* (the web's: server_http.c, POST /api/bans) ban_address with the session's
+role, the duration as text (empty: for ever): 200 with the ban's number, or
+400 or 500 and why */
+int server_commands_ban_address_text(
+	char const *ip,
+	char const *hwid,
+	char const *names,
+	char const *duration,
+	char const *reason,
+	int role,
+	char *message,
+	long message_size,
+	long *number)
+{
+	int previous_role = server_commands.role;
+	long seconds = 0;
+	int answer;
+
+	if (duration && duration[0])
+	{
+		seconds = parse_duration(duration);
+		if (seconds < 0)
+		{
+			snprintf(message, (size_t)message_size, "duration is 30m, 2h, 7d, 1w or forever (ten years at most)");
+			return 400;
+		}
+	}
+	server_commands.role = role;
+	answer = ban_address(ip, hwid, names, seconds, reason, message, message_size, number);
+	server_commands.role = previous_role;
+	return answer;
+}
+
 static boolean command_mute(char const *line, long count, char **words)
 {
 	char name[16];
@@ -1658,9 +1883,58 @@ static boolean command_reload(char const *line, long count, char **words)
 
 static boolean command_quit(char const *line, long count, char **words)
 {
-	boolean restart = !csstrcasecmp(words[0], "sv_restart");
+	server_director_quit(SERVER_EXIT_STOPPED, "quit");
+	return TRUE;
+}
 
-	server_director_quit(restart ? SERVER_EXIT_RESTART : SERVER_EXIT_STOPPED, restart ? "sv_restart" : "quit");
+/* sv_stop and sv_restart: now, or once the game is over or the server
+empty (its listings withdrawn and new players refused meanwhile), or the
+stop waiting cancelled; a notice said to every machine first */
+static boolean command_stop(char const *line, long count, char **words)
+{
+	static char const *const modes[NUMBER_OF_SERVER_DRAINS] = { "now", "game", "empty", "cancel" };
+	boolean restart = !csstrcasecmp(words[0], "sv_restart");
+	char notice[NOTICE_SIZE];
+	short after = _server_drain_now;
+	long notice_words = 1;
+
+	if (count >= 2)
+	{
+		for (after = 0; after < NUMBER_OF_SERVER_DRAINS && csstrcasecmp(words[1], modes[after]); after++)
+		{
+		}
+		if (after == NUMBER_OF_SERVER_DRAINS)
+		{
+			say("%s: now, game, empty or cancel, then a notice for the players", words[0]);
+			return FALSE;
+		}
+		notice_words = 2;
+	}
+	printable_text(notice, sizeof(notice), rest_after_words(line, notice_words));
+	if (notice[0])
+	{
+		send_notice(NONE, notice);
+		server_log(_server_log_info, "chat", "server: %s", notice);
+	}
+	if (after == _server_drain_cancel)
+	{
+		if (!server_director_drain_cancel(notice))
+		{
+			say("%s: no stop is waiting", words[0]);
+			return FALSE;
+		}
+		say("the stop is cancelled: the server is listed and open again");
+		return TRUE;
+	}
+	if (after == _server_drain_game)
+		say("stopping once this game is over (exit code %d); the listings withdrawn, new players refused",
+			restart ? SERVER_EXIT_RESTART : SERVER_EXIT_STOPPED);
+	else if (after == _server_drain_empty)
+		say("stopping once nobody plays (exit code %d); the listings withdrawn, new players refused",
+			restart ? SERVER_EXIT_RESTART : SERVER_EXIT_STOPPED);
+	else
+		say("stopping (exit code %d)", restart ? SERVER_EXIT_RESTART : SERVER_EXIT_STOPPED);
+	server_director_drain(after, restart, notice);
 	return TRUE;
 }
 
@@ -1686,6 +1960,8 @@ static struct server_command const server_command_table[] =
 		"drops a player's machine and bans its address and hardware id (a moderator's: a day at most)", command_ban },
 	{ "unban", "sv_unban", _server_role_admin, "<number|address|hardware id>", "takes a ban out of bans.txt",
 		command_unban },
+	{ "sv_ban_address", NULL, _server_role_admin, "<address|hardware id> [30m|2h|7d|forever] [reason]",
+		"bans an address or hardware id, its player here or not", command_ban_address },
 	{ "mute", NULL, _server_role_moderator, "<player> [minutes]", "mutes a player's chat and voice for everyone",
 		command_mute },
 	{ "unmute", NULL, _server_role_moderator, "<player>", "unmutes a player", command_mute },
@@ -1711,7 +1987,10 @@ static struct server_command const server_command_table[] =
 		command_set_alias },
 	{ "sv_motd", NULL, _server_role_admin, "<text>", "the notice each machine sees as it joins", command_set_alias },
 	{ "sv_reload", NULL, _server_role_admin, "", "reads the server's settings and the rotation again", command_reload },
-	{ "sv_restart", NULL, _server_role_owner, "", "stops with exit code 5 (to be started again)", command_quit },
+	{ "sv_stop", NULL, _server_role_owner, "[now|game|empty|cancel] [notice]",
+		"stops the server now, once the game is over, or once it is empty", command_stop },
+	{ "sv_restart", NULL, _server_role_owner, "[now|game|empty|cancel] [notice]",
+		"as sv_stop, with exit code 5 (to be started again)", command_stop },
 	{ "quit", "exit", _server_role_owner, "", "stops the server", command_quit },
 };
 

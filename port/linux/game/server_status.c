@@ -27,6 +27,7 @@ owner, or with server.log_addresses; the invite only for admins.
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c */
 #include "../src/server_console.h" /* port: port/linux/src/server_console.c */
 #include "../src/server_events.h" /* port: port/linux/src/server_events.c */
+#include "../src/server_http.h" /* port: port/linux/src/server_http.c */
 #include "../src/server_json.h" /* port: port/linux/src/server_json.c */
 #include "../src/server_master.h" /* port: port/linux/src/server_master.c */
 #include "../src/posix_server.h" /* port: port/linux/src/posix_server.c */
@@ -274,6 +275,22 @@ void server_status_rotation(
 	server_status_entry(json, "next", server_director_next());
 }
 
+void server_status_identity(
+	struct server_json *json)
+{
+	char instance[64];
+	char key_id[2 * SERVER_MASTER_KEY_ID_SIZE + 1];
+
+	server_master_identity(instance, sizeof(instance), key_id, sizeof(key_id));
+	server_json_integer(json, "pid", (long long)server_mode_process_id());
+	server_json_integer(json, "started", (long long)server_mode_started());
+	server_json_string(json, "instance", instance);
+	server_json_string(json, "region", config_string("server.region"));
+	server_json_integer(json, "tunnel_port", config_boolean("network.online") ? config_integer("network.tunnel_port") : 0);
+	server_json_string(json, "publisher_key_id", key_id);
+	server_json_integer(json, "web_port", config_integer("server.web_port"));
+}
+
 void server_status_write(
 	struct server_json *json,
 	int role)
@@ -367,6 +384,9 @@ void server_status_write(
 		server_json_string(json, "build", build);
 	}
 	server_json_object_end(json);
+	server_director_drain_json(json);
+	server_status_identity(json);
+	server_http_capabilities(json, "capabilities");
 	server_json_object_end(json);
 }
 

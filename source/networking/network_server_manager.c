@@ -2164,6 +2164,10 @@ boolean network_game_server_game_is_open(
 	{
 		game_is_open = FALSE;
 	}
+	/* port: nor while a dedicated server waits to stop (a drain:
+	port/linux/game/server_director.c) */
+	if (halo_server_mode() && server_director_refuses_joins())
+		game_is_open = FALSE;
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x217,
 		(TRUE == game_is_open) || (FALSE == game_is_open));

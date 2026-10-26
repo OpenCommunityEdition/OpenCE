@@ -774,6 +774,11 @@ static const struct config_setting config_settings[] =
 		_platform_server,
 		"The web page's admin password (8 characters or more). Empty: one is\n"
 		"made at the first start, printed once and written here." },
+	{ "server.web_owner_password", _config_string, "\"\"", "HALO_SERVER_WEB_OWNER_PASSWORD", _environment_value,
+		_platform_server,
+		"A password with the owner role (quit, sv_restart, sv_stop, the owner's\n"
+		"settings, the game's console), for a supervisor on this machine: it\n"
+		"signs in from 127.0.0.0/8 alone. 8 characters or more; empty for none." },
 	{ "server.web_moderator_password", _config_string, "\"\"", "HALO_SERVER_WEB_MODERATOR_PASSWORD",
 		_environment_value, _platform_server,
 		"A second password, with the moderator role (kick, mute, say, the next\n"
@@ -1864,9 +1869,72 @@ static void config_check_words(void)
 	}
 }
 
+/* the passwords a file may hold instead of their variable (a container's
+secrets): <variable>_FILE names it, and its first line is the value */
+static const char *const config_secret_files[] =
+{
+	"server.password", "server.web_password", "server.web_owner_password", "server.web_moderator_password",
+	"server.web_viewer_password",
+};
+#define NUMBER_OF_CONFIG_SECRET_FILES (sizeof(config_secret_files) / sizeof(config_secret_files[0]))
+
+/* the value of the setting's <variable>_FILE (read once, at the first
+question: a file changed after the start is not read again), NULL if
+there is none, it cannot be read or its first line is empty */
+static const char *config_environment_file(const struct config_setting *setting)
+{
+	static char values[NUMBER_OF_CONFIG_SECRET_FILES][512];
+	static signed char read[NUMBER_OF_CONFIG_SECRET_FILES];
+	size_t index;
+
+	for (index = 0; index < NUMBER_OF_CONFIG_SECRET_FILES && strcmp(config_secret_files[index], setting->name); index++)
+	{
+	}
+	if (index == NUMBER_OF_CONFIG_SECRET_FILES || !setting->environment)
+		return NULL;
+	if (!read[index])
+	{
+		char variable[96];
+		const char *path;
+		char *text;
+		size_t size = 0, length;
+
+		read[index] = -1;
+		snprintf(variable, sizeof(variable), "%s_FILE", setting->environment);
+		path = getenv(variable);
+		if (!path || !path[0])
+			return NULL;
+		text = config_read_file(path, &size);
+		if (!text)
+		{
+			platform_log("settings: %s names %s, which cannot be read: %s is not set by it", variable, path,
+				setting->name);
+			return NULL;
+		}
+		/* (the first line, its CR and LF off) */
+		length = strcspn(text, "\n");
+		if (length && text[length - 1] == '\r')
+			length--;
+		if (length >= sizeof(values[index]))
+		{
+			platform_log("settings: the first line of %s (%s) is longer than %d characters: %s is not set by it",
+				path, variable, (int)sizeof(values[index]) - 1, setting->name);
+			length = 0;
+		}
+		memcpy(values[index], text, length);
+		values[index][length] = 0;
+		memset(text, 0, size);
+		free(text);
+		read[index] = length ? 1 : -1;
+	}
+	return read[index] > 0 ? values[index] : NULL;
+}
+
 /* a setting's environment variable, NULL if it is not set; a dedicated
 server's settings' empty ones are not set either (a panel passes every
-variable it has, empty ones too: an empty password must not stand for one) */
+variable it has, empty ones too: an empty password must not stand for one).
+A password's variable that is not set may be read from its file
+(<variable>_FILE: config_environment_file) */
 static const char *config_environment(const struct config_setting *setting)
 {
 	const char *environment = setting->environment ? getenv(setting->environment) : NULL;
@@ -1874,8 +1942,10 @@ static const char *config_environment(const struct config_setting *setting)
 	if (environment && !environment[0] &&
 		(setting->platforms == _platform_server || !strcmp(setting->name, "network.public_address")))
 	{
-		return NULL;
+		environment = NULL;
 	}
+	if (!environment)
+		environment = config_environment_file(setting);
 	return environment;
 }
 

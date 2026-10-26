@@ -65,5 +65,9 @@ void server_mode_at_exit(void (*hook)(void));
 const char *server_mode_build(void);
 /* the seconds since the server started */
 double server_mode_uptime(void);
+/* when the server started (seconds since 1970; 0 for none), and the
+process's id */
+unsigned long server_mode_started(void);
+unsigned long server_mode_process_id(void);
 
 #endif

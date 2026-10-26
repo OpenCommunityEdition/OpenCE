@@ -59,6 +59,11 @@ most 128 bytes) then in answer, to be sent back to where it came from */
 int server_master_probe(const unsigned char *data, int size, unsigned long address, unsigned char *answer,
 	int *answer_size);
 
+/* the name the masters know this server by: server.instance as published
+(else a slug of server.name), and the publisher key's id (16 hex; empty
+without a key), as the start read them */
+void server_master_identity(char *instance, int instance_size, char *key_id, int key_id_size);
+
 /* each master's state, for the status (masters[]) */
 void server_master_status(struct server_json *json);
 

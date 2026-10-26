@@ -20,15 +20,17 @@ CASES = [
     "forwarded", "addresses", "origin", "query", "compare", "frames", "frame-refusals", "fragments",
     "content-length-duplicate", "output", "pipelining", "address-table", "eviction", "deadlines", "close-order",
     "bare-lf", "auth-csrf", "auth-denied", "route-roles", "session-expiry", "session-cap", "lockout", "login-budget",
-    "empty-password", "password-change", "fetch-site", "ws-allowance",
+    "empty-password", "password-change", "fetch-site", "ws-allowance", "owner-local",
 ]
 FUNCTIONS = (
     "sha1_rotate", "sha1", "text_equal_case", "constant_time_equal", "address_text", "parse_address", "hex_digit_value",
     "parse_address6", "port_text", "forwarded_address", "out_pending", "out_append", "server_http_parse_head",
-    "query_number", "address_record", "address_allows_request", "address_locked", "address_login_failed",
+    "query_number", "connection_is_local", "address_record", "address_allows_request", "address_locked",
+    "address_login_failed",
     "session_hash", "session_find", "session_new", "passwords_check", "password_role", "request_host",
     "origin_matches", "ws_frame", "ws_close", "ws_read_frames", "request_session", "body_string", "serve_login",
-    "route_needs_game", "route_role", "handle_request", "handle_upgrade", "connection_take", "connection_to_evict",
+    "route_needs_game", "route_role", "handle_request", "server_http_capabilities", "handle_upgrade", "connection_take",
+    "connection_to_evict",
     "connection_overdue",
 )
 STRUCTURES = ("http_request", "ws_message", "connection", "server_ticket", "session", "address_record")
@@ -186,6 +188,17 @@ NEGATIVE_CONTROLS = {
                               "if (opcode == 0x0 && !connection->message_open)"), "ws_read_frames", "fragments"),
     "messages-unbounded": (("if (connection->message_length + (int)size > WS_MESSAGE)", "if (0)"), "ws_read_frames",
                            "fragments"),
+    "owner-from-anywhere": (("if (local)\n\t\t\treturn _server_role_owner;", "if (1)\n\t\t\treturn _server_role_owner;"),
+                            "password_role", "owner-local"),
+    "owner-through-proxy": (("return (connection->address >> 24) == 127 && !connection->forwarded;",
+                             "return (connection->address >> 24) == 127;"), "connection_is_local", "owner-local"),
+    "owner-session-anywhere": (("if (session && session->role >= _server_role_owner && !connection_is_local(connection))"
+                                "\n\t\tsession = NULL;", "if (0)\n\t\tsession = NULL;"), "handle_request", "owner-local"),
+    "owner-elsewhere-uncounted": (("address_login_failed(address, address_shown);\n\tif (owner_elsewhere)",
+                                   "if (!owner_elsewhere)\n\t\taddress_login_failed(address, address_shown);\n\t"
+                                   "if (owner_elsewhere)"), "password_role", "owner-local"),
+    "owner-password-change-unseen": (('"server.web_owner_password" };', '"server.web_password" };'), "passwords_check",
+                                     "owner-local"),
 }
 
 

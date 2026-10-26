@@ -1,9 +1,10 @@
 """The dedicated server (halo --server: docs/dedicated_server.md) with the game: its refusals and exit codes, a
 rotation played by a joined client (lobby, game, postgame and the next entry), the HTTP API (status, players, kick,
-ban and unban, say, the rotation), the events, standard input's commands, and its shutdown by quit, SIGTERM and
-SIGINT. Needs the retail maps in assets/maps and ninja linux's build/linux/halo; every machine runs from a folder
-of its own under pytest's tmp_path (its config.toml, data root, saves and home), on loopback addresses of its own,
-offline (system link), with no window, sound, update check or Discord."""
+ban and unban, say, the rotation), the events, standard input's commands, the owner's sign-in from loopback, a ban of
+an address, drains (sv_stop empty, sv_restart game), and its shutdown by quit, SIGTERM and SIGINT. Needs the retail
+maps in assets/maps and ninja linux's build/linux/halo; every machine runs from a folder of its own under pytest's
+tmp_path (its config.toml, data root, saves and home), on loopback addresses of its own, offline (system link), with
+no window, sound, update check or Discord."""
 
 import json
 import os
@@ -406,6 +407,81 @@ def test_empty_game_ends_and_join_in_progress(machines):
     _client(machines("third"), CLIENT_ADDRESSES[0], "Third")
     _until(lambda: (api.status() or {}).get("state") == "playing", 120, "a new game for the next player", server)
     assert api.status()["games_hosted"] == 2, api.status()
+
+
+def test_owner_from_loopback_and_a_drain_until_empty(machines, tmp_path):
+    """the owner's password (from its file) signs in from loopback and sees addresses in the events; POST /api/bans
+    bans an address with nobody of it present; sv_stop empty withdraws the server and refuses a new client, then stops
+    with exit code 0 once the last player leaves"""
+    _needs_game("bloodgulch")
+    port = _free_port()
+    owner_file = tmp_path / "owner-password"
+    owner_file.write_text("owner-password-1\r\n")
+    server = machines("server").start(["--server"], **_server_settings(
+        port, HALO_SERVER_ROTATION="bloodgulch:slayer", HALO_SERVER_WEB_OWNER_PASSWORD_FILE=owner_file,
+        HALO_SERVER_INSTANCE="drain-test"))
+    api, owner = Api(port), Api(port)
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    api.login()
+    status, answer = owner.call("POST", "/api/login", {"password": "owner-password-1"}, token=False)
+    assert status == 200 and answer["role"] == "owner", answer
+    owner.token = answer["token"]
+    status = owner.status()
+    assert status["instance"] == "drain-test" and status["pid"] == server.process.pid and status["drain"] is None, status
+    assert {"owner_web", "ban_address", "stop", "event_addresses", "identity"} <= set(status["capabilities"]), status
+    # (the owner's role alone stops the server; a ban needs no player present)
+    status, answer = api.call("POST", "/api/stop", {"after": "empty"})
+    assert status == 403 and answer["error"]["code"] == "forbidden", answer
+    status, answer = api.call("POST", "/api/bans", {"ip": "198.51.100.77", "duration": "1h", "reason": "a test"})
+    assert status == 200 and answer["ok"], answer
+    assert api.call("GET", "/api/bans")[1]["bans"][answer["n"]]["ip"] == "198.51.100.77"
+
+    first = _client(machines("first"), CLIENT_ADDRESSES[0], "First")
+    _until(lambda: (api.status() or {}).get("state") == "playing", 120, "the game", server)
+    joined = [event for event in owner.events() if event.get("event") == "player_joined"]
+    assert joined and joined[0]["address"] == CLIENT_ADDRESSES[0] and "hwid" in joined[0], joined
+    assert all("address" not in event for event in api.events() if event.get("event") == "player_joined")
+
+    status, answer = owner.call("POST", "/api/stop", {"after": "empty", "notice": "maintenance"})
+    assert status == 200 and answer["ok"], answer
+    drain = owner.status()["drain"]
+    assert drain["after"] == "empty" and drain["restart"] is False and drain["since"] > 0, drain
+    assert any(event.get("event") == "drain" and event.get("after") == "empty" for event in owner.events())
+    # a new machine is refused while the server drains
+    second = _client(machines("second"), CLIENT_ADDRESSES[1], "Second")
+    time.sleep(20)
+    assert [player["name"] for player in api.call("GET", "/api/players")[1]["players"]] == ["First"]
+    assert server.process.poll() is None, "the server stopped with a player on it"
+    second.stop()
+    # the last player gone: the server stops, exit code 0, its shutdown said to be the drain's
+    first.stop()
+    assert server.wait(60) == 0, server.text()[-3000:]
+    assert "stopping (drained)" in server.text()
+
+
+def test_a_drain_until_the_game_is_over_restarts(machines):
+    """sv_restart game during a game: the game goes on to its end and its postgame, then the server stops with exit
+    code 5"""
+    _needs_game("bloodgulch")
+    port = _free_port()
+    server = machines("server").start(["--server"], **_server_settings(
+        port, HALO_SERVER_ROTATION="bloodgulch:slayer", HALO_SERVER_WEB_OWNER_PASSWORD="owner-password-1"))
+    owner = Api(port)
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    status, answer = owner.call("POST", "/api/login", {"password": "owner-password-1"}, token=False)
+    assert status == 200 and answer["role"] == "owner", answer
+    owner.token = answer["token"]
+    _client(machines("client"), CLIENT_ADDRESSES[0], "Player")
+    _until(lambda: (owner.status() or {}).get("state") == "playing", 120, "the game", server)
+    status, answer = owner.call("POST", "/api/stop", {"after": "game", "restart": True})
+    assert status == 200 and answer["ok"], answer
+    time.sleep(3)
+    assert server.process.poll() is None and owner.status()["state"] == "playing", "the drain cut the game short"
+    status, answer = owner.call("POST", "/api/command", {"line": "sv_end_game"})
+    assert status == 200 and answer["ok"], answer
+    assert server.wait(60) == 5, server.text()[-3000:]
+    text = server.text()
+    assert "stopping (drained)" in text and text.index("game: ended") < text.index("stopping (drained)"), text[-3000:]
 
 
 def _cpu_seconds(pid):

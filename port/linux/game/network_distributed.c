@@ -4183,6 +4183,16 @@ their address, Discord user and names, and why; separated by tabs, each
 part kept to the characters allowed and their lengths (what a player could
 tell: their Discord user and names). The Discord user of the machine at
 the index, if it is one in the game (NONE: none) */
+static boolean distributed_write_record(
+	char const *file_name,
+	char const *address,
+	char const *hardware_id,
+	char const *discord_id,
+	char const *discord_name,
+	char const *names,
+	char const *reason,
+	unsigned long until);
+
 static void distributed_write_player_record(
 	char const *file_name,
 	char const *address,
@@ -4194,13 +4204,6 @@ static void distributed_write_player_record(
 	char discord_id[DISCORD_ID_SIZE] = "";
 	char discord_name[DISCORD_NAME_SIZE] = "";
 	char hardware_id[40] = "";
-	char kept_names[96];
-	char kept_reason[96];
-	char kept_address[32];
-	char when[32] = "";
-	time_t now = time(NULL);
-	struct tm *local = localtime(&now);
-	FILE *file;
 
 	if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES && game_in_progress())
 	{
@@ -4210,6 +4213,31 @@ static void distributed_write_player_record(
 	}
 	if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 		p2p_hardware_id_sanitize(hardware_id, 33, network_game_server_machine_hardware_id(machine_index));
+	distributed_write_record(file_name, address, hardware_id, discord_id, discord_name, names, reason, until);
+}
+
+/* (the host) the line itself: its parts as distributed_write_player_record
+says (a hardware id, a Discord id or name empty for none); TRUE if it was
+written */
+static boolean distributed_write_record(
+	char const *file_name,
+	char const *address,
+	char const *hardware_id,
+	char const *discord_id,
+	char const *discord_name,
+	char const *names,
+	char const *reason,
+	unsigned long until)
+{
+	char kept_names[96];
+	char kept_reason[96];
+	char kept_address[32];
+	char when[32] = "";
+	time_t now = time(NULL);
+	struct tm *local = localtime(&now);
+	FILE *file;
+	boolean written;
+
 	distributed_printable(kept_names, sizeof(kept_names), names);
 	distributed_printable(kept_reason, sizeof(kept_reason), reason);
 	distributed_printable(kept_address, sizeof(kept_address), address);
@@ -4219,7 +4247,7 @@ static void distributed_write_player_record(
 	if (!file)
 	{
 		error(_error_log, "could not open %s to add a player to it", file_name);
-		return;
+		return FALSE;
 	}
 	/* (the Discord user as the machine told it, which it may say is anyone's:
 	marked so) */
@@ -4233,7 +4261,9 @@ static void distributed_write_player_record(
 	if (until)
 		fprintf(file, "\tuntil=%lu", until);
 	fputc('\n', file);
-	fclose(file);
+	written = !ferror(file);
+	written = fclose(file) == 0 && written;
+	return written;
 }
 
 /* (the host) a player dropped for cheating: in CHEATERS_FILE, and banned
@@ -4254,6 +4284,8 @@ static void distributed_log_cheater(
 ban's reason and end (seconds since 1970; 0: for ever), for its line */
 static char distributed_next_ban_reason[96];
 static unsigned long distributed_next_ban_until;
+/* (sv_ban_address's: the next ban's line written already) */
+static boolean distributed_next_ban_unrecorded;
 
 void network_distributed_ban_details(
 	char const *reason,
@@ -4261,6 +4293,25 @@ void network_distributed_ban_details(
 {
 	snprintf(distributed_next_ban_reason, sizeof(distributed_next_ban_reason), "%s", reason ? reason : "");
 	distributed_next_ban_until = until;
+}
+
+void network_distributed_ban_unrecorded(
+	boolean unrecorded)
+{
+	distributed_next_ban_unrecorded = unrecorded;
+}
+
+boolean network_distributed_ban_record(
+	char const *address,
+	char const *hardware_id,
+	char const *names,
+	char const *reason,
+	unsigned long until)
+{
+	char kept_hardware_id[40];
+
+	p2p_hardware_id_sanitize(kept_hardware_id, 33, hardware_id);
+	return distributed_write_record(BANS_FILE, address, kept_hardware_id, "", "", names, reason, until);
 }
 
 /* (the host: network_server_manager.c) whether a machine of this address
@@ -4338,10 +4389,14 @@ unsigned long network_distributed_ban(
 	unsigned long until = distributed_next_ban_until;
 
 	distributed_address_text(address, text, sizeof(text));
-	distributed_write_player_record(BANS_FILE, text, machine_index, names,
-		distributed_next_ban_reason[0] ? distributed_next_ban_reason : "banned by the host", until);
+	if (!distributed_next_ban_unrecorded)
+	{
+		distributed_write_player_record(BANS_FILE, text, machine_index, names,
+			distributed_next_ban_reason[0] ? distributed_next_ban_reason : "banned by the host", until);
+	}
 	distributed_next_ban_reason[0] = 0;
 	distributed_next_ban_until = 0;
+	distributed_next_ban_unrecorded = FALSE;
 	distributed_printable(kept_names, sizeof(kept_names), names);
 	if (game_in_progress() && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 	{

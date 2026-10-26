@@ -45,6 +45,7 @@ static const char *trusted_proxy = "";
 static const char *setting_admin = "";
 static const char *setting_moderator = "";
 static const char *setting_viewer = "";
+static const char *setting_owner = "";
 static unsigned long setting_changes;
 
 static const char *config_string(const char *name)
@@ -57,6 +58,8 @@ static const char *config_string(const char *name)
 		return setting_moderator;
 	if (!strcmp(name, "server.web_viewer_password"))
 		return setting_viewer;
+	if (!strcmp(name, "server.web_owner_password"))
+		return setting_owner;
 	return "a server";
 }
 
@@ -72,9 +75,9 @@ static const char *server_mode_build(void) { return "build-0"; }
 
 static const char *server_role_name(int role)
 {
-	static const char *const names[] = { "viewer", "moderator", "admin" };
+	static const char *const names[] = { "viewer", "moderator", "admin", "owner" };
 
-	return role >= _server_role_viewer && role <= _server_role_admin ? names[role] : "none";
+	return role >= _server_role_viewer && role <= _server_role_owner ? names[role] : "none";
 }
 
 /* a stand-in for HMAC-SHA-256: a digest that differs for each key and
@@ -294,11 +297,16 @@ static void sign_in_reset(const char *admin, const char *moderator, const char *
 	setting_admin = admin;
 	setting_moderator = moderator;
 	setting_viewer = viewer;
+	setting_owner = "";
 	setting_changes++;
 	for (index = 0; index < MAXIMUM_CONNECTIONS; index++)
 		http.connections[index].socket = -1;
 	passwords_check();
 }
+
+/* request_from's requests come through the trusted proxy (connection_take
+marks them so) */
+static int request_forwarded;
 
 /* a request handed to handle_request as connection_take would: its head
 read from text (CRLF lines), from the address */
@@ -310,6 +318,7 @@ static void request_from(unsigned long address, const char *head, const char *bo
 
 	connection_reset(0);
 	connection.address = connection.real_address = address;
+	connection.forwarded = request_forwarded;
 	snprintf(text, sizeof(text), "%s", head);
 	CHECK(server_http_parse_head(text, (int)strlen(text), &connection.request, &status, &code),
 		"the test's request was refused (%d %s): %s", status, code, head);
@@ -1601,7 +1610,8 @@ int main(int argc, char **argv)
 			{ "PUT", "/api/rotation", _server_role_admin }, { "POST", "/api/gametypes/ctf.txt", _server_role_admin },
 			{ "DELETE", "/api/gametypes/ctf.txt", _server_role_admin }, { "GET", "/api/bans", _server_role_admin },
 			{ "DELETE", "/api/bans/1", _server_role_admin }, { "GET", "/api/settings", _server_role_admin },
-			{ "PUT", "/api/settings", _server_role_admin },
+			{ "PUT", "/api/settings", _server_role_admin }, { "POST", "/api/bans", _server_role_admin },
+			{ "POST", "/api/stop", _server_role_owner },
 		};
 		char tokens[_server_role_admin + 1][2 * TOKEN_BYTES + 1];
 		int index, role;
@@ -1803,6 +1813,50 @@ int main(int argc, char **argv)
 		memset(admin_console, 0, sizeof(*admin_console));
 		memset(viewer_console, 0, sizeof(*viewer_console));
 		admin_console->socket = viewer_console->socket = -1;
+		return 0;
+	}
+	/* the owner's password signs in from this machine alone (127.0.0.0/8,
+	not through the trusted proxy): from anywhere else it is refused
+	"forbidden" and counted as a wrong password; its session is used from
+	this machine alone, and ends when the password changes */
+	CASE("owner-local")
+	{
+		char token[2 * TOKEN_BYTES + 1], other[2 * TOKEN_BYTES + 1], head[512];
+		int index;
+
+		sign_in_reset("admin-pass", "", "");
+		setting_owner = "owner-pass";
+		setting_changes++;
+		test_now = 700000;
+		CHECK(sign_in(0x7F000001UL, "owner-pass", token) && strstr(answered.body, "\"role\":\"owner\""),
+			"the owner's password from this machine was answered %d: %s", answered.status, answered.body);
+		snprintf(head, sizeof(head), "GET /api/session HTTP/1.1\r\nHost: server.example\r\nAuthorization: Bearer %s\r\n",
+			token);
+		request_from(0x7F000002UL, head, NULL);
+		CHECK(answered.status == 200, "the owner's session from this machine was answered %d", answered.status);
+		request_from(0x0A000051UL, head, NULL);
+		CHECK(answered.status == 401, "the owner's session from another address was answered %d", answered.status);
+		request_forwarded = 1;
+		request_from(0x7F000001UL, head, NULL);
+		CHECK(answered.status == 401, "the owner's session through the proxy was answered %d", answered.status);
+		CHECK(!sign_in(0x7F000001UL, "owner-pass", other) && answered.status == 403 && !strcmp(answered.code, "forbidden"),
+			"the owner's password through the proxy was answered %d", answered.status);
+		request_forwarded = 0;
+		for (index = 0; index < LOGIN_FAILURES; index++)
+		{
+			CHECK(!sign_in(0x0A000052UL, "owner-pass", other) && answered.status == 403 &&
+				!strcmp(answered.code, "forbidden"), "the owner's password from another address was answered %d (%d)",
+				answered.status, index + 1);
+		}
+		CHECK(!sign_in(0x0A000052UL, "admin-pass", other) && answered.status == 429,
+			"the owner's password from elsewhere was not counted as a wrong one (%d)", answered.status);
+		CHECK(sign_in(0x7F000003UL, "admin-pass", other) && strstr(answered.body, "\"role\":\"admin\""),
+			"the admin's password from this machine gave another role");
+		setting_owner = "owner-pass-2";
+		setting_changes++;
+		passwords_check();
+		request_from(0x7F000002UL, head, NULL);
+		CHECK(answered.status == 401, "the owner's session was kept after its password changed (%d)", answered.status);
 		return 0;
 	}
 	/* Origin: null from the page itself, which only the browser's

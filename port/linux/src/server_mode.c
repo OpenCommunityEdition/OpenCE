@@ -53,6 +53,8 @@ static struct
 	int checked;
 	int active;
 	Uint64 started;
+	/* (and in seconds since 1970) */
+	unsigned long started_unix;
 	/* the pace: the next frame's deadline, and whether the server is idle */
 	Uint64 deadline;
 	int idle;
@@ -98,6 +100,16 @@ const char *server_mode_build(void)
 double server_mode_uptime(void)
 {
 	return server_mode.started ? (double)(SDL_GetTicksNS() - server_mode.started) / 1e9 : 0.0;
+}
+
+unsigned long server_mode_started(void)
+{
+	return server_mode.started_unix;
+}
+
+unsigned long server_mode_process_id(void)
+{
+	return (unsigned long)posix_process_id();
 }
 
 /* ---------- exits */
@@ -316,6 +328,13 @@ static void check_web_settings(void)
 	check_web_password("server.web_password", loopback);
 	check_web_password("server.web_moderator_password", loopback);
 	check_web_password("server.web_viewer_password", loopback);
+	/* (the owner's, which stops the server and runs the game's console:
+	never short, wherever the port is bound) */
+	if (config_string("server.web_owner_password")[0] && strlen(config_string("server.web_owner_password")) < 8)
+	{
+		server_log(_server_log_error, "server", "server.web_owner_password is shorter than 8 characters; exiting");
+		server_mode_exit(SERVER_EXIT_CONFIGURATION);
+	}
 }
 
 /* the tunnel's UDP port, for internet play: taken by another program, the
@@ -354,6 +373,7 @@ void server_mode_start(void)
 	if (!halo_server_mode())
 		return;
 	server_mode.started = SDL_GetTicksNS();
+	server_mode.started_unix = posix_server_unix_seconds();
 	posix_server_stdout_line_buffered();
 	posix_server_signals_install();
 	/* (SDL's own would turn SIGINT and SIGTERM into a quit event, which the
@@ -504,6 +524,16 @@ const char *server_mode_build(void)
 double server_mode_uptime(void)
 {
 	return 0.0;
+}
+
+unsigned long server_mode_started(void)
+{
+	return 0;
+}
+
+unsigned long server_mode_process_id(void)
+{
+	return 0;
 }
 
 #endif

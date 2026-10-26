@@ -41,6 +41,19 @@ enum
 	NUMBER_OF_SERVER_ENDS
 };
 
+/* when a stop asked for comes (sv_stop, sv_restart: drain's after) */
+enum
+{
+	_server_drain_now,
+	/* once the game being played is over (at once with none) */
+	_server_drain_game,
+	/* once nobody plays on the server */
+	_server_drain_empty,
+	/* (no stop: the one waiting cancelled) */
+	_server_drain_cancel,
+	NUMBER_OF_SERVER_DRAINS
+};
+
 /* ---------- the director (server_director.c) */
 
 /* each frame, from the main loop (main.c), beside network_test_update */
@@ -86,6 +99,16 @@ void server_director_apply_settings(void);
 /* a command dropped the machine's players: their leaving is said so
 (player_left's reason: "kicked", "banned"; a static text) */
 void server_director_player_removed(long machine_index, char const *reason);
+/* the server stops (exit code 0, or 5 to be restarted) now, or once the
+game is over or the server is empty (a drain): until then its listings are
+withdrawn and new players refused. The notice was said already */
+void server_director_drain(short after, boolean restart, char const *notice);
+/* the drain waiting cancelled: listed and open again; FALSE if none was */
+boolean server_director_drain_cancel(char const *notice);
+/* (network_server_manager.c) whether new machines are refused: a drain */
+boolean server_director_refuses_joins(void);
+/* the status's "drain": null, or {after, restart, since} */
+void server_director_drain_json(struct server_json *json);
 
 /* ---------- the commands (server_commands.c) */
 
@@ -122,6 +145,9 @@ void server_event_map_share(long machine_index, char const *map, char const *sta
 
 /* the status (docs/dedicated_server.md, "The status"), as the role sees it */
 void server_status_write(struct server_json *json, int role);
+/* the server's identity, for the status and server_started: its process,
+start, instance, region, ports and publisher key's id */
+void server_status_identity(struct server_json *json);
 /* the players, as the role sees them */
 void server_status_players(struct server_json *json, int role);
 /* one player, as the role sees him (a players[] element) */

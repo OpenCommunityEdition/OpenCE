@@ -552,7 +552,7 @@ the setting for one start of the game. It has priority over the file.
 | `server.name` | `"OpenCE Server"` | `HALO_SERVER_NAME` | The game's name in the lobby and the server browser: 15 characters of printable ASCII. |
 | `server.max_players` | `16` | `HALO_SERVER_MAX_PLAYERS` | The most players (2 to 127). |
 | `server.min_players` | `1` | `HALO_SERVER_MIN_PLAYERS` | The players in the lobby before it counts down to a game (1 to 16). |
-| `server.password` | `""` | `HALO_SERVER_PASSWORD` | The password the server browser asks for (an invite link joins without it). Empty: none. It is never logged. |
+| `server.password` | `""` | `HALO_SERVER_PASSWORD` | The password the server browser asks for (an invite link joins without it). Empty: none. It is never logged. `HALO_SERVER_PASSWORD_FILE` names a file whose first line is it instead (a container's secret; pinned, as the variable would be). |
 | `server.public` | `true` | `HALO_SERVER_PUBLIC` | `true`: the server is in everyone's server browser (on the master servers, with `network.online`). `false`: players join with its invite link, or on the LAN. |
 | `server.rotation` | `"bloodgulch:ctf, sidewinder:team_slayer, prisoner:slayer"` | `HALO_SERVER_ROTATION` | The games, played one after another: `map[:gametype[+rule=value...]]`, separated by commas, semicolons or new lines, 64 at most (an entry 255 characters, the whole 4096); a line that begins with `#` is a comment. A map is a multiplayer map's name (`bloodgulch`), `custom_maps\<name>` or a level's path; a gametype is a built-in gametype's name (`slayer`, `team_slayer`, `ctf`...), an OpenCE gametype's (`swat`...), a gametype file's (`gametypes/<name>.toml`) or `file=<saved gametype>`. An entry that cannot be played is left out with a warning. A change of the rotation (a command, the web page, `sv_reload`) keeps its place: the next game is the entry after the one played last. Refer to `docs/dedicated_server.md`, "The rotation". |
 | `server.rotation_fallback` | `false` | `HALO_SERVER_ROTATION_FALLBACK` | `true`: with no entry of `server.rotation` that can be played, play `bloodgulch:slayer`. `false`: stop (exit code 3). |
@@ -567,7 +567,8 @@ the setting for one start of the game. It has priority over the file.
 | `server.init_file` | `"init.txt"` | `HALO_SERVER_INIT_FILE` | The commands run once at the start, one on each line: in the data root unless a full path. Empty: none. |
 | `server.web_port`, `server.web_bind` | `8080`, `"127.0.0.1"` | `HALO_SERVER_WEB_PORT`, `HALO_SERVER_WEB_BIND` | The TCP port and IPv4 address of the web page, its API and the remote console (RCON). `0`: none. With an address beyond loopback, each web password that is set must have 8 characters or more, else the server stops (exit code 3, as for a port it may not bind or an address the machine does not have; a port in use: exit code 4); put a reverse proxy with TLS in front of it. Each server on a machine needs its own port. Read at the start only. |
 | `server.web_password` | `""` | `HALO_SERVER_WEB_PASSWORD` | The admin password of the web page (8 characters or more). Empty: the server makes one at the first start, shows it once and writes it here. |
-| `server.web_moderator_password`, `server.web_viewer_password` | `""` | `HALO_SERVER_WEB_MODERATOR_PASSWORD`, `HALO_SERVER_WEB_VIEWER_PASSWORD` | Other passwords: the moderator role (kick, mute, say, the next map, bans of one day at most) and the viewer role (the status, the players and the log; no changes). 8 characters or more when the web port is bound beyond loopback (else the server exits with code 3; on loopback, a warning). Empty: none. `sv_set` changes the moderator password, not the viewer password (`config.toml` and `sv_reload`). |
+| `server.web_owner_password` | `""` | `HALO_SERVER_WEB_OWNER_PASSWORD` | A password with the owner role, for a supervisor on the server's own machine (a fleet's agent, a panel): over the API and the RCON it does what the standard input does (`quit`, `sv_stop`, `sv_restart`, the owner's settings, the game's console commands, the players' addresses). It signs in from `127.0.0.0/8` alone, never through `server.web_trusted_proxy`; from another address it is refused (`403 forbidden`) and counted as a wrong password. 8 characters or more (else the server exits with code 3). Empty: none. `sv_set` does not change it (`config.toml` and `sv_reload`). |
+| `server.web_moderator_password`, `server.web_viewer_password` | `""` | `HALO_SERVER_WEB_MODERATOR_PASSWORD`, `HALO_SERVER_WEB_VIEWER_PASSWORD` | Other passwords: the moderator role (kick, mute, say, the next map, bans of one day at most) and the viewer role (the status, the players and the log; no changes). 8 characters or more when the web port is bound beyond loopback (else the server exits with code 3; on loopback, a warning). Empty: none. `sv_set` changes the moderator password, not the viewer password (`config.toml` and `sv_reload`). Each web password's variable has a `_FILE` form (`HALO_SERVER_WEB_PASSWORD_FILE`, `HALO_SERVER_WEB_OWNER_PASSWORD_FILE`...): when the variable is not set, the file's first line is the password, pinned as the variable would be; read at the start. |
 | `server.web_ui` | `true` | `HALO_SERVER_WEB_UI` | `false`: the web port serves the API and RCON, but not the admin page. |
 | `server.web_trusted_proxy` | `""` | `HALO_SERVER_WEB_TRUSTED_PROXY` | The address of a reverse proxy in front of the web port: its `X-Forwarded-For` (the last entry, the one the proxy added, an IPv4 or IPv6 address with or without a port), `-Host` and `-Proto` headers are believed, and a sign-in through it with `X-Forwarded-Proto: https` gets a `Secure` cookie. Empty: none. |
 | `server.metrics` | `true` | `HALO_SERVER_METRICS` | `true`: the web port serves `/metrics` (Prometheus) without a password. |
@@ -1380,14 +1381,20 @@ lines), and the game's own log to `debug.txt` as the game does
   web page take the same commands: `sv_status`, `sv_players`, `say`, `tell`,
   `kick`, `ban <player> 2h <reason>`, `unban`, `mute`, `sv_map`,
   `sv_map_next`, `sv_end_game`, `sv_rotation_set`, `sv_set <setting>
-  <value>`, `sv_reload`, `quit`. `help` lists them. The game's own console
+  <value>`, `sv_reload`, `sv_ban_address <address|hardware id>`,
+  `sv_stop [now|game|empty] [notice]`, `sv_restart`, `quit`. `help` lists
+  them. `sv_stop game` (or `empty`) withdraws the listings, refuses new
+  players and stops once the game is over (or nobody plays), without
+  cutting a game short; `sv_stop cancel` undoes it. The game's own console
   commands need the owner role: the standard input and `init.txt` take
-  them, the web page and the remote console do not (and `kick` and `ban`
-  are always the server's).
+  them, and the web page and the remote console with
+  `server.web_owner_password` from the machine itself; with another
+  password they do not (and `kick` and `ban` are always the server's).
 - **Web page.** `server.web_port` (8080, on `127.0.0.1`) serves an admin
   page, a JSON API, a remote console over WebSocket, `/healthz` and
   `/metrics`. Sign in with `server.web_password` (the admin); the moderator
-  and viewer passwords give fewer rights. To reach it from another
+  and viewer passwords give fewer rights, and `server.web_owner_password`,
+  from the machine itself alone, the owner's. To reach it from another
   computer, use an SSH tunnel, or a reverse proxy with TLS,
   `server.web_bind` and `server.web_trusted_proxy`; bound beyond loopback,
   every web password must have 8 characters or more.
@@ -1434,7 +1441,17 @@ files (`deploy/gametypes`, described in `docs/dedicated_server.md`,
 "Gametype files": their rules have their full names, `team_vehicles`, not
 the rotation's short names) and an example `init.txt`
 (`deploy/init.txt.example`). The README of each of the first six folders
-says how to use it.
+says how to use it. `deploy/release-key.pub` is the public key of the
+releases' signed `SHA256SUMS` (`docs/dedicated_server.md`, "Releases").
+
+**Fleets.** For many servers on many machines, beside the panels,
+`opence-fleet`
+([github.com/OpenCommunityEdition/opence-fleet](https://github.com/OpenCommunityEdition/opence-fleet))
+is one control plane over them all: an agent on each machine runs its
+servers and drives each through the API as the owner, from the machine
+itself (`server.web_owner_password`), drains a server before an update
+(`sv_stop game`, `POST /api/stop`) and bans an address on every server at
+once (`POST /api/bans`); `docs/dedicated_server.md`, "Panels and fleets".
 
 ## Mods
 

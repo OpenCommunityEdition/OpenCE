@@ -47,7 +47,10 @@ short server_director_state(void);
 char const *server_status_state_name(short state);
 char *server_commands_run(char const *line, int role, int origin, unsigned char *succeeded);
 int server_director_set_rotation_text(char const *text, struct server_json *rejected);
-int server_commands_set_setting_text(char const *name, char const *value, char *reason, long reason_size, int *code);
+int server_commands_set_setting_text(char const *name, char const *value, int role, char *reason, long reason_size,
+	int *code);
+int server_commands_ban_address_text(char const *ip, char const *hwid, char const *names, char const *duration,
+	char const *reason, int role, char *message, long message_size, long *number);
 void server_commands_settings_json(struct server_json *json);
 void server_commands_bans_json(struct server_json *json);
 int server_status_player_matches(long slot, char const *name, char *current, long size);
@@ -322,12 +325,15 @@ struct address_record
 	unsigned long last_seen;
 };
 
-/* an event or log line for the WebSockets, from another thread */
+/* an event or log line for the WebSockets, from another thread: its text,
+and after it (at addressed, 0 for none) its text with the players'
+addresses */
 struct push
 {
 	struct push *next;
 	char group[SERVER_EVENT_GROUP_SIZE];
 	int length;
+	int addressed;
 	char text[1];
 };
 
@@ -345,7 +351,7 @@ static struct
 	int budget_used;
 	/* the web passwords' hashes (keyed by session_key), a role's each, as
 	config_changes() last read them: a change signs that role out */
-	unsigned char password_hashes[_server_role_admin + 1][P2P_SHA256_SIZE];
+	unsigned char password_hashes[_server_role_owner + 1][P2P_SHA256_SIZE];
 	unsigned long password_changes;
 	int passwords_known;
 	/* under lock: the tickets waiting for the game's thread, and those it
@@ -356,6 +362,7 @@ static struct
 	char *status_admin;
 	char *players_viewer;
 	char *players_admin;
+	char *players_owner;
 	char state[16];
 	Uint64 snapshot_time;
 	long metrics_players, metrics_max_players, metrics_machines, metrics_games;
@@ -404,6 +411,21 @@ static void address_text(unsigned long address, char *text, int size)
 {
 	snprintf(text, (size_t)size, "%lu.%lu.%lu.%lu", (address >> 24) & 255, (address >> 16) & 255, (address >> 8) & 255,
 		address & 255);
+}
+
+/* whether a connection is the server's own machine's: its socket's peer in
+127.0.0.0/8, and not the trusted proxy's (a proxy on this machine passes
+others' requests on: the owner's role is never given through it) */
+static int connection_is_local(struct connection *connection)
+{
+	return (connection->address >> 24) == 127 && !connection->forwarded;
+}
+
+/* whether a reader of the role sees the players' addresses in the events:
+the owner, or every role with server.log_addresses (as /api/players) */
+static int role_sees_addresses(int role)
+{
+	return role >= _server_role_owner || config_boolean("server.log_addresses");
 }
 
 static int parse_address(const char *text, unsigned long *address)
@@ -1078,8 +1100,9 @@ sv_reload): the sessions of a role whose password changed end, and its
 remote consoles close */
 static void passwords_check(void)
 {
-	static const char *const settings[_server_role_admin + 1] = {
-		"server.web_viewer_password", "server.web_moderator_password", "server.web_password" };
+	static const char *const settings[_server_role_owner + 1] = {
+		"server.web_viewer_password", "server.web_moderator_password", "server.web_password",
+		"server.web_owner_password" };
 	unsigned long changes = config_changes();
 	unsigned long changed = 0;
 	int role, index;
@@ -1087,7 +1110,7 @@ static void passwords_check(void)
 	if (http.passwords_known && changes == http.password_changes)
 		return;
 	http.password_changes = changes;
-	for (role = 0; role <= _server_role_admin; role++)
+	for (role = 0; role <= _server_role_owner; role++)
 	{
 		const char *password = config_string(settings[role]);
 		unsigned char hash[P2P_SHA256_SIZE];
@@ -1113,13 +1136,13 @@ static void passwords_check(void)
 		struct connection *connection = &http.connections[index];
 
 		if (connection->socket >= 0 && connection->websocket && connection->role >= 0 &&
-			connection->role <= _server_role_admin && (changed & (1UL << connection->role)))
+			connection->role <= _server_role_owner && (changed & (1UL << connection->role)))
 		{
 			connection->role = _server_role_none;
 			ws_close(connection, 1008, "the password changed");
 		}
 	}
-	for (role = 0; role <= _server_role_admin; role++)
+	for (role = 0; role <= _server_role_owner; role++)
 	{
 		if (changed & (1UL << role))
 			server_log(_server_log_info, "server", "web: the %s password changed: its sessions are signed out",
@@ -1129,15 +1152,20 @@ static void passwords_check(void)
 
 /* the role a password gives (checked against the budget and the address's
 lockout; the address's text for the log): _server_role_none, and the
-status and code why */
-static int password_role(unsigned long address, const char *address_shown, const char *password, int *status,
-	const char **code, int *retry_after)
+status and code why. The owner's password gives the owner's role to a
+local connection (connection_is_local) alone: from anywhere else it is
+refused "forbidden", and counted as a wrong password is (no cheaper to
+guess than another) */
+static int password_role(unsigned long address, const char *address_shown, const char *password, int local,
+	int *status, const char **code, int *retry_after)
 {
 	unsigned long minute = now_seconds() / 60;
 	const char *admin = config_string("server.web_password");
 	const char *moderator = config_string("server.web_moderator_password");
 	const char *viewer = config_string("server.web_viewer_password");
+	const char *owner = config_string("server.web_owner_password");
 	int locked = address_locked(address);
+	int owner_elsewhere = 0;
 
 	/* (a password changed since the thread's loop began: its sessions end
 	before one is begun with the new one) */
@@ -1162,6 +1190,12 @@ static int password_role(unsigned long address, const char *address_shown, const
 		*retry_after = 60 - (int)(now_seconds() % 60);
 		return _server_role_none;
 	}
+	if (password && password[0] && owner[0] && constant_time_equal(password, owner))
+	{
+		if (local)
+			return _server_role_owner;
+		owner_elsewhere = 1;
+	}
 	if (password && password[0])
 	{
 		if (admin[0] && constant_time_equal(password, admin))
@@ -1172,6 +1206,14 @@ static int password_role(unsigned long address, const char *address_shown, const
 			return _server_role_viewer;
 	}
 	address_login_failed(address, address_shown);
+	if (owner_elsewhere)
+	{
+		server_log(_server_log_warning, "server", "web: the owner's password was given from %s: refused (it signs in "
+			"from this machine alone)", config_boolean("server.log_addresses") ? address_shown : "another address");
+		*status = 403;
+		*code = "forbidden";
+		return _server_role_none;
+	}
 	*status = 401;
 	*code = "denied";
 	return _server_role_none;
@@ -1448,6 +1490,12 @@ struct replay_context
 	struct connection *connection;
 };
 
+/* whether the connection's events carry the players' addresses */
+static int ws_addresses(struct connection *connection)
+{
+	return role_sees_addresses(connection->role);
+}
+
 static void ws_replay_one(void *context, unsigned long sequence, const char *group, const char *text)
 {
 	struct replay_context *replay = context;
@@ -1578,7 +1626,9 @@ static void ws_message(struct connection *connection, const char *text, int leng
 		{
 			struct session *session = session_find(secret);
 
-			if (!session)
+			/* (an owner's session is used from this machine alone, where it
+			was begun) */
+			if (!session || (session->role >= _server_role_owner && !connection_is_local(connection)))
 			{
 				ws_auth_answer(connection, 0, "denied", "no such session", 0);
 			}
@@ -1596,11 +1646,12 @@ static void ws_message(struct connection *connection, const char *text, int leng
 
 			server_json_get_string(&document, server_json_member(&document, 0, "password"), secret, sizeof(secret));
 			server_json_get_string(&document, server_json_member(&document, 0, "by"), by, sizeof(by));
-			role = password_role(connection->real_address, connection->real_text, secret, &status, &code,
-				&retry_after);
+			role = password_role(connection->real_address, connection->real_text, secret, connection_is_local(connection),
+				&status, &code, &retry_after);
 			if (role == _server_role_none)
 			{
-				ws_auth_answer(connection, 0, code, code[0] == 'd' ? "wrong password" : "too many tries: wait",
+				ws_auth_answer(connection, 0, code, status == 401 ? "wrong password" : status == 403 ?
+					"the owner's password signs in from the server's own machine alone" : "too many tries: wait",
 					retry_after);
 			}
 			else
@@ -1699,7 +1750,8 @@ static void ws_message(struct connection *connection, const char *text, int leng
 				unsigned long next, missed;
 
 				replay.connection = connection;
-				server_events_read((unsigned long)after, SERVER_EVENTS_RING_SIZE, ws_replay_one, &replay, &next, &missed);
+				server_events_read((unsigned long)after, SERVER_EVENTS_RING_SIZE, ws_addresses(connection), ws_replay_one,
+					&replay, &next, &missed);
 			}
 			if (groups & (1UL << group_index("status")))
 				ws_send_status(connection);
@@ -2029,7 +2081,7 @@ static void serve_events(struct connection *connection, int role)
 	server_json_array_begin(&json, "events");
 	collected.json = &json;
 	collected.role = role;
-	server_events_read(after, (int)limit, events_collect, &collected, &next, &missed);
+	server_events_read(after, (int)limit, role_sees_addresses(role), events_collect, &collected, &next, &missed);
 	server_json_array_end(&json);
 	server_json_integer(&json, "next", (long long)next);
 	server_json_integer(&json, "missed", after ? (long long)missed : 0);
@@ -2063,11 +2115,13 @@ static void serve_login(struct connection *connection, const char *body, int len
 		return;
 	}
 	body_string(body, length, "by", by, sizeof(by));
-	role = password_role(connection->real_address, connection->real_text, password, &status, &code, &retry_after);
+	role = password_role(connection->real_address, connection->real_text, password, connection_is_local(connection),
+		&status, &code, &retry_after);
 	memset(password, 0, sizeof(password));
 	if (role == _server_role_none)
 	{
-		respond_error(connection, status, code, status == 401 ? "wrong password" : "too many tries: wait", retry_after);
+		respond_error(connection, status, code, status == 401 ? "wrong password" : status == 403 ?
+			"the owner's password signs in from the server's own machine alone" : "too many tries: wait", retry_after);
 		return;
 	}
 	if (!by[0])
@@ -2095,7 +2149,7 @@ static int route_needs_game(const char *method, const char *path)
 {
 	return !strncmp(path, "/api/players/", 13) || !strcmp(path, "/api/say") || !strncmp(path, "/api/rotation", 13) ||
 		!strncmp(path, "/api/gametypes", 14) || !strcmp(path, "/api/maps") || !strncmp(path, "/api/bans", 9) ||
-		!strcmp(path, "/api/settings") || !strcmp(path, "/api/command");
+		!strcmp(path, "/api/settings") || !strcmp(path, "/api/command") || !strcmp(path, "/api/stop");
 	(void)method;
 }
 
@@ -2104,6 +2158,8 @@ static int route_role(const char *method, const char *path)
 {
 	int mutation = strcmp(method, "GET") && strcmp(method, "HEAD");
 
+	if (!strcmp(path, "/api/stop"))
+		return _server_role_owner;
 	if (!strncmp(path, "/api/players/", 13) || !strcmp(path, "/api/say") || !strcmp(path, "/api/rotation/next") ||
 		!strcmp(path, "/api/rotation/play"))
 	{
@@ -2149,6 +2205,10 @@ static void handle_request(struct connection *connection, const char *body, int 
 	allowance, the page's files and the metrics too; a sign in's, above, as
 	one without a session) */
 	session = request_session(connection, &by_cookie);
+	/* (an owner's session is used from this machine alone, where it was
+	begun) */
+	if (session && session->role >= _server_role_owner && !connection_is_local(connection))
+		session = NULL;
 	if (!address_allows_request(connection->real_address, session != NULL))
 	{
 		respond_error(connection, 429, "rate_limited", "too many requests: wait a minute", 60);
@@ -2231,7 +2291,8 @@ static void handle_request(struct connection *connection, const char *body, int 
 	if (!strcmp(path, "/api/players") && !mutation)
 	{
 		SDL_LockMutex(http.lock);
-		serve_snapshot(connection, session->role >= _server_role_admin ? http.players_admin : http.players_viewer);
+		serve_snapshot(connection, session->role >= _server_role_owner ? http.players_owner :
+			session->role >= _server_role_admin ? http.players_admin : http.players_viewer);
 		SDL_UnlockMutex(http.lock);
 		return;
 	}
@@ -2273,6 +2334,22 @@ static void handle_request(struct connection *connection, const char *body, int 
 	respond_error(connection, 404, "not_found", "nothing is there", 0);
 }
 
+void server_http_capabilities(struct server_json *json, const char *key)
+{
+	static const char *const capabilities[] = {
+		"events", "status", "rotation", "settings", "bans",
+		/* (the fleets': the owner's password from this machine, a ban of an
+		address, a drain and stop, addresses in the events, the server's
+		identity in the status) */
+		"owner_web", "ban_address", "stop", "event_addresses", "identity" };
+	int index;
+
+	server_json_array_begin(json, key);
+	for (index = 0; index < (int)(sizeof(capabilities) / sizeof(capabilities[0])); index++)
+		server_json_string(json, NULL, capabilities[index]);
+	server_json_array_end(json);
+}
+
 static void handle_upgrade(struct connection *connection)
 {
 	struct http_request *request = &connection->request;
@@ -2287,6 +2364,8 @@ static void handle_upgrade(struct connection *connection)
 	health's is) */
 	http.requests_total++;
 	session = request_session(connection, &by_cookie);
+	if (session && session->role >= _server_role_owner && !connection_is_local(connection))
+		session = NULL;
 	if (!address_allows_request(connection->real_address, session != NULL))
 	{
 		respond_error(connection, 429, "rate_limited", "too many requests: wait a minute", 60);
@@ -2351,13 +2430,7 @@ static void handle_upgrade(struct connection *connection)
 		server_json_string(&json, "server", config_string("server.name"));
 		server_json_string(&json, "build", server_mode_build());
 		server_json_integer(&json, "network_version", HALO_PORT_NETWORK_VERSION);
-		server_json_array_begin(&json, "capabilities");
-		server_json_string(&json, NULL, "events");
-		server_json_string(&json, NULL, "status");
-		server_json_string(&json, NULL, "rotation");
-		server_json_string(&json, NULL, "settings");
-		server_json_string(&json, NULL, "bans");
-		server_json_array_end(&json);
+		server_http_capabilities(&json, "capabilities");
 		server_json_object_end(&json);
 		ws_send(connection, server_json_text(&json));
 		server_json_free(&json);
@@ -2624,7 +2697,10 @@ static void distribute_pushes(void)
 		for (index = 0; index < MAXIMUM_CONNECTIONS; index++)
 		{
 			if (http.connections[index].socket >= 0 && ws_wants(&http.connections[index], pushes->group))
-				ws_send(&http.connections[index], pushes->text);
+			{
+				ws_send(&http.connections[index], pushes->addressed && ws_addresses(&http.connections[index]) ?
+					pushes->text + pushes->addressed : pushes->text);
+			}
 		}
 		free(pushes);
 		pushes = next;
@@ -2831,20 +2907,25 @@ static int SDLCALL http_thread_main(void *listener_pointer)
 
 /* ---------- the pushes from other threads */
 
-static void push_add(const char *group, const char *text)
+static void push_add(const char *group, const char *text, const char *addressed_text)
 {
 	int length = (int)strlen(text);
+	int addressed_length = addressed_text ? (int)strlen(addressed_text) + 1 : 0;
 	struct push *push;
 
 	if (!http.started)
 		return;
-	push = malloc(sizeof(*push) + (size_t)length);
+	push = malloc(sizeof(*push) + (size_t)length + (size_t)addressed_length);
 	if (!push)
 		return;
 	push->next = NULL;
 	snprintf(push->group, sizeof(push->group), "%s", group);
 	push->length = length;
 	memcpy(push->text, text, (size_t)length + 1);
+	/* (the addressed text after the text and its end) */
+	push->addressed = addressed_text ? length + 1 : 0;
+	if (addressed_text)
+		memcpy(push->text + length + 1, addressed_text, (size_t)addressed_length);
 	SDL_LockMutex(http.lock);
 	if (http.pushes >= WS_QUEUE * 4)
 	{
@@ -2862,10 +2943,10 @@ static void push_add(const char *group, const char *text)
 	SDL_UnlockMutex(http.lock);
 }
 
-static void event_listener(unsigned long sequence, const char *group, const char *text)
+static void event_listener(unsigned long sequence, const char *group, const char *text, const char *addressed_text)
 {
 	(void)sequence;
-	push_add(group, text);
+	push_add(group, text, addressed_text);
 }
 
 static void log_listener(struct server_log_line const *line)
@@ -2892,7 +2973,7 @@ static void log_listener(struct server_log_line const *line)
 		{
 			strcpy(text, head);
 			strcat(text, object + 1);
-			push_add(!strcmp(line->category, "chat") ? "chat" : "log", text);
+			push_add(!strcmp(line->category, "chat") ? "chat" : "log", text, NULL);
 		}
 		free(text);
 	}
@@ -3535,6 +3616,75 @@ static void ticket_api(struct server_ticket *ticket)
 			ticket_error(ticket, 405, "method", "GET, PUT or DELETE");
 		}
 	}
+	else if (!strcmp(path, "/api/bans") && !strcmp(method, "POST"))
+	{
+		char ip[64], hwid[64], names[96], duration[32], reason[160], message[160];
+		long number = 0;
+		int answer;
+
+		body_string(body, length, "ip", ip, sizeof(ip));
+		body_string(body, length, "hwid", hwid, sizeof(hwid));
+		body_string(body, length, "names", names, sizeof(names));
+		body_string(body, length, "duration", duration, sizeof(duration));
+		body_string(body, length, "reason", reason, sizeof(reason));
+		/* (as the command, with the session's role: checked and logged as
+		sv_ban_address is) */
+		answer = server_commands_ban_address_text(ip, hwid, names, duration, reason, ticket->role, message,
+			sizeof(message), &number);
+		if (answer != 200)
+		{
+			ticket_error(ticket, answer, answer == 500 ? "internal" : "schema", message);
+		}
+		else
+		{
+			server_json_object_begin(&json, NULL);
+			server_json_boolean(&json, "ok", 1);
+			server_json_integer(&json, "n", number);
+			server_json_object_end(&json);
+			ticket_answer(ticket, 200, &json);
+		}
+	}
+	else if (!strcmp(path, "/api/stop") && !strcmp(method, "POST"))
+	{
+		struct server_json_document document;
+		char after[16] = "", notice[256] = "", kept[160], line[SERVER_COMMAND_LINE_SIZE];
+		int cancel = 0, restart = 0, token, ok;
+
+		if (!server_json_parse(&document, body, length, 8) || document.tokens[0].type != _server_json_object)
+		{
+			ticket_error(ticket, 400, "bad_request", "the body is a JSON object: after, notice, restart (or cancel)");
+			server_json_free(&json);
+			return;
+		}
+		token = server_json_member(&document, 0, "cancel");
+		ok = token < 0 || server_json_get_boolean(&document, token, &cancel);
+		token = server_json_member(&document, 0, "restart");
+		ok = ok && (token < 0 || server_json_get_boolean(&document, token, &restart));
+		token = server_json_member(&document, 0, "notice");
+		ok = ok && (token < 0 || server_json_get_string(&document, token, notice, sizeof(notice)));
+		token = server_json_member(&document, 0, "after");
+		if (token >= 0 && !server_json_get_string(&document, token, after, sizeof(after)))
+			after[0] = '?';
+		server_json_document_free(&document);
+		if (!ok)
+		{
+			ticket_error(ticket, 400, "schema", "cancel and restart are true or false, notice a text");
+		}
+		else if (cancel)
+		{
+			ticket_command(ticket, "sv_stop cancel");
+		}
+		else if (strcmp(after, "now") && strcmp(after, "game") && strcmp(after, "empty"))
+		{
+			ticket_error(ticket, 400, "schema", "after is now, game or empty");
+		}
+		else
+		{
+			line_text(notice, kept, sizeof(kept));
+			snprintf(line, sizeof(line), "%s %s %s", restart ? "sv_restart" : "sv_stop", after, kept);
+			ticket_command(ticket, line);
+		}
+	}
 	else if (!strcmp(path, "/api/bans") && !strcmp(method, "GET"))
 	{
 		server_json_object_begin(&json, NULL);
@@ -3600,7 +3750,7 @@ static void ticket_api(struct server_ticket *ticket)
 					server_json_get_string(&document, value_token, value, sizeof(value));
 				else
 					snprintf(value, sizeof(value), "%.*s", token->end - token->start, document.text + token->start);
-				if (name[0] && server_commands_set_setting_text(name, value, reason, sizeof(reason), &code))
+				if (name[0] && server_commands_set_setting_text(name, value, ticket->role, reason, sizeof(reason), &code))
 				{
 					server_json_string(&json, NULL, name);
 					server_log(_server_log_info, "server", "%s changed by %s", name, ticket->by);
@@ -3635,7 +3785,7 @@ static void ticket_api(struct server_ticket *ticket)
 static void refresh_snapshots(void)
 {
 	struct server_json json;
-	char *status_viewer, *status_admin, *players_viewer, *players_admin;
+	char *status_viewer, *status_admin, *players_viewer, *players_admin, *players_owner;
 	const char *text;
 	struct server_json_document document;
 	short state = server_director_state();
@@ -3662,15 +3812,24 @@ static void refresh_snapshots(void)
 	server_json_object_end(&json);
 	players_admin = strdup(server_json_text(&json));
 	server_json_free(&json);
+	server_json_begin(&json);
+	server_json_object_begin(&json, NULL);
+	server_json_boolean(&json, "ok", 1);
+	server_status_players(&json, _server_role_owner);
+	server_json_object_end(&json);
+	players_owner = strdup(server_json_text(&json));
+	server_json_free(&json);
 	SDL_LockMutex(http.lock);
 	free(http.status_viewer);
 	free(http.status_admin);
 	free(http.players_viewer);
 	free(http.players_admin);
+	free(http.players_owner);
 	http.status_viewer = status_viewer;
 	http.status_admin = status_admin;
 	http.players_viewer = players_viewer;
 	http.players_admin = players_admin;
+	http.players_owner = players_owner;
 	snprintf(http.state, sizeof(http.state), "%s", server_status_state_name(state));
 	http.snapshot_time = SDL_GetTicksNS();
 	/* (the metrics' numbers, from the status) */
@@ -3780,6 +3939,12 @@ int server_http_start(void)
 
 void server_http_main_thread(void)
 {
+}
+
+void server_http_capabilities(struct server_json *json, const char *key)
+{
+	(void)json;
+	(void)key;
 }
 
 #endif

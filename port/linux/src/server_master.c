@@ -855,6 +855,12 @@ int server_master_probe(const unsigned char *data, int size, unsigned long addre
 	return 1;
 }
 
+void server_master_identity(char *instance, int instance_size, char *key_id, int key_id_size)
+{
+	instance_name(instance, instance_size);
+	snprintf(key_id, (size_t)key_id_size, "%s", master.has_key ? master.key_id : "");
+}
+
 void server_master_status(struct server_json *json)
 {
 	int index;
@@ -931,6 +937,14 @@ int server_master_probe(const unsigned char *data, int size, unsigned long addre
 	(void)answer;
 	(void)answer_size;
 	return 0;
+}
+
+void server_master_identity(char *instance, int instance_size, char *key_id, int key_id_size)
+{
+	if (instance_size > 0)
+		instance[0] = 0;
+	if (key_id_size > 0)
+		key_id[0] = 0;
 }
 
 void server_master_status(struct server_json *json)

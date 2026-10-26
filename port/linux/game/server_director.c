@@ -154,10 +154,21 @@ static struct
 	boolean quitting;
 	int exit_code;
 	real quit_seconds;
+	/* a stop waiting for the game's end or for nobody to play (sv_stop,
+	sv_restart: _server_drain_game or _empty), since when (seconds since
+	1970), and whether it restarts (exit code 5) */
+	boolean drain_active;
+	short drain_after;
+	boolean drain_restart;
+	unsigned long drain_since;
 	/* the players seen, for their joins and leaves (each slot's name and
 	machine), and when each was seen join (the message of the day) */
 	char seen_names[MAXIMUM_SLOTS][16];
 	long seen_machines[MAXIMUM_SLOTS];
+	/* ... and each one's address and hardware id as it joined (the events'
+	for the readers who see them) */
+	char seen_addresses[MAXIMUM_SLOTS][16];
+	char seen_hardware_ids[MAXIMUM_SLOTS][40];
 	/* why each machine's players leave, a moment after a command dropped it
 	("kicked", "banned"; NULL: they left), and the seconds since */
 	char const *leave_reasons[MAXIMUM_MACHINES];
@@ -479,7 +490,8 @@ static void server_apply_listing(
 
 	p2p_set_hosting_allowed(config_boolean("network.online"));
 	p2p_set_hosting_password(password[0] ? password : NULL);
-	p2p_set_hosting_public(config_boolean("server.public"));
+	/* (withdrawn while a stop waits, whatever server.public says) */
+	p2p_set_hosting_public(config_boolean("server.public") && !server.drain_active);
 }
 
 void server_director_apply_settings(
@@ -954,6 +966,122 @@ void server_fatal(
 	server_mode_fatal(text);
 }
 
+/* ---------- a stop that waits (a drain) */
+
+static char const *const server_drain_names[NUMBER_OF_SERVER_DRAINS] = { "now", "game", "empty", "cancel" };
+
+static void server_drain_event(
+	short after,
+	boolean restart,
+	char const *notice)
+{
+	struct server_json json;
+
+	server_json_begin(&json);
+	server_json_object_begin(&json, NULL);
+	server_json_string(&json, "event", "drain");
+	server_json_string(&json, "after", server_drain_names[after]);
+	server_json_boolean(&json, "restart", restart);
+	server_json_string(&json, "notice", notice ? notice : "");
+	server_json_object_end(&json);
+	server_event_add("server", server_json_text(&json));
+	server_json_free(&json);
+}
+
+void server_director_drain(
+	short after,
+	boolean restart,
+	char const *notice)
+{
+	if (server.quitting || after < _server_drain_now || after > _server_drain_empty)
+		return;
+	server_drain_event(after, restart, notice);
+	if (after == _server_drain_now)
+	{
+		server_director_quit(restart ? SERVER_EXIT_RESTART : SERVER_EXIT_STOPPED, restart ? "sv_restart" : "sv_stop");
+		return;
+	}
+	if (!server.drain_active)
+		server.drain_since = posix_server_unix_seconds();
+	server.drain_active = TRUE;
+	server.drain_after = after;
+	server.drain_restart = restart;
+	/* (the listings withdrawn as sv_public 0 withdraws them, the setting
+	kept: new players come by the invite or the LAN alone, and the game
+	refuses them, server_director_refuses_joins) */
+	p2p_set_hosting_public(FALSE);
+	server_log(_server_log_info, "server", "stopping (exit code %d) once %s: the listings withdrawn, new players refused",
+		restart ? SERVER_EXIT_RESTART : SERVER_EXIT_STOPPED, after == _server_drain_game ? "the game is over" :
+		"nobody plays");
+}
+
+boolean server_director_drain_cancel(
+	char const *notice)
+{
+	if (!server.drain_active || server.quitting)
+		return FALSE;
+	server.drain_active = FALSE;
+	server_drain_event(_server_drain_cancel, server.drain_restart, notice);
+	p2p_set_hosting_public(config_boolean("server.public"));
+	server_log(_server_log_info, "server", "the stop is cancelled: listed (as server.public says) and open again");
+	return TRUE;
+}
+
+boolean server_director_refuses_joins(
+	void)
+{
+	return server.drain_active || server.quitting;
+}
+
+void server_director_drain_json(
+	struct server_json *json)
+{
+	if (!server.drain_active)
+	{
+		server_json_null(json, "drain");
+		return;
+	}
+	server_json_object_begin(json, "drain");
+	server_json_string(json, "after", server_drain_names[server.drain_after]);
+	server_json_boolean(json, "restart", server.drain_restart);
+	server_json_integer(json, "since", server.drain_since);
+	server_json_object_end(json);
+}
+
+/* a drain's stop, when its moment comes: for "empty", nobody on the server;
+for "game", no game being played or about to be (not hosting yet, or a
+lobby whose start was not sent, with nobody in it or no countdown running:
+a game over goes back to such a lobby) */
+static void server_drain_update(
+	void)
+{
+	struct network_game_server *network_server = global_network_game_server_get();
+	boolean stop;
+
+	if (!server.drain_active || server.quitting)
+		return;
+	if (server.drain_after == _server_drain_empty)
+	{
+		stop = server_player_count() == 0;
+	}
+	else if (!network_server || server.state == _server_state_waiting || server.state == _server_state_hosting)
+	{
+		stop = TRUE;
+	}
+	else
+	{
+		long countdown = network_game_server_port_countdown_milliseconds(network_server);
+
+		stop = server.state == _server_state_lobby && !network_game_server_port_start_sent(network_server) &&
+			(server_player_count() == 0 || countdown == NONE || network_game_server_port_countdown_paused(network_server));
+	}
+	if (stop)
+	{
+		server.drain_active = FALSE;
+		server_director_quit(server.drain_restart ? SERVER_EXIT_RESTART : SERVER_EXIT_STOPPED, "drained");
+	}
+}
+
 /* ---------- stopping by itself, and updates */
 
 /* debug.exit_after (the tests'): the server stopped as quit stops it once
@@ -1096,6 +1224,48 @@ void server_director_player_removed(
 	}
 }
 
+/* a player's joining or leaving (player_joined: its team and machine;
+player_left: its reason), as every role sees it, and with its address and
+hardware id as it joined for the readers who see them (the owner, or every
+role with server.log_addresses) */
+static void server_player_event(
+	char const *event,
+	long slot,
+	long team,
+	long machine,
+	char const *reason)
+{
+	struct server_json json[2];
+	long pass;
+
+	for (pass = 0; pass < 2; pass++)
+	{
+		server_json_begin(&json[pass]);
+		server_json_object_begin(&json[pass], NULL);
+		server_json_string(&json[pass], "event", event);
+		server_json_integer(&json[pass], "slot", slot);
+		server_json_string(&json[pass], "name", server.seen_names[slot]);
+		if (reason)
+		{
+			server_json_string(&json[pass], "reason", reason);
+		}
+		else
+		{
+			server_json_integer(&json[pass], "team", team);
+			server_json_integer(&json[pass], "machine", machine);
+		}
+		if (pass)
+		{
+			server_json_string(&json[pass], "address", server.seen_addresses[slot]);
+			server_json_string(&json[pass], "hwid", server.seen_hardware_ids[slot]);
+		}
+		server_json_object_end(&json[pass]);
+	}
+	server_event_add_addressed("player", server_json_text(&json[0]), server_json_text(&json[1]));
+	server_json_free(&json[0]);
+	server_json_free(&json[1]);
+}
+
 static void server_note_players(
 	real seconds)
 {
@@ -1126,8 +1296,6 @@ static void server_note_players(
 		}
 		if (strcmp(name, server.seen_names[slot]) || machine != server.seen_machines[slot])
 		{
-			struct server_json json;
-
 			if (server.seen_names[slot][0])
 			{
 				long seen = server.seen_machines[slot];
@@ -1135,34 +1303,29 @@ static void server_note_players(
 					server.leave_reasons[seen] : "left";
 
 				server_log(_server_log_info, "player", "%s %s (slot %ld)", server.seen_names[slot], reason, slot);
-				server_json_begin(&json);
-				server_json_object_begin(&json, NULL);
-				server_json_string(&json, "event", "player_left");
-				server_json_integer(&json, "slot", slot);
-				server_json_string(&json, "name", server.seen_names[slot]);
-				server_json_string(&json, "reason", reason);
-				server_json_object_end(&json);
-				server_event_add("player", server_json_text(&json));
-				server_json_free(&json);
-			}
-			if (name[0])
-			{
-				server_log(_server_log_info, "player", "%s joined (slot %ld, machine %ld)", name, slot, machine);
-				server.seen_joined[slot] = posix_server_unix_milliseconds();
-				server_json_begin(&json);
-				server_json_object_begin(&json, NULL);
-				server_json_string(&json, "event", "player_joined");
-				server_json_integer(&json, "slot", slot);
-				server_json_string(&json, "name", name);
-				server_json_integer(&json, "team", game->variant.universal_variant.teams ?
-					game->players[slot].team_index : -1);
-				server_json_integer(&json, "machine", machine);
-				server_json_object_end(&json);
-				server_event_add("player", server_json_text(&json));
-				server_json_free(&json);
+				server_player_event("player_left", slot, NONE, NONE, reason);
 			}
 			snprintf(server.seen_names[slot], sizeof(server.seen_names[slot]), "%s", name);
 			server.seen_machines[slot] = machine;
+			server.seen_addresses[slot][0] = 0;
+			server.seen_hardware_ids[slot][0] = 0;
+			if (name[0])
+			{
+				unsigned long address = distributed_machine_real_address(machine);
+				char const *hardware_id = network_game_server_machine_hardware_id(machine);
+
+				server_log(_server_log_info, "player", "%s joined (slot %ld, machine %ld)", name, slot, machine);
+				server.seen_joined[slot] = posix_server_unix_milliseconds();
+				if (address)
+				{
+					snprintf(server.seen_addresses[slot], sizeof(server.seen_addresses[slot]), "%lu.%lu.%lu.%lu",
+						(address >> 24) & 255, (address >> 16) & 255, (address >> 8) & 255, address & 255);
+				}
+				snprintf(server.seen_hardware_ids[slot], sizeof(server.seen_hardware_ids[slot]), "%s",
+					hardware_id ? hardware_id : "");
+				server_player_event("player_joined", slot, game->variant.universal_variant.teams ?
+					game->players[slot].team_index : -1, machine, NULL);
+			}
 			server.motd_sent[slot] = FALSE;
 			server.motd_waits[slot] = 0.0f;
 		}
@@ -1699,6 +1862,7 @@ void server_update(
 			server_json_string(&json, "name", config_string("server.name"));
 			server_json_string(&json, "build", server_mode_build());
 			server_json_integer(&json, "network_version", HALO_PORT_NETWORK_VERSION);
+			server_status_identity(&json);
 			server_json_array_begin(&json, "rotation");
 			for (entry = 0; entry < server.rotation.count; entry++)
 				server_json_string(&json, NULL, server.rotation.entries[entry].text);
@@ -1735,6 +1899,11 @@ void server_update(
 		}
 		return;
 	}
+	/* a stop that waited, when its moment comes (stopping from the next
+	frame) */
+	server_drain_update();
+	if (server.quitting)
+		return;
 
 	network_server = global_network_game_server_get();
 	network_state = server_network_state();
@@ -1881,6 +2050,11 @@ boolean server_director_ok_to_countdown(long player_count, boolean needs_more_te
 
 void server_fatal(char const *text)
 {
+}
+
+boolean server_director_refuses_joins(void)
+{
+	return FALSE;
 }
 
 #endif

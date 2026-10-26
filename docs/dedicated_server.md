@@ -19,6 +19,21 @@ dedicated server: they compile those files to nothing, but for
 servers uses in every build) and `server_rotation.c` (the rotation's
 grammar and the gametype rules), which every build compiles.
 
+## Panels and fleets
+
+A game panel (Pterodactyl, PufferPanel, MCSManager: `deploy/`) runs one
+server and reads its standard output; `deploy/systemd` and `deploy/docker`
+run servers on one machine. For many servers on many machines, `opence-fleet`
+([github.com/OpenCommunityEdition/opence-fleet](https://github.com/OpenCommunityEdition/opence-fleet))
+is one control plane over them all: an agent on each machine runs the
+servers and drives each through this document's API, as the owner from
+the machine itself (`server.web_owner_password`, below). What it relies on
+is named in the status's and the RCON's `capabilities`: `owner_web` (the
+owner's role over the web, from loopback), `ban_address` (`sv_ban_address`,
+`POST /api/bans`), `stop` (`sv_stop`, `POST /api/stop`, the `drain` event),
+`event_addresses` (addresses in the player events) and `identity` (the
+status's `pid`, `instance`...).
+
 ## Command line
 
 | Argument | What it does |
@@ -54,12 +69,12 @@ The release has a `halo-server` script beside `halo`, which runs
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Stopped: `quit`, SIGTERM or SIGINT |
+| 0 | Stopped: `quit`, `sv_stop` (now, or at the end of its drain), SIGTERM or SIGINT |
 | 1 | A fatal error in the game (a halt, a map that failed to load); the last error lines were logged. The process exits within 5 seconds of the error, even when what runs at the exit (a hook, a listing's withdrawal) does not return |
 | 2 | No usable game data: `maps/ui.map`, or every rotation map, missing or not a cache file; nothing was bound |
-| 3 | Bad server configuration: no rotation entry that can be played (and `server.rotation_fallback` off), `server.web_port` past 65535, a web port the server may not bind (a port below 1024 without the right to it) or whose `server.web_bind` is an address the machine does not have, or a web password (admin, moderator or viewer) shorter than 8 characters with the web port bound beyond loopback (on loopback, a warning); `--keygen` or `--sign` failing. An entry that cannot be played (a bad gametype file among them) is left out with a warning: the server stops only when none is left |
+| 3 | Bad server configuration: no rotation entry that can be played (and `server.rotation_fallback` off), `server.web_port` past 65535, a web port the server may not bind (a port below 1024 without the right to it) or whose `server.web_bind` is an address the machine does not have, or a web password (admin, moderator or viewer) shorter than 8 characters with the web port bound beyond loopback (on loopback, a warning), or the owner's (`server.web_owner_password`) shorter than 8 wherever it is bound; `--keygen` or `--sign` failing. An entry that cannot be played (a bad gametype file among them) is left out with a warning: the server stops only when none is left |
 | 4 | A port in use: the tunnel's UDP port, or the web port (another program listens on it) |
-| 5 | Restart asked for (`sv_restart`, or an update installed: `server.auto_update = "install"` installs a new release once the server has been empty for 10 minutes, on a thread of its own: the server goes on meanwhile, and stops with 5 once it is empty again (a player who joined during the install plays on). An install that fails is tried again at the next check, 6 hours on) |
+| 5 | Restart asked for (`sv_restart`, now or at the end of its drain, or an update installed: `server.auto_update = "install"` installs a new release once the server has been empty for 10 minutes, on a thread of its own: the server goes on meanwhile, and stops with 5 once it is empty again (a player who joined during the install plays on). An install that fails is tried again at the next check, 6 hours on) |
 | 128 + n | Stopped by signal n: a second SIGTERM or SIGINT, or the shutdown not done 5 seconds after the first |
 
 SIGTERM and SIGINT stop the server: a game in progress goes to its
@@ -113,9 +128,10 @@ and the web page. Each runs on the game's thread between frames. Every
 command has a role; a caller may run it if their role is that one or above:
 **viewer** < **moderator** < **admin** < **owner** (standard input, the
 init file and the telnet console are the owner's: whoever holds the
-process). When standard input ends and `server.console_exit_on_eof` is on,
-its last line runs, whether or not a line's end ended it, and then the
-server stops.
+process; so is a sign-in to the web or the RCON with
+`server.web_owner_password` from the machine itself: "Signing in"). When
+standard input ends and `server.console_exit_on_eof` is on, its last line
+runs, whether or not a line's end ended it, and then the server stops.
 
 A `<player>` is a slot number (`sv_players` lists them) or the start of a
 name; a name that begins more than one player's is refused. A `<duration>`
@@ -133,7 +149,8 @@ for that setting. A command's reply is sent whole, however many lines.
 
 Commands that are not the server's (the game's own console commands, the
 scripts' globals and functions) need the owner role: from the web or the
-RCON they are refused (`not a command of the server's`). The server's
+RCON they are refused (`not a command of the server's`) but to the owner's
+session. The server's
 commands come first, so `kick` and `ban` are always the server's below, not
 the game's console commands of those names.
 
@@ -150,6 +167,7 @@ the game's console commands of those names.
 | `kick <player>` (`sv_kick`) | moderator | Drops the player's machine; it may join again |
 | `ban <player> [<duration>] [<reason>]` (`sv_ban`) | moderator (a day at most), admin | Drops the player's machine and bans its address and hardware id, for the duration (else for ever). A moderator must give a duration of a day or less: a ban for ever, or longer, is refused |
 | `unban <number\|address\|hardware id>` (`sv_unban`) | admin | Takes a ban out of `bans.txt`; the machine may join again at once, by the LAN or the internet |
+| `sv_ban_address <address\|hardware id> [<duration>] [<reason>]` | admin | Bans an IPv4 address (`a.b.c.d`) or a hardware id (up to 32 hex digits), its machine here or not: its line in `bans.txt` as `ban` writes it (the other part `none`), so that `sv_bans`, `unban` and `GET /api/bans` see it, and a machine present of that address or hardware id is dropped as `ban` drops it (`player_left`'s reason `banned`). Answers `ban <n> added` (`n`: its number in `sv_bans`) |
 | `mute <player> [<minutes>]`, `unmute <player>` | moderator | The host's mute of a player's chat and voice for everyone |
 | `sv_map <map> [<gametype>]`, `sv_map <entry>` | moderator | Plays that game (or a rotation entry, `map:gametype+rule=value`; a co-op one too), below |
 | `sv_map_next` (`sv_next`) | moderator | Ends the game without its scores and plays the rotation's next |
@@ -158,7 +176,8 @@ the game's console commands of those names.
 | `sv_set <setting> <value>` | admin | Changes one of the server's settings, now where it can be, and in `config.toml` (below); a setting its environment variable sets is refused. A value is 256 characters at most |
 | `sv_name <name>`, `sv_maxplayers <n>`, `sv_password [<password>]`, `sv_public <0\|1>`, `sv_motd <text>` | admin | `sv_set` of `server.name`, `server.max_players`, `server.password`, `server.public`, `server.motd` |
 | `sv_reload` | admin | Reads `config.toml`'s server settings, the rotation and the gametype files again (as SIGHUP) |
-| `sv_restart` | owner | Stops as `quit` does, with exit code 5 (restart me) |
+| `sv_stop [now\|game\|empty] [<notice>]`, `sv_stop cancel` | owner | Stops the server (exit code 0): `now` (the default) as `quit` does; `game` once the game being played is over, `empty` once nobody plays (a drain, below); `cancel` the drain waiting. The notice is said to every machine first |
+| `sv_restart [now\|game\|empty] [<notice>]`, `sv_restart cancel` | owner | As `sv_stop`, with exit code 5 (restart me) |
 | `quit` (`exit`) | owner | Stops the server (exit code 0) |
 
 `sv_map`'s game is played as soon as it can be, and its answer says when:
@@ -168,6 +187,22 @@ takes the entry, and the rotation's entry it replaced is played after it),
 its scores), and `(once this game is over)` once the lobby's start was sent
 or while a map loads (it is the next game). `sv_map` of the game being
 played plays it again. The rotation goes on after it.
+
+A drain (`sv_stop` or `sv_restart` with `game` or `empty`, `POST
+/api/stop`) is a stop that waits: the listings are withdrawn as `sv_public
+0` withdraws them (a new invite, the masters told), without the setting
+changing; new machines are refused as while a map loads (the game is not
+open: the LAN's search shows it closed, a join by the invite is told the
+game is not open); then the server stops. With `game` it stops once no
+game is played nor about to be: at once in the lobby with nobody in it, or
+with no countdown running (fewer players than `server.min_players`);
+otherwise once the game played (or about to start) is over and its
+postgame shown. With `empty` it stops once nobody is on the server (at once
+if nobody is now). `sv_stop cancel` (or `sv_restart cancel`) ends the
+drain: the server is listed again as `server.public` says and takes new
+players. A `drain` event says each (`after`: `now`, `game`, `empty` or
+`cancel`), and the stop that ends a drain has the `shutdown` reason
+`drained`. `/api/status`'s `drain` is the drain waiting, or `null`.
 
 A co-op entry (`<level>:coop`) is ended as a game is: by `sv_end_game`,
 `sv_map_next`, `sv_map`, `server.empty_seconds` and `server.idle_minutes`.
@@ -195,7 +230,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 the owner role: from the web's admin, `sv_set` of one of them (`POST
 /api/command`) answers `403 forbidden`, and `PUT /api/settings` leaves it
 out, in its `errors` with the code `forbidden` and the message `<setting>
-needs the owner role (the server's console)`. A web password is empty or
+needs the owner role (the server's console)`; the owner's session changes
+them both ways. A web password is empty or
 8 characters or more. A value outside a setting's choices or range is
 refused (`400 failed` from `sv_set`, `schema` in `PUT /api/settings`'s
 `errors`), with `<setting> takes a whole number from <min> to <max>` (or
@@ -223,7 +259,7 @@ in either case, and is kept as the table spells it:
 | `network.shield_effects` | `stock`, `glow`, `light_show`, `overshield`, `glow_overshield`, `light_show_overshield`, `players` |
 
 The settings `sv_set` does not change (`server.web_viewer_password`,
-`server.web_port`, `server.web_bind`, `server.web_trusted_proxy`, the
+`server.web_owner_password`, `server.web_port`, `server.web_bind`, `server.web_trusted_proxy`, the
 paths, the master servers' files...) are changed in `config.toml` or their
 environment variables: `sv_reload` reads the file's `server.*` settings
 again, and the web port and its address are bound once, at the start. The
@@ -234,7 +270,9 @@ rotation is changed by the `sv_rotation_*` commands.
 The server listens on `server.web_port` (8080; 0 for none) at
 `server.web_bind` (`127.0.0.1`, an IPv4 address). Bound beyond loopback,
 every web password that is set (admin, moderator, viewer) must have 8
-characters or more, else the server exits with code 3. The page (`/`), the API
+characters or more, else the server exits with code 3; the owner's
+(`server.web_owner_password`) must have 8 or more wherever the port is
+bound. The page (`/`), the API
 (`/api/...`), the RCON (`/ws`), `/healthz` and `/metrics` share the port.
 
 Requests are HTTP/1.1 (or 1.0), `GET`, `HEAD`, `POST`, `PUT` or `DELETE`
@@ -278,7 +316,27 @@ another address, whatever it says). The admin password
 (`server.web_viewer_password`) the viewer role; `{"by":"…"}` beside the
 password names who signed in, in the log. A session lasts 12 hours, or 30
 minutes without a request (the RCON's messages do not count: a page left
-open asks `GET /api/session` now and then); 16 are kept at most.
+open asks `GET /api/session` now and then); 16 are kept at most, of every
+role.
+
+The owner's password (`server.web_owner_password`, empty by default: none)
+gives the owner role, for a supervisor on the server's own machine (a
+fleet's agent, a panel's daemon): what standard input may do, over the
+API and the RCON (`quit`, `sv_stop`, `sv_restart`, `POST /api/stop`, the
+owner's settings by `sv_set` and `PUT /api/settings`, the game's own
+console commands by `POST /api/command`, the players' addresses and
+hardware ids in `/api/players` and the events). It signs in only when the
+connection's own peer address is in `127.0.0.0/8` and is not the trusted
+proxy's: never by `X-Forwarded-For`, and never through
+`server.web_trusted_proxy`, even one on the machine itself. From any other
+address the right owner's password is refused with `403 forbidden` (the
+RCON's `auth`: `{"code":"forbidden"}`, and the connection closes 1008),
+and counts toward the address's lockout as a wrong password does. An
+owner's session is used from the machine itself alone, as it was begun
+(from elsewhere its token is no session: `401`, the RCON's `auth` with it
+`denied`). A password that is also another role's gives the owner role
+from the machine itself and the other role from elsewhere: give the owner
+a password of its own.
 
 A script passes `Authorization: Bearer <token>`. The page passes the
 cookie, and on every request that changes something the header
@@ -290,11 +348,11 @@ when the browser's `Sec-Fetch-Site` says `same-origin`.
 cookie; `GET` answers 405). `GET /api/session` answers
 `{"ok":true,"role":…,"csrf":…,"expires":…}`, or 401.
 
-When `server.web_password`, `server.web_moderator_password` or
-`server.web_viewer_password` changes (`sv_set` and the settings change the
-first two; `sv_reload` reads any of them from `config.toml`),
-the sessions of its role end and that role's RCON connections close
-(1008, `the password changed`).
+When `server.web_password`, `server.web_moderator_password`,
+`server.web_viewer_password` or `server.web_owner_password` changes
+(`sv_set` and the settings change the first two; `sv_reload` reads any of
+them from `config.toml`), the sessions of its role end and that role's RCON
+connections close (1008, `the password changed`).
 
 Five wrong passwords from an address (an IPv6 one's /64) in 10 minutes
 lock it out for 10 minutes (429), and no more than 30 passwords a minute
@@ -311,7 +369,7 @@ are checked in all. `/api/login` takes `POST` alone (any other method:
 | --- | --- |
 | 400 | `bad_request`, `schema` (a field missing or out of range), `failed` (the command ran and failed: its lines in `lines`), `rejected` (rotation entries: `rejected[]`), `invalid` (a gametype file: `line`) |
 | 401 | `denied` (no session, or a wrong password) |
-| 403 | `forbidden` (the role), `csrf`, `origin` |
+| 403 | `forbidden` (the role; the owner's password from beyond the machine), `csrf`, `origin` |
 | 404 | `not_found` (also a command that is not one, a player or a ban that is not there) |
 | 405 | `method` |
 | 409 | `pinned` (a setting its environment variable sets), `changed` (a player's action whose slot holds another player now: the current name in `name`, nothing done) |
@@ -328,7 +386,7 @@ are checked in all. `/api/login` takes `POST` alone (any other method:
 | `GET /healthz` | none | `200 {"state":"lobby"}` (or `loading`, `playing`, `postgame`) while the server hosts and its frames run; `503` with `{"state":"starting"}`, `{"state":"stalled"}` (no frame for a minute) or the other state otherwise |
 | `GET /metrics` | none (`server.metrics`) | Prometheus text |
 | `GET /api/status` | viewer | The status (below) |
-| `GET /api/players` | viewer | `{"ok":true,"players":[<player>…]}` |
+| `GET /api/players` | viewer | `{"ok":true,"players":[<player>…]}` (with `address` and `hwid` for the owner, or every role with `server.log_addresses`) |
 | `POST /api/players/{slot}/kick` | moderator | `{"name":"<the player's name, checked>"}` → `{"ok":true,"lines":[…]}`, or `409 changed` when the slot holds another player |
 | `POST /api/players/{slot}/ban` | moderator | `{"name":…,"duration":"1d","reason":"…"}` (no duration: for ever, which a moderator's ban cannot be: `400 failed`) |
 | `POST /api/players/{slot}/mute` | moderator | `{"name":…,"minutes":10}` |
@@ -345,12 +403,14 @@ are checked in all. `/api/login` takes `POST` alone (any other method:
 | `DELETE /api/gametypes/{name}` | admin | `{"ok":true}` |
 | `GET /api/maps` | viewer | `{"ok":true,"maps":[{"name":"bloodgulch","level":"levels\\test\\bloodgulch\\bloodgulch","kind":"xbox","title":"Blood Gulch"}…]}` (`kind`: `xbox` or `custom`; `title` is the map's display name, else its `name`) |
 | `GET /api/bans` | admin | `{"ok":true,"bans":[{"n":0,"when":"2026-10-19 18:00:00","ip":"…","hwid":"…","players":"…","reason":"…","until":<unix>\|null}…]}` |
+| `POST /api/bans` | admin | `{"ip":"203.0.113.5","hwid":"…","names":"…","duration":"1d","reason":"…"}` (`ip` or `hwid`, or both; the rest may be left out: no duration is for ever) → `{"ok":true,"n":<the new ban's number in GET /api/bans>}`: `sv_ban_address`, a machine present of the address or the hardware id dropped; `400 schema` for an address that is not IPv4, a hardware id that is not hex, a duration that is not one |
 | `DELETE /api/bans/{n}` | admin | `{"ok":true}` |
 | `GET /api/settings` | admin | `{"ok":true,"settings":[<setting>…]}` |
 | `PUT /api/settings` | admin | `{"server.name":"…","server.max_players":16,"server.public":true,…}` (a value as JSON, a boolean, a number or a string, or its text: `"true"`, `"16"`; `null` empties it) → `{"ok":true,"applied":["server.name"],"errors":[{"name":…,"code":…,"message":…}]}`; each setting is changed or refused on its own |
 | `POST /api/command` | the command's | `{"line":"sv_status"}` (511 characters at most) → `{"ok":true,"lines":["…"]}`, or a refusal (`failed`, `forbidden`, `not_found`, `pinned`) with the command's `lines` |
+| `POST /api/stop` | owner | `{"after":"now\|game\|empty","notice":"…","restart":false}` (`notice` and `restart` may be left out) or `{"cancel":true}` → `{"ok":true,"lines":["…"]}`: `sv_stop` (`sv_restart` with `restart`) `after notice`, or `sv_stop cancel` (`400 failed` with no drain waiting); `400 schema` for another `after` |
 | `GET /api/log?after=<n>&limit=<m>` | viewer | `{"ok":true,"lines":[{"n":12,"time":<ms>,"level":"info","cat":"game","text":"…"}…],"next":12,"missed":0}` (`limit` 1 to 1024, 256 by default; the chat's lines for admins only) |
-| `GET /api/events?after=<seq>` | viewer | `{"ok":true,"events":[<event>…],"next":<seq>,"missed":0}` |
+| `GET /api/events?after=<seq>` | viewer | `{"ok":true,"events":[<event>…],"next":<seq>,"missed":0}` (`player_joined` and `player_left` with `address` and `hwid` for the owner, or every role with `server.log_addresses`) |
 | `GET /ws` | | The RCON (below) |
 | `GET /`, `/app.js`, `/app.css`, `/icon.svg` | none | The page (`server.web_ui`) |
 
@@ -370,7 +430,11 @@ events) before they were asked for.
  "rotation":{"index":0,"count":3,"next":{"text":"sidewinder:team_slayer","map":"sidewinder","gametype":"team_slayer"}},
  "frame_ms_max":4.1,"frame_ms_avg":1.2,"tick_ms_avg":1.2,
  "masters":[{"url":"https://master1.example.org","listed":true,"probe":"ok","code":"","message":"","updated":1760899990}],
- "update":{"available":false,"build":""}}
+ "update":{"available":false,"build":""},
+ "drain":null,
+ "pid":4021,"started":1760896400,"instance":"eu-1","region":"eu","tunnel_port":2302,
+ "publisher_key_id":"3f9a2c7d1e5b8a04","web_port":8080,
+ "capabilities":["events","status","rotation","settings","bans","owner_web","ban_address","stop","event_addresses","identity"]}
 ```
 
 `state` is `waiting` (the menus settling), `hosting` (making the game),
@@ -380,7 +444,15 @@ in a game without teams. `frame_ms_max` and `frame_ms_avg` are the longest
 and the mean frame of the last minute (`tick_ms_avg` is the mean again, for
 older readers). `invite` is given to admins only (empty for others). An entry of the rotation is
 `{"text":"sidewinder:team_slayer+score=50","map":"sidewinder","gametype":"team_slayer","rules":{"score":50},"rejected":null}`
-(`rejected` is why it cannot be played, else `null`). The rotation's
+(`rejected` is why it cannot be played, else `null`). `drain` is the
+drain waiting (`sv_stop game`...), `{"after":"game","restart":false,"since":<unix
+seconds>}`, else `null`. `pid` is the server's process, `started` when it
+started (seconds since 1970), `instance` the name the master servers know
+it by (`server.instance`, else the slug of `server.name` they are given),
+`region` `server.region`, `tunnel_port` the tunnel's UDP port
+(`network.tunnel_port`; 0 when `network.online` is off), `publisher_key_id`
+the publisher key's id (16 hex digits; empty without a key: `sv_publisher`)
+and `web_port` `server.web_port`. `capabilities` is the RCON's hello's. The rotation's
 `index` (in the status and `GET /api/rotation`) is the entry being played,
 `-1` while an `sv_map` game is played or before the first lobby; `next` is
 the entry after the one played last (the first while none has been).
@@ -416,7 +488,7 @@ Every frame is text holding one JSON object. The server speaks first:
 
 ```
 → {"type":"hello","protocol":1,"server":"OpenCE Server","build":"build-206","network_version":38,
-   "capabilities":["events","status","rotation","settings","bans"]}
+   "capabilities":["events","status","rotation","settings","bans","owner_web","ban_address","stop","event_addresses","identity"]}
 ← {"type":"auth","password":"…","by":"paul"}       or {"type":"auth","token":"<session token>"}
 → {"type":"auth","ok":true,"role":"admin"}
 → {"type":"auth","ok":false,"error":{"code":"denied"}}  and the connection closes (1008)
@@ -436,6 +508,11 @@ Every frame is text holding one JSON object. The server speaks first:
 
 A connection signed in with the page's cookie (on the same origin) needs no
 `auth` message: its `hello` is followed by `{"type":"auth","ok":true,…}`.
+The `capabilities` say what the server has beyond the first release's
+(`events`, `status`, `rotation`, `settings`, `bans`): `owner_web`,
+`ban_address`, `stop`, `event_addresses` and `identity` ("Panels and
+fleets"); a client checks for one before it uses it. The owner's password
+signs in from the server's own machine alone ("Signing in").
 A command is a `line`, or a `command` and its `args`, which the server
 joins with spaces, quoting an argument that holds a space or is empty (511
 characters in all at most). Ids are the client's (a number or a string),
@@ -458,7 +535,7 @@ event groups are `player` (`player_joined`, `player_left`, `map_share`), `chat`
 `unban`, `mute`, `unmute`, `speed_hack`), `status` (`status`), `log`
 (`log`, each log line as `{"n","level","cat","text"}`), `master`
 (`master`), and `server` (`server_started`, `reloaded`, `warning`,
-`shutdown`), which every subscriber gets.
+`drain`, `shutdown`), which every subscriber gets.
 The log's lines of the `chat` category go to the `chat` group, the others
 to `log`.
 `status` and `log` events go to their subscribers as they come and are
@@ -479,14 +556,14 @@ Every event has `seq` (rising, never reused while the server runs; a
 
 | Event | Fields |
 | --- | --- |
-| `server_started` | `name, build, network_version, rotation[]` (the entries' texts) |
+| `server_started` | `name, build, network_version, pid, started, instance, region, tunnel_port, publisher_key_id, web_port` (as the status's), `rotation[]` (the entries' texts) |
 | `lobby_opened` | `map, gametype, variant` (the gametype's name as the game shows it), `teams, index` (the rotation's entry) |
 | `countdown` | `seconds` (-1: paused) |
 | `game_started` | `map, gametype, variant, teams, team_scores[]` (team games), `players[]` |
 | `game_ended` | `map, gametype, variant, teams, reason` (`score`, `time`, `idle`, `empty`, `command`, `next`), `duration` (seconds), `team_scores[]` (team games), `players[]` |
 | `postgame` | `seconds` |
-| `player_joined` | `slot, name, team, machine` |
-| `player_left` | `slot, name, reason` (`left`; `kicked` and `banned` when the server's `kick` or `ban` dropped the machine, `banned` for a speed hack's drop too) |
+| `player_joined` | `slot, name, team, machine`; `address, hwid` for the owner, or every role with `server.log_addresses` |
+| `player_left` | `slot, name, reason` (`left`; `kicked` and `banned` when the server's `kick`, `ban` or `sv_ban_address` dropped the machine, `banned` for a speed hack's drop too); `address, hwid` (as it joined) as `player_joined`'s |
 | `chat` | `channel` (`everyone`, `team`, `vehicle`), `slot, name, text` (admins only; the lines the host sends on) |
 | `kill` | `killer, victim` (slots; -1 for none), `weapon` (the killer's weapon's or the killing object's tag name, or null), `friendly_fire` |
 | `score` | `map, gametype, variant, teams, team_scores[]` (team games), `players[]` (once a second at most, on a change) |
@@ -496,10 +573,14 @@ Every event has `seq` (rising, never reused while the server runs; a
 | `warning` | `text` (a newer release, with `server.auto_update`) |
 | `reloaded` | `rotation_changed, rejected[]` (`{"entry","reason"}` of each entry left out) |
 | `master` | `url, listed, probe, code, message` |
-| `shutdown` | `reason, code` |
+| `drain` | `after` (`now`, `game`, `empty`, `cancel`), `restart` (exit code 5), `notice` (empty for none) |
+| `shutdown` | `reason` (`quit`, `sv_stop`, `sv_restart`, `drained`: a drain's end, `signal <n>`, `update installed`, `nothing to play`, `debug.exit_after`), `code` (the exit code) |
 
 Players in events are as in `/api/players` for the viewer role (no
-addresses). `variant` is the gametype's name as the game shows it (`Co-op`
+addresses), but for `player_joined` and `player_left`, which carry the
+player's address and hardware id (`""` when not known) to the owner, and to
+every role when `server.log_addresses` is on (`/api/players`' rule), in the
+RCON's events, their replay and `GET /api/events` alike. `variant` is the gametype's name as the game shows it (`Co-op`
 in a co-op entry).
 
 ## Bans
@@ -508,7 +589,9 @@ A ban is a line of `bans.txt` (in `paths.logs`, else the data root). A
 timed ban is kept out by its line's `until=` alone, and ends then. A ban
 for ever, and a machine dropped for cheating, also keep the machine out
 for the rest of the run by its address, its real address or its hardware
-id. `unban` takes the line out and readmits the machine by
+id. `sv_ban_address` and `POST /api/bans` write such a line for an address
+or a hardware id with no player of it needed (the part not given is
+`none`). `unban` takes the line out and readmits the machine by
 the line's address or hardware id, whether it joins on the LAN or by
 internet play.
 
@@ -625,3 +708,19 @@ lists;
 | `masters.txt` | The master servers (`server.masters_file`: beside `config.toml`, else beside the executable); one that names none leaves the official master, built in |
 | `bans.txt`, `cheaters.txt`, `debug.txt` | In `paths.logs`, else the data root |
 | `status.json` (`server.status_file`) | The status, written every 2 seconds |
+| A password's file (`HALO_SERVER_WEB_PASSWORD_FILE`, `HALO_SERVER_WEB_OWNER_PASSWORD_FILE`, `HALO_SERVER_WEB_MODERATOR_PASSWORD_FILE`, `HALO_SERVER_WEB_VIEWER_PASSWORD_FILE`, `HALO_SERVER_PASSWORD_FILE`) | A container's secret: when the plain variable is not set, the file's first line (its CR and LF off) is the setting's value, which is then pinned as the plain variable's would be (`sv_set` and `PUT /api/settings` refuse it, `409 pinned`). Read once, at the start; a file that cannot be read is logged, and the setting is `config.toml`'s |
+
+## Releases
+
+Each release has `SHA256SUMS` (the SHA-256 of each of its files, as
+`sha256sum` writes them: `<hex>  <name>`, written by `tools/ci_build.py
+sums`) and `SHA256SUMS.sig`: the Ed25519 signature of that file's exact
+bytes by the project's release key, in 128 lowercase hex digits and a
+newline (the form `opence-master-server`'s `cmd/release-sign` writes). The
+public key is `deploy/release-key.pub` (64 hex digits:
+`d04e8b101007d1641cace8b95fcca76f7f44709f6885c3d031b52394dbdf9376`).
+`tools/release_sign.sh verify SHA256SUMS` checks the signature (OpenSSL 3),
+and `sha256sum -c --ignore-missing SHA256SUMS` the files downloaded. The
+build workflow signs with the `RELEASE_SIGNING_KEY` secret (the key's seed,
+64 hex digits) and checks the signature against `deploy/release-key.pub`
+before it publishes the release.
