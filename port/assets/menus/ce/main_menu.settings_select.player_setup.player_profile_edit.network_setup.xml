@@ -138,7 +138,7 @@
 		<string text="Join the game of an invite link copied before\nswitching to the game."/>
 		<string text="Look for a new version when the game starts."/>
 		<string text="Download CE maps or approved MCC packages.\nManage sharing and downloaded MCC copies."/>
-		<string text="Players' names above their heads, the\nscoreboard, the text chat and the match clock."/>
+		<string text="Players' names above their heads, the\nscoreboard, the text chat, the match clock and\nthe talking timer."/>
 		<string text="Hide offensive words in names and text from\nother players, maps and mods, as stars."/>
 		<string text="What the Server Browser lists and its order: the\nsame settings as its Filters screen."/>
 		<string text="Link a Discord account, which lets you join\nservers that block VPNs while you use one."/>
