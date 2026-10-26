@@ -664,11 +664,12 @@ static const struct config_setting config_settings[] =
 		"servers, beside this file unless a full path: an https:// URL and its\n"
 		"key (ed25519:<hex>) on each line, up to 4. None named (no file, or\n"
 		"comments alone): the official master, built in." },
-	{ "network.browser_source", _config_string, "\"dedicated\"", "HALO_NET_BROWSER_SOURCE", _environment_value,
+	{ "network.browser_source", _config_string, "\"all\"", "HALO_NET_BROWSER_SOURCE", _environment_value,
 		_platform_all,
-		"The server browser's games: \"dedicated\" (the master servers'\n"
-		"dedicated servers), \"players\" (P2P GAMES: games players host) or\n"
-		"\"all\". Its top-left tab changes it." },
+		"The server browser's games: \"all\" (ALL GAMES: the dedicated\n"
+		"servers first, then the games players host), \"dedicated\" (the\n"
+		"master servers' dedicated servers) or \"players\" (P2P GAMES: games\n"
+		"players host). Its top-left tab changes it." },
 	{ "network.browser_show_empty", _config_boolean, "true", "HALO_NET_BROWSER_SHOW_EMPTY", _environment_value,
 		_platform_all,
 		"The server browser lists games with no player (its Filters screen)." },

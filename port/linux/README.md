@@ -543,7 +543,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.public_address` | `""` | `HALO_NET_PUBLIC_ADDRESS` | Hosting: the internet address the joiners reach this machine at, `host[:port]` (the port forwarded to `network.tunnel_port`), for a server behind a NAT with one forwarded port. It is offered first, and its name is looked up again every 5 minutes. Empty: what STUN and UPnP find. |
 | `network.listings` | `"both"` | `HALO_NET_LISTINGS` | What the server browser lists. `"both"`: the dedicated servers of the master servers first, then the games players host (from the brokers). `"masters"`: the master servers' only. `"brokers"`: the brokers' only. Refer to "Server browser". |
 | `network.masters_file` | `"masters.txt"` | `HALO_NET_MASTERS_FILE` | The file of the master servers the server browser asks for dedicated servers, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`), 4 at most. A file that names none (missing, or comments alone, as the release's) leaves the official master, built in (`https://master.opencommunityedition.com`). Refer to "Dedicated server". |
-| `network.browser_source` | `"dedicated"` | `HALO_NET_BROWSER_SOURCE` | The server browser's games. `"dedicated"`: the dedicated servers of the master servers; `"players"` (P2P GAMES): the games players host; `"all"`. The tab at the top left of the server browser changes it. |
+| `network.browser_source` | `"all"` | `HALO_NET_BROWSER_SOURCE` | The server browser's games. `"all"` (ALL GAMES): the dedicated servers first, then the games players host; `"dedicated"`: the dedicated servers of the master servers; `"players"` (P2P GAMES): the games players host. The tab at the top left of the server browser changes it. |
 | `network.browser_show_empty`, `network.browser_show_full` | `true` | `HALO_NET_BROWSER_SHOW_EMPTY`, `HALO_NET_BROWSER_SHOW_FULL` | `false`: the server browser does not list the games with no player, the full games. The server browser's Filters screen sets them. |
 | `network.browser_maps` | `"yes"` | `HALO_NET_BROWSER_MAPS` | `"yes"`: the server browser lists the games on maps this computer does not have. `"no"`: it does not. `"downloadable"`: only those of a Custom Edition map that the host shares. |
 | `network.browser_gametype` | `"any"` | `HALO_NET_BROWSER_GAMETYPE` | The server browser lists the games of one kind only: `"any"`, `"ctf"`, `"slayer"`, `"oddball"`, `"king"` or `"race"` (the Filters screen). |
@@ -1040,8 +1040,8 @@ that players host, which come through the brokers. `network.listings`
 chooses the kinds that the browser asks for: both (the default), only the
 master servers, or only the brokers.
 
-- The top-left tab chooses the games that the list shows: DEDICATED (at
-  first), P2P GAMES or ALL GAMES (left and right, `network.browser_source`).
+- The top-left tab chooses the games that the list shows: ALL GAMES (at
+  first), DEDICATED or P2P GAMES (left and right, `network.browser_source`).
   When `network.listings` is `"masters"`, the tab shows DEDICATED only;
   when it is `"brokers"`, P2P GAMES only.
   PLAYERS, the sum of the players in the games shown, is in the middle tab.
