@@ -656,14 +656,18 @@ class Player:
         self.muted = False
         self.address = f"203.0.113.{10 + machine}"
         self.hwid = hashlib.sha256(name.encode()).hexdigest()[:32]
+        # (its machine's build, as its game tells the host)
+        self.client = {"build": 282, "flavor": "release", "version": "OpenCE Linux | build 282 (release)",
+                       "repository": "OpenCommunityEdition/OpenCE",
+                       "mods": ["trollface 1.0"] if machine % 2 else []}
 
     def json(self, addresses, playing=True):
         """as server_status.c's server_status_player: the ping null until the
-        player is in a game, the address and hardware id for the owner (or
-        with server.log_addresses)"""
+        player is in a game, its machine's build (client), the address and
+        hardware id for the owner (or with server.log_addresses)"""
         value = {"slot": self.slot, "name": self.name, "team": self.team, "score": self.score, "kills": self.kills,
                  "deaths": self.deaths, "assists": self.assists, "ping": self.ping if playing else None,
-                 "machine": self.machine, "joined": self.joined, "muted": self.muted}
+                 "machine": self.machine, "joined": self.joined, "muted": self.muted, "client": self.client}
         if addresses:
             value.update(address=self.address, hwid=self.hwid)
         return value

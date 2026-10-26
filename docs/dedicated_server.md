@@ -472,6 +472,13 @@ A player is
 with the owner role, or `server.log_addresses`, also
 `"address":"203.0.113.5","hwid":"…"`. `team` is 0 (red), 1 (blue) or -1
 (no teams); `ping` is in milliseconds, `null` when it is not known yet.
+`client` is the player's machine's build as its game tells it (shortly
+after it joins), for every role:
+`{"build":282,"flavor":"release","version":"OpenCE Linux | build 282 (release)","repository":"OpenCommunityEdition/OpenCE","mods":["trollface 1.0"]}`
+(`build` 0 for a build CI did not number, `repository` empty when the build
+does not know it, `mods` the mods it plays in their load order, each its
+folder and its version), or `null` from a game that does not tell it. It is
+what the player's game says, which a changed build can make anything.
 
 A setting is
 `{"name":"server.name","type":"string","value":"OpenCE Server","default":"OpenCE Server","comment":"…","env":"HALO_SERVER_NAME","pinned":false,"secret":false,"choices":null,"min":null,"max":null}`;

@@ -34,6 +34,7 @@ owner, or with server.log_addresses; the invite only for admins.
 #include "../src/port_config.h" /* port: port/linux/src/port_config.c */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if HALO_SERVER_BUILD
@@ -202,6 +203,37 @@ void server_status_player(
 
 		csmemcpy(wide, player->name, sizeof(wide));
 		server_json_boolean(json, "muted", network_chat_host_name_muted(wide));
+	}
+	/* (its machine's build, as it told it: null from a build that does not) */
+	{
+		struct distributed_client_build build;
+
+		if (distributed_machine_client_build(player->machine_index, &build))
+		{
+			char const *line = build.mods;
+
+			server_json_object_begin(json, "client");
+			server_json_integer(json, "build", strtol(build.number, NULL, 10));
+			server_json_string(json, "flavor", build.flavor);
+			server_json_string(json, "version", build.version);
+			server_json_string(json, "repository", build.repository);
+			server_json_array_begin(json, "mods");
+			while (*line)
+			{
+				char const *end = strchr(line, '\n');
+				int length = end ? (int)(end - line) : (int)strlen(line);
+
+				if (length > 0)
+					server_json_string_length(json, NULL, line, length);
+				line += length + (end ? 1 : 0);
+			}
+			server_json_array_end(json);
+			server_json_object_end(json);
+		}
+		else
+		{
+			server_json_null(json, "client");
+		}
 	}
 	if (role >= _server_role_owner || config_boolean("server.log_addresses"))
 	{
