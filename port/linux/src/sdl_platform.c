@@ -266,7 +266,17 @@ BOOL platform_sdl_initialize(void)
 #endif
 	if (!SDL_Init(flags))
 	{
-		platform_log("SDL_Init failed: %s", SDL_GetError());
+		/* (tried again by each caller that needs SDL, some of them every
+		frame: a failure is logged once, and again only when its reason
+		changes, not tens of thousands of times without a display) */
+		static char last_failure[256];
+		const char *error = SDL_GetError();
+
+		if (strncmp(error, last_failure, sizeof(last_failure) - 1))
+		{
+			snprintf(last_failure, sizeof(last_failure), "%s", error);
+			platform_log("SDL_Init failed: %s", error);
+		}
 		return FALSE;
 	}
 	platform_sdl_started = TRUE;
