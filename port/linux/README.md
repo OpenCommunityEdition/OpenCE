@@ -551,6 +551,8 @@ the setting for one start of the game. It has priority over the file.
 | `audio.volume` | `1.0` | `HALO_VOLUME` | The master volume. |
 | `audio.music_volume` | `1.0` | `HALO_MUSIC_VOLUME` | The music's volume, of the master volume. |
 | `audio.effects_volume` | `1.0` | `HALO_EFFECTS_VOLUME` | The volume of the other sounds (effects and speech), of the master volume. |
+| `audio.talking_timer` | `false` | `HALO_TALKING_TIMER` | Call the game clock aloud in multiplayer: the seconds left in each minute, a countdown from 10, and each minute as it turns, up to 30 minutes. |
+| `audio.timer_volume` | `0.8` | `HALO_TIMER_VOLUME` | The volume of the talking timer's voice, of the master volume. `0.8` plays its clips at their recorded level; `1.0` is 25% louder. |
 | `audio.buffer_frames` | `512` | `HALO_AUDIO_BUFFER_FRAMES` | The audio device's buffer, in sample frames at 48 kHz, from `64` to `8192`. Larger rides out stalls that would cut the sound out; smaller has less delay (512 is 11 ms, 2048 is 43 ms). Not on Android or the web. |
 | `audio.channels` | `"stereo"` | `HALO_AUDIO_CHANNELS` | `"stereo"`, or `"5.1"` for surround sound as with Dolby Digital on the Xbox. `"auto"`: 5.1 if the sound device has 6 or more channels. Linux and Windows only. |
 | `audio.hrtf` | `true` | `HALO_HRTF` | Measured Xbox directional filtering and ear delays for mono 3D voices on stereo headphones, speakers and 5.1. Enabled on every platform. `false` crossfades to panning; authored 2D music/UI remain dry in both modes. |
@@ -2028,6 +2030,7 @@ Other changes:
 | `input/input_xbox.c`, `physics/collision_usage.c` | The clock is read only for a button held, and for collision tests only when their times are shown: a read of the clock is slow in a browser. |
 | `main/main.c`, `interface/hud.c`, `interface/hud_unit.c`, `interface/hud_draw.c`, `game/game_engine.c` | The text chat of network games (`game/network_chat.c`): its keys are read each frame, and the debug keys are not while a line is typed; each view's HUD draws its lines, above the motion sensor, whose place the HUD notes (the left of the last picture drawn); the scoreboard's menu has Mute voice and chat, and the host's Mute for everyone. |
 | `main/main.c`, `cutscene/cinematics.c`, `saved games/game_state.c` | While a cutscene can be skipped and the checkpoint its skip goes back to is taken, another checkpoint waits until the cutscene can no longer be skipped (`cinematic_skip_stop`) as one that is not safe would: a `game_save` gives up after as many ticks, a `game_save_totally_unsafe` at once, and a skip lets go of it. A map's script that saves every so often (Mercury Rising's `passive_saving`, a50's and b40's `general_save`) replaced the skip's checkpoint with one partway into the cutscene, and the skip played the rest of the cutscene again. |
+| `main/main.c` | The talking timer (`game/talking_timer.c`) runs each frame. |
 
 The x86 inline assembly of the game is replaced by C. Thus the compiler
 can optimize that code for each processor:
