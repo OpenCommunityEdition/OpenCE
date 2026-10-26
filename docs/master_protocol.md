@@ -483,12 +483,13 @@ and `ETag: "cd755a50c5cfc457"`.
 
 An operator applies with the master's Discord bot, in the master's
 Discord server (the `/apply` page links to it): the bot's `/apply` command
-answers the applicant alone with a nonce for the proof of key,
+takes the region (a menu of the master's choices) and the number of servers
+at once as its options, and answers the applicant alone with a nonce for
+the proof of key,
 `opence-apply-<unix>-<16 hex>`, good for 24 hours and bound to that Discord
 user (a nonce given to another user, or to none, does not prove this one's
 key), and a button that opens the application's form: a display name, the
-public key, the proof, the number of servers at once with a region, and a
-note. The application's name is 3 to 32 printable ASCII characters,
+public key, the proof, and a note. The application's name is 3 to 32 printable ASCII characters,
 `servers` is 1 to 64, and the region up to 16 of `a-z`, `0-9` and `-`. The
 proof of key is required unless the master's policy says otherwise
 (`MASTER_REQUIRE_PROOF`, true by default): it is the publisher key's
