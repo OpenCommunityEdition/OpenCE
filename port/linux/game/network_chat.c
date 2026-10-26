@@ -9,11 +9,14 @@ D-pad Up (the touch controls' too) opens an on-screen keyboard instead,
 whose keys the stick moves through and A types, a tap types (the
 touchscreen), and the controller then drives nothing else (xinput_sdl.c's
 halo_chat_pad_buttons, halo_chat_taps). The lines are
-drawn above the motion sensor, each with its player's name in their team's
-colour, wrapped to a column a little over half the view wide, and fade after a
-while; where the touch controls hold the bottom left (Android, and a browser
-whose touch controls are used), they go at the top left under the weapon's
-panel, the newest highest. Each local player's view shows the lines that
+drawn above the motion sensor, at half the HUD font's size, each with its
+player's name in their team's colour, wrapped to a column a little over half
+the view wide, and fade after a while; where the motion sensor is not drawn
+(its player dead), where it was last drawn in a view of that size. While a
+line is typed, Page Up and Page Down (and the mouse wheel) scroll back through
+the last CHAT_MAXIMUM_LINES. Where the touch controls hold the bottom left
+(Android, and a browser whose touch controls are used), they go at the top
+left under the weapon's panel, the newest highest, at the font's own size. Each local player's view shows the lines that
 player hears; the first local player types, and their view shows the line
 being typed (its end, when it is wider than the column). No line is typed or
 shown in a menu, a cinematic, or while the HUD is hidden, and the lines of a
@@ -104,8 +107,9 @@ enum
 	CHAT_TEXT_SIZE = 64,
 	/* a player's name, with its end */
 	CHAT_NAME_SIZE = 12,
-	/* the lines kept, and the rows of them shown at once (a line wraps) */
-	CHAT_MAXIMUM_LINES = 8,
+	/* the lines kept (Page Up scrolls back through them while a line is
+	typed), and the rows of them shown at once (a line wraps) */
+	CHAT_MAXIMUM_LINES = 64,
 	CHAT_LINES_SHOWN = 6,
 	/* ... in a view of split screen */
 	CHAT_LINES_SHOWN_SPLIT = 3,
@@ -113,9 +117,13 @@ enum
 	of the view's (clear of the on-screen keyboard at the bottom right) */
 	CHAT_LINE_ROWS = 3,
 	CHAT_COLUMN_PERCENT = 55,
-	/* a motion sensor drawn longer ago than this is not there (the HUD hidden,
-	or none) */
-	CHAT_MOTION_SENSOR_MILLISECONDS = 500,
+	/* the lines Page Up and Page Down scroll by (the mouse wheel, one a notch) */
+	CHAT_PAGE_LINES = 3,
+	/* a view whose HUD has drawn no motion sensor: about where it would be,
+	in the HUD's units (480 high, before its scale), from the view's bottom
+	left */
+	CHAT_FALLBACK_LEFT_UNITS = 24,
+	CHAT_FALLBACK_BOTTOM_UNITS = 110,
 	/* a line shown, then faded out */
 	CHAT_LINE_MILLISECONDS = 10000,
 	CHAT_FADE_MILLISECONDS = 1000,
@@ -160,6 +168,10 @@ enum
 	CHAT_KEYBOARD_WIDTH_PERCENT = 40,
 	CHAT_KEYBOARD_WIDTH_PERCENT_ANDROID = 36,
 };
+
+/* the lines' size, of the HUD font's: laid out at its size, then drawn scaled
+about the column's corner (not with the touch controls, on a phone's screen) */
+#define CHAT_TEXT_SCALE 0.5f
 
 /* the on-screen keyboard's last row's wide keys */
 enum
@@ -283,6 +295,9 @@ struct chat_line
 static struct chat_line chat_lines[CHAT_MAXIMUM_LINES];
 static short chat_line_count;
 static short chat_newest_line;
+/* while a line is typed: the newest lines scrolled past (Page Up), 0 for
+none */
+static short chat_scroll;
 
 /* the line typed */
 static struct
@@ -342,13 +357,16 @@ static struct
 } chat_config;
 
 /* each local player's motion sensor as last drawn (the window's units),
-whether it has been, and (system_milliseconds) when */
+whether it has been, and the size of the view and the local players then: its
+place in the HUD while they stay, drawn or not (a dead player's is not) */
 static struct
 {
 	boolean valid;
 	short left;
 	short top;
-	unsigned long noted_at;
+	short view_width;
+	short view_height;
+	short players;
 } chat_motion_sensors[MAXIMUM_LOCAL_PLAYERS];
 
 /* whether this machine is in a network game (the lines of the last are let
@@ -1570,6 +1588,7 @@ static void chat_input_begin(
 	csmemset(&chat_input, 0, sizeof(chat_input));
 	chat_input.active = TRUE;
 	chat_input.channel = channel;
+	chat_scroll = 0;
 	/* (the keys pressed before) */
 	while (input_get_key(&key))
 		;
@@ -1581,6 +1600,7 @@ static void chat_input_end(
 	chat_input.active = FALSE;
 	chat_keyboard.open = FALSE;
 	chat_keyboard.drawn = FALSE;
+	chat_scroll = 0;
 }
 
 /* the line's last character gone */
@@ -1761,6 +1781,8 @@ void network_chat_update(
 		{
 			chat_in_game = TRUE;
 			chat_line_count = 0;
+			chat_scroll = 0;
+			csmemset(chat_motion_sensors, 0, sizeof(chat_motion_sensors));
 			chat_off_noticed = FALSE;
 			csmemset(chat_rates, 0, sizeof(chat_rates));
 		}
@@ -1838,6 +1860,13 @@ void network_chat_update(
 		case _key_backspace:
 			chat_input_delete();
 			break;
+		/* (back through the lines kept, and forward again) */
+		case _key_page_up:
+			chat_scroll = (short)(chat_scroll + CHAT_PAGE_LINES);
+			break;
+		case _key_page_down:
+			chat_scroll = (short)(chat_scroll - CHAT_PAGE_LINES);
+			break;
 		/* (it opens the console, over the line: console.c) */
 		case _key_backquote:
 			break;
@@ -1861,6 +1890,10 @@ void network_chat_update(
 			break;
 		}
 	}
+	/* (the mouse wheel's notches, up older; then within the lines kept) */
+	if (chat_input.active)
+		chat_scroll = (short)(chat_scroll + halo_chat_wheel_steps());
+	chat_scroll = (short)PIN(chat_scroll, 0, MAX(chat_line_count - 1, 0));
 }
 
 boolean network_chat_typing(
@@ -1881,7 +1914,11 @@ void network_chat_note_motion_sensor(
 	chat_motion_sensors[local_player_index].valid = TRUE;
 	chat_motion_sensors[local_player_index].left = left;
 	chat_motion_sensors[local_player_index].top = top;
-	chat_motion_sensors[local_player_index].noted_at = system_milliseconds();
+	chat_motion_sensors[local_player_index].view_width =
+		(short)(render.camera.window_bounds.x1 - render.camera.window_bounds.x0);
+	chat_motion_sensors[local_player_index].view_height =
+		(short)(render.camera.window_bounds.y1 - render.camera.window_bounds.y0);
+	chat_motion_sensors[local_player_index].players = local_player_count();
 }
 
 /* where the lines go (and the on-screen keyboard): at the top left, the
@@ -2340,6 +2377,10 @@ void network_chat_draw(
 	short edge;
 	short rows;
 	short index;
+	short skipped = 0;
+	real scale;
+	/* the point the lines are scaled about */
+	short anchor;
 
 	if (!chat_network_game() || !chat_shown() || chat_hidden() || font_index == NONE || local_player_index < 0 ||
 		local_player_index >= MAXIMUM_LOCAL_PLAYERS || (!chat_line_count && !typing))
@@ -2352,18 +2393,24 @@ void network_chat_draw(
 	line_height = font->ascending_height + font->descending_height + font->leading_height;
 	if (line_height <= 0 || window_width <= 0)
 		return;
+	scale = touch ? 1.0f : CHAT_TEXT_SCALE;
 	/* (above the motion sensor, a little in from its left, the newest
-	lowest; where it has not been drawn of late, where it would be) */
+	lowest: where it was last drawn in a view of this size, drawn now or not
+	(a dead player's is not); where it has not been, about where it would be) */
 	if (chat_motion_sensors[local_player_index].valid &&
-		now - chat_motion_sensors[local_player_index].noted_at < CHAT_MOTION_SENSOR_MILLISECONDS)
+		chat_motion_sensors[local_player_index].view_width == window_width &&
+		chat_motion_sensors[local_player_index].view_height == (short)(window.y1 - window.y0) &&
+		chat_motion_sensors[local_player_index].players == local_player_count())
 	{
-		left = chat_motion_sensors[local_player_index].left + line_height / 2;
-		edge = chat_motion_sensors[local_player_index].top - line_height / 2;
+		left = (short)(chat_motion_sensors[local_player_index].left + line_height * scale / 2);
+		edge = (short)(chat_motion_sensors[local_player_index].top - line_height * scale / 2);
 	}
 	else
 	{
-		left = window.x0 + 2 * line_height;
-		edge = window.y1 - 9 * line_height;
+		real hud_scale = hud_globals_get_scale(local_player_count() > 1);
+
+		left = (short)(window.x0 + CHAT_FALLBACK_LEFT_UNITS * hud_scale);
+		edge = (short)(window.y1 - CHAT_FALLBACK_BOTTOM_UNITS * hud_scale);
 	}
 	right = (short)MAX(window.x0 + window_width * CHAT_COLUMN_PERCENT / 100, left + 8 * line_height);
 	rows = local_player_count() > 1 ? CHAT_LINES_SHOWN_SPLIT : CHAT_LINES_SHOWN;
@@ -2377,6 +2424,12 @@ void network_chat_draw(
 		rows = CHAT_LINES_SHOWN_ANDROID;
 	}
 	right = (short)MIN(right, window.x1);
+	/* (laid out at the font's size, the column as much wider; drawn scaled
+	about its corner where the lines start, the bottom left, or the top left
+	with the touch controls) */
+	right = (short)(left + (right - left) / scale);
+	anchor = edge;
+	rasterizer_text_set_scale(scale, (real)left, (real)anchor);
 	if (typing)
 	{
 		real_argb_color color;
@@ -2425,7 +2478,27 @@ void network_chat_draw(
 		edge = (short)(edge + (touch ? line_height : -line_height));
 		rows--;
 		if (chat_keyboard.open)
+		{
+			/* (the on-screen keyboard at its own size) */
+			rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
 			chat_keyboard_draw(font_index, &window, line_height);
+			rasterizer_text_set_scale(scale, (real)left, (real)anchor);
+		}
+		/* (scrolled back: a row saying newer lines are below) */
+		if (chat_scroll > 0 && rows > 0)
+		{
+			wchar_t const *hint = L"(Page Down: newer lines)";
+			wchar_t empty[1] = { 0 };
+
+			chat_text_color(0.6f, &text_color);
+			draw_string_set_draw_mode(font_index, NONE, 0 /* left */, 0, &text_color);
+			chat_line_layout(left, right, line_height, empty, hint, &layout);
+			layout.rows = 1;
+			chat_draw_layout(font_index, &layout, left, right, touch ? edge : (short)(edge - line_height), line_height,
+				empty, &text_color, hint, &text_color, 0.6f);
+			edge = (short)(edge + (touch ? line_height : -line_height));
+			rows--;
+		}
 	}
 	for (index = 0; index < chat_line_count && rows > 0; index++)
 	{
@@ -2444,6 +2517,12 @@ void network_chat_draw(
 		/* (this view's player hears it) */
 		if (!TEST_FLAG(line->hearers, local_player_index))
 			continue;
+		/* (scrolled past while typing: Page Up) */
+		if (typing && skipped < chat_scroll)
+		{
+			skipped++;
+			continue;
+		}
 		/* (a notice's text alone, in its colour) */
 		chat_color(line->color, alpha, &color);
 		chat_line_text(line->text, text, NUMBEROF(text));
@@ -2476,4 +2555,5 @@ void network_chat_draw(
 		edge = (short)(edge + (touch ? 1 : -1) * layout.rows * line_height);
 		rows = (short)(rows - layout.rows);
 	}
+	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
 }

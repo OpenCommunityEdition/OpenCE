@@ -95,6 +95,9 @@ static pthread_mutex_t mouse_lock = PTHREAD_MUTEX_INITIALIZER;
 static float mouse_pending_x, mouse_pending_y;
 static unsigned long mouse_polls_unconsumed = 0;
 static float mouse_wheel_accumulated = 0.0f;
+/* the wheel's notches turned while a chat line is typed, not yet taken
+(halo_chat_wheel_steps) */
+static int chat_wheel_steps = 0;
 /* the wheel's switch (wheel_update): when the wheel last moved, until when
 Y is held, and whether a scroll is under way */
 static Uint64 wheel_moved_ms = 0;
@@ -214,6 +217,17 @@ unsigned long halo_chat_pad_buttons(void)
 int halo_chat_taps(float *x, float *y)
 {
 	return touch_input_chat_taps(x, y);
+}
+
+int halo_chat_wheel_steps(void)
+{
+	int steps;
+
+	pthread_mutex_lock(&mouse_lock);
+	steps = chat_wheel_steps;
+	chat_wheel_steps = 0;
+	pthread_mutex_unlock(&mouse_lock);
+	return steps;
 }
 
 int halo_chat_touch_layout(void)
@@ -990,6 +1004,23 @@ static void wheel_update(void)
 	Uint64 now = SDL_GetTicks();
 
 	pthread_mutex_lock(&mouse_lock);
+	/* (a chat line typed: the wheel scrolls its lines, network_chat.c) */
+	if (network_chat_typing())
+	{
+		while (mouse_wheel_accumulated >= WHEEL_NOTCH)
+		{
+			chat_wheel_steps++;
+			mouse_wheel_accumulated -= WHEEL_NOTCH;
+		}
+		while (mouse_wheel_accumulated <= -WHEEL_NOTCH)
+		{
+			chat_wheel_steps--;
+			mouse_wheel_accumulated += WHEEL_NOTCH;
+		}
+		wheel_scrolling = FALSE;
+		pthread_mutex_unlock(&mouse_lock);
+		return;
+	}
 	if (!wheel_scrolling)
 	{
 		if (fabsf(mouse_wheel_accumulated) >= WHEEL_NOTCH)
