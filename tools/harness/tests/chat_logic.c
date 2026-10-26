@@ -446,6 +446,18 @@ int main(int argc, char **argv)
 		CHECK(chat_refused(links, "see discord.gg/x") == NULL, "a link refused where links are allowed");
 	}
 
+	/* a public game's chat: off in one a player hosts (on the host, and on a
+	client that joined it from the server browser), on in a dedicated
+	server's, whose own setting then decides; a game not listed keeps its
+	host's setting */
+	CASE("listing")
+	{
+		CHECK(chat_listing_allows(FALSE, FALSE), "a private or LAN game has no chat");
+		CHECK(chat_listing_allows(FALSE, TRUE), "an unlisted dedicated server has no chat");
+		CHECK(!chat_listing_allows(TRUE, FALSE), "a public game a player hosts has chat");
+		CHECK(chat_listing_allows(TRUE, TRUE), "a public dedicated server has no chat");
+	}
+
 	/* the on-screen keyboard's characters: a letter in capitals with shift,
 	nothing else changed; none on the last row, or off the keyboard */
 	CASE("keyboard-character")
