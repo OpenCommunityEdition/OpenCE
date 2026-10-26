@@ -8,9 +8,10 @@ player 3; player 5 is in no game. Local players: 0 is player 0, 1 none. */
 #define MAXIMUM_LOCAL_PLAYERS 4
 #define csmemcpy memcpy
 #define csmemset memset
+#define csmemcmp memcmp
 typedef unsigned short word;
 typedef struct { short size; } message_header;
-enum { _distributed_message_fire_origins = 92 };
+enum { _distributed_message_fire_origins = 93 };
 enum { _distributed_to_clients, _distributed_to_host };
 static long now = 300;
 static long game_time_get(void) { return now; }
@@ -57,6 +58,8 @@ int main(int argc, char **argv)
  short index;
  for (index = 0; index < MAXIMUM_TRACKED_PLAYERS; index++)
   damage_fire_origins[index].time = NONE;
+ for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
+  damage_fire_origins_sent[index].time = NONE;
  CASE("own") {
   entry(&origins[0], 2, 0.3f);
   network_damage_handle_fire_origins(1, origins, 1);
@@ -87,12 +90,38 @@ int main(int argc, char **argv)
   CHECK(sent_count == 1 && sent[0].player_index == 0, "the local player's, %d", sent_count);
   CHECK(sent[0].offset.i == (short)(0.25f * FIRE_ORIGIN_SCALE + 0.5f), "where from, %d", sent[0].offset.i);
   source_answer = FALSE;
+  now++;
   distributed_send_fire_origins();
   CHECK(sends == 1, "none when from the camera");
   source_answer = TRUE;
   wanted_i = 0.5f;
   distributed_send_fire_origins();
   CHECK(sends == 1, "none further than a player reaches");
+ } else CASE("resend") {
+  network_damage_set_fire_origin_source(source);
+  distributed_send_fire_origins();
+  now++;
+  distributed_send_fire_origins();
+  CHECK(sends == 1, "not again while unchanged, %d", sends);
+  now += FIRE_ORIGIN_RESEND_TICKS - 1;
+  distributed_send_fire_origins();
+  CHECK(sends == 2, "again every few ticks, %d", sends);
+  now++;
+  wanted_i = 0.3f;
+  distributed_send_fire_origins();
+  CHECK(sends == 3, "again when it changes, %d", sends);
+  CHECK(FIRE_ORIGIN_RESEND_TICKS < FIRE_ORIGIN_FRESH_TICKS, "sent again before the host lets it go");
+ } else CASE("shape") {
+  /* the eye at the origin, the target 10 world units ahead (+x) */
+  real_point3d eye = { 0, 0, 0 }, target = { 10, 0, 0 };
+  real_point3d held = { 0.15f, -0.15f, -0.12f }, leaning = { 0.05f, 0.19f, 0.0f };
+  real_point3d behind = { -0.1f, 0.0f, -0.1f }, aside = { 0.1f, 0.25f, 0.0f }, above = { 0.1f, 0.0f, 0.15f };
+  CHECK(distributed_fire_origin_shape(&eye, &held, &target), "a hand held out in front and below");
+  CHECK(distributed_fire_origin_shape(&eye, &leaning, &target), "a lean to the side");
+  CHECK(!distributed_fire_origin_shape(&eye, &behind, &target), "behind the eye");
+  CHECK(!distributed_fire_origin_shape(&eye, &aside, &target), "far to the side, past a corner");
+  CHECK(!distributed_fire_origin_shape(&eye, &above, &target), "high above the eye");
+  CHECK(!distributed_fire_origin_shape(&eye, &held, &eye), "no line to the target");
  } else return 2;
  return 0;
 }
