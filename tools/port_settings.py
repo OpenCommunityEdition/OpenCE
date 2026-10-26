@@ -1197,6 +1197,8 @@ BROWSER_WORDS = [
     # (the error panel: nothing can be listed)
     "Internet play is off:\\nSettings > Network Setup",
     "Neither the master servers\\nnor the brokers answer:\\ncheck the connection",
+    # (a refusal added later, last so that the others keep their places)
+    "The host refused: your player name",
 ]
 
 

@@ -3445,10 +3445,13 @@ void network_objects_client_tick(
 	distributed_client_note_own_inventories();
 	distributed_client_send_vehicles();
 	distributed_client_carry_unsteered_vehicles();
-	/* (who it is, as its Discord told it: once its ready went, which makes
+	/* (who it is, as its Discord told it, and its build: once its ready went, which makes
 	it a machine the host takes messages of) */
 	if (objects_client_ready_time != NONE)
+	{
 		distributed_client_send_identity();
+		distributed_client_send_build();
+	}
 }
 
 /* ---------- the game */

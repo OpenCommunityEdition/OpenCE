@@ -382,6 +382,15 @@ def default_settings():
                  "characters; empty for none.", "HALO_SERVER_REGION"),
         _setting("server.master_publish_address", "boolean", False, "Let the master servers give this server's "
                  "address to players.", "HALO_SERVER_MASTER_PUBLISH_ADDRESS"),
+        _setting("server.chat_filter", "string", "off", "The words the server keeps out of its chat and its players' "
+                 "names: \"off\", \"censor\" (starred) or \"block\" (a line refused, a name refused at the door).",
+                 "HALO_SERVER_CHAT_FILTER", choices=["off", "censor", "block"]),
+        _setting("server.chat_filter_slurs", "string", "mild", "With server.chat_filter, the slurs kept out.",
+                 "HALO_SERVER_CHAT_FILTER_SLURS", choices=["off", "severe", "strong", "mild"]),
+        _setting("server.chat_filter_swearing", "string", "off", "With server.chat_filter, the swearing kept out.",
+                 "HALO_SERVER_CHAT_FILTER_SWEARING", choices=["off", "severe", "strong", "mild"]),
+        _setting("server.chat_filter_insults", "string", "off", "With server.chat_filter, the insults kept out.",
+                 "HALO_SERVER_CHAT_FILTER_INSULTS", choices=["off", "severe", "strong", "mild"]),
     ]
 
 
@@ -656,14 +665,18 @@ class Player:
         self.muted = False
         self.address = f"203.0.113.{10 + machine}"
         self.hwid = hashlib.sha256(name.encode()).hexdigest()[:32]
+        # (its machine's build, as its game tells the host)
+        self.client = {"build": 282, "flavor": "release", "version": "OpenCE Linux | build 282 (release)",
+                       "repository": "OpenCommunityEdition/OpenCE",
+                       "mods": ["trollface 1.0"] if machine % 2 else []}
 
     def json(self, addresses, playing=True):
         """as server_status.c's server_status_player: the ping null until the
-        player is in a game, the address and hardware id for the owner (or
-        with server.log_addresses)"""
+        player is in a game, its machine's build (client), the address and
+        hardware id for the owner (or with server.log_addresses)"""
         value = {"slot": self.slot, "name": self.name, "team": self.team, "score": self.score, "kills": self.kills,
                  "deaths": self.deaths, "assists": self.assists, "ping": self.ping if playing else None,
-                 "machine": self.machine, "joined": self.joined, "muted": self.muted}
+                 "machine": self.machine, "joined": self.joined, "muted": self.muted, "client": self.client}
         if addresses:
             value.update(address=self.address, hwid=self.hwid)
         return value

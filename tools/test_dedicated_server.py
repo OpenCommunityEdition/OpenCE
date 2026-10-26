@@ -6,6 +6,7 @@ maps in assets/maps and ninja linux's build/linux/halo; every machine runs from 
 tmp_path (its config.toml, data root, saves and home), on loopback addresses of its own, offline (system link), with
 no window, sound, update check or Discord."""
 
+import codecs
 import json
 import os
 import re
@@ -312,11 +313,23 @@ def test_rotation_moderation_and_shutdown(machines):
     assert status["name"] == "Test Server" and status["state"] == "lobby", status
     assert status["players"] == 0, "the host has a player of its own"
 
-    client = _client(machines("client"), CLIENT_ADDRESSES[0], "Tester")
+    # (with a mod on, which the client names to the host with its build)
+    client_machine = machines("client")
+    (client_machine.folder / "data" / "mods" / "testmod").mkdir(parents=True)
+    mod_toml = client_machine.folder / "data" / "mods" / "testmod" / "mod.toml"
+    mod_toml.write_text('name = "Test mod"\nversion = "1.2"\n')
+    client = _client(client_machine, CLIENT_ADDRESSES[0], "Tester")
     _until(lambda: (api.status() or {}).get("state") == "playing", 120, "the first game", server)
     assert api.status()["map"] == "bloodgulch"
     players = api.call("GET", "/api/players")[1]["players"]
     assert [player["name"] for player in players] == ["Tester"], players
+    # its machine's build, as the client told it (after its ready, reliably), and said once in the server's log
+    _until(lambda: api.call("GET", "/api/players")[1]["players"][0].get("client"), 30, "the client's build", server)
+    told = api.call("GET", "/api/players")[1]["players"][0]["client"]
+    assert told["version"].startswith("OpenCE Linux | ") and isinstance(told["build"], int), told
+    assert told["flavor"] and re.fullmatch(r"([\w.-]+/[\w.-]+)?", told["repository"]), told
+    assert told["mods"] == ["testmod 1.2"], told
+    assert server.text().count("plays " + told["version"]) == 1, "the client's build not logged once"
 
     # the first game ended by a command, its postgame, the second entry's lobby and game
     server.send("sv_end_game")
@@ -374,6 +387,27 @@ def test_rotation_moderation_and_shutdown(machines):
     assert server.wait(15) == 0, server.text()[-3000:]
     assert "stopped (exit code 0)" in server.text()
     assert not re.search(r"EXCEPTION|assert", server.debug()), "an exception or assert in the server's debug.txt"
+
+
+def test_word_filter_keeps_a_name_out(machines):
+    """with server.chat_filter "block", a player whose name has a word of the filter's list (streamer mode's) is
+    refused at the door, and the server says why; the word is ROT13'd here, as in the filter's own tests"""
+    _needs_game("bloodgulch")
+    port = _free_port()
+    server = machines("server").start(["--server"], **_server_settings(
+        port, HALO_SERVER_CHAT_FILTER="block", HALO_SERVER_CHAT_FILTER_SWEARING="mild",
+        HALO_SERVER_ROTATION="bloodgulch:slayer"))
+    api = Api(port)
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    api.login()
+    _client(machines("client"), CLIENT_ADDRESSES[0], codecs.decode("Shpxre", "rot13"))
+    _until(lambda: "its name has words the server's filter keeps out" in server.debug(), 90, "the name refused",
+           server)
+    assert not api.call("GET", "/api/players")[1]["players"], "a player of a refused name joined"
+    # (a name without them joins)
+    _client(machines("other"), CLIENT_ADDRESSES[1], "Tester")
+    _until(lambda: [player["name"] for player in api.call("GET", "/api/players")[1]["players"]] == ["Tester"], 90,
+           "a player of a fine name in", server)
 
 
 def test_empty_game_ends_and_join_in_progress(machines):

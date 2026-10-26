@@ -2218,6 +2218,15 @@ short network_game_server_last_refusal_code(
 	return network_game_server_refusal_code;
 }
 
+/* port: a machine refused before it is accepted, for a reason of the port's
+(a name the word filter keeps out): what network_game_server_last_refusal_code
+then says */
+void network_game_server_refuse_with(
+	short code)
+{
+	network_game_server_refusal_code = code;
+}
+
 boolean network_game_server_accept_client_machine_into_game(
 	struct network_game_server *server,
 	struct network_game_server_client_machine *machine)

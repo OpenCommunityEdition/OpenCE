@@ -117,6 +117,10 @@ unsigned long p2p_peer_endpoint_address(unsigned long virtual_address);
 boolean network_connection_last_read_was_unreliable(void);
 unsigned long system_milliseconds(void);
 void platform_log(char const *format, ...);
+/* main.c's and port_mods.c's: this build, and the mods it plays */
+void main_build_identity(long *number, char *flavor, size_t flavor_size, char *repository, size_t repository_size,
+	char *version, size_t version_size);
+int port_mods_list(char *text, unsigned long size);
 void console_warning(const char *format, ...);
 
 /* the host: a client's game run faster than its clock (a speed hack, which
@@ -678,6 +682,11 @@ kept only of what is allowed (p2p_discord_sanitize) */
 static struct distributed_client_identity distributed_client_identities[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 /* a client: its Discord user as last sent this game, and whether it was */
 static struct distributed_client_identity distributed_sent_identity;
+/* the host: each client's build, as it told it, and whether it did; a
+client: whether it sent its own this game */
+static struct distributed_client_build distributed_client_builds[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+static boolean distributed_client_build_known[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+static boolean distributed_build_sent;
 static boolean distributed_identity_sent;
 static struct distributed_client_clock
 {
@@ -1401,6 +1410,8 @@ static boolean distributed_machine_loaded(
 	csmemset(&distributed_client_clocks[machine_index], 0, sizeof(distributed_client_clocks[machine_index]));
 	distributed_client_clocks[machine_index].window_tick = NONE;
 	csmemset(&distributed_client_identities[machine_index], 0, sizeof(distributed_client_identities[machine_index]));
+	csmemset(&distributed_client_builds[machine_index], 0, sizeof(distributed_client_builds[machine_index]));
+	distributed_client_build_known[machine_index] = FALSE;
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 		distributed_seen[machine_index][player_index] = FALSE;
 	return TRUE;
@@ -3737,6 +3748,9 @@ void network_distributed_new_game(
 	csmemset(distributed_client_clocks, 0, sizeof(distributed_client_clocks));
 	csmemset(distributed_client_identities, 0, sizeof(distributed_client_identities));
 	distributed_identity_sent = FALSE;
+	csmemset(distributed_client_builds, 0, sizeof(distributed_client_builds));
+	csmemset(distributed_client_build_known, 0, sizeof(distributed_client_build_known));
+	distributed_build_sent = FALSE;
 	{
 		short machine_index;
 
@@ -4106,6 +4120,74 @@ void distributed_client_send_identity(
 	distributed_identity_sent = TRUE;
 	distributed_send(&message, _distributed_message_client_identity, 1, (word)sizeof(message),
 		_distributed_to_host_reliably);
+}
+
+/* keeps of text what a build's field may hold: printable ASCII, and line
+ends where lines says; ended, and its trailing spaces and line ends left
+out (another machine's text is untrusted) */
+static void distributed_build_text(
+	char *destination,
+	size_t size,
+	char const *source,
+	boolean lines)
+{
+	size_t length = 0;
+	size_t index;
+
+	for (index = 0; source[index] && length < size - 1; index++)
+	{
+		char character = source[index];
+
+		if ((character >= ' ' && character <= '~') || (lines && character == '\n'))
+			destination[length++] = character;
+	}
+	while (length > 0 && (destination[length - 1] == ' ' || destination[length - 1] == '\n'))
+		length--;
+	destination[length] = 0;
+}
+
+/* (a client) its build, to the host: once a machine the host takes
+messages of (its ready sent), once a game */
+void distributed_client_send_build(
+	void)
+{
+	struct
+	{
+		struct distributed_message_header header;
+		struct distributed_client_build build;
+	} message;
+	char flavor[DISTRIBUTED_CLIENT_BUILD_FLAVOR_SIZE];
+	char repository[DISTRIBUTED_CLIENT_BUILD_REPOSITORY_SIZE];
+	char version[DISTRIBUTED_CLIENT_BUILD_VERSION_SIZE];
+	char mods[DISTRIBUTED_CLIENT_BUILD_MODS_SIZE];
+	long number;
+
+	if (distributed_build_sent)
+		return;
+	csmemset(&message, 0, sizeof(message));
+	main_build_identity(&number, flavor, sizeof(flavor), repository, sizeof(repository), version, sizeof(version));
+	port_mods_list(mods, sizeof(mods));
+	snprintf(message.build.number, sizeof(message.build.number), "%ld", number);
+	distributed_build_text(message.build.flavor, sizeof(message.build.flavor), flavor, FALSE);
+	distributed_build_text(message.build.repository, sizeof(message.build.repository), repository, FALSE);
+	distributed_build_text(message.build.version, sizeof(message.build.version), version, FALSE);
+	distributed_build_text(message.build.mods, sizeof(message.build.mods), mods, TRUE);
+	distributed_build_sent = TRUE;
+	distributed_send(&message, _distributed_message_client_build, 1, (word)sizeof(message),
+		_distributed_to_host_reliably);
+}
+
+boolean distributed_machine_client_build(
+	long machine_index,
+	struct distributed_client_build *build)
+{
+	if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES ||
+		!distributed_client_build_known[machine_index])
+	{
+		return FALSE;
+	}
+	*build = distributed_client_builds[machine_index];
+	return TRUE;
 }
 
 /* (the host) a client machine's address (host byte order) as it really is:
@@ -4666,6 +4748,7 @@ void network_distributed_handle_message(
 	case _distributed_message_notice:
 	case _distributed_message_client_ready: entry_size = 0; break;
 	case _distributed_message_client_identity: entry_size = sizeof(struct distributed_client_identity); break;
+	case _distributed_message_client_build: entry_size = sizeof(struct distributed_client_build); break;
 	case _distributed_message_damage_events:
 	case _distributed_message_hit_reports: entry_size = network_damage_entry_size(header.type); break;
 	default: entry_size = network_objects_entry_size(header.type); break;
@@ -4699,6 +4782,7 @@ void network_distributed_handle_message(
 	anyone can send as from it, they are not its) */
 	if ((header.type == _distributed_message_client_ready ||
 			header.type == _distributed_message_client_identity ||
+			header.type == _distributed_message_client_build ||
 			header.type == _distributed_message_hit_reports) &&
 		!distributed_handling_stream_message)
 	{
@@ -4710,6 +4794,7 @@ void network_distributed_handle_message(
 	case _distributed_message_player_prediction:
 	case _distributed_message_client_ready:
 	case _distributed_message_client_identity:
+	case _distributed_message_client_build:
 	case _distributed_message_hit_reports:
 	case _distributed_message_vehicle_prediction:
 	case _distributed_message_player_inputs:
@@ -4879,6 +4964,41 @@ void network_distributed_handle_message(
 				sizeof(distributed_client_identities[machine_index].discord_id), identity.discord_id, 0);
 			p2p_discord_sanitize(distributed_client_identities[machine_index].discord_name,
 				sizeof(distributed_client_identities[machine_index].discord_name), identity.discord_name, 1);
+		}
+		break;
+	case _distributed_message_client_build:
+		/* (a client's build, as it tells it: its text kept printable, and
+		said once in the log) */
+		if (header.count >= 1 && machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		{
+			struct distributed_client_build told;
+			struct distributed_client_build *kept = &distributed_client_builds[machine_index];
+			char names[64];
+			char mods[DISTRIBUTED_CLIENT_BUILD_MODS_SIZE];
+			long index;
+
+			csmemcpy(&told, entries, sizeof(told));
+			told.number[sizeof(told.number) - 1] = 0;
+			told.flavor[sizeof(told.flavor) - 1] = 0;
+			told.repository[sizeof(told.repository) - 1] = 0;
+			told.version[sizeof(told.version) - 1] = 0;
+			told.mods[sizeof(told.mods) - 1] = 0;
+			distributed_build_text(kept->number, sizeof(kept->number), told.number, FALSE);
+			distributed_build_text(kept->flavor, sizeof(kept->flavor), told.flavor, FALSE);
+			distributed_build_text(kept->repository, sizeof(kept->repository), told.repository, FALSE);
+			distributed_build_text(kept->version, sizeof(kept->version), told.version, FALSE);
+			distributed_build_text(kept->mods, sizeof(kept->mods), told.mods, TRUE);
+			distributed_client_build_known[machine_index] = TRUE;
+			distributed_machine_player_names(machine_index, names, sizeof(names));
+			snprintf(mods, sizeof(mods), "%s", kept->mods);
+			for (index = 0; mods[index]; index++)
+			{
+				if (mods[index] == '\n')
+					mods[index] = ';';
+			}
+			platform_log("network: machine %ld (%s) plays %s, from %s; mods: %s", machine_index,
+				names[0] ? names : "no player yet", kept->version[0] ? kept->version : "a build it does not name",
+				kept->repository[0] ? kept->repository : "a repository it does not name", mods[0] ? mods : "none");
 		}
 		break;
 	case _distributed_message_notice:
