@@ -335,6 +335,13 @@ static const struct config_setting config_settings[] =
 	{ "audio.effects_volume", _config_real, "1.0", "HALO_EFFECTS_VOLUME", _environment_value, _platform_all,
 		"The volume of every other sound (effects and speech), 0.0 to 1.0 (of\n"
 		"audio.volume)." },
+	{ "audio.talking_timer", _config_boolean, "false", "HALO_TALKING_TIMER", _environment_value, _platform_all,
+		"Call the game clock aloud in multiplayer: the seconds left in each\n"
+		"minute, a countdown from 10, and each minute as it turns, up to 30\n"
+		"minutes." },
+	{ "audio.timer_volume", _config_real, "0.8", "HALO_TIMER_VOLUME", _environment_value, _platform_all,
+		"The talking timer's voice, 0.0 to 1.0 (of audio.volume). 0.8 plays its\n"
+		"clips at their recorded level; 1.0 is 25% louder." },
 	{ "audio.buffer_frames", _config_integer, "512", "HALO_AUDIO_BUFFER_FRAMES", _environment_value,
 		_platform_desktop,
 		"The audio device's buffer, in sample frames at 48 kHz (64 to 8192): larger\n"
