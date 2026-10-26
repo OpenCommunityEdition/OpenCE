@@ -106,6 +106,49 @@ addToLibrary({
     entry.socket.close();
   },
 
+  // the server browser's master servers (port/linux/src/master_list.c): a
+  // GET of the url (the C side's copy, freed here once read), its answer
+  // written into the C side's slot (struct web_fetch_slot: id, done, status,
+  // body, size, Signature, Signature-Key), which its thread waits on. The
+  // slot is claimed for the answer first, its id changed to -id
+  // (compareExchange): an answer that comes after the thread gave up on it
+  // (its id 0, or another request's) is dropped, and the thread, which gives
+  // up the same way, never takes an answer meant for an earlier request. 1 MB
+  // at most, 10 seconds at most. (async: the game's thread does not wait for
+  // the page)
+  web_js_fetch__proxy: 'async',
+  web_js_fetch__deps: ['malloc', 'free'],
+  web_js_fetch: (url, slot, id) => {
+    var address = UTF8ToString(url);
+    _free(url);
+    var finish = (status, bytes, signature, key) => {
+      if (Atomics.compareExchange(HEAP32, slot >> 2, id, -id) !== id) return;
+      var body = 0;
+      if (bytes && bytes.length <= 1048576) {
+        body = _malloc(bytes.length + 1);
+        if (body) {
+          HEAPU8.set(bytes, body);
+          HEAPU8[body + bytes.length] = 0;
+        }
+      }
+      HEAP32[(slot >> 2) + 2] = body ? status : 0;
+      HEAP32[(slot >> 2) + 3] = body;
+      HEAP32[(slot >> 2) + 4] = body ? bytes.length : 0;
+      stringToUTF8(signature || '', slot + 20, 128);
+      stringToUTF8(key || '', slot + 148, 32);
+      Atomics.store(HEAP32, (slot >> 2) + 1, 1);
+    };
+    var controller = new AbortController();
+    var timer = setTimeout(() => controller.abort(), 10000);
+    fetch(address, { signal: controller.signal, cache: 'no-store' })
+      .then((response) => response.arrayBuffer().then((buffer) => {
+        clearTimeout(timer);
+        finish(response.status, new Uint8Array(buffer), response.headers.get('Signature'),
+          response.headers.get('Signature-Key'));
+      }))
+      .catch(() => finish(0, null, '', ''));
+  },
+
   // internet play's WebRTC connections (port/web/src/web_p2p.c), which the
   // page makes (port/web/site/p2p.js, Module.haloP2P): a command, the
   // connection, and a copy of its text or packet, freed here

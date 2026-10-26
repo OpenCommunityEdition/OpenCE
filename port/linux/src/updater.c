@@ -425,6 +425,13 @@ static int SDLCALL updater_download_thread(void *context)
 	return 0;
 }
 
+/* the release's zip's address */
+static void updater_zip_url(char *url, size_t size)
+{
+	snprintf(url, size, "https://github.com/" UPDATE_REPOSITORY "/releases/download/build-%ld/" UPDATE_ASSET,
+		updater_latest_build);
+}
+
 /* downloads the release's zip, showing how far it has got in a window of its
 own (drawn in software, clear of the game's OpenGL); 1 when it is there */
 static int updater_download_zip(const char *zip_path, char *error, size_t error_size)
@@ -437,8 +444,7 @@ static int updater_download_zip(const char *zip_path, char *error, size_t error_
 
 	memset(&download, 0, sizeof(download));
 	download.lock = SDL_CreateMutex();
-	snprintf(download.url, sizeof(download.url),
-		"https://github.com/" UPDATE_REPOSITORY "/releases/download/build-%ld/" UPDATE_ASSET, updater_latest_build);
+	updater_zip_url(download.url, sizeof(download.url));
 	snprintf(download.zip_path, sizeof(download.zip_path), "%s", zip_path);
 	thread = SDL_CreateThread(updater_download_thread, "update download", &download);
 	if (!thread)
@@ -587,12 +593,22 @@ static int updater_replace_files(char names[][256], int name_count, char *error,
 	return 1;
 }
 
-/* downloads, unpacks and puts in place the new build, and starts it; returns
-only if something failed */
-static void updater_update(void)
+/* the release's zip downloaded on this thread, with no window (a dedicated
+server's); 1 when it is there */
+static int updater_download_zip_quietly(const char *zip_path, char *error, size_t error_size)
+{
+	char url[512];
+
+	updater_zip_url(url, sizeof(url));
+	return update_download(url, zip_path, MAXIMUM_UPDATE_SIZE, NULL, NULL, error, (int)error_size);
+}
+
+/* downloads (showing how far it has got, if windowed), unpacks and puts in
+place the new build: 1, else 0 and why */
+static int updater_install(int windowed, char *error, size_t error_size)
 {
 	char names[MAXIMUM_UPDATE_FILES][256];
-	char zip_path[1200], partial[1200], error[512] = "";
+	char zip_path[1200], partial[1200];
 	int name_count = 0;
 
 	updater_path(partial, sizeof(partial), UPDATE_DIRECTORY);
@@ -600,19 +616,31 @@ static void updater_update(void)
 	platform_log("update: downloading build %ld (" UPDATE_ASSET ")", updater_latest_build);
 	if (!update_make_directory(partial))
 	{
-		snprintf(error, sizeof(error), "could not make %s (is the game's folder read-only?)", partial);
+		snprintf(error, error_size, "could not make %s (is the game's folder read-only?)", partial);
 	}
-	else if (updater_download_zip(zip_path, error, sizeof(error)) &&
-		updater_unpack(zip_path, names, &name_count, error, sizeof(error)))
+	else if ((windowed ? updater_download_zip(zip_path, error, error_size) :
+		updater_download_zip_quietly(zip_path, error, error_size)) &&
+		updater_unpack(zip_path, names, &name_count, error, error_size) &&
+		updater_replace_files(names, name_count, error, error_size))
 	{
-		if (updater_replace_files(names, name_count, error, sizeof(error)))
-		{
-			update_delete_file(partial);
-			platform_log("update: starting build %ld", updater_latest_build);
-			if (update_launch(updater_executable))
-				exit(EXIT_SUCCESS);
-			snprintf(error, sizeof(error), "the new version is in place, but could not be started: start it again");
-		}
+		update_delete_file(partial);
+		return 1;
+	}
+	return 0;
+}
+
+/* downloads, unpacks and puts in place the new build, and starts it; returns
+only if something failed */
+static void updater_update(void)
+{
+	char error[512] = "";
+
+	if (updater_install(1, error, sizeof(error)))
+	{
+		platform_log("update: starting build %ld", updater_latest_build);
+		if (update_launch(updater_executable))
+			exit(EXIT_SUCCESS);
+		snprintf(error, sizeof(error), "the new version is in place, but could not be started: start it again");
 	}
 	platform_log("update: failed: %s", error);
 	{
@@ -689,6 +717,144 @@ void updater_start(void)
 		else
 			SDL_SetAtomicInt(&updater_state, _updater_handled);
 	}
+}
+
+/* ---------- a dedicated server's (server.auto_update: server_director.c) */
+
+/* looks for a new version on a thread of its own, unless a look is under
+way (update.auto and the tests' rules are not asked: the setting is the
+operator's): 0 if it cannot be looked for (a build without a number) */
+int updater_server_check(void)
+{
+	char *slash;
+
+	if (HALO_BUILD_NUMBER <= 0)
+		return 0;
+	if (!updater_directory[0])
+	{
+		if (!update_executable_path(updater_executable, sizeof(updater_executable)))
+			return 0;
+		snprintf(updater_directory, sizeof(updater_directory), "%s", updater_executable);
+		slash = strrchr(updater_directory, PATH_SEPARATOR[0]);
+		if (!slash)
+		{
+			updater_directory[0] = 0;
+			return 0;
+		}
+		*slash = 0;
+		updater_clean_up();
+	}
+	if (SDL_GetAtomicInt(&updater_state) == _updater_checking)
+		return 1;
+	SDL_SetAtomicInt(&updater_state, _updater_checking);
+	{
+		SDL_Thread *thread = SDL_CreateThread(updater_check_thread, "update check", NULL);
+
+		if (thread)
+			SDL_DetachThread(thread);
+		else
+			SDL_SetAtomicInt(&updater_state, _updater_handled);
+	}
+	return 1;
+}
+
+/* the newer build the last look found, 0 if none (or the look goes on) */
+long updater_server_available(void)
+{
+	return SDL_GetAtomicInt(&updater_state) == _updater_available ? updater_latest_build : 0;
+}
+
+/* the newer build put in place of this one's files, not started (the server
+stops, to be started again by what runs it): 1, else 0 and why. The game's
+thread waits for the whole download: updater_server_install_start does not */
+int updater_server_install(char *error, int error_size)
+{
+	if (SDL_GetAtomicInt(&updater_state) != _updater_available)
+	{
+		snprintf(error, (size_t)error_size, "no newer build is known");
+		return 0;
+	}
+	SDL_SetAtomicInt(&updater_state, _updater_handled);
+	return updater_install(0, error, (size_t)error_size);
+}
+
+enum
+{
+	_updater_install_none,
+	_updater_install_running,
+	_updater_install_installed,
+	_updater_install_failed,
+};
+
+/* the server's install on a thread of its own: its state, and why it
+failed (written before the state says so) */
+static SDL_AtomicInt updater_install_state;
+static char updater_install_error[512];
+
+static void updater_install_failed(const char *why)
+{
+	snprintf(updater_install_error, sizeof(updater_install_error), "%s", why);
+	SDL_SetAtomicInt(&updater_install_state, _updater_install_failed);
+}
+
+static int SDLCALL updater_install_thread(void *context)
+{
+	char error[512] = "";
+
+	(void)context;
+	if (updater_install(0, error, sizeof(error)))
+		SDL_SetAtomicInt(&updater_install_state, _updater_install_installed);
+	else
+		updater_install_failed(error[0] ? error : "the install failed");
+	return 0;
+}
+
+/* the newer build put in place of this one's files on a thread of its own
+(the game goes on meanwhile: updater_server_install_poll tells its end): 1
+if it began or goes on, else 0 (updater_server_install_poll says why) */
+int updater_server_install_start(void)
+{
+	SDL_Thread *thread;
+
+	if (SDL_GetAtomicInt(&updater_install_state) == _updater_install_running)
+		return 1;
+	if (SDL_GetAtomicInt(&updater_state) != _updater_available)
+	{
+		updater_install_failed("no newer build is known");
+		return 0;
+	}
+	SDL_SetAtomicInt(&updater_state, _updater_handled);
+	SDL_SetAtomicInt(&updater_install_state, _updater_install_running);
+	thread = SDL_CreateThread(updater_install_thread, "update install", NULL);
+	if (!thread)
+	{
+		updater_install_failed("could not start the install");
+		return 0;
+	}
+	SDL_DetachThread(thread);
+	return 1;
+}
+
+/* the install's state: 0 while it goes on, 1 when the new build is in
+place, -1 if it failed (or none was started), and why in error */
+int updater_server_install_poll(char *error, int size)
+{
+	int state = SDL_GetAtomicInt(&updater_install_state);
+
+	if (size > 0)
+		error[0] = 0;
+	switch (state)
+	{
+	case _updater_install_running:
+		return 0;
+	case _updater_install_installed:
+		return 1;
+	case _updater_install_failed:
+		snprintf(error, (size_t)size, "%s", updater_install_error);
+		return -1;
+	}
+	snprintf(error, (size_t)size, "no install was started");
+	return -1;
 }
 
 /* whether the game runs under gamescope (the Steam Deck's Game Mode), where
@@ -791,6 +957,35 @@ void updater_poll(SDL_Window *window)
 
 void updater_start(void)
 {
+}
+
+int updater_server_check(void)
+{
+	return 0;
+}
+
+long updater_server_available(void)
+{
+	return 0;
+}
+
+int updater_server_install(char *error, int error_size)
+{
+	if (error_size > 0)
+		error[0] = 0;
+	return 0;
+}
+
+int updater_server_install_start(void)
+{
+	return 0;
+}
+
+int updater_server_install_poll(char *error, int size)
+{
+	if (size > 0)
+		error[0] = 0;
+	return -1;
 }
 
 #ifdef HALO_WEB

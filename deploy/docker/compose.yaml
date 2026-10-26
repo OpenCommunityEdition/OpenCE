@@ -1,0 +1,92 @@
+# The dedicated server with Docker Compose (deploy/docker/README.md):
+#
+#   docker compose -f deploy/docker/compose.yaml up -d
+#   docker compose -f deploy/docker/compose.yaml --profile https up -d     (with Caddy in front of the web port)
+#
+# HALO_DATA is the folder that holds maps/ (and custom_maps/, gametypes/),
+# mounted read-only; settings come from the environment below or from a
+# .env file beside this one.
+name: opence
+
+services:
+  server:
+    image: ${OPENCE_IMAGE:-ghcr.io/opencommunityedition/opence-server:latest}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    ports:
+      - "${HALO_NET_TUNNEL_PORT:-2302}:${HALO_NET_TUNNEL_PORT:-2302}/udp"
+      # (the web page on the host's loopback only; Caddy reaches it on the
+      # compose network)
+      - "127.0.0.1:${HALO_SERVER_WEB_PORT:-8080}:${HALO_SERVER_WEB_PORT:-8080}/tcp"
+    volumes:
+      - ${HALO_DATA:-./data}:/data:ro
+      - state:/state
+    # A variable named without a value is passed only when it is set (in the
+    # shell or .env): one that is set wins over config.toml, and sv_set
+    # cannot change it.
+    environment:
+      - HALO_NET_TUNNEL_PORT=${HALO_NET_TUNNEL_PORT:-2302}
+      - HALO_SERVER_WEB_PORT=${HALO_SERVER_WEB_PORT:-8080}
+      - HALO_SERVER_NAME
+      - HALO_SERVER_ROTATION
+      - HALO_SERVER_MAX_PLAYERS
+      - HALO_SERVER_PASSWORD
+      - HALO_SERVER_PUBLIC
+      - HALO_SERVER_MOTD
+      # (8 characters or more; unset: one is made at the first start, printed
+      # in the log and kept in the state volume's config.toml)
+      - HALO_SERVER_WEB_PASSWORD
+      - HALO_NET_PUBLIC_ADDRESS
+      - HALO_SERVER_PUBLISHER_KEY
+      - HALO_SERVER_INSTANCE
+      - HALO_SERVER_REGION
+      - HALO_SERVER_LOG_FORMAT
+      # Caddy's address on the network below (the https profile): its
+      # X-Forwarded-For, -Host and -Proto are believed, so the page's rate
+      # limits and log name the visitor, and its session cookie is Secure.
+      # Nothing else has this address.
+      - HALO_SERVER_WEB_TRUSTED_PROXY=172.30.80.10
+    networks:
+      - opence
+    stop_grace_period: 15s
+
+  # HTTPS for the web page, with a certificate from Let's Encrypt for
+  # HALO_WEB_DOMAIN (which must resolve to this host, ports 80 and 443 open).
+  caddy:
+    image: caddy:2
+    profiles: [https]
+    restart: unless-stopped
+    depends_on: [server]
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+    command: ["caddy", "reverse-proxy", "--from", "${HALO_WEB_DOMAIN:-halo.example.org}", "--to", "server:${HALO_SERVER_WEB_PORT:-8080}"]
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      opence:
+        # (server.web_trusted_proxy above; outside the range Docker hands
+        # out, so no other container takes it)
+        ipv4_address: 172.30.80.10
+
+# A fixed subnet, so that Caddy's address is known in advance. Containers
+# other than Caddy get addresses from ip_range only. Change it (and the two
+# addresses above) if it overlaps a network of the host's.
+networks:
+  opence:
+    ipam:
+      config:
+        - subnet: 172.30.80.0/24
+          ip_range: 172.30.80.128/25
+          gateway: 172.30.80.1
+
+volumes:
+  state:
+  caddy-data:
+  caddy-config:
