@@ -64,6 +64,11 @@ and entry points used below that ES lacks */
 struct xgpu_capabilities xgpu_capabilities;
 #endif
 
+/* display.reversed_depth (xgpu.h), as the context was made; never on
+OpenGL ES, which has no glClipControl: its depth from -1 would lose the
+precision near 0 that reversing gains */
+BOOL xgpu_reversed_depth;
+
 /* ---------- the screen's width
 
 The Xbox screen is 640x480. The native ports can draw a wider one: 480
@@ -1450,6 +1455,9 @@ static void render_target_storage(const struct xgpu_render_target *target)
 	if (target->format == GL_DEPTH24_STENCIL8)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
 			GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+	else if (target->format == GL_DEPTH32F_STENCIL8)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
+			GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, NULL);
 	else if (target->format == GL_RGBA16F)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
 			GL_RGBA, GL_HALF_FLOAT, NULL);
@@ -1521,7 +1529,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
 	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
-	entry->target.format = depth ? GL_DEPTH24_STENCIL8 :
+	entry->target.format = depth ? (xgpu_reversed_depth ? GL_DEPTH32F_STENCIL8 : GL_DEPTH24_STENCIL8) :
 		entry->screen_buffer && hdr.active ? GL_RGBA16F : GL_RGBA8;
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
@@ -1931,6 +1939,18 @@ static void gl_initialize(void)
 	}
 	glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 	glEnable(GL_PROGRAM_POINT_SIZE);
+	/* (read once, at start: the depth buffers' format and the programs
+	depend on it) */
+	{
+		static BOOL read;
+
+		if (!read)
+		{
+			read = TRUE;
+			xgpu_reversed_depth = config_boolean("display.reversed_depth");
+			platform_log("depth: %s", xgpu_reversed_depth ? "32-bit float, reversed" : "24 bits, as the Xbox's");
+		}
+	}
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
@@ -3985,8 +4005,10 @@ static void apply_raster_state(BOOL has_depth)
 		glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 	}
 	state_enable(&gl_state.scissor_test, GL_SCISSOR_TEST, scissor[2] > 0 && scissor[3] > 0);
-	depth_range[0] = device.viewport.MinZ;
-	depth_range[1] = device.viewport.MaxZ;
+	/* (display.reversed_depth: Direct3D's MinZ to MaxZ as 1 - MinZ to
+	1 - MaxZ, which glDepthRange takes nearest first) */
+	depth_range[0] = xgpu_reversed_depth ? 1.0f - device.viewport.MaxZ : device.viewport.MinZ;
+	depth_range[1] = xgpu_reversed_depth ? 1.0f - device.viewport.MinZ : device.viewport.MaxZ;
 	if (memcmp(gl_state.depth_range, depth_range, sizeof(depth_range)))
 	{
 		memcpy(gl_state.depth_range, depth_range, sizeof(depth_range));
@@ -3998,6 +4020,12 @@ static void apply_raster_state(BOOL has_depth)
 	{
 		GLenum function = rs[D3DRS_ZFUNC] ? (GLenum)rs[D3DRS_ZFUNC] : GL_NEVER;
 
+		/* (display.reversed_depth: nearer is greater) */
+		if (xgpu_reversed_depth)
+		{
+			function = function == GL_LESS ? GL_GREATER : function == GL_LEQUAL ? GL_GEQUAL :
+				function == GL_GREATER ? GL_LESS : function == GL_GEQUAL ? GL_LEQUAL : function;
+		}
 		if (gl_state.depth_function != function)
 		{
 			gl_state.depth_function = function;
@@ -4129,6 +4157,12 @@ static void apply_raster_state(BOOL has_depth)
 
 		offset[0] = dword_to_float(rs[D3DRS_POLYGONOFFSETZSLOPESCALE]);
 		offset[1] = dword_to_float(rs[D3DRS_POLYGONOFFSETZOFFSET]);
+		/* (display.reversed_depth: toward the camera is up) */
+		if (xgpu_reversed_depth)
+		{
+			offset[0] = -offset[0];
+			offset[1] = -offset[1];
+		}
 		if (memcmp(gl_state.polygon_offset, offset, sizeof(offset)))
 		{
 			memcpy(gl_state.polygon_offset, offset, sizeof(offset));
@@ -6489,7 +6523,7 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	if (has_depth && (flags & D3DCLEAR_ZBUFFER))
 	{
 		glDepthMask(GL_TRUE);
-		glClearDepth(z);
+		glClearDepth(xgpu_reversed_depth ? 1.0f - z : z);
 		mask |= GL_DEPTH_BUFFER_BIT;
 	}
 	if (has_depth && (flags & D3DCLEAR_STENCIL))
