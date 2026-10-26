@@ -144,6 +144,13 @@ A tap during a cinematic that can be skipped skips it, as A does. On the
 on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
 "A =ENTER" to accept the name.
 
+After a multiplayer game, the carnage report shows buttons in place of its
+prompt at the bottom: the host's CONTINUE goes on to the next game (PICK
+GAME), as A does, and LEAVE leaves the game, as B does (the host's LEAVE
+ends it for everyone). A client has LEAVE only. With `input.touch_controls`
+set to `off`, the report shows the prompt as on the Xbox
+(`port/linux/game/touch_postgame.c`).
+
 ### Touch controls
 
 In a game, the app shows touch controls over the picture. They are a
@@ -225,7 +232,7 @@ These settings are only for Android:
 | Setting | Function |
 | --- | --- |
 | `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
-| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
+| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown, and the carnage report shows its prompt, not its CONTINUE and LEAVE buttons. A device without a touchscreen never shows them. The menus take taps in any case. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to cached textures by page protection. `false`: it compares page contents once a frame instead, which is slower. Geometry uses the streaming path in either mode. Refer to "Limits". |
