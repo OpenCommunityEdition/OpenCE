@@ -1,0 +1,17 @@
+apiVersion: v2
+name: opence-server
+description: >-
+  The OpenCE dedicated server: a headless Halo: Combat Evolved host that plays games one after
+  another, with no window, sound or player of its own. The game data (maps) is mounted from a
+  volume you provide.
+type: application
+version: 0.1.0
+kubeVersion: ">=1.29.0-0"
+# Informational only: which image runs is set by image.repository, image.tag and image.digest.
+appVersion: "latest"
+home: https://github.com/OpenCommunityEdition/OpenCE
+sources:
+  - https://github.com/OpenCommunityEdition/OpenCE/tree/main/deploy/helm/opence-server
+keywords:
+  - halo
+  - game-server

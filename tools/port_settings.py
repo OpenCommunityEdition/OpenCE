@@ -303,6 +303,8 @@ _network["categories"] = [
      "Players' names above their heads, the\nscoreboard, and the text chat."),
     ("STREAMER MODE:", "network_setup/streamer_mode",
      "Hide offensive words in names and text from\nother players, maps and mods, as stars."),
+    ("SERVER BROWSER:", "network_setup/server_browser",
+     "What the Server Browser lists and its order: the\nsame settings as its Filters screen."),
 ]
 SCREENS["network_setup/map_sharing"] = {
     "screen": "map_sharing_settings_screen", "header": _network["header"], "spacing": 30,
@@ -317,6 +319,37 @@ SCREENS["network_setup/map_sharing"] = {
          "The most you send of maps to other players, so\nthat the game keeps the rest of your upload.", None),
     ],
 }
+
+# Network Setup's server browser (menu_functions.c's lobby_browser_update): where
+# its games come from (network.listings, master_list.c), the Filters screen's
+# settings and its order; the master servers that answered, shown, not set
+# (a row with no values: its value's text, menu_functions.c's
+# master_servers_show)
+SCREENS["network_setup/server_browser"] = {
+    "screen": "server_browser_settings_screen", "header": _network["header"], "spacing": 30,
+    "rows": [
+        ("LISTS:", "network.listings",
+         [("ALL GAMES", "both"), ("DEDICATED", "masters"), ("P2P GAMES", "brokers")],
+         "The master servers' dedicated servers, the games\nplayers host (through the brokers), or all of them.", None),
+        ("SHOW EMPTY SERVERS:", "network.browser_show_empty", YES_NO, "List games no one is playing yet.", None),
+        ("SHOW FULL SERVERS:", "network.browser_show_full", YES_NO, "List games with no room left.", None),
+        ("SHOW MISSING MAPS:", "network.browser_maps",
+         [("NO", "no"), ("YES", "yes"), ("IF DOWNLOADABLE", "downloadable")],
+         "List games on maps you do not have: IF\nDOWNLOADABLE, those Map Sharing can download.", None),
+        # (a column title chosen again writes the order reversed, "-players": the row shows its order's word,
+        # menu_functions.c's setting_value_index, and writes it again only if another is chosen)
+        ("SORT BY:", "network.browser_sort",
+         [("DEDICATED FIRST", "servers"), ("PLAYERS", "players"), ("NAME", "name"), ("MAP", "map"),
+          ("GAME TYPE", "type"), ("LOCKED FIRST", "locked")],
+         "The list's order. Its column titles sort it too;\nchoosing one again reverses it.", None),
+        ("MASTER SERVERS:", "network.masters_file", None,
+         "The master servers (masters.txt) that answered\nwhen the Server Browser last asked.", None,
+         "master_servers"),
+    ],
+}
+# (the read-only row's words, its screen's words: menu_functions.c's
+# master_servers_show)
+SCREENS["network_setup/server_browser"]["words"] = ["OF", "NONE LISTED", "NOT ASKED YET", "OFF"]
 
 # Network Setup's multiplayer HUD: its rows, moved from Network Setup, and the
 # text chat's (port/linux/game/network_chat.c)
@@ -354,7 +387,8 @@ SCREENS["network_setup/streamer_mode"] = {
 # the clipboard, the updates)
 SCREENS["network_setup/in_game"] = {
     "screen": "in_game_network_settings_screen", "header": _network["header"], "spacing": 30,
-    "platform_places": True, "rows": [], "categories": _network["categories"],
+    "platform_places": True, "rows": [],
+    "categories": [category for category in _network["categories"] if category[1] != "network_setup/server_browser"],
 }
 
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of
@@ -364,7 +398,7 @@ CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
 WIDE_SETTINGS = {"audio.output_device", "audio.input_device", "streamer.slurs", "streamer.swearing",
-                 "streamer.insults"}
+                 "streamer.insults", "network.listings", "network.browser_maps", "network.browser_sort"}
 
 # Teamplay Options' rows of the port's (_teamplay_options_extras): the
 # gametype's FORCE TEAM SPAWNS, then the host's voice chat and vote kicks;
@@ -524,6 +558,21 @@ def _setting_screen(folder: str, spec: dict) -> list:
             if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):
                 place += 1
             rows.append((row, platform, place))
+        # (a row with no values shows its value, set by the game: its text)
+        if choices is None:
+            extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                                   ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
+                             [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
+                              f'<child{attributes([("widget", f"{base}/{key}_value"), ("x", 286), ("y", 1)])}/>'])
+            extra += _widget(f"{base}/{key}_label",
+                             [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
+                              ("string_list", f"{base}/labels"), ("string_index", index), ("font", "ui\\large_ui"),
+                              ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+            extra += _widget(f"{base}/{key}_value",
+                             [("type", "text"), ("controller", 1), ("width", 212), ("height", 22),
+                              ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
+                              ("text_flags", "no_focus_test")], [])
+            continue
         # (a device's name wants the wider spinner Server Setup's co-op rows
         # have: WIDE_SETTINGS)
         wide = setting in WIDE_SETTINGS
@@ -574,6 +623,8 @@ def _setting_screen(folder: str, spec: dict) -> list:
                                               '<on event="start" run="port settings save" back="true"/>'])
     extra += _strings(f"{base}/labels", [label for label, *_ in spec["rows"]] +
                       [label for label, *_ in spec.get("categories", ())])
+    if spec.get("words"):
+        extra += _strings(f"{base}/words", spec["words"])
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
     extra += _strings(f"{base}/help_strings",
                       [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]] +
@@ -724,6 +775,10 @@ OPENCE_ROWS = [
 OPENCE_ITEM = f"{PLAYLIST_EDIT}/playlist_edit_opence_item"
 
 STRING_INSERTS = {
+    # (Filters' SHOW MISSING MAPS' third value's help, after the PC version's:
+    # menu_functions.c's filters_help)
+    f"{MT}/join_game/filters/cap_filter_options": [(11, [
+        "Show servers on maps you do not have if their\\nhost shares them: they download as you join."])],
     # (the gametype editor's OPENCE OPTIONS' words, after the PC version's:
     # menu_functions.c's playlist_edit_description)
     f"{PLAYLIST_EDIT}/playlist_edit_list_extended_dsc_text": [(8, [
@@ -916,6 +971,43 @@ WIDGET_PATCHES = {
     ]},
     # (the small font's line does not fit below their 4 units of offset)
     f"{MT}/join_game/ticker_player_info": {"set": {"text_y": 1}},
+    # (the server browser's top-left tab: which games it lists, not Internet
+    # or LAN, which are menu items of their own here; wider for its words, in
+    # the small font of the counts beside it, and moved left to stay centred
+    # in its tab: ce_menus.py's CHILD_OFFSETS)
+    # (the tab behind it without CE's rounded box: the screen's border
+    # picture already outlines the tab, and the two outlines clashed)
+    f"{MT}/join_game/op_browser_mode": {"set": {"bitmap": None}},
+    f"{MT}/join_game/browser_mode_spinner": {"set": {
+        "string_list": None, "strings": "ALL GAMES|DEDICATED|P2P GAMES", "setting": "network.browser_source",
+        "values": "all|dedicated|players", "width": 117, "footer_bounds": "7 120 19 126", "font": "ui\\small_ui",
+        "text_y": 3}},
+    # (the server browser's error panel: its words in a box of their own in
+    # the error box's place, under its title and button; menu_functions.c's
+    # lobby_browser_error hides the error box)
+    f"{MT}/join_game/gamespy_error_fullscreen": {"insert_before": {"error/error_modal": [
+        f'<child widget="{MT}/join_game/error_words" x="192" y="176"/>']}},
+    # (wider to the left, for "SERVERS: 8 (5 dedicated)": ce_menus.py's
+    # CHILD_OFFSETS keeps its right edge)
+    f"{MT}/join_game/server_count_label": {"set": {"width": 210}},
+    # (the page, when there is more than one: centred in the counts' panel,
+    # between the players and the servers, whatever their numbers' widths;
+    # menu_functions.c's lobby_browser_update places it)
+    f"{MT}/join_game/page_count_label": {"set": {"align": "center"}},
+    # (Filters' rows set the network.browser_* settings, as Network Setup's
+    # SERVER BROWSER does: menu_functions.c's filters_show and
+    # "gamespy update filter settings". SHOW MISSING MAPS has a third value,
+    # those a host shares: Map Sharing downloads them)
+    f"{MT}/join_game/filters/empty_servers_spinner": {"set": {
+        "string_list": None, "strings": "NO|YES", "setting": "network.browser_show_empty", "values": "false|true"}},
+    f"{MT}/join_game/filters/full_servers_spinner": {"set": {
+        "string_list": None, "strings": "NO|YES", "setting": "network.browser_show_full", "values": "false|true"}},
+    f"{MT}/join_game/filters/game_type_spinner": {"set": {
+        "string_list": None, "strings": "ANY|CTF|SLAYER|ODDBALL|KING|RACE", "setting": "network.browser_gametype",
+        "values": "any|ctf|slayer|oddball|king|race"}},
+    f"{MT}/join_game/filters/installed_maps_spinner": {"set": {
+        "string_list": None, "strings": "NO|YES|IF DOWNLOADABLE", "setting": "network.browser_maps",
+        "values": "no|yes|downloadable"}},
     f"{MT}/join_game/ticker_rules_info": {"set": {"text_y": 1}},
     # (Item Options' loadout rows, over its buttons)
     "main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_menu": {"insert_before": {
@@ -1092,11 +1184,50 @@ def _value_row(base: str, key: str, label_index: int, run: str) -> list:
     return lines
 
 
+# the server browser's words (menu_functions.c's lobby_browser_update, in
+# this order: its _browser_word_*): the line below the rows, the rows' status,
+# the counts, and the error panel's
+BROWSER_WORDS = [
+    # (the chosen game's line: "12 of 16 players", and its state)
+    "of", "players", "player", "under way", "full or starting",
+    # (where it was listed, and what it needs)
+    "Dedicated server by", "listed on", "master server", "master servers", "Dedicated server",
+    "Hosted by a player (anonymous listing)", "Password required",
+    "Needs the newer build: Settings > Network Setup > Check for updates",
+    "Runs an older build: it can be joined once it updates",
+    # (a join, as it goes: p2p_join_progress)
+    "Asking the brokers for the host...", "The host answered: connecting (UDP hole punching)...",
+    "Connected: joining the game...",
+    "The host did not answer (offline, or its listing is stale)",
+    "No route to the host: a forwarded port on either side helps",
+    "The host refused: full", "The host refused: closed", "The host refused: banned",
+    "The host refused: wrong password", "The host refused: another version", "The host refused: its invite changed",
+    "Strict NAT: turn on UPnP, or forward a port",
+    # (the list's state)
+    "Internet play is off (Settings)", "The server browser is off (network.public_lobby)",
+    "Looking for public games...", "Games on a newer version (update the game to join them):",
+    "No public games found", "No games match the filters",
+    "No master server answered: showing player-hosted games only",
+    # (the counts: "SERVERS: 8 (3 dedicated)"; the rows' status)
+    "dedicated", "JOINING", "NEWER", "OLDER", "FAILED", "LIVE", "CLOSED",
+    # (the error panel: nothing can be listed)
+    "Internet play is off:\\nSettings > Network Setup",
+    "Neither the master servers\\nnor the brokers answer:\\ncheck the connection",
+]
+
+
 def _join_game_extras() -> list:
-    """the browser's added titles, Direct Link's clipboard button, and the
-    password screen"""
+    """the browser's added titles, Direct Link's clipboard button, the
+    password screen, and the browser's words"""
     base = f"{MT}/join_game"
     lines = _password_screen()
+    lines += _strings(f"{base}/browser_words", BROWSER_WORDS)
+    # (the error panel's words, in a box as the error box: its own text is
+    # the game's error messages')
+    lines += _widget(f"{base}/error_words", [("type", "text"), ("controller", 1), ("width", 280), ("height", 159),
+                                             ("bitmap", "bitmaps/alert_bkd"), ("font", "ui\\large_ui"),
+                                             ("color", "#FF2896FF"), ("text_x", 9),
+                                             ("text_y", 35), ("text_flags", "no_focus_test")], [])
     lines += _header(f"{base}/header_server_browser", f"{base}/header_server_browser")
     lines += _header(f"{base}/header_direct_link", f"{base}/header_direct_link")
     lines += _widget(f"{base}/button_clipboard", [("type", "text"), ("width", 128), ("height", 24),
@@ -1272,8 +1403,8 @@ def _server_settings() -> list:
         "Each team's vehicles and their respawn time, for\\nthis game.",
         "The motion tracker and nav points, for this game.",
         "Friendly fire and team balance, for this game.",
-        # (LISTING's, by its choice)
-        "Anyone can see and join your game: it is listed\\nin everyone's Server Browser.",
+        # (LISTING's, by its choice; PUBLIC's with a publisher key is last)
+        "Anyone can see and join your game: it is listed\\nfor everyone through the brokers.",
         "Only players with your invite link can join.",
         # (co-op's options' rows: COOP_SETUP_SCREENS)
         *(help_text for _, _, help_text, _ in COOP_SETUP_SCREENS),
@@ -1281,6 +1412,9 @@ def _server_settings() -> list:
         "Players from the Server Browser must type it to\\njoin (an invite link needs none). Enter sets it.",
         # (MAP SHARING's)
         MAP_SHARE_SETUP[2],
+        # (LISTING's PUBLIC, on a machine with a publisher key: menu_functions.c's
+        # server_settings_update)
+        "Listed for everyone through the brokers, and on\\nthe master servers with your publisher key.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
@@ -1505,6 +1639,9 @@ def _lobby() -> list:
     lines += _widget(f"{base}/lobby_game_data", [("type", "text"), ("controller", 1), ("left", 417), ("top", 250),
                                                  ("width", 146), ("height", 144), ("font", "ui\\small_ui"),
                                                  ("color", "#FF2896FF")], [])
+    # (its words: menu_functions.c's lobby_update. "<name> - dedicated": the
+    # game's host is a dedicated server)
+    lines += _strings(f"{base}/lobby_words", ["dedicated"])
     lines += _widget(f"{base}/lobby_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
                                                   ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
                      # (SWITCH TEAM first: hidden in a game without teams, which

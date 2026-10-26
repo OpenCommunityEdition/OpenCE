@@ -5668,6 +5668,13 @@ void game_engine_playlist_next(
 	struct game_variant variant;
 
 	csstrcpy(global_stage.map_name, "levels\\test\\carousel\\carousel");
+	/* port: a dedicated server's rotation's next map, not carousel, which it
+	may not have (port/linux/game/server_director.c) */
+	if (halo_server_mode() && server_director_first_level())
+	{
+		csstrncpy(global_stage.map_name, server_director_first_level(), sizeof(global_stage.map_name) - 1);
+		global_stage.map_name[sizeof(global_stage.map_name) - 1] = 0;
+	}
 	map_name = main_get_multiplayer_map_name();
 	if (map_name && map_name[0])
 	{

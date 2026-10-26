@@ -22,7 +22,7 @@ then fills the page.
   the next time), ?play starts the game at once when it can.
 - ?join=<invite> (a halo://join/ link's code, which native builds and the
   game here make: port/linux/src/p2p.c) joins that internet game once the
-  game starts.
+  game starts; the Servers panel (servers.js) sets it with Play here.
 */
 
 'use strict';
@@ -655,6 +655,21 @@ $('invite-copy').addEventListener('click', async () => {
 });
 $('invite-close').addEventListener('click', () => { $('invite').hidden = true; });
 
+// Play here on the Servers panel (servers.js): the server's invite as ?join=,
+// and the game starts at once when it can
+function joinServer(code) {
+  if (!/^[0-9a-f]{64}$/.test(code) || gameStarted) return;
+  params.set('join', code);
+  history.replaceState(null, '', `?${params}`);
+  if (canPlay()) {
+    play();
+    return;
+  }
+  location.hash = '#play-panel';
+  updatePlay();
+  $('play-note').textContent += ' Play then joins the server you chose.';
+}
+
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -838,6 +853,11 @@ document.addEventListener('visibilitychange', async () => {
     updatePlay();
   }
   checkForUpdate();
+  window.HaloServers.start({
+    networkVersion: () => stamp.network_version,
+    visible: () => !gameStarted,
+    onPlay: joinServer,
+  });
   if (/^[0-9a-f]{32}$/.test(params.get('room') || '')) await joinRoom(params.get('room'));
   if (params.has('play')) play();
 })();

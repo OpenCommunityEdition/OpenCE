@@ -91,7 +91,10 @@ jobs:
 
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py
+          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
+          # the dedicated server: --version, and --server without maps refused (exit code 2); its cases with
+          # clients need the retail maps, and are skipped
+          python -m pytest -q tools/test_dedicated_server.py
           python tools/test_light_storage.py
 
       - name: Compile cache
@@ -317,6 +320,8 @@ jobs:
         run: |
           source ~/emsdk/emsdk_env.sh
           node --test "port/web/tests/*.test.js"
+          # (the dedicated server's admin page, port/assets/server_ui, against tools/server_sim.py)
+          node --test tools/server_ui_tests/
           python3 -m pytest -q tools/test_web_build.py
 
       - name: Test in Chromium and Firefox
@@ -349,8 +354,11 @@ jobs:
     # The eight builds (and the Windows builds' PDBs) as a release, tagged
     # build-<run number> and marked latest
     # (every file keeps its name from release to release, for the README's
-    # latest/download links); then all but the newest five build-* releases
-    # go, tags and all. Only for main, and only when every platform built.
+    # latest/download links), with their SHA256SUMS and, when the
+    # RELEASE_SIGNING_KEY secret is set, its Ed25519 signature by the release
+    # key (SHA256SUMS.sig; the public key is deploy/release-key.pub); then all
+    # but the newest five build-* releases go, tags and all. Only for main,
+    # and only when every platform built.
     needs: [linux, android, windows, web]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
@@ -363,6 +371,15 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
+      # (tools/ci_build.py and tools/release_sign.sh, and the public key)
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tools/ci_build.py
+            tools/release_sign.sh
+            deploy/release-key.pub
+          sparse-checkout-cone-mode: false
+
       - uses: actions/download-artifact@v4
         with:
           pattern: halo-*
@@ -375,7 +392,23 @@ jobs:
             name="$(basename "$build")"
             (cd "$build" && zip -qr "$GITHUB_WORKSPACE/release/$name.zip" .)
           done
+          python3 tools/ci_build.py sums release
           ls -l release
+
+      # SHA256SUMS signed with the release key's seed (the RELEASE_SIGNING_KEY
+      # secret, 64 hex digits), and the signature checked against
+      # deploy/release-key.pub before anything is published: a secret that is
+      # not the key of the public key in the repository stops the release
+      - name: Sign the sums
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          if [ -z "$RELEASE_SIGNING_KEY" ]; then
+            echo "::warning::no RELEASE_SIGNING_KEY secret: the release's SHA256SUMS is not signed"
+            exit 0
+          fi
+          sh tools/release_sign.sh sign release/SHA256SUMS
+          sh tools/release_sign.sh verify release/SHA256SUMS
 
       - name: Publish
         id: publish
@@ -388,7 +421,7 @@ jobs:
           subject="$(printf '%s' "${MESSAGE:-manual run}" | head -n 1)"
           printf '%s\n\nCommit: %s\nBuild: %s\n\nThe release builds are for playing; the debug builds stop at the first failed assertion and log it.\n' \
             "$subject" "$COMMIT_URL" "$RUN_URL" > notes.md
-          gh release create "$tag" release/*.zip --target "$GITHUB_SHA" --latest \
+          gh release create "$tag" release/* --target "$GITHUB_SHA" --latest \
             --title "Build $GITHUB_RUN_NUMBER (${GITHUB_SHA:0:7})" --notes-file notes.md
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
