@@ -69,6 +69,12 @@ release, and the web site then plays it. The [Releases](https://github.com/OpenC
 page keeps the last five releases. If the latest build has a problem, get
 an older build from that page.
 
+Each release also has `SHA256SUMS`, the SHA-256 of each of its files, and
+`SHA256SUMS.sig`, that file's Ed25519 signature by the project's release
+key, whose public key is [deploy/release-key.pub](deploy/release-key.pub).
+`sha256sum -c --ignore-missing SHA256SUMS` checks the downloads, and
+`tools/release_sign.sh verify SHA256SUMS` (OpenSSL 3) the signature.
+
 The Linux README also covers the controls, every setting and the multiplayer features. These are almost the same on all platforms. The settings are in `config.toml` next to the game, and many are in the menus too.
 
 The Arch-based distribution release is available on the [AUR](https://aur.archlinux.org/packages/opence-bin).

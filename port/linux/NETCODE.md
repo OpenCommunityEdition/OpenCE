@@ -270,7 +270,11 @@ browser names in its gametype column ("SWAT", "HC CTF"); a browser takes a
 mode for a Slayer game only, and one it does not know as none. Then version 38
 lets the host's shield effects be `players` (SHIELD EFFECTS' PLAYERS' OWN), a
 value of distributed message 91 that tells each client to draw its own
-settings', not synced.
+settings', not synced. Then version 39 marks a dedicated server's game (a
+host with no player of its own, `halo --server`: "Dedicated servers"
+below) with a flag of its LAN advertisement (`HALO_PORT_ADVERTISED_DEDICATED_FLAG`,
+0x04 of the third reserved byte) and of its internet listing (32), which
+the server browser shows.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -329,7 +333,13 @@ hardware id is in it (a line taken out unbans). Both are as the player's
 machine tells them: anyone with administrator or root access can change
 them, and players behind one address share it. The console's `kick <player
 name>` drops a player as `ban` does (every machine told), but adds no line
-and keeps no address out: the player may join again at once.
+and keeps no address out: the player may join again at once. Besides
+`bans.txt`, the host keeps out a machine dropped for cheating or banned for
+ever while it runs, by its address as it joined (an internet play peer's
+stand-in), its real address and its hardware id, any of them; a dedicated
+server's ban for a while (`ban <player> 30m`) is left to its `bans.txt`
+line, whose `until=` ends it, and its `unban` lets the machine in again by
+the line's address or hardware id (`network_game_server_port_forget_kicked_address`).
 
 The players' votes to kick a player (`network_votekick.c`): a client sends
 `_distributed_message_votekick` (the player's absolute index) reliably, and
@@ -466,13 +476,56 @@ do (in free for all, a team of its own).
 
 The game is closed to joins while its machines load and after it ends.
 A machine must join within 10 seconds of connecting; in a game, the host
-drops a machine it has heard nothing from for 15 seconds, and one that
+drops a machine it has heard nothing from for 15 seconds
+(`network.client_timeout_seconds`), and one that
 joined the game in progress and has not loaded in two minutes.
 
 Until it has loaded, the machine hears none of the game's messages (which a
 machine in the pregame refuses, and which the others no longer need), only
 a pregame keep-alive every five seconds from the host
 (`network_server_manager.c`, `network_server_message_handler.c`).
+
+## Dedicated servers
+
+A dedicated server (`halo --server`: `docs/dedicated_server.md`) is a host
+as any other, with these differences, all on the host's side:
+
+- **No player of its own.** The host machine is in the game as machine 0
+  but has no player, so its lobby counts the joined machines' players only
+  (`network_server_manager.c`'s `server_ok_to_countdown`, which asks
+  `server_director_ok_to_countdown` for `server.min_players` and
+  `server.team_start`), and a game with one team's players may start (the
+  next players to join balance the teams). The host waits for no player of
+  its own to precache, and a client's player that quits the game does not
+  end the host's (`network_client_manager.c`: only a local player's quit
+  leaves).
+- **No ticks of its own player.** The host's own action queue may hold no
+  action (`player_queues_new.c`), as a game with no local player has none.
+- **The director.** `port/linux/game/server_director.c` drives the lobby as
+  a player at the pregame screen would: it sets the map and gametype of the
+  rotation's entry, starts the countdown once the server's own rule allows
+  it (`network_game_server_port_ok_to_countdown`, the rule the server checks
+  each tick, then `network_game_server_port_countdown_begin`), and after the postgame
+  goes back to the lobby with the next entry. The clients see a lobby, a
+  game and a postgame as with any host.
+- **Shutdown.** On SIGTERM, a game in progress goes to its postgame, and
+  the host tells every machine it goes (`network_game_server_graceful_shutdown`)
+  before it exits, so that the clients show the scores rather than a lost
+  connection.
+- **The flags.** Since version 39 a dedicated server's LAN advertisement
+  carries `HALO_PORT_ADVERTISED_DEDICATED_FLAG` and its internet listing the
+  dedicated flag (32); a listing published to the master servers is the
+  same signed listing (`docs/master_protocol.md`), and the master's probe
+  is answered on the tunnel's socket (`p2p.c`, `server_master_probe`).
+- **The timeout.** `network.client_timeout_seconds` (15 seconds by
+  default) sets how long a host waits for a silent machine, and two more
+  waits with it: how long a stream's writes may stall before its connection
+  is dropped (`network_connection.c`), on every machine, clients too; and
+  how long a host in a game rides out its network going (an address
+  renewed, a wifi drop: `network_game_server_network_lost`). So it is not
+  the host's alone, and not a dedicated server's only: each machine reads
+  its own setting, and nothing on the wire changes (the machines need not
+  agree on it).
 
 ## Map sharing
 

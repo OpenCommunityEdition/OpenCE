@@ -98,5 +98,5 @@ def build(test, generated):
 
 def run(executable, case):
     """Run one case: (exit status, output)."""
-    result = subprocess.run([str(executable), case], capture_output=True, text=True, timeout=60)
+    result = subprocess.run([str(executable), case], capture_output=True, text=True, errors="replace", timeout=60)
     return result.returncode, (result.stdout + result.stderr).strip()

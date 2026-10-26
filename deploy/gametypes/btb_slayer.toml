@@ -1,0 +1,29 @@
+# Big team slayer: first team to 50 kills, vehicles as Halo PC places them.
+# Play it with server.rotation entries such as bloodgulch:btb_slayer.
+base = "team_slayer"
+name = "BTB Slayer"
+
+[universal]
+teams = true
+score_to_win = 50
+lives = 0
+respawn_time = 5
+health = 100
+weapon_set = "normal"
+vehicle_set = "default"
+radar = true
+friend_indicators = true
+
+[options]
+time_limit = 20
+friendly_fire = "shields_only"
+friendly_fire_penalty = 5
+vehicle_respawn_time = 60
+auto_team_balance = true
+radar_players = "friends"
+team_vehicles = "pc"
+
+[slayer]
+no_death_bonus = false
+no_kill_penalty = false
+kill_in_order = false

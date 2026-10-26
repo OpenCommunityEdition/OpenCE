@@ -1,0 +1,31 @@
+# init.txt: commands a dedicated server runs once at its start, one a line,
+# as if typed at its console (docs/dedicated_server.md, "Commands"). Copy
+# this file to init.txt in the data folder (server.init_file), and take the
+# "# " off the lines you want. Lines starting with # or ; are comments.
+#
+# Settings are better given in config.toml or as HALO_* variables; these are
+# for what changes from one start to the next.
+
+# The rotation, replacing server.rotation (and written to it):
+# sv_rotation_set bloodgulch:ctf, sidewinder:team_slayer+score=50, hangemhigh:king_moving
+# sv_rotation_add prisoner:slayer+time=10
+# sv_rotation_begin 2
+
+# The game's name, players and notice (sv_set of the server.* settings):
+# sv_name My server
+# sv_maxplayers 12
+# sv_motd Welcome. Be nice; admins are watching.
+# sv_public 1
+# sv_password secret
+
+# Any setting the server lists in sv_settings:
+# sv_set server.lobby_seconds 20
+# sv_set server.empty_seconds 60
+
+# A first game other than the rotation's, which goes on after it:
+# sv_map bloodgulch ctf_classic
+
+# The state of the server, in the log:
+# sv_status
+
+# The game's own console commands run too, with the owner's role.

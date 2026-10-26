@@ -1,0 +1,96 @@
+# A dedicated server under systemd (docs/dedicated_server.md), one instance
+# for each folder /opt/opence/servers/<name>:
+#
+#   /opt/opence/bin/                the release (halo-linux-release.zip, unzipped)
+#   /opt/opence/data/               the game data, shared by every instance and
+#                                   only read: maps/, custom_maps/, gametypes/
+#   /opt/opence/servers/<name>/     the instance's own: config.toml, init.txt,
+#                                   publisher.key, server.env, logs/, saves/
+#
+# server.env holds the instance's settings as HALO_* variables, one a line.
+# A second instance on the machine needs its own ports, and its own loopback
+# address for system link:
+#
+#   HALO_NET_TUNNEL_PORT=2303
+#   HALO_SERVER_WEB_PORT=8081
+#   HALO_NET_ADDRESS=127.0.0.2
+#   HALO_NET_BROADCAST=127.0.0.1
+#
+# Install:
+#   sudo useradd --system --home-dir /opt/opence --shell /usr/sbin/nologin halo
+#   sudo install -d -o halo -g halo -m 0750 /opt/opence/servers/main
+#   sudo cp deploy/systemd/halo-server@.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now halo-server@main
+#   journalctl -u halo-server@main -f
+#
+# Open UDP 2302 (each instance's network.tunnel_port) in the firewall. The
+# web port stays on 127.0.0.1 unless server.env says otherwise.
+#
+# Exit code 5 (sv_restart, or an update installed) restarts the server;
+# 2 (no usable maps) and 3 (bad configuration) do not, as a restart would
+# fail the same way.
+[Unit]
+Description=OpenCE dedicated server %i
+Documentation=https://github.com/OpenCommunityEdition/OpenCE/blob/main/docs/dedicated_server.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=halo
+Group=halo
+WorkingDirectory=/opt/opence/servers/%i
+Environment=HOME=/opt/opence/servers/%i
+Environment=HALO_CONFIG_FILE=/opt/opence/servers/%i/config.toml
+Environment=HALO_DATA_ROOT=/opt/opence/data
+Environment=HALO_SAVE_ROOT=/opt/opence/servers/%i/saves
+Environment=HALO_LOG_ROOT=/opt/opence/servers/%i/logs
+Environment=HALO_SERVER_INIT_FILE=/opt/opence/servers/%i/init.txt
+Environment=HALO_NET_TUNNEL_PORT=2302
+EnvironmentFile=-/opt/opence/servers/%i/server.env
+ExecStartPre=/bin/mkdir -p /opt/opence/servers/%i/logs /opt/opence/servers/%i/saves
+ExecStart=/opt/opence/bin/halo --server
+# (no console: commands come from init.txt and the web port)
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+KillSignal=SIGTERM
+TimeoutStopSec=15
+Restart=on-failure
+RestartSec=10
+RestartForceExitStatus=5
+RestartPreventExitStatus=2 3
+# (no privileges, nothing writable but the instance's folder)
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/opt/opence/servers/%i
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+# (a 32-bit x86 program)
+SystemCallArchitectures=native x86
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallErrorNumber=EPERM
+UMask=0027
+MemoryMax=600M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target
