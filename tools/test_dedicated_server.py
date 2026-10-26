@@ -586,6 +586,45 @@ def test_web_port_survives_junk(machines):
     assert server.wait(15) == 0, server.text()[-3000:]
 
 
+def test_settings_refuse_a_value_they_cannot_read(machines):
+    """PUT /api/settings with a string it cannot read whole (300 characters and more, or one holding \\u0000): refused,
+    the setting left as it was (it had been applied as the empty string, which took a game password away), as a
+    value of 257 to 299 characters is; a key it cannot read refused with a message of its own"""
+    _needs_game("bloodgulch")
+    port = _free_port()
+    server = machines("settings").start(["--server"], **_server_settings(port))
+    api = Api(port)
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    api.login()
+
+    def setting(name):
+        status, answer = api.call("GET", "/api/settings")
+        assert status == 200, answer
+        return next(entry for entry in answer["settings"] if entry["name"] == name)
+
+    status, answer = api.call("PUT", "/api/settings", {"server.motd": "Welcome", "server.password": "hunter2"})
+    assert status == 200 and answer["applied"] == ["server.motd", "server.password"], answer
+    assert setting("server.password")["set"]
+    for value in ("a" * 300, "a" * 1000, "hi\u0000"):
+        for name in ("server.motd", "server.password"):
+            status, answer = api.call("PUT", "/api/settings", {name: value})
+            assert status == 200 and answer["applied"] == [], (name, len(value), answer)
+            assert answer["errors"][0]["name"] == name and "longer than 256 characters" in answer["errors"][0]["message"], \
+                answer
+    assert setting("server.motd")["value"] == "Welcome"
+    assert setting("server.password")["set"], "the game password was taken away"
+    status, answer = api.call("PUT", "/api/settings", {"server.motd": "a" * 260})
+    assert answer["applied"] == [] and "longer than 256 characters" in answer["errors"][0]["message"], answer
+    status, answer = api.call("PUT", "/api/settings", {"": 1})
+    assert answer["applied"] == [] and answer["errors"][0]["code"] == "not_found", answer
+    assert answer["errors"][0]["message"] == "a setting's name is a string of at most 63 characters", answer
+    status, answer = api.call("PUT", "/api/settings", {"server.motd": "Hello"})
+    assert answer["applied"] == ["server.motd"], answer
+    assert setting("server.motd")["value"] == "Hello"
+    server.send("quit")
+    assert server.wait(15) == 0, server.text()[-3000:]
+
+
 def test_probe_prints_the_server(machines):
     """halo --probe, on the LAN: the server's game as one line of JSON, nothing joined"""
     _needs_game("prisoner")
