@@ -8,9 +8,6 @@ name: Server image
 #   the image of that release, checked, pushed to
 #   ghcr.io/opencommunityedition/opence-server as sha-<commit>, build-<n> and
 #   latest, and signed keyless with cosign (this workflow's GitHub identity).
-# - Pull requests that change deploy/docker, deploy/helm or this file: the
-#   image of the latest release, built and checked, never pushed (no
-#   secrets needed).
 # - Weekly, the latest release's image again, for Debian's fixes.
 # - By hand, any release's (latest moves only for the newest).
 #
@@ -28,11 +25,6 @@ on:
     workflows: [Build]
     types: [completed]
     branches: [main]
-  pull_request:
-    paths:
-      - "deploy/docker/**"
-      - "deploy/helm/**"
-      - ".github/workflows/server-image.yml"
   schedule:
     - cron: "23 5 * * 1"
   workflow_dispatch:
@@ -43,7 +35,7 @@ on:
 
 concurrency:
   group: server-image-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -169,17 +161,17 @@ jobs:
           docker volume rm smoke-state > /dev/null
 
       - uses: docker/login-action@v3
-        if: github.event_name != 'pull_request' && github.repository == 'OpenCommunityEdition/OpenCE'
+        if: github.repository == 'OpenCommunityEdition/OpenCE'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: sigstore/cosign-installer@v3
-        if: github.event_name != 'pull_request' && github.repository == 'OpenCommunityEdition/OpenCE'
+        if: github.repository == 'OpenCommunityEdition/OpenCE'
 
       - name: Push and sign
-        if: github.event_name != 'pull_request' && github.repository == 'OpenCommunityEdition/OpenCE'
+        if: github.repository == 'OpenCommunityEdition/OpenCE'
         env:
           TAG: ${{ steps.release.outputs.tag }}
           COMMIT: ${{ steps.release.outputs.commit }}
