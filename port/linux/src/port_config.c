@@ -848,6 +848,24 @@ static const struct config_setting config_settings[] =
 	{ "server.region", _config_string, "\"\"", "HALO_SERVER_REGION", _environment_value, _platform_server,
 		"A region shown in the server browser (eu, na-east...): 16 characters;\n"
 		"empty for none." },
+	{ "server.chat_filter", _config_string, "\"off\"", "HALO_SERVER_CHAT_FILTER", _environment_value, _platform_server,
+		"The words the server keeps out of its chat and its players' names\n"
+		"(streamer mode's list, by chat_filter_slurs, _swearing and _insults):\n"
+		"\"off\"; \"censor\", a line's words shown as stars; \"block\", a line\n"
+		"with them refused (its sender is told why) and a player whose name has\n"
+		"them refused at the door. Links are network.text_chat's." },
+	{ "server.chat_filter_slurs", _config_string, "\"mild\"", "HALO_SERVER_CHAT_FILTER_SLURS", _environment_value,
+		_platform_server,
+		"With server.chat_filter, the slurs (race, sexuality, gender, disability)\n"
+		"kept out: \"off\", \"severe\" (the worst), \"strong\" or \"mild\" (all)." },
+	{ "server.chat_filter_swearing", _config_string, "\"off\"", "HALO_SERVER_CHAT_FILTER_SWEARING",
+		_environment_value, _platform_server,
+		"With server.chat_filter, the swearing and sexual words kept out: \"off\",\n"
+		"\"severe\", \"strong\" or \"mild\" (all)." },
+	{ "server.chat_filter_insults", _config_string, "\"off\"", "HALO_SERVER_CHAT_FILTER_INSULTS",
+		_environment_value, _platform_server,
+		"With server.chat_filter, the insults that are not slurs kept out: \"off\",\n"
+		"\"severe\", \"strong\" or \"mild\" (all)." },
 	{ "server.master_publish_address", _config_boolean, "false", "HALO_SERVER_MASTER_PUBLISH_ADDRESS",
 		_environment_value, _platform_server,
 		"Let the master servers give this server's address to players; false:\n"
@@ -1810,6 +1828,10 @@ static const struct
 	{ "game.console_log", { "important", "all", "none", NULL }, NULL },
 	{ "game.language", { "", "ja", "de", "fr", "es", "it", NULL }, NULL },
 	{ "network.text_chat", { "on", "links", "off", NULL }, NULL },
+	{ "server.chat_filter", { "off", "censor", "block", NULL }, NULL },
+	{ "server.chat_filter_slurs", { "off", "severe", "strong", "mild", NULL }, NULL },
+	{ "server.chat_filter_swearing", { "off", "severe", "strong", "mild", NULL }, NULL },
+	{ "server.chat_filter_insults", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "network.voice_mode", { "off", "team_proximity", "team_enemy_proximity", "team_global",
 		"team_global_enemy_proximity", NULL }, NULL },
 	{ "network.coop_friendly_fire", { "off", "on", "shields_only", "explosives_only", NULL }, NULL },

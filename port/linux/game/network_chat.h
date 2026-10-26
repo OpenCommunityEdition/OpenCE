@@ -26,6 +26,9 @@ enum
 
 /* every frame (main.c): the keys that start typing a line, and those typed */
 void network_chat_update(void);
+/* (a dedicated server) whether a player's name has words its word filter
+keeps out at the door (server.chat_filter "block") */
+boolean network_chat_name_blocked(wchar_t const *name, short length);
 /* the first local player says a line to a channel, as if typed and sent;
 the automated tests' (network_test.c) */
 void network_chat_say(short channel, char const *text);

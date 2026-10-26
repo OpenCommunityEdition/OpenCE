@@ -274,7 +274,16 @@ settings', not synced. Then version 39 marks a dedicated server's game (a
 host with no player of its own, `halo --server`: "Dedicated servers"
 below) with a flag of its LAN advertisement (`HALO_PORT_ADVERTISED_DEDICATED_FLAG`,
 0x04 of the third reserved byte) and of its internet listing (32), which
-the server browser shows.
+the server browser shows. With no new version, each client then tells the
+host its build (distributed message 92, `_distributed_message_client_build`,
+reliably once a game after its ready, over its connection alone): its
+number, configuration, the label it shows ("OpenCE Linux | build 282
+(release)"), the GitHub repository it is made from (owner/name, which the
+build scripts take from CI's `GITHUB_REPOSITORY` or the checkout's origin
+remote) and the mods it plays, a line each ("folder version", in the load
+order); the host keeps it printable and logs it once, and a dedicated
+server shows it in `/api/players` (`client`). A host without the message
+drops it as a kind it does not know.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

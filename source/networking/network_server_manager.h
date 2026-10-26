@@ -73,6 +73,7 @@ void network_game_server_kick_machine(
 	boolean kept_out);
 /* port: the rejection code of the last machine
 network_game_server_accept_client_machine_into_game refused */
+void network_game_server_refuse_with(short code);
 short network_game_server_last_refusal_code(
 	void);
 /* the host's ban command (console.c, hs.c) */

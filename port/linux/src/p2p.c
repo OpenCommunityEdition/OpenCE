@@ -2932,7 +2932,8 @@ int p2p_join_progress(int *stage, char *reason, int size)
 	/* (the game's rejection codes in their order: network_game_protocol.h's
 	version too old, too new, bad join token, bad password, full, closed,
 	blacklisted machine) */
-	static const char *const refusals[] = { "version", "version", "token", "password", "full", "closed", "banned" };
+	static const char *const refusals[] = { "version", "version", "token", "password", "full", "closed", "banned",
+		"name" };
 	struct peer *peer;
 	const char *why = "";
 
