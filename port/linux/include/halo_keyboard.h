@@ -85,5 +85,8 @@ int halo_chat_taps(float *x, float *y);
 then goes at the top left: on Android, and in a browser once its touch
 controls have been used */
 int halo_chat_touch_layout(void);
+/* the mouse wheel's notches turned while a chat line is typed, since the
+last call (up positive): they scroll the lines, not the weapons */
+int halo_chat_wheel_steps(void);
 
 #endif
