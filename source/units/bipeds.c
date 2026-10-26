@@ -1619,6 +1619,9 @@ void biped_preprocess_node_orientations(
 	struct real_orientation *node_orientations)
 {
 	biped_verify_object_vectors(biped_index, "preprocess-nodes");
+	/* port: the big head mutator's head scaled, before the node matrices
+	the biped is drawn and hit with are made */
+	mutator_big_head_node_orientations(biped_index, node_orientations);
 
 	return;
 }

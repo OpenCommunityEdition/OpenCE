@@ -270,7 +270,9 @@ browser names in its gametype column ("SWAT", "HC CTF"); a browser takes a
 mode for a Slayer game only, and one it does not know as none. Then version 38
 lets the host's shield effects be `players` (SHIELD EFFECTS' PLAYERS' OWN), a
 value of distributed message 91 that tells each client to draw its own
-settings', not synced.
+settings', not synced. Then version 39 sends the host's mutators (distributed
+message 112, `network_mutators.c`, `docs/mutators.md`) to each client as it
+is ready, which the client plays instead of its own.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

@@ -10,6 +10,9 @@ can play with mods in any game, with players who have other mods or none. (A hos
 the host's scripts and AI wait for dialogue to end; the host decides those
 for every machine, so they still agree.)
 
+Mutators, which change the rules of a game for every machine of it, are
+not mods: see [mutators.md](mutators.md).
+
 The game's code is `port/linux/game/mods.c` (with `mod_sounds.c`,
 `mod_bitmaps.c`, `mod_strings.c` and `mod_models.c`, one for each kind of
 tag) and `port/linux/src/port_mods.c` (the mods folder and its files).
