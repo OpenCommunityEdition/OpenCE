@@ -545,8 +545,9 @@ static const struct config_setting config_settings[] =
 		"to be heard by proximity voice chat (5 to 100)." },
 	{ "network.text_chat", _config_string, "\"on\"", "HALO_NET_TEXT_CHAT", _environment_value, _platform_all,
 		"Hosting: the text chat: \"on\" (links in lines are refused), \"links\"\n"
-		"(links allowed) or \"off\", in either case. Always off in a game listed\n"
-		"in the server browser (a public internet game)." },
+		"(links allowed) or \"off\", in either case. Always off in a game a\n"
+		"player hosts that is listed in the server browser (a public internet\n"
+		"game); a dedicated server's follows this setting, listed or not." },
 	{ "network.votekick", _config_boolean, "true", "HALO_NET_VOTEKICK", _environment_value, _platform_all,
 		"Hosting: let the players vote to kick a player (the scoreboard's\n"
 		"right-click, or the console's votekick). More than half of the players\n"
