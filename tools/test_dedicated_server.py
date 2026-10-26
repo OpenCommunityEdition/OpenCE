@@ -312,11 +312,23 @@ def test_rotation_moderation_and_shutdown(machines):
     assert status["name"] == "Test Server" and status["state"] == "lobby", status
     assert status["players"] == 0, "the host has a player of its own"
 
-    client = _client(machines("client"), CLIENT_ADDRESSES[0], "Tester")
+    # (with a mod on, which the client names to the host with its build)
+    client_machine = machines("client")
+    (client_machine.folder / "data" / "mods" / "testmod").mkdir(parents=True)
+    mod_toml = client_machine.folder / "data" / "mods" / "testmod" / "mod.toml"
+    mod_toml.write_text('name = "Test mod"\nversion = "1.2"\n')
+    client = _client(client_machine, CLIENT_ADDRESSES[0], "Tester")
     _until(lambda: (api.status() or {}).get("state") == "playing", 120, "the first game", server)
     assert api.status()["map"] == "bloodgulch"
     players = api.call("GET", "/api/players")[1]["players"]
     assert [player["name"] for player in players] == ["Tester"], players
+    # its machine's build, as the client told it (after its ready, reliably), and said once in the server's log
+    _until(lambda: api.call("GET", "/api/players")[1]["players"][0].get("client"), 30, "the client's build", server)
+    told = api.call("GET", "/api/players")[1]["players"][0]["client"]
+    assert told["version"].startswith("OpenCE Linux | ") and isinstance(told["build"], int), told
+    assert told["flavor"] and re.fullmatch(r"([\w.-]+/[\w.-]+)?", told["repository"]), told
+    assert told["mods"] == ["testmod 1.2"], told
+    assert server.text().count("plays " + told["version"]) == 1, "the client's build not logged once"
 
     # the first game ended by a command, its postgame, the second entry's lobby and game
     server.send("sv_end_game")

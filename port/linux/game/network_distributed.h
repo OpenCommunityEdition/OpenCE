@@ -140,8 +140,32 @@ enum
 	/* the host's shield effects (network_shield_effects.c), to every client,
 	reliably, when it is ready and when they change */
 	_distributed_message_shield_effects = 91,
+	/* a client's build, as it tells it: its number, configuration, the
+	GitHub repository it is made from, its label and the mods it plays
+	(reliable, once a game, with its ready: distributed_client_send_build).
+	A host without it drops it as a kind it does not know */
+	_distributed_message_client_build = 92,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
+};
+
+/* a client's build, as text (every field printable ASCII and ended; mods a
+line each, "folder version", in the load order) */
+enum
+{
+	DISTRIBUTED_CLIENT_BUILD_NUMBER_SIZE = 12,
+	DISTRIBUTED_CLIENT_BUILD_FLAVOR_SIZE = 16,
+	DISTRIBUTED_CLIENT_BUILD_REPOSITORY_SIZE = 144,
+	DISTRIBUTED_CLIENT_BUILD_VERSION_SIZE = 64,
+	DISTRIBUTED_CLIENT_BUILD_MODS_SIZE = 512,
+};
+struct distributed_client_build
+{
+	char number[DISTRIBUTED_CLIENT_BUILD_NUMBER_SIZE];
+	char flavor[DISTRIBUTED_CLIENT_BUILD_FLAVOR_SIZE];
+	char repository[DISTRIBUTED_CLIENT_BUILD_REPOSITORY_SIZE];
+	char version[DISTRIBUTED_CLIENT_BUILD_VERSION_SIZE];
+	char mods[DISTRIBUTED_CLIENT_BUILD_MODS_SIZE];
 };
 
 /* where a message goes */
@@ -220,6 +244,8 @@ a longer message is split where a batch is full */
 unreliable ones gathered into one datagram a machine each tick */
 void distributed_send(void *message, byte type, short count, word size, short destination);
 void distributed_client_send_identity(void);
+/* (a client) its build, to the host, once a game */
+void distributed_client_send_build(void);
 /* ... unreliably to one client (the host) */
 void distributed_send_to_machine(long machine_index, void *message, byte type, short count, word size);
 /* ... reliably to one client (the host) */
@@ -323,6 +349,9 @@ internet play peer's endpoint, not its stand-in; 0 if not known */
 unsigned long distributed_machine_real_address(long machine_index);
 /* ... and the real address of a machine's address, as it joined from */
 unsigned long distributed_real_address(unsigned long address);
+/* (the host) a client machine's build as it told it: FALSE if it told none
+(a build before the message, or not yet) */
+boolean distributed_machine_client_build(long machine_index, struct distributed_client_build *build);
 
 /* ---------- prototypes/NETWORK_VOTEKICK.C */
 
