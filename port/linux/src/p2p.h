@@ -159,9 +159,11 @@ struct p2p_listing
 	unsigned char key_hash[P2P_LISTING_KEY_HASH_SIZE];
 	unsigned char signing_key[P2P_LISTING_SIGNING_KEY_SIZE];
 	unsigned char sealed_token[P2P_LISTING_SEALED_TOKEN_SIZE];
-	/* a dedicated server's (its listing's flag, or a master's word); listed
-	by the master servers (master_list.c): by how many, its publisher's
-	name and its region (empty: none said) */
+	/* a dedicated server's, on a master server's word (its listing's own
+	flag, which its host sets, is not taken: a game the brokers alone list
+	is shown as the players'); listed by the master servers
+	(master_list.c): by how many, its publisher's name and its region
+	(empty: none said) */
 	unsigned char dedicated;
 	unsigned char master;
 	unsigned char master_count;
