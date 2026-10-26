@@ -219,6 +219,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `server.web_moderator_password`, `server.log_format`,
 `server.log_addresses`, `server.status_file`, `server.auto_update`,
 `server.coop_difficulty`, `server.region`, `server.master_publish`,
+`server.chat_filter`, `server.chat_filter_slurs`, `server.chat_filter_swearing`,
+`server.chat_filter_insults`,
 `server.master_publish_address`, `server.metrics`, and `network.text_chat`,
 `network.voice_lobby`, `network.voice_mode`, `network.voice_kbps`,
 `network.votekick`, `network.votekick_minutes`,
@@ -250,6 +252,8 @@ in either case, and is kept as the table spells it:
 | `server.auto_update` | `off`, `check`, `install` |
 | `server.coop_difficulty` | `easy`, `normal`, `hard`, `impossible` |
 | `network.text_chat` | `on`, `links`, `off` |
+| `server.chat_filter` | `off`, `censor`, `block` |
+| `server.chat_filter_slurs`, `server.chat_filter_swearing`, `server.chat_filter_insults` | `off`, `severe`, `strong`, `mild` |
 | `network.voice_mode` | `off`, `team_proximity`, `team_enemy_proximity`, `team_global`, `team_global_enemy_proximity` |
 | `network.voice_kbps` | 8 to 64 |
 | `network.votekick_minutes` | 0 to 60 |
@@ -257,6 +261,20 @@ in either case, and is kept as the table spells it:
 | `network.map_share_upload` | 16 to 20480 |
 | `network.coop_friendly_fire` | `off`, `on`, `shields_only`, `explosives_only` |
 | `network.shield_effects` | `stock`, `glow`, `light_show`, `overshield`, `glow_overshield`, `light_show_overshield`, `players` |
+
+A dedicated server may also keep words out of its chat and its players'
+names (`server.chat_filter`, off by default): the words of streamer mode's
+list, by group, each group from the least severity its setting names
+(`server.chat_filter_slurs`, `mild` by default: every slur;
+`server.chat_filter_swearing` and `server.chat_filter_insults`, `off`).
+`censor` shows a line's words as stars to everyone; `block` refuses the
+line (its sender is told "Your line was not sent: it has words this server
+does not allow") and refuses at the door a machine whose player's name has
+them, which an updated game shows as "The host refused: your player name"
+(an older one says the game is closed). Each is logged (`chat filter: …`,
+`refusing a machine … its name has words the server's filter keeps out`).
+Links are `network.text_chat`'s, refused by default. A list of words is
+not a moderator: spaced letters and look-alikes get past it.
 
 A dedicated server's text chat is its `network.text_chat`'s, listed or
 not: `on` by default (lines with links refused), `links`, or `off`, live

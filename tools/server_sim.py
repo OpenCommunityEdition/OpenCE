@@ -382,6 +382,15 @@ def default_settings():
                  "characters; empty for none.", "HALO_SERVER_REGION"),
         _setting("server.master_publish_address", "boolean", False, "Let the master servers give this server's "
                  "address to players.", "HALO_SERVER_MASTER_PUBLISH_ADDRESS"),
+        _setting("server.chat_filter", "string", "off", "The words the server keeps out of its chat and its players' "
+                 "names: \"off\", \"censor\" (starred) or \"block\" (a line refused, a name refused at the door).",
+                 "HALO_SERVER_CHAT_FILTER", choices=["off", "censor", "block"]),
+        _setting("server.chat_filter_slurs", "string", "mild", "With server.chat_filter, the slurs kept out.",
+                 "HALO_SERVER_CHAT_FILTER_SLURS", choices=["off", "severe", "strong", "mild"]),
+        _setting("server.chat_filter_swearing", "string", "off", "With server.chat_filter, the swearing kept out.",
+                 "HALO_SERVER_CHAT_FILTER_SWEARING", choices=["off", "severe", "strong", "mild"]),
+        _setting("server.chat_filter_insults", "string", "off", "With server.chat_filter, the insults kept out.",
+                 "HALO_SERVER_CHAT_FILTER_INSULTS", choices=["off", "severe", "strong", "mild"]),
     ]
 
 
