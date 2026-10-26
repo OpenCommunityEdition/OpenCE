@@ -4172,6 +4172,7 @@ enum
 	_browser_word_closed,
 	_browser_word_error_online_off,
 	_browser_word_error_unreachable,
+	_browser_word_refused_name,
 };
 
 /* the words p2p_join_progress gives a join that failed, and the browser's
@@ -4187,6 +4188,7 @@ static struct
 	{ "full", _browser_word_refused_full },
 	{ "closed", _browser_word_refused_closed },
 	{ "banned", _browser_word_refused_banned },
+	{ "name", _browser_word_refused_name },
 	{ "password", _browser_word_refused_password },
 	{ "version", _browser_word_refused_version },
 	{ "token", _browser_word_refused_token },

@@ -2,6 +2,11 @@ version 39
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
+bound DISTRIBUTED_CLIENT_BUILD_FLAVOR_SIZE 16
+bound DISTRIBUTED_CLIENT_BUILD_MODS_SIZE 512
+bound DISTRIBUTED_CLIENT_BUILD_NUMBER_SIZE 12
+bound DISTRIBUTED_CLIENT_BUILD_REPOSITORY_SIZE 144
+bound DISTRIBUTED_CLIENT_BUILD_VERSION_SIZE 64
 bound DISTRIBUTED_INPUT_HISTORY 4
 bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)
 bound DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE 14
@@ -55,6 +60,7 @@ enum _distributed_message_batch 16
 enum _distributed_message_chat_config 89
 enum _distributed_message_chat_down 88
 enum _distributed_message_chat_up 87
+enum _distributed_message_client_build 92
 enum _distributed_message_client_identity 18
 enum _distributed_message_client_ready 9
 enum _distributed_message_coop_device_groups 68
@@ -238,6 +244,7 @@ struct distributed_actor_state 8bd5e771659d
 struct distributed_actor_state_message 51a56e04a536
 struct distributed_chat_config dfa4e32efe1e
 struct distributed_chat_line cdab1468ffe0
+struct distributed_client_build 503e4474b798
 struct distributed_client_identity 4d9e62025616
 struct distributed_coop_device_group 4aa3499be2cc
 struct distributed_coop_device_groups_message b96ad0030ccc

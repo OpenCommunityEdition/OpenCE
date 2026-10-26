@@ -3740,3 +3740,41 @@ static boolean main_loop_iteration(
 }
 
 /* ---------- private code */
+
+/* port: what this build is, which a client tells the hosts it joins
+(network_distributed.c's _distributed_message_client_build): its number (0
+for a build CI did not number), configuration, the GitHub repository it is
+made from (owner/name; empty if not known) and the label it shows */
+#ifndef HALO_BUILD_NUMBER
+#define HALO_BUILD_NUMBER 0
+#endif
+#ifndef HALO_BUILD_FLAVOR
+#define HALO_BUILD_FLAVOR "local"
+#endif
+#ifndef HALO_BUILD_REPOSITORY
+#define HALO_BUILD_REPOSITORY ""
+#endif
+void main_build_identity(
+	long *number,
+	char *flavor,
+	size_t flavor_size,
+	char *repository,
+	size_t repository_size,
+	char *version,
+	size_t version_size)
+{
+	*number = HALO_BUILD_NUMBER;
+	_snprintf(flavor, flavor_size - 1, "%s", HALO_BUILD_FLAVOR);
+	flavor[flavor_size - 1] = 0;
+	_snprintf(repository, repository_size - 1, "%s", HALO_BUILD_REPOSITORY);
+	repository[repository_size - 1] = 0;
+#ifdef HALO_NATIVE_BUILD_INFO
+	main_native_build_label(version, version_size);
+#else
+	if (HALO_BUILD_NUMBER > 0)
+		_snprintf(version, version_size - 1, "OpenCE Web | build %d (%s)", HALO_BUILD_NUMBER, HALO_BUILD_FLAVOR);
+	else
+		_snprintf(version, version_size - 1, "OpenCE Web | local build (%s)", HALO_BUILD_FLAVOR);
+	version[version_size - 1] = 0;
+#endif
+}
