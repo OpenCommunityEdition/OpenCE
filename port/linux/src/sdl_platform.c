@@ -2531,9 +2531,10 @@ does: SDL's input connection makes a key press of each character from space
 to '~' and of each backspace, and its Enter is the Return key, which ends the
 typing as a keyboard's does. The game's own keyboard still takes taps where
 Android's does not cover it. Android's keyboard goes as the typing ends;
-closed by hand (back), it comes again with the next name begun. */
-static SDL_AtomicInt screen_keyboard_wanted;
-static SDL_AtomicInt screen_keyboard_requests;
+closed by hand (back), it comes again with the next name begun. (The
+guest's SDL has no atomics: the compiler's.) */
+static int screen_keyboard_wanted;
+static int screen_keyboard_requests;
 
 /* port/android/guest/runtime/guest_host.h: SDL's text input for the window,
 started as the SDL_TextInputType given (one line, no autocorrection) or
@@ -2542,9 +2543,9 @@ int host_sdl_text_input(unsigned int window, int type);
 
 void platform_screen_keyboard(BOOL show, BOOL password)
 {
-	SDL_SetAtomicInt(&screen_keyboard_wanted, !show ? 0 : password ? 2 : 1);
+	__atomic_store_n(&screen_keyboard_wanted, !show ? 0 : password ? 2 : 1, __ATOMIC_SEQ_CST);
 	if (show)
-		SDL_AddAtomicInt(&screen_keyboard_requests, 1);
+		__atomic_add_fetch(&screen_keyboard_requests, 1, __ATOMIC_SEQ_CST);
 }
 
 /* (on the window's thread: platform_pump_events) */
@@ -2553,8 +2554,8 @@ static void screen_keyboard_update(void)
 	static int requests_handled;
 	static BOOL started;
 	unsigned int window = (unsigned int)(uintptr_t)platform_window;
-	int requests = SDL_GetAtomicInt(&screen_keyboard_requests);
-	int wanted = SDL_GetAtomicInt(&screen_keyboard_wanted);
+	int requests = __atomic_load_n(&screen_keyboard_requests, __ATOMIC_SEQ_CST);
+	int wanted = __atomic_load_n(&screen_keyboard_wanted, __ATOMIC_SEQ_CST);
 
 	if (!wanted)
 	{
