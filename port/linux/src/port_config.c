@@ -155,11 +155,10 @@ static const struct config_setting config_settings[] =
 		"Limit Button Style to the assigned controller's family. Unknown devices\n"
 		"keep the manual choice. Device detection itself is always available." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
-		"P1 custom controller buttons, empty for the profile's layout. Set in Gamepads >\n"
-		"Button Remapping. Ten comma-separated physical buttons, in order: jump,\n"
-		"grenade type, use/reload, weapon, melee, flashlight, grenade, fire, crouch, zoom.\n"
-		"Choose ten unique buttons: south,east,west,north,rb,lb,lt,rt,ls,rs,dpad_left.\n"
-		"Invalid lists use the profile. D-pad Left can also be assigned to an action." },
+		"P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
+		"Button Remapping. v2: stores 25 physical-button names, including unbound.\n"
+		"Gameplay and debug camera have separate bindings. Old ten-action layouts\n"
+		"are accepted. See docs/reading/controller_remapping.md for the full order." },
 	{ "input.controller_p2", _config_string, "\"\"", "HALO_CONTROLLER_P2", _environment_value, _platform_all,
 		"P2 custom controller buttons, same format as controller_p1. Empty uses the profile." },
 	{ "input.controller_p3", _config_string, "\"\"", "HALO_CONTROLLER_P3", _environment_value, _platform_all,

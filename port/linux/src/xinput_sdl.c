@@ -186,10 +186,10 @@ static void touch_used(void)
 
 /* ---------- the text chat's on-screen keyboard (halo_keyboard.h) */
 
-/* the first controller's buttons, as each read of it found them */
-static unsigned long chat_pad;
+/* Each controller's buttons, before the on-screen keyboard consumes them. */
+static unsigned long chat_pad[PORT_COUNT], chat_physical_pad[PORT_COUNT];
 
-static void chat_pad_record(const XINPUT_GAMEPAD *pad)
+static void chat_pad_record(short port, const XINPUT_GAMEPAD *pad)
 {
 	/* (an analog button pressed half way; the stick most of the way) */
 	enum { PRESSED = 0x80, PUSHED = 22000 };
@@ -208,12 +208,19 @@ static void chat_pad_record(const XINPUT_GAMEPAD *pad)
 	if (pad->sThumbLY < -PUSHED) buttons |= 1UL << HALO_CHAT_PAD_STICK_DOWN;
 	if (pad->sThumbLX < -PUSHED) buttons |= 1UL << HALO_CHAT_PAD_STICK_LEFT;
 	if (pad->sThumbLX > PUSHED) buttons |= 1UL << HALO_CHAT_PAD_STICK_RIGHT;
-	chat_pad = buttons;
+	chat_pad[port] = buttons;
+}
+
+extern short network_chat_controller(void);
+unsigned long halo_chat_pad_buttons_for_port(short port)
+{
+	return port >= 0 && port < PORT_COUNT ? chat_physical_pad[port] : 0;
 }
 
 unsigned long halo_chat_pad_buttons(void)
 {
-	return chat_pad;
+	short port = network_chat_controller();
+	return chat_pad[port >= 0 && port < PORT_COUNT ? port : 0];
 }
 
 int halo_chat_taps(float *x, float *y)
@@ -252,35 +259,35 @@ int halo_chat_touch_layout(void)
 B that closed it, the Start or the A that sent the line), which the game
 gets none of till each is let go: it would see a new press of it, a pause
 menu opened, a melee, a jump (the triggers are analog buttons too) */
-static WORD chat_held_buttons;
-static unsigned char chat_held_analog;
+static WORD chat_held_buttons[PORT_COUNT];
+static unsigned char chat_held_analog[PORT_COUNT];
 
-static void chat_pad_hold_over(XINPUT_GAMEPAD *pad)
+static void chat_pad_hold_over(short port, XINPUT_GAMEPAD *pad)
 {
 	int index;
 
-	if (network_chat_keyboard_open())
+	if (network_chat_controller() == port)
 	{
-		chat_held_buttons = pad->wButtons;
-		chat_held_analog = 0;
+		chat_held_buttons[port] = pad->wButtons;
+		chat_held_analog[port] = 0;
 		for (index = 0; index < 8; index++)
 		{
 			if (pad->bAnalogButtons[index])
-				chat_held_analog |= (unsigned char)(1 << index);
+				chat_held_analog[port] |= (unsigned char)(1 << index);
 		}
 		memset(pad, 0, sizeof(*pad));
 		return;
 	}
-	chat_held_buttons &= pad->wButtons;
-	pad->wButtons &= (WORD)~chat_held_buttons;
+	chat_held_buttons[port] &= pad->wButtons;
+	pad->wButtons &= (WORD)~chat_held_buttons[port];
 	for (index = 0; index < 8; index++)
 	{
-		if (!(chat_held_analog & (1 << index)))
+		if (!(chat_held_analog[port] & (1 << index)))
 			continue;
 		if (pad->bAnalogButtons[index])
 			pad->bAnalogButtons[index] = 0;
 		else
-			chat_held_analog &= (unsigned char)~(1 << index);
+			chat_held_analog[port] &= (unsigned char)~(1 << index);
 	}
 }
 
@@ -295,7 +302,7 @@ int halo_linux_touch_move(short controller_index, float *forward, float *strafe)
 	if (controller_index != 0)
 		return FALSE;
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
-	if (!touch_input_move(forward, strafe) || network_chat_keyboard_open())
+	if (!touch_input_move(forward, strafe) || network_chat_controller() == 0)
 	{
 		*forward = 0.0f;
 		*strafe = 0.0f;
@@ -325,7 +332,7 @@ int halo_linux_touch_look(short gamepad_index, float *yaw, float *pitch, float *
 	touch_input_look(0.0022f, yaw, pitch, gyro_yaw, gyro_pitch);
 	/* (none while the chat's on-screen keyboard is up: what was swiped is
 	dropped, not saved for after) */
-	if (network_chat_keyboard_open())
+	if (network_chat_keyboard_open() && network_chat_controller() == 0)
 	{
 		*yaw = 0.0f;
 		*pitch = 0.0f;
@@ -796,7 +803,7 @@ int halo_push_to_talk_held(void)
 		if (input_held(&input, bindings[HALO_KEYBOARD_PUSH_TO_TALK][slot]))
 			return 1;
 	}
-	return 0;
+	return controller_remap_talk();
 }
 
 /* A scroll of the wheel switches weapons once: it holds Y for WHEEL_PRESS_MS
@@ -946,7 +953,7 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		pad->sThumbLX = -32000;
 	if (test_input_pressed & (1UL << HALO_CHAT_PAD_STICK_RIGHT))
 		pad->sThumbLX = 32000;
-	if (network_chat_keyboard_open())
+	if (network_chat_keyboard_open() && network_chat_controller() == 0)
 		return;
 
 	if (!checked)
@@ -1308,6 +1315,9 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	memset(&physical, 0, sizeof(physical));
 	if (port_gamepad(gamepads, count, port))
 		sdl_gamepad_state(port_gamepad(gamepads, count, port), &physical);
+	/* Keep the opening chat press so even B can open it without immediately closing it. */
+	chat_pad_record((short)port, &physical);
+	chat_physical_pad[port] = chat_pad[port];
 	captured = controller_remap_input((short)port, &physical, port_gamepad(gamepads, count, port) != NULL);
 	if (port == 0)
 	{
@@ -1338,10 +1348,6 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
 		touch_input_controls(&state->Gamepad, input.menus);
 #endif
-		/* (the text chat's on-screen keyboard reads them, and takes them
-		while it is up) */
-		chat_pad_record(&state->Gamepad);
-		chat_pad_hold_over(&state->Gamepad);
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
 		{
@@ -1354,6 +1360,9 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	{
 		state->Gamepad = physical;
 	}
+	/* Record the owner's navigation before suppressing their gameplay input. */
+	chat_pad_record((short)port, &state->Gamepad);
+	chat_pad_hold_over((short)port, &state->Gamepad);
 	if (captured) memset(&state->Gamepad, 0, sizeof(state->Gamepad));
 
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))

@@ -117,6 +117,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
 #include "director.h"
 
 #include "camera_scripting.h"
@@ -258,6 +259,8 @@ void director_dispose_from_old_map(
 	void)
 {
 	short local_player_index;
+
+	controller_remap_reset(); /* port: release held actions and camera context between maps */
 
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
@@ -810,8 +813,16 @@ static boolean director_update_controls(
 {
 	boolean switch_camera = FALSE;
 	long player_index;
+	/* port: the remapper receives camera availability, never enables it. */
+	unsigned int pad_held, pad_pressed;
+	int remapped;
 	struct director *director = director_get(local_player_index);
 
+	remapped = controller_remap_camera(local_player_index,
+		director->camera_proc == (director_camera_update_proc)flying_camera_update ||
+		director->camera_proc == (director_camera_update_proc)editor_camera_update ||
+		director->camera_proc == (director_camera_update_proc)orbiting_camera_update,
+		director->debug_controls, &pad_held, &pad_pressed);
 	csmemset(controls, 0, sizeof(*controls));
 	controls->local_player_index = local_player_index;
 	controls->seconds_elapsed = director_globals.dtime;
@@ -841,25 +852,33 @@ static boolean director_update_controls(
 			last_ticks[local_player_index] = ticks;
 		}
 
+		/* port: a debug binding must not also cycle the camera. */
+		if (remapped) switch_camera = FALSE;
 		if (director->camera_proc !=
 				(director_camera_update_proc)first_person_camera_update &&
 			director->camera_proc !=
 				(director_camera_update_proc)following_camera_update)
 		{
-			if (gamepad->buttons[_gamepad_binary_button_right_thumb] == 1)
+			/* port: separate camera context, with stock input as the fallback. */
+			if (remapped ? (pad_pressed & (1u << PAD_CAMERA_SWITCH)) != 0 :
+				gamepad->buttons[_gamepad_binary_button_right_thumb] == 1)
 				director->debug_controls = !director->debug_controls;
-			if (director->debug_controls)
+			/* port: menus and chat retain navigation without moving the custom camera. */
+			if (director->debug_controls && (!remapped || controller_remap_playing((short)player_index)))
 			{
 				control_flags = 0;
 				SET_FLAG(
 					control_flags,
 					_camera_control_up_bit,
-					gamepad->buttons[_gamepad_analog_button_right_trigger] != 0);
+					remapped ? (pad_held & (1u << PAD_CAMERA_UP)) != 0 :
+						gamepad->buttons[_gamepad_analog_button_right_trigger] != 0);
 				SET_FLAG(
 					control_flags,
 					_camera_control_down_bit,
-					gamepad->buttons[_gamepad_analog_button_left_trigger] != 0);
-				controls->wheel_delta =
+					remapped ? (pad_held & (1u << PAD_CAMERA_DOWN)) != 0 :
+						gamepad->buttons[_gamepad_analog_button_left_trigger] != 0);
+				controls->wheel_delta = remapped ?
+					(real)(!!(pad_held & (1u << PAD_CAMERA_FASTER)) - !!(pad_held & (1u << PAD_CAMERA_SLOWER))) * 0.4f :
 					(real)((gamepad->buttons[_gamepad_binary_button_dpad_up] > 1) -
 						(gamepad->buttons[_gamepad_binary_button_dpad_down] > 1)) * 0.4f;
 				director_process_variables(
@@ -967,6 +986,8 @@ void director_initialize_for_new_map(
 	void)
 {
 	short local_player_index;
+
+	controller_remap_reset(); /* port: release held actions and camera context between maps */
 
 	director_globals.game_mode = game_in_editor() ? _director_mode_editor : _director_mode_game;
 	director_globals.initialize_camera = FALSE;
