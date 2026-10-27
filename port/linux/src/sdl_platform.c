@@ -105,13 +105,15 @@ static BOOL scoreboard_pointer_active;
 static struct platform_keystroke keystroke_queue[KEYSTROKE_QUEUE_SIZE];
 static unsigned long keystroke_head, keystroke_count;
 
+/* the system's on-screen keyboard shown or hidden as wanted (Steam's, or
+Android's) */
+static void screen_keyboard_update(void);
 #ifndef HALO_ANDROID
 /* dsound_sdl.c's: the output device followed */
 void dsound_sdl_output_device_check(void);
 /* updater.c's: the desktop self-updater */
 void updater_start(void);
 void updater_poll(SDL_Window *window);
-static void screen_keyboard_update(void);
 #ifndef HALO_GLES
 /* the windows' icon, a PNG (tools/embed_assets.py, from port/assets/icon) */
 extern const unsigned int platform_window_icon[];
@@ -2001,8 +2003,8 @@ void platform_pump_events(void)
 	updater_poll(platform_window);
 	/* (Settings > Audio's output device, as it changes: dsound_sdl.c) */
 	dsound_sdl_output_device_check();
-	screen_keyboard_update();
 #endif
+	screen_keyboard_update();
 	pthread_mutex_lock(&input_lock);
 #ifndef HALO_ANDROID
 	/* (the scoreboard closed, or no longer offering it: the pointer goes) */
@@ -2516,6 +2518,68 @@ scales the fingers' 0..1 by the drawable's size */
 void platform_video_window_size(int *width, int *height)
 {
 	platform_video_drawable_size(width, height);
+}
+
+/* ---------- the system's on-screen keyboard (Android's)
+
+While a name is typed, into the game's own keyboard (Change Name's:
+platform_text_typing) or a menu's text field (the server's name:
+platform_text_field, xinput_sdl.c), SDL's text input runs where the touch
+controls would show (touch_input_screen_buttons), which brings up Android's
+keyboard. What it types arrives as keys, as a Bluetooth or USB keyboard's
+does: SDL's input connection makes a key press of each character from space
+to '~' and of each backspace, and its Enter is the Return key, which ends the
+typing as a keyboard's does. The game's own keyboard still takes taps where
+Android's does not cover it. Android's keyboard goes as the typing ends;
+closed by hand (back), it comes again with the next name begun. (The
+guest's SDL has no atomics: the compiler's.) */
+static int screen_keyboard_wanted;
+static int screen_keyboard_requests;
+
+/* port/android/guest/runtime/guest_host.h: SDL's text input for the window,
+started as the SDL_TextInputType given (one line, no autocorrection) or
+stopped (-1); whether it runs */
+int host_sdl_text_input(unsigned int window, int type);
+
+void platform_screen_keyboard(BOOL show, BOOL password)
+{
+	__atomic_store_n(&screen_keyboard_wanted, !show ? 0 : password ? 2 : 1, __ATOMIC_SEQ_CST);
+	if (show)
+		__atomic_add_fetch(&screen_keyboard_requests, 1, __ATOMIC_SEQ_CST);
+}
+
+/* (on the window's thread: platform_pump_events) */
+static void screen_keyboard_update(void)
+{
+	static int requests_handled;
+	static BOOL started;
+	unsigned int window = (unsigned int)(uintptr_t)platform_window;
+	int requests = __atomic_load_n(&screen_keyboard_requests, __ATOMIC_SEQ_CST);
+	int wanted = __atomic_load_n(&screen_keyboard_wanted, __ATOMIC_SEQ_CST);
+
+	if (!wanted)
+	{
+		if (started)
+			host_sdl_text_input(window, -1);
+		started = FALSE;
+		return;
+	}
+	if (requests == requests_handled)
+		return;
+	requests_handled = requests;
+	/* (stopped first: one closed by hand may be held by SDL to be up still,
+	and not shown again) */
+	if (started)
+		host_sdl_text_input(window, -1);
+	started = FALSE;
+	if (!touch_input_screen_buttons())
+		return;
+	platform_log("text field: showing Android's keyboard");
+	/* (a name's as a visible password, for the keyboards' sake: no
+	suggestions, and no words held back while they are put together, so that
+	each key arrives as it is typed; a password's hidden) */
+	started = host_sdl_text_input(window,
+		wanted == 2 ? SDL_TEXTINPUT_TYPE_TEXT_PASSWORD_HIDDEN : SDL_TEXTINPUT_TYPE_TEXT_PASSWORD_VISIBLE) != 0;
 }
 
 #endif
