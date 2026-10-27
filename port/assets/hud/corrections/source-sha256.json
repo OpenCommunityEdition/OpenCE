@@ -1,0 +1,10 @@
+{
+  "rocket.png": {
+    "supplied_name": "rocketlaunchercrosshair.png",
+    "sha256": "b1e73b2a51f0ae5ffb3e1749c3020ccd2e9db9850b30f36095ecb9a28e2f6cc6"
+  },
+  "scope.png": {
+    "supplied_name": "sniper crosshair and scope zoom numbers.png",
+    "sha256": "65b73b2bc7467029c5f0baa6f7e98e2b12ea9aba4fc78684bbc2b3a2d6b302d0"
+  }
+}
