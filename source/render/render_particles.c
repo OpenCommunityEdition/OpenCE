@@ -262,7 +262,7 @@ void render_particles(
 
 					build_sprites_begin(
 						&sprite_data,
-						particle_count > 16383 ? (short)32767 : (short)(particle_count * 2),
+						particle_count,
 						definition->bitmap.index,
 						&definition->shader,
 						rendered_particle->attached_to_first_person_weapon
@@ -377,59 +377,18 @@ void render_particles(
 										particle_flags,
 										_particle_datum_v_mirror_bit));
 
-								{
-									short next_frame;
-									real blend;
-
-									/* the next cel across this tick, so the
-									flash does not cut from one sprite to the
-									next */
-									if (particle_sprite_blend(
-										rendered_particle->particle_index,
-										&next_frame,
-										&blend))
-									{
-										build_sprite(
-											&sprite_data,
-											definition->sprite_orientation,
-											particle->sequence_index,
-											particle->frame_index,
-											&position,
-											&direction,
-											particle->rotation,
-											scale,
-											&particle->color,
-											fade * (1.0f - blend),
-											flags);
-										build_sprite(
-											&sprite_data,
-											definition->sprite_orientation,
-											particle->sequence_index,
-											next_frame,
-											&position,
-											&direction,
-											particle->rotation,
-											scale,
-											&particle->color,
-											fade * blend,
-											flags);
-									}
-									else
-									{
-										build_sprite(
-											&sprite_data,
-											definition->sprite_orientation,
-											particle->sequence_index,
-											particle->frame_index,
-											&position,
-											&direction,
-											particle->rotation,
-											scale,
-											&particle->color,
-											fade,
-											flags);
-									}
-								}
+								build_sprite(
+									&sprite_data,
+									definition->sprite_orientation,
+									particle->sequence_index,
+									particle->frame_index,
+									&position,
+									&direction,
+									particle->rotation,
+									scale,
+									&particle->color,
+									fade,
+									flags);
 
 								particle->last_rendered_frame_index =
 									render.frame_index;
