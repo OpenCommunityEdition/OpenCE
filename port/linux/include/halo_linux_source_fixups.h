@@ -90,5 +90,9 @@ anti-aliasing (source/render/render.c) */
 void halo_screen_tone_map(short x0, short y0, short x1, short y1);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
+/* the debug camera's mouse and keys (source/camera/director.c): whether the
+middle button, R and F are held, and the wheel's notches since the last call
+(port/linux/src/xinput_sdl.c) */
+int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel);
 
 #endif
