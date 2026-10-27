@@ -317,6 +317,19 @@ static const struct config_setting config_settings[] =
 		"kernel's driver of it (hid-playstation, hid-sony), which needs no setup;\n"
 		"false: through SDL's own, which needs Steam's udev rules to open it. Read\n"
 		"at start-up." },
+	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
+		"Player 1's controller's own button layout (Settings > Gamepad Setup >\n"
+		"Buttons > Button Remapping), empty for the profile's: ten of south, east,\n"
+		"west, north, rb, lb, lt, rt, ls, rs and dpad_left, each once, for jump,\n"
+		"switch grenades, action, switch weapons, melee, flashlight, grenade, fire,\n"
+		"crouch and zoom, comma-separated. South is the Xbox's A, the PlayStation's\n"
+		"cross and the Switch's B." },
+	{ "input.controller_p2", _config_string, "\"\"", "HALO_CONTROLLER_P2", _environment_value, _platform_all,
+		"Player 2's controller's own button layout, as input.controller_p1's." },
+	{ "input.controller_p3", _config_string, "\"\"", "HALO_CONTROLLER_P3", _environment_value, _platform_all,
+		"Player 3's controller's own button layout, as input.controller_p1's." },
+	{ "input.controller_p4", _config_string, "\"\"", "HALO_CONTROLLER_P4", _environment_value, _platform_all,
+		"Player 4's controller's own button layout, as input.controller_p1's." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
 	{ "network.block_mouse_aim_assist", _config_boolean, "false", "HALO_NET_BLOCK_MOUSE_AIM_ASSIST", _environment_value,

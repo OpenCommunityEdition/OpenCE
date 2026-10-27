@@ -79,6 +79,8 @@ their handlers open opens.
 #include "text/unicode.h"
 
 #include "halo_menus.h"
+#include "controller_buttons.h"
+#include "controller_remap.h"
 #include "custom_edition_cache.h"
 #include "custom_edition_maps.h"
 #include "game_modes.h"
@@ -2182,6 +2184,218 @@ static void controls_update(struct widget_instance *list)
 	{
 		list->parameters.list.extended_description->parameters.text_box.string_list_index =
 			controls_screen.capturing_control != NONE ? 2 : focused_row ? 1 : 0;
+	}
+}
+
+/* ---------- Button Remapping (tools/port_settings.py's _remap_screen): a
+controller's own button layout for each of the four players
+(controller_remap.h), shown a group of controls at a time, as Controls
+Setup is. A on a control's row binds the next button pressed on that
+player's controller, left and right move it through the buttons (each
+swapping with the control that had it); Defaults is the profile's layout,
+OK writes the four settings, Cancel forgets them */
+
+#define PAD_EDITOR_ROWS 6
+
+static struct
+{
+	wchar_t const *label;
+	short group;
+} const pad_actions[CONTROLLER_REMAP_ACTIONS] =
+{
+	{ L"JUMP", 0 }, { L"SWITCH GRENADE", 1 }, { L"USE / RELOAD", 0 }, { L"SWITCH WEAPON", 1 }, { L"MELEE", 1 },
+	{ L"FLASHLIGHT", 0 }, { L"THROW GRENADE", 1 }, { L"FIRE", 1 }, { L"CROUCH", 0 }, { L"ZOOM", 1 },
+};
+
+static struct
+{
+	unsigned char buttons[CONTROLLER_PORTS][CONTROLLER_REMAP_ACTIONS];
+	/* (a player left on the profile's layout writes an empty setting) */
+	boolean custom[CONTROLLER_PORTS];
+	short capturing_action;
+	short capturing_port;
+} pad_editor;
+
+static short pad_editor_port(struct widget_instance *screen)
+{
+	struct widget_instance *spinner = named(screen, "player_spinner", 0);
+	short port = spinner ? spinner->parameters.list.selected_index : 0;
+
+	return port >= 0 && port < CONTROLLER_PORTS ? port : 0;
+}
+
+static struct widget_instance *pad_row(struct widget_instance *widget)
+{
+	for (; widget; widget = widget->parent)
+	{
+		if (!strncmp(widget->name, "op_pad_", 7))
+			return widget;
+	}
+	return NULL;
+}
+
+/* the control on a row (op_pad_<n>) in the group shown, else NONE */
+static short pad_action_of_row(struct widget_instance *row)
+{
+	struct widget_instance *spinner;
+	short wanted, group, action;
+
+	if (!row)
+		return NONE;
+	spinner = named(screen_of(row), "group_spinner", 0);
+	group = spinner ? spinner->parameters.list.selected_index : 0;
+	wanted = (short)(atoi(row->name + 7) - 1);
+	for (action = 0; action < CONTROLLER_REMAP_ACTIONS && wanted >= 0; action++)
+	{
+		if (pad_actions[action].group == group && wanted-- == 0)
+			return action;
+	}
+	return NONE;
+}
+
+/* "port controller init" (the screen's created): each player's layout, or
+the profile's */
+static boolean pad_editor_load(struct widget_instance *widget)
+{
+	struct widget_instance *spinner = named(screen_of(widget), "player_spinner", 0);
+	short port;
+
+	controller_remap_capture_end();
+	pad_editor.capturing_action = NONE;
+	for (port = 0; port < CONTROLLER_PORTS; port++)
+	{
+		controller_remap_profile(port, pad_editor.buttons[port]);
+		pad_editor.custom[port] = (boolean)controller_remap_read(port, pad_editor.buttons[port]);
+	}
+	/* (the player who opened it first) */
+	if (spinner)
+		spinner->parameters.list.selected_index = controller_of(widget);
+	return TRUE;
+}
+
+/* "port controller save" (OK) */
+static boolean pad_editor_save(void)
+{
+	boolean result = TRUE;
+	short port;
+
+	for (port = 0; port < CONTROLLER_PORTS; port++)
+	{
+		char text[CONTROLLER_REMAP_TEXT] = "";
+
+		if (pad_editor.custom[port])
+			controller_remap_format(pad_editor.buttons[port], text, sizeof(text));
+		if (strcmp(text, config_string(controller_remap_setting(port))))
+		{
+			if (config_write(controller_remap_setting(port), text))
+				platform_log("menus: %s = %s", controller_remap_setting(port), text);
+			else
+				result = FALSE;
+		}
+	}
+	return result;
+}
+
+/* the screen's functions, "port controller <name>" */
+static boolean pad_editor_event(struct widget_instance *widget, char const *name)
+{
+	short port = pad_editor_port(screen_of(widget));
+	short action;
+
+	if (!strcmp(name, "init"))
+		return pad_editor_load(widget);
+	if (!strcmp(name, "close"))
+	{
+		pad_editor.capturing_action = NONE;
+		controller_remap_capture_end();
+	}
+	else if (!strcmp(name, "defaults"))
+	{
+		controller_remap_profile(port, pad_editor.buttons[port]);
+		pad_editor.custom[port] = FALSE;
+	}
+	else if (!strcmp(name, "save"))
+	{
+		return pad_editor_save();
+	}
+	else if ((action = pad_action_of_row(pad_row(widget))) != NONE)
+	{
+		if (!strcmp(name, "bind"))
+		{
+			pad_editor.capturing_action = action;
+			pad_editor.capturing_port = port;
+			controller_remap_capture_begin(port);
+		}
+		else if (!strcmp(name, "left") || !strcmp(name, "right"))
+		{
+			controller_remap_swap(pad_editor.buttons[port], action,
+				controller_remap_cycle(pad_editor.buttons[port][action], !strcmp(name, "left") ? -1 : 1));
+			pad_editor.custom[port] = TRUE;
+		}
+	}
+	return TRUE;
+}
+
+/* the button a capture took */
+static void pad_editor_capture_poll(void)
+{
+	int button = 0;
+	int result;
+
+	if (pad_editor.capturing_action == NONE)
+		return;
+	result = controller_remap_capture_poll(&button);
+	if (result == _remap_capture_waiting)
+		return;
+	if (result == _remap_capture_bound)
+	{
+		controller_remap_swap(pad_editor.buttons[pad_editor.capturing_port], pad_editor.capturing_action, button);
+		pad_editor.custom[pad_editor.capturing_port] = TRUE;
+	}
+	pad_editor.capturing_action = NONE;
+}
+
+/* "port controller update": the group's rows, each control's button as the
+player's controller names it, and the help */
+static void pad_editor_update(struct widget_instance *list)
+{
+	struct widget_instance *row;
+	struct controller_device device;
+	short port = pad_editor_port(screen_of(list));
+
+	pad_editor_capture_poll();
+	controller_device_get(port, &device);
+	for (row = list->child; row; row = row->next)
+	{
+		short action;
+		char const *shown;
+		wchar_t text[ROW_TEXT_LENGTH];
+		short index;
+
+		if (strncmp(row->name, "op_pad_", 7))
+			continue;
+		action = pad_action_of_row(row);
+		row->visible = action != NONE;
+		if (action == NONE)
+		{
+			if (row == pad_row(list->focused_child))
+				focus_row(list, 1);
+			continue;
+		}
+		text_set(named(row, "pad_action", 0), pad_actions[action].label);
+		if (pad_editor.capturing_action == action && pad_editor.capturing_port == port)
+			shown = "PRESS A BUTTON";
+		else
+			shown = controller_remap_button_name(pad_editor.buttons[port][action], device.family);
+		for (index = 0; shown[index] && index < ROW_TEXT_LENGTH - 1; index++)
+			text[index] = (wchar_t)(unsigned char)shown[index];
+		text[index] = 0;
+		text_set(named(row, "pad_binding", 0), text);
+	}
+	if (list->parameters.list.extended_description)
+	{
+		list->parameters.list.extended_description->parameters.text_box.string_list_index =
+			pad_editor.capturing_action != NONE ? 2 : pad_row(list->focused_child) ? 1 : 0;
 	}
 }
 
@@ -6433,6 +6647,10 @@ boolean pc_menu_event_function_invoke(
 		{
 			return mods_save();
 		}
+		else if (!strncmp(name, "port controller ", 16))
+		{
+			return pad_editor_event(widget, name + 16);
+		}
 		else if (!strcmp(name, "controls screen init") || !strcmp(name, "controls screen defaults"))
 		{
 			return controls_load(!strcmp(name, "controls screen defaults"));
@@ -6611,6 +6829,8 @@ void pc_menu_game_data_function_invoke(
 	}
 	else if (!strcmp(name, "controls update menu"))
 		controls_update(widget);
+	else if (!strcmp(name, "port controller update"))
+		pad_editor_update(widget);
 	else if (!strcmp(name, "port mods update"))
 		mods_update(widget);
 	else if (!strcmp(name, "color picker update"))

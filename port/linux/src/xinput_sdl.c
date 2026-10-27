@@ -45,6 +45,7 @@ drive the controller.
 extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
 #include "controller_buttons.h"
+#include "controller_remap.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -1137,13 +1138,8 @@ static SHORT stick(Sint16 value, BOOL flip)
 	return (SHORT)result;
 }
 
-static void merge_button(XINPUT_GAMEPAD *pad, int analog_index, BOOL down)
-{
-	if (down)
-		pad->bAnalogButtons[analog_index] = 0xff;
-}
-
-static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
+/* a pad as SDL has it */
+static void sdl_gamepad_read(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 {
 	static const struct
 	{
@@ -1160,39 +1156,63 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 		{ SDL_GAMEPAD_BUTTON_LEFT_STICK, XINPUT_GAMEPAD_LEFT_THUMB },
 		{ SDL_GAMEPAD_BUTTON_RIGHT_STICK, XINPUT_GAMEPAD_RIGHT_THUMB },
 	};
+	static const struct
+	{
+		SDL_GamepadButton button;
+		int analog_index;
+	} analog[] =
+	{
+		{ SDL_GAMEPAD_BUTTON_SOUTH, XINPUT_GAMEPAD_A },
+		{ SDL_GAMEPAD_BUTTON_EAST, XINPUT_GAMEPAD_B },
+		{ SDL_GAMEPAD_BUTTON_WEST, XINPUT_GAMEPAD_X },
+		{ SDL_GAMEPAD_BUTTON_NORTH, XINPUT_GAMEPAD_Y },
+		/* the Duke's white and black buttons sit where later pads have shoulders */
+		{ SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, XINPUT_GAMEPAD_WHITE },
+		{ SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, XINPUT_GAMEPAD_BLACK },
+	};
 	int index;
 	int left_trigger, right_trigger;
-	SHORT value;
 
+	memset(pad, 0, sizeof(*pad));
 	for (index = 0; index < (int)(sizeof(digital) / sizeof(digital[0])); index++)
 	{
 		if (SDL_GetGamepadButton(gamepad, digital[index].button))
 			pad->wButtons |= digital[index].mask;
 	}
-	merge_button(pad, XINPUT_GAMEPAD_A, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH));
-	merge_button(pad, XINPUT_GAMEPAD_B, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_EAST));
-	merge_button(pad, XINPUT_GAMEPAD_X, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_WEST));
-	merge_button(pad, XINPUT_GAMEPAD_Y, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_NORTH));
-	/* the Duke's white and black buttons sit where later pads have shoulders */
-	merge_button(pad, XINPUT_GAMEPAD_WHITE, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER));
-	merge_button(pad, XINPUT_GAMEPAD_BLACK, SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER));
-
+	for (index = 0; index < (int)(sizeof(analog) / sizeof(analog[0])); index++)
+	{
+		if (SDL_GetGamepadButton(gamepad, analog[index].button))
+			pad->bAnalogButtons[analog[index].analog_index] = 0xff;
+	}
 	left_trigger = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) * 255 / 32767;
 	right_trigger = SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) * 255 / 32767;
-	if (left_trigger > pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER])
+	if (left_trigger > 0)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] = (BYTE)left_trigger;
-	if (right_trigger > pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER])
+	if (right_trigger > 0)
 		pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] = (BYTE)right_trigger;
+	pad->sThumbLX = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX), FALSE);
+	pad->sThumbLY = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY), TRUE);
+	pad->sThumbRX = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX), FALSE);
+	pad->sThumbRY = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY), TRUE);
+}
 
-	/* a stick only overrides the keyboard when it is pushed further */
-	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTX), FALSE);
-	if (abs(value) > abs(pad->sThumbLX)) pad->sThumbLX = value;
-	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFTY), TRUE);
-	if (abs(value) > abs(pad->sThumbLY)) pad->sThumbLY = value;
-	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTX), FALSE);
-	if (abs(value) > abs(pad->sThumbRX)) pad->sThumbRX = value;
-	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY), TRUE);
-	if (abs(value) > abs(pad->sThumbRY)) pad->sThumbRY = value;
+/* one pad's input added to another's (the controller's to the keyboard's
+and touch controls', port 0): a button held on either, the further pull of
+each, and a stick only where it is pushed further */
+static void gamepad_merge(XINPUT_GAMEPAD const *source, XINPUT_GAMEPAD *target)
+{
+	int index;
+
+	target->wButtons |= source->wButtons;
+	for (index = 0; index < (int)sizeof(source->bAnalogButtons); index++)
+	{
+		if (source->bAnalogButtons[index] > target->bAnalogButtons[index])
+			target->bAnalogButtons[index] = source->bAnalogButtons[index];
+	}
+	if (abs(source->sThumbLX) > abs(target->sThumbLX)) target->sThumbLX = source->sThumbLX;
+	if (abs(source->sThumbLY) > abs(target->sThumbLY)) target->sThumbLY = source->sThumbLY;
+	if (abs(source->sThumbRX) > abs(target->sThumbRX)) target->sThumbRX = source->sThumbRX;
+	if (abs(source->sThumbRY) > abs(target->sThumbRY)) target->sThumbRY = source->sThumbRY;
 }
 
 /* ---------- XAPI */
@@ -1295,14 +1315,24 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 {
 	int port = controller_port(device);
 	SDL_Gamepad *gamepads[PORT_COUNT];
+	SDL_Gamepad *gamepad;
+	XINPUT_GAMEPAD pad;
 	int count;
+	int captured;
 
 	memset(state, 0, sizeof(*state));
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
 	platform_pump_events();
 	count = sdl_gamepads(gamepads);
-	controller_device_update((short)port, port_gamepad(gamepads, count, port));
+	gamepad = port_gamepad(gamepads, count, port);
+	controller_device_update((short)port, gamepad);
+	/* (the controller's buttons in its player's own layout, before the
+	keyboard's and the touch controls' are added: controller_remap_input.c) */
+	memset(&pad, 0, sizeof(pad));
+	if (gamepad)
+		sdl_gamepad_read(gamepad, &pad);
+	captured = controller_remap_input((short)port, &pad, gamepad != NULL);
 	if (port == 0)
 	{
 		struct platform_input_state input;
@@ -1325,8 +1355,8 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			else
 				keyboard_controls(held, &state->Gamepad);
 		}
-		if (port_gamepad(gamepads, count, 0))
-			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+		if (gamepad)
+			gamepad_merge(&pad, &state->Gamepad);
 		test_input_gamepad(&state->Gamepad);
 		touch_input_gamepad(&state->Gamepad);
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
@@ -1344,10 +1374,13 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			pthread_mutex_unlock(&mouse_lock);
 		}
 	}
-	else if (port_gamepad(gamepads, count, port))
+	else if (gamepad)
 	{
-		sdl_gamepad_state(port_gamepad(gamepads, count, port), &state->Gamepad);
+		state->Gamepad = pad;
 	}
+	/* (a button being bound reaches neither the game nor the menus) */
+	if (captured)
+		memset(&state->Gamepad, 0, sizeof(state->Gamepad));
 
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
 	{

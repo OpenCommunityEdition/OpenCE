@@ -238,6 +238,16 @@ SCREENS["gamepad_setup/buttons"] = {
         ("SWITCH:", "display.hud_button_style_switch", SWITCH_BUTTON_STYLES,
          "Auto's style for Switch controllers.", None),
     ],
+    "categories": [("BUTTON REMAPPING:", "gamepad_setup/buttons/remapping",
+                    "Your own button layout for each player's\ncontroller; the profile's is left as it is.")],
+}
+# (its Button Remapping: _remap_screen, not a screen of settings' rows)
+SCREENS["gamepad_setup/buttons/remapping"] = {
+    "screen": "button_remapping_screen",
+    "header": SCREENS["gamepad_setup/buttons"]["header"],
+    "spacing": 30,
+    "rows": [],
+    "remap": True,
 }
 
 # Video Setup's categories open ordinary settings screens. Each has the same
@@ -641,11 +651,72 @@ def _controls_screen() -> list:
                    extra)
 
 
+# Button Remapping's rows of controls (menu_functions.c's PAD_EDITOR_ROWS:
+# its larger group's)
+REMAP_ROWS = 6
+
+
+def _remap_screen(folder: str, spec: dict) -> list:
+    """Button Remapping (menu_functions.c's pad editor): the player and the
+    controls shown, then a row for each control shown, with its button"""
+    base = f"{PE}/{folder}"
+    rows, extra = [], []
+    for key, label, choices in [("player", "PLAYER:", ["P1", "P2", "P3", "P4"]),
+                                ("group", "SHOW:", ["MOVEMENT / ACTIONS", "COMBAT"])]:
+        row = f"{base}/op_{key}"
+        rows.append((row, None))
+        extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
+                          f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 200), ("y", 1)])}/>'])
+        extra += _widget(f"{base}/{key}_label",
+                         [("type", "text"), ("controller", 1), ("width", 200), ("height", 22), ("text", label),
+                          ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        extra += _widget(f"{base}/{key}_spinner",
+                         [("type", "spinner"), ("left", 3), ("top", 2), ("width", 297), ("height", 20),
+                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                          ("strings", "|".join(choices)), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
+                          ("align", "center"), ("text_y", 1), ("header_bitmap", "bitmaps/arrow_sm_left"),
+                          ("footer_bitmap", "bitmaps/arrow_sm_right"), ("header_bounds", "7 -6 19 0"),
+                          ("footer_bounds", "7 300 19 306")], [])
+    for index in range(REMAP_ROWS):
+        row = f"{base}/op_pad_{index + 1}"
+        rows.append((row, None))
+        extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         ['<on event="a" run="port controller bind"/>',
+                          '<on event="start" run="port controller bind"/>',
+                          '<on event="left" run="port controller left"/>',
+                          '<on event="right" run="port controller right"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>',
+                          f'<child{attributes([("widget", f"{base}/pad_action")])}/>',
+                          f'<child{attributes([("widget", f"{base}/pad_binding"), ("x", 220)])}/>'])
+    extra += _widget(f"{base}/pad_action",
+                     [("type", "text"), ("controller", 1), ("width", 220), ("height", 22), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+    extra += _widget(f"{base}/pad_binding",
+                     [("type", "text"), ("controller", 1), ("width", 280), ("height", 22), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4), ("text_flags", "no_focus_test")], [])
+    extra += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port controller defaults"/>',
+                                                    '<on event="start" run="port controller defaults"/>'])
+    extra += _button(f"{base}/button_ok", 1, ['<on event="a" run="port controller save" back="true"/>',
+                                              '<on event="start" run="port controller save" back="true"/>'])
+    extra += _strings(f"{base}/help_strings", [
+        "Choose the player, and the controls shown,\\nwith left and right.",
+        "A, then the button to use on the player's\\ncontroller; left and right go through them.",
+        "Press a button on the player's controller.\\nStart or Back cancels.",
+    ])
+    return _screen(folder, spec, rows, ["port controller update"],
+                   ['<on event="created" run="port controller init"/>',
+                    '<on event="deleted" run="port controller close"/>'], extra)
+
+
 def settings_files() -> dict:
     """the files of the port's screens, by their names in ce/"""
     files = {}
     for folder, spec in SCREENS.items():
-        files[f"{PE}/{folder}".replace("/", ".") + ".xml"] = _setting_screen(folder, spec)
+        files[f"{PE}/{folder}".replace("/", ".") + ".xml"] = (_remap_screen(folder, spec) if spec.get("remap")
+                                                               else _setting_screen(folder, spec))
     files[f"{PE}/controls_setup".replace("/", ".") + ".xml"] = _controls_screen()
     return {name: ['<?xml version="1.0" encoding="UTF-8"?>',
                    "<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->",
