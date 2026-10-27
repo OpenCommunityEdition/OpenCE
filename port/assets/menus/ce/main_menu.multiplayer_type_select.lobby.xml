@@ -7,7 +7,8 @@
 		<on event="created" run="net server allow start"/>
 		<on event="b" run="port lobby leave" back="true"/>
 		<on event="back" run="port lobby leave" back="true"/>
-		<on event="start" run="port lobby join" open="main_menu/multiplayer_type_select/lobby/player_profile_screen" branch="true"/>
+		<on event="start" run="port lobby join"/>
+		<on event="y" run="port lobby add player" open="main_menu/multiplayer_type_select/lobby/join4_screen"/>
 		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_list"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/header_lobby"/>
@@ -115,8 +116,8 @@
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_button_leave" x="510" y="1"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_button_add" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="ADD PLAYER" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
-		<on event="a" run="port lobby add player"/>
-		<on event="start" run="port lobby add player"/>
+		<on event="a" run="port lobby add player" open="main_menu/multiplayer_type_select/lobby/join4_screen"/>
+		<on event="start" run="port lobby add player" open="main_menu/multiplayer_type_select/lobby/join4_screen"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_button_team" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="SWITCH TEAM" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
@@ -167,7 +168,8 @@
 		<on event="created" run="port lobby open"/>
 		<on event="b" run="port lobby preview leave" back="true"/>
 		<on event="back" run="port lobby preview leave" back="true"/>
-		<on event="start" run="port lobby preview add" open="main_menu/multiplayer_type_select/lobby/player_profile_screen" branch="true"/>
+		<on event="start" run="port lobby preview add"/>
+		<on event="y" run="port lobby add player" open="main_menu/multiplayer_type_select/lobby/join4_screen"/>
 		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/preview_list"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/header_lobby"/>
@@ -191,13 +193,46 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/preview_button_add" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="ADD PLAYER" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
-		<on event="a" run="port lobby add player"/>
-		<on event="start" run="port lobby add player"/>
+		<on event="a" run="port lobby add player" open="main_menu/multiplayer_type_select/lobby/join4_screen"/>
+		<on event="start" run="port lobby add player" open="main_menu/multiplayer_type_select/lobby/join4_screen"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/preview_button_back" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="mouse emit back event"/>
 		<on event="start" run="mouse emit back event"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_screen" width="640" height="480" bitmap="bitmaps/gradient">
+		<on event="created" run="port join4 open"/>
+		<on event="created" run="net server defer start"/>
+		<on event="b" run="port join4 back" back="true"/>
+		<on event="back" run="port join4 back" back="true"/>
+		<on event="start" run="port join4 done" back="true"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/header_add_player"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_slots"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_notice" x="20" y="394"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_help" x="20" y="420"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_slots" width="640" height="480">
+		<data input="port join4 update"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot" x="20" y="75"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot" x="325" y="75"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot" x="20" y="235"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot" x="325" y="235"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_slot" width="295" height="150" bitmap="bitmaps/alert_bkd">
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot_title" x="12" y="8"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot_name" y="58"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot_status" y="110"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_slot_title" type="text" width="270" height="28" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_slot_name" type="text" width="295" height="30" font="ui\large_ui" color="#FFFFFFFF" align="center" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_slot_status" type="text" width="295" height="24" font="ui\small_ui" color="#FF2896FF" align="center" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_notice" type="text" width="600" height="24" font="ui\small_ui" color="#FFFFFFFF" align="center" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_help" type="text" width="600" height="24" text="A or SPACE: join    LEFT / RIGHT: profile    A: ready    B: back    START or ENTER: done" font="ui\small_ui" color="#FF2896FF" align="center" text_y="5" text_flags="no_focus_test">
 	</widget>
 </menus>

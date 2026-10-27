@@ -369,6 +369,7 @@ static char const *const port_function_names[] =
 	"port pause end game", "port coop friendly fire",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
+	"port join4 open", "port join4 back", "port join4 done",
 	"port lobby player list initialize", "port lobby player choose",
 	"port lobby preview add", "port lobby preview leave",
 	/* (the gametype editor's: the Xbox's walk their rows by place, which the
@@ -408,7 +409,7 @@ static char const *const port_game_data_input_names[] =
 	"mp map list update", "gt select list update", "gt edit list update", "load game list update",
 	"direct ip connect update", "network settings update",
 	"port settings help", "color picker update", "3wide player profile list update", "port lobby update",
-	"port lobby preview update",
+	"port lobby preview update", "port join4 update",
 	/* (the gametype editor's: the Xbox's stops the game on the buttons'
 	row; the Xbox's read only player_ui's gametype, not Server Setup's) */
 	"game settings lists text update", "get edit game settings name", "mp edit profile set rule text",

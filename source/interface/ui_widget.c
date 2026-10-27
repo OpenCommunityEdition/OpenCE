@@ -7740,11 +7740,18 @@ static boolean widget_takes_any_controller(
 		(we_are_at_the_main_menu || players_port_local_player_count() <= 1);
 }
 
+/* port: (port/linux/game/menu_functions.c) the network lobby, which reads
+every controller's events however many players there are: another
+controller's START joins it, a player's B leaves it (its handlers know each
+controller), where a screen of player 1's would read theirs alone */
+extern unsigned char pc_menu_screen_reads_every_controller(struct widget_instance const *widget);
+
 /* port: the controller whose events a screen reads (NONE: every one's) */
 static short widget_event_controller(
 	struct widget_instance const *widget)
 {
-	return widget_takes_any_controller(widget) ? NONE : widget->local_player_index;
+	return widget_takes_any_controller(widget) || pc_menu_screen_reads_every_controller(widget) ? NONE :
+		widget->local_player_index;
 }
 
 /* port: whether a widget of the local player (NONE: any) takes the
@@ -7762,7 +7769,7 @@ static boolean widget_takes_events_of_controller(
 	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
 		return TRUE;
 	if (controller_index > 0 && controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS &&
-		widget_takes_any_controller(widget))
+		(widget_takes_any_controller(widget) || pc_menu_screen_reads_every_controller(widget)))
 	{
 		return TRUE;
 	}

@@ -88,6 +88,15 @@ static struct controller controllers[PORT_COUNT];
 static struct controller keyboard_device;
 static DWORD reported_gamepads = 0;
 static BOOL reported_keyboard = FALSE;
+/* the 4-way join screen's SPACE (menu_functions.c's join4): the keyboard
+plays player 1 alone, and the gamepad that shared port 0 with it takes the
+first port no gamepad has (port_gamepad), asked for and in effect */
+static BOOL keyboard_alone_wanted, keyboard_alone;
+/* the keyboard's join key (SPACE) and done key (Enter) held, as the menus
+read them (keyboard_gamepad), and the test script's (virtual_gamepads_update) */
+static BOOL keyboard_join_down, keyboard_done_down, virtual_keyboard_join, virtual_keyboard_done;
+/* polls of port 0 left with START held (halo_keyboard_press_start) */
+static int keyboard_start_polls;
 
 /* ---------- mouse */
 
@@ -504,8 +513,9 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 
 	/* (escape backs out, as backspace does: the pause menu's B resumes the
 	game, the main menu's asks to quit; Start would choose, as A does) */
-	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(k[SDL_SCANCODE_SPACE] || k[SDL_SCANCODE_RETURN] ||
-		k[SDL_SCANCODE_KP_ENTER]);
+	keyboard_join_down = k[SDL_SCANCODE_SPACE] || virtual_keyboard_join;
+	keyboard_done_down = k[SDL_SCANCODE_RETURN] || k[SDL_SCANCODE_KP_ENTER] || virtual_keyboard_done;
+	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(keyboard_join_down || keyboard_done_down);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_ESCAPE] || k[SDL_SCANCODE_BACKSPACE] ||
 		(mouse && m[SDL_BUTTON_X1]));
 #ifdef HALO_ANDROID
@@ -514,6 +524,11 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 #endif
 	pad->bAnalogButtons[XINPUT_GAMEPAD_X] |= analog(k[SDL_SCANCODE_DELETE] || k[SDL_SCANCODE_E]);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB]);
+	if (keyboard_start_polls > 0)
+	{
+		keyboard_start_polls--;
+		pad->wButtons |= XINPUT_GAMEPAD_START;
+	}
 }
 
 /* the keys held when the game and the menus switch, or typing or the
@@ -1058,6 +1073,10 @@ static int sdl_gamepads(SDL_Gamepad *gamepads[PORT_COUNT])
 
 /* whether one gamepad is port 1's (port_gamepad) */
 static BOOL lone_gamepad_split;
+/* pc_menu_split_players, as the game's thread last read it (XInputGetState):
+port_gamepad also runs on the input thread's rumble (XInputSetState), which
+must not read the game's state while the game's thread has it */
+static BOOL split_players;
 
 /* no button of the gamepad held, its sticks and triggers at rest */
 static BOOL gamepad_idle(SDL_Gamepad *gamepad)
@@ -1086,14 +1105,59 @@ static SDL_Gamepad *port_gamepad(SDL_Gamepad *gamepads[PORT_COUNT], int count, i
 {
 	if (count == 1)
 	{
-		BOOL split = pc_menu_split_players() != 0;
+		BOOL split = split_players;
 
 		if (split != lone_gamepad_split && gamepad_idle(gamepads[0]))
 			lone_gamepad_split = split;
 		if (lone_gamepad_split)
 			return port == 1 ? gamepads[0] : NULL;
 	}
+	/* (back to one player: the keyboard shares port 0 again) */
+	if (!split_players)
+		keyboard_alone_wanted = FALSE;
+	if (keyboard_alone != keyboard_alone_wanted && count > 1 && gamepad_idle(gamepads[0]))
+		keyboard_alone = keyboard_alone_wanted;
+	if (keyboard_alone && count > 1 && count < PORT_COUNT)
+		return port == 0 ? NULL : port == count ? gamepads[0] : port < count ? gamepads[port] : NULL;
 	return port < count ? gamepads[port] : NULL;
+}
+
+unsigned char halo_keyboard_join_held(void)
+{
+	return keyboard_join_down || virtual_keyboard_join;
+}
+
+unsigned char halo_keyboard_done_held(void)
+{
+	return keyboard_done_down || virtual_keyboard_done;
+}
+
+/* (the 4-way join screen's Enter) player 1's START, pressed for the next
+two polls: the menus read it as the controller's */
+void halo_keyboard_press_start(void)
+{
+	keyboard_start_polls = 2;
+}
+
+void halo_keyboard_alone_set(unsigned char alone)
+{
+	keyboard_alone_wanted = alone != 0;
+}
+
+/* whether port 0 (player 1) is the keyboard's and a gamepad's */
+unsigned char halo_keyboard_shares_gamepad(void)
+{
+	SDL_Gamepad *gamepads[PORT_COUNT];
+	int count = sdl_gamepads(gamepads);
+
+	return port_gamepad(gamepads, count, 0) != NULL;
+}
+
+int halo_gamepad_count(void)
+{
+	SDL_Gamepad *gamepads[PORT_COUNT];
+
+	return sdl_gamepads(gamepads);
 }
 
 static SHORT stick(Sint16 value, BOOL flip)
@@ -1161,6 +1225,196 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 	if (abs(value) > abs(pad->sThumbRX)) pad->sThumbRX = value;
 	value = stick(SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHTY), TRUE);
 	if (abs(value) > abs(pad->sThumbRY)) pad->sThumbRY = value;
+}
+
+/* ---------- virtual gamepads (tests)
+
+debug.virtual_gamepads attaches that many SDL virtual gamepads (1 to 4),
+which the game takes for gamepads plugged in, after any real ones; and
+debug.virtual_gamepad_script drives them: entries "<seconds> <pad> <what>"
+separated by semicolons, the seconds from when the network lobby first
+opens (the game loads at its own pace before), the pad 1 to 4 in the order
+attached (0: the keyboard, whose a is SPACE and start Enter), and what one
+of a, b, x, y, start, back, up, down, left, right, lb, rb, lt or rt (pressed
+for 150 ms and until the game has read it), "walk" (the sticks moving and
+turning from then on, each pad its own way) or "still". For testing split
+screen without four controllers. */
+
+#define VIRTUAL_PRESS_MS 150
+
+static SDL_Joystick *virtual_pads[PORT_COUNT];
+static int virtual_pad_count = -1;
+static Uint64 virtual_pads_since;
+static BOOL virtual_pad_walking[PORT_COUNT];
+/* how many polls each of the script's first entries has been pressed for
+(a press lasts until 8 polls, two frames or so, have seen it, however slow
+the frames) */
+#define VIRTUAL_ENTRIES 64
+static int virtual_entry_polls[VIRTUAL_ENTRIES];
+
+/* (menu_functions.c: the network lobby opening) the script's clock starts,
+the first time */
+void halo_virtual_gamepads_start(void)
+{
+	if (!virtual_pads_since && virtual_pad_count > 0)
+		virtual_pads_since = SDL_GetTicks();
+}
+
+static void virtual_gamepads_attach(void)
+{
+	long wanted = config_integer("debug.virtual_gamepads");
+	int index;
+
+	virtual_pad_count = 0;
+	if (wanted <= 0)
+		return;
+	/* (the test runs while other windows have the focus) */
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+	if (wanted > PORT_COUNT)
+		wanted = PORT_COUNT;
+	for (index = 0; index < wanted; index++)
+	{
+		/* (SDL keeps the name's pointer) */
+		static char names[PORT_COUNT][32];
+		SDL_VirtualJoystickDesc desc;
+		SDL_JoystickID id;
+		char *name = names[index];
+
+		SDL_INIT_INTERFACE(&desc);
+		snprintf(name, sizeof(names[index]), "OpenCE virtual gamepad %d", index + 1);
+		desc.type = SDL_JOYSTICK_TYPE_GAMEPAD;
+		desc.naxes = SDL_GAMEPAD_AXIS_COUNT;
+		desc.nbuttons = SDL_GAMEPAD_BUTTON_COUNT;
+		desc.axis_mask = (1u << SDL_GAMEPAD_AXIS_COUNT) - 1;
+		desc.button_mask = (1u << SDL_GAMEPAD_BUTTON_COUNT) - 1;
+		desc.name = name;
+		id = SDL_AttachVirtualJoystick(&desc);
+		if (!id || !(virtual_pads[virtual_pad_count] = SDL_OpenJoystick(id)))
+		{
+			platform_log("virtual gamepads: %s", SDL_GetError());
+			break;
+		}
+		virtual_pad_count++;
+	}
+	platform_log("virtual gamepads: %d attached", virtual_pad_count);
+}
+
+static int virtual_button(const char *what, size_t length)
+{
+	static const struct
+	{
+		const char *name;
+		int button;
+	} buttons[] =
+	{
+		{ "a", SDL_GAMEPAD_BUTTON_SOUTH }, { "b", SDL_GAMEPAD_BUTTON_EAST },
+		{ "x", SDL_GAMEPAD_BUTTON_WEST }, { "y", SDL_GAMEPAD_BUTTON_NORTH },
+		{ "start", SDL_GAMEPAD_BUTTON_START }, { "back", SDL_GAMEPAD_BUTTON_BACK },
+		{ "up", SDL_GAMEPAD_BUTTON_DPAD_UP }, { "down", SDL_GAMEPAD_BUTTON_DPAD_DOWN },
+		{ "left", SDL_GAMEPAD_BUTTON_DPAD_LEFT }, { "right", SDL_GAMEPAD_BUTTON_DPAD_RIGHT },
+		{ "lb", SDL_GAMEPAD_BUTTON_LEFT_SHOULDER }, { "rb", SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER },
+	};
+	unsigned int index;
+
+	for (index = 0; index < sizeof(buttons) / sizeof(buttons[0]); index++)
+	{
+		if (strlen(buttons[index].name) == length && !strncmp(what, buttons[index].name, length))
+			return buttons[index].button;
+	}
+	return -1;
+}
+
+/* the script's state at this moment, set on the pads */
+static void virtual_gamepads_update(void)
+{
+	BOOL pressed[PORT_COUNT][SDL_GAMEPAD_BUTTON_COUNT];
+	int triggers[PORT_COUNT][2];
+	BOOL keyboard_pressed = FALSE, keyboard_enter = FALSE;
+	const char *entry;
+	int entry_index;
+	double now;
+	int pad, index;
+
+	if (virtual_pad_count < 0)
+		virtual_gamepads_attach();
+	if (!virtual_pad_count)
+		return;
+	entry = config_string("debug.virtual_gamepad_script");
+	/* (nothing pressed until the lobby opens: halo_virtual_gamepads_start) */
+	now = virtual_pads_since ? (double)(SDL_GetTicks() - virtual_pads_since) / 1000.0 : -1.0;
+	memset(pressed, 0, sizeof(pressed));
+	memset(triggers, 0, sizeof(triggers));
+	for (entry_index = 0; *entry; entry_index++)
+	{
+		double at = 0.0;
+		int number = 0, consumed = 0;
+		char what[16];
+		BOOL held;
+
+		entry += strspn(entry, " ;");
+		if (!*entry)
+			break;
+		held = FALSE;
+		if (sscanf(entry, "%lf %d %15[a-z]%n", &at, &number, what, &consumed) == 3)
+		{
+			held = now >= at && entry_index < VIRTUAL_ENTRIES &&
+				(now < at + VIRTUAL_PRESS_MS / 1000.0 || virtual_entry_polls[entry_index] < 8);
+			if (held && strcmp(what, "walk") && strcmp(what, "still"))
+				virtual_entry_polls[entry_index]++;
+		}
+		if (sscanf(entry, "%lf %d %15[a-z]%n", &at, &number, what, &consumed) == 3 && number == 0 && held)
+		{
+			/* (the keyboard: a is SPACE, start Enter) */
+			if (!strcmp(what, "a"))
+				keyboard_pressed = TRUE;
+			else if (!strcmp(what, "start"))
+				keyboard_enter = TRUE;
+		}
+		else if (sscanf(entry, "%lf %d %15[a-z]%n", &at, &number, what, &consumed) == 3 && number >= 1 &&
+			number <= virtual_pad_count && now >= at)
+		{
+			int button = virtual_button(what, strlen(what));
+
+			pad = number - 1;
+			if (!strcmp(what, "walk"))
+				virtual_pad_walking[pad] = TRUE;
+			else if (!strcmp(what, "still"))
+				virtual_pad_walking[pad] = FALSE;
+			else if (held)
+			{
+				if (button >= 0)
+					pressed[pad][button] = TRUE;
+				else if (!strcmp(what, "lt"))
+					triggers[pad][0] = 32767;
+				else if (!strcmp(what, "rt"))
+					triggers[pad][1] = 32767;
+			}
+		}
+		entry += strcspn(entry, ";");
+	}
+	virtual_keyboard_join = keyboard_pressed;
+	virtual_keyboard_done = keyboard_enter;
+	for (pad = 0; pad < virtual_pad_count; pad++)
+	{
+		double t = now + pad * 2.3;
+		BOOL walking = virtual_pad_walking[pad];
+
+		for (index = 0; index < SDL_GAMEPAD_BUTTON_COUNT; index++)
+			SDL_SetJoystickVirtualButton(virtual_pads[pad], index, pressed[pad][index]);
+		SDL_SetJoystickVirtualAxis(virtual_pads[pad], SDL_GAMEPAD_AXIS_LEFTX,
+			walking ? (Sint16)(cos(t * 0.6 + pad) * 20000.0) : 0);
+		SDL_SetJoystickVirtualAxis(virtual_pads[pad], SDL_GAMEPAD_AXIS_LEFTY,
+			walking ? (Sint16)(sin(t * 0.9) * 30000.0) : 0);
+		SDL_SetJoystickVirtualAxis(virtual_pads[pad], SDL_GAMEPAD_AXIS_RIGHTX,
+			walking ? (Sint16)(sin(t * 0.4 + pad) * 16000.0) : 0);
+		SDL_SetJoystickVirtualAxis(virtual_pads[pad], SDL_GAMEPAD_AXIS_RIGHTY, 0);
+		/* (a virtual gamepad's trigger reads the axis's whole range: at rest
+		its least) */
+		SDL_SetJoystickVirtualAxis(virtual_pads[pad], SDL_GAMEPAD_AXIS_LEFT_TRIGGER,
+			triggers[pad][0] ? (Sint16)triggers[pad][0] : -32768);
+		SDL_SetJoystickVirtualAxis(virtual_pads[pad], SDL_GAMEPAD_AXIS_RIGHT_TRIGGER,
+			triggers[pad][1] ? (Sint16)triggers[pad][1] : -32768);
+	}
 }
 
 /* ---------- XAPI */
@@ -1264,7 +1518,9 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	memset(state, 0, sizeof(*state));
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
+	virtual_gamepads_update();
 	platform_pump_events();
+	split_players = pc_menu_split_players() != 0;
 	count = sdl_gamepads(gamepads);
 	if (port == 0)
 	{

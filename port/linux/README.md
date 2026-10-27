@@ -230,7 +230,8 @@ game adds the input of the first gamepad to controller 1. The other
 gamepads operate controllers 2 to 4. With two or more players on this
 computer (co-op, or split screen in a network game) and only one gamepad,
 that gamepad is controller 2 (player 2) and the keyboard and mouse stay
-controller 1. The gamepad changes controller only when none of its buttons
+controller 1; with more gamepads, SPACE on the ADD PLAYER screen does the
+same for the first (refer to the network games' split screen below). The gamepad changes controller only when none of its buttons
 is held. The profile's button layout (Settings > Gamepads) is the
 gamepads' only. Besides the Xbox's five, it has the Master Chief
 Collection's Bumper Jumper: jump on the left bumper, melee on the right,
@@ -332,11 +333,18 @@ New Game's levels are those either profile has reached. Either player's
 controller chooses the level and the difficulty. A co-op game does
 not continue a saved game of one player.
 
-Network games have split screen too: up to 4 players on each computer. In
-the game lobby, another controller presses START to join, and the new
-player's profile is chosen on the ADD PLAYER screen that opens (with any
-controller). With one gamepad, choose the lobby's ADD PLAYER button first:
-until then that gamepad shares controller 1 with the keyboard. Two players on one profile get different names from the host. A
+Network games have split screen too: up to 4 players on each computer. The
+game lobby's ADD PLAYER button, or another controller's START, opens the ADD
+PLAYER screen: a quarter for each controller, as the Xbox's profile select.
+Each controller not yet playing presses A to join, chooses a profile with
+left and right (past the profiles other players have), and presses A again
+to be ready; its B goes back a step. Player 1's START (or Enter) brings the
+ready players into the lobby, their B (or Escape) goes back without them.
+The keyboard and the first gamepad share controller 1 until SPACE is
+pressed on that screen: the keyboard is then player 1 alone, and that
+gamepad joins in a quarter of its own (with four gamepads, every controller
+is taken, and the keyboard stays with the first). Two players on one
+profile get different names from the host. A
 player's B in the lobby leaves the game alone, and the last player of the
 computer leaves it for all of them. When all the players are on the host's
 computer, START NOW starts the game without another computer, and a team
@@ -344,7 +352,7 @@ game does not need a player on each team. In the game, each player's pause menu
 opens on their part of the screen, and its LEAVE GAME is theirs: their part
 of the screen stays until the game ends. A game under way shows its own
 screen before JOIN GAME: players join there the same way, START or ADD
-PLAYER then START, and JOIN GAME brings them all into the game.
+PLAYER, and JOIN GAME brings them all into the game.
 
 In a multiplayer game, the pause menu (escape) has SETTINGS, which opens
 the profile's settings while the game goes on, and for the host END GAME.
@@ -621,6 +629,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.menu_open` | `""` | `HALO_MENU_OPEN` | Start on this screen of the menus (`main_menu/settings_select/...`, as `port/assets/menus` names it), a player profile being edited, to look at it. |
 | `debug.gpu_skip_vertex_shaders`, `debug.gpu_debug_expression`, `debug.gpu_debug_flat`, `debug.gpu_debug_texture0` | off | `HALO_GPU_SKIP_VS`, `HALO_GPU_DEBUG_EXPR`, `HALO_GPU_DEBUG_FLAT`, `HALO_GPU_DEBUG_T0` | Tools to find problems in the graphics: skip the draws of a vertex shader, or replace the output of all pixel shaders with a GLSL expression (for example `t0.rgb`). |
 | `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.network_test_chat`, `debug.network_test_name`, `debug.network_test_public`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_NETWORK_TEST_CHAT`, `HALO_NETWORK_TEST_NAME`, `HALO_NETWORK_TEST_PUBLIC`, `HALO_TEST_INPUT` | Automatic tests of system link, or (`log`) a log of the game one machine plays (`game/network_test.c`). Refer to `NETCODE.md`. `debug.test_input = "menu:a down down a"` presses menu buttons one a second (`a`, `b`, `x`, `y`, `up`, `down`, `left`, `right`, `start`, `back` or `wait`), for testing the menus. |
+| `debug.virtual_gamepads`, `debug.virtual_gamepad_script` | `0`, empty | `HALO_VIRTUAL_GAMEPADS`, `HALO_VIRTUAL_GAMEPAD_SCRIPT` | Desktop: attach this many SDL virtual gamepads (`0` to `4`), which the game takes for gamepads plugged in, and press their buttons from a script of `<seconds> <pad> <what>` entries separated by semicolons: the seconds from when the network lobby first opens, the pad `1` to `4` (`0`: the keyboard, whose `a` is SPACE and `start` Enter), and a button (`a`, `b`, `x`, `y`, `start`, `back`, `up`, `down`, `left`, `right`, `lb`, `rb`, `lt`, `rt`), `walk` (the sticks move from then on) or `still`. For testing split screen without four controllers, for example `"3 2 start; 6 2 a; 8 0 a; 10 1 a; 11 1 a; 14 0 start"` with `debug.network_test = "host:bloodgulch"`. |
 | `debug.network_test_cues`, `debug.network_test_cue_players` | none, `1` | `HALO_NETWORK_TEST_CUES`, `HALO_NETWORK_TEST_CUE_PLAYERS` | Console lines a test runs at their seconds, from the first tick that many players are in (`"<second> <line>\|..."`; not on the web). |
 | `debug.bot_trace` | `0` | `HALO_BOT_TRACE` | Every this many seconds, each bot's state is written to the log: where it is and where it goes, its path, its target and its weapon. `0`: never. |
 | `debug.touch_targets` | `false` | `HALO_TOUCH_TARGETS` | Outlines the tap targets of the menus (item green, value blue, list slot yellow, legend button red, the band beside the slots of a list orange, keys of the on-screen keyboard white), marks where the last finger went down and the last tap landed for 3 seconds, and logs each tap with the target that it hit (for a value, also where it splits into previous and next): to judge the accuracy of touch. |

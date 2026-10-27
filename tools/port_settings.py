@@ -1577,7 +1577,10 @@ def _lobby() -> list:
                      '<on event="created" run="net server allow start"/>',
                      '<on event="b" run="port lobby leave" back="true"/>',
                      '<on event="back" run="port lobby leave" back="true"/>',
-                     f'<on event="start" run="port lobby join" open="{base}/player_profile_screen" branch="true"/>',
+                     # (another controller's START joins, its ADD PLAYER too: both
+                     # ask player 1's Y, which opens the 4-way screen as player 1's)
+                     '<on event="start" run="port lobby join"/>',
+                     f'<on event="y" run="port lobby add player" open="{base}/join4_screen"/>',
                      '<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
                      f'<child widget="{base}/lobby_list"/>',
                      f'<child widget="{base}/header_lobby"/>',
@@ -1638,8 +1641,8 @@ def _lobby() -> list:
                       f'<child widget="{base}/lobby_button_add" x="380" y="1"/>',
                       f'<child widget="{base}/lobby_button_leave" x="510" y="1"/>'])
     for key, caption, handlers in (
-        ("add", "ADD PLAYER", ['<on event="a" run="port lobby add player"/>',
-                               '<on event="start" run="port lobby add player"/>']),
+        ("add", "ADD PLAYER", [f'<on event="a" run="port lobby add player" open="{base}/join4_screen"/>',
+                               f'<on event="start" run="port lobby add player" open="{base}/join4_screen"/>']),
         ("team", "SWITCH TEAM", ['<on event="a" run="swap player team"/>', '<on event="start" run="swap player team"/>']),
         ("start", "START NOW", ['<on event="a" run="net game speed start"/>',
                                 '<on event="start" run="net game speed start"/>']),
@@ -1686,7 +1689,8 @@ def _lobby() -> list:
                      ['<on event="created" run="port lobby open"/>',
                       '<on event="b" run="port lobby preview leave" back="true"/>',
                       '<on event="back" run="port lobby preview leave" back="true"/>',
-                      f'<on event="start" run="port lobby preview add" open="{base}/player_profile_screen" branch="true"/>',
+                      '<on event="start" run="port lobby preview add"/>',
+                      f'<on event="y" run="port lobby add player" open="{base}/join4_screen"/>',
                       '<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
                       f'<child widget="{base}/preview_list"/>',
                       f'<child widget="{base}/header_lobby"/>',
@@ -1707,12 +1711,60 @@ def _lobby() -> list:
     for key, caption, run in (("join", "JOIN GAME", "port lobby preview join"),
                               ("add", "ADD PLAYER", "port lobby add player"),
                               ("back", "BACK", "mouse emit back event")):
+        opened = f' open="{base}/join4_screen"' if key == "add" else ""
         lines += _widget(f"{base}/preview_button_{key}", [("type", "text"), ("width", 128), ("height", 24),
                                                          ("bitmap", "bitmaps/text_button_background"),
                                                          ("text", caption), ("font", "ui\\small_ui"),
                                                          ("color", "#FFFFFFFF"), ("align", "center"), ("text_y", 2)],
-                         [f'<on event="a" run="{run}"/>', f'<on event="start" run="{run}"/>',
+                         [f'<on event="a" run="{run}"{opened}/>', f'<on event="start" run="{run}"{opened}/>',
                           '<on event="left_mouse" run="mouse emit accept event"/>'])
+    lines += _join4(base)
+    return lines
+
+
+def _join4(base: str) -> list:
+    """ADD PLAYER's screen: a quarter for each controller (the Xbox's 4-way
+    profile select), where each one not playing presses A to join, chooses
+    its profile with left and right and presses A again to be ready; the
+    keyboard's SPACE makes the keyboard player 1 alone (freeing the
+    controller it shared); player 1's START adds those ready, their B goes
+    back without them (menu_functions.c's join4: it reads the other
+    controllers itself, the screen's events being player 1's)"""
+    lines = _widget(f"{base}/join4_screen", [("width", 640), ("height", 480), ("bitmap", "bitmaps/gradient")],
+                    ['<on event="created" run="port join4 open"/>',
+                     '<on event="created" run="net server defer start"/>',
+                     '<on event="b" run="port join4 back" back="true"/>',
+                     '<on event="back" run="port join4 back" back="true"/>',
+                     '<on event="start" run="port join4 done" back="true"/>',
+                     f'<child widget="{base}/header_add_player"/>',
+                     f'<child widget="{base}/join4_slots"/>',
+                     f'<child widget="{base}/join4_notice" x="20" y="394"/>',
+                     f'<child widget="{base}/join4_help" x="20" y="420"/>'])
+    places = [(20, 75), (325, 75), (20, 235), (325, 235)]
+    lines += _widget(f"{base}/join4_slots", [("width", 640), ("height", 480)],
+                     ['<data input="port join4 update"/>',
+                      *[f'<child widget="{base}/join4_slot" x="{x}" y="{y}"/>' for x, y in places]])
+    lines += _widget(f"{base}/join4_slot", [("width", 295), ("height", 150), ("bitmap", "bitmaps/alert_bkd")],
+                     [f'<child widget="{base}/join4_slot_title" x="12" y="8"/>',
+                      f'<child widget="{base}/join4_slot_name" y="58"/>',
+                      f'<child widget="{base}/join4_slot_status" y="110"/>'])
+    lines += _widget(f"{base}/join4_slot_title", [("type", "text"), ("width", 270), ("height", 28),
+                                                  ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
+                                                  ("text_flags", "no_focus_test")], [])
+    lines += _widget(f"{base}/join4_slot_name", [("type", "text"), ("width", 295), ("height", 30),
+                                                 ("font", "ui\\large_ui"), ("color", "#FFFFFFFF"), ("align", "center"),
+                                                 ("text_flags", "no_focus_test")], [])
+    lines += _widget(f"{base}/join4_slot_status", [("type", "text"), ("width", 295), ("height", 24),
+                                                   ("font", "ui\\small_ui"), ("color", "#FF2896FF"),
+                                                   ("align", "center"), ("text_flags", "no_focus_test")], [])
+    lines += _widget(f"{base}/join4_notice", [("type", "text"), ("width", 600), ("height", 24),
+                                              ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"),
+                                              ("text_flags", "no_focus_test")], [])
+    lines += _widget(f"{base}/join4_help", [("type", "text"), ("width", 600), ("height", 24),
+                                            ("text", "A or SPACE: join    LEFT / RIGHT: profile    A: ready    "
+                                                     "B: back    START or ENTER: done"),
+                                            ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("align", "center"),
+                                            ("text_y", 5), ("text_flags", "no_focus_test")], [])
     return lines
 
 
