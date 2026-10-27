@@ -2561,12 +2561,48 @@ static struct widget_instance *widget_instance_find_by_tag_index_recursive(
 	return result;
 }
 
+/* port: giving the focus clears focused_child all along the old focus's path,
+then links only the new focus's parents. Backing out of a screen does that: it
+loads the screen, focused on its first row, then focuses the row you left it
+from, so the first row is left with no focused child. A row that only passes
+events on (a setting's row and its spinner, a lobby row) then passes the d-pad,
+keys and buttons to nothing when it has the focus again, and only the mouse,
+which focuses the spinner itself, could change it. Such a row gets its first
+child that takes events back, as it had when its screen was loaded, whenever
+it takes the focus (here, and the d-pad's widget_instance_tab_to_*) */
+static void widget_instance_refocus_passthrough(
+	struct widget_instance *widget)
+{
+	struct widget_instance *child;
+	long flags;
+
+	if (!widget || widget->focused_child || widget_instance_can_handle_events(widget))
+		return;
+	flags = ui_widget_definition_get(widget->definition_tag_index)->flags;
+	if (!TEST_FLAG(flags, _widget_pass_unhandled_events_to_children_bit) ||
+		TEST_FLAG(flags, _widget_dont_focus_a_specific_child_bit))
+	{
+		return;
+	}
+	for (child = widget->child; child; child = child->next)
+	{
+		if (widget_instance_can_handle_events(child))
+		{
+			widget->focused_child = child;
+			break;
+		}
+	}
+
+	return;
+}
+
 static void widget_instance_give_focus_directly(
 	struct widget_instance *widget,
 	struct widget_instance *new_focus)
 {
 	struct widget_instance *focused_child =
 		widget_instance_get_topmost_parent(widget)->focused_child;
+	struct widget_instance *leaf;
 
 	if (new_focus->disabled == TRUE)
 	{
@@ -2596,6 +2632,7 @@ static void widget_instance_give_focus_directly(
 		if (substitute)
 			new_focus = substitute;
 	}
+	leaf = new_focus;
 	if (focused_child)
 	{
 		if (new_focus &&
@@ -2603,6 +2640,7 @@ static void widget_instance_give_focus_directly(
 			focused_child->parent)
 		{
 			new_focus->parent->focused_child = new_focus;
+			widget_instance_refocus_passthrough(leaf);
 
 			return;
 		}
@@ -2617,6 +2655,7 @@ static void widget_instance_give_focus_directly(
 		new_focus->parent->focused_child = new_focus;
 		new_focus = new_focus->parent;
 	}
+	widget_instance_refocus_passthrough(leaf);
 
 	return;
 }
@@ -7630,6 +7669,8 @@ static void widget_instance_tab_to_next_valid_widget(
 				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
+			/* port: (widget_instance_refocus_passthrough) */
+			widget_instance_refocus_passthrough(child);
 			break;
 		}
 		child = child->next;
@@ -7672,6 +7713,8 @@ static void widget_instance_tab_to_previous_valid_widget(
 				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
+			/* port: (widget_instance_refocus_passthrough) */
+			widget_instance_refocus_passthrough(child);
 			break;
 		}
 		if (child->previous)
