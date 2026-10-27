@@ -723,7 +723,7 @@ static char const *const settable_settings[] =
 	"network.text_chat", "network.voice_lobby", "network.voice_mode", "network.voice_kbps", "network.votekick",
 	"network.votekick_minutes", "network.votekick_ban_minutes", "network.map_share", "network.map_share_upload",
 	"network.public_address", "network.coop_friendly_fire", "network.coop_player_collisions",
-	"network.coop_ally_friendly_fire", "network.shield_effects",
+	"network.coop_ally_friendly_fire", "network.shield_effects", "network.fire_origins",
 };
 
 /* those of them the owner's console alone changes (the standard input, the

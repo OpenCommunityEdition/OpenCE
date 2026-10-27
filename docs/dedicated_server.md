@@ -227,7 +227,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `network.votekick_ban_minutes`, `network.map_share`,
 `network.map_share_upload`, `network.public_address`,
 `network.coop_friendly_fire`, `network.coop_player_collisions`,
-`network.coop_ally_friendly_fire` and `network.shield_effects`. Of them,
+`network.coop_ally_friendly_fire`, `network.shield_effects` and
+`network.fire_origins`. Of them,
 `server.status_file`, `server.auto_update` and `server.log_addresses` need
 the owner role: from the web's admin, `sv_set` of one of them (`POST
 /api/command`) answers `403 forbidden`, and `PUT /api/settings` leaves it
