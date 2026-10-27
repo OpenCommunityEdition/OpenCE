@@ -9,7 +9,10 @@ phone without a controller has neither: the touch controls hide while the
 report is up, and a tap is the menus' (ui_widget.c), which the report does
 not read. So in the prompt's place the report draws the buttons it names,
 CONTINUE (the host's only) and LEAVE, and a tap on one presses it for the
-report. With input.touch_controls off, the prompt is drawn as on the Xbox.
+report. They show when the touch controls would (input.touch_controls,
+touch_input.c): on a touchscreen, with "auto", the default, while no
+controller is connected, and with "on" also with one. Otherwise (a
+controller, "off", no touchscreen) the prompt is drawn as on the Xbox.
 */
 
 #include "cseries.h"
@@ -18,8 +21,6 @@ report. With input.touch_controls off, the prompt is drawn as on the Xbox.
 #include "render/render.h"
 #include "text/draw_string.h"
 #include "touch_postgame.h"
-
-#include <string.h>
 
 /* ---------- constants */
 
@@ -47,11 +48,12 @@ enum
 
 /* ---------- prototypes */
 
-/* port_config.c's, cseries_windows.c's, cinematics.c's */
-const char *config_string(const char *name);
-unsigned long config_changes(void);
+/* cseries_windows.c's, cinematics.c's, touch_input.c's */
 unsigned long system_milliseconds(void);
 void draw_quad(rectangle2d *rectangle, pixel32 color);
+#ifdef HALO_ANDROID
+int touch_input_screen_buttons(void);
+#endif
 
 /* ---------- globals */
 
@@ -70,22 +72,12 @@ static struct
 
 /* ---------- private code */
 
-/* the Android build, unless input.touch_controls is off */
+/* the Android build, as its touch controls would show */
 static boolean touch_postgame_enabled(
 	void)
 {
 #ifdef HALO_ANDROID
-	static unsigned long changes = (unsigned long)-1;
-	static boolean enabled = TRUE;
-
-	if (changes != config_changes())
-	{
-		const char *value = config_string("input.touch_controls");
-
-		changes = config_changes();
-		enabled = !value || strcmp(value, "off") != 0;
-	}
-	return enabled;
+	return touch_input_screen_buttons() != 0;
 #else
 	return FALSE;
 #endif

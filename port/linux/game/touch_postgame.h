@@ -2,7 +2,7 @@
 TOUCH_POSTGAME.H
 
 The carnage report's buttons on the Android build's touchscreen, in place
-of its prompt (touch_postgame.c).
+of its prompt while the touch controls would show (touch_postgame.c).
 */
 
 #ifndef __TOUCH_POSTGAME_H
