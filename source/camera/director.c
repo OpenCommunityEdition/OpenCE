@@ -139,6 +139,10 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 
+extern real_vector2d player_control_port_debug_throttle[];
+extern real_euler_angles2d player_control_port_debug_facing[];
+extern int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel);
+
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
 
@@ -147,6 +151,15 @@ boolean network_game_distributed_client(void);
 /* ---------- macros */
 
 /* ---------- structures */
+
+struct game_input_state
+{
+	byte buttons[12];
+	real forward_movement;
+	real strafe;
+	real yaw;
+	real pitch;
+};
 
 struct camera_control
 {
@@ -395,7 +408,7 @@ void director_save_camera(
 {
 	FILE *file;
 
-	file = fopen("d:\\camera.txt", "w");
+	file = fopen("camera.txt", "w");
 	if (file)
 	{
 		struct observer_result const *camera;
@@ -430,7 +443,7 @@ static void director_set_camera(
 void director_load_camera(
 	void)
 {
-	FILE *file = fopen("d:\\camera.txt", "r");
+	FILE *file = fopen("camera.txt", "r");
 
 	if (file)
 	{
@@ -461,6 +474,7 @@ void director_load_camera(
 			0,
 			(director_camera_update_proc)flying_camera_update,
 			FALSE);
+		director_set_camera(0, (director_camera_update_proc)flying_camera_update, FALSE);
 		director->camera_mode_index = _camera_flying;
 	}
 
@@ -819,6 +833,7 @@ static boolean director_update_controls(
 		local_player_get_player_index(local_player_index))->local_player_index;
 	if (player_index != NONE && input_has_gamepad((short)player_index))
 	{
+		struct game_input_state *input_state = input_abstraction_get_input_state((short)player_index);
 		unsigned long control_flags;
 		struct gamepad_state const *gamepad =
 			input_get_gamepad_state((short)player_index);
@@ -850,6 +865,8 @@ static boolean director_update_controls(
 				director->debug_controls = !director->debug_controls;
 			if (director->debug_controls)
 			{
+				real_vector2d throttle = player_control_port_debug_throttle[local_player_index];
+				real_euler_angles2d facing = player_control_port_debug_facing[local_player_index];
 				control_flags = 0;
 				SET_FLAG(
 					control_flags,
@@ -866,18 +883,12 @@ static boolean director_update_controls(
 					local_player_index,
 					control_flags,
 					controls->wheel_delta);
-				controls->facing_delta.yaw =
-					(real)gamepad->sticks[_gamepad_stick_right].x *
-						director_globals.dtime * -0.0000392699076f;
-				controls->facing_delta.pitch =
-					(real)gamepad->sticks[_gamepad_stick_right].y *
-						director_globals.dtime * 0.0000196349538f;
+				controls->facing_delta.yaw = facing.yaw;
+				controls->facing_delta.pitch = facing.pitch;
 				controls->position_delta.i =
-					(real)gamepad->sticks[_gamepad_stick_left].y *
-						director->debug_input_scale * director_globals.dtime * 0.00005f;
+					throttle.i * director->debug_input_scale * director_globals.dtime * 1.638f;
 				controls->position_delta.j =
-					(real)gamepad->sticks[_gamepad_stick_left].x *
-						director->debug_input_scale * director_globals.dtime * -0.00005f;
+					throttle.j * director->debug_input_scale * director_globals.dtime * 1.638f;
 				controls->position_delta.k +=
 					director->debug_variables[_variable_height].delta;
 				controls->active = TRUE;
@@ -935,7 +946,48 @@ static boolean director_update_controls(
 			director_inhibit_facing(local_player_index);
 		}
 	}
+	if (director->camera_proc !=
+				(director_camera_update_proc)first_person_camera_update &&
+			director->camera_proc !=
+				(director_camera_update_proc)following_camera_update)
+		{
+			unsigned long control_flags;
+			real_vector2d throttle = player_control_port_debug_throttle[local_player_index];
+			real_euler_angles2d facing = player_control_port_debug_facing[local_player_index];
+			int middle;
+			int key_up;
+			int key_down;
+			float wheel;
 
+			halo_linux_debug_camera_input(&middle, &key_up, &key_down, &wheel);
+			control_flags = 0;
+			director->debug_controls = middle ? TRUE : FALSE;
+			if (middle)
+			{
+				SET_FLAG(control_flags, _camera_control_up_bit, key_up);
+				SET_FLAG(control_flags, _camera_control_down_bit, key_down);
+				controls->wheel_delta = -(real)wheel;
+			}
+			director_process_variables(
+				local_player_index,
+				control_flags,
+				controls->wheel_delta);
+
+			if (middle)
+			{
+				controls->facing_delta.yaw = facing.yaw;
+				controls->facing_delta.pitch = facing.pitch;
+				controls->position_delta.i =
+					throttle.i * director->debug_input_scale * director_globals.dtime * 1.638f;
+				controls->position_delta.j =
+					throttle.j * director->debug_input_scale * director_globals.dtime * 1.638f;
+				controls->position_delta.k +=
+					director->debug_variables[_variable_height].delta;
+				controls->active = TRUE;
+				director_inhibit_input(local_player_index);
+				director_inhibit_facing(local_player_index);
+			}
+		}
 	return switch_camera;
 }
 

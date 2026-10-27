@@ -12544,8 +12544,8 @@ static boolean const hs_function_allowed_in_maps[]=
 	TRUE, /* camera_time */
 
 	/* the game: speed, time, difficulty, map, BSP; developer tools */
-	FALSE, /* debug_camera_load: reads the saved camera file */
-	FALSE, /* debug_camera_save: writes the saved camera file */
+	TRUE, /* debug_camera_load: reads the saved camera file */
+	TRUE, /* debug_camera_save: writes the saved camera file */
 	TRUE, /* game_speed */
 	TRUE, /* game_time */
 	FALSE, /* game_variant: sets the game engine */
