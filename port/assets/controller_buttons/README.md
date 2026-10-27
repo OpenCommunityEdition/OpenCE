@@ -11,6 +11,10 @@ folders and are not regenerated here. This set adds Xbox Modern, four PlayStatio
 styles and three Switch styles. Face slots follow SDL's physical south, east,
 west and north positions. Switch therefore uses B, A, Y and X in that order.
 
+Gamepads > Button Appearance can also use this set's existing `xbox_control_4`
+(RB) and `xbox_control_5` (LB) for Xbox Classic, Gems and Dark Gems. Bumper Style
+defaults to Original Xbox and does not regenerate or modify any artwork.
+
 Regenerate with `python tools/controller_button_assets.py` from the repository
 root. The script requires Pillow, NumPy and SciPy. It writes `buttons.json`, the
 62 generated PNGs and `port/linux/game/controller_glyph_assets.h`. The generator

@@ -1,7 +1,7 @@
 # Controller detection and button styles
 
-Graphics contains AUTO BUTTON DETECTION, enabled by default for new configurations.
-Saved choices are preserved. With High-Res HUD enabled, detection limits Button
+Gamepads > Button Appearance contains AUTO BUTTON DETECTION, enabled by default for new configurations.
+Saved choices are preserved. Detection limits Button
 Style to the controller assigned to the menu's player. Turning it off exposes all
 eleven styles; unknown or disconnected devices retain the saved manual choice.
 Device detection always runs, including when the option is off.
@@ -12,13 +12,21 @@ its preferred style. Labels use the detected family independently of artwork.
 For example, P2's DualSense exposes PlayStation styles while P1's Xbox controller
 continues using the Xbox preference. Steam Input may expose an Xbox identity.
 
+BUMPER STYLE appears for Xbox Classic, Gems and Dark Gems. Original Xbox, the
+default, keeps black/white buttons; Modern Xbox uses the existing LB/RB artwork.
+The preference is shared by local players, retained across controller changes and
+automatic detection, and changes no bindings. Other styles keep their bumpers.
+Appearance settings remain available with High-Res HUD off; the artwork changes
+apply when High-Res HUD is enabled in Graphics.
+
 ## Reading route
 
 1. [controller_buttons.c](../../port/linux/src/controller_buttons.c) classifies SDL
    devices and owns per-port snapshots and style preferences. Existing assignments
    in [xinput_sdl.c](../../port/linux/src/xinput_sdl.c) supply device identity.
 2. [controller_button_menu.inl](../../port/linux/game/controller_button_menu.inl)
-   filters pending settings without overwriting the manual preference. Cancel,
+   filters pending settings and the optional bumper row without overwriting the
+   manual preference. Dynamic labels retain their help indices. Cancel,
    Defaults, disconnects and live family changes retain normal menu behavior.
 3. [controller_glyphs.c](../../port/linux/game/controller_glyphs.c) maps the viewport
    to its local input port. It draws supplied artwork within the existing prompt
@@ -37,4 +45,4 @@ The settings table is in [the port README](../../port/linux/README.md).
 The production-C and artwork checks in [test_controller_buttons.py](../../tools/test_controller_buttons.py)
 and [test_hud_button_style.py](../../tools/test_hud_button_style.py) cover family
 selection, pending settings, unknown devices, glyph geometry, animated controls,
-opacity and cache cleanup. Driver behavior and real hardware require playtesting.
+opacity, bumper choices and cache cleanup. Driver behavior and real hardware require playtesting.
