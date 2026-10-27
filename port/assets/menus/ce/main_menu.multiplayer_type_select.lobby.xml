@@ -202,37 +202,59 @@
 		<on event="start" run="mouse emit back event"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_screen" width="640" height="480" bitmap="bitmaps/gradient">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_screen" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child no_focused_child pass_unhandled_to_all_children pass_handled_to_all_children">
 		<on event="created" run="port join4 open"/>
 		<on event="created" run="net server defer start"/>
 		<on event="b" run="port join4 back" back="true"/>
 		<on event="back" run="port join4 back" back="true"/>
-		<on event="start" run="port join4 done" back="true"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/header_add_player"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_slots"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_notice" x="20" y="394"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_help" x="20" y="420"/>
-	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_slots" width="640" height="480">
 		<data input="port join4 update"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot" x="20" y="75"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot" x="325" y="75"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot" x="20" y="235"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot" x="325" y="235"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\header_select_profile"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_qtr_join" controller="1" x="70" y="76"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_qtr_join" controller="2" x="328" y="76"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_qtr_join" controller="3" x="70" y="242"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_qtr_join" controller="4" x="328" y="242"/>
+		<child widget="ui\shell\main_menu\button_key"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_hint" x="30" y="419"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_slot" width="295" height="150" bitmap="bitmaps/alert_bkd">
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot_title" x="12" y="8"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot_name" y="58"/>
-		<child widget="main_menu/multiplayer_type_select/lobby/join4_slot_status" y="110"/>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_join" width="255" height="165" bitmap="ui\shell\bitmaps\split_screen_bkd" flags="pass_unhandled_to_focused_child">
+		<on event="black" run="port join4 playing" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_playing"/>
+		<on event="white" run="port join4 opener" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_select"/>
+		<on event="a" run="port join4 join" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_select"/>
+		<on event="start" run="port join4 join" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_select"/>
+		<on event="b"/>
+		<on event="back"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\connected\4way_profile_select\press_start_to_join" x="54" y="20"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\connected\4way_profile_select\press_start_to_join_controller"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_slot_title" type="text" width="270" height="28" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_select" width="254" height="164" bitmap="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\4way_profile_border" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port join4 choosing"/>
+		<on event="a" run="port join4 select" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_ready"/>
+		<on event="start" run="port join4 select" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_ready"/>
+		<on event="b" run="port join4 leave" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_join"/>
+		<on event="back"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_desc"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_spinner"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_slot_name" type="text" width="295" height="30" font="ui\large_ui" color="#FFFFFFFF" align="center" text_flags="no_focus_test">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_ready" width="254" height="164" bitmap="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\4way_profile_border">
+		<on event="created" run="port join4 ready"/>
+		<on event="a" run="port join4 done" back="true"/>
+		<on event="start" run="port join4 done" back="true"/>
+		<on event="b" run="port join4 unready" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_select"/>
+		<on event="back"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic_selected"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_text"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_name"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_slot_status" type="text" width="295" height="24" font="ui\small_ui" color="#FF2896FF" align="center" text_flags="no_focus_test">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_playing" width="254" height="164" bitmap="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\4way_profile_border">
+		<on event="a" run="port join4 done" back="true"/>
+		<on event="start" run="port join4 done" back="true"/>
+		<on event="b"/>
+		<on event="back"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic_selected"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_text"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_name"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_notice" type="text" width="600" height="24" font="ui\small_ui" color="#FFFFFFFF" align="center" text_flags="no_focus_test">
-	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_help" type="text" width="600" height="24" text="A or SPACE: join    LEFT / RIGHT: profile    A: ready    B: back    START or ENTER: done" font="ui\small_ui" color="#FF2896FF" align="center" text_y="5" text_flags="no_focus_test">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_hint" type="text" width="345" height="24" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test">
 	</widget>
 </menus>

@@ -6100,24 +6100,24 @@ static boolean preview_join(struct widget_instance *widget, short controller, bo
 	return ui_widget_port_join(widget, game, LOBBY_NAME, widget_deleted);
 }
 
-/* ---- ADD PLAYER's screen: four quarters, one for each controller (the
-Xbox's 4-way profile select), where each controller not yet playing
-presses A to join, chooses its profile with left and right, and presses A
-again to be ready; B backs out. The keyboard's SPACE makes the keyboard
-player 1 alone, when it shares player 1 with a controller and a port is
-free (xinput_sdl.c's halo_keyboard_alone_set): that controller then joins
-in a quarter of its own. Player 1's START adds the players who are ready
-and goes back to the lobby; their B goes back without them. The screen is
-player 1's (its events are theirs: "port join4 back", "port join4 done");
-the other controllers' presses are read here, each frame, from their
-gamepads, as no screen of theirs takes them. */
+/* ---- ADD PLAYER's screen: the Xbox's split screen profile select
+(tools/port_settings.py's _join4: its widgets and bitmaps), a quarter for
+each controller. A controller not playing presses A in its quarter to join,
+chooses a profile on the Xbox's spinner, and presses A to select it ("1wide
+plyr prof set for game": the controller's active profile); B goes back a
+step. A selected or playing quarter's A (or Enter) brings the players who
+selected theirs into the lobby; player 1's B goes back without them. The
+keyboard's SPACE makes the keyboard player 1 alone, when it shares player
+1 with a gamepad and a port is free (xinput_sdl.c's halo_keyboard_alone_set):
+that gamepad then joins in a quarter of its own. Each quarter takes its own
+controller's presses (pc_menu_screen_routes_by_controller) */
 
-/* (xinput_sdl.c) the keyboard's join key (SPACE, Enter) held; the
-keyboard plays player 1 alone; whether it does, or shares port 0 with a
-gamepad; how many gamepads there are */
+#define JOIN4_NAME "pc\\main_menu\\multiplayer_type_select\\lobby\\join4_screen"
+
+/* (xinput_sdl.c) the keyboard's SPACE held; the keyboard plays player 1
+alone; whether it shares port 0 with a gamepad; how many gamepads there
+are */
 extern unsigned char halo_keyboard_join_held(void);
-extern unsigned char halo_keyboard_done_held(void);
-extern void halo_keyboard_press_start(void);
 extern void halo_keyboard_alone_set(unsigned char alone);
 extern unsigned char halo_keyboard_shares_gamepad(void);
 extern int halo_gamepad_count(void);
@@ -6126,55 +6126,19 @@ enum
 {
 	_join4_away,
 	_join4_choosing,
-	_join4_ready,
-};
-
-enum
-{
-	_join4_key_a,
-	_join4_key_b,
-	_join4_key_left,
-	_join4_key_right,
-	NUMBER_OF_JOIN4_KEYS
+	_join4_selected,
 };
 
 static struct
 {
 	unsigned char state[MAXIMUM_LOCAL_PLAYERS];
-	/* the profile each chooses (profile_list's) */
-	short profile[MAXIMUM_LOCAL_PLAYERS];
-	/* each controller's keys held at the last frame (a press acts) */
-	boolean held[MAXIMUM_LOCAL_PLAYERS][NUMBER_OF_JOIN4_KEYS];
-	boolean keyboard_held, keyboard_done_held;
-	/* Enter pressed while the screen shows (its release finishes it) */
-	boolean keyboard_done_pressed;
+	/* the controller whose START opened the screen (it joins at once) */
+	short opener;
+	boolean keyboard_held;
 	/* "All four controllers are in use." and the like, for a while */
 	wchar_t notice[64];
 	unsigned long notice_until;
 } join4;
-
-/* the controller's keys pressed since the last frame */
-static void join4_keys(short controller, boolean pressed[NUMBER_OF_JOIN4_KEYS])
-{
-	struct gamepad_state const *gamepad = input_has_gamepad(controller) ? input_get_gamepad_state(controller) : NULL;
-	boolean down[NUMBER_OF_JOIN4_KEYS] = { FALSE };
-	short key;
-
-	if (gamepad)
-	{
-		down[_join4_key_a] = gamepad->buttons[FIRST_GAMEPAD_ANALOG_BUTTON + _gamepad_analog_button_a] > 0;
-		down[_join4_key_b] = gamepad->buttons[FIRST_GAMEPAD_ANALOG_BUTTON + _gamepad_analog_button_b] > 0;
-		down[_join4_key_left] = gamepad->buttons[_gamepad_binary_button_dpad_left] > 0 ||
-			gamepad->sticks[_gamepad_stick_left].x < -16000;
-		down[_join4_key_right] = gamepad->buttons[_gamepad_binary_button_dpad_right] > 0 ||
-			gamepad->sticks[_gamepad_stick_left].x > 16000;
-	}
-	for (key = 0; key < NUMBER_OF_JOIN4_KEYS; key++)
-	{
-		pressed[key] = down[key] && !join4.held[controller][key];
-		join4.held[controller][key] = down[key];
-	}
-}
 
 static void join4_notice(wchar_t const *text)
 {
@@ -6183,81 +6147,120 @@ static void join4_notice(wchar_t const *text)
 	join4.notice_until = system_milliseconds() + 3000;
 }
 
-/* whether another player of this machine plays or chooses the profile
-(profile_list's) */
-static boolean join4_profile_taken(short controller, short index)
+/* the quarters' events that set them at first (no button the PC's
+controllers have): a player's shows their profile, the opener's its
+spinner */
+#define JOIN4_EVENT_PLAYING 4
+#define JOIN4_EVENT_OPENER 5
+
+/* "port join4 open" (the screen made, its quarters with it): nobody joining
+yet, but the players in the game and the controller whose START opened it;
+the host's countdown waits (as for the profile screen) */
+static boolean join4_open(struct widget_instance *screen)
+{
+	struct widget_instance *quarters[8];
+	struct widget_instance *child;
+	long quarter = tag_loaded('DeLa', "pc\\main_menu\\multiplayer_type_select\\lobby\\join4_qtr_join");
+	short controller, count = 0, index;
+
+	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+		join4.state[controller] = _join4_away;
+	join4.opener = lobby_join.controller;
+	join4.keyboard_held = TRUE;
+	/* (player 1's quarter shows their profile: the one used last, when the
+	main menu cleared the active one) */
+	if (player_ui_get_active_player_profile_index(0) == NONE)
+	{
+		struct player_profile profile;
+		long last = player_ui_get_player1_last_used_profile_index();
+
+		if (last != NONE && player_profile_get(last, &profile))
+			player_ui_set_active_player_profile(0, last, &profile);
+	}
+	join4.notice[0] = 0;
+	lobby_join.controller = NONE;
+	lobby_join.adding = TRUE;
+	/* (a quarter's event replaces it: the list is taken first) */
+	for (child = screen->child; child && count < (short)NUMBEROF(quarters); child = child->next)
+	{
+		if (child->definition_tag_index == quarter)
+			quarters[count++] = child;
+	}
+	for (index = 0; index < count; index++)
+	{
+		boolean deleted = FALSE;
+
+		controller = quarters[index]->local_player_index;
+		if (controller < 0 || controller >= MAXIMUM_LOCAL_PLAYERS)
+			continue;
+		if (lobby_controller_playing(controller))
+			ui_widget_port_dispatch_event(quarters[index], JOIN4_EVENT_PLAYING, controller, &deleted);
+		else if (controller > 0 && controller == join4.opener && input_has_gamepad(controller))
+			ui_widget_port_dispatch_event(quarters[index], JOIN4_EVENT_OPENER, controller, &deleted);
+	}
+	join4.opener = NONE;
+	return TRUE;
+}
+
+/* "port join4 join" (A, START): a controller not playing joins (FALSE:
+its quarter stays) */
+static boolean join4_join(short controller)
+{
+	return controller > 0 && controller < MAXIMUM_LOCAL_PLAYERS && input_has_gamepad(controller) &&
+		!lobby_controller_playing(controller);
+}
+
+/* whether another player of this machine plays, or has selected, the
+profile */
+static boolean join4_profile_taken(short controller, long profile)
 {
 	short other;
 
 	for (other = 0; other < MAXIMUM_LOCAL_PLAYERS; other++)
 	{
-		if (other == controller)
-			continue;
-		if (lobby_controller_playing(other) &&
-			player_ui_get_active_player_profile_index(other) == profile_list.indices[index])
+		if (other != controller && (lobby_controller_playing(other) || join4.state[other] == _join4_selected) &&
+			player_ui_get_active_player_profile_index(other) == profile)
 		{
 			return TRUE;
 		}
-		if (join4.state[other] != _join4_away && join4.profile[other] == index)
-			return TRUE;
 	}
 	return FALSE;
 }
 
-/* the first profile no other player has, from start going the direction
-(1, -1); start itself when every one is taken */
-static short join4_free_profile(short controller, short start, short direction)
+static boolean join4_profile_free(short controller, long profile)
 {
-	short step;
-
-	if (!profile_list.count)
-		return 0;
-	for (step = 0; step < profile_list.count; step++)
-	{
-		short index = (short)(((start + direction * step) % profile_list.count + profile_list.count) %
-			profile_list.count);
-
-		if (!join4_profile_taken(controller, index))
-			return index;
-	}
-	return (short)(start % profile_list.count);
+	return !join4_profile_taken(controller, profile);
 }
 
-/* "port join4 open" (the screen made): nobody joining yet, the keys held
-as it opens not pressed (the A that chose ADD PLAYER); the host's countdown
-waits (as for the profile screen) */
-static boolean join4_open(void)
+/* "port join4 select" (A, START on the spinner): the profile is the
+controller's ("1wide plyr prof set for game"), unless another player has it
+(FALSE: the spinner stays) */
+static boolean join4_select(struct widget_instance *widget, struct event_record *event, boolean *widget_deleted)
 {
-	short controller, key;
+	short controller = controller_of(widget);
 
-
-
-	profile_list_read(TRUE);
-	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+	if (!game_function("1wide plyr prof set for game", widget, event, widget_deleted))
+		return FALSE;
+	if (join4_profile_taken(controller, player_ui_get_active_player_profile_index(controller)))
 	{
-		join4.state[controller] = _join4_away;
-		join4.profile[controller] = 0;
-		for (key = 0; key < NUMBER_OF_JOIN4_KEYS; key++)
-			join4.held[controller][key] = TRUE;
+		join4_notice(L"Another player has that profile.");
+		ui_play_audio_feedback_sound(SOUND_ERROR);
+		return FALSE;
 	}
-	join4.keyboard_held = TRUE;
-	join4.keyboard_done_held = TRUE;
-	join4.keyboard_done_pressed = FALSE;
-	join4.notice[0] = 0;
-	if (lobby_join.controller > 0 && lobby_join.controller < MAXIMUM_LOCAL_PLAYERS &&
-		!lobby_controller_playing(lobby_join.controller) && profile_list.count)
-	{
-		join4.state[lobby_join.controller] = _join4_choosing;
-		join4.profile[lobby_join.controller] = join4_free_profile(lobby_join.controller, 0, 1);
-	}
-	lobby_join.controller = NONE;
-	lobby_join.adding = TRUE;
 	return TRUE;
 }
 
-/* "port join4 back" (player 1's B): back to the lobby, nobody added (FALSE
-for another controller's B, whose quarter takes it: the screen has every
-controller's presses while player 1 is the machine's only player) */
+/* "port join4 choosing", "port join4 leave", "port join4 ready", "port
+join4 unready": the controller's quarter */
+static boolean join4_set(short controller, unsigned char state)
+{
+	if (controller >= 0 && controller < MAXIMUM_LOCAL_PLAYERS)
+		join4.state[controller] = state;
+	return TRUE;
+}
+
+/* "port join4 back" (player 1's B): back to the lobby, nobody added
+(FALSE for another player's) */
 static boolean join4_back(short controller)
 {
 	if (controller > 0)
@@ -6266,18 +6269,30 @@ static boolean join4_back(short controller)
 	return TRUE;
 }
 
-/* "port join4 done" (START: player 1's, or a ready player's): those ready
-join, back to the lobby (whose "net splitscreen prejoin players" adds them) */
+/* "port join4 done" (a selected or playing quarter's A): those who
+selected their profile join, back to the lobby (whose "net splitscreen
+prejoin players" adds them); FALSE while a player is still choosing, and
+for the keyboard's SPACE (join4_keyboard's) */
 static boolean join4_done(short pressed_by)
 {
 	short controller;
 
-	if (pressed_by > 0 && (pressed_by >= MAXIMUM_LOCAL_PLAYERS || join4.state[pressed_by] != _join4_ready))
+	if (pressed_by == 0 && halo_keyboard_join_held())
 		return FALSE;
 	for (controller = 1; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
 	{
-		if (join4.state[controller] == _join4_ready && join4.profile[controller] < profile_list.count &&
-			!ui_widget_port_multiplayer_player(controller, profile_list.indices[join4.profile[controller]]))
+		if (join4.state[controller] == _join4_choosing)
+		{
+			join4_notice(L"Waiting for every player to select a profile.");
+			return FALSE;
+		}
+	}
+	for (controller = 1; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+	{
+		long profile = player_ui_get_active_player_profile_index(controller);
+
+		if (join4.state[controller] == _join4_selected && profile != NONE &&
+			!lobby_controller_playing(controller) && !ui_widget_port_multiplayer_player(controller, profile))
 		{
 			platform_log("menus: player %d could not join", controller + 1);
 		}
@@ -6291,18 +6306,7 @@ static void join4_keyboard(void)
 {
 	boolean down = halo_keyboard_join_held() != 0;
 	boolean pressed = down && !join4.keyboard_held;
-	boolean done = halo_keyboard_done_held() != 0;
 
-	/* (Enter: player 1's START, which the keyboard has not in the menus,
-	as it is let go: Enter is A too while held) */
-	if (done && !join4.keyboard_done_held)
-		join4.keyboard_done_pressed = TRUE;
-	else if (!done && join4.keyboard_done_pressed)
-	{
-		join4.keyboard_done_pressed = FALSE;
-		halo_keyboard_press_start();
-	}
-	join4.keyboard_done_held = done;
 	join4.keyboard_held = down;
 	if (!pressed || !halo_keyboard_shares_gamepad())
 		return;
@@ -6312,120 +6316,31 @@ static void join4_keyboard(void)
 		return;
 	}
 	halo_keyboard_alone_set(TRUE);
-	join4_notice(L"The keyboard is player 1. Controller 1: press A to join.");
+	join4_notice(L"The keyboard plays alone: controller 1 can join.");
 }
 
-static void join4_name(short profile, wchar_t *text, short size)
-{
-	if (profile >= 0 && profile < profile_list.count)
-	{
-		ustrncpy(text, profile_list.profiles[profile].player_name, size - 1);
-		text[size - 1] = 0;
-	}
-	else
-		ustrncpy(text, L"", size);
-}
-
-/* "port join4 update" (each frame): the controllers' presses, and the
-quarters' words */
+/* "port join4 update" (each frame): SPACE, and the keyboard's keys (the
+controller's are the Xbox's, at the bottom right) */
 static void join4_update(struct widget_instance *widget)
 {
 	struct widget_instance *screen = screen_of(widget);
-	short controller;
 
-	profile_list_read(FALSE);
 	join4_keyboard();
-	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
-	{
-		boolean pressed[NUMBER_OF_JOIN4_KEYS];
-		wchar_t title[32], name[48], status[64];
-		boolean playing = lobby_controller_playing(controller);
+	text_set(named(screen, "join4_hint", 0),
+		system_milliseconds() < join4.notice_until ? join4.notice :
+		halo_keyboard_shares_gamepad() && halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS ?
+			L"SPACE: join    ENTER: select    ESC: back" : L"ENTER: select    ESC: back");
+}
 
-		join4_keys(controller, pressed);
-		usnprintf(title, NUMBEROF(title) - 1, L"PLAYER %d", controller + 1);
-		title[NUMBEROF(title) - 1] = 0;
-		name[0] = 0;
-		if (playing)
-		{
-			struct player_profile profile;
-			long index = player_ui_get_active_player_profile_index(controller);
-
-			if (index != NONE && player_profile_get(index, &profile))
-			{
-				ustrncpy(name, profile.player_name, NUMBEROF(name) - 1);
-				name[NUMBEROF(name) - 1] = 0;
-			}
-			/* (player 1: SPACE separates the keyboard from the controller) */
-			ustrncpy(status, controller == 0 && halo_keyboard_shares_gamepad() ?
-				L"Keyboard + controller 1" : L"In the game", NUMBEROF(status) - 1);
-		}
-		else if (!input_has_gamepad(controller))
-		{
-			ustrncpy(status, L"No controller", NUMBEROF(status) - 1);
-		}
-		else
-		{
-			if (join4.state[controller] == _join4_away)
-			{
-				if (pressed[_join4_key_a])
-				{
-					if (!profile_list.count)
-						join4_notice(L"Make a profile in Settings first.");
-					else
-					{
-						join4.state[controller] = _join4_choosing;
-						join4.profile[controller] = join4_free_profile(controller, 0, 1);
-					}
-				}
-			}
-			else if (join4.state[controller] == _join4_choosing)
-			{
-				/* (past the profiles others have) */
-				if (pressed[_join4_key_left])
-					join4.profile[controller] = join4_free_profile(controller, join4.profile[controller] - 1, -1);
-				if (pressed[_join4_key_right])
-					join4.profile[controller] = join4_free_profile(controller, join4.profile[controller] + 1, 1);
-				if (pressed[_join4_key_a])
-					join4.state[controller] = _join4_ready;
-				else if (pressed[_join4_key_b])
-					join4.state[controller] = _join4_away;
-			}
-			else if (pressed[_join4_key_b])
-				join4.state[controller] = _join4_choosing;
-
-			switch (join4.state[controller])
-			{
-			case _join4_choosing:
-			{
-				wchar_t chosen[40];
-
-				join4_name(join4.profile[controller], chosen, NUMBEROF(chosen));
-				usnprintf(name, NUMBEROF(name) - 1, L"< %s >", chosen);
-				name[NUMBEROF(name) - 1] = 0;
-				ustrncpy(status, L"A: ready   B: back", NUMBEROF(status) - 1);
-				break;
-			}
-			case _join4_ready:
-				join4_name(join4.profile[controller], name, NUMBEROF(name));
-				ustrncpy(status, L"Ready (B: change)", NUMBEROF(status) - 1);
-				break;
-			default:
-				ustrncpy(status, L"Press A to join", NUMBEROF(status) - 1);
-				break;
-			}
-		}
-		status[NUMBEROF(status) - 1] = 0;
-		text_set(named(screen, "join4_slot_title", controller), title);
-		text_set(named(screen, "join4_slot_name", controller), name);
-		text_set(named(screen, "join4_slot_status", controller), status);
-	}
-	text_set(named(screen, "join4_notice", 0), system_milliseconds() < join4.notice_until ? join4.notice : L"");
+static long join4_tag(void)
+{
+	return tag_loaded('DeLa', JOIN4_NAME);
 }
 
 /* (ui_widget.c) whether the screen reads every controller's events, not
 only its player's: the lobby, where another controller's START joins and
 a player's B leaves (lobby_join_start, lobby_leave: each knows its
-controller), however many players there are */
+controller), however many players there are, and ADD PLAYER's quarters */
 unsigned char pc_menu_screen_reads_every_controller(struct widget_instance const *widget)
 {
 	long tag;
@@ -6436,7 +6351,20 @@ unsigned char pc_menu_screen_reads_every_controller(struct widget_instance const
 		return FALSE;
 	/* (looked up each time: the menus' tags are made again with each map) */
 	return tag == tag_loaded('DeLa', LOBBY_NAME) ||
-		tag == tag_loaded('DeLa', "pc\\main_menu\\multiplayer_type_select\\lobby\\preview_screen");
+		tag == tag_loaded('DeLa', "pc\\main_menu\\multiplayer_type_select\\lobby\\preview_screen") ||
+		tag == join4_tag();
+}
+
+/* (ui_widget.c) whether the widgets of the screen take a controller's
+events by their own controller alone: ADD PLAYER's quarters, each a
+controller's (the screen itself takes them all, to pass to its quarters) */
+unsigned char pc_menu_screen_routes_by_controller(struct widget_instance const *widget)
+{
+	struct widget_instance const *screen = widget;
+
+	while (screen && screen->parent)
+		screen = screen->parent;
+	return screen && screen->definition_tag_index != NONE && screen->definition_tag_index == join4_tag();
 }
 
 /* ---- the gametype editor: Edit Gametypes' list (the built-in gametypes
@@ -7655,7 +7583,41 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "port join4 open"))
 		{
-			return join4_open();
+			return join4_open(widget);
+		}
+		else if (!strcmp(name, "port join4 playing") || !strcmp(name, "port join4 opener"))
+		{
+			/* (join4_open sends their events only to the quarters to set) */
+			return TRUE;
+		}
+		else if (!strcmp(name, "port join4 select"))
+		{
+			return join4_select(widget, event, widget_deleted);
+		}
+		else if (!strcmp(name, "port join4 join"))
+		{
+			return join4_join(controller_of(widget));
+		}
+		else if (!strcmp(name, "port join4 choosing"))
+		{
+			/* (the spinner on a profile no other player has) */
+			extern boolean ui_widget_port_spinner_first_available(struct widget_instance *widget,
+				boolean (*usable)(short controller, long profile));
+
+			ui_widget_port_spinner_first_available(widget, join4_profile_free);
+			return join4_set(controller_of(widget), _join4_choosing);
+		}
+		else if (!strcmp(name, "port join4 unready"))
+		{
+			return join4_set(controller_of(widget), _join4_choosing);
+		}
+		else if (!strcmp(name, "port join4 leave"))
+		{
+			return join4_set(controller_of(widget), _join4_away);
+		}
+		else if (!strcmp(name, "port join4 ready"))
+		{
+			return join4_set(controller_of(widget), _join4_selected);
 		}
 		else if (!strcmp(name, "port join4 back"))
 		{
@@ -7663,7 +7625,7 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "port join4 done"))
 		{
-			return join4_done(event_controller(widget, event));
+			return join4_done(controller_of(widget));
 		}
 		else if (!strcmp(name, "port lobby join"))
 		{

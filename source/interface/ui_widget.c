@@ -3870,6 +3870,41 @@ static void widget_instance_initialize(
 	return;
 }
 
+/* port: (menu_functions.c's ADD PLAYER screen) the profile spinner among
+the widget's children on the first profile that is usable ("player profile
+list initialize" starts on player 1's), when the one it is on is not: the
+enumeration's high bit (available to its player) and the callback's say;
+FALSE if it has none */
+boolean ui_widget_port_spinner_first_available(
+	struct widget_instance *widget,
+	boolean (*usable)(short controller, long profile))
+{
+	struct widget_instance *spinner;
+	long const *profiles;
+	word index;
+
+	for (spinner = widget->child; spinner && spinner->type != _ui_widget_type_spinner_list; spinner = spinner->next)
+		;
+	if (!spinner || !(profiles = spinner->parameters.list.list_items) || !spinner->parameters.list.number_of_items)
+		return FALSE;
+#define SPINNER_USABLE(profile) ((profile) != NONE && ((profile) & 0x80000000) && 	usable(spinner->local_player_index, (profile)))
+	if ((word)spinner->parameters.list.selected_index < spinner->parameters.list.number_of_items &&
+		SPINNER_USABLE(profiles[spinner->parameters.list.selected_index]))
+	{
+		return TRUE;
+	}
+	for (index = 0; index < spinner->parameters.list.number_of_items; index++)
+	{
+		if (SPINNER_USABLE(profiles[index]))
+		{
+			spinner->parameters.list.selected_index = (short)index;
+			return TRUE;
+		}
+	}
+#undef SPINNER_USABLE
+	return FALSE;
+}
+
 /* port: the PC version's events that this engine never sends (its custom
 activation), for the menus' functions (port/linux/game/menu_functions.c):
 runs the widget's handlers for the event, else the first descendant's that
@@ -7745,6 +7780,10 @@ every controller's events however many players there are: another
 controller's START joins it, a player's B leaves it (its handlers know each
 controller), where a screen of player 1's would read theirs alone */
 extern unsigned char pc_menu_screen_reads_every_controller(struct widget_instance const *widget);
+/* port: (menu_functions.c) ADD PLAYER's screen, whose quarters are each a
+controller's: the screen takes every controller's events, its widgets their
+own controller's alone */
+extern unsigned char pc_menu_screen_routes_by_controller(struct widget_instance const *widget);
 
 /* port: the controller whose events a screen reads (NONE: every one's) */
 static short widget_event_controller(
@@ -7766,6 +7805,8 @@ static boolean widget_takes_events_of_controller(
 {
 	short player;
 
+	if (pc_menu_screen_routes_by_controller(widget))
+		return !widget->parent || widget->local_player_index == controller_index;
 	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
 		return TRUE;
 	if (controller_index > 0 && controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS &&

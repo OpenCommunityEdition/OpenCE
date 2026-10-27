@@ -92,11 +92,9 @@ static BOOL reported_keyboard = FALSE;
 plays player 1 alone, and the gamepad that shared port 0 with it takes the
 first port no gamepad has (port_gamepad), asked for and in effect */
 static BOOL keyboard_alone_wanted, keyboard_alone;
-/* the keyboard's join key (SPACE) and done key (Enter) held, as the menus
-read them (keyboard_gamepad), and the test script's (virtual_gamepads_update) */
-static BOOL keyboard_join_down, keyboard_done_down, virtual_keyboard_join, virtual_keyboard_done;
-/* polls of port 0 left with START held (halo_keyboard_press_start) */
-static int keyboard_start_polls;
+/* the keyboard's SPACE held, as the menus read it (keyboard_gamepad); the
+test script's SPACE and Enter (virtual_gamepads_update) */
+static BOOL keyboard_join_down, virtual_keyboard_join, virtual_keyboard_done;
 
 /* ---------- mouse */
 
@@ -514,8 +512,8 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	/* (escape backs out, as backspace does: the pause menu's B resumes the
 	game, the main menu's asks to quit; Start would choose, as A does) */
 	keyboard_join_down = k[SDL_SCANCODE_SPACE] || virtual_keyboard_join;
-	keyboard_done_down = k[SDL_SCANCODE_RETURN] || k[SDL_SCANCODE_KP_ENTER] || virtual_keyboard_done;
-	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(keyboard_join_down || keyboard_done_down);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(keyboard_join_down || k[SDL_SCANCODE_RETURN] ||
+		k[SDL_SCANCODE_KP_ENTER] || virtual_keyboard_done);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_ESCAPE] || k[SDL_SCANCODE_BACKSPACE] ||
 		(mouse && m[SDL_BUTTON_X1]));
 #ifdef HALO_ANDROID
@@ -524,11 +522,6 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 #endif
 	pad->bAnalogButtons[XINPUT_GAMEPAD_X] |= analog(k[SDL_SCANCODE_DELETE] || k[SDL_SCANCODE_E]);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_Y] |= analog(k[SDL_SCANCODE_TAB]);
-	if (keyboard_start_polls > 0)
-	{
-		keyboard_start_polls--;
-		pad->wButtons |= XINPUT_GAMEPAD_START;
-	}
 }
 
 /* the keys held when the game and the menus switch, or typing or the
@@ -1127,17 +1120,7 @@ unsigned char halo_keyboard_join_held(void)
 	return keyboard_join_down || virtual_keyboard_join;
 }
 
-unsigned char halo_keyboard_done_held(void)
-{
-	return keyboard_done_down || virtual_keyboard_done;
-}
 
-/* (the 4-way join screen's Enter) player 1's START, pressed for the next
-two polls: the menus read it as the controller's */
-void halo_keyboard_press_start(void)
-{
-	keyboard_start_polls = 2;
-}
 
 void halo_keyboard_alone_set(unsigned char alone)
 {
