@@ -1287,39 +1287,40 @@ static int controller_port(HANDLE device)
 }
 
 /* debug camera (director.c): the middle button, R and F, and the wheel's
-		notches since the director last asked */
-	static BOOL debug_cam_middle = FALSE;
-	static BOOL debug_cam_up = FALSE;
-	static BOOL debug_cam_down = FALSE;
-	static float debug_cam_wheel = 0.0f;
+notches since the director last asked */
+static BOOL debug_cam_middle = FALSE;
+static BOOL debug_cam_up = FALSE;
+static BOOL debug_cam_down = FALSE;
+static float debug_cam_wheel = 0.0f;
 
-	static void debug_camera_update(const struct platform_input_state *input, BOOL blocked)
-	{
-		pthread_mutex_lock(&mouse_lock);
-		debug_cam_middle = !blocked && !input->mouse_released &&
-			input->mouse_buttons[SDL_BUTTON_MIDDLE] != 0;
-		debug_cam_up = !blocked && input->keys[SDL_SCANCODE_R] != 0;
-		debug_cam_down = !blocked && input->keys[SDL_SCANCODE_F] != 0;
-		if (debug_cam_middle)
-			debug_cam_wheel += input->mouse_wheel;
-		else
-			debug_cam_wheel = 0.0f;
-		pthread_mutex_unlock(&mouse_lock);
-	}
-
-	/* port: read by director.c; the wheel is returned once, then cleared */
-	int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel)
-	{
-		pthread_mutex_lock(&mouse_lock);
-		*middle = debug_cam_middle;
-		*up = debug_cam_up;
-		*down = debug_cam_down;
-		*wheel = debug_cam_wheel;
+static void debug_camera_update(const struct platform_input_state *input, BOOL blocked)
+{
+	pthread_mutex_lock(&mouse_lock);
+	debug_cam_middle = !blocked && !input->mouse_released &&
+		input->mouse_buttons[SDL_BUTTON_MIDDLE] != 0;
+	debug_cam_up = !blocked && input->keys[SDL_SCANCODE_R] != 0;
+	debug_cam_down = !blocked && input->keys[SDL_SCANCODE_F] != 0;
+	if (debug_cam_middle)
+		debug_cam_wheel += input->mouse_wheel;
+	else
 		debug_cam_wheel = 0.0f;
-		pthread_mutex_unlock(&mouse_lock);
-		return TRUE;
-	}
-		
+	pthread_mutex_unlock(&mouse_lock);
+}
+
+/* read by director.c (halo_linux_source_fixups.h); the wheel's notches are
+returned once, then cleared */
+int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel)
+{
+	pthread_mutex_lock(&mouse_lock);
+	*middle = debug_cam_middle;
+	*up = debug_cam_up;
+	*down = debug_cam_down;
+	*wheel = debug_cam_wheel;
+	debug_cam_wheel = 0.0f;
+	pthread_mutex_unlock(&mouse_lock);
+	return TRUE;
+}
+
 /* reads a controller's state; for port 0 the keyboard, mouse, debug input
 and touchscreen are merged into the first gamepad's; runs on the game's main
 thread (touch_input_gamepad relies on it); returns ERROR_SUCCESS or
