@@ -816,6 +816,23 @@ static struct
 	BOOL statistics;
 } debug_settings;
 
+#ifndef HALO_GLES
+/* display.frames_in_flight: a fence after each frame's swap, and the frame
+that many before waited for (frame_pacing_wait). Without it a driver queues
+frames until its own limit, then blocks for several at once at whatever
+call fills its queue: on Intel graphics on Windows, a frame of 50-60 ms
+every sixth frame (some 15 fps felt at 80 fps). OpenGL ES's frames are
+paced by its stream buffer ring instead (host_gl_wait_frame). */
+#define MAXIMUM_FRAMES_IN_FLIGHT 8
+
+static struct
+{
+	long limit;
+	GLsync fences[MAXIMUM_FRAMES_IN_FLIGHT];
+	long next;
+} frame_pacing;
+#endif
+
 /* ---------- GL state cache
 
 Consecutive draws share most of their state, but each sets all of it: the
@@ -2010,6 +2027,13 @@ static void gl_initialize(void)
 	debug_settings.dump_shaders = *config_string("debug.gpu_dump_shaders") ?
 		config_string("debug.gpu_dump_shaders") : NULL;
 	debug_settings.statistics = config_boolean("debug.gpu_stats");
+#ifndef HALO_GLES
+	frame_pacing.limit = config_integer("display.frames_in_flight");
+	if (frame_pacing.limit < 0)
+		frame_pacing.limit = 0;
+	if (frame_pacing.limit > MAXIMUM_FRAMES_IN_FLIGHT)
+		frame_pacing.limit = MAXIMUM_FRAMES_IN_FLIGHT;
+#endif
 	{
 		GLint renderbuffer_size = 0;
 
@@ -6776,6 +6800,28 @@ static void front_buffer_take(void)
 	device.front_buffer_taken = device.frame + 1;
 }
 
+#ifndef HALO_GLES
+/* after the swap: this frame's fence, then a wait for the frame
+frame_pacing.limit before it (a second at most: a GPU that slow is not
+waited for longer) */
+static void frame_pacing_wait(void)
+{
+	GLsync *slot;
+
+	if (!frame_pacing.limit)
+		return;
+	frame_pacing.fences[frame_pacing.next] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	frame_pacing.next = (frame_pacing.next + 1) % frame_pacing.limit;
+	slot = &frame_pacing.fences[frame_pacing.next];
+	if (*slot)
+	{
+		glClientWaitSync(*slot, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
+		glDeleteSync(*slot);
+		*slot = NULL;
+	}
+}
+#endif
+
 void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destination_rectangle,
 	void *unused, void *unused2)
 {
@@ -6839,6 +6885,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 		platform_video_swap();
 #ifndef HALO_GLES
+		frame_pacing_wait();
 		visibility_read_batch();
 #endif
 		xgpu_gl_state_invalidate();
