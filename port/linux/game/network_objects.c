@@ -210,6 +210,11 @@ the longest the host leaves between a moving object's states. A record left
 from before (driven since, or at rest for long) glides no slower, and a jump
 is judged against no more than this. */
 #define UNSTEERED_PATH_MAXIMUM_TICKS (2 * MAXIMUM_OBJECT_PERIOD_TICKS)
+/* the most ticks an unsteered vehicle goes on along its path past the newest
+sample, when the next is late (the longest the host leaves between a moving
+object's states); as long again it takes to come back to the newest, if
+none came (the host's has stopped) */
+#define UNSTEERED_PATH_LATE_TICKS MAXIMUM_OBJECT_PERIOD_TICKS
 /* world units */
 #define REMOTE_OBJECT_TOLERANCE 0.05f
 /* ... and the cosine of the angle (an object at rest turned) */
@@ -428,13 +433,16 @@ static struct
 	long time;
 } objects_client_dead[MAXIMUM_TRACKED_OBJECTS];
 /* ... the host samples an unsteered vehicle is drawn between: where it was,
-where the host has it now, and how many ticks that gap covers
+where the host has it now, the ticks the glide between them takes, the host's
+tick of the newest, and the path's velocity between the host's last two
 (distributed_client_note_unsteered_path) */
 static struct
 {
 	long object_index;
 	long time;
-	long interval;
+	long host_time;
+	real interval;
+	real_vector3d velocity;
 	real_point3d previous_position;
 	real_point3d latest_position;
 	real_vector3d previous_forward;
@@ -2618,16 +2626,23 @@ static void unsteered_blend_facing(
 	*up = blended.up;
 }
 
-/* Client: the next host sample of an unsteered vehicle. The picture moves
-from where the vehicle is to that sample over the ticks since the last one,
-and stops there if the next sample is late. The host's physics velocity is
-not used: a lifepod swings about the path, and a Pelican's spin flaps its
-fins. A jump further than a step of the path is taken whole. */
+/* Client: the next host sample of an unsteered vehicle, of the host's tick
+host_time. The path's velocity is the host's last two samples' difference
+over the host's ticks between them (not when they arrived, which a late or
+bunched message would make uneven). The picture moves from where the vehicle
+is to the sample at that speed, so it keeps its pace whether it was behind or
+gone on past the last sample, and goes on along the path if the next sample
+is late (distributed_client_carry_unsteered_vehicles). One the host has at
+rest stops at the sample. The host's physics velocity is not used: a lifepod
+swings about the path, and a Pelican's spin flaps its fins. A jump further
+than a step of the path is taken whole. */
 static void distributed_client_note_unsteered_path(
 	long object_index,
 	real_point3d const *host_position,
 	real_vector3d const *host_forward,
-	real_vector3d const *host_up)
+	real_vector3d const *host_up,
+	long host_time,
+	boolean host_at_rest)
 {
 	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
 	struct object_datum *object;
@@ -2636,6 +2651,9 @@ static void distributed_client_note_unsteered_path(
 	boolean same;
 	real_vector3d step;
 	real limit;
+	real_vector3d velocity;
+	real speed_squared;
+	real interval;
 
 	/* (rest uses this glide too: a late sample holds at the newest) */
 	if (absolute_index < 0 || absolute_index >= MAXIMUM_TRACKED_OBJECTS ||
@@ -2646,7 +2664,10 @@ static void distributed_client_note_unsteered_path(
 	object = object_get(object_index);
 	now = game_time_get();
 	same = objects_client_unsteered_path[absolute_index].object_index == object_index;
-	since = same ? now - objects_client_unsteered_path[absolute_index].time : 0;
+	/* (an older sample than the newest, or the same tick's again) */
+	if (same && host_time - objects_client_unsteered_path[absolute_index].host_time < 1)
+		return;
+	since = same ? host_time - objects_client_unsteered_path[absolute_index].host_time : 0;
 	if (since < 1)
 		since = 1;
 	if (since > UNSTEERED_PATH_MAXIMUM_TICKS)
@@ -2660,7 +2681,9 @@ static void distributed_client_note_unsteered_path(
 	{
 		objects_client_unsteered_path[absolute_index].object_index = object_index;
 		objects_client_unsteered_path[absolute_index].time = now;
-		objects_client_unsteered_path[absolute_index].interval = 1;
+		objects_client_unsteered_path[absolute_index].host_time = host_time;
+		objects_client_unsteered_path[absolute_index].interval = 1.0f;
+		objects_client_unsteered_path[absolute_index].velocity = *global_zero_vector3d;
 		objects_client_unsteered_path[absolute_index].previous_position = *host_position;
 		objects_client_unsteered_path[absolute_index].latest_position = *host_position;
 		objects_client_unsteered_path[absolute_index].previous_forward = *host_forward;
@@ -2672,20 +2695,42 @@ static void distributed_client_note_unsteered_path(
 		object_set_position(object_index, host_position, host_forward, host_up);
 		return;
 	}
+	/* the path's velocity, sample to sample on the host's clock */
+	velocity.i = (host_position->x - objects_client_unsteered_path[absolute_index].latest_position.x) / (real)since;
+	velocity.j = (host_position->y - objects_client_unsteered_path[absolute_index].latest_position.y) / (real)since;
+	velocity.k = (host_position->z - objects_client_unsteered_path[absolute_index].latest_position.z) / (real)since;
+	if (host_at_rest)
+		velocity = *global_zero_vector3d;
+	speed_squared = velocity.i * velocity.i + velocity.j * velocity.j + velocity.k * velocity.k;
+	/* the glide to the sample at that speed: no faster than twice it, nor
+	slower than half (behind or ahead of the path by more, it closes the
+	distance); one at rest over the samples' gap */
+	interval = (real)since;
+	if (speed_squared > 1.0e-6f)
+	{
+		interval = (real)sqrt((double)((step.i * step.i + step.j * step.j + step.k * step.k) / speed_squared));
+		if (!(interval >= 0.5f * (real)since))
+			interval = 0.5f * (real)since;
+		if (interval > 2.0f * (real)since)
+			interval = 2.0f * (real)since;
+	}
 	objects_client_unsteered_path[absolute_index].previous_position = object->object.position;
 	objects_client_unsteered_path[absolute_index].previous_forward = object->object.forward;
 	objects_client_unsteered_path[absolute_index].previous_up = object->object.up;
 	objects_client_unsteered_path[absolute_index].latest_position = *host_position;
 	objects_client_unsteered_path[absolute_index].latest_forward = *host_forward;
 	objects_client_unsteered_path[absolute_index].latest_up = *host_up;
-	objects_client_unsteered_path[absolute_index].interval = since;
+	objects_client_unsteered_path[absolute_index].interval = interval;
+	objects_client_unsteered_path[absolute_index].velocity = velocity;
 	objects_client_unsteered_path[absolute_index].time = now;
+	objects_client_unsteered_path[absolute_index].host_time = host_time;
 	objects_client_unsteered_path[absolute_index].object_index = object_index;
 }
 
 void network_objects_handle_states(
 	void const *entries,
-	short count)
+	short count,
+	long host_time)
 {
 	struct distributed_object_state const *states = (struct distributed_object_state const *)entries;
 	short index;
@@ -2783,7 +2828,8 @@ void network_objects_handle_states(
 		/* (no snap onto the host: the carry moves it across the gap) */
 		if (distributed_vehicle_unsteered(state->object_index))
 		{
-			distributed_client_note_unsteered_path(state->object_index, &state->position, &forward, &up);
+			distributed_client_note_unsteered_path(state->object_index, &state->position, &forward, &up,
+				host_time, TEST_FLAG(state->flags, _distributed_object_at_rest_bit));
 			continue;
 		}
 		dx = state->position.x - object->object.position.x;
@@ -3282,13 +3328,16 @@ static void distributed_client_remove_own_objects(
 	objects_client_new_object_count = 0;
 }
 
-/* Client: moves each unsteered vehicle from the host's previous sample to
-the new one (distributed_client_note_unsteered_path). Past that gap it holds
-at the newest sample. A Pelican its pilot flies, and a recording's lifepod.
-Its velocity is its path's while it glides, for what reads it (the engine's
-pitch, the wheels' turn, a passenger who gets out), and none once it holds;
-its spin is none (the host's flaps a Pelican's fins). One already holding at
-the newest sample is not placed again. */
+/* Client: moves each unsteered vehicle from where it was to the host's newest
+sample (distributed_client_note_unsteered_path). Past that, with no newer
+sample, it goes on at the path's velocity for UNSTEERED_PATH_LATE_TICKS (a
+late sample then finds it moving), then comes back to the newest sample over
+as long and holds there (the host's has stopped). A Pelican its pilot flies,
+and a recording's lifepod. Its velocity is its path's while it moves on, for
+what reads it (the engine's pitch, the wheels' turn, a passenger who gets
+out), and none once it comes back or holds; its spin is none (the host's
+flaps a Pelican's fins). One already holding at the newest sample is not
+placed again. */
 static void distributed_client_carry_unsteered_vehicles(
 	void)
 {
@@ -3300,11 +3349,13 @@ static void distributed_client_carry_unsteered_vehicles(
 	{
 		long absolute_index;
 		long since;
-		long interval;
+		real interval;
 		real alpha;
+		real late;
 		real_point3d position;
 		real_vector3d forward;
 		real_vector3d up;
+		real_vector3d velocity;
 
 		if (object->object.parent_object_index != NONE || !distributed_vehicle_unsteered(iterator.index))
 			continue;
@@ -3316,14 +3367,23 @@ static void distributed_client_carry_unsteered_vehicles(
 		}
 		since = game_time_get() - objects_client_unsteered_path[absolute_index].time;
 		interval = objects_client_unsteered_path[absolute_index].interval;
-		if (interval < 1)
-			interval = 1;
+		if (!(interval >= 0.5f))
+			interval = 0.5f;
 		if (since < 0)
 			since = 0;
-		alpha = (real)since / (real)interval;
+		alpha = (real)since / interval;
 		if (alpha > 1.0f)
 			alpha = 1.0f;
-		if (alpha >= 1.0f &&
+		/* past the newest sample: on along the path, then back to it */
+		late = (real)since - interval;
+		if (late > 2.0f * (real)UNSTEERED_PATH_LATE_TICKS)
+			late = 0.0f;
+		else if (late > (real)UNSTEERED_PATH_LATE_TICKS)
+			late = 2.0f * (real)UNSTEERED_PATH_LATE_TICKS - late;
+		if (!(late > 0.0f))
+			late = 0.0f;
+		velocity = objects_client_unsteered_path[absolute_index].velocity;
+		if (alpha >= 1.0f && late == 0.0f &&
 			object->object.position.x == objects_client_unsteered_path[absolute_index].latest_position.x &&
 			object->object.position.y == objects_client_unsteered_path[absolute_index].latest_position.y &&
 			object->object.position.z == objects_client_unsteered_path[absolute_index].latest_position.z)
@@ -3349,20 +3409,28 @@ static void distributed_client_carry_unsteered_vehicles(
 			alpha,
 			&forward,
 			&up);
+		if (alpha >= 1.0f)
+		{
+			position.x += velocity.i * late;
+			position.y += velocity.j * late;
+			position.z += velocity.k * late;
+		}
 		if (!distributed_transform_valid(&position, &forward, &up, NULL, NULL, &forward, &up))
 			continue;
 		if (alpha < 1.0f)
 		{
 			object->object.translational_velocity.i =
 				(objects_client_unsteered_path[absolute_index].latest_position.x -
-					objects_client_unsteered_path[absolute_index].previous_position.x) / (real)interval;
+					objects_client_unsteered_path[absolute_index].previous_position.x) / interval;
 			object->object.translational_velocity.j =
 				(objects_client_unsteered_path[absolute_index].latest_position.y -
-					objects_client_unsteered_path[absolute_index].previous_position.y) / (real)interval;
+					objects_client_unsteered_path[absolute_index].previous_position.y) / interval;
 			object->object.translational_velocity.k =
 				(objects_client_unsteered_path[absolute_index].latest_position.z -
-					objects_client_unsteered_path[absolute_index].previous_position.z) / (real)interval;
+					objects_client_unsteered_path[absolute_index].previous_position.z) / interval;
 		}
+		else if ((real)since - interval <= (real)UNSTEERED_PATH_LATE_TICKS)
+			object->object.translational_velocity = velocity;
 		else
 			object->object.translational_velocity = *global_zero_vector3d;
 		object->object.angular_velocity = *global_zero_vector3d;
