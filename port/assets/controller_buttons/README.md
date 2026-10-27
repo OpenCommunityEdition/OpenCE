@@ -20,6 +20,10 @@ L/R/ZL/ZR for Switch. The project owner explicitly approved these deterministic
 corrections. Source silhouettes, face artwork and original source files remain
 unchanged. No commercial map fonts are used.
 
+The short ASCII labels explicitly use Pillow's Basic text layout, matching
+the committed artwork. Pillow otherwise selects Raqm automatically when it
+is installed, which changes some label metrics and pixels on Linux.
+
 The generator preserves each silhouette's aspect ratio within the established
 HUD cell, and records half-alpha bounds for the renderer. Transparent padding
 does not affect prompt centering. Thumbsticks retain the supplied three frames;

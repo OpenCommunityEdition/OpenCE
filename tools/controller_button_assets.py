@@ -68,10 +68,12 @@ def correct_label(face, text, trigger):
     # Include the old lettering's antialiased edges without touching its outline.
     pixels[ndimage.binary_dilation(mask, iterations=4)] = [255, 255, 255, 255]
     font_path = ROOT / 'port/assets/fonts/Overpass-900.ttf'
-    font = ImageFont.truetype(str(font_path), 1000)
+    # These ASCII labels were authored with Basic layout. Raqm availability
+    # must not change their metrics or rasterized pixels on another platform.
+    font = ImageFont.truetype(str(font_path), 1000, layout_engine=ImageFont.Layout.BASIC)
     box = font.getbbox(text)
     size = int(1000 * min((right-left) / (box[2]-box[0]), (bottom-top) / (box[3]-box[1])))
-    font = ImageFont.truetype(str(font_path), size)
+    font = ImageFont.truetype(str(font_path), size, layout_engine=ImageFont.Layout.BASIC)
     box = font.getbbox(text)
     ink = Image.new('L', face.size)
     ImageDraw.Draw(ink).text(((left+right-box[2]-box[0])/2, (top+bottom-box[3]-box[1])/2), text, font=font, fill=255)
