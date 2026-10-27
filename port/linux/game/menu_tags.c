@@ -1697,12 +1697,19 @@ static boolean pause_box_stock(struct ui_widget_definition const *box)
 		tag_name_ends(pieces[2].widget_tag.index, "\\pausebox2_right");
 }
 
+/* the port's box's height for the number of buttons (tools/port_settings.py's
+pause_box_height: the Xbox's of two is 159), and its footer band, the button
+key's, at its bottom */
+#define PAUSE_BOX_HEIGHT(buttons) (159 + ((buttons) - 2) * PAUSE_BUTTON_SPACING)
+#define PAUSE_BOX_FOOTER 28
+
 /* the stock box's pieces drawn with the port's taller box: its frame for
-the number of buttons */
-static void pause_box_redraw(struct ui_widget_definition const *box, long buttons)
+the number of buttons; the box's height */
+static short pause_box_redraw(struct ui_widget_definition const *box, long buttons)
 {
 	static char const *const names[] = { "pause/pausebox_left", "pause/pausebox_center", "pause/pausebox_right" };
 	struct ui_widget_child_reference const *pieces = box->child_widgets.address;
+	short height = (short)PAUSE_BOX_HEIGHT(PAUSE_BOX_FIRST_BUTTONS);
 	long piece;
 
 	for (piece = 0; piece < 3; piece++)
@@ -1720,7 +1727,43 @@ static void pause_box_redraw(struct ui_widget_definition const *box, long button
 		sequence->first_bitmap_index = (short)PIN(buttons - PAUSE_BOX_FIRST_BUTTONS, 0, group->bitmaps.count - 1);
 		sequence->bitmap_count = 1;
 		reference_set(&definition->background_bitmap, BITMAP_GROUP_TAG, build.bitmap_tags[bitmap]);
-		definition->bounds.y1 = (short)(definition->bounds.y0 + 256);
+		/* (as high as the box: its texture's rows below it, empty, cropped,
+		as a split screen's 240 lines would squeeze the whole 256) */
+		height = (short)PAUSE_BOX_HEIGHT(PAUSE_BOX_FIRST_BUTTONS + sequence->first_bitmap_index);
+		definition->bounds.y1 = (short)(definition->bounds.y0 + height);
+	}
+	return height;
+}
+
+/* the stock screen's box within the screen (a split screen's is 240 high:
+the box of four buttons is taller than the room under the Xbox's place for
+it), moved up with its list as far as it must, and the button key (what is
+below the list) in the box's footer band, where the Xbox's stood under its
+shorter box */
+static void pause_box_fit(struct ui_widget_definition *screen, long box_child, long list_child, short list_top,
+	short height)
+{
+	struct ui_widget_child_reference *children = screen->child_widgets.address;
+	short room = (short)(screen->bounds.y1 - screen->bounds.y0 - 4);
+	short top = children[box_child].vertical_offset;
+	short up = (short)MAX(0, MIN(top - 2, top + height - room));
+	long child;
+
+	children[box_child].vertical_offset -= up;
+	children[list_child].vertical_offset -= up;
+	top = children[box_child].vertical_offset;
+	for (child = 0; child < screen->child_widgets.count; child++)
+	{
+		struct ui_widget_definition const *widget;
+
+		if (child == box_child || child == list_child || children[child].widget_tag.index == NONE ||
+			children[child].vertical_offset <= list_top)
+		{
+			continue;
+		}
+		widget = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		children[child].vertical_offset = (short)(top + height - PAUSE_BOX_FOOTER +
+			(PAUSE_BOX_FOOTER - (widget->bounds.y1 - widget->bounds.y0)) / 2);
 	}
 }
 
@@ -1731,7 +1774,7 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 	boolean host = global_network_game_server_get() != NULL;
 	struct tag_block const *screens;
 	long patched_list = NONE, added = 0, buttons = 0, screen;
-	short grow = 0;
+	short grow = 0, box_height = 0;
 	boolean box_redrawn = FALSE;
 
 	if (collection == NONE || quit_function == NONE)
@@ -1796,10 +1839,16 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 			else if (children[child].vertical_offset > list_top)
 				children[child].vertical_offset += box_child != NONE ? grow - grow / 2 : grow;
 		}
-		if (box_child != NONE && !box_redrawn)
+		if (box_child != NONE)
 		{
-			pause_box_redraw(tag_get(UI_WIDGET_DEFINITION_TAG, children[box_child].widget_tag.index), buttons);
-			box_redrawn = TRUE;
+			/* (the pieces are the screens' own: drawn once) */
+			if (!box_redrawn)
+			{
+				box_height = pause_box_redraw(tag_get(UI_WIDGET_DEFINITION_TAG, children[box_child].widget_tag.index),
+					buttons);
+				box_redrawn = TRUE;
+			}
+			pause_box_fit(definition, box_child, list_child, list_top, box_height);
 		}
 	}
 	if (patched_list != NONE)
