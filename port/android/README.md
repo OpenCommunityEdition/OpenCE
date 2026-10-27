@@ -141,8 +141,21 @@ or scroll at the sides, and do not scroll at the top and bottom, because the
 first swipe from an edge in full screen only shows the system bars.
 
 A tap during a cinematic that can be skipped skips it, as A does. On the
-on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
-"A =ENTER" to accept the name.
+game's on-screen keyboard (a player profile's name), tap a key to press it,
+"B =BACK" to cancel and "A =ENTER" to accept the name.
+
+While a name is typed, on the game's on-screen keyboard or in a menu's text
+field (Server Setup's server name and password, a game's password when
+joining it), Android's keyboard comes up as well when the touch controls
+would show (see "Touch controls"). Its letters, numbers, symbols (those of
+ASCII only) and backspace type into the name, and its Enter accepts it, as a
+keyboard's Enter does. A name is typed as a visible password to Android's
+keyboard, so that it offers no suggestions and does not learn the names
+typed. The back gesture closes Android's keyboard first; it comes back with
+the next name begun, and the game's own keyboard takes taps meanwhile. A
+Bluetooth or USB keyboard types into the names in the same way, with or
+without Android's keyboard (`port/linux/src/sdl_platform.c`, "the system's
+on-screen keyboard").
 
 After a multiplayer game, the carnage report shows buttons in place of its
 prompt at the bottom: the host's CONTINUE goes on to the next game (PICK
