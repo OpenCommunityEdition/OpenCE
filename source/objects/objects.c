@@ -1577,21 +1577,25 @@ void object_function_values_for_render(
 {
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *definition = object_definition_get(object->definition_index);
-	real fraction = game_time_get_tick_fraction();
+	/* port: where the picture is, between the previous tick (0) and this one
+	(1) (render_interpolation.c); 1 outside an interpolated frame (Smooth
+	Motion off), where the tick's own values are shown */
+	real fraction = render_interpolation_fraction();
 	short function_count = (short)MIN(
 		definition->object.functions.count,
 		NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS);
 	short function_index;
 	real huh;
+	real back;
 
 	csmemcpy(
 		values,
 		object->object.outgoing_function_values,
 		sizeof(object->object.outgoing_function_values));
-	/* a fraction of 0 is the tick itself, and 1 is the paused hold */
-	if (!(fraction > 0.0f) || !(fraction < 1.0f))
+	if (!(fraction >= 0.0f) || !(fraction < 1.0f))
 		return;
 
+	back = 1.0f - fraction;
 	huh = (57 * DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index) + game_time_get()) * 0.033333335f;
 	for (function_index = 0; function_index < function_count; function_index++)
 	{
@@ -1602,8 +1606,9 @@ void object_function_values_for_render(
 		boolean active;
 		real output;
 
-		/* port: an additive function steps by a whole tick. Move that step
-		across the frames. Anything else is the function at this moment. */
+		/* port: an additive function steps by a whole tick: the picture
+		is that part of the step back from this tick's value. Anything else
+		is the function at the picture's moment. */
 		if (TEST_FLAG(function->flags, _object_function_clip_to_bounds_and_normalize))
 		{
 			output = object_function_addition(
@@ -1613,14 +1618,14 @@ void object_function_values_for_render(
 				object->object.outgoing_function_values,
 				&active);
 			values[function_index] = object_function_wrap(
-				object->object.outgoing_function_values[function_index] + fraction * output);
+				object->object.outgoing_function_values[function_index] - back * output);
 		}
 		else
 		{
 			output = object_function_addition(
 				object,
 				function,
-				huh + fraction * 0.033333335f,
+				huh - back * 0.033333335f,
 				values,
 				&active);
 			values[function_index] = output;
@@ -5283,8 +5288,10 @@ static real object_function_wrap(
 	return value;
 }
 
-/* what one tick stores, before an additive function folds it into the value
-it already held. `outgoing` is the functions already computed. */
+/* port: the original's loop body, as one function, so that the picture's
+values (object_function_values_for_render) are found as the tick's are: what
+one tick stores, before an additive function folds it into the value it
+already held. `outgoing` is the functions already computed. */
 static real object_function_addition(
 	struct object_datum *object,
 	struct object_function_definition *function,

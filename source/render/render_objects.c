@@ -486,9 +486,13 @@ static void render_object_list(
 		real_matrix4x3 const *node_matrices = legs ?
 			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
 			object_get_node_matrices(object_index);
-		/* port: a child copies this object's modifier, and that child is
-		drawn after the block below. The values have to still be here. */
-		real shown_functions[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
+		/* port: the function values the picture shows
+		(object_function_values_for_render), kept in the rasterizer's memory
+		for the frame: a modifier's group, a queued transparent part and a
+		child that copies this modifier read them after this block is done,
+		and the overshield finds its own values by their address
+		(overshield_effect.c), so they are not copied again */
+		real const *shown_functions = object->object.outgoing_function_values;
 
 		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices))
 		{
@@ -534,7 +538,15 @@ static void render_object_list(
 				{
 					/* port: the tick's functions, moved into this frame, so a
 					charge clicks with the picture instead of once a tick */
-					object_function_values_for_render(object_index, shown_functions);
+					{
+						real values[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
+						real *kept;
+
+						object_function_values_for_render(object_index, values);
+						kept = rasterizer_memory_alloc(values, sizeof(values));
+						if (kept)
+							shown_functions = kept;
+					}
 					if (definition->object.modifier_shader.index != NONE)
 					{
 						model_effect.modifier_shader = shader_definition_get(
@@ -671,12 +683,13 @@ static void render_object_list(
 			if (!data->shadow && !legs && object->object.first_widget_index != NONE)
 			{
 				struct render_animation animation;
-				real shown_functions[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
+				real widget_functions[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
 
-				/* port: the tick's functions, moved into this frame */
-				object_function_values_for_render(object_index, shown_functions);
+				/* port: the tick's functions, moved into this frame (the
+				widgets read them as they are drawn, here) */
+				object_function_values_for_render(object_index, widget_functions);
 				animation.colors = object->object.outgoing_change_colors;
-				animation.values = shown_functions;
+				animation.values = widget_functions;
 				widgets_render(object_index, data->lighting, &animation);
 			}
 
