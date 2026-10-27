@@ -93,7 +93,7 @@ jobs:
         run: |
           python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py
           python tools/test_light_storage.py
-          python -m pytest -q tools/test_hud_corrections.py
+          python -m pytest -q tools/test_controller_buttons.py tools/test_controller_remap.py tools/test_hud_button_style.py tools/test_hud_corrections.py
 
       - name: Compile cache
         run: ccache --show-stats

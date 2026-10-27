@@ -64,6 +64,11 @@ and entry points used below that ES lacks */
 struct xgpu_capabilities xgpu_capabilities;
 #endif
 
+/* display.reversed_depth (xgpu.h), as the context was made; never on
+OpenGL ES, which has no glClipControl: its depth from -1 would lose the
+precision near 0 that reversing gains */
+BOOL xgpu_reversed_depth;
+
 /* ---------- the screen's width
 
 The Xbox screen is 640x480. The native ports can draw a wider one: 480
@@ -386,6 +391,10 @@ static struct
 	pixels are linear, in scRGB's units, the desktop's white sdr_white */
 	BOOL float_window;
 	float sdr_white;
+	/* display.hdr_paper_white and display.hdr_peak_brightness, in nits: 0
+	for Windows' own (its SDR content brightness, and its HDR calibration's
+	peak, as SDL reports them) */
+	int paper_white, peak_brightness;
 #ifdef HALO_GLES
 	/* the most samples a pixel of a GL_RGBA16F renderbuffer */
 	GLint maximum_samples;
@@ -1450,6 +1459,9 @@ static void render_target_storage(const struct xgpu_render_target *target)
 	if (target->format == GL_DEPTH24_STENCIL8)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
 			GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+	else if (target->format == GL_DEPTH32F_STENCIL8)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
+			GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, NULL);
 	else if (target->format == GL_RGBA16F)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
 			GL_RGBA, GL_HALF_FLOAT, NULL);
@@ -1521,7 +1533,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
 	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
-	entry->target.format = depth ? GL_DEPTH24_STENCIL8 :
+	entry->target.format = depth ? (xgpu_reversed_depth ? GL_DEPTH32F_STENCIL8 : GL_DEPTH24_STENCIL8) :
 		entry->screen_buffer && hdr.active ? GL_RGBA16F : GL_RGBA8;
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
@@ -1769,7 +1781,8 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- display.hdr */
 
-static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] = { "neutral", "aces", "reinhard" };
+static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] =
+	{ "neutral", "aces", "reinhard", "gt7" };
 
 /* display.hdr's settings, if they have changed: the back buffer's entries
 are made again in the format it takes (what they held is lost, and a frame
@@ -1800,12 +1813,19 @@ static void hdr_read(void)
 #endif
 		hdr.sdr_white = 1.0f;
 		hdr.tone_mapping.peak = 1.0f;
+		hdr.tone_mapping.paper = 0.0f;
 	}
 	hdr.read = TRUE;
 	hdr.read_at = config_changes();
 	curve = config_string("display.hdr_tone_mapping");
 	exposure = config_real("display.hdr_exposure");
 	wanted = config_boolean("display.hdr");
+	hdr.paper_white = config_integer("display.hdr_paper_white");
+	hdr.paper_white = hdr.paper_white <= 0 ? 0 : hdr.paper_white < 80 ? 80 : hdr.paper_white > 1000 ? 1000 :
+		hdr.paper_white;
+	hdr.peak_brightness = config_integer("display.hdr_peak_brightness");
+	hdr.peak_brightness = hdr.peak_brightness <= 0 ? 0 : hdr.peak_brightness < 250 ? 250 :
+		hdr.peak_brightness > 10000 ? 10000 : hdr.peak_brightness;
 	for (value = NUMBER_OF_XGPU_TONE_MAPPINGS - 1; value > 0 && strcmp(curve, tone_mapping_names[value]); value--)
 	{
 	}
@@ -1931,6 +1951,18 @@ static void gl_initialize(void)
 	}
 	glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 	glEnable(GL_PROGRAM_POINT_SIZE);
+	/* (read once, at start: the depth buffers' format and the programs
+	depend on it) */
+	{
+		static BOOL read;
+
+		if (!read)
+		{
+			read = TRUE;
+			xgpu_reversed_depth = config_boolean("display.reversed_depth");
+			platform_log("depth: %s", xgpu_reversed_depth ? "32-bit float, reversed" : "24 bits, as the Xbox's");
+		}
+	}
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
@@ -2328,9 +2360,28 @@ long halo_screen_commit(void)
 #ifndef HALO_ANDROID
 	if (hdr.float_window)
 	{
-		float headroom;
+		float sdr_white, headroom, paper, peak;
+		BOOL on = platform_video_hdr(&sdr_white, &headroom);
 
-		hdr.tone_mapping.peak = platform_video_hdr(&hdr.sdr_white, &headroom) ? headroom : 1.0f;
+		/* (in nits: scRGB's 1.0 is 80) */
+		paper = hdr.paper_white ? (float)hdr.paper_white : sdr_white * 80.0f;
+		peak = hdr.peak_brightness ? (float)hdr.peak_brightness : headroom * sdr_white * 80.0f;
+		if (!on)
+		{
+			paper = sdr_white * 80.0f;
+			peak = paper;
+		}
+		if (peak < paper)
+			peak = paper;
+		if (paper != hdr.sdr_white * 80.0f || peak / paper != hdr.tone_mapping.peak)
+		{
+			if (on)
+				platform_log("HDR: the display's paper white %.0f nits%s, peak %.0f nits%s", paper,
+					hdr.paper_white ? "" : " (Windows')", peak, hdr.peak_brightness ? "" : " (Windows')");
+		}
+		hdr.sdr_white = paper / 80.0f;
+		hdr.tone_mapping.peak = peak / paper;
+		hdr.tone_mapping.paper = on ? paper / 100.0f : 0.0f;
 	}
 #endif
 	/* display.shadow_resolution, if it has changed: the maps' entries at
@@ -3985,8 +4036,10 @@ static void apply_raster_state(BOOL has_depth)
 		glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 	}
 	state_enable(&gl_state.scissor_test, GL_SCISSOR_TEST, scissor[2] > 0 && scissor[3] > 0);
-	depth_range[0] = device.viewport.MinZ;
-	depth_range[1] = device.viewport.MaxZ;
+	/* (display.reversed_depth: Direct3D's MinZ to MaxZ as 1 - MinZ to
+	1 - MaxZ, which glDepthRange takes nearest first) */
+	depth_range[0] = xgpu_reversed_depth ? 1.0f - device.viewport.MaxZ : device.viewport.MinZ;
+	depth_range[1] = xgpu_reversed_depth ? 1.0f - device.viewport.MinZ : device.viewport.MaxZ;
 	if (memcmp(gl_state.depth_range, depth_range, sizeof(depth_range)))
 	{
 		memcpy(gl_state.depth_range, depth_range, sizeof(depth_range));
@@ -3998,6 +4051,12 @@ static void apply_raster_state(BOOL has_depth)
 	{
 		GLenum function = rs[D3DRS_ZFUNC] ? (GLenum)rs[D3DRS_ZFUNC] : GL_NEVER;
 
+		/* (display.reversed_depth: nearer is greater) */
+		if (xgpu_reversed_depth)
+		{
+			function = function == GL_LESS ? GL_GREATER : function == GL_LEQUAL ? GL_GEQUAL :
+				function == GL_GREATER ? GL_LESS : function == GL_GEQUAL ? GL_LEQUAL : function;
+		}
 		if (gl_state.depth_function != function)
 		{
 			gl_state.depth_function = function;
@@ -4129,6 +4188,12 @@ static void apply_raster_state(BOOL has_depth)
 
 		offset[0] = dword_to_float(rs[D3DRS_POLYGONOFFSETZSLOPESCALE]);
 		offset[1] = dword_to_float(rs[D3DRS_POLYGONOFFSETZOFFSET]);
+		/* (display.reversed_depth: toward the camera is up) */
+		if (xgpu_reversed_depth)
+		{
+			offset[0] = -offset[0];
+			offset[1] = -offset[1];
+		}
 		if (memcmp(gl_state.polygon_offset, offset, sizeof(offset)))
 		{
 			memcpy(gl_state.polygon_offset, offset, sizeof(offset));
@@ -6489,7 +6554,7 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	if (has_depth && (flags & D3DCLEAR_ZBUFFER))
 	{
 		glDepthMask(GL_TRUE);
-		glClearDepth(z);
+		glClearDepth(xgpu_reversed_depth ? 1.0f - z : z);
 		mask |= GL_DEPTH_BUFFER_BIT;
 	}
 	if (has_depth && (flags & D3DCLEAR_STENCIL))

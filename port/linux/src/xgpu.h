@@ -13,6 +13,16 @@ device itself (d3d8_gl.c).
 #include "platform.h"
 #include "gl.h"
 
+/* display.reversed_depth (desktop GL, taken up as the context is made): the
+depth buffers hold 32-bit floats, 1.0 at the near plane and 0.0 at the far
+(d3d8_gl.c turns the game's Direct3D depth around: its tests, clears, depth
+range and polygon offsets; nv2a_vsh.c and nv2a_psh.c the depth they give).
+A float's precision follows its size, so reversed it is about the same at
+every distance, where 24 bits and Direct3D's depth spend most of theirs near
+the camera: surfaces a few millimetres apart, which 24 bits run together
+past a few tens of metres (Blood Gulch's lights on the base), stay apart. */
+extern BOOL xgpu_reversed_depth;
+
 #ifdef HALO_GLES
 /* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
 struct xgpu_capabilities
@@ -289,6 +299,7 @@ enum
 	_xgpu_tone_mapping_neutral,
 	_xgpu_tone_mapping_aces,
 	_xgpu_tone_mapping_reinhard,
+	_xgpu_tone_mapping_gt7,
 	NUMBER_OF_XGPU_TONE_MAPPINGS
 };
 
@@ -300,6 +311,8 @@ struct xgpu_tone_mapping
 	/* the brightest value the curve gives, in the display's whites: 1.0 for
 	SDR, an HDR display's headroom */
 	float peak;
+	/* with an HDR display, paper white in GT7's units (100 nits); 0 for SDR */
+	float paper;
 };
 
 /* the tone mapping and presentation programs made now; FALSE if they

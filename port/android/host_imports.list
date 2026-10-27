@@ -28,6 +28,7 @@ host_sdl_gl_make_current
 host_sdl_gl_set_swap_interval
 host_sdl_gl_swap_window
 host_sdl_poll_event
+host_sdl_text_input
 host_sdl_set_clipboard_text
 host_sdl_get_clipboard_text
 host_sdl_show_toast
@@ -63,5 +64,6 @@ host_touch_look_read
 host_touch_rumble
 host_touch_scene
 host_touch_bindings
+host_touch_devices
 
 host_errno

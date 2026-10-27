@@ -34,6 +34,7 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 #include "text/draw_string.h"
 #include "hud_button_layout.h"
 #include "hud_hires_crosshairs.h"
+#include "controller_glyphs.h"
 #include "scenario/scenario_definitions.h"
 #include "cache/texture_cache.h"
 #ifdef HALO_ANDROID
@@ -165,6 +166,7 @@ static void hud_hires_sprite_bitmaps_forget(
 	}
 	hires_sprite_bitmap_count = 0;
 	hud_buttons_forget();
+	controller_glyphs_dispose();
 
 	return;
 }
@@ -526,11 +528,12 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	if (!ce_hud_buttons_stock(icon, index)) return FALSE;
 	if (!config_boolean("display.high_res_hud"))
 		return ce_hud_button_draw(icon, cursor, color);
+	style = controller_glyph_style();
+	if (controller_glyph_draw(style, (short)index, icon, cursor, color)) return TRUE;
 	slot = index < 6 ? (short)index : hud_button_control_slot((short)index,
 		icon->frame_rate > 0 ? game_time_get() / icon->frame_rate : 0);
 	if (slot < 0) return FALSE;
-	style = (!strcmp(config_string("display.hud_button_style"), "dark_gems") || !strcmp(config_string("display.hud_button_style"), "menu_gems")) ? 2 :
-		!strcmp(config_string("display.hud_button_style"), "gems");
+	if (style >= 3) style = 0; /* unavailable new artwork: the legacy fallback */
 	if (style != hud_buttons_style)
 	{
 		hud_buttons_forget();
