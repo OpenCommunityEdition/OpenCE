@@ -214,3 +214,6 @@ map=...>`), else a placeholder, placed where the PC version's picture is in
 its frame (`--pictures`: only where, not the picture, is read);
 `NON_HANDDRAWN.md` lists both. It needs `rsvg-convert`, Pillow, NumPy and
 SciPy.
+
+Port-owned settings screens can be regenerated without PC tags with
+`python tools/ce_menus.py --settings-only`; new screens are registered for embedding.

@@ -183,7 +183,7 @@ def stencil(svg: str, cell: list, place: list, index: int, letter: list = (0, 0)
 
 
 def classic(svg: str, color: str, letter_move: list = (0, 0)) -> str:
-    """The existing redraw's plain oval and black letter in the same cell."""
+    """The existing redraw's plain oval with a transparent letter cutout."""
     root = ElementTree.parse(ASSETS / "svg" / svg).getroot()
     parents = {child: parent for parent in root.iter() for child in parent}
     oval, letter = root.find(".//*[@id='oval']"), root.find(".//*[@id='letter']")
@@ -193,7 +193,11 @@ def classic(svg: str, color: str, letter_move: list = (0, 0)) -> str:
     if letter is not None:
         letter.set("fill", "#000000")
         letter.set("transform", f"translate({letter_move[0]} {letter_move[1]}) {letter.get('transform', '')}")
-        body += ElementTree.tostring(letter, encoding="unicode")
+        cut = ElementTree.tostring(letter, encoding="unicode")
+        body = ('<defs><mask id="classic-letter" maskUnits="userSpaceOnUse" '
+                'x="0" y="0" width="32" height="32">'
+                '<rect width="32" height="32" fill="white"/>' + cut +
+                '</mask></defs><g mask="url(#classic-letter)">' + body + '</g>')
     return document(32, 32, body)
 
 

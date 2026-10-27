@@ -44,6 +44,8 @@ drive the controller.
 /* port/linux/game/network_aim_assist.c */
 extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
+#include "controller_buttons.h"
+#include "controller_remap.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -1211,6 +1213,8 @@ static DWORD connected_gamepads(void)
 	int port;
 
 	/* the first pad shares port 0 with the keyboard (port_gamepad) */
+	for (port = 0; port < PORT_COUNT; port++)
+		controller_device_update((short)port, port_gamepad(gamepads, count, port));
 	for (port = 1; port < PORT_COUNT; port++)
 	{
 		if (port_gamepad(gamepads, count, port))
@@ -1291,12 +1295,20 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	int port = controller_port(device);
 	SDL_Gamepad *gamepads[PORT_COUNT];
 	int count;
+	XINPUT_GAMEPAD physical;
+	int captured;
 
 	memset(state, 0, sizeof(*state));
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
 	platform_pump_events();
 	count = sdl_gamepads(gamepads);
+	controller_device_update((short)port, port_gamepad(gamepads, count, port));
+	/* Keep physical remapping separate from the keyboard and touch controls. */
+	memset(&physical, 0, sizeof(physical));
+	if (port_gamepad(gamepads, count, port))
+		sdl_gamepad_state(port_gamepad(gamepads, count, port), &physical);
+	captured = controller_remap_input((short)port, &physical, port_gamepad(gamepads, count, port) != NULL);
 	if (port == 0)
 	{
 		struct platform_input_state input;
@@ -1320,7 +1332,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 				keyboard_controls(held, &state->Gamepad);
 		}
 		if (port_gamepad(gamepads, count, 0))
-			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+			controller_remap_merge(&physical, &state->Gamepad);
 		test_input_gamepad(&state->Gamepad);
 		touch_input_gamepad(&state->Gamepad);
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
@@ -1340,8 +1352,9 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	}
 	else if (port_gamepad(gamepads, count, port))
 	{
-		sdl_gamepad_state(port_gamepad(gamepads, count, port), &state->Gamepad);
+		state->Gamepad = physical;
 	}
+	if (captured) memset(&state->Gamepad, 0, sizeof(state->Gamepad));
 
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
 	{
