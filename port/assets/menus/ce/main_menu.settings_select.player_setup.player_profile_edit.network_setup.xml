@@ -126,7 +126,7 @@
 		<string text="Join the game of an invite link copied before\nswitching to the game."/>
 		<string text="Look for a new version when the game starts."/>
 		<string text="Downloading Custom Edition maps you do not have,\nand helping send them to other players."/>
-		<string text="Players' names above their heads, the\nscoreboard, and the text chat."/>
+		<string text="Players' names above their heads, the\nscoreboard, the text chat and the match clock."/>
 		<string text="Hide offensive words in names and text from\nother players, maps and mods, as stars."/>
 		<string text="What the Server Browser lists and its order: the\nsame settings as its Filters screen."/>
 	</strings>

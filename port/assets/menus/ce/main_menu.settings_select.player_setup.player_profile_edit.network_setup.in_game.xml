@@ -67,7 +67,7 @@
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/help_strings">
 		<string text=""/>
 		<string text="Downloading Custom Edition maps you do not have,\nand helping send them to other players."/>
-		<string text="Players' names above their heads, the\nscoreboard, and the text chat."/>
+		<string text="Players' names above their heads, the\nscoreboard, the text chat and the match clock."/>
 		<string text="Hide offensive words in names and text from\nother players, maps and mods, as stars."/>
 	</strings>
 </menus>
