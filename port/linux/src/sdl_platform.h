@@ -49,6 +49,8 @@ void platform_menus_set_active(BOOL active);
 mouse button or wheel turn is taken, and none reaches the game or the
 menus; nor does the keyboard after, until every key and button is up */
 void platform_binding_capture_begin(void);
+/* Stop a capture, retaining its release guard for already held keys. */
+void platform_binding_capture_cancel(void);
 /* 0 while waiting; else the capture ends: 1 with the input, 2 for none
 (Delete), 3 if cancelled (Escape) */
 int platform_binding_capture_poll(int *input);

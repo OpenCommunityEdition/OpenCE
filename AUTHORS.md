@@ -23,3 +23,6 @@
 - **The Mods menu's warning icons** (a mod out of its requested order, and
   a mod that cannot be played): `triangle-alert` and `circle-x` from
   [Lucide](https://lucide.dev) 1.53.0, under the same licence.
+
+- **Additional controller button styles**: supplied by the contributor
+  (`port/assets/controller_buttons`); original artist attribution is unverified.
