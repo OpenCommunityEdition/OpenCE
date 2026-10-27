@@ -1183,11 +1183,31 @@ void lights_preprocess_scene(
 							definition->flags,
 							_light_definition_is_first_person_flashlight_bit))
 						{
-							first_person_weapon_center_flashlight(
+							boolean centered = first_person_weapon_center_flashlight(
 								light->object_index,
 								&light_parameters.position,
 								&light_parameters.forward,
 								&light_parameters.up);
+
+							/* port: another player's beam, in a match, from
+							the marker on the pose the frame draws: the light's
+							own place is the tick's, so it stepped */
+							if (!centered && game_connection() != _game_connection_local)
+							{
+								struct object_marker markers[1];
+
+								if (object_get_marker_by_name(
+									light->object_index,
+									object_get_attachment_marker_name(light->object_index,
+										light->attachment_marker_index),
+									markers,
+									1) > 0)
+								{
+									light_parameters.position = markers[0].matrix.position;
+									light_parameters.forward = markers[0].matrix.forward;
+									light_parameters.up = markers[0].matrix.up;
+								}
+							}
 							adjusted = TRUE;
 						}
 						else if (object->object.type == _object_type_weapon
