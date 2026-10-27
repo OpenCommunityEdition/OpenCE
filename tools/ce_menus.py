@@ -612,15 +612,32 @@ def pause_art(art):
     return lines
 
 
+def regenerate_settings():
+    """Write port-owned settings and register any new screens for embedding."""
+    screens = port_settings.settings_files()
+    for name, lines in screens.items():
+        (CE / name).write_text("\n".join(lines))
+    manifest = MENUS / "menus.json"
+    data = json.loads(manifest.read_text())
+    files = set(data["files"]) | {"ce/" + name for name in screens}
+    data["files"] = sorted(name for name in files if name.endswith(".xml")) + sorted(
+        name for name in files if not name.endswith(".xml"))
+    manifest.write_text(json.dumps(data, indent=1) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--tags", type=Path, required=True)
-    parser.add_argument("--definitions", type=Path, required=True)
-    parser.add_argument("--redraws", type=Path, required=True)
-    parser.add_argument("--placeholder", type=Path, required=True, help="the picture for frames with no redraw")
+    parser.add_argument("--settings-only", action="store_true", help="regenerate port-owned settings screens and their manifest")
+    parser.add_argument("--tags", type=Path, required="--settings-only" not in sys.argv)
+    parser.add_argument("--definitions", type=Path, required="--settings-only" not in sys.argv)
+    parser.add_argument("--redraws", type=Path, required="--settings-only" not in sys.argv)
+    parser.add_argument("--placeholder", type=Path, required="--settings-only" not in sys.argv, help="the picture for frames with no redraw")
     parser.add_argument("--pictures", type=Path,
                         help="the PC version's pictures, as PNGs by tag path: only where each is, to place its placeholder")
     arguments = parser.parse_args()
+    if arguments.settings_only:
+        regenerate_settings()
+        return
     tags = Tags(arguments.tags, arguments.definitions)
     # (the names of the Xbox's own as the game has them, which the tags' own
     # names give a little differently: "create&edit", "NULL")

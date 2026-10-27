@@ -3,7 +3,8 @@ MOD_FILES.C (test)
 
 The real checks that stand between a mod's files and the game: the keys a
 map's tag names are looked up by in the mods' files
-(port/linux/src/port_mods.c), the bounds of a tag file's counts and offsets
+(port/linux/src/port_mods.c), mod.toml's channel_order (port_mods.c), the
+bounds of a tag file's counts and offsets
 (port/linux/game/mods.c), and the comparison that keeps a mod's string from
 being printed as a format that reads arguments the game does not pass
 (port/linux/game/mod_strings.c): test_mod_files.py takes the code
@@ -129,6 +130,19 @@ int main(int argc, char **argv)
 			CHECK(!formats_match(wide, sizeof(wide), modifier, sizeof(modifier), TRUE),
 				"a wide character was read as its low byte");
 		}
+		return 0;
+	}
+	/* mod.toml's channel_order: "xbox" or "pc", whatever their case; else
+	none (the mod's bitmaps taken as Halo PC's) */
+	CASE("channel-order")
+	{
+		CHECK(channel_order_xbox("xbox") == 1, "\"xbox\" was not the Xbox's order");
+		CHECK(channel_order_xbox("XBOX") == 1, "\"XBOX\" was not the Xbox's order");
+		CHECK(channel_order_xbox("pc") == 0, "\"pc\" was not Halo PC's order");
+		CHECK(channel_order_xbox("Pc") == 0, "\"Pc\" was not Halo PC's order");
+		CHECK(channel_order_xbox("gearbox") == -1, "an unknown value was taken");
+		CHECK(channel_order_xbox("") == -1, "an empty value was taken");
+		CHECK(channel_order_xbox("xbox1") == -1, "a longer value was taken");
 		return 0;
 	}
 	fprintf(stderr, "unknown case: %s\n", case_name);

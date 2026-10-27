@@ -108,6 +108,9 @@ struct port_mod
 	struct mod_names load_after;
 	struct mod_names load_before;
 	struct mod_names incompatible;
+	/* its bitmaps' multipurpose maps and HUD meters keep their channels
+	where the Xbox does (channel_order = "xbox"), not where Halo PC does */
+	int xbox_channels;
 	/* turned off in the Mods menu */
 	int disabled;
 	/* its place in the load order */
@@ -341,12 +344,24 @@ static const char *toml_text(toml_datum_t table, const char *key, const char *pa
 	return value.u.s;
 }
 
+/* channel_order's value: 1 for "xbox", 0 for "pc", -1 for anything else
+(not case-sensitive) */
+static int channel_order_xbox(const char *text)
+{
+	if (names_equal(text, "xbox"))
+		return 1;
+	if (names_equal(text, "pc"))
+		return 0;
+	return -1;
+}
+
 /* reads the mod.toml of the mod in `folder`; 0 when there is none */
 static int mod_read(struct port_mod *mod, const char *root, const char *folder)
 {
 	static const char *const keys[] =
 	{
 		"name", "id", "version", "authors", "description", "maps", "load_after", "load_before", "incompatible", "format",
+		"channel_order",
 	};
 	char path[MAXIMUM_PATH_LENGTH];
 	size_t size = 0;
@@ -437,6 +452,16 @@ static int mod_read(struct port_mod *mod, const char *root, const char *folder)
 	else if (value.type != TOML_UNKNOWN && value.type != TOML_ARRAY)
 	{
 		platform_log("mods: %s line %d: maps is not a list of maps", path, value.lineno);
+	}
+	value = toml_get(result.toptab, "channel_order");
+	if (value.type == TOML_STRING && channel_order_xbox(value.u.s) >= 0)
+	{
+		mod->xbox_channels = channel_order_xbox(value.u.s);
+	}
+	else if (value.type != TOML_UNKNOWN)
+	{
+		platform_log("mods: %s line %d: channel_order is not \"pc\" or \"xbox\": its bitmaps are taken as Halo PC's",
+			path, value.lineno);
 	}
 	value = toml_get(result.toptab, "format");
 	if (value.type == TOML_INT64 && value.u.int64 > MODS_FORMAT)
@@ -1071,6 +1096,11 @@ long port_mods_file_order(long file)
 const char *port_mods_file_mod(long file)
 {
 	return file >= 0 && file < port_mods.file_count ? port_mods.mods[port_mods.files[file].mod].folder : "";
+}
+
+int port_mods_file_xbox_channels(long file)
+{
+	return file >= 0 && file < port_mods.file_count && port_mods.mods[port_mods.files[file].mod].xbox_channels;
 }
 
 const char *port_mods_file_path(long file)

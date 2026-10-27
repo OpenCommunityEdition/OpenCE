@@ -20,6 +20,7 @@ clip-space position again.
 #include "xgpu.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 /* ---------- instruction fields */
 
@@ -386,11 +387,92 @@ static const char shader_prologue[] =
 	"	return vec4(1.0, max(s.x, 0.0), specular, 1.0);\n"
 	"}\n";
 
+/* display.reversed_depth: the depth of the clip-space position, turned
+around (w - z), taken from the rows of the matrix the program transforms the
+position by. Halo's programs write oPos.z and oPos.w as dph or dp4 of one
+position with consecutive constants c[n] and c[n + 1]; w - z is then that
+position with c[n + 1] - c[n], a difference that is exact in floats (the
+rows are within a factor of two of each other). Taking z from w per vertex
+instead would lose the precision a reversed float depth buffer gives: at a
+distance z and w are nearly equal. */
+struct reversed_depth_rows
+{
+	/* the constants oPos.z and oPos.w were read from; -1 until written */
+	long z_row, w_row;
+	/* the position's operand, which both must read */
+	struct operand_fields z_position;
+	unsigned long z_position_input;
+	/* oPos.z or oPos.w written some other way: w - z instead */
+	BOOL other;
+};
+
+static BOOL same_operand(const struct operand_fields *a, unsigned long a_input, const struct operand_fields *b,
+	unsigned long b_input)
+{
+	return a->negate == b->negate && a->mux == b->mux && a->index == b->index && a_input == b_input &&
+		!memcmp(a->swizzle, b->swizzle, sizeof(a->swizzle));
+}
+
+/* an instruction's writes to oPos.z and oPos.w before the position is
+converted to screen space, and for oPos.z the reversed depth beside it */
+static void reversed_depth_instruction(struct xgpu_text *text, const DWORD *instruction, struct reversed_depth_rows *rows)
+{
+	unsigned long mac = field(instruction, 1, 21, 4);
+	unsigned long ilu = field(instruction, 1, 25, 3);
+	unsigned long temporary = field(instruction, 3, 20, 4);
+	unsigned long mac_mask = mac != _mac_nop && mac != _mac_arl && temporary == 12 ? field(instruction, 3, 24, 4) : 0;
+	unsigned long ilu_mask = ilu != _ilu_nop && mac == _mac_nop && temporary == 12 ? field(instruction, 3, 16, 4) : 0;
+	unsigned long output_mask = field(instruction, 3, 11, 1) && field(instruction, 3, 3, 8) == 0 ?
+		field(instruction, 3, 12, 4) : 0;
+	BOOL output_from_ilu = field(instruction, 3, 2, 1) != 0;
+	unsigned long writes = mac_mask | (output_from_ilu ? 0 : output_mask);
+	struct operand_fields a, b;
+	unsigned long row = field(instruction, 1, 13, 8);
+	unsigned long input = field(instruction, 1, 9, 4);
+
+	/* (the ILU's z or w: no row) */
+	if ((ilu_mask | (output_from_ilu ? output_mask : 0)) & 3)
+		rows->other = TRUE;
+	if (!(writes & 3))
+		return;
+	operand_fields(instruction, 'A', &a);
+	operand_fields(instruction, 'B', &b);
+	if ((mac != _mac_dph && mac != _mac_dp4) || b.mux != _mux_constant || field(instruction, 3, 1, 1) ||
+		b.negate || b.swizzle[0] != 0 || b.swizzle[1] != 1 || b.swizzle[2] != 2 || b.swizzle[3] != 3 ||
+		row + 1 >= XGPU_VERTEX_CONSTANT_COUNT || (writes & 3) == 3)
+	{
+		rows->other = TRUE;
+		return;
+	}
+	if (writes & 2)
+	{
+		rows->z_row = (long)row;
+		rows->z_position = a;
+		rows->z_position_input = input;
+		if (mac == _mac_dph)
+			xgpu_text_append(text, "\treversed_z = dot(A.xyz, c[%lu].xyz - c[%lu].xyz) + (c[%lu].w - c[%lu].w);\n",
+				row + 1, row, row + 1, row);
+		else
+			xgpu_text_append(text, "\treversed_z = dot(A, c[%lu] - c[%lu]);\n", row + 1, row);
+	}
+	else
+	{
+		rows->w_row = (long)row;
+		if (rows->z_row >= 0 && !same_operand(&a, input, &rows->z_position, rows->z_position_input))
+			rows->other = TRUE;
+	}
+}
+
 char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instruction_count,
 	unsigned long packed_attribute_mask, const struct nv2a_vertex_lighting *lighting)
 {
 	struct xgpu_text text = { 0 };
 	unsigned long index;
+	struct reversed_depth_rows rows;
+	BOOL position_converted = FALSE, reversed_rows;
+
+	rows.z_row = rows.w_row = -1;
+	rows.other = FALSE;
 
 #ifdef HALO_GLES
 	xgpu_text_append(&text, "#version %s\n", xgpu_capabilities.shading_language);
@@ -430,6 +512,8 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\tint a0 = 0;\n"
 		"\tvec4 A, B, C, mac, ilu;\n");
 	xgpu_text_append(&text, "\tvec4 clip_position = vec4(0.0);\n\tbool clip_captured = false;\n");
+	if (xgpu_reversed_depth)
+		xgpu_text_append(&text, "\tfloat reversed_z = 0.0;\n");
 
 	for (index = 0; index < instruction_count; index++)
 	{
@@ -495,6 +579,11 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 			((field(instruction, 2, 0, 2) << 2) | field(instruction, 3, 30, 2)) == 12)
 		{
 			xgpu_text_append(&text, "\tclip_position = oPos;\n\tclip_captured = true;\n");
+			position_converted = TRUE;
+		}
+		else if (xgpu_reversed_depth && !position_converted)
+		{
+			reversed_depth_instruction(&text, instruction, &rows);
 		}
 
 		/* results are written only after both units have read their inputs */
@@ -561,7 +650,29 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\t{\n"
 		"\t\tvec3 ndc = (vec3(oPos.xy + vec2(0.5 + screen_offset, 0.5), oPos.z) - viewport_offset.xyz) / scale;\n"
 		"\t\tposition = vec4(ndc * oPos.w, oPos.w);\n"
-		"\t}\n"
+		"\t}\n",
+		XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37);
+	/* display.reversed_depth: Direct3D's depth turned around, 1 - z / w.
+	With the rows found, the clip-space z above is a z + b w (a the depth
+	scale's c[-38].z / scale.z, b its offset's), so w - (a z + b w) is a times
+	the reversed depth plus (1 - a - b) w, which is 0 where the game's
+	conversion is the device's own. Else, from z itself. */
+	reversed_rows = rows.z_row >= 0 && rows.w_row == rows.z_row + 1 && !rows.other && position_converted;
+	if (xgpu_reversed_depth && reversed_rows)
+	{
+		xgpu_text_append(&text,
+			"\tif (clip_captured)\n"
+			"\t\tposition.z = (reversed_z * c[%d].z + (scale.z - c[%d].z - c[%d].z + viewport_offset.z) * clip_position.w)\n"
+			"\t\t\t/ scale.z;\n"
+			"\telse\n"
+			"\t\tposition.z = position.w - position.z;\n",
+			XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37);
+	}
+	else if (xgpu_reversed_depth)
+	{
+		xgpu_text_append(&text, "\tposition.z = position.w - position.z;\n");
+	}
+	xgpu_text_append(&text,
 		/* A position whose w is zero, or is not a number, is the clip-space
 		origin: the screen conversion's reciprocal is clamped rather than
 		infinite, so a large position times a w of zero is exactly zero, and
@@ -591,9 +702,7 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		"\txT2 = oT2;\n"
 		"\txT3 = oT3;\n"
 		"\txFog = oFog.x;\n"
-		"}\n",
-		XGPU_VERTEX_CONSTANT_BIAS - 38, XGPU_VERTEX_CONSTANT_BIAS - 37
-		);
+		"}\n");
 	return text.buffer;
 }
 
@@ -621,6 +730,7 @@ char *nv2a_fixed_function_glsl(void)
 		"\tgl_Position.y = -gl_Position.y;\n"
 		"\tgl_Position.z = 2.0 * gl_Position.z - gl_Position.w;\n"
 #endif
+		"%s"
 		"\tgl_PointSize = 1.0;\n"
 		"\txD0 = clamp(v3_in, 0.0, 1.0);\n"
 		"\txD1 = clamp(v4_in, 0.0, 1.0);\n"
@@ -631,6 +741,8 @@ char *nv2a_fixed_function_glsl(void)
 		"\txT2 = v11_in;\n"
 		"\txT3 = v12_in;\n"
 		"\txFog = 1.0;\n"
-		"}\n");
+		"}\n",
+		/* (display.reversed_depth) */
+		xgpu_reversed_depth ? "\tgl_Position.z = gl_Position.w - gl_Position.z;\n" : "");
 	return text.buffer;
 }

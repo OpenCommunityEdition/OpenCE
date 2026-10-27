@@ -44,6 +44,8 @@ drive the controller.
 /* port/linux/game/network_aim_assist.c */
 extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
+#include "controller_buttons.h"
+#include "controller_remap.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -95,6 +97,9 @@ static pthread_mutex_t mouse_lock = PTHREAD_MUTEX_INITIALIZER;
 static float mouse_pending_x, mouse_pending_y;
 static unsigned long mouse_polls_unconsumed = 0;
 static float mouse_wheel_accumulated = 0.0f;
+/* the wheel's notches turned while a chat line is typed, not yet taken
+(halo_chat_wheel_steps) */
+static int chat_wheel_steps = 0;
 /* the wheel's switch (wheel_update): when the wheel last moved, until when
 Y is held, and whether a scroll is under way */
 static Uint64 wheel_moved_ms = 0;
@@ -214,6 +219,17 @@ unsigned long halo_chat_pad_buttons(void)
 int halo_chat_taps(float *x, float *y)
 {
 	return touch_input_chat_taps(x, y);
+}
+
+int halo_chat_wheel_steps(void)
+{
+	int steps;
+
+	pthread_mutex_lock(&mouse_lock);
+	steps = chat_wheel_steps;
+	chat_wheel_steps = 0;
+	pthread_mutex_unlock(&mouse_lock);
+	return steps;
 }
 
 int halo_chat_touch_layout(void)
@@ -440,18 +456,18 @@ void platform_text_typing(int typing)
 {
 	text_typing_keyboard = typing != 0;
 	text_typing_update();
+#ifdef HALO_ANDROID
+	/* (on a touchscreen: Android's on-screen keyboard as well, sdl_platform.c) */
+	platform_screen_keyboard(text_typing_keyboard, FALSE);
+#endif
 }
 
 void platform_text_field(int typing, int password)
 {
 	text_typing_field = typing != 0;
 	text_typing_update();
-#ifndef HALO_ANDROID
-	/* (with no keyboard: Steam's on-screen one, sdl_platform.c) */
+	/* (with no keyboard: Steam's on-screen one, or Android's, sdl_platform.c) */
 	platform_screen_keyboard(text_typing_field, typing && password);
-#else
-	(void)password;
-#endif
 }
 
 static void typing_gamepad(const struct platform_input_state *input, XINPUT_GAMEPAD *pad)
@@ -990,6 +1006,23 @@ static void wheel_update(void)
 	Uint64 now = SDL_GetTicks();
 
 	pthread_mutex_lock(&mouse_lock);
+	/* (a chat line typed: the wheel scrolls its lines, network_chat.c) */
+	if (network_chat_typing())
+	{
+		while (mouse_wheel_accumulated >= WHEEL_NOTCH)
+		{
+			chat_wheel_steps++;
+			mouse_wheel_accumulated -= WHEEL_NOTCH;
+		}
+		while (mouse_wheel_accumulated <= -WHEEL_NOTCH)
+		{
+			chat_wheel_steps--;
+			mouse_wheel_accumulated += WHEEL_NOTCH;
+		}
+		wheel_scrolling = FALSE;
+		pthread_mutex_unlock(&mouse_lock);
+		return;
+	}
 	if (!wheel_scrolling)
 	{
 		if (fabsf(mouse_wheel_accumulated) >= WHEEL_NOTCH)
@@ -1180,6 +1213,8 @@ static DWORD connected_gamepads(void)
 	int port;
 
 	/* the first pad shares port 0 with the keyboard (port_gamepad) */
+	for (port = 0; port < PORT_COUNT; port++)
+		controller_device_update((short)port, port_gamepad(gamepads, count, port));
 	for (port = 1; port < PORT_COUNT; port++)
 	{
 		if (port_gamepad(gamepads, count, port))
@@ -1294,12 +1329,20 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	int port = controller_port(device);
 	SDL_Gamepad *gamepads[PORT_COUNT];
 	int count;
+	XINPUT_GAMEPAD physical;
+	int captured;
 
 	memset(state, 0, sizeof(*state));
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
 	platform_pump_events();
 	count = sdl_gamepads(gamepads);
+	controller_device_update((short)port, port_gamepad(gamepads, count, port));
+	/* Keep physical remapping separate from the keyboard and touch controls. */
+	memset(&physical, 0, sizeof(physical));
+	if (port_gamepad(gamepads, count, port))
+		sdl_gamepad_state(port_gamepad(gamepads, count, port), &physical);
+	captured = controller_remap_input((short)port, &physical, port_gamepad(gamepads, count, port) != NULL);
 	if (port == 0)
 	{
 		struct platform_input_state input;
@@ -1324,7 +1367,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 				keyboard_controls(held, &state->Gamepad);
 		}
 		if (port_gamepad(gamepads, count, 0))
-			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+			controller_remap_merge(&physical, &state->Gamepad);
 		test_input_gamepad(&state->Gamepad);
 		touch_input_gamepad(&state->Gamepad);
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
@@ -1344,8 +1387,9 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	}
 	else if (port_gamepad(gamepads, count, port))
 	{
-		sdl_gamepad_state(port_gamepad(gamepads, count, port), &state->Gamepad);
+		state->Gamepad = physical;
 	}
+	if (captured) memset(&state->Gamepad, 0, sizeof(state->Gamepad));
 
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
 	{

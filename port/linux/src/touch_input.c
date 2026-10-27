@@ -27,6 +27,9 @@ void host_touch_rumble(unsigned int low, unsigned int high);
 void host_touch_scene(int scene);
 void host_touch_bindings(const int *controls);
 #endif
+#ifdef HALO_ANDROID
+int host_touch_devices(void);
+#endif
 
 /* the game's (port/linux/game/touch_game.c) */
 int touch_game_cinematic_skippable(void);
@@ -263,6 +266,24 @@ static int touch_controls_setting(void)
 	}
 	return setting;
 }
+
+#ifdef HALO_ANDROID
+/* the overlay's devices (port/android/host/host_touch.c's
+HOST_TOUCH_DEVICE_*) */
+#define TOUCH_DEVICE_TOUCHSCREEN 1
+#define TOUCH_DEVICE_CONTROLLER 2
+
+int touch_input_screen_buttons(void)
+{
+	int devices = host_touch_devices();
+	int setting = touch_controls_setting();
+
+	/* (TouchControls.java's shown(), but for the scene) */
+	if (setting == _touch_scene_off || !(devices & TOUCH_DEVICE_TOUCHSCREEN))
+		return FALSE;
+	return setting == _touch_scene_on || !(devices & TOUCH_DEVICE_CONTROLLER);
+}
+#endif
 
 void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
 {

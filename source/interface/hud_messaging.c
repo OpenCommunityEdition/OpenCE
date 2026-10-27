@@ -146,6 +146,7 @@ symbols in this file:
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
 
 #include <stddef.h>
 
@@ -1438,6 +1439,9 @@ void hud_messaging_update(
 			input_abstraction_get_local_player_preferences(
 				local_player_index,
 				&preferences);
+			/* port: physical prompt buttons for optional controller layouts
+			(port/linux/game/controller_remap_game.c); profile data stays stock. */
+			controller_remap_prompt(local_player_index, &preferences);
 			if (objective_active)
 			{
 				struct hud_color_definition *objective_color =

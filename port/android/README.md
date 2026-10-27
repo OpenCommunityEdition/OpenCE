@@ -141,8 +141,29 @@ or scroll at the sides, and do not scroll at the top and bottom, because the
 first swipe from an edge in full screen only shows the system bars.
 
 A tap during a cinematic that can be skipped skips it, as A does. On the
-on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
-"A =ENTER" to accept the name.
+game's on-screen keyboard (a player profile's name), tap a key to press it,
+"B =BACK" to cancel and "A =ENTER" to accept the name.
+
+While a name is typed, on the game's on-screen keyboard or in a menu's text
+field (Server Setup's server name and password, a game's password when
+joining it), Android's keyboard comes up as well when the touch controls
+would show (see "Touch controls"). Its letters, numbers, symbols (those of
+ASCII only) and backspace type into the name, and its Enter accepts it, as a
+keyboard's Enter does. A name is typed as a visible password to Android's
+keyboard, so that it offers no suggestions and does not learn the names
+typed. The back gesture closes Android's keyboard first; it comes back with
+the next name begun, and the game's own keyboard takes taps meanwhile. A
+Bluetooth or USB keyboard types into the names in the same way, with or
+without Android's keyboard (`port/linux/src/sdl_platform.c`, "the system's
+on-screen keyboard").
+
+After a multiplayer game, the carnage report shows buttons in place of its
+prompt at the bottom: the host's CONTINUE goes on to the next game (PICK
+GAME), as A does, and LEAVE leaves the game, as B does (the host's LEAVE
+ends it for everyone). A client has LEAVE only. The buttons follow the touch
+controls (`input.touch_controls`): while a controller is connected, or with
+`off`, the report shows the prompt as on the Xbox, and A and B act as before
+(`port/linux/game/touch_postgame.c`).
 
 ### Touch controls
 
@@ -225,7 +246,7 @@ These settings are only for Android:
 | Setting | Function |
 | --- | --- |
 | `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
-| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
+| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The carnage report's CONTINUE and LEAVE buttons follow the same rule (otherwise it shows its A and B prompt). The menus take taps in any case. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to cached textures by page protection. `false`: it compares page contents once a frame instead, which is slower. Geometry uses the streaming path in either mode. Refer to "Limits". |
@@ -463,20 +484,51 @@ assembly of the port is necessary:
 
 ## Geometry uploads
 
-Android streams vertex and index data from the current CPU bytes instead
-of reusing the persistent geometry mirror or its cached index extents.
-This is automatic; no console command or configuration change is needed.
+Android selects its rendering fixes once at startup from the chip identity:
+
+| Chip | Geometry fixes | Custom Edition texture fixes |
+| --- | --- | --- |
+| Qualcomm Snapdragon | On | On |
+| MediaTek | Off | On |
+| Other identified vendors, including Google Tensor and Samsung Exynos | Off | Off |
+| Unknown or conflicting identity | On | On |
+
+The host reads `ro.soc.manufacturer` and `ro.soc.model`, falling back to
+`ro.hardware` and `ro.board.platform` on older devices. Phone brand is not
+used: Samsung phones, for example, can have different chip vendors. Mali
+and PowerVR GPU names alone do not identify a chip vendor. Unrecognized
+identifiers retain both fixes. The policy is selected before the game
+creates resources, stays fixed for the process, and is logged at startup.
+No console command, configuration change or device permission is needed.
+
+With geometry fixes enabled, Android bypasses the persistent geometry
+mirror and its cached index extents and uses the upload paths below.
 Affected players reported that bypassing the cache resolved stretched or
 missing geometry, with some also reporting better performance. The exact
 cache failure mechanism remains unconfirmed.
 
-The Android-only guard in `mirror_range` uses the existing streaming
-fallback. Streamed upload methods, frame fences, shaders, texture caching
-and CPU write tracking are unchanged. Desktop and web retain their cache.
+With geometry fixes disabled, Android uses the normal persistent mirror
+and fixed stream buffers, without registering static-cache entries or
+allocating per-draw pooled buffers. Desktop and web retain their existing
+geometry cache and upload paths. These geometry
+changes preserve shaders, texture caching and CPU write tracking.
 Xbox and Custom Edition maps keep their existing loaders and resource
 paths. `tools/test_android_mirror_uploads.py` checks the bypass with large
 and reused ranges, frame-counter rollover and desktop/web cache controls;
-it does not substitute for device gameplay validation.
+it does not substitute for device gameplay validation. The chip and policy
+matrix is covered by `tools/test_android_render_policy.py`.
+
+Streamed vertices and indices go into pooled buffers, a buffer for each
+draw that no queued draw reads, written with `glBufferSubData` and reused
+only after the ring's frame fence (`web_chunk_get`, as the web build does):
+unsynchronized writes into the frame's one stream buffer drew some
+geometry as long spikes on Snapdragon. Geometry the game writes once (the
+models and BSPs of Xbox, Custom Edition and mod maps) gets GL buffers of
+its own, filled at its first draw and released when it unloads; a range
+whose storage GL cannot allocate is streamed instead.
+`tools/test_android_static_geometry.py` checks both with fake GL: no upload
+writes a buffer a queued draw reads, and the static ranges' reuse, unload
+and reload, address reuse and allocation failure.
 
 ## Find problems
 
@@ -515,3 +567,25 @@ it does not substitute for device gameplay validation.
   point to an integer in a SIMD register (`fcvtzs s0, s1`, an illegal
   instruction there), so `tools/android_asm_convert.py` writes each as the
   vector form, which leaves the register and the exception flags the same.
+
+## Custom Edition texture storage
+
+When the chip policy enables texture fixes, cached Custom Edition textures
+on Android use stable individual allocations,
+created on demand with a 128 MiB pixel limit and 8,192-entry limit, outside the
+fixed Xbox memory window. This avoids exhausting the old arena with textures
+needed in the same frame and avoids re-uploading surviving textures after
+compaction. Current-frame entries cannot be evicted. Normal GPU caching,
+texture conversion and HUD replacements remain. With texture fixes disabled,
+Custom Edition uses the established Xbox texture arena and normal GPU cache.
+The blanket GL shadow-state refresh before every draw is disabled on all
+Android devices; resource deletion and context changes still invalidate state
+where necessary. Desktop, web and other map storage paths retain their
+established behavior. Fullscreen behavior is unchanged.
+
+Cleanup releases bindings and GPU copies before pixel/header reuse. Map unload,
+cache flush and mod reload release the stored pixels. Diagnostics are limited to
+an unload summary and the first allocation failure per cache lifetime in the
+normal platform log. No test log files, per-frame reports, texture fingerprints
+or uniform readbacks run in the permanent build. The cache can still exhaust
+its limit or system memory; normal fallback handling remains available.

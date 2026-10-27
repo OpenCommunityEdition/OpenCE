@@ -1,0 +1,624 @@
+{
+ "assets": [
+  {
+   "name": "xbox_modern_0",
+   "tag": "ui\\controller_buttons\\xbox_modern_0",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_modern_1",
+   "tag": "ui\\controller_buttons\\xbox_modern_1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_modern_2",
+   "tag": "ui\\controller_buttons\\xbox_modern_2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_modern_3",
+   "tag": "ui\\controller_buttons\\xbox_modern_3",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_classic_0",
+   "tag": "ui\\controller_buttons\\ps_classic_0",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_classic_1",
+   "tag": "ui\\controller_buttons\\ps_classic_1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_classic_2",
+   "tag": "ui\\controller_buttons\\ps_classic_2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_classic_3",
+   "tag": "ui\\controller_buttons\\ps_classic_3",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_gems_0",
+   "tag": "ui\\controller_buttons\\ps_gems_0",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_gems_1",
+   "tag": "ui\\controller_buttons\\ps_gems_1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_gems_2",
+   "tag": "ui\\controller_buttons\\ps_gems_2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_gems_3",
+   "tag": "ui\\controller_buttons\\ps_gems_3",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_dark_gems_0",
+   "tag": "ui\\controller_buttons\\ps_dark_gems_0",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_dark_gems_1",
+   "tag": "ui\\controller_buttons\\ps_dark_gems_1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_dark_gems_2",
+   "tag": "ui\\controller_buttons\\ps_dark_gems_2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_dark_gems_3",
+   "tag": "ui\\controller_buttons\\ps_dark_gems_3",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_modern_0",
+   "tag": "ui\\controller_buttons\\ps_modern_0",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_modern_1",
+   "tag": "ui\\controller_buttons\\ps_modern_1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_modern_2",
+   "tag": "ui\\controller_buttons\\ps_modern_2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_modern_3",
+   "tag": "ui\\controller_buttons\\ps_modern_3",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_classic_0",
+   "tag": "ui\\controller_buttons\\switch_classic_0",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_classic_1",
+   "tag": "ui\\controller_buttons\\switch_classic_1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_classic_2",
+   "tag": "ui\\controller_buttons\\switch_classic_2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_classic_3",
+   "tag": "ui\\controller_buttons\\switch_classic_3",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_gems_0",
+   "tag": "ui\\controller_buttons\\switch_gems_0",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_gems_1",
+   "tag": "ui\\controller_buttons\\switch_gems_1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_gems_2",
+   "tag": "ui\\controller_buttons\\switch_gems_2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_gems_3",
+   "tag": "ui\\controller_buttons\\switch_gems_3",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_modern_0",
+   "tag": "ui\\controller_buttons\\switch_modern_0",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_modern_1",
+   "tag": "ui\\controller_buttons\\switch_modern_1",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_modern_2",
+   "tag": "ui\\controller_buttons\\switch_modern_2",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_modern_3",
+   "tag": "ui\\controller_buttons\\switch_modern_3",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_4",
+   "tag": "ui\\controller_buttons\\xbox_control_4",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_5",
+   "tag": "ui\\controller_buttons\\xbox_control_5",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_6",
+   "tag": "ui\\controller_buttons\\xbox_control_6",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_7",
+   "tag": "ui\\controller_buttons\\xbox_control_7",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_8",
+   "tag": "ui\\controller_buttons\\xbox_control_8",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_9",
+   "tag": "ui\\controller_buttons\\xbox_control_9",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_10",
+   "tag": "ui\\controller_buttons\\xbox_control_10",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_11",
+   "tag": "ui\\controller_buttons\\xbox_control_11",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_12",
+   "tag": "ui\\controller_buttons\\xbox_control_12",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "xbox_control_13",
+   "tag": "ui\\controller_buttons\\xbox_control_13",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_4",
+   "tag": "ui\\controller_buttons\\ps_control_4",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_5",
+   "tag": "ui\\controller_buttons\\ps_control_5",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_6",
+   "tag": "ui\\controller_buttons\\ps_control_6",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_7",
+   "tag": "ui\\controller_buttons\\ps_control_7",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_8",
+   "tag": "ui\\controller_buttons\\ps_control_8",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_9",
+   "tag": "ui\\controller_buttons\\ps_control_9",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_10",
+   "tag": "ui\\controller_buttons\\ps_control_10",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_11",
+   "tag": "ui\\controller_buttons\\ps_control_11",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_12",
+   "tag": "ui\\controller_buttons\\ps_control_12",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "ps_control_13",
+   "tag": "ui\\controller_buttons\\ps_control_13",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_4",
+   "tag": "ui\\controller_buttons\\switch_control_4",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_5",
+   "tag": "ui\\controller_buttons\\switch_control_5",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_6",
+   "tag": "ui\\controller_buttons\\switch_control_6",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_7",
+   "tag": "ui\\controller_buttons\\switch_control_7",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_8",
+   "tag": "ui\\controller_buttons\\switch_control_8",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_9",
+   "tag": "ui\\controller_buttons\\switch_control_9",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_10",
+   "tag": "ui\\controller_buttons\\switch_control_10",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_11",
+   "tag": "ui\\controller_buttons\\switch_control_11",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_12",
+   "tag": "ui\\controller_buttons\\switch_control_12",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  },
+  {
+   "name": "switch_control_13",
+   "tag": "ui\\controller_buttons\\switch_control_13",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "format": "a8r8g8b8",
+   "scale": 8,
+   "crc": 0
+  }
+ ]
+}
