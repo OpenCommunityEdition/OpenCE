@@ -125,7 +125,8 @@ def gameplay_control(entry: dict) -> np.ndarray:
     face = source.crop(source.getchannel("A").getbbox())
     scale = entry["scale"]
     width, height = [n * scale for n in entry["control_cell"]]
-    face.thumbnail((width - 2 * scale, height - 2 * scale), Image.Resampling.LANCZOS)
+    # Keep the original single-pass RGBA resize on Pillow 13 and later.
+    face.thumbnail((width - 2 * scale, height - 2 * scale), Image.Resampling.LANCZOS, reducing_gap=None)
     image = Image.new("RGBA", (entry["width"] * scale, entry["height"] * scale))
     image.paste(face, ((width - face.width) // 2, (height - face.height) // 2))
     # The original HUD uses ONE / INVSRCALPHA. Store premultiplied edges
@@ -215,7 +216,8 @@ def gameplay_gem(entry: dict) -> np.ndarray:
     left, top, right, bottom = [round(n * factor) for n in reference.getchannel("A").getbbox()]
     cell = (right - left, bottom - top)
     face = source.crop(bounds)
-    face.thumbnail(cell, Image.Resampling.LANCZOS)
+    # Pillow 13 applies the default reduction pass to RGBA; these assets use none.
+    face.thumbnail(cell, Image.Resampling.LANCZOS, reducing_gap=None)
     image = Image.new("RGBA", (entry["width"] * scale, entry["height"] * scale))
     image.paste(face, (left + (cell[0] - face.width) // 2, top + (cell[1] - face.height) // 2))
     return bleed(np.asarray(image).copy())

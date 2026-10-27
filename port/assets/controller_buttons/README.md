@@ -28,3 +28,8 @@ D-pad, Start and Back retain the existing renderer's fallback.
 `tools/test_controller_buttons.py` regenerates and compares every output and
 checks the production renderer's bounds, advances, split-screen scale, opacity,
 allocation failure and cleanup. Asset generation does not require retail maps.
+
+RGBA resizing explicitly disables Pillow's preliminary reduction pass so the
+generated pixels match the committed artwork on both Pillow 12.3 and 13.
+[Pillow 13 began applying `reducing_gap` to RGBA thumbnails](https://pillow.readthedocs.io/en/stable/releasenotes/13.0.0.html#resizing-images-with-alpha);
+the supplied Xbox gem/control generator uses the same explicit setting.

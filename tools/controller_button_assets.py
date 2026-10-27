@@ -89,7 +89,9 @@ def render(entry):
         face = correct_label(face, entry['label'], entry['trigger'])
     # Keep the supplied aspect ratio. The renderer scales the visible bounds
     # to the established face/control dimensions, centered on the prompt text.
-    face.thumbnail((entry['cell'][0] * 8 - 8, entry['cell'][1] * 8 - 8), Image.Resampling.LANCZOS)
+    # Preserve the committed single-pass RGBA resize across Pillow versions.
+    face.thumbnail((entry['cell'][0] * 8 - 8, entry['cell'][1] * 8 - 8),
+                   Image.Resampling.LANCZOS, reducing_gap=None)
     result = Image.new('RGBA', (512, 512))
     result.paste(face, ((512 - face.width) // 2, (512 - face.height) // 2))
     return result
