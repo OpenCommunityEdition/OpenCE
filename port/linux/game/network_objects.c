@@ -24,9 +24,7 @@ same datum index (identifier and all), so that any message can name one:
   less often, with each as it comes to rest, and to every client a few of
   those at rest, round the lot; a client moves its copies there, a little
   off half of the way each tick, further (or come to rest) drawn gliding
-  from where they were rather than jumping (render_interpolation.c). The
-  picture also turns from the previous pose to this one across the frames
-  until the next sample, so a light aimed from it does not snap.
+  from where they were rather than jumping (render_interpolation.c).
   A client's own player's vehicle is its own, as its own player's unit is:
   it sends the host where it drives it at which of its ticks, which the host
   takes within what the vehicle can have moved at its next tick, and tells
@@ -207,6 +205,11 @@ fourth (as it sends players, network_distributed.c) */
 this in one tick, the host moved it some other way (a teleport), which is
 not carried on as the path */
 #define UNSTEERED_PATH_STEP 4.0f
+/* the most ticks an unsteered vehicle's glide between samples covers: twice
+the longest the host leaves between a moving object's states. A record left
+from before (driven since, or at rest for long) glides no slower, and a jump
+is judged against no more than this. */
+#define UNSTEERED_PATH_MAXIMUM_TICKS (2 * MAXIMUM_OBJECT_PERIOD_TICKS)
 /* world units */
 #define REMOTE_OBJECT_TOLERANCE 0.05f
 /* ... and the cosine of the angle (an object at rest turned) */
@@ -789,9 +792,6 @@ static void distributed_object_move(
 	offset.k = object->object.position.z - position->z;
 	distributed_body_unfix_pose(object_index);
 	object_set_position(object_index, position, forward, up);
-	/* the weapon's matrices too: its beam and muzzle flash are placed from
-	them, and set_position poses only this object */
-	object_compute_node_matrices_recursive(object_index);
 	if (velocity)
 		object->object.translational_velocity = *velocity;
 	if (angular_velocity)
@@ -863,9 +863,6 @@ boolean network_objects_reconcile(
 		offset.k = object->object.position.z - blended.z;
 		distributed_body_unfix_pose(object_index);
 		object_set_position(object_index, &blended, &valid_forward, &valid_up);
-		/* the weapon's matrices too: its beam and muzzle flash are placed
-		from them, and set_position poses only this object */
-		object_compute_node_matrices_recursive(object_index);
 		if (!distributed_object_follows_host(object_index))
 			render_interpolation_correct_object(object_index, &offset);
 	}
@@ -2630,8 +2627,7 @@ static void distributed_client_note_unsteered_path(
 	long object_index,
 	real_point3d const *host_position,
 	real_vector3d const *host_forward,
-	real_vector3d const *host_up,
-	boolean host_at_rest)
+	real_vector3d const *host_up)
 {
 	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
 	struct object_datum *object;
@@ -2641,8 +2637,7 @@ static void distributed_client_note_unsteered_path(
 	real_vector3d step;
 	real limit;
 
-	/* rest uses this glide too: a late sample holds at the newest */
-	(void)host_at_rest;
+	/* (rest uses this glide too: a late sample holds at the newest) */
 	if (absolute_index < 0 || absolute_index >= MAXIMUM_TRACKED_OBJECTS ||
 		!host_position || !host_forward || !host_up)
 	{
@@ -2654,8 +2649,8 @@ static void distributed_client_note_unsteered_path(
 	since = same ? now - objects_client_unsteered_path[absolute_index].time : 0;
 	if (since < 1)
 		since = 1;
-	object->object.translational_velocity = *global_zero_vector3d;
-	object->object.angular_velocity = *global_zero_vector3d;
+	if (since > UNSTEERED_PATH_MAXIMUM_TICKS)
+		since = UNSTEERED_PATH_MAXIMUM_TICKS;
 	step.i = host_position->x - object->object.position.x;
 	step.j = host_position->y - object->object.position.y;
 	step.k = host_position->z - object->object.position.z;
@@ -2672,6 +2667,8 @@ static void distributed_client_note_unsteered_path(
 		objects_client_unsteered_path[absolute_index].previous_up = *host_up;
 		objects_client_unsteered_path[absolute_index].latest_forward = *host_forward;
 		objects_client_unsteered_path[absolute_index].latest_up = *host_up;
+		object->object.translational_velocity = *global_zero_vector3d;
+		object->object.angular_velocity = *global_zero_vector3d;
 		object_set_position(object_index, host_position, host_forward, host_up);
 		return;
 	}
@@ -2786,8 +2783,7 @@ void network_objects_handle_states(
 		/* (no snap onto the host: the carry moves it across the gap) */
 		if (distributed_vehicle_unsteered(state->object_index))
 		{
-			distributed_client_note_unsteered_path(state->object_index, &state->position, &forward, &up,
-				TEST_FLAG(state->flags, _distributed_object_at_rest_bit));
+			distributed_client_note_unsteered_path(state->object_index, &state->position, &forward, &up);
 			continue;
 		}
 		dx = state->position.x - object->object.position.x;
@@ -3288,7 +3284,11 @@ static void distributed_client_remove_own_objects(
 
 /* Client: moves each unsteered vehicle from the host's previous sample to
 the new one (distributed_client_note_unsteered_path). Past that gap it holds
-at the newest sample. A Pelican its pilot flies, and a recording's lifepod. */
+at the newest sample. A Pelican its pilot flies, and a recording's lifepod.
+Its velocity is its path's while it glides, for what reads it (the engine's
+pitch, the wheels' turn, a passenger who gets out), and none once it holds;
+its spin is none (the host's flaps a Pelican's fins). One already holding at
+the newest sample is not placed again. */
 static void distributed_client_carry_unsteered_vehicles(
 	void)
 {
@@ -3323,6 +3323,15 @@ static void distributed_client_carry_unsteered_vehicles(
 		alpha = (real)since / (real)interval;
 		if (alpha > 1.0f)
 			alpha = 1.0f;
+		if (alpha >= 1.0f &&
+			object->object.position.x == objects_client_unsteered_path[absolute_index].latest_position.x &&
+			object->object.position.y == objects_client_unsteered_path[absolute_index].latest_position.y &&
+			object->object.position.z == objects_client_unsteered_path[absolute_index].latest_position.z)
+		{
+			object->object.translational_velocity = *global_zero_vector3d;
+			object->object.angular_velocity = *global_zero_vector3d;
+			continue;
+		}
 		position.x = objects_client_unsteered_path[absolute_index].previous_position.x +
 			(objects_client_unsteered_path[absolute_index].latest_position.x -
 				objects_client_unsteered_path[absolute_index].previous_position.x) * alpha;
@@ -3342,7 +3351,20 @@ static void distributed_client_carry_unsteered_vehicles(
 			&up);
 		if (!distributed_transform_valid(&position, &forward, &up, NULL, NULL, &forward, &up))
 			continue;
-		object->object.translational_velocity = *global_zero_vector3d;
+		if (alpha < 1.0f)
+		{
+			object->object.translational_velocity.i =
+				(objects_client_unsteered_path[absolute_index].latest_position.x -
+					objects_client_unsteered_path[absolute_index].previous_position.x) / (real)interval;
+			object->object.translational_velocity.j =
+				(objects_client_unsteered_path[absolute_index].latest_position.y -
+					objects_client_unsteered_path[absolute_index].previous_position.y) / (real)interval;
+			object->object.translational_velocity.k =
+				(objects_client_unsteered_path[absolute_index].latest_position.z -
+					objects_client_unsteered_path[absolute_index].previous_position.z) / (real)interval;
+		}
+		else
+			object->object.translational_velocity = *global_zero_vector3d;
 		object->object.angular_velocity = *global_zero_vector3d;
 		object_set_position(iterator.index, &position, &forward, &up);
 	}
