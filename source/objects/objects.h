@@ -430,6 +430,11 @@ void object_start_interpolation(long object_index, short frame_count);
 void object_offset_interpolation(long object_index, real_vector3d *offset);
 void object_permute_region(long object_index, char *permutation_name, short desired_region_index, boolean active_flag);
 boolean object_get_function_value(long object_index, short function_index, real *value_reference);
+/* port: the picture is drawn between ticks. While this is set, a function
+read for drawing is the tick's value moved forward by the fraction of the
+tick that has passed. */
+void object_functions_set_for_render(boolean for_render);
+void object_function_values_for_render(long object_index, real values[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS]);
 short objects_in_clusters_by_indices(unsigned long class_flags, short cluster_count, short const *cluster_indices, short maximum_object_count, long *object_indices);
 long object_index_from_name_index(short name_index);
 /* port: this object takes a scenario name nobody holds, the way a placed

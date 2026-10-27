@@ -97,6 +97,19 @@ index, which reads no function: 0 */
 
 #define OBJECT_FRAME_INDEX_GET(object_index) ((object_index) + game_time_get())
 
+/* port: set while a frame is drawn, so a function read for the picture is
+the tick's value moved into the frame */
+static int object_function_render_depth = 0;
+
+static real object_function_addition(
+	struct object_datum *object,
+	struct object_function_definition *function,
+	real huh,
+	real const *outgoing,
+	boolean *active);
+static real object_function_wrap(
+	real value);
+
 /* ---------- structures */
 
 struct object_globals
@@ -1550,6 +1563,77 @@ void object_permute_region(
 	return;
 }
 
+void object_functions_set_for_render(
+	boolean for_render)
+{
+	if (for_render)
+		object_function_render_depth++;
+	else if (object_function_render_depth > 0)
+		object_function_render_depth--;
+}
+
+void object_function_values_for_render(
+	long object_index,
+	real values[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS])
+{
+	struct object_datum *object = object_get(object_index);
+	struct object_definition *definition = object_definition_get(object->definition_index);
+	/* port: where the picture is, between the previous tick (0) and this one
+	(1) (render_interpolation.c); 1 outside an interpolated frame (Smooth
+	Motion off), where the tick's own values are shown */
+	real fraction = render_interpolation_fraction();
+	short function_count = (short)MIN(
+		definition->object.functions.count,
+		NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS);
+	short function_index;
+	real huh;
+	real back;
+
+	csmemcpy(
+		values,
+		object->object.outgoing_function_values,
+		sizeof(object->object.outgoing_function_values));
+	if (!(fraction >= 0.0f) || !(fraction < 1.0f))
+		return;
+
+	back = 1.0f - fraction;
+	huh = (57 * DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index) + game_time_get()) * 0.033333335f;
+	for (function_index = 0; function_index < function_count; function_index++)
+	{
+		struct object_function_definition *function = TAG_BLOCK_GET_ELEMENT(
+			&definition->object.functions,
+			function_index,
+			struct object_function_definition);
+		boolean active;
+		real output;
+
+		/* port: an additive function steps by a whole tick: the picture
+		is that part of the step back from this tick's value. Anything else
+		is the function at the picture's moment. */
+		if (TEST_FLAG(function->flags, _object_function_clip_to_bounds_and_normalize))
+		{
+			output = object_function_addition(
+				object,
+				function,
+				huh,
+				object->object.outgoing_function_values,
+				&active);
+			values[function_index] = object_function_wrap(
+				object->object.outgoing_function_values[function_index] - back * output);
+		}
+		else
+		{
+			output = object_function_addition(
+				object,
+				function,
+				huh - back * 0.033333335f,
+				values,
+				&active);
+			values[function_index] = output;
+		}
+	}
+}
+
 boolean object_get_function_value(
 	long object_index,
 	short function_index,
@@ -1573,7 +1657,17 @@ boolean object_get_function_value(
 		it reads as off */
 		if (VALID_INDEX(function_index, NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS))
 		{
-			*value_reference = object->object.outgoing_function_values[function_index];
+			if (object_function_render_depth > 0)
+			{
+				real shown[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
+
+				object_function_values_for_render(object_index, shown);
+				*value_reference = shown[function_index];
+			}
+			else
+			{
+				*value_reference = object->object.outgoing_function_values[function_index];
+			}
 
 			result = TEST_FLAG(object->object.functions_active_flags, function_index);
 		}
@@ -5175,6 +5269,150 @@ static void object_delete_recursive(
 	return;
 }
 
+static real object_function_input_value(
+	struct object_datum *object,
+	real const *outgoing,
+	short index)
+{
+	if ((unsigned long)(index - 1) >=
+		(unsigned long)(NUMBER_OF_INCOMING_OBJECT_FUNCTIONS + NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS))
+		return 0.0f;
+	if (index >= NUMBER_OF_INCOMING_OBJECT_FUNCTIONS + 1)
+		return outgoing[index - NUMBER_OF_INCOMING_OBJECT_FUNCTIONS - 1];
+	return object->object.incoming_function_values[index - 1];
+}
+
+static real object_function_wrap(
+	real value)
+{
+	value -= (real)floor((double)value);
+	if (!(value >= 0.0f))
+		value += 1.0f;
+	return value;
+}
+
+/* port: the original's loop body, as one function, so that the picture's
+values (object_function_values_for_render) are found as the tick's are: what
+one tick stores, before an additive function folds it into the value it
+already held. `outgoing` is the functions already computed. */
+static real object_function_addition(
+	struct object_datum *object,
+	struct object_function_definition *function,
+	real huh,
+	real const *outgoing,
+	boolean *active)
+{
+	real value;
+	real output;
+	boolean function_is_active = TRUE;
+	real period = function->runtime_one_over_period;
+
+	if (function->scale_period_by_function_index)
+	{
+		real function_value = object_function_input_value(
+			object,
+			outgoing,
+			function->scale_period_by_function_index);
+
+		if (function_value > 0.f)
+			period = period / function_value;
+	}
+
+	value = periodic_function_evaluate(function->function_type, huh * period);
+
+	if (function->scale_function_by_function_index)
+	{
+		value *= object_function_input_value(
+			object,
+			outgoing,
+			function->scale_function_by_function_index);
+	}
+
+	if (TEST_FLAG(function->flags, _object_function_invert_function_bit))
+		value = 1.f - value;
+
+	if (function->wobble_magnitude != 0.f)
+	{
+		real val = periodic_function_evaluate(
+			function->wobble_function_type,
+			huh * function->wobble_period);
+
+		value += (2.f * function->wobble_magnitude * (val - 0.5f));
+	}
+
+	if (function->square_wave_threshold != 0.f)
+		value = value > function->square_wave_threshold ? 1.f : 0.f;
+
+	if (function->step_count > 1)
+	{
+		real floor_value = floor(function->step_count * value);
+
+		value = floor_value * function->runtime_reciprocal_step_count;
+	}
+
+	if (function->runtime_reciprocal_sawtooth_count > 0.f)
+		value = fmod(value, function->runtime_reciprocal_sawtooth_count);
+
+	if (function->add_function_index)
+	{
+		value += object_function_input_value(object, outgoing, function->add_function_index);
+		value = MIN(value, 1.f);
+	}
+
+	if (function->scale_result_by_function_index)
+	{
+		value *= object_function_input_value(
+			object,
+			outgoing,
+			function->scale_result_by_function_index);
+	}
+
+	output = transition_function_evaluate(function->map_result_to_transition_function, value);
+
+	if (function->scale_by > 0.f)
+		output *= function->scale_by;
+
+	if (function->bounds_mode == _object_function_scale_to_fit_bounds)
+	{
+		output *= (function->upper_bound - function->lower_bound);
+		output += function->lower_bound;
+
+		if (function->lower_bound + _real_epsilon >= output)
+		{
+			function_is_active = TEST_FLAG(
+				function->flags,
+				_object_function_does_not_deactivate_below_lower_bound_bit);
+		}
+	}
+	else
+	{
+		if (function->lower_bound + _real_epsilon >= output)
+		{
+			output = function->lower_bound;
+			function_is_active = TEST_FLAG(
+				function->flags,
+				_object_function_does_not_deactivate_below_lower_bound_bit);
+		}
+
+		if (output > function->upper_bound)
+			output = function->upper_bound;
+
+		if (function->bounds_mode == _object_function_clip_to_bounds_and_normalize)
+		{
+			output = (output - function->lower_bound) * function->runtime_reciprocal_bounds_range;
+		}
+	}
+
+	if (function->turn_off_with_function_index != NONE &&
+		!TEST_FLAG(object->object.functions_active_flags, function->turn_off_with_function_index))
+	{
+		function_is_active = FALSE;
+	}
+
+	*active = function_is_active;
+	return output;
+}
+
 static void object_compute_function_values(
 	long object_index)
 {
@@ -5194,112 +5432,20 @@ static void object_compute_function_values(
 
 	for (function_index = 0; function_index<function_count; ++function_index)
 	{
-		real value;
-		real output;
-
 		struct object_function_definition* function = TAG_BLOCK_GET_ELEMENT(
 			&object_definition->object.functions,
 			function_index,
 			struct object_function_definition);
-		boolean function_is_active = TRUE;
-		real period = function->runtime_one_over_period;
+		boolean function_is_active;
+		real output = object_function_addition(
+			object,
+			function,
+			huh,
+			object->object.outgoing_function_values,
+			&function_is_active);
 
-		if (function->scale_period_by_function_index)
-		{
-			real function_value = OBJECT_INCOMING_FUNCTION_GET_VALUE(object, function->scale_period_by_function_index);
-			if (function_value>0.f)
-			{
-				period = period/function_value;
-			}
-		}
-
-		value = periodic_function_evaluate(function->function_type, huh*period);
-
-		if (function->scale_function_by_function_index)
-		{
-			value*= OBJECT_INCOMING_FUNCTION_GET_VALUE(object, function->scale_function_by_function_index);
-		}
-
-		if (TEST_FLAG(function->flags, _object_function_invert_function_bit))
-		{
-			value = 1.f-value;
-		}
-
-		if (function->wobble_magnitude!=0.f)
-		{
-			real val = periodic_function_evaluate(function->wobble_function_type, huh*function->wobble_period);
-			value+= (2.f*function->wobble_magnitude * (val-0.5f));
-		}
-
-		if (function->square_wave_threshold!=0.f)
-		{
-			value = value>function->square_wave_threshold ? 1.f : 0.f ;
-		}
-
-		if (function->step_count>1)
-		{
-			real floor_value = floor(function->step_count*value);
-			value = floor_value*function->runtime_reciprocal_step_count;
-		}
-
-		if (function->runtime_reciprocal_sawtooth_count>0.f)
-		{
-			value = fmod(value, function->runtime_reciprocal_sawtooth_count);
-		}
-
-		if (function->add_function_index)
-		{
-			value+= OBJECT_INCOMING_FUNCTION_GET_VALUE(object, function->add_function_index);
-			value = MIN(value, 1.f);
-		}
-
-		if (function->scale_result_by_function_index)
-		{
-			value*= OBJECT_INCOMING_FUNCTION_GET_VALUE(object, function->scale_result_by_function_index);
-		}
-
-		output = transition_function_evaluate(function->map_result_to_transition_function, value);
-
-		if (function->scale_by>0.f)
-		{
-			output*= function->scale_by;
-		}
-
-		if (function->bounds_mode==_object_function_scale_to_fit_bounds)
-		{
-			output*= (function->upper_bound-function->lower_bound);
-			output+= function->lower_bound;
-
-			if (function->lower_bound+_real_epsilon>=output)
-			{
-				function_is_active = TEST_FLAG(function->flags, _object_function_does_not_deactivate_below_lower_bound_bit);
-			}
-		}
-		else
-		{
-			if (function->lower_bound+_real_epsilon>=output)
-			{
-				output = function->lower_bound;
-				function_is_active = TEST_FLAG(function->flags, _object_function_does_not_deactivate_below_lower_bound_bit);
-			}
-
-			if (output>function->upper_bound)
-			{
-				output = function->upper_bound;
-			}
-
-			if (function->bounds_mode==_object_function_clip_to_bounds_and_normalize)
-			{
-				output = (output-function->lower_bound)*function->runtime_reciprocal_bounds_range;
-			}
-		}
-
-		if (function->turn_off_with_function_index!=NONE &&
-			!TEST_FLAG(object->object.functions_active_flags, function->turn_off_with_function_index))
-		{
-			function_is_active = FALSE;
-		}
-
+		/* bit 1 is the additive function (the bounds-mode name shares its
+		value). It folds this tick onto the value already held. */
 		if (TEST_FLAG(function->flags, _object_function_clip_to_bounds_and_normalize))
 		{
 			output = fmod(output+object->object.outgoing_function_values[function_index], 1.f);

@@ -55,7 +55,8 @@ short first_person_weapon_get_marker_by_name_render(
 	char const *name,
 	struct object_marker *markers,
 	short maximum_marker_count);
-void first_person_weapon_center_flashlight(
+/* port: TRUE where the viewmodel placed it */
+boolean first_person_weapon_center_flashlight(
 	long unit_index,
 	real_point3d *position,
 	real_vector3d *forward,
