@@ -29,7 +29,9 @@ An object the distributed netcode moves to where the host has it
 rather than jumping: its snapshots move with it, and the difference is drawn
 on top of it, whole until the next tick and fading from then on (no more than
 a few world units of it: further is a jump). A local player's view glides so
-with their unit, and with what it rides.
+with their unit, and with what it rides. A point placed on an object from the
+tick, such as a nav marker, is moved as far as the object is drawn from there
+(render_interpolation_object_point).
 */
 
 #include "cseries.h"
@@ -596,6 +598,27 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 		record->blended_frame = interpolation_frame;
 	}
 	return record->nodes + 2 * record->node_capacity;
+}
+
+/* a point placed on the object from the tick, moved with the object's root
+to where this frame draws it: unchanged outside a frame between ticks, or
+for an object not blended */
+void render_interpolation_object_point(long object_index, real_point3d *point)
+{
+	struct object_datum *object;
+	real_matrix4x3 const *drawn;
+	real_matrix4x3 const *simulated;
+
+	if (!interpolation_rendering || object_index == NONE)
+		return;
+	drawn = render_interpolation_object_node_matrices(object_index);
+	object = object_try_and_get(object_index);
+	if (!drawn || !object || object->object.node_matrices.size < (short)sizeof(real_matrix4x3))
+		return;
+	simulated = object_header_block_get(object_index, &object->object.node_matrices);
+	point->x += drawn[0].position.x - simulated[0].position.x;
+	point->y += drawn[0].position.y - simulated[0].position.y;
+	point->z += drawn[0].position.z - simulated[0].position.z;
 }
 
 /* ---------- corrections */
