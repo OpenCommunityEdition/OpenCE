@@ -31,6 +31,10 @@ ON_OFF = [("ON", "true"), ("OFF", "false")]
 # the multiplayer armor colors, in the profile's order (player_profile.c)
 SHIELD_COLORS = ["white", "black", "red", "blue", "gray", "yellow", "green", "pink", "purple", "cyan", "cobalt",
                  "orange", "teal", "sage", "brown", "tan", "maroon", "salmon"]
+# the HUD's controller button styles, by family (controller_buttons.h)
+XBOX_BUTTON_STYLES = [("CLASSIC", "classic"), ("GEMS", "gems"), ("DARK GEMS", "menu_gems"), ("MODERN", "xbox_modern")]
+PS_BUTTON_STYLES = [("CLASSIC", "ps_classic"), ("GEMS", "ps_gems"), ("DARK GEMS", "ps_dark_gems"), ("MODERN", "ps_modern")]
+SWITCH_BUTTON_STYLES = [("CLASSIC", "switch_classic"), ("GEMS", "switch_gems"), ("MODERN", "switch_modern")]
 SENSITIVITIES = [(f"{value:g}", f"{value:g}") for value in (0.1, 0.15, 0.25, 0.4, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4)]
 VOLUMES = [(str(step), f"{step / 10:g}") for step in range(11)]
 
@@ -81,9 +85,6 @@ SCREENS = {
              "In first person, turn the view the moment the\nmouse moves, not up to two ticks later.", "desktop web"),
             ("HIGH-RES HUD:", "display.high_res_hud", ON_OFF,
              "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
-            ("BUTTON STYLE:", "display.hud_button_style",
-             [("CLASSIC", "classic"), ("GEMS", "gems"), ("DARK GEMS", "menu_gems")],
-             "Classic: plain Xbox buttons. Gems: shaded Xbox\nbuttons. Dark Gems: the menu's button artwork.", None),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
             ("ANTI-ALIASING:", "display.anti_aliasing",
@@ -214,13 +215,35 @@ SCREENS = {
             ("VIBRATION:", "profile.vibration", ON_OFF, "Rumble the controller.", None),
             ("IN-GAME HELP:", "profile.ingame_help", ON_OFF, "Show the game's hints about its controls.", None),
         ],
+        "categories": [("BUTTONS:", "gamepad_setup/buttons",
+                        "The HUD's controller buttons: your controller's\nkind, or one style for everyone.")],
     },
+}
+
+# Gamepad Setup's Buttons: the HUD's controller button styles (controller_buttons.h)
+SCREENS["gamepad_setup/buttons"] = {
+    "screen": "button_style_settings_screen",
+    "header": ("header_profile_controller_setting", f"{PE}/controller_edit/header_profile_controller_setting"),
+    "spacing": 30,
+    "rows": [
+        ("BUTTON STYLE:", "display.hud_button_style",
+         [("AUTO", "auto")] + [(f"XBOX {shown}", value) for shown, value in XBOX_BUTTON_STYLES] +
+         [(f"PS {shown}", value) for shown, value in PS_BUTTON_STYLES] +
+         [(f"SWITCH {shown}", value) for shown, value in SWITCH_BUTTON_STYLES],
+         "Auto: each player's controller's kind, in its\nstyle below. Needs Graphics' High-Res HUD.", None),
+        ("XBOX:", "display.hud_button_style_xbox", XBOX_BUTTON_STYLES,
+         "Auto's style for Xbox controllers, and for any\nother kind.", None),
+        ("PLAYSTATION:", "display.hud_button_style_ps", PS_BUTTON_STYLES,
+         "Auto's style for PlayStation controllers.", None),
+        ("SWITCH:", "display.hud_button_style_switch", SWITCH_BUTTON_STYLES,
+         "Auto's style for Switch controllers.", None),
+    ],
 }
 
 # Video Setup's categories open ordinary settings screens. Each has the same
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
-_graphics = {"display.high_res_hud", "display.hud_button_style", "display.high_res_text", "display.anti_aliasing",
+_graphics = {"display.high_res_hud", "display.high_res_text", "display.anti_aliasing",
              "display.anisotropic_filtering", "display.shadow_resolution", "display.per_pixel_lighting", "display.match_timer",
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
@@ -363,7 +386,7 @@ CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS", "COMMUNICATION"]
 CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
-WIDE_SETTINGS = {"audio.output_device", "audio.input_device", "streamer.slurs", "streamer.swearing",
+WIDE_SETTINGS = {"audio.output_device", "display.hud_button_style", "audio.input_device", "streamer.slurs", "streamer.swearing",
                  "streamer.insults"}
 
 # the host's voice chat and vote kicks, on Teamplay Options

@@ -44,6 +44,7 @@ drive the controller.
 /* port/linux/game/network_aim_assist.c */
 extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
+#include "controller_buttons.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -1216,6 +1217,10 @@ static DWORD connected_gamepads(void)
 		if (port_gamepad(gamepads, count, port))
 			mask |= 1UL << port;
 	}
+	/* (each port's controller, for the HUD's button styles: a port the game
+	stops reading keeps none) */
+	for (port = 0; port < PORT_COUNT; port++)
+		controller_device_update((short)port, port_gamepad(gamepads, count, port));
 	return mask;
 }
 
@@ -1297,6 +1302,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		return ERROR_DEVICE_NOT_CONNECTED;
 	platform_pump_events();
 	count = sdl_gamepads(gamepads);
+	controller_device_update((short)port, port_gamepad(gamepads, count, port));
 	if (port == 0)
 	{
 		struct platform_input_state input;

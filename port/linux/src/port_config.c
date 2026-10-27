@@ -142,10 +142,25 @@ static const struct config_setting config_settings[] =
 		"Draw the HUD (meters, counters, panels, motion sensor, reticles,\n"
 		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps);\n"
 		"false draws the maps' own bitmaps." },
-	{ "display.hud_button_style", _config_string, "\"classic\"", "HALO_HUD_BUTTON_STYLE", _environment_value, _platform_all,
-		"High-res gameplay controller buttons: classic uses plain Xbox faces;\n"
-		"gems uses shaded Xbox faces; menu_gems uses the menu's button art.\n"
+	{ "display.hud_button_style", _config_string, "\"auto\"", "HALO_HUD_BUTTON_STYLE", _environment_value, _platform_all,
+		"The high-res HUD's controller buttons: \"auto\" draws each player's\n"
+		"controller's kind's style (display.hud_button_style_xbox, _ps, _switch;\n"
+		"the Xbox's for any other), else one style for everyone: classic,\n"
+		"gems, menu_gems (dark gems), xbox_modern, ps_classic, ps_gems,\n"
+		"ps_dark_gems, ps_modern, switch_classic, switch_gems, switch_modern.\n"
 		"Requires display.high_res_hud." },
+	{ "display.hud_button_style_xbox", _config_string, "\"classic\"", "HALO_HUD_BUTTON_STYLE_XBOX", _environment_value,
+		_platform_all,
+		"The style \"auto\" draws an Xbox controller's (or any other's) buttons in:\n"
+		"classic, gems, menu_gems (dark gems) or xbox_modern." },
+	{ "display.hud_button_style_ps", _config_string, "\"ps_classic\"", "HALO_HUD_BUTTON_STYLE_PS", _environment_value,
+		_platform_all,
+		"The style \"auto\" draws a PlayStation controller's buttons in: ps_classic,\n"
+		"ps_gems, ps_dark_gems or ps_modern." },
+	{ "display.hud_button_style_switch", _config_string, "\"switch_classic\"", "HALO_HUD_BUTTON_STYLE_SWITCH",
+		_environment_value, _platform_all,
+		"The style \"auto\" draws a Switch controller's buttons in: switch_classic,\n"
+		"switch_gems or switch_modern." },
 	{ "display.high_res_text", _config_boolean, "true", "HALO_HIGH_RES_TEXT", _environment_value, _platform_all,
 		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
 		"(Overpass) at the resolution the game draws at, and the menus' titles\n"
@@ -1532,7 +1547,11 @@ static const struct
 	{ "display.mode", { "", "fullscreen", "borderless", "windowed", NULL }, "display.fullscreen's" },
 	{ "display.resolution_scaling", { "native", "original", NULL }, NULL },
 	{ "display.anti_aliasing", { "off", "fxaa", "smaa", "ssaa2x", "msaa2x", "msaa4x", "msaa8x", NULL }, NULL },
-	{ "display.hud_button_style", { "classic", "gems", "menu_gems", NULL }, NULL },
+	{ "display.hud_button_style", { "auto", "classic", "gems", "menu_gems", "dark_gems", "xbox_modern", "ps_classic",
+		"ps_gems", "ps_dark_gems", "ps_modern", "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
+	{ "display.hud_button_style_xbox", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern", NULL }, NULL },
+	{ "display.hud_button_style_ps", { "ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", NULL }, NULL },
+	{ "display.hud_button_style_switch", { "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
 	{ "display.menus", { "pc", "xbox", NULL }, NULL },
 	{ "display.player_names", { "all", "allies", "enemies", "none", NULL }, NULL },
 	{ "display.scoreboard_team_layout", { "teams", "score", NULL }, NULL },
