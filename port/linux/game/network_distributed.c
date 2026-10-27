@@ -4942,7 +4942,7 @@ void network_distributed_handle_message(
 		network_objects_handle_changes(entries, header.count);
 		break;
 	case _distributed_message_object_states:
-		network_objects_handle_states(entries, header.count);
+		network_objects_handle_states(entries, header.count, header.game_time);
 		break;
 	case _distributed_message_game_state:
 		game_engine_read_network_state((byte const *)entries, size - sizeof(header));
