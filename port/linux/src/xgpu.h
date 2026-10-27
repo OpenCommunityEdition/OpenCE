@@ -289,6 +289,7 @@ enum
 	_xgpu_tone_mapping_neutral,
 	_xgpu_tone_mapping_aces,
 	_xgpu_tone_mapping_reinhard,
+	_xgpu_tone_mapping_gt7,
 	NUMBER_OF_XGPU_TONE_MAPPINGS
 };
 
@@ -300,6 +301,8 @@ struct xgpu_tone_mapping
 	/* the brightest value the curve gives, in the display's whites: 1.0 for
 	SDR, an HDR display's headroom */
 	float peak;
+	/* with an HDR display, paper white in GT7's units (100 nits); 0 for SDR */
+	float paper;
 };
 
 /* the tone mapping and presentation programs made now; FALSE if they
