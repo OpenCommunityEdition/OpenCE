@@ -45,6 +45,10 @@ static struct sound_datum *checked_sound(long index) {
 #define render_debug_looping_sound(...) ((void)0)
 #define player_effect_continuous_refresh(...) ((void)0)
 #define csmemcpy memcpy
+/* port: port/linux/game/subtitles.c */
+static void subtitles_sound_started(long definition_index,long delay_milliseconds,long length_milliseconds) {
+ (void)definition_index;(void)delay_milliseconds;(void)length_milliseconds;
+}
 static int _sound_cache_sound_request(struct sound_permutation *p,int a,int b,int c) {
  (void)p;(void)a;(void)b;(void)c;return TRUE;
 }
