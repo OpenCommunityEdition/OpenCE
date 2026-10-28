@@ -6077,6 +6077,7 @@ link on the clipboard reached, its game then in the list */
 static boolean direct_link_from_clipboard(void)
 {
 	char text[TEXT_FIELD_LENGTH];
+	byte host[6];
 	char *link = text;
 	size_t length;
 
@@ -6087,6 +6088,8 @@ static boolean direct_link_from_clipboard(void)
 	for (length = strlen(link); length && (link[length - 1] == ' ' || link[length - 1] == '\t' ||
 		link[length - 1] == '\r' || link[length - 1] == '\n'); length--)
 		link[length - 1] = 0;
+	if (p2p_invite_host(link, host))
+		p2p_mm_cancel();
 	if (!*link || !p2p_join_invite(link))
 	{
 		platform_log("menus: the clipboard has no invite link");
