@@ -224,6 +224,8 @@ static void validate_element(struct tag_validation *validation, byte *base,
 	struct tag_schema_definition const *definition, char const *field_name, long element_index);
 static void validate_fields(struct tag_validation *validation, byte *base,
 	struct tag_schema_definition const *definition);
+static void validation_begin(struct tag_validation *validation, void *tag_header, long tag_data_size,
+	unsigned long tag_cache_size, boolean custom_edition, char const *map_name);
 
 /* ---------- private code */
 
@@ -665,15 +667,29 @@ static void validate_tag_index(
 	unsigned long const *groups)
 {
 	struct tag_validate_instance *instance;
+	struct tag_validate_instance *raw = NULL;
+	struct tag_validate_header *header = tag_validate_globals.header;
+	short absolute_index = (short)*tag_index;
 	char text[96];
+	char found[5] = "?";
+	char const *why = "no such tag";
 
 	if (*tag_index == NONE)
 		return;
 	instance = instance_get(*tag_index);
-	if (!instance || !instance_in_groups(instance, groups))
+	if (header && absolute_index >= 0 && absolute_index < header->tag_count)
+		raw = &header->instances[absolute_index];
+	if (!instance || !instance_in_groups(instance, groups) ||
+		(!instance->base_address && instance->group_tag != STRUCTURE_BSP_GROUP_TAG))
 	{
-		tag_validate_correct(validation, "names %08lx, not a tag of %s: none",
-			*tag_index, groups_text(groups, text, sizeof(text)));
+		if (raw)
+		{
+			tag_to_text(raw->group_tag, found);
+			why = raw->tag_index != *tag_index ? "handle differs" :
+				!instance_in_groups(raw, groups) ? "wrong group" : "no data";
+		}
+		tag_validate_correct(validation, "names %08lx, not a tag of %s (%s: instance handle %08lx, group '%s'): none",
+			*tag_index, groups_text(groups, text, sizeof(text)), why, raw ? raw->tag_index : 0, found);
 		*tag_index = NONE;
 		return;
 	}
@@ -1087,6 +1103,340 @@ static boolean validate_buffers(
 	return TRUE;
 }
 
+/* ---------- groups inferred from references (map protection) */
+
+enum
+{
+	MAXIMUM_INFERENCE_ELEMENTS = 2000000
+};
+
+struct inference_context
+{
+	byte *buffer;
+	unsigned long address;
+	unsigned long size;
+};
+
+static byte tag_validate_walked[UNSIGNED_SHORT_MAX + 1];
+
+/* the bytes at a runtime address, if size bytes of them lie in the context */
+static byte *inference_translate(
+	struct inference_context const *context,
+	void const *address,
+	unsigned long size)
+{
+	unsigned long offset = (unsigned long)address - context->address;
+
+	if ((unsigned long)address < context->address || offset > context->size || size > context->size - offset)
+		return NULL;
+
+	return context->buffer + offset;
+}
+
+static boolean group_accepted(
+	unsigned long group_tag,
+	unsigned long const *groups)
+{
+	struct tag_schema_group const *group = schema_group_get(group_tag);
+
+	if (!groups)
+		return TRUE;
+	for (; *groups; groups++)
+	{
+		if (*groups == group_tag ||
+			(group && (group->parent_group_tags[0] == *groups || group->parent_group_tags[1] == *groups)) ||
+			(tag_validate_globals.custom_edition && group_tag == GBXMODEL_GROUP_TAG && *groups == MODEL_GROUP_TAG))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+static struct
+{
+	long budget;
+	long regrouped;
+	long references;
+	long candidates;
+	long mismatched;
+	long unresolved;
+	unsigned long example_reference_group;
+	unsigned long example_instance_group;
+} tag_validate_inference;
+enum
+{
+	MAXIMUM_PENDING_BSP_GROUPS = 4096
+};
+
+/* the groups a structure bsp's references give tags, noted as the bsp is
+read and applied with the rest (tag_validate_custom_edition_infer_groups):
+the tags' own table must not change before the map's checksum is taken */
+static struct
+{
+	long count;
+	long tag_index[MAXIMUM_PENDING_BSP_GROUPS];
+	unsigned long group_tag[MAXIMUM_PENDING_BSP_GROUPS];
+} tag_validate_pending_groups;
+
+static boolean tag_validate_inference_defer = FALSE;
+
+static void pending_group_add(
+	long tag_index,
+	unsigned long group_tag)
+{
+	long index;
+
+	for (index = 0; index < tag_validate_pending_groups.count; index++)
+	{
+		if (tag_validate_pending_groups.tag_index[index] == tag_index)
+			return;
+	}
+	if (tag_validate_pending_groups.count < MAXIMUM_PENDING_BSP_GROUPS)
+	{
+		tag_validate_pending_groups.tag_index[tag_validate_pending_groups.count] = tag_index;
+		tag_validate_pending_groups.group_tag[tag_validate_pending_groups.count] = group_tag;
+		tag_validate_pending_groups.count++;
+	}
+
+	return;
+}
+static void infer_reference(
+	struct tag_reference const *reference,
+	unsigned long const *groups)
+{
+	struct tag_validate_header *header = tag_validate_globals.header;
+	short absolute_index = (short)reference->index;
+	struct tag_validate_instance *instance;
+	struct tag_schema_group const *group;
+
+	if (reference->index == NONE || absolute_index < 0 || absolute_index >= header->tag_count)
+		return;
+	instance = &header->instances[absolute_index];
+	group = schema_group_get(reference->group_tag);
+	if (instance->tag_index != reference->index || schema_group_get(instance->group_tag) ||
+		!group || !group_accepted(reference->group_tag, groups))
+	{
+		return;
+	}
+	if (tag_validate_inference_defer)
+	{
+		pending_group_add(reference->index, reference->group_tag);
+		return;
+	}
+	instance->group_tag = reference->group_tag;
+	instance->parent_group_tags[0] = group->parent_group_tags[0];
+	instance->parent_group_tags[1] = group->parent_group_tags[1];
+	tag_validate_inference.regrouped++;
+
+	return;
+}
+
+static void infer_walk(
+	struct inference_context const *context,
+	byte *base,
+	struct tag_schema_definition const *definition,
+	short depth)
+{
+	struct tag_schema_field const *field;
+
+	if (depth >= MAXIMUM_VALIDATION_DEPTH)
+		return;
+	for (field = definition->fields; field->type != _tag_schema_terminator; field++)
+	{
+		short index;
+
+		for (index = 0; index < field->count && tag_validate_inference.budget > 0; index++)
+		{
+			byte *address = base + field->offset + index * field->size;
+
+			if (field->type == _tag_schema_struct)
+			{
+				infer_walk(context, address, field->definition, depth);
+			}
+			else if (field->type == _tag_schema_reference)
+			{
+				infer_reference((struct tag_reference const *)address, field->definition);
+			}
+			else if (field->type == _tag_schema_block)
+			{
+				struct tag_block const *block = (struct tag_block const *)address;
+				struct tag_schema_definition const *element_definition = field->definition;
+				byte *elements;
+				long element_index;
+
+				if (block->count <= 0 || element_definition->size <= 0 ||
+					(unsigned long)block->count > context->size / (unsigned long)element_definition->size)
+				{
+					continue;
+				}
+				elements = inference_translate(context, block->address,
+					(unsigned long)block->count * element_definition->size);
+				for (element_index = 0; elements && element_index < block->count && tag_validate_inference.budget-- > 0;
+					element_index++)
+				{
+					infer_walk(context, elements + element_index * element_definition->size,
+						element_definition, depth + 1);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+/* A protected map's tags have their groups scrambled in the tag table
+(the extractors' "INVALID"), while the references to them keep the real
+ones, which is all Halo PC read. Every tag of a known group is walked once,
+and each tag it refers to that has no known group is given the group the
+reference says; the tags that gives a group are walked in turn. Returns how
+many were given one. Call it on the loaded tags before they are converted
+or validated. */
+long tag_validate_custom_edition_infer_groups(
+	void *tag_header,
+	long loaded_size,
+	unsigned long tag_cache_size,
+	char const *map_name)
+{
+	struct tag_validate_custom_edition_header *header = tag_header;
+	struct tag_validation validation;
+	struct inference_context context;
+	long absolute_index;
+	boolean walked_any;
+	char message[MAXIMUM_MESSAGE_LENGTH];
+	char reference_text[5];
+	char instance_text[5];
+
+	validation_begin(&validation, tag_header, loaded_size, tag_cache_size, TRUE, map_name);
+	tag_validate_report(message);
+	if (!schemas_fit() || tag_cache_size > TAG_VALIDATE_MAXIMUM_TAG_CACHE_SIZE ||
+		loaded_size < (long)sizeof(*header) || (unsigned long)loaded_size > tag_cache_size ||
+		header->signature != TAG_HEADER_SIGNATURE ||
+		header->tag_count <= 0 || header->tag_count > UNSIGNED_SHORT_MAX ||
+		!region_contains(&validation, header->instances, header->tag_count * sizeof(struct tag_validate_instance)))
+	{
+		return 0;
+	}
+	context.buffer = tag_header;
+	context.address = (unsigned long)tag_header;
+	context.size = (unsigned long)loaded_size;
+	memset(tag_validate_walked, 0, sizeof(tag_validate_walked));
+	tag_validate_inference.budget = MAXIMUM_INFERENCE_ELEMENTS;
+	long pending_index;
+	long pending_applied = 0;
+
+	for (pending_index = 0; pending_index < tag_validate_pending_groups.count; pending_index++)
+	{
+		long handle = tag_validate_pending_groups.tag_index[pending_index];
+		short absolute = (short)handle;
+		struct tag_schema_group const *pending_group =
+			schema_group_get(tag_validate_pending_groups.group_tag[pending_index]);
+		struct tag_validate_instance *pending_instance;
+
+		if (absolute < 0 || absolute >= header->tag_count || !pending_group)
+			continue;
+		pending_instance = &header->instances[absolute];
+		if (pending_instance->tag_index != handle || schema_group_get(pending_instance->group_tag))
+			continue;
+		pending_instance->group_tag = tag_validate_pending_groups.group_tag[pending_index];
+		pending_instance->parent_group_tags[0] = pending_group->parent_group_tags[0];
+		pending_instance->parent_group_tags[1] = pending_group->parent_group_tags[1];
+		pending_applied++;
+	}
+	tag_validate_pending_groups.count = 0;
+	tag_validate_inference.regrouped += pending_applied;
+	tag_validate_report(message);
+	tag_validate_inference.regrouped = 0;
+	do
+	{
+		walked_any = FALSE;
+		for (absolute_index = 0; absolute_index < header->tag_count; absolute_index++)
+		{
+			struct tag_validate_instance *instance = &header->instances[absolute_index];
+			struct tag_schema_group const *group = schema_group_get(instance->group_tag);
+
+			if (tag_validate_walked[absolute_index] || !group || !group->definition || !instance->base_address ||
+				instance->group_tag == STRUCTURE_BSP_GROUP_TAG ||
+				!inference_translate(&context, instance->base_address, group->definition->size))
+			{
+				continue;
+			}
+			tag_validate_walked[absolute_index] = TRUE;
+			walked_any = TRUE;
+			infer_walk(&context, instance->base_address, group->definition, 0);
+		}
+	}
+	while (walked_any && tag_validate_inference.budget > 0);
+	snprintf(message, sizeof(message),
+	"group inference: %ld references to tags, %ld to tags of no known group, %ld given a group, "
+	"%ld unresolved (reference group '%s', instance group '%s' in the first), %ld with a different handle",
+	tag_validate_inference.references, tag_validate_inference.candidates, tag_validate_inference.regrouped,
+	tag_validate_inference.unresolved,
+	tag_to_text(tag_validate_inference.example_reference_group, reference_text),
+	tag_to_text(tag_validate_inference.example_instance_group, instance_text),
+	tag_validate_inference.mismatched);
+	tag_validate_report(message);
+	return tag_validate_inference.regrouped;
+}
+
+/* A structure bsp's references, as tag_validate_custom_edition_infer_groups
+reads the tags': `bsp` is a copy of the bsp's bytes that loads at
+bsp_address, in a map whose tag table is at tag_header (tag_data_bytes of
+it). The groups they name are noted, and given to the tags when the tags'
+own are (the bsp is not in memory yet). */
+void tag_validate_custom_edition_note_structure_bsp(
+	void *tag_header,
+	unsigned long tag_data_bytes,
+	long bsp_index,
+	void *bsp,
+	unsigned long bsp_bytes,
+	unsigned long bsp_address,
+	char const *map_name)
+{
+	struct tag_validate_custom_edition_header *header = tag_header;
+	struct tag_validation validation;
+	struct inference_context context;
+	struct tag_schema_group const *group;
+	unsigned long root_address;
+	byte *root;
+	char message[MAXIMUM_MESSAGE_LENGTH];
+
+	if (bsp_index == 0)
+		tag_validate_pending_groups.count = 0;
+	memset(&tag_validate_globals, 0, sizeof(tag_validate_globals));
+	tag_validate_globals.header = tag_header;
+	tag_validate_globals.tag_data_size = (long)tag_data_bytes;
+	tag_validate_globals.tag_cache_size = TAG_VALIDATE_MAXIMUM_TAG_CACHE_SIZE;
+	tag_validate_globals.custom_edition = TRUE;
+	snprintf(tag_validate_globals.map_name, sizeof(tag_validate_globals.map_name), "%s", map_name);
+	validation_new(&validation, tag_header, tag_data_bytes);
+	group = schema_group_get(STRUCTURE_BSP_GROUP_TAG);
+	if (!schemas_fit() || !group || !group->definition ||
+		tag_data_bytes < sizeof(*header) || header->signature != TAG_HEADER_SIGNATURE ||
+		header->tag_count <= 0 || header->tag_count > UNSIGNED_SHORT_MAX ||
+		!region_contains(&validation, header->instances, header->tag_count * sizeof(struct tag_validate_instance)) ||
+		bsp_bytes < sizeof(unsigned long))
+	{
+		return;
+	}
+	context.buffer = bsp;
+	context.address = bsp_address;
+	context.size = bsp_bytes;
+	root_address = *(unsigned long const *)bsp;
+	root = inference_translate(&context, (void const *)root_address, group->definition->size);
+	if (!root)
+		return;
+	memset(&tag_validate_inference, 0, sizeof(tag_validate_inference));
+	tag_validate_inference.budget = MAXIMUM_INFERENCE_ELEMENTS;
+	tag_validate_inference_defer = TRUE;
+	infer_walk(&context, root, group->definition, 0);
+	tag_validate_inference_defer = FALSE;
+	tag_validate_report(message);
+
+	return;
+}
+
 /* ---------- public code */
 
 /* the tags at tag_header (tag_data_size bytes of a tag cache), whose header
@@ -1140,8 +1490,10 @@ static boolean validate_tag_table(
 		}
 		if (!instance->base_address)
 		{
-			tag_validate_refuse(validation, "has no data");
-			break;
+			/* port: a protected map's tag without data: left empty, and nothing
+			may refer to it (validate_tag_index) */
+			tag_validate_correct(validation, "has no data");
+			continue;
 		}
 		if (group && group->definition &&
 			(!region_contains(validation, instance->base_address, group->definition->size) ||
