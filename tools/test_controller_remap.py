@@ -276,6 +276,7 @@ unsigned int controller_remap_pressed(short p,unsigned int m){return 0;}
 static short local_player_get_next(short p){return p<1?1:NONE;}
 static struct {short local_player_index;} fake_player={2};
 static void input_abstraction_get_local_player_preferences(short port,struct game_input_preferences *p){*p=profile;}
+static int game_time_initialized(void){return 1;}
 static int game_in_progress(void){return in_game;}
 static int ui_widgets_active_for_local_player(short port){return menus;}
 short network_chat_controller(void){return (short)chat;}
@@ -370,6 +371,7 @@ def test_all_upstream_presets_and_dpad_action_translation(tmp_path):
 struct game_input_preferences {unsigned char game_control_to_xbox_buttons[12];};
 static struct game_input_preferences profile;
 static void input_abstraction_get_local_player_preferences(short port,struct game_input_preferences *p){*p=profile;}
+static int game_time_initialized(void){return 1;}
 static int game_in_progress(void){return 1;}
 static int ui_widgets_active_for_local_player(short port){return menu[port];}
 short network_chat_controller(void){return -1;}
