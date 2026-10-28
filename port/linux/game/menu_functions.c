@@ -84,6 +84,7 @@ their handlers open opens.
 
 #include "halo_menus.h"
 #include "controller_remap.h"
+#include "matchmaking.h"
 #include "custom_edition_cache.h"
 #include "mcc_ui.h"
 #include "mcc_pause.h"
@@ -3323,6 +3324,8 @@ void network_game_server_port_set_cooperative_player_collisions(boolean player_c
 void network_game_server_port_set_cooperative_ally_friendly_fire(boolean ally_friendly_fire);
 void *global_network_game_client_get(void);
 void *global_network_game_server_get(void);
+void dispose_global_network_game_client(void);
+void dispose_global_network_game_server(void);
 boolean network_game_is_splitscreen_local(void);
 struct advertised_game *network_game_client_get_available_games(void *client);
 boolean network_game_client_advertised_game_is_valid(struct advertised_game *game);
@@ -6363,12 +6366,21 @@ ADD PLAYER */
 static boolean lobby_leave(struct widget_instance *widget, struct event_record *event, short controller,
 	boolean *widget_deleted)
 {
+	boolean left;
+
 	if (!lobby_controller_playing(controller))
 	{
 		lobby_join_reset();
 		return FALSE;
 	}
-	return ui_widget_port_unjoin_player(widget, event, widget_deleted);
+	left = ui_widget_port_unjoin_player(widget, event, widget_deleted);
+	/* (the Multiplayer menu keeps a server: the main menu's start ended it) */
+	if (left && matchmaking_game_locked() && global_network_game_server_get())
+	{
+		dispose_global_network_game_client();
+		dispose_global_network_game_server();
+	}
+	return left;
 }
 
 /* "port lobby player list initialize": on the joining controller's profile,
@@ -6730,7 +6742,7 @@ static void lobby_update(struct widget_instance *list)
 	}
 	lobby_join_help(list);
 	map_vote_lobby_check();
-	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams);
+	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams && !matchmaking_game_locked());
 	/* (the buttons' focus, off Switch Team when it is hidden) */
 	focus_off_hidden(named(list, "lobby_button_bar", 0));
 	visible_set(named(description, "lobby_right_item", 0), game != NULL && state >= _client_state_pregame);
