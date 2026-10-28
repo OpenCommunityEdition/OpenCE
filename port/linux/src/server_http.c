@@ -3740,22 +3740,36 @@ static void ticket_api(struct server_ticket *ticket)
 			server_json_array_begin(&errors, NULL);
 			for (index = 0; index < document.tokens[0].size; index++)
 			{
-				char name[64], value[300], reason[160];
-				int value_token = member + 1, code = 0;
+				char name[64], value[300], reason[160] = "";
+				int value_token = member + 1, code = 0, value_read = 1, applied = 0;
 				struct server_json_token const *token = &document.tokens[value_token];
 
 				if (!server_json_get_string(&document, member, name, sizeof(name)))
 					name[0] = 0;
+				/* (a string it cannot read whole, too long for value or with a
+				\u0000, is refused: read, it would be the empty string, which
+				the setting would take) */
 				if (token->type == _server_json_string_token)
-					server_json_get_string(&document, value_token, value, sizeof(value));
+					value_read = server_json_get_string(&document, value_token, value, sizeof(value));
 				else
 					snprintf(value, sizeof(value), "%.*s", token->end - token->start, document.text + token->start);
-				if (name[0] && server_commands_set_setting_text(name, value, ticket->role, reason, sizeof(reason), &code))
+				if (!name[0])
 				{
+					code = 404;
+					snprintf(reason, sizeof(reason), "a setting's name is a string of at most 63 characters");
+				}
+				else if (!value_read)
+				{
+					snprintf(reason, sizeof(reason), "%s's value is longer than 256 characters, or has a control character",
+						name);
+				}
+				else if (server_commands_set_setting_text(name, value, ticket->role, reason, sizeof(reason), &code))
+				{
+					applied = 1;
 					server_json_string(&json, NULL, name);
 					server_log(_server_log_info, "server", "%s changed by %s", name, ticket->by);
 				}
-				else
+				if (!applied)
 				{
 					server_json_object_begin(&errors, NULL);
 					server_json_string(&errors, "name", name);
