@@ -185,3 +185,75 @@ int mm_open_token(const unsigned char *seed, const unsigned char *host_key, cons
 
 	return token_key(seed, host_key, key) && p2p_open(key, sealed, MM_SEALED_TOKEN_SIZE, token) == P2P_TOKEN_SIZE;
 }
+
+/* every machine must sort alike: key hash, never clock or arrival order */
+static int hash_before(const struct mm_unit *units, int a, int b)
+{
+	return memcmp(units[a].key_hash, units[b].key_hash, P2P_KEY_HASH_SIZE) < 0;
+}
+
+static void indices_in_order(const struct mm_unit *units, const int *indices, int count, int *order)
+{
+	int index, other;
+
+	for (index = 0; index < count; index++)
+	{
+		for (other = index; other > 0 && hash_before(units, indices[index], order[other - 1]); other--)
+			order[other] = order[other - 1];
+		order[other] = indices[index];
+	}
+}
+
+int mm_pool(const struct mm_unit *units, int count, int players, int *pool)
+{
+	int all[MM_MAXIMUM_UNITS + 1], order[MM_MAXIMUM_UNITS + 1], index, taken = 0, pool_count = 0, has_host = 0;
+
+	for (index = 0; index < count; index++)
+		all[index] = index;
+	indices_in_order(units, all, count, order);
+	for (index = 0; index < count && taken < players; index++)
+	{
+		const struct mm_unit *candidate = &units[order[index]];
+		int can_host = candidate->can_host && !candidate->failed;
+
+		if (taken + candidate->players > players)
+			continue;
+		if (!can_host && !has_host && taken + candidate->players == players)
+			continue;
+		pool[pool_count++] = order[index];
+		taken += candidate->players;
+		has_host |= can_host;
+	}
+	return taken == players && has_host ? pool_count : 0;
+}
+
+int mm_elect(const struct mm_unit *units, const int *pool, int pool_count)
+{
+	unsigned char material[MM_MAXIMUM_POOL * P2P_KEY_HASH_SIZE + P2P_KEY_SIZE], digest[P2P_SHA256_SIZE];
+	unsigned char best[P2P_SHA256_SIZE];
+	int sorted[MM_MAXIMUM_POOL], index, at = 0, unit, host = -1;
+
+	if (pool_count > MM_MAXIMUM_POOL)
+		return -1;
+	/* sorted so every machine hashes the same bytes */
+	indices_in_order(units, pool, pool_count, sorted);
+	for (index = 0; index < pool_count; index++)
+	{
+		memcpy(material + at, units[sorted[index]].key_hash, P2P_KEY_HASH_SIZE);
+		at += P2P_KEY_HASH_SIZE;
+	}
+	for (index = 0; index < pool_count; index++)
+	{
+		unit = pool[index];
+		if (!units[unit].can_host || units[unit].failed)
+			continue;
+		memcpy(material + at, units[unit].key, P2P_KEY_SIZE);
+		p2p_sha256(material, at + P2P_KEY_SIZE, digest);
+		if (host < 0 || memcmp(digest, best, sizeof(best)) < 0)
+		{
+			host = unit;
+			memcpy(best, digest, sizeof(best));
+		}
+	}
+	return host;
+}

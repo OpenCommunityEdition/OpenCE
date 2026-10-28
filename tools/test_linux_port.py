@@ -436,6 +436,9 @@ def test_p2p_matchmaking(tmp_path):
     (("bytes[2] != MM_FORMAT)", "0)"), "records"),
     (("if (!record->held)\n\t\t{\n\t\t\tmemcpy(bytes + at, record->token",
       "if (1)\n\t\t{\n\t\t\tmemcpy(bytes + at, record->token"), "hosting"),
+    (("return memcmp(units[a].key_hash, units[b].key_hash, P2P_KEY_HASH_SIZE) < 0;", "return 1;"), "pool"),
+    (("memcpy(material + at, units[unit].key, P2P_KEY_SIZE);\n\t\tp2p_sha256(material, at + P2P_KEY_SIZE",
+      "memcpy(material, units[unit].key, P2P_KEY_SIZE);\n\t\tp2p_sha256(material, P2P_KEY_SIZE"), "election"),
 ])
 def test_p2p_matchmaking_negative_control(tmp_path, fault, case):
     output = matchmaking_check(tmp_path, fault)

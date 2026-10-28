@@ -22,6 +22,9 @@ enum
 	MM_FLAG_UNDER_WAY = 2,
 	MM_FLAG_HELD = 4,
 	MM_MAXIMUM_POOL = 8,
+	MM_MAXIMUM_UNITS = 256,
+	/* a searcher counts once heard on this many records */
+	MM_REFRESHES_COUNTED = 2,
 	MM_SEALED_TOKEN_SIZE = P2P_TOKEN_SIZE + P2P_SEAL_OVERHEAD,
 	MM_HEADER_SIZE = 2 + 1 + 2 + 1 + 4 + 1 + 1 + 1 + 1 + P2P_KEY_SIZE,
 	MM_MAXIMUM_RECORD_SIZE = MM_HEADER_SIZE + 3 + MM_MAXIMUM_POOL * (P2P_KEY_HASH_SIZE + MM_SEALED_TOKEN_SIZE) +
@@ -58,5 +61,17 @@ int mm_seal_token(const unsigned char *seed, const unsigned char *member_key, co
 	unsigned char *sealed);
 int mm_open_token(const unsigned char *seed, const unsigned char *host_key, const unsigned char *sealed,
 	unsigned char *token);
+
+struct mm_unit
+{
+	unsigned char key[P2P_KEY_SIZE];
+	unsigned char key_hash[P2P_KEY_HASH_SIZE];
+	int players;
+	int can_host;
+	int failed;
+};
+
+int mm_pool(const struct mm_unit *units, int count, int players, int *pool);
+int mm_elect(const struct mm_unit *units, const int *pool, int pool_count);
 
 #endif

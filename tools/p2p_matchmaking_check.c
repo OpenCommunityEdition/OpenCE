@@ -137,8 +137,97 @@ static void check_hosting(void)
 	CHECK(!contains(bytes, size, token, P2P_TOKEN_SIZE), "a held game's token is nowhere in clear");
 }
 
+static struct mm_unit unit(int machine, int can_host)
+{
+	struct mm_unit result;
+	unsigned char seed[P2P_SEED_SIZE], x25519[P2P_KEY_SIZE];
+
+	memset(&result, 0, sizeof(result));
+	seed_of(machine, seed);
+	p2p_ed25519_public(seed, result.key, NULL);
+	p2p_ed25519_to_x25519(result.key, x25519);
+	p2p_key_hash(x25519, result.key_hash);
+	result.players = 1;
+	result.can_host = can_host;
+	return result;
+}
+
+static int hash_rank(const struct mm_unit *units, int count, int index)
+{
+	int other, rank = 0;
+
+	for (other = 0; other < count; other++)
+		rank += memcmp(units[other].key_hash, units[index].key_hash, P2P_KEY_HASH_SIZE) < 0;
+	return rank;
+}
+
+static void check_pool(void)
+{
+	static struct mm_unit every[MM_MAXIMUM_UNITS + 1];
+	struct mm_unit units[8], shuffled[8];
+	int pool[8], again[8], count, index, host, host_again, last = 0;
+
+	case_name = "pool";
+	for (index = 0; index < 6; index++)
+		units[index] = unit(index, 1);
+	count = mm_pool(units, 6, 4, pool);
+	CHECK(count == 4, "E4: a pool of 4 from 6: %d", count);
+	for (index = 0; index < count; index++)
+		CHECK(hash_rank(units, 6, pool[index]) == index, "E4: the 4 lowest key hashes, in order: %d at %d",
+			pool[index], index);
+	for (index = 0; index < 6; index++)
+		shuffled[index] = units[5 - index];
+	CHECK(mm_pool(shuffled, 6, 4, again) == 4, "shuffled: a pool");
+	for (index = 0; index < 4; index++)
+		CHECK(!memcmp(units[pool[index]].key, shuffled[again[index]].key, P2P_KEY_SIZE), "shuffled: the same pool at %d", index);
+	host = mm_elect(units, pool, count);
+	host_again = mm_elect(shuffled, again, 4);
+	CHECK(host >= 0 && host_again >= 0 && !memcmp(units[host].key, shuffled[host_again].key, P2P_KEY_SIZE),
+		"E4: the same host on every machine");
+	CHECK(mm_pool(units, 3, 4, pool) == 0, "3 of 4: no pool");
+	for (index = 0; index < MM_MAXIMUM_UNITS; index++)
+		every[index].players = 2;
+	every[MM_MAXIMUM_UNITS].players = every[MM_MAXIMUM_UNITS].can_host = 1;
+	CHECK(mm_pool(every, MM_MAXIMUM_UNITS + 1, 1, pool) == 1 && pool[0] == MM_MAXIMUM_UNITS,
+		"this machine and a full peers table: every unit is walked");
+	/* four strict, then one that can host with the highest key hash: it can take only the last place */
+	for (index = 0; index < 5; index++)
+		units[index] = unit(index, 0);
+	for (index = 0; index < 5; index++)
+		if (hash_rank(units, 5, index) == 4)
+			last = index;
+	units[last].can_host = 1;
+	CHECK(mm_pool(units, 5, 4, pool) == 4 && pool[3] == last && mm_elect(units, pool, 4) == last,
+		"E38: the host takes the last place and hosts");
+	units[last].can_host = 0;
+	CHECK(mm_pool(units, 5, 4, pool) == 0, "E38: five strict routers form no pool");
+	units[last].can_host = 1;
+	units[last].failed = 1;
+	CHECK(mm_pool(units, 5, 4, pool) == 0, "E12: the only host failed: no pool until another arrives");
+}
+
+static void check_election(void)
+{
+	struct mm_unit units[4];
+	int pool[4] = { 0, 1, 2, 3 }, index, host, winners = 0;
+
+	case_name = "election";
+	for (index = 0; index < 3; index++)
+		units[index] = unit(index, 1);
+	for (index = 0; index < 40; index++)
+	{
+		units[3] = unit(100 + index, 1);
+		host = mm_elect(units, pool, 4);
+		if (host >= 0 && host < 3)
+			winners |= 1 << host;
+	}
+	CHECK((winners & (winners - 1)) != 0, "E14: one of the three always wins when it can: %d", winners);
+}
+
 int main(void)
 {
+	check_pool();
+	check_election();
 	check_records();
 	check_hosting();
 	check_playlists();
