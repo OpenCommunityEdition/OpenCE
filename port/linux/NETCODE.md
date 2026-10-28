@@ -284,6 +284,20 @@ remote) and the mods it plays, a line each ("folder version", in the load
 order); the host keeps it printable and logs it once, and a dedicated
 server shows it in `/api/players` (`client`). A host without the message
 drops it as a kind it does not know.
+Distributed message 93 (`network_damage.c`) needs no new version either,
+as a host that does not know it drops it: a client whose players' shots
+leave from elsewhere than their units' cameras (a VR build, whose weapon
+fires from the player's hand) sends the host where from, unreliably when it
+changes and every eighth tick: an offset from the camera of no more than 0.4
+world units (a player leaning out and an arm). The host keeps it a second,
+for that machine's own players only. When none of the shooter's eyes (nor a
+vehicle's gun) had a line to a reported hit's target, the host's line of
+sight check then also looks from the hand, with the line from the eye to it
+clear (a hand through a wall does not hit) and the hand where one firing at
+the target can be: no more than 0.05 world units behind the eye along the
+line to the target, 0.2 to its side and 0.1 above it (a client cannot claim
+a hand far past a corner). Such hits are counted in the host's log, and the
+host's `network.fire_origins` (true by default) turns the hand off.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
