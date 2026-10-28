@@ -11,6 +11,10 @@ Matchmaking's records, and machines searching through a stand-in broker.
 #include <stdlib.h>
 #include <string.h>
 
+#define TEXT_OF_(x) #x
+#define TEXT_OF(x) TEXT_OF_(x)
+#define HALO_PORT_NETWORK_VERSION_TEXT TEXT_OF(HALO_PORT_NETWORK_VERSION)
+
 pthread_mutex_t p2p_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static unsigned long clock_now = 1800000000UL;
@@ -94,6 +98,20 @@ static void check_playlists(void)
 	CHECK(!mm_playlist_has_size(1u << P2P_MM_CTF, P2P_MM_FFA_6), "CTF has no free-for-all");
 	CHECK(mm_playlist_has_size(1u << P2P_MM_CTF, P2P_MM_4V4) && mm_playlist_has_size(1u << P2P_MM_SLAYER, P2P_MM_FFA_6),
 		"every other pair is a queue");
+}
+
+static void check_topics(void)
+{
+	char topic[P2P_MM_TOPIC_SIZE];
+
+	case_name = "topics";
+	mm_topic(P2P_MM_SLAYER, P2P_MM_2V2, topic, sizeof(topic));
+	CHECK(!strcmp(topic, "hceu/3/mm/" HALO_PORT_NETWORK_VERSION_TEXT "/slayer/2v2"), "E16: %s", topic);
+	mm_topic(P2P_MM_RACE, P2P_MM_FFA_6, topic, sizeof(topic));
+	CHECK(!strcmp(topic, "hceu/3/mm/" HALO_PORT_NETWORK_VERSION_TEXT "/race/ffa6"), "%s", topic);
+	CHECK(mm_interval(1) == 30 && mm_interval(12) == 30, "up to 12 queues: 3 s");
+	CHECK(mm_interval(25) >= 62 && mm_interval(25) <= 63, "E44: 25 queues: about 6.3 s: %d", mm_interval(25));
+	CHECK(mm_interval(25) * MM_RECORDS_PER_SECOND >= 25 * 10, "E44: at most 4 a second");
 }
 
 static int contains(const unsigned char *bytes, int size, const unsigned char *part, int part_size)
@@ -231,6 +249,7 @@ int main(void)
 	check_records();
 	check_hosting();
 	check_playlists();
+	check_topics();
 	printf(failures ? "FAILED %d\n" : "PASS\n", failures);
 	return failures != 0;
 }

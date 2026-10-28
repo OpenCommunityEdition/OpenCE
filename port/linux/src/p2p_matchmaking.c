@@ -7,9 +7,36 @@ MATCHMAKING's signed records, queues and search.
 #include "p2p_matchmaking.h"
 #include "halo_port_limits.h"
 
+#include <stdio.h>
 #include <string.h>
 
 static const char record_label[] = "hceu-mm-1";
+
+static const char *const playlist_names[NUMBER_OF_P2P_MM_PLAYLISTS] = { "slayer", "ctf", "king", "oddball", "race" };
+static const char *const size_names[NUMBER_OF_P2P_MM_SIZES] = { "1v1", "2v2", "3v3", "4v4", "ffa6" };
+
+void mm_topic(int playlist, int size, char *topic, int topic_size)
+{
+	snprintf(topic, (size_t)topic_size, "hceu/3/mm/%d/%s/%s", HALO_PORT_NETWORK_VERSION, playlist_names[playlist],
+		size_names[size]);
+}
+
+int mm_topic_listed(const char *const *topics, int count, const char *topic)
+{
+	int index;
+
+	for (index = 0; index < count; index++)
+		if (topic[0] && !strcmp(topics[index], topic))
+			return 1;
+	return 0;
+}
+
+int mm_interval(int queues)
+{
+	if (queues <= 12)
+		return MM_INTERVAL;
+	return (queues * 10 + MM_RECORDS_PER_SECOND - 1) / MM_RECORDS_PER_SECOND;
+}
 
 static void put_long(unsigned char *bytes, unsigned long value)
 {
@@ -256,4 +283,10 @@ int mm_elect(const struct mm_unit *units, const int *pool, int pool_count)
 		}
 	}
 	return host;
+}
+
+void p2p_mm_heard(const unsigned char *payload, int size)
+{
+	(void)payload;
+	(void)size;
 }

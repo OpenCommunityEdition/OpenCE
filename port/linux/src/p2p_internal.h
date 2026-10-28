@@ -364,6 +364,16 @@ slot's retained copy, sent on subscribing */
 void p2p_lobby_slot_heard(const char *hash_text, const unsigned char *payload, int size, int retained);
 /* a query was heard */
 void p2p_lobby_query_heard(void);
+
+enum
+{
+	P2P_MM_MAXIMUM_TOPICS = NUMBER_OF_P2P_MM_PLAYLISTS * NUMBER_OF_P2P_MM_SMALL_SIZES,
+	P2P_MM_TOPIC_SIZE = 48,
+};
+/* replaces the topics subscribed before */
+void p2p_signal_mm_topics(const char topics[][P2P_MM_TOPIC_SIZE], int count);
+void p2p_signal_mm_publish(const char *topic, const unsigned char *payload, int size);
+void p2p_mm_heard(const unsigned char *payload, int size);
 /* a probe of a host (its identifier) ended: its ping in milliseconds, -1 if
 it was not reached; under p2p_lock */
 void p2p_lobby_probed(const unsigned char *identifier, int ping);

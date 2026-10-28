@@ -32,6 +32,7 @@ enum
 	/* tenths of a second */
 	MM_INTERVAL = 30,
 	MM_MINIMUM_INTERVAL = 10,
+	MM_RECORDS_PER_SECOND = 4,
 };
 
 struct mm_record
@@ -53,6 +54,12 @@ struct mm_record
 	unsigned char sealed[MM_MAXIMUM_POOL][MM_SEALED_TOKEN_SIZE];
 	unsigned char token[P2P_TOKEN_SIZE];
 };
+
+void mm_topic(int playlist, int size, char *topic, int topic_size);
+/* tenths of a second */
+int mm_interval(int queues);
+
+int mm_topic_listed(const char *const *topics, int count, const char *topic);
 
 int mm_record_write(const struct mm_record *record, const unsigned char *seed, unsigned char *bytes, int size);
 /* checks the signature: 1 only if whole and signed by its key */
