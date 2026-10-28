@@ -20,8 +20,8 @@ final class TouchLayout {
     static final int FIRE_LEFT = 17;
     static final int BASE_COUNT = 18;
     static final int MAX_CONTROLS = 64;
-    static final float MIN_SIZE = 0.5f;
-    static final float MAX_SIZE = 2f;
+    static final float MIN_SIZE = 0.35f;
+    static final float MAX_SIZE = 2.5f;
     static final float MIN_OPACITY = 0.2f;
     static final float MAX_OPACITY = 1f;
     static final float MIN_SENSITIVITY = 0.25f;
@@ -38,11 +38,29 @@ final class TouchLayout {
     private static final int VERSION = 3;
     private static final int MAX_FILE_LENGTH = 65536;
 
-    /** each kind's default place on the grid, and its radius */
-    private static final float[][] DEFAULTS = {
+    /**
+     * Mobile gameplay preset based on the 1600x720 layout approved by the user.
+     * Positions are normalized to the saved 960x540 grid; TouchLayout.bounds()
+     * adapts them to the actual Android display. The gamepad's classic HUD
+     * and the native weapon slots/radar are independent of this preset.
+     * Order: A, B, X, Y, RT, LT, LS, RS, White, Black, Start, Back,
+     * D-pad up/down/left/right, movement stick, left fire.
+     */
+    private static final float[][] CLASSIC_DEFAULTS = {
         {856, 447}, {913, 377}, {794, 377}, {850, 312}, {915, 239}, {802, 239},
         {236, 449}, {691, 449}, {360, 490}, {438, 490}, {570, 36}, {390, 36},
         {100, 237}, {100, 335}, {51, 286}, {149, 286}, {115, 440}, {255, 239}
+    };
+    private static final float[][] DEFAULTS = {
+        {887, 470}, {905, 359}, {300, 486}, {824, 304}, {787, 371}, {782, 225},
+        {792, 489}, {878, 243}, {599, 495}, {659, 494}, {570, 36}, {390, 36},
+        {100, 237}, {100, 335}, {51, 286}, {149, 286}, {127, 380}, {206, 227}
+    };
+    /** Relative icon/button sizes for the same preset; each can be edited. */
+    private static final float[] DEFAULT_SIZES = {
+        1.05f, 1.0f, 1.0f, 1.0f, 1.2f, 1.0f,
+        1.0f, 1.0f, 1.2f, 1.1f, 1.16f, 1.16f,
+        1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f
     };
     private static final float[] RADII = {
         36, 32, 34, 32, 39, 35, 32, 32, 27, 29, 28, 28, 25, 25, 25, 25, 64, 39
@@ -147,7 +165,7 @@ final class TouchLayout {
 
     void setSize(int control, float size) {
         if (!Float.isFinite(size) || size < MIN_SIZE || size > MAX_SIZE)
-            throw new IllegalArgumentException("Button size must be between 50% and 200%");
+            throw new IllegalArgumentException("Button size must be between 35% and 250%");
         controls.get(control).size = size;
         move(control, x(control), y(control));
     }
@@ -167,10 +185,22 @@ final class TouchLayout {
     }
 
     /** the default controls, at their default places, sizes and visibility */
+    void resetClassicDefaults() {
+        controls.clear();
+        for (int i = 0; i < CLASSIC_DEFAULTS.length; i++)
+            controls.add(new Control(i, CLASSIC_DEFAULTS[i][0] * width / GRID_WIDTH,
+                CLASSIC_DEFAULTS[i][1] * height / GRID_HEIGHT));
+        keepAllInside();
+    }
+
     void resetDefaults() {
         controls.clear();
-        for (int i = 0; i < DEFAULTS.length; i++)
-            controls.add(new Control(i, DEFAULTS[i][0] * width / GRID_WIDTH, DEFAULTS[i][1] * height / GRID_HEIGHT));
+        for (int i = 0; i < DEFAULTS.length; i++) {
+            Control control = new Control(i, DEFAULTS[i][0] * width / GRID_WIDTH,
+                DEFAULTS[i][1] * height / GRID_HEIGHT);
+            control.size = DEFAULT_SIZES[i];
+            controls.add(control);
+        }
         keepAllInside();
     }
 
@@ -207,9 +237,11 @@ final class TouchLayout {
     void move(int control, float x, float y) {
         if (!Float.isFinite(x) || !Float.isFinite(y))
             return;
-        float radius = radius(control);
-        controls.get(control).x = Math.max(radius, Math.min(width - radius, x));
-        controls.get(control).y = Math.max(radius, Math.min(height - radius, y));
+        // Permit partial edge overlap, but always leave enough of the button
+        // visible and touchable to drag it back into view.
+        float inset = Math.min(radius(control) * 0.5f, 24f);
+        controls.get(control).x = Math.max(inset, Math.min(width - inset, x));
+        controls.get(control).y = Math.max(inset, Math.min(height - inset, y));
     }
 
     /** puts a control at a saved place on the grid, if it is a valid one */

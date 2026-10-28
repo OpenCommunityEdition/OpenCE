@@ -65,3 +65,12 @@ host_touch_bindings
 host_https_get
 
 host_errno
+
+host_touch_weapon_slots
+host_touch_weapon_request
+host_touch_hud_active
+host_touch_weapon_drawer_expanded
+host_touch_weapon_display_order
+
+host_touch_layout_request
+host_touch_layout_take_choice

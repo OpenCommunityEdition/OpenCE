@@ -42,6 +42,8 @@ static int64_t gyro_ns;
 static int rumble_amplitude;
 static int64_t rumble_ns;
 static volatile int touch_scene;
+static volatile int touch_hud_active;
+static volatile int touch_weapon_drawer_expanded;
 /* the game control on each controller button (-1: none), and a count of
 its changes, which the overlay polls */
 #define TOUCH_BUTTONS 16
@@ -226,4 +228,161 @@ JNIEXPORT jint JNICALL Java_com_halo_decomp_TouchControls_nativeScene(JNIEnv *en
 	(void)env;
 	(void)cls;
 	return touch_scene;
+}
+
+/* Touch weapon-slot state is published by the guest game once per input read.
+ * Reading/switching requests only cross threads under touch_lock. */
+/* First 10 entries stay wire-compatible; [10..15] hold original extra icons. */
+static int32_t touch_weapon_slots[16] = {-1, -1, -1, -1, -1, -1, -1, -1,
+                                        -1, 0, -1, -1, -1, -1, -1, -1};
+static int32_t touch_weapon_request = -1;
+/* The visual layout can be reordered without modifying networked inventory. */
+static int32_t touch_weapon_display_order[4] = {0, 1, 2, 3};
+
+void host_touch_weapon_slots(const int *slots)
+{
+    pthread_mutex_lock(&touch_lock);
+    memcpy(touch_weapon_slots, slots, sizeof(touch_weapon_slots));
+    pthread_mutex_unlock(&touch_lock);
+}
+
+int host_touch_weapon_request(void)
+{
+    int slot;
+    pthread_mutex_lock(&touch_lock);
+    slot = touch_weapon_request;
+    touch_weapon_request = -1;
+    pthread_mutex_unlock(&touch_lock);
+    return slot;
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeWeaponSlots(
+    JNIEnv *env, jclass cls, jintArray state)
+{
+    int32_t slots[16];
+    (void)cls;
+    if (!state || (*env)->GetArrayLength(env, state) < 16) return;
+    pthread_mutex_lock(&touch_lock);
+    memcpy(slots, touch_weapon_slots, sizeof(slots));
+    pthread_mutex_unlock(&touch_lock);
+    (*env)->SetIntArrayRegion(env, state, 0, 16, (const jint *)slots);
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeSelectWeaponSlot(
+    JNIEnv *env, jclass cls, jint slot)
+{
+    (void)env; (void)cls;
+    if (slot < 0 || slot > 3) return;
+    pthread_mutex_lock(&touch_lock);
+    touch_weapon_request = slot;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+/* Only the Android on-screen gameplay UI owns the customized radar and
+ * native weapon sprites. Controller devices restore the original Halo HUD. */
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeTouchHudActive(
+    JNIEnv *env, jclass cls, jboolean active)
+{
+    (void)env; (void)cls;
+    touch_hud_active = active ? 1 : 0;
+}
+
+int host_touch_hud_active(void)
+{
+    return touch_hud_active;
+}
+
+/* Native Halo HUD sprites follow the Android arrow state. The original HUD
+ * remains unchanged when the classic layout or a controller is in use. */
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeWeaponDrawerExpanded(
+    JNIEnv *env, jclass cls, jboolean expanded)
+{
+    (void)env; (void)cls;
+    touch_weapon_drawer_expanded = expanded ? 1 : 0;
+}
+
+int host_touch_weapon_drawer_expanded(void)
+{
+    return touch_hud_active && touch_weapon_drawer_expanded;
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeWeaponDisplayOrder(
+    JNIEnv *env, jclass cls, jintArray order)
+{
+    jint local[4];
+    int seen = 0, i;
+    (void)cls;
+    if (!order || (*env)->GetArrayLength(env, order) != 4) return;
+    (*env)->GetIntArrayRegion(env, order, 0, 4, local);
+    for (i = 0; i < 4; i++) {
+        if (local[i] < 0 || local[i] > 3 || (seen & (1 << local[i]))) return;
+        seen |= 1 << local[i];
+    }
+    pthread_mutex_lock(&touch_lock);
+    memcpy(touch_weapon_display_order, local, sizeof(local));
+    pthread_mutex_unlock(&touch_lock);
+}
+
+void host_touch_weapon_display_order(int order[4])
+{
+    pthread_mutex_lock(&touch_lock);
+    memcpy(order, touch_weapon_display_order, sizeof(touch_weapon_display_order));
+    pthread_mutex_unlock(&touch_lock);
+}
+
+/* A campaign launch waits asynchronously in the menu until Java accepts a
+ * layout. Both threads keep running; no render/input lock waits on a dialog. */
+static int layout_available;
+static int layout_request; /* 0: idle, 1: waiting for choice, 2: accepted */
+
+int host_touch_layout_request(void)
+{
+    int available;
+    pthread_mutex_lock(&touch_lock);
+    available = layout_available;
+    if (available && !layout_request) layout_request = 1;
+    pthread_mutex_unlock(&touch_lock);
+    return available;
+}
+
+int host_touch_layout_take_choice(void)
+{
+    int chosen;
+    pthread_mutex_lock(&touch_lock);
+    chosen = layout_request == 2;
+    if (chosen) layout_request = 0;
+    pthread_mutex_unlock(&touch_lock);
+    return chosen;
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeLayoutAvailable(
+    JNIEnv *env, jclass cls, jboolean available)
+{
+    (void)env;
+    (void)cls;
+    pthread_mutex_lock(&touch_lock);
+    layout_available = available;
+    pthread_mutex_unlock(&touch_lock);
+}
+
+JNIEXPORT jboolean JNICALL Java_com_halo_decomp_TouchControls_nativeLayoutRequested(
+    JNIEnv *env, jclass cls)
+{
+    int requested;
+    (void)env;
+    (void)cls;
+    pthread_mutex_lock(&touch_lock);
+    requested = layout_request == 1;
+    pthread_mutex_unlock(&touch_lock);
+    return requested;
+}
+
+JNIEXPORT void JNICALL Java_com_halo_decomp_TouchControls_nativeLayoutChosen(
+    JNIEnv *env, jclass cls)
+{
+    (void)env;
+    (void)cls;
+    pthread_mutex_lock(&touch_lock);
+    if (layout_request == 1) layout_request = 2;
+    pthread_mutex_unlock(&touch_lock);
 }

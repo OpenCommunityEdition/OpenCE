@@ -25,6 +25,10 @@ void host_touch_read(int *state);
 void host_touch_look_read(float *delta);
 void host_touch_rumble(unsigned int low, unsigned int high);
 void host_touch_scene(int scene);
+#ifdef HALO_ANDROID
+void host_touch_weapon_slots(const int *slots);
+int host_touch_weapon_request(void);
+#endif
 void host_touch_bindings(const int *controls);
 #endif
 
@@ -32,7 +36,21 @@ void host_touch_bindings(const int *controls);
 int touch_game_cinematic_skippable(void);
 int touch_game_cinematic_playing(void);
 int touch_game_playing(void);
+#ifdef HALO_ANDROID
+int touch_game_vehicle_enter_available(void);
+int touch_game_vehicle_hud_state(void);
+int touch_game_vehicle_occupied(void);
+int touch_game_ground_item_prompt(void); /* VEHICLE_WEAPON_PICKUP_PRIORITY_V11 */
+int touch_game_vehicle_flip_available(void); /* VEHICLE_FLIP_RELOAD_PROMPT_V18 */
+int touch_game_vehicle_is_ghost(void); /* VEHICLE_GHOST_SECONDARY_V12 */
+#endif
+#ifdef HALO_ANDROID
+void menu_functions_touch_layout_update(void);
+#endif
 void touch_game_button_controls(int *controls);
+#ifdef HALO_ANDROID
+void touch_game_weapon_slots(int slots[16], int requested);
+#endif
 
 /* the gamepad's buttons (input.h), which the touch controls are named by */
 #define TOUCH_BUTTONS 16
@@ -285,6 +303,9 @@ void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
 	int state[7];
 	int index;
 
+#ifdef HALO_ANDROID
+	menu_functions_touch_layout_update();
+#endif
 	/* (the controls show only in a game: not while it starts, at the main
 	menu, in a menu or during a cinematic; nor while the text chat's
 	on-screen keyboard is up, whose keys the fingers then tap) */
@@ -299,6 +320,37 @@ void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
 		bindings_known = TRUE;
 		host_touch_bindings(bindings);
 	}
+#ifdef HALO_ANDROID
+    {
+        int slots[16];
+        touch_game_weapon_slots(slots, host_touch_weapon_request());
+        /* Bit 3 of slot 9: context-sensitive vehicle enter/evict prompt.
+         * Existing weapon occupancy flags live in bits 0..2. */
+        /* VEHICLE_PICKUP_GUARD_V10: only valid, occupied vehicle seats may
+         * contribute vehicle-role bits. Outside the vehicle, only a real
+         * enter/evict vehicle target can show the wheel. */
+        /* VEHICLE_WEAPON_PICKUP_PRIORITY_V11: a real pickup message beats
+         * any stale vehicle state. Bit 9 is a one-frame ground-item guard;
+         * lower three inventory/drawer bits remain unchanged. */
+        if (touch_game_ground_item_prompt()) {
+            slots[9] = (slots[9] & 7) | 512;
+        } else if (touch_game_vehicle_occupied()) {
+            int role = touch_game_vehicle_hud_state() & 15;
+            /* Unknown/unresolved seats must NOT hide infantry controls. */
+            if ((role & 3) != 0) {
+                slots[9] |= 256 | (role << 4);
+                /* bit 10: seated in a stock Ghost; suppress LT artwork AND input. */
+                if (touch_game_vehicle_is_ghost()) slots[9] |= 1024;
+            }
+        } else if (touch_game_vehicle_enter_available()) {
+            slots[9] |= 8;
+        } else if (touch_game_vehicle_flip_available()) {
+            /* VEHICLE_FLIP_RELOAD_PROMPT_V18: bit 11, never entry or pickup. */
+            slots[9] |= 2048;
+        }
+        host_touch_weapon_slots(slots);
+    }
+#endif
 	host_touch_read(state);
 	/* the stick moves the player through the game's input state, whatever
 	the profile's sticks do (touch_input_move), not as the left stick */
