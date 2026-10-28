@@ -1,6 +1,6 @@
 # Controller button remapping
 
-Gamepad Setup > **Button Remapping** edits separate P1–P4 layouts. These belong
+Gamepad Setup > **Button Remapping** edits separate P1â€“P4 layouts. These belong
 to input slots on this installation, not device serial numbers or player profiles.
 Empty settings keep the profile preset and stock shortcuts.
 
@@ -40,6 +40,10 @@ player. While controlling the player with a debug camera available, only the deb
 switch takes priority over gameplay. While controlling the camera, the whole debug
 layout takes priority. Defaults match stock camera controls: D-pad Up/Down,
 Right Stick, RT and LT. All can be changed or cleared.
+Keyboard R/F still raise and lower the camera with a custom layout. Holding the
+middle mouse button gives the mouse camera controls priority, with the wheel
+adjusting speed. Camera movement uses the player's movement and look settings.
+Menus and chat continue to block custom camera input in either mode.
 
 Gameplay prompts use the physical binding, or **UNBOUND** for a cleared action.
 Xbox and CE retain their existing glyph renderers, sizes and anchoring.
@@ -108,6 +112,8 @@ Clearing a layout never changes another player's bindings or a saved player prof
 parsing, migration, replacement, cleared saves, all stock presets, per-player input,
 pressure, capture, disconnects, focus and context changes, semantic commands,
 prompt identity and pending menu state. Chat ownership and hold-over checks use
-the real production functions. Tests distinguish those contracts from physical
+the real production functions. [Camera routing tests](../../tools/harness/tests/test_controller_remap_camera.py)
+check stock and remapped camera input alongside keyboard and mouse controls,
+including mouse priority and menu/chat blocking. Tests distinguish those contracts from physical
 driver behaviour. Runtime screenshots, Xbox/CE gameplay checks and real-controller playtesting
 remain separate validation steps for rendering and device-specific behaviour.
