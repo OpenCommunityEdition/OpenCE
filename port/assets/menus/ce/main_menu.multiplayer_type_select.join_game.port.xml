@@ -52,6 +52,53 @@
 		<string text="That is not the game's password. Try again."/>
 		<string text="Could not join the game."/>
 	</strings>
+	<strings name="main_menu/multiplayer_type_select/join_game/browser_words">
+		<string text="of"/>
+		<string text="players"/>
+		<string text="player"/>
+		<string text="under way"/>
+		<string text="full or starting"/>
+		<string text="Dedicated server by"/>
+		<string text="listed on"/>
+		<string text="master server"/>
+		<string text="master servers"/>
+		<string text="Dedicated server"/>
+		<string text="Hosted by a player (anonymous listing)"/>
+		<string text="Password required"/>
+		<string text="Needs the newer build: Settings &gt; Network Setup &gt; Check for updates"/>
+		<string text="Runs an older build: it can be joined once it updates"/>
+		<string text="Asking the brokers for the host..."/>
+		<string text="The host answered: connecting (UDP hole punching)..."/>
+		<string text="Connected: joining the game..."/>
+		<string text="The host did not answer (offline, or its listing is stale)"/>
+		<string text="No route to the host: a forwarded port on either side helps"/>
+		<string text="The host refused: full"/>
+		<string text="The host refused: closed"/>
+		<string text="The host refused: banned"/>
+		<string text="The host refused: wrong password"/>
+		<string text="The host refused: another version"/>
+		<string text="The host refused: its invite changed"/>
+		<string text="Strict NAT: turn on UPnP, or forward a port"/>
+		<string text="Internet play is off (Settings)"/>
+		<string text="The server browser is off (network.public_lobby)"/>
+		<string text="Looking for public games..."/>
+		<string text="Games on a newer version (update the game to join them):"/>
+		<string text="No public games found"/>
+		<string text="No games match the filters"/>
+		<string text="No master server answered: showing player-hosted games only"/>
+		<string text="dedicated"/>
+		<string text="JOINING"/>
+		<string text="NEWER"/>
+		<string text="OLDER"/>
+		<string text="FAILED"/>
+		<string text="LIVE"/>
+		<string text="CLOSED"/>
+		<string text="Internet play is off:\nSettings &gt; Network Setup"/>
+		<string text="Neither the master servers\nnor the brokers answer:\ncheck the connection"/>
+		<string text="The host refused: your player name"/>
+	</strings>
+	<widget name="main_menu/multiplayer_type_select/join_game/error_words" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="35" text_flags="no_focus_test">
+	</widget>
 	<widget name="main_menu/multiplayer_type_select/join_game/header_server_browser" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/join_game/header_server_browser">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/join_game/header_direct_link" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/join_game/header_direct_link">

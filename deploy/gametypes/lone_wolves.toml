@@ -1,0 +1,23 @@
+# Free for all slayer to 25 kills, starting with a pistol and an assault rifle.
+base = "slayer"
+name = "Lone Wolves"
+
+[universal]
+teams = false
+score_to_win = 25
+respawn_time = 3
+health = 100
+radar = false
+
+[options]
+time_limit = 15
+radar_players = "none"
+loadout = "custom"
+primary_weapon = "pistol"
+secondary_weapon = "assault_rifle"
+team_vehicles = "pc"
+
+[slayer]
+no_death_bonus = false
+no_kill_penalty = false
+kill_in_order = false

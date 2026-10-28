@@ -1,0 +1,40 @@
+# The tunnel port, UDP: the one port players need.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opence-server.fullname" . }}
+  labels:
+    {{- include "opence-server.labels" . | nindent 4 }}
+    {{- with .Values.service.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  {{- if ne .Values.service.type "ClusterIP" }}
+  {{- with .Values.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  {{- end }}
+  {{- if eq .Values.service.type "LoadBalancer" }}
+  {{- with .Values.service.loadBalancerClass }}
+  loadBalancerClass: {{ . }}
+  {{- end }}
+  {{- with .Values.service.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  selector:
+    {{- include "opence-server.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: tunnel
+      port: {{ .Values.service.port }}
+      targetPort: tunnel
+      protocol: UDP
+      {{- if and (ne .Values.service.type "ClusterIP") .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}

@@ -24,6 +24,11 @@ Automated system link sessions for testing the netcode without the menus
   and then as "join". It logs what it lists.
 - "log" hosts and joins nothing: the game that runs (map_name, in init.txt,
   plays one without the menus) is logged, as below.
+- "probe" (halo --probe [<invite>]: a list site's look at a server) searches
+  as "join" does, joins nothing, and prints the first game it finds (with
+  an invite, only its host's, over its tunnel; without, one on the LAN) on
+  the standard output as one line of JSON, then exits (1, with ok false, if
+  none is found in PROBE_SECONDS).
 
 Once the game runs, every second each machine logs where every player's
 unit is, so the machines' views of the game can be compared, and the host
@@ -104,6 +109,17 @@ void network_damage_statistics(long *sent_reports, long *dealt_reports, long *re
 /* xinput_sdl.c's */
 void test_input_hold_action(int hold);
 void test_input_press(unsigned long buttons);
+/* menu_functions.c's: whether the client's advertised game at the index is
+an internet play peer's (over the tunnel), not the LAN's */
+boolean menu_advertised_game_from_peer(long index);
+
+enum
+{
+	/* how long a probe looks for a game (halo --probe), and the client's
+	advertised games (network_client_manager.c's) */
+	PROBE_SECONDS = 30,
+	PROBE_MAXIMUM_GAMES = 9,
+};
 
 enum
 {
@@ -112,6 +128,7 @@ enum
 	_network_test_join,
 	_network_test_browse,
 	_network_test_log,
+	_network_test_probe,
 };
 
 static struct
@@ -130,6 +147,11 @@ static struct
 	real start_delay;
 	real menu_seconds;
 	boolean set_up;
+	/* (the hosted game's whole invite logged, for the test that joins it:
+	the game's own lines give its first digits only, since players post
+	their logs. This is debug.network_test's host alone, a test's machine,
+	whose log nobody posts) */
+	boolean invite_logged;
 	real setup_seconds;
 	boolean started;
 	boolean joined;
@@ -151,6 +173,7 @@ static struct
 	boolean browsing;
 	boolean browse_listed;
 	float browse_seconds;
+	float probe_seconds;
 	/* debug.network_test_cues: each line and its tick from the cues' start,
 	the first tick every player of cue_players has a unit (NONE until then) */
 	struct
@@ -221,6 +244,10 @@ static void network_test_read_settings(
 	else if (!strcmp(setting, "log"))
 	{
 		network_test.mode = _network_test_log;
+	}
+	else if (!strcmp(setting, "probe"))
+	{
+		network_test.mode = _network_test_probe;
 	}
 	network_test.public_game = config_boolean("debug.network_test_public") != 0;
 	network_test.start_delay = (real)config_real("debug.network_test_start");
@@ -391,9 +418,16 @@ static void network_test_log_players(
 	}
 	{
 		long sent, received, corrections;
-
 		struct object_iterator objects;
 		long ground_items = 0;
+		long creates, deletes, failures, removed;
+		long sent_reports, dealt_reports, rejected_reports, replayed_events;
+		/* this machine's player and where its camera is (a player that never
+		spawns leaves it where it began) */
+		long local_player_index = local_player_get_player_index(0);
+		struct observer_result const *camera = observer_get_camera(0);
+		long divergence_samples, divergence_apart;
+		real divergence_mean, divergence_largest;
 
 		object_iterator_new(&objects, _object_mask_weapon | _object_mask_equipment, 0);
 		while (object_iterator_next(&objects))
@@ -408,19 +442,8 @@ static void network_test_log_players(
 			}
 		}
 		network_distributed_statistics(&sent, &received, &corrections);
-		long creates, deletes, failures, removed;
-
-		long sent_reports, dealt_reports, rejected_reports, replayed_events;
-
 		network_distributed_item_statistics(&creates, &deletes, &failures, &removed);
 		network_damage_statistics(&sent_reports, &dealt_reports, &rejected_reports, &replayed_events);
-		/* this machine's player and where its camera is (a player that never
-		spawns leaves it where it began) */
-		long local_player_index = local_player_get_player_index(0);
-		struct observer_result const *camera = observer_get_camera(0);
-		long divergence_samples, divergence_apart;
-		real divergence_mean, divergence_largest;
-
 		network_distributed_divergence(&divergence_samples, &divergence_apart, &divergence_mean, &divergence_largest);
 
 		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s to %ld | sent %ld received %ld corrected %ld"
@@ -1051,6 +1074,73 @@ static void network_test_pickup(
 	}
 }
 
+/* (a probe: halo --probe) the first game found, printed as JSON on the
+standard output, and the end; when given_up, that none was. With an
+invite (p2p.c joins the command line's), the invite's host's game alone:
+the tunnel's peers are its host only, and a game on the LAN is another */
+static void network_test_probe_answer(
+	boolean given_up)
+{
+	static char const *const engines[] = { "none", "ctf", "slayer", "oddball", "king", "race" };
+	struct network_advertised_game_summary game;
+	long index;
+	int stage;
+	boolean invited = p2p_join_progress(&stage, NULL, 0) != P2P_JOIN_NONE;
+
+	for (index = 0; index < PROBE_MAXIMUM_GAMES; index++)
+	{
+		char name[2 * NUMBEROF(game.name) + 1];
+		char map[2 * sizeof(game.map_name) + 1];
+		char const *last;
+		long character, length = 0;
+
+		if (!network_game_client_port_advertised_game_summary(index, &game) ||
+			(invited && !menu_advertised_game_from_peer(index)))
+		{
+			continue;
+		}
+		/* (printable ASCII, quotes and backslashes escaped) */
+		for (character = 0; character < (long)NUMBEROF(game.name) && game.name[character]; character++)
+		{
+			char ascii = game.name[character] >= 0x20 && game.name[character] < 0x7F ? (char)game.name[character] : '?';
+
+			if (ascii == '"' || ascii == '\\')
+				name[length++] = '\\';
+			name[length++] = ascii;
+		}
+		name[length] = 0;
+		/* (the map's name, the last part of its path) */
+		last = strrchr(game.map_name, '\\');
+		last = last ? last + 1 : game.map_name;
+		for (length = 0, character = 0; last[character]; character++)
+		{
+			char ascii = (unsigned char)last[character] >= 0x20 && (unsigned char)last[character] < 0x7F ?
+				last[character] : '?';
+
+			if (ascii == '"' || ascii == '\\')
+				map[length++] = '\\';
+			map[length++] = ascii;
+		}
+		map[length] = 0;
+		printf("{\"ok\":true,\"name\":\"%s\",\"map\":\"%s\",\"gametype\":\"%s\",\"players\":%d,"
+			"\"max_players\":%d,\"teams\":%s,\"in_progress\":%s,\"open\":%s,\"dedicated\":%s,"
+			"\"network_version\":%u,\"kind\":%u}\n", name, map,
+			game.engine_type >= 0 && game.engine_type < (short)NUMBEROF(engines) ? engines[game.engine_type] : "none",
+			game.player_count, game.maximum_player_count, game.has_teams ? "true" : "false",
+			game.in_progress ? "true" : "false", game.open ? "true" : "false", game.dedicated ? "true" : "false",
+			(unsigned)game.version, (unsigned)game.kind);
+		fflush(stdout);
+		exit(0);
+	}
+	if (given_up)
+	{
+		printf("{\"ok\":false,\"error\":\"no game answered in %d seconds%s\"}\n", PROBE_SECONDS,
+			invited ? " from the invite's host" : "");
+		fflush(stdout);
+		exit(1);
+	}
+}
+
 void network_test_update(
 	boolean main_menu_loaded,
 	real seconds)
@@ -1466,6 +1556,16 @@ void network_test_update(
 		break;
 	}
 	case _network_test_host:
+		if (network_test.set_up && !network_test.local && !network_test.invite_logged)
+		{
+			char invite[256];
+
+			if (p2p_invite_link(invite, sizeof(invite)))
+			{
+				network_test.invite_logged = TRUE;
+				platform_log("network test: invite %s", invite);
+			}
+		}
 		if (!network_test.set_up)
 		{
 			network_test.set_up = TRUE;
@@ -1557,6 +1657,21 @@ void network_test_update(
 				network_game_client_request_immediate_start();
 				platform_log("network test: starting the game");
 			}
+		}
+		break;
+	case _network_test_probe:
+		if (!network_test.set_up)
+		{
+			network_test.set_up = TRUE;
+			dispose_global_network_game_client();
+			dispose_global_network_game_server();
+			if (create_global_network_game_client())
+				game_connection_set(_game_connection_network_client);
+		}
+		else
+		{
+			network_test.probe_seconds += seconds;
+			network_test_probe_answer(network_test.probe_seconds >= PROBE_SECONDS);
 		}
 		break;
 	case _network_test_join:

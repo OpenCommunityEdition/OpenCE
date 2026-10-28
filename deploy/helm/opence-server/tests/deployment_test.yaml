@@ -1,0 +1,221 @@
+suite: deployment
+templates:
+  - templates/deployment.yaml
+set:
+  gameData.existingClaim: halo-maps
+tests:
+  - it: refuses to render without game data, which is never in the image
+    set:
+      gameData.existingClaim: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: "gameData: set existingClaim"
+
+  - it: mounts an existing claim read-only at /data
+    asserts:
+      - equal:
+          path: 'spec.template.spec.volumes[0]'
+          value: { name: game-data, persistentVolumeClaim: { claimName: halo-maps, readOnly: true } }
+      - contains:
+          path: 'spec.template.spec.containers[0].volumeMounts'
+          content: { name: game-data, mountPath: /data, readOnly: true }
+
+  - it: mounts an NFS export read-only, with a subPath
+    set:
+      gameData: { existingClaim: "", nfs: { server: nfs.example.com, path: /halo }, subPath: xbox }
+    asserts:
+      - equal:
+          path: 'spec.template.spec.volumes[0]'
+          value: { name: game-data, nfs: { server: nfs.example.com, path: /halo, readOnly: true } }
+      - contains:
+          path: 'spec.template.spec.containers[0].volumeMounts'
+          content: { name: game-data, mountPath: /data, readOnly: true, subPath: xbox }
+
+  - it: takes any other volume source
+    set:
+      gameData: { existingClaim: "", volume: { emptyDir: {} } }
+    asserts:
+      - equal:
+          path: 'spec.template.spec.volumes[0]'
+          value: { name: game-data, emptyDir: {} }
+
+  - it: runs one replica, replaced not rolled, hardened
+    asserts:
+      - equal: { path: spec.replicas, value: 1 }
+      - equal: { path: spec.strategy.type, value: Recreate }
+      - equal: { path: spec.template.spec.automountServiceAccountToken, value: false }
+      - equal: { path: spec.template.spec.securityContext.runAsNonRoot, value: true }
+      - equal: { path: spec.template.spec.securityContext.runAsUser, value: 10001 }
+      - equal: { path: spec.template.spec.securityContext.seccompProfile.type, value: RuntimeDefault }
+      - equal: { path: 'spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem', value: true }
+      - equal: { path: 'spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation', value: false }
+      - equal: { path: 'spec.template.spec.containers[0].securityContext.capabilities.drop', value: [ALL] }
+      - equal: { path: spec.template.spec.nodeSelector, value: { kubernetes.io/os: linux, kubernetes.io/arch: amd64 } }
+      - equal: { path: spec.template.spec.terminationGracePeriodSeconds, value: 15 }
+      - exists: { path: 'spec.template.spec.containers[0].resources.limits.memory' }
+
+  - it: sets the server's paths and mode
+    asserts:
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER, value: "1" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_CONFIG_FILE, value: /state/config.toml } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_DATA_ROOT, value: /data } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SAVE_ROOT, value: /state/saves } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_LOG_ROOT, value: /state/logs } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_CONSOLE, value: "false" } }
+
+  - it: maps the values to the HALO_ variables
+    set:
+      server:
+        name: Test server
+        rotation: [bloodgulch:ctf, "sidewinder:team_slayer+score=50"]
+        maxPlayers: 24
+        public: false
+        lobbySeconds: 30
+        motd: Hello
+        logFormat: json
+        instance: eu-1
+        region: eu
+        masterPublish: false
+      network: { tunnelPort: 2303, publicAddress: "halo.example.com:2303" }
+    asserts:
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_NAME, value: Test server } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_ROTATION, value: "bloodgulch:ctf, sidewinder:team_slayer+score=50" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_MAX_PLAYERS, value: "24" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_PUBLIC, value: "false" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_LOBBY_SECONDS, value: "30" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_MOTD, value: Hello } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_LOG_FORMAT, value: json } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_INSTANCE, value: eu-1 } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_REGION, value: eu } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_MASTER_PUBLISH, value: "false" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_NET_TUNNEL_PORT, value: "2303" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_NET_PUBLIC_ADDRESS, value: "halo.example.com:2303" } }
+      - equal: { path: 'spec.template.spec.containers[0].ports[0]', value: { name: tunnel, containerPort: 2303, protocol: UDP } }
+
+  - it: leaves empty values to config.toml
+    asserts:
+      - notContains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_NAME, value: "" } }
+      - notContains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_MOTD, value: "" } }
+      - notContains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_NET_PUBLIC_ADDRESS, value: "" } }
+
+  - it: leaves the settings the values do not give to config.toml, sv_set and the web page
+    asserts:
+      - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_ROTATION")]' }
+      - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_MAX_PLAYERS")]' }
+      - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_PUBLIC")]' }
+      - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_LOBBY_SECONDS")]' }
+      - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_LOG_FORMAT")]' }
+      - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_MASTER_PUBLISH")]' }
+
+  - it: sets a false or zero value that is given
+    set:
+      server: { public: false, masterPublish: false, lobbySeconds: 0 }
+    asserts:
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_PUBLIC, value: "false" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_MASTER_PUBLISH, value: "false" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_LOBBY_SECONDS, value: "0" } }
+
+  - it: refuses a name longer than the game's 15 characters (the values' schema, or the template)
+    set:
+      server.name: "A name too long!"
+    asserts:
+      - failedTemplate:
+          errorPattern: "server.name|/server/name|15 characters"
+
+  - it: takes the web password from the chart's Secret, bound beyond loopback for the probes
+    release: { name: opence-server }
+    asserts:
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_WEB_PORT, value: "8080" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_WEB_BIND, value: 0.0.0.0 } }
+      - contains:
+          path: 'spec.template.spec.containers[0].env'
+          content: { name: HALO_SERVER_WEB_PASSWORD, valueFrom: { secretKeyRef: { name: opence-server-secrets, key: web-password } } }
+      - contains: { path: 'spec.template.spec.containers[0].ports', content: { name: web, containerPort: 8080, protocol: TCP } }
+
+  - it: takes the passwords and the publisher key from existing Secrets
+    set:
+      web: { existingSecret: halo-web, key: admin, moderatorKey: moderator }
+      server.password: { existingSecret: halo-join, key: password }
+      publisherKey: { existingSecret: halo-publisher, key: seed }
+    asserts:
+      - contains:
+          path: 'spec.template.spec.containers[0].env'
+          content: { name: HALO_SERVER_WEB_PASSWORD, valueFrom: { secretKeyRef: { name: halo-web, key: admin } } }
+      - contains:
+          path: 'spec.template.spec.containers[0].env'
+          content: { name: HALO_SERVER_WEB_MODERATOR_PASSWORD, valueFrom: { secretKeyRef: { name: halo-web, key: moderator, optional: true } } }
+      - contains:
+          path: 'spec.template.spec.containers[0].env'
+          content: { name: HALO_SERVER_PASSWORD, valueFrom: { secretKeyRef: { name: halo-join, key: password } } }
+      - contains:
+          path: 'spec.template.spec.containers[0].env'
+          content: { name: HALO_SERVER_PUBLISHER_KEY, valueFrom: { secretKeyRef: { name: halo-publisher, key: seed } } }
+
+  - it: probes GET /healthz on the web port
+    asserts:
+      - equal: { path: 'spec.template.spec.containers[0].startupProbe.httpGet', value: { path: /healthz, port: web } }
+      - equal: { path: 'spec.template.spec.containers[0].readinessProbe.httpGet', value: { path: /healthz, port: web } }
+      - equal: { path: 'spec.template.spec.containers[0].livenessProbe.httpGet', value: { path: /healthz, port: web } }
+      - equal: { path: 'spec.template.spec.containers[0].startupProbe.failureThreshold', value: 60 }
+
+  - it: drops a probe that is turned off
+    set:
+      probes.liveness.enabled: false
+    asserts:
+      - notExists: { path: 'spec.template.spec.containers[0].livenessProbe' }
+      - exists: { path: 'spec.template.spec.containers[0].readinessProbe' }
+
+  - it: has no web port, password or probes with web.port 0
+    set:
+      web.port: 0
+    asserts:
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_WEB_PORT, value: "0" } }
+      - notContains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_WEB_BIND, value: 0.0.0.0 } }
+      - lengthEqual: { path: 'spec.template.spec.containers[0].ports', count: 1 }
+      - notExists: { path: 'spec.template.spec.containers[0].startupProbe' }
+      - notExists: { path: 'spec.template.spec.containers[0].livenessProbe' }
+
+  - it: puts extraEnv after the chart's variables, so it can override them
+    set:
+      extraEnv: [{ name: HALO_SERVER_LOBBY_SECONDS, value: "5" }]
+    asserts:
+      - equal:
+          path: 'spec.template.spec.containers[0].env[-1:]'
+          value: { name: HALO_SERVER_LOBBY_SECONDS, value: "5" }
+
+  - it: keeps the state in an emptyDir without persistence
+    asserts:
+      - contains: { path: spec.template.spec.volumes, content: { name: state, emptyDir: { sizeLimit: 1Gi } } }
+      - lengthEqual: { path: spec.template.spec.volumes, count: 3 }
+
+  - it: uses the claim with persistence
+    release: { name: opence-server }
+    set:
+      persistence.enabled: true
+    asserts:
+      - contains: { path: spec.template.spec.volumes, content: { name: state, persistentVolumeClaim: { claimName: opence-server-state } } }
+
+  - it: mounts a custom_maps claim read-only, with its variable
+    set:
+      customMaps: { existingClaim: halo-custom-maps, subPath: ce }
+    asserts:
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_CUSTOM_MAPS_ROOT, value: /custom_maps } }
+      - contains:
+          path: spec.template.spec.volumes
+          content: { name: custom-maps, persistentVolumeClaim: { claimName: halo-custom-maps, readOnly: true } }
+      - contains:
+          path: 'spec.template.spec.containers[0].volumeMounts'
+          content: { name: custom-maps, mountPath: /custom_maps, readOnly: true, subPath: ce }
+
+  - it: takes a tag with a digest, and lets digest replace it
+    set:
+      image.tag: build-206@sha256:1111111111111111111111111111111111111111111111111111111111111111
+      image.digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
+    asserts:
+      - equal:
+          path: 'spec.template.spec.containers[0].image'
+          value: ghcr.io/opencommunityedition/opence-server:build-206@sha256:2222222222222222222222222222222222222222222222222222222222222222
+
+  - it: uses the appVersion as the default tag
+    asserts:
+      - equal: { path: 'spec.template.spec.containers[0].image', value: "ghcr.io/opencommunityedition/opence-server:latest" }

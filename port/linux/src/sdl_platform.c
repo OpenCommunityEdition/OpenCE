@@ -15,6 +15,8 @@ and the debug keyboard that the game's console reads.
 #include "port_config.h"
 #include "p2p.h"
 #include "port_mods.h"
+#include "server_mode.h"
+#include "server_master.h"
 #include "xiso.h"
 #include "touch_input.h"
 #include "../game/text_filter.h"
@@ -209,6 +211,8 @@ static void platform_choose_video_driver(void)
 
 BOOL platform_sdl_initialize(void)
 {
+	SDL_InitFlags flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS;
+
 	if (platform_sdl_started)
 		return TRUE;
 #if !defined(_WIN32) && !defined(HALO_ANDROID)
@@ -249,21 +253,51 @@ BOOL platform_sdl_initialize(void)
 			SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS4, "0");
 	}
 #endif
-	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS))
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	/* a dedicated server (server_mode.c) runs where there is no display,
+	sound or controller (a service, a container): SDL's drivers that need
+	none, and its events alone */
+	if (halo_server_mode())
 	{
-		platform_log("SDL_Init failed: %s", SDL_GetError());
+		SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+		SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
+		flags = SDL_INIT_EVENTS;
+	}
+#endif
+	if (!SDL_Init(flags))
+	{
+		/* (tried again by each caller that needs SDL, some of them every
+		frame: a failure is logged once, and again only when its reason
+		changes, not tens of thousands of times without a display) */
+		static char last_failure[256];
+		const char *error = SDL_GetError();
+
+		if (strncmp(error, last_failure, sizeof(last_failure) - 1))
+		{
+			snprintf(last_failure, sizeof(last_failure), "%s", error);
+			platform_log("SDL_Init failed: %s", error);
+		}
 		return FALSE;
 	}
 	platform_sdl_started = TRUE;
 #ifndef HALO_ANDROID
 	/* found (or offered to the player, platform_offer_game_data) before the
-	game's window opens, and checked to be the Xbox maps */
+	game's window opens, and checked to be the Xbox maps (a dedicated
+	server's were, by server_mode.c) */
 	platform_data_root();
 #ifndef HALO_WEB
-	data_check_maps();
+	if (!halo_server_mode())
+		data_check_maps();
 #endif
-	/* (a new version looked for meanwhile, updater_poll asking about it) */
-	updater_start();
+	/* (a new version looked for meanwhile, updater_poll asking about it; a
+	dedicated server's is server.auto_update's) */
+	if (!halo_server_mode())
+	{
+		updater_start();
+		/* (a player's public game on the master servers too, with a
+		publisher key: server_master.c) */
+		server_master_start_host();
+	}
 #endif
 	/* (the mods, and whether to play those that say they cannot be played
 	together, before the window opens: port_mods.c) */
@@ -1957,7 +1991,9 @@ static void platform_pump_events_headless(void)
 		thread = SDL_GetCurrentThreadID();
 	if (SDL_GetCurrentThreadID() != thread)
 		return;
-	exit_after_check();
+	/* (a dedicated server stops itself: server_director.c) */
+	if (!halo_server_mode())
+		exit_after_check();
 #ifndef HALO_ANDROID
 	if (config_string("debug.update_answer")[0])
 		updater_poll(NULL);

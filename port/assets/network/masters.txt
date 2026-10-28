@@ -1,0 +1,12 @@
+# The master servers that list dedicated servers (docs/master_protocol.md):
+# the server browser asks each for its signed list, and a dedicated server
+# publishes its game to each. One master on each line: its https:// URL and
+# its list-signing key, "ed25519:" and 64 hex digits; up to 4; "#" starts a
+# comment. A list whose signature does not check with the key is refused.
+# (The game reads this file beside config.toml: network.masters_file, and a
+# dedicated server's server.masters_file. An update replaces it; keep a list
+# of your own under another name.)
+#
+# A file that names no master, as this one, leaves the game the official
+# master, built in: https://master.opencommunityedition.com. A file that
+# names one or more is asked instead of it.

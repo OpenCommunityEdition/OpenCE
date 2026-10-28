@@ -13,7 +13,11 @@
 // - the native build hosting a public game, which a browser finds in the
 //   server browser and joins (debug.network_test "browse");
 // - a browser hosting a public game, which the native build joins the same
-//   way.
+//   way;
+// - the native build as a dedicated server (halo --server, listed through
+//   the brokers: server.list_on_brokers), which a browser finds in the
+//   server browser and joins. The server runs from a copy of <halo> in the
+//   test's folder, its settings, saves and logs there too.
 //
 // Each must reach the other over WebRTC (the native build's ICE-lite end and
 // DTLS server, port/linux/src/p2p_webrtc.c) and play: both log the two
@@ -21,7 +25,7 @@
 // build's system link would find it.
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -98,6 +102,9 @@ function native(name, test, extra = {}) {
     HALO_HIDDEN_WINDOW: '1', SDL_VIDEO_DRIVER: 'x11', HALO_NET_BROKERS_FILE: path.join(work, 'brokers.txt'),
     HALO_NET_JOIN_FROM_CLIPBOARD: '0', HALO_NET_ALLOW_UPNP: 'false', HALO_DISCORD_APPLICATION: '',
     HALO_EXIT_AFTER: '600', ...extra };
+  // (its saves and home the test's, not the person's running it)
+  Object.assign(env, { HALO_SAVE_ROOT: path.join(work, name + '-saves'), HOME: path.join(work, name + '-home'),
+    XDG_DATA_HOME: path.join(work, name + '-xdg') });
   delete env.WAYLAND_DISPLAY;
   const child = spawn('xvfb-run', ['-a', '-s', '-screen 0 640x480x24', halo], { cwd: path.dirname(halo), env, detached: true });
   child.stdout.on('data', (data) => log.add(data));
@@ -109,6 +116,37 @@ function native(name, test, extra = {}) {
       // (ended already)
     }
   };
+  running.push(log);
+  return log;
+}
+
+// the native build as a dedicated server, from a copy of it in the test's
+// folder (its config.toml beside it): its standard output's lines
+function dedicated(name) {
+  const log = side(name);
+  const folder = path.join(work, name);
+  mkdirSync(folder, { recursive: true });
+  copyFileSync(halo, path.join(folder, 'halo'));
+  const sdl = path.join(path.dirname(halo), 'libSDL3.so.0');
+  if (existsSync(sdl)) copyFileSync(sdl, path.join(folder, 'libSDL3.so.0'));
+  // (none of the environment's HALO_* settings: the server's are the test's)
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('HALO_')));
+  const env = { ...inherited, HALO_DATA_ROOT: path.dirname(maps), HALO_LOG_ROOT: folder,
+    HALO_SAVE_ROOT: path.join(folder, 'saves'), HOME: folder, XDG_DATA_HOME: path.join(folder, 'xdg'),
+    HALO_NET_BROKERS_FILE: path.join(work, 'brokers.txt'), HALO_NET_ONLINE: 'true', HALO_DISCORD_APPLICATION: '',
+    HALO_SERVER_LIST_ON_BROKERS: 'true', HALO_SERVER_MASTER_PUBLISH: 'false', HALO_SERVER_WEB_PORT: '0',
+    HALO_SERVER_LOBBY_SECONDS: '3', HALO_SERVER_ROTATION: 'bloodgulch:slayer', HALO_SERVER_NAME: 'Web Test',
+    HALO_NET_TUNNEL_PORT: String(tcpPort + 2000), HALO_NET_ALLOW_UPNP: 'false' };
+  const child = spawn(path.join(folder, 'halo'), ['--server'], { cwd: folder, env });
+  child.stdout.on('data', (data) => log.add(data));
+  child.stderr.on('data', (data) => log.add(data));
+  log.stop = () => {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+  };
+  running.push(log);
+  log.ready = () => log.lines.some((line) => /server: ready/.test(line));
+  log.joined = () => log.lines.some((line) => /player: .* joined/.test(line)) &&
+    log.lines.some((line) => /game: started/.test(line));
   return log;
 }
 
@@ -118,6 +156,8 @@ async function until(test, seconds) {
 }
 
 const opened = [];
+// (the native builds started, each stopped at the end however the test ends)
+const running = [];
 try {
   await sleep(1500);
   const first = await browser('first');
@@ -162,10 +202,28 @@ try {
     }
     joiner.stop();
   }
+
+  console.log('the native build as a dedicated server, a browser joining from the server browser');
+  await first.page.goto('about:blank');
+  const dedicatedServer = dedicated('server');
+  if (!await until(() => dedicatedServer.ready(), 120)) fail('the dedicated server was not ready');
+  else {
+    second.log.lines.length = 0;
+    await play(second, 'set=HALO_NETWORK_TEST=browse');
+    // (the server has no player: the browser's player alone, in a game the server started)
+    if (!await until(() => dedicatedServer.joined() &&
+      second.log.lines.some((line) => /network test: tick .*player 0: /.test(line)), 120 + PLAY_SECONDS)) {
+      fail('the browser did not play on the dedicated server');
+    }
+    if (!dedicatedServer.lines.some((line) => /WebRTC connected/.test(line))) {
+      fail('the dedicated server had no WebRTC connection');
+    }
+  }
   if (!process.exitCode) console.log('internet play: ok');
 } catch (error) {
   fail(String(error && error.stack ? error.stack : error));
 } finally {
+  for (const side of running) side.stop();
   for (const game of opened) await game.context.close().catch(() => {});
   server.kill();
   broker.kill();

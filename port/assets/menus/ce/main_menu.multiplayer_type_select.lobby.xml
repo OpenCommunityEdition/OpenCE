@@ -105,6 +105,9 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_game_data" type="text" controller="1" left="417" top="250" width="146" height="144" font="ui\small_ui" color="#FF2896FF">
 	</widget>
+	<strings name="main_menu/multiplayer_type_select/lobby/lobby_words">
+		<string text="dedicated"/>
+	</strings>
 	<widget name="main_menu/multiplayer_type_select/lobby/lobby_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_button_team" x="120" y="1"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/lobby_button_start" x="250" y="1"/>

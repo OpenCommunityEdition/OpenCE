@@ -53,6 +53,7 @@
   "ce/main_menu.settings_select.player_setup.player_profile_edit.network_setup.in_game.xml",
   "ce/main_menu.settings_select.player_setup.player_profile_edit.network_setup.map_sharing.xml",
   "ce/main_menu.settings_select.player_setup.player_profile_edit.network_setup.multiplayer_hud.xml",
+  "ce/main_menu.settings_select.player_setup.player_profile_edit.network_setup.server_browser.xml",
   "ce/main_menu.settings_select.player_setup.player_profile_edit.network_setup.streamer_mode.xml",
   "ce/main_menu.settings_select.player_setup.player_profile_edit.network_setup.xml",
   "ce/main_menu.settings_select.player_setup.player_profile_edit.video_settings.extra_effects.xml",

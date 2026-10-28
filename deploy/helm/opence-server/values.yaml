@@ -1,0 +1,239 @@
+# opence-server: the OpenCE dedicated server (docs/dedicated_server.md). One replica: the server
+# owns its tunnel port and the address players reach it at.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/opencommunityedition/opence-server
+  # Empty: the chart's appVersion (latest). A release's tag (build-206) or sha-<commit> pins it;
+  # <tag>@sha256:... as Argo CD Image Updater writes it works too.
+  tag: ""
+  # sha256:... ; replaces any digest in tag.
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The game data: the folder that holds maps/ (and custom_maps/, gametypes/ and init.txt if you have
+# them), from your own copy of the game. It is never in the image. Mounted read-only at /data
+# (HALO_DATA_ROOT). One source is required.
+gameData:
+  # An existing PersistentVolumeClaim.
+  existingClaim: ""
+  # Or an NFS export.
+  nfs:
+    server: ""
+    path: ""
+  # Or any other volume source, as in a pod's volumes (without the name), e.g.
+  # {hostPath: {path: /srv/halo, type: Directory}}. Without maps/ui.map and the rotation's maps the
+  # server exits with code 2 and says which maps it looked for, and the pod goes into
+  # CrashLoopBackOff.
+  volume: {}
+  # The folder within the volume that holds maps/. Empty: the volume's root.
+  subPath: ""
+
+# A custom_maps folder of its own (Custom Edition maps with bitmaps.map, sounds.map and loc.map),
+# mounted read-only at /custom_maps (HALO_CUSTOM_MAPS_ROOT). Optional: without one the server uses
+# gameData's custom_maps/.
+customMaps:
+  existingClaim: ""
+  nfs:
+    server: ""
+    path: ""
+  volume: {}
+  subPath: ""
+
+# The server's settings, as its HALO_* environment variables (docs/dedicated_server.md and
+# port/linux/README.md, "Dedicated server"). A value given here wins over config.toml, and sv_set
+# and the web page's settings cannot change it. Each is unset by default (empty, or null): the
+# setting is then config.toml's, or the server's default (named below), and can be changed from
+# the web page.
+server:
+  # server.name: 15 characters of printable ASCII (default "OpenCE Server").
+  name: ""
+  # server.rotation: map[:gametype[+rule=value...]] entries, played in turn, e.g.
+  # [bloodgulch:ctf, sidewinder:team_slayer, prisoner:slayer] (the default).
+  rotation: []
+  # server.max_players: 2 to 127 (default 16).
+  maxPlayers: null
+  # server.public: list the server in everyone's server browser (default true).
+  public: null
+  # server.lobby_seconds (default 15).
+  lobbySeconds: null
+  # server.motd: a notice each player is shown on joining.
+  motd: ""
+  # server.log_format: text or json (default text).
+  logFormat: ""
+  # server.instance and server.region, as the master servers list them.
+  instance: ""
+  region: ""
+  # server.master_publish: publish the server to the official master servers (needs a publisher
+  # key, below; default true).
+  masterPublish: null
+  # server.password: the password the server browser asks for. value, or a key of an existing
+  # Secret; empty for none.
+  password:
+    value: ""
+    existingSecret: ""
+    key: password
+
+# The master servers' publisher key (HALO_SERVER_PUBLISHER_KEY): the 64 hex characters of the seed
+# halo --server --keygen writes. value, or a key of an existing Secret; empty: the state volume's
+# publisher.key, if there is one.
+publisherKey:
+  value: ""
+  existingSecret: ""
+  key: publisher-key
+
+# The web page, its API and the remote console (server.web_port), on which the probes ask
+# GET /healthz. 0 turns them off, and the probes with them.
+web:
+  port: 8080
+  # The admin password (server.web_password, 8 characters or more), from existingSecret's key, else
+  # from password, else made at the first install and kept in the chart's Secret. The made one is
+  # found again with lookup on upgrades, which helm template and GitOps tools (Argo CD, Flux's
+  # dry runs) cannot do: they make a new one at each render. Give password or existingSecret
+  # there (README.md, "Web password").
+  password: ""
+  existingSecret: ""
+  key: web-password
+  # server.web_moderator_password, from the same Secret's moderatorKey when it has one.
+  moderatorPassword: ""
+  moderatorKey: web-moderator-password
+  # A ClusterIP Service for the web port, for an Ingress (with TLS) or kubectl port-forward.
+  service:
+    enabled: true
+    port: 8080
+    annotations: {}
+
+network:
+  # network.tunnel_port: the UDP port of internet play, which the Service exposes.
+  tunnelPort: 2302
+  # network.public_address: host[:port] players reach the tunnel port at, when the cluster is behind
+  # a NAT that STUN cannot see through. Empty: what STUN finds.
+  publicAddress: ""
+
+# More environment variables, as in a pod spec ({name, value} or {name, valueFrom}); they come after
+# the chart's, so the same name overrides it.
+extraEnv: []
+
+# /state: config.toml (HALO_CONFIG_FILE), publisher.key, the save root with its map cache (about
+# 115 MB for the multiplayer maps), the logs. Without persistence an emptyDir: the cache is built
+# again at each start, and settings changed from the web page are lost.
+persistence:
+  enabled: false
+  existingClaim: ""
+  size: 2Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  annotations: {}
+  emptyDirSizeLimit: 1Gi
+
+# The tunnel port's Service. Players reach it from outside the cluster, so a real deployment needs
+# LoadBalancer or NodePort.
+service:
+  type: LoadBalancer
+  port: 2302
+  nodePort: ""
+  annotations: {}
+  labels: {}
+  # Local keeps the players' own addresses (no SNAT to a node), which bans and the server's limits
+  # rely on.
+  externalTrafficPolicy: Local
+  loadBalancerClass: ""
+  loadBalancerSourceRanges: []
+
+strategy:
+  type: Recreate
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    memory: 600Mi
+
+# The image is 32-bit x86 Linux code, which runs on amd64 nodes only.
+nodeSelector:
+  kubernetes.io/os: linux
+  kubernetes.io/arch: amd64
+affinity: {}
+tolerations: []
+priorityClassName: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# SIGTERM ends the game in progress, tells the players and exits 0; a second signal, or 5 seconds
+# on, exits at once.
+terminationGracePeriodSeconds: 15
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# GET /healthz on the web port: 200 while the server hosts (lobby, loading, playing, postgame) and
+# its frames run. Each probe's fields override these; enabled: false drops it.
+probes:
+  startup:
+    enabled: true
+    periodSeconds: 2
+    failureThreshold: 60
+    timeoutSeconds: 2
+  readiness:
+    enabled: true
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 2
+  liveness:
+    enabled: true
+    periodSeconds: 20
+    failureThreshold: 3
+    timeoutSeconds: 3
+
+networkPolicy:
+  enabled: true
+  # Who may reach the tunnel port. Empty: anyone (players are on the internet).
+  from: []
+  # Who may reach the web port, as NetworkPolicy peers (an Ingress controller's namespace, say).
+  # Empty: no pod; kubectl port-forward and the kubelet's probes still reach it.
+  webFrom: []
+  dns:
+    to:
+      - namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: kube-system
+        podSelector:
+          matchLabels:
+            k8s-app: kube-dns
+  # The internet: TCP to the MQTT brokers (1883) and the master servers (443), and UDP to anywhere
+  # (STUN, and the players' own ports). The private ranges are excepted.
+  internet:
+    cidr: 0.0.0.0/0
+    except:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 100.64.0.0/10
+      - 169.254.0.0/16
+    tcpPorts:
+      - 1883
+      - 443
+    udp: true
+  extraIngress: []
+  extraEgress: []
+
+# More objects to render with the release (templated).
+extraObjects: []

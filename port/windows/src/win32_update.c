@@ -14,6 +14,7 @@ Paths are UTF-8, as SDL gives them.
 #include <windows.h>
 #include <winhttp.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "update.h"
@@ -159,6 +160,168 @@ done:
 		if (!succeeded)
 			DeleteFileW(wide_path);
 	}
+	if (request)
+		WinHttpCloseHandle(request);
+	if (connection)
+		WinHttpCloseHandle(connection);
+	if (session)
+		WinHttpCloseHandle(session);
+	return succeeded;
+}
+
+/* ---------- any request */
+
+int update_https_request(const char *method, const char *url, const char *headers, const void *body,
+	unsigned long body_size, unsigned long maximum, struct update_response *response, char *error, int error_size)
+{
+	wchar_t wide_url[2048], host[256], url_path[2048], wide_method[16];
+	wchar_t *wide_headers = NULL;
+	URL_COMPONENTS components;
+	HINTERNET session = NULL, connection = NULL, request = NULL;
+	DWORD status = 0, status_size = sizeof(status);
+	DWORD protocols, flags = 0;
+	char *data = NULL;
+	unsigned long received = 0, capacity = 0;
+	int succeeded = 0;
+
+	memset(response, 0, sizeof(*response));
+	if (!wide_from_utf8(url, wide_url, 2048) || !wide_from_utf8(method, wide_method, 16))
+	{
+		snprintf(error, (size_t)error_size, "a bad address");
+		return 0;
+	}
+	memset(&components, 0, sizeof(components));
+	components.dwStructSize = sizeof(components);
+	components.lpszHostName = host;
+	components.dwHostNameLength = 256;
+	components.lpszUrlPath = url_path;
+	components.dwUrlPathLength = 2048;
+	if (!WinHttpCrackUrl(wide_url, 0, 0, &components) ||
+		(components.nScheme != INTERNET_SCHEME_HTTPS &&
+			!(components.nScheme == INTERNET_SCHEME_HTTP && (!wcscmp(host, L"127.0.0.1") || !_wcsicmp(host, L"localhost")))))
+	{
+		snprintf(error, (size_t)error_size, "not an https:// address: %s", url);
+		return 0;
+	}
+	if (components.nScheme == INTERNET_SCHEME_HTTPS)
+		flags = WINHTTP_FLAG_SECURE;
+	if (headers && headers[0])
+	{
+		int length = MultiByteToWideChar(CP_UTF8, 0, headers, -1, NULL, 0);
+
+		wide_headers = length > 0 ? malloc(sizeof(wchar_t) * (size_t)length) : NULL;
+		if (!wide_headers || !MultiByteToWideChar(CP_UTF8, 0, headers, -1, wide_headers, length))
+		{
+			free(wide_headers);
+			snprintf(error, (size_t)error_size, "bad headers");
+			return 0;
+		}
+	}
+	session = WinHttpOpen(L"opence", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+	if (!session)
+	{
+		set_error(error, error_size, "could not start WinHTTP");
+		goto done;
+	}
+	protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+	if (!WinHttpSetOption(session, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols)))
+	{
+		protocols = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;
+		WinHttpSetOption(session, WINHTTP_OPTION_SECURE_PROTOCOLS, &protocols, sizeof(protocols));
+	}
+	WinHttpSetTimeouts(session, TIMEOUT_MILLISECONDS, TIMEOUT_MILLISECONDS, TIMEOUT_MILLISECONDS,
+		TIMEOUT_MILLISECONDS);
+	connection = WinHttpConnect(session, host, components.nPort, 0);
+	if (connection)
+		request = WinHttpOpenRequest(connection, wide_method, url_path, NULL, WINHTTP_NO_REFERER,
+			WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
+	if (request)
+	{
+		/* (no redirect followed: a master's answer is its own) */
+		DWORD policy = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+
+		WinHttpSetOption(request, WINHTTP_OPTION_REDIRECT_POLICY, &policy, sizeof(policy));
+	}
+	if (!request || !WinHttpSendRequest(request, wide_headers ? wide_headers : WINHTTP_NO_ADDITIONAL_HEADERS,
+		wide_headers ? (DWORD)-1L : 0, (void *)body, body ? (DWORD)body_size : 0, body ? (DWORD)body_size : 0, 0) ||
+		!WinHttpReceiveResponse(request, NULL))
+	{
+		set_error(error, error_size, "could not reach the server");
+		goto done;
+	}
+	if (!WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+		WINHTTP_HEADER_NAME_BY_INDEX, &status, &status_size, WINHTTP_NO_HEADER_INDEX))
+	{
+		set_error(error, error_size, "no answer from the server");
+		goto done;
+	}
+	response->status = (int)status;
+	{
+		wchar_t raw[4096];
+		DWORD raw_size = sizeof(raw);
+
+		/* (the headers after the status line, one a line) */
+		if (WinHttpQueryHeaders(request, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, raw, &raw_size,
+			WINHTTP_NO_HEADER_INDEX))
+		{
+			char text[4096];
+			int read, written = 0;
+			const char *first;
+
+			WideCharToMultiByte(CP_UTF8, 0, raw, -1, text, sizeof(text), NULL, NULL);
+			text[sizeof(text) - 1] = 0;
+			first = strstr(text, "\r\n");
+			for (read = first ? (int)(first - text) + 2 : 0; text[read] && written < (int)sizeof(response->headers) - 1;
+				read++)
+			{
+				if (text[read] != '\r')
+					response->headers[written++] = text[read];
+			}
+			response->headers[written] = 0;
+		}
+	}
+	for (;;)
+	{
+		char buffer[16384];
+		DWORD count = 0;
+
+		if (!WinHttpReadData(request, buffer, sizeof(buffer), &count))
+		{
+			set_error(error, error_size, "the answer broke off");
+			goto done;
+		}
+		if (!count)
+			break;
+		if (received + count > maximum)
+		{
+			snprintf(error, (size_t)error_size, "the answer is larger than %lu bytes", maximum);
+			goto done;
+		}
+		if (received + count + 1 > capacity)
+		{
+			unsigned long grown_capacity = capacity ? capacity * 2 : 16384;
+			char *grown;
+
+			while (grown_capacity < received + count + 1)
+				grown_capacity *= 2;
+			grown = realloc(data, grown_capacity);
+			if (!grown)
+				goto done;
+			data = grown;
+			capacity = grown_capacity;
+		}
+		memcpy(data + received, buffer, count);
+		received += count;
+		data[received] = 0;
+	}
+	response->body = data ? data : calloc(1, 1);
+	response->body_size = received;
+	data = NULL;
+	succeeded = 1;
+
+done:
+	free(data);
+	free(wide_headers);
 	if (request)
 		WinHttpCloseHandle(request);
 	if (connection)

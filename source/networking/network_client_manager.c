@@ -599,6 +599,7 @@ struct message_client_ping
 
 /* port/linux/src/p2p.c's */
 void p2p_hardware_id(char *hex, int size);
+void p2p_join_refused(int rejection_code);
 
 struct message_client_join_game_request
 {
@@ -1846,7 +1847,11 @@ boolean network_game_client_remove_player(
 				}
 			}
 
-			if (network_player_index == MAXIMUM_NUMBER_OF_PLAYERS)
+			/* port: a dedicated server's own machine never has a player
+			(port/linux/game/server_director.c): it leaves only when a player
+			of its own goes, which none is */
+			if (network_player_index == MAXIMUM_NUMBER_OF_PLAYERS &&
+				(!halo_server_mode() || player->machine_index == client->machine_index))
 			{
 				network_game_client_all_local_players_have_quit();
 				network_event("no local players remain in the game, exiting the game now");
@@ -2358,6 +2363,8 @@ void network_game_client_rejected_by_game(
 		"unable to join game: reason= #%d/%s",
 		rejection_code,
 		reason);
+	/* port: why, for the server browser's line (p2p_join_progress) */
+	p2p_join_refused(rejection_code);
 	/* port: the join went to the pregame screen at once (and a machine
 	refused a game in progress, network_game_server_refuse_late_joiner, is in
 	it): with no game behind it, it is left for the main menu, which says
@@ -3153,7 +3160,6 @@ boolean network_game_client_advertised_game_compatible(
 	unsigned int ours = HALO_PORT_NETWORK_VERSION;
 	unsigned int theirs;
 	boolean distributed;
-	char message[400];
 
 	if (game_index < 0 || game_index >= MAXIMUM_NETWORK_ADVERTISED_GAMES)
 		return FALSE;
@@ -3165,6 +3171,20 @@ boolean network_game_client_advertised_game_compatible(
 		network_event("joining a host of network version %u", theirs);
 		return TRUE;
 	}
+	if (tell)
+		network_game_client_tell_version(theirs, distributed);
+	return FALSE;
+}
+
+/* port: the player told why a host of this network version (and netcode)
+cannot be joined: an advertised game's, or a server browser's row's */
+void network_game_client_tell_version(
+	unsigned int theirs,
+	boolean distributed)
+{
+	unsigned int ours = HALO_PORT_NETWORK_VERSION;
+	char message[400];
+
 	if (theirs == ours)
 	{
 		csprintf(message,
@@ -3187,13 +3207,9 @@ boolean network_game_client_advertised_game_compatible(
 			"Ask the host to update the game.",
 			ours, theirs);
 	}
-	if (tell)
-	{
-		network_event("not joining a host of network version %u%s (this machine's is %u)", theirs,
-			distributed ? "" : " with the lockstep netcode", ours);
-		platform_show_message("Halo: cannot join this game", message);
-	}
-	return FALSE;
+	network_event("not joining a host of network version %u%s (this machine's is %u)", theirs,
+		distributed ? "" : " with the lockstep netcode", ours);
+	platform_show_message("Halo: cannot join this game", message);
 }
 
 /* port: whether the advertised game is under way (HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG),
@@ -3206,6 +3222,49 @@ boolean network_game_client_advertised_game_in_progress(
 
 	return game_index >= 0 && game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES &&
 		(network_game_client_advertised_versions[game_index].flags & HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG) != 0;
+}
+
+/* port: whether the advertised game's host is a dedicated server
+(HALO_PORT_ADVERTISED_DEDICATED_FLAG), for the lobby's line */
+boolean network_game_client_advertised_game_dedicated(
+	struct network_game_client *client,
+	struct network_advertised_game const *game)
+{
+	long game_index = client ? game - client->available_games : NONE;
+
+	return game_index >= 0 && game_index < MAXIMUM_NETWORK_ADVERTISED_GAMES &&
+		(network_game_client_advertised_versions[game_index].flags & HALO_PORT_ADVERTISED_DEDICATED_FLAG) != 0;
+}
+
+/* port: the client's index'th advertised game, as a probe tells it (halo
+--probe: port/linux/game/network_test.c) */
+boolean network_game_client_port_advertised_game_summary(
+	long index,
+	struct network_advertised_game_summary *summary)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	struct network_advertised_game *game;
+
+	if (!client || index < 0 || index >= MAXIMUM_NETWORK_ADVERTISED_GAMES)
+		return FALSE;
+	game = &client->available_games[index];
+	if (!network_game_client_advertised_game_is_valid(game))
+		return FALSE;
+	csmemset(summary, 0, sizeof(*summary));
+	csmemcpy(summary->name, game->game_name, sizeof(summary->name));
+	summary->name[NUMBEROF(summary->name) - 1] = 0;
+	csmemcpy(summary->map_name, game->map.name, sizeof(summary->map_name));
+	summary->map_name[sizeof(summary->map_name) - 1] = 0;
+	summary->engine_type = game->engine_type;
+	summary->player_count = (short)game->player_count;
+	summary->maximum_player_count = game->maximum_player_count;
+	summary->open = game->open;
+	summary->has_teams = game->has_teams;
+	summary->in_progress = network_game_client_advertised_game_in_progress(client, game);
+	summary->dedicated = network_game_client_advertised_game_dedicated(client, game);
+	summary->version = network_game_client_advertised_versions[index].version;
+	summary->kind = network_game_client_advertised_versions[index].kind;
+	return TRUE;
 }
 
 /* port: the advertised game's kind (an OpenCE gametype's mode, and Hardcore:

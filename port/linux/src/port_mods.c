@@ -1104,6 +1104,40 @@ int port_mods_describe(long index, char *text, unsigned long size, const char *m
 	return 1;
 }
 
+int port_mods_list(char *text, unsigned long size)
+{
+	long position;
+	int count = 0;
+	size_t length = 0;
+
+	if (!size)
+		return 0;
+	text[0] = 0;
+	for (position = 0; position < port_mods.mod_count; position++)
+	{
+		long index = port_mods.ordered[position];
+		const struct port_mod *mod;
+		int written;
+
+		if (index < 0 || index >= port_mods.mod_count)
+			continue;
+		mod = &port_mods.mods[index];
+		if (!mod_on(mod))
+			continue;
+		written = snprintf(text + length, size - length, "%s%s%s%s", count ? "\n" : "", mod->folder,
+			mod->version[0] ? " " : "", mod->version);
+		/* (a line that does not fit is left out whole) */
+		if (written < 0 || (size_t)written >= size - length)
+		{
+			text[length] = 0;
+			break;
+		}
+		length += (size_t)written;
+		count++;
+	}
+	return count;
+}
+
 unsigned long port_mods_scans(void)
 {
 	return port_mods.scans;

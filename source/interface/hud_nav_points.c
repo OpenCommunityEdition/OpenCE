@@ -851,6 +851,9 @@ void hud_render_nav_points(
 						nav_point->reference_index,
 						&position,
 						&radius);
+					/* port: where the frame draws the object, so the marker
+					does not step once a tick (render_interpolation.c) */
+					render_interpolation_object_point(nav_point->reference_index, &position);
 				}
 				break;
 

@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="same-origin">
+<meta name="color-scheme" content="dark light">
+<title>OpenCE server</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<div id="login" class="login" hidden>
+  <form id="login-form" class="panel login-panel">
+    <div class="login-head"><img src="icon.svg" alt="" width="52" height="52"><h1>OpenCE server</h1></div>
+    <label for="login-password">Password</label>
+    <input id="login-password" type="password" autocomplete="current-password" required>
+    <p id="login-error" class="error" role="alert"></p>
+    <button type="submit" class="primary" id="login-button">Sign in</button>
+    <p class="note">server.web_password (admin) or server.web_moderator_password (moderator). The page keeps no
+      password: the session is a cookie for 12 hours, or 30 minutes unused.</p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <img src="icon.svg" alt="" width="34" height="34">
+    <h1 id="server-name">OpenCE server</h1>
+    <span id="server-state" class="badge"></span>
+    <span class="top-end">
+      <span id="link-state" class="badge" title="How the page hears from the server"></span>
+      <span id="role" class="badge"></span>
+      <button id="logout" class="small">Sign out</button>
+    </span>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" data-tab="status">Status</button>
+    <button role="tab" data-tab="players">Players</button>
+    <button role="tab" data-tab="rotation">Rotation</button>
+    <button role="tab" data-tab="gametypes">Gametypes</button>
+    <button role="tab" data-tab="bans" data-needs="admin">Bans</button>
+    <button role="tab" data-tab="console">Console</button>
+    <button role="tab" data-tab="settings" data-needs="admin">Settings</button>
+    <button role="tab" data-tab="about">About</button>
+  </nav>
+
+  <main>
+    <section id="tab-status" class="tab" role="tabpanel" hidden>
+      <div class="grid">
+        <div class="panel">
+          <h2>Game</h2>
+          <dl id="status-facts" class="facts"></dl>
+        </div>
+        <div class="panel">
+          <h2>Players</h2>
+          <p class="count"><span id="status-count">0</span><span class="of"> of <span id="status-max">0</span></span></p>
+          <svg id="spark" class="spark" viewBox="0 0 300 64" preserveAspectRatio="none" role="img"
+            aria-label="Players over the last 10 minutes"><polyline id="spark-fill" class="spark-fill" points=""/><polyline id="spark-line" class="spark-line" points=""/></svg>
+          <p class="note" id="spark-note">The last 10 minutes, as this page saw them.</p>
+          <h2>Actions</h2>
+          <div class="bar">
+            <button id="next-map" data-needs="moderator">Next map</button>
+            <button id="end-game" data-needs="moderator">End game</button>
+          </div>
+          <form id="say-form" class="inline">
+            <input id="say-text" maxlength="127" placeholder="A notice on every screen" aria-label="Notice"
+              data-needs="moderator">
+            <button data-needs="moderator">Say</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Invite</h2>
+          <div class="inline">
+            <input id="invite" readonly aria-label="The invite link">
+            <button id="invite-copy" data-needs="admin">Copy</button>
+          </div>
+          <p class="note">Anyone with the link joins: the game's Join Game, or ?join= on the web page.</p>
+          <h2>Master servers</h2>
+          <table id="masters" class="cards">
+            <thead><tr><th>Master</th><th>Listed</th><th>Probe</th><th>Answer</th><th>When</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <p id="masters-empty" class="note">No master servers.</p>
+        </div>
+        <div class="panel">
+          <h2>Recent events</h2>
+          <ol id="feed" class="feed"></ol>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-players" class="tab" role="tabpanel" hidden>
+      <div class="panel">
+        <h2>Players</h2>
+        <table id="players" class="cards">
+          <thead><tr><th>Slot</th><th>Name</th><th>Team</th><th>Score</th><th>K/D/A</th><th>Ping</th><th>Played</th>
+            <th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p id="players-empty" class="note">No players.</p>
+        <p class="note">Every action names the slot and the player: the server checks the slot is still theirs.</p>
+      </div>
+    </section>
+
+    <section id="tab-rotation" class="tab" role="tabpanel" hidden>
+      <div class="panel">
+        <h2>Rotation</h2>
+        <ol id="rotation" class="rotation"></ol>
+        <form id="rotation-add" class="fields">
+          <label>Map <select id="add-map" data-needs="admin"></select></label>
+          <label>Gametype <select id="add-gametype" data-needs="admin"></select></label>
+          <label>Rules <input id="add-rules" placeholder="score=50+time=15" data-needs="admin"></label>
+          <button data-needs="admin">Add</button>
+        </form>
+        <p id="rotation-note" class="note"></p>
+        <div class="bar">
+          <button id="rotation-save" class="primary" data-needs="admin">Save</button>
+          <button id="rotation-revert">Revert</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-gametypes" class="tab" role="tabpanel" hidden>
+      <div class="grid">
+        <div class="panel">
+          <h2>Gametypes</h2>
+          <ul id="gametype-files" class="list"></ul>
+          <h3>Built-in</h3>
+          <p id="gametype-builtins" class="note"></p>
+          <form id="gametype-new" class="fields">
+            <label>Name <input id="new-name" pattern="[a-z0-9_\-]{1,32}" placeholder="btb_ctf" required
+              data-needs="admin"></label>
+            <label>Base <select id="new-base" data-needs="admin"></select></label>
+            <button data-needs="admin">New</button>
+          </form>
+        </div>
+        <div class="panel wide" id="gametype-editor" hidden>
+          <h2 id="editor-title"></h2>
+          <div class="editor">
+            <div id="gametype-form" class="schema-form"></div>
+            <label class="raw"><span>gametypes/<span id="editor-file"></span>.toml</span>
+              <textarea id="gametype-text" spellcheck="false" autocapitalize="off" rows="22"></textarea></label>
+          </div>
+          <p id="gametype-error" class="error" role="alert"></p>
+          <div class="bar">
+            <button id="gametype-save" class="primary" data-needs="admin">Save</button>
+            <button id="gametype-delete" class="danger" data-needs="admin">Delete</button>
+            <button id="gametype-close">Close</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-bans" class="tab" role="tabpanel" hidden>
+      <div class="panel">
+        <h2>Bans</h2>
+        <table id="bans" class="cards">
+          <thead><tr><th>#</th><th>When</th><th>Players</th><th>Address</th><th>Hardware id</th><th>Reason</th>
+            <th>Until</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p id="bans-empty" class="note">No bans.</p>
+      </div>
+    </section>
+
+    <section id="tab-console" class="tab" role="tabpanel" hidden>
+      <div class="panel console">
+        <div class="console-bar">
+          <label class="check"><input type="checkbox" id="follow" checked> Follow</label>
+          <span id="categories" class="chips"></span>
+          <button id="log-clear" class="small">Clear</button>
+        </div>
+        <div id="log" class="log" role="log" tabindex="0"></div>
+        <form id="command-form" class="command">
+          <input id="command" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send"
+            placeholder="A command: help lists them" aria-label="Command">
+          <button>Run</button>
+        </form>
+        <p id="command-hint" class="note">Tab completes, Up and Down go through what was run.</p>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="tab" role="tabpanel" hidden>
+      <form id="settings-form" class="panel">
+        <h2>Settings</h2>
+        <p class="note">Written to config.toml and applied now where they can be. A setting its environment
+          variable sets cannot be changed here.</p>
+        <div id="settings-fields"></div>
+        <p id="settings-note" class="note" role="status"></p>
+        <div class="bar"><button class="primary" data-needs="admin">Save</button>
+          <button type="button" id="settings-revert">Revert</button></div>
+      </form>
+    </section>
+
+    <section id="tab-about" class="tab" role="tabpanel" hidden>
+      <div class="grid">
+        <div class="panel">
+          <h2>Ports to open</h2>
+          <dl class="facts" id="about-ports"></dl>
+          <p class="note">Only the tunnel's port needs to reach the internet. Keep the web port on loopback, or
+            behind a proxy that adds TLS (Caddy: reverse_proxy 127.0.0.1:8080), or reach it with
+            ssh -L 8080:127.0.0.1:8080.</p>
+        </div>
+        <div class="panel">
+          <h2>Where files are</h2>
+          <dl class="facts">
+            <div><dt>config.toml</dt><dd>Every setting: beside the executable, or --config</dd></div>
+            <div><dt>init.txt</dt><dd>Commands run at the start (server.init_file), in the data root</dd></div>
+            <div><dt>gametypes/</dt><dd>The operator's gametypes (.toml) and saved ones (.gametype), in the data
+              root</dd></div>
+            <div><dt>bans.txt, debug.txt</dt><dd>In paths.logs, else the data root</dd></div>
+            <div><dt>masters.txt</dt><dd>The master servers, beside the executable</dd></div>
+            <div><dt>publisher.key</dt><dd>The publisher key for the master servers, beside config.toml</dd></div>
+            <div><dt>status.json</dt><dd>The status every 2 seconds (server.status_file)</dd></div>
+          </dl>
+        </div>
+        <div class="panel">
+          <h2>This server</h2>
+          <dl class="facts" id="about-facts"></dl>
+          <p class="note">docs/dedicated_server.md is the reference of the commands, the API and the RCON.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="dialog" class="sheet" hidden>
+  <form id="dialog-form" class="sheet-body" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+    <h2 id="dialog-title"></h2>
+    <div id="dialog-body"></div>
+    <p id="dialog-error" class="error" role="alert"></p>
+    <div class="actions">
+      <button type="button" id="dialog-cancel">Cancel</button>
+      <button type="submit" id="dialog-ok" class="primary">OK</button>
+    </div>
+  </form>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

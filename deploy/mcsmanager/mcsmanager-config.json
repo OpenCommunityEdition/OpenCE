@@ -1,0 +1,139 @@
+{
+  "_comment": "MCSManager quick-install entries for the OpenCE dedicated server (docs/dedicated_server.md). Each package unzips the release into the instance's folder; put the maps/ folder of your own copy of the game beside halo before the first start. Settings: config.toml beside halo, written at the first start, or HALO_* variables.",
+  "languages": [
+    {
+      "label": "English",
+      "value": "en_us"
+    }
+  ],
+  "packages": [
+    {
+      "language": "en_us",
+      "platform": "Linux",
+      "title": "OpenCE Dedicated Server",
+      "category": "Halo: Combat Evolved",
+      "runtime": "Linux x86-64 with 32-bit libraries",
+      "hardware": "1 CPU core, 600 MB of memory",
+      "size": "45 MB, and the game data you upload",
+      "author": "OpenCE",
+      "targetLink": "https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-release.zip",
+      "description": "The dedicated server run on the node itself, which needs the 32-bit C runtime (Debian and Ubuntu: dpkg --add-architecture i386 && apt install libc6:i386). Open UDP 2302; the web page is on http://127.0.0.1:8080/.",
+      "remark": "Host",
+      "setupInfo": {
+        "nickname": "OpenCE Dedicated Server",
+        "startCommand": "./halo --server",
+        "stopCommand": "quit",
+        "ie": "utf-8",
+        "oe": "utf-8",
+        "type": "universal",
+        "tag": [
+          "halo",
+          "opence"
+        ],
+        "processType": "general",
+        "updateCommand": "",
+        "crlf": 1,
+        "actionCommandList": [
+          {
+            "name": "Status",
+            "command": "sv_status"
+          },
+          {
+            "name": "Players",
+            "command": "sv_players"
+          },
+          {
+            "name": "Next map",
+            "command": "sv_map_next"
+          },
+          {
+            "name": "Reload settings",
+            "command": "sv_reload"
+          }
+        ],
+        "eventTask": {
+          "autoStart": false,
+          "autoRestart": true,
+          "ignore": false
+        },
+        "terminalOption": {
+          "haveColor": false,
+          "pty": false
+        }
+      }
+    },
+    {
+      "language": "en_us",
+      "platform": "Linux",
+      "title": "OpenCE Dedicated Server",
+      "category": "Halo: Combat Evolved",
+      "runtime": "Linux x86-64 with 32-bit libraries",
+      "hardware": "1 CPU core, 600 MB of memory",
+      "size": "45 MB, and the game data you upload",
+      "author": "OpenCE",
+      "targetLink": "https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-release.zip",
+      "description": "The dedicated server in a container of ghcr.io/ptero-eggs/games:source (Debian 12 with the 32-bit libraries), the instance's folder mounted as its working folder; the save root (with the map cache) and the logs are kept in it, as the container is made again at each start. Publishes UDP 2302 and the web page on the node's 127.0.0.1:8080 (each instance on a node needs ports of its own).",
+      "remark": "Docker",
+      "setupInfo": {
+        "nickname": "OpenCE Dedicated Server",
+        "startCommand": "./halo --server",
+        "stopCommand": "quit",
+        "ie": "utf-8",
+        "oe": "utf-8",
+        "type": "universal",
+        "tag": [
+          "halo",
+          "opence"
+        ],
+        "processType": "docker",
+        "updateCommand": "",
+        "crlf": 1,
+        "actionCommandList": [
+          {
+            "name": "Status",
+            "command": "sv_status"
+          },
+          {
+            "name": "Players",
+            "command": "sv_players"
+          },
+          {
+            "name": "Next map",
+            "command": "sv_map_next"
+          },
+          {
+            "name": "Reload settings",
+            "command": "sv_reload"
+          }
+        ],
+        "eventTask": {
+          "autoStart": false,
+          "autoRestart": true,
+          "ignore": false
+        },
+        "terminalOption": {
+          "haveColor": false,
+          "pty": false
+        },
+        "docker": {
+          "image": "ghcr.io/ptero-eggs/games:source",
+          "ports": [
+            "2302:2302/udp",
+            "127.0.0.1:8080:8080/tcp"
+          ],
+          "extraVolumes": [],
+          "networkMode": "bridge",
+          "networkAliases": [],
+          "env": [
+            "HALO_SERVER_WEB_BIND=0.0.0.0",
+            "HALO_SAVE_ROOT=/workspace/saves",
+            "HALO_LOG_ROOT=/workspace/logs"
+          ],
+          "memory": 600,
+          "workingDir": "/workspace/",
+          "changeWorkdir": true
+        }
+      }
+    }
+  ]
+}

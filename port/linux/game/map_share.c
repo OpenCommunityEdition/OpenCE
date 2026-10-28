@@ -66,6 +66,7 @@ what it says it has grows.
 #include "custom_edition_cache.h"
 #include "custom_edition_maps.h"
 #include "map_share.h"
+#include "server_director.h"
 #include "../src/p2p.h"
 
 #include <stdio.h>
@@ -499,6 +500,10 @@ struct host_machine
 	unsigned long requested_at;
 	boolean request_waiting;
 	struct distributed_map_share_request waiting_request;
+	/* the download's end (done, or failed) said, in the log and a dedicated
+	server's event: once a request (host_request clears it), however often
+	the machine says it */
+	boolean end_said;
 };
 
 struct map_share_globals
@@ -3234,6 +3239,7 @@ static void host_request(
 	machine->downloading = TRUE;
 	error(_error_silent, "map sharing: machine #%ld asks for %s (files 0x%X)", machine_index, request->level_name,
 		(unsigned)request->wanted);
+	server_event_map_share(machine_index, request->level_name, "asked", 0, 0);
 }
 
 /* a machine's request, as it comes: taken at once if the last it made was
@@ -3360,15 +3366,29 @@ static void host_progress(
 		(machine->done > machine->advanced_done && machine->done == machine->offered_total) ||
 		progress->state == _progress_done)
 	{
-		machine->advanced_done = machine->done;
+		/* (a dedicated server's event at each tenth it passes, going on:
+		what it says it has never goes back) */
+		if (progress->state == _progress_downloading && machine->offered_total &&
+			machine->done > machine->advanced_done &&
+			(unsigned long long)machine->done * 10 / machine->offered_total !=
+			(unsigned long long)machine->advanced_done * 10 / machine->offered_total)
+		{
+			server_event_map_share(machine_index, machine->request.level_name, "downloading", machine->done,
+				machine->offered_total);
+		}
+		if (machine->done > machine->advanced_done)
+			machine->advanced_done = machine->done;
 		machine->advanced_at = machine->heard_at | 1;
 	}
 	machine->downloading = progress->state != _progress_failed;
 	machine->downloaded = progress->state == _progress_done;
-	if (progress->state != _progress_downloading)
+	if (progress->state != _progress_downloading && !machine->end_said)
 	{
+		machine->end_said = TRUE;
 		error(_error_silent, "map sharing: machine #%ld %s %s", machine_index,
 			progress->state == _progress_done ? "downloaded" : "could not download", machine->request.level_name);
+		server_event_map_share(machine_index, machine->request.level_name,
+			progress->state == _progress_done ? "downloaded" : "failed", machine->done, machine->offered_total);
 	}
 }
 

@@ -12,6 +12,10 @@ declares these for itself: keep the two the same).
 /* finds the mods again, and lists the files of those that are on: how
 many are on. Every file index from before is gone */
 long port_mods_scan(void);
+/* the mods that are on, in the load order, a line each: its folder, and
+its version if its mod.toml says one ("trollface 1.0"); how many fitted
+into text (a line that does not fit is left out whole) */
+int port_mods_list(char *text, unsigned long size);
 /* how many times the mods have been found (port_mods_scan) */
 unsigned long port_mods_scans(void);
 /* how many mods the last port_mods_scan found that are on */

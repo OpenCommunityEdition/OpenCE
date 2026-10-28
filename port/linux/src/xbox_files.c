@@ -19,6 +19,7 @@ matched case-insensitively, like the Xbox's FATX volumes.
 #include "platform.h"
 #include "posix.h"
 #include "port_config.h"
+#include "server_mode.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -112,7 +113,10 @@ const char *platform_data_root(void)
 				}
 			}
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
-			if (!has_maps(root) && executable_directory[0] && platform_offer_game_data(executable_directory) &&
+			/* (a dedicated server asks nobody: it says what is missing and
+			stops, server_mode.c) */
+			if (!has_maps(root) && executable_directory[0] && !halo_server_mode() &&
+				platform_offer_game_data(executable_directory) &&
 				has_maps(executable_directory))
 			{
 				snprintf(root, sizeof(root), "%s", executable_directory);
@@ -204,6 +208,57 @@ const char *platform_custom_edition_root(void)
 	return root;
 }
 
+/* whether the first length characters of a and b match, ignoring case
+(the Windows build has no strings.h); a shorter string matches only up to
+its end, which must come at the same place in both */
+static BOOL names_match(const char *a, const char *b, unsigned long length)
+{
+	unsigned long index;
+
+	for (index = 0; index < length; index++)
+	{
+		if (tolower((unsigned char)a[index]) != tolower((unsigned char)b[index]))
+			return FALSE;
+		if (!a[index])
+			return TRUE;
+	}
+	return TRUE;
+}
+
+/* the data root's files and folders kept elsewhere when the settings say
+(paths.logs, paths.custom_maps): a read-only data root, a dedicated
+server's maps mounted so. The rest of the path after them in rest */
+static int translate_elsewhere(const char *cursor, char *resolved, unsigned long size, const char **rest)
+{
+	static const char *const logs[] = { "debug.txt", "bans.txt", "cheaters.txt" };
+	const char *logs_folder = config_string("paths.logs");
+	const char *custom_maps = config_string("paths.custom_maps");
+	unsigned long index;
+
+	while (*cursor == '\\' || *cursor == '/')
+		cursor++;
+	for (index = 0; logs_folder[0] && index < sizeof(logs) / sizeof(logs[0]); index++)
+	{
+		if (names_match(cursor, logs[index], strlen(logs[index]) + 1))
+		{
+			make_directories(logs_folder);
+			snprintf(resolved, size, "%s", logs_folder);
+			trim_separators(resolved);
+			*rest = cursor;
+			return 1;
+		}
+	}
+	if (custom_maps[0] && names_match(cursor, "custom_maps", 11) && (!cursor[11] || cursor[11] == '\\' ||
+		cursor[11] == '/'))
+	{
+		snprintf(resolved, size, "%s", custom_maps);
+		trim_separators(resolved);
+		*rest = cursor + 11;
+		return 1;
+	}
+	return 0;
+}
+
 void platform_translate_path(const char *xbox_path, char *host_path, unsigned long host_path_size)
 {
 	char resolved[1024];
@@ -218,6 +273,10 @@ void platform_translate_path(const char *xbox_path, char *host_path, unsigned lo
 		if (drive == 'h' && platform_custom_edition_root()[0])
 		{
 			snprintf(resolved, sizeof(resolved), "%s", platform_custom_edition_root());
+		}
+		else if (drive == 'd' && translate_elsewhere(cursor + 2, resolved, sizeof(resolved), &cursor))
+		{
+			cursor -= 2;
 		}
 		else if (drive != 'd')
 		{

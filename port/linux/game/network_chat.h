@@ -26,6 +26,9 @@ enum
 
 /* every frame (main.c): the keys that start typing a line, and those typed */
 void network_chat_update(void);
+/* (a dedicated server) whether a player's name has words its word filter
+keeps out at the door (server.chat_filter "block") */
+boolean network_chat_name_blocked(wchar_t const *name, short length);
 /* the first local player says a line to a channel, as if typed and sent;
 the automated tests' (network_test.c) */
 void network_chat_say(short channel, char const *text);
@@ -50,6 +53,11 @@ short network_chat_host_mute_minutes(short player_index);
 their lines and their voice, for /mute's minutes when it gives none (every
 machine told), or unmuted */
 void network_chat_host_mute(short player_index, boolean mute);
+/* (the host: a dedicated server's mute and unmute commands,
+server_commands.c) a player's name (ASCII, 11 characters) muted for everyone
+for minutes (0: /mute's), every machine told, or unmuted: FALSE if it could
+not be */
+boolean network_chat_host_mute_named(char const *name, short minutes, boolean mute);
 /* (the host: network_voice.c) whether a player's name (the network game's,
 in the lobby too; at most 12 characters, ended or not) is muted for everyone:
 their machine's voice goes no further */

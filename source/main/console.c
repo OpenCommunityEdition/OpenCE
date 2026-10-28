@@ -400,6 +400,11 @@ void console_startup(
 	FILE *file;
 	short newest_previous_command_index;
 
+	/* port: a dedicated server's init file is its own commands, which it
+	runs itself with its owner's role (port/linux/src/server_console.c),
+	and none of them (a password) is kept in the console's history */
+	if (halo_server_mode())
+		return;
 	if (!game_in_editor())
 	{
 		file = fopen("d:\\init.txt", "r");

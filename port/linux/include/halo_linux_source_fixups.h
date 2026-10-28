@@ -12,6 +12,7 @@ the platform layer reads the display.interpolation setting */
 struct observer_result;
 struct render_camera;
 struct real_matrix4x3;
+union real_point3d;
 int halo_interpolation_enabled(void);
 float game_time_get_tick_fraction(void);
 void render_interpolation_tick(void);
@@ -20,6 +21,8 @@ void render_interpolation_frame_begin(void);
 void render_interpolation_frame_end(void);
 float render_interpolation_fraction(void);
 struct real_matrix4x3 *render_interpolation_object_node_matrices(long object_index);
+/* a point on an object (a nav marker's), moved to where the frame draws it */
+void render_interpolation_object_point(long object_index, union real_point3d *point);
 struct observer_result const *render_interpolation_camera(short local_player_index,
 	struct observer_result const *observer);
 void render_interpolation_first_person(short local_player_index, struct real_matrix4x3 *node_matrices,
@@ -88,6 +91,23 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1);
 /* display.hdr's tone mapping of a window's 3D view, before its
 anti-aliasing (source/render/render.c) */
 void halo_screen_tone_map(short x0, short y0, short x1, short y1);
+/* network.client_timeout_seconds, in milliseconds (port/linux/src/port_config.c) */
+unsigned long network_client_timeout_milliseconds(void);
+/* a dedicated server (halo --server: port/linux/src/server_mode.c,
+port/linux/game/server_director.c; docs/dedicated_server.md): whether this
+run is one; its start, before the game's (shell_xbox.c); its frames' pace
+(main.c); the game's fatal error ended with (main.c); and the console's
+output, which it logs and captures for its commands' replies (terminal.c) */
+int halo_server_mode(void);
+void server_mode_start(void);
+void server_mode_pace_frame(void);
+void server_fatal(char const *text);
+void server_console_output(const char *text);
+/* ... whether debug.txt's lines go to the standard error too
+(server.log_debug_echo: errors.c) */
+int halo_server_debug_echo(void);
+/* ... the level its rotation plays next, NULL if none (game_engine.c) */
+char const *server_director_first_level(void);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
 

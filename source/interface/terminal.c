@@ -380,6 +380,9 @@ void terminal_printf(
 				line->buffer[NUMBEROF(line->buffer)-2] = 0;
 			line->tabstop = strstr(line->buffer, "|t") != 0;
 			telnet_console_print(line->buffer);
+			/* port: a dedicated server's log, and its commands' replies
+			(port/linux/src/server_console.c) */
+			server_console_output(line->buffer);
 		}
 	}
 

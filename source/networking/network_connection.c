@@ -1957,7 +1957,9 @@ static boolean network_connection_flush_reliable(
 		}
 		else if (sent == _transport_result_operation_would_block)
 		{
-			if (current_time - connection->reliable_outgoing_time >= NETWORK_CONNECTION_WRITE_TIMEOUT)
+			/* port: network.client_timeout_seconds (NETWORK_CONNECTION_WRITE_TIMEOUT
+			by default) */
+			if (current_time - connection->reliable_outgoing_time >= network_client_timeout_milliseconds())
 			{
 				error(_error_silent, "a reliable connection's peer has stopped reading");
 				return FALSE;

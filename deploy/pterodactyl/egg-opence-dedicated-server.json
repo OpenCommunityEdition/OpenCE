@@ -1,0 +1,203 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-10-24T00:00:00+00:00",
+    "name": "OpenCE Dedicated Server",
+    "author": "opence@halocombatevolved.com",
+    "description": "A dedicated server of OpenCE, the port of Halo: Combat Evolved: hosts multiplayer games one after another, with no window, sound or player of its own. Installs a release from GitHub. The game data is yours to upload: put the maps/ folder of your own copy of the game in the server's folder over SFTP; the server does not start without it.",
+    "features": [],
+    "docker_images": {
+        "Debian 12 with 32-bit libraries (Pterodactyl)": "ghcr.io/ptero-eggs/games:source",
+        "Debian 12 with 32-bit libraries (Pelican)": "ghcr.io/pelican-eggs/games:source"
+    },
+    "file_denylist": [],
+    "startup": "HALO_NET_TUNNEL_PORT={{SERVER_PORT}} HALO_LOG_ROOT=/home/container/logs ./halo --server",
+    "config": {
+        "files": "{}",
+        "startup": "{\r\n    \"done\": [\r\n        \"server: ready\",\r\n        \"\\\"msg\\\":\\\"ready (\"\r\n    ]\r\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# The OpenCE dedicated server egg's installation script (Pterodactyl and\n# Pelican), run as root in ghcr.io/ptero-eggs/installers:debian with the\n# server's folder at /mnt/server. tools/egg_build.py copies it into\n# egg-opence-dedicated-server.json.\n#\n# OPENCE_RELEASE: \"latest\" or a release tag (build-206).\n# OPENCE_REPOSITORY: the GitHub repository (owner/name) to download from.\n#\n# A reinstall replaces the release's files and keeps the owner's:\n# config.toml, init.txt, publisher.key, gametypes/, custom_maps/, maps/ and\n# logs/. The panel ignores this script's exit code, so each failure says\n# what went wrong.\n\nset -u\n\nSERVER_DIR=\"${SERVER_DIR:-/mnt/server}\"\nRELEASE=\"${OPENCE_RELEASE:-latest}\"\nREPOSITORY=\"${OPENCE_REPOSITORY:-OpenCommunityEdition/OpenCE}\"\nGITHUB_URL=\"${OPENCE_GITHUB_URL:-https://github.com}\"\nGITHUB_API=\"${OPENCE_GITHUB_API:-https://api.github.com}\"\nASSET=halo-linux-release.zip\n\nfail() {\n\techo \"INSTALL FAILED: $*\"\n\texit 1\n}\n\nif ! [[ \"$REPOSITORY\" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then\n\tfail \"the repository \\\"$REPOSITORY\\\" is not owner/name\"\nfi\nif [ -z \"$RELEASE\" ] || [ \"$RELEASE\" = latest ]; then\n\t# (no API call, so no rate limit)\n\turl=\"$GITHUB_URL/$REPOSITORY/releases/latest/download/$ASSET\"\nelse\n\tif ! [[ \"$RELEASE\" =~ ^[A-Za-z0-9._-]+$ ]]; then\n\t\tfail \"the release \\\"$RELEASE\\\" is not a tag name (build-206) or latest\"\n\tfi\n\techo \"Looking up release $RELEASE of $REPOSITORY\"\n\trelease_json=\"$(curl -fsSL --retry 3 -H 'Accept: application/vnd.github+json' \\\n\t\t\"$GITHUB_API/repos/$REPOSITORY/releases/tags/$RELEASE\")\" \\\n\t\t|| fail \"no release $RELEASE in $REPOSITORY (or GitHub's API did not answer)\"\n\turl=\"$(printf '%s' \"$release_json\" | jq -r --arg name \"$ASSET\" \\\n\t\t'[.assets[]? | select(.name == $name) | .browser_download_url][0] // empty')\"\n\t[ -n \"$url\" ] || fail \"release $RELEASE has no $ASSET\"\nfi\n\nmkdir -p \"$SERVER_DIR\" || fail \"cannot make $SERVER_DIR\"\ncd \"$SERVER_DIR\" || fail \"cannot enter $SERVER_DIR\"\n\nwork=\"$(mktemp -d)\" || fail \"cannot make a temporary folder\"\ntrap 'rm -rf \"$work\"' EXIT\n\necho \"Downloading $url\"\ncurl -fL --retry 3 --progress-bar -o \"$work/$ASSET\" \"$url\" || fail \"the download of $url failed\"\nunzip -tq \"$work/$ASSET\" > /dev/null || fail \"$ASSET is not a zip file\"\nmkdir \"$work/release\"\nunzip -q \"$work/$ASSET\" -d \"$work/release\" || fail \"cannot unzip $ASSET\"\n[ -f \"$work/release/halo\" ] || fail \"$ASSET has no halo executable\"\n\n# the release's files, over the old release's; the owner's are never in it,\n# and gametypes/ only adds the examples not already there\nfor entry in \"$work/release\"/* \"$work/release\"/.[!.]*; do\n\t[ -e \"$entry\" ] || continue\n\tname=\"$(basename \"$entry\")\"\n\tcase \"$name\" in\n\tconfig.toml | init.txt | publisher.key | custom_maps | maps | logs)\n\t\tcontinue\n\t\t;;\n\tgametypes)\n\t\tmkdir -p gametypes\n\t\tcp -rn \"$entry\"/. gametypes/\n\t\tcontinue\n\t\t;;\n\tesac\n\trm -rf \"./$name\"\n\tcp -a \"$entry\" \"./$name\" || fail \"cannot copy $name\"\ndone\n\nchmod 0755 halo\nif [ ! -f halo-server ]; then\n\tprintf '#!/bin/sh\\nexec \"$(dirname \"$0\")/halo\" --server \"$@\"\\n' > halo-server\nfi\nchmod 0755 halo-server\nmkdir -p maps custom_maps gametypes logs\n\necho \"Checking that the server runs\"\nif version=\"$(HOME=\"$work\" HALO_SAVE_ROOT=\"$work/saves\" timeout 30 ./halo --version 2>&1)\"; then\n\techo \"$version\"\nelse\n\techo \"WARNING: ./halo --version did not run. The server needs the 32-bit C runtime\"\n\techo \"WARNING: (the egg's ghcr.io/ptero-eggs/games:source image has it):\"\n\techo \"$version\"\nfi\n\nif [ ! -f maps/ui.map ]; then\n\techo \"No game data yet: upload your maps/ folder (ui.map and the multiplayer maps)\"\n\techo \"over SFTP into the server's folder before starting it.\"\nfi\necho \"Installation completed\"\n",
+            "container": "ghcr.io/ptero-eggs/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Release",
+            "description": "A release tag (build-206) or latest. A change takes effect on Reinstall (Settings tab), which keeps config.toml, init.txt, gametypes/, custom_maps/ and maps/.",
+            "env_variable": "OPENCE_RELEASE",
+            "default_value": "latest",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:40|regex:/^[A-Za-z0-9._-]+$/",
+            "field_type": "text"
+        },
+        {
+            "name": "Server name",
+            "description": "The game's name in the lobby and the server browser: 15 characters of printable ASCII.",
+            "env_variable": "HALO_SERVER_NAME",
+            "default_value": "OpenCE Server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:15|regex:/^[\\x20-\\x7E]+$/",
+            "field_type": "text"
+        },
+        {
+            "name": "Rotation",
+            "description": "The games played one after another, separated by commas: map:gametype, with +rule=value after a gametype (bloodgulch:ctf, sidewinder:team_slayer+score=50). A gametype is a built-in's name or a gametypes/<name>.toml of yours.",
+            "env_variable": "HALO_SERVER_ROTATION",
+            "default_value": "bloodgulch:ctf, sidewinder:team_slayer, prisoner:slayer",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:4096",
+            "field_type": "text"
+        },
+        {
+            "name": "Max players",
+            "description": "2 to 127.",
+            "env_variable": "HALO_SERVER_MAX_PLAYERS",
+            "default_value": "16",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:2,127",
+            "field_type": "text"
+        },
+        {
+            "name": "Join password",
+            "description": "The password the server browser asks for; empty for none. The invite link joins without it.",
+            "env_variable": "HALO_SERVER_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Public",
+            "description": "List the server in everyone's server browser.",
+            "env_variable": "HALO_SERVER_PUBLIC",
+            "default_value": "true",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:true,false",
+            "field_type": "text"
+        },
+        {
+            "name": "Message of the day",
+            "description": "A notice each player is shown on joining (127 characters); empty for none.",
+            "env_variable": "HALO_SERVER_MOTD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:127",
+            "field_type": "text"
+        },
+        {
+            "name": "Lobby seconds",
+            "description": "Seconds the lobby counts down before each game (0 to 300).",
+            "env_variable": "HALO_SERVER_LOBBY_SECONDS",
+            "default_value": "15",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:0,300",
+            "field_type": "text"
+        },
+        {
+            "name": "Web UI port",
+            "description": "0: no web page. Else the port of an additional allocation (Network tab) for the admin page, its API and the remote console, at http://<allocation address>:<port>/; it needs a web UI password.",
+            "env_variable": "HALO_SERVER_WEB_PORT",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|integer|between:0,65535",
+            "field_type": "text"
+        },
+        {
+            "name": "Web UI password",
+            "description": "The admin password of the web page, 8 characters or more.",
+            "env_variable": "HALO_SERVER_WEB_PASSWORD",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|min:8|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Public address",
+            "description": "host[:port] offered to joiners first, for a node behind a NAT that STUN cannot see through; usually empty.",
+            "env_variable": "HALO_NET_PUBLIC_ADDRESS",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:253",
+            "field_type": "text"
+        },
+        {
+            "name": "Publisher key",
+            "description": "Your approved key for the master servers that list dedicated servers: the 64 hex characters of the seed ./halo --server --keygen writes to publisher.key. Empty: the key file, if there is one; the server is not listed on the masters without one.",
+            "env_variable": "HALO_SERVER_PUBLISHER_KEY",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|regex:/^[0-9a-f]{64}$/",
+            "field_type": "text"
+        },
+        {
+            "name": "Instance name",
+            "description": "Tells this server from your others on the master servers: letters, digits, dashes.",
+            "env_variable": "HALO_SERVER_INSTANCE",
+            "default_value": "main",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|alpha_dash|max:32",
+            "field_type": "text"
+        },
+        {
+            "name": "Region",
+            "description": "A label in the server browser (eu, na-east); empty for none.",
+            "env_variable": "HALO_SERVER_REGION",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|alpha_dash|max:16",
+            "field_type": "text"
+        },
+        {
+            "name": "Log format",
+            "description": "The console's lines: text, or json for a log collector.",
+            "env_variable": "HALO_SERVER_LOG_FORMAT",
+            "default_value": "text",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:text,json",
+            "field_type": "text"
+        },
+        {
+            "name": "Web UI bind",
+            "description": "The container's address the web port listens on: all of them, as the allocation's address is the node's.",
+            "env_variable": "HALO_SERVER_WEB_BIND",
+            "default_value": "0.0.0.0",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|string|in:0.0.0.0",
+            "field_type": "text"
+        },
+        {
+            "name": "GitHub repository",
+            "description": "owner/name the installation downloads the release from.",
+            "env_variable": "OPENCE_REPOSITORY",
+            "default_value": "OpenCommunityEdition/OpenCE",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|string|max:100|regex:/^[A-Za-z0-9._-]+\\/[A-Za-z0-9._-]+$/",
+            "field_type": "text"
+        }
+    ]
+}

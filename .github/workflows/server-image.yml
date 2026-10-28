@@ -1,0 +1,199 @@
+name: Server image
+
+# The dedicated server's container image (deploy/docker), made from a
+# release's halo-linux-release.zip, and the Helm chart's checks
+# (deploy/helm/opence-server).
+#
+# - After each successful Build of main (which publishes release build-<n>):
+#   the image of that release, checked, pushed to
+#   ghcr.io/opencommunityedition/opence-server as sha-<commit>, build-<n> and
+#   latest, and signed keyless with cosign (this workflow's GitHub identity).
+# - Weekly, the latest release's image again, for Debian's fixes.
+# - By hand, any release's (latest moves only for the newest).
+#
+# The checks (no game data in CI: it is never published): the image runs as
+# 10001:10001; started on a read-only root without maps it writes its
+# settings to /state, says "server: no usable maps" and exits 2; halo
+# --version answers; the health check fails with nothing listening.
+#
+# Verify:
+#   cosign verify ghcr.io/opencommunityedition/opence-server:latest \
+#     --certificate-identity-regexp '^https://github\.com/OpenCommunityEdition/OpenCE/\.github/workflows/server-image\.yml@' \
+#     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+on:
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "The release to build the image of: a tag (build-206) or latest"
+        default: latest
+
+concurrency:
+  group: server-image-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/opencommunityedition/opence-server
+
+jobs:
+  chart:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: azure/setup-helm@v4
+
+      - name: Lint
+        run: |
+          set -euo pipefail
+          chart=deploy/helm/opence-server
+          for values in "$chart"/ci/*-values.yaml; do
+            helm lint "$chart" --strict -f "$values"
+            helm template ci "$chart" -f "$values" > /dev/null
+          done
+          # the maps are never in the image: without game data the chart refuses to render
+          if helm template ci "$chart" > /dev/null 2>&1; then
+            echo "::error::the chart renders without gameData"; exit 1
+          fi
+
+      - name: Unit tests
+        run: |
+          set -euo pipefail
+          # (Helm 4 checks plugins' signatures, which helm-unittest does not publish)
+          if helm version --short | grep -q '^v3'; then verify=; else verify=--verify=false; fi
+          helm plugin install https://github.com/helm-unittest/helm-unittest $verify
+          helm unittest deploy/helm/opence-server
+
+  image:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+      # keyless signing: the workflow's OIDC token gets a short-lived Sigstore certificate
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+          WANTED: ${{ inputs.release }}
+        run: |
+          set -euo pipefail
+          case "$EVENT" in
+          workflow_run) tag="build-$RUN_NUMBER" ;;
+          workflow_dispatch) tag="${WANTED:-latest}" ;;
+          *) tag=latest ;;
+          esac
+          newest="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)"
+          if [ "$tag" = latest ]; then
+            tag="$newest"
+          fi
+          commit="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json targetCommitish -q .targetCommitish)"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern halo-linux-release.zip --dir deploy/docker
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "newest=$([ "$tag" = "$newest" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "Release $tag (commit $commit; the newest: $newest)"
+
+      - name: Build
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          COMMIT: ${{ steps.release.outputs.commit }}
+        run: |
+          set -euo pipefail
+          docker build --pull -t opence-server:ci \
+            --build-arg RELEASE=halo-linux-release.zip \
+            --label org.opencontainers.image.source="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.revision="$COMMIT" \
+            --label org.opencontainers.image.version="$TAG" \
+            --label org.opencontainers.image.licenses=AGPL-3.0-or-later \
+            --label org.opencontainers.image.title="OpenCE dedicated server" \
+            deploy/docker
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          [ "$(docker image inspect -f '{{.Config.User}}' opence-server:ci)" = 10001:10001 ] \
+            || { echo "::error::the image does not run as 10001:10001"; exit 1; }
+          docker run --rm --read-only --entrypoint /opt/opence/halo opence-server:ci --version | tee version.txt
+          grep -Eq '^OpenCE build-[0-9]+ \(network version [0-9]+\)$' version.txt \
+            || { echo "::error::halo --version did not answer"; exit 1; }
+          # without maps, on a read-only root with /state the one writable folder
+          docker volume create smoke-state > /dev/null
+          status=0
+          timeout 60 docker run --name smoke --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --tmpfs /tmp -v smoke-state:/state -e HALO_SERVER_WEB_PASSWORD=ci-smoke-password \
+            opence-server:ci > server.log 2>&1 || status=$?
+          cat server.log
+          docker rm -f smoke > /dev/null
+          [ "$status" = 2 ] || { echo "::error::the server without maps exited with $status, not 2"; exit 1; }
+          grep -qF 'server: no usable maps' server.log \
+            || { echo "::error::no 'server: no usable maps' line"; exit 1; }
+          if grep -qF 'server: ready' server.log; then echo "::error::the server said it was ready"; exit 1; fi
+          docker run --rm -v smoke-state:/state --entrypoint /bin/bash opence-server:ci -c 'test -s /state/config.toml' \
+            || { echo "::error::no /state/config.toml"; exit 1; }
+          # the health check, with nothing listening
+          if docker run --rm --entrypoint /opt/opence/healthz.sh opence-server:ci; then
+            echo "::error::the health check passed with no server"; exit 1
+          fi
+          docker volume rm smoke-state > /dev/null
+
+      - uses: docker/login-action@v3
+        if: github.repository == 'OpenCommunityEdition/OpenCE'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: sigstore/cosign-installer@v3
+        if: github.repository == 'OpenCommunityEdition/OpenCE'
+
+      - name: Push and sign
+        if: github.repository == 'OpenCommunityEdition/OpenCE'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          COMMIT: ${{ steps.release.outputs.commit }}
+          NEWEST: ${{ steps.release.outputs.newest }}
+          IDENTITY: ^https://github\.com/${{ github.repository }}/\.github/workflows/server-image\.yml@
+        run: |
+          set -euo pipefail
+          tags=("sha-${COMMIT:0:7}" "$TAG")
+          if [ "$NEWEST" = true ]; then
+            tags+=(latest)
+          fi
+          for tag in "${tags[@]}"; do
+            docker tag opence-server:ci "$IMAGE:$tag"
+            docker push "$IMAGE:$tag"
+          done
+          ref="$(docker image inspect -f '{{index .RepoDigests 0}}' "$IMAGE:$TAG")"
+          test -n "$ref"
+          cosign sign --yes "$ref"
+          cosign verify "$ref" --certificate-identity-regexp "$IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+          {
+            echo "Pushed and signed $ref as ${tags[*]}."
+            echo
+            echo "Verify: cosign verify $IMAGE:$TAG --certificate-identity-regexp '$IDENTITY' --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+          } >> "$GITHUB_STEP_SUMMARY"

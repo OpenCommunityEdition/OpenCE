@@ -1,0 +1,87 @@
+# Every option the chart has, for lint and the schema check (not installed: the NFS server is made
+# up).
+image:
+  tag: build-206@sha256:0000000000000000000000000000000000000000000000000000000000000000
+imagePullSecrets:
+  - name: registry-credentials
+gameData:
+  nfs:
+    server: nfs.example.com
+    path: /exports/halo
+  subPath: xbox
+customMaps:
+  existingClaim: halo-custom-maps
+server:
+  name: Example server
+  rotation: [bloodgulch:ctf_classic, sidewinder:team_slayer+score=50, hangemhigh:king_moving]
+  maxPlayers: 24
+  public: true
+  lobbySeconds: 20
+  motd: Welcome
+  logFormat: json
+  instance: eu-1
+  region: eu
+  masterPublish: true
+  password:
+    existingSecret: halo-join
+    key: password
+publisherKey:
+  existingSecret: halo-publisher
+  key: seed
+web:
+  port: 8080
+  existingSecret: halo-web
+  key: admin
+  moderatorKey: moderator
+network:
+  tunnelPort: 2303
+  publicAddress: halo.example.com:2303
+extraEnv:
+  - name: HALO_SERVER_EMPTY_SECONDS
+    value: "60"
+persistence:
+  enabled: true
+  storageClass: standard
+  annotations:
+    example.com/keep: "true"
+service:
+  type: LoadBalancer
+  port: 2303
+  nodePort: 30703
+  annotations:
+    example.com/address: 192.0.2.10
+  externalTrafficPolicy: Local
+  loadBalancerSourceRanges: [0.0.0.0/0]
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: games
+    effect: NoSchedule
+podAnnotations:
+  example.com/scrape: "true"
+podLabels:
+  team: games
+probes:
+  liveness:
+    periodSeconds: 30
+  readiness:
+    enabled: false
+networkPolicy:
+  webFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+  extraEgress:
+    - to:
+        - ipBlock:
+            cidr: 203.0.113.0/24
+      ports:
+        - protocol: TCP
+          port: 8443
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: '{{ .Release.Name }}-extra'
+    data:
+      hello: world

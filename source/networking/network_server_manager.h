@@ -48,6 +48,24 @@ void network_game_server_pause_countdown(
 starts with none (network_test.c's host) */
 void network_game_server_port_clear_queued_players(
 	struct network_game_server *server);
+/* port: a dedicated server's lobby (port/linux/game/server_director.c) */
+long network_game_server_port_countdown_milliseconds(
+	struct network_game_server *server);
+boolean network_game_server_port_countdown_paused(
+	struct network_game_server *server);
+void network_game_server_port_countdown_begin(
+	struct network_game_server *server,
+	long milliseconds);
+boolean network_game_server_port_start_sent(
+	struct network_game_server *server);
+boolean network_game_server_port_ok_to_countdown(
+	struct network_game_server *server);
+void network_game_server_port_forget_kicked_address(
+	unsigned long address,
+	char const *hardware_id);
+long network_game_server_port_remote_machine_count(
+	struct network_game_server *server,
+	boolean joined);
 void network_game_generate_join_game_token(
 	byte *join_token);
 void network_game_server_kick_machine(
@@ -55,6 +73,7 @@ void network_game_server_kick_machine(
 	boolean kept_out);
 /* port: the rejection code of the last machine
 network_game_server_accept_client_machine_into_game refused */
+void network_game_server_refuse_with(short code);
 short network_game_server_last_refusal_code(
 	void);
 /* the host's ban command (console.c, hs.c) */

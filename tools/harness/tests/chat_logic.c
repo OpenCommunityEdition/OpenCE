@@ -446,6 +446,39 @@ int main(int argc, char **argv)
 		CHECK(chat_refused(links, "see discord.gg/x") == NULL, "a link refused where links are allowed");
 	}
 
+	/* a public game's chat: off in one a player hosts (on the host, and on a
+	client that joined it from the server browser), on in a dedicated
+	server's, whose own setting then decides; a game not listed keeps its
+	host's setting */
+	CASE("listing")
+	{
+		CHECK(chat_listing_allows(FALSE, FALSE), "a private or LAN game has no chat");
+		CHECK(chat_listing_allows(FALSE, TRUE), "an unlisted dedicated server has no chat");
+		CHECK(!chat_listing_allows(TRUE, FALSE), "a public game a player hosts has chat");
+		CHECK(chat_listing_allows(TRUE, TRUE), "a public dedicated server has no chat");
+	}
+
+	/* the server's word filter: its modes and levels as server.chat_filter*
+	spell them (in either case; anything else off), and a line's marked
+	characters starred, its spaces kept */
+	CASE("filter")
+	{
+		char line[] = "you are a bad word ok";
+		unsigned char marked[sizeof(line)] = { 0 };
+		long index;
+
+		CHECK(chat_filter_mode("censor") == _chat_filter_censor && chat_filter_mode("BLOCK") == _chat_filter_block &&
+			chat_filter_mode("off") == _chat_filter_off && chat_filter_mode("nonsense") == _chat_filter_off &&
+			chat_filter_mode(NULL) == _chat_filter_off, "the modes");
+		CHECK(chat_filter_level("mild") == _text_filter_mild && chat_filter_level("Strong") == _text_filter_strong &&
+			chat_filter_level("severe") == _text_filter_severe && chat_filter_level("off") == _text_filter_off &&
+			chat_filter_level("") == _text_filter_off, "the levels");
+		for (index = 10; index < 18; index++)
+			marked[index] = 1;
+		chat_filter_star(line, marked, (long)sizeof(line));
+		CHECK(!strcmp(line, "you are a *** **** ok"), "'%s'", line);
+	}
+
 	/* the on-screen keyboard's characters: a letter in capitals with shift,
 	nothing else changed; none on the last row, or off the keyboard */
 	CASE("keyboard-character")

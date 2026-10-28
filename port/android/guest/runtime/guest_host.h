@@ -138,4 +138,12 @@ void host_touch_scene(int scene);
 for the overlay's labels */
 void host_touch_bindings(const int *controls);
 
+/* ---------- the server browser's master servers (host_https.c) */
+
+/* a GET of an https:// url (port/linux/src/master_list.c): 1 with the
+status, the headers ("Name: value" lines) and up to body_capacity bytes of
+the body (its size in body_size), else 0 and why in error */
+int host_https_get(const char *url, int *status, char *headers, int headers_size, char *body, int body_capacity,
+	int *body_size, char *error, int error_size);
+
 #endif
