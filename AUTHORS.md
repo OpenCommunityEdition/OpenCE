@@ -8,8 +8,9 @@
   the HUD messages'): redraws by saulob (`port/assets/buttons`).
 - **The high-res HUD** (its meters, icons, scopes and messages, and the
   weapons' reticles): redraws by MrBruh (`port/assets/hud`), based on
-  reference photos by Aerocatia. The sniper rifle's zoom labels (2x, 10x)
-  are set in Overpass (`port/assets/fonts`).
+  reference photos by Aerocatia. The corrected rocket/sniper reticles and
+  sniper zoom labels (2x, 10x) use artwork supplied by the project owner
+  (`port/assets/hud/corrections`); original artist attribution is unverified.
 - **The menus' mouse cursor** (the blue arrow the menus show for the
   mouse): by pugzysixtyfour (`port/assets/cursor`).
 

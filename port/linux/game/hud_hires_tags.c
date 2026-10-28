@@ -33,6 +33,7 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 #include "rasterizer/rasterizer.h"
 #include "text/draw_string.h"
 #include "hud_button_layout.h"
+#include "hud_hires_crosshairs.h"
 #include "controller_glyphs.h"
 #include "scenario/scenario_definitions.h"
 #include "cache/texture_cache.h"
@@ -368,6 +369,24 @@ struct bitmap_data const *hud_hires_sprite_bitmap(
 	}
 
 	return bitmap;
+}
+
+/* CE packs 2x and 8x into the same sequence. Only the supplied 2x and
+ * reticle have replacements; the original 8x must keep its own pixels.
+ * Identify the registered stock sheet, then use the existing CRC-checked,
+ * setting-gated placeholder path. No tags, bounds or anchoring are changed. */
+struct bitmap_data const *hud_hires_crosshair_bitmap(struct bitmap_data const *bitmap,
+    short sequence_index,short frame_index)
+{
+    long index;
+    if (!custom_edition_cache_tags_loaded() || !config_boolean("display.high_res_hud") ||
+        frame_index!=0 || (sequence_index!=0 && sequence_index!=1)) return bitmap;
+    for (index=0;index<hires_sprite_bitmap_count;index++)
+        if (hires_sprite_bitmaps[index].bitmap==bitmap && !strcmp(
+            hud_hires_asset_tag(hires_sprite_bitmaps[index].asset),
+            "ui\\hud\\bitmaps\\sniper\\hud_reticles_scope"))
+            return hud_hires_sprite_bitmap(bitmap,sequence_index);
+    return bitmap;
 }
 
 /* whether the bitmap at address that `asset` stands for is a Custom Edition

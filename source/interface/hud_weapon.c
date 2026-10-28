@@ -78,6 +78,7 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "custom_edition_hud.h" /* port: CE warning placement and reticle classification */
+#include "hud_hires_crosshairs.h" /* port: port/linux/game/hud_hires_tags.c */
 
 #include <math.h>
 #include <string.h>
@@ -1250,7 +1251,7 @@ static void crosshairs_draw(
 										item->sequence_index;
 									/* port: the bitmap (the sprite's, or the item's own) must be
 									one the group has, or the item isn't drawn */
-									struct bitmap_data *bitmap = bitmap_index >= 0 && bitmap_index < bitmap_group->bitmaps.count ?
+									struct bitmap_data const *bitmap = bitmap_index >= 0 && bitmap_index < bitmap_group->bitmaps.count ? /* port: replacement is read-only */
 										TAG_BLOCK_GET_ELEMENT(
 											&bitmap_group->bitmaps,
 											bitmap_index,
@@ -1265,6 +1266,8 @@ static void crosshairs_draw(
 									}
 									if (bitmap && _texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
 									{
+										/* port: replace only supplied CE scope sprites, preserving its original 8x. */
+										bitmap = hud_hires_crosshair_bitmap(bitmap, item->sequence_index, frame_index);
 										if (TEST_FLAG(item->flags, _hud_crosshair_hide_outside_area_bit))
 										{
 											real texel_scale_u = 1.0f;
