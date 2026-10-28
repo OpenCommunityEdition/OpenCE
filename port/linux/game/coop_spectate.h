@@ -19,12 +19,6 @@ the player is alive or nobody else is */
 long coop_spectate_unit(
 	short local_player_index);
 
-/* TRUE if the teammate this local player is spectating (while dead or not
-yet spawned) rides in an AI-driven vehicle, such as an insertion Pelican.
-network_coop.c then shows that seat instead of the scripted camera. */
-boolean coop_spectate_watching_rider(
-	short local_player_index);
-
 /* whether a local player has nothing to look at: no unit of its own and
 no living teammate to watch (network_coop.c shows it the host's view) */
 boolean coop_spectate_nothing_to_watch(
