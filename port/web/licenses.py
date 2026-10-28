@@ -26,6 +26,7 @@ NOTICES = [
     ("OpenCE (the title font, from Newtown)", "port/assets/fonts/OpenCE-OFL.txt"),
     ("Newtown", "port/assets/fonts/Newtown-LICENSE.txt"),
     ("Lucide (voice chat's speaker icons, the Mods menu's warning icons)", "port/assets/icons/lucide/LICENSE"),
+    ("Rose on Toast (the talking timer's voice)", "port/assets/sound/talking_timer/LICENSE"),
 ]
 
 

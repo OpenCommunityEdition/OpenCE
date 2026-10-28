@@ -1,0 +1,9 @@
+The talking timer's voice lines are recorded by Rose on Toast
+(https://www.instagram.com/NyxFinSharkCat/) and licensed under the
+Creative Commons Attribution 4.0 International licence (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/
+
+OpenCE changed the recordings: each is filtered through an 80 Hz
+high-pass, cut to one take without the silence at its ends, set to a
+loudness of -14.5 LUFS ("20 seconds" -12.5 LUFS) with its peaks limited
+to -1 dBFS, and coded as Opus at 24 kbit/s.
