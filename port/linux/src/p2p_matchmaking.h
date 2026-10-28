@@ -73,7 +73,6 @@ struct mm_unit
 {
 	unsigned char key[P2P_KEY_SIZE];
 	unsigned char key_hash[P2P_KEY_HASH_SIZE];
-	int players;
 	int can_host;
 	int failed;
 };
@@ -96,7 +95,9 @@ enum
 enum
 {
 	MM_FAILED_NONE,
-	MM_FAILED_GAME_UNJOINABLE
+	MM_FAILED_GAME_UNJOINABLE,
+	/* an elected host, until it is heard hosting */
+	MM_FAILED_PASSED_OVER
 };
 
 struct mm_peer
@@ -156,5 +157,6 @@ void mm_hosted(struct mm_search *search, const unsigned char *token, int players
 	unsigned long now);
 void mm_joined(struct mm_search *search, int ok, unsigned long now);
 int mm_cancel(struct mm_search *search, struct mm_out *out, int out_size);
+void mm_game_lost(struct mm_search *search, unsigned long now);
 
 #endif

@@ -174,7 +174,6 @@ static struct mm_unit unit(int machine, int can_host)
 	p2p_ed25519_public(seed, result.key, NULL);
 	p2p_ed25519_to_x25519(result.key, x25519);
 	p2p_key_hash(x25519, result.key_hash);
-	result.players = 1;
 	result.can_host = can_host;
 	return result;
 }
@@ -213,8 +212,8 @@ static void check_pool(void)
 		"E4: the same host on every machine");
 	CHECK(mm_pool(units, 3, 4, pool) == 0, "3 of 4: no pool");
 	for (index = 0; index < MM_MAXIMUM_UNITS; index++)
-		every[index].players = 2;
-	every[MM_MAXIMUM_UNITS].players = every[MM_MAXIMUM_UNITS].can_host = 1;
+		every[index].failed = 1;
+	every[MM_MAXIMUM_UNITS].can_host = 1;
 	CHECK(mm_pool(every, MM_MAXIMUM_UNITS + 1, 1, pool) == 1 && pool[0] == MM_MAXIMUM_UNITS,
 		"this machine and a full peers table: every unit is walked");
 	/* four strict, then one that can host with the highest key hash: it can take only the last place */
@@ -263,6 +262,7 @@ static unsigned long now_ms, now_unix;
 static int drop_percent;
 static int cancel_on_join, cancel_sent, never_joins = -1;
 static int fail_join = -1, hosted_while_joining, joins_taken;
+static int ignore_first_host, ignore_only = -1, ignored = -1, fail_first_host, failed_host = -1;
 static int capture_from = -1, captured_count;
 static struct mm_out captured[256], quit_out[MM_MAXIMUM_OUT];
 
@@ -367,6 +367,23 @@ static void game_side(int index)
 
 	memset(token, index + 1, sizeof(token));
 	machine->search.decision.kind = P2P_MM_DECIDE_NONE;
+	if (machine->in >= 0 && (machines[machine->in].quit || !machines[machine->in].hosting))
+	{
+		machine->in = -1;
+		mm_game_lost(&machine->search, now_ms);
+	}
+	if (decision.kind == P2P_MM_DECIDE_HOST && ignore_first_host && ignored < 0 &&
+		(ignore_only < 0 || ignore_only == index))
+	{
+		ignored = index;
+		return;
+	}
+	if (decision.kind == P2P_MM_DECIDE_HOST && fail_first_host && failed_host < 0)
+	{
+		failed_host = index;
+		publish(index, quit_out, mm_cancel(&machine->search, quit_out, MM_MAXIMUM_OUT));
+		return;
+	}
 	if (decision.kind == P2P_MM_DECIDE_HOST)
 	{
 		machine->hosting = 1;
@@ -376,6 +393,7 @@ static void game_side(int index)
 	else if (decision.kind == P2P_MM_DECIDE_JOIN)
 	{
 		joins_taken++;
+		machine->hosting = 0;
 		if (fail_join == index)
 		{
 			mm_hosted(&machine->search, token, 1, 4, 0, now_ms);
@@ -439,12 +457,13 @@ static void world(int count)
 	machine_count = count;
 	for (count = 0; count < 8; count++)
 		machines[count].in = -1;
+	ignore_first_host = fail_first_host = 0;
+	ignored = failed_host = ignore_only = -1;
 	now_ms = 1000;
 	now_unix = 1800000000UL;
 	drop_percent = flight_count = captured_count = cancel_on_join = cancel_sent = 0;
 	never_joins = capture_from = fail_join = -1;
 	hosted_while_joining = joins_taken = 0;
-	srand(1);
 }
 
 static void start_searching(int index, unsigned playlists, int size, int can_host)
@@ -534,6 +553,34 @@ static void check_replay(void)
 	CHECK(peer_count(&machines[1].search) == 0, "E43: a replayed searcher is never counted again");
 }
 
+static void check_return(void)
+{
+	unsigned long returned;
+	int index, host, restarted = 1;
+
+	case_name = "e39_return";
+	world(4);
+	for (index = 0; index < 4; index++)
+		start_searching(index, 1u << P2P_MM_SLAYER, P2P_MM_2V2, 1);
+	run(100.0);
+	host = find_host();
+	CHECK(host >= 0 && machines[host].players == 4, "a full match");
+	if (host < 0)
+		return;
+	machines[host].quit = 1;
+	run(0.2);
+	returned = now_ms;
+	for (index = 0; index < 4; index++)
+		if (index != host)
+			restarted &= machines[index].search.marks_from >= returned - 200;
+	CHECK(restarted, "E39: marks restart from the return");
+	run(125.0);
+	CHECK(host_count() == 0, "E39: a player short, no lone host: %d", host_count());
+	for (index = 0; index < 4; index++)
+		CHECK(index == host || machines[index].search.state == P2P_MM_QUEUED,
+			"E39: machine %d searches on", index);
+}
+
 int main(void)
 {
 	check_pool();
@@ -544,6 +591,7 @@ int main(void)
 	check_topics();
 	check_four();
 	check_replay();
+	check_return();
 	printf(failures ? "FAILED %d\n" : "PASS\n", failures);
 	return failures != 0;
 }
