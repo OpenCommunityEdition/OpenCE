@@ -77,6 +77,36 @@ with the host ABI.
 
 static __thread int last_error;
 
+#ifdef __APPLE__
+#define SOCK_CLOEXEC 0
+#define SOCK_NONBLOCK 0
+#define accept4(socket, address, length, flags) accept(socket, address, length)
+#define getrandom(buffer, size, flags) (arc4random_buf(buffer, size), (ssize_t)(size))
+
+static const void *address_in(const void *address, int length, struct sockaddr_storage *storage)
+{
+	if (!address || length < 2 || length > (int)sizeof(*storage))
+		return address;
+	memcpy(storage, address, (size_t)length);
+	storage->ss_family = (sa_family_t)*(const unsigned short *)address;
+	storage->ss_len = (unsigned char)length;
+	return storage;
+}
+
+static void address_out(void *address, int length)
+{
+	unsigned short family;
+
+	if (!address || length < 2)
+		return;
+	family = ((unsigned char *)address)[1];
+	memcpy(address, &family, sizeof(family));
+}
+#else
+#define address_in(address, length, storage) ((void)(storage), (address))
+#define address_out(address, length)
+#endif
+
 static int fail(void)
 {
 	switch (errno)
@@ -144,7 +174,9 @@ int posix_socket_close(int socket)
 
 int posix_socket_bind(int socket, const void *address, int address_length)
 {
-	return succeed(bind(socket, address, (socklen_t)address_length));
+	struct sockaddr_storage storage;
+
+	return succeed(bind(socket, address_in(address, address_length, &storage), (socklen_t)address_length));
 }
 
 int posix_socket_connect(int socket, const void *address, int address_length)
@@ -155,7 +187,8 @@ int posix_socket_connect(int socket, const void *address, int address_length)
 	transport_endpoint_winsock.c); as WSAEINPROGRESS it gave up at once,
 	and every system link join failed, a split screen game's join of its
 	own host included. */
-	int result = connect(socket, address, (socklen_t)address_length);
+	struct sockaddr_storage storage;
+	int result = connect(socket, address_in(address, address_length, &storage), (socklen_t)address_length);
 
 	if (result < 0 && errno == EINPROGRESS)
 	{
@@ -177,6 +210,7 @@ int posix_socket_accept(int socket, void *address, int *address_length)
 
 	if (address_length)
 		*address_length = (int)length;
+	address_out(address, (int)length);
 	return succeed(result);
 }
 
@@ -188,8 +222,10 @@ int posix_socket_send(int socket, const void *buffer, int length, int flags)
 int posix_socket_sendto(int socket, const void *buffer, int length, int flags,
 	const void *address, int address_length)
 {
+	struct sockaddr_storage storage;
+
 	return succeed((int)sendto(socket, buffer, (size_t)length, flags | MSG_NOSIGNAL,
-		address, (socklen_t)address_length));
+		address_in(address, address_length, &storage), (socklen_t)address_length));
 }
 
 int posix_socket_recv(int socket, void *buffer, int length, int flags)
@@ -214,6 +250,7 @@ int posix_socket_recvfrom(int socket, void *buffer, int length, int flags,
 	result = (int)recvmsg(socket, &message, flags);
 	if (address_length)
 		*address_length = (int)message.msg_namelen;
+	address_out(address, (int)message.msg_namelen);
 	/* a datagram larger than the buffer: both give its start, but Winsock
 	with WSAEMSGSIZE, which the game takes as an error, not as the datagram */
 	if (result >= 0 && (message.msg_flags & MSG_TRUNC))
@@ -315,6 +352,7 @@ int posix_socket_getsockname(int socket, void *address, int *address_length)
 	int result = getsockname(socket, address, &length);
 
 	*address_length = (int)length;
+	address_out(address, (int)length);
 	return succeed(result);
 }
 
@@ -324,6 +362,7 @@ int posix_socket_getpeername(int socket, void *address, int *address_length)
 	int result = getpeername(socket, address, &length);
 
 	*address_length = (int)length;
+	address_out(address, (int)length);
 	return succeed(result);
 }
 

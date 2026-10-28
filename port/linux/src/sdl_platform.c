@@ -32,7 +32,7 @@ void win32_window_borderless_apply(SDL_Window *window);
 #if !defined(_WIN32) && !defined(HALO_ANDROID)
 #include <signal.h>
 #endif
-#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID)
+#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 #include <dlfcn.h>
 #include <unistd.h>
 #endif
@@ -179,7 +179,7 @@ static void data_check_maps(void)
 }
 #endif
 
-#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID)
+#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 /* NVIDIA's driver draws into a Wayland window through its egl-wayland
 library, which distributions ship 64-bit only (Arch has no lib32 package
 of it). In this 32-bit game, OpenGL on Wayland (EGL) then falls back to
@@ -226,7 +226,7 @@ BOOL platform_sdl_initialize(void)
 	if (p2p_hand_off_invite())
 		exit(EXIT_SUCCESS);
 	SDL_SetHint(SDL_HINT_APP_NAME, "Halo");
-#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID)
+#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	platform_choose_video_driver();
 #endif
 #ifdef HALO_ANDROID
@@ -1287,7 +1287,7 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	(void)version;
 	platform_event_thread = SDL_GetCurrentThreadID();
 	platform_log("OpenGL %s on %s", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER));
-#if defined(__linux__) && !defined(HALO_ANDROID)
+#if defined(__linux__) && !defined(HALO_ANDROID) && !defined(HALO_MACOS)
 	{
 		const char *renderer = (const char *)glGetString(GL_RENDERER);
 
@@ -2037,7 +2037,9 @@ void platform_pump_events(void)
 	updater_poll(platform_window);
 	/* (Settings > Audio's output device, as it changes: dsound_sdl.c) */
 	dsound_sdl_output_device_check();
+#ifndef HALO_MACOS
 	screen_keyboard_update();
+#endif
 #endif
 	pthread_mutex_lock(&input_lock);
 #ifndef HALO_ANDROID
@@ -2282,7 +2284,7 @@ void platform_pump_events(void)
 			break;
 #endif
 		case SDL_EVENT_GAMEPAD_ADDED:
-#ifdef HALO_ARM64_GUEST
+#if defined(HALO_ARM64_GUEST) || defined(HALO_MACOS)
 			/* (the guest reaches SDL only through host_imports.list, which
 			has no SDL_GetGamepadName) */
 			SDL_OpenGamepad(event.gdevice.which);

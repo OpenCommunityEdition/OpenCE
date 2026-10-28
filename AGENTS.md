@@ -1,7 +1,7 @@
 # Notes for agents
 
 This repository ports the Halo: Combat Evolved decompilation (Xbox build
-01.01.14.2342, `cachebeta.exe`) to Linux, Windows, Android and the web. The game's C
+01.01.14.2342, `cachebeta.exe`) to Linux, Windows, macOS, Android and the web. The game's C
 sources are the decompilation; the port adds a platform layer that
 implements the Xbox APIs the game calls, and features the Xbox game did not
 have (a new netcode, internet play, the PC version's menus, Custom Edition
@@ -21,6 +21,7 @@ end.
 | `port/include/xdk/` | Stand-ins for the Xbox SDK's headers (declarations only) |
 | `port/windows/` | The Windows build's own files (`win32_*.c`, headers) |
 | `port/android/` | The Android app: the guest runtime, the host library (`host/`), the Java app (`app/`), host imports (`host_imports.list`) |
+| `port/macos/` | The Mac app: the guest runtime (`guest/`), x32 for Intel and arm64_32 for Apple Silicon (`compiler/`: Apple Silicon's rebase pass), and their universal host (`host/`) |
 | `port/web/` | The web build: its runtime (`src/`: entry, sockets inside the page, memory watch), the page and its service worker (`site/`), the SDL port, tests |
 | `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers and master servers, the dedicated server's web page (`server_ui/`) |
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
@@ -41,6 +42,7 @@ ninja android                  # the Android guest image and native libraries
 ninja android_apk              # the APK (Gradle)
 ninja web                      # build/web/site (Emscripten: port/web/README.md)
 ninja windows                  # on Windows, or on Linux after configure.py --windows-cross
+ninja macos                    # build/macos/OpenCE.app, after configure.py --macos (port/macos/README.md)
 python tools/ci_build.py linux release   # what CI builds
 ```
 
@@ -69,7 +71,8 @@ python tools/ci_build.py linux release   # what CI builds
 | --- | --- | --- |
 | `HALO_ANDROID` | Android | The app: its display, input, files and lifecycle |
 | `HALO_GLES` | Android, web | The OpenGL ES renderer |
-| `HALO_ARM64_GUEST` | Android | The guest's ABI (ILP32 AArch64) |
+| `HALO_ARM64_GUEST` | Android, macOS (Apple Silicon) | The guest's ABI (ILP32 AArch64) |
+| `HALO_MACOS` | macOS | The Mac's guests (Apple Silicon's with `HALO_ARM64_GUEST`), with the desktop's code paths |
 | `HALO_WEB` | Web | The browser: its frames, storage, sockets and WebGL 2's limits (with `HALO_GLES`, not `HALO_ANDROID`) |
 | `HALO_WINDOWS` | Windows (`halo_windows_prefix.h`) | The Windows build |
 | `HALO_RELEASE` | `--release` | No assertions checked |
@@ -234,6 +237,7 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [port/linux/NETCODE.md](port/linux/NETCODE.md) | The distributed netcode, network versions, joining a game in progress, map sharing, transport, testing |
 | [port/windows/README.md](port/windows/README.md) | The Windows build, its headers, inline functions, crash reports |
 | [port/android/README.md](port/android/README.md) | The Android build, the guest and host, touch controls, Android settings, finding problems |
+| [port/macos/README.md](port/macos/README.md) | The Mac build, its files, and how its guest and host operate |
 | [port/web/README.md](port/web/README.md) | The web build, the page, the game data in the browser, limits, how it operates, hosting on GitHub Pages |
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |

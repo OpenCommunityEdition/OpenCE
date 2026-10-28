@@ -1598,7 +1598,7 @@ static void *silent_clock_thread(void *parameter)
 at least six channels. Android and the browser play stereo */
 static unsigned long choose_output_channels(SDL_AudioDeviceID device)
 {
-#if defined(HALO_ANDROID) || defined(HALO_WEB) || defined(HALO_ARM64_GUEST)
+#if defined(HALO_ANDROID) || defined(HALO_WEB) || defined(HALO_ARM64_GUEST) || defined(HALO_MACOS)
 	(void)device;
 	return 2;
 #else
@@ -1642,7 +1642,7 @@ static void audio_start(void)
 		spec.format = SDL_AUDIO_F32;
 		spec.channels = (int)output_channels;
 		spec.freq = OUTPUT_RATE;
-#ifdef HALO_ARM64_GUEST
+#if defined(HALO_ARM64_GUEST) || defined(HALO_MACOS)
 		/* frames per callback: on Android each callback is handed to a thread
 		that can run the guest (host_sdl.c): 512 left it too little time and
 		the menus' music broke up, which 1024 does not (about 21 ms at 48 kHz,

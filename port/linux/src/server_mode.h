@@ -11,7 +11,7 @@ Android and web builds compile the server's files to nothing
 #ifndef __HALO_LINUX_SERVER_MODE_H
 #define __HALO_LINUX_SERVER_MODE_H
 
-#if defined(HALO_ANDROID) || defined(HALO_WEB)
+#if defined(HALO_ANDROID) || defined(HALO_WEB) || defined(HALO_MACOS)
 #define HALO_SERVER_BUILD 0
 #else
 #define HALO_SERVER_BUILD 1

@@ -99,7 +99,7 @@ static long file_add(const char *path, const unsigned char *data, unsigned long 
 
 static unsigned char *file_read(const char *path, unsigned long *size)
 {
-#ifdef HALO_ARM64_GUEST
+#if defined(HALO_ARM64_GUEST) || defined(HALO_MACOS)
 	FILE *file = fopen(path, "rb");
 	unsigned char *data = NULL;
 	long length;
