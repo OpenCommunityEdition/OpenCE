@@ -1222,6 +1222,9 @@ long scenario_tags_load(
 	name: a Custom Edition map that cannot load is not played at all. */
 	if (custom_edition_level_name(scenario_name))
 	{
+		/* port: a protected map's structure bsp names the groups of tags
+		whose own are scrambled (port/linux/game/tag_validate.c) */
+		custom_edition_structure_bsp_proc_set(tag_validate_custom_edition_note_structure_bsp);
 		cache_file_globals.tag_header = custom_edition_cache_tags_load(
 			stripped_scenario_name,
 			&cache_file_globals.header);
