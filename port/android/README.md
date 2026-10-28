@@ -166,11 +166,14 @@ Gamepads): with "Swap triggers", the right trigger's button says "Grenade".
 The stick moves the player with every "Stick layout", southpaw too.
 
 A finger that holds a button can also swipe to look, so you can fire and
-aim with one thumb. The controls are a finger wide (48 dp) or larger, but
+aim with one thumb ("Held buttons don't aim" in General turns this off).
+The controls are a finger wide (48 dp) or larger, but
 on a small screen of high density they stay apart rather than reach that
 size. A short tap reaches the game even when it is shorter than one frame.
 Swipes that start in the edge-gesture zones of Android do not turn the
-view. The swipe aims as the controller's stick does, not as a mouse: the
+view or place the floating stick, but a control drawn in one still presses
+(Android keeps the zones while the system bars are hidden: with 3-button
+navigation, all of where the bar was). The swipe aims as the controller's stick does, not as a mouse: the
 aim slows over a target and follows a moving one, as with a controller,
 and it follows the profile's "invert look" (the gyroscope turns the view
 as the phone turns, never inverted). The setting `input.touch_aim_assist`
@@ -193,11 +196,14 @@ The buttons at the top of the screen:
     vibration setting of the game's profile), aiming with the gyroscope
     (off by default), a floating move stick (off by default: the stick goes
     where your thumb lands in the lower left of the screen), the opacity of
-    the controls, "Hide or add buttons" (hide a button, add a copy of a
+    the controls, "Held buttons don't aim" (off by default: a finger
+    that swipes from a button only holds it),
+    "Hide or add buttons" (hide a button, add a copy of a
     button) and "Edit buttons size".
-  - "Edit buttons layout": drag the controls to new positions, then push
-    "Save". "Export" and "Import" write and read a layout file with the
-    file picker of the system.
+  - "Edit buttons layout": drag the controls, and the "Options" button
+    itself, to new positions, then push "Save" in the middle of the
+    screen. "Export" and "Import", beside it, write and read a layout
+    file with the file picker of the system.
   - "Look sensitivity".
 
 "Hide" and "Options" act when the finger lifts on them: a swipe that
