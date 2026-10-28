@@ -6132,6 +6132,9 @@ enum
 static struct
 {
 	unsigned char state[MAXIMUM_LOCAL_PLAYERS];
+	/* the profile each choosing player's spinner started on (two joining
+	at once start on different ones) */
+	long starting[MAXIMUM_LOCAL_PLAYERS];
 	/* the controller whose START opened the screen (it joins at once) */
 	short opener;
 	boolean keyboard_held;
@@ -6211,25 +6214,34 @@ static boolean join4_join(short controller)
 }
 
 /* whether another player of this machine plays, or has selected, the
-profile */
-static boolean join4_profile_taken(short controller, long profile)
+profile; with choosing, or has a spinner started on it */
+static boolean join4_profile_has(short controller, long profile, boolean choosing)
 {
 	short other;
 
 	for (other = 0; other < MAXIMUM_LOCAL_PLAYERS; other++)
 	{
-		if (other != controller && (lobby_controller_playing(other) || join4.state[other] == _join4_selected) &&
+		if (other == controller)
+			continue;
+		if ((lobby_controller_playing(other) || join4.state[other] == _join4_selected) &&
 			player_ui_get_active_player_profile_index(other) == profile)
 		{
 			return TRUE;
 		}
+		if (choosing && join4.state[other] == _join4_choosing && join4.starting[other] == profile)
+			return TRUE;
 	}
 	return FALSE;
 }
 
+static boolean join4_profile_taken(short controller, long profile)
+{
+	return join4_profile_has(controller, profile, FALSE);
+}
+
 static boolean join4_profile_free(short controller, long profile)
 {
-	return !join4_profile_taken(controller, profile);
+	return !join4_profile_has(controller, profile, TRUE);
 }
 
 /* "port join4 select" (A, START on the spinner): the profile is the
@@ -7601,10 +7613,12 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port join4 choosing"))
 		{
 			/* (the spinner on a profile no other player has) */
-			extern boolean ui_widget_port_spinner_first_available(struct widget_instance *widget,
+			extern long ui_widget_port_spinner_first_available(struct widget_instance *widget,
 				boolean (*usable)(short controller, long profile));
+			long profile = ui_widget_port_spinner_first_available(widget, join4_profile_free);
 
-			ui_widget_port_spinner_first_available(widget, join4_profile_free);
+			if (controller_of(widget) < MAXIMUM_LOCAL_PLAYERS)
+				join4.starting[controller_of(widget)] = profile;
 			return join4_set(controller_of(widget), _join4_choosing);
 		}
 		else if (!strcmp(name, "port join4 unready"))

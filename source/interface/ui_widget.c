@@ -3874,8 +3874,8 @@ static void widget_instance_initialize(
 the widget's children on the first profile that is usable ("player profile
 list initialize" starts on player 1's), when the one it is on is not: the
 enumeration's high bit (available to its player) and the callback's say;
-FALSE if it has none */
-boolean ui_widget_port_spinner_first_available(
+the profile it is on, NONE if it has none */
+long ui_widget_port_spinner_first_available(
 	struct widget_instance *widget,
 	boolean (*usable)(short controller, long profile))
 {
@@ -3886,23 +3886,23 @@ boolean ui_widget_port_spinner_first_available(
 	for (spinner = widget->child; spinner && spinner->type != _ui_widget_type_spinner_list; spinner = spinner->next)
 		;
 	if (!spinner || !(profiles = spinner->parameters.list.list_items) || !spinner->parameters.list.number_of_items)
-		return FALSE;
+		return NONE;
 #define SPINNER_USABLE(profile) ((profile) != NONE && ((profile) & 0x80000000) && 	usable(spinner->local_player_index, (profile)))
 	if ((word)spinner->parameters.list.selected_index < spinner->parameters.list.number_of_items &&
 		SPINNER_USABLE(profiles[spinner->parameters.list.selected_index]))
 	{
-		return TRUE;
+		return profiles[spinner->parameters.list.selected_index];
 	}
 	for (index = 0; index < spinner->parameters.list.number_of_items; index++)
 	{
 		if (SPINNER_USABLE(profiles[index]))
 		{
 			spinner->parameters.list.selected_index = (short)index;
-			return TRUE;
+			return profiles[index];
 		}
 	}
 #undef SPINNER_USABLE
-	return FALSE;
+	return NONE;
 }
 
 /* port: the PC version's events that this engine never sends (its custom
@@ -7170,12 +7170,15 @@ static void widget_instance_render_recursive(
 			ui_plasma_effect_color.green = 0.05f;
 			ui_plasma_effect_color.blue = 0.05f;
 		}
+		/* (the view's margins: the centring shift, on either side of the
+		640 columns, or of a quarter's 320) */
+		long extra = halo_screen_ui_offset_current();
+		short design_right = bounds.x1;
+
 		if (widen_to_screen)
 		{
-			long extra = (halo_screen_width() - 640) / 2;
 			bounds.x0 -= (short)extra;
-			if (bounds.x1 >= 640)
-				bounds.x1 = (short)(640 + extra);
+			bounds.x1 = (short)(bounds.x1 + extra);
 		}
 		bounds.x0 += offset.x;
 		bounds.x1 += offset.x;
@@ -7195,10 +7198,9 @@ static void widget_instance_render_recursive(
 			/* widen the clip by the same amount (it is offset-shifted but
 			 * still 640-wide at the edges) so the dim is not clipped back
 			 * to the centered columns */
-			long extra = (halo_screen_width() - 640) / 2;
 			if (clip->x0 <= 0)
 				clip->x0 -= (short)extra;
-			if (clip->x1 >= 640)
+			if (clip->x1 >= design_right)
 				clip->x1 = (short)(clip->x1 + extra);
 		}
 		if (TEST_FLAG(definition->flags, _widget_flash_background_bitmap_bit))
