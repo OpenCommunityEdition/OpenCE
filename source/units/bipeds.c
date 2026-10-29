@@ -521,8 +521,10 @@ static void biped_update_jumping(
 	struct unit_animation_update_data *animation);
 static void biped_update_physics(
 	struct biped_physics *physics);
-/* units.c's: whether the unit gets the animation enhancements */
+/* units.c's: whether the unit gets the animation enhancements, and whether
+a player biped turns with the aim where the original did not (port) */
 boolean unit_animation_enhanced(long unit_index);
+boolean unit_turns_with_aim(long unit_index);
 static void biped_snap_facing(
 	long biped_index);
 
@@ -3334,20 +3336,22 @@ static void biped_update_turning(
 		/* port: a player throwing a grenade turns with the aim, as one
 		meleeing does: the melee plays over the moving or idle state, the
 		throw is a state of its own, which the original never turned in
-		(game.enhanced_animations: unit_animation_enhanced) */
+		(unit_turns_with_aim: game.enhanced_animations, but always in a
+		network game) */
 		boolean throwing_turn =
 			biped->unit.player_index!=NONE &&
 			biped->unit.animation.state==_unit_state_throw_grenade &&
-			unit_animation_enhanced(biped_index);
+			unit_turns_with_aim(biped_index);
 		/* port: and a player in the air turns with the aim, as one running
 		does: the original never turned the airborne state, and clipped the
 		aim to its aiming screen about the body left facing where the jump
 		began, so a shot after a turn in the air missed the crosshair
-		(game.enhanced_animations: unit_animation_enhanced) */
+		(unit_turns_with_aim: game.enhanced_animations, but always in a
+		network game) */
 		boolean airborne_turn =
 			biped->unit.player_index!=NONE &&
 			biped->unit.animation.state==_unit_state_airborne &&
-			unit_animation_enhanced(biped_index);
+			unit_turns_with_aim(biped_index);
 		real_vector3d turn_axis;
 		real turn_error;
 		real facing_alignment;

@@ -35,7 +35,11 @@ static boolean enhanced;
 static const real_vector3d *global_up3d = &(real_vector3d){ 0.f, 0.f, 1.f };
 static struct biped_datum *biped_get(long index) { CHECK(index == 3, "wrong biped"); return &biped; }
 static struct biped_definition *biped_definition_get(long index) { return &definition; }
+static short connection = _game_connection_local;
 static boolean unit_animation_enhanced(long index) { return enhanced; }
+static boolean unit_animation_enhanced_unit(long index) { return TRUE; }
+static short game_connection(void) { return connection; }
+#include "turns_with_aim.inc"
 static void biped_verify_object_vectors(long index, const char *where) { }
 static void biped_snap_facing(long index) { CHECK(0, "snapped as a flying biped"); }
 static real dot_product3d(const real_vector3d *a, const real_vector3d *b) { return a->i*b->i + a->j*b->j + a->k*b->k; }
@@ -123,6 +127,15 @@ int main(int argc, char **argv)
 		for (tick = 0; tick < 20; tick++)
 			biped_update_turning(3, &animation);
 		CHECK(yaw() == 0.f, "turned to %f", yaw());
+	}
+	CASE("network")
+	{
+		/* a network game: the turn is every machine's, whatever its own setting */
+		enhanced = FALSE;
+		connection = _game_connection_network_client;
+		for (tick = 0; tick < 13; tick++)
+			biped_update_turning(3, &animation);
+		CHECK(fabsf(yaw() - 150.f) < 0.01f, "a client with the setting off at %f, not the aim's 150", yaw());
 	}
 	CASE("actor")
 	{
