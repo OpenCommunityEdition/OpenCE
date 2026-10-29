@@ -76,6 +76,7 @@ mutes.
 #include "interface/hud_draw.h"
 #include "interface/hud_messaging.h"
 #include "interface/ui_widget.h"
+#include "interface/terminal.h"
 #include "main/console.h"
 #include "objects/objects.h"
 #include "cutscene/cinematics.h"
@@ -1741,6 +1742,45 @@ static void chat_send(
 		chat_message_new(&message, player_index, chat_channel_flags(channel), text);
 		distributed_send(&message, _distributed_message_chat_up, 1, (word)sizeof(message),
 			_distributed_to_host_reliably);
+	}
+}
+
+void network_chat_host_notice(
+	char const *text)
+{
+	long length = (long)csstrlen(text);
+	long start = 0;
+
+	/* (with the chat not shown, the console's red line, whatever
+	game.console_log says: the host's notices are for the players) */
+	if (!chat_network_game() || !chat_shown())
+	{
+		terminal_printf(global_real_argb_red, "%s", text);
+		return;
+	}
+	/* (a line of the chat's at most: a longer notice in several, broken at
+	a space where there is one) */
+	while (start < length)
+	{
+		char part[CHAT_TEXT_SIZE];
+		long end = start + CHAT_TEXT_SIZE - 1;
+
+		if (end >= length)
+			end = length;
+		else
+		{
+			long space;
+
+			for (space = end; space > start && text[space] != ' '; space--)
+				;
+			if (space > start)
+				end = space;
+		}
+		csmemcpy(part, text + start, end - start);
+		part[end - start] = 0;
+		chat_add_notice(part);
+		for (start = end; start < length && text[start] == ' '; start++)
+			;
 	}
 }
 
