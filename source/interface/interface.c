@@ -108,6 +108,7 @@ symbols in this file:
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 #include "stats_log.h" /* port: port/linux/game/stats_log.c */
+#include "frame_rate_display.h" /* port: port/linux/game/frame_rate_display.c */
 
 /* ---------- constants */
 
@@ -395,6 +396,9 @@ void interface_draw_fullscreen_overlays(
 	latency_meter_draw();
 	/* port: display.stats_log, a line a second in the log (stats_log.c) */
 	stats_log_tick();
+	/* port: the frame rate counter as display.show_fps says
+	(port/linux/game/frame_rate_display.c) */
+	frame_rate_display_update();
 	terminal_draw();
 	main_framerate_render();
 	render_debug_profile();

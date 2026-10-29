@@ -83,12 +83,26 @@ SCREENS = {
              "The window's size: 4:3, then 16:10, 16:9 and 21:9\n(its edges can also be dragged).", "desktop"),
             ("RESOLUTION SCALING:", "display.resolution_scaling", [("NATIVE", "native"), ("ORIGINAL", "original")],
              "Native draws at the resolution; Original draws\nthe Xbox's 640x480 and scales it up.", "desktop web"),
+            # (Android's own: the display's resolution cannot be chosen on a
+            # device, but the picture's can, and is the setting that decides
+            # the work a phone's GPU is asked for; port/android/README.md)
+            ("RESOLUTION:", "display.resolution_scaling", [("NATIVE", "native"), ("ORIGINAL", "original")],
+             "Native draws at the display's resolution; Original\nthe Xbox's 640x480 scaled up. Original is quicker.", "android",
+             "resolution_scaling_android"),
             ("V-SYNC:", "display.vsync", ON_OFF,
              "Wait for the display between frames, so that the\npicture never tears.", None),
             ("FRAME RATE LIMIT:", "display.max_fps",
              [("AUTO", "0"), ("30", "30"), ("60", "60"), ("120", "120"), ("144", "144"), ("165", "165"),
               ("240", "240"), ("NONE", "-1")],
              "With V-Sync off, the most frames a second. Auto:\ntwice the display's refresh rate.", "desktop web"),
+            ("FRAME RATE LIMIT:", "display.max_fps",
+             [("AUTO", "0"), ("30", "30"), ("60", "60"), ("120", "120"), ("NONE", "-1")],
+             "With V-Sync off, the most frames a second. Auto:\ntwice the display's refresh rate.", "android",
+             "max_fps_android"),
+            # (the game's own counter, main.c's main_framerate_render, which
+            # display.show_fps turns on: port/linux/game/frame_rate_display.c)
+            ("SHOW FRAMES:", "display.show_fps", ON_OFF,
+             "Draw the frame rate at the bottom right of a game,\ncounted over half a second.", None),
             ("SMOOTH MOTION:", "display.interpolation", ON_OFF,
              "Draw a frame for every display refresh, blending\nbetween the game's 30 ticks a second.", None),
             ("INSTANT AIM:", "display.direct_camera", ON_OFF,

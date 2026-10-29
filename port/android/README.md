@@ -241,6 +241,20 @@ get the default values again, delete the file.
 
 The settings are the settings of Linux, without the window, the mouse and
 the paths. Refer to [port/linux/README.md](../linux/README.md#settings).
+Some video settings also apply on Android, with these notes; the first three
+have rows of their own in Video Setup:
+
+- `display.resolution_scaling` (`RESOLUTION` in the menus) is `"original"`
+  (the default) for the Xbox's 640x480 scaled up, or `"native"` for the
+  display's own resolution: sharper, but more work for the GPU, and the
+  display must fit in the GPU's largest render target.
+- `display.max_fps` (`FRAME RATE LIMIT`) limits the frame rate while
+  `display.vsync` is off: `0` (the default) is twice the display's refresh
+  rate, `-1` no limit, or the most frames each second.
+- `display.show_fps` (`SHOW FRAMES`) draws the frame rate at the bottom right
+  of a game, which is the quickest way to see what a device manages; the
+  same setting on the other ports (`port/linux/README.md`).
+
 These settings are only for Android:
 
 | Setting | Function |
