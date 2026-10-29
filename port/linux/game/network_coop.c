@@ -2149,6 +2149,17 @@ static boolean checkpoint_players_match(
 
 /* Only the host chooses. Unknown values use the automatic policy too;
 PUBLIC is a visibility choice, including games protected by a password. */
+/* whether the game hosted is public, for network.coop_team_wipe "auto": a
+player's listed lobby (p2p_hosting_listed), or a dedicated server's
+server.public with internet play, which its lobby's own flag does not say */
+static boolean network_coop_hosting_public(
+	void)
+{
+	if (halo_server_mode())
+		return config_boolean("server.public") && config_boolean("network.online");
+	return p2p_hosting_listed() != 0;
+}
+
 boolean network_coop_wipe_reverts(
 	void)
 {
@@ -2157,7 +2168,7 @@ boolean network_coop_wipe_reverts(
 	if (!coop_host())
 		return FALSE;
 	mode = config_string("network.coop_team_wipe");
-	if (!strcmp(mode, "respawn") || (strcmp(mode, "revert") && p2p_hosting_listed()))
+	if (!strcmp(mode, "respawn") || (strcmp(mode, "revert") && network_coop_hosting_public()))
 		return FALSE;
 	if (!checkpoint_players_match())
 	{

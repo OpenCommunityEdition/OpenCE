@@ -338,6 +338,9 @@ def default_settings():
                  "each other.", "HALO_NET_COOP_FRIENDLY_FIRE", choices=["off", "on", "shields_only", "explosives_only"]),
         _setting("network.coop_ally_friendly_fire", "boolean", True, "Whether the players of an online co-op game "
                  "hurt their AI allies.", "HALO_NET_COOP_ALLY_FRIENDLY_FIRE"),
+        _setting("network.coop_team_wipe", "string", "auto", "When every co-op player dies: \"auto\" reverts the "
+                 "checkpoint in a private game and only respawns in a public one; \"revert\" or \"respawn\".",
+                 "HALO_NET_COOP_TEAM_WIPE", choices=["auto", "revert", "respawn"]),
         _setting("network.coop_player_collisions", "boolean", True, "Whether the players of an online co-op game bump "
                  "into each other.", "HALO_NET_COOP_PLAYER_COLLISIONS"),
         _setting("network.public_address", "string", "", "Hosting: the internet address joiners reach this machine "

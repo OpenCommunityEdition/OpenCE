@@ -239,7 +239,7 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `network.votekick_ban_minutes`, `network.map_share`,
 `network.map_share_upload`, `network.public_address`,
 `network.coop_friendly_fire`, `network.coop_player_collisions`,
-`network.coop_ally_friendly_fire`, `network.shield_effects` and
+`network.coop_ally_friendly_fire`, `network.coop_team_wipe`, `network.shield_effects` and
 `network.fire_origins`. Of them,
 `server.status_file`, `server.auto_update` and `server.log_addresses` need
 the owner role: from the web's admin, `sv_set` of one of them (`POST
@@ -287,6 +287,7 @@ in either case, and is kept as the table spells it:
 | `network.votekick_ban_minutes` | 1 to 1440 |
 | `network.map_share_upload` | 16 to 20480 |
 | `network.coop_friendly_fire` | `off`, `on`, `shields_only`, `explosives_only` |
+| `network.coop_team_wipe` | `auto`, `revert`, `respawn` (`auto`: a public server, `server.public` with internet play, only respawns the team) |
 | `network.shield_effects` | `stock`, `glow`, `light_show`, `overshield`, `glow_overshield`, `light_show_overshield`, `players` |
 
 A dedicated server may also keep words out of its chat and its players'

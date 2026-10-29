@@ -745,7 +745,7 @@ static char const *const settable_settings[] =
 	"network.text_chat", "network.voice_lobby", "network.voice_mode", "network.voice_kbps", "network.votekick",
 	"network.vote_end_game", "network.votekick_threshold", "network.votekick_percent", "network.votekick_minutes", "network.votekick_ban_minutes", "network.map_share", "network.map_share_upload",
 	"network.public_address", "network.coop_friendly_fire", "network.coop_player_collisions",
-	"network.coop_ally_friendly_fire", "network.shield_effects", "network.fire_origins",
+	"network.coop_ally_friendly_fire", "network.coop_team_wipe", "network.shield_effects", "network.fire_origins",
 };
 
 /* those of them the owner's console alone changes (the standard input, the
@@ -827,6 +827,7 @@ static struct
 	{ "network.votekick_ban_minutes", NULL, "1", "1440" },
 	{ "network.map_share_upload", NULL, "16", "20480" },
 	{ "network.coop_friendly_fire", "off|on|shields_only|explosives_only", NULL, NULL },
+	{ "network.coop_team_wipe", "auto|revert|respawn", NULL, NULL },
 	{ "network.shield_effects", "stock|glow|light_show|overshield|glow_overshield|light_show_overshield|players", NULL,
 		NULL },
 };
