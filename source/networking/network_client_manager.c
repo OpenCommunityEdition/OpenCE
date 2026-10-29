@@ -2402,6 +2402,10 @@ void network_game_client_rejected_by_game(
 	case _rejection_code_vpn_link_in_use:
 		reason = "_rejection_code_vpn_link_in_use";
 		break;
+
+	case _rejection_code_address_full:
+		reason = "_rejection_code_address_full";
+		break;
 	}
 
 	network_event(

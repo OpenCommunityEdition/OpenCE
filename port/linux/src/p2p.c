@@ -2956,7 +2956,7 @@ int p2p_join_progress(int *stage, char *reason, int size)
 	blacklisted machine, then the port's: a name refused, and a dedicated
 	server's VPN policy's) */
 	static const char *const refusals[] = { "version", "version", "token", "password", "full", "closed", "banned",
-		"name", "vpn", "vpn_blocked", "link", "link_age", "link_in_use" };
+		"name", "vpn", "vpn_blocked", "link", "link_age", "link_in_use", "address_full" };
 	struct peer *peer;
 	const char *why = "";
 

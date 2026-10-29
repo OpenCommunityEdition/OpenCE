@@ -81,6 +81,8 @@ machine (their datum identifiers need not be).
 #include "network_aim_assist.h"
 #include "network_shield_effects.h"
 #include "map_share.h"
+#include "network_afk.h"
+#include "network_map_vote.h"
 #include "latency_meter.h"
 #include "profile_sections.h"
 #include "server_director.h"
@@ -3831,6 +3833,8 @@ void network_distributed_new_game(
 	network_aim_assist_reset();
 	network_shield_effects_reset();
 	network_votekick_new_game();
+	network_afk_new_game();
+	network_map_vote_reset();
 }
 
 /* after each tick (game_time.c) */
@@ -3890,6 +3894,7 @@ void network_distributed_tick(
 		if (game_time_get() % GAME_STATE_INTERVAL_TICKS == 0)
 			profile_scope(distributed_tick_send_game_state_section, distributed_send_game_state(NONE);)
 		network_votekick_host_tick();
+		network_afk_host_tick();
 	}
 	else if (connection == _game_connection_network_client)
 	{
@@ -4734,6 +4739,14 @@ void network_distributed_handle_message(
 	if (map_share_handles_message(message, size))
 	{
 		map_share_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
+		return;
+	}
+	/* (a dedicated server's map vote's, in the lobby too, over the host's
+	connection alone: network_map_vote.c) */
+	if (network_map_vote_handles_message(message, size))
+	{
+		network_map_vote_handle_message(machine_index, message, size, machine_index != NONE ?
 			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
 	}

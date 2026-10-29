@@ -396,6 +396,8 @@ static char const *const port_function_names[] =
 	"port mods init", "port mods close", "port mods toggle", "port mods move up", "port mods move down",
 	"port mods save",
 	"port controller init", "port controller close", "port controller defaults", "port controller save", "port controller bind", "port controller left", "port controller right",
+	/* (a dedicated server's map vote: menu_functions.c) */
+	"port map vote open", "port map vote choose",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -424,6 +426,8 @@ static char const *const port_game_data_input_names[] =
 	/* (the gametype editor's description, with OPENCE OPTIONS' row) */
 	"port playlist edit desc",
 	"port controller update",
+	/* (a dedicated server's map vote's screen) */
+	"port map vote update",
 };
 
 static struct

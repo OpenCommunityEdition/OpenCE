@@ -39,6 +39,7 @@ come from the wire.
 
 int halo_server_mode(void);
 char const *network_game_server_machine_hardware_id(long machine_index);
+unsigned long distributed_machine_real_address(long machine_index);
 
 /* each machine's pass as it joined, and what checked of it (by machine
 index) */
@@ -135,7 +136,7 @@ static short network_link_refuse(
 
 	snprintf(address, sizeof(address), "%lu.%lu.%lu.%lu", (real_address >> 24) & 255, (real_address >> 16) & 255,
 		(real_address >> 8) & 255, real_address & 255);
-	network_event("refusing a machine @ %s: vpn: %s", address, why);
+	network_event("refusing a machine @ %s: %s: %s", address, reason, why);
 	server_log(_server_log_info, "player", "%s refused at the door (%s): %s",
 		network_link_machines[machine_index].name[0] ? network_link_machines[machine_index].name : "a machine", reason,
 		why);
@@ -277,4 +278,38 @@ short network_link_door(
 		}
 	}
 	return NONE;
+}
+
+short network_link_address_limit(
+	struct network_game const *game,
+	long machine_index,
+	unsigned long real_address,
+	boolean local)
+{
+	long limit = config_integer("server.max_machines_per_address");
+	long other, count = 0;
+
+	if (!halo_server_mode() || local || limit <= 0 || !real_address || !game)
+		return NONE;
+	/* (the machines in the game from the same real address: an internet play
+	peer's endpoint, a LAN's address) */
+	for (other = 0; other < game->machine_count && other < HALO_PORT_MAXIMUM_NETWORK_MACHINES; other++)
+	{
+		long slot = game->machines[other].machine_index;
+
+		if (slot >= 0 && slot < HALO_PORT_MAXIMUM_NETWORK_MACHINES && slot != machine_index &&
+			distributed_machine_real_address(slot) == real_address)
+		{
+			count++;
+		}
+	}
+	if (count < limit)
+		return NONE;
+	{
+		char why[96];
+
+		snprintf(why, sizeof(why), "%ld machines of its address play already (server.max_machines_per_address)", count);
+		network_link_refuse(machine_index, real_address, _rejection_code_address_full, "address_full", why);
+	}
+	return _rejection_code_address_full;
 }

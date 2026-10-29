@@ -318,6 +318,8 @@ def default_settings():
                  "\"links\" or \"off\".", "HALO_NET_TEXT_CHAT", choices=["on", "links", "off"]),
         _setting("network.votekick", "boolean", True, "Hosting: let the players vote to kick a player.",
                  "HALO_NET_VOTEKICK"),
+        _setting("network.vote_end_game", "boolean", True, "Hosting: let the players vote to end the game "
+                 "(\"!endgame\" in the chat).", "HALO_NET_VOTE_END_GAME"),
         _setting("network.votekick_minutes", "integer", 5, "Hosting: the minutes a player must have played on this "
                  "server to start a vote to kick (0 to 60).", "HALO_NET_VOTEKICK_MINUTES", low=0, high=60),
         _setting("network.votekick_ban_minutes", "integer", 30, "Hosting: the minutes a player kicked by a vote "
@@ -374,9 +376,9 @@ def default_settings():
                  "HALO_SERVER_LOG_ADDRESSES"),
         _setting("server.status_file", "string", "", "A file the status (as /api/status) is written to every 2 "
                  "seconds, for a panel without HTTP; empty for none.", "HALO_SERVER_STATUS_FILE"),
-        _setting("server.auto_update", "string", "off", "\"off\"; \"check\" logs a newer release; \"install\" "
-                 "installs it once the server has been empty for 10 minutes.", "HALO_SERVER_AUTO_UPDATE",
-                 choices=["off", "check", "install"]),
+        _setting("server.auto_update", "string", "install", "\"off\"; \"check\" logs a newer release; \"install\" "
+                 "installs it at once and restarts when empty (a new network version: after the game).",
+                 "HALO_SERVER_AUTO_UPDATE", choices=["off", "check", "install"]),
         _setting("server.coop_difficulty", "string", "normal", "Co-op rotation entries' (<level>:coop) difficulty.",
                  "HALO_SERVER_COOP_DIFFICULTY", choices=["easy", "normal", "hard", "impossible"]),
         _setting("server.master_publish", "boolean", True, "Publish a public server to the official master servers.",
@@ -407,6 +409,30 @@ def default_settings():
                  "HALO_SERVER_LINK_MIN_AGE_DAYS", low=0, high=3650),
         _setting("server.link_one_seat", "boolean", True, "Refuse a second machine of a linked Discord account "
                  "already in the game.", "HALO_SERVER_LINK_ONE_SEAT"),
+        _setting("server.update_check_minutes", "integer", 30, "The minutes between checks for a newer release.",
+                 "HALO_SERVER_UPDATE_CHECK_MINUTES", low=5, high=1440),
+        _setting("server.update_game_minutes", "integer", 30, "After a new network version's install, the minutes a "
+                 "game may go on before it is ended (0: until it ends).", "HALO_SERVER_UPDATE_GAME_MINUTES", low=0,
+                 high=240),
+        _setting("server.max_machines_per_address", "integer", 0, "The machines of one address that may play at once "
+                 "(0: no limit).", "HALO_SERVER_MAX_MACHINES_PER_ADDRESS", low=0, high=128),
+        _setting("server.afk_kick_minutes", "integer", 5, "The minutes a player may be away before being kicked "
+                 "(0: never).", "HALO_SERVER_AFK_KICK_MINUTES", low=0, high=60),
+        _setting("server.afk_kick_when_full", "boolean", False, "Kick players away only while the game is full.",
+                 "HALO_SERVER_AFK_KICK_WHEN_FULL"),
+        _setting("server.afk_kick_full_minutes", "integer", 3, "With server.afk_kick_when_full, the minutes away "
+                 "before a kick.", "HALO_SERVER_AFK_KICK_FULL_MINUTES", low=2, high=60),
+        _setting("server.coop_bsp_switch", "string", "majority", "A co-op loading zone switches once most living "
+                 "players cross (\"majority\"), or at the first (\"anyone\").", "HALO_SERVER_COOP_BSP_SWITCH",
+                 choices=["majority", "anyone"]),
+        _setting("server.coop_bsp_switch_cooldown_seconds", "integer", 15, "The seconds after a loading zone's "
+                 "switch before another may.", "HALO_SERVER_COOP_BSP_SWITCH_COOLDOWN_SECONDS", low=0, high=300),
+        _setting("server.map_vote", "boolean", False, "The players vote for the next game in the lobby.",
+                 "HALO_SERVER_MAP_VOTE"),
+        _setting("server.map_vote_choices", "integer", 4, "The entries a map vote offers.",
+                 "HALO_SERVER_MAP_VOTE_CHOICES", low=2, high=8),
+        _setting("server.map_vote_seconds", "integer", 20, "How long a map vote runs.", "HALO_SERVER_MAP_VOTE_SECONDS",
+                 low=5, high=120),
     ]
 
 

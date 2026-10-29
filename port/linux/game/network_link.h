@@ -38,6 +38,15 @@ short network_link_door(
 	unsigned long real_address,
 	boolean local);
 
+/* (the host: then) a dedicated server's limit of machines from one real
+address (server.max_machines_per_address; 0: none): the rejection code that
+refuses the machine, or NONE */
+short network_link_address_limit(
+	struct network_game const *game,
+	long machine_index,
+	unsigned long real_address,
+	boolean local);
+
 /* whether the machine showed a pass that checked: its account's id (decimal
 text) and username */
 boolean network_link_machine_verified(

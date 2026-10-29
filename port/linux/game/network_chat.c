@@ -84,6 +84,7 @@ mutes.
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "network_distributed.h"
+#include "network_votekick.h"
 #include "network_voice.h"
 #include "network_chat.h"
 #include "text_filter.h"
@@ -1694,6 +1695,20 @@ static void chat_send(
 
 	if (player_index == NONE || !chat_text_clean(text, typed, CHAT_TEXT_SIZE))
 		return;
+	/* (the votes' words, not said: "!endgame" starts a vote to end the game,
+	"!yes" and "!no" vote in the one running, as F1 and F2 do; the host's
+	notices tell everyone: network_votekick.c) */
+	if (chat_command_word(text, "!endgame"))
+	{
+		network_vote_end_game();
+		return;
+	}
+	if (chat_command_word(text, "!yes") || chat_command_word(text, "!no"))
+	{
+		if (!network_vote_choose(chat_command_word(text, "!yes") != NULL))
+			chat_add_notice("There is no vote you can vote in");
+		return;
+	}
 	/* (the host's commands, whatever its settings; a client's is not sent) */
 	if (chat_host() && chat_host_command(player_index, text))
 		return;
@@ -1949,6 +1964,18 @@ void network_chat_update(
 			chat_host_update_config();
 			chat_host_update_rates();
 		}
+	}
+	/* (the votes' keys, F1 and F2: yes or no in the vote running, whether the
+	chat is shown or not: network_votekick.c) */
+	{
+		static unsigned long vote_keys_held;
+		unsigned long vote_keys = 0;
+
+		if (chat_network_game() && game_in_progress() && !chat_hidden() && !chat_input.active && !console_is_active())
+			vote_keys = halo_keyboard_actions(0) & (FLAG(HALO_KEYBOARD_VOTE_YES) | FLAG(HALO_KEYBOARD_VOTE_NO));
+		if (vote_keys & ~vote_keys_held)
+			network_vote_choose(TEST_FLAG(vote_keys & ~vote_keys_held, HALO_KEYBOARD_VOTE_YES));
+		vote_keys_held = vote_keys;
 	}
 	if (!chat_network_game() || !game_in_progress() || chat_speaker() == NONE || !chat_shown() || chat_hidden())
 	{

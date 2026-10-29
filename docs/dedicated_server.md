@@ -74,7 +74,7 @@ The release has a `halo-server` script beside `halo`, which runs
 | 2 | No usable game data: `maps/ui.map`, or every rotation map, missing or not a cache file; nothing was bound |
 | 3 | Bad server configuration: no rotation entry that can be played (and `server.rotation_fallback` off), `server.web_port` past 65535, a web port the server may not bind (a port below 1024 without the right to it) or whose `server.web_bind` is an address the machine does not have, or a web password (admin, moderator or viewer) shorter than 8 characters with the web port bound beyond loopback (on loopback, a warning), or the owner's (`server.web_owner_password`) shorter than 8 wherever it is bound; `--keygen` or `--sign` failing. An entry that cannot be played (a bad gametype file among them) is left out with a warning: the server stops only when none is left |
 | 4 | A port in use: the tunnel's UDP port, or the web port (another program listens on it) |
-| 5 | Restart asked for (`sv_restart`, now or at the end of its drain, or an update installed: `server.auto_update = "install"` installs a new release once the server has been empty for 10 minutes, on a thread of its own: the server goes on meanwhile, and stops with 5 once it is empty again (a player who joined during the install plays on). An install that fails is tried again at the next check, 6 hours on) |
+| 5 | Restart asked for (`sv_restart`, now or at the end of its drain, or an update installed: `server.auto_update = "install"`, the default, installs a new release as soon as a check finds it, on a thread of its own, the server going on meanwhile. Then, of a release of the same network version, it stops with 5 once the server has been empty for 10 minutes; of a new network version (one its players' games no longer join), it says "This server updates after this game" and stops with 5 when the game ends (in the lobby, after 30 seconds' notice), a game going on past `server.update_game_minutes` (30) since the install being ended as `sv_end_game` ends it (`game_ended`'s reason `update`). An install that fails is tried again at the next check: "Updates", below) |
 | 128 + n | Stopped by signal n: a second SIGTERM or SIGINT, or the shutdown not done 5 seconds after the first |
 
 SIGTERM and SIGINT stop the server: a game in progress goes to its
@@ -226,9 +226,15 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `server.chat_filter_insults`,
 `server.master_publish_address`, `server.metrics`, `server.vpn_policy`,
 `server.vpn_fail`, `server.vpn_check_lan`, `server.link_min_age_days`,
-`server.link_one_seat`, and `network.text_chat`,
+`server.link_one_seat`, `server.update_check_minutes`,
+`server.update_game_minutes`, `server.max_machines_per_address`,
+`server.afk_kick_minutes`, `server.afk_kick_when_full`,
+`server.afk_kick_full_minutes`, `server.coop_bsp_switch`,
+`server.coop_bsp_switch_cooldown_seconds`, `server.map_vote`,
+`server.map_vote_choices`, `server.map_vote_seconds`, and
+`network.text_chat`,
 `network.voice_lobby`, `network.voice_mode`, `network.voice_kbps`,
-`network.votekick`, `network.votekick_minutes`,
+`network.votekick`, `network.vote_end_game`, `network.votekick_minutes`,
 `network.votekick_ban_minutes`, `network.map_share`,
 `network.map_share_upload`, `network.public_address`,
 `network.coop_friendly_fire`, `network.coop_player_collisions`,
@@ -262,6 +268,15 @@ in either case, and is kept as the table spells it:
 | `server.vpn_policy` | `off`, `link`, `block` |
 | `server.vpn_fail` | `open`, `closed` |
 | `server.link_min_age_days` | 0 to 3650 |
+| `server.update_check_minutes` | 5 to 1440 |
+| `server.update_game_minutes` | 0 to 240 |
+| `server.max_machines_per_address` | 0 to 128 |
+| `server.afk_kick_minutes` | 0 to 60 |
+| `server.afk_kick_full_minutes` | 2 to 60 |
+| `server.coop_bsp_switch` | `majority`, `anyone` |
+| `server.coop_bsp_switch_cooldown_seconds` | 0 to 300 |
+| `server.map_vote_choices` | 2 to 8 |
+| `server.map_vote_seconds` | 5 to 120 |
 | `server.chat_filter_slurs`, `server.chat_filter_swearing`, `server.chat_filter_insults` | `off`, `severe`, `strong`, `mild` |
 | `network.voice_mode` | `off`, `team_proximity`, `team_enemy_proximity`, `team_global`, `team_global_enemy_proximity` |
 | `network.voice_kbps` | 8 to 64 |
@@ -284,6 +299,67 @@ them, which an updated game shows as "The host refused: your player name"
 `refusing a machine … its name has words the server's filter keeps out`).
 Links are `network.text_chat`'s, refused by default. A list of words is
 not a moderator: spaced letters and look-alikes get past it.
+
+### Votes, the map vote and players away
+
+The players vote to kick a player (`network.votekick`: the scoreboard's
+right-click, or the console's `votekick <name>`) and to end the game
+(`network.vote_end_game`: `!endgame` in the chat). While a vote runs every
+player sees its box at the left of the screen, and F1 votes yes, F2 no
+(`controls.vote_yes`, `controls.vote_no`; `!yes` and `!no` in the chat do
+too). The yes votes needed scale with the players who may vote: more than
+half up to 8, then 40% (at least 5) up to 32, then 30% (at least 13), at
+least 2, and more yes than no; a vote the no votes have made lost ends at
+once. A vote to end the game may start from 30 seconds played on the
+server, not in a game's first minute, and ends it as `sv_end_game` does,
+its scores and postgame shown (`game_ended`'s reason `vote`).
+
+`server.map_vote` (off by default) lets the players choose the next game:
+as the lobby opens after a game with players in it, the server offers
+`server.map_vote_choices` (4) entries of the rotation picked at random (not
+the one just played, nor one twice), every player's lobby opens its vote
+screen, and after `server.map_vote_seconds` (20), or once every machine has
+voted, the entry with the most votes is played next (a tie, or no vote, at
+random among them); the rotation goes on after it. `sv_map` (an entry
+interposed) and a changed rotation set the vote aside. `map_vote_started`
+and `map_vote_ended` events say each.
+
+A player away from the controls (no button pressed or let go, no stick or
+trigger held, the view not turned) for `server.afk_kick_minutes` (5; 0:
+never) is told a minute before and then kicked (`player_left`'s reason
+`afk`, an `afk_kick` event), free to join again at once. Only time in a
+game counts: not the lobby, the postgame, a cinematic, nor a player dead.
+With `server.afk_kick_when_full` a player is kicked only while the game is
+full, after `server.afk_kick_full_minutes` (3).
+
+`server.max_machines_per_address` (0: no limit) refuses a machine whose
+address (an internet play peer's real one) has that many in the game
+already (`join_refused`'s reason `address_full`); an updated game shows
+"The host refused: too many players from your address".
+
+In a co-op game a loading zone (a trigger that moves the team to another
+part of the level) switches only once more than half of the living players
+who are not away stand in zones to the same part (`server.coop_bsp_switch`
+`majority`, the default; `anyone`: the first player in one). The others see
+"Waiting for N more players to cross"; a mission script's switch is not
+held. After a switch the zones wait `server.coop_bsp_switch_cooldown_seconds`
+(15) before another, the players told when they open; each switch is told
+to everyone, logged and a `coop_bsp_switch` event names who crossed.
+
+### Updates
+
+`server.auto_update` is `install` by default (the Docker image's, `check`:
+its image is updated instead). The server asks GitHub for the latest
+release `server.update_check_minutes` (30) after the last check (the first
+two minutes after it starts), and when there is a newer one says so (a
+`warning` event) and, with `install`, installs it on a thread of its own.
+The release's notes tell its network version: one of the same version
+restarts the server (exit code 5) once it has been empty for 10 minutes;
+one of a new version, which its players' games no longer join, tells the
+players "This server updates after this game" and restarts it once the game
+ends, in the lobby after 30 seconds' notice, and a game still going on
+`server.update_game_minutes` (30; 0: no limit) after the install is ended
+as `sv_end_game` ends it, its scores shown.
 
 ### VPNs and linked Discord accounts
 
@@ -627,7 +703,8 @@ upgrade answers `503 busy`), and each upgrade counts against its address's
 allowance (above). The
 event groups are `player` (`player_joined`, `player_left`, `map_share`), `chat`
 (`chat`), `game` (`lobby_opened`, `countdown`, `game_started`,
-`game_ended`, `postgame`, `score`, `kill`), `moderation` (`kick`, `ban`,
+`game_ended`, `postgame`, `score`, `kill`, `afk_kick`, `coop_bsp_switch`,
+`map_vote_started`, `map_vote_ended`), `moderation` (`kick`, `ban`,
 `unban`, `mute`, `unmute`, `speed_hack`, `join_refused`), `status` (`status`), `log`
 (`log`, each log line as `{"n","level","cat","text"}`), `master`
 (`master`), and `server` (`server_started`, `reloaded`, `warning`,
@@ -656,11 +733,15 @@ Every event has `seq` (rising, never reused while the server runs; a
 | `lobby_opened` | `map, gametype, variant` (the gametype's name as the game shows it), `teams, index` (the rotation's entry) |
 | `countdown` | `seconds` (-1: paused) |
 | `game_started` | `map, gametype, variant, teams, team_scores[]` (team games), `players[]` |
-| `game_ended` | `map, gametype, variant, teams, reason` (`score`, `time`, `idle`, `empty`, `command`, `next`), `duration` (seconds), `team_scores[]` (team games), `players[]` |
+| `game_ended` | `map, gametype, variant, teams, reason` (`score`, `time`, `idle`, `empty`, `command`, `next`, `update`: a new network version's install, `vote`: the players' vote to end it), `duration` (seconds), `team_scores[]` (team games), `players[]` |
 | `postgame` | `seconds` |
 | `player_joined` | `slot, name, team, machine`; `address, hwid, discord_id, discord_name, discord_verified` for the owner, or every role with `server.log_addresses` |
-| `join_refused` | `name` (the machine's), `reason` (`vpn_link_required`, `vpn_blocked`, `vpn_link_invalid`, `vpn_link_too_new`, `vpn_link_in_use`); `address, hwid` as `player_joined`'s |
-| `player_left` | `slot, name, reason` (`left`; `kicked` and `banned` when the server's `kick`, `ban` or `sv_ban_address` dropped the machine, `banned` for a speed hack's drop too); `address, hwid` (as it joined) as `player_joined`'s |
+| `join_refused` | `name` (the machine's), `reason` (`vpn_link_required`, `vpn_blocked`, `vpn_link_invalid`, `vpn_link_too_new`, `vpn_link_in_use`, `address_full`); `address, hwid` as `player_joined`'s |
+| `player_left` | `slot, name, reason` (`left`; `kicked` and `banned` when the server's `kick`, `ban` or `sv_ban_address` dropped the machine, `banned` for a speed hack's drop too, `afk` for a player away); `address, hwid` (as it joined) as `player_joined`'s |
+| `afk_kick` | `players` (the machine's players' names), `seconds` (away) |
+| `coop_bsp_switch` | `from, to` (the level's parts), `players[]` (the names of those who crossed) |
+| `map_vote_started` | `seconds`, `choices[]` (`{"map","gametype","index"}`: the rotation's entries) |
+| `map_vote_ended` | `map, gametype, index, votes` (the winner) |
 | `chat` | `channel` (`everyone`, `team`, `vehicle`), `slot, name, text` (admins only; the lines the host sends on) |
 | `kill` | `killer, victim` (slots; -1 for none), `weapon` (the killer's weapon's or the killing object's tag name, or null), `friendly_fire` |
 | `score` | `map, gametype, variant, teams, team_scores[]` (team games), `players[]` (once a second at most, on a change) |

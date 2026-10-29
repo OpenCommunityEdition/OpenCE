@@ -39,6 +39,9 @@ enum
 	_rejection_code_vpn_link_invalid,
 	_rejection_code_vpn_link_too_new,
 	_rejection_code_vpn_link_in_use,
+	/* port: a dedicated server's limit of machines from one address
+	(server.max_machines_per_address) */
+	_rejection_code_address_full,
 	NUMBER_OF_SERVER_REJECTION_CODES,
 };
 

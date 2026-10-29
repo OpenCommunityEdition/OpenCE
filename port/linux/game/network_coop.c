@@ -122,6 +122,9 @@ index and tag, since the map placed them at the same index everywhere.
 #include "coop_spectate.h"
 #include "network_coop.h"
 #include "network_distributed.h"
+#include "../src/server_events.h" /* port: port/linux/src/server_events.c */
+#include "../src/server_json.h" /* port: port/linux/src/server_json.c */
+#include "../src/server_log.h" /* port: port/linux/src/server_log.c */
 
 /* ---------- constants */
 
@@ -576,6 +579,9 @@ static void client_play_presentation(void);
 void unit_scripting_set_current_vitality_of(long unit_index, real body_vitality, real shield_vitality);
 /* port_config.c */
 int config_boolean(char const *name);
+long config_integer(char const *name);
+char const *config_string(char const *name);
+int halo_server_mode(void);
 
 /* ---------- private code */
 
@@ -2113,6 +2119,147 @@ boolean network_coop_players_friendly_fire(
 	/* one who is away is hurt whatever either chose; else both must play
 	with it */
 	return victim->idle_ticks > FRIENDLY_FIRE_AWAY_TICKS || (!attacker->declined && !victim->declined);
+}
+
+boolean network_coop_player_away(
+	long player_index)
+{
+	struct friendly_fire_player *entry;
+
+	if (!coop_host())
+		return FALSE;
+	entry = host_friendly_fire_player(player_index);
+	return entry && entry->idle_ticks > FRIENDLY_FIRE_AWAY_TICKS;
+}
+
+boolean network_coop_host_dedicated(
+	void)
+{
+	struct network_game *game;
+
+	if (game_connection() == _game_connection_network_server)
+		return halo_server_mode() != 0;
+	if (!network_coop_active() || !(game = network_game_get_game()))
+		return FALSE;
+	return TEST_FLAG(game->cooperative_flags, _network_game_cooperative_dedicated_bit);
+}
+
+boolean network_coop_bsp_switch_majority(
+	void)
+{
+	return coop_host() && halo_server_mode() && strcmp(config_string("server.coop_bsp_switch"), "anyone") != 0;
+}
+
+long network_coop_bsp_switch_cooldown_ticks(
+	void)
+{
+	long seconds;
+
+	if (!coop_host() || !halo_server_mode())
+		return 0;
+	seconds = config_integer("server.coop_bsp_switch_cooldown_seconds");
+	return seconds < 0 ? 0 : MIN(seconds, 300) * TICKS_PER_SECOND;
+}
+
+/* how often a player waiting at a loading zone is told so */
+#define BSP_SWITCH_WAITING_TICKS (3 * TICKS_PER_SECOND)
+
+void network_coop_tell_bsp_switch_waiting(
+	long player_index,
+	long more,
+	long in,
+	long total)
+{
+	static long told_times[MAXIMUM_TRACKED_PLAYERS];
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	long machine_index = distributed_player_machine((short)absolute_index);
+	char text[128];
+
+	if (!coop_host() || absolute_index >= MAXIMUM_TRACKED_PLAYERS ||
+		(told_times[absolute_index] && game_time_get() - told_times[absolute_index] < BSP_SWITCH_WAITING_TICKS &&
+			game_time_get() >= told_times[absolute_index]))
+	{
+		return;
+	}
+	told_times[absolute_index] = game_time_get() ? game_time_get() : 1;
+	if (more > 0)
+		snprintf(text, sizeof(text), "Waiting for %ld more player%s to cross (%ld of %ld)", more, more == 1 ? "" : "s",
+			in, total);
+	else
+		snprintf(text, sizeof(text), "The loading zone opens in %ld seconds", total);
+	if (machine_index == NONE)
+	{
+		short local_player_index = player_get(player_index)->local_player_index;
+		wchar_t wide[128];
+		long index;
+
+		if (local_player_index == NONE)
+			return;
+		for (index = 0; text[index] && index < (long)NUMBEROF(wide) - 1; index++)
+			wide[index] = (wchar_t)(unsigned char)text[index];
+		wide[index] = 0;
+		hud_print_message(local_player_index, wide);
+		return;
+	}
+	distributed_send_notice_to_machine(machine_index, text);
+}
+
+void network_coop_note_bsp_switch(
+	short from,
+	short to,
+	long const *player_indices,
+	long count)
+{
+	char names[96] = "", notice[160];
+	struct server_json json;
+	long index;
+
+	if (!coop_host())
+		return;
+	server_json_begin(&json);
+	server_json_object_begin(&json, NULL);
+	server_json_string(&json, "event", "coop_bsp_switch");
+	server_json_integer(&json, "from", from);
+	server_json_integer(&json, "to", to);
+	server_json_array_begin(&json, "players");
+	for (index = 0; index < count; index++)
+	{
+		char name[16] = "";
+
+		if (player_indices[index] == NONE)
+			continue;
+		{
+			struct player_datum *player = player_get(player_indices[index]);
+			long character;
+
+			/* (printable ASCII of the player's name) */
+			for (character = 0; character < (long)NUMBEROF(player->name) && player->name[character] &&
+				character < (long)sizeof(name) - 1; character++)
+			{
+				name[character] = player->name[character] >= 0x20 && player->name[character] < 0x7F ?
+					(char)player->name[character] : '?';
+			}
+			name[character] = 0;
+		}
+		server_json_string(&json, NULL, name);
+		if (strlen(names) + strlen(name) + 3 < sizeof(names))
+		{
+			if (names[0])
+				strcat(names, index == count - 1 ? " and " : ", ");
+			strcat(names, name);
+		}
+	}
+	server_json_array_end(&json);
+	server_json_object_end(&json);
+	if (halo_server_mode())
+	{
+		server_event_add("game", server_json_text(&json));
+		server_log(_server_log_info, "coop", "the loading zone to part %d crossed by %s (from part %d)", to,
+			names[0] ? names : "nobody", from);
+	}
+	server_json_free(&json);
+	snprintf(notice, sizeof(notice), "%s moved the team on", names[0] ? names : "A player");
+	distributed_send_notice(notice);
 }
 
 boolean network_coop_devices_remote(

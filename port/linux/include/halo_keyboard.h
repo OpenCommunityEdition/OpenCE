@@ -42,6 +42,10 @@ enum halo_keyboard_action
 	everyone, or to the team: port/linux/game/network_chat.c) */
 	HALO_KEYBOARD_CHAT,
 	HALO_KEYBOARD_TEAM_CHAT,
+	/* (the players' votes', yes and no in the vote running: port/linux/game/
+	network_votekick.c, read with the chat's keys) */
+	HALO_KEYBOARD_VOTE_YES,
+	HALO_KEYBOARD_VOTE_NO,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 
