@@ -82,6 +82,11 @@ each permutation's level (port/linux/game/model_detail.c) */
 int halo_model_detail_stock(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* the same for a player's view of a split screen (its width): a half
+screen's 640 columns are centred as the screen's, a quarter's 320 in the
+quarter; the shift in effect */
+void halo_screen_ui_offset_view(long view_width);
+long halo_screen_ui_offset_current(void);
 /* names a model lighting vertex program, whose draws can be lit for each
 pixel (port/linux/src/d3d8_gl.c, display.per_pixel_lighting) */
 void halo_vertex_shader_lighting(unsigned long handle);

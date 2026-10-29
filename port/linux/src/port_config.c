@@ -1146,6 +1146,17 @@ static const struct config_setting config_settings[] =
 		"up and down; \"menu:<buttons>\" presses menu buttons one a second (a,\n"
 		"b, x, y, up, down, left, right, start, back or wait, separated by\n"
 		"spaces or commas), for testing the menus; empty for none." },
+	{ "debug.virtual_gamepads", _config_integer, "0", "HALO_VIRTUAL_GAMEPADS", _environment_value, _platform_desktop,
+		"Attach this many SDL virtual gamepads (0 to 4), which the game takes for\n"
+		"gamepads plugged in, for testing split screen; debug.virtual_gamepad_script\n"
+		"drives them." },
+	{ "debug.virtual_gamepad_script", _config_string, "\"\"", "HALO_VIRTUAL_GAMEPAD_SCRIPT", _environment_value,
+		_platform_desktop,
+		"What debug.virtual_gamepads press: \"<seconds> <pad> <what>; ...\", the\n"
+		"seconds from when the network lobby first opens, the pad 1 to 4 (0: the\n"
+		"keyboard, a SPACE and start Enter), and a button (a, b, x, y, start, back,\n"
+		"up, down, left, right, lb, rb, lt, rt: pressed for 150 ms),\n"
+		"\"walk\" (the sticks move from then on) or \"still\"." },
 	{ "debug.bot_trace", _config_integer, "0", "HALO_BOT_TRACE", _environment_value, _platform_all,
 		"Log each bot's state (bots.count) every this many seconds: where it is\n"
 		"and goes, its path, target and weapon; 0 never." },
