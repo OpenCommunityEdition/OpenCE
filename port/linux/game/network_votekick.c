@@ -1507,6 +1507,10 @@ unsigned char network_vote_pad_open(
 {
 	struct network_votekick_status status;
 
+	/* (asked of every read of the controllers, the first before the game's
+	state exists: nothing but a network game in progress) */
+	if (!network_votekick_available() || !game_time_initialized() || !game_in_progress())
+		return FALSE;
 	if (ui_widgets_active() || cinematic_in_progress() || network_chat_keyboard_open() ||
 		!network_votekick_get_status(&status))
 	{

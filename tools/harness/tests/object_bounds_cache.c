@@ -8,6 +8,7 @@ same. test_object_bounds_cache.py takes the enums (enums.inc) and the code
 */
 
 #include "harness.h"
+#include <limits.h>
 #include "enums.inc"
 
 /* objects: the members the loop reads */
