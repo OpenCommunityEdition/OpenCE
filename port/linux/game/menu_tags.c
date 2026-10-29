@@ -398,6 +398,7 @@ static char const *const port_function_names[] =
 	"port controller init", "port controller close", "port controller defaults", "port controller save", "port controller bind", "port controller left", "port controller right",
 	/* (a dedicated server's map vote: menu_functions.c) */
 	"port map vote open", "port map vote choose",
+	"port controller clear", "port controller cancel",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from

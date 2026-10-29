@@ -52,6 +52,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
 #include "cseries/cseries.h"
 #include "bink/bink_playback.h"
 #include "cseries/errors.h"
@@ -764,6 +765,8 @@ void input_abstraction_update(
 					error(_error_silent, "unknown joystick preset");
 					break;
 			}
+			/* port: digital movement bindings are independent of stick presets. */
+			controller_remap_movement((short)controller_index, &state->forward_movement, &state->strafe);
 			keyboard_controls_update(controller_index, state);
 			input_abstraction_globals.controller_available[controller_index] = TRUE;
 		}

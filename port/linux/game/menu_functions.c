@@ -1731,6 +1731,7 @@ static void discord_account_show(struct widget_instance *list)
 
 /* Graphics' button style follows the pending HUD choice, including Defaults.
 The remaining options close the gap; the help and bottom buttons stay put. */
+/* Button Appearance filters its rows in the controller feature module. */
 #include "controller_buttons.h"
 #include "controller_button_menu.inl"
 

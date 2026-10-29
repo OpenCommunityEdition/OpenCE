@@ -15,6 +15,7 @@
 #include "hud_button_layout.h"
 #include <string.h>
 
+char const *config_string(char const *name);
 long hud_hires_asset_count(void);
 char const *hud_hires_asset_tag(long asset);
 void hud_hires_register_placeholder(long asset, unsigned long const *texture);
@@ -64,6 +65,11 @@ void controller_glyphs_dispose(void)
 static short controller_glyph_asset_index(short style, short slot)
 {
     short family;
+    /* Older Xbox styles can use the supplied modern bumpers independently of
+     * their face buttons. The caller has already resolved automatic detection. */
+    if (style >= 0 && style < 3 && (slot == 4 || slot == 5) &&
+        !strcmp(config_string("display.hud_bumper_style"), "modern"))
+        return (short)(32 + slot - 4);
     if (style < 3 || style >= 11 || slot < 0 || slot >= 14) return NONE;
     if (slot < 4) return (short)((style - 3) * 4 + slot);
     family = (short)(style < 4 ? 0 : style < 8 ? 1 : 2);

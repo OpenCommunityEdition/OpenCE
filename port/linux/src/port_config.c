@@ -160,15 +160,18 @@ static const struct config_setting config_settings[] =
 		"is on. Xbox: classic, gems, menu_gems (dark gems), xbox_modern.\n"
 		"PlayStation: ps_classic, ps_gems, ps_dark_gems, ps_modern.\n"
 		"Switch: switch_classic, switch_gems, switch_modern. Requires high_res_hud." },
+	{ "display.hud_bumper_style", _config_string, "\"original\"", "HALO_HUD_BUMPER_STYLE", _environment_value, _platform_all,
+		"Xbox Classic, Gems and Dark Gems bumpers: original (black/white) or modern\n"
+		"(LB/RB). Shared by local players, including automatic button detection.\n"
+		"Requires high_res_hud; other button styles keep their own artwork." },
 	{ "input.auto_button_detection", _config_boolean, "true", "HALO_AUTO_BUTTON_DETECTION", _environment_value, _platform_all,
 		"Limit Button Style to the assigned controller's family. Unknown devices\n"
 		"keep the manual choice. Device detection itself is always available." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
-		"P1 custom controller buttons, empty for the profile's layout. Set in Gamepads >\n"
-		"Button Remapping. Ten comma-separated physical buttons, in order: jump,\n"
-		"grenade type, use/reload, weapon, melee, flashlight, grenade, fire, crouch, zoom.\n"
-		"Choose ten unique buttons: south,east,west,north,rb,lb,lt,rt,ls,rs,dpad_left.\n"
-		"Invalid lists use the profile. D-pad Left can also be assigned to an action." },
+		"P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
+		"Button Remapping. v2: stores 25 physical-button names, including unbound.\n"
+		"Gameplay and debug camera have separate bindings. Old ten-action layouts\n"
+		"are accepted. See docs/reading/controller_remapping.md for the full order." },
 	{ "input.controller_p2", _config_string, "\"\"", "HALO_CONTROLLER_P2", _environment_value, _platform_all,
 		"P2 custom controller buttons, same format as controller_p1. Empty uses the profile." },
 	{ "input.controller_p3", _config_string, "\"\"", "HALO_CONTROLLER_P3", _environment_value, _platform_all,
@@ -1977,6 +1980,7 @@ static const struct
 	{ "display.hud_button_style", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern",
 		"ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
 	{ "display.hud_button_style_xbox", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern", NULL }, NULL },
+	{ "display.hud_bumper_style", { "original", "modern", NULL }, NULL },
 	{ "display.hud_button_style_ps", { "ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", NULL }, NULL },
 	{ "display.hud_button_style_switch", { "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
 	{ "display.menus", { "pc", "xbox", NULL }, NULL },

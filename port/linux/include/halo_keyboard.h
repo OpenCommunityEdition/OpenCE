@@ -85,6 +85,8 @@ unsigned long halo_chat_pad_buttons(void);
 stick moved) rather than the keyboard and mouse: the vote's box shows the
 D-pad's keys then (port/linux/game/network_votekick.c) */
 int halo_gamepad_last_used(void);
+/* Raw physical snapshot: suppress the button which opened controller chat. */
+unsigned long halo_chat_pad_buttons_for_port(short port);
 /* the taps on the touchscreen outside the menus since the last call while
 that keyboard is up, and where the latest was (0 to 1 across and down the
 window) */
