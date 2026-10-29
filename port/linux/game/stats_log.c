@@ -14,6 +14,7 @@ scoreboard names it.
 
 #include "cseries.h"
 #include "cache/cache_files.h"
+#include "game/game.h"
 #include "game/game_engine.h"
 #include "render/render.h"
 #include "stats_log.h"
@@ -51,8 +52,12 @@ static char const *stats_log_mode(void)
 {
 	struct game_variant *variant = game_engine_get_variant();
 
-	if (!variant)
+	/* (game_engine_get_variant is never NULL: the global variant. No game,
+	the menus; a game with no multiplayer engine, the campaign or co-op) */
+	if (!game_in_progress())
 		return "menus";
+	if (!game_engine_running())
+		return "campaign";
 	switch (variant->game_engine_index)
 	{
 	case game_engine_ctf: return "CTF";
