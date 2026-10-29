@@ -303,7 +303,15 @@ static int zip_extract(SDL_IOStream *zip, char names[][256], int *name_count, ch
 			if (name_length && name[name_length - 1] != '/')
 				platform_log("update: left out %s (not one of a release's names)", name);
 		}
-		else if (*name_count < MAXIMUM_UPDATE_FILES)
+		/* port: a release with more files than this build can install is refused, not installed in part (the
+		files past the limit were left out, and the update still counted as done) */
+		else if (*name_count >= MAXIMUM_UPDATE_FILES)
+		{
+			snprintf(error, error_size, "the download has more files than this build can install (%d)",
+				MAXIMUM_UPDATE_FILES);
+			goto done;
+		}
+		else
 		{
 			int method = (int)zip_word(header + 10);
 
