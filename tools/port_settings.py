@@ -145,6 +145,12 @@ SCREENS = {
              "Moving the mouse forward looks down.", None),
             ("AIM ASSIST:", "input.mouse_aim_assist", ON_OFF,
              "Slow and drag the view along with a target while\naiming with the mouse, as with a controller.", None),
+            # (port/linux/src/sdl_platform.c's menu_cursor_size; last, as the
+            # other platforms have no row in its place)
+            ("MENU CURSOR:", "display.menu_cursor",
+             [("OFF", "off"), ("SMALL", "small"), ("MEDIUM", "medium"), ("LARGE", "large"),
+              ("EXTRA LARGE", "extra_large")],
+             "The menus' blue arrow for the mouse, and its size;\nOff shows the system's pointer.", "desktop"),
         ],
     },
     "audio_settings": {

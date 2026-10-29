@@ -1055,10 +1055,9 @@ BOOL platform_video_hdr(float *sdr_white, float *headroom)
 The blue arrow the menus show for the mouse, in place of the system's. Halo
 PC drew its cursor in the menus' 640 x 480, so it took the same part of the
 screen at any resolution; this one is made again whenever the window's size
-in pixels changes (menu_cursor_fit, from platform_pump_events). */
+in pixels or display.menu_cursor changes (menu_cursor_fit, from
+platform_pump_events). */
 
-/* the arrow's height in the menus' 480 lines (72 pixels at 1080p) */
-#define MENU_CURSOR_HEIGHT 32
 /* the arrow's tip in the picture, past its soft edge: the click point */
 #define MENU_CURSOR_TIP 2
 
@@ -1090,14 +1089,41 @@ static SDL_Surface *menu_cursor_scale(int height)
 	return surface;
 }
 
-/* the cursor made for the window's size, when that has changed: its height
-the part of the window the menus' 480 lines take (their 4:3 fits a window of
-another shape), in pixels; where the desktop counts in points (macOS, Wayland
-at a scale) the cursor is that size in points, with the pixels' image as its
-alternate */
+/* display.menu_cursor: the arrow's height in the menus' 480 lines (medium:
+54 pixels at 1080p), or 0 for the system's pointer; read again when a
+setting changes */
+static int menu_cursor_size(void)
+{
+	static const struct { const char *name; int lines; } sizes[] =
+	{
+		{ "off", 0 }, { "small", 18 }, { "medium", 24 }, { "large", 32 }, { "extra_large", 40 }
+	};
+	static unsigned long read_at = (unsigned long)-1;
+	static int lines = 24;
+
+	if (read_at != config_changes())
+	{
+		const char *name = config_string("display.menu_cursor");
+		size_t index;
+
+		read_at = config_changes();
+		lines = 24;
+		for (index = 0; index < sizeof(sizes) / sizeof(sizes[0]); index++)
+			if (!strcmp(name, sizes[index].name))
+				lines = sizes[index].lines;
+	}
+	return lines;
+}
+
+/* the cursor made for the window's size and display.menu_cursor, when one
+has changed: its height the part of the window the menus' 480 lines take
+(their 4:3 fits a window of another shape), in pixels; where the desktop
+counts in points (macOS, Wayland at a scale) the cursor is that size in
+points, with the pixels' image as its alternate. Off, the system's pointer
+again. */
 static void menu_cursor_fit(void)
 {
-	int width = 0, height = 0, lines, cursor_height;
+	int width = 0, height = 0, lines, cursor_height, size = menu_cursor_size();
 	float density;
 	SDL_Surface *pixels, *points;
 	SDL_Cursor *cursor = NULL;
@@ -1105,8 +1131,19 @@ static void menu_cursor_fit(void)
 	if (!menu_cursor_picture || !SDL_GetWindowSizeInPixels(platform_window, &width, &height) ||
 		width <= 0 || height <= 0)
 		return;
+	if (!size)
+	{
+		if (menu_cursor)
+		{
+			SDL_SetCursor(SDL_GetDefaultCursor());
+			SDL_DestroyCursor(menu_cursor);
+			menu_cursor = NULL;
+		}
+		menu_cursor_height = 0;
+		return;
+	}
 	lines = height < width * 3 / 4 ? height : width * 3 / 4;
-	cursor_height = lines * MENU_CURSOR_HEIGHT / 480;
+	cursor_height = lines * size / 480;
 	if (cursor_height < 16)
 		cursor_height = 16;
 	if (cursor_height == menu_cursor_height)
