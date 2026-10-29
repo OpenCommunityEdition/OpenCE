@@ -17,13 +17,15 @@ CASES = [
     "two-machines-team-game-needs-both-teams", "playerless-machine-keeps-countdown",
     "split-screen-team-game-one-team", "dedicated-one-team-starts", "dedicated-both-teams-waits",
     "dedicated-below-minimum-waits", "dedicated-minimum-clamped", "dedicated-director-refuses",
+    "dedicated-start-now-five-seconds",
 ]
 FUNCTIONS = (
     "countdown_timer_update", "countdown_timer_get_time_remaining", "countdown_timer_increment",
     "countdown_timer_decrement", "countdown_timer_set_time_remaining",
     "network_game_server_get_client_machine_count", "server_needs_more_teams",
     "server_has_enough_machines", "server_players_on_one_machine", "server_ok_to_countdown",
-    "network_game_server_update_countdown",
+    "network_game_server_update_countdown", "network_game_server_begin_game_start_countdown",
+    "network_game_server_port_countdown_begin",
 )
 CONSTANTS = (
     "MAXIMUM_NETWORK_MACHINE_COUNT", "MAXIMUM_NETWORK_PLAYER_COUNT", "NUMBER_OF_MULTIPLAYER_TEAMS",
@@ -88,6 +90,10 @@ NEGATIVE_CONTROLS = {
     "entry-ignored": (
         ("!director.entry_applied || ", ""),
         "server_director_ok_to_countdown", "dedicated-director-refuses",
+    ),
+    "dedicated-start-now-starts-countdown": (
+        ("if (!halo_server_mode() &&", "if (1 &&"),
+        "network_game_server_update_countdown", "dedicated-start-now-five-seconds",
     ),
 }
 
