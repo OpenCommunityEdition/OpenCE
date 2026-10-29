@@ -12,9 +12,10 @@ devices, for example the Pixel 9 Pro XL.
 
 The Android build uses the platform layer of the Linux build
 (`port/linux/src`). Refer to [port/linux/README.md](../linux/README.md).
-Physical mice use the same control bindings. During play, F12 toggles mouse
-capture; captured mode hides Android's pointer and uses relative movement for
-continuous aiming, while releasing capture restores normal pointer behavior.
+Physical mice use the same control bindings. While playing, the mouse is
+captured: Android's pointer hides and its relative movement aims continuously.
+In the menus the capture is released, so the pointer shows again. During play,
+F12 still toggles the capture by hand.
 
 ## Requirements
 
@@ -200,10 +201,12 @@ the mouse settings do not apply.
 
 The touch controls show only in a game. In the menus and during
 cinematics they hide, and the touchscreen operates the menus as described
-above. They also hide when a controller is connected, for example the
-built-in controller of a handheld. A device without a touchscreen (a TV)
-never shows them. The setting `input.touch_controls` changes this (refer
-to "Settings").
+above. They also hide when a controller, a physical mouse or a physical
+keyboard is connected, for example the built-in controller of a handheld:
+the game says which controllers it sees, as SDL finds a pad the app's own
+device list can miss (one paired while the game runs). A device without a
+touchscreen (a TV) never shows them. The setting `input.touch_controls`
+changes this (refer to "Settings").
 
 The buttons at the top of the screen:
 
