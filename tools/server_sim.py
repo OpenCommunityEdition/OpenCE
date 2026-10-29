@@ -320,6 +320,12 @@ def default_settings():
                  "HALO_NET_VOTEKICK"),
         _setting("network.vote_end_game", "boolean", True, "Hosting: let the players vote to end the game "
                  "(\"!endgame\" in the chat).", "HALO_NET_VOTE_END_GAME"),
+        _setting("network.votekick_threshold", "string", "dynamic", "Hosting: the yes votes a vote needs: \"dynamic\" "
+                 "(scaled with the players) or \"static\" (network.votekick_percent of them).",
+                 "HALO_NET_VOTEKICK_THRESHOLD", choices=["dynamic", "static"]),
+        _setting("network.votekick_percent", "integer", 50, "Hosting: with a static threshold, the percentage of the "
+                 "players who may vote whose yes passes a vote (1 to 100).", "HALO_NET_VOTEKICK_PERCENT", low=1,
+                 high=100),
         _setting("network.votekick_minutes", "integer", 5, "Hosting: the minutes a player must have played on this "
                  "server to start a vote to kick (0 to 60).", "HALO_NET_VOTEKICK_MINUTES", low=0, high=60),
         _setting("network.votekick_ban_minutes", "integer", 30, "Hosting: the minutes a player kicked by a vote "

@@ -65,6 +65,9 @@ boolean network_vote_choose(boolean yes);
 /* the vote running's box, in the view of the local player (hud.c: drawn for
 the first) */
 void network_votekick_draw(short local_player_index);
+/* whether the first controller's D-pad left and right vote yes and no now
+(xinput_sdl.c keeps them from the game meanwhile) */
+unsigned char network_vote_pad_open(void);
 /* whether this machine hosts the game (its scoreboard offers Kick and Ban) */
 boolean network_votekick_host(void);
 /* (the host) kicks, or bans, the machine of the player (absolute index):

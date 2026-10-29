@@ -234,7 +234,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `server.map_vote_choices`, `server.map_vote_seconds`, and
 `network.text_chat`,
 `network.voice_lobby`, `network.voice_mode`, `network.voice_kbps`,
-`network.votekick`, `network.vote_end_game`, `network.votekick_minutes`,
+`network.votekick`, `network.vote_end_game`, `network.votekick_threshold`,
+`network.votekick_percent`, `network.votekick_minutes`,
 `network.votekick_ban_minutes`, `network.map_share`,
 `network.map_share_upload`, `network.public_address`,
 `network.coop_friendly_fire`, `network.coop_player_collisions`,
@@ -280,6 +281,8 @@ in either case, and is kept as the table spells it:
 | `server.chat_filter_slurs`, `server.chat_filter_swearing`, `server.chat_filter_insults` | `off`, `severe`, `strong`, `mild` |
 | `network.voice_mode` | `off`, `team_proximity`, `team_enemy_proximity`, `team_global`, `team_global_enemy_proximity` |
 | `network.voice_kbps` | 8 to 64 |
+| `network.votekick_threshold` | `dynamic`, `static` |
+| `network.votekick_percent` | 1 to 100 |
 | `network.votekick_minutes` | 0 to 60 |
 | `network.votekick_ban_minutes` | 1 to 1440 |
 | `network.map_share_upload` | 16 to 20480 |
@@ -306,11 +309,14 @@ The players vote to kick a player (`network.votekick`: the scoreboard's
 right-click, or the console's `votekick <name>`) and to end the game
 (`network.vote_end_game`: `!endgame` in the chat). While a vote runs every
 player sees its box at the left of the screen, and F1 votes yes, F2 no
-(`controls.vote_yes`, `controls.vote_no`; `!yes` and `!no` in the chat do
-too). The yes votes needed scale with the players who may vote: more than
-half up to 8, then 40% (at least 5) up to 32, then 30% (at least 13), at
-least 2, and more yes than no; a vote the no votes have made lost ends at
-once. A vote to end the game may start from 30 seconds played on the
+(`controls.vote_yes`, `controls.vote_no`), or a controller's D-pad left and
+right, which then do nothing else (`!yes` and `!no` in the chat do too).
+The yes votes needed are `network.votekick_threshold`'s, of the players who
+may vote: `dynamic` (the default) scales them, more than half up to 8, then
+40% (at least 5) up to 32, then 30% (at least 13); `static` asks
+`network.votekick_percent` (50 by default) of them, rounded up, and for a
+kick never more than those who can vote yes. At least 2 either way, and
+more yes than no; a vote the no votes have made lost ends at once. A vote to end the game may start from 30 seconds played on the
 server, not in a game's first minute, and ends it as `sv_end_game` does,
 its scores and postgame shown (`game_ended`'s reason `vote`).
 

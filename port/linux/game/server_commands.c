@@ -743,7 +743,7 @@ static char const *const settable_settings[] =
 	"server.afk_kick_when_full", "server.afk_kick_full_minutes", "server.coop_bsp_switch",
 	"server.coop_bsp_switch_cooldown_seconds", "server.map_vote", "server.map_vote_choices", "server.map_vote_seconds",
 	"network.text_chat", "network.voice_lobby", "network.voice_mode", "network.voice_kbps", "network.votekick",
-	"network.vote_end_game", "network.votekick_minutes", "network.votekick_ban_minutes", "network.map_share", "network.map_share_upload",
+	"network.vote_end_game", "network.votekick_threshold", "network.votekick_percent", "network.votekick_minutes", "network.votekick_ban_minutes", "network.map_share", "network.map_share_upload",
 	"network.public_address", "network.coop_friendly_fire", "network.coop_player_collisions",
 	"network.coop_ally_friendly_fire", "network.shield_effects", "network.fire_origins",
 };
@@ -821,6 +821,8 @@ static struct
 	{ "network.voice_mode", "off|team_proximity|team_enemy_proximity|team_global|team_global_enemy_proximity", NULL,
 		NULL },
 	{ "network.voice_kbps", NULL, "8", "64" },
+	{ "network.votekick_threshold", "dynamic|static", NULL, NULL },
+	{ "network.votekick_percent", NULL, "1", "100" },
 	{ "network.votekick_minutes", NULL, "0", "60" },
 	{ "network.votekick_ban_minutes", NULL, "1", "1440" },
 	{ "network.map_share_upload", NULL, "16", "20480" },

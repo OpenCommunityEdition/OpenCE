@@ -81,6 +81,10 @@ enum halo_chat_pad_button
 };
 
 unsigned long halo_chat_pad_buttons(void);
+/* whether the first player last used a controller (a button pressed, a
+stick moved) rather than the keyboard and mouse: the vote's box shows the
+D-pad's keys then (port/linux/game/network_votekick.c) */
+int halo_gamepad_last_used(void);
 /* the taps on the touchscreen outside the menus since the last call while
 that keyboard is up, and where the latest was (0 to 1 across and down the
 window) */

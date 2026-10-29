@@ -1965,17 +1965,28 @@ void network_chat_update(
 			chat_host_update_rates();
 		}
 	}
-	/* (the votes' keys, F1 and F2: yes or no in the vote running, whether the
-	chat is shown or not: network_votekick.c) */
+	/* (the votes' keys, F1 and F2, and the first controller's D-pad left and
+	right while a vote it may vote in runs (network_vote_pad_open, which
+	xinput_sdl.c keeps from the game meanwhile): yes or no, whether the chat
+	is shown or not: network_votekick.c) */
 	{
 		static unsigned long vote_keys_held;
+		static unsigned long vote_pad_held;
 		unsigned long vote_keys = 0;
+		unsigned long vote_pad = 0;
 
 		if (chat_network_game() && game_in_progress() && !chat_hidden() && !chat_input.active && !console_is_active())
+		{
 			vote_keys = halo_keyboard_actions(0) & (FLAG(HALO_KEYBOARD_VOTE_YES) | FLAG(HALO_KEYBOARD_VOTE_NO));
+			if (network_vote_pad_open())
+				vote_pad = halo_chat_pad_buttons() & (FLAG(HALO_CHAT_PAD_LEFT) | FLAG(HALO_CHAT_PAD_RIGHT));
+		}
 		if (vote_keys & ~vote_keys_held)
 			network_vote_choose(TEST_FLAG(vote_keys & ~vote_keys_held, HALO_KEYBOARD_VOTE_YES));
+		else if (vote_pad & ~vote_pad_held)
+			network_vote_choose(TEST_FLAG(vote_pad & ~vote_pad_held, HALO_CHAT_PAD_LEFT));
 		vote_keys_held = vote_keys;
+		vote_pad_held = vote_pad;
 	}
 	if (!chat_network_game() || !game_in_progress() || chat_speaker() == NONE || !chat_shown() || chat_hidden())
 	{

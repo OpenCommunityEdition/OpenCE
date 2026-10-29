@@ -48,7 +48,7 @@ static void count(
 	short *needed)
 {
 	votekick_count(voters, voter_count, votes, electorate);
-	*needed = votekick_votes_needed(*electorate);
+	*needed = votekick_votes_needed(*electorate, 0);
 }
 
 int main(int argc, char **argv)
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 		add(0x0A000002, "", TRUE, TRUE);
 		count(&votes, &electorate, &needed);
 		CHECK(votes < needed, "one of two kicked the other (%d of %d)", votes, needed);
-		CHECK(votekick_votes_needed(0) >= 2 && votekick_votes_needed(1) >= 2, "one vote kicked");
+		CHECK(votekick_votes_needed(0, 0) >= 2 && votekick_votes_needed(1, 0) >= 2, "one vote kicked");
 		return 0;
 	}
 	/* machines of one address: one vote, and counted once */
@@ -173,12 +173,30 @@ int main(int argc, char **argv)
 
 		for (index = 0; index < (short)(sizeof(expected) / sizeof(expected[0])); index++)
 		{
-			needed = votekick_votes_needed(expected[index][0]);
+			needed = votekick_votes_needed(expected[index][0], 0);
 			CHECK(needed == expected[index][1], "%d needed of %d, not %d", needed, expected[index][0],
 				expected[index][1]);
 		}
 		for (index = 1; index < 128; index++)
-			CHECK(votekick_votes_needed(index) >= votekick_votes_needed((short)(index - 1)), "fewer needed of %d", index);
+			CHECK(votekick_votes_needed(index, 0) >= votekick_votes_needed((short)(index - 1), 0), "fewer needed of %d", index);
+		return 0;
+	}
+	/* a static percentage of those who may vote, rounded up, at least 2 */
+	CASE("static")
+	{
+		static short const expected[][3] =
+		{
+			{ 10, 50, 5 }, { 11, 50, 6 }, { 6, 50, 3 }, { 3, 50, 2 }, { 2, 50, 2 }, { 20, 75, 15 }, { 16, 100, 16 },
+			{ 64, 30, 20 }, { 7, 1, 2 }, { 9, 67, 7 },
+		};
+		short index;
+
+		for (index = 0; index < (short)(sizeof(expected) / sizeof(expected[0])); index++)
+		{
+			needed = votekick_votes_needed(expected[index][0], expected[index][1]);
+			CHECK(needed == expected[index][2], "%d needed of %d at %d%%, not %d", needed, expected[index][0],
+				expected[index][1], expected[index][2]);
+		}
 		return 0;
 	}
 	/* a vote passes with enough yes, and more yes than no */

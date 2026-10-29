@@ -398,8 +398,9 @@ stand-in), and votes again deduplicated by hardware id, which only ever
 removes votes (the players who may vote are counted by address alone, so a
 copied hardware id cannot lower the votes needed). A vote needs yes votes
 scaled with the players who may vote, the target counted (more than half
-up to 8, then 40% and at least 5 up to 32, then 30% and at least 13), at
-least two, and more yes than no; one the no votes have made lost ends at
+up to 8, then 40% and at least 5 up to 32, then 30% and at least 13), or a
+fixed percentage of them (`network.votekick_threshold` `static`,
+`network.votekick_percent`), at least two, and more yes than no; one the no votes have made lost ends at
 once;
 starting one needs `network.votekick_minutes` played on this host in its
 own ticks, voting two minutes; one vote runs at a time, and a failed vote

@@ -66,6 +66,8 @@ extern unsigned char network_chat_typing(void);
 /* ... and its on-screen keyboard is up, which takes the first controller
 and the touch controls' stick and look */
 extern unsigned char network_chat_keyboard_open(void);
+/* port/linux/game/network_votekick.c: the D-pad's left and right vote now */
+extern unsigned char network_vote_pad_open(void);
 /* port/linux/game/menu_functions.c: two or more players on this machine
 (co-op, or split screen in a network game) */
 extern unsigned char pc_menu_split_players(void);
@@ -112,6 +114,10 @@ the touch controls (their swipe, gyroscope or stick: halo_linux_mouse_aiming,
 halo_linux_touch_aiming) */
 static Uint64 mouse_aimed_ms = 0;
 static Uint64 stick_aimed_ms = 0;
+/* when the first player last pressed a gamepad's button or moved its
+sticks, and a key or mouse button of theirs (halo_gamepad_last_used) */
+static Uint64 pad_used_ms = 0;
+static Uint64 keyboard_used_ms = 0;
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
 static Uint64 touch_aimed_ms = 0;
 #endif
@@ -282,6 +288,36 @@ static void chat_pad_hold_over(XINPUT_GAMEPAD *pad)
 		else
 			chat_held_analog &= (unsigned char)~(1 << index);
 	}
+}
+
+/* the first controller's D-pad left and right held as a vote took them,
+which the game gets none of till each is let go: else a vote's end would
+hand it a press (the Fishsticks layout switches grenades with left) */
+static WORD vote_held_buttons;
+
+static void vote_pad_hold_over(XINPUT_GAMEPAD *pad)
+{
+	const WORD sides = XINPUT_GAMEPAD_DPAD_LEFT | XINPUT_GAMEPAD_DPAD_RIGHT;
+
+	if (network_vote_pad_open())
+		vote_held_buttons |= (WORD)(pad->wButtons & sides);
+	else
+		vote_held_buttons &= pad->wButtons;
+	if (network_vote_pad_open())
+		pad->wButtons &= (WORD)~sides;
+	else
+		pad->wButtons &= (WORD)~vote_held_buttons;
+}
+
+int halo_gamepad_last_used(void)
+{
+	Uint64 pad, keyboard;
+
+	pthread_mutex_lock(&mouse_lock);
+	pad = pad_used_ms > stick_aimed_ms ? pad_used_ms : stick_aimed_ms;
+	keyboard = keyboard_used_ms > mouse_aimed_ms ? keyboard_used_ms : mouse_aimed_ms;
+	pthread_mutex_unlock(&mouse_lock);
+	return pad != 0 && pad > keyboard;
 }
 
 /* the touch controls' stick as the player's movement (input_abstraction.c's
@@ -1359,6 +1395,23 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		console_active = console_is_active() || network_chat_typing();
 		debug_camera_update(&input, console_active);
 		held = console_active ? 0 : keyboard_bound_actions(&input);
+		/* (what the player last used: a gamepad's button or stick, or a key
+		or mouse button bound to an action) */
+		{
+			enum { MOVED = 8000 };
+			int index;
+			int used = physical.wButtons != 0 || abs(physical.sThumbLX) > MOVED || abs(physical.sThumbLY) > MOVED ||
+				abs(physical.sThumbRX) > MOVED || abs(physical.sThumbRY) > MOVED;
+
+			for (index = 0; index < 8 && !used; index++)
+				used = physical.bAnalogButtons[index] > 0x40;
+			pthread_mutex_lock(&mouse_lock);
+			if (used)
+				pad_used_ms = SDL_GetTicks();
+			if (held)
+				keyboard_used_ms = SDL_GetTicks();
+			pthread_mutex_unlock(&mouse_lock);
+		}
 		keyboard_screenshot(held);
 		if (!console_active)
 		{
@@ -1378,6 +1431,9 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		while it is up) */
 		chat_pad_record(&state->Gamepad);
 		chat_pad_hold_over(&state->Gamepad);
+		/* (and a vote running takes the D-pad's left and right:
+		network_votekick.c) */
+		vote_pad_hold_over(&state->Gamepad);
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
 		{

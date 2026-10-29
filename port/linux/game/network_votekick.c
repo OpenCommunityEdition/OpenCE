@@ -78,10 +78,12 @@ know: its players cannot vote, and count as players who did not.
 #include "text/unicode.h"
 
 #include <stdio.h>
+#include <string.h>
 
 /* port_config.c's, network_server_manager.c's, cseries_windows.c's */
 int config_boolean(const char *name);
 long config_integer(const char *name);
+const char *config_string(const char *name);
 void network_game_server_kick_machine(long machine_index, boolean kept_out);
 boolean network_game_server_kick_machine_of_player(long machine_index, boolean ban);
 char const *network_game_server_machine_hardware_id(long machine_index);
@@ -89,6 +91,7 @@ void p2p_hardware_id_sanitize(char *destination, int size, const char *source);
 unsigned long system_milliseconds(void);
 void console_warning(const char *format, ...);
 int halo_server_mode(void);
+unsigned char network_chat_keyboard_open(void);
 
 /* ---------- constants */
 
@@ -331,22 +334,37 @@ static void votekick_count(
 	}
 }
 
-/* the yes votes that pass a vote, scaled with the lobby: more than half of
-those who may vote up to 8 of them; then 40% (at least 5) up to 32; then
-30% (at least 13); and at least MINIMUM_VOTES. (A vote passes with more
-yes than no too: votekick_passes) */
+/* the yes votes that pass a vote. percent 0, network.votekick_threshold
+"dynamic": scaled with the lobby, more than half of those who may vote up
+to 8 of them, then 40% (at least 5) up to 32, then 30% (at least 13).
+Else "static": that percentage of those who may vote, rounded up. At least
+MINIMUM_VOTES either way. (A vote passes with more yes than no too:
+votekick_passes) */
 static short votekick_votes_needed(
-	short electorate)
+	short electorate,
+	short percent)
 {
 	short needed;
 
-	if (electorate <= 8)
+	if (percent > 0)
+		needed = (short)(((long)electorate * percent + 99) / 100);
+	else if (electorate <= 8)
 		needed = (short)(electorate / 2 + 1);
 	else if (electorate <= 32)
 		needed = (short)MAX(5, (electorate * 4 + 9) / 10);
 	else
 		needed = (short)MAX(13, (electorate * 3 + 9) / 10);
 	return needed < MINIMUM_VOTES ? MINIMUM_VOTES : needed;
+}
+
+/* the host's threshold: 0 for "dynamic" (network.votekick_threshold),
+else network.votekick_percent (1 to 100) for "static" */
+static short votekick_threshold_percent(
+	void)
+{
+	if (strcmp(config_string("network.votekick_threshold"), "static"))
+		return 0;
+	return (short)PIN(config_integer("network.votekick_percent"), 1, 100);
 }
 
 /* whether the votes pass it: enough yes, and more yes than no */
@@ -578,7 +596,15 @@ static void votekick_recount(
 	for (index = 0; index < count; index++)
 		votekick_voter_get(machine_indices[index], &voters[index]);
 	votekick_count(voters, count, &votekick.votes, &electorate);
-	votekick.needed = votekick_votes_needed(electorate);
+	votekick.needed = votekick_votes_needed(electorate, votekick_threshold_percent());
+	/* (a static percentage asks no more than those who can vote yes: the
+	player voted against never does) */
+	if (votekick_threshold_percent() > 0)
+	{
+		short voters = (short)(electorate - (votekick.kind == _network_vote_kick ? 1 : 0));
+
+		votekick.needed = (short)MAX(MINIMUM_VOTES, MIN(votekick.needed, voters));
+	}
 	votekick.electorate = electorate;
 	/* (the no votes counted as the yes are) */
 	for (index = 0; index < count; index++)
@@ -979,7 +1005,7 @@ static void votekick_host_request(
 	votekick_recount();
 	votekick_names(machine_index, names, sizeof(names));
 	votekick_subject(subject, sizeof(subject));
-	snprintf(notice, sizeof(notice), "%s started a vote to %s (%d needed): F1 votes yes, F2 no", names, subject,
+	snprintf(notice, sizeof(notice), "%s started a vote to %s (%d needed): F1 or D-pad left votes yes, F2 or right no", names, subject,
 		votekick.needed);
 	distributed_send_notice(notice);
 	error(_error_log, "vote: %s started by machine %ld (against machine %ld)", subject, machine_index, target_machine);
@@ -1450,10 +1476,16 @@ void network_votekick_draw(
 		usprintf(text, L"Vote: end the game");
 	}
 	votekick_draw_row(font_index, left, top, width, line_height, 0, text, 1.0f, 0.8f, 0.35f);
-	usprintf(text, touch ? L"!yes   Yes: %d" : L"F1   Yes: %d", status.votes);
-	votekick_draw_row(font_index, left, top, width, line_height, 1, text, status.voted ? 0.5f : 0.45f,
-		status.voted ? 1.0f : 0.85f, 0.45f);
-	usprintf(text, touch ? L"!no    No: %d" : L"F2   No: %d", status.no_votes);
+	/* (the keys of what the player last used: the controller's D-pad, the
+	keyboard's F1 and F2, or the chat's words with the touch controls) */
+	{
+		boolean pad = halo_gamepad_last_used() != 0;
+
+		usprintf(text, pad ? L"D-pad Left   Yes: %d" : touch ? L"!yes   Yes: %d" : L"F1   Yes: %d", status.votes);
+		votekick_draw_row(font_index, left, top, width, line_height, 1, text, status.voted ? 0.5f : 0.45f,
+			status.voted ? 1.0f : 0.85f, 0.45f);
+		usprintf(text, pad ? L"D-pad Right  No: %d" : touch ? L"!no    No: %d" : L"F2   No: %d", status.no_votes);
+	}
 	votekick_draw_row(font_index, left, top, width, line_height, 2, text, status.voted_no ? 1.0f : 0.9f,
 		status.voted_no ? 0.45f : 0.5f, 0.4f);
 	if (status.voted || status.voted_no)
@@ -1464,4 +1496,21 @@ void network_votekick_draw(
 		usprintf(text, L"%d needed, %d s left", status.needed, status.seconds_left);
 	votekick_draw_row(font_index, left, top, width, line_height, 3, text, 0.75f, 0.75f, 0.75f);
 	rasterizer_text_set_scale(1.0f, 0.0f, 0.0f);
+}
+
+/* (xinput_sdl.c) whether the D-pad's left and right are the vote's now,
+not the game's: a vote runs that this machine may vote in and has not, the
+chat's on-screen keyboard is not up, and nothing hides the HUD (a menu, a
+cinematic) */
+unsigned char network_vote_pad_open(
+	void)
+{
+	struct network_votekick_status status;
+
+	if (ui_widgets_active() || cinematic_in_progress() || network_chat_keyboard_open() ||
+		!network_votekick_get_status(&status))
+	{
+		return FALSE;
+	}
+	return status.may_vote && !status.voted && !status.voted_no;
 }

@@ -614,9 +614,21 @@ static const struct config_setting config_settings[] =
 		"game); a dedicated server's follows this setting, listed or not." },
 	{ "network.votekick", _config_boolean, "true", "HALO_NET_VOTEKICK", _environment_value, _platform_all,
 		"Hosting: let the players vote to kick a player (the scoreboard's\n"
-		"right-click, or the console's votekick; F1 votes yes, F2 no). The yes\n"
-		"votes needed scale with the players: more than half up to 8, 40% up to\n"
-		"32, 30% beyond, counted once per address, and more yes than no." },
+		"right-click, or the console's votekick; F1 or the D-pad's left votes\n"
+		"yes, F2 or its right no). The yes votes needed are\n"
+		"network.votekick_threshold's, counted once per address, and more yes\n"
+		"than no." },
+	{ "network.votekick_threshold", _config_string, "\"dynamic\"", "HALO_NET_VOTEKICK_THRESHOLD", _environment_value,
+		_platform_all,
+		"Hosting: the yes votes a vote (to kick, to end the game) needs, of the\n"
+		"players who may vote: \"dynamic\", scaled with the players (more than\n"
+		"half up to 8, 40% up to 32, 30% beyond); \"static\",\n"
+		"network.votekick_percent of them. At least 2 either way." },
+	{ "network.votekick_percent", _config_integer, "50", "HALO_NET_VOTEKICK_PERCENT", _environment_value,
+		_platform_all,
+		"Hosting: with network.votekick_threshold \"static\", the percentage of\n"
+		"the players who may vote whose yes passes a vote (1 to 100, rounded\n"
+		"up; a kick's never more than those who can vote)." },
 	{ "network.vote_end_game", _config_boolean, "true", "HALO_NET_VOTE_END_GAME", _environment_value, _platform_all,
 		"Hosting: let the players vote to end the game (\"!endgame\" in the chat;\n"
 		"F1 votes yes, F2 no), counted as a vote to kick. The game ends with its\n"
@@ -1986,6 +1998,7 @@ static const struct
 	{ "server.chat_filter_insults", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "server.vpn_policy", { "link", "block", "off", NULL }, NULL },
 	{ "server.vpn_fail", { "open", "closed", NULL }, NULL },
+	{ "network.votekick_threshold", { "dynamic", "static", NULL }, NULL },
 	{ "server.coop_bsp_switch", { "majority", "anyone", NULL }, NULL },
 	{ "network.link_share", { "when_needed", "always", "never", NULL }, NULL },
 	{ "network.voice_mode", { "off", "team_proximity", "team_enemy_proximity", "team_global",

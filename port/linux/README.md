@@ -263,8 +263,8 @@ grenades switched with the left bumper (the flashlight moves to X).
 | talk in voice chat (hold) | V |
 | type a chat line to everyone | T |
 | type a chat line to your team | Y |
-| vote yes in the vote running (to kick a player, to end the game) | F1 |
-| vote no in the vote running | F2 |
+| vote yes in the vote running (to kick a player, to end the game) | F1 (a controller: the D-pad's left, while the vote runs) |
+| vote no in the vote running | F2 (a controller: the D-pad's right, while the vote runs) |
 | while typing a chat line: to everyone, the team or the vehicle, in turn | Tab |
 
 With a controller, or the touch controls' D-pad, D-pad Up opens the text
@@ -576,6 +576,8 @@ the setting for one start of the game. It has priority over the file.
 | `network.voice_proximity` | `15.0` | `HALO_NET_VOICE_PROXIMITY` | When you host: the distance in world units (1 unit is approximately 3 metres) at which players are near, for voice chat. `5` to `100`. |
 | `network.text_chat` | `"on"` | `HALO_NET_TEXT_CHAT` | When you host: the text chat. `"on"`, lines with links refused; `"links"`, links allowed; `"off"`, no chat (in either case). Always off in a game a player hosts that is listed in the server browser; a dedicated server's follows it, listed or not. TEXT CHAT in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. Refer to "Text chat". |
 | `network.votekick` | `true` | `HALO_NET_VOTEKICK` | When you host: `true`, the players can vote to kick a player. Refer to "Security". `false`: no votes. VOTE KICK in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. |
+| `network.votekick_threshold` | `"dynamic"` | `HALO_NET_VOTEKICK_THRESHOLD` | When you host: the yes votes that a vote (to kick, to end the game) needs, of the players who can vote. `"dynamic"`: scaled with the players, more than half up to 8 players, 40% (at least 5) up to 32, 30% (at least 13) above. `"static"`: `network.votekick_percent` of them, rounded up. At least 2 in both cases, and more yes than no. Only in config.toml (and a dedicated server's `sv_set`), not in the menus. |
+| `network.votekick_percent` | `50` | `HALO_NET_VOTEKICK_PERCENT` | When you host, with `network.votekick_threshold = "static"`: the percentage of the players who can vote that must vote yes (`1` to `100`). For a vote to kick, never more than the players who can vote yes (the player of the vote cannot). |
 | `network.vote_end_game` | `true` | `HALO_NET_VOTE_END_GAME` | When you host: `true`, the players can vote to end the game (`!endgame` in the chat; F1 votes yes, F2 no), counted as a vote to kick. The game ends with its scores, as `sv_end_game` ends it. `false`: no such votes. |
 | `network.votekick_minutes` | `5` | `HALO_NET_VOTEKICK_MINUTES` | When you host: the minutes that a player must play on the server before the player can start a vote to kick (`0` to `60`). To vote, a player must play for 2 minutes, or for this time if it is less. |
 | `network.votekick_ban_minutes` | `30` | `HALO_NET_VOTEKICK_BAN_MINUTES` | When you host: the minutes that a player who is kicked by a vote cannot join again (`1` to `1440`). |
@@ -1342,15 +1344,19 @@ Only machines with the invite can find the game:
   co-op, Server Setup > Voice and Voting). Hold the scoreboard key, right-click to
   show the pointer, and click the name of the player. Then click **Start
   a vote to kick**. While a vote runs, every player sees its box at the
-  left of the screen: F1 votes yes, F2 no (`!yes` and `!no` in the chat do
-  the same). Players can also vote to end the game: say `!endgame` in the
+  left of the screen: F1 votes yes, F2 no, or with a controller the D-pad's
+  left and right (only while the vote runs: then they do nothing else; the
+  box shows the keys of what you last used). `!yes` and `!no` in the chat do
+  the same. Players can also vote to end the game: say `!endgame` in the
   chat (`network.vote_end_game`). `votekick <player name>` in the developer console does
   the same. The host also gets **Kick** and **Ban** in this menu: these do
   the same as the `kick` and `ban` commands (click **Ban** two times). The
   host counts the votes, and these rules prevent abuse:
   - The yes votes needed scale with the players: more than half of them up
     to 8 players, then 40% (at least 5) up to 32, then 30% (at least 13),
-    and at least two; and there must be more yes than no. The player of
+    and at least two; and there must be more yes than no. The host can set
+    a fixed percentage instead (`network.votekick_threshold = "static"`,
+    `network.votekick_percent`, 50 by default). The player of
     the vote is counted, but cannot vote. Thus, in a small game of two
     equal teams, one team cannot kick a player of the other team without
     help.
