@@ -784,7 +784,7 @@ To see the frame rate:
 1. Push \` to open the developer console.
 2. Enter `display_framerate true`.
 
-Or set `display.show_fps` (Video Setup's SHOW FRAMES, which on Android is
+Or set `display.show_fps` (Video Setup > Graphics' SHOW FRAMES, which on Android is
 where the console is not at hand), which turns on the same counter.
 
 In the game of another host, the console runs only the commands that change

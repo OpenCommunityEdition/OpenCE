@@ -59,10 +59,13 @@ SCREENS = {
     "video_settings": {
         "screen": "video_settings_screen",
         "header": ("header_profile_video_settings", f"{PE}/video_settings/header_profile_video_settings"),
-        # the other screens' 30px step. each platform packs its own rows, so
-        # a row hidden on this machine does not leave a gap
-        "spacing": 30,
-        "help_top": 364,
+        # a 28px step (the other screens' 30 would take the desktop's ten
+        # rows into the help: Graphics' is 27). each platform packs its own
+        # rows, so a row hidden on this machine does not leave a gap
+        "spacing": 28,
+        # (below the desktop's last row, 353: its two lines clear of the
+        # buttons, 414)
+        "help_top": 358, "help_height": 54,
         "platform_places": True,
         # (rows in the place of the row before them: Window Size in
         # Resolution's, port/linux/game/menu_functions.c showing the one the
@@ -99,14 +102,15 @@ SCREENS = {
              [("AUTO", "0"), ("30", "30"), ("60", "60"), ("120", "120"), ("NONE", "-1")],
              "With V-Sync off, the most frames a second. Auto:\ntwice the display's refresh rate.", "android",
              "max_fps_android"),
-            # (the game's own counter, main.c's main_framerate_render, which
-            # display.show_fps turns on: port/linux/game/frame_rate_display.c)
-            ("SHOW FRAMES:", "display.show_fps", ON_OFF,
-             "Draw the frame rate at the bottom right of a game,\ncounted over half a second.", None),
             ("SMOOTH MOTION:", "display.interpolation", ON_OFF,
              "Draw a frame for every display refresh, blending\nbetween the game's 30 ticks a second.", None),
             ("INSTANT AIM:", "display.direct_camera", ON_OFF,
              "In first person, turn the view the moment the\nmouse moves, not up to two ticks later.", "desktop web"),
+            # (Graphics', with the HUD's rows: Video Setup's own has no room
+            # left above its help on the desktop. The game's own counter, main.c's main_framerate_render, which
+            # display.show_fps turns on: port/linux/game/frame_rate_display.c)
+            ("SHOW FRAMES:", "display.show_fps", ON_OFF,
+             "Draw the frame rate at the bottom right of a game,\ncounted over half a second.", None),
             ("HIGH-RES HUD:", "display.high_res_hud", ON_OFF,
              "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
@@ -286,7 +290,7 @@ SCREENS = {
 # Video Setup's categories open ordinary settings screens. Each has the same
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
-_graphics = {"display.high_res_hud",
+_graphics = {"display.show_fps", "display.high_res_hud",
              "display.high_res_text", "display.anti_aliasing",
              "display.anisotropic_filtering", "display.shadow_resolution", "display.per_pixel_lighting",
              "display.model_detail"}
