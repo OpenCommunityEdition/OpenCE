@@ -369,6 +369,9 @@ static char const *const port_function_names[] =
 	"port pause end game", "port coop friendly fire",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
+	"port join4 open", "port join4 back", "port join4 done", "port join4 playing", "port join4 opener",
+	"port join4 select", "port join4 join", "port join4 choosing", "port join4 leave", "port join4 ready",
+	"port join4 unready",
 	"port lobby player list initialize", "port lobby player choose",
 	"port lobby preview add", "port lobby preview leave",
 	/* (the gametype editor's: the Xbox's walk their rows by place, which the
@@ -395,6 +398,10 @@ static char const *const port_function_names[] =
 	/* (the main menu's Mods: menu_functions.c) */
 	"port mods init", "port mods close", "port mods toggle", "port mods move up", "port mods move down",
 	"port mods save",
+	"port controller init", "port controller close", "port controller defaults", "port controller save", "port controller bind", "port controller left", "port controller right",
+	/* (a dedicated server's map vote: menu_functions.c) */
+	"port map vote open", "port map vote choose",
+	"port controller clear", "port controller cancel",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -408,7 +415,7 @@ static char const *const port_game_data_input_names[] =
 	"mp map list update", "gt select list update", "gt edit list update", "load game list update",
 	"direct ip connect update", "network settings update",
 	"port settings help", "color picker update", "3wide player profile list update", "port lobby update",
-	"port lobby preview update",
+	"port lobby preview update", "port join4 update",
 	/* (the gametype editor's: the Xbox's stops the game on the buttons'
 	row; the Xbox's read only player_ui's gametype, not Server Setup's) */
 	"game settings lists text update", "get edit game settings name", "mp edit profile set rule text",
@@ -422,6 +429,11 @@ static char const *const port_game_data_input_names[] =
 	"port coop friendly fire text",
 	/* (the gametype editor's description, with OPENCE OPTIONS' row) */
 	"port playlist edit desc",
+	"port controller update",
+	/* (a dedicated server's map vote's screen) */
+	"port map vote update",
+	/* (HDR Calibration's patterns, drawn by the renderer) */
+	"port hdr calibration",
 };
 
 static struct
@@ -1694,12 +1706,19 @@ static boolean pause_box_stock(struct ui_widget_definition const *box)
 		tag_name_ends(pieces[2].widget_tag.index, "\\pausebox2_right");
 }
 
+/* the port's box's height for the number of buttons (tools/port_settings.py's
+pause_box_height: the Xbox's of two is 159), and its footer band, the button
+key's, at its bottom */
+#define PAUSE_BOX_HEIGHT(buttons) (159 + ((buttons) - 2) * PAUSE_BUTTON_SPACING)
+#define PAUSE_BOX_FOOTER 28
+
 /* the stock box's pieces drawn with the port's taller box: its frame for
-the number of buttons */
-static void pause_box_redraw(struct ui_widget_definition const *box, long buttons)
+the number of buttons; the box's height */
+static short pause_box_redraw(struct ui_widget_definition const *box, long buttons)
 {
 	static char const *const names[] = { "pause/pausebox_left", "pause/pausebox_center", "pause/pausebox_right" };
 	struct ui_widget_child_reference const *pieces = box->child_widgets.address;
+	short height = (short)PAUSE_BOX_HEIGHT(PAUSE_BOX_FIRST_BUTTONS);
 	long piece;
 
 	for (piece = 0; piece < 3; piece++)
@@ -1717,8 +1736,283 @@ static void pause_box_redraw(struct ui_widget_definition const *box, long button
 		sequence->first_bitmap_index = (short)PIN(buttons - PAUSE_BOX_FIRST_BUTTONS, 0, group->bitmaps.count - 1);
 		sequence->bitmap_count = 1;
 		reference_set(&definition->background_bitmap, BITMAP_GROUP_TAG, build.bitmap_tags[bitmap]);
-		definition->bounds.y1 = (short)(definition->bounds.y0 + 256);
+		/* (as high as the box: its texture's rows below it, empty, cropped,
+		as a split screen's 240 lines would squeeze the whole 256) */
+		height = (short)PAUSE_BOX_HEIGHT(PAUSE_BOX_FIRST_BUTTONS + sequence->first_bitmap_index);
+		definition->bounds.y1 = (short)(definition->bounds.y0 + height);
 	}
+	return height;
+}
+
+/* the stock screen's box within the screen (a split screen's is 240 high:
+the box of four buttons is taller than the room under the Xbox's place for
+it), moved up with its list as far as it must, and the button key (what is
+below the list) in the box's footer band, where the Xbox's stood under its
+shorter box */
+static void pause_box_fit(struct ui_widget_definition *screen, long box_child, long list_child, short list_top,
+	short height)
+{
+	struct ui_widget_child_reference *children = screen->child_widgets.address;
+	short room = (short)(screen->bounds.y1 - screen->bounds.y0 - 4);
+	short top = children[box_child].vertical_offset;
+	short up = (short)MAX(0, MIN(top - 2, top + height - room));
+	long child;
+
+	children[box_child].vertical_offset -= up;
+	children[list_child].vertical_offset -= up;
+	top = children[box_child].vertical_offset;
+	for (child = 0; child < screen->child_widgets.count; child++)
+	{
+		struct ui_widget_definition const *widget;
+
+		if (child == box_child || child == list_child || children[child].widget_tag.index == NONE ||
+			children[child].vertical_offset <= list_top)
+		{
+			continue;
+		}
+		widget = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		children[child].vertical_offset = (short)(top + height - PAUSE_BOX_FOOTER +
+			(PAUSE_BOX_FOOTER - (widget->bounds.y1 - widget->bounds.y0)) / 2);
+	}
+}
+
+
+
+/* ---------- a Custom Edition map's own pause screens
+
+The PC version had no split screen: a Custom Edition map's half and quarter
+screen pause screens were never shown, and its box (200 high) is taller than
+the half screen's room under it; a protected map's are scrambled (Lefty's
+box is a 640x480 picture of its own, its buttons far outside the screen).
+Such a map's screens are laid out as the Xbox's are (pause_rebuild), with
+the port's box, the list in it and the button key in its footer band (a
+screen without one, as the full screen's, gets the half screen's), so that
+pause_patch fits them as it does the Xbox's. Not a map whose list has more
+buttons than the port's box holds. */
+
+#define PAUSE_LIST_WIDTH 202
+#define PAUSE_LIST_HEIGHT 145
+#define PAUSE_BOX_WIDTH 226
+/* (the Xbox's: the list 8 in from the box, 43 down; the key 25 in) */
+#define PAUSE_LIST_LEFT 8
+#define PAUSE_LIST_TOP 43
+#define PAUSE_KEY_LEFT 25
+#define PAUSE_BOX_MOST_BUTTONS 4
+
+/* the screen's box: a widget of three pieces (the Xbox's pausebox2, Custom
+Edition's pausebox4), else NONE */
+static long pause_box_child(struct ui_widget_definition const *screen, long list_child)
+{
+	struct ui_widget_child_reference const *children = screen->child_widgets.address;
+	long child;
+
+	for (child = 0; child < screen->child_widgets.count; child++)
+	{
+		struct ui_widget_definition const *box;
+		struct ui_widget_child_reference const *pieces;
+
+		if (child == list_child || children[child].widget_tag.index == NONE)
+			continue;
+		box = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		pieces = box->child_widgets.address;
+		if (box->child_widgets.count == 3 && tag_name_ends(pieces[0].widget_tag.index, "_left") &&
+			tag_name_ends(pieces[1].widget_tag.index, "_left_center") &&
+			tag_name_ends(pieces[2].widget_tag.index, "_right"))
+		{
+			return child;
+		}
+	}
+	return NONE;
+}
+
+/* the screen's pause list (a column list with the quit button), else NONE */
+static long pause_list_child(struct ui_widget_definition const *screen, long quit_function)
+{
+	struct ui_widget_child_reference const *children = screen->child_widgets.address;
+	long child;
+
+	for (child = 0; child < screen->child_widgets.count; child++)
+	{
+		struct ui_widget_definition const *list;
+
+		if (children[child].widget_tag.index == NONE)
+			continue;
+		list = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		if (list->type == _widget_type_column_list && pause_quit_button(list, quit_function) != NONE)
+			return child;
+	}
+	return NONE;
+}
+
+/* the screen's button key (what is below its list), else NONE */
+static long pause_key_child(struct ui_widget_definition const *screen, long list_child, long box_child)
+{
+	struct ui_widget_child_reference const *children = screen->child_widgets.address;
+	long child;
+
+	for (child = 0; child < screen->child_widgets.count; child++)
+	{
+		if (child != list_child && child != box_child && children[child].widget_tag.index != NONE &&
+			children[child].vertical_offset > children[list_child].vertical_offset)
+		{
+			return child;
+		}
+	}
+	return NONE;
+}
+
+/* the multiplayer pause screens laid out as the Xbox's (above), if they are a
+Custom Edition map's; TRUE if they are */
+static boolean pause_rebuild(struct tag_block const *screens, long quit_function, long added)
+{
+	long screen, key_tag = NONE;
+	long large_font = tag_loaded('font', "ui\\large_ui");
+	long highlight = tag_loaded(BITMAP_GROUP_TAG, "ui\\shell\\bitmaps\\menu_bkds");
+	boolean rebuilt = FALSE;
+
+	/* (any screen's list and box will do: the screens share them) */
+	for (screen = 0; screen < screens->count; screen++)
+	{
+		long screen_tag = ((struct tag_reference const *)screens->address)[screen].index;
+		struct ui_widget_definition const *definition;
+		long list_child, box_child, key;
+
+		if (screen_tag == NONE)
+			continue;
+		definition = tag_get(UI_WIDGET_DEFINITION_TAG, screen_tag);
+		if ((list_child = pause_list_child(definition, quit_function)) == NONE ||
+			(box_child = pause_box_child(definition, list_child)) == NONE)
+		{
+			continue;
+		}
+		if (pause_box_stock(tag_get(UI_WIDGET_DEFINITION_TAG,
+			((struct ui_widget_child_reference const *)definition->child_widgets.address)[box_child].widget_tag.index)))
+		{
+			return FALSE;
+		}
+		{
+			struct ui_widget_definition const *list = tag_get(UI_WIDGET_DEFINITION_TAG,
+				((struct ui_widget_child_reference const *)definition->child_widgets.address)[list_child].widget_tag.index);
+
+			if (list->child_widgets.count + added > PAUSE_BOX_MOST_BUTTONS)
+				return FALSE;
+		}
+		key = pause_key_child(definition, list_child, box_child);
+		if (key != NONE && key_tag == NONE)
+			key_tag = ((struct ui_widget_child_reference const *)definition->child_widgets.address)[key].widget_tag.index;
+		rebuilt = TRUE;
+	}
+	if (!rebuilt)
+		return FALSE;
+	for (screen = 0; screen < screens->count; screen++)
+	{
+		long screen_tag = ((struct tag_reference const *)screens->address)[screen].index;
+		struct ui_widget_definition *definition, *list, *box;
+		struct ui_widget_child_reference *children, *rows, *pieces;
+		long list_child, box_child, key, child;
+		short width, height, box_x, box_y, piece_x;
+
+		if (screen_tag == NONE)
+			continue;
+		definition = tag_get(UI_WIDGET_DEFINITION_TAG, screen_tag);
+		if ((list_child = pause_list_child(definition, quit_function)) == NONE ||
+			(box_child = pause_box_child(definition, list_child)) == NONE)
+		{
+			continue;
+		}
+		children = definition->child_widgets.address;
+		list = tag_get(UI_WIDGET_DEFINITION_TAG, children[list_child].widget_tag.index);
+		box = tag_get(UI_WIDGET_DEFINITION_TAG, children[box_child].widget_tag.index);
+		width = (short)(definition->bounds.x1 - definition->bounds.x0);
+		height = (short)(definition->bounds.y1 - definition->bounds.y0);
+		/* the list: the Xbox's size, its buttons centred across it and the
+		Xbox's pitch apart (pause_list_patch centres them down it) */
+		list->bounds.x0 = list->bounds.y0 = 0;
+		list->bounds.x1 = PAUSE_LIST_WIDTH;
+		list->bounds.y1 = PAUSE_LIST_HEIGHT;
+		rows = list->child_widgets.address;
+		for (child = 0; child < list->child_widgets.count; child++)
+		{
+			struct ui_widget_definition *row = rows[child].widget_tag.index == NONE ? NULL :
+				tag_get(UI_WIDGET_DEFINITION_TAG, rows[child].widget_tag.index);
+			short row_width = row ? (short)(row->bounds.x1 - row->bounds.x0) : PAUSE_LIST_WIDTH;
+
+			/* (a protected map's: Lefty's text is see-through, and its font and
+			the highlight renamed, which the stock ones replace; the buttons
+			pause_list_patch adds copy them) */
+			if (row && row->type == _widget_type_text_box)
+			{
+				if (row->text_color.alpha <= 0.0f)
+					row->text_color.alpha = 1.0f;
+				if (row->text_font.index != NONE && !strchr(tag_get_name(row->text_font.index), '\\') &&
+					large_font != NONE)
+				{
+					reference_set(&row->text_font, 'font', large_font);
+				}
+				if (row->background_bitmap.index != NONE &&
+					!strchr(tag_get_name(row->background_bitmap.index), '\\') && highlight != NONE)
+				{
+					reference_set(&row->background_bitmap, BITMAP_GROUP_TAG, highlight);
+				}
+			}
+
+			rows[child].horizontal_offset = (short)MAX(0, (PAUSE_LIST_WIDTH - row_width) / 2);
+			rows[child].vertical_offset = (short)(child * PAUSE_BUTTON_SPACING);
+		}
+		/* the box: the Xbox's pieces' places (pause_box_redraw draws them), no
+		picture of its own (Lefty's covers the screen) */
+		reference_clear(&box->background_bitmap, BITMAP_GROUP_TAG);
+		box->bounds.x0 = box->bounds.y0 = 0;
+		box->bounds.x1 = PAUSE_BOX_WIDTH;
+		box->bounds.y1 = (short)PAUSE_BOX_HEIGHT(PAUSE_BOX_MOST_BUTTONS);
+		pieces = box->child_widgets.address;
+		for (child = 0, piece_x = 0; child < 3; child++)
+		{
+			struct ui_widget_definition *piece = tag_get(UI_WIDGET_DEFINITION_TAG, pieces[child].widget_tag.index);
+			short piece_width = (short)(child == 1 ? PAUSE_BOX_WIDTH - 32 : 16);
+
+			pieces[child].horizontal_offset = piece_x;
+			pieces[child].vertical_offset = 0;
+			piece->bounds.x0 = piece->bounds.y0 = 0;
+			piece->bounds.x1 = piece_width;
+			piece->bounds.y1 = (short)PAUSE_BOX_HEIGHT(PAUSE_BOX_MOST_BUTTONS);
+			piece_x = (short)(piece_x + piece_width);
+		}
+		/* centred in the screen, the list in the box (pause_box_fit fits a
+		box taller than the room) */
+		box_x = (short)MAX(0, (width - PAUSE_BOX_WIDTH) / 2);
+		box_y = (short)MAX(2, (height - PAUSE_BOX_HEIGHT(PIN(list->child_widgets.count + added,
+			PAUSE_BOX_FIRST_BUTTONS, PAUSE_BOX_MOST_BUTTONS))) / 2);
+		children[box_child].horizontal_offset = box_x;
+		children[box_child].vertical_offset = box_y;
+		children[list_child].horizontal_offset = (short)(box_x + PAUSE_LIST_LEFT);
+		children[list_child].vertical_offset = (short)(box_y + PAUSE_LIST_TOP);
+		/* the button key, under the list (pause_box_fit puts it in the box's
+		footer band); a screen without one gets another screen's */
+		key = pause_key_child(definition, list_child, box_child);
+		if (key == NONE && key_tag != NONE)
+		{
+			struct ui_widget_child_reference *grown =
+				allocate((definition->child_widgets.count + 1) * sizeof(struct ui_widget_child_reference));
+
+			if (grown)
+			{
+				memcpy(grown, children, definition->child_widgets.count * sizeof(*grown));
+				memset(&grown[definition->child_widgets.count], 0, sizeof(*grown));
+				reference_set(&grown[definition->child_widgets.count].widget_tag, UI_WIDGET_DEFINITION_TAG, key_tag);
+				key = definition->child_widgets.count;
+				definition->child_widgets.address = children = grown;
+				definition->child_widgets.count++;
+			}
+		}
+		if (key != NONE)
+		{
+			children[key].horizontal_offset = (short)(box_x + PAUSE_KEY_LEFT);
+			children[key].vertical_offset = (short)(box_y + PAUSE_LIST_TOP + PAUSE_LIST_HEIGHT);
+		}
+	}
+	platform_log("menus: the map's pause screens laid out as the Xbox's");
+	return TRUE;
 }
 
 static void pause_patch(struct cache_file_tag_instance *instances)
@@ -1728,12 +2022,13 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 	boolean host = global_network_game_server_get() != NULL;
 	struct tag_block const *screens;
 	long patched_list = NONE, added = 0, buttons = 0, screen;
-	short grow = 0;
-	boolean box_redrawn = FALSE;
+	short grow = 0, box_height = 0;
+	boolean box_redrawn = FALSE, rebuilt;
 
 	if (collection == NONE || quit_function == NONE)
 		return;
 	screens = tag_get('Soul', collection);
+	rebuilt = pause_rebuild(screens, quit_function, host || build.coop ? 2 : 1);
 	for (screen = 0; screen < screens->count; screen++)
 	{
 		long screen_tag = ((struct tag_reference const *)screens->address)[screen].index;
@@ -1782,6 +2077,9 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 				box_child = child;
 			}
 		}
+		/* (a Custom Edition map's, laid out as the Xbox's: pause_rebuild) */
+		if (box_child == NONE && rebuilt)
+			box_child = pause_box_child(definition, list_child);
 		/* the stock box: taller, centred where it was, the list with it, and
 		what is below it moved down; else only what is below the list (as far
 		as the list grew) */
@@ -1793,10 +2091,16 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 			else if (children[child].vertical_offset > list_top)
 				children[child].vertical_offset += box_child != NONE ? grow - grow / 2 : grow;
 		}
-		if (box_child != NONE && !box_redrawn)
+		if (box_child != NONE)
 		{
-			pause_box_redraw(tag_get(UI_WIDGET_DEFINITION_TAG, children[box_child].widget_tag.index), buttons);
-			box_redrawn = TRUE;
+			/* (the pieces are the screens' own: drawn once) */
+			if (!box_redrawn)
+			{
+				box_height = pause_box_redraw(tag_get(UI_WIDGET_DEFINITION_TAG, children[box_child].widget_tag.index),
+					buttons);
+				box_redrawn = TRUE;
+			}
+			pause_box_fit(definition, box_child, list_child, list_top, box_height);
 		}
 	}
 	if (patched_list != NONE)

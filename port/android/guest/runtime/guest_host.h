@@ -68,8 +68,13 @@ int host_sdl_gl_make_current(unsigned int window, unsigned int context);
 int host_sdl_gl_set_swap_interval(int interval);
 int host_sdl_gl_swap_window(unsigned int window);
 int host_sdl_poll_event(void *event);
+/* SDL's text input for the window (Android's keyboard while a name is typed:
+sdl_platform.c), started as the SDL_TextInputType given, one line and with no
+autocorrection, or stopped (-1); whether it runs */
+int host_sdl_text_input(unsigned int window, int type);
 int host_sdl_set_clipboard_text(const char *text);
 void host_sdl_get_clipboard_text(char *buffer, unsigned int size);
+int host_sdl_open_url(const char *url);
 /* the keyboard's keys by name (the controls' bindings, xinput_sdl.c) */
 void host_sdl_scancode_name(int scancode, char *buffer, unsigned int size);
 int host_sdl_scancode_from_name(const char *name);
@@ -115,6 +120,9 @@ void host_gl_wait_frame(unsigned int slot);
 
 /* ---------- Android */
 
+/* SoC classification for the immutable rendering policy. */
+int host_android_chip_family(void);
+
 /* the storage directories the port uses, copied into buffer */
 void host_android_path(int which, char *buffer, unsigned int size);
 
@@ -137,6 +145,9 @@ void host_touch_scene(int scene);
 /* the game control on each of the 16 controller buttons (touch_game.c),
 for the overlay's labels */
 void host_touch_bindings(const int *controls);
+/* the overlay's devices: 1, a touchscreen; 2, a game controller; 0 until it
+has looked */
+int host_touch_devices(void);
 
 /* ---------- the server browser's master servers (host_https.c) */
 

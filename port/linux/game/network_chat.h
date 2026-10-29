@@ -32,12 +32,20 @@ boolean network_chat_name_blocked(wchar_t const *name, short length);
 /* the first local player says a line to a channel, as if typed and sent;
 the automated tests' (network_test.c) */
 void network_chat_say(short channel, char const *text);
+/* a notice of the host's (network_distributed.c's _distributed_message_notice:
+the MOTD, the votes', a kick's) shown to this machine's players: among the
+chat's lines, in its notice colour (in more than one when it is longer than
+one holds), or with the chat not shown, as a red line of the console's,
+whatever game.console_log says */
+void network_chat_host_notice(char const *text);
 /* ... sent past this machine's own checks of the host's settings, as a
 changed build could send it, for the host to refuse (network_test.c) */
 void network_chat_say_unchecked(short channel, char const *text);
 /* whether a line is being typed: the keyboard types into it, and drives no
 player (xinput_sdl.c), as with the console */
 boolean network_chat_typing(void);
+/* Physical controller owning the on-screen keyboard, or NONE. */
+short network_chat_controller(void);
 /* (hud_unit.c) where the local player's motion sensor was drawn: its left
 and the top of its circle, in the window's units */
 void network_chat_note_motion_sensor(short local_player_index, short left, short top);

@@ -65,8 +65,14 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   outside the loaded BSP and falling for two seconds is brought back beside
   the host, else a teammate. A dead
   player watches a living teammate (`coop_spectate.c`) and comes back
-  beside one once it is safe. With everyone dead they come back where they
-  were at the last checkpoint, without a revert. A mission the scripts fail
+  beside one once it is safe. With everyone dead, TEAM WIPE in Co-op
+  Options (`network.coop_team_wipe`) defaults to AUTO: private games revert
+  the checkpoint; public games respawn at checkpoint positions without
+  reverting the world. REVERT CHECKPOINT and RESPAWN ONLY override the
+  visibility choice, including public games with passwords. Reverting
+  requires a saved checkpoint with the same players and machine
+  assignments; otherwise the host logs the fallback and respawns them.
+  A mission the scripts fail
   with players still alive reverts to the last checkpoint on the host, as a
   skipped cutscene does (below); a client never reverts on its own. A level
   won ends the round as in multiplayer, and the next round is the
@@ -298,6 +304,30 @@ the target can be: no more than 0.05 world units behind the eye along the
 line to the target, 0.2 to its side and 0.1 above it (a client cannot claim
 a hand far past a corner). Such hits are counted in the host's log, and the
 host's `network.fire_origins` (true by default) turns the hand off.
+Then version 40 adds to the join request (`message_client_join_game_request`,
+0x70 bytes before) a Discord account's pass, 170 bytes, and its proof, 64
+(`port/linux/src/player_link.c`; `docs/master_protocol.md`, "Player keys,
+links and passes"), all zero for none: a dedicated server refuses a machine
+from a VPN's, Tor exit's or datacenter's address with one of five new
+rejection codes (`_rejection_code_vpn_link_required` and the four after it,
+`port/linux/game/network_link.c`), and a client refused with the first joins
+again at once with its pass, bound to the tunnel's session. A build before
+them shows the codes as the game being closed.
+
+Then version 41 changes both vote messages' entries (`network_votekick.c`:
+the request's first byte, once the player's index, is the vote's kind; the
+status's first byte, once the player's index, is the kind, and it carries
+the no votes), adds `_rejection_code_address_full` (a host's
+`server.max_machines_per_address`), and a dedicated server's map vote
+(`network_map_vote.c`), in the lobby too, over the machines' streams as map
+sharing's: the host's choices (map and gametype, 8 at most), their votes,
+the time left and the winner (`_distributed_message_map_vote`, 94, to each
+client reliably every second and as it changes), and a client's choice
+(`_distributed_message_map_vote_choice`, 95), taken only from the machine's
+own stream, at most four a second, one counted per machine. A co-op
+game's flags also tell its clients whether the host is a dedicated server
+(`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
+most of the living players).
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -364,23 +394,32 @@ server's ban for a while (`ban <player> 30m`) is left to its `bans.txt`
 line, whose `until=` ends it, and its `unban` lets the machine in again by
 the line's address or hardware id (`network_game_server_port_forget_kicked_address`).
 
-The players' votes to kick a player (`network_votekick.c`): a client sends
-`_distributed_message_votekick` (the player's absolute index) reliably, and
-the host takes it only from the client's stream. The host alone counts:
+The players' votes to kick a player and to end the game
+(`network_votekick.c`): a client sends `_distributed_message_votekick` (the
+vote's kind, the player's absolute index for a kick, and yes or no)
+reliably, and the host takes it only from the client's stream. The host
+alone counts:
 one vote per real address (an internet play peer's endpoint, not its
 stand-in), and votes again deduplicated by hardware id, which only ever
 removes votes (the players who may vote are counted by address alone, so a
-copied hardware id cannot lower the votes needed). A vote needs more than
-half of the players who may vote, the target counted, and at least two;
+copied hardware id cannot lower the votes needed). A vote needs yes votes
+scaled with the players who may vote, the target counted (more than half
+up to 8, then 40% and at least 5 up to 32, then 30% and at least 13), or a
+fixed percentage of them (`network.votekick_threshold` `static`,
+`network.votekick_percent`), at least two, and more yes than no; one the no votes have made lost ends at
+once;
 starting one needs `network.votekick_minutes` played on this host in its
 own ticks, voting two minutes; one vote runs at a time, and a failed vote
 cools its starter down and protects its target. A vote that passes kicks as
 the `kick` command does, and the host refuses the address and hardware id
 for `network.votekick_ban_minutes`. The host sends each client
 `_distributed_message_votekick_status` every second while a vote runs (and
-as it changes), for the scoreboard, whose right click frees the mouse to
-pick a player; the host's own scoreboard adds Kick and Ban. Builds without
-votes drop both kinds as unknown, so the network version is unchanged.
+as it changes: its kind, yes, no and needed), for the vote's box at the
+left of the HUD (F1 votes yes, F2 no) and the scoreboard, whose right click
+frees the mouse to pick a player; the host's own scoreboard adds Kick and
+Ban. A vote to end the game ("!endgame" in the chat, `network.vote_end_game`)
+counts as a kick's with no target, from 30 seconds played and not in a
+game's first minute, and ends the game as `sv_end_game` does.
 
 The text chat (`network_chat.c`): a client sends its player's line to the
 host (`_distributed_message_chat_up`, reliably), which takes it only from

@@ -82,6 +82,21 @@ each permutation's level (port/linux/game/model_detail.c) */
 int halo_model_detail_stock(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* the same for a player's view of a split screen (its width): a half
+screen's 640 columns are centred as the screen's, a quarter's 320 in the
+quarter; the shift in effect */
+void halo_screen_ui_offset_view(long view_width);
+long halo_screen_ui_offset_current(void);
+/* (port/linux/game/menu_functions.c, for source/interface/ui_widget.c) the
+network lobby, which reads every controller's events however many players
+there are: another controller's START joins it, a player's B leaves it (its
+handlers know each controller), where a screen of player 1's would read
+theirs alone; and ADD PLAYER's screen, whose quarters are each a
+controller's: the screen takes every controller's events, its widgets their
+own controller's alone */
+struct widget_instance;
+unsigned char pc_menu_screen_reads_every_controller(struct widget_instance const *widget);
+unsigned char pc_menu_screen_routes_by_controller(struct widget_instance const *widget);
 /* names a model lighting vertex program, whose draws can be lit for each
 pixel (port/linux/src/d3d8_gl.c, display.per_pixel_lighting) */
 void halo_vertex_shader_lighting(unsigned long handle);
@@ -110,5 +125,9 @@ int halo_server_debug_echo(void);
 char const *server_director_first_level(void);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
+/* the debug camera's mouse and keys (source/camera/director.c): whether the
+middle button, R and F are held, and the wheel's notches since the last call
+(port/linux/src/xinput_sdl.c) */
+int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel);
 
 #endif

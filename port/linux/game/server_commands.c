@@ -24,6 +24,7 @@ password's command is never logged nor answered with the password.
 #include "game/players.h"
 #include "network_chat.h"
 #include "network_distributed.h"
+#include "network_link.h"
 #include "server_director.h"
 #include "server_gametypes.h"
 
@@ -33,6 +34,7 @@ password's command is never logged nor answered with the password.
 #include "../src/server_json.h" /* port: port/linux/src/server_json.c */
 #include "../src/server_log.h" /* port: port/linux/src/server_log.c */
 #include "../src/server_master.h" /* port: port/linux/src/server_master.c */
+#include "../src/server_netlist.h" /* port: port/linux/src/server_netlist.c */
 #include "../src/posix_server.h" /* port: port/linux/src/posix_server.c */
 #include "../src/port_config.h" /* port: port/linux/src/port_config.c */
 
@@ -460,6 +462,22 @@ void server_commands_bans_json(
 		server_json_string(json, "when", when);
 		server_json_string(json, "ip", ban_field(ban_lines[index], "ip", field, sizeof(field)) ? field : "");
 		server_json_string(json, "hwid", ban_field(ban_lines[index], "hwid", field, sizeof(field)) ? field : "");
+		/* (a Discord id without "(self-reported)" after it is a verified
+		account's, which keeps it out) */
+		if (ban_field(ban_lines[index], "discord_id", field, sizeof(field)) && strcmp(field, "none"))
+		{
+			char *reported = strstr(field, " (self-reported)");
+
+			if (reported)
+				*reported = 0;
+			server_json_string(json, "discord_id", field);
+			server_json_boolean(json, "discord_verified", reported == NULL);
+		}
+		else
+		{
+			server_json_string(json, "discord_id", "");
+			server_json_boolean(json, "discord_verified", 0);
+		}
 		server_json_string(json, "players", ban_field(ban_lines[index], "players", field, sizeof(field)) ? field : "");
 		server_json_string(json, "reason", ban_field(ban_lines[index], "reason", field, sizeof(field)) ? field : "");
 		if (ban_field(ban_lines[index], "until", field, sizeof(field)))
@@ -719,11 +737,15 @@ static char const *const settable_settings[] =
 	"server.web_moderator_password", "server.log_format", "server.log_addresses", "server.status_file",
 	"server.auto_update", "server.coop_difficulty", "server.region", "server.master_publish",
 	"server.master_publish_address", "server.metrics", "server.chat_filter", "server.chat_filter_slurs",
-	"server.chat_filter_swearing", "server.chat_filter_insults",
+	"server.chat_filter_swearing", "server.chat_filter_insults", "server.vpn_policy", "server.vpn_fail",
+	"server.vpn_check_lan", "server.link_min_age_days", "server.link_one_seat", "server.update_check_minutes",
+	"server.update_game_minutes", "server.max_machines_per_address", "server.afk_kick_minutes",
+	"server.afk_kick_when_full", "server.afk_kick_full_minutes", "server.coop_bsp_switch",
+	"server.coop_bsp_switch_cooldown_seconds", "server.map_vote", "server.map_vote_choices", "server.map_vote_seconds",
 	"network.text_chat", "network.voice_lobby", "network.voice_mode", "network.voice_kbps", "network.votekick",
-	"network.votekick_minutes", "network.votekick_ban_minutes", "network.map_share", "network.map_share_upload",
+	"network.vote_end_game", "network.votekick_threshold", "network.votekick_percent", "network.votekick_minutes", "network.votekick_ban_minutes", "network.map_share", "network.map_share_upload",
 	"network.public_address", "network.coop_friendly_fire", "network.coop_player_collisions",
-	"network.coop_ally_friendly_fire", "network.shield_effects", "network.fire_origins",
+	"network.coop_ally_friendly_fire", "network.coop_team_wipe", "network.shield_effects", "network.fire_origins",
 };
 
 /* those of them the owner's console alone changes (the standard input, the
@@ -784,13 +806,28 @@ static struct
 	{ "server.auto_update", "off|check|install", NULL, NULL },
 	{ "server.coop_difficulty", "easy|normal|hard|impossible", NULL, NULL },
 	{ "network.text_chat", "on|links|off", NULL, NULL },
+	{ "server.vpn_policy", "off|link|block", NULL, NULL },
+	{ "server.vpn_fail", "open|closed", NULL, NULL },
+	{ "server.link_min_age_days", NULL, "0", "3650" },
+	{ "server.update_check_minutes", NULL, "5", "1440" },
+	{ "server.update_game_minutes", NULL, "0", "240" },
+	{ "server.max_machines_per_address", NULL, "0", "128" },
+	{ "server.afk_kick_minutes", NULL, "0", "60" },
+	{ "server.afk_kick_full_minutes", NULL, "2", "60" },
+	{ "server.coop_bsp_switch", "majority|anyone", NULL, NULL },
+	{ "server.coop_bsp_switch_cooldown_seconds", NULL, "0", "300" },
+	{ "server.map_vote_choices", NULL, "2", "8" },
+	{ "server.map_vote_seconds", NULL, "5", "120" },
 	{ "network.voice_mode", "off|team_proximity|team_enemy_proximity|team_global|team_global_enemy_proximity", NULL,
 		NULL },
 	{ "network.voice_kbps", NULL, "8", "64" },
+	{ "network.votekick_threshold", "dynamic|static", NULL, NULL },
+	{ "network.votekick_percent", NULL, "1", "100" },
 	{ "network.votekick_minutes", NULL, "0", "60" },
 	{ "network.votekick_ban_minutes", NULL, "1", "1440" },
 	{ "network.map_share_upload", NULL, "16", "20480" },
 	{ "network.coop_friendly_fire", "off|on|shields_only|explosives_only", NULL, NULL },
+	{ "network.coop_team_wipe", "auto|revert|respawn", NULL, NULL },
 	{ "network.shield_effects", "stock|glow|light_show|overshield|glow_overshield|light_show_overshield|players", NULL,
 		NULL },
 };
@@ -1347,7 +1384,7 @@ static boolean command_unban(char const *line, long count, char **words)
 
 	if (count < 2)
 	{
-		say("unban: give a ban's number (sv_bans), an address or a hardware id");
+		say("unban: give a ban's number (sv_bans), an address, a hardware id or discord:<id>");
 		return FALSE;
 	}
 	if (!whole)
@@ -1366,7 +1403,9 @@ static boolean command_unban(char const *line, long count, char **words)
 			char field[128];
 
 			if ((ban_field(ban_lines[index], "ip", field, sizeof(field)) && !strcmp(field, words[1])) ||
-				(ban_field(ban_lines[index], "hwid", field, sizeof(field)) && !strcmp(field, words[1])))
+				(ban_field(ban_lines[index], "hwid", field, sizeof(field)) && !strcmp(field, words[1])) ||
+				(!strncmp(words[1], "discord:", 8) && ban_field(ban_lines[index], "discord_id", field, sizeof(field)) &&
+					!strcmp(field, words[1] + 8)))
 			{
 				found = index;
 			}
@@ -1457,15 +1496,31 @@ static boolean parse_hardware_id(
 	return TRUE;
 }
 
-/* a ban of an address, a hardware id or both, with no player needed
-(sv_ban_address, POST /api/bans): its line in bans.txt as ban writes one
-(so that sv_bans, unban and the joins read it), and each machine present of
-that address or hardware id dropped as ban drops it. 200 with the new ban's
-number (sv_bans'), else 400 (a part that will not do) or 500 (bans.txt not
-written) and why */
+/* a verified Discord account's id checked: decimal digits, 20 at most (a
+snowflake); TRUE with it */
+static boolean parse_discord_id(
+	char const *text,
+	char *kept,
+	long size)
+{
+	long length = (long)strlen(text);
+
+	if (!length || length > 20 || length >= size || (long)strspn(text, "0123456789") != length)
+		return FALSE;
+	snprintf(kept, (size_t)size, "%s", text);
+	return TRUE;
+}
+
+/* a ban of an address, a hardware id, a verified Discord account or more
+than one, with no player needed (sv_ban_address, POST /api/bans): its line
+in bans.txt as ban writes one (so that sv_bans, unban and the joins read
+it), and each machine present of that address, hardware id or account
+dropped as ban drops it. 200 with the new ban's number (sv_bans'), else 400
+(a part that will not do) or 500 (bans.txt not written) and why */
 static int ban_address(
 	char const *ip,
 	char const *hwid,
+	char const *discord,
 	char const *names,
 	long seconds,
 	char const *reason,
@@ -1476,6 +1531,7 @@ static int ban_address(
 	struct network_game *game = server_game();
 	char address_text[32] = "none";
 	char hardware_id[2 * P2P_HARDWARE_ID_BYTES + 1] = "";
+	char discord_id[24] = "";
 	char kept_names[64];
 	char kept_reason[96];
 	char full_reason[sizeof(kept_reason) + 32];
@@ -1485,9 +1541,14 @@ static int ban_address(
 	boolean whole;
 	long slot, index;
 
-	if ((!ip || !ip[0]) && (!hwid || !hwid[0]))
+	if ((!ip || !ip[0]) && (!hwid || !hwid[0]) && (!discord || !discord[0]))
 	{
-		snprintf(why, (size_t)why_size, "give an address (a.b.c.d) or a hardware id");
+		snprintf(why, (size_t)why_size, "give an address (a.b.c.d), a hardware id or a Discord account's id");
+		return 400;
+	}
+	if (discord && discord[0] && !parse_discord_id(discord, discord_id, sizeof(discord_id)))
+	{
+		snprintf(why, (size_t)why_size, "a Discord account's id is up to 20 digits");
 		return 400;
 	}
 	if (ip && ip[0] && !parse_ipv4(ip, &address, address_text, sizeof(address_text)))
@@ -1514,7 +1575,7 @@ static int ban_address(
 	}
 	if (seconds > 0)
 		until = posix_server_unix_seconds() + (unsigned long)seconds;
-	if (!network_distributed_ban_record(address_text, hardware_id, kept_names, full_reason, until))
+	if (!network_distributed_ban_record(address_text, hardware_id, discord_id, kept_names, full_reason, until))
 	{
 		snprintf(why, (size_t)why_size, "bans.txt cannot be written");
 		return 500;
@@ -1535,10 +1596,17 @@ static int ban_address(
 		if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES || done[machine_index])
 			continue;
 		machine_hardware_id = network_game_server_machine_hardware_id(machine_index);
-		if (!(address && distributed_machine_real_address(machine_index) == address) &&
-			!(hardware_id[0] && machine_hardware_id && !strcmp(machine_hardware_id, hardware_id)))
 		{
-			continue;
+			char machine_discord_id[32] = "";
+			boolean verified = network_link_machine_verified(machine_index, machine_discord_id,
+				sizeof(machine_discord_id), NULL, 0);
+
+			if (!(address && distributed_machine_real_address(machine_index) == address) &&
+				!(hardware_id[0] && machine_hardware_id && !strcmp(machine_hardware_id, hardware_id)) &&
+				!(discord_id[0] && verified && !strcmp(machine_discord_id, discord_id)))
+			{
+				continue;
+			}
 		}
 		done[machine_index] = TRUE;
 		/* (its players' names, for the event, before they go) */
@@ -1563,10 +1631,12 @@ static int ban_address(
 			network_distributed_ban_unrecorded(FALSE);
 		}
 	}
-	server_log(_server_log_info, "moderation", "ban %ld added: %s%s%s (%s)", *number,
+	server_log(_server_log_info, "moderation", "ban %ld added: %s%s%s%s%s (%s)", *number,
 		config_boolean("server.log_addresses") ? (address ? address_text : "") : address ? "an address" : "",
 		address && hardware_id[0] ? " and " : "",
 		hardware_id[0] ? (config_boolean("server.log_addresses") ? hardware_id : "a hardware id") : "",
+		(address || hardware_id[0]) && discord_id[0] ? " and " : "",
+		discord_id[0] ? (config_boolean("server.log_addresses") ? discord_id : "a Discord account") : "",
 		server_role_name(server_commands.role));
 	moderation_event("ban", kept_names[0] ? kept_names : dropped, kept_reason[0] ? kept_reason : NULL, until);
 	return 200;
@@ -1576,12 +1646,12 @@ static boolean command_ban_address(char const *line, long count, char **words)
 {
 	char why[128];
 	long seconds = 0, reason_words = 2, number = 0;
-	boolean address;
+	boolean address, discord;
 
 	if (count < 2)
 	{
-		say("sv_ban_address: give an address (a.b.c.d) or a hardware id, then a duration (30m, 2h, 7d, forever) and "
-			"a reason");
+		say("sv_ban_address: give an address (a.b.c.d), a hardware id or discord:<id>, then a duration (30m, 2h, 7d, "
+			"forever) and a reason");
 		return FALSE;
 	}
 	if (count >= 3)
@@ -1593,8 +1663,9 @@ static boolean command_ban_address(char const *line, long count, char **words)
 			seconds = 0;
 	}
 	address = strchr(words[1], '.') != NULL;
-	if (ban_address(address ? words[1] : "", address ? "" : words[1], "", seconds, rest_after_words(line, reason_words),
-		why, sizeof(why), &number) != 200)
+	discord = !strncmp(words[1], "discord:", 8);
+	if (ban_address(address ? words[1] : "", address || discord ? "" : words[1], discord ? words[1] + 8 : "", "",
+		seconds, rest_after_words(line, reason_words), why, sizeof(why), &number) != 200)
 	{
 		say("sv_ban_address: %s", why);
 		return FALSE;
@@ -1612,6 +1683,7 @@ role, the duration as text (empty: for ever): 200 with the ban's number, or
 int server_commands_ban_address_text(
 	char const *ip,
 	char const *hwid,
+	char const *discord_id,
 	char const *names,
 	char const *duration,
 	char const *reason,
@@ -1634,7 +1706,7 @@ int server_commands_ban_address_text(
 		}
 	}
 	server_commands.role = role;
-	answer = ban_address(ip, hwid, names, seconds, reason, message, message_size, number);
+	answer = ban_address(ip, hwid, discord_id, names, seconds, reason, message, message_size, number);
 	server_commands.role = previous_role;
 	return answer;
 }
@@ -1876,6 +1948,52 @@ static boolean command_set_alias(char const *line, long count, char **words)
 	return TRUE;
 }
 
+/* sv_vpn, sv_vpn_check, sv_vpn_fetch: the VPN policy (server_netlist.c,
+network_link.c) */
+static boolean command_vpn(char const *line, long count, char **words)
+{
+	static char text[4096];
+	char *cursor = text;
+
+	server_netlist_describe(text, sizeof(text));
+	while (cursor && *cursor)
+	{
+		char *end = strchr(cursor, '\n');
+
+		if (end)
+			*end = 0;
+		say("%s", cursor);
+		cursor = end ? end + 1 : NULL;
+	}
+	return TRUE;
+}
+
+static boolean command_vpn_check(char const *line, long count, char **words)
+{
+	char kept[32], by[32];
+	unsigned long address = 0;
+
+	if (count < 2 || !parse_ipv4(words[1], &address, kept, sizeof(kept)))
+	{
+		say("sv_vpn_check: give an IPv4 address (a.b.c.d)");
+		return FALSE;
+	}
+	if (server_netlist_listed(address, by, sizeof(by)))
+		say("%s is listed (%s): refused as server.vpn_policy says (%s)", kept, by, config_string("server.vpn_policy"));
+	else if (by[0])
+		say("%s is allowed (%s)", kept, by);
+	else
+		say("%s is not listed", kept);
+	return TRUE;
+}
+
+static boolean command_vpn_fetch(char const *line, long count, char **words)
+{
+	server_netlist_fetch_now();
+	say("the master servers' netlists are being fetched (sv_vpn says when)");
+	return TRUE;
+}
+
 static boolean command_reload(char const *line, long count, char **words)
 {
 	server_director_reload();
@@ -1959,10 +2077,15 @@ static struct server_command const server_command_table[] =
 		command_kick },
 	{ "ban", "sv_ban", _server_role_moderator, "<player> [30m|2h|7d|forever] [reason]",
 		"drops a player's machine and bans its address and hardware id (a moderator's: a day at most)", command_ban },
-	{ "unban", "sv_unban", _server_role_admin, "<number|address|hardware id>", "takes a ban out of bans.txt",
+	{ "unban", "sv_unban", _server_role_admin, "<number|address|hardware id|discord:id>", "takes a ban out of bans.txt",
 		command_unban },
-	{ "sv_ban_address", NULL, _server_role_admin, "<address|hardware id> [30m|2h|7d|forever] [reason]",
-		"bans an address or hardware id, its player here or not", command_ban_address },
+	{ "sv_ban_address", NULL, _server_role_admin, "<address|hardware id|discord:id> [30m|2h|7d|forever] [reason]",
+		"bans an address, hardware id or verified Discord account, its player here or not", command_ban_address },
+	{ "sv_vpn", NULL, _server_role_viewer, "", "the VPN policy, the netlists held and the joins refused",
+		command_vpn },
+	{ "sv_vpn_check", NULL, _server_role_moderator, "<address>", "whether an IPv4 address is refused as a VPN's",
+		command_vpn_check },
+	{ "sv_vpn_fetch", NULL, _server_role_admin, "", "fetches the master servers' netlists now", command_vpn_fetch },
 	{ "mute", NULL, _server_role_moderator, "<player> [minutes]", "mutes a player's chat and voice for everyone",
 		command_mute },
 	{ "unmute", NULL, _server_role_moderator, "<player>", "unmutes a player", command_mute },

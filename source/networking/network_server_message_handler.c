@@ -274,6 +274,8 @@ boolean network_voice_handles_message(word const *message, word size);
 void network_voice_handle_message(long machine_index, word const *message, word size);
 /* port/linux/game/map_share.c's: map sharing, in the lobby too */
 boolean map_share_handles_message(word const *message, word size);
+boolean network_map_vote_handles_message(word const *message, word size);
+void network_map_vote_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void map_share_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void network_distributed_handle_stream_message(long machine_index, word const *message, word size);
 
@@ -441,6 +443,11 @@ struct message_client_join_game_request
 	byte join_game_token[JOIN_GAME_TOKEN_LENGTH];
 	/* port: the machine's hardware id, as hex, as it tells it (p2p.c) */
 	char hardware_id[0x20];
+	/* port: a Discord account's pass and its proof for this connection, all
+	zero for none (port/linux/src/player_link.c: a dedicated server that
+	refused the machine for its VPN asks for it) */
+	byte link_pass[170];
+	byte link_proof[64];
 };
 
 struct message_client_settings_request
@@ -1412,6 +1419,20 @@ boolean network_game_server_handle_client_message(
 					}
 					break;
 				}
+				/* (port: a dedicated server's map vote's, in the lobby too,
+				from its stream alone: network_map_vote.c) */
+				if (network_map_vote_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						network_map_vote_handle_message(machine_index, message, message_buffer_size, TRUE);
+					}
+					break;
+				}
 				/* (in game, from a machine that has loaded it, as a datagram
 				is: else dropped) */
 				if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
@@ -1983,6 +2004,10 @@ static boolean network_game_server_handle_message_client_join_game_request(
 				join_game_request.machine_name,
 				(char *)join_game_request.machine_name,
 				sizeof(join_game_request.machine_name));
+			/* port: the Discord pass it showed, if any, for the door
+			(network_game_server_accept_client_machine_into_game) */
+			network_game_server_set_machine_link(server_client_machine, join_game_request.link_pass,
+				join_game_request.link_proof, (char const *)join_game_request.machine_name);
 			network_connection_get_address(
 				network_game_server_get_client_connection(server_client_machine),
 				&source_address,
@@ -2529,9 +2554,11 @@ static boolean network_game_server_handle_message_client_game_start_request(
 			short countdown_event = (short)game_start_request.countdown_time;
 
 			/* port: the pregame screen's faster and slower, from any machine;
-			to stop the countdown or start at once (a script's), the host's own
-			(the Xbox game took any event from any machine, and a machine
-			could hold the lobby or skip the countdown) */
+			to stop the countdown or start at once (a script's, or the host's
+			faster), the host's own (the Xbox game took any event from any
+			machine, and a machine could hold the lobby or skip the countdown) */
+			if (countdown_event == _network_game_server_countdown_event_player_joined)
+				countdown_event = network_game_server_client_machine_faster_event(server, client_machine);
 			if ((countdown_event == _network_game_server_countdown_event_player_left &&
 					network_game_server_client_machine_may_slow_countdown(server, client_machine)) ||
 				countdown_event == _network_game_server_countdown_event_player_joined ||

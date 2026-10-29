@@ -36,6 +36,9 @@ long port_mods_file_order(long file);
 /* the folder name of a file's mod, and the file's path (for messages) */
 const char *port_mods_file_mod(long file);
 const char *port_mods_file_path(long file);
+/* whether the mod of a file says its bitmaps' multipurpose maps and HUD
+meters keep their channels where the Xbox does (mod.toml's channel_order) */
+int port_mods_file_xbox_channels(long file);
 
 /* the mods found, played or not, the folder of each (in the folders' order),
 and a line about each for the console */

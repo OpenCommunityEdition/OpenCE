@@ -124,6 +124,7 @@ symbols in this file:
 
 #ifdef HALO_ANDROID
 #include "android_ce_texture_cache.h" /* port: port/linux/game/android_ce_texture_cache.c */
+#include "../../port/android/include/android_render_policy.h" /* port: Android chip policy */
 #endif
 
 /* ---------- constants */
@@ -1053,7 +1054,7 @@ void *_texture_cache_bitmap_get_hardware_format(
 #ifdef HALO_ANDROID
 	/* port: CE's frame working set is not bounded by the Xbox texture arena.
 	 * Keep dynamic textures and Xbox maps on their own paths. */
-	if (custom_edition_cache_tags_loaded() &&
+	if (android_texture_fixes && custom_edition_cache_tags_loaded() &&
 		TEST_FLAG(bitmap->flags, _bitmap_cached_bit))
 	{
 		if (texture_cache_bitmap_valid(bitmap))

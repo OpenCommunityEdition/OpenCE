@@ -1,4 +1,4 @@
-version 39
+version 41
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -29,6 +29,9 @@ bound MAXIMUM_QUEUED_EVENTS 128
 bound MAXIMUM_REGIONS_PER_OBJECT 8
 bound MAXIMUM_STATISTICS_PER_MESSAGE 64
 bound MAXIMUM_WEAPONS_PER_UNIT 4
+bound NETWORK_MAP_VOTE_GAMETYPE_SIZE 24
+bound NETWORK_MAP_VOTE_MAP_SIZE 32
+bound NETWORK_MAP_VOTE_MAXIMUM_CHOICES 8
 bound NUMBER_OF_ANGLES enum f0ce7d0319b6
 bound NUMBER_OF_OBJECT_CHANGE_COLORS enum b00724872e2d
 bound NUMBER_OF_PLAYER_POWERUPS enum 43075f42087c
@@ -84,6 +87,8 @@ enum _distributed_message_map_share_offer 84
 enum _distributed_message_map_share_progress 86
 enum _distributed_message_map_share_request 83
 enum _distributed_message_map_share_sources 85
+enum _distributed_message_map_vote 94
+enum _distributed_message_map_vote_choice 95
 enum _distributed_message_notice 17
 enum _distributed_message_object_changes 5
 enum _distributed_message_object_states 6
@@ -175,7 +180,7 @@ fields client_game_update 1134bf6a029b
 fields client_graceful_game_exit_postgame 678699dea271
 fields client_graceful_game_exit_pregame 678699dea271
 fields client_host_crashed_cry_for_help 52eb2291ec03
-fields client_join_game_request 28f7514cbcd9
+fields client_join_game_request 20da8c4f815f
 fields client_join_new_host 52eb2291ec03
 fields client_loaded 678699dea271
 fields client_map_is_precached_pregame 0073b9d65051
@@ -213,7 +218,7 @@ size message_client_game_update 0x88
 size message_client_graceful_game_exit_postgame 0x04
 size message_client_graceful_game_exit_pregame 0x04
 size message_client_host_crashed_cry_for_help 0x10
-size message_client_join_game_request 0x70
+size message_client_join_game_request 0x70 + 170 + 64
 size message_client_join_new_host 0x10
 size message_client_loaded 0x04
 size message_client_map_is_precached_pregame 0x100
@@ -283,6 +288,9 @@ struct distributed_map_share_offer_file 204a3b73d193
 struct distributed_map_share_progress 2c3831013302
 struct distributed_map_share_request 3cdcbc8c3a49
 struct distributed_map_share_source 940f8a4c9849
+struct distributed_map_vote_choice e0aa3fb40224
+struct distributed_map_vote_choice_entry b8e5a595dbad
+struct distributed_map_vote_status 524c63fc37e2
 struct distributed_message_header 0e026a4933a1
 struct distributed_object_change 343e570cfa1d
 struct distributed_object_change_message 4c3679cd4dae
@@ -300,6 +308,6 @@ struct distributed_vector e80d7f9fc970
 struct distributed_voice_config 665bdc14478b
 struct distributed_voice_down e3751d692f16
 struct distributed_voice_up 3d74ee44e4cb
-struct distributed_votekick_request d5f913f22d81
-struct distributed_votekick_status 966041386843
+struct distributed_votekick_request 7e29ffd54bd1
+struct distributed_votekick_status b94458cdc180
 struct game_variant_options 0e258e4cf85b

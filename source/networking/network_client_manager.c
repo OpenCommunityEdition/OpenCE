@@ -600,6 +600,16 @@ struct message_client_ping
 /* port/linux/src/p2p.c's */
 void p2p_hardware_id(char *hex, int size);
 void p2p_join_refused(int rejection_code);
+/* port/linux/src/player_link.c's (a Discord account's pass, shown to a
+dedicated server that asks for it) */
+int player_link_join_fill(unsigned long host_virtual_address, unsigned char *pass, unsigned char *proof);
+int player_link_join_refused(int rejection_code);
+void player_link_join_reset(void);
+/* port: a join made again with the pass (network_game_client_rejected_by_game),
+not a new one; and one made while the refused connection's end is handled
+(its idle failed: the join goes on) */
+static boolean network_game_client_joining_with_link;
+static boolean network_game_client_joined_again_with_link;
 
 struct message_client_join_game_request
 {
@@ -607,6 +617,10 @@ struct message_client_join_game_request
 	byte join_token[0x10];
 	/* port: this machine's hardware id, as hex (p2p.c's p2p_hardware_id) */
 	char hardware_id[0x20];
+	/* port: a Discord account's pass and its proof for this connection, all
+	zero for none (port/linux/src/player_link.c) */
+	byte link_pass[170];
+	byte link_proof[64];
 };
 
 struct message_client_map_is_precached_pregame
@@ -733,8 +747,9 @@ typedef char message_client_broadcast_game_search_size_assert[
 	sizeof(struct message_client_broadcast_game_search) == 0xC ? 1 : -1];
 typedef char message_client_ping_size_assert[
 	sizeof(struct message_client_ping) == 8 ? 1 : -1];
+/* (port: and a Discord account's pass and proof after the Xbox's 0x70) */
 typedef char message_client_join_game_request_size_assert[
-	sizeof(struct message_client_join_game_request) == 0x70 ? 1 : -1];
+	sizeof(struct message_client_join_game_request) == 0x70 + 170 + 64 ? 1 : -1];
 typedef char network_game_client_seconds_to_game_start_offset_assert[
 	offsetof(struct network_game_client, seconds_to_game_start) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x10 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
@@ -1890,6 +1905,8 @@ void network_game_client_accepted_into_game(
 		client->game.machines[message_packet->machine_index].machine_index =
 			(char)message_packet->machine_index;
 		client->state = _network_game_client_state_pregame;
+		/* port: the next join shows no Discord pass until asked */
+		player_link_join_reset();
 
 		network_game_set_random_seed(message_packet->random_seed);
 		network_event(
@@ -2078,6 +2095,9 @@ boolean network_game_client_initiate_join_game(
 	client->join_in_progress = TRUE;
 	client->connect_process = 0;
 	client->connection_attempt_time = system_milliseconds();
+	/* port: a new join shows no Discord pass until its host asks for one */
+	if (!network_game_client_joining_with_link)
+		player_link_join_reset();
 
 	csmemcpy(
 		&client->join_parameters,
@@ -2357,12 +2377,68 @@ void network_game_client_rejected_by_game(
 	case _rejection_code_blacklisted_machine:
 		reason = "_rejection_code_blacklisted_machine";
 		break;
+
+	/* port: the port's own */
+	case _rejection_code_name_refused:
+		reason = "_rejection_code_name_refused";
+		break;
+
+	case _rejection_code_vpn_link_required:
+		reason = "_rejection_code_vpn_link_required";
+		break;
+
+	case _rejection_code_vpn_blocked:
+		reason = "_rejection_code_vpn_blocked";
+		break;
+
+	case _rejection_code_vpn_link_invalid:
+		reason = "_rejection_code_vpn_link_invalid";
+		break;
+
+	case _rejection_code_vpn_link_too_new:
+		reason = "_rejection_code_vpn_link_too_new";
+		break;
+
+	case _rejection_code_vpn_link_in_use:
+		reason = "_rejection_code_vpn_link_in_use";
+		break;
+
+	case _rejection_code_address_full:
+		reason = "_rejection_code_address_full";
+		break;
 	}
 
 	network_event(
 		"unable to join game: reason= #%d/%s",
 		rejection_code,
 		reason);
+	/* port: a dedicated server that refused this machine for its VPN asked
+	for a Discord account's pass (or refused the one shown): the join made
+	again at once with this machine's (the next it holds), if it holds one
+	(player_link.c), on the pregame screen it is on */
+	if (player_link_join_refused(rejection_code))
+	{
+		struct transport_address address;
+		struct network_join_parameters join_parameters;
+		struct network_advertised_game game;
+		boolean joining;
+
+		csmemset(&address, 0, sizeof(address));
+		network_connection_get_address(client->connection, &address, NULL);
+		csmemcpy(&join_parameters, &client->join_parameters, sizeof(join_parameters));
+		network_game_client_reset(client, TRUE);
+		csmemset(&game, 0, sizeof(game));
+		game.platform = network_game_get_local_platform();
+		network_game_client_joining_with_link = TRUE;
+		joining = network_game_client_initiate_join_game(client, &game, &join_parameters, &address);
+		network_game_client_joining_with_link = FALSE;
+		if (joining)
+		{
+			network_event("joining again with a Discord account's pass");
+			network_game_client_joined_again_with_link = TRUE;
+			return;
+		}
+	}
 	/* port: why, for the server browser's line (p2p_join_progress) */
 	p2p_join_refused(rejection_code);
 	/* port: the join went to the pregame screen at once (and a machine
@@ -2872,6 +2948,21 @@ static boolean network_game_client_idle_joining(
 					p2p_hardware_id(hardware_id, sizeof(hardware_id));
 					csmemcpy(join_game_request.hardware_id, hardware_id, csstrlen(hardware_id));
 				}
+				/* (port: and a Discord account's pass, when the host asked
+				for one: bound to this connection, the internet play tunnel's
+				with the host's stand-in in 100.64.0.0/10, in network byte
+				order) */
+				{
+					struct transport_address host_address;
+					unsigned long host;
+
+					csmemset(&host_address, 0, sizeof(host_address));
+					network_connection_get_address(client->connection, &host_address, NULL);
+					host = host_address.address.long_words[0];
+					player_link_join_fill((host & 0xFFC00000) == 0x64400000 ?
+						(host >> 24) | ((host >> 8) & 0xFF00) | ((host << 8) & 0xFF0000) | (host << 24) : 0,
+						join_game_request.link_pass, join_game_request.link_proof);
+				}
 
 				message = create_network_game_message(
 					_message_client_join_game_request,
@@ -2927,6 +3018,14 @@ static boolean network_game_client_idle_joining(
 		{
 			network_event("network_connection_idle() failed in network_game_client_idle_joining()");
 			success = network_game_client_process_last_messages(client);
+		}
+		/* port: the host's refusal asked for a Discord account's pass and the
+		join was made again with it: the refused connection's end, which the
+		host closed, is not this join's failure */
+		if (network_game_client_joined_again_with_link)
+		{
+			network_game_client_joined_again_with_link = FALSE;
+			success = TRUE;
 		}
 	}
 

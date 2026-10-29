@@ -102,6 +102,9 @@ void network_game_server_port_set_cooperative_friendly_fire(
 	short friendly_fire);
 /* port: whether co-op's players collide with each other (Server Setup's
 PLAYER COLLISIONS), kept for the levels after */
+/* port: the co-op flag that says the host is a dedicated server */
+void network_game_server_port_set_cooperative_dedicated(
+	boolean dedicated);
 void network_game_server_port_set_cooperative_player_collisions(
 	boolean player_collisions);
 /* port: whether co-op's players hurt their AI allies (Server Setup's ALLY

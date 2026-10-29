@@ -27,6 +27,9 @@ Conventions carried over from the Xbox:
 #include "port_config.h"
 #include "posix.h"
 #include "main/console.h"
+#ifdef HALO_ANDROID
+#include "../../android/include/android_render_policy.h"
+#endif
 
 #include <SDL3/SDL.h>
 
@@ -38,6 +41,10 @@ Conventions carried over from the Xbox:
 
 void d3d8_surface_initialize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
 void d3d8_surface_resize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
+
+/* port/linux/game/stats_log.c: display.stats_log's line names the renderer the
+driver reports */
+void stats_log_set_renderer(const char *vendor, const char *renderer);
 
 #ifdef HALO_GLES
 /* OpenGL ES 3 (port/android/README.md): the desktop formats, enumerants
@@ -61,6 +68,11 @@ and entry points used below that ES lacks */
 /* what the context supports (gl_initialize) */
 struct xgpu_capabilities xgpu_capabilities;
 #endif
+
+/* display.reversed_depth (xgpu.h), as the context was made; never on
+OpenGL ES, which has no glClipControl: its depth from -1 would lose the
+precision near 0 that reversing gains */
+BOOL xgpu_reversed_depth;
 
 /* ---------- the screen's width
 
@@ -441,6 +453,13 @@ static struct
 	pixels are linear, in scRGB's units, the desktop's white sdr_white */
 	BOOL float_window;
 	float sdr_white;
+	/* the float window's display has HDR on (platform_video_hdr), as the
+	last frame found */
+	BOOL display_on;
+	/* display.hdr_paper_white and display.hdr_peak_brightness, in nits: 0
+	for Windows' own (its SDR content brightness, and its HDR calibration's
+	peak, as SDL reports them) */
+	int paper_white, peak_brightness;
 #ifdef HALO_GLES
 	/* the most samples a pixel of a GL_RGBA16F renderbuffer */
 	GLint maximum_samples;
@@ -450,6 +469,19 @@ static struct
 void halo_screen_ui_offset(unsigned char centered)
 {
 	ui_offset = centered ? (halo_screen_width() - 640) / 2 : 0;
+}
+
+void halo_screen_ui_offset_view(long view_width)
+{
+	long width = halo_screen_width();
+
+	/* (a quarter's pause menu and dialogs are 320 wide: the Xbox's) */
+	ui_offset = view_width > 0 && view_width < width ? (view_width > 320 ? (view_width - 320) / 2 : 0) : (width - 640) / 2;
+}
+
+long halo_screen_ui_offset_current(void)
+{
+	return ui_offset;
 }
 
 /* ---------- state the XDK header's inline functions read and write */
@@ -1048,7 +1080,7 @@ struct gl_device
 	unsigned long stream_offset;
 	GLuint index_buffer;
 	unsigned long index_offset;
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	/* (web_chunk_get) the room in the stream and index buffers, the draws
 	made so far, and the count at each buffer's latest write */
 	unsigned long stream_capacity;
@@ -1840,6 +1872,9 @@ static void render_target_storage(const struct xgpu_render_target *target)
 	if (target->format == GL_DEPTH24_STENCIL8)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
 			GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+	else if (target->format == GL_DEPTH32F_STENCIL8)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
+			GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, NULL);
 	else if (target->format == GL_RGBA16F)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, (GLsizei)target->gl_width, (GLsizei)target->gl_height, 0,
 			GL_RGBA, GL_HALF_FLOAT, NULL);
@@ -1911,7 +1946,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
 	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
-	entry->target.format = depth ? GL_DEPTH24_STENCIL8 :
+	entry->target.format = depth ? (xgpu_reversed_depth ? GL_DEPTH32F_STENCIL8 : GL_DEPTH24_STENCIL8) :
 		entry->screen_buffer && hdr.active ? GL_RGBA16F : GL_RGBA8;
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
@@ -2159,7 +2194,132 @@ static BOOL bind_targets(BOOL *has_depth)
 
 /* ---------- display.hdr */
 
-static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] = { "neutral", "aces", "reinhard" };
+static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] =
+	{ "neutral", "aces", "reinhard", "gt7" };
+
+/* the HDR calibration screen (port/linux/game/menu_functions.c), while it
+is drawn: the pattern of its row chosen (HDR_CALIBRATION_PEAK or
+HDR_CALIBRATION_PAPER_WHITE), and the paper white and peak it shows, in
+nits (0 for Windows'), which the display takes in place of the settings'
+until the screen closes (OK writes them to the settings) */
+enum
+{
+	HDR_CALIBRATION_PEAK,
+	HDR_CALIBRATION_PAPER_WHITE
+};
+
+static struct
+{
+	/* device.frame + 1 of the frame the screen was last drawn in; 0 never */
+	unsigned long frame;
+	int pattern;
+	int paper_white, peak_brightness;
+} hdr_calibration;
+
+/* a setting in nits, within lowest and highest; 0 (Windows' own) stays */
+static int hdr_nits(int value, int lowest, int highest)
+{
+	return value <= 0 ? 0 : value < lowest ? lowest : value > highest ? highest : value;
+}
+
+/* the calibration screen was drawn in this frame, or (or_last_frame) in
+this frame or the one before: it says so as it is drawn, after this frame's
+halo_screen_commit */
+static BOOL hdr_calibration_shown(BOOL or_last_frame)
+{
+	return hdr.float_window && hdr_calibration.frame &&
+		device.frame + 1 - hdr_calibration.frame <= (or_last_frame ? 1UL : 0UL);
+}
+
+int halo_hdr_calibration_available(void)
+{
+	return hdr.float_window && hdr.display_on;
+}
+
+void halo_hdr_calibration_show(int pattern, int paper_white, int peak_brightness)
+{
+	hdr_calibration.frame = device.frame + 1;
+	hdr_calibration.pattern = pattern;
+	hdr_calibration.paper_white = hdr_nits(paper_white, 80, 1000);
+	hdr_calibration.peak_brightness = hdr_nits(peak_brightness, 250, 10000);
+}
+
+/* a rectangle of the menus' 640 by 480 units (the screen's middle, as the
+menus are drawn) as corners in the window, row 0 at the bottom, where the
+back buffer is drawn at window's x, y, width and height */
+static void hdr_calibration_place(const struct render_target_entry *back_buffer, const int window[4], float left,
+	float top, float right, float bottom, GLint corners[4])
+{
+	float across = (float)window[2] / (float)back_buffer->target.width;
+	float down = (float)window[3] / (float)back_buffer->target.height;
+	float offset = (float)(halo_screen_width() - 640) / 2.0f;
+
+	corners[0] = window[0] + (GLint)((left + offset) * across + 0.5f);
+	corners[2] = window[0] + (GLint)((right + offset) * across + 0.5f);
+	corners[1] = window[1] + window[3] - (GLint)(bottom * down + 0.5f);
+	corners[3] = window[1] + window[3] - (GLint)(top * down + 0.5f);
+}
+
+/* a square, and a ring in it, of the menus' units: its left and top, the
+square's colour and the ring's (scRGB) */
+static void hdr_calibration_square(const struct render_target_entry *back_buffer, const int window[4], float left,
+	float top, float square_color, float ring_color)
+{
+	/* (the square's side, and the ring's radii) */
+	const float SIDE = 180.0f, OUTER = 62.0f, INNER = 42.0f;
+	float down = (float)window[3] / (float)back_buffer->target.height;
+	float color[3], ring[4];
+	GLint corners[4];
+
+	hdr_calibration_place(back_buffer, window, left, top, left + SIDE, top + SIDE, corners);
+	color[0] = color[1] = color[2] = square_color;
+	ring[0] = ring[1] = ring[2] = ring[3] = 0.0f;
+	xgpu_post_fill(corners, color, ring);
+	color[0] = color[1] = color[2] = ring_color;
+	ring[0] = (float)(corners[0] + corners[2]) / 2.0f;
+	ring[1] = (float)(corners[1] + corners[3]) / 2.0f;
+	ring[2] = OUTER * down;
+	ring[3] = INNER * down;
+	xgpu_post_fill(corners, color, ring);
+}
+
+/* the calibration screen's pattern, over its menus, between its rows and
+its help. The peak's: a square at the peak shown, and in it a ring at 10000
+nits, brighter than any display shows, which disappears into the square
+once the square is as bright as the display goes. Paper white's: a grey
+scale up to white at the paper white shown, as the menus' white then is,
+beside a square of that white with a ring in it at the peak, the light past
+white. */
+static void hdr_calibration_draw(const struct render_target_entry *back_buffer, const int window[4])
+{
+	/* (scRGB, 1.0 at 80 nits) */
+	const float BRIGHTEST = 10000.0f / 80.0f;
+	const int GREYS = 8;
+	float paper = hdr.sdr_white, peak = hdr.sdr_white * hdr.tone_mapping.peak;
+
+	if (hdr_calibration.pattern == HDR_CALIBRATION_PEAK)
+	{
+		hdr_calibration_square(back_buffer, window, 230.0f, 146.0f, peak, BRIGHTEST);
+	}
+	else
+	{
+		float ring[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+		int grey;
+
+		for (grey = 0; grey < GREYS; grey++)
+		{
+			float color[3];
+			GLint corners[4];
+
+			/* (the menus' values are gamma encoded, as the presentation's) */
+			color[0] = color[1] = color[2] = powf((float)(grey + 1) / (float)GREYS, 2.2f) * paper;
+			hdr_calibration_place(back_buffer, window, 100.0f + 26.0f * (float)grey, 166.0f,
+				100.0f + 26.0f * (float)(grey + 1), 306.0f, corners);
+			xgpu_post_fill(corners, color, ring);
+		}
+		hdr_calibration_square(back_buffer, window, 360.0f, 146.0f, paper, peak);
+	}
+}
 
 /* display.hdr's settings, if they have changed: the back buffer's entries
 are made again in the format it takes (what they held is lost, and a frame
@@ -2190,12 +2350,15 @@ static void hdr_read(void)
 #endif
 		hdr.sdr_white = 1.0f;
 		hdr.tone_mapping.peak = 1.0f;
+		hdr.tone_mapping.paper = 0.0f;
 	}
 	hdr.read = TRUE;
 	hdr.read_at = config_changes();
 	curve = config_string("display.hdr_tone_mapping");
 	exposure = config_real("display.hdr_exposure");
 	wanted = config_boolean("display.hdr");
+	hdr.paper_white = hdr_nits((int)config_integer("display.hdr_paper_white"), 80, 1000);
+	hdr.peak_brightness = hdr_nits((int)config_integer("display.hdr_peak_brightness"), 250, 10000);
 	for (value = NUMBER_OF_XGPU_TONE_MAPPINGS - 1; value > 0 && strcmp(curve, tone_mapping_names[value]); value--)
 	{
 	}
@@ -2254,6 +2417,10 @@ static void gl_initialize(void)
 	int index;
 
 	glGetIntegerv(GL_MAJOR_VERSION, &major);
+#ifdef HALO_ANDROID
+	platform_log("Android render policy: chip=%d geometry=%s CE textures=%s per-draw refresh=off",
+		android_render_chip, android_geometry_fixes ? "on" : "off", android_texture_fixes ? "on" : "off");
+#endif
 	glGetIntegerv(GL_MINOR_VERSION, &minor);
 #ifdef HALO_GLES
 	{
@@ -2317,6 +2484,18 @@ static void gl_initialize(void)
 	}
 	glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 	glEnable(GL_PROGRAM_POINT_SIZE);
+	/* (read once, at start: the depth buffers' format and the programs
+	depend on it) */
+	{
+		static BOOL read;
+
+		if (!read)
+		{
+			read = TRUE;
+			xgpu_reversed_depth = config_boolean("display.reversed_depth");
+			platform_log("depth: %s", xgpu_reversed_depth ? "32-bit float, reversed" : "24 bits, as the Xbox's");
+		}
+	}
 #endif
 	glGenVertexArrays(1, &device.vertex_array);
 	glBindVertexArray(device.vertex_array);
@@ -2417,6 +2596,8 @@ static void gl_initialize(void)
 	}
 	xgpu_gl_state_invalidate();
 	device.gl_ready = TRUE;
+	/* display.stats_log's line: the driver's own text for the renderer */
+	stats_log_set_renderer((const char *)glGetString(GL_VENDOR), (const char *)glGetString(GL_RENDERER));
 	if (anti_aliasing_value < 0)
 		anti_aliasing_read();
 	else
@@ -2722,9 +2903,33 @@ long halo_screen_commit(void)
 #ifndef HALO_ANDROID
 	if (hdr.float_window)
 	{
-		float headroom;
+		float sdr_white, headroom, paper, peak;
+		BOOL on = platform_video_hdr(&sdr_white, &headroom);
+		/* (the calibration screen's, while it is drawn) */
+		BOOL calibrating = hdr_calibration_shown(TRUE);
+		int paper_white = calibrating ? hdr_calibration.paper_white : hdr.paper_white;
+		int peak_brightness = calibrating ? hdr_calibration.peak_brightness : hdr.peak_brightness;
 
-		hdr.tone_mapping.peak = platform_video_hdr(&hdr.sdr_white, &headroom) ? headroom : 1.0f;
+		hdr.display_on = on;
+		/* (in nits: scRGB's 1.0 is 80) */
+		paper = paper_white ? (float)paper_white : sdr_white * 80.0f;
+		peak = peak_brightness ? (float)peak_brightness : headroom * sdr_white * 80.0f;
+		if (!on)
+		{
+			paper = sdr_white * 80.0f;
+			peak = paper;
+		}
+		if (peak < paper)
+			peak = paper;
+		if (paper != hdr.sdr_white * 80.0f || peak / paper != hdr.tone_mapping.peak)
+		{
+			if (on && !calibrating)
+				platform_log("HDR: the display's paper white %.0f nits%s, peak %.0f nits%s", paper,
+					paper_white ? "" : " (Windows')", peak, peak_brightness ? "" : " (Windows')");
+		}
+		hdr.sdr_white = paper / 80.0f;
+		hdr.tone_mapping.peak = peak / paper;
+		hdr.tone_mapping.paper = on ? paper / 100.0f : 0.0f;
 	}
 #endif
 	/* display.shadow_resolution, if it has changed: the maps' entries at
@@ -4410,8 +4615,10 @@ static void apply_raster_state(BOOL has_depth)
 		glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 	}
 	state_enable(&gl_state.scissor_test, GL_SCISSOR_TEST, scissor[2] > 0 && scissor[3] > 0);
-	depth_range[0] = device.viewport.MinZ;
-	depth_range[1] = device.viewport.MaxZ;
+	/* (display.reversed_depth: Direct3D's MinZ to MaxZ as 1 - MinZ to
+	1 - MaxZ, which glDepthRange takes nearest first) */
+	depth_range[0] = xgpu_reversed_depth ? 1.0f - device.viewport.MaxZ : device.viewport.MinZ;
+	depth_range[1] = xgpu_reversed_depth ? 1.0f - device.viewport.MinZ : device.viewport.MaxZ;
 	if (memcmp(gl_state.depth_range, depth_range, sizeof(depth_range)))
 	{
 		memcpy(gl_state.depth_range, depth_range, sizeof(depth_range));
@@ -4423,6 +4630,12 @@ static void apply_raster_state(BOOL has_depth)
 	{
 		GLenum function = rs[D3DRS_ZFUNC] ? (GLenum)rs[D3DRS_ZFUNC] : GL_NEVER;
 
+		/* (display.reversed_depth: nearer is greater) */
+		if (xgpu_reversed_depth)
+		{
+			function = function == GL_LESS ? GL_GREATER : function == GL_LEQUAL ? GL_GEQUAL :
+				function == GL_GREATER ? GL_LESS : function == GL_GEQUAL ? GL_LEQUAL : function;
+		}
 		if (gl_state.depth_function != function)
 		{
 			gl_state.depth_function = function;
@@ -4554,6 +4767,12 @@ static void apply_raster_state(BOOL has_depth)
 
 		offset[0] = dword_to_float(rs[D3DRS_POLYGONOFFSETZSLOPESCALE]);
 		offset[1] = dword_to_float(rs[D3DRS_POLYGONOFFSETZOFFSET]);
+		/* (display.reversed_depth: toward the camera is up) */
+		if (xgpu_reversed_depth)
+		{
+			offset[0] = -offset[0];
+			offset[1] = -offset[1];
+		}
 		if (memcmp(gl_state.polygon_offset, offset, sizeof(offset)))
 		{
 			memcpy(gl_state.polygon_offset, offset, sizeof(offset));
@@ -4701,10 +4920,6 @@ static struct program_entry *prepare_draw(BOOL immediate)
 				skip++;
 		}
 	}
-#ifdef HALO_ANDROID
-	/* Refresh GL shadow state before binding this draw, without reloading pixels. */
-	xgpu_gl_state_invalidate();
-#endif
 	memset(&key, 0, sizeof(key));
 	memcpy(key.combiner_state, D3D__RenderState, sizeof(key.combiner_state));
 	/* constants are uniforms, not part of the program */
@@ -4774,7 +4989,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		stats.immediate_draws++;
 	else
 		stats.draws++;
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	device.draw_serial++;
 #endif
 	draw_flush();
@@ -5266,9 +5481,9 @@ static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buff
 	BOOL present = TRUE;
 
 #ifdef HALO_ANDROID
-	/* Persistent geometry caching causes corruption on affected Android
-	devices. Use current vertex/index bytes through the streaming path. */
-	return FALSE;
+	/* Affected and unknown chips use static buffers or current CPU bytes. */
+	if (android_geometry_fixes)
+		return FALSE;
 #endif
 	if (!size || address < PLATFORM_CONTIGUOUS_BASE || start + size > PLATFORM_CONTIGUOUS_SIZE)
 		return FALSE;
@@ -5360,9 +5575,279 @@ static void index_extent(const WORD *indices, unsigned long count, unsigned long
 	*maximum = high;
 }
 
+#ifdef HALO_ANDROID
+/* ---------- static geometry
+
+When Android's geometry fixes are enabled, mirror_range declines the
+contiguous window, so draws stream their vertices and indices. Geometry the game writes once and
+never again gets GL buffers of its own instead, filled the first time a draw
+reads it and never written after, so nothing tracks writes and no queued
+draw can read a buffer while it changes:
+- the vertex and index buffers rasterizer_vertex_buffer_new and
+  rasterizer_triangle_buffer_new make (Custom Edition and mod models, a
+  Custom Edition map's BSP), one each (xgpu_static_buffer_add);
+- an Xbox map's model geometry in its tags, and its BSP's in the BSP, from
+  the first buffer to the end of the tags or the BSP (xgpu_static_buffers_add):
+  the cache files hold the buffers there, written only as the map loads.
+An entry goes when the game releases or unloads it; its GL buffer is
+deleted at the next Present. */
+
+struct static_buffer
+{
+	unsigned long start;
+	unsigned long size;
+	GLuint buffer;
+	/* (GL had no storage for it: it streams, as before, and is not tried
+	again) */
+	BOOL failed;
+	/* (a value of its own, for index_extent's cache of this range) */
+	unsigned long serial;
+};
+
+/* sorted by start, one list of vertices (0) and one of indices (1); the
+ranges of a list are separate memory */
+static struct static_buffer_list
+{
+	struct static_buffer *entries;
+	unsigned long count;
+	unsigned long capacity;
+} static_buffer_lists[2];
+
+static struct
+{
+	unsigned long serial;
+	GLuint *doomed;
+	unsigned long doomed_count;
+	unsigned long doomed_capacity;
+} static_buffers;
+
+/* the first entry of the list whose start is above address */
+static unsigned long static_buffer_upper(const struct static_buffer_list *list, unsigned long address)
+{
+	unsigned long low = 0, high = list->count;
+
+	while (low < high)
+	{
+		unsigned long middle = (low + high) / 2;
+
+		if (list->entries[middle].start <= address)
+			low = middle + 1;
+		else
+			high = middle;
+	}
+	return low;
+}
+
+/* a resource's bytes in memory: vertex buffers carry a physical address,
+index buffers a virtual one (d3d8_resources.c) */
+static unsigned long static_buffer_start(const void *resource, BOOL indices)
+{
+	DWORD data = ((const DWORD *)resource)[1];
+
+	if (!data)
+		return 0;
+	return indices ? (unsigned long)data : (unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(data);
+}
+
+static void static_buffer_forget(struct static_buffer_list *list, unsigned long start)
+{
+	unsigned long index = static_buffer_upper(list, start);
+	struct static_buffer *entry;
+
+	if (!index || list->entries[index - 1].start != start)
+		return;
+	entry = &list->entries[index - 1];
+	if (entry->buffer)
+	{
+		/* (deleted at Present, from the thread that draws) */
+		if (static_buffers.doomed_count == static_buffers.doomed_capacity)
+		{
+			unsigned long capacity = static_buffers.doomed_capacity ? static_buffers.doomed_capacity * 2 : 64;
+			GLuint *doomed = realloc(static_buffers.doomed, capacity * sizeof(*doomed));
+
+			if (doomed)
+			{
+				static_buffers.doomed = doomed;
+				static_buffers.doomed_capacity = capacity;
+			}
+		}
+		if (static_buffers.doomed_count < static_buffers.doomed_capacity)
+			static_buffers.doomed[static_buffers.doomed_count++] = entry->buffer;
+	}
+	memmove(entry, entry + 1, (list->count - index) * sizeof(*entry));
+	list->count--;
+}
+
+static void static_buffer_note(struct static_buffer_list *list, unsigned long start, unsigned long size)
+{
+	unsigned long index;
+	struct static_buffer *entry;
+
+	if (!android_geometry_fixes || !start || !size)
+		return;
+	static_buffer_forget(list, start);
+	index = static_buffer_upper(list, start);
+	/* (a bsp's vertices and lightmap vertices both run to its end: the one
+	that starts lower covers the other) */
+	if (index && list->entries[index - 1].start + list->entries[index - 1].size == start + size)
+		return;
+	if (index < list->count && list->entries[index].start + list->entries[index].size == start + size)
+		static_buffer_forget(list, list->entries[index].start);
+	/* (a range that would overlap another is left to stream) */
+	if ((index && list->entries[index - 1].start + list->entries[index - 1].size > start) ||
+		(index < list->count && start + size > list->entries[index].start))
+	{
+		return;
+	}
+	if (list->count == list->capacity)
+	{
+		unsigned long capacity = list->capacity ? list->capacity * 2 : 256;
+		struct static_buffer *entries = realloc(list->entries, capacity * sizeof(*entries));
+
+		if (!entries)
+			return;
+		list->entries = entries;
+		list->capacity = capacity;
+	}
+	memmove(&list->entries[index + 1], &list->entries[index], (list->count - index) * sizeof(*entry));
+	list->count++;
+	entry = &list->entries[index];
+	entry->start = start;
+	entry->size = size;
+	entry->buffer = 0;
+	entry->failed = FALSE;
+	entry->serial = ++static_buffers.serial;
+}
+
+void xgpu_static_buffer_add(const void *resource, unsigned long size, int indices)
+{
+	if (resource)
+		static_buffer_note(&static_buffer_lists[indices != 0], static_buffer_start(resource, indices != 0), size);
+}
+
+void xgpu_static_buffer_remove(const void *resource, int indices)
+{
+	if (resource)
+		static_buffer_forget(&static_buffer_lists[indices != 0], static_buffer_start(resource, indices != 0));
+}
+
+/* the lowest data of count resources, stride bytes apart; 0 without */
+static unsigned long static_buffers_first(const void *buffers, long count, unsigned long stride, BOOL indices)
+{
+	unsigned long first = 0;
+	long index;
+
+	for (index = 0; buffers && index < count; index++)
+	{
+		unsigned long start = static_buffer_start((const unsigned char *)buffers + index * stride, indices);
+
+		if (start && (!first || start < first))
+			first = start;
+	}
+	return first;
+}
+
+void xgpu_static_buffers_add(const void *buffers, long count, unsigned long stride, int indices, const void *end)
+{
+	unsigned long first = static_buffers_first(buffers, count, stride, indices != 0);
+
+	if (first && (unsigned long)end > first)
+		static_buffer_note(&static_buffer_lists[indices != 0], first, (unsigned long)end - first);
+}
+
+void xgpu_static_buffers_remove(const void *buffers, long count, unsigned long stride, int indices)
+{
+	unsigned long first = static_buffers_first(buffers, count, stride, indices != 0);
+
+	if (first)
+		static_buffer_forget(&static_buffer_lists[indices != 0], first);
+}
+
+void xgpu_static_range_add(const void *start, unsigned long size, int indices)
+{
+	static_buffer_note(&static_buffer_lists[indices != 0], (unsigned long)start, size);
+}
+
+void xgpu_static_range_remove(const void *start, int indices)
+{
+	static_buffer_forget(&static_buffer_lists[indices != 0], (unsigned long)start);
+}
+
+/* the GL buffers of released resources, deleted; the state cache forgets
+them, as GL unbinds them and may give their names to new buffers */
+static void static_buffers_collect(void)
+{
+	if (!static_buffers.doomed_count)
+		return;
+	glDeleteBuffers((GLsizei)static_buffers.doomed_count, static_buffers.doomed);
+	static_buffers.doomed_count = 0;
+	xgpu_gl_state_invalidate();
+}
+
+/* as mirror_range, for [address, address + size) inside one static range
+of the kind asked for: the GL buffer that holds it (filled now if no draw
+has read it yet), the range's offset in it and the range's serial */
+static BOOL static_buffer_range(unsigned long address, unsigned long size, BOOL indices, GLuint *buffer,
+	unsigned long *offset, unsigned long *serial)
+{
+	struct static_buffer_list *list = &static_buffer_lists[indices != 0];
+	unsigned long index = static_buffer_upper(list, address);
+	struct static_buffer *entry;
+
+	if (!android_geometry_fixes || !index || !size)
+		return FALSE;
+	entry = &list->entries[index - 1];
+	if (address - entry->start > entry->size || size > entry->size - (address - entry->start))
+		return FALSE;
+	if (!entry->buffer)
+	{
+		int pending;
+
+		if (entry->failed)
+			return FALSE;
+		glGenBuffers(1, &entry->buffer);
+		if (!entry->buffer)
+		{
+			entry->failed = TRUE;
+			return FALSE;
+		}
+		/* (the errors already queued, so that the upload's own are read) */
+		for (pending = 0; pending < 8 && glGetError() != GL_NO_ERROR; pending++)
+			;
+		if (indices)
+		{
+			state_element_array_buffer(entry->buffer);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)entry->size, (const void *)entry->start, GL_STATIC_DRAW);
+		}
+		else
+		{
+			state_array_buffer(entry->buffer);
+			glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)entry->size, (const void *)entry->start, GL_STATIC_DRAW);
+		}
+		if (glGetError() != GL_NO_ERROR)
+		{
+			/* (no storage, GL_OUT_OF_MEMORY: the buffer goes, unbinding
+			itself, and the range streams from now on) */
+			platform_log("GPU: no storage for %lu bytes of static %s; they are streamed", entry->size,
+				indices ? "indices" : "vertices");
+			glDeleteBuffers(1, &entry->buffer);
+			entry->buffer = 0;
+			entry->failed = TRUE;
+			xgpu_gl_state_invalidate();
+			return FALSE;
+		}
+	}
+	*buffer = entry->buffer;
+	*offset = address - entry->start;
+	if (serial)
+		*serial = entry->serial;
+	return TRUE;
+}
+#endif
+
 /* ---------- vertex data */
 
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 /* port: WebGL on Metal (Chrome's and Safari's ANGLE) waits for the GPU to
 finish everything queued before it writes a buffer that a queued draw reads
 (without its shadow buffers, which Chrome leaves off): a glBufferSubData
@@ -5371,9 +5856,22 @@ some 2000 a frame, the frame rate a few frames each second. So each draw's
 uploads go into a buffer of their own that no queued draw reads, taken from
 pools of a few sizes, one set for each frame of the ring: a buffer is
 written again only STREAM_BUFFER_RING frames on, when the GPU is done with
-it. */
+it. Android does the same: on Snapdragon, vertices and indices written
+(unsynchronized) into the frame's one stream buffer, which draws earlier
+in the frame read, were sometimes drawn wrong, as long spikes, and
+glBufferSubData into that buffer made the driver copy all of it each
+time. */
 #define WEB_CHUNK_SHIFT 12 /* 4 KB */
 #define WEB_CHUNK_CLASSES 14 /* to 32 MB */
+
+static BOOL stream_uses_chunks(void)
+{
+#ifdef HALO_ANDROID
+	return android_geometry_fixes;
+#else
+	return TRUE;
+#endif
+}
 
 static struct web_chunks
 {
@@ -5427,6 +5925,8 @@ static void web_chunks_begin_frame(void)
 {
 	int indices, chunk_class;
 
+	if (!stream_uses_chunks())
+		return;
 	for (indices = 0; indices < 2; indices++)
 	{
 		for (chunk_class = 0; chunk_class < WEB_CHUNK_CLASSES; chunk_class++)
@@ -5443,15 +5943,19 @@ between two of them would leave the attributes already pointed at the
 buffer reading its new, empty storage. */
 static void stream_reserve(unsigned long size)
 {
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	/* (a new buffer when a draw since the latest write may read this one) */
-	if (size && (device.stream_offset + size > device.stream_capacity ||
-		(device.stream_offset && device.stream_serial != device.draw_serial)))
+	if (stream_uses_chunks())
 	{
-		device.stream_buffer = web_chunk_get(0, size, &device.stream_capacity);
-		device.stream_offset = 0;
+		if (size && (device.stream_offset + size > device.stream_capacity ||
+			(device.stream_offset && device.stream_serial != device.draw_serial)))
+		{
+			device.stream_buffer = web_chunk_get(0, size, &device.stream_capacity);
+			device.stream_offset = 0;
+		}
+		return;
 	}
-#else
+#endif
 	if (device.stream_offset + size > STREAM_BUFFER_SIZE)
 	{
 		/* orphan the buffer and start again */
@@ -5459,7 +5963,6 @@ static void stream_reserve(unsigned long size)
 		glBufferData(GL_ARRAY_BUFFER, STREAM_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
 		device.stream_offset = 0;
 	}
-#endif
 }
 
 static unsigned long stream_upload(const void *data, unsigned long size);
@@ -5484,12 +5987,18 @@ static unsigned long stream_upload(const void *data, unsigned long size)
 	stream_reserve(size);
 	offset = device.stream_offset;
 	state_array_buffer(device.stream_buffer);
-#ifdef HALO_GLES
+#ifdef HALO_WEB
 	host_gl_buffer_write(GL_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
+#elif defined(HALO_GLES)
+	/* (into a pooled buffer that no queued draw reads, web_chunk_get) */
+	if (stream_uses_chunks())
+		glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)length, data);
+	else
+		host_gl_buffer_write(GL_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #else
 	buffer_upload(GL_ARRAY_BUFFER, offset, length, data);
 #endif
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	device.stream_serial = device.draw_serial;
 #endif
 	device.stream_offset += size;
@@ -5547,30 +6056,41 @@ static unsigned long index_upload(const void *data, unsigned long size)
 	unsigned long length = size;
 
 	size = (size + 15) & ~15UL;
-#ifdef HALO_WEB
-	/* (as stream_reserve) */
-	if (device.index_offset + size > device.index_capacity ||
-		(device.index_offset && device.index_serial != device.draw_serial))
-	{
-		device.index_buffer = web_chunk_get(1, size, &device.index_capacity);
-		device.index_offset = 0;
-	}
-	state_element_array_buffer(device.index_buffer);
-#else
-	state_element_array_buffer(device.index_buffer);
-	if (device.index_offset + size > INDEX_BUFFER_SIZE)
-	{
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
-		device.index_offset = 0;
-	}
-#endif
-	offset = device.index_offset;
 #ifdef HALO_GLES
+	/* (as stream_reserve) */
+	if (stream_uses_chunks())
+	{
+		if (device.index_offset + size > device.index_capacity ||
+			(device.index_offset && device.index_serial != device.draw_serial))
+		{
+			device.index_buffer = web_chunk_get(1, size, &device.index_capacity);
+			device.index_offset = 0;
+		}
+		state_element_array_buffer(device.index_buffer);
+	}
+	else
+#endif
+	{
+		state_element_array_buffer(device.index_buffer);
+		if (device.index_offset + size > INDEX_BUFFER_SIZE)
+		{
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, NULL, GL_STREAM_DRAW);
+			device.index_offset = 0;
+		}
+	}
+	offset = device.index_offset;
+#ifdef HALO_WEB
 	host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
+#elif defined(HALO_GLES)
+	/* (into a pooled buffer that no queued draw reads, web_chunk_get) */
+	if (stream_uses_chunks())
+		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, (GLintptr)offset, (GLsizeiptr)length, data);
+	else
+		host_gl_buffer_write(GL_ELEMENT_ARRAY_BUFFER, (unsigned int)offset, (unsigned int)length, data);
 #else
 	buffer_upload(GL_ELEMENT_ARRAY_BUFFER, offset, length, data);
 #endif
-#ifdef HALO_WEB
+#ifdef HALO_GLES
 	device.index_serial = device.draw_serial;
 #endif
 	device.index_offset += size;
@@ -5849,6 +6369,14 @@ static void setup_streams(unsigned long first, unsigned long count)
 		placed[stream] = TRUE;
 		stream_buffers[stream] = 0;
 		base = (unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(device.streams[stream].data) + first * stride;
+#ifdef HALO_ANDROID
+		/* (a model's or the BSP's vertices, uploaded once) */
+		if (!stream_has_colors(declaration, stream) &&
+			static_buffer_range(base, bytes, FALSE, &stream_buffers[stream], &stream_offsets[stream], NULL))
+		{
+			continue;
+		}
+#endif
 #ifdef HALO_GLES
 		if (!stream_has_colors(declaration, stream))
 #endif
@@ -6233,6 +6761,15 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		xgpu_capabilities.base_vertex &&
 #endif
 		mirror_range((unsigned long)index_data, vertex_count * sizeof(WORD), &index_buffer, &index_offset, &generation);
+#ifdef HALO_ANDROID
+	/* (a model's or the BSP's indices, uploaded once: drawn as the mirror's
+	are, their extent cached under the buffer's serial) */
+	if (!mirrored && primitive_type != D3DPT_QUADLIST && xgpu_capabilities.base_vertex)
+	{
+		mirrored = static_buffer_range((unsigned long)index_data, vertex_count * sizeof(WORD), TRUE, &index_buffer,
+			&index_offset, &generation);
+	}
+#endif
 #ifdef HALO_WEB
 	if (!mirrored && primitive_type != D3DPT_QUADLIST &&
 		index_cache_get(index_data, vertex_count, &minimum, &maximum, &index_offset))
@@ -6596,7 +7133,7 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	if (has_depth && (flags & D3DCLEAR_ZBUFFER))
 	{
 		glDepthMask(GL_TRUE);
-		glClearDepth(z);
+		glClearDepth(xgpu_reversed_depth ? 1.0f - z : z);
 		mask |= GL_DEPTH_BUFFER_BIT;
 	}
 	if (has_depth && (flags & D3DCLEAR_STENCIL))
@@ -7284,6 +7821,18 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
 				x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		}
+		/* (the HDR calibration screen's pattern, brighter than the back
+		buffer's white can be) */
+		if (hdr_calibration_shown(FALSE) && hdr.display_on)
+		{
+			int window[4];
+
+			window[0] = x;
+			window[1] = y;
+			window[2] = width;
+			window[3] = height;
+			hdr_calibration_draw(back_buffer, window);
+		}
 		glBindVertexArray(device.vertex_array);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 		platform_video_swap();
@@ -7308,6 +7857,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			glBindBuffer(GL_COPY_READ_BUFFER, 0);
 			glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
 		}
+#ifdef HALO_ANDROID
+		static_buffers_collect();
+#endif
 		host_gl_fence_frame((unsigned int)device.buffer_ring);
 		device.buffer_ring = (device.buffer_ring + 1) % STREAM_BUFFER_RING;
 		host_gl_wait_frame((unsigned int)device.buffer_ring);
@@ -7331,9 +7883,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		device.index_buffer = device.index_buffers[device.buffer_ring];
 		device.stream_offset = 0;
 		device.index_offset = 0;
-#ifdef HALO_WEB
 		web_chunks_begin_frame();
-#endif
 #else
 		device.stream_offset = STREAM_BUFFER_SIZE; /* orphan next frame */
 		device.index_offset = INDEX_BUFFER_SIZE;

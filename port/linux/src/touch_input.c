@@ -26,6 +26,15 @@ void host_touch_look_read(float *delta);
 void host_touch_rumble(unsigned int low, unsigned int high);
 void host_touch_scene(int scene);
 void host_touch_bindings(const int *controls);
+
+/* the SDL gamepads in connection order, at most one per port
+(xinput_sdl.c); the touch controls are port 0's controller */
+#define TOUCH_PORTS 4
+struct SDL_Gamepad;
+int sdl_gamepads(struct SDL_Gamepad **gamepads);
+#endif
+#ifdef HALO_ANDROID
+int host_touch_devices(void);
 #endif
 
 /* the game's (port/linux/game/touch_game.c) */
@@ -171,7 +180,7 @@ void touch_input_menu_read(struct platform_ui_pointer *pointer)
 
 /* port/linux/game/network_chat.c: its on-screen keyboard is up, which
 takes the taps outside the menus */
-extern unsigned char network_chat_keyboard_open(void);
+extern short network_chat_controller(void);
 
 /* the taps for that keyboard since it last took them, and the latest's
 place (0 to 1 of the window) */
@@ -199,7 +208,7 @@ void touch_input_gamepad(XINPUT_GAMEPAD *pad)
 		menu_setup();
 		touch_menu_read(&menu, &output);
 		/* (or, while the text chat's on-screen keyboard is up, its keys) */
-		if (output.clicks && network_chat_keyboard_open())
+		if (output.clicks && (network_chat_controller() == 0))
 		{
 			int width = 0, height = 0;
 
@@ -239,6 +248,10 @@ enum
 	device has a touchscreen and no controller) */
 	_touch_scene_on = 1 << 2,
 	_touch_scene_off = 1 << 3,
+	/* the game reads a controller (SDL_GetGamepads): "auto" hides the
+	controls, and on Android the overlay's own input device list did not
+	show every controller (a Bluetooth pad arrived after it looked) */
+	_touch_scene_controller = 1 << 4,
 };
 
 /* the touch controls' stick at port 0's last read, -1..1, y down */
@@ -264,6 +277,48 @@ static int touch_controls_setting(void)
 	return setting;
 }
 
+#ifdef HALO_ANDROID
+/* the overlay's devices (port/android/host/host_touch.c's
+HOST_TOUCH_DEVICE_*) */
+#define TOUCH_DEVICE_TOUCHSCREEN 1
+#define TOUCH_DEVICE_CONTROLLER 2
+
+int touch_input_screen_buttons(void)
+{
+	int devices = host_touch_devices();
+	int setting = touch_controls_setting();
+
+	/* (TouchControls.java's shown(), but for the scene) */
+	if (setting == _touch_scene_off || !(devices & TOUCH_DEVICE_TOUCHSCREEN))
+		return FALSE;
+	return setting == _touch_scene_on || !(devices & TOUCH_DEVICE_CONTROLLER);
+}
+#endif
+/* whether a controller is connected (xinput_sdl.c, sdl_gamepads). The touch
+controls are no SDL gamepad, so one gamepad is enough; on Android only a
+recognised one counts, not the generic gamepads it lists for a phone's own
+keys (its power and volume keys) or the emulator's keyboard */
+static int touch_controller_connected(void)
+{
+	struct SDL_Gamepad *gamepads[TOUCH_PORTS];
+	int count = sdl_gamepads(gamepads);
+#ifdef HALO_ANDROID
+	int index;
+	int found = 0;
+
+	for (index = 0; index < count; index++)
+	{
+		SDL_GamepadType type = SDL_GetGamepadType(gamepads[index]);
+
+		if (type != SDL_GAMEPAD_TYPE_UNKNOWN && type != SDL_GAMEPAD_TYPE_STANDARD)
+			found++;
+	}
+	return found >= 1;
+#else
+	return count >= 1;
+#endif
+}
+
 void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
 {
 	/* SDL's gamepad buttons, in order (SDL_GamepadButton); the first four
@@ -284,12 +339,18 @@ void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
 	int bindings[TOUCH_BUTTONS];
 	int state[7];
 	int index;
+	int controller;
 
+	/* a gamepad that is not the touch controls' own: the controls' state
+	goes to port 0 only, and the overlay's device list has left some
+	controllers out (it looked before a Bluetooth pad was paired) */
+	controller = touch_controller_connected();
 	/* (the controls show only in a game: not while it starts, at the main
 	menu, in a menu or during a cinematic; nor while the text chat's
 	on-screen keyboard is up, whose keys the fingers then tap) */
 	host_touch_scene(_touch_scene_known | touch_controls_setting() |
-		(menus || !touch_game_playing() || touch_game_cinematic_playing() || network_chat_keyboard_open() ?
+		(controller ? _touch_scene_controller : 0) |
+		(menus || !touch_game_playing() || touch_game_cinematic_playing() || (network_chat_controller() == 0) ?
 			_touch_scene_menus : 0));
 	/* (the profile's mapping, for the buttons' names; only when it changes) */
 	touch_game_button_controls(bindings);

@@ -663,6 +663,7 @@ symbols in this file:
 #include "effects/effects.h"
 #include "effects/material_effect_definitions.h"
 #include "game/cheats.h"
+#include "game/game.h" /* port: game_connection (unit_turns_with_aim) */
 #include "game/game_allegiance.h"
 #include "game/game_globals.h"
 #include "game/game_engine.h"
@@ -3340,14 +3341,31 @@ static char const *const enhanced_animation_units[] =
 	"cyborg_mp",
 };
 
+/* whether the unit is one of the player bipeds the enhancements were made
+for */
+static boolean unit_animation_enhanced_unit(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	char const *name = tag_name_strip_path(tag_get_name(unit->definition_index));
+	long name_index;
+
+	for (name_index = 0; name_index < NUMBEROF(enhanced_animation_units); name_index++)
+	{
+		if (!_stricmp(name, enhanced_animation_units[name_index]))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 boolean unit_animation_enhanced(
 	long unit_index)
 {
 	static boolean enhanced = TRUE;
 	static unsigned long read_at = (unsigned long)-1;
-	struct unit_datum *unit;
-	char const *name;
-	long name_index;
 
 	/* (read again when the settings change) */
 	if (read_at != config_changes())
@@ -3359,17 +3377,26 @@ boolean unit_animation_enhanced(
 	{
 		return FALSE;
 	}
-	unit = unit_get(unit_index);
-	name = tag_name_strip_path(tag_get_name(unit->definition_index));
-	for (name_index = 0; name_index < NUMBEROF(enhanced_animation_units); name_index++)
-	{
-		if (!_stricmp(name, enhanced_animation_units[name_index]))
-		{
-			return TRUE;
-		}
-	}
+	return unit_animation_enhanced_unit(unit_index);
+}
 
-	return FALSE;
+/* port: whether a player biped turns with the aim where the original left
+its body facing (throwing a grenade, in the air: bipeds.c's
+biped_update_turning). It moves where a shot goes, not only how the body
+looks, so in a network game every machine turns them, whatever its own
+game.enhanced_animations says: a player who turned it off would otherwise
+aim differently from the others, and a client and its host would turn that
+player's body differently. In a game of one machine the setting decides,
+as for the other enhancements. */
+boolean unit_turns_with_aim(
+	long unit_index)
+{
+	if (game_connection() == _game_connection_network_client ||
+		game_connection() == _game_connection_network_server)
+	{
+		return unit_animation_enhanced_unit(unit_index);
+	}
+	return unit_animation_enhanced(unit_index);
 }
 
 /* port: a seat whose graph has no reload of its own (a Scorpion rider's)

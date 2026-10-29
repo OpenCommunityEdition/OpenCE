@@ -18,6 +18,10 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_shield_glow_intensity" x="54" y="133"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr" x="54" y="163"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_output" x="54" y="193" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_tone_mapping" x="54" y="223"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_paper_white" x="54" y="253" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_peak_brightness" x="54" y="283" platform="desktop"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_calibration" x="54" y="313" platform="desktop"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -70,6 +74,41 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_output_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="display.hdr_output" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_tone_mapping" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_tone_mapping_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_tone_mapping_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_tone_mapping_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_tone_mapping_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="GT7|NEUTRAL|ACES|REINHARD" setting="display.hdr_tone_mapping" values="gt7|neutral|aces|reinhard" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_paper_white" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_paper_white_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_paper_white_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_paper_white_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_paper_white_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="AUTO|80|90|100|110|120|130|140|150|160|170|180|190|200|203|220|240|250|260|280|300|320|340|360|380|400" setting="display.hdr_paper_white" values="0|80|90|100|110|120|130|140|150|160|170|180|190|200|203|220|240|250|260|280|300|320|340|360|380|400" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_peak_brightness" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_peak_brightness_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_peak_brightness_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_peak_brightness_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_peak_brightness_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="AUTO|250|275|300|325|350|375|400|425|450|475|500|525|550|575|600|650|700|750|800|850|900|950|1000|1050|1100|1150|1200|1300|1400|1500|1600|1700|1800|1900|2000|2500|3000|4000|5000|6000|8000|10000" setting="display.hdr_peak_brightness" values="0|250|275|300|325|350|375|400|425|450|475|500|525|550|575|600|650|700|750|800|850|900|950|1000|1050|1100|1150|1200|1300|1400|1500|1600|1700|1800|1900|2000|2500|3000|4000|5000|6000|8000|10000" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/op_hdr_calibration" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop">
+		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/video_settings/hdr_calibration/hdr_calibration_settings_screen"/>
+		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/video_settings/hdr_calibration/hdr_calibration_settings_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_calibration_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/hdr_calibration_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port settings defaults"/>
 		<on event="start" run="port settings defaults"/>
@@ -86,13 +125,21 @@
 		<string text="GLOW INTENSITY:"/>
 		<string text="HDR:"/>
 		<string text="HDR DISPLAY:"/>
+		<string text="TONE CURVE:"/>
+		<string text="PAPER WHITE:"/>
+		<string text="PEAK BRIGHTNESS:"/>
+		<string text="HDR CALIBRATION:"/>
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/extra_effects/help_strings">
 		<string text=""/>
 		<string text="The overshield rises up the body and stays lit,\nin its own color. Online: the host's choice."/>
 		<string text="Shields light their surroundings as they flare.\nOnline: the host's choice."/>
 		<string text="Light Show: three times as far, at full from a\nthird of the flare. Online: the host's choice."/>
-		<string text="Keep the light of explosions, plasma and the sun\npast white, and roll it off instead of clipping."/>
-		<string text="With HDR, on an HDR display, show that light\nbrighter than white. From the next start."/>
+		<string text="Let explosions, plasma and the sun shine brighter\nthan white, then fit them to the screen."/>
+		<string text="On an HDR display (Windows HDR on), show that\nlight truly brighter. From the next start."/>
+		<string text="GT7: bright light turns white, as on film. Neutral:\nas drawn. ACES: more contrast. Reinhard: softer."/>
+		<string text="With HDR Display, how bright white is, in nits.\nAuto: Windows' SDR content brightness."/>
+		<string text="With HDR Display, your display's brightest, in\nnits. Auto: Windows' HDR calibration."/>
+		<string text="Set Peak Brightness and Paper White by eye,\nwith patterns brighter than white."/>
 	</strings>
 </menus>

@@ -127,7 +127,7 @@ static const struct config_setting config_settings[] =
 		"Xbox's 4:3." },
 	{ "display.vsync", _config_boolean, "true", "HALO_NO_VSYNC", _environment_set_is_false, _platform_all,
 		"Wait for the display between frames; false draws as fast as possible." },
-	{ "display.max_fps", _config_integer, "0", "HALO_MAX_FPS", _environment_value, _platform_desktop,
+	{ "display.max_fps", _config_integer, "0", "HALO_MAX_FPS", _environment_value, _platform_all,
 		"With vsync off, the most frames a second: 0 for twice the display's\n"
 		"refresh rate, -1 for no limit (which can hang some Intel graphics)." },
 	{ "display.frames_in_flight", _config_integer, "3", "HALO_FRAMES_IN_FLIGHT", _environment_value,
@@ -135,6 +135,13 @@ static const struct config_setting config_settings[] =
 		"The most frames the GPU has queued (1 to 8): a frame waits for the GPU\n"
 		"to finish the one this many before it, so that frames come evenly when\n"
 		"the GPU is the slower; 0 leaves it to the driver." },
+	/* port: the frame counter the game draws at the bottom right of a game
+	(main.c's main_framerate_render, display_framerate) for a setting, so the
+	settings screens show it (tools/port_settings.py) and it is kept in
+	config.toml: true to draw it, green from 30 frames a second, red below */
+	{ "display.show_fps", _config_boolean, "false", "HALO_SHOW_FPS", _environment_set_is_true, _platform_all,
+		"Draw the frame rate at the bottom right of a game, counted over half a\n"
+		"second: green from 30 frames a second, red below." },
 	{ "display.anti_aliasing", _config_string, "\"off\"", "HALO_ANTI_ALIASING", _environment_value, _platform_all,
 		"Smoothing of jagged edges, which the Xbox did not have: \"off\"; \"fxaa\"\n"
 		"or \"smaa\" smooth the 3D view once it is drawn (the HUD and menus stay\n"
@@ -144,6 +151,10 @@ static const struct config_setting config_settings[] =
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },
+	{ "display.menu_cursor", _config_string, "\"large\"", "HALO_MENU_CURSOR", _environment_value, _platform_desktop,
+		"The menus' pointer for the mouse: the game's blue arrow, \"small\",\n"
+		"\"medium\", \"large\" or \"extra_large\" (18, 24, 32 or 40 of the menus'\n"
+		"480 lines tall, at any resolution), or \"off\" for the system's pointer." },
 	{ "display.direct_camera", _config_boolean, "true", "HALO_DIRECT_CAMERA", _environment_value, _platform_desktop,
 		"In first person, point the view where the player aims now instead of\n"
 		"where the last tick left it: the view turns the frame the mouse moves,\n"
@@ -166,9 +177,34 @@ static const struct config_setting config_settings[] =
 		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps);\n"
 		"false draws the maps' own bitmaps." },
 	{ "display.hud_button_style", _config_string, "\"classic\"", "HALO_HUD_BUTTON_STYLE", _environment_value, _platform_all,
-		"High-res gameplay controller buttons: classic uses plain Xbox faces;\n"
-		"gems uses shaded Xbox faces; menu_gems uses the menu's button art.\n"
-		"Requires display.high_res_hud." },
+		"Manual high-res gameplay button style, preserved while automatic detection\n"
+		"is on. Xbox: classic, gems, menu_gems (dark gems), xbox_modern.\n"
+		"PlayStation: ps_classic, ps_gems, ps_dark_gems, ps_modern.\n"
+		"Switch: switch_classic, switch_gems, switch_modern. Requires high_res_hud." },
+	{ "display.hud_bumper_style", _config_string, "\"original\"", "HALO_HUD_BUMPER_STYLE", _environment_value, _platform_all,
+		"Xbox Classic, Gems and Dark Gems bumpers: original (black/white) or modern\n"
+		"(LB/RB). Shared by local players, including automatic button detection.\n"
+		"Requires high_res_hud; other button styles keep their own artwork." },
+	{ "input.auto_button_detection", _config_boolean, "true", "HALO_AUTO_BUTTON_DETECTION", _environment_value, _platform_all,
+		"Limit Button Style to the assigned controller's family. Unknown devices\n"
+		"keep the manual choice. Device detection itself is always available." },
+	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
+		"P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
+		"Button Remapping. v2: stores 25 physical-button names, including unbound.\n"
+		"Gameplay and debug camera have separate bindings. Old ten-action layouts\n"
+		"are accepted. See docs/reading/controller_remapping.md for the full order." },
+	{ "input.controller_p2", _config_string, "\"\"", "HALO_CONTROLLER_P2", _environment_value, _platform_all,
+		"P2 custom controller buttons, same format as controller_p1. Empty uses the profile." },
+	{ "input.controller_p3", _config_string, "\"\"", "HALO_CONTROLLER_P3", _environment_value, _platform_all,
+		"P3 custom controller buttons, same format as controller_p1. Empty uses the profile." },
+	{ "input.controller_p4", _config_string, "\"\"", "HALO_CONTROLLER_P4", _environment_value, _platform_all,
+		"P4 custom controller buttons, same format as controller_p1. Empty uses the profile." },
+	{ "display.hud_button_style_xbox", _config_string, "\"classic\"", "HALO_HUD_BUTTON_STYLE_XBOX", _environment_value, _platform_all,
+		"Remembered automatic Xbox style: classic, gems, menu_gems, xbox_modern." },
+	{ "display.hud_button_style_ps", _config_string, "\"ps_classic\"", "HALO_HUD_BUTTON_STYLE_PS", _environment_value, _platform_all,
+		"Remembered automatic PlayStation style: ps_classic, ps_gems, ps_dark_gems, ps_modern." },
+	{ "display.hud_button_style_switch", _config_string, "\"switch_classic\"", "HALO_HUD_BUTTON_STYLE_SWITCH", _environment_value, _platform_all,
+		"Remembered automatic Switch style: switch_classic, switch_gems, switch_modern." },
 	{ "display.high_res_text", _config_boolean, "true", "HALO_HIGH_RES_TEXT", _environment_value, _platform_all,
 		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
 		"(Overpass) at the resolution the game draws at, and the menus' titles\n"
@@ -228,6 +264,11 @@ static const struct config_setting config_settings[] =
 		"Keep the GPU programs the game links under the save root (shader_cache),\n"
 		"and load them from there next time instead of linking them again, which\n"
 		"stalls a frame on some drivers; false links each every run." },
+	{ "display.stats_log", _config_boolean, "false", "HALO_STATS_LOG", _environment_value, _platform_all,
+		"A line a second in the log with the frame rate, the mode, the map, the\n"
+		"renderer and the size of the 3D view, so a graphics bug's report or two\n"
+		"builds compared say which of them was running and at what frame rate.\n"
+		"Nothing is sent anywhere; off by default." },
 	{ "display.per_pixel_lighting", _config_boolean, "false", "HALO_PER_PIXEL_LIGHTING", _environment_value,
 		_platform_all,
 		"Light the models (characters, weapons, vehicles, scenery) for each\n"
@@ -247,6 +288,12 @@ static const struct config_setting config_settings[] =
 		"size on the display's, so that more detail is kept at a distance at high\n"
 		"resolutions; \"highest\" draws the models \"native\" does, each at its most\n"
 		"detailed level." },
+	{ "display.reversed_depth", _config_boolean, "true", "HALO_REVERSED_DEPTH", _environment_value, _platform_desktop,
+		"Keep depth in 32-bit floats, reversed (1 near, 0 far), as precise far\n"
+		"away as near: surfaces a few millimetres apart (the lights on Blood\n"
+		"Gulch's base) stay apart at any distance in place of flickering\n"
+		"through each other. false: 24 bits, as the Xbox's. Taken up when the\n"
+		"game starts." },
 	{ "display.hdr", _config_boolean, "false", "HALO_HDR", _environment_value, _platform_all,
 		"Draw the 3D view into a floating-point back buffer, which keeps what\n"
 		"the game's additive effects (explosions, plasma, lights, the sun's\n"
@@ -257,17 +304,27 @@ static const struct config_setting config_settings[] =
 	{ "display.hdr_exposure", _config_real, "1.0", "HALO_HDR_EXPOSURE", _environment_value, _platform_all,
 		"With display.hdr, the 3D view's brightness in linear light before it\n"
 		"is tone mapped, 0.25 to 4.0." },
-	{ "display.hdr_tone_mapping", _config_string, "\"neutral\"", "HALO_HDR_TONE_MAPPING", _environment_value,
+	{ "display.hdr_tone_mapping", _config_string, "\"gt7\"", "HALO_HDR_TONE_MAPPING", _environment_value,
 		_platform_all,
-		"With display.hdr, the curve that brings what is past white into the\n"
-		"display's range: \"neutral\" (the picture as drawn, with only its\n"
-		"brightest parts rolled off), \"aces\" (filmic, more contrast) or\n"
-		"\"reinhard\" (softer, and darker throughout)." },
+		"With display.hdr, the curve that fits the brightest light into what the\n"
+		"display shows: \"gt7\" (Gran Turismo 7's: the brightest light turns to\n"
+		"white, as film shows it), \"neutral\" (the picture as drawn, its\n"
+		"brightest parts rolled off at their own colour), \"aces\" (filmic,\n"
+		"more contrast) or \"reinhard\" (softer, and darker throughout)." },
 	{ "display.hdr_output", _config_boolean, "false", "HALO_HDR_OUTPUT", _environment_value, _platform_desktop,
 		"With display.hdr, ask for a floating-point window (scRGB), so that an\n"
 		"HDR display shows what is past white brighter than the desktop's\n"
 		"white rather than tone mapped down to it; the operating system's HDR\n"
 		"must be on. Taken up when the game starts." },
+	{ "display.hdr_paper_white", _config_integer, "0", "HALO_HDR_PAPER_WHITE", _environment_value, _platform_desktop,
+		"With display.hdr_output on an HDR display, how bright white is, in\n"
+		"nits (80 to 1000): the HUD, the menus, and the 3D view's white. 0:\n"
+		"Windows' SDR content brightness." },
+	{ "display.hdr_peak_brightness", _config_integer, "0", "HALO_HDR_PEAK_BRIGHTNESS", _environment_value,
+		_platform_desktop,
+		"With display.hdr_output on an HDR display, the brightest the display\n"
+		"shows, in nits (250 to 10000), which the brightest light is fitted to.\n"
+		"0: what Windows reports (set by its HDR Calibration app)." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
@@ -314,7 +371,9 @@ static const struct config_setting config_settings[] =
 		"The on-screen touch controls in a game: \"auto\" shows them on a\n"
 		"touchscreen while no controller is connected, \"on\" also with a\n"
 		"controller, \"off\" never. A device without a touchscreen never shows\n"
-		"them. The menus take taps in any case." },
+		"them. The menus take taps in any case. On Android, the carnage\n"
+		"report's CONTINUE and LEAVE buttons follow the same rule (otherwise\n"
+		"it shows its A and B prompt)." },
 	{ "input.touch_aim_assist", _config_boolean, "true", "HALO_TOUCH_AIM_ASSIST", _environment_value, _platform_android | _platform_web,
 		"The touch controls' swipe aiming gets a controller's aim assist: the\n"
 		"aim slows over a target and follows a moving one. false: none, as a\n"
@@ -336,8 +395,9 @@ static const struct config_setting config_settings[] =
 		"their own: \"stock\", \"glow\", \"light_show\", \"overshield\",\n"
 		"\"glow_overshield\" or \"light_show_overshield\" (display.shield_glow,\n"
 		"its light_show intensity, display.overshield_effect); \"players\": not\n"
-		"synced, each player sees their own settings'. SHIELD EFFECTS in Server\n"
-		"Setup > Player Options writes its choice here." },
+		"synced, each player sees their own settings'. An online co-op game is\n"
+		"always each player's own. SHIELD EFFECTS in Server Setup > Player\n"
+		"Options writes its choice here." },
 	{ "network.fire_origins", _config_boolean, "true", "HALO_NET_FIRE_ORIGINS", _environment_value, _platform_all,
 		"Host: whether a reported hit the shooter's camera had no line of sight\n"
 		"to may still count from where their machine says the shot left, when\n"
@@ -408,6 +468,11 @@ static const struct config_setting config_settings[] =
 		"Escape lets it go)." },
 	{ "controls.team_chat", _config_string, "\"Y\"", "HALO_KEY_TEAM_CHAT", _environment_value, _platform_all,
 		"Network games' text chat: type a line to your team." },
+	{ "controls.vote_yes", _config_string, "\"F1\"", "HALO_KEY_VOTE_YES", _environment_value, _platform_all,
+		"Network games' votes (to kick a player, to end the game): vote yes in\n"
+		"the vote running, whose box shows at the left." },
+	{ "controls.vote_no", _config_string, "\"F2\"", "HALO_KEY_VOTE_NO", _environment_value, _platform_all,
+		"Network games' votes: vote no in the vote running." },
 
 	{ "game.console_log", _config_string, "\"none\"", "HALO_CONSOLE_LOG", _environment_value, _platform_all,
 		"What the game's console shows on screen of what it logs: \"important\"\n"
@@ -429,9 +494,11 @@ static const struct config_setting config_settings[] =
 	{ "game.enhanced_animations", _config_boolean, "true", "HALO_ENHANCED_ANIMATIONS", _environment_value, _platform_all,
 		"The player bipeds' grenade throws keep their legs moving (crouched,\n"
 		"in the air and in a vehicle's seat too), riders' hands leave the grips\n"
-		"to throw and reload, and a player turns with the aim while throwing;\n"
+		"to throw and reload, and a player turns with the aim while throwing\n"
+		"and in the air (so shots after a turn in a jump go to the crosshair);\n"
 		"false: the original animations, which freeze the legs and stand a\n"
-		"rider up." },
+		"rider up (the turning, which moves where shots go, stays on in a\n"
+		"network game for every player)." },
 	{ "game.custom_edition", _config_boolean, "true", "HALO_CUSTOM_EDITION", _environment_value, _platform_all,
 		"Load and run Halo Custom Edition maps (not those that need OpenSauce):\n"
 		"put them and Custom Edition's bitmaps.map, sounds.map and loc.map in\n"
@@ -444,8 +511,9 @@ static const struct config_setting config_settings[] =
 		"join its lobby with the players, as far as the game has room. Not in\n"
 		"system link or internet games. 0: none, as in the stock game." },
 	{ "bots.skill", _config_string, "\"normal\"", "HALO_BOT_SKILL", _environment_value, _platform_all,
-		"How well the bots play: \"easy\", \"normal\", \"heroic\" or \"legendary\"\n"
-		"(how soon they react, how well they aim, how far they see)." },
+		"How well the bots play: \"recruit\", \"easy\", \"normal\", \"heroic\",\n"
+		"\"veteran\" or \"legendary\" (how soon they react, how well they aim,\n"
+		"how far they see, and how they fight: blows, grenades, strafes, retreats)." },
 	{ "bots.teams", _config_string, "\"even\"", "HALO_BOT_TEAMS", _environment_value, _platform_all,
 		"In team games: \"even\" puts the bots on both teams, evening them with\n"
 		"the players; \"against\" puts them all on the team the players are not on." },
@@ -462,17 +530,17 @@ static const struct config_setting config_settings[] =
 		"arms too with viewmodel_shield; a hit on it plays what the projectile\n"
 		"plays on an Elite's shield. Only what is drawn and heard changes.\n"
 		"In a network game, the host's network.shield_effects decides, unless\n"
-		"it is \"players\" (each player's own)." },
+		"it is \"players\" (each player's own) or the game is co-op." },
 	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
 		"Energy shields light what is around them as they flare, as plasma\n"
 		"does, in the shield's own color. In a network game, the host's\n"
 		"network.shield_effects decides, unless it is \"players\" (each\n"
-		"player's own)." },
+		"player's own) or the game is co-op." },
 	{ "display.shield_glow_intensity", _config_string, "\"default\"", "HALO_SHIELD_GLOW_INTENSITY", _environment_value, _platform_all,
 		"How far the shield glow reaches: \"default\" or \"light_show\" (three\n"
 		"times as far, and at full strength from a third of the flare).\n"
 		"In a network game, the host's network.shield_effects decides, unless\n"
-		"it is \"players\" (each player's own)." },
+		"it is \"players\" (each player's own) or the game is co-op." },
 	{ "display.shield_color", _config_string, "\"default\"", "HALO_SHIELD_COLOR", _environment_value, _platform_all,
 		"Your energy shield's color, as this machine draws it: \"default\" (the\n"
 		"shield's own) or a multiplayer armor color: white, black, red, blue,\n"
@@ -575,8 +643,25 @@ static const struct config_setting config_settings[] =
 		"game); a dedicated server's follows this setting, listed or not." },
 	{ "network.votekick", _config_boolean, "true", "HALO_NET_VOTEKICK", _environment_value, _platform_all,
 		"Hosting: let the players vote to kick a player (the scoreboard's\n"
-		"right-click, or the console's votekick). More than half of the players\n"
-		"must vote, counted once per address." },
+		"right-click, or the console's votekick; F1 or the D-pad's left votes\n"
+		"yes, F2 or its right no). The yes votes needed are\n"
+		"network.votekick_threshold's, counted once per address, and more yes\n"
+		"than no." },
+	{ "network.votekick_threshold", _config_string, "\"dynamic\"", "HALO_NET_VOTEKICK_THRESHOLD", _environment_value,
+		_platform_all,
+		"Hosting: the yes votes a vote (to kick, to end the game) needs, of the\n"
+		"players who may vote: \"dynamic\", scaled with the players (more than\n"
+		"half up to 8, 40% up to 32, 30% beyond); \"static\",\n"
+		"network.votekick_percent of them. At least 2 either way." },
+	{ "network.votekick_percent", _config_integer, "50", "HALO_NET_VOTEKICK_PERCENT", _environment_value,
+		_platform_all,
+		"Hosting: with network.votekick_threshold \"static\", the percentage of\n"
+		"the players who may vote whose yes passes a vote (1 to 100, rounded\n"
+		"up; a kick's never more than those who can vote)." },
+	{ "network.vote_end_game", _config_boolean, "true", "HALO_NET_VOTE_END_GAME", _environment_value, _platform_all,
+		"Hosting: let the players vote to end the game (\"!endgame\" in the chat;\n"
+		"F1 votes yes, F2 no), counted as a vote to kick. The game ends with its\n"
+		"scores, as sv_end_game ends it." },
 	{ "network.votekick_minutes", _config_integer, "5", "HALO_NET_VOTEKICK_MINUTES", _environment_value,
 		_platform_all,
 		"Hosting: the minutes a player must have played on this server to start\n"
@@ -612,6 +697,14 @@ static const struct config_setting config_settings[] =
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"
 		"co-op, which writes its choice here." },
+	{ "network.coop_team_wipe", _config_string, "\"auto\"", "HALO_NET_COOP_TEAM_WIPE", _environment_value,
+		_platform_all,
+		"When every co-op player dies: \"auto\" reverts the checkpoint in a\n"
+		"PRIVATE game and only respawns in a PUBLIC game; \"revert\" or\n"
+		"\"respawn\" overrides that choice. A password does not make a PUBLIC\n"
+		"game private. Reverting requires a saved checkpoint with the current\n"
+		"players and machines; otherwise they respawn without a world reset.\n"
+		"TEAM WIPE in Server Setup > Co-op Options writes its choice here." },
 	{ "network.coop_friendly_fire", _config_string, "\"on\"", "HALO_NET_COOP_FRIENDLY_FIRE", _environment_value,
 		_platform_all,
 		"Whether the players of an online co-op game hurt each other: \"off\",\n"
@@ -690,6 +783,11 @@ static const struct config_setting config_settings[] =
 		"servers, beside this file unless a full path: an https:// URL and its\n"
 		"key (ed25519:<hex>) on each line, up to 4. None named (no file, or\n"
 		"comments alone): the official master, built in." },
+	{ "network.link_share", _config_string, "\"when_needed\"", "HALO_NET_LINK_SHARE", _environment_value,
+		_platform_all,
+		"When the game shows a server the Discord account linked to it\n"
+		"(Settings > Network Setup > Discord Account): \"when_needed\" (a server\n"
+		"that asks, to let you in from a VPN), \"always\" or \"never\"." },
 	{ "network.browser_source", _config_string, "\"all\"", "HALO_NET_BROWSER_SOURCE", _environment_value,
 		_platform_all,
 		"The server browser's games: \"all\" (ALL GAMES: the dedicated\n"
@@ -837,11 +935,23 @@ static const struct config_setting config_settings[] =
 		_platform_server,
 		"A file the status (as /api/status) is written to every 2 seconds, for a\n"
 		"panel without HTTP; empty for none." },
-	{ "server.auto_update", _config_string, "\"off\"", "HALO_SERVER_AUTO_UPDATE", _environment_value,
+	{ "server.auto_update", _config_string, "\"install\"", "HALO_SERVER_AUTO_UPDATE", _environment_value,
 		_platform_server,
-		"\"off\"; \"check\" logs a newer release; \"install\" installs it once the\n"
-		"server has been empty for 10 minutes, and stops (exit code 5) to be\n"
-		"started again." },
+		"\"install\" installs a newer release at once, on a thread of its own,\n"
+		"and stops (exit code 5) to be started again: once the server has been\n"
+		"empty for 10 minutes, or, for a new network version, once the game\n"
+		"being played is over (server.update_game_minutes at most). \"check\"\n"
+		"logs a newer release; \"off\" looks for none. A server whose files it\n"
+		"may not write (a container's image) is \"check\"." },
+	{ "server.update_check_minutes", _config_integer, "30", "HALO_SERVER_UPDATE_CHECK_MINUTES", _environment_value,
+		_platform_server,
+		"Minutes between looks for a newer release, with server.auto_update\n"
+		"(5 to 1440; a tenth either way at random)." },
+	{ "server.update_game_minutes", _config_integer, "30", "HALO_SERVER_UPDATE_GAME_MINUTES", _environment_value,
+		_platform_server,
+		"A new network version installed: the minutes a game may go on before\n"
+		"it is ended (its scores and postgame shown) and the server restarts\n"
+		"(0: it waits for the game's end)." },
 	{ "server.upnp", _config_boolean, "false", "HALO_SERVER_UPNP", _environment_value, _platform_server,
 		"Ask the router (UPnP) to forward the tunnel's port (network.allow_upnp,\n"
 		"for a server at home)." },
@@ -895,6 +1005,68 @@ static const struct config_setting config_settings[] =
 		_environment_value, _platform_server,
 		"Let the master servers give this server's address to players; false:\n"
 		"only their reachability probe uses it." },
+	{ "server.vpn_policy", _config_string, "\"link\"", "HALO_SERVER_VPN_POLICY", _environment_value, _platform_server,
+		"Machines joining from the address of a VPN, a Tor exit or a datacenter\n"
+		"(the master servers' netlist): \"link\", refused unless the player shows\n"
+		"a Discord account linked at a master server this server publishes to;\n"
+		"\"block\", refused; \"off\", let in." },
+	{ "server.vpn_fail", _config_string, "\"open\"", "HALO_SERVER_VPN_FAIL", _environment_value, _platform_server,
+		"Until a netlist is held: \"open\" lets every machine in, \"closed\"\n"
+		"refuses those from the internet as server.vpn_policy \"block\" would." },
+	{ "server.vpn_list", _config_string, "\"\"", "HALO_SERVER_VPN_LIST", _environment_value, _platform_server,
+		"A netlist file checked besides the master servers' (beside this file\n"
+		"unless a full path): for a server that publishes nowhere, or a test.\n"
+		"Read at the start and by sv_reload." },
+	{ "server.vpn_check_lan", _config_boolean, "false", "HALO_SERVER_VPN_CHECK_LAN", _environment_value,
+		_platform_server,
+		"Check the LAN's machines' addresses against the netlist too (tests)." },
+	{ "server.link_min_age_days", _config_integer, "365", "HALO_SERVER_LINK_MIN_AGE_DAYS", _environment_value,
+		_platform_server,
+		"A machine joining over a VPN with a linked Discord account is refused\n"
+		"when the account is younger than this many days (0: any age)." },
+	{ "server.link_one_seat", _config_boolean, "true", "HALO_SERVER_LINK_ONE_SEAT", _environment_value,
+		_platform_server,
+		"Refuse a second machine of a linked Discord account already in the game." },
+	{ "server.max_machines_per_address", _config_integer, "0", "HALO_SERVER_MAX_MACHINES_PER_ADDRESS",
+		_environment_value, _platform_server,
+		"The most machines that play from one address (an internet play peer's\n"
+		"real one); one more is refused (0: no limit). Households, LAN cafes\n"
+		"and mobile carriers share one address among many players." },
+	{ "server.afk_kick_minutes", _config_integer, "5", "HALO_SERVER_AFK_KICK_MINUTES", _environment_value,
+		_platform_server,
+		"Minutes a player may stand idle in a game (no move, look or button)\n"
+		"before the server kicks them, told a minute before (0: never). The\n"
+		"lobby, the postgame, cutscenes and waiting to respawn do not count." },
+	{ "server.afk_kick_when_full", _config_boolean, "false", "HALO_SERVER_AFK_KICK_WHEN_FULL", _environment_value,
+		_platform_server,
+		"Kick idle players only when the server is full, after\n"
+		"server.afk_kick_full_minutes (server.afk_kick_minutes is not used)." },
+	{ "server.afk_kick_full_minutes", _config_integer, "3", "HALO_SERVER_AFK_KICK_FULL_MINUTES", _environment_value,
+		_platform_server,
+		"With server.afk_kick_when_full, the minutes a player may stand idle while\n"
+		"the server is full (told a minute before)." },
+	{ "server.coop_bsp_switch", _config_string, "\"majority\"", "HALO_SERVER_COOP_BSP_SWITCH", _environment_value,
+		_platform_server,
+		"A co-op game's loading zones: \"majority\", a zone switches the level's\n"
+		"part only once more than half of the living players who are not idle\n"
+		"stand in zones to the same part (the others are told how many more it\n"
+		"needs); \"anyone\", any player's crossing brings everyone. The\n"
+		"mission's own switches are never held." },
+	{ "server.coop_bsp_switch_cooldown_seconds", _config_integer, "15", "HALO_SERVER_COOP_BSP_SWITCH_COOLDOWN_SECONDS",
+		_environment_value, _platform_server,
+		"Seconds after a co-op loading zone switched the level's part before\n"
+		"another may (0 to 300)." },
+	{ "server.map_vote", _config_boolean, "false", "HALO_SERVER_MAP_VOTE", _environment_value, _platform_server,
+		"As the lobby opens after a game, the players vote for the next among\n"
+		"server.map_vote_choices entries of the rotation picked at random (not\n"
+		"the one just played); the rotation goes on after the winner." },
+	{ "server.map_vote_choices", _config_integer, "4", "HALO_SERVER_MAP_VOTE_CHOICES", _environment_value,
+		_platform_server,
+		"The entries a map vote offers (2 to 8)." },
+	{ "server.map_vote_seconds", _config_integer, "20", "HALO_SERVER_MAP_VOTE_SECONDS", _environment_value,
+		_platform_server,
+		"How long a map vote runs (5 to 120 seconds); it ends sooner once every\n"
+		"player has voted." },
 	{ "streamer.enabled", _config_boolean, "false", "HALO_STREAMER_MODE", _environment_value, _platform_all,
 		"Hide offensive words in names and text from other players, maps and mods\n"
 		"as stars, at the levels below (Settings > Network Setup > Streamer Mode)." },
@@ -1004,6 +1176,17 @@ static const struct config_setting config_settings[] =
 		"up and down; \"menu:<buttons>\" presses menu buttons one a second (a,\n"
 		"b, x, y, up, down, left, right, start, back or wait, separated by\n"
 		"spaces or commas), for testing the menus; empty for none." },
+	{ "debug.virtual_gamepads", _config_integer, "0", "HALO_VIRTUAL_GAMEPADS", _environment_value, _platform_desktop,
+		"Attach this many SDL virtual gamepads (0 to 4), which the game takes for\n"
+		"gamepads plugged in, for testing split screen; debug.virtual_gamepad_script\n"
+		"drives them." },
+	{ "debug.virtual_gamepad_script", _config_string, "\"\"", "HALO_VIRTUAL_GAMEPAD_SCRIPT", _environment_value,
+		_platform_desktop,
+		"What debug.virtual_gamepads press: \"<seconds> <pad> <what>; ...\", the\n"
+		"seconds from when the network lobby first opens, the pad 1 to 4 (0: the\n"
+		"keyboard, a SPACE and start Enter), and a button (a, b, x, y, start, back,\n"
+		"up, down, left, right, lb, rb, lt, rt: pressed for 150 ms),\n"
+		"\"walk\" (the sticks move from then on) or \"still\"." },
 	{ "debug.bot_trace", _config_integer, "0", "HALO_BOT_TRACE", _environment_value, _platform_all,
 		"Log each bot's state (bots.count) every this many seconds: where it is\n"
 		"and goes, its path, target and weapon; 0 never." },
@@ -1839,7 +2022,12 @@ static const struct
 	{ "display.mode", { "", "fullscreen", "borderless", "windowed", NULL }, "display.fullscreen's" },
 	{ "display.resolution_scaling", { "native", "75%", "50%", "25%", "original", NULL }, NULL },
 	{ "display.anti_aliasing", { "off", "fxaa", "smaa", "ssaa2x", "msaa2x", "msaa4x", "msaa8x", NULL }, NULL },
-	{ "display.hud_button_style", { "classic", "gems", "menu_gems", NULL }, NULL },
+	{ "display.hud_button_style", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern",
+		"ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
+	{ "display.hud_button_style_xbox", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern", NULL }, NULL },
+	{ "display.hud_bumper_style", { "original", "modern", NULL }, NULL },
+	{ "display.hud_button_style_ps", { "ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", NULL }, NULL },
+	{ "display.hud_button_style_switch", { "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
 	{ "display.menus", { "pc", "xbox", NULL }, NULL },
 	{ "display.player_names", { "all", "allies", "enemies", "none", NULL }, NULL },
 	{ "display.scoreboard_team_layout", { "teams", "score", NULL }, NULL },
@@ -1857,8 +2045,14 @@ static const struct
 	{ "server.chat_filter_slurs", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "server.chat_filter_swearing", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "server.chat_filter_insults", { "off", "severe", "strong", "mild", NULL }, NULL },
+	{ "server.vpn_policy", { "link", "block", "off", NULL }, NULL },
+	{ "server.vpn_fail", { "open", "closed", NULL }, NULL },
+	{ "network.votekick_threshold", { "dynamic", "static", NULL }, NULL },
+	{ "server.coop_bsp_switch", { "majority", "anyone", NULL }, NULL },
+	{ "network.link_share", { "when_needed", "always", "never", NULL }, NULL },
 	{ "network.voice_mode", { "off", "team_proximity", "team_enemy_proximity", "team_global",
 		"team_global_enemy_proximity", NULL }, NULL },
+	{ "network.coop_team_wipe", { "auto", "revert", "respawn", NULL }, NULL },
 	{ "network.coop_friendly_fire", { "off", "on", "shields_only", "explosives_only", NULL }, NULL },
 	{ "network.shield_effects", { "stock", "glow", "light_show", "overshield", "glow_overshield",
 		"light_show_overshield", "players", NULL }, NULL },

@@ -744,6 +744,24 @@ static void master_start(int quiet)
 		atexit(server_master_stop);
 }
 
+int server_master_publishing_masters(char (*urls)[256], unsigned char (*keys)[SERVER_MASTER_PUBLIC_KEY_SIZE],
+	int maximum)
+{
+	int index, count = 0;
+
+	/* (read once at the start: not written after) */
+	if (!halo_server_mode() || !config_boolean("server.master_publish") || !master.has_key)
+		return 0;
+	for (index = 0; index < master.master_count && count < maximum; index++)
+	{
+		if (urls)
+			snprintf(urls[count], 256, "%s", master.masters[index].url);
+		memcpy(keys[count], master.masters[index].key, SERVER_MASTER_PUBLIC_KEY_SIZE);
+		count++;
+	}
+	return count;
+}
+
 void server_master_set_state(const char *members, int changed)
 {
 	if (!master.started)
@@ -950,6 +968,15 @@ void server_master_identity(char *instance, int instance_size, char *key_id, int
 void server_master_status(struct server_json *json)
 {
 	(void)json;
+}
+
+int server_master_publishing_masters(char (*urls)[256], unsigned char (*keys)[SERVER_MASTER_PUBLIC_KEY_SIZE],
+	int maximum)
+{
+	(void)urls;
+	(void)keys;
+	(void)maximum;
+	return 0;
 }
 
 #endif

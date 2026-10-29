@@ -597,6 +597,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "units/units.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
+#include "touch_postgame.h" /* port: port/linux/game/touch_postgame.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1930,11 +1931,12 @@ static void scoreboard_menu_items(
 		labels[item][0] = 0;
 	}
 	offered[_scoreboard_item_vote] = TRUE;
-	if (network_votekick_get_status(&status) &&
+	if (network_votekick_get_status(&status) && status.kind == _network_vote_kick &&
 		status.player_index == DATUM_INDEX_TO_ABSOLUTE_INDEX(scoreboard_menu.player_index))
 	{
 		usprintf(labels[_scoreboard_item_vote], status.voted ? L"Voted to kick (%d of %d)" :
-			L"Vote to kick (%d of %d)", status.votes, status.needed);
+			status.voted_no ? L"Voted not to kick (%d of %d)" : L"Vote to kick (%d of %d)", status.votes,
+			status.needed);
 	}
 	else
 	{
@@ -2480,10 +2482,12 @@ static void game_engine_rasterize_scoreboard(
 		struct data_iterator iterator;
 		struct player_datum *target;
 		wchar_t const *name = L"?";
-		wchar_t const *note = vote.voted ? L" (you voted)" : vote.may_vote ? L"" : L" (too new to vote)";
+		wchar_t const *note = vote.voted ? L" (you voted yes)" : vote.voted_no ? L" (you voted no)" :
+			vote.may_vote ? L"  F1 yes, F2 no" : L" (too new to vote)";
 
 		data_iterator_new(&iterator, player_data);
-		while ((target = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		while (vote.kind == _network_vote_kick &&
+			(target = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 		{
 			if (DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index) == vote.player_index)
 			{
@@ -2496,8 +2500,16 @@ static void game_engine_rasterize_scoreboard(
 		color.red = 1.0f;
 		color.green = 0.75f;
 		color.blue = 0.3f;
-		usprintf(row_string, L"Vote to kick %s: %d of %d, %d s left%s", name, vote.votes, vote.needed,
-			vote.seconds_left, note);
+		if (vote.kind == _network_vote_end_game)
+		{
+			usprintf(row_string, L"Vote to end the game: %d yes, %d no, %d needed, %d s left%s", vote.votes,
+				vote.no_votes, vote.needed, vote.seconds_left, note);
+		}
+		else
+		{
+			usprintf(row_string, L"Vote to kick %s: %d yes, %d no, %d needed, %d s left%s", name, vote.votes,
+				vote.no_votes, vote.needed, vote.seconds_left, note);
+		}
 		scoreboard_draw_row(row_string, FALSE, &color, next_row++, top, left, FALSE);
 	}
 	if (network && pointer_state >= 0)
@@ -2966,6 +2978,10 @@ void game_engine_post_rasterize_post_game(
 		draw_string_set_color(&prompt_color);
 
 		server = global_network_game_server_get();
+		/* port: on the touchscreen, buttons for the prompt's A and B
+		(port/linux/game/touch_postgame.c) */
+		if (touch_postgame_draw(font_index, server != NULL, &prompt_color))
+			return;
 		if (server)
 		{
 			bounds.x0 = 380;
@@ -5336,13 +5352,17 @@ void game_engine_update_non_deterministic(
 			if (game_engine_globals.postgame_progress > 1.0f)
 				game_engine_globals.postgame_progress = 1.0f;
 
-			if (test_any_gamepad_button(0) || test_any_gamepad_button(12))
+			/* port: or the touchscreen's buttons for A and B
+			(port/linux/game/touch_postgame.c) */
+			if (test_any_gamepad_button(0) || test_any_gamepad_button(12) ||
+				touch_postgame_pressed(_gamepad_analog_button_a))
 			{
 				if (global_network_game_server_get())
 				network_game_server_reset_to_pregame(
 					global_network_game_server_get());
 			}
-			else if (test_any_gamepad_button(1) || test_any_gamepad_button(13))
+			else if (test_any_gamepad_button(1) || test_any_gamepad_button(13) ||
+				touch_postgame_pressed(_gamepad_analog_button_b))
 			{
 				network_game_abort();
 			}

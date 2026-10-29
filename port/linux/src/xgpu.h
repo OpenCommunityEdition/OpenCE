@@ -13,6 +13,16 @@ device itself (d3d8_gl.c).
 #include "platform.h"
 #include "gl.h"
 
+/* display.reversed_depth (desktop GL, taken up as the context is made): the
+depth buffers hold 32-bit floats, 1.0 at the near plane and 0.0 at the far
+(d3d8_gl.c turns the game's Direct3D depth around: its tests, clears, depth
+range and polygon offsets; nv2a_vsh.c and nv2a_psh.c the depth they give).
+A float's precision follows its size, so reversed it is about the same at
+every distance, where 24 bits and Direct3D's depth spend most of theirs near
+the camera: surfaces a few millimetres apart, which 24 bits run together
+past a few tens of metres (Blood Gulch's lights on the base), stay apart. */
+extern BOOL xgpu_reversed_depth;
+
 #ifdef HALO_GLES
 /* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
 struct xgpu_capabilities
@@ -292,6 +302,7 @@ enum
 	_xgpu_tone_mapping_neutral,
 	_xgpu_tone_mapping_aces,
 	_xgpu_tone_mapping_reinhard,
+	_xgpu_tone_mapping_gt7,
 	NUMBER_OF_XGPU_TONE_MAPPINGS
 };
 
@@ -303,6 +314,8 @@ struct xgpu_tone_mapping
 	/* the brightest value the curve gives, in the display's whites: 1.0 for
 	SDR, an HDR display's headroom */
 	float peak;
+	/* with an HDR display, paper white in GT7's units (100 nits); 0 for SDR */
+	float paper;
 };
 
 /* the tone mapping and presentation programs made now; FALSE if they
@@ -321,5 +334,25 @@ y, width, height (the window's, row 0 at the bottom), turned the right way
 up: as it is (SDR), or, with scale more than 0, made linear and scaled by
 it (an HDR display's scRGB framebuffer: scale is its SDR white) */
 BOOL xgpu_post_present(GLuint texture, int x, int y, int width, int height, float scale);
+
+/* Android: a vertex (indices 0) or index (1) buffer resource whose size
+bytes the game wrote once and will not write again, drawn from a GL buffer
+of its own; and the end of one, when the game releases it (d3d8_gl.c) */
+void xgpu_static_buffer_add(const void *resource, unsigned long size, int indices);
+void xgpu_static_buffer_remove(const void *resource, int indices);
+/* Android: an Xbox map's count vertex (indices 0) or index (1) buffers,
+stride bytes apart, whose data lie from the first of them to end and are
+not written while they are registered; and their end (d3d8_gl.c) */
+void xgpu_static_buffers_add(const void *buffers, long count, unsigned long stride, int indices, const void *end);
+void xgpu_static_buffers_remove(const void *buffers, long count, unsigned long stride, int indices);
+/* Android: size bytes of vertices or indices from start, as above */
+void xgpu_static_range_add(const void *start, unsigned long size, int indices);
+void xgpu_static_range_remove(const void *start, int indices);
+/* fills the corners x0, y0 to x1, y1 of the window (row 0 at the bottom)
+with color, as it is (an HDR display's scRGB framebuffer: linear, 1.0 at 80
+nits), or only the ring ring[0], ring[1] (its centre in the window), from
+radius ring[3] to ring[2]; ring[2] 0 for the whole rectangle. FALSE if its
+program does not build. */
+BOOL xgpu_post_fill(const GLint corners[4], const float color[3], const float ring[4]);
 
 #endif
