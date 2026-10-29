@@ -6133,8 +6133,12 @@ enum
 	_option_option_byte,	/* a byte of the options */
 	_option_radar,		/* the options' radar players, and the variant's flag */
 	_option_setting,	/* the host's own (config.toml): Server Setup's copy only */
-	_option_byte_value	/* a byte of the variant, its number (not on or off) */
+	_option_byte_value,	/* a byte of the variant, its number (not on or off) */
+	_option_mode		/* the options' mode, and its take (mode_variant) above its byte */
 };
+
+/* OPENCE OPTIONS' MODE's value of a mode and its take on it (_option_mode) */
+#define GAMETYPE_MODE_VALUE(mode, mode_variant) ((mode) | (mode_variant) << 8)
 
 struct gametype_option
 {
@@ -6156,8 +6160,9 @@ struct gametype_option
 static struct gametype_option const gametype_options[] =
 {
 	/* OPENCE OPTIONS (OpenCE's gametypes: game_modes.c) */
-	{ "oce_mode_spinner", _option_option_byte, OPTIONS_FIELD(mode), 0, 4,
-		{ _game_mode_none, _game_mode_swat, _game_mode_infection, _game_mode_gun_game } },
+	{ "oce_mode_spinner", _option_mode, 0, 0, 5,
+		{ _game_mode_none, _game_mode_swat, _game_mode_infection, _game_mode_gun_game,
+			GAMETYPE_MODE_VALUE(_game_mode_infection, _game_mode_variant_floodfection) } },
 	{ "oce_hardcore_spinner", _option_option_byte, OPTIONS_FIELD(hardcore), 0, 2, { FALSE, TRUE } },
 	{ "inf_zombies_spinner", _option_option_byte, OPTIONS_FIELD(infection_initial_zombies), 0, 6, { 1, 2, 3, 4, 8, 16 } },
 	{ "inf_speed_spinner", _option_option_byte, OPTIONS_FIELD(infection_zombie_speed), 0, 6,
@@ -6369,6 +6374,7 @@ static long gametype_option_value(struct gametype_option const *option, struct g
 	case _option_option_byte: return o[option->offset];
 	case _option_byte_value: return v[option->offset];
 	case _option_radar: return options->radar_players;
+	case _option_mode: return GAMETYPE_MODE_VALUE(options->mode, options->mode_variant);
 	}
 	return 0;
 }
@@ -6400,6 +6406,10 @@ static void gametype_option_value_set(struct gametype_option const *option, long
 			variant->universal_variant.flags &= ~FLAG(_game_variant_draw_object_in_motion_sensor_bit);
 		else
 			variant->universal_variant.flags |= FLAG(_game_variant_draw_object_in_motion_sensor_bit);
+		break;
+	case _option_mode:
+		options->mode = (byte)(value & 0xFF);
+		options->mode_variant = (byte)(value >> 8);
 		break;
 	}
 }
@@ -6875,10 +6885,12 @@ static void gametype_option_help(struct widget_instance *list)
 		visible_set(named(list, "op_secondary_weapon", 0), custom);
 	}
 	/* (OPENCE OPTIONS: the mode's own rows, Infection's or Gun Game's, below
-	MODE and HARDCORE) */
+	MODE and HARDCORE; Floodfection's Infection's) */
 	if (named(list, "oce_mode_spinner", 0))
 	{
-		short mode = named(list, "oce_mode_spinner", 0)->parameters.list.selected_index;
+		struct gametype_option const *option = gametype_option_named("oce_mode_spinner");
+		short mode = (short)(option->values[PIN(named(list, "oce_mode_spinner", 0)->parameters.list.selected_index, 0,
+			option->count - 1)] & 0xFF);
 		short place = 73 + 2 * 30;
 
 		for (row = list->child; row; row = row->next)

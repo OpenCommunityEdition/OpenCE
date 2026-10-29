@@ -655,7 +655,7 @@ a rotation that long is saved whole and read back after a restart.
   names `ffa`, `ffa_slayer`, `teamslayer`, `tslayer`, `koth`, `team_koth`,
   `iron_ctf`, `teamrace`, `teamoddball`), an OpenCE gametype's (`swat`,
   `infection`, `gun_game`, `hardcore`, `hardcore_ctf`, `hardcore_oddball`,
-  `hardcore_king`), a gametype file's name (`gametypes/<name>.toml`), or
+  `hardcore_king`, `floodfection`), a gametype file's name (`gametypes/<name>.toml`), or
   `file=<name>` (a gametype a player's game saved, below). A gametype's
   name is letters, digits, `_`, `-` and `.`, in any case.
 - A rule is a gametype rule's name or its short name (`score`, `time`,

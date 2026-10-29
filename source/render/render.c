@@ -90,6 +90,7 @@ symbols in this file:
 /* port: static transparent part links for the newly loaded model tags. */
 #include "models/models.h"
 #include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
+#include "infection.h" /* port: port/linux/game/infection.c */
 
 /* ---------- constants */
 
@@ -472,6 +473,10 @@ static void render_player_frame(
 		&camera->position,
 		&render.fog);
 	structure_get_planar_fog((short)render.cluster_index, &render.fog);
+	/* port: Floodfection's fog over every map, which hides the sky
+	(port/linux/game/infection.c), closer in a cluster with none */
+	if (infection_fog(window->local_player_index, render.visible_sky_index == NONE, &render.fog))
+		render.visible_sky_model = FALSE;
 
 	if (render.fog.atmospheric_maximum_distance != 0.0f &&
 		render.visible_sky_index == NONE &&

@@ -143,6 +143,8 @@ symbols in this file:
 #include "units/units.h"
 /* port: port/linux/game/overshield_effect.c */
 boolean overshield_effect_active(long object_index);
+/* port: port/linux/game/infection.c */
+boolean infection_floodfection_zombie(long object_index);
 boolean overshield_effect_hit_effect_allowed(long effect_index);
 
 /* ---------- constants */
@@ -1631,6 +1633,22 @@ static void projectile_collision(
 
 		if (overshield_effect_hit_effect_allowed(elite_response->default_effect.index))
 			effect_definition_index = elite_response->default_effect.index;
+	}
+
+	/* port: a hit on a Floodfection zombie plays what the projectile plays
+	on a Flood combat form (its green blood), when the map has it; how the
+	projectile responds stays the hit's own (port/linux/game/infection.c) */
+	if (collision->type == _collision_result_object &&
+		VALID_INDEX(_material_flood_combat_form, definition->projectile.material_responses.count) &&
+		infection_floodfection_zombie(collision->object_index))
+	{
+		struct projectile_material_response_definition const *flood_response = TAG_BLOCK_GET_ELEMENT(
+			&definition->projectile.material_responses,
+			_material_flood_combat_form,
+			struct projectile_material_response_definition);
+
+		if (flood_response->default_effect.index != NONE)
+			effect_definition_index = flood_response->default_effect.index;
 	}
 
 	if (collision->type == _collision_result_structure &&

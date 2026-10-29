@@ -4,7 +4,7 @@
 /* OpenCE's gametypes (port/linux/game/game_modes.c, infection.c, gun_game.c):
 a gametype's options kept in range, the modes each game engine and teams
 allow, Infection's round result and the state a client takes, and Gun Game's
-list of weapons. */
+list of weapons, and the takes on a mode (Floodfection). */
 typedef unsigned short word;
 #define VALID_INDEX(index, count) ((index) >= 0 && (index) < (count))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -210,6 +210,30 @@ int main(int argc,char **argv)
   gun_game_levels_build();
   CHECK(draws==0&&gun_game.level_count==8,"a client draws nothing, its list as long");
   client=FALSE;
+ } else CASE("mode_variant") {
+  struct game_variant variant;
+  memset(&variant,0,sizeof(variant));
+  game_modes_options_default(&options);
+  CHECK(options.mode_variant==_game_mode_variant_none,"none by default");
+  options.mode=_game_mode_infection;options.mode_variant=_game_mode_variant_floodfection;
+  game_modes_options_sanitize(&options);
+  CHECK(options.mode_variant==_game_mode_variant_floodfection,"Floodfection of Infection kept");
+  options.mode=_game_mode_gun_game;
+  game_modes_options_sanitize(&options);
+  CHECK(options.mode_variant==_game_mode_variant_none,"no Floodfection of Gun Game");
+  options.mode=_game_mode_infection;options.mode_variant=0x7F;
+  game_modes_options_sanitize(&options);
+  CHECK(options.mode_variant==_game_mode_variant_none,"an unknown take is none");
+  variant.game_engine_index=game_engine_slayer;variant.universal_variant.teams=TRUE;
+  options.mode=_game_mode_infection;options.mode_variant=_game_mode_variant_floodfection;
+  CHECK(game_modes_variant_mode_variant(&variant,&options)==_game_mode_variant_floodfection,"Floodfection on teams");
+  CHECK(!wcscmp(game_modes_variant_kind_name(&variant,&options),L"FLOODFECTION"),"named FLOODFECTION");
+  variant.universal_variant.teams=FALSE;
+  CHECK(game_modes_variant_mode_variant(&variant,&options)==_game_mode_variant_none,"none without teams");
+  variant.universal_variant.teams=TRUE;options.mode=_game_mode_gun_game;
+  CHECK(game_modes_variant_mode_variant(&variant,&options)==_game_mode_variant_none,"no Floodfection of Gun Game");
+  variant.game_engine_index=game_engine_ctf;options.mode=_game_mode_infection;
+  CHECK(game_modes_variant_mode_variant(&variant,&options)==_game_mode_variant_none,"Slayer's only");
  } else CASE("kind") {
   struct game_variant variant;
   memset(&variant,0,sizeof(variant));memset(&options,0,sizeof(options));

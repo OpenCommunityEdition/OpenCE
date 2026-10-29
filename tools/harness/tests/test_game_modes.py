@@ -17,6 +17,7 @@ def generated(fault=None):
         enum_with(engine, 'game_engine_none = 0'), enum_with(engine, '_loadout_weapon_none = 0'),
         enum_with(engine, '_variant_vehicle_warthog = 0'), enum_with(engine, '_game_mode_none = 0'),
         enum_with(engine, '_gun_game_order_strongest_first = 0'),
+        enum_with(engine, '_game_mode_variant_none = 0'),
         enum_with(network, '_distributed_infection_waiting = 0'),
         enum_with(network, '_distributed_infection_role_none = 0')]) + '\n'
     structures = '\n'.join([
@@ -32,8 +33,10 @@ def generated(fault=None):
     code = '\n'.join([
         defaults, function(modes, 'game_modes_option'), function(modes, 'game_modes_options_default'),
         function(modes, 'game_modes_options_sanitize'), function(modes, 'game_modes_player_killed'),
-        function(modes, 'game_modes_variant_mode'), '#define GAME_MODES_KIND_HARDCORE 0x80',
+        function(modes, 'game_modes_variant_mode'), function(modes, 'game_modes_variant_mode_variant'),
+        '#define GAME_MODES_KIND_HARDCORE 0x80',
         function(modes, 'game_modes_kind'), function(modes, 'game_modes_kind_name'),
+        function(modes, 'game_modes_variant_kind_name'),
         function(infection, 'infection_round_result'),
         function(infection, 'infection_state_valid'), order,
         '#define GUN_GAME_MAXIMUM_LEVELS NUMBEROF(gun_game_strongest_first)',
@@ -45,7 +48,7 @@ def generated(fault=None):
 
 CASES = ['options_default', 'hardcore_restore', 'hardcore_no_restore', 'sanitize_defaults', 'sanitize_range',
          'sanitize_keeps', 'variant_mode', 'round_result', 'state_valid', 'gun_game_order', 'gun_game_missing',
-         'gun_game_random', 'kind', 'kind_untrusted']
+         'gun_game_random', 'mode_variant', 'kind', 'kind_untrusted']
 
 
 @pytest.mark.parametrize('case', CASES)
@@ -55,7 +58,8 @@ def test_case(case):
 
 
 @pytest.mark.parametrize('fault,case', [
-    (('!= FALSE;\n\tcsmemset(options->reserved, 0,', '!= FALSE;\n\tcsmemset(options->reserved, 1,'), 'sanitize_range'),
+    (('\t\toptions->mode_variant = _game_mode_variant_none;\n\tcsmemset(options->reserved, 0,',
+      '\t\toptions->mode_variant = _game_mode_variant_none;\n\tcsmemset(options->reserved, 1,'), 'sanitize_range'),
     (('unit->object.shield_vitality < 1.0f', 'TRUE'), 'hardcore_restore'),
     (('friendly_fire ||\n', ''), 'hardcore_no_restore'),
     (('return variant->universal_variant.teams ? _game_mode_infection', 'return 1 ? _game_mode_infection'),
@@ -65,6 +69,10 @@ def test_case(case):
     (('player->reserved[0] || player->reserved[1] || player->reserved[2]', 'player->reserved[0]'), 'state_valid'),
     (('if (game_engine_loadout_weapon_definition(weapon) != NONE)', 'if (TRUE)'), 'gun_game_missing'),
     (('&& !network_game_distributed_client()', ''), 'gun_game_random'),
+    (('if (!(options->mode == _game_mode_infection && options->mode_variant',
+      'if (!(options->mode_variant'), 'mode_variant'),
+    (('options->mode_variant == _game_mode_variant_floodfection)\n\t{\n\t\treturn _game_mode_variant_floodfection',
+      '1)\n\t{\n\t\treturn _game_mode_variant_floodfection'), 'mode_variant'),
     (('game_engine_index == game_engine_slayer && mode > _game_mode_none', 'mode > _game_mode_none'),
      'kind_untrusted'),
     (('if (!hardcore || game_engine_index', 'if (game_engine_index'), 'kind_untrusted'),

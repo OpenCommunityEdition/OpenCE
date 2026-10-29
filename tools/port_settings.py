@@ -744,11 +744,12 @@ SHIELD_EFFECTS_HELP = [
 PLAYLIST_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit"
 OPENCE_EDIT = "main_menu/settings_select/multiplayer_setup/opence_options_edit"
 OPENCE_ROWS = [
-    ("oce_mode", "MODE:", ["NONE", "SWAT", "INFECTION", "GUN GAME"], [
+    ("oce_mode", "MODE:", ["NONE", "SWAT", "INFECTION", "GUN GAME", "FLOODFECTION"], [
         "The game type's own rules.",
         "No shields, and a shot to the head kills. Slayer only.",
         "Humans killed join the zombies, who win when\\nno human is left. Team Slayer only.",
-        "Each kill gives the next weapon; a kill with the\\nlast wins. Free for all Slayer only."]),
+        "Each kill gives the next weapon; a kill with the\\nlast wins. Free for all Slayer only.",
+        "Infection whose zombies are the Flood, every\\nmap under its fog. Team Slayer only."]),
     ("oce_hardcore", "HARDCORE:", ["OFF", "ON"], [
         "The motion sensor and aim assist as the game\\ntype has them.",
         "No motion sensor, no aim assist, and a kill\\nrestores the killer's health and shields."]),

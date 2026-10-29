@@ -172,6 +172,7 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "units/bipeds.h"
 #include "units/units.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
 #undef real_local_random
 
 /* ---------- constants */
@@ -1593,6 +1594,16 @@ static void effect_generate_part(
 	real_vector3d direction;
 	real_vector3d velocity;
 
+	/* port: Floodfection's burst and bits: no damage, and no objects but
+	garbage (its bits), which each machine keeps for itself: a multiplayer
+	game's clients would not have the others (port/linux/game/infection.c) */
+	if (infection_effect_local &&
+		(part_definition->runtime_base_class_tag == DAMAGE_EFFECT_DEFINITION_TAG ||
+			(part_definition->runtime_base_class_tag == OBJECT_DEFINITION_TAG &&
+				part_definition->reference.group_tag != 'garb')))
+	{
+		return;
+	}
 	switch (part_definition->runtime_base_class_tag)
 	{
 		case PARTICLE_SYSTEM_DEFINITION_TAG:

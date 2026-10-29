@@ -1,0 +1,23 @@
+# Floodfection's pack: its carrier burst and flood bits
+# (port/linux/game/infection.c) and its zombies' Flood combat forms, models
+# and animations (floodfection_forms.c), all Two Betrayals'. Written at
+# start-up whatever is set: any multiplayer game joined may be Floodfection.
+# See port/linux/TAG_INJECTION.md.
+
+name = "opence_floodfection"
+version = 1
+legacy_file_names = []
+maps = ["c40"]
+minimum_bitmaps = 1
+minimum_sounds = 0
+wanted = ["always"]
+
+[keep]
+include_contains = ["flood"]
+include_prefixes = ["effects\\"]
+
+[text]
+notice = "Floodfection needs some\ndata from other maps.\nIt takes a moment."
+building = "Building Floodfection data:\n"
+ready = "The Floodfection data is ready."
+failed = "The Floodfection data could not\nbe built. Is the card full?"

@@ -30,7 +30,8 @@ so).
 | `port/linux/game/level_tag_import.c` | A level's import, each user's roots in a fixed order (`cache_files.c` calls it as the level's tags load) |
 | `tools/tag_pack.py` | Writes the same packs on a computer, and lists each manifest's content hash |
 
-OpenCE has no user of it yet: a user adds its roots in `level_tag_import.c`.
+OpenCE's user of it: `infection.c` (`infection_tag_import`, Floodfection),
+from `level_tag_import.c`.
 
 ## Making a pack
 
@@ -148,9 +149,9 @@ messages.
 A network game that needs a pack should check it before joining (in
 `network_game_client_advertised_game_compatible`,
 `source/networking/network_client_manager.c`): without it the player is
-told, the pack is asked for, and nothing is joined. A game a machine without
-the pack still plays alike (below) needs no check: its pack is written at
-start-up.
+told, the pack is asked for, and nothing is joined. Floodfection needs no
+check: its pack is written at start-up, and a machine without it plays the
+game with blue zombies.
 
 ## Copying tags into a level
 
@@ -236,8 +237,8 @@ or the tags after it (anything sent over the network by its index) are
 other tags on each machine:
 
 - Decide from what every machine of the game has alike: the game's variant
-  and options (the game's mode, not a local setting), the host's
-  advertisement.
+  and options (`infection_tag_import_wanted` reads the game's mode, not a
+  local setting), the host's advertisement.
 - Ask for the same roots in the same order. The importer sorts its copies
   by map, then name, so the same roots give the same table.
 - Make sure every machine has the pack: write it at start-up (`always`) or
@@ -246,8 +247,8 @@ other tags on each machine:
   `... tag table: <n> tags, fingerprint <hash>`); two machines' lines must
   match.
 
-A game a machine without the importer can join (a take on a mode that a
-build without it plays as the mode itself) may use the copies only for what each
+A game a machine without the importer can join (Floodfection: a build
+without it plays plain Infection) may use the copies only for what each
 machine draws and plays for itself (effects, a model drawn in place of
 another), never for anything it sends.
 
@@ -273,5 +274,6 @@ names and its content in the version word.
 
 ## OpenCE's packs
 
-None yet: each is listed here with its maps, when it is wanted, its size
-and what uses it.
+| Pack | Maps | Wanted | Size | Used by |
+| --- | --- | --- | --- | --- |
+| `opence_floodfection` | c40 | always | ~25 MB | Floodfection (`infection.c`, `floodfection_forms.c`) |

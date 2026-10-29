@@ -41,7 +41,7 @@ const ENGINES = {
   ffa: 'slayer', ffa_slayer: 'slayer', teamslayer: 'slayer', tslayer: 'slayer', koth: 'king', team_koth: 'king',
   iron_ctf: 'ctf', teamrace: 'race', teamoddball: 'oddball',
   swat: 'slayer', infection: 'slayer', gun_game: 'slayer', hardcore: 'slayer', hardcore_ctf: 'ctf',
-  hardcore_oddball: 'oddball', hardcore_king: 'king',
+  hardcore_oddball: 'oddball', hardcore_king: 'king', floodfection: 'slayer',
 };
 // the settings the server's own console alone changes (server_commands.c's
 // owner_settings): the page's admin is refused them

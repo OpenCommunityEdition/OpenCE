@@ -48,6 +48,7 @@
 		<string text="SWAT"/>
 		<string text="INFECTION"/>
 		<string text="GUN GAME"/>
+		<string text="FLOODFECTION"/>
 	</strings>
 	<widget name="main_menu/settings_select/multiplayer_setup/opence_options_edit/op_oce_hardcore" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/settings_select/multiplayer_setup/opence_options_edit/oce_hardcore_label"/>
@@ -201,6 +202,7 @@
 		<string text="No shields, and a shot to the head kills. Slayer only."/>
 		<string text="Humans killed join the zombies, who win when\nno human is left. Team Slayer only."/>
 		<string text="Each kill gives the next weapon; a kill with the\nlast wins. Free for all Slayer only."/>
+		<string text="Infection whose zombies are the Flood, every\nmap under its fog. Team Slayer only."/>
 		<string text="The motion sensor and aim assist as the game\ntype has them."/>
 		<string text="No motion sensor, no aim assist, and a kill\nrestores the killer's health and shields."/>
 		<string text="The zombies chosen when the round starts\n(a human is always left)."/>

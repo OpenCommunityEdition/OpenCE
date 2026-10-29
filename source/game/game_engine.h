@@ -242,6 +242,16 @@ enum
 	NUMBER_OF_GUN_GAME_ORDERS
 };
 
+enum
+{
+	/* port: a take on a mode (game_variant_options' mode_variant):
+	Floodfection, Infection whose zombies are the Flood, under its fog over
+	every map (port/linux/game/infection.c) */
+	_game_mode_variant_none = 0,
+	_game_mode_variant_floodfection,
+	NUMBER_OF_GAME_MODE_VARIANTS
+};
+
 /* (the starting equipment, generic or the map's, is the variant's own:
 _game_variant_generic_starting_equipment_bit) */
 struct game_variant_options
@@ -289,7 +299,11 @@ struct game_variant_options
 	of their own team (game_engine_get_starting_location_rating). Taken from
 	reserved, which older builds zero and ignore: the host alone picks spawns */
 	boolean force_team_spawns;
-	byte reserved[5];
+	byte reserved[4];
+	/* port: the take on the mode (_game_mode_variant_*), from reserved's
+	last byte, which builds without it zero: they play the mode itself
+	(Infection) */
+	byte mode_variant;
 };
 
 typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x2C ? 1 : -1];

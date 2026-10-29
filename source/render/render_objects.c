@@ -112,6 +112,9 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_model_types.h"
+#include "models/model_definitions.h"
+#include "infection.h" /* port: port/linux/game/infection.c */
+#include "floodfection_forms.h" /* port: port/linux/game/floodfection_forms.c */
 
 /* ---------- constants */
 
@@ -493,6 +496,36 @@ static void render_object_list(
 		and the overshield finds its own values by their address
 		(overshield_effect.c), so they are not copied again */
 		real const *shown_functions = object->object.outgoing_function_values;
+		/* port: a Floodfection zombie drawn as a Flood combat form, its body
+		not at all once dead, and nothing either carries
+		(port/linux/game/floodfection_forms.c) */
+		long model_index = object_definition_get(object->definition_index)->object.model.index;
+		byte const *region_permutations = object->object.region_permutations;
+		short form = _floodfection_form_render_normal;
+
+		if (!legs && infection_floodfection_enabled())
+		{
+			real_matrix4x3 const *form_matrices = NULL;
+
+			form = floodfection_forms_render(object_index, &model_index, &form_matrices, &region_permutations);
+			if (form == _floodfection_form_render_hidden)
+			{
+				object_index = object->object.next_object_index;
+				continue;
+			}
+			if (form == _floodfection_form_render_form)
+			{
+				/* (kept for the frame: a queued transparent part reads them
+				after this) */
+				node_matrices = rasterizer_memory_alloc(form_matrices,
+					model_definition_get(model_index)->nodes.count * sizeof(real_matrix4x3));
+				if (!node_matrices)
+				{
+					object_index = object->object.next_object_index;
+					continue;
+				}
+			}
+		}
 
 		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices))
 		{
@@ -642,10 +675,10 @@ static void render_object_list(
 					}
 
 					render_model(
-						definition->object.model.index,
+						model_index,
 						level_of_detail_pixels,
 						node_matrices,
-						object->object.region_permutations,
+						region_permutations,
 						object->object.outgoing_change_colors,
 						shown_functions,
 						data->lighting,
@@ -664,10 +697,10 @@ static void render_object_list(
 				else
 				{
 					render_model(
-						definition->object.model.index,
+						model_index,
 						level_of_detail_pixels * 0.3f,
 						node_matrices,
-						object->object.region_permutations,
+						region_permutations,
 						object->object.outgoing_change_colors,
 						object->object.outgoing_function_values,
 						data->lighting,
@@ -680,7 +713,8 @@ static void render_object_list(
 				}
 			}
 
-			if (!data->shadow && !legs && object->object.first_widget_index != NONE)
+			if (!data->shadow && !legs && form == _floodfection_form_render_normal &&
+				object->object.first_widget_index != NONE)
 			{
 				struct render_animation animation;
 				real widget_functions[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
@@ -693,7 +727,7 @@ static void render_object_list(
 				widgets_render(object_index, data->lighting, &animation);
 			}
 
-			if (object->object.first_child_object_index != NONE && !legs)
+			if (object->object.first_child_object_index != NONE && !legs && form == _floodfection_form_render_normal)
 			{
 				render_object_list(
 					data,

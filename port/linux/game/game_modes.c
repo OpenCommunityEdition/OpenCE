@@ -19,6 +19,12 @@ machine (network_game_manager.h) and the game plays by
 - Hardcore: no motion sensor, no aim assist, and a kill restores the
   killer's health and shields.
 
+And a take on one of them (the options' mode_variant, which builds without
+it zero, playing the mode itself):
+
+- Floodfection (infection.c): Infection whose zombies are the Flood and
+  whose maps are all under its fog, drawn by each machine that has it.
+
 The built-in gametypes (game_modes_gametype) are written with the Xbox's
 default ones, after them, and the Select Gametype screen lists them in a bank
 of their own (menu_functions.c's OPENCE).
@@ -66,6 +72,7 @@ enum
 	_gametype_hardcore_ctf,
 	_gametype_hardcore_oddball,
 	_gametype_hardcore_king,
+	_gametype_floodfection,
 	NUMBER_OF_GAMETYPES
 };
 
@@ -87,6 +94,7 @@ static struct
 	{ "hardcore_ctf", L"Hardcore CTF", L"HC CTF" },
 	{ "hardcore_oddball", L"Hardcore Oddball", L"HC Oddball" },
 	{ "hardcore_king", L"Hardcore King", L"HC King" },
+	{ "floodfection", L"Floodfection", L"Flood" },
 };
 
 /* the kill being recorded is a melee's (game_modes_kill_by_melee) */
@@ -159,7 +167,10 @@ void game_modes_gametype(
 		options->no_map_weapons = TRUE;
 		break;
 	case _gametype_infection:
+	case _gametype_floodfection:
 		options->mode = _game_mode_infection;
+		if (index == _gametype_floodfection)
+			options->mode_variant = _game_mode_variant_floodfection;
 		variant->universal_variant.vehicle_set = VEHICLE_SET_NONE;
 		variant->universal_variant.respawn_time = INFECTION_DEFAULT_RESPAWN_TIME * TICKS_PER_SECOND;
 		variant->universal_variant.suicide_penalty = 0;
@@ -225,6 +236,7 @@ void game_modes_options_default(
 	options->infection_zombie_shields = TRUE;
 	options->gun_game_order = _gun_game_order_strongest_first;
 	options->gun_game_melee_demotes = TRUE;
+	options->mode_variant = _game_mode_variant_none;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 
@@ -259,6 +271,9 @@ void game_modes_options_sanitize(
 		options->gun_game_order = _gun_game_order_strongest_first;
 	options->gun_game_melee_demotes = options->gun_game_melee_demotes != FALSE;
 	options->force_team_spawns = options->force_team_spawns != FALSE;
+	/* (a take on the mode the gametype plays, else none) */
+	if (!(options->mode == _game_mode_infection && options->mode_variant == _game_mode_variant_floodfection))
+		options->mode_variant = _game_mode_variant_none;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 
@@ -278,6 +293,18 @@ short game_modes_variant_mode(
 		return !variant->universal_variant.teams ? _game_mode_gun_game : _game_mode_none;
 	}
 	return _game_mode_none;
+}
+
+short game_modes_variant_mode_variant(
+	struct game_variant const *variant,
+	struct game_variant_options const *options)
+{
+	if (game_modes_variant_mode(variant, options) == _game_mode_infection &&
+		options->mode_variant == _game_mode_variant_floodfection)
+	{
+		return _game_mode_variant_floodfection;
+	}
+	return _game_mode_variant_none;
 }
 
 byte game_modes_kind(
@@ -325,6 +352,13 @@ wchar_t const *game_modes_variant_kind_name(
 	struct game_variant const *variant,
 	struct game_variant_options const *options)
 {
+	/* (a take on a mode, by its own name: a kind carries the mode alone,
+	which another machine names) */
+	if (variant && options &&
+		game_modes_variant_mode_variant(variant, options) == _game_mode_variant_floodfection)
+	{
+		return options->hardcore ? L"HARDCORE FLOODFECTION" : L"FLOODFECTION";
+	}
 	return variant && options ?
 		game_modes_kind_name(variant->game_engine_index, game_modes_kind(variant, options), FALSE) : NULL;
 }
@@ -344,6 +378,14 @@ short game_modes_mode(
 	if (!game_engine_running())
 		return _game_mode_none;
 	return game_modes_variant_mode(game_engine_get_variant(), game_variant_options_get());
+}
+
+short game_modes_mode_variant(
+	void)
+{
+	if (!game_engine_running())
+		return _game_mode_variant_none;
+	return game_modes_variant_mode_variant(game_engine_get_variant(), game_variant_options_get());
 }
 
 boolean game_modes_hardcore(

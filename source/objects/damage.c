@@ -104,6 +104,7 @@ symbols in this file:
 #include "cseries.h"
 #include "damage.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "infection.h" /* port: port/linux/game/infection.c */
 #include "ai/ai.h"
 #include "cseries/errors.h"
 #include "effects/effects.h"
@@ -1239,14 +1240,17 @@ static void object_damage_body(
 	{
 		if (damage_amount > 0.f && TEST_FLAG(damage_material->flags, _damage_material_head_bit))
 		{
-			/* port: SWAT's headshots, a shot of any weapon's (game_modes.c) */
-			if (TEST_FLAG(damage_definition->flags, _damage_can_cause_headshots_bit) ||
+			/* port: SWAT's headshots, a shot of any weapon's (game_modes.c);
+			none on a Floodfection zombie, which has no shield to lose first
+			(its shot is a multiplayer headshot's, below: infection.c) */
+			if ((TEST_FLAG(damage_definition->flags, _damage_can_cause_headshots_bit) ||
 				game_modes_headshot_kills(object_index,
 					damage_definition->category == _damage_category_bullet ||
 					damage_definition->category == _damage_category_sniper ||
 					damage_definition->category == _damage_category_plasma ||
 					damage_definition->category == _damage_category_needle ||
-					damage_definition->category == _damage_category_shotgun))
+					damage_definition->category == _damage_category_shotgun)) &&
+				!infection_floodfection_zombie(object_index))
 			{
 				if (game_engine_running() ||
 					object->object.type != _object_type_biped ||

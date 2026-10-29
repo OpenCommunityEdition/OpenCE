@@ -25,7 +25,7 @@ wchar_t const *game_modes_gametype_name(short index);
 /* its variant and options */
 void game_modes_gametype(short index, struct game_variant *variant, struct game_variant_options *options);
 /* the one of that name (debug.network_test's: "swat", "infection",
-"gun_game", "hardcore", "hardcore_ctf" ...), FALSE if none is */
+"gun_game", "hardcore", "hardcore_ctf", "floodfection" ...), FALSE if none is */
 boolean game_modes_gametype_by_name(char const *name, struct game_variant *variant,
 	struct game_variant_options *options);
 
@@ -41,8 +41,15 @@ void game_modes_options_sanitize(struct game_variant_options *options);
 allow it (SWAT and Infection on teams, Gun Game free for all, all of them
 Slayer), else none */
 short game_modes_variant_mode(struct game_variant const *variant, struct game_variant_options const *options);
+/* the take on the mode it plays (_game_mode_variant_*: Floodfection of
+Infection), else none */
+short game_modes_variant_mode_variant(struct game_variant const *variant,
+	struct game_variant_options const *options);
+/* the tag pack Floodfection copies its tags from (infection.c:
+port/assets/tag_packs/opence_floodfection.toml) */
+#define FLOODFECTION_PACK "opence_floodfection"
 /* the name the menus show for its kind of game ("INFECTION", "HARDCORE
-CTF"), NULL for a game engine's own ("SLAYER") */
+CTF", "FLOODFECTION"), NULL for a game engine's own ("SLAYER") */
 wchar_t const *game_modes_variant_kind_name(struct game_variant const *variant,
 	struct game_variant_options const *options);
 /* a game's kind in a byte, as its LAN advertisement and internet listing
@@ -62,6 +69,8 @@ boolean game_modes_variant_is_opence(struct game_variant const *variant, struct 
 
 /* its mode (_game_mode_none with no game engine) */
 short game_modes_mode(void);
+/* its take on its mode (_game_mode_variant_none with no game engine) */
+short game_modes_mode_variant(void);
 /* whether it plays by Hardcore's rules */
 boolean game_modes_hardcore(void);
 /* the game engine a mode plays with: Infection's and Gun Game's are

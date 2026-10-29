@@ -7319,6 +7319,8 @@ real_rgb_color *game_engine_player_get_change_color(
 
 		result = player_profile_get_rgb_color(color_index);
 	}
+	/* port: Floodfection's zombies are green (port/linux/game/infection.c) */
+	infection_change_color(player_index, &result);
 
 	*change_color = result;
 
