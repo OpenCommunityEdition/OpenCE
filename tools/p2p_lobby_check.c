@@ -302,6 +302,10 @@ static void lobby_checks(void)
 		!strcmp(listing.gametype, "Slayer") && listing.player_count == 3 && listing.maximum_player_count == 16 &&
 		listing.engine_type == 2 && listing.kind == 0x81 && listing.open && listing.has_teams && !listing.in_progress,
 		"the listing's details");
+	/* the next pass in the same millisecond as the probe's end (an even one) */
+	count = probe_count;
+	lobby_update(token, 3, 16);
+	check(probe_count == count, "a host just timed is not probed again in the same millisecond");
 	/* a change: published again after TRIGGER_INTERVAL */
 	p2p_set_game_listing(NULL, NULL, NULL, 2, 0x81, 1, 1, 1);
 	clock_now += 1000;
