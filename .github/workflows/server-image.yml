@@ -160,6 +160,20 @@ jobs:
           fi
           docker volume rm smoke-state > /dev/null
 
+      - name: Label the network version
+        run: |
+          set -euo pipefail
+          # (the build's own word: halo --version, "OpenCE build-N (network version V)", which every release
+          # answers. opence-fleet reads it from the image's labels before it updates a server: a new network
+          # version waits for the game's end, the same one for the server to be empty)
+          version="$(sed -nE 's/^OpenCE build-[0-9]+ \(network version ([0-9]+)\)$/\1/p' version.txt)"
+          [ -n "$version" ] || { echo "::error::no network version in halo --version"; exit 1; }
+          printf 'FROM opence-server:ci\nLABEL org.opence.network-version="%s"\n' "$version" \
+            | docker build -t opence-server:ci -
+          [ "$(docker image inspect -f '{{index .Config.Labels "org.opence.network-version"}}' opence-server:ci)" = "$version" ] \
+            || { echo "::error::the image has no org.opence.network-version label"; exit 1; }
+          echo "network version $version"
+
       - uses: docker/login-action@v3
         if: github.repository == 'OpenCommunityEdition/OpenCE'
         with:
