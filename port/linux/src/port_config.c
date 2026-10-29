@@ -247,6 +247,11 @@ static const struct config_setting config_settings[] =
 		"Keep the GPU programs the game links under the save root (shader_cache),\n"
 		"and load them from there next time instead of linking them again, which\n"
 		"stalls a frame on some drivers; false links each every run." },
+	{ "display.stats_log", _config_boolean, "false", "HALO_STATS_LOG", _environment_value, _platform_all,
+		"A line a second in the log with the frame rate, the mode, the map, the\n"
+		"renderer and the size of the 3D view, so a graphics bug's report or two\n"
+		"builds compared say which of them was running and at what frame rate.\n"
+		"Nothing is sent anywhere; off by default." },
 	{ "display.per_pixel_lighting", _config_boolean, "false", "HALO_PER_PIXEL_LIGHTING", _environment_value,
 		_platform_all,
 		"Light the models (characters, weapons, vehicles, scenery) for each\n"
