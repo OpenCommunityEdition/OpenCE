@@ -87,6 +87,16 @@ screen's 640 columns are centred as the screen's, a quarter's 320 in the
 quarter; the shift in effect */
 void halo_screen_ui_offset_view(long view_width);
 long halo_screen_ui_offset_current(void);
+/* (port/linux/game/menu_functions.c, for source/interface/ui_widget.c) the
+network lobby, which reads every controller's events however many players
+there are: another controller's START joins it, a player's B leaves it (its
+handlers know each controller), where a screen of player 1's would read
+theirs alone; and ADD PLAYER's screen, whose quarters are each a
+controller's: the screen takes every controller's events, its widgets their
+own controller's alone */
+struct widget_instance;
+unsigned char pc_menu_screen_reads_every_controller(struct widget_instance const *widget);
+unsigned char pc_menu_screen_routes_by_controller(struct widget_instance const *widget);
 /* names a model lighting vertex program, whose draws can be lit for each
 pixel (port/linux/src/d3d8_gl.c, display.per_pixel_lighting) */
 void halo_vertex_shader_lighting(unsigned long handle);

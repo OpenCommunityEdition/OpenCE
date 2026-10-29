@@ -7166,6 +7166,11 @@ static void widget_instance_render_recursive(
 			bounds.x1 >= 320 && bounds.y1 >= 240 &&
 			bitmap->width <= 16 &&
 			halo_screen_width() > 640;
+		/* (the view's margins: the centring shift, on either side of the
+		640 columns, or of a quarter's 320; declared here, before the first
+		statement: C89) */
+		long extra = halo_screen_ui_offset_current();
+		short design_right = bounds.x1;
 
 		if (use_nifty_plasma_fx)
 		{
@@ -7174,11 +7179,6 @@ static void widget_instance_render_recursive(
 			ui_plasma_effect_color.green = 0.05f;
 			ui_plasma_effect_color.blue = 0.05f;
 		}
-		/* (the view's margins: the centring shift, on either side of the
-		640 columns, or of a quarter's 320) */
-		long extra = halo_screen_ui_offset_current();
-		short design_right = bounds.x1;
-
 		if (widen_to_screen)
 		{
 			bounds.x0 -= (short)extra;
@@ -7784,16 +7784,6 @@ static boolean widget_takes_any_controller(
 	return widget->local_player_index == 0 && !pc_menu_split_players() &&
 		(we_are_at_the_main_menu || players_port_local_player_count() <= 1);
 }
-
-/* port: (port/linux/game/menu_functions.c) the network lobby, which reads
-every controller's events however many players there are: another
-controller's START joins it, a player's B leaves it (its handlers know each
-controller), where a screen of player 1's would read theirs alone */
-extern unsigned char pc_menu_screen_reads_every_controller(struct widget_instance const *widget);
-/* port: (menu_functions.c) ADD PLAYER's screen, whose quarters are each a
-controller's: the screen takes every controller's events, its widgets their
-own controller's alone */
-extern unsigned char pc_menu_screen_routes_by_controller(struct widget_instance const *widget);
 
 /* port: the controller whose events a screen reads (NONE: every one's) */
 static short widget_event_controller(
