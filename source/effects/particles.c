@@ -83,7 +83,7 @@ symbols in this file:
 #include "effects/effect_definitions.h"
 #include "effects/effects.h"
 #include "effects/material_effects.h"
-#include "game/game.h"
+#include "game/game.h" /* port: game_players_are_double_speed (particle_drawn) */
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "memory/data.h"
@@ -105,7 +105,8 @@ enum
 };
 
 #define PARTICLE_SHARED_LIFESPAN 0.7f
-// port: a fixed timestep's tick and the frames' sum of one differ by rounding
+/* port: a fixed timestep's tick and the frames' sum of one differ by
+rounding */
 #define PARTICLE_DRAW_TICK_TOLERANCE 0.001f
 
 enum particle_effect_markers
@@ -201,6 +202,7 @@ static boolean particle_next_frame(
 static boolean particle_update_frame_time(
 	long particle_index,
 	real dt);
+/* port: (particle_drawn) */
 static boolean particle_age_drawn(
 	real age,
 	real update_dt,
@@ -225,7 +227,7 @@ static real particles_leftover_ticks = 0.f;
 static long particles_update_ticks = 0;
 static long particles_tick_frame_indices[MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT + 1];
 static long particles_tick_frame_head = 0;
-/* The Xbox drew a frame a tick, so a particle's first update before it was
+/* port: the Xbox drew a frame a tick, so a particle's first update before it was
 drawn was a whole tick, and one that lives a tick or less (a plasma impact's
 bolts, some flashes) died in it unseen. The frames between the ticks update
 particles a fraction of a tick at a time, so particle_drawn holds a particle
@@ -1014,6 +1016,7 @@ void particle_new(
 	return;
 }
 
+/* port: whether the particle is drawn yet (render_particles.c) */
 boolean particle_drawn(
 	long particle_index)
 {
@@ -1045,6 +1048,7 @@ void particles_update(
 
 	profile_enter(particles_update_section);
 
+	/* port: (particle_drawn) */
 	particles_last_update_dt = dt;
 
 	{
@@ -1103,7 +1107,7 @@ void particles_update(
 
 /* ---------- private code */
 
-/* A tick's update in one step (the Xbox's frame, which a fixed timestep keeps)
+/* port: a tick's update in one step (the Xbox's frame, which a fixed timestep keeps)
 draws what it leaves, as did the Xbox, and so does any particle created after
 it (age 0). Otherwise a particle is drawn once its age is past a tick: past it,
 not at it, because the frames' steps can add up to a particle's span of exactly
