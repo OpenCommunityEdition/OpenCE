@@ -408,7 +408,10 @@ public final class TouchControls extends View implements SensorEventListener, In
     private static boolean isKeyboard(InputDevice device) {
         if (device == null || device.isVirtual())
             return false;
-        return (device.getSources() & InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD;
+        // (a typing keyboard: most phones list their power and volume keys
+        // as a keyboard source too, which hid the touch controls on "auto")
+        return (device.getSources() & InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
+                && device.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC;
     }
 
     private void refreshInputDevices() {
