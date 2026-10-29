@@ -218,7 +218,7 @@
 		<string text="Friendly fire and team balance, for this game."/>
 		<string text="Anyone can see and join your game: it is listed\nfor everyone through the brokers."/>
 		<string text="Only players with your invite link can join."/>
-		<string text="Friendly fire, the enemies and player collisions,\nfor this game."/>
+		<string text="Team wipes, friendly fire, enemies and collisions,\nfor this game."/>
 		<string text="Voice chat, text chat and votes to kick a player,\nfor this game."/>
 		<string text="Players from the Server Browser must type it to\njoin (an invite link needs none). Enter sets it."/>
 		<string text="Sending players who join without the game's\nCustom Edition map the map, and how fast."/>
@@ -236,13 +236,14 @@
 		<data input="game settings lists text update"/>
 		<on event="created" run="port setup options init"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_friendly_fire" x="54" y="73"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_enemies" x="54" y="103"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_pickups" x="54" y="133"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_vehicles" x="54" y="163"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" x="54" y="193"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" x="54" y="223"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" x="54" y="253"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_ally_friendly_fire" x="54" y="283"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_enemies" x="54" y="102"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_pickups" x="54" y="131"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_vehicles" x="54" y="160"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" x="54" y="189"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" x="54" y="218"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" x="54" y="247"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_ally_friendly_fire" x="54" y="276"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_team_wipe" x="54" y="305"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -370,6 +371,20 @@
 		<string text="ON"/>
 		<string text="OFF"/>
 	</strings>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_team_wipe" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_team_wipe_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_team_wipe_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_team_wipe_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_team_wipe_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_team_wipe" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_team_wipe">
+		<string text="AUTO"/>
+		<string text="REVERT CHECKPOINT"/>
+		<string text="RESPAWN ONLY"/>
+	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels">
 		<string text="FRIENDLY FIRE:"/>
 		<string text="EXTRA ENEMIES:"/>
@@ -379,6 +394,7 @@
 		<string text="PER PLAYER:"/>
 		<string text="PLAYER COLLISIONS:"/>
 		<string text="ALLY FRIENDLY FIRE:"/>
+		<string text="TEAM WIPE:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/cap_coop_options">
 		<string text="Players can not be hurt by weapons and explosives\nfired by the other players."/>
@@ -408,6 +424,9 @@
 		<string text="Players walk through each other, so that no one\nblocks a doorway. The AI's characters still block."/>
 		<string text="Players can hurt and kill their AI allies, as in\nthe campaign."/>
 		<string text="Players can not hurt their AI allies, so that no\none can kill Keyes or the Marines a level needs."/>
+		<string text="Private games revert the checkpoint; public games\nonly respawn. A changed team or missing save\nalways uses respawn only."/>
+		<string text="Revert the checkpoint after everyone dies. A changed\nteam or missing save uses respawn only."/>
+		<string text="Respawn at checkpoint positions after everyone dies.\nThe world keeps its progress."/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/voice_options/voice_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/header_voice_options"/>

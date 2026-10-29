@@ -6948,6 +6948,8 @@ static struct gametype_option const gametype_options[] =
 	COOP_SETUP_SCREENS; coop_enemies.c) */
 	{ "coop_friendly_fire_spinner", _option_setting, 0, 0, 4, { 0 }, "network.coop_friendly_fire",
 		{ "off", "on", "shields_only", "explosives_only" } },
+	{ "coop_team_wipe_spinner", _option_setting, 0, 0, 3, { 0 }, "network.coop_team_wipe",
+		{ "auto", "revert", "respawn" } },
 	{ "coop_extra_enemies_spinner", _option_setting, 0, 0, 3, { 0 }, "network.coop_enemies_mode",
 		{ "per_player", "multiplier", "none" } },
 	{ "coop_extra_pickups_spinner", _option_setting, 0, 0, 3, { 0 }, "network.coop_pickups",

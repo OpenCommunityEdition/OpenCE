@@ -1615,7 +1615,7 @@ def _server_settings() -> list:
                     ['<on event="created" run="server settings init"/>'], extra)
     # (co-op's options' screens, and map sharing's)
     for key, title, _, screen_rows in [*COOP_SETUP_SCREENS, MAP_SHARE_SETUP]:
-        lines += _setup_option_screen(f"{base}/{key}", key, screen_rows)
+        lines += _setup_option_screen(f"{base}/{key}", key, screen_rows, fit=True)
     # (no Defaults: the bar is START and CANCEL; B cancels the name's edit
     # first)
     lines = [line.replace(f'<child widget="{base}/button_defaults" y="1"/>', "") for line in lines]
@@ -1636,7 +1636,7 @@ COOP_ENEMIES_MULTIPLIERS = [2, 4, 8, 16, 32]
 # help of each of them; menu_functions.c's gametype_options give their
 # settings' values)
 COOP_SETUP_SCREENS = [
-    ("coop_options", "CO-OP OPTIONS", "Friendly fire, the enemies and player collisions,\\nfor this game.", [
+    ("coop_options", "CO-OP OPTIONS", "Team wipes, friendly fire, enemies and collisions,\\nfor this game.", [
         ("coop_friendly_fire", "FRIENDLY FIRE:", ["OFF", "ON", "SHIELD ONLY", "EXPLOSIVES ONLY"], [
             "Players can not be hurt by weapons and explosives\\nfired by the other players.",
             "Players can be hurt by weapons or explosives\\nfired by the other players.",
@@ -1673,6 +1673,11 @@ COOP_SETUP_SCREENS = [
             "Players can hurt and kill their AI allies, as in\\nthe campaign.",
             "Players can not hurt their AI allies, so that no\\none can kill Keyes or the Marines a level needs.",
         ]),
+        ("coop_team_wipe", "TEAM WIPE:", ["AUTO", "REVERT CHECKPOINT", "RESPAWN ONLY"], [
+            "Private games revert the checkpoint; public games\\nonly respawn. A changed team or missing save\\nalways uses respawn only.",
+            "Revert the checkpoint after everyone dies. A changed\\nteam or missing save uses respawn only.",
+            "Respawn at checkpoint positions after everyone dies.\\nThe world keeps its progress.",
+        ]),
     ]),
     ("voice_options", "VOICE AND VOTING", "Voice chat, text chat and votes to kick a player,\\nfor this game.",
      TEAMPLAY_ROWS),
@@ -1702,7 +1707,7 @@ TITLES.update({f"{MT}/server_settings/{key}/header_{key}": title
 SETUP_OPTION_SAME_PLACE = set()
 
 
-def _setup_option_screen(base: str, key: str, rows: list) -> list:
+def _setup_option_screen(base: str, key: str, rows: list, fit: bool = False) -> list:
     """a screen of options laid out as the gametype's are (Teamplay
     Options'), its spinners setting config.toml's settings (menu_functions.c's
     "port setup options init" and "port setup options save", OK), each
@@ -1718,11 +1723,16 @@ def _setup_option_screen(base: str, key: str, rows: list) -> list:
                                            ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
     children = ['<data input="game settings lists text update"/>',
                 '<on event="created" run="port setup options init"/>']
+    # (30 apart; with fit, closer for more rows than eight, the last 28 tall
+    # clear of the help at 341: Server Setup's, whose rows are all shown, as
+    # OpenCE Options' are not)
+    places = len([row_key for row_key, *_ in rows if row_key not in SETUP_OPTION_SAME_PLACE])
+    spacing = min(30, (341 - 1 - 73 - 28) // max(1, places - 1)) if fit else 30
     place = -1
     for row_key, *_ in rows:
         if row_key not in SETUP_OPTION_SAME_PLACE:
             place += 1
-        children.append(f'<child widget="{base}/op_{row_key}" x="54" y="{73 + 30 * place}"/>')
+        children.append(f'<child widget="{base}/op_{row_key}" x="54" y="{73 + spacing * place}"/>')
     children.append(f'<child widget="{base}/{key}_button_bar" y="414"/>')
     lines += _widget(f"{base}/{key}_menu", [("type", "column_list"), ("width", 640), ("height", 480),
                                            ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),

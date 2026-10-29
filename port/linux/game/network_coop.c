@@ -529,6 +529,18 @@ static struct
 	boolean refresh;
 } host_resend;
 
+/* Checkpoints restore player_data, but not the live machines' player
+table. A team wipe may rewind only while both still name the saved team. */
+struct coop_checkpoint_players
+{
+	long players[MAXIMUM_TRACKED_PLAYERS];
+	long machine_players[HALO_PORT_MAXIMUM_NETWORK_MACHINES][MAXIMUM_LOCAL_PLAYERS];
+	short count;
+	boolean valid;
+};
+
+static struct coop_checkpoint_players checkpoint_players;
+
 /* client: the host's snap count last seen for each of its groups */
 static struct
 {
@@ -582,6 +594,8 @@ int config_boolean(char const *name);
 long config_integer(char const *name);
 char const *config_string(char const *name);
 int halo_server_mode(void);
+/* p2p_lobby.c: chosen visibility, independent of listing transport state */
+int p2p_hosting_listed(void);
 
 /* ---------- private code */
 
@@ -2040,6 +2054,7 @@ void network_coop_new_game(
 	csmemset(host_friendly_fire, 0, sizeof(host_friendly_fire));
 	csmemset(&host_sent_screen_effect, 0, sizeof(host_sent_screen_effect));
 	csmemset(&host_resend, 0, sizeof(host_resend));
+	csmemset(&checkpoint_players, 0, sizeof(checkpoint_players));
 	csmemset(&players_vitality, 0, sizeof(players_vitality));
 	host_attachment_count = 0;
 	host_looping_sound_count = 0;
@@ -2053,6 +2068,103 @@ void network_coop_new_game(
 	coop_enemies_new_game();
 	coop_pickups_new_game();
 	coop_vehicles_new_game();
+}
+
+/* game_state.c calls only after the checkpoint file was written. This
+metadata stays outside the saved image, as the live machine table does. */
+void network_coop_checkpoint_saved(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	short machine_index;
+	short local_player_index;
+
+	checkpoint_players.valid = FALSE;
+	checkpoint_players.count = 0;
+	if (!coop_host())
+		return;
+	csmemset(checkpoint_players.players, NONE, sizeof(checkpoint_players.players));
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		short index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+
+		if (player->quit_out_of_game)
+			continue;
+		if (!VALID_INDEX(index, MAXIMUM_TRACKED_PLAYERS))
+			return;
+		checkpoint_players.players[index] = iterator.datum_index;
+		checkpoint_players.count++;
+	}
+	for (machine_index = 0; machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; machine_index++)
+	{
+		long *players = machine_get_player_list(machine_index);
+
+		for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+			checkpoint_players.machine_players[machine_index][local_player_index] = players[local_player_index];
+	}
+	checkpoint_players.valid = checkpoint_players.count > 0;
+}
+
+static boolean checkpoint_players_match(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	short count = 0;
+	short machine_index;
+	short local_player_index;
+
+	if (!checkpoint_players.valid)
+		return FALSE;
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		short index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+
+		if (player->quit_out_of_game)
+			continue;
+		if (!VALID_INDEX(index, MAXIMUM_TRACKED_PLAYERS) ||
+			checkpoint_players.players[index] != iterator.datum_index)
+		{
+			return FALSE;
+		}
+		count++;
+	}
+	if (count != checkpoint_players.count)
+		return FALSE;
+	for (machine_index = 0; machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; machine_index++)
+	{
+		long *players = machine_get_player_list(machine_index);
+
+		for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+		{
+			if (checkpoint_players.machine_players[machine_index][local_player_index] != players[local_player_index])
+				return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+/* Only the host chooses. Unknown values use the automatic policy too;
+PUBLIC is a visibility choice, including games protected by a password. */
+boolean network_coop_wipe_reverts(
+	void)
+{
+	char const *mode;
+
+	if (!coop_host())
+		return FALSE;
+	mode = config_string("network.coop_team_wipe");
+	if (!strcmp(mode, "respawn") || (strcmp(mode, "revert") && p2p_hosting_listed()))
+		return FALSE;
+	if (!checkpoint_players_match())
+	{
+		error(_error_silent, "co-op: team wipe respawns without a revert: no checkpoint with the current players and machines");
+		return FALSE;
+	}
+	return TRUE;
 }
 
 /* A network game on a campaign scenario with no game engine. Checking the

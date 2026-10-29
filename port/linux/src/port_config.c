@@ -695,6 +695,14 @@ static const struct config_setting config_settings[] =
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"
 		"co-op, which writes its choice here." },
+	{ "network.coop_team_wipe", _config_string, "\"auto\"", "HALO_NET_COOP_TEAM_WIPE", _environment_value,
+		_platform_all,
+		"When every co-op player dies: \"auto\" reverts the checkpoint in a\n"
+		"PRIVATE game and only respawns in a PUBLIC game; \"revert\" or\n"
+		"\"respawn\" overrides that choice. A password does not make a PUBLIC\n"
+		"game private. Reverting requires a saved checkpoint with the current\n"
+		"players and machines; otherwise they respawn without a world reset.\n"
+		"TEAM WIPE in Server Setup > Co-op Options writes its choice here." },
 	{ "network.coop_friendly_fire", _config_string, "\"on\"", "HALO_NET_COOP_FRIENDLY_FIRE", _environment_value,
 		_platform_all,
 		"Whether the players of an online co-op game hurt each other: \"off\",\n"
