@@ -428,6 +428,10 @@ int p2p_mm_size_players(int size);
 /* CTF has no free-for-all variant; playlists has a bit per playlist */
 int mm_playlist_has_size(unsigned playlists, int size);
 
+/* on the wire (queue topics) and in config.toml */
+extern const char *const p2p_mm_playlist_names[NUMBER_OF_P2P_MM_PLAYLISTS];
+extern const char *const p2p_mm_size_names[NUMBER_OF_P2P_MM_SIZES];
+
 struct p2p_mm_choice
 {
 	unsigned playlists;

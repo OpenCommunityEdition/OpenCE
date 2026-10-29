@@ -439,6 +439,7 @@ def test_p2p_matchmaking(tmp_path):
     (("return memcmp(units[a].key_hash, units[b].key_hash, P2P_KEY_HASH_SIZE) < 0;", "return 1;"), "pool"),
     (("memcpy(material + at, units[unit].key, P2P_KEY_SIZE);\n\t\tp2p_sha256(material, at + P2P_KEY_SIZE",
       "memcpy(material, units[unit].key, P2P_KEY_SIZE);\n\t\tp2p_sha256(material, P2P_KEY_SIZE"), "election"),
+    (("HALO_PORT_NETWORK_VERSION, p2p_mm_playlist_names", "38, p2p_mm_playlist_names"), "topics"),
     (("if (record->kind == MM_KIND_CANCEL)", "if (0)"), "e43_replay"),
     (("record->sequence <= peer->record.sequence", "0"), "e43_replay"),
     (("elapsed_ms(started) >= VERIFY_BUDGET", "0"), "verify_budget"),

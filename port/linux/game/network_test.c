@@ -138,8 +138,6 @@ enum
 	_network_test_match,
 };
 
-static char const *const match_playlists[NUMBER_OF_P2P_MM_PLAYLISTS] = { "slayer", "ctf", "king", "oddball", "race" };
-static char const *const match_sizes[NUMBER_OF_P2P_MM_SIZES] = { "1v1", "2v2", "3v3", "4v4", "ffa6" };
 
 static struct
 {
@@ -240,7 +238,7 @@ static boolean network_test_read_match(
 	choice->size = NONE;
 	for (index = 0; index < NUMBER_OF_P2P_MM_SIZES; index++)
 	{
-		if (!strcmp(size + 1, match_sizes[index]))
+		if (!strcmp(size + 1, p2p_mm_size_names[index]))
 			choice->size = index;
 	}
 	while (text < size)
@@ -248,7 +246,7 @@ static boolean network_test_read_match(
 		size_t length = strcspn(text, ",:");
 
 		for (index = 0; index < NUMBER_OF_P2P_MM_PLAYLISTS &&
-			(strlen(match_playlists[index]) != length || strncmp(text, match_playlists[index], length));
+			(strlen(p2p_mm_playlist_names[index]) != length || strncmp(text, p2p_mm_playlist_names[index], length));
 			index++)
 		{
 		}

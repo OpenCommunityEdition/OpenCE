@@ -14,13 +14,13 @@ MATCHMAKING's signed records, queues and search.
 
 static const char record_label[] = "hceu-mm-1";
 
-static const char *const playlist_names[NUMBER_OF_P2P_MM_PLAYLISTS] = { "slayer", "ctf", "king", "oddball", "race" };
-static const char *const size_names[NUMBER_OF_P2P_MM_SIZES] = { "1v1", "2v2", "3v3", "4v4", "ffa6" };
+const char *const p2p_mm_playlist_names[NUMBER_OF_P2P_MM_PLAYLISTS] = { "slayer", "ctf", "king", "oddball", "race" };
+const char *const p2p_mm_size_names[NUMBER_OF_P2P_MM_SIZES] = { "1v1", "2v2", "3v3", "4v4", "ffa6" };
 
 void mm_topic(int playlist, int size, char *topic, int topic_size)
 {
-	snprintf(topic, (size_t)topic_size, "hceu/3/mm/%d/%s/%s", HALO_PORT_NETWORK_VERSION, playlist_names[playlist],
-		size_names[size]);
+	snprintf(topic, (size_t)topic_size, "hceu/3/mm/%d/%s/%s", HALO_PORT_NETWORK_VERSION, p2p_mm_playlist_names[playlist],
+		p2p_mm_size_names[size]);
 }
 
 int mm_topic_listed(const char *const *topics, int count, const char *topic)
