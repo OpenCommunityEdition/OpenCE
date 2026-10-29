@@ -1,6 +1,7 @@
 /* Existing profile mappings remain authoritative for stock and menu input.
  * Custom layouts translate physical buttons before keyboard/touch merging. */
 #include "cseries.h"
+#include "memory/data.h"
 #include "controller_remap.h"
 #include "input/input_abstraction.h"
 #include "game/game.h"

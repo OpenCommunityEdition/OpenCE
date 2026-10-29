@@ -1,6 +1,7 @@
 /* Optional controller-family artwork. Legacy Xbox renderers remain the fallback;
  * callers identify their own map's controller entries before reaching this code. */
 #include "cseries.h"
+#include "memory/data.h"
 #include "controller_buttons.h"
 #include "controller_glyphs.h"
 #include "bitmaps/bitmaps.h"
