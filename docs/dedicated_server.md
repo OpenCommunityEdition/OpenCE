@@ -167,7 +167,10 @@ the game's console commands of those names.
 | `kick <player>` (`sv_kick`) | moderator | Drops the player's machine; it may join again |
 | `ban <player> [<duration>] [<reason>]` (`sv_ban`) | moderator (a day at most), admin | Drops the player's machine and bans its address and hardware id, for the duration (else for ever). A moderator must give a duration of a day or less: a ban for ever, or longer, is refused |
 | `unban <number\|address\|hardware id>` (`sv_unban`) | admin | Takes a ban out of `bans.txt`; the machine may join again at once, by the LAN or the internet |
-| `sv_ban_address <address\|hardware id> [<duration>] [<reason>]` | admin | Bans an IPv4 address (`a.b.c.d`) or a hardware id (up to 32 hex digits), its machine here or not: its line in `bans.txt` as `ban` writes it (the other part `none`), so that `sv_bans`, `unban` and `GET /api/bans` see it, and a machine present of that address or hardware id is dropped as `ban` drops it (`player_left`'s reason `banned`). Answers `ban <n> added` (`n`: its number in `sv_bans`) |
+| `sv_ban_address <address\|hardware id\|discord:<id>> [<duration>] [<reason>]` | admin | Bans an IPv4 address (`a.b.c.d`), a hardware id (up to 32 hex digits) or a verified Discord account (`discord:` and its id, below), its machine here or not: its line in `bans.txt` as `ban` writes it (the other part `none`), so that `sv_bans`, `unban` and `GET /api/bans` see it, and a machine present of that address or hardware id is dropped as `ban` drops it (`player_left`'s reason `banned`). Answers `ban <n> added` (`n`: its number in `sv_bans`) |
+| `sv_vpn` | viewer | The VPN policy, the netlist held (its masters, serial, ranges, age) and the joins refused for it ("VPNs and linked Discord accounts") |
+| `sv_vpn_check <address>` | moderator | Whether an IPv4 address is refused as a VPN's, and by what (`netlist`, `vpn_block.txt`, `vpn_allow.txt`) |
+| `sv_vpn_fetch` | admin | Fetches the masters' netlists now |
 | `mute <player> [<minutes>]`, `unmute <player>` | moderator | The host's mute of a player's chat and voice for everyone |
 | `sv_map <map> [<gametype>]`, `sv_map <entry>` | moderator | Plays that game (or a rotation entry, `map:gametype+rule=value`; a co-op one too), below |
 | `sv_map_next` (`sv_next`) | moderator | Ends the game without its scores and plays the rotation's next |
@@ -221,7 +224,9 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `server.coop_difficulty`, `server.region`, `server.master_publish`,
 `server.chat_filter`, `server.chat_filter_slurs`, `server.chat_filter_swearing`,
 `server.chat_filter_insults`,
-`server.master_publish_address`, `server.metrics`, and `network.text_chat`,
+`server.master_publish_address`, `server.metrics`, `server.vpn_policy`,
+`server.vpn_fail`, `server.vpn_check_lan`, `server.link_min_age_days`,
+`server.link_one_seat`, and `network.text_chat`,
 `network.voice_lobby`, `network.voice_mode`, `network.voice_kbps`,
 `network.votekick`, `network.votekick_minutes`,
 `network.votekick_ban_minutes`, `network.map_share`,
@@ -254,6 +259,9 @@ in either case, and is kept as the table spells it:
 | `server.coop_difficulty` | `easy`, `normal`, `hard`, `impossible` |
 | `network.text_chat` | `on`, `links`, `off` |
 | `server.chat_filter` | `off`, `censor`, `block` |
+| `server.vpn_policy` | `off`, `link`, `block` |
+| `server.vpn_fail` | `open`, `closed` |
+| `server.link_min_age_days` | 0 to 3650 |
 | `server.chat_filter_slurs`, `server.chat_filter_swearing`, `server.chat_filter_insults` | `off`, `severe`, `strong`, `mild` |
 | `network.voice_mode` | `off`, `team_proximity`, `team_enemy_proximity`, `team_global`, `team_global_enemy_proximity` |
 | `network.voice_kbps` | 8 to 64 |
@@ -276,6 +284,54 @@ them, which an updated game shows as "The host refused: your player name"
 `refusing a machine … its name has words the server's filter keeps out`).
 Links are `network.text_chat`'s, refused by default. A list of words is
 not a moderator: spaced letters and look-alikes get past it.
+
+### VPNs and linked Discord accounts
+
+A dedicated server refuses by default machines that join from the address
+of a VPN, a Tor exit or a datacenter, as the master servers' netlist says
+(`docs/master_protocol.md`, "The netlist"), and lets one in that shows a
+pass of a Discord account linked at a master the server publishes to ("Player
+keys, links and passes" there): a player on a VPN links a Discord account
+once, and joins. `server.vpn_policy`, live:
+
+| Value | A machine from a listed address |
+| --- | --- |
+| `link` (the default) | is refused with "This server blocks VPNs: link Discord in Settings, Account to join, or turn your VPN off", unless it shows a pass (which an updated game does at once, by itself, when it holds one) |
+| `block` | is refused, pass or not ("This server does not allow VPNs") |
+| `off` | joins |
+
+The server fetches the netlist of each master it publishes to (the masters
+of `server.masters_file`) every hour, keeps the newest of each on disk
+(`netlist-<master key id>.bin` beside `bans.txt`) and checks the union of
+them. Until it holds one, `server.vpn_fail` decides: `open` (the default)
+lets every machine in, `closed` refuses those from the internet as
+`block` would. `server.vpn_list` names a netlist file checked besides
+the masters' (a full path, or beside `config.toml`; for a server that
+publishes nowhere, or a test), read at the start and by `sv_reload`. Beside
+`bans.txt`, `vpn_allow.txt` names ranges never refused and `vpn_block.txt`
+ranges refused besides, one a line (`203.0.113.0/24`, `198.51.100.7`, or
+`198.51.100.1-198.51.100.9`; `#` starts a comment), read at the start and by
+`sv_reload`. Only a machine's real internet address is checked (an
+internet play peer's endpoint, `distributed_real_address`): a LAN's
+machines are not, unless `server.vpn_check_lan` (for tests) says so.
+
+A pass is taken from the masters the server publishes to alone (with
+`server.master_publish` and a publisher key): a server that publishes
+nowhere takes none, and a player from a listed address joins it only with
+`server.vpn_policy` `off`. With a pass, the server also refuses an account
+younger than `server.link_min_age_days` (365 by default: a year, from the
+account's id; "This server needs a Discord account a year old to join over
+a VPN") and, with `server.link_one_seat` (on by default), a second machine
+of an account already in the game ("Your Discord account is already
+playing on this server"). A pass that does not check (another master's, out
+of date, not this connection's) is refused as "Your Discord link could not
+be checked". The machine of a pass is a verified Discord account: its id
+and username (`discord_id`, `discord_name`, `discord_verified` in
+`/api/players` and `player_joined`, with the addresses: for the owner, or
+every role with `server.log_addresses`) replace what
+the machine says of itself, and `ban` bans the account too. Each refusal
+is logged (`refusing a machine @<address>: vpn …`) and is a `join_refused`
+event. An older game is told the game is closed.
 
 A dedicated server's text chat is its `network.text_chat`'s, listed or
 not: `on` by default (lines with links refused), `links`, or `off`, live
@@ -415,7 +471,7 @@ are checked in all. `/api/login` takes `POST` alone (any other method:
 | `GET /healthz` | none | `200 {"state":"lobby"}` (or `loading`, `playing`, `postgame`) while the server hosts and its frames run; `503` with `{"state":"starting"}`, `{"state":"stalled"}` (no frame for a minute) or the other state otherwise |
 | `GET /metrics` | none (`server.metrics`) | Prometheus text |
 | `GET /api/status` | viewer | The status (below) |
-| `GET /api/players` | viewer | `{"ok":true,"players":[<player>…]}` (with `address` and `hwid` for the owner, or every role with `server.log_addresses`) |
+| `GET /api/players` | viewer | `{"ok":true,"players":[<player>…]}` (with `address` and `hwid` for the owner, or every role with `server.log_addresses`; and `discord_id`, `discord_name` and `discord_verified` with them: a verified account's, else what the machine says, `""` for none) |
 | `POST /api/players/{slot}/kick` | moderator | `{"name":"<the player's name, checked>"}` → `{"ok":true,"lines":[…]}`, or `409 changed` when the slot holds another player |
 | `POST /api/players/{slot}/ban` | moderator | `{"name":…,"duration":"1d","reason":"…"}` (no duration: for ever, which a moderator's ban cannot be: `400 failed`) |
 | `POST /api/players/{slot}/mute` | moderator | `{"name":…,"minutes":10}` |
@@ -431,8 +487,10 @@ are checked in all. `/api/login` takes `POST` alone (any other method:
 | `PUT /api/gametypes/{name}` | admin | `{"text":"<TOML>"}` → `{"ok":true}`, or `400 invalid` with `line` and `message` (a name is `a`–`z`, `0`–`9`, `_` and `-`, 32 at most) |
 | `DELETE /api/gametypes/{name}` | admin | `{"ok":true}` |
 | `GET /api/maps` | viewer | `{"ok":true,"maps":[{"name":"bloodgulch","level":"levels\\test\\bloodgulch\\bloodgulch","kind":"xbox","title":"Blood Gulch"}…]}` (`kind`: `xbox` or `custom`; `title` is the map's display name, else its `name`) |
-| `GET /api/bans` | admin | `{"ok":true,"bans":[{"n":0,"when":"2026-10-19 18:00:00","ip":"…","hwid":"…","players":"…","reason":"…","until":<unix>\|null}…]}` |
-| `POST /api/bans` | admin | `{"ip":"203.0.113.5","hwid":"…","names":"…","duration":"1d","reason":"…"}` (`ip` or `hwid`, or both; the rest may be left out: no duration is for ever) → `{"ok":true,"n":<the new ban's number in GET /api/bans>}`: `sv_ban_address`, a machine present of the address or the hardware id dropped; `400 schema` for an address that is not IPv4, a hardware id that is not hex, a duration that is not one |
+| `GET /api/bans` | admin | `{"ok":true,"bans":[{"n":0,"when":"2026-10-19 18:00:00","ip":"…","hwid":"…","discord_id":"…","discord_verified":true,"players":"…","reason":"…","until":<unix>\|null}…]}` |
+| `GET /api/vpn` | viewer | `{"ok":true,"policy":"link","fail":"open","lists":[{"master":"<url>","key_id":"…","serial":12,"generated":<unix>,"fetched":<unix>\|null,"ranges":30582,"error":""}…],"file":"<server.vpn_list>","allow_ranges":0,"block_ranges":0,"held":true,"refused":{"vpn_link_required":0,"vpn_blocked":0,"vpn_link_invalid":0,"vpn_link_too_new":0,"vpn_link_in_use":0}}` (`held`: a list is held, from a master or the file) |
+| `POST /api/vpn/check` | moderator | `{"ip":"203.0.113.5"}` → `{"ok":true,"listed":true,"by":"netlist"}` (`by`: `netlist`, `vpn_block.txt`, `vpn_allow.txt`, or `""`) |
+| `POST /api/bans` | admin | `{"ip":"203.0.113.5","hwid":"…","discord_id":"…","names":"…","duration":"1d","reason":"…"}` (`ip`, `hwid` or `discord_id` (a verified account's: up to 20 digits), or more than one; the rest may be left out: no duration is for ever) → `{"ok":true,"n":<the new ban's number in GET /api/bans>}`: `sv_ban_address`, a machine present of the address or the hardware id dropped; `400 schema` for an address that is not IPv4, a hardware id that is not hex, a duration that is not one |
 | `DELETE /api/bans/{n}` | admin | `{"ok":true}` |
 | `GET /api/settings` | admin | `{"ok":true,"settings":[<setting>…]}` |
 | `PUT /api/settings` | admin | `{"server.name":"…","server.max_players":16,"server.public":true,…}` (a value as JSON, a boolean, a number or a string, or its text: `"true"`, `"16"`; `null` empties it) → `{"ok":true,"applied":["server.name"],"errors":[{"name":…,"code":…,"message":…}]}`; each setting is changed or refused on its own |
@@ -524,7 +582,7 @@ Every frame is text holding one JSON object. The server speaks first:
 
 ```
 → {"type":"hello","protocol":1,"server":"OpenCE Server","build":"build-206","network_version":38,
-   "capabilities":["events","status","rotation","settings","bans","owner_web","ban_address","stop","event_addresses","identity"]}
+   "capabilities":["events","status","rotation","settings","bans","owner_web","ban_address","stop","event_addresses","identity","vpn","link"]}
 ← {"type":"auth","password":"…","by":"paul"}       or {"type":"auth","token":"<session token>"}
 → {"type":"auth","ok":true,"role":"admin"}
 → {"type":"auth","ok":false,"error":{"code":"denied"}}  and the connection closes (1008)
@@ -547,7 +605,9 @@ A connection signed in with the page's cookie (on the same origin) needs no
 The `capabilities` say what the server has beyond the first release's
 (`events`, `status`, `rotation`, `settings`, `bans`): `owner_web`,
 `ban_address`, `stop`, `event_addresses` and `identity` ("Panels and
-fleets"); a client checks for one before it uses it. The owner's password
+fleets"), `vpn` (the VPN policy, `/api/vpn`, `join_refused`) and `link`
+(verified Discord accounts: `discord_*` in players, bans by `discord_id`);
+a client checks for one before it uses it. The owner's password
 signs in from the server's own machine alone ("Signing in").
 A command is a `line`, or a `command` and its `args`, which the server
 joins with spaces, quoting an argument that holds a space or is empty (511
@@ -568,7 +628,7 @@ allowance (above). The
 event groups are `player` (`player_joined`, `player_left`, `map_share`), `chat`
 (`chat`), `game` (`lobby_opened`, `countdown`, `game_started`,
 `game_ended`, `postgame`, `score`, `kill`), `moderation` (`kick`, `ban`,
-`unban`, `mute`, `unmute`, `speed_hack`), `status` (`status`), `log`
+`unban`, `mute`, `unmute`, `speed_hack`, `join_refused`), `status` (`status`), `log`
 (`log`, each log line as `{"n","level","cat","text"}`), `master`
 (`master`), and `server` (`server_started`, `reloaded`, `warning`,
 `drain`, `shutdown`), which every subscriber gets.
@@ -598,7 +658,8 @@ Every event has `seq` (rising, never reused while the server runs; a
 | `game_started` | `map, gametype, variant, teams, team_scores[]` (team games), `players[]` |
 | `game_ended` | `map, gametype, variant, teams, reason` (`score`, `time`, `idle`, `empty`, `command`, `next`), `duration` (seconds), `team_scores[]` (team games), `players[]` |
 | `postgame` | `seconds` |
-| `player_joined` | `slot, name, team, machine`; `address, hwid` for the owner, or every role with `server.log_addresses` |
+| `player_joined` | `slot, name, team, machine`; `address, hwid, discord_id, discord_name, discord_verified` for the owner, or every role with `server.log_addresses` |
+| `join_refused` | `name` (the machine's), `reason` (`vpn_link_required`, `vpn_blocked`, `vpn_link_invalid`, `vpn_link_too_new`, `vpn_link_in_use`); `address, hwid` as `player_joined`'s |
 | `player_left` | `slot, name, reason` (`left`; `kicked` and `banned` when the server's `kick`, `ban` or `sv_ban_address` dropped the machine, `banned` for a speed hack's drop too); `address, hwid` (as it joined) as `player_joined`'s |
 | `chat` | `channel` (`everyone`, `team`, `vehicle`), `slot, name, text` (admins only; the lines the host sends on) |
 | `kill` | `killer, victim` (slots; -1 for none), `weapon` (the killer's weapon's or the killing object's tag name, or null), `friendly_fire` |
@@ -630,6 +691,14 @@ or a hardware id with no player of it needed (the part not given is
 `none`). `unban` takes the line out and readmits the machine by
 the line's address or hardware id, whether it joins on the LAN or by
 internet play.
+
+A line's `discord_id` is a verified Discord account's when it has no
+`(self-reported)` after it: `ban` writes it so for a machine that showed a
+pass, and `sv_ban_address discord:<id>` and `POST /api/bans`' `discord_id`
+write it. Such a line keeps out every machine that shows a pass of that
+account, from any address. What a machine says of its Discord account
+itself is written with `(self-reported)` and never matched: anyone could
+say it.
 
 ## The rotation
 
@@ -743,6 +812,7 @@ lists;
 | `publisher.key` | The publisher key for the master servers (beside `config.toml`). On Windows, a server's `config.toml` and `publisher.key` are given an access list of their owner alone (the entries inherited for Administrators and SYSTEM taken out) |
 | `masters.txt` | The master servers (`server.masters_file`: beside `config.toml`, else beside the executable); one that names none leaves the official master, built in |
 | `bans.txt`, `cheaters.txt`, `debug.txt` | In `paths.logs`, else the data root |
+| `vpn_allow.txt`, `vpn_block.txt`, `netlist-<master key id>.bin` | Beside `bans.txt`: ranges never refused as a VPN's, ranges refused besides, and the masters' netlists held ("VPNs and linked Discord accounts") |
 | `status.json` (`server.status_file`) | The status, written every 2 seconds |
 | A password's file (`HALO_SERVER_WEB_PASSWORD_FILE`, `HALO_SERVER_WEB_OWNER_PASSWORD_FILE`, `HALO_SERVER_WEB_MODERATOR_PASSWORD_FILE`, `HALO_SERVER_WEB_VIEWER_PASSWORD_FILE`, `HALO_SERVER_PASSWORD_FILE`) | A container's secret: when the plain variable is not set, the file's first line (its CR and LF off) is the setting's value, which is then pinned as the plain variable's would be (`sv_set` and `PUT /api/settings` refuse it, `409 pinned`). Read once, at the start; a file that cannot be read is logged, and the setting is `config.toml`'s |
 
