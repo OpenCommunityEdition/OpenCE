@@ -39,6 +39,14 @@ SWITCH_BUTTON_STYLES = [("SWITCH CLASSIC", "switch_classic"), ("SWITCH GEMS", "s
                        ("SWITCH MODERN", "switch_modern")]
 SENSITIVITIES = [(f"{value:g}", f"{value:g}") for value in (0.1, 0.15, 0.25, 0.4, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4)]
 VOLUMES = [(str(step), f"{step / 10:g}") for step in range(11)]
+# an HDR display's paper white and peak in nits (display.hdr_paper_white,
+# display.hdr_peak_brightness), in steps fine enough for HDR Calibration's
+# patterns (and BT.2408's reference white, 203); Extra Effects' rows have the
+# same, so they show what it chose
+PAPER_WHITES = [("AUTO", "0")] + [(str(nits), str(nits)) for nits in sorted({*range(80, 200, 10), 200, 203, *range(220, 401, 20), 250})]
+PEAK_BRIGHTNESSES = [("AUTO", "0")] + [(str(nits), str(nits)) for nits in
+                                       [*range(250, 600, 25), *range(600, 1200, 50), *range(1200, 2001, 100),
+                                        2500, 3000, 4000, 5000, 6000, 8000, 10000]]
 
 # each screen: its folder below PE, its screen's widget (the name the profile
 # menu opens), its header (widget, bitmap), the row spacing, and its rows:
@@ -122,13 +130,9 @@ SCREENS = {
             ("TONE CURVE:", "display.hdr_tone_mapping",
              [("GT7", "gt7"), ("NEUTRAL", "neutral"), ("ACES", "aces"), ("REINHARD", "reinhard")],
              "GT7: bright light turns white, as on film. Neutral:\nas drawn. ACES: more contrast. Reinhard: softer.", None),
-            ("PAPER WHITE:", "display.hdr_paper_white",
-             [("AUTO", "0"), ("80", "80"), ("100", "100"), ("120", "120"), ("160", "160"), ("200", "200"),
-              ("203", "203"), ("250", "250"), ("300", "300"), ("400", "400")],
+            ("PAPER WHITE:", "display.hdr_paper_white", PAPER_WHITES,
              "With HDR Display, how bright white is, in nits.\nAuto: Windows' SDR content brightness.", "desktop"),
-            ("PEAK BRIGHTNESS:", "display.hdr_peak_brightness",
-             [("AUTO", "0"), ("400", "400"), ("600", "600"), ("800", "800"), ("1000", "1000"), ("1500", "1500"),
-              ("2000", "2000"), ("4000", "4000"), ("10000", "10000")],
+            ("PEAK BRIGHTNESS:", "display.hdr_peak_brightness", PEAK_BRIGHTNESSES,
              "With HDR Display, your display's brightest, in\nnits. Auto: Windows' HDR calibration.", "desktop"),
         ],
     },
@@ -284,6 +288,26 @@ SCREENS["video_settings/graphics"] = {
 SCREENS["video_settings/extra_effects"] = {
     "screen": "extra_effects_settings_screen", "header": _video["header"], "spacing": 30,
     "rows": [row for row in _video["rows"] if row[1] in _extra_effects],
+    # (shown only with an HDR display: menu_functions.c's
+    # hdr_calibration_row_show)
+    "categories": [
+        ("HDR CALIBRATION:", "video_settings/hdr_calibration",
+         "Set Peak Brightness and Paper White by eye,\nwith patterns brighter than white.", "desktop"),
+    ],
+}
+# HDR Calibration: the peak, then paper white, each row's pattern drawn by
+# the renderer between the rows and the help, at the values shown, which the
+# display takes while the screen is open (menu_functions.c's "port hdr
+# calibration", d3d8_gl.c's hdr_calibration_draw)
+SCREENS["video_settings/hdr_calibration"] = {
+    "screen": "hdr_calibration_settings_screen", "header": _video["header"], "spacing": 30,
+    "inputs": ["port hdr calibration"],
+    "rows": [
+        ("PEAK BRIGHTNESS:", "display.hdr_peak_brightness", PEAK_BRIGHTNESSES,
+         "Raise it until the ring just disappears into\nthe square: the brightest your display shows.", None),
+        ("PAPER WHITE:", "display.hdr_paper_white", PAPER_WHITES,
+         "How bright white is (the menus, the HUD, the\ngrey bars), in nits. Choose what looks right.", None),
+    ],
 }
 _video["rows"] = [row for row in _video["rows"] if row[1] not in _graphics | _extra_effects]
 _video["categories"] = [
@@ -722,7 +746,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
     extra += _strings(f"{base}/help_strings",
                       [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]] +
                       [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())])
-    return _screen(folder, spec, rows, ["port settings help"], [], extra)
+    return _screen(folder, spec, rows, ["port settings help", *spec.get("inputs", ())], [], extra)
 
 
 def _controls_screen() -> list:
