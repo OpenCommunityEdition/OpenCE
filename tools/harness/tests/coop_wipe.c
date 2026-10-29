@@ -30,7 +30,15 @@ static struct {int public,has_password,listed;} lobby;
 static boolean browser_enabled=TRUE;
 #define pthread_mutex_lock(lock) ((void)0)
 #define pthread_mutex_unlock(lock) ((void)0)
-static int config_boolean(char const *name){CHECK(!strcmp(name,"network.public_lobby"),"wrong visibility key");return browser_enabled;}
+/* (a dedicated server: its server.public and network.online, not the lobby's) */
+static int dedicated,dedicated_public=TRUE,dedicated_online=TRUE;
+static int halo_server_mode(void){return dedicated;}
+static int config_boolean(char const *name)
+{
+ if(dedicated&&!strcmp(name,"server.public"))return dedicated_public;
+ if(dedicated&&!strcmp(name,"network.online"))return dedicated_online;
+ CHECK(!strcmp(name,"network.public_lobby"),"wrong visibility key");return browser_enabled;
+}
 static char const *policy="auto";
 static short game_connection(void){return (short)connection;}
 static boolean coop_game(void){return active;}
@@ -86,6 +94,10 @@ int main(int argc,char **argv)
    CHECK(reverts==cases[i].want&&respawns==1-cases[i].want,"policy %s/public%d/password%d/transport%d",policy,lobby.public,locked,transport);
   }
   setup();lobby.public=TRUE;browser_enabled=FALSE;wipe();CHECK(reverts==1&&!respawns,"disabled public browser counted as listed");
+  /* a dedicated server is public by server.public with internet play, whatever its lobby says */
+  setup();dedicated=1;lobby.public=FALSE;wipe();CHECK(!reverts&&respawns==1,"public dedicated server reverted on auto");
+  setup();dedicated=1;dedicated_online=FALSE;wipe();CHECK(reverts==1&&!respawns,"LAN-only dedicated server counted as public");
+  dedicated=0;dedicated_online=TRUE;
  } else CASE("authority") {
   policy="revert";connection=_game_connection_network_client;CHECK(!network_coop_wipe_reverts(),"client decides wipe");
   connection=_game_connection_network_server;active=FALSE;CHECK(!network_coop_wipe_reverts(),"multiplayer decides co-op wipe");
