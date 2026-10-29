@@ -435,6 +435,9 @@ read for drawing is the tick's value moved forward by the fraction of the
 tick that has passed. */
 void object_functions_set_for_render(boolean for_render);
 void object_function_values_for_render(long object_index, real values[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS]);
+/* port: forgets the inputs kept for the objects' pictures (objects.c's
+object_function_inputs), when a load puts the objects back or a map starts */
+void object_function_inputs_forget(void);
 short objects_in_clusters_by_indices(unsigned long class_flags, short cluster_count, short const *cluster_indices, short maximum_object_count, long *object_indices);
 long object_index_from_name_index(short name_index);
 /* port: this object takes a scenario name nobody holds, the way a placed

@@ -105,6 +105,7 @@ static real object_function_addition(
 	struct object_datum *object,
 	struct object_function_definition *function,
 	real huh,
+	real const *incoming,
 	real const *outgoing,
 	boolean *active);
 static real object_function_wrap(
@@ -153,6 +154,23 @@ struct dump_datum
 	short dead_count;
 	short outside_map_count;
 	short at_rest_count;
+};
+
+/* port: the incoming values an object's functions were last computed from
+(object_compute_function_values), from which its picture's values are made
+(object_function_values_for_render). By the time a frame is drawn, an
+invisible weapon has written its own values into its parent's (as the
+original does, after the parent's functions are computed:
+weapon_export_function_values, a vehicle's gun), and read as the parent's
+own they put the gun's values into the picture: a warthog's headlights, a
+function of its driver's seat power, read its gun's illumination and went
+dark. Not in the game state: an entry is an object's only while its index
+is, and none is kept across a map's start or a game state's load
+(object_function_inputs_forget). */
+struct object_function_inputs
+{
+	long object_index;
+	real values[NUMBER_OF_INCOMING_OBJECT_FUNCTIONS];
 };
 
 /* ---------- prototypes */
@@ -213,6 +231,8 @@ static const struct object_memory_release_function object_memory_release_procs[3
 static long *object_name_list = NULL;
 static struct memory_pool *object_memory_pool = NULL;
 static struct object_globals *object_globals = NULL;
+/* port: (by the object's absolute index) */
+static struct object_function_inputs object_function_inputs[MAXIMUM_OBJECTS_PER_MAP];
 
 boolean debug_objects_names;
 boolean debug_objects_pathfinding_spheres;
@@ -1572,12 +1592,25 @@ void object_functions_set_for_render(
 		object_function_render_depth--;
 }
 
+void object_function_inputs_forget(
+	void)
+{
+	long index;
+
+	for (index = 0; index < MAXIMUM_OBJECTS_PER_MAP; index++)
+		object_function_inputs[index].object_index = NONE;
+}
+
 void object_function_values_for_render(
 	long object_index,
 	real values[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS])
 {
 	struct object_datum *object = object_get(object_index);
 	struct object_definition *definition = object_definition_get(object->definition_index);
+	struct object_function_inputs const *inputs =
+		&object_function_inputs[DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index)];
+	/* port: the inputs the tick's values came from (object_function_inputs) */
+	real const *incoming = inputs->values;
 	/* port: where the picture is, between the previous tick (0) and this one
 	(1) (render_interpolation.c); 1 outside an interpolated frame (Smooth
 	Motion off), where the tick's own values are shown */
@@ -1594,6 +1627,10 @@ void object_function_values_for_render(
 		object->object.outgoing_function_values,
 		sizeof(object->object.outgoing_function_values));
 	if (!(fraction >= 0.0f) || !(fraction < 1.0f))
+		return;
+	/* port: none kept for this object (not computed since its index was
+	taken, or since a game state was loaded): the tick's own values */
+	if (inputs->object_index != object_index)
 		return;
 
 	back = 1.0f - fraction;
@@ -1616,6 +1653,7 @@ void object_function_values_for_render(
 				object,
 				function,
 				huh,
+				incoming,
 				object->object.outgoing_function_values,
 				&active);
 			values[function_index] = object_function_wrap(
@@ -1627,6 +1665,7 @@ void object_function_values_for_render(
 				object,
 				function,
 				huh - back * 0.033333335f,
+				incoming,
 				values,
 				&active);
 			values[function_index] = output;
@@ -5270,7 +5309,7 @@ static void object_delete_recursive(
 }
 
 static real object_function_input_value(
-	struct object_datum *object,
+	real const *incoming,
 	real const *outgoing,
 	short index)
 {
@@ -5279,7 +5318,7 @@ static real object_function_input_value(
 		return 0.0f;
 	if (index >= NUMBER_OF_INCOMING_OBJECT_FUNCTIONS + 1)
 		return outgoing[index - NUMBER_OF_INCOMING_OBJECT_FUNCTIONS - 1];
-	return object->object.incoming_function_values[index - 1];
+	return incoming[index - 1];
 }
 
 static real object_function_wrap(
@@ -5299,6 +5338,7 @@ static real object_function_addition(
 	struct object_datum *object,
 	struct object_function_definition *function,
 	real huh,
+	real const *incoming,
 	real const *outgoing,
 	boolean *active)
 {
@@ -5310,7 +5350,7 @@ static real object_function_addition(
 	if (function->scale_period_by_function_index)
 	{
 		real function_value = object_function_input_value(
-			object,
+			incoming,
 			outgoing,
 			function->scale_period_by_function_index);
 
@@ -5323,7 +5363,7 @@ static real object_function_addition(
 	if (function->scale_function_by_function_index)
 	{
 		value *= object_function_input_value(
-			object,
+			incoming,
 			outgoing,
 			function->scale_function_by_function_index);
 	}
@@ -5355,14 +5395,14 @@ static real object_function_addition(
 
 	if (function->add_function_index)
 	{
-		value += object_function_input_value(object, outgoing, function->add_function_index);
+		value += object_function_input_value(incoming, outgoing, function->add_function_index);
 		value = MIN(value, 1.f);
 	}
 
 	if (function->scale_result_by_function_index)
 	{
 		value *= object_function_input_value(
-			object,
+			incoming,
 			outgoing,
 			function->scale_result_by_function_index);
 	}
@@ -5425,10 +5465,17 @@ static void object_compute_function_values(
 	past them are the attachments and the node blocks; retail has up to 4) */
 	short function_count = (short)MIN(object_definition->object.functions.count, NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS);
 
+	struct object_function_inputs *inputs =
+		&object_function_inputs[DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index)];
+
 	if (object_definition->object.functions.count>NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS)
 	{
 		object_definition_data_error(object->definition_index, "function count; only the first 4 are computed");
 	}
+
+	/* port: kept for the picture's values (object_function_inputs) */
+	inputs->object_index = object_index;
+	csmemcpy(inputs->values, object->object.incoming_function_values, sizeof(inputs->values));
 
 	for (function_index = 0; function_index<function_count; ++function_index)
 	{
@@ -5441,6 +5488,7 @@ static void object_compute_function_values(
 			object,
 			function,
 			huh,
+			object->object.incoming_function_values,
 			object->object.outgoing_function_values,
 			&function_is_active);
 
