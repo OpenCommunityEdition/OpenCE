@@ -412,8 +412,8 @@ static struct network_game_message_packet_definitions data_0030aa68 =
 		DATA_PACKET_FIELD(_data_packet_field_shorts, 32),
 		DATA_PACKET_FIELD(_data_packet_field_bytes, 16),
 		DATA_PACKET_FIELD(_data_packet_field_bytes, 32),
-		/* (port: the Discord pass and its proof) */
-		DATA_PACKET_FIELD(_data_packet_field_bytes, 170 + 64),
+		/* (port: the Discord pass, 170 bytes, and its proof, 64) */
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 234),
 		DATA_PACKET_FIELD_END,
 	},
 	NETWORK_GAME_MESSAGE_DEFINITION(client_join_game_request, "message_client_join_game_request_packet", message_client_join_game_request),

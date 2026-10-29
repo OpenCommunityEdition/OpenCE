@@ -175,7 +175,7 @@ fields client_game_update 1134bf6a029b
 fields client_graceful_game_exit_postgame 678699dea271
 fields client_graceful_game_exit_pregame 678699dea271
 fields client_host_crashed_cry_for_help 52eb2291ec03
-fields client_join_game_request ed59276d04cc
+fields client_join_game_request 20da8c4f815f
 fields client_join_new_host 52eb2291ec03
 fields client_loaded 678699dea271
 fields client_map_is_precached_pregame 0073b9d65051
