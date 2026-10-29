@@ -283,7 +283,7 @@ movement after a short pause changes it again.
 In the menus, the mouse moves a pointer, a blue arrow
 (`port/assets/cursor/menu_cursor.png`) in place of the system's, sized to
 the window as Halo PC's was (Settings > Mouse > MENU CURSOR:
-`display.menu_cursor`, medium by default, 24 of the menus' 480 lines tall;
+`display.menu_cursor`, large by default, 32 of the menus' 480 lines tall;
 off shows the system's pointer):
 
 - The item below the pointer gets the focus.
@@ -480,6 +480,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.anti_aliasing` | `"off"` | `HALO_ANTI_ALIASING` | The smoothing of jagged edges, which the Xbox did not have. `"off"`: none, as on the Xbox. `"fxaa"` or `"smaa"`: a pass over the 3D view after the game draws it. The HUD and the menus stay sharp. SMAA is the sharper and costs more. `"ssaa2x"`: the game draws at two times the resolution in each direction (at most the GPU's largest texture), and the picture is scaled down. The GPU does four times the work. Not with `display.resolution_scaling = "original"`. `"msaa2x"`, `"msaa4x"` or `"msaa8x"`: each pixel of the 3D view has that many samples (at most the GPU's). On Android, `"smaa"` gives FXAA and `"ssaa2x"` none. A change applies from the next frame. Refer to "Anti-aliasing" in "What operates". |
 | `debug.gpu_flush_draws` | `-1` | `HALO_GPU_FLUSH_DRAWS` | Flush the GPU's pipeline every this many draws. `-1`: every 3 on Intel graphics with Mesa's driver, which can otherwise hang in the game's long runs of small draws and reset the desktop's graphics too. `0`: never. |
 | `display.interpolation` | `true` | `HALO_INTERPOLATION` | `true`: one frame for each refresh of the display. `false`: 30 frames each second, as on the Xbox. Refer to "Frame rate". |
+| `display.menu_cursor` | `"large"` | `HALO_MENU_CURSOR` | Windows, Linux and the web: the menus' pointer for the mouse, the game's blue arrow, sized to the window as Halo PC's was: `"small"`, `"medium"`, `"large"` or `"extra_large"` (18, 24, 32 or 40 of the menus' 480 lines tall), or `"off"` for the system's pointer. MENU CURSOR in Settings > Mouse writes its choice here. |
 | `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
 | `display.fov` | `0.0` | `HALO_FOV` | The first-person view's field of view on foot, in degrees across at 16:9, from 20 to 150. `0`: the stock view. Refer to "Field of view". |
 | `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | The first-person weapon's and hands' field of view, in degrees across at 16:9, from 20 to 150. `0`: the weapon's stock view, also when `display.fov` widens the world. Refer to "Field of view". |

@@ -1089,9 +1089,9 @@ static SDL_Surface *menu_cursor_scale(int height)
 	return surface;
 }
 
-/* display.menu_cursor: the arrow's height in the menus' 480 lines (medium:
-54 pixels at 1080p), or 0 for the system's pointer; read again when a
-setting changes */
+/* display.menu_cursor: the arrow's height in the menus' 480 lines (large,
+the default, Halo PC's: 72 pixels at 1080p), or 0 for the system's pointer;
+read again when a setting changes */
 static int menu_cursor_size(void)
 {
 	static const struct { const char *name; int lines; } sizes[] =
@@ -1099,7 +1099,7 @@ static int menu_cursor_size(void)
 		{ "off", 0 }, { "small", 18 }, { "medium", 24 }, { "large", 32 }, { "extra_large", 40 }
 	};
 	static unsigned long read_at = (unsigned long)-1;
-	static int lines = 24;
+	static int lines = 32;
 
 	if (read_at != config_changes())
 	{
@@ -1107,7 +1107,7 @@ static int menu_cursor_size(void)
 		size_t index;
 
 		read_at = config_changes();
-		lines = 24;
+		lines = 32;
 		for (index = 0; index < sizeof(sizes) / sizeof(sizes[0]); index++)
 			if (!strcmp(name, sizes[index].name))
 				lines = sizes[index].lines;
