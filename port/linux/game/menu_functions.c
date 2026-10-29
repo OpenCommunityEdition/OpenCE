@@ -3954,6 +3954,29 @@ static boolean invite_copy(void)
 }
 
 /* "ss start game": the settings given the server, then the lobby */
+/* the co-op game's settings, as CO-OP OPTIONS left them in config.toml
+(network.coop_friendly_fire, in cooperative_friendly_fire_modes' order,
+network.coop_player_collisions and network.coop_ally_friendly_fire), given
+the game's server: Server Setup's START, and a dedicated server's co-op
+entry (server_director.c's server_apply_entry) */
+void ui_widget_port_cooperative_settings_apply(void)
+{
+	static char const *const friendly_fire_names[] = { "off", "on", "shields_only", "explosives_only" };
+	char const *friendly_fire = config_string("network.coop_friendly_fire");
+	short index;
+
+	multiplayer.cooperative_friendly_fire = _friendly_fire_on;
+	for (index = 0; friendly_fire && index < (short)NUMBEROF(friendly_fire_names); index++)
+	{
+		if (!strcmp(friendly_fire, friendly_fire_names[index]))
+			multiplayer.cooperative_friendly_fire = cooperative_friendly_fire_modes[index];
+	}
+	multiplayer.cooperative_no_player_collisions = !config_boolean("network.coop_player_collisions");
+	network_game_server_port_set_cooperative_friendly_fire(multiplayer.cooperative_friendly_fire);
+	network_game_server_port_set_cooperative_player_collisions(!multiplayer.cooperative_no_player_collisions);
+	network_game_server_port_set_cooperative_ally_friendly_fire(config_boolean("network.coop_ally_friendly_fire"));
+}
+
 static boolean server_start(void)
 {
 	if (text_field_editing(NULL))
@@ -3967,24 +3990,8 @@ static boolean server_start(void)
 	and its FRIENDLY FIRE) */
 	if (hosting_cooperative())
 	{
-		/* (as CO-OP OPTIONS left them: network.coop_friendly_fire, in
-		cooperative_friendly_fire_modes' order, network.coop_player_collisions
-		and network.coop_ally_friendly_fire) */
-		static char const *const friendly_fire_names[] = { "off", "on", "shields_only", "explosives_only" };
-		char const *friendly_fire = config_string("network.coop_friendly_fire");
-		short index;
-
 		gametype_setup_end();
-		multiplayer.cooperative_friendly_fire = _friendly_fire_on;
-		for (index = 0; friendly_fire && index < (short)NUMBEROF(friendly_fire_names); index++)
-		{
-			if (!strcmp(friendly_fire, friendly_fire_names[index]))
-				multiplayer.cooperative_friendly_fire = cooperative_friendly_fire_modes[index];
-		}
-		multiplayer.cooperative_no_player_collisions = !config_boolean("network.coop_player_collisions");
-		network_game_server_port_set_cooperative_friendly_fire(multiplayer.cooperative_friendly_fire);
-		network_game_server_port_set_cooperative_player_collisions(!multiplayer.cooperative_no_player_collisions);
-		network_game_server_port_set_cooperative_ally_friendly_fire(config_boolean("network.coop_ally_friendly_fire"));
+		ui_widget_port_cooperative_settings_apply();
 	}
 	else if (!gametype_setup_apply())
 		return campaign_fail();

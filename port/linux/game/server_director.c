@@ -66,6 +66,7 @@ unsigned long system_milliseconds(void);
 extern boolean debug_no_drawing;
 /* (menu_functions.c's) */
 extern boolean ui_widget_port_cooperative_level_choose(char const *map_name, short difficulty);
+extern void ui_widget_port_cooperative_settings_apply(void);
 /* (port/linux/src/updater.c's) */
 int updater_server_check(void);
 long updater_server_available(void);
@@ -461,15 +462,21 @@ static long server_rotation_after(
 	return NONE;
 }
 
+/* the level the network game is first set up on: the entry being played,
+else the rotation's next. A co-op entry's own level too (its campaign map,
+which the rotation found present), which server_apply_entry then makes the
+co-op game: else the game's stock default, carousel, which a server's maps
+need not have (or not readable as this build's), and a lobby that fails to
+read its map is fatal: a rotation of co-op entries alone never started */
 char const *server_director_first_level(
 	void)
 {
 	struct server_entry const *entry;
 
-	if (server.current_set && strcmp(server.current.gametype, "coop"))
+	if (server.current_set)
 		return server.current.level;
 	entry = server_director_next();
-	return entry && strcmp(entry->gametype, "coop") ? entry->level : NULL;
+	return entry ? entry->level : NULL;
 }
 
 struct server_entry const *server_director_next(
@@ -567,6 +574,12 @@ static boolean server_apply_entry(
 			server_log(_server_log_warning, "lobby", "%s cannot be played as co-op", entry->level);
 			return FALSE;
 		}
+		/* (and as the player's Server Setup gives a co-op game: its friendly
+		fire, player collisions and ally friendly fire from config.toml,
+		which a dedicated server had never applied; and server.max_players
+		again, which choosing the level holds to the co-op default of 16) */
+		ui_widget_port_cooperative_settings_apply();
+		server_apply_game_settings();
 	}
 	else
 	{
