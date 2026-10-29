@@ -188,11 +188,14 @@ Gamepads): with "Swap triggers", the right trigger's button says "Grenade".
 The stick moves the player with every "Stick layout", southpaw too.
 
 A finger that holds a button can also swipe to look, so you can fire and
-aim with one thumb. The controls are a finger wide (48 dp) or larger, but
+aim with one thumb ("Held buttons don't aim" in General turns this off).
+The controls are a finger wide (48 dp) or larger, but
 on a small screen of high density they stay apart rather than reach that
 size. A short tap reaches the game even when it is shorter than one frame.
 Swipes that start in the edge-gesture zones of Android do not turn the
-view. The swipe aims as the controller's stick does, not as a mouse: the
+view or place the floating stick, but a control drawn in one still presses
+(Android keeps the zones while the system bars are hidden: with 3-button
+navigation, all of where the bar was). The swipe aims as the controller's stick does, not as a mouse: the
 aim slows over a target and follows a moving one, as with a controller,
 and it follows the profile's "invert look" (the gyroscope turns the view
 as the phone turns, never inverted). The setting `input.touch_aim_assist`
@@ -217,11 +220,14 @@ The buttons at the top of the screen:
     vibration setting of the game's profile), aiming with the gyroscope
     (off by default), a floating move stick (off by default: the stick goes
     where your thumb lands in the lower left of the screen), the opacity of
-    the controls, "Hide or add buttons" (hide a button, add a copy of a
+    the controls, "Held buttons don't aim" (off by default: a finger
+    that swipes from a button only holds it),
+    "Hide or add buttons" (hide a button, add a copy of a
     button) and "Edit buttons size".
-  - "Edit buttons layout": drag the controls to new positions, then push
-    "Save". "Export" and "Import" write and read a layout file with the
-    file picker of the system.
+  - "Edit buttons layout": drag the controls, and the "Options" button
+    itself, to new positions, then push "Save" in the middle of the
+    screen. "Export" and "Import", beside it, write and read a layout
+    file with the file picker of the system.
   - "Look sensitivity".
 
 "Hide" and "Options" act when the finger lifts on them: a swipe that
@@ -266,6 +272,7 @@ These settings are only for Android:
 | `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller, mouse or keyboard is connected. `"on"`: also shown with one. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `display.stats_log` | `false` (the default): `true` writes a line a second to the log with the frame rate, the mode, the map, the renderer and the size of the 3D view, for a bug report or to compare two builds. |
+| `display.resolution_scaling` | Also Linux's, with another default on Android. `"original"` (the default): the game draws the 480 lines of the Xbox, which the display scales up. `"native"`: the game draws at the display's resolution (1080 lines on a 1080p phone). `"75%"`, `"50%"` or `"25%"`: that part of the display's resolution each way, scaled up: less for the GPU to draw, for more frames a second and less heat. Video Setup's Resolution Scaling sets it, from the next frame. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to cached textures by page protection. `false`: it compares page contents once a frame instead, which is slower. Geometry uses the streaming path in either mode. Refer to "Limits". |
 

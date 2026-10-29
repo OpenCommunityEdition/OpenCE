@@ -87,13 +87,12 @@ Ctrl+D, which moving and crouching would press, from the browser) */
 #define CROUCH_KEYS "\"Left Ctrl, C\""
 #endif
 
-/* display.resolution_scaling's default: the desktop builds draw at the
-display's own resolution, Android draws the Xbox's 640x480 (a phone's GPU
-has less to spare) unless the player asks for native */
+/* display.resolution_scaling's default: on Android the Xbox's 480 lines, which
+a phone's GPU draws with time to spare, elsewhere the window's resolution */
 #ifdef HALO_ANDROID
-#define RESOLUTION_SCALING_DEFAULT "\"original\""
+#define RESOLUTION_SCALING "\"original\""
 #else
-#define RESOLUTION_SCALING_DEFAULT "\"native\""
+#define RESOLUTION_SCALING "\"native\""
 #endif
 
 static const struct config_setting config_settings[] =
@@ -110,10 +109,13 @@ static const struct config_setting config_settings[] =
 		"What fullscreen and borderless draw at: \"native\", the display's own, or\n"
 		"\"<width>x<height>\" (\"1920x1080\"), 640x480 or more. Fullscreen sets the\n"
 		"display to it; borderless draws it scaled to the display." },
-	{ "display.resolution_scaling", _config_string, RESOLUTION_SCALING_DEFAULT, "HALO_RESOLUTION_SCALING",
-		_environment_value, _platform_all,
-		"\"native\" draws at the display's resolution; \"original\" draws the\n"
-		"Xbox's 640x480 and scales it up. On Android the default is \"original\"." },
+	{ "display.resolution_scaling", _config_string, RESOLUTION_SCALING, "HALO_RESOLUTION_SCALING", _environment_value,
+		_platform_all,
+		"\"native\" draws at the window's resolution (fullscreen, the display's or\n"
+		"display.resolution; on Android, the display's); \"75%\", \"50%\" or \"25%\"\n"
+		"draw that part of it each way and scale it up; \"original\" draws the\n"
+		"Xbox's 480 lines (640x480; on Android, at the display's shape) and\n"
+		"scales them up, as Android does unless this is set." },
 	{ "display.window_size", _config_string, "\"\"", "HALO_WINDOW_SIZE", _environment_value, _platform_desktop,
 		"The window's size, \"<width>x<height>\" (\"1920x1080\"), 640x480 or more (it\n"
 		"can be resized). Empty: display.window_scale's." },
@@ -2018,7 +2020,7 @@ static const struct
 } config_words[] =
 {
 	{ "display.mode", { "", "fullscreen", "borderless", "windowed", NULL }, "display.fullscreen's" },
-	{ "display.resolution_scaling", { "native", "original", NULL }, NULL },
+	{ "display.resolution_scaling", { "native", "75%", "50%", "25%", "original", NULL }, NULL },
 	{ "display.anti_aliasing", { "off", "fxaa", "smaa", "ssaa2x", "msaa2x", "msaa4x", "msaa8x", NULL }, NULL },
 	{ "display.hud_button_style", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern",
 		"ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },

@@ -758,8 +758,9 @@ static BOOL platform_window_fullscreen(void)
 /* the size in pixels the game draws its picture at (d3d8_gl.c): the
 window's, the display's while fullscreen, or display.resolution's while
 fullscreen (either kind) where the display has room for it; before the
-window opens, what it will be. FALSE where display.resolution_scaling is
-"original": the Xbox's 640x480, scaled to the window. */
+window opens, what it will be (d3d8_gl.c draws a part of it for
+display.resolution_scaling's percentages). FALSE where it is "original": the
+Xbox's 640x480, scaled to the window. */
 BOOL platform_screen_mode(long *width, long *height)
 {
 	/* (the size last given, for a window that has none: minimized) */

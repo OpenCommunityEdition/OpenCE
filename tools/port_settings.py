@@ -84,14 +84,9 @@ SCREENS = {
             # in place of this one)
             ("WINDOW SIZE:", "display.window_size", [("1280 x 960", "1280x960")],
              "The window's size: 4:3, then 16:10, 16:9 and 21:9\n(its edges can also be dragged).", "desktop"),
-            ("RESOLUTION SCALING:", "display.resolution_scaling", [("NATIVE", "native"), ("ORIGINAL", "original")],
-             "Native draws at the resolution; Original draws\nthe Xbox's 640x480 and scales it up.", "desktop web"),
-            # (Android's own: the display's resolution cannot be chosen on a
-            # device, but the picture's can, and is the setting that decides
-            # the work a phone's GPU is asked for; port/android/README.md)
-            ("RESOLUTION:", "display.resolution_scaling", [("NATIVE", "native"), ("ORIGINAL", "original")],
-             "Native draws at the display's resolution; Original\nthe Xbox's 640x480 scaled up. Original is quicker.", "android",
-             "resolution_scaling_android"),
+            ("RESOLUTION SCALING:", "display.resolution_scaling",
+             [("NATIVE", "native"), ("75%", "75%"), ("50%", "50%"), ("25%", "25%"), ("ORIGINAL", "original")],
+             "Native draws at the resolution, 75% to 25% that\npart each way; Original, the Xbox's 480 lines.", None),
             ("V-SYNC:", "display.vsync", ON_OFF,
              "Wait for the display between frames, so that the\npicture never tears.", None),
             ("FRAME RATE LIMIT:", "display.max_fps",
