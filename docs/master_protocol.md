@@ -659,6 +659,18 @@ join with `_rejection_code_vpn_link_required` (8): it joins again at once
 with the pass, so a player's Discord account is shown only to servers that
 need it (`network.link_share`).
 
+A server may publish to several masters, and a player links with one of
+them (or more): the game shows the pass of a master it is linked with that
+lists the server (the masters whose lists had the game it joined from the
+server browser), and no other master's, since a pass of a master the
+server does not publish to would show the account to it for nothing. When
+it holds no pass of any master that lists the server, it joins no more and
+names the one of them to link with (Settings, Network Setup, Discord
+Account chooses it already). A game joined by an invite or on the LAN comes
+with no list: the game then shows each pass it holds in turn, after a
+refusal with `_rejection_code_vpn_link_invalid` (10) the next. Masters do not
+share links: each master's word on an account is its own.
+
 ## Other endpoints
 
 | Request | Who | Answer |

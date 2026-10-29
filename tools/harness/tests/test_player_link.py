@@ -1,7 +1,8 @@
 """A Discord link's pass and a dedicated server's netlist (docs/master_protocol.md, "The netlist", "Player keys,
 links and passes") against the master's test vectors: a pass read and its master's signature, a connection's binding
 and the player key's proof, a server's whole check of a pass at the door, the link page's code and the texts a link
-and a pass request sign (port/linux/src/player_link.c); a netlist read, the addresses in it, and vpn_allow.txt's
+and a pass request sign, and which master's pass a join shows (port/linux/src/player_link.c); a netlist read, the
+addresses in it, and vpn_allow.txt's
 ranges (port/linux/src/server_netlist.c); on the real SHA-256 and Ed25519 (p2p_crypto.c, Monocypher).
 
 The vectors are test_master_protocol.py's (the master's testdata/vectors.json, else the copy here)."""
@@ -16,14 +17,14 @@ from harness import CHECK_FAILED, build, constant, function, mutated, read, run 
 from harness.tests.test_master_protocol import c_string, crypto_includes, key_hex, vectors  # noqa: E402
 
 CASES = ["pass-read", "pass-signed", "proof", "check", "passes-refused", "link-texts", "netlist", "netlists-refused",
-         "ranges-text"]
+         "ranges-text", "next-pass"]
 
 SOURCES = {
     "port/linux/src/p2p.c": ["p2p_hex"],
     "port/linux/src/player_link.c": ["get_u64", "player_link_pass_read", "player_link_pass_signed",
                                      "player_link_binding", "player_link_proof_message", "player_link_proof_check",
                                      "player_link_code", "player_link_request_text", "player_link_check",
-                                     "player_link_discord_created"],
+                                     "player_link_discord_created", "listed_by", "player_link_next_pass"],
     "port/linux/src/server_netlist.c": ["get_u32", "get_u64", "server_netlist_read", "server_netlist_ranges_contain",
                                         "read_address", "compare_pairs", "server_netlist_parse_ranges"],
 }
@@ -54,6 +55,11 @@ NEGATIVE_CONTROLS = {
     "netlist-contains-off": (("return low < count && get_u32(ranges + 8 * low) <= address;",
                               "return low < count && get_u32(ranges + 8 * low) < address;"),
                              "server_netlist_ranges_contain", "netlist"),
+    "next-pass-any-master": (("(!server_count || listed_by(key_ids[index], server_key_ids, server_count))", "1"),
+                             "player_link_next_pass", "next-pass"),
+    "next-pass-repeats": (("index = after < 0 ? 0 : after + 1;", "index = after < 0 ? 0 : after;"),
+                          "player_link_next_pass", "next-pass"),
+    "next-pass-names-none": (("*needed = index;", "*needed = -1;"), "player_link_next_pass", "next-pass"),
     "ranges-never-merged": (("if (first <= *previous_last || first - 1 == *previous_last)",
                              "if (first <= *previous_last)"), "server_netlist_parse_ranges", "ranges-text"),
 }

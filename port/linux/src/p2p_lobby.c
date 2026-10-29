@@ -859,6 +859,7 @@ static void update_browsing(void)
 		{
 			lobby.games[index].master = 0;
 			lobby.games[index].listing.master = 0;
+			lobby.games[index].listing.master_key_id_count = 0;
 		}
 		if (lobby.newer[index].used && elapsed(lobby.newer[index].heard_time, GAME_EXPIRY))
 			lobby.newer[index].used = 0;
@@ -907,7 +908,7 @@ int p2p_lobby_host_listing(unsigned char *bytes, int size)
 }
 
 int p2p_lobby_take_master_listing(const unsigned char *payload, int size, const char *publisher, const char *region,
-	int network_version_shown, int dedicated)
+	int network_version_shown, int dedicated, const unsigned char *master_key_id)
 {
 	struct listing listing;
 	struct queued queued;
@@ -952,6 +953,22 @@ int p2p_lobby_take_master_listing(const unsigned char *payload, int size, const 
 			snprintf(game->listing.region, sizeof(game->listing.region), "%s", region ? region : "");
 			if (game->listing.master_count < 255)
 				game->listing.master_count++;
+			/* (the master among those that list it: a Discord link's pass
+			is shown from one of them, player_link.c) */
+			if (master_key_id)
+			{
+				int known;
+
+				for (known = 0; known < game->listing.master_key_id_count &&
+					memcmp(game->listing.master_key_ids[known], master_key_id, P2P_LISTING_MASTER_KEY_ID_SIZE); known++)
+				{
+				}
+				if (known == game->listing.master_key_id_count && known < P2P_LISTING_MAXIMUM_MASTERS)
+				{
+					memcpy(game->listing.master_key_ids[known], master_key_id, P2P_LISTING_MASTER_KEY_ID_SIZE);
+					game->listing.master_key_id_count++;
+				}
+			}
 			taken = 1;
 		}
 	}

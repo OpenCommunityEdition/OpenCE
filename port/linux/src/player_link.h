@@ -80,6 +80,14 @@ int player_link_check(const unsigned char *pass, const unsigned char *proof, con
 	struct player_link_pass *fields);
 /* the Discord account's creation, Unix seconds, from its id */
 unsigned long long player_link_discord_created(unsigned long long discord_id);
+/* which pass a join shows next: of this machine's masters (their key ids,
+and whether each holds a good pass), the first after the one shown last
+(after; -1: none yet) of a master the server's game is listed by (its
+masters' key ids; none known: any master, as for an invite's join). -1 if
+none; then needed is the first of this machine's masters the server is
+listed by of which it holds no good pass (the one to link with), -1 if none */
+int player_link_next_pass(const unsigned char (*key_ids)[PLAYER_LINK_KEY_ID_SIZE], const int *usable, int count,
+	const unsigned char (*server_key_ids)[PLAYER_LINK_KEY_ID_SIZE], int server_count, int after, int *needed);
 
 /* ---------- a server (the game's side: network_link.c) */
 
@@ -100,20 +108,26 @@ int player_link_server_check(const unsigned char *pass, const unsigned char *pro
 a machine with no player key does nothing until one is made) */
 void player_link_start(void);
 /* the join's pass to show, if it shows one (player_link_join_refused said
-so, or network.link_share is "always"): the pass, and its proof for the
-connection to the host (its virtual address, network byte order; 0: a
-LAN's); 1 if it fills them */
+so, or network.link_share is "always"): the pass of the master this machine
+linked with, of those that list the game joined from the server browser
+(p2p_joined_listing_masters; any held, in turn, for an invite's), and its
+proof for the connection to the host (its virtual address, network byte
+order; 0: a LAN's); 1 if it fills them */
 int player_link_join_fill(unsigned long host_virtual_address, unsigned char *pass, unsigned char *proof);
 /* a join refused (its rejection code): 1 if it should be made again at
 once, with a pass (the next held, after one refused as invalid) */
 int player_link_join_refused(int rejection_code);
 /* a new join, or one accepted: no pass to show unless asked again */
 void player_link_join_reset(void);
+/* the master (its index among this machine's: player_link_master_state) a
+server that refused the join for its VPN is listed by, of which this machine
+holds no pass: the one to link with; -1 if none (until the next join) */
+int player_link_needed_master(void);
 
 /* Network Setup's DISCORD ACCOUNT (menu_functions.c): the link page opened
-in the browser (the player key made if there is none) for the first master;
-1 if it was */
-int player_link_begin(void);
+in the browser (the player key made if there is none) for this machine's
+master at the index; 1 if it was */
+int player_link_begin(int master_index);
 /* ... every pass and the player key forgotten (the master's record of the
 key is then unused, and deleted in time; /link/manage deletes it at once) */
 void player_link_unlink(void);
@@ -128,7 +142,17 @@ enum
 	_player_link_state_revoked,
 	/* linked, but the passes ran out and no master answers */
 	_player_link_state_expired,
+	/* not linked, and a server that refused a join for its VPN is listed by
+	it (player_link_needed_master) */
+	_player_link_state_needed,
 };
-int player_link_state(char *name, int name_size, char *code, int code_size);
+/* ... the whole: linked (to any master) as the account, waiting for a link
+page, revoked, expired, or none; how many of this machine's masters it is
+linked with, of how many */
+int player_link_state(char *name, int name_size, char *code, int code_size, int *linked, int *masters);
+/* ... a master's (the index among this machine's: masters.txt's order): its
+address's host and its state (none past the last master, with host empty) */
+int player_link_master_state(int master_index, char *host, int host_size, char *name, int name_size, char *code,
+	int code_size);
 
 #endif

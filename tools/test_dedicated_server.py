@@ -657,7 +657,7 @@ class FakeMaster:
     """a master server on loopback: it serves a signed netlist and the passes of the player keys linked to it, and
     takes a server's publishes (ed25519_ref signs: tools/ed25519_ref.py)"""
 
-    def __init__(self, ranges):
+    def __init__(self, ranges, seed=MASTER_SEED):
         import http.server
         import sys
         import threading
@@ -666,7 +666,8 @@ class FakeMaster:
         import ed25519_ref
 
         self.ed25519 = ed25519_ref
-        self.public_key = ed25519_ref.public_key(MASTER_SEED)
+        self.seed = seed
+        self.public_key = ed25519_ref.public_key(seed)
         self.key_id = hashlib.sha256(self.public_key).digest()[:8]
         self.links = {}
         self.asked = []
@@ -700,7 +701,7 @@ class FakeMaster:
                 url = urlparse(self.path)
                 master.asked.append(url.path)
                 if url.path == "/v1/netlist":
-                    signature = master.ed25519.sign(MASTER_SEED, master.netlist)
+                    signature = master.ed25519.sign(master.seed, master.netlist)
                     self.answer(200, master.netlist, "application/octet-stream", [
                         ("Signature", "ed25519=" + base64.b64encode(signature).decode()),
                         ("Signature-Key", master.key_id.hex())])
@@ -729,7 +730,7 @@ class FakeMaster:
         issued = int(time.time()) if issued is None else issued
         body = (b"OPCEPASS" + bytes([1, flags]) + self.key_id + player_key + struct.pack(">Q", discord_id) +
                 name.encode().ljust(32, b"\0") + struct.pack(">QQ", issued, issued + 72 * 3600))
-        return body + self.ed25519.sign(MASTER_SEED, b"opence-pass-1" + body)
+        return body + self.ed25519.sign(self.seed, b"opence-pass-1" + body)
 
     def close(self):
         self.server.shutdown()
@@ -750,10 +751,11 @@ def snowflake(created):
     return (created * 1000 - 1420070400000) << 22
 
 
-def linked_player(machine, master, seed, discord_id, name):
-    """a player machine with a player key linked at the master, and its pass already held"""
+def linked_player(machine, master, seed, discord_id, name, masters=None):
+    """a player machine with a player key linked at the master, and its pass already held (its masters.txt the
+    master's, or those given, in their order)"""
     public = master.ed25519.public_key(seed)
-    (machine.folder / "bin" / "masters.txt").write_text(master.masters_line())
+    (machine.folder / "bin" / "masters.txt").write_text("".join(each.masters_line() for each in masters or [master]))
     (machine.folder / "bin" / "player.key").write_text(f"# test\n{seed.hex()}\n")
     (machine.folder / "bin" / f"pass-{master.key_id.hex()}.bin").write_bytes(
         master.make_pass(public, discord_id, name))
@@ -876,3 +878,37 @@ def test_vpn_policy_off_and_no_list(machines):
            "a machine of that address in once the policy is off", server)
     server.send("quit")
     assert server.wait(15) == 0, server.text()[-3000:]
+
+
+def test_vpn_link_with_one_of_a_servers_masters(machines):
+    """a server that publishes to two masters takes a pass of either; a player linked with the second alone (its
+    masters.txt naming both, the first before) joins with that one's pass: the first's, which it has none of, is
+    not asked for"""
+    _needs_game("bloodgulch")
+    first, second = FakeMaster([("127.0.0.202", "127.0.0.203")]), \
+        FakeMaster([("127.0.0.202", "127.0.0.203")], seed=bytes(range(64, 96)))
+    try:
+        port = _free_port()
+        server_machine = machines("server")
+        (server_machine.folder / "bin" / "masters.txt").write_text(first.masters_line() + second.masters_line())
+        server = server_machine.start(["--server"], **_server_settings(
+            port, HALO_SERVER_ROTATION="bloodgulch:slayer", HALO_SERVER_PUBLISHER_KEY=PUBLISHER_SEED.hex(),
+            HALO_SERVER_VPN_CHECK_LAN="true", HALO_SERVER_LOG_ADDRESSES="true", HALO_SERVER_LOBBY_SECONDS=300))
+        api = Api(port)
+        _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+        _until(lambda: server.text().count("netlist taken") == 2, 30, "both masters' netlists", server)
+        api.login()
+        assert len(api.call("GET", "/api/vpn")[1]["lists"]) == 2
+        linked = linked_player(machines("linked"), second, bytes([5] * 32), snowflake(int(time.time()) - 900 * 86400),
+                               "second_only", masters=[first, second])
+        _client(linked, CLIENT_ADDRESSES[0], "Linked")
+        _until(lambda: [p for p in api.call("GET", "/api/players")[1]["players"] if p["name"] == "Linked"], 90,
+               "the player linked with the second master in", server)
+        player = [p for p in api.call("GET", "/api/players")[1]["players"] if p["name"] == "Linked"][0]
+        assert player["discord_verified"] and player["discord_name"] == "second_only", player
+        assert "joining again with " + second.url + "'s pass" in linked.text(), linked.text()[-2000:]
+        server.send("quit")
+        assert server.wait(15) == 0, server.text()[-3000:]
+    finally:
+        first.close()
+        second.close()

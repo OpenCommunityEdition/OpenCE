@@ -1408,16 +1408,22 @@ The game sends the activity only to a Discord client of the same user.
 Dedicated servers refuse by default players who join from the address of a
 VPN, a Tor exit or a datacenter (`server.vpn_policy`), unless the player has
 linked a Discord account at a master server the server publishes to.
-Settings > Network Setup > Discord Account links one: LINK NOW, then OK,
-opens the master's page in the browser (`player_link.c`), which shows a
-code that the screen's first row shows too, and logs in with Discord (its
-username and id alone). The game then holds a pass the master signs, for
-72 hours, and asks for a new one before it runs out. A server that refuses
-the game for its VPN asks for it, and the game joins again at once with it:
-the server sees the account's username and id (SHOW TO SERVERS,
-`network.link_share`, also offers ALWAYS and NEVER). UNLINK deletes the key
-and its passes; the master's page `/link/manage` deletes its record of
-them.
+Settings > Network Setup > Discord Account links one: a row for each master
+server of `masters.txt` (up to 4) says whether the account is linked with
+it; LINK: WITH MASTER n, then OK, opens that master's page in the browser
+(`player_link.c`), which shows a code that the master's row shows too, and
+logs in with Discord (its username and id alone). The game then holds a
+pass that master signs, for 72 hours, and asks for a new one before it runs
+out. A server that refuses the game for its VPN asks for it, and the game
+joins again at once with the pass of the master it is linked with among
+those that list the server (any it holds, in turn, for a game joined by an
+invite): the server sees the account's username and id (SHOW TO SERVERS,
+`network.link_share`, also offers ALWAYS and NEVER). A server listed by none
+of the masters the game is linked with is refused for it with "link Discord
+with its master": the screen marks that master (A SERVER NEEDS IT) and LINK
+has it chosen. Masters share no links: linking with one master does not link
+with another. UNLINK ALL deletes the key and its passes; each master's page
+`/link/manage` deletes its record of them.
 
 The game keeps its key in `player.key` and the passes in
 `pass-<master key id>.bin`, next to `config.toml`. The key is this

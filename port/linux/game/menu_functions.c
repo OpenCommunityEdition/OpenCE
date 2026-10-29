@@ -337,10 +337,17 @@ static boolean setting_text(char const *name, char *text, unsigned int size, boo
 {
 	short index;
 
-	/* (DISCORD ACCOUNT's LINK: no change, until one is chosen) */
+	/* (DISCORD ACCOUNT's LINK: no change, until one is chosen; the master a
+	server that refused this machine for its VPN is listed by, chosen
+	already, player_link.c) */
 	if (!strcmp(name, "link.action"))
 	{
-		snprintf(text, size, "none");
+		int needed = default_value ? -1 : player_link_needed_master();
+
+		if (needed >= 0)
+			snprintf(text, size, "link_%d", needed + 1);
+		else
+			snprintf(text, size, "none");
 		return TRUE;
 	}
 	if (strncmp(name, "profile.", 8))
@@ -403,8 +410,8 @@ static boolean setting_write(char const *name, char const *value)
 	in the browser, or the account forgotten, player_link.c) */
 	if (!strcmp(name, "link.action"))
 	{
-		if (!strcmp(value, "link"))
-			player_link_begin();
+		if (!strncmp(value, "link_", 5))
+			player_link_begin(atoi(value + 5) - 1);
 		else if (!strcmp(value, "unlink"))
 			player_link_unlink();
 		return TRUE;
@@ -1623,10 +1630,11 @@ static void master_servers_show(struct widget_instance *list)
 	text_set(value, text);
 }
 
-/* Network Setup's DISCORD ACCOUNT's state (tools/port_settings.py: its
-words): linked as the account, the link page's code while it waits, revoked,
-expired (the passes ran out and no master answered), or not linked
-(player_link.c) */
+/* Network Setup's DISCORD ACCOUNT (tools/port_settings.py: its words): the
+account, "LINKED AS <name> (<n> OF <masters>)", the link page's code while it
+waits, revoked, expired (the passes ran out and no master answered), or not
+linked; and a row a master, "<host>: <its state>", a server that refused
+this machine for its VPN marking the one to link with (player_link.c) */
 #define DISCORD_ACCOUNT_WORDS \
 	"pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\discord_account\\words"
 enum
@@ -1636,37 +1644,86 @@ enum
 	_discord_account_word_waiting,
 	_discord_account_word_revoked,
 	_discord_account_word_expired,
+	_discord_account_word_of,
+	_discord_account_word_needed,
+	_discord_account_word_no_master,
 };
+
+/* text widened into a wide one (ASCII) */
+static void discord_account_widen(char const *text, wchar_t *wide, long size)
+{
+	long index;
+
+	for (index = 0; text[index] && index < size - 1; index++)
+		wide[index] = (wchar_t)(unsigned char)text[index];
+	wide[index] = 0;
+}
+
+/* a state's word and its detail (a name, a code), into text */
+static void discord_account_state_text(int state, char const *name, char const *code, wchar_t *text, long size)
+{
+	wchar_t word[ROW_TEXT_LENGTH], detail[48];
+	short word_index = state == _player_link_state_linked ? _discord_account_word_linked :
+		state == _player_link_state_waiting ? _discord_account_word_waiting :
+		state == _player_link_state_revoked ? _discord_account_word_revoked :
+		state == _player_link_state_expired ? _discord_account_word_expired :
+		state == _player_link_state_needed ? _discord_account_word_needed : _discord_account_word_none;
+
+	words_get(DISCORD_ACCOUNT_WORDS, word_index, word, NUMBEROF(word));
+	discord_account_widen(state == _player_link_state_waiting ? code : state == _player_link_state_linked ||
+		state == _player_link_state_expired ? name : "", detail, NUMBEROF(detail));
+	if (detail[0])
+		usnprintf(text, size - 1, L"%s %s", word, detail);
+	else
+		usnprintf(text, size - 1, L"%s", word);
+	text[size - 1] = 0;
+}
 
 static void discord_account_show(struct widget_instance *list)
 {
 	struct widget_instance *value = named(list, "discord_account_value", 0);
-	wchar_t text[ROW_TEXT_LENGTH], word[ROW_TEXT_LENGTH], wide[48];
-	char name[PLAYER_LINK_NAME_SIZE + 1], code[PLAYER_LINK_CODE_SIZE];
-	char const *shown;
-	short word_index;
-	long index;
-	int state;
+	wchar_t text[ROW_TEXT_LENGTH], state_text[ROW_TEXT_LENGTH], word[ROW_TEXT_LENGTH], wide[96];
+	char name[PLAYER_LINK_NAME_SIZE + 1], code[PLAYER_LINK_CODE_SIZE], host[80], row[32];
+	long master;
+	int state, linked, masters;
 
 	if (!value)
 		return;
-	state = player_link_state(name, sizeof(name), code, sizeof(code));
-	word_index = state == _player_link_state_linked ? _discord_account_word_linked :
-		state == _player_link_state_waiting ? _discord_account_word_waiting :
-		state == _player_link_state_revoked ? _discord_account_word_revoked :
-		state == _player_link_state_expired ? _discord_account_word_expired : _discord_account_word_none;
-	words_get(DISCORD_ACCOUNT_WORDS, word_index, word, NUMBEROF(word));
-	shown = state == _player_link_state_waiting ? code : state == _player_link_state_linked ||
-		state == _player_link_state_expired ? name : "";
-	for (index = 0; shown[index] && index < NUMBEROF(wide) - 1; index++)
-		wide[index] = (wchar_t)(unsigned char)shown[index];
-	wide[index] = 0;
-	if (wide[0])
-		usnprintf(text, NUMBEROF(text) - 1, L"%s %s", word, wide);
+	state = player_link_state(name, sizeof(name), code, sizeof(code), &linked, &masters);
+	discord_account_state_text(state, name, code, text, NUMBEROF(text));
+	/* ("(1 OF 2)": the masters it is linked with) */
+	if (state == _player_link_state_linked && masters > 1)
+	{
+		words_get(DISCORD_ACCOUNT_WORDS, _discord_account_word_of, word, NUMBEROF(word));
+		usnprintf(state_text, NUMBEROF(state_text) - 1, L"%s (%d %s %d)", text, linked, word, masters);
+		state_text[NUMBEROF(state_text) - 1] = 0;
+		text_set(value, state_text);
+	}
 	else
-		usnprintf(text, NUMBEROF(text) - 1, L"%s", word);
-	text[NUMBEROF(text) - 1] = 0;
-	text_set(value, text);
+	{
+		text_set(value, text);
+	}
+	for (master = 0; master < PLAYER_LINK_MAXIMUM_MASTERS; master++)
+	{
+		struct widget_instance *row_value;
+
+		snprintf(row, sizeof(row), "link_master_%ld_value", master + 1);
+		row_value = named(list, row, 0);
+		if (!row_value)
+			continue;
+		state = player_link_master_state((int)master, host, sizeof(host), name, sizeof(name), code, sizeof(code));
+		if (!host[0])
+		{
+			words_get(DISCORD_ACCOUNT_WORDS, _discord_account_word_no_master, text, NUMBEROF(text));
+			text_set(row_value, text);
+			continue;
+		}
+		discord_account_state_text(state, name, code, state_text, NUMBEROF(state_text));
+		discord_account_widen(host, wide, NUMBEROF(wide));
+		usnprintf(text, NUMBEROF(text) - 1, L"%s: %s", wide, state_text);
+		text[NUMBEROF(text) - 1] = 0;
+		text_set(row_value, text);
+	}
 }
 
 /* Graphics' button style follows the pending HUD choice, including Defaults.
@@ -4252,6 +4309,7 @@ enum
 	_browser_word_refused_link,
 	_browser_word_refused_link_age,
 	_browser_word_refused_link_in_use,
+	_browser_word_refused_vpn_master,
 };
 
 /* the words p2p_join_progress gives a join that failed, and the browser's
@@ -4273,6 +4331,7 @@ static struct
 	{ "link", _browser_word_refused_link },
 	{ "link_age", _browser_word_refused_link_age },
 	{ "link_in_use", _browser_word_refused_link_in_use },
+	{ "vpn_master", _browser_word_refused_vpn_master },
 	{ "password", _browser_word_refused_password },
 	{ "version", _browser_word_refused_version },
 	{ "token", _browser_word_refused_token },

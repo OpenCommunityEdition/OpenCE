@@ -387,25 +387,33 @@ SCREENS["network_setup/server_browser"] = {
 SCREENS["network_setup/server_browser"]["words"] = ["OF", "NONE LISTED", "NOT ASKED YET", "OFF"]
 
 # Network Setup's Discord account (port/linux/src/player_link.c): the account
-# linked at the master servers, which a dedicated server that blocks VPNs lets
-# in from one; LINK NOW opens the master's page in the browser (on OK), UNLINK
-# forgets it (link.action is no setting of config.toml's: menu_functions.c's
-# setting_write does it). The first row shows its state (menu_functions.c's
-# discord_account_show: its words)
+# linked at the master servers (masters.txt's, up to 4), which a dedicated
+# server that blocks VPNs lets in from one when it is listed by the master the
+# account is linked with. A row a master: its state; LINK WITH MASTER n opens
+# that master's page in the browser (on OK; the master a refusing server needs
+# is chosen already), UNLINK ALL forgets the account (link.action is no
+# setting of config.toml's: menu_functions.c's setting_write does it). The
+# rows' text: menu_functions.c's discord_account_show, its words
 SCREENS["network_setup/discord_account"] = {
     "screen": "discord_account_settings_screen", "header": _network["header"], "spacing": 30,
+    "wide_values": ["link_master_1", "link_master_2", "link_master_3", "link_master_4"],
     "rows": [
         ("DISCORD ACCOUNT:", "network.link_share", None,
-         "The Discord account linked to this game, or the\ncode the master server's page shows while linking.",
-         None, "discord_account"),
-        ("LINK:", "link.action", [("NO CHANGE", "none"), ("LINK NOW", "link"), ("UNLINK", "unlink")],
-         "LINK NOW opens the master server's page in the\nbrowser (on OK); UNLINK forgets the account.", None,
+         "The Discord account linked to this game, and with\nhow many of the master servers.", None,
+         "discord_account"),
+        *[(f"MASTER {n}:", "network.masters_file", None,
+           "A master server (masters.txt) and the account\nlinked with it: a server it lists lets it in.", None,
+           f"link_master_{n}") for n in range(1, 5)],
+        ("LINK:", "link.action",
+         [("NO CHANGE", "none")] + [(f"WITH MASTER {n}", f"link_{n}") for n in range(1, 5)] +
+         [("UNLINK ALL", "unlink")],
+         "WITH MASTER n opens that master's page in the\nbrowser (on OK). UNLINK ALL forgets the account.", None,
          "link_action"),
         ("SHOW TO SERVERS:", "network.link_share",
          [("WHEN ASKED", "when_needed"), ("ALWAYS", "always"), ("NEVER", "never")],
          "Which servers see your Discord account: WHEN\nASKED, those that block VPNs, joined from one.", None),
     ],
-    "words": ["NOT LINKED", "LINKED AS", "WAITING: CODE", "REVOKED", "EXPIRED:"],
+    "words": ["NOT LINKED", "LINKED AS", "WAITING: CODE", "REVOKED", "EXPIRED:", "OF", "A SERVER NEEDS IT", "NONE"],
 }
 
 # Network Setup's multiplayer HUD: its rows, moved from Network Setup, and the
@@ -617,19 +625,23 @@ def _setting_screen(folder: str, spec: dict) -> list:
             if setting not in spec.get("same_place", ()) and key not in spec.get("same_place", ()):
                 place += 1
             rows.append((row, platform, place))
-        # (a row with no values shows its value, set by the game: its text)
+        # (a row with no values shows its value, set by the game: its text; a
+        # wide one, a short label and a long value in the small font)
         if choices is None:
+            wide_value = key in spec.get("wide_values", ())
+            label_width, value_x, value_width = (130, 130, 382) if wide_value else (300, 286, 212)
             extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
                                    ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
                              [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
-                              f'<child{attributes([("widget", f"{base}/{key}_value"), ("x", 286), ("y", 1)])}/>'])
+                              f'<child{attributes([("widget", f"{base}/{key}_value"), ("x", value_x), ("y", 1)])}/>'])
             extra += _widget(f"{base}/{key}_label",
-                             [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
+                             [("type", "text"), ("controller", 1), ("width", label_width), ("height", 22),
                               ("string_list", f"{base}/labels"), ("string_index", index), ("font", "ui\\large_ui"),
                               ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
             extra += _widget(f"{base}/{key}_value",
-                             [("type", "text"), ("controller", 1), ("width", 212), ("height", 22),
-                              ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
+                             [("type", "text"), ("controller", 1), ("width", value_width), ("height", 22),
+                              ("font", "ui\\small_ui" if wide_value else "ui\\large_ui"), ("color", "#FF2896FF"),
+                              ("align", "left" if wide_value else "center"), ("text_y", 5 if wide_value else 1),
                               ("text_flags", "no_focus_test")], [])
             continue
         # (a device's name wants the wider spinner Server Setup's co-op rows
@@ -1327,6 +1339,7 @@ BROWSER_WORDS = [
     "The host refused your Discord link: link it again",
     "The host refused: your Discord account is too new",
     "The host refused: your Discord account is in the game",
+    "The host blocks VPNs: link Discord with its master (Settings > Network Setup)",
 ]
 
 

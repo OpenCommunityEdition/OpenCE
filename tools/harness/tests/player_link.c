@@ -314,6 +314,41 @@ static void case_ranges_text(void)
 	CHECK(pairs[4] == dotted("203.0.113.0") && pairs[5] == dotted("203.0.114.255"), "the third range");
 }
 
+static void case_next_pass(void)
+{
+	/* (this machine's masters A, B, C; servers listed by some of them, and
+	by D, which this machine does not know) */
+	static const unsigned char keys[3][8] = { "masterAA", "masterBB", "masterCC" };
+	static const unsigned char by_b[1][8] = { "masterBB" };
+	static const unsigned char by_d_b[2][8] = { "masterDD", "masterBB" };
+	static const unsigned char by_d[1][8] = { "masterDD" };
+	static const unsigned char by_a_c[2][8] = { "masterAA", "masterCC" };
+	int only_b[3] = { 0, 1, 0 }, only_a[3] = { 1, 0, 0 }, all[3] = { 1, 1, 1 }, none[3] = { 0, 0, 0 };
+	int needed;
+
+	/* (linked with B alone: B's pass for a server B lists, whichever else does) */
+	CHECK(player_link_next_pass(keys, only_b, 3, by_b, 1, -1, &needed) == 1 && needed == -1, "B's pass for B's server");
+	CHECK(player_link_next_pass(keys, only_b, 3, by_d_b, 2, -1, &needed) == 1, "B's pass for a server of D and B");
+	/* (and none after it: a refusal of B's is the last) */
+	CHECK(player_link_next_pass(keys, only_b, 3, by_b, 1, 1, &needed) == -1 && needed == -1, "a pass after B's");
+	/* (linked with A alone, a server B lists: no pass shown, B the one to
+	link with) */
+	CHECK(player_link_next_pass(keys, only_a, 3, by_b, 1, -1, &needed) == -1 && needed == 1,
+		"A's pass shown to B's server, or B not named");
+	/* (a server listed only by masters this machine does not know: nothing) */
+	CHECK(player_link_next_pass(keys, all, 3, by_d, 1, -1, &needed) == -1 && needed == -1, "a pass for D's server");
+	/* (not linked at all, a server of A and C: A named) */
+	CHECK(player_link_next_pass(keys, none, 3, by_a_c, 2, -1, &needed) == -1 && needed == 0, "A not named");
+	/* (linked with all: the first that lists it, then the next) */
+	CHECK(player_link_next_pass(keys, all, 3, by_a_c, 2, -1, &needed) == 0, "A first");
+	CHECK(player_link_next_pass(keys, all, 3, by_a_c, 2, 0, &needed) == 2, "C after A, not B");
+	/* (an invite's join, its masters not known: each held in turn) */
+	CHECK(player_link_next_pass(keys, all, 3, NULL, 0, -1, &needed) == 0 &&
+		player_link_next_pass(keys, all, 3, NULL, 0, 0, &needed) == 1 &&
+		player_link_next_pass(keys, all, 3, NULL, 0, 2, &needed) == -1 && needed == -1, "an invite's turns");
+	CHECK(player_link_next_pass(keys, only_b, 3, NULL, 0, -1, &needed) == 1, "the held one for an invite");
+}
+
 int main(int argc, char **argv)
 {
 	static const struct
@@ -331,6 +366,7 @@ int main(int argc, char **argv)
 		{ "netlist", case_netlist },
 		{ "netlists-refused", case_netlists_refused },
 		{ "ranges-text", case_ranges_text },
+		{ "next-pass", case_next_pass },
 	};
 	int index;
 

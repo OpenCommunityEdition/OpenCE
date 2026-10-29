@@ -173,6 +173,44 @@ unsigned long long player_link_discord_created(unsigned long long discord_id)
 	return ((discord_id >> 22) + 1420070400000ULL) / 1000;
 }
 
+/* whether the key id is one of the server's masters' */
+static int listed_by(const unsigned char *key_id, const unsigned char (*server_key_ids)[PLAYER_LINK_KEY_ID_SIZE],
+	int server_count)
+{
+	int index;
+
+	for (index = 0; index < server_count; index++)
+	{
+		if (!memcmp(key_id, server_key_ids[index], PLAYER_LINK_KEY_ID_SIZE))
+			return 1;
+	}
+	return 0;
+}
+
+int player_link_next_pass(const unsigned char (*key_ids)[PLAYER_LINK_KEY_ID_SIZE], const int *usable, int count,
+	const unsigned char (*server_key_ids)[PLAYER_LINK_KEY_ID_SIZE], int server_count, int after, int *needed)
+{
+	int index;
+
+	*needed = -1;
+	for (index = after < 0 ? 0 : after + 1; index < count; index++)
+	{
+		if (usable[index] && (!server_count || listed_by(key_ids[index], server_key_ids, server_count)))
+			return index;
+	}
+	/* (a server listed by masters this machine knows, none of which it holds
+	a pass of: the one to link with) */
+	for (index = 0; server_count && after < 0 && index < count; index++)
+	{
+		if (listed_by(key_ids[index], server_key_ids, server_count))
+		{
+			*needed = index;
+			break;
+		}
+	}
+	return -1;
+}
+
 /* ---------- a server */
 
 int player_link_pass_shown(const unsigned char *pass)
@@ -251,10 +289,13 @@ static struct
 	int waiting_master;
 	unsigned long long waiting_since;
 	char code[PLAYER_LINK_CODE_SIZE];
-	/* the join's pass: shown, which one, and how many joins were made again */
+	/* the join's pass: shown, which one, and how many joins were made again;
+	and the master a refusing server is listed by that this machine has no
+	pass of (-1: none) */
 	int attach;
 	int attach_index;
 	int retries;
+	int needed_master;
 } player = { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
 
 /* under player.lock: waits for seconds at most, or a wake */
@@ -585,10 +626,20 @@ void player_link_start(void)
 		return;
 	}
 	player.started = 1;
+	player.needed_master = -1;
 	player.has_key = read_key();
 	pthread_mutex_unlock(&player.lock);
 	if (pthread_create(&thread, NULL, link_thread_main, NULL) == 0)
 		pthread_detach(thread);
+}
+
+/* under player.lock: which of the masters' passes are good now */
+static void usable_passes(int *usable, unsigned long long now)
+{
+	int index;
+
+	for (index = 0; index < player.master_count; index++)
+		usable[index] = player.has_key && pass_current(index, now);
 }
 
 int player_link_join_fill(unsigned long host_virtual_address, unsigned char *pass, unsigned char *proof)
@@ -597,29 +648,36 @@ int player_link_join_fill(unsigned long host_virtual_address, unsigned char *pas
 	unsigned long long now = now_seconds();
 	unsigned char binding[PLAYER_LINK_BINDING_SIZE];
 	unsigned char message[PLAYER_LINK_PROOF_MESSAGE_SIZE];
-	int index, filled = 0;
+	unsigned char server_key_ids[PLAYER_LINK_MAXIMUM_MASTERS][PLAYER_LINK_KEY_ID_SIZE];
+	int usable[PLAYER_LINK_MAXIMUM_MASTERS];
+	int server_count, filled = 0;
 
 	if (!strcmp(share, "never"))
 		return 0;
+	/* (the masters that list the game joined: read before player.lock, which
+	p2p.c's lock is never taken under) */
+	server_count = p2p_joined_listing_masters(server_key_ids, PLAYER_LINK_MAXIMUM_MASTERS);
+	if (!host_virtual_address || !p2p_peer_binding(host_virtual_address, binding))
+		player_link_binding(NULL, binding);
 	pthread_mutex_lock(&player.lock);
-	/* ("always": the first good pass, unless one was refused already) */
+	usable_passes(usable, now);
+	/* ("always": the pass of a master that lists the game, unless one was
+	refused already) */
 	if (!player.attach && !strcmp(share, "always"))
 	{
-		for (index = 0; index < player.master_count && !player.attach; index++)
+		int needed, index = player_link_next_pass((const unsigned char (*)[PLAYER_LINK_KEY_ID_SIZE])player.key_ids,
+			usable, player.master_count, (const unsigned char (*)[PLAYER_LINK_KEY_ID_SIZE])server_key_ids,
+			server_count, -1, &needed);
+
+		if (index >= 0)
 		{
-			if (pass_current(index, now))
-			{
-				player.attach = 1;
-				player.attach_index = index;
-			}
+			player.attach = 1;
+			player.attach_index = index;
 		}
 	}
-	if (player.attach && player.has_key && player.attach_index < player.master_count &&
-		pass_current(player.attach_index, now))
+	if (player.attach && player.attach_index < player.master_count && usable[player.attach_index])
 	{
 		memcpy(pass, player.passes[player.attach_index], PLAYER_LINK_PASS_SIZE);
-		if (!host_virtual_address || !p2p_peer_binding(host_virtual_address, binding))
-			player_link_binding(NULL, binding);
 		player_link_proof_message(pass, binding, message);
 		p2p_ed25519_sign(player.seed, player.public_key, message, (int)sizeof(message), proof);
 		filled = 1;
@@ -638,28 +696,32 @@ enum
 int player_link_join_refused(int rejection_code)
 {
 	unsigned long long now = now_seconds();
-	int index, again = 0;
+	unsigned char server_key_ids[PLAYER_LINK_MAXIMUM_MASTERS][PLAYER_LINK_KEY_ID_SIZE];
+	int usable[PLAYER_LINK_MAXIMUM_MASTERS];
+	int server_count, again = 0, needed = -1;
 
 	if (!strcmp(config_string("network.link_share"), "never"))
 		return 0;
+	server_count = p2p_joined_listing_masters(server_key_ids, PLAYER_LINK_MAXIMUM_MASTERS);
 	pthread_mutex_lock(&player.lock);
-	if ((rejection_code == _refused_vpn_link_required && !player.attach) ||
-		(rejection_code == _refused_vpn_link_invalid && player.attach))
+	usable_passes(usable, now);
+	if (((rejection_code == _refused_vpn_link_required && !player.attach) ||
+		(rejection_code == _refused_vpn_link_invalid && player.attach)) && player.retries < MAXIMUM_RETRIES)
 	{
-		/* (the first good pass, or the next after one refused) */
-		int first = rejection_code == _refused_vpn_link_invalid ? player.attach_index + 1 : 0;
+		/* (the pass of the master this machine linked with, of those that
+		list the game; or, after one refused, the next such) */
+		int index = player_link_next_pass((const unsigned char (*)[PLAYER_LINK_KEY_ID_SIZE])player.key_ids, usable,
+			player.master_count, (const unsigned char (*)[PLAYER_LINK_KEY_ID_SIZE])server_key_ids, server_count,
+			rejection_code == _refused_vpn_link_invalid ? player.attach_index : -1, &needed);
 
-		for (index = first; index < player.master_count && !again && player.retries < MAXIMUM_RETRIES; index++)
+		if (index >= 0)
 		{
-			if (pass_current(index, now))
-			{
-				player.attach = 1;
-				player.attach_index = index;
-				player.retries++;
-				again = 1;
-				platform_log("Discord link: the server asks for a Discord account: joining again with %s's pass",
-					player.urls[index]);
-			}
+			player.attach = 1;
+			player.attach_index = index;
+			player.retries++;
+			again = 1;
+			platform_log("Discord link: the server asks for a Discord account: joining again with %s's pass",
+				player.urls[index]);
 		}
 	}
 	if (!again)
@@ -667,8 +729,16 @@ int player_link_join_refused(int rejection_code)
 		player.attach = 0;
 		player.retries = 0;
 		if (rejection_code == _refused_vpn_link_required)
-			platform_log("Discord link: the server blocks VPNs; link a Discord account (Settings, Network Setup, "
-				"Discord Account) or turn the VPN off");
+		{
+			player.needed_master = needed;
+			if (needed >= 0)
+				platform_log("Discord link: the server blocks VPNs; it is listed by %s, which this machine is not "
+					"linked with: link Discord with it (Settings, Network Setup, Discord Account)",
+					player.urls[needed]);
+			else
+				platform_log("Discord link: the server blocks VPNs; link a Discord account with a master server it "
+					"is listed by (Settings, Network Setup, Discord Account) or turn the VPN off");
+		}
 	}
 	pthread_mutex_unlock(&player.lock);
 	return again;
@@ -679,10 +749,20 @@ void player_link_join_reset(void)
 	pthread_mutex_lock(&player.lock);
 	player.attach = 0;
 	player.retries = 0;
+	player.needed_master = -1;
 	pthread_mutex_unlock(&player.lock);
 }
 
-int player_link_begin(void)
+int player_link_needed_master(void)
+{
+	/* (read without player.lock: p2p.c asks under its own; none before the
+	start, which a dedicated server never makes) */
+	if (!__atomic_load_n(&player.started, __ATOMIC_RELAXED))
+		return -1;
+	return __atomic_load_n(&player.needed_master, __ATOMIC_RELAXED);
+}
+
+int player_link_begin(int master_index)
 {
 	char text[256], url[MASTER_LIST_URL_SIZE + 400];
 	char key[2 * PLAYER_LINK_KEY_SIZE + 1], signature_hex[2 * P2P_SIGNATURE_SIZE + 1];
@@ -698,29 +778,36 @@ int player_link_begin(void)
 		read_masters_and_passes();
 		pthread_mutex_lock(&player.lock);
 	}
-	if (!player.has_key)
-		player.has_key = make_key();
-	if (!player.has_key || !player.master_count)
+	if (master_index < 0 || master_index >= player.master_count)
 	{
-		if (player.has_key)
-			platform_log("Discord link: no master server to link with (masters.txt)");
+		platform_log("Discord link: no master server %d to link with (masters.txt names %d)", master_index + 1,
+			player.master_count);
 		pthread_mutex_unlock(&player.lock);
 		return 0;
 	}
-	player_link_request_text("opence-link-1", player.key_ids[0], player.public_key, ts, text, sizeof(text));
+	if (!player.has_key)
+		player.has_key = make_key();
+	if (!player.has_key)
+	{
+		pthread_mutex_unlock(&player.lock);
+		return 0;
+	}
+	player_link_request_text("opence-link-1", player.key_ids[master_index], player.public_key, ts, text,
+		sizeof(text));
 	p2p_ed25519_sign(player.seed, player.public_key, text, (int)strlen(text), signature);
 	p2p_hex(player.public_key, PLAYER_LINK_KEY_SIZE, key);
 	p2p_hex(signature, P2P_SIGNATURE_SIZE, signature_hex);
-	snprintf(url, sizeof(url), "%s/link?key=%s&ts=%llu&sig=%s", player.urls[0], key, ts, signature_hex);
+	snprintf(url, sizeof(url), "%s/link?key=%s&ts=%llu&sig=%s", player.urls[master_index], key, ts, signature_hex);
 	player_link_code(player.public_key, ts, player.code);
 	player.waiting = 1;
-	player.waiting_master = 0;
+	player.waiting_master = master_index;
 	player.waiting_since = ts;
-	player.revoked[0] = 0;
-	player.next_ask[0] = ts + WAIT_POLL_SECONDS;
+	player.revoked[master_index] = 0;
+	player.next_ask[master_index] = ts + WAIT_POLL_SECONDS;
 	pthread_cond_broadcast(&player.wake);
 	pthread_mutex_unlock(&player.lock);
-	platform_log("Discord link: opening %s/link in the browser (the page shows the code %s)", player.urls[0], player.code);
+	platform_log("Discord link: opening %s/link in the browser (the page shows the code %s)",
+		player.urls[master_index], player.code);
 	platform_open_url(url);
 	return 1;
 }
@@ -754,22 +841,25 @@ void player_link_unlink(void)
 	platform_log("Discord link: unlinked (the player key and its passes deleted)");
 }
 
-int player_link_state(char *name, int name_size, char *code, int code_size)
+int player_link_state(char *name, int name_size, char *code, int code_size, int *linked, int *masters)
 {
 	unsigned long long now = now_seconds();
 	int index, state = _player_link_state_none;
 
 	name[0] = 0;
 	code[0] = 0;
+	*linked = 0;
 	pthread_mutex_lock(&player.lock);
-	for (index = 0; index < player.master_count && state != _player_link_state_linked; index++)
+	*masters = player.master_count;
+	for (index = 0; index < player.master_count; index++)
 	{
-		if (pass_current(index, now))
+		if (player.has_key && pass_current(index, now))
 		{
+			if (!(*linked)++)
+				snprintf(name, (size_t)name_size, "%s", player.fields[index].discord_name);
 			state = _player_link_state_linked;
-			snprintf(name, (size_t)name_size, "%s", player.fields[index].discord_name);
 		}
-		else if (player.revoked[index])
+		else if (player.revoked[index] && state != _player_link_state_linked)
 		{
 			state = _player_link_state_revoked;
 		}
@@ -783,6 +873,51 @@ int player_link_state(char *name, int name_size, char *code, int code_size)
 	{
 		state = _player_link_state_waiting;
 		snprintf(code, (size_t)code_size, "%s", player.code);
+	}
+	pthread_mutex_unlock(&player.lock);
+	return state;
+}
+
+int player_link_master_state(int master_index, char *host, int host_size, char *name, int name_size, char *code,
+	int code_size)
+{
+	unsigned long long now = now_seconds();
+	int state = _player_link_state_none;
+
+	host[0] = 0;
+	name[0] = 0;
+	code[0] = 0;
+	pthread_mutex_lock(&player.lock);
+	if (master_index >= 0 && master_index < player.master_count)
+	{
+		/* (its address's host: after the scheme, to the port or path) */
+		const char *start = strstr(player.urls[master_index], "://");
+
+		start = start ? start + 3 : player.urls[master_index];
+		snprintf(host, (size_t)host_size, "%.*s", (int)strcspn(start, ":/"), start);
+		if (player.has_key && pass_current(master_index, now))
+		{
+			state = _player_link_state_linked;
+			snprintf(name, (size_t)name_size, "%s", player.fields[master_index].discord_name);
+		}
+		else if (player.waiting && player.waiting_master == master_index)
+		{
+			state = _player_link_state_waiting;
+			snprintf(code, (size_t)code_size, "%s", player.code);
+		}
+		else if (player.revoked[master_index])
+		{
+			state = _player_link_state_revoked;
+		}
+		else if (player.has_key && player.has_pass[master_index])
+		{
+			state = _player_link_state_expired;
+			snprintf(name, (size_t)name_size, "%s", player.fields[master_index].discord_name);
+		}
+		else if (player.needed_master == master_index)
+		{
+			state = _player_link_state_needed;
+		}
 	}
 	pthread_mutex_unlock(&player.lock);
 	return state;

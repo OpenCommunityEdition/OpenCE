@@ -105,6 +105,8 @@ NEGATIVE_CONTROLS = {
                              "take_list", "take-list"),
     "take-list-publisher-long": (("publisher[P2P_LISTING_PUBLISHER_SIZE] = 0;", "publisher[sizeof(publisher) - 1] = 0;"),
                                  "take_list", "take-list"),
+    "take-list-other-master": (("dedicated,\n\t\t\tmaster_key_id);", 'dedicated,\n\t\t\t(const unsigned char *)"wrongmas");'),
+                               "take_list", "take-list"),
     "take-list-never-dedicated": (('server_json_member(&document, entry, "dedicated")',
                                    'server_json_member(&document, entry, "no such field")'), "take_list", "take-list"),
     "listing-unlabelled": (("memcpy(data, signature_label, sizeof(signature_label) - 1);\n\tmemcpy(data + sizeof",

@@ -552,8 +552,9 @@ static void read_masters(void)
 	pthread_mutex_unlock(&list.lock);
 }
 
-/* a list's servers given to the browser: how many were taken */
-static int take_list(const char *body, unsigned long size)
+/* a list's servers given to the browser, as the master of that key id's
+(8 bytes): how many were taken */
+static int take_list(const char *body, unsigned long size, const unsigned char *master_key_id)
 {
 	struct server_json_document document;
 	int servers, index, taken = 0;
@@ -601,7 +602,8 @@ static int take_list(const char *body, unsigned long size)
 				region[character] = '?';
 		}
 		region[P2P_LISTING_REGION_SIZE] = 0;
-		taken += p2p_lobby_take_master_listing(listing, listing_size, publisher, region, (int)version, dedicated);
+		taken += p2p_lobby_take_master_listing(listing, listing_size, publisher, region, (int)version, dedicated,
+			master_key_id);
 	}
 	server_json_document_free(&document);
 	return taken;
@@ -657,7 +659,11 @@ static void *list_thread_main(void *argument)
 			}
 			else
 			{
-				int taken = take_list(fetched.body, fetched.size);
+				unsigned char digest[P2P_SHA256_SIZE];
+				int taken;
+
+				p2p_sha256(keys[index], MASTER_LIST_KEY_SIZE, digest);
+				taken = take_list(fetched.body, fetched.size, digest);
 
 				answered++;
 				platform_log("server browser: %s lists %d server%s", urls[index], taken, taken == 1 ? "" : "s");
