@@ -15,6 +15,7 @@
   "ce/main_menu.multiplayer_type_select.join_game.port.xml",
   "ce/main_menu.multiplayer_type_select.join_game.xml",
   "ce/main_menu.multiplayer_type_select.lobby.xml",
+  "ce/main_menu.multiplayer_type_select.matchmaking.xml",
   "ce/main_menu.multiplayer_type_select.mp_map_select.xml",
   "ce/main_menu.multiplayer_type_select.server_settings.xml",
   "ce/main_menu.multiplayer_type_select.xml",

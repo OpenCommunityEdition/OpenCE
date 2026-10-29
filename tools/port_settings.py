@@ -947,6 +947,10 @@ def replaced(folder: str) -> bool:
 # ---------- multiplayer (PLAN.md section 11)
 
 MT = "main_menu/multiplayer_type_select"
+# 29 units apart, not CE's 33: at 33 a tenth row would put EDIT GAMETYPES's bar on the description panel's bottom curve
+MULTIPLAYER_ROWS = ["join", "matchmaking", "join_internet", "join_lan", "join_direct", "create", "create_internet",
+                    "create_lan", "coop"]
+MULTIPLAYER_ROW_Y = {row: 78 + 29 * index for index, row in enumerate(MULTIPLAYER_ROWS)}
 
 # strings added to the PC version's lists: (at, strings) of each list. Slayer's
 # kills to win goes up to 500, for big games (the Xbox editor's are
@@ -1065,8 +1069,9 @@ def LOADOUT_HELPS(slot: str) -> list:
 
 STRING_OVERRIDES.update({
     f"{MT}/multiplayer_options": ["JOIN GAME", "CREATE GAME", "INTERNET", "LAN", "DIRECT LINK", "EDIT GAMETYPES",
-                                  "SERVER BROWSER", "CO-OP CAMPAIGN"],
+                                  "SERVER BROWSER", "CO-OP CAMPAIGN", "MATCHMAKING"],
     f"{MT}/multiplayer_option_descriptions": [
+        "Join a match without choosing\\na game: pick playlists and a\\nsize, alone or with friends.",
         "Browse the games on the\\nInternet.",
         "Join a multiplayer game on\\nyour LAN.",
         "Join a game by its invite link,\\nor one a Discord invite\\nreached.",
@@ -1122,8 +1127,8 @@ STRING_OVERRIDES.update({
 # port's own, the rest of their lists the PC version's
 OVERRIDE_ORIGINALS = {
     f"{PE}/profile_edit_descriptions": [0, None, None, None, None, None, None, 7, None],
-    f"{MT}/multiplayer_options": [0, 1, 2, 3, None, 5, None, None],
-    f"{MT}/multiplayer_option_descriptions": [0, 1, None, None, 4, None, 5],
+    f"{MT}/multiplayer_options": [0, 1, 2, 3, None, 5, None, None, None],
+    f"{MT}/multiplayer_option_descriptions": [None, 0, 1, None, None, 4, None, 5],
     "main_menu/gametype_select/var_gametype_banks": [0, None, 2],
     "main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels": [0, 1, 2, 3, 4] + [None] * 4,
     # (the first's note that infinite grenades work only with 4 players or
@@ -1178,9 +1183,11 @@ WIDGET_PATCHES = {
         f'<on event="start" run="mp type set mode" open="{MT}/join_game/join_game_screen"/>',
         '<on event="left_mouse" run="mouse emit accept event"/>',
     ]},
-    # (Co-op, after Create Game's: _coop)
     f"{MT}/multiplayer_type_select_list": {"insert_before": {
-        f"{MT}/multiplayer_type_gametypes_item": [f'<child widget="{MT}/multiplayer_type_coop_item" y="309"/>'],
+        f"{MT}/multiplayer_type_join_internet_item": [
+            f'<child widget="{MT}/multiplayer_type_matchmaking_item" y="{MULTIPLAYER_ROW_Y["matchmaking"]}"/>'],
+        f"{MT}/multiplayer_type_gametypes_item": [
+            f'<child widget="{MT}/multiplayer_type_coop_item" y="{MULTIPLAYER_ROW_Y["coop"]}"/>'],
     }},
     # (the Map screen's and New Game's lists: SINGLEPLAYER or MULTIPLAYER
     # maps, the first row's chooser's (_map_kind); B on the Map screen goes
@@ -2166,6 +2173,17 @@ def _join4(base: str) -> list:
     return lines
 
 
+def _matchmaking() -> list:
+    """MATCHMAKING, Multiplayer's row for the search"""
+    return _widget(f"{MT}/multiplayer_type_matchmaking_item",
+                   [("type", "text"), ("left", 51), ("width", 232), ("height", 32), ("bitmap", "bitmaps/list_item_bkd"),
+                    ("string_list", f"{MT}/multiplayer_options"), ("string_index", 8), ("font", "ui\\large_ui"),
+                    ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)],
+                   ['<on event="a" run="mp type set mode"/>',
+                    '<on event="start" run="mp type set mode"/>',
+                    '<on event="left_mouse" run="mouse emit accept event"/>'])
+
+
 def _coop() -> list:
     """Co-op, the campaign for two players on this machine in split screen
     (the Xbox's Cooperative Play): Multiplayer's CO-OP CAMPAIGN, then player
@@ -2395,6 +2413,7 @@ def multiplayer_files() -> dict:
         f"{MT}/server_settings".replace("/", ".") + ".xml": head + _server_settings() + ["</menus>", ""],
         f"{MT}/lobby".replace("/", ".") + ".xml": head + _lobby() + ["</menus>", ""],
         f"{MT}/coop".replace("/", ".") + ".xml": head + _coop() + ["</menus>", ""],
+        f"{MT}/matchmaking".replace("/", ".") + ".xml": head + _matchmaking() + ["</menus>", ""],
         "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
         PLAYER_EDIT.replace("/", ".") + ".port.xml": head + _player_options_extras() + ["</menus>", ""],

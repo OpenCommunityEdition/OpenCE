@@ -75,9 +75,7 @@ LEFT_OUT = {
     "ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\filters\\op_game_options",
 }
 # children moved: (parent, child) to (x, y); the main menu's Quit a row below
-# Mods, which takes Credits' place; Multiplayer's Edit Gametypes and divider
-# below Co-op, keeping its 32-unit highlight inside the description panel's
-# bottom curve (port_settings.WIDGET_PATCHES)
+# Mods, which takes Credits' place
 CHILD_OFFSETS = {
     # the server browser's source tab (ALL GAMES, DEDICATED, P2P GAMES), 20
     # units wider than CE's for its words (port_settings.WIDGET_PATCHES): 9
@@ -93,6 +91,12 @@ CHILD_OFFSETS = {
        for index, row in enumerate(port_settings.PLAYER_OPTIONS_ROWS)},
     ("ui\\shell\\main_menu\\main_menu_select_list", "ui\\shell\\main_menu\\main_menu_item_quit_game"):
         port_settings.QUIT_ITEM_PLACE,
+    # the divider at 349 and EDIT GAMETYPES at 358: its 32-unit bar ends at 390,
+    # above the description panel's bottom curve at 393
+    **{("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
+        f"ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_{row}_item"):
+       (-32 if row in ("join", "create") else 0, port_settings.MULTIPLAYER_ROW_Y[row])
+       for row in ("join", "join_internet", "join_lan", "join_direct", "create", "create_internet", "create_lan")},
     ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_list",
      "ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_gametypes_item"): (0, 358),
     ("ui\\shell\\main_menu\\multiplayer_type_select\\multiplayer_type_select_screen",

@@ -358,6 +358,7 @@
 		<string text="UNKNOWN LEVEL\n\n\n" map="19"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/multiplayer_option_descriptions" map="ui\shell\main_menu\multiplayer_type_select\multiplayer_option_descriptions">
+		<string text="Join a match without choosing\na game: pick playlists and a\nsize."/>
 		<string text="Browse the games on the\nInternet." map="0"/>
 		<string text="Join a multiplayer game on\nyour LAN." map="1"/>
 		<string text="Join a game by its invite link,\nor one a Discord invite\nreached."/>
@@ -375,6 +376,7 @@
 		<string text="EDIT GAMETYPES" map="5"/>
 		<string text="SERVER BROWSER"/>
 		<string text="CO-OP CAMPAIGN"/>
+		<string text="MATCHMAKING"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/cap_server_settings_options" map="ui\shell\main_menu\multiplayer_type_select\server_settings\cap_server_settings_options">
 		<string text="Enter a name for your server." map="0"/>
