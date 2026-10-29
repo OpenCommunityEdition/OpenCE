@@ -30,6 +30,10 @@ fill 3,165,260 of its 0x305000 bytes); the GPU part holds only the decal
 vertices, as on the Xbox. A change to a pool's size changes the game state's
 layout: saved games of builds before it no longer load. */
 
+/* the tag cache's size, as the Xbox's (physical_memory_map.h's
+TAG_CACHE_SIZE): the largest tag section a map, or a tag pack's map, has
+(port/linux/game/tag_pack.c) */
+#define HALO_PORT_TAG_CACHE_SIZE 0x1600000 /* (0x1600000) */
 #define HALO_PORT_GAME_STATE_BASE_ADDRESS 0x81A00000 /* (0x80061000) */
 #define HALO_PORT_GAME_STATE_CPU_SIZE 0x13C0000 /* (0x305000) */
 #define HALO_PORT_GAME_STATE_GPU_SIZE 0x40000 /* (0x40000) */

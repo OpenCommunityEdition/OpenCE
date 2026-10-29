@@ -134,6 +134,9 @@ void game_initialize(
 void game_dispose(void);
 void game_precache_new_map(char *map_name, boolean blocking);
 boolean game_map_loading_in_progress(real *progress);
+/* port: the loading screen shown again, at this progress, or closed
+(port/linux/game/tag_import.c) */
+void game_loading_progress_show(boolean show, real progress);
 void game_unload(
 	void);
 void game_dispose_from_old_map(void);

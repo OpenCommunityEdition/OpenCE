@@ -866,6 +866,18 @@ short cache_file_read(
 
 		return request_index;
 	}
+	/* port: a tag copied from another map: its bitmap pixels and sound
+	samples stay in that map's tag pack (port/linux/game/tag_import.c) */
+	{
+		extern int tag_import_donor_read(long, long, long, void *);
+
+		if (tag_import_donor_read(tag_index, offset, size, buffer))
+		{
+			*completion_flag_reference = TRUE;
+
+			return request_index;
+		}
+	}
 	match_assert(
 		"c:\\halo\\SOURCE\\cache\\cache_files_windows.c",
 		269,

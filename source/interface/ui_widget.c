@@ -4384,6 +4384,38 @@ void display_error_text_deferred(
 	return;
 }
 
+/* port: whether an error dialog is up, or waiting to be: a tag pack is
+written once its notice has been read (port/linux/game/tag_pack.c) */
+boolean ui_widget_port_error_showing(
+	void)
+{
+	short index;
+
+	for (index = 0; index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; index++)
+	{
+		if (widget_globals.deferred_errors[index].error_code != NONE ||
+			(widget_globals.active_widgets[index] && widget_globals.active_widgets[index]->widget_is_error_dialog))
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+/* port: whether an error dialog is open now (not only waiting to be) */
+boolean ui_widget_port_error_open(
+	void)
+{
+	short index;
+
+	for (index = 0; index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; index++)
+	{
+		if (widget_globals.active_widgets[index] && widget_globals.active_widgets[index]->widget_is_error_dialog)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
 void display_errors_deferred_until_cinematic_stop(
 	void)
 {

@@ -833,6 +833,15 @@ static void texture_cache_read_android_ce(struct bitmap_data *bitmap, void *head
 		cache_file_read(bitmap->tag_index, bitmap->pixels_offset, bitmap->pixels_size,
 			bitmap->base_address, &loaded, TRUE);
 }
+
+/* port: a bitmap of a tag copied into an Xbox map from another map's tag
+ * pack (port/linux/game/tag_import.c) */
+static boolean texture_cache_bitmap_imported(struct bitmap_data *bitmap)
+{
+	extern int tag_import_tag_imported(long tag_index);
+
+	return tag_import_tag_imported(bitmap->tag_index) != 0;
+}
 #endif
 
 static boolean texture_cache_start_loading_bitmap(
@@ -1052,8 +1061,10 @@ void *_texture_cache_bitmap_get_hardware_format(
 		load || !block);
 #ifdef HALO_ANDROID
 	/* port: CE's frame working set is not bounded by the Xbox texture arena.
-	 * Keep dynamic textures and Xbox maps on their own paths. */
-	if (custom_edition_cache_tags_loaded() &&
+	 * Keep dynamic textures and Xbox maps on their own paths. So are the
+	 * bitmaps copied into a map from others, which its arena was not made
+	 * to hold: they are read at once (tag_import_donor_read) */
+	if ((custom_edition_cache_tags_loaded() || texture_cache_bitmap_imported(bitmap)) &&
 		TEST_FLAG(bitmap->flags, _bitmap_cached_bit))
 	{
 		if (texture_cache_bitmap_valid(bitmap))

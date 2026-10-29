@@ -736,6 +736,24 @@ boolean game_map_loading_in_progress(
 	return globals->map_load_in_progress;
 }
 
+/* port: the tag importer copies tags after the precache screen has closed
+(port/linux/game/tag_import.c). show opens that screen again. */
+void game_loading_progress_show(
+	boolean show,
+	real progress)
+{
+	if (!game_globals)
+		return;
+	if (progress < 0.0f)
+		progress = 0.0f;
+	if (progress > 1.0f)
+		progress = 1.0f;
+	game_globals->map_load_in_progress = show;
+	game_globals->loading_progress = progress;
+
+	return;
+}
+
 void game_unload(
 	void)
 {

@@ -617,6 +617,14 @@ void scenario_tags_unload(
 
 		menu_tags_unloaded();
 	}
+	/* port: the tags copied into the level from other maps' tag packs go,
+	and the map's own table comes back (port/linux/game/level_tag_import.c).
+	Added before the menus' and the mods', they go after them */
+	{
+		extern void level_tag_import_unloaded(void);
+
+		level_tag_import_unloaded();
+	}
 	cache_file_close();
 	/* port: a Halo Custom Edition map has no Xbox vertex or index buffers
 	(port/linux/game/custom_edition_cache.c) */
@@ -1322,6 +1330,16 @@ long scenario_tags_load(
 				extern void powerup_render_bounds_tags_loaded(void);
 
 				powerup_render_bounds_tags_loaded();
+			}
+			/* port: the tags a game mode copies into the level from other
+			maps' tag packs (port/linux/game/level_tag_import.c): before the
+			menus' and the mods' tags, which are this machine's own (its
+			platform's menus, its mods), so that the tags it copies are at the
+			same indices on every machine of a network game */
+			{
+				extern void level_tag_import_loaded(char const *scenario_name);
+
+				level_tag_import_loaded(scenario_name);
 			}
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{
