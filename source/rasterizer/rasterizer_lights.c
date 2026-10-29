@@ -756,7 +756,12 @@ long rasterizer_light_submit(
 	}
 	else
 	{
-		error(2, "### ERROR too many lights submitted to window");
+		/* port: said once in a while, not for each light past the most of
+		each frame: the lights past them are only not drawn */
+		static long refused;
+
+		if (refused++ % 1000 == 0)
+			error(2, "### ERROR too many lights submitted to window (%ld refused so far)", refused);
 	}
 
 	return light_index;

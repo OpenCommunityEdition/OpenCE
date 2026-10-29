@@ -38,4 +38,32 @@ int config_default(const char *name, char *text, size_t size);
 it again when this moves */
 unsigned long config_changes(void);
 
+/* whether this is a dedicated server (server.enabled, --server,
+HALO_SERVER: port/linux/src/server_mode.c), whose settings the file holds */
+int config_server_mode_enabled(void);
+
+/* a setting, for a list of them (a dedicated server's Settings page): the
+one at index; 0 past the last */
+struct config_setting_info
+{
+	const char *name;
+	/* "boolean", "integer", "real" or "string" */
+	const char *type;
+	/* NULL: none */
+	const char *environment;
+	const char *comment;
+	/* as text, a string's without its quotes */
+	char default_text[300];
+	/* its environment variable sets it for this run */
+	int pinned;
+	/* this build writes it into config.toml */
+	int written;
+};
+int config_setting_info(int index, struct config_setting_info *info);
+
+/* the settings whose names begin with prefix ("server.") read from
+config.toml again, but for those their environment variables set; 1 on
+success (a file that cannot be read leaves them as they were) */
+int config_reload(const char *prefix);
+
 #endif

@@ -183,11 +183,17 @@ void render_particles(
 					(short)particle->definition_index;
 				rendered_particle->cluster_index =
 					particle->location.cluster_index;
+				/* port: a charge stuck to the viewmodel is drawn with it.
+				One that also shows on the body was left on the world's
+				view, and the near plane cut it down. */
 				rendered_particle->attached_to_first_person_weapon =
 					owned_by_local_player &&
+					(TEST_FLAG(
+						particle->flags,
+						_particle_datum_dont_draw_third_person_bit) ||
 					TEST_FLAG(
 						particle->flags,
-						_particle_datum_dont_draw_third_person_bit);
+						_particle_datum_attached_to_local_player_bit));
 			}
 		}
 

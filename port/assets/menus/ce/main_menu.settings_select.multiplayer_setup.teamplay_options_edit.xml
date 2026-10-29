@@ -40,7 +40,7 @@
 		<on event="start" back="true"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_help" type="text" controller="1" left="68" top="341" width="482" height="79" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/cap_teamplay_options" font="ui\large_ui" color="#FFFFFFFF">
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_help" type="text" controller="1" left="68" top="351" width="482" height="63" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/cap_teamplay_options" font="ui\large_ui" color="#FFFFFFFF">
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_help">
 		<data input="game settings lists text update"/>
@@ -48,12 +48,13 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_friendly_fire" x="54" y="73"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_friendly_fire_penalty" x="54" y="103"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_autobalance" x="54" y="133"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_mode" x="54" y="163"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_lobby" x="54" y="193"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_kbps" x="54" y="223"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_proximity" x="54" y="253"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_votekick" x="54" y="283"/>
-		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_text_chat" x="54" y="313"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_force_team_spawns" x="54" y="163"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_mode" x="54" y="189"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_lobby" x="54" y="215"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_kbps" x="54" y="241"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_proximity" x="54" y="267"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_votekick" x="54" y="293"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_text_chat" x="54" y="319"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">

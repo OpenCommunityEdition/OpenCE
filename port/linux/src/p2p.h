@@ -100,7 +100,8 @@ reached only by its invite. Going private makes a new invite, if the old one
 was listed */
 void p2p_set_hosting_public(int public);
 /* whether the game this machine hosts is listed in everyone's server
-browser (PUBLIC, and network.public_lobby): the text chat is off in one */
+browser (PUBLIC, and network.public_lobby): the text chat is off in one a
+player hosts (a dedicated server's follows network.text_chat) */
 int p2p_hosting_listed(void);
 /* the password of the game hosted for the internet (Server Setup's
 PASSWORD; NULL or empty: none): its listing lets only those who know it
@@ -130,6 +131,9 @@ enum
 	P2P_LISTING_SIGNING_KEY_SIZE = 32,
 	P2P_LISTING_KEY_HASH_SIZE = 16,
 	P2P_LISTING_SEALED_TOKEN_SIZE = 56,
+	/* a master server's word on a listed server (master_list.c) */
+	P2P_LISTING_PUBLISHER_SIZE = 32,
+	P2P_LISTING_REGION_SIZE = 16,
 };
 
 struct p2p_listing
@@ -155,6 +159,18 @@ struct p2p_listing
 	unsigned char key_hash[P2P_LISTING_KEY_HASH_SIZE];
 	unsigned char signing_key[P2P_LISTING_SIGNING_KEY_SIZE];
 	unsigned char sealed_token[P2P_LISTING_SEALED_TOKEN_SIZE];
+	/* a dedicated server's, on a master server's word (its listing's own
+	flag, which its host sets, is not taken: a game the brokers alone list
+	is shown as the players'); listed by the master servers
+	(master_list.c): by how many, its publisher's name and its region
+	(empty: none said) */
+	unsigned char dedicated;
+	unsigned char master;
+	unsigned char master_count;
+	char publisher[P2P_LISTING_PUBLISHER_SIZE + 1];
+	char region[P2P_LISTING_REGION_SIZE + 1];
+	/* the network version its host plays (another's cannot be joined) */
+	unsigned short network_version;
 };
 /* joins a public game the server browser found (p2p_join_invite with its
 invite), remembering its host: nonzero if it held an invite */
@@ -162,16 +178,123 @@ int p2p_join_listing(const struct p2p_listing *listing);
 /* whether this machine is in the public game it joined from the server
 browser: the tunnel still reaches its host, and no other invite was joined
 since. Such a game has no text chat, whatever its host says
-(port/linux/game/network_chat.c) */
+(port/linux/game/network_chat.c), unless it is a dedicated server's: */
 int p2p_joined_listed_host(void);
+/* whether the public game joined (p2p_joined_listed_host) is a dedicated
+server's that a master server lists: an approved operator's, whose chat
+follows its network.text_chat (a listing's own dedicated flag, which any
+host may set, is not enough) */
+int p2p_joined_listed_dedicated(void);
 /* a copy of the public games found, in the order shown (the most players
 first; then those not failed, the open ones, by name); returns their count */
 int p2p_lobby_games(struct p2p_listing *games, int maximum_count);
+/* the master servers' (port/linux/src/master_list.c, server_master.c): a
+fresh signed listing of the game this machine hosts for the internet, as
+the brokers get it (0 if it hosts none, or none public); a master's entry's
+listing taken into the server browser's games (its signature checked) with
+the master's word on it, 1 if it was; and the masters' lists fetched again
+(each game's count of them starts over) */
+int p2p_lobby_host_listing(unsigned char *bytes, int size);
+/* network.public_address as last looked up (p2p.c), "a.b.c.d:port": 0 if it
+is unset or cannot be looked up (an IPv6 one, which the tunnel does not use) */
+int p2p_public_address(char *text, int size);
+int p2p_lobby_take_master_listing(const unsigned char *payload, int size, const char *publisher, const char *region,
+	int network_version_shown, int dedicated);
+void p2p_lobby_masters_heard(void);
 /* how many hosts list a game of a newer network version, which is not
 shown (an old build sees none of the games) */
 int p2p_lobby_newer_games(void);
 /* a game the browser could not join: kept, marked failed, for this run */
 void p2p_lobby_mark_failed(const unsigned char *identifier);
+/* whether a signalling broker answers (the player-hosted games' lists come
+through them) */
+int p2p_lobby_brokers_reached(void);
+
+/* ---- what the server browser shows of the games found, and in what order:
+its source (its top-left tab), Filters and the column titles (the menus'
+network.browser_* settings). Pure, over a copy of the games (the harness
+tests them) */
+
+/* network.browser_source */
+enum
+{
+	P2P_LOBBY_SOURCE_ALL,
+	P2P_LOBBY_SOURCE_DEDICATED,
+	P2P_LOBBY_SOURCE_PLAYERS,
+};
+/* network.browser_maps: games on maps this machine lacks shown, not, or
+those it could download as it joins */
+enum
+{
+	P2P_LOBBY_MAPS_YES,
+	P2P_LOBBY_MAPS_NO,
+	P2P_LOBBY_MAPS_DOWNLOADABLE,
+};
+/* what a game's map is to this machine */
+enum
+{
+	P2P_LOBBY_MAP_INSTALLED,
+	P2P_LOBBY_MAP_DOWNLOADABLE,
+	P2P_LOBBY_MAP_MISSING,
+};
+/* network.browser_sort's orders (a column title's), each in its own first
+direction: dedicated servers first, then the most players, then by name
+(servers); the most players; by name, map or type (A to Z); those with a
+password first */
+enum
+{
+	P2P_LOBBY_SORT_SERVERS,
+	P2P_LOBBY_SORT_PLAYERS,
+	P2P_LOBBY_SORT_NAME,
+	P2P_LOBBY_SORT_MAP,
+	P2P_LOBBY_SORT_TYPE,
+	P2P_LOBBY_SORT_LOCKED,
+	NUMBER_OF_P2P_LOBBY_SORTS,
+};
+struct p2p_lobby_choices
+{
+	int source;
+	int show_empty, show_full;
+	/* one game engine's only (1 CTF, 2 Slayer, 3 Oddball, 4 King, 5 Race),
+	0 any */
+	int engine_type;
+	int maps;
+};
+/* the games the choices show, kept at the front in their order; returns
+how many. map_state tells what a game's map is to this machine (NULL: every
+map installed). A game of another network version is kept: shown, greyed,
+not joinable */
+int p2p_lobby_filter(struct p2p_listing *games, int count, const struct p2p_lobby_choices *choices,
+	int (*map_state)(const char *map));
+/* the games in the order's (reverse: the other way), those of another
+network version last; equal ones keep their order */
+void p2p_lobby_sort(struct p2p_listing *games, int count, int order, int reverse);
+/* network.browser_sort's text: an order's name, "-" before it reversed
+("-players"); an unknown one is servers' */
+int p2p_lobby_sort_parse(const char *text, int *reverse);
+void p2p_lobby_sort_text(int order, int reverse, char *text, int size);
+
+/* the join of an invite (or a listing) under way: its stage, and once it
+failed why, as a word ("" while it goes on): "no_answer" (the host never
+answered), "no_route" (it answered, and the tunnel never reached it); or
+the host's game refused it (p2p_join_refused): "full", "closed", "banned",
+"password", "version" or "token" (its invite was replaced). Returns the
+stage */
+enum
+{
+	P2P_JOIN_NONE,
+	/* asking the brokers for the host */
+	P2P_JOIN_ASKING,
+	/* the host answered: the tunnel being made (hole punching) */
+	P2P_JOIN_ANSWERED,
+	/* the tunnel reaches the host: the game's own join follows */
+	P2P_JOIN_CONNECTED,
+	P2P_JOIN_FAILED,
+};
+int p2p_join_progress(int *stage, char *reason, int size);
+/* the host of the game joined refused it (the game's rejection code:
+network_game_protocol.h's _rejection_code_*), the game's client says */
+void p2p_join_refused(int rejection_code);
 /* a locked game's invite (into its invite), if the password is its own:
 FALSE if not; TRUE for a game with none. It takes a few milliseconds */
 int p2p_listing_unlock(struct p2p_listing *listing, const char *password);

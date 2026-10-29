@@ -65,5 +65,6 @@ host_touch_rumble
 host_touch_scene
 host_touch_bindings
 host_touch_devices
+host_https_get
 
 host_errno

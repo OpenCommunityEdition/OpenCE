@@ -23,10 +23,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, STB_VORBIS_SOURCE, WINDOWS_PROFILE, XDK_INCLUDE,
+                          build_repository,
                           lto_mode, march_flag, miniupnpc_sources, pgo_mode, compile_launcher, configuration_defines,
                           game_defines_and_includes, game_sources, musl_math_cflags, musl_math_sources, opus_cflags,
                           opus_sources, pgo_profile, profile_use_flags, xdk_headers)
-from .embed_assets import hud_assets_build, hud_configure_inputs
+from .embed_assets import hud_assets_build, hud_configure_inputs, server_ui_build
 from .ninja_syntax import Writer
 from .windows_cross_build import cross_toolchain_prefix
 
@@ -80,7 +81,8 @@ def updater_defines(release: bool) -> str:
     if not number.isdigit():
         number = "0"
     flavor = "release" if release else "debug"
-    return f'-DHALO_BUILD_NUMBER={number} -DHALO_BUILD_FLAVOR=\\"{flavor}\\"'
+    return (f'-DHALO_BUILD_NUMBER={number} -DHALO_BUILD_FLAVOR=\\"{flavor}\\" '
+            f'-DHALO_BUILD_REPOSITORY=\\"{build_repository()}\\"')
 
 WINDOWS_ABI_FLAGS = [
     "--target=i686-pc-windows-msvc",
@@ -347,6 +349,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
 
     # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
     embedded_assets = hud_assets_build(n, "windows", BUILD / "generated" / "hud_hires_assets.c")
+    embedded_assets += server_ui_build(n, "windows", BUILD / "generated" / "server_ui_assets.c")
 
     # (a debug build checks its stack frames (/GS), and stops at the first
     # one overrun, as at the first failed assertion; a release build does
@@ -458,7 +461,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             if source.name == "posix_dtls.c":
                 # (Mbed TLS sees the Windows SDK, as the win32_*.c do)
                 add_object(source, f"{win32_cflags} {mbedtls_include}")
-            elif source.name == "updater.c":
+            elif source.name in ("updater.c", "server_mode.c"):
                 add_object(source, f"{platform_cflags} {updater_defines(getattr(sln, 'port_release', False))}")
             else:
                 add_object(source, platform_cflags)
@@ -571,5 +574,9 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = BUILD / "brokers.txt"
     n.build(outputs=brokers, rule="windows_copy", inputs=Path("port/assets/network/brokers.txt"))
-    n.build(outputs="windows", rule="phony", inputs=[output, sdl_dll, brokers])
+    # the master servers of dedicated servers, a file beside the game too
+    # (network.masters_file, server.masters_file)
+    masters = BUILD / "masters.txt"
+    n.build(outputs=masters, rule="windows_copy", inputs=Path("port/assets/network/masters.txt"))
+    n.build(outputs="windows", rule="phony", inputs=[output, sdl_dll, brokers, masters])
     n.newline()

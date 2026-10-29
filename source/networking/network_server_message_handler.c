@@ -249,6 +249,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
@@ -1793,6 +1794,10 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			{
 				advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] |= HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG;
 			}
+			/* port: a dedicated server, with no player of its own
+			(port/linux/game/server_director.c) */
+			if (halo_server_mode())
+				advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] |= HALO_PORT_ADVERTISED_DEDICATED_FLAG;
 			/* (an OpenCE gametype's kind, the server browser's name for it) */
 			advertisement.reserved[HALO_PORT_ADVERTISED_KIND_OFFSET] = game_modes_kind(&game->variant,
 				&game->variant_options);
@@ -1996,8 +2001,18 @@ static boolean network_game_server_handle_message_client_join_game_request(
 				{
 					/* (the Xbox game refused a machine not named in the
 					development kit's d:\hosts.txt: a stray file of that name
-					on a PC refused machines) */
-					if (network_game_server_accept_client_machine_into_game(server, server_client_machine))
+					on a PC refused machines. port: a dedicated server's word
+					filter refuses one whose player's name it keeps out,
+					network_chat.c) */
+					boolean name_refused = network_chat_name_blocked(machine_name, MAXIMUM_MACHINE_NAME_LENGTH);
+
+					if (name_refused)
+					{
+						network_event("refusing a machine @%s: its name has words the server's filter keeps out",
+							transport_address_to_string(&source_address));
+						network_game_server_refuse_with(_rejection_code_name_refused);
+					}
+					if (!name_refused && network_game_server_accept_client_machine_into_game(server, server_client_machine))
 					{
 						struct message_server_machine_accepted acceptance;
 						struct network_message *reply;

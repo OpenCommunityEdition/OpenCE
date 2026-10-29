@@ -428,11 +428,13 @@ static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
 unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
 	unsigned long height, long kind, unsigned long *levels)
 {
-	unsigned char *pixels = kind == 4 ? upscale_pixels(bgra, width, height, 512) :
-		hud_hires_upscale_pixels(bgra, width, height);
+	unsigned char *pixels;
 	unsigned long largest;
 	GLuint texture;
 
+	if (!xgpu_gl_ready())
+		return 0;
+	pixels = kind == 4 ? upscale_pixels(bgra, width, height, 512) : hud_hires_upscale_pixels(bgra, width, height);
 	if (!pixels)
 		return 0;
 	upscale_outline(pixels, bgra, width, height, kind);
@@ -584,8 +586,12 @@ static unsigned int png_pixels_texture(unsigned char *pixels, unsigned long widt
 	unsigned long largest;
 	GLuint texture;
 
-	if (!pixels)
+	/* (no OpenGL: a null renderer's postgame scoreboard asks for its icons) */
+	if (!pixels || !xgpu_gl_ready())
+	{
+		free(pixels);
 		return 0;
+	}
 	*levels = 1;
 	for (largest = width > height ? width : height; largest > 1; largest >>= 1)
 		(*levels)++;
@@ -614,7 +620,7 @@ unsigned int hud_hires_override_texture(long asset, unsigned long *levels)
 {
 	const struct hud_hires_embedded *embedded;
 
-	if (asset < 0 || asset >= hud_hires_asset_count() || textures[asset].failed)
+	if (asset < 0 || asset >= hud_hires_asset_count() || textures[asset].failed || !xgpu_gl_ready())
 		return 0;
 	if (textures[asset].texture)
 	{

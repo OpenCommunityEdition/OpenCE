@@ -3139,14 +3139,14 @@ static void client_presentation_apply(
 	{
 		client_cinematic_end();
 	}
-	/* Use the host's camera while its scripts control it. Spectate instead
-	when the cutscene leaves the camera with the player, or when the watched
-	teammate rides an AI-flown Pelican (a level's insertion): shots filmed
-	beside a moving Pelican shake against this machine's copy of it. A player
-	with no unit and nobody to watch also gets the host's view, rather than
-	a dead camera at the world origin. */
-	client_host_camera_set((coop_presentation.cinematic_started && presentation->camera_scripted &&
-		!coop_spectate_watching_rider(0)) || coop_spectate_nothing_to_watch(0));
+	/* Use the host's camera while its scripts control it, a dead player's
+	too: the cutscene's camera wins over spectating (shots filmed by a moving
+	Pelican follow this machine's copy of it: camera_object_offset). Spectate
+	instead only when the cutscene leaves the camera with the player. A
+	player with no unit and nobody to watch also gets the host's view,
+	rather than a dead camera at the world origin. */
+	client_host_camera_set((coop_presentation.cinematic_started && presentation->camera_scripted) ||
+		coop_spectate_nothing_to_watch(0));
 	/* (also outside a cinematic: a cutscene that leaves the players their
 	controls shows the bars too) */
 	cinematic_show_letterbox(TEST_FLAG(presentation->flags, _presentation_letterbox_bit));

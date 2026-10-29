@@ -1,11 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
 <menus>
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_force_team_spawns" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/force_team_spawns_label"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/force_team_spawns_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/force_team_spawns_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/force_team_spawns_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_force_team_spawns" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_force_team_spawns">
+		<string text="OFF"/>
+		<string text="ON"/>
+	</strings>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/op_voice_mode" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_mode_label"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_mode_spinner" x="286" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_mode_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_mode_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_mode_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_voice_mode" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
@@ -21,7 +34,7 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_lobby_label"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_lobby_spinner" x="286" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_lobby_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_lobby_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_lobby_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_voice_lobby" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
@@ -34,7 +47,7 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_kbps_label"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_kbps_spinner" x="286" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_kbps_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_kbps_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_kbps_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_voice_kbps" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
@@ -52,7 +65,7 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_proximity_label"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_proximity_spinner" x="286" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_proximity_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_proximity_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/voice_proximity_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_voice_proximity" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
@@ -69,7 +82,7 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/votekick_label"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/votekick_spinner" x="286" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/votekick_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/votekick_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/votekick_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_votekick" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
@@ -82,7 +95,7 @@
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/text_chat_label"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/text_chat_spinner" x="286" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/text_chat_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/text_chat_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/teamplay_options_labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/text_chat_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/settings_select/multiplayer_setup/teamplay_options_edit/var_text_chat" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>

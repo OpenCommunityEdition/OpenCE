@@ -287,6 +287,7 @@
 		<string text="Show only servers running teamplay modes." map="8"/>
 		<string text="Show only servers with custom maps that are\ncurrently installed." map="9"/>
 		<string text="Show servers with custom maps that are not\ncurrently installed." map="10"/>
+		<string text="Show servers on maps you do not have if their\nhost shares them: they download as you join."/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/join_game/filters/filter_options" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\filter_options">
 		<string text="SHOW EMPTY SERVERS" map="0"/>
@@ -296,11 +297,6 @@
 		<string text="TEAMPLAY OPTIONS" map="4"/>
 		<string text="SHOW MISSING MAPS" map="5"/>
 	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_game_options" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\var_filter_game_options">
-		<string text="ANY" map="0"/>
-		<string text="FREE-FOR-ALL" map="1"/>
-		<string text="TEAMPLAY" map="2"/>
-	</strings>
 	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_gametype" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\var_filter_gametype">
 		<string text="ANY" map="0"/>
 		<string text="CTF" map="1"/>
@@ -308,14 +304,6 @@
 		<string text="ODDBALL" map="3"/>
 		<string text="KING" map="4"/>
 		<string text="RACE" map="5"/>
-	</strings>
-	<strings name="main_menu/multiplayer_type_select/join_game/filters/var_filter_ping" map="ui\shell\main_menu\multiplayer_type_select\join_game\filters\var_filter_ping">
-		<string text="ANY" map="0"/>
-		<string text="&lt; 50" map="1"/>
-		<string text="&lt; 100" map="2"/>
-		<string text="&lt; 150" map="3"/>
-		<string text="&lt; 200" map="4"/>
-		<string text="&lt; 300" map="5"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/join_game/join_game_buttons" map="ui\shell\main_menu\multiplayer_type_select\join_game\join_game_buttons">
 		<string text="GET LIST" map="0"/>
@@ -674,6 +662,18 @@
 		<string text="Capture the flag five times and you'll win the game." map="14"/>
 		<string text="You'll need to capture ten flags if you want to win." map="15"/>
 		<string text="Grab fifteen flags and you'll rack up a win - not to\nmention an impressive flag collection." map="16"/>
+		<string text="Each kill scores a point for the killer's team (a\nbetrayal takes one away), and each capture is worth\nKills per Capture. The limit is in captures."/>
+		<string text="Only flag captures score."/>
+		<string text="With Kills Score on, each flag capture is worth\n5 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n10 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n15 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n20 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n25 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n30 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n40 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n50 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n75 points (a kill is worth 1)."/>
+		<string text="With Kills Score on, each flag capture is worth\n100 points (a kill is worth 1)."/>
 		<string text="The game will have no time limit.  It will only end\nwhen someone wins." map="17"/>
 		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins." map="18"/>
 		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins." map="19"/>
@@ -689,6 +689,24 @@
 		<string text="FLAG AT HOME TO SCORE:" map="3"/>
 		<string text="CAPTURES TO WIN:" map="4"/>
 		<string text="TIME LIMIT:" map="5"/>
+		<string text="KILLS SCORE:"/>
+		<string text="KILLS PER CAPTURE:"/>
+	</strings>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_kills_score">
+		<string text="YES"/>
+		<string text="NO"/>
+	</strings>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_kills_per_capture">
+		<string text="5"/>
+		<string text="10"/>
+		<string text="15"/>
+		<string text="20"/>
+		<string text="25"/>
+		<string text="30"/>
+		<string text="40"/>
+		<string text="50"/>
+		<string text="75"/>
+		<string text="100"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/ctf_edit/var_assault" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\ctf_edit\var_assault">
 		<string text="YES" map="0"/>
@@ -752,6 +770,11 @@
 		<string text="Get a comfy chair, because you'll need to control the\nhill for a solid fifteen minutes in order to win." map="6"/>
 		<string text="This is a team game." map="7"/>
 		<string text="It's every man for himself." map="8"/>
+		<string text="There will be only one Hill at a time."/>
+		<string text="There will be two Hills at once. Holding either one\nscores."/>
+		<string text="There will be three Hills at once. Holding any of\nthem scores."/>
+		<string text="There will be four Hills at once. Holding any of\nthem scores."/>
+		<string text="There will be five Hills at once. Holding any of\nthem scores."/>
 		<string text="The game will have no time limit.  It will only end\nwhen someone wins." map="9"/>
 		<string text="This game will have a 10 minute time limit.  It will\nend after the time limit is up or someone wins." map="10"/>
 		<string text="This game will have a 15 minute time limit.  It will\nend after the time limit is up or someone wins." map="11"/>
@@ -764,10 +787,18 @@
 		<string text="MOVING HILL:" map="0"/>
 		<string text="SCORE TO WIN:" map="1"/>
 		<string text="TEAM PLAY:" map="2"/>
+		<string text="MULTI-HILL:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_moving_hill" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\koth_edit\var_moving_hill">
 		<string text="YES" map="0"/>
 		<string text="NO" map="1"/>
+	</strings>
+	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_multi_hill">
+		<string text="OFF"/>
+		<string text="2"/>
+		<string text="3"/>
+		<string text="4"/>
+		<string text="5"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/playlist_edit/koth_edit/var_score_to_win" map="ui\shell\main_menu\settings_select\multiplayer_setup\playlist_edit\koth_edit\var_score_to_win">
 		<string text="1 MINUTE" map="0"/>
@@ -1036,6 +1067,8 @@
 		<string text="Players who kill a teammate will be assessed\na fifteen-second respawn penalty the next time\nthey die." map="7"/>
 		<string text="Team autobalancing will be disabled.  Players will\nbe free to change teams as they wish." map="8"/>
 		<string text="Team autobalancing will be enabled.  Players will\nnot be able to change to a more full team." map="9"/>
+		<string text="Players will spawn at any spawn point the\ngametype allows."/>
+		<string text="Players will only spawn at their own team's\nCapture the Flag spawn points."/>
 		<string text="No voice chat during the game."/>
 		<string text="Players hear their teammates who are near them."/>
 		<string text="Players hear everyone who is near them."/>
@@ -1066,6 +1099,7 @@
 		<string text="FRIENDLY FIRE:" map="0"/>
 		<string text="FRIENDLY FIRE PENALTY:" map="1"/>
 		<string text="AUTO TEAM BALANCE:" map="2"/>
+		<string text="FORCE TEAM SPAWNS:"/>
 		<string text="VOICE CHAT:"/>
 		<string text="LOBBY VOICE CHAT:"/>
 		<string text="VOICE QUALITY:"/>
