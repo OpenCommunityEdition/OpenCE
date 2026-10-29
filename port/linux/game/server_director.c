@@ -46,6 +46,7 @@ Called from the main loop every frame (main.c).
 #include "../src/server_json.h" /* port: port/linux/src/server_json.c */
 #include "../src/server_log.h" /* port: port/linux/src/server_log.c */
 #include "../src/server_master.h" /* port: port/linux/src/server_master.c */
+#include "../src/server_netlist.h" /* port: port/linux/src/server_netlist.c */
 #include "../src/posix_server.h" /* port: port/linux/src/posix_server.c */
 
 #include <stdio.h>
@@ -169,6 +170,11 @@ static struct
 	for the readers who see them) */
 	char seen_addresses[MAXIMUM_SLOTS][16];
 	char seen_hardware_ids[MAXIMUM_SLOTS][40];
+	/* (and its Discord account as it joined: a verified one's, else what it
+	said of itself) */
+	char seen_discord_ids[MAXIMUM_SLOTS][32];
+	char seen_discord_names[MAXIMUM_SLOTS][48];
+	boolean seen_discord_verified[MAXIMUM_SLOTS];
 	/* why each machine's players leave, a moment after a command dropped it
 	("kicked", "banned"; NULL: they left), and the seconds since */
 	char const *leave_reasons[MAXIMUM_MACHINES];
@@ -859,6 +865,8 @@ void server_director_reload(
 		server_log(_server_log_warning, "server", "config.toml cannot be read again: nothing changed");
 		return;
 	}
+	/* (server.vpn_list's file, vpn_allow.txt and vpn_block.txt too) */
+	server_netlist_reload();
 	server_read_rotation(&rotation, config_string("server.rotation"));
 	server_rotation_text(&rotation, after, sizeof(after));
 	/* (the same entries, checked again: a map or gametype file added or
@@ -1258,6 +1266,9 @@ static void server_player_event(
 		{
 			server_json_string(&json[pass], "address", server.seen_addresses[slot]);
 			server_json_string(&json[pass], "hwid", server.seen_hardware_ids[slot]);
+			server_json_string(&json[pass], "discord_id", server.seen_discord_ids[slot]);
+			server_json_string(&json[pass], "discord_name", server.seen_discord_names[slot]);
+			server_json_boolean(&json[pass], "discord_verified", server.seen_discord_verified[slot]);
 		}
 		server_json_object_end(&json[pass]);
 	}
@@ -1309,6 +1320,9 @@ static void server_note_players(
 			server.seen_machines[slot] = machine;
 			server.seen_addresses[slot][0] = 0;
 			server.seen_hardware_ids[slot][0] = 0;
+			server.seen_discord_ids[slot][0] = 0;
+			server.seen_discord_names[slot][0] = 0;
+			server.seen_discord_verified[slot] = FALSE;
 			if (name[0])
 			{
 				unsigned long address = distributed_machine_real_address(machine);
@@ -1323,6 +1337,9 @@ static void server_note_players(
 				}
 				snprintf(server.seen_hardware_ids[slot], sizeof(server.seen_hardware_ids[slot]), "%s",
 					hardware_id ? hardware_id : "");
+				server.seen_discord_verified[slot] = network_distributed_machine_discord(machine,
+					server.seen_discord_ids[slot], sizeof(server.seen_discord_ids[slot]),
+					server.seen_discord_names[slot], sizeof(server.seen_discord_names[slot]));
 				server_player_event("player_joined", slot, game->variant.universal_variant.teams ?
 					game->players[slot].team_index : -1, machine, NULL);
 			}

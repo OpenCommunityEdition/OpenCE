@@ -441,6 +441,11 @@ struct message_client_join_game_request
 	byte join_game_token[JOIN_GAME_TOKEN_LENGTH];
 	/* port: the machine's hardware id, as hex, as it tells it (p2p.c) */
 	char hardware_id[0x20];
+	/* port: a Discord account's pass and its proof for this connection, all
+	zero for none (port/linux/src/player_link.c: a dedicated server that
+	refused the machine for its VPN asks for it) */
+	byte link_pass[170];
+	byte link_proof[64];
 };
 
 struct message_client_settings_request
@@ -1983,6 +1988,10 @@ static boolean network_game_server_handle_message_client_join_game_request(
 				join_game_request.machine_name,
 				(char *)join_game_request.machine_name,
 				sizeof(join_game_request.machine_name));
+			/* port: the Discord pass it showed, if any, for the door
+			(network_game_server_accept_client_machine_into_game) */
+			network_game_server_set_machine_link(server_client_machine, join_game_request.link_pass,
+				join_game_request.link_proof, (char const *)join_game_request.machine_name);
 			network_connection_get_address(
 				network_game_server_get_client_connection(server_client_machine),
 				&source_address,

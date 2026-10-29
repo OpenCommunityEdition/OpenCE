@@ -28,6 +28,7 @@ rate limited, and its password guesses locked out.
 #include "server_json.h"
 #include "server_log.h"
 #include "server_master.h"
+#include "server_netlist.h"
 #include "server_toml.h"
 
 #include <SDL3/SDL.h>
@@ -49,8 +50,8 @@ char *server_commands_run(char const *line, int role, int origin, unsigned char 
 int server_director_set_rotation_text(char const *text, struct server_json *rejected);
 int server_commands_set_setting_text(char const *name, char const *value, int role, char *reason, long reason_size,
 	int *code);
-int server_commands_ban_address_text(char const *ip, char const *hwid, char const *names, char const *duration,
-	char const *reason, int role, char *message, long message_size, long *number);
+int server_commands_ban_address_text(char const *ip, char const *hwid, char const *discord_id, char const *names,
+	char const *duration, char const *reason, int role, char *message, long message_size, long *number);
 void server_commands_settings_json(struct server_json *json);
 void server_commands_bans_json(struct server_json *json);
 int server_status_player_matches(long slot, char const *name, char *current, long size);
@@ -2149,7 +2150,8 @@ static int route_needs_game(const char *method, const char *path)
 {
 	return !strncmp(path, "/api/players/", 13) || !strcmp(path, "/api/say") || !strncmp(path, "/api/rotation", 13) ||
 		!strncmp(path, "/api/gametypes", 14) || !strcmp(path, "/api/maps") || !strncmp(path, "/api/bans", 9) ||
-		!strcmp(path, "/api/settings") || !strcmp(path, "/api/command") || !strcmp(path, "/api/stop");
+		!strcmp(path, "/api/settings") || !strcmp(path, "/api/command") || !strcmp(path, "/api/stop") ||
+		!strncmp(path, "/api/vpn", 8);
 	(void)method;
 }
 
@@ -2161,7 +2163,7 @@ static int route_role(const char *method, const char *path)
 	if (!strcmp(path, "/api/stop"))
 		return _server_role_owner;
 	if (!strncmp(path, "/api/players/", 13) || !strcmp(path, "/api/say") || !strcmp(path, "/api/rotation/next") ||
-		!strcmp(path, "/api/rotation/play"))
+		!strcmp(path, "/api/rotation/play") || !strcmp(path, "/api/vpn/check"))
 	{
 		return _server_role_moderator;
 	}
@@ -2340,8 +2342,9 @@ void server_http_capabilities(struct server_json *json, const char *key)
 		"events", "status", "rotation", "settings", "bans",
 		/* (the fleets': the owner's password from this machine, a ban of an
 		address, a drain and stop, addresses in the events, the server's
-		identity in the status) */
-		"owner_web", "ban_address", "stop", "event_addresses", "identity" };
+		identity in the status; the VPN policy's /api/vpn and join_refused,
+		and verified Discord accounts in the players and the bans) */
+		"owner_web", "ban_address", "stop", "event_addresses", "identity", "vpn", "link" };
 	int index;
 
 	server_json_array_begin(json, key);
@@ -3616,20 +3619,65 @@ static void ticket_api(struct server_ticket *ticket)
 			ticket_error(ticket, 405, "method", "GET, PUT or DELETE");
 		}
 	}
+	else if (!strcmp(path, "/api/vpn") && !strcmp(method, "GET"))
+	{
+		server_json_object_begin(&json, NULL);
+		server_json_boolean(&json, "ok", 1);
+		server_netlist_status(&json);
+		server_json_object_end(&json);
+		ticket_answer(ticket, 200, &json);
+	}
+	else if (!strcmp(path, "/api/vpn/check") && !strcmp(method, "POST"))
+	{
+		char ip[64], by[32];
+		unsigned long address = 0;
+		int part, listed;
+		const char *cursor = ip;
+
+		ip[0] = 0;
+		body_string(body, length, "ip", ip, sizeof(ip));
+		/* (a dotted IPv4 address, each part 0 to 255) */
+		for (part = 0; part < 4; part++)
+		{
+			char *end;
+			unsigned long number = strtoul(cursor, &end, 10);
+
+			if (end == cursor || number > 255 || (part < 3 && *end != '.') || (part == 3 && *end))
+				break;
+			address = address << 8 | number;
+			cursor = end + 1;
+		}
+		if (part < 4 || !isdigit((unsigned char)ip[0]))
+		{
+			ticket_error(ticket, 400, "schema", "ip is an IPv4 address (a.b.c.d)");
+		}
+		else
+		{
+			listed = server_netlist_listed(address, by, sizeof(by));
+			server_json_object_begin(&json, NULL);
+			server_json_boolean(&json, "ok", 1);
+			server_json_boolean(&json, "listed", listed);
+			server_json_string(&json, "by", by);
+			server_json_object_end(&json);
+			ticket_answer(ticket, 200, &json);
+		}
+	}
 	else if (!strcmp(path, "/api/bans") && !strcmp(method, "POST"))
 	{
-		char ip[64], hwid[64], names[96], duration[32], reason[160], message[160];
+		char ip[64], hwid[64], discord_id[64], names[96], duration[32], reason[160], message[160];
 		long number = 0;
 		int answer;
 
 		body_string(body, length, "ip", ip, sizeof(ip));
 		body_string(body, length, "hwid", hwid, sizeof(hwid));
+		discord_id[0] = 0;
+		body_string(body, length, "discord_id", discord_id, sizeof(discord_id));
 		body_string(body, length, "names", names, sizeof(names));
 		body_string(body, length, "duration", duration, sizeof(duration));
 		body_string(body, length, "reason", reason, sizeof(reason));
 		/* (as the command, with the session's role: checked and logged as
 		sv_ban_address is) */
-		answer = server_commands_ban_address_text(ip, hwid, names, duration, reason, ticket->role, message,
+		answer = server_commands_ban_address_text(ip, hwid, discord_id, names, duration, reason, ticket->role, message,
 			sizeof(message), &number);
 		if (answer != 200)
 		{

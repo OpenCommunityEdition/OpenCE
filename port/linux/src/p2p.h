@@ -346,6 +346,11 @@ enum
 /* the identifier (6 bytes) and key hash of the internet play peer of this
 virtual address (network byte order): 0 if it is no peer's */
 int p2p_peer_key_hash(unsigned long virtual_address, unsigned char *identifier, unsigned char *key_hash);
+/* the binding of the internet play tunnel's session with the peer of this
+virtual address (network byte order), for a Discord link's pass
+(player_link_binding of the session's secret, which both ends share and
+nobody else has); 0 if it is no peer's */
+int p2p_peer_binding(unsigned long virtual_address, unsigned char *binding);
 /* whether this machine, a player of an internet game (not its host),
 answers the game's other players: holders of the invite it joined with */
 void p2p_set_answering_players(int on);

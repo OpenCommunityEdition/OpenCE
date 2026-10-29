@@ -298,6 +298,15 @@ the target can be: no more than 0.05 world units behind the eye along the
 line to the target, 0.2 to its side and 0.1 above it (a client cannot claim
 a hand far past a corner). Such hits are counted in the host's log, and the
 host's `network.fire_origins` (true by default) turns the hand off.
+Then version 40 adds to the join request (`message_client_join_game_request`,
+0x70 bytes before) a Discord account's pass, 170 bytes, and its proof, 64
+(`port/linux/src/player_link.c`; `docs/master_protocol.md`, "Player keys,
+links and passes"), all zero for none: a dedicated server refuses a machine
+from a VPN's, Tor exit's or datacenter's address with one of five new
+rejection codes (`_rejection_code_vpn_link_required` and the four after it,
+`port/linux/game/network_link.c`), and a client refused with the first joins
+again at once with its pass, bound to the tunnel's session. A build before
+them shows the codes as the game being closed.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

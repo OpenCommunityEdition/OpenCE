@@ -74,6 +74,7 @@ autocorrection, or stopped (-1); whether it runs */
 int host_sdl_text_input(unsigned int window, int type);
 int host_sdl_set_clipboard_text(const char *text);
 void host_sdl_get_clipboard_text(char *buffer, unsigned int size);
+int host_sdl_open_url(const char *url);
 /* the keyboard's keys by name (the controls' bindings, xinput_sdl.c) */
 void host_sdl_scancode_name(int scancode, char *buffer, unsigned int size);
 int host_sdl_scancode_from_name(const char *name);

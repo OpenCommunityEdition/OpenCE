@@ -499,13 +499,27 @@ static int fetch(const char *url, struct fetched *fetched)
 }
 #endif
 
-/* the masters to ask (the list thread's): masters.txt's; else, in the web
-build, its site's masters.json (the page's list of them, which its Servers
-panel reads too); else the official ones */
-static void read_masters(void)
+int master_list_get(const char *url, int *status, char **body, unsigned long *size)
 {
-	char urls[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_URL_SIZE];
-	unsigned char keys[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_KEY_SIZE];
+	struct fetched fetched;
+
+	memset(&fetched, 0, sizeof(fetched));
+	*status = 0;
+	*body = NULL;
+	*size = 0;
+	if (!fetch(url, &fetched))
+	{
+		free(fetched.body);
+		return 0;
+	}
+	*status = fetched.status;
+	*body = fetched.body;
+	*size = fetched.size;
+	return 1;
+}
+
+int master_list_client_masters(char (*urls)[MASTER_LIST_URL_SIZE], unsigned char (*keys)[MASTER_LIST_KEY_SIZE])
+{
 	int count = master_list_read_file(config_string("network.masters_file"), urls, keys, MASTER_LIST_MAXIMUM_MASTERS);
 
 #if defined(HALO_WEB)
@@ -521,6 +535,16 @@ static void read_masters(void)
 #endif
 	if (!count)
 		count = master_list_read_defaults(urls, keys, MASTER_LIST_MAXIMUM_MASTERS);
+	return count;
+}
+
+/* the masters to ask (the list thread's): master_list_client_masters' */
+static void read_masters(void)
+{
+	char urls[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_URL_SIZE];
+	unsigned char keys[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_KEY_SIZE];
+	int count = master_list_client_masters(urls, keys);
+
 	pthread_mutex_lock(&list.lock);
 	memcpy(list.urls, urls, sizeof(urls));
 	memcpy(list.keys, keys, sizeof(keys));

@@ -338,6 +338,8 @@ _network["categories"] = [
      "Hide offensive words in names and text from\nother players, maps and mods, as stars."),
     ("SERVER BROWSER:", "network_setup/server_browser",
      "What the Server Browser lists and its order: the\nsame settings as its Filters screen."),
+    ("DISCORD ACCOUNT:", "network_setup/discord_account",
+     "Link a Discord account, which lets you join\nservers that block VPNs while you use one."),
 ]
 SCREENS["network_setup/map_sharing"] = {
     "screen": "map_sharing_settings_screen", "header": _network["header"], "spacing": 30,
@@ -383,6 +385,28 @@ SCREENS["network_setup/server_browser"] = {
 # (the read-only row's words, its screen's words: menu_functions.c's
 # master_servers_show)
 SCREENS["network_setup/server_browser"]["words"] = ["OF", "NONE LISTED", "NOT ASKED YET", "OFF"]
+
+# Network Setup's Discord account (port/linux/src/player_link.c): the account
+# linked at the master servers, which a dedicated server that blocks VPNs lets
+# in from one; LINK NOW opens the master's page in the browser (on OK), UNLINK
+# forgets it (link.action is no setting of config.toml's: menu_functions.c's
+# setting_write does it). The first row shows its state (menu_functions.c's
+# discord_account_show: its words)
+SCREENS["network_setup/discord_account"] = {
+    "screen": "discord_account_settings_screen", "header": _network["header"], "spacing": 30,
+    "rows": [
+        ("DISCORD ACCOUNT:", "network.link_share", None,
+         "The Discord account linked to this game, or the\ncode the master server's page shows while linking.",
+         None, "discord_account"),
+        ("LINK:", "link.action", [("NO CHANGE", "none"), ("LINK NOW", "link"), ("UNLINK", "unlink")],
+         "LINK NOW opens the master server's page in the\nbrowser (on OK); UNLINK forgets the account.", None,
+         "link_action"),
+        ("SHOW TO SERVERS:", "network.link_share",
+         [("WHEN ASKED", "when_needed"), ("ALWAYS", "always"), ("NEVER", "never")],
+         "Which servers see your Discord account: WHEN\nASKED, those that block VPNs, joined from one.", None),
+    ],
+    "words": ["NOT LINKED", "LINKED AS", "WAITING: CODE", "REVOKED", "EXPIRED:"],
+}
 
 # Network Setup's multiplayer HUD: its rows, moved from Network Setup, and the
 # text chat's (port/linux/game/network_chat.c)
@@ -1297,6 +1321,12 @@ BROWSER_WORDS = [
     "Neither the master servers\\nnor the brokers answer:\\ncheck the connection",
     # (a refusal added later, last so that the others keep their places)
     "The host refused: your player name",
+    # (and a dedicated server's VPN policy's: port/linux/game/network_link.c)
+    "The host blocks VPNs: link Discord in Settings > Network Setup",
+    "The host refused: it allows no VPNs",
+    "The host refused your Discord link: link it again",
+    "The host refused: your Discord account is too new",
+    "The host refused: your Discord account is in the game",
 ]
 
 

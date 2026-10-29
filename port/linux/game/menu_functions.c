@@ -89,6 +89,7 @@ their handlers open opens.
 #include "../src/p2p.h"
 /* (the server browser's master servers, and Server Setup's publisher key) */
 #include "../src/master_list.h"
+#include "../src/player_link.h" /* port: port/linux/src/player_link.c */
 #include "../src/server_master.h"
 #include "text_filter.h"
 
@@ -336,6 +337,12 @@ static boolean setting_text(char const *name, char *text, unsigned int size, boo
 {
 	short index;
 
+	/* (DISCORD ACCOUNT's LINK: no change, until one is chosen) */
+	if (!strcmp(name, "link.action"))
+	{
+		snprintf(text, size, "none");
+		return TRUE;
+	}
 	if (strncmp(name, "profile.", 8))
 	{
 		if (!(default_value ? config_default(name, text, size) : config_text(name, text, size)))
@@ -392,6 +399,16 @@ static boolean setting_write(char const *name, char const *value)
 {
 	short index;
 
+	/* (DISCORD ACCOUNT's LINK: done, not written: the master's page opened
+	in the browser, or the account forgotten, player_link.c) */
+	if (!strcmp(name, "link.action"))
+	{
+		if (!strcmp(value, "link"))
+			player_link_begin();
+		else if (!strcmp(value, "unlink"))
+			player_link_unlink();
+		return TRUE;
+	}
 	if (strncmp(name, "profile.", 8))
 		return config_write(name, value);
 	for (index = 0; index < NUMBEROF(profile_settings); index++)
@@ -1603,6 +1620,52 @@ static void master_servers_show(struct widget_instance *list)
 		usnprintf(text, NUMBEROF(text) - 1, L"%d %s %d", answered, word, count);
 		text[NUMBEROF(text) - 1] = 0;
 	}
+	text_set(value, text);
+}
+
+/* Network Setup's DISCORD ACCOUNT's state (tools/port_settings.py: its
+words): linked as the account, the link page's code while it waits, revoked,
+expired (the passes ran out and no master answered), or not linked
+(player_link.c) */
+#define DISCORD_ACCOUNT_WORDS \
+	"pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\discord_account\\words"
+enum
+{
+	_discord_account_word_none,
+	_discord_account_word_linked,
+	_discord_account_word_waiting,
+	_discord_account_word_revoked,
+	_discord_account_word_expired,
+};
+
+static void discord_account_show(struct widget_instance *list)
+{
+	struct widget_instance *value = named(list, "discord_account_value", 0);
+	wchar_t text[ROW_TEXT_LENGTH], word[ROW_TEXT_LENGTH], wide[48];
+	char name[PLAYER_LINK_NAME_SIZE + 1], code[PLAYER_LINK_CODE_SIZE];
+	char const *shown;
+	short word_index;
+	long index;
+	int state;
+
+	if (!value)
+		return;
+	state = player_link_state(name, sizeof(name), code, sizeof(code));
+	word_index = state == _player_link_state_linked ? _discord_account_word_linked :
+		state == _player_link_state_waiting ? _discord_account_word_waiting :
+		state == _player_link_state_revoked ? _discord_account_word_revoked :
+		state == _player_link_state_expired ? _discord_account_word_expired : _discord_account_word_none;
+	words_get(DISCORD_ACCOUNT_WORDS, word_index, word, NUMBEROF(word));
+	shown = state == _player_link_state_waiting ? code : state == _player_link_state_linked ||
+		state == _player_link_state_expired ? name : "";
+	for (index = 0; shown[index] && index < NUMBEROF(wide) - 1; index++)
+		wide[index] = (wchar_t)(unsigned char)shown[index];
+	wide[index] = 0;
+	if (wide[0])
+		usnprintf(text, NUMBEROF(text) - 1, L"%s %s", word, wide);
+	else
+		usnprintf(text, NUMBEROF(text) - 1, L"%s", word);
+	text[NUMBEROF(text) - 1] = 0;
 	text_set(value, text);
 }
 
@@ -4184,6 +4247,11 @@ enum
 	_browser_word_error_online_off,
 	_browser_word_error_unreachable,
 	_browser_word_refused_name,
+	_browser_word_refused_vpn,
+	_browser_word_refused_vpn_blocked,
+	_browser_word_refused_link,
+	_browser_word_refused_link_age,
+	_browser_word_refused_link_in_use,
 };
 
 /* the words p2p_join_progress gives a join that failed, and the browser's
@@ -4200,6 +4268,11 @@ static struct
 	{ "closed", _browser_word_refused_closed },
 	{ "banned", _browser_word_refused_banned },
 	{ "name", _browser_word_refused_name },
+	{ "vpn", _browser_word_refused_vpn },
+	{ "vpn_blocked", _browser_word_refused_vpn_blocked },
+	{ "link", _browser_word_refused_link },
+	{ "link_age", _browser_word_refused_link_age },
+	{ "link_in_use", _browser_word_refused_link_in_use },
 	{ "password", _browser_word_refused_password },
 	{ "version", _browser_word_refused_version },
 	{ "token", _browser_word_refused_token },
@@ -7474,6 +7547,7 @@ void pc_menu_game_data_function_invoke(
 		video_rows_show(widget);
 		hud_button_style_row_show(widget);
 		master_servers_show(widget);
+		discord_account_show(widget);
 		settings_help(widget);
 	}
 	else if (!strcmp(name, "controls update menu"))

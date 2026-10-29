@@ -572,6 +572,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.client_timeout_seconds` | `15` | `HALO_NET_CLIENT_TIMEOUT_SECONDS` | Hosting: the seconds the host waits for a machine it hears nothing from before it drops it (5 to 300; the stock game waits 15). The same seconds are how long each machine's reliable stream waits for its peer to read before it gives up, and how long a host in a game waits for its own network to come back (an address renewed, a wifi drop) before it ends the game; each machine reads its own setting. A longer wait keeps players whose connection stalls (a browser tab in the background), but a machine that is really gone leaves its players frozen for longer. |
 | `network.public_address` | `""` | `HALO_NET_PUBLIC_ADDRESS` | Hosting: the internet address the joiners reach this machine at, `host[:port]` (the port forwarded to `network.tunnel_port`), for a server behind a NAT with one forwarded port. It is offered first, and its name is looked up again every 5 minutes. Empty: what STUN and UPnP find. |
 | `network.listings` | `"both"` | `HALO_NET_LISTINGS` | What the server browser lists. `"both"`: the dedicated servers of the master servers first, then the games players host (from the brokers). `"masters"`: the master servers' only. `"brokers"`: the brokers' only. Refer to "Server browser". |
+| `network.link_share` | `"when_needed"` | `HALO_NET_LINK_SHARE` | When the game shows a server the Discord account linked to it (Settings > Network Setup > Discord Account): `"when_needed"` (a server that asks, to let you in from a VPN), `"always"` or `"never"`. Refer to "Discord account". |
 | `network.masters_file` | `"masters.txt"` | `HALO_NET_MASTERS_FILE` | The file of the master servers the server browser asks for dedicated servers, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`), 4 at most. A file that names none (missing, or comments alone, as the release's) leaves the official master, built in (`https://master.opencommunityedition.com`). Refer to "Dedicated server". |
 | `network.browser_source` | `"all"` | `HALO_NET_BROWSER_SOURCE` | The server browser's games. `"all"` (ALL GAMES): the dedicated servers first, then the games players host; `"dedicated"`: the dedicated servers of the master servers; `"players"` (P2P GAMES): the games players host. The tab at the top left of the server browser changes it. |
 | `network.browser_show_empty`, `network.browser_show_full` | `true` | `HALO_NET_BROWSER_SHOW_EMPTY`, `HALO_NET_BROWSER_SHOW_FULL` | `false`: the server browser does not list the games with no player, the full games. The server browser's Filters screen sets them. |
@@ -617,6 +618,12 @@ the setting for one start of the game. It has priority over the file.
 | `server.region` | `""` | `HALO_SERVER_REGION` | A region the server browser shows (`eu`, `na-east`...): 16 characters. Empty: none. |
 | `server.chat_filter` | `"off"` | `HALO_SERVER_CHAT_FILTER` | The words the server keeps out of its chat and its players' names (streamer mode's list): `"off"`; `"censor"`, a line's words shown as stars; `"block"`, a line with them refused (its sender told why) and a player whose name has them refused at the door. Links are `network.text_chat`'s. |
 | `server.chat_filter_slurs`, `server.chat_filter_swearing`, `server.chat_filter_insults` | `"mild"`, `"off"`, `"off"` | `HALO_SERVER_CHAT_FILTER_SLURS`, `_SWEARING`, `_INSULTS` | With `server.chat_filter`, each group's words kept out: `"off"`, `"severe"` (the worst), `"strong"` or `"mild"` (all). |
+| `server.vpn_policy` | `"link"` | `HALO_SERVER_VPN_POLICY` | Machines joining from the address of a VPN, a Tor exit or a datacenter (the master servers' netlist): `"link"`, refused unless the player shows a Discord account linked at a master server this server publishes to; `"block"`, refused; `"off"`, let in. Refer to `docs/dedicated_server.md`, "VPNs and linked Discord accounts". |
+| `server.vpn_fail` | `"open"` | `HALO_SERVER_VPN_FAIL` | Until a netlist is held: `"open"` lets every machine in, `"closed"` refuses those from the internet as `server.vpn_policy` `"block"` would. |
+| `server.vpn_list` | `""` | `HALO_SERVER_VPN_LIST` | A netlist file checked besides the master servers' (next to `config.toml` unless a full path): for a server that publishes nowhere, or a test. Read at the start and by `sv_reload`. |
+| `server.vpn_check_lan` | `false` | `HALO_SERVER_VPN_CHECK_LAN` | Check the LAN's machines' addresses against the netlist too (tests). |
+| `server.link_min_age_days` | `365` | `HALO_SERVER_LINK_MIN_AGE_DAYS` | A machine joining over a VPN with a linked Discord account is refused when the account is younger than this many days (0: any age). |
+| `server.link_one_seat` | `true` | `HALO_SERVER_LINK_ONE_SEAT` | Refuse a second machine of a linked Discord account already in the game. |
 | `server.master_publish_address` | `false` | `HALO_SERVER_MASTER_PUBLISH_ADDRESS` | `true`: the master servers can give this server's address to players. `false`: only their probe uses it. |
 | `discord.application_id` | the application of the project | `HALO_DISCORD_APPLICATION` | The Discord application for invites. Empty: no Discord. |
 | `update.auto` | `true` | `HALO_UPDATE_AUTO` | `true`: at start-up, the game looks for a new version. Refer to "Updates". `false`: the game does not look. |
@@ -1395,6 +1402,27 @@ has a private party with the invite as its join secret. The host can send
 the invite with the invite button of Discord. When a person accepts it, that
 person joins the game. If the game does not operate, Discord starts it.
 The game sends the activity only to a Discord client of the same user.
+
+### Discord account
+
+Dedicated servers refuse by default players who join from the address of a
+VPN, a Tor exit or a datacenter (`server.vpn_policy`), unless the player has
+linked a Discord account at a master server the server publishes to.
+Settings > Network Setup > Discord Account links one: LINK NOW, then OK,
+opens the master's page in the browser (`player_link.c`), which shows a
+code that the screen's first row shows too, and logs in with Discord (its
+username and id alone). The game then holds a pass the master signs, for
+72 hours, and asks for a new one before it runs out. A server that refuses
+the game for its VPN asks for it, and the game joins again at once with it:
+the server sees the account's username and id (SHOW TO SERVERS,
+`network.link_share`, also offers ALWAYS and NEVER). UNLINK deletes the key
+and its passes; the master's page `/link/manage` deletes its record of
+them.
+
+The game keeps its key in `player.key` and the passes in
+`pass-<master key id>.bin`, next to `config.toml`. The key is this
+machine's: whoever has it joins as the account. Refer to
+`docs/master_protocol.md`, "Player keys, links and passes".
 
 ## Dedicated server
 

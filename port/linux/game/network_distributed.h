@@ -339,10 +339,16 @@ void distributed_send_notice_to_machine(long machine_index, char const *text);
 (seconds since 1970; 0: for ever), written in its bans.txt line */
 void network_distributed_ban_details(char const *reason, unsigned long until);
 /* (the host: a dedicated server's sv_ban_address) a ban's line in bans.txt
-for an address (its text; "none" for none) and a hardware id (empty for
-none), as the ban command writes one: TRUE if it was written */
-boolean network_distributed_ban_record(char const *address, char const *hardware_id, char const *names,
-	char const *reason, unsigned long until);
+for an address (its text; "none" for none), a hardware id and a verified
+Discord account's id (each empty for none), as the ban command writes one:
+TRUE if it was written */
+boolean network_distributed_ban_record(char const *address, char const *hardware_id, char const *discord_id,
+	char const *names, char const *reason, unsigned long until);
+/* (the host) a client machine's Discord account, its id and username: a
+verified one's (a pass that checked, network_link.c), else the one it told
+(empty for none); TRUE if it is verified */
+boolean network_distributed_machine_discord(long machine_index, char *discord_id, long discord_id_size,
+	char *discord_name, long discord_name_size);
 /* whether the next ban drops its machine and keeps it out without its line
 in bans.txt (network_distributed_ban_record wrote it) */
 void network_distributed_ban_unrecorded(boolean unrecorded);

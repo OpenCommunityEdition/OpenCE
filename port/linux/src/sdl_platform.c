@@ -17,6 +17,7 @@ and the debug keyboard that the game's console reads.
 #include "port_mods.h"
 #include "server_mode.h"
 #include "server_master.h"
+#include "player_link.h"
 #include "xiso.h"
 #include "touch_input.h"
 #include "../game/text_filter.h"
@@ -301,6 +302,10 @@ BOOL platform_sdl_initialize(void)
 		server_master_start_host();
 	}
 #endif
+	/* (a Discord account linked at a master server: its passes asked for
+	again before they run out, player_link.c) */
+	if (!halo_server_mode())
+		player_link_start();
 	/* (the mods, and whether to play those that say they cannot be played
 	together, before the window opens: port_mods.c) */
 	port_mods_startup();
@@ -1676,6 +1681,17 @@ int platform_clipboard_get(char *text, int size)
 void platform_clipboard_set(const char *text)
 {
 	SDL_SetClipboardText(text);
+}
+
+void platform_open_url(const char *url)
+{
+#ifdef HALO_WEB
+	web_js_post(5, url);
+#else
+	/* (the address logged too, for a machine whose browser does not open) */
+	if (!SDL_OpenURL(url))
+		platform_log("could not open the browser (%s): open %s", SDL_GetError(), url);
+#endif
 }
 
 /* puts a new invite on the clipboard, and joins one found there when the

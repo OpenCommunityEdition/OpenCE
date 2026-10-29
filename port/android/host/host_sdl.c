@@ -524,6 +524,11 @@ void host_sdl_get_clipboard_text(char *buffer, uint32_t size)
 	SDL_free(text);
 }
 
+int host_sdl_open_url(const char *url)
+{
+	return SDL_OpenURL(url) ? 1 : 0;
+}
+
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y)
 {
 	return SDL_ShowAndroidToast(message, duration, gravity, x, y) ? 1 : 0;

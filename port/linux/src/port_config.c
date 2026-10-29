@@ -720,6 +720,11 @@ static const struct config_setting config_settings[] =
 		"servers, beside this file unless a full path: an https:// URL and its\n"
 		"key (ed25519:<hex>) on each line, up to 4. None named (no file, or\n"
 		"comments alone): the official master, built in." },
+	{ "network.link_share", _config_string, "\"when_needed\"", "HALO_NET_LINK_SHARE", _environment_value,
+		_platform_all,
+		"When the game shows a server the Discord account linked to it\n"
+		"(Settings > Network Setup > Discord Account): \"when_needed\" (a server\n"
+		"that asks, to let you in from a VPN), \"always\" or \"never\"." },
 	{ "network.browser_source", _config_string, "\"all\"", "HALO_NET_BROWSER_SOURCE", _environment_value,
 		_platform_all,
 		"The server browser's games: \"all\" (ALL GAMES: the dedicated\n"
@@ -925,6 +930,28 @@ static const struct config_setting config_settings[] =
 		_environment_value, _platform_server,
 		"Let the master servers give this server's address to players; false:\n"
 		"only their reachability probe uses it." },
+	{ "server.vpn_policy", _config_string, "\"link\"", "HALO_SERVER_VPN_POLICY", _environment_value, _platform_server,
+		"Machines joining from the address of a VPN, a Tor exit or a datacenter\n"
+		"(the master servers' netlist): \"link\", refused unless the player shows\n"
+		"a Discord account linked at a master server this server publishes to;\n"
+		"\"block\", refused; \"off\", let in." },
+	{ "server.vpn_fail", _config_string, "\"open\"", "HALO_SERVER_VPN_FAIL", _environment_value, _platform_server,
+		"Until a netlist is held: \"open\" lets every machine in, \"closed\"\n"
+		"refuses those from the internet as server.vpn_policy \"block\" would." },
+	{ "server.vpn_list", _config_string, "\"\"", "HALO_SERVER_VPN_LIST", _environment_value, _platform_server,
+		"A netlist file checked besides the master servers' (beside this file\n"
+		"unless a full path): for a server that publishes nowhere, or a test.\n"
+		"Read at the start and by sv_reload." },
+	{ "server.vpn_check_lan", _config_boolean, "false", "HALO_SERVER_VPN_CHECK_LAN", _environment_value,
+		_platform_server,
+		"Check the LAN's machines' addresses against the netlist too (tests)." },
+	{ "server.link_min_age_days", _config_integer, "365", "HALO_SERVER_LINK_MIN_AGE_DAYS", _environment_value,
+		_platform_server,
+		"A machine joining over a VPN with a linked Discord account is refused\n"
+		"when the account is younger than this many days (0: any age)." },
+	{ "server.link_one_seat", _config_boolean, "true", "HALO_SERVER_LINK_ONE_SEAT", _environment_value,
+		_platform_server,
+		"Refuse a second machine of a linked Discord account already in the game." },
 	{ "streamer.enabled", _config_boolean, "false", "HALO_STREAMER_MODE", _environment_value, _platform_all,
 		"Hide offensive words in names and text from other players, maps and mods\n"
 		"as stars, at the levels below (Settings > Network Setup > Streamer Mode)." },
@@ -1891,6 +1918,9 @@ static const struct
 	{ "server.chat_filter_slurs", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "server.chat_filter_swearing", { "off", "severe", "strong", "mild", NULL }, NULL },
 	{ "server.chat_filter_insults", { "off", "severe", "strong", "mild", NULL }, NULL },
+	{ "server.vpn_policy", { "link", "block", "off", NULL }, NULL },
+	{ "server.vpn_fail", { "open", "closed", NULL }, NULL },
+	{ "network.link_share", { "when_needed", "always", "never", NULL }, NULL },
 	{ "network.voice_mode", { "off", "team_proximity", "team_enemy_proximity", "team_global",
 		"team_global_enemy_proximity", NULL }, NULL },
 	{ "network.coop_friendly_fire", { "off", "on", "shields_only", "explosives_only", NULL }, NULL },

@@ -63,6 +63,7 @@ only look up and create stand-ins.
 #include "server_master.h"
 #include "port_config.h"
 #include "p2p_internal.h"
+#include "player_link.h"
 #include "log_address.h"
 #include "ikcp.h"
 #ifdef HALO_PROFILE
@@ -2931,9 +2932,10 @@ int p2p_join_progress(int *stage, char *reason, int size)
 {
 	/* (the game's rejection codes in their order: network_game_protocol.h's
 	version too old, too new, bad join token, bad password, full, closed,
-	blacklisted machine) */
+	blacklisted machine, then the port's: a name refused, and a dedicated
+	server's VPN policy's) */
 	static const char *const refusals[] = { "version", "version", "token", "password", "full", "closed", "banned",
-		"name" };
+		"name", "vpn", "vpn_blocked", "link", "link_age", "link_in_use" };
 	struct peer *peer;
 	const char *why = "";
 
@@ -3194,6 +3196,24 @@ int p2p_peer_key_hash(unsigned long virtual_address, unsigned char *peer_identif
 	{
 		memcpy(peer_identifier, peer->identifier, P2P_IDENTIFIER_SIZE);
 		memcpy(key_hash, peer->key_hash, P2P_KEY_HASH_SIZE);
+		result = 1;
+	}
+	pthread_mutex_unlock(&p2p_lock);
+	return result;
+}
+
+int p2p_peer_binding(unsigned long virtual_address, unsigned char *binding)
+{
+	struct peer *peer;
+	int result = 0;
+
+	if (!p2p.running)
+		return 0;
+	pthread_mutex_lock(&p2p_lock);
+	peer = find_peer_by_address(virtual_address);
+	if (peer)
+	{
+		player_link_binding(peer->secret, binding);
 		result = 1;
 	}
 	pthread_mutex_unlock(&p2p_lock);
