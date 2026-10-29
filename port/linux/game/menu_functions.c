@@ -5891,9 +5891,10 @@ static void lobby_map_show(struct widget_instance *description, char const *map_
 	short level = campaign_level_of(map_name);
 	struct widget_instance *widget;
 
+	/* (by the scenario's own name: a map vote's choices name only that) */
 	for (index = 0; index < count; index++)
 	{
-		if (!_stricmp(names[index], map_name))
+		if (!_stricmp(scenario_name(names[index]), scenario_name(map_name)))
 			map = index;
 	}
 	/* (a Custom Edition map's picture and name, multiplayer or campaign, by
@@ -6202,9 +6203,20 @@ static void map_vote_update(struct widget_instance *list)
 	}
 	else
 	{
-		usnprintf(text, NUMBEROF(text) - 1, L"Vote for the next game\r\n\r\n%d vote%s\r\n\r\n%d s left\r\n%s",
+		wchar_t gametype[NETWORK_MAP_VOTE_GAMETYPE_SIZE];
+		short index;
+
+		for (index = 0; status->gametypes[row][index] && index < NETWORK_MAP_VOTE_GAMETYPE_SIZE - 1; index++)
+		{
+			char character = status->gametypes[row][index];
+
+			gametype[index] = (wchar_t)(unsigned char)(character >= 'a' && character <= 'z' ? character - 'a' + 'A' :
+				character);
+		}
+		gametype[index] = 0;
+		usnprintf(text, NUMBEROF(text) - 1, L"%s\r\n%d vote%s\r\n\r\n%d s left\r\n\r\n%s", gametype,
 			status->votes[row], status->votes[row] == 1 ? L"" : L"s", status->seconds_left,
-			status->chosen == NONE ? L"A: vote" : L"A: change your vote");
+			status->chosen == NONE ? L"A: vote" : row == status->chosen ? L"Your vote" : L"A: change vote");
 	}
 	text[NUMBEROF(text) - 1] = 0;
 	text_set_length(named(description, "lobby_game_data", 0), text, LOBBY_TEXT_LENGTH);
