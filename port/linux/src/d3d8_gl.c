@@ -74,12 +74,14 @@ the 3D view simply widens. The menus and full-screen overlays are laid out
 for 640 columns; while they draw (halo_screen_ui_offset), everything shifts
 right to center them.
 
-The desktop also draws at that resolution (platform_screen_mode): render
+The desktop also draws at that resolution (platform_screen_mode), and
+Android at the window's where display.resolution_scaling asks for it: render
 targets the size of the screen get that many pixels (screen_scale), and
 viewports, clears and visibility counts are scaled to match, so the game
-still works in its 480 lines; "original" draws 640x480, scaled up at
-presentation. The width and the scale change only between frames, after one
-is presented (halo_screen_commit). */
+still works in its 480 lines; "75%", "50%" and "25%" draw that part of the
+resolution each way, and "original" (Android's default) the 480 lines, scaled
+up at presentation. The width and the scale change only between frames,
+after one is presented (halo_screen_commit). */
 
 #define SCREEN_HEIGHT 480
 #define SCREEN_MAXIMUM_WIDTH 1920
@@ -177,12 +179,28 @@ static int anti_aliasing(void)
 	return anti_aliasing_values[anti_aliasing_value].mode;
 }
 
+/* display.resolution_scaling's part of the resolution each way: 1 for
+"native", 0.75, 0.5 or 0.25 for "75%", "50%" or "25%", 0 for "original" (the
+Xbox's 480 lines) */
+static float resolution_scaling_part(void)
+{
+	const char *setting = config_string("display.resolution_scaling");
+
+	return !strcmp(setting, "original") ? 0.0f : !strcmp(setting, "75%") ? 0.75f :
+		!strcmp(setting, "50%") ? 0.5f : !strcmp(setting, "25%") ? 0.25f : 1.0f;
+}
+
 static void screen_mode_choose(long *width, float scale[2])
 {
 #ifdef HALO_ANDROID
 	/* display.screen_width, or 0 for the display's shape, which the app
 	passes (port/android/host/host_main.c) */
 	const char *display = getenv("HALO_DISPLAY_WIDTH");
+	/* (the window's size last given, for a window that has none: before it
+	opens, or while the app is away) */
+	static int last_width, last_height;
+	float part = resolution_scaling_part();
+	int display_width = 0, display_height = 0;
 
 	*width = config_integer("display.screen_width");
 	if (*width <= 0)
@@ -194,8 +212,40 @@ static void screen_mode_choose(long *width, float scale[2])
 	*width &= ~1L;
 	scale[0] = scale[1] = 1.0f;
 	screen_supersampling = 1.0f;
+	/* display.resolution_scaling: "original" draws the 480 lines, which the
+	display blit scales up; "native" the window's pixels; "75%", "50%" or
+	"25%" that part of them each way. The picture keeps its shape: a width
+	of another (display.screen_width) is letterboxed. */
+	if (part <= 0.0f)
+		return;
+	platform_video_drawable_size(&display_width, &display_height);
+	if (display_width > 0 && display_height > 0)
+	{
+		last_width = display_width;
+		last_height = display_height;
+	}
+	if (last_width <= 0 || last_height <= 0)
+		return;
+	scale[0] = (float)last_width / (float)*width;
+	scale[1] = (float)last_height / (float)SCREEN_HEIGHT;
+	if (*width != ((SCREEN_HEIGHT * last_width / last_height) & ~1L))
+		scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
+	scale[0] *= part;
+	scale[1] *= part;
+	/* (no more than the GPU's largest target, once it is known) */
+	if (maximum_target_size > 0 && (*width * scale[0] > (float)maximum_target_size ||
+		SCREEN_HEIGHT * scale[1] > (float)maximum_target_size))
+	{
+		float fit = (float)maximum_target_size / (*width * scale[0]);
+
+		if ((float)maximum_target_size / (SCREEN_HEIGHT * scale[1]) < fit)
+			fit = (float)maximum_target_size / (SCREEN_HEIGHT * scale[1]);
+		scale[0] *= fit;
+		scale[1] *= fit;
+	}
 #else
 	long display_width, display_height;
+	float part = resolution_scaling_part();
 
 	*width = 640;
 	scale[0] = scale[1] = 1.0f;
@@ -211,6 +261,13 @@ static void screen_mode_choose(long *width, float scale[2])
 		keeps its shape and the display blit letterboxes it */
 		if (*width != wanted && *width != (wanted & ~1L))
 			scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
+		/* display.resolution_scaling's "75%", "50%" or "25%": that part of
+		the resolution each way, which the display blit scales up */
+		if (part > 0.0f)
+		{
+			scale[0] *= part;
+			scale[1] *= part;
+		}
 		/* supersampling: twice the pixels each way, or as many as the GPU's
 		largest target has (once it is known), which the display blit
 		scales down; not with "original" resolution scaling, which draws
