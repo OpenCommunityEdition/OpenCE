@@ -182,6 +182,8 @@ void particle_new(
 	struct new_particle_data const *data);
 void particles_update(
 	real dt);
+boolean particle_drawn(
+	long particle_index);
 
 /* ---------- globals */
 
