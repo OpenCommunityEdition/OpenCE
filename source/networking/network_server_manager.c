@@ -4353,6 +4353,18 @@ boolean network_game_server_client_machine_may_slow_countdown(
 	return TRUE;
 }
 
+/* port: a machine's faster (the lobby's START NOW): the host's own starts the
+game at once, a client machine's takes five seconds off the countdown (the
+Xbox game took five seconds off for any machine) */
+short network_game_server_client_machine_faster_event(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine)
+{
+	if (network_game_server_client_machine_is_local(server, machine))
+		return _network_game_server_countdown_event_start_immediately;
+	return _network_game_server_countdown_event_player_joined;
+}
+
 /* ---------- private code */
 
 static void network_game_server_countdown_started(

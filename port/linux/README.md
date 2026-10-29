@@ -354,7 +354,9 @@ different names from the host. A
 player's B in the lobby leaves the game alone, and the last player of the
 computer leaves it for all of them. When all the players are on the host's
 computer, START NOW starts the game without another computer, and a team
-game does not need a player on each team. In the game, each player's pause menu
+game does not need a player on each team. The host's START NOW starts the
+game at once; another computer's starts the countdown or takes five
+seconds off it. In the game, each player's pause menu
 opens on their part of the screen, and its LEAVE GAME is theirs: their part
 of the screen stays until the game ends. A game under way shows its own
 screen before JOIN GAME: players join there the same way, START or ADD
