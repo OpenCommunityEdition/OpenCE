@@ -6140,6 +6140,64 @@ static boolean matchmaking_screen_back(struct widget_instance *widget, boolean *
 	return TRUE;
 }
 
+static wchar_t const *const matchmaking_playlist_words[NUMBER_OF_P2P_MM_PLAYLISTS] =
+	{ L"SLAYER", L"CTF", L"KING OF THE HILL", L"ODDBALL", L"RACE" };
+static wchar_t const *const matchmaking_size_words[NUMBER_OF_P2P_MM_SIZES] =
+	{ L"1V1", L"2V2", L"3V3", L"4V4", L"FFA 6" };
+
+static wchar_t const *const matchmaking_dots[] = { L"   ", L".  ", L".. ", L"..." };
+
+static void matchmaking_lines(const struct p2p_mm_status *status, wchar_t *title, wchar_t *count, wchar_t *help,
+	wchar_t *notice, short size)
+{
+	wchar_t const *playlist = matchmaking_playlist_words[PIN(status->playlist, 0, NUMBER_OF_P2P_MM_PLAYLISTS - 1)];
+	wchar_t const *game_size = matchmaking_size_words[PIN(status->size, 0, NUMBER_OF_P2P_MM_SIZES - 1)];
+	int missing = status->needed - status->count;
+
+	title[0] = count[0] = help[0] = notice[0] = 0;
+	switch (status->state)
+	{
+	case P2P_MM_LOOKING:
+		usnprintf(title, size - 1, L"LOOKING FOR A GAME");
+		usnprintf(help, size - 1, L"Checking %d public games...", status->games_checked);
+		break;
+	case P2P_MM_QUEUED:
+		usnprintf(title, size - 1, L"SEARCHING%ls", matchmaking_dots[system_milliseconds() / 500 % 4]);
+		usnprintf(count, size - 1, L"%d searching", status->count);
+		if (missing <= 0)
+			usnprintf(help, size - 1, L"The %ls is full: choosing the host.", game_size);
+		else
+			usnprintf(help, size - 1, status->can_host > 0 ? L"%d more for %ls." : status->can_host < 0 ?
+				L"%d more for %ls.\r\nChecking your router..." : L"%d more for %ls.\r\nYour router cannot host.",
+				missing, game_size);
+		break;
+	case P2P_MM_FOUND:
+	case P2P_MM_HOSTING:
+		if (status->hosts)
+		{
+			usnprintf(title, size - 1, L"%ls %ls", playlist, game_size);
+			usnprintf(help, size - 1, L"Searchers join you.");
+			break;
+		}
+		usnprintf(title, size - 1, L"MATCH FOUND");
+		usnprintf(count, size - 1, L"%d of %d matched", status->players, status->most_players);
+		if (status->ping >= 0)
+			usnprintf(help, size - 1, L"Joining the game: %ls %ls, %d ms", playlist, game_size, status->ping);
+		else
+			usnprintf(help, size - 1, L"Joining the game: %ls %ls", playlist, game_size);
+		break;
+	default:
+		usnprintf(title, size - 1, L"SEARCH CANCELLED");
+		usnprintf(help, size - 1, L"B goes back to MATCHMAKING.");
+		break;
+	}
+	if (status->notice == P2P_MM_NOTICE_HOST_LEFT)
+		usnprintf(notice, size - 1, L"THE HOST LEFT. BACK IN THE QUEUE, YOUR PLACE KEPT.");
+	else if (status->notice == P2P_MM_NOTICE_HOST_UNREACHED)
+		usnprintf(notice, size - 1, L"COULD NOT REACH THE HOST. BACK IN THE QUEUE.");
+	title[size - 1] = count[size - 1] = help[size - 1] = notice[size - 1] = 0;
+}
+
 /* "gamespy screen update": the games' rows (name, map, gametype, players),
 the one chosen's line, the counts over the titles (the PC version's: its
 players, page, servers) */
