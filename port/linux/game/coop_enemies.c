@@ -156,6 +156,17 @@ static struct
 
 /* ---------- private code */
 
+/* whether a team fights the players.
+Humans never count as enemies,
+since the map's squads are placed before its scripts make humans allies (ai_allegiance). */
+static boolean coop_enemies_team_against_players(
+	short team_index)
+{
+	if (team_index == _game_team_player || team_index == _game_team_human)
+		return FALSE;
+	return game_team_is_enemy(_game_team_player, team_index);
+}
+
 static boolean coop_enemies_host(
 	void)
 {
@@ -446,7 +457,7 @@ short coop_enemies_extra_count(
 	if (count <= 0 || !coop_enemies_on())
 		return 0;
 	encounter = encounter_get(encounter_index);
-	if (!game_team_is_enemy(_game_team_player, encounter->team_index))
+	if (!coop_enemies_team_against_players(encounter->team_index))
 		return 0;
 	if (coop_enemies.mode == _coop_enemies_multiplier)
 		extra = (long)count * (coop_enemies.multiplier - 1);
@@ -605,7 +616,7 @@ boolean coop_enemies_rider_unseated(
 	}
 	actor = actor_get(unit->unit.actor_index);
 	if (actor->meta.swarm || actor->meta.encounter_index == NONE ||
-		!game_team_is_enemy(_game_team_player, encounter_get(actor->meta.encounter_index)->team_index))
+		!coop_enemies_team_against_players(encounter_get(actor->meta.encounter_index)->team_index))
 	{
 		return FALSE;
 	}
