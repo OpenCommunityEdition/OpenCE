@@ -6543,7 +6543,7 @@ and a screen a press opens is the presser's: another controller's press asks
 player 1's Y instead (FALSE: nothing opens for it) */
 static boolean lobby_add_player(short controller)
 {
-	if (lobby_local_player_count() >= MAXIMUM_LOCAL_PLAYERS)
+	if (matchmaking_game_locked() || lobby_local_player_count() >= MAXIMUM_LOCAL_PLAYERS)
 		return campaign_fail();
 	if (controller > 0)
 	{
@@ -6563,6 +6563,9 @@ static boolean lobby_join_start(struct widget_instance *widget, short controller
 	struct network_game *game = client ? network_game_client_get_game(client) : NULL;
 	short state_data;
 
+	/* (else a START by habit is the focused LEAVE's, the only button shown) */
+	if (matchmaking_game_locked())
+		return campaign_fail();
 	if (lobby_controller_playing(controller))
 	{
 		ui_widget_port_dispatch_event(focused_leaf(widget), BUTTON_START, controller, widget_deleted);
@@ -6662,7 +6665,7 @@ static void lobby_join_help(struct widget_instance *list)
 	{
 		text = L"New player: press START.";
 	}
-	else if (lobby_local_player_count() < MAXIMUM_LOCAL_PLAYERS)
+	else if (!matchmaking_game_locked() && lobby_local_player_count() < MAXIMUM_LOCAL_PLAYERS)
 	{
 		for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
 		{
@@ -6965,6 +6968,8 @@ static void lobby_update(struct widget_instance *list)
 	lobby_join_help(list);
 	map_vote_lobby_check();
 	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams && !matchmaking_game_locked());
+	visible_set(named(list, "lobby_button_start", 0), !matchmaking_game_locked());
+	visible_set(named(list, "lobby_button_add", 0), !matchmaking_game_locked());
 	/* (the buttons' focus, off Switch Team when it is hidden) */
 	focus_off_hidden(named(list, "lobby_button_bar", 0));
 	visible_set(named(description, "lobby_right_item", 0), game != NULL && state >= _client_state_pregame);
