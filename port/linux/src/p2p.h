@@ -474,6 +474,8 @@ struct p2p_mm_status
 	/* counts include this machine */
 	int playlist, size, count, needed;
 	int games_checked;
+	/* FOUND and HOSTING only; ping -1: not timed */
+	int hosts, players, most_players, ping;
 	int notice;
 };
 enum { P2P_MM_NOTICE_NONE, P2P_MM_NOTICE_HOST_LEFT, P2P_MM_NOTICE_HOST_UNREACHED };
