@@ -5001,10 +5001,15 @@ void main_screen_shell_load(
 	if (main_screen_shell_first_load == TRUE)
 	{
 		char const *command_line = shell_get_command_line();
+		int config_boolean(char const *name);
 
 		if (command_line && _stricmp(command_line, "xdemo") == 0)
 		{
 			error(_error_silent, "xbox command line= '%s'", command_line);
+		}
+		else if (config_boolean("display.skip_intro"))
+		{
+			load_main_menu = TRUE;
 		}
 		else
 		{

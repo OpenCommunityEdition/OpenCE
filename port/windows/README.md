@@ -182,7 +182,8 @@ argument to a function of the C runtime.
 
 ## Limits
 
-- Bink video is not available. The game skips the movies.
+- Bink video is not available: the disc's movies play on the Linux and Android
+  builds (`configure.py --with-ffmpeg`), and the Windows build keeps the stubs.
 - The game uses only the ANSI file functions. A path to the data or the
   saved games with characters that are not in the code page of the system
   does not always operate.

@@ -1,3 +1,8 @@
+/* The stubs, for the builds with no decoder of their own: bink_ffmpeg.c
+implements the SDK's own entry points behind the same HALO_BINK_FFMPEG the
+build sets, and this file compiles to nothing when it is. */
+#ifndef HALO_BINK_FFMPEG
+
 /*
 BINK_NULL.C
 
@@ -65,3 +70,5 @@ long __stdcall BinkCopyToBuffer(HBINK bink, void *destination, long destination_
 
 void __stdcall BinkGetSummary(HBINK bink, void *summary) { (void)bink; (void)summary; }
 void __stdcall BinkGetRealtime(HBINK bink, void *realtime, unsigned long frame_count) { (void)bink; (void)realtime; (void)frame_count; }
+
+#endif /* !HALO_BINK_FFMPEG */

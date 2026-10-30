@@ -89,7 +89,9 @@ To see the glibc version that a build needs, enter
 ## Build the game
 
 1. Go to the root folder of the repository.
-2. Enter `python configure.py`.
+2. Enter `python configure.py`. Add `--with-ffmpeg` to play the disc's movies
+   (refer to "Bink video" below): it downloads FFmpeg's release tarball,
+   checked against its SHA-256, and builds its libraries for this target.
 3. Enter `ninja linux`.
 
 ## Start the game
@@ -487,6 +489,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.window_size` | `""` | `HALO_WINDOW_SIZE` | The size of the window, as `"<width>x<height>"`, such as `"1920x1080"`, 640x480 or more. You can change the size of the window; the game's picture takes its shape. Empty: `display.window_scale` decides. Video Setup's Window Size sets it, from sizes of each shape (4:3, 16:10, 16:9 and 21:9) that fit the desktop; it shows with Windowed. |
 | `display.window_scale` | `2` | `HALO_WINDOW_SCALE` | Used when `display.window_size` is empty: the size of the window, as a multiple of 640x480. |
 | `display.vsync` | `true` | `HALO_NO_VSYNC=1` sets `false` | `true`: each frame waits for the display. |
+| `display.skip_intro` | `false` | `HALO_SKIP_INTRO` | `true`: skip the intro movie on startup and load straight into the main menu. |
 | `display.max_fps` | `0` | `HALO_MAX_FPS` | With vsync off, the most frames each second. `0`: twice the display's refresh rate. `-1`: no limit, which can hang some Intel graphics (Raptor Lake), resetting the desktop's graphics too. |
 | `display.frames_in_flight` | `3` | `HALO_FRAMES_IN_FLIGHT` | Windows and Linux: the most frames the GPU has queued, 1 to 8. Each frame waits until the GPU has finished the frame this many before it, so that the frames come evenly when the GPU is slower than the game. `0`: the driver decides, which on a slow GPU can give a long frame every few frames. Refer to "Frame rate". |
 | `display.anti_aliasing` | `"off"` | `HALO_ANTI_ALIASING` | The smoothing of jagged edges, which the Xbox did not have. `"off"`: none, as on the Xbox. `"fxaa"` or `"smaa"`: a pass over the 3D view after the game draws it. The HUD and the menus stay sharp. SMAA is the sharper and costs more. `"ssaa2x"`: the game draws at two times the resolution in each direction (at most the GPU's largest texture), and the picture is scaled down. The GPU does four times the work. Not with `display.resolution_scaling = "original"`. `"msaa2x"`, `"msaa4x"` or `"msaa8x"`: each pixel of the 3D view has that many samples (at most the GPU's). On Android, `"smaa"` gives FXAA and `"ssaa2x"` none. A change applies from the next frame. Refer to "Anti-aliasing" in "What operates". |
@@ -1741,7 +1744,7 @@ crafted file) is refused, and the level starts over.
 | Memory | The port reserves the Xbox memory at `0x80000000`. Thus the game gets the fixed addresses that it expects. |
 | Saved games | The Xbox `UDATA` layout, with SHA-1 signatures. |
 | Networking | Winsock on BSD sockets. System link on a local network and on the internet. |
-| Bink video | Not available. The game skips the movies. |
+| Bink video | The disc's `.bik` movies (the intro, the menu's attract loop, the credits) play with `configure.py --with-ffmpeg`, through the game's own Bink SDK entry points (`src/bink_ffmpeg.c`) over FFmpeg's Bink demuxer and decoders; without the option `src/bink_null.c` keeps the stubs and the game skips them, as it always did. FFmpeg is built by the build for this target, against the same system root, since a library called from the game's units has to share their ABI (`tools/linux_ffmpeg.py`; its release tarball is checked against the SHA-256 in the script). The importer copies the disc's `bink` folder beside `maps`. |
 
 ## How the port operates
 
