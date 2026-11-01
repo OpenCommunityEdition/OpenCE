@@ -57,9 +57,10 @@ The Linux binary release is available on the [AUR](https://aur.archlinux.org/pac
 
 ## Will you always stay compatible with OpenCE?
 
-Yes! GulchCE and OpenCE players can play online together on both Xbox and
-Custom Edition maps. The only time they can't do crossplay is when GulchCE
-players are playing MCC maps.
+GulchCE and OpenCE players can play together on Xbox and Custom Edition maps
+in **OpenCE Crossplay** sessions. This branch also offers **GulchCE Third
+Person** sessions, which require matching camera builds. MCC maps require
+compatible GulchCE clients in either session mode.
 
 This is due to MCC-specific netcode additions that only function when an
 MCC map is being played online. OpenCE clients wouldn't recognise the

@@ -68,6 +68,9 @@ The upstream optional client-hand origins remain separately controlled.
 
 ## Session compatibility
 
+See the [crossplay qualification](third_person_crossplay_qualification.md)
+for the tested revisions, menu checks and remaining validation limits.
+
 Host setup keeps its existing layout; **Session Options** opens the
 compatibility and camera-policy controls plus the invite link. Moving that
 link leaves room for two lines of host-menu help without shrinking the rows.
