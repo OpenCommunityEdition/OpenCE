@@ -225,9 +225,17 @@ to a complete weapon/parent draw, preventing inherited components from using
 different margins. Stock gameplay message offsets also use native margins;
 High-Res controller glyph dimensions and text spacing match the native HUD.
 
-MCC cutscene titles have a separate drawing adjustment:
-[`cinematic_render`](../../source/cutscene/cinematics.c) first resolves the
-authored/default rectangle and its widescreen position, then
+Chapter titles share [`cinematic_render`](../../source/cutscene/cinematics.c),
+which resolves the authored/default rectangle in the 640-column layout. Its
+widescreen translation uses the text's left edge, right edge or center according
+to its justification, preserving that anchor's relative screen position and the
+box's size. For example, Xbox `b30` authors a right-aligned title ending at 597;
+on an 852-column screen it ends at 794. Translating by the box center instead
+pulled it inward to 695 ([issue #86](https://github.com/chestahh/GulchCE/issues/86)).
+At 640 columns the translation is zero for every alignment. The same positioning
+applies to Custom Edition and MCC without changing tags or retaining state.
+
+MCC cutscene titles then have a separate drawing adjustment:
 `mcc_hud_title_bounds` in
 [`mcc_hud_draw.c`](../../port/linux/game/mcc_hud_draw.c) expands non-wrapping
 lines toward the screen edges while preserving their left, right or center
@@ -423,6 +431,35 @@ Focused coverage lives in `test_mcc_campaign.py`, `test_mcc_scripts.py`,
 `test_mcc_tag_validation.py` under [`tools`](../../tools/).
 The supplied `b30_vs.map` has a version-609 Custom Edition header, so it cannot
 establish runtime coverage for the issue's MCC version-13 map.
+
+For issue #89, follow `mcc_script_find` and `mcc_scripts_prepare` in
+[`mcc_scripts.c`](../../port/linux/game/mcc_scripts.c), then
+`mcc_kill_thread_evaluate` in
+[`mcc_script_runtime.inl`](../../port/linux/game/mcc_script_runtime.inl).
+Halo RPG's self-termination calls discard the current invocation after releasing
+parameter-held object lists; they must not return through the discarded stack.
+Thread handles include their allocation identifier, so a stale handle cannot
+cancel a replacement console thread. Existing checkpointed thread storage owns
+all remaining state, with no new shared-engine hook.
+
+Ruined Halo extends `mcc_animation_model_tree` recovery to disconnected chains
+with some zeroed parents. Matching associated models must agree on ordered
+names and retained parent relationships; complete graphs stay unchanged and the
+recovered tree still receives the normal validation. `mcc_particle_type_constants`
+also supplies a bounded default for a missing jet orientation constant exposed
+by the map's intro effects.
+
+Mission Z9's model-lighting writes are owned by `mcc_campaign_begin`,
+`mcc_campaign_snapshot`, `mcc_campaign_restore` and `mcc_campaign_dispose` in
+[`mcc_campaign.c`](../../port/linux/game/mcc_campaign.c). The script-startup entry
+in [`mcc_script_threads.inl`](../../port/linux/game/mcc_script_threads.inl)
+resets that value on restart. [`mcc_checkpoint.c`](../../port/linux/game/mcc_checkpoint.c)
+stores the added value in reserved footer space so existing saved thread
+addresses remain stable. MCC protocol 63 carries the larger campaign snapshot;
+Xbox/CE keep OpenCE protocol 41. See
+[issue #89 evidence and limits](../mcc_maps.md#issue-89-script-extensions-and-animation-recovery)
+for the inspected Warthog hierarchy, integer edge policy, runtime coverage and
+Mission Z9's lighting state and checkpoint compatibility.
 
 Continue with [platforms and testing](platforms_and_testing.md), or return
 to the [guide](README.md).

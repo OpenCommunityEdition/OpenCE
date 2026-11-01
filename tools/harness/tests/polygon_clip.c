@@ -132,6 +132,58 @@ int main(int argc, char **argv)
 			CHECK(result[index].x >= 1.0f && result[index].x <= 2.0f, "corner %d at x %g", index, result[index].x);
 		return 0;
 	}
+	/* A later portal consumes the preceding intersection, not the original
+	outline. Keep a nonempty finite region through repeated intersections. */
+	CASE("successive-portals")
+	{
+		real_point2d region[64], outline[64], results[2][CLIP_BUFFER_SIZE];
+		short count, step, index;
+
+		points_from(region_a, 10, region);
+		points_from(outline_a, 11, outline);
+		count = convex_hull2d_intersect(10, region, 11, outline, 256, results[0], 0.0001f);
+		for (step = 0; step < 8; step++)
+		{
+			real_point2d *current = results[step & 1];
+
+			CHECK(count >= 3 && count <= 256, "portal %d has %d corners", step, count);
+			for (index = 0; index < count; index++)
+				CHECK(isfinite(current[index].x) && isfinite(current[index].y),
+					"portal %d corner %d is not finite", step, index);
+			if (step < 7)
+				count = convex_hull2d_intersect(11, outline, count, current, 256,
+					results[(step + 1) & 1], 0.0001f);
+		}
+		return 0;
+	}
+	/* The NaN correction must not turn clipping into a conservative draw-all
+	fallback. Exercise rejection, unchanged polygons and the in-place API. */
+	CASE("clip-contract")
+	{
+		real_point2d square[4] = { {{0, 0}}, {{2, 0}}, {{2, 2}}, {{0, 2}} };
+		real_point2d result[CLIP_BUFFER_SIZE];
+		real_plane2d plane = { {{1, 0}}, -1 };
+		boolean clipped;
+		unsigned long flags = 5;
+		short count;
+
+		count = convex_polygon2d_clip_to_plane(4, square, &plane, 16, result, &flags, &clipped, 0.0001f);
+		CHECK(count == 4 && !memcmp(square, result, sizeof(square)), "inside polygon unchanged");
+		CHECK(!clipped && flags == 5, "inside polygon preserves clip metadata");
+		plane.d = 3;
+		count = convex_polygon2d_clip_to_plane(4, square, &plane, 16, result, NULL, NULL, 0.0001f);
+		CHECK(count == 0, "outside polygon rejected");
+		plane.d = 2;
+		count = convex_polygon2d_clip_to_plane(4, square, &plane, 16, result, NULL, NULL, 0.0001f);
+		CHECK(count == 0, "edge-only intersection rejected");
+		plane.d = 1;
+		count = convex_polygon2d_clip_to_plane(4, square, &plane, 16, square, &flags, &clipped, 0.0001f);
+		CHECK(count == 4 && clipped && flags == 13, "in-place clip metadata");
+		CHECK(square[0].x == 1 && square[0].y == 0 && square[1].x == 2 && square[1].y == 0 &&
+			square[2].x == 2 && square[2].y == 2 && square[3].x == 1 && square[3].y == 2,
+			"in-place clip retains the correct half");
+		return 0;
+	}
 	fprintf(stderr, "unknown case '%s'\n", case_name);
 	return 2;
 }

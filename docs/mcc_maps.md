@@ -2359,3 +2359,187 @@ Remaining limitations established during this investigation:
   verification. Android and web builds were attempted but their generated shell
   commands cannot run on this Windows host; WSL is absent. Platform integration
   must repeat those builds in a supported environment.
+
+## Issue 89 script extensions and animation recovery
+
+The supplied version-13 maps reproduce three separate admission failures:
+Ruined Halo `b30h3` at animation tag `ea4008cc`, Mission Z9 `z9` at
+`abs_integer`, and Halo RPG `halo_rpg` at `kill_thread` and
+`get_executing_running_thread`.
+
+`mcc_scripts.c` registers the three functions outside the native Xbox/CE
+function table. `abs_integer` takes and returns a 32-bit long; negation uses
+unsigned arithmetic, retaining `0x80000000` for the unrepresentable positive
+absolute value of `LONG_MIN`. This edge policy is explicit and tested; no
+observation of MCC's `LONG_MIN` result is claimed. The public
+[H1 script reference](https://c20.reclaimers.net/h1/scripting/#math)
+documents the ordinary integer signature. Z9 calls it on the difference
+between its marine count and `ai_living_count`.
+
+Halo RPG contains 40 compiled self-termination calls of the form
+`(kill_thread (get_executing_running_thread))`. The MCC runtime adapter
+returns the full salted thread handle and checks that handle before cancelling
+an invocation. It releases parameter-held object lists, clears the stack and
+marks a scenario thread terminated, so ordinary `wake` cannot resume it.
+Self-termination does not return through discarded frames. The native scheduler
+still owns deletion of its current console thread. Invalid, unsalted, deleted
+and stale handles do not cancel another thread. These operations add no external
+state: thread state retains its existing checkpoint, restart and unload lifetime.
+The previously supported named `sleep_forever` reset operation is unchanged.
+
+Ruined Halo's graph `reach\objects\vehicles\human\warthog\warthog`
+has 20 named nodes. Its root starts at suspension node 2, leaving cargo node 1
+and its descendants outside the root's child chain; several of those descendants
+also carry zero parent indices. All three objects referencing the graph point
+to a model with the same ordered names and a complete hierarchy. The MCC
+validator recovers incomplete chains only from agreeing associated models.
+Nonzero retained parents must match, siblings must belong to the same parent,
+children must belong to their stated parent, and cycles still fail. Zero parents
+are treated as omitted only in this incomplete-chain recovery path. Complete
+hierarchies are preserved. The recovered graph still passes full reachability
+and permutation checks; no animation or vertex indices are remapped.
+
+Mission Z9's `watch_land` writes `rasterizer_model_lighting_ambient` to
+`0.1`, then `0`. This is implemented by `mcc_campaign.c`, using the existing
+native lighting global and renderer. A positive value selects constant model
+ambient lighting; zero returns to ordinary model lighting. MCC captures the
+pre-load value, restores it on unload and script startup (including `map_reset`),
+and includes the live value in host-owned campaign snapshots. The existing
+`mcc_hs_threads_activate` lifecycle entry calls the MCC lighting reset; no new
+shared-engine hook or renderer branch is needed. Xbox/CE write permissions and
+loading paths are unchanged.
+
+Campaign state version 6 is 772 bytes, with the new real after the previous
+768-byte version 5. Older checkpoint states default the absent lighting value
+to the captured pre-load value. Snapshot validation rejects nonfinite and
+out-of-range values. MCC protocol 63 requires the larger snapshot on both peers;
+OpenCE's `HALO_PORT_NETWORK_VERSION` remains 41 because Xbox/CE retain the pinned
+upstream wire contract. This is an MCC-only peer-agreement change.
+
+`mcc_checkpoint.c` keeps the existing 768-byte campaign reservation and all
+thread/object-name arena addresses. Checkpoint footer version 3 uses four of
+its eight reserved bytes for the lighting extension and four for a footer CRC.
+It reassembles the full campaign snapshot for validation and restore. Versions
+1 and 2 retain their original layouts and checks. Increasing the reservation
+instead would invalidate pointers inside older saved thread stacks.
+
+A longer Ruined Halo run also exposed a later particle-system assertion:
+`particle_system_new_particle_jet` read constant index 2 from a two-entry block.
+The supplied map contains two-entry jet types in dirt, blood and water effects,
+and a needler type that selects jet creation in a later state. The pair contains
+velocity and spread; the January engine additionally reads a rotates-up switch.
+`mcc_particle_type_constants` preserves the pair and appends a false switch in
+bounded MCC-owned runtime tag storage. Existing three-entry blocks are unchanged.
+This is an explicit compatibility default, not a claim of verified MCC visual
+parity. The same third slot is also used as intensity if a later state switches
+to explosion creation; an absent slot defaults to zero there. Shorter required
+blocks, invalid extents and allocation failures are refused before runtime.
+The public [Invader particle-system schema](https://github.com/SnowyMouse/invader/blob/master/src/tag/hek/definition/particle_system.json)
+corroborates the block layouts and mode values; this implementation was written
+from the local engine consumer and inspected map data, without copied code.
+
+These changes remain in MCC-owned modules and their tests. The host continues
+to run campaign scripts. Regression tests exercise the real linker, evaluator,
+validator, campaign snapshot and checkpoint adapters: integer limits, argument
+shape, stale thread handles, object-list cleanup, malformed graph links, jet
+constants, lighting ownership and older checkpoints.
+
+Validation used a Windows debug portable build with PGO and LTO disabled, based
+on `origin/testing` at `75130bccc757a1448096b6a19d16507870f88b26`. The final
+executable SHA-256 was
+`debd6a358dbfb7dbecbe26e70746e5ef175a2759ebd813b15f7a3d28c9a94659`.
+
+- Final focused regressions: 535 passed, five skipped (four optional CE cache
+  fixtures were not configured; one socket test requires POSIX). The Windows
+  build passed, and documentation links and named symbols were checked.
+- All three original admission failures were reproduced before implementation.
+  Ruined Halo subsequently passed a 90-second hidden rendered run, advanced a
+  delayed 150-tick expression, reached gameplay beyond the particle assertion,
+  and exited normally. Captured frames were inspected. Its shader bitmap-type
+  warnings remain; this is not full visual parity or campaign completion.
+- Z9 loaded with the authored lighting writes enabled. A hidden live run verified
+  `abs_integer`, self-termination, lighting save/revert and restart, then Z9 ->
+  Xbox Blood Gulch -> CE Death Island -> Z9, with normal lighting at each
+  boundary and normal exit. This covers lifecycle behavior, not the full mission.
+- Two hidden Halo RPG peers ran for 100 seconds and exited normally. Read-only
+  inspection of the two test processes verified that host writes of `0.1` and
+  `0` reached the client's actual renderer variable. The client's console query
+  is deliberately blocked by the existing host-authority policy, which remains
+  unchanged. The full log comparison reported 21 seconds of aim differences
+  during the opening cinematic, also present in the earlier run before the
+  lighting-state changes. It reported no position drift. Comparing the 45
+  seconds after the intro (skip 25 seconds) passed with no mismatched seconds
+  and zero drift across 1,349 samples. This is a bounded native loopback check.
+- Android and web builds were attempted but those targets are unavailable in
+  this Windows build graph; WSL is absent. Browser transport tests remain
+  unverified: with the bundled Playwright resolved, `webrtc_native.mjs` fails
+  on its POSIX-style Windows file-URL path; `internet.mjs` additionally lacks
+  a built web site, the broker and Xvfb prerequisites. Repeat platform and
+  browser checks in a supported environment before integration.
+
+Final review retained MCC ownership and bounds checks, covered the missed
+restart reset, and removed the superseded narrow animation-tree recovery
+special case. No shared-engine implementation was changed. Useful logs and
+selected captures remain in `build/issue89`; inactive test saves are archived
+losslessly with original relative paths and verified SHA-256 manifests.
+Disposable map hardlinks, generated map caches, duplicate test binaries and
+harness build directories were removed. Original maps and saves were untouched.
+
+## Flamethrower particle-system views (issue #33)
+
+Ruby Rebalanced C20 attaches `defoliant` and `defoliant2` to the world-model
+`defoliant spawn` marker, with particle-type flags `0x10041` and `0x10001`.
+Its `fp_defoliant3` and `fp_defoliant2` attachments instead name `spawn fire`,
+which exists only on the first-person model, with flags `0x20041` and
+`0x20001`. These are inspected map fields, not filename-based special cases.
+The [public particle-system format](https://c20.reclaimers.net/h1/tags/particle_system/)
+identifies bits 16 and 17 as the first- and third-person drawing exclusions.
+
+The inherited particle-system emitter queries only world-model markers, and
+its renderer does not apply these exclusions. Thus the first-person stream
+has no emission marker while the lower world-model stream appears in the
+player's view. In a hidden Windows reproduction, the original firing effect
+and projectile markers both resolved; that did not establish that the
+separate attached particle systems were working.
+
+[mcc_particles.c](../port/linux/game/mcc_particles.c) supplies the missing
+MCC behavior. `mcc_particle_system_markers` uses the active local viewmodel's
+marker for first-person-only types; a missing marker, remote or holstered
+weapon, deleted handle or third-person camera does not fall back to the world
+origin. `mcc_particle_system_visible` applies the exclusions for each viewer,
+so another split-screen player can see the world stream without seeing the
+owner's first-person stream. Types without view exclusions retain their
+existing behavior. The two `port:` hooks in
+[particle_systems.c](../source/effects/particle_systems.c) are necessary because
+emission and drawing are private engine operations without registration
+interfaces. Xbox and Custom Edition retain the native queries and drawing.
+
+The adapter has no persistent state or allocations. Existing particle systems
+own their emitted particles and dispose them on map unload; orphaned
+first-person-only streams remain hidden. Weapon switching and camera changes
+are evaluated from current engine state. Projectile origins, damage, network
+messages and deterministic simulation are unchanged; the particle system
+uses the local visual random seed, so no network-version change is needed.
+
+`tools/test_mcc_particles.py` exercises the actual adapter functions, including
+marker failures, invalid attachments, view flags, split-screen ownership,
+weapon deletion, view changes and MCC-to-legacy activation transitions.
+Private before/after Windows captures of the same Ruby C20 fixture showed the
+missing barrel stream before and a stream leaving the barrel after the fix.
+The fixture changed only a starting profile's weapon to obtain the
+flamethrower, and used temporary stationary firing input; neither change is
+shipped. This is a bounded visual check, not full campaign completion.
+
+The final release/portable Windows build passed, as did 149 focused regression
+checks (two skipped: an optional MCC map fixture and a POSIX-only socket
+harness). Both changed translation units also compiled to Android guest ELF
+and web Wasm objects with the generated target flags. Full Android and web
+builds were attempted but remain unverified: their generated Unix shell
+commands and the Android NDK wrapper cannot run unchanged on this Windows
+host, which has no WSL. These object checks do not replace full platform
+builds, multiplayer testing or visual checks on those platforms.
+
+The final Windows binary also completed a single-process sequence from Ruby
+C20 to Xbox `a10`, to Custom Edition `deathisland`, then back to Ruby C20,
+with console responses after each load and a normal timed exit. This checks
+bounded loading and activation transitions, not full legacy visual parity.

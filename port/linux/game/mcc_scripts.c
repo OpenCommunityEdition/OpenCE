@@ -146,6 +146,36 @@ static struct {
         NULL, 3, { _hs_type_unit } }, { _hs_type_starting_profile, _hs_type_boolean }
 };
 
+/* MCC integer arithmetic retains the 32-bit result for LONG_MIN without
+ * invoking C signed-overflow undefined behavior. */
+static void mcc_abs_integer_evaluate(short function, long thread, boolean initialize)
+{
+    long *arguments = hs_macro_function_evaluate(function, thread, initialize);
+    unsigned long value;
+    if (!arguments) return;
+    value = (unsigned long)arguments[0];
+    if (arguments[0] < 0) value = 0u - value;
+    hs_return(thread, (long)value);
+}
+
+static struct hs_function_definition mcc_abs_integer_definition = {
+    _hs_type_long_integer, 0, "abs_integer", hs_macro_function_parse,
+    mcc_abs_integer_evaluate, "Returns the absolute value of a 32-bit integer.",
+    NULL, 1, { _hs_type_long_integer }
+};
+
+static struct hs_function_definition mcc_executing_thread_definition = {
+    _hs_type_long_integer, 0, "get_executing_running_thread", hs_macro_function_parse,
+    mcc_executing_thread_evaluate, "Returns the current script thread handle.",
+    NULL, 0, { 0 }
+};
+
+static struct hs_function_definition mcc_kill_thread_definition = {
+    _hs_type_void, 0, "kill_thread", hs_macro_function_parse,
+    mcc_kill_thread_evaluate, "Terminates the specified script thread.",
+    NULL, 1, { _hs_type_long_integer }
+};
+
 struct hs_function_definition *mcc_script_function(short index)
 {
     if (!mcc_cache_tags_loaded()) return NULL;
@@ -153,6 +183,9 @@ struct hs_function_definition *mcc_script_function(short index)
     if (index == MCC_HS_MISSION_SEGMENT) return &mcc_mission_segment_definition;
     if (index == MCC_HS_CORE_SEGMENT) return &mcc_core_segment_definition;
     if (index == MCC_HS_PLAYER_EQUIPMENT) return &mcc_equipment_definition.definition;
+    if (index == MCC_HS_ABS_INTEGER) return &mcc_abs_integer_definition;
+    if (index == MCC_HS_EXECUTING_THREAD) return &mcc_executing_thread_definition;
+    if (index == MCC_HS_KILL_THREAD) return &mcc_kill_thread_definition;
     return mcc_campaign_function(index);
 }
 
@@ -165,6 +198,9 @@ short mcc_script_find(char const *name)
     if (!csstrcasecmp(name, "core_save_name")) return MCC_HS_CORE_SEGMENT;
     if (!csstrcasecmp(name, "player_effect_set_max_vibrate"))
         return hs_find_function_by_name("player_effect_set_max_rumble");
+    if (!csstrcasecmp(name, "abs_integer")) return MCC_HS_ABS_INTEGER;
+    if (!csstrcasecmp(name, "get_executing_running_thread")) return MCC_HS_EXECUTING_THREAD;
+    if (!csstrcasecmp(name, "kill_thread")) return MCC_HS_KILL_THREAD;
     return mcc_campaign_find(name);
 }
 
@@ -340,6 +376,9 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
             else if (!csstrcasecmp(name, "mcc_mission_segment")) index = MCC_HS_MISSION_SEGMENT;
             else if (!csstrcasecmp(name, "core_save_name")) index = MCC_HS_CORE_SEGMENT;
             else if (!csstrcasecmp(name, "player_add_equipment")) index = MCC_HS_PLAYER_EQUIPMENT;
+            else if (!csstrcasecmp(name, "abs_integer")) index = MCC_HS_ABS_INTEGER;
+            else if (!csstrcasecmp(name, "get_executing_running_thread")) index = MCC_HS_EXECUTING_THREAD;
+            else if (!csstrcasecmp(name, "kill_thread")) index = MCC_HS_KILL_THREAD;
             else if (!csstrcasecmp(name, "player_effect_set_max_vibrate"))
                 index = hs_find_function_by_name("player_effect_set_max_rumble");
             else {

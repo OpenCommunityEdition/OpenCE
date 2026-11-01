@@ -142,13 +142,19 @@ static void contrail_add_points(
 	long contrail_index,
 	short contrail_point_count,
 	boolean force);
+/* port: age on the emission clock; move every frame. */
 static void contrail_update_points(
 	long contrail_index,
-	real dt);
+	real dt,
+	real state_dt);
 static void contrail_verify(
 	long contrail_index);
 
 /* ---------- globals */
+
+/* port: emission and point aging share a map-local tick clock. */
+static long last_point_game_time = NONE;
+static real pending_point_dt = 0.0f;
 
 /* ---------- public code */
 
@@ -214,6 +220,9 @@ void contrails_initialize(
 void contrails_initialize_for_new_map(
 	void)
 {
+	/* port: do not carry a partial frame across map loads. */
+	last_point_game_time = NONE;
+	pending_point_dt = 0.0f;
 	data_make_valid(contrail_data);
 	data_make_valid(contrail_point_data);
 
@@ -223,6 +232,9 @@ void contrails_initialize_for_new_map(
 void contrails_dispose_from_old_map(
 	void)
 {
+	/* port: discard the old map's emission and aging clock. */
+	last_point_game_time = NONE;
+	pending_point_dt = 0.0f;
 	data_make_invalid(contrail_point_data);
 	data_make_invalid(contrail_data);
 
@@ -368,13 +380,10 @@ void contrails_update(
 	real dt)
 {
 	long contrail_index;
-	/* The native builds update contrails every frame, several frames per
-	tick (port/linux/game/render_interpolation.c), but objects and their
-	markers move only on ticks: points due on a frame that ran no tick would
-	land on the last point, be skipped and be lost. Emit on the first frame
-	after each tick, for all the time since the last emission. */
-	static long last_point_game_time = NONE;
-	static real pending_point_dt = 0.0f;
+	/* port: emit and age points together on the first frame after a tick.
+	Point states discard elapsed time when changing states; aging every
+	render frame shortened the 30 Hz trails, especially states shorter
+	than a tick. Texture animation below still advances every frame. */
 	real point_dt;
 
 	pending_point_dt += dt;
@@ -465,7 +474,8 @@ void contrails_update(
 			texture_animation_v = texture_animation_v * contrail->density;
 		contrail->texture_offset_v = texture_animation_v * frame_dt + contrail->texture_offset_v;
 
-		contrail_update_points(contrail_index, dt);
+		/* port: zero still initializes newly attached/collision points. */
+		contrail_update_points(contrail_index, dt, point_dt);
 
 		for (instance_index = 0;
 			instance_index < MAXIMUM_CONTRAIL_INSTANCES;
@@ -584,9 +594,11 @@ static void contrail_verify(
 	return;
 }
 
+/* port: age on the emission clock; move every frame. */
 static void contrail_update_points(
 	long contrail_index,
-	real dt)
+	real dt,
+	real state_dt)
 {
 	struct contrail_datum *contrail = contrail_get(contrail_index);
 	struct contrail_definition *definition = contrail_definition_get(contrail->definition_index);
@@ -606,7 +618,8 @@ static void contrail_update_points(
 
 			if (!TEST_FLAG(contrail_point->flags, _contrail_point_expired_bit))
 			{
-				contrail_point->time = dt * contrail_point->delta + contrail_point->time;
+				/* port: match state lifetimes to tick-batched point emission. */
+				contrail_point->time = state_dt * contrail_point->delta + contrail_point->time;
 
 				while (contrail_point->delta == 0.0f || contrail_point->time > 1.0f)
 				{

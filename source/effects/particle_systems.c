@@ -76,6 +76,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "effects/particle_systems.h"
+#include "mcc_particles.h" /* port: port/linux/game/mcc_particles.c */
 #include "effects/particle_system_definitions.h"
 
 #include "bitmaps/bitmap_group.h"
@@ -717,6 +718,9 @@ static void particle_system_new_particles(
 					struct object_attachment_definition)->marker_name,
 				markers,
 				NUMBEROF(markers));
+			/* port: MCC first-person streams use their authored viewmodel marker. */
+			marker_count = mcc_particle_system_markers(system->object_index,
+				system->attachment_index, type_definition->flags, markers, NUMBEROF(markers), marker_count);
 			object_get_location(system->object_index, &system->location);
 		}
 		else
@@ -1439,6 +1443,10 @@ static void particle_system_render(
 			type_index,
 			struct particle_system_type);
 		struct particle_type *type = &system->types[type_index];
+
+		/* port: MCC view exclusions are evaluated separately for each split-screen view. */
+		if (!mcc_particle_system_visible(system->object_index, type_definition->flags, render.local_player_index))
+			continue;
 
 		if (type->state_index != NONE &&
 			!TEST_FLAG(type_definition->flags, _particle_system_type_disabled_bit))

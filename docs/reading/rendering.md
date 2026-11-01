@@ -28,6 +28,9 @@ pass keeps each split-screen view's previous camera in its own slot through
 `previous_camera_matrix_for_window` in
 [rasterizer_xbox_environment_fog.c](../../source/rasterizer/xbox/rasterizer_xbox_environment_fog.c).
 Both corrections apply through the existing renderer for every map family.
+The [issue 83 investigation](../geometry_flicker_83.md) connects the portal
+correction to disappearing terrain, its regression tests and the remaining
+limits of that evidence.
 
 `screen_mode_choose` in [d3d8_gl.c](../../port/linux/src/d3d8_gl.c) selects
 the render-target scale separately from the game's logical 480-line view.
@@ -53,6 +56,39 @@ simulation snapshots. A teleport or respawn should not interpolate through
 all intervening space. `render_interpolation.c` contains the checks and
 fallbacks for those discontinuities. Rendered poses and simulation positions
 are related values with different purposes.
+
+First-person hands and weapons use `render_interpolation_first_person` in
+[render_interpolation.c](../../port/linux/game/render_interpolation.c). It keeps
+camera-relative poses per local player. The caller,
+`first_person_weapon_build_node_matrices` in
+[first_person_weapons.c](../../source/interface/first_person_weapons.c), supplies
+the weapon's full object handle and animation graph tag index. Those identities,
+the node count and consecutive ticks determine whether two poses can blend.
+The identities must come from the caller: matrices alone cannot distinguish a
+weapon replacement from a fast animation with the same number of nodes.
+
+This replaces a 0.25-world-unit displacement cutoff that held the entire pose
+at its latest tick during fast rocket-launcher melee and reload motion. Rendering
+still refuses non-finite displacements. A replacement within a tick, missing
+poses, disabled Smooth Motion or `render_interpolation_reset` at map startup
+discards the old history. Xbox, Custom Edition and MCC retain their own loading
+paths and supply their existing poses to this shared render service; simulation
+state and animation timing are unchanged.
+
+A separate discontinuity occurs when the stock rocket's tube node resets by
+180 degrees after chambering. Its rotation advances normally before that reset;
+blending the reset invents an extra half-turn between the equivalent tube poses.
+Near-half-turn rotations snap that node only. Smaller turns and the other nodes
+continue blending, including the hands. This is a render-side discontinuity
+guard, not a change to the authored animation or ammunition state.
+
+[test_first_person_interpolation.py](../../tools/harness/tests/test_first_person_interpolation.py)
+compiles the production snapshot, matrix and rotation code. It checks fractional
+frames, weapon/graph replacement, split-screen slots, camera transforms, capacity,
+invalid data, chamber resets and history resets. Negative controls restore the old
+distance cutoff or blend through the half-turn and must fail their corresponding
+cases. These asset-free tests do not establish
+visual compatibility for every authored animation.
 
 OpenCE also advances visual function values into the picture's time. Read
 `object_function_values_for_render` in [objects.c](../../source/objects/objects.c):
@@ -176,6 +212,18 @@ When a new shared fragment is compiled, `fragment_source_get` also calls
 OpenCE's separate on-disk program cache. Reused fragments keep the same shader
 ID and source hash, so source deduplication does not disable binary-program reuse.
 
+Before its presentation blit, `D3DDevice_Present` selects the window's draw
+framebuffer after looking up the source framebuffer. `framebuffer_find`
+binds both read and draw targets when it creates an entry. Without restoring
+the draw target, a first presentation can blit the back buffer onto itself.
+A fresh Xbox map's loading-screen draws can create that entry earlier,
+masking the defect when saved map caches are absent. The
+[presentation regression](../../tools/harness/tests/test_present_framebuffer.py)
+checks new, reused and changed source framebuffers, plus HDR presentation
+and its blit fallback. This binding defect was reproduced during issue #80's
+investigation; it does not establish the cause of the reported persistent
+Android geometry loss.
+
 At presentation, `D3DDevice_Present` unbinds the OpenGL read framebuffer
 before `platform_video_swap`. The read framebuffer selects the image used
 by pixel-read and copy operations; binding zero selects the default window
@@ -190,6 +238,19 @@ visibility-query results and reusable upload storage have completion rules.
 show why a delayed GPU result must not be treated as a zero or why asking
 for a result too soon can stall the frame. The test uses fake driver
 behaviour; it does not measure real GPU performance.
+
+## Contrail timing
+
+Projectile trails are chains of points. Read `contrails_update` and
+`contrail_update_points` in [contrails.c](../../source/effects/contrails.c),
+then `render_contrail` in [render_contrails.c](../../source/render/render_contrails.c).
+Emission and point-state aging share the time accumulated between simulation
+ticks. Point motion and texture animation still use each rendered frame's time.
+This preserves short bright states at high refresh rates; aging every frame
+previously shortened trails whose state transitions discard excess time.
+The timing accumulator resets on map initialization and disposal. New points
+still initialize on frames without a tick so the renderer has a valid state.
+See the [contrail fix record](../contrail_timing.md) for evidence and limits.
 
 ## Dynamic lighting 1.0
 
@@ -413,5 +474,20 @@ benchmarks or GPU test runs. To investigate a rendering change, distinguish
 wrong simulation state, wrong rendered pose, culling, shader translation
 and stale GPU resources. Check a real image as well as relevant tests, and
 record the backend, platform, map, settings and view layout.
+
+## MCC weapon particle streams
+
+Ruby Rebalanced's flamethrower authors different particle systems for its
+first-person and world-model barrels. Start at `particle_system_new_particles`
+and `particle_system_render` in
+[particle_systems.c](../../source/effects/particle_systems.c), then read
+`mcc_particle_system_markers` and `mcc_particle_system_visible` in
+[mcc_particles.c](../../port/linux/game/mcc_particles.c). The first chooses the
+local viewmodel marker for first-person-only streams; the second checks the
+authored view exclusions for each rendered player. The native Xbox and CE
+paths pass through unchanged when MCC is inactive. The adapter owns no
+persistent state, and the engine retains particle lifetime and map cleanup.
+See the [MCC evidence and regression checks](../mcc_maps.md#flamethrower-particle-system-views-issue-33)
+for the inspected flags, reproduction and validation limits.
 
 Continue with [networking](networking.md), or return to the [guide](README.md).

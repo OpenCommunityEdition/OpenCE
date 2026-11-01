@@ -205,7 +205,12 @@ names and synchronized its opening sequence; the short run did not provide
 enough on-foot samples for the comparator's full drift verdict. These checks
 do not establish full campaign or public internet transport compatibility.
 
-MCC sessions use separate MCC protocol version 62. Version 62 retains OpenCE
+MCC sessions use separate MCC protocol version 63. Version 63 extends campaign
+snapshots from 768 to 772 bytes (state version 6) to replicate the host's
+`rasterizer_model_lighting_ambient` value for Mission Z9. Older MCC peers are
+rejected. Xbox/Custom Edition retain the pinned upstream 41 contract and
+`HALO_PORT_NETWORK_VERSION`; the MCC-only version carries this agreement change.
+Version 62 retains OpenCE
 41 map-vote messages 94-95 and moves MCC gameplay messages to 96-99 and its
 join envelope to 100. Its bounded buffer grows to 512 bytes to carry upstream
 41 link credentials, including the local host connection. Older MCC peers are rejected; Xbox and Custom Edition
