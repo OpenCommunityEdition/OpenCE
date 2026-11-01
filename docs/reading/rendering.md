@@ -176,6 +176,18 @@ When a new shared fragment is compiled, `fragment_source_get` also calls
 OpenCE's separate on-disk program cache. Reused fragments keep the same shader
 ID and source hash, so source deduplication does not disable binary-program reuse.
 
+Before its presentation blit, `D3DDevice_Present` selects the window's draw
+framebuffer after looking up the source framebuffer. `framebuffer_find`
+binds both read and draw targets when it creates an entry. Without restoring
+the draw target, a first presentation can blit the back buffer onto itself.
+A fresh Xbox map's loading-screen draws can create that entry earlier,
+masking the defect when saved map caches are absent. The
+[presentation regression](../../tools/harness/tests/test_present_framebuffer.py)
+checks new, reused and changed source framebuffers, plus HDR presentation
+and its blit fallback. This binding defect was reproduced during issue #80's
+investigation; it does not establish the cause of the reported persistent
+Android geometry loss.
+
 At presentation, `D3DDevice_Present` unbinds the OpenGL read framebuffer
 before `platform_video_swap`. The read framebuffer selects the image used
 by pixel-read and copy operations; binding zero selects the default window
