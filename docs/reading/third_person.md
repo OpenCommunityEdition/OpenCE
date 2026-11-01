@@ -120,8 +120,9 @@ same-process split-screen input independence.
 host roster when a checkpoint predates a join or departure. The small
 [game_state.c](../../source/saved%20games/game_state.c) after-load hook must
 run before observer, director and input restoration: those caches need the
-live players, rather than the saved membership. This is an existing co-op
-lifecycle fix, reproduced with the camera forced off, not an MCC adapter.
+live players, rather than the saved membership. This co-op
+lifecycle extension runs only in GulchCE camera sessions, including Forced Off;
+OpenCE Crossplay retains the upstream checkpoint behavior. It is not an MCC adapter.
 It uses the established player, unit and session interfaces; Xbox, Custom
 Edition and MCC discovery/loading remain separate. Clients do not choose
 membership or restore a checkpoint themselves. `tools/test_coop_checkpoint.py`

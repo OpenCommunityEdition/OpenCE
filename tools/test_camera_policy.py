@@ -144,6 +144,9 @@ def test_host_camera_menu_layout():
         assert all(int(root.find(f"widget[@name='{base}{name}']").attrib["height"]) >= 28 for name in common + mode)
     spinner = root.find(f"widget[@name='{base}camera_policy_spinner']")
     assert spinner.attrib["strings"] == "PLAYER CHOICE|FORCED ON|FORCED OFF"
+    compatibility = root.find(f"widget[@name='{base}session_compatibility_spinner']")
+    assert compatibility.attrib["strings"] == "OPENCE CROSSPLAY|GULCHCE THIRD PERSON"
+    assert compatibility.find('on[@event="left_mouse"]').attrib["run"] == "mouse spinner 1wide click"
     # Camera help adds three entries before map sharing and publisher help.
     import re
     menus = (ROOT / "port/linux/game/menu_functions.c").read_text()

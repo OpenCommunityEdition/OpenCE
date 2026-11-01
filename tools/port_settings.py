@@ -1709,7 +1709,7 @@ def _server_settings() -> list:
     whether the server browser lists it (PUBLIC or PRIVATE: an internet
     game's)"""
     base = f"{MT}/server_settings"
-    # Thirteen full-height rows: leave the selection artwork room to draw.
+    # Fourteen full-height rows: leave the selection artwork room to draw.
     spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 420, "help_height": 32, "rows_top": 25,
             "help_font": "ui\\small_ui", "button_top": 455,
             "background_bitmap": "bitmaps/gradient_big", "header_top": -16, "title": "SERVER SETUP",
@@ -1772,7 +1772,8 @@ def _server_settings() -> list:
         ("strings", "OPENCE CROSSPLAY|GULCHCE THIRD PERSON"), ("font", "ui\\small_ui"),
         ("color", "#FF2896FF"), ("align", "center"), ("text_y", 3),
         ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
-        ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 228 19 234")], [])
+        ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 228 19 234")],
+        ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     rows.append((f"{base}/op_session_compatibility", None))
     extra += _widget(f"{base}/op_camera_policy", [("width", 512), ("height", 28),
                          ("flags", "pass_unhandled_to_focused_child"),

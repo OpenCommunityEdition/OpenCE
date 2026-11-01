@@ -4225,8 +4225,8 @@ static boolean server_settings_initialize(struct widget_instance *list)
 		spinner->parameters.list.selected_index = *server_settings_maximum_players_index();
 	if ((spinner = named(list, "camera_policy_spinner", 0)) != NULL)
 		spinner->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
-    if ((spinner = named(list, "session_compatibility_spinner", 0)) != NULL)
-        spinner->parameters.list.selected_index = third_person_session_active();
+	if ((spinner = named(list, "session_compatibility_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = third_person_session_active();
 	/* (PUBLIC or PRIVATE: this game's; the screen is made again on coming
 	back from an option's screen) */
 	if ((spinner = named(list, "listing_spinner", 0)) != NULL)
@@ -4276,21 +4276,21 @@ static void server_settings_update(struct widget_instance *list)
 		text_set(named(list, "game_type_value", 0), type);
 	}
 	settings_help(list);
-    if ((spinner = named(list, "session_compatibility_spinner", 0)) != NULL)
-    {
-        int selected = spinner->parameters.list.selected_index != 0;
-        if (selected != third_person_session_active())
-        {
-            third_person_session_set(selected);
-            spinner->parameters.list.selected_index = third_person_session_active();
-            if ((row = named(list, "camera_policy_spinner", 0)) != NULL)
-                row->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
-        }
-        if (list->parameters.list.extended_description && list->focused_child == named(list, "op_session_compatibility", 0))
-            list->parameters.list.extended_description->parameters.text_box.string_list_index =
-                third_person_session_locked() ? 22 : 20 + third_person_session_active();
-    }
-    visible_set(named(list, "op_camera_policy", 0), third_person_session_active());
+	if ((spinner = named(list, "session_compatibility_spinner", 0)) != NULL)
+	{
+		int selected = spinner->parameters.list.selected_index != 0;
+		if (selected != third_person_session_active())
+		{
+			third_person_session_set(selected);
+			spinner->parameters.list.selected_index = third_person_session_active();
+			if ((row = named(list, "camera_policy_spinner", 0)) != NULL)
+				row->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
+		}
+		if (list->parameters.list.extended_description && list->focused_child == named(list, "op_session_compatibility", 0))
+			list->parameters.list.extended_description->parameters.text_box.string_list_index =
+				third_person_session_locked() ? 22 : 20 + third_person_session_active();
+	}
+	visible_set(named(list, "op_camera_policy", 0), third_person_session_active());
 	if (third_person_session_active() && (spinner = named(list, "camera_policy_spinner", 0)) != NULL)
 	{
 		short policy = (short)PIN(spinner->parameters.list.selected_index, 0, 2);
