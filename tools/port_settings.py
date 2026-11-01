@@ -1711,16 +1711,16 @@ def _session_options(base: str, host: str) -> list:
     ]:
         extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
             ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-            [f'<child widget="{base}/{key}_label"/>', f'<child widget="{base}/{key}_spinner" x="270" y="1"/>'])
+            [f'<child widget="{base}/{key}_label"/>', f'<child widget="{base}/{key}_spinner" x="264" y="1"/>'])
         extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 260), ("height", 22),
             ("text", label), ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
         # Generated spinners draw at their bounds, ignoring text_y. Top 3 +
         # child y 1 matches the label's text_y 4; arrows centre on the 28px row.
-        extra += _widget(f"{base}/{key}_spinner", [("type", "spinner"), ("top", 3), ("width", 225), ("height", 20),
+        extra += _widget(f"{base}/{key}_spinner", [("type", "spinner"), ("top", 3), ("width", 237), ("height", 20),
             ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"), ("strings", values),
             ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"),
             ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
-            ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 225 19 231")],
+            ("header_bounds", "7 0 19 6"), ("footer_bounds", "7 231 19 237")],
             ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
         rows.append((f"{base}/op_{key}", None))
     extra += _value_row(base, "invite", 2, "ss copy invite")

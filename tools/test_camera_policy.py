@@ -159,6 +159,10 @@ def test_host_camera_menu_layout():
         assert label.attrib["font"] == spinner.attrib["font"] == "ui\\large_ui"
         assert int(child.attrib["y"]) + int(spinner.attrib["top"]) == int(label.attrib["text_y"])
         assert spinner.attrib["align"] == "center"
+        for arrow in ("header_bounds", "footer_bounds"):
+            top, left, bottom, right = map(int, spinner.attrib[arrow].split())
+            assert 0 <= left < right <= int(spinner.attrib["width"])
+            assert 0 <= top < bottom <= int(spinner.attrib["height"])
         assert spinner.find('on[@event="left_mouse"]').attrib["run"] == "mouse spinner 1wide click"
     assert root.find(f"widget[@name='{sub}camera_policy_spinner']").attrib["strings"] == "PLAYER CHOICE|FORCED ON|FORCED OFF"
     # Camera help adds three entries before map sharing and publisher help.
