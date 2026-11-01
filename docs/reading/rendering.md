@@ -191,6 +191,19 @@ show why a delayed GPU result must not be treated as a zero or why asking
 for a result too soon can stall the frame. The test uses fake driver
 behaviour; it does not measure real GPU performance.
 
+## Contrail timing
+
+Projectile trails are chains of points. Read `contrails_update` and
+`contrail_update_points` in [contrails.c](../../source/effects/contrails.c),
+then `render_contrail` in [render_contrails.c](../../source/render/render_contrails.c).
+Emission and point-state aging share the time accumulated between simulation
+ticks. Point motion and texture animation still use each rendered frame's time.
+This preserves short bright states at high refresh rates; aging every frame
+previously shortened trails whose state transitions discard excess time.
+The timing accumulator resets on map initialization and disposal. New points
+still initialize on frames without a tick so the renderer has a valid state.
+See the [contrail fix record](../contrail_timing.md) for evidence and limits.
+
 ## Dynamic lighting 1.0
 
 Android builds exclude the optional lighting modules and their model-shader
