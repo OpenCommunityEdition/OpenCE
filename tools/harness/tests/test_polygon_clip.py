@@ -10,12 +10,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, function, inline, mutated, read, run  # noqa: E402
 
-CASES = ["shared-corners-a", "shared-corners-b", "ordinary-clip"]
+CASES = ["shared-corners-a", "shared-corners-b", "ordinary-clip", "successive-portals", "clip-contract"]
 
 # a fault and the case that must catch it
 NEGATIVE_CONTROLS = {
     "nan-crossing": (("if (scale != scale) scale = 0.f;\n", ""), "shared-corners-a"),
     "nan-crossing-b": (("if (scale != scale) scale = 0.f;\n", ""), "shared-corners-b"),
+    "nan-later-portal": (("if (scale != scale) scale = 0.f;\n", ""), "successive-portals"),
     "no-clip": (("result_count = convex_polygon2d_clip_to_plane(", "result_count = 0 * convex_polygon2d_clip_to_plane("),
                 "shared-corners-a"),
 }
