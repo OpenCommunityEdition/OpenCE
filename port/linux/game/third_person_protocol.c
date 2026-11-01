@@ -1,6 +1,8 @@
 #include "cseries.h"
 #include "third_person_protocol.h"
 #include "mcc_protocol.h"
+#include "networking/network_messages.h"
+#include "bungie_net/common/message_header.h"
 #include "third_person.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
@@ -77,8 +79,6 @@ int third_person_session_compatible(char const *map, unsigned int version, unsig
     return version == base || version == (base == MCC_PROTOCOL_VERSION ?
         THIRD_PERSON_PROTOCOL_MCC_VERSION : THIRD_PERSON_PROTOCOL_VERSION);
 }
-#include "networking/network_messages.h"
-#include "bungie_net/common/message_header.h"
 
 /* MCC retains ownership of its optional inner envelope and capability checks.
  * This outer envelope only establishes the camera branch's wire contract. */

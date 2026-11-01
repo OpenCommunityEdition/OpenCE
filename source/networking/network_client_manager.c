@@ -2155,6 +2155,7 @@ boolean network_game_client_initiate_join_game(
 	else
 	{
 		client->join_in_progress = FALSE;
+		third_person_session_client_clear(); /* port: failed connection grants no camera permission */
 		display_error_when_main_menu_loaded(7);
 		network_event(
 			"failed attempt to initiate a connection to game @ %s",
@@ -2292,6 +2293,7 @@ void network_game_client_reset(
 		0x4EE,
 		client);
 
+	third_person_session_client_clear(); /* port: a reset ends the selected camera session */
 	network_game_invalidate(&client->game);
 
 	client->machine_index = NONE;
@@ -2376,6 +2378,7 @@ void network_game_client_rejected_by_game(
 	word rejection_code)
 {
 	const char *reason = "<unknown>";
+	boolean camera_retry = third_person_session_active(); /* port: retain only for the same-host pass retry */
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
@@ -2470,6 +2473,8 @@ void network_game_client_rejected_by_game(
 		network_game_client_joining_with_link = FALSE;
 		if (joining)
 		{
+			/* port: the temporary advertisement has no camera metadata; this is the same host. */
+			third_person_session_client_begin(camera_retry ? THIRD_PERSON_PROTOCOL_VERSION : 0);
 			network_event("joining again with a Discord account's pass");
 			network_game_client_joined_again_with_link = TRUE;
 			return;

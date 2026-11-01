@@ -17,6 +17,7 @@ def test_camera_admission(tmp_path):
     gate = function(server, "network_game_server_handle_client_message")
     gate = gate[:gate.index("\tmessage_type =")]
     gate += "(void)result;(void)message_type;(void)packet_type;return TRUE;\n}\n"
+    reset = function((ROOT / "source/networking/network_client_manager.c").read_text(), "network_game_client_reset")
     limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
     version = re.search(r"^#define HALO_PORT_NETWORK_VERSION \d+$", limits, re.M).group()
     code = r'''
@@ -52,13 +53,29 @@ struct network_game_server_client_machine {int joined;};
 static int network_game_server_client_machine_is_joined_to_game(struct network_game_server *s,
     struct network_game_server_client_machine *m) {(void)s;return m->joined;}
 static void network_event(char const *fmt,...) {(void)fmt;}
+#define NONE -1
+#define SET_FLAG(flags,bit,value) ((flags) = ((flags) & ~(1 << (bit))) | ((value) << (bit)))
+#define csmemset memset
+enum {_network_game_client_state_searching, _network_game_client_connection_established_bit,
+ _network_game_client_join_request_sent_bit, _network_game_client_error_unknown, _network_game_client_error_none};
+struct network_game_client {struct network_game game;void *connection;int machine_index,state,flags,error,
+ join_in_progress,last_broadcast_search_time,next_update_number,connection_silent,seconds_to_game_start;};
+static int network_game_client_late_join_time,network_game_client_late_join_clock_pending,
+ network_game_client_start_pending,network_game_client_incompatibility_told,network_game_client_add_player_requested[4];
+static void network_game_invalidate(struct network_game *g){memset(g,0,sizeof(*g));}
+static int network_connection_connected(void *c){(void)c;return 1;}
+static int network_connection_active(void *c){(void)c;return 1;}
+static int network_connection_disconnect(void *c){(void)c;return 1;}
+static void network_game_client_set_error(struct network_game_client *c,int e){c->error=e;}
+
 ''' + version + "\n" + (ROOT / "source/bungie_net/common/message_header.h").read_text().replace("#pragma once", "") + "\n" + enum_with(
         (ROOT / "source/networking/network_messages.h").read_text(),
         "_message_client_broadcast_game_search") + r'''
 void build_message_header(word *out,word bytes,byte type,byte flags) {*out=(word)((bytes<<4)|(type<<2)|flags);}
-''' + camera + "\n" + gate + r'''
+''' + camera + "\n" + reset + "\n" + gate + r'''
 int main(void) {
     struct network_game_server server={0};
+    struct network_game_client client={0};
     struct network_game_server_client_machine machine={0};
     word join[256]={0},outer[260],inner[260],size;
     byte saved;
@@ -113,7 +130,12 @@ int main(void) {
     machine.joined=0;CHECK(!network_game_server_handle_client_message(&server,&machine,join,40));
     third_person_session_host_end();host=NULL;CHECK(!third_person_session_active());
     third_person_session_client_begin(32712);CHECK(third_person_session_active());
-    third_person_session_client_clear();CHECK(!third_person_session_active());
+    network_game_client_reset(&client,0);CHECK(!third_person_session_active());
+    third_person_session_client_begin(32713);client.connection=&client;
+    network_game_client_reset(&client,1);CHECK(!third_person_session_active());
+    mode="gulchce_third_person";host=&server;third_person_session_host_begin();
+    network_game_client_reset(&client,0);CHECK(third_person_session_active());
+    third_person_session_host_end();host=NULL;
     third_person_session_client_begin(41);CHECK(!third_person_session_active());
     build_message_header(join,3,_message_type_packet,0);((byte *)join)[2]=_message_client_join_game_request;
     CHECK(network_game_server_handle_client_message(&server,&machine,join,3));
