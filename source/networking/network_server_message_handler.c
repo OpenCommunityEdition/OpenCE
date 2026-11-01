@@ -1203,14 +1203,14 @@ boolean network_game_server_handle_client_message(
 		return FALSE;
 	}
 
-	/* port: require camera compatibility before either ordinary or MCC admission.
+	/* port: camera sessions require compatibility before ordinary or MCC admission.
 	The normal join handler still owns tokens, bans, slots and MCC authorization. */
-	if (!network_game_server_client_machine_is_joined_to_game(server, machine))
+	if (third_person_session_active() && !network_game_server_client_machine_is_joined_to_game(server, machine))
 	{
 		if (!third_person_protocol_unwrap(message, message_buffer_size, camera_join, &camera_join_size))
 		{
 			network_event("camera admission rejected: matching online-third-person protocol %u required",
-				HALO_PORT_NETWORK_VERSION);
+				THIRD_PERSON_PROTOCOL_VERSION);
 			return FALSE;
 		}
 		message = camera_join;
@@ -1851,8 +1851,8 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			/* the native builds' network version and netcode (a client
 			refuses a host of another version, or of the lockstep netcode
 			older builds had: network_client_manager.c) */
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(mcc_protocol_version(game->map.name) & 0xFF);
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(mcc_protocol_version(game->map.name) >> 8);
+			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(third_person_session_version(game->map.name) & 0xFF);
+			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(third_person_session_version(game->map.name) >> 8);
 			/* port: capability version is separate even in an OpenCE lobby. */
 			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET] = MCC_PROTOCOL_VERSION & 255;
 			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET + 1] = MCC_PROTOCOL_VERSION >> 8;

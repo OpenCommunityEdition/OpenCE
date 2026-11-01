@@ -39,6 +39,7 @@ def run_case(binary, maps, output, name, policy, preferences, coop=False, late=F
                        HALO_NET_BROADCAST=f"127.0.0.{237-index}", HALO_DATA_ROOT=str(folder),
                        HALO_SAVE_ROOT=str(folder / "saves"), HALO_UPDATE_ANSWER="never",
                        # An opposing client's host preference must have no authority.
+                       HALO_SESSION_COMPATIBILITY="gulchce_third_person",
                        HALO_CAMERA_POLICY=policy if index == 0 else ("forced_off" if policy != "forced_off" else "forced_on"))
             if index and late:
                 time.sleep(20)

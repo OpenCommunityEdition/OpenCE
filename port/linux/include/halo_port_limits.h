@@ -66,10 +66,9 @@ is newer (network_client_manager.c). A host advertises it, with its netcode,
 in its game's advertisement's reserved bytes (network_server_message_handler.c),
 which hosts built before there was a version send as zeros: version 0.
 Raise it with any change to what the machines send each other. */
-/* Experimental shoulder relay and mandatory camera admission; no OpenCE crossplay.
-32710 integrates OpenCE 41 and MCC 63 while retaining camera isolation.
-Keep this branch outside the ordinary OpenCE/GulchCE version sequence. */
-#define HALO_PORT_NETWORK_VERSION 32710
+/* OpenCE crossplay retains the exact upstream 41 contract. Camera sessions
+use separate revisions declared in third_person_protocol.h. */
+#define HALO_PORT_NETWORK_VERSION 41
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags, then the game's kind (an OpenCE gametype's mode, and Hardcore:
 port/linux/game/game_modes.h's game_modes_kind), for the server browser */

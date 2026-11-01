@@ -12,6 +12,8 @@ def test_host_checkpoint_sends_loaded_peers_fresh_objects(tmp_path):
                       "network_objects_host_reverted")
     run_c(tmp_path, r'''
 #include <assert.h>
+static int camera_mode=1;
+static int third_person_session_active(void){return camera_mode;}
 typedef int boolean;
 #define TRUE 1
 #define NONE -1
@@ -31,6 +33,7 @@ static void network_objects_client_asked(long machine,boolean again){
 }
 ''' + actual + r'''
 int main(void){
+ camera_mode=0;network_objects_host_reverted();assert(!calls);camera_mode=1;
  connection=1;network_objects_host_reverted();assert(!calls);
  connection=2;coop=0;network_objects_host_reverted();assert(!calls);
  coop=1;network_objects_host_reverted();assert(calls==1);
@@ -49,6 +52,8 @@ def test_restore_current_roster_and_machine_ownership(tmp_path):
                      "network_player_is_valid")
     run_c(tmp_path, r'''
 #include <assert.h>
+static int camera_mode=1;
+static int third_person_session_active(void){return camera_mode;}
 #include <string.h>
 typedef int boolean;
 typedef unsigned char byte;
@@ -146,6 +151,8 @@ def test_dead_client_units_request_bounded_authoritative_recreation(tmp_path):
         "distributed_client_reuses_object"))
     run_c(tmp_path, r'''
 #include <assert.h>
+static int camera_mode=1;
+static int third_person_session_active(void){return camera_mode;}
 typedef int boolean;
 #define TRUE 1
 #define FALSE 0

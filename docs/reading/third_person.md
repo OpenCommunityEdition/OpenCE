@@ -66,10 +66,45 @@ existing visibility check requires clear eye-to-muzzle and muzzle-to-target
 segments. Ownership, rate limits, target history and damage rules still run.
 The upstream optional client-hand origins remain separately controlled.
 
-The host acceptance and checkpoint membership rules use experimental network versions 32710
-(Xbox/CE) and 32711 (MCC). Matching builds are required even with the camera
-off. See [networking](networking.md) for the mandatory join envelope and
-the intentional OpenCE/main crossplay boundary.
+## Session compatibility
+
+The host setup selector defaults to **OpenCE Crossplay**. On Xbox and Custom
+Edition maps this uses the pinned OpenCE 41 wire format and simulation paths.
+The optional shoulder camera, its input bit, muzzle solver and checkpoint
+recovery extensions are disabled, regardless of the saved preference.
+Normal vehicles, scripted cameras and MCC weapon-authored cameras are unchanged.
+MCC maps still require the separate MCC 63 capability; the crossplay selector
+does not make MCC maps compatible with OpenCE.
+
+**GulchCE Third Person** enables Player Choice / Forced On / Forced Off and
+requires camera agreement 32712 (Xbox/CE) or 32713 (MCC). It uses bounded join
+kind 101 around the normal join, or around MCC's own kind 100 envelope. The
+larger bound includes OpenCE 41's account-link credentials. Camera policy uses
+bits 3-4, leaving OpenCE's co-op flags in bits 0-2. Forced Off is still a camera
+session and requires the same admission proof and relay format.
+
+Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c)
+next to the policy module. `third_person_session_host_begin` initializes host
+state; `third_person_session_set` permits changes only before the server opens
+and before another machine joins. `third_person_session_lock` keeps the mode
+fixed through subsequent rounds. The server's create/open/dispose hooks are
+necessary because the engine owns admission and server lifetime. Client join
+and teardown hooks bind permission to the selected host and clear it at the
+connection boundary. Settings validate policy bits against that permission;
+settings and personal preferences cannot enable a camera extension themselves.
+
+For example, a player with third person saved as on joins an OpenCE host:
+the ordinary join and relay are used, N cannot enable the shoulder camera,
+and the saved preference remains on. Disconnecting clears the session state;
+offline play can use that preference again. A matching GulchCE camera host
+instead supplies the authoritative camera policy. A stale or unsupported
+camera revision is rejected, rather than treated as OpenCE-compatible.
+
+The common internet discovery transport remains OpenCE 41, as with MCC.
+The subsequent game advertisement and admission establish actual support;
+a listing is never permission to enable the camera. There is no change to
+WebRTC framing or signalling. Separate-computer/WAN checks remain a release
+validation requirement, not something established by local two-peer tests.
 
 ## State and checks
 

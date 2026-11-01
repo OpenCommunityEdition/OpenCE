@@ -1710,9 +1710,9 @@ def _server_settings() -> list:
     game's)"""
     base = f"{MT}/server_settings"
     # Thirteen full-height rows: leave the selection artwork room to draw.
-    spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 410, "rows_top": 49,
-            "help_font": "ui\\small_ui", "button_top": 448,
-            "background_bitmap": "bitmaps/gradient_big", "header_top": -10,
+    spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 420, "help_height": 32, "rows_top": 25,
+            "help_font": "ui\\small_ui", "button_top": 455,
+            "background_bitmap": "bitmaps/gradient_big", "header_top": -16, "title": "SERVER SETUP",
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
     extra += _value_row(base, "server_name", 0, "ss edit server name")
@@ -1760,6 +1760,20 @@ def _server_settings() -> list:
     extra += _value_row(base, "password", 10 + len(COOP_SETUP_SCREENS), "ss edit server password")
     rows.append((f"{base}/op_password", None))
     # Shared match rule: visible for LAN, internet and campaign co-op alike.
+    extra += _widget(f"{base}/op_session_compatibility", [("width", 512), ("height", 28),
+        ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+        [f'<child widget="{base}/session_compatibility_label"/>',
+         f'<child widget="{base}/session_compatibility_spinner" x="260" y="1"/>'])
+    extra += _widget(f"{base}/session_compatibility_label", [("type", "text"), ("controller", 1),
+        ("width", 255), ("height", 22), ("text", "SESSION COMPATIBILITY:"), ("font", "ui\\small_ui"),
+        ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)], [])
+    extra += _widget(f"{base}/session_compatibility_spinner", [("type", "spinner"), ("left", 3), ("top", 2),
+        ("width", 225), ("height", 20), ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+        ("strings", "OPENCE CROSSPLAY|GULCHCE THIRD PERSON"), ("font", "ui\\small_ui"),
+        ("color", "#FF2896FF"), ("align", "center"), ("text_y", 3),
+        ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+        ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 228 19 234")], [])
+    rows.append((f"{base}/op_session_compatibility", None))
     extra += _widget(f"{base}/op_camera_policy", [("width", 512), ("height", 28),
                          ("flags", "pass_unhandled_to_focused_child"),
                          ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
@@ -1868,6 +1882,9 @@ def _server_settings() -> list:
         # (LISTING's PUBLIC, on a machine with a publisher key: menu_functions.c's
         # server_settings_update)
         "Listed for everyone through the brokers, and on\\nthe master servers with your publisher key.",
+        "OpenCE and GulchCE can join; third person is off.\\nMCC maps still require GulchCE.",
+        "Matching GulchCE camera builds only.\\nChoose the third-person policy below.",
+        "Compatibility is locked for this session.\\nClose the lobby to choose another mode.",
     ])
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
@@ -1960,7 +1977,7 @@ MAP_SHARE_SETUP = ("map_share_options", "MAP SHARING",
 ])
 # (Server Setup's place of its options' rows, co-op's or the gametype's: after
 # MAP SHARING's)
-SETUP_OPTIONS_PLACE = 7
+SETUP_OPTIONS_PLACE = 8
 # (their screens' titles)
 TITLES.update({f"{MT}/server_settings/{key}/header_{key}": title
                for key, title, _, _ in [*COOP_SETUP_SCREENS, MAP_SHARE_SETUP]})

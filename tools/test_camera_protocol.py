@@ -31,7 +31,23 @@ typedef int boolean;
 #define FALSE 0
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
 #define match_assert(...) ((void)0)
-struct network_game_server {int unused;};
+#define HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG 1
+#define THIRD_PERSON_POLICY_MASK 24
+#define THIRD_PERSON_POLICY_SHIFT 3
+struct network_game {int machine_count;unsigned char cooperative_flags;};
+struct network_game_server {struct network_game game;};
+static struct network_game_server *host;
+static char const *mode="opence_crossplay";
+static int resets,sends;
+char const *config_string(char const *name){(void)name;return mode;}
+int config_write(char const *name,char const *value){(void)name;mode=value;return 1;}
+static struct network_game_server *global_network_game_server_get(void){return host;}
+struct network_game *network_game_server_get_game(struct network_game_server *s){return &s->game;}
+boolean network_game_server_send_game_data_pregame(struct network_game_server *s){(void)s;sends++;return 1;}
+static short third_person_host_policy(void){return 1;}
+static void third_person_reset(void){resets++;}
+static unsigned int mcc_protocol_version(char const *map){return !strncmp(map,"mcc_maps",8)?MCC_PROTOCOL_VERSION:41;}
+
 struct network_game_server_client_machine {int joined;};
 static int network_game_server_client_machine_is_joined_to_game(struct network_game_server *s,
     struct network_game_server_client_machine *m) {(void)s;return m->joined;}
@@ -44,12 +60,27 @@ void build_message_header(word *out,word bytes,byte type,byte flags) {*out=(word
 int main(void) {
     struct network_game_server server={0};
     struct network_game_server_client_machine machine={0};
-    word join[128]={0},outer[132],inner[132],size;
+    word join[256]={0},outer[260],inner[260],size;
     byte saved;
     int i,bytes;
-    CHECK(HALO_PORT_NETWORK_VERSION==32710 && MCC_PROTOCOL_VERSION==32711);
+    CHECK(HALO_PORT_NETWORK_VERSION==41 && MCC_PROTOCOL_VERSION==63);
+    host=&server;third_person_session_host_begin();CHECK(!third_person_session_active());
+    CHECK(third_person_session_version("bloodgulch")==41);
+    CHECK(third_person_session_version("mcc_maps\\test")==63);
+    CHECK(third_person_session_compatible("bloodgulch",41,1));
+    CHECK(third_person_session_compatible("bloodgulch",32712,1));
+    CHECK(!third_person_session_compatible("bloodgulch",32713,1));
+    CHECK(!third_person_session_compatible("bloodgulch",32712,0));
+    CHECK(!third_person_session_compatible("mcc_maps\\test",32713,1));
+    CHECK(third_person_session_compatible("mcc_maps\\test",32713,9));
+    CHECK(!third_person_session_compatible("bloodgulch",32708,1));
+    CHECK(third_person_session_set(1));CHECK(server.game.cooperative_flags==8);
+    CHECK(third_person_session_version("bloodgulch")==32712);
+    CHECK(third_person_session_version("mcc_maps\\test")==32713);
+    third_person_session_lock();CHECK(!third_person_session_set(0));
+    CHECK(third_person_session_active() && third_person_session_locked());
     CHECK(THIRD_PERSON_PROTOCOL_JOIN_KIND!=MCC_PROTOCOL_JOIN_KIND);
-    for(bytes=3;bytes<=256;bytes++) {
+    for(bytes=3;bytes<=512;bytes++) {
         build_message_header(join,(word)bytes,_message_type_packet,0);
         ((byte *)join)[bytes-1]=_message_client_join_game_request;
         CHECK(third_person_protocol_join(join,(word)bytes,outer)==outer);
@@ -59,15 +90,15 @@ int main(void) {
         /* Stock/main/old camera direct joins have no camera envelope. */
         CHECK(!network_game_server_handle_client_message(&server,&machine,join,(short)bytes));
     }
-    for(i=0;i<=265;i++) if(i!=264) CHECK(!third_person_protocol_unwrap(outer,(word)i,inner,&size));
+    for(i=0;i<=521;i++) if(i!=520) CHECK(!third_person_protocol_unwrap(outer,(word)i,inner,&size));
     for(i=0;i<10;i++) {
         saved=((byte *)outer)[i];((byte *)outer)[i]^=1;
-        CHECK(!third_person_protocol_unwrap(outer,264,inner,&size));
-        CHECK(!network_game_server_handle_client_message(&server,&machine,outer,264));
+        CHECK(!third_person_protocol_unwrap(outer,520,inner,&size));
+        CHECK(!network_game_server_handle_client_message(&server,&machine,outer,520));
         ((byte *)outer)[i]=saved;
     }
-    ((byte *)outer)[263]=_message_client_game_start_request;
-    CHECK(!third_person_protocol_unwrap(outer,264,inner,&size));
+    ((byte *)outer)[519]=_message_client_game_start_request;
+    CHECK(!third_person_protocol_unwrap(outer,520,inner,&size));
     /* A matching MCC envelope passes to the existing MCC validator unchanged. */
     build_message_header(join,40,2,0);((byte *)join)[2]=MCC_PROTOCOL_JOIN_KIND;
     CHECK(third_person_protocol_join(join,40,outer)==outer);
@@ -80,6 +111,14 @@ int main(void) {
     /* Established connections keep the ordinary dispatcher and its direction checks. */
     machine.joined=1;CHECK(network_game_server_handle_client_message(&server,&machine,join,40));
     machine.joined=0;CHECK(!network_game_server_handle_client_message(&server,&machine,join,40));
+    third_person_session_host_end();host=NULL;CHECK(!third_person_session_active());
+    third_person_session_client_begin(32712);CHECK(third_person_session_active());
+    third_person_session_client_clear();CHECK(!third_person_session_active());
+    third_person_session_client_begin(41);CHECK(!third_person_session_active());
+    build_message_header(join,3,_message_type_packet,0);((byte *)join)[2]=_message_client_join_game_request;
+    CHECK(network_game_server_handle_client_message(&server,&machine,join,3));
+    third_person_session_client_begin(32708);CHECK(!third_person_session_active());
+    CHECK(!third_person_session_set(1));
     return 0;
 }
 '''

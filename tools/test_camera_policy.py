@@ -45,6 +45,10 @@ static struct network_game *current;
 static struct network_game_server *server_pointer;
 static char const *host_setting="player_choice";
 static int preference,shoulder,writes,sends;
+static int capability=1;
+static int third_person_session_active(void){return capability;}
+static int network_game_is_active(void){return current!=NULL;}
+static int network_game_is_splitscreen_local(void){return 0;}
 static unsigned long held;
 static struct network_game *network_game_get_game(void){return current;}
 static struct network_game_server *global_network_game_server_get(void){return server_pointer;}
@@ -69,6 +73,8 @@ int main(void){int i,p,saved;struct network_game remote;
  host_setting="forced_on";CHECK(third_person_host_policy()==1);
  host_setting="forced_off";CHECK(third_person_host_policy()==2);
  host_setting="bad";CHECK(third_person_host_policy()==0);
+ capability=0;current=&remote;preference=1;CHECK(third_person_policy()==2&&!third_person_enabled());
+ CHECK(!third_person_match_flags_valid(8)&&third_person_match_flags_valid(7));capability=1;current=NULL;
  for(i=0;i<256;i++)CHECK(!!third_person_match_flags_valid(i)==(i<=23));
  CHECK(!third_person_match_flags_valid(256));
  for(p=0;p<3;p++)for(i=0;i<2;i++){
@@ -129,11 +135,11 @@ def test_host_camera_menu_layout():
     base = "main_menu/multiplayer_type_select/server_settings/"
     menu = root.find(f"widget[@name='{base}options_menu']")
     rows = {node.attrib["widget"].removeprefix(base): int(node.attrib["y"]) for node in menu.findall("child")}
-    common = ["op_server_name", "op_max_players", "op_invite", "op_listing", "op_password", "op_camera_policy", "op_map_share_options"]
+    common = ["op_server_name", "op_max_players", "op_invite", "op_listing", "op_password", "op_session_compatibility", "op_camera_policy", "op_map_share_options"]
     for mode in (["op_coop_options", "op_voice_options"], ["op_game_type", "op_player_options", "op_item_options", "op_vehicle_options", "op_indicator_options", "op_team_options"]):
         positions = [rows[name] for name in common + mode]
         assert len(set(positions)) == len(positions)
-        assert max(positions) + 28 < 414
+        assert max(positions) + 28 <= int(root.find(f"widget[@name='{base}help']").attrib["top"])
         assert all(b - a >= 28 for a, b in zip(sorted(positions), sorted(positions)[1:]))
         assert all(int(root.find(f"widget[@name='{base}{name}']").attrib["height"]) >= 28 for name in common + mode)
     spinner = root.find(f"widget[@name='{base}camera_policy_spinner']")

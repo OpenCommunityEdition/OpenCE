@@ -478,6 +478,7 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "interface/player_ui.h"
 #include "third_person.h" /* port: port/linux/game/third_person_policy.c */
+#include "third_person_protocol.h" /* port: session compatibility lifecycle */
 #include "tag_files/tag_files.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "server_director.h" /* port: port/linux/game/server_director.c */
@@ -1328,7 +1329,9 @@ struct network_game_server *network_game_server_create(
 			network_game_invalidate(&server->game);
 			/* port: every match path, including quickstart and co-op, starts
 			with the host's camera rule. Subsequent rounds retain it. */
-			server->game.cooperative_flags |= third_person_host_policy() << THIRD_PERSON_POLICY_SHIFT;
+			third_person_session_host_begin();
+			if (third_person_session_active())
+				server->game.cooperative_flags |= third_person_host_policy() << THIRD_PERSON_POLICY_SHIFT;
 
 			server->game.difficulty = main_get_difficulty();
 			mcc_protocol_reset(); /* port: a fresh server has no negotiated MCC peers */
@@ -1380,6 +1383,7 @@ void network_game_server_dispose(
 	struct network_game_server *server)
 {
 	mcc_protocol_reset(); /* port: no stale MCC peer pointers */
+	third_person_session_host_end(); /* port: discard the prior camera contract */
 	bots_network_session_end(); /* port: bot policy belongs to this host alone */
 	mcc_ui_network_server_dispose(server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
@@ -1943,6 +1947,7 @@ void network_game_server_open_game(
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x1FC, server);
 
+	third_person_session_lock(); /* port: mode is fixed before remote admission */
 	SET_FLAG(server->flags, _network_game_server_game_open_bit, TRUE);
 	network_server_allow_client_connections(server->connection, TRUE);
 	network_event("opening game");
@@ -4662,7 +4667,7 @@ void network_game_server_port_set_camera_policy(short policy)
 {
 	struct network_game_server *server = global_network_game_server_get();
 	if (!server || server->state != _network_game_server_state_pregame ||
-		policy < _third_person_player_choice || policy > _third_person_forced_off)
+		!third_person_session_active() || policy < _third_person_player_choice || policy > _third_person_forced_off)
 		return;
 	server->game.cooperative_flags = (server->game.cooperative_flags & ~THIRD_PERSON_POLICY_MASK) |
 		(policy << THIRD_PERSON_POLICY_SHIFT);

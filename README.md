@@ -1,4 +1,5 @@
-> **Experimental `online-third-person` branch:** crossplay with OpenCE and GulchCE main is disabled. All participants must use matching camera builds, even with third person turned off. The main-branch compatibility statements below do not apply to this branch.
+> **`online-third-person` branch:** OpenCE Crossplay is the default host mode and disables the optional shoulder camera. GulchCE Third Person sessions require matching camera builds. MCC maps always require compatible GulchCE clients.
+
 
 <p align="center">
   <img width="420" height="420" alt="gulchceopencelogo" src="https://github.com/user-attachments/assets/1787aa2f-3305-4353-8dd4-27d08661f6d4" />

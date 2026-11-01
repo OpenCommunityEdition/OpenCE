@@ -172,7 +172,7 @@ following packet details into those files.
 ## GulchCE compatibility and teardown
 
 Xbox/CE crossplay and MCC sessions have separate protocol boundaries.
-The current baseline is OpenCE 41 and MCC 62. Map-vote messages remain
+The current baseline is OpenCE 41 and MCC 63. Map-vote messages remain
 upstream IDs 94-95; MCC owns IDs 96-99 and join kind 100. The 512-byte MCC
 admission envelope also fits OpenCE's account-link credentials. This bound
 applies to the host's local join as well as remote MCC clients.
@@ -197,27 +197,24 @@ then read `server_director.c` for rotation and session ownership and
 `server_commands.c` for administration. These are upstream additions; they
 do not make an MCC capability claim sufficient to pass normal admission.
 
-`online-third-person` deliberately disables crossplay with OpenCE and main.
-Xbox/Custom Edition use version 32710; MCC uses 32711. Even first-person-only
-games retain the camera branch's extra shoulder byte in relayed inputs.
+`online-third-person` selects its contract per session. OpenCE Crossplay uses
+the upstream 41 relay and disables shoulder-camera gameplay. GulchCE Third
+Person uses camera versions 32712/32713, the additional shoulder relay byte,
+and a mandatory kind 101 join envelope. MCC retains its independent version
+63 and kind 100 admission inside that envelope. Forced Off remains a camera
+session; it does not relax admission.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c):
-`third_person_protocol_join` wraps an ordinary join or the existing MCC
-admission envelope; `third_person_protocol_unwrap` validates framing, size,
-version and inner message kind. The client hook in `network_game_client_idle_joining`
-and the server hook in `network_game_server_handle_client_message` are needed
-because these shared functions own the reliable join send and dispatch. The
-feature module cannot intercept them through an existing registration interface.
-
-For example, a main client that connects directly to this branch's host is
-rejected before settings or player admission, even if it bypasses discovery.
-A matching camera client passes this stateless check, then still needs the
-usual token, ban, slot and map-capability checks. MCC owns its inner admission
-and connection cleanup; the camera wrapper neither grants MCC capability nor
-adds persistent state. Joined gameplay continues through the existing dispatcher.
-`tools/test_camera_protocol.py` executes the framing and pre-admission gate;
-`tools/test_mcc_protocol.py` covers the downstream MCC and authorization rules.
-These source and harness checks do not establish internet transport behavior.
+`third_person_protocol_join` and `third_person_protocol_unwrap` bound and
+validate camera admission. The shared join send/dispatch hooks are necessary
+because the engine owns those boundaries. Host create/open/dispose hooks own
+the session lifetime; client join/disconnect hooks clear prior permissions.
+A camera server requires the envelope before the ordinary token, bans, slots
+and MCC checks. A crossplay server retains the ordinary admission path.
+The selected mode cannot change after the lobby opens. See the
+[camera walkthrough](third_person.md#session-compatibility) for behavior,
+state ownership and tests. Public listings retain the common discovery
+format; the subsequent advertisement and handshake determine compatibility.
 
 ## Evidence and useful checks
 

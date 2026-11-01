@@ -1,6 +1,7 @@
 /* Match camera rules never overwrite a player's saved camera preference. */
 #include "cseries.h"
 #include "third_person.h"
+#include "third_person_protocol.h"
 #include "halo_keyboard.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
@@ -12,7 +13,7 @@ int config_write(char const *name, char const *value);
 boolean third_person_match_flags_valid(unsigned long flags)
 {
 	/* Bits zero through two are upstream co-op flags; policy value three is reserved. */
-	return !(flags & ~(7UL | THIRD_PERSON_POLICY_MASK)) &&
+	return !(flags & ~(7UL | (third_person_session_active() ? THIRD_PERSON_POLICY_MASK : 0))) &&
 		((flags & THIRD_PERSON_POLICY_MASK) >> THIRD_PERSON_POLICY_SHIFT) <= _third_person_forced_off;
 }
 
@@ -28,7 +29,10 @@ short third_person_policy(void)
 {
 	struct network_game const *game = network_game_get_game();
 	short policy = game ? (game->cooperative_flags & THIRD_PERSON_POLICY_MASK) >> THIRD_PERSON_POLICY_SHIFT : 0;
-	/* The receiver rejects invalid records; fail closed if called earlier. */
+	/* Local split screen has no remote peers and retains the offline preference. */
+    if (network_game_is_splitscreen_local() && !third_person_session_active()) return _third_person_player_choice;
+    if (network_game_is_active() && !third_person_session_active()) return _third_person_forced_off;
+    /* The receiver rejects invalid records; fail closed if called earlier. */
 	return policy <= _third_person_forced_off ? policy : _third_person_forced_off;
 }
 

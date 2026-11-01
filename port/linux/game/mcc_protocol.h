@@ -4,7 +4,7 @@
 
 /* OpenCE 41 owns messages through 95. MCC 63 adds model ambient lighting
  * to the campaign snapshot; gameplay messages remain above upstream voting. */
-#define MCC_PROTOCOL_VERSION 32711
+#define MCC_PROTOCOL_VERSION 63
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x08
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 4
 #define MCC_PROTOCOL_JOIN_KIND 100

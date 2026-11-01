@@ -683,6 +683,8 @@ static const struct config_setting config_settings[] =
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
 		"networks; empty chooses one." },
+	{ "network.session_compatibility", _config_string, "\"opence_crossplay\"", "HALO_SESSION_COMPATIBILITY", _environment_value, _platform_all,
+        "Host session: opence_crossplay disables shoulder cameras; gulchce_third_person requires matching camera clients. Fixed once the lobby opens. MCC maps always require GulchCE." },
 	{ "network.camera_policy", _config_string, "\"player_choice\"", "HALO_CAMERA_POLICY", _environment_value, _platform_all,
 		"Host camera rule for new matches: player_choice, forced_on, or forced_off.\n"
 		"Applies to LAN, internet and co-op matches; scope and collision overrides remain." },

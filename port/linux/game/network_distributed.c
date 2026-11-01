@@ -98,6 +98,7 @@ machine (their datum identifiers need not be).
 #include <time.h>
 #include <math.h>
 #include "third_person.h"
+#include "third_person_protocol.h"
 
 /* network_game_globals.c's and network_server_message_handler.c's */
 boolean network_distributed_client_send(void *message, word size);
@@ -430,8 +431,8 @@ enum
 	DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE = 3,
 	DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE = 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 +
 		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1,
-	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 15,
-	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 15 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
+	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 14,
+	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
 };
 
 struct distributed_pickup
@@ -3003,7 +3004,8 @@ static word distributed_relayed_action_write(
 	byte *cursor = buffer + 2;
 	short history;
 
-	cursor = distributed_put(cursor, &relayed->shoulder, sizeof(relayed->shoulder));
+	if (third_person_session_active())
+		cursor = distributed_put(cursor, &relayed->shoulder, sizeof(relayed->shoulder));
 	cursor = distributed_put(cursor, &relayed->desired_weapon_index, sizeof(relayed->desired_weapon_index));
 	cursor = distributed_put(cursor, &relayed->desired_grenade_index, sizeof(relayed->desired_grenade_index));
 	cursor = distributed_put(cursor, &relayed->desired_zoom_level, sizeof(relayed->desired_zoom_level));
@@ -3040,8 +3042,8 @@ static word distributed_relayed_action_read(
 	csmemset(relayed, 0, sizeof(*relayed));
 	if (!distributed_take(&cursor, end, &relayed->player_index, sizeof(relayed->player_index)) ||
 		!distributed_take(&cursor, end, &parts, sizeof(parts)) ||
-		!distributed_take(&cursor, end, &relayed->shoulder, sizeof(relayed->shoulder)) ||
-		relayed->shoulder > 1 ||
+		(third_person_session_active() && (!distributed_take(&cursor, end, &relayed->shoulder, sizeof(relayed->shoulder)) ||
+			relayed->shoulder > 1)) ||
 		!distributed_take(&cursor, end, &relayed->desired_weapon_index, sizeof(relayed->desired_weapon_index)) ||
 		!distributed_take(&cursor, end, &relayed->desired_grenade_index, sizeof(relayed->desired_grenade_index)) ||
 		!distributed_take(&cursor, end, &relayed->desired_zoom_level, sizeof(relayed->desired_zoom_level)) ||
@@ -3313,7 +3315,7 @@ static void distributed_host_send_players(
 			&distributed_host_update_number, sizeof(distributed_host_update_number));
 		for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 		{
-			byte entry[DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE];
+			byte entry[DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE + 1]; /* optional camera byte */
 
 			if (TEST_FLAG(distributed_sends[machine_index][player_index], _distributed_send_action_bit))
 			{

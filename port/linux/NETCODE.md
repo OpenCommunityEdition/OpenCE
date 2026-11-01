@@ -84,13 +84,14 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   threads' wake times along with it. The object, device and name syncs
   bring the clients up to date.
 
-  On this branch, checkpoint loading retains the host's current session
+  In GulchCE Third Person sessions, checkpoint loading retains the host's current session
   roster (`network_coop_restore_players`), before rebuilding view and input
   caches. Saved players who left lose their restored units and remain quit;
   current players missing from the save are created in their authoritative
   slots and use the normal co-op spawn rules. The machine-to-player table
   is rebuilt too: it lives outside the checkpoint, whose datum identifiers
-  may differ. This fixes restores after reconnects, with either camera mode.
+  may differ. This fixes restores after reconnects, with either camera perspective.
+  OpenCE Crossplay retains the upstream checkpoint behavior.
   If an authoritative sample says a unit is alive but the client's copy is
   dead, the client requests the existing full object description, with the
   existing retry backoff and host rate limit. A validated create replaces
@@ -235,8 +236,7 @@ still owns equipment changes and replicates them through existing messages;
 packet layouts and the then-current Xbox/Custom Edition protocol 39 were unchanged.
 Version 60 moves MCC
 gameplay messages to 94-97 and the join envelope to 98, reserving message 93
-for OpenCE 39's optional client fire origins. Main retains protocol 39 for Xbox and Custom Edition crossplay. This branch
-uses separate versions described below; it cannot join those sessions.
+for OpenCE 39's optional client fire origins. At that revision Xbox and Custom Edition retained OpenCE protocol 39.
 Version 59 moved the MCC
 capability to flag `0x08`, gameplay messages to 93-96 and the join envelope to
 97, leaving OpenCE 39's dedicated flag `0x04` and client-build message 92 intact.
@@ -1260,8 +1260,8 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
 
 ## Testing
 
-The host's third-person camera policy travels in the reliable game settings
-record (bits 2-3 of `network_game.cooperative_flags`), for every transport
+In GulchCE Third Person sessions, the host's camera policy travels in the reliable game settings
+record (bits 3-4 of `network_game.cooperative_flags`), for every transport
 and game type. Zero allows player choice, one forces third person, and two
 disables it. Receivers reject the reserved value and unknown flag bits.
 Pregame edits are host-only; late joiners receive the same record. Camera
@@ -1282,7 +1282,7 @@ ownership, rate, target history and damage limits still apply. Scoped, dead,
 seated, Forced Off and ordinary first-person paths do not add this history.
 These rules, current-roster checkpoint restoration and immediate host object
 refresh after a restore use experimental
-versions 32710/32711. The latter changes simulation agreement, so older
+camera agreement versions 32712/32713. The latter changes simulation agreement, so older
 camera builds are excluded too; it adds no packet fields or client authority.
 The host independently excludes weapon-authored following cameras from the
 shoulder solver; stale or forged input bits cannot override that priority.
@@ -1357,29 +1357,27 @@ action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
 
-The `online-third-person` branch uses version 32710 for Xbox/Custom Edition
-and MCC protocol version 32711. These separate experimental revisions retain
-the shoulder-policy bits and extra input-relay byte. They incorporate main's
-OpenCE fire-origin message 93 and keep MCC messages at 94-97 and MCC admission
-at 98. Camera admission reserves data-message kind 99.
+The host's Session Compatibility selector defaults to OpenCE Crossplay.
+Xbox/CE use the exact pinned OpenCE 41 contract; MCC remains independently
+versioned at 63. In this mode the optional shoulder camera, its input and
+muzzle behavior, and its checkpoint recovery extensions do not execute.
+GulchCE Third Person instead advertises camera agreement 32712 (Xbox/CE) or
+32713 (MCC), requires a kind 101 envelope before admission and adds the
+shoulder byte to relayed actions. The envelope's bound is 520 bytes, including
+MCC's optional 512-byte inner envelope and upstream account-link credentials.
+Its header carries revision 1, camera base version 32712 and zero reserved
+bytes. Ordinary authorization and map-family checks still apply.
 
-Every join, including a first-person-only game, must carry an eight-byte camera
-envelope: the normal two-byte data header, kind 99, revision 1, little-endian
-base camera version 32710, and two zero reserved bytes. The inner message is
-either the original join packet or the existing MCC envelope. The maximum is
-264 bytes. The host validates this before normal admission; an advertised
-version alone would leave direct joins unprotected. MCC validates its own
-inner envelope and capability independently. Tokens, bans, session state and
-slot checks still apply. There is no persistent camera-admission state.
-
-OpenCE, main and older camera builds are rejected in either host/client
-role. Matching experimental builds retain LAN, internet, dedicated-server
-and co-op paths, subject to the existing transport and map requirements.
-Turning the camera off does not restore crossplay: the input wire format
-still differs. No runtime option bypasses this boundary. Asset-free coverage
-is in `tools/test_camera_protocol.py`, `tools/test_mcc_protocol.py` and
-`tools/test_camera_wire.py`; passing those checks is not proof of public
-internet transport or full campaign compatibility.
+Session mode is selected before opening the lobby and locked until disposal,
+including across rounds. The client binds camera permission to the selected
+host's exact advertised version and clears it on disconnect. Unknown versions
+are rejected; settings cannot grant capability. Player preferences are not
+rewritten. All platforms and transports share this path. Common internet
+listings use the base discovery format; admission establishes compatibility.
+See [the camera guide](../../docs/reading/third_person.md) for lifecycle details.
+Asset-free checks exercise both relay formats, malformed envelopes, host locks,
+policy enforcement and the pinned upstream contract. Actual crossplay and
+browser gameplay must also be tested against the resulting build.
 
 ### Comparing two builds
 

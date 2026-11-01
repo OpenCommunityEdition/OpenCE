@@ -25,14 +25,9 @@ def test_opence_41_contract():
     # Compare the upstream size separately rather than accepting a fork size.
     assert actual["layout HALO_PORT_NETWORK_GAME_SIZE"] == "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 32) /* MCC SHA-256 */"
     actual["layout HALO_PORT_NETWORK_GAME_SIZE"] = "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A)"
-    # The camera branch adds exactly one shoulder byte to the relay.
-    assert actual["bound DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE"] == "15"
-    assert actual["bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE"] == "15 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)"
-    actual["bound DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE"] = "14"
-    actual["bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE"] = "14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)"
     assert {key: actual.get(key) for key in expected} == expected
     limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
-    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 32710\b", limits)
+    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 41\b", limits)
     # All fields of the transmitted prefix match upstream, including names,
     # types and order. The Windows build also asserts the actual ABI offsets.
     header = (ROOT / "source/networking/network_game_manager.h").read_text()
@@ -175,7 +170,8 @@ def test_loopback_host_and_remote_capability_selection(tmp_path):
 struct network_advertised_game {int dummy;};
 struct network_game_client {struct network_advertised_game available_games[4];};
 struct transport_address {struct {unsigned long long_words[1];} address;};
-static struct {unsigned int flags;} network_game_client_advertised_versions[4];
+static struct {unsigned int flags,version;} network_game_client_advertised_versions[4];
+static void third_person_session_client_begin(unsigned int version){(void)version;}
 static int local_server;
 static unsigned int selected;
 static int global_network_game_server_get(void) {return local_server;}
@@ -440,7 +436,7 @@ static int game_modes_kind(int const *variant,int const *options) {(void)options
 static int network_game_server_get_state(void *server,void *state) {(void)server;(void)state;return 0;}
 static int network_game_server_game_is_loading(void *server) {(void)server;return 0;}
 ''' + defines + '\n#define BASE_VERSION ' + base + r'''
-unsigned int mcc_protocol_version(char const *map) {return map[0] ? MCC_PROTOCOL_VERSION : BASE_VERSION;}
+unsigned int third_person_session_version(char const *map) {return map[0] ? MCC_PROTOCOL_VERSION : BASE_VERSION;}
 static void write_advertisement(byte *bytes,int kind,int mcc) {
     struct {byte reserved[26];} advertisement={{0}};
     struct game data={{""},0,0};

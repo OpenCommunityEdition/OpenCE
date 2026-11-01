@@ -71,6 +71,7 @@ their handlers open opens.
 
 #include "cseries.h"
 #include "third_person.h"
+#include "third_person_protocol.h"
 #include "input/input.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
@@ -4223,7 +4224,9 @@ static boolean server_settings_initialize(struct widget_instance *list)
 	if (spinner)
 		spinner->parameters.list.selected_index = *server_settings_maximum_players_index();
 	if ((spinner = named(list, "camera_policy_spinner", 0)) != NULL)
-		spinner->parameters.list.selected_index = third_person_policy();
+		spinner->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
+    if ((spinner = named(list, "session_compatibility_spinner", 0)) != NULL)
+        spinner->parameters.list.selected_index = third_person_session_active();
 	/* (PUBLIC or PRIVATE: this game's; the screen is made again on coming
 	back from an option's screen) */
 	if ((spinner = named(list, "listing_spinner", 0)) != NULL)
@@ -4273,7 +4276,22 @@ static void server_settings_update(struct widget_instance *list)
 		text_set(named(list, "game_type_value", 0), type);
 	}
 	settings_help(list);
-	if ((spinner = named(list, "camera_policy_spinner", 0)) != NULL)
+    if ((spinner = named(list, "session_compatibility_spinner", 0)) != NULL)
+    {
+        int selected = spinner->parameters.list.selected_index != 0;
+        if (selected != third_person_session_active())
+        {
+            third_person_session_set(selected);
+            spinner->parameters.list.selected_index = third_person_session_active();
+            if ((row = named(list, "camera_policy_spinner", 0)) != NULL)
+                row->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
+        }
+        if (list->parameters.list.extended_description && list->focused_child == named(list, "op_session_compatibility", 0))
+            list->parameters.list.extended_description->parameters.text_box.string_list_index =
+                third_person_session_locked() ? 22 : 20 + third_person_session_active();
+    }
+    visible_set(named(list, "op_camera_policy", 0), third_person_session_active());
+	if (third_person_session_active() && (spinner = named(list, "camera_policy_spinner", 0)) != NULL)
 	{
 		short policy = (short)PIN(spinner->parameters.list.selected_index, 0, 2);
 		if (policy != third_person_policy())
@@ -4414,7 +4432,8 @@ void ui_widget_port_cooperative_settings_apply(void)
 static boolean server_start(void)
 {
 	static char const *const camera_policies[] = { "player_choice", "forced_on", "forced_off" };
-	config_write("network.camera_policy", camera_policies[third_person_policy()]);
+	if (third_person_session_active())
+		config_write("network.camera_policy", camera_policies[third_person_policy()]);
 	if (text_field_editing(NULL))
 		text_field_end(TRUE);
 	network_game_server_port_set_settings(multiplayer.game_name,

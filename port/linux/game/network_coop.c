@@ -122,6 +122,7 @@ index and tag, since the map placed them at the same index everywhere.
 #include "coop_vehicles.h"
 #include "coop_spectate.h"
 #include "network_coop.h"
+#include "third_person_protocol.h"
 #include "network_distributed.h"
 #include "../src/server_events.h" /* port: port/linux/src/server_events.c */
 #include "../src/server_json.h" /* port: port/linux/src/server_json.c */
@@ -2979,7 +2980,7 @@ void network_coop_restore_players(void)
 	short machine, local;
 	long slot;
 
-	if (!coop_host())
+	if (!third_person_session_active() || !coop_host())
 		return;
 	game = network_game_get_game();
 	if (!game || !player_data || !player_data->valid)

@@ -65,6 +65,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
 #include "network_coop.h"
+#include "third_person_protocol.h"
 #include "network_distributed.h"
 #include "mcc_network.h"
 #include "profile_sections.h"
@@ -1344,7 +1345,7 @@ void network_objects_host_reverted(void)
 	long machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 	short count, index;
 
-	if (game_connection() != _game_connection_network_server || !network_coop_active())
+	if (!third_person_session_active() || game_connection() != _game_connection_network_server || !network_coop_active())
 		return;
 	count = distributed_client_machines(machines, NUMBEROF(machines));
 	for (index = 0; index < count; index++)
@@ -2285,7 +2286,7 @@ void network_objects_expect_live_unit(long object_index)
 {
 	struct object_datum *object;
 
-	if (!network_game_distributed_client() || !network_coop_active() ||
+	if (!third_person_session_active() || !network_game_distributed_client() || !network_coop_active() ||
 		!network_objects_client_has(object_index))
 		return;
 	object = object_try_and_get_and_verify_type(object_index, _object_mask_unit);
@@ -2433,7 +2434,7 @@ static boolean distributed_client_reuses_object(long existing_index,
 {
 	return existing_index == change->object_index && existing &&
 		existing->definition_index == change->definition_index &&
-		!(network_coop_active() && TEST_FLAG(_object_mask_unit, existing->object.type) &&
+		!(third_person_session_active() && network_coop_active() && TEST_FLAG(_object_mask_unit, existing->object.type) &&
 			TEST_FLAG(existing->object.damage_flags, _object_dead_bit) &&
 			!TEST_FLAG(change->flags, _distributed_object_dead_bit));
 }
