@@ -140,7 +140,7 @@
 		<string text="The energy shield's flare on your first-person\narms too, as on your body."/>
 		<string text="Right-shoulder view on foot. Zoom uses first\nperson. The reticle follows your aim point."/>
 		<string text="Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it."/>
-		<string text="Choose the shoulder and camera position.\nV swaps shoulders while playing."/>
+		<string text="Choose the shoulder and camera position.\nB swaps shoulders while playing."/>
 		<string text="CONTROLLED BY HOST. Your personal camera\npreference returns after leaving the match."/>
 	</strings>
 </menus>

@@ -415,7 +415,7 @@ SCREENS["video_settings/fov_viewmodels"] = {
 SCREENS["video_settings/fov_viewmodels"]["spacing"] = 26
 SCREENS["video_settings/fov_viewmodels"]["categories"] = [
     ("SHOULDER CAMERA:", "video_settings/shoulder_camera",
-     "Choose the shoulder and camera position.\nV swaps shoulders while playing."),
+     "Choose the shoulder and camera position.\nB swaps shoulders while playing."),
 ]
 SCREENS["video_settings/fov_viewmodels"]["extra_help"] = [
     "CONTROLLED BY HOST. Your personal camera\\npreference returns after leaving the match.",
@@ -432,10 +432,10 @@ SCREENS["video_settings/shoulder_camera"] = {
          "Distance behind the eye, in world units.\nAlt + wheel adjusts in game. Default 0.85.", None),
         ("HEIGHT:", "display.third_person_height",
          [(f"{n / 100:.2f}", f"{n / 100:.2f}") for n in [-20, -10, 0, 6, 12, 18, 24, 36, 48, 60]],
-         "Height along the camera's up direction.\nDefault 0.12 world units.", None),
+         "Shift + wheel adjusts height in game.\nDefault 0.12 world units.", None),
         ("LATERAL OFFSET:", "display.third_person_offset",
          [(f"{n / 100:.2f}", f"{n / 100:.2f}") for n in [0, 6, 12, 18, 24, 30, 36, 48, 60]],
-         "Distance to the selected shoulder's side.\nDefault 0.24 world units.", None),
+         "Hold Caps Lock + wheel to move left or right.\nDefault 0.24 world units to the right.", None),
     ],
 }
 # Audio Setup's sound processing (port/linux/src/dsound_sdl.c): the reverb

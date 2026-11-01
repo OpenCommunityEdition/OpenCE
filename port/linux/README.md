@@ -1962,4 +1962,6 @@ bindings are preserved; choose Reset or rebind them to use the new defaults.
 
 | Setting | Default | Environment | Meaning |
 | --- | --- | --- | --- |
+| `controls.camera_height` | `"Left Shift, Right Shift"` | `HALO_KEY_CAMERA_HEIGHT` | Hold either Shift and scroll to adjust camera height during shoulder view; up raises it. |
+| `controls.camera_offset` | `"CapsLock"` | `HALO_KEY_CAMERA_OFFSET` | Hold Caps Lock and scroll to move left or right across either shoulder; up moves right. Uses the physical key, not its typing-toggle state. |
 | `controls.camera_distance` | `"Left Alt"` | `HALO_KEY_CAMERA_DISTANCE` | Hold with the wheel to change `display.third_person_distance` during shoulder view. In first person, scopes, menus, text chat and the console the wheel keeps its existing behavior. |

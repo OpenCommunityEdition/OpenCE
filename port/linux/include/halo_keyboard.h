@@ -50,6 +50,8 @@ enum halo_keyboard_action
 	network_votekick.c, read with the chat's keys) */
 	HALO_KEYBOARD_VOTE_YES,
 	HALO_KEYBOARD_VOTE_NO,
+	HALO_KEYBOARD_CAMERA_HEIGHT,
+	HALO_KEYBOARD_CAMERA_OFFSET,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 

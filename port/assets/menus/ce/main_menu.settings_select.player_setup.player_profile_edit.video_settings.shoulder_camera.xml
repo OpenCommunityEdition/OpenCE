@@ -92,7 +92,7 @@
 		<string text="Smooth eases recovery and shoulder changes.\nSharp moves immediately; collision stays active."/>
 		<string text="Off uses the right shoulder. B swaps in game.\nRemap it under Controls Setup &gt; Camera."/>
 		<string text="Distance behind the eye, in world units.\nAlt + wheel adjusts in game. Default 0.85."/>
-		<string text="Height along the camera's up direction.\nDefault 0.12 world units."/>
-		<string text="Distance to the selected shoulder's side.\nDefault 0.24 world units."/>
+		<string text="Shift + wheel adjusts height in game.\nDefault 0.12 world units."/>
+		<string text="Hold Caps Lock + wheel to move left or right.\nDefault 0.24 world units to the right."/>
 	</strings>
 </menus>

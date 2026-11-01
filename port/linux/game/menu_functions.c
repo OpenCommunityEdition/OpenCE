@@ -2549,6 +2549,8 @@ static struct
 	{ "controls.chat", L"CHAT", 3 },
 	{ "controls.team_chat", L"TEAM CHAT", 3 },
 	{ "controls.camera_distance", L"CAMERA DISTANCE", 4 },
+	{ "controls.camera_height", L"CAMERA HEIGHT", 4 },
+	{ "controls.camera_offset", L"CAMERA OFFSET", 4 },
 	{ "controls.vote_yes", L"VOTE YES", 3 },
 	{ "controls.vote_no", L"VOTE NO", 3 },
 };

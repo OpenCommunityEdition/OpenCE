@@ -7,10 +7,21 @@ Edition and MCC loading paths remain separate; MCC weapon-authored following
 cameras, vehicle cameras, scripts and cinematics retain their priority.
 
 Default keyboard controls are **N** for perspective, **B** for shoulder,
-and **Left Alt** held for free look. Holding the configurable Camera Distance
-modifier (also Left Alt by default) while scrolling adjusts the bounded
-distance setting. Ordinary scrolling switches weapons. Menus, console, text
-chat and released mouse capture do not consume the wheel for distance.
+and **Left Alt** held for free look. Hold a modifier and scroll to adjust the
+camera: **Alt** for distance, **either Shift** for height, or **Caps Lock** for
+lateral offset. Wheel up moves closer, higher or right respectively; wheel
+down reverses it. Caps Lock must be physically held, regardless of its typing
+toggle. These bindings are configurable under Controls Setup > Camera. If
+modifiers overlap, distance takes priority, then height, then lateral offset.
+
+[third_person_input.c](../../port/linux/game/third_person_input.c)'s
+`third_person_camera_scroll` uses the menu's existing bounds and saved settings.
+Lateral scrolling can cross the centre by changing the existing shoulder
+selection while keeping the offset a magnitude; B still mirrors that offset.
+At the centre the shoulder selection is retained. Ordinary scrolling switches
+weapons. First person (including scope and collision fallback), menus, console,
+text chat and released mouse capture do not consume the wheel for adjustments.
+Host policy and session compatibility still gate camera availability.
 Saved custom bindings are retained. Camera controller bindings are deferred.
 No stencil shadows or cosmetic head tracking are part of this consolidation.
 

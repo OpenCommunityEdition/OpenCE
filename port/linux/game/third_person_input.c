@@ -1,22 +1,78 @@
-/* Live distance adjustment uses the same bounded setting as the menu. */
+/* Live camera adjustments use the same bounded settings as the menu. */
 #include "cseries.h"
 #include "third_person.h"
+#include "halo_keyboard.h"
 
 double config_real(char const *name);
+int config_boolean(char const *name);
 int config_write(char const *name, char const *value);
 
-int third_person_distance_scroll(float notches)
+int third_person_camera_scroll(float notches, unsigned long actions)
 {
-	double distance;
+	char const *setting;
+	double position, minimum, maximum, fallback, step;
+	int lateral = FALSE;
+	int left = FALSE;
 	char value[32];
+
+	/* One axis per scroll; preserve distance when modifiers overlap. */
+	if (actions & (1UL << HALO_KEYBOARD_CAMERA_DISTANCE))
+	{
+		setting = "display.third_person_distance";
+		minimum = 0.3;
+		maximum = 2.0;
+		fallback = 0.85;
+		step = -0.08;
+	}
+	else if (actions & (1UL << HALO_KEYBOARD_CAMERA_HEIGHT))
+	{
+		setting = "display.third_person_height";
+		minimum = -0.2;
+		maximum = 0.6;
+		fallback = 0.12;
+		step = 0.04;
+	}
+	else if (actions & (1UL << HALO_KEYBOARD_CAMERA_OFFSET))
+	{
+		setting = "display.third_person_offset";
+		minimum = 0.0;
+		maximum = 0.6;
+		fallback = 0.24;
+		step = 0.04;
+		lateral = TRUE;
+	}
+	else
+		return 0;
+
 	if (!third_person_active(0) || !third_person_available(0) ||
 		!(notches >= -100.0f && notches <= 100.0f) || notches == 0.0f)
 		return 0;
-	distance = config_real("display.third_person_distance");
-	if (!(distance >= 0.3 && distance <= 2.0))
-		distance = 0.85;
-	distance = PIN(distance - (double)notches * 0.08, 0.3, 2.0);
-	snprintf(value, sizeof(value), "%.4f", distance);
-	config_write("display.third_person_distance", value);
+	position = config_real(setting);
+	if (!(position >= minimum && position <= maximum))
+		position = fallback;
+	if (lateral)
+	{
+		/* The menu stores magnitude and shoulder separately; scrolling can
+		cross the centre without changing that contract or the B binding. */
+		left = config_boolean("display.third_person_left_shoulder");
+		if (left)
+			position = -position;
+		minimum = -maximum;
+	}
+	position = PIN(position + (double)notches * step, minimum, maximum);
+	if (lateral)
+	{
+		/* Keep the shoulder when the saved four-decimal offset rounds to zero. */
+		if (position > -0.00005 && position < 0.00005)
+			position = 0.0;
+		if (position < 0.0 && !left)
+			config_write("display.third_person_left_shoulder", "true");
+		else if (position > 0.0 && left)
+			config_write("display.third_person_left_shoulder", "false");
+		if (position < 0.0)
+			position = -position;
+	}
+	snprintf(value, sizeof(value), "%.4f", position);
+	config_write(setting, value);
 	return 1;
 }

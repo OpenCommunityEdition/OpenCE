@@ -32,7 +32,7 @@ boolean third_person_active(short local_player_index);
 boolean third_person_available(short local_player_index);
 boolean third_person_director_active(short local_player_index);
 void third_person_camera_update(void *camera, void *controls, void *result);
-int third_person_distance_scroll(float notches);
+int third_person_camera_scroll(float notches, unsigned long actions);
 void third_person_camera(short local_player_index, struct render_camera *camera);
 boolean third_person_reticle(union point2d *point, real reticle_scale);
 

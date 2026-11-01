@@ -528,6 +528,11 @@ static const struct config_setting config_settings[] =
 		"Save a PNG screenshot beside maps/ (press once per capture)." },
 	{ "controls.camera_distance", _config_string, "\"Left Alt\"", "HALO_KEY_CAMERA_DISTANCE", _environment_value, _platform_all,
 		"Hold with the mouse wheel to adjust shoulder distance; ordinary scrolling switches weapons." },
+	{ "controls.camera_height", _config_string, "\"Left Shift, Right Shift\"", "HALO_KEY_CAMERA_HEIGHT", _environment_value, _platform_all,
+		"Hold with the mouse wheel to raise or lower the shoulder camera." },
+	{ "controls.camera_offset", _config_string, "\"CapsLock\"", "HALO_KEY_CAMERA_OFFSET", _environment_value, _platform_all,
+		"Hold with the mouse wheel to move the camera left or right, across either shoulder.\n"
+		"Caps Lock is a held key, not its typing-toggle state. Wheel up moves right." },
 	{ "controls.push_to_talk", _config_string, "\"V\"", "HALO_KEY_PUSH_TO_TALK", _environment_value, _platform_all,
 		"Voice chat: talk while it is held (audio.voice_chat \"push_to_talk\")." },
 	{ "controls.chat", _config_string, "\"T\"", "HALO_KEY_CHAT", _environment_value, _platform_all,
