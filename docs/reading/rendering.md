@@ -475,4 +475,19 @@ wrong simulation state, wrong rendered pose, culling, shader translation
 and stale GPU resources. Check a real image as well as relevant tests, and
 record the backend, platform, map, settings and view layout.
 
+## MCC weapon particle streams
+
+Ruby Rebalanced's flamethrower authors different particle systems for its
+first-person and world-model barrels. Start at `particle_system_new_particles`
+and `particle_system_render` in
+[particle_systems.c](../../source/effects/particle_systems.c), then read
+`mcc_particle_system_markers` and `mcc_particle_system_visible` in
+[mcc_particles.c](../../port/linux/game/mcc_particles.c). The first chooses the
+local viewmodel marker for first-person-only streams; the second checks the
+authored view exclusions for each rendered player. The native Xbox and CE
+paths pass through unchanged when MCC is inactive. The adapter owns no
+persistent state, and the engine retains particle lifetime and map cleanup.
+See the [MCC evidence and regression checks](../mcc_maps.md#flamethrower-particle-system-views-issue-33)
+for the inspected flags, reproduction and validation limits.
+
 Continue with [networking](networking.md), or return to the [guide](README.md).

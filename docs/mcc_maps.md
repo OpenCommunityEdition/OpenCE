@@ -2484,3 +2484,62 @@ selected captures remain in `build/issue89`; inactive test saves are archived
 losslessly with original relative paths and verified SHA-256 manifests.
 Disposable map hardlinks, generated map caches, duplicate test binaries and
 harness build directories were removed. Original maps and saves were untouched.
+
+## Flamethrower particle-system views (issue #33)
+
+Ruby Rebalanced C20 attaches `defoliant` and `defoliant2` to the world-model
+`defoliant spawn` marker, with particle-type flags `0x10041` and `0x10001`.
+Its `fp_defoliant3` and `fp_defoliant2` attachments instead name `spawn fire`,
+which exists only on the first-person model, with flags `0x20041` and
+`0x20001`. These are inspected map fields, not filename-based special cases.
+The [public particle-system format](https://c20.reclaimers.net/h1/tags/particle_system/)
+identifies bits 16 and 17 as the first- and third-person drawing exclusions.
+
+The inherited particle-system emitter queries only world-model markers, and
+its renderer does not apply these exclusions. Thus the first-person stream
+has no emission marker while the lower world-model stream appears in the
+player's view. In a hidden Windows reproduction, the original firing effect
+and projectile markers both resolved; that did not establish that the
+separate attached particle systems were working.
+
+[mcc_particles.c](../port/linux/game/mcc_particles.c) supplies the missing
+MCC behavior. `mcc_particle_system_markers` uses the active local viewmodel's
+marker for first-person-only types; a missing marker, remote or holstered
+weapon, deleted handle or third-person camera does not fall back to the world
+origin. `mcc_particle_system_visible` applies the exclusions for each viewer,
+so another split-screen player can see the world stream without seeing the
+owner's first-person stream. Types without view exclusions retain their
+existing behavior. The two `port:` hooks in
+[particle_systems.c](../source/effects/particle_systems.c) are necessary because
+emission and drawing are private engine operations without registration
+interfaces. Xbox and Custom Edition retain the native queries and drawing.
+
+The adapter has no persistent state or allocations. Existing particle systems
+own their emitted particles and dispose them on map unload; orphaned
+first-person-only streams remain hidden. Weapon switching and camera changes
+are evaluated from current engine state. Projectile origins, damage, network
+messages and deterministic simulation are unchanged; the particle system
+uses the local visual random seed, so no network-version change is needed.
+
+`tools/test_mcc_particles.py` exercises the actual adapter functions, including
+marker failures, invalid attachments, view flags, split-screen ownership,
+weapon deletion, view changes and MCC-to-legacy activation transitions.
+Private before/after Windows captures of the same Ruby C20 fixture showed the
+missing barrel stream before and a stream leaving the barrel after the fix.
+The fixture changed only a starting profile's weapon to obtain the
+flamethrower, and used temporary stationary firing input; neither change is
+shipped. This is a bounded visual check, not full campaign completion.
+
+The final release/portable Windows build passed, as did 149 focused regression
+checks (two skipped: an optional MCC map fixture and a POSIX-only socket
+harness). Both changed translation units also compiled to Android guest ELF
+and web Wasm objects with the generated target flags. Full Android and web
+builds were attempted but remain unverified: their generated Unix shell
+commands and the Android NDK wrapper cannot run unchanged on this Windows
+host, which has no WSL. These object checks do not replace full platform
+builds, multiplayer testing or visual checks on those platforms.
+
+The final Windows binary also completed a single-process sequence from Ruby
+C20 to Xbox `a10`, to Custom Edition `deathisland`, then back to Ruby C20,
+with console responses after each load and a normal timed exit. This checks
+bounded loading and activation transitions, not full legacy visual parity.
