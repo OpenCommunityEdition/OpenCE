@@ -69,7 +69,9 @@ The upstream optional client-hand origins remain separately controlled.
 ## Session compatibility
 
 Host setup keeps its existing layout; **Session Options** opens the
-compatibility and camera-policy controls. Both rows use the standard menu
+compatibility and camera-policy controls plus the invite link. Moving that
+link leaves room for two lines of host-menu help without shrinking the rows.
+Both camera rows use the standard menu
 font and full-size selection background. The compatibility selector defaults
 to **OpenCE Crossplay**. On Xbox and Custom
 Edition maps this uses the pinned OpenCE 41 wire format and simulation paths.

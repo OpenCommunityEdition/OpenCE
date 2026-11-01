@@ -4224,6 +4224,7 @@ static boolean session_options_update(struct widget_instance *list)
 	static char const *const policies[] = { "player_choice", "forced_on", "forced_off" };
 	struct widget_instance *spinner = named(list, "session_compatibility_spinner", 0);
 	struct widget_instance *help = list->parameters.list.extended_description;
+	char text[TEXT_FIELD_LENGTH];
 	short selected;
 	if (!spinner) return FALSE;
 	selected = spinner->parameters.list.selected_index != 0;
@@ -4245,6 +4246,18 @@ static boolean session_options_update(struct widget_instance *list)
 		spinner->parameters.list.selected_index = third_person_policy();
 		if (help && list->focused_child == named(list, "op_camera_policy", 0))
 			help->parameters.text_box.string_list_index = 3 + third_person_policy();
+	}
+	if (multiplayer.mode != _multiplayer_mode_host_internet)
+		snprintf(text, sizeof(text), "NONE: A LAN GAME");
+	else if (!config_boolean("network.online"))
+		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
+	else if (!p2p_invite_link(text, sizeof(text)))
+		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
+	text_field_show(named(list, "invite_value", 0), text, FALSE);
+	if ((spinner = named(list, "op_invite", 0)) != NULL)
+	{
+		spinner->vertical_offset = third_person_session_active() ? 133 : 103;
+		if (help && list->focused_child == spinner) help->parameters.text_box.string_list_index = 6;
 	}
 	return TRUE;
 }
@@ -4302,13 +4315,6 @@ static void server_settings_update(struct widget_instance *list)
 			NUMBEROF(maximum_players) - 1);
 	wide_to_text(multiplayer.game_name, text, sizeof(text));
 	text_field_show(named(list, "server_name_value", 0), text, text_field_editing(row));
-	if (multiplayer.mode != _multiplayer_mode_host_internet)
-		snprintf(text, sizeof(text), "NONE: A LAN GAME");
-	else if (!config_boolean("network.online"))
-		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
-	else if (!p2p_invite_link(text, sizeof(text)))
-		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
-	text_field_show(named(list, "invite_value", 0), text, FALSE);
 	{
 		wchar_t type[ROW_TEXT_LENGTH];
 

@@ -135,7 +135,11 @@ def test_host_camera_menu_layout():
     base = "main_menu/multiplayer_type_select/server_settings/"
     menu = root.find(f"widget[@name='{base}options_menu']")
     rows = {node.attrib["widget"].removeprefix(base): int(node.attrib["y"]) for node in menu.findall("child")}
-    common = ["op_server_name", "op_max_players", "op_invite", "op_listing", "op_password", "op_session_options", "op_map_share_options"]
+    help_box = root.find(f"widget[@name='{base}help']")
+    assert int(help_box.attrib["left"]) == 54 + 13
+    assert int(help_box.attrib["height"]) >= 40
+    assert int(help_box.attrib["top"]) + int(help_box.attrib["height"]) <= rows["button_bar"]
+    common = ["op_server_name", "op_max_players", "op_listing", "op_password", "op_session_options", "op_map_share_options"]
     for mode in (["op_coop_options", "op_voice_options"], ["op_game_type", "op_player_options", "op_item_options", "op_vehicle_options", "op_indicator_options", "op_team_options"]):
         positions = [rows[name] for name in common + mode]
         assert len(set(positions)) == len(positions)
@@ -144,6 +148,8 @@ def test_host_camera_menu_layout():
         assert all(int(root.find(f"widget[@name='{base}{name}']").attrib["height"]) >= 28 for name in common + mode)
     assert root.find(f"widget[@name='{base}op_session_options']/on[@event='a']").attrib["open"] == base + "session_options/session_options_screen"
     sub = base + "session_options/"
+    assert "op_invite" not in rows
+    assert root.find(f"widget[@name='{sub}options_menu']/child[@widget='{sub}op_invite']") is not None
     for key in ("session_compatibility", "camera_policy"):
         row = root.find(f"widget[@name='{sub}op_{key}']")
         label = root.find(f"widget[@name='{sub}{key}_label']")

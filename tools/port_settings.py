@@ -736,8 +736,8 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
         ("type", "text"), ("text", spec["title"]), ("font", "ui\\large_ui"), ("color", "#FFFFFFFF"), ("text_y", 18)]
     lines += _widget(f"{base}/{header}", [("controller", 1), ("left", 35), ("top", spec.get("header_top", 11)), ("width", 605), ("height", 59),
                                           *header_style], [])
-    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 68),
-                                      ("top", spec.get("help_top", 350)), ("width", 482),
+    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", spec.get("help_left", 68)),
+                                      ("top", spec.get("help_top", 350)), ("width", spec.get("help_width", 482)),
                                       ("height", spec.get("help_height", 60)), ("string_list", None if spec.get("dynamic_help") else f"{base}/help_strings"),
                                       ("font", spec.get("help_font", "ui\\large_ui")), ("color", "#FFFFFFFF")],
                      [f'<on event="created" run="{spec["help_init"]}"/>'] if spec.get("help_init") else [])
@@ -1723,6 +1723,9 @@ def _session_options(base: str, host: str) -> list:
             ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 225 19 231")],
             ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
         rows.append((f"{base}/op_{key}", None))
+    extra += _value_row(base, "invite", 2, "ss copy invite")
+    extra += _strings(f"{base}/labels", ["", "", "INVITE LINK:"])
+    rows.append((f"{base}/op_invite", None))
     extra += _strings(f"{base}/help_strings", [
         "OpenCE and GulchCE can join; third person is off.\\nMCC maps still require GulchCE.",
         "Matching GulchCE camera builds only.\\nChoose the camera policy below.",
@@ -1730,6 +1733,7 @@ def _session_options(base: str, host: str) -> list:
         "Each player chooses first or third person.\\nTheir camera toggle remains available.",
         "Everyone uses third person on foot. Scoping and\\ntight spaces still use first person.",
         "Third person is disabled for everyone.\\nNormal vehicle and cinematic cameras remain.",
+        "Players join by this invite link. Enter copies it.\\nLAN games use the server browser instead.",
     ])
     lines = _screen(base, {"screen": "session_options_screen", "spacing": 30,
         "header": ("header", f"{host}/header_server_settings")}, rows,
@@ -1744,9 +1748,10 @@ def _server_settings() -> list:
     whether the server browser lists it (PUBLIC or PRIVATE: an internet
     game's)"""
     base = f"{MT}/server_settings"
-    # Thirteen full-height rows: leave the selection artwork room to draw.
-    spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 414, "help_height": 40, "rows_top": 49,
-            "help_font": "ui\\small_ui", "button_top": 454,
+    # Twelve full-height rows: leave the selection artwork room to draw.
+    spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 392, "help_height": 40, "rows_top": 49,
+            "help_left": 67, "help_width": 486,
+            "help_font": "ui\\small_ui", "button_top": 448,
             "background_bitmap": "bitmaps/gradient_big", "header_top": -10,
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
@@ -1769,8 +1774,6 @@ def _server_settings() -> list:
                       ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                       ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")], [])
     rows.append((f"{base}/op_max_players", None))
-    extra += _value_row(base, "invite", 2, "ss copy invite")
-    rows.append((f"{base}/op_invite", None))
     # (PUBLIC or PRIVATE: menu_functions.c's server_settings_update)
     extra += _widget(f"{base}/op_listing", [("width", 512), ("height", 28),
                                             ("flags", "pass_unhandled_to_focused_child"),
@@ -1990,7 +1993,7 @@ MAP_SHARE_SETUP = ("map_share_options", "MAP SHARING",
 ])
 # (Server Setup's place of its options' rows, co-op's or the gametype's: after
 # MAP SHARING's)
-SETUP_OPTIONS_PLACE = 7
+SETUP_OPTIONS_PLACE = 6
 # (their screens' titles)
 TITLES.update({f"{MT}/server_settings/{key}/header_{key}": title
                for key, title, _, _ in [*COOP_SETUP_SCREENS, MAP_SHARE_SETUP]})
