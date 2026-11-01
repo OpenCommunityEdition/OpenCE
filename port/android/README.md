@@ -523,6 +523,25 @@ functions of OpenGL ES 3.2 if they are available:
   the query buffer of desktop OpenGL. A read of the counters themselves
   waits for the GPU, which halved the frame rate on Turnip (Zink).
 
+`host_gl_wait_frame` in [`host/host_gl.c`](host/host_gl.c) releases an upload
+ring slot only after GPU completion. A signaled fence takes the normal path;
+if the one-second wait times out or fails, `glFinish` completes queued work
+before the slot is reused. Failed fence creation uses the same fallback.
+This can stall longer than one second under GPU pressure, but cannot safely
+be replaced by treating a timeout as completion. The first fallback is logged.
+The contract applies to every Android chip policy and map family, including
+frames drawn during loading; it neither reads nor deletes saved games or maps.
+
+[`test_android_frame_fences.py`](../../tools/test_android_frame_fences.py)
+compiles the production host fence and upload functions with a delayed fake
+GPU. Timeout, wait failure and fence creation failure previously let queued
+draws read the next upload's bytes. The test covers those failures, successful
+waits and repeated slot reuse. This establishes a synchronization defect found
+while investigating [issue #80](https://github.com/chestahh/GulchCE/issues/80),
+not that it explains the reported save-folder workaround. An affected-device
+comparison across consecutive matches with the original saves retained is
+still needed to establish whether that issue is resolved.
+
 ### Calling conventions
 
 Some files of the game declare a function differently from its definition,
