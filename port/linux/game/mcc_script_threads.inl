@@ -3,6 +3,7 @@
  * allocation records and Xbox/CE checkpoints keep their original layout. */
 #include "mcc_script_threads.h"
 #include "mcc_checkpoint.h"
+#include "mcc_campaign.h"
 #include "saved games/game_state.h"
 #include <stdint.h>
 #include <stdlib.h>
@@ -57,6 +58,7 @@ int mcc_script_threads_prepare(void)
 static void mcc_hs_threads_activate(void)
 {
     if (mcc_cache_tags_loaded() && mcc_threads.array) {
+        mcc_campaign_reset_model_lighting();
         data_make_invalid(mcc_threads.native);
         hs_thread_data=mcc_threads.array;
     }

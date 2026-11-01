@@ -9,6 +9,12 @@ struct mcc_runtime;
 #define MCC_HS_MISSION_SEGMENT 0x7001
 #define MCC_HS_CORE_SEGMENT 0x7002
 #define MCC_HS_PLAYER_EQUIPMENT 0x7003
+#define MCC_HS_ABS_INTEGER 0x7004
+#define MCC_HS_EXECUTING_THREAD 0x7005
+#define MCC_HS_KILL_THREAD 0x7006
+/* Implemented beside the interpreter's private thread and stack types. */
+void mcc_executing_thread_evaluate(short function, long thread, boolean initialize);
+void mcc_kill_thread_evaluate(short function, long thread, boolean initialize);
 struct hs_function_definition *mcc_script_function(short index);
 short mcc_script_find(char const *name);
 boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax);
