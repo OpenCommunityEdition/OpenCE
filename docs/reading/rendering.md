@@ -28,6 +28,9 @@ pass keeps each split-screen view's previous camera in its own slot through
 `previous_camera_matrix_for_window` in
 [rasterizer_xbox_environment_fog.c](../../source/rasterizer/xbox/rasterizer_xbox_environment_fog.c).
 Both corrections apply through the existing renderer for every map family.
+The [issue 83 investigation](../geometry_flicker_83.md) connects the portal
+correction to disappearing terrain, its regression tests and the remaining
+limits of that evidence.
 
 `screen_mode_choose` in [d3d8_gl.c](../../port/linux/src/d3d8_gl.c) selects
 the render-target scale separately from the game's logical 480-line view.
