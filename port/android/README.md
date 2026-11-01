@@ -15,7 +15,6 @@ The Android build uses the platform layer of the Linux build
 Physical mice use the same control bindings. During play, F12 toggles mouse
 capture; captured mode hides Android's pointer and uses relative movement for
 continuous aiming, while releasing capture restores normal pointer behavior.
-<<<<<<< HEAD
 
 ## Lighting availability
 
@@ -39,8 +38,6 @@ requested by the host. Animated Overshield surfaces remain available and obey
 the existing host policy. This is an Android compatibility fallback, not a
 diagnosis or repair of every device rendering issue. Device playtests are still
 needed to confirm recovery on the affected devices.
-=======
->>>>>>> upstream/main
 
 ## Requirements
 
