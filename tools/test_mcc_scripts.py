@@ -44,7 +44,7 @@ def scripts_tool(native_mcc_harness):
     return native_mcc_harness("mcc_scripts")
 
 
-@pytest.mark.parametrize("case", ["link", "alias", "extension", "equipment", "segment", "core_segment", "global", "unknown", "speed", "score", "score_write", "score_capacity", "score_allocation",
+@pytest.mark.parametrize("case", ["issue89_link_abs_integer", "issue89_link_get_executing_running_thread", "issue89_link_kill_thread", "issue89_registry", "link", "alias", "extension", "equipment", "segment", "core_segment", "global", "unknown", "speed", "score", "score_write", "score_capacity", "score_allocation",
                                   "bad_child", "child_salt", "short_data", "capacity", "full_capacity",
                                   "negative_count", "unterminated", "skull_read", "skull_wrong_type", "skull_write", "developer_read", "developer_cast", "developer_write", "skull_disable", "skull_enable", "skull_computed", "developer_capacity", "developer_allocation"])
 def test_mcc_script_linking(scripts_tool, case):

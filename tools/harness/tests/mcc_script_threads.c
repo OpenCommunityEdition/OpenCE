@@ -14,7 +14,8 @@ typedef unsigned char byte,boolean;
 #include "types.inc"
 static byte image[2*1024*1024], saved[sizeof(image)];
 static unsigned long used=160000, capacity=sizeof(image);
-static int loaded;
+static int loaded, lighting_resets;
+static void mcc_campaign_reset_model_lighting(void) {++lighting_resets;}
 static struct data_array *hs_thread_data;
 static struct hs_thread_datum *hs_thread_get(long index) {(void)index;return hs_thread_data->data;}
 static void hs_stack_overflow(long index) {hs_thread_get(index)->flags|=1u<<_hs_thread_stack_overflow_bit;}
@@ -75,9 +76,9 @@ int main(int argc,char **argv)
         mcc_script_threads_dispose();CHECK(native->valid && hs_thread_data==native);
         CHECK(storage[0]==0xA5 && storage[MCC_SCRIPT_THREAD_STORAGE-1]==0xA5);return 0;
     }
-    mcc_hs_threads_activate();CHECK(hs_thread_data==native);
+    mcc_hs_threads_activate();CHECK(hs_thread_data==native && !lighting_resets);
     if (!strcmp(argv[1],"migration")) memcpy(saved,image,sizeof(image));
-    loaded=1;mcc_hs_threads_activate();CHECK(hs_thread_data==mcc_threads.array);
+    loaded=1;mcc_hs_threads_activate();CHECK(hs_thread_data==mcc_threads.array && lighting_resets==1);
     if (!strcmp(argv[1],"bounds")) {
         t=populate(hs_thread_data,1025);
         CHECK(hs_stack_allocate(0,1024));CHECK(hs_stack_push(0));

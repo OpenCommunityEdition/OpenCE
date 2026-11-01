@@ -25,6 +25,8 @@
 #undef strstr
 #undef strncmp
 
+void mcc_executing_thread_evaluate(short f,long t,boolean i) {(void)f;(void)t;(void)i;}
+void mcc_kill_thread_evaluate(short f,long t,boolean i) {(void)f;(void)t;(void)i;}
 short const hs_external_global_count=443;
 static boolean loaded;
 static struct data_array list_data;
@@ -122,6 +124,28 @@ int main(int argc, char **argv) {
     short segment_index;
     CHECK(argc >= 2 && argc <= 4);
     segment_index = !strcmp(argv[1], "core_segment") ? MCC_HS_CORE_SEGMENT : MCC_HS_MISSION_SEGMENT;
+    if (!strcmp(argv[1], "issue89_registry")) {
+        char const *names[3]={"abs_integer","get_executing_running_thread","kill_thread"};
+        long values[5]={0,1,-1,2147483647L,(-2147483647L-1)};
+        int j;
+        for(j=0;j<3;j++) {
+            loaded=0;CHECK(mcc_script_find(names[j])==NONE);
+            CHECK(!mcc_script_function((short)(0x7004+j)));
+            loaded=1;CHECK(mcc_script_find(names[j])==0x7004+j);
+            extension=mcc_script_function((short)(0x7004+j));CHECK(extension);
+            CHECK(extension->parameter_count==(j==1 ? 0 : 1));
+            CHECK(extension->return_type==(j==2 ? _hs_type_void : _hs_type_long_integer));
+            if(j!=1) CHECK(extension->parameter_types[0]==_hs_type_long_integer);
+        }
+        extension=mcc_script_function(0x7004);
+        for(j=0;j<5;j++) {
+            arguments[0]=values[j];returned=123;
+            extension->evaluate(0x7004,0,FALSE);CHECK(returned==123);
+            extension->evaluate(0x7004,0,TRUE);
+            CHECK((unsigned long)returned==(values[j]<0 ? 0UL-(unsigned long)values[j] : (unsigned long)values[j]));
+        }
+        return 0;
+    }
     runtime.used = 0x100000;
     runtime.capacity=runtime.used+65536;
     runtime.tags = malloc(runtime.capacity);
@@ -162,6 +186,12 @@ int main(int argc, char **argv) {
     nodes[3].flags = 1;
     nodes[3].next_node_index = NONE;
     strcpy(strings, "sleep");
+    if (!strncmp(argv[1], "issue89_link_", 13)) {
+        strcpy(strings,argv[1]+13);
+        nodes[0].type=!strcmp(strings,"kill_thread") ? _hs_type_void : _hs_type_long_integer;
+        nodes[2].type=_hs_type_long_integer;nodes[2].next_node_index=NONE;
+        if (!strcmp(strings,"get_executing_running_thread")) nodes[1].next_node_index=NONE;
+    }
     if (!strcmp(argv[1], "unknown")) { strcpy(strings, "not_implemented"); expected = 0; }
     if (!strcmp(argv[1], "bad_child")) { nodes[0].data = 0x10008; expected = 0; }
     if (!strcmp(argv[1], "child_salt")) { nodes[0].data = 0x20001; expected = 0; }
@@ -350,6 +380,15 @@ int main(int argc, char **argv) {
         CHECK(!mcc_script_ai_cast(_hs_type_ai, _hs_type_unit));
         CHECK(!mcc_script_can_cast(_hs_type_short_integer, _hs_type_long_integer));
         loaded = TRUE;
+    }
+    if (!strncmp(argv[1], "issue89_link_", 13)) {
+        short index=mcc_script_find(strings);
+        CHECK(index!=NONE && nodes[0].function_index==index && nodes[1].function_index==index);
+        CHECK(mcc_script_call_valid(nodes,syntax));
+        if (!strcmp(strings,"get_executing_running_thread")) nodes[1].next_node_index=0x10002;
+        else nodes[2].type=_hs_type_string;
+        CHECK(!mcc_script_call_valid(nodes,syntax));
+        free(runtime.tags);return 0;
     }
     CHECK(mcc_script_find("player_effect_set_max_vibrate") == 322);
     CHECK(mcc_script_find("MCC_MISSION_SEGMENT") == MCC_HS_MISSION_SEGMENT);

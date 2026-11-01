@@ -10,7 +10,7 @@ def parameters_tool(native_mcc_harness):
     return native_mcc_harness("mcc_script_parameters")
 
 
-@pytest.mark.parametrize("case", ["metadata", "count", "type", "pointer", "slot", "orphan", "flags",
+@pytest.mark.parametrize("case", ["executing_thread", "kill_self", "kill_other", "kill_self_lists", "kill_other_lists", "kill_console", "kill_stale", "kill_slot", "kill_none", "kill_outside", "kill_deleted", "kill_legacy", "metadata", "count", "type", "pointer", "slot", "orphan", "flags",
                                   "call_arity", "call_type", "global_scope", "legacy", "return", "snapshot",
                                   "nested_scope", "recursive_arguments", "lists", "set", "overflow", "ai_cast", "widen",
                                   "global_capacity", "global_overflow", "maximum", "disabled", "predicate", "script_kind",

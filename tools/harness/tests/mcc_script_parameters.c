@@ -31,7 +31,19 @@ static struct data_array *hs_global_data;
 static int loaded=1,errors,refs,returned,disabled;
 short const hs_external_global_count=443;
 static long last_result;
-static struct hs_thread_datum *hs_thread_get(long index) {return index==1 ? &other_thread : &thread;}
+static struct hs_thread_datum *hs_thread_get(long index) {return (index&65535)==1 ? &other_thread : &thread;}
+static struct data_array thread_array;
+static struct data_array *hs_thread_data=&thread_array;
+#define _hs_thread_type_script 0
+#define _hs_thread_type_console_command 2
+static int deleted;
+static void hs_thread_delete(long index) {(void)index;deleted++;}
+void *datum_try_and_get(struct data_array *data,long index) {
+    struct hs_thread_datum *t;
+    if(data!=hs_thread_data || (unsigned short)index>1)return NULL;
+    t=hs_thread_get(index);
+    return t->identifier && t->identifier==(short)((unsigned long)index>>16) ? t : NULL;
+}
 #define _hs_thread_sleeping_bit 1
 static long hs_find_thread_by_script(short script) { return script==0 ? 0 : script==1 ? 1 : NONE; }
 short hs_find_script_by_name(char const *name) {return !strcmp(name,"target") ? 1 : NONE;}
@@ -108,6 +120,50 @@ int main(int argc,char **argv) {
     nodes[2].flags=10;nodes[2].script_index=0;nodes[2].data=0x10003;
     nodes[3].type=_hs_function_name;nodes[3].next_node_index=0x10004;
     nodes[4].data=42;
+    if(!strncmp(argv[1],"kill_",5) || !strcmp(argv[1],"executing_thread")) {
+        struct hs_stack_frame *base=(void *)thread.stack_data;
+        struct hs_stack_frame *other_base=(void *)other_thread.stack_data;
+        thread_array.valid=1;thread.identifier=other_thread.identifier=3;
+        thread.type=other_thread.type=_hs_thread_type_script;
+        thread.stack=(void *)(thread.stack_data+64);thread.stack->previous=base;
+        other_thread.stack=(void *)(other_thread.stack_data+64);other_thread.stack->previous=other_base;
+        thread.sleep_until=other_thread.sleep_until=99;
+        if(!strcmp(argv[1],"executing_thread")) {
+            mcc_executing_thread_evaluate(0,0x30000,TRUE);CHECK(last_result==0x30000);return 0;
+        }
+        finished_argument=(!strcmp(argv[1],"kill_self") || !strcmp(argv[1],"kill_self_lists")) ? 0x30000 : 0x30001;
+        if(!strcmp(argv[1],"kill_self_lists") || !strcmp(argv[1],"kill_other_lists")) {
+            struct hs_thread_datum *target=hs_thread_get(finished_argument);
+            struct mcc_hs_arguments *args=(void *)target->stack->data;
+            CHECK(mcc_parameters_prepare(&runtime,scenario,hs_syntax_data));
+            target->stack->expression_index=0x10002;target->stack->size=(short)mcc_hs_arguments_size(1);
+            args->magic=MCC_HS_ARGUMENT_MAGIC;args->script=0;args->count=1;
+            args->references=1;args->values[0]=42;refs=1;
+        }
+        if(!strcmp(argv[1],"kill_stale"))finished_argument=0x20001;
+        if(!strcmp(argv[1],"kill_slot"))finished_argument=1;
+        if(!strcmp(argv[1],"kill_none"))finished_argument=NONE;
+        if(!strcmp(argv[1],"kill_outside"))finished_argument=0x3ffff;
+        if(!strcmp(argv[1],"kill_deleted"))other_thread.identifier=0;
+        if(!strcmp(argv[1],"kill_legacy"))loaded=0;
+        if(!strcmp(argv[1],"kill_console"))other_thread.type=_hs_thread_type_console_command;
+        mcc_kill_thread_evaluate(0,0x30000,FALSE);CHECK(!returned && !deleted);
+        mcc_kill_thread_evaluate(0,0x30000,TRUE);
+        if(!strcmp(argv[1],"kill_self") || !strcmp(argv[1],"kill_self_lists")) {
+            CHECK(thread.stack==base && thread.sleep_until==NONE && !returned && !deleted);
+            CHECK(other_thread.sleep_until==99);
+        } else if(!strcmp(argv[1],"kill_other") || !strcmp(argv[1],"kill_other_lists") || !strcmp(argv[1],"kill_console")) {
+            CHECK(other_thread.stack==other_base && !other_thread.flags && !other_thread.previous_sleep_until);
+            CHECK(other_thread.sleep_until==(other_thread.type==_hs_thread_type_console_command ? 0 : NONE));
+            CHECK(returned==1 && deleted==(other_thread.type==_hs_thread_type_console_command));
+        } else {
+            CHECK(other_thread.stack!=other_base && other_thread.sleep_until==99 && !deleted);
+            CHECK(returned==loaded);
+        }
+        CHECK(!refs);
+        free(runtime.tags);
+        return 0;
+    }
     if(!strncmp(argv[1],"tail_",5)) {
         struct hs_stack_frame *parent=(void *)thread.stack_data;
         struct hs_stack_frame *child=(void *)(thread.stack_data+64);
