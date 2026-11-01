@@ -9,6 +9,7 @@
 #include "mcc_maps.h"
 #include "mcc_package.h"
 #include "mcc_precache.h"
+#include "mcc_validation.h"
 #include <string.h>
 
 #define MCC_IDENTITY_MAX_CANDIDATES 16
@@ -37,6 +38,8 @@ static int mcc_identity_error(char const *message)
 
 void mcc_identity_disconnect(void)
 {
+    mcc_validation_cancel();
+    mcc_cache_validation_clear();
     memset(&mcc_client_identity,0,sizeof(mcc_client_identity));
     memset(&mcc_host_identity,0,sizeof(mcc_host_identity));
     mcc_cache_precache_clear();
@@ -60,12 +63,41 @@ static unsigned char const *mcc_identity_expected(char const *name)
     return NULL;
 }
 
-void const *mcc_identity_host_settings(void const *settings,long bytes,struct network_game *copy)
+/* Prepare alongside the map version, before sending its settings. Initial
+ * MCC host setup does this before opening the lobby; mcc_ui_network defers
+ * early map changes until the host's loopback client has joined. */
+int mcc_identity_prepare_host(char const *map)
 {
-    struct network_game const *game=settings;
     struct mcc_precache_snapshot before,after;
     char name[64];
     unsigned char digest[32];
+    if (!mcc_package_name(map,name) || !mcc_precache_snapshot(name,&before)) {
+        mcc_host_identity.valid=0;
+        return 0;
+    }
+    if (!mcc_host_identity.valid || strcmp(name,mcc_host_identity.name) ||
+        memcmp(&before,&mcc_host_identity.files,sizeof(before))) {
+        mcc_host_identity.valid=0;
+        if (mcc_validation_request(name,NULL,digest)!=1) return 0;
+        if (!mcc_precache_snapshot(name,&after) ||
+            memcmp(&before,&after,sizeof(before))) {
+            mcc_identity_error("The host's MCC map or resources could not be fingerprinted, or changed during validation.");
+            return 0;
+        }
+        strcpy(mcc_host_identity.name,name);
+        memcpy(mcc_host_identity.digest,digest,32);
+        mcc_host_identity.files=after;
+        mcc_host_identity.valid=1;
+    }
+    return 1;
+}
+
+void const *mcc_identity_host_settings(void const *settings,long bytes,struct network_game *copy)
+{
+    struct network_game const *game=settings;
+    struct mcc_precache_snapshot files;
+    char canonical[64];
+    uint32_t checksum;
     if (!game || bytes!=sizeof(*game)) return NULL;
     memcpy(copy,game,sizeof(*copy));
     memset(copy->mcc_content_sha256,0,32);
@@ -73,20 +105,15 @@ void const *mcc_identity_host_settings(void const *settings,long bytes,struct ne
         mcc_host_identity.valid=0;
         return copy;
     }
-    if (!mcc_package_name(game->map.name,name) || !mcc_precache_snapshot(name,&before)) return NULL;
-    if (!mcc_host_identity.valid || strcmp(name,mcc_host_identity.name) ||
-        memcmp(&before,&mcc_host_identity.files,sizeof(before))) {
-        mcc_host_identity.valid=0;
-        if (!mcc_content_probe(name,digest) || !mcc_precache_snapshot(name,&after) ||
-            memcmp(&before,&after,sizeof(before))) {
-            mcc_identity_error("The host's MCC map or resources could not be fingerprinted, or changed during validation.");
-            return NULL;
-        }
-        strcpy(mcc_host_identity.name,name);
-        memcpy(mcc_host_identity.digest,digest,32);
-        mcc_host_identity.files=after;
-        mcc_host_identity.valid=1;
-    }
+    /* Recheck every resource candidate before reusing the prepared digest.
+     * A changed installation still requires fresh validation. */
+    /* Sending or tearing down a session must never initiate package work.
+     * Only pregame preparation may establish the host's identity. */
+    if (!mcc_host_identity.valid || !mcc_package_name(game->map.name,canonical) ||
+        strcmp(canonical,mcc_host_identity.name) || !mcc_precache_snapshot(canonical,&files) ||
+        memcmp(&files,&mcc_host_identity.files,sizeof(files)) ||
+        !mcc_validation_lookup(canonical,&checksum,NULL) ||
+        checksum!=(uint32_t)game->map.version) return NULL;
     memcpy(copy->mcc_content_sha256,mcc_host_identity.digest,32);
     return copy;
 }
@@ -96,7 +123,19 @@ static int mcc_identity_matches(char const *name,unsigned char const digest[32],
 {
     struct mcc_precache_snapshot before,after;
     unsigned char actual[32];
-    int ok=mcc_precache_snapshot(name,&before) && mcc_content_probe(name,actual) &&
+    int ok;
+    if (!mcc_precache_snapshot(name,&before)) return 0;
+    /* The host's loopback client admits the very package just fingerprinted
+     * for these settings. Rehashing it here stalls remote join requests.
+     * Reuse only the exact identity and unchanged complete file snapshot;
+     * actual loading still fingerprints the opened content independently. */
+    if (mcc_host_identity.valid && !strcmp(name,mcc_host_identity.name) &&
+        !memcmp(digest,mcc_host_identity.digest,32) &&
+        !memcmp(&before,&mcc_host_identity.files,sizeof(before))) {
+        if (validated) *validated=before;
+        return 1;
+    }
+    ok=mcc_content_probe(name,actual) &&
         !memcmp(actual,digest,32) && mcc_precache_snapshot(name,&after) &&
         !memcmp(&before,&after,sizeof(before));
     if (ok && validated) *validated=after;

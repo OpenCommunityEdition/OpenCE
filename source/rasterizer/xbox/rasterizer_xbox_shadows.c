@@ -212,7 +212,8 @@ boolean _rasterizer_environment_shadow_begin(
 	real object_bounding_radius,
 	real *shadow_volume_bounding_radius)
 {
-	boolean success = TRUE;
+	/* port: a skipped pass has no initialized shadow volume for the caller. */
+	boolean success = FALSE;
 	real inverse_radius;
 	real vsh_constants__screenproj[20];
 
@@ -322,6 +323,7 @@ boolean _rasterizer_environment_shadow_begin(
 		shadow_setup = FALSE;
 		shadow_used = FALSE;
 		shadow_restored = FALSE;
+		success = TRUE; /* port: report success only after shadow setup. */
 
 		if (rasterizer_debug_options.statistics_mode ==
 			_rasterizer_statistics_mode_enabled)

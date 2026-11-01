@@ -230,6 +230,8 @@ void display_error_abort_to_dashboard(
 	boolean optional);
 void display_error_damaged_media(
 	void);
+/* port: explanatory text with the same fatal media-error lifecycle. */
+void display_error_damaged_media_text(wchar_t const *text);
 void display_errors_deferred_until_cinematic_stop(
 	void);
 void display_scenario_help(

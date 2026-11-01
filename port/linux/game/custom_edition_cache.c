@@ -29,6 +29,8 @@ where its offset falls in their combined offset space.
 #include "scenario/scenario_definitions.h"
 #include "cache_file_formats.h"
 #include "custom_edition_cache.h"
+#include "custom_edition_errors.h"
+#include "interface/ui_widget.h"
 #include "tag_schema.h"
 #include "map_share.h"
 
@@ -96,6 +98,10 @@ struct custom_edition_cache_globals
 /* ---------- globals */
 
 static struct custom_edition_cache_globals custom_edition_cache_globals;
+/* Only an actual tag load writes this record. Admission/catalog probes use
+their caller's buffer. No pointers into the failed map survive cleanup. */
+static char custom_edition_failure_name[64];
+static char custom_edition_failure_reason[320];
 
 /* ---------- private code */
 
@@ -672,6 +678,22 @@ static boolean custom_edition_cache_tags_convert(
 	uint32_t loaded_bytes = report->tag_data_bytes + report->resource_tag_bytes;
 	struct custom_edition_conversion_report conversion;
 	enum cache_file_status status;
+	long regrouped;
+
+	/* (first: what follows selects tags by group, and a protected map's tag
+	table has them scrambled; the references to them keep the real ones) */
+	regrouped = tag_validate_custom_edition_infer_groups(
+		tag_cache,
+		(long)loaded_bytes,
+		report->tag_cache_bytes,
+		report->identity.name);
+	if (regrouped)
+	{
+		error(
+			_error_silent,
+			"custom edition: %ld tags had their group (scrambled by map protection) taken from the references to them",
+			regrouped);
+	}
 
 	custom_edition_cache_combine_resource_offsets(
 		tag_cache,
@@ -689,6 +711,8 @@ static boolean custom_edition_cache_tags_convert(
 			"custom edition: cannot convert '%s': %s",
 			custom_edition_cache_tag_name(tag_cache, loaded_bytes, conversion.problem_tag_index),
 			cache_file_status_describe(status));
+		snprintf(custom_edition_failure_reason, sizeof(custom_edition_failure_reason), "%s",
+			custom_edition_status_explanation(status));
 		return FALSE;
 	}
 	error(
@@ -732,7 +756,7 @@ static boolean custom_edition_cache_tags_convert(
 	{
 		error(
 			_error_silent,
-			"custom edition: %ld HUD elements drawn from Halo PC's double resolution bitmaps were given half their scale",
+			"custom edition: %ld HUD elements rescaled using Halo PC's placement and bitmap flags",
 			(long)conversion.hud_placements_rescaled);
 	}
 	if (conversion.score_hint_converted)
@@ -748,11 +772,28 @@ static boolean custom_edition_cache_tags_convert(
 			conversion.pause_menu_trimmed ? "; the multiplayer pause menu is the Xbox's resume and quit" : "");
 	}
 
-	return custom_edition_cache_tags_validate(tag_cache, report) &&
-		custom_edition_bitmaps_verify(tag_cache, loaded_bytes) &&
-		custom_edition_reordered_bitmaps_find(tag_cache, loaded_bytes, custom_edition_cache_globals.behaviours) &&
-		custom_edition_scripts_convert(tag_cache, loaded_bytes) &&
-		custom_edition_cache_models_convert(tag_cache, report);
+	if (!custom_edition_cache_tags_validate(tag_cache, report))
+	{
+		strcpy(custom_edition_failure_reason, "Its converted map data failed validation. See debug.txt for the failing check.");
+		return FALSE;
+	}
+	if (!custom_edition_bitmaps_verify(tag_cache, loaded_bytes) ||
+		!custom_edition_reordered_bitmaps_find(tag_cache, loaded_bytes, custom_edition_cache_globals.behaviours))
+	{
+		strcpy(custom_edition_failure_reason, "Its textures could not be prepared. See debug.txt for the failing texture check.");
+		return FALSE;
+	}
+	if (!custom_edition_scripts_convert(tag_cache, loaded_bytes))
+	{
+		strcpy(custom_edition_failure_reason, "Its scripts could not be prepared. Check for an updated map; debug.txt has the failing check.");
+		return FALSE;
+	}
+	if (!custom_edition_cache_models_convert(tag_cache, report))
+	{
+		strcpy(custom_edition_failure_reason, "Its models could not be prepared. See debug.txt for the failing geometry or memory check.");
+		return FALSE;
+	}
+	return TRUE;
 }
 
 /* Whether Custom Edition maps may run (game.custom_edition) and the map
@@ -1023,8 +1064,7 @@ boolean custom_edition_cache_present(
 	{
 		error(_error_silent, "custom edition: the map '%s' cannot be played: %s", level_name,
 			custom_edition_unavailable_reason());
-		snprintf(message, message_size, "The map %.64s can't be played: Custom Edition maps can't run (see debug.txt).",
-			name);
+		custom_edition_error_message(name, custom_edition_unavailable_reason(), message, message_size);
 		return FALSE;
 	}
 	if (custom_edition_file_open(&file, path))
@@ -1044,7 +1084,8 @@ boolean custom_edition_cache_present(
 		error(_error_silent, "custom edition: '%s' cannot be played: %s", path,
 			status != _cache_file_status_ok ? cache_file_status_describe(status) :
 			"it is not a Halo Custom Edition cache");
-		snprintf(message, message_size, "Your %.64s.map can't be played (debug.txt says why).", name);
+		custom_edition_error_message(name, status != _cache_file_status_ok ? custom_edition_status_explanation(status) :
+			"It is not a Halo Custom Edition map. Install a Custom Edition version in custom_maps.", message, message_size);
 		return FALSE;
 	}
 	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)
@@ -1080,6 +1121,39 @@ boolean custom_edition_cache_playable(
 	return custom_edition_level_name(level_name) && custom_edition_cache_identify(level_name, &identity);
 }
 
+/* Consumed only by the existing fatal load path, after its cleanup. */
+char const *custom_edition_cache_load_error(char const *level_name)
+{
+	static char message[512];
+	char const *name;
+	char const *reason = "Its level could not be prepared. See debug.txt for the failing setup check.";
+	if (!custom_edition_level_name(level_name)) return "game_load() failed.";
+	name = tag_name_strip_path(level_name);
+	if (!csstrcasecmp(name, custom_edition_failure_name) && custom_edition_failure_reason[0])
+		reason = custom_edition_failure_reason;
+	custom_edition_error_message(name, reason, message, sizeof(message));
+	custom_edition_failure_name[0] = 0;
+	custom_edition_failure_reason[0] = 0;
+	return message;
+}
+
+/* A precache refusal still uses the fatal media screen. Only its text changes. */
+boolean custom_edition_cache_display_error(char const *level_name)
+{
+	char message[512];
+	wchar_t text[512];
+	size_t i;
+	if (!custom_edition_level_name(level_name)) return FALSE;
+	if (custom_edition_cache_present(level_name, 0, message, sizeof(message)))
+		custom_edition_error_message(tag_name_strip_path(level_name),
+			"Its file could not be read during loading. Check that the complete map is accessible.", message, sizeof(message));
+	for (i = 0; message[i] && i < NUMBEROF(text) - 1; i++) text[i] = (unsigned char)message[i];
+	text[i] = 0;
+	error(_error_silent, "%s", message);
+	display_error_damaged_media_text(text);
+	return TRUE;
+}
+
 boolean custom_edition_cache_campaign(
 	char const *map_name)
 {
@@ -1111,14 +1185,18 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 	short type;
 
 	assert(!globals->tags_loaded);
+	snprintf(custom_edition_failure_name, sizeof(custom_edition_failure_name), "%s", tag_name_strip_path(map_name));
+	custom_edition_failure_reason[0] = 0;
 	if (!tag_cache)
 	{
+		snprintf(custom_edition_failure_reason, sizeof(custom_edition_failure_reason), "%s", custom_edition_unavailable_reason());
 		error(_error_silent, "custom edition: cannot load the map '%s': %s", map_name,
 			custom_edition_unavailable_reason());
 		return NULL;
 	}
 	if (!custom_edition_map_path(map_name, path) || !custom_edition_file_open(&globals->map, path))
 	{
+		strcpy(custom_edition_failure_reason, "Its .map file is missing or unreadable. Check the complete map in custom_maps.");
 		error(_error_silent, "custom edition: cannot open the map '%s' (it is looked for in the custom_maps folder)",
 			map_name);
 		return NULL;
@@ -1131,6 +1209,9 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 		!globals->map.source.read(globals->map.source.context, 0, CACHE_FILE_HEADER_BYTES, header))
 	{
 		error(_error_silent, "custom edition: '%s' is not a loadable cache (%s)", path, cache_file_status_describe(status));
+		snprintf(custom_edition_failure_reason, sizeof(custom_edition_failure_reason), "%s",
+			status != _cache_file_status_ok ? custom_edition_status_explanation(status) :
+			"Its format or size is unsupported, or its header could not be read. See debug.txt for details.");
 		custom_edition_cache_files_close();
 		return NULL;
 	}
@@ -1172,6 +1253,7 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 		globals->resource_files[_resource_map_sounds].source.size > COMBINED_OFFSET_LIMIT - COMBINED_SOUNDS_OFFSET))
 	{
 		error(_error_silent, "custom edition: a resource map is too large for this loader");
+		strcpy(custom_edition_failure_reason, "A resource file is larger than the Custom Edition loader supports.");
 		custom_edition_cache_files_close();
 		return NULL;
 	}
@@ -1191,6 +1273,8 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 			cache_file_status_describe(status),
 			(long)report.problem_tag_index,
 			(unsigned long)report.problem_location);
+		snprintf(custom_edition_failure_reason, sizeof(custom_edition_failure_reason), "%s",
+			custom_edition_status_explanation(status));
 		custom_edition_cache_files_close();
 		return NULL;
 	}
@@ -1209,6 +1293,8 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 	globals->tag_cache_bytes = report.tag_cache_bytes;
 	globals->file_length = report.identity.file_length;
 	globals->tags_loaded = TRUE;
+	custom_edition_failure_name[0] = 0;
+	custom_edition_failure_reason[0] = 0;
 
 	return (struct cache_file_tag_header *)tag_cache;
 }

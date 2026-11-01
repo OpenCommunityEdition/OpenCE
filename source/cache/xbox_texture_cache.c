@@ -126,6 +126,7 @@ symbols in this file:
 
 #ifdef HALO_ANDROID
 #include "android_ce_texture_cache.h" /* port: port/linux/game/android_ce_texture_cache.c */
+#include "../../port/android/include/android_render_policy.h" /* port: Android chip policy */
 #endif
 
 /* ---------- constants */
@@ -671,6 +672,15 @@ static void texture_cache_initialize_hardware_format(
 	return;
 }
 
+/* port: loading-only preparation reuses the native descriptor contract without
+ * fetching pixels. MCC descriptors remain owned by mcc_texture_cache_get. */
+int texture_cache_prepare_descriptor(struct bitmap_data *bitmap, void *header)
+{
+	if (!texture_cache_bitmap_valid(bitmap)) return FALSE;
+	texture_cache_initialize_hardware_format(bitmap, (D3DBaseTexture *)header);
+	return TRUE;
+}
+
 static void render_inverse_transform_screen_point(
 	real_point2d const *screen_position,
 	real_point3d *world_position,
@@ -1065,10 +1075,12 @@ void *_texture_cache_bitmap_get_hardware_format(
 		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
 		210,
 		load || !block);
+	/* port: metadata only during the optional loading pass, never gameplay. */
+	if (material_prepare_bitmap(bitmap, &hardware_format)) return hardware_format;
 #ifdef HALO_ANDROID
 	/* port: CE's frame working set is not bounded by the Xbox texture arena.
 	 * Keep dynamic textures and both other map families on their own paths. */
-	if (custom_edition_cache_tags_loaded() && !mcc_cache_tags_loaded() &&
+	if (android_texture_fixes && custom_edition_cache_tags_loaded() && !mcc_cache_tags_loaded() &&
 		TEST_FLAG(bitmap->flags, _bitmap_cached_bit))
 	{
 		if (texture_cache_bitmap_valid(bitmap))

@@ -157,15 +157,17 @@ static struct
 	char region[64];
 	int version;
 	int dedicated;
+	unsigned char master_key_id[8];
 } entries_taken[4];
 static int entries_count;
 
 static int p2p_lobby_take_master_listing(const unsigned char *payload, int size, const char *publisher,
-	const char *region, int network_version_shown, int dedicated)
+	const char *region, int network_version_shown, int dedicated, const unsigned char *master_key_id)
 {
 	(void)payload;
 	if (entries_count < 4)
 	{
+		memcpy(entries_taken[entries_count].master_key_id, master_key_id, 8);
 		entries_taken[entries_count].size = size;
 		snprintf(entries_taken[entries_count].publisher, sizeof(entries_taken[entries_count].publisher), "%s", publisher);
 		snprintf(entries_taken[entries_count].region, sizeof(entries_taken[entries_count].region), "%s", region);
@@ -1208,7 +1210,7 @@ int main(int argc, char **argv)
 			"{\"id\":\"f\",\"listing\":\"%s\",\"region\":\"us-east-1\",\"dedicated\":\"yes\"}]}",
 			base64, large_base64, base64);
 		entries_count = 0;
-		CHECK(take_list(body, (unsigned long)strlen(body)) == 2 && entries_count == 2,
+		CHECK(take_list(body, (unsigned long)strlen(body), (const unsigned char *)"listedby") == 2 && entries_count == 2,
 			"%d entries taken of the 2 good ones", entries_count);
 		CHECK(entries_taken[0].size == size && entries_taken[0].dedicated == 1 && entries_taken[0].version == 38,
 			"the first entry was taken as %d bytes, dedicated %d, version %d", entries_taken[0].size,
@@ -1216,11 +1218,13 @@ int main(int argc, char **argv)
 		CHECK(!strcmp(entries_taken[0].publisher, "Mil?enko's ?? servers, a name pa") &&
 			!strcmp(entries_taken[0].region, "eu?west?"), "the publisher %s, the region %s", entries_taken[0].publisher,
 			entries_taken[0].region);
+		CHECK(!memcmp(entries_taken[0].master_key_id, "listedby", 8) && !memcmp(entries_taken[1].master_key_id, "listedby", 8),
+			"the entries were not taken as the master's");
 		CHECK(entries_taken[1].dedicated == 0 && !strcmp(entries_taken[1].region, "us-east-1") &&
 			!entries_taken[1].publisher[0], "the last entry was taken as dedicated %d, region %s",
 			entries_taken[1].dedicated, entries_taken[1].region);
 		entries_count = 0;
-		CHECK(!take_list("{\"servers\":7}", 13) && !take_list("not json", 8) && !entries_count,
+		CHECK(!take_list("{\"servers\":7}", 13, (const unsigned char *)"listedby") && !take_list("not json", 8, (const unsigned char *)"listedby") && !entries_count,
 			"entries taken from what is no list");
 		return 0;
 	}
@@ -1250,7 +1254,7 @@ int main(int argc, char **argv)
 		CHECK(verify_list(body, (unsigned long)length, master_signs(body), VECTOR_LIST_KEY_HEADER,
 			VECTOR_MASTER_PUBLIC_KEY, 1760900000), "a list of %d entries was refused", MAXIMUM_ENTRIES + 3);
 		entries_count = 0;
-		CHECK(take_list(body, (unsigned long)length) == MAXIMUM_ENTRIES && entries_count == MAXIMUM_ENTRIES,
+		CHECK(take_list(body, (unsigned long)length, (const unsigned char *)"listedby") == MAXIMUM_ENTRIES && entries_count == MAXIMUM_ENTRIES,
 			"%d entries were taken of %d", entries_count, MAXIMUM_ENTRIES + 3);
 		return 0;
 	}

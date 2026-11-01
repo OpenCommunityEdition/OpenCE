@@ -32,14 +32,27 @@ Voice uses the existing shared microphone and first player's voice routing; any
 slot can hold its assigned Push to Talk button. Enable push-to-talk in voice settings.
 Keyboard and touch retain their own bindings.
 
-Debug includes Camera Speed Up/Down, Camera / Player Switch, Camera Raise/Lower.
-These reuse buttons independently of gameplay. They apply only to an already
-available flying, orbiting or editor camera; they never enable a camera or bypass
-the game's permissions. The switch changes whether input controls the camera or
+Debug includes Camera Speed Up/Down, Camera / Player Switch, Camera Raise/Lower
+and Cycle Camera. These reuse buttons independently of gameplay. Hold Cycle Camera
+for one second to advance through the director's views: first person, flying,
+following, then first person again during normal play. Release between view changes.
+Its default is RB/Black. The existing `director_camera_switch_fast` debug setting
+changes it to one cycle per press. The director still refuses cycling for clients
+in another machine's game; remapping does not bypass that restriction.
+
+The other debug actions apply only to an already available flying, orbiting or
+editor camera. Camera / Player Switch changes whether input controls the camera or
 player. While controlling the player with a debug camera available, only the debug
 switch takes priority over gameplay. While controlling the camera, the whole debug
 layout takes priority. Defaults match stock camera controls: D-pad Up/Down,
-Right Stick, RT and LT. All can be changed or cleared.
+Right Stick, RT and LT. All can be changed or cleared. Cycle Camera also works
+while controlling the player; its button can still perform its gameplay action,
+just as the stock RB shortcut does. Clearing Cycle Camera disables custom camera
+cycling, including the old shortcut through the translated gameplay buttons.
+Keyboard R/F still raise and lower the camera with a custom layout. Holding the
+middle mouse button gives the mouse camera controls priority, with the wheel
+adjusting speed. Camera movement uses the player's movement and look settings.
+Menus and chat continue to block custom camera input in either mode.
 
 Gameplay prompts use the physical binding, or **UNBOUND** for a cleared action.
 Xbox, CE and MCC retain their existing glyph renderers, sizes and anchoring.
@@ -60,7 +73,10 @@ Xbox, CE and MCC retain their existing glyph renderers, sizes and anchoring.
    Capture, gameplay, menus and camera contexts have independent release guards.
 4. [controller_remap_game.c](../../port/linux/game/controller_remap_game.c) maps
    physical ports to local players, reads profile and camera context, supplies
-   digital movement and adjusts a temporary copy of prompt preferences.
+   digital movement and adjusts a temporary copy of prompt preferences. Its main-menu
+   guard is separate from per-player widgets: the UI map has a live player, while
+   the main-menu root belongs to any player (`NONE`). Pause menus retain their
+   per-player ownership so other split-screen players can continue playing.
 5. The minimal hooks in [xinput_sdl.c](../../port/linux/src/xinput_sdl.c) provide
    physical input, per-port chat navigation and push-to-talk. Chat's existing
    [network_chat.c](../../port/linux/game/network_chat.c) editor retains its normal
@@ -68,7 +84,11 @@ Xbox, CE and MCC retain their existing glyph renderers, sizes and anchoring.
    version change is needed: existing chat packets already identify their sender,
    and the host already validates that sender against the sending machine.
 6. Small `port:` hooks in [director.c](../../source/camera/director.c) supply camera
-   availability and map cleanup; [input_abstraction.c](../../source/input/input_abstraction.c)
+   availability and map cleanup, and pass the custom cycle request to the existing
+   camera selector. `controller_remap_camera_cycle` owns its physical-button timing
+   in the input module; the director owns camera selection and permissions, which
+   cannot be implemented solely in that module. No map-family selector is changed.
+   [input_abstraction.c](../../source/input/input_abstraction.c)
    applies digital movement; [hud_messaging.c](../../source/interface/hud_messaging.c)
    maps prompt identity and renders UNBOUND. Those private engine states cannot be
    accessed solely from a feature module. No map loading or MCC adapter is changed.
@@ -76,13 +96,13 @@ Xbox, CE and MCC retain their existing glyph renderers, sizes and anchoring.
 ## Persistence and lifecycle
 
 `input.controller_p1` through `input.controller_p4` default to empty strings.
-New custom layouts use `v2:` followed by 25 comma-separated entries in this order:
+New custom layouts use `v3:` followed by 26 comma-separated entries in this order:
 
 ```
 jump, grenade type, use/reload, weapon, melee, flashlight, grenade, fire, crouch,
 zoom, scoreboard, screenshot, forward, backward, left, right, all chat, team chat,
 vehicle chat, push to talk, camera faster, camera slower, camera/player switch,
-camera raise, camera lower
+camera raise, camera lower, cycle camera
 ```
 
 Entries are physical tokens: `south,east,west,north,rb,lb,lt,rt,ls,rs,dpad_up,
@@ -91,7 +111,10 @@ PlayStation and B on Switch. Tokens must be unique within gameplay/communication
 and separately within Debug; `unbound` may repeat. Unbound saves remain distinct
 from an empty setting (profile defaults).
 
-Old ten-action strings remain readable. Their original actions take priority over
+Old ten-action and 25-action `v2:` strings remain readable. The appended Cycle
+Camera defaults to RB unless an old debug action already owns RB, in which case
+Cycle Camera starts unbound and can be assigned in the Debug group. Existing
+assignments are preserved. Ten-action strings' original actions take priority over
 new defaults, including Recon's use of D-pad Left. P1 retains the Up chat shortcut;
 other slots default to Up movement. Additional chat channels, voice and screenshot
 start unbound. Saving writes the new format. Custom digital movement now has the
@@ -108,6 +131,12 @@ Clearing a layout never changes another player's bindings or a saved player prof
 parsing, migration, replacement, cleared saves, all stock presets, per-player input,
 pressure, capture, disconnects, focus and context changes, semantic commands,
 prompt identity and pending menu state. Chat ownership and hold-over checks use
-the real production functions. Tests distinguish those contracts from physical
-driver behaviour. Runtime screenshots and Xbox/CE/MCC gameplay checks complement
-the tests; real-controller playtesting is still needed for device-specific behaviour.
+the real production functions. [Camera routing tests](../../tools/harness/tests/test_controller_remap_camera.py)
+check stock and remapped camera input alongside keyboard and mouse controls,
+including mouse priority and menu/chat blocking.
+[Context integration tests](../../tools/test_controller_remap_context.py)
+combine the real widget-ownership check, remapper and director input for main-menu
+navigation, pause, camera cycling, alternate bindings, timing and lifecycle guards.
+Tests distinguish those contracts from physical driver behaviour. Runtime
+screenshots and Xbox/CE/MCC gameplay checks complement the tests;
+real-controller playtesting is still needed for device-specific behaviour.

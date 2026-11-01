@@ -21,6 +21,8 @@ CASES += [('windows', case) for case in ('postgame', 'ingame', 'message-failure'
 CASES += [('xbox', case) for case in ('postgame', 'ingame')]
 GUARD = '#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(HALO_WEB) && !defined(__linux__)'
 CONTROLS = {
+    'bot-policy-not-cleared': ('bots_network_session_end();', ';', 'windows', 'back'),
+    'bot-cooldown-not-cleared': ('bots_management_reset();', ';', 'windows', 'back'),
     'native-sleeps': (GUARD, '#if 1', 'windows', 'back'),
     'xbox-loses-grace': ('SleepEx(MILLISECONDS_PER_SECOND, FALSE);', ';', 'xbox', 'back'),
     'transport-not-terminated': ('transport_server_terminate();', ';', 'windows', 'back'),
@@ -31,7 +33,9 @@ CONTROLS = {
 
 def generated(platform, control=None):
     server = read('source/networking/network_server_manager.c')
-    code = function(server, 'network_game_server_dispose')
+    code = function(read('port/linux/game/bots_management.inl'), 'bots_management_reset')
+    code += '\n' + function(read('port/linux/game/bots_network.c'), 'bots_network_session_end')
+    code += '\n' + function(server, 'network_game_server_dispose')
     if control:
         before, after, _, _ = CONTROLS[control]
         code = mutated(code, before, after)
@@ -44,6 +48,7 @@ def generated(platform, control=None):
     defines, sleep = PLATFORMS[platform]
     # The harness runs on Linux; each compiled variant selects its own target.
     config = '#undef __linux__\n#define xbox 1\n' + defines + f'\n#define EXPECTED_SLEEP {sleep}\n'
+    config += f'#define BOTS_MAXIMUM {constant(read("port/linux/game/bots.h"), "BOTS_MAXIMUM")}\n'
     config += f'#define MILLISECONDS_PER_SECOND {constant(read("source/cseries/cseries.h"), "MILLISECONDS_PER_SECOND")}\n'
     for member in ('_network_game_server_state_pregame', '_network_game_server_game_open_bit'):
         config += enum_with(server, member) + '\n'

@@ -63,6 +63,7 @@ only look up and create stand-ins.
 #include "server_master.h"
 #include "port_config.h"
 #include "p2p_internal.h"
+#include "player_link.h"
 #include "log_address.h"
 #include "ikcp.h"
 #ifdef HALO_PROFILE
@@ -2774,6 +2775,9 @@ static int listed_host_known;
 /* the listing joined is a dedicated server's that a master server lists (an
 approved operator's, by its key: a player's host cannot say it is one) */
 static int listed_host_dedicated;
+/* ... and the masters that listed it, by their key ids */
+static unsigned char listed_host_masters[P2P_LISTING_MAXIMUM_MASTERS][P2P_LISTING_MASTER_KEY_ID_SIZE];
+static int listed_host_master_count;
 
 /* a new join's progress (p2p_join_progress): answered, its host reached
 already (a probe's tunnel) */
@@ -2800,6 +2804,7 @@ static int join_invite(const char *text)
 	/* (any invite's game is no listed one, unless p2p_join_listing says) */
 	listed_host_known = 0;
 	listed_host_dedicated = 0;
+	listed_host_master_count = 0;
 	p2p_identifier_from_hash(hash, host);
 	if (!memcmp(host, identifier, P2P_IDENTIFIER_SIZE))
 		return 1;
@@ -2896,6 +2901,10 @@ int p2p_join_listing(const struct p2p_listing *listing)
 		p2p_identifier_from_hash(hash, listed_host);
 		listed_host_known = 1;
 		listed_host_dedicated = listing->dedicated && listing->master;
+		listed_host_master_count = listing->master ? listing->master_key_id_count : 0;
+		if (listed_host_master_count > P2P_LISTING_MAXIMUM_MASTERS)
+			listed_host_master_count = P2P_LISTING_MAXIMUM_MASTERS;
+		memcpy(listed_host_masters, listing->master_key_ids, sizeof(listed_host_masters));
 	}
 	pthread_mutex_unlock(&p2p_lock);
 	return 1;
@@ -2927,13 +2936,27 @@ int p2p_joined_listed_dedicated(void)
 	return dedicated;
 }
 
+int p2p_joined_listing_masters(unsigned char (*key_ids)[P2P_LISTING_MASTER_KEY_ID_SIZE], int maximum)
+{
+	int count;
+
+	pthread_mutex_lock(&p2p_lock);
+	count = listed_host_known ? listed_host_master_count : 0;
+	if (count > maximum)
+		count = maximum;
+	memcpy(key_ids, listed_host_masters, (size_t)count * P2P_LISTING_MASTER_KEY_ID_SIZE);
+	pthread_mutex_unlock(&p2p_lock);
+	return count;
+}
+
 int p2p_join_progress(int *stage, char *reason, int size)
 {
 	/* (the game's rejection codes in their order: network_game_protocol.h's
 	version too old, too new, bad join token, bad password, full, closed,
-	blacklisted machine) */
+	blacklisted machine, then the port's: a name refused, and a dedicated
+	server's VPN policy's) */
 	static const char *const refusals[] = { "version", "version", "token", "password", "full", "closed", "banned",
-		"name" };
+		"name", "vpn", "vpn_blocked", "link", "link_age", "link_in_use", "address_full" };
 	struct peer *peer;
 	const char *why = "";
 
@@ -2944,6 +2967,10 @@ int p2p_join_progress(int *stage, char *reason, int size)
 	{
 		*stage = P2P_JOIN_FAILED;
 		why = p2p.join_refused < (int)(sizeof(refusals) / sizeof(*refusals)) ? refusals[p2p.join_refused] : "closed";
+		/* (a server that blocks VPNs, on a master this machine knows but holds
+		no pass of: link Discord with that one, player_link.c) */
+		if (!strcmp(why, "vpn") && player_link_needed_master() >= 0)
+			why = "vpn_master";
 	}
 	else if (peer && peer->connected && peer->is_host && !peer->is_player)
 		*stage = P2P_JOIN_CONNECTED;
@@ -3194,6 +3221,24 @@ int p2p_peer_key_hash(unsigned long virtual_address, unsigned char *peer_identif
 	{
 		memcpy(peer_identifier, peer->identifier, P2P_IDENTIFIER_SIZE);
 		memcpy(key_hash, peer->key_hash, P2P_KEY_HASH_SIZE);
+		result = 1;
+	}
+	pthread_mutex_unlock(&p2p_lock);
+	return result;
+}
+
+int p2p_peer_binding(unsigned long virtual_address, unsigned char *binding)
+{
+	struct peer *peer;
+	int result = 0;
+
+	if (!p2p.running)
+		return 0;
+	pthread_mutex_lock(&p2p_lock);
+	peer = find_peer_by_address(virtual_address);
+	if (peer)
+	{
+		player_link_binding(peer->secret, binding);
 		result = 1;
 	}
 	pthread_mutex_unlock(&p2p_lock);

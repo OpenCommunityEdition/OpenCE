@@ -74,6 +74,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "text/draw_string.h"
 #include "text/text_group.h"
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
@@ -463,15 +464,26 @@ void cinematic_render(
 					(title->shadow_color & 0x00FFFFFF));
 
 				{
-					/* the bounds are for 640 columns: on a wider screen move
-					them so they keep their place relative to its sides */
+					/* port: use the justified anchor in the authored 640-column
+					bounds. The box center pulls right-aligned chapter titles
+					inward on wide screens. Keep the box's width and height. */
 					static rectangle2d wide_bounds;
-					short shift = (short)(((title_bounds->x0 + title_bounds->x1) / 2) *
-						(halo_screen_width() - 640) / 640);
+					short anchor;
+					short shift;
+
+					switch (title->justification)
+					{
+					case 0: anchor = title_bounds->x0; break; /* left */
+					case 1: anchor = title_bounds->x1; break; /* right */
+					default: anchor = (short)((title_bounds->x0 + title_bounds->x1) / 2); break;
+					}
+					shift = (short)(anchor * (halo_screen_width() - 640) / 640);
 
 					wide_bounds = *title_bounds;
 					wide_bounds.x0 += shift;
 					wide_bounds.x1 += shift;
+					/* port: MCC title layout uses the final screen anchor. */
+					mcc_hud_title_bounds(&wide_bounds, title->justification, title->text_flags);
 					title_bounds = &wide_bounds;
 				}
 				rasterizer_draw_unicode_string(

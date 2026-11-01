@@ -7,6 +7,7 @@
 #include "networking/network_game_globals.h"
 #include "mcc_cache.h"
 #include "mcc_main.h"
+#include "mcc_errors.h"
 
 boolean mcc_main_map_completed(void)
 {
@@ -22,10 +23,11 @@ boolean mcc_main_map_completed(void)
 
 boolean mcc_main_load_failed(char const *name)
 {
+    wchar_t text[512];
     if (!mcc_level_name(name)) return FALSE;
     error(_error_silent, "mcc: returning to the menu after failed load of %s", name);
-    display_error_text_when_main_menu_loaded(
-        L"The MCC map could not be loaded. See debug.txt for the failing stage.");
+    mcc_error_text(name,"Its level could not be prepared. See debug.txt for the failing setup check.",text,512);
+    display_error_text_when_main_menu_loaded(text);
     errors_clear();
     main_goto_main_menu();
     main_menu_load();
@@ -34,10 +36,11 @@ boolean mcc_main_load_failed(char const *name)
 
 boolean mcc_main_network_load_failed(char const *name)
 {
+    wchar_t text[512];
     if (!mcc_level_name(name)) return FALSE;
     error(_error_silent, "mcc: ending the network session after failed load of %s", name);
-    display_error_text_when_main_menu_loaded(
-        L"The MCC map could not be loaded. See debug.txt for the failing stage.");
+    mcc_error_text(name,"Its level could not be prepared. See debug.txt for the failing setup check.",text,512);
+    display_error_text_when_main_menu_loaded(text);
     errors_clear();
     /* This runs inside a network receive callback. Queue both operations:
      * the next frame needs the menu's globals before input_abstraction_update,

@@ -21,7 +21,8 @@ addToLibrary({
 
   // kind: 0 a status, 1 a notice, 2 an invite link of a game hosted for the
   // internet (to offer), 3 a fatal error (the game stops), 4 the game quits
-  // as the player asked (the page starts again: port_mods.c)
+  // as the player asked (the page starts again: port_mods.c), 5 a page to
+  // offer to open (a Discord link's: player_link.c)
   web_js_post__proxy: 'sync',
   web_js_post: (kind, text) => {
     var message = UTF8ToString(text);

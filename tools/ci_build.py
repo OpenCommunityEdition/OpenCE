@@ -156,6 +156,9 @@ def main() -> int:
             print(f"{pdb.relative_to(ROOT)} -> {symbols.relative_to(ROOT)}", flush=True)
     # OpenCE's own licence, the AGPL, which asks each copy to carry its text
     shutil.copy2(ROOT / "LICENSE", dist / "LICENSE.txt")
+    # Enhanced bot tactics retain the Vita author's GPL 3.0 licence.
+    shutil.copy2(ROOT / "LICENSES/GPL-3.0-only.txt", dist / "bots-GPL-3.0.txt")
+    shutil.copy2(ROOT / "docs/reading/bots_and_android_features.md", dist / "bots-and-android-credits.md")
     if args.platform != "web":
         # internet play's DTLS with browsers, and the Linux self-updater's TLS
         # (port/third_party/mbedtls), whose Apache license asks the same

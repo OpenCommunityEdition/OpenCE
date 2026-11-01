@@ -2,6 +2,7 @@
 #include <stdarg.h>
 typedef unsigned long DWORD;
 typedef int BOOL;
+static BOOL xgpu_reversed_depth;
 #define XGPU_VERTEX_ATTRIBUTE_COUNT 16
 #define XGPU_VERTEX_CONSTANT_COUNT 192
 #define XGPU_VERTEX_CONSTANT_BIAS 96

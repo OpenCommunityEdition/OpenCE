@@ -34,6 +34,10 @@ LFE bin. Stereo output mixes exactly as before.
 Packets the mixer has finished are completed from DirectSoundDoWork, which
 the game calls every frame, and from Flush, never from the audio thread:
 the game's completion callback is not meant to run concurrently with it.
+On the desktop DirectSoundDoWork also runs on sdl_platform.c's swap sound
+thread, but only while the game's thread is blocked in the driver showing a
+frame (an unfocused window's long swaps), and the game's thread waits for it
+to finish before going on: never at once with the game's.
 
 Without an audio device, a clock thread runs the same mixer into a scratch
 buffer, so streams still drain at their real rate.

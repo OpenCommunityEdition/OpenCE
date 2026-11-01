@@ -32,11 +32,11 @@ def media_tool(tmp_path_factory):
     native_bitmap = (ROOT / "source/bitmaps/bitmaps.c").read_text()
     native_swizzle = (ROOT / "source/rasterizer/rasterizer_swizzle.c").read_text()
     hud = (ROOT / "port/linux/game/mcc_hud.c").read_text()
-    declarations = "\n".join(structure(audio, name) for name in ["mcc_audio_storage", "mcc_pcm", "mcc_ima"])
+    declarations = "\n".join(structure(audio, name) for name in ["mcc_audio_storage", "mcc_audio_tags", "mcc_pcm", "mcc_ima"])
     tables = "\n".join(re.search(r"static int const " + name + r"\[.*?\};", audio, re.S).group()
                        for name in ["mcc_ima_steps", "mcc_ima_changes"])
     functions = "\n".join(function(audio, name) for name in ["mcc_ima_advance", "mcc_ima_quantize",
-        "mcc_pcm_sample", "mcc_resampled", "mcc_audio_store", "mcc_audio_contains"])
+        "mcc_pcm_sample", "mcc_resampled", "mcc_audio_reserve", "mcc_audio_store", "mcc_audio_tag_storage", "mcc_audio_contains"])
     functions += "\n" + function(native_swizzle, "rasterizer_xbox_bitmap_get_max_mipmap_count")
     functions += "\n" + function(native_bitmap, "bitmap_2d_address")
     functions += "\n" + "\n".join(function(bitmap, name) for name in ["mcc_bitmap_bytes", "mcc_pixel",
@@ -58,10 +58,18 @@ def media_tool(tmp_path_factory):
 #define MCC_AUDIO_FRAME_LIMIT 0x1000000u
 struct sound_permutation {struct {uint32_t file_offset,size;} samples; uint32_t sample_buffer_size; int compression;};
 struct mcc_runtime {void *audio;};
+static int test_reserve;
+static size_t reserve_request;
+static void *media_malloc(size_t n) {
+    if(test_reserve){reserve_request=n;return NULL;}
+    return malloc(n);
+}
+#define malloc media_malloc
 struct hud_placement_definition {struct {short x,y;} offset;struct {float i,j;} scale; short multiplayer_scaling_flags,pad;};
 struct bitmap_data {short type,width,height,depth,format,mipmap_count;unsigned short flags;void *base_address;};
 typedef unsigned char byte;
 #define FALSE 0
+#define NONE (-1)
 #define _bitmap_type_2d 0
 #define _bitmap_has_power_of_two_dimensions_bit 0
 #define _bitmap_compressed_bit 1
@@ -80,9 +88,20 @@ uint32_t global_vector_palette[256];
 ''' + declarations + "\n" + tables + "\n" + functions + r'''
 int main(int argc,char **argv) {
     if (argc<2) return 2;
+    if (!strcmp(argv[1],"audio-limit")) {
+        struct mcc_audio_storage output={0};
+        output.limit=MCC_AUDIO_LIMIT-1;
+        test_reserve=1;output.used=MCC_AUDIO_LIMIT-32;
+        if(mcc_audio_reserve(&output,32) || reserve_request)return 40;
+        if(mcc_audio_reserve(&output,31) || reserve_request!=MCC_AUDIO_LIMIT-1)return 41;
+        output.used=MCC_AUDIO_LIMIT+1;reserve_request=0;
+        if(mcc_audio_reserve(&output,1) || reserve_request)return 42;
+        return 0;
+    }
     if (!strcmp(argv[1],"audio")) {
         int channels=atoi(argv[2]), input_rate=atoi(argv[3]), output_rate=atoi(argv[4]);
         struct mcc_audio_storage output={0};
+        output.limit=MCC_AUDIO_LIMIT-1;
         struct sound_permutation permutation={0};
         struct mcc_pcm pcm;
         uint32_t i;
@@ -98,13 +117,14 @@ int main(int argc,char **argv) {
     }
     if (!strcmp(argv[1],"contains")) {
         struct mcc_audio_storage storage={0};
+        struct mcc_audio_tags audio={&storage,1,72,72,72};
         struct mcc_runtime runtime;
-        storage.used=72;runtime.audio=&storage;
-        if (!mcc_audio_contains(&runtime,MCC_AUDIO_BASE,72) ||
-            !mcc_audio_contains(&runtime,MCC_AUDIO_BASE+36,36) ||
-            mcc_audio_contains(&runtime,MCC_AUDIO_BASE-1,1) ||
-            mcc_audio_contains(&runtime,MCC_AUDIO_BASE+36,37) ||
-            mcc_audio_contains(&runtime,0xFFFFFFFFu,2)) return 5;
+        storage.used=72;runtime.audio=&audio;
+        if (!mcc_audio_contains(&runtime,0,MCC_AUDIO_BASE,72) ||
+            !mcc_audio_contains(&runtime,0,MCC_AUDIO_BASE+36,36) ||
+            mcc_audio_contains(&runtime,0,MCC_AUDIO_BASE-1,1) ||
+            mcc_audio_contains(&runtime,0,MCC_AUDIO_BASE+36,37) ||
+            mcc_audio_contains(&runtime,0,0xFFFFFFFFu,2)) return 5;
         return 0;
     }
     if (!strcmp(argv[1],"hud")) {
@@ -397,6 +417,7 @@ def test_mcc_owned_pixels_survive_pressure_without_legacy_cache(tmp_path):
 #include <string.h>
 #include "halo_port_capacity.h"
 #define FALSE 0
+#define NONE (-1)
 struct bitmap_data {
     uint32_t tag_index,pixels_offset,pixels_size;
     short width,height,depth,format,mipmap_count;
@@ -524,3 +545,7 @@ def test_bc7_mode6_opaque_red(media_tool, tmp_path):
     bits |= 3 << position
     block = bits.to_bytes(16, "little")
     assert pixel_vector(media_tool, tmp_path, block, 18) == [0xFFFF0101] * 16
+
+
+def test_audio_growth_stays_below_engine_allocation_limit(media_tool):
+    subprocess.run([str(media_tool), "audio-limit"], check=True, capture_output=True)

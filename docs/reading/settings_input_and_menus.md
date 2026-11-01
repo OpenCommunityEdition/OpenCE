@@ -91,6 +91,22 @@ role can change which parts of this route are active.
 
 ## Keyboard, mouse and text have distinct routes
 
+Android gyro settings live in [touch_gyro.c](../../port/linux/src/touch_gyro.c).
+`touch_gyro_mode` preserves the saved Android layout in the default `legacy`
+mode; explicit on/zoom modes use independent sensitivity and inversion.
+`TouchControls.nativeGyroMode` reads that selection through
+[host_touch.c](../../port/android/host/host_touch.c). `halo_linux_touch_look`
+consumes swipe and gyro separately, then `touch_gyro_apply` scales only gyro.
+`get_local_player_input_blob` supplies the player's zoom state to
+`halo_linux_gyro_filter`: a turn made while unzoomed in zoom-only mode is
+discarded before conversion to a player action. This small engine hook is
+needed because the platform input layer does not own player zoom state.
+No action format or simulation rule changes, and the functions leave desktop
+and web input untouched. The Android view resets sensor timing across mode,
+visibility and app lifecycle transitions. The [gyro harness](../../tools/harness/tests/test_touch_gyro.py)
+checks default behavior, independent axes, invalid sensitivity and zoom
+transitions; physical-device aiming and lifecycle checks remain necessary.
+
 The opening comment in `xinput_sdl.c` is particularly useful. During
 gameplay, keyboard bindings produce named actions rather than pretending
 to press all the controller buttons. During menus, navigation keys do map

@@ -65,8 +65,14 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   outside the loaded BSP and falling for two seconds is brought back beside
   the host, else a teammate. A dead
   player watches a living teammate (`coop_spectate.c`) and comes back
-  beside one once it is safe. With everyone dead they come back where they
-  were at the last checkpoint, without a revert. A mission the scripts fail
+  beside one once it is safe. With everyone dead, TEAM WIPE in Co-op
+  Options (`network.coop_team_wipe`) defaults to AUTO: private games revert
+  the checkpoint; public games respawn at checkpoint positions without
+  reverting the world. REVERT CHECKPOINT and RESPAWN ONLY override the
+  visibility choice, including public games with passwords. Reverting
+  requires a saved checkpoint with the same players and machine
+  assignments; otherwise the host logs the fallback and respawns them.
+  A mission the scripts fail
   with players still alive reverts to the last checkpoint on the host, as a
   skipped cutscene does (below); a client never reverts on its own. A level
   won ends the round as in multiplayer, and the next round is the
@@ -176,14 +182,23 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## GulchCE crossplay boundary
 
-The main-branch baseline for Xbox and Custom Edition is OpenCE network version 39, pinned to
-OpenCommunityEdition/OpenCE commit `22947203a52c6f4b04171eaec426b4f5059b43f4`.
+Xbox and Custom Edition sessions use OpenCE network version 41, pinned to
+OpenCommunityEdition/OpenCE commit `c507cb26b6ea7e89c7669fb7c911e27b80d5d779`.
 This is an explicit protocol baseline, not automatic compatibility with future
 OpenCE releases. Do not change the base version without auditing its wire format,
 simulation rules and admission behavior and testing unmodified upstream clients.
 The pinned fixture and settings-prefix check are in `tools/test_mcc_protocol.py`.
 
-The following historical checks describe main, not experimental camera crossplay.
+The f2597b70 merge retains upstream's protocol 39: Force Team Spawns uses
+one reserved options byte without moving the settings prefix. CTF kill
+scoring and Multi-Hill use existing variant storage; the host decides scores
+and spawns. Multi-Hill appends extra hill IDs to its engine-state payload
+only when several hills are active. Both peers need this implementation for
+the new multi-hill presentation; an unchanged version number alone does not
+establish support for that optional mode. MCC admission and its separate
+protocol remain unchanged. The pinned fixture is upstream's complete
+manifest; the combined manifest retains the MCC entries.
+
 The 22947203 integration was checked on Windows against official OpenCE
 build 309. Xbox Blood Gulch passed both host/client directions. Custom Edition
 Death Island passed with GulchCE hosting and with OpenCE hosting a movement
@@ -203,7 +218,22 @@ names and synchronized its opening sequence; the short run did not provide
 enough on-foot samples for the comparator's full drift verdict. These checks
 do not establish full campaign or public internet transport compatibility.
 
-Main uses MCC protocol version 60. Version 60 moves MCC
+MCC sessions use separate MCC protocol version 63. Version 63 extends campaign
+snapshots from 768 to 772 bytes (state version 6) to replicate the host's
+`rasterizer_model_lighting_ambient` value for Mission Z9. Older MCC peers are
+rejected. Xbox/Custom Edition retain the pinned upstream 41 contract and
+`HALO_PORT_NETWORK_VERSION`; the MCC-only version carries this agreement change.
+Version 62 retains OpenCE
+41 map-vote messages 94-95 and moves MCC gameplay messages to 96-99 and its
+join envelope to 100. Its bounded buffer grows to 512 bytes to carry upstream
+41 link credentials, including the local host connection. Older MCC peers are rejected; Xbox and Custom Edition
+keep the exact upstream 41 contract. The pinned upstream manifest covers the
+new voting fields and cooperative settings byte. Version 61 required the
+MCC-only equipment reset that removes the held weapon before assigning a
+scripted starting profile, fixing Meincrap's dummy-weapon selector. The host
+still owns equipment changes and replicates them through existing messages;
+packet layouts and the then-current Xbox/Custom Edition protocol 39 were unchanged.
+Version 60 moves MCC
 gameplay messages to 94-97 and the join envelope to 98, reserving message 93
 for OpenCE 39's optional client fire origins. Main retains protocol 39 for Xbox and Custom Edition crossplay. This branch
 uses separate versions described below; it cannot join those sessions.
@@ -411,6 +441,30 @@ the target can be: no more than 0.05 world units behind the eye along the
 line to the target, 0.2 to its side and 0.1 above it (a client cannot claim
 a hand far past a corner). Such hits are counted in the host's log, and the
 host's `network.fire_origins` (true by default) turns the hand off.
+Then version 40 adds to the join request (`message_client_join_game_request`,
+0x70 bytes before) a Discord account's pass, 170 bytes, and its proof, 64
+(`port/linux/src/player_link.c`; `docs/master_protocol.md`, "Player keys,
+links and passes"), all zero for none: a dedicated server refuses a machine
+from a VPN's, Tor exit's or datacenter's address with one of five new
+rejection codes (`_rejection_code_vpn_link_required` and the four after it,
+`port/linux/game/network_link.c`), and a client refused with the first joins
+again at once with its pass, bound to the tunnel's session. A build before
+them shows the codes as the game being closed.
+
+Then version 41 changes both vote messages' entries (`network_votekick.c`:
+the request's first byte, once the player's index, is the vote's kind; the
+status's first byte, once the player's index, is the kind, and it carries
+the no votes), adds `_rejection_code_address_full` (a host's
+`server.max_machines_per_address`), and a dedicated server's map vote
+(`network_map_vote.c`), in the lobby too, over the machines' streams as map
+sharing's: the host's choices (map and gametype, 8 at most), their votes,
+the time left and the winner (`_distributed_message_map_vote`, 94, to each
+client reliably every second and as it changes), and a client's choice
+(`_distributed_message_map_vote_choice`, 95), taken only from the machine's
+own stream, at most four a second, one counted per machine. A co-op
+game's flags also tell its clients whether the host is a dedicated server
+(`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
+most of the living players).
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -576,23 +630,32 @@ server's ban for a while (`ban <player> 30m`) is left to its `bans.txt`
 line, whose `until=` ends it, and its `unban` lets the machine in again by
 the line's address or hardware id (`network_game_server_port_forget_kicked_address`).
 
-The players' votes to kick a player (`network_votekick.c`): a client sends
-`_distributed_message_votekick` (the player's absolute index) reliably, and
-the host takes it only from the client's stream. The host alone counts:
+The players' votes to kick a player and to end the game
+(`network_votekick.c`): a client sends `_distributed_message_votekick` (the
+vote's kind, the player's absolute index for a kick, and yes or no)
+reliably, and the host takes it only from the client's stream. The host
+alone counts:
 one vote per real address (an internet play peer's endpoint, not its
 stand-in), and votes again deduplicated by hardware id, which only ever
 removes votes (the players who may vote are counted by address alone, so a
-copied hardware id cannot lower the votes needed). A vote needs more than
-half of the players who may vote, the target counted, and at least two;
+copied hardware id cannot lower the votes needed). A vote needs yes votes
+scaled with the players who may vote, the target counted (more than half
+up to 8, then 40% and at least 5 up to 32, then 30% and at least 13), or a
+fixed percentage of them (`network.votekick_threshold` `static`,
+`network.votekick_percent`), at least two, and more yes than no; one the no votes have made lost ends at
+once;
 starting one needs `network.votekick_minutes` played on this host in its
 own ticks, voting two minutes; one vote runs at a time, and a failed vote
 cools its starter down and protects its target. A vote that passes kicks as
 the `kick` command does, and the host refuses the address and hardware id
 for `network.votekick_ban_minutes`. The host sends each client
 `_distributed_message_votekick_status` every second while a vote runs (and
-as it changes), for the scoreboard, whose right click frees the mouse to
-pick a player; the host's own scoreboard adds Kick and Ban. Builds without
-votes drop both kinds as unknown, so the network version is unchanged.
+as it changes: its kind, yes, no and needed), for the vote's box at the
+left of the HUD (F1 votes yes, F2 no) and the scoreboard, whose right click
+frees the mouse to pick a player; the host's own scoreboard adds Kick and
+Ban. A vote to end the game ("!endgame" in the chat, `network.vote_end_game`)
+counts as a kick's with no target, from 30 seconds played and not in a
+game's first minute, and ends the game as `sv_end_game` does.
 
 The text chat (`network_chat.c`): a client sends its player's line to the
 host (`_distributed_message_chat_up`, reliably), which takes it only from
@@ -1219,7 +1282,7 @@ ownership, rate, target history and damage limits still apply. Scoped, dead,
 seated, Forced Off and ordinary first-person paths do not add this history.
 These rules, current-roster checkpoint restoration and immediate host object
 refresh after a restore use experimental
-versions 32708/32709. The latter changes simulation agreement, so older
+versions 32710/32711. The latter changes simulation agreement, so older
 camera builds are excluded too; it adds no packet fields or client authority.
 The host independently excludes weapon-authored following cameras from the
 shoulder solver; stale or forged input bits cannot override that priority.
@@ -1294,15 +1357,15 @@ action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
 
-The `online-third-person` branch uses version 32708 for Xbox/Custom Edition
-and MCC protocol version 32709. These separate experimental revisions retain
+The `online-third-person` branch uses version 32710 for Xbox/Custom Edition
+and MCC protocol version 32711. These separate experimental revisions retain
 the shoulder-policy bits and extra input-relay byte. They incorporate main's
 OpenCE fire-origin message 93 and keep MCC messages at 94-97 and MCC admission
 at 98. Camera admission reserves data-message kind 99.
 
 Every join, including a first-person-only game, must carry an eight-byte camera
 envelope: the normal two-byte data header, kind 99, revision 1, little-endian
-base camera version 32708, and two zero reserved bytes. The inner message is
+base camera version 32710, and two zero reserved bytes. The inner message is
 either the original join packet or the existing MCC envelope. The maximum is
 264 bytes. The host validates this before normal admission; an advertised
 version alone would leave direct joins unprotected. MCC validates its own

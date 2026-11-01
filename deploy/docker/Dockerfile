@@ -47,6 +47,7 @@ ENV HALO_SERVER=1 \
     HALO_NET_TUNNEL_PORT=2302 \
     HALO_SERVER_WEB_BIND=0.0.0.0 \
     HALO_SERVER_WEB_PORT=8080 \
+    HALO_SERVER_AUTO_UPDATE=check \
     HOME=/state
 VOLUME ["/state"]
 # Internet play's tunnel, and the web page, API and RCON (publish it on the

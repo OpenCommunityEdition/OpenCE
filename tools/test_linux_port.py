@@ -75,6 +75,19 @@ def test_render_skips_tags_used_as_both_struct_and_union():
 XDK_INCLUDE = Path(__file__).resolve().parent.parent / "port" / "include" / "xdk"
 
 
+@pytest.mark.skipif(shutil.which("clang") is None, reason="clang is needed to compile the headers")
+def test_source_fixups_header_is_self_contained(tmp_path):
+    root = XDK_INCLUDE.parent.parent.parent
+    source = write(tmp_path / "fixups.c", '#include "halo_linux_source_fixups.h"\n')
+    # This declarations-only header must not require the game's include path
+    # or host libc, so the Linux target can be checked on Windows too.
+    subprocess.run(
+        ["clang", "--target=i686-linux-gnu", "-std=gnu89", "-Werror", "-fsyntax-only",
+         "-I", str(root / "port/linux/include"), str(source)],
+        check=True,
+    )
+
+
 def test_xdk_headers_use_the_sdk_spellings():
     # each port gives the SDK's keywords and names its own meaning (its
     # prefix header), so none of one port's must be written into them
@@ -303,7 +316,8 @@ def test_menus_are_well_formed():
 
 def test_menu_settings_exist():
     """Every setting a menu's spinner sets is one of config.toml's
-    (port/linux/src/port_config.c) or of the profile (menu_functions.c), and
+    (port/linux/src/port_config.c), of the profile or an action of a row's
+    (menu_functions.c), and
     the keyboard's controls are the same in the settings, in the controls'
     screen and in the input code."""
     root = MENUS.parent.parent.parent
@@ -311,9 +325,11 @@ def test_menu_settings_exist():
     functions = (root / "port/linux/game/menu_functions.c").read_text()
     known = set(re.findall(r'^\t\{ "([a-z_]+\.[a-z_]+)", _config_', config, re.M))
     profile = set(re.findall(r'\{ "(profile\.[a-z_]+)", \d', functions))
+    # (and the actions a row does on OK rather than a setting: DISCORD ACCOUNT's LINK, setting_write's)
+    actions = set(re.findall(r'!strcmp\(name, "([a-z_]+\.action)"\)', functions))
     for path in (MENUS / "ce").glob("*.xml"):
         for setting in re.findall(r'setting="([^"]+)"', path.read_text()):
-            assert setting in known | profile, f"{path.name}: {setting}"
+            assert setting in known | profile | actions, f"{path.name}: {setting}"
     controls = set(re.findall(r'"(controls\.[a-z_]+)"', (root / "port/linux/src/xinput_sdl.c").read_text()))
     assert controls == {name for name in known if name.startswith("controls.")}
     assert controls == set(re.findall(r'\{ "(controls\.[a-z_]+)", L"', functions))

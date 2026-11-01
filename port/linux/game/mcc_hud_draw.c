@@ -331,3 +331,24 @@ boolean mcc_hud_anchor_number(short anchor, real width, real origin, short *curs
     *cursor=(short)(origin+(anchor<=6 ? width*0.5f : anchor==7 ? width : 0));
     return TRUE;
 }
+
+/* Warthog Rally authors centered, non-wrapping titles in a 160-unit box,
+ * including trophy messages wider than that box. Keep the authored anchor
+ * but give these lines room to reach the screen edge. Wrapping titles keep
+ * their authored layout (text flag bit 0); only temporary draw bounds change. */
+void mcc_hud_title_bounds(rectangle2d *bounds, short justification, unsigned long flags)
+{
+    long width, margin;
+    if (!mcc_cache_tags_loaded() || (flags&1)) return;
+    width=MIN(halo_screen_width(),SHORT_MAX);
+    if (bounds->x0<0 || bounds->x1>width || bounds->x0>=bounds->x1) return;
+    switch (justification) {
+    case 0: bounds->x1=(short)width; break;
+    case 1: bounds->x0=0; break;
+    case 2:
+        margin=MIN(bounds->x0,width-bounds->x1);
+        bounds->x0-=(short)margin;
+        bounds->x1+=(short)margin;
+        break;
+    }
+}

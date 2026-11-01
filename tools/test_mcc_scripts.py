@@ -44,7 +44,7 @@ def scripts_tool(native_mcc_harness):
     return native_mcc_harness("mcc_scripts")
 
 
-@pytest.mark.parametrize("case", ["link", "alias", "extension", "segment", "core_segment", "global", "unknown", "speed", "score", "score_write", "score_capacity", "score_allocation",
+@pytest.mark.parametrize("case", ["issue89_link_abs_integer", "issue89_link_get_executing_running_thread", "issue89_link_kill_thread", "issue89_registry", "link", "alias", "extension", "equipment", "segment", "core_segment", "global", "unknown", "speed", "score", "score_write", "score_capacity", "score_allocation",
                                   "bad_child", "child_salt", "short_data", "capacity", "full_capacity",
                                   "negative_count", "unterminated", "skull_read", "skull_wrong_type", "skull_write", "developer_read", "developer_cast", "developer_write", "skull_disable", "skull_enable", "skull_computed", "developer_capacity", "developer_allocation"])
 def test_mcc_script_linking(scripts_tool, case):
@@ -110,4 +110,17 @@ def test_mcc_weapon_movement(native_mcc_harness):
 @pytest.mark.parametrize("counter", "012345")
 def test_mcc_scratch_globals_are_map_local(scripts_tool, counter):
     result = subprocess.run([str(scripts_tool), "scratch", counter], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("case", ["prediction_enable", "prediction_disable", "prediction_computed"])
+def test_breadcrumb_availability_override(scripts_tool, case):
+    result = subprocess.run([str(scripts_tool), case, "breadcrumbs_navpoints_enabled_override"],
+                            capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_mcc_sound_streams_and_cleanup(native_mcc_harness):
+    result = subprocess.run([str(native_mcc_harness("mcc_audio"))],
+                            capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr

@@ -499,13 +499,27 @@ static int fetch(const char *url, struct fetched *fetched)
 }
 #endif
 
-/* the masters to ask (the list thread's): masters.txt's; else, in the web
-build, its site's masters.json (the page's list of them, which its Servers
-panel reads too); else the official ones */
-static void read_masters(void)
+int master_list_get(const char *url, int *status, char **body, unsigned long *size)
 {
-	char urls[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_URL_SIZE];
-	unsigned char keys[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_KEY_SIZE];
+	struct fetched fetched;
+
+	memset(&fetched, 0, sizeof(fetched));
+	*status = 0;
+	*body = NULL;
+	*size = 0;
+	if (!fetch(url, &fetched))
+	{
+		free(fetched.body);
+		return 0;
+	}
+	*status = fetched.status;
+	*body = fetched.body;
+	*size = fetched.size;
+	return 1;
+}
+
+int master_list_client_masters(char (*urls)[MASTER_LIST_URL_SIZE], unsigned char (*keys)[MASTER_LIST_KEY_SIZE])
+{
 	int count = master_list_read_file(config_string("network.masters_file"), urls, keys, MASTER_LIST_MAXIMUM_MASTERS);
 
 #if defined(HALO_WEB)
@@ -521,6 +535,16 @@ static void read_masters(void)
 #endif
 	if (!count)
 		count = master_list_read_defaults(urls, keys, MASTER_LIST_MAXIMUM_MASTERS);
+	return count;
+}
+
+/* the masters to ask (the list thread's): master_list_client_masters' */
+static void read_masters(void)
+{
+	char urls[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_URL_SIZE];
+	unsigned char keys[MASTER_LIST_MAXIMUM_MASTERS][MASTER_LIST_KEY_SIZE];
+	int count = master_list_client_masters(urls, keys);
+
 	pthread_mutex_lock(&list.lock);
 	memcpy(list.urls, urls, sizeof(urls));
 	memcpy(list.keys, keys, sizeof(keys));
@@ -528,8 +552,9 @@ static void read_masters(void)
 	pthread_mutex_unlock(&list.lock);
 }
 
-/* a list's servers given to the browser: how many were taken */
-static int take_list(const char *body, unsigned long size)
+/* a list's servers given to the browser, as the master of that key id's
+(8 bytes): how many were taken */
+static int take_list(const char *body, unsigned long size, const unsigned char *master_key_id)
 {
 	struct server_json_document document;
 	int servers, index, taken = 0;
@@ -577,7 +602,8 @@ static int take_list(const char *body, unsigned long size)
 				region[character] = '?';
 		}
 		region[P2P_LISTING_REGION_SIZE] = 0;
-		taken += p2p_lobby_take_master_listing(listing, listing_size, publisher, region, (int)version, dedicated);
+		taken += p2p_lobby_take_master_listing(listing, listing_size, publisher, region, (int)version, dedicated,
+			master_key_id);
 	}
 	server_json_document_free(&document);
 	return taken;
@@ -633,7 +659,11 @@ static void *list_thread_main(void *argument)
 			}
 			else
 			{
-				int taken = take_list(fetched.body, fetched.size);
+				unsigned char digest[P2P_SHA256_SIZE];
+				int taken;
+
+				p2p_sha256(keys[index], MASTER_LIST_KEY_SIZE, digest);
+				taken = take_list(fetched.body, fetched.size, digest);
 
 				answered++;
 				platform_log("server browser: %s lists %d server%s", urls[index], taken, taken == 1 ? "" : "s");

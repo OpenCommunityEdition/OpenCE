@@ -51,6 +51,9 @@ enum
 	/* the players do their AI allies no harm (Server Setup's ALLY FRIENDLY
 	FIRE: OFF, co-op's): network_coop_ally_friendly_fire */
 	_network_game_cooperative_no_ally_friendly_fire_bit = 1,
+	/* the host is a dedicated server: its loading zones ask for most of the
+	players, not the host's (network_coop_host_dedicated) */
+	_network_game_cooperative_dedicated_bit = 2,
 };
 
 struct network_game
@@ -58,7 +61,7 @@ struct network_game
 	wchar_t name[16];
 	struct network_game_map map;
 	struct game_variant variant;
-	/* port: co-op switches in bit 0 and the match camera policy in bits 1-2
+	/* port: co-op switches in bits 0-2 and the match camera policy in bits 3-4
 	(third_person.h), in a byte the Xbox left as padding. */
 	byte cooperative_flags;
 	char minimum_players;

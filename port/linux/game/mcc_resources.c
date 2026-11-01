@@ -6,12 +6,14 @@
 #include "mcc_identity.h"
 #include "mcc_sha256.h"
 #include "mcc_package.h"
+#include "mcc_errors.h"
 #include "cseries.h"
 #include "errors.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+unsigned long system_milliseconds(void);
 
 /* Logging includes the game's allocation macros. This reader owns libc
  * allocations (including calloc), so keep their original matching frees. */
@@ -47,7 +49,8 @@ static int mcc_resource_compare(void const *a,void const *b)
     return x<y ? -1 : x>y;
 }
 
-static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char const *level,char const *explicit_path)
+static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char const *level,char const *explicit_path,
+    char *reason,size_t reason_size)
 {
     unsigned char header[16],entry[12];
     uint32_t names,index,count,names_bytes,i;
@@ -59,6 +62,8 @@ static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char c
     if (!file->stream) {
         if (errno==ENOENT) return -1;
         error(_error_silent,"mcc resources: cannot open %s (required by %s)",path,level);
+        if (reason && reason_size) snprintf(reason,reason_size,
+            "Cannot read %s. Check access to this MCC resource.",type==1 ? "bitmaps.map" : "sounds.map");
         return 0;
     }
     if (fseek(file->stream,0,SEEK_END) || (length=ftell(file->stream))<16 ||
@@ -70,7 +75,11 @@ static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char c
     names_bytes=index-names;
     if (!names_bytes || names_bytes>MCC_RESOURCE_METADATA_LIMIT) goto failed;
     file->names=malloc(names_bytes);file->items=malloc(count*sizeof(*file->items));
-    if (!file->names || !file->items || fseek(file->stream,(long)names,SEEK_SET) ||
+    if (!file->names || !file->items) {
+        if (reason && reason_size) snprintf(reason,reason_size,"Not enough memory to inspect MCC resources. Close other applications.");
+        goto failed;
+    }
+    if (fseek(file->stream,(long)names,SEEK_SET) ||
         fread(file->names,1,names_bytes,file->stream)!=names_bytes) goto failed;
     for (i=0;i<count;i++) {
         struct mcc_resource_item *item=&file->items[i];
@@ -87,6 +96,8 @@ static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char c
     return 1;
 failed:
     error(_error_silent,"mcc resources: invalid resource file %s (required by %s)",path,level);
+    if (reason && reason_size && !reason[0]) snprintf(reason,reason_size,
+        "MCC %s is invalid or unreadable. Reinstall the matching resource.",type==1 ? "bitmaps.map" : "sounds.map");
     mcc_resource_close(file);return 0;
 }
 
@@ -102,7 +113,7 @@ static struct mcc_resource_file *mcc_resource_get(struct mcc_runtime *runtime,un
         runtime->resources=resources;
     }
     file=&resources->files[type-1];
-    if (!file->stream && mcc_resource_open(file,type,runtime->level_name,NULL)!=1) return NULL;
+    if (!file->stream && mcc_resource_open(file,type,runtime->level_name,NULL,NULL,0)!=1) return NULL;
     return file;
 }
 
@@ -173,7 +184,10 @@ int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
     if (!runtime || runtime->resources) return 0;
     if (!runtime->report.external_bitmap_count && !runtime->report.external_sound_count) return 1;
     resources=calloc(1,sizeof(*resources));
-    if (!resources) return 0;
+    if (!resources) {
+        snprintf(runtime->failure,sizeof(runtime->failure),"Not enough memory to check the required MCC resources.");
+        return 0;
+    }
     runtime->resources=resources;
     for (type=1;type<=2;type++) {
         struct mcc_resource_file *selected=&resources->files[type-1];
@@ -182,11 +196,13 @@ int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
         if (!(type==1 ? runtime->report.external_bitmap_count : runtime->report.external_sound_count)) continue;
         probe.type=type;probe.file=selected;
         /* Explicit package and legacy root files are authoritative. */
-        status=mcc_resource_open(selected,type,runtime->level_name,NULL);
+        status=mcc_resource_open(selected,type,runtime->level_name,NULL,runtime->failure,sizeof(runtime->failure));
         if (!status) return 0;
         if (status==1) {
             if (!mcc_cache_visit_resources(raw,&runtime->report,mcc_resource_check,&probe)) {
                 error(_error_silent,"mcc resources: %s does not satisfy every external reference in %s",selected->path,runtime->level_name);
+                snprintf(runtime->failure,sizeof(runtime->failure),
+                    "%s does not match. Install the matching MCC package resource.",type==1 ? "bitmaps.map" : "sounds.map");
                 return 0;
             }
         } else for (set=0;set<2;set++) {
@@ -194,7 +210,7 @@ int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
             char path[128];
             memset(&candidate,0,sizeof(candidate));
             snprintf(path,sizeof(path),"mcc_maps/_shared/%s/%s.map",set ? "multiplayer" : "singleplayer",type==1 ? "bitmaps" : "sounds");
-            status=mcc_resource_open(&candidate,type,runtime->level_name,path);
+            status=mcc_resource_open(&candidate,type,runtime->level_name,path,runtime->failure,sizeof(runtime->failure));
             if (!status) return 0;
             if (status<0) continue;
             probe.file=&candidate;
@@ -202,6 +218,9 @@ int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
                 if (selected->stream && !mcc_resource_equal(selected->stream,candidate.stream)) {
                     error(_error_silent,"mcc resources: ambiguous shared %s for %s; put the intended file beside the level",
                         type==1 ? "bitmaps.map" : "sounds.map",runtime->level_name);
+                    snprintf(runtime->failure,sizeof(runtime->failure),
+                        "Shared %s is ambiguous. Put the intended file beside the level.",
+                        type==1 ? "bitmaps.map" : "sounds.map");
                     mcc_resource_close(&candidate);return 0;
                 }
                 if (!selected->stream) {*selected=candidate;memset(&candidate,0,sizeof(candidate));}
@@ -211,6 +230,9 @@ int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
         if (!selected->stream) {
             error(_error_silent,"mcc resources: no complete matching %s for %s; check the package and MCC shared folders",
                 type==1 ? "bitmaps.map" : "sounds.map",runtime->level_name);
+            snprintf(runtime->failure,sizeof(runtime->failure),
+                "No matching %s. Install its MCC package resources beside the level.",
+                type==1 ? "bitmaps.map" : "sounds.map");
             return 0;
         }
         error(_error_silent,"mcc resources: using %s (required by %s)",selected->path,runtime->level_name);
@@ -311,35 +333,54 @@ int mcc_resources_fingerprint(struct mcc_runtime *runtime,unsigned char digest[3
 }
 
 static int mcc_resources_inspect(char const *name,struct mcc_cache_source const *source,
-    uint32_t *checksum,unsigned char *digest)
+    uint32_t *checksum,unsigned char *digest,char *reason,size_t reason_size)
 {
     struct mcc_runtime runtime;
     unsigned char header[MCC_CACHE_HEADER_BYTES];
     struct mcc_cache_identity identity;
-    void *raw;
-    int ok;
+    void *raw=NULL;
+    int ok=0;
+    enum mcc_cache_status status=MCC_CACHE_READ_FAILED;
+    char const *problem="The map could not be inspected. Check that its complete file is accessible.";
+    if (reason && reason_size) reason[0]=0;
     memset(&runtime,0,sizeof(runtime));
     if (!source || !source->read || !mcc_package_name(name,runtime.level_name) ||
-        !source->read(source->context,0,sizeof(header),header) ||
-        mcc_cache_identify(header,sizeof(header),source->size,&identity)!=MCC_CACHE_OK) return 0;
+        !source->read(source->context,0,sizeof(header),header)) goto done;
+    status=mcc_cache_identify(header,sizeof(header),source->size,&identity);
+    problem=mcc_status_explanation(status);
+    if (status!=MCC_CACHE_OK) goto done;
     raw=malloc(identity.tag_data_size);
-    if (!raw) return 0;
+    problem=mcc_status_explanation(MCC_CACHE_NO_MEMORY);
+    if (!raw) goto done;
     runtime.source=*source;
-    ok=mcc_cache_load(source,raw,identity.tag_data_size,&runtime.report)==MCC_CACHE_OK &&
-        mcc_resources_select(&runtime,raw);
+    status=mcc_cache_load(source,raw,identity.tag_data_size,&runtime.report);
+    problem=mcc_status_explanation(status);
+    if (status!=MCC_CACHE_OK) goto done;
+    ok=mcc_resources_select(&runtime,raw);
+    problem="The required MCC resources could not be checked. See debug.txt for the failing check.";
     if (ok && digest) ok=mcc_resources_fingerprint(&runtime,digest);
     if (ok && checksum) ok=mcc_resources_checksum(&runtime,
         (runtime.report.external_bitmap_count ? 1u : 0u)|(runtime.report.external_sound_count ? 2u : 0u),checksum);
+done:
+    if (!ok && reason && reason_size) snprintf(reason,reason_size,"%s",runtime.failure[0] ? runtime.failure : problem);
     mcc_resources_dispose(&runtime);free(raw);
     return ok;
 }
 
 int mcc_resources_probe(char const *name,struct mcc_cache_source const *source,uint32_t *checksum)
 {
-    return mcc_resources_inspect(name,source,checksum,NULL);
+    return mcc_resources_inspect(name,source,checksum,NULL,NULL,0);
+}
+
+int mcc_resources_probe_explain(char const *name,struct mcc_cache_source const *source,
+    uint32_t *checksum,char *reason,size_t size)
+{
+    return mcc_resources_inspect(name,source,checksum,NULL,reason,size);
 }
 
 int mcc_resources_fingerprint_probe(char const *name,struct mcc_cache_source const *source,unsigned char digest[32])
 {
-    return mcc_resources_inspect(name,source,NULL,digest);
+    return mcc_resources_inspect(name,source,NULL,digest,NULL,0);
 }
+
+#include "mcc_resource_check.inl"

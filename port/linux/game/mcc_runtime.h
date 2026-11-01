@@ -8,6 +8,9 @@ struct bitmap_data;
 
 struct mcc_runtime {
     char level_name[64]; /* Canonical MCC package/map, retained through conversion. */
+    /* First terminal conversion/resource failure; probes own a separate runtime.
+     * The UI copies its explanation before this runtime is disposed. */
+    char failure[320];
     unsigned char *tags;
     unsigned char *tag_index;
     uint32_t used;
@@ -42,10 +45,11 @@ short mcc_geometry_part_palette(struct mcc_runtime *runtime, void const *vertex_
     unsigned char const **nodes);
 
 int mcc_audio_prepare(struct mcc_runtime *runtime);
-int mcc_audio_read(struct mcc_runtime *runtime, uint32_t offset, uint32_t bytes, void *out);
-int mcc_audio_contains(struct mcc_runtime *runtime, uint32_t offset, uint32_t bytes);
+int mcc_audio_read(struct mcc_runtime *runtime, long tag, uint32_t offset, uint32_t bytes, void *out);
+int mcc_audio_contains(struct mcc_runtime *runtime, long tag, uint32_t offset, uint32_t bytes);
 void mcc_audio_dispose(struct mcc_runtime *runtime);
 int mcc_bitmaps_prepare(struct mcc_runtime *runtime);
+void mcc_bitmaps_prepare_gpu(struct mcc_runtime *runtime);
 int mcc_hud_bitmaps_prepare(struct mcc_runtime *runtime);
 int mcc_bitmaps_read(struct mcc_runtime *runtime, long tag, uint32_t offset,
     uint32_t bytes, void *out);

@@ -370,7 +370,8 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         command=f"$python {PORT_DIR}/licenses.py $out {sdl_license}",
         description="WEB LICENSES $out",
     )
-    n.build(outputs=licenses, rule="web_licenses", implicit=[PORT_DIR / "licenses.py", Path("LICENSE"), sdl_license])
+    n.build(outputs=licenses, rule="web_licenses", implicit=[PORT_DIR / "licenses.py", Path("LICENSE"), sdl_license,
+            Path("LICENSES/GPL-3.0-only.txt"), Path("docs/reading/bots_and_android_features.md")])
     site_files.append(licenses)
     n.rule(
         name="web_version",

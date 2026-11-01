@@ -13,6 +13,8 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 
 # what each notice is for, and its file
 NOTICES = [
+    ("Enhanced bot tactics: BirchWoodGod, adapted by thelinkin3000 and GulchCE", "LICENSES/GPL-3.0-only.txt"),
+    ("Bot and Android feature provenance", "docs/reading/bots_and_android_features.md"),
     ("Expat (the menus' XML)", "port/third_party/expat/COPYING"),
     ("Opus (voice chat's codec)", "port/third_party/opus/COPYING"),
     ("zlib", "port/third_party/zlib/LICENSE"),

@@ -1151,6 +1151,18 @@ void update_server_handle_distributed_input(
 	queue->current_action = *action;
 }
 
+/* port: the host's bot input replaces the queued idle action in the same
+update its tick executed. Clients receive the existing player-action message.
+Adapted from halo-ce-universal ed6cdaeda8871b7bee781c76bff3a4da2836c1bf. */
+void update_server_note_bot_action(short player_index, struct player_action const *action)
+{
+	long number = update_server_ticked_update_number();
+	struct update *update = number != NONE ? update_server_get_update(number) : NULL;
+	if (update && update->update_number == number && player_index >= 0 &&
+		player_index < (short)update->update.action_count)
+		update->update.actions[player_index] = *action;
+}
+
 long update_server_ticked_update_number(
 	void)
 {

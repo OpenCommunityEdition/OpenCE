@@ -115,6 +115,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
+#include "custom_edition_hud_draw.h" /* port: port/linux/game/custom_edition_hud_draw.c */
 #include "mcc_cache.h" /* port: preserve MCC-authored gameplay icons */
 #include "cseries/cseries.h"
 
@@ -538,6 +539,7 @@ static void render_state_bitmap(
 	struct bitmap_data const *bitmap = NULL;
 	real_rectangle2d const *clip = NULL;
 	real scale;
+	real bitmap_scale; /* port: authored CE pickup icons, not controller glyphs. */
 	point2d point;
 
 	/* port: keep gameplay prompts on the high-resolution HUD path, which
@@ -564,6 +566,8 @@ static void render_state_bitmap(
 		if (mcc_cache_tags_loaded() && hud_hires_button_draw(icon, cursor_bounds, color))
 			return;
 		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
+		/* port: controller glyphs return above; map artwork keeps its flags. */
+		bitmap_scale = custom_edition_hud_bitmap_scale(bitmap_group_index);
 		scale = local_player_count() > 1 ? 0.75f : 1.0f;
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale);
@@ -572,7 +576,7 @@ static void render_state_bitmap(
 			_hud_corner_bottom_left,
 			&point,
 			clip,
-			scale,
+			scale * bitmap_scale, /* port: CE bitmap scale, independent of text offsets. */
 			0.0f,
 			TEST_FLAG(icon->flags, _hud_icon_use_color_bit) ? icon->color : color,
 			FALSE);
@@ -581,12 +585,12 @@ static void render_state_bitmap(
 		else if (clip)
 		{
 			cursor_bounds->x0 = (short)(
-				((clip->x1 - clip->x0) * bitmap->width + icon->width_offset) * scale + point.x);
+				((clip->x1 - clip->x0) * bitmap->width * bitmap_scale + icon->width_offset) * scale + point.x); /* port: CE icon advance. */
 		}
 		else
 		{
 			cursor_bounds->x0 = (short)(
-				(bitmap->width + icon->width_offset) * scale + point.x);
+				(bitmap->width * bitmap_scale + icon->width_offset) * scale + point.x); /* port: CE icon advance. */
 		}
 	}
 

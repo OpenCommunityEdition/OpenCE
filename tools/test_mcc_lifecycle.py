@@ -18,6 +18,9 @@ def test_network_mcc_load_failure_schedules_abort_without_initializing_players(t
     code = r'''
 #include <string.h>
 #include <wchar.h>
+#include "mcc_errors.h"
+#define custom_edition_level_name(p) (!strncmp(p,"custom_maps\\",12))
+#define custom_edition_cache_load_error(p) "CE fixture load failed"
 #include <stdio.h>
 typedef int boolean;
 #define TRUE 1
@@ -84,7 +87,7 @@ int main(void) {
 '''
     source = tmp_path / "network_failure.c"
     source.write_text(code)
-    binary = compile_tool(tmp_path, [source])
+    binary = compile_tool(tmp_path, [source, ROOT / "port/linux/game/mcc_errors.c"])
     subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 
 
@@ -288,7 +291,7 @@ static void scenario_unload(void) {unloads++;mcc_owner=0;global_scenario=NULL;}
     checks = r'''
 int main(void) {
     mcc_owner=1;
-    if(scenario_load("mcc_maps\\a10") || unloads!=1 || mcc_owner || global_scenario) return 1;
+    if(scenario_load("mcc_maps\\a10") || unloads!=1 || mcc_owner || global_scenario || global_game_globals!=&scenario) return 1;
     /* A subsequent ordinary map must retain its existing lifetime behavior. */
     unloads=0;
     if(scenario_load("a10") || unloads || mcc_owner) return 2;
@@ -322,6 +325,9 @@ def test_failed_mcc_map_returns_to_ui_before_game_initialization(tmp_path):
     source = r'''
 #include <string.h>
 #include <wchar.h>
+#include "mcc_errors.h"
+#define custom_edition_level_name(p) (!strncmp(p,"custom_maps\\",12))
+#define custom_edition_cache_load_error(p) "CE fixture load failed"
 typedef int boolean;
 #define TRUE 1
 #define FALSE 0
@@ -374,7 +380,7 @@ int main(void) {
     binary = tmp_path / ("recovery.exe" if sys.platform == "win32" else "recovery")
     flags = (["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else [])
     built = subprocess.run([compiler, *flags, "-std=c99", "-Wall", "-Wextra", "-Werror",
-                            str(path), "-o", str(binary)], capture_output=True, text=True)
+                            "-I", str(ROOT / "port/linux/game"), str(path), str(ROOT / "port/linux/game/mcc_errors.c"), "-o", str(binary)], capture_output=True, text=True)
     assert built.returncode == 0, built.stderr
     result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr

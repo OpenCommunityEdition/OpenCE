@@ -60,10 +60,10 @@ void mcc_loading_pulse(void)
     mcc_loading.drawing = 0;
 }
 
-void mcc_loading_begin(char const *name)
+int mcc_loading_begin(char const *name)
 {
     if (mcc_loading.active || !mcc_level_name(name) || !global_d3d_device ||
-        config_boolean("debug.null_renderer") || progress_bar_is_active()) return;
+        config_boolean("debug.null_renderer") || progress_bar_is_active()) return 0;
     memset(&mcc_loading, 0, sizeof(mcc_loading));
     mcc_loading.active = 1;
     mcc_loading.stage = -1;
@@ -72,6 +72,7 @@ void mcc_loading_begin(char const *name)
     progress_bar_eachframe();
     progress_bar_begin(FALSE);
     mcc_loading_stage(MCC_LOADING_RESOURCES);
+    return 1;
 }
 
 void mcc_loading_stage(enum mcc_loading_stage stage)

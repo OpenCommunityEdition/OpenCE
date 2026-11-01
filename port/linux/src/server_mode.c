@@ -24,6 +24,7 @@ without a display to wait for, and its exits.
 #include "server_http.h"
 #include "server_log.h"
 #include "server_master.h"
+#include "server_netlist.h"
 #include "server_rotation.h"
 
 #include <SDL3/SDL.h>
@@ -392,6 +393,8 @@ void server_mode_start(void)
 	if (!server_http_start())
 		server_mode_exit(SERVER_EXIT_PORT_IN_USE);
 	server_master_start();
+	/* (the netlists of the masters it publishes to: its VPN policy) */
+	server_netlist_start();
 }
 
 int server_mode_signals(int *quit_signal)

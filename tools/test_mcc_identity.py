@@ -85,6 +85,8 @@ int csstrcasecmp(char const *a,char const *b){while(*a && tolower(*a)==tolower(*
 int game_connection(void){return connection;}
 void error(short level,char const *format,...){(void)level;(void)format;}
 void display_error_text_when_main_menu_loaded(wchar_t const *text){(void)text;errors++;}
+void mcc_cache_validation_clear(void) {}
+void mcc_validation_cancel(void) {}
 void mcc_cache_precache_clear(void){clears++;}
 void mcc_maps_rescan(void){}
 short mcc_maps_count(boolean multiplayer){(void)multiplayer;return (short)count;}
@@ -98,6 +100,12 @@ int mcc_precache_snapshot(char const *s,struct mcc_precache_snapshot *out){
 int mcc_content_probe(char const *s,unsigned char digest[32]){
  int i=find(s);probes++;if(i<0)return 0;memcpy(digest,files[i].digest,32);
  if(changing)files[i].stamp++;return 1;
+}
+int mcc_validation_request(char const *s,uint32_t *sum,unsigned char digest[32]){
+ if(sum)*sum=123;return mcc_content_probe(s,digest);
+}
+int mcc_validation_lookup(char const *s,uint32_t *sum,unsigned char digest[32]){
+ (void)digest;if(sum)*sum=123;return find(s)>=0;
 }
 int mcc_resources_fingerprint(struct mcc_runtime *r,unsigned char digest[32]){
  (void)r;hash_loads++;memcpy(digest,files[0].digest,32);return 1;
@@ -133,14 +141,34 @@ int main(void){
  CHECK(!mcc_identity_loaded(game.map.name,NULL));connection=0;CHECK(mcc_identity_loaded(game.map.name,NULL));
  strcpy(game.map.name,"levels\\test\\bloodgulch\\bloodgulch");
  memset(game.mcc_content_sha256,0,32);CHECK(mcc_identity_accept(&game));
- /* Host cache avoids repeat hashing; mutations and disconnect invalidate it. */
- strcpy(game.map.name,files[0].name);old=probes;
+ /* Prepare before opening the lobby: even a slow fingerprint must not be
+  * repeated by the first settings send while a client waits to join. */
+ strcpy(game.map.name,files[0].name);game.map.version=123;old=probes;
+ CHECK(mcc_identity_prepare_host(game.map.name));CHECK(probes==old+1);
  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy)==&copy);CHECK(probes==old+1);
  CHECK(!memcmp(copy.mcc_content_sha256,wanted,32));CHECK(!game.mcc_content_sha256[0]);
  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));CHECK(probes==old+1);
- files[0].stamp++;CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));CHECK(probes==old+2);
+ /* The local admission reuses this exact snapshot, but neither a changed
+  * file nor a different wire digest can use it. Loading still rehashes. */
+ CHECK(mcc_identity_accept(&copy));CHECK(probes==old+1);
+ files[0].stamp++;CHECK(mcc_identity_accept(&copy));CHECK(probes==old+2);
+ files[0].stamp--;copy.mcc_content_sha256[31]^=1;
+ CHECK(!mcc_identity_accept(&copy));CHECK(probes>old+2);
+ CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));
+ old=probes;
+ files[0].stamp++;CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));CHECK(probes==old);
+ CHECK(mcc_identity_prepare_host(game.map.name));CHECK(probes==old+1);
+ CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));
  mcc_identity_disconnect();changing=1;CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));changing=0;
  CHECK(!mcc_identity_host_settings(&game,sizeof(game)-1,&copy));
+ /* Invalid or unreadable preparation drops a previously cached identity. */
+ CHECK(mcc_identity_prepare_host(game.map.name));old=probes;
+ denied=1;CHECK(!mcc_identity_prepare_host(game.map.name));denied=0;
+ CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));CHECK(probes==old);
+ CHECK(mcc_identity_prepare_host(game.map.name));CHECK(probes==old+1);
+ CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));
+ CHECK(!mcc_identity_prepare_host("custom_maps/a10"));
+ CHECK(!mcc_identity_prepare_host("levels/test/bloodgulch/bloodgulch"));
  /* Bound same-filename work before any fallback fingerprints. */
  strcpy(game.map.name,"mcc_maps\\Host\\a10");memcpy(game.mcc_content_sha256,wanted,32);count=17;
  for(i=0;i<count;i++)sprintf(files[i].name,"mcc_maps\\folder%d\\a10",i);

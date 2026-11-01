@@ -74,6 +74,16 @@ are stored in a `long`. Likewise, an array of local-player values cannot
 be indexed by either handle. The compiler sees similar integer types; the
 program's contracts give them different meanings.
 
+An object can also have no player owner. For example, multiplayer overshield
+decay in `object_damage_update` in [damage.c](../../source/objects/damage.c)
+can reach `hud_tick_shield` with `NONE`. The HUD function in
+[hud_unit.c](../../source/interface/hud_unit.c) skips that notification before
+looking up a player; decay still runs normally on the object. Monaco's
+multiplayer startup exposed the inherited invalid lookup. Local players
+still receive the HUD adjustment, while remote players have no local HUD
+to update. [test_hud_shield_tick.py](../../tools/test_hud_shield_tick.py)
+checks these three ownership cases against the real function.
+
 Pointers returned by lookups refer to engine-owned storage. They are not
 permission to free that storage, and retaining one across deletion or map
 unload can outlive its referent. When following a long-lived field, look
@@ -112,7 +122,19 @@ Do not infer ownership from a local object being present. Read the checks
 in `network_objects.c` and the [network walkthrough](networking.md).
 
 The engine supplies the core object, unit and weapon systems. Port gametypes
-and networking add guarded integration. GulchCE's MCC inventory, movement,
+and networking add guarded integration. OpenCE's optional CTF kill scoring
+starts at `ctf_kills_score` and `ctf_capture_points` in
+[game_engine_ctf.c](../../source/game/game_engine_ctf.c). Multi-Hill keeps
+each active hill in `king_hills`; read `king_pick_extra_hills`,
+`king_hills_to_globals` and the network-state readers and writers in
+[game_engine_king.c](../../source/game/game_engine_king.c). Its first hill
+still supplies the legacy `king_globals` view. Force Team Spawns is checked
+by `game_engine_force_team_spawns` in
+[game_engine.c](../../source/game/game_engine.c), with a fallback when a map
+lacks either team's CTF spawn locations. These options default to stock
+behavior and the host controls their scoring and spawn decisions.
+
+GulchCE's MCC inventory, movement,
 damage and object-name adaptations live in the MCC modules listed in
 [CODINGSTANDARDS.md](../../CODINGSTANDARDS.md). Similar-looking structures
 do not make those compatibility paths interchangeable with Xbox or CE paths.

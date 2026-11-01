@@ -14,7 +14,8 @@ enum mcc_loading_stage {
     MCC_LOADING_STAGES
 };
 
-void mcc_loading_begin(char const *name);
+/* Returns ownership: only the caller that starts feedback may end it. */
+int mcc_loading_begin(char const *name);
 void mcc_loading_stage(enum mcc_loading_stage stage);
 void mcc_loading_update(enum mcc_loading_stage stage, unsigned long done, unsigned long total);
 void mcc_loading_pulse(void);

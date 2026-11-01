@@ -18,7 +18,8 @@
 #include <string.h>
 
 #define MCC_CHECKPOINT_PAYLOAD_LIMIT (8u + 8192u * 8u)
-#define MCC_CHECKPOINT_TOTAL_PAYLOAD (MCC_CHECKPOINT_PAYLOAD_LIMIT + MCC_CAMPAIGN_SNAPSHOT_BYTES)
+#define MCC_CHECKPOINT_CAMPAIGN_BYTES MCC_CAMPAIGN_SNAPSHOT_V5_BYTES
+#define MCC_CHECKPOINT_TOTAL_PAYLOAD (MCC_CHECKPOINT_PAYLOAD_LIMIT + MCC_CHECKPOINT_CAMPAIGN_BYTES)
 #define MCC_CHECKPOINT_FOOTER_BYTES 96u
 #define MCC_CHECKPOINT_SLOT_BYTES (MCC_CHECKPOINT_TOTAL_PAYLOAD + MCC_CHECKPOINT_FOOTER_BYTES)
 
@@ -200,12 +201,29 @@ static int mcc_checkpoint_names_validate(void const *image, void const *current,
     return mcc_checkpoint_names_claim(current_tail, bytes + 16);
 }
 
+/* Version 3 uses the footer's last eight previously reserved bytes for the
+ * lighting value and a footer checksum. Keep every arena offset unchanged:
+ * growing the payload reservation would relocate saved thread pointers. */
+static int mcc_checkpoint_campaign(unsigned char const *payload, unsigned long bytes,
+    unsigned char const *footer, int restore)
+{
+    unsigned char state[MCC_CAMPAIGN_SNAPSHOT_BYTES];
+    if (mcc_checkpoint_word(footer+4)==3) {
+        if (bytes!=MCC_CHECKPOINT_CAMPAIGN_BYTES || sizeof(state)!=bytes+4) return 0;
+        memcpy(state,payload,bytes);
+        memcpy(state+bytes,footer+88,4);
+        payload=state;bytes+=4;
+    }
+    return restore ? mcc_campaign_restore(payload,bytes) : mcc_campaign_validate(payload,bytes);
+}
+
 int mcc_checkpoint_capture(void *image, unsigned long total,
     unsigned long used, unsigned long capacity)
 {
     struct game_state_header const *header = image;
     unsigned char *tail, *footer;
     uint32_t bytes;
+    unsigned char campaign[MCC_CAMPAIGN_SNAPSHOT_BYTES];
     if (!mcc_cache_tags_loaded()) return 1;
     tail = mcc_checkpoint_tail(image, total, used, capacity);
     if (!tail || !mcc_checkpoint_identity(header) || !mcc_checkpoint_claim(tail) ||
@@ -216,16 +234,20 @@ int mcc_checkpoint_capture(void *image, unsigned long total,
     /* Invalidate the previous footer before any partial payload write. */
     memset(footer, 0, MCC_CHECKPOINT_FOOTER_BYTES);
     if (mcc_grenades_snapshot(tail, bytes) != bytes || !mcc_grenades_snapshot_validate(tail, bytes)) goto failed;
-    mcc_campaign_snapshot(tail + bytes);
-    if (!mcc_campaign_validate(tail + bytes, MCC_CAMPAIGN_SNAPSHOT_BYTES)) goto failed;
-    bytes += MCC_CAMPAIGN_SNAPSHOT_BYTES;
+    mcc_campaign_snapshot(campaign);
+    if (sizeof(campaign)!=MCC_CHECKPOINT_CAMPAIGN_BYTES+4 ||
+        !mcc_campaign_validate(campaign,sizeof(campaign))) goto failed;
+    memcpy(tail+bytes,campaign,MCC_CHECKPOINT_CAMPAIGN_BYTES);
+    memcpy(footer+88,campaign+MCC_CHECKPOINT_CAMPAIGN_BYTES,4);
+    bytes += MCC_CHECKPOINT_CAMPAIGN_BYTES;
     memcpy(footer, "MCCS", 4);
-    mcc_checkpoint_put(footer + 4, 2);
+    mcc_checkpoint_put(footer + 4, 3);
     mcc_checkpoint_put(footer + 8, bytes);
     mcc_checkpoint_put(footer + 12, mcc_checkpoint_checksum(tail, bytes));
     mcc_checkpoint_put(footer + 16, (uint32_t)header->cache_file_checksum);
-    mcc_checkpoint_put(footer + 20, MCC_CAMPAIGN_SNAPSHOT_BYTES);
+    mcc_checkpoint_put(footer + 20, MCC_CHECKPOINT_CAMPAIGN_BYTES);
     memcpy(footer + 24, header->map_name, strlen(header->map_name) + 1);
+    mcc_checkpoint_put(footer+92,mcc_checkpoint_checksum(footer,92));
     return 1;
 failed:
     error(_error_silent, "mcc checkpoint: the extra state could not be captured in unused CPU memory");
@@ -250,22 +272,24 @@ int mcc_checkpoint_validate(void const *image, unsigned long total,
     campaign_bytes = mcc_checkpoint_word(footer + 20);
     /* The footer stays at the same CPU address. Version 1 had only inventory;
      * those maps could not use these formerly unsupported campaign functions. */
-    if (version == 1) tail += MCC_CAMPAIGN_SNAPSHOT_BYTES;
+    if (version == 1) tail += MCC_CHECKPOINT_CAMPAIGN_BYTES;
     else if (version == 2 && (campaign_bytes == MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ||
         campaign_bytes == MCC_CAMPAIGN_SNAPSHOT_V4_BYTES))
-        tail += MCC_CAMPAIGN_SNAPSHOT_BYTES - campaign_bytes;
-    if (memcmp(footer, "MCCS", 4) || (version != 1 && version != 2) ||
+        tail += MCC_CHECKPOINT_CAMPAIGN_BYTES - campaign_bytes;
+    if (memcmp(footer, "MCCS", 4) || (version != 1 && version != 2 && version != 3) ||
         (version == 1 ? campaign_bytes != 0 :
-            (campaign_bytes != MCC_CAMPAIGN_SNAPSHOT_BYTES && campaign_bytes != MCC_CAMPAIGN_SNAPSHOT_V4_BYTES &&
+            (campaign_bytes != MCC_CHECKPOINT_CAMPAIGN_BYTES && campaign_bytes != MCC_CAMPAIGN_SNAPSHOT_V4_BYTES &&
              campaign_bytes != MCC_CAMPAIGN_SNAPSHOT_V1_BYTES)) ||
         bytes < 8 + campaign_bytes || bytes - campaign_bytes > MCC_CHECKPOINT_PAYLOAD_LIMIT ||
         mcc_checkpoint_word(footer + 12) != mcc_checkpoint_checksum(tail, bytes) ||
         mcc_checkpoint_word(footer + 16) != (uint32_t)header->cache_file_checksum ||
-        mcc_checkpoint_word(footer + 88) ||
-        mcc_checkpoint_word(footer + 92) || !memchr(footer + 24, 0, 64) ||
+        (version==3 ? (campaign_bytes!=MCC_CHECKPOINT_CAMPAIGN_BYTES ||
+            mcc_checkpoint_word(footer+92)!=mcc_checkpoint_checksum(footer,92)) :
+            (mcc_checkpoint_word(footer+88) || mcc_checkpoint_word(footer+92))) ||
+        !memchr(footer + 24, 0, 64) ||
         strcmp((char const *)footer + 24, header->map_name) ||
         !mcc_grenades_snapshot_validate(tail, bytes - campaign_bytes) ||
-        (campaign_bytes && !mcc_campaign_validate(tail + bytes - campaign_bytes, campaign_bytes)) ||
+        (campaign_bytes && !mcc_checkpoint_campaign(tail + bytes - campaign_bytes, campaign_bytes, footer, 0)) ||
         !mcc_checkpoint_units(image, current_image, used, tail) ||
         !mcc_checkpoint_names_validate(image, current_image, used, capacity) ||
         !mcc_script_threads_validate(image,current_image,used,capacity) ||
@@ -279,7 +303,7 @@ failed:
 int mcc_checkpoint_restore(void const *image, unsigned long total,
     unsigned long used, unsigned long capacity)
 {
-    unsigned char *tail;
+    unsigned char *tail, *footer;
     uint32_t bytes, campaign_bytes, version;
     if (!mcc_cache_tags_loaded()) return 1;
     if (!mcc_checkpoint_validate(image, total, used, capacity, image) ||
@@ -290,15 +314,16 @@ int mcc_checkpoint_restore(void const *image, unsigned long total,
         if (!mcc_object_names_restore(names + 16, names_bytes)) return 0;
     }
     tail = mcc_checkpoint_tail(image, total, used, capacity);
-    bytes = mcc_checkpoint_word(tail + MCC_CHECKPOINT_TOTAL_PAYLOAD + 8);
+    footer=tail+MCC_CHECKPOINT_TOTAL_PAYLOAD;
+    bytes = mcc_checkpoint_word(footer + 8);
     campaign_bytes = mcc_checkpoint_word(tail + MCC_CHECKPOINT_TOTAL_PAYLOAD + 20);
     version = mcc_checkpoint_word(tail + MCC_CHECKPOINT_TOTAL_PAYLOAD + 4);
-    if (version == 1) tail += MCC_CAMPAIGN_SNAPSHOT_BYTES;
+    if (version == 1) tail += MCC_CHECKPOINT_CAMPAIGN_BYTES;
     else if (version == 2 && (campaign_bytes == MCC_CAMPAIGN_SNAPSHOT_V1_BYTES ||
         campaign_bytes == MCC_CAMPAIGN_SNAPSHOT_V4_BYTES))
-        tail += MCC_CAMPAIGN_SNAPSHOT_BYTES - campaign_bytes;
+        tail += MCC_CHECKPOINT_CAMPAIGN_BYTES - campaign_bytes;
     if (mcc_grenades_restore(tail, bytes - campaign_bytes)) {
-        if (campaign_bytes) return mcc_campaign_restore(tail + bytes - campaign_bytes, campaign_bytes);
+        if (campaign_bytes) return mcc_checkpoint_campaign(tail + bytes - campaign_bytes, campaign_bytes, footer, 1);
         mcc_campaign_begin();
         return 1;
     }

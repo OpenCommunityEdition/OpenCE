@@ -15,6 +15,15 @@ the Xbox maps' are, before anything reads them
 
 ## Running a map
 
+Load refusals name the map and explain known causes such as required OpenSauce
+features, unreadable files, missing resources or the tag-cache limit. Later
+conversion failures identify the failing stage, with detailed checks in
+`debug.txt`. Precache failures retain the fatal media screen and later load
+failures retain the existing fatal error path; clearer text does not add retry
+or return-to-menu recovery.
+If a startup command fails before the UI map has loaded, the existing fatal
+path has no error widget to draw; the explanation is still written to the log.
+
 Custom Edition maps run when the `game.custom_edition` setting is on, as it
 is by default (`custom_edition = true` under `[game]` in `config.toml`, or
 `HALO_CUSTOM_EDITION`). Put the maps and Custom Edition's `bitmaps.map`,
@@ -243,7 +252,7 @@ changed:
   size of the one its Xbox counterpart draws (256×64 for 128×32, 512×512 for
   256×256), with the same scale, and every unflagged one a bitmap of the same
   size ([Evidence](#observed-not-stated-by-the-sources-established-on-the-sample-maps)).
-  This build ignores the flag, so it drew them twice too large; the
+  The Xbox renderer ignores the flag, so it drew them twice too large; the
   placements of the unit, weapon and grenade HUD interfaces and the HUD
   globals' messages that have it get half their scale, and lose the flag (32
   in `bloodgulch.map`). Halo PC reads the flag only on statics, meters and
@@ -252,11 +261,14 @@ changed:
   digits', so a flagged number keeps the flag and `hud_draw_numbers` draws
   its digits at half their size, spaced as the digits tag says. A bitmap may ask the
   same of every element that draws it, with Halo PC's bitmap flags *half hud
-  scale* and *force hud use highres scale* (Invader's `bitmap.json`): an
-  element drawing such a bitmap (a static or meter, its bitmap after its
-  placement; a crosshair's or overlay's items, their crosshair's or
-  overlay's) gets half its scale too. None of the 18 Custom Edition maps on
-  hand, nor `bitmaps.map`, sets either.
+  scale* (bit 4) and *force hud use highres scale* (bit 7), documented in
+  Invader's `bitmap.json`. Placement high resolution OR bitmap force-highres
+  supplies one halving; bitmap half-scale supplies a separate halving.
+  Both bitmap flags therefore give quarter scale. Crosshair and overlay
+  items continue to ignore the placement flag. These bitmap flags were
+  absent from the original sample of 18 maps and its `bitmaps.map`.
+  [CE HUD scaling](reading/hud_corrections.md#custom-edition-authored-hd-scaling)
+  describes conversion, drawing and the preserved known-map exceptions.
 - **Maps made around Halo PC's own behaviour.** Chimera fixes Halo PC to draw
   as the Xbox does, and keeps a list of the maps made around Halo PC's way
   instead, by map name (in lower case) and tag data checksum, with the

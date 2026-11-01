@@ -47,7 +47,7 @@ int main(void) {
     word join[128]={0},outer[132],inner[132],size;
     byte saved;
     int i,bytes;
-    CHECK(HALO_PORT_NETWORK_VERSION==32708 && MCC_PROTOCOL_VERSION==32709);
+    CHECK(HALO_PORT_NETWORK_VERSION==32710 && MCC_PROTOCOL_VERSION==32711);
     CHECK(THIRD_PERSON_PROTOCOL_JOIN_KIND!=MCC_PROTOCOL_JOIN_KIND);
     for(bytes=3;bytes<=256;bytes++) {
         build_message_header(join,(word)bytes,_message_type_packet,0);

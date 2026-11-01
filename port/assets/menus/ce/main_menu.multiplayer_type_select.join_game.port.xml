@@ -96,6 +96,13 @@
 		<string text="Internet play is off:\nSettings &gt; Network Setup"/>
 		<string text="Neither the master servers\nnor the brokers answer:\ncheck the connection"/>
 		<string text="The host refused: your player name"/>
+		<string text="The host blocks VPNs: link Discord in Settings &gt; Network Setup"/>
+		<string text="The host refused: it allows no VPNs"/>
+		<string text="The host refused your Discord link: link it again"/>
+		<string text="The host refused: your Discord account is too new"/>
+		<string text="The host refused: your Discord account is in the game"/>
+		<string text="The host blocks VPNs: link Discord with its master (Settings &gt; Network Setup)"/>
+		<string text="The host refused: too many players from your address"/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/join_game/error_words" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" font="ui\large_ui" color="#FF2896FF" text_x="9" text_y="35" text_flags="no_focus_test">
 	</widget>

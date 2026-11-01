@@ -191,7 +191,8 @@ class Machine:
         # then the machine's hardware id, 32 hex digits (p2p.c's p2p_hardware_id),
         # one of its own so bans and kick votes tell the machines apart
         hardware_id = b"%032x" % self.index
-        self.send(message(CLIENT_JOIN_GAME_REQUEST, wide(self.name, 32) + JOIN_TOKEN + hardware_id))
+        # (and no Discord account's pass and proof: 170 and 64 zero bytes, player_link.c)
+        self.send(message(CLIENT_JOIN_GAME_REQUEST, wide(self.name, 32) + JOIN_TOKEN + hardware_id + bytes(170 + 64)))
         self.state = "joining"
 
     def receive(self):

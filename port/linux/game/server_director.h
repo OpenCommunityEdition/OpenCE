@@ -38,6 +38,10 @@ enum
 	_server_end_empty,
 	_server_end_command,
 	_server_end_next,
+	/* a new network version's update that would wait no longer
+	(server.update_game_minutes), and the players' vote (!endgame) */
+	_server_end_update,
+	_server_end_vote,
 	NUMBER_OF_SERVER_ENDS
 };
 
@@ -79,6 +83,8 @@ real server_director_game_seconds(void);
 /* the commands' (server_commands.c) */
 /* the game ended now: with its scores (end_game), or without (skip) */
 boolean server_director_end_game(short reason, boolean skip_postgame);
+/* whether a game is being played that server_director_end_game would end */
+boolean server_director_playing(void);
 /* the entry played next (sv_map; now: the lobby's set again, or the game
 ended at once if one runs; once the lobby's start was sent, after the game
 it starts): TRUE and when in reason, else FALSE and why */

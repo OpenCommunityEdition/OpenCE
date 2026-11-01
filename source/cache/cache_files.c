@@ -1221,7 +1221,11 @@ boolean cache_files_give_time_to_precache(
 			short status = cache_files_precache_map_status(&progress);
 
 			if (status == 2)
-				display_error_damaged_media();
+			{
+				/* port: CE explains its refusal without changing the fatal path. */
+				if (!custom_edition_cache_display_error(map_name))
+					display_error_damaged_media();
+			}
 			else if (status == 1)
 				cache_files_precache_map_end();
 		}
@@ -1229,7 +1233,11 @@ boolean cache_files_give_time_to_precache(
 		{
 			cache_files_precache_set_priority(0);
 			if (!cache_files_precache_map_begin(map_name, FALSE))
-				display_error_damaged_media();
+			{
+				/* port: Xbox retains its fixed error; CE supplies its own text. */
+				if (!custom_edition_cache_display_error(map_name))
+					display_error_damaged_media();
+			}
 		}
 	}
 
@@ -1298,6 +1306,9 @@ long scenario_tags_load(
 	name: a Custom Edition map that cannot load is not played at all. */
 	if (custom_edition_level_name(scenario_name))
 	{
+		/* port: a protected map's structure bsp names the groups of tags
+		whose own are scrambled (port/linux/game/tag_validate.c) */
+		custom_edition_structure_bsp_proc_set(tag_validate_custom_edition_note_structure_bsp);
 		cache_file_globals.tag_header = custom_edition_cache_tags_load(
 			stripped_scenario_name,
 			&cache_file_globals.header);

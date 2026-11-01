@@ -146,7 +146,53 @@ static struct tag_schema_definition const anchor_schema=TAG_SCHEMA_DEFINITION(hu
 struct test_flag {long unused;char name[31];byte padding;byte rest[56];};
 static struct tag_schema_field const flag_fields[]={TAG_SCHEMA_STRING(struct test_flag,name),TAG_SCHEMA_END};
 static struct tag_schema_definition const flag_schema=TAG_SCHEMA_DEFINITION(cutscene_flag,struct test_flag,flag_fields);
+struct test_collision_surface {long plane,first_edge_index;byte flags,breakable;short material;};
+struct test_collision_edge {long vertices[2],next[2],owners[2];};
+struct test_collision {struct tag_block surfaces,edges;};
+static boolean collision_model_bsp_check(struct tag_validation *validation,void *base)
+{
+    struct test_collision *bsp=base;
+    struct test_collision_surface *surfaces=bsp->surfaces.address;
+    struct test_collision_edge *edges=bsp->edges.address;
+    long i;
+    (void)validation;
+    for(i=0;i<bsp->surfaces.count;i++) {
+        long start=surfaces[i].first_edge_index,cursor=start,steps=0;
+        do {
+            int side;
+            if(cursor<0 || cursor>=bsp->edges.count || steps++>=8)return FALSE;
+            side=edges[cursor].owners[1]==i;
+            if(edges[cursor].owners[side]!=i)return FALSE;
+            cursor=edges[cursor].next[side];
+        } while(cursor!=start);
+    }
+    return TRUE;
+}
+static struct tag_schema_definition const surface_schema=TAG_SCHEMA_DEFINITION(surface,struct test_collision_surface,name_fields);
+static struct tag_schema_definition const edge_schema=TAG_SCHEMA_DEFINITION(edge,struct test_collision_edge,name_fields);
+static struct tag_schema_field const collision_fields[]={
+    TAG_SCHEMA_BLOCK(struct test_collision,surfaces,surface_schema,131072),
+    TAG_SCHEMA_BLOCK(struct test_collision,edges,edge_schema,262144),
+    TAG_SCHEMA_CHECK(collision_model_bsp_check),TAG_SCHEMA_END
+};
+static struct tag_schema_definition const collision_schema=TAG_SCHEMA_DEFINITION(collision,struct test_collision,collision_fields);
+struct test_particle {short initial_particle_creation_physics,pad;struct tag_block physics_constants,type_states;};
+struct test_particle_state {short particle_creation_physics;};
+static boolean particle_system_type_check(struct tag_validation *validation,void *base)
+{(void)validation;(void)base;return TRUE;}
+static struct tag_schema_field const particle_state_fields[]={
+    TAG_SCHEMA_ENUM(struct test_particle_state,particle_creation_physics,3,0),TAG_SCHEMA_END};
+static struct tag_schema_definition const particle_state_schema=TAG_SCHEMA_DEFINITION(particle_state,struct test_particle_state,particle_state_fields);
+static struct tag_schema_definition const constant_schema={"constant",4,empty_fields};
+static struct tag_schema_field const particle_fields[]={
+    TAG_SCHEMA_ENUM(struct test_particle,initial_particle_creation_physics,3,0),
+    TAG_SCHEMA_BLOCK(struct test_particle,physics_constants,constant_schema,16),
+    TAG_SCHEMA_BLOCK(struct test_particle,type_states,particle_state_schema,8),
+    TAG_SCHEMA_CHECK(particle_system_type_check),TAG_SCHEMA_END};
+static struct tag_schema_definition const particle_schema=TAG_SCHEMA_DEFINITION(particle,struct test_particle,particle_fields);
 static struct tag_schema_group const groups[] = {
+    {'pctl',{NONE,NONE},&particle_schema},
+    {'coll',{NONE,NONE},&collision_schema},
     {'dmg!',{NONE,NONE},&damage_schema},
     {'emp!',{NONE,NONE},&empty_weapon_root},
     {'adt!',{NONE,NONE},&animation_data_schema},
@@ -165,8 +211,8 @@ struct tag_schema_group const tag_schema_custom_edition_groups[] = {{0, {0, 0}, 
 void tag_validate_report(char const *message) { (void)message; }
 uint32_t mcc_audio_stream_end(struct mcc_runtime *runtime) { (void)runtime; return 1024; }
 uint32_t mcc_bitmaps_stream_end(struct mcc_runtime *runtime) { (void)runtime; return 1024; }
-int mcc_audio_contains(struct mcc_runtime *runtime, uint32_t offset, uint32_t size)
-{ (void)runtime; (void)offset; (void)size; return 0; }
+int mcc_audio_contains(struct mcc_runtime *runtime, long tag, uint32_t offset, uint32_t size)
+{ (void)tag; (void)runtime; (void)offset; (void)size; return 0; }
 int mcc_bitmaps_contains(struct mcc_runtime *runtime, uint32_t offset, uint32_t size)
 { (void)runtime; (void)offset; (void)size; return 0; }
 int mcc_bitmaps_valid(struct mcc_runtime *runtime, struct bitmap_data *bitmap)
@@ -224,6 +270,32 @@ int main(int argc, char **argv)
     root->file.file_offset = 100; root->file.size = 8;
     child->data.address = runtime.tags + 0x300; child->data.size = 16;
     child->reference.group_tag = 'scnr'; child->reference.index = header->scenario; child->reference.name = NULL;
+    if (!strncmp(argv[1],"jet_",4)) {
+        struct test_particle *particle=(void *)(runtime.tags+0x500);
+        struct test_particle_state *state=(void *)(runtime.tags+0x600);
+        real *constants=(void *)(runtime.tags+0x700);
+        header->count=2;instance[1]=instance[0];instance[1].handle++;instance[1].group='pctl';instance[1].root=particle;
+        particle->initial_particle_creation_physics=2;
+        particle->physics_constants.count=2;particle->physics_constants.address=constants;
+        particle->type_states.count=1;particle->type_states.address=state;
+        constants[0]=40.0f;constants[1]=0.4f;constants[2]=17.0f;
+        if (!strcmp(argv[1],"jet_state")) {particle->initial_particle_creation_physics=0;state->particle_creation_physics=2;}
+        if (!strcmp(argv[1],"jet_complete")) particle->physics_constants.count=3;
+        if (!strcmp(argv[1],"jet_short")) {particle->physics_constants.count=1;expected=0;}
+        if (!strcmp(argv[1],"jet_outside")) {particle->physics_constants.address=runtime.tags+runtime.used-4;expected=0;}
+        if (!strcmp(argv[1],"jet_capacity")) {runtime.capacity=runtime.used;expected=0;}
+        if (!strcmp(argv[1],"jet_explosion")) {particle->initial_particle_creation_physics=1;expected=0;}
+        if (!strcmp(argv[1],"jet_unused")) particle->initial_particle_creation_physics=0;
+        CHECK(mcc_tags_validate(&runtime)==expected);
+        if (expected) {
+            real *adapted=particle->physics_constants.address;
+            CHECK(adapted[0]==40.0f && adapted[1]==0.4f && constants[2]==17.0f);
+            if (!strcmp(argv[1],"jet_unused")) CHECK(particle->physics_constants.count==2 && adapted==constants);
+            else {CHECK(particle->physics_constants.count==3);
+                CHECK(adapted[2]==(!strcmp(argv[1],"jet_complete") ? 17.0f : 0.0f));}
+        }
+        mcc_validation_dispose(&runtime);free(runtime.tags);return 0;
+    }
     if (!strcmp(argv[1], "overlap")) { child->data.address = root; expected = 0; }
     if (!strcmp(argv[1], "outside")) { root->children.address = runtime.tags + runtime.used - 1; expected = 0; }
     if (!strcmp(argv[1], "misaligned")) { root->children.address = (byte *)child + 1; expected = 0; }
@@ -329,6 +401,55 @@ int main(int argc, char **argv)
             strcpy((char *)model_nodes,"root");strcpy((char *)model_nodes+156,"child");
             memcpy(model_nodes+32,links,6);memcpy(model_nodes+156+32,links+3,6);
             nodes[0].first_child_node_index=NONE;
+            if (!strncmp(argv[1],"graph_model_partial",19)) {
+                short extra[3]={NONE,NONE,1},child=2;
+                block->count=graph->nodes.count=3;
+                strcpy(nodes[2].name,"head");strcpy((char *)model_nodes+312,"head");
+                memcpy(model_nodes+312+32,extra,6);memcpy(model_nodes+156+34,&child,2);
+                nodes[0].first_child_node_index=1;
+                nodes[2].next_sibling_node_index=nodes[2].first_child_node_index=NONE;
+                nodes[2].parent_node_index=1;
+                if (!strcmp(argv[1],"graph_model_partial_omitted_parents")) nodes[2].parent_node_index=0;
+                if (!strcmp(argv[1],"graph_model_partial_conflict")) {nodes[1].next_sibling_node_index=2;expected=0;}
+                if (!strcmp(argv[1],"graph_model_partial_cycle")) {
+                    short cycle=0;memcpy(model_nodes+312+34,&cycle,2);expected=0;
+                }
+            }
+            if (!strcmp(argv[1],"graph_model_complete")) {
+                short extra[3]={NONE,NONE,0},child=2;
+                block->count=graph->nodes.count=3;
+                strcpy(nodes[2].name,"other");strcpy((char *)model_nodes+312,"other");
+                memcpy(model_nodes+312+32,extra,6);memcpy(model_nodes+156+32,&child,2);
+                nodes[0].first_child_node_index=2;
+                nodes[2].next_sibling_node_index=1;nodes[2].first_child_node_index=NONE;
+                nodes[2].parent_node_index=0;
+            }
+            if (!strncmp(argv[1],"graph_model_pruned",18)) {
+                short model_links[5][3]={{NONE,1,NONE},{2,3,0},{NONE,NONE,0},{NONE,4,1},{NONE,NONE,3}};
+                int k;
+                runtime.used=0x3000;
+                nodes=(void *)(runtime.tags+0x1800);graph->nodes.address=nodes;
+                model_nodes=runtime.tags+0x2000;block->address=model_nodes;
+                block->count=graph->nodes.count=5;
+                /* A detached child chain and a zeroed parent, as in Ruined Halo. */
+                for(k=0;k<5;k++) {
+                    sprintf(nodes[k].name,"node%d",k);
+                    strcpy((char *)model_nodes+k*156,nodes[k].name);
+                    memcpy(model_nodes+k*156+32,model_links[k],6);
+                    memcpy(&nodes[k].next_sibling_node_index,model_links[k],6);
+                }
+                nodes[0].first_child_node_index=2;
+                nodes[1].next_sibling_node_index=NONE;
+                nodes[3].parent_node_index=0;
+                if (!strcmp(argv[1],"graph_model_pruned_parent")) {nodes[3].parent_node_index=2;expected=0;}
+                if (!strcmp(argv[1],"graph_model_pruned_sibling")) {nodes[1].next_sibling_node_index=3;expected=0;}
+                if (!strcmp(argv[1],"graph_model_pruned_cycle")) {nodes[1].next_sibling_node_index=1;expected=0;}
+                if (!strcmp(argv[1],"graph_model_pruned_child")) {nodes[1].first_child_node_index=2;expected=0;}
+                if (!strcmp(argv[1],"graph_model_pruned_name")) {model_nodes[3*156]='x';expected=0;}
+                if (!strcmp(argv[1],"graph_model_pruned_model_cycle")) {
+                    short cycle=1;memcpy(model_nodes+2*156+32,&cycle,2);expected=0;
+                }
+            }
             if (!strncmp(argv[1],"graph_model_empty",17)) {
                 nodes[0].parent_node_index=nodes[1].parent_node_index=NONE;
                 if (!strcmp(argv[1],"graph_model_empty_partial")) {
@@ -369,6 +490,26 @@ int main(int argc, char **argv)
             if (!strcmp(argv[1],"graph_model_outside")) {block->address=runtime.tags+runtime.used-1;expected=0;}
             if (!strcmp(argv[1],"graph_model_cycle")) {short cycle=0;memcpy(model_nodes+156+34,&cycle,2);expected=0;}
         }
+    }
+    if (!strncmp(argv[1],"collision_",10)) {
+        long i;
+        struct test_collision *bsp=(void *)(runtime.tags+0x700);
+        struct test_collision_surface *surfaces=(void *)(runtime.tags+0x800);
+        struct test_collision_edge *edges=(void *)(runtime.tags+0x900);
+        header->count=2;instance[1]=instance[0];instance[1].group='coll';instance[1].handle++;instance[1].root=bsp;
+        bsp->surfaces.count=2;bsp->surfaces.address=surfaces;bsp->edges.count=6;bsp->edges.address=edges;
+        surfaces[0].first_edge_index=3;surfaces[1].first_edge_index=0;
+        for(i=0;i<6;i++) {
+            edges[i].owners[0]=i/3;edges[i].owners[1]=NONE;
+            edges[i].next[0]=i/3*3+(i+1)%3;
+        }
+        if(!strcmp(argv[1],"collision_valid")) {surfaces[0].first_edge_index=0;surfaces[1].first_edge_index=3;}
+        if(!strcmp(argv[1],"collision_no_owner")) {for(i=0;i<3;i++)edges[i].owners[0]=NONE;expected=0;}
+        if(!strcmp(argv[1],"collision_short_ring")) {edges[1].next[0]=0;expected=0;}
+        if(!strcmp(argv[1],"collision_open_ring")) {edges[2].next[0]=1;expected=0;}
+        if(!strcmp(argv[1],"collision_bad_next")) {edges[2].next[0]=6;expected=0;}
+        if(!strcmp(argv[1],"collision_bad_owner")) {edges[2].owners[0]=2;expected=0;}
+        if(!strcmp(argv[1],"collision_outside")) {bsp->edges.address=runtime.tags+runtime.used-1;expected=0;}
     }
     if (!strncmp(argv[1],"bitmap",6)) {
         header->count=2; instance[1]=instance[0]; instance[1].group='bitm'; instance[1].handle++;
@@ -446,6 +587,11 @@ int main(int argc, char **argv)
         }
     }
     CHECK(mcc_tags_validate(&runtime) == expected);
+    if (!strcmp(argv[1],"graph_model_complete")) {
+        struct test_graph *graph=instance[1].root;
+        struct test_graph_node *nodes=graph->nodes.address;
+        CHECK(nodes[0].first_child_node_index==2 && nodes[2].next_sibling_node_index==1);
+    }
     if (!strncmp(argv[1], "palette_", 8)) {
         int count = atoi(argv[1]+8);
         if (!count) count = 101;

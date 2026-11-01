@@ -376,6 +376,11 @@ high-res redraws are in [AUTHORS.md](AUTHORS.md). The main contributors are Jona
 
 ## Licence
 
+Optional bot and Android features credit their authors and earlier sources
+in [the provenance guide](docs/reading/bots_and_android_features.md).
+Adapted BirchWoodGod/thelinkin3000 bot tactics retain
+[GPL-3.0-only](LICENSES/GPL-3.0-only.txt), alongside the project's AGPL code.
+
 GulchCE is free software: you can give it to others and change it under the
 terms of the GNU Affero General Public License as published by the Free
 Software Foundation, version 3 of the License or (at your option) any later

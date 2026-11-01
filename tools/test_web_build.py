@@ -40,7 +40,8 @@ def graph(release=False, emcc="/opt/emsdk/upstream/emscripten/emcc"):
     sln = SimpleNamespace(build_dir=Path("build"), web_emcc=emcc, port_release=release, port_profile=False,
                           compiler_launcher=None)
     web_build.generate_web_build(ninja_syntax.Writer(out), sln)
-    return re.sub(r" \$\n +", " ", out.getvalue())
+    # Path emits native separators; these graph assertions use portable paths.
+    return re.sub(r" \$\n +", " ", out.getvalue()).replace("\\", "/")
 
 
 def compile_flags(text, source):
@@ -181,6 +182,7 @@ def test_licenses_txt_has_every_notice():
 
 
 @pytest.mark.skipif(not (shutil.which("cc") or shutil.which("clang")), reason="no C compiler")
+@pytest.mark.skipif(sys.platform == "win32", reason="native socket harness requires POSIX pthreads")
 def test_the_sockets_inside_the_page(tmp_path):
     compiler = shutil.which("cc") or shutil.which("clang")
     program = tmp_path / "web_net_test"

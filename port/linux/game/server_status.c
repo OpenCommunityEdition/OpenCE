@@ -245,6 +245,17 @@ void server_status_player(
 			(address >> 8) & 255, address & 255);
 		server_json_string(json, "address", address ? text : "");
 		server_json_string(json, "hwid", hardware_id ? hardware_id : "");
+		/* (and its Discord account: a verified one's, a pass that checked,
+		else what the machine says of itself) */
+		{
+			char discord_id[32], discord_name[48];
+			boolean verified = network_distributed_machine_discord(player->machine_index, discord_id,
+				sizeof(discord_id), discord_name, sizeof(discord_name));
+
+			server_json_string(json, "discord_id", discord_id);
+			server_json_string(json, "discord_name", discord_name);
+			server_json_boolean(json, "discord_verified", verified);
+		}
 	}
 	server_json_object_end(json);
 }

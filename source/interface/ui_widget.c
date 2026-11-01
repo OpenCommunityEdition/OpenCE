@@ -666,6 +666,7 @@ struct widget_instance;
 #include "networking/network_game_globals.h"
 #include "networking/network_server_manager.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "touch_postgame.h" /* port: port/linux/game/touch_postgame.c */
 #include "rasterizer/rasterizer.h"
 #include "saved games/player_profile.h"
 #include "saved games/playlist_profile.h"
@@ -1490,6 +1491,8 @@ static wchar_t const *const kills_to_win_extra_descriptions[] =
 /* port: an error message of the port's own text (display_error_text_deferred):
 the text waiting for its dialog, then the dialog's text box showing it */
 static wchar_t const *ui_widget_port_error_pending_text = NULL;
+/* port: one synchronous fatal-screen call; its text is copied by the caller. */
+static wchar_t const *ui_widget_port_fatal_text = NULL;
 static wchar_t const *ui_widget_port_error_text = NULL;
 static struct widget_instance *ui_widget_port_error_text_box = NULL;
 
@@ -3928,6 +3931,41 @@ static void widget_instance_initialize(
 	return;
 }
 
+/* port: (menu_functions.c's ADD PLAYER screen) the profile spinner among
+the widget's children on the first profile that is usable ("player profile
+list initialize" starts on player 1's), when the one it is on is not: the
+enumeration's high bit (available to its player) and the callback's say;
+the profile it is on, NONE if it has none */
+long ui_widget_port_spinner_first_available(
+	struct widget_instance *widget,
+	boolean (*usable)(short controller, long profile))
+{
+	struct widget_instance *spinner;
+	long const *profiles;
+	word index;
+
+	for (spinner = widget->child; spinner && spinner->type != _ui_widget_type_spinner_list; spinner = spinner->next)
+		;
+	if (!spinner || !(profiles = spinner->parameters.list.list_items) || !spinner->parameters.list.number_of_items)
+		return NONE;
+#define SPINNER_USABLE(profile) ((profile) != NONE && ((profile) & 0x80000000) && 	usable(spinner->local_player_index, (profile)))
+	if ((word)spinner->parameters.list.selected_index < spinner->parameters.list.number_of_items &&
+		SPINNER_USABLE(profiles[spinner->parameters.list.selected_index]))
+	{
+		return profiles[spinner->parameters.list.selected_index];
+	}
+	for (index = 0; index < spinner->parameters.list.number_of_items; index++)
+	{
+		if (SPINNER_USABLE(profiles[index]))
+		{
+			spinner->parameters.list.selected_index = (short)index;
+			return profiles[index];
+		}
+	}
+#undef SPINNER_USABLE
+	return NONE;
+}
+
 /* port: the PC version's events that this engine never sends (its custom
 activation), for the menus' functions (port/linux/game/menu_functions.c):
 runs the widget's handlers for the event, else the first descendant's that
@@ -4739,13 +4777,35 @@ void display_error_abort_to_dashboard(
 		widget->parameters.text_box.string_list_index = error_code;
 		widget->widget_is_error_dialog = TRUE;
 		dashboard_abort_error = error_code;
+		/* port: keep the fatal screen and lifecycle, with a loader's explanation. */
+		if (ui_widget_port_fatal_text)
+		{
+			ui_widget_port_error_text_box = widget;
+			ui_widget_port_error_text = ui_widget_port_fatal_text;
+		}
 	}
 	else
 	{
 		error(_error_silent, "failed to load '%s' widget", widget_name);
 	}
+	/* port: never carry this override into another error. */
+	ui_widget_port_fatal_text = NULL;
 
 	return;
+}
+
+/* port: CE precache errors need text while retaining display_error_damaged_media's
+fatal behaviour. The copy remains valid throughout its non-returning loop. */
+void display_error_damaged_media_text(wchar_t const *text)
+{
+	static wchar_t message[512];
+	if (text && text[0])
+	{
+		ustrncpy(message, text, NUMBEROF(message) - 1);
+		message[NUMBEROF(message) - 1] = 0;
+		ui_widget_port_fatal_text = message;
+	}
+	display_error_damaged_media();
 }
 
 void display_error_damaged_media(
@@ -6965,7 +7025,10 @@ static void ui_widgets_process_mouse(
 			ui_mouse_hover_x = pointer.x;
 			ui_mouse_hover_y = pointer.y;
 		}
-		if (pointer.left_clicks)
+		/* (a click on the carnage report's touchscreen buttons is the
+		report's: touch_postgame.c) */
+		if (pointer.left_clicks &&
+			(!game_engine_showing_postgame() || !touch_postgame_click(pointer.click_x, pointer.click_y)))
 		{
 			ui_mouse_click_pending = TRUE;
 			ui_mouse_click_x = pointer.click_x;
@@ -7206,11 +7269,19 @@ static void widget_instance_render_recursive(
 		 * added. Only flat fills (the dims, and the menus' vertical
 		 * gradient, at most 16 texels wide): a picture is drawn texel for
 		 * texel, so wider bounds would shift it (the loading screen). */
+		/* (a split screen's too: the pause menu's dim of a half screen,
+		640x240, and of a quarter, 320x240, whose right edge is already the
+		quarter's: the 640 columns are centred in the screen) */
 		boolean widen_to_screen =
 			bounds.x0 <= 0 && bounds.y0 <= 0 &&
-			bounds.x1 >= 640 && bounds.y1 >= 480 &&
+			bounds.x1 >= 320 && bounds.y1 >= 240 &&
 			bitmap->width <= 16 &&
 			halo_screen_width() > 640;
+		/* (the view's margins: the centring shift, on either side of the
+		640 columns, or of a quarter's 320; declared here, before the first
+		statement: C89) */
+		long extra = halo_screen_ui_offset_current();
+		short design_right = bounds.x1;
 
 		if (use_nifty_plasma_fx)
 		{
@@ -7221,9 +7292,8 @@ static void widget_instance_render_recursive(
 		}
 		if (widen_to_screen)
 		{
-			long extra = (halo_screen_width() - 640) / 2;
 			bounds.x0 -= (short)extra;
-			bounds.x1 = (short)(640 + extra);
+			bounds.x1 = (short)(bounds.x1 + extra);
 		}
 		bounds.x0 += offset.x;
 		bounds.x1 += offset.x;
@@ -7243,10 +7313,9 @@ static void widget_instance_render_recursive(
 			/* widen the clip by the same amount (it is offset-shifted but
 			 * still 640-wide at the edges) so the dim is not clipped back
 			 * to the centered columns */
-			long extra = (halo_screen_width() - 640) / 2;
 			if (clip->x0 <= 0)
 				clip->x0 -= (short)extra;
-			if (clip->x1 >= 640)
+			if (clip->x1 >= design_right)
 				clip->x1 = (short)(clip->x1 + extra);
 		}
 		if (TEST_FLAG(definition->flags, _widget_flash_background_bitmap_bit))
@@ -7831,7 +7900,8 @@ static boolean widget_takes_any_controller(
 static short widget_event_controller(
 	struct widget_instance const *widget)
 {
-	return widget_takes_any_controller(widget) ? NONE : widget->local_player_index;
+	return widget_takes_any_controller(widget) || pc_menu_screen_reads_every_controller(widget) ? NONE :
+		widget->local_player_index;
 }
 
 /* port: whether a widget of the local player (NONE: any) takes the
@@ -7846,10 +7916,12 @@ static boolean widget_takes_events_of_controller(
 {
 	short player;
 
+	if (pc_menu_screen_routes_by_controller(widget))
+		return !widget->parent || widget->local_player_index == controller_index;
 	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
 		return TRUE;
 	if (controller_index > 0 && controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS &&
-		widget_takes_any_controller(widget))
+		(widget_takes_any_controller(widget) || pc_menu_screen_reads_every_controller(widget)))
 	{
 		return TRUE;
 	}

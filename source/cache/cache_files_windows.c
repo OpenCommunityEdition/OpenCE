@@ -613,7 +613,8 @@ boolean cache_files_precache_map_begin(
 		error(_error_silent, "couldn't find the Custom Edition map '%s' in custom_maps", map_name);
 		if (copy_map)
 		{
-			display_error_damaged_media();
+			/* port: same fatal screen, with the CE refusal explained. */
+			custom_edition_cache_display_error(map_name);
 		}
 
 		return FALSE;

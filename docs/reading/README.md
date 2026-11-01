@@ -60,6 +60,10 @@ the map-family isolation rules are in [AGENTS.md](../../AGENTS.md).
 
 ## How to follow a feature
 
+The [optional bots and Android controls walkthrough](bots_and_android_features.md)
+follows host-owned bot actions, objective/tactical additions, gyro modes and
+the offline cheat menu, including lifecycle boundaries and source credits.
+
 1. Start with a concrete question, such as "what changes when I select
    120 degrees?" Find the setting name or the function that handles the
    visible action.

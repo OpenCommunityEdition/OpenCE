@@ -74,8 +74,8 @@ int main(int argc,char **argv) {
     if(test==4)clock_ms=UINT32_MAX-20;
     if(test>=8 && test<=10)failure=test-7;
     if(test==11)reenter=1;
-    mcc_loading_begin("mcc_maps/a10");assert(starts==1);
-    mcc_loading_begin("mcc_maps/b30");assert(starts==1);
+    assert(mcc_loading_begin("mcc_maps/a10"));assert(starts==1);
+    assert(!mcc_loading_begin("mcc_maps/b30"));assert(starts==1);
     if(failure) {
         assert(!frames);assert(releases==(failure==3));
         failure=0;clock_ms+=50;mcc_loading_pulse();assert(frames==1);
@@ -117,3 +117,53 @@ def test_loading_wraps_scenario_load_without_normal_frame_callbacks():
     controller = (ROOT / "port/linux/game/mcc_loading.c").read_text()
     for unsafe in ["main_loop(", "main_pregame_render(", "render_frame_pregame(", "network_game_update("]:
         assert unsafe not in controller
+
+
+def test_menu_probe_never_opens_a_loading_screen(tmp_path):
+    from harness import function
+    implementation = (ROOT / "port/linux/game/mcc_resources.c").read_text()
+    source = r'''
+#include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "mcc_cache_format.h"
+#include "mcc_errors.c"
+struct mcc_runtime {char level_name[64];struct mcc_cache_source source;
+    struct {int external_bitmap_count,external_sound_count;} report;char failure[320];};
+static int owns,starts,ends,last_success,fail;
+static int mcc_package_name(char const *name,char *out) {(void)name;out[0]=0;return 1;}
+enum mcc_cache_status mcc_cache_identify(void const *h,size_t b,uint64_t s,struct mcc_cache_identity *i) {
+    (void)h;(void)b;(void)s;i->tag_data_size=16;return fail==5 ? MCC_CACHE_WRONG_VERSION : MCC_CACHE_OK;
+}
+static int read_source(void *c,uint32_t o,uint32_t b,void *out) {(void)c;(void)o;memset(out,0,b);return fail!=4;}
+static int mcc_loading_begin(char const *name) {(void)name;starts++;return owns;}
+static void mcc_loading_end(int success) {assert(owns);ends++;last_success=success;}
+static enum mcc_cache_status load_stub(struct mcc_cache_source const *s,void *r,uint32_t n,void *report) {
+    (void)s;(void)r;(void)n;(void)report;return fail==6 ? MCC_CACHE_BAD_SOUND : MCC_CACHE_OK;
+}
+#define mcc_cache_load load_stub
+static int mcc_resources_select(struct mcc_runtime *r,void *raw) {(void)r;(void)raw;return fail!=1;}
+static int mcc_resources_fingerprint(struct mcc_runtime *r,unsigned char *d) {(void)r;(void)d;return fail!=2;}
+static int mcc_resources_checksum(struct mcc_runtime *r,unsigned bits,uint32_t *sum) {(void)r;(void)bits;*sum=1;return fail!=3;}
+static void mcc_resources_dispose(struct mcc_runtime *r) {(void)r;}
+''' + function(implementation, "mcc_resources_inspect") + r'''
+int main(void) {
+    struct mcc_cache_source source;unsigned char digest[32];uint32_t sum;int expected,started;char reason[320];
+    source.context=NULL;source.read=read_source;source.size=2048;
+    for(owns=0;owns<=1;owns++)for(fail=0;fail<7;fail++) {
+        starts=ends=0;last_success=-1;expected=fail==0;
+        started=fail!=4 && fail!=5;strcpy(reason,"stale failure");
+        assert(mcc_resources_inspect("mcc_maps/a10",&source,&sum,digest,reason,sizeof(reason))==expected);
+        (void)started;(void)mcc_loading_begin;(void)mcc_loading_end;
+        assert(starts==0 && ends==0 && last_success==-1);
+        assert((reason[0]==0)==expected);
+    }
+    return 0;
+}
+'''
+    path = tmp_path / "probe.c"
+    path.write_text(source)
+    output = tmp_path / "probe.exe"
+    _compile(path, output)
+    subprocess.run([str(output)], check=True, capture_output=True)

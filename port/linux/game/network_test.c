@@ -1496,7 +1496,9 @@ void network_test_update(
 		}
 	}
 
-	if (!main_menu_loaded)
+	/* The real menu waits for profile enumeration before accepting input.
+	Starting a lobby sooner can block its join on the profile mutex. */
+	if (!main_menu_loaded || filesystem_check_thread_is_active())
 		return;
 	/* the intro movie skipped first, as a button press does: the movie
 	holds the texture cache's spare memory, which starting the map

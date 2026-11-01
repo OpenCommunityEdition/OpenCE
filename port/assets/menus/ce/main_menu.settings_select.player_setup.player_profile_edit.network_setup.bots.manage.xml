@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/bots_manage_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/header_profile_network_settings"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/header_profile_network_settings" controller="1" left="35" top="11" width="605" height="59" type="text" text="MANAGE BOTS" font="ui\large_ui" color="#FFFFFFFF" text_y="18">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/help" type="text" controller="1" left="68" top="300" width="482" height="110" font="ui\large_ui" color="#FFFFFFFF">
+		<on event="created" run="port bots init"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/help">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_add_any" x="54" y="73"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_add_red" x="54" y="109"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_add_blue" x="54" y="145"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_drop_any" x="54" y="181"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_drop_red" x="54" y="217"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_drop_blue" x="54" y="253"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_add_any" type="text" width="512" height="28" bitmap="bitmaps/option_bkds" text="ADD BOT - ANY TEAM" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+		<on event="a" run="port bots command"/>
+		<on event="start" run="port bots command"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_add_red" type="text" width="512" height="28" bitmap="bitmaps/option_bkds" text="ADD BOT - RED TEAM" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+		<on event="a" run="port bots command"/>
+		<on event="start" run="port bots command"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_add_blue" type="text" width="512" height="28" bitmap="bitmaps/option_bkds" text="ADD BOT - BLUE TEAM" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+		<on event="a" run="port bots command"/>
+		<on event="start" run="port bots command"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_drop_any" type="text" width="512" height="28" bitmap="bitmaps/option_bkds" text="REMOVE BOT - ANY TEAM" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+		<on event="a" run="port bots command"/>
+		<on event="start" run="port bots command"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_drop_red" type="text" width="512" height="28" bitmap="bitmaps/option_bkds" text="REMOVE BOT - RED TEAM" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+		<on event="a" run="port bots command"/>
+		<on event="start" run="port bots command"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/op_drop_blue" type="text" width="512" height="28" bitmap="bitmaps/option_bkds" text="REMOVE BOT - BLUE TEAM" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+		<on event="a" run="port bots command"/>
+		<on event="start" run="port bots command"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" back="true"/>
+		<on event="start" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

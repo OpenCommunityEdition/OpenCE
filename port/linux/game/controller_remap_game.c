@@ -1,6 +1,7 @@
 /* Existing profile mappings remain authoritative for stock and menu input.
  * Custom layouts translate physical buttons before keyboard/touch merging. */
 #include "cseries.h"
+#include "memory/data.h"
 #include "controller_remap.h"
 #include "input/input_abstraction.h"
 #include "game/game.h"
@@ -11,9 +12,10 @@
 short network_chat_controller(void);
 static unsigned char camera_context[4];
 
-static int remap_game_active(void)
+/* input_initialize reads the pads before game_time_initialize has made the
+ * game time globals, which game_in_progress reads without checking. */
+static int remap_game_in_progress(void)
 {
-    /* Devices are polled before game time exists and between maps. */
     return game_time_initialized() && game_in_progress();
 }
 
@@ -47,7 +49,7 @@ void controller_remap_profile(short port, unsigned char *buttons)
 short controller_remap_local_player(short port)
 {
     short local;
-    if (port < 0 || port >= 4 || !remap_game_active()) return NONE;
+    if (port < 0 || port >= 4 || !remap_game_in_progress()) return NONE;
     for (local = local_player_get_next(NONE); local != NONE; local = local_player_get_next(local))
     {
         long player = local_player_get_player_index(local);
@@ -59,7 +61,8 @@ short controller_remap_local_player(short port)
 int controller_remap_playing(short port)
 {
     short local = controller_remap_local_player(port);
-    return local != NONE && !ui_widgets_active_for_local_player(local) &&
+    /* The main menu has a live UI-map player, but its widgets belong to NONE. */
+    return remap_game_in_progress() && !main_menu_is_active() && local != NONE && !ui_widgets_active_for_local_player(local) &&
         !console_is_active() && network_chat_controller() != port;
 }
 
@@ -67,20 +70,20 @@ int controller_remap_context(short port)
 {
     if (!controller_remap_playing(port))
     {
-        if (!remap_game_active() && port >= 0 && port < 4) camera_context[port] = 0;
+        if (!remap_game_in_progress() && port >= 0 && port < 4) camera_context[port] = 0;
         return 0;
     }
     return 1 + camera_context[port];
 }
 
-/* The director supplies availability. This never enables a camera or
- * bypasses the game's camera permissions. */
+/* The director supplies the free-camera context and retains camera selection
+ * and permissions. Cycle input is available in the normal player context too. */
 int controller_remap_camera(short local, int available, int controlling,
     unsigned int *held, unsigned int *pressed)
 {
     long player = local_player_get_player_index(local);
     short port;
-    unsigned int mask = ((1u << CONTROLLER_REMAP_ACTIONS) - 1) & ~((1u << PAD_CAMERA_FASTER) - 1);
+    unsigned int mask = ((1u << PAD_CAMERA_CYCLE) - 1) & ~((1u << PAD_CAMERA_FASTER) - 1);
     *held = *pressed = 0;
     if (player == NONE) return 0;
     port = player_get(player)->local_player_index;
@@ -90,7 +93,8 @@ int controller_remap_camera(short local, int available, int controlling,
         unsigned char layout[CONTROLLER_REMAP_ACTIONS];
         if (!controller_remap_read(port, layout)) { camera_context[port] = 0; return 0; }
     }
-    if (!available || !controller_remap_connected(port)) return 0;
+    /* Custom cycling also owns the shortcut before a debug camera is active. */
+    if (!controller_remap_connected(port)) return 0;
     *held = controller_remap_held(port) & mask;
     *pressed = controller_remap_pressed(port, mask);
     return 1;

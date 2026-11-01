@@ -4,6 +4,7 @@
 struct network_game;
 struct mcc_runtime;
 struct mcc_cache_source;
+int mcc_identity_prepare_host(char const *name);
 void const *mcc_identity_host_settings(void const *game, long bytes, struct network_game *copy);
 int mcc_identity_accept(struct network_game const *game);
 void mcc_identity_disconnect(void);

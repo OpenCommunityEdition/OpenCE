@@ -1879,6 +1879,8 @@ void rasterizer_draw(
 	struct vertex_buffer const *vertex_buffer,
 	long dynamic_vertex_buffer_index)
 {
+	/* port: select/compile loading-time materials without submitting geometry. */
+	if (material_prepare_draw()) return;
 	match_assert(
 		RASTERIZER_XBOX_DRAW_PRIMITIVES_FILE,
 		1145,

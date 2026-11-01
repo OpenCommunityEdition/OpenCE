@@ -73,6 +73,28 @@ def test_empty_history_and_no_subject_fallback(repo):
     assert repo.collect(head=repo.baseline)[0]["entries"][0]["notes"] == []
 
 
+def test_published_category_correction_is_commit_scoped(repo, monkeypatch):
+    correction = player_notes.HISTORICAL_NOTE_PREFIXES[
+        "4f3eec76a1165a111bff83047b064a55c156f3bc"]
+    sha = repo.commit("Published merge\n\nPlayer-Note: [Android] Open Cheats directly.\n"
+                      "Player-Note: [Android] Hosts can use cheats online.")
+    monkeypatch.setattr(player_notes, "HISTORICAL_NOTE_PREFIXES", {sha: correction})
+    data, _, _ = repo.collect()
+    assert texts(data) == ["Open Cheats directly.", "Hosts can use cheats online."]
+    assert data["entries"][0]["categories"] == ["ANDROID", "ANDROID"]
+    later = repo.commit("New invalid note\n\nPlayer-Note: [Android] A different change.")
+    with pytest.raises(player_notes.NotesError, match=later):
+        repo.collect()
+
+
+def test_historical_prefix_correction_keeps_note_validation(repo, monkeypatch):
+    sha = repo.commit("Malformed text\n\nPlayer-Note: [Android] Bad|menu text.")
+    monkeypatch.setattr(player_notes, "HISTORICAL_NOTE_PREFIXES",
+                        {sha: ("Player-Note: [Android] ", "Player-Note: [ANDROID] ")})
+    with pytest.raises(player_notes.NotesError, match="without backslashes or menu pipes"):
+        repo.collect()
+
+
 def test_prose_mentioning_annotation_syntax_is_not_an_annotation(repo):
     repo.commit("Document Player-Note usage\n\nPlayer-Note approach is authored, not inferred.\n"
                 "Write Player-Note: short text in the body.\n"

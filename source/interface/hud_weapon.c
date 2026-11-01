@@ -80,6 +80,7 @@ symbols in this file:
 #include "units/units.h"
 #include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "custom_edition_hud.h" /* port: CE warning placement and reticle classification */
+#include "custom_edition_hud_draw.h" /* port: port/linux/game/custom_edition_hud_draw.c */
 #include "hud_hires_crosshairs.h" /* port: port/linux/game/hud_hires_tags.c */
 
 #include <math.h>
@@ -1302,6 +1303,8 @@ static void crosshairs_draw(
 											}
 
 											inverse_scale = 1.0f / scale;
+											/* port: a CE scope covers the view at its converted bitmap scale. */
+											inverse_scale /= custom_edition_hud_bitmap_scale(element->crosshairs.bitmap.index);
 											expand_u = (bitmap->width - (render.camera.viewport_bounds.x1 - render.camera.viewport_bounds.x0) * inverse_scale) *
 												texel_scale_u * -0.5f;
 											expand_v = (bitmap->height - (render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0) * inverse_scale) *

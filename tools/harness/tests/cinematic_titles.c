@@ -4,8 +4,9 @@ CINEMATIC_TITLES.C (test)
 The real cinematic_render (cinematics.c) over a fake scenario with one title, as
 some Custom Edition maps show their name for the whole game: drawn in the game,
 not over a menu (the screen's overlays are drawn after the players' menus), and
-its time going on under one. test_cinematic_titles.py takes the structures, the
-slots' count (config.inc) and the code (under_test.inc).
+its time going on under one. Widescreen placement follows the title alignment;
+MCC clipping expansion preserves that anchor. test_cinematic_titles.py takes the
+structures, the slots' count (config.inc) and the code (under_test.inc).
 */
 
 #include <math.h>
@@ -81,8 +82,13 @@ static void draw_string_set_draw_mode(long font_index, short style, short justif
 	drawn_alpha = color->alpha;
 }
 static void rasterizer_text_set_shadow_color(pixel32 color) { shadow = color; }
-static short halo_screen_width(void) { return 640; }
-#define rasterizer_draw_unicode_string(bounds, style, color, flags, string) (draws++, drawn_shadow = shadow)
+static short screen_width = 640;
+static boolean mcc_loaded;
+#define SHORT_MAX 32767
+static short halo_screen_width(void) { return screen_width; }
+static boolean mcc_cache_tags_loaded(void) { return mcc_loaded; }
+static rectangle2d drawn_bounds;
+#define rasterizer_draw_unicode_string(bounds, style, color, flags, string) (draws++, drawn_shadow = shadow, drawn_bounds = *(bounds))
 
 #include "under_test.inc"
 
@@ -124,6 +130,120 @@ int main(int argc, char **argv)
 	struct cinematic_title const *slot = &globals_data.queued_titles[0];
 	long index;
 
+	CASE("title-screen-anchors")
+	{
+		static short const widths[] = { 640, 852, 1120, 480 };
+		static short const shifts[3][4] = {
+			{ 0, 13, 30, -10 }, /* left edge at 40 */
+			{ 0, 197, 447, -149 }, /* right edge at 597 */
+			{ 0, 105, 238, -79 } /* center at 318 */
+		};
+		short alignment, width;
+		rectangle2d original;
+		queue_title(1000000.0f, 1.0f);
+		titles[0].bounds.x0 = 40;
+		titles[0].bounds.x1 = 597;
+		original = titles[0].bounds;
+		for (alignment = 0; alignment < 3; alignment++)
+		{
+			titles[0].justification = alignment;
+			for (width = 0; width < 4; width++)
+			{
+				screen_width = widths[width];
+				frame();
+				CHECK(drawn_bounds.x0 == 40 + shifts[alignment][width] &&
+					drawn_bounds.x1 == 597 + shifts[alignment][width],
+					"alignment %d at width %d: bounds %d..%d", alignment, screen_width, drawn_bounds.x0, drawn_bounds.x1);
+				CHECK(drawn_bounds.y0 == original.y0 && drawn_bounds.y1 == original.y1, "vertical bounds moved");
+				CHECK(!memcmp(&original, &titles[0].bounds, sizeof(original)), "authored bounds mutated");
+			}
+		}
+		return 0;
+	}
+	CASE("default-title-anchor")
+	{
+		queue_title(1000000.0f, 1.0f);
+		hud_globals->defaults.default_title_bounds = titles[0].bounds;
+		hud_globals->defaults.default_title_bounds.x0 = 0;
+		hud_globals->defaults.default_title_bounds.x1 = 597;
+		titles[0].bounds.x1 = titles[0].bounds.x0;
+		titles[0].justification = 1;
+		screen_width = 852;
+		frame();
+		CHECK(drawn_bounds.x0 == 197 && drawn_bounds.x1 == 794, "default bounds did not use right anchor");
+		CHECK(hud_globals->defaults.default_title_bounds.x1 == 597, "HUD default bounds mutated");
+		return 0;
+	}
+	CASE("mcc-title-screen-anchor")
+	{
+		queue_title(1000000.0f, 1.0f);
+		titles[0].bounds.x0 = 40;
+		titles[0].bounds.x1 = 597;
+		titles[0].justification = 1;
+		screen_width = 852;
+		mcc_loaded = TRUE;
+		frame();
+		CHECK(drawn_bounds.x0 == 0 && drawn_bounds.x1 == 794, "MCC expansion changed right anchor");
+		titles[0].text_flags = 1;
+		frame();
+		CHECK(drawn_bounds.x0 == 237 && drawn_bounds.x1 == 794, "wrapping title moved its anchor");
+		mcc_loaded = FALSE;
+		titles[0].text_flags = 0;
+		frame();
+		CHECK(drawn_bounds.x0 == 237 && drawn_bounds.x1 == 794, "MCC expansion leaked into legacy title");
+		screen_width = 640;
+		frame();
+		CHECK(drawn_bounds.x0 == 40 && drawn_bounds.x1 == 597, "resolution change retained wide bounds");
+		return 0;
+	}
+	CASE("mcc-title-bounds")
+	{
+		rectangle2d original;
+		queue_title(1000000.0f, 1.0f);
+		titles[0].bounds.x0 = 240;
+		titles[0].bounds.x1 = 400;
+		titles[0].justification = 2;
+		original = titles[0].bounds;
+		/* Xbox and CE keep the exact authored clipping rectangle. */
+		frame();
+		CHECK(drawn_bounds.x0 == 240 && drawn_bounds.x1 == 400, "legacy bounds changed");
+		mcc_loaded = TRUE;
+		frame();
+		CHECK(drawn_bounds.x0 == 0 && drawn_bounds.x1 == 640, "MCC title still clipped");
+		CHECK(drawn_bounds.y0 == original.y0 && drawn_bounds.y1 == original.y1, "vertical bounds changed");
+		CHECK(!memcmp(&original, &titles[0].bounds, sizeof(original)), "authored tag changed");
+		screen_width = 854;
+		frame();
+		CHECK(drawn_bounds.x0 == 0 && drawn_bounds.x1 == 854, "widescreen center moved");
+		titles[0].text_flags = 1;
+		frame();
+		CHECK(drawn_bounds.x0 == 347 && drawn_bounds.x1 == 507, "wrapping bounds changed");
+		titles[0].text_flags = 0;
+		mcc_loaded = FALSE;
+		frame();
+		CHECK(drawn_bounds.x0 == 347 && drawn_bounds.x1 == 507, "MCC bounds leaked after unload");
+		return 0;
+	}
+	CASE("mcc-title-anchors")
+	{
+		rectangle2d bounds = { 160, 100, 500, 261 };
+		mcc_loaded = TRUE;
+		mcc_hud_title_bounds(&bounds, 2, 0);
+		CHECK(bounds.x0 == 0 && bounds.x1 == 361, "odd-width center moved");
+		bounds.x0 = 240; bounds.x1 = 400;
+		mcc_hud_title_bounds(&bounds, 0, 0);
+		CHECK(bounds.x0 == 240 && bounds.x1 == 640, "left anchor moved");
+		bounds.x0 = 240; bounds.x1 = 400;
+		mcc_hud_title_bounds(&bounds, 1, 0);
+		CHECK(bounds.x0 == 0 && bounds.x1 == 400, "right anchor moved");
+		bounds.x0 = -10; bounds.x1 = 400;
+		mcc_hud_title_bounds(&bounds, 2, 0);
+		CHECK(bounds.x0 == -10 && bounds.x1 == 400, "offscreen bounds changed");
+		bounds.x0 = 400; bounds.x1 = 240;
+		mcc_hud_title_bounds(&bounds, 2, 0);
+		CHECK(bounds.x0 == 400 && bounds.x1 == 240, "inverted bounds changed");
+		return 0;
+	}
 	/* a title for the whole game, no menu: drawn each frame, opaque */
 	CASE("drawn-in-the-game")
 	{

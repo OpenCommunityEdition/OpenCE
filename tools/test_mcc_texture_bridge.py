@@ -94,6 +94,7 @@ static void *tracked_calloc(size_t count,size_t bytes) {
 }
 static void tracked_free(void *p) {if(p)live_allocations--;free(p);}
 void glGenTextures(int count,GLuint *p) {(void)count;*p=fail_generate?0:++generated;}
+GLuint xgpu_texture_name_new(void) {GLuint texture;glGenTextures(1,&texture);return texture;}
 void glDeleteTextures(int count,GLuint const *p) {(void)count;if(!*p)exit(80);deleted++;}
 void xgpu_gl_state_invalidate(void) {invalidated++;}
 void xgpu_mcc_texture_unbind(DWORD const *p) {if(!p)exit(81);unbound++;}
@@ -159,10 +160,14 @@ int main(int argc,char **argv) {
         if(deleted!=2 || live_allocations)return 49;
     } else if(!strcmp(argv[1],"identity")) {
         DWORD copy[5];
+        struct xgpu_texture_description description;
         header=mcc_texture_bridge_register(&owner,format(2,2,0,1,0),0,pixels,sizeof(pixels));
         if(!header||header!=mcc_texture_bridge_find(&owner)||mcc_texture_bridge_find(&other))return 1;
         if(header!=mcc_texture_bridge_register(&owner,0,0,NULL,0)||allocations!=1)return 2;
         memcpy(copy,header,sizeof(copy));
+        if(!xgpu_mcc_texture_describe(header,&description) || description.width!=4 || uploads || generated ||
+            xgpu_mcc_texture_describe(copy,&description) || xgpu_mcc_texture_describe(NULL,&description) ||
+            xgpu_mcc_texture_describe((DWORD const *)(uintptr_t)1,&description))return 50;
         if(get(copy,&texture,&target)||get((DWORD const *)(uintptr_t)1,&texture,&target)||get(NULL,&texture,&target))return 3;
         if(!get(header,&texture,&target)||!texture||target!=GL_TEXTURE_2D||uploads!=1||last_pixels!=pixels)return 4;
         if(!get(header,&texture,&target)||uploads!=1)return 5;
@@ -248,6 +253,23 @@ int main(int argc,char **argv) {
         header=mcc_texture_bridge_register(&owner,format(10,13,0,14,0),0,data,chain_bytes);
         if(!header || !get(header,&texture,&target) || !texture || target!=GL_TEXTURE_2D)return 25;
         mcc_texture_bridge_dispose();free(data);
+    } else if(!strcmp(argv[1],"prepare")) {
+        enum {chain_bytes=1398100};
+        unsigned char *data=malloc(chain_bytes);unsigned long charge;
+        if(!data)return 40;
+        header=mcc_texture_bridge_register(&owner,format(9,9,0,10,0),0,data,chain_bytes);
+        if(!header || mcc_texture_bridge_prepare(&other,chain_bytes) ||
+            mcc_texture_bridge_prepare(&owner,chain_bytes-1) || generated)return 41;
+        fail_upload=1;
+        if(mcc_texture_bridge_prepare(&owner,chain_bytes) || generated!=1 || deleted!=1)return 42;
+        fail_upload=0;charge=mcc_texture_bridge_prepare(&owner,chain_bytes);
+        if(charge!=chain_bytes || generated!=2 || uploads!=2)return 43;
+        if(mcc_texture_bridge_prepare(&owner,chain_bytes) || !get(header,&texture,&target) || uploads!=2)return 44;
+        mcc_texture_bridge_dispose();if(deleted!=2)return 45;
+        header=mcc_texture_bridge_register(&owner,
+            (format(9,9,0,10,0)&~D3DFORMAT_FORMAT_MASK)|(D3DFMT_P8<<D3DFORMAT_FORMAT_SHIFT),0,data,chain_bytes);
+        if(!header || mcc_texture_bridge_prepare(&owner,chain_bytes) || generated!=2)return 46;
+        mcc_texture_bridge_dispose();free(data);
     } else if(!strcmp(argv[1],"pressure")) {
         enum {count=13,chain_bytes=22369664};
         unsigned char *data[count];DWORD *headers[count];unsigned i,frame;
@@ -286,7 +308,7 @@ int main(int argc,char **argv) {
     return binary
 
 
-@pytest.mark.parametrize("case", ["hud", "identity", "bounds", "failure", "dispose", "palette", "descriptors", "pressure", "credits", "wide_linear"])
+@pytest.mark.parametrize("case", ["hud", "identity", "bounds", "failure", "dispose", "palette", "descriptors", "prepare", "pressure", "credits", "wide_linear"])
 def test_mcc_texture_bridge(bridge_tool, case):
     result = subprocess.run([str(bridge_tool), case], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, f"{case}: exit {result.returncode}\n{result.stdout}{result.stderr}"

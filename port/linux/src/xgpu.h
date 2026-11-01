@@ -13,6 +13,16 @@ device itself (d3d8_gl.c).
 #include "platform.h"
 #include "gl.h"
 
+/* display.reversed_depth (desktop GL, taken up as the context is made): the
+depth buffers hold 32-bit floats, 1.0 at the near plane and 0.0 at the far
+(d3d8_gl.c turns the game's Direct3D depth around: its tests, clears, depth
+range and polygon offsets; nv2a_vsh.c and nv2a_psh.c the depth they give).
+A float's precision follows its size, so reversed it is about the same at
+every distance, where 24 bits and Direct3D's depth spend most of theirs near
+the camera: surfaces a few millimetres apart, which 24 bits run together
+past a few tens of metres (Blood Gulch's lights on the base), stay apart. */
+extern BOOL xgpu_reversed_depth;
+
 #ifdef HALO_GLES
 /* OpenGL ES features that are optional (d3d8_gl.c gl_initialize) */
 struct xgpu_capabilities
@@ -58,6 +68,10 @@ int xgpu_gl_ready(void);
 /* a texture about to be deleted: the binding shadows forget it, since GL
 may give its name to a new texture (call before glDeleteTextures) */
 void xgpu_gl_texture_deleted(unsigned int texture);
+
+GLuint xgpu_texture_name_new(void);
+void xgpu_texture_names_prepare(void);
+void xgpu_texture_names_dispose(void);
 
 /* a compiled shader, or a linked program of two, or 0 with the log
 written */
@@ -171,6 +185,8 @@ struct nv2a_pixel_shader_key
 	unsigned char mcc_bump_attenuation;
 	/* Optional model-light falloff/occlusion, only for selected point lights. */
 	unsigned char plasma_model;
+	/* The procedural surface is needed only while a shield draw enables it. */
+	unsigned char shield_honeycomb;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
@@ -237,6 +253,7 @@ void xgpu_statistics_texture_upload(unsigned long bytes);
 /* MCC-owned immutable resources never enter the guest physical texture cache. */
 BOOL xgpu_mcc_texture_get(DWORD const *resource, D3DCOLOR const *palette,
 	GLuint *texture, GLenum *target, struct xgpu_texture_description *description);
+BOOL xgpu_mcc_texture_describe(DWORD const *resource, struct xgpu_texture_description *description);
 BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target,
 	struct xgpu_texture_description const *description, void const *pixels,
 	unsigned long bytes, D3DCOLOR const *palette);
@@ -306,6 +323,7 @@ enum
 	_xgpu_tone_mapping_neutral,
 	_xgpu_tone_mapping_aces,
 	_xgpu_tone_mapping_reinhard,
+	_xgpu_tone_mapping_gt7,
 	NUMBER_OF_XGPU_TONE_MAPPINGS
 };
 
@@ -317,6 +335,8 @@ struct xgpu_tone_mapping
 	/* the brightest value the curve gives, in the display's whites: 1.0 for
 	SDR, an HDR display's headroom */
 	float peak;
+	/* with an HDR display, paper white in GT7's units (100 nits); 0 for SDR */
+	float paper;
 };
 
 /* the tone mapping and presentation programs made now; FALSE if they
@@ -349,5 +369,11 @@ void xgpu_static_buffers_remove(const void *buffers, long count, unsigned long s
 /* Android: size bytes of vertices or indices from start, as above */
 void xgpu_static_range_add(const void *start, unsigned long size, int indices);
 void xgpu_static_range_remove(const void *start, int indices);
+/* fills the corners x0, y0 to x1, y1 of the window (row 0 at the bottom)
+with color, as it is (an HDR display's scRGB framebuffer: linear, 1.0 at 80
+nits), or only the ring ring[0], ring[1] (its centre in the window), from
+radius ring[3] to ring[2]; ring[2] 0 for the whole rectangle. FALSE if its
+program does not build. */
+BOOL xgpu_post_fill(const GLint corners[4], const float color[3], const float ring[4]);
 
 #endif

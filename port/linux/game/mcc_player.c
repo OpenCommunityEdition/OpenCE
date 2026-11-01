@@ -3,6 +3,9 @@
 #include "cseries.h"
 #include "math/real_math.h"
 #include "game/players.h"
+#include "game/game.h"
+#include "scenario/scenario.h"
+#include "mcc_cache.h"
 #include "units/units.h"
 #include "scenario/scenario_definitions.h"
 #include "mcc_grenades.h"
@@ -41,4 +44,27 @@ void mcc_player_profile_grenades(long unit, struct scenario_starting_profile con
 void mcc_player_postspawn_grenades(long unit, boolean disabled)
 {
     if (mcc_grenades_active() && disabled) mcc_grenades_clear(unit);
+}
+
+/* MCC reset profiles replace the held weapon too. The Xbox inventory clear
+ * retains it; Meincrap's selector would keep its readied dummy
+ * weapon and repeatedly select new profiles. Delete through the normal object
+ * service so first-person references and replicated deletions are handled. */
+void mcc_player_add_equipment(long unit_index, short profile_index, boolean reset)
+{
+    struct unit_datum *unit;
+    struct scenario *scenario;
+    short slot;
+    if (!mcc_cache_tags_loaded() || game_connection() == _game_connection_network_client ||
+        unit_index == NONE || !(unit = unit_try_and_get(unit_index)) || unit->unit.player_index == NONE)
+        return;
+    scenario = global_scenario_get();
+    if (!scenario || profile_index < 0 || profile_index >= scenario->starting_profiles.count) return;
+    slot = unit->unit.current_weapon_index;
+    if (reset && slot >= 0 && slot < MAXIMUM_WEAPONS_PER_UNIT &&
+        unit->unit.weapon_object_indices[slot] != NONE)
+        object_delete(unit->unit.weapon_object_indices[slot]);
+    /* MCC scripts name each recipient themselves, including local_players;
+     * do not expand one player's profile to the legacy co-op followers. */
+    player_add_equipment(unit_index, profile_index, reset);
 }

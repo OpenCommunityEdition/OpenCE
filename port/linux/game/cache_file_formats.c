@@ -24,6 +24,7 @@ evidence.
 /* ---------- headers */
 
 #include "cache_file_formats.h"
+#include "custom_edition_hud_scale.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -89,6 +90,9 @@ cache_files_structures.hpp, s_cache_tag_header and s_cache_tag_instance) */
 #define TAG_INSTANCE_NAME_OFFSET 0x10
 #define TAG_INSTANCE_ADDRESS_OFFSET 0x14
 #define TAG_INSTANCE_IN_RESOURCE_MAP_OFFSET 0x18
+/* the second of the instance's unused words, left zero: its first byte is
+an empty name for tags whose own is unusable */
+#define TAG_INSTANCE_EMPTY_NAME_OFFSET 0x1C
 /* the longest tag path a name may hold, terminator excluded */
 #define TAG_NAME_MAXIMUM_LENGTH 255
 
@@ -752,7 +756,15 @@ static struct element_layout const transparent_chicago_extended_layout =
 {
 	TRANSPARENT_CHICAGO_EXTENDED_BYTES, transparent_chicago_extended_blocks, 3, NULL, 0, NULL
 };
+static custom_edition_structure_bsp_proc structure_bsp_proc = NULL;
 
+void custom_edition_structure_bsp_proc_set(
+	custom_edition_structure_bsp_proc proc)
+{
+	structure_bsp_proc = proc;
+
+	return;
+}
 /* The value of the type field each shader group has in Custom Edition, which
 inserted transparent chicago extended at 7 (OpenSauce
 shader_definitions.hpp, e_shader_type), and in this build (shaders.c); a
@@ -1858,7 +1870,7 @@ static enum cache_file_status structure_bsp_geometry_verify(
 
 static enum cache_file_status structure_bsps_verify(
 	struct load_state *state,
-	uint8_t const *tag_instances,
+	uint8_t *tag_instances,
 	int32_t tag_count,
 	uint32_t scenario_offset,
 	uint32_t *checksum)
@@ -1891,6 +1903,23 @@ static enum cache_file_status structure_bsps_verify(
 		uint32_t bsp_pointer;
 		enum cache_file_status status;
 
+		/* port: map protection can rename a structure BSP's group, as it does the
+		scenario's; a tag the scenario names as one, with no address yet (a BSP has
+		none until it loads) and not held by a resource map, is one */
+		if (tag_index < (uint32_t)tag_count)
+		{
+			uint8_t *bsp_instance = tag_instances + tag_index * TAG_INSTANCE_BYTES;
+
+			if (read_u32(bsp_instance + TAG_INSTANCE_HANDLE_OFFSET) == tag_handle &&
+				read_u32(bsp_instance + TAG_INSTANCE_GROUP_OFFSET) != STRUCTURE_BSP_GROUP_TAG &&
+				!read_u32(bsp_instance + TAG_INSTANCE_ADDRESS_OFFSET) &&
+				!read_u32(bsp_instance + TAG_INSTANCE_IN_RESOURCE_MAP_OFFSET))
+			{
+				write_u32(bsp_instance + TAG_INSTANCE_GROUP_OFFSET, STRUCTURE_BSP_GROUP_TAG);
+				write_u32(bsp_instance + TAG_INSTANCE_PARENT_GROUP_OFFSET, NO_GROUP_TAG);
+				write_u32(bsp_instance + TAG_INSTANCE_PARENT_GROUP_OFFSET + 4, NO_GROUP_TAG);
+			}
+		}
 		/* the tag the reference names: a structure BSP, not yet loaded */
 		if (tag_index >= (uint32_t)tag_count ||
 			read_u32(tag_instances + tag_index * TAG_INSTANCE_BYTES + TAG_INSTANCE_HANDLE_OFFSET) != tag_handle ||
@@ -1929,6 +1958,19 @@ static enum cache_file_status structure_bsps_verify(
 		{
 			free(bsp);
 			return load_fail(state, _cache_file_status_bad_structure_bsp_header, (uint32_t)file_offset);
+		}
+		/* port: the references a protected map's bsp holds name the groups of
+		tags whose own are scrambled (tag_validate.c) */
+		if (structure_bsp_proc)
+		{
+			structure_bsp_proc(
+				state->tag_cache,
+				state->used_bytes,
+				bsp_index,
+				bsp,
+				(uint32_t)size,
+				bsp_address,
+				state->report->identity.name);
 		}
 		status = structure_bsp_geometry_verify(state, bsp, (uint32_t)size, bsp_address);
 		free(bsp);
@@ -2324,7 +2366,11 @@ enum cache_file_status custom_edition_cache_load(
 		{
 			return load_fail(&state, _cache_file_status_bad_tag_handle, handle);
 		}
-		if (!tag_name_get(&state, instance))
+		/* port: a protected map's tag names may lie anywhere; only a tag held by a
+		resource map needs its name (to find its entry), and is checked again
+		below. The others are given an empty name after the checksum. */
+		if (read_u32(instance + TAG_INSTANCE_IN_RESOURCE_MAP_OFFSET) &&
+			!tag_name_get(&state, instance))
 		{
 			return load_fail(&state, _cache_file_status_bad_tag_name, read_u32(instance + TAG_INSTANCE_NAME_OFFSET));
 		}
@@ -2347,7 +2393,10 @@ enum cache_file_status custom_edition_cache_load(
 			is past the tags */
 			write_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET, 0);
 		}
-		else if (!address || !tag_cache_offset(&state, address, 1, &offset))
+		/* port: a protected map may leave a tag without data (address 0), which
+		Halo PC tolerates while nothing reads it; the validator refuses any
+		reference to such a tag (tag_validate.c) */
+		else if (address && !tag_cache_offset(&state, address, 1, &offset))
 		{
 			return load_fail(&state, _cache_file_status_bad_tag_address, address);
 		}
@@ -2403,6 +2452,26 @@ enum cache_file_status custom_edition_cache_load(
 	{
 		report->warnings |= 1UL << _custom_edition_warning_checksum_mismatch_bit;
 	}
+
+	/* port: a name that lies outside the tag data or is not terminated (map
+	protection scrambles them; Halo PC never needed them) becomes an empty
+	one: a zero byte in the tag's own instance. tag_validate.c then makes
+	it its own empty name. */
+	for (tag_index_value = 0; tag_index_value < tag_count; tag_index_value++)
+	{
+		uint8_t *instance = tag_instances + (uint32_t)tag_index_value * TAG_INSTANCE_BYTES;
+
+		state.tag_index = tag_index_value;
+		if (!read_u32(instance + TAG_INSTANCE_IN_RESOURCE_MAP_OFFSET) && !tag_name_get(&state, instance))
+		{
+			write_u32(instance + TAG_INSTANCE_EMPTY_NAME_OFFSET, 0);
+			write_u32(
+				instance + TAG_INSTANCE_NAME_OFFSET,
+				CUSTOM_EDITION_TAG_CACHE_ADDRESS + instances_offset +
+					(uint32_t)tag_index_value * TAG_INSTANCE_BYTES + TAG_INSTANCE_EMPTY_NAME_OFFSET);
+		}
+	}
+	state.tag_index = NO_TAG_INDEX;
 
 	/* the tags held by resource maps, placed after the tag data */
 	for (tag_index_value = 0; tag_index_value < tag_count; tag_index_value++)
@@ -2460,6 +2529,10 @@ enum cache_file_status custom_edition_cache_load(
 			continue;
 		}
 		state.tag_index = tag_index_value;
+		if (!read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET))
+		{
+			continue;
+		}
 		if (!tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), layout->bytes, &offset))
 		{
 			return load_fail(&state, _cache_file_status_bad_tag_address, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET));
@@ -3127,7 +3200,7 @@ flag at half the size of its bitmap, and Custom Edition's HUD bitmaps are
 made for that: in Blood Gulch every flagged element draws a bitmap twice the
 size of the one its Xbox counterpart draws, and every other element one of
 the same size (docs/custom_edition_caches.md). A bitmap may ask the same of
-every element that draws it (hud_bitmap_halves_scale). This build has no
+every element that draws it (hud_bitmap_scale_flags). This build has no
 such flags (hud_draw.c draws a bitmap at its size times the placement's
 scale), so the scale takes them in.
 
@@ -3137,15 +3210,18 @@ items are halved by their bitmap's flags alone. A number keeps its flag,
 which hud_draw_numbers reads: its scale is not its digits'. */
 static void hud_placement_convert(
 	uint8_t *placement,
-	int bitmap_halves_scale,
+	uint16_t bitmap_flags,
+	int items,
 	struct custom_edition_conversion_report *report)
 {
 	uint16_t flags = read_u16(placement + HUD_PLACEMENT_SCALING_FLAGS_OFFSET);
+	float scale = custom_edition_hud_scale(bitmap_flags,
+		!items && flag_is_set(flags, HUD_SCALING_USE_HIGH_RESOLUTION_SCALE_BIT));
 
-	if (flag_is_set(flags, HUD_SCALING_USE_HIGH_RESOLUTION_SCALE_BIT) || bitmap_halves_scale)
+	if (scale != 1.0f)
 	{
-		write_f32(placement + HUD_PLACEMENT_WIDTH_SCALE_OFFSET, read_f32(placement + HUD_PLACEMENT_WIDTH_SCALE_OFFSET) * 0.5f);
-		write_f32(placement + HUD_PLACEMENT_HEIGHT_SCALE_OFFSET, read_f32(placement + HUD_PLACEMENT_HEIGHT_SCALE_OFFSET) * 0.5f);
+		write_f32(placement + HUD_PLACEMENT_WIDTH_SCALE_OFFSET, read_f32(placement + HUD_PLACEMENT_WIDTH_SCALE_OFFSET) * scale);
+		write_f32(placement + HUD_PLACEMENT_HEIGHT_SCALE_OFFSET, read_f32(placement + HUD_PLACEMENT_HEIGHT_SCALE_OFFSET) * scale);
 		write_u16(
 			placement + HUD_PLACEMENT_SCALING_FLAGS_OFFSET,
 			(uint16_t)(flags & ~(1U << HUD_SCALING_USE_HIGH_RESOLUTION_SCALE_BIT)));
@@ -3155,9 +3231,8 @@ static void hud_placement_convert(
 	return;
 }
 
-/* whether the bitmap a HUD element draws (its tag reference) has Halo PC's
-half HUD scale or force HUD high resolution scale flag */
-static int hud_bitmap_halves_scale(
+/* The flags of the bitmap a HUD element draws (its tag reference). */
+static uint16_t hud_bitmap_scale_flags(
 	struct load_state const *state,
 	uint8_t const *reference)
 {
@@ -3180,7 +3255,7 @@ static int hud_bitmap_halves_scale(
 	}
 	flags = read_u16(state->tag_cache + offset + BITMAP_GROUP_FLAGS_OFFSET);
 
-	return flag_is_set(flags, BITMAP_HALF_HUD_SCALE_BIT) || flag_is_set(flags, BITMAP_FORCE_HUD_HIGH_RESOLUTION_SCALE_BIT);
+	return flags;
 }
 
 /* the placement at `placement_offset` in each element of the block at
@@ -3355,17 +3430,9 @@ static void hud_conversion_placement(
 	int items)
 {
 	struct hud_conversion const *conversion = context;
-	int bitmap_halves_scale = bitmap && hud_bitmap_halves_scale(conversion->state, bitmap);
+	uint16_t bitmap_flags = bitmap ? hud_bitmap_scale_flags(conversion->state, bitmap) : 0;
 
-	if (items)
-	{
-		if (bitmap_halves_scale)
-			hud_placement_convert(placement, 1, conversion->report);
-	}
-	else
-	{
-		hud_placement_convert(placement, bitmap_halves_scale, conversion->report);
-	}
+	hud_placement_convert(placement, bitmap_flags, items, conversion->report);
 
 	return;
 }
@@ -3782,6 +3849,10 @@ enum cache_file_status custom_edition_cache_convert(
 				multiplayer_pause_list_convert(&state, offset, report);
 		}
 		if (!shader_type)
+		{
+			continue;
+		}
+		if (!read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET))
 		{
 			continue;
 		}

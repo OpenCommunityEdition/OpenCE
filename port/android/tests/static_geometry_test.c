@@ -15,6 +15,7 @@ typedef long GLsizeiptr;
 #define TRUE 1
 #define FALSE 0
 #define HALO_ANDROID 1
+static int android_geometry_fixes = 1;
 #define GL_NO_ERROR 0
 #define GL_OUT_OF_MEMORY 0x0505
 #define GL_ARRAY_BUFFER 0x8892
@@ -279,6 +280,21 @@ int main(int argc, char **argv)
 {
 	if (argc != 2)
 		return 2;
+	if (!strcmp(argv[1], "disabled"))
+	{
+		android_geometry_fixes = 0;
+		xgpu_static_range_add(window + 0x1000, 0x400, 0);
+		xgpu_static_range_add(window + 0x2000, 0x400, 1);
+		CHECK(!static_buffer_lists[0].count && !static_buffer_lists[1].count);
+		CHECK(!static_buffer_lists[0].entries && !static_buffer_lists[1].entries);
+		CHECK(!draw_reads((unsigned long)window + 0x1000, 0x40, FALSE));
+		CHECK(!draw_reads((unsigned long)window + 0x2000, 0x40, TRUE));
+		xgpu_static_range_remove(window + 0x1000, 0);
+		xgpu_static_range_remove(window + 0x2000, 1);
+		static_buffers_collect();
+		CHECK(!generated && !uploads && !deleted);
+		return 0;
+	}
 	if (!strcmp(argv[1], "reuse"))
 		return reuse();
 	if (!strcmp(argv[1], "reload"))

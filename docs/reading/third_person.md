@@ -66,8 +66,8 @@ existing visibility check requires clear eye-to-muzzle and muzzle-to-target
 segments. Ownership, rate limits, target history and damage rules still run.
 The upstream optional client-hand origins remain separately controlled.
 
-The host acceptance and checkpoint membership rules use experimental network versions 32708
-(Xbox/CE) and 32709 (MCC). Matching builds are required even with the camera
+The host acceptance and checkpoint membership rules use experimental network versions 32710
+(Xbox/CE) and 32711 (MCC). Matching builds are required even with the camera
 off. See [networking](networking.md) for the mandatory join envelope and
 the intentional OpenCE/main crossplay boundary.
 

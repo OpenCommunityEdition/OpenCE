@@ -8,6 +8,7 @@ struct bitmap_data;
 /* Path ownership is decided before stripping a filename. MCC never searches
  * maps/, custom_maps/ or the optional Custom Edition installation. */
 boolean mcc_level_name(char const *name);
+void mcc_cache_validation_clear(void);
 boolean mcc_cache_available(char const *name);
 boolean mcc_cache_present(char const *name, unsigned long checksum,
     char *message, long message_size);

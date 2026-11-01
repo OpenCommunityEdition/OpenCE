@@ -78,6 +78,8 @@ void update_server_handle_distributed_input(
 	short count);
 /* (the host) the update its last tick ran (NONE for none), and an update's
 actions (NULL once it is gone) */
+/* port: host bot actions in the existing relayed update (bots_network.c). */
+void update_server_note_bot_action(short player_index, struct player_action const *action);
 long update_server_ticked_update_number(
 	void);
 struct player_action const *update_server_update_actions(

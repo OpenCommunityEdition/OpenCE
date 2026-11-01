@@ -1,7 +1,8 @@
 """The bots (port/linux/game/bots.c, bots.count) in the game: a local Slayer game on a stock map, played without a
 person (debug.network_test "local:", the scripted controller 1 of debug.test_input) for a minute and more, in which
 every bot walks the map, the bots kill and die, and the game ends cleanly; and a system link game, which no bot joins
-whatever bots.count asks. Needs the retail maps in assets/maps and ninja linux's build/linux/halo; the game draws
+when bots.network is off. Enhanced Slayer/CTF/King cases use the same checks.
+Retail map/build/profile paths can be supplied through HALO_TEST_MAPS, HALO_TEST_GAME and HALO_TEST_SAVES. The game draws
 offscreen (SDL's offscreen video driver), with no audio, internet play or update check."""
 
 import math
@@ -13,13 +14,13 @@ from pathlib import Path
 
 import pytest
 
-RETAIL_MAPS = Path("assets/maps")
-GAME = Path("build/linux/halo")
+RETAIL_MAPS = Path(os.environ.get("HALO_TEST_MAPS", "assets/maps"))
+GAME = Path(os.environ.get("HALO_TEST_GAME", "build/linux/halo"))
 # a player's line of the network test's each second (network_test.c): alive or dead, its kills, deaths, team and
-# machine (a bot's is BOTS_FIRST_MACHINE, 113, and up)
+# machine (a bot's is BOTS_FIRST_MACHINE, 65, and up)
 PLAYER = re.compile(r"player (\d+): (?:\((-?[\d.]+) (-?[\d.]+) -?[\d.]+\)|dead).*? s-?\d+ k(-?\d+) d(-?\d+) f-?\d+ "
                     r"t-?\d+ m(\d+)")
-BOTS_FIRST_MACHINE = 113
+BOTS_FIRST_MACHINE = 65
 
 
 def _game(map_name):
@@ -31,20 +32,46 @@ def _play(tmp_path, test, seconds, **settings):
     """the game played for that many seconds: (exit status, its output, debug.txt)"""
     (tmp_path / "data").mkdir()
     (tmp_path / "save").mkdir()
-    (tmp_path / "data" / "maps").symlink_to(RETAIL_MAPS.resolve())
-    game = tmp_path / "halo"
+    if os.environ.get("HALO_TEST_SAVES"):
+        shutil.copytree(os.environ["HALO_TEST_SAVES"], tmp_path / "save", dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("cache*.map"))
+    if os.name == "nt":
+        maps = tmp_path / "data" / "maps"
+        maps.mkdir()
+        # Only this scenario's maps; remove these disposable copies after the run.
+        for name in {"ui.map", "carousel.map", test.split(":")[1] + ".map"}:
+            source = RETAIL_MAPS / name
+            if source.is_file():
+                shutil.copyfile(source, maps / name)
+    else:
+        (tmp_path / "data" / "maps").symlink_to(RETAIL_MAPS.resolve())
+    game = tmp_path / ("halo.exe" if os.name == "nt" else "halo")
     shutil.copy(GAME, game)
+    for library in GAME.parent.glob("*.dll"):
+        shutil.copy(library, tmp_path / library.name)
     env = {**os.environ, "SDL_VIDEODRIVER": "offscreen", "SDL_AUDIODRIVER": "dummy",
            "HALO_DATA_ROOT": str(tmp_path / "data"), "HALO_SAVE_ROOT": str(tmp_path / "save"),
-           "HALO_HIDDEN_WINDOW": "1", "HALO_FULLSCREEN": "0", "HALO_NO_VSYNC": "1", "HALO_NO_AUDIO": "1",
+           "HALO_HIDDEN_WINDOW": "1", "HALO_NULL_RENDERER": "1", "HALO_FULLSCREEN": "0", "HALO_NO_VSYNC": "1", "HALO_NO_AUDIO": "1",
            "HALO_UPDATE_AUTO": "false", "HALO_NET_ONLINE": "false", "HALO_NET_ADDRESS": "127.0.0.1",
            "HALO_NET_BROADCAST": "127.255.255.255", "HALO_NETWORK_TEST": test, "HALO_NETWORK_TEST_START": "5",
            "HALO_NETWORK_TEST_SCORE": "500", "HALO_TEST_INPUT": "bot:1", "HALO_EXIT_AFTER": str(seconds + 20)}
     env.update({name: str(value) for name, value in settings.items()})
-    result = subprocess.run([str(game)], cwd=tmp_path, env=env, capture_output=True, text=True,
-                            errors="replace", timeout=seconds + 120)
-    debug = tmp_path / "data" / "debug.txt"
-    return result.returncode, result.stdout + result.stderr, debug.read_text(errors="replace") if debug.is_file() else ""
+    try:
+        result = subprocess.run([str(game)], cwd=tmp_path, env=env, capture_output=True, text=True,
+                                errors="replace", timeout=seconds + 120,
+                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+        output = result.stdout + result.stderr
+        (tmp_path / "output.log").write_text(output, encoding="utf-8")
+        debug = tmp_path / "data" / "debug.txt"
+        return result.returncode, output, debug.read_text(errors="replace") if debug.is_file() else ""
+    finally:
+        owned = [game, *(tmp_path.glob("*.dll")), *((tmp_path / "save").rglob("cache*.map"))]
+        if os.name == "nt":
+            owned.extend((tmp_path / "data" / "maps").glob("*.map"))
+        for path in owned:
+            assert path.resolve().is_relative_to(tmp_path.resolve()) and not path.is_symlink()
+            if path.is_file():
+                path.unlink()
 
 
 def _players(output):
@@ -71,6 +98,7 @@ def _players(output):
 @pytest.mark.parametrize("map_name,variant,count,skill", [
     ("bloodgulch", "slayer", 6, "normal"),
     ("chillout", "team_slayer", 5, "heroic"),
+    ("bloodgulch", "slayer", 6, "veteran"),
 ])
 def test_bots_play_a_local_slayer_game(tmp_path, map_name, variant, count, skill):
     _game(map_name)
@@ -85,6 +113,20 @@ def test_bots_play_a_local_slayer_game(tmp_path, map_name, variant, count, skill
     deaths = sum(bot["deaths"] for bot in bots.values())
     assert kills >= count // 2 and deaths > 0, f"the bots killed {kills} and died {deaths} times"
     assert "bots: tick" in output, "no bots line a minute into the game"
+    assert "bots: fights since" in output, "no line of the fight's counts after the bots line"
+
+
+@pytest.mark.parametrize("variant", ["slayer", "ctf", "king"])
+def test_enhanced_bots_play_objectives(tmp_path, variant):
+    _game("bloodgulch")
+    status, output, debug = _play(tmp_path, f"local:bloodgulch:{variant}", 75,
+                                 HALO_BOTS=6, HALO_BOTS_ENHANCED="true", HALO_BOT_ROUTES="mixed")
+    assert status == 0, output[-2000:]
+    assert not re.search(r"assert|exception", output + debug, re.I), output[-2000:]
+    bots = [player for player in _players(output).values() if player["machine"] >= BOTS_FIRST_MACHINE]
+    assert len(bots) == 6, output[-2000:]
+    assert all(bot["walked"] >= 20 for bot in bots), bots
+    assert sum(bot["kills"] for bot in bots) > 0, bots
 
 
 def test_no_bots_in_a_system_link_game(tmp_path):

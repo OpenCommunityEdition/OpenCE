@@ -1855,4 +1855,15 @@ boolean path_state_find(
 	return result;
 }
 
+/* port: A bot worker supplies a private graph snapshot, with breakage
+already applied and no debug storage. Keep profiling and live-world debug
+queries on the game thread; the established path_state_find is unchanged.
+Used by port/linux/game/bots_worker.inl. */
+void bots_path_find_snapshot(struct path_state *state)
+{
+	path_state_reset(state);
+	if (path_state_begin(state))
+		path_state_traverse(state);
+}
+
 /* ---------- private code */

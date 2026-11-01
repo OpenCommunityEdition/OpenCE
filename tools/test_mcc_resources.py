@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("kind", [0, 1, 2])
-def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_path, kind):
+@pytest.mark.parametrize("mode", ["fingerprint", "incremental"])
+def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_path, kind, mode):
     from test_mcc_cache_format import resource_dependency_map, TAG_OFFSET
     data = resource_dependency_map("bitm" if kind == 1 else "snd!", int(kind != 0), 4)
     name = b"res_0\0" if kind == 1 else b"res__0__0\0"
@@ -19,10 +20,11 @@ def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_pa
     struct.pack_into("<I", data, TAG_OFFSET+offset, 16)
     resource = bytearray(struct.pack("<4I", kind, 20, 20+len(name), 1)+b"abcd"+name+
                          struct.pack("<3I", 0, 4, 16))
+    resource.extend(bytes(range(256))*32768)  # More than one bounded validation slice.
     filename = "bitmaps.map" if kind == 1 else "sounds.map"
     def digest(package):
         folder = tmp_path / "mcc_maps" / package
-        result = subprocess.run([str(resource_tool), "fingerprint", str(folder / "a10.map"),
+        result = subprocess.run([str(resource_tool), mode, str(folder / "a10.map"),
                                  "mcc_maps/"+package+"/a10"], cwd=tmp_path, capture_output=True)
         assert result.returncode == 0, result.stderr
         return result.stdout.decode()
@@ -77,6 +79,29 @@ static int read_map(void *context,uint32_t offset,uint32_t size,void *out) {
 }
 int main(int argc,char **argv) {
     struct mcc_runtime runtime={0};unsigned char bytes[32]={0};int ok;
+    if(argc==4 && !strcmp(argv[1],"explain")) {
+        struct mcc_cache_source source;uint32_t sum=0;char reason[320];
+        FILE *f=fopen(argv[2],"rb");if(!f)return 8;
+        fseek(f,0,SEEK_END);source.size=(uint64_t)ftell(f);source.context=f;source.read=read_map;
+        strcpy(reason,"stale failure");
+        ok=mcc_resources_probe_explain("mcc_maps/package/a10",&source,&sum,reason,sizeof(reason));fclose(f);
+        printf("%s",reason);
+        return ok==atoi(argv[3]) ? 0 : 9;
+    }
+    if(argc==4 && !strcmp(argv[1],"incremental")) {
+        struct mcc_cache_source source;struct mcc_resource_check *check;
+        uint32_t sum,expected;unsigned i,steps=0;char reason[320];
+        FILE *f=fopen(argv[2],"rb");if(!f)return 8;
+        fseek(f,0,SEEK_END);source.size=(uint64_t)ftell(f);source.context=f;source.read=read_map;
+        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));if(!check)return 10;
+        /* Cancelling a partial check releases only its own resources. */
+        mcc_resources_check_step(check,&sum,bytes);mcc_resources_check_end(check);
+        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));if(!check)return 11;
+        do {ok=mcc_resources_check_step(check,&sum,bytes);steps++;} while(!ok && steps<100);
+        mcc_resources_check_end(check);
+        if(ok!=1 || !mcc_resources_probe(argv[3],&source,&expected) || sum!=expected)return 12;
+        fclose(f);for(i=0;i<32;i++)printf("%02x",bytes[i]);return 0;
+    }
     if(argc==4 && !strcmp(argv[1],"fingerprint")) {
         struct mcc_cache_source source;unsigned i;
         FILE *f=fopen(argv[2],"rb");if(!f)return 8;
@@ -125,7 +150,7 @@ int main(int argc,char **argv) {
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else []
     # Match the game's GNU89 mode, including libc's snprintf declaration on Linux.
     result = subprocess.run([clang] + target + [str(ROOT / "tools/mcc_loading_stub.c"), "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-D_CRT_SECURE_NO_WARNINGS", "-I"+str(ROOT / "port/linux/game"),
-                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), "-o", str(exe)], capture_output=True, text=True)
+                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
 
@@ -361,6 +386,21 @@ def test_shared_set_selection(resource_tool, tmp_path, kind, case):
     result = subprocess.run([str(resource_tool), "probe", str(package / "a10.map"), str(int(expected)), "unused"],
                             cwd=tmp_path, capture_output=True, timeout=10)
     assert result.returncode == 0, result.stdout+result.stderr
+    explanation = subprocess.run([str(resource_tool), "explain", str(package / "a10.map"), str(int(expected))],
+                                 cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    assert explanation.returncode == 0, explanation.stderr
+    if expected:
+        # A rejected partial candidate is not a failed load if another set matches.
+        assert explanation.stdout == ""
+    else:
+        assert filename in explanation.stdout
+        if case == "ambiguous":
+            assert "ambiguous" in explanation.stdout and "beside the level" in explanation.stdout
+        elif case in {"package_bad", "root_bad", "malformed_shared"}:
+            assert "invalid or unreadable" in explanation.stdout
+            assert "matching resource" in explanation.stdout
+        else:
+            assert "No matching" in explanation.stdout
     if expected and case != "unused":
         # Moving identical chosen data into the package preserves the fingerprint.
         (package / filename).write_bytes(blob())

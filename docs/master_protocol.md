@@ -278,7 +278,7 @@ signature as `listing_signed` does.
 | --- | --- | --- |
 | 0 | 2 | `"HL"` |
 | 2 | 1 | Format: 1 |
-| 3 | 2 | Network version (`HALO_PORT_NETWORK_VERSION`, 39 now) |
+| 3 | 2 | Network version (`HALO_PORT_NETWORK_VERSION`, 40 now) |
 | 5 | 1 | Flags (below) |
 | 6 | 4 | Sequence: the host's count of its listings (the newest wins) |
 | 10 | 4 | The host's Unix time when it made the listing |
@@ -466,10 +466,218 @@ and `ETag: "cd755a50c5cfc457"`.
 `{"protocol":1,"master":{…},"server":{<entry>}}` with the same headers, or
 `404 not_found`.
 
+## The netlist: VPN, Tor and datacenter addresses
+
+A master compiles the IPv4 ranges of VPN providers, Tor exits and
+datacenters into one signed list, the *netlist*, which dedicated servers
+fetch and check joining players' addresses against on their own
+(`port/linux/src/server_netlist.c`, `docs/dedicated_server.md`, "VPNs"): no
+player's address is sent to a master or to anyone else to be judged.
+
+`GET /v1/netlist`, no signature needed, plain HTTP allowed (the body is
+signed). The body is binary, in network byte order:
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 8 | `"OPCENET1"` |
+| 8 | 1 | Format: 1 |
+| 9 | 3 | Reserved, zero |
+| 12 | 8 | Generated: the master's Unix time when it built the list |
+| 20 | 8 | Serial: raised at each list the master publishes (a server keeps the highest it saw) |
+| 28 | 4 | Count of ranges |
+| 32 | 8 each | The ranges: the first and the last IPv4 address of each (4 bytes each), ascending, neither overlapping nor touching (the last of one is at least 2 below the first of the next), the first no more than the last |
+
+So a body is `32 + 8 × count` bytes; a reader refuses one of another size,
+without the magic and format 1, of more than 1,048,576 ranges, with ranges
+out of order, overlapping or touching, or with a non-zero reserved byte. Its headers:
+
+| Header | Value |
+| --- | --- |
+| `Signature` | `ed25519=` and the base64 of the master key's signature of the body's exact bytes (before any `Content-Encoding`) |
+| `Signature-Key` | The master's key id |
+| `Signature-Time` | The body's generated time |
+| `ETag` | `"` and the first 16 hexadecimal digits of SHA-256 of the body, and `"`; `If-None-Match` with it answers `304` |
+| `Cache-Control` | `public, max-age=300` |
+| `Content-Type` | `application/octet-stream` |
+| `Content-Encoding` | `gzip` when the request's `Accept-Encoding` asks for it |
+
+`503 netlist_unavailable` while a master has built no list yet (or serves
+none: `MASTER_NETLIST=off`).
+
+A server takes a netlist only if `Signature` checks with the key pinned for
+that master in its masters file and `Signature-Key` is that key's id, the
+body reads as above, its generated time is no more than 300 seconds ahead of
+the server's clock, and its serial is no lower than that of the list it
+holds from that master. It fetches every hour (with `If-None-Match`), keeps
+the newest list it took on disk, and checks an address against the union of
+the lists of the masters it publishes to.
+
+What goes in the list is each master's policy. `opence-master`'s
+(`internal/netlist`), from public sources, IPv4 only:
+
+1. the autonomous systems of X4BNet's `lists_vpn` (MIT,
+   github.com/X4BNet/lists_vpn): `input/datacenter/ASN.txt` (hosting and
+   cloud) and `input/vpn/ASN.txt` (VPN providers), and the master admin's
+   own (AS13335, Cloudflare, by default: its WARP VPN's exits are not
+   published apart from the rest), each expanded to its ranges with
+   iptoasn.com's `ip2asn-v4.tsv.gz` (public domain);
+2. X4BNet's built lists, `output/vpn/ipv4.txt` (with ranges no autonomous
+   system gives) and `output/datacenter/ipv4.txt` (the same systems,
+   expanded by X4BNet: what step 1 gives when iptoasn is out of reach);
+3. the Tor Project's exits, `https://check.torproject.org/torbulkexitlist`,
+   fetched every hour;
+4. the master admin's own blocked ranges, less its allowed ranges and the
+   ranges of its allowed autonomous systems;
+
+each keeping only globally routable addresses (as "Publishing" says),
+merged. A source that fails keeps its last good copy; a build whose
+addresses are fewer than half the last published list's is held until an
+admin publishes it, so a broken source does not open every server.
+
+## Player keys, links and passes
+
+A dedicated server refuses players whose address is in the netlist (by
+default: `server.vpn_policy`), unless the player has linked a Discord
+account at a master the server publishes to. The link is the master's: the
+game holds a key, the master learns which Discord account holds it, and
+gives the game a short-lived *pass* it signs, which a server checks with
+the master's pinned key, offline, when the player joins.
+
+### The player key
+
+The game's own Ed25519 key, `player.key` beside `config.toml`, made the
+first time it is needed, in the key file form above. Only its public half
+leaves the machine. Its key id is formed as every key id is.
+
+### Linking
+
+The game opens the master's link page in the browser:
+
+```
+GET /link?key=<64 hex: the player's public key>&ts=<unix seconds>&sig=<128 hex>
+```
+
+`sig` is the player key's signature of `opence-link-1`, the master's key
+id, the public key in hexadecimal and `ts`, joined by line feeds:
+
+```
+opence-link-1
+<the master's key id>
+<the player's public key, 64 hex>
+<ts>
+```
+
+The game shows a confirmation code beside it, which the page shows too, so
+the player can tell the page links the game in front of them: the first 6
+characters of the base32 (RFC 4648, `A-Z2-7`, no padding) of SHA-256 of the
+32 bytes of the public key followed by the ASCII text of `ts`, shown as
+`ABC-DEF`. A master refuses a link whose signature fails (`401
+bad_signature`), whose `ts` is more than 600 seconds from its clock (`401
+clock`), or whose key has a small order.
+
+The page sends the player to Discord's OAuth2 authorisation (`identify`
+scope alone, `state` bound to a cookie of the page), takes the Discord
+account's id and username from `GET /users/@me` with the code's token, and
+forgets the token. The master then refuses an account it revoked, one
+younger than its minimum (`MASTER_LINK_MIN_ACCOUNT_DAYS`, 0 by default:
+servers have their own), or, if it asks (`MASTER_LINK_REQUIRE_GUILD`), one
+outside its Discord server; else it records the key as that account's. A
+key belongs to one account (a new link of it replaces the old); an account
+holds up to `MASTER_LINK_MAX_KEYS` keys (3 by default), and a fourth drops
+the one least recently used. `/link/manage` lists a Discord account's keys
+(after the same login) and unlinks them.
+
+### The pass
+
+```
+GET /v1/pass?key=<64 hex>&ts=<unix seconds>&sig=<128 hex>
+```
+
+No `Authorization` header: the signature is in the query, so a client that
+can only make GET requests without headers (the web build, Android) can
+ask. `sig` is the player key's signature of:
+
+```
+opence-pass-get-1
+<the master's key id>
+<the player's public key, 64 hex>
+<ts>
+```
+
+| Answer | Meaning |
+| --- | --- |
+| `200`, `application/octet-stream` | The pass (below), new: issued now |
+| `404 not_linked` | No Discord account holds the key (yet: the game asks every 3 seconds while the player links) |
+| `403 link_revoked` | The account was revoked by the master's admins (`message` says why) |
+| `401 bad_signature`, `401 clock` | As for signed requests: `ts` within 300 seconds |
+| `429 rate_limited` | 30 a minute per key, and the list's limit per address |
+
+The answer has `Cache-Control: no-store` and `Access-Control-Allow-Origin:
+*`. Errors are JSON, as everywhere.
+
+The pass is 170 bytes, in network byte order:
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 8 | `"OPCEPASS"` |
+| 8 | 1 | Format: 1 |
+| 9 | 1 | Flags: 1 the account is in the master's Discord server (checked when it linked); the others zero |
+| 10 | 8 | The master's key id, raw |
+| 18 | 32 | The player's public key |
+| 50 | 8 | The Discord account's id (its snowflake, which holds its creation time: the top 42 bits are milliseconds since 2015-01-01, Unix time 1420070400000 ms) |
+| 58 | 32 | The Discord username, ASCII (a byte outside 0x20 to 0x7E made `?`), padded with zeros |
+| 90 | 8 | Issued: Unix time |
+| 98 | 8 | Expires: Unix time, `MASTER_PASS_TTL` after it was issued (72 hours) |
+| 106 | 64 | The master key's signature of the 13 ASCII bytes `opence-pass-1` followed by the 106 bytes before it |
+
+The game keeps the newest pass of each master (`pass-<master key id>.bin`
+beside `player.key`) and asks for a new one when less than 48 hours is
+left, and at start.
+
+### The pass at the door
+
+A pass is shown to a server in the join request
+(`message_client_join_game_request`, network version 40), with a proof
+that binds it to this connection: the player key's signature of the 19
+ASCII bytes `opence-pass-proof-1`, then SHA-256 of the pass's 170 bytes,
+then the connection's binding (32 bytes): HMAC-SHA-256, keyed with the
+internet play tunnel's session secret both ends share, of the 21 ASCII
+bytes `opence-link-binding-1`; 32 zero bytes for a connection outside the
+tunnel (a LAN's). A pass copied by a server's operator cannot be shown to
+another server: the tunnel's secret differs.
+
+A server takes a pass only if: it reads as above; its master is one the
+server publishes to (the masters of `server.masters_file`, with
+`server.master_publish` and a publisher key) and its signature checks with
+that master's pinned key; it was issued no more than 300 seconds ahead of
+the server's clock and expires no more than 300 seconds behind it; and the
+proof checks with the pass's player key. Then the player is a verified
+Discord account, and a server may ban the account (`docs/dedicated_server.md`).
+
+The game sends its pass only when a server asks for it, by refusing the
+join with `_rejection_code_vpn_link_required` (8): it joins again at once
+with the pass, so a player's Discord account is shown only to servers that
+need it (`network.link_share`).
+
+A server may publish to several masters, and a player links with one of
+them (or more): the game shows the pass of a master it is linked with that
+lists the server (the masters whose lists had the game it joined from the
+server browser), and no other master's, since a pass of a master the
+server does not publish to would show the account to it for nothing. When
+it holds no pass of any master that lists the server, it joins no more and
+names the one of them to link with (Settings, Network Setup, Discord
+Account chooses it already). A game joined by an invite or on the LAN comes
+with no list: the game then shows each pass it holds in turn, after a
+refusal with `_rejection_code_vpn_link_invalid` (10) the next. Masters do not
+share links: each master's word on an account is its own.
+
 ## Other endpoints
 
 | Request | Who | Answer |
 | --- | --- | --- |
+| `GET /v1/netlist` | anyone | The signed netlist ("The netlist") |
+| `GET /v1/pass` | the key's holder (signed in the query) | A pass ("Player keys, links and passes") |
+| `GET /link`, `/link/callback`, `/link/manage` | people | Linking a player key to a Discord account, and unlinking |
 | `GET /v1/publishers/{id}` | anyone (the list's limit) | `{"ok":true,"id","name","since":"2026-10","status","servers":<listed now>}`, or `404` |
 | `POST /v1/applications`, `/v1/applications/…` | anyone | `410 applications_by_discord`: applications are made with the master's Discord bot (below), not over HTTP |
 | `POST /v1/keys` | signed, an approved publisher's active key | Body `{"public_key":"ed25519:…"}`: adds a key (8 active at most). `201 {"ok":true,"key_id","status":"active"}`; `409 key_exists`; `403 too_many_keys` |
@@ -584,12 +792,15 @@ The message is for people and may change; programs read the code.
 | 403 | `too_many_instances` | The publisher holds its quota and 16 server records, none of which can be dropped | Log it; use fewer instance names |
 | 403 | `tls_required` | Plain HTTP from beyond loopback | Use the `https://` URL |
 | 403 | `not_a_peer` | A peer's request from a master not configured as a peer | |
+| 403 | `link_revoked` | A pass asked for a key whose Discord account the master revoked | Tell the player (`message` says why) |
 | 404 | `not_found` | No such server, publisher or endpoint | |
+| 404 | `not_linked` | A pass asked for a key no Discord account holds | Ask again while the player links |
 | 409 | `key_exists` | The key added (`POST /v1/keys`) is known already | |
 | 410 | `applications_by_discord` | An application sent over HTTP: applications are made with the master's Discord bot | Log it: apply with the bot's `/apply` |
 | 413 | `too_large` | The body is over 16 KB | |
 | 429 | `rate_limited` | Too many requests; `Retry-After` gives the seconds to wait | Wait that long (the header's name read in any case; the game waits a day at most, and 30 seconds without one) |
 | 500 | `internal` | The master failed | Try again at the next interval |
+| 503 | `netlist_unavailable` | The master has no netlist to serve yet | Keep the list held; try again at the next interval |
 
 ## Privacy and limits
 
@@ -600,6 +811,8 @@ The message is for people and may change; programs read the code.
 | Applications | A denied one: deleted 30 days after the denial |
 | Servers' records | A closed server's: deleted an hour after it closed; one not published again: after 24 hours (unless an admin flagged it) |
 | Contacts | Discord names (and the earlier HTTP applications' e-mail addresses) are seen by the master's admins and approvers only, and are not shared with peers |
+| Links | A player key's public half, its Discord account's id and username, when it was linked and last given a pass; no OAuth token, no address. Seen by the master's admins; deleted by `/link/manage` or 90 days after the last pass; not shared with peers. A pass shows the account's id and username to the servers the player joins that ask for it |
+| The netlist | Built from public lists; no player's address is sent to the master to be judged |
 | Strings | Printable ASCII, cut to the listing's lengths: name 32, map 32, gametype and variant 24, build 32 |
 | Requests | 60 list requests a minute per address (the list, one server, a publisher's page, the list page and the metrics together); the application limits above; bodies 16 KB at most; the publish limits above. Every limit by address counts an IPv6 address by its /64 |
 
@@ -638,7 +851,10 @@ headers), a probe and its answer,
 four listings (a dedicated team game, a password game in progress with its
 sealed token, a tombstone, and an altered listing that must be refused), a
 signed list body with its headers and ETag, a small-order key that must be
-refused, and a proof of key. Monocypher's `crypto_ed25519_sign`,
+refused, a proof of key, a netlist (its ranges, body, signature and ETag, and
+bodies that must be refused), and a player's key with its link URL,
+confirmation code, pass request, a pass, a proof at the door with a binding,
+and passes that must be refused. Monocypher's `crypto_ed25519_sign`,
 `crypto_ed25519_check` and `crypto_aead_lock` give the same bytes.
 `tests/conformance/opence_publisher.py` is a reference publisher in Python
 (keys, signatures, listings, publishing, the probe's answer), and

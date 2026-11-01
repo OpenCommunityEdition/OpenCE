@@ -280,3 +280,16 @@ int main(void){
 }
 '''
     run_c(tmp_path, code)
+
+
+def test_classic_letters_are_transparent_cutouts():
+    import numpy as np
+    from PIL import Image
+    from scipy.ndimage import binary_fill_holes
+    for letter in 'abxy':
+        rgba = np.asarray(Image.open(ROOT / f'port/assets/buttons/classic_{letter}__0.png'))
+        solid = rgba[..., 3] >= 128
+        holes = binary_fill_holes(solid) & ~solid
+        assert np.count_nonzero(holes & (rgba[..., 3] == 0)) > 500
+        # No painted black letter remains on any of the coloured faces.
+        assert np.min(np.max(rgba[..., :3][solid], axis=1)) > 100

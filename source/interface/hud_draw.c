@@ -110,6 +110,7 @@ symbols in this file:
 #include "units/units.h"
 #include "cache_file_formats.h" /* port: port/linux/game/cache_file_formats.c */
 #include "custom_edition_cache.h"
+#include "custom_edition_hud_draw.h" /* port: port/linux/game/custom_edition_hud_draw.c */
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
 
 /* ---------- constants */
@@ -2120,6 +2121,11 @@ void hud_draw_numbers(
 			digit_scale = TEST_FLAG(numbers->placement.multiplayer_scaling_flags, _hud_use_high_resolution_scale_bit) ||
 				TEST_FLAG(bitmap_group->flags, _bitmap_group_half_hud_scale_bit) ?
 				scale*0.5f : scale;
+			/* port: CE bitmap flags compose without changing digit spacing.
+			Xbox/mod and MCC number handling keep the existing rule above. */
+			if (custom_edition_cache_tags_loaded())
+				digit_scale = scale * custom_edition_hud_number_scale(hud_number->number_bitmap.index,
+					numbers->placement.multiplayer_scaling_flags);
 
 			if (mcc_cache_tags_loaded())
 				digit_scale *= mcc_hud_canvas_scale();

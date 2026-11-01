@@ -2,6 +2,7 @@
  * adapter uses its existing stack service, so arguments, recursion, sleep
  * and checkpoint state remain inside each checkpointed thread stack. */
 #include "mcc_script_parameters.h"
+#include "mcc_scripts.h"
 #include "mcc_campaign.h"
 #include "mcc_game_speed.h"
 
@@ -148,6 +149,42 @@ static void mcc_hs_release_thread(long thread_index)
         struct mcc_hs_arguments *state = mcc_hs_frame(frame);
         if (state) mcc_hs_release_arguments(state);
     }
+}
+
+void mcc_executing_thread_evaluate(short function, long thread_index, boolean initialize)
+{
+    (void)function; (void)initialize;
+    if (mcc_cache_tags_loaded()) hs_return(thread_index, thread_index);
+}
+
+void mcc_kill_thread_evaluate(short function, long thread_index, boolean initialize)
+{
+    long *arguments, target;
+    struct hs_thread_datum *thread;
+    if (!mcc_cache_tags_loaded()) return;
+    arguments = hs_macro_function_evaluate(function, thread_index, initialize);
+    if (!arguments) return;
+    target = arguments[0];
+    /* Accept only salted live handles, not untrusted absolute slot indices.
+     * A deleted console thread's handle must not kill its replacement. */
+    thread = target != NONE && (unsigned long)target >> 16 && hs_thread_data && hs_thread_data->valid ?
+        datum_try_and_get(hs_thread_data, target) : NULL;
+    if (thread) {
+        mcc_hs_release_thread(target);
+        thread->stack = (struct hs_stack_frame *)thread->stack_data;
+        thread->stack->previous = NULL;
+        thread->stack->expression_index = NONE;
+        thread->stack->size = 0;
+        thread->flags = 0;
+        thread->previous_sleep_until = 0;
+        thread->sleep_until = thread->type == _hs_thread_type_script ? NONE : 0;
+        thread->result = 0;
+        /* Self-termination must not return through the frames just released.
+         * hs_thread_main owns deletion of its current console thread. */
+        if (thread == hs_thread_get(thread_index)) return;
+        if (thread->type == _hs_thread_type_console_command) hs_thread_delete(target);
+    }
+    hs_return(thread_index, 0);
 }
 
 static long *mcc_hs_parameter_address(long thread_index, struct hs_syntax_node *node, short *type)

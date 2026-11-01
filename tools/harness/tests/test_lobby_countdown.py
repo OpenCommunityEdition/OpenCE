@@ -1,7 +1,8 @@
 """The real pregame countdown of network_server_manager.c: the lobby's START NOW starts it for a host alone, a host with
 split screen players and machines together, and a machine joining without a player does not stop it; and a dedicated
 server's rule, its director's (server_director.c's server_director_ok_to_countdown): server.min_players held to 1 to
-16, server.team_start, and its own state."""
+16, server.team_start, and its own state; the host's START NOW starts the game at once, a client machine's takes
+five seconds off."""
 
 import re
 import sys
@@ -17,13 +18,21 @@ CASES = [
     "two-machines-team-game-needs-both-teams", "playerless-machine-keeps-countdown",
     "split-screen-team-game-one-team", "dedicated-one-team-starts", "dedicated-both-teams-waits",
     "dedicated-below-minimum-waits", "dedicated-minimum-clamped", "dedicated-director-refuses",
+    "one-bot-start", "31-bots-start", "63-bots-start", "split-screen-bots-start",
+    "bots-team-rule", "bots-minimum-rule", "bots-paused", "bots-no-machine",
+    "bots-existing-countdown", "bots-second-machine", "bots-ownership-lifecycle",
+    "dedicated-start-now-five-seconds",
+    "host-start-now-starts", "host-start-now-ends-countdown",
+    "split-screen-host-start-now-starts", "client-start-now-five-seconds", "host-start-now-team-game-needs-both-teams",
 ]
 FUNCTIONS = (
     "countdown_timer_update", "countdown_timer_get_time_remaining", "countdown_timer_increment",
     "countdown_timer_decrement", "countdown_timer_set_time_remaining",
     "network_game_server_get_client_machine_count", "server_needs_more_teams",
     "server_has_enough_machines", "server_players_on_one_machine", "server_ok_to_countdown",
-    "network_game_server_update_countdown",
+    "network_game_server_update_countdown", "network_game_server_begin_game_start_countdown",
+    "network_game_server_port_countdown_begin",
+    "network_game_server_client_machine_faster_event",
 )
 CONSTANTS = (
     "MAXIMUM_NETWORK_MACHINE_COUNT", "MAXIMUM_NETWORK_PLAYER_COUNT", "NUMBER_OF_MULTIPLAYER_TEAMS",
@@ -33,6 +42,10 @@ CONSTANTS = (
 
 # a fault in network_server_manager.c, the function it is in, and the case that must catch it
 NEGATIVE_CONTROLS = {
+    "bot-start-hook-missing": (
+        ("bots_lobby_can_start(&server->game)", "FALSE"),
+        "network_game_server_update_countdown", "31-bots-start",
+    ),
     "one-player-only": (
         ("else if ((short)player->machine_index != first_machine_index)", "else"),
         "server_players_on_one_machine", "split-screen-start-now",
@@ -89,6 +102,19 @@ NEGATIVE_CONTROLS = {
         ("!director.entry_applied || ", ""),
         "server_director_ok_to_countdown", "dedicated-director-refuses",
     ),
+    "dedicated-start-now-starts-countdown": (
+        ("if (!halo_server_mode() &&", "if (1 &&"),
+        "network_game_server_update_countdown", "dedicated-start-now-five-seconds",
+    ),
+    "host-takes-five-seconds": (
+        ("return _network_game_server_countdown_event_start_immediately;",
+         "return _network_game_server_countdown_event_player_joined;"),
+        "network_game_server_client_machine_faster_event", "host-start-now-starts",
+    ),
+    "client-starts-game": (
+        ("if (network_game_server_client_machine_is_local(server, machine))", "if (1)"),
+        "network_game_server_client_machine_faster_event", "client-start-now-five-seconds",
+    ),
 }
 
 
@@ -110,7 +136,14 @@ def generated(fault=None, faulty_function=None):
         config += structure(source, name) + "\n"
     config += enum_with(read("port/linux/game/server_director.h"), "_server_state_lobby") + "\n"
     config += "#define MAX(a, b) ((a) > (b) ? (a) : (b))\n"
+    config += f"#define BOTS_MAXIMUM {constant(read('port/linux/game/bots.h'), 'BOTS_MAXIMUM')}\n"
+    config += "#define BOTS_FIRST_MACHINE (MAXIMUM_NETWORK_MACHINE_COUNT - BOTS_MAXIMUM)\n"
     text = ""
+    network_bots = read("port/linux/game/bots_network.c")
+    text += function(read("port/linux/game/bots.c"), "bots_machine_is_bot") + "\n"
+    for name in ("bots_network_session_begin", "bots_network_session_end", "bots_player_ownership",
+                 "bots_player_owned", "bots_session_allowed", "bots_lobby_can_start"):
+        text += function(network_bots, name) + "\n"
     for name in DIRECTOR_FUNCTIONS:
         code = re.sub(r'(?<!")\bserver\.', "director.", function(director, name))
         if fault and name == faulty_function:

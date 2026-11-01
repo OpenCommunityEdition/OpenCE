@@ -80,6 +80,9 @@ boolean custom_edition_level_name(
 it is then read in place, never copied to the cache partition. */
 boolean custom_edition_cache_playable(
 	char const *level_name);
+/* Existing fatal paths only: no recovery or validation policy changes. */
+boolean custom_edition_cache_display_error(char const *level_name);
+char const *custom_edition_cache_load_error(char const *level_name);
 /* Whether the map `map_name` (a level name or a file name) has a file in the
 Custom Edition maps folders, whatever it holds. */
 boolean custom_edition_map_file_present(

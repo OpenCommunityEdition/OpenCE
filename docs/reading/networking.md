@@ -74,6 +74,16 @@ reach. The hit-report path checks freshness, hand position and line of sight;
 MCC's separate message numbers and admission revision are recorded in
 [NETCODE.md](../../port/linux/NETCODE.md), preserving OpenCE's message 93.
 
+Co-op presentation has its own authority path. In
+[network_coop.c](../../port/linux/game/network_coop.c),
+`client_presentation_apply` gives the host's scripted cutscene camera
+precedence over dead-player spectating, including vehicle insertion scenes.
+`camera_object_offset` follows the client's local copy of the filmed object.
+When scripts release the camera, the normal spectating path applies again;
+`coop_spectate_nothing_to_watch` retains the host view when nobody is alive
+to watch. This is source behavior, not evidence of every campaign cutscene
+having been played through.
+
 ## Compare states from the same time
 
 Suppose the host replies about tick T, but the client has already moved on.
@@ -162,6 +172,10 @@ following packet details into those files.
 ## GulchCE compatibility and teardown
 
 Xbox/CE crossplay and MCC sessions have separate protocol boundaries.
+The current baseline is OpenCE 41 and MCC 62. Map-vote messages remain
+upstream IDs 94-95; MCC owns IDs 96-99 and join kind 100. The 512-byte MCC
+admission envelope also fits OpenCE's account-link credentials. This bound
+applies to the host's local join as well as remote MCC clients.
 `mcc_protocol.c` handles capability negotiation, settings sizing and
 connection-scoped admission. Its checks supplement ordinary host authority;
 a capability claim is not trusted identity. MCC-only gameplay messages must
@@ -184,7 +198,7 @@ then read `server_director.c` for rotation and session ownership and
 do not make an MCC capability claim sufficient to pass normal admission.
 
 `online-third-person` deliberately disables crossplay with OpenCE and main.
-Xbox/Custom Edition use version 32708; MCC uses 32709. Even first-person-only
+Xbox/Custom Edition use version 32710; MCC uses 32711. Even first-person-only
 games retain the camera branch's extra shoulder byte in relayed inputs.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c):

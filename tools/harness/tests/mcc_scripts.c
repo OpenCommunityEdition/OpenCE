@@ -25,11 +25,20 @@
 #undef strstr
 #undef strncmp
 
+void mcc_executing_thread_evaluate(short f,long t,boolean i) {(void)f;(void)t;(void)i;}
+void mcc_kill_thread_evaluate(short f,long t,boolean i) {(void)f;(void)t;(void)i;}
 short const hs_external_global_count=443;
 static boolean loaded;
 static struct data_array list_data;
 struct data_array *object_list_header_data = &list_data;
-static long arguments[2], returned;
+static long arguments[3], returned;
+static long equipment_unit;
+static short equipment_profile;
+static boolean equipment_reset;
+static unsigned equipment_calls;
+void mcc_player_add_equipment(long unit, short profile, boolean reset) {
+    equipment_unit=unit;equipment_profile=profile;equipment_reset=reset;++equipment_calls;
+}
 static int segment_events;
 static char last_event[256];
 static struct object_datum mock_object;
@@ -115,6 +124,28 @@ int main(int argc, char **argv) {
     short segment_index;
     CHECK(argc >= 2 && argc <= 4);
     segment_index = !strcmp(argv[1], "core_segment") ? MCC_HS_CORE_SEGMENT : MCC_HS_MISSION_SEGMENT;
+    if (!strcmp(argv[1], "issue89_registry")) {
+        char const *names[3]={"abs_integer","get_executing_running_thread","kill_thread"};
+        long values[5]={0,1,-1,2147483647L,(-2147483647L-1)};
+        int j;
+        for(j=0;j<3;j++) {
+            loaded=0;CHECK(mcc_script_find(names[j])==NONE);
+            CHECK(!mcc_script_function((short)(0x7004+j)));
+            loaded=1;CHECK(mcc_script_find(names[j])==0x7004+j);
+            extension=mcc_script_function((short)(0x7004+j));CHECK(extension);
+            CHECK(extension->parameter_count==(j==1 ? 0 : 1));
+            CHECK(extension->return_type==(j==2 ? _hs_type_void : _hs_type_long_integer));
+            if(j!=1) CHECK(extension->parameter_types[0]==_hs_type_long_integer);
+        }
+        extension=mcc_script_function(0x7004);
+        for(j=0;j<5;j++) {
+            arguments[0]=values[j];returned=123;
+            extension->evaluate(0x7004,0,FALSE);CHECK(returned==123);
+            extension->evaluate(0x7004,0,TRUE);
+            CHECK((unsigned long)returned==(values[j]<0 ? 0UL-(unsigned long)values[j] : (unsigned long)values[j]));
+        }
+        return 0;
+    }
     runtime.used = 0x100000;
     runtime.capacity=runtime.used+65536;
     runtime.tags = malloc(runtime.capacity);
@@ -155,6 +186,12 @@ int main(int argc, char **argv) {
     nodes[3].flags = 1;
     nodes[3].next_node_index = NONE;
     strcpy(strings, "sleep");
+    if (!strncmp(argv[1], "issue89_link_", 13)) {
+        strcpy(strings,argv[1]+13);
+        nodes[0].type=!strcmp(strings,"kill_thread") ? _hs_type_void : _hs_type_long_integer;
+        nodes[2].type=_hs_type_long_integer;nodes[2].next_node_index=NONE;
+        if (!strcmp(strings,"get_executing_running_thread")) nodes[1].next_node_index=NONE;
+    }
     if (!strcmp(argv[1], "unknown")) { strcpy(strings, "not_implemented"); expected = 0; }
     if (!strcmp(argv[1], "bad_child")) { nodes[0].data = 0x10008; expected = 0; }
     if (!strcmp(argv[1], "child_salt")) { nodes[0].data = 0x20001; expected = 0; }
@@ -168,6 +205,13 @@ int main(int argc, char **argv) {
         nodes[32766] = nodes[1]; nodes[32766].next_node_index = NONE;
     }
     if (!strcmp(argv[1], "unterminated")) { memset(strings, 'x', 128); expected = 0; }
+    if (!strcmp(argv[1], "equipment")) {
+        strcpy(strings, "player_add_equipment");
+        nodes[0].type=_hs_type_void;nodes[2].type=_hs_type_unit;
+        nodes[3].type=_hs_type_starting_profile;nodes[3].next_node_index=0x10004;
+        nodes[4].datum_header=1;nodes[4].flags=1;nodes[4].type=_hs_type_boolean;
+        nodes[4].next_node_index=NONE;syntax->count=syntax->actual_count=5;
+    }
     if (!strcmp(argv[1], "alias")) strcpy(strings, "player_effect_set_max_vibrate");
     if (!strcmp(argv[1], "extension")) strcpy(strings, "objects_distance_to_object");
     if (!strcmp(argv[1], "segment") || !strcmp(argv[1], "core_segment")) {
@@ -307,6 +351,7 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "full_capacity")) {
         CHECK(nodes[32765].function_index == 321 && nodes[32766].function_index == 321);
     }
+    CHECK(mcc_script_find("player_add_equipment") == NONE);
     CHECK(!mcc_script_function(MCC_HS_DISTANCE_TO_OBJECT));
     CHECK(!mcc_script_function(MCC_HS_MISSION_SEGMENT));
     CHECK(!mcc_script_function(MCC_HS_CORE_SEGMENT));
@@ -336,10 +381,35 @@ int main(int argc, char **argv) {
         CHECK(!mcc_script_can_cast(_hs_type_short_integer, _hs_type_long_integer));
         loaded = TRUE;
     }
+    if (!strncmp(argv[1], "issue89_link_", 13)) {
+        short index=mcc_script_find(strings);
+        CHECK(index!=NONE && nodes[0].function_index==index && nodes[1].function_index==index);
+        CHECK(mcc_script_call_valid(nodes,syntax));
+        if (!strcmp(strings,"get_executing_running_thread")) nodes[1].next_node_index=0x10002;
+        else nodes[2].type=_hs_type_string;
+        CHECK(!mcc_script_call_valid(nodes,syntax));
+        free(runtime.tags);return 0;
+    }
     CHECK(mcc_script_find("player_effect_set_max_vibrate") == 322);
     CHECK(mcc_script_find("MCC_MISSION_SEGMENT") == MCC_HS_MISSION_SEGMENT);
     CHECK(mcc_script_find("CORE_SAVE_NAME") == MCC_HS_CORE_SEGMENT);
-    if (!strcmp(argv[1], "global")) CHECK((unsigned short)nodes[0].short_value == 0x8009);
+    if (!strcmp(argv[1], "equipment")) {
+        short index=mcc_script_find("PLAYER_ADD_EQUIPMENT");
+        CHECK(index!=NONE && nodes[0].function_index==index && nodes[1].function_index==index);
+        extension=mcc_script_function(index);
+        CHECK(extension && extension->parameter_count==3 && extension->return_type==_hs_type_void);
+        CHECK(mcc_script_call_valid(nodes,syntax));
+        nodes[4].type=_hs_type_real;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[4].type=_hs_type_boolean;nodes[4].next_node_index=0x10002;
+        CHECK(!mcc_script_call_valid(nodes,syntax));
+        arguments[0]=123;arguments[1]=0xFFFF0007;arguments[2]=(long)0xFFFFFF01;
+        extension->evaluate(index,0,FALSE);CHECK(!equipment_calls);
+        extension->evaluate(index,0,TRUE);
+        CHECK(equipment_calls==1 && equipment_unit==123 && equipment_profile==7 && equipment_reset==TRUE);
+        arguments[2]=(long)0xFFFFFF00;extension->evaluate(index,0,TRUE);
+        CHECK(equipment_calls==2 && equipment_reset==FALSE);
+        loaded=FALSE;CHECK(!mcc_script_function(index));
+    } else if (!strcmp(argv[1], "global")) CHECK((unsigned short)nodes[0].short_value == 0x8009);
     else if (!strcmp(argv[1], "alias")) CHECK(nodes[0].function_index == 322);
     else if (!strcmp(argv[1], "extension")) {
         union { long bits; float value; } result;

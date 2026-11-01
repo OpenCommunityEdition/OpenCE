@@ -829,7 +829,11 @@ static void get_particle_world_position(
 	for (marker_index = 0; marker_index < glow->number_of_markers - 1; marker_index++)
 	{
 		if (glow->marker_time_index[marker_index] <= particle->t &&
-			glow->marker_time_index[marker_index + 1] > particle->t)
+			(glow->marker_time_index[marker_index + 1] > particle->t ||
+			/* port: particle updates/random ranges admit the final endpoint.
+			Keep interior boundaries half-open, but include the last marker. */
+			(marker_index == glow->number_of_markers - 2 &&
+			particle->t == glow->marker_time_index[marker_index + 1])))
 		{
 			break;
 		}

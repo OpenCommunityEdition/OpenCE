@@ -47,9 +47,15 @@ struct mcc_campaign_state {
     real effects_gain;
     real ambient_base,ambient_scale;
     real music_gain;
+    real model_ambient;
 };
 typedef char mcc_campaign_state_size[sizeof(struct mcc_campaign_state)==MCC_CAMPAIGN_SNAPSHOT_BYTES ? 1 : -1];
 static struct mcc_campaign_state mcc_campaign;
+/* Checkpoints store this extension in their reserved footer, preserving the
+ * fixed addresses of existing thread and object-name storage. */
+typedef char mcc_campaign_ambient_offset[offsetof(struct mcc_campaign_state,model_ambient)==MCC_CAMPAIGN_SNAPSHOT_V5_BYTES ? 1 : -1];
+static real *mcc_model_ambient;
+static real mcc_original_model_ambient;
 static real mcc_original_gravity;
 static real mcc_original_dialog_gain;
 static boolean mcc_original_infinite_ammo;
@@ -73,7 +79,8 @@ boolean mcc_campaign_global_settable(short index)
     return mcc_script_effect_global(name) || !csstrcasecmp(name,"sound_gain_under_dialog") || !csstrcasecmp(name,"cheat_infinite_ammo") ||
         !csstrcasecmp(name,"object_light_ambient_base") || !csstrcasecmp(name,"object_light_ambient_scale") ||
         !csstrcasecmp(name,"loud_dialog_hack") || !csstrcasecmp(name,"ai_debug_ignore_player") ||
-        !csstrcasecmp(name,"rasterizer_screen_flashes");
+        !csstrcasecmp(name,"rasterizer_screen_flashes") ||
+        !csstrcasecmp(name,"rasterizer_model_lighting_ambient");
 }
 
 static int mcc_campaign_real(real value) { return value>=-1000000.0f && value<=1000000.0f; }
@@ -98,6 +105,11 @@ void mcc_campaign_begin(void)
             hs_global_external_get(index&0x7fff) : NULL;
         mcc_screen_flashes=global && global->type==_hs_type_boolean ? global->address : NULL;
         mcc_original_screen_flashes=mcc_screen_flashes ? *mcc_screen_flashes : TRUE;
+        index=hs_find_global_by_name("rasterizer_model_lighting_ambient");
+        global=index!=NONE && ((unsigned short)index&0x8000) && (index&0x7fff)<hs_external_global_count ?
+            hs_global_external_get(index&0x7fff) : NULL;
+        mcc_model_ambient=global && global->type==_hs_type_real ? global->address : NULL;
+        mcc_original_model_ambient=mcc_model_ambient ? *mcc_model_ambient : 0.0f;
         mcc_original_gravity=global_gravity;mcc_original_dialog_gain=sound_gain_under_dialog;mcc_campaign_owned=TRUE;
         mcc_original_infinite_ammo=cheat.infinite_ammo;
         mcc_original_ambient_base=object_light_ambient_base;mcc_original_ambient_scale=object_light_ambient_scale;
@@ -105,9 +117,10 @@ void mcc_campaign_begin(void)
         mcc_original_ignore_player=mcc_ignore_player ? *mcc_ignore_player : FALSE;
     }
     memset(&mcc_campaign,0,sizeof(mcc_campaign));
-    mcc_campaign.version=5; mcc_campaign.gravity=1.0f;
+    mcc_campaign.version=6; mcc_campaign.gravity=1.0f;
     mcc_campaign.effects_gain=1.0f;
     mcc_campaign.music_gain=1.0f;
+    mcc_campaign.model_ambient=mcc_original_model_ambient;
     mcc_campaign.dialog_gain=mcc_original_dialog_gain;
     global_gravity=mcc_original_gravity;
     sound_gain_under_dialog=mcc_original_dialog_gain;
@@ -117,6 +130,14 @@ void mcc_campaign_begin(void)
     loud_dialog_hack=mcc_original_loud_dialog;
     if (mcc_ignore_player) *mcc_ignore_player=mcc_original_ignore_player;
     if (mcc_screen_flashes) *mcc_screen_flashes=mcc_original_screen_flashes;
+    if (mcc_model_ambient) *mcc_model_ambient=mcc_original_model_ambient;
+}
+
+/* Script startup also runs for map_reset without unloading the cache. */
+void mcc_campaign_reset_model_lighting(void)
+{
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned && mcc_model_ambient)
+        *mcc_model_ambient=mcc_original_model_ambient;
 }
 
 void mcc_campaign_dispose(void)
@@ -130,16 +151,19 @@ void mcc_campaign_dispose(void)
         loud_dialog_hack=mcc_original_loud_dialog;
         if (mcc_ignore_player) *mcc_ignore_player=mcc_original_ignore_player;
         if (mcc_screen_flashes) *mcc_screen_flashes=mcc_original_screen_flashes;
+        if (mcc_model_ambient) *mcc_model_ambient=mcc_original_model_ambient;
     }
     mcc_campaign_owned=FALSE;
     mcc_ignore_player=NULL;
     mcc_screen_flashes=NULL;
+    mcc_model_ambient=NULL;
     memset(&mcc_campaign,0,sizeof(mcc_campaign));
 }
 
 void mcc_campaign_snapshot(void *out)
 {
     mcc_campaign.dialog_gain=sound_gain_under_dialog;
+    if (mcc_model_ambient) mcc_campaign.model_ambient=*mcc_model_ambient;
     if (game_connection()!=_game_connection_network_client)
         mcc_campaign.flags=(mcc_campaign.flags&8u) | (cheat.infinite_ammo ? 1u : 0u) | (loud_dialog_hack ? 2u : 0u) |
             (mcc_ignore_player && *mcc_ignore_player ? 4u : 0u) |
@@ -153,18 +177,21 @@ int mcc_campaign_validate(void const *in, unsigned long bytes)
 {
     struct mcc_campaign_state state;
     int i,j;
-    if (!in || (bytes!=sizeof(state) && bytes!=MCC_CAMPAIGN_SNAPSHOT_V4_BYTES && bytes!=MCC_CAMPAIGN_SNAPSHOT_V1_BYTES)) return 0;
+    if (!in || (bytes!=sizeof(state) && bytes!=MCC_CAMPAIGN_SNAPSHOT_V5_BYTES && bytes!=MCC_CAMPAIGN_SNAPSHOT_V4_BYTES && bytes!=MCC_CAMPAIGN_SNAPSHOT_V1_BYTES)) return 0;
     memset(&state,0,sizeof(state));state.effects_gain=state.music_gain=1.0f;
+    state.model_ambient=mcc_original_model_ambient;
     state.ambient_base=mcc_original_ambient_base;state.ambient_scale=mcc_original_ambient_scale;
     memcpy(&state,in,bytes);
     if ((bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES && state.version!=1u) ||
         (bytes==MCC_CAMPAIGN_SNAPSHOT_V4_BYTES && (state.version<2u || state.version>4u)) ||
-        (bytes==sizeof(state) && state.version!=5u)) return 0;
+        (bytes==MCC_CAMPAIGN_SNAPSHOT_V5_BYTES && state.version!=5u) ||
+        (bytes==sizeof(state) && state.version!=6u)) return 0;
     if (!(state.effects_gain>=0.0f && state.effects_gain<=4.0f) ||
         !(state.music_gain>=0.0f && state.music_gain<=1.0f) ||
         (state.flags & ~(state.version==1u ? 1u : state.version==2u ? 15u :
             15u|(MCC_EFFECT_MASK<<4)|(state.version>=4u ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u))) ||
         !mcc_campaign_real(state.ambient_base) || !mcc_campaign_real(state.ambient_scale) ||
+        !mcc_campaign_real(state.model_ambient) ||
         !mcc_campaign_real(state.dialog_gain) ||
         !(state.gravity>=-1000.0f && state.gravity<=1000.0f)) return 0;
     for (i=0;i<MCC_NAV_LIMIT;i++) {
@@ -193,19 +220,21 @@ int mcc_campaign_restore(void const *in, unsigned long bytes)
     if (!mcc_cache_tags_loaded() || !mcc_campaign_owned || !mcc_campaign_validate(in,bytes)) return 0;
     mcc_campaign.effects_gain=1.0f;
     mcc_campaign.music_gain=1.0f;
+    mcc_campaign.model_ambient=mcc_original_model_ambient;
     mcc_campaign.ambient_base=mcc_original_ambient_base;mcc_campaign.ambient_scale=mcc_original_ambient_scale;
     memcpy(&mcc_campaign,in,bytes);
     if (bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES)
         mcc_campaign.flags|=(mcc_original_loud_dialog ? 2u : 0u) | (mcc_original_ignore_player ? 4u : 0u);
     if (mcc_campaign.version<4u && !mcc_original_screen_flashes)
         mcc_campaign.flags|=MCC_CAMPAIGN_FLASHES_DISABLED;
-    mcc_campaign.version=5;
+    mcc_campaign.version=6;
     mcc_script_effects_restore((mcc_campaign.flags>>4)&MCC_EFFECT_MASK);
     global_gravity=mcc_original_gravity*mcc_campaign.gravity;
     sound_gain_under_dialog=mcc_campaign.dialog_gain;
     object_light_ambient_base=mcc_campaign.ambient_base;object_light_ambient_scale=mcc_campaign.ambient_scale;
     loud_dialog_hack=(mcc_campaign.flags&2u)!=0;
     if (mcc_screen_flashes) *mcc_screen_flashes=!(mcc_campaign.flags&MCC_CAMPAIGN_FLASHES_DISABLED);
+    if (mcc_model_ambient) *mcc_model_ambient=mcc_campaign.model_ambient;
     /* The native client cheat policy remains authoritative. Only the host
      * runs campaign scripts and decides ammunition consumption. */
     if (game_connection()!=_game_connection_network_client) cheat.infinite_ammo=(mcc_campaign.flags&1u)!=0;
@@ -545,6 +574,15 @@ static void mcc_spawn_vehicles_evaluate(short function, long thread, boolean ini
     hs_return(thread,0);
 }
 
+static void mcc_spawn_weapons_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    /* Use the loaded map's weapon list and existing host object replication. */
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned &&
+        game_connection()!=_game_connection_network_client) cheat_all_weapons();
+    hs_return(thread,0);
+}
+
 static void mcc_object_type_predict_evaluate(short function, long thread, boolean initialize)
 {
     long *args=hs_macro_function_evaluate(function,thread,initialize);
@@ -667,7 +705,8 @@ static struct mcc_campaign_definition mcc_campaign_functions[]={
     {{_hs_type_boolean,0,"game_is_cooperative",hs_macro_function_parse,mcc_cooperative_evaluate,NULL,NULL,0,{0}},{0}},
     {{_hs_type_boolean,0,"unit_get_current_flashlight_state",hs_macro_function_parse,mcc_flashlight_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}},
     {{_hs_type_void,0,"sound_set_music_gain",hs_macro_function_parse,mcc_music_gain_set_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
-    {{_hs_type_object_list,0,"players_on_multiplayer_team",hs_macro_function_parse,mcc_team_players_evaluate,NULL,NULL,1,{_hs_type_short_integer}},{0}}
+    {{_hs_type_object_list,0,"players_on_multiplayer_team",hs_macro_function_parse,mcc_team_players_evaluate,NULL,NULL,1,{_hs_type_short_integer}},{0}},
+    {{_hs_type_void,0,"cheat_all_weapons",hs_macro_function_parse,mcc_spawn_weapons_evaluate,NULL,NULL,0,{0}},{0}}
 };
 
 struct hs_function_definition *mcc_campaign_function(short index)

@@ -2780,6 +2780,7 @@ symbols in this file:
 #include "camera/director.h"
 #include "cache/sound_cache.h"
 #include "hs.h"
+#include "bots.h" /* port: port/linux/game/bots_network.c */
 #include "hs_library_external.h"
 #include "hs_library_internal.h"
 #include "object_lists.h"
@@ -15604,6 +15605,11 @@ static boolean hs_compile_and_evaluate_command(
 
 		if (server_command_try(expression, &server_result))
 			return server_result;
+	}
+	/* port: typed bot controls, after the dedicated console's role check. */
+	{
+		int bot_result = bots_console_command(expression);
+		if (bot_result >= 0) return bot_result != 0;
 	}
 	/* port: the co-op host's bringto, which brings every player to the host
 	(players.c; a client is told it is the host's) */

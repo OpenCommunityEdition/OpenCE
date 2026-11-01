@@ -79,7 +79,10 @@ NOTICE_SIZE = 128
 NETWORK_VERSION = 38
 # the RCON's hello's capabilities, and the status's (server_http.c's server_http_capabilities)
 CAPABILITIES = ["events", "status", "rotation", "settings", "bans", "owner_web", "ban_address", "stop",
-                "event_addresses", "identity"]
+                "event_addresses", "identity", "vpn", "link"]
+# the VPN policy's netlist (server_netlist.c): a master's list the simulator holds, and the addresses it lists
+VPN_LISTED = ("198.51.100.0", "198.51.100.255")
+VPN_REASONS = ("vpn_link_required", "vpn_blocked", "vpn_link_invalid", "vpn_link_too_new", "vpn_link_in_use")
 PUBLISHER_KEY_ID = "3f9a2c7d1e5b8a04"
 DRAINS = ("now", "game", "empty", "cancel")
 
@@ -315,6 +318,14 @@ def default_settings():
                  "\"links\" or \"off\".", "HALO_NET_TEXT_CHAT", choices=["on", "links", "off"]),
         _setting("network.votekick", "boolean", True, "Hosting: let the players vote to kick a player.",
                  "HALO_NET_VOTEKICK"),
+        _setting("network.vote_end_game", "boolean", True, "Hosting: let the players vote to end the game "
+                 "(\"!endgame\" in the chat).", "HALO_NET_VOTE_END_GAME"),
+        _setting("network.votekick_threshold", "string", "dynamic", "Hosting: the yes votes a vote needs: \"dynamic\" "
+                 "(scaled with the players) or \"static\" (network.votekick_percent of them).",
+                 "HALO_NET_VOTEKICK_THRESHOLD", choices=["dynamic", "static"]),
+        _setting("network.votekick_percent", "integer", 50, "Hosting: with a static threshold, the percentage of the "
+                 "players who may vote whose yes passes a vote (1 to 100).", "HALO_NET_VOTEKICK_PERCENT", low=1,
+                 high=100),
         _setting("network.votekick_minutes", "integer", 5, "Hosting: the minutes a player must have played on this "
                  "server to start a vote to kick (0 to 60).", "HALO_NET_VOTEKICK_MINUTES", low=0, high=60),
         _setting("network.votekick_ban_minutes", "integer", 30, "Hosting: the minutes a player kicked by a vote "
@@ -327,6 +338,9 @@ def default_settings():
                  "each other.", "HALO_NET_COOP_FRIENDLY_FIRE", choices=["off", "on", "shields_only", "explosives_only"]),
         _setting("network.coop_ally_friendly_fire", "boolean", True, "Whether the players of an online co-op game "
                  "hurt their AI allies.", "HALO_NET_COOP_ALLY_FRIENDLY_FIRE"),
+        _setting("network.coop_team_wipe", "string", "auto", "When every co-op player dies: \"auto\" reverts the "
+                 "checkpoint in a private game and only respawns in a public one; \"revert\" or \"respawn\".",
+                 "HALO_NET_COOP_TEAM_WIPE", choices=["auto", "revert", "respawn"]),
         _setting("network.coop_player_collisions", "boolean", True, "Whether the players of an online co-op game bump "
                  "into each other.", "HALO_NET_COOP_PLAYER_COLLISIONS"),
         _setting("network.public_address", "string", "", "Hosting: the internet address joiners reach this machine "
@@ -371,9 +385,9 @@ def default_settings():
                  "HALO_SERVER_LOG_ADDRESSES"),
         _setting("server.status_file", "string", "", "A file the status (as /api/status) is written to every 2 "
                  "seconds, for a panel without HTTP; empty for none.", "HALO_SERVER_STATUS_FILE"),
-        _setting("server.auto_update", "string", "off", "\"off\"; \"check\" logs a newer release; \"install\" "
-                 "installs it once the server has been empty for 10 minutes.", "HALO_SERVER_AUTO_UPDATE",
-                 choices=["off", "check", "install"]),
+        _setting("server.auto_update", "string", "install", "\"off\"; \"check\" logs a newer release; \"install\" "
+                 "installs it at once and restarts when empty (a new network version: after the game).",
+                 "HALO_SERVER_AUTO_UPDATE", choices=["off", "check", "install"]),
         _setting("server.coop_difficulty", "string", "normal", "Co-op rotation entries' (<level>:coop) difficulty.",
                  "HALO_SERVER_COOP_DIFFICULTY", choices=["easy", "normal", "hard", "impossible"]),
         _setting("server.master_publish", "boolean", True, "Publish a public server to the official master servers.",
@@ -391,6 +405,43 @@ def default_settings():
                  "HALO_SERVER_CHAT_FILTER_SWEARING", choices=["off", "severe", "strong", "mild"]),
         _setting("server.chat_filter_insults", "string", "off", "With server.chat_filter, the insults kept out.",
                  "HALO_SERVER_CHAT_FILTER_INSULTS", choices=["off", "severe", "strong", "mild"]),
+        _setting("server.vpn_policy", "string", "link", "Machines joining from the address of a VPN, a Tor exit or "
+                 "a datacenter: \"link\", refused unless the player shows a Discord account linked at a master "
+                 "server this server publishes to; \"block\", refused; \"off\", let in.", "HALO_SERVER_VPN_POLICY",
+                 choices=["off", "link", "block"]),
+        _setting("server.vpn_fail", "string", "open", "Until a netlist is held: \"open\" lets every machine in, "
+                 "\"closed\" refuses those from the internet.", "HALO_SERVER_VPN_FAIL", choices=["open", "closed"]),
+        _setting("server.vpn_check_lan", "boolean", False, "Check the LAN's machines' addresses against the netlist "
+                 "too (tests).", "HALO_SERVER_VPN_CHECK_LAN"),
+        _setting("server.link_min_age_days", "integer", 365, "A machine joining over a VPN with a linked Discord "
+                 "account is refused when the account is younger than this many days (0: any age).",
+                 "HALO_SERVER_LINK_MIN_AGE_DAYS", low=0, high=3650),
+        _setting("server.link_one_seat", "boolean", True, "Refuse a second machine of a linked Discord account "
+                 "already in the game.", "HALO_SERVER_LINK_ONE_SEAT"),
+        _setting("server.update_check_minutes", "integer", 30, "The minutes between checks for a newer release.",
+                 "HALO_SERVER_UPDATE_CHECK_MINUTES", low=5, high=1440),
+        _setting("server.update_game_minutes", "integer", 30, "After a new network version's install, the minutes a "
+                 "game may go on before it is ended (0: until it ends).", "HALO_SERVER_UPDATE_GAME_MINUTES", low=0,
+                 high=240),
+        _setting("server.max_machines_per_address", "integer", 0, "The machines of one address that may play at once "
+                 "(0: no limit).", "HALO_SERVER_MAX_MACHINES_PER_ADDRESS", low=0, high=128),
+        _setting("server.afk_kick_minutes", "integer", 5, "The minutes a player may be away before being kicked "
+                 "(0: never).", "HALO_SERVER_AFK_KICK_MINUTES", low=0, high=60),
+        _setting("server.afk_kick_when_full", "boolean", False, "Kick players away only while the game is full.",
+                 "HALO_SERVER_AFK_KICK_WHEN_FULL"),
+        _setting("server.afk_kick_full_minutes", "integer", 3, "With server.afk_kick_when_full, the minutes away "
+                 "before a kick.", "HALO_SERVER_AFK_KICK_FULL_MINUTES", low=2, high=60),
+        _setting("server.coop_bsp_switch", "string", "majority", "A co-op loading zone switches once most living "
+                 "players cross (\"majority\"), or at the first (\"anyone\").", "HALO_SERVER_COOP_BSP_SWITCH",
+                 choices=["majority", "anyone"]),
+        _setting("server.coop_bsp_switch_cooldown_seconds", "integer", 15, "The seconds after a loading zone's "
+                 "switch before another may.", "HALO_SERVER_COOP_BSP_SWITCH_COOLDOWN_SECONDS", low=0, high=300),
+        _setting("server.map_vote", "boolean", False, "The players vote for the next game in the lobby.",
+                 "HALO_SERVER_MAP_VOTE"),
+        _setting("server.map_vote_choices", "integer", 4, "The entries a map vote offers.",
+                 "HALO_SERVER_MAP_VOTE_CHOICES", low=2, high=8),
+        _setting("server.map_vote_seconds", "integer", 20, "How long a map vote runs.", "HALO_SERVER_MAP_VOTE_SECONDS",
+                 low=5, high=120),
     ]
 
 
@@ -665,6 +716,10 @@ class Player:
         self.muted = False
         self.address = f"203.0.113.{10 + machine}"
         self.hwid = hashlib.sha256(name.encode()).hexdigest()[:32]
+        # (its Discord account: a verified one's, a pass that checked, for every other machine; else what it says)
+        self.discord_id = str(80351110224678912 + machine)
+        self.discord_name = name.lower()
+        self.discord_verified = machine % 2 == 0
         # (its machine's build, as its game tells the host)
         self.client = {"build": 282, "flavor": "release", "version": "OpenCE Linux | build 282 (release)",
                        "repository": "OpenCommunityEdition/OpenCE",
@@ -678,7 +733,8 @@ class Player:
                  "deaths": self.deaths, "assists": self.assists, "ping": self.ping if playing else None,
                  "machine": self.machine, "joined": self.joined, "muted": self.muted, "client": self.client}
         if addresses:
-            value.update(address=self.address, hwid=self.hwid)
+            value.update(address=self.address, hwid=self.hwid, discord_id=self.discord_id,
+                         discord_name=self.discord_name, discord_verified=self.discord_verified)
         return value
 
 
@@ -721,9 +777,12 @@ COMMANDS = [
     ("kick", "sv_kick", "moderator", "<player>", "drops a player's machine (it may join again)"),
     ("ban", "sv_ban", "moderator", "<player> [30m|2h|7d|forever] [reason]",
      "drops a player's machine and bans its address and hardware id (a moderator's: a day at most)"),
-    ("unban", "sv_unban", "admin", "<number|address|hardware id>", "takes a ban out of bans.txt"),
-    ("sv_ban_address", None, "admin", "<address|hardware id> [30m|2h|7d|forever] [reason]",
-     "bans an address or hardware id, its player here or not"),
+    ("unban", "sv_unban", "admin", "<number|address|hardware id|discord:id>", "takes a ban out of bans.txt"),
+    ("sv_ban_address", None, "admin", "<address|hardware id|discord:id> [30m|2h|7d|forever] [reason]",
+     "bans an address, hardware id or verified Discord account, its player here or not"),
+    ("sv_vpn", None, "viewer", "", "the VPN policy, the netlists held and the joins refused"),
+    ("sv_vpn_check", None, "moderator", "<address>", "whether an IPv4 address is refused as a VPN's"),
+    ("sv_vpn_fetch", None, "admin", "", "fetches the master servers' netlists now"),
     ("mute", None, "moderator", "<player> [minutes]", "mutes a player's chat and voice for everyone"),
     ("unmute", None, "moderator", "<player>", "unmutes a player"),
     ("sv_map", None, "moderator", "<map> [gametype]", "plays that game now (the rotation goes on after)"),
@@ -791,11 +850,14 @@ class Sim:
         self.gametype_files = dict(GAMETYPE_FILES)
         self.bans = [
             {"when": "2026-10-19 18:00:00", "ip": "198.51.100.23", "hwid": "4f1c9a0e7b2d4c6e8a1f3b5d7c9e0a2b",
-             "players": "Griefer", "reason": "team killing", "until": None},
+             "discord_id": "", "discord_verified": False, "players": "Griefer", "reason": "team killing",
+             "until": None},
             # (a timed ban that has ended: bans.txt keeps it, the server lets its machine in)
-            {"when": "2026-10-18 09:30:00", "ip": "198.51.100.40", "hwid": "", "players": "Spammer",
-             "reason": "chat spam (by the moderator)", "until": int(time.time()) - 3600},
+            {"when": "2026-10-18 09:30:00", "ip": "198.51.100.40", "hwid": "", "discord_id": "",
+             "discord_verified": False, "players": "Spammer", "reason": "chat spam (by the moderator)",
+             "until": int(time.time()) - 3600},
         ]
+        self.vpn_refused = {reason: 0 for reason in VPN_REASONS}
         self.rotation = []
         self.rotation_index = 0
         self.rotation_text = ("bloodgulch:ctf, sidewinder:team_slayer+score=50+time=15, prisoner:slayer, "
@@ -1115,16 +1177,20 @@ class Sim:
         self.next_machine += 1
         self.players[slot] = player
         self.log("info", "player", f"{name} joined (slot {slot}, machine {player.machine})")
-        self.emit("player_joined", "player", {"address": player.address, "hwid": player.hwid}, slot=slot, name=name,
-                  team=player.team, machine=player.machine)
+        self.emit("player_joined", "player", {"address": player.address, "hwid": player.hwid,
+                                              "discord_id": player.discord_id, "discord_name": player.discord_name,
+                                              "discord_verified": player.discord_verified},
+                  slot=slot, name=name, team=player.team, machine=player.machine)
         return player
 
     def remove_player(self, player, reason):
         """a player gone: reason left, kicked or banned"""
         self.players.pop(player.slot, None)
         self.log("info", "player", f"{player.name} left (slot {player.slot})")
-        self.emit("player_left", "player", {"address": player.address, "hwid": player.hwid}, slot=player.slot,
-                  name=player.name, reason=reason)
+        self.emit("player_left", "player", {"address": player.address, "hwid": player.hwid,
+                                            "discord_id": player.discord_id, "discord_name": player.discord_name,
+                                            "discord_verified": player.discord_verified},
+                  slot=player.slot, name=player.name, reason=reason)
 
     def find_player(self, command, text):
         """a player by slot or the start of their name, or Failed"""
@@ -1236,6 +1302,8 @@ class Sim:
             for entry in self.rotation:
                 if entry["rejected"]:
                     self.log("warn", "server", f"rotation: {entry['text']} left out: {entry['rejected']}")
+            # (a machine from a VPN's address with no Discord account, refused at the door: network_link.c)
+            self.refuse_vpn("Hidden", "198.51.100.77", "vpn_link_required")
             self.rotation_index = 0
             if self.options.still:
                 for _ in range(5):
@@ -1525,7 +1593,9 @@ class Sim:
         until = int(time.time()) + seconds if seconds else None
         shown = (reason or "banned by the server") + ("" if role == "owner" else f" (by the {role})")
         self.bans.append({"when": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), "ip": player.address,
-                          "hwid": player.hwid, "players": player.name, "reason": shown, "until": until})
+                          "hwid": player.hwid, "discord_id": player.discord_id,
+                          "discord_verified": player.discord_verified, "players": player.name, "reason": shown,
+                          "until": until})
         lines = []
         if until:
             lines.append(f"{player.name} banned for {seconds // 60} minutes")
@@ -1541,20 +1611,24 @@ class Sim:
             raise Failed("unban: give a ban's number (sv_bans), an address or a hardware id")
         target = words[1]
         for index, ban in enumerate(self.bans):
-            if (re.fullmatch(r"\d+", target) and int(target) == index) or target in (ban["ip"], ban["hwid"]):
+            if (re.fullmatch(r"\d+", target) and int(target) == index) or target in (ban["ip"], ban["hwid"]) or \
+                    (target.startswith("discord:") and target[8:] == ban.get("discord_id")):
                 del self.bans[index]
                 self.log("info", "moderation", f"ban {index} taken out ({role})")
                 self.moderation_event("unban", ban["players"] or f"ban {index}", role)
                 return [f"unbanned: {self.ban_line(ban)}"]
         raise Failed(f"unban: no ban {target} (sv_bans lists them)")
 
-    def ban_address(self, ip, hwid, names, seconds, reason, role):
+    def ban_address(self, ip, hwid, names, seconds, reason, role, discord_id=""):
         """server_commands.c's ban_address: a line of bans.txt for an address,
-        a hardware id or both, and each player present of them dropped as ban
-        drops one; the new ban's number, or CommandError (400)"""
-        ip, hwid = ip or "", hwid or ""
-        if not ip and not hwid:
-            raise CommandError("schema", "give an address (a.b.c.d) or a hardware id")
+        a hardware id, a verified Discord account or more than one, and each
+        player present of them dropped as ban drops one; the new ban's number,
+        or CommandError (400)"""
+        ip, hwid, discord_id = ip or "", hwid or "", discord_id or ""
+        if not ip and not hwid and not discord_id:
+            raise CommandError("schema", "give an address (a.b.c.d), a hardware id or a Discord account's id")
+        if discord_id and not re.fullmatch(r"\d{1,20}", discord_id):
+            raise CommandError("schema", "a Discord account's id is up to 20 digits")
         if ip:
             match = re.fullmatch(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", ip)
             if not match or any(int(part) > 255 for part in match.groups()) or \
@@ -1570,10 +1644,12 @@ class Sim:
         until = int(time.time()) + seconds if seconds else None
         shown = (reason or "banned by the server") + ("" if role == "owner" else f" (by the {role})")
         self.bans.append({"when": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()), "ip": ip or "none",
-                          "hwid": hwid or "none", "players": names, "reason": shown, "until": until})
+                          "hwid": hwid or "none", "discord_id": discord_id, "discord_verified": bool(discord_id),
+                          "players": names, "reason": shown, "until": until})
         number = len(self.bans) - 1
         dropped = [player for player in self.players.values() if (ip and player.address == ip) or
-                   (hwid and player.hwid == hwid)]
+                   (hwid and player.hwid == hwid) or
+                   (discord_id and player.discord_verified and player.discord_id == discord_id)]
         self.log("info", "moderation", f"ban {number} added ({role})")
         self.moderation_event("ban", names or ", ".join(player.name for player in dropped), role, reason or None,
                               until)
@@ -1593,12 +1669,56 @@ class Sim:
             else:
                 seconds = 0
         address = "." in words[1]
+        discord = words[1].startswith("discord:")
         try:
-            number = self.ban_address(words[1] if address else "", "" if address else words[1], "", seconds,
-                                      rest_after_words(line, reason_words), role)
+            number = self.ban_address(words[1] if address else "", "" if address or discord else words[1], "",
+                                      seconds, rest_after_words(line, reason_words), role,
+                                      words[1][8:] if discord else "")
         except CommandError as failure:
             raise Failed(f"sv_ban_address: {failure.message}") from None
         return [f"ban {number} added" + (f", for {seconds // 60} minutes" if seconds else "")]
+
+    def vpn_listed(self, address):
+        """server_netlist.c's server_netlist_listed: (listed, by)"""
+        def number(text):
+            return int.from_bytes(bytes(int(part) for part in text.split(".")), "big")
+        listed = number(VPN_LISTED[0]) <= number(address) <= number(VPN_LISTED[1])
+        return listed, "netlist" if listed else ""
+
+    def vpn_json(self):
+        """server_netlist.c's server_netlist_status: /api/vpn's members"""
+        return {"policy": self.value("server.vpn_policy"), "fail": self.value("server.vpn_fail"),
+                "lists": [{"master": "https://master.opencommunityedition.com", "key_id": "89f4eda71229f11f",
+                           "serial": 12, "generated": int(self.started) - 3600, "fetched": int(self.started),
+                           "ranges": 1, "error": ""}],
+                "file": "", "allow_ranges": 0, "block_ranges": 0, "held": True,
+                "refused": dict(self.vpn_refused)}
+
+    def c_sv_vpn(self, line, words, role):
+        info = self.vpn_json()
+        return [f"VPN policy {info['policy']} (server.vpn_fail {info['fail']})",
+                "https://master.opencommunityedition.com: serial 12, 1 ranges, 1 hours old",
+                "vpn_allow.txt: 0 ranges, vpn_block.txt: 0 ranges",
+                "refused: " + ", ".join(f"{count} {reason}" for reason, count in info["refused"].items())]
+
+    def c_sv_vpn_check(self, line, words, role):
+        if len(words) < 2 or not re.fullmatch(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", words[1]) or \
+                any(int(part) > 255 for part in words[1].split(".")):
+            raise Failed("sv_vpn_check: give an IPv4 address (a.b.c.d)")
+        listed, by = self.vpn_listed(words[1])
+        if listed:
+            return [f"{words[1]} is listed ({by}): refused as server.vpn_policy says ({self.value('server.vpn_policy')})"]
+        return [f"{words[1]} is not listed"]
+
+    def c_sv_vpn_fetch(self, line, words, role):
+        return ["the master servers' netlists are being fetched (sv_vpn says when)"]
+
+    def refuse_vpn(self, name, address, reason):
+        """network_link.c's refusal: counted, logged, and a join_refused event"""
+        self.vpn_refused[reason] += 1
+        self.log("info", "player", f"{name} refused at the door ({reason})")
+        self.emit("join_refused", "moderation", {"address": address, "hwid": hashlib.sha256(name.encode()).hexdigest()[:32]},
+                  name=name, reason=reason)
 
     def c_mute(self, line, words, role):
         mute = words[0].lower() != "unmute"
@@ -2408,6 +2528,21 @@ def h_maps(api, request, session, body):
     return Response(200, {"ok": True, "maps": api.sim.maps()})
 
 
+@route("GET", r"/api/vpn", "viewer")
+def h_vpn(api, request, session, body):
+    return Response(200, {"ok": True, **api.sim.vpn_json()})
+
+
+@route("POST", r"/api/vpn/check", "moderator")
+def h_vpn_check(api, request, session, body):
+    ip = body.get("ip")
+    if not isinstance(ip, str) or not re.fullmatch(r"(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})", ip) or \
+            any(int(part) > 255 for part in ip.split(".")):
+        raise CommandError("schema", "ip is an IPv4 address (a.b.c.d)", field="ip")
+    listed, by = api.sim.vpn_listed(ip)
+    return Response(200, {"ok": True, "listed": listed, "by": by})
+
+
 @route("GET", r"/api/bans", "admin")
 def h_bans(api, request, session, body):
     return Response(200, {"ok": True, "bans": [dict(ban, n=index) for index, ban in enumerate(api.sim.bans)]})
@@ -2423,7 +2558,7 @@ def h_ban_add(api, request, session, body):
     """a ban of an address or hardware id (sv_ban_address): {"ok":true,"n":…}"""
     sim = api.sim
     fields = {}
-    for name in ("ip", "hwid", "names", "duration", "reason"):
+    for name in ("ip", "hwid", "discord_id", "names", "duration", "reason"):
         value = body.get(name)
         if value is not None and not isinstance(value, str):
             raise CommandError("schema", f"{name} is a text", field=name)
@@ -2435,7 +2570,8 @@ def h_ban_add(api, request, session, body):
             raise CommandError("schema", "duration is 30m, 2h, 7d, 1w or forever (ten years at most)",
                                field="duration")
     sim.log("info", "console", f"{session.by}: (a ban of an address or hardware id)")
-    number = sim.ban_address(fields["ip"], fields["hwid"], fields["names"], seconds, fields["reason"], session.role)
+    number = sim.ban_address(fields["ip"], fields["hwid"], fields["names"], seconds, fields["reason"], session.role,
+                             fields["discord_id"])
     return Response(200, {"ok": True, "n": number})
 
 

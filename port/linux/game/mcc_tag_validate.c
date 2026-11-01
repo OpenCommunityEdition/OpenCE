@@ -205,6 +205,10 @@ static int mcc_value_block(struct tag_schema_definition const *schema)
 static void mcc_problem(struct mcc_validation_context *context, int rejected, char const *message)
 {
     char text[512];
+    if (rejected && mcc_validation.runtime && !mcc_validation.runtime->failure[0])
+        snprintf(mcc_validation.runtime->failure,sizeof(mcc_validation.runtime->failure),
+            "Invalid data: tag %08lx, %.24s. See debug.txt.",
+            context->handle,context->field ? context->field : "root");
     if (rejected) context->rejected = TRUE;
     else ++mcc_validation.corrections;
     if (rejected || mcc_validation.corrections <= 64) {
@@ -278,6 +282,116 @@ static struct tag_schema_field const *mcc_field(struct tag_schema_definition con
     return NULL;
 }
 
+/* Some MCC jet types carry velocity and spread only. The January runtime
+ * also reads a third, rotates-up switch. Keep the authored pair and provide
+ * an explicit false switch in MCC-owned tag storage; never read a following
+ * allocation as that switch. Complete constant blocks retain their values. */
+static int mcc_particle_type_constants(struct mcc_validation_context *context,
+    byte *address, struct tag_schema_definition const *schema)
+{
+    struct tag_schema_field const *cf=mcc_field(schema,"physics_constants");
+    struct tag_schema_field const *pf=mcc_field(schema,"initial_particle_creation_physics");
+    struct tag_schema_field const *sf=mcc_field(schema,"type_states"),*mode;
+    struct tag_schema_definition const *states;
+    struct tag_block *constants,*block;
+    int jet,required;
+    long i;
+    real *copy;
+    if (!cf || !pf || !sf || !sf->definition) return 0;
+    constants=(struct tag_block *)(address+cf->offset);
+    block=(struct tag_block *)(address+sf->offset);
+    states=sf->definition;mode=mcc_field(states,"particle_creation_physics");
+    if (!mode) return 0;
+    jet=mcc_integer(address+pf->offset,pf->size,0)==2;
+    required=mcc_integer(address+pf->offset,pf->size,0)!=0;
+    for (i=0;i<block->count;i++) {
+        long value=mcc_integer((byte *)block->address+i*states->size+mode->offset,mode->size,0);
+        if (value==2) jet=1;
+        if (value) required=1;
+    }
+    if (!required || constants->count>=3) return 1;
+    if (!jet || constants->count!=2 || context->region!=mcc_validation.runtime->tags) {
+        mcc_problem(context,1,"particle creation physics has too few constants");return 0;
+    }
+    copy=mcc_runtime_allocate(mcc_validation.runtime,3*sizeof(*copy));
+    if (!copy) {mcc_problem(context,1,"no room for MCC jet constants");return 0;}
+    memcpy(copy,constants->address,2*sizeof(*copy));copy[2]=0.0f;
+    if (!mcc_claim_allocation(copy,3*sizeof(*copy),cf->definition)) return 0;
+    constants->address=copy;constants->count=3;
+    context->length=mcc_validation.runtime->used;
+    mcc_problem(context,0,"jet's absent rotates-up constant defaults to false");
+    return 1;
+}
+
+/* Recover a misplaced start edge only from the surface's complete, unique
+ * authored ring. Super Wacky Funtime's Flood model swaps two start edges;
+ * no vertices, planes, edge links or surface ownership are changed. */
+static int mcc_collision_surface_edges(struct mcc_validation_context *context,
+    byte *address, struct tag_schema_definition const *schema)
+{
+    struct tag_schema_field const *sf=mcc_field(schema,"surfaces"),*ef=mcc_field(schema,"edges");
+    struct tag_block *surfaces,*edges;
+    long *first,*counts,i,j;
+    int result=0;
+    if (!sf || !ef || !sf->definition || !ef->definition ||
+        ((struct tag_schema_definition const *)sf->definition)->size!=12 ||
+        ((struct tag_schema_definition const *)ef->definition)->size!=24) return 0;
+    surfaces=(struct tag_block *)(address+sf->offset);
+    edges=(struct tag_block *)(address+ef->offset);
+    if (!surfaces->count) return 1;
+    if (surfaces->count<0 || surfaces->count>131072 || edges->count<0 || edges->count>262144) return 0;
+    /* Valid BSPs need no ownership table or allocation. */
+    for (i=0;i<surfaces->count;i++) {
+        long start=mcc_integer((byte *)surfaces->address+i*12+4,4,0);
+        byte const *edge;
+        if (start<0 || start>=edges->count) break;
+        edge=(byte *)edges->address+start*24;
+        if (mcc_integer(edge+16,4,0)!=i && mcc_integer(edge+20,4,0)!=i) break;
+    }
+    if (i==surfaces->count) return 1;
+    first=malloc(surfaces->count*2*sizeof(*first));
+    if (!first) return 0;
+    counts=first+surfaces->count;
+    for (i=0;i<surfaces->count;i++) {first[i]=NONE;counts[i]=0;}
+    for (i=0;i<edges->count;i++) {
+        byte const *edge=(byte *)edges->address+i*24;
+        for (j=0;j<2;j++) {
+            long surface=mcc_integer(edge+16+j*4,4,0);
+            if (surface==NONE) continue;
+            if (surface<0 || surface>=surfaces->count) goto done;
+            if (first[surface]==NONE) first[surface]=i;
+            counts[surface]++;
+        }
+    }
+    for (i=0;i<surfaces->count;i++) {
+        byte *surface=(byte *)surfaces->address+i*12;
+        long start=mcc_integer(surface+4,4,0),cursor,steps=0;
+        if (start>=0 && start<edges->count) {
+            byte const *edge=(byte *)edges->address+start*24;
+            if (mcc_integer(edge+16,4,0)==i || mcc_integer(edge+20,4,0)==i) continue;
+        }
+        start=cursor=first[i];
+        if (start==NONE || counts[i]<3 || counts[i]>8) goto done;
+        do {
+            byte const *edge;
+            long side;
+            if (cursor<0 || cursor>=edges->count || steps++>=counts[i]) goto done;
+            edge=(byte *)edges->address+cursor*24;
+            side=mcc_integer(edge+20,4,0)==i;
+            if (mcc_integer(edge+16+side*4,4,0)!=i) goto done;
+            cursor=mcc_integer(edge+8+side*4,4,0);
+        } while (cursor!=start);
+        if (steps!=counts[i]) goto done;
+        mcc_set_integer(surface+4,4,start);
+        mcc_problem(context,0,"collision surface start restored from its complete owned edge ring");
+    }
+    result=1;
+done:
+    if (!result) mcc_problem(context,1,"misplaced collision start has no complete unique owned edge ring");
+    free(first);
+    return result;
+}
+
 /* Some compiled graphs omit their parent hierarchy. Recover it only from
  * the model referenced by the same object, with matching ordered names.
  * Unnamed, unlinked slots can be filled without changing node indices.
@@ -288,8 +402,9 @@ static int mcc_animation_model_tree(struct mcc_validation_context *context,
     struct mcc_validation_header *header=mcc_validation.header;
     short links[64][3];
     char names[64][32];
-    long i,j,root_child;
-    int found=0,parents_omitted=1,links_omitted=1,holes=0;
+    long i,j;
+    int pruned,incomplete=0;
+    int found=0,parents_omitted=1,links_omitted=1,holes=0,partial=1,missing=0;
     if (!schema->name || schema->size!=64 || nodes->count<2 || nodes->count>64) return 0;
     for (j=0;j<nodes->count;j++) {
         byte const *node=(byte *)nodes->address+j*64;
@@ -309,9 +424,20 @@ static int mcc_animation_model_tree(struct mcc_validation_context *context,
             holes=1;
         }
     }
-    if (!parents_omitted && !links_omitted && !holes) return 0;
+    if (!links_omitted && !holes) {
+        byte referenced[64];
+        memset(referenced,0,sizeof(referenced));referenced[0]=1;
+        for (j=0;j<nodes->count;j++) {
+            byte const *node=(byte *)nodes->address+j*64;
+            long sibling=mcc_integer(node+32,2,0),child=mcc_integer(node+34,2,0);
+            if (j && sibling>0 && sibling<nodes->count) referenced[sibling]=1;
+            if (child>0 && child<nodes->count) referenced[child]=1;
+        }
+        for (j=1;j<nodes->count && referenced[j];j++) {}
+        incomplete=j!=nodes->count;
+        if (!parents_omitted && !incomplete) return 0;
+    }
     if (mcc_integer((byte *)nodes->address+32,2,0)!=NONE) return 0;
-    root_child=mcc_integer((byte *)nodes->address+34,2,0);
     for (i=0;i<header->count;i++) {
         struct mcc_validation_instance *object=header->instances+i,*model;
         struct tag_block const *model_nodes;
@@ -337,10 +463,27 @@ static int mcc_animation_model_tree(struct mcc_validation_context *context,
         found=1;
     }
     if (!found) return 0;
-    /* Exile's Flood Banshee retains the matching model's non-root links,
-     * but puts the last sibling in the root's first-child slot. Admit that
-     * exact convention as well as omitted links, never an arbitrary tree. */
-    if (holes) {
+    /* Bot Bootcamp's cyborg omits the neck's child; Arbiter's Demise's
+     * Ghost omits siblings and all parents. Recover only absent edges;
+     * every retained edge must match the associated model exactly. */
+    for (j=0;j<nodes->count;j++) {
+        byte const *node=(byte *)nodes->address+j*64;
+        long k;
+        for (k=0;k<3;k++) {
+            long link=mcc_integer(node+32+k*2,2,0);
+            if (k==2 && (!j || parents_omitted)) continue;
+            if (link==NONE && links[j][k]!=NONE) missing=1;
+            else if (link!=links[j][k]) partial=0;
+        }
+    }
+    partial=partial && missing && !holes;
+    /* Ruined Halo's Warthog retains disconnected sibling chains and some
+     * zeroed parents. Names and nonzero parents must match the associated
+     * model; retained edges may skip siblings, never cross parent groups.
+     * This also covers Exile's root pointing at its last child. */
+    pruned=incomplete && !holes && !links_omitted && !partial;
+    if (!holes && !links_omitted && !partial && !pruned) return 0;
+    if (holes || pruned) {
         /* Named nodes must still describe the same parent relationships.
          * Sibling order may differ, but every retained edge must agree with
          * the model. No animation or vertex node indices are remapped. */
@@ -350,7 +493,7 @@ static int mcc_animation_model_tree(struct mcc_validation_context *context,
             if (!node[0]) continue;
             sibling=mcc_integer(node+32,2,0);child=mcc_integer(node+34,2,0);
             parent=mcc_integer(node+36,2,0);
-            if (j && parent!=links[j][2]) return 0;
+            if (j && parent!=links[j][2] && !(pruned && parent==0)) return 0;
             if (sibling!=NONE && (sibling<=0 || sibling>=nodes->count || sibling==j ||
                 links[sibling][2]!=links[j][2])) return 0;
             if (child!=NONE && (child<=0 || child>=nodes->count || child==j || links[child][2]!=j)) return 0;
@@ -360,15 +503,6 @@ static int mcc_animation_model_tree(struct mcc_validation_context *context,
                 cursor=mcc_integer((byte *)nodes->address+cursor*64+32,2,0);
             }
         }
-    } else if (root_child!=NONE) {
-        long child=links[0][1],last=NONE,steps=0;
-        for (j=1;j<nodes->count;j++)
-            if (memcmp((byte *)nodes->address+j*64+32,links[j],6)) return 0;
-        while (child!=NONE) {
-            if (child<=0 || child>=nodes->count || steps++>=nodes->count) return 0;
-            last=child;child=links[child][0];
-        }
-        if (root_child!=last) return 0;
     }
     for (j=0;j<nodes->count;j++) {
         byte *node=(byte *)nodes->address+j*64;
@@ -624,8 +758,14 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                         accepted = mcc_bitmaps_valid(mcc_validation.runtime, (struct bitmap_data *)address);
                     else if (!strcmp(field->name, "bitmap_group_check"))
                         accepted = mcc_bitmaps_group_valid(mcc_validation.runtime, address);
+                    else if (!strcmp(field->name, "collision_model_bsp_check"))
+                        accepted = mcc_collision_surface_edges(context,address,schema) &&
+                            field->check((struct tag_validation *)context,address);
                     else if (!strcmp(field->name, "animation_graph_check"))
                         accepted = mcc_animation_graph_check(context, address, schema);
+                    else if (!strcmp(field->name, "particle_system_type_check"))
+                        accepted = mcc_particle_type_constants(context,address,schema) &&
+                            field->check((struct tag_validation *)context,address);
                     else accepted = field->check((struct tag_validation *)context, address);
                     if (!accepted && !context->rejected)
                         mcc_problem(context, 1, "schema callback rejected data");
@@ -853,11 +993,11 @@ void mcc_validation_message(struct tag_validation *validation, boolean refuse, c
 boolean mcc_validation_file_contains(struct tag_validation *validation, long offset, long size)
 {
     struct mcc_runtime *runtime = mcc_validation.runtime;
-    (void)validation;
-    if (offset < 0 || size < 0 || !runtime) return FALSE;
+    struct mcc_validation_context *context=(struct mcc_validation_context *)validation;
+    if (!context || offset < 0 || size < 0 || !runtime) return FALSE;
     return ((unsigned long)offset <= runtime->source.size &&
         (unsigned long)size <= runtime->source.size - (unsigned long)offset) ||
-        mcc_audio_contains(runtime, (uint32_t)offset, (uint32_t)size) ||
+        mcc_audio_contains(runtime, context->handle, (uint32_t)offset, (uint32_t)size) ||
         mcc_bitmaps_contains(runtime, (uint32_t)offset, (uint32_t)size);
 }
 void *mcc_validation_root(struct tag_validation *validation)

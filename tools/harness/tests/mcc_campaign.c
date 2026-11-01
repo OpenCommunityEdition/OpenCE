@@ -27,8 +27,9 @@
 void mcc_game_speed_reset(void) {}
 
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-static int printed,requests,blocks,restarts,network_restarts,cinematic_skips,vehicle_spawns,possessions;
+static int printed,requests,blocks,restarts,network_restarts,cinematic_skips,vehicle_spawns,weapon_spawns,possessions;
 void cheat_all_vehicles(void) {vehicle_spawns++;}
+void cheat_all_weapons(void) {weapon_spawns++;}
 void main_skip_cinematic(void) {cinematic_skips++;}
 void main_reset_map(void) {restarts++;}
 boolean mcc_ui_restart_network_game(void) {network_restarts++;return TRUE;}
@@ -78,16 +79,19 @@ real sound_gain_under_dialog=.7f;
 struct cheat_globals cheat;
 real object_light_ambient_base=.03f,object_light_ambient_scale=1.0f;
 boolean loud_dialog_hack,ignore_player;
-short const hs_external_global_count=8;
-static struct hs_external_global_definition globals[8]={{"sound_gain_under_dialog",_hs_type_real,0,&sound_gain_under_dialog},
+static real model_ambient=.2f;
+short const hs_external_global_count=9;
+static struct hs_external_global_definition globals[9]={{"sound_gain_under_dialog",_hs_type_real,0,&sound_gain_under_dialog},
     {"cheat_infinite_ammo",_hs_type_boolean,0,&cheat.infinite_ammo},{"unsafe",_hs_type_real,0,NULL},
     {"object_light_ambient_base",_hs_type_real,0,&object_light_ambient_base},
     {"object_light_ambient_scale",_hs_type_real,0,&object_light_ambient_scale},
     {"loud_dialog_hack",_hs_type_boolean,0,&loud_dialog_hack},
     {"ai_debug_ignore_player",_hs_type_boolean,0,&ignore_player},
-    {"rasterizer_screen_flashes",_hs_type_boolean,0,&screen_flashes}};
+    {"rasterizer_screen_flashes",_hs_type_boolean,0,&screen_flashes},
+    {"rasterizer_model_lighting_ambient",_hs_type_real,0,&model_ambient}};
 short hs_find_global_by_name(char const *name) {return !strcmp(name,"ai_debug_ignore_player") ? (short)0x8006 :
-    !strcmp(name,"rasterizer_screen_flashes") ? (short)0x8007 : NONE;}
+    !strcmp(name,"rasterizer_screen_flashes") ? (short)0x8007 :
+    !strcmp(name,"rasterizer_model_lighting_ambient") ? (short)0x8008 : NONE;}
 struct hs_external_global_definition *hs_global_external_get(short index) {return &globals[index];}
 void *csmemset(void *p,long c,unsigned long n) {return memset(p,c,n);}
 void *csmemcpy(void *p,void const *q,unsigned long n) {return memcpy(p,q,n);}
@@ -156,6 +160,28 @@ int main(int argc,char **argv) {
     scenario.cutscene_flags.address=flags;scenario.cutscene_flags.count=2;
     flags[1].position.x=10;
     mcc_campaign_begin();
+    if(!strcmp(argv[1],"model_ambient")) {
+        CHECK(mcc_campaign_global_settable(8));
+        loaded=0;CHECK(!mcc_campaign_global_settable(8));loaded=1;
+        model_ambient=.1f;mcc_campaign_snapshot(saved);
+        CHECK(mcc_campaign_validate(saved,sizeof(saved)));
+        model_ambient=0;CHECK(mcc_campaign_restore(saved,sizeof(saved)));CHECK(model_ambient==.1f);
+        connection=_game_connection_network_client;
+        model_ambient=0;CHECK(mcc_campaign_restore(saved,sizeof(saved)));CHECK(model_ambient==.1f);
+        memcpy(bad,saved,sizeof(saved));bad[0]=5;
+        CHECK(mcc_campaign_restore(bad,MCC_CAMPAIGN_SNAPSHOT_V5_BYTES));CHECK(model_ambient==.2f);
+        CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        memcpy(bad,saved,sizeof(saved));*(unsigned long *)(bad+MCC_CAMPAIGN_SNAPSHOT_V5_BYTES)=0x7fc00000UL;
+        CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        *(unsigned long *)(bad+MCC_CAMPAIGN_SNAPSHOT_V5_BYTES)=0x7f800000UL;
+        CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        model_ambient=.3f;loaded=0;mcc_campaign_reset_model_lighting();CHECK(model_ambient==.3f);
+        loaded=1;mcc_campaign_reset_model_lighting();CHECK(model_ambient==.2f);
+        mcc_campaign_begin();CHECK(model_ambient==.2f);
+        model_ambient=.3f;mcc_campaign_dispose();CHECK(model_ambient==.2f);
+        CHECK(!mcc_campaign_restore(saved,sizeof(saved)));
+        return 0;
+    }
     if(!strcmp(argv[1],"music")) {
         CHECK(mcc_campaign_mix_gain(TRUE)==1);
         args[0]=bits(.25f);call("sound_set_music_gain");
@@ -439,16 +465,23 @@ int main(int argc,char **argv) {
         call("sound_enable");CHECK(mcc_campaign_mix_gain(TRUE)==1 && mcc_campaign_mix_gain(FALSE)==.25f);
         args[0]=0;call("sound_enable");mcc_campaign_dispose();CHECK(mcc_campaign_mix_gain(TRUE)==1);
         loaded=FALSE;call("map_reset");CHECK(restarts==1);
+    } else if(!strcmp(argv[1],"weapons")) {
+        call("cheat_all_weapons");CHECK(weapon_spawns==1);
+        connection=_game_connection_network_client;call("cheat_all_weapons");CHECK(weapon_spawns==1);
+        connection=_game_connection_network_server;call("cheat_all_weapons");CHECK(weapon_spawns==2);
+        loaded=FALSE;call("cheat_all_weapons");CHECK(weapon_spawns==2);
+        loaded=TRUE;mcc_campaign_dispose();call("cheat_all_weapons");CHECK(weapon_spawns==2);
+        mcc_campaign_begin();call("cheat_all_weapons");CHECK(weapon_spawns==3);
     } else if(!strcmp(argv[1],"validation")) {
         mcc_campaign_snapshot(saved);CHECK(mcc_campaign_validate(saved,sizeof(saved)));
         CHECK(!mcc_campaign_validate(saved,sizeof(saved)-1));
-        memcpy(bad,saved,sizeof(saved));bad[0]=6;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
+        memcpy(bad,saved,sizeof(saved));bad[0]=7;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));bad[13]=16;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));{long nan=0x7fc00000;memcpy(bad+4,&nan,4);}CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         memcpy(bad,saved,sizeof(saved));bad[16]=4;CHECK(!mcc_campaign_restore(bad,sizeof(bad)));
         CHECK(global_gravity==original);
         CHECK(mcc_campaign_global_settable(0));CHECK(mcc_campaign_global_settable(1));
-        CHECK(!mcc_campaign_global_settable(2));CHECK(!mcc_campaign_global_settable(8));CHECK(!mcc_campaign_global_settable(-1));
+        CHECK(!mcc_campaign_global_settable(2));CHECK(!mcc_campaign_global_settable(9));CHECK(!mcc_campaign_global_settable(-1));
         for(i=3;i<7;i++) CHECK(mcc_campaign_global_settable((short)i));
         loaded=FALSE;CHECK(!mcc_campaign_global_settable(0));
     } else if(!strcmp(argv[1],"lighting_controls")) {

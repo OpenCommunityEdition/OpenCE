@@ -1,6 +1,8 @@
 #include "cseries.h"
 #include "math/real_math.h"
 #include "game/players.h"
+#include "game/game.h"
+#include "units/units.h"
 #include "scenario/scenario_definitions.h"
 #include "mcc_player.h"
 #include <stdio.h>
@@ -8,6 +10,31 @@
 #undef memset
 static boolean active;
 static short types = 4, counts[4];
+static struct unit_datum equipment_unit;
+static struct scenario equipment_scenario;
+static short connection = _game_connection_local;
+static unsigned equipment_calls, deleted_weapons;
+static long deleted_weapon, given_unit;
+static short given_profile;
+static boolean given_reset, held_at_assignment;
+short game_connection(void) { return connection; }
+struct scenario *global_scenario_get(void) { return &equipment_scenario; }
+void *object_try_and_get_and_verify_type(long index, unsigned long mask) {
+    return index == 123 && (mask & _object_mask_biped) ? &equipment_unit : NULL;
+}
+void object_delete(long weapon) {
+    short slot=equipment_unit.unit.current_weapon_index;
+    ++deleted_weapons;deleted_weapon=weapon;
+    /* The engine's deleted-object notification clears matching inventory. */
+    if (slot>=0 && equipment_unit.unit.weapon_object_indices[slot]==weapon) {
+        equipment_unit.unit.weapon_object_indices[slot]=NONE;
+        equipment_unit.unit.current_weapon_index=NONE;
+    }
+}
+void player_add_equipment(long unit, short profile, boolean reset) {
+    ++equipment_calls;given_unit=unit;given_profile=profile;given_reset=reset;
+    held_at_assignment=equipment_unit.unit.current_weapon_index!=NONE;
+}
 static struct { long weapon_index; } cached_weapons[4];
 static unsigned forgotten;
 boolean mcc_cache_tags_loaded(void) { return active; }
@@ -29,6 +56,48 @@ int main(void) {
     struct scenario_starting_profile profile = {0};
     union { unsigned long bits; float value; } invalid;
     short choice;
+    equipment_scenario.starting_profiles.count=2;
+    equipment_unit.unit.player_index=7;
+    equipment_unit.unit.current_weapon_index=1;
+    equipment_unit.unit.weapon_object_indices[0]=44;
+    equipment_unit.unit.weapon_object_indices[1]=55;
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(!equipment_calls && !deleted_weapons); /* Xbox/CE */
+    active=TRUE;
+    connection=_game_connection_network_client;
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(!equipment_calls && !deleted_weapons);
+    connection=_game_connection_local;
+    mcc_player_add_equipment(NONE,1,TRUE);
+    mcc_player_add_equipment(999,1,TRUE);
+    mcc_player_add_equipment(123,NONE,TRUE);
+    mcc_player_add_equipment(123,2,TRUE);
+    equipment_unit.unit.player_index=NONE;
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(!equipment_calls && !deleted_weapons);
+    equipment_unit.unit.player_index=7;
+    mcc_player_add_equipment(123,1,FALSE);
+    CHECK(equipment_calls==1 && !deleted_weapons && held_at_assignment && !given_reset);
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(equipment_calls==2 && deleted_weapons==1 && deleted_weapon==55 && !held_at_assignment);
+    CHECK(given_unit==123 && given_profile==1 && given_reset);
+    CHECK(equipment_unit.unit.weapon_object_indices[0]==44); /* native service clears the rest */
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(equipment_calls==3 && deleted_weapons==1); /* unarmed/repeated reset */
+    equipment_unit.unit.current_weapon_index=MAXIMUM_WEAPONS_PER_UNIT;
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(equipment_calls==4 && deleted_weapons==1);
+    equipment_unit.unit.current_weapon_index=1;
+    equipment_unit.unit.weapon_object_indices[1]=NONE;
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(equipment_calls==5 && deleted_weapons==1);
+    connection=_game_connection_network_server;
+    equipment_unit.unit.weapon_object_indices[1]=66;
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(equipment_calls==6 && deleted_weapons==2 && deleted_weapon==66 && !held_at_assignment);
+    active=FALSE;
+    mcc_player_add_equipment(123,1,TRUE);
+    CHECK(equipment_calls==6 && deleted_weapons==2); /* unload/legacy transition */
     cached_weapons[0].weapon_index = cached_weapons[2].weapon_index = 123;
     cached_weapons[1].weapon_index = 456;
     cached_weapons[3].weapon_index = NONE;

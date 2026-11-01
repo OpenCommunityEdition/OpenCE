@@ -2,13 +2,14 @@
 #ifndef MCC_PROTOCOL_H
 #define MCC_PROTOCOL_H
 
-/* OpenCE 39 owns flag 0x04 and messages through 93. MCC messages and admission
- * stay past fire origins. This camera branch uses a separate MCC version. */
-#define MCC_PROTOCOL_VERSION 32709
+/* OpenCE 41 owns messages through 95. MCC 63 adds model ambient lighting
+ * to the campaign snapshot; gameplay messages remain above upstream voting. */
+#define MCC_PROTOCOL_VERSION 32711
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x08
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 4
-#define MCC_PROTOCOL_JOIN_KIND 98
-#define MCC_PROTOCOL_JOIN_MAX 256
+#define MCC_PROTOCOL_JOIN_KIND 100
+/* The upstream 41 join carries a 170-byte pass and a 64-byte proof. */
+#define MCC_PROTOCOL_JOIN_MAX 512
 
 struct network_game;
 struct network_game_server;

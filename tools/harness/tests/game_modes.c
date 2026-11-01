@@ -71,7 +71,7 @@ int main(int argc,char **argv)
   /* (a gametype saved before OpenCE's: every byte 0) */
   memset(&options,0,sizeof(options));
   game_modes_options_sanitize(&options);
-  CHECK(options.mode==_game_mode_none&&!options.hardcore,"no mode");
+  CHECK(options.mode==_game_mode_none&&!options.hardcore&&!options.force_team_spawns,"no mode or forced spawns");
   CHECK(options.infection_initial_zombies==1&&options.infection_zombie_speed==150&&
    options.infection_skull_damage==200&&options.infection_respawn_time==5,"Infection's defaults");
   CHECK(options.infection_countdown==0,"a countdown of 0 is one");
@@ -120,6 +120,7 @@ int main(int argc,char **argv)
   CHECK(options.infection_initial_zombies==1&&options.infection_zombie_speed==150&&options.infection_skull_damage==200&&
    options.infection_respawn_time==5&&options.infection_countdown==10,"out of range: the defaults");
   CHECK(options.gun_game_order==_gun_game_order_strongest_first,"an unknown order");
+  CHECK(options.force_team_spawns==TRUE,"forced spawns normalized");
   for(int index=0;index<(int)sizeof(options.reserved);index++) CHECK(options.reserved[index]==0,"reserved cleared");
  } else CASE("sanitize_keeps") {
   memset(&options,0,sizeof(options));

@@ -23,18 +23,20 @@ def test_release_feed_and_build_comparison(tmp_path):
 #include <string.h>
 #include <assert.h>
 #define HALO_BUILD_NUMBER 60
+#define MAXIMUM_CHECK_SIZE (1024ULL * 1024)
 #define SDLCALL
 #define SDL_free free
 enum { _updater_idle, _updater_checking, _updater_available, _updater_handled };
 static int updater_state, download_ok = 1, deleted;
-static long updater_latest_build;
+static long updater_latest_build, updater_latest_network_version, updater_release_network_version;
 static const char *response;
 static void updater_path(char *path, size_t size, const char *name) {
     snprintf(path, size, "%s", name);
 }
-static int update_download(const char *url, const char *path, void *a, void *b,
+static int update_download(const char *url, const char *path, unsigned long long maximum, void *a, void *b,
     char *error, size_t size) {
     assert(!strcmp(url, "https://api.github.com/repos/chestahh/GulchCE/releases/latest"));
+    assert(maximum == MAXIMUM_CHECK_SIZE);
     return download_ok;
 }
 static char *SDL_LoadFile(const char *path, size_t *size) {
@@ -52,7 +54,10 @@ int main(void) {
     response = "{\"tag_name\":\"build-61\"}";
     updater_check_thread(NULL);
     assert(updater_state == _updater_available && updater_latest_build == 61);
-    assert(deleted == 1);
+    assert(deleted == 1 && updater_latest_network_version == 0);
+    response = "{\"tag_name\":\"build-62\",\"body\":\"Network version: 41\"}";
+    updater_check_thread(NULL);
+    assert(updater_latest_build == 62 && updater_latest_network_version == 41);
     response = "{\"tag_name\":\"build-60\"}";
     updater_check_thread(NULL); assert(updater_state == _updater_handled);
     response = "{\"tag_name\":\"build-59\"}";
