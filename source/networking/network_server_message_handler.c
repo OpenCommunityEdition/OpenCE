@@ -252,6 +252,7 @@ symbols in this file:
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_address_constants.h" /* port: distinguish the host's loopback admission */
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "game/game.h"
 #include "game/game_engine.h"
@@ -2098,6 +2099,12 @@ static boolean network_game_server_handle_message_client_join_game_request(
 						struct network_message *reply;
 						struct network_machine *client_machine;
 						long machine_index = NONE;
+
+						/* port: setup opens the socket before the host's loopback client
+						has its index. Only remote admission fixes the camera contract. */
+						if (source_address.address.long_words[0] != IPV4_LOOPBACK_ADDRESS ||
+							network_game_server_get_game(server)->machine_count > 1)
+							third_person_session_lock();
 
 						client_machine = network_game_server_get_client_machine(
 							server,

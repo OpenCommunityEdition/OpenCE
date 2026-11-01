@@ -1947,7 +1947,6 @@ void network_game_server_open_game(
 {
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x1FC, server);
 
-	third_person_session_lock(); /* port: mode is fixed before remote admission */
 	SET_FLAG(server->flags, _network_game_server_game_open_bit, TRUE);
 	network_server_allow_client_connections(server->connection, TRUE);
 	network_event("opening game");
@@ -1964,6 +1963,7 @@ boolean network_game_server_start_network_game(
 	/* port: an MCC check still in progress is a successful idle, not a failed
 	connection. Keep the countdown pending until its validated settings are sent. */
 	if (mcc_ui_network_map_pending(server)) return TRUE;
+	third_person_session_lock(); /* port: non-menu hosts also fix the session contract before starting */
 
 	if (server->sent_start_game_message == FALSE)
 	{

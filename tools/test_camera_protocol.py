@@ -18,6 +18,8 @@ def test_camera_admission(tmp_path):
     gate = gate[:gate.index("\tmessage_type =")]
     gate += "(void)result;(void)message_type;(void)packet_type;return TRUE;\n}\n"
     reset = function((ROOT / "source/networking/network_client_manager.c").read_text(), "network_game_client_reset")
+    open_game = function((ROOT / "source/networking/network_server_manager.c").read_text(), "network_game_server_open_game")
+    lobby = function((ROOT / "port/linux/game/menu_functions.c").read_text(), "lobby_join_reset")
     limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
     version = re.search(r"^#define HALO_PORT_NETWORK_VERSION \d+$", limits, re.M).group()
     code = r'''
@@ -36,7 +38,7 @@ typedef int boolean;
 #define THIRD_PERSON_POLICY_MASK 24
 #define THIRD_PERSON_POLICY_SHIFT 3
 struct network_game {int machine_count;unsigned char cooperative_flags;};
-struct network_game_server {struct network_game game;};
+struct network_game_server {struct network_game game;int flags;void *connection;};
 static struct network_game_server *host;
 static char const *mode="opence_crossplay";
 static int resets,sends;
@@ -56,6 +58,10 @@ static void network_event(char const *fmt,...) {(void)fmt;}
 #define NONE -1
 #define SET_FLAG(flags,bit,value) ((flags) = ((flags) & ~(1 << (bit))) | ((value) << (bit)))
 #define csmemset memset
+#define _network_game_server_game_open_bit 0
+static void network_server_allow_client_connections(void *c,int allow) {(void)c;(void)allow;}
+static void halo_virtual_gamepads_start(void) {}
+static struct {int adding,controller;} lobby_join;
 enum {_network_game_client_state_searching, _network_game_client_connection_established_bit,
  _network_game_client_join_request_sent_bit, _network_game_client_error_unknown, _network_game_client_error_none};
 struct network_game_client {struct network_game game;void *connection;int machine_index,state,flags,error,
@@ -72,7 +78,7 @@ static void network_game_client_set_error(struct network_game_client *c,int e){c
         (ROOT / "source/networking/network_messages.h").read_text(),
         "_message_client_broadcast_game_search") + r'''
 void build_message_header(word *out,word bytes,byte type,byte flags) {*out=(word)((bytes<<4)|(type<<2)|flags);}
-''' + camera + "\n" + reset + "\n" + gate + r'''
+''' + camera + "\n" + reset + "\n" + open_game + "\n" + lobby + "\n" + gate + r'''
 int main(void) {
     struct network_game_server server={0};
     struct network_game_client client={0};
@@ -82,6 +88,8 @@ int main(void) {
     int i,bytes;
     CHECK(HALO_PORT_NETWORK_VERSION==41 && MCC_PROTOCOL_VERSION==63);
     host=&server;third_person_session_host_begin();CHECK(!third_person_session_active());
+    network_game_server_open_game(&server);CHECK(!third_person_session_locked());
+    CHECK(third_person_session_set(1));CHECK(third_person_session_set(0));
     CHECK(third_person_session_version("bloodgulch")==41);
     CHECK(third_person_session_version("mcc_maps\\test")==63);
     CHECK(third_person_session_compatible("bloodgulch",41,1));
@@ -94,7 +102,8 @@ int main(void) {
     CHECK(third_person_session_set(1));CHECK(server.game.cooperative_flags==8);
     CHECK(third_person_session_version("bloodgulch")==32712);
     CHECK(third_person_session_version("mcc_maps\\test")==32713);
-    third_person_session_lock();CHECK(!third_person_session_set(0));
+    CHECK(lobby_join_reset());CHECK(!third_person_session_set(0));
+    CHECK(!lobby_join.adding && lobby_join.controller==NONE);
     CHECK(third_person_session_active() && third_person_session_locked());
     CHECK(THIRD_PERSON_PROTOCOL_JOIN_KIND!=MCC_PROTOCOL_JOIN_KIND);
     for(bytes=3;bytes<=512;bytes++) {

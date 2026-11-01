@@ -4253,6 +4253,10 @@ static boolean session_options_update(struct widget_instance *list)
 		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
 	else if (!p2p_invite_link(text, sizeof(text)))
 		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
+	else
+		/* The 64-digit invite does not fit a menu value. The action copies
+		the complete link; show its purpose rather than a clipped address. */
+		snprintf(text, sizeof(text), "SELECT TO COPY LINK");
 	text_field_show(named(list, "invite_value", 0), text, FALSE);
 	if ((spinner = named(list, "op_invite", 0)) != NULL)
 	{
@@ -6332,6 +6336,7 @@ extern void halo_virtual_gamepads_start(void);
 /* "port lobby open" (the lobby made, or come back to): no player being added */
 static boolean lobby_join_reset(void)
 {
+	third_person_session_lock();
 	halo_virtual_gamepads_start();
 	lobby_join.adding = FALSE;
 	lobby_join.controller = NONE;

@@ -90,10 +90,12 @@ session and requires the same admission proof and relay format.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c)
 next to the policy module. `third_person_session_host_begin` initializes host
-state; `third_person_session_set` permits changes only before the server opens
-and before another machine joins. `third_person_session_lock` keeps the mode
-fixed through subsequent rounds. The server's create/open/dispose hooks are
-necessary because the engine owns admission and server lifetime. Client join
+state; `third_person_session_set` permits changes during host setup. Opening
+the network socket happens before setup and must not lock the selector.
+`third_person_session_lock` fixes the mode when the lobby opens, a remote
+machine is admitted, or the match starts, and keeps it fixed through subsequent
+rounds. The server's create/admission/start/dispose hooks are necessary because
+the engine owns admission and server lifetime. Client join
 and teardown hooks bind permission to the selected host and clear it at the
 connection boundary. Settings validate policy bits against that permission;
 settings and personal preferences cannot enable a camera extension themselves.
