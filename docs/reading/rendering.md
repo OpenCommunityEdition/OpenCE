@@ -57,6 +57,39 @@ all intervening space. `render_interpolation.c` contains the checks and
 fallbacks for those discontinuities. Rendered poses and simulation positions
 are related values with different purposes.
 
+First-person hands and weapons use `render_interpolation_first_person` in
+[render_interpolation.c](../../port/linux/game/render_interpolation.c). It keeps
+camera-relative poses per local player. The caller,
+`first_person_weapon_build_node_matrices` in
+[first_person_weapons.c](../../source/interface/first_person_weapons.c), supplies
+the weapon's full object handle and animation graph tag index. Those identities,
+the node count and consecutive ticks determine whether two poses can blend.
+The identities must come from the caller: matrices alone cannot distinguish a
+weapon replacement from a fast animation with the same number of nodes.
+
+This replaces a 0.25-world-unit displacement cutoff that held the entire pose
+at its latest tick during fast rocket-launcher melee and reload motion. Rendering
+still refuses non-finite displacements. A replacement within a tick, missing
+poses, disabled Smooth Motion or `render_interpolation_reset` at map startup
+discards the old history. Xbox, Custom Edition and MCC retain their own loading
+paths and supply their existing poses to this shared render service; simulation
+state and animation timing are unchanged.
+
+A separate discontinuity occurs when the stock rocket's tube node resets by
+180 degrees after chambering. Its rotation advances normally before that reset;
+blending the reset invents an extra half-turn between the equivalent tube poses.
+Near-half-turn rotations snap that node only. Smaller turns and the other nodes
+continue blending, including the hands. This is a render-side discontinuity
+guard, not a change to the authored animation or ammunition state.
+
+[test_first_person_interpolation.py](../../tools/harness/tests/test_first_person_interpolation.py)
+compiles the production snapshot, matrix and rotation code. It checks fractional
+frames, weapon/graph replacement, split-screen slots, camera transforms, capacity,
+invalid data, chamber resets and history resets. Negative controls restore the old
+distance cutoff or blend through the half-turn and must fail their corresponding
+cases. These asset-free tests do not establish
+visual compatibility for every authored animation.
+
 OpenCE also advances visual function values into the picture's time. Read
 `object_function_values_for_render` in [objects.c](../../source/objects/objects.c):
 for example, a charging plasma weapon's displayed intensity changes between
