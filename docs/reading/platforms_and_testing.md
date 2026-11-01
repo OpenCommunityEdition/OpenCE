@@ -58,6 +58,13 @@ establish that the Android bridge exists or passes the value correctly.
 See [Android internals](../../port/android/README.md#how-the-port-operates)
 before adding cross-boundary calls.
 
+For GPU buffer lifetime, follow `host_gl_fence_frame` and `host_gl_wait_frame`
+in [`host_gl.c`](../../port/android/host/host_gl.c), then the ring rotation in
+`D3DDevice_Present` in [`d3d8_gl.c`](../../port/linux/src/d3d8_gl.c).
+A timed-out fence still owns its slot: the host finishes queued work before
+allowing another upload. The [Android OpenGL ES notes](../../port/android/README.md#opengl-es)
+describe the fallback, regression coverage and remaining device-validation limit.
+
 ## Web: the same game with browser scheduling and storage
 
 `web_main.c` runs on the Emscripten worker, mounts the browser's Origin
