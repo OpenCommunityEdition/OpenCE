@@ -47,7 +47,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *s)
 boolean network_game_server_send_game_data_pregame(struct network_game_server *s){(void)s;sends++;return 1;}
 static short third_person_host_policy(void){return 1;}
 static void third_person_reset(void){resets++;}
-static unsigned int mcc_protocol_version(char const *map){return !strncmp(map,"mcc_maps",8)?MCC_PROTOCOL_VERSION:41;}
+unsigned int mcc_protocol_version(char const *map){return !strncmp(map,"mcc_maps",8)?MCC_PROTOCOL_VERSION:41;}
 
 struct network_game_server_client_machine {int joined;};
 static int network_game_server_client_machine_is_joined_to_game(struct network_game_server *s,
@@ -130,7 +130,12 @@ int main(void) {
     machine.joined=0;CHECK(!network_game_server_handle_client_message(&server,&machine,join,40));
     third_person_session_host_end();host=NULL;CHECK(!third_person_session_active());
     third_person_session_client_begin(32712);CHECK(third_person_session_active());
+    network_game_client_late_join_time=9;network_game_client_late_join_clock_pending=1;
+    network_game_client_start_pending=1;network_game_client_incompatibility_told=1;
     network_game_client_reset(&client,0);CHECK(!third_person_session_active());
+    CHECK(!network_game_client_late_join_time&&!network_game_client_late_join_clock_pending);
+    CHECK(!network_game_client_start_pending&&!network_game_client_incompatibility_told);
+    CHECK(resets>0&&sends>0);
     third_person_session_client_begin(32713);client.connection=&client;
     network_game_client_reset(&client,1);CHECK(!third_person_session_active());
     mode="gulchce_third_person";host=&server;third_person_session_host_begin();

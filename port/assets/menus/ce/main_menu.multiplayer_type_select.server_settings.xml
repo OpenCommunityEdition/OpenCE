@@ -7,30 +7,29 @@
 		<child widget="main_menu/multiplayer_type_select/server_settings/header_server_settings"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/options_menu"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/header_server_settings" controller="1" left="35" top="-16" width="605" height="59" type="text" text="SERVER SETUP" font="ui\large_ui" color="#FFFFFFFF" text_y="18">
+	<widget name="main_menu/multiplayer_type_select/server_settings/header_server_settings" controller="1" left="35" top="-10" width="605" height="59" bitmap="main_menu/multiplayer_type_select/server_settings/header_server_settings">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/help" type="text" controller="1" left="68" top="420" width="482" height="32" string_list="main_menu/multiplayer_type_select/server_settings/help_strings" font="ui\small_ui" color="#FFFFFFFF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/help" type="text" controller="1" left="68" top="414" width="482" height="40" string_list="main_menu/multiplayer_type_select/server_settings/help_strings" font="ui\small_ui" color="#FFFFFFFF">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/multiplayer_type_select/server_settings/help">
 		<data input="server settings update"/>
 		<on event="created" run="server settings init"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_server_name" x="54" y="25"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_max_players" x="54" y="53"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_invite" x="54" y="81"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_listing" x="54" y="109"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_password" x="54" y="137"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_session_compatibility" x="54" y="165"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_camera_policy" x="54" y="193"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_map_share_options" x="54" y="221"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_coop_options" x="54" y="249"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_voice_options" x="54" y="277"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_game_type" x="54" y="249"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_player_options" x="54" y="277"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_item_options" x="54" y="305"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_vehicle_options" x="54" y="333"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_indicator_options" x="54" y="361"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_team_options" x="54" y="389"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/button_bar" y="455"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_server_name" x="54" y="49"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_max_players" x="54" y="77"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_invite" x="54" y="105"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_listing" x="54" y="133"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_password" x="54" y="161"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_session_options" x="54" y="189"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_map_share_options" x="54" y="217"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_coop_options" x="54" y="245"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_voice_options" x="54" y="273"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_game_type" x="54" y="245"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_player_options" x="54" y="273"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_item_options" x="54" y="301"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_vehicle_options" x="54" y="329"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_indicator_options" x="54" y="357"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_team_options" x="54" y="385"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/button_bar" y="454"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		
@@ -93,24 +92,60 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/password_value" type="text" controller="1" width="280" height="22" font="ui\small_ui" color="#FF2896FF" align="center" text_y="5" text_flags="no_focus_test">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/op_session_compatibility" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
-		<child widget="main_menu/multiplayer_type_select/server_settings/session_compatibility_label"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/session_compatibility_spinner" x="260" y="1"/>
+	<widget name="main_menu/multiplayer_type_select/server_settings/op_session_options" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" open="main_menu/multiplayer_type_select/server_settings/session_options/session_options_screen"/>
+		<on event="start" open="main_menu/multiplayer_type_select/server_settings/session_options/session_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options_label"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/session_compatibility_label" type="text" controller="1" width="255" height="22" text="SESSION COMPATIBILITY:" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="5">
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options_label" type="text" controller="1" width="480" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="13" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/session_compatibility_spinner" type="spinner" left="3" top="2" width="225" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OPENCE CROSSPLAY|GULCHCE THIRD PERSON" font="ui\small_ui" color="#FF2896FF" align="center" text_y="3" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 228 19 234">
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" run="gamespy back handler"/>
+		<on event="back" run="gamespy back handler"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/header"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/options_menu"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/header" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/multiplayer_type_select/server_settings/header_server_settings">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/help" type="text" controller="1" left="68" top="350" width="482" height="60" string_list="main_menu/multiplayer_type_select/server_settings/session_options/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/multiplayer_type_select/server_settings/session_options/help">
+		<data input="server settings update"/>
+		<on event="created" run="server settings init"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/op_session_compatibility" x="54" y="73"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/op_camera_policy" x="54" y="103"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/op_session_compatibility" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_spinner" x="270" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_label" type="text" controller="1" width="260" height="22" text="SESSION COMPATIBILITY:" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_spinner" type="spinner" top="3" width="225" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OPENCE CROSSPLAY|GULCHCE THIRD PERSON" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 225 19 231">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/op_camera_policy" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
-		<child widget="main_menu/multiplayer_type_select/server_settings/camera_policy_label"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/camera_policy_spinner" x="270" y="1"/>
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/op_camera_policy" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/camera_policy_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/session_options/camera_policy_spinner" x="270" y="1"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/camera_policy_label" type="text" controller="1" width="260" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="13" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/camera_policy_label" type="text" controller="1" width="260" height="22" text="CAMERA POLICY:" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/camera_policy_spinner" type="spinner" left="3" top="2" width="197" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="PLAYER CHOICE|FORCED ON|FORCED OFF" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 200 19 206">
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/camera_policy_spinner" type="spinner" top="3" width="225" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="PLAYER CHOICE|FORCED ON|FORCED OFF" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 225 19 231">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
+	<strings name="main_menu/multiplayer_type_select/server_settings/session_options/help_strings">
+		<string text="OpenCE and GulchCE can join; third person is off.\nMCC maps still require GulchCE."/>
+		<string text="Matching GulchCE camera builds only.\nChoose the camera policy below."/>
+		<string text="Compatibility is locked for this session.\nClose the lobby to choose another mode."/>
+		<string text="Each player chooses first or third person.\nTheir camera toggle remains available."/>
+		<string text="Everyone uses third person on foot. Scoping and\ntight spaces still use first person."/>
+		<string text="Third person is disabled for everyone.\nNormal vehicle and cinematic cameras remain."/>
+	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/op_map_share_options" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" open="main_menu/multiplayer_type_select/server_settings/map_share_options/map_share_options_screen"/>
 		<on event="start" open="main_menu/multiplayer_type_select/server_settings/map_share_options/map_share_options_screen"/>
@@ -223,7 +258,7 @@
 		<string text="CO-OP OPTIONS:"/>
 		<string text="VOICE AND VOTING:"/>
 		<string text="PASSWORD:"/>
-		<string text="THIRD PERSON:"/>
+		<string text="SESSION OPTIONS:"/>
 		<string text="MAP SHARING:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/help_strings">
@@ -242,14 +277,11 @@
 		<string text="Team wipes, friendly fire, enemies and collisions,\nfor this game."/>
 		<string text="Voice chat, text chat and votes to kick a player,\nfor this game."/>
 		<string text="Players from the Server Browser must type it to\njoin (an invite link needs none). Enter sets it."/>
-		<string text="Each player chooses first or third person.\nTheir camera toggle remains available."/>
+		<string text="Session compatibility and the host camera policy.\nChoose who can join and which views they can use."/>
 		<string text="Everyone uses third person on foot. Scoping and\ntight spaces still use first person."/>
 		<string text="Third person is disabled for everyone.\nNormal vehicle and cinematic cameras remain."/>
 		<string text="Sending players who join without the game's\nCustom Edition map the map, and how fast."/>
 		<string text="Listed for everyone through the brokers, and on\nthe master servers with your publisher key."/>
-		<string text="OpenCE and GulchCE can join; third person is off.\nMCC maps still require GulchCE."/>
-		<string text="Matching GulchCE camera builds only.\nChoose the third-person policy below."/>
-		<string text="Compatibility is locked for this session.\nClose the lobby to choose another mode."/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/button_bots" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BOTS" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/bots_screen"/>

@@ -135,18 +135,26 @@ def test_host_camera_menu_layout():
     base = "main_menu/multiplayer_type_select/server_settings/"
     menu = root.find(f"widget[@name='{base}options_menu']")
     rows = {node.attrib["widget"].removeprefix(base): int(node.attrib["y"]) for node in menu.findall("child")}
-    common = ["op_server_name", "op_max_players", "op_invite", "op_listing", "op_password", "op_session_compatibility", "op_camera_policy", "op_map_share_options"]
+    common = ["op_server_name", "op_max_players", "op_invite", "op_listing", "op_password", "op_session_options", "op_map_share_options"]
     for mode in (["op_coop_options", "op_voice_options"], ["op_game_type", "op_player_options", "op_item_options", "op_vehicle_options", "op_indicator_options", "op_team_options"]):
         positions = [rows[name] for name in common + mode]
         assert len(set(positions)) == len(positions)
         assert max(positions) + 28 <= int(root.find(f"widget[@name='{base}help']").attrib["top"])
         assert all(b - a >= 28 for a, b in zip(sorted(positions), sorted(positions)[1:]))
         assert all(int(root.find(f"widget[@name='{base}{name}']").attrib["height"]) >= 28 for name in common + mode)
-    spinner = root.find(f"widget[@name='{base}camera_policy_spinner']")
-    assert spinner.attrib["strings"] == "PLAYER CHOICE|FORCED ON|FORCED OFF"
-    compatibility = root.find(f"widget[@name='{base}session_compatibility_spinner']")
-    assert compatibility.attrib["strings"] == "OPENCE CROSSPLAY|GULCHCE THIRD PERSON"
-    assert compatibility.find('on[@event="left_mouse"]').attrib["run"] == "mouse spinner 1wide click"
+    assert root.find(f"widget[@name='{base}op_session_options']/on[@event='a']").attrib["open"] == base + "session_options/session_options_screen"
+    sub = base + "session_options/"
+    for key in ("session_compatibility", "camera_policy"):
+        row = root.find(f"widget[@name='{sub}op_{key}']")
+        label = root.find(f"widget[@name='{sub}{key}_label']")
+        spinner = root.find(f"widget[@name='{sub}{key}_spinner']")
+        child = row.find(f"child[@widget='{sub}{key}_spinner']")
+        assert row.attrib["width"] == "512" and row.attrib["height"] == "28"
+        assert label.attrib["font"] == spinner.attrib["font"] == "ui\\large_ui"
+        assert int(child.attrib["y"]) + int(spinner.attrib["top"]) == int(label.attrib["text_y"])
+        assert spinner.attrib["align"] == "center"
+        assert spinner.find('on[@event="left_mouse"]').attrib["run"] == "mouse spinner 1wide click"
+    assert root.find(f"widget[@name='{sub}camera_policy_spinner']").attrib["strings"] == "PLAYER CHOICE|FORCED ON|FORCED OFF"
     # Camera help adds three entries before map sharing and publisher help.
     import re
     menus = (ROOT / "port/linux/game/menu_functions.c").read_text()

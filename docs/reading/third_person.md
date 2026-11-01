@@ -68,7 +68,10 @@ The upstream optional client-hand origins remain separately controlled.
 
 ## Session compatibility
 
-The host setup selector defaults to **OpenCE Crossplay**. On Xbox and Custom
+Host setup keeps its existing layout; **Session Options** opens the
+compatibility and camera-policy controls. Both rows use the standard menu
+font and full-size selection background. The compatibility selector defaults
+to **OpenCE Crossplay**. On Xbox and Custom
 Edition maps this uses the pinned OpenCE 41 wire format and simulation paths.
 The optional shoulder camera, its input bit, muzzle solver and checkpoint
 recovery extensions are disabled, regardless of the saved preference.

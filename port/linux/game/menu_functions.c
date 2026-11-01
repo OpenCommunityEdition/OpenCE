@@ -4207,10 +4207,53 @@ static void server_settings_private_set(boolean private_game)
 /* "server settings init": the game's name (player 1's, else the one given
 last), the most players, the gametype's copy (once: the screen is made
 again on coming back from an option's screen) */
+/* This submenu edits the host-owned session without reinitializing the
+main setup's gametype copy, listing or other pending edits. */
+static boolean session_options_initialize(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "session_compatibility_spinner", 0);
+	if (!spinner) return FALSE;
+	spinner->parameters.list.selected_index = third_person_session_active();
+	spinner = named(list, "camera_policy_spinner", 0);
+	if (spinner) spinner->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
+	return TRUE;
+}
+
+static boolean session_options_update(struct widget_instance *list)
+{
+	static char const *const policies[] = { "player_choice", "forced_on", "forced_off" };
+	struct widget_instance *spinner = named(list, "session_compatibility_spinner", 0);
+	struct widget_instance *help = list->parameters.list.extended_description;
+	short selected;
+	if (!spinner) return FALSE;
+	selected = spinner->parameters.list.selected_index != 0;
+	if (selected != third_person_session_active())
+	{
+		third_person_session_set(selected);
+		session_options_initialize(list);
+	}
+	if (help) help->parameters.text_box.string_list_index = third_person_session_locked() ? 2 : third_person_session_active();
+	visible_set(named(list, "op_camera_policy", 0), third_person_session_active());
+	if (third_person_session_active() && (spinner = named(list, "camera_policy_spinner", 0)) != NULL)
+	{
+		selected = (short)PIN(spinner->parameters.list.selected_index, 0, 2);
+		if (selected != third_person_policy())
+		{
+			network_game_server_port_set_camera_policy(selected);
+			if (selected == third_person_policy()) config_write("network.camera_policy", policies[selected]);
+		}
+		spinner->parameters.list.selected_index = third_person_policy();
+		if (help && list->focused_child == named(list, "op_camera_policy", 0))
+			help->parameters.text_box.string_list_index = 3 + third_person_policy();
+	}
+	return TRUE;
+}
+
 static boolean server_settings_initialize(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
 
+	if (session_options_initialize(list)) return TRUE;
 	/* (co-op has no gametype to edit) */
 	if (!hosting_cooperative())
 		gametype_setup_begin();
@@ -4223,10 +4266,6 @@ static boolean server_settings_initialize(struct widget_instance *list)
 	}
 	if (spinner)
 		spinner->parameters.list.selected_index = *server_settings_maximum_players_index();
-	if ((spinner = named(list, "camera_policy_spinner", 0)) != NULL)
-		spinner->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
-	if ((spinner = named(list, "session_compatibility_spinner", 0)) != NULL)
-		spinner->parameters.list.selected_index = third_person_session_active();
 	/* (PUBLIC or PRIVATE: this game's; the screen is made again on coming
 	back from an option's screen) */
 	if ((spinner = named(list, "listing_spinner", 0)) != NULL)
@@ -4257,6 +4296,7 @@ static void server_settings_update(struct widget_instance *list)
 	struct widget_instance *row = named(list, "op_server_name", 0);
 	char text[TEXT_FIELD_LENGTH];
 
+	if (session_options_update(list)) return;
 	if (spinner)
 		*server_settings_maximum_players_index() = (short)PIN(spinner->parameters.list.selected_index, 0,
 			NUMBEROF(maximum_players) - 1);
@@ -4276,29 +4316,8 @@ static void server_settings_update(struct widget_instance *list)
 		text_set(named(list, "game_type_value", 0), type);
 	}
 	settings_help(list);
-	if ((spinner = named(list, "session_compatibility_spinner", 0)) != NULL)
-	{
-		int selected = spinner->parameters.list.selected_index != 0;
-		if (selected != third_person_session_active())
-		{
-			third_person_session_set(selected);
-			spinner->parameters.list.selected_index = third_person_session_active();
-			if ((row = named(list, "camera_policy_spinner", 0)) != NULL)
-				row->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
-		}
-		if (list->parameters.list.extended_description && list->focused_child == named(list, "op_session_compatibility", 0))
-			list->parameters.list.extended_description->parameters.text_box.string_list_index =
-				third_person_session_locked() ? 22 : 20 + third_person_session_active();
-	}
-	visible_set(named(list, "op_camera_policy", 0), third_person_session_active());
-	if (third_person_session_active() && (spinner = named(list, "camera_policy_spinner", 0)) != NULL)
-	{
-		short policy = (short)PIN(spinner->parameters.list.selected_index, 0, 2);
-		if (policy != third_person_policy())
-			network_game_server_port_set_camera_policy(policy);
-		if (list->parameters.list.extended_description && list->focused_child == named(list, "op_camera_policy", 0))
-			list->parameters.list.extended_description->parameters.text_box.string_list_index = 15 + policy;
-	}
+	if (list->parameters.list.extended_description && list->focused_child == named(list, "op_session_options", 0))
+		list->parameters.list.extended_description->parameters.text_box.string_list_index = 15;
 	{
 		boolean cooperative = hosting_cooperative();
 		short row;
