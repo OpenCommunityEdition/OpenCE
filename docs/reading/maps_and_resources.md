@@ -225,9 +225,17 @@ to a complete weapon/parent draw, preventing inherited components from using
 different margins. Stock gameplay message offsets also use native margins;
 High-Res controller glyph dimensions and text spacing match the native HUD.
 
-MCC cutscene titles have a separate drawing adjustment:
-[`cinematic_render`](../../source/cutscene/cinematics.c) first resolves the
-authored/default rectangle and its widescreen position, then
+Chapter titles share [`cinematic_render`](../../source/cutscene/cinematics.c),
+which resolves the authored/default rectangle in the 640-column layout. Its
+widescreen translation uses the text's left edge, right edge or center according
+to its justification, preserving that anchor's relative screen position and the
+box's size. For example, Xbox `b30` authors a right-aligned title ending at 597;
+on an 852-column screen it ends at 794. Translating by the box center instead
+pulled it inward to 695 ([issue #86](https://github.com/chestahh/GulchCE/issues/86)).
+At 640 columns the translation is zero for every alignment. The same positioning
+applies to Custom Edition and MCC without changing tags or retaining state.
+
+MCC cutscene titles then have a separate drawing adjustment:
 `mcc_hud_title_bounds` in
 [`mcc_hud_draw.c`](../../port/linux/game/mcc_hud_draw.c) expands non-wrapping
 lines toward the screen edges while preserving their left, right or center

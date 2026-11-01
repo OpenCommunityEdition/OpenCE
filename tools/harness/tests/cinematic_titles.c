@@ -4,8 +4,9 @@ CINEMATIC_TITLES.C (test)
 The real cinematic_render (cinematics.c) over a fake scenario with one title, as
 some Custom Edition maps show their name for the whole game: drawn in the game,
 not over a menu (the screen's overlays are drawn after the players' menus), and
-its time going on under one. test_cinematic_titles.py takes the structures, the
-slots' count (config.inc) and the code (under_test.inc).
+its time going on under one. Widescreen placement follows the title alignment;
+MCC clipping expansion preserves that anchor. test_cinematic_titles.py takes the
+structures, the slots' count (config.inc) and the code (under_test.inc).
 */
 
 #include <math.h>
@@ -129,6 +130,72 @@ int main(int argc, char **argv)
 	struct cinematic_title const *slot = &globals_data.queued_titles[0];
 	long index;
 
+	CASE("title-screen-anchors")
+	{
+		static short const widths[] = { 640, 852, 1120, 480 };
+		static short const shifts[3][4] = {
+			{ 0, 13, 30, -10 }, /* left edge at 40 */
+			{ 0, 197, 447, -149 }, /* right edge at 597 */
+			{ 0, 105, 238, -79 } /* center at 318 */
+		};
+		short alignment, width;
+		rectangle2d original;
+		queue_title(1000000.0f, 1.0f);
+		titles[0].bounds.x0 = 40;
+		titles[0].bounds.x1 = 597;
+		original = titles[0].bounds;
+		for (alignment = 0; alignment < 3; alignment++)
+		{
+			titles[0].justification = alignment;
+			for (width = 0; width < 4; width++)
+			{
+				screen_width = widths[width];
+				frame();
+				CHECK(drawn_bounds.x0 == 40 + shifts[alignment][width] &&
+					drawn_bounds.x1 == 597 + shifts[alignment][width],
+					"alignment %d at width %d: bounds %d..%d", alignment, screen_width, drawn_bounds.x0, drawn_bounds.x1);
+				CHECK(drawn_bounds.y0 == original.y0 && drawn_bounds.y1 == original.y1, "vertical bounds moved");
+				CHECK(!memcmp(&original, &titles[0].bounds, sizeof(original)), "authored bounds mutated");
+			}
+		}
+		return 0;
+	}
+	CASE("default-title-anchor")
+	{
+		queue_title(1000000.0f, 1.0f);
+		hud_globals->defaults.default_title_bounds = titles[0].bounds;
+		hud_globals->defaults.default_title_bounds.x0 = 0;
+		hud_globals->defaults.default_title_bounds.x1 = 597;
+		titles[0].bounds.x1 = titles[0].bounds.x0;
+		titles[0].justification = 1;
+		screen_width = 852;
+		frame();
+		CHECK(drawn_bounds.x0 == 197 && drawn_bounds.x1 == 794, "default bounds did not use right anchor");
+		CHECK(hud_globals->defaults.default_title_bounds.x1 == 597, "HUD default bounds mutated");
+		return 0;
+	}
+	CASE("mcc-title-screen-anchor")
+	{
+		queue_title(1000000.0f, 1.0f);
+		titles[0].bounds.x0 = 40;
+		titles[0].bounds.x1 = 597;
+		titles[0].justification = 1;
+		screen_width = 852;
+		mcc_loaded = TRUE;
+		frame();
+		CHECK(drawn_bounds.x0 == 0 && drawn_bounds.x1 == 794, "MCC expansion changed right anchor");
+		titles[0].text_flags = 1;
+		frame();
+		CHECK(drawn_bounds.x0 == 237 && drawn_bounds.x1 == 794, "wrapping title moved its anchor");
+		mcc_loaded = FALSE;
+		titles[0].text_flags = 0;
+		frame();
+		CHECK(drawn_bounds.x0 == 237 && drawn_bounds.x1 == 794, "MCC expansion leaked into legacy title");
+		screen_width = 640;
+		frame();
+		CHECK(drawn_bounds.x0 == 40 && drawn_bounds.x1 == 597, "resolution change retained wide bounds");
+		return 0;
+	}
 	CASE("mcc-title-bounds")
 	{
 		rectangle2d original;
