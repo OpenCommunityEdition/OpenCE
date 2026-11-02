@@ -198,6 +198,20 @@ clears precache and feature state, disposes dependent resources, releases
 tag storage, closes the stream and clears the runtime structure. The load
 failure path frees its temporary raw buffer and calls the same unload path.
 
+On Windows, `mcc_window_initialize` in
+[mcc_memory.c](../../port/linux/src/mcc_memory.c) reserves the usual 64 MiB
+tag window at `0x50000000` before the first SDL call. The Windows linker
+delay-loads SDL without changing its ASLR protection. This ordering must
+precede CE's constructor, which calls SDL while reading settings; waiting
+until renderer startup is too late. `mcc_memory_log_startup` reports any
+saved failure after `windows_startup` connects the port log. Unloading an
+MCC map decommits its pages but retains the reservation for the next load.
+[test_windows_mcc_startup.py](../../tools/test_windows_mcc_startup.py) checks
+loader ordering and deferred logging with a disposable DLL deliberately
+linked inside that window; [test_mcc_memory.py](../../tools/test_mcc_memory.py)
+checks ownership, conflicting allocations and reloads. These tests do not
+establish compatibility with arbitrary injected modules.
+
 In `scenario_tags_load`, the shared engine installs the returned tag table
 only after a loader succeeds and performs the relevant menu/HUD/mod wiring.
 Additional integration can still fail and require teardown. Thus "the

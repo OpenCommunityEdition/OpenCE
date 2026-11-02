@@ -365,6 +365,10 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         "--target=i686-pc-windows-msvc",
         "-fuse-ld=lld",
         "-g",
+        # Reserve the MCC tag window before SDL's ASLR placement. Keep the
+        # shipped DLL unchanged; the first SDL call loads it after reservation.
+        "-Wl,/DELAYLOAD:SDL3.dll",
+        "-ldelayimp",
         # the Xbox memory window is at 0x80000000, in the upper half of the
         # 32-bit address space
         "-Wl,/LARGEADDRESSAWARE",
