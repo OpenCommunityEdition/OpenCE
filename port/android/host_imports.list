@@ -32,6 +32,7 @@ host_sdl_text_input
 host_sdl_set_clipboard_text
 host_sdl_get_clipboard_text
 host_sdl_show_toast
+host_sdl_open_url
 host_sdl_show_simple_message_box
 host_sdl_show_message_box
 host_sdl_get_gamepads
@@ -65,5 +66,6 @@ host_touch_rumble
 host_touch_scene
 host_touch_bindings
 host_touch_devices
+host_https_get
 
 host_errno

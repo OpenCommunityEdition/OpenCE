@@ -41,13 +41,16 @@ without the chat drops the three kinds as unknown: its players neither send
 nor see lines.
 
 The host's settings (network.text_chat: on, links allowed, or off; off in a
-game listed in the server browser) go to every client
-(_distributed_message_chat_config). A line they refuse is refused by its
-sender's machine and again by the host, which tells the sender why; a
+game a player hosts that is listed in the server browser) go to every
+client (_distributed_message_chat_config). A line they refuse is refused by
+its sender's machine and again by the host, which tells the sender why; a
 client without them (from a host without the chat) has the chat off. A
 client in a public game it joined from the server browser has the chat off
 whatever the host says (a changed host could turn it on): it takes no line
-from it and sends none.
+from it and sends none. A dedicated server is the exception on both sides
+(chat_listing_allows): its network.text_chat holds when it is listed, and
+a client that joined it from a master server's list (an approved
+operator's, by its key, not the listing's own word) follows it.
 display.text_chat hides the chat on this machine.
 
 The host may type "/mute <player> [minutes]" (20 when it gives none, a day
@@ -61,6 +64,7 @@ chat (_chat_line_notice_bit). A client's /mute is not sent: only the host
 mutes.
 */
 
+#include "controller_remap.h"
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "memory/data.h"
@@ -72,6 +76,7 @@ mutes.
 #include "interface/hud_draw.h"
 #include "interface/hud_messaging.h"
 #include "interface/ui_widget.h"
+#include "interface/terminal.h"
 #include "main/console.h"
 #include "objects/objects.h"
 #include "cutscene/cinematics.h"
@@ -81,10 +86,12 @@ mutes.
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "network_distributed.h"
+#include "network_votekick.h"
 #include "network_voice.h"
 #include "network_chat.h"
 #include "text_filter.h"
 #include "halo_keyboard.h"
+#include "server_director.h"
 
 #include <stdio.h>
 
@@ -98,6 +105,10 @@ unsigned long config_changes(void);
 /* p2p_lobby.c's, p2p.c's */
 int p2p_hosting_listed(void);
 int p2p_joined_listed_host(void);
+int p2p_joined_listed_dedicated(void);
+/* server_mode.c's: a dedicated server (halo --server) */
+int halo_server_mode(void);
+void platform_log(char const *format, ...);
 
 /* ---------- constants */
 
@@ -303,7 +314,9 @@ static short chat_scroll;
 static struct
 {
 	boolean active;
-	short channel;
+	short channel, controller;
+	long player;
+	boolean physical;
 	char text[CHAT_TEXT_SIZE];
 } chat_input;
 
@@ -315,6 +328,7 @@ touchscreen (its keys tapped) */
 static struct
 {
 	boolean open;
+	unsigned long opening_buttons;
 	/* the key picked */
 	short row;
 	short column;
@@ -945,8 +959,21 @@ static boolean chat_host(
 	return game_connection() == _game_connection_network_server;
 }
 
+/* whether a game's text chat may be on: not in a public game (listed in
+the server browser), unless its host is a dedicated server, whose own
+network.text_chat then decides. On the host, listed is its listing and
+dedicated whether it runs halo --server; on a client, listed is the game
+joined from the browser and dedicated whether a master server listed it as
+a dedicated server's */
+static boolean chat_listing_allows(
+	boolean listed,
+	boolean dedicated)
+{
+	return !listed || dedicated;
+}
+
 /* (the host) its chat settings: network.text_chat's, the chat off in a game
-listed in the server browser */
+a player hosts that is listed in the server browser */
 static byte chat_host_config_flags(
 	void)
 {
@@ -954,7 +981,8 @@ static byte chat_host_config_flags(
 	byte flags = 0;
 
 	/* (in either case: HALO_NET_TEXT_CHAT=OFF is off) */
-	if (setting && !chat_names_equal(setting, "off") && !p2p_hosting_listed())
+	if (setting && !chat_names_equal(setting, "off") &&
+		chat_listing_allows(p2p_hosting_listed() != 0, halo_server_mode() != 0))
 	{
 		flags |= (byte)FLAG(_chat_config_allowed_bit);
 		if (chat_names_equal(setting, "links"))
@@ -964,8 +992,8 @@ static byte chat_host_config_flags(
 }
 
 /* (a client) whether its game is a public one it joined from the server
-browser (p2p.c): no chat, whatever its host says. A public dedicated
-server's listing, once there are those, would say it may have one */
+browser (p2p.c): no chat, whatever its host says, unless a master server
+lists it as a dedicated server's (chat_listing_allows) */
 static boolean chat_joined_listed(
 	void)
 {
@@ -973,13 +1001,15 @@ static boolean chat_joined_listed(
 }
 
 /* the host's chat settings: the host's own, or as it sent them (none, and
-no chat, till it does; none in a public game joined from the browser) */
+no chat, till it does; none in a public game a player hosts, joined from
+the browser) */
 static byte chat_config_flags(
 	void)
 {
 	if (chat_host())
 		return chat_host_config_flags();
-	return chat_config.known && !chat_joined_listed() ? chat_config.flags : 0;
+	return chat_config.known && chat_listing_allows(chat_joined_listed(), p2p_joined_listed_dedicated() != 0) ?
+		chat_config.flags : 0;
 }
 
 static void chat_send_to_clients(void *message, byte type, word size);
@@ -1037,6 +1067,107 @@ static char const *chat_refused(
 	if (!TEST_FLAG(flags, _chat_config_links_bit) && chat_text_has_link(text))
 		return "Links aren't allowed in this game";
 	return NULL;
+}
+
+/* ---------- the server's word filter (server.chat_filter)
+
+A dedicated server may keep words out of its chat and its players' names:
+the words of streamer mode's list (text_filter_match.c), by group (slurs,
+swearing, insults) and the least severity each keeps out, its own settings'
+(server.chat_filter_slurs...). "censor" stars a line's words before the
+line goes on; "block" refuses the line (its sender told why) and a machine
+whose player's name has them at the door
+(network_game_server_accept_client_machine_into_game). Off by default. */
+
+enum
+{
+	_chat_filter_off,
+	_chat_filter_censor,
+	_chat_filter_block
+};
+
+/* server.chat_filter's mode (in either case; anything else: off) */
+static short chat_filter_mode(
+	char const *setting)
+{
+	if (setting && chat_names_equal(setting, "censor"))
+		return _chat_filter_censor;
+	if (setting && chat_names_equal(setting, "block"))
+		return _chat_filter_block;
+	return _chat_filter_off;
+}
+
+/* a group's level: the least severity kept out ("mild" keeps out every
+term of the group; anything else: off) */
+static unsigned char chat_filter_level(
+	char const *setting)
+{
+	if (setting && chat_names_equal(setting, "mild"))
+		return _text_filter_mild;
+	if (setting && chat_names_equal(setting, "strong"))
+		return _text_filter_strong;
+	if (setting && chat_names_equal(setting, "severe"))
+		return _text_filter_severe;
+	return _text_filter_off;
+}
+
+/* a line's marked characters as stars, in place */
+static void chat_filter_star(
+	char *text,
+	unsigned char const *marked,
+	long length)
+{
+	long index;
+
+	for (index = 0; index < length && text[index]; index++)
+	{
+		if (marked[index] && text[index] != ' ')
+			text[index] = '*';
+	}
+}
+
+/* (the host) the filter's mode, off but on a dedicated server */
+static short chat_filter_mode_now(
+	void)
+{
+	return halo_server_mode() ? chat_filter_mode(config_string("server.chat_filter")) : _chat_filter_off;
+}
+
+/* which characters of an ASCII text are the filter's words, marked in
+marked (as long as the text); how many */
+static long chat_filter_marks(
+	char const *text,
+	unsigned char *marked)
+{
+	unsigned short units[CHAT_TEXT_SIZE];
+	unsigned char levels[NUMBER_OF_TEXT_FILTER_GROUPS];
+	long length;
+
+	for (length = 0; length < CHAT_TEXT_SIZE && text[length]; length++)
+		units[length] = (unsigned char)text[length];
+	if (!length)
+		return 0;
+	levels[_text_filter_slurs] = chat_filter_level(config_string("server.chat_filter_slurs"));
+	levels[_text_filter_swearing] = chat_filter_level(config_string("server.chat_filter_swearing"));
+	levels[_text_filter_insults] = chat_filter_level(config_string("server.chat_filter_insults"));
+	levels[_text_filter_own] = _text_filter_off;
+	return text_filter_censor(units, length, TRUE, levels, marked);
+}
+
+boolean network_chat_name_blocked(
+	wchar_t const *name,
+	short length)
+{
+	char text[CHAT_TEXT_SIZE];
+	unsigned char marked[CHAT_TEXT_SIZE];
+	short index;
+
+	if (chat_filter_mode_now() != _chat_filter_block)
+		return FALSE;
+	for (index = 0; index < length && index < CHAT_TEXT_SIZE - 1 && name[index]; index++)
+		text[index] = name[index] >= ' ' && name[index] <= '~' ? (char)name[index] : ' ';
+	text[index] = 0;
+	return chat_filter_marks(text, marked) > 0;
 }
 
 /* the characters of a player's name a line keeps (at most CHAT_NAME_SIZE - 1) */
@@ -1238,6 +1369,7 @@ static void chat_host_send(
 	if (!sender || sender->quit_out_of_game)
 		return;
 	sender_vehicle = chat_player_vehicle(sender);
+	server_event_chat(player_index, channel, text);
 	chat_message_new(&message, player_index, chat_channel_flags(channel), text);
 	for (index = 0; index < count; index++)
 	{
@@ -1418,6 +1550,18 @@ void network_chat_host_mute(
 		chat_host_unmute_name(name);
 }
 
+boolean network_chat_host_mute_named(
+	char const *name,
+	short minutes,
+	boolean mute)
+{
+	if (!chat_host() || !name || !name[0])
+		return FALSE;
+	if (!mute)
+		return chat_host_unmute_name(name);
+	return chat_host_mute_name(name, minutes > 0 ? minutes : CHAT_MUTE_DEFAULT_MINUTES);
+}
+
 boolean network_chat_host_name_muted(
 	wchar_t const *name)
 {
@@ -1474,6 +1618,24 @@ void network_chat_handle_up(
 		chat_host_notice(machine_index, refused);
 		return;
 	}
+	/* (nor, on a dedicated server, one with words its filter keeps out:
+	refused, or its words starred) */
+	{
+		short mode = chat_filter_mode_now();
+		unsigned char marked[CHAT_TEXT_SIZE];
+
+		if (mode != _chat_filter_off && chat_filter_marks(text, marked) > 0)
+		{
+			if (mode == _chat_filter_block)
+			{
+				platform_log("chat filter: a line of %s not sent (blocked words)", name);
+				chat_host_notice(machine_index, "Your line was not sent: it has words this server does not allow");
+				return;
+			}
+			chat_filter_star(text, marked, CHAT_TEXT_SIZE);
+			platform_log("chat filter: a line of %s sent with its blocked words starred", name);
+		}
+	}
 	chat_host_send(line.player_index, chat_channel_from_flags(line.flags), text);
 }
 
@@ -1492,9 +1654,11 @@ void network_chat_handle_down(
 	struct distributed_chat_line line;
 	char text[CHAT_TEXT_SIZE];
 
-	/* (none in a public game joined from the server browser, the host's
-	notices too: its chat is off, whatever the host says) */
-	if (game_connection() != _game_connection_network_client || !from_stream || chat_joined_listed())
+	/* (none in a public game a player hosts, joined from the server
+	browser, the host's notices too: its chat is off, whatever the host
+	says; a master's dedicated server's are taken) */
+	if (game_connection() != _game_connection_network_client || !from_stream ||
+		!chat_listing_allows(chat_joined_listed(), p2p_joined_listed_dedicated() != 0))
 		return;
 	csmemcpy(&line, entries, sizeof(line));
 	if (!chat_text_clean(text, line.text, CHAT_TEXT_SIZE))
@@ -1511,12 +1675,14 @@ void network_chat_handle_down(
 
 /* ---------- typing */
 
-/* the first local player's (absolute index), who speaks; NONE */
+/* The editor's owner, or the first local player for direct commands; NONE. */
 static short chat_speaker(
-	void)
+	boolean typed)
 {
-	short local_player_index = local_player_get_next(NONE);
+	short local_player_index = typed && chat_input.active ? controller_remap_local_player(chat_input.controller) : local_player_get_next(NONE);
 	long player_index = local_player_index != NONE ? local_player_get_player_index(local_player_index) : NONE;
+	/* A departing player's unfinished line must never become somebody else's. */
+	if (typed && chat_input.active && player_index != chat_input.player) return NONE;
 
 	return player_index != NONE ? (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index) : NONE;
 }
@@ -1526,16 +1692,31 @@ client sends one unchecked, as a changed build could, for the host to refuse) */
 static void chat_send(
 	short channel,
 	char const *typed,
-	boolean checked)
+	boolean checked,
+	boolean from_editor)
 {
 	char text[CHAT_TEXT_SIZE];
 	char name[CHAT_TEXT_SIZE];
 	short minutes;
-	short player_index = chat_speaker();
+	short player_index = chat_speaker(from_editor);
 	char const *refused;
 
 	if (player_index == NONE || !chat_text_clean(text, typed, CHAT_TEXT_SIZE))
 		return;
+	/* (the votes' words, not said: "!endgame" starts a vote to end the game,
+	"!yes" and "!no" vote in the one running, as F1 and F2 do; the host's
+	notices tell everyone: network_votekick.c) */
+	if (chat_command_word(text, "!endgame"))
+	{
+		network_vote_end_game();
+		return;
+	}
+	if (chat_command_word(text, "!yes") || chat_command_word(text, "!no"))
+	{
+		if (!network_vote_choose(chat_command_word(text, "!yes") != NULL))
+			chat_add_notice("There is no vote you can vote in");
+		return;
+	}
 	/* (the host's commands, whatever its settings; a client's is not sent) */
 	if (chat_host() && chat_host_command(player_index, text))
 		return;
@@ -1564,12 +1745,51 @@ static void chat_send(
 	}
 }
 
+void network_chat_host_notice(
+	char const *text)
+{
+	long length = (long)csstrlen(text);
+	long start = 0;
+
+	/* (with the chat not shown, the console's red line, whatever
+	game.console_log says: the host's notices are for the players) */
+	if (!chat_network_game() || !chat_shown())
+	{
+		terminal_printf(global_real_argb_red, "%s", text);
+		return;
+	}
+	/* (a line of the chat's at most: a longer notice in several, broken at
+	a space where there is one) */
+	while (start < length)
+	{
+		char part[CHAT_TEXT_SIZE];
+		long end = start + CHAT_TEXT_SIZE - 1;
+
+		if (end >= length)
+			end = length;
+		else
+		{
+			long space;
+
+			for (space = end; space > start && text[space] != ' '; space--)
+				;
+			if (space > start)
+				end = space;
+		}
+		csmemcpy(part, text + start, end - start);
+		part[end - start] = 0;
+		chat_add_notice(part);
+		for (start = end; start < length && text[start] == ' '; start++)
+			;
+	}
+}
+
 void network_chat_say(
 	short channel,
 	char const *text)
 {
 	if (chat_network_game() && game_in_progress() && channel >= 0 && channel < NUMBER_OF_CHAT_CHANNELS)
-		chat_send(channel, text, TRUE);
+		chat_send(channel, text, TRUE, FALSE);
 }
 
 void network_chat_say_unchecked(
@@ -1577,18 +1797,24 @@ void network_chat_say_unchecked(
 	char const *text)
 {
 	if (chat_network_game() && game_in_progress() && channel >= 0 && channel < NUMBER_OF_CHAT_CHANNELS)
-		chat_send(channel, text, FALSE);
+		chat_send(channel, text, FALSE, FALSE);
 }
 
 static void chat_input_begin(
-	short channel)
+	short channel, short controller, boolean physical)
 {
 	struct key_stroke key;
+	short local = controller < 0 ? local_player_get_next(NONE) : controller_remap_local_player(controller);
+	long player = local != NONE ? local_player_get_player_index(local) : NONE;
+	if (player == NONE) return;
 
 	csmemset(&chat_input, 0, sizeof(chat_input));
 	chat_input.active = TRUE;
 	chat_input.channel = channel;
 	chat_scroll = 0;
+	chat_input.controller = player_get(player)->local_player_index;
+	chat_input.player = player;
+	chat_input.physical = physical;
 	/* (the keys pressed before) */
 	while (input_get_key(&key))
 		;
@@ -1599,6 +1825,7 @@ static void chat_input_end(
 {
 	chat_input.active = FALSE;
 	chat_keyboard.open = FALSE;
+	chat_keyboard.opening_buttons = 0;
 	chat_keyboard.drawn = FALSE;
 	chat_scroll = 0;
 }
@@ -1643,7 +1870,7 @@ static void chat_keyboard_press(
 		chat_input_delete();
 		break;
 	default:
-		chat_send(chat_input.channel, chat_input.text, TRUE);
+		chat_send(chat_input.channel, chat_input.text, TRUE, TRUE);
 		chat_input_end();
 		break;
 	}
@@ -1671,7 +1898,7 @@ static void chat_keyboard_update(
 	}
 	if (TEST_FLAG(pressed, HALO_CHAT_PAD_START))
 	{
-		chat_send(chat_input.channel, chat_input.text, TRUE);
+		chat_send(chat_input.channel, chat_input.text, TRUE, TRUE);
 		chat_input_end();
 		return;
 	}
@@ -1707,7 +1934,7 @@ static void chat_keyboard_update(
 		chat_keyboard.shift = !chat_keyboard.shift;
 	/* (a tap on a key presses it; elsewhere it closes the keyboard, as the
 	touch controls, B among them, hide while it is up: touch_input.c) */
-	if (chat_input.active && halo_chat_taps(&x, &y) && chat_keyboard.drawn)
+	if (chat_input.active && chat_input.controller == 0 && halo_chat_taps(&x, &y) && chat_keyboard.drawn)
 	{
 		if (chat_keyboard_key_at((real)(x * 1000.0f - chat_keyboard.left) / (real)(chat_keyboard.right - chat_keyboard.left),
 			(real)(y * 1000.0f - chat_keyboard.top) / (real)(chat_keyboard.bottom - chat_keyboard.top),
@@ -1757,15 +1984,38 @@ static void chat_host_update_rates(
 	}
 }
 
+/* The command's opening press is not navigation, even when bound to B,
+ * a channel direction or a key-repeat direction. */
+static unsigned long chat_keyboard_buttons(unsigned long buttons)
+{
+	chat_keyboard.opening_buttons &= buttons;
+	return buttons & ~chat_keyboard.opening_buttons;
+}
+
 void network_chat_update(
 	void)
 {
 	unsigned long held;
 	unsigned long pressed;
-	unsigned long pad = halo_chat_pad_buttons();
+	unsigned long pad = chat_keyboard_buttons(halo_chat_pad_buttons());
 	unsigned long pad_pressed = pad & ~chat_keyboard.held;
 	unsigned long now = system_milliseconds();
+	short port, requested_port = NONE, requested_channel = _chat_channel_everyone;
+	unsigned int chat_mask = (1u << PAD_CHAT) | (1u << PAD_TEAM_CHAT) | (1u << PAD_VEHICLE_CHAT);
 	struct key_stroke key;
+
+	/* Drain every port even while typing, so another player's press is not
+	 * replayed after this line closes. Keyboard and touch keep their path. */
+	for (port = 0; port < 4; port++)
+	{
+		unsigned int actions = controller_remap_pressed(port, chat_mask);
+		if (actions && requested_port == NONE)
+		{
+			requested_port = port;
+			requested_channel = actions & (1u << PAD_CHAT) ? _chat_channel_everyone :
+				actions & (1u << PAD_TEAM_CHAT) ? _chat_channel_team : _chat_channel_vehicle;
+		}
+	}
 
 	chat_keyboard.held = pad;
 	/* (the host's settings: a client's as the host sends them in each game;
@@ -1792,7 +2042,31 @@ void network_chat_update(
 			chat_host_update_rates();
 		}
 	}
-	if (!chat_network_game() || !game_in_progress() || chat_speaker() == NONE || !chat_shown() || chat_hidden())
+	/* (the votes' keys, F1 and F2, and the first controller's D-pad left and
+	right while a vote it may vote in runs (network_vote_pad_open, which
+	xinput_sdl.c keeps from the game meanwhile): yes or no, whether the chat
+	is shown or not: network_votekick.c) */
+	{
+		static unsigned long vote_keys_held;
+		static unsigned long vote_pad_held;
+		unsigned long vote_keys = 0;
+		unsigned long vote_pad = 0;
+
+		if (chat_network_game() && game_in_progress() && !chat_hidden() && !chat_input.active && !console_is_active())
+		{
+			vote_keys = halo_keyboard_actions(0) & (FLAG(HALO_KEYBOARD_VOTE_YES) | FLAG(HALO_KEYBOARD_VOTE_NO));
+			if (network_vote_pad_open())
+				vote_pad = halo_chat_pad_buttons_for_port(0) & (FLAG(HALO_CHAT_PAD_LEFT) | FLAG(HALO_CHAT_PAD_RIGHT));
+		}
+		if (vote_keys & ~vote_keys_held)
+			network_vote_choose(TEST_FLAG(vote_keys & ~vote_keys_held, HALO_KEYBOARD_VOTE_YES));
+		else if (vote_pad & ~vote_pad_held)
+			network_vote_choose(TEST_FLAG(vote_pad & ~vote_pad_held, HALO_CHAT_PAD_LEFT));
+		vote_keys_held = vote_keys;
+		vote_pad_held = vote_pad;
+	}
+	if (!chat_network_game() || !game_in_progress() || chat_speaker(TRUE) == NONE || !chat_shown() || chat_hidden() ||
+		(chat_input.active && chat_input.physical && !controller_remap_connected(chat_input.controller)))
 	{
 		chat_input_end();
 		chat_actions_held = 0;
@@ -1806,7 +2080,7 @@ void network_chat_update(
 		chat_actions_held = held;
 		/* (or the controller's D-pad Up, the touch controls' too, which opens
 		the on-screen keyboard) */
-		if ((pressed || TEST_FLAG(pad_pressed, HALO_CHAT_PAD_UP)) && !console_is_active())
+		if ((pressed || requested_port != NONE || TEST_FLAG(pad_pressed, HALO_CHAT_PAD_UP)) && !console_is_active())
 		{
 			/* (no typing where the host has the chat off: it says so, once a
 			while) */
@@ -1820,10 +2094,14 @@ void network_chat_update(
 				}
 			}
 			else if (pressed)
-				chat_input_begin(TEST_FLAG(pressed, HALO_KEYBOARD_CHAT) ? _chat_channel_everyone : _chat_channel_team);
+				chat_input_begin(TEST_FLAG(pressed, HALO_KEYBOARD_CHAT) ? _chat_channel_everyone : _chat_channel_team, NONE, FALSE);
 			else
 			{
-				chat_input_begin(_chat_channel_everyone);
+				chat_input_begin(requested_channel, requested_port, requested_port != NONE);
+				if (!chat_input.active) return;
+				chat_keyboard.opening_buttons = requested_port != NONE ?
+					halo_chat_pad_buttons_for_port(chat_input.controller) : halo_chat_pad_buttons();
+				chat_keyboard.held = 0;
 				chat_keyboard.open = TRUE;
 				error(_error_log, "chat: the on-screen keyboard opened");
 				chat_keyboard.row = 1;
@@ -1850,7 +2128,7 @@ void network_chat_update(
 			break;
 		case _key_return:
 		case _keypad_enter:
-			chat_send(chat_input.channel, chat_input.text, TRUE);
+			chat_send(chat_input.channel, chat_input.text, TRUE, TRUE);
 			chat_input_end();
 			break;
 		/* (to everyone, the team, the vehicle, in turn) */
@@ -1894,6 +2172,11 @@ void network_chat_update(
 	if (chat_input.active)
 		chat_scroll = (short)(chat_scroll + halo_chat_wheel_steps());
 	chat_scroll = (short)PIN(chat_scroll, 0, MAX(chat_line_count - 1, 0));
+}
+
+short network_chat_controller(void)
+{
+	return chat_input.active && chat_keyboard.open ? chat_input.controller : NONE;
 }
 
 boolean network_chat_typing(
@@ -2362,7 +2645,8 @@ void network_chat_draw(
 {
 	long font_index = hud_get_font_index();
 	unsigned long now = system_milliseconds();
-	boolean speaker = local_player_index == local_player_get_next(NONE);
+	boolean speaker = chat_input.active ? local_player_index == controller_remap_local_player(chat_input.controller) :
+		local_player_index == local_player_get_next(NONE);
 	boolean typing = speaker && chat_input.active && !console_is_active();
 	boolean touch = chat_touch_layout();
 	rectangle2d window = render.camera.window_bounds;

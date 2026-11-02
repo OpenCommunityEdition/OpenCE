@@ -510,17 +510,6 @@ static enum cache_file_status animation_graph_check(
 static enum cache_file_status animation_check(
 	struct load_state *state,
 	uint32_t element_offset);
-typedef void (*custom_edition_structure_bsp_proc)(
-	void *tag_cache,
-	unsigned long tag_data_bytes,
-	long bsp_index,
-	void *bsp,
-	unsigned long bsp_bytes,
-	unsigned long bsp_address,
-	char const *map_name);
-
-void custom_edition_structure_bsp_proc_set(
-	custom_edition_structure_bsp_proc proc);
 
 /* ---------- globals */
 

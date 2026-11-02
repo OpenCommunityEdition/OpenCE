@@ -258,6 +258,7 @@ void game_modes_options_sanitize(
 	if (options->gun_game_order >= NUMBER_OF_GUN_GAME_ORDERS)
 		options->gun_game_order = _gun_game_order_strongest_first;
 	options->gun_game_melee_demotes = options->gun_game_melee_demotes != FALSE;
+	options->force_team_spawns = options->force_team_spawns != FALSE;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 

@@ -51,6 +51,9 @@ enum
 	/* the players do their AI allies no harm (Server Setup's ALLY FRIENDLY
 	FIRE: OFF, co-op's): network_coop_ally_friendly_fire */
 	_network_game_cooperative_no_ally_friendly_fire_bit = 1,
+	/* the host is a dedicated server: its loading zones ask for most of the
+	players, not the host's (network_coop_host_dedicated) */
+	_network_game_cooperative_dedicated_bit = 2,
 };
 
 struct network_game

@@ -52,6 +52,13 @@ void playlist_profile_delete(
 boolean playlist_profile_get_from_path(
 	char *full_path,
 	struct game_variant *variant);
+/* port: ... from the file's bytes, read already, and its PC options too
+(playlist_profile.c) */
+boolean playlist_profile_get_from_data_with_options(
+	byte const *data,
+	unsigned long size,
+	struct game_variant *variant,
+	struct game_variant_options *options);
 boolean playlist_profile_get_display_name(
 	long playlist_profile_index,
 	wchar_t *display_name);

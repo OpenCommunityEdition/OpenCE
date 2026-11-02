@@ -12,9 +12,10 @@ devices, for example the Pixel 9 Pro XL.
 
 The Android build uses the platform layer of the Linux build
 (`port/linux/src`). Refer to [port/linux/README.md](../linux/README.md).
-Physical mice use the same control bindings. During play, F12 toggles mouse
-capture; captured mode hides Android's pointer and uses relative movement for
-continuous aiming, while releasing capture restores normal pointer behavior.
+Physical mice use the same control bindings. While playing, the mouse is
+captured: Android's pointer hides and its relative movement aims continuously.
+In the menus the capture is released, so the pointer shows again. During play,
+F12 still toggles the capture by hand.
 
 ## Requirements
 
@@ -187,11 +188,14 @@ Gamepads): with "Swap triggers", the right trigger's button says "Grenade".
 The stick moves the player with every "Stick layout", southpaw too.
 
 A finger that holds a button can also swipe to look, so you can fire and
-aim with one thumb. The controls are a finger wide (48 dp) or larger, but
+aim with one thumb ("Held buttons don't aim" in General turns this off).
+The controls are a finger wide (48 dp) or larger, but
 on a small screen of high density they stay apart rather than reach that
 size. A short tap reaches the game even when it is shorter than one frame.
 Swipes that start in the edge-gesture zones of Android do not turn the
-view. The swipe aims as the controller's stick does, not as a mouse: the
+view or place the floating stick, but a control drawn in one still presses
+(Android keeps the zones while the system bars are hidden: with 3-button
+navigation, all of where the bar was). The swipe aims as the controller's stick does, not as a mouse: the
 aim slows over a target and follows a moving one, as with a controller,
 and it follows the profile's "invert look" (the gyroscope turns the view
 as the phone turns, never inverted). The setting `input.touch_aim_assist`
@@ -200,10 +204,12 @@ the mouse settings do not apply.
 
 The touch controls show only in a game. In the menus and during
 cinematics they hide, and the touchscreen operates the menus as described
-above. They also hide when a controller is connected, for example the
-built-in controller of a handheld. A device without a touchscreen (a TV)
-never shows them. The setting `input.touch_controls` changes this (refer
-to "Settings").
+above. They also hide when a controller, a physical mouse or a physical
+keyboard is connected, for example the built-in controller of a handheld:
+the game says which controllers it sees, as SDL finds a pad the app's own
+device list can miss (one paired while the game runs). A device without a
+touchscreen (a TV) never shows them. The setting `input.touch_controls`
+changes this (refer to "Settings").
 
 The buttons at the top of the screen:
 
@@ -214,11 +220,14 @@ The buttons at the top of the screen:
     vibration setting of the game's profile), aiming with the gyroscope
     (off by default), a floating move stick (off by default: the stick goes
     where your thumb lands in the lower left of the screen), the opacity of
-    the controls, "Hide or add buttons" (hide a button, add a copy of a
+    the controls, "Held buttons don't aim" (off by default: a finger
+    that swipes from a button only holds it),
+    "Hide or add buttons" (hide a button, add a copy of a
     button) and "Edit buttons size".
-  - "Edit buttons layout": drag the controls to new positions, then push
-    "Save". "Export" and "Import" write and read a layout file with the
-    file picker of the system.
+  - "Edit buttons layout": drag the controls, and the "Options" button
+    itself, to new positions, then push "Save" in the middle of the
+    screen. "Export" and "Import", beside it, write and read a layout
+    file with the file picker of the system.
   - "Look sensitivity".
 
 "Hide" and "Options" act when the finger lifts on them: a swipe that
@@ -241,13 +250,29 @@ get the default values again, delete the file.
 
 The settings are the settings of Linux, without the window, the mouse and
 the paths. Refer to [port/linux/README.md](../linux/README.md#settings).
+Some video settings also apply on Android, with these notes; the first three
+have rows of their own in Video Setup:
+
+- `display.resolution_scaling` (`RESOLUTION` in the menus) is `"original"`
+  (the default) for the Xbox's 640x480 scaled up, or `"native"` for the
+  display's own resolution: sharper, but more work for the GPU, and the
+  display must fit in the GPU's largest render target.
+- `display.max_fps` (`FRAME RATE LIMIT`) limits the frame rate while
+  `display.vsync` is off: `0` (the default) is twice the display's refresh
+  rate, `-1` no limit, or the most frames each second.
+- `display.show_fps` (`SHOW FRAMES`) draws the frame rate at the bottom right
+  of a game, which is the quickest way to see what a device manages; the
+  same setting on the other ports (`port/linux/README.md`).
+
 These settings are only for Android:
 
 | Setting | Function |
 | --- | --- |
 | `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
-| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The carnage report's CONTINUE and LEAVE buttons follow the same rule (otherwise it shows its A and B prompt). The menus take taps in any case. |
+| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller, mouse or keyboard is connected. `"on"`: also shown with one. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
+| `display.stats_log` | `false` (the default): `true` writes a line a second to the log with the frame rate, the mode, the map, the renderer and the size of the 3D view, for a bug report or to compare two builds. |
+| `display.resolution_scaling` | Also Linux's, with another default on Android. `"original"` (the default): the game draws the 480 lines of the Xbox, which the display scales up. `"native"`: the game draws at the display's resolution (1080 lines on a 1080p phone). `"75%"`, `"50%"` or `"25%"`: that part of the display's resolution each way, scaled up: less for the GPU to draw, for more frames a second and less heat. Video Setup's Resolution Scaling sets it, from the next frame. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to cached textures by page protection. `false`: it compares page contents once a frame instead, which is slower. Geometry uses the streaming path in either mode. Refer to "Limits". |
 

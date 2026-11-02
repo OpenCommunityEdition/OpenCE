@@ -2562,12 +2562,48 @@ static struct widget_instance *widget_instance_find_by_tag_index_recursive(
 	return result;
 }
 
+/* port: giving the focus clears focused_child all along the old focus's path,
+then links only the new focus's parents. Backing out of a screen does that: it
+loads the screen, focused on its first row, then focuses the row you left it
+from, so the first row is left with no focused child. A row that only passes
+events on (a setting's row and its spinner, a lobby row) then passes the d-pad,
+keys and buttons to nothing when it has the focus again, and only the mouse,
+which focuses the spinner itself, could change it. Such a row gets its first
+child that takes events back, as it had when its screen was loaded, whenever
+it takes the focus (here, and the d-pad's widget_instance_tab_to_*) */
+static void widget_instance_refocus_passthrough(
+	struct widget_instance *widget)
+{
+	struct widget_instance *child;
+	long flags;
+
+	if (!widget || widget->focused_child || widget_instance_can_handle_events(widget))
+		return;
+	flags = ui_widget_definition_get(widget->definition_tag_index)->flags;
+	if (!TEST_FLAG(flags, _widget_pass_unhandled_events_to_children_bit) ||
+		TEST_FLAG(flags, _widget_dont_focus_a_specific_child_bit))
+	{
+		return;
+	}
+	for (child = widget->child; child; child = child->next)
+	{
+		if (widget_instance_can_handle_events(child))
+		{
+			widget->focused_child = child;
+			break;
+		}
+	}
+
+	return;
+}
+
 static void widget_instance_give_focus_directly(
 	struct widget_instance *widget,
 	struct widget_instance *new_focus)
 {
 	struct widget_instance *focused_child =
 		widget_instance_get_topmost_parent(widget)->focused_child;
+	struct widget_instance *leaf;
 
 	if (new_focus->disabled == TRUE)
 	{
@@ -2597,6 +2633,7 @@ static void widget_instance_give_focus_directly(
 		if (substitute)
 			new_focus = substitute;
 	}
+	leaf = new_focus;
 	if (focused_child)
 	{
 		if (new_focus &&
@@ -2604,6 +2641,7 @@ static void widget_instance_give_focus_directly(
 			focused_child->parent)
 		{
 			new_focus->parent->focused_child = new_focus;
+			widget_instance_refocus_passthrough(leaf);
 
 			return;
 		}
@@ -2618,6 +2656,7 @@ static void widget_instance_give_focus_directly(
 		new_focus->parent->focused_child = new_focus;
 		new_focus = new_focus->parent;
 	}
+	widget_instance_refocus_passthrough(leaf);
 
 	return;
 }
@@ -3830,6 +3869,41 @@ static void widget_instance_initialize(
 	}
 
 	return;
+}
+
+/* port: (menu_functions.c's ADD PLAYER screen) the profile spinner among
+the widget's children on the first profile that is usable ("player profile
+list initialize" starts on player 1's), when the one it is on is not: the
+enumeration's high bit (available to its player) and the callback's say;
+the profile it is on, NONE if it has none */
+long ui_widget_port_spinner_first_available(
+	struct widget_instance *widget,
+	boolean (*usable)(short controller, long profile))
+{
+	struct widget_instance *spinner;
+	long const *profiles;
+	word index;
+
+	for (spinner = widget->child; spinner && spinner->type != _ui_widget_type_spinner_list; spinner = spinner->next)
+		;
+	if (!spinner || !(profiles = spinner->parameters.list.list_items) || !spinner->parameters.list.number_of_items)
+		return NONE;
+#define SPINNER_USABLE(profile) ((profile) != NONE && ((profile) & 0x80000000) && 	usable(spinner->local_player_index, (profile)))
+	if ((word)spinner->parameters.list.selected_index < spinner->parameters.list.number_of_items &&
+		SPINNER_USABLE(profiles[spinner->parameters.list.selected_index]))
+	{
+		return profiles[spinner->parameters.list.selected_index];
+	}
+	for (index = 0; index < spinner->parameters.list.number_of_items; index++)
+	{
+		if (SPINNER_USABLE(profiles[index]))
+		{
+			spinner->parameters.list.selected_index = (short)index;
+			return profiles[index];
+		}
+	}
+#undef SPINNER_USABLE
+	return NONE;
 }
 
 /* port: the PC version's events that this engine never sends (its custom
@@ -7102,11 +7176,19 @@ static void widget_instance_render_recursive(
 		 * added. Only flat fills (the dims, and the menus' vertical
 		 * gradient, at most 16 texels wide): a picture is drawn texel for
 		 * texel, so wider bounds would shift it (the loading screen). */
+		/* (a split screen's too: the pause menu's dim of a half screen,
+		640x240, and of a quarter, 320x240, whose right edge is already the
+		quarter's: the 640 columns are centred in the screen) */
 		boolean widen_to_screen =
 			bounds.x0 <= 0 && bounds.y0 <= 0 &&
-			bounds.x1 >= 640 && bounds.y1 >= 480 &&
+			bounds.x1 >= 320 && bounds.y1 >= 240 &&
 			bitmap->width <= 16 &&
 			halo_screen_width() > 640;
+		/* (the view's margins: the centring shift, on either side of the
+		640 columns, or of a quarter's 320; declared here, before the first
+		statement: C89) */
+		long extra = halo_screen_ui_offset_current();
+		short design_right = bounds.x1;
 
 		if (use_nifty_plasma_fx)
 		{
@@ -7117,9 +7199,8 @@ static void widget_instance_render_recursive(
 		}
 		if (widen_to_screen)
 		{
-			long extra = (halo_screen_width() - 640) / 2;
 			bounds.x0 -= (short)extra;
-			bounds.x1 = (short)(640 + extra);
+			bounds.x1 = (short)(bounds.x1 + extra);
 		}
 		bounds.x0 += offset.x;
 		bounds.x1 += offset.x;
@@ -7139,10 +7220,9 @@ static void widget_instance_render_recursive(
 			/* widen the clip by the same amount (it is offset-shifted but
 			 * still 640-wide at the edges) so the dim is not clipped back
 			 * to the centered columns */
-			long extra = (halo_screen_width() - 640) / 2;
 			if (clip->x0 <= 0)
 				clip->x0 -= (short)extra;
-			if (clip->x1 >= 640)
+			if (clip->x1 >= design_right)
 				clip->x1 = (short)(clip->x1 + extra);
 		}
 		if (TEST_FLAG(definition->flags, _widget_flash_background_bitmap_bit))
@@ -7653,6 +7733,8 @@ static void widget_instance_tab_to_next_valid_widget(
 				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
+			/* port: (widget_instance_refocus_passthrough) */
+			widget_instance_refocus_passthrough(child);
 			break;
 		}
 		child = child->next;
@@ -7695,6 +7777,8 @@ static void widget_instance_tab_to_previous_valid_widget(
 				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
+			/* port: (widget_instance_refocus_passthrough) */
+			widget_instance_refocus_passthrough(child);
 			break;
 		}
 		if (child->previous)
@@ -7724,7 +7808,8 @@ static boolean widget_takes_any_controller(
 static short widget_event_controller(
 	struct widget_instance const *widget)
 {
-	return widget_takes_any_controller(widget) ? NONE : widget->local_player_index;
+	return widget_takes_any_controller(widget) || pc_menu_screen_reads_every_controller(widget) ? NONE :
+		widget->local_player_index;
 }
 
 /* port: whether a widget of the local player (NONE: any) takes the
@@ -7739,10 +7824,12 @@ static boolean widget_takes_events_of_controller(
 {
 	short player;
 
+	if (pc_menu_screen_routes_by_controller(widget))
+		return !widget->parent || widget->local_player_index == controller_index;
 	if (widget->local_player_index == NONE || widget->local_player_index == controller_index)
 		return TRUE;
 	if (controller_index > 0 && controller_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS &&
-		widget_takes_any_controller(widget))
+		(widget_takes_any_controller(widget) || pc_menu_screen_reads_every_controller(widget)))
 	{
 		return TRUE;
 	}

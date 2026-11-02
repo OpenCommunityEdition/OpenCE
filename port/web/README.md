@@ -200,6 +200,11 @@ node port/web/tests/webrtc_native.mjs chromium firefox  # the native builds' Web
 node port/web/tests/internet.mjs build/web/site <maps folder>  # internet play with the Linux build
 ```
 
+The smoke, rooms and internet browser tests answer the optional public
+analytics script with empty JavaScript. Their local page checks therefore
+do not depend on the analytics service responding. The site's normal
+analytics and the tests' service-worker isolation checks are unchanged.
+
 The smoke test serves the site as GitHub Pages does, checks that the page
 isolates itself and passes its checks, and starts the game with an empty
 maps folder, which gets as far as looking for the menus' map. The rooms test

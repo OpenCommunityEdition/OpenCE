@@ -62,7 +62,7 @@ public final class TouchLayoutTest {
         check(wide.add(4) == 4 && wide.shown(4), "Add must restore a hidden button first");
         wide.setShown(TouchLayout.LEFT, false);
         check(wide.add(TouchLayout.LEFT) == TouchLayout.LEFT, "Hidden move stick must be restorable");
-        reject(exported.replace("version=3", "version=9"));
+        reject(exported.replace("version=4", "version=9"));
         reject(exported.replace("control.18.type=4", "control.18.type=16"));
         reject(exported.replace("control.18.x=240.0", "control.18.x=NaN"));
         reject(exported.replace("count=19", "count=10000"));
@@ -86,8 +86,8 @@ public final class TouchLayoutTest {
         reject(sizedText.replace("control.18.size=1.6", "control.18.size=3.0"));
         reject(sizedText.replace("rumble=false", "rumble=invalid"));
         reject(sizedText.replace("gyroscope=true", "gyroscope=invalid"));
-        String legacy = sizedText.replace("version=3", "version=1").replaceAll("(?m)^.*\\.size=.*\\R", "")
-            .replaceAll("(?m)^(rumble|gyroscope|opacity|floating-stick)=.*\\R", "");
+        String legacy = sizedText.replace("version=4", "version=1").replaceAll("(?m)^.*\\.size=.*\\R", "")
+            .replaceAll("(?m)^(rumble|gyroscope|opacity|floating-stick|buttons-aim|options\\.x|options\\.y)=.*\\R", "");
         TouchLayout.Configuration old = TouchLayout.importConfiguration(legacy);
         check(old.layout.sizeScale(copy) == 1 && old.layout.rumbleEnabled && !old.layout.gyroscopeEnabled,
               "Legacy layouts must load with default sizes and gyro disabled");
@@ -102,11 +102,39 @@ public final class TouchLayoutTest {
               "The floating stick must survive export/import");
         sized.layout.floatingStick = false;
         reject(translucent.replace("floating-stick=false", "floating-stick=maybe"));
-        String version2 = translucent.replace("version=3", "version=2").replaceAll("(?m)^(opacity|floating-stick)=.*\\R", "");
+        String version2 = translucent.replace("version=4", "version=2").replaceAll("(?m)^(opacity|floating-stick|buttons-aim)=.*\\R", "");
         check(TouchLayout.importConfiguration(version2).layout.opacity == 1f
               && !TouchLayout.importConfiguration(version2).layout.floatingStick,
               "Version 2 layouts load fully opaque, with the stick in its place");
         reject(translucent.replaceAll("(?m)^opacity=.*\\R", ""));
+        // Held buttons aim (version 4) unless turned off.
+        check(TouchLayout.importConfiguration(translucent).layout.buttonsAim, "Held buttons aim by default");
+        sized.layout.buttonsAim = false;
+        String buttonsStill = sized.layout.exportConfiguration(2.25f);
+        sized.layout.buttonsAim = true;
+        check(!TouchLayout.importConfiguration(buttonsStill).layout.buttonsAim,
+              "Held buttons that do not aim must survive export/import");
+        reject(buttonsStill.replace("buttons-aim=false", "buttons-aim=maybe"));
+        reject(buttonsStill.replaceAll("(?m)^buttons-aim=.*\\R", ""));
+        // Options stays at the top right until dragged; a dragged place round-trips and scales.
+        check(!TouchLayout.importConfiguration(translucent).layout.optionsMoved(), "Options starts in its place");
+        sized.layout.moveOptions(300, 200);
+        String movedOptions = sized.layout.exportConfiguration(2.25f);
+        TouchLayout.Configuration placed = TouchLayout.importConfiguration(movedOptions);
+        placed.layout.bounds(1200, 540);
+        check(placed.layout.optionsMoved() && Math.abs(placed.layout.optionsX() - 300 * 1200 / 960f) < 0.01f
+              && Math.abs(placed.layout.optionsY() - 200) < 0.01f,
+              "A dragged Options must survive export/import");
+        sized.layout.moveOptions(99999, -99999);
+        check(sized.layout.optionsX() + sized.layout.optionsRadius() <= 960
+              && sized.layout.optionsY() - sized.layout.optionsRadius() >= 0, "Options must stay on the display");
+        reject(movedOptions.replaceAll("(?m)^options\\.y=.*\\R", ""));
+        reject(movedOptions.replaceAll("(?m)^options\\.x=.*", "options.x=NaN"));
+        reject(movedOptions.replaceAll("(?m)^options\\.x=.*", "options.x=5000"));
+        sized.layout.resetDefaults();
+        check(!sized.layout.optionsMoved(), "Reset puts Options back in its place");
+        String version3 = buttonsStill.replace("version=4", "version=3").replaceAll("(?m)^buttons-aim=.*\\R", "");
+        check(TouchLayout.importConfiguration(version3).layout.buttonsAim, "Version 3 layouts' held buttons aim");
         try {
             sized.layout.setOpacity(1.5f);
             throw new AssertionError("Out-of-range opacity was accepted");

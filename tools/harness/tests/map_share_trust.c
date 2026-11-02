@@ -24,6 +24,7 @@ typedef unsigned short word;
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define _error_silent 0
 #define error(level, ...) ((void)0)
+#define server_event_map_share(machine_index, map, state, done, total) ((void)0)
 #define _distributed_message_map_share_offer 0x40
 
 /* the fake world: a clock, the host's game and its machines, a catalog of one

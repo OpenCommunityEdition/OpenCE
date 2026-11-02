@@ -82,6 +82,13 @@ char *SDL_GetClipboardText(void)
 	return strdup(buffer);
 }
 
+/* ---------- the browser (a Discord link's page: player_link.c) */
+
+bool SDL_OpenURL(const char *url)
+{
+	return host_sdl_open_url(url) != 0;
+}
+
 bool SDL_ShowAndroidToast(const char *message, int duration, int gravity, int xoffset, int yoffset)
 {
 	return host_sdl_show_toast(message, duration, gravity, xoffset, yoffset) != 0;

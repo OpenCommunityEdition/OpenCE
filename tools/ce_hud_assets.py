@@ -17,6 +17,9 @@ RECIPE = ASSETS / 'ce_layout.json'
 def build_asset(entry):
     if not 0 < entry['width'] * entry['scale'] <= 2048 or not 0 < entry['height'] * entry['scale'] <= 2048:
         raise ValueError('CE HUD atlas exceeds texture bounds')
+    if entry['cells'] and 'source_png' in entry['cells'][0]:
+        from hud_assets import build_asset as pack_supplied_cells
+        return Image.fromarray(pack_supplied_cells(entry, {}))
     image = Image.new('RGBA', (entry['width'] * entry['scale'], entry['height'] * entry['scale']))
     for cell in entry['cells']:
         with Image.open(ASSETS / (cell['source'] + '.png')) as source:

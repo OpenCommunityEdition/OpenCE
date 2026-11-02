@@ -71,6 +71,7 @@ def _players(output):
 @pytest.mark.parametrize("map_name,variant,count,skill", [
     ("bloodgulch", "slayer", 6, "normal"),
     ("chillout", "team_slayer", 5, "heroic"),
+    ("bloodgulch", "slayer", 6, "veteran"),
 ])
 def test_bots_play_a_local_slayer_game(tmp_path, map_name, variant, count, skill):
     _game(map_name)
@@ -85,6 +86,7 @@ def test_bots_play_a_local_slayer_game(tmp_path, map_name, variant, count, skill
     deaths = sum(bot["deaths"] for bot in bots.values())
     assert kills >= count // 2 and deaths > 0, f"the bots killed {kills} and died {deaths} times"
     assert "bots: tick" in output, "no bots line a minute into the game"
+    assert "bots: fights since" in output, "no line of the fight's counts after the bots line"
 
 
 def test_no_bots_in_a_system_link_game(tmp_path):

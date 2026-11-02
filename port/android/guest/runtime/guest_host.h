@@ -74,6 +74,7 @@ autocorrection, or stopped (-1); whether it runs */
 int host_sdl_text_input(unsigned int window, int type);
 int host_sdl_set_clipboard_text(const char *text);
 void host_sdl_get_clipboard_text(char *buffer, unsigned int size);
+int host_sdl_open_url(const char *url);
 /* the keyboard's keys by name (the controls' bindings, xinput_sdl.c) */
 void host_sdl_scancode_name(int scancode, char *buffer, unsigned int size);
 int host_sdl_scancode_from_name(const char *name);
@@ -147,5 +148,13 @@ void host_touch_bindings(const int *controls);
 /* the overlay's devices: 1, a touchscreen; 2, a game controller; 0 until it
 has looked */
 int host_touch_devices(void);
+
+/* ---------- the server browser's master servers (host_https.c) */
+
+/* a GET of an https:// url (port/linux/src/master_list.c): 1 with the
+status, the headers ("Name: value" lines) and up to body_capacity bytes of
+the body (its size in body_size), else 0 and why in error */
+int host_https_get(const char *url, int *status, char *headers, int headers_size, char *body, int body_capacity,
+	int *body_size, char *error, int error_size);
 
 #endif

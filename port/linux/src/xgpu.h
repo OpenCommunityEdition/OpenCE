@@ -62,6 +62,9 @@ changes GL state behind it (binding a texture to upload it, deleting one)
 must call this afterwards. */
 
 void xgpu_gl_state_invalidate(void);
+/* whether there is an OpenGL context (not with debug.null_renderer, a
+dedicated server's): textures are made only then */
+int xgpu_gl_ready(void);
 /* a texture about to be deleted: the binding shadows forget it, since GL
 may give its name to a new texture (call before glDeleteTextures) */
 void xgpu_gl_texture_deleted(unsigned int texture);
@@ -345,5 +348,11 @@ void xgpu_static_buffers_remove(const void *buffers, long count, unsigned long s
 /* Android: size bytes of vertices or indices from start, as above */
 void xgpu_static_range_add(const void *start, unsigned long size, int indices);
 void xgpu_static_range_remove(const void *start, int indices);
+/* fills the corners x0, y0 to x1, y1 of the window (row 0 at the bottom)
+with color, as it is (an HDR display's scRGB framebuffer: linear, 1.0 at 80
+nits), or only the ring ring[0], ring[1] (its centre in the window), from
+radius ring[3] to ring[2]; ring[2] 0 for the whole rectangle. FALSE if its
+program does not build. */
+BOOL xgpu_post_fill(const GLint corners[4], const float color[3], const float ring[4]);
 
 #endif

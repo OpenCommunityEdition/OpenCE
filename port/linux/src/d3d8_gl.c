@@ -25,6 +25,7 @@ Conventions carried over from the Xbox:
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
+#include "posix.h"
 #include "main/console.h"
 #ifdef HALO_ANDROID
 #include "../../android/include/android_render_policy.h"
@@ -40,6 +41,10 @@ Conventions carried over from the Xbox:
 
 void d3d8_surface_initialize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
 void d3d8_surface_resize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
+
+/* port/linux/game/stats_log.c: display.stats_log's line names the renderer the
+driver reports */
+void stats_log_set_renderer(const char *vendor, const char *renderer);
 
 #ifdef HALO_GLES
 /* OpenGL ES 3 (port/android/README.md): the desktop formats, enumerants
@@ -81,12 +86,14 @@ the 3D view simply widens. The menus and full-screen overlays are laid out
 for 640 columns; while they draw (halo_screen_ui_offset), everything shifts
 right to center them.
 
-The desktop also draws at that resolution (platform_screen_mode): render
+The desktop also draws at that resolution (platform_screen_mode), and
+Android at the window's where display.resolution_scaling asks for it: render
 targets the size of the screen get that many pixels (screen_scale), and
 viewports, clears and visibility counts are scaled to match, so the game
-still works in its 480 lines; "original" draws 640x480, scaled up at
-presentation. The width and the scale change only between frames, after one
-is presented (halo_screen_commit). */
+still works in its 480 lines; "75%", "50%" and "25%" draw that part of the
+resolution each way, and "original" (Android's default) the 480 lines, scaled
+up at presentation. The width and the scale change only between frames,
+after one is presented (halo_screen_commit). */
 
 #define SCREEN_HEIGHT 480
 #define SCREEN_MAXIMUM_WIDTH 1920
@@ -184,12 +191,28 @@ static int anti_aliasing(void)
 	return anti_aliasing_values[anti_aliasing_value].mode;
 }
 
+/* display.resolution_scaling's part of the resolution each way: 1 for
+"native", 0.75, 0.5 or 0.25 for "75%", "50%" or "25%", 0 for "original" (the
+Xbox's 480 lines) */
+static float resolution_scaling_part(void)
+{
+	const char *setting = config_string("display.resolution_scaling");
+
+	return !strcmp(setting, "original") ? 0.0f : !strcmp(setting, "75%") ? 0.75f :
+		!strcmp(setting, "50%") ? 0.5f : !strcmp(setting, "25%") ? 0.25f : 1.0f;
+}
+
 static void screen_mode_choose(long *width, float scale[2])
 {
 #ifdef HALO_ANDROID
 	/* display.screen_width, or 0 for the display's shape, which the app
 	passes (port/android/host/host_main.c) */
 	const char *display = getenv("HALO_DISPLAY_WIDTH");
+	/* (the window's size last given, for a window that has none: before it
+	opens, or while the app is away) */
+	static int last_width, last_height;
+	float part = resolution_scaling_part();
+	int display_width = 0, display_height = 0;
 
 	*width = config_integer("display.screen_width");
 	if (*width <= 0)
@@ -201,8 +224,40 @@ static void screen_mode_choose(long *width, float scale[2])
 	*width &= ~1L;
 	scale[0] = scale[1] = 1.0f;
 	screen_supersampling = 1.0f;
+	/* display.resolution_scaling: "original" draws the 480 lines, which the
+	display blit scales up; "native" the window's pixels; "75%", "50%" or
+	"25%" that part of them each way. The picture keeps its shape: a width
+	of another (display.screen_width) is letterboxed. */
+	if (part <= 0.0f)
+		return;
+	platform_video_drawable_size(&display_width, &display_height);
+	if (display_width > 0 && display_height > 0)
+	{
+		last_width = display_width;
+		last_height = display_height;
+	}
+	if (last_width <= 0 || last_height <= 0)
+		return;
+	scale[0] = (float)last_width / (float)*width;
+	scale[1] = (float)last_height / (float)SCREEN_HEIGHT;
+	if (*width != ((SCREEN_HEIGHT * last_width / last_height) & ~1L))
+		scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
+	scale[0] *= part;
+	scale[1] *= part;
+	/* (no more than the GPU's largest target, once it is known) */
+	if (maximum_target_size > 0 && (*width * scale[0] > (float)maximum_target_size ||
+		SCREEN_HEIGHT * scale[1] > (float)maximum_target_size))
+	{
+		float fit = (float)maximum_target_size / (*width * scale[0]);
+
+		if ((float)maximum_target_size / (SCREEN_HEIGHT * scale[1]) < fit)
+			fit = (float)maximum_target_size / (SCREEN_HEIGHT * scale[1]);
+		scale[0] *= fit;
+		scale[1] *= fit;
+	}
 #else
 	long display_width, display_height;
+	float part = resolution_scaling_part();
 
 	*width = 640;
 	scale[0] = scale[1] = 1.0f;
@@ -218,6 +273,13 @@ static void screen_mode_choose(long *width, float scale[2])
 		keeps its shape and the display blit letterboxes it */
 		if (*width != wanted && *width != (wanted & ~1L))
 			scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
+		/* display.resolution_scaling's "75%", "50%" or "25%": that part of
+		the resolution each way, which the display blit scales up */
+		if (part > 0.0f)
+		{
+			scale[0] *= part;
+			scale[1] *= part;
+		}
 		/* supersampling: twice the pixels each way, or as many as the GPU's
 		largest target has (once it is known), which the display blit
 		scales down; not with "original" resolution scaling, which draws
@@ -391,6 +453,9 @@ static struct
 	pixels are linear, in scRGB's units, the desktop's white sdr_white */
 	BOOL float_window;
 	float sdr_white;
+	/* the float window's display has HDR on (platform_video_hdr), as the
+	last frame found */
+	BOOL display_on;
 	/* display.hdr_paper_white and display.hdr_peak_brightness, in nits: 0
 	for Windows' own (its SDR content brightness, and its HDR calibration's
 	peak, as SDL reports them) */
@@ -404,6 +469,19 @@ static struct
 void halo_screen_ui_offset(unsigned char centered)
 {
 	ui_offset = centered ? (halo_screen_width() - 640) / 2 : 0;
+}
+
+void halo_screen_ui_offset_view(long view_width)
+{
+	long width = halo_screen_width();
+
+	/* (a quarter's pause menu and dialogs are 320 wide: the Xbox's) */
+	ui_offset = view_width > 0 && view_width < width ? (view_width > 320 ? (view_width - 320) / 2 : 0) : (width - 640) / 2;
+}
+
+long halo_screen_ui_offset_current(void)
+{
+	return ui_offset;
 }
 
 /* ---------- state the XDK header's inline functions read and write */
@@ -528,6 +606,319 @@ struct program_entry
 
 #define FRAGMENT_BUCKETS 1024
 #define PROGRAM_BUCKETS 1024
+
+/* ---------- the program cache on disk (desktop)
+
+Linking a program is where the drivers do most of their work: on Intel
+graphics on Windows up to 70 ms a program, and a large Custom Edition map
+makes a hundred or more as new things come into view, each a stalled frame.
+A linked program's binary (glGetProgramBinary) is kept in a file of the
+driver's (its vendor, renderer and version) under the save root, by the
+hashes of its two shaders' GLSL: the next time the program is wanted, in this
+run or another, it is loaded from that instead of linked, in under 2 ms
+(display.shader_cache). The binaries share one file, opened once: on Windows
+opening or making a file of its own for each took 3-110 ms (the antivirus's
+look at it), as much as the link it saved. A binary the driver refuses is
+forgotten and the program linked again. OpenGL ES keeps its programs to
+itself: its drivers' binaries are not all to be trusted. */
+
+/* each compiled shader's GLSL hash, by its name (shader_hash_set) */
+static unsigned long long *shader_hashes;
+static GLuint shader_hashes_size;
+
+static unsigned long long source_hash(const char *source)
+{
+	unsigned long long hash = 14695981039346656037ULL;
+
+	while (*source)
+		hash = (hash ^ (unsigned char)*source++) * 1099511628211ULL;
+	return hash;
+}
+
+static void shader_hash_set(GLuint shader, const char *source)
+{
+	if (!shader)
+		return;
+	if (shader >= shader_hashes_size)
+	{
+		GLuint size = shader_hashes_size ? shader_hashes_size : 256;
+		unsigned long long *grown;
+
+		while (size <= shader)
+			size *= 2;
+		grown = realloc(shader_hashes, size * sizeof(*grown));
+		if (!grown)
+			return;
+		memset(grown + shader_hashes_size, 0, (size - shader_hashes_size) * sizeof(*grown));
+		shader_hashes = grown;
+		shader_hashes_size = size;
+	}
+	shader_hashes[shader] = source_hash(source);
+}
+
+#ifndef HALO_GLES
+static unsigned long long shader_hash(GLuint shader)
+{
+	return shader < shader_hashes_size ? shader_hashes[shader] : 0;
+}
+
+/* the cache file: entries one after another, each a header (magic, the two
+shaders' GLSL hashes, the binary's format and length, and its data's hash)
+then the binary. Entries are appended as programs are linked; at the start
+the file is read through once for its index (the place of each entry), and
+a program found in it is read from the open file. Reading stops at the first
+entry that is not whole (a write a crash cut short): the next entry is
+written over it. */
+#define PROGRAM_CACHE_MAGIC 0x31435048 /* "HPC1" */
+#define PROGRAM_CACHE_BUCKETS 1024
+/* a file grown past this starts again empty (each binary is 10-60 KB) */
+#define PROGRAM_CACHE_MAXIMUM_SIZE (64UL * 1024 * 1024)
+
+struct program_cache_header
+{
+	unsigned long magic;
+	unsigned long long vertex_hash;
+	unsigned long long fragment_hash;
+	unsigned long format;
+	unsigned long length;
+	unsigned long long data_hash;
+};
+
+struct program_cache_entry
+{
+	struct program_cache_entry *next;
+	unsigned long long vertex_hash;
+	unsigned long long fragment_hash;
+	unsigned long format;
+	unsigned long length;
+	unsigned long long data_hash;
+	/* where its binary starts in the file */
+	unsigned long offset;
+};
+
+static struct
+{
+	BOOL enabled;
+	FILE *file;
+	/* the end of the file's last whole entry: the next is written there */
+	unsigned long end;
+	struct program_cache_entry *buckets[PROGRAM_CACHE_BUCKETS];
+	/* this run's: programs loaded from the cache, linked, written to it,
+	and binaries the driver refused */
+	unsigned long loaded, linked, written, refused;
+} program_cache;
+
+static unsigned long long data_hash(const void *data, unsigned long size)
+{
+	const unsigned char *bytes = data;
+	unsigned long long hash = 14695981039346656037ULL;
+
+	while (size--)
+		hash = (hash ^ *bytes++) * 1099511628211ULL;
+	return hash;
+}
+
+static struct program_cache_entry **program_cache_bucket(unsigned long long vertex_hash,
+	unsigned long long fragment_hash)
+{
+	unsigned long long key = vertex_hash * 0x9e3779b97f4a7c15ULL ^ fragment_hash;
+
+	return &program_cache.buckets[(unsigned long)(key >> 32 ^ key) % PROGRAM_CACHE_BUCKETS];
+}
+
+static struct program_cache_entry *program_cache_find(unsigned long long vertex_hash,
+	unsigned long long fragment_hash)
+{
+	struct program_cache_entry *entry;
+
+	for (entry = *program_cache_bucket(vertex_hash, fragment_hash); entry; entry = entry->next)
+	{
+		if (entry->vertex_hash == vertex_hash && entry->fragment_hash == fragment_hash)
+			return entry;
+	}
+	return NULL;
+}
+
+/* the file read through once for its entries' places (their data is read
+when it is wanted): a later entry for the same program takes the place of
+an earlier */
+static void program_cache_index(void)
+{
+	struct program_cache_header header;
+	unsigned long offset = 0, size;
+
+	fseek(program_cache.file, 0, SEEK_END);
+	size = (unsigned long)ftell(program_cache.file);
+	while (offset + sizeof(header) <= size && fseek(program_cache.file, (long)offset, SEEK_SET) == 0 &&
+		fread(&header, sizeof(header), 1, program_cache.file) == 1 && header.magic == PROGRAM_CACHE_MAGIC &&
+		header.length && header.length <= size - offset - sizeof(header))
+	{
+		struct program_cache_entry *entry = program_cache_find(header.vertex_hash, header.fragment_hash);
+
+		if (!entry)
+		{
+			struct program_cache_entry **bucket = program_cache_bucket(header.vertex_hash, header.fragment_hash);
+
+			entry = calloc(1, sizeof(*entry));
+			if (!entry)
+				break;
+			entry->vertex_hash = header.vertex_hash;
+			entry->fragment_hash = header.fragment_hash;
+			entry->next = *bucket;
+			*bucket = entry;
+		}
+		entry->format = header.format;
+		entry->length = header.length;
+		entry->data_hash = header.data_hash;
+		entry->offset = offset + sizeof(header);
+		offset += sizeof(header) + header.length;
+	}
+	program_cache.end = offset;
+}
+
+static void program_cache_initialize(void)
+{
+	GLint formats = 0;
+	char path[512];
+	unsigned long long driver;
+	const char *strings[3];
+	int index;
+
+	program_cache.enabled = FALSE;
+	if (!config_boolean("display.shader_cache"))
+		return;
+	glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formats);
+	if (formats <= 0)
+	{
+		platform_log("shader cache: off (the driver keeps no program binaries)");
+		return;
+	}
+	strings[0] = (const char *)glGetString(GL_VENDOR);
+	strings[1] = (const char *)glGetString(GL_RENDERER);
+	strings[2] = (const char *)glGetString(GL_VERSION);
+	driver = 14695981039346656037ULL;
+	for (index = 0; index < 3; index++)
+		driver = (driver ^ source_hash(strings[index] ? strings[index] : "")) * 1099511628211ULL;
+	snprintf(path, sizeof(path), "%s/shader_cache", platform_save_root());
+	posix_make_directory(path);
+	snprintf(path, sizeof(path), "%s/shader_cache/%016llx.bin", platform_save_root(), driver);
+	program_cache.file = fopen(path, "r+b");
+	if (program_cache.file)
+	{
+		fseek(program_cache.file, 0, SEEK_END);
+		if ((unsigned long)ftell(program_cache.file) > PROGRAM_CACHE_MAXIMUM_SIZE)
+		{
+			fclose(program_cache.file);
+			program_cache.file = NULL;
+		}
+	}
+	if (!program_cache.file)
+		program_cache.file = fopen(path, "w+b");
+	if (!program_cache.file)
+	{
+		platform_log("shader cache: off (%s cannot be opened)", path);
+		return;
+	}
+	program_cache_index();
+	program_cache.enabled = TRUE;
+	platform_log("shader cache: %s, %lu KB", path, program_cache.end / 1024);
+}
+
+/* the cached binary of the program of these shaders, loaded into a new
+program; 0 if there is none or the driver refuses it (then forgotten: the
+program is linked again, and its new binary written after) */
+static GLuint program_cache_load(unsigned long long vertex_hash, unsigned long long fragment_hash)
+{
+	struct program_cache_entry *entry;
+	void *binary;
+	GLuint program = 0;
+	GLint status = 0;
+
+	if (!program_cache.enabled || !vertex_hash || !fragment_hash)
+		return 0;
+	entry = program_cache_find(vertex_hash, fragment_hash);
+	if (!entry || !entry->length || !(binary = malloc(entry->length)))
+		return 0;
+	if (fseek(program_cache.file, (long)entry->offset, SEEK_SET) == 0 &&
+		fread(binary, entry->length, 1, program_cache.file) == 1 &&
+		data_hash(binary, entry->length) == entry->data_hash)
+	{
+		program = glCreateProgram();
+		glProgramBinary(program, (GLenum)entry->format, binary, (GLsizei)entry->length);
+		glGetProgramiv(program, GL_LINK_STATUS, &status);
+		if (!status)
+		{
+			glDeleteProgram(program);
+			program = 0;
+		}
+	}
+	free(binary);
+	if (!program)
+	{
+		program_cache.refused++;
+		entry->length = 0;
+		return 0;
+	}
+	program_cache.loaded++;
+	return program;
+}
+
+/* a linked program's binary, written after the file's last whole entry */
+static void program_cache_store(GLuint program, unsigned long long vertex_hash, unsigned long long fragment_hash)
+{
+	struct program_cache_header header;
+	struct program_cache_entry *entry;
+	GLint length = 0;
+	GLenum format = 0;
+	void *binary;
+
+	if (!program_cache.enabled || !vertex_hash || !fragment_hash)
+		return;
+	glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+	if (length <= 0 || program_cache.end + sizeof(header) + (unsigned long)length > PROGRAM_CACHE_MAXIMUM_SIZE ||
+		!(binary = malloc((size_t)length)))
+	{
+		return;
+	}
+	glGetProgramBinary(program, length, &length, &format, binary);
+	memset(&header, 0, sizeof(header));
+	header.magic = PROGRAM_CACHE_MAGIC;
+	header.vertex_hash = vertex_hash;
+	header.fragment_hash = fragment_hash;
+	header.format = format;
+	header.length = (unsigned long)length;
+	header.data_hash = data_hash(binary, header.length);
+	if (length > 0 && fseek(program_cache.file, (long)program_cache.end, SEEK_SET) == 0 &&
+		fwrite(&header, sizeof(header), 1, program_cache.file) == 1 &&
+		fwrite(binary, header.length, 1, program_cache.file) == 1 && fflush(program_cache.file) == 0)
+	{
+		entry = program_cache_find(vertex_hash, fragment_hash);
+		if (!entry)
+		{
+			struct program_cache_entry **bucket = program_cache_bucket(vertex_hash, fragment_hash);
+
+			entry = calloc(1, sizeof(*entry));
+			if (entry)
+			{
+				entry->vertex_hash = vertex_hash;
+				entry->fragment_hash = fragment_hash;
+				entry->next = *bucket;
+				*bucket = entry;
+			}
+		}
+		if (entry)
+		{
+			entry->format = header.format;
+			entry->length = header.length;
+			entry->data_hash = header.data_hash;
+			entry->offset = program_cache.end + sizeof(header);
+		}
+		program_cache.end += sizeof(header) + header.length;
+		program_cache.written++;
+	}
+	free(binary);
+}
+#endif
 
 static struct fragment_entry *fragment_buckets[FRAGMENT_BUCKETS];
 static struct program_entry *program_buckets[PROGRAM_BUCKETS];
@@ -828,6 +1219,23 @@ static struct
 	BOOL statistics;
 } debug_settings;
 
+#ifndef HALO_GLES
+/* display.frames_in_flight: a fence after each frame's swap, and the frame
+that many before waited for (frame_pacing_wait). Without it a driver queues
+frames until its own limit, then blocks for several at once at whatever
+call fills its queue: on Intel graphics on Windows, a frame of 50-60 ms
+every sixth frame (some 15 fps felt at 80 fps). OpenGL ES's frames are
+paced by its stream buffer ring instead (host_gl_wait_frame). */
+#define MAXIMUM_FRAMES_IN_FLIGHT 8
+
+static struct
+{
+	long limit;
+	GLsync fences[MAXIMUM_FRAMES_IN_FLIGHT];
+	long next;
+} frame_pacing;
+#endif
+
 /* ---------- GL state cache
 
 Consecutive draws share most of their state, but each sets all of it: the
@@ -940,6 +1348,11 @@ static struct
 #ifdef HALO_WEB
 static void vertex_array_cache_invalidate(void);
 #endif
+
+int xgpu_gl_ready(void)
+{
+	return device.gl_ready;
+}
 
 void xgpu_gl_state_invalidate(void)
 {
@@ -1784,6 +2197,130 @@ static BOOL bind_targets(BOOL *has_depth)
 static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] =
 	{ "neutral", "aces", "reinhard", "gt7" };
 
+/* the HDR calibration screen (port/linux/game/menu_functions.c), while it
+is drawn: the pattern of its row chosen (HDR_CALIBRATION_PEAK or
+HDR_CALIBRATION_PAPER_WHITE), and the paper white and peak it shows, in
+nits (0 for Windows'), which the display takes in place of the settings'
+until the screen closes (OK writes them to the settings) */
+enum
+{
+	HDR_CALIBRATION_PEAK,
+	HDR_CALIBRATION_PAPER_WHITE
+};
+
+static struct
+{
+	/* device.frame + 1 of the frame the screen was last drawn in; 0 never */
+	unsigned long frame;
+	int pattern;
+	int paper_white, peak_brightness;
+} hdr_calibration;
+
+/* a setting in nits, within lowest and highest; 0 (Windows' own) stays */
+static int hdr_nits(int value, int lowest, int highest)
+{
+	return value <= 0 ? 0 : value < lowest ? lowest : value > highest ? highest : value;
+}
+
+/* the calibration screen was drawn in this frame, or (or_last_frame) in
+this frame or the one before: it says so as it is drawn, after this frame's
+halo_screen_commit */
+static BOOL hdr_calibration_shown(BOOL or_last_frame)
+{
+	return hdr.float_window && hdr_calibration.frame &&
+		device.frame + 1 - hdr_calibration.frame <= (or_last_frame ? 1UL : 0UL);
+}
+
+int halo_hdr_calibration_available(void)
+{
+	return hdr.float_window && hdr.display_on;
+}
+
+void halo_hdr_calibration_show(int pattern, int paper_white, int peak_brightness)
+{
+	hdr_calibration.frame = device.frame + 1;
+	hdr_calibration.pattern = pattern;
+	hdr_calibration.paper_white = hdr_nits(paper_white, 80, 1000);
+	hdr_calibration.peak_brightness = hdr_nits(peak_brightness, 250, 10000);
+}
+
+/* a rectangle of the menus' 640 by 480 units (the screen's middle, as the
+menus are drawn) as corners in the window, row 0 at the bottom, where the
+back buffer is drawn at window's x, y, width and height */
+static void hdr_calibration_place(const struct render_target_entry *back_buffer, const int window[4], float left,
+	float top, float right, float bottom, GLint corners[4])
+{
+	float across = (float)window[2] / (float)back_buffer->target.width;
+	float down = (float)window[3] / (float)back_buffer->target.height;
+	float offset = (float)(halo_screen_width() - 640) / 2.0f;
+
+	corners[0] = window[0] + (GLint)((left + offset) * across + 0.5f);
+	corners[2] = window[0] + (GLint)((right + offset) * across + 0.5f);
+	corners[1] = window[1] + window[3] - (GLint)(bottom * down + 0.5f);
+	corners[3] = window[1] + window[3] - (GLint)(top * down + 0.5f);
+}
+
+/* a square, and a ring in it, of the menus' units: its left and top, the
+square's colour and the ring's (scRGB) */
+static void hdr_calibration_square(const struct render_target_entry *back_buffer, const int window[4], float left,
+	float top, float square_color, float ring_color)
+{
+	/* (the square's side, and the ring's radii) */
+	const float SIDE = 180.0f, OUTER = 62.0f, INNER = 42.0f;
+	float down = (float)window[3] / (float)back_buffer->target.height;
+	float color[3], ring[4];
+	GLint corners[4];
+
+	hdr_calibration_place(back_buffer, window, left, top, left + SIDE, top + SIDE, corners);
+	color[0] = color[1] = color[2] = square_color;
+	ring[0] = ring[1] = ring[2] = ring[3] = 0.0f;
+	xgpu_post_fill(corners, color, ring);
+	color[0] = color[1] = color[2] = ring_color;
+	ring[0] = (float)(corners[0] + corners[2]) / 2.0f;
+	ring[1] = (float)(corners[1] + corners[3]) / 2.0f;
+	ring[2] = OUTER * down;
+	ring[3] = INNER * down;
+	xgpu_post_fill(corners, color, ring);
+}
+
+/* the calibration screen's pattern, over its menus, between its rows and
+its help. The peak's: a square at the peak shown, and in it a ring at 10000
+nits, brighter than any display shows, which disappears into the square
+once the square is as bright as the display goes. Paper white's: a grey
+scale up to white at the paper white shown, as the menus' white then is,
+beside a square of that white with a ring in it at the peak, the light past
+white. */
+static void hdr_calibration_draw(const struct render_target_entry *back_buffer, const int window[4])
+{
+	/* (scRGB, 1.0 at 80 nits) */
+	const float BRIGHTEST = 10000.0f / 80.0f;
+	const int GREYS = 8;
+	float paper = hdr.sdr_white, peak = hdr.sdr_white * hdr.tone_mapping.peak;
+
+	if (hdr_calibration.pattern == HDR_CALIBRATION_PEAK)
+	{
+		hdr_calibration_square(back_buffer, window, 230.0f, 146.0f, peak, BRIGHTEST);
+	}
+	else
+	{
+		float ring[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+		int grey;
+
+		for (grey = 0; grey < GREYS; grey++)
+		{
+			float color[3];
+			GLint corners[4];
+
+			/* (the menus' values are gamma encoded, as the presentation's) */
+			color[0] = color[1] = color[2] = powf((float)(grey + 1) / (float)GREYS, 2.2f) * paper;
+			hdr_calibration_place(back_buffer, window, 100.0f + 26.0f * (float)grey, 166.0f,
+				100.0f + 26.0f * (float)(grey + 1), 306.0f, corners);
+			xgpu_post_fill(corners, color, ring);
+		}
+		hdr_calibration_square(back_buffer, window, 360.0f, 146.0f, paper, peak);
+	}
+}
+
 /* display.hdr's settings, if they have changed: the back buffer's entries
 are made again in the format it takes (what they held is lost, and a frame
 clears them before it draws) */
@@ -1820,12 +2357,8 @@ static void hdr_read(void)
 	curve = config_string("display.hdr_tone_mapping");
 	exposure = config_real("display.hdr_exposure");
 	wanted = config_boolean("display.hdr");
-	hdr.paper_white = config_integer("display.hdr_paper_white");
-	hdr.paper_white = hdr.paper_white <= 0 ? 0 : hdr.paper_white < 80 ? 80 : hdr.paper_white > 1000 ? 1000 :
-		hdr.paper_white;
-	hdr.peak_brightness = config_integer("display.hdr_peak_brightness");
-	hdr.peak_brightness = hdr.peak_brightness <= 0 ? 0 : hdr.peak_brightness < 250 ? 250 :
-		hdr.peak_brightness > 10000 ? 10000 : hdr.peak_brightness;
+	hdr.paper_white = hdr_nits((int)config_integer("display.hdr_paper_white"), 80, 1000);
+	hdr.peak_brightness = hdr_nits((int)config_integer("display.hdr_peak_brightness"), 250, 10000);
 	for (value = NUMBER_OF_XGPU_TONE_MAPPINGS - 1; value > 0 && strcmp(curve, tone_mapping_names[value]); value--)
 	{
 	}
@@ -2044,6 +2577,14 @@ static void gl_initialize(void)
 	debug_settings.dump_shaders = *config_string("debug.gpu_dump_shaders") ?
 		config_string("debug.gpu_dump_shaders") : NULL;
 	debug_settings.statistics = config_boolean("debug.gpu_stats");
+#ifndef HALO_GLES
+	program_cache_initialize();
+	frame_pacing.limit = config_integer("display.frames_in_flight");
+	if (frame_pacing.limit < 0)
+		frame_pacing.limit = 0;
+	if (frame_pacing.limit > MAXIMUM_FRAMES_IN_FLIGHT)
+		frame_pacing.limit = MAXIMUM_FRAMES_IN_FLIGHT;
+#endif
 	{
 		GLint renderbuffer_size = 0;
 
@@ -2055,6 +2596,8 @@ static void gl_initialize(void)
 	}
 	xgpu_gl_state_invalidate();
 	device.gl_ready = TRUE;
+	/* display.stats_log's line: the driver's own text for the renderer */
+	stats_log_set_renderer((const char *)glGetString(GL_VENDOR), (const char *)glGetString(GL_RENDERER));
 	if (anti_aliasing_value < 0)
 		anti_aliasing_read();
 	else
@@ -2362,10 +2905,15 @@ long halo_screen_commit(void)
 	{
 		float sdr_white, headroom, paper, peak;
 		BOOL on = platform_video_hdr(&sdr_white, &headroom);
+		/* (the calibration screen's, while it is drawn) */
+		BOOL calibrating = hdr_calibration_shown(TRUE);
+		int paper_white = calibrating ? hdr_calibration.paper_white : hdr.paper_white;
+		int peak_brightness = calibrating ? hdr_calibration.peak_brightness : hdr.peak_brightness;
 
+		hdr.display_on = on;
 		/* (in nits: scRGB's 1.0 is 80) */
-		paper = hdr.paper_white ? (float)hdr.paper_white : sdr_white * 80.0f;
-		peak = hdr.peak_brightness ? (float)hdr.peak_brightness : headroom * sdr_white * 80.0f;
+		paper = paper_white ? (float)paper_white : sdr_white * 80.0f;
+		peak = peak_brightness ? (float)peak_brightness : headroom * sdr_white * 80.0f;
 		if (!on)
 		{
 			paper = sdr_white * 80.0f;
@@ -2375,9 +2923,9 @@ long halo_screen_commit(void)
 			peak = paper;
 		if (paper != hdr.sdr_white * 80.0f || peak / paper != hdr.tone_mapping.peak)
 		{
-			if (on)
+			if (on && !calibrating)
 				platform_log("HDR: the display's paper white %.0f nits%s, peak %.0f nits%s", paper,
-					hdr.paper_white ? "" : " (Windows')", peak, hdr.peak_brightness ? "" : " (Windows')");
+					paper_white ? "" : " (Windows')", peak, peak_brightness ? "" : " (Windows')");
 		}
 		hdr.sdr_white = paper / 80.0f;
 		hdr.tone_mapping.peak = peak / paper;
@@ -3245,6 +3793,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 
 		program->shaders_tried |= tried;
 		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
+		shader_hash_set(*shader, source);
 		if (debug_settings.dump_shaders)
 		{
 			char path[512];
@@ -3297,6 +3846,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry->key = *key;
 	source = nv2a_pixel_shader_to_glsl(key);
 	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
+	shader_hash_set(entry->shader, source);
 	if (debug_settings.dump_shaders)
 	{
 		char path[512];
@@ -3345,9 +3895,38 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	if (!vertex_shader || !fragment_shader)
 		return NULL;
 
+#ifndef HALO_GLES
+	entry->program = program_cache_load(shader_hash(vertex_shader), shader_hash(fragment_shader));
+	if (!entry->program)
+	{
+		/* (linked as xgpu_link_program does, keeping its binary) */
+		GLint status = 0;
+
+		entry->program = glCreateProgram();
+		glAttachShader(entry->program, vertex_shader);
+		glAttachShader(entry->program, fragment_shader);
+		if (program_cache.enabled)
+			glProgramParameteri(entry->program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+		glLinkProgram(entry->program);
+		glGetProgramiv(entry->program, GL_LINK_STATUS, &status);
+		if (!status)
+		{
+			char log[4096];
+
+			glGetProgramInfoLog(entry->program, sizeof(log), NULL, log);
+			platform_log("cannot link the shader program: %s", log);
+			glDeleteProgram(entry->program);
+			entry->program = 0;
+			return NULL;
+		}
+		program_cache.linked++;
+		program_cache_store(entry->program, shader_hash(vertex_shader), shader_hash(fragment_shader));
+	}
+#else
 	entry->program = xgpu_link_program(vertex_shader, fragment_shader, "shader");
 	if (!entry->program)
 		return NULL;
+#endif
 	state_program(entry->program);
 	entry->constants = glGetUniformLocation(entry->program, "c");
 	entry->constant_count = XGPU_VERTEX_CONSTANT_COUNT;
@@ -7161,6 +7740,28 @@ static void front_buffer_take(void)
 	device.front_buffer_taken = device.frame + 1;
 }
 
+#ifndef HALO_GLES
+/* after the swap: this frame's fence, then a wait for the frame
+frame_pacing.limit before it (a second at most: a GPU that slow is not
+waited for longer) */
+static void frame_pacing_wait(void)
+{
+	GLsync *slot;
+
+	if (!frame_pacing.limit)
+		return;
+	frame_pacing.fences[frame_pacing.next] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	frame_pacing.next = (frame_pacing.next + 1) % frame_pacing.limit;
+	slot = &frame_pacing.fences[frame_pacing.next];
+	if (*slot)
+	{
+		glClientWaitSync(*slot, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
+		glDeleteSync(*slot);
+		*slot = NULL;
+	}
+}
+#endif
+
 void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destination_rectangle,
 	void *unused, void *unused2)
 {
@@ -7220,9 +7821,23 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
 				x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		}
+		/* (the HDR calibration screen's pattern, brighter than the back
+		buffer's white can be) */
+		if (hdr_calibration_shown(FALSE) && hdr.display_on)
+		{
+			int window[4];
+
+			window[0] = x;
+			window[1] = y;
+			window[2] = width;
+			window[3] = height;
+			hdr_calibration_draw(back_buffer, window);
+		}
 		glBindVertexArray(device.vertex_array);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 		platform_video_swap();
 #ifndef HALO_GLES
+		frame_pacing_wait();
 		visibility_read_batch();
 #endif
 		xgpu_gl_state_invalidate();
@@ -7305,6 +7920,18 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			stats.mirrored_bytes / stats.presents / 1024, stats.streamed_bytes / stats.presents / 1024,
 			stats.texture_uploads, stats.texture_upload_bytes / 1024, stats.most_draws, stats.slowest_frame);
 		memset(&stats, 0, sizeof(stats));
+#ifndef HALO_GLES
+		{
+			static unsigned long shown = ~0UL;
+
+			if (program_cache.loaded + program_cache.linked != shown)
+			{
+				shown = program_cache.loaded + program_cache.linked;
+				platform_log("programs: %lu from the shader cache, %lu linked (%lu written to it, %lu refused by the driver)",
+					program_cache.loaded, program_cache.linked, program_cache.written, program_cache.refused);
+			}
+		}
+#endif
 	}
 	platform_pump_events();
 

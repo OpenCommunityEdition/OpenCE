@@ -1,0 +1,17 @@
+# King of the hill whose hill moves about the map, for teams.
+base = "team_king"
+name = "Moving Hill"
+
+[universal]
+teams = true
+score_to_win = 3
+respawn_time = 5
+radar = true
+
+[options]
+time_limit = 15
+friendly_fire = "off"
+auto_team_balance = true
+
+[king]
+moving_hill = true

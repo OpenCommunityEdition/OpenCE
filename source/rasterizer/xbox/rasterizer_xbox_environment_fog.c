@@ -1017,11 +1017,9 @@ void _rasterizer_environment_fog_screen_begin(
 					}
 					/* January copies the first matrix-sized camera bytes here verbatim. */
 					csmemcpy(
-						&previous_camera_matrix[
-							window_index],
+						previous_camera_matrix_for_window(window_index),
 						&global_window_parameters.camera,
-						sizeof(previous_camera_matrix[
-							window_index]));
+						sizeof(real_matrix4x3));
 				}
 				local_fog_screen_first_time = FALSE;
 			}
@@ -1037,8 +1035,7 @@ void _rasterizer_environment_fog_screen_begin(
 			matrix4x3_multiply(&wind_matrix, &matrix, &matrix);
 			matrix4x3_multiply(&global_window_parameters.frustum.world_to_view, &matrix, &matrix);
 			csmemcpy(
-				&previous_camera_matrix[
-					global_window_parameters.window_index],
+				previous_camera_matrix,
 				&global_window_parameters.frustum.world_to_view,
 				sizeof(real_matrix4x3));
 			}

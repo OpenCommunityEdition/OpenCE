@@ -1,0 +1,43 @@
+suite: service
+templates:
+  - templates/service.yaml
+  - templates/service-web.yaml
+release:
+  name: opence-server
+tests:
+  - it: exposes the tunnel port over UDP on a load balancer that keeps the players' addresses
+    template: templates/service.yaml
+    asserts:
+      - equal: { path: metadata.name, value: opence-server }
+      - equal: { path: spec.type, value: LoadBalancer }
+      - equal: { path: spec.externalTrafficPolicy, value: Local }
+      - equal: { path: 'spec.ports[0]', value: { name: tunnel, port: 2302, targetPort: tunnel, protocol: UDP } }
+
+  - it: ignores externalTrafficPolicy and nodePort on a ClusterIP Service
+    template: templates/service.yaml
+    set:
+      service: { type: ClusterIP, nodePort: 30702 }
+    asserts:
+      - notExists: { path: spec.externalTrafficPolicy }
+      - notExists: { path: 'spec.ports[0].nodePort' }
+
+  - it: sets a fixed node port
+    template: templates/service.yaml
+    set:
+      service: { type: NodePort, nodePort: 30702 }
+    asserts:
+      - equal: { path: 'spec.ports[0].nodePort', value: 30702 }
+
+  - it: keeps the web port inside the cluster
+    template: templates/service-web.yaml
+    asserts:
+      - equal: { path: metadata.name, value: opence-server-web }
+      - equal: { path: spec.type, value: ClusterIP }
+      - equal: { path: 'spec.ports[0]', value: { name: web, port: 8080, targetPort: web, protocol: TCP } }
+
+  - it: has no web Service without a web port
+    template: templates/service-web.yaml
+    set:
+      web.port: 0
+    asserts:
+      - hasDocuments: { count: 0 }
