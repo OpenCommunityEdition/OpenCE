@@ -386,6 +386,22 @@ static const struct config_setting config_settings[] =
 		"kernel's driver of it (hid-playstation, hid-sony), which needs no setup;\n"
 		"false: through SDL's own, which needs Steam's udev rules to open it. Read\n"
 		"at start-up." },
+	{ "input.adaptive_triggers", _config_boolean, "false", "HALO_ADAPTIVE_TRIGGERS", _environment_value,
+		_platform_desktop,
+		"A PS5 DualSense's adaptive triggers (dualsense.c): R2 a feel for each\n"
+		"weapon and a kick at each shot, free while reloading or switching,\n"
+		"a dry click when empty; L2 light while zoomed. Other controllers are never touched. On\n"
+		"Linux with input.playstation_kernel_driver it needs write access to the\n"
+		"controller's hidraw device (Steam's udev rules)." },
+	{ "input.trigger_strength", _config_string, "\"normal\"", "HALO_TRIGGER_STRENGTH", _environment_value,
+		_platform_desktop,
+		"How strong a DualSense's trigger effects are: \"light\" (a hair\n"
+		"trigger: every hold or click a short light break at the top of the\n"
+		"pull), \"normal\", \"strong\" (every effect two steps firmer)." },
+	{ "input.lightbar", _config_string, "\"off\"", "HALO_LIGHTBAR", _environment_value, _platform_desktop,
+		"A PS5 DualSense's lightbar and player lights: \"player_color\", the\n"
+		"lightbar in your color (your team's in a team game) and the player\n"
+		"lights your split-screen number. \"off\": left alone." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
 	{ "network.block_mouse_aim_assist", _config_boolean, "false", "HALO_NET_BLOCK_MOUSE_AIM_ASSIST", _environment_value,
