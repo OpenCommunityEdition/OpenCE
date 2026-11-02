@@ -1745,6 +1745,9 @@ static boolean setting_default_show(struct widget_instance *spinner, struct pc_m
 	return TRUE;
 }
 
+#include "frontend_menu_runtime.inl"
+#include "frontend_prompts.h"
+
 /* "port settings help": the line of the row chosen (by its label's string:
 the buttons' is the first) */
 static void settings_help(struct widget_instance *list)
@@ -6220,6 +6223,8 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 {
 	short row;
 
+	frontend_prompts_draw(widget->definition_tag_index, bounds);
+
 	/* (the Mods screen's texts: the fonts and widths their lines are
 	measured in, mods_text_fits) */
 	for (row = 0; widget->name && row < NUMBER_OF_MOD_TEXT_BOXES; row++)
@@ -7467,6 +7472,8 @@ boolean pc_menu_event_function_invoke(
 
 		if (!name)
 			return FALSE;
+		if (!strncmp(name, "port frontend ", 14))
+			return frontend_menu_event(widget, name, widget_deleted);
 		if (!strncmp(name, "port bots ", 10))
 			return bots_menu_event(widget, name);
 		if (!strncmp(name, "port controller ", 16))
@@ -7913,6 +7920,12 @@ void pc_menu_game_data_function_invoke(
 		preview_update(widget);
 	else if (!strcmp(name, "port lobby update"))
 		lobby_update(widget);
+	else if (!strcmp(name, "port frontend update"))
+		frontend_menu_help(widget);
+	else if (!strcmp(name, "port frontend navigation update"))
+		frontend_navigation_update(widget);
+	else if (!strcmp(name, "port frontend multiplayer update"))
+		frontend_multiplayer_update(widget);
 	else if (!strcmp(name, "port settings help"))
 	{
 		video_rows_show(widget);

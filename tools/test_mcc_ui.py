@@ -633,7 +633,7 @@ def test_native_settings_admission_preserves_mcc_pause_ownership(tmp_path):
     if not compiler:
         pytest.skip("clang is needed for native menu admission tests")
     menu = (ROOT / "port/linux/game/menu_tags.c").read_text()
-    admission = function(menu, "menu_tags_loaded").split("menus = halo_menus_load();", 1)[0]
+    admission = function(menu, "menu_tags_loaded").split("\n\tmenus = ", 1)[0]
     source = r'''
 #include <assert.h>
 #include <string.h>
@@ -643,6 +643,9 @@ typedef int boolean;
 #define MULTIPLAYER_COLLECTION "collection"
 static int mcc, wants_settings, pc=1, campaign_tag, multiplayer_tag;
 static int built, built_campaign;
+static int frontend;
+static int frontend_menu_requested(void){return frontend;}
+static void frontend_menu_map_loaded(char const *name,int is_mcc){(void)name;(void)is_mcc;}
 static int mcc_cache_tags_loaded(void){return mcc;}
 static int mcc_ui_settings_needed(char const *name){(void)name;return wants_settings;}
 static int network_coop_campaign_map(void){return 0;}
@@ -664,6 +667,10 @@ int main(void)
     campaign_tag=1;check("a10",1,1);check("custom_maps\\a10",1,1);
     campaign_tag=0;multiplayer_tag=1;check("bloodgulch",1,0);
     pc=0;check("bloodgulch",0,0);check("ui",0,0);pc=1;
+    /* The optional frontend permits ui.map's PC definitions even when
+       the unchanged pause policy is Xbox. It never admits gameplay. */
+    frontend=1;pc=0;check("ui",1,0);check("bloodgulch",0,0);
+    campaign_tag=1;check("a10",0,0);check("custom_maps\\a10",0,0);pc=1;
     /* MCC owns its campaign widgets, but requests native Settings with
        either main-menu style, without the native campaign widget patch. */
     mcc=1;campaign_tag=1;multiplayer_tag=0;

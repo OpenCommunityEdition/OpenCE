@@ -2,7 +2,7 @@
 
 Gamepads > Button Appearance contains AUTO BUTTON DETECTION, on by default for
 new configurations. Existing saved choices are preserved. The manual Button Style
-row offers all eleven styles. Turning detection on restricts that row to the
+row offers eleven controller styles and KEYBOARD. Turning detection on restricts that row to the
 controller assigned to the player editing the menu;
 the caption identifies P1 through P4. Devices are identified even while the
 option is off. Detection and style selection do not change input;
@@ -22,8 +22,22 @@ connected, or when another style hides the row. For example, an Xbox player usin
 Gems and Modern Xbox bumpers gets gem face buttons with LB/RB prompts; a simultaneous
 PlayStation player keeps PlayStation artwork. The option changes no bindings.
 
-These choices can be saved while High-Res HUD is off, but affect gameplay only
-when it is enabled in Graphics. The submenu's hints explain this requirement.
+Controller artwork choices can be saved while High-Res HUD is off, but affect
+gameplay only when it is enabled in Graphics. The selectable KEYBOARD style
+works independently; see [keyboard/mouse prompts](keyboard_prompts.md).
+With automatic detection on, KEYBOARD GLYPHS enables keyboard/mouse activity
+switching; it defaults off. With detection off, manual KEYBOARD stays selected.
+
+The opt-in [modern frontend](menu_redesign.md) also uses these saved styles.
+Its Interface page starts with Menu Style, High-Res Text and High-Res HUD.
+Auto Detection and glyph appearance controls populate below High-Res HUD only
+while its pending value is enabled. Detection shows only the assigned controller
+family's style, falling back to Manual Style for an unknown device; turning
+detection off restores Manual Style. Hiding controls preserves their pending and
+saved choices. These visibility rules do not change the legacy submenu above.
+Its navigation prompts follow the most recently used physical controller port,
+with keyboard/mouse and touch alternatives. These menu glyphs work even when
+High-Res HUD is off; controller gameplay artwork retains the requirement above.
 
 ## Reading route and boundaries
 

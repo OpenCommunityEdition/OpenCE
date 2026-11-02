@@ -175,7 +175,8 @@ def test_menu_generated_and_default_on():
     assert len(labels) == 4
     assert all('string_list' not in w.attrib and 'string_index' in w.attrib for w in labels)
     rows = port_settings.SCREENS['controller_appearance']['rows']
-    assert len(next(r[2] for r in rows if r[1] == 'display.hud_button_style')) == 11
+    assert len(next(r[2] for r in rows if r[1] == 'display.hud_button_style')) == 12
+    assert next(r[2] for r in rows if r[1] == 'display.hud_button_style')[-1] == ('KEYBOARD', 'keyboard')
     assert next(r[2] for r in rows if r[1] == 'display.hud_bumper_style') == [('ORIGINAL XBOX', 'original'), ('MODERN XBOX', 'modern')]
     parent = ET.parse(ROOT / f'port/assets/menus/ce/{prefix}.gamepad_setup.xml')
     assert any('controller_appearance_screen' in e.get('open', '') for e in parent.iter('on'))

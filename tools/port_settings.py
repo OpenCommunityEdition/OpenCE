@@ -260,8 +260,8 @@ SCREENS = {
         "rows": [
             ("AUTO BUTTON DETECTION:", "input.auto_button_detection", ON_OFF,
              "Show styles for your controller's family.\nRequires High-Res HUD in Graphics.", None),
-            ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES,
-             "Manual gameplay button artwork, kept when auto\ndetection is on. Requires High-Res HUD.", None),
+            ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES + [("KEYBOARD", "keyboard")],
+             "Manual style when auto detection is off. Keyboard\nuses current bindings; controllers need High-Res HUD.", None),
             ("BUTTON STYLE:", "display.hud_button_style_xbox", XBOX_BUTTON_STYLES,
              "Preferred Xbox artwork for automatic detection.\nRequires High-Res HUD in Graphics.", None),
             ("BUTTON STYLE:", "display.hud_button_style_ps", PS_BUTTON_STYLES,
@@ -271,6 +271,8 @@ SCREENS = {
             ("BUMPER STYLE:", "display.hud_bumper_style",
              [("ORIGINAL XBOX", "original"), ("MODERN XBOX", "modern")],
              "Original: black/white buttons. Modern: LB/RB.\nKept when automatic detection is on.", None),
+            ("KEYBOARD GLYPHS:", "display.keyboard_glyphs", ON_OFF,
+             "Automatic keyboard/mouse glyphs in menus and play.\nManual Keyboard style works even with this off.", None),
         ],
     },
     "controller_remapping": {

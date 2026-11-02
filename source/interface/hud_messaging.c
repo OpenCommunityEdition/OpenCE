@@ -472,6 +472,7 @@ static void render_state_text(
 /* port: original Xbox high-resolution glyphs, port/linux/game/hud_hires_tags.c */
 boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	rectangle2d *cursor, pixel32 color);
+#include "keyboard_glyphs.h" /* port: optional semantic keyboard prompts; custom icons stay native */
 struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *bitmap, short sequence_index);
 
 static void render_state_bitmap(
@@ -1609,6 +1610,10 @@ void hud_messaging_update(
 					case _hud_message_type_icon:
 						{
 							short icon_index = NONE;
+							/* port: resolve keyboard actions before controller translation loses
+							 * their meaning. The feature declines unsupported/custom icons. */
+							if (keyboard_hud_prompt(local_player_index, element->data, &line_cursor, pixel_color))
+								break;
 
 							if (element->data > _icon_right_stick)
 							{

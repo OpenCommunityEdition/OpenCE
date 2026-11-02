@@ -174,14 +174,20 @@ static const struct config_setting config_settings[] =
 		"Manual high-res gameplay button style, preserved while automatic detection\n"
 		"is on. Xbox: classic, gems, menu_gems (dark gems), xbox_modern.\n"
 		"PlayStation: ps_classic, ps_gems, ps_dark_gems, ps_modern.\n"
-		"Switch: switch_classic, switch_gems, switch_modern. Requires high_res_hud." },
+		"Switch: switch_classic, switch_gems, switch_modern. Controllers require high_res_hud.\n"
+		"keyboard selects binding-aware keyboard/mouse glyphs without that requirement." },
+	{ "display.keyboard_glyphs", _config_boolean, "false", "HALO_KEYBOARD_GLYPHS", _environment_value, _platform_all,
+		"With auto button detection on, show keyboard/mouse glyphs after keyboard\n"
+		"or mouse input. Applies to modern menus and semantic gameplay prompts.\n"
+		"Off preserves existing presentation. Manual keyboard style works independently." },
 	{ "display.hud_bumper_style", _config_string, "\"original\"", "HALO_HUD_BUMPER_STYLE", _environment_value, _platform_all,
 		"Xbox Classic, Gems and Dark Gems bumpers: original (black/white) or modern\n"
 		"(LB/RB). Shared by local players, including automatic button detection.\n"
 		"Requires high_res_hud; other button styles keep their own artwork." },
 	{ "input.auto_button_detection", _config_boolean, "true", "HALO_AUTO_BUTTON_DETECTION", _environment_value, _platform_all,
 		"Limit Button Style to the assigned controller's family. Unknown devices\n"
-		"keep the manual choice. Device detection itself is always available." },
+		"keep the manual choice. With display.keyboard_glyphs, keyboard/mouse input\n"
+		"selects keycaps. Off uses the manual style. Device detection always runs." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
         "P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
         "Button Remapping. v2: stores 25 physical-button names, including unbound.\n"
@@ -213,6 +219,11 @@ static const struct config_setting config_settings[] =
 	{ "display.changelog", _config_boolean, "true", "HALO_CHANGELOG", _environment_value, _platform_all,
 		"Show CHANGELOG beneath the build labels in the PC main menu.\n"
 		"Restart the game after changing this setting." },
+	{ "display.menu_frontend", _config_string, "\"off\"", "HALO_MENU_FRONTEND", _environment_value, _platform_all,
+		"Optional submenu frontend: \"off\" keeps display.menus, or choose\n"
+		"\"modern\", \"pc\" or \"xbox\". Enable before loading the main menu.\n"
+		"Frontend changes take effect only at the main menu, never in gameplay.\n"
+		"The starting menu retains its layout. Pause menus use display.menus." },
 	{ "display.menu_language", _config_string, "\"maps\"", "HALO_MENU_LANGUAGE", _environment_value, _platform_all,
 		"The PC menus' language: \"maps\" for the language of the Custom Edition\n"
 		"whose loc.map is in custom_maps (as that edition shows them; English\n"
@@ -1923,13 +1934,14 @@ static const struct
 	{ "display.resolution_scaling", { "native", "original", NULL }, NULL },
 	{ "display.anti_aliasing", { "off", "fxaa", "smaa", "ssaa2x", "msaa2x", "msaa4x", "msaa8x", NULL }, NULL },
 	{ "display.hud_button_style", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern",
-		"ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
+		"ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", "switch_classic", "switch_gems", "switch_modern", "keyboard", NULL }, NULL },
 	{ "display.hud_button_style_xbox", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern", NULL }, NULL },
 	{ "display.hud_bumper_style", { "original", "modern", NULL }, NULL },
 	{ "display.hud_button_style_ps", { "ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", NULL }, NULL },
 	{ "display.hud_button_style_switch", { "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
 	{ "display.shield_look", { "classic", "classic_with_sprinkles", "enhanced", "classic_honeycomb2", NULL }, NULL },
 	{ "display.menus", { "pc", "xbox", NULL }, NULL },
+	{ "display.menu_frontend", { "off", "modern", "pc", "xbox", NULL }, NULL },
 	{ "display.player_names", { "all", "allies", "enemies", "none", NULL }, NULL },
 	{ "display.scoreboard_team_layout", { "teams", "score", NULL }, NULL },
 	{ "display.chat_style", { "colors", "white", NULL }, NULL },

@@ -13,6 +13,7 @@ import io
 import json
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -54,6 +55,19 @@ def compile_flags(text, source):
 
 def link_flags(text):
     return re.search(r"^build build/web/site/halo\.js.*?\n  ldflags = ([^\n]*)", text, re.M | re.S).group(1)
+
+
+def test_link_response_paths_survive_emscripten_parsing():
+    out = io.StringIO()
+    sln = SimpleNamespace(build_dir=Path("build directory"), web_emcc="emcc",
+                          port_release=True, port_profile=False, compiler_launcher=None)
+    web_build.generate_web_build(ninja_syntax.Writer(out), sln)
+    text = re.sub(r" \$\n +", " ", out.getvalue())
+    response = re.search(r"^  rspfile_content = (.*)$", text, re.M).group(1)
+    paths = shlex.split(response)
+    assert len(paths) > 100
+    assert all(path.startswith("build directory/web/obj/") and "\\" not in path for path in paths)
+    assert "build directory/web/obj/source/ai/action_alert.o" in paths
 
 
 def test_without_emscripten_the_graph_says_so():
