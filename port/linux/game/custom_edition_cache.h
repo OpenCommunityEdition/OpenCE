@@ -51,6 +51,12 @@ struct structure_bsp;
 
 /* ---------- prototypes/CUSTOM_EDITION_CACHE.C */
 
+/* Only bytes owned by the currently loaded CE tag cache. */
+boolean custom_edition_cache_contains(void const *pointer, unsigned long bytes);
+
+/* A bounded raw DXT layout that needs no Xbox swizzle or mip reordering. */
+boolean custom_edition_bitmap_raw_2d(struct bitmap_data const *bitmap);
+
 /* Whether a tag of the Custom Edition map loaded is one of Halo PC's own, as
 it shipped: read from bitmaps.map, sounds.map or loc.map. FALSE when no
 Custom Edition map is loaded. */

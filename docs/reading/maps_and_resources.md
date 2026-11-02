@@ -36,6 +36,27 @@ little-endian reads. The host reporting tool and tests use the same parser
 as the game. MCC has its own parser and conversion modules; a shared runtime
 tag shape does not imply a shared on-disk format or resource owner.
 
+For CE bitmap admission, read `custom_edition_bitmaps_verify` and
+`custom_edition_bitmap_raw_2d` in
+[custom_edition_bitmaps.c](../../port/linux/game/custom_edition_bitmaps.c).
+A synthetic single-level DXT1 texture of 200 by 112 pixels needs 11,200
+bytes of compressed blocks. Its sides cannot be represented by the Xbox
+descriptor's power-of-two fields. The narrow CE-owned branch in
+`texture_cache_initialize_hardware_format` in
+[xbox_texture_cache.c](../../source/cache/xbox_texture_cache.c) records its
+exact dimensions in the Size word; `xgpu_texture_describe` in
+[xbox_textures.c](../../port/linux/src/xbox_textures.c) keeps compressed
+textures addressed with normalized coordinates. These shared additions are
+necessary because the existing cache constructs and decodes the hardware
+header outside the CE module. Admission and layout selection remain CE-owned.
+
+`custom_edition_cache_contains` checks the loaded tag allocation rather than
+just a global CE setting. The loader publishes that allocation after successful
+conversion and clears it on unload, so unrelated resources and later Xbox
+sessions cannot inherit this exception. The MCC guard preserves its independent
+texture bridge. See the [bitmap restrictions](../custom_edition_caches.md)
+and [synthetic regression checks](../../tools/test_ce_npot_bitmaps.py).
+
 ## Workshop identity in join refusals
 
 For MCC join refusals, also follow `mcc_identity_prepare_host`,

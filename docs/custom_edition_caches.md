@@ -424,14 +424,27 @@ MCC retain their existing crosshair drawing and meter tint behavior.
 - **Bitmaps.** Every bitmap must pass the game's own `bitmap_verify` and be
   of a kind the texture cache and the swizzling code handle (a format with a
   hardware texture, a compressed flag that agrees with the format,
-  power-of-two sizes unless linear, square cube maps, all its pixels
-  present). Halo PC draws a 2D bitmap of any size, so an uncompressed one
+  power-of-two sizes unless linear or the bounded DXT case below, square
+  cube maps, all its pixels present). Halo PC draws a 2D bitmap of any size,
+  so an uncompressed one
   whose sides are not powers of two is made linear as the map loads, and
   drawn from its first level (birdcage-plus's 3840 by 64 needler plasma).
   Its pixels are laid out for Halo PC, levels as the tag stores them,
   unswizzled; as they arrive, the game's own
   `rasterizer_xbox_bitmap_rebuild_hardware_format` lays them out as an Xbox
   cache would (swizzled, cube maps face by face, padded).
+  Non-power-of-two DXT1/3/5 2D bitmaps are also supported when both sides
+  are multiples of four, no larger than 4096, depth is one and there are
+  no mip levels beyond the base level. These retain their compressed blocks
+  without rebuilding. The port's descriptor extension records exact sides
+  in the Size word while keeping normalized texture coordinates. Admission
+  still checks the compressed flag and required pixel bytes; other
+  non-power-of-two compressed, cube, volume and P8 layouts remain refused.
+  The extension requires ownership by the loaded CE tag cache and is disabled
+  while MCC tags are loaded; Xbox and MCC descriptors retain their own paths.
+  `tools/test_ce_npot_bitmaps.py` exercises the real admission and descriptor
+  functions with synthetic 200 by 112 textures, malformed layouts and legacy
+  cases. It does not establish that an entire custom map or authored UI works.
 - **Chicago extra layers.** January's transparent chicago shader draws its
   extra layers in a loop that never advances
   (`rasterizer_xbox_transparent_geometry.c`, marked as a preserved bug). No

@@ -1335,6 +1335,17 @@ boolean custom_edition_structure_bsp_reference_valid(
 	return TRUE;
 }
 
+boolean custom_edition_cache_contains(void const *pointer, unsigned long bytes)
+{
+	struct custom_edition_cache_globals *globals = &custom_edition_cache_globals;
+	unsigned long base = (unsigned long)globals->tag_cache;
+	unsigned long address = (unsigned long)pointer;
+
+	return globals->tags_loaded && address >= base &&
+		address - base <= globals->loaded_bytes &&
+		bytes <= globals->loaded_bytes - (address - base);
+}
+
 boolean custom_edition_cache_tags_loaded(
 	void)
 {

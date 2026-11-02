@@ -7,6 +7,8 @@ An Xbox texture is a Direct3D header - Common, Data (physical address),
 Lock, Format and Size - over texels in guest memory. Power-of-two textures
 are swizzled (Morton order, one level after another); textures with a Size
 field are linear, with a pitch, and are addressed with texel coordinates.
+The port also uses Size for bounded CE non-power-of-two DXT textures;
+these retain normalized coordinates and tightly packed compressed blocks.
 DXT textures are stored as plain 4x4 blocks. Everything except DXT is
 converted to 32-bit BGRA on upload.
 
@@ -166,7 +168,11 @@ void xgpu_texture_describe(DWORD format_word, DWORD size_word, struct xgpu_textu
 		description->depth = 1;
 		description->levels = 1;
 		description->pitch = (((size_word & D3DSIZE_PITCH_MASK) >> D3DSIZE_PITCH_SHIFT) + 1) * D3DTEXTURE_PITCH_ALIGNMENT;
-		description->linear = TRUE;
+		/* port: a compressed texture is never linear on an Xbox (it has no
+		linear DXT formats), so a Size word on one only gives the true sides
+		of a Custom Edition bitmap that is not a power of two; it is addressed
+		with normalized coordinates like any compressed texture */
+		description->linear = !description->compressed;
 	}
 	else
 	{
