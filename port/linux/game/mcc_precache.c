@@ -6,6 +6,8 @@
 #include "mcc_package.h"
 #include "mcc_precache.h"
 #include "mcc_identity.h"
+#include "mcc_validation.h"
+#include "networking/network_game_globals.h"
 #include <xtl.h>
 #include <stdio.h>
 #include <string.h>
@@ -71,6 +73,11 @@ boolean mcc_cache_precache_ready(char const *name)
     char canonical[64];
     struct mcc_precache_stamp before[MCC_PRECACHE_FILES], after[MCC_PRECACHE_FILES];
     boolean stamped;
+    /* The host's pregame update owns package work. Selection also polls
+     * readiness through main_set_multiplayer_map_name; it must not fall back
+     * to a synchronous hash or supersede a newer pending selection. */
+    if (global_network_game_server_get())
+        return mcc_validation_lookup(mcc_identity_local_name(name),NULL,NULL);
     if (!mcc_package_name(mcc_identity_local_name(name), canonical)) {
         mcc_cache_precache_clear();
         return FALSE;

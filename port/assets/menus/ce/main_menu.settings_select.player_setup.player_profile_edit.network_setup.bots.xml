@@ -53,7 +53,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/skill_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/skill_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="EASY|NORMAL|HEROIC|LEGENDARY" setting="bots.skill" values="easy|normal|heroic|legendary" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/skill_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="RECRUIT|EASY|NORMAL|HEROIC|VETERAN|LEGENDARY" setting="bots.skill" values="recruit|easy|normal|heroic|veteran|legendary" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/op_teams" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -115,8 +115,8 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
-		<on event="a" run="port settings save" back="true"/>
-		<on event="start" run="port settings save" back="true"/>
+		<on event="a" run="port bots settings save" back="true"/>
+		<on event="start" run="port bots settings save" back="true"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/labels">
@@ -132,14 +132,14 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/help_strings">
 		<string text=""/>
-		<string text="Bots to add in the lobby, when there is room.\n0 keeps bots off. Up to 63 bots per host."/>
-		<string text="Allow bots online. Set before creating the host;\nreserves 63 machine slots until that host closes."/>
-		<string text="The host's bot aim, reactions and awareness."/>
-		<string text="In the lobby, balance bots between teams or\nplace them opposite the first human player's team."/>
-		<string text="Tactics and CTF/King goals. Takes effect when\nloading a map. Off preserves the original bots."/>
-		<string text="Enhanced bots may enter and drive ground vehicles\nand use turrets. Off by default."/>
-		<string text="Enhanced bots can take alternate routes.\nDirect preserves the original route choice."/>
-		<string text="Optional background path searches for enhanced bots.\nOff by default. Takes effect on the next map."/>
-		<string text="Host only: add or remove bots during a match.\nThese changes do not alter the saved Bot Count."/>
+		<string text="Set the lobby's bot count, up to 63.\nBots fill the available player slots."/>
+		<string text="Allow bots in a network lobby.\nPress OK to apply before starting."/>
+		<string text="Set bot aim, reactions and awareness."/>
+		<string text="Balance teams, or put bots on the\nother team from the first human."/>
+		<string text="Add tactics and CTF/King goals.\nTakes effect when loading a map."/>
+		<string text="Enhanced bots can drive vehicles\nand use turrets. Off by default."/>
+		<string text="Let enhanced bots take other routes.\nDirect keeps the original routes."/>
+		<string text="Run path searches in the background.\nOff by default. Applies next map."/>
+		<string text="Add or remove bots during a match.\nThe saved Bot Count stays the same."/>
 	</strings>
 </menus>

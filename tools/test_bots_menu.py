@@ -50,3 +50,23 @@ def test_capacity_choices_and_live_actions():
         target = child.get("widget")
         if target.startswith(BASE):
             assert target in names
+
+
+def test_bot_settings_apply_only_on_ok_and_help_fits():
+    root = document(BASE)
+    ok = root.find("widget[@name='" + BASE + "/button_ok']")
+    registered = (ROOT / "port/linux/game/menu_tags.c").read_text()
+    for event in ("a", "start"):
+        assert ok.find(f"on[@event='{event}'][@run='port bots settings save'][@back='true']") is not None
+    assert '"port bots settings save"' in registered
+    # Cancel/back never saves the choices or applies a host policy.
+    screen = root.find("widget[@name='" + BASE + "/bots_screen']")
+    for event in ("b", "back"):
+        assert "run" not in screen.find(f"on[@event='{event}']").attrib
+    help_widget = root.find("widget[@name='" + BASE + "/help']")
+    assert int(help_widget.get("top")) + int(help_widget.get("height")) <= 414
+    helps = root.find("strings[@name='" + BASE + "/help_strings']")
+    for hint in helps:
+        lines = hint.get("text").split("\\n")
+        assert len(lines) <= 2
+        assert all(len(line) <= 42 for line in lines)

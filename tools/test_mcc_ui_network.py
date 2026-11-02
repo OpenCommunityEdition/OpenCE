@@ -17,6 +17,8 @@ def restart_tool(tmp_path_factory):
         pytest.skip("a C compiler is needed")
     directory = tmp_path_factory.mktemp("mcc_ui_network")
     (directory / "mcc_cache.h").write_text("")
+    (directory / "mcc_validation.h").write_text((ROOT / "port/linux/game/mcc_validation.h").read_text())
+    (directory / "mcc_identity.h").write_text((ROOT / "port/linux/game/mcc_identity.h").read_text())
     implementation = (ROOT / "port/linux/game/mcc_ui_network.inl").read_text()
     server_source = (ROOT / "source/networking/network_server_manager.c").read_text()
     widget_source = (ROOT / "source/interface/ui_widget.c").read_text()
@@ -25,6 +27,7 @@ def restart_tool(tmp_path_factory):
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
 typedef int boolean;
 #define TRUE 1
 #define FALSE 0
@@ -50,6 +53,18 @@ struct network_game_server { int state,sent_start_game_message; struct network_g
 static int exists=1,loaded=1,fail_reset,countdowns,opened,switched,reset,leaver;
 static int splitscreen,quickstart,closed_ui,loaded_ui,errors;
 static int client_exists=1,local_machine=NONE,map_changes;
+static int validation=1,updates,cancels;
+int mcc_validation_request(char const *name,uint32_t *sum,unsigned char digest[32]) {
+    (void)name;(void)digest;if(sum)*sum=123;return validation;
+}
+int mcc_validation_lookup(char const *name,uint32_t *sum,unsigned char digest[32]) {
+    return mcc_validation_request(name,sum,digest)==1;
+}
+void mcc_validation_update(void) {updates++;}
+void mcc_validation_cancel(void) {cancels++;}
+char const *mcc_validation_error(void) {return "bad package";}
+int mcc_identity_prepare_host(char const *name) {(void)name;return validation==1;}
+void display_error_text_when_main_menu_loaded(wchar_t const *text) {(void)text;errors++;}
 static struct network_game_server *selected_server=&server;
 static struct network_game original;
 static char map_name[128],screen_name[256];
@@ -57,13 +72,14 @@ static struct network_game_server *global_network_game_server_get(void) {return 
 static void *global_network_game_client_get(void) {return client_exists ? &client_exists : NULL;}
 static short network_game_client_get_local_machine_index(void) {return (short)local_machine;}
 static void network_game_server_change_map_name(struct network_game_server *s,char const *name) {
-    strcpy(s->game.map.name,name);map_changes++;
+    strcpy(s->game.map.name,name);s->game.map.version=123;map_changes++;
 }
 static int mcc_cache_tags_loaded(void) {return loaded;}
 static int mcc_level_name(char const *name) {return !strncmp(name,"mcc_maps\\",9);}
 static int network_player_is_valid(struct network_player const *p) {return p->machine_index>=0;}
 static void main_set_multiplayer_map_name(char const *name) {strcpy(map_name,name);}
 static void network_game_server_open_game(struct network_game_server *s) {(void)s;opened++;}
+static void third_person_session_lock(void) {}
 static void network_game_server_switch_to_postgame(struct network_game_server *s) {s->state=_network_game_server_state_postgame;switched++;}
 static void network_event(char const *s) {(void)s;}
 static void countdown_timer_set_time_remaining(int *timer,long ms) {*timer=(int)ms;}
@@ -100,11 +116,44 @@ static int network_game_server_reset_to_pregame(struct network_game_server *s) {
 }
 ''' + '\n'.join(function(server_source, name) for name in [
         "network_game_server_pause_countdown", "network_game_server_begin_game_start_countdown"
-    ]) + '\n' + implementation + '\n' + function(widget_source, "network_game_reset_to_pregame_ui") + r'''
+    ]) + '\n' + implementation + '\n' + function(widget_source, "network_game_reset_to_pregame_ui") + '\n' + (
+        # Exercise the production early-return boundary without starting a world.
+        function(server_source, "network_game_server_start_network_game").split(
+            "if (server->sent_start_game_message")[0] + "return FALSE;\n}\n"
+    ) + r'''
 #define CHECK(c,n) do {if(!(c))return n;} while(0)
 int main(int argc,char **argv) {
     int i,result;struct network_game_server untouched;
     if(argc!=2)return 99;
+    if(!strncmp(argv[1],"validation-",11)) {
+      char const *name="mcc_maps\\Package\\arena";
+      server.state=_network_game_server_state_pregame;local_machine=0;validation=0;
+      if(!strcmp(argv[1],"validation-dedicated"))client_exists=0;
+      strcpy(server.game.map.name,"levels\\test\\bloodgulch\\bloodgulch");
+      CHECK(mcc_ui_network_defer_map(&server,name)&&!updates,50);
+      CHECK(mcc_ui_network_map_pending(&server),51);
+      CHECK(network_game_server_start_network_game(&server)&&!server.sent_start_game_message,61);
+      mcc_ui_network_update_map(&server);CHECK(updates==1&&!map_changes,52);
+      if(!strcmp(argv[1],"validation-ready")||!strcmp(argv[1],"validation-dedicated")) {
+        validation=1;mcc_ui_network_update_map(&server);
+        CHECK(map_changes==1&&!mcc_ui_network_map_pending(&server),53);
+        mcc_ui_network_update_map(&server);CHECK(map_changes==1&&updates==1,54);
+      } else if(!strcmp(argv[1],"validation-failed")) {
+        validation=-1;for(i=0;i<10;i++)mcc_ui_network_update_map(&server);
+        CHECK(errors==1&&!map_changes&&updates==1,55);
+        CHECK(mcc_ui_network_map_pending(&server),56);
+      } else {
+        if(!strcmp(argv[1],"validation-gameplay"))server.state=_network_game_server_state_ingame;
+        else if(!strcmp(argv[1],"validation-started"))server.sent_start_game_message=1;
+        else if(!strcmp(argv[1],"validation-back"))mcc_ui_network_server_dispose(&server);
+        else if(!strcmp(argv[1],"validation-xbox"))CHECK(!mcc_ui_network_defer_map(&server,"levels\\a10\\a10"),57);
+        else if(!strcmp(argv[1],"validation-ce"))CHECK(!mcc_ui_network_defer_map(&server,"custom_maps\\arena"),58);
+        else return 59;
+        for(i=0;i<10;i++)mcc_ui_network_update_map(&server);
+        CHECK(updates==1&&!map_changes&&cancels>=2,60);
+      }
+      return 0;
+    }
     if(!strncmp(argv[1],"map-",4)) {
       char const *name="mcc_maps\\Package\\arena";
       server.state=_network_game_server_state_pregame;
@@ -240,6 +289,8 @@ int main(int argc,char **argv) {
                                  "splitscreen", "second-round", "ui-dispose", "ui-map", "ui-version", "ui-round",
                                  "ui-state", "ui-server", "ui-exit", "map-join", "map-replace",
                                  "map-xbox", "map-ce", "map-dispose", "map-no-client",
-                                 "map-other-server", "map-started", "map-ingame"])
+                                 "map-other-server", "map-started", "map-ingame",
+                                 "validation-ready", "validation-dedicated", "validation-failed", "validation-gameplay",
+                                 "validation-started", "validation-back", "validation-xbox", "validation-ce"])
 def test_restart_transaction(restart_tool, case):
     subprocess.run([str(restart_tool), case], check=True, capture_output=True)

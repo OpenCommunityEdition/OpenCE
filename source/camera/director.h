@@ -119,6 +119,9 @@ struct director_globals
 
 /* ---------- prototypes/DIRECTOR.C */
 
+/* port: read-only camera identity for feature-owned camera procedures. */
+boolean director_camera_is(short local_player_index, director_camera_update_proc camera_proc);
+
 void director_initialize(
 	void);
 void director_dispose(

@@ -1,4 +1,5 @@
 #include "harness.h"
+#include "bots_combat.h"
 #include <math.h>
 #include <float.h>
 #define REAL_MAX FLT_MAX
@@ -72,29 +73,29 @@ int main(int argc, char **argv)
 	else if (!strcmp(argv[1], "powerups"))
 	{
 		equipment.equipment.powerup_type = _equipment_powerup_health;
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 10, 1, FALSE, FALSE) == REAL_MAX, "healthy bot seeks health");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 10, _bots_skill_normal, FALSE, FALSE) == REAL_MAX, "healthy bot seeks health");
 		unit.object.body_vitality = 0.1f;
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 10, 1, FALSE, FALSE) < 0, "critical health not prioritized");
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 10, 0, TRUE, FALSE) == REAL_MAX, "easy bot heals during combat");
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 16, 3, TRUE, FALSE) == REAL_MAX, "combat healing exceeds reach");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 10, _bots_skill_normal, FALSE, FALSE) < 0, "critical health not prioritized");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 10, _bots_skill_easy, TRUE, FALSE) == REAL_MAX, "easy bot heals during combat");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 16, _bots_skill_legendary, TRUE, FALSE) == REAL_MAX, "combat healing exceeds reach");
 		unit.object.body_vitality = 0.7f;
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, 3, FALSE, FALSE) < REAL_MAX, "legendary health threshold");
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, 1, FALSE, FALSE) == REAL_MAX, "normal health threshold");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, _bots_skill_legendary, FALSE, FALSE) < REAL_MAX, "legendary health threshold");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, _bots_skill_normal, FALSE, FALSE) == REAL_MAX, "normal health threshold");
 		equipment.equipment.powerup_type = _equipment_powerup_overshield;
 		unit.object.shield_vitality = 2;
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, 1, FALSE, FALSE) == REAL_MAX, "overshield wasted");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, _bots_skill_normal, FALSE, FALSE) == REAL_MAX, "overshield wasted");
 		equipment.equipment.powerup_type = _equipment_powerup_active_camouflage;
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, 1, FALSE, FALSE) < 0, "camouflage ignored");
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 7, 3, FALSE, TRUE) == REAL_MAX, "vantage point abandoned for distant powerup");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, _bots_skill_normal, FALSE, FALSE) < 0, "camouflage ignored");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 7, _bots_skill_legendary, FALSE, TRUE) == REAL_MAX, "vantage point abandoned for distant powerup");
 		variant.game_engine_index = game_engine_ctf;
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 13, 3, FALSE, FALSE) == REAL_MAX, "objective powerup detour too long");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 13, _bots_skill_legendary, FALSE, FALSE) == REAL_MAX, "objective powerup detour too long");
 		unit.unit.flags = FLAG(_unit_active_camouflaged_bit);
-		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, 1, FALSE, FALSE) == REAL_MAX, "camouflage wasted");
+		CHECK(enhanced_bots_powerup_score(&unit, 0, 1, _bots_skill_normal, FALSE, FALSE) == REAL_MAX, "camouflage wasted");
 		unit.object.body_vitality = 0.2f; unit.object.shield_vitality = 0;
-		CHECK(enhanced_bots_retreat(&unit, 1, 95), "wounded turret gunner stayed");
-		CHECK(!enhanced_bots_retreat(&unit, 1, 50), "old injury caused turret exit");
+		CHECK(enhanced_bots_retreat(&unit, _bots_skill_normal, 95), "wounded turret gunner stayed");
+		CHECK(!enhanced_bots_retreat(&unit, _bots_skill_normal, 50), "old injury caused turret exit");
 		unit.object.shield_vitality = 1;
-		CHECK(!enhanced_bots_retreat(&unit, 1, 95), "shielded gunner abandoned turret");
+		CHECK(!enhanced_bots_retreat(&unit, _bots_skill_normal, 95), "shielded gunner abandoned turret");
 	}
 	else CHECK(0, "unknown case");
 	return 0;

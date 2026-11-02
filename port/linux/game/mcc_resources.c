@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+unsigned long system_milliseconds(void);
 
 /* Logging includes the game's allocation macros. This reader owns libc
  * allocations (including calloc), so keep their original matching frees. */
@@ -338,7 +339,7 @@ static int mcc_resources_inspect(char const *name,struct mcc_cache_source const 
     unsigned char header[MCC_CACHE_HEADER_BYTES];
     struct mcc_cache_identity identity;
     void *raw=NULL;
-    int ok=0, loading=0;
+    int ok=0;
     enum mcc_cache_status status=MCC_CACHE_READ_FAILED;
     char const *problem="The map could not be inspected. Check that its complete file is accessible.";
     if (reason && reason_size) reason[0]=0;
@@ -351,7 +352,6 @@ static int mcc_resources_inspect(char const *name,struct mcc_cache_source const 
     raw=malloc(identity.tag_data_size);
     problem=mcc_status_explanation(MCC_CACHE_NO_MEMORY);
     if (!raw) goto done;
-    loading=mcc_loading_begin(name);
     runtime.source=*source;
     status=mcc_cache_load(source,raw,identity.tag_data_size,&runtime.report);
     problem=mcc_status_explanation(status);
@@ -364,7 +364,6 @@ static int mcc_resources_inspect(char const *name,struct mcc_cache_source const 
 done:
     if (!ok && reason && reason_size) snprintf(reason,reason_size,"%s",runtime.failure[0] ? runtime.failure : problem);
     mcc_resources_dispose(&runtime);free(raw);
-    if (loading) mcc_loading_end(ok);
     return ok;
 }
 
@@ -383,3 +382,5 @@ int mcc_resources_fingerprint_probe(char const *name,struct mcc_cache_source con
 {
     return mcc_resources_inspect(name,source,NULL,digest,NULL,0);
 }
+
+#include "mcc_resource_check.inl"

@@ -9,7 +9,7 @@ import android.widget.Switch;
 import android.widget.Toast;
 import java.util.function.Consumer;
 
-/* Optional local-game controls, inspired by thelinkin3000's Android overlay
+/* Optional offline/host controls, inspired by thelinkin3000's Android overlay
  * and its credited antecedents, hardran3's OpenCE-Ultrahand and HaloDrones.
  * The engine rechecks permission for every request; UI state is advisory. */
 final class AndroidCheatMenu {
@@ -18,6 +18,10 @@ final class AndroidCheatMenu {
 
     static boolean enabled() {
         return (nativeState() & 1) != 0;
+    }
+
+    static boolean available() {
+        return (nativeState() & 3) == 3;
     }
 
     private static boolean request(Context context, int command) {
@@ -30,7 +34,8 @@ final class AndroidCheatMenu {
         int state = nativeState();
         if ((state & 2) == 0) {
             openDialog.accept(new AlertDialog.Builder(context).setTitle("Cheats")
-                .setMessage("Available during an offline game.").setPositiveButton("Close", null).create());
+                .setMessage("Available during gameplay when playing offline or hosting the game.")
+                .setPositiveButton("Close", null).create());
             return;
         }
         LinearLayout panel = new LinearLayout(context);

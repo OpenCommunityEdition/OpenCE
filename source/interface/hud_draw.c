@@ -83,6 +83,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 #include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
 #include "cseries/errors.h"
 #include "math/real_math.h"
@@ -1699,6 +1700,10 @@ static void hud_draw_bitmap_with_meter(
 			_hud_dont_scale_offset_bit),
 		0.0f,
 		&point);
+	/* port: move every reticle piece to the stock aim point in the shoulder view. */
+	if (is_crosshair_bitmap && absolute_placement->corner == _hud_anchor_center &&
+		!third_person_reticle(&point, render_fov_reticle_scale(render.local_player_index)))
+		return;
 	/* port: the crosshairs_draw scope moves only the weapon's reticle */
 	if (is_crosshair_bitmap)
 		passenger_camera_reticle_offset(&point);

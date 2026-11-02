@@ -158,6 +158,7 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "interface/first_person_weapons.h"
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 #include "math/periodic_functions.h"
 #include "memory/data.h"
 #include "objects/light_definitions.h"
@@ -1294,7 +1295,8 @@ void lights_preprocess_scene(
 						0x1F0,
 						light->color.blue >=0.0f && light->color.blue <=1.0f);
 
-					if (light->parent_light_index == NONE)
+					/* port: shoulder-view lights stay on the world weapon. */
+					if (light->parent_light_index == NONE && !third_person_active(render.local_player_index))
 					{
 						boolean adjusted = FALSE;
 
@@ -1403,7 +1405,9 @@ void lights_preprocess_scene(
 					short marker_index;
 
 					if (object->object.type == _object_type_weapon
-						&& object->object.parent_object_index != NONE)
+						&& object->object.parent_object_index != NONE
+						/* port: show the charge flare at the world muzzle. */
+						&& !third_person_active(render.local_player_index))
 					{
 						marker_count = first_person_weapon_get_marker_by_name_render(
 							light->object_index,

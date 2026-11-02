@@ -54,6 +54,7 @@ symbols in this file:
 #include "cache/cache_files.h"
 #include "camera/director.h"
 #include "camera/observer.h"
+#include "game/game.h" /* port: distinguish network hosts when spawning cheats */
 #include "game/game_globals.h"
 #include "game/players.h"
 #include "hs/hs.h"
@@ -399,6 +400,14 @@ static void cheat_objects(
 				real angle = arctangent(forward.i, forward.j)+
 					(reference_index-reference_count/2)*angle_separation;
 
+				/* port: flags and balls need game-engine ownership. Cheat spawns
+				have none, so clients refuse them and cannot match their pickups. */
+				if (game_connection() == _game_connection_network_server &&
+					object_definition_get(references[reference_index].index)->object.type == _object_type_weapon &&
+					TEST_FLAG(weapon_definition_get(references[reference_index].index)->weapon.flags, _weapon_must_be_readied_bit))
+				{
+					continue;
+				}
 				object_placement_data_new(&data, references[reference_index].index, NONE);
 
 				data.position.x = cosine(angle)*1.5f+origin.x;

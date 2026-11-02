@@ -18,7 +18,7 @@ def run_c(tmp_path, code):
     source = tmp_path / 'style.c'
     binary = tmp_path / 'style.exe'
     source.write_text(code)
-    target = ['--target=i686-pc-windows-msvc'] if sys.platform == 'win32' else []
+    target = ['--target=i686-pc-windows-msvc'] if sys.platform == 'win32' else ['-m32']
     result = subprocess.run([compiler, *target, '-std=gnu89', '-O1', str(source), '-o', str(binary)],
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

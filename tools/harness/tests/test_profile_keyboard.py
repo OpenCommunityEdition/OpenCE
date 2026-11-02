@@ -26,7 +26,9 @@ def generated(fault=False):
     config += vk[start:vk.index('\n};', start)+3] + '\n'
     names = ['text_typing_update', 'platform_text_typing', 'platform_text_field',
              'analog', 'typing_gamepad', 'keyboard_gamepad', 'keys_held_over_switch']
-    code = '\n'.join(function(inputs, name) for name in names) + '\n'
+    # (keyboard_gamepad's join keys: xinput_sdl.c's own globals, the 4-way ADD PLAYER screen's)
+    code = re.search(r'^static BOOL keyboard_join_down[^\n]*\n', inputs, re.M).group(0)
+    code += '\n'.join(function(inputs, name) for name in names) + '\n'
     if fault == 'held-enter':
         code, count = re.subn(r' \| \(text_typing \? [24] : 0\)', '', code)
         assert count == 1

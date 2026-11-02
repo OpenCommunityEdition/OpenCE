@@ -471,11 +471,14 @@ symbols in this file:
 #include "networking/network_server_message_handler.h"
 #include "mcc_protocol.h" /* port: capability lifetime belongs to the connection */
 #include "mcc_ui_network.h"
+#include "network_link.h" /* port: port/linux/game/network_link.c */
 #include "saved games/player_profile.h"
 #include "text/unicode.h"
 
 #include "cache/cache_files.h"
 #include "interface/player_ui.h"
+#include "third_person.h" /* port: port/linux/game/third_person_policy.c */
+#include "third_person_protocol.h" /* port: session compatibility lifecycle */
 #include "tag_files/tag_files.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "server_director.h" /* port: port/linux/game/server_director.c */
@@ -825,12 +828,13 @@ static boolean network_game_server_countdown_slowed[MAXIMUM_NETWORK_MACHINE_COUN
 /* port/linux/game/network_distributed.c's (the host's bans: bans.txt; a
 ban's end, 0 for ever; an internet play peer's real address for its
 stand-in) */
-boolean network_distributed_banned(unsigned long address, char const *hardware_id);
+boolean network_distributed_banned(unsigned long address, char const *hardware_id, char const *discord_id);
 unsigned long network_distributed_ban(long machine_index, unsigned long address, char const *names);
 void network_distributed_kick(char const *names);
 unsigned long distributed_real_address(unsigned long address);
 /* port/linux/game/network_votekick.c's (the players' votes to kick) */
 void network_votekick_machine_joined(long machine_index);
+void network_afk_machine_joined(long machine_index);
 boolean network_votekick_kept_out(unsigned long address, char const *hardware_id);
 /* port/linux/game/network_voice.c's (voice chat: each machine's key) */
 void network_voice_machine_joined(long machine_index);
@@ -1212,6 +1216,18 @@ void network_game_server_set_machine_hardware_id(
 	}
 }
 
+/* port: the Discord pass and proof a joining machine showed (its join
+request), for its door (network_link.c) */
+void network_game_server_set_machine_link(
+	struct network_game_server_client_machine *machine,
+	void const *pass,
+	void const *proof,
+	char const *name)
+{
+	if (machine && VALID_INDEX(machine->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT))
+		network_link_set_machine_pass(machine->machine_index, pass, proof, name);
+}
+
 /* port: ... and as the distributed netcode logs it (empty if none told) */
 char const *network_game_server_machine_hardware_id(
 	long machine_index)
@@ -1311,6 +1327,11 @@ struct network_game_server *network_game_server_create(
 				network_game_server_reject_connection_game_is_full);
 
 			network_game_invalidate(&server->game);
+			/* port: every match path, including quickstart and co-op, starts
+			with the host's camera rule. Subsequent rounds retain it. */
+			third_person_session_host_begin();
+			if (third_person_session_active())
+				server->game.cooperative_flags |= third_person_host_policy() << THIRD_PERSON_POLICY_SHIFT;
 
 			server->game.difficulty = main_get_difficulty();
 			mcc_protocol_reset(); /* port: a fresh server has no negotiated MCC peers */
@@ -1362,6 +1383,7 @@ void network_game_server_dispose(
 	struct network_game_server *server)
 {
 	mcc_protocol_reset(); /* port: no stale MCC peer pointers */
+	third_person_session_host_end(); /* port: discard the prior camera contract */
 	bots_network_session_end(); /* port: bot policy belongs to this host alone */
 	mcc_ui_network_server_dispose(server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
@@ -1938,8 +1960,10 @@ boolean network_game_server_start_network_game(
 	boolean success = TRUE;
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x2DE, server);
-	/* port: do not start the temporary lobby while an MCC selection waits. */
-	if (mcc_ui_network_map_pending(server)) return FALSE;
+	/* port: an MCC check still in progress is a successful idle, not a failed
+	connection. Keep the countdown pending until its validated settings are sent. */
+	if (mcc_ui_network_map_pending(server)) return TRUE;
+	third_person_session_lock(); /* port: non-menu hosts also fix the session contract before starting */
 
 	if (server->sent_start_game_message == FALSE)
 	{
@@ -2265,6 +2289,8 @@ address, real address or hardware id) */
 		unsigned long real_address;
 		char const *hardware_id = VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) ?
 			network_game_server_hardware_ids[machine_index] : "";
+		/* (port: a verified Discord account's id, network_link.c) */
+		char discord_id[32] = "";
 		long index;
 
 		network_connection_get_address(machine->connection, &address, FALSE);
@@ -2283,14 +2309,22 @@ address, real address or hardware id) */
 				return FALSE;
 			}
 		}
-		/* (and not one the host banned: its address or hardware id in
-		bans.txt) */
+		/* (the Discord account it shows checked, which its bans may name:
+		network_link.c) */
+		if (!network_game_server_client_machine_is_local(server, machine) &&
+			address.address.long_words[0] != IPV4_LOOPBACK_ADDRESS)
+		{
+			network_link_check_pass(machine_index, address.address.long_words[0]);
+			network_link_machine_verified(machine_index, discord_id, sizeof(discord_id), NULL, 0);
+		}
+		/* (and not one the host banned: its address, hardware id or verified
+		Discord account in bans.txt) */
 		/* (the host's own client, which connects from 127.0.0.1, never) */
 		if (!network_game_server_client_machine_is_local(server, machine) &&
 			address.address.long_words[0] != IPV4_LOOPBACK_ADDRESS &&
 			network_distributed_banned(address.address.long_words[0],
 				VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) ?
-					network_game_server_hardware_ids[machine_index] : ""))
+					network_game_server_hardware_ids[machine_index] : "", discord_id))
 		{
 			network_event("refusing a machine @ %s: banned (bans.txt)", transport_address_to_string(&address));
 			network_game_server_refusal_code = _rejection_code_blacklisted_machine;
@@ -2305,6 +2339,27 @@ address, real address or hardware id) */
 			network_event("refusing a machine @ %s: kicked by a vote", transport_address_to_string(&address));
 			network_game_server_refusal_code = _rejection_code_blacklisted_machine;
 			return FALSE;
+		}
+		/* (nor, on a dedicated server, one from a VPN's address without a
+		Discord account that lets it in: network_link.c) */
+		{
+			short refusal = network_link_door(network_game_server_get_game(server), machine_index, real_address,
+				network_game_server_client_machine_is_local(server, machine) ||
+					address.address.long_words[0] == IPV4_LOOPBACK_ADDRESS);
+
+			if (refusal == NONE)
+			{
+				/* (nor one past the server's limit of machines from one
+				address) */
+				refusal = network_link_address_limit(network_game_server_get_game(server), machine_index,
+					real_address, network_game_server_client_machine_is_local(server, machine) ||
+						address.address.long_words[0] == IPV4_LOOPBACK_ADDRESS);
+			}
+			if (refusal != NONE)
+			{
+				network_game_server_refusal_code = refusal;
+				return FALSE;
+			}
 		}
 	}
 	/* (a kick asked for the slot's machine before is not this one's) */
@@ -2372,6 +2427,7 @@ address, real address or hardware id) */
 				network_game_server_client_machine_join_times[machine_index] = system_milliseconds();
 				/* (its time played for votes starts over) */
 				network_votekick_machine_joined(machine_index);
+				network_afk_machine_joined(machine_index);
 				/* (and its voice chat key) */
 				network_voice_machine_joined(machine_index);
 			}
@@ -4264,9 +4320,14 @@ void network_game_server_update_countdown(
 				}
 				else
 				{
-					if (network_game_should_accept_remote_connections() == FALSE ||
+					/* port: a dedicated server's countdown is its director's to
+					start (server.lobby_seconds, port/linux/game/server_director.c) */
+					if (!halo_server_mode() &&
+						(network_game_should_accept_remote_connections() == FALSE ||
 						network_game_server_get_client_machine_count(server) > 1 ||
-						server_players_on_one_machine(server))
+						server_players_on_one_machine(server) ||
+						/* port: owned bots have machine IDs but no connections. */
+						bots_lobby_can_start(&server->game)))
 					{
 						unsigned long countdown;
 
@@ -4321,6 +4382,18 @@ boolean network_game_server_client_machine_may_slow_countdown(
 	}
 	network_game_server_countdown_slowed[machine->machine_index] = TRUE;
 	return TRUE;
+}
+
+/* port: a machine's faster (the lobby's START NOW): the host's own starts the
+game at once, a client machine's takes five seconds off the countdown (the
+Xbox game took five seconds off for any machine) */
+short network_game_server_client_machine_faster_event(
+	struct network_game_server *server,
+	struct network_game_server_client_machine *machine)
+{
+	if (network_game_server_client_machine_is_local(server, machine))
+		return _network_game_server_countdown_event_start_immediately;
+	return _network_game_server_countdown_event_player_joined;
 }
 
 /* ---------- private code */
@@ -4589,6 +4662,19 @@ void network_game_server_port_set_cooperative_friendly_fire(
 		network_event("network_game_server_port_set_cooperative_friendly_fire() failed to send updated game settings to clients");
 }
 
+/* port: update the authoritative pregame record, including late joiners. */
+void network_game_server_port_set_camera_policy(short policy)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	if (!server || server->state != _network_game_server_state_pregame ||
+		!third_person_session_active() || policy < _third_person_player_choice || policy > _third_person_forced_off)
+		return;
+	server->game.cooperative_flags = (server->game.cooperative_flags & ~THIRD_PERSON_POLICY_MASK) |
+		(policy << THIRD_PERSON_POLICY_SHIFT);
+	if (!network_game_server_send_game_data_pregame(server))
+		network_event("failed to send updated camera policy to clients");
+}
+
 void network_game_server_port_set_cooperative_player_collisions(
 	boolean player_collisions)
 {
@@ -4599,6 +4685,16 @@ void network_game_server_port_set_cooperative_player_collisions(
 	SET_FLAG(server->game.cooperative_flags, _network_game_cooperative_no_player_collisions_bit, !player_collisions);
 	if (server->state == _network_game_server_state_pregame && !network_game_server_send_game_data_pregame(server))
 		network_event("network_game_server_port_set_cooperative_player_collisions() failed to send updated game settings to clients");
+}
+
+void network_game_server_port_set_cooperative_dedicated(
+	boolean dedicated)
+{
+	struct network_game_server *server = global_network_game_server_get();
+
+	if (!server)
+		return;
+	SET_FLAG(server->game.cooperative_flags, _network_game_cooperative_dedicated_bit, dedicated);
 }
 
 void network_game_server_port_set_cooperative_ally_friendly_fire(

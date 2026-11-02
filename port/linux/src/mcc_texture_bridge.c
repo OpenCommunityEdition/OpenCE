@@ -145,6 +145,15 @@ void *mcc_texture_bridge_register_linear(void const *bitmap,unsigned long format
     return mcc_texture_register(bitmap,format,0,pixels,bytes,width,height,pitch);
 }
 
+/* Metadata-only lookup for loading-time shader selection. No texture upload. */
+BOOL xgpu_mcc_texture_describe(DWORD const *resource,struct xgpu_texture_description *description)
+{
+    struct mcc_gpu_texture *entry;
+    for (entry=mcc_gpu_hardware[mcc_texture_bucket(resource)];entry;entry=entry->hardware_next)
+        if (entry->header==resource) {*description=entry->description;return TRUE;}
+    return FALSE;
+}
+
 BOOL xgpu_mcc_texture_get(DWORD const *resource,D3DCOLOR const *palette,
     GLuint *texture,GLenum *target,struct xgpu_texture_description *description)
 {
@@ -170,7 +179,7 @@ BOOL xgpu_mcc_texture_get(DWORD const *resource,D3DCOLOR const *palette,
         }
         if (!entry->texture) {
             GLuint created=0;
-            glGenTextures(1,&created);
+            created=xgpu_texture_name_new();
             if (created && xgpu_mcc_texture_upload(created,entry->target,
                 &entry->description,entry->pixels,entry->bytes,palette)) {
                 entry->texture=created;
@@ -200,4 +209,46 @@ void mcc_texture_bridge_dispose(void)
             free(entry);entry=next;
         }
     }
+}
+
+unsigned long mcc_texture_bridge_prepare(void const *bitmap, unsigned long budget)
+{
+#ifndef HALO_GLES
+    struct mcc_gpu_texture *entry;
+    for (entry=mcc_gpu_textures[mcc_texture_bucket(bitmap)];entry;entry=entry->next) {
+        struct xgpu_texture_description const *description=&entry->description;
+        unsigned long long estimate=0;
+        unsigned long width,height,depth,level;
+        GLuint created=0;
+        if (entry->bitmap!=bitmap) continue;
+        /* Paletted textures need their draw's palette. HUD replacements are
+         * independently owned and must not be charged to this budget. */
+        if (entry->texture || description->format==0x0b ||
+            (entry->hud_asset>=0 && config_boolean("display.high_res_hud"))) return 0;
+        width=description->width;height=description->height;depth=description->depth;
+        if (!width || !height || !depth || !description->levels || description->levels>14) return 0;
+        if (description->compressed) estimate=(unsigned long long)xgpu_texture_face_size(description)*(description->cube_map?6:1);
+        else {
+            for (level=0;level<description->levels;level++) {
+                estimate+=(unsigned long long)width*height*depth*4*(description->cube_map?6:1);
+                if (estimate>budget) return 0;
+                if (width>1) width>>=1;
+                if (height>1) height>>=1;
+                if (depth>1) depth>>=1;
+            }
+        }
+        if (estimate<256*1024 || estimate>budget) return 0;
+        created=xgpu_texture_name_new();
+        if (created && xgpu_mcc_texture_upload(created,entry->target,description,entry->pixels,entry->bytes,NULL)) {
+            entry->texture=created;entry->palette_present=FALSE;
+            return (unsigned long)estimate;
+        }
+        if (created) glDeleteTextures(1,&created);
+        xgpu_gl_state_invalidate();
+        return 0;
+    }
+#else
+    (void)bitmap;(void)budget;
+#endif
+    return 0;
 }

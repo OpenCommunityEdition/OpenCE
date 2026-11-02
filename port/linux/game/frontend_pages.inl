@@ -15,4 +15,5 @@ static struct { char const *path; short tab, parent; } const frontend_pages[] = 
     {"pc\\modern\\hud\\settings", 4, 4},
     {"pc\\modern\\streamer\\settings", 4, 4},
     {"pc\\modern\\touch\\settings", 2, 2},
+    {"pc\\modern\\shoulder_camera\\settings", 0, 7},
 };

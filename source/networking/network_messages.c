@@ -222,7 +222,7 @@ struct network_game_message_packet_definitions
 	struct data_packet_definition server_begin_game;
 	struct data_packet_field server_graceful_game_exit_pregame_fields[2];
 	struct data_packet_definition server_graceful_game_exit_pregame;
-	struct data_packet_field client_join_game_request_fields[4];
+	struct data_packet_field client_join_game_request_fields[5];
 	struct data_packet_definition client_join_game_request;
 	struct data_packet_field client_add_player_request_pregame_fields[4];
 	struct data_packet_definition client_add_player_request_pregame;
@@ -297,8 +297,9 @@ server_pregame_keep_alive_fields) */
 DEFINE_NETWORK_GAME_MESSAGE(message_server_pregame_keep_alive, 0x04);
 DEFINE_NETWORK_GAME_MESSAGE(message_server_postgame_keep_alive, 0x02);
 /* (port: the joining machine's hardware id after the Xbox's, 0x20 bytes of
-hex: p2p.c's p2p_hardware_id) */
-DEFINE_NETWORK_GAME_MESSAGE(message_client_join_game_request, 0x70);
+hex: p2p.c's p2p_hardware_id; then a Discord account's pass, 170 bytes, and
+its proof, 64: port/linux/src/player_link.c) */
+DEFINE_NETWORK_GAME_MESSAGE(message_client_join_game_request, 0x70 + 170 + 64);
 DEFINE_NETWORK_GAME_MESSAGE(message_client_add_player_request_pregame, 0x20);
 DEFINE_NETWORK_GAME_MESSAGE(message_client_remove_player_request_pregame, 0x20);
 DEFINE_NETWORK_GAME_MESSAGE(message_client_settings_request, 0x44);
@@ -411,6 +412,8 @@ static struct network_game_message_packet_definitions data_0030aa68 =
 		DATA_PACKET_FIELD(_data_packet_field_shorts, 32),
 		DATA_PACKET_FIELD(_data_packet_field_bytes, 16),
 		DATA_PACKET_FIELD(_data_packet_field_bytes, 32),
+		/* (port: the Discord pass, 170 bytes, and its proof, 64) */
+		DATA_PACKET_FIELD(_data_packet_field_bytes, 234),
 		DATA_PACKET_FIELD_END,
 	},
 	NETWORK_GAME_MESSAGE_DEFINITION(client_join_game_request, "message_client_join_game_request_packet", message_client_join_game_request),

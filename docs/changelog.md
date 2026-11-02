@@ -45,6 +45,12 @@ appear under `GENERAL`. Categories follow their first appearance in a build,
 and notes retain their order within each category. Release Markdown retains
 the original note order and plain bullet format.
 
+The published testing merge `4f3eec76a1165a111bff83047b064a55c156f3bc`
+mistakenly used `[Android]`. The collector corrects that exact commit's prefix
+to `[ANDROID]` before normal validation, preserving its notes without rewriting
+shared history. This historical exception does not accept mixed-case categories
+in new commits or relax note-text validation.
+
 Use `Player-Note: none` to explicitly omit a commit, including any catch-up
 entry for it. Do not combine `none` with another note in the same commit.
 The omission marker has no category.

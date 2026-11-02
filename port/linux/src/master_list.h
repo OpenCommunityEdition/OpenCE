@@ -47,6 +47,17 @@ the web site's) */
 int master_list_read_json(const char *text, unsigned long size, char (*urls)[MASTER_LIST_URL_SIZE],
 	unsigned char (*keys)[MASTER_LIST_KEY_SIZE], int maximum);
 
+/* the masters a player's machine asks (the server browser's, and a Discord
+link's: player_link.c): masters.txt's; else, in the web build, its site's
+masters.json (the page's list of them, which its Servers panel reads too);
+else the official ones. How many */
+int master_list_client_masters(char (*urls)[MASTER_LIST_URL_SIZE], unsigned char (*keys)[MASTER_LIST_KEY_SIZE]);
+/* a GET of the url, as the server browser asks a master on each platform
+(Mbed TLS or WinHTTP, the Android app's host, the page's fetch): 1 if an
+answer came, with its status and its body (malloc'd, NUL terminated after
+its size: the caller frees it; 1 MB at most). Any thread; it may block */
+int master_list_get(const char *url, int *status, char **body, unsigned long *size);
+
 /* the server browser open (asked every 30 seconds) or closed */
 void master_list_browse(int on);
 /* Refresh: asked again now */

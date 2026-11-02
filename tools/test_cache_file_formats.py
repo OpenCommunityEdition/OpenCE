@@ -1252,11 +1252,10 @@ MALFORMED_CACHES = {
                              "the model vertex and index data do not fit in the file"),
     "handle": (instance_case(3, 0x0C, "<I", 0xE1770009), "load",
                "a tag handle does not match its position in the index"),
-    "name outside": (instance_case(2, 0x10, "<I", 0x3FFFFFFF), "load",
+    "resource name outside": (instance_case(4, 0x10, "<I", 0x3FFFFFFF), "load",
                      "a tag name lies outside the tag data or is not terminated"),
     "tag address outside": (instance_case(8, 0x14, "<I", BASE + 0x1000000), "load",
                             "a tag's address lies outside the tag data"),
-    "null tag address": (instance_case(8, 0x14, "<I", 0), "load", "a tag's address lies outside the tag data"),
     "external weapon": (instance_case(8, 0x18, "<I", 1), "load",
                         "a tag of a group that resource maps never hold is marked as held by one"),
     "external sound header outside": (instance_case(4, 0x14, "<I", BASE - 0x100), "load",
@@ -1538,3 +1537,24 @@ def test_real_maps_convert_as_recorded(report_tool, real_maps):
         name = Path(block["file"]).name
         assert block["convert"] == "ok", name
         assert {key: block[key] for key in recorded[name]} == recorded[name], name
+
+
+@pytest.mark.parametrize("case", ["name outside", "null tag address"])
+def test_protected_ce_tag_metadata_is_tolerated_by_loader(report_tool, tmp_path, case):
+    """OpenCE protected-map loading sanitizes names and defers null references
+    to tag validation; external resource names still must pass bounds checks."""
+    cache = Map()
+    path = cache.write(tmp_path)
+    index, field, value = (2, 0x10, 0x3FFFFFFF) if case == "name outside" else (8, 0x14, 0)
+    instance_case(index, field, "<I", value)(cache, path)
+    dump = tmp_path / "protected_tags.bin"
+    returncode, report = report_one(report_tool, path, "--dump-tags", dump)
+    assert returncode == 0, report
+    tags = dump.read_bytes()
+    instance = cache.where["instances"] - cache.where["tag_data"] + index * 0x20
+    address = struct.unpack_from("<I", tags, instance + field)[0]
+    if case == "name outside":
+        assert address == BASE + instance + 0x1C
+        assert tags[address - BASE] == 0
+    else:
+        assert address == 0

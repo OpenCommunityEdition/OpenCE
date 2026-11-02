@@ -119,7 +119,7 @@ def test_loading_wraps_scenario_load_without_normal_frame_callbacks():
         assert unsafe not in controller
 
 
-def test_menu_probe_feedback_closes_only_its_own_session(tmp_path):
+def test_menu_probe_never_opens_a_loading_screen(tmp_path):
     from harness import function
     implementation = (ROOT / "port/linux/game/mcc_resources.c").read_text()
     source = r'''
@@ -155,8 +155,8 @@ int main(void) {
         starts=ends=0;last_success=-1;expected=fail==0;
         started=fail!=4 && fail!=5;strcpy(reason,"stale failure");
         assert(mcc_resources_inspect("mcc_maps/a10",&source,&sum,digest,reason,sizeof(reason))==expected);
-        assert(starts==started && ends==owns*started);
-        assert(last_success==(owns && started ? expected : -1));
+        (void)started;(void)mcc_loading_begin;(void)mcc_loading_end;
+        assert(starts==0 && ends==0 && last_success==-1);
         assert((reason[0]==0)==expected);
     }
     return 0;

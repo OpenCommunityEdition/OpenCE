@@ -63,6 +63,18 @@ size_t mcc_test_fread(void *,size_t,size_t,FILE *);
 ''')
     (work / "errors.h").write_text('#define _error_silent 0\nvoid error(short,const char *,...);\n')
     (work / "xtl.h").write_text(r'''
+#pragma once
+#ifndef _WIN32
+#define __stdcall
+#endif
+#define TRUE 1
+#define FALSE 0
+#define WAIT_OBJECT_0 0
+#define INFINITE (~0u)
+#define CreateEventA(a,b,c,d) ((void *)0)
+#define CreateThread(a,b,c,d,e,f) ((void)(c),(void *)0)
+#define WaitForSingleObject(h,t) ((void)(h),(void)(t),0)
+#define SetEvent(h) ((void)(h))
 typedef void *HANDLE;
 typedef struct {unsigned long dwFileAttributes;char cFileName[256];} WIN32_FIND_DATAA;
 #define FILE_ATTRIBUTE_DIRECTORY 16
@@ -97,7 +109,8 @@ int mcc_identity_prepare_host(char const *name) {(void)name;identities_prepared+
 #include "mcc_runtime.h"
 #include "mcc_resources.h"
 #include "mcc_precache.h"
-int mcc_precache_snapshot(char const *name,struct mcc_precache_snapshot *s) {(void)name;(void)s;return 0;}
+#include "mcc_validation.h"
+int mcc_precache_snapshot(char const *name,struct mcc_precache_snapshot *s) {(void)name;memset(s,0,sizeof(*s));return 1;}
 static char saved_identity[64];
 static int allocation_fails;
 void *mcc_runtime_allocate(struct mcc_runtime *r,uint32_t bytes) {
@@ -176,7 +189,11 @@ int main(int argc,char **argv) {
     }
     if(argc==5 && !strcmp(argv[2],"admit")) {
         char message[256]={0};unsigned long checksum;
-        root=argv[1];admission_reads=1;checksum=mcc_cache_checksum(argv[3]);
+        int status,steps=0;
+        root=argv[1];admission_reads=1;
+        do {status=mcc_validation_request(argv[3],NULL,NULL);if(!status)mcc_validation_update();}
+        while(!status && ++steps<10000);
+        checksum=mcc_cache_checksum(argv[3]);
         if(checksum && identities_prepared!=1)return 43;
         printf("checksum=%lu\n",checksum);
         printf("accepted=%d\n",mcc_cache_present(argv[3],strtoul(argv[4],NULL,0),message,sizeof(message)));
@@ -253,7 +270,8 @@ int main(int argc,char **argv) {
     # Exercise the actual side-effect-free runtime admission functions too.
     cache_source = (ROOT / "port/linux/game/mcc_cache.c").read_text()
     admission = re.search(r"static struct \{.*?\} mcc_validation;", cache_source, re.S).group() + "\n" + "\n".join(function(cache_source, name) for name in
-                          ("mcc_cache_validation_clear", "mcc_cache_probe", "mcc_path", "mcc_scenario_identity", "mcc_file_read", "mcc_open_explain", "mcc_open", "mcc_cache_checksum", "mcc_cache_present"))
+                          ("mcc_cache_validation_clear", "mcc_cache_probe", "mcc_path", "mcc_scenario_identity", "mcc_file_read", "mcc_open_explain", "mcc_cache_checksum", "mcc_cache_present"))
+    admission += "\n" + (ROOT / "port/linux/game/mcc_validation.inl").read_text()
     source.write_text(source_code.replace("int main(int argc,char **argv)", "#define fopen mcc_test_fopen\n#define fread mcc_test_fread\n" + admission + "\n#undef fopen\n#undef fread\nint main(int argc,char **argv)"))
     output = work / ("catalog.exe" if sys.platform == "win32" else "catalog")
     command = [compiler, "-include", str(ROOT / "port/linux/game/mcc_loading.h"), str(ROOT / "tools/mcc_loading_stub.c"), "-std=c99", "-Wall", "-Wextra", "-Werror",

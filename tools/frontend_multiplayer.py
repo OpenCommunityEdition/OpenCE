@@ -17,6 +17,7 @@ PAGES = {
     "maps": (MP + "connected/connected_map_select_wrapper", "SELECT MAP", "MAPS"),
     "gametypes": (MP + "connected/gametype_select_screen_wrapper", "GAMETYPE", "GAME RULES"),
     "server": (MP + "server_settings/server_settings_screen", "SERVER SETUP", "HOST OPTIONS"),
+    "session": (MP + "server_settings/session_options/session_options_screen", "SESSION OPTIONS", "COMPATIBILITY"),
     "lobby": (MP + "lobby/lobby_screen", "GAME LOBBY", "PLAYERS"),
     "preview": (MP + "lobby/preview_screen", "JOIN GAME", "GAME IN PROGRESS"),
     "bots": ("main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/bots_screen", "BOTS", "BOT OPTIONS"),
@@ -62,7 +63,7 @@ def append(doc):
         routes.append((original, root.get("name")))
         by_name = {w.get("name"): w for w in copies.values()}
         # The native wrappers retain their B/back and server-defer lifecycle.
-        screens = [w for w in copies.values() if w.get("bitmap") == "bitmaps/gradient"]
+        screens = [w for w in copies.values() if w.get("bitmap") in ("bitmaps/gradient", "bitmaps/gradient_big")]
         body = next(iter(screens), root)
         for w in screens:
             w.set("bitmap", "modern/panel")
@@ -74,7 +75,7 @@ def append(doc):
             for c in children:
                 target = by_name[c.get("widget")]
                 n = leaf(target.get("name"))
-                if n == "sel_list_desc_bkd" or n == "current_profile_name" or n.startswith("header_") and w is body:
+                if n == "sel_list_desc_bkd" or n == "current_profile_name" or (n == "header" or n.startswith("header_")) and w is body:
                     w.remove(c)
             # Lists keep child order: existing services address rows by index.
             data = {c.get("input") for c in w.findall("data")}
@@ -99,14 +100,21 @@ def append(doc):
                                 continue
                             if item.get("type") == "spinner" or item_name.endswith("_value"):
                                 chooser = n.startswith("list_item_0")
-                                put(inner, x=20 if chooser else 218, y=3)
-                                put(item, left=0, top=0, width=296 if chooser else 98, height=24, text_x=0, text_y=0, font="ui\\large_ui", align="center")
+                                value_width = 296 if chooser else 140 if page == "session" else 98
+                                put(inner, x=20 if chooser else 180 if page == "session" else 218, y=3)
+                                put(item, left=0, top=0, width=value_width, height=24, text_x=0, text_y=0, font="ui\\large_ui", align="center")
                                 if item.get("type") == "spinner":
-                                    put(item, header_bounds="5 -12 17 -6", footer_bounds=f"5 {296 if chooser else 98} 17 {302 if chooser else 104}")
+                                    put(item, header_bounds="5 -12 17 -6", footer_bounds=f"5 {value_width} 17 {value_width + 6}")
+                                    if item_name == "session_compatibility_spinner":
+                                        # The native service reads indices; short captions fit
+                                        # the modern value column even at 4:3.
+                                        put(item, strings="CROSSPLAY|THIRD PERSON")
                                 role(item, "chooser" if chooser else "value")
                             elif item.get("type") == "text":
                                 put(inner, x=12, y=3)
-                                put(item, left=0, top=0, width=312 if item_name=="list_item_text" else 196, height=24, text_x=0, text_y=0, font="ui\\large_ui", align="left")
+                                put(item, left=0, top=0, width=312 if item_name=="list_item_text" else 152 if page == "session" else 196, height=24, text_x=0, text_y=0, font="ui\\large_ui", align="left")
+                                if item_name == "session_compatibility_label":
+                                    put(item, text="COMPATIBILITY")
                                 role(item, "label_full" if item_name=="list_item_text" else "label")
             if name.endswith("button_bar") or name == "button_bar":
                 put(w, left=0, top=0, width=588, height=26)
@@ -146,9 +154,9 @@ def append(doc):
                 put(w,left=40,top=120,width=312,height=260,font="ui\\large_ui")
                 role(w,"heading")
             if w.get("type") == "text" and name == "help":
-                put(w,left=396,top=174 if page=="server" else 108,width=200,height=212 if page=="server" else 278,font="ui\\large_ui",color="#FF2896FF")
+                put(w,left=396,top=174 if page in ("server", "session") else 108,width=200,height=212 if page in ("server", "session") else 278,font="ui\\large_ui",color="#FF2896FF")
                 role(w,"detail_wrap")
-        if page == "server":
+        if page in ("server", "session"):
             w=add("widget",base+"/help_value",type="text",controller=1,left=396,top=108,width=200,height=56,font="ui\\large_ui",color="#FFFFFFFF")
             ET.SubElement(body,"child",widget=w.get("name"))
             role(w,"detail_wrap")

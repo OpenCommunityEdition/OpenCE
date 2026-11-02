@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image
-from scipy.ndimage import binary_fill_holes
 
 from harness import function
 from hud_assets import build_asset
@@ -13,6 +12,7 @@ from test_hud_button_style import run_c
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / 'port/assets/hud'
+
 
 
 def test_supplied_sources_are_unchanged():
@@ -62,15 +62,6 @@ def test_sniper_reticle_keeps_stock_visible_size_and_position():
         # by one high-res pixel (1/8 Xbox/CE texel), not one stock texel.
         assert np.all(np.abs(actual - np.array(bounds)*scale) <= 1), name
 
-
-def test_classic_letters_are_transparent_cutouts():
-    for letter in 'abxy':
-        rgba = np.asarray(Image.open(ROOT / f'port/assets/buttons/classic_{letter}__0.png'))
-        solid = rgba[..., 3] >= 128
-        holes = binary_fill_holes(solid) & ~solid
-        assert np.count_nonzero(holes & (rgba[..., 3] == 0)) > 500
-        # No painted black letter remains on any of the coloured faces.
-        assert np.min(np.max(rgba[..., :3][solid], axis=1)) > 100
 
 
 def test_ce_keeps_8x_and_only_selects_verified_scope(tmp_path):

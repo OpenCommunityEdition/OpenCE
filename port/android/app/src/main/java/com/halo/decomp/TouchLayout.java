@@ -332,7 +332,8 @@ final class TouchLayout {
                 layout.floatingStick = readBoolean(values, "floating-stick");
             }
             if (version >= 4) {
-                int fingers = Integer.parseInt(values.getProperty("menu-fingers"));
+                // OpenCE version 4 layouts have no GulchCE cheat-menu gesture field.
+                int fingers = Integer.parseInt(values.getProperty("menu-fingers", "3"));
                 if (fingers < MIN_MENU_FINGERS || fingers > MAX_MENU_FINGERS)
                     throw new IllegalArgumentException("Invalid menu fingers");
                 layout.menuFingers = fingers;

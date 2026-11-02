@@ -45,6 +45,7 @@ struct network_game_server
 	word state;
 	struct network_game game;
 	boolean sent_start_game_message;
+	struct { short machine_index; } client_machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
 };
 
 /* the world the lobby asks */
@@ -127,6 +128,8 @@ static void lobby(short game_engine_index, long maximum)
 	server.game.maximum_players = (byte)maximum;
 	for (index = 0; index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
 		network_game_invalidate_player(&server.game.players[index]);
+	for (index = 0; index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; index++)
+		server.client_machines[index].machine_index = NONE;
 	local_game = TRUE;
 	teams_setting = _bots_teams_even;
 	sends = 0;
@@ -194,6 +197,81 @@ int main(int argc, char **argv)
 	char const *case_name = argc > 1 ? argv[1] : "";
 	long team0, team1, count;
 	char status[180];
+
+	CASE("lobby-enable")
+	{
+		lobby(game_engine_slayer, 128);
+		player(0, 0);
+		local_game = FALSE;
+		bots_network_session_begin();
+		network_option = TRUE;
+		wanted = 63;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)), "lobby apply refused: %s", status);
+		CHECK(server.game.player_count == 64, "settings saved in lobby did not add 63 bots");
+		CHECK(bots_network_reserved() && bots_session_allowed(), "IDs were not reserved before admission");
+		CHECK(sends == 1, "new lobby not published once");
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && sends == 1, "reapply changed unchanged lobby");
+		CHECK(bots_player_owned(BOTS_FIRST_MACHINE + 62), "last bot ownership lost");
+		wanted = 1;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && server.game.player_count == 2, "count reduction ignored");
+		CHECK(bots_player_owned(BOTS_FIRST_MACHINE), "remaining ownership reset");
+		bots_network_session_end();
+		CHECK(!bots_network_reserved() && !bots_session_allowed(), "session state leaked");
+		return 0;
+	}
+	CASE("lobby-disable")
+	{
+		lobby(game_engine_slayer, 128); player(0, 0); local_game = FALSE;
+		network_option = TRUE; bots_network_session_begin(); wanted = 63;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && server.game.player_count == 64, "initial bots absent");
+		network_option = FALSE;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)), "disable refused");
+		CHECK(server.game.player_count == 1 && !bots_session_allowed(), "disabled bots stayed");
+		CHECK(bots_network_reserved(), "identity reservation released before session end");
+		network_option = TRUE;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && server.game.player_count == 64, "reenable failed");
+		wanted = 0;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && server.game.player_count == 1, "zero count ignored");
+		return 0;
+	}
+	CASE("lobby-enable-conflict")
+	{
+		struct network_player *human;
+		lobby(game_engine_slayer, 128); human = player(0, 0); local_game = FALSE;
+		bots_network_session_begin(); network_option = TRUE; wanted = 63;
+		server.client_machines[BOTS_FIRST_MACHINE].machine_index = BOTS_FIRST_MACHINE;
+		CHECK(!bots_lobby_settings_apply(status, sizeof(status)) && strstr(status, "Re-host"), "pending client conflict hidden");
+		CHECK(!bots_network_reserved() && !bots_session_allowed() && server.game.player_count == 1, "pending client stolen");
+		server.client_machines[BOTS_FIRST_MACHINE].machine_index = NONE;
+		human->machine_index = BOTS_FIRST_MACHINE + 62;
+		CHECK(!bots_lobby_settings_apply(status, sizeof(status)), "high-ID human stolen");
+		CHECK(!bots_player_owned(human->machine_index) && sends == 0, "human ownership changed");
+		human->machine_index = 0;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && server.game.player_count == 64, "released IDs unusable");
+		return 0;
+	}
+	CASE("lobby-apply-guards")
+	{
+		lobby(game_engine_slayer, 128); player(0, 0); local_game = FALSE;
+		bots_network_session_begin(); network_option = TRUE; wanted = 63;
+		is_host = FALSE;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && !bots_network_reserved(), "client changed host policy");
+		is_host = TRUE; server.sent_start_game_message = TRUE;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && !bots_network_reserved(), "loading changed policy");
+		server.sent_start_game_message = FALSE; server.state = _network_game_server_state_ingame;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && !bots_network_reserved(), "ingame enabled policy");
+		server.state = _network_game_server_state_pregame;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && server.game.player_count == 64, "pregame not applied");
+		server.state = _network_game_server_state_ingame; network_option = FALSE;
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && bots_session_allowed(), "live bot AI stopped");
+		CHECK(server.game.player_count == 64 && bots_player_owned(BOTS_FIRST_MACHINE), "live roster reset");
+		bots_network_session_end(); bots_network_session_begin();
+		CHECK(!bots_network_reserved() && !bots_session_allowed(), "disabled policy not read on next host");
+		lobby(game_engine_slayer, 16); player(0, 0);
+		CHECK(bots_lobby_settings_apply(status, sizeof(status)) && server.game.player_count == 16, "local capacity changed");
+		CHECK(!bots_network_reserved(), "local settings reserved network IDs");
+		return 0;
+	}
 
 	CASE("live")
 	{

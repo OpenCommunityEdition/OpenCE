@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("kind", [0, 1, 2])
-def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_path, kind):
+@pytest.mark.parametrize("mode", ["fingerprint", "incremental"])
+def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_path, kind, mode):
     from test_mcc_cache_format import resource_dependency_map, TAG_OFFSET
     data = resource_dependency_map("bitm" if kind == 1 else "snd!", int(kind != 0), 4)
     name = b"res_0\0" if kind == 1 else b"res__0__0\0"
@@ -19,10 +20,11 @@ def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_pa
     struct.pack_into("<I", data, TAG_OFFSET+offset, 16)
     resource = bytearray(struct.pack("<4I", kind, 20, 20+len(name), 1)+b"abcd"+name+
                          struct.pack("<3I", 0, 4, 16))
+    resource.extend(bytes(range(256))*32768)  # More than one bounded validation slice.
     filename = "bitmaps.map" if kind == 1 else "sounds.map"
     def digest(package):
         folder = tmp_path / "mcc_maps" / package
-        result = subprocess.run([str(resource_tool), "fingerprint", str(folder / "a10.map"),
+        result = subprocess.run([str(resource_tool), mode, str(folder / "a10.map"),
                                  "mcc_maps/"+package+"/a10"], cwd=tmp_path, capture_output=True)
         assert result.returncode == 0, result.stderr
         return result.stdout.decode()
@@ -85,6 +87,20 @@ int main(int argc,char **argv) {
         ok=mcc_resources_probe_explain("mcc_maps/package/a10",&source,&sum,reason,sizeof(reason));fclose(f);
         printf("%s",reason);
         return ok==atoi(argv[3]) ? 0 : 9;
+    }
+    if(argc==4 && !strcmp(argv[1],"incremental")) {
+        struct mcc_cache_source source;struct mcc_resource_check *check;
+        uint32_t sum,expected;unsigned i,steps=0;char reason[320];
+        FILE *f=fopen(argv[2],"rb");if(!f)return 8;
+        fseek(f,0,SEEK_END);source.size=(uint64_t)ftell(f);source.context=f;source.read=read_map;
+        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));if(!check)return 10;
+        /* Cancelling a partial check releases only its own resources. */
+        mcc_resources_check_step(check,&sum,bytes);mcc_resources_check_end(check);
+        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));if(!check)return 11;
+        do {ok=mcc_resources_check_step(check,&sum,bytes);steps++;} while(!ok && steps<100);
+        mcc_resources_check_end(check);
+        if(ok!=1 || !mcc_resources_probe(argv[3],&source,&expected) || sum!=expected)return 12;
+        fclose(f);for(i=0;i<32;i++)printf("%02x",bytes[i]);return 0;
     }
     if(argc==4 && !strcmp(argv[1],"fingerprint")) {
         struct mcc_cache_source source;unsigned i;

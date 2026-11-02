@@ -632,14 +632,75 @@ static void model_lighting(struct xgpu_text *text, BOOL point_lights, BOOL plasm
 	xgpu_text_append(text, "\treturn clamp(light, 0.0, 1.0);\n}\n");
 }
 
+#ifndef HALO_GLES
+static BOOL inputs_read_r0_alpha(DWORD inputs)
+{
+	int input;
+	for (input = 0; input < 4; input++, inputs >>= 8)
+		if ((inputs & 0x1f) == (_register_r0 | 0x10)) return TRUE;
+	return FALSE;
+}
+
+/* Model draws can inherit an unused alpha combiner from preceding materials.
+ * Its source still costs a new driver link. Remove only alpha portions whose
+ * destinations are discard or r0.a, with no later read of r0.a. RGB writes,
+ * all other destinations, mux selectors and the implicit final r0 are retained.
+ * This is deliberately conservative; no general liveness analysis is needed. */
+static void discard_dead_r0_alpha(DWORD *state)
+{
+	unsigned count = state[D3DRS_PSCOMBINERCOUNT] & 0xff;
+	unsigned stage, later, destination;
+	DWORD final_abcd = state[D3DRS_PSFINALCOMBINERINPUTSABCD];
+	DWORD final_efg = state[D3DRS_PSFINALCOMBINERINPUTSEFG];
+	if (count > 8) count = 8;
+	for (stage = 0; stage < count; stage++)
+	{
+		DWORD outputs = state[D3DRS_PSALPHAOUTPUTS0 + stage];
+		BOOL writes_r0 = FALSE, live = FALSE;
+		for (destination = 0; destination < 3; destination++)
+		{
+			unsigned reg = (outputs >> (destination * 4)) & 0xf;
+			if (reg == _register_r0) writes_r0 = TRUE;
+			else if (reg) live = TRUE;
+		}
+		if (writes_r0)
+		{
+			if ((!final_abcd && !final_efg) || inputs_read_r0_alpha(final_abcd) ||
+				inputs_read_r0_alpha(final_efg & 0xffffff00UL)) live = TRUE;
+			for (later = stage + 1; later < count && !live; later++)
+				if (inputs_read_r0_alpha(state[D3DRS_PSRGBINPUTS0 + later]) ||
+					inputs_read_r0_alpha(state[D3DRS_PSALPHAINPUTS0 + later]) ||
+					((state[D3DRS_PSRGBOUTPUTS0 + later] | state[D3DRS_PSALPHAOUTPUTS0 + later]) & 0x4000)) live = TRUE;
+		}
+		if (!live)
+		{
+			state[D3DRS_PSALPHAINPUTS0 + stage] = 0;
+			state[D3DRS_PSALPHAOUTPUTS0 + stage] = 0;
+		}
+	}
+}
+#endif
+
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 {
+#ifndef HALO_GLES
+	struct nv2a_pixel_shader_key normalized;
+#endif
 	const DWORD *state = key->combiner_state;
 	struct xgpu_text text = { 0 };
 	unsigned long combiner_count = state[D3DRS_PSCOMBINERCOUNT] & 0xff;
 	DWORD final_abcd = state[D3DRS_PSFINALCOMBINERINPUTSABCD];
 	DWORD final_efg = state[D3DRS_PSFINALCOMBINERINPUTSEFG];
 	int stage;
+
+#ifndef HALO_GLES
+	normalized = *key;
+	/* A diagnostic expression may explicitly inspect an otherwise dead register. */
+	if (!*config_string("debug.gpu_debug_expression"))
+		discard_dead_r0_alpha(normalized.combiner_state);
+	key = &normalized;
+	state = key->combiner_state;
+#endif
 
 	if (combiner_count > 8)
 		combiner_count = 8;
@@ -668,7 +729,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		"in float xFog;\n"
 		"layout(location = 0) out vec4 fragment_color;\n"
 		XGPU_PIXEL_UNIFORMS);
-	xgpu_text_append(&text, "%s", shield_honeycomb_glsl);
+	if (key->shield_honeycomb)
+		xgpu_text_append(&text, "%s", shield_honeycomb_glsl);
 	for (stage = 0; stage < 4; stage++)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
 	if (key->source_blend)
@@ -761,7 +823,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, ";\n\tvec4 result = vec4(fA * fB + (1.0 - fA) * fC + fD, fG);\n");
 	}
 
-	xgpu_text_append(&text, "\tresult = shield_honeycomb_surface(result);\n");
+	if (key->shield_honeycomb)
+		xgpu_text_append(&text, "\tresult = shield_honeycomb_surface(result);\n");
 	if (key->coverage_alpha)
 		xgpu_text_append(&text, "\tresult.a = mix(1.0, result.a, t0.g);\n");
 	if (key->alpha_test_function)
@@ -801,8 +864,9 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 	if (key->count_samples)
 		xgpu_text_append(&text, "\tatomicCounterIncrement(visible_samples);\n");
 #endif
+	/* (display.reversed_depth: turned around, as the device's depth is) */
 	if (replaces_depth(key))
-		xgpu_text_append(&text, "\tgl_FragDepth = replaced_depth;\n");
+		xgpu_text_append(&text, "\tgl_FragDepth = %sreplaced_depth;\n", xgpu_reversed_depth ? "1.0 - " : "");
 	if (key->source_blend)
 	{
 		static const char *const factors[] =

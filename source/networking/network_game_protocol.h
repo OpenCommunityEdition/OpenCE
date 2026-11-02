@@ -28,6 +28,20 @@ enum
 	/* port: a player's name a dedicated server's word filter keeps out
 	(server.chat_filter "block"); a build before it says the game is closed */
 	_rejection_code_name_refused,
+	/* port: a dedicated server's VPN policy (server.vpn_policy,
+	port/linux/game/network_link.c): a machine from a listed address shows
+	no Discord pass (an updated game joins again at once with one); the
+	server lets no VPN in; the pass shown does not check; its account is
+	younger than the server takes; its account is in the game already. A
+	build before them says the game is closed */
+	_rejection_code_vpn_link_required,
+	_rejection_code_vpn_blocked,
+	_rejection_code_vpn_link_invalid,
+	_rejection_code_vpn_link_too_new,
+	_rejection_code_vpn_link_in_use,
+	/* port: a dedicated server's limit of machines from one address
+	(server.max_machines_per_address) */
+	_rejection_code_address_full,
 	NUMBER_OF_SERVER_REJECTION_CODES,
 };
 

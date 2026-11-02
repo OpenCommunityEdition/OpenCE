@@ -22,7 +22,8 @@ their existing map loaders, limits, rules and resource ownership.
   Aircraft navigation is not implemented. Switching this option off asks
   seated bots to leave; disabling enhanced bots takes effect on the next map.
 - `bots.network = true` permits bots on a network host. Set it before
-  creating the host; `bots.count`, `bots.skill` and `bots.teams` still apply.
+  creating the host or apply it with **OK** in the lobby's Bots settings;
+  `bots.count`, `bots.skill` and `bots.teams` still apply.
   Up to 63 bots join, subject to the lobby's player limit (63 bots plus one
   human need at least 64 player slots). The default count remains zero.
 - In the CE menus, **Settings > Network > Bots** configures count, network
@@ -39,10 +40,17 @@ their existing map loaders, limits, rules and resource ownership.
   settings. Zoom Only discards motion while unzoomed.
 - Touch Options can be moved in the layout editor; Export, Import and Save
   sit in its center. General settings can disable aiming with held buttons
-  and choose a three- or four-finger tap for enabled offline cheats. Older
+  and choose a three- or four-finger tap for enabled cheats. Older
   layouts retain their saved controls and gyro behavior when loaded.
-- Android's **Cheat Menu** option adds **Cheats** to touch **Options**.
-  It defaults off and is available during offline gameplay only. It exposes
+  OpenCE version-4 layouts omit GulchCE's `menu-fingers` field; importing
+  those files uses the existing three-finger cheat gesture default.
+- Android's **Cheat Menu** option adds a **CHEATS** touch button beside
+  **Hide/Touch**, as well as **Cheats** in touch **Options**. The button is
+  available during offline or hosted gameplay, including when the gameplay controls
+  are hidden; the layout editor and cinematics hide it. Tapping opens the
+  existing dialog through `openDialog`, which releases held controls.
+  It defaults off and is unavailable to joining clients, including while joining
+  a lobby. Android hosts use the same cheat APIs as desktop hosts. It exposes
   invincibility, ammunition, bottomless clip, super jump, omnipotence,
   no fall damage, Medusa, bump possession, Easy Rider, weapon/powerup/vehicle
   spawning and camouflage through existing engine cheat APIs. Easy Rider
@@ -62,22 +70,56 @@ The complete settings and environment variables are in
 ## Read the bot flow
 
 1. [bots_network.c](../../port/linux/game/bots_network.c):
-   `bots_network_session_begin` latches admission policy;
+   `bots_network_session_begin` initializes admission policy;
    `bots_player_ownership` records synthetic players actually created by
    this host. A high machine number alone never grants bot ownership.
+   `bots_network_lobby_enable` changes admission only after the bot management
+   module checks the pregame state and unused machine IDs. Disabling it
+   removes lobby bots but retains the reservation until session disposal.
 2. [network_server_manager.c](../../source/networking/network_server_manager.c):
    `network_game_server_port_bots` retains the existing lobby, team and
    capacity rules. An opted-in host reserves the final 63 machine IDs;
    ordinary hosts retain all human machine slots.
+   `network_game_server_update_countdown` also asks `bots_lobby_can_start`
+   in the bot module whether one human machine has owned bots. Those bots
+   have synthetic machine IDs but no connections, so the ordinary
+   **START NOW** request can start play without another computer joining.
+   Upstream now starts immediately for the host; a client request only
+   shortens the countdown. This hook only extends the inactive-countdown start gate;
+   existing player minimums, team requirements and countdown pauses still
+   apply. It adds no session state or network messages and applies equally
+   to Xbox, Custom Edition and MCC lobbies. High-ID human players never
+   acquire this permission merely from their IDs.
    [bots_management.inl](../../port/linux/game/bots_management.inl)'s
+   `bots_lobby_settings_apply` is called by the Bots menu's OK event after
+   saving choices. It checks connections, including pending joins, and
+   unowned high-ID players before enabling bots in an existing network lobby.
+   Conflicts produce an actionable error without stealing a player's ID.
+   It runs the existing lobby reconciliation immediately; clients and hosts
+   already loading or playing only save their choices for a future host.
    `bots_manage` uses that server's existing join/quit dispatch for live
    changes. Admission assigns the authoritative slot before encoding;
    failed encoding rolls back the unannounced record. A departing bot's
    machine identity stays unavailable until after the scheduled quit tick.
 3. [bots.c](../../port/linux/game/bots.c): `bots_update_actions` runs only
-   on the host. `bots_choose_goal` asks the enhanced module for urgent
+   on the host. Upstream `bots_combat.c` supplies six skill levels: Recruit,
+   Easy, Normal, Heroic, Veteran and Legendary. `bots_level_may_fire`,
+   `bots_level_melee` and `bots_level_grenade` apply their combat rules.
+   GulchCE retains Infection zombies' no-gun/no-grenade rule and close-range
+   melee cadence; enhanced navigation, vehicles and objectives stay optional.
+   `bots_choose_goal` asks the enhanced module for urgent
    objectives before the inherited combat/item/roaming decisions.
 4. [enhanced_bots.c](../../port/linux/game/enhanced_bots.c):
+   Its enhanced aiming, healing, powerup reach and retreat thresholds use
+   the same six-level enum as upstream combat. Easy, Normal, Heroic and
+   Legendary retain their original enhanced values. Recruit shares Easy's
+   enhanced table row while upstream combat supplies its weaker reactions
+   and aiming; Veteran interpolates Heroic and Legendary. This prevents an
+   inserted skill from silently selecting the next difficulty's tactics.
+   When enhanced bots are enabled, their head/SWAT/feet selection owns the
+   aim-point override; the base automatic head selection must not bypass
+   its probabilities. Other upstream combat rules still run, including
+   reaction, shot pacing, grenade decisions and skill-dependent movement.
    `enhanced_bots_update` caches objective state once per tick;
    `enhanced_bots_goal` selects flag, carrier, hill or vantage destinations.
    A flag carrier keeps advancing while fighting. A bot on the hill holds
@@ -107,7 +149,7 @@ bounded working memory (32,768 walkable nodes and a 262,144-entry surface
 lookup at most) and releases it when finished. The optional worker only
 traverses private graph snapshots; bot decisions stay on the host's game
 thread. No network packet, deterministic simulation rule or protocol version
-is added. Xbox/CE network version remains 39. See
+is added. This bot extension does not add to the current upstream Xbox/CE protocol. See
 [NETCODE.md](../../port/linux/NETCODE.md) for authority and transport rules.
 
 Map initialization resets objective, precision-cache and vehicle state.
@@ -115,6 +157,12 @@ Map disposal frees graph/grid allocations, including partial preparation.
 Respawn releases seat reservations and vantage claims. Session disposal
 clears bot ownership and the network reservation. Map-loading and MCC
 cleanup paths remain unchanged.
+
+`tools/harness/tests/test_lobby_countdown.py` exercises the real countdown
+and bot ownership functions with 1, 31 and 63 bots, split-screen humans,
+existing countdowns, team/minimum/pause checks and session ownership reset.
+It also checks that removing the bot start hook reproduces the failure.
+These asset-free checks do not establish map-loading or gameplay compatibility.
 
 [bots_menu.inl](../../port/linux/game/bots_menu.inl)'s `bots_menu_event`
 connects generated CE widgets to those host operations and displays their
@@ -141,8 +189,35 @@ uses the touch overlay's existing dialog/input-reset path. It sends typed
 IDs through [host_android_cheats.c](../../port/android/host/host_android_cheats.c),
 an eight-entry mutex-protected queue. No console text or guest pointers cross
 this boundary. [android_cheats.c](../../port/linux/game/android_cheats.c)
-rechecks offline permission on the game thread and consumes at most four
-requests per poll. Cinematics suspend requests without losing owned toggle
+rechecks offline/host permission on the game thread and consumes at most four
+requests per poll. It follows the desktop console's
+`hs_playing_in_anothers_game` rule: both distributed clients and clients
+joining a lobby without a local server are denied. Changing from host to
+client clears queued requests and releases menu-owned switches. Existing
+host cheat semantics and object replication are reused; this menu adds no
+network messages or client-side cheat settings.
+
+Both the desktop console and Android menu reach `cheat_all_weapons` in
+[cheats.c](../../source/game/cheats.c). Its map-supplied weapon list, or its fallback
+enumeration of loaded weapon tags, can include CTF flags and Oddball balls. These
+objective items need ownership assigned by the game mode. The generic cheat spawn
+has no such owner, so `distributed_client_change_valid` in
+[network_objects.c](../../port/linux/game/network_objects.c) rejects them. The host
+could still pick them up, leaving clients unable to reproduce its inventory.
+
+`cheat_objects` now skips weapons with the objective flag (the same bit used by
+`weapon_is_flag`) when the game is a network host. This applies to both weapon-list
+paths and both cheat interfaces. For example, spawning all weapons in Blood Gulch
+creates ordinary weapons without adding unowned flags or balls. Offline spawning,
+powerups, vehicles and the game modes' own objective creation retain their paths.
+This is a shared cheat-spawn correction, not an MCC adapter or a change to client
+validation. It adds no state, messages or peer agreement requirement; the
+current upstream and separate MCC protocols are described in NETCODE.md.
+
+Host access does not establish that every cheat synchronizes correctly; physical
+Android touch and Android-to-desktop network testing remain separate checks.
+
+Cinematics suspend requests without losing owned toggle
 values. Disabling the menu or leaving the map restores values it changed,
 unless a later console/script edit changed them again. One-shot spawned
 items remain ordinary game objects; they are not undone by closing the UI.
@@ -205,7 +280,7 @@ design references below; this is not a wholesale cherry-pick.
 | Gyro settings | **thelinkin3000**, [29638d60](https://github.com/thelinkin3000/halo-ce-universal/commit/29638d603d90283e16f95b2ac78d1ab99639912a), as the settings/zoom-mode reference. Built on **MrBruh**'s existing OpenCE Android controls (`fc610044`), preserving their legacy behavior. |
 | Android cheat menu | **thelinkin3000**, [406f793f](https://github.com/thelinkin3000/halo-ce-universal/commit/406f793f4c08751f854a3615ed244ea3b1f90b88), whose overlay credits **hardran3**'s **OpenCE-Ultrahand** and **HaloDrones** packages. GulchCE uses a new small typed Android dialog/queue and existing cheat APIs; the fork's general console and renderer overlay are not imported. |
 | Navigation, richer vehicles, aiming, powerups and Infection | Focused adaptations from **thelinkin3000**'s `bots.c` at `18a94774`, retaining its credit to **BirchWoodGod**'s Vita navigation, vehicles and powerups (GPL-3.0-only). SWAT/Infection and aiming rules are the fork's additions on that base. The snapshot worker is a separate implementation of the optional worker capability. |
-| Touch editor and edge handling | **thelinkin3000**, [d119125f](https://github.com/thelinkin3000/halo-ce-universal/commit/d119125f) (edge controls, button aim, version-4 layout and toolbar), [62824171](https://github.com/thelinkin3000/halo-ce-universal/commit/62824171) (scrolling), and the earlier three/four-finger gesture, built on **MrBruh**'s OpenCE Android controls. The gesture opens GulchCE's existing offline cheat dialog. |
+| Touch editor and edge handling | **thelinkin3000**, [d119125f](https://github.com/thelinkin3000/halo-ce-universal/commit/d119125f) (edge controls, button aim, version-4 layout and toolbar), [62824171](https://github.com/thelinkin3000/halo-ce-universal/commit/62824171) (scrolling), and the earlier three/four-finger gesture, built on **MrBruh**'s OpenCE Android controls. The gesture opens GulchCE's existing cheat dialog. |
 
 Code credits belong here and in player-facing commit notes, not in the
 art-only `AUTHORS.md`. Release packaging includes the retained GPL text and
@@ -224,8 +299,8 @@ capabilities below while retaining GulchCE's defaults and engine interfaces.
 | Reference capability | GulchCE disposition |
 | --- | --- |
 | 63 bots, names and host-only network actions | Capacity restored; ordinary protocol-39 player records/actions retained. Lobby limits still apply. |
-| Live add/drop by team; difficulty, routes and vehicles in a menu | Implemented through CE settings and Manage Current Bots. The three/four-finger gesture opens the Android cheat dialog when enabled offline; the general renderer overlay remains separate. |
-| Nine cheat switches and weapon/powerup/vehicle spawns | All exposed by the Android dialog, plus the earlier camouflage action. Offline-only permission remains intentional. |
+| Live add/drop by team; difficulty, routes and vehicles in a menu | Implemented through CE settings and Manage Current Bots. The three/four-finger gesture opens the Android cheat dialog when enabled offline or as host; the general renderer overlay remains separate. |
+| Nine cheat switches and weapon/powerup/vehicle spawns | All exposed by the Android dialog, plus the earlier camouflage action. Available offline or to the session host; joined clients cannot use them. |
 | Explicit gyro modes, per-axis sensitivity and inversion | Adapted; the default Touch Settings mode additionally preserves the user's earlier saved gyro settings. |
 | Roles, lanes, vantage choices, CTF/King goals and ground vehicles | Focused adaptation already present, not an import of the fork's complete bot core. Vehicles stay off by default, unlike the fork's enabled default. |
 | Teleporter routing/shortcuts, ladder routing and learned navigation obstacles | `bots_navigation.inl` adds bounded link discovery, measured shortcuts, disconnected-floor links, reservations, cooldowns and ordinary climbing controls around the existing path core. |

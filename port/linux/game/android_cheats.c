@@ -43,8 +43,11 @@ void android_cheats_reset(void)
 void android_cheats_update(void)
 {
 	int enabled = config_boolean("android.cheat_menu");
+	/* Match the desktop console: a joined client never changes the game,
+	including the lobby before distributed-client simulation begins. */
 	int allowed = enabled && touch_game_playing() &&
-		(!network_game_is_active() || network_game_is_splitscreen_local());
+		!network_game_distributed_client() &&
+		(!global_network_game_client_get() || global_network_game_server_get());
 	int request, count, state = enabled ? 1 : 0;
 	long index;
 	if (!allowed)

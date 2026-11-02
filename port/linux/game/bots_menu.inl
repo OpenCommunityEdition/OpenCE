@@ -1,4 +1,4 @@
-/* CE-style bot controls. Only these named events invoke host actions;
+/* CE-style bot controls. Bot settings apply host policy only on OK;
 ordinary settings keep the existing load/save and cancellation behavior. */
 #include "bots.h"
 
@@ -6,10 +6,25 @@ static boolean bots_menu_event(struct widget_instance *widget, char const *event
 {
 	static char const *const names[] = { "op_add_any", "op_add_red", "op_add_blue",
 		"op_drop_any", "op_drop_red", "op_drop_blue" };
+	/* Deferred error dialogs retain the pointer until the next UI update. */
+	static wchar_t error_message[180];
 	char status[180];
 	wchar_t message[180];
 	long index, character;
 	struct widget_instance *list;
+
+	if (!strcmp(event, "port bots settings save"))
+	{
+		settings_each(screen_of(widget), setting_changed_save);
+		if (!bots_lobby_settings_apply(status, sizeof(status)))
+		{
+			for (character = 0; status[character] && character < (long)NUMBEROF(error_message) - 1; character++)
+				error_message[character] = (wchar_t)(unsigned char)status[character];
+			error_message[character] = 0;
+			display_error_text_deferred(error_message, NONE);
+		}
+		return TRUE;
+	}
 
 	if (!strcmp(event, "port bots init"))
 	{

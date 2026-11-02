@@ -14,7 +14,7 @@ def test_objectives(case):
     code = source[start:source.index("};", start) + 2] + "\n"
     code += "\n".join(function(source, name) for name in (
         "bots_distance3d", "bots_ctf_urgent_goal", "enhanced_bots_powerup_score", "enhanced_bots_retreat"))
-    status, output = run(build("bot_decisions", (("under_test.inc", code),)), case)
+    status, output = run(build("bot_decisions", (("under_test.inc", code), ("bots_combat.h", read("port/linux/game/bots_combat.h")))), case)
     assert status == 0, output
 
 

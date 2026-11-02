@@ -2,14 +2,14 @@
 #ifndef MCC_PROTOCOL_H
 #define MCC_PROTOCOL_H
 
-/* OpenCE 39 owns flag 0x04 and messages through 93. MCC version 60 moves
- * its gameplay messages and admission envelope past the new fire origins. */
-/* MCC 61 replaces the held weapon when a script resets player equipment. */
-#define MCC_PROTOCOL_VERSION 61
+/* OpenCE 41 owns messages through 95. MCC 63 adds model ambient lighting
+ * to the campaign snapshot; gameplay messages remain above upstream voting. */
+#define MCC_PROTOCOL_VERSION 63
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x08
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 4
-#define MCC_PROTOCOL_JOIN_KIND 98
-#define MCC_PROTOCOL_JOIN_MAX 256
+#define MCC_PROTOCOL_JOIN_KIND 100
+/* The upstream 41 join carries a 170-byte pass and a 64-byte proof. */
+#define MCC_PROTOCOL_JOIN_MAX 512
 
 struct network_game;
 struct network_game_server;

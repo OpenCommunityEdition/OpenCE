@@ -388,12 +388,14 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "mcc_protocol.h" /* port: negotiate MCC only with an advertising host */
+#include "third_person_protocol.h" /* port: port/linux/game/third_person_protocol.c */
 void network_game_client_reset_settings_staging(void); /* port: discard partial settings across connections */
 #include "mcc_identity.h" /* port: MCC content admission and local package resolution */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager.h"
 #include "text/unicode.h"
+#include "third_person.h" /* port: port/linux/game/third_person_policy.c */
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 
@@ -603,6 +605,16 @@ struct message_client_ping
 /* port/linux/src/p2p.c's */
 void p2p_hardware_id(char *hex, int size);
 void p2p_join_refused(int rejection_code);
+/* port/linux/src/player_link.c's (a Discord account's pass, shown to a
+dedicated server that asks for it) */
+int player_link_join_fill(unsigned long host_virtual_address, unsigned char *pass, unsigned char *proof);
+int player_link_join_refused(int rejection_code);
+void player_link_join_reset(void);
+/* port: a join made again with the pass (network_game_client_rejected_by_game),
+not a new one; and one made while the refused connection's end is handled
+(its idle failed: the join goes on) */
+static boolean network_game_client_joining_with_link;
+static boolean network_game_client_joined_again_with_link;
 
 struct message_client_join_game_request
 {
@@ -610,6 +622,10 @@ struct message_client_join_game_request
 	byte join_token[0x10];
 	/* port: this machine's hardware id, as hex (p2p.c's p2p_hardware_id) */
 	char hardware_id[0x20];
+	/* port: a Discord account's pass and its proof for this connection, all
+	zero for none (port/linux/src/player_link.c) */
+	byte link_pass[170];
+	byte link_proof[64];
 };
 
 struct message_client_map_is_precached_pregame
@@ -736,8 +752,9 @@ typedef char message_client_broadcast_game_search_size_assert[
 	sizeof(struct message_client_broadcast_game_search) == 0xC ? 1 : -1];
 typedef char message_client_ping_size_assert[
 	sizeof(struct message_client_ping) == 8 ? 1 : -1];
+/* (port: and a Discord account's pass and proof after the Xbox's 0x70) */
 typedef char message_client_join_game_request_size_assert[
-	sizeof(struct message_client_join_game_request) == 0x70 ? 1 : -1];
+	sizeof(struct message_client_join_game_request) == 0x70 + 170 + 64 ? 1 : -1];
 typedef char network_game_client_seconds_to_game_start_offset_assert[
 	offsetof(struct network_game_client, seconds_to_game_start) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x10 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
@@ -918,6 +935,7 @@ void network_game_client_dispose(
 	{
 		network_game_client_reset_settings_staging(); /* port: discard partial old-host settings */
 		mcc_protocol_client_clear(); /* port: no capability survives a connection */
+		third_person_session_client_clear(); /* port: discard camera permission too */
 		mcc_identity_disconnect(); /* port: discard the MCC session's local binding */
 		if (client->connection)
 			network_connection_delete(client->connection);
@@ -1290,6 +1308,8 @@ boolean network_game_client_game_settings_updated(
 		added (network_game_add_player) */
 		message_packet->maximum_players > 0 &&
 		message_packet->maximum_players <= MAXIMUM_NUMBER_OF_PLAYERS &&
+		/* port: reject unknown flags and the reserved camera policy. */
+		third_person_match_flags_valid(message_packet->cooperative_flags) &&
 		network_game_client_map_name_is_valid(message_packet->map.name, sizeof(message_packet->map.name)) &&
 		VALID_INDEX(message_packet->difficulty, NUMBER_OF_GAME_DIFFICULTY_LEVELS))
 	{
@@ -1901,6 +1921,8 @@ void network_game_client_accepted_into_game(
 		client->game.machines[message_packet->machine_index].machine_index =
 			(char)message_packet->machine_index;
 		client->state = _network_game_client_state_pregame;
+		/* port: the next join shows no Discord pass until asked */
+		player_link_join_reset();
 
 		network_game_set_random_seed(message_packet->random_seed);
 		network_event(
@@ -2089,7 +2111,7 @@ boolean network_game_client_initiate_join_game(
 	/* port: bind the capability to the selected advertisement, not a prior host. */
 	network_game_client_reset_settings_staging(); /* port: a new host starts a new record */
 	{
-		unsigned int mcc_flags = 0;
+		unsigned int mcc_flags = 0, camera_version = 0;
 		long advertised_index;
 		/* port: the host joins its own loopback server using a temporary
 		 * advertisement, which is not an entry in available_games. */
@@ -2100,13 +2122,18 @@ boolean network_game_client_initiate_join_game(
 			if (game == &client->available_games[advertised_index])
 			{
 				mcc_flags = network_game_client_advertised_versions[advertised_index].flags;
+				camera_version = network_game_client_advertised_versions[advertised_index].version;
 				break;
 			}
 		mcc_protocol_client_begin(mcc_flags);
+		third_person_session_client_begin(camera_version); /* port: host state owns loopback mode */
 	}
 	client->join_in_progress = TRUE;
 	client->connect_process = 0;
 	client->connection_attempt_time = system_milliseconds();
+	/* port: a new join shows no Discord pass until its host asks for one */
+	if (!network_game_client_joining_with_link)
+		player_link_join_reset();
 
 	csmemcpy(
 		&client->join_parameters,
@@ -2128,6 +2155,7 @@ boolean network_game_client_initiate_join_game(
 	else
 	{
 		client->join_in_progress = FALSE;
+		third_person_session_client_clear(); /* port: failed connection grants no camera permission */
 		display_error_when_main_menu_loaded(7);
 		network_event(
 			"failed attempt to initiate a connection to game @ %s",
@@ -2265,6 +2293,7 @@ void network_game_client_reset(
 		0x4EE,
 		client);
 
+	third_person_session_client_clear(); /* port: a reset ends the selected camera session */
 	network_game_invalidate(&client->game);
 
 	client->machine_index = NONE;
@@ -2349,6 +2378,7 @@ void network_game_client_rejected_by_game(
 	word rejection_code)
 {
 	const char *reason = "<unknown>";
+	boolean camera_retry = third_person_session_active(); /* port: retain only for the same-host pass retry */
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_client_manager.c",
@@ -2386,12 +2416,70 @@ void network_game_client_rejected_by_game(
 	case _rejection_code_blacklisted_machine:
 		reason = "_rejection_code_blacklisted_machine";
 		break;
+
+	/* port: the port's own */
+	case _rejection_code_name_refused:
+		reason = "_rejection_code_name_refused";
+		break;
+
+	case _rejection_code_vpn_link_required:
+		reason = "_rejection_code_vpn_link_required";
+		break;
+
+	case _rejection_code_vpn_blocked:
+		reason = "_rejection_code_vpn_blocked";
+		break;
+
+	case _rejection_code_vpn_link_invalid:
+		reason = "_rejection_code_vpn_link_invalid";
+		break;
+
+	case _rejection_code_vpn_link_too_new:
+		reason = "_rejection_code_vpn_link_too_new";
+		break;
+
+	case _rejection_code_vpn_link_in_use:
+		reason = "_rejection_code_vpn_link_in_use";
+		break;
+
+	case _rejection_code_address_full:
+		reason = "_rejection_code_address_full";
+		break;
 	}
 
 	network_event(
 		"unable to join game: reason= #%d/%s",
 		rejection_code,
 		reason);
+	/* port: a dedicated server that refused this machine for its VPN asked
+	for a Discord account's pass (or refused the one shown): the join made
+	again at once with this machine's (the next it holds), if it holds one
+	(player_link.c), on the pregame screen it is on */
+	if (player_link_join_refused(rejection_code))
+	{
+		struct transport_address address;
+		struct network_join_parameters join_parameters;
+		struct network_advertised_game game;
+		boolean joining;
+
+		csmemset(&address, 0, sizeof(address));
+		network_connection_get_address(client->connection, &address, NULL);
+		csmemcpy(&join_parameters, &client->join_parameters, sizeof(join_parameters));
+		network_game_client_reset(client, TRUE);
+		csmemset(&game, 0, sizeof(game));
+		game.platform = network_game_get_local_platform();
+		network_game_client_joining_with_link = TRUE;
+		joining = network_game_client_initiate_join_game(client, &game, &join_parameters, &address);
+		network_game_client_joining_with_link = FALSE;
+		if (joining)
+		{
+			/* port: the temporary advertisement has no camera metadata; this is the same host. */
+			third_person_session_client_begin(camera_retry ? THIRD_PERSON_PROTOCOL_VERSION : 0);
+			network_event("joining again with a Discord account's pass");
+			network_game_client_joined_again_with_link = TRUE;
+			return;
+		}
+	}
 	/* port: why, for the server browser's line (p2p_join_progress) */
 	p2p_join_refused(rejection_code);
 	/* port: the join went to the pregame screen at once (and a machine
@@ -2891,6 +2979,7 @@ static boolean network_game_client_idle_joining(
 				struct message_client_join_game_request join_game_request;
 				message_header *message;
 				word mcc_join[MCC_PROTOCOL_JOIN_MAX / sizeof(word)]; /* port: bounded optional envelope */
+				word camera_join[THIRD_PERSON_PROTOCOL_JOIN_MAX / sizeof(word)]; /* port: required camera admission */
 
 				csmemset(&join_game_request, 0, sizeof(join_game_request));
 				network_game_generate_local_machine_name(join_game_request.machine_name);
@@ -2906,6 +2995,21 @@ static boolean network_game_client_idle_joining(
 					p2p_hardware_id(hardware_id, sizeof(hardware_id));
 					csmemcpy(join_game_request.hardware_id, hardware_id, csstrlen(hardware_id));
 				}
+				/* (port: and a Discord account's pass, when the host asked
+				for one: bound to this connection, the internet play tunnel's
+				with the host's stand-in in 100.64.0.0/10, in network byte
+				order) */
+				{
+					struct transport_address host_address;
+					unsigned long host;
+
+					csmemset(&host_address, 0, sizeof(host_address));
+					network_connection_get_address(client->connection, &host_address, NULL);
+					host = host_address.address.long_words[0];
+					player_link_join_fill((host & 0xFFC00000) == 0x64400000 ?
+						(host >> 24) | ((host >> 8) & 0xFF00) | ((host << 8) & 0xFF0000) | (host << 24) : 0,
+						join_game_request.link_pass, join_game_request.link_proof);
+				}
 
 				message = create_network_game_message(
 					_message_client_join_game_request,
@@ -2913,6 +3017,8 @@ static boolean network_game_client_idle_joining(
 					sizeof(join_game_request));
 				if (message)
 					message = (message_header *)mcc_protocol_join(message, GET_MESSAGE_SIZE(*message), mcc_join); /* port */
+				if (message && third_person_session_active()) /* port: only negotiated camera sessions */
+					message = (message_header *)third_person_protocol_join(message, GET_MESSAGE_SIZE(*message), camera_join);
 				if (message)
 				{
 					if (network_game_client_write(
@@ -2963,6 +3069,14 @@ static boolean network_game_client_idle_joining(
 		{
 			network_event("network_connection_idle() failed in network_game_client_idle_joining()");
 			success = network_game_client_process_last_messages(client);
+		}
+		/* port: the host's refusal asked for a Discord account's pass and the
+		join was made again with it: the refused connection's end, which the
+		host closed, is not this join's failure */
+		if (network_game_client_joined_again_with_link)
+		{
+			network_game_client_joined_again_with_link = FALSE;
+			success = TRUE;
 		}
 	}
 
@@ -3203,8 +3317,8 @@ boolean network_game_client_advertised_game_compatible(
 	theirs = network_game_client_advertised_versions[game_index].version;
 	distributed = (network_game_client_advertised_versions[game_index].flags &
 		HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG) != 0;
-	if (theirs == ours && distributed && (ours == HALO_PORT_NETWORK_VERSION ||
-		(network_game_client_advertised_versions[game_index].flags & MCC_PROTOCOL_ADVERTISED_FLAG)))
+	if (third_person_session_compatible(game->map.name, theirs,
+		network_game_client_advertised_versions[game_index].flags)) /* port: exact base or camera agreement */
 	{
 		network_event("joining a host of network version %u", theirs);
 		return TRUE;
@@ -3214,7 +3328,7 @@ boolean network_game_client_advertised_game_compatible(
 	{
 		char message[400];
 		csprintf(message, "This MCC game requires GulchCE with MCC network version %u.\n\n"
-			"OpenCE clients can join Xbox and Custom Edition games only.", MCC_PROTOCOL_VERSION);
+			"Use a matching GulchCE MCC build. Camera sessions additionally require third-person support.", MCC_PROTOCOL_VERSION); /* port: experimental branch */
 		platform_show_message("Halo: cannot join this game", message);
 	}
 	else if (tell)
@@ -3229,7 +3343,7 @@ void network_game_client_tell_version(
 	boolean distributed)
 {
 	unsigned int ours = HALO_PORT_NETWORK_VERSION;
-	char message[400];
+	char message[600]; /* port: room for the experimental branch's compatibility notice */
 
 	if (theirs == ours)
 	{
@@ -3253,6 +3367,9 @@ void network_game_client_tell_version(
 			"Ask the host to update the game.",
 			ours, theirs);
 	}
+	/* port: numeric ordering alone cannot explain this branch's reserved versions. */
+	csstrcat(message, "\n\nGulchCE Third Person sessions require a matching camera build. "
+		"OpenCE Crossplay sessions require the supported OpenCE protocol.");
 	network_event("not joining a host of network version %u%s (this machine's is %u)", theirs,
 		distributed ? "" : " with the lockstep netcode", ours);
 	platform_show_message("Halo: cannot join this game", message);

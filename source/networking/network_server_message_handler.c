@@ -252,6 +252,7 @@ symbols in this file:
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
+#include "bungie_net/network/transport_address_constants.h" /* port: distinguish the host's loopback admission */
 #include "bungie_net/network/transport_endpoint_winsock.h"
 #include "game/game.h"
 #include "game/game_engine.h"
@@ -260,6 +261,7 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "mcc_protocol.h" /* port: MCC-only admission and settings envelope */
+#include "third_person_protocol.h" /* port: port/linux/game/third_person_protocol.c */
 #include "mcc_identity.h" /* port: attach MCC content identity to host settings */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
@@ -276,6 +278,8 @@ boolean network_voice_handles_message(word const *message, word size);
 void network_voice_handle_message(long machine_index, word const *message, word size);
 /* port/linux/game/map_share.c's: map sharing, in the lobby too */
 boolean map_share_handles_message(word const *message, word size);
+boolean network_map_vote_handles_message(word const *message, word size);
+void network_map_vote_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void map_share_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void network_distributed_handle_stream_message(long machine_index, word const *message, word size);
 
@@ -443,6 +447,11 @@ struct message_client_join_game_request
 	byte join_game_token[JOIN_GAME_TOKEN_LENGTH];
 	/* port: the machine's hardware id, as hex, as it tells it (p2p.c) */
 	char hardware_id[0x20];
+	/* port: a Discord account's pass and its proof for this connection, all
+	zero for none (port/linux/src/player_link.c: a dedicated server that
+	refused the machine for its VPN asks for it) */
+	byte link_pass[170];
+	byte link_proof[64];
 };
 
 struct message_client_settings_request
@@ -1183,6 +1192,7 @@ boolean network_game_server_handle_client_message(
 	boolean result = TRUE;
 	word message_type;
 	byte packet_type;
+	word camera_join[THIRD_PERSON_PROTOCOL_JOIN_MAX / sizeof(word)], camera_join_size; /* port */
 
 	/* port: the size comes from the wire, and an assert is no check (an
 	empty message read its packet type from before the buffer): the machine
@@ -1192,6 +1202,20 @@ boolean network_game_server_handle_client_message(
 	{
 		network_event("server received a client message of a bad size (#%d)", message_buffer_size);
 		return FALSE;
+	}
+
+	/* port: camera sessions require compatibility before ordinary or MCC admission.
+	The normal join handler still owns tokens, bans, slots and MCC authorization. */
+	if (third_person_session_active() && !network_game_server_client_machine_is_joined_to_game(server, machine))
+	{
+		if (!third_person_protocol_unwrap(message, message_buffer_size, camera_join, &camera_join_size))
+		{
+			network_event("camera admission rejected: matching online-third-person protocol %u required",
+				THIRD_PERSON_PROTOCOL_VERSION);
+			return FALSE;
+		}
+		message = camera_join;
+		message_buffer_size = (short)camera_join_size;
 	}
 
 	match_assert(
@@ -1438,6 +1462,20 @@ boolean network_game_server_handle_client_message(
 					{
 						network_game_server_client_machine_heard(server, machine);
 						map_share_handle_message(machine_index, message, message_buffer_size, TRUE);
+					}
+					break;
+				}
+				/* (port: a dedicated server's map vote's, in the lobby too,
+				from its stream alone: network_map_vote.c) */
+				if (network_map_vote_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						network_map_vote_handle_message(machine_index, message, message_buffer_size, TRUE);
 					}
 					break;
 				}
@@ -1814,8 +1852,8 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			/* the native builds' network version and netcode (a client
 			refuses a host of another version, or of the lockstep netcode
 			older builds had: network_client_manager.c) */
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(mcc_protocol_version(game->map.name) & 0xFF);
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(mcc_protocol_version(game->map.name) >> 8);
+			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(third_person_session_version(game->map.name) & 0xFF);
+			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(third_person_session_version(game->map.name) >> 8);
 			/* port: capability version is separate even in an OpenCE lobby. */
 			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET] = MCC_PROTOCOL_VERSION & 255;
 			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET + 1] = MCC_PROTOCOL_VERSION >> 8;
@@ -2022,6 +2060,10 @@ static boolean network_game_server_handle_message_client_join_game_request(
 				join_game_request.machine_name,
 				(char *)join_game_request.machine_name,
 				sizeof(join_game_request.machine_name));
+			/* port: the Discord pass it showed, if any, for the door
+			(network_game_server_accept_client_machine_into_game) */
+			network_game_server_set_machine_link(server_client_machine, join_game_request.link_pass,
+				join_game_request.link_proof, (char const *)join_game_request.machine_name);
 			network_connection_get_address(
 				network_game_server_get_client_connection(server_client_machine),
 				&source_address,
@@ -2057,6 +2099,12 @@ static boolean network_game_server_handle_message_client_join_game_request(
 						struct network_message *reply;
 						struct network_machine *client_machine;
 						long machine_index = NONE;
+
+						/* port: setup opens the socket before the host's loopback client
+						has its index. Only remote admission fixes the camera contract. */
+						if (source_address.address.long_words[0] != IPV4_LOOPBACK_ADDRESS ||
+							network_game_server_get_game(server)->machine_count > 1)
+							third_person_session_lock();
 
 						client_machine = network_game_server_get_client_machine(
 							server,
@@ -2573,9 +2621,11 @@ static boolean network_game_server_handle_message_client_game_start_request(
 			short countdown_event = (short)game_start_request.countdown_time;
 
 			/* port: the pregame screen's faster and slower, from any machine;
-			to stop the countdown or start at once (a script's), the host's own
-			(the Xbox game took any event from any machine, and a machine
-			could hold the lobby or skip the countdown) */
+			to stop the countdown or start at once (a script's, or the host's
+			faster), the host's own (the Xbox game took any event from any
+			machine, and a machine could hold the lobby or skip the countdown) */
+			if (countdown_event == _network_game_server_countdown_event_player_joined)
+				countdown_event = network_game_server_client_machine_faster_event(server, client_machine);
 			if ((countdown_event == _network_game_server_countdown_event_player_left &&
 					network_game_server_client_machine_may_slow_countdown(server, client_machine)) ||
 				countdown_event == _network_game_server_countdown_event_player_joined ||

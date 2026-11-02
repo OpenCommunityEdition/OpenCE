@@ -9,6 +9,45 @@ void bots_management_reset(void)
 	csmemset(bots_reuse_after, 0, sizeof(bots_reuse_after));
 }
 
+static boolean bots_lobby_slots_available(struct network_game_server *server)
+{
+	long index;
+	/* Include connected machines that have not admitted a player yet. */
+	for (index = 0; index < MAXIMUM_NETWORK_MACHINE_COUNT; index++)
+		if (bots_machine_is_bot(server->client_machines[index].machine_index))
+			return FALSE;
+	for (index = 0; index < MAXIMUM_NETWORK_PLAYER_COUNT; index++)
+	{
+		struct network_player *player = &server->game.players[index];
+		if (network_player_is_valid(player) && bots_machine_is_bot(player->machine_index) &&
+			!bots_player_owned(player->machine_index))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+int bots_lobby_settings_apply(char *status, long size)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	int enabled = config_boolean("bots.network");
+
+	/* Network policy saved outside pregame remains for the next host. Never change the
+	bot policy after peers have been told to load, or reset live ownership. */
+	if (!server || server->state != _network_game_server_state_pregame || server->sent_start_game_message)
+		return TRUE;
+	if (!network_game_is_splitscreen_local())
+	{
+		if (enabled && !bots_network_reserved() && !bots_lobby_slots_available(server))
+		{
+			snprintf(status, size, "A player connection holds a bot slot. Re-host with Network Bots enabled.");
+			return FALSE;
+		}
+		bots_network_lobby_enable(enabled);
+	}
+	network_game_server_port_bots(server);
+	return TRUE;
+}
+
 int bots_manage(int add, int team, char *status, long size)
 {
 	struct network_game_server *server = global_network_game_server_get();
@@ -29,7 +68,7 @@ int bots_manage(int add, int team, char *status, long size)
 	}
 	if (!bots_session_allowed())
 	{
-		snprintf(status, size, "Enable Network Bots before creating the host.");
+		snprintf(status, size, "Enable Network Bots in the lobby before starting the match.");
 		return FALSE;
 	}
 	if (!bots_gametype_active(server->game.variant.game_engine_index))

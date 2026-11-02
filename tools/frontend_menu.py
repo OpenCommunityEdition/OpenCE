@@ -35,11 +35,12 @@ PAGES = [
     ("hud", 4, 4, "MULTIPLAYER HUD", ["network_setup/multiplayer_hud"]),
     ("streamer", 4, 4, "STREAMER MODE", ["network_setup/streamer_mode"]),
     ("touch", 2, 2, "TOUCH CONTROLS", ["gamepad_setup/android", "gamepad_setup/gyro"]),
+    ("shoulder_camera", 0, 7, "SHOULDER CAMERA", ["video_settings/shoulder_camera"]),
 ]
 TABS = ("VIDEO", "AUDIO", "CONTROLS", "ONLINE", "INTERFACE", "PROFILE")
 LINKS = {0: [(6, None), (7, None)], 6: [(8, "desktop web")],
          3: [(9, None), (10, "desktop android"), (11, None)], 4: [(12, None), (13, None)],
-         2: [(14, "android")]}
+         2: [(14, "android")], 7: [(15, None)]}
 STYLE = ("MENU STYLE", "display.menu_frontend",
          [("MODERN", "modern"), ("CLASSIC PC", "pc"), ("XBOX", "xbox"), ("STOCK", "off")],
          "Choose the submenu style. The starting menu keeps its existing layout. The switch takes effect when you leave Settings for the main menu. Pause menus and map UI stay unchanged.", None)

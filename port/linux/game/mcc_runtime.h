@@ -49,6 +49,7 @@ int mcc_audio_read(struct mcc_runtime *runtime, long tag, uint32_t offset, uint3
 int mcc_audio_contains(struct mcc_runtime *runtime, long tag, uint32_t offset, uint32_t bytes);
 void mcc_audio_dispose(struct mcc_runtime *runtime);
 int mcc_bitmaps_prepare(struct mcc_runtime *runtime);
+void mcc_bitmaps_prepare_gpu(struct mcc_runtime *runtime);
 int mcc_hud_bitmaps_prepare(struct mcc_runtime *runtime);
 int mcc_bitmaps_read(struct mcc_runtime *runtime, long tag, uint32_t offset,
     uint32_t bytes, void *out);

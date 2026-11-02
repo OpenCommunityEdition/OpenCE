@@ -666,7 +666,7 @@ def regenerate_child_offsets():
 
 def regenerate_settings():
     """Write port-owned settings and register any new screens for embedding."""
-    screens = port_settings.settings_files()
+    screens = {**port_settings.settings_files(), **port_settings.multiplayer_files()}
     for name, lines in screens.items():
         (CE / name).write_text("\n".join(lines))
     manifest = MENUS / "menus.json"

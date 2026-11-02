@@ -13,7 +13,8 @@ from harness import CHECK_FAILED, build, constant, enum_with, function, mutated,
 
 CASES = ["fills", "room", "fewer", "even", "against", "follows-players", "never-network", "slayer-only",
          "not-once-started", "no-player-no-bots", "names-and-machines", "enhanced-objectives", "network-opt-in", "human-high-id",
-         "live", "live-permissions", "live-encode-failure"]
+         "live", "live-permissions", "live-encode-failure", "lobby-enable", "lobby-disable",
+         "lobby-enable-conflict", "lobby-apply-guards"]
 GAME_MANAGER_FUNCTIONS = ("network_game_invalidate_player", "network_player_is_valid", "network_game_player_is_valid",
                           "network_game_add_player", "network_game_remove_player")
 
@@ -54,9 +55,9 @@ def generated(fault=None):
     config += structure(read("source/game/players.h"), "network_player") + "\n"
     code = ""
     network = read("port/linux/game/bots_network.c")
-    code += "static int network_bots;\nstatic byte owned[BOTS_MAXIMUM];\nint bots_machine_is_bot(long machine_index);\n"
+    code += "static int network_bots, network_bots_enabled;\nstatic byte owned[BOTS_MAXIMUM];\nint bots_machine_is_bot(long machine_index);\n"
     for name in ("bots_network_session_begin", "bots_network_session_end", "bots_network_reserved", "bots_session_allowed",
-                 "bots_player_ownership", "bots_player_owned"):
+                 "bots_player_ownership", "bots_player_owned", "bots_network_lobby_enable"):
         code += function(network, name) + "\n"
     for name in GAME_MANAGER_FUNCTIONS:
         code += function(manager, name) + "\n"
@@ -81,3 +82,10 @@ def test_negative_control(control):
     fault, case = NEGATIVE_CONTROLS[control]
     status, output = run(build("bots_lobby", generated(fault)), case)
     assert status == CHECK_FAILED, f"the bots' lobby with a fault ({control}) passed '{case}': the test cannot see it"
+
+
+def test_lobby_setting_activation_is_required():
+    files = dict(generated())
+    files["under_test.inc"] = mutated(files["under_test.inc"], "bots_network_lobby_enable(enabled);", "")
+    status, output = run(build("bots_lobby", tuple(files.items())), "lobby-enable")
+    assert status == CHECK_FAILED, f"missing lobby activation passed: {output}"

@@ -652,7 +652,7 @@ def test_rcon_hello_auth_commands_and_events(sim):
     rcon = opence_rcon.Rcon(sim.url, password="opence-admin", by="tests")
     assert rcon.hello["type"] == "hello" and rcon.hello["protocol"] == 1
     assert rcon.hello["capabilities"] == ["events", "status", "rotation", "settings", "bans", "owner_web", "ban_address",
-                                          "stop", "event_addresses", "identity"]
+                                          "stop", "event_addresses", "identity", "vpn", "link"]
     assert rcon.role == "admin"
     reply = rcon.command("sv_status")
     assert reply["ok"] and reply["id"] == 1 and reply["lines"][0].startswith("OpenCE Server: playing")
@@ -854,3 +854,38 @@ def test_rotation_grammar():
     assert server_sim.parse_duration("2h") == 7200 and server_sim.parse_duration("forever") == 0
     assert server_sim.parse_duration("2w") == 14 * 86400 and server_sim.parse_duration("90") == 5400
     assert server_sim.parse_duration("2x") == -1 and server_sim.parse_duration("11y") == -1
+
+
+def test_vpn_policy_and_discord_bans(fresh):
+    """the VPN policy (docs/dedicated_server.md, "VPNs and linked Discord accounts"): /api/vpn and its check, the
+    capabilities, a join refused at the door as an event, a ban by a verified Discord account, and the players'
+    Discord accounts with their addresses"""
+    sim = fresh("--still", "--tick", "0.05")
+    admin = sim.browser()
+    moderator = sim.browser("opence-mod")
+    owner = {"Authorization": "Bearer " + sim.login("opence-owner")[0]["token"]}
+    status, _, body = sim.request("GET", "/api/vpn", headers=admin)
+    assert status == 200 and body["policy"] == "link" and body["held"], body
+    assert set(body["refused"]) == {"vpn_link_required", "vpn_blocked", "vpn_link_invalid", "vpn_link_too_new",
+                                    "vpn_link_in_use"} and body["refused"]["vpn_link_required"] == 1, body
+    assert sim.request("POST", "/api/vpn/check", {"ip": "198.51.100.9"}, headers=moderator)[2] == \
+        {"ok": True, "listed": True, "by": "netlist"}
+    assert sim.request("POST", "/api/vpn/check", {"ip": "203.0.113.9"}, headers=moderator)[2]["listed"] is False
+    assert sim.request("POST", "/api/vpn/check", {"ip": "nope"}, headers=moderator)[0] == 400
+    assert {"vpn", "link"} <= set(sim.request("GET", "/api/status", headers=admin)[2]["capabilities"])
+    refused = [event for event in sim.request("GET", "/api/events?after=0", headers=admin)[2]["events"]
+               if event["event"] == "join_refused"]
+    assert refused and refused[0]["reason"] == "vpn_link_required" and "address" not in refused[0], refused
+    # (the owner sees each player's Discord account, with their address; an admin without server.log_addresses not)
+    players = sim.request("GET", "/api/players", headers=owner)[2]["players"]
+    assert all({"discord_id", "discord_name", "discord_verified"} <= set(player) for player in players), players
+    assert "discord_id" not in sim.request("GET", "/api/players", headers=admin)[2]["players"][0]
+    verified = [player for player in players if player["discord_verified"]][0]
+    status, _, body = sim.request("POST", "/api/bans", {"discord_id": verified["discord_id"], "reason": "test"},
+                                  headers=admin)
+    assert status == 200 and body["ok"], body
+    ban = sim.request("GET", "/api/bans", headers=admin)[2]["bans"][body["n"]]
+    assert ban["discord_id"] == verified["discord_id"] and ban["discord_verified"] is True, ban
+    assert verified["slot"] not in [player["slot"] for player in
+                                    sim.request("GET", "/api/players", headers=admin)[2]["players"]]
+    assert sim.request("POST", "/api/bans", {"discord_id": "12ab"}, headers=admin)[0] == 400

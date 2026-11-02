@@ -38,8 +38,24 @@ try {
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
   const page = await browser.newPage();
+  // Local browser checks must not wait for the public analytics service.
+  await page.route('https://nexus.mrbruh.com/**', (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: '', headers: { 'Access-Control-Allow-Origin': '*' } }));
   page.on('console', (message) => log.push(message.text()));
   page.on('pageerror', (error) => log.push('page error: ' + error));
+  // Connected controllers are polled before the game clock is initialized.
+  // Keep both neutral: this checks real startup, without changing bindings.
+  await page.addInitScript(() => {
+    const pads = [0, 1].map((index) => ({
+      id: `Startup test controller ${index}`, index, connected: true,
+      mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+    }));
+    Object.defineProperty(navigator, 'getGamepads', { value: () => {
+      for (const pad of pads) pad.timestamp = performance.now();
+      return pads;
+    } });
+  });
 
   await page.goto(url);
   await page.waitForFunction(() => window.crossOriginIsolated && document.querySelectorAll('#checks li').length >= 5,
@@ -70,6 +86,10 @@ try {
   if (!log.some((line) => /data root: \/data/.test(line))) fail('the game did not mount the storage at /data');
   if (!log.some((line) => /OpenGL ES 3\.0 \(WebGL 2/.test(line))) fail('the game did not set up WebGL 2');
   if (!log.some((line) => /couldn't find map 'ui'/.test(line))) fail('the game did not get as far as the maps');
+  for (const index of [0, 1]) {
+    if (!log.some((line) => line.includes(`gamepad: Startup test controller ${index}`)))
+      fail(`the game did not poll controller ${index}`);
+  }
   if (!(await page.isHidden('#fatal'))) fail('the game stopped: ' + (await page.textContent('#fatal-text')));
   console.log('the game started and looked for its maps');
 } catch (error) {

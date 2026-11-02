@@ -148,15 +148,22 @@ enum
 	units' cameras (a VR build's hand), to the host, unreliably, every tick
 	while they do (network_damage.c): its line of sight check's */
 	_distributed_message_fire_origins = 93,
+	/* a dedicated server's vote for the next game (network_map_vote.c), in
+	the lobby too, reliably: the host's choices and their votes, to every
+	client, once a second and as they change, and the one that won; a
+	client's choice, to the host, which takes it only from the machine's own
+	stream */
+	_distributed_message_map_vote = 94,
+	_distributed_message_map_vote_choice = 95,
 
 	/* MCC-only extra grenade slots; ordinary inventory packets stay exact. */
-	_distributed_message_mcc_grenades = 94,
+	_distributed_message_mcc_grenades = 96,
 	/* MCC-only campaign gravity and breadcrumb state. */
-	_distributed_message_mcc_campaign = 95,
+	_distributed_message_mcc_campaign = 97,
 	/* Expanded MCC scenario-name presence, in bounded chunks. */
-	_distributed_message_mcc_object_names = 96,
+	_distributed_message_mcc_object_names = 98,
 	/* MCC host-authorized speed, ordered on the reliable stream, even paused. */
-	_distributed_message_mcc_game_speed = 97,
+	_distributed_message_mcc_game_speed = 99,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -347,10 +354,16 @@ void distributed_send_notice_to_machine(long machine_index, char const *text);
 (seconds since 1970; 0: for ever), written in its bans.txt line */
 void network_distributed_ban_details(char const *reason, unsigned long until);
 /* (the host: a dedicated server's sv_ban_address) a ban's line in bans.txt
-for an address (its text; "none" for none) and a hardware id (empty for
-none), as the ban command writes one: TRUE if it was written */
-boolean network_distributed_ban_record(char const *address, char const *hardware_id, char const *names,
-	char const *reason, unsigned long until);
+for an address (its text; "none" for none), a hardware id and a verified
+Discord account's id (each empty for none), as the ban command writes one:
+TRUE if it was written */
+boolean network_distributed_ban_record(char const *address, char const *hardware_id, char const *discord_id,
+	char const *names, char const *reason, unsigned long until);
+/* (the host) a client machine's Discord account, its id and username: a
+verified one's (a pass that checked, network_link.c), else the one it told
+(empty for none); TRUE if it is verified */
+boolean network_distributed_machine_discord(long machine_index, char *discord_id, long discord_id_size,
+	char *discord_name, long discord_name_size);
 /* whether the next ban drops its machine and keeps it out without its line
 in bans.txt (network_distributed_ban_record wrote it) */
 void network_distributed_ban_unrecorded(boolean unrecorded);
@@ -451,6 +464,7 @@ void network_objects_client_tick(void);
 /* (the host) a client has loaded the game and asks for the host's objects:
 again, having failed to make one of them */
 void network_objects_client_asked(long machine_index, boolean again);
+void network_objects_host_reverted(void);
 void network_objects_handle_changes(void const *entries, short count);
 void network_objects_handle_synchronized(void);
 /* (host_time: the message's, the host's tick its states are of) */
@@ -464,6 +478,8 @@ void network_objects_apply_vehicle_predictions(void);
 word network_objects_entry_size(byte type);
 /* whether this client has the host's object at this index */
 boolean network_objects_client_has(long object_index);
+/* Host says alive: recover a dead client copy after a co-op restore. */
+void network_objects_expect_live_unit(long object_index);
 /* moves the object where the host has it, drawn gliding from where it was */
 void network_objects_correct(long object_index, real_point3d const *position, real_vector3d const *forward,
 	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity);

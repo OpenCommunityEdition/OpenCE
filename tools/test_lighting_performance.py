@@ -1,6 +1,28 @@
 """Check that benchmark reports retain real stalls and separate capture overhead."""
 import pytest
 from lighting_performance_run import distribution, summarize, memory_window_mib
+from lighting_performance_build import ROOT, instrument_shader_stalls
+from harness import function
+
+
+@pytest.mark.parametrize('name,kind', [('xgpu_compile_shader', 0),
+                                     ('xgpu_link_program', 1), ('program_get', 1)])
+def test_shader_stall_clocks_cover_real_compile_and_link_paths(name, kind):
+    source = (ROOT/'port/linux/src/d3d8_gl.c').read_text()
+    body = function(instrument_shader_stalls(source), name)
+    begin = body.index(f'lighting_stall_shader_begin({kind});')
+    operation = body.index('glCompileShader(' if kind == 0 else 'glLinkProgram(')
+    status = body.index('GL_COMPILE_STATUS' if kind == 0 else 'GL_LINK_STATUS')
+    end = body.index(f'lighting_stall_shader_end({kind});')
+    assert begin < operation < status < end
+    assert body.count('lighting_stall_shader_begin(') == 1
+    assert body.count('lighting_stall_shader_end(') == 1
+
+
+def test_binary_cache_status_does_not_end_a_link_timer():
+    source = (ROOT/'port/linux/src/d3d8_gl.c').read_text()
+    body = function(instrument_shader_stalls(source), 'program_cache_load')
+    assert 'lighting_stall_shader_' not in body
 
 
 def test_percentiles_and_slow_frame_budget():

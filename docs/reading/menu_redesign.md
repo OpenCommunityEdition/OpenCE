@@ -763,3 +763,70 @@ Evidence is retained in `build/frontend-phase8-*.log` and selected
 archives with original paths recorded. Disposable fixtures, duplicate captures,
 temporary dependency staging and independent compile outputs are cleaned after
 the runs; the required Windows/web builds remain available.
+
+### Online third-person merge, 2 November 2026
+
+The menu checkpoint `e4bef11d9` integrates `online-third-person` at `f7fa7dcf7`,
+including its upstream OpenCE prerequisites. The resulting code contains no
+stencil-shadow feature, setting or hooks. Ordinary inherited stencil APIs are
+unchanged. The incoming protocols remain OpenCE 41, MCC 63, third-person 32712
+and third-person MCC 32713. This menu integration does not change wire formats
+or authoritative simulation, so it introduces no further protocol revision.
+
+[frontend_menu.py](../../tools/frontend_menu.py) adds the native Shoulder Camera
+inventory below Modern Video > First Person. It uses the same pending settings,
+Save and Cancel flow as other Modern settings pages. The third-person preference
+remains off by default. [frontend_multiplayer.py](../../tools/frontend_multiplayer.py)
+adds a Modern Session Options presentation reached from Server Setup, retaining
+the native compatibility and host camera-policy callbacks and value indices.
+Crossplay and Player Choice remain the defaults. Shorter Modern captions and
+wider value columns keep the choices legible at 4:3 without changing row fonts.
+
+The combined review covered menu callback/data registrations, generated routes,
+input ownership, defaults, source hooks and map-family guards. Upstream server
+screens introduced another gradient and a generic header widget; replacing both
+variants in the Modern generator prevents a legacy border and title appearing
+under the Modern header. Raw device observation still precedes input filtering,
+but Modern key handling now follows upstream held-key suppression. Camera wheel
+capture retains its upstream position before normal weapon-wheel handling.
+Feature logic remains in its existing modules. No additional shared-engine or
+MCC hooks were required. Starting menus, the native server browser, gameplay
+pause menus and the main-menu-only style-switch boundary remain intact.
+
+The merge regression run passed **253 tests with one existing socket-harness
+skip**, covering frontend layout/navigation, glyphs/remapping, camera policy and
+wire behavior, checkpoints, MCC menu/camera boundaries and web generation.
+After the header fix, all **25 affected frontend tests** passed again. All
+**36 web JavaScript tests** passed. Final Windows and web release builds passed;
+Windows retains existing Expat linker warnings. The web build used the installed
+SDL cache and a temporary local Ninja wrapper for Windows-host dependency/copy
+commands; this does not establish a clean dependency bootstrap. The Android
+target was attempted but blocked by missing staged SDL sources. WSL2 and an
+Android device are unavailable; no successful full Android or Linux build/runtime
+is claimed for this combined merge.
+
+Hidden Windows runs rendered the shoulder settings at 16:9 and Session Options
+at 4:3. Normal host-menu navigation selected Third Person compatibility and
+Forced On, with both values verified in the isolated saved configuration.
+The corrected Session Options capture has one title, clear section spacing and
+unclipped policy choices. Headless Edge 156.0.4314.58 also rendered the actual
+web shoulder settings and changed a pending height value through keyboard input.
+
+Five isolated two-instance Windows cases passed host/client policy checks and
+five two-player samples per peer: Forced On, Forced Off, Player Choice with
+different preferences, late joining, and the opening co-op sequence. The co-op
+intro retained its cinematic camera; this is policy/join evidence, not rendered
+shoulder-camera or full campaign coverage. These were local loopback tests with
+internet discovery disabled. No new combined-build CE/MCC gameplay, WAN,
+native/browser WebRTC, physical-controller or split-screen runtime coverage is
+claimed. Earlier phase checks and the separate
+[third-person qualification](third_person_qualification.md) are distinct evidence,
+not substitutes for those remaining combined-build checks.
+
+Logs are retained in `build/third-person-merge-*.log`, with per-peer results in
+`build/merge-camera-runtime/`, selected Windows captures in
+`build/frontend-smoke/merge-third-person-*` and browser captures in
+`build/merge-camera-web-runtime/`. Test-save archives retain original paths and
+verified hashes; disposable cache maps, copied maps/binaries, duplicate captures
+and temporary test dependencies are removed. Original profile hashes were checked
+unchanged. The required Windows/web builds remain available for further testing.

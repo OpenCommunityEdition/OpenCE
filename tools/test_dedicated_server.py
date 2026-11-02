@@ -6,13 +6,16 @@ maps in assets/maps and ninja linux's build/linux/halo; every machine runs from 
 tmp_path (its config.toml, data root, saves and home), on loopback addresses of its own, offline (system link), with
 no window, sound, update check or Discord."""
 
+import base64
 import codecs
+import hashlib
 import json
 import os
 import re
 import shutil
 import signal
 import socket
+import struct
 import subprocess
 import time
 import urllib.error
@@ -641,3 +644,271 @@ def test_probe_prints_the_server(machines):
     assert game["ok"] and game["name"] == "Probe Me" and game["map"] == "prisoner", game
     assert game["gametype"] == "ctf" and game["dedicated"] and game["players"] == 0, game
     assert not (prober.folder / "bin" / "config.toml").exists(), "the probe wrote its settings"
+
+
+# ---------- VPNs and linked Discord accounts (docs/dedicated_server.md; docs/master_protocol.md, "The netlist",
+# "Player keys, links and passes")
+
+MASTER_SEED = bytes(range(32))
+PUBLISHER_SEED = bytes(range(32, 64))
+
+
+class FakeMaster:
+    """a master server on loopback: it serves a signed netlist and the passes of the player keys linked to it, and
+    takes a server's publishes (ed25519_ref signs: tools/ed25519_ref.py)"""
+
+    def __init__(self, ranges, seed=MASTER_SEED):
+        import http.server
+        import sys
+        import threading
+
+        sys.path.insert(0, str(ROOT / "tools"))
+        import ed25519_ref
+
+        self.ed25519 = ed25519_ref
+        self.seed = seed
+        self.public_key = ed25519_ref.public_key(seed)
+        self.key_id = hashlib.sha256(self.public_key).digest()[:8]
+        self.links = {}
+        self.asked = []
+        self.netlist = netlist_body(ranges, serial=1)
+        master = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *arguments):
+                pass
+
+            def answer(self, status, body, content_type="application/json", headers=()):
+                self.send_response(status)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(body)))
+                for name, value in headers:
+                    self.send_header(name, value)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_PUT(self):
+                self.rfile.read(int(self.headers.get("Content-Length", 0)))
+                self.answer(200, json.dumps({"ok": True, "listed": True, "interval": 30, "ttl": 90,
+                                             "probe": "skipped", "reachable": True,
+                                             "master_time": int(time.time())}).encode())
+
+            do_DELETE = do_PUT
+
+            def do_GET(self):
+                from urllib.parse import parse_qs, urlparse
+
+                url = urlparse(self.path)
+                master.asked.append(url.path)
+                if url.path == "/v1/netlist":
+                    signature = master.ed25519.sign(master.seed, master.netlist)
+                    self.answer(200, master.netlist, "application/octet-stream", [
+                        ("Signature", "ed25519=" + base64.b64encode(signature).decode()),
+                        ("Signature-Key", master.key_id.hex())])
+                elif url.path == "/v1/pass":
+                    query = parse_qs(url.query)
+                    key = bytes.fromhex(query["key"][0])
+                    signed = f"opence-pass-get-1\n{master.key_id.hex()}\n{key.hex()}\n{query['ts'][0]}".encode()
+                    if not master.ed25519.verify(key, signed, bytes.fromhex(query["sig"][0])):
+                        self.answer(401, b'{"ok":false,"error":{"code":"bad_signature"}}')
+                    elif key not in master.links:
+                        self.answer(404, b'{"ok":false,"error":{"code":"not_linked"}}')
+                    else:
+                        self.answer(200, master.make_pass(key, *master.links[key]), "application/octet-stream")
+                else:
+                    self.answer(404, b'{"ok":false,"error":{"code":"not_found"}}')
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def masters_line(self):
+        return f"{self.url} ed25519:{self.public_key.hex()}\n"
+
+    def make_pass(self, player_key, discord_id, name, issued=None, flags=1):
+        issued = int(time.time()) if issued is None else issued
+        body = (b"OPCEPASS" + bytes([1, flags]) + self.key_id + player_key + struct.pack(">Q", discord_id) +
+                name.encode().ljust(32, b"\0") + struct.pack(">QQ", issued, issued + 72 * 3600))
+        return body + self.ed25519.sign(self.seed, b"opence-pass-1" + body)
+
+    def close(self):
+        self.server.shutdown()
+
+
+def netlist_body(ranges, serial):
+    """a netlist (docs/master_protocol.md) of (first, last) dotted IPv4 ranges"""
+    def number(text):
+        return struct.unpack(">I", socket.inet_aton(text))[0]
+
+    pairs = sorted((number(first), number(last)) for first, last in ranges)
+    return (b"OPCENET1" + bytes([1, 0, 0, 0]) + struct.pack(">QQI", int(time.time()), serial, len(pairs)) +
+            b"".join(struct.pack(">II", first, last) for first, last in pairs))
+
+
+def snowflake(created):
+    """a Discord id made at the Unix time"""
+    return (created * 1000 - 1420070400000) << 22
+
+
+def linked_player(machine, master, seed, discord_id, name, masters=None):
+    """a player machine with a player key linked at the master, and its pass already held (its masters.txt the
+    master's, or those given, in their order)"""
+    public = master.ed25519.public_key(seed)
+    (machine.folder / "bin" / "masters.txt").write_text("".join(each.masters_line() for each in masters or [master]))
+    (machine.folder / "bin" / "player.key").write_text(f"# test\n{seed.hex()}\n")
+    (machine.folder / "bin" / f"pass-{master.key_id.hex()}.bin").write_bytes(
+        master.make_pass(public, discord_id, name))
+    master.links[public] = (discord_id, name)
+    return machine
+
+
+def test_vpn_policy_and_linked_discord_accounts(machines):
+    """a server whose masters' netlist lists its clients' addresses (server.vpn_check_lan, as on the LAN): a client
+    with no Discord account is refused (vpn_link_required, a join_refused event); one with a pass of an account a
+    year old, linked at the master the server publishes to, is refused, joins again at once with its pass and plays
+    as that verified account; a young account is refused (server.link_min_age_days), and so is the account's second
+    machine (server.link_one_seat); with server.vpn_policy block a pass does not help; and a ban of the account drops
+    it, its line in bans.txt a verified account's"""
+    _needs_game("bloodgulch")
+    clients = ("127.0.0.202", "127.0.0.203", "127.0.0.204", "127.0.0.205", "127.0.0.206")
+    master = FakeMaster([("127.0.0.202", "127.0.0.206")])
+    try:
+        port = _free_port()
+        server_machine = machines("server")
+        (server_machine.folder / "bin" / "masters.txt").write_text(master.masters_line())
+        server = server_machine.start(["--server"], **_server_settings(
+            port, HALO_NET_BROADCAST=",".join(clients), HALO_SERVER_ROTATION="bloodgulch:slayer",
+            HALO_SERVER_PUBLISHER_KEY=PUBLISHER_SEED.hex(), HALO_SERVER_VPN_CHECK_LAN="true",
+            HALO_SERVER_LOG_ADDRESSES="true", HALO_SERVER_LOBBY_SECONDS=300))
+        api = Api(port)
+        _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+        _until(lambda: "netlist taken" in server.text(), 30, "the master's netlist", server)
+        api.login()
+        status, vpn = api.call("GET", "/api/vpn")
+        assert status == 200 and vpn["policy"] == "link" and vpn["held"], vpn
+        assert vpn["lists"][0]["ranges"] == 1 and vpn["lists"][0]["key_id"] == master.key_id.hex(), vpn
+        assert api.call("POST", "/api/vpn/check", {"ip": "127.0.0.203"})[1]["by"] == "netlist"
+        assert api.call("POST", "/api/vpn/check", {"ip": "127.0.0.9"})[1]["listed"] is False
+
+        # (no Discord account: refused)
+        _client(machines("unlinked"), clients[0], "Nobody")
+        _until(lambda: "refused at the door (vpn_link_required)" in server.text(), 90, "the unlinked refused", server)
+        refused = [event for event in api.events() if event.get("event") == "join_refused"]
+        assert refused and refused[0]["reason"] == "vpn_link_required" and refused[0]["name"], refused
+        assert not api.call("GET", "/api/players")[1]["players"], "a machine with no account joined"
+
+        # (an account a year and more old: in, verified)
+        old_id = snowflake(int(time.time()) - 400 * 86400)
+        linked = linked_player(machines("linked"), master, bytes([7] * 32), old_id, "nelly")
+        _client(linked, clients[1], "Linked")
+        _until(lambda: [player for player in api.call("GET", "/api/players")[1]["players"]
+                        if player["name"] == "Linked"], 90, "the linked player in", server)
+        player = [p for p in api.call("GET", "/api/players")[1]["players"] if p["name"] == "Linked"][0]
+        assert player["discord_verified"] is True and player["discord_name"] == "nelly", player
+        assert player["discord_id"] == str(old_id), player
+        assert "shows the Discord account nelly" in server.text()
+        joined = [event for event in api.events() if event.get("event") == "player_joined" and event["name"] == "Linked"]
+        assert joined and joined[0]["discord_verified"] is True, joined
+
+        # (a young account: refused)
+        young = linked_player(machines("young"), master, bytes([9] * 32), snowflake(int(time.time()) - 10 * 86400),
+                              "fresh")
+        _client(young, clients[2], "Young")
+        _until(lambda: "refused at the door (vpn_link_too_new)" in server.text(), 90, "the young account refused",
+               server)
+
+        # (the linked account on a second machine while it plays: refused, server.link_one_seat)
+        twin = linked_player(machines("twin"), master, bytes([7] * 32), old_id, "nelly")
+        _client(twin, clients[4], "Twin")
+        _until(lambda: "refused at the door (vpn_link_in_use)" in server.text(), 90, "the second seat refused", server)
+
+        # (server.vpn_policy block: a pass does not help)
+        status, answer = api.call("PUT", "/api/settings", {"server.vpn_policy": "block"})
+        assert answer["applied"] == ["server.vpn_policy"], answer
+        blocked = linked_player(machines("blocked"), master, bytes([11] * 32),
+                                snowflake(int(time.time()) - 800 * 86400), "elder")
+        _client(blocked, clients[3], "Blocked")
+        _until(lambda: "refused at the door (vpn_blocked)" in server.text(), 90, "the VPN blocked", server)
+        assert [p["name"] for p in api.call("GET", "/api/players")[1]["players"]] == ["Linked"]
+
+        # (the account banned: dropped, and its line in bans.txt a verified one; last, since every machine of
+        # this test has the same hardware id, which the ban keeps out too)
+        status, answer = api.call("POST", "/api/bans", {"discord_id": str(old_id), "reason": "test"})
+        assert status == 200 and answer["ok"], answer
+        _until(lambda: not [p for p in api.call("GET", "/api/players")[1]["players"] if p["name"] == "Linked"], 30,
+               "the banned account dropped", server)
+        bans = api.call("GET", "/api/bans")[1]["bans"]
+        assert bans[-1]["discord_id"] == str(old_id) and bans[-1]["discord_verified"] is True, bans
+        assert f"discord_id={old_id}\t" in (server_machine.folder / "data" / "bans.txt").read_text()
+        counts = api.call("GET", "/api/vpn")[1]["refused"]
+        assert counts["vpn_link_required"] >= 1 and counts["vpn_link_too_new"] >= 1 and counts["vpn_blocked"] >= 1 and \
+            counts["vpn_link_in_use"] >= 1, counts
+        server.send("quit")
+        assert server.wait(15) == 0, server.text()[-3000:]
+    finally:
+        master.close()
+
+
+def test_vpn_policy_off_and_no_list(machines):
+    """server.vpn_fail closed refuses machines from the internet's (here the LAN's, server.vpn_check_lan) while no
+    netlist is held; vpn_allow.txt lets one in; server.vpn_policy off lets everyone in"""
+    _needs_game("bloodgulch")
+    port = _free_port()
+    server_machine = machines("server")
+    (server_machine.folder / "data" / "vpn_allow.txt").write_text("# the second client\n127.0.0.203\n")
+    server = server_machine.start(["--server"], **_server_settings(
+        port, HALO_SERVER_ROTATION="bloodgulch:slayer", HALO_SERVER_VPN_CHECK_LAN="true",
+        HALO_SERVER_VPN_FAIL="closed", HALO_SERVER_MASTER_PUBLISH="false", HALO_SERVER_LOBBY_SECONDS=300))
+    api = Api(port)
+    _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+    api.login()
+    assert api.call("GET", "/api/vpn")[1]["held"] is False
+    first = _client(machines("first"), CLIENT_ADDRESSES[0], "First")
+    _until(lambda: "refused at the door (vpn_blocked)" in server.text(), 90, "the first refused", server)
+    _client(machines("second"), CLIENT_ADDRESSES[1], "Second")
+    _until(lambda: [p for p in api.call("GET", "/api/players")[1]["players"] if p["name"] == "Second"], 90,
+           "the allowed machine in", server)
+    status, answer = api.call("PUT", "/api/settings", {"server.vpn_policy": "off"})
+    assert answer["applied"] == ["server.vpn_policy"], answer
+    # (a refused test client gives up: another, of the same address, joins)
+    first.stop()
+    _client(machines("again"), CLIENT_ADDRESSES[0], "Again")
+    _until(lambda: [p for p in api.call("GET", "/api/players")[1]["players"] if p["name"] == "Again"], 120,
+           "a machine of that address in once the policy is off", server)
+    server.send("quit")
+    assert server.wait(15) == 0, server.text()[-3000:]
+
+
+def test_vpn_link_with_one_of_a_servers_masters(machines):
+    """a server that publishes to two masters takes a pass of either; a player linked with the second alone (its
+    masters.txt naming both, the first before) joins with that one's pass: the first's, which it has none of, is
+    not asked for"""
+    _needs_game("bloodgulch")
+    first, second = FakeMaster([("127.0.0.202", "127.0.0.203")]), \
+        FakeMaster([("127.0.0.202", "127.0.0.203")], seed=bytes(range(64, 96)))
+    try:
+        port = _free_port()
+        server_machine = machines("server")
+        (server_machine.folder / "bin" / "masters.txt").write_text(first.masters_line() + second.masters_line())
+        server = server_machine.start(["--server"], **_server_settings(
+            port, HALO_SERVER_ROTATION="bloodgulch:slayer", HALO_SERVER_PUBLISHER_KEY=PUBLISHER_SEED.hex(),
+            HALO_SERVER_VPN_CHECK_LAN="true", HALO_SERVER_LOG_ADDRESSES="true", HALO_SERVER_LOBBY_SECONDS=300))
+        api = Api(port)
+        _until(lambda: "server: ready" in server.text(), 90, "server: ready", server)
+        _until(lambda: server.text().count("netlist taken") == 2, 30, "both masters' netlists", server)
+        api.login()
+        assert len(api.call("GET", "/api/vpn")[1]["lists"]) == 2
+        linked = linked_player(machines("linked"), second, bytes([5] * 32), snowflake(int(time.time()) - 900 * 86400),
+                               "second_only", masters=[first, second])
+        _client(linked, CLIENT_ADDRESSES[0], "Linked")
+        _until(lambda: [p for p in api.call("GET", "/api/players")[1]["players"] if p["name"] == "Linked"], 90,
+               "the player linked with the second master in", server)
+        player = [p for p in api.call("GET", "/api/players")[1]["players"] if p["name"] == "Linked"][0]
+        assert player["discord_verified"] and player["discord_name"] == "second_only", player
+        assert "joining again with " + second.url + "'s pass" in linked.text(), linked.text()[-2000:]
+        server.send("quit")
+        assert server.wait(15) == 0, server.text()[-3000:]
+    finally:
+        first.close()
+        second.close()

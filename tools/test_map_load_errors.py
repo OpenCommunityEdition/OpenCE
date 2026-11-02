@@ -104,6 +104,7 @@ static int mcc_scripts_prepare(struct mcc_runtime *r) {
 int mcc_geometry_prepare(struct mcc_runtime *r) {(void)r;return fail!=10;}
 int mcc_audio_prepare(struct mcc_runtime *r) {(void)r;return fail!=11;}
 int mcc_bitmaps_prepare(struct mcc_runtime *r) {(void)r;return fail!=12;}
+void mcc_bitmaps_prepare_gpu(struct mcc_runtime *r) {(void)r;}
 static int mcc_tags_validate(struct mcc_runtime *r) {(void)r;return fail!=13;}
 int mcc_runtime_read(struct mcc_runtime *r,uint32_t off,uint32_t size,void *out) {(void)r;(void)off;memset(out,0,size);return fail!=14;}
 static int mcc_script_threads_prepare(void) {return fail!=15;}

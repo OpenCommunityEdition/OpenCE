@@ -387,6 +387,17 @@ def test_labels_and_values_fit_narrow_layout():
                 assert frontend_menu.text_width(caption, size) <= 136, caption
 
 
+def test_shoulder_camera_settings_are_reachable_and_use_pending_edits():
+    doc = ET.fromstring(frontend_menu.document())
+    widgets = {w.get('name'): w for w in doc.findall('widget')}
+    page = next(i for i, spec in enumerate(frontend_menu.PAGES) if spec[0] == 'shoulder_camera')
+    assert widgets[f'modern/first_person/row_link_{page}'].find("on[@event='a']").get('run') == 'port frontend page'
+    settings = {w.get('setting') for w in widgets.values() if w.get('name').startswith('modern/shoulder_camera/')}
+    assert settings - {None} == {row[1] for row in frontend_menu.SCREENS['video_settings/shoulder_camera']['rows']}
+    assert widgets['modern/shoulder_camera/button_cancel'].find("on[@event='a']").get('run') == 'port frontend cancel'
+    assert widgets['modern/shoulder_camera/button_apply'].find("on[@event='a']").get('run') == 'port frontend apply'
+
+
 def test_scroll_hook_precedes_pointer_registration():
     render = function((ROOT / 'source/interface/ui_widget.c').read_text(), 'widget_instance_render_recursive')
     assert render.index('frontend_menu_row_drawable(widget)') < render.index('ui_mouse_note_target(widget, definition, offset)')

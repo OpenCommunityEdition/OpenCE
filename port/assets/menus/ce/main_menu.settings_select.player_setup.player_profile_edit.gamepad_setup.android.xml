@@ -79,7 +79,7 @@
 		<string text=""/>
 		<string text="Auto shows touch controls without a gamepad.\nOn also shows them with a connected gamepad."/>
 		<string text="Apply controller aim assistance to touch aiming."/>
-		<string text="Show Cheats in the touch overlay's Options.\nOffline games only. Off by default."/>
+		<string text="Show a CHEATS touch button and Options entry.\nOffline or game host only. Off by default."/>
 		<string text="Phone gyro mode, sensitivity and inversion.\nTouch settings keeps your saved layout."/>
 	</strings>
 </menus>

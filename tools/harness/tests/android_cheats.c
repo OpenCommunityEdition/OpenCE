@@ -22,12 +22,13 @@ static struct { boolean deathless_player, infinite_ammo, bottomless_clip, super_
 boolean rider_ejection = TRUE;
 static int vehicles;
 static void cheat_all_vehicles(void) { vehicles++; }
-static int enabled, playing, cinematic, network, local, weapons, powerups, camouflage;
+static int enabled, playing, cinematic, network, local, hosting, client_lobby, weapons, powerups, camouflage;
 static int config_boolean(char const *name) { (void)name; return enabled; }
 static int touch_game_playing(void) { return playing; }
 static int touch_game_cinematic_playing(void) { return cinematic; }
-static boolean network_game_is_active(void) { return network; }
-static boolean network_game_is_splitscreen_local(void) { return local; }
+static boolean network_game_distributed_client(void) { return network && !local && !hosting; }
+static void *global_network_game_client_get(void) { return network || client_lobby ? (void *)1 : NULL; }
+static void *global_network_game_server_get(void) { return local || hosting ? (void *)1 : NULL; }
 static void cheat_all_weapons(void) { weapons++; }
 static void cheat_all_powerups(void) { powerups++; }
 static void cheat_active_camouflage_local_player(short player) { CHECK(player == 0, "wrong player"); camouflage++; }
@@ -40,7 +41,8 @@ int main(int argc, char **argv)
 	int i;
 	CHECK(argc == 2, "case");
 	playing = 1;
-	if (!strcmp(argv[1], "disabled"))
+	if (!strncmp(argv[1], "host", 4)) network = hosting = 1;
+	if (!strcmp(argv[1], "disabled") || !strcmp(argv[1], "host-disabled"))
 	{
 		android_cheats_update();
 		CHECK(state_read() == 0 && !request(0x100), "default enabled");
@@ -49,7 +51,7 @@ int main(int argc, char **argv)
 	enabled = 1;
 	android_cheats_update();
 	CHECK((state_read() & 3) == 3, "offline unavailable");
-	if (!strcmp(argv[1], "offline"))
+	if (!strcmp(argv[1], "offline") || !strcmp(argv[1], "host"))
 	{
 		CHECK(request(0x100) && request(9) && request(10) && request(11), "rejected typed request");
 		android_cheats_update();
@@ -81,14 +83,34 @@ int main(int argc, char **argv)
 		CHECK(request(9), "queue before transition");
 		network = 1;
 		android_cheats_update();
-		CHECK(state_read() == 1 && !request(9) && weapons == 0, "network host/client accepted cheat");
+		CHECK(state_read() == 1 && !request(9) && weapons == 0, "network client accepted cheat");
 		local = 1;
 		android_cheats_update();
 		CHECK(request(9), "offline split screen rejected");
 		android_cheats_update();
 		CHECK(weapons == 1, "stale request survived transition");
 	}
-	else if (!strcmp(argv[1], "reset"))
+	else if (!strcmp(argv[1], "host-client"))
+	{
+		CHECK(request(0x100), "host switch refused");
+		android_cheats_update();
+		CHECK(cheat.deathless_player && request(9), "host request refused");
+		hosting = 0;
+		android_cheats_update();
+		CHECK(!cheat.deathless_player && state_read() == 1 && !request(9) && weapons == 0,
+			"host privilege or queued request survived joining another host");
+		hosting = 1;
+		android_cheats_update();
+		CHECK((state_read() & 3) == 3 && weapons == 0, "new host inherited a queued request");
+	}
+	else if (!strcmp(argv[1], "client-lobby"))
+	{
+		CHECK(request(9), "queue before joining");
+		client_lobby = 1;
+		android_cheats_update();
+		CHECK(state_read() == 1 && !request(9) && weapons == 0, "joining lobby accepted cheat");
+	}
+	else if (!strcmp(argv[1], "reset") || !strcmp(argv[1], "host-reset"))
 	{
 		cheat.infinite_ammo = TRUE;
 		CHECK(request(0x100) && request(1), "switch requests");
@@ -107,7 +129,7 @@ int main(int argc, char **argv)
 		android_cheats_reset();
 		CHECK(cheat.infinite_ammo, "repeated reset lost original setting");
 	}
-	else if (!strcmp(argv[1], "cinematic"))
+	else if (!strcmp(argv[1], "cinematic") || !strcmp(argv[1], "host-cinematic"))
 	{
 		CHECK(request(0x100), "deathless request");
 		android_cheats_update();

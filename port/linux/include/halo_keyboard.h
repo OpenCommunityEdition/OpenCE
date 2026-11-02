@@ -38,10 +38,20 @@ enum halo_keyboard_action
 	/* (voice chat's, which the game itself does not read:
 	halo_push_to_talk_held) */
 	HALO_KEYBOARD_PUSH_TO_TALK,
+	HALO_KEYBOARD_SWAP_SHOULDER,
+	HALO_KEYBOARD_FREE_LOOK,
+	HALO_KEYBOARD_TOGGLE_PERSPECTIVE,
 	/* (the text chat's, which the game itself does not read: a line to
 	everyone, or to the team: port/linux/game/network_chat.c) */
 	HALO_KEYBOARD_CHAT,
 	HALO_KEYBOARD_TEAM_CHAT,
+	HALO_KEYBOARD_CAMERA_DISTANCE,
+	/* (the players' votes', yes and no in the vote running: port/linux/game/
+	network_votekick.c, read with the chat's keys) */
+	HALO_KEYBOARD_VOTE_YES,
+	HALO_KEYBOARD_VOTE_NO,
+	HALO_KEYBOARD_CAMERA_HEIGHT,
+	HALO_KEYBOARD_CAMERA_OFFSET,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 
@@ -80,6 +90,10 @@ enum halo_chat_pad_button
 };
 
 unsigned long halo_chat_pad_buttons(void);
+/* whether the first player last used a controller (a button pressed, a
+stick moved) rather than the keyboard and mouse: the vote's box shows the
+D-pad's keys then (port/linux/game/network_votekick.c) */
+int halo_gamepad_last_used(void);
 /* Raw physical snapshot: suppress the button which opened controller chat. */
 unsigned long halo_chat_pad_buttons_for_port(short port);
 /* the taps on the touchscreen outside the menus since the last call while
@@ -90,5 +104,8 @@ int halo_chat_taps(float *x, float *y);
 then goes at the top left: on Android, and in a browser once its touch
 controls have been used */
 int halo_chat_touch_layout(void);
+/* the mouse wheel's notches turned while a chat line is typed, since the
+last call (up positive): they scroll the lines, not the weapons */
+int halo_chat_wheel_steps(void);
 
 #endif

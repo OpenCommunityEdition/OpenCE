@@ -13,6 +13,24 @@ from lighting_trace_check import instrument
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def instrument_shader_stalls(text):
+    # Desktop program_get links directly when its binary cache misses;
+    # xgpu_link_program alone no longer covers gameplay shader links.
+    for kind, call, status in [
+        (0, 'glCompileShader(shader);', 'glGetShaderiv(shader, GL_COMPILE_STATUS, &status);'),
+        (1, 'glLinkProgram(program);', 'glGetProgramiv(program, GL_LINK_STATUS, &status);'),
+        (1, 'glLinkProgram(entry->program);', 'glGetProgramiv(entry->program, GL_LINK_STATUS, &status);'),
+    ]:
+        assert text.count(call) == 1
+        start = text.index(call)
+        # The binary-cache loader also checks GL_LINK_STATUS. Time only
+        # the status query following this compile/link operation.
+        end = text.index(status, start) + len(status)
+        text = (text[:start] + f'lighting_stall_shader_begin({kind});\n\t' +
+                text[start:end] + f'\n\tlighting_stall_shader_end({kind});' + text[end:])
+    return text
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output-dir', type=Path, default=ROOT/'build/lighting-performance-build')
@@ -105,12 +123,7 @@ def main():
             fixture.write_text(text)
         if args.stalls:
             backend = ROOT/paths[1]
-            text = backend.read_text()
-            for kind, call, status in [(0, 'glCompileShader(shader);', 'glGetShaderiv(shader, GL_COMPILE_STATUS, &status);'),
-                                       (1, 'glLinkProgram(program);', 'glGetProgramiv(program, GL_LINK_STATUS, &status);')]:
-                assert text.count(call) == 1 and text.count(status) == 1
-                text = text.replace(call, f'lighting_stall_shader_begin({kind});\n\t'+call)
-                text = text.replace(status, status+f'\n\tlighting_stall_shader_end({kind});')
+            text = instrument_shader_stalls(backend.read_text())
             backend.write_text('void lighting_stall_shader_begin(int);\nvoid lighting_stall_shader_end(int);\n'+text+'\n'+
                                (ROOT/'tools/fixtures/lighting_stall_diagnostics.inc').read_text())
             text = fixture.read_text()

@@ -13,6 +13,8 @@ def test_readiness_reuses_only_unchanged_successful_inputs(tmp_path):
     if not compiler:
         pytest.skip("clang required")
     (tmp_path / "cseries.h").write_text("typedef int boolean;\ntypedef unsigned char byte;\n#define TRUE 1\n#define FALSE 0\n")
+    (tmp_path / "networking").mkdir()
+    (tmp_path / "networking/network_game_globals.h").write_text("struct network_game_server *global_network_game_server_get(void);\n")
     (tmp_path / "xtl.h").write_text(r'''
 #include <stdint.h>
 typedef uint32_t DWORD;
@@ -40,6 +42,11 @@ static char paths[9][128];
 static WIN32_FILE_ATTRIBUTE_DATA files[9];
 static int count,probes,valid=1,mutate,denied=-1,present[9];
 static DWORD last_error;
+static int hosting,prepared;
+struct network_game_server *global_network_game_server_get(void) {return hosting ? (void *)&hosting : NULL;}
+int mcc_validation_lookup(char const *name,uint32_t *checksum,unsigned char digest[32]) {
+ (void)name;(void)checksum;(void)digest;return prepared;
+}
 char const *mcc_identity_local_name(char const *name) {
  return name && !strcmp(name,"mcc_maps/host/a10") ? "mcc_maps/package/a10" : name;
 }
@@ -62,6 +69,10 @@ boolean mcc_cache_require(char const *name,unsigned long checksum) {
 int main(void) {
  int i,old;char const *name="mcc_maps/package/a10";
  present[0]=1;files[0].nFileSizeLow=200;
+ hosting=1;
+ CHECK(!mcc_cache_precache_ready(name));CHECK(!probes);
+ prepared=1;CHECK(mcc_cache_precache_ready(name));CHECK(!probes);
+ hosting=0;
  CHECK(mcc_cache_precache_ready(name));CHECK(probes==1 && count==9);
  for(i=0;i<1000;i++)CHECK(mcc_cache_precache_ready(name));
  CHECK(probes==1);

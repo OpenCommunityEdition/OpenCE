@@ -139,6 +139,7 @@ static FILE *mcc_stream;
 static void cleanup(void *unused){(void)unused;}
 #define mcc_checkpoint_dispose() cleanup(NULL)
 #define mcc_script_threads_dispose() cleanup(NULL)
+#define mcc_validation_cancel() cleanup(NULL)
 #define mcc_cache_validation_clear() cleanup(NULL)
 #define mcc_cache_precache_clear() cleanup(NULL)
     #define mcc_hud_glyphs_dispose() cleanup(NULL)

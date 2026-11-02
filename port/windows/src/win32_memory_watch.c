@@ -83,18 +83,32 @@ void memory_watch_protect(unsigned long address, unsigned long size)
 	if (!watch_active || !size || !in_window(address))
 		return;
 	first = page_index(address);
+	/* Clamp before adding: the caller's range must not wrap around. */
+	if (size > PLATFORM_CONTIGUOUS_SIZE - (address - PLATFORM_CONTIGUOUS_BASE))
+		size = PLATFORM_CONTIGUOUS_SIZE - (address - PLATFORM_CONTIGUOUS_BASE);
 	last = page_index(address + size - 1);
-	if (last >= WATCH_PAGE_COUNT)
-		last = WATCH_PAGE_COUNT - 1;
 	for (page = first; page <= last; page++)
 	{
 		if (page_protected[page] != 1)
 		{
+			unsigned long begin = page, retry;
 			DWORD previous;
 
-			page_protected[page] = 1;
-			VirtualProtect((void *)(PLATFORM_CONTIGUOUS_BASE + page * WATCH_PAGE_SIZE), WATCH_PAGE_SIZE,
-				PAGE_READONLY, &previous);
+			/* A texture commonly spans hundreds of adjacent pages. One
+			 * protection change avoids a kernel call and TLB update per page.
+			 * Publish the watch first so a concurrent write is still caught.
+			 * Separate reservations cannot be protected together on Windows;
+			 * retain the per-page path if the combined request fails. */
+			while (page <= last && page_protected[page] != 1)
+				page_protected[page++] = 1;
+			if (!VirtualProtect((void *)(PLATFORM_CONTIGUOUS_BASE + begin * WATCH_PAGE_SIZE),
+				(page - begin) * WATCH_PAGE_SIZE, PAGE_READONLY, &previous))
+			{
+				for (retry = begin; retry < page; retry++)
+					VirtualProtect((void *)(PLATFORM_CONTIGUOUS_BASE + retry * WATCH_PAGE_SIZE),
+						WATCH_PAGE_SIZE, PAGE_READONLY, &previous);
+			}
+			page--;
 		}
 	}
 }

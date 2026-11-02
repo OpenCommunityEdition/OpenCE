@@ -72,6 +72,11 @@ enum
 
 static SDL_AtomicInt updater_state;
 static long updater_latest_build;
+/* the network version its release's notes give ("Network version: <n>",
+which CI writes since it plays one other than the build before it can), 0
+when they give none */
+static long updater_latest_network_version;
+static long updater_release_network_version;
 static char updater_directory[1024];
 static char updater_executable[1024];
 
@@ -303,7 +308,15 @@ static int zip_extract(SDL_IOStream *zip, char names[][256], int *name_count, ch
 			if (name_length && name[name_length - 1] != '/')
 				platform_log("update: left out %s (not one of a release's names)", name);
 		}
-		else if (*name_count < MAXIMUM_UPDATE_FILES)
+		/* port: a release with more files than this build can install is refused, not installed in part (the
+		files past the limit were left out, and the update still counted as done) */
+		else if (*name_count >= MAXIMUM_UPDATE_FILES)
+		{
+			snprintf(error, error_size, "the download has more files than this build can install (%d)",
+				MAXIMUM_UPDATE_FILES);
+			goto done;
+		}
+		else
 		{
 			int method = (int)zip_word(header + 10);
 
@@ -364,6 +377,12 @@ static long updater_latest_release(void)
 		if (tag && !strncmp(tag, "\"build-", 7))
 			build = strtol(tag + 7, NULL, 10);
 	}
+	/* (and the network version its notes give, "Network version: <n>") */
+	{
+		const char *network = strstr(text, "Network version: ");
+
+		updater_release_network_version = network ? strtol(network + 17, NULL, 10) : 0;
+	}
 	SDL_free(text);
 	return build;
 }
@@ -377,6 +396,7 @@ static int SDLCALL updater_check_thread(void *context)
 	{
 		platform_log("update: build %ld is available (this is build %d)", latest, HALO_BUILD_NUMBER);
 		updater_latest_build = latest;
+		updater_latest_network_version = updater_release_network_version;
 		SDL_SetAtomicInt(&updater_state, _updater_available);
 	}
 	else
@@ -764,6 +784,13 @@ long updater_server_available(void)
 	return SDL_GetAtomicInt(&updater_state) == _updater_available ? updater_latest_build : 0;
 }
 
+/* ... the network version of the newer build the last look found (its
+release's notes'), 0 if not known (an older release's notes give none) */
+long updater_server_available_network_version(void)
+{
+	return updater_latest_network_version;
+}
+
 /* the newer build put in place of this one's files, not started (the server
 stops, to be started again by what runs it): 1, else 0 and why. The game's
 thread waits for the whole download: updater_server_install_start does not */
@@ -965,6 +992,11 @@ int updater_server_check(void)
 }
 
 long updater_server_available(void)
+{
+	return 0;
+}
+
+long updater_server_available_network_version(void)
 {
 	return 0;
 }

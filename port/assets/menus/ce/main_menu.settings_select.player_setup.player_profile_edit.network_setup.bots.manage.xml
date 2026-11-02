@@ -9,7 +9,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/header_profile_network_settings" controller="1" left="35" top="11" width="605" height="59" type="text" text="MANAGE BOTS" font="ui\large_ui" color="#FFFFFFFF" text_y="18">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/help" type="text" controller="1" left="68" top="350" width="482" height="60" font="ui\large_ui" color="#FFFFFFFF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/help" type="text" controller="1" left="68" top="300" width="482" height="110" font="ui\large_ui" color="#FFFFFFFF">
 		<on event="created" run="port bots init"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/manage/help">

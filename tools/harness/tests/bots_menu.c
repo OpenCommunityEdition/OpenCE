@@ -7,6 +7,7 @@ struct widget_instance {
 	struct { struct { struct widget_instance *extended_description; } list; } parameters;
 };
 static int host, calls, last_add, last_team;
+static int saves, applies, apply_ok = TRUE, errors;
 static wchar_t displayed[180];
 static struct widget_instance description, options;
 static void *global_network_game_server_get(void) { return host ? (void *)1 : NULL; }
@@ -22,6 +23,16 @@ static int bots_manage(int add, int team, char *status, long size)
 	return host;
 }
 static void console_printf(int color, char const *format, ...) { (void)color; (void)format; }
+struct pc_menu_setting;
+static boolean setting_changed_save(struct widget_instance *widget, struct pc_menu_setting *setting)
+{ (void)widget; (void)setting; return TRUE; }
+static void settings_each(struct widget_instance *widget,
+	boolean (*visit)(struct widget_instance *, struct pc_menu_setting *))
+{ (void)widget; CHECK(visit == setting_changed_save, "wrong save callback"); saves++; }
+static int bots_lobby_settings_apply(char *status, long size)
+{ CHECK(saves == applies + 1, "policy applied before saving choices"); applies++; snprintf(status, size, "Slot conflict"); return apply_ok; }
+static void display_error_text_deferred(wchar_t const *message, short controller)
+{ (void)controller; CHECK(!wcscmp(message, L"Slot conflict"), "missing rejection text"); errors++; }
 #include "under_test.inc"
 
 int main(void)
@@ -50,5 +61,11 @@ int main(void)
 		"unrelated console command intercepted");
 	host = FALSE;
 	CHECK(bots_console_command("add_bot") == FALSE, "host rejection hidden");
+	widget.name = "button_ok";
+	CHECK(!bots_menu_event(&widget, "unrelated") && saves == 0, "unrelated event applied settings");
+	CHECK(bots_menu_event(&widget, "port bots settings save") && saves == 1 && applies == 1 && !errors,
+		"OK did not save then apply");
+	apply_ok = FALSE;
+	CHECK(bots_menu_event(&widget, "port bots settings save") && errors == 1, "slot conflict was silent");
 	return 0;
 }

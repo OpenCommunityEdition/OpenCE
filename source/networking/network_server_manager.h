@@ -87,6 +87,8 @@ every game the server sets up */
 void network_game_server_port_set_settings(
 	wchar_t const *name,
 	long maximum_players);
+/* port: host camera rule, editable only before the match starts. */
+void network_game_server_port_set_camera_policy(short policy);
 /* port: a co-op level was won (main.c). Ends the round for everyone as in
 multiplayer; the next round is on next_map (NULL repeats the level). */
 void network_game_server_port_cooperative_won(
@@ -102,6 +104,9 @@ void network_game_server_port_set_cooperative_friendly_fire(
 	short friendly_fire);
 /* port: whether co-op's players collide with each other (Server Setup's
 PLAYER COLLISIONS), kept for the levels after */
+/* port: the co-op flag that says the host is a dedicated server */
+void network_game_server_port_set_cooperative_dedicated(
+	boolean dedicated);
 void network_game_server_port_set_cooperative_player_collisions(
 	boolean player_collisions);
 /* port: whether co-op's players hurt their AI allies (Server Setup's ALLY

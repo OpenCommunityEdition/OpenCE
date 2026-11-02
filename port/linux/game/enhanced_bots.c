@@ -22,6 +22,7 @@ selects destinations; it never changes engine rules or replicated state. */
 #include "tag_files/tag_groups.h"
 #include "networking/network_game_globals.h"
 #include "bots.h"
+#include "bots_combat.h"
 #include "bots_objectives.h"
 #include "bots_tactics.h"
 #include "bots_vehicles.h"
@@ -74,15 +75,20 @@ static struct
 static boolean bots_king_guard(struct bots_bot *bot, struct player_datum *player);
 static boolean bots_king_active(void);
 
-/* BirchWoodGod/thelinkin3000 difficulty rules, kept separate from stock bots. */
+/* BirchWoodGod/thelinkin3000 difficulty rules, kept separate from stock bots.
+ * Preserve the four named levels when using OpenCE's six-level ordering.
+ * Recruit shares Easy's enhanced tactics; its base combat is weaker.
+ * Veteran interpolates Heroic and Legendary, as the base skill table does. */
 static struct
 {
 	real head, feet, heal, heal_fighting, powerup_reach;
-} const enhanced_skills[4] =
+} const enhanced_skills[NUMBER_OF_BOTS_SKILLS] =
 {
-	{ 0.15f, 0.0f, 0.35f, 0.00f, 15.0f },
+	{ 0.15f, 0.0f, 0.35f, 0.00f, 15.0f }, /* Recruit */
+	{ 0.15f, 0.0f, 0.35f, 0.00f, 15.0f }, /* Easy */
 	{ 0.40f, 0.4f, 0.50f, 0.25f, 25.0f },
 	{ 0.70f, 0.8f, 0.65f, 0.35f, 30.0f },
+	{ 0.85f, 0.9f, 0.725f, 0.40f, 35.0f }, /* Veteran */
 	{ 1.00f, 1.0f, 0.80f, 0.45f, 40.0f },
 };
 
@@ -635,7 +641,7 @@ void enhanced_bots_aim(long index, short skill, long target_index, long weapon_i
 	char const *name = weapon_index != NONE ? tag_get_name(weapon_get(weapon_index)->definition_index) : NULL;
 	boolean precision = name && (strstr(name, "sniper") || (strstr(name, "pistol") && !strstr(name, "plasma")));
 	boolean explosive = name && (strstr(name, "rocket") || strstr(name, "fuel rod") || strstr(name, "plasma_cannon"));
-	skill = PIN(skill, 0, 3);
+	skill = PIN(skill, _bots_skill_recruit, _bots_skill_legendary);
 	if (bot->aim_target != target_index || now >= bot->aim_until)
 	{
 		bot->aim_target = target_index;
@@ -664,7 +670,7 @@ boolean enhanced_bots_holding_hill(long unit_index)
 boolean enhanced_bots_retreat(struct unit_datum *unit, short skill, long hurt_tick)
 {
 	return game_time_get() - hurt_tick < TICKS_PER_SECOND && unit->object.shield_vitality <= 0.05f &&
-		unit->object.body_vitality < enhanced_skills[PIN(skill, 0, 3)].heal_fighting + 0.1f;
+		unit->object.body_vitality < enhanced_skills[PIN(skill, _bots_skill_recruit, _bots_skill_legendary)].heal_fighting + 0.1f;
 }
 
 /* BirchWoodGod's health/overshield/camouflage priorities, using the base
@@ -672,13 +678,13 @@ bot's item scan, unreachable-item memory and pickup lifecycle. */
 real enhanced_bots_powerup_score(struct unit_datum *unit, long definition_index, real distance,
 	short skill, boolean fighting, boolean holding)
 {
-	real threshold, reach = fighting ? 10.0f : enhanced_skills[PIN(skill, 0, 3)].powerup_reach;
+	real threshold, reach = fighting ? 10.0f : enhanced_skills[PIN(skill, _bots_skill_recruit, _bots_skill_legendary)].powerup_reach;
 	if (game_engine_get_variant()->game_engine_index != game_engine_slayer) reach = MIN(reach, 12.0f);
 	if (holding) reach = MIN(reach, 6.0f);
 	switch (equipment_definition_get(definition_index)->equipment.powerup_type)
 	{
 	case _equipment_powerup_health:
-		threshold = fighting ? enhanced_skills[PIN(skill, 0, 3)].heal_fighting : enhanced_skills[PIN(skill, 0, 3)].heal;
+		threshold = fighting ? enhanced_skills[PIN(skill, _bots_skill_recruit, _bots_skill_legendary)].heal_fighting : enhanced_skills[PIN(skill, _bots_skill_recruit, _bots_skill_legendary)].heal;
 		if (unit->object.body_vitality < threshold && distance <= (fighting ? 15.0f : 45.0f))
 			return distance - (threshold - unit->object.body_vitality) * 40.0f;
 		break;

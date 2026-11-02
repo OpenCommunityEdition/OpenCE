@@ -80,6 +80,9 @@ async function browser(name) {
     headless: true, viewport: { width: 800, height: 450 },
   });
   const page = context.pages()[0] || await context.newPage();
+  // Local browser checks must not wait for the public analytics service.
+  await page.route('https://nexus.mrbruh.com/**', (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: '', headers: { 'Access-Control-Allow-Origin': '*' } }));
   await page.goto(pageUrl);
   await page.waitForFunction(() => document.querySelectorAll('#checks li').length >= 5, null, { timeout: 60000 });
   await page.setInputFiles('#folder-input', maps);

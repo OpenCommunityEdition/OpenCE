@@ -9,6 +9,7 @@
 #include "mcc_maps.h"
 #include "mcc_package.h"
 #include "mcc_precache.h"
+#include "mcc_validation.h"
 #include <string.h>
 
 #define MCC_IDENTITY_MAX_CANDIDATES 16
@@ -37,6 +38,7 @@ static int mcc_identity_error(char const *message)
 
 void mcc_identity_disconnect(void)
 {
+    mcc_validation_cancel();
     mcc_cache_validation_clear();
     memset(&mcc_client_identity,0,sizeof(mcc_client_identity));
     memset(&mcc_host_identity,0,sizeof(mcc_host_identity));
@@ -76,7 +78,8 @@ int mcc_identity_prepare_host(char const *map)
     if (!mcc_host_identity.valid || strcmp(name,mcc_host_identity.name) ||
         memcmp(&before,&mcc_host_identity.files,sizeof(before))) {
         mcc_host_identity.valid=0;
-        if (!mcc_content_probe(name,digest) || !mcc_precache_snapshot(name,&after) ||
+        if (mcc_validation_request(name,NULL,digest)!=1) return 0;
+        if (!mcc_precache_snapshot(name,&after) ||
             memcmp(&before,&after,sizeof(before))) {
             mcc_identity_error("The host's MCC map or resources could not be fingerprinted, or changed during validation.");
             return 0;
@@ -92,6 +95,9 @@ int mcc_identity_prepare_host(char const *map)
 void const *mcc_identity_host_settings(void const *settings,long bytes,struct network_game *copy)
 {
     struct network_game const *game=settings;
+    struct mcc_precache_snapshot files;
+    char canonical[64];
+    uint32_t checksum;
     if (!game || bytes!=sizeof(*game)) return NULL;
     memcpy(copy,game,sizeof(*copy));
     memset(copy->mcc_content_sha256,0,32);
@@ -101,7 +107,13 @@ void const *mcc_identity_host_settings(void const *settings,long bytes,struct ne
     }
     /* Recheck every resource candidate before reusing the prepared digest.
      * A changed installation still requires fresh validation. */
-    if (!mcc_identity_prepare_host(game->map.name)) return NULL;
+    /* Sending or tearing down a session must never initiate package work.
+     * Only pregame preparation may establish the host's identity. */
+    if (!mcc_host_identity.valid || !mcc_package_name(game->map.name,canonical) ||
+        strcmp(canonical,mcc_host_identity.name) || !mcc_precache_snapshot(canonical,&files) ||
+        memcmp(&files,&mcc_host_identity.files,sizeof(files)) ||
+        !mcc_validation_lookup(canonical,&checksum,NULL) ||
+        checksum!=(uint32_t)game->map.version) return NULL;
     memcpy(copy->mcc_content_sha256,mcc_host_identity.digest,32);
     return copy;
 }

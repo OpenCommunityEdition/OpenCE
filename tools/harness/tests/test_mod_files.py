@@ -10,10 +10,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["keys", "bounds", "formats", "long-formats"]
+CASES = ["keys", "bounds", "formats", "long-formats", "channel-order"]
 
 SOURCES = {
-    "port/linux/src/port_mods.c": ["lower", "key_hash", "key_make", "names_equal"],
+    "port/linux/src/port_mods.c": ["lower", "key_hash", "key_make", "names_equal", "channel_order_xbox"],
     "port/linux/game/mods.c": ["mods_in_file"],
     "port/linux/game/mod_strings.c": ["character_get", "character_in", "format_conversions", "formats_match"],
 }
@@ -29,6 +29,8 @@ NEGATIVE_CONTROLS = {
                           "formats_match", "formats"),
     "counts-percent-signs": (("if (character_get(string, size, index, unicode) == '%')\n\t\t{",
                               "if (0)\n\t\t{"), "format_conversions", "formats"),
+    "channel-order-swapped": (("if (names_equal(text, \"xbox\"))\n\t\treturn 1;", "if (names_equal(text, \"xbox\"))\n\t\treturn 0;"),
+                              "channel_order_xbox", "channel-order"),
     "reads-low-bytes": (("return character && character < 0x80 &&", "return character &&"), "character_in",
                         "long-formats"),
 }

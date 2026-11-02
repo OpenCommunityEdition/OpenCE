@@ -83,9 +83,12 @@ Wings counts an exit it did not ask for as a crash and starts the server
 again; use Stop. `sv_restart` exits with code 5, which Wings also takes as a
 crash and restarts, which is what it asks for.
 
-Updates: `server.auto_update` is for servers that own their files; on a
-panel, change the Release variable (or keep `latest`) and Reinstall, by hand
-or as a schedule.
+Updates: `server.auto_update` is `install` by default, which installs a new
+release into the server's own files and exits with code 5 (empty for 10
+minutes, or after the game for a new network version), which Wings restarts
+into the new build. To manage releases from the panel instead, set it to
+`check` (`HALO_SERVER_AUTO_UPDATE`), change the Release variable (or keep
+`latest`) and Reinstall, by hand or as a schedule.
 
 ## Checking the egg
 

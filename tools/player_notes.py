@@ -18,6 +18,12 @@ MAX_NOTES = 4096
 MAX_BUILD_NUMBER = 2147483647
 SHA = re.compile(r"[0-9a-fA-F]{40}\Z")
 CATEGORY = re.compile(r"[A-Z][A-Z0-9]*(?: [A-Z0-9]+)*\Z")
+# Repair the published testing merge's category spelling without rewriting
+# history. Only this immutable commit gets the correction; new notes stay strict.
+HISTORICAL_NOTE_PREFIXES = {
+    "4f3eec76a1165a111bff83047b064a55c156f3bc":
+        ("Player-Note: [Android] ", "Player-Note: [ANDROID] "),
+}
 
 
 class NotesError(ValueError):
@@ -158,6 +164,10 @@ def read_commits(repo, baseline, head):
     commits = {}
     for offset in range(0, len(fields), 3):
         sha, parents, message = fields[offset:offset + 3]
+        if sha in HISTORICAL_NOTE_PREFIXES:
+            old, new = HISTORICAL_NOTE_PREFIXES[sha]
+            message = "\n".join(new + line[len(old):] if line.startswith(old) else line
+                                for line in message.split("\n"))
         notes, omitted = parse_notes(message, f"commit {sha}")
         commits[sha] = Commit(sha, parents.split(), notes, omitted)
     return commits

@@ -947,6 +947,8 @@ void rasterizer_transparent_geometry_group_draw__internal(
 	struct transparent_geometry_group const *group,
 	boolean has_lightmap)
 {
+	/* port: compile optional loading-time material variants without geometry. */
+	if (material_prepare_draw()) return;
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",
 		109,
@@ -1073,6 +1075,8 @@ void rasterizer_transparent_geometry_group_draw(
 {
 	boolean success = TRUE;
 	boolean draw_active_camouflage_groups2 = FALSE;
+	/* port: loading preparation excludes layers that need real geometry. */
+	if (material_prepare_skip_shader(group ? group->shader : NULL)) return;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_transparent_geometry.c",

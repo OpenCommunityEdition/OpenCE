@@ -313,6 +313,27 @@ boolean tag_validate_custom_edition_tags(
 	short file_range_count,
 	char const *map_name);
 
+/* A protected map's tags have their groups scrambled in the tag table
+(extractors show them as INVALID), while the references to them keep the
+real ones, which is all Halo PC read. Gives each tag of no known group the
+group a reference to it says (walking from the tags of known groups), and
+returns how many it gave one to. Call it on the loaded tags (loaded_size
+bytes at tag_header, the start of a tag cache of tag_cache_size bytes)
+after custom_edition_cache_load and before custom_edition_cache_convert,
+which selects tags by group, and before they are validated. */
+long tag_validate_custom_edition_infer_groups(
+	void *tag_header,
+	long loaded_size,
+	unsigned long tag_cache_size,
+	char const *map_name);
+void tag_validate_custom_edition_note_structure_bsp(
+	void *tag_header,
+	unsigned long tag_data_bytes,
+	long bsp_index,
+	void *bsp,
+	unsigned long bsp_bytes,
+	unsigned long bsp_address,
+	char const *map_name);
 /* a structure bsp just read (size bytes at base, its header there) as tag
 tag_index: FALSE if it cannot be used */
 boolean tag_validate_structure_bsp(

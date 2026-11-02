@@ -101,6 +101,7 @@ symbols in this file:
 #include "console.h"
 #include "game_state.h"
 #include "coop_vehicles.h" /* port: preserve replacement-vehicle homes across reverts */
+#include "network_coop.h" /* port: checkpoint roster restoration and host team-wipe policy */
 #include "game.h"
 #include "tag_files.h"
 #include "cache_files.h"
@@ -125,6 +126,7 @@ symbols in this file:
 #include "cluster_partitions.h"
 #include "mcc_cache.h"
 #include "mcc_checkpoint.h"
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_invalidate(void);
 
@@ -196,14 +198,21 @@ static game_state_before_load_proc before_load_procs[] =
 	cluster_partitions_port_forget,
 	/* port: (the objects are put back: object_bounds_cache.c) */
 	object_bounds_cache_invalidate,
+	/* port: (and the inputs their functions were computed from are not
+	theirs: objects.c's object_function_inputs) */
+	object_function_inputs_forget,
 };
 
 static game_state_after_load_proc after_load_procs[] =
 {
 	scenario_reload_structure_bsp_if_necessary,
+	/* port: the session roster is not part of a gameplay checkpoint. */
+	network_coop_restore_players,
 	sound_stop_all,
 	game_sound_restore,
 	observer_initialize_for_new_map,
+	/* port: camera smoothing and free look are not stored in checkpoints. */
+	third_person_reset,
 	update_queues_reset_and_fill_with_lies,
 	rasterizer_decals_update_function_pointers,
 	recorded_animations_clear_debug_storage,
@@ -297,6 +306,9 @@ void game_state_initialize_for_new_map(
 
 	/* port: (the objects are put back: object_bounds_cache.c) */
 	object_bounds_cache_invalidate();
+	/* port: (and the inputs their functions were computed from are not
+	theirs: objects.c's object_function_inputs) */
+	object_function_inputs_forget();
 	game_state_note_event("map start");
 	game_state_data_arrays_new_map();
 
@@ -330,7 +342,7 @@ void game_state_save(
 	void)
 {
 	game_state_call_before_save_procs();
-	/* MCC extra slots occupy only proven-unused CPU bytes in this image. */
+	/* port: MCC extra slots occupy only proven-unused CPU bytes in this image. */
 	if (mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
 		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
 	{
@@ -340,6 +352,9 @@ void game_state_save(
 
 	main_stop_time();
 	game_state_globals.saved_game_valid = (game_state_write_to_file()!=FALSE);
+	/* port: never associate new players with an older or failed save. */
+	if (game_state_globals.saved_game_valid)
+		network_coop_checkpoint_saved();
 	main_start_time();
 	game_state_note_event("checkpoint saved");
 

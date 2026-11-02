@@ -181,6 +181,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 #define limit2d limit2d_inline
 #include "game/game.h"
 #undef limit2d
@@ -399,6 +400,10 @@ limits were stepped once per input update, a tick on the Xbox, so they step
 by the ticks the frame lasted; an impulse applied from a tick steps by one. */
 static real player_control_angle_step_ticks = 1.f;
 static real player_control_autolevel_time[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+/* port: the blob's input before the director's inhibit zeroes it, which
+moves the debug camera (director.c) */
+real_vector2d player_control_port_debug_throttle[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+real_euler_angles2d player_control_port_debug_facing[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
 
 /* ---------- public code */
 
@@ -644,6 +649,9 @@ static void handle_one_player_input(
 		local_player_index,
 		time_delta_sec,
 		&input);
+	/* port: for the debug camera (player_control_port_debug_throttle) */
+	player_control_port_debug_throttle[local_player_index] = input.throttle;
+	player_control_port_debug_facing[local_player_index] = input.facing_delta;
 	if (local_player_get_player_index(local_player_index) != NONE)
 	{
 		match_assert_valid_real(
@@ -831,6 +839,9 @@ static void handle_one_player_input(
 
 		action.desired_facing = player->desired_angles;
 		action.control_flags = player->control_flags;
+		/* port: replicate this tick's shoulder view, including collision fallback. */
+		SET_FLAG(action.control_flags, THIRD_PERSON_INPUT_BIT,
+			third_person_active(local_player_index) && third_person_enabled() && player->zoom_level == NONE);
 		action.desired_weapon_index = player->desired_weapon_index;
 		action.desired_grenade_index = player->desired_grenade_index;
 		action.desired_zoom_level = player->zoom_level;
@@ -1976,6 +1987,10 @@ static void player_control_modify_desired_angles(
 	struct player_control_unit_camera_info camera_info;
 	real pitch_minimum = -DEGREES_TO_RADIANS(85.5f);
 	real pitch_maximum = DEGREES_TO_RADIANS(85.5f);
+
+	/* port: orbit the shoulder camera while keeping gameplay aim fixed. */
+	if (third_person_free_look_input(local_player_index, delta_yaw, delta_pitch))
+		return;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\player_control.c",

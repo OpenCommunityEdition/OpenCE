@@ -2,6 +2,7 @@
 import xml.etree.ElementTree as ET
 
 import frontend_multiplayer
+from frontend_menu import text_width
 from test_frontend_menu import ROOT, HEADER, RUNTIME_STUBS, without_includes
 from test_frontend_presentation import source
 from test_hud_button_style import run_c
@@ -36,6 +37,8 @@ def test_service_contracts_and_routes():
         for c in w.findall('on'):
             if c.get('open'): assert c.get('open') in legacy
     assert not any('main_menu/main_menu' == old for old,_ in routes)
+    assert not any(w.get('bitmap') in ('bitmaps/gradient', 'bitmaps/gradient_big') for w in widgets.values())
+    assert not any(path.rsplit('/', 1)[-1] == 'header' or path.rsplit('/', 1)[-1].startswith('header_') for path in widgets)
     assert len(dict(roles)) < len(widgets)
 
 
@@ -79,6 +82,23 @@ int main(void){
     return 0;
 }
 ''')
+
+
+def test_session_options_keep_host_callbacks_and_fit_narrow_columns():
+    doc = ET.Element('menus')
+    _, routes = frontend_multiplayer.append(doc)
+    root = dict(routes)[frontend_multiplayer.PAGES['session'][0]]
+    widgets = {w.get('name'): w for w in doc.findall('widget')}
+    assert root.startswith('modern/network/session/')
+    session = [w for w in widgets.values() if w.get('name').startswith('modern/network/session/')]
+    options = next(w for w in session if w.get('name').endswith('/options_menu'))
+    assert options.find("on[@event='created']").get('run') == 'server settings init'
+    assert [n.get('input') for n in options.findall('data')] == ['server settings update', 'port frontend multiplayer update']
+    for leaf in ('session_compatibility_spinner', 'camera_policy_spinner'):
+        spinner = next(w for w in session if w.get('name').endswith('/'+leaf))
+        for caption in spinner.get('strings').split('|'):
+            assert text_width(caption, 10) <= int(spinner.get('width'))
+        assert spinner.find("on[@event='left_mouse']").get('run') == 'mouse spinner 1wide click'
 
 
 def test_scroll_preserves_service_indices_visibility_and_lifetime(tmp_path):
