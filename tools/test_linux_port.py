@@ -442,6 +442,7 @@ def test_p2p_matchmaking(tmp_path):
     (("if (record->kind == MM_KIND_CANCEL)", "if (0)"), "e43_replay"),
     (("record->sequence <= peer->record.sequence", "0"), "e43_replay"),
     (("elapsed_ms(started) >= VERIFY_BUDGET", "0"), "verify_budget"),
+    (("record->most_players > p2p_mm_size_players(record->size)", "0"), "fake_fuller_game"),
 ])
 def test_p2p_matchmaking_negative_control(tmp_path, fault, case):
     output = matchmaking_check(tmp_path, fault)

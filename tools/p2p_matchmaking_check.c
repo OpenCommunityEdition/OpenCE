@@ -620,6 +620,26 @@ static void check_replay(void)
 	CHECK(peer_count(&machines[1].search) == 0, "E43: a replayed searcher is never counted again");
 }
 
+static int game_most_players = 4;
+
+static void hear_game(int host, int players, unsigned long sequence, unsigned char *key_hash)
+{
+	struct mm_record record = searching(host, sequence), read_back;
+	unsigned char seed[P2P_SEED_SIZE], bytes[MM_MAXIMUM_RECORD_SIZE], token[P2P_TOKEN_SIZE];
+
+	seed_of(host, seed);
+	memset(token, host, sizeof(token));
+	record.kind = MM_KIND_HOSTING;
+	record.players = players;
+	record.most_players = game_most_players;
+	memcpy(record.token, token, P2P_TOKEN_SIZE);
+	if (mm_record_read(bytes, mm_record_write(&record, seed, bytes, sizeof(bytes)), &read_back))
+	{
+		mm_heard(&machines[0].search, &read_back, now_ms);
+		memcpy(key_hash, read_back.key_hash, P2P_KEY_HASH_SIZE);
+	}
+}
+
 static void check_return(void)
 {
 	unsigned long returned;
@@ -648,6 +668,32 @@ static void check_return(void)
 			"E39: machine %d searches on", index);
 }
 
+static void check_fake_fuller_game(void)
+{
+	unsigned char key_hash[P2P_KEY_HASH_SIZE];
+	int sequence;
+
+	case_name = "fake_fuller_game";
+	world(1);
+	start_searching(0, 1u << P2P_MM_SLAYER, P2P_MM_2V2, 1);
+	machines[0].search.state = P2P_MM_HOSTING;
+	machines[0].search.players = 1;
+	machines[0].search.most_players = 4;
+	game_most_players = 16;
+	for (sequence = 1; sequence <= 3; sequence++)
+		hear_game(20, 3, sequence, key_hash);
+	game_most_players = 4;
+	run(1.0);
+	CHECK(machines[0].search.state == P2P_MM_HOSTING, "a game claiming more players than its size is ignored");
+	hear_game(21, 3, 1, key_hash);
+	run(1.0);
+	CHECK(machines[0].search.state == P2P_MM_HOSTING, "one record does not end a lobby");
+	hear_game(21, 3, 2, key_hash);
+	hear_game(21, 3, 3, key_hash);
+	run(1.0);
+	CHECK(machines[0].search.state != P2P_MM_HOSTING, "a counted fuller game takes the lobby");
+}
+
 int main(void)
 {
 	check_pool();
@@ -657,6 +703,7 @@ int main(void)
 	check_playlists();
 	check_topics();
 	check_verify_budget();
+	check_fake_fuller_game();
 	check_four();
 	check_replay();
 	check_return();

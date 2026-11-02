@@ -415,7 +415,8 @@ void mm_heard(struct mm_search *search, const struct mm_record *record, unsigned
 	struct mm_peer *peer;
 
 	if (search->state == P2P_MM_OFF || record->network_version != HALO_PORT_NETWORK_VERSION ||
-		!memcmp(record->key, search->key, P2P_KEY_SIZE) || !in_queue(search, record->playlist, record->size))
+		!memcmp(record->key, search->key, P2P_KEY_SIZE) || !in_queue(search, record->playlist, record->size) ||
+		(record->kind == MM_KIND_HOSTING && record->most_players > p2p_mm_size_players(record->size)))
 	{
 		return;
 	}
@@ -693,7 +694,7 @@ static int join(struct mm_search *search, unsigned long now, struct mm_out *out,
 			peer->record.players >= peer->record.most_players ||
 			(peer->record.held && pool_index(&peer->record, search->key_hash) < 0) ||
 			(!peer->record.held && (long)(now - search->join_after) < 0) ||
-			(search->state == P2P_MM_HOSTING && !outranks(search, &peer->record)))
+			(search->state == P2P_MM_HOSTING && (!mm_counted(peer) || !outranks(search, &peer->record))))
 		{
 			continue;
 		}
