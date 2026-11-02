@@ -41,6 +41,7 @@ drive the controller.
 #include "sdl_platform.h"
 #include "port_config.h"
 #include "touch_input.h"
+#include "dualsense.h"
 /* port/linux/game/network_aim_assist.c */
 extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
@@ -1732,6 +1733,10 @@ DWORD WINAPI XInputSetState(HANDLE device, PXINPUT_FEEDBACK feedback)
 		touch_input_rumble(feedback->Rumble.wLeftMotorSpeed, feedback->Rumble.wRightMotorSpeed);
 #endif
 	count = sdl_gamepads(gamepads);
+	/* (a DualSense's adaptive triggers: which pad this port has, and the
+	motors, after which the triggers are sent again: dualsense.c) */
+	dualsense_port(port, port_gamepad(gamepads, count, port), feedback->Rumble.wLeftMotorSpeed,
+		feedback->Rumble.wRightMotorSpeed);
 	if (port_gamepad(gamepads, count, port))
 	{
 		/* the game refreshes the motors every frame; rumble a little longer

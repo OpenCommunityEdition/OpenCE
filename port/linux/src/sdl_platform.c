@@ -20,6 +20,7 @@ and the debug keyboard that the game's console reads.
 #include "player_link.h"
 #include "xiso.h"
 #include "touch_input.h"
+#include "dualsense.h"
 #include "../game/text_filter.h"
 
 #include <SDL3/SDL.h>
@@ -2563,6 +2564,8 @@ void platform_pump_events(void)
 			{
 				SDL_Gamepad *gamepad = SDL_GetGamepadFromID(event.gdevice.which);
 
+				/* (a DualSense's triggers let go first) */
+				dualsense_removed(gamepad);
 				if (gamepad)
 					SDL_CloseGamepad(gamepad);
 			}
@@ -2587,6 +2590,9 @@ void platform_pump_events(void)
 	}
 #endif
 	pthread_mutex_unlock(&input_lock);
+	/* a DualSense's adaptive triggers, lightbar and player lights: what
+	changed since the last frame (dualsense.c) */
+	dualsense_frame();
 	looked_at_clipboard = TRUE;
 	platform_invite_clipboard(look_at_clipboard);
 }
