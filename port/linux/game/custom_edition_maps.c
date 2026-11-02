@@ -453,6 +453,33 @@ static void custom_edition_maps_tell_versions_apart(
 	}
 }
 
+/* port: Halo PC's own multiplayer maps come right after the Xbox's, in the
+order of the menus' names (stock_maps), then the rest as sorted */
+static void custom_edition_maps_stock_first(void)
+{
+	struct custom_edition_maps_globals *globals = &custom_edition_maps_globals;
+	static struct custom_edition_map held;
+	short target = 0;
+	short stock_index;
+	short map_index;
+
+	for (stock_index = 0; stock_index < (short)NUMBEROF(stock_maps); stock_index++)
+	{
+		for (map_index = target; map_index < globals->map_count; map_index++)
+		{
+			if (!csstrcasecmp(globals->maps[map_index].name, stock_maps[stock_index].file))
+			{
+				held = globals->maps[map_index];
+				csmemmove(&globals->maps[target + 1], &globals->maps[target],
+					(map_index - target) * sizeof(held));
+				globals->maps[target] = held;
+				target++;
+				break;
+			}
+		}
+	}
+}
+
 static void custom_edition_maps_look_for(
 	void)
 {
@@ -510,6 +537,7 @@ static void custom_edition_maps_look_for(
 	qsort(globals->campaigns, globals->campaign_count, sizeof(globals->campaigns[0]), custom_edition_map_compare);
 	custom_edition_maps_tell_versions_apart(globals->maps, globals->map_count);
 	custom_edition_maps_tell_versions_apart(globals->campaigns, globals->campaign_count);
+	custom_edition_maps_stock_first();
 	error(_error_silent, "custom edition: %d multiplayer maps for the level list, %d campaign maps", globals->map_count,
 		globals->campaign_count);
 

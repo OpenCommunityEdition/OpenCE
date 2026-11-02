@@ -3764,7 +3764,7 @@ static void widget_instance_initialize(
 	/* port: a network co-op game never pauses (it opens the campaign's pause
 	screen, which would) */
 	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
-		!network_coop_active();
+	!network_coop_active() && !network_game_is_active();
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -4660,6 +4660,8 @@ void display_error_damaged_media(
 	return;
 }
 
+void network_game_server_start_now(struct network_game_server *server);
+
 void network_game_reset_to_pregame_ui(
 	void)
 {
@@ -4689,13 +4691,24 @@ void network_game_reset_to_pregame_ui(
 	{
 		if (global_network_game_server_get())
 		{
-			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
-			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
-			if (!ui_widget_load_by_name_or_tag(
-				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
-				NONE, NULL, NONE, NONE, NONE, NONE))
+			extern boolean pc_menu_new_game_apply(void);
+
+			if (pc_menu_new_game_apply())
 			{
-				error(_error_silent, "failed to load map select postgame screen");
+				/* port: a game set up from the pause menu starts at once */
+				network_game_server_pause_countdown(global_network_game_server_get(), FALSE);
+				network_game_server_start_now(global_network_game_server_get());
+			}
+			else
+			{
+				network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
+				/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
+				if (!ui_widget_load_by_name_or_tag(
+					pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
+					NONE, NULL, NONE, NONE, NONE, NONE))
+				{
+					error(_error_silent, "failed to load map select postgame screen");
+				}
 			}
 		}
 		else
@@ -6692,8 +6705,13 @@ port/assets/menus) */
 static boolean ui_mouse_selection_row(
 	struct widget_instance *widget)
 {
-	return widget && widget->parent && pc_menu_tag(widget->parent->definition_tag_index) &&
-		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
+	if (widget && widget->parent && !strcmp(widget->parent->name, "select_screen_list_template") &&
+		(!strcmp(widget->name, "list_item_0") || !strcmp(widget->name, "list_item_10")))
+		return FALSE;
+	return widget && widget->parent &&
+		(pc_menu_tag(widget->parent->definition_tag_index) ||
+		!strcmp(widget->parent->name, "select_screen_list_template") ||
+		!strcmp(widget->parent->name, "gametype_select_list")) &&		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
 			!strncmp(widget->name, "op_mod_", 7));
 }
 
@@ -7595,17 +7613,18 @@ static void column_list_update(
 {
 	struct widget_instance *child;
 
+	/* port: a map's own lists have rows of three frames */
+	boolean own_list = !strcmp(widget->name, "select_screen_list_template") ||
+		!strcmp(widget->name, "gametype_select_list");
+
 	for (child = widget->child; child; child = child->next)
 	{
-		if (child == widget->focused_child)
-		{
-			if (child->animation.number_of_sprite_frames == 2)
-				child->animation.current_frame_index = 1;
-		}
-		else if (child->animation.number_of_sprite_frames == 2)
-		{
-			child->animation.current_frame_index = 0;
-		}
+		boolean has_frames = child->animation.number_of_sprite_frames == 2 ||
+			(own_list && child->animation.number_of_sprite_frames == 3);
+
+		if (!has_frames)
+			continue;
+		child->animation.current_frame_index = child == widget->focused_child ? 1 : 0;
 	}
 
 	return;

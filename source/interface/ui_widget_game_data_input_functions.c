@@ -723,6 +723,34 @@ void ui_widget_game_data_function_invoke(
 		return;
 	}
 
+	/* port: Halo PC's own game data functions (past the Xbox's, below the
+	menus' numbers): this build has none of them, so they do nothing; said
+	once, with the number */
+	if (function < PC_MENU_FUNCTION_BASE)
+	{
+		static boolean pc_function_reported = FALSE;
+		static unsigned char dbg_seen[256];
+
+		if (function == 52)
+		{
+			extern void pc_menu_map_list_update(struct widget_instance *widget);
+			pc_menu_map_list_update(widget); /* DBG experiment */
+			return;
+		}
+		if (function == 53)
+		{
+			extern void pc_menu_gametype_list_update(struct widget_instance *list);
+			pc_menu_gametype_list_update(widget); /* DBG experiment */
+			return;
+		}
+		if (function == 46 && widget->parent)
+		{
+			extern void pc_menu_map_list_update(struct widget_instance *list);
+			pc_menu_map_list_update(widget->parent); /* DBG experiment: the list, from its button bar */
+			return;
+		}
+		return;
+	}
 	error(2, "invalid game_data_input_reference_function");
 	return;
 }

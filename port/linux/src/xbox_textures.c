@@ -166,7 +166,11 @@ void xgpu_texture_describe(DWORD format_word, DWORD size_word, struct xgpu_textu
 		description->depth = 1;
 		description->levels = 1;
 		description->pitch = (((size_word & D3DSIZE_PITCH_MASK) >> D3DSIZE_PITCH_SHIFT) + 1) * D3DTEXTURE_PITCH_ALIGNMENT;
-		description->linear = TRUE;
+		/* port: a compressed texture is never linear on an Xbox (it has no
+		linear DXT formats), so a Size word on one only gives the true sides
+		of a Custom Edition bitmap that is not a power of two; it is addressed
+		with normalized coordinates like any compressed texture */
+		description->linear = !description->compressed;	
 	}
 	else
 	{
@@ -1238,6 +1242,15 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 {
 	*target = entry->target;
 	*description = entry->description;
+
+	/* port: a Custom Edition bitmap whose Size word gives sides that are 
+	any uncompressed linear bitmap: sampled with normalized
+	coordinates like any other texture, not in texels as an Xbox's linear
+	texture is. Decoding keeps the entry's own description (its pitch). */
+	if (entry->description.linear && !entry->description.compressed)
+	{
+		description->linear = FALSE;
+	}
 	/* (the high-res text's atlas, for its placeholder bitmap: text_hires.h) */
 	{
 		GLuint atlas = text_hires_atlas_texture(entry->data);
