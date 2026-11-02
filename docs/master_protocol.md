@@ -265,6 +265,7 @@ not_found` for a server that is not the publisher's.
 | 120 publishes a minute per source address, and per key | `429 rate_limited` |
 | A body is 16 KB at most | `413 too_large` |
 | A publisher has at most its quota of live servers at once (default 4; live: published within `ttl` and not closed) | `403 quota_exceeded` |
+| A master may cap live registrations across all publishers. Hidden and unreachable registrations count; closed and expired registrations do not. Existing live registrations may renew after a cap reduction; no records are deleted. A cap does not limit game server processes. | `403 master_capacity` |
 | An instance is published by one key of a publisher at a time | `403 instance_taken` (another key's server of that instance is live) |
 | A publisher holds at most its quota and 16 server records (one per server id); for a new server id past that, its oldest records that are not live are dropped, and if none can be | `403 too_many_instances` |
 
@@ -787,6 +788,7 @@ The message is for people and may change; programs read the code.
 | 403 | `publisher_suspended` | The publisher is suspended | Log it; keep publishing slowly |
 | 403 | `publisher_revoked`, `key_revoked` | Revoked for good | Log it; stop publishing to that master |
 | 403 | `quota_exceeded` | The publisher has its quota of servers live | Log it |
+| 403 | `master_capacity` | The master's configured cap of live registrations across all publishers is full | Log it; retry after capacity is released |
 | 403 | `instance_taken` | Another key of the publisher has a live server of this instance | Log it; the old server expires after `ttl` |
 | 403 | `listing_taken` | The listing's host key is that of another publisher's live server, which has renewed it within 90 seconds | Log it once a minute; it is someone else's listing, or the host key is shared; keep publishing |
 | 403 | `too_many_instances` | The publisher holds its quota and 16 server records, none of which can be dropped | Log it; use fewer instance names |
