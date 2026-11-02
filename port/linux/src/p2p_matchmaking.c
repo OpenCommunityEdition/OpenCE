@@ -692,6 +692,7 @@ static int join(struct mm_search *search, unsigned long now, struct mm_out *out,
 			!in_queue(search, peer->playlist, peer->size) ||
 			peer->record.players >= peer->record.most_players ||
 			(peer->record.held && pool_index(&peer->record, search->key_hash) < 0) ||
+			(!peer->record.held && (long)(now - search->join_after) < 0) ||
 			(search->state == P2P_MM_HOSTING && !outranks(search, &peer->record)))
 		{
 			continue;
@@ -749,7 +750,7 @@ void mm_joined(struct mm_search *search, int ok, unsigned long now)
 		host->failed = MM_FAILED_GAME_UNJOINABLE;
 	set_queues(search);
 	search->state = P2P_MM_QUEUED;
-	search->marks_from = now;
+	search->join_after = now + MM_JOIN_BACKOFF;
 }
 
 void mm_hosted(struct mm_search *search, const unsigned char *token, int players, int most_players, int under_way,
