@@ -112,38 +112,6 @@ static boolean gun_game_weapon_empty(
 	return holds_rounds ? TRUE : weapon->weapon.age >= 1.0f;
 }
 
-/* every weapon of a unit gone, the one in its hand too (which
-unit_delete_all_weapons keeps) */
-static void gun_game_delete_weapons(
-	long unit_index)
-{
-	struct unit_datum *unit = unit_get(unit_index);
-	short slot;
-	short other;
-
-	for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
-	{
-		long weapon_index = unit->unit.weapon_object_indices[slot];
-
-		if (weapon_index == NONE)
-			continue;
-		/* (each deleted once, should two slots hold it) */
-		for (other = slot; other < MAXIMUM_WEAPONS_PER_UNIT; other++)
-		{
-			if (unit->unit.weapon_object_indices[other] == weapon_index)
-			{
-				unit->unit.weapon_object_indices[other] = NONE;
-				if (unit->unit.current_weapon_index == other)
-					unit->unit.current_weapon_index = NONE;
-				if (unit->unit.desired_weapon_index == other)
-					unit->unit.desired_weapon_index = NONE;
-			}
-		}
-		if (object_try_and_get(weapon_index))
-			object_delete(weapon_index);
-	}
-}
-
 /* the host gives a living player their level's weapon (their others gone),
 again when it is spent */
 static void gun_game_equip(
@@ -181,7 +149,7 @@ static void gun_game_equip(
 	if (definition_index == NONE)
 		return;
 	gun_game.equipping = TRUE;
-	gun_game_delete_weapons(player->unit_index);
+	game_modes_delete_weapons(player->unit_index);
 	object_placement_data_new(&placement, definition_index, NONE);
 	weapon_index = object_new(&placement);
 	if (weapon_index != NONE && !unit_add_weapon_to_inventory(player->unit_index, weapon_index, 2))

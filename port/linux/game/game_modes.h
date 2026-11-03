@@ -1,7 +1,7 @@
 /* game_modes.h: OpenCE's gametypes (port/linux/game/game_modes.c)
 
-SWAT, Infection and Gun Game are modes of Slayer, and Hardcore is a set of
-rules over any game engine's: a gametype's PC options (game_engine.h's struct
+SWAT, Infection, Gun Game, One in the Chamber, Frag Nation and Snowball Fight
+are modes of Slayer, and Hardcore is a set of rules over any game engine's: a gametype's PC options (game_engine.h's struct
 game_variant_options, from mode on) say which, so a saved gametype, the
 network game and the game all carry them. The built-in ones are written with
 the Xbox's default gametypes (playlist_profile.c), after them, and the
@@ -12,6 +12,7 @@ Select Gametype screen lists them in a bank of their own, OPENCE. */
 struct game_engine;
 struct game_variant;
 struct game_variant_options;
+struct unit_datum;
 
 /* the built-in gametypes' place among the default ones (the Xbox's 26 come
 first: playlist_profile.c checks it) */
@@ -25,7 +26,8 @@ wchar_t const *game_modes_gametype_name(short index);
 /* its variant and options */
 void game_modes_gametype(short index, struct game_variant *variant, struct game_variant_options *options);
 /* the one of that name (debug.network_test's: "swat", "infection",
-"gun_game", "hardcore", "hardcore_ctf" ...), FALSE if none is */
+"gun_game", "hardcore", "hardcore_ctf" ..., "one_in_the_chamber",
+"frag_nation", "snowball_fight"), FALSE if none is */
 boolean game_modes_gametype_by_name(char const *name, struct game_variant *variant,
 	struct game_variant_options *options);
 
@@ -38,8 +40,8 @@ void game_modes_options_default(struct game_variant_options *options);
 mode's own set to their defaults where none were given */
 void game_modes_options_sanitize(struct game_variant_options *options);
 /* the mode a gametype plays: its options' if its game engine and teams
-allow it (SWAT and Infection on teams, Gun Game free for all, all of them
-Slayer), else none */
+allow it (Infection on teams, Gun Game and One in the Chamber free for all,
+the others either, all of them Slayer), else none */
 short game_modes_variant_mode(struct game_variant const *variant, struct game_variant_options const *options);
 /* the name the menus show for its kind of game ("INFECTION", "HARDCORE
 CTF"), NULL for a game engine's own ("SLAYER") */
@@ -64,12 +66,18 @@ boolean game_modes_variant_is_opence(struct game_variant const *variant, struct 
 short game_modes_mode(void);
 /* whether it plays by Hardcore's rules */
 boolean game_modes_hardcore(void);
-/* the game engine a mode plays with: Infection's and Gun Game's are
-Slayer's with their own rules; SWAT's variant has no shields
-(game_engine_initialize) */
+/* the game engine a mode plays with: Infection's, Gun Game's, One in the
+Chamber's, Frag Nation's and Snowball Fight's are Slayer's with their own
+rules; SWAT's variant has no shields (game_engine_initialize) */
 struct game_engine *game_modes_engine(struct game_engine *engine);
 /* a player's spawn, after its starting equipment (game_engine_postspawn_player_update) */
 void game_modes_postspawn(long player_index);
+/* a player's living unit, the host's to give weapons, rounds and grenades
+to; NULL on a client, or for a player dead or gone */
+struct unit_datum *game_modes_host_unit(long player_index);
+/* every weapon of a unit gone, the one in its hand too (which
+unit_delete_all_weapons keeps): before a mode gives its own */
+void game_modes_delete_weapons(long unit_index);
 /* a player killed (game_engine_player_killed, after the game engine's):
 Hardcore's restore of the killer */
 void game_modes_player_killed(long killing_player_index, long dead_player_index, boolean friendly_fire);
@@ -77,9 +85,19 @@ void game_modes_player_killed(long killing_player_index, long dead_player_index,
 game_statistics_record_kill) */
 void game_modes_kill_by_melee(boolean melee);
 boolean game_modes_killed_by_melee(void);
+/* the kill being recorded's damage (damage.c, around
+game_statistics_record_kill; NONE after): Frag Nation's grenades back */
+void game_modes_kill_damage(long damage_definition_index);
+long game_modes_killing_damage(void);
 /* a shot's hit on a player's head (a bullet's, a plasma bolt's, a needle's,
 not a melee's or an explosion's) kills at once (SWAT) */
 boolean game_modes_headshot_kills(long object_index, boolean shot);
+/* the host's hit on a player's unit, by another player, kills it at once,
+body or head (One in the Chamber's bullets: damage.c) */
+boolean game_modes_hit_kills(long owner_player_index, long object_index, boolean bullet);
+/* the map's grenades are not placed (One in the Chamber, Snowball Fight,
+and Frag Nation's option: game_engine_remap_equipment) */
+boolean game_modes_map_grenades_off(void);
 /* the motion sensor is not drawn (Hardcore) */
 boolean game_modes_motion_sensor_hidden(void);
 /* no aim assist: neither autoaim nor magnetism (Hardcore) */
