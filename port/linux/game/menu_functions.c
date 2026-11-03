@@ -4099,7 +4099,7 @@ boolean pc_menu_text_color(struct widget_instance *widget, real_argb_color *colo
 			level = (short)(level_list.first + campaign_row - 1);
 			if (level >= 0 && level < NUMBER_OF_SINGLE_PLAYER_LEVELS && !campaign.levels[level].available)
 			{
-				rgba = 0x125A99FFUL;
+				rgba = 0x0C3D70FFUL;
 				color->red = (real)((rgba >> 24) & 0xFF) / 255.0f;
 				color->green = (real)((rgba >> 16) & 0xFF) / 255.0f;
 				color->blue = (real)((rgba >> 8) & 0xFF) / 255.0f;
