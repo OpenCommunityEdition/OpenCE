@@ -434,7 +434,7 @@ static int pad_write(struct pad *pad, SDL_Gamepad *gamepad, Uint64 now, int imme
 }
 
 /* these fields given back, at once (the window ignored), where the pad has them from us: the triggers let go, the
-player lights off (SDL: its own player index again), the lightbar the kernel's own blue (hid-playstation's default;
+player lights off (SDL: player index -1, its lights off), the lightbar the kernel's own blue (hid-playstation's default;
 the hidraw way only: SDL's driver keeps the last colour set). Returns the fields still to give back: those a busy
 write kept, to be tried again; 0 when all are sent or the pad is gone */
 static int pad_reset(struct pad *pad, SDL_Gamepad *gamepad, int fields, Uint64 now)
