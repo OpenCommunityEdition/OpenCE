@@ -25,8 +25,6 @@ from pathlib import Path
 from typing import Any
 
 from .embed_assets import hud_configure_inputs
-
-# (VARIADIC_PROTOTYPE_FILES is tools/web_build.py's too)
 from .guest_build import (
     MUSL_VERSION,
     GuestTarget,
@@ -170,8 +168,6 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     jni_dir = BUILD / "jniLibs" / "arm64-v8a"
     libmain = jni_dir / "libmain.so"
     assets_dir = BUILD / "assets"
-    linker_script = PORT_DIR / "guest" / "guest.ld"
-    libguestc = BUILD / "guest" / "libguestc.a"
 
     # ---------- SDL3
 
