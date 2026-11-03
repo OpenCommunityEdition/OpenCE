@@ -39,14 +39,32 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from .android_build import VARIADIC_PROTOTYPE_FILES
 from .embed_assets import hud_assets_build, hud_configure_inputs
-from .linux_build import (EXPAT_DIR, EXPAT_SOURCES, KCP_DIR, MONOCYPHER_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, TOML_DIR,
-                          XDK_INCLUDE, ZLIB_DEFINES, ZLIB_DIR, ZLIB_SOURCES, compile_launcher, configuration_defines,
-                          game_defines_and_includes, game_sources, musl_math_cflags, musl_math_sources,
-                          opus_cflags, opus_sources, updater_defines, xdk_headers)
+from .guest_build import VARIADIC_PROTOTYPE_FILES
+from .linux_build import (
+    EXPAT_DIR,
+    EXPAT_SOURCES,
+    KCP_DIR,
+    MONOCYPHER_DIR,
+    STB_VORBIS_SOURCE,
+    TOML_DIR,
+    XDK_INCLUDE,
+    ZLIB_DEFINES,
+    ZLIB_DIR,
+    ZLIB_SOURCES,
+    compile_launcher,
+    configuration_defines,
+    game_defines_and_includes,
+    game_sources,
+    musl_math_cflags,
+    musl_math_sources,
+    opus_cflags,
+    opus_sources,
+    updater_defines,
+    xdk_headers,
+)
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/web")
@@ -144,7 +162,7 @@ def _quote(path: Any) -> str:
     return f'"{text}"' if " " in text else text
 
 
-def find_emcc(sln: Any) -> Optional[str]:
+def find_emcc(sln: Any) -> str | None:
     """--web-emcc's, emcc on the PATH, or ~/emsdk's"""
     explicit = getattr(sln, "web_emcc", None)
     if explicit:
@@ -158,12 +176,12 @@ def find_emcc(sln: Any) -> Optional[str]:
     return None
 
 
-def site_sources() -> List[Path]:
+def site_sources() -> list[Path]:
     """the page's files (port/web/site), copied beside halo.js"""
     return sorted(path for path in (PORT_DIR / "site").rglob("*") if path.is_file())
 
 
-def web_configure_inputs() -> List[Path]:
+def web_configure_inputs() -> list[Path]:
     return [Path(__file__), PORT_DIR / "src", PORT_DIR / "site", PORT_DIR / "site" / "icons", SDL_PORT,
             *hud_configure_inputs()]
 
@@ -175,7 +193,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     if not emcc:
         n.comment("Web build: no Emscripten found (put emcc on the PATH, or pass --web-emcc)")
         return
-    config: Dict[str, Any] = json.loads(PORT_CONFIG.read_text(encoding="utf-8"))
+    config: dict[str, Any] = json.loads(PORT_CONFIG.read_text(encoding="utf-8"))
     release = getattr(sln, "port_release", False)
 
     build_dir: Path = sln.build_dir / "web"
@@ -215,7 +233,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     abi = " ".join(WEB_ABI_FLAGS + configuration_defines(sln))
     code = " ".join(WEB_CODE_FLAGS)
     implicit_headers = [*xdk_headers(), prefix_header, semantics_header, platform_semantics_header, sdl_stamp]
-    objects: List[Path] = []
+    objects: list[Path] = []
 
     def add_object(source: Path, cflags: str) -> None:
         relative = source.relative_to(build_dir) if str(source).startswith(str(build_dir)) else source
@@ -273,18 +291,18 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         add_object(source, platform_cflags)
     for source in sorted((PORT_DIR / "src").glob("*.c")):
         add_object(source, posix_cflags if source.name in WEB_POSIX_SOURCES else platform_cflags)
-    add_object(WATCH_HASH, " ".join([abi, "-std=gnu11", "-w"]))
+    add_object(WATCH_HASH, f"{abi} -std=gnu11 -w")
 
     # ---------- third-party libraries, as the other builds have them
 
-    add_object(TOML_DIR / "tomlc17.c", " ".join([abi, "-std=gnu11", "-w"]))
+    add_object(TOML_DIR / "tomlc17.c", f"{abi} -std=gnu11 -w")
     for name in EXPAT_SOURCES:
         add_object(EXPAT_DIR / name, " ".join([abi, "-std=gnu11", f"-I{EXPAT_DIR}", "-w"]))
-    add_object(KCP_DIR / "ikcp.c", " ".join([abi, "-std=gnu11", "-w"]))
+    add_object(KCP_DIR / "ikcp.c", f"{abi} -std=gnu11 -w")
     for source in opus_sources():
         add_object(source, opus_cflags(abi))
     for name in ("monocypher.c", "monocypher-ed25519.c"):
-        add_object(MONOCYPHER_DIR / name, " ".join([abi, "-std=gnu11", "-w"]))
+        add_object(MONOCYPHER_DIR / name, f"{abi} -std=gnu11 -w")
     for name in ZLIB_SOURCES:
         add_object(ZLIB_DIR / name, " ".join([abi, "-std=gnu11", *ZLIB_DEFINES, "-w"]))
     for source in musl_math_sources():
@@ -351,7 +369,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     # ---------- the site: the page, its service worker and the importer
 
     n.rule(name="web_copy", command="cp $in $out", description="WEB STAGE $out")
-    site_files: List[Path] = []
+    site_files: list[Path] = []
     for source in site_sources():
         target = site_dir / source.relative_to(PORT_DIR / "site")
         n.build(outputs=target, rule="web_copy", inputs=source)

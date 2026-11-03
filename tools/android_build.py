@@ -18,6 +18,7 @@ and stages both, with the SDL3 Java sources, for the Gradle project in
 port/android/app, which ``ninja android_apk`` then assembles.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -25,8 +26,6 @@ from pathlib import Path
 from typing import Any
 
 from .embed_assets import hud_configure_inputs
-
-# (VARIADIC_PROTOTYPE_FILES is tools/web_build.py's too)
 from .guest_build import (
     MUSL_VERSION,
     GuestTarget,
@@ -88,7 +87,7 @@ def fetch_third_party() -> None:
     # CI's cached one) is put back as SDL has it before this one is applied.
     reverse = subprocess.run(
         ["git", "-C", str(SDL_DIR), "apply", "--reverse", "--check", str(SDL_ANDROID_MOUSE_PATCH.resolve())],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
     )
     if reverse.returncode != 0:
         subprocess.run(["git", "-C", str(SDL_DIR), "checkout", "--", SDL_ANDROID_MOUSE_LISTENER], check=True)
@@ -113,7 +112,6 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     except (subprocess.CalledProcessError, OSError) as error:
         print(f"Android build disabled: cannot fetch musl/SDL3 ({error})", file=sys.stderr)
         return
-    import json
     config: dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
 
     prebuilt = ndk / "toolchains" / "llvm" / "prebuilt"
@@ -170,8 +168,6 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     jni_dir = BUILD / "jniLibs" / "arm64-v8a"
     libmain = jni_dir / "libmain.so"
     assets_dir = BUILD / "assets"
-    linker_script = PORT_DIR / "guest" / "guest.ld"
-    libguestc = BUILD / "guest" / "libguestc.a"
 
     # ---------- SDL3
 
@@ -205,7 +201,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-I{PORT_DIR}/include", f"-I{PORT_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
         f"-I{TOML_DIR}",
     ])
-    host_sources = sorted((PORT_DIR / "host").glob("*.c")) + [
+    host_sources = [*sorted((PORT_DIR / "host").glob("*.c")),
         LINUX_DIR / "src" / "posix_files.c", LINUX_DIR / "src" / "posix_net.c",
         # the app reads debug.sample_seconds from config.toml (host_main.c)
         TOML_DIR / "tomlc17.c",
