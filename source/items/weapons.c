@@ -201,6 +201,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "third_person.h" /* port: port/linux/game/third_person_weapon.c */
 #include "weapons.h"
 
 #include "equipment.h"
@@ -364,14 +365,7 @@ struct animation_graph_first_person_weapon_animations
 };
 
 /* TU-local: weapon_trigger_definition.firing_effects element; no shared header declares it yet. */
-struct trigger_firing_effect
-{
-	short shots_lower_bound;
-	short shots_upper_bound;
-	long unused[8];
-	struct tag_reference effects[NUMBER_OF_TRIGGER_FIRING_EFFECTS];
-	struct tag_reference damage_effects[NUMBER_OF_TRIGGER_FIRING_EFFECTS];
-};
+/* port: firing-effect layout is shared in weapon_definitions.h. */
 
 /* ---------- prototypes */
 
@@ -2475,6 +2469,7 @@ static void trigger_create_projectiles(
 		long target_object_index= NONE;
 		long projectile_definition_index;
 		short projectile_count;
+		boolean muzzle_origin = FALSE; /* port: exclude shooter from BSP repair */
 
 		if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit) &&
 			unit &&
@@ -2548,6 +2543,12 @@ static void trigger_create_projectiles(
 		{
 			origin= markers[marker_index].matrix.position;
 		}
+
+		/* port: shoulder shots leave the world muzzle. Custom
+		   triggers that explicitly choose an origin or forbid aiming keep it. */
+		if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_uses_weapon_origin_bit) &&
+			!TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit))
+			muzzle_origin = third_person_muzzle_shot(weapon_index, owner_object_index, trigger_index, &origin, &forward);
 
 		if (trigger_index==0 && weapon->weapon.alternate_shots_loaded>0)
 		{
@@ -2633,7 +2634,9 @@ static void trigger_create_projectiles(
 						real_point3d camera_position;
 
 						unit_get_camera_position(owner_object_index, &camera_position);
-						object_force_inside_bsp(projectile_object_index, &camera_position);
+						/* port: do not pull a validated muzzle shot back onto its owner. */
+						object_force_inside_bsp_ignoring(projectile_object_index, &camera_position,
+							muzzle_origin ? owner_object_index : NONE);
 					}
 					if (target_object_index!=NONE)
 					{
@@ -2724,7 +2727,7 @@ static void weapon_trigger_fire(
 
 	if (trigger_definition->firing_effects.count>0)
 	{
-		struct trigger_firing_effect *firing_effect;
+		struct weapon_firing_effect_definition *firing_effect;
 		short effect_type;
 
 		if (trigger->firing_effect_shots_remaining<=0)
@@ -2743,7 +2746,7 @@ static void weapon_trigger_fire(
 
 			do
 			{
-				struct trigger_firing_effect *next_firing_effect;
+				struct weapon_firing_effect_definition *next_firing_effect;
 
 				if (trigger->firing_effects_used_flags==FLAG(trigger_definition->firing_effects.count)-1)
 				{
@@ -2760,7 +2763,7 @@ static void weapon_trigger_fire(
 				}
 				while (TEST_FLAG(trigger->firing_effects_used_flags, firing_effect_index));
 
-				next_firing_effect= TAG_BLOCK_GET_ELEMENT(&trigger_definition->firing_effects, firing_effect_index, struct trigger_firing_effect);
+				next_firing_effect= TAG_BLOCK_GET_ELEMENT(&trigger_definition->firing_effects, firing_effect_index, struct weapon_firing_effect_definition);
 				trigger->firing_effect_index= firing_effect_index;
 				SET_FLAG(trigger->firing_effects_used_flags, firing_effect_index, TRUE);
 				trigger->firing_effect_shots_remaining= random_range(next_firing_effect->shots_lower_bound, next_firing_effect->shots_upper_bound);
@@ -2769,7 +2772,7 @@ static void weapon_trigger_fire(
 		}
 
 		trigger->firing_effect_shots_remaining--;
-		firing_effect= TAG_BLOCK_GET_ELEMENT(&trigger_definition->firing_effects, trigger->firing_effect_index, struct trigger_firing_effect);
+		firing_effect= TAG_BLOCK_GET_ELEMENT(&trigger_definition->firing_effects, trigger->firing_effect_index, struct weapon_firing_effect_definition);
 
 		if (weapon_definition->weapon.age_misfire_start>0.0f &&
 			weapon_definition->weapon.age_misfire_start<1.0f &&

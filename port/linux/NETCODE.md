@@ -84,6 +84,20 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   threads' wake times along with it. The object, device and name syncs
   bring the clients up to date.
 
+  In GulchCE Third Person sessions, checkpoint loading retains the host's current session
+  roster (`network_coop_restore_players`), before rebuilding view and input
+  caches. Saved players who left lose their restored units and remain quit;
+  current players missing from the save are created in their authoritative
+  slots and use the normal co-op spawn rules. The machine-to-player table
+  is rebuilt too: it lives outside the checkpoint, whose datum identifiers
+  may differ. This fixes restores after reconnects, with either camera perspective.
+  OpenCE Crossplay retains the upstream checkpoint behavior.
+  If an authoritative sample says a unit is alive but the client's copy is
+  dead, the client requests the existing full object description, with the
+  existing retry backoff and host rate limit. A validated create replaces
+  that dead co-op copy instead of reusing it. This also handles a restored
+  object keeping its checkpoint handle; no client decides to resurrect it.
+
   The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies_mode`)
   give each squad of enemies a level places more of itself: PER PLAYER, a
   percentage of itself for each player past the first, to 8 times its size
@@ -222,8 +236,7 @@ still owns equipment changes and replicates them through existing messages;
 packet layouts and the then-current Xbox/Custom Edition protocol 39 were unchanged.
 Version 60 moves MCC
 gameplay messages to 94-97 and the join envelope to 98, reserving message 93
-for OpenCE 39's optional client fire origins. The upstream protocol remains
-39 for Xbox and Custom Edition crossplay; older MCC peers are rejected.
+for OpenCE 39's optional client fire origins. At that revision Xbox and Custom Edition retained OpenCE protocol 39.
 Version 59 moved the MCC
 capability to flag `0x08`, gameplay messages to 93-96 and the join envelope to
 97, leaving OpenCE 39's dedicated flag `0x04` and client-build message 92 intact.
@@ -253,7 +266,7 @@ It also corrects named sleep_forever resets and online cooperative script querie
 It retains signed/vector damage impulses from version 48 and initialized
 three-point boat controls from version 47. Packet sizes are unchanged.
 At version 52, Xbox/Custom Edition retained OpenCE protocol 32; the current
-protocol baseline is described above.
+baseline and this camera branch's separate protocol are described above.
 Discovery advertises the selected map family's protocol and, separately,
 the host's MCC capability version. A GulchCE client sends a bounded reliable join
 envelope only to a host advertising the same MCC capability. The envelope wraps
@@ -1247,9 +1260,50 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
 
 ## Testing
 
-`debug.network_test` (`port/linux/game/network_test.c`) waits for the menu's
-filesystem/profile initialization before launching, as normal menu input does.
-It then hosts or joins a
+In GulchCE Third Person sessions, the host's camera policy travels in the reliable game settings
+record (bits 3-4 of `network_game.cooperative_flags`), for every transport
+and game type. Zero allows player choice, one forces third person, and two
+disables it. Receivers reject the reserved value and unknown flag bits.
+Pregame edits are host-only; late joiners receive the same record. Camera
+preferences are never written by receipt of a policy. The experimental camera
+protocol prevents stock OpenCE clients, which cannot enforce this rule,
+from joining. It also carries the current shoulder state in each
+player input and host relay. It is a state, never accumulated with earlier
+button presses. The host masks unknown input bits and Forced Off clears it.
+Scoped, dead and seated units retain stock firing. Each simulation computes
+the muzzle and cover correction from world markers. The camera feature does
+not send muzzle positions. The separate upstream `network.fire_origins`
+option retains its existing host controls and validation.
+Damage still uses the existing validated hit reports. The host records its
+own shoulder muzzle in visibility history, alongside the existing eye route,
+so a legitimate shot from beside cover is not judged only from the head.
+Both the eye-to-muzzle and muzzle-to-impact routes must be clear; weapon
+ownership, rate, target history and damage limits still apply. Scoped, dead,
+seated, Forced Off and ordinary first-person paths do not add this history.
+These rules, current-roster checkpoint restoration and immediate host object
+refresh after a restore use experimental
+camera agreement versions 32712/32713. The latter changes simulation agreement, so older
+camera builds are excluded too; it adds no packet fields or client authority.
+The host independently excludes weapon-authored following cameras from the
+shoulder solver; stale or forged input bits cannot override that priority.
+The relay rejects non-boolean shoulder values and truncated messages.
+
+Add `--combat` to the session runner below to exercise real bot firing on
+both peers, including 100 ms receive delay and 5 percent packet loss. Muzzle
+diagnostics identify shooters on each peer; this does not visually verify
+effects or exercise the public internet transport.
+
+`tools/camera_policy_sessions.py --binary build/windows/halo.exe --maps
+dist/halo-windows-release/maps --output build/camera-policy-sessions` runs
+two headless Windows instances with isolated saves over loopback. Add
+`--saves <profile-folder>` to copy a preselected profile for unattended startup;
+the source saves are never changed. Use a new output folder for every run. It checks
+all policies, an opposing client host preference, a late join and co-op.
+The supplied map directory must contain ui, carousel, bloodgulch and a30.
+The policy, saved preference, effective setting and active shoulder view
+are included in `debug.network_test`'s per-second logs.
+
+`debug.network_test` (`port/linux/game/network_test.c`) hosts or joins a
 game without the menus (in a team game the joining player takes the other
 team; `local:<map>` plays a local split screen game instead, which the
 bots of `bots.count` join), and `debug.test_input` plays controller 1 with a scripted bot (or,
@@ -1303,9 +1357,27 @@ action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
 
-MCC protocol version 52 reserves OpenCE text chat (87-89) and aim assist (90),
-with MCC data messages at 91-94. Ordinary Xbox and Custom Edition sessions
-use upstream version 32.
+The host's Session Compatibility selector defaults to OpenCE Crossplay.
+Xbox/CE use the exact pinned OpenCE 41 contract; MCC remains independently
+versioned at 63. In this mode the optional shoulder camera, its input and
+muzzle behavior, and its checkpoint recovery extensions do not execute.
+GulchCE Third Person instead advertises camera agreement 32712 (Xbox/CE) or
+32713 (MCC), requires a kind 101 envelope before admission and adds the
+shoulder byte to relayed actions. The envelope's bound is 520 bytes, including
+MCC's optional 512-byte inner envelope and upstream account-link credentials.
+Its header carries revision 1, camera base version 32712 and zero reserved
+bytes. Ordinary authorization and map-family checks still apply.
+
+Session mode is selected before opening the lobby and locked until disposal,
+including across rounds. The client binds camera permission to the selected
+host's exact advertised version and clears it on disconnect. Unknown versions
+are rejected; settings cannot grant capability. Player preferences are not
+rewritten. All platforms and transports share this path. Common internet
+listings use the base discovery format; admission establishes compatibility.
+See [the camera guide](../../docs/reading/third_person.md) for lifecycle details.
+Asset-free checks exercise both relay formats, malformed envelopes, host locks,
+policy enforcement and the pinned upstream contract. Actual crossplay and
+browser gameplay must also be tested against the resulting build.
 
 ### Comparing two builds
 

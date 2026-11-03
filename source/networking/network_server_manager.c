@@ -477,6 +477,8 @@ symbols in this file:
 
 #include "cache/cache_files.h"
 #include "interface/player_ui.h"
+#include "third_person.h" /* port: port/linux/game/third_person_policy.c */
+#include "third_person_protocol.h" /* port: session compatibility lifecycle */
 #include "tag_files/tag_files.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "server_director.h" /* port: port/linux/game/server_director.c */
@@ -1325,6 +1327,11 @@ struct network_game_server *network_game_server_create(
 				network_game_server_reject_connection_game_is_full);
 
 			network_game_invalidate(&server->game);
+			/* port: every match path, including quickstart and co-op, starts
+			with the host's camera rule. Subsequent rounds retain it. */
+			third_person_session_host_begin();
+			if (third_person_session_active())
+				server->game.cooperative_flags |= third_person_host_policy() << THIRD_PERSON_POLICY_SHIFT;
 
 			server->game.difficulty = main_get_difficulty();
 			mcc_protocol_reset(); /* port: a fresh server has no negotiated MCC peers */
@@ -1376,6 +1383,7 @@ void network_game_server_dispose(
 	struct network_game_server *server)
 {
 	mcc_protocol_reset(); /* port: no stale MCC peer pointers */
+	third_person_session_host_end(); /* port: discard the prior camera contract */
 	bots_network_session_end(); /* port: bot policy belongs to this host alone */
 	mcc_ui_network_server_dispose(server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
@@ -1955,6 +1963,7 @@ boolean network_game_server_start_network_game(
 	/* port: an MCC check still in progress is a successful idle, not a failed
 	connection. Keep the countdown pending until its validated settings are sent. */
 	if (mcc_ui_network_map_pending(server)) return TRUE;
+	third_person_session_lock(); /* port: non-menu hosts also fix the session contract before starting */
 
 	if (server->sent_start_game_message == FALSE)
 	{
@@ -4651,6 +4660,19 @@ void network_game_server_port_set_cooperative_friendly_fire(
 	server->game.variant_options.friendly_fire = friendly_fire;
 	if (server->state == _network_game_server_state_pregame && !network_game_server_send_game_data_pregame(server))
 		network_event("network_game_server_port_set_cooperative_friendly_fire() failed to send updated game settings to clients");
+}
+
+/* port: update the authoritative pregame record, including late joiners. */
+void network_game_server_port_set_camera_policy(short policy)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	if (!server || server->state != _network_game_server_state_pregame ||
+		!third_person_session_active() || policy < _third_person_player_choice || policy > _third_person_forced_off)
+		return;
+	server->game.cooperative_flags = (server->game.cooperative_flags & ~THIRD_PERSON_POLICY_MASK) |
+		(policy << THIRD_PERSON_POLICY_SHIFT);
+	if (!network_game_server_send_game_data_pregame(server))
+		network_event("failed to send updated camera policy to clients");
 }
 
 void network_game_server_port_set_cooperative_player_collisions(

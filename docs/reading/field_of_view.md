@@ -106,6 +106,14 @@ first-person weapon in that mode. The first-person path described here
 applies when that mode is inactive. This branch-specific ordering matters
 when locating the call in `main.c`.
 
+The director now selects the feature-owned `third_person_camera_update`
+callback, which retains the stock first-person eye calculation. Its reported
+perspective follows the resolved shoulder view, including collision fallback.
+This lets body and particle rendering use the ordinary director query while
+hidden viewmodel poses and sounds remain live for immediate fallback. Read
+[the shoulder-camera walkthrough](third_person.md) for the selection order,
+controls and host-owned combat path.
+
 ## 3. Read the reasons for doing nothing
 
 Inside `render_fov_adjust`, several early returns preserve the incoming

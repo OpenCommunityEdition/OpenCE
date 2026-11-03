@@ -38,14 +38,20 @@ enum halo_keyboard_action
 	/* (voice chat's, which the game itself does not read:
 	halo_push_to_talk_held) */
 	HALO_KEYBOARD_PUSH_TO_TALK,
+	HALO_KEYBOARD_SWAP_SHOULDER,
+	HALO_KEYBOARD_FREE_LOOK,
+	HALO_KEYBOARD_TOGGLE_PERSPECTIVE,
 	/* (the text chat's, which the game itself does not read: a line to
 	everyone, or to the team: port/linux/game/network_chat.c) */
 	HALO_KEYBOARD_CHAT,
 	HALO_KEYBOARD_TEAM_CHAT,
+	HALO_KEYBOARD_CAMERA_DISTANCE,
 	/* (the players' votes', yes and no in the vote running: port/linux/game/
 	network_votekick.c, read with the chat's keys) */
 	HALO_KEYBOARD_VOTE_YES,
 	HALO_KEYBOARD_VOTE_NO,
+	HALO_KEYBOARD_CAMERA_HEIGHT,
+	HALO_KEYBOARD_CAMERA_OFFSET,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 
@@ -53,6 +59,9 @@ enum halo_keyboard_action
 (a bit for each halo_keyboard_action): theirs is the first's; none while a
 menu or the console is up, or a chat line is typed */
 unsigned long halo_keyboard_actions(short controller_index);
+/* Binding-aware prompt groundwork: slot 0/1, layout-aware key/mouse label.
+ * Returns zero (and an empty label) for an invalid or unbound action/slot. */
+int halo_keyboard_binding_label(int action, int slot, char *shown, unsigned int size);
 /* whether voice chat's push to talk is held (controls.push_to_talk), in the
 game and in the menus alike */
 int halo_push_to_talk_held(void);

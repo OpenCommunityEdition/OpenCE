@@ -666,7 +666,7 @@ def regenerate_child_offsets():
 
 def regenerate_settings():
     """Write port-owned settings and register any new screens for embedding."""
-    screens = port_settings.settings_files()
+    screens = {**port_settings.settings_files(), **port_settings.multiplayer_files()}
     for name, lines in screens.items():
         (CE / name).write_text("\n".join(lines))
     manifest = MENUS / "menus.json"
@@ -863,7 +863,9 @@ def main() -> None:
     report += ["", "Wired: " + ", ".join(f"`{name}`" for name in sorted(WIRED)) + ".", ""]
     (MENUS / "UNWIRED.md").write_text("\n".join(report))
     files = sorted(path.relative_to(MENUS).as_posix() for path in MENUS.rglob("*.xml"))
-    files += sorted(art.pngs)
+    # The optional frontend's independent generator owns these redraws.
+    files += sorted(set(art.pngs) | {path.relative_to(MENUS).as_posix()
+                                   for path in (MENUS / "modern").glob("*.png")})
     (MENUS / "menus.json").write_text(json.dumps({
         "comment": "The menus' files the game embeds (tools/ce_menus.py, tools/embed_assets.py).",
         "files": files,

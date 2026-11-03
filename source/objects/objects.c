@@ -63,6 +63,7 @@ OBJECTS.C
 void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
 /* port: port/linux/game/first_person_legs.c's */
 void first_person_legs_reset(void);
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 
 /* ---------- constants */
 
@@ -1114,7 +1115,11 @@ void objects_initialize_for_new_map(
 	widgets_initialize_for_new_map();
 	object_types_initialize_for_new_map();
 	lights_initialize_for_new_map();
-	first_person_legs_reset(); /* port: (the last map's legs forgotten) */
+	/* port: the last map's waist and mesh forgotten
+	(port/linux/game/first_person_legs.c) */
+	first_person_legs_reset();
+	/* port: reset the shoulder camera across map loads. */
+	third_person_reset();
 	
 	data_make_valid(object_header_data);
 	object_name_list_clear();
@@ -3940,9 +3945,18 @@ void object_attach_to_node(
 	return;
 }
 
+/* port: muzzle shots must exclude their shooter during the safety check. */
 boolean object_force_inside_bsp(
 	long object_index,
 	real_point3d const *known_good_point)
+{
+	return object_force_inside_bsp_ignoring(object_index, known_good_point, NONE);
+}
+
+boolean object_force_inside_bsp_ignoring(
+	long object_index,
+	real_point3d const *known_good_point,
+	long ignore_object_index)
 {
 	struct collision_result collision;
 
@@ -3952,7 +3966,7 @@ boolean object_force_inside_bsp(
 	match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 2365, global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
 	global_current_collision_users[global_current_collision_user_depth++] = 19;
 	
-	if (collision_test_line(_collision_test_for_projectiles_flags, known_good_point, &object->object.position, NONE, &collision) ||
+	if (collision_test_line(_collision_test_for_projectiles_flags, known_good_point, &object->object.position, ignore_object_index, &collision) ||
 		object->object.location.cluster_index==NONE)
 	{
 		if (collision.location.cluster_index!=NONE)

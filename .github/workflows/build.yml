@@ -148,6 +148,7 @@ jobs:
           python -m pytest -q tools/test_shadow_setup.py tools/test_hud_shield_tick.py
           python -m pytest -q tools/test_android_mcc_memory.py tools/test_mcc_memory.py tools/test_android_dynamic_lighting.py tools/test_android_shader_logs.py
           python -m pytest -q tools/test_changelog_layout.py tools/test_changelog_menu.py tools/test_gulch_build_label.py tools/test_player_notes.py tools/test_changelog_release_base.py
+          python -m pytest -q tools/test_third_person.py tools/test_camera_policy.py tools/test_camera_wire.py tools/test_camera_protocol.py tools/test_third_person_director.py tools/test_coop_checkpoint.py
           # the dedicated server: --version, and --server without maps refused (exit code 2); its cases with
           # clients need the retail maps, and are skipped
           python -m pytest -q tools/test_dedicated_server.py tools/test_king_network_state.py

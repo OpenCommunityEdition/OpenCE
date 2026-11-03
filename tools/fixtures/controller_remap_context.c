@@ -36,6 +36,7 @@ static void input_abstraction_get_local_player_preferences(short p,struct game_i
 }
 typedef void (*director_camera_update_proc)(void);
 static void first_person_camera_update(void){}
+static void third_person_camera_update(void){}
 static void following_camera_update(void){}
 static void flying_camera_update(void){}
 static void editor_camera_update(void){}

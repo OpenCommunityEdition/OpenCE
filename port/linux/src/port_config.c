@@ -159,6 +159,19 @@ static const struct config_setting config_settings[] =
 		"In first person, point the view where the player aims now instead of\n"
 		"where the last tick left it: the view turns the frame the mouse moves,\n"
 		"not up to two ticks (66 ms) later." },
+	{ "display.third_person_smooth", _config_boolean, "true", "HALO_THIRD_PERSON_SMOOTH", _environment_value, _platform_all,
+		"Smooth camera recovery and shoulder changes; false uses sharp movement." },
+	{ "display.third_person_left_shoulder", _config_boolean, "false", "HALO_THIRD_PERSON_LEFT_SHOULDER", _environment_value, _platform_all,
+		"Use the left shoulder. Swap shoulders with B (controls.swap_shoulder)." },
+	{ "display.third_person_distance", _config_real, "0.85", "HALO_THIRD_PERSON_DISTANCE", _environment_value, _platform_all,
+		"Shoulder camera distance behind the eye, in world units (0.3 to 2.0)." },
+	{ "display.third_person_height", _config_real, "0.12", "HALO_THIRD_PERSON_HEIGHT", _environment_value, _platform_all,
+		"Shoulder camera height along camera up, in world units (-0.2 to 0.6)." },
+	{ "display.third_person_offset", _config_real, "0.24", "HALO_THIRD_PERSON_OFFSET", _environment_value, _platform_all,
+		"Shoulder camera lateral offset, in world units (0.0 to 0.6)." },
+	{ "display.third_person", _config_boolean, "false", "HALO_THIRD_PERSON", _environment_value, _platform_all,
+		"On foot, use a right-shoulder camera. Zoom returns to first person.\n"
+		"The reticle follows the stock aim point; weapon behaviour is unchanged." },
 	{ "display.fov", _config_real, "0.0", "HALO_FOV", _environment_value, _platform_all,
 		"The first-person view's field of view on foot, in degrees across at\n"
 		"16:9 (20 to 150); 0 keeps the stock view. Vehicles, cinematics and\n"
@@ -195,14 +208,20 @@ static const struct config_setting config_settings[] =
 		"Manual high-res gameplay button style, preserved while automatic detection\n"
 		"is on. Xbox: classic, gems, menu_gems (dark gems), xbox_modern.\n"
 		"PlayStation: ps_classic, ps_gems, ps_dark_gems, ps_modern.\n"
-		"Switch: switch_classic, switch_gems, switch_modern. Requires high_res_hud." },
+		"Switch: switch_classic, switch_gems, switch_modern. Controllers require high_res_hud.\n"
+		"keyboard selects binding-aware keyboard/mouse glyphs without that requirement." },
+	{ "display.keyboard_glyphs", _config_boolean, "false", "HALO_KEYBOARD_GLYPHS", _environment_value, _platform_all,
+		"With auto button detection on, show keyboard/mouse glyphs after keyboard\n"
+		"or mouse input. Applies to modern menus and semantic gameplay prompts.\n"
+		"Off preserves existing presentation. Manual keyboard style works independently." },
 	{ "display.hud_bumper_style", _config_string, "\"original\"", "HALO_HUD_BUMPER_STYLE", _environment_value, _platform_all,
 		"Xbox Classic, Gems and Dark Gems bumpers: original (black/white) or modern\n"
 		"(LB/RB). Shared by local players, including automatic button detection.\n"
 		"Requires high_res_hud; other button styles keep their own artwork." },
 	{ "input.auto_button_detection", _config_boolean, "true", "HALO_AUTO_BUTTON_DETECTION", _environment_value, _platform_all,
 		"Limit Button Style to the assigned controller's family. Unknown devices\n"
-		"keep the manual choice. Device detection itself is always available." },
+		"keep the manual choice. With display.keyboard_glyphs, keyboard/mouse input\n"
+		"selects keycaps. Off uses the manual style. Device detection always runs." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
 		"P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
 		"Button Remapping. v3: stores 26 physical-button names, including unbound.\n"
@@ -234,6 +253,11 @@ static const struct config_setting config_settings[] =
 	{ "display.changelog", _config_boolean, "true", "HALO_CHANGELOG", _environment_value, _platform_all,
 		"Show CHANGELOG beneath the build labels in the PC main menu.\n"
 		"Restart the game after changing this setting." },
+	{ "display.menu_frontend", _config_string, "\"modern\"", "HALO_MENU_FRONTEND", _environment_value, _platform_all,
+		"Optional submenu frontend: \"off\" keeps display.menus, or choose\n"
+		"\"modern\", \"pc\" or \"xbox\". Change it in Interface or Video Setup > Graphics.\n"
+		"Settings use the selected style in gameplay too. Changes made while\n"
+		"playing take effect on return to the main menu. Pause roots stay native." },
 	{ "display.menu_language", _config_string, "\"maps\"", "HALO_MENU_LANGUAGE", _environment_value, _platform_all,
 		"The PC menus' language: \"maps\" for the language of the Custom Edition\n"
 		"whose loc.map is in custom_maps (as that edition shows them; English\n"
@@ -505,8 +529,21 @@ static const struct config_setting config_settings[] =
 		"Showing the scores (the controller's Back)." },
 	{ "controls.pause", _config_string, "\"Escape\"", "HALO_KEY_PAUSE", _environment_value, _platform_all,
 		"The pause menu (the controller's Start)." },
+	{ "controls.free_look", _config_string, "\"Left Alt\"", "HALO_KEY_FREE_LOOK", _environment_value, _platform_all,
+		"Hold to orbit the third-person camera without changing aim." },
+	{ "controls.toggle_perspective", _config_string, "\"N\"", "HALO_KEY_TOGGLE_PERSPECTIVE", _environment_value, _platform_all,
+		"Toggle first-person and third-person view during play." },
+	{ "controls.swap_shoulder", _config_string, "\"B\"", "HALO_KEY_SWAP_SHOULDER", _environment_value, _platform_all,
+		"Swap third-person shoulders. Up to two keyboard or mouse bindings." },
 	{ "controls.screenshot", _config_string, "\"F10\"", "HALO_KEY_SCREENSHOT", _environment_value, _platform_all,
 		"Save a PNG screenshot beside maps/ (press once per capture)." },
+	{ "controls.camera_distance", _config_string, "\"Left Alt\"", "HALO_KEY_CAMERA_DISTANCE", _environment_value, _platform_all,
+		"Hold with the mouse wheel to adjust shoulder distance; ordinary scrolling switches weapons." },
+	{ "controls.camera_height", _config_string, "\"Left Shift, Right Shift\"", "HALO_KEY_CAMERA_HEIGHT", _environment_value, _platform_all,
+		"Hold with the mouse wheel to raise or lower the shoulder camera." },
+	{ "controls.camera_offset", _config_string, "\"CapsLock\"", "HALO_KEY_CAMERA_OFFSET", _environment_value, _platform_all,
+		"Hold with the mouse wheel to move the camera left or right, across either shoulder.\n"
+		"Caps Lock is a held key, not its typing-toggle state. Wheel up moves right." },
 	{ "controls.push_to_talk", _config_string, "\"V\"", "HALO_KEY_PUSH_TO_TALK", _environment_value, _platform_all,
 		"Voice chat: talk while it is held (audio.voice_chat \"push_to_talk\")." },
 	{ "controls.chat", _config_string, "\"T\"", "HALO_KEY_CHAT", _environment_value, _platform_all,
@@ -662,6 +699,11 @@ static const struct config_setting config_settings[] =
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
 		"networks; empty chooses one." },
+	{ "network.session_compatibility", _config_string, "\"opence_crossplay\"", "HALO_SESSION_COMPATIBILITY", _environment_value, _platform_all,
+        "Host session: opence_crossplay disables shoulder cameras; gulchce_third_person requires matching camera clients. Fixed once the lobby opens. MCC maps always require GulchCE." },
+	{ "network.camera_policy", _config_string, "\"player_choice\"", "HALO_CAMERA_POLICY", _environment_value, _platform_all,
+		"Host camera rule for new matches: player_choice, forced_on, or forced_off.\n"
+		"Applies to LAN, internet and co-op matches; scope and collision overrides remain." },
 	{ "network.broadcast", _config_string, "\"\"", "HALO_NET_BROADCAST", _environment_value, _platform_all,
 		"Comma-separated IPv4 addresses system link sends its announcements to\n"
 		"instead of the local network's broadcast address (for VPNs); empty for\n"
@@ -2103,13 +2145,14 @@ static const struct
 	{ "display.resolution_scaling", { "native", "75%", "50%", "25%", "original", NULL }, NULL },
 	{ "display.anti_aliasing", { "off", "fxaa", "smaa", "ssaa2x", "msaa2x", "msaa4x", "msaa8x", NULL }, NULL },
 	{ "display.hud_button_style", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern",
-		"ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
+		"ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", "switch_classic", "switch_gems", "switch_modern", "keyboard", NULL }, NULL },
 	{ "display.hud_button_style_xbox", { "classic", "gems", "menu_gems", "dark_gems", "xbox_modern", NULL }, NULL },
 	{ "display.hud_bumper_style", { "original", "modern", NULL }, NULL },
 	{ "display.hud_button_style_ps", { "ps_classic", "ps_gems", "ps_dark_gems", "ps_modern", NULL }, NULL },
 	{ "display.hud_button_style_switch", { "switch_classic", "switch_gems", "switch_modern", NULL }, NULL },
 	{ "display.shield_look", { "classic", "classic_with_sprinkles", "enhanced", "classic_honeycomb2", NULL }, NULL },
 	{ "display.menus", { "pc", "xbox", NULL }, NULL },
+	{ "display.menu_frontend", { "off", "modern", "pc", "xbox", NULL }, NULL },
 	{ "display.player_names", { "all", "allies", "enemies", "none", NULL }, NULL },
 	{ "display.scoreboard_team_layout", { "teams", "score", NULL }, NULL },
 	{ "display.chat_style", { "colors", "white", NULL }, NULL },

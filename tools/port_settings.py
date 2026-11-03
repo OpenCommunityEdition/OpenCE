@@ -28,6 +28,9 @@ MODS_ITEM_PLACE = (192, 391)
 QUIT_ITEM_PLACE = (192, 427)
 YES_NO = [("YES", "true"), ("NO", "false")]
 ON_OFF = [("ON", "true"), ("OFF", "false")]
+MENU_STYLE = ("MENU STYLE:", "display.menu_frontend",
+              [("STOCK", "off"), ("MODERN", "modern"), ("CLASSIC PC", "pc"), ("XBOX", "xbox")],
+              "Choose the menu style. Applies on return to the\nmain menu; pause menus keep their existing style.", None)
 XBOX_BUTTON_STYLES = [("XBOX CLASSIC", "classic"), ("XBOX GEMS", "gems"),
                      ("XBOX DARK GEMS", "menu_gems"), ("XBOX MODERN", "xbox_modern")]
 PS_BUTTON_STYLES = [("PS CLASSIC", "ps_classic"), ("PS GEMS", "ps_gems"),
@@ -194,7 +197,7 @@ SCREENS = {
     "network_setup": {
         "screen": "network_settings_screen",
         "header": ("header_profile_network_settings", f"{PE}/network_setup/header_profile_network_settings"),
-        "spacing": 30,
+        "spacing": 27,
         # (the router, the clipboard and the updates, which the web build
         # has not: the other rows from the top there)
         "platform_places": True,
@@ -291,8 +294,8 @@ SCREENS = {
         "rows": [
             ("AUTO BUTTON DETECTION:", "input.auto_button_detection", ON_OFF,
              "Show styles for your controller's family.\nRequires High-Res HUD in Graphics.", None),
-            ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES,
-             "Manual gameplay button artwork, kept when auto\ndetection is on. Requires High-Res HUD.", None),
+            ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES + [("KEYBOARD", "keyboard")],
+             "Manual style when auto detection is off. Keyboard\nuses current bindings; controllers need High-Res HUD.", None),
             ("BUTTON STYLE:", "display.hud_button_style_xbox", XBOX_BUTTON_STYLES,
              "Preferred Xbox artwork for automatic detection.\nRequires High-Res HUD in Graphics.", None),
             ("BUTTON STYLE:", "display.hud_button_style_ps", PS_BUTTON_STYLES,
@@ -302,6 +305,8 @@ SCREENS = {
             ("BUMPER STYLE:", "display.hud_bumper_style",
              [("ORIGINAL XBOX", "original"), ("MODERN XBOX", "modern")],
              "Original: black/white buttons. Modern: LB/RB.\nKept when automatic detection is on.", None),
+            ("KEYBOARD GLYPHS:", "display.keyboard_glyphs", ON_OFF,
+             "Automatic keyboard/mouse glyphs in menus and play.\nManual Keyboard style works even with this off.", None),
         ],
     },
     "controller_remapping": {
@@ -327,7 +332,7 @@ _extra_effects = {"display.overshield_effect", "display.hdr", "display.hdr_outpu
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 27,
     "same_place": ["anti_aliasing_android"],
-    "rows": [row for row in _video["rows"] if row[1] in _graphics],
+    "rows": [MENU_STYLE] + [row for row in _video["rows"] if row[1] in _graphics],
 }
 SCREENS["video_settings/extra_effects"] = {
     "screen": "extra_effects_settings_screen", "header": _video["header"], "spacing": 30,
@@ -405,11 +410,39 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Classic keeps map shields. Other looks keep custom colour.\nSprinkles adds layers, arcs and recharge to the classic surface.", None),
         ("ARM SHIELDS:", "display.viewmodel_shield", ON_OFF,
          "The energy shield's flare on your first-person\narms too, as on your body.", None),
+        ("THIRD PERSON:", "display.third_person", ON_OFF,
+         "Right-shoulder view on foot. Zoom uses first\nperson. The reticle follows your aim point.", None),
         ("LEGS:", "display.first_person_legs", ON_OFF,
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
     ],
 }
 
+SCREENS["video_settings/fov_viewmodels"]["spacing"] = 26
+SCREENS["video_settings/fov_viewmodels"]["categories"] = [
+    ("SHOULDER CAMERA:", "video_settings/shoulder_camera",
+     "Choose the shoulder and camera position.\nB swaps shoulders while playing."),
+]
+SCREENS["video_settings/fov_viewmodels"]["extra_help"] = [
+    "CONTROLLED BY HOST. Your personal camera\\npreference returns after leaving the match.",
+]
+SCREENS["video_settings/shoulder_camera"] = {
+    "screen": "shoulder_camera_settings_screen", "header": _video["header"], "spacing": 30,
+    "rows": [
+        ("CAMERA MOTION:", "display.third_person_smooth", [("SMOOTH", "true"), ("SHARP", "false")],
+         "Smooth eases recovery and shoulder changes.\nSharp moves immediately; collision stays active.", None),
+        ("LEFT SHOULDER:", "display.third_person_left_shoulder", ON_OFF,
+         "Off uses the right shoulder. B swaps in game.\nRemap it under Controls Setup > Camera.", None),
+        ("DISTANCE:", "display.third_person_distance",
+         [(f"{n / 100:.2f}", f"{n / 100:.2f}") for n in [30, 45, 60, 70, 85, 100, 125, 150, 175, 200]],
+         "Distance behind the eye, in world units.\nAlt + wheel adjusts in game. Default 0.85.", None),
+        ("HEIGHT:", "display.third_person_height",
+         [(f"{n / 100:.2f}", f"{n / 100:.2f}") for n in [-20, -10, 0, 6, 12, 18, 24, 36, 48, 60]],
+         "Shift + wheel adjusts height in game.\nDefault 0.12 world units.", None),
+        ("LATERAL OFFSET:", "display.third_person_offset",
+         [(f"{n / 100:.2f}", f"{n / 100:.2f}") for n in [0, 6, 12, 18, 24, 30, 36, 48, 60]],
+         "Hold Caps Lock + wheel to move left or right.\nDefault 0.24 world units to the right.", None),
+    ],
+}
 # Audio Setup's sound processing (port/linux/src/dsound_sdl.c): the reverb
 # and the resampler, a screen of their own (a category, as Video Setup's);
 # the devices and the volumes stay on Audio Setup
@@ -599,7 +632,7 @@ SCREENS["network_setup/in_game"] = {
 
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of
 # port/linux/game/menu_functions.c's table of them)
-CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS", "COMMUNICATION"]
+CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS", "COMMUNICATION", "CAMERA"]
 CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
@@ -700,18 +733,18 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
     lines = []
     lines += _widget(f"{base}/{spec['screen']}",
                      [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child pause_game"),
-                      ("bitmap", "bitmaps/gradient")],
+                      ("bitmap", spec.get("background_bitmap", "bitmaps/gradient"))],
                      ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
                       f'<child{attributes([("widget", f"{base}/{header}")])}/>',
                       f'<child{attributes([("widget", f"{base}/options_menu")])}/>'])
     header_style = [("bitmap", header_bitmap)] if not spec.get("title") else [
         ("type", "text"), ("text", spec["title"]), ("font", "ui\\large_ui"), ("color", "#FFFFFFFF"), ("text_y", 18)]
-    lines += _widget(f"{base}/{header}", [("controller", 1), ("left", 35), ("top", 11), ("width", 605), ("height", 59),
+    lines += _widget(f"{base}/{header}", [("controller", 1), ("left", 35), ("top", spec.get("header_top", 11)), ("width", 605), ("height", 59),
                                           *header_style], [])
-    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 68),
-                                      ("top", spec.get("help_top", 350)), ("width", 482),
+    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", spec.get("help_left", 68)),
+                                      ("top", spec.get("help_top", 350)), ("width", spec.get("help_width", 482)),
                                       ("height", spec.get("help_height", 60)), ("string_list", None if spec.get("dynamic_help") else f"{base}/help_strings"),
-                                      ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")],
+                                      ("font", spec.get("help_font", "ui\\large_ui")), ("color", "#FFFFFFFF")],
                      [f'<on event="created" run="{spec["help_init"]}"/>'] if spec.get("help_init") else [])
     children = [f'<data input="{name}"/>' for name in list_inputs] + list_handlers
     # (each row: its widget, platform, and the place it is in, else the next)
@@ -722,13 +755,13 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
             groups = {}
             for name in platform.split() if platform else ("desktop", "android", "web"):
                 spacing = spec["platform_spacing"].get(name, spec["spacing"])
-                groups.setdefault(73 + position * spacing, []).append(name)
+                groups.setdefault(spec.get("rows_top", 73) + position * spacing, []).append(name)
             for y, names in groups.items():
                 children.append(f'<child{attributes([("widget", row), ("x", 54), ("y", y), ("platform", " ".join(names))])}/>')
         else:
-            y = 73 + position * spec["spacing"]
+            y = spec.get("rows_top", 73) + position * spec["spacing"]
             children.append(f'<child{attributes([("widget", row), ("x", 54), ("y", y), ("platform", platform)])}/>')
-    children.append(f'<child{attributes([("widget", f"{base}/button_bar"), ("y", 414)])}/>')
+    children.append(f'<child{attributes([("widget", f"{base}/button_bar"), ("y", spec.get("button_top", 414))])}/>')
     lines += _widget(f"{base}/options_menu",
                      [("type", "column_list"), ("width", 640), ("height", 480),
                       ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
@@ -858,7 +891,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
     extra += _strings(f"{base}/help_strings",
                       [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]] +
-                      [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())])
+                      [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())] + spec.get("extra_help", []))
     return _screen(folder, spec, rows, ["port settings help", *spec.get("inputs", ())], [], extra)
 
 
@@ -1675,14 +1708,56 @@ def _bots_link(base, name, host_only=False):
          '<on event="left_mouse" run="mouse emit accept event"/>'])
 
 
+def _session_options(base: str, host: str) -> list:
+    rows, extra = [], []
+    for key, label, values in [
+        ("session_compatibility", "SESSION COMPATIBILITY:", "CROSSPLAY|GULCHCE"),
+        ("camera_policy", "CAMERA POLICY:", "PLAYER CHOICE|FORCED ON|FORCED OFF"),
+    ]:
+        extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
+            ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+            [f'<child widget="{base}/{key}_label"/>', f'<child widget="{base}/{key}_spinner" x="264" y="1"/>'])
+        extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 260), ("height", 22),
+            ("text", label), ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        # Generated spinners draw at their bounds, ignoring text_y. Top 3 +
+        # child y 1 matches the label's text_y 4; arrows centre on the 28px row.
+        extra += _widget(f"{base}/{key}_spinner", [("type", "spinner"), ("top", 3), ("width", 237), ("height", 20),
+            ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"), ("strings", values),
+            ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"),
+            ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+            ("header_bounds", "7 0 19 6"), ("footer_bounds", "7 231 19 237")],
+            ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+        rows.append((f"{base}/op_{key}", None))
+    extra += _value_row(base, "invite", 2, "ss copy invite")
+    extra += _strings(f"{base}/labels", ["", "", "INVITE LINK:"])
+    rows.append((f"{base}/op_invite", None))
+    extra += _strings(f"{base}/help_strings", [
+        "OpenCE and GulchCE can join; third person is off.\\nMCC maps still require GulchCE.",
+        "Compatible GulchCE hosts and clients only.\\nEnables GulchCE session features, including third person.",
+        "Compatibility is locked for this session.\\nClose the lobby to choose another mode.",
+        "Each player chooses first or third person.\\nTheir camera toggle remains available.",
+        "Everyone uses third person on foot. Scoping and\\ntight spaces still use first person.",
+        "Third person is disabled for everyone.\\nNormal vehicle and cinematic cameras remain.",
+        "Players join by this invite link. Enter copies it.\\nLAN games use the server browser instead.",
+    ])
+    lines = _screen(base, {"screen": "session_options_screen", "spacing": 30,
+        "header": ("header", f"{host}/header_server_settings")}, rows,
+        ["server settings update"], ['<on event="created" run="server settings init"/>'], extra)
+    return [line for line in lines if f'<child widget="{base}/button_defaults"' not in line
+            and f'<child widget="{base}/button_ok"' not in line]
+
+
 def _server_settings() -> list:
     """Create Game's server settings (in the PC version's place): the game's
     name, the most players (up to the port's 128), its invite link, and
     whether the server browser lists it (PUBLIC or PRIVATE: an internet
     game's)"""
     base = f"{MT}/server_settings"
-    # (twelve rows: closer together, the help lower)
-    spec = {"screen": "server_settings_screen", "spacing": 24, "help_top": 366,
+    # Twelve full-height rows: leave the selection artwork room to draw.
+    spec = {"screen": "server_settings_screen", "spacing": 28, "help_top": 392, "help_height": 40, "rows_top": 49,
+            "help_left": 67, "help_width": 486,
+            "help_font": "ui\\small_ui", "button_top": 448,
+            "background_bitmap": "bitmaps/gradient_big", "header_top": -10,
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
     extra += _value_row(base, "server_name", 0, "ss edit server name")
@@ -1704,8 +1779,6 @@ def _server_settings() -> list:
                       ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                       ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")], [])
     rows.append((f"{base}/op_max_players", None))
-    extra += _value_row(base, "invite", 2, "ss copy invite")
-    rows.append((f"{base}/op_invite", None))
     # (PUBLIC or PRIVATE: menu_functions.c's server_settings_update)
     extra += _widget(f"{base}/op_listing", [("width", 512), ("height", 28),
                                             ("flags", "pass_unhandled_to_focused_child"),
@@ -1729,6 +1802,20 @@ def _server_settings() -> list:
     # which players from the server browser must type
     extra += _value_row(base, "password", 10 + len(COOP_SETUP_SCREENS), "ss edit server password")
     rows.append((f"{base}/op_password", None))
+    # Session options occupy the former camera row; the established host
+    # layout and all detailed gametype links remain in their original places.
+    session = f"{base}/session_options"
+    extra += _widget(f"{base}/op_session_options", [("width", 512), ("height", 28),
+        ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+        [f'<on event="a" open="{session}/session_options_screen"/>',
+         f'<on event="start" open="{session}/session_options_screen"/>',
+         '<on event="left_mouse" run="mouse emit accept event"/>',
+         f'<child widget="{base}/session_options_label"/>'])
+    extra += _widget(f"{base}/session_options_label", [("type", "text"), ("controller", 1),
+        ("width", 480), ("height", 22), ("string_list", f"{base}/labels"), ("string_index", 13),
+        ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+    rows.append((f"{base}/op_session_options", None))
+    extra += _session_options(session, base)
     # MAP SHARING (map_share.c), a screen of its own as co-op's options are,
     # for any game: SETUP_OPTIONS_PLACE below it
     key, _, _, _ = MAP_SHARE_SETUP
@@ -1741,7 +1828,7 @@ def _server_settings() -> list:
                       f'<child widget="{base}/{key}_label"/>'])
     extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
                                              ("string_list", f"{base}/labels"),
-                                             ("string_index", 11 + len(COOP_SETUP_SCREENS)),
+                                             ("string_index", 12 + len(COOP_SETUP_SCREENS)),
                                              ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13),
                                              ("text_y", 4)], [])
     rows.append((f"{base}/op_{key}", None, SETUP_OPTIONS_PLACE - 1))
@@ -1792,8 +1879,7 @@ def _server_settings() -> list:
     extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
                                          "TEAMPLAY OPTIONS:", "LISTING:",
-                                         *(f"{title}:" for _, title, _, _ in COOP_SETUP_SCREENS), "PASSWORD:",
-                                         f"{MAP_SHARE_SETUP[1]}:"])
+                                         *(f"{title}:" for _, title, _, _ in COOP_SETUP_SCREENS), "PASSWORD:", "SESSION OPTIONS:", f"{MAP_SHARE_SETUP[1]}:"])
     extra += _strings(f"{base}/help_strings", [
         "",
         "The name the game shows in the lists of games.\\nEnter changes it.",
@@ -1812,6 +1898,9 @@ def _server_settings() -> list:
         *(help_text for _, _, help_text, _ in COOP_SETUP_SCREENS),
         # (PASSWORD's)
         "Players from the Server Browser must type it to\\njoin (an invite link needs none). Enter sets it.",
+        "Session compatibility and the host camera policy.\\nChoose who can join and which views they can use.",
+        "Everyone uses third person on foot. Scoping and\\ntight spaces still use first person.",
+        "Third person is disabled for everyone.\\nNormal vehicle and cinematic cameras remain.",
         # (MAP SHARING's)
         MAP_SHARE_SETUP[2],
         # (LISTING's PUBLIC, on a machine with a publisher key: menu_functions.c's

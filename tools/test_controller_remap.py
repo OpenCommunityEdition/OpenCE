@@ -301,7 +301,7 @@ def test_profile_fallback_context_and_viewport_prompt_mapping(tmp_path):
 #define csmemset memset
 struct game_input_preferences {unsigned char game_control_to_xbox_buttons[12];};
 static struct game_input_preferences profile;
-static int in_game=1,menus,chat=-1;
+static int in_game=1,initialized=1,menus,chat=-1;
 static int console_is_active(void){return 0;}
 void controller_remap_input_reset(void){}
 int controller_remap_connected(short p){return 1;}
@@ -310,8 +310,8 @@ unsigned int controller_remap_pressed(short p,unsigned int m){return 0;}
 static short local_player_get_next(short p){return p<1?1:NONE;}
 static struct {short local_player_index;} fake_player={2};
 static void input_abstraction_get_local_player_preferences(short port,struct game_input_preferences *p){*p=profile;}
-static int game_time_initialized(void){return 1;}
-static int game_in_progress(void){return in_game;}
+static int game_time_initialized(void){return initialized;}
+static int game_in_progress(void){assert(initialized);return in_game;}
 static int main_menu_is_active(void){return 0;}
 static int ui_widgets_active_for_local_player(short port){return menus;}
 short network_chat_controller(void){return (short)chat;}
@@ -331,6 +331,12 @@ int main(void) {
  assert(controller_remap_playing(2) && !controller_remap_playing(0));menus=1;assert(!controller_remap_playing(2));menus=0;
  chat=2;assert(!controller_remap_playing(2));
  chat=-1;in_game=0;assert(!controller_remap_playing(0));
+ /* Connected devices are polled before the clock exists and after unload. */
+ initialized=0;camera_context[2]=2;
+ assert(controller_remap_local_player(2)==NONE);
+ assert(!controller_remap_playing(2));
+ assert(controller_remap_context(2)==0 && camera_context[2]==0);
+ initialized=1;in_game=1;assert(controller_remap_playing(2));
  return 0;
 }
 ''')

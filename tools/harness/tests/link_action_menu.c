@@ -1,6 +1,8 @@
 #include "harness.h"
 #include <strings.h>
 #define MAXIMUM_STRINGS 32
+enum {_third_person_player_choice};
+static int third_person_policy(void){return _third_person_player_choice;}
 #define NUMBEROF(a) ((short)(sizeof(a)/sizeof((a)[0])))
 #define _stricmp strcasecmp
 struct widget_instance {

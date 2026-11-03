@@ -66,6 +66,7 @@ int controller_button_style_index(char const *name)
         "ps_classic", "ps_gems", "ps_dark_gems", "ps_modern",
         "switch_classic", "switch_gems", "switch_modern"};
     int i;
+    if (!strcmp(name, "keyboard")) return 11;
     if (!strcmp(name, "dark_gems")) return 2;
     for (i = 0; i < 11; i++) if (!strcmp(name, names[i])) return i;
     return 0;

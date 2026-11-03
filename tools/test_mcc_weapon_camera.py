@@ -60,9 +60,12 @@ static struct weapon_definition *weapon_definition_get(long i) {return &definiti
 ''' + function(adapter, "mcc_camera_weapon_following") + '\n' + function(director, "director_desired_perspective") + r'''
 typedef void (*director_camera_update_proc)(void *,void *,void *);
 struct first_person_camera {int unused;};struct following_camera {int unused;};
-struct director {short seat_state;director_camera_update_proc camera_proc;char camera_data[64];};
+struct director {short seat_state;director_camera_update_proc camera_proc;char camera_data[64];float camera_change_pause;};
 static struct director view;
 static int changes, interpolated;
+static int shoulder_enabled;
+static boolean third_person_available(short p){(void)p;return shoulder_enabled&&units[0].object.parent_object_index==NONE;}
+static void third_person_camera_update(void *a,void *b,void *c){(void)a;(void)b;(void)c;}
 static void first_person_camera_update(void *a,void *b,void *c){(void)a;(void)b;(void)c;}
 static void following_camera_update(void *a,void *b,void *c){(void)a;(void)b;(void)c;}
 static void first_person_camera_new(struct first_person_camera *p){(void)p;}
@@ -121,6 +124,19 @@ int main(int argc,char **argv){
         CHECK(view.camera_proc==following_camera_update&&changes==3);
         active=0;director_choose_game_perspective(0,FALSE);
         CHECK(view.camera_proc==first_person_camera_update&&changes==4);
+    }else if(!strcmp(argv[1],"shoulder")){
+        shoulder_enabled=1;
+        director_choose_game_perspective(0,FALSE);
+        CHECK(view.camera_proc==following_camera_update); /* authored MCC camera wins */
+        units[0].unit.current_weapon_index=1;
+        director_choose_game_perspective(0,FALSE);director_choose_game_perspective(0,FALSE);
+        CHECK(view.camera_proc==third_person_camera_update);
+        units[0].unit.current_weapon_index=0;director_choose_game_perspective(0,FALSE);
+        CHECK(view.camera_proc==following_camera_update);
+        active=0;director_choose_game_perspective(0,FALSE);director_choose_game_perspective(0,FALSE);
+        CHECK(view.camera_proc==third_person_camera_update); /* legacy maps keep optional shoulder view */
+        shoulder_enabled=0;director_choose_game_perspective(0,FALSE);
+        CHECK(view.camera_proc==first_person_camera_update);
     }else return 3;
     return 0;
 }
@@ -136,7 +152,7 @@ int main(int argc,char **argv){
     return exe
 
 
-@pytest.mark.parametrize("case", ["flags", "isolation", "invalid", "lifecycle", "seats", "switch"])
+@pytest.mark.parametrize("case", ["flags", "isolation", "invalid", "lifecycle", "seats", "switch", "shoulder"])
 def test_weapon_camera(camera, case):
     result = subprocess.run([str(camera), case], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

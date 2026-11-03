@@ -101,7 +101,7 @@ symbols in this file:
 #include "console.h"
 #include "game_state.h"
 #include "coop_vehicles.h" /* port: preserve replacement-vehicle homes across reverts */
-#include "network_coop.h" /* port: checkpoint membership for host team-wipe reverts */
+#include "network_coop.h" /* port: checkpoint roster restoration and host team-wipe policy */
 #include "game.h"
 #include "tag_files.h"
 #include "cache_files.h"
@@ -126,6 +126,7 @@ symbols in this file:
 #include "cluster_partitions.h"
 #include "mcc_cache.h"
 #include "mcc_checkpoint.h"
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_invalidate(void);
 
@@ -205,9 +206,13 @@ static game_state_before_load_proc before_load_procs[] =
 static game_state_after_load_proc after_load_procs[] =
 {
 	scenario_reload_structure_bsp_if_necessary,
+	/* port: the session roster is not part of a gameplay checkpoint. */
+	network_coop_restore_players,
 	sound_stop_all,
 	game_sound_restore,
 	observer_initialize_for_new_map,
+	/* port: camera smoothing and free look are not stored in checkpoints. */
+	third_person_reset,
 	update_queues_reset_and_fill_with_lies,
 	rasterizer_decals_update_function_pointers,
 	recorded_animations_clear_debug_storage,

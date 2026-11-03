@@ -109,6 +109,17 @@ struct weapon_magazine_definition
 	struct tag_block ammunition_objects;
 };
 
+/* port: shared with the shoulder camera's firing-effect marker lookup.
+   Firing, misfire and empty effects, in weapons.c's effect-type order. */
+struct weapon_firing_effect_definition
+{
+	short shots_lower_bound;
+	short shots_upper_bound;
+	long unused[8];
+	struct tag_reference effects[3];
+	struct tag_reference damage_effects[3];
+};
+
 struct weapon_trigger_definition
 {
 	unsigned long flags;

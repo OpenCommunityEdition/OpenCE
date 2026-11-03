@@ -79,6 +79,7 @@ static int mcc_level_name(char const *name) {return !strncmp(name,"mcc_maps\\",9
 static int network_player_is_valid(struct network_player const *p) {return p->machine_index>=0;}
 static void main_set_multiplayer_map_name(char const *name) {strcpy(map_name,name);}
 static void network_game_server_open_game(struct network_game_server *s) {(void)s;opened++;}
+static void third_person_session_lock(void) {}
 static void network_game_server_switch_to_postgame(struct network_game_server *s) {s->state=_network_game_server_state_postgame;switched++;}
 static void network_event(char const *s) {(void)s;}
 static void countdown_timer_set_time_remaining(int *timer,long ms) {*timer=(int)ms;}

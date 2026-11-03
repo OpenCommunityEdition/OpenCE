@@ -36,6 +36,7 @@ static void flying_camera_update(void) {}
 static void editor_camera_update(void) {}
 static void orbiting_camera_update(void) {}
 static void first_person_camera_update(void) {}
+static void third_person_camera_update(void) {}
 static void following_camera_update(void) {}
 static struct director camera;
 static struct gamepad_state pad;
