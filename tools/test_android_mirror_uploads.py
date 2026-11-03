@@ -4,12 +4,11 @@ Compile the production mirror and frame rotation. Model driver storage
 renaming, not a particular phone; this does not establish the device cause.
 """
 import os
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
-
 from harness import function, mutated
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,8 +38,8 @@ def mirror_uploads(tmp_path_factory):
                            "unused") if variant == "unguarded" else mirror
         if variant == "android-cached":
             selected = mutated(selected,
-                               "if (android_geometry_fixes)\n\t\treturn FALSE;",
-                               "if (android_geometry_fixes && 0)\n\t\treturn FALSE;")
+                               "if (halo_geometry_fixes)\n\t\treturn FALSE;",
+                               "if (halo_geometry_fixes && 0)\n\t\treturn FALSE;")
         (work / "mirror.inc").write_text(selected)
         (work / "rotation.inc").write_text(rotation)
         executable = work / ("test.exe" if os.name == "nt" else "test")

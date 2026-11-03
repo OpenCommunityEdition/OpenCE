@@ -34,7 +34,7 @@ jobs:
       - name: Install the toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 curl git libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxss-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libgl-dev libpulse-dev libasound2-dev libpipewire-0.3-dev libdecor-0-dev libudev-dev libdbus-1-dev
+          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 curl git libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxtst-dev libxss-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libgl-dev libpulse-dev libasound2-dev libpipewire-0.3-dev libdecor-0-dev libudev-dev libdbus-1-dev
       - uses: actions/checkout@v4
       - name: Build SDL 3
         run: |

@@ -186,7 +186,7 @@ MUSL_THREAD_PREFIXES = (
     "pthread_spin",
     "sem_",
 )
-# replaced by the guest runtime (port/android/guest/runtime)
+# replaced by the guest runtime (the runtime folder of port/guest)
 MUSL_EXCLUDE = {
     "env/__stack_chk.c",
     "env/__init_tls.c",
@@ -222,7 +222,7 @@ VARIADIC_PROTOTYPE_FILES = {
 class GuestTarget:
     name: str
     label: str
-    port_dir: Path
+    port_dir: Path  # guest source folder (port/guest)
     build: Path
     third_party: Path
     musl_dir: Path
@@ -327,7 +327,7 @@ def generate_guest(
     libc_include = guest_dir / "libc_include"
     libc_internal = guest_dir / "libc_internal"
     gl_include = guest_dir / "gl_include"
-    arch = t.port_dir / "guest" / "libc" / "arch" / "arm64_32"
+    arch = t.port_dir / "libc" / "arch" / "arm64_32"
     semantics_header = Path("build/linux/halo_msvc_semantics.h")
     platform_semantics_header = Path("build/linux/platform_msvc_semantics.h")
     prefix_header = LINUX_DIR / "include" / "halo_linux_prefix.h"
@@ -387,7 +387,7 @@ def generate_guest(
     n.rule(
         name=f"{t.name}_gl_stubs",
         command=(
-            f"{python} tools/android_gl_stubs.py {LINUX_DIR}/src/gl.h {t.gl_headers}/GLES3/gl32.h "
+            f"{python} tools/guest_gl_stubs.py {LINUX_DIR}/src/gl.h {t.gl_headers}/GLES3/gl32.h "
             f"{t.gl_headers}/GLES2/gl2ext.h {guest_gl_c} {gl_imports}"
         ),
         description=f"{t.label} GL STUBS",
@@ -395,33 +395,33 @@ def generate_guest(
     n.build(
         outputs=[guest_gl_c, gl_imports],
         rule=f"{t.name}_gl_stubs",
-        implicit=[Path("tools/android_gl_stubs.py"), LINUX_DIR / "src" / "gl.h"],
+        implicit=[Path("tools/guest_gl_stubs.py"), LINUX_DIR / "src" / "gl.h"],
     )
 
     guest_posix_c = gen_dir / "guest_posix.c"
     posix_imports = gen_dir / "posix_imports.list"
     n.rule(
         name=f"{t.name}_posix_stubs",
-        command=f"{python} tools/android_posix_stubs.py {LINUX_DIR}/src/posix.h {guest_posix_c} {posix_imports}",
+        command=f"{python} tools/guest_posix_stubs.py {LINUX_DIR}/src/posix.h {guest_posix_c} {posix_imports}",
         description=f"{t.label} POSIX STUBS",
     )
     n.build(
         outputs=[guest_posix_c, posix_imports],
         rule=f"{t.name}_posix_stubs",
-        implicit=[Path("tools/android_posix_stubs.py"), LINUX_DIR / "src" / "posix.h"],
+        implicit=[Path("tools/guest_posix_stubs.py"), LINUX_DIR / "src" / "posix.h"],
     )
 
     imports_s = gen_dir / "imports.s"
     n.rule(
         name=f"{t.name}_imports",
-        command=f"{python} tools/android_imports.py --host-table {t.host_table_c} {imports_s} $in",
+        command=f"{python} tools/guest_imports.py --host-table {t.host_table_c} {imports_s} $in",
         description=f"{t.label} IMPORTS",
     )
     n.build(
         outputs=[imports_s, t.host_table_c],
         rule=f"{t.name}_imports",
         inputs=[t.host_imports_list, posix_imports, gl_imports],
-        implicit=[Path("tools/android_imports.py")],
+        implicit=[Path("tools/guest_imports.py")],
     )
 
     generated_headers = [
@@ -440,7 +440,7 @@ def generate_guest(
         name=f"{t.name}_guest_cc",
         command=(
             f"{compile_launcher(sln)}${t.name}_guest_cc -MMD -MF $out.d $cflags -S $in -o $out.darwin.s && "
-            f"{python} tools/android_asm_convert.py $out.darwin.s $out.s && "
+            f"{python} tools/guest_asm_convert.py $out.darwin.s $out.s && "
             f"${t.name}_guest_cc --target={t.asm_triple} -c $out.s -o $out"
         ),
         description=f"{t.label} CC $out",
@@ -461,7 +461,7 @@ def generate_guest(
     ]
     guest_abi = " ".join(GUEST_ABI_FLAGS + configuration_defines(sln))
     guest_code = " ".join(GUEST_CODE_FLAGS)
-    tool_implicit = [Path("tools/android_asm_convert.py"), *generated_headers]
+    tool_implicit = [Path("tools/guest_asm_convert.py"), *generated_headers]
     # profile-guided optimisation with the Linux build's profile (committed,
     # or trained by the Linux build with --pgo=train): the game and platform
     # code are the same, and functions that differ simply go without
@@ -500,7 +500,7 @@ def generate_guest(
             f"-I{arch}",
             f"-I{t.musl_dir}/arch/generic",
             f"-I{libc_internal}",
-            f"-I{t.port_dir}/guest/libc/src_include",
+            f"-I{t.port_dir}/libc/src_include",
             f"-I{t.musl_dir}/src/include",
             f"-I{t.musl_dir}/src/internal",
             f"-I{libc_include}",
@@ -556,7 +556,7 @@ def generate_guest(
             cflags += " " + updater_defines(getattr(sln, "port_release", False))
         if source.as_posix() in VARIADIC_PROTOTYPE_FILES:
             cflags += (
-                f" -include {t.port_dir}/include/halo_android_variadic_prototypes.h"
+                f" -include {t.port_dir}/include/halo_guest_variadic_prototypes.h"
             )
         objects.append(guest_object(source, cflags))
     for source in sorted(Path(config["game_sources"]).glob("*.c")):
@@ -577,7 +577,7 @@ def generate_guest(
             f"-include {platform_semantics_header}",
             f"-I{LINUX_DIR}/src",
             f"-I{LINUX_DIR}/include",
-            f"-I{t.port_dir}/guest/runtime",
+            f"-I{t.port_dir}/runtime",
             f"-I{t.port_dir}/include",
             f"-I{TOML_DIR}",
             f"-I{EXPAT_DIR}",
@@ -649,12 +649,12 @@ def generate_guest(
             "-fno-common",
             "-D_XOPEN_SOURCE=700",
             "-D_GNU_SOURCE",
-            f"-I{t.port_dir}/guest/runtime",
+            f"-I{t.port_dir}/runtime",
             f"-I{t.port_dir}/include",
             f"-I{arch}",
             f"-I{t.musl_dir}/arch/generic",
             f"-I{libc_internal}",
-            f"-I{t.port_dir}/guest/libc/src_include",
+            f"-I{t.port_dir}/libc/src_include",
             f"-I{t.musl_dir}/src/include",
             f"-I{t.musl_dir}/src/internal",
             f"-I{libc_include}",
@@ -667,7 +667,7 @@ def generate_guest(
             guest_code,
             "-std=gnu11",
             "-D_GNU_SOURCE",
-            f"-I{t.port_dir}/guest/runtime",
+            f"-I{t.port_dir}/runtime",
             f"-I{t.port_dir}/include",
             f"-I{LINUX_DIR}/src",
             f"-I{t.sdl_dir}/include",
@@ -675,7 +675,7 @@ def generate_guest(
             *libc_includes,
         ]
     )
-    runtime_dir = t.port_dir / "guest" / "runtime"
+    runtime_dir = t.port_dir / "runtime"
     for source in sorted(runtime_dir.glob("*.c")):
         if source.name in ("guest_thread.c", "guest_start.c"):
             objects.append(guest_object(source, runtime_internal_cflags))
@@ -691,7 +691,7 @@ def generate_guest(
 
     # ---------- the guest image
 
-    linker_script = t.port_dir / "guest" / "guest.ld"
+    linker_script = t.port_dir / "guest.ld"
     n.rule(
         name=f"{t.name}_guest_link",
         command=(

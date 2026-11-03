@@ -33,6 +33,7 @@ TOML_DIR = Path("port/third_party/tomlc17")
 MBEDTLS_DIR = Path("port/third_party/mbedtls")
 LINUX_ARM64_HOST = Path("port/linux-arm64") / "host"
 ANDROID_HOST = Path("port/android") / "host"
+GUEST_DIR = Path("port/guest")
 
 # The Khronos registries' commits the OpenGL ES headers are taken from, and
 # the headers themselves
@@ -85,7 +86,7 @@ def linux_arm64_host_build(n: Writer, host_table_c: Path) -> None:
                 "-O2",
                 "-std=gnu11",
                 "-D_GNU_SOURCE",
-                f"-I{ANDROID_HOST.parent}/include",
+                f"-I{GUEST_DIR}/include",
                 f"-I{ANDROID_HOST}",
                 f"-I{TOML_DIR}",
                 "$$(pkg-config --cflags sdl3)",
@@ -105,6 +106,7 @@ def linux_arm64_host_build(n: Writer, host_table_c: Path) -> None:
             ANDROID_HOST / name
             for name in (
                 "host_loader.c",
+                "host_boot.c",
                 "host_memory.c",
                 "host_watch_hash.c",
                 "host_syscall.c",
@@ -219,7 +221,7 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
     target = GuestTarget(
         name="linux_arm64",
         label="LINUX ARM64",
-        port_dir=Path("port/android"),
+        port_dir=GUEST_DIR,
         build=BUILD,
         third_party=THIRD_PARTY,
         musl_dir=THIRD_PARTY / f"musl-{MUSL_VERSION}",
@@ -230,7 +232,7 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         ld=str(Path(lld_bin) / "ld.lld"),
         libgcc="",
         asm_triple="aarch64-unknown-linux-gnu",
-        host_imports_list=Path("port/android/host_imports.list"),
+        host_imports_list=GUEST_DIR / "host_imports.list",
         host_table_c=BUILD / "host" / "host_import_table.c",
     )
     image, host_table_c = generate_guest(n, sln, config, target)

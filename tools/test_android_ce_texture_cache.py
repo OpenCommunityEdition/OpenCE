@@ -1,11 +1,13 @@
 """Android CE stable storage, upload reuse, HUD residency and state isolation."""
-from pathlib import Path
 import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
+
 import pytest
 from harness import function
+
 ROOT = Path(__file__).resolve().parents[1]
 
 def run_c(tmp_path, code):
@@ -42,7 +44,7 @@ struct xgpu_texture_description {
  unsigned long width, height, depth, levels, format;
  BOOL cube_map;
 };
-static int android_texture_fixes=1;
+static int halo_texture_fixes=1;
 static unsigned long serial=1, generation=1, uploads, next_texture;
 static unsigned long memory_watch_serial(void) { return serial; }
 static unsigned long memory_watch_generation(unsigned long a,unsigned long s) { return generation; }
@@ -88,7 +90,7 @@ void android_ce_texture_unbind(const void *r) { unbinds++; }
     # cseries redirects free, but not calloc. Exercise the production source's
     # allocator pairing, including unload, instead of hiding it in this fixture.
     code += '#define free(p) abort()\n#define calloc storage_calloc\n'
-    code += re.sub(r'^#include .*$', '', storage, flags=re.M)
+    code += re.sub(r'^#include .*$', '', storage, flags=re.MULTILINE)
     code += '#undef calloc\n'
     code += gpu[gpu.index('struct texture_entry\n'):gpu.index('/* (every bit of the three mixed')]
     for name in ('bucket_index', 'palette_hash', 'android_ce_texture_gpu_forget', 'texture_entry_pixels_valid'):
@@ -213,7 +215,7 @@ def test_android_ce_scope_and_cleanup():
     assert 'custom_edition_cache_tags_loaded()' in get
     assert 'TEST_FLAG(bitmap->flags, _bitmap_cached_bit)' in get
     assert 'texture_cache_bitmap_valid(bitmap)' in get
-    stripped = re.sub(r'#ifdef HALO_ANDROID\n.*?#endif', '', source, flags=re.S)
+    stripped = re.sub(r'#ifdef HALO_ANDROID\n.*?#endif', '', source, flags=re.DOTALL)
     assert 'android_ce_texture_' not in stripped
     assert 'android_ce_texture_delete(bitmap)' in function(source, 'texture_cache_bitmap_delete')
     assert 'android_ce_texture_reset()' in function(source, 'texture_cache_flush')
@@ -268,7 +270,7 @@ int main(void) {
 }
 '''
     if platform == 'android-normal':
-        code = code.replace('static int android_texture_fixes=1;', 'static int android_texture_fixes=0;')
+        code = code.replace('static int halo_texture_fixes=1;', 'static int halo_texture_fixes=0;')
     code = code.replace('if(uploads!=2)return 3;',
                         'if(uploads!=2)return 3; if(ce_queries!=' + str(3 if platform == 'android' else 0) + ')return 4;')
     run_c(tmp_path,code)
