@@ -16,7 +16,7 @@ def generated(fault=None):
     network = read('port/linux/game/network_infection.h')
     frag_nation_header = read('port/linux/game/frag_nation.h')
     enums = '\n'.join([
-        enum_with(engine, 'game_engine_none = 0'), enum_with(engine, '_loadout_weapon_none = 0'),
+        enum_with(engine, 'game_engine_none = 0'), enum_with(engine, '_loadout_weapon_none = 0'), enum_with(engine, '_loadout_category = 0'),
         enum_with(engine, '_variant_vehicle_warthog = 0'), enum_with(engine, '_game_mode_none = 0'),
         enum_with(engine, '_gun_game_order_strongest_first = 0'),
         enum_with(network, '_distributed_infection_waiting = 0'),
@@ -37,7 +37,7 @@ def generated(fault=None):
     code = '\n'.join([
         defaults, function(modes, 'game_modes_option'), function(modes, 'game_modes_options_default'),
         function(modes, 'game_modes_options_sanitize'), function(modes, 'game_modes_player_killed'),
-        function(modes, 'game_modes_variant_mode'), '#define GAME_MODES_KIND_HARDCORE 0x80',
+        function(modes, 'game_modes_variant_mode'), function(modes, 'game_modes_variant_is_opence'), '#define GAME_MODES_KIND_HARDCORE 0x80',
         function(modes, 'game_modes_kind'), function(modes, 'game_modes_kind_name'),
         function(infection, 'infection_round_result'),
         function(infection, 'infection_state_valid'), order,
@@ -53,7 +53,7 @@ def generated(fault=None):
 CASES = ['options_default', 'hardcore_restore', 'hardcore_no_restore', 'sanitize_defaults', 'sanitize_range',
          'sanitize_keeps', 'variant_mode', 'round_result', 'state_valid', 'gun_game_order', 'gun_game_missing',
          'gun_game_random', 'kind', 'kind_untrusted', 'chamber_round', 'chamber_round_resets', 'chamber_hit_kills',
-         'bottomless', 'map_grenades', 'grenades_for_kill', 'grenades_added']
+         'is_opence', 'bottomless', 'map_grenades', 'grenades_for_kill', 'grenades_added']
 
 
 @pytest.mark.parametrize('case', CASES)
@@ -75,6 +75,15 @@ def test_case(case):
       'return !network_game_distributed_client() && game_variant_options_get()->bottomless;'), 'bottomless'),
     (('return !network_game_distributed_client() && game_engine_running() && game_variant_options_get()->bottomless;',
       'return !network_game_distributed_client() && game_engine_running();'), 'bottomless'),
+    (('options->hardcore || options->bottomless ||', 'options->hardcore ||'), 'is_opence'),
+    (('options->hardcore || options->bottomless ||', 'options->bottomless ||'), 'is_opence'),
+    (('options->secondary_weapon == _loadout_weapon_none && options->no_map_weapons)',
+      'options->secondary_weapon == _loadout_weapon_none)'), 'is_opence'),
+    (('options->loadout == _loadout_custom && options->primary_weapon == _loadout_weapon_none &&',
+      'options->primary_weapon == _loadout_weapon_none &&'), 'is_opence'),
+    (('options->primary_weapon == _loadout_weapon_none &&\n\t\t\toptions->secondary_weapon',
+      'options->secondary_weapon'), 'is_opence'),
+    (('||\n\t\tgame_modes_variant_mode(variant, options) != _game_mode_none);', '||\n\t\tFALSE);'), 'is_opence'),
     (('unit->object.shield_vitality < 1.0f', 'TRUE'), 'hardcore_restore'),
     (('friendly_fire ||\n', ''), 'hardcore_no_restore'),
     (('return variant->universal_variant.teams ? _game_mode_infection', 'return 1 ? _game_mode_infection'),

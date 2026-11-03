@@ -313,6 +313,33 @@ int main(int argc,char **argv)
   CHECK(!game_modes_hit_kills(1,9,TRUE),"a client's copy: the host decides");
   client=FALSE;mode=_game_mode_swat;
   CHECK(!game_modes_hit_kills(1,9,TRUE),"One in the Chamber only");
+ } else CASE("is_opence") {
+  struct game_variant variant;
+  memset(&variant,0,sizeof(variant));memset(&options,0,sizeof(options));
+  variant.game_engine_index=game_engine_slayer;
+  CHECK(!game_modes_variant_is_opence(&variant,&options),"a plain Slayer gametype is the game's own");
+  CHECK(!game_modes_variant_is_opence(&variant,NULL),"no options: not OpenCE's");
+  options.hardcore=TRUE;
+  CHECK(game_modes_variant_is_opence(&variant,&options),"Hardcore");
+  memset(&options,0,sizeof(options));options.mode=_game_mode_gun_game;
+  CHECK(game_modes_variant_is_opence(&variant,&options),"a mode");
+  /* (Needles: the needler, Bottomless, none on the map) */
+  memset(&options,0,sizeof(options));
+  options.loadout=_loadout_custom;options.primary_weapon=_loadout_weapon_needler;
+  options.no_map_weapons=TRUE;options.bottomless=TRUE;
+  CHECK(game_modes_variant_is_opence(&variant,&options),"Bottomless");
+  options.bottomless=FALSE;
+  CHECK(!game_modes_variant_is_opence(&variant,&options),"a needler loadout alone is a custom gametype's");
+  /* (Melee Only: a loadout of none, none on the map) */
+  memset(&options,0,sizeof(options));
+  options.loadout=_loadout_custom;options.no_map_weapons=TRUE;
+  CHECK(game_modes_variant_is_opence(&variant,&options),"a loadout of none and no map weapons");
+  options.no_map_weapons=FALSE;
+  CHECK(!game_modes_variant_is_opence(&variant,&options),"a loadout of none with the map's weapons");
+  options.no_map_weapons=TRUE;options.loadout=_loadout_category;
+  CHECK(!game_modes_variant_is_opence(&variant,&options),"the weapon set's loadout");
+  options.loadout=_loadout_custom;options.secondary_weapon=_loadout_weapon_pistol;
+  CHECK(!game_modes_variant_is_opence(&variant,&options),"a pistol as the secondary weapon");
  } else CASE("bottomless") {
   memset(&options,0,sizeof(options));
   client=FALSE;engine_running=TRUE;

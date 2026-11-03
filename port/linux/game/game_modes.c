@@ -97,6 +97,8 @@ enum
 	_gametype_one_in_the_chamber,
 	_gametype_frag_nation,
 	_gametype_snowball_fight,
+	_gametype_melee_only,
+	_gametype_needles,
 	NUMBER_OF_GAMETYPES
 };
 
@@ -121,6 +123,8 @@ static struct
 	{ "one_in_the_chamber", L"One in the Chamber", L"One Chamber" },
 	{ "frag_nation", L"Frag Nation", L"Frag Nation" },
 	{ "snowball_fight", L"Snowball Fight", L"Snowball" },
+	{ "melee_only", L"Melee Only", L"Melee Only" },
+	{ "needles", L"Needles", L"Needles" },
 };
 
 /* the kill being recorded's damage (game_modes_kill_damage) */
@@ -176,6 +180,8 @@ void game_modes_gametype(
 	case _gametype_one_in_the_chamber:
 	case _gametype_frag_nation:
 	case _gametype_snowball_fight:
+	case _gametype_melee_only:
+	case _gametype_needles:
 		*variant = *build_game_variant_slayer(&temporary);
 		break;
 	default:
@@ -229,6 +235,20 @@ void game_modes_gametype(
 		options->primary_weapon = _loadout_weapon_none;
 		options->secondary_weapon = _loadout_weapon_none;
 		options->no_map_weapons = TRUE;
+		break;
+	case _gametype_melee_only:
+	case _gametype_needles:
+		/* (made of the variant's own fields and Bottomless, with no mode of
+		their own: no weapons on the map, the weapon set that has no
+		grenades, the map's and the start's, and a loadout of none for Melee
+		Only, of the needler for Needles) */
+		variant->universal_variant.weapon_set = WEAPON_SET_NO_GRENADES;
+		variant->universal_variant.vehicle_set = VEHICLE_SET_NONE;
+		options->loadout = _loadout_custom;
+		options->primary_weapon = index == _gametype_needles ? _loadout_weapon_needler : _loadout_weapon_none;
+		options->secondary_weapon = _loadout_weapon_none;
+		options->no_map_weapons = TRUE;
+		options->bottomless = index == _gametype_needles;
 		break;
 	default:
 		options->hardcore = TRUE;
@@ -405,7 +425,12 @@ boolean game_modes_variant_is_opence(
 	struct game_variant const *variant,
 	struct game_variant_options const *options)
 {
-	return options && (options->hardcore || game_modes_variant_mode(variant, options) != _game_mode_none);
+	/* (Bottomless, and Melee Only's loadout of none with no weapons on the
+	map, are the rules of the two built-ins that have no mode) */
+	return options && (options->hardcore || options->bottomless ||
+		(options->loadout == _loadout_custom && options->primary_weapon == _loadout_weapon_none &&
+			options->secondary_weapon == _loadout_weapon_none && options->no_map_weapons) ||
+		game_modes_variant_mode(variant, options) != _game_mode_none);
 }
 
 /* ---- the game being played */
