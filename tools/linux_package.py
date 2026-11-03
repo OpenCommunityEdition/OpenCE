@@ -37,7 +37,7 @@ APPRUN = {
 
 def require(path):
     if not Path(path).is_file():
-        raise SystemExit("missing input file: %s" % path)
+        raise SystemExit(f"missing input file: {path}")
     return Path(path)
 
 
@@ -48,7 +48,7 @@ def copy(src, dst):
 
 def stage_appdir(arch, bin_dir, out):
     if arch not in APPRUN:
-        raise SystemExit("unknown architecture: %s" % arch)
+        raise SystemExit(f"unknown architecture: {arch}")
     bin_dir = Path(bin_dir)
     out = Path(out)
     dest = out / "usr" / "bin"
@@ -58,7 +58,7 @@ def stage_appdir(arch, bin_dir, out):
         names = ["halo_host", "halo_guest.elf"]
         libs = sorted(p.name for p in bin_dir.glob("libSDL3.so*"))
         if not libs:
-            raise SystemExit("missing input file: %s" % (bin_dir / "libSDL3.so*"))
+            raise SystemExit(f"missing input file: {bin_dir / 'libSDL3.so*'}")
         names += libs
     for name in names:
         copy(bin_dir / name, dest / name)
@@ -109,14 +109,14 @@ def flatpak_binaries(arch, bin_dir):
         return ["halo", "libSDL3.so.0", "SDL3-LICENSE.txt"]
     libs = sorted(p.name for p in Path(bin_dir).glob("libSDL3.so*"))
     if not libs:
-        raise SystemExit("missing input file: %s" % (Path(bin_dir) / "libSDL3.so*"))
+        raise SystemExit(f"missing input file: {Path(bin_dir) / 'libSDL3.so*'}")
     return ["halo_host", "halo_guest.elf"] + libs
 
 
 def flatpak_manifest(arch, bin_dir):
     """Returns the flatpak-builder manifest; source paths are relative to its directory."""
     if arch not in FLATPAK_ARCH:
-        raise SystemExit("unknown architecture: %s" % arch)
+        raise SystemExit(f"unknown architecture: {arch}")
     binaries = flatpak_binaries(arch, bin_dir)
     exe = "halo" if arch == "x86_64" else "halo_host"
     launcher = LAUNCHER[arch]
@@ -124,17 +124,18 @@ def flatpak_manifest(arch, bin_dir):
     sources.append({"type": "file", "path": DESKTOP.name, "dest-filename": APP_ID + ".desktop"})
     sources.append({"type": "file", "path": METAINFO.name})
     sources.append({"type": "file", "path": ICON.name, "dest-filename": APP_ID + ".png"})
-    commands = ["install -Dm755 %s /app/bin/%s" % (exe, exe)]
+    commands = [f"install -Dm755 {exe} /app/bin/{exe}"]
     if arch == "aarch64":
         commands.append("install -Dm644 halo_guest.elf /app/bin/halo_guest.elf")
     for name in binaries:
         if name.startswith("libSDL3") or name == "SDL3-LICENSE.txt":
-            commands.append("install -Dm644 %s /app/lib/%s" % (name, name))
+            commands.append(f"install -Dm644 {name} /app/lib/{name}")
+    quoted_launcher = launcher.replace("'", "'\\''")
     commands += [
-        "install -Dm644 %s.desktop /app/share/applications/%s.desktop" % (APP_ID, APP_ID),
-        "install -Dm644 %s /app/share/metainfo/%s" % (METAINFO.name, METAINFO.name),
-        "install -Dm644 %s.png /app/share/icons/hicolor/512x512/apps/%s.png" % (APP_ID, APP_ID),
-        "printf '%s' > /app/bin/opence" % launcher.replace("'", "'\\''"),
+        f"install -Dm644 {APP_ID}.desktop /app/share/applications/{APP_ID}.desktop",
+        f"install -Dm644 {METAINFO.name} /app/share/metainfo/{METAINFO.name}",
+        f"install -Dm644 {APP_ID}.png /app/share/icons/hicolor/512x512/apps/{APP_ID}.png",
+        f"printf '{quoted_launcher}' > /app/bin/opence",
         "chmod 755 /app/bin/opence",
     ]
     manifest = {
