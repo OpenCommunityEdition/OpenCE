@@ -13,6 +13,7 @@ same names and signatures.
 
 #include "../../android/host/host.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -106,4 +107,43 @@ void host_gesture_insets(int *insets)
 
 	for (index = 0; index < 4; index++)
 		insets[index] = 0;
+}
+
+/* the Linux host has no touch overlay yet (host_touch.c stays Android
+only); these satisfy the guest's imports and report no touch input */
+void host_touch_read(int32_t *state)
+{
+	int index;
+
+	for (index = 0; index < 7; index++)
+		state[index] = 0;
+}
+
+void host_touch_look_read(float *delta)
+{
+	int index;
+
+	for (index = 0; index < 4; index++)
+		delta[index] = 0.0f;
+}
+
+void host_touch_rumble(unsigned int low, unsigned int high)
+{
+	(void)low;
+	(void)high;
+}
+
+void host_touch_scene(int scene)
+{
+	(void)scene;
+}
+
+void host_touch_bindings(const int32_t *controls)
+{
+	(void)controls;
+}
+
+int host_touch_devices(void)
+{
+	return 0;
 }
