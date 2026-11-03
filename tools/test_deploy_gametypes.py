@@ -24,6 +24,7 @@ OPENCE_ENGINES = {
     "swat": "slayer", "infection": "slayer", "gun_game": "slayer", "hardcore": "slayer",
     "hardcore_ctf": "ctf", "hardcore_oddball": "oddball", "hardcore_king": "king",
     "one_in_the_chamber": "slayer", "frag_nation": "slayer", "snowball_fight": "slayer",
+    "melee_only": "slayer", "needles": "slayer",
 }
 
 
