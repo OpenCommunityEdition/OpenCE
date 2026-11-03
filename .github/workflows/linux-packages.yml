@@ -1,0 +1,124 @@
+name: Linux packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-x86_64:
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
+          pacman -Syu --noconfirm --needed git zstd python python-pytest python-pillow python-numpy python-scipy ninja ccache clang lld gcc lib32-glibc lib32-gcc-libs cmake pkgconf wayland
+      - uses: actions/checkout@v4
+      - name: Build
+        run: python tools/ci_build.py linux release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-x86_64
+          path: dist/halo-linux-release
+
+  build-aarch64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 curl git libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxss-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libgl-dev libpulse-dev libasound2-dev libpipewire-0.3-dev libdecor-0-dev libudev-dev libdbus-1-dev
+      - uses: actions/checkout@v4
+      - name: Build SDL 3
+        run: |
+          git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
+          cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/sdl-prefix"
+          cmake --build "$RUNNER_TEMP/SDL/build" -j"$(nproc)"
+          cmake --install "$RUNNER_TEMP/SDL/build"
+          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/sdl-prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Build the game
+        run: |
+          ./configure.py --guest-lld-bin /usr/bin
+          ninja linux_arm64_guest linux_arm64_host
+      - name: Collect the binaries
+        run: |
+          mkdir bin
+          cp build/linux-arm64/halo_host build/linux-arm64/halo_guest.elf bin/
+          cp -a sdl-prefix/lib/libSDL3.so* bin/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin-aarch64
+          path: bin
+
+  package-x86_64:
+    runs-on: ubuntu-24.04
+    needs: build-x86_64
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin-x86_64
+          path: bin
+      - name: Install the packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder python3
+      - name: Install the Flatpak runtimes
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08 org.freedesktop.Platform.Compat.i386//24.08 org.freedesktop.Platform.GL32.default//24.08
+      - name: Download appimagetool
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+      - name: Pack the AppImage
+        run: python3 tools/linux_package.py appimage --arch x86_64 --bin-dir bin --out OpenCE-x86_64.AppImage --appimagetool ./appimagetool
+      - name: Pack the Flatpak
+        run: python3 tools/linux_package.py flatpak --arch x86_64 --bin-dir bin --out OpenCE-x86_64.flatpak
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-x86_64
+          path: |
+            OpenCE-x86_64.AppImage
+            OpenCE-x86_64.flatpak
+
+  package-aarch64:
+    runs-on: ubuntu-24.04-arm
+    needs: build-aarch64
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin-aarch64
+          path: bin
+      - name: Install the packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder python3
+      - name: Install the Flatpak runtimes
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+      - name: Download appimagetool
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-aarch64.AppImage
+          chmod +x appimagetool
+      - name: Pack the AppImage
+        run: python3 tools/linux_package.py appimage --arch aarch64 --bin-dir bin --out OpenCE-aarch64.AppImage --appimagetool ./appimagetool
+      - name: Pack the Flatpak
+        run: python3 tools/linux_package.py flatpak --arch aarch64 --bin-dir bin --out OpenCE-aarch64.flatpak
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-aarch64
+          path: |
+            OpenCE-aarch64.AppImage
+            OpenCE-aarch64.flatpak
