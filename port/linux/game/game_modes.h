@@ -2,7 +2,8 @@
 
 SWAT, Infection, Gun Game, One in the Chamber, Frag Nation and Snowball Fight
 are modes of Slayer, and Hardcore and Bottomless are sets of rules over any
-game engine's: a gametype's PC options (game_engine.h's struct
+game engine's (Melee Only and Needles, the last built-ins, have no mode of
+their own: a loadout of none, and the needler with Bottomless): a gametype's PC options (game_engine.h's struct
 game_variant_options, from mode on) say which, so a saved gametype, the
 network game and the game all carry them. The built-in ones are written with
 the Xbox's default gametypes (playlist_profile.c), after them, and the
@@ -28,7 +29,7 @@ wchar_t const *game_modes_gametype_name(short index);
 void game_modes_gametype(short index, struct game_variant *variant, struct game_variant_options *options);
 /* the one of that name (debug.network_test's: "swat", "infection",
 "gun_game", "hardcore", "hardcore_ctf" ..., "one_in_the_chamber",
-"frag_nation", "snowball_fight"), FALSE if none is */
+"frag_nation", "snowball_fight", "melee_only", "needles"), FALSE if none is */
 boolean game_modes_gametype_by_name(char const *name, struct game_variant *variant,
 	struct game_variant_options *options);
 
@@ -58,7 +59,8 @@ byte game_modes_kind(struct game_variant const *variant, struct game_variant_opt
 (another machine's kind: a mode of any game engine but Slayer, or one this
 build does not know, is none) */
 wchar_t const *game_modes_kind_name(long game_engine_index, byte kind, boolean abbreviated);
-/* whether a gametype is one of OpenCE's (a mode, or Hardcore) */
+/* whether a gametype is one of OpenCE's (a mode, Hardcore, Bottomless, or
+Melee Only's loadout of none with no weapons on the map) */
 boolean game_modes_variant_is_opence(struct game_variant const *variant, struct game_variant_options const *options);
 
 /* ---- the game being played */
