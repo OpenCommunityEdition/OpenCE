@@ -42,6 +42,8 @@ TITLE_ASSETS = Path("port/assets/titles")
 TITLE_LIST = TITLE_ASSETS / "titles.json"
 BUTTON_ASSETS = Path("port/assets/buttons")
 BUTTON_LIST = BUTTON_ASSETS / "buttons.json"
+CONTROLLER_ASSETS = Path("port/assets/controller_buttons")
+CONTROLLER_LIST = CONTROLLER_ASSETS / "buttons.json"
 FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
 MENU_ASSETS = Path("port/assets/menus")
@@ -73,7 +75,8 @@ def textures() -> List[tuple]:
     text)."""
     result = []
     for folder, listing, title in ((HUD_ASSETS, LAYOUT, False), (TITLE_ASSETS, TITLE_LIST, True),
-                                   (BUTTON_ASSETS, BUTTON_LIST, True), (HUD_ASSETS, CE_LAYOUT, False)):
+                                   (BUTTON_ASSETS, BUTTON_LIST, True), (HUD_ASSETS, CE_LAYOUT, False),
+                                   (CONTROLLER_ASSETS, CONTROLLER_LIST, True)):
         if (ROOT / listing).is_file():
             result += [(folder, asset, title) for asset in json.loads((ROOT / listing).read_text())["assets"]]
     return result
@@ -100,7 +103,7 @@ def smaa_files() -> List[tuple]:
 
 def hud_asset_inputs() -> List[Path]:
     """The files the generated source is made from."""
-    inputs = [listing for listing in (LAYOUT, CE_LAYOUT, CE_STOCK, CUSTOM_EDITION_HUD, TITLE_LIST, BUTTON_LIST, FONT_LIST, MENU_LIST)
+    inputs = [listing for listing in (LAYOUT, CE_LAYOUT, CE_STOCK, CUSTOM_EDITION_HUD, TITLE_LIST, BUTTON_LIST, CONTROLLER_LIST, FONT_LIST, MENU_LIST)
               if (ROOT / listing).is_file()]
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
             *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
@@ -116,6 +119,7 @@ def hud_configure_inputs() -> List[Path]:
     list may rename or remove."""
     inputs = []
     for folder, listing in ((HUD_ASSETS, LAYOUT), (HUD_ASSETS, CE_LAYOUT), (TITLE_ASSETS, TITLE_LIST), (BUTTON_ASSETS, BUTTON_LIST),
+                            (CONTROLLER_ASSETS, CONTROLLER_LIST),
                             (FONT_ASSETS, FONT_LIST), (MENU_ASSETS, MENU_LIST)):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
@@ -145,6 +149,22 @@ def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
         description=f"{prefix.upper()} EMBED $out",
     )
     n.build(outputs=output, rule=f"{prefix}_embed_assets", implicit=[Path("tools/embed_assets.py"), *inputs])
+    return [output]
+
+
+def server_ui_build(n: Any, prefix: str, output: Path) -> List[Path]:
+    """Emits the rule that generates a dedicated server's admin page as C
+    (tools/server_ui_embed.py, port/assets/server_ui); returns [output]"""
+    ui = Path("port/assets/server_ui")
+    inputs = sorted(path for path in (ROOT / ui).glob("*") if path.is_file())
+    n.rule(
+        name=f"{prefix}_server_ui",
+        command="$python tools/server_ui_embed.py $out",
+        description=f"{prefix.upper()} EMBED $out",
+    )
+    n.build(outputs=output, rule=f"{prefix}_server_ui",
+            implicit=[Path("tools/server_ui_embed.py"), Path("tools/server_sim.py"),
+                      *(ui / path.name for path in inputs)])
     return [output]
 
 

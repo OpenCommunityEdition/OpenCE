@@ -1,0 +1,140 @@
+{
+  "type": "opence",
+  "display": "OpenCE Dedicated Server",
+  "install": [
+    {
+      "type": "download",
+      "files": [
+        "${release_url}"
+      ]
+    },
+    {
+      "type": "command",
+      "commands": [
+        "unzip -o halo-linux-release.zip",
+        "rm -f halo-linux-release.zip",
+        "chmod 0755 halo halo-server",
+        "mkdir -p maps custom_maps gametypes saves logs",
+        "./halo --version"
+      ]
+    }
+  ],
+  "run": {
+    "command": "./halo --server",
+    "stop": "quit",
+    "workingDirectory": "",
+    "pre": [],
+    "post": [],
+    "environmentVars": {
+      "HALO_NET_TUNNEL_PORT": "${port}",
+      "HALO_SERVER_NAME": "${name}",
+      "HALO_SERVER_ROTATION": "${rotation}",
+      "HALO_SERVER_MAX_PLAYERS": "${max_players}",
+      "HALO_SERVER_PUBLIC": "${public}",
+      "HALO_SERVER_WEB_PORT": "${web_port}",
+      "HALO_SERVER_LOG_FORMAT": "${log_format}",
+      "HALO_SERVER_STATUS_FILE": "status.json",
+      "HALO_SAVE_ROOT": "saves",
+      "HALO_LOG_ROOT": "logs"
+    },
+    "autostart": false,
+    "autorecover": true,
+    "autorestart": false
+  },
+  "data": {
+    "release_url": {
+      "type": "string",
+      "display": "Release",
+      "desc": "The release's halo-linux-release.zip: .../releases/latest/download/halo-linux-release.zip, or .../releases/download/<tag>/halo-linux-release.zip. Used when the server is installed again.",
+      "required": true,
+      "value": "https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-release.zip",
+      "userEdit": true
+    },
+    "port": {
+      "type": "integer",
+      "display": "Tunnel port",
+      "desc": "The UDP port of internet play (network.tunnel_port), the one port players need.",
+      "required": true,
+      "value": 2302,
+      "userEdit": true
+    },
+    "name": {
+      "type": "string",
+      "display": "Server name",
+      "desc": "The game's name in the server browser: 15 characters of printable ASCII.",
+      "required": true,
+      "value": "OpenCE Server",
+      "userEdit": true
+    },
+    "rotation": {
+      "type": "string",
+      "display": "Rotation",
+      "desc": "The games played one after another: map:gametype entries separated by commas.",
+      "required": true,
+      "value": "bloodgulch:ctf, sidewinder:team_slayer, prisoner:slayer",
+      "userEdit": true
+    },
+    "max_players": {
+      "type": "integer",
+      "display": "Max players",
+      "desc": "2 to 127.",
+      "required": true,
+      "value": 16,
+      "userEdit": true
+    },
+    "public": {
+      "type": "boolean",
+      "display": "Public",
+      "desc": "List the server in everyone's server browser.",
+      "required": true,
+      "value": true,
+      "userEdit": true
+    },
+    "web_port": {
+      "type": "integer",
+      "display": "Web UI port",
+      "desc": "The web page, its API and the remote console, on 127.0.0.1 (server.web_port); 0 for none. Each server on a node needs a port of its own, and not PufferPanel's own (8080). The admin password is printed at the first start and kept in config.toml.",
+      "required": true,
+      "value": 8090,
+      "userEdit": true
+    },
+    "log_format": {
+      "type": "option",
+      "display": "Log format",
+      "desc": "The console's lines.",
+      "required": true,
+      "value": "text",
+      "userEdit": true,
+      "options": [
+        {
+          "value": "text",
+          "display": "Text"
+        },
+        {
+          "value": "json",
+          "display": "JSON"
+        }
+      ]
+    }
+  },
+  "environment": {
+    "type": "host",
+    "mounts": [
+      "/lib32",
+      "/usr/lib32"
+    ]
+  },
+  "supportedEnvironments": [
+    {
+      "type": "host",
+      "mounts": [
+        "/lib32",
+        "/usr/lib32"
+      ]
+    }
+  ],
+  "requirements": {
+    "os": "linux",
+    "arch": "amd64"
+  }
+}

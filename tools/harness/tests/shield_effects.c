@@ -12,6 +12,8 @@ static char const *setting = "stock";
 static unsigned long changes = 1;
 static short connection = _game_connection_local;
 static boolean unreliable;
+static boolean coop;
+static boolean network_coop_active(void){return coop;}
 static char const *config_string(char const *name){(void)name;return setting;}
 static unsigned long config_changes(void){return changes;}
 static short game_connection(void){return connection;}
@@ -71,6 +73,18 @@ int main(int argc,char **argv)
   message=message_of(_shield_effects_players);
   network_shield_effects_handle_message(3,(word const *)&message,sizeof(message));
   CHECK(network_shield_effects()==_shield_effects_glow,"another machine than the host refused");
+ } else CASE("coop") {
+  /* an online co-op game: each player's own, whatever the host chose */
+  connection=_game_connection_network_server;
+  setting="light_show_overshield";changes++;
+  coop=TRUE;
+  CHECK(network_shield_effects()==NONE,"co-op host: each player's own");
+  connection=_game_connection_network_client;
+  network_shield_effects_reset();
+  take(message_of(_shield_effects_glow));
+  CHECK(network_shield_effects()==NONE,"co-op client: each player's own");
+  coop=FALSE;
+  CHECK(network_shield_effects()==_shield_effects_glow,"not co-op: the host's choice");
  } else return 2;
  return 0;
 }

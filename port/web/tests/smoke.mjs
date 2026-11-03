@@ -38,6 +38,9 @@ try {
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
   const page = await browser.newPage();
+  // Local browser checks must not wait for the public analytics service.
+  await page.route('https://nexus.mrbruh.com/**', (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: '', headers: { 'Access-Control-Allow-Origin': '*' } }));
   page.on('console', (message) => log.push(message.text()));
   page.on('pageerror', (error) => log.push('page error: ' + error));
 

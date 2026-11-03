@@ -22,7 +22,7 @@ then fills the page.
   the next time), ?play starts the game at once when it can.
 - ?join=<invite> (a halo://join/ link's code, which native builds and the
   game here make: port/linux/src/p2p.c) joins that internet game once the
-  game starts.
+  game starts; the Servers panel (servers.js) sets it with Play here.
 */
 
 'use strict';
@@ -645,6 +645,28 @@ function showInvite(text) {
   $('invite').hidden = false;
 }
 
+// a master server's page that links a Discord account (player_link.c): a
+// page opens a tab only when it is clicked, so the dialog's button opens it
+function showLinkPage(url) {
+  if (!/^https?:\/\/[^\s]+\/link\?/.test(url)) return;
+  $('ask-title').textContent = 'Link Discord';
+  $('ask-text').textContent = 'The master server\'s page links your Discord account to this game. '
+    + 'Check that it shows the code Settings > Network Setup > Discord Account shows.';
+  const open = document.createElement('button');
+  open.textContent = 'Open the page';
+  open.className = 'primary';
+  open.addEventListener('click', () => {
+    $('ask').hidden = true;
+    window.open(url, '_blank', 'noopener');
+  });
+  const close = document.createElement('button');
+  close.textContent = 'Close';
+  close.addEventListener('click', () => { $('ask').hidden = true; });
+  $('ask-buttons').replaceChildren(open, close);
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  $('ask').hidden = false;
+}
+
 $('invite-copy').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText($('invite-link').value);
@@ -654,6 +676,21 @@ $('invite-copy').addEventListener('click', async () => {
   }
 });
 $('invite-close').addEventListener('click', () => { $('invite').hidden = true; });
+
+// Play here on the Servers panel (servers.js): the server's invite as ?join=,
+// and the game starts at once when it can
+function joinServer(code) {
+  if (!/^[0-9a-f]{64}$/.test(code) || gameStarted) return;
+  params.set('join', code);
+  history.replaceState(null, '', `?${params}`);
+  if (canPlay()) {
+    play();
+    return;
+  }
+  location.hash = '#play-panel';
+  updatePlay();
+  $('play-note').textContent += ' Play then joins the server you chose.';
+}
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -700,6 +737,7 @@ async function play() {
         if (kind === 3) showFatal(text);
         // (the game quits, as the player asked: the page starts again)
         if (kind === 4) location.reload();
+        if (kind === 5) showLinkPage(text);
       },
       // a question the game waits on (sdl_platform.c's platform_ask: the
       // mods that cannot be played together), answered with a button's index
@@ -838,6 +876,11 @@ document.addEventListener('visibilitychange', async () => {
     updatePlay();
   }
   checkForUpdate();
+  window.HaloServers.start({
+    networkVersion: () => stamp.network_version,
+    visible: () => !gameStarted,
+    onPlay: joinServer,
+  });
   if (/^[0-9a-f]{32}$/.test(params.get('room') || '')) await joinRoom(params.get('room'));
   if (params.has('play')) play();
 })();

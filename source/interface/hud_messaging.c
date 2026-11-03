@@ -147,6 +147,7 @@ symbols in this file:
 #include "text/unicode.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "addons.h" /* port: port/linux/game/addons.c */
+#include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
 
 #include <stddef.h>
 
@@ -1442,6 +1443,9 @@ void hud_messaging_update(
 			input_abstraction_get_local_player_preferences(
 				local_player_index,
 				&preferences);
+			/* port: physical prompt buttons for optional controller layouts
+			(port/linux/game/controller_remap_game.c); profile data stays stock. */
+			controller_remap_prompt(local_player_index, &preferences);
 			if (objective_active)
 			{
 				struct hud_color_definition *objective_color =
@@ -1791,7 +1795,7 @@ void hud_messaging_update(
 								draw_string_set_indents(line_cursor.x0 - line_bounds.x0, 0);
 								draw_unicode_string_compute_bounds(
 									&line_bounds,
-									L"<no button icon>",
+									(icon_index == CONTROLLER_REMAP_UNBOUND ? L"UNBOUND" : L"<no button icon>") /* port: explicit cleared controller action */,
 									&text_bounds,
 									&line_cursor);
 								line_cursor.x0 -= 3;
@@ -1801,7 +1805,7 @@ void hud_messaging_update(
 									NULL,
 									NULL,
 									0,
-									L"<no button icon>");
+									(icon_index == CONTROLLER_REMAP_UNBOUND ? L"UNBOUND" : L"<no button icon>") /* port: explicit cleared controller action */);
 								line_bounds.y0 = line_cursor.y0;
 							}
 						}

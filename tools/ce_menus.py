@@ -68,12 +68,23 @@ LEFT_OUT = {
     # port_settings.WIDGET_PATCHES)
     "ui\\shell\\main_menu\\multiplayer_type_select\\checking_updates_screen_create",
     "ui\\shell\\main_menu\\multiplayer_type_select\\checking_updates_screen_join",
+    # (the server browser's Filters' PING, which is not known before a game
+    # is joined (the browser does not ping the master servers' servers), and
+    # TEAMPLAY OPTIONS, which the port's Filters leave to GAME TYPE)
+    "ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\filters\\op_ping",
+    "ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\filters\\op_game_options",
 }
 # children moved: (parent, child) to (x, y); the main menu's Quit a row below
 # Mods, which takes Credits' place; Multiplayer's Edit Gametypes and divider
 # below Co-op, keeping its 32-unit highlight inside the description panel's
 # bottom curve (port_settings.WIDGET_PATCHES)
 CHILD_OFFSETS = {
+    # the server browser's source tab (ALL GAMES, DEDICATED, P2P GAMES), 20
+    # units wider than CE's for its words (port_settings.WIDGET_PATCHES): 9
+    # units left, so that its words and arrows are centred in the tab the
+    # screen's border picture outlines (its own box is gone)
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\op_browser_mode",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\browser_mode_spinner"): (16, 1),
     # Player Options' rows 27 apart, not 30, so that the host's AIM ASSIST and
     # SHIELD EFFECTS fit below them and above the help, which some fill with
     # three lines (port_settings.WIDGET_PATCHES)
@@ -91,6 +102,15 @@ CHILD_OFFSETS = {
     **{("ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\join_game_items_list",
         f"ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\server_item_{row}"): (10, 102 + 17 * (row - 1))
        for row in range(1, 16)},
+    # the server browser's count of servers, wider to the left
+    # (port_settings.WIDGET_PATCHES)
+    ("ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\screen_stats_container",
+     "ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\server_count_label"): (410, 60),
+    # the server browser's Filters' rows, closed up where PING and TEAMPLAY
+    # OPTIONS were (LEFT_OUT)
+    **{("ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\filters\\filters_options_menu",
+        f"ui\\shell\\main_menu\\multiplayer_type_select\\join_game\\filters\\op_{row}"): (54, 133 + 30 * index)
+       for index, row in enumerate(("game_type", "installed_maps"))},
     # the map lists' first row, the SINGLEPLAYER or MULTIPLAYER chooser
     # (port_settings.MAP_KIND_CHOOSER), where the gametype list has its own
     **{(f"ui\\shell\\main_menu\\{list_tag}", "ui\\shell\\main_menu\\new_select\\list_item_0"): (82, 73)
@@ -157,6 +177,9 @@ WIRED = {
     "mouse emit x event", "emit custom activation event", "single prev cl item activated", "controls back handler",
     "gamespy back handler", "gamespy dismiss error", "gamespy dismiss filters", "gamespy screen init",
     "gamespy screen dispose", "mp type set mode",
+    # (the server browser's: menu_functions.c's lobby_browser_*)
+    "gamespy select header", "gamespy select button", "gamespy select item", "gamespy screen update",
+    "gamespy update filter settings",
     "campaign menu init", "campaign menu continue", "difficulty item select", "solo map list update",
     "load game menu init", "load game menu dispose", "load game menu activated", "load game list update",
     "load game menu delete request", "load game menu delete finish",
@@ -589,15 +612,32 @@ def pause_art(art):
     return lines
 
 
+def regenerate_settings():
+    """Write port-owned settings and register any new screens for embedding."""
+    screens = port_settings.settings_files()
+    for name, lines in screens.items():
+        (CE / name).write_text("\n".join(lines))
+    manifest = MENUS / "menus.json"
+    data = json.loads(manifest.read_text())
+    files = set(data["files"]) | {"ce/" + name for name in screens}
+    data["files"] = sorted(name for name in files if name.endswith(".xml")) + sorted(
+        name for name in files if not name.endswith(".xml"))
+    manifest.write_text(json.dumps(data, indent=1) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--tags", type=Path, required=True)
-    parser.add_argument("--definitions", type=Path, required=True)
-    parser.add_argument("--redraws", type=Path, required=True)
-    parser.add_argument("--placeholder", type=Path, required=True, help="the picture for frames with no redraw")
+    parser.add_argument("--settings-only", action="store_true", help="regenerate port-owned settings screens and their manifest")
+    parser.add_argument("--tags", type=Path, required="--settings-only" not in sys.argv)
+    parser.add_argument("--definitions", type=Path, required="--settings-only" not in sys.argv)
+    parser.add_argument("--redraws", type=Path, required="--settings-only" not in sys.argv)
+    parser.add_argument("--placeholder", type=Path, required="--settings-only" not in sys.argv, help="the picture for frames with no redraw")
     parser.add_argument("--pictures", type=Path,
                         help="the PC version's pictures, as PNGs by tag path: only where each is, to place its placeholder")
     arguments = parser.parse_args()
+    if arguments.settings_only:
+        regenerate_settings()
+        return
     tags = Tags(arguments.tags, arguments.definitions)
     # (the names of the Xbox's own as the game has them, which the tags' own
     # names give a little differently: "create&edit", "NULL")

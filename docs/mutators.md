@@ -538,22 +538,24 @@ it.
 
 ## Network games
 
+- Network version 49 has the mutators (`port/linux/NETCODE.md`): a machine of
+  another version does not join, whatever mutators are on.
 - The host, and a game of one machine, plays the mutators that are on when
   the map loads. Changes take effect in the next game.
 - A client plays the host's mutators, never its own. As each client is ready
   for the host's game, before the host's objects, the host sends it each
-  key, its scripts' (distributed message 112, network version 39).
+  key, its scripts' (distributed message 112).
 - A client takes them only from the host, reliably, and only whole: a count
   that the size does not match, a key that is not a key's text, or a value
   that is not a number leaves the message unplayed.
 - A key that the client's build does not have (a fork's own) is passed
   over, and the console says so: that game cannot play as the host's does.
-- The host's tag edits go before the keys (distributed message 113, network
-  version 40): their bytes in pieces of 4000, each its own reliable message.
-  A client takes a piece only from the host, and only where the last ended,
-  and makes the edits when it has them all. The poses go with them, as edits
-  of their own kind (network version 47). Edits of a group, field or value
-  that its build does not take leave none made, and the log says so.
+- The host's tag edits go before the keys (distributed message 113): their
+  bytes in pieces of 4000, each its own reliable message. A client takes a
+  piece only from the host, and only where the last ended, and makes the
+  edits when it has them all. The poses go with them, as edits of their own
+  kind. Edits of a group, field or value that its build does not take leave
+  none made, and the log says so.
 - Each machine's console and `debug.txt` name the mutators of the game.
 - The host sends the files of its mutators that have an add-on or a script: each
   `mutator.toml`, `.lua`, `.cevehicle` and `.ceweapon`
@@ -577,6 +579,6 @@ it.
   asked about. One refused is not fetched, if its mutator is only that; a mutator with
   an add-on too needs the script to be checked, so it is fetched and not run.
   `network.mutator_host_scripts` is `"ask"`, `"always"` or `"never"`.
-- Network version 45 adds them on Custom Edition maps too, with the stock tags
+- They play on Custom Edition maps too, with the stock tags
   those lack ("Stock tags", above), whose indices every machine's tags must
   agree on.

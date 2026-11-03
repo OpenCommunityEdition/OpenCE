@@ -80,6 +80,14 @@ void p2p_signal_lobby_publish(const unsigned char *listing, int size, int closin
 	publish_count++;
 }
 void p2p_signal_lobby_quit(void) {}
+/* (not a dedicated server, and no master servers: master_list.c) */
+int halo_server_mode(void) { return 0; }
+void master_list_browse(int on) { (void)on; }
+void master_list_refresh(void) {}
+/* (the token handed out with a listing, and the masters' prompt publish:
+p2p.c, server_master.c) */
+void p2p_token_listed(const unsigned char *token) { (void)token; }
+void server_master_changed(void) {}
 
 /* the probes asked for (p2p.c's), and the last one's host and token: each
 ends at once, its host not reached (as p2p.c's does when it needs no
@@ -294,6 +302,10 @@ static void lobby_checks(void)
 		!strcmp(listing.gametype, "Slayer") && listing.player_count == 3 && listing.maximum_player_count == 16 &&
 		listing.engine_type == 2 && listing.kind == 0x81 && listing.open && listing.has_teams && !listing.in_progress,
 		"the listing's details");
+	/* the next pass in the same millisecond as the probe's end (an even one) */
+	count = probe_count;
+	lobby_update(token, 3, 16);
+	check(probe_count == count, "a host just timed is not probed again in the same millisecond");
 	/* a change: published again after TRIGGER_INTERVAL */
 	p2p_set_game_listing(NULL, NULL, NULL, 2, 0x81, 1, 1, 1);
 	clock_now += 1000;

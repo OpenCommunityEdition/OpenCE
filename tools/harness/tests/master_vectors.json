@@ -1,0 +1,306 @@
+{
+  "comment": "OpenCE master protocol v1 test vectors (docs/master_protocol.md). Hex is lowercase; strings are ASCII. Made by github.com/OpenCommunityEdition/opence-master-server/internal/vectors.",
+  "protocol": 1,
+  "publisher": {
+    "seed": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    "public_key": "ed25519:d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+    "key_id": "21fe31dfa154a261",
+    "key_id_bytes": "21fe31dfa154a261"
+  },
+  "master": {
+    "seed": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+    "public_key": "ed25519:3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+    "key_id": "39f713d0a644253f",
+    "key_id_bytes": "39f713d0a644253f"
+  },
+  "host": {
+    "seed": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+    "public_key": "ed25519:fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+    "key_id": "dac073e0123bdea5",
+    "key_id_bytes": "dac073e0123bdea5"
+  },
+  "instance": "main",
+  "server_id_input": "21fe31dfa154a261main",
+  "server_id": "4c5f15237c866f6f",
+  "publish_request": {
+    "master_key_id": "39f713d0a644253f",
+    "method": "PUT",
+    "path": "/v1/servers/4c5f15237c866f6f",
+    "ts": "1760900000",
+    "nonce": "000102030405060708090a0b0c0d0e0f",
+    "body": "{\"build\":\"build-206\",\"closed\":false,\"dedicated\":true,\"gametype\":\"CTF\",\"in_progress\":false,\"instance\":\"main\",\"listing\":\"SEwBACYlAAABnGj1M6D8Uc2OYhiho42kftACMPBYCBbtE7ozA6xd65EVSJCAJaChoqOkpaanqKmqq6ytrq8FEAEQT3BlbkNFIERlZGljYXRlZApibG9vZGd1bGNoA0NURgAAAAAAAAAAYz3GPrJ4KNblieNNxDNtuy1RSyAY5L9KOt9a63dLalI/5mLD0pJBxvkchxSoyiteSTqssyvK65vOcV8Vt20jDw==\",\"map\":\"bloodgulch\",\"max_players\":16,\"name\":\"OpenCE Dedicated\",\"network_version\":38,\"password\":false,\"players\":5,\"protocol\":1,\"region\":\"eu\",\"serial\":412,\"teams\":true,\"tunnel_port\":2302,\"variant\":\"CTF\"}",
+    "body_sha256": "f9c46f7703b94e8530a48252b19b372bb20e46a1f5270dc029a9582ee1eedfec",
+    "canonical": "OpenCE-Master-v1\n39f713d0a644253f\nPUT\n/v1/servers/4c5f15237c866f6f\n1760900000\n000102030405060708090a0b0c0d0e0f\nf9c46f7703b94e8530a48252b19b372bb20e46a1f5270dc029a9582ee1eedfec",
+    "signature": "21c7zV0RuW7zoePIeW1IzqzVdr4uFDzg6wBQnNq8rpMne1mR/7EfwhTPcZx87Tm/LhqAmB+cj3EWoZ1zZDqeDg==",
+    "authorization": "OpenCE-Ed25519 keyid=21fe31dfa154a261, ts=1760900000, nonce=000102030405060708090a0b0c0d0e0f, sig=21c7zV0RuW7zoePIeW1IzqzVdr4uFDzg6wBQnNq8rpMne1mR/7EfwhTPcZx87Tm/LhqAmB+cj3EWoZ1zZDqeDg=="
+  },
+  "me_request": {
+    "master_key_id": "39f713d0a644253f",
+    "method": "GET",
+    "path": "/v1/me",
+    "ts": "1760900001",
+    "nonce": "f0e0d0c0b0a090807060504030201000",
+    "body": "",
+    "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "canonical": "OpenCE-Master-v1\n39f713d0a644253f\nGET\n/v1/me\n1760900001\nf0e0d0c0b0a090807060504030201000\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "signature": "duRZ+WKAI8hbvidtC63U1XHxOSoeRN5mcrZvw4qihhlilhZjbVBCLYjsQLr4+F2C1gy6lN9/ixqevFX7dfNGDA==",
+    "authorization": "OpenCE-Ed25519 keyid=21fe31dfa154a261, ts=1760900001, nonce=f0e0d0c0b0a090807060504030201000, sig=duRZ+WKAI8hbvidtC63U1XHxOSoeRN5mcrZvw4qihhlilhZjbVBCLYjsQLr4+F2C1gy6lN9/ixqevFX7dfNGDA=="
+  },
+  "probe": {
+    "master_key_id": "39f713d0a644253f",
+    "nonce": "101112131415161718191a1b1c1d1e1f",
+    "packet": "4f5043452d50524f42450139f713d0a644253f101112131415161718191a1b1c1d1e1f",
+    "signed_message": "70726f626539f713d0a644253f101112131415161718191a1b1c1d1e1f",
+    "answer": "4f5043452d50524f42452d41434b0139f713d0a644253f101112131415161718191a1b1c1d1e1fa63af355db038dff90e6c82abc0e252eddbd1ed3562580d7becaf3e4edbdd39cef7ef3163b91849ba57f6e83240b92df1efbce15dfa42f4a12981590a0234109"
+  },
+  "listings": [
+    {
+      "description": "an open team game of a dedicated server (flags open, teams, dedicated)",
+      "host_seed": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+      "host_public_key": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+      "network_version": 38,
+      "flags": 37,
+      "sequence": 412,
+      "time": 1760900000,
+      "token": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+      "players": 5,
+      "max_players": 16,
+      "engine": 1,
+      "name": "OpenCE Dedicated",
+      "map": "bloodgulch",
+      "gametype": "CTF",
+      "kind": 0,
+      "bytes": "484c010026250000019c68f533a0fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025a0a1a2a3a4a5a6a7a8a9aaabacadaeaf051001104f70656e4345204465646963617465640a626c6f6f6467756c6368034354460000000000000000633dc63eb27828d6e589e34dc4336dbb2d514b2018e4bf4a3adf5aeb774b6a523fe662c3d29241c6f91c8714a8ca2b5e493aacb32bcaeb9bce715f15b76d230f",
+      "base64": "SEwBACYlAAABnGj1M6D8Uc2OYhiho42kftACMPBYCBbtE7ozA6xd65EVSJCAJaChoqOkpaanqKmqq6ytrq8FEAEQT3BlbkNFIERlZGljYXRlZApibG9vZGd1bGNoA0NURgAAAAAAAAAAYz3GPrJ4KNblieNNxDNtuy1RSyAY5L9KOt9a63dLalI/5mLD0pJBxvkchxSoyiteSTqssyvK65vOcV8Vt20jDw==",
+      "size": 169,
+      "signed_size": 105,
+      "signed_message": "686365752d6c6f6262792d31484c010026250000019c68f533a0fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025a0a1a2a3a4a5a6a7a8a9aaabacadaeaf051001104f70656e4345204465646963617465640a626c6f6f6467756c6368034354460000000000000000",
+      "signature": "633dc63eb27828d6e589e34dc4336dbb2d514b2018e4bf4a3adf5aeb774b6a523fe662c3d29241c6f91c8714a8ca2b5e493aacb32bcaeb9bce715f15b76d230f",
+      "valid": true
+    },
+    {
+      "description": "a password game in progress: its token sealed (56 bytes); kind 0x81 is SWAT with Hardcore",
+      "host_seed": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+      "host_public_key": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+      "network_version": 38,
+      "flags": 19,
+      "sequence": 7,
+      "time": 1760900030,
+      "sealed_token": "020202020202020202020202020202020202020202020202830b7b34e4bfb2066a5a2b270ac905b26cc7944c0ed25aea08c8cb3adefdd731",
+      "players": 3,
+      "max_players": 8,
+      "engine": 2,
+      "name": "Hardcore SWAT",
+      "map": "prisoner",
+      "gametype": "Team Slayer",
+      "kind": 129,
+      "bytes": "484c010026130000000768f533befc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025020202020202020202020202020202020202020202020202830b7b34e4bfb2066a5a2b270ac905b26cc7944c0ed25aea08c8cb3adefdd7310308020d48617264636f7265205357415408707269736f6e65720b5465616d20536c6179657281000000000000004eec35187da028138c2cb4c28951f02fae8e4986ed4bf5ec0ccd5ba465f29b3ae9fda23271d3528fc119868bd303e73f75335ea09fa113d293c5f2af141e990a",
+      "base64": "SEwBACYTAAAAB2j1M778Uc2OYhiho42kftACMPBYCBbtE7ozA6xd65EVSJCAJQICAgICAgICAgICAgICAgICAgICAgICAoMLezTkv7IGalorJwrJBbJsx5RMDtJa6gjIyzre/dcxAwgCDUhhcmRjb3JlIFNXQVQIcHJpc29uZXILVGVhbSBTbGF5ZXKBAAAAAAAAAE7sNRh9oCgTjCy0wolR8C+ujkmG7Uv17AzNW6Rl8ps66f2iMnHTUo/BGYaL0wPnP3UzXqCfoRPSk8XyrxQemQo=",
+      "size": 212,
+      "signed_size": 148,
+      "signed_message": "686365752d6c6f6262792d31484c010026130000000768f533befc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025020202020202020202020202020202020202020202020202830b7b34e4bfb2066a5a2b270ac905b26cc7944c0ed25aea08c8cb3adefdd7310308020d48617264636f7265205357415408707269736f6e65720b5465616d20536c617965728100000000000000",
+      "signature": "4eec35187da028138c2cb4c28951f02fae8e4986ed4bf5ec0ccd5ba465f29b3ae9fda23271d3528fc119868bd303e73f75335ea09fa113d293c5f2af141e990a",
+      "valid": true
+    },
+    {
+      "description": "a tombstone: the host stopped (flags closed, token zero)",
+      "host_seed": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+      "host_public_key": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+      "network_version": 38,
+      "flags": 8,
+      "sequence": 413,
+      "time": 1760900100,
+      "token": "00000000000000000000000000000000",
+      "players": 0,
+      "max_players": 16,
+      "engine": 1,
+      "name": "OpenCE Dedicated",
+      "map": "bloodgulch",
+      "gametype": "CTF",
+      "kind": 0,
+      "bytes": "484c010026080000019d68f53404fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb91154890802500000000000000000000000000000000001001104f70656e4345204465646963617465640a626c6f6f6467756c636803435446000000000000000046260bbe15b8aa617724442e82a164f2ebdb093d3866c0c09496aa483121dd8f1ba3591aba35dce2d61389a48d384aac9ea079576810e836b7e9f4a15b6b5308",
+      "base64": "SEwBACYIAAABnWj1NAT8Uc2OYhiho42kftACMPBYCBbtE7ozA6xd65EVSJCAJQAAAAAAAAAAAAAAAAAAAAAAEAEQT3BlbkNFIERlZGljYXRlZApibG9vZGd1bGNoA0NURgAAAAAAAAAARiYLvhW4qmF3JEQugqFk8uvbCT04ZsDAlJaqSDEh3Y8bo1kaujXc4tYTiaSNOEqsnqB5V2gQ6Da36fShW2tTCA==",
+      "size": 169,
+      "signed_size": 105,
+      "signed_message": "686365752d6c6f6262792d31484c010026080000019d68f53404fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb91154890802500000000000000000000000000000000001001104f70656e4345204465646963617465640a626c6f6f6467756c6368034354460000000000000000",
+      "signature": "46260bbe15b8aa617724442e82a164f2ebdb093d3866c0c09496aa483121dd8f1ba3591aba35dce2d61389a48d384aac9ea079576810e836b7e9f4a15b6b5308",
+      "valid": true
+    },
+    {
+      "description": "a listing whose name was changed after signing: it must be refused",
+      "host_seed": "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+      "host_public_key": "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+      "network_version": 38,
+      "flags": 37,
+      "sequence": 412,
+      "time": 1760900000,
+      "token": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+      "players": 5,
+      "max_players": 16,
+      "engine": 1,
+      "name": "oPenCE Dedicated",
+      "map": "bloodgulch",
+      "gametype": "CTF",
+      "kind": 0,
+      "bytes": "484c010026250000019c68f533a0fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025a0a1a2a3a4a5a6a7a8a9aaabacadaeaf051001106f70656e4345204465646963617465640a626c6f6f6467756c6368034354460000000000000000633dc63eb27828d6e589e34dc4336dbb2d514b2018e4bf4a3adf5aeb774b6a523fe662c3d29241c6f91c8714a8ca2b5e493aacb32bcaeb9bce715f15b76d230f",
+      "base64": "SEwBACYlAAABnGj1M6D8Uc2OYhiho42kftACMPBYCBbtE7ozA6xd65EVSJCAJaChoqOkpaanqKmqq6ytrq8FEAEQb3BlbkNFIERlZGljYXRlZApibG9vZGd1bGNoA0NURgAAAAAAAAAAYz3GPrJ4KNblieNNxDNtuy1RSyAY5L9KOt9a63dLalI/5mLD0pJBxvkchxSoyiteSTqssyvK65vOcV8Vt20jDw==",
+      "size": 169,
+      "signed_size": 105,
+      "signed_message": "686365752d6c6f6262792d31484c010026250000019c68f533a0fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025a0a1a2a3a4a5a6a7a8a9aaabacadaeaf051001104f70656e4345204465646963617465640a626c6f6f6467756c6368034354460000000000000000",
+      "signature": "633dc63eb27828d6e589e34dc4336dbb2d514b2018e4bf4a3adf5aeb774b6a523fe662c3d29241c6f91c8714a8ca2b5e493aacb32bcaeb9bce715f15b76d230f",
+      "valid": false
+    }
+  ],
+  "list": {
+    "body": "{\"protocol\":1,\"master\":{\"name\":\"OpenCE Master 1\",\"key_id\":\"39f713d0a644253f\",\"time\":1760900000},\"servers\":[]}",
+    "signature_header": "ed25519=18dmQnIfmRnC+wUwRJ/loxAH1VfASRBVnZgCfRuHrAw/2uo4thTibWnNQFScgRju+5lQtt709blK86BLT0fYCw==",
+    "signature_key_header": "39f713d0a644253f",
+    "signature_time_header": "1760900000",
+    "etag": "\"cd755a50c5cfc457\""
+  },
+  "small_order_key_refused": "ed25519:0100000000000000000000000000000000000000000000000000000000000000",
+  "proof_nonce": "opence-apply-1760900000-0123456789abcdef",
+  "proof_signature_hex": "8e7d8fcafeb3763625557028360d959a3f9f586ff22f5744546bba5a82567dfb9480188076e7c179334b85781929da9b3dce3035dc77ac588bd62d1236b35209",
+  "player": {
+    "seed": "8b8d38ea4ccbb4f2a3fbd5a1c6b4a2b8a9e5b7c7d1f0e3a2b4c6d8e0f1a3b5c7",
+    "public_key": "ed25519:08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070",
+    "key_id": "41cea55b89103af6",
+    "key_id_bytes": "41cea55b89103af6"
+  },
+  "link": {
+    "master_key_id": "39f713d0a644253f",
+    "ts": "1760900100",
+    "signed_text": "opence-link-1\n39f713d0a644253f\n08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070\n1760900100",
+    "sig": "c54a5af3efeebf206bc790561f210b8c84b88e9a892d88605e776f114b7b1336991d075183e9e25a240246d9fa52284b0abb5b35bd188a17128b34e01f27ea0a",
+    "query": "key=08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070&ts=1760900100&sig=c54a5af3efeebf206bc790561f210b8c84b88e9a892d88605e776f114b7b1336991d075183e9e25a240246d9fa52284b0abb5b35bd188a17128b34e01f27ea0a",
+    "code": "XU3-APH"
+  },
+  "pass_request": {
+    "master_key_id": "39f713d0a644253f",
+    "ts": "1760900200",
+    "signed_text": "opence-pass-get-1\n39f713d0a644253f\n08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070\n1760900200",
+    "sig": "9603361264453f0aef4c185183099ff4e5c9e8aa64c2fe2ae9058236a09e7f6f929bf82d0f8f7243adb571b042fcd4b6399b2099612eb7c7fde51b979f12b904",
+    "query": "key=08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070&ts=1760900200&sig=9603361264453f0aef4c185183099ff4e5c9e8aa64c2fe2ae9058236a09e7f6f929bf82d0f8f7243adb571b042fcd4b6399b2099612eb7c7fde51b979f12b904"
+  },
+  "pass": {
+    "flags": 1,
+    "master_key_id": "39f713d0a644253f",
+    "player_public_key": "08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070",
+    "discord_id": "80351110224678912",
+    "discord_name": "nelly",
+    "issued": 1760900200,
+    "expires": 1761159400,
+    "signed_message": "6f70656e63652d706173732d314f50434550415353010139f713d0a644253f08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070011d76e8b64010006e656c6c790000000000000000000000000000000000000000000000000000000000000068f534680000000068f928e8",
+    "signature": "9d07d4e5b3ffb38c5931beae8885f7a0e3c2af616338b56bf6a180087618e5a6d943beddc98738da41ca6ec1c788453885ef98eac3c7c9a3c1f7533cdff2b203",
+    "bytes": "4f50434550415353010139f713d0a644253f08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070011d76e8b64010006e656c6c790000000000000000000000000000000000000000000000000000000000000068f534680000000068f928e89d07d4e5b3ffb38c5931beae8885f7a0e3c2af616338b56bf6a180087618e5a6d943beddc98738da41ca6ec1c788453885ef98eac3c7c9a3c1f7533cdff2b203"
+  },
+  "pass_proof": {
+    "session_secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "binding": "047695a601a9043f3e8d712c5aad2d21ad9d70baa14ff6a72eec4fc5e6084120",
+    "message": "6f70656e63652d706173732d70726f6f662d3163c70591df8ab19aae93f2d7b7f1cb194ca7c9a1342b63a692b51507fe81370d047695a601a9043f3e8d712c5aad2d21ad9d70baa14ff6a72eec4fc5e6084120",
+    "proof": "eca50058defc0cc7e156dabc751a74548839a6b8e8b9c6984415ccc830388cf5dd08c378a989465875489194806e0755a6b7b435d27c47e2d0fbabe35303b801",
+    "lan_binding": "0000000000000000000000000000000000000000000000000000000000000000",
+    "lan_message": "6f70656e63652d706173732d70726f6f662d3163c70591df8ab19aae93f2d7b7f1cb194ca7c9a1342b63a692b51507fe81370d0000000000000000000000000000000000000000000000000000000000000000",
+    "lan_proof": "bdd326d1b1379e7a080b2248e01b624896a0bec2b92ecddf0750c498269aab6ca47f1fbe7018cd3e6c1526dc9c10bf585370c84a922c1ac8db687c142482b40a"
+  },
+  "passes_refused": [
+    {
+      "name": "altered discord id",
+      "bytes": "4f50434550415353010139f713d0a644253f08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070011d76e8b64010016e656c6c790000000000000000000000000000000000000000000000000000000000000068f534680000000068f928e89d07d4e5b3ffb38c5931beae8885f7a0e3c2af616338b56bf6a180087618e5a6d943beddc98738da41ca6ec1c788453885ef98eac3c7c9a3c1f7533cdff2b203",
+      "why": "the Discord id's last byte changed after signing: the master's signature fails"
+    },
+    {
+      "name": "wrong magic",
+      "bytes": "4f50434550415358010139f713d0a644253f08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070011d76e8b64010006e656c6c790000000000000000000000000000000000000000000000000000000000000068f534680000000068f928e87cba42ca5143c39dfc0425304a382a89e82eda0d509282eeec59a3b1753dc4e1465c61b4360e7b39119a1c53745cabf9282142a79fd4e739cc878577e2531b02",
+      "why": "OPCEPASX, not OPCEPASS (signed again by the master)"
+    },
+    {
+      "name": "format 2",
+      "bytes": "4f50434550415353020139f713d0a644253f08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070011d76e8b64010006e656c6c790000000000000000000000000000000000000000000000000000000000000068f534680000000068f928e8bfab7b5cacc5e7aee16e9fa7e83051cca9677e9194ad001eb1b918d3c65000abbace639ca1c27d62e264105e8bc30c8ffc1e5a4d9463f71b018eca0c723b7403",
+      "why": "format 2, not 1 (signed again by the master)"
+    },
+    {
+      "name": "signed by the publisher key",
+      "bytes": "4f50434550415353010139f713d0a644253f08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070011d76e8b64010006e656c6c790000000000000000000000000000000000000000000000000000000000000068f534680000000068f928e813fb3fd8904b61d838c4fe2081c44d9b5283e6f33089e47847ab7d4b9f967b0c47cbc0bd1cfc7158b8bfb25b3c24e0b356ed9bbc01e62d2002567e98beb8450f",
+      "why": "signed by the vectors' publisher key instead of the master key: the master's signature fails"
+    },
+    {
+      "name": "another master's key id",
+      "bytes": "4f50434550415353010121fe31dfa154a26108c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070011d76e8b64010006e656c6c790000000000000000000000000000000000000000000000000000000000000068f534680000000068f928e84b6f2ee2ec7acb7641c5c1c50dc9da3f976ce5c57e2cf90d630baad2f55e712718b36d484610897fc6cf051f0c40f0c72d56efdf6be2a98953b8d7483d47a30b",
+      "why": "its master key id is the publisher key's, not a pinned master's (signed by the master)"
+    },
+    {
+      "name": "truncated",
+      "bytes": "4f50434550415353010139f713d0a644253f08c49c5545326df382e9ea1db021fb7ca405961840cd069d599881d453503070011d76e8b64010006e656c6c790000000000000000000000000000000000000000000000000000000000000068f534680000000068f928e89d07d4e5b3ffb38c5931beae8885f7a0e3c2af616338b56bf6a180087618e5a6d943beddc98738da41ca6ec1c788453885ef98eac3c7c9a3c1f7533cdff2b2",
+      "why": "169 bytes, not 170"
+    }
+  ],
+  "netlist": {
+    "ranges": [
+      [
+        "1.2.3.0",
+        "1.2.3.255"
+      ],
+      [
+        "5.6.7.8",
+        "5.6.7.8"
+      ],
+      [
+        "45.0.0.0",
+        "45.15.255.255"
+      ],
+      [
+        "185.220.100.0",
+        "185.220.103.255"
+      ]
+    ],
+    "generated": 1760900000,
+    "serial": 7,
+    "body": "4f5043454e455431010000000000000068f533a000000000000000070000000401020300010203ff05060708050607082d0000002d0fffffb9dc6400b9dc67ff",
+    "signature": "4ca4d5e38760784eb745b98d3e0263b5efc368e89836a7c5a6d0d25a00ed853aecb6646babec57e5e7b8c6317bc99bcb9aa22656fa71f354798362dc8e6cdb00",
+    "signature_header": "ed25519=TKTV44dgeE63RbmNPgJjte/DaOiYNqfFptDSWgDthTrstmRrq+xX5ee4xjF7yZvLmqImVvpx81R5g2LcjmzbAA==",
+    "etag": "\"20f9ba5a274c52cd\"",
+    "refused": [
+      {
+        "name": "overlapping",
+        "body": "4f5043454e455431010000000000000068f533a000000000000000070000000201020300010203ff010203800102040a",
+        "why": "the second range starts inside the first"
+      },
+      {
+        "name": "touching",
+        "body": "4f5043454e455431010000000000000068f533a000000000000000070000000201020300010203ff01020400010204ff",
+        "why": "the second range starts right after the first: merged lists never touch"
+      },
+      {
+        "name": "out of order",
+        "body": "4f5043454e455431010000000000000068f533a0000000000000000700000002050607080506070801020300010203ff",
+        "why": "the ranges are not ascending"
+      },
+      {
+        "name": "wrong size",
+        "body": "4f5043454e455431010000000000000068f533a000000000000000070000000401020300010203ff05060708050607082d0000002d0fffffb9dc6400b9dc67",
+        "why": "a byte short of 32 + 8 * count"
+      },
+      {
+        "name": "reserved byte set",
+        "body": "4f5043454e455431010001000000000068f533a000000000000000070000000401020300010203ff05060708050607082d0000002d0fffffb9dc6400b9dc67ff",
+        "why": "byte 10 (reserved) is not zero"
+      },
+      {
+        "name": "wrong magic",
+        "body": "585043454e455431010000000000000068f533a000000000000000070000000401020300010203ff05060708050607082d0000002d0fffffb9dc6400b9dc67ff",
+        "why": "XPCENET1, not OPCENET1"
+      },
+      {
+        "name": "format 2",
+        "body": "4f5043454e455431020000000000000068f533a000000000000000070000000401020300010203ff05060708050607082d0000002d0fffffb9dc6400b9dc67ff",
+        "why": "format 2, not 1"
+      },
+      {
+        "name": "first after last",
+        "body": "4f5043454e455431010000000000000068f533a0000000000000000700000001010203ff01020300",
+        "why": "the range's first address is after its last"
+      }
+    ]
+  }
+}

@@ -253,7 +253,7 @@ speed and riders every second.
 
 ## Network games
 
-Network version 45. The host sends its add-ons to its clients, who play them in the
+The host sends its add-ons to its clients, who play them in the
 host's order, so every machine gives their tags the same indices
 ([mutators.md](mutators.md), "Network games"). A client that has turned that off
 (`network.mutator_download`) plays a map without them: what it sees of them, and of

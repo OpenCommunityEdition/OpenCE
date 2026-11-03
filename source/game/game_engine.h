@@ -92,6 +92,12 @@ struct ctf_variant
 	boolean flag_must_reset;
 	boolean flag_at_home_to_score;
 	long single_flag_time;
+	/* port: Kills Score (the editor's): a kill scores a point for the
+	killer's team, and a capture is worth points_per_capture (5 to 100, 25 by
+	default) in place of one; the score to win is in captures, each worth
+	that much. Off (0): the Xbox's capture the flag */
+	long points_per_capture;
+	long kills_score;
 };
 
 struct slayer_variant
@@ -104,6 +110,9 @@ struct slayer_variant
 struct king_variant
 {
 	boolean moving_hill;
+	/* port: Multi-Hill: this many hills in play at once (2 to 5), else one
+	(game_engine_king.c). Zero in January's gametypes, whose union keeps it */
+	byte multi_hill;
 };
 
 /* the balls of an oddball game */
@@ -287,12 +296,17 @@ struct game_variant_options
 	kill takes the victim back a weapon */
 	byte gun_game_order;
 	boolean gun_game_melee_demotes;
+	/* port: Teamplay Options' FORCE TEAM SPAWNS: a team game other than CTF
+	spawns its players as CTF does, only at the map's CTF starting locations
+	of their own team (game_engine_get_starting_location_rating). Taken from
+	reserved, which older builds zero and ignore: the host alone picks spawns */
+	boolean force_team_spawns;
 	/* port: a custom vehicle set's add-on vehicles of each team (red's and
 	blue's), as MAXIMUM_VARIANT_VEHICLE_COUNT less their count: 0, a
 	gametype's from before them, is the most (those of a set of another
 	kind: game_engine_vehicle_placement_allowed) */
 	byte addon_vehicles_fewer[2][MAXIMUM_VARIANT_ADDON_VEHICLES];
-	byte reserved[2];
+	byte reserved[1];
 };
 
 typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x2C ? 1 : -1];

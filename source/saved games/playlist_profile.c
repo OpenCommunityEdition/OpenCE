@@ -436,6 +436,29 @@ boolean playlist_profile_get_from_path(
 	return success;
 }
 
+/* port: a saved gametype's file, read whole already, its PC options too
+(the Xbox's defaults for one saved without them): a dedicated server's
+file=<name> rotation entries, read from its gametypes folder by the
+platform layer (port/linux/game/server_gametypes.c) */
+boolean playlist_profile_get_from_data_with_options(
+	byte const *data,
+	unsigned long size,
+	struct game_variant *variant,
+	struct game_variant_options *options)
+{
+	XCALCSIG_SIGNATURE checksum;
+
+	if (!data || size < SAVED_GAME_FILE_BLOCK_SIZE)
+		return FALSE;
+	saved_game_file_generate_checksum(data, PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE, &checksum);
+	if (csmemcmp(&checksum, data + PLAYLIST_PROFILE_CHECKSUM_DATA_SIZE, sizeof(checksum)))
+		return FALSE;
+	csmemcpy(variant, data, sizeof(struct game_variant));
+	if (!playlist_profile_options_from_block(data, options))
+		game_variant_options_default(variant, options);
+	return TRUE;
+}
+
 boolean playlist_profile_get_display_name(
 	long playlist_profile_index,
 	wchar_t *display_name)

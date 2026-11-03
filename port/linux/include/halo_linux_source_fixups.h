@@ -12,6 +12,7 @@ the platform layer reads the display.interpolation setting */
 struct observer_result;
 struct render_camera;
 struct real_matrix4x3;
+union real_point3d;
 int halo_interpolation_enabled(void);
 float game_time_get_tick_fraction(void);
 void render_interpolation_tick(void);
@@ -20,6 +21,8 @@ void render_interpolation_frame_begin(void);
 void render_interpolation_frame_end(void);
 float render_interpolation_fraction(void);
 struct real_matrix4x3 *render_interpolation_object_node_matrices(long object_index);
+/* a point on an object (a nav marker's), moved to where the frame draws it */
+void render_interpolation_object_point(long object_index, union real_point3d *point);
 struct observer_result const *render_interpolation_camera(short local_player_index,
 	struct observer_result const *observer);
 void render_interpolation_first_person(short local_player_index, struct real_matrix4x3 *node_matrices,
@@ -79,6 +82,21 @@ each permutation's level (port/linux/game/model_detail.c) */
 int halo_model_detail_stock(void);
 /* while TRUE, drawing shifts right to center 640-column layouts */
 void halo_screen_ui_offset(unsigned char centered);
+/* the same for a player's view of a split screen (its width): a half
+screen's 640 columns are centred as the screen's, a quarter's 320 in the
+quarter; the shift in effect */
+void halo_screen_ui_offset_view(long view_width);
+long halo_screen_ui_offset_current(void);
+/* (port/linux/game/menu_functions.c, for source/interface/ui_widget.c) the
+network lobby, which reads every controller's events however many players
+there are: another controller's START joins it, a player's B leaves it (its
+handlers know each controller), where a screen of player 1's would read
+theirs alone; and ADD PLAYER's screen, whose quarters are each a
+controller's: the screen takes every controller's events, its widgets their
+own controller's alone */
+struct widget_instance;
+unsigned char pc_menu_screen_reads_every_controller(struct widget_instance const *widget);
+unsigned char pc_menu_screen_routes_by_controller(struct widget_instance const *widget);
 /* names a model lighting vertex program, whose draws can be lit for each
 pixel (port/linux/src/d3d8_gl.c, display.per_pixel_lighting) */
 void halo_vertex_shader_lighting(unsigned long handle);
@@ -88,7 +106,28 @@ void halo_screen_anti_alias(short x0, short y0, short x1, short y1);
 /* display.hdr's tone mapping of a window's 3D view, before its
 anti-aliasing (source/render/render.c) */
 void halo_screen_tone_map(short x0, short y0, short x1, short y1);
+/* network.client_timeout_seconds, in milliseconds (port/linux/src/port_config.c) */
+unsigned long network_client_timeout_milliseconds(void);
+/* a dedicated server (halo --server: port/linux/src/server_mode.c,
+port/linux/game/server_director.c; docs/dedicated_server.md): whether this
+run is one; its start, before the game's (shell_xbox.c); its frames' pace
+(main.c); the game's fatal error ended with (main.c); and the console's
+output, which it logs and captures for its commands' replies (terminal.c) */
+int halo_server_mode(void);
+void server_mode_start(void);
+void server_mode_pace_frame(void);
+void server_fatal(char const *text);
+void server_console_output(const char *text);
+/* ... whether debug.txt's lines go to the standard error too
+(server.log_debug_echo: errors.c) */
+int halo_server_debug_echo(void);
+/* ... the level its rotation plays next, NULL if none (game_engine.c) */
+char const *server_director_first_level(void);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
+/* the debug camera's mouse and keys (source/camera/director.c): whether the
+middle button, R and F are held, and the wheel's notches since the last call
+(port/linux/src/xinput_sdl.c) */
+int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel);
 
 #endif

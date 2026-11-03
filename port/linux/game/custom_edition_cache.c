@@ -672,7 +672,23 @@ static boolean custom_edition_cache_tags_convert(
 	uint32_t loaded_bytes = report->tag_data_bytes + report->resource_tag_bytes;
 	struct custom_edition_conversion_report conversion;
 	enum cache_file_status status;
+	long regrouped;
 
+	/* (first: what follows selects tags by group, and a protected map's tag
+	table has them scrambled; the references to them keep the real ones) */
+	regrouped = tag_validate_custom_edition_infer_groups(
+		tag_cache,
+		(long)loaded_bytes,
+		report->tag_cache_bytes,
+		report->identity.name);
+	if (regrouped)
+	{
+		error(
+			_error_silent,
+			"custom edition: %ld tags had their group (scrambled by map protection) taken from the references to them",
+			regrouped);
+	}
+	
 	custom_edition_cache_combine_resource_offsets(
 		tag_cache,
 		loaded_bytes,

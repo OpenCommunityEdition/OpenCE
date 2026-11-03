@@ -379,7 +379,8 @@ symbols in this file:
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "networking/network_server_manager.h" /* port: a co-op game's level won */
-#include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "network_coop.h"
+#include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "network_voice.h" /* port: port/linux/game/network_voice.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "network_aim_assist.h" /* port: port/linux/game/network_aim_assist.c */
@@ -683,6 +684,7 @@ typedef char screenshot_and_framerate_globals_size_assert[
 	sizeof(struct _screenshot_and_framerate_globals) == 0x38B ? 1 : -1];
 
 void network_test_update(boolean main_menu_loaded, real seconds);
+#include "server_director.h" /* port: port/linux/game/server_director.c */
 
 /* ---------- prototypes */
 
@@ -1989,10 +1991,23 @@ on the host alone. */
 static boolean main_coop_host_revert(
 	void)
 {
+	/* (the last reverts' times: a script whose failure holds again at once
+	after the revert would pull everyone back to the save over and over; a
+	third in a minute respawns the players at the checkpoint instead) */
+	static unsigned long revert_times[2];
+	unsigned long milliseconds = system_milliseconds();
 	long now = game_time_get();
 
 	if (!game_state_port_saved_game_valid())
 		return FALSE;
+	if (revert_times[0] && milliseconds - revert_times[0] < 60000)
+	{
+		error(_error_log, "co-op: a third revert in a minute: the players respawn at the checkpoint instead");
+		revert_times[0] = revert_times[1] = 0;
+		return FALSE;
+	}
+	revert_times[0] = revert_times[1];
+	revert_times[1] = milliseconds;
 	game_state_revert();
 	network_coop_reverted(now);
 	ui_widgets_disable_pause_game(30);
@@ -2118,7 +2133,13 @@ static void main_save_map_private(
 				}
 				else if (main_globals.ticks_until_next_save_check-- <= 0)
 				{
-					if (game_safe_to_save())
+					/* port: in network co-op one player safe is enough, as for
+					the scripts' own test (coop_scripts_safe_to_save): the game's
+					asks it of every player at once, whom one dead, one in the air
+					or one driving past held off, and a level's checkpoint (the
+					Maw's before its Warthog run) gave up; a team wipe went back
+					to the one before */
+					if (coop_scripts_safe_to_save())
 					{
 						if (main_globals.safe_intervals++ >= 3)
 							save_map = TRUE;
@@ -2198,13 +2219,12 @@ static void main_lost_map_private(
 	{
 		main_globals.lost_map = FALSE;
 		main_globals.loss_timer = 0;
-		/* port: in network co-op, everyone dying respawns the players where
-		they were at the last checkpoint, without a revert. A mission the
-		scripts failed (game_lost, with players still alive: d40's timer,
-		a50's Keyes) does revert, or its failure cutscene would never end. */
+		/* port: the co-op host chooses whether a team wipe rewinds or only
+		respawns. Scripted failures still revert, or their cutscene would
+		never end. A missing save falls back to checkpoint positions. */
 		if (game_connection() != _game_connection_network_server)
 			game_state_revert();
-		else if (players_are_all_dead() || !main_coop_host_revert())
+		else if ((players_are_all_dead() && !network_coop_wipe_reverts()) || !main_coop_host_revert())
 			players_respawn_at_checkpoint();
 	}
 	return;
@@ -3145,6 +3165,10 @@ void halt_and_catch_fire(
 	emscripten_cancel_main_loop();
 	abort();
 #endif
+	/* port: a dedicated server has no screen to halt on: its error logged,
+	it ends with exit code 1 (port/linux/game/server_director.c) */
+	if (halo_server_mode())
+		server_fatal(error_get());
 	if (!global_screenshot_count.halt_recursion_lock)
 	{
 		scenario = global_scenario_try_and_get();
@@ -3268,6 +3292,9 @@ void halt_and_catch_fire(
 void main_loop_of_death(
 	void)
 {
+	/* port: as halt_and_catch_fire, on a dedicated server */
+	if (halo_server_mode())
+		server_fatal(error_get());
 	while (TRUE)
 	{
 		input_frame_begin();
@@ -3556,6 +3583,9 @@ static boolean main_loop_iteration(
 
 			/* automated system link tests (port/linux/game/network_test.c) */
 			network_test_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
+			/* port: a dedicated server's hosting, rotation and commands
+			(port/linux/game/server_director.c) */
+			server_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
 			/* port: voice chat, in the lobby and in game (port/linux/game/network_voice.c) */
 			network_voice_update();
 			/* port: apply and replicate the host's mouse aim-assist policy. */
@@ -3599,7 +3629,17 @@ static boolean main_loop_iteration(
 			}
 			profile_scope_exit(main_network_start_frame_section)
 
-			profile_scope(main_update_time_section, main_update_time();)
+			/* port: a dedicated server's frames paced by its clock, with no
+			display to wait for (port/linux/src/server_mode.c) */
+			if (halo_server_mode())
+			{
+				server_mode_pace_frame();
+				profile_scope(main_update_time_section, main_update_time_unthrottled();)
+			}
+			else
+			{
+				profile_scope(main_update_time_section, main_update_time();)
+			}
 			profile_scope_enter(main_ui_update_section)
 			process_ui_widgets();
 			bink_playback_update();
@@ -3674,14 +3714,16 @@ static boolean main_loop_iteration(
 					profile_render_end();
 				}
 			}
-			else
+			/* port: nothing drawn on a dedicated server, nor waited for */
+			else if (!halo_server_mode())
 			{
 				profile_render_start();
 				main_pregame_render();
 				profile_render_end();
 			}
 
-			profile_scope(main_throttle_section, main_rasterizer_throttle();)
+			if (!halo_server_mode())
+				profile_scope(main_throttle_section, main_rasterizer_throttle();)
 
 			if (render_frame && !debug_no_drawing)
 			{
@@ -3717,3 +3759,41 @@ static boolean main_loop_iteration(
 }
 
 /* ---------- private code */
+
+/* port: what this build is, which a client tells the hosts it joins
+(network_distributed.c's _distributed_message_client_build): its number (0
+for a build CI did not number), configuration, the GitHub repository it is
+made from (owner/name; empty if not known) and the label it shows */
+#ifndef HALO_BUILD_NUMBER
+#define HALO_BUILD_NUMBER 0
+#endif
+#ifndef HALO_BUILD_FLAVOR
+#define HALO_BUILD_FLAVOR "local"
+#endif
+#ifndef HALO_BUILD_REPOSITORY
+#define HALO_BUILD_REPOSITORY ""
+#endif
+void main_build_identity(
+	long *number,
+	char *flavor,
+	size_t flavor_size,
+	char *repository,
+	size_t repository_size,
+	char *version,
+	size_t version_size)
+{
+	*number = HALO_BUILD_NUMBER;
+	_snprintf(flavor, flavor_size - 1, "%s", HALO_BUILD_FLAVOR);
+	flavor[flavor_size - 1] = 0;
+	_snprintf(repository, repository_size - 1, "%s", HALO_BUILD_REPOSITORY);
+	repository[repository_size - 1] = 0;
+#ifdef HALO_NATIVE_BUILD_INFO
+	main_native_build_label(version, version_size);
+#else
+	if (HALO_BUILD_NUMBER > 0)
+		_snprintf(version, version_size - 1, "OpenCE Web | build %d (%s)", HALO_BUILD_NUMBER, HALO_BUILD_FLAVOR);
+	else
+		_snprintf(version, version_size - 1, "OpenCE Web | local build (%s)", HALO_BUILD_FLAVOR);
+	version[version_size - 1] = 0;
+#endif
+}
