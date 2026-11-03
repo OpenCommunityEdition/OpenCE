@@ -941,6 +941,9 @@ OPENCE_ROWS = [
     ("oce_hardcore", "HARDCORE:", ["OFF", "ON"], [
         "The motion sensor and aim assist as the game\\ntype has them.",
         "No motion sensor, no aim assist, and a kill\\nrestores the killer's health and shields."]),
+    ("oce_bottomless", "BOTTOMLESS:", ["OFF", "ON"], [
+        "Weapons run dry and reload as the game type\\nhas them.",
+        "Weapons never run dry: the host refills the\\nmagazine as it empties."]),
     ("inf_zombies", "FIRST ZOMBIES:", ["1", "2", "3", "4", "8", "16"],
      ["The zombies chosen when the round starts\\n(a human is always left)."] * 6),
     ("inf_speed", "ZOMBIE SPEED:", ["100%", "110%", "125%", "150%", "175%", "200%"],
