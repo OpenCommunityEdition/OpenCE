@@ -34,6 +34,8 @@ static struct
 	struct game_engine slayer;
 	/* the pistol being given (one_in_the_chamber_allow_pick_up allows it) */
 	boolean equipping;
+	/* the missing pistol has been logged */
+	boolean no_pistol_logged;
 } one_in_the_chamber;
 
 void one_in_the_chamber_round_for_kill(
@@ -63,8 +65,18 @@ void one_in_the_chamber_postspawn(
 	struct weapon_datum *weapon;
 	long weapon_index;
 
-	if (!unit || definition_index == NONE)
+	if (!unit)
 		return;
+	if (definition_index == NONE)
+	{
+		/* (logged once: the loadouts have no pistol to give) */
+		if (!one_in_the_chamber.no_pistol_logged)
+		{
+			one_in_the_chamber.no_pistol_logged = TRUE;
+			platform_log("one in the chamber: no pistol in this map's loadouts, players spawn unarmed");
+		}
+		return;
+	}
 	one_in_the_chamber.equipping = TRUE;
 	game_modes_delete_weapons(player_get(player_index)->unit_index);
 	object_placement_data_new(&placement, definition_index, NONE);

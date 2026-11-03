@@ -292,8 +292,8 @@ struct game_variant_options
 	of their own team (game_engine_get_starting_location_rating). Taken from
 	reserved, which older builds zero and ignore: the host alone picks spawns */
 	boolean force_team_spawns;
-	/* (reserved[0], at 0x27, is used by a downstream build: keep it free,
-	and take new options from the end of reserved) */
+	/* port: reserved[0], at 0x27, is used by a downstream build: keep it
+	free, and take new options from the end of reserved */
 	byte reserved[3];
 	/* port: One in the Chamber: whether a kill sets the killer's pistol back
 	to one round (else it adds one); Frag Nation: whether the map's grenades
