@@ -290,7 +290,7 @@ signature as `listing_signed` does.
 | | 1 + up to 32 | The game's name: a length byte, then that many bytes |
 | | 1 + up to 32 | The map's name |
 | | 1 + up to 24 | The gametype's name |
-| | 8 | The stamp: the game's kind (`game_modes_kind`: the OpenCE mode, 1 SWAT, 2 Infection, 3 Gun Game, or 0; with 0x80 for Hardcore), then 7 reserved bytes, zero |
+| | 8 | The stamp: the game's kind (`game_modes_kind`: the OpenCE mode, 1 SWAT, 2 Infection, 3 Gun Game, 4 One in the Chamber, 5 Frag Nation, 6 Snowball Fight, or 0; with 0x80 for Hardcore), then 7 reserved bytes, zero |
 | | 64 | The Ed25519 signature, by the listing's key, of the 12 ASCII bytes `hceu-lobby-1` followed by every byte before the signature |
 
 | Flag | Meaning |
