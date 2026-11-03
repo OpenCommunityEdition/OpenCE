@@ -667,10 +667,10 @@ int main(void)
     campaign_tag=1;check("a10",1,1);check("custom_maps\\a10",1,1);
     campaign_tag=0;multiplayer_tag=1;check("bloodgulch",1,0);
     pc=0;check("bloodgulch",0,0);check("ui",0,0);pc=1;
-    /* The optional frontend permits ui.map's PC definitions even when
-       the unchanged pause policy is Xbox. It never admits gameplay. */
-    frontend=1;pc=0;check("ui",1,0);check("bloodgulch",0,0);
-    campaign_tag=1;check("a10",0,0);check("custom_maps\\a10",0,0);pc=1;
+    /* The latched frontend now supplies Settings during gameplay too.
+       Map-family pause roots and the MCC admission guard still own access. */
+    frontend=1;pc=0;check("ui",1,0);check("bloodgulch",1,0);
+    campaign_tag=1;check("a10",1,1);check("custom_maps\\a10",1,1);pc=1;
     /* MCC owns its campaign widgets, but requests native Settings with
        either main-menu style, without the native campaign widget patch. */
     mcc=1;campaign_tag=1;multiplayer_tag=0;
