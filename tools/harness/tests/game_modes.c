@@ -25,6 +25,8 @@ static struct { byte levels[8]; short level_count; } gun_game;
 static struct game_variant_options const *game_variant_options_get(void){return &options;}
 static long game_engine_loadout_weapon_definition(byte weapon){return map_has[weapon]?100+weapon:NONE;}
 static boolean network_game_distributed_client(void){return client;}
+static boolean engine_running=TRUE;
+static boolean game_engine_running(void){return engine_running;}
 /* (the draw: the first of the range each time, so each weapon from the last
 swaps with the first) */
 static short local_random_range(short lower,short upper){draws++;(void)upper;return lower;}
@@ -101,6 +103,7 @@ int main(int argc,char **argv)
    "a countdown, zombies' shields, melee demotes");
   CHECK(options.time_limit==(short)0xAAAA,"the game type's own options left alone");
   CHECK(!options.chamber_kill_resets&&!options.frag_nation_no_map_grenades,"a kill adds a round, the map's grenades on");
+  CHECK(!options.bottomless,"weapons run dry, as the game type has them");
   for(int index=0;index<(int)sizeof(options.reserved);index++) CHECK(options.reserved[index]==0,"reserved cleared");
   game_modes_options_sanitize(&options);
   CHECK(options.infection_countdown==10&&options.infection_zombie_speed==150,"the defaults are in range");
@@ -141,15 +144,17 @@ int main(int argc,char **argv)
    options.infection_respawn_time==5&&options.infection_countdown==10,"out of range: the defaults");
   CHECK(options.gun_game_order==_gun_game_order_strongest_first,"an unknown order");
   CHECK(!options.chamber_kill_resets&&!options.frag_nation_no_map_grenades,"the bytes taken from reserved: unknown is off");
+  CHECK(!options.bottomless,"Bottomless: unknown is off");
   for(int index=0;index<(int)sizeof(options.reserved);index++) CHECK(options.reserved[index]==0,"reserved cleared");
  } else CASE("sanitize_keeps") {
   memset(&options,0,sizeof(options));
   options.mode=_game_mode_infection;options.infection_initial_zombies=16;options.infection_zombie_speed=200;
   options.infection_skull_damage=100;options.infection_respawn_time=30;options.infection_countdown=30;
   options.gun_game_order=_gun_game_order_random;
-  options.chamber_kill_resets=TRUE;options.frag_nation_no_map_grenades=TRUE;
+  options.chamber_kill_resets=TRUE;options.frag_nation_no_map_grenades=TRUE;options.bottomless=TRUE;
   game_modes_options_sanitize(&options);
-  CHECK(options.chamber_kill_resets==TRUE&&options.frag_nation_no_map_grenades==TRUE,"the new options kept");
+  CHECK(options.chamber_kill_resets==TRUE&&options.frag_nation_no_map_grenades==TRUE&&options.bottomless==TRUE,
+   "the new options kept");
   CHECK(options.mode==_game_mode_infection&&options.infection_initial_zombies==16&&options.infection_zombie_speed==200&&
    options.infection_skull_damage==100&&options.infection_respawn_time==30&&options.infection_countdown==30&&
    options.gun_game_order==_gun_game_order_random,"values in range are kept");
@@ -308,6 +313,23 @@ int main(int argc,char **argv)
   CHECK(!game_modes_hit_kills(1,9,TRUE),"a client's copy: the host decides");
   client=FALSE;mode=_game_mode_swat;
   CHECK(!game_modes_hit_kills(1,9,TRUE),"One in the Chamber only");
+ } else CASE("bottomless") {
+  memset(&options,0,sizeof(options));
+  client=FALSE;engine_running=TRUE;
+  CHECK(!game_modes_bottomless(),"off: weapons run dry");
+  options.bottomless=TRUE;
+  CHECK(game_modes_bottomless(),"on: the host's weapons never do");
+  mode=_game_mode_swat;
+  CHECK(game_modes_bottomless(),"with a mode: an option of any gametype");
+  mode=_game_mode_none;
+  client=TRUE;
+  CHECK(!game_modes_bottomless(),"a client does not refill: its ammunition is the host's");
+  client=FALSE;engine_running=FALSE;
+  CHECK(!game_modes_bottomless(),"no game running (the campaign's weapons)");
+  engine_running=TRUE;
+  options.bottomless=2;
+  game_modes_options_sanitize(&options);
+  CHECK(!game_modes_bottomless(),"an unknown value, sanitized, is off");
  } else CASE("map_grenades") {
   memset(&options,0,sizeof(options));
   mode=_game_mode_none;

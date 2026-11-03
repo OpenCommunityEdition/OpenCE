@@ -1,7 +1,8 @@
 /* game_modes.h: OpenCE's gametypes (port/linux/game/game_modes.c)
 
 SWAT, Infection, Gun Game, One in the Chamber, Frag Nation and Snowball Fight
-are modes of Slayer, and Hardcore is a set of rules over any game engine's: a gametype's PC options (game_engine.h's struct
+are modes of Slayer, and Hardcore and Bottomless are sets of rules over any
+game engine's: a gametype's PC options (game_engine.h's struct
 game_variant_options, from mode on) say which, so a saved gametype, the
 network game and the game all carry them. The built-in ones are written with
 the Xbox's default gametypes (playlist_profile.c), after them, and the
@@ -98,6 +99,11 @@ boolean game_modes_hit_kills(long owner_player_index, long object_index, boolean
 /* the map's grenades are not placed (One in the Chamber, Snowball Fight,
 and Frag Nation's option: game_engine_remap_equipment) */
 boolean game_modes_map_grenades_off(void);
+/* the host's weapons never run dry: their magazines are refilled as they
+empty, and their batteries do not drain (Bottomless, an option of any game
+engine: weapons.c's weapon_trigger_fire). FALSE on a client, whose weapons
+are the host's state */
+boolean game_modes_bottomless(void);
 /* the motion sensor is not drawn (Hardcore) */
 boolean game_modes_motion_sensor_hidden(void);
 /* no aim assist: neither autoaim nor magnetism (Hardcore) */

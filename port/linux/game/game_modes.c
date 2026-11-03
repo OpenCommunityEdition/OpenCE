@@ -283,6 +283,7 @@ void game_modes_options_default(
 	options->gun_game_melee_demotes = TRUE;
 	options->chamber_kill_resets = FALSE;
 	options->frag_nation_no_map_grenades = FALSE;
+	options->bottomless = FALSE;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 
@@ -320,6 +321,7 @@ void game_modes_options_sanitize(
 	/* (taken from reserved: a value but 1 reads as off) */
 	options->chamber_kill_resets = options->chamber_kill_resets == TRUE;
 	options->frag_nation_no_map_grenades = options->frag_nation_no_map_grenades == TRUE;
+	options->bottomless = options->bottomless == TRUE;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 
@@ -612,6 +614,14 @@ boolean game_modes_map_grenades_off(
 		return game_variant_options_get()->frag_nation_no_map_grenades;
 	}
 	return FALSE;
+}
+
+boolean game_modes_bottomless(
+	void)
+{
+	/* (the host's, and a local game's: a client's weapons are the host's
+	state, which it takes with the player's inventory) */
+	return !network_game_distributed_client() && game_engine_running() && game_variant_options_get()->bottomless;
 }
 
 boolean game_modes_motion_sensor_hidden(

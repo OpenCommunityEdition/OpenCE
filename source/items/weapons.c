@@ -221,6 +221,7 @@ symbols in this file:
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "infection.h" /* port: port/linux/game/infection.c */
+#include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "game/players.h"
 #include "game/aim_assist.h" /* port: the reticle's read-only shot direction */
 #include "interface/first_person_weapons.h"
@@ -2683,6 +2684,13 @@ static void weapon_trigger_fire(
 		struct weapon_magazine_definition *magazine_definition= magazine ?
 			TAG_BLOCK_GET_ELEMENT(&weapon_definition->weapon.magazines, trigger_definition->magazine_index, struct weapon_magazine_definition) : NULL;
 
+		/* port: Bottomless (the host's, game_modes.c): the magazine is full
+		before the shot, and again after it */
+		if (magazine && magazine_definition && game_modes_bottomless())
+		{
+			magazine->rounds_loaded= magazine_definition->rounds_loaded_maximum;
+		}
+
 		if (magazine &&
 			(!loads_alternate_ammunition || weapon->weapon.alternate_shots_loaded<weapon_definition->weapon.maximum_alternate_shots_loaded))
 		{
@@ -2698,6 +2706,12 @@ static void weapon_trigger_fire(
 				{
 					magazine->state= _magazine_unchambered;
 					magazine->state_timer= 0;
+				}
+
+				if (game_modes_bottomless())
+				{
+					/* port: Bottomless, as above */
+					magazine->rounds_loaded= magazine_definition->rounds_loaded_maximum;
 				}
 
 				fired= TRUE;
@@ -2847,7 +2861,8 @@ static void weapon_trigger_fire(
 			weapon->weapon.heat= 1.0f;
 		}
 
-		if (TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && !cheat.infinite_ammo)
+		/* port: nor does Bottomless drain a battery (the host's, game_modes.c) */
+		if (TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && !cheat.infinite_ammo && !game_modes_bottomless())
 		{
 			weapon->weapon.age+= trigger_definition->age_generated_per_round;
 			if (weapon->weapon.age>1.0f)
