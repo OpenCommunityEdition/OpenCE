@@ -2,10 +2,10 @@
 GUEST_HOST.H
 
 The host services the guest imports (the guest's view; the host defines
-them in port/android/host). Every name here must also be listed in
-port/android/host_imports.list, which generates the import stubs.
+them in the Android host port). Every name here must also be listed in
+port/guest/host_imports.list, which generates the import stubs.
 
-Parameter types follow the rules in halo_android_abi.h: 32-bit values are
+Parameter types follow the rules in halo_guest_abi.h: 32-bit values are
 int or unsigned int, 64-bit values long long, and pointers are passed as
 they are.
 */
@@ -121,10 +121,10 @@ void host_gl_wait_frame(unsigned int slot);
 /* ---------- Android */
 
 /* SoC classification for the immutable rendering policy. */
-int host_android_chip_family(void);
+int host_chip_family(void);
 
 /* the storage directories the port uses, copied into buffer */
-void host_android_path(int which, char *buffer, unsigned int size);
+void host_storage_path(int which, char *buffer, unsigned int size);
 
 /* the edges where Android keeps its gestures, as left, top, right, bottom
 in pixels of the current orientation, into insets[4]; all 0 when unknown */

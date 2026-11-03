@@ -70,6 +70,7 @@ from .ninja_syntax import Writer
 PORT_DIR = Path("port/web")
 LINUX_DIR = Path("port/linux")
 ANDROID_DIR = Path("port/android")
+GUEST_DIR = Path("port/guest")
 PORT_CONFIG = LINUX_DIR / "port.json"
 SDL_PORT = PORT_DIR / "halo_sdl3.py"
 # (the release port/web/halo_sdl3.py fetches, as the other builds')
@@ -257,7 +258,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         if name == "source/main/main.c":
             cflags += " " + updater_defines(release)
         if name in VARIADIC_PROTOTYPE_FILES:
-            cflags += f" -include {ANDROID_DIR}/include/halo_android_variadic_prototypes.h"
+            cflags += f" -include {GUEST_DIR}/include/halo_guest_variadic_prototypes.h"
         if name in PROTOTYPE_FILES:
             cflags += f" -include {PROTOTYPE_FILES[name]}"
         if name == "source/shell/shell_xbox.c":

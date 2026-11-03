@@ -150,7 +150,7 @@ physical/virtual arithmetic the game and Direct3D rely on keeps working. */
 #define PLATFORM_CONTIGUOUS_BASE 0x80000000UL
 #if defined(HALO_ARM64_GUEST) || defined(HALO_WEB)
 /* 128 MB, a development kit's: Android's guest image is linked just above
-the window (port/android/include/halo_android_abi.h), and the web build's
+the window (port/guest/include/halo_guest_abi.h), and the web build's
 WebAssembly memory ends with it (tools/web_build.py) */
 #define PLATFORM_CONTIGUOUS_SIZE 0x08000000UL
 #else

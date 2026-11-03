@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
-from tools import ninja_syntax, web_build  # noqa: E402
+from tools import ninja_syntax, web_build
 
 
 @pytest.fixture(autouse=True)
@@ -46,13 +46,13 @@ def graph(release=False, emcc="/opt/emsdk/upstream/emscripten/emcc"):
 def compile_flags(text, source):
     """the cflags of the unit compiled from source"""
     match = re.search(r"^build [^\n]*: web_cc " + re.escape(source.replace(" ", "$ ")) + r"[ \n].*?\n  cflags = ([^\n]*)",
-                      text, re.M | re.S)
+                      text, re.MULTILINE | re.DOTALL)
     assert match, f"{source} is not compiled"
     return match.group(1)
 
 
 def link_flags(text):
-    return re.search(r"^build build/web/site/halo\.js.*?\n  ldflags = ([^\n]*)", text, re.M | re.S).group(1)
+    return re.search(r"^build build/web/site/halo\.js.*?\n  ldflags = ([^\n]*)", text, re.MULTILINE | re.DOTALL).group(1)
 
 
 def test_without_emscripten_the_graph_says_so():
@@ -80,7 +80,7 @@ def test_the_game_is_compiled_as_the_web_port():
     assert "-flto" not in text
     assert "-DHALO_RELEASE" not in flags
     assert "-Dmain=halo_game_main" in compile_flags(text, "source/shell/shell_xbox.c")
-    assert "halo_android_variadic_prototypes.h" in compile_flags(text, "source/hs/hs.c")
+    assert "halo_guest_variadic_prototypes.h" in compile_flags(text, "source/hs/hs.c")
     assert "-include time.h" in compile_flags(text, "source/bungie_net/common/random_numbers.c")
 
 
@@ -128,7 +128,7 @@ def test_the_memory_layout_agrees_with_the_sources():
     platform = (ROOT / "port/linux/src/platform.h").read_text()
     base = int(re.search(r"#define PLATFORM_CONTIGUOUS_BASE (0x[0-9A-Fa-f]+)", platform).group(1), 16)
     sizes = re.search(r"#if defined\(HALO_ARM64_GUEST\) \|\| defined\(HALO_WEB\).*?#define PLATFORM_CONTIGUOUS_SIZE "
-                      r"(0x[0-9A-Fa-f]+)", platform, re.S)
+                      r"(0x[0-9A-Fa-f]+)", platform, re.DOTALL)
     assert sizes, "platform.h gives the web build the 128 MB window"
     assert web_build.WEB_MEMORY_BYTES == base + int(sizes.group(1), 16)
     main = (ROOT / "port/web/src/web_main.c").read_text()
@@ -139,7 +139,7 @@ def test_the_memory_layout_agrees_with_the_sources():
 
 def test_the_site_holds_the_page_its_fonts_licences_and_version():
     text = graph()
-    phony = re.search(r"^build web: phony ([^\n]*)", text, re.M).group(1)
+    phony = re.search(r"^build web: phony ([^\n]*)", text, re.MULTILINE).group(1)
     outputs = set(phony.split())
     for name in ("halo.js", "halo.wasm", "version.json", "licenses.txt", "fonts/OpenCE-Regular.ttf",
                  "fonts/Overpass-750.ttf", "fonts/Overpass-900.ttf"):

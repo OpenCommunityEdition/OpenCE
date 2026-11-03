@@ -79,7 +79,7 @@ int host_errno(void)
 static char data_root[512];
 static char save_root[512];
 
-/* fills the two roots host_android_path copies from; called by the Linux
+/* fills the two roots host_storage_path copies from; called by the Linux
 main before the guest starts */
 void host_linux_set_paths(const char *data, const char *save)
 {
@@ -87,14 +87,14 @@ void host_linux_set_paths(const char *data, const char *save)
 	snprintf(save_root, sizeof(save_root), "%s", save);
 }
 
-void host_android_path(int which, char *buffer, uint32_t size)
+void host_storage_path(int which, char *buffer, uint32_t size)
 {
 	snprintf(buffer, size, "%s", which ? save_root : data_root);
 }
 
 /* 0 = unknown; the Linux host has no SoC to classify, and unknown
-hardware keeps both compatibility paths (see android_render_policy.h) */
-int host_android_chip_family(void)
+hardware keeps both compatibility paths (see halo_render_policy.h) */
+int host_chip_family(void)
 {
 	return 0;
 }

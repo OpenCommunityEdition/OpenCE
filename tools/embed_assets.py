@@ -21,7 +21,7 @@ android_build.py), so the assets are the committed source and Android needs
 no files beside its guest image.
 
 The data are 32-bit words, not bytes: the Android build passes the guest's
-assembly through tools/android_asm_convert.py, which rewrites identifiers in
+assembly through tools/guest_asm_convert.py, which rewrites identifiers in
 operands (it keeps .ascii strings as they are, but once garbled them).
 """
 
@@ -29,7 +29,7 @@ import json
 import struct
 import sys
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 HUD_ASSETS = Path("port/assets/hud")
@@ -59,7 +59,7 @@ MENU_CURSOR = Path("port/assets/cursor/menu_cursor.png")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
-def font_files() -> List[str]:
+def font_files() -> list[str]:
     """The font files fonts.json uses, each once."""
     if not (ROOT / FONT_LIST).is_file():
         return []
@@ -67,7 +67,7 @@ def font_files() -> List[str]:
     return sorted({font["file"] for font in fonts})
 
 
-def textures() -> List[tuple]:
+def textures() -> list[tuple]:
     """The textures: each one's folder, its entry in its list, and whether
     it is the menus' (a title or a button icon, drawn with the high-res
     text)."""
@@ -80,19 +80,19 @@ def textures() -> List[tuple]:
     return result
 
 
-def menu_files() -> List[str]:
+def menu_files() -> list[str]:
     """The menus' files menus.json lists, relative to their folder."""
     if not (ROOT / MENU_LIST).is_file():
         return []
     return json.loads((ROOT / MENU_LIST).read_text())["files"]
 
 
-def smaa_files() -> List[tuple]:
+def smaa_files() -> list[tuple]:
     """SMAA's files that the checkout has, with their symbols."""
     return [(name, symbol) for name, symbol in SMAA_FILES if (ROOT / SMAA_ASSETS / name).is_file()]
 
 
-def hud_asset_inputs() -> List[Path]:
+def hud_asset_inputs() -> list[Path]:
     """The files the generated source is made from."""
     inputs = [listing for listing in (LAYOUT, CE_LAYOUT, CE_STOCK, CUSTOM_EDITION_HUD, TITLE_LIST, BUTTON_LIST, CONTROLLER_LIST, FONT_LIST, MENU_LIST)
               if (ROOT / listing).is_file()]
@@ -103,7 +103,7 @@ def hud_asset_inputs() -> List[Path]:
             *([MENU_CURSOR] if (ROOT / MENU_CURSOR).is_file() else [])]
 
 
-def hud_configure_inputs() -> List[Path]:
+def hud_configure_inputs() -> list[Path]:
     """What configure.py is run again for: the lists of assets (and the
     folders, for files added or removed), not each file, which a change of a
     list may rename or remove."""
@@ -118,7 +118,7 @@ def hud_configure_inputs() -> List[Path]:
     return inputs
 
 
-def words(data: bytes) -> List[str]:
+def words(data: bytes) -> list[str]:
     """data as lines of 32-bit words (padded with zeros)."""
     padded = data + b"\0" * (-len(data) % 4)
     values = struct.unpack(f"<{len(padded) // 4}I", padded)
@@ -126,7 +126,7 @@ def words(data: bytes) -> List[str]:
             for start in range(0, len(values), 8)]
 
 
-def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
+def hud_assets_build(n: Any, prefix: str, output: Path) -> list[Path]:
     """Emits the rule that generates output; returns [output]. It is made
     whatever assets the checkout has (with none, its tables are empty), so
     that the symbols the platform layer refers to are always defined."""
@@ -140,7 +140,7 @@ def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
     return [output]
 
 
-def server_ui_build(n: Any, prefix: str, output: Path) -> List[Path]:
+def server_ui_build(n: Any, prefix: str, output: Path) -> list[Path]:
     """Emits the rule that generates a dedicated server's admin page as C
     (tools/server_ui_embed.py, port/assets/server_ui); returns [output]"""
     ui = Path("port/assets/server_ui")

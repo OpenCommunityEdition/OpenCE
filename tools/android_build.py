@@ -6,9 +6,9 @@ ordinary 64-bit Android app. This graph builds
 
 - the guest image, build/android/halo_guest.elf: the game sources, the
   platform layer shared with the Linux port (port/linux/src) and the guest
-  runtime (port/android/guest) with a subset of musl as its C library, all
+  runtime (port/guest) with a subset of musl as its C library, all
   compiled by clang for arm64_32-apple-watchos, converted to ELF assembly
-  (tools/android_asm_convert.py), assembled for AArch64 and linked at a fixed
+  (tools/guest_asm_convert.py), assembled for AArch64 and linked at a fixed
   address below 4 GB;
 - the host library, build/android/jniLibs/arm64-v8a/libmain.so, with the
   Android NDK: the loader and the services the guest calls, over SDL3;
@@ -37,6 +37,7 @@ from .linux_build import MINIUPNPC_DEFINES, MINIUPNPC_DIR, miniupnpc_sources
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
+GUEST_DIR = Path("port/guest")
 LINUX_DIR = Path("port/linux")
 BUILD = Path("build/android")
 THIRD_PARTY = BUILD / "third_party"
@@ -95,7 +96,7 @@ def fetch_third_party() -> None:
 
 
 def android_configure_inputs() -> list[Path]:
-    return [Path(__file__), SDL_ANDROID_MOUSE_PATCH, PORT_DIR / "guest" / "runtime", PORT_DIR / "host",
+    return [Path(__file__), SDL_ANDROID_MOUSE_PATCH, GUEST_DIR / "runtime", PORT_DIR / "host",
             LINUX_DIR / "src", *hud_configure_inputs()]
 
 
@@ -145,7 +146,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     target = GuestTarget(
         name="android",
         label="ANDROID",
-        port_dir=PORT_DIR,
+        port_dir=GUEST_DIR,
         build=BUILD,
         third_party=THIRD_PARTY,
         musl_dir=MUSL_DIR,
@@ -156,7 +157,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         ld="$android_ndk_bin/ld.lld",
         libgcc="$$($android_host_cc -print-libgcc-file-name)",
         asm_triple="aarch64-linux-android",
-        host_imports_list=PORT_DIR / "host_imports.list",
+        host_imports_list=GUEST_DIR / "host_imports.list",
         host_table_c=BUILD / "host" / "host_import_table.c",
     )
     image, host_table_c = generate_guest(n, sln, config, target)
@@ -198,7 +199,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     )
     host_cflags = " ".join([
         "-O2", "-g", "-fPIC", "-Wall", "-Wno-unused-function", "-D_GNU_SOURCE",
-        f"-I{PORT_DIR}/include", f"-I{PORT_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
+        f"-I{GUEST_DIR}/include", f"-I{PORT_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
         f"-I{TOML_DIR}",
     ])
     host_sources = [*sorted((PORT_DIR / "host").glob("*.c")),

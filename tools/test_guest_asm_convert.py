@@ -1,5 +1,5 @@
 """The Darwin to ELF assembly conversion of the ILP32 guest
-(tools/android_asm_convert.py): string literals keep every byte. It once took
+(tools/guest_asm_convert.py): string literals keep every byte. It once took
 a quoted .ascii operand for a quoted symbol name and dropped its leading "_"
 (and, after an escaped quote, the "_" of any word after it), which shifted
 tables such as Opus's pulse cache by a byte: voice chat crashed in
@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from tools.android_asm_convert import Converter
+from tools.guest_asm_convert import Converter
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -74,7 +74,7 @@ def test_tables_survive_the_build(tmp_path):
                        check=True, capture_output=True)
     except subprocess.CalledProcessError:
         pytest.skip("clang has no arm64_32 target")
-    subprocess.run([sys.executable, str(ROOT / "tools" / "android_asm_convert.py"), str(darwin), str(converted)],
+    subprocess.run([sys.executable, str(ROOT / "tools" / "guest_asm_convert.py"), str(darwin), str(converted)],
                    check=True)
     subprocess.run([clang, "--target=aarch64-linux-gnu", "-c", str(converted), "-o", str(obj)], check=True)
     data = rodata(obj.read_bytes())
@@ -128,7 +128,7 @@ def test_compiled_conversions_are_replaced(tmp_path):
         pytest.skip("clang has no arm64_32 target")
     if not SCALAR_FROM_SIMD.search(darwin.read_text()):
         pytest.skip("this clang converts in general registers")
-    subprocess.run([sys.executable, str(ROOT / "tools" / "android_asm_convert.py"), str(darwin), str(converted)],
+    subprocess.run([sys.executable, str(ROOT / "tools" / "guest_asm_convert.py"), str(darwin), str(converted)],
                    check=True)
     text = converted.read_text()
     assert not SCALAR_FROM_SIMD.search(text)
