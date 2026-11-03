@@ -62,9 +62,34 @@ than 64 MB, or one of another name; if it has places but no add-on; or if a
 place has a key the game does not have, names both a vehicle and a weapon, or
 lacks its map, its vehicle or weapon, or its position. A stock mutator has
 no add-on. A map with no places is given the add-on's tags but none of its
-vehicles or weapons.
+vehicles or weapons, but for a vehicle placed by itself (below).
 
 ### Vehicles
+
+A vehicle needs no `[[place]]`. On a multiplayer map with none for it, it is
+placed beside the map's own vehicles:
+
+1. A flown vehicle (a human plane or an alien fighter) goes beside the map's
+   flown ones, any other beside the map's driven ones, or beside the other kind
+   if the map has none of its own. Turrets are never used.
+2. It takes the first such vehicle and, if there is one 20 world units or more
+   away, the furthest: so a map of two bases has one at each.
+3. It looks around that vehicle at up to four distances in eight directions,
+   then around the map's other vehicles, nearest first (its own kind, then the
+   others). A spot must have level ground, clear height, the vehicle in sight,
+   and room among the level and the game's other objects, by their collision
+   models. These vehicles are made after those objects for that reason.
+4. If no spot will do it is not placed, and `debug.txt` says so.
+
+`debug.txt` says where each went:
+
+```
+add-ons: 'vehicles\falcon\falcon' placed beside 'halo3\vehicles\banshee\banshee_mp', at (-60.500, 32.223, -2.132)
+```
+
+A `[[place]]` for the map is used instead, and its vehicle is then not placed by
+itself there. A campaign map is given only the places that name it. The vehicle
+set still decides whether a vehicle placed by itself is made (below).
 
 A vehicle is placed as the scenario's first vehicle is (its permutation, the
 bsps it is on) where its place says, and added to the scenario's vehicle
@@ -122,8 +147,14 @@ build/linux/addon_build --map <custom_maps>/bigass_open_v1.1.map --maps <custom_
 - `--vehicle` or `--weapon` is its tag. Every tag it names, and every tag
   those name, is the add-on's, unless every map given by `--stock` (an Xbox
   map, each of the multiplayer maps the add-on is for) has a tag of its group
-  and name: then the add-on names the map's own, an import. A map that lacks
-  an import cannot be given the add-on.
+  and name: then the add-on names the map's own, an import, and carries none
+  of its data. A Custom Edition map that lacks an import is given it from the
+  player's own stock maps (below); so an add-on holds no retail data, and needs
+  `--stock` for what is the stock maps' to be left out of it.
+- `--also group:name` (up to 8) takes another tag of the map's, and every tag it
+  names, into the add-on as well: what a mutator's script makes and shows
+  (`model.create`), such as the grappling hook's hook (`proj:...`) and rope
+  (`weap:...`) beside its gun. They are placed nowhere themselves.
 - `--riders` (a vehicle's) is the animation graph, in the map, of the bipeds
   that ride it. Each seat label of the vehicle's seats is written from it,
   its animations by name.
@@ -182,6 +213,8 @@ is read:
    (`tag_validate_addon_tags`), apart from the map's: the map's own checks,
    and those of its structure bsps as they load, are as they were.
 3. Each import must be a tag of the map's (a gbxmodel's import is a model).
+   On a Custom Edition map, those it lacks are added first from a stock map:
+   see "Stock tags" in [mutators.md](mutators.md).
 4. The add-on's tags join the map's table after its own, in the order of
    the mutators on, so every machine with the same add-ons gives them the
    same indices. A tag of the add-on's whose group and name the map has is
@@ -210,27 +243,70 @@ An add-on that fails any of these is not added, and `debug.txt` says why.
 All of it is taken back before the map's tags go. The main menu's map is
 given none.
 
+A place's `map` is the map's file's name, on a Custom Edition map as on a stock
+one. A Custom Edition map's own bitmaps keep following its own Halo PC
+behaviours, not those an add-on records.
+
 `debug.network_test_vehicle` seats the player in an add-on's vehicle when
 there is one, and the network test logs each add-on vehicle's position,
 speed and riders every second.
 
 ## Network games
 
-Network version 43. Each machine adds the add-ons of its own mutators that
-are on; the host does not send its add-ons yet, so every machine of a game
-must have the same add-ons on (the same files: the builder makes the same
-bytes from the same map). A client without them plays a map without the
-host's vehicles: what it sees of them, and of the players in them, is not
-the host's.
+Network version 45. The host sends its add-ons to its clients, who play them in the
+host's order, so every machine gives their tags the same indices
+([mutators.md](mutators.md), "Network games"). A client that has turned that off
+(`network.mutator_download`) plays a map without them: what it sees of them, and of
+the players in them, is not the host's.
 
 ## What is not done yet
 
-- The host sending its add-ons to its clients, as it sends a map.
 - Importing a mutator from a file or a catalog in the game.
-- Custom Edition maps are given no add-ons; the web build finds only the
-  stock mutators.
+- The web build finds only the stock mutators.
 - A bitmap that Halo PC draws linear whose rows are not whole steps of the
   pitch is not drawn. The Halo PC behaviours a map relies on (Chimera's map
   list) are its own: an add-on taken from one does not bring them.
 - Making an add-on from tag files (with Invader building a map of the
   vehicle alone, which the builder reads as it reads any).
+
+## Planned: more grenade types
+
+Not built, and not to be started without deciding to: a mutator cannot add a
+grenade type today. The Bubble Shield of Mercury Rising (`a10.map`, cache version
+13) is what asked for it: there a grenade type of a four-slot `globals`, which
+throws a projectile whose effect makes the dome, a weapon object with collision of
+its own. This game has two types.
+
+Extra types must never change what an existing save or map holds, so:
+
+- `NUMBER_OF_UNIT_GRENADE_TYPES` stays 2. A saved game is a dump of the game state
+  (`source/saved games/game_state.c`), so a larger `unit_datum` would shift what
+  every old save holds, and a new game state allocation would change the
+  allocation checksum, which refuses them all.
+- The maps' files, the tags' layouts and a map's `globals` grenades block stay as
+  they are. The types are a list of the mutators', outside the tags' table of
+  grenades.
+- Each unit's counts of them, and which is chosen, are in a table outside the game
+  state. `current_grenade_index` stays 0 or 1, so that a save never holds a value
+  older code cannot read.
+- The game asks that table where it switches, throws, picks up, drops on death and
+  draws the HUD: with no extra types, each returns at once and the game goes on as
+  it does now. If one of these cannot be intercepted so narrowly, the plan stops
+  there; the saved data is not touched instead.
+- The table is saved in a file beside a save, only with such a mutator on. A save
+  without that file gives the players none.
+- The network sends the table in a message of its own, which raises
+  `HALO_PORT_NETWORK_VERSION`.
+
+A save made with add-ons on can hold their objects, by tag index, so it should be
+marked: `game_state_header`'s `unused[7]` (zeros in every existing save) can hold a
+version, the add-ons' count and a shortened hash of their SHA-256s in load order,
+written as the game saves. An unmarked save loads as it does today; a marked one
+loads only with the same add-ons in the same order, and is otherwise refused with a
+message (their names from the file beside it). Older builds ignore the mark. Check
+when building it that the header's checksum takes those bytes without troubling old
+saves.
+
+The builder would also need to read cache version 13 (tags at 0x50000000, otherwise
+laid out much as Custom Edition's), and a kind of add-on for a grenade type. Players
+would start each life with one, as the mutator's file says.

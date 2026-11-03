@@ -1,22 +1,23 @@
 /*
 MUTATORS.C
 
-The mutators a game plays: effects built into the game that change its
-rules (a big head on every biped), each turned on by a mutator and set by
-its parameters. A mutator is only data: a mutator.toml naming the effects
-it turns on and their parameters' values (port/linux/src/port_mutators.c,
-docs/mutators.md). It runs nothing of its own, and a key or value this
-build does not have is refused, so a mutator can do no more than the
-effects built in here.
+The mutators a game plays: its tag edits and poses (mutator_tags.c,
+object_pose.c), its add-ons' objects (addons.c) and its scripts
+(mutator_scripts.c), each from a mutator's files (port/linux/src/port_mutators.c,
+docs/mutators.md). The game has no rules of a mutator's built in: a mutator is
+data, and what it changes is general (a node of a model scaled, a field of a
+tag set), so that players make mutators of their own with no change to the
+game. A key or value this build does not have is refused.
 
 The host, and a game of one machine, plays the mutators turned on when its
 map loads; a client plays the host's (network_mutators.c), never its own,
 so that every machine of a network game plays the same rules. A client
 plays none until the host's come with the host's first answer to it.
 
-Each effect's key is its name ("big_head"), and each parameter's is that
-and its own ("big_head.scale"): names, not numbers, so that builds of other
-forks which add effects of their own never take one for another.
+The host's keys name its scripts ("script." and the first digits of its
+mutator's digest), which each machine runs from its own copy. A key is a name,
+not a number, so that builds of other forks which add keys of their own never
+take one for another; one this build does not have is passed over and said.
 */
 
 #include "cseries.h"
@@ -28,44 +29,26 @@ forks which add effects of their own never take one for another.
 #include "scenario/scenario_definitions.h"
 
 #include "mutators.h"
+#include "mutator_scripts.h"
 
 #include <stdio.h>
 #include <string.h>
 
 /* ---------- constants */
 
-/* the most parameters a mutator.toml lists (port_mutators.c's, which
-declares it for itself) */
+/* the most keys port_mutators.c gives (port_mutators.c's, which declares it
+for itself) */
 #define MAXIMUM_PORT_MUTATOR_KEYS 64
 
-/* ---------- structures */
-
-struct mutator_parameter_definition
-{
-	short effect;
-	char const *name;
-	real minimum;
-	real maximum;
-	real default_value;
-};
+/* a script's key: this, and the first digits of its mutator's digest */
+#define MUTATOR_SCRIPT_KEY_PREFIX "script."
 
 /* ---------- globals */
 
-static char const *const mutator_effect_names[NUMBER_OF_MUTATOR_EFFECTS] =
-{
-	"big_head",
-};
-
-static struct mutator_parameter_definition const mutator_parameter_definitions[NUMBER_OF_MUTATOR_PARAMETERS] =
-{
-	/* how many times its size a biped's head is drawn and hit */
-	{ _mutator_effect_big_head, "scale", 1.f, 4.f, 2.5f },
-};
-
 static struct
 {
-	boolean effects[NUMBER_OF_MUTATOR_EFFECTS];
-	real parameters[NUMBER_OF_MUTATOR_PARAMETERS];
+	/* the scripts played (mutator_scripts.c runs them) */
+	short script_count;
 	/* the tag edits played (mutator_tags.c) */
 	byte tag_edits[MAXIMUM_MUTATOR_TAG_EDIT_BYTES];
 	long tag_edit_size;
@@ -78,43 +61,9 @@ long port_mutators_tag_edits(unsigned char *edits, long maximum);
 
 /* ---------- private code */
 
-static void mutators_clear(void)
+static boolean mutators_script_key(char const *key)
 {
-	short index;
-
-	csmemset(mutators_globals.effects, 0, sizeof(mutators_globals.effects));
-	for (index = 0; index < NUMBER_OF_MUTATOR_PARAMETERS; index++)
-		mutators_globals.parameters[index] = mutator_parameter_definitions[index].default_value;
-}
-
-/* the effect `key` names ("big_head"), or NONE; *parameter its parameter
-("big_head.scale"), or NONE for the effect's own key */
-static short mutators_key_find(char const *key, short *parameter)
-{
-	char const *dot = strchr(key, '.');
-	size_t length = dot ? (size_t)(dot - key) : strlen(key);
-	short effect;
-	short index;
-
-	*parameter = NONE;
-	for (effect = 0; effect < NUMBER_OF_MUTATOR_EFFECTS; effect++)
-	{
-		if (strlen(mutator_effect_names[effect]) == length && !strncmp(mutator_effect_names[effect], key, length))
-			break;
-	}
-	if (effect == NUMBER_OF_MUTATOR_EFFECTS)
-		return NONE;
-	if (!dot)
-		return effect;
-	for (index = 0; index < NUMBER_OF_MUTATOR_PARAMETERS; index++)
-	{
-		if (mutator_parameter_definitions[index].effect == effect && !strcmp(mutator_parameter_definitions[index].name, dot + 1))
-		{
-			*parameter = index;
-			return effect;
-		}
-	}
-	return NONE;
+	return !strncmp(key, MUTATOR_SCRIPT_KEY_PREFIX, sizeof(MUTATOR_SCRIPT_KEY_PREFIX) - 1);
 }
 
 /* a key's text: lower case letters, digits and underscores, and one dot
@@ -141,17 +90,6 @@ static boolean mutators_key_text_valid(char const *key)
 	return length > 0 && length < MUTATOR_KEY_LENGTH && key[length - 1] != '.';
 }
 
-static boolean mutators_value_valid(short parameter, real value)
-{
-	/* (not a NaN, not infinite) */
-	if (!(value == value && value - value == 0.f))
-		return FALSE;
-	if (parameter == NONE)
-		return value == 1.f;
-	return value >= mutator_parameter_definitions[parameter].minimum &&
-		value <= mutator_parameter_definitions[parameter].maximum;
-}
-
 static void mutators_say(char const *whose)
 {
 	char keys[MAXIMUM_MUTATOR_KEYS][MUTATOR_KEY_LENGTH];
@@ -167,10 +105,7 @@ static void mutators_say(char const *whose)
 	{
 		size_t length = strlen(text);
 
-		if (strchr(keys[index], '.'))
-			snprintf(text + length, sizeof(text) - length, " %s=%g", strchr(keys[index], '.') + 1, values[index]);
-		else
-			snprintf(text + length, sizeof(text) - length, "%s %s", index ? "," : "", keys[index]);
+		snprintf(text + length, sizeof(text) - length, " %s", keys[index]);
 	}
 	error(_error_log, "%s", text);
 	console_printf(FALSE, "%s", text);
@@ -186,8 +121,8 @@ void mutators_new_game(
 	long count;
 	long index;
 
-	mutators_clear();
-	mutator_big_head_new_game();
+	mutators_globals.script_count = 0;
+	mutator_scripts_begin();
 	mutator_tags_undo();
 	mutators_globals.tag_edit_size = 0;
 	/* (a client's are the host's: network_mutators.c; the main menu's map
@@ -202,47 +137,23 @@ void mutators_new_game(
 		error(_error_log, "mutators: the tag edits are not this build's: none played");
 		mutators_globals.tag_edit_size = 0;
 	}
-	/* (port_mutators.c checked each of them with mutators_key_check) */
+	/* (port_mutators.c gives only its scripts' keys) */
 	count = port_mutators_keys(keys, values, MAXIMUM_PORT_MUTATOR_KEYS);
 	for (index = 0; index < count; index++)
 	{
-		short parameter;
-		short effect = mutators_key_find(keys[index], &parameter);
-
-		if (effect == NONE || !mutators_value_valid(parameter, (real)values[index]))
+		if (!mutators_script_key(keys[index]))
 			continue;
-		mutators_globals.effects[effect] = TRUE;
-		if (parameter != NONE)
-			mutators_globals.parameters[parameter] = (real)values[index];
+		mutator_scripts_add(keys[index]);
+		mutators_globals.script_count++;
 	}
+	mutator_scripts_commit();
 	mutators_say("This game's");
-}
-
-boolean mutators_effect_active(
-	short effect)
-{
-	return effect >= 0 && effect < NUMBER_OF_MUTATOR_EFFECTS && mutators_globals.effects[effect];
-}
-
-real mutators_parameter(
-	short parameter)
-{
-	if (parameter < 0 || parameter >= NUMBER_OF_MUTATOR_PARAMETERS)
-		return 0.f;
-	return mutators_globals.parameters[parameter];
 }
 
 boolean mutators_active(
 	void)
 {
-	short effect;
-
-	for (effect = 0; effect < NUMBER_OF_MUTATOR_EFFECTS; effect++)
-	{
-		if (mutators_globals.effects[effect])
-			return TRUE;
-	}
-	return mutators_globals.tag_edit_size > 0;
+	return mutators_globals.script_count > 0 || mutators_globals.tag_edit_size > 0;
 }
 
 long mutators_tag_edits(
@@ -274,24 +185,13 @@ short mutators_keys(
 	short maximum)
 {
 	short count = 0;
-	short effect;
-	short parameter;
+	short index;
 
-	for (effect = 0; effect < NUMBER_OF_MUTATOR_EFFECTS; effect++)
-	{
-		if (!mutators_globals.effects[effect] || count >= maximum)
-			continue;
-		snprintf(keys[count], MUTATOR_KEY_LENGTH, "%s", mutator_effect_names[effect]);
-		values[count++] = 1.f;
-		for (parameter = 0; parameter < NUMBER_OF_MUTATOR_PARAMETERS && count < maximum; parameter++)
-		{
-			if (mutator_parameter_definitions[parameter].effect != effect)
-				continue;
-			snprintf(keys[count], MUTATOR_KEY_LENGTH, "%s.%s", mutator_effect_names[effect],
-				mutator_parameter_definitions[parameter].name);
-			values[count++] = mutators_globals.parameters[parameter];
-		}
-	}
+	/* (a script's key says which: the client runs its own copy of it) */
+	if (maximum > 0)
+		count = mutator_scripts_keys(keys, maximum);
+	for (index = 0; index < count; index++)
+		values[index] = 1.f;
 	return count;
 }
 
@@ -305,31 +205,27 @@ boolean mutators_set_host(
 	/* (all of them checked before any is played) */
 	for (index = 0; index < count; index++)
 	{
-		short parameter;
-		short effect;
-
-		if (!mutators_key_text_valid(keys[index]))
+		/* (not a NaN, not infinite) */
+		if (!mutators_key_text_valid(keys[index]) || !(values[index] == values[index] &&
+			values[index] - values[index] == 0.f))
+		{
 			return FALSE;
-		effect = mutators_key_find(keys[index], &parameter);
-		if (effect != NONE && !mutators_value_valid(parameter, values[index]))
-			return FALSE;
+		}
 	}
-	mutators_clear();
+	mutators_globals.script_count = 0;
+	mutator_scripts_begin();
 	for (index = 0; index < count; index++)
 	{
-		short parameter;
-		short effect = mutators_key_find(keys[index], &parameter);
-
-		if (effect == NONE)
+		if (!mutators_script_key(keys[index]))
 		{
-			console_warning("The host plays the mutator effect %s, which this game does not have", keys[index]);
+			console_warning("The host plays the mutator %s, which this game does not have", keys[index]);
 			error(_error_log, "mutators: the host's %s is not this build's: passed over", keys[index]);
 			continue;
 		}
-		mutators_globals.effects[effect] = TRUE;
-		if (parameter != NONE)
-			mutators_globals.parameters[parameter] = values[index];
+		mutator_scripts_add(keys[index]);
+		mutators_globals.script_count++;
 	}
+	mutator_scripts_commit();
 	mutators_say("The host's");
 	return TRUE;
 }
@@ -340,9 +236,7 @@ int mutators_key_check(
 	char *reason,
 	unsigned long size)
 {
-	short parameter;
-	short effect;
-
+	(void)value;
 	if (reason && size)
 		reason[0] = 0;
 	if (!key || !mutators_key_text_valid(key))
@@ -351,25 +245,11 @@ int mutators_key_check(
 			snprintf(reason, size, "%s is not an effect's name", key ? key : "(nothing)");
 		return FALSE;
 	}
-	effect = mutators_key_find(key, &parameter);
-	if (effect == NONE)
+	/* (the game has no effects built in: a big head is a [[pose]]) */
+	if (reason)
 	{
-		if (reason)
-			snprintf(reason, size, "this game has no %s %s", strchr(key, '.') ? "parameter" : "effect", key);
-		return FALSE;
+		snprintf(reason, size, "this game has no effect %s%s", key,
+			strncmp(key, "big_head", 8) ? "" : " (a big head is a [[pose]] now)");
 	}
-	if (!mutators_value_valid(parameter, (real)value))
-	{
-		if (reason && parameter != NONE)
-		{
-			snprintf(reason, size, "%s must be from %g to %g", key, mutator_parameter_definitions[parameter].minimum,
-				mutator_parameter_definitions[parameter].maximum);
-		}
-		else if (reason)
-		{
-			snprintf(reason, size, "%s is not a number", key);
-		}
-		return FALSE;
-	}
-	return TRUE;
+	return FALSE;
 }

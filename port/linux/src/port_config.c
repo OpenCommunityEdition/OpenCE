@@ -561,6 +561,15 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"Playing in another's game: the most kilobytes a second this machine\n"
 		"sends of maps to other players (16 to 10240: 10 MB/s)." },
+	{ "network.mutator_download", _config_boolean, "true", "HALO_NET_MUTATOR_DOWNLOAD", _environment_value, _platform_all,
+		"Fetch the files of a host's mutators this machine lacks (mutator.toml, Lua\n"
+		"scripts, .cevehicle, .ceweapon) into mutator_downloads, and play them in that\n"
+		"host's games." },
+	{ "network.mutator_host_scripts", _config_string, "\"ask\"", "HALO_NET_MUTATOR_HOST_SCRIPTS", _environment_value,
+		_platform_all,
+		"The Lua scripts of mutators a host sent, which run in their sandbox: \"ask\" the\n"
+		"first time for each, \"always\" run them, or \"never\". This machine's own\n"
+		"mutators' scripts always run." },
 	{ "network.map_download", _config_boolean, "true", "HALO_NET_MAP_DOWNLOAD", _environment_value, _platform_all,
 		"Joining a game on a Custom Edition map this machine does not have:\n"
 		"download it (and the resource maps it needs) from the game's players\n"
@@ -1577,6 +1586,7 @@ static const struct
 	{ "audio.resampler", { "sinc", "linear", NULL }, NULL },
 	{ "audio.voice_chat", { "push_to_talk", "open_mic", "off", NULL }, NULL },
 	{ "input.touch_controls", { "auto", "on", "off", NULL }, NULL },
+	{ "network.mutator_host_scripts", { "ask", "always", "never", NULL }, NULL },
 	{ "game.console_log", { "important", "all", "none", NULL }, NULL },
 	{ "game.language", { "", "ja", "de", "fr", "es", "it", NULL }, NULL },
 	{ "network.text_chat", { "on", "links", "off", NULL }, NULL },

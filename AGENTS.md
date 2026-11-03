@@ -232,7 +232,7 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |
 | [docs/mods.md](docs/mods.md) | Mods: folders of Halo PC tag files whose sounds, bitmaps, text and models play over a map's on one machine |
-| [docs/mutators.md](docs/mutators.md) | Mutators: built-in effects and tag edits that change a game's rules, set by data files and played alike on every machine |
+| [docs/mutators.md](docs/mutators.md) | Mutators: tag edits, poses, add-ons and Lua scripts that change a game's rules, set by data files and played alike on every machine |
 | [docs/addons.md](docs/addons.md) | Add-ons: a vehicle and its tags, built from a Custom Edition map into a .cevehicle that a mutator adds to the maps it plays on |
 | [port/assets/text_filter/README.md](port/assets/text_filter/README.md) | Streamer mode's words: Surge AI's list, the review, the allowed words |
 | [port/assets/menus/README.md](port/assets/menus/README.md) | The menu files' format and how to write them again |

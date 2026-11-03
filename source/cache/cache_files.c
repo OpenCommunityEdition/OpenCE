@@ -1221,6 +1221,14 @@ long scenario_tags_load(
 			global_tag_instances = cache_file_globals.tag_header->tag_instances;
 			global_tag_count = cache_file_globals.tag_header->tag_count;
 			cache_file_globals.tags_loaded = TRUE;
+			/* port: the add-ons' tags, as for this build's maps below, by the
+			map's file's name, which is what a mutator's places name
+			(port/linux/game/addons.c) */
+			{
+				extern void addons_tags_loaded(char const *map_name, long scenario_index);
+
+				addons_tags_loaded(stripped_scenario_name, cache_file_globals.tag_header->scenario_tag_index);
+			}
 			/* (the menus' tags, as for this build's maps below) */
 			{
 				extern void menu_tags_loaded(char const *map_name);

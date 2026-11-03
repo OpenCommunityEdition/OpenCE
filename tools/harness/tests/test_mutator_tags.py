@@ -31,6 +31,17 @@ def generated(fault=None):
         tags = mutated(tags, '\t\t*(real *)(address - field->offset + field->runtime_offset) = value;\n', '')
     if fault == 'speed':
         tags = mutated(tags, 'value = edit->number / (real)TICKS_PER_SECOND;', 'value = edit->number;')
+    if fault == 'stock':
+        tags = mutated(tags, 'return index != NONE ? index : stock_tags_find(group_tag, name);', 'return index;')
+    if fault == 'stock_first':
+        tags = mutated(tags, 'return index != NONE ? index : stock_tags_find(group_tag, name);',
+                       'stock_tags_find(group_tag, name); return index;')
+    if fault == 'pose_range':
+        tags = mutated(tags, 'edit->number < OBJECT_POSE_MINIMUM_SCALE || edit->number > OBJECT_POSE_MAXIMUM_SCALE)',
+                       'FALSE)')
+    if fault == 'pose_clear':
+        tags = mutated(tags, '\tmutator_tags.element_bytes_used = 0;\n\tobject_pose_clear();\n}\n\nboolean',
+                       '\tmutator_tags.element_bytes_used = 0;\n}\n\nboolean')
     if fault == 'append':
         tags = mutated(tags, 'count = (edit->append ? block->count : 0) +', 'count =')
     source = sha256_source(read('port/linux/src/port_mutators.c')).replace(
@@ -42,11 +53,15 @@ def generated(fault=None):
                     ('tomlc17.h', read('port/third_party/tomlc17/tomlc17.h')),
                     ('tomlc17.inc', read('port/third_party/tomlc17/tomlc17.c')),
                     ('mutators_header.inc', read('port/linux/game/mutators.h')),
+                    ('object_pose_header.inc', '\n'.join(
+                        line for line in read('port/linux/game/object_pose.h').splitlines()
+                        if line.startswith('#define OBJECT_POSE_'))),
                     ('mutator_tags.inc', tags), ('enums.inc', enums),
                     ('port_mutators_source.inc', source))
 
 
-@pytest.mark.parametrize('case', ['ma5b', 'plasma', 'magazine', 'missing', 'refused', 'bytes'])
+@pytest.mark.parametrize('case', ['ma5b', 'plasma', 'magazine', 'missing', 'stock', 'refused', 'pose',
+                                  'bytes'])
 def test_case(case):
     status, output = run(build('mutator_tags', generated()), case)
     assert status == 0, output
@@ -54,7 +69,9 @@ def test_case(case):
 
 @pytest.mark.parametrize('fault,case', [('range', 'refused'), ('element', 'missing'), ('undo', 'ma5b'),
                                         ('whole', 'bytes'), ('append', 'ma5b'), ('runtime', 'plasma'),
-                                        ('speed', 'plasma'), ('element', 'magazine')])
+                                        ('speed', 'plasma'), ('element', 'magazine'), ('stock', 'stock'),
+                                        ('stock_first', 'stock'), ('pose_range', 'pose'),
+                                        ('pose_clear', 'pose')])
 def test_negative(fault, case):
     status, output = run(build('mutator_tags', generated(fault)), case)
     assert status == CHECK_FAILED, output

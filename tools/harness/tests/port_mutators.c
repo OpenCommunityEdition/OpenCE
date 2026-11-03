@@ -77,6 +77,7 @@ int main(int argc, char **argv)
 	CHECK(argc == 2, "case");
 	if (!strcmp(case_name, "stock"))
 	{
+		static unsigned char pose[4096];
 		size_t size = 0;
 		char *readme;
 
@@ -84,7 +85,7 @@ int main(int argc, char **argv)
 		CHECK(port_mutators_count() == 3 && find("accurized_ma5b") == 0 && find("big_head") == 1 &&
 			find("revolved_plasma_rifle") == 2, "the stock mutators, by folder");
 		CHECK(file_writes == 4, "the README and the three mutator.toml written (%d)", file_writes);
-		CHECK(written_holds("/data/stock_mutators/big_head/mutator.toml", "[effects.big_head]\nscale = 2.5\n") &&
+		CHECK(written_holds("/data/stock_mutators/big_head/mutator.toml", "node = \"head\"\nscale = 2.5\n") &&
 			written_holds("/data/stock_mutators/accurized_ma5b/mutator.toml", "id = \"accurized_ma5b\"") &&
 			written_holds("/data/stock_mutators/revolved_plasma_rifle/mutator.toml", "group = \"damage_effect\""),
 			"the stock mutators' files");
@@ -97,7 +98,7 @@ int main(int argc, char **argv)
 		CHECK(!strcmp(files_written[2].path, "/data/stock_mutators/big_head/mutator.toml"), "the order written");
 		strcpy(files_written[2].text, "id = \"changed\"\n[effects.big_head]\nscale = 4\n");
 		port_mutators_scan();
-		CHECK(file_writes == 5 && written_holds(files_written[2].path, "format = 1"), "a changed file not put back");
+		CHECK(file_writes == 5 && written_holds(files_written[2].path, "format = 6"), "a changed file not put back");
 		CHECK(find("changed") == NONE, "a changed file played");
 		CHECK(port_mutators_status(0, text, sizeof(text)) == _port_mutator_fine, "%s", text);
 		CHECK(port_mutators_status(1, text, sizeof(text)) == _port_mutator_fine, "%s", text);
@@ -105,12 +106,13 @@ int main(int argc, char **argv)
 		CHECK(port_mutators_keys(keys, values, 16) == 0, "keys of a mutator off");
 		strcpy(setting, " Big_Head ");
 		CHECK(port_mutators_scan() == 1 && port_mutators_on(1), "game.mutators's id (any case, spaced)");
-		CHECK(port_mutators_keys(keys, values, 16) == 2 && !strcmp(keys[0], "big_head") && values[0] == 1.0 &&
-			!strcmp(keys[1], "big_head.scale") && values[1] == 2.5, "the big head's keys");
+		/* (a pose: an edit, and no key) */
+		CHECK(port_mutators_keys(keys, values, 16) == 0 && port_mutators_tag_edits(pose, sizeof(pose)) > 0,
+			"the big head's pose");
 		strcpy(setting, "big_head_x,xbig_head");
 		CHECK(port_mutators_scan() == 0, "an id taken for another it begins or ends");
 		CHECK(port_mutators_details(1, text, sizeof(text)) && strstr(text, "stock_mutators/big_head") &&
-			strstr(text, "scale 2.5"), "the details: %s", text);
+			strstr(text, "Poses: 1"), "the details: %s", text);
 	}
 	else if (!strcmp(case_name, "stock_unwritable"))
 	{
@@ -136,7 +138,7 @@ int main(int argc, char **argv)
 		folder("none", NULL);
 		folder("range", "[effects.big_head]\nscale = 40\n");
 		folder("large", large);
-		folder("unknown", "script = \"run()\"\n[effects.big_head]\n");
+		folder("unknown", "run = \"run()\"\n[effects.big_head]\n");
 		strcpy(setting, "zeta,moon,big_head,copy,range,large,unknown");
 		port_mutators_scan();
 		CHECK(port_mutators_count() == 10, "the folders with a mutator.toml, and the stock mutators (%ld)",
@@ -158,12 +160,98 @@ int main(int argc, char **argv)
 			strstr(text, "from 1 to 4"), "out of range: %s", text);
 		CHECK(port_mutators_status(find("large"), text, sizeof(text)) == _port_mutator_unplayable, "64 KB");
 		CHECK(port_mutators_status(find("unknown"), text, sizeof(text)) == _port_mutator_unplayable &&
-			strstr(text, "script"), "a key this build does not know: %s", text);
+			strstr(text, "run"), "a key this build does not know: %s", text);
 		CHECK(!port_mutators_on(find("moon")) && !port_mutators_on(find("range")), "a refused mutator on");
-		CHECK(port_mutators_keys(keys, values, 16) == 4 && !strcmp(keys[0], "big_head") && values[1] == 2.5 &&
-			!strcmp(keys[3], "big_head.scale") && values[3] == 4.0, "the keys of those that can be played, in order");
+		/* (the stock big head's is a pose: zeta's alone) */
+		CHECK(port_mutators_keys(keys, values, 16) == 2 && !strcmp(keys[0], "big_head") && values[0] == 1.0 &&
+			!strcmp(keys[1], "big_head.scale") && values[1] == 4.0, "the keys of those that can be played, in order");
 		CHECK(!strcmp(port_mutators_name(find("zeta")), "Huge heads"), "the name");
-		CHECK(port_mutators_keys(keys, values, 3) == 3, "the most keys asked for");
+		CHECK(port_mutators_keys(keys, values, 1) == 1, "the most keys asked for");
+	}
+	else if (!strcmp(case_name, "scripts"))
+	{
+		extern char *port_mutators_script_read(const char *key, unsigned long *size);
+		extern void port_mutators_script_free(char *text);
+		extern int port_mutators_share_valid(const struct port_mutator_share *entry);
+		extern int port_mutators_share_store(const struct port_mutator_share *entry, long file, const void *bytes,
+			unsigned long size);
+		extern long port_mutators_script_controls(struct port_mutator_control *controls, long maximum);
+		extern int port_mutators_script_control_write(long index, const char *name, const char *value);
+		struct port_mutator_control rows[4];
+		char keys[4][PORT_MUTATOR_KEY_LENGTH];
+		double values[4];
+		char text[128];
+		char *script;
+		unsigned long size = 0;
+
+		folder("view", "format = 5\n[script]\nfile = \"main.lua\"\ndistance = 2.5\nkeyboard = \"F5\"\n"
+			"[script.menu]\nkeyboard = \"THIRD PERSON\"\n");
+		file("/data/mutators/view/main.lua", "function frame() end");
+		folder("missing", "[script]\nfile = \"gone.lua\"\n");
+		folder("path", "[script]\nfile = \"../main.lua\"\n");
+		folder("other", "[script]\nfile = \"main.txt\"\n");
+		folder("nofile", "[script]\ndistance = 2.5\n");
+		folder("notable", "script = \"main.lua\"\n");
+		folder("later", "format = 6\n[script]\nfile = \"main.lua\"\n");
+		port_mutators_scan();
+		CHECK(port_mutators_status(find("view"), text, sizeof(text)) == _port_mutator_fine, "refused: %s", text);
+		CHECK(port_mutators_status(find("missing"), text, sizeof(text)) == _port_mutator_unplayable, "a script not there");
+		CHECK(port_mutators_status(find("path"), text, sizeof(text)) == _port_mutator_unplayable, "a script in another folder");
+		CHECK(port_mutators_status(find("other"), text, sizeof(text)) == _port_mutator_unplayable, "a script not .lua");
+		CHECK(port_mutators_status(find("nofile"), text, sizeof(text)) == _port_mutator_unplayable, "no file named");
+		CHECK(port_mutators_status(find("notable"), text, sizeof(text)) == _port_mutator_unplayable, "not a table");
+		CHECK(port_mutators_status(find("later"), text, sizeof(text)) == _port_mutator_unplayable, "a later format");
+		port_mutators_turn(find("view"), 1);
+		CHECK(port_mutators_keys(keys, values, 4) == 1 && !strncmp(keys[0], "script.", 7) && strlen(keys[0]) == 31,
+			"its key: %s", keys[0]);
+		script = port_mutators_script_read(keys[0], &size);
+		CHECK(script && size == 20 && !memcmp(script, "function", 8), "its file");
+		port_mutators_script_free(script);
+		CHECK(!port_mutators_script_read("script.000000000000000000000000", &size), "another's key found");
+		/* a control's row, only while its mutator is on, and its value written */
+		CHECK(port_mutators_script_controls(rows, 4) == 1 && !strcmp(rows[0].name, "keyboard") &&
+			!strcmp(rows[0].label, "THIRD PERSON") && !strcmp(rows[0].value, "F5") && !strcmp(rows[0].fallback, "F5"),
+			"its row");
+		CHECK(port_mutators_script_control_write(rows[0].mutator, "keyboard", "F6, G"), "not written");
+		CHECK(written_holds("/data/mutators/view/settings.toml", "\"keyboard\" = \"F6, G\""), "what it wrote");
+		port_mutators_turn(find("view"), 0);
+		CHECK(port_mutators_script_controls(rows, 4) == 0, "a row with its mutator off");
+		/* what a host lists: only a mutator.toml first, then one add-on and one script,
+		of plain names, no larger than the game reads; nothing else is asked for */
+		{
+			struct port_mutator_share entry;
+
+			memset(&entry, 0, sizeof(entry));
+			entry.file_count = 2;
+			strcpy(entry.files[0].name, "mutator.toml");
+			entry.files[0].size = 100;
+			strcpy(entry.files[1].name, "main.lua");
+			entry.files[1].size = 100;
+			CHECK(port_mutators_share_valid(&entry), "a mutator and its script");
+			strcpy(entry.files[1].name, "../../evil.lua");
+			CHECK(!port_mutators_share_valid(&entry), "a name out of its folder");
+			strcpy(entry.files[1].name, "c:evil.lua");
+			CHECK(!port_mutators_share_valid(&entry), "a name of a drive");
+			strcpy(entry.files[1].name, "evil.exe");
+			CHECK(!port_mutators_share_valid(&entry), "a file of another kind");
+			strcpy(entry.files[1].name, "main.lua");
+			entry.files[1].size = 0x40001;
+			CHECK(!port_mutators_share_valid(&entry), "a script too large");
+			entry.files[1].size = 100;
+			strcpy(entry.files[0].name, "other.toml");
+			CHECK(!port_mutators_share_valid(&entry), "no mutator.toml first");
+			strcpy(entry.files[0].name, "mutator.toml");
+			memset(entry.files[1].name, 'a', sizeof(entry.files[1].name));
+			CHECK(!port_mutators_share_valid(&entry), "a name not ended");
+			strcpy(entry.files[1].name, "main.lua");
+			entry.file_count = 4;
+			CHECK(!port_mutators_share_valid(&entry), "too many files");
+			entry.file_count = 2;
+			/* (bytes that are not what the list says are not kept) */
+			CHECK(!port_mutators_share_store(&entry, 1, "not those bytes", 15), "another file's size kept");
+			entry.files[1].size = 15;
+			CHECK(!port_mutators_share_store(&entry, 1, "not those bytes", 15), "another file's bytes kept");
+		}
 	}
 	else if (!strcmp(case_name, "addons"))
 	{

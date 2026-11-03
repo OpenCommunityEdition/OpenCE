@@ -33,6 +33,7 @@ STUBS = (
     ('port_config.h', 'static struct { char path[256]; char *text; } files_written[16];\n'
                       'static int file_writes, files_unwritable;\n'
                       'static char const *config_string(char const *name) { (void)name; return setting; }\n'
+                      'static int config_boolean(char const *name) { (void)name; return 1; }\n'
                       'static int config_write(char const *name, char const *value)\n'
                       '{ (void)name; snprintf(written, sizeof(written), "%s", value);\n'
                       '  snprintf(setting, sizeof(setting), "%s", value); return 1; }\n'
@@ -162,7 +163,7 @@ def generated(fault=None):
                     ('port_mutators_source.inc', source))
 
 
-@pytest.mark.parametrize('case', ['stock', 'stock_unwritable', 'folders', 'addons', 'weapons', 'ids', 'menu'])
+@pytest.mark.parametrize('case', ['stock', 'stock_unwritable', 'folders', 'scripts', 'addons', 'weapons', 'ids', 'menu'])
 def test_case(case):
     status, output = run(build('port_mutators', generated()), case)
     assert status == 0, output

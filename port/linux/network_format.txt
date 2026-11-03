@@ -1,9 +1,9 @@
-version 44
+version 48
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
 bound DISTRIBUTED_INPUT_HISTORY 4
-bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)
+bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE 15 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)
 bound DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE 14
 bound DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 + 2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1
 bound DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE 3
@@ -33,6 +33,7 @@ bound NUMBER_OF_UNIT_GRENADE_TYPES enum a0462dbcbdd9
 bound OBJECT_NAME_BYTES MAXIMUM_OBJECT_NAMES_PER_SCENARIO / 8
 bound P2P_PLAYER_KEY_HASH_SIZE 16
 define DISTRIBUTED_ANGULAR_VELOCITY_SCALE 4096.0f
+define DISTRIBUTED_RELAYED_ACTION_SCRIPT_BUTTONS_BIT 7
 define DISTRIBUTED_TIME_WINDOW_TICKS (15 * TICKS_PER_SECOND)
 define DISTRIBUTED_UNIT_SCALE 32767.0f
 define DISTRIBUTED_VELOCITY_SCALE 1024.0f
@@ -79,6 +80,10 @@ enum _distributed_message_map_share_offer 84
 enum _distributed_message_map_share_progress 86
 enum _distributed_message_map_share_request 83
 enum _distributed_message_map_share_sources 85
+enum _distributed_message_mutator_share_ask 114
+enum _distributed_message_mutator_share_done 117
+enum _distributed_message_mutator_share_entry 115
+enum _distributed_message_mutator_share_fetching 116
 enum _distributed_message_mutator_tag_edits 113
 enum _distributed_message_mutators 112
 enum _distributed_message_notice 17

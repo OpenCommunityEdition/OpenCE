@@ -8,11 +8,11 @@ from port/assets/mutators); each scan writes them into the data root's
 stock_mutators folder, in place of what is there, so that they can be read
 and copied, and plays them as the game has them (as it does when they cannot
 be written). A mutator is only data: it names effects the game has
-built in (port/linux/game/mutators.c) and its parameters' values, and values
-of tags it sets (port/linux/game/mutator_tags.c). Nothing in it runs, and the
-game checks each key and value against the effects it has
-(mutators_key_check), and each tag edit against the fields it can set
-(mutators_tag_edit_check): a mutator with one it does not have, or a value
+values of tags it sets (port/linux/game/mutator_tags.c), nodes of objects it
+poses (port/linux/game/object_pose.c), an add-on and a script. The game checks
+each tag edit and pose against the fields and groups it can set
+(mutators_tag_edit_check), and each effect against those built in, of which it
+has none (mutators_key_check): a mutator with one it does not have, or a value
 out of its range, cannot be played, and the Mods menu says why.
 
 mutator.toml (all but effects or tags may be left out):
@@ -24,8 +24,12 @@ mutator.toml (all but effects or tags may be left out):
 	description = "..."
 	format = 1                    # the mutators' format it is made for
 
-	[effects.big_head]            # an effect it turns on
-	scale = 2.5                   # and its parameters (else their defaults)
+	[[pose]]                      # a node of objects it scales and moves
+	objects = "biped"             # a group of them, by object_pose.c's name
+	tag = '...'                   # one tag of it (else all of them)
+	node = "head"                 # a node of their models, or "head", a biped's
+	scale = 2.5                   # (else 1)
+	offset = [0, 0, -0.1]         # in its parent's frame, world units (else none)
 
 	[[tags]]                      # a tag it edits
 	group = "weapon"              # its group, by mutator_tags.c's name
@@ -64,8 +68,9 @@ played instead (port/linux/game/network_mutators.c).
 /* ---------- constants */
 
 /* the mutators' format this build plays (2: tag edits; 3: an add-on and its
-placements; 4: a weapon's) */
-#define MUTATORS_FORMAT 4
+placements; 4: a weapon's; 6: poses) */
+#define MUTATORS_FORMAT 6
+#define MAXIMUM_SCRIPT_FILE_SIZE 0x40000UL
 
 #define MAXIMUM_MUTATORS 64
 #define MAXIMUM_MUTATOR_FOLDER_LENGTH 64
@@ -101,6 +106,7 @@ enum
 	_tag_edit_number,
 	_tag_edit_text,
 	_tag_edit_copy,
+	_tag_edit_pose,
 };
 
 /* ---------- structures */
@@ -133,12 +139,18 @@ struct port_mutator
 	long tag_edit_size;
 	long tag_edit_count;
 	long tag_count;
+	/* of its edits, how many are poses */
+	long pose_count;
 	/* its add-on's file (docs/addons.md), else empty, and where it places
 	the add-on's vehicles */
 	char addon_path[MAXIMUM_PATH_LENGTH];
 	int addon_kind;
 	long place_count;
 	struct port_mutator_place places[MAXIMUM_PLACES_PER_MUTATOR];
+	/* its Lua script's file (docs/mutators.md, "Scripts"), else empty, and on a client,
+	whether its player refused to run a host's */
+	char script_path[MAXIMUM_PATH_LENGTH];
+	int script_refused;
 	/* its mutator.toml's SHA-256, and its files' (mutator_digest): the
 	SHA-256 of its mutator.toml's and its add-on's file's, one after the
 	other; digest_state is 0 until that is made, 1 once it is, -1 if a file
@@ -171,6 +183,13 @@ static struct
 	int stock_unwritten_logged;
 } port_mutators;
 
+#define MAXIMUM_SHARED_MUTATORS 8
+
+/* on a client: the host's mutators with files, played in place of its own */
+static struct port_mutator host_mutators[MAXIMUM_SHARED_MUTATORS];
+static long host_mutator_count;
+static int host_mutators_on;
+
 /* ---------- prototypes/MUTATORS.C (port/linux/game/mutators.h's) */
 
 int mutators_key_check(const char *key, double value, char *reason, unsigned long size);
@@ -197,6 +216,19 @@ static int names_compare(const char *first, const char *second)
 
 /* text as mutator.toml has it, its control characters (but its line breaks,
 if `lines`) spaces, its last character whole: what the menus show of it */
+/* a row of the Controls Setup screen a mutator's script asks for */
+struct port_mutator_control
+{
+	long mutator;
+	char name[32];
+	char label[32];
+	char value[64];
+	char fallback[64];
+};
+
+typedef void (*port_mutators_setting_proc)(void *context, const char *name, const char *text, double number,
+	int boolean_value, int kind);
+
 static void text_copy(char *destination, size_t size, const char *source, int lines)
 {
 	size_t length;
@@ -282,7 +314,8 @@ static void key_add(struct port_mutator *mutator, const char *path, const char *
 }
 
 /* [effects.<name>] and its parameters: each effect's key, then its
-parameters' ("big_head", "big_head.scale") */
+parameters' ("<name>", "<name>.<parameter>"), checked by the game, which has
+no effects built in (mutators_key_check) */
 static void effects_read(struct port_mutator *mutator, toml_datum_t effects, const char *path)
 {
 	char reason[MAXIMUM_REFUSAL_LENGTH];
@@ -590,6 +623,109 @@ static int toml_number(toml_datum_t table, const char *key, int required, double
 	return 1;
 }
 
+/* [[pose]]: each a node of the objects of a group (or one tag of it) scaled
+and moved, kept as a tag edit's bytes (mutator_tags.c's header says how) */
+static void poses_read(struct port_mutator *mutator, toml_datum_t poses, const char *path)
+{
+	static const char *const keys[] = { "objects", "tag", "node", "scale", "offset" };
+	char reason[MAXIMUM_REFUSAL_LENGTH];
+	int index;
+
+	if (poses.type != TOML_ARRAY)
+	{
+		snprintf(reason, sizeof(reason), "line %d: pose is not a list of tables ([[pose]])", poses.lineno);
+		refuse(mutator, path, reason);
+		return;
+	}
+	for (index = 0; index < poses.u.arr.size; index++)
+	{
+		toml_datum_t pose = poses.u.arr.elem[index];
+		toml_datum_t offset;
+		long elements[3];
+		double scale = 1.0;
+		const char *tag;
+		long edits;
+		int element_count = 0;
+		int key;
+
+		if (pose.type != TOML_TABLE)
+		{
+			snprintf(reason, sizeof(reason), "line %d: pose is not a list of tables ([[pose]])", poses.lineno);
+			refuse(mutator, path, reason);
+			return;
+		}
+		for (key = 0; key < pose.u.tab.size; key++)
+		{
+			size_t known;
+
+			for (known = 0; known < sizeof(keys) / sizeof(keys[0]); known++)
+			{
+				if (!strcmp(pose.u.tab.key[key], keys[known]))
+					break;
+			}
+			if (known == sizeof(keys) / sizeof(keys[0]))
+			{
+				snprintf(reason, sizeof(reason), "line %d: a pose has no key %.40s", pose.u.tab.value[key].lineno,
+					pose.u.tab.key[key]);
+				refuse(mutator, path, reason);
+				return;
+			}
+		}
+		if (toml_get(pose, "objects").type != TOML_STRING || toml_get(pose, "node").type != TOML_STRING)
+		{
+			snprintf(reason, sizeof(reason), "line %d: a pose names its objects' group and a node", pose.lineno);
+			refuse(mutator, path, reason);
+			return;
+		}
+		tag = toml_get(pose, "tag").type == TOML_STRING ? toml_get(pose, "tag").u.s : "";
+		if (toml_get(pose, "tag").type != TOML_UNKNOWN && toml_get(pose, "tag").type != TOML_STRING)
+		{
+			snprintf(reason, sizeof(reason), "line %d: a pose's tag is a tag's name", pose.lineno);
+			refuse(mutator, path, reason);
+			return;
+		}
+		if (toml_get(pose, "scale").type != TOML_UNKNOWN && !toml_number(pose, "scale", 0, &scale, mutator, path))
+			return;
+		offset = toml_get(pose, "offset");
+		if (offset.type != TOML_UNKNOWN)
+		{
+			if (offset.type != TOML_ARRAY || offset.u.arr.size != 3)
+			{
+				snprintf(reason, sizeof(reason), "line %d: a pose's offset is three numbers (world units)",
+					offset.lineno);
+				refuse(mutator, path, reason);
+				return;
+			}
+			for (element_count = 0; element_count < 3; element_count++)
+			{
+				toml_datum_t number = offset.u.arr.elem[element_count];
+				double value;
+
+				if (number.type == TOML_INT64)
+					value = (double)number.u.int64;
+				else if (number.type == TOML_FP64)
+					value = number.u.fp64;
+				else
+				{
+					snprintf(reason, sizeof(reason), "line %d: a pose's offset is three numbers (world units)",
+						offset.lineno);
+					refuse(mutator, path, reason);
+					return;
+				}
+				/* (thousandths of a world unit, rounded; mutator_tags.c checks
+				the range) */
+				if (!(value > -1000.0 && value < 1000.0))
+					value = 1000.0;
+				elements[element_count] = (long)(value * 1000.0 + (value < 0.0 ? -0.5 : 0.5));
+			}
+		}
+		edits = mutator->tag_edit_count;
+		tag_edit_add(mutator, path, pose.lineno, toml_get(pose, "objects").u.s, tag, toml_get(pose, "node").u.s,
+			_tag_edit_pose, scale, NULL, elements, element_count, 0);
+		mutator->pose_count += mutator->tag_edit_count - edits;
+	}
+}
+
 /* [[place]]: where the add-on's vehicles are placed, on which map */
 static void places_read(struct port_mutator *mutator, toml_datum_t places, const char *path)
 {
@@ -733,11 +869,30 @@ static void addon_read(struct port_mutator *mutator, const char *path, const cha
 		refuse(mutator, path, "its addon's file is larger than 64 MB");
 }
 
+/* a script's name, beside the mutator.toml at path */
+static void script_read(struct port_mutator *mutator, const char *path, const char *name)
+{
+	struct posix_file_information information;
+	size_t folder_length = strlen(path) - strlen("mutator.toml");
+
+	if (!name_ends(name, ".lua") || name[0] == '.' || strchr(name, '/') || strchr(name, '\\') ||
+		folder_length + strlen(name) >= sizeof(mutator->script_path))
+	{
+		refuse(mutator, path, "its script is not a .lua file's name beside its mutator.toml");
+		return;
+	}
+	snprintf(mutator->script_path, sizeof(mutator->script_path), "%.*s%s", (int)folder_length, path, name);
+	if (posix_stat(mutator->script_path, &information) != 0)
+		refuse(mutator, path, "its script's file is not there");
+	else if (information.size_high || information.size_low > MAXIMUM_SCRIPT_FILE_SIZE)
+		refuse(mutator, path, "its script's file is larger than 256 KB");
+}
+
 static void mutator_read(struct port_mutator *mutator, const char *folder, const char *text, size_t size,
 	const char *path)
 {
 	static const char *const keys[] = { "name", "id", "version", "authors", "description", "format", "effects",
-		"tags", "addon", "place" };
+		"tags", "pose", "addon", "place", "script" };
 	toml_result_t result;
 	toml_datum_t value;
 	char reason[MAXIMUM_REFUSAL_LENGTH];
@@ -815,6 +970,9 @@ static void mutator_read(struct port_mutator *mutator, const char *folder, const
 	value = toml_get(result.toptab, "tags");
 	if (value.type != TOML_UNKNOWN)
 		tags_read(mutator, value, path);
+	value = toml_get(result.toptab, "pose");
+	if (value.type != TOML_UNKNOWN)
+		poses_read(mutator, value, path);
 	if (toml_text(result.toptab, "addon", mutator, path))
 	{
 		/* (the stock mutators have none: their folders are written from
@@ -831,12 +989,36 @@ static void mutator_read(struct port_mutator *mutator, const char *folder, const
 		if (!mutator->addon_path[0])
 			refuse(mutator, path, "it places vehicles or weapons but has no addon");
 	}
-	if (!mutator->key_count && !mutator->tag_edit_count && !mutator->addon_path[0])
-		refuse(mutator, path, "it turns on no effect, edits no tag and adds nothing");
+	value = toml_get(result.toptab, "script");
+	if (value.type != TOML_UNKNOWN)
+	{
+		const char *script = value.type == TOML_TABLE ? toml_text(value, "file", mutator, path) : NULL;
+
+		if (script)
+			script_read(mutator, path, script);
+		else
+			refuse(mutator, path, "its [script] has no file");
+	}
+	if (!mutator->key_count && !mutator->tag_edit_count && !mutator->addon_path[0] && !mutator->script_path[0])
+		refuse(mutator, path, "it edits no tag, poses nothing and adds nothing");
 	toml_free(result);
 }
 
 /* where the mutator is, as the log and the Mods menu say it */
+/* a file written whole, of any bytes */
+static int share_file_write(const char *path, const void *bytes, unsigned long size)
+{
+	FILE *stream = fopen(path, "wb");
+	int written;
+
+	if (!stream)
+		return 0;
+	written = fwrite(bytes, 1, size, stream) == size;
+	if (fclose(stream))
+		written = 0;
+	return written;
+}
+
 static void mutator_place_text(const struct port_mutator *mutator, char *text, size_t size)
 {
 	snprintf(text, size, "%s/%s", mutator->stock ? "stock_mutators" : "mutators", mutator->folder);
@@ -846,7 +1028,7 @@ static void mutator_place_text(const struct port_mutator *mutator, char *text, s
 asked for: 0 if a file cannot be read */
 static int mutator_digest(struct port_mutator *mutator)
 {
-	unsigned char digests[2 * SHA256_SIZE];
+	unsigned char digests[3 * SHA256_SIZE];
 	int size = SHA256_SIZE;
 
 	if (mutator->digest_state)
@@ -867,6 +1049,20 @@ static int mutator_digest(struct port_mutator *mutator)
 		}
 		p2p_sha256(addon, (int)addon_size, digests + SHA256_SIZE);
 		free(addon);
+		size += SHA256_SIZE;
+	}
+	if (mutator->script_path[0])
+	{
+		size_t script_size = 0;
+		char *script = config_file_read(mutator->script_path, &script_size);
+
+		if (!script || script_size > MAXIMUM_SCRIPT_FILE_SIZE)
+		{
+			free(script);
+			return 0;
+		}
+		p2p_sha256(script, (int)script_size, digests + size);
+		free(script);
 		size += SHA256_SIZE;
 	}
 	p2p_sha256(digests, size, mutator->digest);
@@ -1164,6 +1360,24 @@ long port_mutators_scan(void)
 	return on;
 }
 
+/* a script's key: "script." and its mutator's digest's first digits */
+static int script_key_make(struct port_mutator *mutator, char *key)
+{
+	static const char digits[] = "0123456789abcdef";
+	int index;
+
+	if (!mutator_digest(mutator))
+		return 0;
+	strcpy(key, "script.");
+	for (index = 0; index < 12; index++)
+	{
+		key[7 + index * 2] = digits[mutator->digest[index] >> 4];
+		key[7 + index * 2 + 1] = digits[mutator->digest[index] & 15];
+	}
+	key[7 + 24] = 0;
+	return 1;
+}
+
 long port_mutators_keys(char keys[][PORT_MUTATOR_KEY_LENGTH], double *values, long maximum)
 {
 	long count = 0;
@@ -1183,8 +1397,283 @@ long port_mutators_keys(char keys[][PORT_MUTATOR_KEY_LENGTH], double *values, lo
 			memcpy(keys[count], mutator->keys[key], PORT_MUTATOR_KEY_LENGTH);
 			values[count++] = mutator->values[key];
 		}
+		if (mutator->script_path[0] && count < maximum && script_key_make(&port_mutators.mutators[index], keys[count]))
+			values[count++] = 1.;
 	}
 	return count;
+}
+
+/* the mutator (on or not: a client plays the host's) whose script the key names */
+static struct port_mutator *script_mutator_find(const char *key)
+{
+	char own[PORT_MUTATOR_KEY_LENGTH];
+	long index;
+
+	if (!port_mutators.scans)
+		port_mutators_scan();
+	/* (a host's, unless this player refused it) */
+	for (index = 0; index < host_mutator_count; index++)
+	{
+		struct port_mutator *mutator = &host_mutators[index];
+
+		if (mutator->script_path[0] && script_key_make(mutator, own) && !strcmp(own, key))
+		{
+			if (mutator->script_refused)
+			{
+				platform_log("mutators: the host's script %s is not run: this player refused it", mutator->id);
+				return NULL;
+			}
+			return mutator;
+		}
+	}
+	for (index = 0; index < port_mutators.count; index++)
+	{
+		struct port_mutator *mutator = &port_mutators.mutators[index];
+
+		if (mutator->script_path[0] && !mutator->refusal[0] && script_key_make(mutator, own) && !strcmp(own, key))
+			return mutator;
+	}
+	return NULL;
+}
+
+char *port_mutators_script_read(const char *key, unsigned long *size)
+{
+	struct port_mutator *mutator = script_mutator_find(key);
+	size_t read_size = 0;
+	char *text = mutator ? config_file_read(mutator->script_path, &read_size) : NULL;
+
+	*size = (unsigned long)read_size;
+	return text;
+}
+
+void port_mutators_script_free(char *text)
+{
+	free(text);
+}
+
+/* a table's values of a kind a script's settings can hold */
+static void script_table_values(toml_datum_t table, port_mutators_setting_proc proc, void *context)
+{
+	int index;
+
+	for (index = 0; index < table.u.tab.size; index++)
+	{
+		const char *name = table.u.tab.key[index];
+		toml_datum_t value = table.u.tab.value[index];
+
+		if (value.type == TOML_STRING)
+			proc(context, name, value.u.s, 0., 0, 0);
+		else if (value.type == TOML_INT64)
+			proc(context, name, NULL, (double)value.u.int64, 0, 1);
+		else if (value.type == TOML_FP64)
+			proc(context, name, NULL, value.u.fp64, 0, 1);
+		else if (value.type == TOML_BOOLEAN)
+			proc(context, name, NULL, 0., value.u.boolean, 2);
+	}
+}
+
+/* a file beside the script, parsed: its top table, or its [script] table */
+static void script_file_values(const struct port_mutator *mutator, const char *file, int script_table,
+	port_mutators_setting_proc proc, void *context)
+{
+	char path[MAXIMUM_PATH_LENGTH];
+	const char *slash = strrchr(mutator->script_path, '/');
+	size_t size = 0;
+	char *text;
+	toml_result_t result;
+
+	if (!slash || (size_t)(slash - mutator->script_path) + strlen(file) + 2 > sizeof(path))
+		return;
+	snprintf(path, sizeof(path), "%.*s/%s", (int)(slash - mutator->script_path), mutator->script_path, file);
+	text = config_file_read(path, &size);
+	if (!text)
+		return;
+	result = toml_parse(text, (int)size);
+	if (result.ok)
+	{
+		toml_datum_t table = script_table ? toml_get(result.toptab, "script") : result.toptab;
+
+		if (table.type == TOML_TABLE)
+			script_table_values(table, proc, context);
+	}
+	else
+	{
+		platform_log("mutators: %s is not TOML (%.100s)", path, result.errmsg);
+	}
+	toml_free(result);
+	free(text);
+}
+
+/* one value of a file's top table, or of its [script] table, if it is text */
+struct script_value_find
+{
+	const char *name;
+	char *value;
+	size_t size;
+	int found;
+};
+
+static void script_value_found(void *context, const char *name, const char *text, double number, int boolean_value,
+	int kind)
+{
+	struct script_value_find *find = context;
+
+	(void)number;
+	(void)boolean_value;
+	if (kind == 0 && !strcmp(name, find->name))
+	{
+		text_copy(find->value, find->size, text, 0);
+		find->found = 1;
+	}
+}
+
+/* the controls that the mutators on have the Controls Setup screen show: for each
+key of its [script.menu], a row of that label for that value of its [script],
+the player's own from settings.toml */
+long port_mutators_script_controls(struct port_mutator_control *controls, long maximum)
+{
+	long count = 0;
+	long index;
+
+	if (!port_mutators.scans)
+		port_mutators_scan();
+	for (index = 0; index < port_mutators.count; index++)
+	{
+		const struct port_mutator *mutator = &port_mutators.mutators[index];
+		char path[MAXIMUM_PATH_LENGTH];
+		const char *slash = strrchr(mutator->script_path, '/');
+		size_t size = 0;
+		char *text;
+		toml_result_t result;
+
+		if (!mutator->on || mutator->refusal[0] || !mutator->script_path[0] || !slash ||
+			(size_t)(slash - mutator->script_path) + sizeof("/mutator.toml") > sizeof(path))
+		{
+			continue;
+		}
+		snprintf(path, sizeof(path), "%.*s/mutator.toml", (int)(slash - mutator->script_path), mutator->script_path);
+		text = config_file_read(path, &size);
+		if (!text)
+			continue;
+		result = toml_parse(text, (int)size);
+		if (result.ok)
+		{
+			toml_datum_t menu = toml_seek(result.toptab, "script.menu");
+			int row;
+
+			for (row = 0; menu.type == TOML_TABLE && row < menu.u.tab.size && count < maximum; row++)
+			{
+				struct port_mutator_control *control = &controls[count];
+				struct script_value_find find;
+
+				if (menu.u.tab.value[row].type != TOML_STRING)
+					continue;
+				memset(control, 0, sizeof(*control));
+				control->mutator = index;
+				text_copy(control->name, sizeof(control->name), menu.u.tab.key[row], 0);
+				text_copy(control->label, sizeof(control->label), menu.u.tab.value[row].u.s, 0);
+				find.name = control->name;
+				find.value = control->fallback;
+				find.size = sizeof(control->fallback);
+				find.found = 0;
+				script_file_values(mutator, "mutator.toml", 1, script_value_found, &find);
+				find.value = control->value;
+				find.size = sizeof(control->value);
+				find.found = 0;
+				script_file_values(mutator, "settings.toml", 0, script_value_found, &find);
+				if (!find.found)
+					text_copy(control->value, sizeof(control->value), control->fallback, 0);
+				count++;
+			}
+		}
+		toml_free(result);
+		free(text);
+	}
+	return count;
+}
+
+/* settings.toml being written again, each value as it was */
+struct script_settings_write
+{
+	const char *name;
+	const char *value;
+	int written;
+	char text[0x2000];
+	size_t used;
+};
+
+static void script_settings_text(struct script_settings_write *write, const char *name, const char *value)
+{
+	const char *cursor;
+
+	write->used += (size_t)snprintf(write->text + write->used, sizeof(write->text) - write->used, "\"%s\" = \"", name);
+	for (cursor = value; *cursor && write->used + 4 < sizeof(write->text); cursor++)
+	{
+		if (*cursor == '"' || *cursor == '\\')
+			write->text[write->used++] = '\\';
+		if ((unsigned char)*cursor >= 0x20)
+			write->text[write->used++] = *cursor;
+	}
+	write->used += (size_t)snprintf(write->text + write->used, sizeof(write->text) - write->used, "\"\n");
+}
+
+static void script_settings_kept(void *context, const char *name, const char *text, double number, int boolean_value,
+	int kind)
+{
+	struct script_settings_write *write = context;
+
+	if (write->used + 0x200 > sizeof(write->text))
+		return;
+	if (!strcmp(name, write->name))
+	{
+		script_settings_text(write, name, write->value);
+		write->written = 1;
+	}
+	else if (kind == 1)
+		write->used += (size_t)snprintf(write->text + write->used, sizeof(write->text) - write->used,
+			"\"%s\" = %.17g\n", name, number);
+	else if (kind == 2)
+		write->used += (size_t)snprintf(write->text + write->used, sizeof(write->text) - write->used,
+			"\"%s\" = %s\n", name, boolean_value ? "true" : "false");
+	else
+		script_settings_text(write, name, text);
+}
+
+/* a value in the mutator's settings.toml: 0 if it cannot be written */
+int port_mutators_script_control_write(long index, const char *name, const char *value)
+{
+	static struct script_settings_write write;
+	const struct port_mutator *mutator;
+	char path[MAXIMUM_PATH_LENGTH];
+	const char *slash;
+
+	if (index < 0 || index >= port_mutators.count)
+		return 0;
+	mutator = &port_mutators.mutators[index];
+	slash = strrchr(mutator->script_path, '/');
+	if (!slash || (size_t)(slash - mutator->script_path) + sizeof("/settings.toml") > sizeof(path))
+		return 0;
+	snprintf(path, sizeof(path), "%.*s/settings.toml", (int)(slash - mutator->script_path), mutator->script_path);
+	memset(&write, 0, sizeof(write));
+	write.name = name;
+	write.value = value;
+	script_file_values(mutator, "settings.toml", 0, script_settings_kept, &write);
+	if (!write.written)
+		script_settings_text(&write, name, value);
+	return config_file_write(path, write.text);
+}
+
+/* a script's settings: the values of its mutator.toml's [script] table, then this
+player's own, from a settings.toml beside it, which is in no digest */
+void port_mutators_script_settings(const char *key, port_mutators_setting_proc proc, void *context)
+{
+	struct port_mutator *mutator = script_mutator_find(key);
+
+	if (mutator)
+	{
+		script_file_values(mutator, "mutator.toml", 1, proc, context);
+		script_file_values(mutator, "settings.toml", 0, proc, context);
+	}
 }
 
 long port_mutators_tag_edits(unsigned char *edits, long maximum)
@@ -1217,6 +1706,16 @@ static const struct port_mutator *addon_mutator(long index)
 {
 	long mutator_index;
 
+	/* (a client's are its host's, in the host's order) */
+	if (host_mutators_on)
+	{
+		for (mutator_index = 0; mutator_index < host_mutator_count; mutator_index++)
+		{
+			if (host_mutators[mutator_index].addon_path[0] && !index--)
+				return &host_mutators[mutator_index];
+		}
+		return NULL;
+	}
 	for (mutator_index = 0; mutator_index < port_mutators.count; mutator_index++)
 	{
 		const struct port_mutator *mutator = &port_mutators.mutators[mutator_index];
@@ -1227,6 +1726,390 @@ static const struct port_mutator *addon_mutator(long index)
 			return mutator;
 	}
 	return NULL;
+}
+
+/* ---------- the host's mutators' files (port/linux/game/mutator_share.c) */
+
+#define SHARED_NAME_BYTES 64
+#define SHARED_ID_BYTES 64
+
+struct port_mutator_share_file
+{
+	char name[SHARED_NAME_BYTES];
+	unsigned long size;
+	unsigned char sha256[SHA256_SIZE];
+};
+
+struct port_mutator_share
+{
+	char id[SHARED_ID_BYTES];
+	unsigned char digest[SHA256_SIZE];
+	long file_count;
+	struct port_mutator_share_file files[3];
+};
+
+/* the host's mutators with files, by the order they are played */
+static struct port_mutator *share_mutator(long wanted)
+{
+	long index;
+
+	if (!port_mutators.scans)
+		port_mutators_scan();
+	for (index = 0; index < port_mutators.count; index++)
+	{
+		struct port_mutator *mutator = &port_mutators.mutators[index];
+
+		if (mutator->on && !mutator->refusal[0] && (mutator->addon_path[0] || mutator->script_path[0]) && wanted-- == 0)
+			return mutator;
+	}
+	return NULL;
+}
+
+int port_mutators_share_any(void)
+{
+	return share_mutator(0) != NULL;
+}
+
+long port_mutators_share_count(void)
+{
+	long count = 0;
+
+	while (share_mutator(count))
+		count++;
+	return count;
+}
+
+static const char *path_file_name(const char *path)
+{
+	const char *slash = strrchr(path, '/');
+
+	return slash ? slash + 1 : path;
+}
+
+/* a mutator's files: its mutator.toml, its add-on's, its script's */
+static int share_file_paths(const struct port_mutator *mutator, char paths[3][MAXIMUM_PATH_LENGTH])
+{
+	const char *one = mutator->addon_path[0] ? mutator->addon_path : mutator->script_path;
+	const char *slash = strrchr(one, '/');
+	int count = 0;
+
+	if (!slash || (size_t)(slash - one) + sizeof("/mutator.toml") > MAXIMUM_PATH_LENGTH)
+		return 0;
+	snprintf(paths[count++], MAXIMUM_PATH_LENGTH, "%.*s/mutator.toml", (int)(slash - one), one);
+	if (mutator->addon_path[0])
+		snprintf(paths[count++], MAXIMUM_PATH_LENGTH, "%s", mutator->addon_path);
+	if (mutator->script_path[0])
+		snprintf(paths[count++], MAXIMUM_PATH_LENGTH, "%s", mutator->script_path);
+	return count;
+}
+
+int port_mutators_share_entry(long index, struct port_mutator_share *entry)
+{
+	struct port_mutator *mutator = share_mutator(index);
+	char paths[3][MAXIMUM_PATH_LENGTH];
+	int count;
+	int file;
+
+	if (!mutator || !mutator_digest(mutator) || !(count = share_file_paths(mutator, paths)))
+		return 0;
+	memset(entry, 0, sizeof(*entry));
+	text_copy(entry->id, sizeof(entry->id), mutator->id, 0);
+	memcpy(entry->digest, mutator->digest, SHA256_SIZE);
+	entry->file_count = count;
+	for (file = 0; file < count; file++)
+	{
+		size_t size = 0;
+		char *bytes = config_file_read(paths[file], &size);
+
+		if (!bytes)
+			return 0;
+		text_copy(entry->files[file].name, sizeof(entry->files[file].name), path_file_name(paths[file]), 0);
+		entry->files[file].size = (unsigned long)size;
+		p2p_sha256(bytes, (int)size, entry->files[file].sha256);
+		free(bytes);
+	}
+	return 1;
+}
+
+/* the last file read, kept: a piece of it is asked for at a time */
+static struct
+{
+	char path[MAXIMUM_PATH_LENGTH];
+	char *bytes;
+	size_t size;
+} share_read_file;
+
+int port_mutators_share_file_size(long index, long file, unsigned long *size)
+{
+	struct port_mutator *mutator = share_mutator(index);
+	char paths[3][MAXIMUM_PATH_LENGTH];
+	struct posix_file_information information;
+
+	if (!mutator || file < 0 || file >= share_file_paths(mutator, paths) || posix_stat(paths[file], &information) != 0 ||
+		information.size_high)
+	{
+		return 0;
+	}
+	*size = (unsigned long)information.size_low;
+	return 1;
+}
+
+int port_mutators_share_read(long index, long file, unsigned long offset, void *buffer, long size)
+{
+	struct port_mutator *mutator = share_mutator(index);
+	char paths[3][MAXIMUM_PATH_LENGTH];
+
+	if (!mutator || file < 0 || file >= share_file_paths(mutator, paths))
+		return 0;
+	if (strcmp(share_read_file.path, paths[file]) || !share_read_file.bytes)
+	{
+		free(share_read_file.bytes);
+		share_read_file.bytes = config_file_read(paths[file], &share_read_file.size);
+		snprintf(share_read_file.path, sizeof(share_read_file.path), "%s", paths[file]);
+		if (!share_read_file.bytes)
+			return 0;
+	}
+	if (size < 0 || offset > share_read_file.size || (size_t)size > share_read_file.size - offset)
+		return 0;
+	memcpy(buffer, share_read_file.bytes + offset, (size_t)size);
+	return 1;
+}
+
+/* a file's name and size as a host's list may have them: mutator.toml first, then
+at most one add-on and one script, each no larger than the game reads */
+int port_mutators_share_valid(const struct port_mutator_share *entry)
+{
+	long file;
+	int addon = 0;
+	int script = 0;
+
+	if (entry->file_count < 2 || entry->file_count > 3)
+		return 0;
+	for (file = 0; file < entry->file_count; file++)
+	{
+		const char *name = entry->files[file].name;
+		unsigned long maximum;
+
+		if (!memchr(name, 0, SHARED_NAME_BYTES) || !name[0] || name[0] == '.' || strchr(name, '/') || strchr(name, '\\') ||
+			strchr(name, ':'))
+		{
+			return 0;
+		}
+		if (file == 0)
+		{
+			if (strcmp(name, "mutator.toml"))
+				return 0;
+			maximum = MAXIMUM_MUTATOR_FILE_SIZE;
+		}
+		else if (name_ends(name, ".lua") && !script)
+		{
+			script = 1;
+			maximum = MAXIMUM_SCRIPT_FILE_SIZE;
+		}
+		else if ((name_ends(name, ".cevehicle") || name_ends(name, ".ceweapon")) && !addon)
+		{
+			addon = 1;
+			maximum = MAXIMUM_ADDON_FILE_SIZE;
+		}
+		else
+		{
+			return 0;
+		}
+		if (!entry->files[file].size || entry->files[file].size > maximum)
+			return 0;
+	}
+	return 1;
+}
+
+static void share_folder(const struct port_mutator_share *entry, char *path, size_t size)
+{
+	static const char digits[] = "0123456789abcdef";
+	char text[17];
+	int index;
+
+	for (index = 0; index < 8; index++)
+	{
+		text[index * 2] = digits[entry->digest[index] >> 4];
+		text[index * 2 + 1] = digits[entry->digest[index] & 15];
+	}
+	text[16] = 0;
+	snprintf(path, size, "%s/mutator_downloads/%s", platform_data_root(), text);
+}
+
+/* the mutator of those digits read from the downloads folder: 0 if it is not whole,
+or its files are not its list's, or the game would not play it */
+static int share_read_mutator(const struct port_mutator_share *entry, struct port_mutator *mutator)
+{
+	char folder[MAXIMUM_PATH_LENGTH];
+	char path[MAXIMUM_PATH_LENGTH];
+	size_t size = 0;
+	char *text;
+	int result = 0;
+
+	share_folder(entry, folder, sizeof(folder));
+	if (strlen(folder) + sizeof("/mutator.toml") > sizeof(path))
+		return 0;
+	snprintf(path, sizeof(path), "%s/mutator.toml", folder);
+	text = config_file_read(path, &size);
+	if (!text)
+		return 0;
+	memset(mutator, 0, sizeof(*mutator));
+	mutator_read(mutator, path_file_name(folder), text, size, path);
+	free(text);
+	if (!mutator->refusal[0] && mutator_digest(mutator) && !memcmp(mutator->digest, entry->digest, SHA256_SIZE))
+		result = 1;
+	else
+		platform_log("mutators: %s is not played: %s", folder, mutator->refusal[0] ? mutator->refusal : "its files are not the host's");
+	mutator->on = result;
+	return result;
+}
+
+/* this machine's own mutator of the digest, or NULL */
+static struct port_mutator *share_own_mutator(const struct port_mutator_share *entry)
+{
+	long index;
+
+	if (!port_mutators.scans)
+		port_mutators_scan();
+	for (index = 0; index < port_mutators.count; index++)
+	{
+		struct port_mutator *mutator = &port_mutators.mutators[index];
+
+		if (!mutator->refusal[0] && mutator_digest(mutator) && !memcmp(mutator->digest, entry->digest, SHA256_SIZE))
+			return mutator;
+	}
+	return NULL;
+}
+
+int port_mutators_share_has(const struct port_mutator_share *entry)
+{
+	static struct port_mutator read;
+
+	return share_own_mutator(entry) || share_read_mutator(entry, &read);
+}
+
+int port_mutators_share_file_has(const struct port_mutator_share *entry, long file)
+{
+	char folder[MAXIMUM_PATH_LENGTH];
+	char path[MAXIMUM_PATH_LENGTH + SHARED_NAME_BYTES];
+	unsigned char sha256[SHA256_SIZE];
+	size_t size = 0;
+	char *bytes;
+	int has;
+
+	share_folder(entry, folder, sizeof(folder));
+	snprintf(path, sizeof(path), "%s/%s", folder, entry->files[file].name);
+	bytes = config_file_read(path, &size);
+	if (!bytes)
+		return 0;
+	p2p_sha256(bytes, (int)size, sha256);
+	has = size == entry->files[file].size && !memcmp(sha256, entry->files[file].sha256, SHA256_SIZE);
+	free(bytes);
+	return has;
+}
+
+/* a file fetched kept in the downloads folder, if it is what the list says */
+int port_mutators_share_store(const struct port_mutator_share *entry, long file, const void *bytes, unsigned long size)
+{
+	char root[MAXIMUM_PATH_LENGTH];
+	char folder[MAXIMUM_PATH_LENGTH];
+	char path[MAXIMUM_PATH_LENGTH + SHARED_NAME_BYTES];
+	unsigned char sha256[SHA256_SIZE];
+
+	if (size != entry->files[file].size)
+		return 0;
+	p2p_sha256(bytes, (int)size, sha256);
+	if (memcmp(sha256, entry->files[file].sha256, SHA256_SIZE))
+		return 0;
+	snprintf(root, sizeof(root), "%s/mutator_downloads", platform_data_root());
+	share_folder(entry, folder, sizeof(folder));
+	snprintf(path, sizeof(path), "%s/%s", folder, entry->files[file].name);
+	posix_make_directory(root);
+	posix_make_directory(folder);
+	return share_file_write(path, bytes, size);
+}
+
+void port_mutators_host_begin(void)
+{
+	host_mutator_count = 0;
+	host_mutators_on = 1;
+}
+
+/* whether a host's mutator has a script */
+int port_mutators_share_has_script(const struct port_mutator_share *entry)
+{
+	long file;
+
+	for (file = 1; file < entry->file_count && file < 3; file++)
+	{
+		if (name_ends(entry->files[file].name, ".lua"))
+			return 1;
+	}
+	return 0;
+}
+
+static void share_allowed_path(const struct port_mutator_share *entry, char *path, size_t size)
+{
+	char folder[MAXIMUM_PATH_LENGTH];
+
+	share_folder(entry, folder, sizeof(folder));
+	snprintf(path, size, "%.*s/script_allowed", (int)(MAXIMUM_PATH_LENGTH - sizeof("/script_allowed")), folder);
+}
+
+/* whether a host's script needs no question: the player's own mutator has it, or they
+said yes to it */
+int port_mutators_share_script_known(const struct port_mutator_share *entry)
+{
+	char path[MAXIMUM_PATH_LENGTH];
+	struct posix_file_information information;
+
+	if (share_own_mutator(entry))
+		return 1;
+	share_allowed_path(entry, path, sizeof(path));
+	return posix_stat(path, &information) == 0;
+}
+
+void port_mutators_share_script_allow(const struct port_mutator_share *entry)
+{
+	char root[MAXIMUM_PATH_LENGTH];
+	char folder[MAXIMUM_PATH_LENGTH];
+	char path[MAXIMUM_PATH_LENGTH];
+
+	snprintf(root, sizeof(root), "%s/mutator_downloads", platform_data_root());
+	share_folder(entry, folder, sizeof(folder));
+	share_allowed_path(entry, path, sizeof(path));
+	posix_make_directory(root);
+	posix_make_directory(folder);
+	config_file_write(path, "The player allowed this mutator's Lua script.\n");
+}
+
+int port_mutators_host_add(const struct port_mutator_share *entry, int script_allowed)
+{
+	struct port_mutator *own;
+	struct port_mutator *mutator;
+
+	if (host_mutator_count >= MAXIMUM_SHARED_MUTATORS)
+		return 0;
+	mutator = &host_mutators[host_mutator_count];
+	own = share_own_mutator(entry);
+	if (own)
+	{
+		*mutator = *own;
+		mutator->on = 1;
+	}
+	else if (!port_mutators_share_valid(entry) || !share_read_mutator(entry, mutator))
+	{
+		return 0;
+	}
+	mutator->script_refused = !script_allowed;
+	host_mutator_count++;
+	return 1;
+}
+
+void port_mutators_host_clear(void)
+{
+	host_mutators_on = 0;
+	host_mutator_count = 0;
 }
 
 long port_mutators_addon_count(void)
@@ -1294,6 +2177,18 @@ long port_mutators_places(struct port_mutator_place *places, long maximum)
 
 	if (!port_mutators.scans)
 		port_mutators_scan();
+	/* (a client's are its host's) */
+	if (host_mutators_on)
+	{
+		for (index = 0; index < host_mutator_count; index++)
+		{
+			long place;
+
+			for (place = 0; place < host_mutators[index].place_count && count < maximum; place++)
+				places[count++] = host_mutators[index].places[place];
+		}
+		return count;
+	}
 	for (index = 0; index < port_mutators.count; index++)
 	{
 		const struct port_mutator *mutator = &port_mutators.mutators[index];
@@ -1372,9 +2267,13 @@ int port_mutators_details(long index, char *text, unsigned long size)
 			snprintf(text + length, size - length, "%s%s", key ? "\n" : "Effects: ", mutator->keys[key]);
 	}
 	length = strlen(text);
-	if (mutator->tag_edit_count)
+	if (mutator->tag_edit_count > mutator->pose_count)
 		snprintf(text + length, size - length, "%sTag edits: %ld, of %ld tags", mutator->key_count ? "\n" : "",
-			mutator->tag_edit_count, mutator->tag_count);
+			mutator->tag_edit_count - mutator->pose_count, mutator->tag_count);
+	length = strlen(text);
+	if (mutator->pose_count)
+		snprintf(text + length, size - length, "%sPoses: %ld", mutator->key_count ||
+			mutator->tag_edit_count > mutator->pose_count ? "\n" : "", mutator->pose_count);
 	length = strlen(text);
 	if (mutator->addon_path[0])
 		snprintf(text + length, size - length, "%sAdds: %s, placed %ld times", mutator->key_count ||

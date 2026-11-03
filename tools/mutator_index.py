@@ -34,7 +34,7 @@ INDEX_FORMAT = 1
 # port_mutators.c's: MUTATORS_FORMAT, MAXIMUM_MUTATORS,
 # MAXIMUM_MUTATOR_FOLDER_LENGTH (ended), MAXIMUM_MUTATOR_FILE_SIZE and
 # MAXIMUM_ADDON_FILE_SIZE
-MUTATORS_FORMAT = 4
+MUTATORS_FORMAT = 6
 MAXIMUM_MUTATORS = 64
 MAXIMUM_FOLDER_BYTES = 63
 MAXIMUM_MUTATOR_FILE_SIZE = 65536
@@ -103,6 +103,14 @@ def mutator_entry(folder: Path) -> Dict[str, Any]:
         if not addon or "/" in addon or "\\" in addon or addon in (".", ".."):
             raise RefusedError(f"{where}: its addon is a file's name, with no folder")
         files.append(file_entry(folder, addon, MAXIMUM_ADDON_FILE_SIZE))
+    if "script" in table:
+        section = table["script"]
+        if not isinstance(section, dict):
+            raise RefusedError(f"{where}: its script is a table, with its file")
+        script = text(section, "file", "", where)
+        if not script.endswith(".lua") or "/" in script or "\\" in script or script.startswith("."):
+            raise RefusedError(f"{where}: its script is a .lua file's name, with no folder")
+        files.append(file_entry(folder, script, 0x40000))
     authors = table.get("authors", [])
     if isinstance(authors, str):
         authors = [authors]

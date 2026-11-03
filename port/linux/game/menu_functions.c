@@ -1967,6 +1967,22 @@ bindings each */
 #define CONTROL_BINDINGS 2
 #define CONTROL_ROWS 7
 #define CONTROL_NAME_LENGTH 32
+/* the rows the mutators on can have: those groups' left */
+#define MUTATOR_CONTROLS 6
+
+/* (port/linux/src/port_mutators.c's) */
+struct port_mutator_control
+{
+	long mutator;
+	char name[32];
+	char label[32];
+	char value[64];
+	char fallback[64];
+};
+long port_mutators_script_controls(struct port_mutator_control *controls, long maximum);
+int port_mutators_script_control_write(long index, char const *name, char const *value);
+/* (mutator_scripts.c) */
+void mutator_scripts_settings_changed(void);
 
 static struct
 {
@@ -2001,12 +2017,36 @@ static struct
 static struct
 {
 	/* the bindings shown, until OK writes them */
-	char bindings[NUMBEROF(controls)][CONTROL_BINDINGS][CONTROL_NAME_LENGTH];
+	char bindings[NUMBEROF(controls) + MUTATOR_CONTROLS][CONTROL_BINDINGS][CONTROL_NAME_LENGTH];
+	/* the mutators' rows, after the game's */
+	struct port_mutator_control mutator_controls[MUTATOR_CONTROLS];
+	wchar_t mutator_labels[MUTATOR_CONTROLS][32];
+	short mutator_control_count;
 	/* the binding left and right choose, and the one being set */
 	short slot;
 	short capturing_control;
 	short capturing_slot;
-} controls_screen = { { { { 0 } } }, 0, NONE, 0 };
+} controls_screen = { .capturing_control = NONE };
+
+/* the game's controls, and after them the mutators', in the groups with rows left */
+static short controls_count(void)
+{
+	return (short)(NUMBEROF(controls) + controls_screen.mutator_control_count);
+}
+
+static short control_group_of(short control)
+{
+	if (control < (short)NUMBEROF(controls))
+		return controls[control].group;
+	return control - (short)NUMBEROF(controls) < 2 ? 2 : 3;
+}
+
+static wchar_t const *control_label(short control)
+{
+	if (control < (short)NUMBEROF(controls))
+		return controls[control].label;
+	return controls_screen.mutator_labels[control - NUMBEROF(controls)];
+}
 
 /* a setting's bindings ("Left Ctrl, C") into the control's */
 static void control_bindings_read(short control, char const *text)
@@ -2043,7 +2083,20 @@ static void control_bindings_text(short control, char *text, unsigned int size)
 static boolean controls_load(boolean defaults)
 {
 	short control;
+	short mutator_control;
 
+	controls_screen.mutator_control_count = (short)port_mutators_script_controls(controls_screen.mutator_controls,
+		MUTATOR_CONTROLS);
+	for (mutator_control = 0; mutator_control < controls_screen.mutator_control_count; mutator_control++)
+	{
+		struct port_mutator_control const *row = &controls_screen.mutator_controls[mutator_control];
+		short index;
+
+		for (index = 0; row->label[index] && index < 31; index++)
+			controls_screen.mutator_labels[mutator_control][index] = (wchar_t)(unsigned char)row->label[index];
+		controls_screen.mutator_labels[mutator_control][index] = 0;
+		control_bindings_read((short)(NUMBEROF(controls) + mutator_control), defaults ? row->fallback : row->value);
+	}
 	for (control = 0; control < NUMBEROF(controls); control++)
 	{
 		char text[128];
@@ -2062,8 +2115,32 @@ static boolean controls_load(boolean defaults)
 static boolean controls_save(void)
 {
 	short control;
+	short mutator_control;
 	boolean result = TRUE;
+	boolean mutator_changed = FALSE;
 
+	for (mutator_control = 0; mutator_control < controls_screen.mutator_control_count; mutator_control++)
+	{
+		struct port_mutator_control *row = &controls_screen.mutator_controls[mutator_control];
+		char text[128];
+
+		control_bindings_text((short)(NUMBEROF(controls) + mutator_control), text, sizeof(text));
+		if (strcmp(text, row->value))
+		{
+			if (port_mutators_script_control_write(row->mutator, row->name, text))
+			{
+				platform_log("menus: %s = %s", row->name, text);
+				snprintf(row->value, sizeof(row->value), "%s", text);
+				mutator_changed = TRUE;
+			}
+			else
+			{
+				result = FALSE;
+			}
+		}
+	}
+	if (mutator_changed)
+		mutator_scripts_settings_changed();
 	for (control = 0; control < NUMBEROF(controls); control++)
 	{
 		char text[128];
@@ -2096,9 +2173,9 @@ static short control_of_row(struct widget_instance *row, short group)
 	short wanted = row ? (short)(atoi(row->name + 11) - 1) : NONE;
 	short control;
 
-	for (control = 0; control < NUMBEROF(controls) && wanted >= 0; control++)
+	for (control = 0; control < controls_count() && wanted >= 0; control++)
 	{
-		if (controls[control].group == group && wanted-- == 0)
+		if (control_group_of(control) == group && wanted-- == 0)
 			return control;
 	}
 	return NONE;
@@ -2143,7 +2220,7 @@ static void control_capture_poll(void)
 		halo_input_name(input, name, sizeof(name));
 		if (!*name)
 			return;
-		for (other = 0; other < NUMBEROF(controls); other++)
+		for (other = 0; other < controls_count(); other++)
 		{
 			for (other_slot = 0; other_slot < CONTROL_BINDINGS; other_slot++)
 			{
@@ -2182,7 +2259,7 @@ static void controls_update(struct widget_instance *list)
 				focus_row(list, 0);
 			continue;
 		}
-		text_set(named(row, "command_label", 0), controls[control].label);
+		text_set(named(row, "command_label", 0), control_label(control));
 		for (slot = 0; slot < CONTROL_BINDINGS; slot++)
 		{
 			char const *binding = controls_screen.bindings[control][slot];

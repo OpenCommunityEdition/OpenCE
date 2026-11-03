@@ -43,6 +43,7 @@ menu gets FRIENDLY FIRE too.
 
 #include "halo_menus.h"
 #include "custom_edition_cache.h"
+#include "stock_tags.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -2348,8 +2349,24 @@ done:
 void menu_tags_unloaded(
 	void)
 {
+	/* (the stock tags added after these go first: stock_tags.c) */
+	stock_tags_menus_unloading();
 	if (menu_tags.loaded || menu_tags.block_count)
 		menu_tags_release();
+}
+
+/* the index the menus' tags begin at: the count of the tags before them,
+every machine's alike (the table's whole count if they were not added) */
+long menu_tags_first_index(
+	void)
+{
+	long count;
+
+	if (menu_tags.original_instances)
+		return menu_tags.original_count;
+	cache_files_tag_instances(&count);
+
+	return count;
 }
 
 char const *pc_menus_root_name(

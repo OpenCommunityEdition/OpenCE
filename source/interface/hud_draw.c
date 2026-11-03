@@ -710,8 +710,9 @@ static void hud_draw_multitexture_overlay(
 			spans becomes the map's width and height: Halo PC's interface
 			bitmaps are linear at any size, and bigass_v3's dynamic DMR reticle
 			drew as a square. This build's maps keep the Xbox's scale, but for
-			an add-on's bitmaps, which are Halo PC's (port/linux/game/addons.c) */
-			if ((custom_edition_cache_tags_loaded() || addons_bitmap_contains(parameters.map[map_index])) &&
+			an add-on's bitmaps, which are Halo PC's (port/linux/game/addons.c),
+			and so do a Custom Edition map's stock tags (stock_tags.c) */
+			if (addons_bitmap_is_halo_pc(parameters.map[map_index]) &&
 				TEST_FLAG(parameters.map[map_index]->flags, _bitmap_linear_bit))
 			{
 				parameters.map_texture_scale[map_index].i =
@@ -719,7 +720,7 @@ static void hud_draw_multitexture_overlay(
 				parameters.map_texture_scale[map_index].j =
 					(real)parameters.map[map_index]->height;
 			}
-			else if (!custom_edition_cache_tags_loaded() && !addons_bitmap_contains(parameters.map[map_index]) &&
+			else if (!addons_bitmap_is_halo_pc(parameters.map[map_index]) &&
 				non_power_of_two)
 			{
 				parameters.map_texture_scale[map_index].i =
@@ -785,7 +786,7 @@ static void hud_draw_multitexture_overlay(
 	/* port: Halo PC adds a Custom Edition overlay's color weighted by its
 	alpha, where those overlays keep their shape (bigass_v3's dynamic DMR
 	reticle added its whole square), and an add-on's overlay (addons.c) */
-	parameters.alpha_weighted = (custom_edition_cache_tags_loaded() || addons_bitmap_contains(parameters.map[0])) &&
+	parameters.alpha_weighted = addons_bitmap_is_halo_pc(parameters.map[0]) &&
 		parameters.framebuffer_blend_function == _shader_framebuffer_blend_function_add;
 
 	for (function_index = 0;
@@ -1632,7 +1633,7 @@ static void hud_draw_bitmap_internal(
 	(port/linux/src/xbox_textures.c), leaving their static artwork intact;
 	and an add-on's meters, which are Halo PC's (port/linux/game/addons.c) */
 	halo_custom_edition_hud_meter(meter_parameters &&
-		(custom_edition_cache_tags_loaded() || addons_bitmap_contains((struct bitmap_data const *)bitmap)));
+		addons_bitmap_is_halo_pc((struct bitmap_data const *)bitmap));
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 	halo_custom_edition_hud_meter(FALSE); /* port: end the CE meter draw scope */
 

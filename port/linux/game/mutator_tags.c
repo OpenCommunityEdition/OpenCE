@@ -15,12 +15,19 @@ tag's, an enum's, flags' separated by commas) or, for a block, elements of
 the same block in another tag of the group, copied. A tag, element or tag
 named that the map does not have is passed over and logged, on every
 machine alike, since every machine of a game plays the same map: the rest
-are made.
+are made. A tag that an edit only names (one it copies from, or refers to) and
+that a Custom Edition map lacks is first taken from a stock map (stock_tags.c).
+
+A pose (_mutator_tag_edit_pose: object_pose.c) comes as an edit too, so that
+it is checked, sent and played as they are: its group is an object group's
+name, its tag one tag of it or none for all of them, its path a node's name,
+its number the node's scale and its elements none or its offset, three
+thousandths of a world unit.
 
 The edits come as bytes (port_mutators.c writes them, network_mutators.c
 sends the host's), each of them:
 
-	byte kind;              (_mutator_tag_edit_number, _text or _copy)
+	byte kind;              (_mutator_tag_edit_number, _text, _copy or _pose)
 	byte element_count;     (a copy's elements, or 0 for all of them)
 	byte append;            (a copy's: added after the block's own)
 	byte unused;
@@ -49,6 +56,8 @@ a client undoes its last game's before it plays the host's.
 #include "tag_files/tag_groups.h"
 
 #include "mutators.h"
+#include "object_pose.h"
+#include "stock_tags.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -580,7 +589,7 @@ static boolean mutator_tags_read(byte const *data, long size, long *offset, stru
 		((unsigned long)data[at + 7] << 24);
 	csmemcpy(&edit->number, &bits, sizeof(edit->number));
 	at += 8;
-	if (edit->kind > _mutator_tag_edit_copy || edit->append > 1 || data[*offset + 3] ||
+	if (edit->kind >= NUMBER_OF_MUTATOR_TAG_EDIT_KINDS || edit->append > 1 || data[*offset + 3] ||
 		edit->element_count > MAXIMUM_MUTATOR_TAG_COPY_ELEMENTS ||
 		!mutator_tags_read_text(data, size, &at, MUTATOR_TAG_GROUP_LENGTH, &edit->group) ||
 		!mutator_tags_read_text(data, size, &at, MUTATOR_TAG_NAME_LENGTH, &edit->tag) ||
@@ -690,11 +699,55 @@ static boolean mutator_tags_value_valid(struct mutator_tag_field const *field, s
 	return FALSE;
 }
 
+/* whether a pose's group, node, scale and offset are ones it takes */
+static boolean mutator_tags_pose_valid(struct mutator_tag_edit const *edit, char *reason, unsigned long size)
+{
+	short index;
+
+	if (object_pose_group_tag(edit->group) == NONE)
+	{
+		snprintf(reason, size, "this game cannot pose objects of the group %.32s", edit->group);
+		return FALSE;
+	}
+	if (!edit->path[0] || edit->text[0] || edit->append)
+	{
+		snprintf(reason, size, "a pose names a node, and nothing else");
+		return FALSE;
+	}
+	/* (not a NaN, not infinite) */
+	if (!(edit->number == edit->number && edit->number - edit->number == 0.f) ||
+		edit->number < OBJECT_POSE_MINIMUM_SCALE || edit->number > OBJECT_POSE_MAXIMUM_SCALE)
+	{
+		snprintf(reason, size, "a pose's scale must be from %g to %g", OBJECT_POSE_MINIMUM_SCALE,
+			OBJECT_POSE_MAXIMUM_SCALE);
+		return FALSE;
+	}
+	if (edit->element_count != 0 && edit->element_count != 3)
+	{
+		snprintf(reason, size, "a pose's offset is three numbers");
+		return FALSE;
+	}
+	for (index = 0; index < edit->element_count; index++)
+	{
+		short element = mutator_tags_element(edit, index);
+
+		if (element < -1000 * OBJECT_POSE_MAXIMUM_OFFSET || element > 1000 * OBJECT_POSE_MAXIMUM_OFFSET)
+		{
+			snprintf(reason, size, "a pose's offset must be from %g to %g", -OBJECT_POSE_MAXIMUM_OFFSET,
+				OBJECT_POSE_MAXIMUM_OFFSET);
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
 static boolean mutator_tags_edit_valid(struct mutator_tag_edit const *edit, char *reason, unsigned long size)
 {
 	struct mutator_tag_definition const *definition = mutator_tags_group_find(edit->group);
 	struct mutator_tag_field const *field;
 
+	if (edit->kind == _mutator_tag_edit_pose)
+		return mutator_tags_pose_valid(edit, reason, size);
 	if (!definition)
 	{
 		snprintf(reason, size, "this game cannot edit tags of the group %.32s", edit->group);
@@ -728,12 +781,21 @@ static void mutator_tags_pass_over(struct mutator_tag_edit const *edit, char con
 	error(_error_log, "mutators: the edit of %s %s's %s passed over: %s", edit->group, edit->tag, edit->path, reason);
 }
 
+/* a tag an edit names: the map's, or from a stock map if a Custom Edition map
+lacks it (stock_tags.c) */
+static long mutator_tags_named_find(long group_tag, char const *name)
+{
+	long index = tag_loaded(group_tag, name);
+
+	return index != NONE ? index : stock_tags_find(group_tag, name);
+}
+
 /* a copy: the elements of the block at `path` in the tag named by the
 edit's text, in place of (or after) the block's own */
 static boolean mutator_tags_copy(struct mutator_tag_field const *field, struct mutator_tag_edit const *edit,
 	struct tag_block *block, unsigned long group_tag, char *reason, unsigned long size)
 {
-	long source_index = tag_loaded(group_tag, edit->text);
+	long source_index = mutator_tags_named_find(group_tag, edit->text);
 	struct tag_block const *source;
 	long count;
 	long bytes;
@@ -809,6 +871,20 @@ static boolean mutator_tags_make(struct mutator_tag_edit const *edit, char *reas
 	unsigned long bits;
 	real value;
 
+	if (edit->kind == _mutator_tag_edit_pose)
+	{
+		real_vector3d offset;
+
+		offset.i = offset.j = offset.k = 0.f;
+		if (edit->element_count == 3)
+		{
+			offset.i = (real)mutator_tags_element(edit, 0) / 1000.f;
+			offset.j = (real)mutator_tags_element(edit, 1) / 1000.f;
+			offset.k = (real)mutator_tags_element(edit, 2) / 1000.f;
+		}
+		return object_pose_add(object_pose_group_tag(edit->group), edit->tag, edit->path, edit->number, &offset,
+			reason, size);
+	}
 	tag_index = definition ? tag_loaded(definition->group_tag, edit->tag) : NONE;
 	if (tag_index == NONE)
 	{
@@ -824,7 +900,7 @@ static boolean mutator_tags_make(struct mutator_tag_edit const *edit, char *reas
 	if (field->type == _mutator_field_reference)
 	{
 		struct tag_reference *reference = (struct tag_reference *)address;
-		long index = edit->text[0] ? tag_loaded(field->group_tag, edit->text) : NONE;
+		long index = edit->text[0] ? mutator_tags_named_find(field->group_tag, edit->text) : NONE;
 
 		if (edit->text[0] && index == NONE)
 		{
@@ -922,6 +998,7 @@ void mutator_tags_loaded(
 	/* (the map's own bytes everywhere: nothing to undo) */
 	mutator_tags.undo_count = 0;
 	mutator_tags.element_bytes_used = 0;
+	object_pose_clear();
 }
 
 void mutator_tags_undo(
@@ -934,6 +1011,7 @@ void mutator_tags_undo(
 		csmemcpy(undo->address, undo->bytes, undo->size);
 	}
 	mutator_tags.element_bytes_used = 0;
+	object_pose_clear();
 }
 
 boolean mutator_tags_play(
@@ -961,6 +1039,7 @@ boolean mutator_tags_play(
 		else
 			mutator_tags_pass_over(&edit, reason);
 	}
+	stock_tags_finish();
 	if (mutator_tags.made || mutator_tags.passed_over)
 	{
 		error(_error_log, "mutators: %d tag edits made, %d passed over", mutator_tags.made, mutator_tags.passed_over);

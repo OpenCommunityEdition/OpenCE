@@ -1139,6 +1139,114 @@ void custom_edition_addon_models_dispose(
 	return;
 }
 
+/* the indices a part's triangle buffer draws (as tag_schema_models.c's
+model_geometry_part_check counts them) */
+static long stock_part_index_count(
+	struct triangle_buffer const *triangles)
+{
+	if (triangles->type == _triangle_buffer_type_precompiled_strip)
+		return triangles->count > 0 ? triangles->count + 2 : 0;
+
+	return triangles->type == _triangle_buffer_type_triangles ? triangles->count * 3 : 0;
+}
+
+/* the bytes a D3D buffer's Data names, before it is registered (tag_validate.c's
+buffer_data) */
+static void const *stock_buffer_data(
+	void const *hardware_format)
+{
+	return *(void const *const *)((byte const *)hardware_format + 4);
+}
+
+void *custom_edition_stock_model_make(
+	struct model *model,
+	char const *name)
+{
+	struct custom_edition_geometry_globals *globals = malloc(sizeof(*globals));
+	unsigned long geometry_bytes = 0;
+	long part_count = 0;
+	long geometry_index;
+	byte *next;
+	boolean success = TRUE;
+
+	if (!globals)
+		return NULL;
+	csmemset(globals, 0, sizeof(*globals));
+	for (geometry_index = 0; geometry_index < model->geometries.count; geometry_index++)
+	{
+		struct model_geometry const *geometry = TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry_index,
+			struct model_geometry);
+		long part_index;
+
+		for (part_index = 0; part_index < geometry->parts.count; part_index++)
+		{
+			struct model_geometry_part const *part = TAG_BLOCK_GET_ELEMENT(&geometry->parts, part_index,
+				struct model_geometry_part);
+
+			part_count++;
+			if (part->vertex_buffer.hardware_format && part->triangle_buffer.hardware_format)
+			{
+				geometry_bytes += (part->vertex_buffer.count * rasterizer_geometry_get_vertex_size(part->vertex_buffer.type) +
+					3UL) & ~3UL;
+				geometry_bytes += (stock_part_index_count(&part->triangle_buffer) * sizeof(word) + 3UL) & ~3UL;
+			}
+		}
+	}
+	globals->model_parts = malloc((part_count + 1) * sizeof(*globals->model_parts));
+	globals->model_geometry = geometry_allocate(geometry_bytes + 1, &globals->model_geometry_contiguous);
+	if (!globals->model_parts || !globals->model_geometry)
+	{
+		error(_error_silent, "stock tags: out of memory for the geometry of the model '%s'", name);
+		models_dispose(globals);
+		free(globals);
+		return NULL;
+	}
+	next = globals->model_geometry;
+	for (geometry_index = 0; success && geometry_index < model->geometries.count; geometry_index++)
+	{
+		struct model_geometry const *geometry = TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry_index,
+			struct model_geometry);
+		long part_index;
+
+		for (part_index = 0; success && part_index < geometry->parts.count; part_index++)
+		{
+			struct model_geometry_part *part = TAG_BLOCK_GET_ELEMENT(&geometry->parts, part_index,
+				struct model_geometry_part);
+			struct vertex_buffer vertex_source = part->vertex_buffer;
+			struct triangle_buffer triangle_source = part->triangle_buffer;
+			unsigned long vertex_bytes;
+			unsigned long index_bytes;
+			byte *vertices = next;
+			byte *indices;
+
+			/* (none, as the validator leaves a part whose buffers it refused) */
+			csmemset(&part->vertex_buffer, 0, sizeof(part->vertex_buffer));
+			csmemset(&part->triangle_buffer, 0, sizeof(part->triangle_buffer));
+			if (!vertex_source.hardware_format || !triangle_source.hardware_format)
+				continue;
+			vertex_bytes = vertex_source.count * rasterizer_geometry_get_vertex_size(vertex_source.type);
+			index_bytes = stock_part_index_count(&triangle_source) * sizeof(word);
+			indices = vertices + ((vertex_bytes + 3UL) & ~3UL);
+			next = indices + ((index_bytes + 3UL) & ~3UL);
+			csmemcpy(vertices, stock_buffer_data(vertex_source.hardware_format), vertex_bytes);
+			csmemcpy(indices, stock_buffer_data(triangle_source.hardware_format), index_bytes);
+			success = rasterizer_vertex_buffer_new(&part->vertex_buffer, vertex_source.type, vertex_source.count,
+					vertices, vertex_bytes) &&
+				rasterizer_triangle_buffer_new(&part->triangle_buffer, triangle_source.type, triangle_source.count, indices);
+			globals->model_parts[globals->model_part_count++] = part;
+		}
+	}
+	if (!success)
+	{
+		error(_error_silent, "stock tags: cannot make the buffers of the model '%s'", name);
+		models_dispose(globals);
+		free(globals);
+		return NULL;
+	}
+
+	return globals;
+}
+
 boolean custom_edition_structure_bsp_load(
 	struct structure_bsp *structure_bsp)
 {

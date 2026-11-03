@@ -23,6 +23,18 @@ of it taken back */
 void addons_tags_unloaded(
 	void);
 
+/* whether a placement of the scenario's vehicles is one of those beside the
+map's own, which are made after the game's other objects (object_types.c) */
+boolean addons_vehicle_placement_automatic(
+	void const *placement);
+/* the next of those to be made, from *place (0 at first), given a place clear of
+the level and those objects: NULL at the last. One with no room is said, and
+passed over */
+struct scenario;
+void *addons_vehicle_placement_next(
+	struct scenario *scenario,
+	short *place);
+
 /* whether the vehicle definition is an add-on's (game_engine_remap_vehicle
 keeps it), and whether the weapon definition is (game_engine_remap_weapon
 keeps it in the weapon sets of every kind) */
@@ -48,6 +60,18 @@ long addons_messaging_icons(
 struct bitmap_data;
 boolean addons_bitmap_contains(
 	struct bitmap_data const *bitmap);
+/* whether the map loaded has an add-on's tags (stock_tags.h's
+stock_tags_in_map: a stock map's): with neither, the game's hooks return at
+once */
+extern boolean addons_in_map;
+extern boolean stock_tags_in_map;
+/* whether the bitmap is drawn as Halo PC's are: a Custom Edition map's, but for
+the stock tags added to it (stock_tags.c), and an add-on's on any map; with
+neither in the map, as the map's own */
+boolean addons_bitmap_is_halo_pc_found(
+	struct bitmap_data const *bitmap);
+#define addons_bitmap_is_halo_pc(bitmap) ((addons_in_map || stock_tags_in_map) ? \
+	addons_bitmap_is_halo_pc_found(bitmap) : custom_edition_cache_tags_loaded())
 /* a bitmap's pixels read into buffer at once from its add-on's file, and
 made what this build draws, as a Custom Edition map's are (the texture
 cache): FALSE if it is not an add-on's */

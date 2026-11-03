@@ -26,6 +26,11 @@ kind) and for the weapons a custom loadout names (game_engine.c). A tag of the a
 map's: the game finds a reference's tag by its name (tag_loaded), the map's
 first. All of it is taken back before the map's tags go.
 
+A vehicle add-on with no place on a multiplayer map is placed by itself, beside
+the map's own vehicles, flown ones by flown ones and driven by driven, once the
+game's other objects are made and it can be tested against them
+(addons_vehicle_placement_next), on every machine alike.
+
 A bitmap's pixels and a sound's samples are read from the add-on's file
 (addons_read, from cache_file_read), its bitmaps drawn as a Custom Edition
 map's are (addons_bitmap_contains).
@@ -41,12 +46,19 @@ map's are (addons_bitmap_contains).
 #include "text/text_group.h"
 #include "models/model_definitions.h"
 #include "objects/object_definitions.h"
+#include "objects/object_types.h"
+#include "objects/objects.h"
+#include "physics/collision_features.h"
+#include "physics/collision_models.h"
+#include "physics/collisions.h"
+#include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "rasterizer/rasterizer_swizzle.h"
 #include "addon_file.h"
 #include "addons.h"
 #include "cache_file_formats.h"
 #include "custom_edition_cache.h"
+#include "stock_tags.h"
 #include "tag_schema.h"
 #include "tag_walk.h"
 
@@ -116,6 +128,22 @@ enum
 	a vehicle placement (tag_schema_scenario.c's unit_placement) */
 	VEHICLE_PLACEMENT_BYTES = 0x78,
 	VEHICLE_PALETTE_ENTRY_BYTES = 0x30,
+	/* a vehicle's type (coop_vehicles.c's coop_vehicle_definition), and the
+	types that are flown and fixed in place */
+	VEHICLE_TYPE_OFFSET = 0x2F4,
+	_addon_vehicle_type_human_plane = 3,
+	_addon_vehicle_type_alien_fighter = 5,
+	_addon_vehicle_type_turret = 6,
+	/* the vehicles placed by themselves (addon_vehicles_place_beside), each by a
+	map's vehicle, one to a base of a map of two */
+	MAXIMUM_ADDON_AUTOMATIC_PLACES = 16,
+	ADDON_AUTOMATIC_PLACES_PER_VEHICLE = 2,
+	ADDON_AUTOMATIC_DIRECTIONS = 8,
+	ADDON_AUTOMATIC_DISTANCES = 4,
+	/* a Custom Edition map's placement's game types' default and allowed bits,
+	all of them (custom_edition_objects.c's multiplayer_spawn_flags) */
+	VEHICLE_PLACEMENT_SPAWN_FLAGS_OFFSET = 0x5A,
+	VEHICLE_PLACEMENT_SPAWN_FLAGS_ALL = 0x0F0F,
 	MAXIMUM_VEHICLE_PLACEMENTS = 0x50,
 	MAXIMUM_VEHICLE_PALETTE_ENTRIES = 0x50,
 	/* a scenario's netgame equipment (scenario.h's most), and the game type
@@ -230,6 +258,9 @@ struct addon_walk
 
 /* ---------- globals */
 
+/* whether the map loaded has an add-on's tags (addons.h) */
+boolean addons_in_map;
+
 static struct
 {
 	struct addon addons[MAXIMUM_ADDONS];
@@ -259,6 +290,17 @@ static struct
 	named by), and the add-ons' texts they were given */
 	struct addon_icon_text_list icon_text_lists[MAXIMUM_ICON_TEXT_LISTS];
 	short icon_text_list_count;
+	/* the vehicles placed by themselves, beside a map's, after the game's other
+	objects (addons_vehicle_placement_next): a place in the scenario's vehicles,
+	and the vehicle it is beside first */
+	struct
+	{
+		short placement;
+		short beside;
+	} automatic_places[MAXIMUM_ADDON_AUTOMATIC_PLACES];
+	short automatic_place_count;
+	/* the scenario's vehicles that are the map's own, before those */
+	short map_vehicle_count;
 	/* whether the bitmaps whose channels lie where Halo PC keeps them were
 	found (custom_edition_bitmaps.c), with the add-ons' in the table */
 	boolean orders_found;
@@ -285,6 +327,7 @@ long port_mutators_places(struct port_mutator_place *places, long maximum);
 
 static byte *block_grow(struct tag_block *block, struct tag_block *original, byte **placed, long element_size,
 	long maximum);
+static struct addon const *addon_of(long tag_index);
 
 /* ---------- prototypes/CACHE_FILES.C */
 
@@ -669,8 +712,8 @@ static boolean addon_imports_find(
 			group[2] = (char)(imports[index].group_tag >> 8);
 			group[3] = (char)imports[index].group_tag;
 			group[4] = 0;
-			error(_error_silent, "add-ons: %s needs the map's %s '%s', which this map has not", addon->name, group,
-				name ? name : "");
+			error(_error_silent, "add-ons: %s needs the map's %s '%s', which this map has not, nor any stock map", addon->name,
+				group, name ? name : "");
 			return FALSE;
 		}
 		addon->imports[index] = tag_index;
@@ -1202,10 +1245,11 @@ static long addon_tag_find(
 
 /* a vehicle the mutators place, added to the scenario's vehicles as its
 first vehicle is placed (its bsps, its permutation) */
-static void addon_vehicle_place(
+static long addon_vehicle_place(
 	char const *map_name,
 	struct scenario *scenario,
-	struct port_mutator_place const *place)
+	struct port_mutator_place const *place,
+	short source_index)
 {
 	long vehicle = addon_tag_find(VEHICLE_GROUP_TAG, place->tag, NULL);
 	short palette_index;
@@ -1217,7 +1261,7 @@ static void addon_vehicle_place(
 	if (vehicle == NONE)
 	{
 		error(_error_silent, "add-ons: no vehicle '%s' to place on %s", place->tag, map_name);
-		return;
+		return NONE;
 	}
 	/* its palette entry, the scenario's or a new one */
 	for (palette_index = 0; palette_index < scenario->vehicle_palette.count; palette_index++)
@@ -1235,7 +1279,7 @@ static void addon_vehicle_place(
 		if (!reference)
 		{
 			error(_error_silent, "add-ons: %s's vehicle palette is full", map_name);
-			return;
+			return NONE;
 		}
 		addons_globals.vehicle_palette = &scenario->vehicle_palette;
 		reference->group_tag = VEHICLE_GROUP_TAG;
@@ -1243,18 +1287,20 @@ static void addon_vehicle_place(
 		reference->name_length = (long)strlen(reference->name);
 		reference->index = vehicle;
 	}
-	/* the placement: as the scenario's first vehicle is placed (its bsps,
-	its permutation), at the place's position and facing */
+	/* the placement: as a vehicle of the scenario's is placed (its bsps, its
+	permutation; the first, or the one it is placed beside), at the place's
+	position and facing */
 	placement = block_grow(&scenario->vehicles, &addons_globals.original_vehicles, &addons_globals.placed_vehicles,
 		VEHICLE_PLACEMENT_BYTES, MAXIMUM_VEHICLE_PLACEMENTS);
 	if (!placement)
 	{
 		error(_error_silent, "add-ons: %s has as many vehicles placed as it can have", map_name);
-		return;
+		return NONE;
 	}
 	addons_globals.vehicles = &scenario->vehicles;
 	if (scenario->vehicles.count > 1)
-		csmemcpy(placement, scenario->vehicles.address, VEHICLE_PLACEMENT_BYTES);
+		csmemcpy(placement, (byte *)scenario->vehicles.address + source_index * VEHICLE_PLACEMENT_BYTES,
+			VEHICLE_PLACEMENT_BYTES);
 	{
 		struct scenario_object_datum *object = (struct scenario_object_datum *)placement;
 
@@ -1267,10 +1313,14 @@ static void addon_vehicle_place(
 		object->rotation.pitch = 0.f;
 		object->rotation.roll = 0.f;
 	}
+	/* (a Custom Edition map places a vehicle by these, for the game type: an
+	add-on's in every one, whatever the vehicle it was copied from's) */
+	if (custom_edition_cache_tags_loaded())
+		*(word *)(placement + VEHICLE_PLACEMENT_SPAWN_FLAGS_OFFSET) = VEHICLE_PLACEMENT_SPAWN_FLAGS_ALL;
 	error(_error_silent, "add-ons: '%s' placed on %s at (%.3f, %.3f, %.3f), facing %.1f degrees", place->tag,
 		map_name, place->position[0], place->position[1], place->position[2], place->facing);
 
-	return;
+	return scenario->vehicles.count - 1;
 }
 
 /* the item collection of a weapon add-on's that spawns its weapon (the
@@ -1336,6 +1386,166 @@ static void addon_weapon_place(
 
 /* the vehicles and weapons the mutators on place on this map, added to its
 scenario */
+/* a vehicle's type, by its definition */
+static short addon_vehicle_type(
+	long definition_index)
+{
+	return *(short *)((byte *)tag_get(VEHICLE_GROUP_TAG, definition_index) + VEHICLE_TYPE_OFFSET);
+}
+
+static boolean addon_vehicle_type_flown(
+	short type)
+{
+	return type == _addon_vehicle_type_human_plane || type == _addon_vehicle_type_alien_fighter;
+}
+
+/* the map's own vehicle a placement places, or NONE (none, an add-on's, or
+fixed in place) */
+static long addon_placement_map_vehicle(
+	struct scenario const *scenario,
+	short placement_index)
+{
+	struct scenario_object_datum const *placement = (struct scenario_object_datum const *)
+		((byte const *)scenario->vehicles.address + placement_index * VEHICLE_PLACEMENT_BYTES);
+	struct tag_reference const *reference;
+
+	if (placement->palette_entry_index < 0 || placement->palette_entry_index >= scenario->vehicle_palette.count)
+		return NONE;
+	reference = (struct tag_reference const *)((byte const *)scenario->vehicle_palette.address +
+		placement->palette_entry_index * VEHICLE_PALETTE_ENTRY_BYTES);
+	if (reference->index == NONE || addon_of(reference->index) ||
+		addon_vehicle_type(reference->index) == _addon_vehicle_type_turret)
+	{
+		return NONE;
+	}
+
+	return reference->index;
+}
+
+/* the map's vehicles the add-on's is placed beside: the first of its kind
+(flown or driven), and the one of them furthest from it, a base's distance
+away; of another kind if the map has none of its. The count */
+static short addon_vehicle_places_choose(
+	struct scenario const *scenario,
+	short map_vehicle_count,
+	boolean flown,
+	short *beside)
+{
+	short pass;
+
+	for (pass = 0; pass < 2; pass++)
+	{
+		real furthest = 20.f * 20.f;
+		short count = 0;
+		short index;
+
+		for (index = 0; index < map_vehicle_count; index++)
+		{
+			long vehicle = addon_placement_map_vehicle(scenario, index);
+			struct scenario_object_datum const *placement = (struct scenario_object_datum const *)
+				((byte const *)scenario->vehicles.address + index * VEHICLE_PLACEMENT_BYTES);
+
+			if (vehicle == NONE || (pass == 0 && addon_vehicle_type_flown(addon_vehicle_type(vehicle)) != flown))
+				continue;
+			if (!count)
+			{
+				beside[count++] = index;
+			}
+			else
+			{
+				struct scenario_object_datum const *first = (struct scenario_object_datum const *)
+					((byte const *)scenario->vehicles.address + beside[0] * VEHICLE_PLACEMENT_BYTES);
+				real x = placement->position.x - first->position.x;
+				real y = placement->position.y - first->position.y;
+				real z = placement->position.z - first->position.z;
+				real distance = x * x + y * y + z * z;
+
+				if (distance > furthest)
+				{
+					furthest = distance;
+					beside[1] = index;
+					count = 2;
+				}
+			}
+		}
+		if (count)
+			return count;
+	}
+
+	return 0;
+}
+
+/* a multiplayer map given each vehicle add-on with no place on it: beside the
+map's vehicles. Where exactly waits for the level and its objects
+(addons_vehicle_placement_next) */
+static void addon_vehicles_place_beside(
+	char const *map_name,
+	struct scenario *scenario,
+	struct port_mutator_place const *places,
+	long place_count)
+{
+	short map_vehicle_count = (short)scenario->vehicles.count;
+	short addon_index;
+
+	if (scenario->type != _scenario_type_multiplayer)
+		return;
+	addons_globals.map_vehicle_count = map_vehicle_count;
+	for (addon_index = 0; addon_index < addons_globals.count; addon_index++)
+	{
+		struct addon const *addon = &addons_globals.addons[addon_index];
+		char const *name;
+		short beside[ADDON_AUTOMATIC_PLACES_PER_VEHICLE];
+		short count;
+		short index;
+		long place;
+		boolean placed = FALSE;
+
+		if (addon->kind != _addon_file_kind_vehicle)
+			continue;
+		name = addon->tag_header->instances[addon->header.root_tag].name;
+		for (place = 0; place < place_count; place++)
+		{
+			if (!places[place].weapon && !_stricmp(places[place].map, map_name) && !_stricmp(places[place].tag, name))
+				placed = TRUE;
+		}
+		if (placed)
+			continue;
+		count = addon_vehicle_places_choose(scenario, map_vehicle_count,
+			addon_vehicle_type_flown(addon_vehicle_type(addon->handles[addon->header.root_tag])), beside);
+		if (!count)
+		{
+			error(_error_silent, "add-ons: %s has no vehicles for '%s' to be placed beside, and no place for it", map_name,
+				name);
+			continue;
+		}
+		for (index = 0; index < count && addons_globals.automatic_place_count < MAXIMUM_ADDON_AUTOMATIC_PLACES; index++)
+		{
+			struct scenario_object_datum const *source = (struct scenario_object_datum const *)
+				((byte const *)scenario->vehicles.address + beside[index] * VEHICLE_PLACEMENT_BYTES);
+			struct port_mutator_place automatic;
+			long placement;
+
+			csmemset(&automatic, 0, sizeof(automatic));
+			csstrncpy(automatic.map, map_name, sizeof(automatic.map) - 1);
+			csstrncpy(automatic.tag, name, sizeof(automatic.tag) - 1);
+			automatic.position[0] = source->position.x;
+			automatic.position[1] = source->position.y;
+			automatic.position[2] = source->position.z;
+			automatic.facing = source->rotation.yaw * (real)(180.0 / 3.14159265358979323846);
+			placement = addon_vehicle_place(map_name, scenario, &automatic, beside[index]);
+			if (placement != NONE)
+			{
+				short automatic_index = addons_globals.automatic_place_count++;
+
+				addons_globals.automatic_places[automatic_index].placement = (short)placement;
+				addons_globals.automatic_places[automatic_index].beside = beside[index];
+			}
+		}
+	}
+
+	return;
+}
+
 static void addons_place(
 	char const *map_name,
 	struct scenario *scenario)
@@ -1351,10 +1561,178 @@ static void addons_place(
 		if (places[index].weapon)
 			addon_weapon_place(map_name, scenario, &places[index]);
 		else
-			addon_vehicle_place(map_name, scenario, &places[index]);
+			addon_vehicle_place(map_name, scenario, &places[index], 0);
 	}
+	addon_vehicles_place_beside(map_name, scenario, places, place_count);
 
 	return;
+}
+
+/* the collision the places are tested against: the level and the objects
+already made, the same on every machine as a game's objects are placed */
+#define ADDON_PLACE_COLLISION_FLAGS (FLAG(_collision_test_structure_bit) | FLAG(_collision_test_objects_bit) | \
+	_collision_test_objects_sight_blocking_flags | FLAG(_collision_test_front_facing_surfaces_bit) | \
+	FLAG(_collision_test_back_facing_surfaces_bit))
+
+/* the first thing a ray from point along vector hits */
+static boolean addon_structure_hit(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	struct collision_result *hit)
+{
+	return collision_test_vector(ADDON_PLACE_COLLISION_FLAGS, point, vector, NONE, hit);
+}
+
+/* the ground under a point, level enough for a vehicle: FALSE if there is none
+near where the vehicle beside it stands */
+static boolean addon_ground_find(
+	real x,
+	real y,
+	real z,
+	struct collision_result *hit)
+{
+	real_point3d above;
+	real_vector3d down = { 0.f, 0.f, -16.f };
+
+	above.x = x;
+	above.y = y;
+	above.z = z + 6.f;
+
+	return addon_structure_hit(&above, &down, hit) && hit->plane.n.k >= 0.65f;
+}
+
+/* whether a sphere round the point touches an object's collision model, or an
+object that has none by its bounding sphere (as coop_vehicles.c's
+vehicles_home_clear): a bounding sphere alone will not do, a map's scenery may
+have one of thousands of world units */
+static boolean addon_place_free(
+	real_point3d const *center,
+	real radius)
+{
+	struct location location;
+	long indices[64];
+	short count;
+	short index;
+
+	scenario_location_from_point(&location, center);
+	if (location.leaf_index == NONE || location.cluster_index == NONE)
+		return FALSE;
+	count = objects_in_sphere(0, _object_mask_all & ~_object_mask_projectile, &location, center, radius,
+		indices, NUMBEROF(indices));
+	if (count == NUMBEROF(indices) || collision_test_sphere(center, radius, NONE))
+		return FALSE;
+	for (index = 0; index < count; index++)
+	{
+		struct object_datum *object = object_get(indices[index]);
+		struct collision_model_instance instance;
+
+		if (object->object.parent_object_index != NONE)
+			continue;
+		if (collision_model_instance_new(&instance, indices[index]))
+		{
+			if (collision_model_test_sphere(&instance, center, radius))
+				return FALSE;
+		}
+		else
+		{
+			real x = object->object.bounding_sphere_center.x - center->x;
+			real y = object->object.bounding_sphere_center.y - center->y;
+			real z = object->object.bounding_sphere_center.z - center->z;
+			real clearance = radius + object->object.bounding_sphere_radius;
+
+			if (x * x + y * y + z * z < clearance * clearance)
+				return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
+/* a place for the vehicle in sight of the one it is beside, on level ground with
+room around and above it: FALSE if there is none */
+static boolean addon_place_find(
+	struct scenario_object_datum const *beside,
+	long vehicle,
+	real beside_radius,
+	real_point3d *found)
+{
+	/* (its right, its left, behind and before it, then between them) */
+	static real const directions[ADDON_AUTOMATIC_DIRECTIONS][2] =
+	{
+		{ 0.f, -1.f }, { 0.f, 1.f }, { -1.f, 0.f }, { 1.f, 0.f },
+		{ -0.7071f, -0.7071f }, { -0.7071f, 0.7071f }, { 0.7071f, -0.7071f }, { 0.7071f, 0.7071f },
+	};
+	struct _object_definition const *definition = (struct _object_definition const *)tag_get(VEHICLE_GROUP_TAG, vehicle);
+	real radius = definition->bounding_radius;
+	boolean flown = addon_vehicle_type_flown(addon_vehicle_type(vehicle));
+	real lift = flown ? 1.f : 0.3f;
+	/* (what the ground may rise or fall under it: what is flown stands on less) */
+	real step = flown ? 2.f : 1.5f;
+	real forward_x = (real)cos(beside->rotation.yaw);
+	real forward_y = (real)sin(beside->rotation.yaw);
+	short distance_index;
+	short direction;
+
+	for (distance_index = 1; distance_index <= ADDON_AUTOMATIC_DISTANCES; distance_index++)
+	{
+		real distance = (radius + beside_radius + 1.f) * (real)distance_index;
+
+		for (direction = 0; direction < ADDON_AUTOMATIC_DIRECTIONS; direction++)
+		{
+			real along = directions[direction][0];
+			real across = directions[direction][1];
+			real x = beside->position.x + (forward_x * along - forward_y * across) * distance;
+			real y = beside->position.y + (forward_y * along + forward_x * across) * distance;
+			struct collision_result ground;
+			struct collision_result other;
+			real_point3d point;
+			real_point3d from;
+			real_point3d center;
+			real_vector3d up;
+			real_vector3d to;
+			short corner;
+			boolean level = TRUE;
+
+			if (!addon_ground_find(x, y, beside->position.z, &ground))
+				continue;
+			/* (the ground around it within a step of the ground under it) */
+			for (corner = 0; level && corner < 4; corner++)
+			{
+				real corner_x = x + (corner < 2 ? radius : -radius) * 0.7f;
+				real corner_y = y + (corner % 2 ? radius : -radius) * 0.7f;
+
+				level = addon_ground_find(corner_x, corner_y, beside->position.z, &other) &&
+					other.point.z - ground.point.z < step && ground.point.z - other.point.z < step;
+			}
+			if (!level)
+				continue;
+			point = ground.point;
+			point.z += lift;
+			/* (inside the level, with its height clear above it, and the vehicle
+			beside it in sight: not over a wall) */
+			up.i = 0.f;
+			up.j = 0.f;
+			up.k = radius * 2.f;
+			if (addon_structure_hit(&point, &up, &other))
+				continue;
+			/* (above the vehicle beside it, which the ray must not take for a wall) */
+			from = beside->position;
+			from.z += beside_radius + 1.f;
+			to.i = point.x - from.x;
+			to.j = point.y - from.y;
+			to.k = point.z + beside_radius + 1.f - from.z;
+			if (addon_structure_hit(&from, &to, &other))
+				continue;
+			center = point;
+			center.z += radius;
+			if (!addon_place_free(&center, radius))
+				continue;
+			*found = point;
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
 /* whether a graph has a weapon type of the label, in any seat */
@@ -1487,9 +1865,44 @@ static struct addon const *addon_of(
 	return NULL;
 }
 
-/* ---------- public code */
+/* the stock tags the add-ons on name that a Custom Edition map lacks, added to
+it before the add-ons' tags are (stock_tags.c): a stock map has them all */
+static void addons_stock_imports_add(
+	long addon_count)
+{
+	long index;
 
-void addons_tags_loaded(
+	for (index = 0; index < addon_count; index++)
+	{
+		struct addon addon;
+
+		csmemset(&addon, 0, sizeof(addon));
+		if (addon_file_read(&addon, index))
+		{
+			struct addon_file_import const *imports =
+				(struct addon_file_import const *)(addon.file + addon.header.imports.offset);
+			long import;
+
+			addon.tag_data = addon.file + addon.header.tag_data.offset;
+			for (import = 0; import < (long)addon.header.imports.count; import++)
+			{
+				long group_tag = table_group((long)imports[import].group_tag);
+				char const *name = tag_data_string(&addon, imports[import].name_offset);
+
+				if (name && tag_loaded(group_tag, name) == NONE)
+					stock_tags_find_before_menus(group_tag, name);
+			}
+			addon.tag_data = NULL;
+		}
+		addon_dispose(&addon);
+	}
+	stock_tags_finish();
+
+	return;
+}
+
+/* the add-ons' tags of the mutators on, after the map's */
+static void addons_tags_load(
 	char const *map_name,
 	long scenario_index)
 {
@@ -1503,6 +1916,8 @@ void addons_tags_loaded(
 	/* (the main menu's map plays none) */
 	if (!addon_count || !_stricmp(map_name, "ui"))
 		return;
+	if (custom_edition_cache_tags_loaded())
+		addons_stock_imports_add(addon_count);
 	addons_globals.original_instances = cache_files_tag_instances(&addons_globals.original_count);
 	if (!addons_globals.original_instances)
 		return;
@@ -1590,6 +2005,10 @@ void addons_tags_loaded(
 		/* (the maps' they were made from: bigass_open_v1.1's ammo meters
 		keep the Xbox's channels) */
 		behaviours &= (1UL << NUMBER_OF_CUSTOM_EDITION_BEHAVIOURS) - 1;
+		/* (a Custom Edition map's bitmaps follow its own, which an add-on's
+		would change) */
+		if (custom_edition_cache_tags_loaded())
+			behaviours = 0;
 		addons_globals.orders_found = custom_edition_loaded_reordered_bitmaps_find(behaviours);
 	}
 
@@ -1607,6 +2026,16 @@ void addons_tags_loaded(
 		addons_place(map_name, addons_globals.original_instances[DATUM_INDEX_TO_ABSOLUTE_INDEX(scenario_index)].base_address);
 
 	return;
+}
+
+/* ---------- public code */
+
+void addons_tags_loaded(
+	char const *map_name,
+	long scenario_index)
+{
+	addons_tags_load(map_name, scenario_index);
+	addons_in_map = addons_globals.count > 0;
 }
 
 void addons_tags_unloaded(
@@ -1656,13 +2085,150 @@ void addons_tags_unloaded(
 		cache_files_set_tag_instances(addons_globals.original_instances, addons_globals.original_count);
 		free(addons_globals.instances);
 	}
-	if (addons_globals.orders_found)
+	/* (a Custom Edition map's are its own, which it forgets as it goes) */
+	if (addons_globals.orders_found && !custom_edition_cache_tags_loaded())
 		custom_edition_bitmaps_dispose();
 	for (index = 0; index < addons_globals.count; index++)
 		addon_dispose(&addons_globals.addons[index]);
 	csmemset(&addons_globals, 0, sizeof(addons_globals));
+	addons_in_map = FALSE;
+	stock_tags_unloaded();
 
 	return;
+}
+
+/* how far a placement of the scenario's vehicles is from another, squared */
+static real addon_placement_distance(
+	byte const *vehicles,
+	struct scenario_object_datum const *from,
+	short index)
+{
+	struct scenario_object_datum const *to = (struct scenario_object_datum const *)
+		(vehicles + index * VEHICLE_PLACEMENT_BYTES);
+	real x = to->position.x - from->position.x;
+	real y = to->position.y - from->position.y;
+	real z = to->position.z - from->position.z;
+
+	return x * x + y * y + z * z;
+}
+
+void *addons_vehicle_placement_next(
+	struct scenario *scenario,
+	short *place)
+{
+	short index;
+
+	for (index = *place; index < addons_globals.automatic_place_count; index++)
+	{
+		byte *vehicles = scenario->vehicles.address;
+		struct scenario_object_datum *placement = (struct scenario_object_datum *)
+			(vehicles + addons_globals.automatic_places[index].placement * VEHICLE_PLACEMENT_BYTES);
+		struct scenario_object_datum const *beside = (struct scenario_object_datum const *)
+			(vehicles + addons_globals.automatic_places[index].beside * VEHICLE_PLACEMENT_BYTES);
+		struct scenario_object_palette_entry const *entry =
+			TAG_BLOCK_GET_ELEMENT(&scenario->vehicle_palette, placement->palette_entry_index,
+				struct scenario_object_palette_entry);
+		boolean flown = addon_vehicle_type_flown(addon_vehicle_type(entry->reference.index));
+		short *order;
+		short order_count = 0;
+		short pass;
+		short tried;
+		boolean found_place = FALSE;
+
+		order = malloc((addons_globals.map_vehicle_count + 1) * sizeof(*order));
+		if (!order)
+			continue;
+		/* (the one chosen, then the map's other vehicles of its kind, then of
+		the other kinds, the nearest of each first: the same on every machine) */
+		order[order_count++] = addons_globals.automatic_places[index].beside;
+		for (pass = 0; pass < 2; pass++)
+		{
+			short first_of_pass = order_count;
+			short other;
+
+			for (other = 0; other < addons_globals.map_vehicle_count; other++)
+			{
+				long vehicle = addon_placement_map_vehicle(scenario, other);
+				short at;
+
+				if (vehicle == NONE || other == addons_globals.automatic_places[index].beside ||
+					(addon_vehicle_type_flown(addon_vehicle_type(vehicle)) == flown) != (pass == 0))
+				{
+					continue;
+				}
+				at = order_count++;
+				order[at] = other;
+				while (at > first_of_pass)
+				{
+					short held;
+
+					if (addon_placement_distance(vehicles, beside, order[at - 1]) <=
+						addon_placement_distance(vehicles, beside, order[at]))
+					{
+						break;
+					}
+					held = order[at - 1];
+					order[at - 1] = order[at];
+					order[at] = held;
+					at--;
+				}
+			}
+		}
+		for (tried = 0; tried < order_count && !found_place; tried++)
+		{
+			struct scenario_object_datum const *candidate = (struct scenario_object_datum const *)
+				(vehicles + order[tried] * VEHICLE_PLACEMENT_BYTES);
+			struct scenario_object_palette_entry const *candidate_entry =
+				TAG_BLOCK_GET_ELEMENT(&scenario->vehicle_palette, candidate->palette_entry_index,
+					struct scenario_object_palette_entry);
+			real_point3d found;
+
+			if (candidate->on_bsp_flags && !TEST_FLAG(candidate->on_bsp_flags, global_structure_bsp_index))
+				continue;
+			if (addon_place_find(candidate, entry->reference.index,
+				((struct _object_definition const *)tag_get(VEHICLE_GROUP_TAG, candidate_entry->reference.index))->bounding_radius,
+				&found))
+			{
+				placement->position = found;
+				placement->on_bsp_flags = candidate->on_bsp_flags;
+				found_place = TRUE;
+				error(_error_silent, "add-ons: '%s' placed beside '%s', at (%.3f, %.3f, %.3f)",
+					tag_get_name(entry->reference.index), tag_get_name(candidate_entry->reference.index), found.x, found.y, found.z);
+			}
+		}
+		free(order);
+		if (!found_place)
+		{
+			error(_error_silent, "add-ons: no room for '%s' beside any of the map's %d vehicles: it is not placed",
+				tag_get_name(entry->reference.index), order_count);
+		}
+		else
+		{
+			*place = index + 1;
+			return placement;
+		}
+	}
+	*place = index;
+
+	return NULL;
+}
+
+boolean addons_vehicle_placement_automatic(
+	void const *placement)
+{
+	byte const *vehicles;
+	short index;
+
+	if (!addons_globals.automatic_place_count)
+		return FALSE;
+	vehicles = addons_globals.vehicles->address;
+	for (index = 0; index < addons_globals.automatic_place_count; index++)
+	{
+		if (placement == vehicles + addons_globals.automatic_places[index].placement * VEHICLE_PLACEMENT_BYTES)
+			return TRUE;
+	}
+
+	return FALSE;
 }
 
 boolean addons_vehicle(
@@ -1736,19 +2302,36 @@ boolean addons_bitmap_contains(
 	return bitmap && addon_of(bitmap->tag_index) != NULL;
 }
 
+boolean addons_bitmap_is_halo_pc_found(
+	struct bitmap_data const *bitmap)
+{
+	if (custom_edition_cache_tags_loaded())
+		return !stock_tags_bitmap_contains(bitmap);
+
+	return addons_bitmap_contains(bitmap);
+}
+
 boolean addons_bitmaps_read(
 	struct bitmap_data *bitmap,
 	void *buffer)
 {
-	struct addon const *addon = bitmap ? addon_of(bitmap->tag_index) : NULL;
+	struct addon const *addon;
 	struct bitmap_group const *group;
 	long bitmap_index;
 
+	/* (with no add-on, none before it and no stock tag: as the map's own, at
+	once) */
+	if (!addons_globals.count && !addons_globals.orders_found && !stock_tags_in_map)
+		return FALSE;
+	addon = bitmap ? addon_of(bitmap->tag_index) : NULL;
+	if (stock_tags_bitmaps_read(bitmap, buffer))
+		return TRUE;
 	if (!addon)
 	{
 		/* (the renderer keeps each address's channel order until it is told
-		another: a map's bitmap where an add-on's was has the Xbox's) */
-		if (addons_globals.orders_found)
+		another: a map's bitmap where an add-on's was has the Xbox's; a Custom
+		Edition map's are told theirs as they arrive) */
+		if (addons_globals.orders_found && !custom_edition_cache_tags_loaded())
 			halo_custom_edition_texels_channels(buffer, _custom_edition_channels_xbox);
 		return FALSE;
 	}
@@ -1772,8 +2355,13 @@ boolean addons_read(
 	long size,
 	void *buffer)
 {
-	struct addon const *addon = addon_of(tag_index);
+	struct addon const *addon;
 
+	if (!addons_globals.count && !stock_tags_in_map)
+		return FALSE;
+	addon = addon_of(tag_index);
+	if (stock_tags_read(tag_index, offset, size, buffer))
+		return TRUE;
 	if (!addon)
 		return FALSE;
 	/* (the validator checked every offset the tags hold: these are checked

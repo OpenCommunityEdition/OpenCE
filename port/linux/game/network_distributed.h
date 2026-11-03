@@ -149,6 +149,13 @@ enum
 	bytes in pieces, to each client, reliably, as it is ready, before the
 	host's mutators' keys */
 	_distributed_message_mutator_tag_edits = 113,
+	/* the host's mutators' files (mutator_share.c): a client asks, the host lists them,
+	a client says it is fetching them (map_share.c's connections carry them), and has
+	them */
+	_distributed_message_mutator_share_ask = 114,
+	_distributed_message_mutator_share_entry = 115,
+	_distributed_message_mutator_share_fetching = 116,
+	_distributed_message_mutator_share_done = 117,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

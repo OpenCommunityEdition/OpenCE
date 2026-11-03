@@ -1,4 +1,4 @@
-"""The mutators' game side (mutators.c, network_mutators.c, mutator_big_head.c) and their hooks, without assets."""
+"""The mutators' game side (mutators.c, network_mutators.c, object_pose.c) and their hooks, without assets."""
 import re
 import sys
 from pathlib import Path
@@ -22,9 +22,9 @@ def message_ids():
 def generated(fault=None):
     game = stripped('port/linux/game/mutators.c')
     network = stripped('port/linux/game/network_mutators.c')
-    big_head = stripped('port/linux/game/mutator_big_head.c')
-    if fault == 'range':
-        game = mutated(game, 'return value >= mutator_parameter_definitions[parameter].minimum &&', 'return TRUE ||')
+    pose = stripped('port/linux/game/object_pose.c')
+    if fault == 'number':
+        game = mutated(game, '!(values[index] == values[index] &&', '!(TRUE ||')
     if fault == 'authority':
         network = mutated(network, 'if (machine_index != NONE ||', 'if (FALSE ||')
     if fault == 'client':
@@ -33,39 +33,55 @@ def generated(fault=None):
         network = mutated(network, '(message.offset && (message.offset != network_mutator_tag_edits.received ||',
                           '(FALSE && (message.offset != network_mutator_tag_edits.received ||')
     if fault == 'sphere':
-        big_head = mutated(big_head, 'return MAX(bounding_radius, big_head_radius(object_index, 1.f));',
-                           'return bounding_radius;')
-    return (('mutators_header.inc', read('port/linux/game/mutators.h')), ('mutators.inc', game),
-            ('network_mutators.inc', network), ('big_head.inc', big_head), ('message_ids.inc', message_ids()))
+        pose = mutated(pose, 'posed = object_pose_radius(object_index, 1.f);', 'posed = 0.f;')
+    if fault == 'children':
+        pose = mutated(pose, 'if (VALID_INDEX(node->first_child_node_index, node_count) && depth < node_count)',
+                       'if (FALSE)')
+    if fault == 'siblings':
+        pose = mutated(pose, 'if (index != node_index && VALID_INDEX(node->next_sibling_node_index, node_count)',
+                       'if (VALID_INDEX(node->next_sibling_node_index, node_count)')
+    if fault == 'twice':
+        pose = mutated(pose, 'pose->nodes[index].scale *= scale;', 'pose->nodes[index].scale = scale;')
+    header = '\n'.join(line for line in read('port/linux/game/object_pose.h').splitlines()
+                       if line.startswith('#define OBJECT_POSE_'))
+    return (('mutators_header.inc', read('port/linux/game/mutators.h') + '\n' + header), ('mutators.inc', game),
+            ('network_mutators.inc', network), ('object_pose.inc', pose), ('message_ids.inc', message_ids()))
 
 
-@pytest.mark.parametrize('case', ['keys', 'local', 'host', 'wire', 'tag_edits', 'big_head'])
+@pytest.mark.parametrize('case', ['keys', 'local', 'host', 'wire', 'scripts', 'tag_edits', 'pose'])
 def test_case(case):
     status, output = run(build('mutators', generated()), case)
     assert status == 0, output
 
 
-@pytest.mark.parametrize('fault,case', [('range', 'keys'), ('authority', 'wire'), ('client', 'local'),
-                                        ('order', 'tag_edits'), ('authority', 'tag_edits'), ('sphere', 'big_head')])
+@pytest.mark.parametrize('fault,case', [('number', 'host'), ('authority', 'wire'), ('client', 'local'),
+                                        ('order', 'tag_edits'), ('authority', 'tag_edits'), ('sphere', 'pose'),
+                                        ('children', 'pose'), ('siblings', 'pose'), ('twice', 'pose')])
 def test_negative(fault, case):
     status, output = run(build('mutators', generated(fault)), case)
     assert status == CHECK_FAILED, output
 
 
 def test_hooks():
-    """the engine's hooks, each marked, and the collision test that scales with the node's matrix"""
-    bipeds = read('source/units/bipeds.c')
-    hook = bipeds[bipeds.index('void biped_preprocess_node_orientations('):]
+    """the engine's hooks, each marked and none a mutator's own, and the collision test that scales with the node's
+    matrix"""
+    for path in ('source/units/bipeds.c', 'source/objects/objects.c', 'source/objects/objects.h',
+                 'source/objects/object_types.c'):
+        assert 'big_head' not in read(path) and 'big head' not in read(path), path
+    types = read('source/objects/object_types.c')
+    hook = types[types.index('void object_type_preprocess_node_orientations('):]
     hook = hook[:hook.index('\n}\n')]
-    assert 'mutator_big_head_node_orientations(biped_index, node_orientations);' in hook
-    assert 'port: the big head mutator' in hook
+    # (after every part's own, the biped's among them)
+    assert hook.index('object_pose_node_orientations(object_index, node_orientations);') > hook.index(
+        'datum_preprocess_node_orientations(object_index, node_orientations);')
+    assert 'port: and posed' in hook
     objects = read('source/objects/objects.c')
-    grown = objects.index('mutator_big_head_bounding_radius(object_index,')
+    grown = objects.index('object_pose_bounding_radius(object_index,')
     assert grown < objects.index('object_bounds_cache_update(object_index, &object->object.bounding_sphere_center')
-    assert 'port: grown to hold a head' in objects[grown - 120:grown]
+    assert "port: grown to hold the nodes a mutator's poses moved" in objects[grown - 120:grown]
     header = read('source/objects/objects.h')
     render = header[header.index('void object_get_render_bounding_sphere('):]
-    assert 'mutator_big_head_render_radius(object_index, *radius);' in render[:render.index('\n}\n')]
+    assert 'object_pose_render_radius(object_index, *radius);' in render[:render.index('\n}\n')]
     # (what makes the head's hits follow its scale: collision_models.c tests a
     # node's geometry through its matrix, the radius scaled by its inverse)
     collision = read('source/physics/collision_models.c')

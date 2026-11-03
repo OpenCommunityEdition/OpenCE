@@ -144,6 +144,8 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "game/game_engine.h" /* port: game_engine_vehicle_placement_begin's type, which WebAssembly calls it by */
+#include "addons.h" /* port: port/linux/game/addons.c */
+#include "object_pose.h" /* port: port/linux/game/object_pose.c */
 
 /* ---------- constants */
 
@@ -886,6 +888,9 @@ void object_type_preprocess_node_orientations(
 			current_definition->datum_preprocess_node_orientations(object_index, node_orientations);
 		}
 	}
+	/* port: and posed, by a mutator's poses, before the node matrices the
+	object is drawn and hit with are made */
+	object_pose_node_orientations(object_index, node_orientations);
 
 	return;
 }
@@ -1150,6 +1155,9 @@ void object_types_place_objects(
 						if ((scenario_object->name_index==NONE ||
 							object_index_from_name_index(scenario_object->name_index)==NONE) &&
 							!TEST_FLAG(scenario_object->placement_flags, _scenario_object_placement_not_automatic_bit) &&
+							/* port: an add-on's vehicle beside the map's is made only as
+							a game's vehicles are placed (port/linux/game/addons.c) */
+							!addons_vehicle_placement_automatic(scenario_object) &&
 							TEST_FLAG(scenario_object->on_bsp_flags, global_structure_bsp_index))
 						{
 							object_new_from_scenario(scenario_object, scenario_palette);
@@ -1228,12 +1236,32 @@ void object_types_place_all(
 					every machine places the same), asked last as it counts those it
 					places */
 					if (object_type == _object_type_vehicle &&
-						(!custom_edition_vehicle_placement_allowed(scenario_object) ||
+						(addons_vehicle_placement_automatic(scenario_object) ||
+						!custom_edition_vehicle_placement_allowed(scenario_object) ||
 						!game_engine_vehicle_placement_allowed(scenario_object, scenario_palette)))
 					{
 						continue;
 					}
 					object_new_from_scenario(scenario_object, scenario_palette);
+					objects_garbage_collection();
+				}
+			}
+		}
+
+		/* port: an add-on's vehicle with no place on this map, beside the map's,
+		now that the objects it must be clear of are made
+		(port/linux/game/addons.c) */
+		{
+			struct tag_block *palette = scenario_get_object_type_scenario_palette(scenario, _object_type_vehicle);
+			struct scenario_object_datum *placement;
+			short place = 0;
+
+			while ((placement = addons_vehicle_placement_next(scenario, &place)) != NULL)
+			{
+				if (custom_edition_vehicle_placement_allowed(placement) &&
+					game_engine_vehicle_placement_allowed(placement, palette))
+				{
+					object_new_from_scenario(placement, palette);
 					objects_garbage_collection();
 				}
 			}

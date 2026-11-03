@@ -357,6 +357,13 @@ void *custom_edition_addon_models_convert(
 	unsigned long index_data_offset);
 void custom_edition_addon_models_dispose(
 	void *geometry);
+/* A model copied from a stock map, whose tags the validator has checked and
+which are still in the Xbox tag cache (stock_tags.c): each part given buffers of
+its own, made from a copy of what its buffers name. Returns the geometry, which
+custom_edition_addon_models_dispose releases, or NULL after logging why. */
+void *custom_edition_stock_model_make(
+	struct model *model,
+	char const *name);
 
 /* Called by scenario_structure_bsp_load and scenario_structure_bsp_unload
 for the structure BSPs of a Custom Edition map: gives its materials

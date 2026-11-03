@@ -61,6 +61,7 @@ extern unsigned char console_is_active(void);
 /* port/linux/game/network_chat.c: a chat line is typed, which takes the
 keyboard as the console does */
 extern unsigned char network_chat_typing(void);
+extern unsigned char mutator_share_prompt_open(void);
 /* ... and its on-screen keyboard is up, which takes the first controller
 and the touch controls' stick and look */
 extern unsigned char network_chat_keyboard_open(void);
@@ -243,7 +244,8 @@ static void chat_pad_hold_over(XINPUT_GAMEPAD *pad)
 {
 	int index;
 
-	if (network_chat_keyboard_open())
+	/* (and a question about a host's script: mutator_share.c) */
+	if (network_chat_keyboard_open() || mutator_share_prompt_open())
 	{
 		chat_held_buttons = pad->wButtons;
 		chat_held_analog = 0;
@@ -750,6 +752,36 @@ static void keyboard_screenshot(unsigned long held)
 	if (down && !was_down)
 		platform_screenshot_request();
 	was_down = down;
+}
+
+/* the first controller's buttons at its last read */
+static unsigned short script_pad_buttons;
+
+int halo_input_held_named(const char *name)
+{
+	static const struct { const char *name; unsigned short button; } buttons[] =
+	{
+		{ "DPad Up", XINPUT_GAMEPAD_DPAD_UP },
+		{ "DPad Down", XINPUT_GAMEPAD_DPAD_DOWN },
+		{ "DPad Left", XINPUT_GAMEPAD_DPAD_LEFT },
+		{ "DPad Right", XINPUT_GAMEPAD_DPAD_RIGHT },
+	};
+	struct platform_input_state input;
+	unsigned int index;
+	int code;
+
+	if (console_is_active() || network_chat_typing())
+		return 0;
+	platform_input_read(&input, FALSE);
+	if (input.menus)
+		return 0;
+	for (index = 0; index < sizeof(buttons) / sizeof(buttons[0]); index++)
+	{
+		if (!_stricmp(name, buttons[index].name))
+			return (script_pad_buttons & buttons[index].button) != 0;
+	}
+	code = halo_input_from_name(name);
+	return code >= 0 && input_held(&input, code);
 }
 
 /* in the game: the actions held, and Start/Back for pause/scores */
@@ -1299,6 +1331,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		while it is up) */
 		chat_pad_record(&state->Gamepad);
 		chat_pad_hold_over(&state->Gamepad);
+		script_pad_buttons = state->Gamepad.wButtons;
 		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
 			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
 		{

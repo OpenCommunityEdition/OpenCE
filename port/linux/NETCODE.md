@@ -292,7 +292,25 @@ as the map's netgame equipment, and gives the gametype's options a custom
 loadout's add-on weapons (from 16 in its weapons' bytes) and a custom
 vehicle set's counts of the first two add-on vehicles (in two of its spare
 bytes); the weapon and vehicle sets of one kind leave the add-ons' out. A
-build of 43 would read those options otherwise.
+build of 43 would read those options otherwise. Then version 45 gives Custom
+Edition maps the add-ons of the mutators on, and the stock tags those and the
+tag edits name that such a map lacks (`docs/mutators.md`, "Stock tags"), and
+places a vehicle add-on with no place on a map beside the map's vehicles, after
+the game's other objects (`docs/addons.md`): the messages are unchanged, but the
+tables and the objects are not a build of 44's. The host's keys also name its
+mutators' Lua scripts (`script.` and digits of their SHA-256), which each machine
+runs for itself (`docs/mutators.md`, "Scripts"). Messages 114 to 117 list the host's
+mutators' files, and map sharing's connections carry them (`_frame_mutator_request`,
+`_frame_mutator_block`). Then version 46 sends the buttons of those scripts: a client's
+in the pad of its input's action, and the host's relayed actions have a byte of them,
+so that a script's `tick()` moves a player alike on every machine. What a host's
+script sends a client's player is noted as a throw is
+(`distributed_note_script_velocity`), so that the host takes that client's prediction
+of it. Then version 47 takes the big head out of the game: the host's tag
+edits carry poses (`object_pose.c`), a node of objects scaled and moved, and a big
+head is one of them; the host's keys name no effects, which a build of 46 would play.
+Then version 48 sends a relayed action's script buttons only when one is set (bit 7 of
+its parts), so that a game without a mutator's script sends what it did before them.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

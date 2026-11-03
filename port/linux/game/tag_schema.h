@@ -323,6 +323,15 @@ boolean tag_validate_addon_tags(
 	long size,
 	struct tag_validate_file_range const *file_range,
 	char const *addon_name);
+/* a stock map's tags, read to the tag cache for a Custom Edition map that
+lacks some (port/linux/game/stock_tags.c): checked as tag_validate_tags checks
+them when the map is played, and the playing map's own checks are as they were
+before */
+boolean tag_validate_stock_tags(
+	void *tag_header,
+	long size,
+	long file_length,
+	char const *map_name);
 /* a structure bsp just read (size bytes at base, its header there) as tag
 tag_index: FALSE if it cannot be used */
 boolean tag_validate_structure_bsp(

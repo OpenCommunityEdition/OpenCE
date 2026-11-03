@@ -86,4 +86,9 @@ then goes at the top left: on Android, and in a browser once its touch
 controls have been used */
 int halo_chat_touch_layout(void);
 
+/* whether a key, a mouse button (controls.*'s names) or a D-pad direction ("DPad Up",
+"DPad Down", "DPad Left", "DPad Right") is held, in the game: for a mutator's
+script (port/linux/src/xinput_sdl.c) */
+int halo_input_held_named(const char *name);
+
 #endif

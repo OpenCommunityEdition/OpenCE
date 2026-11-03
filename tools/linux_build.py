@@ -123,6 +123,12 @@ MUSL_MATH_DIR = Path("port/third_party/musl-math")
 # the port's zlib (port/third_party/zlib/zlib_prefixed.h): what inflates the
 # maps, the menus' and the HUD's PNGs and the updates, data from anywhere,
 # instead of the game's own 1.1.3 (its inflate only, its names prefixed z_)
+# what a mutator's scripts run on (port/third_party/lua), without the libraries
+# they do not have
+LUA_DIR = Path("port/third_party/lua")
+LUA_SOURCES = ("lapi.c", "lauxlib.c", "lbaselib.c", "lcode.c", "lctype.c", "ldebug.c", "ldo.c", "ldump.c", "lfunc.c", "lgc.c",
+               "llex.c", "lmathlib.c", "lmem.c", "lobject.c", "lopcodes.c", "lparser.c", "lstate.c", "lstring.c", "lstrlib.c",
+               "ltable.c", "ltablib.c", "ltm.c", "lundump.c", "lvm.c", "lzio.c")
 ZLIB_DIR = Path("port/third_party/zlib")
 ZLIB_SOURCES = ("adler32.c", "crc32.c", "inffast.c", "inflate.c", "inftrees.c", "uncompr.c", "zutil.c")
 # (its names prefixed, and the one Z_PREFIX leaves, its error messages, which
@@ -637,6 +643,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # the port's zlib
         for name in ZLIB_SOURCES:
             add_object(ZLIB_DIR / name, " ".join([abi, "-std=gnu11", *ZLIB_DEFINES, "-w"]))
+        # (port/third_party/lua; mutator_scripts.c)
+        for name in LUA_SOURCES:
+            add_object(LUA_DIR / name, " ".join([abi, "-std=gnu11", "-w"]))
         # the game's sin, pow and the rest, the same on every port
         # (port/include/halo_math.h)
         for source in musl_math_sources():

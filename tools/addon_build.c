@@ -71,6 +71,8 @@ enum
 	MODEL_GROUP_TAG = 'mode',
 
 	MAXIMUM_STOCK_MAPS = 32,
+	/* the tags of the map's given by --also */
+	MAXIMUM_ALSO_TAGS = 8,
 	/* a tag index's index in its handle */
 	TAG_HANDLE_INDEX_MASK = 0xFFFF,
 	NONE = -1,
@@ -646,6 +648,11 @@ struct build
 	struct custom_edition_load_report report;
 	struct stock_map stock[MAXIMUM_STOCK_MAPS];
 	short stock_count;
+	/* other tags of the map's that the add-on carries (--also), each a group
+	and a name */
+	unsigned long also_groups[MAXIMUM_ALSO_TAGS];
+	char const *also_names[MAXIMUM_ALSO_TAGS];
+	short also_count;
 
 	/* each tag's state, the kept tags in the order they were found (the
 	add-on's tags' order), and the imports in theirs */
@@ -1090,6 +1097,30 @@ static int root_walk(struct build *build, unsigned long group_tag, char const *n
 			return 0;
 		item_collections_keep(build, *root);
 		messaging_icons_keep(build);
+	}
+	/* (an --also tag every stock map has is an import, as any is) */
+	{
+		short also;
+
+		for (also = 0; also < build->also_count; also++)
+		{
+			long found = NONE;
+
+			for (index = 0; index < count && found == NONE; index++)
+			{
+				if (build->header->instances[index].group_tag == build->also_groups[also] &&
+					!strcasecmp(tag_name_of(build, index), build->also_names[also]))
+				{
+					found = index;
+				}
+			}
+			if (found == NONE)
+			{
+				printf("the map has no %s '%s'\n", tag_text(build->also_groups[also]), build->also_names[also]);
+				return 0;
+			}
+			tag_visit(build, found);
+		}
 	}
 	while (build->walked < build->kept_count)
 	{
@@ -2146,7 +2177,7 @@ static void usage(void)
 {
 	fprintf(stderr, "usage: addon_build --map map.map [--maps folder] (--vehicle name --riders graph | --weapon name "
 		"[--hud-parent name [--hud-keep name] [--hud-strip name]... [--hud-meter x,y] [--hud-meter-reverse]]) "
-		"[--stock map.map]... [--out file.cevehicle|file.ceweapon] [--report]\n");
+		"[--also group:name]... [--stock map.map]... [--out file.cevehicle|file.ceweapon] [--report]\n");
 }
 
 int main(int argc, char **argv)
@@ -2189,6 +2220,15 @@ int main(int argc, char **argv)
 		{
 			build.hud_meter_moved = 1;
 			argument++;
+		}
+		else if (!strcmp(argv[argument], "--also") && argument + 1 < argc && build.also_count < MAXIMUM_ALSO_TAGS &&
+			strlen(argv[argument + 1]) > 5 && argv[argument + 1][4] == ':')
+		{
+			unsigned char const *group = (unsigned char const *)argv[++argument];
+
+			build.also_groups[build.also_count] = ((unsigned long)group[0] << 24) | ((unsigned long)group[1] << 16) |
+				((unsigned long)group[2] << 8) | group[3];
+			build.also_names[build.also_count++] = argv[argument] + 5;
 		}
 		else if (!strcmp(argv[argument], "--out") && argument + 1 < argc)
 			out = argv[++argument];

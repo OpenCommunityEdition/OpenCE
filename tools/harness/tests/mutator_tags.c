@@ -207,6 +207,57 @@ static int file_count;
 static int folder_count, listed, reads, logged;
 static char setting[300], written[300];
 
+/* the stock maps (stock_tags.c): the zoom sound, when one has it, and what was asked */
+static int stock_has_zoom, stock_finds, stock_finishes;
+static long stock_tags_find(long group_tag, char const *name)
+{
+	stock_finds++;
+	if (stock_has_zoom && group_tag == (long)tags[_tag_zoom_in].group_tag && !strcasecmp(tags[_tag_zoom_in].name, name))
+	{
+		tags[_tag_zoom_in].present = 1;
+		return TAG_INDEX(_tag_zoom_in);
+	}
+	return NONE;
+}
+static void stock_tags_finish(void)
+{
+	stock_finishes++;
+}
+
+/* object_pose.c's (test_mutators.py tests it): the groups a pose names, and
+the poses made */
+#include "object_pose_header.inc"
+static struct { long group_tag; char tag[80]; char node[40]; real scale; real_vector3d offset; } poses[8];
+static int pose_count, pose_clears;
+static long object_pose_group_tag(char const *name)
+{
+	return !strcmp(name, "biped") ? 'bipd' : !strcmp(name, "unit") ? 'unit' : NONE;
+}
+static void object_pose_clear(void)
+{
+	pose_clears++;
+	pose_count = 0;
+}
+static boolean object_pose_add(long group_tag, char const *tag_name, char const *node_name, real scale,
+	real_vector3d const *offset, char *reason, unsigned long size)
+{
+	/* (no model of the map has a tail) */
+	if (!strcmp(node_name, "tail"))
+	{
+		snprintf(reason, size, "no model has a node tail");
+		return FALSE;
+	}
+	if (pose_count < 8)
+	{
+		poses[pose_count].group_tag = group_tag;
+		snprintf(poses[pose_count].tag, sizeof(poses[pose_count].tag), "%s", tag_name);
+		snprintf(poses[pose_count].node, sizeof(poses[pose_count].node), "%s", node_name);
+		poses[pose_count].scale = scale;
+		poses[pose_count++].offset = *offset;
+	}
+	return TRUE;
+}
+
 #include "mutators_header.inc"
 #include "mutator_tags.inc"
 #include "port_mutators_source.inc"
@@ -621,6 +672,30 @@ int main(int argc, char **argv)
 		rifle.weapon.triggers.count = 2;
 		CHECK(mutator_tags_play(edits, size) && triggers[1].rounds_between_tracers == 9, "the second trigger");
 	}
+	else if (!strcmp(case_name, "stock"))
+	{
+		/* a map with every tag: the stock maps not asked for any */
+		size = edits_of("accurized_ma5b", edits, sizeof(edits));
+		CHECK(mutator_tags_play(edits, size) && !stock_finds && mutator_tags.passed_over == 0, "asked of a whole map");
+		/* a tag only named, which a stock map has: added, the edit made, and the
+		stock map let go of */
+		mutator_tags_undo();
+		world();
+		tags[_tag_zoom_in].present = 0;
+		stock_has_zoom = 1;
+		stock_finishes = 0;
+		CHECK(mutator_tags_play(edits, size) && mutator_tags.passed_over == 0, "passed over %d", mutator_tags.passed_over);
+		CHECK(stock_finds == 1 && rifle.weapon.zoom_in_sound.index == TAG_INDEX(_tag_zoom_in), "the sound of a stock map");
+		CHECK(stock_finishes == 1, "the stock map kept");
+		/* a tag edited, which a stock map may have: only passed over */
+		mutator_tags_undo();
+		world();
+		tags[_tag_rifle].present = 0;
+		stock_finds = 0;
+		mutator_tags_play(edits, size);
+		CHECK(rifle.weapon.zoom_level_count == 0, "a tag the map has not edited");
+		CHECK(mutator_tags.passed_over > 0, "not passed over");
+	}
 	else if (!strcmp(case_name, "refused"))
 	{
 		static struct { char const *id; char const *text; char const *reason; } const cases[] =
@@ -648,7 +723,7 @@ int main(int argc, char **argv)
 				"crosshairs = { from = 'y', run = 'z' }\n", "not run" },
 			{ "nameless", "[[tags]]\ngroup = \"weapon\"\nzoom_level_count = 1\n", "names its group and its tag" },
 			{ "reference", "[[tags]]\ngroup = \"weapon\"\ntag = 'x'\nzoom_in_sound = 3\n", "a tag's name" },
-			{ "nothing", "name = \"Nothing\"\n", "no effect, edits no tag and adds nothing" },
+			{ "nothing", "name = \"Nothing\"\n", "edits no tag, poses nothing and adds nothing" },
 			{ "array", "[[tags]]\ngroup = \"damage_effect\"\ntag = 'x'\n[tags.material_modifiers]\nlava = 1\n",
 				"name one of material_modifiers" },
 			{ "array_range", "[[tags]]\ngroup = \"damage_effect\"\ntag = 'x'\n[tags.material_modifiers]\n"
@@ -665,7 +740,7 @@ int main(int argc, char **argv)
 				"reload_time = 1\n", "no field" },
 			{ "gravity_range", "[[tags]]\ngroup = \"projectile\"\ntag = 'x'\nair_gravity_scale = -1\n",
 				"from 0 to 10" },
-			{ "later", "format = 5\n[[tags]]\ngroup = \"weapon\"\ntag = 'x'\nzoom_level_count = 1\n", "later build" },
+			{ "later", "format = 7\n[[tags]]\ngroup = \"weapon\"\ntag = 'x'\nzoom_level_count = 1\n", "later build" },
 		};
 		for (index = 0; index < (int)NUMBEROF(cases); index++)
 			folder(cases[index].id, cases[index].text);
@@ -678,6 +753,60 @@ int main(int argc, char **argv)
 		}
 		CHECK(edits_of("group,field,range,enum,flags,copy,many,nothing", edits, sizeof(edits)) == 0,
 			"a refused mutator's edits played");
+	}
+	else if (!strcmp(case_name, "pose"))
+	{
+		static struct { char const *id; char const *text; char const *reason; } const cases[] =
+		{
+			{ "large", "[[pose]]\nobjects = \"biped\"\nnode = \"head\"\nscale = 5\n", "from 0.25 to 4" },
+			{ "nan", "[[pose]]\nobjects = \"biped\"\nnode = \"head\"\nscale = nan\n", "from 0.25 to 4" },
+			{ "far", "[[pose]]\nobjects = \"biped\"\nnode = \"head\"\noffset = [0, 1.5, 0]\n", "from -1 to 1" },
+			{ "farther", "[[pose]]\nobjects = \"biped\"\nnode = \"head\"\noffset = [0, 1e30, 0]\n", "from -1 to 1" },
+			{ "two", "[[pose]]\nobjects = \"biped\"\nnode = \"head\"\noffset = [0, 1]\n", "three numbers" },
+			{ "text", "[[pose]]\nobjects = \"biped\"\nnode = \"head\"\noffset = [0, 'up', 0]\n", "three numbers" },
+			{ "tree", "[[pose]]\nobjects = \"tree\"\nnode = \"head\"\n", "the group tree" },
+			{ "nodeless", "[[pose]]\nobjects = \"biped\"\nscale = 2\n", "a node" },
+			{ "key", "[[pose]]\nobjects = \"biped\"\nnode = \"head\"\nsize = 2\n", "no key size" },
+			{ "table", "pose = 3\n", "list of tables" },
+			{ "effect", "[effects.moon_gravity]\nscale = 0.2\n", "no effect" },
+		};
+		real_vector3d none = { 0.f, 0.f, 0.f };
+
+		/* (the stock big head: every biped's head) */
+		size = edits_of("big_head", edits, sizeof(edits));
+		CHECK(port_mutators_status(find("big_head"), NULL, 0) == _port_mutator_fine && size > 0, "%s",
+			refusal("big_head"));
+		CHECK(mutator_tags_play(edits, size) && mutator_tags.made == 1 && pose_count == 1 &&
+			poses[0].group_tag == 'bipd' && !poses[0].tag[0] && !strcmp(poses[0].node, "head") &&
+			poses[0].scale == 2.5f && !memcmp(&poses[0].offset, &none, sizeof(none)), "the big head's pose");
+		CHECK(unchanged(&stock), "a pose edited a tag");
+		/* (a pose of one tag, moved; one the map has no node for, passed over) */
+		folder("long_arms", "[[pose]]\nobjects = \"unit\"\ntag = 'characters\\cyborg\\cyborg'\n"
+			"node = \"bip01 l upperarm\"\nscale = 1.35\noffset = [0.01, 0, -0.08]\n"
+			"[[pose]]\nobjects = \"biped\"\nnode = \"tail\"\nscale = 0.5\n");
+		size = edits_of("long_arms", edits, sizeof(edits));
+		CHECK(port_mutators_status(find("long_arms"), NULL, 0) == _port_mutator_fine, "%s", refusal("long_arms"));
+		CHECK(mutator_tags_play(edits, size) && pose_count == 1 && mutator_tags.passed_over == 1, "the poses made");
+		CHECK(poses[0].group_tag == 'unit' && !strcmp(poses[0].tag, "characters\\cyborg\\cyborg") &&
+			!strcmp(poses[0].node, "bip01 l upperarm") && poses[0].scale == 1.35f && poses[0].offset.i == 0.01f &&
+			poses[0].offset.j == 0.f && poses[0].offset.k == -0.08f, "the arm's pose");
+		CHECK(port_mutators_details(find("long_arms"), (char *)edits, sizeof(edits)) &&
+			strstr((char const *)edits, "Poses: 2") && !strstr((char const *)edits, "Tag edits"), "%s", edits);
+		/* (each game's poses made again: the last undone) */
+		index = pose_clears;
+		mutator_tags_undo();
+		CHECK(pose_clears == index + 1 && pose_count == 0, "the poses kept past their game");
+		mutator_tags_loaded();
+		CHECK(pose_clears == index + 2, "the poses kept past their map");
+		for (index = 0; index < (int)NUMBEROF(cases); index++)
+			folder(cases[index].id, cases[index].text);
+		port_mutators_scan();
+		for (index = 0; index < (int)NUMBEROF(cases); index++)
+		{
+			CHECK(port_mutators_status(find(cases[index].id), NULL, 0) == _port_mutator_unplayable &&
+				strstr(refusal(cases[index].id), cases[index].reason), "%s: %s", cases[index].id,
+				refusal(cases[index].id));
+		}
 	}
 	else if (!strcmp(case_name, "bytes"))
 	{

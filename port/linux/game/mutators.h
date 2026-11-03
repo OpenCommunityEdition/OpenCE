@@ -1,10 +1,9 @@
 /*
 MUTATORS.H
 
-The mutators a game plays (mutators.c): effects built into the game that
-change its rules, each set by the mutators' parameters, the same on every
-machine of a network game (network_mutators.c). The mutators' files are
-port/linux/src/port_mutators.c's.
+The mutators a game plays (mutators.c): their tag edits and poses and their
+scripts, the same on every machine of a network game (network_mutators.c).
+The mutators' files are port/linux/src/port_mutators.c's.
 */
 
 #ifndef MUTATORS_H
@@ -12,10 +11,10 @@ port/linux/src/port_mutators.c's.
 
 /* ---------- constants */
 
-/* a parameter's key: its effect's name ("big_head"), which turns the effect
-on, or that and the parameter's ("big_head.scale"), ended */
+/* a key: a script's ("script." and its mutator's digest's first digits),
+ended */
 #define MUTATOR_KEY_LENGTH 32
-/* the most keys a game plays (every effect and every parameter fit) */
+/* the most keys a game plays */
 #define MAXIMUM_MUTATOR_KEYS 32
 /* the most bytes of tag edits a game plays, all its mutators' (mutator_tags.c
 says what the bytes are) */
@@ -29,19 +28,9 @@ enum
 	_mutator_tag_edit_text,
 	/* elements of a block copied from another tag's */
 	_mutator_tag_edit_copy,
+	/* a node of objects scaled and moved (object_pose.c) */
+	_mutator_tag_edit_pose,
 	NUMBER_OF_MUTATOR_TAG_EDIT_KINDS
-};
-
-enum
-{
-	_mutator_effect_big_head,
-	NUMBER_OF_MUTATOR_EFFECTS
-};
-
-enum
-{
-	_mutator_big_head_scale,
-	NUMBER_OF_MUTATOR_PARAMETERS
 };
 
 /* ---------- prototypes/MUTATORS.C */
@@ -50,23 +39,19 @@ enum
 host and in a game of one machine; none on a client until the host's come
 (mutators_set_host) */
 void mutators_new_game(void);
-boolean mutators_effect_active(short effect);
-/* a parameter of an effect that is on, else its default */
-real mutators_parameter(short parameter);
-/* whether any effect is on */
+/* whether a script or a tag edit is played */
 boolean mutators_active(void);
 
-/* the keys the game plays and their values (a parameter's, or 1 for an
-effect's): how many */
+/* the keys the game plays and their values (1): how many */
 short mutators_keys(char keys[][MUTATOR_KEY_LENGTH], real *values, short maximum);
 /* (network_mutators.c) a client's: the host's keys, played instead of any
 before; a key this build does not have is passed over and said on the
 console. FALSE, and nothing played, when one is not a key's text or a
-value of a key this build has is out of its range */
+value is not a number */
 boolean mutators_set_host(char const keys[][MUTATOR_KEY_LENGTH], real const *values, short count);
 
-/* (port_mutators.c) whether a mutator.toml's key and value are this build's
-and in range; if not, why not into reason */
+/* (port_mutators.c) whether a mutator.toml's effect's key and value are this
+build's: none is, the game having no effects built in; why not into reason */
 int mutators_key_check(char const *key, double value, char *reason, unsigned long size);
 
 /* the tag edits the game plays (the host's, on a client): how many bytes */
@@ -90,18 +75,5 @@ void mutator_tags_undo(void);
 named that the map has not is passed over (and logged). FALSE, and none
 made, when the bytes are not edits or one is not one this build makes */
 boolean mutator_tags_play(byte const *edits, long size);
-
-/* ---------- prototypes/MUTATOR_BIG_HEAD.C */
-
-/* (biped_preprocess_node_orientations) a biped's head node scaled */
-void mutator_big_head_node_orientations(long biped_index, struct real_orientation *node_orientations);
-/* (object_compute_node_matrices_non_recursive) an object's bounding radius,
-made to hold its head as scaled */
-real mutator_big_head_bounding_radius(long object_index, real bounding_radius);
-/* (object_get_render_bounding_sphere) the radius an object is culled by,
-made to hold its head as scaled */
-real mutator_big_head_render_radius(long object_index, real render_radius);
-/* a new map: the heads' sizes the radius is found with forgotten */
-void mutator_big_head_new_game(void);
 
 #endif
