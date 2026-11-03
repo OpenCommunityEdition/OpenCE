@@ -28,7 +28,8 @@ FLOAT_TYPES = {"GLfloat", "GLclampf", "GLdouble", "GLclampd", "float", "double"}
 
 
 def android_functions(gl_header: str):
-    text = open(gl_header, encoding="utf-8").read()
+    with open(gl_header, encoding="utf-8") as f:
+        text = f.read()
     start = text.index("/* ANDROID_GL_FUNCTIONS_BEGIN */")
     end = text.index("/* ANDROID_GL_FUNCTIONS_END */")
     return re.findall(r"X\((\w+)\)", text[start:end])
@@ -38,7 +39,8 @@ def prototypes(*headers):
     result = {}
     pattern = re.compile(r"GL_APICALL\s+(.+?)\s*GL_APIENTRY\s+(\w+)\s*\((.*?)\);", re.DOTALL)
     for header in headers:
-        text = open(header, encoding="utf-8").read()
+        with open(header, encoding="utf-8") as f:
+            text = f.read()
         for ret, name, params in pattern.findall(text):
             params = " ".join(params.split())
             result.setdefault(name, (ret.strip(), params))
@@ -96,10 +98,14 @@ def main():
             # an array of pointers: widen each to a host pointer
             import_names.append("hostgl_glShaderSource")
             out += [
-                "void hostgl_glShaderSource(GLuint shader, GLsizei count, const unsigned long long *strings, "
-                "const GLint *lengths);",
-                "static void GL_APIENTRY guest_glShaderSource(GLuint shader, GLsizei count, "
-                "const GLchar *const *strings, const GLint *lengths)",
+                (
+                    "void hostgl_glShaderSource(GLuint shader, GLsizei count, const unsigned long long *strings, "
+                    "const GLint *lengths);"
+                ),
+                (
+                    "static void GL_APIENTRY guest_glShaderSource(GLuint shader, GLsizei count, "
+                    "const GLchar *const *strings, const GLint *lengths)"
+                ),
                 "{",
                 "\tunsigned long long wide[16];",
                 "\tGLsizei index;",

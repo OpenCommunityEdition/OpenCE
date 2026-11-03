@@ -13,11 +13,12 @@ Usage: guest_posix_stubs.py posix.h output.c imports.list
 
 import re
 import sys
+from pathlib import Path
 
 
 def main():
     header, output, imports = sys.argv[1:4]
-    text = open(header, encoding="utf-8").read()
+    text = Path(header).read_text(encoding="utf-8")
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
     prototypes = re.findall(r"^([A-Za-z_][\w \*]*?)\b(posix_\w+)\s*\(([^;]*?)\);", text, re.MULTILINE | re.DOTALL)
     out = [

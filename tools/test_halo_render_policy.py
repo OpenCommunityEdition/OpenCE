@@ -68,7 +68,7 @@ int main(int argc, char **argv)
                              "-I", str(header), str(source),
                              str(ROOT / "port/android/host/host_chip.c"),
                              str(ROOT / "port/guest/runtime/guest_render_policy.c"),
-                             "-o", str(executable)], capture_output=True, text=True)
+                             "-o", str(executable)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
     return executable
 
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 ])
 def test_chip_policy(policy, manufacturer, model, hardware, platform, family, geometry, textures):
     result = subprocess.run([str(policy), manufacturer, model, hardware, platform,
-                             str(family), str(geometry), str(textures)], capture_output=True, text=True)
+                             str(family), str(geometry), str(textures)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
 
 

@@ -47,7 +47,7 @@ def mirror_uploads(tmp_path_factory):
             [compiler, *target, *defines, "-std=gnu89", "-Wall", "-Wextra", "-Werror",
              "-Wno-unused-function", "-O2", "-I", str(work),
              str(ROOT / "port/android/tests/mirror_upload_test.c"), "-o", str(executable)],
-            capture_output=True, text=True)
+            capture_output=True, text=True, check=False)
         assert result.returncode == 0, result.stdout + result.stderr
         binaries[variant] = executable
     return binaries
@@ -56,7 +56,7 @@ def mirror_uploads(tmp_path_factory):
 @pytest.mark.parametrize("case", ["reuse", "rollover"])
 @pytest.mark.parametrize("variant", ["android", "android-cached", "android-normal", "gles", "web", "desktop", "unguarded"])
 def test_mirror_upload_ordering(mirror_uploads, case, variant):
-    result = subprocess.run([str(mirror_uploads[variant]), case], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([str(mirror_uploads[variant]), case], capture_output=True, text=True, timeout=15, check=False)
     if variant == "android-cached":
         assert result.returncode == 1, result.stdout + result.stderr
         assert result.stderr.rstrip().endswith(

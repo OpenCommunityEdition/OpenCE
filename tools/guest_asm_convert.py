@@ -151,7 +151,7 @@ class Converter:
         parts = [a.strip() for a in args.split(",")]
         if len(parts) < 4:
             return
-        segment, name, symbol, size = parts[:4]
+        _segment, _name, symbol, size = parts[:4]
         align = int(parts[4]) if len(parts) > 4 else 0
         symbol = self.sym(symbol)
         # a definition in either section: tentative definitions (-fcommon)

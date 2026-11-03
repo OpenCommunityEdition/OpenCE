@@ -15,6 +15,7 @@ not part of it).
 """
 
 import sys
+from pathlib import Path
 
 
 def main():
@@ -26,7 +27,7 @@ def main():
     output, lists = arguments[0], arguments[1:]
     names = []
     for path in lists:
-        for line in open(path, encoding="utf-8"):
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
             line = line.split("#", 1)[0].strip()
             if line and line not in names:
                 names.append(line)

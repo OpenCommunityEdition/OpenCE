@@ -187,7 +187,7 @@ def test_the_sockets_inside_the_page(tmp_path):
     subprocess.run([compiler, "-std=gnu11", "-Wall", "-g", "-pthread", f"-I{ROOT / 'port/linux/src'}",
                     str(ROOT / "port/web/tests/web_net_test.c"), str(ROOT / "port/web/src/web_net.c"),
                     "-o", str(program)], check=True)
-    result = subprocess.run([str(program)], capture_output=True, text=True, timeout=60)
+    result = subprocess.run([str(program)], capture_output=True, text=True, timeout=60, check=False)
     assert result.returncode == 0, result.stderr
     assert "web_net: ok" in result.stdout
 

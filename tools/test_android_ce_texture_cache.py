@@ -18,9 +18,9 @@ def run_c(tmp_path, code):
     path.write_text(code)
     exe = tmp_path / ("cache.exe" if os.name == "nt" else "cache")
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"] if os.name == "nt" else ["-m32"]
-    result = subprocess.run([compiler, *target, "-std=gnu89", "-Werror=format", str(path), "-o", str(exe)], capture_output=True, text=True)
+    result = subprocess.run([compiler, *target, "-std=gnu89", "-Werror=format", str(path), "-o", str(exe)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
-    result = subprocess.run([str(exe)], capture_output=True, text=True)
+    result = subprocess.run([str(exe)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
 
 
