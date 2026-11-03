@@ -923,16 +923,21 @@ SHIELD_EFFECTS_HELP = [
 # OpenCE's gametypes' options (port/linux/game/game_modes.c), a screen of the
 # gametype editor's (menu_functions.c's "mp profile init opence options"): the
 # mode and Hardcore, then the mode's own rows, which menu_functions.c's
-# gametype_option_help shows (op_inf_ for Infection, op_gg_ for Gun Game)
-# below them; a row's values are menu_functions.c's gametype_options'
+# gametype_option_help shows (op_inf_ for Infection, op_gg_ for Gun Game,
+# op_oitc_ for One in the Chamber, op_fn_ for Frag Nation) below them; a
+# row's values are menu_functions.c's gametype_options'
 PLAYLIST_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit"
 OPENCE_EDIT = "main_menu/settings_select/multiplayer_setup/opence_options_edit"
 OPENCE_ROWS = [
-    ("oce_mode", "MODE:", ["NONE", "SWAT", "INFECTION", "GUN GAME"], [
+    ("oce_mode", "MODE:", ["NONE", "SWAT", "INFECTION", "GUN GAME", "ONE IN THE CHAMBER", "FRAG NATION",
+                           "SNOWBALL FIGHT"], [
         "The game type's own rules.",
         "No shields, and a shot to the head kills. Slayer only.",
         "Humans killed join the zombies, who win when\\nno human is left. Team Slayer only.",
-        "Each kill gives the next weapon; a kill with the\\nlast wins. Free for all Slayer only."]),
+        "Each kill gives the next weapon; a kill with the\\nlast wins. Free for all Slayer only.",
+        "A pistol with one round; a bullet kills, and a\\nkill gives a round. Free for all Slayer only.",
+        "No weapon, two frags and two plasmas; a grenade\\nkill gives grenades back. Slayer only.",
+        "No weapon, four plasmas and none on the map; a\\nplasma kill gives plasmas back. Slayer only."]),
     ("oce_hardcore", "HARDCORE:", ["OFF", "ON"], [
         "The motion sensor and aim assist as the game\\ntype has them.",
         "No motion sensor, no aim assist, and a kill\\nrestores the killer's health and shields."]),
@@ -955,6 +960,12 @@ OPENCE_ROWS = [
     ("gg_melee", "MELEE DEMOTES:", ["OFF", "ON"], [
         "A melee kill takes nothing from the victim.",
         "A melee kill takes the victim back a weapon."]),
+    ("oitc_kill", "A KILL:", ["ADDS A ROUND", "RESETS TO ONE"], [
+        "A kill adds a round to the killer's pistol.",
+        "A kill sets the killer's pistol back to one round."]),
+    ("fn_grenades", "MAP GRENADES:", ["ON", "OFF"], [
+        "Grenades lie on the map, as it places them.",
+        "No grenades on the map: only those kills give\\nback."]),
 ]
 OPENCE_ITEM = f"{PLAYLIST_EDIT}/playlist_edit_opence_item"
 
