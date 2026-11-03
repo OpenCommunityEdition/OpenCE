@@ -43,7 +43,7 @@ def generated(fault=None):
         function(infection, 'infection_state_valid'), order,
         '#define GUN_GAME_MAXIMUM_LEVELS NUMBEROF(gun_game_strongest_first)',
         function(gun_game, 'gun_game_levels_build'), function(modes, 'game_modes_hit_kills'),
-        function(modes, 'game_modes_map_grenades_off'), function(chamber, 'one_in_the_chamber_round_for_kill'),
+        function(modes, 'game_modes_map_grenades_off'), function(modes, 'game_modes_bottomless'), function(chamber, 'one_in_the_chamber_round_for_kill'),
         function(frag_nation, 'frag_nation_grenades_for_kill'), function(frag_nation, 'frag_nation_grenades_added')])
     if fault:
         code = mutated(code, *fault)
@@ -53,7 +53,7 @@ def generated(fault=None):
 CASES = ['options_default', 'hardcore_restore', 'hardcore_no_restore', 'sanitize_defaults', 'sanitize_range',
          'sanitize_keeps', 'variant_mode', 'round_result', 'state_valid', 'gun_game_order', 'gun_game_missing',
          'gun_game_random', 'kind', 'kind_untrusted', 'chamber_round', 'chamber_round_resets', 'chamber_hit_kills',
-         'map_grenades', 'grenades_for_kill', 'grenades_added']
+         'bottomless', 'map_grenades', 'grenades_for_kill', 'grenades_added']
 
 
 @pytest.mark.parametrize('case', CASES)
@@ -66,6 +66,15 @@ def test_case(case):
     (('== TRUE;\n\tcsmemset(options->reserved, 0,', '== TRUE;\n\tcsmemset(options->reserved, 1,'), 'sanitize_range'),
     (('options->chamber_kill_resets = options->chamber_kill_resets == TRUE;',
       'options->chamber_kill_resets = options->chamber_kill_resets != FALSE;'), 'sanitize_range'),
+    (('options->bottomless = options->bottomless == TRUE;', 'options->bottomless = options->bottomless != FALSE;'),
+     'sanitize_range'),
+    (('options->bottomless = FALSE;\n\tcsmemset', 'options->bottomless = TRUE;\n\tcsmemset'), 'options_default'),
+    (('return !network_game_distributed_client() && game_engine_running() && game_variant_options_get()->bottomless;',
+      'return game_engine_running() && game_variant_options_get()->bottomless;'), 'bottomless'),
+    (('return !network_game_distributed_client() && game_engine_running() && game_variant_options_get()->bottomless;',
+      'return !network_game_distributed_client() && game_variant_options_get()->bottomless;'), 'bottomless'),
+    (('return !network_game_distributed_client() && game_engine_running() && game_variant_options_get()->bottomless;',
+      'return !network_game_distributed_client() && game_engine_running();'), 'bottomless'),
     (('unit->object.shield_vitality < 1.0f', 'TRUE'), 'hardcore_restore'),
     (('friendly_fire ||\n', ''), 'hardcore_no_restore'),
     (('return variant->universal_variant.teams ? _game_mode_infection', 'return 1 ? _game_mode_infection'),
