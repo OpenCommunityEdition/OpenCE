@@ -81,6 +81,16 @@ complete map/required resource contents must match the host. Optional
 `.txt` descriptions remain beside the corresponding level. No manifest is
 required.
 
+A package from the Steam Workshop can say which item it is, so a joiner who
+cannot match the host's map is told what to do. The item is the package folder
+when Steam's own name (the item id, all digits) is kept, or a `workshop_id.txt`
+in the folder: the id on the first line and, optionally, the title on the
+second. The host sends the id and title in the map name's unused bytes
+(`mcc_workshop.c`), so the wire layout and `MCC_PROTOCOL_VERSION` are
+unchanged. A joiner without the item is told to subscribe to it; one with the
+item but other content, to let Steam update it; a map with no item id gets the
+fingerprint text, naming the level file.
+
 The two MCC categories show package folders first (alphabetically, in brackets),
 then loose maps. Open a folder to choose one of its levels; the rows omit the
 repeated package suffix, while the selected map's details retain its identity.

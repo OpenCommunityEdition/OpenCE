@@ -10,6 +10,8 @@
 #include "mcc_package.h"
 #include "mcc_precache.h"
 #include "mcc_validation.h"
+#include "mcc_workshop.h"
+#include <stdio.h>
 #include <string.h>
 
 #define MCC_IDENTITY_MAX_CANDIDATES 16
@@ -17,6 +19,7 @@ static struct {
     char name[64];
     unsigned char digest[32];
     struct mcc_precache_snapshot files;
+    struct mcc_workshop_item item;
     int valid;
 } mcc_host_identity;
 static struct {
@@ -87,6 +90,7 @@ int mcc_identity_prepare_host(char const *map)
         strcpy(mcc_host_identity.name,name);
         memcpy(mcc_host_identity.digest,digest,32);
         mcc_host_identity.files=after;
+        mcc_workshop_local_item(name,&mcc_host_identity.item);
         mcc_host_identity.valid=1;
     }
     return 1;
@@ -115,6 +119,8 @@ void const *mcc_identity_host_settings(void const *settings,long bytes,struct ne
         !mcc_validation_lookup(canonical,&checksum,NULL) ||
         checksum!=(uint32_t)game->map.version) return NULL;
     memcpy(copy->mcc_content_sha256,mcc_host_identity.digest,32);
+    /* The Workshop item rides in the name's unused bytes; older builds never read them. */
+    mcc_workshop_wire_pack(copy->map.name,&mcc_host_identity.item);
     return copy;
 }
 
@@ -140,6 +146,27 @@ static int mcc_identity_matches(char const *name,unsigned char const digest[32],
         !memcmp(&before,&after,sizeof(before));
     if (ok && validated) *validated=after;
     return ok;
+}
+
+/* Why no local package matches the host's, in the joiner's words. A local
+ * package of the host's level that is the host's item (or carries no item id)
+ * is the item with other content; otherwise the item is missing. */
+static int mcc_identity_refusal(struct network_game const *game,char const *session)
+{
+    struct mcc_workshop_item host,local;
+    enum mcc_workshop_refusal kind=MCC_WORKSHOP_MISSING;
+    char const *leaf=strrchr(session,'\\')+1,*candidate,*candidate_leaf;
+    char text[256];
+    short i,count=mcc_maps_count(FALSE);
+    if (!mcc_workshop_wire_unpack(game->map.name,&host)) kind=MCC_WORKSHOP_NOT_WORKSHOP;
+    else for (i=0;i<count;i++) {
+        candidate=mcc_maps_level_name(i);
+        candidate_leaf=strrchr(candidate,'\\')+1;
+        if (csstrcasecmp(leaf,candidate_leaf)) continue;
+        if (!mcc_workshop_local_item(candidate,&local) || !strcmp(local.id,host.id)) kind=MCC_WORKSHOP_DIFFERS;
+    }
+    mcc_workshop_refusal_text(kind,&host,leaf,text,sizeof(text));
+    return mcc_identity_error(text);
 }
 
 int mcc_identity_accept(struct network_game const *game)
@@ -180,7 +207,7 @@ int mcc_identity_accept(struct network_game const *game)
             }
         }
     }
-    if (!matches) return mcc_identity_error("No local MCC map and required resources match the host's SHA-256 fingerprint. Install the same complete package; its folder name may differ.");
+    if (!matches) return mcc_identity_refusal(game,session);
     mcc_client_identity.files=selected_files;
     strcpy(mcc_client_identity.session,session);
     strcpy(mcc_client_identity.local,selected);
