@@ -41,6 +41,12 @@ the process allows: from JNI_OnLoad, before the Java side of the game's
 process allocates much (host_main.c); a failure is reported again by
 host_memory_initialize */
 void host_memory_reserve_early(void);
+/* sets the host's page size from the kernel's page size; called by
+host_memory_reserve_early and host_memory_initialize (and safe to call
+more than once) */
+void host_memory_page_size_init(void);
+/* the page size the host uses for its allocations */
+uint64_t host_page_size(void);
 /* takes the fixed ranges for the image; returns 0 on success */
 int host_memory_initialize(uint32_t image_base, uint32_t image_size);
 /* 1 if the fixed ranges could not be reserved (something else holds them) */

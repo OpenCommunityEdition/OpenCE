@@ -8,6 +8,7 @@ build/linux-arm64/halo_guest.elf; ``ninja linux_arm64_guest``.
 """
 
 import json
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +27,10 @@ from .ninja_syntax import Writer
 BUILD = Path("build/linux-arm64")
 THIRD_PARTY = BUILD / "third_party"
 GL_HEADERS_DIR = THIRD_PARTY / "gl-headers"
+# the TOML parser config.toml is read with, as for the Android host
+TOML_DIR = Path("port/third_party/tomlc17")
+LINUX_ARM64_HOST = Path("port/linux-arm64") / "host"
+ANDROID_HOST = Path("port/android") / "host"
 
 # The Khronos registries' commits the OpenGL ES headers are taken from, and
 # the headers themselves
@@ -58,6 +63,72 @@ def fetch_gl_headers() -> Path:
 
 def linux_arm64_configure_inputs() -> list[Path]:
     return [Path(__file__)]
+
+
+def linux_arm64_host_build(n: Writer, host_table_c: Path) -> None:
+    """The host the guest runs in (``ninja linux_arm64_host``).
+
+    The Android host's sources, with the Android-only parts guarded out in
+    the sources themselves, built with the system's SDL3 through pkg-config.
+    The host import table generate_guest returns is compiled as it is for the
+    Android host, as is tomlc17, config.toml's parser (the command lines of
+    tools/android_build.py, with the system's compiler).
+    """
+    n.comment("Native Linux arm64 host build (ninja linux_arm64_host)")
+    n.variable("linux_arm64_host_cc", "cc")
+    n.variable(
+        "linux_arm64_host_cflags",
+        " ".join(
+            [
+                "-O2",
+                "-std=gnu11",
+                f"-I{ANDROID_HOST.parent}/include",
+                f"-I{ANDROID_HOST}",
+                f"-I{TOML_DIR}",
+                "$$(pkg-config --cflags sdl3)",
+            ]
+        ),
+    )
+    obj_dir = BUILD / "host" / "obj"
+    n.rule(
+        name="linux_arm64_host_cc",
+        command="$linux_arm64_host_cc $linux_arm64_host_cflags -c $in -o $out",
+        description="LINUX ARM64 HOST CC $out",
+    )
+    host_sources = [
+        LINUX_ARM64_HOST / "host_linux_support.c",
+        LINUX_ARM64_HOST / "host_linux_main.c",
+        *[
+            ANDROID_HOST / name
+            for name in (
+                "host_loader.c",
+                "host_memory.c",
+                "host_watch_hash.c",
+                "host_syscall.c",
+                "host_thread.c",
+                "host_debug.c",
+                "host_sdl.c",
+                "host_gl.c",
+                "host_https.c",
+            )
+        ],
+        host_table_c,
+        TOML_DIR / "tomlc17.c",
+    ]
+    host_objects: list[Path] = []
+    for source in host_sources:
+        obj = obj_dir / (source.name + ".o")
+        n.build(outputs=obj, rule="linux_arm64_host_cc", inputs=source)
+        host_objects.append(obj)
+    n.rule(
+        name="linux_arm64_host_link",
+        command="$linux_arm64_host_cc $in -o $out $$(pkg-config --libs sdl3) -lm -lpthread -ldl",
+        description="LINUX ARM64 HOST LINK $out",
+    )
+    n.build(
+        outputs=BUILD / "halo_host", rule="linux_arm64_host_link", inputs=host_objects
+    )
+    n.build(outputs="linux_arm64_host", rule="phony", inputs=BUILD / "halo_host")
 
 
 def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
@@ -106,6 +177,12 @@ def generate_linux_arm64_build(n: Writer, sln: Any) -> None:
         host_imports_list=Path("port/android/host_imports.list"),
         host_table_c=BUILD / "host" / "host_import_table.c",
     )
-    image, _host_table_c = generate_guest(n, sln, config, target)
+    image, host_table_c = generate_guest(n, sln, config, target)
     n.build(outputs="linux_arm64_guest", rule="phony", inputs=image)
+    # the host is built only on Linux arm64, with the system's SDL3
+    if platform.system() == "Linux" and platform.machine().lower() in (
+        "aarch64",
+        "arm64",
+    ):
+        linux_arm64_host_build(n, host_table_c)
     n.newline()
