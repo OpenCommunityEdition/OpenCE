@@ -4,6 +4,30 @@ import xml.etree.ElementTree as ET
 MP = "main_menu/multiplayer_type_select"
 HOST = MP + "/connected/connected_map_select_wrapper"
 BROWSER = MP + "/join_game/join_game_screen"
+PROFILE = "main_menu/settings_select/player_setup/player_profile_edit/"
+
+
+def append_legacy(doc):
+    """Additive Xbox links use stock editors and never replace native widgets."""
+    links = [
+        ("audio", "AUDIO SETUP", "audio_settings/audio_settings_screen", 51, 177, 232),
+        ("video", "VIDEO SETUP", "video_settings/video_settings_screen", 51, 210, 232),
+        ("network", "NETWORK SETUP", "network_setup/network_settings_screen", 51, 243, 232),
+        ("keyboard", "KEYBOARD BINDINGS", "controls_setup/controls_settings_screen", 54, 223, 512),
+        ("controller", "CONTROLLER REMAPPING", "controller_remapping/controller_remapping_screen", 54, 253, 512),
+        ("glyphs", "BUTTON GLYPHS", "controller_appearance/controller_appearance_screen", 54, 283, 512),
+    ]
+    for key, caption, target, x, y, width in links:
+        w = ET.SubElement(doc, "widget", name="frontend_legacy/"+key, type="text",
+                          left=str(x), top=str(y), width=str(width), height="32" if width == 232 else "28",
+                          text=caption, font="ui\\large_ui", color="#FF2896FF",
+                          text_x="13", text_y="5", bitmap="bitmaps/list_item_bkd" if width == 232 else "ui\\shell\\bitmaps\\option_bkds")
+        for event in ("a", "start"):
+            ET.SubElement(w,"on",event=event,open=PROFILE+target)
+        ET.SubElement(w,"on",event="left_mouse",run="mouse emit accept event")
+    ET.SubElement(doc, "widget", name="frontend_legacy/description", type="text",
+                  controller="1", left="294", top="290", width="296", height="110",
+                  font="ui\\large_ui", color="#FF2896FF")
 
 # Section, caption, key, destination, callback(s), help.
 # Multiplayer mode callbacks use the documented create_inter/create_lan/join_lan/

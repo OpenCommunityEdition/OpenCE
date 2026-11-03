@@ -6,6 +6,7 @@
 #include "frontend_input.h"
 #include "keyboard_prompts.h"
 #include "keyboard_glyphs.h"
+#include "../src/port_config.h"
 #include "tag_files/tag_files.h"
 #include "rasterizer/rasterizer.h"
 #include "text/draw_string.h"
@@ -68,15 +69,18 @@ void frontend_prompts_draw(long tag, rectangle2d const *bounds)
     if (!name || strncmp(name, "pc\\modern\\", 10)) return;
     navigation = !strncmp(name + 10, "multiplayer\\", 12) || !strncmp(name + 10, "host\\", 5) || !strncmp(name + 10, "network\\", 8);
     name = strrchr(name, '\\') + 1;
-    if (strcmp(name, "prompts") && strcmp(name, "entry_button")) return;
+    if (strcmp(name, "prompts")) return;
     device = frontend_input_device();
+    /* A manual controller style is a display preference even when the mouse
+     * last moved. Automatic mode continues to follow the active input. */
+    if (config_boolean("display.high_res_hud") && !config_boolean("input.auto_button_detection") &&
+        !keyboard_prompt_menu_enabled(device))
+        device = 0;
     cursor = *bounds;
     draw_string_get_color(&color);
     packed = ((unsigned long)(color.alpha * 255.0f) << 24) | 0xffffffUL;
-    /* Both generated text widgets use left justification and the small font. */
-    if (!strcmp(name, "entry_button"))
-        frontend_prompt_action(&cursor, device, FRONTEND_STYLE, "MENU STYLE", packed);
-    else if (device == -2 && !keyboard_prompt_menu_enabled(device))
+    /* The generated footer uses left justification and the small font. */
+    if (device == -2 && !keyboard_prompt_menu_enabled(device))
         frontend_prompt_text(&cursor, navigation ? "Tap an option to select it." : "Tap arrows to change a value. Tap OK or CANCEL.");
     else
     {
@@ -88,6 +92,8 @@ void frontend_prompts_draw(long tag, rectangle2d const *bounds)
             keyboard_glyph_draw("Right", &cursor, packed, TRUE);
             frontend_prompt_text(&cursor, "MOVE");
         }
+        else if (device >= 0 && frontend_glyph_draw((short)device, 16, &cursor, packed))
+            frontend_prompt_text(&cursor, "MOVE");
         else frontend_prompt_text(&cursor, device >= 0 ? "D-pad: MOVE" : "Arrows: MOVE");
         cursor.x0 = (short)(bounds->x0 + 180);
         frontend_prompt_action(&cursor, device, FRONTEND_SELECT, "SELECT", packed);

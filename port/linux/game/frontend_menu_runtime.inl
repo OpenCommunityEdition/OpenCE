@@ -5,19 +5,21 @@
 #include "tag_files/tag_files.h"
 #include "frontend_pages.inl"
 #include "frontend_multiplayer.inl"
+#include "frontend_legacy_footers.inl"
 
 boolean network_game_is_active(void);
+boolean ui_widget_port_open(struct widget_instance *, char const *, boolean *);
 
 static boolean frontend_menu_can_edit(void)
 {
-	return frontend_menu_available() && main_menu_is_active() && !network_game_is_active();
+	return frontend_menu_available();
 }
 
 static boolean frontend_menu_legacy_root(struct widget_instance *widget)
 {
 	char const *name;
 
-	if (!widget || widget->parent || !frontend_menu_can_edit())
+	if (!widget || widget->parent || !frontend_menu_can_edit() || !main_menu_is_active() || network_game_is_active())
 		return FALSE;
 	name = tag_get_name(widget->definition_tag_index);
 	return name && (!strcmp(name, FRONTEND_MENU_PC) || !strcmp(name, FRONTEND_MENU_XBOX));
@@ -25,30 +27,146 @@ static boolean frontend_menu_legacy_root(struct widget_instance *widget)
 
 void frontend_menu_attach(struct widget_instance *widget)
 {
-	struct widget_instance *entry, *last;
+    static char const *settings[] = {"audio", "video", "network"};
+    static char const *controls[] = {"keyboard", "controller", "glyphs"};
+    char const *name, **links;
+    char path[96];
+    struct widget_instance *entry, *last, *save, *before, *description;
+    int index;
+    if (!widget || !frontend_menu_can_edit() || strcmp(frontend_menu_style(), "xbox")) return;
+    name = tag_get_name(widget->definition_tag_index);
+    if (!name) return;
+    /* Gameplay caches may omit ui.map's button-key art. Use the same Xbox
+     * redraws as the existing HUD, never the user's modern glyph preference. */
+    for (index = 0; index < 3; index++)
+    {
+        static char const glyphs[] = "abx";
+        snprintf(path, sizeof(path), "pc\\frontend_legacy\\footer_glyph_%c", glyphs[index]);
+        if (!strcmp(name, path))
+        {
+            long fallback;
+            snprintf(path, sizeof(path), "ui\\shell\\bitmaps\\%c_butn", glyphs[index]);
+            if (tag_loaded('bitm', path) != NONE) return;
+            snprintf(path, sizeof(path), "pc\\frontend_legacy\\footer_glyph_%c_fallback", glyphs[index]);
+            fallback = tag_loaded('DeLa', path);
+            if (fallback != NONE) widget->definition_tag_index = fallback;
+            return;
+        }
+    }
+    /* Only this live Xbox instance borrows the matching footer definition.
+     * Its native callbacks/name stay intact; no stock tag is modified. */
+    for (index = 0; index < NUMBEROF(frontend_legacy_footers); index++)
+        if (!strcmp(name, frontend_legacy_footers[index].native))
+        {
+            long replacement = tag_loaded('DeLa', frontend_legacy_footers[index].replacement);
+            char const *root_name = tag_get_name(screen_of(widget)->definition_tag_index);
+            static char const profile[] = "pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\";
+            if (!root_name || strncmp(root_name, profile, sizeof(profile) - 1)) return;
+            if (replacement == NONE) return;
+            widget->definition_tag_index = replacement;
+            widget->parameters.text_box.string_list_index = 0;
+            entry = ui_widget_load_by_name_or_tag(frontend_legacy_footers[index].glyph, NONE,
+                widget, widget->local_player_index, NONE, NONE, NONE);
+            if (entry) widget->child = entry;
+            return;
+        }
+    if (!strcmp(name, "ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\player_profile_edit_screen"))
+    {
+        entry = named(widget, "blueline", 0);
+        if (entry) entry->vertical_offset += 99;
+        return;
+    }
+    if (!strcmp(name, "ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\profile_edit_select_list"))
+        links = settings;
+    else if (!strcmp(name, "ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\advanced_controls\\advanced_controls_menu"))
+        links = controls;
+    else return;
+    save = links == settings ? named(widget, "save_changes_profile_item", 0) : NULL;
+    before = links == settings ? named(widget, "color_profile_item", 0) : NULL;
+    for (index = 0; index < 3; index++)
+    {
+        snprintf(path, sizeof(path), "pc\\frontend_legacy\\%s", links[index]);
+        entry = ui_widget_load_by_name_or_tag(path, NONE, widget, widget->local_player_index, NONE, NONE, NONE);
+        if (!entry) continue;
+        last = before ? before->previous : widget->child;
+        if (!before) while (last && last->next) last = last->next;
+        entry->previous = last;
+        entry->next = before;
+        if (last) last->next = entry;
+        else widget->child = entry;
+        if (before) before->previous = entry;
+    }
+    if (before) before->vertical_offset += 99;
+    if (save) save->vertical_offset += 99;
+    description = links == settings ? widget->parameters.list.extended_description : NULL;
+    if (description)
+    {
+        entry = ui_widget_load_by_name_or_tag("pc\\frontend_legacy\\description", NONE, description,
+            widget->local_player_index, NONE, NONE, NONE);
+        if (entry)
+        {
+            last = description->child;
+            while (last && last->next) last = last->next;
+            entry->previous = last;
+            if (last) last->next = entry;
+            else description->child = entry;
+            entry->visible = FALSE;
+        }
+    }
+}
 
-	if (!frontend_menu_legacy_root(widget))
-		return;
-	entry = ui_widget_load_by_name_or_tag("pc\\modern\\entry", NONE, widget,
-		widget->local_player_index, NONE, NONE, NONE);
-	if (!entry)
-		return;
-	entry->horizontal_offset = 450;
-	entry->vertical_offset = 4;
-	last = widget->child;
-	if (last)
-	{
-		while (last->next)
-			last = last->next;
-		last->next = entry;
-		entry->previous = last;
-	}
-	else
-		widget->child = entry;
+/* Native settings use X for defaults and A to accept a value page. Binding
+ * editors retain A-to-bind/X-to-clear while a binding row owns focus. */
+static boolean frontend_menu_legacy_footer_action(struct widget_instance *root, struct event_record *event)
+{
+	struct widget_instance *focused = root, *button = NULL, *spinner;
+	char const *name = tag_get_name(root->definition_tag_index), *path;
+	boolean deleted = FALSE;
+	if (event->type != 3 || event->data.button.value != 1) return FALSE;
+	while (focused->focused_child) focused = focused->focused_child;
+	if (event->data.button.index == 2 && name &&
+		!strstr(name, "\\controls_setup\\") && !strstr(name, "\\controller_remapping\\"))
+		button = named(root, "button_defaults", 0);
+	else if (event->data.button.index == 0)
+		for (spinner = focused; spinner && spinner != root; spinner = spinner->parent)
+			if (spinner->type == 2 && pc_menu_setting_get(spinner->definition_tag_index))
+			{
+				button = named(root, "button_ok", 0);
+				break;
+			}
+	path = button ? tag_get_name(button->definition_tag_index) : NULL;
+	if (!path || strncmp(path, "pc\\frontend_legacy\\footer\\", 26)) return FALSE;
+	return ui_widget_port_dispatch_event(button, 0, event->controller_index, &deleted);
 }
 
 int frontend_menu_shortcut(struct widget_instance *widget, struct event_record *event)
 {
+	struct widget_instance *focused;
+	char const *name, *target = NULL;
+	char path[256];
+	boolean deleted = FALSE;
+	if (widget && !widget->parent && frontend_menu_can_edit() &&
+		!strcmp(frontend_menu_style(), "xbox") &&
+		frontend_menu_legacy_footer_action(widget, event)) return TRUE;
+	/* The native Advanced Controls list accepts A itself, before dispatching
+	 * to a child. Open our appended editor actions before that save/back event. */
+	if (widget && !widget->parent && frontend_menu_can_edit() &&
+		!strcmp(frontend_menu_style(), "xbox") && event->type == 3 &&
+		(event->data.button.index == 0 || event->data.button.index == 12) && event->data.button.value == 1)
+	{
+		focused = widget;
+		while (focused->focused_child) focused = focused->focused_child;
+		name = tag_get_name(focused->definition_tag_index);
+		if (name && !strcmp(name, "pc\\frontend_legacy\\keyboard")) target = "controls_setup\\controls_settings_screen";
+		else if (name && !strcmp(name, "pc\\frontend_legacy\\controller")) target = "controller_remapping\\controller_remapping_screen";
+		else if (name && !strcmp(name, "pc\\frontend_legacy\\glyphs")) target = "controller_appearance\\controller_appearance_screen";
+		if (target && focused->parent)
+		{
+			if (!game_function("plyr prf save adv cntl set", focused->parent, event, &deleted)) return FALSE;
+			snprintf(path, sizeof(path), "pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\%s", target);
+			return ui_widget_port_open(focused, path, &deleted);
+		}
+	}
 	/* event_manager's button event (3), Y (also the keyboard's Tab).
 	 * A repeat must not reopen the freshly created screen. */
 	if (!frontend_menu_legacy_root(widget) || event->type != 3 ||
@@ -56,6 +174,57 @@ int frontend_menu_shortcut(struct widget_instance *widget, struct event_record *
 		return FALSE;
 	return ui_widget_load_by_name_or_tag(FRONTEND_MENU_SCREEN, NONE, NULL,
 		widget->local_player_index, NONE, NONE, NONE) != NULL;
+}
+
+/* The native description's frames and strings correspond only to native
+ * rows. Inserted links have no matching frame; Save retains its old index. */
+short frontend_menu_legacy_description_index(struct widget_instance *list, short index)
+{
+	struct widget_instance *child, *detail;
+	char const *name;
+	short native_index = 0;
+	boolean added;
+	if (!list || !frontend_menu_can_edit() || !main_menu_is_active() || network_game_is_active() ||
+		strcmp(frontend_menu_style(), "xbox")) return index;
+	name = tag_get_name(list->definition_tag_index);
+	if (!name || strcmp(name, "ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\profile_edit_select_list")) return index;
+	for (child = list->child; child; child = child->next)
+	{
+		name = tag_get_name(child->definition_tag_index);
+		added = name && !strncmp(name, "pc\\frontend_legacy\\", 19);
+		if (child == list->focused_child)
+		{
+			if (list->parameters.list.extended_description)
+				for (detail = list->parameters.list.extended_description->child; detail; detail = detail->next)
+				{
+					char const *path = tag_get_name(detail->definition_tag_index);
+					boolean help = path && !strcmp(path, "pc\\frontend_legacy\\description");
+					detail->visible = help ? added : !added;
+					if (help && added)
+						text_set_length(detail, !strcmp(name + 19, "audio") ? L"Adjust music, sound effects|nand audio playback.|n|nCurrent Profile:" :
+							!strcmp(name + 19, "video") ? L"Adjust the display, graphics|nand menu style.|n|nCurrent Profile:" :
+							L"Configure network connections|nand online play.|n|nCurrent Profile:", 128);
+				}
+			return added ? NONE : native_index;
+		}
+		if (!added) native_index++;
+	}
+	return index;
+}
+
+/* Advanced Controls' native help requires a spinner in every selected row.
+ * The appended editor links are actions, so leave that service to its rows. */
+int frontend_menu_legacy_controls_help(struct widget_instance *list)
+{
+	char const *name;
+	boolean added;
+	if (!list || !frontend_menu_can_edit() || strcmp(frontend_menu_style(), "xbox")) return FALSE;
+	name = tag_get_name(list->definition_tag_index);
+	if (!name || strcmp(name, "ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\advanced_controls\\advanced_controls_menu")) return FALSE;
+	name = list->focused_child ? tag_get_name(list->focused_child->definition_tag_index) : NULL;
+	added = name && !strncmp(name, "pc\\frontend_legacy\\", 19);
+	if (list->parameters.list.extended_description) list->parameters.list.extended_description->visible = !added;
+	return added;
 }
 
 /* Tags live for one ui.map. Keep indices, never widget pointers: changing a
@@ -70,7 +239,6 @@ static struct
 	struct { long tag; short index, original; } pending[FRONTEND_PENDING_MAX];
 } frontend_session;
 
-boolean ui_widget_port_open(struct widget_instance *, char const *, boolean *);
 static void settings_help(struct widget_instance *list);
 static void master_servers_show(struct widget_instance *list);
 
@@ -86,7 +254,7 @@ static short frontend_page(struct widget_instance *root)
 	char const *path = root ? tag_get_name(root->definition_tag_index) : NULL;
 	short page;
 	for (page = 0; path && page < NUMBEROF(frontend_pages); page++)
-		if (!strcmp(path, frontend_pages[page].path)) return page;
+		if (!strcmp(path, frontend_pages[page].path) || !strcmp(path, frontend_pages[page].paused)) return page;
 	return NONE;
 }
 
@@ -188,7 +356,7 @@ static boolean frontend_open_page(struct widget_instance *root, short page, bool
 		return FALSE;
 	}
 	frontend_session.error = FALSE;
-	*deleted = ui_widget_load_by_name_or_tag(frontend_pages[page].path, NONE, NULL,
+	*deleted = ui_widget_load_by_name_or_tag(main_menu_is_active() ? frontend_pages[page].path : frontend_pages[page].paused, NONE, NULL,
 		root->local_player_index, NONE, NONE, NONE) != NULL;
 	return *deleted;
 }
@@ -262,30 +430,14 @@ static boolean frontend_menu_event(struct widget_instance *widget, char const *n
 	short index, page;
 	if (!frontend_menu_can_edit()) return FALSE;
 	if (frontend_navigation_root(root)) return frontend_navigation_event(widget, name);
-	if (!strcmp(name, "port frontend focus") && frontend_menu_legacy_root(root))
-	{
-		for (list = root->child; list; list = list->next)
-		{
-			if (list->type != 3 || !list->child || !strcmp(list->name, "entry")) continue;
-			child = list->child;
-			for (index = 0; child->next && index < list->parameters.list.selected_index; index++) child = child->next;
-			list->focused_child = child;
-			root->focused_child = list;
-			return TRUE;
-		}
-		return FALSE;
-	}
-	if (!strcmp(name, "port frontend open") && frontend_menu_legacy_root(root))
-	{
-		frontend_menu_session_reset();
-		*deleted = ui_widget_load_by_name_or_tag(FRONTEND_MENU_SCREEN, NONE, NULL,
-			root->local_player_index, NONE, NONE, NONE) != NULL;
-		return *deleted;
-	}
 	page = frontend_page(root);
 	if (page == NONE) return FALSE;
 	if (!strcmp(name, "port frontend init"))
 	{
+		/* The pause entry already owns a controller-specific profile session.
+		 * Adopt it instead of beginning another (especially on MCC). */
+		if (!main_menu_is_active() && player_ui_get_edit_player_profile())
+			frontend_session.owns_profile = TRUE;
 		if (page == 5 && !frontend_session.owns_profile)
 			frontend_session.owns_profile = pc_menu_profile_edit_begin();
 		settings_each(root, frontend_restore);
@@ -336,7 +488,12 @@ static boolean frontend_menu_event(struct widget_instance *widget, char const *n
 	}
 	else if (strcmp(name, "port frontend cancel") && strcmp(name, "port frontend back")) return FALSE;
 	frontend_menu_session_reset();
-	main_goto_main_menu();
+	if (main_menu_is_active()) main_goto_main_menu();
+	else
+	{
+		ui_widget_port_go_back(root);
+		*deleted = TRUE;
+	}
 	return TRUE;
 }
 
@@ -424,6 +581,10 @@ static void frontend_rows_show(struct widget_instance *list)
 	struct widget_instance *resolution = frontend_setting_row(list, "display.resolution");
 	struct widget_instance *window = frontend_setting_row(list, "display.window_size");
 	struct widget_instance *shown;
+	struct widget_instance *third = frontend_setting_row(list, "display.third_person");
+	struct widget_instance *row, *child;
+	struct pc_menu_setting *setting;
+	short index;
 	if (resolution && window)
 	{
 		shown = !strcmp(frontend_row_value(frontend_setting_row(list, "display.mode")), "windowed") ? window : resolution;
@@ -432,6 +593,17 @@ static void frontend_rows_show(struct widget_instance *list)
 		if (list->focused_child == (shown == resolution ? window : resolution)) list->focused_child = shown;
 	}
 	frontend_button_rows_show(list);
+	if (third)
+		for (row = list->child; row; row = row->next)
+			for (child = row->child; child; child = child->next)
+			{
+				setting = child->type == 2 ? pc_menu_setting_get(child->definition_tag_index) : NULL;
+				if (!setting || strncmp(setting->setting, "display.third_person_", 21)) continue;
+				row->visible = !strcmp(frontend_row_value(third), "true");
+				if (!row->visible && list->focused_child == row) list->focused_child = third;
+			}
+	for (row = list->child, index = 0; row; row = row->next, index++)
+		if (row == list->focused_child) list->parameters.list.selected_index = index;
 }
 
 static void frontend_menu_help(struct widget_instance *list)
@@ -446,6 +618,22 @@ static void frontend_menu_help(struct widget_instance *list)
 	wchar_t status[ROW_TEXT_LENGTH];
 	if (!frontend_menu_can_edit() || page == NONE || strcmp(list->name, "options")) return;
 	frontend_rows_show(list);
+	if (!main_menu_is_active())
+		for (row = list->child; row; row = row->next)
+		{
+			/* Retain the native in-game Settings restrictions: no profile
+			 * replacement or connection changes while a game is running. */
+			if (!strncmp(row->name, "row_", 4) && (!strcmp(row->name, "row_profiles") || !strcmp(row->name, "row_name") ||
+				!strcmp(row->name, "row_color") || (page == 3 &&
+				strncmp(row->name, "row_link_", 9)) || (page == 3 && !strcmp(row->name, "row_link_11"))))
+				row->visible = FALSE;
+		}
+	if (list->focused_child && !list->focused_child->visible)
+		for (row = list->child; row; row = row->next)
+			if (row->visible && !row->disabled) { list->focused_child = row; break; }
+	for (row = list->child, index = 0; row; row = row->next, index++)
+		if (row == list->focused_child) list->parameters.list.selected_index = index;
+	index = 0;
 	master_servers_show(list);
 	first = &frontend_session.first[page];
 	for (row = list->child; row; row = row->next)

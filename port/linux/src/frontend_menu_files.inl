@@ -1,5 +1,6 @@
-/* A separate immutable parse keeps modern definitions out of gameplay's
- * legacy/MCC Settings set. The ordinary reader owns file discovery. */
+/* A separate immutable parse preserves the stock Settings set when disabled.
+ * The enabled set serves main-menu and paused Settings; map-owned pause roots
+ * retain their existing definitions. The ordinary reader owns discovery. */
 #include "../game/frontend_menu.h"
 
 struct halo_menus const *frontend_menu_files_load(void)

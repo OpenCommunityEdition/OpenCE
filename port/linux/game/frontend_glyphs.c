@@ -40,17 +40,16 @@ void frontend_glyphs_dispose(void)
 
 boolean frontend_glyph_draw(short port, short button, rectangle2d *cursor, pixel32 color)
 {
-    struct icon_hud_element_definition icon;
     struct rasterizer_dynamic_screen_geometry_parameters parameters;
     struct dynamic_screen_vertex vertices[4];
     struct bitmap_data *bitmap;
     short style, i;
     long asset;
-    real x, y, width = 21.0f, height = 26.0f;
-    if (button < 0 || button > 3 || port < 0 || port > 3) return FALSE;
+    real x, y, width = 16.0f, height = 20.0f;
+    if (button < 0 || (button > 3 && button != 16) || port < 0 || port > 3) return FALSE;
     style = (short)controller_button_style_for_port(port);
-    memset(&icon, 0, sizeof(icon));
-    if (style >= 3) return controller_glyph_draw(style, button, &icon, cursor, color, NULL);
+    if (button == 16) return controller_glyph_draw_menu(style < 3 ? 3 : style, button, cursor, color);
+    if (style >= 3) return controller_glyph_draw_menu(style, button, cursor, color);
     if (style < 0) return FALSE;
     if (!frontend_faces[style][button].attempted)
     {
@@ -70,7 +69,7 @@ boolean frontend_glyph_draw(short port, short button, rectangle2d *cursor, pixel
     bitmap = frontend_faces[style][button].bitmap;
     if (!bitmap) return FALSE;
     x = cursor->x0 + 4.0f;
-    y = draw_unicode_string_capital_middle(cursor, L"") - 13.0f;
+    y = draw_unicode_string_capital_middle(cursor, L"") - height * 0.5f;
     hud_button_face_bounds(style, button, &x, &y, &width, &height);
     memset(&parameters, 0, sizeof(parameters));
     parameters.map[0] = bitmap;
@@ -86,6 +85,6 @@ boolean frontend_glyph_draw(short port, short button, rectangle2d *cursor, pixel
         vertices[i].color = (color & 0xff000000UL) | 0xffffffUL;
     }
     rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
-    cursor->x0 += 22;
+    cursor->x0 += 26;
     return TRUE;
 }

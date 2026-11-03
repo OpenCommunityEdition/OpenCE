@@ -21,6 +21,11 @@ PAGES = {
     "lobby": (MP + "lobby/lobby_screen", "GAME LOBBY", "PLAYERS"),
     "preview": (MP + "lobby/preview_screen", "JOIN GAME", "GAME IN PROGRESS"),
     "bots": ("main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/bots_screen", "BOTS", "BOT OPTIONS"),
+    "sharing": ("main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_sharing_settings_screen", "MAP SHARING", "MAP SHARING"),
+    "coop": (MP + "server_settings/coop_options/coop_options_screen", "CO-OP OPTIONS", "CO-OP OPTIONS"),
+    "voice": (MP + "server_settings/voice_options/voice_options_screen", "VOICE AND VOTING", "VOICE AND VOTING"),
+    "campaign": ("main_menu/solo_level_select/solo_level_select_screen", "SELECT MISSION", "MISSIONS"),
+    "difficulty": ("main_menu/difficulty_select/difficulty_select_list_screen", "DIFFICULTY", "CHOOSE DIFFICULTY"),
 }
 TITLES = {"title_" + key: title for key, (_, title, _) in PAGES.items()}
 
@@ -60,6 +65,13 @@ def append(doc):
             w.set("flags", " ".join(f for f in w.get("flags", "").split() if f != "pause_game"))
             return w
         root = copy(original)
+        if page == "maps":
+            # Multiplayer chooses difficulty in-place, inside its map list.
+            # Give that step the same detail art/text as the campaign screen.
+            description = copy(MP + "mp_map_select/mp_map_extended_desc")
+            for leaf_name in ("difficulty_options", "difficulty_extended_description"):
+                detail = copy("main_menu/difficulty_select/" + leaf_name)
+                ET.SubElement(description, "child", widget=detail.get("name"))
         routes.append((original, root.get("name")))
         by_name = {w.get("name"): w for w in copies.values()}
         # The native wrappers retain their B/back and server-defer lifecycle.
@@ -79,18 +91,20 @@ def append(doc):
                     w.remove(c)
             # Lists keep child order: existing services address rows by index.
             data = {c.get("input") for c in w.findall("data")}
-            scroll = bool(data & {"mp map list update", "gt select list update", "server settings update", "port lobby update", "game settings lists text update", "port settings help"})
+            scroll = bool(data & {"mp map list update", "solo map list update", "difficulty menu update desc", "gt select list update", "server settings update", "port lobby update", "game settings lists text update", "port settings help"})
             if scroll:
                 ET.SubElement(w, "data", input="port frontend multiplayer update")
                 index = 0
                 for c in w.findall("child"):
                     target = by_name[c.get("widget")]
                     n = leaf(target.get("name"))
-                    if re.match(r"list_item_\d", n) or n.startswith("op_"):
+                    if re.match(r"list_item_\d", n) or n.startswith("op_") or n.endswith("_difficulty_item"):
                         put(c, x=28, y=110+30*index)
                         put(target, left=0, top=0, width=336, height=26, bitmap="modern/row")
                         target.set("flags", target.get("flags", "") + " nifty_fx")
                         role(target, "row")
+                        if n.endswith("_difficulty_item"):
+                            put(target, text_x=0, text_y=3, align="center", font="ui\\large_ui")
                         index += 1
                         for inner in target.findall("child"):
                             item = by_name[inner.get("widget")]
@@ -100,21 +114,27 @@ def append(doc):
                                 continue
                             if item.get("type") == "spinner" or item_name.endswith("_value"):
                                 chooser = n.startswith("list_item_0")
-                                value_width = 296 if chooser else 140 if page == "session" else 98
-                                put(inner, x=20 if chooser else 180 if page == "session" else 218, y=3)
+                                value_width = 296 if chooser else 140
+                                put(inner, x=20 if chooser else 180, y=3)
                                 put(item, left=0, top=0, width=value_width, height=24, text_x=0, text_y=0, font="ui\\large_ui", align="center")
                                 if item.get("type") == "spinner":
                                     put(item, header_bounds="5 -12 17 -6", footer_bounds=f"5 {value_width} 17 {value_width + 6}")
                                     if item_name == "session_compatibility_spinner":
                                         # The native service reads indices; short captions fit
                                         # the modern value column even at 4:3.
-                                        put(item, strings="CROSSPLAY|THIRD PERSON")
+                                        put(item, strings="CROSSPLAY|GULCHCE")
+                                    if item_name == "voice_mode_spinner":
+                                        item.attrib.pop("string_list", None)
+                                        put(item, strings="OFF|TEAM NEAR|ANYONE NEAR|TEAM|TEAM + NEARBY")
                                 role(item, "chooser" if chooser else "value")
                             elif item.get("type") == "text":
                                 put(inner, x=12, y=3)
-                                put(item, left=0, top=0, width=312 if item_name=="list_item_text" else 152 if page == "session" else 196, height=24, text_x=0, text_y=0, font="ui\\large_ui", align="left")
+                                put(item, left=0, top=0, width=312 if item_name=="list_item_text" else 152, height=24, text_x=0, text_y=0, font="ui\\large_ui", align="left")
                                 if item_name == "session_compatibility_label":
                                     put(item, text="COMPATIBILITY")
+                                if item_name == "voice_proximity_label":
+                                    item.attrib.pop("string_list", None)
+                                    put(item, text="VOICE RANGE:", string_index=0)
                                 role(item, "label_full" if item_name=="list_item_text" else "label")
             if name.endswith("button_bar") or name == "button_bar":
                 put(w, left=0, top=0, width=588, height=26)
@@ -135,37 +155,84 @@ def append(doc):
                 w.attrib.pop("bitmap", None)
                 for c in w.findall("child"):
                     put(c,x=0,y=0)
-            if name.endswith("_extended_desc") or name == "lobby_desc":
+                if page == "campaign":
+                    markers = [c for c in w.findall("child") if leaf(c.get("widget")) == "difficulty_indicator"]
+                    for i,c in enumerate(markers):
+                        put(c,x=444+36*i,y=359)
+            if page == "campaign" and name == "difficulty_indicator":
+                put(w,width=32,height=35)
+                role(w,"detail_icon")
+            if name.endswith("_extended_desc") or name in ("lobby_desc", "difficulty_ext_desc"):
+                if name == "difficulty_ext_desc":
+                    put(w,left=0,top=0,width=640,height=480)
+                    w.attrib.pop("bitmap",None)
+                    role(w,"full")
                 for c in w.findall("child"):
                     put(c,x=0,y=0)
             if name.endswith("_right_pic") or name == "lobby_map_pic":
-                put(w,left=426,top=104,width=140,height=114)
+                put(w,left=426,top=94,width=140,height=114)
                 role(w,"detail_fixed")
             if name.endswith("_right_name") or name in ("lobby_map_name", "mcc_folder_name"):
-                put(w,left=396,top=232,width=200,height=42,font="ui\\large_ui")
+                put(w,left=396,top=218,width=200,height=42,font="ui\\large_ui",align="center",text_x=0,text_y=0)
                 role(w,"detail")
             if name.endswith("_right_data") or name in ("lobby_game_data", "mcc_folder_help"):
-                put(w,left=396,top=280,width=200,height=110,font="ui\\small_ui")
-                role(w,"detail")
+                put(w,left=396,top=266,width=200,height=94 if page=="campaign" else 124,font="ui\\small_ui",align="center",text_x=0,text_y=0)
+                role(w,"detail_wrap")
+            if page in ("difficulty", "maps") and name == "difficulty_options":
+                put(w,left=415,top=92,width=162,height=171)
+                role(w,"detail_icon")
+            if page in ("difficulty", "maps") and name == "difficulty_extended_description":
+                put(w,left=396,top=270,width=200,height=122,text_x=0,text_y=0,align="center",font="ui\\small_ui")
+                role(w,"detail_wrap")
+            if page == "difficulty" and name == "warning_message":
+                put(w,left=0,top=0,width=312,height=140,text_x=0,text_y=0,align="center")
+                role(w,"heading")
+                for c in body.findall("child"):
+                    if c.get("widget")==w.get("name"):put(c,x=40,y=245)
             if name == "lobby_join_help":
                 put(w,left=28,top=387,width=584,height=20,align="left",text_y=0)
                 role(w,"status")
             if name == "preview_status":
                 put(w,left=40,top=120,width=312,height=260,font="ui\\large_ui")
                 role(w,"heading")
-            if w.get("type") == "text" and name == "help":
+            if w.get("type") == "text" and name in ("help", "coop_options_help", "voice_options_help"):
                 put(w,left=396,top=174 if page in ("server", "session") else 108,width=200,height=212 if page in ("server", "session") else 278,font="ui\\large_ui",color="#FF2896FF")
                 role(w,"detail_wrap")
+        if page == "maps":
+            for original_label in list(copies.values()):
+                if leaf(original_label.get("name")) == "list_item_text":
+                    centered = deepcopy(original_label)
+                    centered.set("name", original_label.get("name") + "_centered")
+                    centered.set("align", "center")
+                    doc.append(centered)
+                    role(centered, "label_full")
         if page in ("server", "session"):
             w=add("widget",base+"/help_value",type="text",controller=1,left=396,top=108,width=200,height=56,font="ui\\large_ui",color="#FFFFFFFF")
             ET.SubElement(body,"child",widget=w.get("name"))
             role(w,"detail_wrap")
         # The fixed chrome is not inserted into service lists (row indices).
         parent, title, chrome_base = body, page, base
+        if page == "difficulty":
+            # The difficulty service owns child zero (list) and one (warning),
+            # and the list draws its detached description before later siblings.
+            # Put decoration behind that intact service screen in an outer shell.
+            parent = add("widget", base+"/screen", width=640, height=480,
+                         flags="pass_unhandled_to_focused_child", bitmap="modern/panel")
+            root.attrib.pop("bitmap", None)
+            role(parent, "full")
+            routes[-1] = (original, parent.get("name"))
+            ET.SubElement(parent, "on", event="created", focus=root.get("name"))
         for n,x,y,width,height,bitmap in [("title",70,40,300,28,"modern/title_"+title), ("help_panel",380,82,232,318,"modern/help_panel"), ("rule",28,104,336,1,"modern/rule")]:
             w=add("widget",chrome_base+"/"+n,left=x,top=y,width=width,height=height,controller=1,bitmap=bitmap,flags="nifty_fx" if n=="help_panel" else "")
-            parent.insert(0,ET.Element("child",widget=w.get("name")))
+            # The difficulty shell owns decoration; other screens already
+            # permit leading chrome. Always draw it before detached details.
+            if page == "difficulty":
+                ET.SubElement(parent,"child",widget=w.get("name"))
+            else:
+                parent.insert(0,ET.Element("child",widget=w.get("name")))
             role(w,"detail" if n=="help_panel" else "heading")
+        if page == "difficulty":
+            ET.SubElement(parent, "child", widget=root.get("name"))
         for n,x,y,width,text in [("section",32,82,332,heading),("prompts",28,450,584," "),("status",28,387,336,"")]:
             w=add("widget",chrome_base+"/"+n,type="text",left=x,top=y,width=width,height=22,controller=1,text=text,font="ui\\small_ui" if n!="section" else "ui\\large_ui",color="#FF80A2C0")
             ET.SubElement(parent,"child",widget=w.get("name"))
@@ -181,6 +248,8 @@ def append(doc):
         for c in w.findall("child"):visit(c.get("widget"))
         if w.get("description"):visit(w.get("description"))
     for _,name in routes:visit(name)
+    for name in generated:
+        if name.endswith("_centered") and name[:-9] in reachable:visit(name)
     for name,w in generated.items():
         if name not in reachable:doc.remove(w)
     return [(n,r) for n,r in roles if n in reachable], routes

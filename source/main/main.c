@@ -409,6 +409,7 @@ symbols in this file:
 #include "mcc_cache.h"
 #include "mcc_main.h"
 #include "view_fov.h" /* port: display.fov, before the projection and culling */
+#include "frontend_menu.h" /* port: optional menu-tag lifecycle at the main menu */
 
 #if defined(HALO_WINDOWS) || defined(HALO_ANDROID) || defined(__linux__)
 #define HALO_NATIVE_BUILD_INFO 1
@@ -1133,6 +1134,9 @@ void main_menu_unload(
 void main_menu_load(
 	void)
 {
+	/* port: optional frontend tags are rebuilt only at the main-menu boundary. */
+	if (frontend_menu_reload_required())
+		main_menu_unload();
 	if (!main_globals.main_menu_scenario_loaded)
 		main_load_ui_scenario(FALSE);
 	main_screen_shell_load();

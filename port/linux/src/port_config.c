@@ -253,11 +253,11 @@ static const struct config_setting config_settings[] =
 	{ "display.changelog", _config_boolean, "true", "HALO_CHANGELOG", _environment_value, _platform_all,
 		"Show CHANGELOG beneath the build labels in the PC main menu.\n"
 		"Restart the game after changing this setting." },
-	{ "display.menu_frontend", _config_string, "\"off\"", "HALO_MENU_FRONTEND", _environment_value, _platform_all,
+	{ "display.menu_frontend", _config_string, "\"modern\"", "HALO_MENU_FRONTEND", _environment_value, _platform_all,
 		"Optional submenu frontend: \"off\" keeps display.menus, or choose\n"
-		"\"modern\", \"pc\" or \"xbox\". Enable before loading the main menu.\n"
-		"Frontend changes take effect only at the main menu, never in gameplay.\n"
-		"The starting menu retains its layout. Pause menus use display.menus." },
+		"\"modern\", \"pc\" or \"xbox\". Change it in Interface or Video Setup > Graphics.\n"
+		"Settings use the selected style in gameplay too. Changes made while\n"
+		"playing take effect on return to the main menu. Pause roots stay native." },
 	{ "display.menu_language", _config_string, "\"maps\"", "HALO_MENU_LANGUAGE", _environment_value, _platform_all,
 		"The PC menus' language: \"maps\" for the language of the Custom Edition\n"
 		"whose loc.map is in custom_maps (as that edition shows them; English\n"

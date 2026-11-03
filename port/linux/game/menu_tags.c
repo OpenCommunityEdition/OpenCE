@@ -410,8 +410,8 @@ static char const *const port_function_names[] =
 	"port controller save", "port controller bind", "port controller left", "port controller right",
 	"port controller clear", "port controller cancel",
 	"port bots init", "port bots command", "port bots host entry", "port bots settings save",
-	"port frontend apply", "port frontend cancel", "port frontend open",
-	"port frontend focus", "port frontend init", "port frontend defaults",
+	"port frontend apply", "port frontend cancel",
+	"port frontend init", "port frontend defaults",
 	"port frontend back", "port frontend page", "port frontend next tab", "port frontend editor",
 	"port frontend navigation init",
 	"port map vote open", "port map vote choose",
@@ -2511,9 +2511,10 @@ void menu_tags_loaded(
 	boolean game_map = strcmp(map_name, "ui") != 0;
 	boolean campaign = game_map && full_screen_campaign_map();
 	boolean coop = game_map && network_coop_campaign_map();
-	boolean frontend = !game_map && !mcc_cache_tags_loaded() && frontend_menu_requested();
+	boolean frontend;
 
 	frontend_menu_map_loaded(map_name, mcc_cache_tags_loaded());
+	frontend = frontend_menu_requested();
 
 	/* MCC owns its pause menus and uses these native Settings screens.
 	Do not patch embedded MCC campaign widgets. */

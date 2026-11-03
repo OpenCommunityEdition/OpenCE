@@ -273,6 +273,9 @@
   "modern/tab_1.png",
   "modern/title_0.png",
   "modern/title_bots_0.png",
+  "modern/title_campaign_0.png",
+  "modern/title_coop_0.png",
+  "modern/title_difficulty_0.png",
   "modern/title_gametypes_0.png",
   "modern/title_host_0.png",
   "modern/title_lobby_0.png",
@@ -280,6 +283,11 @@
   "modern/title_multiplayer_0.png",
   "modern/title_preview_0.png",
   "modern/title_server_0.png",
-  "modern/title_session_0.png"
+  "modern/title_session_0.png",
+  "modern/title_sharing_0.png",
+  "modern/title_voice_0.png",
+  "modern/xbox_a.png",
+  "modern/xbox_b.png",
+  "modern/xbox_x.png"
  ]
 }

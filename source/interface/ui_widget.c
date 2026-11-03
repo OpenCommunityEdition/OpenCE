@@ -4071,8 +4071,8 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 		(widget_stack>=0) && (widget_stack<MAXIMUM_GAMEPADS));
 	if (tag_index == NONE)
 		tag_index = tag_loaded(UI_WIDGET_DEFINITION_TAG, name);
-	/* port: optional submenu route; feature code preserves the starting menu
-	 * and rejects gameplay/MCC. Child definitions are never redirected. */
+	/* port: explicit frontend/settings routes preserve the starting and pause
+	 * roots. Child definitions and map-authored widgets are never redirected. */
 	if (!parent) tag_index = frontend_menu_destination(tag_index);
 	if (tag_index != NONE)
 	{
@@ -4141,7 +4141,7 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 				tag_index,
 				local_player_index,
 				widget_stack);
-			/* port: optional frontend entry; feature code rejects other screens/maps. */
+			/* port: additive Xbox settings links; feature code rejects other screens/maps. */
 			frontend_menu_attach(widget);
 		}
 		else
@@ -5596,7 +5596,12 @@ static void widget_instance_render_text_box(
 	{
 		rectangle2d measure = bounds;
 		measure.x1 = SHORT_MAX;
+		frontend_menu_reflow_text(*text);
+		/* port: measure line advances from the left, then restore the authored
+		 * alignment. A centered cursor includes half the measurement box. */
+		draw_string_set_draw_mode(font_index, NONE, 0, 0, &color);
 		ui_widget_port_text_wrap(*text, &measure, (short)(bounds.x1 - bounds.x0 - 2));
+		draw_string_set_draw_mode(font_index, NONE, justification, 0, &color);
 	}
 	if (string_has_icons_to_draw(*text))
 		draw_string_and_hack_in_icons(&bounds, &clip, NULL, 0, *text, FALSE);
@@ -7417,6 +7422,13 @@ static void widget_instance_render_recursive(
 			}
 			if (shown)
 			{
+				/* port: scaled modern difficulty icons exclude the native bitmap's
+				 * power-of-two padding, keeping their visible art centered. */
+				if (frontend_layout && frontend_menu_bitmap_region(widget->definition_tag_index, &frame_width, &frame_height))
+				{
+					set_rectangle2d(&texels, 0, 0, frame_width, frame_height);
+					stretched = FALSE;
+				}
 				/* port: scope panel slicing to this modern widget's background. */
 				frontend_panel_begin(widget->definition_tag_index);
 				draw_bitmap_in_rect(
@@ -8025,7 +8037,7 @@ static void widget_instance_process_one_event_recursive(
 		"c:\\halo\\SOURCE\\interface\\ui_widget.c",
 		3067,
 		widget && definition && event && return_widget_deleted);
-	/* port: the optional frontend's shortcut belongs only to a main-menu root. */
+	/* port: optional main-menu shortcuts and additive Xbox editor actions. */
 	if (event_for_this_widget && frontend_menu_shortcut(widget, event))
 	{
 		*return_widget_deleted = TRUE;

@@ -12,30 +12,61 @@ boolean main_menu_is_active(void);
 boolean network_game_is_active(void);
 
 static int frontend_menu_loaded;
+static int frontend_menu_ui_map;
+static int frontend_style_latched;
+static char frontend_style[8];
+
+char const *frontend_menu_style(void)
+{
+	return frontend_menu_ui_map || !frontend_style_latched ?
+		config_string("display.menu_frontend") : frontend_style;
+}
 
 #include "frontend_network_routes.inl"
 
 int frontend_menu_requested(void)
 {
-	char const *value = config_string("display.menu_frontend");
+	char const *value = frontend_menu_style();
 	return !strcmp(value, "modern") || !strcmp(value, "pc") || !strcmp(value, "xbox");
 }
 
 void frontend_menu_map_loaded(char const *name, int mcc)
 {
-	frontend_menu_loaded = !mcc && !strcmp(name, "ui") && frontend_menu_requested();
+	frontend_menu_ui_map = !mcc && !strcmp(name, "ui");
+	/* A gameplay load keeps the style selected at the main menu, including
+	 * across rounds. Saved in-game changes are adopted only on return to ui. */
+	if (frontend_menu_ui_map || !frontend_style_latched)
+	{
+		strncpy(frontend_style, config_string("display.menu_frontend"), sizeof(frontend_style) - 1);
+		frontend_style[sizeof(frontend_style) - 1] = 0;
+		frontend_style_latched = 1;
+	}
+	frontend_menu_loaded = !(mcc && !strcmp(name, "ui")) && frontend_menu_requested();
 	frontend_input_enable(frontend_menu_loaded);
 }
 
 void frontend_menu_unloaded(void)
 {
+	if (frontend_menu_ui_map)
+	{
+		strncpy(frontend_style, config_string("display.menu_frontend"), sizeof(frontend_style) - 1);
+		frontend_style[sizeof(frontend_style) - 1] = 0;
+	}
 	frontend_menu_session_reset();
 	frontend_menu_loaded = 0;
+	frontend_menu_ui_map = 0;
 	frontend_input_enable(0);
 	frontend_menu_text_end();
 	frontend_panel_end();
 	frontend_glyphs_dispose();
 	keyboard_glyphs_dispose();
+}
+
+int frontend_menu_reload_required(void)
+{
+	/* Stock does not load the optional tags. Rebuild ui.map only when crossing
+	 * that boundary, after the current settings widgets have been closed. */
+	return frontend_menu_ui_map && frontend_menu_loaded != frontend_menu_requested();
 }
 
 int frontend_menu_available(void)
@@ -54,7 +85,7 @@ char const *frontend_menu_root(char const *legacy)
 		legacy = FRONTEND_MENU_XBOX;
 	if (!frontend_menu_available())
 		return legacy;
-	value = config_string("display.menu_frontend");
+	value = frontend_menu_style();
 	root = !strcmp(value, "pc") ? FRONTEND_MENU_PC : !strcmp(value, "xbox") ? FRONTEND_MENU_XBOX : legacy;
 	return tag_loaded('DeLa', root) != NONE ? root : legacy;
 }
@@ -66,10 +97,20 @@ long frontend_menu_destination(long tag)
 	char const *name;
 	long modern;
 	unsigned int index;
-	if (tag == NONE || !frontend_menu_available() || !main_menu_is_active() ||
-		strcmp(config_string("display.menu_frontend"), "modern")) return tag;
+	if (tag == NONE || !frontend_menu_available()) return tag;
 	name = tag_get_name(tag);
 	if (!name) return tag;
+	if (!strcmp(name, "pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\player_profile_edit_screen") ||
+		!strcmp(name, "ui\\shell\\main_menu\\settings_select\\player_setup\\player_profile_edit\\player_profile_edit_screen"))
+	{
+		if (!strcmp(frontend_menu_style(), "modern"))
+			modern = tag_loaded('DeLa', main_menu_is_active() ? FRONTEND_MENU_SCREEN : FRONTEND_MENU_PAUSED);
+		else if (!main_menu_is_active() && !strcmp(frontend_menu_style(), "xbox"))
+			modern = tag_loaded('DeLa', FRONTEND_MENU_XBOX_SETTINGS);
+		else return tag;
+		return modern == NONE ? tag : modern;
+	}
+	if (!frontend_menu_ui_map || !main_menu_is_active() || strcmp(frontend_menu_style(), "modern")) return tag;
 	for (index = 0; index < sizeof(frontend_network_routes) / sizeof(frontend_network_routes[0]); index++)
 		if (!strcmp(name, frontend_network_routes[index].legacy))
 		{

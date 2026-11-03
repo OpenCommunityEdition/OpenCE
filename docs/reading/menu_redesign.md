@@ -1,7 +1,8 @@
 # Optional modern frontend: Settings, navigation and legacy switching
 
 This is general feature work. Xbox and Custom Edition implementations stay
-in place; MCC continues to own its pause UI. The new frontend is opt-in and
+in place; MCC continues to own its pause UI. Modern is the default frontend;
+an explicitly saved Stock, PC or Xbox choice is preserved. The frontend
 does not change map-family selection, networking or simulation. Phases 1–3 established the isolated frontend, widescreen layout and input
 prompts. Phase 4 provides the Settings tabs and scrolling subpages. The
 starting menu stays unchanged. Phase 5 adds modern Multiplayer and Create Game
@@ -13,13 +14,13 @@ retain their existing definitions and appearance.
 
 | Area | Existing owner / route | Modern-menu plan |
 | --- | --- | --- |
-| Main menu, campaign, profiles, multiplayer | `tools/ce_menus.py`, generated `port/assets/menus/ce`, `menu_tags.c`, `menu_functions.c` | Keep the starting menu, campaign and profiles unchanged. The PC multiplayer landing and explicitly listed hosting/lobby roots opt into modern views. |
-| Video, audio, mouse, controller, interface and network settings | `tools/port_settings.py`, `port_config.c`; profile values use the profile editor | Phase 4 reuses this inventory and the existing services across six tabs and nine subpages. Profile settings use the existing profile editor transaction. |
+| Main menu, campaign, profiles, multiplayer | `tools/ce_menus.py`, generated `port/assets/menus/ce`, `menu_tags.c`, `menu_functions.c` | Keep the starting menu and profile editors unchanged; the campaign map chooser opts into the Modern layout. The PC multiplayer landing and explicitly listed hosting/lobby roots opt into modern views. |
+| Video, audio, mouse, controller, interface and network settings | `tools/port_settings.py`, `port_config.c`; profile values use the profile editor | Reuse this inventory and the existing services across six tabs and eleven subpages. Profile settings use the existing profile editor transaction. |
 | Keyboard/mouse remapping | Base-game input/profile bindings plus port Controls Setup | Keep binding ownership. Later prompt lookup resolves an action to its current binding, not a hard-coded key. |
 | Controller mapping and glyph families | `controller_remap.c`, `controller_remap_game.c`, `controller_buttons.c`, `xinput_sdl.c`, existing HUD/menu glyph settings | Phase 3 connects action prompts to these services, including per-device automatic detection and preserved manual overrides. |
 | Internet/LAN browser, hosting, lobby and co-op | Existing `menu_functions.c` callbacks and network modules | Phase 6 adds hosting/lobby views over these services. All browser views stay native; no transport or protocol change. |
-| In-game Xbox/CE pause menus and map UI | `menu_tags_loaded`, `pause_patch`, `pause_campaign_patch`; map-provided resources | Continue using `display.menus`. Never rebuild or switch their resources in gameplay. |
-| MCC pause and Settings integration | `mcc_ui`, `mcc_pause`, `mcc_pause_runtime`, existing `mcc_settings` branch | Leave ownership, guards and unload order intact. Modern definitions are absent from this parse. |
+| In-game Xbox/CE pause menus and map UI | `menu_tags_loaded`, `pause_patch`, `pause_campaign_patch`; map-provided resources | Pause roots continue using `display.menus`. Their Settings entry uses the selected frontend. Never rebuild or switch resources in gameplay. |
+| MCC pause and Settings integration | `mcc_ui`, `mcc_pause`, `mcc_pause_runtime`, existing `mcc_settings` branch | Keep ownership, guards, profile session and pause-clock rules intact. The trusted generated Settings entry can route to the selected frontend. |
 | Changelog, bots, mods and other GulchCE entries | Existing feature modules and generated CE screens | Keep their existing starting-menu routes; bots remain available through Settings and Server Setup, including the modern hosting view. |
 
 The current reader constructs native widget tags from XML. It is not a web
@@ -57,15 +58,17 @@ obligations. Art credits belong in AUTHORS; code provenance does not.
    own the frontend availability latch and root policy.
 3. [frontend_menu_files.inl](../../port/linux/src/frontend_menu_files.inl):
    `frontend_menu_files_load` uses the existing parser for a separate cached
-   frontend set. The ordinary reader excludes `modern/`. It remains the
-   source of gameplay Settings, including MCC's existing integration.
+   frontend set. The ordinary reader excludes `modern/` and remains the
+   source of Stock Settings when the feature is disabled.
 4. [menu_tags.c](../../port/linux/game/menu_tags.c): `menu_tags_loaded`
-   chooses the frontend set only for a non-MCC `ui` map with the feature
-   enabled. `menu_tags_unloaded` clears the latch before normal cleanup.
+   chooses the frontend set when the active style is enabled, including
+   gameplay Settings through each family's existing loader. `menu_tags_unloaded`
+   disposes resources; the active style persists across gameplay map changes.
 5. [frontend_menu_runtime.inl](../../port/linux/game/frontend_menu_runtime.inl):
    `frontend_menu_can_edit`, `frontend_menu_attach`, `frontend_menu_shortcut`,
-   `frontend_menu_event` reject gameplay and network sessions, add the
-   optional legacy entry, and handle Apply/Cancel.
+   `frontend_menu_event` add the Xbox settings links and handle Apply/Cancel.
+   Gameplay uses paused page roots without main-menu initialization; closing
+   Settings returns through the existing pause history.
 6. [ui_widget.c](../../source/interface/ui_widget.c):
    `ui_widget_load_by_name_or_tag` offers the feature an attachment point;
    `widget_instance_process_one_event_recursive` offers the guarded shortcut;
@@ -74,36 +77,43 @@ obligations. Art credits belong in AUTHORS; code provenance does not.
 The small shared hooks are necessary because feature modules cannot own
 the engine's widget creation/event loop or select the initial shell root.
 They contain no feature policy and are marked `port:`. Loader registration,
-the setting, and callback names are additive. Existing CE XML and all MCC
+the setting, and callback names are additive. The stock Graphics generator adds only the Menu Style setting; all MCC
 modules remain unchanged. No map paths are renamed or redirected.
 
 ## Trying the prototype
 
 Set `display.menu_frontend = "modern"` in the isolated run's `config.toml`
-before loading `ui.map`. The default, `"off"`, preserves existing behavior.
+before loading `ui.map`. Modern is now the default; `"off"` preserves the
+established Settings presentation.
 `HALO_MENU_FRONTEND` provides the usual one-run override. The other enabled
 values are `"pc"` and `"xbox"`. `display.menus` still controls the established
 pause-menu policy independently.
 
-For example: use the starting menu’s MENU STYLE entry or Tab/Y, open Interface, select Xbox under Menu Style, then OK. The next main-loop
+For example: open Settings in Modern mode, open Interface, select Xbox under
+Menu Style, then OK. The next main-loop
 iteration closes the current widget/history and opens the original Xbox
-root. At that root, Tab/Y or the MENU STYLE button reopens the prototype.
+root. Xbox Settings > Video Setup > Graphics exposes Menu Style too; Tab/Y
+at an enabled frontend's starting root remains a shortcut to Modern Settings.
 Select Modern and OK to return to the unchanged starting menu with modern
-submenus enabled. Switching is unavailable in play-flow submenus,
-lobbies, gameplay or pause menus. A preference written by another in-process
-consumer during gameplay is only considered on return to the main menu;
+submenus enabled. In gameplay, Settings exposes Menu Style but saves it as
+a pending preference. `frontend_menu_style` retains the style selected on
+departure from the main menu across Xbox, CE and MCC map transitions. The
+new preference is adopted only when the main menu loads again;
 editing config.toml externally does not promise live reload.
 
 Choice arrows edit widget-local selections. Changing pages captures pending
 selections in feature-owned storage; no config is written. Cancel discards
 the pending selections from every page. OK saves changed values across pages
-and requests the main-menu transition.
+and requests the main-menu transition when already there. In gameplay, OK
+and Cancel return to the existing pause menu without changing its resources.
 The existing configuration writer is not transactional: if persistence
 fails, some values may already have changed in memory. The prototype keeps
 the screen open with an error and offers retry; Cancel cannot undo an
 earlier failed Apply. Missing frontend definitions fall back to the normal
-legacy menu. The initial feature activation requires a fresh `ui.map` load
-(restart is simplest); normal enabled style changes need no restart.
+legacy menu. Crossing between Off and an enabled style requests a fresh
+`ui.map` load at `main_menu_load`, after closing the old widgets. Changes
+between enabled styles reuse the loaded optional definitions. Neither path
+rebuilds tags during a menu callback or during gameplay.
 
 Modern preserves the starting menu selected by `display.menus`; Classic PC
 and Xbox explicitly select their established shell. Modern mode routes the
@@ -113,14 +123,14 @@ and profile-management editors retain their established presentation.
 Phase 3 replaces the temporary Tab/Y caption with device-aware prompts and
 the existing controller glyph preferences. Phase 7 adds optional binding-aware
 [keyboard/mouse glyphs](keyboard_prompts.md) using that lookup. A later
-menu-style setting in a pause screen must be disabled there or queue a
-preference, never switch UI.
+menu-style setting in a pause screen queues a preference, never switches UI.
 
 ## Phase 5: multiplayer submenus; unchanged starting menu
 
 The starting screen is deliberately preserved, including its artwork, positions,
-Campaign, Profiles, Settings, Mods, Changelog and Quit routes. The previously
-added MENU STYLE / Tab/Y shortcut still opens modern Settings. No modern main
+Campaign, Profiles, Mods, Changelog and Quit entries. Settings opens Modern
+Settings when selected, and the campaign chooser has a Modern presentation.
+The Tab/Y shortcut still opens Modern Settings. No modern main
 screen or replacement main-screen art is generated.
 
 Read [frontend_navigation.py](../../tools/frontend_navigation.py), `SCREENS` and
@@ -190,10 +200,10 @@ of this repository's menu contracts, not newly imported third-party code.
 [frontend_network_routes.inl](../../port/linux/game/frontend_network_routes.inl)
 is an explicit generated whitelist. `frontend_menu_destination` accepts these
 roots while `main_menu_is_active()` on the non-MCC `ui.map` latch, including an
-active pregame host/client. **This does not relax the style-switching guard:**
-`frontend_menu_can_edit` still rejects network sessions. Loading gameplay or
-unloading the frontend clears availability, so Xbox/CE map UI and MCC pause
-ownership keep their established paths.
+active pregame host/client. Gameplay does not enable these multiplayer routes.
+Only the explicit Settings root also routes during gameplay; its active style
+stays latched until the main menu returns. Xbox/CE map UI and MCC pause ownership
+keep their established paths.
 
 For example, Create Game → Local Network calls the original host service, then
 shows the modern map chooser. The map-family spinner still calls the existing
@@ -388,8 +398,7 @@ copy of each modern definition for both drawing and pointer targets. Additional
 width is divided between rows and help. Phase 4 selects a uniform option font
 for narrow or wide viewports, as described above.
 Content is centered and capped at 1280 logical columns on very wide displays;
-the background still spans the screen. The legacy MENU STYLE entry retains
-its existing 640-column placement. Dimensions are recomputed every frame.
+the background still spans the screen. Dimensions are recomputed every frame.
 
 The original text renderer clips negative centered coordinates. A scoped
 `frontend_menu_text_begin` / `frontend_menu_text_end` pair allows only the
@@ -774,12 +783,16 @@ and third-person MCC 32713. This menu integration does not change wire formats
 or authoritative simulation, so it introduces no further protocol revision.
 
 [frontend_menu.py](../../tools/frontend_menu.py) adds the native Shoulder Camera
-inventory below Modern Video > First Person. It uses the same pending settings,
+inventory below Modern Video > Third Person. Shoulder rows are visible only
+when the pending Third Person choice is enabled. It uses the same pending settings,
 Save and Cancel flow as other Modern settings pages. The third-person preference
 remains off by default. [frontend_multiplayer.py](../../tools/frontend_multiplayer.py)
 adds a Modern Session Options presentation reached from Server Setup, retaining
 the native compatibility and host camera-policy callbacks and value indices.
-Crossplay and Player Choice remain the defaults. Shorter Modern captions and
+Crossplay and Player Choice remain the defaults. Session Options labels its
+compatibility choices **Crossplay / GulchCE** in every style. This names the
+GulchCE-only session mode without tying its caption to one feature; protocol
+values, version requirements and camera policy remain unchanged. Shorter captions and
 wider value columns keep the choices legible at 4:3 without changing row fonts.
 
 The combined review covered menu callback/data registrations, generated routes,
@@ -830,3 +843,110 @@ Logs are retained in `build/third-person-merge-*.log`, with per-peer results in
 verified hashes; disposable cache maps, copied maps/binaries, duplicate captures
 and temporary test dependencies are removed. Original profile hashes were checked
 unchanged. The required Windows/web builds remain available for further testing.
+
+
+## Menu follow-up layout and navigation
+
+The Modern Video tab separates First Person and Third Person. Advanced
+Graphics links to Extra Effects for overshield, HDR and tone mapping controls.
+Session Options, Bots, Map Sharing, Co-op Options, and Voice and Voting share
+the same generated rows, scrolling and right-hand help layout. Their original
+callbacks, host restrictions and network values remain responsible for behavior.
+The server browser remains native.
+
+`append_legacy` in [frontend_navigation.py](../../tools/frontend_navigation.py)
+defines separate Xbox links. `frontend_menu_attach` inserts Audio, Video and
+Network Setup between Advanced Setup and Change Color, and binding/remapping/
+glyph editors in Advanced Controls. Original widget definitions are preserved;
+only these optional instances receive links and vertical offsets. The native
+profile help indexes strings and pictures by row number, so the guarded
+`frontend_menu_legacy_description_index` hook excludes inserted links from that
+index and supplies their help in an added description child. This shared hook
+is necessary because the native callback otherwise indexes past its original
+five descriptions. Children are owned and freed by their existing widget parent.
+Advanced Controls also assumes each native row contains a spinner. The guarded
+`frontend_menu_legacy_controls_help` hook skips that lookup for added editor
+actions, and `frontend_menu_shortcut` opens those actions before the native
+Accept handler saves and closes the screen. Existing native settings are saved
+through their original handler; editor return restores the existing history.
+The added Advanced Controls rows reference the native `option_bkds` bitmap,
+matching its opacity. [frontend_legacy.py](../../tools/frontend_legacy.py)
+generates separate footer definitions with unchanged action callbacks and
+references to the original Xbox A/B/X menu bitmaps. Only live Xbox frontend
+instances use these definitions, including Settings reached from gameplay;
+Stock, PC and Modern retain their glyph preferences. Gameplay caches missing
+the native menu bitmaps use the existing Xbox redraws from `port/assets/buttons`,
+copied by the generator without alteration. A accepts ordinary settings
+values and X resets defaults. Binding rows retain their bind/clear actions.
+
+[frontend_multiplayer.py](../../tools/frontend_multiplayer.py) creates the
+campaign chooser and shared difficulty screen. The difficulty screen uses an
+outer presentation container so the native first two children remain the list
+and saved-progress warning. Plasma panels render before the native details;
+selected difficulty rows retain their own plasma background. Completion icons
+form a centered group beneath the campaign description.
+
+The multiplayer map chooser selects campaign difficulty inside its existing
+map list, rather than opening the Campaign difficulty screen.
+`frontend_multiplayer_difficulty` adds the same icon and wrapped description to
+that step, hides the mission details, and uses centered label definitions for
+those live rows. Returning to map selection restores the original labels and
+details. Native and MCC host services keep their existing selection state.
+
+## Settings during gameplay
+
+`frontend_menu_style` separates the saved preference from the active style.
+Leaving `ui.map` latches the current choice; gameplay map loads, including CE
+and MCC, retain it. Saving a different style in Settings does not replace tags
+or rebuild menus. Returning to `ui.map` adopts the saved choice. Stock remains
+available explicitly; new configurations default to Modern. Automatic keyboard
+glyphs remain disabled by default, with controller auto detection enabled.
+
+Only the known generated profile Settings root is redirected. Modern paused
+page roots share the settings inventory but omit `main menu intialize` and use
+the existing pause history on OK/Cancel. The existing loader removes pause-time
+flags for network sessions. MCC still decides its own Settings pause behavior
+and owns its controller-specific profile session. Xbox gameplay uses a separate
+Settings entry because gameplay caches need not contain the Xbox main-menu
+profile editor. No map-authored pause roots are replaced. Profile replacement
+and connection controls retain the established in-game restrictions.
+
+The combined review removed obsolete style-row visibility wiring and kept the
+main-menu navigation guard separate from paused Settings access. Tests exercise
+deferred saves across all three map-family identities, Apply/Cancel returning
+to pause history, in-game Online restrictions, and embedded difficulty details.
+Windows hidden runs verified Modern Settings on Xbox Blood Gulch, CE Death
+Island and MCC Digsite `1`, Xbox Audio Setup, and Modern-to-PC deferral through
+return to the main menu. These sampled maps do not establish compatibility with
+every custom map. Full Android runtime and physical controller checks remain
+unverified; the user asked to skip the unavailable controller test.
+
+Final checks for this follow-up: 105 Python tests passed; one POSIX socket
+harness skipped on Windows and two unrelated artwork tests were deselected
+because SciPy is unavailable. Windows and web builds passed, and all 11 changed
+Android guest compilation units passed. The complete Android target remains
+blocked by the missing staged SDL `CMakeLists.txt`. The multiplayer difficulty
+panel was also checked at 640×480 and 854×480, and disabled/Stock Audio Setup
+retained its normal buttons. Generated map fixtures and caches were removed;
+test saves, logs and screenshots were retained separately from user data.
+
+`frontend_menu_reflow_text` in
+[frontend_layout.c](../../port/linux/game/frontend_layout.c) normalizes native
+manual line breaks in Modern instance text, including CRLF and `|n`, before
+width-based wrapping. It rejoins manually hyphenated words such as
+`wea-` followed by a newline and `pon`. The text is measured left-aligned,
+then drawn using its authored centered alignment. Difficulty icon crop bounds
+exclude the original bitmap padding; other native preview placement is retained.
+These changes apply only to recognized Modern widgets, not stock text or map UI.
+
+Menu navigation uses `controller_glyph_draw_menu`, with bounded icon cells and
+label spacing independent of gameplay's HUD scale. Manual controller styles
+remain visible when auto detection is off; automatic mode still follows the
+active input source. Gameplay uses its existing drawing entry point.
+
+Focused regression coverage is in `test_frontend_menu.py`,
+`test_frontend_multiplayer.py`, `test_frontend_presentation.py` and
+`test_controller_buttons.py`. Runtime captures use isolated hidden Windows runs;
+small-resolution captures are desktop rendering checks, not Android hardware
+validation. Build and runtime outcomes are reported separately from full
+map-family or multiplayer compatibility.

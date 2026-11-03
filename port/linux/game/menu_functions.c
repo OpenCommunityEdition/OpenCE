@@ -1762,6 +1762,8 @@ static struct widget_instance *screen_of(struct widget_instance *widget)
 }
 
 /* "port settings save" (OK): those changed written, and applied */
+boolean network_game_is_active(void);
+
 static boolean setting_changed_save(struct widget_instance *spinner, struct pc_menu_setting *setting)
 {
 	short index = spinner->parameters.list.selected_index;
@@ -1780,6 +1782,8 @@ static boolean setting_changed_save(struct widget_instance *spinner, struct pc_m
 	}
 	platform_log("menus: %s = %s", setting->setting, setting->values[index]);
 	setting->loaded_index = index;
+	if (!strcmp(setting->setting, "display.menu_frontend") && main_menu_is_active() &&
+		!network_game_is_active()) main_goto_main_menu();
 	return TRUE;
 }
 
@@ -3680,6 +3684,7 @@ static void mcc_host_list_update(struct widget_instance *list)
 	else
 		mcc_browser_description(description, browser);
 	profile_name_show(description);
+	frontend_multiplayer_difficulty(list, mcc_host_list.step == MAP_STEP_DIFFICULTIES ? mcc_host_list.chosen : NONE);
 }
 
 static boolean mcc_host_list_choose(struct widget_instance *list, boolean *widget_deleted)
@@ -3806,6 +3811,7 @@ static void map_list_update(struct widget_instance *list)
 			NONE);
 	}
 	profile_name_show(description);
+	frontend_multiplayer_difficulty(list, map_list.step == MAP_STEP_DIFFICULTIES ? map_list.chosen : NONE);
 }
 
 /* "mp level select" (the list's OK): the map chosen, or a level's

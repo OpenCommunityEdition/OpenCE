@@ -30,7 +30,8 @@ static int frontend_network_geometry(char const *name, int screen, short *left, 
 		*shift = (short)origin; *right += (short)rows; break;
 	case FRONTEND_NET_DETAIL: case FRONTEND_NET_DETAIL_WRAP:
 		*shift = (short)(origin + rows); *right += (short)(extra - rows); break;
-	case FRONTEND_NET_DETAIL_FIXED: *shift = (short)(origin + rows + (extra - rows) / 2); break;
+	case FRONTEND_NET_DETAIL_FIXED: case FRONTEND_NET_DETAIL_ICON:
+		*shift = (short)(origin + rows + (extra - rows) / 2); break;
 	case FRONTEND_NET_LABEL: *right += (short)(rows * 2 / 3); break;
 	case FRONTEND_NET_LABEL_FULL: case FRONTEND_NET_CHOOSER: *right += (short)rows; break;
 	case FRONTEND_NET_VALUE: *shift = (short)(rows * 2 / 3); *right += (short)(rows - rows * 2 / 3); break;
@@ -150,7 +151,35 @@ int frontend_menu_wrap(long tag)
 		return 0;
 	name = tag_get_name(tag);
 	return name && !strncmp(name, "pc\\modern\\", 10) &&
-		(!strcmp(strrchr(name, '\\') + 1, "help") || frontend_network_role(name) == FRONTEND_NET_DETAIL_WRAP);
+		(!strcmp(strrchr(name, '\\') + 1, "help") || !strcmp(strrchr(name, '\\') + 1, "help_value") || frontend_network_role(name) == FRONTEND_NET_DETAIL_WRAP);
+}
+
+/* Native descriptions contain manual |n breaks (including split words such
+ * as wea-|npon). Reflow only the modern instance copy for its current width.
+ * Authored alignment belongs to the modern widget, not those legacy strings. */
+void frontend_menu_reflow_text(wchar_t *text)
+{
+	wchar_t *read = text, *write = text;
+	while (*read)
+	{
+		if (*read == L'|' && (read[1] == L'c' || read[1] == L'l' || read[1] == L'r'))
+		{
+			read += 2;
+			continue;
+		}
+		if (*read == L'\r' || *read == L'\n' || (*read == L'|' && read[1] == L'n'))
+		{
+			do
+			{
+				read += *read == L'|' ? 2 : 1;
+			} while (*read == L'\r' || *read == L'\n' || (*read == L'|' && read[1] == L'n'));
+			if (write > text && write[-1] == L'-') write--;
+			else if (write > text && write[-1] != L' ' && *read && *read != L' ') *write++ = L' ';
+			continue;
+		}
+		*write++ = *read++;
+	}
+	*write = 0;
 }
 
 /* Stock previews occupy a subrectangle of a padded bitmap. Keep the native
@@ -162,6 +191,18 @@ int frontend_menu_stretch_bitmap(long tag)
 	name = tag_get_name(tag);
 	return name && !strncmp(name, "pc\\modern\\", 10) &&
 		frontend_network_role(name) != FRONTEND_NET_DETAIL_FIXED;
+}
+
+int frontend_menu_bitmap_region(long tag, short *width, short *height)
+{
+	char const *name;
+	if (!frontend_menu_available()) return 0;
+	name = tag_get_name(tag);
+	if (!name || frontend_network_role(name) != FRONTEND_NET_DETAIL_ICON) return 0;
+	name = strrchr(name, '\\') + 1;
+	*width = (short)(!strcmp(name, "difficulty_indicator") ? 44 : 200);
+	*height = (short)(!strcmp(name, "difficulty_indicator") ? 48 : 211);
+	return 1;
 }
 
 /* One option-text size for the whole screen, never a size chosen per row.

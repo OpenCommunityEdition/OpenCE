@@ -4,6 +4,7 @@ Layout inspiration: OpenH1/OpenH1 df16d2e56c3b69be46f964f741a23fd2d3b4f57a.
 Original GulchCE implementation and geometric art; no upstream code/assets copied.
 """
 import json
+from copy import deepcopy
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -16,6 +17,7 @@ BASE = "modern"
 from port_settings import SCREENS
 import frontend_navigation
 import frontend_multiplayer
+import frontend_legacy
 
 # Each page: key, tab, parent, heading, source inventories. Page zero is the
 # stable entry tag used by the main-menu policy.
@@ -26,7 +28,7 @@ PAGES = [
     ("online", 3, 3, "ONLINE", ["network_setup"]),
     ("interface", 4, 4, "INTERFACE", ["controller_appearance"]),
     ("profile", 5, 5, "PLAYER PROFILE", ["gamepad_setup"]),
-    ("graphics", 0, 0, "ADVANCED GRAPHICS", ["video_settings/graphics", "video_settings/extra_effects"]),
+    ("graphics", 0, 0, "ADVANCED GRAPHICS", ["video_settings/graphics"]),
     ("first_person", 0, 0, "FIRST PERSON", ["video_settings/fov_viewmodels"]),
     ("lighting", 0, 6, "LIGHTING AND SHIELDS", ["video_settings/dynamic_lighting"]),
     ("bots", 3, 3, "BOTS", ["network_setup/bots"]),
@@ -35,15 +37,16 @@ PAGES = [
     ("hud", 4, 4, "MULTIPLAYER HUD", ["network_setup/multiplayer_hud"]),
     ("streamer", 4, 4, "STREAMER MODE", ["network_setup/streamer_mode"]),
     ("touch", 2, 2, "TOUCH CONTROLS", ["gamepad_setup/android", "gamepad_setup/gyro"]),
-    ("shoulder_camera", 0, 7, "SHOULDER CAMERA", ["video_settings/shoulder_camera"]),
+    ("third_person", 0, 0, "THIRD PERSON", ["video_settings/shoulder_camera"]),
+    ("extra_effects", 0, 6, "EXTRA EFFECTS", ["video_settings/extra_effects"]),
 ]
 TABS = ("VIDEO", "AUDIO", "CONTROLS", "ONLINE", "INTERFACE", "PROFILE")
-LINKS = {0: [(6, None), (7, None)], 6: [(8, "desktop web")],
+LINKS = {0: [(6, None), (7, None), (15, None)], 6: [(8, "desktop web"), (16, None)],
          3: [(9, None), (10, "desktop android"), (11, None)], 4: [(12, None), (13, None)],
-         2: [(14, "android")], 7: [(15, None)]}
+         2: [(14, "android")]}
 STYLE = ("MENU STYLE", "display.menu_frontend",
          [("MODERN", "modern"), ("CLASSIC PC", "pc"), ("XBOX", "xbox"), ("STOCK", "off")],
-         "Choose the submenu style. The starting menu keeps its existing layout. The switch takes effect when you leave Settings for the main menu. Pause menus and map UI stay unchanged.", None)
+         "Choose the Settings and submenu style. Saved changes take effect on return to the main menu. The starting menu, pause menu and map UI keep their existing layout.", None)
 INTERFACE_RENDERING = ("display.high_res_text", "display.high_res_hud")
 EDITORS = {
     2: [("keyboard", "KEYBOARD BINDINGS", "Set the base game's keyboard and mouse bindings in its existing editor. That editor's OK saves bindings independently of these Settings."),
@@ -122,10 +125,10 @@ def document():
         w("rule_display",width=336,height=1,bitmap="modern/rule",controller=1)
         w("help_panel",width=232,height=294,bitmap="modern/help_panel",controller=1,flags="nifty_fx")
         w("help_title",type="text",controller=1,width=200,height=22,string_list=base+"/labels",font="ui\\large_ui",color="#FF80A2C0")
-        w("help_value",type="text",controller=1,width=200,height=24,font="ui\\large_ui",color="#FFDDDDDD")
+        w("help_value",type="text",controller=1,width=200,height=46,font="ui\\large_ui",color="#FFDDDDDD")
         w("status",type="text",controller=1,width=336,height=20,font="ui\\small_ui",color="#FF80A2C0")
         text(base+"/prompts"," ",580,22).set("font","ui\\small_ui")
-        w("help",type="text",controller=1,left=396,top=165,width=200,height=222,string_list=base+"/help_strings",font="ui\\large_ui",color="#FF2896FF")
+        w("help",type="text",controller=1,left=396,top=193,width=200,height=194,string_list=base+"/help_strings",font="ui\\large_ui",color="#FF2896FF")
         options=w("options",type="column_list",width=640,height=480,flags="pass_unhandled_to_focused_child up_down_tabs_children",description=base+"/help")
         ET.SubElement(options,"data",input="port frontend update")
         c(options,"tabs",28,76)
@@ -138,12 +141,14 @@ def document():
             button.set("font","ui\\small_ui")
             activate(button,"port frontend page")
         rows=[]
+        if page==15:
+            rows.append(next(row for row in SCREENS["video_settings/fov_viewmodels"]["rows"] if row[1]=="display.third_person"))
         if page==4:
             rows.append(STYLE)
             rows.extend(next(row for row in SCREENS["video_settings/graphics"]["rows"] if row[1] == key)
                         for key in INTERFACE_RENDERING)
         for inventory in inventories:
-            rows.extend(row for row in SCREENS[inventory]["rows"] if row[1] not in INTERFACE_RENDERING)
+            rows.extend(row for row in SCREENS[inventory]["rows"] if row[1] not in (*INTERFACE_RENDERING, "display.menu_frontend", "display.third_person"))
         # Labels/help are local to each page; dynamic spinner captions come from
         # the real instance, including enumerated monitors and audio devices.
         labels=[]; helps=["OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs."]
@@ -155,8 +160,10 @@ def document():
             labels.append(label.rstrip(":")); helps.append(help_text)
             c(options,f"row_{key}",28,137+index*30,platform=platform)
             row=w(f"row_{key}",width=336,height=26,bitmap="modern/row",platform=platform,flags="pass_unhandled_to_focused_child nifty_fx")
-            c(row,f"label_{key}",12,3); c(row,f"spinner_{key}",180,3)
-            w(f"label_{key}",type="text",controller=1,width=152,height=24,string_list=base+"/labels",string_index=index,font="ui\\large_ui",color="#FF2896FF")
+            wide_value = setting == "display.shield_look"
+            value_width = 198 if wide_value else 140
+            c(row,f"label_{key}",12,3); c(row,f"spinner_{key}",122 if wide_value else 180,3)
+            w(f"label_{key}",type="text",controller=1,width=94 if wide_value else 152,height=24,string_list=base+"/labels",string_index=index,font="ui\\large_ui",color="#FF2896FF")
 
             if choices is None:
                 # Reuse the existing read-only master-server status service.
@@ -164,10 +171,10 @@ def document():
                 c(row,"master_servers_value",180,3)
                 w("master_servers_value",type="text",controller=1,width=140,height=20,font="ui\\large_ui",color="#FFDDDDDD",align="center")
                 continue
-            spinner=w(f"spinner_{key}",type="spinner",width=140,height=20,flags="pass_unhandled_to_focused_child left_right_tabs_items",
-                      strings="|".join(value_caption(caption) for caption,_ in choices),values="|".join(value for _,value in choices),setting=setting,
+            spinner=w(f"spinner_{key}",type="spinner",width=value_width,height=20,flags="pass_unhandled_to_focused_child left_right_tabs_items",
+                      strings="|".join(caption if wide_value else value_caption(caption) for caption,_ in choices),values="|".join(value for _,value in choices),setting=setting,
                       font="ui\\large_ui",color="#FF2896FF",align="center",
-                      header_bitmap="bitmaps/arrow_sm_left",footer_bitmap="bitmaps/arrow_sm_right",header_bounds="4 -10 16 -4",footer_bounds="4 144 16 150")
+                      header_bitmap="bitmaps/arrow_sm_left",footer_bitmap="bitmaps/arrow_sm_right",header_bounds="4 -10 16 -4",footer_bounds=f"4 {value_width+4} 16 {value_width+10}")
             event(spinner,"created","port setting load")
         actions=[(f"link_{target}",PAGES[target][3]+" >",f"Open {PAGES[target][3].lower()} settings. Pending changes stay until OK or Cancel.",platform,"port frontend page") for target,platform in LINKS.get(page,[])]
         actions += [(key,caption+" >",help_text,None,"port frontend editor") for key,caption,help_text in EDITORS.get(page,[])]
@@ -186,12 +193,16 @@ def document():
             c(bar,"button_"+key,x)
             button=text(base+"/button_"+key,caption,124,26,align="center",text_y=3,bitmap="modern/button",flags="nifty_fx")
             activate(button,"port frontend "+key)
+        paused = deepcopy(screen)
+        paused.set("name", screen.get("name").replace("modern/", "modern/paused/", 1))
+        paused.set("flags", paused.get("flags") + " pause_game")
+        for handler in list(paused.findall("on")):
+            if handler.get("run") == "main menu intialize": paused.remove(handler)
+        doc.append(paused)
     frontend_navigation.append(doc)
+    frontend_navigation.append_legacy(doc)
+    frontend_legacy.append(doc)
     frontend_multiplayer.append(doc)
-    entry=widget("modern/entry",type="column_list",width=184,height=24,flags="pass_unhandled_to_focused_child")
-    event(entry,"up down","port frontend focus"); child(entry,"modern/entry_button")
-    button=text("modern/entry_button"," ",184,24,bitmap="bitmaps/text_button_background")
-    button.set("font","ui\\small_ui"); activate(button,"port frontend open")
     for name,width,height in ART:
         bitmap=ET.SubElement(doc,"bitmap",name="modern/"+name)
         for frame in range(1 if name in ("panel","help_panel","rule") or name.startswith("title") else 2):
@@ -209,9 +220,11 @@ ART = (("panel", 640, 480), ("help_panel", 232, 294), ("row", 336, 26),
 def generate(folder=MENUS):
     target = folder / "modern"
     target.mkdir(parents=True, exist_ok=True)
+    frontend_legacy.copy_art(target)
     (target / "settings.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<!-- Generated by tools/frontend_menu.py -->\n' + document(), encoding="utf-8")
     if Path(folder).resolve() == MENUS.resolve():
         frontend_multiplayer.write_metadata(*frontend_multiplayer.append(ET.Element("menus")))
+        frontend_legacy.write_metadata(frontend_legacy.append(ET.Element("menus")))
     for name, width, height in ART:
         for frame in range(1 if name in ("panel", "help_panel", "rule") or name.startswith("title") else 2):
             # Four samples per menu unit keep the native renderer's outlines smooth.
@@ -259,9 +272,10 @@ def generate(folder=MENUS):
 if __name__ == "__main__":
     generate()
     header = "/* Generated by tools/frontend_menu.py; page routes, never legacy widgets. */\n"
-    header += "static struct { char const *path; short tab, parent; } const frontend_pages[] = {\n"
+    header += "static struct { char const *path; short tab, parent; char const *paused; } const frontend_pages[] = {\n"
     for index, (_, tab, parent, _, _) in enumerate(PAGES):
         path = "pc\\" + (page_base(index) + "/settings").replace("/", "\\")
-        header += "    {" + json.dumps(path) + f", {tab}, {parent}" + "},\n"
+        paused = path.replace("pc\\modern\\", "pc\\modern\\paused\\", 1)
+        header += "    {" + json.dumps(path) + f", {tab}, {parent}, " + json.dumps(paused) + "},\n"
     header += "};\n"
     (ROOT / "port/linux/game/frontend_pages.inl").write_text(header, encoding="utf-8")

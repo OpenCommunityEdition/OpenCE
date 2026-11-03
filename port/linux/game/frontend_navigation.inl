@@ -3,7 +3,8 @@
 static boolean frontend_navigation_root(struct widget_instance *root)
 {
 	char const *name = root ? tag_get_name(root->definition_tag_index) : NULL;
-	return name && (!strcmp(name, "pc\\modern\\multiplayer\\screen") || !strcmp(name, "pc\\modern\\host\\screen"));
+	return main_menu_is_active() && !network_game_is_active() && name &&
+		(!strcmp(name, "pc\\modern\\multiplayer\\screen") || !strcmp(name, "pc\\modern\\host\\screen"));
 }
 
 static boolean frontend_navigation_content(struct widget_instance *widget)

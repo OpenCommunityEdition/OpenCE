@@ -1,0 +1,92 @@
+"""Xbox-only footer instances over the existing settings services.
+
+The original definitions and callbacks stay intact. Glyphs use the native map
+bitmaps when present, with the existing Xbox redraws for gameplay caches.
+"""
+from copy import deepcopy
+import json
+import xml.etree.ElementTree as ET
+
+from frontend_multiplayer import ROOT, inventory
+
+
+def append(doc):
+    routes = []
+    for name, original in inventory().items():
+        leaf = name.rsplit('/', 1)[-1]
+        if not (name.startswith('main_menu/settings_select/player_setup/player_profile_edit/')
+                or name in ('common_button_cancel', 'common_button_back')):
+            continue
+        kind = {'button_defaults': ('x', '=DEFAULTS'), 'button_ok': ('a', '=OK'),
+                'common_button_cancel': ('b', '=CANCEL'), 'common_button_back': ('b', '=BACK')}.get(leaf)
+        if not kind:
+            continue
+        glyph, caption = kind
+        replacement = 'frontend_legacy/footer/' + name
+        widget = deepcopy(original)
+        for key in ('bitmap', 'string_list', 'strings', 'string_index'):
+            widget.attrib.pop(key, None)
+        widget.attrib.update(name=replacement, text=caption, height='28',
+                             font='ui\\large_ui', color='#FF2896FF', align='left', text_x='22', text_y='0')
+        if leaf == 'button_defaults':
+            widget.set('width', '180')
+        doc.append(widget)
+        routes.append((name, replacement, glyph))
+    for glyph in ('a', 'b', 'x'):
+        ET.SubElement(doc, 'widget', name='frontend_legacy/footer_glyph_' + glyph,
+                      controller='1', width='21', height='26', bitmap='ui\\shell\\bitmaps\\' + glyph + '_butn')
+        ET.SubElement(doc, 'widget', name='frontend_legacy/footer_glyph_' + glyph + '_fallback',
+                      controller='1', width='21', height='26', bitmap='frontend_legacy/glyph_' + glyph)
+        bitmap = ET.SubElement(doc, 'bitmap', name='frontend_legacy/glyph_' + glyph)
+        ET.SubElement(bitmap, 'frame', png='modern/xbox_' + glyph + '.png', width='21', height='26')
+    # Gameplay caches need not contain the main-menu Xbox profile screen.
+    # A feature-owned entry keeps its layout and delegates to trusted editors.
+    base = 'frontend_legacy/paused/'
+    profile = 'main_menu/settings_select/player_setup/player_profile_edit/'
+    screen = ET.SubElement(doc, 'widget', name=base+'settings', width='640', height='480',
+                           bitmap='bitmaps/gradient', flags='pass_unhandled_to_focused_child pause_game')
+    for event in ('b', 'back'):
+        ET.SubElement(screen, 'on', event=event, run='player profile end editing', back='true')
+    ET.SubElement(screen, 'child', widget=profile+'header_profile_settings')
+    ET.SubElement(screen, 'child', widget=base+'options')
+    ET.SubElement(screen, 'child', widget=base+'back', x='440', y='414')
+    footer = ET.SubElement(doc, 'widget', name=base+'back', type='text', controller='1',
+                          width='160', height='28', text='=BACK', text_x='22',
+                          font='ui\\large_ui', color='#FF2896FF')
+    ET.SubElement(footer, 'child', widget='frontend_legacy/footer_glyph_b')
+    options = ET.SubElement(doc, 'widget', name=base+'options', type='column_list', width='640', height='480',
+                            flags='pass_unhandled_to_focused_child up_down_tabs_items')
+    for index, (caption, target) in enumerate((
+            ('CONTROLLER SETUP', 'gamepad_setup/gamepad_setup_screen'),
+            ('KEYBOARD BINDINGS', 'controls_setup/controls_settings_screen'),
+            ('MOUSE SETUP', 'mouse_settings/mouse_settings_screen'),
+            ('AUDIO SETUP', 'audio_settings/audio_settings_screen'),
+            ('VIDEO SETUP', 'video_settings/video_settings_screen'),
+            ('NETWORK SETUP', 'network_setup/in_game/in_game_network_settings_screen'),
+            ('CONTROLLER REMAPPING', 'controller_remapping/controller_remapping_screen'),
+            ('BUTTON GLYPHS', 'controller_appearance/controller_appearance_screen'))):
+        key = base+'row_'+str(index)
+        ET.SubElement(options, 'child', widget=key)
+        row = ET.SubElement(doc, 'widget', name=key, type='text', left='64', top=str(78+33*index),
+                            width='512', height='30', bitmap='bitmaps/list_item_bkd', text=caption,
+                            font='ui\\large_ui', color='#FF2896FF', text_x='13', text_y='5')
+        for event in ('a','start'):
+            ET.SubElement(row, 'on', event=event, open=profile+target)
+        ET.SubElement(row, 'on', event='left_mouse', run='mouse emit accept event')
+    return routes
+
+
+def copy_art(target):
+    for glyph in ('a', 'b', 'x'):
+        (target / ('xbox_' + glyph + '.png')).write_bytes(
+            (ROOT / 'port/assets/buttons' / (glyph + '_butn__0.png')).read_bytes())
+
+
+def write_metadata(routes):
+    text = '/* Generated by tools/frontend_menu.py. Xbox-only footer replacements. */\n'
+    text += 'static struct { char const *native, *replacement, *glyph; } const frontend_legacy_footers[] = {\n'
+    for native, replacement, glyph in routes:
+        text += '    {' + ', '.join(json.dumps('pc\\' + path.replace('/', '\\'))
+                                   for path in (native, replacement, 'frontend_legacy/footer_glyph_' + glyph)) + '},\n'
+    text += '};\n'
+    (ROOT / 'port/linux/game/frontend_legacy_footers.inl').write_text(text, encoding='utf-8')

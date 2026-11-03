@@ -14,6 +14,29 @@ def source(name):
     return re.sub(r'^#include .*$', '', text, flags=re.M)
 
 
+def test_description_reflow_joins_native_split_words(tmp_path):
+    implementation = function((ROOT / 'port/linux/game/frontend_layout.c').read_text(), 'frontend_menu_reflow_text')
+    run_c(tmp_path, r'''
+#include <assert.h>
+#include <wchar.h>
+''' + implementation + r'''
+int main(void) {
+    wchar_t text[256] = L"|cReactivate the wea-\r\npon at the heart of\r\nHalo...and learn the truth.";
+    wchar_t marked[64] = L"|lwea-|npon|nready|r";
+    wchar_t plain[64] = L"Co-op campaign |";
+    wchar_t empty[1] = {0};
+    frontend_menu_reflow_text(text);
+    assert(!wcscmp(text,L"Reactivate the weapon at the heart of Halo...and learn the truth."));
+    frontend_menu_reflow_text(text);
+    assert(!wcscmp(text,L"Reactivate the weapon at the heart of Halo...and learn the truth."));
+    frontend_menu_reflow_text(marked);assert(!wcscmp(marked,L"weapon ready"));
+    frontend_menu_reflow_text(plain);assert(!wcscmp(plain,L"Co-op campaign |"));
+    frontend_menu_reflow_text(empty);assert(!empty[0]);
+    return 0;
+}
+''')
+
+
 def test_wide_geometry_resize_and_scoped_text_clip(tmp_path):
     run_c(tmp_path, r'''
 #include <assert.h>
@@ -284,8 +307,8 @@ struct rasterizer_dynamic_screen_geometry_parameters {
 static int style,live,created,registered,fail,new_draws,draws;
 static short observed_port;
 static int controller_button_style_for_port(short p){observed_port=p;return style;}
-static int controller_glyph_draw(short s,short b,struct icon_hud_element_definition const *icon,rectangle2d *r,pixel32 c,void *unbind){
- assert(s==style&&b>=0&&b<4&&!unbind);new_draws++;r->x0+=22;return 1;
+static int controller_glyph_draw_menu(short s,short b,rectangle2d *r,pixel32 c){
+ assert(s==style&&b>=0&&b<4);new_draws++;r->x0+=26;return 1;
 }
 static real draw_unicode_string_capital_middle(rectangle2d *r,void const *s){return 100;}
 static struct bitmap_data *bitmap_2d_new(int w,int h,int m,int f){
@@ -307,7 +330,7 @@ void hud_hires_register_placeholder(long a,unsigned long const *p){registered+=p
 int main(void){
  rectangle2d cursor={100,50,500,150};int repeat,before,button;
  for(repeat=0;repeat<10;repeat++)for(style=0;style<11;style++)for(button=0;button<4;button++) {
-  cursor.x0=100;assert(frontend_glyph_draw(2,button,&cursor,0x40112233));assert(observed_port==2&&cursor.x0==122);
+  cursor.x0=100;assert(frontend_glyph_draw(2,button,&cursor,0x40112233));assert(observed_port==2&&cursor.x0==126);
  }
  assert(live==12&&created==12&&registered==12&&draws==120&&new_draws==320);
  frontend_glyphs_dispose();assert(!live&&!registered);frontend_glyphs_dispose();assert(!live&&!registered);
@@ -322,3 +345,40 @@ int main(void){
 }
 '''
     run_c(tmp_path, code)
+
+
+
+def test_manual_controller_prompts_follow_hud_gate_and_auto_source(tmp_path):
+    text = (ROOT/'port/linux/game/frontend_prompts.c').read_text()
+    header = (ROOT/'port/linux/game/frontend_prompts.h').read_text()
+    enum = re.search(r'enum frontend_prompt_action.*?;',header).group()
+    run_c(tmp_path, r"""
+#include <assert.h>
+#include <string.h>
+#define TRUE 1
+typedef struct {short x0,y0,x1,y1;}rectangle2d;
+typedef unsigned long pixel32;
+typedef struct {float alpha,red,green,blue;}real_argb_color;
+static int hud=1,automatic=1,keyboard,device=-1,observed=99,calls;
+static int config_boolean(char const *n){return !strcmp(n,"display.high_res_hud")?hud:automatic;}
+static int keyboard_prompt_menu_enabled(int d){(void)d;return keyboard;}
+static int frontend_menu_available(void){return 1;}
+static char const *tag_get_name(long tag){(void)tag;return "pc\\modern\\prompts";}
+static int frontend_input_device(void){return device;}
+static void draw_string_get_color(real_argb_color *c){c->alpha=1.0f;}
+static int frontend_glyph_draw(short d,short b,rectangle2d *r,pixel32 c){(void)d;(void)b;(void)r;(void)c;return 1;}
+static void keyboard_glyph_draw(char const *s,rectangle2d *r,pixel32 c,int m){(void)s;(void)r;(void)c;(void)m;}
+static void frontend_prompt_text(rectangle2d *r,char const *s){(void)r;(void)s;}
+static void frontend_prompt_action(rectangle2d *r,int d,int a,char const *s,pixel32 c){(void)r;(void)a;(void)s;(void)c;observed=d;calls++;}
+"""+enum+function(text,'frontend_prompts_draw')+r"""
+int main(void){
+    rectangle2d bounds={0,0,640,22};
+    frontend_prompts_draw(1,&bounds);assert(observed==-1&&calls==3);
+    automatic=0;frontend_prompts_draw(1,&bounds);assert(observed==0);
+    hud=0;frontend_prompts_draw(1,&bounds);assert(observed==-1);
+    hud=1;keyboard=1;frontend_prompts_draw(1,&bounds);assert(observed==-1);
+    automatic=1;keyboard=0;device=2;frontend_prompts_draw(1,&bounds);assert(observed==2);
+    device=-2;calls=0;frontend_prompts_draw(1,&bounds);assert(!calls);
+    return 0;
+}
+""")

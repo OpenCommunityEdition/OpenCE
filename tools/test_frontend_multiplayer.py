@@ -6,6 +6,7 @@ from frontend_menu import text_width
 from test_frontend_menu import ROOT, HEADER, RUNTIME_STUBS, without_includes
 from test_frontend_presentation import source
 from test_hud_button_style import run_c
+from harness import function
 
 
 def test_service_contracts_and_routes():
@@ -15,7 +16,8 @@ def test_service_contracts_and_routes():
     legacy = frontend_multiplayer.inventory()
     assert len(routes) == len(frontend_multiplayer.PAGES)
     for old, new in routes:
-        assert [n.attrib for n in widgets[new].findall('on')] == [n.attrib for n in legacy[old].findall('on')]
+        service = next((w for path,w in widgets.items() if path.startswith(new.rsplit('/',1)[0]+'/') and path.endswith('/'+old.rsplit('/',1)[-1])), widgets[new])
+        assert [n.attrib for n in service.findall('on')] == [n.attrib for n in legacy[old].findall('on')]
         assert new.startswith('modern/network/')
         assert 'pause_game' not in widgets[new].get('flags', '')
     # Preserve child order and count for the native paged services. Presentation
@@ -30,6 +32,7 @@ def test_service_contracts_and_routes():
     assert not any('join_game_screen' in old for old,_ in routes)
     # Every dependency is in the isolated generated set or an existing service.
     for w in widgets.values():
+        assert sum(key in w.attrib for key in ('text', 'strings', 'string_list')) <= 1
         if w.get('text') is not None:
             assert int(w.get('string_index', '0')) == 0
         for c in w.findall('child'):
@@ -40,6 +43,44 @@ def test_service_contracts_and_routes():
     assert not any(w.get('bitmap') in ('bitmaps/gradient', 'bitmaps/gradient_big') for w in widgets.values())
     assert not any(path.rsplit('/', 1)[-1] == 'header' or path.rsplit('/', 1)[-1].startswith('header_') for path in widgets)
     assert len(dict(roles)) < len(widgets)
+
+
+def test_embedded_difficulty_replaces_detail_and_restores_rows(tmp_path):
+    stubs = RUNTIME_STUBS.replace('return id==1?',
+        'return id==8?"pc\\\\modern\\\\network\\\\maps\\\\screen":id==9?"pc\\\\modern\\\\network\\\\maps\\\\list_item_text":id==10?"pc\\\\modern\\\\network\\\\maps\\\\list_item_text_centered":id==1?')
+    stubs = stubs.replace('(void)group;(void)path;return -1;',
+                         '(void)group;return strstr(path,"_centered")?10:9;')
+    stubs = stubs.replace('(void)root;(void)name;(void)n;return 0;', '''
+        struct widget_instance *child,*found;(void)n;
+        if(!root)return 0;
+        if(root->name&&!strcmp(root->name,name))return root;
+        for(child=root->child;child;child=child->next){found=named(child,name,0);if(found)return found;}
+        return 0;''')
+    code = (ROOT/'port/linux/game/frontend_multiplayer.inl').read_text()
+    run_c(tmp_path, stubs + ''.join(function(code, n) for n in
+          ('frontend_multiplayer_root', 'frontend_multiplayer_difficulty')) + r'''
+int main(void){
+    struct widget_instance root={0},list={0},description={0},icon={0},text={0},map={0},row={0},label={0};
+    int i;
+    root.definition_tag_index=8;list.parent=&root;list.child=&row;row.child=&label;
+    label.name="list_item_text";label.definition_tag_index=9;
+    list.parameters.list.extended_description=&description;description.child=&icon;
+    icon.name="difficulty_options";icon.next=&text;text.name="difficulty_extended_description";
+    text.next=&map;map.name="mp_map_right_item";
+    for(i=0;i<4;i++){
+        map.visible=1;frontend_multiplayer_difficulty(&list,i);
+        assert(!map.visible&&icon.visible&&text.visible);
+        assert(icon.animation.current_frame_index==i&&text.parameters.text_box.string_list_index==i);
+        assert(label.definition_tag_index==10);
+    }
+    map.visible=1;frontend_multiplayer_difficulty(&list,NONE);
+    assert(map.visible&&!icon.visible&&!text.visible&&label.definition_tag_index==9);
+    available=0;frontend_multiplayer_difficulty(&list,2);assert(map.visible&&!icon.visible);
+    available=1;root.definition_tag_index=1;frontend_multiplayer_difficulty(&list,2);
+    assert(map.visible&&!icon.visible&&label.definition_tag_index==9);
+    return 0;
+}
+''')
 
 
 def test_pregame_routes_and_style_switch_guard(tmp_path):
@@ -99,6 +140,25 @@ def test_session_options_keep_host_callbacks_and_fit_narrow_columns():
         for caption in spinner.get('strings').split('|'):
             assert text_width(caption, 10) <= int(spinner.get('width'))
         assert spinner.find("on[@event='left_mouse']").get('run') == 'mouse spinner 1wide click'
+    compatibility = next(w for w in session if w.get('name').endswith('/session_compatibility_spinner'))
+    assert compatibility.get('strings') == 'CROSSPLAY|GULCHCE'
+
+
+def test_added_options_keep_help_inside_panel_and_voice_modes_in_order():
+    doc = ET.Element('menus')
+    roles, _ = frontend_multiplayer.append(doc)
+    widgets = {w.get('name'): w for w in doc.findall('widget')}
+    for page, leaf in [('coop', 'coop_options_help'), ('voice', 'voice_options_help'), ('sharing', 'help')]:
+        help = next(w for name, w in widgets.items()
+                    if name.startswith('modern/network/'+page+'/') and name.endswith('/'+leaf))
+        assert dict(roles)[help.get('name')] == 'detail_wrap'
+        assert int(help.get('left')) >= 396
+        assert int(help.get('top')) + int(help.get('height')) <= 390
+    voice = next(w for name, w in widgets.items() if name.endswith('/voice_mode_spinner'))
+    assert voice.get('strings').split('|') == ['OFF', 'TEAM NEAR', 'ANYONE NEAR', 'TEAM', 'TEAM + NEARBY']
+    assert all(text_width(s, 10) <= int(voice.get('width')) for s in voice.get('strings').split('|'))
+    label = next(w for name, w in widgets.items() if name.endswith('/voice_proximity_label'))
+    assert text_width(label.get('text'), 10) <= int(label.get('width'))
 
 
 def test_scroll_preserves_service_indices_visibility_and_lifetime(tmp_path):
@@ -160,3 +220,25 @@ int main(void){
     return 0;
 }
 ''')
+
+
+def test_difficulty_native_order_and_background_layer():
+    doc = ET.Element('menus')
+    _, routes = frontend_multiplayer.append(doc)
+    widgets = {w.get('name'): w for w in doc.findall('widget')}
+    root = widgets[dict(routes)[frontend_multiplayer.PAGES['difficulty'][0]]]
+    children = [c.get('widget') for c in root.findall('child')]
+    service = next(n for n in children if n.endswith('/difficulty_select_list_screen'))
+    panel = next(n for n in children if n.endswith('/help_panel'))
+    assert children.index(panel) < children.index(service)
+    assert 'nifty_fx' in widgets[panel].get('flags')
+    assert widgets[service].get('bitmap') is None
+    native_children = [c.get('widget') for c in widgets[service].findall('child')]
+    assert native_children[0].endswith('/difficulty_select_list')
+    assert native_children[1].endswith('/warning_message')
+    warning = widgets[native_children[1]]
+    assert warning.get('align') == 'center'
+    assert int(warning.get('width')) == 312
+    desc = next(w for n,w in widgets.items() if n.startswith('modern/network/difficulty/') and n.endswith('/difficulty_extended_description'))
+    assert desc.get('align') == 'center'
+    assert desc.get('text_x') == desc.get('text_y') == '0'

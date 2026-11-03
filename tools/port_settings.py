@@ -28,6 +28,9 @@ MODS_ITEM_PLACE = (192, 391)
 QUIT_ITEM_PLACE = (192, 427)
 YES_NO = [("YES", "true"), ("NO", "false")]
 ON_OFF = [("ON", "true"), ("OFF", "false")]
+MENU_STYLE = ("MENU STYLE:", "display.menu_frontend",
+              [("STOCK", "off"), ("MODERN", "modern"), ("CLASSIC PC", "pc"), ("XBOX", "xbox")],
+              "Choose the menu style. Applies on return to the\nmain menu; pause menus keep their existing style.", None)
 XBOX_BUTTON_STYLES = [("XBOX CLASSIC", "classic"), ("XBOX GEMS", "gems"),
                      ("XBOX DARK GEMS", "menu_gems"), ("XBOX MODERN", "xbox_modern")]
 PS_BUTTON_STYLES = [("PS CLASSIC", "ps_classic"), ("PS GEMS", "ps_gems"),
@@ -194,7 +197,7 @@ SCREENS = {
     "network_setup": {
         "screen": "network_settings_screen",
         "header": ("header_profile_network_settings", f"{PE}/network_setup/header_profile_network_settings"),
-        "spacing": 30,
+        "spacing": 27,
         # (the router, the clipboard and the updates, which the web build
         # has not: the other rows from the top there)
         "platform_places": True,
@@ -329,7 +332,7 @@ _extra_effects = {"display.overshield_effect", "display.hdr", "display.hdr_outpu
 SCREENS["video_settings/graphics"] = {
     "screen": "graphics_settings_screen", "header": _video["header"], "spacing": 27,
     "same_place": ["anti_aliasing_android"],
-    "rows": [row for row in _video["rows"] if row[1] in _graphics],
+    "rows": [MENU_STYLE] + [row for row in _video["rows"] if row[1] in _graphics],
 }
 SCREENS["video_settings/extra_effects"] = {
     "screen": "extra_effects_settings_screen", "header": _video["header"], "spacing": 30,
@@ -1708,7 +1711,7 @@ def _bots_link(base, name, host_only=False):
 def _session_options(base: str, host: str) -> list:
     rows, extra = [], []
     for key, label, values in [
-        ("session_compatibility", "SESSION COMPATIBILITY:", "OPENCE CROSSPLAY|GULCHCE THIRD PERSON"),
+        ("session_compatibility", "SESSION COMPATIBILITY:", "CROSSPLAY|GULCHCE"),
         ("camera_policy", "CAMERA POLICY:", "PLAYER CHOICE|FORCED ON|FORCED OFF"),
     ]:
         extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
@@ -1730,7 +1733,7 @@ def _session_options(base: str, host: str) -> list:
     rows.append((f"{base}/op_invite", None))
     extra += _strings(f"{base}/help_strings", [
         "OpenCE and GulchCE can join; third person is off.\\nMCC maps still require GulchCE.",
-        "Matching GulchCE camera builds only.\\nChoose the camera policy below.",
+        "Compatible GulchCE hosts and clients only.\\nEnables GulchCE session features, including third person.",
         "Compatibility is locked for this session.\\nClose the lobby to choose another mode.",
         "Each player chooses first or third person.\\nTheir camera toggle remains available.",
         "Everyone uses third person on foot. Scoping and\\ntight spaces still use first person.",
