@@ -442,6 +442,8 @@ CUSTOM: OPENCE, the port's own gametypes (`game/game_modes.c`).
 | One in the Chamber | Free for all Slayer with 3 lives: the last player standing wins. Everyone starts with a pistol holding one round, with none carried and no grenades; no weapons or grenades are on the map, and no one picks up a weapon. A bullet of another player's kills at once, body or head, and a kill gives the killer a round, into the pistol's magazine (`game/one_in_the_chamber.c`). |
 | Frag Nation | Free for all Slayer. Everyone starts with no weapon (a blow with the bare hands), two frag grenades and two plasma grenades, and no one picks up a weapon. A grenade kill gives the killer grenades back, of the kind that made it: a frag's explosion a frag, a plasma's a plasma, a plasma stuck to the one killed two plasmas, each up to the most a player carries. The map's grenades lie on it (`game/frag_nation.c`). |
 | Snowball Fight | Free for all Slayer. Everyone starts with no weapon and four plasma grenades, with none on the map; a plasma kill gives the killer plasmas back, as in Frag Nation. |
+| Melee Only | Free for all Slayer. Everyone starts with no weapon (a blow with the bare hands) and no grenades; no weapons or grenades are on the map. It is made of the gametype's own options (a loadout of none, no map weapons, the weapon set with no grenades), with no mode of its own. |
+| Needles | Free for all Slayer. Everyone starts with the needler and no grenades, with no weapons or grenades on the map, and BOTTOMLESS on, so the needler never runs dry. Made of the gametype's own options and Bottomless, with no mode of its own. |
 | Hardcore Slayer, Hardcore CTF, Hardcore Oddball, Hardcore King | The team gametypes with Hardcore's rules: no motion sensor (the flag, the ball and the hill keep their nav points), no aim assist (no autoaim nor magnetism, for controllers and the mouse alike), friendly fire on, and a kill restores the killer's health, and their shields unless an overshield has them past full. |
 
 Edit Gametypes edits them as any gametype, and its OPENCE OPTIONS screen
@@ -472,8 +474,8 @@ not know the option plays it correctly); the clients take them from it as they t
 the rest of the game. The lobby and Server Setup name the gametype's mode.
 `debug.network_test` hosts them by name: `swat`, `infection`, `gun_game`,
 `hardcore`, `hardcore_ctf`, `hardcore_oddball`, `hardcore_king`,
-`one_in_the_chamber`, `frag_nation` and `snowball_fight`
-(`host:bloodgulch:infection`). One in the Chamber, Frag Nation and Snowball
+`one_in_the_chamber`, `frag_nation`, `snowball_fight`, `melee_only` and
+`needles` (`host:bloodgulch:infection`). One in the Chamber, Frag Nation and Snowball
 Fight are the ideas and numbers of Chalwk's SPCLib scripts (MIT; none of
 their code).
 
