@@ -25,7 +25,7 @@ is compiled. The notice accompanies source and binary distributions.
 [SDL release-3.4.16](https://github.com/libsdl-org/SDL/tree/release-3.4.16),
 commit `fa2c02bb6e21974a89ea9824bc53c9932abe5f9c`, zlib licence.
 Reference: `src/joystick/hidapi/SDL_hidapi_ps5.c`;
-SHA-256: `31bcd932cec0b223422beda3c9b5e46835d85dfcae8607c836865828e56241e2`.
+SHA-256 with LF line endings: `c535231bf9ec785e4e7dc1805c5d989d534ca5b9a3f47b1fe354b224faf22a16`.
 Its output-body layout, player-light patterns and report framing inform
 `dualsense_rules.c`; `dualsense.c` also reproduces the default player-index
 lightbar palette. [SDL-LICENSE.txt](SDL-LICENSE.txt) is copied unchanged.
