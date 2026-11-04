@@ -134,3 +134,45 @@ def test_compiled_conversions_are_replaced(tmp_path):
     assert not SCALAR_FROM_SIMD.search(text)
     assert re.search(r"fcvtzs v\d+\.2s, v\d+\.2s", text)
     subprocess.run([clang, "--target=aarch64-linux-gnu", "-c", str(converted), "-o", str(obj)], check=True)
+
+
+def test_guest_setjmp_fills_the_guests_jmp_buf(tmp_path):
+    """the guest's setjmp and longjmp (port/android/guest/runtime/guest_setjmp.c,
+    which Lua's errors need), through the guest's pipeline: their four names, the
+    32-bit buffer pointer zero-extended first, and every register saved and
+    restored within the guest's __jmp_buf, at the same places"""
+    clang, objdump = shutil.which("clang"), shutil.which("llvm-objdump")
+    if not clang or not objdump:
+        pytest.skip("no clang or llvm-objdump")
+    source = ROOT / "port" / "android" / "guest" / "runtime" / "guest_setjmp.c"
+    darwin, converted, obj = tmp_path / "setjmp.darwin.s", tmp_path / "setjmp.s", tmp_path / "setjmp.o"
+    try:
+        subprocess.run([clang, "--target=arm64_32-apple-watchos", "-O2", "-S", str(source), "-o", str(darwin)],
+                       check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        pytest.skip("clang has no arm64_32 target")
+    subprocess.run([sys.executable, str(ROOT / "tools" / "android_asm_convert.py"), str(darwin), str(converted)],
+                   check=True)
+    subprocess.run([clang, "--target=aarch64-linux-gnu", "-c", str(converted), "-o", str(obj)], check=True)
+    symbols = subprocess.run([objdump, "-t", str(obj)], check=True, capture_output=True, text=True).stdout
+    for name in ("setjmp", "_setjmp", "longjmp", "_longjmp"):
+        assert re.search(rf"\bg\s+F?\s*\.text\s+\S+\s+{name}$", symbols, re.M), name
+    header = (ROOT / "port" / "android" / "guest" / "libc" / "arch" / "arm64_32" / "bits" / "setjmp.h").read_text()
+    words = int(re.search(r"unsigned long long __jmp_buf\[(\d+)\]", header).group(1))
+    listing = subprocess.run([objdump, "-d", "--no-show-raw-insn", str(obj)], check=True, capture_output=True,
+                             text=True).stdout
+    routines = re.split(r"^[0-9a-f]+ <(\w+)>:$", listing, flags=re.M)
+    code = {routines[index]: routines[index + 1] for index in range(1, len(routines), 2)}
+
+    def places(text, mnemonics):
+        """each register a routine stores to (or loads from) the buffer, and where: a pair's second 8 bytes on"""
+        found = {}
+        for registers, offset in re.findall(rf"\b(?:{mnemonics})\s+([^\[]+)\[x0(?:, #(0x[0-9a-f]+))?\]", text):
+            for place, register in enumerate(registers.replace(",", " ").split()):
+                found[register] = int(offset or "0", 16) + 8 * place
+        return found
+
+    saved, restored = places(code["setjmp"], "stp|str"), places(code["longjmp"], "ldp|ldr")
+    assert "mov\tw0, w0" in code["setjmp"].split("\n")[1] and "mov\tw0, w0" in code["longjmp"].split("\n")[1]
+    assert saved == restored and max(saved.values()) + 8 <= 8 * words
+    assert {f"x{index}" for index in range(19, 31)} | {f"d{index}" for index in range(8, 16)} <= set(saved)

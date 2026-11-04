@@ -34,6 +34,12 @@ dist/
 
 # tools
 claude.sh
+# (this machine's build scripts, its toolchains' paths)
+build-env.sh
+build-linux.sh
+build-windows.sh
+build-android.sh
+build-web.sh
 
 # add-ons built from maps (tools/addon_build.c): rebuilt, never committed
 addons/**/*.cevehicle
