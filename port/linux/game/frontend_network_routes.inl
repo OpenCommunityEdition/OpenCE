@@ -8,6 +8,7 @@ static struct { char const *legacy, *modern; } const frontend_network_routes[] =
     {"pc\\main_menu\\multiplayer_type_select\\lobby\\preview_screen", "pc\\modern\\network\\preview\\0\\preview_screen"},
     {"pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\bots\\bots_screen", "pc\\modern\\network\\bots\\0\\bots_screen"},
     {"pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\map_sharing\\map_sharing_settings_screen", "pc\\modern\\network\\sharing\\0\\map_sharing_settings_screen"},
+    {"pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\mcc_packages\\mcc_packages_screen", "pc\\modern\\network\\mcc_packages\\0\\mcc_packages_screen"},
     {"pc\\main_menu\\multiplayer_type_select\\server_settings\\coop_options\\coop_options_screen", "pc\\modern\\network\\coop\\0\\coop_options_screen"},
     {"pc\\main_menu\\multiplayer_type_select\\server_settings\\voice_options\\voice_options_screen", "pc\\modern\\network\\voice\\0\\voice_options_screen"},
     {"pc\\main_menu\\solo_level_select\\solo_level_select_screen", "pc\\modern\\network\\campaign\\0\\solo_level_select_screen"},

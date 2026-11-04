@@ -2412,6 +2412,14 @@ static void main_won_map_private(
 	short level;
 	short local_player_index;
 
+	/* port: explicit MCC campaigns own their mission order and host decision.
+	 * The Xbox/CE level table below cannot represent package mission identities. */
+	if (mcc_main_campaign_won())
+	{
+		main_globals.won_map = FALSE;
+		return;
+	}
+
 	/* port: when a network co-op level is won, the round ends for everyone as
 	in multiplayer, back to the lobby, and the next round is the campaign's
 	next level (The Maw's: The Pillar of Autumn). A level not in the campaign

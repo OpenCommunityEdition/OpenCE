@@ -5,6 +5,7 @@ The subscribed Steam Workshop items' Halo CE maps, found in place (steam_worksho
 */
 
 #include "steam_workshop.h"
+#include "mcc_manifest.h"
 #include "server_json.h"
 #include "port_config.h"
 #include "posix.h"
@@ -109,6 +110,8 @@ int steam_workshop_read_item(const char *text, int length, struct steam_workshop
 	neutral_title(&document, item->title);
 	if (server_json_get_string(&document, server_json_member(&document, 0, "Engine"), engine, (int)sizeof(engine)))
 		item->halo1 = !strcmp(engine, "Halo1");
+	server_json_get_boolean(&document, server_json_member(&document,
+		server_json_member(&document, 0, "GameModContents"), "HasCampaign"), &item->has_campaign);
 	maps = server_json_member(&document, server_json_member(&document, 0, "GameModContents"), "MultiplayerMaps");
 	if (maps >= 0)
 	{
@@ -337,9 +340,11 @@ static void scan_item(const char *item_folder, const char *item_id)
 {
 	static struct steam_workshop_item_text item;
 	static struct steam_workshop_map_text map;
+	static struct mcc_manifest campaign;
 	char path[STEAM_WORKSHOP_PATH_SIZE], maps_folder[STEAM_WORKSHOP_PATH_SIZE], found[256], file_name[96];
+	char reason[128];
 	char *text;
-	int length, index;
+	int length, index, count;
 
 	if (!resolve(item_folder, "ModInfo.json", path, sizeof(path)) || !(text = read_file(path, &length)))
 		return;
@@ -348,14 +353,26 @@ static void scan_item(const char *item_folder, const char *item_id)
 	if (!index || !item.halo1 || !resolve(item_folder, "maps", maps_folder, sizeof(maps_folder)) ||
 		!is_directory(maps_folder))
 		return;
-	for (index = 0; index < item.map_count && catalog.count < STEAM_WORKSHOP_MAXIMUM_MAPS; index++)
+	campaign.count = 0;
+	if (item.has_campaign && config_boolean("game.mcc_campaigns"))
+		mcc_manifest_load(item_folder, &campaign, reason);
+	count = item.map_count + campaign.count;
+	for (index = 0; index < count && catalog.count < STEAM_WORKSHOP_MAXIMUM_MAPS; index++)
 	{
 		struct steam_workshop_map *entry = &catalog.maps[catalog.count];
 
-		if (!resolve(item_folder, item.map_json[index], path, sizeof(path)) || !(text = read_file(path, &length)))
-			continue;
-		length = steam_workshop_read_map(text, length, &map);
-		free(text);
+		if (index < item.map_count)
+		{
+			if (!resolve(item_folder, item.map_json[index], path, sizeof(path)) || !(text = read_file(path, &length)))
+				continue;
+			length = steam_workshop_read_map(text, length, &map);
+			free(text);
+		}
+		else
+		{
+			map = campaign.missions[index - item.map_count];
+			length = 1;
+		}
 		snprintf(file_name, sizeof(file_name), "%s.map", map.name);
 		if (!length || !posix_find_entry_case_insensitive(maps_folder, file_name, found, sizeof(found)) ||
 			!join(entry->path, sizeof(entry->path), maps_folder, found))

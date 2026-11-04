@@ -49,6 +49,7 @@ struct steam_workshop_item_text
 	char title[STEAM_WORKSHOP_TITLE_SIZE];
 	/* Engine is "Halo1" */
 	int halo1;
+	int has_campaign;
 	int map_count;
 	/* MultiplayerMaps: item-relative json paths, '/' separators */
 	char map_json[STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS][128];

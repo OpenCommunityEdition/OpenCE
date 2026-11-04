@@ -152,6 +152,10 @@ public class LauncherActivity extends Activity {
         layout.addView(message);
 
         pick = new Button(this);
+        Button mccImport = new Button(this);
+        mccImport.setText("Import MCC maps");
+        mccImport.setOnClickListener(v -> startActivity(new Intent(this, MccImportActivity.class)));
+        layout.addView(mccImport);
         pick.setText("Choose disc image");
         pick.setOnClickListener(v -> {
             // (disc images have no MIME type of their own: any file, checked

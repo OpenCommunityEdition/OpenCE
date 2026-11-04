@@ -76,6 +76,52 @@ The asset-free regressions in `test_steam_workshop.py` and `test_mcc_maps.py`
 check these paths, bounds, selection restoration and disabled settings; they
 do not establish gameplay compatibility for every discovered map.
 
+## Explicit MCC campaigns and Android imports
+
+Enable `game.mcc_campaigns` to use an installed campaign's metadata. Start with
+[`mcc_manifest.c`](../../port/linux/src/mcc_manifest.c): `mcc_manifest_load`
+reads the complete mission list, rejects ambiguous names and keeps missing
+binary entries in the authored sequence. `mcc_manifest_for_level` selects the
+metadata belonging to the actual resolved package, so an overridden Steam item
+cannot supply unrelated local campaign metadata. The parser shares the existing
+Workshop mission-text reader; it does not require Steam on Android or web.
+
+Next read `mcc_maps_campaign_metadata` and `mcc_maps_next_mission` in
+[`mcc_maps.c`](../../port/linux/game/mcc_maps.c). The catalog stores mission
+order, display titles and explicit next-level identities; package selections
+remain stable across sorting. For example, a manifest listing `z10` followed by
+`a10` displays and advances in that order. An absent `a10` stops progression;
+an unrelated map with a similar name is never substituted. Settings changes
+invalidate the catalog when it is next used.
+
+The small completion hook in `main_won_map_private` delegates to
+[`mcc_main_campaign_won`](../../port/linux/game/mcc_main.c), guarded by a loaded
+MCC campaign and the setting. Solo games retain difficulty and queue the next
+map. Network clients do not choose; hosts use the existing co-op lobby/settings
+transition. No progression cursor survives unload: the current level and its
+own package identify the next mission. Standalone and final levels return to
+the menu or lobby. Xbox and CE still use their existing completion code.
+
+For Android, follow
+[`MccImportActivity`](../../port/android/app/src/main/java/com/halo/decomp/MccImportActivity.java)
+from the document picker into
+[`MccPackageImporter.prepare`](../../port/android/app/src/main/java/com/halo/decomp/MccPackageImporter.java).
+ZIP and document-tree streams enter the same bounded staging path. The importer
+flattens only the package's maps, retains metadata, and records its Workshop ID.
+The pure Java [`MccJson`](../../port/android/app/src/main/java/com/halo/decomp/MccJson.java)
+reader retains numeric IDs exactly. `Prepared.install` publishes a complete
+directory, with replacement rollback and next-import recovery after an
+interruption. It never installs into `maps`, `custom_maps` or saved-game folders.
+
+Checks cover authored order, malformed/duplicate/missing metadata, local
+precedence, full-length titles, completion ownership, import traversal,
+cancellation, replacement recovery and legacy/save preservation. Native Ruby
+checks establish parsing of ten real mission records and forced A10-to-A30 and
+final-mission transitions; they are not a complete campaign playthrough.
+The Java importer tests do not substitute for Android document-provider and
+device testing. See [Android importing](../../port/android/README.md#importing-mcc-packages)
+and [campaign constraints](../mcc_maps.md#installation-and-menus).
+
 ## Follow an MCC package level
 
 Consider selecting `mcc_maps\solar_flare\m0`. This is an illustrative

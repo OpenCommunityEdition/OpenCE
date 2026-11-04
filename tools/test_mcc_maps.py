@@ -104,7 +104,20 @@ static int identities_prepared;
 static unsigned reads, largest, scans, closed;
 void mcc_cache_precache_clear(void) {}
 int config_boolean(char const *name) {
+ if(!strcmp(name,"game.mcc_campaigns"))return getenv("TEST_MISSIONS")!=NULL;
  char const *disabled=getenv("TEST_COLLECTIONS_DISABLED");(void)name;return !disabled;
+}
+#include "../src/mcc_manifest.h"
+int mcc_manifest_for_level(char const *level,struct mcc_manifest *manifest,char reason[128]) {
+ char buffer[512],*name;int count=0;(void)level;reason[0]=0;
+ memset(manifest,0,sizeof(*manifest));
+ if(!getenv("TEST_MISSIONS"))return 0;
+ snprintf(buffer,sizeof(buffer),"%s",getenv("TEST_MISSIONS"));
+ for(name=strtok(buffer,",");name&&count<64;name=strtok(NULL,",")) {
+  snprintf(manifest->missions[count].name,64,"%s",name);
+  snprintf(manifest->missions[count].title,64,"Explicit mission %s",name);count++;
+ }
+ strcpy(manifest->title,"Example campaign");manifest->count=count;return 1;
 }
 #include "../src/steam_workshop.h"
 static int workshop_items;
@@ -303,6 +316,10 @@ int main(int argc,char **argv) {
         if(found!=i || row!=i || !level || strlen(level)>63)return 25;
         printf("map=%s|%d\n",level,mcc_maps_campaign(i));
         printf("label_%d=%ls\n",i,mcc_maps_name(i));
+        if(getenv("TEST_MISSIONS")) {
+            char next[64];int state=mcc_maps_next_mission(level,next);
+            printf("next_%d=%d|%s\n",i,state,next);
+        }
     }
     for(i=0;i<mcc_maps_count(TRUE);i++) {
         short index=mcc_maps_index(i,TRUE);
@@ -773,3 +790,36 @@ def test_disabled_collections_keep_package_folders(catalog_tool, tmp_path, monke
     assert fields["view0"] == "|1|0"
     assert fields["row0_0"] == "[2899747345]|folder"
     assert fields["row1_0"] == "Arena|mcc_maps\\2899747345\\arena"
+
+
+def test_campaign_browser_orders_explicit_missions_and_keeps_full_titles(catalog_tool, tmp_path, monkeypatch):
+    base = local_packages(tmp_path, ["Campaign"])
+    for name in ("z10", "a10", "extra"):
+        (base / f"Campaign/{name}.map").write_bytes(header(scenario=0))
+    (base / "Campaign/list.txt").write_text("z10.map\na10.map\nextra.map\n")
+    monkeypatch.setenv("TEST_MISSIONS", "z10,a10")
+    fields, maps = run(catalog_tool, tmp_path)
+    assert [m.split("|")[0] for m in maps] == ["mcc_maps\\Campaign\\z10", "mcc_maps\\Campaign\\a10", "mcc_maps\\Campaign\\extra"]
+    assert fields["next_0"] == "1|mcc_maps\\Campaign\\a10"
+    assert fields["next_1"] == "2|" and fields["next_2"] == "0|"
+    fields, _ = run(catalog_tool, tmp_path, "browse", "1", "enter:0", "back")
+    assert fields["row0_0"] == "[Example campaign]|folder"
+    assert fields["row1_0"] == "Explicit mission z10|mcc_maps\\Campaign\\z10"
+    assert fields["view2"] == "|1|0"
+
+
+def test_missing_campaign_mission_is_not_skipped(catalog_tool, tmp_path, monkeypatch):
+    base = local_packages(tmp_path, ["Campaign"])
+    for name in ("z10", "a10"):
+        (base / f"Campaign/{name}.map").write_bytes(header(scenario=0))
+    (base / "Campaign/list.txt").write_text("z10.map\na10.map\n")
+    monkeypatch.setenv("TEST_MISSIONS", "z10,missing,a10")
+    fields, _ = run(catalog_tool, tmp_path)
+    assert fields["next_0"] == "-1|mcc_maps\\Campaign\\missing"
+    assert fields["next_1"] == "2|"
+
+
+def test_workshop_browser_keeps_title_longer_than_filename(catalog_tool, tmp_path):
+    local_packages(tmp_path, ["12345"])
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0", items=[("12345", "Item", "arena", "A much longer mission title")])
+    assert fields["row1_0"] == "A much longer mission title|mcc_maps\\12345\\arena"

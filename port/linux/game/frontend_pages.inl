@@ -17,4 +17,5 @@ static struct { char const *path; short tab, parent; char const *paused; } const
     {"pc\\modern\\touch\\settings", 2, 2, "pc\\modern\\paused\\touch\\settings"},
     {"pc\\modern\\third_person\\settings", 0, 0, "pc\\modern\\paused\\third_person\\settings"},
     {"pc\\modern\\extra_effects\\settings", 0, 6, "pc\\modern\\paused\\extra_effects\\settings"},
+    {"pc\\modern\\mcc_packages\\settings", 3, 10, "pc\\modern\\paused\\mcc_packages\\settings"},
 };

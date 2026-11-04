@@ -8,6 +8,47 @@
 #include "mcc_cache.h"
 #include "mcc_main.h"
 #include "mcc_errors.h"
+#include "mcc_maps.h"
+#include "game/game.h"
+#include "networking/network_server_manager.h"
+#include "networking/network_game_manager.h"
+#include "../src/port_config.h"
+
+boolean mcc_main_campaign_won(void)
+{
+    struct network_game *game;
+    char const *current;
+    char next[64];
+    wchar_t text[512];
+    int state;
+    boolean server;
+    if (!mcc_cache_tags_loaded() || mcc_cache_scenario_type() != 0 ||
+        !config_boolean("game.mcc_campaigns")) return FALSE;
+    /* Clients follow the host's existing round/settings messages. */
+    if (game_connection() == _game_connection_network_client) return TRUE;
+    server = game_connection() == _game_connection_network_server;
+    game = server ? network_game_get_game() : NULL;
+    current = game ? game->map.name : main_get_map_name();
+    state = mcc_maps_next_mission(current, next);
+    if (state < 0) {
+        error(_error_silent, "mcc campaign: next mission for %s is unavailable: %s", current, next);
+        mcc_error_text(current, "The next campaign mission is missing or invalid. Install the complete package; no mission was skipped.", text, 512);
+        display_error_text_deferred(text, 0);
+    }
+    if (server) {
+        /* Ending a campaign returns to the lobby on its last selection;
+         * it never wraps to the first mission or chooses an Xbox level. */
+        network_game_server_port_cooperative_won(state == 1 ? next : NULL);
+    } else if (state == 1) {
+        error(_error_silent, "mcc campaign: advancing from %s to %s", current, next);
+        main_set_map_name(next);
+        main_disallow_persistent_storage();
+    } else {
+        error(_error_silent, "mcc campaign: %s completed; returning to the menu", current);
+        main_goto_main_menu();
+    }
+    return TRUE;
+}
 
 boolean mcc_main_map_completed(void)
 {

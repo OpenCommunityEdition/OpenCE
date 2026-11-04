@@ -19,6 +19,9 @@ wchar_t const *mcc_maps_name(short index);
 wchar_t const *mcc_maps_description(short index);
 boolean mcc_maps_campaign(short index);
 boolean mcc_maps_level_campaign(char const *level_name);
+/* 0 standalone/disabled, 1 next mission, 2 completed, -1 unavailable next
+ * mission. Only the explicit manifest supplies an order. */
+int mcc_maps_next_mission(char const *level_name, char next[64]);
 /* The title of the Steam Workshop item with this id when it is subscribed here and has one. */
 boolean mcc_maps_workshop_title(char const *item_id, char *title, unsigned size);
 

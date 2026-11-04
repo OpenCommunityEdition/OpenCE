@@ -51,6 +51,7 @@
             android:exported="true"
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode">
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/mcc_shortcuts" />
             <meta-data
                 android:name="android.app.category"
                 android:value="game" />
@@ -67,6 +68,10 @@
                 <data android:scheme="halo" android:host="join" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".MccImportActivity" android:exported="true"
+            android:launchMode="singleTask" android:label="@string/mcc_import_label"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode" />
 
         <!-- in a process of its own, with a fresh Java heap (HaloApplication) -->
         <activity

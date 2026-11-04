@@ -16,6 +16,49 @@ Physical mice use the same control bindings. During play, F12 toggles mouse
 capture; captured mode hides Android's pointer and uses relative movement for
 continuous aiming, while releasing capture restores normal pointer behavior.
 
+## Importing MCC packages
+
+Quit the game, then long-press its launcher icon and choose **Import MCC maps**.
+The first-run game-data screen also has an import button. Copy a complete Halo 1
+Workshop package from your computer to a selectable folder (for example Downloads)
+or a ZIP on the phone. Select **Workshop package**, then **Choose folder** or
+**Choose ZIP**. Keep `ModInfo.json`, `CampaignInfo.json`, the mission JSON files
+and maps together. Steam is not needed on Android.
+
+The importer defaults to the Workshop ID as its destination folder; an optional
+name can use letters, digits, spaces, underscores and hyphens. It checks package
+paths, metadata, campaign completeness and MCC cache headers before offering
+installation. It copies the package's maps into `mcc_maps/<package>`, retaining
+metadata subfolders and writing `workshop_id.txt`. Folder and ZIP inputs share
+the same importer. Android document URIs are read as streams through the system
+picker, with no broad storage permission.
+
+Use the shared-resource modes separately: singleplayer requires `bitmaps.map`;
+multiplayer requires `bitmaps.map` and `sounds.map`. Select one resource set at a
+time. These are installed under `mcc_maps/_shared/singleplayer` or `multiplayer`.
+The engine performs its normal full map/resource validation when loading; an
+importer's header check does not establish full gameplay compatibility.
+
+An existing destination requires explicit replacement confirmation. New files
+are staged outside `mcc_maps`; a failed publish restores the old package. An
+interrupted replacement is recovered at the next import. Cancellation removes
+staged files, and installed Xbox/CE maps and game saves are preserved. Imports
+are serialized and the activity refuses to import while the game process runs.
+Limits are 4,096 files, 16 GiB total, less than 2 GiB per map, 256 KiB per JSON
+file and 64 declared campaign missions. Hub/flashback mission kinds are refused.
+
+Start the game after importing. Enable **CAMPAIGN MISSIONS** in Modern Settings >
+Online > Map Sharing > MCC Packages (Network Setup > Map Sharing > MCC Packages
+in the Stock, Classic PC and Xbox styles) for mission ordering and progression;
+it is off by default. **COLLECTION FOLDERS** can group identified imported
+packages without Steam. See [MCC packages](../../docs/mcc_maps.md) for desktop
+discovery, resource rules and compatibility limits.
+
+`tools/test_mcc_android_importer.py` compiles and runs the actual Java core with
+JDK 17+, including failure rollback, cancellation, malformed metadata, path
+traversal and legacy/save preservation. These checks do not exercise an Android
+document provider or establish on-device rendering compatibility.
+
 ## Lighting availability
 
 The optional Dynamic Lighting renderer is excluded from Android builds after

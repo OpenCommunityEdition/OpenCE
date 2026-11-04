@@ -188,9 +188,43 @@ to gametypes. Split-screen multiplayer skips **MCC SINGLEPLAYER**, just as
 it skips the existing singleplayer categories. These
 are menu routes in the implementation; multiplayer interoperability and
 complete campaigns require gameplay testing.
-Each selected MCC campaign map is treated as an independent scenario.
-Automatic progression through a package's campaign map sequence is not
-implemented; the MCC package manifest is not interpreted.
+Without campaign metadata enabled, each selected MCC campaign map remains an
+independent scenario. Enable **CAMPAIGN MISSIONS** under Settings > Network
+Setup > Map Sharing > MCC Packages (`game.mcc_campaigns`, default false) to
+discover Workshop campaigns and use their authored mission order. The same
+screen exposes desktop Steam discovery and optional collection folders.
+
+`ModInfo.json` must identify `Halo1` and `GameModContents.HasCampaign = true`.
+`CampaignInfo.json` supplies an explicit `CampaignMaps` list; each referenced
+mission JSON supplies `ScenarioFile` and an optional `Title.Neutral`.
+The order in that list is authoritative, even when filenames sort differently.
+The last component of `ScenarioFile` names the compiled map, following the
+[public Excession format](https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/creatingmodpackage/specifyingproperties).
+A package contains one campaign, whose mission list can be reordered in
+[Excession](https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/creatingmodpackage/campaignmod).
+The bounded reader supports 1-64 missions, rejects duplicate paths or filenames,
+and accepts the default mission kind. Hub/flashback semantics and insertion-point
+selection are not implemented; missions start normally at their beginning.
+
+For local packages, keep `ModInfo.json`, `CampaignInfo.json` and the referenced
+mission metadata beside the flattened maps, retaining the metadata subfolders.
+The Android importer performs this layout conversion and preserves the Workshop
+ID in `workshop_id.txt`. Metadata never redirects loading to another package,
+Xbox or CE. A local override never borrows metadata from its Steam counterpart.
+Missing map binaries remain in the declared order: completion stops with a
+diagnostic instead of skipping a mission. Unlisted maps remain independently
+selectable and do not acquire an inferred next mission.
+
+Solo completion queues the next explicit MCC level with the current difficulty;
+the last mission returns to the menu. In co-op only the host chooses the next
+mission, using the existing round transition and content-admission messages.
+The lobby selects that mission; the final mission returns to the lobby without
+wrapping to the first. Clients need matching map/resource content, not identical
+metadata or package folder names. No network fields or agreement rules changed.
+The minimal `main_won_map_private` hook is necessary because the established
+completion table cannot represent MCC package identities; all selection logic
+remains in MCC modules, behind loaded-campaign and setting guards. Xbox and CE
+completion paths are preserved.
 
 MCC checkpoints retain the canonical `mcc_maps\[package\]<filename>` scenario
 identity, including when the original tag names an Xbox campaign level.
@@ -1427,8 +1461,9 @@ compatibility-version change is involved. This is an MCC-specific avoidance
 of the credits/cache interaction, not a general change to the movie player
 or background I/O. Xbox and CE completion remain unchanged.
 
-Automatic MCC campaign-package progression remains unsupported: after M0
-finishes, select M1 manually. An unrelated saved-map identity rejection is
+At the time of that fix, automatic MCC campaign progression was unsupported.
+Packages without an enabled explicit campaign manifest still require manual
+mission selection. An unrelated saved-map identity rejection is
 normal, and the map's equipment/grenade warnings are not suppressed here.
 
 Regression tests cover camera bounds, default and supported lenses, wide

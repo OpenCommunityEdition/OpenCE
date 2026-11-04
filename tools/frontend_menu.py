@@ -39,11 +39,12 @@ PAGES = [
     ("touch", 2, 2, "TOUCH CONTROLS", ["gamepad_setup/android", "gamepad_setup/gyro"]),
     ("third_person", 0, 0, "THIRD PERSON", ["video_settings/shoulder_camera"]),
     ("extra_effects", 0, 6, "EXTRA EFFECTS", ["video_settings/extra_effects"]),
+    ("mcc_packages", 3, 10, "MCC PACKAGES", ["network_setup/mcc_packages"]),
 ]
 TABS = ("VIDEO", "AUDIO", "CONTROLS", "ONLINE", "INTERFACE", "PROFILE")
 LINKS = {0: [(6, None), (7, None), (15, None)], 6: [(8, "desktop web"), (16, None)],
          3: [(9, None), (10, "desktop android"), (11, None)], 4: [(12, None), (13, None)],
-         2: [(14, "android")]}
+         2: [(14, "android")], 10: [(17, None)]}
 STYLE = ("MENU STYLE", "display.menu_frontend",
          [("MODERN", "modern"), ("CLASSIC PC", "pc"), ("XBOX", "xbox"), ("STOCK", "off")],
          "Choose the Settings and submenu style. Saved changes take effect on return to the main menu. The starting menu, pause menu and map UI keep their existing layout.", None)

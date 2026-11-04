@@ -82,6 +82,15 @@ modules remain unchanged. No map paths are renamed or redirected.
 
 ## Trying the prototype
 
+MCC package options use the same setting inventory in each frontend. Modern
+Settings > Online > Map Sharing > MCC Packages is a Modern page with its own
+help panel, tab navigation and pending Save/Cancel state. Stock and Classic PC
+use the generated Network Setup screen; Xbox applies its generated controller
+footers to that screen. Steam Discovery is desktop-only in every style.
+Campaign and package folders use the existing map selector callbacks through
+the Modern map/mission layouts, retaining MCC-owned ordering and identity.
+See [campaign discovery and importing](maps_and_resources.md#explicit-mcc-campaigns-and-android-imports).
+
 Set `display.menu_frontend = "modern"` in the isolated run's `config.toml`
 before loading `ui.map`. Modern is now the default; `"off"` preserves the
 established Settings presentation.

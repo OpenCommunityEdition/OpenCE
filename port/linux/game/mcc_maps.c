@@ -18,6 +18,7 @@ list, loader, resource directory or display index is used here.
 #include "../src/steam_workshop.h"
 #include "../src/workshop_collections.h"
 #include "../src/port_config.h"
+#include "../src/mcc_manifest.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,12 +36,16 @@ struct mcc_menu_map
 	char item_id[MCC_WORKSHOP_ID_SIZE];
 	wchar_t name[64];
 	wchar_t description[MCC_MAP_DESCRIPTION_MAXIMUM + 1];
-	boolean campaign;
+	boolean campaign, titled;
+	short mission_order, next_state;
+	char next_mission[64];
+	char campaign_title[64];
 };
 
 static struct
 {
 	boolean scanned;
+	boolean workshop_enabled, campaigns_enabled;
 	short count;
 	struct mcc_menu_map maps[MCC_MAPS_MAXIMUM];
 } mcc_menu_catalog;
@@ -157,8 +162,66 @@ static void mcc_map_register(char const *name)
 
 static int mcc_map_order(void const *left, void const *right)
 {
+	struct mcc_menu_map const *a = left, *b = right;
+	char package_a[64], package_b[64];
+	if ((a->mission_order || b->mission_order) &&
+		mcc_workshop_package_folder(a->level_name, package_a) &&
+		mcc_workshop_package_folder(b->level_name, package_b) && !csstrcasecmp(package_a, package_b))
+	{
+		int order_a = a->mission_order ? a->mission_order : STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS + 1;
+		int order_b = b->mission_order ? b->mission_order : STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS + 1;
+		if (order_a != order_b) return order_a - order_b;
+	}
 	return csstrcasecmp(((struct mcc_menu_map const *)left)->file_name,
 		((struct mcc_menu_map const *)right)->file_name);
+}
+
+static void mcc_maps_campaign_metadata(void)
+{
+	static struct mcc_manifest manifest;
+	char previous[64] = "", package[64], reason[128];
+	int result = 0;
+	short index;
+	if (!config_boolean("game.mcc_campaigns")) return;
+	/* The first sort groups package paths. Read each manifest once, keeping
+     * its missing binary entries so progression cannot jump a missing level. */
+	for (index = 0; index < mcc_menu_catalog.count; index++)
+	{
+		struct mcc_menu_map *map = &mcc_menu_catalog.maps[index];
+		int mission;
+		if (!map->campaign || !mcc_workshop_package_folder(map->level_name, package)) continue;
+		if (csstrcasecmp(previous, package))
+		{
+			strcpy(previous, package);
+			result = mcc_manifest_for_level(map->level_name, &manifest, reason);
+			if (result < 0) error(_error_silent, "mcc campaign %s: %s", package, reason);
+		}
+		if (result != 1) continue;
+		for (mission = 0; mission < manifest.count; mission++)
+		{
+			char const *title;
+			size_t n;
+			if (csstrcasecmp(strrchr(map->level_name, '\\') + 1, manifest.missions[mission].name)) continue;
+			map->mission_order = (short)(mission + 1);
+			strcpy(map->campaign_title, manifest.title);
+			title = manifest.missions[mission].title;
+			if (title[0])
+			{
+				for (n = 0; title[n] && n < 63; n++) map->name[n] = (unsigned char)title[n] >= 32 && (unsigned char)title[n] < 127 ? title[n] : '?';
+				map->name[n] = 0;
+				map->titled = TRUE;
+			}
+			map->next_state = 2;
+			if (mission + 1 < manifest.count)
+			{
+				int written = snprintf(map->next_mission, sizeof(map->next_mission), "%s%s\\%s",
+					MCC_MAPS_LEVEL_PREFIX, package, manifest.missions[mission + 1].name);
+				map->next_state = written > 0 && written < (int)sizeof(map->next_mission) ? 1 : -1;
+			}
+			break;
+		}
+	}
+	qsort(mcc_menu_catalog.maps, (size_t)mcc_menu_catalog.count, sizeof(mcc_menu_catalog.maps[0]), mcc_map_order);
 }
 
 static boolean mcc_map_package_is_item(char const *package)
@@ -209,6 +272,7 @@ static boolean mcc_map_workshop_title(struct mcc_menu_map *map)
 					item_title[index] : '?';
 			map->description[used] = 0;
 		}
+		map->titled = TRUE;
 		return TRUE;
 	}
 	return FALSE;
@@ -250,7 +314,13 @@ static void mcc_maps_scan_directory(char const *package)
 static void mcc_maps_scan(void)
 {
     short i;
-    if (mcc_menu_catalog.scanned) return;
+    boolean workshop = config_boolean("game.workshop_maps");
+    boolean campaigns = config_boolean("game.mcc_campaigns");
+    if (mcc_menu_catalog.scanned && mcc_menu_catalog.workshop_enabled == workshop &&
+        mcc_menu_catalog.campaigns_enabled == campaigns) return;
+    if (mcc_menu_catalog.scanned) mcc_maps_rescan();
+    mcc_menu_catalog.workshop_enabled = workshop;
+    mcc_menu_catalog.campaigns_enabled = campaigns;
     mcc_menu_catalog.scanned=TRUE;
     mcc_menu_catalog.count=0;
     mcc_maps_scan_directory("");
@@ -275,7 +345,24 @@ static void mcc_maps_scan(void)
             map->name[n++]=']';map->name[n]=0;
         }
     }
+    mcc_maps_campaign_metadata();
     error(_error_silent,"mcc maps: %d maps found in mcc_maps and its packages",mcc_menu_catalog.count);
+}
+
+int mcc_maps_next_mission(char const *level_name, char next[64])
+{
+	short index, target;
+	struct mcc_menu_map const *map;
+	next[0] = 0;
+	if (!config_boolean("game.mcc_campaigns")) return 0;
+	index = mcc_maps_find(level_name);
+	if (index == NONE) return 0;
+	map = &mcc_menu_catalog.maps[index];
+	if (!map->campaign || !map->mission_order) return 0;
+	if (map->next_state != 1) return map->next_state;
+	strcpy(next, map->next_mission);
+	target = mcc_maps_find(next);
+	return target != NONE && mcc_menu_catalog.maps[target].campaign ? 1 : -1;
 }
 
 void mcc_maps_rescan(void)
@@ -622,6 +709,8 @@ void mcc_map_browser_text(struct mcc_map_browser const *browser, short row, wcha
 			if (steam_workshop_item_title(package, title, sizeof(title)) && title[0])
 				snprintf(package, sizeof(package), "%s", title);
 		}
+		if (browser->groups[row] == NONE && mcc_menu_catalog.maps[index].campaign_title[0])
+			snprintf(package, sizeof(package), "%s", mcc_menu_catalog.maps[index].campaign_title);
 		for (length = 0; package[length] && used < 62; length++)
 		{
 			unsigned char c = (unsigned char)package[length];
@@ -634,7 +723,7 @@ void mcc_map_browser_text(struct mcc_map_browser const *browser, short row, wcha
 		char const *base = strrchr(mcc_menu_catalog.maps[index].file_name, '\\');
 
 		base = base ? base + 1 : mcc_menu_catalog.maps[index].file_name;
-		length = strlen(base);
+		length = mcc_menu_catalog.maps[index].titled ? 63 : strlen(base);
 		name = mcc_maps_name(index);
 		while (used < 63 && (size_t)used < length && name[used])
 		{

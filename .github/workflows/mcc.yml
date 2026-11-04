@@ -12,6 +12,8 @@ on:
       - "source/**"
       - "tools/test_mcc_*.py"
       - "tools/test_steam_workshop.py"
+      - "tools/tests/MccPackageImporterTest.java"
+      - "port/android/app/src/main/java/com/halo/decomp/Mcc*.java"
       - "tools/mcc_native_smoke.py"
       - "tools/test_cache_file_formats.py"
       - "tools/harness/**"
@@ -47,6 +49,7 @@ jobs:
           tools/test_mcc_identity.py
           tools/test_mcc_workshop.py
           tools/test_steam_workshop.py
+          tools/test_mcc_android_importer.py
           tools/test_mcc_loading.py
           tools/test_mcc_precache.py
           tools/test_mcc_protocol.py

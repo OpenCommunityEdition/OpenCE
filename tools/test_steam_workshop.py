@@ -15,11 +15,13 @@ SRC = ROOT / "port/linux/src"
 
 DRIVER = r'''
 #include "steam_workshop.h"
+#include "mcc_manifest.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 int config_boolean(const char *name) {
+ if(!strcmp(name,"game.mcc_campaigns")) return getenv("TEST_MCC_CAMPAIGNS") != NULL;
  const char *value=getenv("TEST_WORKSHOP_ENABLED");(void)name;
  return !value || strcmp(value,"0");
 }
@@ -97,6 +99,15 @@ int main(int argc, char **argv)
 		platform_translate_path(argv[2], path, sizeof(path));
 		printf("path=%s\n", path);
 	}
+	else if (argc == 3 && (!strcmp(argv[1], "manifest") || !strcmp(argv[1], "manifest-level")))
+	{
+		static struct mcc_manifest campaign;
+		char reason[128];
+		int result = !strcmp(argv[1], "manifest") ? mcc_manifest_load(argv[2], &campaign, reason) :
+			mcc_manifest_for_level(argv[2], &campaign, reason);
+		printf("result=%d\nreason=%s\ncount=%d\ntitle=%s\n", result, reason, campaign.count, campaign.title);
+		for(index=0;index<campaign.count;index++) printf("mission=%s|%s\n",campaign.missions[index].name,campaign.missions[index].title);
+	}
 	return 0;
 }
 '''
@@ -128,6 +139,7 @@ static void make_directories(char const *path) {(void)path;}
     files = ROOT / "port/windows/src/win32_files.c" if windows else SRC / "posix_files.c"
     result = subprocess.run([compiler, *flags, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-I", str(SRC), str(work / "driver.c"),
                              str(SRC / "steam_workshop.c"), str(files), str(SRC / "server_json.c"),
+                             str(SRC / "mcc_manifest.c"),
                              "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
@@ -318,3 +330,65 @@ def test_translation_keeps_local_override_and_legacy_roots(tool, tmp_path):
     for folder in ("maps", "custom_maps"):
         fields, _ = run(tool, "translate", "d:\\" + folder + "\\a10.map", setting=str(library), data_root=data)
         assert Path(fields["path"]) == data / folder / "a10.map"
+
+
+def make_campaign(folder, names=("z10", "a10")):
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "campaign").mkdir(exist_ok=True)
+    (folder / "ModInfo.json").write_text(item_json(GameModContents={"HasCampaign": True}))
+    (folder / "CampaignInfo.json").write_text(json.dumps({"Title": {"Neutral": "Example campaign"},
+        "CampaignMaps": [f"campaign/{name}.json" for name in names]}))
+    for name in names:
+        (folder / f"campaign/{name}.json").write_text(json.dumps({"ScenarioFile": f"levels/example/{name}",
+            "Title": {"Neutral": "Mission " + name}, "CampaignMapKind": "Default"}))
+        make_map(folder / "maps", name)
+
+
+def test_campaign_discovery_and_explicit_order(tool, tmp_path, monkeypatch):
+    folder = tmp_path / "steamapps/workshop/content/976730/111"
+    make_campaign(folder)
+    assert run(tool, "scan", setting=str(tmp_path))[0]["count"] == "0"
+    monkeypatch.setenv("TEST_MCC_CAMPAIGNS", "1")
+    fields, rows = run(tool, "scan", setting=str(tmp_path))
+    assert fields["count"] == "2"
+    assert [row.split("|")[2] for row in rows["map"]] == ["z10", "a10"]
+    fields, rows = run(tool, "manifest", folder)
+    assert fields["result"] == "1" and fields["title"] == "Example campaign"
+    assert rows["mission"] == ["z10|Mission z10", "a10|Mission a10"]
+    # Missing binaries do not change the authored sequence.
+    (folder / "maps/a10.map").unlink()
+    assert run(tool, "manifest", folder)[0]["count"] == "2"
+
+
+def test_local_campaign_override_never_borrows_steam_metadata(tool, tmp_path, monkeypatch):
+    library, data = tmp_path / "steam", tmp_path / "data"
+    make_campaign(library / "steamapps/workshop/content/976730/111")
+    data.mkdir()
+    monkeypatch.setenv("TEST_MCC_CAMPAIGNS", "1")
+    args = dict(setting=str(library), data_root=data)
+    assert run(tool, "manifest-level", "mcc_maps\\111\\z10", **args)[0]["count"] == "2"
+    local = data / "MCC_MAPS/111"
+    local.mkdir(parents=True)
+    assert run(tool, "manifest-level", "mcc_maps\\111\\z10", **args)[0]["result"] == "0"
+    make_campaign(local, ("c10", "b10"))
+    fields, rows = run(tool, "manifest-level", "mcc_maps\\111\\c10", **args)
+    assert fields["result"] == "1" and rows["mission"][0] == "c10|Mission c10"
+
+
+@pytest.mark.parametrize("fault", ["missing", "traversal", "duplicate_path", "duplicate_name", "kind", "engine", "disabled", "oversize", "too_many"])
+def test_campaign_manifest_refuses_partial_or_ambiguous_metadata(tool, tmp_path, fault):
+    make_campaign(tmp_path)
+    campaign = tmp_path / "CampaignInfo.json"
+    mission = tmp_path / "campaign/a10.json"
+    if fault == "missing": mission.unlink()
+    elif fault == "traversal": campaign.write_text(json.dumps({"CampaignMaps": ["../a10.json"]}))
+    elif fault == "duplicate_path": campaign.write_text(json.dumps({"CampaignMaps": ["campaign/a10.json", "CAMPAIGN/A10.JSON"]}))
+    elif fault == "duplicate_name": mission.write_text(json.dumps({"ScenarioFile": "z10"}))
+    elif fault == "kind": mission.write_text(json.dumps({"ScenarioFile": "a10", "CampaignMapKind": "Hub"}))
+    elif fault in ("engine", "disabled"):
+        (tmp_path / "ModInfo.json").write_text(item_json(Engine="Halo2" if fault == "engine" else "Halo1",
+            GameModContents={"HasCampaign": fault != "disabled"}))
+    elif fault == "oversize": mission.write_text(" " * (256 * 1024 + 1))
+    elif fault == "too_many": campaign.write_text(json.dumps({"CampaignMaps": [f"campaign/{i}.json" for i in range(65)]}))
+    fields, _ = run(tool, "manifest", tmp_path)
+    assert fields["result"] == "-1" and fields["count"] == "0" and fields["reason"]
