@@ -1,13 +1,14 @@
 # Mutators
 
 A mutator changes the rules of a game: it sets values of the map's tags, poses
-the nodes of its objects' models, adds weapons and vehicles, and runs a
-script. Mods (`docs/mods.md`) change only what one machine plays and shows. A mutator changes what every machine of a
+the nodes of its objects' models, changes how units die, adds weapons and
+vehicles, and runs a script. Mods (`docs/mods.md`) change only what one machine plays and shows. A mutator changes what every machine of a
 network game must agree on, so a game plays the host's mutators on every
 machine.
 
 The game's code is `port/linux/game/mutators.c` (what a game plays),
-`mutator_tags.c` (the tag edits), `object_pose.c` (the poses),
+`mutator_tags.c` (the tag edits), `object_pose.c` (the poses), `explosion_decals.c` (the explosions), `object_death.c`
+(the deaths),
 `mutator_scripts.c` (the scripts), `network_mutators.c` (the host's mutators
 sent to its clients) and
 `port/linux/src/port_mutators.c` (the mutators' files). The stock mutators'
@@ -17,7 +18,9 @@ files are `port/assets/mutators`.
 
 A mutator is data. It sets values of the map's tags, of the fields that the
 game lists (the tag edits, below); it scales and moves the nodes of objects'
-models (the poses, below); it can add a vehicle (`format = 3`) or a weapon
+models (the poses, below); it can make a unit's death play an effect and its
+body vanish (`[death]`, below); its numbers can be scaled by options the host
+sets (`[[option]]`, below); it can add a vehicle (`format = 3`) or a weapon
 (`format = 4`), with every tag it uses, to the maps it is played on (an
 add-on: [addons.md](addons.md)), checked as a map's tags are; and it can run a
 Lua script (the scripts, below). The game refuses a mutator with a key, a
@@ -146,7 +149,8 @@ The fields that a mutator can set:
 | | `triggers.<index>.projectile_error_angle_lower_bound`, `..._upper_bound` | 0 to 180 degrees |
 | | `triggers.<index>.heat_generated_per_round`, `.age_generated_per_round` | 0 to 1 |
 | | `triggers.<index>.rounds_between_tracers` | 0 to 32767 |
-| `projectile` | `maximum_range` | 0 to 10000 world units |
+| `projectile` | `model` | a model's name (what it is drawn as) |
+| | `maximum_range` | 0 to 10000 world units |
 | | `air_gravity_scale`, `water_gravity_scale` | 0 to 10 (1 is the world's gravity) |
 | | `air_damage_range_lower_bound`, `..._upper_bound`, `water_damage_range_lower_bound`, `..._upper_bound` | 0 to 10000 world units |
 | | `initial_velocity`, `final_velocity` | 0 to 3000 world units a second |
@@ -161,6 +165,30 @@ The fields that a mutator can set:
 | `damage_effect` | `damage_minimum`, `damage_lower_bound`, `damage_upper_bound` | 0 to 10000 |
 | | `active_camouflage_damage` | 0 to 1 |
 | | `material_modifiers.<material>` | 0 to 10 |
+| `decal` | `type` | `scratch`, `splatter`, `burn` or `painted_sign` |
+| | `flags` | `color_interpolate_in_hsv`, `color_interpolate_along_farthest_hue_path`, `no_random_rotation`, ... (`mutator_tags.c` lists them): the decal's flags, all of them (those not named are cleared) |
+| | `radius_lower_bound`, `radius_upper_bound` | 0 to 10 world units |
+| | `intensity_lower_bound`, `intensity_upper_bound` | 0 to 1 |
+| | `color_lower_bound.<red, green or blue>`, `color_upper_bound.<...>` | 0 to 1 (each decal is a colour between them, through hue with the HSV flags) |
+| | `framebuffer_blend_function` | `alpha_blend`, `multiply`, `double_multiply`, `add`, `subtract`, `component_min`, `component_max`, `alpha_multiply_add` |
+| | `map` | a bitmap's name (the splat drawn) |
+
+A block whose elements have names (a projectile's `material_responses`) can
+be edited in all of them at once, by the element `all`:
+`[tags.material_responses.all]` sets the field in each element the tag has.
+
+`tag = '*'` edits every tag of the group the map has, the add-ons' too, so a
+mutator can change any weapon without naming it; a later edit of one tag sets
+it again (paintball's stock weapons' speeds, after every projectile's). With
+`where`, only those tags whose enum field has one of the values:
+
+```toml
+[[tags]]
+group = "decal"
+tag = '*'
+where = { type = ["scratch", "splatter", "burn"] }   # not the map's painted signs
+framebuffer_blend_function = "add"
+```
 
 A magazine's `rounds_total_initial` is the rounds a weapon is made with, loaded
 and in reserve (`rounds_loaded_maximum` of them loaded), and
@@ -180,7 +208,9 @@ A material is one of `dirt`, `sand`, `stone`, `snow`, `wood`, `hollow_metal`,
 `human`, `sentinel`, `monitor`, `plastic`, `water`, `leaves`,
 `elite_energy_shield`, `ice` or `hunter_shield`.
 
-A mutator with tag edits is made for `format = 2`. Limits: 32 KB of edits
+A mutator with tag edits is made for `format = 2`; one with decal edits, an
+`all` element, `tag = '*'`, options, a `[death]` or an `[explosion]`, for
+`format = 7`. Limits: 32 KB of edits
 in a mutator and in a game (an edit is its names and a few bytes), and 2048
 edits made in a game.
 
@@ -226,6 +256,84 @@ shield no longer reflects them.
 
 Its melee (Combat Revolved's is 91), the flash of its firing and its HUD are
 stock.
+
+### Paintball
+
+GoldenEye's paintball mode, from the maps' own tags. Every weapon's
+projectile, an add-on weapon's too (`tag = '*'`: 450 feet a second), flies at
+350 to 600 feet a second (at 10 feet a world unit: the
+shotgun's pellets, rockets, the charged plasma bolt and the tank's shell 350,
+needles and the plasma pistol's bolts 400, the assault rifle's bullets, the
+plasma rifle's and the Ghost's bolts 450, the pistol's, the Warthog's and the
+Scorpion's guns' 500, the sniper rifle's 600), with one and a half times the
+world's gravity. Its hit on any material plays its weapon's hit on a grunt,
+whose splat (the grunt's blood decal) is drawn with the hunter's glowing
+splat, added to what is behind it, in a colour of any hue: a bright splotch
+in place of a bullet hole and its flash. Every other mark (bullet holes,
+blood, scorches; not the map's painted signs) is painted so too, and an
+explosion leaves a splotch as big as its blast (`[explosion]`). A biped that dies plays the co-op
+teleport and its body vanishes; its weapons drop, and its player respawns,
+as in the stock game.
+
+Its options, in MUTATOR SETTINGS: PAINT SPEED (25 to 200%) and PAINT DROP (0
+to 300%), each a percent of the speeds and the drop above.
+
+## Options
+
+A mutator's `[[option]]`s are percents the host sets, in Server Setup's
+MUTATOR OPTIONS > SETTINGS (a row each, for the mutators on: left and right
+step it), kept in `game.mutator_options`. A tag edit's number names one
+instead of being a number, and is that number at 100%, scaled:
+
+```toml
+[[option]]
+id = "speed"            # what its numbers name it by (no . = or ,)
+name = "PAINT SPEED"    # its row's label
+default = 100           # whole percents, from minimum to maximum by step
+minimum = 25
+maximum = 200
+step = 25
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\pistol\bullet'
+initial_velocity = { value = 50, option = "speed" }   # 50 world units a second at 100%
+```
+
+The number is checked at the option's least and most, and made as each game
+starts at the host's percent: a client plays the host's edits, already
+scaled. Limits: 4 options a mutator, and 128 numbers they scale.
+
+## Explosions
+
+A mutator's `[explosion]` names a decal every explosion leaves, on every
+machine, as big as its damage reaches (its damage effect's cutoff radius),
+whatever made it:
+
+```toml
+[explosion]
+decal = 'effects\decals\blood splats\blood grunt splat'
+```
+
+It is placed on what the explosion hit, and on the ground below one that
+does not face up (off a wall, or in the air). A shock wave's push, which does
+no damage, leaves none.
+
+## Deaths
+
+A mutator's `[death]` changes what a unit does as it dies, on every machine:
+
+```toml
+[death]
+objects = "biped"                # unit, biped or vehicle (a pose's groups)
+effect = 'effects\coop teleport' # played at it (an effect's name), else none
+body = "vanish"                  # "vanish": no longer drawn; "stays", the default
+```
+
+A body that vanishes is still there for what follows a death (the dead
+player's camera, the weapons dropped, the cleanup that takes it away later),
+only not drawn. It comes as a tag edit of its own kind, so that a client plays
+the host's.
 
 ## Scripts
 
@@ -376,6 +484,8 @@ stock_mutators/           the game's own: written again at each start
   accurized_ma5b/
     mutator.toml
   big_head/
+    mutator.toml
+  paintball/
     mutator.toml
   revolved_plasma_rifle/
     mutator.toml

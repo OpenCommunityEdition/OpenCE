@@ -86,6 +86,22 @@ def test_hooks():
     # node's geometry through its matrix, the radius scaled by its inverse)
     collision = read('source/physics/collision_models.c')
     assert collision.count('scaled_radius = inverted_matrix.scale * radius;') == 2
+    # (a unit's death as a mutator's [death] makes it, after the game's own: object_death.c)
+    units = read('source/units/units.c')
+    died = units[units.index('void unit_died('):]
+    died = died[:died.index('\n}\n')]
+    assert died.index('object_death(unit_index);') > died.index('unit->unit.time_of_death = game_time_get();')
+    assert "port: and as a mutator's [death] has it" in died
+    # (an explosion's decal, after its damage: explosion_decals.c)
+    effects = read('source/effects/effects.c')
+    part = effects[effects.index('case DAMAGE_EFFECT_DEFINITION_TAG:'):]
+    part = part[:part.index('break;')]
+    assert part.index('explosion_decal(part_definition->reference.index, world_point, world_forward);') > part.index(
+        'area_of_effect_cause_damage(&damage, NONE);')
+    assert "port: and the decal a mutator's [explosion] leaves" in part
+    assert 'do { if (explosion_decal_count > 0) explosion_decal_found(' in read('port/linux/game/explosion_decals.h')
+    death = read('port/linux/game/object_death.h')
+    assert 'do { if (object_death_count > 0) object_death_found(unit_index); } while (0)' in death
     distributed = read('port/linux/game/network_distributed.c')
     ready = distributed[distributed.index('case _distributed_message_client_ready:'):]
     assert ready.index('network_mutators_send(machine_index);') < ready.index('network_objects_client_asked(')

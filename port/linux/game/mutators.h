@@ -30,6 +30,10 @@ enum
 	_mutator_tag_edit_copy,
 	/* a node of objects scaled and moved (object_pose.c) */
 	_mutator_tag_edit_pose,
+	/* what a unit of a group does as it dies (object_death.c) */
+	_mutator_tag_edit_death,
+	/* the decal every explosion leaves (explosion_decals.c) */
+	_mutator_tag_edit_explosion,
 	NUMBER_OF_MUTATOR_TAG_EDIT_KINDS
 };
 

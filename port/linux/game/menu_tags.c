@@ -403,6 +403,9 @@ static char const *const port_function_names[] =
 	"port mods switch",
 	/* (Server Setup's MUTATOR OPTIONS: the Mods screen's rows, the mutators') */
 	"port mutators init", "port mutators save",
+	/* (MUTATOR OPTIONS' SETTINGS: the mutators' options) */
+	"port mutator settings init", "port mutator settings left", "port mutator settings right",
+	"port mutator settings save",
 	"port controller init", "port controller close", "port controller defaults", "port controller save", "port controller bind", "port controller left", "port controller right",
 	/* (a dedicated server's map vote: menu_functions.c) */
 	"port map vote open", "port map vote choose",
@@ -435,6 +438,8 @@ static char const *const port_game_data_input_names[] =
 	/* (the gametype editor's description, with OPENCE OPTIONS' row) */
 	"port playlist edit desc",
 	"port controller update",
+	/* (MUTATOR SETTINGS' rows: menu_functions.c's mutator_settings_show) */
+	"port mutator settings update",
 	/* (a dedicated server's map vote's screen) */
 	"port map vote update",
 	/* (HDR Calibration's patterns, drawn by the renderer) */

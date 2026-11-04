@@ -40,11 +40,29 @@ def generated(fault=None):
         tags = mutated(tags, 'edit->number < OBJECT_POSE_MINIMUM_SCALE || edit->number > OBJECT_POSE_MAXIMUM_SCALE)',
                        'FALSE)')
     if fault == 'pose_clear':
-        tags = mutated(tags, '\tmutator_tags.element_bytes_used = 0;\n\tobject_pose_clear();\n}\n\nboolean',
-                       '\tmutator_tags.element_bytes_used = 0;\n}\n\nboolean')
+        tags = mutated(tags, '\tmutator_tags.element_bytes_used = 0;\n\tobject_pose_clear();\n\tobject_death_clear();\n\texplosion_decal_clear();\n}\n\nboolean',
+                       '\tmutator_tags.element_bytes_used = 0;\n\tobject_death_clear();\n\texplosion_decal_clear();\n}\n\nboolean')
+    if fault == 'death_clear':
+        tags = mutated(tags, '\tmutator_tags.element_bytes_used = 0;\n\tobject_pose_clear();\n\tobject_death_clear();\n\texplosion_decal_clear();\n}\n\nboolean',
+                       '\tmutator_tags.element_bytes_used = 0;\n\tobject_pose_clear();\n\texplosion_decal_clear();\n}\n\nboolean')
+    if fault == 'where':
+        tags = mutated(tags, '\t\t\tif (value < 0 || value >= where->name_count || !(bits & (1UL << value)))\n\t\t\t\tcontinue;\n', '')
+    if fault == 'every':
+        tags = mutated(tags, '\t\tif (mutator_tags_make_elements(edit, tag_index, reason, size))\n\t\t\tmade++;',
+                       '\t\tif (mutator_tags_make_elements(edit, tag_index, reason, size))\n\t\t{\n\t\t\tmade++;\n\t\t\tbreak;\n\t\t}')
+    if fault == 'all':
+        tags = mutated(tags, 'for (index = 0; mutator_tags_path_each(edit->path, index, path, sizeof(path)); index++)',
+                       'for (index = 0; index < 1 && mutator_tags_path_each(edit->path, index, path, sizeof(path)); index++)')
     if fault == 'append':
         tags = mutated(tags, 'count = (edit->append ? block->count : 0) +', 'count =')
-    source = sha256_source(read('port/linux/src/port_mutators.c')).replace(
+    ported = read('port/linux/src/port_mutators.c')
+    if fault == 'scaled':
+        ported = mutated(ported, 'edit->number * option_value(mutator, &mutator->options[edit->option]) / 100.0',
+                         'edit->number')
+    if fault == 'extremes':
+        ported = mutated(ported, 'for (index = 0; index < 2; index++)\n\t{\n\t\tedit_number_write',
+                         'for (index = 0; index < 0; index++)\n\t{\n\t\tedit_number_write')
+    source = sha256_source(ported).replace(
         'int mutators_key_check(const char *key, double value, char *reason, unsigned long size);', CHECK_KEY)
     enums = '\n'.join((enum_with(read('source/game/game_globals.h'), '_material_dirt = 0'),
                        enum_with(read('source/items/projectile_definitions.h'), '_projectile_material_response_disappear')))
@@ -61,7 +79,7 @@ def generated(fault=None):
 
 
 @pytest.mark.parametrize('case', ['ma5b', 'plasma', 'magazine', 'missing', 'stock', 'refused', 'pose',
-                                  'bytes'])
+                                  'paintball', 'bytes'])
 def test_case(case):
     status, output = run(build('mutator_tags', generated()), case)
     assert status == 0, output
@@ -71,7 +89,9 @@ def test_case(case):
                                         ('whole', 'bytes'), ('append', 'ma5b'), ('runtime', 'plasma'),
                                         ('speed', 'plasma'), ('element', 'magazine'), ('stock', 'stock'),
                                         ('stock_first', 'stock'), ('pose_range', 'pose'),
-                                        ('pose_clear', 'pose')])
+                                        ('pose_clear', 'pose'), ('death_clear', 'paintball'),
+                                        ('all', 'paintball'), ('scaled', 'paintball'), ('extremes', 'paintball'),
+                                        ('where', 'paintball'), ('every', 'paintball')])
 def test_negative(fault, case):
     status, output = run(build('mutator_tags', generated(fault)), case)
     assert status == CHECK_FAILED, output

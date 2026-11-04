@@ -37,7 +37,14 @@ enum
 	EFFECT_DEFINITION_TAG = 'effe',
 	DAMAGE_EFFECT_DEFINITION_TAG = 'jpt!',
 	HUD_GROUP_TAG = 'wphi',
+	DECAL_GROUP_TAG = 'deca',
+	BITMAP_GROUP_TAG = 'bitm',
+	MODELS_GROUP_TAG = 'mode',
 };
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+typedef struct { real red, green, blue; } real_rgb_color;
 struct real_orientation;
 
 /* the tags' structures: the fields mutator_tags.c sets, by the game's names */
@@ -111,6 +118,7 @@ struct projectile_material_response_definition
 };
 struct projectile_definition
 {
+	struct { struct tag_reference model; } object;
 	struct
 	{
 		real maximum_range;
@@ -151,7 +159,8 @@ struct hud_screen_effect_definition { word mask_flags; word pad; struct tag_refe
 enum
 {
 	_tag_rifle, _tag_bullet, _tag_rifle_hud, _tag_pistol_hud, _tag_zoom_in, _tag_zoom_out, _tag_stone, _tag_hollow,
-	_tag_thin, _tag_thick, _tag_ice, _tag_plasma, _tag_bolt, _tag_bolt_damage, _tag_plasma_hud, NUMBER_OF_TAGS
+	_tag_thin, _tag_thick, _tag_ice, _tag_plasma, _tag_bolt, _tag_bolt_damage, _tag_plasma_hud, _tag_splat, _tag_glow,
+	_tag_teleport, _tag_splotch, _tag_sign, _tag_ball, NUMBER_OF_TAGS
 };
 #define TAG_INDEX(index) ((long)(0xE1740000UL | (unsigned long)(index)))
 static struct { unsigned long group_tag; char name[80]; void *data; int present; } tags[NUMBER_OF_TAGS];
@@ -172,6 +181,25 @@ static struct projectile_material_response_definition bolt_responses[NUMBER_OF_M
 static struct damage_effect_definition bolt_damage;
 static struct weapon_hud_interface_definition plasma_hud;
 static byte plasma_crosshairs[2][CROSSHAIR_BYTES];
+
+/* cache_files.h's iterator over the map's tags of a group */
+struct tag_iterator { unsigned long group_tag; int next; };
+static void tag_iterator_new(struct tag_iterator *iterator, long group_tag)
+{
+	iterator->group_tag = (unsigned long)group_tag;
+	iterator->next = 0;
+}
+static long tag_iterator_next(struct tag_iterator *iterator)
+{
+	while (iterator->next < NUMBER_OF_TAGS)
+	{
+		int index = iterator->next++;
+
+		if (tags[index].present && tags[index].group_tag == iterator->group_tag)
+			return TAG_INDEX(index);
+	}
+	return NONE;
+}
 
 static long tag_loaded(long group_tag, char const *name)
 {
@@ -258,9 +286,49 @@ static boolean object_pose_add(long group_tag, char const *tag_name, char const 
 	return TRUE;
 }
 
+/* explosion_decals.c's: the decal every explosion leaves */
+static long explosion_decal_index = NONE;
+static real explosion_decal_radius;
+static int explosion_clears;
+static void explosion_decal_clear(void)
+{
+	explosion_clears++;
+	explosion_decal_index = NONE;
+}
+static void explosion_decal_add(long decal_index, real decal_radius)
+{
+	explosion_decal_index = decal_index;
+	explosion_decal_radius = decal_radius;
+}
+
+/* object_death.c's: the deaths made */
+static struct { long group_tag; long effect_index; boolean vanish; } deaths[4];
+static int death_count, death_clears;
+static void object_death_clear(void)
+{
+	death_clears++;
+	death_count = 0;
+}
+static boolean object_death_add(long group_tag, long effect_index, boolean vanish, char *reason, unsigned long size)
+{
+	(void)reason;
+	(void)size;
+	if (death_count < 4)
+	{
+		deaths[death_count].group_tag = group_tag;
+		deaths[death_count].effect_index = effect_index;
+		deaths[death_count++].vanish = vanish;
+	}
+	return TRUE;
+}
+
 #include "mutators_header.inc"
 #include "mutator_tags.inc"
 #include "port_mutators_source.inc"
+
+/* the grunt's blood splat and a painted sign (mutator_tags.c's own layout
+of a decal's) */
+static struct mutator_decal_definition splat, sign;
 
 static void tag(int index, unsigned long group_tag, char const *name, void *data)
 {
@@ -308,6 +376,7 @@ static void world(void)
 		responses[index].potential_effect.index = NONE;
 	}
 	responses[_material_grunt].default_response = _projectile_material_response_overpenetrate;
+	bullet.object.model.index = NONE;
 	bullet.projectile.maximum_range = 40.f;
 	bullet.projectile.air_gravity_scale = 1.f;
 	bullet.projectile.water_gravity_scale = 1.f;
@@ -352,6 +421,7 @@ static void world(void)
 	plasma_triggers[0].runtime_error_deceleration_time = 1.f;
 	plasma_triggers[0].projectile_error_angle_lower_bound = 0.01f;
 	memset(&bolt, 0, sizeof(bolt));
+	bolt.object.model.index = NONE;
 	memset(bolt_responses, 0, sizeof(bolt_responses));
 	bolt_responses[_material_hunter_shield].default_response = _projectile_material_response_reflect;
 	bolt.projectile.initial_velocity = 50.f / 30.f;
@@ -370,6 +440,24 @@ static void world(void)
 	tag(_tag_bolt, PROJECTILE_DEFINITION_TAG, "weapons\\plasma rifle\\bolt", &bolt);
 	tag(_tag_bolt_damage, DAMAGE_EFFECT_DEFINITION_TAG, "weapons\\plasma rifle\\bolt", &bolt_damage);
 	tag(_tag_plasma_hud, HUD_GROUP_TAG, "weapons\\plasma rifle\\plasma rifle", &plasma_hud);
+	memset(&splat, 0, sizeof(splat));
+	splat.flags = 1 << 3;
+	splat.radius_lower_bound = 0.1f;
+	splat.radius_upper_bound = 0.2f;
+	splat.framebuffer_blend_function = 1;
+	splat.map.index = NONE;
+	tag(_tag_splat, DECAL_GROUP_TAG, "effects\\decals\\blood splats\\blood grunt splat", &splat);
+	splat.type = 1;
+	memset(&sign, 0, sizeof(sign));
+	sign.type = 3;
+	sign.framebuffer_blend_function = 1;
+	sign.map.index = NONE;
+	tag(_tag_sign, DECAL_GROUP_TAG, "levels\\test\\bloodgulch\\decals\\red base", &sign);
+	tag(_tag_ball, MODELS_GROUP_TAG, "powerups\\active camoflage\\active camoflage", &other_tag_data);
+	tag(_tag_glow, BITMAP_GROUP_TAG, "effects\\decals\\blood splats\\bitmaps\\blood splat hunter glow",
+		&other_tag_data);
+	tag(_tag_teleport, EFFECT_DEFINITION_TAG, "effects\\coop teleport", &other_tag_data);
+	tag(_tag_splotch, EFFECT_DEFINITION_TAG, "weapons\\assault rifle\\effects\\impact grunt", &other_tag_data);
 	mutator_tags_loaded();
 }
 
@@ -740,7 +828,7 @@ int main(int argc, char **argv)
 				"reload_time = 1\n", "no field" },
 			{ "gravity_range", "[[tags]]\ngroup = \"projectile\"\ntag = 'x'\nair_gravity_scale = -1\n",
 				"from 0 to 10" },
-			{ "later", "format = 7\n[[tags]]\ngroup = \"weapon\"\ntag = 'x'\nzoom_level_count = 1\n", "later build" },
+			{ "later", "format = 8\n[[tags]]\ngroup = \"weapon\"\ntag = 'x'\nzoom_level_count = 1\n", "later build" },
 		};
 		for (index = 0; index < (int)NUMBEROF(cases); index++)
 			folder(cases[index].id, cases[index].text);
@@ -798,6 +886,90 @@ int main(int argc, char **argv)
 		CHECK(pose_clears == index + 1 && pose_count == 0, "the poses kept past their game");
 		mutator_tags_loaded();
 		CHECK(pose_clears == index + 2, "the poses kept past their map");
+		for (index = 0; index < (int)NUMBEROF(cases); index++)
+			folder(cases[index].id, cases[index].text);
+		port_mutators_scan();
+		for (index = 0; index < (int)NUMBEROF(cases); index++)
+		{
+			CHECK(port_mutators_status(find(cases[index].id), NULL, 0) == _port_mutator_unplayable &&
+				strstr(refusal(cases[index].id), cases[index].reason), "%s: %s", cases[index].id,
+				refusal(cases[index].id));
+		}
+	}
+	else if (!strcmp(case_name, "paintball"))
+	{
+		static struct { char const *id; char const *text; char const *reason; } const cases[] =
+		{
+			{ "fast", "[[option]]\nid = \"speed\"\nname = \"S\"\nminimum = 25\nmaximum = 200\n[[tags]]\n"
+				"group = \"projectile\"\ntag = 'x'\ninitial_velocity = { value = 2000, option = \"speed\" }\n", "at 200%" },
+			{ "unnamed", "[[tags]]\ngroup = \"projectile\"\ntag = 'x'\ninitial_velocity = { value = 20, option = \"pace\" }\n",
+				"not one of its [[option]]s" },
+			{ "between", "[[option]]\nid = \"speed\"\nname = \"S\"\ndefault = 110\nminimum = 25\nmaximum = 200\n"
+				"step = 25\n", "whole percents" },
+			{ "trees", "[death]\nobjects = \"scenery\"\n", "units" },
+			{ "melts", "[death]\nobjects = \"biped\"\nbody = \"melts\"\n", "vanish or stays" },
+			{ "bright", "[[tags]]\ngroup = \"decal\"\ntag = 'x'\n[tags.color_lower_bound]\nred = 2\n", "from 0 to 1" },
+			{ "wherever", "[[tags]]\ngroup = \"decal\"\ntag = '*'\nwhere = { type = [\"sticker\"] }\nradius_lower_bound = 1\n",
+				"in a where is one of" },
+			{ "whereof", "[[tags]]\ngroup = \"decal\"\ntag = 'x'\nwhere = { type = [\"burn\"] }\nradius_lower_bound = 1\n",
+				"of tag = '*'" },
+			{ "boom", "[explosion]\ndecal = 'x'\nsize = 2\n", "[explosion] has a decal" },
+		};
+
+		folder("paint", "format = 7\n"
+			"[[option]]\nid = \"speed\"\nname = \"SPEED\"\nminimum = 25\nmaximum = 200\nstep = 25\n"
+			"[[tags]]\ngroup = \"decal\"\ntag = '*'\nwhere = { type = [\"scratch\", \"splatter\", \"burn\"] }\n"
+			"map = 'effects\\decals\\blood splats\\bitmaps\\blood splat hunter glow'\n"
+			"framebuffer_blend_function = \"add\"\nflags = [\"color_interpolate_in_hsv\"]\n"
+			"[tags.color_upper_bound]\nblue = 0.5\n"
+			"[[tags]]\ngroup = \"projectile\"\ntag = 'weapons\\assault rifle\\bullet'\n"
+			"initial_velocity = { value = 45, option = \"speed\" }\n"
+			"[tags.material_responses.all]\ndefault_effect = 'weapons\\assault rifle\\effects\\impact grunt'\n"
+			"[[tags]]\ngroup = \"projectile\"\ntag = '*'\nmodel = 'powerups\\active camoflage\\active camoflage'\n"
+			"[explosion]\ndecal = 'effects\\decals\\blood splats\\blood grunt splat'\n"
+			"[death]\nobjects = \"biped\"\neffect = 'effects\\coop teleport'\nbody = \"vanish\"\n");
+		size = edits_of("paint", edits, sizeof(edits));
+		CHECK(port_mutators_status(find("paint"), NULL, 0) == _port_mutator_fine && size > 0, "%s", refusal("paint"));
+		CHECK(mutator_tags_play(edits, size) && !mutator_tags.passed_over, "passed over %d", mutator_tags.passed_over);
+		CHECK(splat.framebuffer_blend_function == 3 && splat.flags == 2 && splat.map.index == TAG_INDEX(_tag_glow) &&
+			splat.color_upper_bound.blue == 0.5f && splat.radius_upper_bound == 0.2f, "the splat's edits");
+		/* (every decal of the types where names: not the map's painted sign) */
+		CHECK(sign.framebuffer_blend_function == 1 && sign.map.index == NONE, "a painted sign edited");
+		/* (every projectile: both of the map's) */
+		CHECK(bullet.object.model.index == TAG_INDEX(_tag_ball) && bolt.object.model.index == TAG_INDEX(_tag_ball),
+			"every projectile's model");
+		CHECK(explosion_decal_index == TAG_INDEX(_tag_splat) && explosion_decal_radius == 0.2f,
+			"the explosion's decal, and its radius");
+		/* (every element the block has: an "all") */
+		for (index = 0; index < NUMBER_OF_MATERIAL_TYPES + 1; index++)
+		{
+			CHECK((responses[index].default_effect.index == TAG_INDEX(_tag_splotch)) == (index < NUMBER_OF_MATERIAL_TYPES),
+				"material %d's effect", index);
+		}
+		CHECK(bullet.projectile.initial_velocity == 45.f / TICKS_PER_SECOND, "the speed at 100%%");
+		CHECK(death_count == 1 && deaths[0].group_tag == 'bipd' && deaths[0].effect_index == TAG_INDEX(_tag_teleport) &&
+			deaths[0].vanish, "the death");
+		/* (its option: a step at a time, kept as it differs from its default) */
+		{
+			char name[32];
+			long value, minimum, maximum, step;
+
+			CHECK(port_mutators_option_count() == 1 &&
+				port_mutators_option(0, name, sizeof(name), &value, &minimum, &maximum, &step) &&
+				!strcmp(name, "SPEED") && value == 100 && minimum == 25 && maximum == 200 && step == 25, "the option");
+			CHECK(!port_mutators_option_set(0, 110) && !port_mutators_option_set(0, 225), "a percent not a step");
+			CHECK(port_mutators_option_set(0, 200) && !strcmp(option_setting, "paint.speed=200"), "%s", option_setting);
+			size = port_mutators_tag_edits(edits, sizeof(edits));
+			CHECK(mutator_tags_play(edits, size) && bullet.projectile.initial_velocity == 90.f / TICKS_PER_SECOND,
+				"the speed at 200%%");
+			CHECK(port_mutators_option_set(0, 100) && !option_setting[0], "the default kept: %s", option_setting);
+		}
+		/* (each game's undone: the map's own again, and no death) */
+		index = death_clears;
+		mutator_tags_undo();
+		CHECK(splat.framebuffer_blend_function == 1 && splat.flags == 8 && splat.map.index == NONE &&
+			responses[0].default_effect.index == NONE && death_clears == index + 1 && !death_count &&
+			bullet.object.model.index == NONE && explosion_decal_index == NONE && explosion_clears > 0, "undone");
 		for (index = 0; index < (int)NUMBEROF(cases); index++)
 			folder(cases[index].id, cases[index].text);
 		port_mutators_scan();

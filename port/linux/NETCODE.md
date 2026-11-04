@@ -352,7 +352,8 @@ on. Then version 44 adds weapon add-ons (`.ceweapon`), which the host spawns
 as the map's netgame equipment, and gives the gametype's options a custom
 loadout's add-on weapons (from 16 in its weapons' bytes) and a custom
 vehicle set's counts of the first two add-on vehicles (in two of its spare
-bytes); the weapon and vehicle sets of one kind leave the add-ons' out. A
+bytes); the weapon sets of one kind leave the add-ons' out, and version 49's
+vehicle sets of one kind place them. A
 build of 43 would read those options otherwise. Then version 45 gives Custom
 Edition maps the add-ons of the mutators on, and the stock tags those and the
 tag edits name that such a map lacks (`docs/mutators.md`, "Stock tags"), and
@@ -372,6 +373,9 @@ edits carry poses (`object_pose.c`), a node of objects scaled and moved, and a b
 head is one of them; the host's keys name no effects, which a build of 46 would play.
 Then version 48 sends a relayed action's script buttons only when one is set (bit 7 of
 its parts), so that a game without a mutator's script sends what it did before them.
+Version 49's tag edits also carry a kind for a unit's death (`object_death.c`), the
+decals' fields and the `all` element, and a vehicle set of one kind places the
+add-ons' vehicles; a mutator's options scale the host's edits before they are sent.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

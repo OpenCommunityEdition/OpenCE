@@ -68,8 +68,9 @@ played instead (port/linux/game/network_mutators.c).
 /* ---------- constants */
 
 /* the mutators' format this build plays (2: tag edits; 3: an add-on and its
-placements; 4: a weapon's; 6: poses) */
-#define MUTATORS_FORMAT 6
+placements; 4: a weapon's; 6: poses; 7: decals, "all" elements, options and
+[death]) */
+#define MUTATORS_FORMAT 7
 #define MAXIMUM_SCRIPT_FILE_SIZE 0x40000UL
 
 #define MAXIMUM_MUTATORS 64
@@ -97,6 +98,12 @@ copy's most elements (mutator_tags.c's) */
 #define MAXIMUM_TAG_EDIT_ELEMENTS 64
 /* the most placements one mutator has */
 #define MAXIMUM_PLACES_PER_MUTATOR 16
+/* the most options one mutator has, the bytes of an option's id and name,
+and the most of its tag edits' numbers they scale */
+#define MAXIMUM_OPTIONS_PER_MUTATOR 4
+#define OPTION_ID_LENGTH 32
+#define OPTION_NAME_LENGTH 32
+#define MAXIMUM_SCALED_EDITS_PER_MUTATOR 128
 /* the largest add-on file played (docs/addons.md) */
 #define MAXIMUM_ADDON_FILE_SIZE (64UL * 1024 * 1024)
 
@@ -107,9 +114,32 @@ enum
 	_tag_edit_text,
 	_tag_edit_copy,
 	_tag_edit_pose,
+	_tag_edit_death,
+	_tag_edit_explosion,
 };
 
 /* ---------- structures */
+
+/* an option ([[option]]): a percent the host sets in MUTATOR SETTINGS, which
+scales the numbers of its mutator's tag edits that name it */
+struct port_mutator_option
+{
+	char id[OPTION_ID_LENGTH];
+	char name[OPTION_NAME_LENGTH];
+	long minimum;
+	long maximum;
+	long step;
+	long fallback;
+};
+
+/* a tag edit's number scaled by an option: where its number is in the
+mutator's tag edits' bytes, the option, and the number at 100% */
+struct port_mutator_scaled_edit
+{
+	long offset;
+	short option;
+	double number;
+};
 
 struct port_mutator
 {
@@ -147,6 +177,11 @@ struct port_mutator
 	int addon_kind;
 	long place_count;
 	struct port_mutator_place places[MAXIMUM_PLACES_PER_MUTATOR];
+	/* its options, and its tag edits' numbers they scale */
+	long option_count;
+	struct port_mutator_option options[MAXIMUM_OPTIONS_PER_MUTATOR];
+	long scaled_edit_count;
+	struct port_mutator_scaled_edit scaled_edits[MAXIMUM_SCALED_EDITS_PER_MUTATOR];
 	/* its Lua script's file (docs/mutators.md, "Scripts"), else empty, and on a client,
 	whether its player refused to run a host's */
 	char script_path[MAXIMUM_PATH_LENGTH];
@@ -492,6 +527,92 @@ static void tag_copy_read(struct port_mutator *mutator, const char *path, const 
 		append.type == TOML_BOOLEAN && append.u.boolean);
 }
 
+static int toml_number(toml_datum_t table, const char *key, int required, double *number,
+	struct port_mutator *mutator, const char *path);
+
+/* a 4-byte float of the tag edits' bytes, written (tag_edit_add's order) */
+static void edit_number_write(unsigned char *bytes, double number)
+{
+	float value = (float)number;
+	unsigned long bits;
+
+	memcpy(&bits, &value, sizeof(bits));
+	bytes[0] = (unsigned char)bits;
+	bytes[1] = (unsigned char)(bits >> 8);
+	bytes[2] = (unsigned char)(bits >> 16);
+	bytes[3] = (unsigned char)(bits >> 24);
+}
+
+/* a number scaled by an option: { value = <the number at 100%>, option = '<id>' }, checked at the
+option's least and most */
+static void tag_option_read(struct port_mutator *mutator, const char *path, const char *group, const char *tag,
+	const char *field, toml_datum_t table)
+{
+	char reason[MAXIMUM_REFUSAL_LENGTH];
+	char check[MAXIMUM_REFUSAL_LENGTH - 16];
+	toml_datum_t option = toml_get(table, "option");
+	double number;
+	long offset = mutator->tag_edit_size;
+	long edits = mutator->tag_edit_count;
+	const struct port_mutator_option *found = NULL;
+	struct port_mutator_scaled_edit *scaled;
+	int index;
+
+	for (index = 0; index < table.u.tab.size; index++)
+	{
+		if (strcmp(table.u.tab.key[index], "value") && strcmp(table.u.tab.key[index], "option"))
+		{
+			snprintf(reason, sizeof(reason), "line %d: a number an option scales has value and option, not %.40s",
+				table.lineno, table.u.tab.key[index]);
+			refuse(mutator, path, reason);
+			return;
+		}
+	}
+	if (!toml_number(table, "value", 1, &number, mutator, path))
+		return;
+	for (index = 0; option.type == TOML_STRING && index < mutator->option_count; index++)
+	{
+		if (!strcmp(mutator->options[index].id, option.u.s))
+			found = &mutator->options[index];
+	}
+	if (!found)
+	{
+		snprintf(reason, sizeof(reason), "line %d: %.40s's option is not one of its [[option]]s", table.lineno, field);
+		refuse(mutator, path, reason);
+		return;
+	}
+	if (mutator->scaled_edit_count == MAXIMUM_SCALED_EDITS_PER_MUTATOR)
+	{
+		snprintf(reason, sizeof(reason), "line %d: options scale at most %d numbers", table.lineno,
+			MAXIMUM_SCALED_EDITS_PER_MUTATOR);
+		refuse(mutator, path, reason);
+		return;
+	}
+	tag_edit_add(mutator, path, table.lineno, group, tag, field, _tag_edit_number, number * found->fallback / 100.0,
+		NULL, NULL, 0, 0);
+	if (mutator->tag_edit_count == edits)
+		return;
+	/* (at the option's least and most too) */
+	for (index = 0; index < 2; index++)
+	{
+		edit_number_write(mutator->tag_edits + offset + 4,
+			number * (index ? found->maximum : found->minimum) / 100.0);
+		if (!mutators_tag_edit_check(mutator->tag_edits + offset, mutator->tag_edit_size - offset, check,
+			sizeof(check)))
+		{
+			snprintf(reason, sizeof(reason), "line %d: at %ld%%, %s", table.lineno,
+				index ? found->maximum : found->minimum, check);
+			refuse(mutator, path, reason);
+			return;
+		}
+	}
+	edit_number_write(mutator->tag_edits + offset + 4, number * found->fallback / 100.0);
+	scaled = &mutator->scaled_edits[mutator->scaled_edit_count++];
+	scaled->offset = offset + 4;
+	scaled->option = (short)(found - mutator->options);
+	scaled->number = number;
+}
+
 /* a [[tags]] table's fields, those of its tables' as paths ("triggers.0.x") */
 static void tag_fields_read(struct port_mutator *mutator, const char *path, const char *group, const char *tag,
 	const char *prefix, toml_datum_t table)
@@ -505,7 +626,7 @@ static void tag_fields_read(struct port_mutator *mutator, const char *path, cons
 		toml_datum_t value = table.u.tab.value[index];
 		char field[TAG_EDIT_PATH_LENGTH + 1];
 
-		if (!prefix[0] && (!strcmp(key, "group") || !strcmp(key, "tag")))
+		if (!prefix[0] && (!strcmp(key, "group") || !strcmp(key, "tag") || !strcmp(key, "where")))
 			continue;
 		if (strlen(prefix) + strlen(key) + 2 > sizeof(field))
 		{
@@ -518,6 +639,8 @@ static void tag_fields_read(struct port_mutator *mutator, const char *path, cons
 		{
 			if (toml_get(value, "from").type != TOML_UNKNOWN)
 				tag_copy_read(mutator, path, group, tag, field, value);
+			else if (toml_get(value, "option").type != TOML_UNKNOWN)
+				tag_option_read(mutator, path, group, tag, field, value);
 			else
 				tag_fields_read(mutator, path, group, tag, field, value);
 		}
@@ -593,7 +716,40 @@ static void tags_read(struct port_mutator *mutator, toml_datum_t tags, const cha
 			refuse(mutator, path, reason);
 			return;
 		}
-		tag_fields_read(mutator, path, group.u.s, name.u.s, "", tag);
+		/* (every tag of the group, with tag = '*', of those whose field has
+		one of the values where names: tag_edit_add's "*?type=scratch,burn") */
+		if (toml_get(tag, "where").type != TOML_UNKNOWN)
+		{
+			toml_datum_t where = toml_get(tag, "where");
+			char every[TAG_EDIT_NAME_LENGTH];
+			int value;
+
+			if (strcmp(name.u.s, "*") || where.type != TOML_TABLE || where.u.tab.size != 1 ||
+				where.u.tab.value[0].type != TOML_ARRAY)
+			{
+				snprintf(reason, sizeof(reason), "line %d: a where is of tag = '*': a field and a list of its values",
+					tag.lineno);
+				refuse(mutator, path, reason);
+				return;
+			}
+			snprintf(every, sizeof(every), "*?%s=", where.u.tab.key[0]);
+			for (value = 0; value < where.u.tab.value[0].u.arr.size; value++)
+			{
+				toml_datum_t one = where.u.tab.value[0].u.arr.elem[value];
+				size_t length = strlen(every);
+
+				if (one.type != TOML_STRING)
+				{
+					snprintf(reason, sizeof(reason), "line %d: a where's values are names", tag.lineno);
+					refuse(mutator, path, reason);
+					return;
+				}
+				snprintf(every + length, sizeof(every) - length, "%s%s", value ? "," : "", one.u.s);
+			}
+			tag_fields_read(mutator, path, group.u.s, every, "", tag);
+		}
+		else
+			tag_fields_read(mutator, path, group.u.s, name.u.s, "", tag);
 		mutator->tag_count++;
 	}
 }
@@ -621,6 +777,135 @@ static int toml_number(toml_datum_t table, const char *key, int required, double
 	else
 		return 0;
 	return 1;
+}
+
+/* [[option]]: each a percent the host sets (MUTATOR SETTINGS), from its
+least to its most by its step, which scales the numbers that name it */
+static void options_read(struct port_mutator *mutator, toml_datum_t options, const char *path)
+{
+	static const char *const keys[] = { "id", "name", "default", "minimum", "maximum", "step" };
+	char reason[MAXIMUM_REFUSAL_LENGTH];
+	int index;
+
+	if (options.type != TOML_ARRAY)
+	{
+		snprintf(reason, sizeof(reason), "line %d: option is not a list of tables ([[option]])", options.lineno);
+		refuse(mutator, path, reason);
+		return;
+	}
+	for (index = 0; index < options.u.arr.size; index++)
+	{
+		toml_datum_t table = options.u.arr.elem[index];
+		struct port_mutator_option *option;
+		double minimum = 0.0, maximum = 0.0, step = 5.0, fallback = 100.0;
+		int key;
+
+		if (table.type != TOML_TABLE || mutator->option_count == MAXIMUM_OPTIONS_PER_MUTATOR)
+		{
+			snprintf(reason, sizeof(reason), "line %d: option is a list of at most %d tables ([[option]])",
+				options.lineno, MAXIMUM_OPTIONS_PER_MUTATOR);
+			refuse(mutator, path, reason);
+			return;
+		}
+		for (key = 0; key < table.u.tab.size; key++)
+		{
+			size_t known;
+
+			for (known = 0; known < sizeof(keys) / sizeof(keys[0]); known++)
+			{
+				if (!strcmp(table.u.tab.key[key], keys[known]))
+					break;
+			}
+			if (known == sizeof(keys) / sizeof(keys[0]))
+			{
+				snprintf(reason, sizeof(reason), "line %d: an option has no key %.40s", table.u.tab.value[key].lineno,
+					table.u.tab.key[key]);
+				refuse(mutator, path, reason);
+				return;
+			}
+		}
+		if (toml_get(table, "id").type != TOML_STRING || toml_get(table, "name").type != TOML_STRING ||
+			!toml_get(table, "id").u.s[0] || strlen(toml_get(table, "id").u.s) >= OPTION_ID_LENGTH ||
+			strchr(toml_get(table, "id").u.s, '.') || strchr(toml_get(table, "id").u.s, '=') ||
+			strchr(toml_get(table, "id").u.s, ','))
+		{
+			snprintf(reason, sizeof(reason), "line %d: an option has an id (no . = or ,) and a name", table.lineno);
+			refuse(mutator, path, reason);
+			return;
+		}
+		if (!toml_number(table, "minimum", 1, &minimum, mutator, path) ||
+			!toml_number(table, "maximum", 1, &maximum, mutator, path) ||
+			(toml_get(table, "step").type != TOML_UNKNOWN && !toml_number(table, "step", 0, &step, mutator, path)) ||
+			(toml_get(table, "default").type != TOML_UNKNOWN &&
+			!toml_number(table, "default", 0, &fallback, mutator, path)))
+		{
+			return;
+		}
+		/* (whole percents, at most 1000%, the default one of the steps) */
+		if (!(minimum >= 0.0 && minimum < maximum && maximum <= 1000.0 && step >= 1.0 && fallback >= minimum &&
+			fallback <= maximum) || minimum != (long)minimum || maximum != (long)maximum || step != (long)step ||
+			fallback != (long)fallback || ((long)fallback - (long)minimum) % (long)step ||
+			((long)maximum - (long)minimum) % (long)step)
+		{
+			snprintf(reason, sizeof(reason), "line %d: an option is whole percents from its minimum to its maximum "
+				"(at most 1000) by its step, its default one of them", table.lineno);
+			refuse(mutator, path, reason);
+			return;
+		}
+		option = &mutator->options[mutator->option_count++];
+		text_copy(option->id, sizeof(option->id), toml_get(table, "id").u.s, 0);
+		text_copy(option->name, sizeof(option->name), toml_get(table, "name").u.s, 0);
+		option->minimum = (long)minimum;
+		option->maximum = (long)maximum;
+		option->step = (long)step;
+		option->fallback = (long)fallback;
+	}
+}
+
+/* [death]: what a unit of a group (its objects, as a pose's) does as it dies, played on every machine:
+an effect at it, and its body vanishing (kept as a tag edit's bytes, mutator_tags.c's header says how) */
+static void death_read(struct port_mutator *mutator, toml_datum_t death, const char *path)
+{
+	static const char *const keys[] = { "objects", "effect", "body" };
+	char reason[MAXIMUM_REFUSAL_LENGTH];
+	toml_datum_t objects = toml_get(death, "objects");
+	toml_datum_t effect = toml_get(death, "effect");
+	toml_datum_t body = toml_get(death, "body");
+	int key;
+
+	if (death.type != TOML_TABLE)
+	{
+		snprintf(reason, sizeof(reason), "line %d: death is a table ([death])", death.lineno);
+		refuse(mutator, path, reason);
+		return;
+	}
+	for (key = 0; key < death.u.tab.size; key++)
+	{
+		size_t known;
+
+		for (known = 0; known < sizeof(keys) / sizeof(keys[0]); known++)
+		{
+			if (!strcmp(death.u.tab.key[key], keys[known]))
+				break;
+		}
+		if (known == sizeof(keys) / sizeof(keys[0]))
+		{
+			snprintf(reason, sizeof(reason), "line %d: [death] has no key %.40s", death.u.tab.value[key].lineno,
+				death.u.tab.key[key]);
+			refuse(mutator, path, reason);
+			return;
+		}
+	}
+	if (objects.type != TOML_STRING || (effect.type != TOML_UNKNOWN && effect.type != TOML_STRING) ||
+		(body.type != TOML_UNKNOWN && body.type != TOML_STRING))
+	{
+		snprintf(reason, sizeof(reason), "line %d: [death] names its objects' group, and an effect and a body "
+			"(\"vanish\" or \"stays\") if it has them", death.lineno);
+		refuse(mutator, path, reason);
+		return;
+	}
+	tag_edit_add(mutator, path, death.lineno, objects.u.s, effect.type == TOML_STRING ? effect.u.s : "", "",
+		_tag_edit_death, 0.0, body.type == TOML_STRING ? body.u.s : "stays", NULL, 0, 0);
 }
 
 /* [[pose]]: each a node of the objects of a group (or one tag of it) scaled
@@ -892,7 +1177,7 @@ static void mutator_read(struct port_mutator *mutator, const char *folder, const
 	const char *path)
 {
 	static const char *const keys[] = { "name", "id", "version", "authors", "description", "format", "effects",
-		"tags", "pose", "addon", "place", "script" };
+		"option", "tags", "pose", "death", "explosion", "addon", "place", "script" };
 	toml_result_t result;
 	toml_datum_t value;
 	char reason[MAXIMUM_REFUSAL_LENGTH];
@@ -967,12 +1252,35 @@ static void mutator_read(struct port_mutator *mutator, const char *folder, const
 	value = toml_get(result.toptab, "effects");
 	if (value.type != TOML_UNKNOWN)
 		effects_read(mutator, value, path);
+	/* (its options before the tag edits that name them) */
+	value = toml_get(result.toptab, "option");
+	if (value.type != TOML_UNKNOWN)
+		options_read(mutator, value, path);
 	value = toml_get(result.toptab, "tags");
 	if (value.type != TOML_UNKNOWN)
 		tags_read(mutator, value, path);
 	value = toml_get(result.toptab, "pose");
 	if (value.type != TOML_UNKNOWN)
 		poses_read(mutator, value, path);
+	value = toml_get(result.toptab, "death");
+	if (value.type != TOML_UNKNOWN)
+		death_read(mutator, value, path);
+	value = toml_get(result.toptab, "explosion");
+	if (value.type != TOML_UNKNOWN)
+	{
+		/* [explosion]: the decal every explosion leaves, as big as its damage
+		reaches (kept as a tag edit's bytes) */
+		if (value.type != TOML_TABLE || value.u.tab.size != 1 || strcmp(value.u.tab.key[0], "decal") ||
+			value.u.tab.value[0].type != TOML_STRING)
+		{
+			snprintf(reason, sizeof(reason), "line %d: [explosion] has a decal (a decal's name), and nothing else",
+				value.lineno);
+			refuse(mutator, path, reason);
+		}
+		else
+			tag_edit_add(mutator, path, value.lineno, "", value.u.tab.value[0].u.s, "", _tag_edit_explosion, 0.0,
+				NULL, NULL, 0, 0);
+	}
 	if (toml_text(result.toptab, "addon", mutator, path))
 	{
 		/* (the stock mutators have none: their folders are written from
@@ -1676,6 +1984,33 @@ void port_mutators_script_settings(const char *key, port_mutators_setting_proc p
 	}
 }
 
+/* an option's percent: game.mutator_options' "<mutator's id>.<option's id>=<percent>", else its default,
+kept to its least, its most and its steps */
+static long option_value(const struct port_mutator *mutator, const struct port_mutator_option *option)
+{
+	const char *setting = config_string("game.mutator_options");
+	char key[MAXIMUM_MUTATOR_ID_LENGTH + OPTION_ID_LENGTH + 2];
+	size_t length;
+	long value = option->fallback;
+
+	snprintf(key, sizeof(key), "%s.%s=", mutator->id, option->id);
+	length = strlen(key);
+	while (setting && *setting)
+	{
+		while (*setting == ' ' || *setting == ',')
+			setting++;
+		if (!strncmp(setting, key, length))
+		{
+			value = strtol(setting + length, NULL, 10);
+			break;
+		}
+		setting = strchr(setting, ',');
+	}
+	if (value < option->minimum || value > option->maximum)
+		value = option->fallback;
+	return value - (value - option->minimum) % option->step;
+}
+
 long port_mutators_tag_edits(unsigned char *edits, long maximum)
 {
 	long size = 0;
@@ -1696,9 +2031,108 @@ long port_mutators_tag_edits(unsigned char *edits, long maximum)
 			break;
 		}
 		memcpy(edits + size, mutator->tag_edits, (size_t)mutator->tag_edit_size);
+		/* (its options' numbers, at the percents the host has set) */
+		{
+			long scaled;
+
+			for (scaled = 0; scaled < mutator->scaled_edit_count; scaled++)
+			{
+				const struct port_mutator_scaled_edit *edit = &mutator->scaled_edits[scaled];
+
+				edit_number_write(edits + size + edit->offset,
+					edit->number * option_value(mutator, &mutator->options[edit->option]) / 100.0);
+			}
+		}
 		size += mutator->tag_edit_size;
 	}
 	return size;
+}
+
+/* the option at `index` of those of the mutators on, in their order, else NULL */
+static const struct port_mutator_option *option_of_on(long index, const struct port_mutator **of)
+{
+	long mutator_index;
+
+	if (!port_mutators.scans)
+		port_mutators_scan();
+	for (mutator_index = 0; index >= 0 && mutator_index < port_mutators.count; mutator_index++)
+	{
+		const struct port_mutator *mutator = &port_mutators.mutators[mutator_index];
+
+		if (!mutator->on || mutator->refusal[0])
+			continue;
+		if (index < mutator->option_count)
+		{
+			*of = mutator;
+			return &mutator->options[index];
+		}
+		index -= mutator->option_count;
+	}
+	return NULL;
+}
+
+long port_mutators_option_count(void)
+{
+	const struct port_mutator *mutator;
+	long count = 0;
+
+	while (option_of_on(count, &mutator))
+		count++;
+	return count;
+}
+
+int port_mutators_option(long index, char *name, unsigned long size, long *value, long *minimum, long *maximum,
+	long *step)
+{
+	const struct port_mutator *mutator;
+	const struct port_mutator_option *option = option_of_on(index, &mutator);
+
+	if (!option)
+		return 0;
+	if (name && size)
+		snprintf(name, size, "%s", option->name);
+	*value = option_value(mutator, option);
+	*minimum = option->minimum;
+	*maximum = option->maximum;
+	*step = option->step;
+	return 1;
+}
+
+int port_mutators_option_set(long index, long value)
+{
+	const struct port_mutator *mutator;
+	const struct port_mutator_option *option = option_of_on(index, &mutator);
+	const char *setting;
+	char kept[1024] = "";
+	char key[MAXIMUM_MUTATOR_ID_LENGTH + OPTION_ID_LENGTH + 2];
+	size_t length;
+
+	if (!option || value < option->minimum || value > option->maximum || (value - option->minimum) % option->step)
+		return 0;
+	snprintf(key, sizeof(key), "%s.%s=", mutator->id, option->id);
+	length = strlen(key);
+	/* (the setting's other options kept, this one's in place of its own; none at its default) */
+	for (setting = config_string("game.mutator_options"); setting && *setting;)
+	{
+		const char *end;
+		size_t used = strlen(kept);
+
+		while (*setting == ' ' || *setting == ',')
+			setting++;
+		end = strchr(setting, ',');
+		if (!end)
+			end = setting + strlen(setting);
+		if (end > setting && strncmp(setting, key, length))
+			snprintf(kept + used, sizeof(kept) - used, "%s%.*s", used ? "," : "", (int)(end - setting), setting);
+		setting = end;
+	}
+	if (value != option->fallback)
+	{
+		size_t used = strlen(kept);
+
+		snprintf(kept + used, sizeof(kept) - used, "%s%s%ld", used ? "," : "", key, value);
+	}
+	return config_write("game.mutator_options", kept);
 }
 
 /* the mutators on that can be played that have an add-on, in their order */

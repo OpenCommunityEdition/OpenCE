@@ -82,9 +82,9 @@ int main(int argc, char **argv)
 		char *readme;
 
 		CHECK(port_mutators_scan() == 0, "a mutator on with game.mutators empty");
-		CHECK(port_mutators_count() == 3 && find("accurized_ma5b") == 0 && find("big_head") == 1 &&
-			find("revolved_plasma_rifle") == 2, "the stock mutators, by folder");
-		CHECK(file_writes == 4, "the README and the three mutator.toml written (%d)", file_writes);
+		CHECK(port_mutators_count() == 4 && find("accurized_ma5b") == 0 && find("big_head") == 1 &&
+			find("paintball") == 2 && find("revolved_plasma_rifle") == 3, "the stock mutators, by folder");
+		CHECK(file_writes == 5, "the README and the four mutator.toml written (%d)", file_writes);
 		CHECK(written_holds("/data/stock_mutators/big_head/mutator.toml", "node = \"head\"\nscale = 2.5\n") &&
 			written_holds("/data/stock_mutators/accurized_ma5b/mutator.toml", "id = \"accurized_ma5b\"") &&
 			written_holds("/data/stock_mutators/revolved_plasma_rifle/mutator.toml", "group = \"damage_effect\""),
@@ -93,16 +93,17 @@ int main(int argc, char **argv)
 		CHECK(readme && strstr(readme, "copy one of"), "the README");
 		free(readme);
 		port_mutators_scan();
-		CHECK(file_writes == 4, "files that hold the game's written again (%d)", file_writes);
+		CHECK(file_writes == 5, "files that hold the game's written again (%d)", file_writes);
 		/* (written after the README and accurized_ma5b's) */
 		CHECK(!strcmp(files_written[2].path, "/data/stock_mutators/big_head/mutator.toml"), "the order written");
 		strcpy(files_written[2].text, "id = \"changed\"\n[effects.big_head]\nscale = 4\n");
 		port_mutators_scan();
-		CHECK(file_writes == 5 && written_holds(files_written[2].path, "format = 6"), "a changed file not put back");
+		CHECK(file_writes == 6 && written_holds(files_written[2].path, "format = 6"), "a changed file not put back");
 		CHECK(find("changed") == NONE, "a changed file played");
 		CHECK(port_mutators_status(0, text, sizeof(text)) == _port_mutator_fine, "%s", text);
 		CHECK(port_mutators_status(1, text, sizeof(text)) == _port_mutator_fine, "%s", text);
 		CHECK(port_mutators_status(2, text, sizeof(text)) == _port_mutator_fine, "%s", text);
+		CHECK(port_mutators_status(3, text, sizeof(text)) == _port_mutator_fine, "%s", text);
 		CHECK(port_mutators_keys(keys, values, 16) == 0, "keys of a mutator off");
 		strcpy(setting, " Big_Head ");
 		CHECK(port_mutators_scan() == 1 && port_mutators_on(1), "game.mutators's id (any case, spaced)");
@@ -117,7 +118,7 @@ int main(int argc, char **argv)
 	else if (!strcmp(case_name, "stock_unwritable"))
 	{
 		files_unwritable = 1;
-		CHECK(port_mutators_scan() == 0 && port_mutators_count() == 3, "the stock mutators unwritten not played");
+		CHECK(port_mutators_scan() == 0 && port_mutators_count() == 4, "the stock mutators unwritten not played");
 		CHECK(port_mutators_status(0, text, sizeof(text)) == _port_mutator_fine &&
 			port_mutators_status(2, text, sizeof(text)) == _port_mutator_fine, "%s", text);
 		CHECK(logged == 1, "the folder unwritten logged (%d)", logged);
@@ -141,12 +142,12 @@ int main(int argc, char **argv)
 		folder("unknown", "run = \"run()\"\n[effects.big_head]\n");
 		strcpy(setting, "zeta,moon,big_head,copy,range,large,unknown");
 		port_mutators_scan();
-		CHECK(port_mutators_count() == 10, "the folders with a mutator.toml, and the stock mutators (%ld)",
+		CHECK(port_mutators_count() == 11, "the folders with a mutator.toml, and the stock mutators (%ld)",
 			port_mutators_count());
-		CHECK(find("accurized_ma5b") == 0 && find("big_head") == 1 && find("revolved_plasma_rifle") == 2 &&
-			find("moon") == 3 && find("broken") == 4 && find("BIG_HEAD@copy") == 5 && find("large") == 6 &&
-			find("range") == 7 &&
-			find("unknown") == 8 && find("zeta") == 9, "the stock mutators first, then the folders by name");
+		CHECK(find("accurized_ma5b") == 0 && find("big_head") == 1 && find("paintball") == 2 &&
+			find("revolved_plasma_rifle") == 3 && find("moon") == 4 && find("broken") == 5 &&
+			find("BIG_HEAD@copy") == 6 && find("large") == 7 && find("range") == 8 &&
+			find("unknown") == 9 && find("zeta") == 10, "the stock mutators first, then the folders by name");
 		CHECK(reads == 6, "the large file read, or one without mutator.toml (%d)", reads);
 		CHECK(port_mutators_status(find("moon"), text, sizeof(text)) == _port_mutator_unplayable &&
 			strstr(text, "moon_gravity"), "an effect this build lacks: %s", text);
@@ -314,19 +315,19 @@ int main(int argc, char **argv)
 		folder("accurized_ma5b", "[effects.big_head]\nscale = 3\n");
 		folder("at", "id = \"a@b\"\n[effects.big_head]\n");
 		strcpy(setting, "big_head@mine");
-		CHECK(port_mutators_scan() == 1 && port_mutators_count() == 6, "the same mutator again played once (%ld)",
+		CHECK(port_mutators_scan() == 1 && port_mutators_count() == 7, "the same mutator again played once (%ld)",
 			port_mutators_count());
 		CHECK(find("big_head") == 1 && !strcmp(port_mutators.mutators[1].folder, "big_head") &&
 			port_mutators.mutators[1].stock, "the stock mutator kept");
 		text[0] = 0;
-		CHECK(find("big_head@mine") == 5 && port_mutators_on(5) &&
-			port_mutators_status(5, text, sizeof(text)) == _port_mutator_fine, "its folder's name: %s", text);
+		CHECK(find("big_head@mine") == 6 && port_mutators_on(6) &&
+			port_mutators_status(6, text, sizeof(text)) == _port_mutator_fine, "its folder's name: %s", text);
 		CHECK(port_mutators_keys(keys, values, 16) == 2 && values[1] == 4.0, "big_head@mine's keys");
-		CHECK(port_mutators_details(5, text, sizeof(text)) &&
+		CHECK(port_mutators_details(6, text, sizeof(text)) &&
 			strstr(text, "Played as big_head@mine: stock_mutators/big_head has its id, big_head"), "%s", text);
 		/* (its folder's name is the stock one's: its files' SHA-256's first
 		hex digits) */
-		hashed = 3;
+		hashed = 4;
 		CHECK(!strcmp(port_mutators.mutators[hashed].folder, "accurized_ma5b") &&
 			!port_mutators.mutators[hashed].stock, "the order: %s", port_mutators.mutators[hashed].id);
 		snprintf(hashed_id, sizeof(hashed_id), "accurized_ma5b@");
@@ -343,7 +344,7 @@ int main(int argc, char **argv)
 		CHECK(port_mutators_status(find("a@b"), text, sizeof(text)) == _port_mutator_unplayable &&
 			strstr(text, "@"), "an id with an @: %s", text);
 		port_mutators_scan();
-		CHECK(find(hashed_id) == hashed && find("big_head@mine") == 5, "the same ids found again");
+		CHECK(find(hashed_id) == hashed && find("big_head@mine") == 6, "the same ids found again");
 	}
 	else if (!strcmp(case_name, "weapons"))
 	{

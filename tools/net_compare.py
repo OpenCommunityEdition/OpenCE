@@ -188,6 +188,9 @@ def parse_log(path):
             parts = text.split(" | ")
             head = parts[0]
             tick_text, _, players_text = head.partition(" ")
+            # (an add-on's vehicle's line, of the same tick: not a sample)
+            if players_text.startswith("add-on vehicle "):
+                continue
             try:
                 tick = int(tick_text)
                 players = parse_players(" " + players_text)

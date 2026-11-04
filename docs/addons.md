@@ -99,8 +99,8 @@ whether it is placed, on the side whose spawn points are nearest:
 
 | Vehicle set | An add-on's vehicles |
 | --- | --- |
-| DEFAULT, PC | placed |
-| NONE, and the sets of one kind (WARTHOGS, GHOSTS, ...) | left out |
+| DEFAULT, PC, and the sets of one kind (WARTHOGS, GHOSTS, ...), which most stock gametypes have | placed |
+| NONE | left out |
 | CUSTOM | the first two vehicle add-ons of the mutators on have rows of their own, after GUN TURRET (their mutators' names: NONE to 4, 4 at first); the rest are placed |
 
 ### Weapons

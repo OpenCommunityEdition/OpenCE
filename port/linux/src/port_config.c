@@ -565,6 +565,11 @@ static const struct config_setting config_settings[] =
 		"(big_head), separated by commas; empty plays none, the stock game. A\n"
 		"game you join plays its host's. The Mods menu's MUTATORS sets this\n"
 		"(docs/mutators.md)." },
+	{ "game.mutator_options", _config_string, "\"\"", "HALO_MUTATOR_OPTIONS", _environment_value, _platform_all,
+		"The options of the mutators you host or play alone, each a percent:\n"
+		"<mutator's id>.<option's id>=<percent>, separated by commas; one not\n"
+		"here is at its default. Server Setup's MUTATOR SETTINGS sets this\n"
+		"(docs/mutators.md)." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"

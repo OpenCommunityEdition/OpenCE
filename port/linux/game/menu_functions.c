@@ -2650,6 +2650,10 @@ int port_mutators_save(void);
 void port_mutators_revert(void);
 int port_mutators_addon_kind(long index);
 char const *port_mutators_addon_name(long index);
+long port_mutators_option_count(void);
+int port_mutators_option(long index, char *name, unsigned long size, long *value, long *minimum, long *maximum,
+	long *step);
+int port_mutators_option_set(long index, long value);
 /* (below: ui_widget.c's too) */
 long menus_loadout_addon_count(void);
 wchar_t const *menus_loadout_addon_name(long index);
@@ -3142,6 +3146,101 @@ next game */
 static boolean mutators_save(void)
 {
 	port_mutators_save();
+	return TRUE;
+}
+
+/* MUTATOR SETTINGS (MUTATOR OPTIONS' SETTINGS: tools/port_settings.py's
+_mutator_settings): the options of the mutators on, as MUTATOR OPTIONS has
+them turned on, a row each, its name and its percent, which left and right
+step; OK keeps them (game.mutator_options) for the next game the host plays,
+Cancel forgets them */
+#define MUTATOR_SETTING_ROWS 4
+
+static struct
+{
+	short count;
+	long values[MUTATOR_SETTING_ROWS];
+} mutator_settings;
+
+/* "port mutator settings update" (its list's, each frame): the rows */
+static void mutator_settings_show(struct widget_instance *screen)
+{
+	short index;
+
+	for (index = 0; index < MUTATOR_SETTING_ROWS; index++)
+	{
+		char row_name[32];
+		char name[64] = "";
+		char value[16] = "";
+		wchar_t wide[64];
+		struct widget_instance *row;
+		long current, minimum, maximum, step;
+
+		snprintf(row_name, sizeof(row_name), "op_mutator_setting_%d", index + 1);
+		row = named(screen, row_name, 0);
+		if (!row)
+			continue;
+		if (index < mutator_settings.count &&
+			port_mutators_option(index, name, sizeof(name), &current, &minimum, &maximum, &step))
+		{
+			snprintf(value, sizeof(value), "%ld%%", mutator_settings.values[index]);
+		}
+		else if (!index && !mutator_settings.count)
+		{
+			snprintf(name, sizeof(name), "NO MUTATOR ON HAS OPTIONS");
+		}
+		mods_wide_text(name, wide, NUMBEROF(wide));
+		text_set(named(row, "mutator_setting_name", 0), wide);
+		mods_wide_text(value, wide, NUMBEROF(wide));
+		text_set(named(row, "mutator_setting_value", 0), wide);
+	}
+}
+
+/* "port mutator settings init" (its list's created) */
+static boolean mutator_settings_initialize(struct widget_instance *widget)
+{
+	short index;
+
+	mutator_settings.count = (short)MIN(port_mutators_option_count(), MUTATOR_SETTING_ROWS);
+	for (index = 0; index < mutator_settings.count; index++)
+	{
+		long minimum, maximum, step;
+
+		port_mutators_option(index, NULL, 0, &mutator_settings.values[index], &minimum, &maximum, &step);
+	}
+	(void)widget;
+	return TRUE;
+}
+
+/* "port mutator settings left" and "right" (on a row): its percent a step
+down or up, kept to its least and most */
+static boolean mutator_settings_step(struct widget_instance *widget, short direction)
+{
+	struct widget_instance *row = widget;
+	long current, minimum, maximum, step;
+	short index;
+
+	while (row && strncmp(row->name, "op_mutator_setting_", 19))
+		row = row->parent;
+	if (!row)
+		return FALSE;
+	index = (short)(atoi(row->name + 19) - 1);
+	if (index < 0 || index >= mutator_settings.count ||
+		!port_mutators_option(index, NULL, 0, &current, &minimum, &maximum, &step))
+	{
+		return TRUE;
+	}
+	mutator_settings.values[index] = PIN(mutator_settings.values[index] + direction * step, minimum, maximum);
+	return TRUE;
+}
+
+/* "port mutator settings save" (OK) */
+static boolean mutator_settings_save(void)
+{
+	short index;
+
+	for (index = 0; index < mutator_settings.count; index++)
+		port_mutators_option_set(index, mutator_settings.values[index]);
 	return TRUE;
 }
 
@@ -8353,6 +8452,18 @@ boolean pc_menu_event_function_invoke(
 		{
 			return mutators_save();
 		}
+		else if (!strcmp(name, "port mutator settings init"))
+		{
+			return mutator_settings_initialize(widget);
+		}
+		else if (!strcmp(name, "port mutator settings left") || !strcmp(name, "port mutator settings right"))
+		{
+			return mutator_settings_step(widget, (short)(!strcmp(name, "port mutator settings left") ? -1 : 1));
+		}
+		else if (!strcmp(name, "port mutator settings save"))
+		{
+			return mutator_settings_save();
+		}
 		else if (!strcmp(name, "port mods switch"))
 		{
 			return mods_switch(widget);
@@ -8624,6 +8735,8 @@ void pc_menu_game_data_function_invoke(
 		pad_editor_update(widget);
 	else if (!strcmp(name, "port mods update"))
 		mods_update(widget);
+	else if (!strcmp(name, "port mutator settings update"))
+		mutator_settings_show(widget);
 	else if (!strcmp(name, "color picker update"))
 		color_list_update(widget);
 	else if (!strcmp(name, "3wide player profile list update"))

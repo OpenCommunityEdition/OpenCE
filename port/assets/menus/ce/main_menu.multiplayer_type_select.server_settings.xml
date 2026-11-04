@@ -821,12 +821,78 @@
 	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details_text" type="text" controller="1" left="412" top="130" width="200" height="272" font="ui\small_ui" color="#FF2896FF">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/button_settings" x="256" y="1"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/button_ok" x="384" y="1"/>
 		<child widget="common_button_cancel" x="512" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/button_settings" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="SETTINGS" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" open="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_screen"/>
+		<on event="start" open="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port mutators save" back="true"/>
 		<on event="start" run="port mutators save" back="true"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_menu"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_help" type="text" controller="1" left="68" top="341" width="482" height="79" string_list="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/cap_mutator_settings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_help">
+		<data input="port mutator settings update"/>
+		<on event="created" run="port mutator settings init"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_1" x="54" y="73"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_2" x="54" y="103"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_3" x="54" y="133"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_4" x="54" y="163"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mutator settings save" back="true"/>
+		<on event="start" run="port mutator settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_1" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port mutator settings left"/>
+		<on event="right" run="port mutator settings right"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" x="286"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_2" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port mutator settings left"/>
+		<on event="right" run="port mutator settings right"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" x="286"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_3" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port mutator settings left"/>
+		<on event="right" run="port mutator settings right"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" x="286"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_4" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port mutator settings left"/>
+		<on event="right" run="port mutator settings right"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" x="286"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name" type="text" controller="1" width="286" height="22" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" type="text" controller="1" width="206" height="22" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" text_flags="no_focus_test">
+	</widget>
+	<strings name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/cap_mutator_settings">
+		<string text="The options of the mutators on, for the games\nyou host. Left and right change one."/>
+	</strings>
 </menus>

@@ -99,6 +99,20 @@ def test_no_drift_figures_is_a_problem(tmp_path):
     assert any("drift" in problem for problem in judge(host, client)["problems"])
 
 
+def test_add_on_vehicle_lines_are_not_samples(tmp_path):
+    """the network test's line for each add-on's vehicle, of the same tick as the players', starts no new game"""
+    host, client = write_logs(tmp_path)
+    for log in (host, client):
+        log.write_text("".join(text + f"halo-linux: network test: tick {text.split('tick ')[1].split(' ')[0]} add-on "
+                               "vehicle e2730004 at (35.986 -98.147 1.334) speed 0.000 riders 0 vitality 0.00\n"
+                               if "network test: tick" in text else text
+                               for text in log.read_text().splitlines(True)))
+    samples, _, errors = net_compare.parse_log(host)
+    assert len(samples) == 40 and not errors
+    result = judge(host, client)
+    assert not result["problems"] and not result["divergences"]
+
+
 # ---------- the exit status, the tolerances, the copies' folders and processes
 
 

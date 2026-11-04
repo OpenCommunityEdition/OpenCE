@@ -7837,17 +7837,18 @@ boolean game_engine_vehicle_placement_allowed(
 		return TRUE;
 	definition_index = TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
 		struct scenario_object_palette_entry)->reference.index;
-	/* an add-on's vehicle: placed by the sets of every kind (default, PC),
-	counted by a custom one (the first add-ons' only: the rest as placed),
-	and left out by none and those of one kind */
+	/* an add-on's vehicle: placed by every set but none (those of one kind
+	too, as the stock gametypes' are: a mutator that adds a vehicle is on
+	to play it), and counted by a custom one (the first add-ons' only: the
+	rest as placed) */
 	if (addons_vehicle(definition_index))
 	{
 		short slot = addons_vehicle_slot(definition_index);
 
-		if (set == _game_engine_vehicles_default)
-			return TRUE;
-		if (set != VARIANT_VEHICLE_SET_CUSTOM)
+		if (set == _game_engine_vehicles_none)
 			return FALSE;
+		if (set != VARIANT_VEHICLE_SET_CUSTOM)
+			return TRUE;
 		if (!VALID_INDEX(slot, MAXIMUM_VARIANT_ADDON_VEHICLES))
 			return TRUE;
 		if (game_engine_addon_vehicles_placed[side][slot] >=

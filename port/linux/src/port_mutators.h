@@ -76,6 +76,12 @@ long port_mutators_places(struct port_mutator_place *places, long maximum);
 long port_mutators_count(void);
 const char *port_mutators_name(long index);
 int port_mutators_on(long index);
+/* the options ([[option]]) of the mutators on, in their order, each a percent the host sets (MUTATOR
+SETTINGS): its name, value, least, most and step; and one set (game.mutator_options) */
+long port_mutators_option_count(void);
+int port_mutators_option(long index, char *name, unsigned long size, long *value, long *minimum, long *maximum,
+	long *step);
+int port_mutators_option_set(long index, long value);
 /* what is wrong with a mutator, and a line saying so into text (else empty) */
 int port_mutators_status(long index, char *text, unsigned long size);
 /* what its mutator.toml says of a mutator, a line each (its version,

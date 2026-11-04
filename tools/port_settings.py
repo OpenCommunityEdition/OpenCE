@@ -1726,6 +1726,9 @@ SETUP_OPTIONS_PLACE = 7
 TITLES.update({f"{MT}/server_settings/{key}/header_{key}": title
                for key, title, _, _ in [*COOP_SETUP_SCREENS, MAP_SHARE_SETUP]})
 TITLES[f"{MT}/server_settings/mutator_options/header_mutator_options"] = "MUTATOR OPTIONS"
+TITLES[f"{MT}/server_settings/mutator_options/mutator_settings/header_mutator_settings"] = "MUTATOR SETTINGS"
+# MUTATOR SETTINGS' rows (menu_functions.c's MUTATOR_SETTING_ROWS)
+MUTATOR_SETTING_ROWS = 4
 
 
 def _mutator_options(base: str) -> list:
@@ -1734,10 +1737,63 @@ def _mutator_options(base: str) -> list:
     with A; OK keeps them (game.mutators), which the game started next plays,
     and Cancel forgets them (menu_functions.c's "port mutators init" and
     "port mutators save")"""
+    target = f"{base}/mutator_settings/mutator_settings_screen"
     lines = _mod_list(base, "mutator_options_screen", "header_mutator_options", "port mutators init",
-                      [(f"{base}/button_ok", 384)])
+                      [(f"{base}/button_settings", 256), (f"{base}/button_ok", 384)])
+    lines += _text_button(f"{base}/button_settings", "SETTINGS", [f'<on event="a" open="{target}"/>',
+                                                                  f'<on event="start" open="{target}"/>'])
     lines += _button(f"{base}/button_ok", 1, ['<on event="a" run="port mutators save" back="true"/>',
                                               '<on event="start" run="port mutators save" back="true"/>'])
+    return lines + _mutator_settings(f"{base}/mutator_settings")
+
+
+def _mutator_settings(base: str) -> list:
+    """MUTATOR OPTIONS' SETTINGS: the options of the mutators MUTATOR OPTIONS
+    has on, a row each, its name and its percent, which left and right step
+    (menu_functions.c's "port mutator settings init", "... left", "... right");
+    OK keeps them (game.mutator_options, "port mutator settings save"), Cancel
+    forgets them"""
+    key = "mutator_settings"
+    lines = _widget(f"{base}/{key}_screen", [("width", 640), ("height", 480),
+                                            ("flags", "pass_unhandled_to_focused_child"),
+                                            ("bitmap", "bitmaps/gradient")],
+                    ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
+                     f'<child widget="{base}/header_{key}"/>', f'<child widget="{base}/{key}_menu"/>'])
+    lines += _header(f"{base}/header_{key}", f"{base}/header_{key}")
+    lines += _widget(f"{base}/{key}_help", [("type", "text"), ("controller", 1), ("left", 68), ("top", 341),
+                                           ("width", 482), ("height", 79), ("string_list", f"{base}/cap_{key}"),
+                                           ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
+    children = ['<data input="port mutator settings update"/>',
+                '<on event="created" run="port mutator settings init"/>']
+    children += [f'<child widget="{base}/op_mutator_setting_{index + 1}" x="54" y="{73 + 30 * index}"/>'
+                 for index in range(MUTATOR_SETTING_ROWS)]
+    children.append(f'<child widget="{base}/{key}_button_bar" y="414"/>')
+    lines += _widget(f"{base}/{key}_menu", [("type", "column_list"), ("width", 640), ("height", 480),
+                                           ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                                           ("description", f"{base}/{key}_help")], children)
+    lines += _widget(f"{base}/{key}_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
+                                                 ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
+                     ['<data input="common button bar update"/>', f'<child widget="{base}/{key}_button_ok" x="380" y="1"/>',
+                      '<child widget="common_button_cancel" x="510" y="1"/>'])
+    lines += _button(f"{base}/{key}_button_ok", 1, ['<on event="a" run="port mutator settings save" back="true"/>',
+                                                     '<on event="start" run="port mutator settings save" back="true"/>'])
+    for index in range(MUTATOR_SETTING_ROWS):
+        lines += _widget(f"{base}/op_mutator_setting_{index + 1}", [("width", 512), ("height", 28),
+                                                         ("flags", "pass_unhandled_to_focused_child"),
+                                                         ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         ['<on event="left" run="port mutator settings left"/>',
+                          '<on event="right" run="port mutator settings right"/>',
+                          f'<child widget="{base}/mutator_setting_name"/>',
+                          f'<child widget="{base}/mutator_setting_value" x="286"/>'])
+    lines += _widget(f"{base}/mutator_setting_name", [("type", "text"), ("controller", 1), ("width", 286),
+                                                      ("height", 22), ("font", "ui\\large_ui"),
+                                                      ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+    lines += _widget(f"{base}/mutator_setting_value", [("type", "text"), ("controller", 1), ("width", 206),
+                                                       ("height", 22), ("font", "ui\\large_ui"),
+                                                       ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
+                                                       ("text_flags", "no_focus_test")], [])
+    lines += _strings(f"{base}/cap_{key}", ["The options of the mutators on, for the games\\nyou host. Left and right "
+                                            "change one."])
     return lines
 # (the rows of a co-op options screen in one place, the one shown: PER
 # PLAYER's and MULTIPLIER's, by EXTRA ENEMIES')
