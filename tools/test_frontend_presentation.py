@@ -160,6 +160,7 @@ def test_detached_help_retains_viewport_clip(tmp_path):
     run_c(tmp_path, r'''
 #include <assert.h>
 #include <string.h>
+#include <wchar.h>
 typedef int boolean;
 typedef struct {short x0,y0,x1,y1;} rectangle2d;
 struct ui_widget_definition {rectangle2d bounds,list_footer_bounds;struct {long index;}text_font;};

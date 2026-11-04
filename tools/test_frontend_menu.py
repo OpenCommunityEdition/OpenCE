@@ -380,7 +380,15 @@ def test_generated_assets_routes_and_platform_filter(tmp_path):
     frontend_menu.generate(tmp_path)
     frontend_menu.generate(tmp_path)
     for path in (tmp_path / 'modern').iterdir():
-        assert path.read_bytes() == (menus / 'modern' / path.name).read_bytes()
+        expected = menus / 'modern' / path.name
+        if path.suffix == '.png':
+            # PNG compression differs between the runner's Pillow/zlib builds;
+            # compare the artwork, not its container encoding.
+            with frontend_menu.Image.open(path) as actual, frontend_menu.Image.open(expected) as reference:
+                assert actual.size == reference.size, path.name
+                assert actual.convert('RGBA').tobytes() == reference.convert('RGBA').tobytes(), path.name
+        else:
+            assert path.read_text() == expected.read_text(), path.name
     manifest = json.loads((menus / 'menus.json').read_text())['files']
     doc = ET.parse(menus / 'modern/settings.xml').getroot()
     widgets = {node.get('name'): node for node in doc.findall('widget')}
