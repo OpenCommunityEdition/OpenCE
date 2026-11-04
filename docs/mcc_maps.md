@@ -81,6 +81,26 @@ complete map/required resource contents must match the host. Optional
 `.txt` descriptions remain beside the corresponding level. No manifest is
 required.
 
+A package from the Steam Workshop can say which item it is, so a joiner who
+cannot match the host's map is told what to do. The item is the package folder
+when Steam's own name (the item id, all digits) is kept, or a `workshop_id.txt`
+in the folder: the id on the first line and, optionally, the title on the
+second. The host sends the id and title in the map name's reserved tail
+(`mcc_workshop.c`). MCC protocol 64 versions this extension without changing
+the settings record's size; older MCC peers are refused. Xbox/CE retain
+OpenCE protocol 41. See the [wire contract](../port/linux/NETCODE.md#gulchce-crossplay-boundary).
+
+The item is advisory: the level filename and content fingerprint still decide
+admission. A known local item is recognized even if its older package lacks
+the requested level. A matching filename without an item id does not prove
+the item is installed. The refusal distinguishes an identified package that
+does not match from a package that cannot be identified locally. Both messages
+name the item and tell the player to copy the host's matching map and required
+resources into `mcc_maps`; a map with no item id gets the fingerprint text,
+naming the level file. A mismatch does not establish which player's copy is
+newer. This does not discover Steam libraries or synchronize manually copied
+packages; those require separate Workshop catalog integration.
+
 The two MCC categories show package folders first (alphabetically, in brackets),
 then loose maps. Open a folder to choose one of its levels; the rows omit the
 repeated package suffix, while the selected map's details retain its identity.

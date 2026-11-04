@@ -73,6 +73,7 @@ def test_session_resolution_and_validation(tmp_path):
 #include "cseries.h"
 #include "mcc_identity.h"
 #include "mcc_precache.h"
+#include "mcc_workshop.h"
 #include "networking/network_game_manager.h"
 #include <string.h>
 #include <stdio.h>
@@ -84,7 +85,8 @@ static int count,probes,errors,connection,changing,denied,clears,hash_loads;
 int csstrcasecmp(char const *a,char const *b){while(*a && tolower(*a)==tolower(*b)){a++;b++;}return tolower(*a)-tolower(*b);}
 int game_connection(void){return connection;}
 void error(short level,char const *format,...){(void)level;(void)format;}
-void display_error_text_when_main_menu_loaded(wchar_t const *text){(void)text;errors++;}
+static char last_error[256];
+void display_error_text_when_main_menu_loaded(wchar_t const *text){int k;errors++;for(k=0;text[k] && k<255;k++)last_error[k]=(char)text[k];last_error[k]=0;}
 void mcc_cache_validation_clear(void) {}
 void mcc_validation_cancel(void) {}
 void mcc_cache_precache_clear(void){clears++;}
@@ -173,23 +175,79 @@ int main(void){
  strcpy(game.map.name,"mcc_maps\\Host\\a10");memcpy(game.mcc_content_sha256,wanted,32);count=17;
  for(i=0;i<count;i++)sprintf(files[i].name,"mcc_maps\\folder%d\\a10",i);
  old=probes;CHECK(!mcc_identity_accept(&game));CHECK(probes==old+1);
- CHECK(errors && clears);return 0;
+ CHECK(errors && clears);
+ /* Filename equality does not prove item presence; a known older item may
+  * not contain the host's newly added level at all. */
+ {
+  struct mcc_workshop_item item;
+  memset(game.map.name,0,sizeof(game.map.name));strcpy(game.map.name,"mcc_maps\\2899609719\\pat_beavercreek");
+  strcpy(item.id,"2899609719");strcpy(item.title,"Better Creek");mcc_workshop_wire_pack(game.map.name,&item);
+  count=1;strcpy(files[0].name,"mcc_maps\\Other\\pat_beavercreek");memset(files[0].digest,9,32);
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(strstr(last_error,"No identified local copy of Better Creek (Steam Workshop item 2899609719)"));
+  strcpy(files[0].name,"mcc_maps\\2899609719\\older_level");
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(strstr(last_error,"Your local package for Better Creek (Steam Workshop item 2899609719) does not match"));
+  strcpy(files[0].name,"mcc_maps\\12345\\pat_beavercreek");
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(strstr(last_error,"No identified local copy"));
+  strcpy(files[0].name,"mcc_maps\\2899609719\\pat_beavercreek");
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(strstr(last_error,"Your local package for Better Creek"));
+  /* Item IDs never override content admission in either direction. */
+  strcpy(files[0].name,"mcc_maps\\12345\\pat_beavercreek");
+  memcpy(files[0].digest,wanted,32);CHECK(mcc_identity_accept(&game));
+  memset(files[0].digest,9,32);
+  count=1;strcpy(files[0].name,"mcc_maps\\Other\\a10");
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(strstr(last_error,"No identified local copy") && strstr(last_error,"mcc_maps"));
+  memset(game.map.name+64,0,64);
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(strstr(last_error,"pat_beavercreek.map") && strstr(last_error,"SHA-256"));
+  /* Host preparation populates only the outgoing copy. Disconnect and
+   * transitions cannot reuse an MCC host identity for another map family. */
+  mcc_identity_disconnect();
+  memset(&game,0,sizeof(game));game.map.version=123;
+  strcpy(game.map.name,"mcc_maps\\2899609719\\pat_beavercreek");
+  strcpy(files[0].name,game.map.name);memcpy(files[0].digest,wanted,32);
+  CHECK(mcc_identity_prepare_host(game.map.name));
+  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy)==&copy);
+  CHECK(mcc_workshop_wire_unpack(copy.map.name,&item) && !strcmp(item.id,"2899609719"));
+  CHECK(!strcmp(item.title,"Pat Beavercreek") && !game.map.name[64]);
+  CHECK(!memcmp(copy.mcc_content_sha256,wanted,32));
+  mcc_identity_disconnect();CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));
+  CHECK(mcc_identity_prepare_host(game.map.name));
+  memset(&game,0,sizeof(game));strcpy(game.map.name,"custom_maps\\bloodgulch");
+  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy)==&copy);
+  CHECK(!memcmp(&game,&copy,sizeof(game)) && mcc_identity_accept(&copy));
+  strcpy(game.map.name,files[0].name);
+  CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));
+  CHECK(mcc_identity_prepare_host(game.map.name));
+  memset(&game,0,sizeof(game));strcpy(game.map.name,"levels\\test\\bloodgulch\\bloodgulch");
+  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy)==&copy);
+  CHECK(!memcmp(&game,&copy,sizeof(game)) && mcc_identity_accept(&copy));
+ }
+ return 0;
 }
 ''')
     exe = compile_tool(tmp_path, [source, ROOT / "port/linux/game/mcc_identity.c",
-                                  ROOT / "port/linux/game/mcc_package.c"])
+                                  ROOT / "port/linux/game/mcc_package.c",
+                                  ROOT / "port/linux/game/mcc_workshop.c"])
     result = subprocess.run([str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 
 def test_fingerprint_settings_keep_host_and_fragment_checks(tmp_path):
     native = (ROOT / "source/networking/network_client_message_handler.c").read_text()
+    (tmp_path / "cseries.h").write_text(
+        "#include <stddef.h>\ntypedef int boolean;\ntypedef unsigned char byte;\n")
     source = tmp_path / "settings.c"
     source.write_text('#include "'+(ROOT / "port/linux/include/halo_port_limits.h").as_posix()+'"\n'+r'''
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdio.h>
+#include "mcc_workshop.h"
 typedef int boolean;typedef unsigned char byte;typedef uint16_t word;
 #define TRUE 1
 #define FALSE 0
@@ -221,7 +279,11 @@ static boolean decode_network_game_message(void *out,word *m,short *size,short *
         function(native, "network_game_client_handle_message_server_game_settings_update") + r'''
 int main(void){
  struct network_game_client c;struct transport_address address={0};word packet[4]={0};
- struct network_game original;unsigned offset,n;memset(&original,42,sizeof(original));
+ struct network_game original;struct mcc_workshop_item item,back;unsigned offset,n;
+ memset(&original,42,sizeof(original));
+ strcpy((char *)original.previous,"mcc_maps\\2899609719\\pat_beavercreek");
+ strcpy(item.id,"2899609719");strcpy(item.title,"Better Creek");
+ mcc_workshop_wire_pack((char *)original.previous,&item);
  memset(&decoded,0,sizeof(decoded));decoded.total_size=sizeof(original);
  CHECK(network_game_client_handle_message_server_game_settings_update(&c,packet,8,&address));
  CHECK(!decodes && !applies);address.host=1;
@@ -232,6 +294,8 @@ int main(void){
   CHECK(applies==(offset+n==sizeof(original)));
  }
  CHECK(!memcmp(&received,&original,sizeof(original)));
+ CHECK(mcc_workshop_wire_unpack((char const *)received.previous,&back));
+ CHECK(!strcmp(back.id,item.id) && !strcmp(back.title,item.title));
  decoded.total_size-=32;CHECK(!network_game_client_receive_game_settings_piece(&c,&decoded));
  decoded.total_size=sizeof(original);decoded.offset=sizeof(original)-1;decoded.length=2;
  CHECK(!network_game_client_receive_game_settings_piece(&c,&decoded));
@@ -243,6 +307,7 @@ int main(void){
  CHECK(applies==1);return 0;
 }
 ''')
-    exe = compile_tool(tmp_path, [source])
+    exe = compile_tool(tmp_path, [source, ROOT / "port/linux/game/mcc_workshop.c",
+                                 ROOT / "port/linux/game/mcc_package.c"])
     result = subprocess.run([str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

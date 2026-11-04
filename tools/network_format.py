@@ -140,6 +140,9 @@ def items():
     protocol = (ROOT / "port/linux/game/mcc_protocol.h").read_text()
     for name, value in re.findall(r"^#define (MCC_PROTOCOL_\w+) ([^\n]+)", protocol, re.M):
         add(f"define {name}", value)
+    workshop = (ROOT / "port/linux/game/mcc_workshop.h").read_text()
+    for name, value in re.findall(r"^#define (MCC_WORKSHOP_WIRE_\w+) ([^\n]+)", workshop, re.M):
+        add(f"define {name}", value)
     camera = (ROOT / "port/linux/game/third_person_protocol.h").read_text()
     for name, value in re.findall(r"^#define (THIRD_PERSON_PROTOCOL_\w+) ([^\n]+)", camera, re.M):
         add(f"define {name}", value)
