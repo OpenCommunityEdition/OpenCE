@@ -48,14 +48,22 @@ red = 1
 green = 0
 blue = 0.1
 
-# every projectile, an add-on's too: 450 feet a second, the drop, and a hit on
-# anything a spray of paint and its splotch (the assault rifle's hit on a grunt)
+# every projectile a weapon fires, an add-on's too (not one a vehicle throws out by
+# itself, as the Falcon's rotors do, nor a grenade, which a unit throws): a ball
+# (the plasma grenade), 450 feet a second, the drop, and a hit on anything a spray
+# of paint and its splotch (the assault rifle's hit on a grunt). It flies until it
+# hits something (a range of 1000): one with no range and no timer (the Warthog's
+# gun's) would vanish past its damage's reach once it no longer slows, as paint
+# does not
 [[tags]]
 group = "projectile"
 tag = '*'
+where = { fired = true }
+maximum_range = 1000
 initial_velocity = { value = 45, option = "speed" }
 final_velocity = { value = 45, option = "speed" }
 air_gravity_scale = { value = 1.5, option = "drop" }
+model = 'weapons\plasma grenade\plasma grenade'
 [tags.material_responses.all]
 default_effect = 'weapons\assault rifle\effects\impact grunt'
 potential_effect = 'weapons\assault rifle\effects\impact grunt'

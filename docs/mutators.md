@@ -190,6 +190,11 @@ where = { type = ["scratch", "splatter", "burn"] }   # not the map's painted sig
 framebuffer_blend_function = "add"
 ```
 
+Of projectiles, `where = { fired = true }` edits only those a weapon's trigger
+fires (an add-on weapon's or vehicle's too): not a grenade, which a unit
+throws, nor one a vehicle or an effect throws out by itself (the Falcon's
+rotor wash).
+
 A magazine's `rounds_total_initial` is the rounds a weapon is made with, loaded
 and in reserve (`rounds_loaded_maximum` of them loaded), and
 `rounds_total_maximum` the most it carries in reserve. A weapon placed in a
@@ -260,13 +265,17 @@ stock.
 ### Paintball
 
 GoldenEye's paintball mode, from the maps' own tags. Every weapon's
-projectile, an add-on weapon's too (`tag = '*'`: 450 feet a second), flies at
+projectile, an add-on weapon's too (`tag = '*'`, `where = { fired = true }`: 450
+feet a second), is drawn
+as a ball (the plasma grenade's model) and flies at
 350 to 600 feet a second (at 10 feet a world unit: the
 shotgun's pellets, rockets, the charged plasma bolt and the tank's shell 350,
 needles and the plasma pistol's bolts 400, the assault rifle's bullets, the
 plasma rifle's and the Ghost's bolts 450, the pistol's, the Warthog's and the
 Scorpion's guns' 500, the sniper rifle's 600), with one and a half times the
-world's gravity. Its hit on any material plays its weapon's hit on a grunt,
+world's gravity, until it hits something (a range of 1000 world units: one
+with no range and no timer, such as the Warthog's gun's, would vanish once
+past its damage's reach, as it no longer slows). Its hit on any material plays its weapon's hit on a grunt,
 whose splat (the grunt's blood decal) is drawn with the hunter's glowing
 splat, added to what is behind it, in a colour of any hue: a bright splotch
 in place of a bullet hole and its flash. Every other mark (bullet holes,

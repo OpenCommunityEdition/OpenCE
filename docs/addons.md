@@ -218,7 +218,9 @@ is read:
 4. The add-on's tags join the map's table after its own, in the order of
    the mutators on, so every machine with the same add-ons gives them the
    same indices. A tag of the add-on's whose group and name the map has is
-   the map's: the game finds a reference's tag by its name.
+   the map's, and one an earlier add-on has is that add-on's (two built from
+   Custom Edition maps can carry the same HUD bitmap): the game finds a
+   reference's tag by its name.
 5. Its tags are walked through their groups' schemas (`tag_walk.c`), and
    each reference and tag index is given its tag's index in the table (an
    import field the map's tag; a field the file names that is not a

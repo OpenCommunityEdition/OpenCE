@@ -50,6 +50,8 @@ def generated(fault=None):
     if fault == 'every':
         tags = mutated(tags, '\t\tif (mutator_tags_make_elements(edit, tag_index, reason, size))\n\t\t\tmade++;',
                        '\t\tif (mutator_tags_make_elements(edit, tag_index, reason, size))\n\t\t{\n\t\t\tmade++;\n\t\t\tbreak;\n\t\t}')
+    if fault == 'fired':
+        tags = mutated(tags, '\t\tif (!where && names && !mutator_tags_fired(tag_index))\n\t\t\tcontinue;\n', '')
     if fault == 'all':
         tags = mutated(tags, 'for (index = 0; mutator_tags_path_each(edit->path, index, path, sizeof(path)); index++)',
                        'for (index = 0; index < 1 && mutator_tags_path_each(edit->path, index, path, sizeof(path)); index++)')
@@ -91,7 +93,8 @@ def test_case(case):
                                         ('stock_first', 'stock'), ('pose_range', 'pose'),
                                         ('pose_clear', 'pose'), ('death_clear', 'paintball'),
                                         ('all', 'paintball'), ('scaled', 'paintball'), ('extremes', 'paintball'),
-                                        ('where', 'paintball'), ('every', 'paintball')])
+                                        ('where', 'paintball'), ('every', 'paintball'),
+                                        ('fired', 'paintball')])
 def test_negative(fault, case):
     status, output = run(build('mutator_tags', generated(fault)), case)
     assert status == CHECK_FAILED, output

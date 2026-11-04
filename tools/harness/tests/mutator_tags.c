@@ -80,6 +80,7 @@ struct weapon_trigger_definition
 	real runtime_rate_of_fire_deceleration_time;
 	real runtime_error_acceleration_time;
 	real runtime_error_deceleration_time;
+	struct tag_reference projectile;
 };
 struct weapon_definition
 {
@@ -360,6 +361,9 @@ static void world(void)
 	triggers[0].projectile_error_angle_lower_bound = 0.0349066f;
 	triggers[0].projectile_error_angle_upper_bound = 0.113446f;
 	triggers[0].rounds_between_tracers = 3;
+	/* (the rifle fires its bullet; the plasma rifle, here, nothing) */
+	triggers[0].projectile.index = TAG_INDEX(_tag_bullet);
+	triggers[1].projectile.index = NONE;
 	rifle.weapon.zoom_magnification_minimum = 1.f;
 	rifle.weapon.zoom_in_sound.index = NONE;
 	rifle.weapon.zoom_out_sound.index = NONE;
@@ -417,6 +421,7 @@ static void world(void)
 	plasma.weapon.triggers.count = 1;
 	plasma.weapon.triggers.address = plasma_triggers;
 	plasma_triggers[0].error_acceleration_time = 2.5f;
+	plasma_triggers[0].projectile.index = NONE;
 	plasma_triggers[0].runtime_error_acceleration_time = 1.f / 75.f;
 	plasma_triggers[0].runtime_error_deceleration_time = 1.f;
 	plasma_triggers[0].projectile_error_angle_lower_bound = 0.01f;
@@ -914,6 +919,8 @@ int main(int argc, char **argv)
 			{ "whereof", "[[tags]]\ngroup = \"decal\"\ntag = 'x'\nwhere = { type = [\"burn\"] }\nradius_lower_bound = 1\n",
 				"of tag = '*'" },
 			{ "boom", "[explosion]\ndecal = 'x'\nsize = 2\n", "[explosion] has a decal" },
+			{ "firedecal", "[[tags]]\ngroup = \"decal\"\ntag = '*'\nwhere = { fired = true }\nradius_lower_bound = 1\n",
+				"of projectiles" },
 		};
 
 		folder("paint", "format = 7\n"
@@ -925,7 +932,9 @@ int main(int argc, char **argv)
 			"[[tags]]\ngroup = \"projectile\"\ntag = 'weapons\\assault rifle\\bullet'\n"
 			"initial_velocity = { value = 45, option = \"speed\" }\n"
 			"[tags.material_responses.all]\ndefault_effect = 'weapons\\assault rifle\\effects\\impact grunt'\n"
-			"[[tags]]\ngroup = \"projectile\"\ntag = '*'\nmodel = 'powerups\\active camoflage\\active camoflage'\n"
+			"[[tags]]\ngroup = \"projectile\"\ntag = '*'\nwhere = { fired = true }\n"
+			"model = 'powerups\\active camoflage\\active camoflage'\n"
+			"[[tags]]\ngroup = \"projectile\"\ntag = '*'\nmaximum_range = 500\n"
 			"[explosion]\ndecal = 'effects\\decals\\blood splats\\blood grunt splat'\n"
 			"[death]\nobjects = \"biped\"\neffect = 'effects\\coop teleport'\nbody = \"vanish\"\n");
 		size = edits_of("paint", edits, sizeof(edits));
@@ -935,9 +944,12 @@ int main(int argc, char **argv)
 			splat.color_upper_bound.blue == 0.5f && splat.radius_upper_bound == 0.2f, "the splat's edits");
 		/* (every decal of the types where names: not the map's painted sign) */
 		CHECK(sign.framebuffer_blend_function == 1 && sign.map.index == NONE, "a painted sign edited");
-		/* (every projectile: both of the map's) */
-		CHECK(bullet.object.model.index == TAG_INDEX(_tag_ball) && bolt.object.model.index == TAG_INDEX(_tag_ball),
-			"every projectile's model");
+		/* (every projectile a weapon fires: the rifle's bullet, not the bolt
+		no trigger here fires) */
+		CHECK(bullet.object.model.index == TAG_INDEX(_tag_ball) && bolt.object.model.index == NONE,
+			"the fired projectiles' model");
+		CHECK(bullet.projectile.maximum_range == 500.f && bolt.projectile.maximum_range == 500.f,
+			"every projectile's range");
 		CHECK(explosion_decal_index == TAG_INDEX(_tag_splat) && explosion_decal_radius == 0.2f,
 			"the explosion's decal, and its radius");
 		/* (every element the block has: an "all") */

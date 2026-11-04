@@ -103,9 +103,11 @@ enum
 };
 
 /* a tag edit's tag that is every tag of its group, and what follows it
-for those of them whose enum field has one of the values ("*?type=scratch,burn") */
+for those of them whose enum field has one of the values ("*?type=scratch,burn"),
+or, of projectiles, those a weapon's trigger fires ("*?fired") */
 #define MUTATOR_TAG_EVERY "*"
 #define MUTATOR_TAG_WHERE "*?"
+#define MUTATOR_TAG_WHERE_FIRED "fired"
 
 enum
 {
@@ -864,6 +866,31 @@ static boolean mutator_tags_death_valid(struct mutator_tag_edit const *edit, cha
 	return TRUE;
 }
 
+/* whether a weapon's trigger fires the projectile (a where of "fired") */
+static boolean mutator_tags_fired(long projectile_index)
+{
+	struct tag_iterator iterator;
+	long weapon_index;
+
+	tag_iterator_new(&iterator, WEAPON_DEFINITION_TAG);
+	while ((weapon_index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct weapon_definition const *weapon = (struct weapon_definition const *)tag_get(WEAPON_DEFINITION_TAG,
+			weapon_index);
+		long trigger;
+
+		for (trigger = 0; trigger < weapon->weapon.triggers.count; trigger++)
+		{
+			if (((struct weapon_trigger_definition const *)weapon->weapon.triggers.address)[trigger].projectile.index ==
+				projectile_index)
+			{
+				return TRUE;
+			}
+		}
+	}
+	return FALSE;
+}
+
 /* an edit's "*?<field>=<names>": the enum field it is of each tag, and the
 names after the = (FALSE, said into reason, if the field is not an enum or
 a name not its); TRUE with no field for a tag that is not one */
@@ -875,9 +902,21 @@ static boolean mutator_tags_where(struct mutator_tag_definition const *definitio
 	unsigned long bits;
 
 	*field = NULL;
+	*names = NULL;
 	if (strncmp(tag, MUTATOR_TAG_WHERE, strlen(MUTATOR_TAG_WHERE)))
 		return TRUE;
 	tag += strlen(MUTATOR_TAG_WHERE);
+	/* (projectiles a weapon fires: no field, and the names the word) */
+	if (!strcmp(tag, MUTATOR_TAG_WHERE_FIRED))
+	{
+		if (definition->group_tag != PROJECTILE_DEFINITION_TAG)
+		{
+			snprintf(reason, size, "a where of fired is of projectiles");
+			return FALSE;
+		}
+		*names = tag;
+		return TRUE;
+	}
 	equals = strchr(tag, '=');
 	if (!equals || equals == tag || (size_t)(equals - tag) >= sizeof(path))
 	{
@@ -1112,6 +1151,8 @@ static boolean mutator_tags_make(struct mutator_tag_edit const *edit, char *reas
 	tag_iterator_new(&iterator, definition->group_tag);
 	while ((tag_index = tag_iterator_next(&iterator)) != NONE)
 	{
+		if (!where && names && !mutator_tags_fired(tag_index))
+			continue;
 		if (where)
 		{
 			short value = *(short const *)((byte const *)tag_get(definition->group_tag, tag_index) + where->offset);

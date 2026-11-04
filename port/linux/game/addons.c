@@ -404,6 +404,34 @@ static long map_tag_find(
 	return NONE;
 }
 
+/* an earlier add-on's own tag of the group and name (not one it took from
+the map or another), else NONE */
+static long addon_earlier_tag_find(
+	struct addon const *before,
+	long group_tag,
+	char const *name)
+{
+	struct addon const *addon;
+
+	for (addon = addons_globals.addons; addon < before; addon++)
+	{
+		long index;
+
+		for (index = 0; index < addon->tag_count; index++)
+		{
+			struct addon_tag_instance const *instance = &addon->tag_header->instances[index];
+
+			if (instance->group_tag == group_tag && !_stricmp(instance->name, name) &&
+				DATUM_INDEX_TO_ABSOLUTE_INDEX(addon->handles[index]) == addon->first_index + index)
+			{
+				return addon->handles[index];
+			}
+		}
+	}
+
+	return NONE;
+}
+
 /* the add-on's file read and its sections checked: FALSE (said) if it
 cannot be played */
 static boolean addon_file_read(
@@ -740,6 +768,11 @@ static boolean addon_handles_make(
 		struct addon_tag_instance const *instance = &addon->tag_header->instances[index];
 		long existing = map_tag_find(instance->group_tag, instance->name);
 
+		/* (or an earlier add-on's: two add-ons from Custom Edition maps can
+		carry the same tag, a HUD's bitmap, which a reference by its name
+		must find once) */
+		if (existing == NONE)
+			existing = addon_earlier_tag_find(addon, instance->group_tag, instance->name);
 		addon->handles[index] = existing != NONE ? existing :
 			DATUM_INDEX_NEW(first_index + index, (first_salt + index) & UNSIGNED_SHORT_MAX);
 	}

@@ -724,6 +724,15 @@ static void tags_read(struct port_mutator *mutator, toml_datum_t tags, const cha
 			char every[TAG_EDIT_NAME_LENGTH];
 			int value;
 
+			/* (projectiles a weapon fires: where = { fired = true }) */
+			if (!strcmp(name.u.s, "*") && where.type == TOML_TABLE && where.u.tab.size == 1 &&
+				!strcmp(where.u.tab.key[0], "fired") && where.u.tab.value[0].type == TOML_BOOLEAN &&
+				where.u.tab.value[0].u.boolean)
+			{
+				tag_fields_read(mutator, path, group.u.s, "*?fired", "", tag);
+				mutator->tag_count++;
+				continue;
+			}
 			if (strcmp(name.u.s, "*") || where.type != TOML_TABLE || where.u.tab.size != 1 ||
 				where.u.tab.value[0].type != TOML_ARRAY)
 			{
