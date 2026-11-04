@@ -315,6 +315,24 @@ boolean director_camera_is(short local_player_index, director_camera_update_proc
 		director_get(local_player_index)->camera_proc == camera_proc;
 }
 
+/* port: the unit whose motion the camera follows: the player's own in first
+person or behind it, the one a dead player watches; NONE for a scripted,
+editor or flying camera. For the sounds' Doppler effect (sound_manager.c). */
+long director_get_followed_unit(
+	short local_player_index)
+{
+	struct director *director = director_get(local_player_index);
+
+	if (*director_camera_scripted)
+		return NONE;
+	if (director->camera_proc == (director_camera_update_proc)first_person_camera_update ||
+		director->camera_proc == (director_camera_update_proc)following_camera_update)
+		return player_control_get_unit_index(local_player_index);
+	if (director->camera_proc == (director_camera_update_proc)dead_camera_update)
+		return ((struct dead_camera *)director->camera_data)->unit_index;
+	return NONE;
+}
+
 director_perspective director_get_perspective(
 	short local_player_index)
 {
