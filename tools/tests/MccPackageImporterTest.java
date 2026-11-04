@@ -108,12 +108,13 @@ public final class MccPackageImporterTest {
                 Map<String,byte[]> input = campaign(); input.put(bad, map(0));
                 refuses(() -> MccPackageImporter.prepare(root.toFile(), zip(input), "", 0)); noStaging(root);
             }
-            for (String fault : new String[]{"duplicate", "missing", "type", "kind", "malformed", "oversized", "engine", "header", "duplicate-mission"}) {
+            for (String fault : new String[]{"duplicate", "missing", "type", "kind", "null-kind", "malformed", "oversized", "engine", "header", "duplicate-mission"}) {
                 Map<String,byte[]> input = campaign();
                 if (fault.equals("duplicate")) input.put("2915693904/maps/A10.MAP", map(0));
                 if (fault.equals("missing")) input.remove("2915693904/Maps/a10.map");
                 if (fault.equals("type")) input.put("2915693904/Maps/a10.map", map(1));
                 if (fault.equals("kind")) input.put("2915693904/campaign/a10.json", bytes("{\"ScenarioFile\":\"a10\",\"CampaignMapKind\":\"Hub\"}"));
+                if (fault.equals("null-kind")) input.put("2915693904/campaign/a10.json", bytes("{\"ScenarioFile\":\"a10\",\"CampaignMapKind\":null}"));
                 if (fault.equals("malformed")) input.put("2915693904/ModInfo.json", bytes("{broken}"));
                 if (fault.equals("oversized")) input.put("2915693904/ModInfo.json", new byte[262145]);
                 if (fault.equals("engine")) input.put("2915693904/ModInfo.json", bytes("{\"Engine\":\"Halo2\"}"));
