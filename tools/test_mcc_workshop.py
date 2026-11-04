@@ -123,6 +123,9 @@ FILE *workshop_test_fopen(char const *path,char const *mode) {
  local[i-3]=0;
  return fopen(local,mode);
 }
+int mcc_maps_workshop_title(char const *id,char *title,unsigned size) {
+ (void)id;(void)title;(void)size;return 0;
+}
 int main(void) {
  struct mcc_workshop_item item;
  CHECK(mcc_workshop_local_item("mcc_maps\\Named\\level",&item));

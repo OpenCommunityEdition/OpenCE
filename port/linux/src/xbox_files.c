@@ -230,9 +230,8 @@ static BOOL names_match(const char *a, const char *b, unsigned long length)
 player's Steam library (steam_workshop.h). The rest of the path after the id in rest */
 static int translate_workshop(const char *cursor, char *resolved, unsigned long size, const char **rest)
 {
-	char id[STEAM_WORKSHOP_ID_SIZE], package[1024], data_folder[1100];
+	char id[STEAM_WORKSHOP_ID_SIZE], package[1024], data_folder[1100], local_name[256];
 	unsigned long length = 0;
-	struct posix_file_information information;
 
 	while (*cursor == '\\' || *cursor == '/')
 		cursor++;
@@ -248,8 +247,13 @@ static int translate_workshop(const char *cursor, char *resolved, unsigned long 
 	if (!length || (cursor[length] && cursor[length] != '\\' && cursor[length] != '/'))
 		return 0;
 	/* a package folder of that name in the data root wins */
-	snprintf(data_folder, sizeof(data_folder), "%s/mcc_maps/%s", platform_data_root(), id);
-	if (posix_stat(data_folder, &information) == 0 || !steam_workshop_package_folder(id, package, sizeof(package)) ||
+	if (posix_find_entry_case_insensitive(platform_data_root(), "mcc_maps", local_name, sizeof(local_name)))
+	{
+		snprintf(data_folder, sizeof(data_folder), "%s/%s", platform_data_root(), local_name);
+		if (posix_find_entry_case_insensitive(data_folder, id, local_name, sizeof(local_name)))
+			return 0;
+	}
+	if (!steam_workshop_package_folder(id, package, sizeof(package)) ||
 		strlen(package) >= size)
 		return 0;
 	snprintf(resolved, size, "%s", package);

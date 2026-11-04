@@ -103,7 +103,8 @@ packages; those require separate Workshop catalog integration.
 
 ### Subscribed Steam Workshop items
 
-Halo CE maps from the Workshop items a player is subscribed to are listed
+With `game.workshop_maps = true` (`HALO_WORKSHOP_MAPS=1`), desktop builds list
+Halo CE maps from the Workshop items a player is subscribed to
 without copying anything into the data root. `steam_workshop.c` looks in Steam's
 libraries for `steamapps/workshop/content/976730/<item id>/`: the usual Steam
 folders (on Windows `%ProgramFiles(x86)%\Steam`; on Linux `~/.steam/steam`,
@@ -115,6 +116,12 @@ names the `.map` file in the item's `maps` folder, whose `Title.Neutral` is the
 map's title and whose `Images.Thumbnail` is its preview picture. Folder names
 inside an item are found without regard to case, as Steam's files are spelled
 by their makers. An item seen through two paths to one library is listed once.
+
+Discovery defaults to off. Android and web use installed `mcc_maps` packages;
+they do not search for Steam. Local package folders take precedence regardless
+of their letter case. The path translation hook is necessary because the shared
+file reader opens virtual Xbox paths; it handles only `mcc_maps` requests and
+leaves `maps` and `custom_maps` on their established paths.
 
 Each map is the level `mcc_maps\<item id>\<map name>`, so it is the same
 package identity as a folder named by the item id (above), and the host's item
@@ -137,7 +144,11 @@ nothing else.
 
 Several Workshop items belong to a collection that their makers published as a
 set (a competitive pack, a social pack, a 2v2 set). `workshop_collections.c`
-holds the Halo CE collections as data: a name and the ids of its items. At the
+holds a fixed, curated set of Halo CE collections as data: a name and the ids of
+its items. It does not query current Steam collection membership. Enable
+`game.mcc_collections` (`HALO_MCC_COLLECTIONS=1`, default off) and reopen the
+map list to use these groups. Imported packages can identify their collection
+through `workshop_id.txt`, without Steam. At the
 top of the MCC map menus a collection the player has an item of is a folder
 (`[PRO EDITION]`), before the package folders; it holds the maps of the
 player's items that are in it, by their Workshop titles. An item that is in two

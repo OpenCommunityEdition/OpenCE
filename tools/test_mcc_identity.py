@@ -81,7 +81,7 @@ def test_session_resolution_and_validation(tmp_path):
 #include <stddef.h>
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
 static struct {char name[64];unsigned char digest[32];unsigned stamp;} files[20];
-static int count,probes,errors,connection,changing,denied,clears,hash_loads;
+static int count,probes,errors,connection,changing,denied,clears,hash_loads,rescan_install;
 int csstrcasecmp(char const *a,char const *b){while(*a && tolower(*a)==tolower(*b)){a++;b++;}return tolower(*a)-tolower(*b);}
 int game_connection(void){return connection;}
 void error(short level,char const *format,...){(void)level;(void)format;}
@@ -90,7 +90,9 @@ void display_error_text_when_main_menu_loaded(wchar_t const *text){int k;errors+
 void mcc_cache_validation_clear(void) {}
 void mcc_validation_cancel(void) {}
 void mcc_cache_precache_clear(void){clears++;}
-void mcc_maps_rescan(void){}
+void mcc_maps_rescan(void){
+ if(rescan_install){count=1;strcpy(files[0].name,"mcc_maps\\2899609719\\pat_beavercreek");memset(files[0].digest,42,32);}
+}
 boolean mcc_maps_workshop_title(char const *id,char *title,unsigned size){(void)id;(void)title;(void)size;return 0;}
 short mcc_maps_count(boolean multiplayer){(void)multiplayer;return (short)count;}
 char const *mcc_maps_level_name(short i){return files[i].name;}
@@ -175,7 +177,7 @@ int main(void){
  /* Bound same-filename work before any fallback fingerprints. */
  strcpy(game.map.name,"mcc_maps\\Host\\a10");memcpy(game.mcc_content_sha256,wanted,32);count=17;
  for(i=0;i<count;i++)sprintf(files[i].name,"mcc_maps\\folder%d\\a10",i);
- old=probes;CHECK(!mcc_identity_accept(&game));CHECK(probes==old+1);
+ old=probes;CHECK(!mcc_identity_accept(&game));CHECK(probes==old+2);
  CHECK(errors && clears);
  /* Filename equality does not prove item presence; a known older item may
   * not contain the host's newly added level at all. */
@@ -228,6 +230,12 @@ int main(void){
   CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy)==&copy);
   CHECK(!memcmp(&game,&copy,sizeof(game)) && mcc_identity_accept(&copy));
  }
+ /* An item installed after the cached scan must join on the first retry,
+  * even when its canonical path is exactly the host's path. */
+ memset(&game,0,sizeof(game));strcpy(game.map.name,"mcc_maps\\2899609719\\pat_beavercreek");
+ memcpy(game.mcc_content_sha256,wanted,32);count=0;rescan_install=1;
+ CHECK(mcc_identity_accept(&game));CHECK(count==1);
+ CHECK(!strcmp(mcc_identity_local_name(game.map.name),game.map.name));
  return 0;
 }
 ''')
@@ -250,6 +258,9 @@ def test_fingerprint_settings_keep_host_and_fragment_checks(tmp_path):
 #include <stdio.h>
 #include "mcc_workshop.h"
 typedef int boolean;typedef unsigned char byte;typedef uint16_t word;
+int mcc_maps_workshop_title(char const *id,char *title,unsigned size) {
+ (void)id;(void)title;(void)size;return 0;
+}
 #define TRUE 1
 #define FALSE 0
 #define NETWORK_CLIENT_MESSAGE_HANDLER_FILE "test"

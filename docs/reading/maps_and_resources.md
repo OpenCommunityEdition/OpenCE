@@ -49,11 +49,32 @@ checked independently of level names. An unidentified same-name level is not
 evidence that the item is installed. SHA-256 and level matching remain
 authoritative even when ids differ. Metadata is cached with host preparation
 and cleared on disconnect; changing a sidecar during a session requires fresh
-host preparation after disconnect. The feature does not scan Steam libraries.
+host preparation after disconnect. Identity checks do not require Steam.
 See [installation and messages](../mcc_maps.md#installation-and-menus) and the
 [MCC wire contract](../../port/linux/NETCODE.md#gulchce-crossplay-boundary).
 Focused checks are `test_mcc_workshop.py`, `test_mcc_identity.py` and
 `test_mcc_protocol.py` under [`tools`](../../tools/).
+
+Desktop discovery is separately enabled by `game.workshop_maps`. Follow
+`steam_workshop_scan` in [steam_workshop.c](../../port/linux/src/steam_workshop.c)
+from library manifests to installed map records, then `mcc_maps_scan` and
+`mcc_map_browser_open` in [mcc_maps.c](../../port/linux/game/mcc_maps.c).
+For example, a Workshop item becomes `mcc_maps\2899609719\pat_beavercreek`;
+the MCC-only branch in `platform_translate_path` resolves it in place unless a
+local package already owns that folder. A rescan retries an exact host identity
+before searching aliases. Xbox and CE roots retain their own resolution.
+
+`game.mcc_collections` optionally groups installed items using the fixed table in
+[workshop_collections.c](../../port/linux/src/workshop_collections.c).
+An imported package's `workshop_id.txt` also supplies its group without Steam.
+Folder selections store their kind and collection number as well as their name,
+so a package named `PRO EDITION` remains distinct from that collection. Browser
+storage allows each map to belong to every supported group. Discovery and
+grouping both default off; reopen the map list after changing settings.
+See [Workshop installation](../mcc_maps.md#subscribed-steam-workshop-items).
+The asset-free regressions in `test_steam_workshop.py` and `test_mcc_maps.py`
+check these paths, bounds, selection restoration and disabled settings; they
+do not establish gameplay compatibility for every discovered map.
 
 ## Follow an MCC package level
 

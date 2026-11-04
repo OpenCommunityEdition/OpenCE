@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from harness import function
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "port/linux/src"
@@ -17,6 +18,11 @@ DRIVER = r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+int config_boolean(const char *name) {
+ const char *value=getenv("TEST_WORKSHOP_ENABLED");(void)name;
+ return !value || strcmp(value,"0");
+}
 const char *config_string(const char *name)
 {
 	const char *value = !strcmp(name, "paths.steam") ? getenv("TEST_STEAM_SETTING") : NULL;
@@ -69,7 +75,7 @@ int main(int argc, char **argv)
 	}
 	else if (argc == 2 && !strcmp(argv[1], "scan"))
 	{
-		char folder[512], title[64];
+		char folder[512] = {0}, title[64] = {0};
 
 		printf("count=%d\n", steam_workshop_scan());
 		for (index = 0; index < steam_workshop_count(); index++)
@@ -85,6 +91,12 @@ int main(int argc, char **argv)
 		printf("title=%d %s\n", steam_workshop_item_title("222", title, sizeof(title)), title);
 		printf("small=%d\n", steam_workshop_package_folder("111", folder, 8));
 	}
+	else if (argc == 3 && !strcmp(argv[1], "translate"))
+	{
+		char path[1024];
+		platform_translate_path(argv[2], path, sizeof(path));
+		printf("path=%s\n", path);
+	}
 	return 0;
 }
 '''
@@ -92,23 +104,38 @@ int main(int argc, char **argv)
 
 @pytest.fixture(scope="module")
 def tool(tmp_path_factory):
-    if sys.platform == "win32":
-        pytest.skip("the directory code under test is the POSIX one")
-    compiler = os.environ.get("CC") or shutil.which("gcc") or shutil.which("clang")
+    compiler = os.environ.get("CC") or shutil.which("clang") or shutil.which("gcc")
     if not compiler:
         pytest.skip("a C compiler is needed")
     work = tmp_path_factory.mktemp("steam-workshop")
-    (work / "driver.c").write_text(DRIVER)
-    exe = work / "driver"
-    result = subprocess.run([compiler, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-I", str(SRC), str(work / "driver.c"),
-                             str(SRC / "steam_workshop.c"), str(SRC / "posix_files.c"), str(SRC / "server_json.c"),
+    native = (SRC / "xbox_files.c").read_text()
+    translation = r'''
+#include "posix.h"
+typedef int BOOL;
+#define TRUE 1
+#define FALSE 0
+static char const *platform_data_root(void) {return getenv("TEST_DATA_ROOT");}
+static char const *platform_save_root(void) {return platform_data_root();}
+static char const *platform_custom_edition_root(void) {return "";}
+static void make_directories(char const *path) {(void)path;}
+'''
+    for name in ("trim_separators", "names_match", "translate_workshop", "translate_elsewhere", "platform_translate_path"):
+        translation += function(native, name) + "\n"
+    (work / "driver.c").write_text(DRIVER.replace("int main(", translation + "\nint main("))
+    exe = work / ("driver.exe" if sys.platform == "win32" else "driver")
+    windows = sys.platform == "win32"
+    flags = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"] if windows else []
+    files = ROOT / "port/windows/src/win32_files.c" if windows else SRC / "posix_files.c"
+    result = subprocess.run([compiler, *flags, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-I", str(SRC), str(work / "driver.c"),
+                             str(SRC / "steam_workshop.c"), str(files), str(SRC / "server_json.c"),
                              "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
 
 
-def run(tool, *args, home=None, setting=""):
-    env = {"PATH": os.environ["PATH"], "HOME": str(home or "/nonexistent"), "TEST_STEAM_SETTING": setting}
+def run(tool, *args, home=None, setting="", enabled=True, data_root=None):
+    env = dict(os.environ, HOME=str(home or "/nonexistent"), TEST_STEAM_SETTING=setting,
+               TEST_WORKSHOP_ENABLED=str(int(enabled)), TEST_DATA_ROOT=str(data_root or "/nonexistent"))
     result = subprocess.run([str(tool), *map(str, args)], capture_output=True, text=True, timeout=20, env=env)
     assert result.returncode == 0, result.stderr
     fields, lists = {}, {}
@@ -222,11 +249,12 @@ def test_scan(tool, tmp_path):
     other = tmp_path / "library two"
     # both usual links lead to the one Steam folder: each item once
     (home / ".steam").mkdir(parents=True)
-    (home / ".steam/steam").symlink_to(steam)
-    (home / ".steam/root").symlink_to(steam)
+    if sys.platform != "win32":
+        (home / ".steam/steam").symlink_to(steam)
+        (home / ".steam/root").symlink_to(steam)
     (steam / "steamapps").mkdir(parents=True)
     (steam / "steamapps/libraryfolders.vdf").write_text(
-        '"libraryfolders"\n{\n"0"\n{\n"path"\t"%s"\n}\n"1"\n{\n"path"\t"%s"\n}\n}\n' % (steam, other))
+        '"libraryfolders"\n{\n"0"\n{\n"path"\t"%s"\n}\n"1"\n{\n"path"\t"%s"\n}\n}\n' % (steam.as_posix(), other.as_posix()))
     make_item(steam, "111", "Pro Edition", maps=(("beaver", "Better Creek"), ("shouting", "Loud")))
     folder = make_item(other, "222", "Social Pack", manifest="modinfo.JSON")
     make_item(other, "333", engine="Halo2")
@@ -240,7 +268,7 @@ def test_scan(tool, tmp_path):
     # a manifest naming a json outside the item refuses the item
     outside = make_item(other, "777")
     (outside / "ModInfo.json").write_text(item_json(GameModContents={"MultiplayerMaps": ["..\\\\111\\\\maps\\\\beaver.json"]}))
-    fields, lists = run(tool, "scan", home=home)
+    fields, lists = run(tool, "scan", home=home, setting=str(steam) if sys.platform == "win32" else "")
     rows = [row.split("|") for row in lists["map"]]
     assert sorted((r[0], r[2]) for r in rows) == [("111", "SHOUTING"), ("111", "beaver"), ("222", "beaver"),
                                                   ("555", "beaver")]
@@ -266,3 +294,27 @@ def test_setting_names_a_steam_folder(tool, tmp_path):
     assert row[:4] == ["888", "From the setting", "beaver", "Better Creek"] and row[5] == ""
     # no Steam at all: an empty catalog, no error
     assert run(tool, "scan", home=tmp_path / "nothing")[0]["count"] == "0"
+
+
+def test_scan_keeps_short_map_names(tool, tmp_path):
+    make_item(tmp_path, "111", maps=(("a10", "One"), ("test", "Two"), ("longer", "Three")))
+    _, rows = run(tool, "scan", setting=str(tmp_path))
+    assert {row.split("|")[2] for row in rows["map"]} == {"a10", "test", "longer"}
+    assert run(tool, "scan", setting=str(tmp_path), enabled=False)[0]["count"] == "0"
+
+
+def test_translation_keeps_local_override_and_legacy_roots(tool, tmp_path):
+    library, data = tmp_path / "steam", tmp_path / "data"
+    make_item(library, "111")
+    data.mkdir()
+    fields, _ = run(tool, "translate", "d:\\mcc_maps\\111\\beaver.map", setting=str(library), data_root=data)
+    assert fields["path"].replace("\\", "/").endswith("/111/Maps/beaver.map")
+    override = data / "MCC_MAPS/111"
+    override.mkdir(parents=True)
+    (override / "beaver.map").write_bytes(b"manual")
+    for prefix in ("d:\\", ""):
+        fields, _ = run(tool, "translate", prefix + "mcc_maps\\111\\beaver.map", setting=str(library), data_root=data)
+        assert Path(fields["path"]) == override / "beaver.map"
+    for folder in ("maps", "custom_maps"):
+        fields, _ = run(tool, "translate", "d:\\" + folder + "\\a10.map", setting=str(library), data_root=data)
+        assert Path(fields["path"]) == data / folder / "a10.map"

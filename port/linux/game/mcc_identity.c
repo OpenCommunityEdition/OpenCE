@@ -189,20 +189,28 @@ int mcc_identity_accept(struct network_game const *game)
         leaf=strrchr(session,'\\')+1;
         mcc_maps_rescan();
         count=mcc_maps_count(FALSE);
-        /* Bound work before hashing any fallback candidates. */
-        for (i=0;i<count;i++) {
-            candidate=mcc_maps_level_name(i);
-            candidate_leaf=strrchr(candidate,'\\')+1;
-            if (!csstrcasecmp(leaf,candidate_leaf) && ++candidates>MCC_IDENTITY_MAX_CANDIDATES)
-                return mcc_identity_error("Too many MCC maps share this filename. Keep one matching package installed and retry.");
+        /* Discovery may have made the exact package available since the first
+         * probe. Prefer it before looking for aliases with the same leaf. */
+        if (mcc_identity_matches(session,game->mcc_content_sha256,&selected_files)) {
+            strcpy(selected,session);
+            matches=1;
         }
-        for (i=0;i<count;i++) {
-            candidate=mcc_maps_level_name(i);
-            candidate_leaf=strrchr(candidate,'\\')+1;
-            if (csstrcasecmp(leaf,candidate_leaf) || !csstrcasecmp(candidate,session)) continue;
-            if (mcc_identity_matches(candidate,game->mcc_content_sha256,&selected_files)) {
-                strcpy(selected,candidate);
-                if (++matches>1) return mcc_identity_error("Several local MCC packages match the host. Keep one matching copy, or use the host's package folder name.");
+        if (!matches) {
+            /* Bound work before hashing any fallback candidates. */
+            for (i=0;i<count;i++) {
+                candidate=mcc_maps_level_name(i);
+                candidate_leaf=strrchr(candidate,'\\')+1;
+                if (!csstrcasecmp(leaf,candidate_leaf) && ++candidates>MCC_IDENTITY_MAX_CANDIDATES)
+                    return mcc_identity_error("Too many MCC maps share this filename. Keep one matching package installed and retry.");
+            }
+            for (i=0;i<count;i++) {
+                candidate=mcc_maps_level_name(i);
+                candidate_leaf=strrchr(candidate,'\\')+1;
+                if (csstrcasecmp(leaf,candidate_leaf) || !csstrcasecmp(candidate,session)) continue;
+                if (mcc_identity_matches(candidate,game->mcc_content_sha256,&selected_files)) {
+                    strcpy(selected,candidate);
+                    if (++matches>1) return mcc_identity_error("Several local MCC packages match the host. Keep one matching copy, or use the host's package folder name.");
+                }
             }
         }
     }

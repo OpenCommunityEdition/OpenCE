@@ -19,9 +19,19 @@ The subscribed Steam Workshop items' Halo CE maps, found in place (steam_worksho
 static struct
 {
 	int scanned;
+	int enabled;
 	int count;
 	struct steam_workshop_map maps[STEAM_WORKSHOP_MAXIMUM_MAPS];
 } catalog;
+
+static int discovery_enabled(void)
+{
+#if defined(HALO_ANDROID) || defined(HALO_WEB)
+	return 0;
+#else
+	return config_boolean("game.workshop_maps");
+#endif
+}
 
 /* ---------- parsing */
 
@@ -352,7 +362,7 @@ static void scan_item(const char *item_folder, const char *item_id)
 			continue;
 		/* the name as the file is spelled on disk */
 		found[strlen(found) - 4] = 0;
-		if (strlen(found) < 5 || strlen(found) >= sizeof(entry->name) || !is_file(entry->path))
+		if (!found[0] || strlen(found) >= sizeof(entry->name) || !is_file(entry->path))
 			continue;
 		copy_text(entry->item_id, sizeof(entry->item_id), item_id);
 		copy_text(entry->item_title, sizeof(entry->item_title), item.title);
@@ -449,11 +459,15 @@ static int libraries(char (*paths)[STEAM_WORKSHOP_PATH_SIZE], int maximum)
 
 int steam_workshop_scan(void)
 {
-	char (*paths)[STEAM_WORKSHOP_PATH_SIZE] = malloc(sizeof(*paths) * 2 * STEAM_WORKSHOP_MAXIMUM_LIBRARIES);
+	char (*paths)[STEAM_WORKSHOP_PATH_SIZE];
 	int count, index;
 
 	catalog.scanned = 1;
 	catalog.count = 0;
+	catalog.enabled = discovery_enabled();
+	if (!catalog.enabled)
+		return 0;
+	paths = malloc(sizeof(*paths) * 2 * STEAM_WORKSHOP_MAXIMUM_LIBRARIES);
 	if (!paths)
 		return 0;
 	count = libraries(paths, 2 * STEAM_WORKSHOP_MAXIMUM_LIBRARIES);
@@ -465,7 +479,7 @@ int steam_workshop_scan(void)
 
 int steam_workshop_count(void)
 {
-	if (!catalog.scanned)
+	if (!catalog.scanned || catalog.enabled != discovery_enabled())
 		steam_workshop_scan();
 	return catalog.count;
 }

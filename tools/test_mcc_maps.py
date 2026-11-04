@@ -103,6 +103,9 @@ static int admission_reads;
 static int identities_prepared;
 static unsigned reads, largest, scans, closed;
 void mcc_cache_precache_clear(void) {}
+int config_boolean(char const *name) {
+ char const *disabled=getenv("TEST_COLLECTIONS_DISABLED");(void)name;return !disabled;
+}
 #include "../src/steam_workshop.h"
 static int workshop_items;
 static struct steam_workshop_map workshop_list[4];
@@ -329,6 +332,7 @@ int main(int argc,char **argv) {
     command = [compiler, "-include", str(ROOT / "port/linux/game/mcc_loading.h"), str(ROOT / "tools/mcc_loading_stub.c"), "-std=c99", "-Wall", "-Wextra", "-Werror",
                "-I", str(work), "-I", str(ROOT / "port/linux/game"), str(source),
                str(ROOT / "port/linux/game/mcc_maps.c"),
+               str(ROOT / "port/linux/game/mcc_workshop.c"),
                str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/src/workshop_collections.c"),
                str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), "-o", str(output)]
     if sys.platform == "win32":
@@ -720,3 +724,52 @@ def test_a_collection_folder_shows_only_items_the_player_has(catalog_tool, tmp_p
     # nothing subscribed from any collection: no collection folder
     assert fields["view0"] == "|2|0"
     assert fields["row0_0"] == "[Lone Item]|folder"
+
+
+def local_packages(root, names):
+    install(root, {})
+    base = root / "mcc_maps"
+    for name in names:
+        folder = base / name
+        folder.mkdir()
+        (folder / "arena.map").write_bytes(header(scenario=1))
+        (folder / "list.txt").write_text("arena.map\n")
+    (base / "list.txt").write_text("\n".join("/" + name for name in names))
+    return base
+
+
+def test_collection_rows_do_not_exceed_browser_storage(catalog_tool, tmp_path):
+    # One map in two groups plus 1023 independent package folders: 1025 rows.
+    local_packages(tmp_path, ["2899747345"] + [f"package{i:04}" for i in range(1023)])
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:1024", "back")
+    assert fields["view0"] == "|1025|0"
+    assert fields["view1"] == "package1022|1|0"
+    assert fields["row1_0"] == "Arena|mcc_maps\\package1022\\arena"
+    assert fields["view2"] == "|1025|1024"
+
+
+def test_collection_and_package_names_have_distinct_selection_keys(catalog_tool, tmp_path):
+    local_packages(tmp_path, ["2899666869", "PRO EDITION"])
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:1", "back", "enter:0", "back")
+    assert fields["view0"] == "|2|0"
+    assert fields["row1_0"] == "Arena|mcc_maps\\PRO EDITION\\arena"
+    assert fields["view2"] == "|2|1"
+    assert fields["row3_0"] == "Arena|mcc_maps\\2899666869\\arena"
+    assert fields["view4"] == "|2|0"
+
+
+def test_collection_identity_uses_sidecar_without_steam(catalog_tool, tmp_path):
+    base = local_packages(tmp_path, ["MyPack"])
+    (base / "MyPack/workshop_id.txt").write_text("2899666869\nPro Edition\n")
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0")
+    assert fields["row0_0"] == "[PRO EDITION]|folder"
+    assert fields["row1_0"] == "Arena|mcc_maps\\MyPack\\arena"
+
+
+def test_disabled_collections_keep_package_folders(catalog_tool, tmp_path, monkeypatch):
+    local_packages(tmp_path, ["2899747345"])
+    monkeypatch.setenv("TEST_COLLECTIONS_DISABLED", "1")
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0")
+    assert fields["view0"] == "|1|0"
+    assert fields["row0_0"] == "[2899747345]|folder"
+    assert fields["row1_0"] == "Arena|mcc_maps\\2899747345\\arena"
