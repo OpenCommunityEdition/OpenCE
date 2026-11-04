@@ -25,11 +25,14 @@ boolean mcc_maps_workshop_title(char const *item_id, char *title, unsigned size)
 /* Menu-only views. Identities, not catalog indices, survive a rescan. */
 struct mcc_map_browser
 {
+	/* the open folder: a package, or a Workshop collection (`collection`, its number in group); "" at the top */
 	char package[64], selected[64];
 	short entries[MCC_MAPS_MAXIMUM];
+	/* a folder row's collection (workshop_collections.h), or NONE for a package's */
+	short groups[MCC_MAPS_MAXIMUM];
 	boolean folders[MCC_MAPS_MAXIMUM];
-	short count, chosen;
-	boolean campaign;
+	short count, chosen, group;
+	boolean campaign, collection;
 };
 
 void mcc_map_browser_open(struct mcc_map_browser *browser, boolean campaign);

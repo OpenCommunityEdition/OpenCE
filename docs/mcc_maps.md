@@ -133,6 +133,20 @@ files are the item makers' text: one that is too large (256 KB), too deep, not
 an object, or that names a path leaving its item, refuses that item or map and
 nothing else.
 
+### Workshop collections
+
+Several Workshop items belong to a collection that their makers published as a
+set (a competitive pack, a social pack, a 2v2 set). `workshop_collections.c`
+holds the Halo CE collections as data: a name and the ids of its items. At the
+top of the MCC map menus a collection the player has an item of is a folder
+(`[PRO EDITION]`), before the package folders; it holds the maps of the
+player's items that are in it, by their Workshop titles. An item that is in two
+collections is in both folders; an item in none keeps the package folder of its
+own, named by its title. A collection with no subscribed item has no folder.
+Only the menu changes: levels are still `mcc_maps\<item id>\<map name>`, so
+a host's map and a joiner's messages do not depend on collections. A collection
+the table does not know is shown as its items' own folders.
+
 The two MCC categories show package folders first (alphabetically, in brackets),
 then loose maps. Open a folder to choose one of its levels; the rows omit the
 repeated package suffix, while the selected map's details retain its identity.

@@ -105,13 +105,37 @@ static unsigned reads, largest, scans, closed;
 void mcc_cache_precache_clear(void) {}
 #include "../src/steam_workshop.h"
 static int workshop_items;
-static struct steam_workshop_map workshop_item;
+static struct steam_workshop_map workshop_list[4];
+#define workshop_item workshop_list[0]
 int steam_workshop_scan(void) {return workshop_items;}
 int steam_workshop_count(void) {return workshop_items;}
-struct steam_workshop_map const *steam_workshop_map(int index) {return index==0 && workshop_items ? &workshop_item : NULL;}
+struct steam_workshop_map const *steam_workshop_map(int index) {return index>=0 && index<workshop_items ? &workshop_list[index] : NULL;}
 int steam_workshop_item_title(char const *id,char *title,unsigned long size) {
-    if(!workshop_items || strcmp(id,workshop_item.item_id))return 0;
-    snprintf(title,size,"%s",workshop_item.item_title);return 1;
+    int i;
+    for(i=0;i<workshop_items;i++) if(!strcmp(id,workshop_list[i].item_id)) {
+        snprintf(title,size,"%s",workshop_list[i].item_title);return 1;
+    }
+    return 0;
+}
+/* the CATALOG_ITEMS environment: "id:item title:map name:map title;..." */
+static void workshop_from_environment(void) {
+    char *text=getenv("CATALOG_ITEMS"),*field[4];
+    static char copy[512];
+    if(!text)return;
+    snprintf(copy,sizeof(copy),"%s",text);text=copy;
+    while(*text && workshop_items<4) {
+        char *end=strchr(text,';');int f;
+        if(end)*end=0;
+        field[0]=text;
+        for(f=1;f<4;f++){text=strchr(text,':');if(!text)exit(50);*text++=0;field[f]=text;}
+        strcpy(workshop_list[workshop_items].item_id,field[0]);
+        strcpy(workshop_list[workshop_items].item_title,field[1]);
+        strcpy(workshop_list[workshop_items].name,field[2]);
+        strcpy(workshop_list[workshop_items].title,field[3]);
+        workshop_items++;
+        if(!end)break;
+        text=end+1;
+    }
 }
 char const *mcc_identity_local_name(char const *name) {return name;}
 int mcc_identity_check(char const *name) {(void)name;return 1;}
@@ -175,7 +199,7 @@ int main(int argc,char **argv) {
     if(argc<2)return 2;
     if(argc>=4 && !strcmp(argv[2],"browse")) {
         struct mcc_map_browser b={0};int step;
-        root=argv[1];mcc_map_browser_open(&b,atoi(argv[3]));
+        root=argv[1];workshop_from_environment();mcc_map_browser_open(&b,atoi(argv[3]));
         for(step=4;step<=argc;step++) {
             int row;wchar_t text[64];
             printf("view%d=%s|%d|%d\n",step-4,b.package,b.count,b.chosen);
@@ -305,7 +329,7 @@ int main(int argc,char **argv) {
     command = [compiler, "-include", str(ROOT / "port/linux/game/mcc_loading.h"), str(ROOT / "tools/mcc_loading_stub.c"), "-std=c99", "-Wall", "-Wextra", "-Werror",
                "-I", str(work), "-I", str(ROOT / "port/linux/game"), str(source),
                str(ROOT / "port/linux/game/mcc_maps.c"),
-               str(ROOT / "port/linux/game/mcc_package.c"),
+               str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/src/workshop_collections.c"),
                str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), "-o", str(output)]
     if sys.platform == "win32":
         command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
@@ -322,8 +346,12 @@ def install(root, entries):
     (directory / "list.txt").write_text("\n".join(entries))
 
 
-def run(tool, root, *args):
-    result = subprocess.run([str(tool), str(root), *args], capture_output=True, text=True, timeout=10, cwd=root)
+def run(tool, root, *args, items=None):
+    environment = dict(os.environ)
+    if items:
+        environment["CATALOG_ITEMS"] = ";".join(":".join(item) for item in items)
+    result = subprocess.run([str(tool), str(root), *args], capture_output=True, text=True, timeout=10, cwd=root,
+                            env=environment)
     assert result.returncode == 0, result.stdout + result.stderr
     fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if not line.startswith("map="))
     maps = [line[4:] for line in result.stdout.splitlines() if line.startswith("map=")]
@@ -632,3 +660,63 @@ def test_workshop_item_maps_are_listed_by_title(catalog_tool, tmp_path):
     # the same data root without the item: only the ordinary map
     fields, maps = run(catalog_tool, tmp_path)
     assert maps == ["mcc_maps\\a10|1"]
+
+
+COLLECTION_ITEMS = [
+    # in PRO EDITION
+    ("2899666869", "Item One", "alpha_map_file", "Alpha Arena"),
+    # in SOCIAL MAP PACK and 2V2 MAPS
+    ("2899747345", "Item Two", "beta_map_file", "Beta Arena"),
+    # in no collection
+    ("12345", "Lone Item", "gamma_map_file", "Gamma Arena"),
+]
+
+
+def collection_install(tmp_path):
+    install(tmp_path, {"solo.map": header(scenario=0), "arena.map": header(scenario=1)})
+    base = tmp_path / "mcc_maps"
+    for item, _, name, _ in COLLECTION_ITEMS:
+        (base / item).mkdir()
+        (base / item / f"{name}.map").write_bytes(header(scenario=1))
+
+
+def test_workshop_collections_are_folders_of_their_items_maps(catalog_tool, tmp_path):
+    """An item in a collection is listed in that collection's folder; an item in none keeps its own."""
+    collection_install(tmp_path)
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0", "back", items=COLLECTION_ITEMS)
+    # the folders: collections in the table's order, then an uncollected item's, then the loose map
+    assert fields["row0_0"] == "[PRO EDITION]|folder"
+    assert fields["row0_1"] == "[SOCIAL MAP PACK]|folder"
+    assert fields["row0_2"] == "[2V2 MAPS]|folder"
+    assert fields["row0_3"] == "[Lone Item]|folder"
+    assert fields["row0_4"].endswith("|mcc_maps\\arena")
+    assert fields["view0"] == "|5|0"
+    # inside a collection, the maps of its items by their Workshop titles
+    assert fields["view1"] == "PRO EDITION|1|0"
+    assert fields["row1_0"] == "Alpha Arena|mcc_maps\\2899666869\\alpha_map_file"
+    # back lands on the collection's own row
+    assert fields["view2"] == "|5|0"
+
+
+def test_an_item_in_two_collections_is_in_both(catalog_tool, tmp_path):
+    collection_install(tmp_path)
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:1", "back", "enter:2", items=COLLECTION_ITEMS)
+    assert fields["row1_0"] == "Beta Arena|mcc_maps\\2899747345\\beta_map_file"
+    assert fields["view2"] == "|5|1"
+    assert fields["row3_0"] == "Beta Arena|mcc_maps\\2899747345\\beta_map_file"
+
+
+def test_an_item_in_no_collection_keeps_its_own_folder(catalog_tool, tmp_path):
+    collection_install(tmp_path)
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:3", "back", items=COLLECTION_ITEMS)
+    assert fields["view1"] == "12345|1|0"
+    assert fields["row1_0"] == "Gamma Arena|mcc_maps\\12345\\gamma_map_file"
+    assert fields["view2"] == "|5|3"
+
+
+def test_a_collection_folder_shows_only_items_the_player_has(catalog_tool, tmp_path):
+    collection_install(tmp_path)
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", items=COLLECTION_ITEMS[2:])
+    # nothing subscribed from any collection: no collection folder
+    assert fields["view0"] == "|2|0"
+    assert fields["row0_0"] == "[Lone Item]|folder"
