@@ -1,7 +1,7 @@
 /* Optional path worker, inspired by thelinkin3000/halo-ce-universal's
 BirchWoodGod-derived bots. This implementation owns three bounded jobs.
 Only graph traversal runs off-thread; engine queries and path smoothing
-stay on the game thread. Included by bots.c after bots_navigation.inl. */
+stay on the game thread. Included by enhanced_bots_controller.c after bots_navigation.inl. */
 #include "physics/breakable_surfaces.h"
 #include <xtl.h>
 
@@ -11,7 +11,7 @@ struct bots_path_job
 {
 	void *request, *done;
 	boolean pending, waypoint, navigation;
-	long bot, unit, goal_surface, tick;
+	long bot, unit, goal_surface, tick, serial, parent, seat;
 	short goal_kind, phase, link;
 	real radius;
 	real_point3d start, goal, original_goal, origin;
@@ -153,7 +153,8 @@ static struct bots_path_job *bots_worker_job(struct bots_bot *bot)
 		owner = &bots_globals.bots[job->bot];
 		route = &bots_navigation.routes[job->bot];
 		if (WaitForSingleObject(job->done, 0) == WAIT_OBJECT_0 &&
-			(owner->unit_index != job->unit || owner->goal_kind != job->goal_kind ||
+			(owner->unit_index != job->unit || owner->goal_serial != job->serial ||
+			owner->navigation_parent != job->parent || owner->navigation_seat != job->seat || owner->goal_kind != job->goal_kind ||
 			bots_distance3d(&owner->goal_point, &job->original_goal) > 1.0f ||
 			bots_distance3d(&owner->last_position, &job->origin) > 3.0f ||
 			route->phase != job->phase || route->link != job->link || game_time_get() - job->tick > TICKS_PER_SECOND))
@@ -211,6 +212,9 @@ static boolean bots_worker_submit(struct bots_bot *bot, struct path_state *state
 	job->state.input.ignore_broken_surfaces = TRUE;
 	job->bot = (long)(bot - bots_globals.bots);
 	job->unit = bot->unit_index;
+	job->serial = bot->goal_serial;
+	job->parent = bot->navigation_parent;
+	job->seat = bot->navigation_seat;
 	job->goal_kind = bot->goal_kind;
 	job->original_goal = bot->goal_point;
 	job->origin = bot->last_position;

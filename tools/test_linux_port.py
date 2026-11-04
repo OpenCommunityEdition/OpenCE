@@ -274,7 +274,12 @@ def test_menus_are_well_formed():
                         header = png.read(24)
                     width, height = int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
                     logical = int(frame.get("width")), int(frame.get("height"))
-                    assert width % logical[0] == 0 and width // logical[0] == height // logical[1], where
+                    if element.get("name", "").startswith("frontend_legacy/glyph_"):
+                        # Controller artwork is presented in its authored 21x26
+                        # legacy glyph cell, independently of the texture size.
+                        assert logical == (21, 26) and width == height == 256, where
+                    else:
+                        assert width % logical[0] == 0 and width // logical[0] == height // logical[1], where
             elif element.tag == "strings":
                 strings[element.get("name")] = element
                 # (a string's map= is its number in the list's map list, menu_tags.c)

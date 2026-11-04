@@ -68,6 +68,7 @@ being hit looks and feels like on the clients).
 #include "units/units.h"
 #include "network_distributed.h"
 #include "mcc_grenades.h"
+#include "third_person.h"
 
 #include <math.h>
 
@@ -480,7 +481,7 @@ static struct damage_trail_point
 	real radius;
 	real eye;
 	boolean mounted;
-	/* (the muzzle the player's machine said: a hand, not a vehicle's gun) */
+	/* A client-reported hand, rather than a host-owned vehicle/shoulder muzzle. */
 	boolean hand;
 	real_point3d muzzle;
 } damage_trails[MAXIMUM_TRACKED_PLAYERS][PLAYER_TRAIL_POINTS];
@@ -1575,6 +1576,10 @@ static void distributed_note_targets(
 							point->mounted = distributed_vehicle_muzzle(vehicle_index, &point->muzzle);
 						}
 					}
+					/* Shoulder origins come from the host's own weapon pose.
+					The existing visibility check still traces eye-to-muzzle. */
+					else if (third_person_muzzle_history(unit_index, &point->muzzle))
+						point->mounted = TRUE;
 					/* on foot, shots that leave from elsewhere than the
 					camera (a VR player's hand, which may be past a corner
 					the camera is behind): from there as from a vehicle's

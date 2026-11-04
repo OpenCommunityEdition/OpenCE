@@ -64,3 +64,7 @@ def test_host_wiring_and_cleanup():
     reset = function(source, 'network_damage_new_game')
     assert 'stuck[index].time = NONE;' in reset
     assert 'damage_trails[player_index][index].time = NONE;' in reset
+    targets = function(source, 'distributed_note_targets')
+    assert targets.index('distributed_vehicle_muzzle(') < targets.index('third_person_muzzle_history(')
+    assert targets.index('third_person_muzzle_history(') < targets.index('else if (damage_fire_origins[')
+    assert 'else if (third_person_muzzle_history(unit_index, &point->muzzle))\n\t\t\t\t\t\tpoint->mounted = TRUE;' in targets

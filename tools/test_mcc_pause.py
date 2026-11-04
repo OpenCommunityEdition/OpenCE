@@ -23,7 +23,8 @@ def pause_tool(tmp_path_factory):
     work = tmp_path_factory.mktemp("mcc-pause")
     native = (ROOT / "source/interface/ui_widget.c").read_text()
     wrap_hook_start = native.index("\n\t{\n\t\textern boolean mcc_pause_text_wrap_needed(long);")
-    wrap_hook_end = native.index("\n\tif (string_has_icons_to_draw(*text))", wrap_hook_start)
+    # Extract only the MCC-owned block, not adjacent optional frontend hooks.
+    wrap_hook_end = native.index("\n\t}\n", wrap_hook_start) + len("\n\t}")
     wrap_hook = native[wrap_hook_start:wrap_hook_end]
     tag_groups = (ROOT / "source/tag_files/tag_groups.h").read_text()
     native_types = "\n".join(structure(tag_groups, name) for name in [

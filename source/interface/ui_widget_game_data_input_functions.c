@@ -356,6 +356,7 @@ symbols in this file:
 #include "text/unicode.h"
 #include "custom_edition_maps.h" /* port: port/linux/game/custom_edition_maps.c */
 #include "halo_menus.h" /* port: PC_MENU_FUNCTION_BASE */
+#include "frontend_menu.h" /* port: optional Xbox settings links */
 
 /* ---------- constants */
 
@@ -2252,6 +2253,8 @@ static void player_profile_edit_select_menu_update_extended_description(
 	leave the last item's description shown, as they have none */
 	if (pc_menu_tag(list_widget->definition_tag_index) && list_widget->focused_child->type == _ui_widget_type_column_list)
 		index = NONE;
+	/* port: added Xbox links do not consume the native description's frames. */
+	index = frontend_menu_legacy_description_index(list_widget, index);
 
 	if (index != NONE)
 	{
@@ -2278,6 +2281,8 @@ static void game_options_menu_update_text_desc(
 	struct widget_instance *spinner_list;
 	struct ui_widget_definition *definition;
 	long description_index = 0;
+	/* port: optional Xbox editor links have no native spinner description. */
+	if (frontend_menu_legacy_controls_help(widget)) return;
 
 	match_vassert(
 		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",

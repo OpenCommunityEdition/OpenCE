@@ -56,6 +56,7 @@ Called from the main loop every frame (main.c).
 */
 
 #include "cseries.h"
+#include "third_person.h"
 #include "game_modes.h"
 #include "main/main.h"
 #include "bink/bink_playback.h"
@@ -449,6 +450,7 @@ static void network_test_log_players(
 
 		platform_log("network test: tick %ld%s | items %ld (+%ld -%ld !%ld x%ld) | %s to %ld | sent %ld received %ld corrected %ld"
 			" | hits %ld dealt %ld rejected %ld replayed %ld | local %ld camera (%.1f %.1f %.1f) respawn %ld"
+			" | camera-policy %d preference %d effective %d active %d"
 			" | drift %ld %ld %.6f %.6f",
 			game_time_get(), line, ground_items, creates, deletes, failures, removed,
 			game_engine_can_score() ? "playing" : "game over",
@@ -458,6 +460,8 @@ static void network_test_log_players(
 			local_player_index == NONE ? -1L : (long)DATUM_INDEX_TO_ABSOLUTE_INDEX(local_player_index),
 			camera ? camera->position.x : 0.0f, camera ? camera->position.y : 0.0f, camera ? camera->position.z : 0.0f,
 			local_player_index == NONE ? 0L : (long)player_get(local_player_index)->respawn_timer,
+			(int)third_person_policy(), config_boolean("display.third_person"),
+			(int)third_person_enabled(), (int)third_person_active(0),
 			divergence_samples, divergence_apart, divergence_mean, divergence_largest);
 	}
 }

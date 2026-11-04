@@ -23,7 +23,7 @@ struct structure_bsp {
 };
 #define TAG_BLOCK_GET_ELEMENT(block,i,type) (&(block)->address[i])
 struct path_state { struct structure_bsp *structure; struct { boolean ignore_broken_surfaces; } input; };
-struct bots_bot { long unit_index; short goal_kind; real_point3d goal_point, last_position; };
+struct bots_bot { long goal_serial, navigation_parent, navigation_seat; long unit_index; short goal_kind; real_point3d goal_point, last_position; };
 struct bots_nav_route { short phase, link; };
 static struct { struct bots_bot bots[63]; } bots_globals;
 static struct { struct bots_nav_route routes[63]; } bots_navigation;
@@ -110,9 +110,12 @@ int main(int argc, char **argv)
         walkable[0]=0;broken=1;
         CHECK(job->walkable[0]==1 && !(job->walkable[1]&1),"snapshot reads mutable state");
     }
-    else if (!strcmp(argv[1],"stale"))
+    else if (!strcmp(argv[1],"stale") || !strcmp(argv[1],"goal") || !strcmp(argv[1],"boarding") || !strcmp(argv[1],"seat"))
     {
-        bot->unit_index=11;
+        if (!strcmp(argv[1],"stale")) bot->unit_index=11;
+        if (!strcmp(argv[1],"goal")) bot->goal_serial++;
+        if (!strcmp(argv[1],"boarding")) bot->navigation_parent=1;
+        if (!strcmp(argv[1],"seat")) bot->navigation_seat=1;
         CHECK(bots_worker_job(bot)==job && job->pending,"in-flight answer overwritten on respawn");
         SetEvent(job->done);
         CHECK(!bots_worker_job(bot) && !job->pending,"respawn consumed stale answer");

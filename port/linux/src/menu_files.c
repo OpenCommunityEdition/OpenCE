@@ -967,7 +967,9 @@ struct halo_menus const *halo_menus_load(void)
 	{
 		size_t length = strlen(files[index].path);
 
-		if (length > 4 && !strcmp(files[index].path + length - 4, ".xml"))
+		/* The optional frontend has a separate, ui.map-only parse. */
+		if (strncmp(files[index].path, "modern/", 7) &&
+			length > 4 && !strcmp(files[index].path + length - 4, ".xml"))
 			read_file(&reader, &files[index]);
 	}
 	free(reader.last_child);
@@ -988,6 +990,8 @@ struct halo_menus const *halo_menus_load(void)
 	succeeded = 1;
 	return &menus;
 }
+
+#include "frontend_menu_files.inl"
 
 long halo_menus_utf16(char const *utf8, unsigned short *out, long capacity)
 {

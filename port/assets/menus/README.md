@@ -14,6 +14,7 @@ controller, the keyboard and the mouse, on every port.
 | `UNWIRED.md` | The menus' functions that do nothing yet: the lists they fill are empty, and the settings they change do not change |
 | `menus.json` | The files the game embeds |
 | `ce/main_menu.changelog.port.xml` | Port-owned player notes screens and their bitmap definitions |
+| `modern/` | Opt-in GulchCE Settings, hosting and lobby frontend (native browsers preserved), generated independently by `python tools/frontend_menu.py`; excluded from gameplay's menu set |
 
 `tools/ce_menus.py` writes all of them from the PC version's tags and the
 redraws, but the settings screens (Controls Setup, Gamepads, Mouse, Audio,

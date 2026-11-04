@@ -42,6 +42,7 @@ menu gets FRIENDLY FIRE too.
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 
 #include "halo_menus.h"
+#include "frontend_menu.h"
 #include "mcc_ui.h"
 #include "mcc_cache.h"
 #include "custom_edition_cache.h"
@@ -408,8 +409,12 @@ static char const *const port_function_names[] =
 	"port controller init", "port controller close", "port controller defaults",
 	"port controller save", "port controller bind", "port controller left", "port controller right",
 	"port controller clear", "port controller cancel",
-	"port map vote open", "port map vote choose",
 	"port bots init", "port bots command", "port bots host entry", "port bots settings save",
+	"port frontend apply", "port frontend cancel",
+	"port frontend init", "port frontend defaults",
+	"port frontend back", "port frontend page", "port frontend next tab", "port frontend editor",
+	"port frontend navigation init",
+	"port map vote open", "port map vote choose",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -422,7 +427,7 @@ static char const *const port_game_data_input_names[] =
 	"server settings update", "audio menu update", "mp prof vehicles update", "solo map list update",
 	"mp map list update", "gt select list update", "gt edit list update", "load game list update",
 	"direct ip connect update", "network settings update",
-	"port settings help", "color picker update", "3wide player profile list update", "port lobby update",
+	"port frontend update", "port frontend navigation update", "port frontend multiplayer update", "port settings help", "color picker update", "3wide player profile list update", "port lobby update",
 	"port lobby preview update", "port join4 update",
 	/* (the gametype editor's: the Xbox's stops the game on the buttons'
 	row; the Xbox's read only player_ui's gametype, not Server Setup's) */
@@ -2506,6 +2511,10 @@ void menu_tags_loaded(
 	boolean game_map = strcmp(map_name, "ui") != 0;
 	boolean campaign = game_map && full_screen_campaign_map();
 	boolean coop = game_map && network_coop_campaign_map();
+	boolean frontend;
+
+	frontend_menu_map_loaded(map_name, mcc_cache_tags_loaded());
+	frontend = frontend_menu_requested();
 
 	/* MCC owns its pause menus and uses these native Settings screens.
 	Do not patch embedded MCC campaign widgets. */
@@ -2522,12 +2531,12 @@ void menu_tags_loaded(
 	campaign's too, single player's or network co-op's, which also gets
 	FRIENDLY FIRE) */
 	if ((game_map && tag_loaded('Soul', MULTIPLAYER_COLLECTION) == NONE && !campaign) ||
-		!menus_pc_chosen())
+		(!menus_pc_chosen() && !frontend))
 	{
 		return;
 	}
 mcc_settings:
-	menus = halo_menus_load();
+	menus = frontend ? frontend_menu_files_load() : halo_menus_load();
 	if (!menus)
 		return;
 	memset(&build, 0, sizeof(build));
@@ -2680,6 +2689,7 @@ done:
 void menu_tags_unloaded(
 	void)
 {
+	frontend_menu_unloaded();
 	if (menu_tags.loaded || menu_tags.block_count)
 		menu_tags_release();
 }

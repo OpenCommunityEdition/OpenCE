@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import read, build, run, mutated
 
 
-@pytest.mark.parametrize("case", ["snapshot", "stale", "cleanup", "disabled", "malformed", "allocation", "graph_allocation"])
+@pytest.mark.parametrize("case", ["snapshot", "stale", "goal", "boarding", "seat", "cleanup", "disabled", "malformed", "allocation", "graph_allocation"])
 def test_worker(case):
     source = read("port/linux/game/bots_worker.inl")
     code = source[source.index("struct bots_path_job"):]

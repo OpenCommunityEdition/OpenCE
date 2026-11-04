@@ -4,7 +4,7 @@ decisions draw on id Software's and ioquake3 contributors' Quake III Arena bot r
 classification and tactics derive from BirchWoodGod/halo-ce-vita.
 See docs/reading/bots_and_android_features.md for the provenance chain.
 
-The existing bots.c owns combat, spawning and pathfinding. This module
+The standalone enhanced controller owns combat and navigation. This module
 selects destinations; it never changes engine rules or replicated state. */
 #include "cseries.h"
 #include "game/game.h"
@@ -14,6 +14,7 @@ selects destinations; it never changes engine rules or replicated state. */
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "objects/objects.h"
+#include "physics/collisions.h"
 #include "items/weapons.h"
 #include "items/weapon_definitions.h"
 #include "items/projectile_definitions.h"
@@ -594,9 +595,13 @@ boolean enhanced_bots_goal(long index, long player_index, real_point3d const *po
 		bots_tactics_objective(index);
 	if (!found && !urgent_only)
 	{
-		if (bots_tactics_goal(index, player_index, position, goal, surface))
+		/* Attackers keep a flag destination even with a precision weapon.
+		Defenders may cover their stand from a vantage point. */
+		if (bots_ctf_active() && !bots_ctf_defender(bot, player))
+			found = bots_ctf_choose_goal(bot, player, position);
+		if (!found && bots_tactics_goal(index, player_index, position, goal, surface))
 			return TRUE;
-		if (bots_ctf_active())
+		if (!found && bots_ctf_active())
 			found = bots_ctf_choose_goal(bot, player, position);
 	}
 	if (found)
@@ -609,7 +614,10 @@ boolean enhanced_bots_goal(long index, long player_index, real_point3d const *po
 
 boolean enhanced_bots_advancing(long index, long unit_index)
 {
-	return bots_ctf_carrying(&bots_globals.bots[index]) ||
+	struct bots_bot *bot = &bots_globals.bots[index];
+	return bots_ctf_carrying(bot) ||
+		(bots_ctf_active() && bot->goal_kind == _bots_goal_objective &&
+			!bots_ctf_defender(bot, player_get(bot->player_index))) ||
 		(bots_king_active() && !bots_king_on_hill(unit_index)) ||
 		(infection_enabled() && infection_unit_is_zombie(unit_index));
 }
@@ -698,4 +706,39 @@ real enhanced_bots_powerup_score(struct unit_datum *unit, long definition_index,
 		break;
 	}
 	return REAL_MAX;
+}
+
+void enhanced_bots_failed(long index)
+{
+	bots_globals.bots[index].goal_kind = _bots_goal_none;
+	bots_tactics_objective(index);
+}
+
+boolean enhanced_bots_capture_approach(long index, real_point3d const *position, real *direction, unsigned long *flags)
+{
+	struct bots_bot *bot = &bots_globals.bots[index];
+	struct player_datum *player;
+	real_point3d const *home;
+	real_point3d start, finish;
+	real_vector3d delta;
+	struct collision_result hit;
+	unsigned long collision_flags;
+	if (!bots_ctf_carrying(bot)) return FALSE;
+	player = player_get(bot->player_index);
+	if (player->team_index < 0 || player->team_index > 1) return FALSE;
+	home = &bots_globals.ctf.home[player->team_index];
+	if (bots_distance2d(position, home) >= 4.0f || fabs(home->z - position->z) >= 2.5f) return FALSE;
+	/* Being close in XY is not permission to cut through the base wall.
+	Keep the route around entrances until the final approach is visible. */
+	start = *position; finish = *home;
+	start.z += 0.6f; finish.z += 0.6f;
+	vector_from_points3d(&start, &finish, &delta);
+	collision_flags = FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit) |
+		FLAG(_collision_test_objects_bit) | FLAG(_collision_test_objects_scenery_bit) |
+		FLAG(_collision_test_objects_machines_bit) | FLAG(_collision_test_objects_vehicles_bit);
+	if (collision_test_vector(collision_flags, &start, &delta, player->unit_index, &hit)) return FALSE;
+	*direction = (real)atan2(home->y - position->y, home->x - position->x);
+	if (home->z > position->z + 0.4f && bots_distance2d(position, home) < 1.5f && !(game_time_get() & 15))
+		*flags |= FLAG(_unit_control_jump_bit);
+	return TRUE;
 }

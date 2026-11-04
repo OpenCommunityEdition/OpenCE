@@ -725,11 +725,16 @@ decoded texture storage to exceed the former single 512 MiB offset range.
   MCC virtual resources. Runtime tag windows must be free, 64 KiB-aligned,
   64 MiB allocations based between `0x42000000` and `0x70000000` inclusive.
   The observed MCC base is `0x50000000`.
-  Windows reserves this address range before renderer initialization and
+  Windows delay-loads `SDL3.dll` and reserves this address range at constructor
+  priority 101, before CE's settings read (priority 102) first calls SDL.
+  SDL retains ASLR; it is not patched to use a fixed address. Windows
   retains the reservation between maps. Pages are committed only during an
   MCC load and decommitted on unload; other accepted linked bases can replace
   only our inactive reservation. An occupied range is never overwritten.
   Allocation refusals report the address, size and OS error in `debug.txt`.
+  Early reservation failures are retained until `windows_startup` opens the
+  port log, then reported to stderr (normally `halo.log` for release builds).
+  The map loader still retries the reservation and refuses occupied memory.
   MCC network load failures schedule session teardown and a menu reload before
   the next frame's input update, rather than entering the fatal error screen.
   A player reported that disabling XFire and restarting GulchCE resolved this
@@ -737,6 +742,13 @@ decoded texture storage to exceed the former single 512 MiB offset range.
   but the specific allocation conflict has not been captured. Early reservation
   is not a guarantee of compatibility with XFire; disabling it and restarting
   remains the confirmed workaround for that report.
+  Separately, [issue 87's follow-up](https://github.com/chestahh/GulchCE/issues/87#issuecomment-6486929272)
+  records two launches with the unmodified SDL DLL inside the MCC window and
+  a successful launch with SDL's ASLR disabled locally. Those post-startup
+  snapshots do not establish which module first occupied the range. They do
+  demonstrate why a normal load-time SDL import can defeat any constructor.
+  Delay loading removes that SDL race; other eager or injected DLLs can still
+  prevent reservation and must not be overwritten.
 - There are at most 65,535 tags and 32 BSP references. Runtime conversion
   descriptors must fit below the lowest BSP in the tag window. Geometry
   currently admits at most 64 nodes per model, 22 palette nodes per part,

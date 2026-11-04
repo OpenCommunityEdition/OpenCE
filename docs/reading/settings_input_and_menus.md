@@ -38,6 +38,10 @@ file externally is not evidence that every consumer watches it live.
 
 ## Menu data selects a runtime operation
 
+The opt-in [modern Settings frontend](menu_redesign.md) uses a separate
+frontend parse and root selector. It leaves gameplay's `display.menus`
+policy and MCC pause ownership intact; switching occurs only at the main menu.
+
 The menu XML describes widgets and event names. It is produced by
 [ce_menus.py](../../tools/ce_menus.py) and `port_settings.py`; use the
 [menu asset reference](../../port/assets/menus/README.md) for regeneration.

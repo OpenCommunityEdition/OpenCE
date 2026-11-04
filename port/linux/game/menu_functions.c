@@ -70,6 +70,8 @@ their handlers open opens.
 */
 
 #include "cseries.h"
+#include "third_person.h"
+#include "third_person_protocol.h"
 #include "input/input.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
@@ -419,6 +421,8 @@ static boolean setting_write(char const *name, char const *value)
 {
 	short index;
 
+	if (!strcmp(name, "display.third_person") && third_person_policy() != _third_person_player_choice)
+		return TRUE;
 	/* (DISCORD ACCOUNT's LINK: done, not written: the master's page opened
 	in the browser, or the account forgotten, player_link.c) */
 	if (!strcmp(name, "link.action"))
@@ -479,6 +483,8 @@ static boolean setting_save(struct widget_instance *widget)
 	if (!setting || setting->loaded_index == NONE || widget->parameters.list.selected_index < 0 ||
 		widget->parameters.list.selected_index >= setting->value_count)
 		return FALSE;
+	if (!strcmp(setting->setting, "display.third_person") && third_person_policy() != _third_person_player_choice)
+		return TRUE;
 	if (widget->parameters.list.selected_index == setting->loaded_index)
 		return TRUE;
 	if (!config_write(setting->setting, setting->values[widget->parameters.list.selected_index]))
@@ -1756,10 +1762,17 @@ static struct widget_instance *screen_of(struct widget_instance *widget)
 }
 
 /* "port settings save" (OK): those changed written, and applied */
+boolean network_game_is_active(void);
+
 static boolean setting_changed_save(struct widget_instance *spinner, struct pc_menu_setting *setting)
 {
 	short index = spinner->parameters.list.selected_index;
 
+	/* A locked display value is never a change to the personal preference,
+	   even if the host unlocks the lobby just before this menu closes. */
+	if (!strcmp(setting->setting, "display.third_person") &&
+		(third_person_policy() != _third_person_player_choice || setting->loaded_index == NONE))
+		return TRUE;
 	if (index < 0 || index >= setting->value_count || index == setting->loaded_index)
 		return TRUE;
 	if (!setting_write(setting->setting, setting->values[index]))
@@ -1769,6 +1782,8 @@ static boolean setting_changed_save(struct widget_instance *spinner, struct pc_m
 	}
 	platform_log("menus: %s = %s", setting->setting, setting->values[index]);
 	setting->loaded_index = index;
+	if (!strcmp(setting->setting, "display.menu_frontend") && main_menu_is_active() &&
+		!network_game_is_active()) main_goto_main_menu();
 	return TRUE;
 }
 
@@ -1779,6 +1794,27 @@ static boolean setting_default_show(struct widget_instance *spinner, struct pc_m
 
 	if (setting_text(setting->setting, text, sizeof(text), TRUE))
 		spinner->parameters.list.selected_index = setting_value_index(setting, text);
+	return TRUE;
+}
+
+#include "frontend_menu_runtime.inl"
+#include "frontend_prompts.h"
+
+static boolean camera_setting_show(struct widget_instance *spinner, struct pc_menu_setting *setting)
+{
+	if (!strcmp(setting->setting, "display.third_person"))
+	{
+		if (third_person_policy() != _third_person_player_choice)
+		{
+			spinner->parameters.list.selected_index = setting_value_index(setting, third_person_enabled() ? "true" : "false");
+			setting->loaded_index = NONE;
+		}
+		else if (setting->loaded_index == NONE)
+		{
+			setting->loaded_index = setting_value_index(setting, config_boolean("display.third_person") ? "true" : "false");
+			spinner->parameters.list.selected_index = setting->loaded_index;
+		}
+	}
 	return TRUE;
 }
 
@@ -2513,9 +2549,15 @@ static struct
 	{ "controls.scoreboard", L"SHOW SCORES", 2 },
 	{ "controls.pause", L"PAUSE MENU", 2 },
 	{ "controls.screenshot", L"SCREENSHOT", 2 },
+	{ "controls.swap_shoulder", L"SWAP SHOULDER", 4 },
+	{ "controls.free_look", L"HOLD FREE LOOK", 4 },
+	{ "controls.toggle_perspective", L"TOGGLE PERSPECTIVE", 4 },
 	{ "controls.push_to_talk", L"PUSH TO TALK", 3 },
 	{ "controls.chat", L"CHAT", 3 },
 	{ "controls.team_chat", L"TEAM CHAT", 3 },
+	{ "controls.camera_distance", L"CAMERA DISTANCE", 4 },
+	{ "controls.camera_height", L"CAMERA HEIGHT", 4 },
+	{ "controls.camera_offset", L"CAMERA OFFSET", 4 },
 	{ "controls.vote_yes", L"VOTE YES", 3 },
 	{ "controls.vote_no", L"VOTE NO", 3 },
 };
@@ -3301,6 +3343,7 @@ boolean ui_widget_port_multiplayer_player(short controller_index, long profile_i
 boolean ui_widget_port_unjoin_player(struct widget_instance *widget, struct event_record *event,
 	boolean *widget_deleted);
 void network_game_server_port_set_settings(wchar_t const *name, long maximum_players);
+void network_game_server_port_set_camera_policy(short policy);
 void network_game_server_port_set_cooperative_friendly_fire(short friendly_fire);
 void network_game_server_port_set_cooperative_player_collisions(boolean player_collisions);
 void network_game_server_port_set_cooperative_ally_friendly_fire(boolean ally_friendly_fire);
@@ -3641,6 +3684,7 @@ static void mcc_host_list_update(struct widget_instance *list)
 	else
 		mcc_browser_description(description, browser);
 	profile_name_show(description);
+	frontend_multiplayer_difficulty(list, mcc_host_list.step == MAP_STEP_DIFFICULTIES ? mcc_host_list.chosen : NONE);
 }
 
 static boolean mcc_host_list_choose(struct widget_instance *list, boolean *widget_deleted)
@@ -3767,6 +3811,7 @@ static void map_list_update(struct widget_instance *list)
 			NONE);
 	}
 	profile_name_show(description);
+	frontend_multiplayer_difficulty(list, map_list.step == MAP_STEP_DIFFICULTIES ? map_list.chosen : NONE);
 }
 
 /* "mp level select" (the list's OK): the map chosen, or a level's
@@ -4104,9 +4149,9 @@ VOTING), PASSWORD's and MAP SHARING's (its help_strings, tools/port_settings.py)
 #define COOPERATIVE_OPTIONS_HELP 12
 #define COOPERATIVE_VOICE_OPTIONS_HELP 13
 #define SERVER_PASSWORD_HELP 14
-#define MAP_SHARE_OPTIONS_HELP 15
+#define MAP_SHARE_OPTIONS_HELP 18
 /* (LISTING's PUBLIC on a machine with a publisher key: server_master.c) */
-#define SERVER_LISTING_PUBLISHER_HELP 16
+#define SERVER_LISTING_PUBLISHER_HELP 19
 
 /* whether this machine has a publisher key (read as Server Setup opens) */
 static boolean server_settings_publisher;
@@ -4173,10 +4218,70 @@ static void server_settings_private_set(boolean private_game)
 /* "server settings init": the game's name (player 1's, else the one given
 last), the most players, the gametype's copy (once: the screen is made
 again on coming back from an option's screen) */
+/* This submenu edits the host-owned session without reinitializing the
+main setup's gametype copy, listing or other pending edits. */
+static boolean session_options_initialize(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "session_compatibility_spinner", 0);
+	if (!spinner) return FALSE;
+	spinner->parameters.list.selected_index = third_person_session_active();
+	spinner = named(list, "camera_policy_spinner", 0);
+	if (spinner) spinner->parameters.list.selected_index = third_person_session_active() ? third_person_policy() : third_person_host_policy();
+	return TRUE;
+}
+
+static boolean session_options_update(struct widget_instance *list)
+{
+	static char const *const policies[] = { "player_choice", "forced_on", "forced_off" };
+	struct widget_instance *spinner = named(list, "session_compatibility_spinner", 0);
+	struct widget_instance *help = list->parameters.list.extended_description;
+	char text[TEXT_FIELD_LENGTH];
+	short selected;
+	if (!spinner) return FALSE;
+	selected = spinner->parameters.list.selected_index != 0;
+	if (selected != third_person_session_active())
+	{
+		third_person_session_set(selected);
+		session_options_initialize(list);
+	}
+	if (help) help->parameters.text_box.string_list_index = third_person_session_locked() ? 2 : third_person_session_active();
+	visible_set(named(list, "op_camera_policy", 0), third_person_session_active());
+	if (third_person_session_active() && (spinner = named(list, "camera_policy_spinner", 0)) != NULL)
+	{
+		selected = (short)PIN(spinner->parameters.list.selected_index, 0, 2);
+		if (selected != third_person_policy())
+		{
+			network_game_server_port_set_camera_policy(selected);
+			if (selected == third_person_policy()) config_write("network.camera_policy", policies[selected]);
+		}
+		spinner->parameters.list.selected_index = third_person_policy();
+		if (help && list->focused_child == named(list, "op_camera_policy", 0))
+			help->parameters.text_box.string_list_index = 3 + third_person_policy();
+	}
+	if (multiplayer.mode != _multiplayer_mode_host_internet)
+		snprintf(text, sizeof(text), "NONE: A LAN GAME");
+	else if (!config_boolean("network.online"))
+		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
+	else if (!p2p_invite_link(text, sizeof(text)))
+		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
+	else
+		/* The 64-digit invite does not fit a menu value. The action copies
+		the complete link; show its purpose rather than a clipped address. */
+		snprintf(text, sizeof(text), "SELECT TO COPY LINK");
+	text_field_show(named(list, "invite_value", 0), text, FALSE);
+	if ((spinner = named(list, "op_invite", 0)) != NULL)
+	{
+		spinner->vertical_offset = third_person_session_active() ? 133 : 103;
+		if (help && list->focused_child == spinner) help->parameters.text_box.string_list_index = 6;
+	}
+	return TRUE;
+}
+
 static boolean server_settings_initialize(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
 
+	if (session_options_initialize(list)) return TRUE;
 	/* (co-op has no gametype to edit) */
 	if (!hosting_cooperative())
 		gametype_setup_begin();
@@ -4219,18 +4324,12 @@ static void server_settings_update(struct widget_instance *list)
 	struct widget_instance *row = named(list, "op_server_name", 0);
 	char text[TEXT_FIELD_LENGTH];
 
+	if (session_options_update(list)) return;
 	if (spinner)
 		*server_settings_maximum_players_index() = (short)PIN(spinner->parameters.list.selected_index, 0,
 			NUMBEROF(maximum_players) - 1);
 	wide_to_text(multiplayer.game_name, text, sizeof(text));
 	text_field_show(named(list, "server_name_value", 0), text, text_field_editing(row));
-	if (multiplayer.mode != _multiplayer_mode_host_internet)
-		snprintf(text, sizeof(text), "NONE: A LAN GAME");
-	else if (!config_boolean("network.online"))
-		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
-	else if (!p2p_invite_link(text, sizeof(text)))
-		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
-	text_field_show(named(list, "invite_value", 0), text, FALSE);
 	{
 		wchar_t type[ROW_TEXT_LENGTH];
 
@@ -4238,6 +4337,8 @@ static void server_settings_update(struct widget_instance *list)
 		text_set(named(list, "game_type_value", 0), type);
 	}
 	settings_help(list);
+	if (list->parameters.list.extended_description && list->focused_child == named(list, "op_session_options", 0))
+		list->parameters.list.extended_description->parameters.text_box.string_list_index = 15;
 	{
 		boolean cooperative = hosting_cooperative();
 		short row;
@@ -4370,6 +4471,9 @@ void ui_widget_port_cooperative_settings_apply(void)
 
 static boolean server_start(void)
 {
+	static char const *const camera_policies[] = { "player_choice", "forced_on", "forced_off" };
+	if (third_person_session_active())
+		config_write("network.camera_policy", camera_policies[third_person_policy()]);
 	if (text_field_editing(NULL))
 		text_field_end(TRUE);
 	network_game_server_port_set_settings(multiplayer.game_name,
@@ -6243,6 +6347,7 @@ extern void halo_virtual_gamepads_start(void);
 /* "port lobby open" (the lobby made, or come back to): no player being added */
 static boolean lobby_join_reset(void)
 {
+	third_person_session_lock();
 	halo_virtual_gamepads_start();
 	lobby_join.adding = FALSE;
 	lobby_join.controller = NONE;
@@ -6465,6 +6570,8 @@ voice chat (or muted) has a speaker just left of their name
 void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d const *bounds)
 {
 	short row;
+
+	frontend_prompts_draw(widget->definition_tag_index, bounds);
 
 	/* (the Mods screen's texts: the fonts and widths their lines are
 	measured in, mods_text_fits) */
@@ -8134,6 +8241,8 @@ boolean pc_menu_event_function_invoke(
 
 		if (!name)
 			return FALSE;
+		if (!strncmp(name, "port frontend ", 14))
+			return frontend_menu_event(widget, name, widget_deleted);
 		if (!strncmp(name, "port bots ", 10))
 			return bots_menu_event(widget, name);
 		if (!strncmp(name, "port controller ", 16))
@@ -8640,6 +8749,12 @@ void pc_menu_game_data_function_invoke(
 		preview_update(widget);
 	else if (!strcmp(name, "port lobby update"))
 		lobby_update(widget);
+	else if (!strcmp(name, "port frontend update"))
+		frontend_menu_help(widget);
+	else if (!strcmp(name, "port frontend navigation update"))
+		frontend_navigation_update(widget);
+	else if (!strcmp(name, "port frontend multiplayer update"))
+		frontend_multiplayer_update(widget);
 	else if (!strcmp(name, "port map vote update"))
 		map_vote_update(widget);
 	else if (!strcmp(name, "port join4 update"))
@@ -8652,6 +8767,12 @@ void pc_menu_game_data_function_invoke(
 		discord_account_show(widget);
 		hdr_calibration_row_show(widget);
 		settings_help(widget);
+		settings_each(widget, camera_setting_show);
+		if (third_person_policy() != _third_person_player_choice &&
+			widget->parameters.list.extended_description &&
+			widget->focused_child == named(widget, "op_third_person", 0))
+			/* FOV And Viewmodels: eight rows, one category, then this help. */
+			widget->parameters.list.extended_description->parameters.text_box.string_list_index = 10;
 	}
 	else if (!strcmp(name, "port hdr calibration"))
 		hdr_calibration_update(widget);

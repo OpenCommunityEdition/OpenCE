@@ -175,7 +175,8 @@ def test_menu_generated_and_default_on():
     assert len(labels) == 4
     assert all('string_list' not in w.attrib and 'string_index' in w.attrib for w in labels)
     rows = port_settings.SCREENS['controller_appearance']['rows']
-    assert len(next(r[2] for r in rows if r[1] == 'display.hud_button_style')) == 11
+    assert len(next(r[2] for r in rows if r[1] == 'display.hud_button_style')) == 12
+    assert next(r[2] for r in rows if r[1] == 'display.hud_button_style')[-1] == ('KEYBOARD', 'keyboard')
     assert next(r[2] for r in rows if r[1] == 'display.hud_bumper_style') == [('ORIGINAL XBOX', 'original'), ('MODERN XBOX', 'modern')]
     parent = ET.parse(ROOT / f'port/assets/menus/ce/{prefix}.gamepad_setup.xml')
     assert any('controller_appearance_screen' in e.get('open', '') for e in parent.iter('on'))
@@ -258,6 +259,18 @@ int main(void){
   assert(cursor.x0==100+(short)((index<4?22:index<6?20:index<8?45:33)*scale));
   before=allocations;icon.flags=2;icon.color=0x40123456;
   assert(controller_glyph_draw(style,index,&icon,&cursor,0xffffffff,unbind));assert(drawn[0].color==0x40ffffff&&before==allocations);icon.flags=0;
+ }
+ /* Menu layout uses the same assets but a smaller footer cell, independent
+  * of split-screen HUD scale, with at least six units before its caption. */
+ for(players=1;players<=2;players++)for(style=3;style<11;style++)for(index=0;index<18;index++){
+  if(index>3&&index!=16)continue;
+  cursor.x0=100;assert(controller_glyph_draw_menu(style,index,&cursor,0x7fffffff));
+  bounds=controller_glyph_assets[controller_glyph_asset_index(style,index==16?8:index)].bounds;
+  w=drawn[2].position.x-drawn[0].position.x;h=drawn[2].position.y-drawn[0].position.y;
+  x=drawn[0].position.x+bounds[2]*w/512;
+  y=drawn[0].position.y+(bounds[1]+bounds[3])*h/1024;
+  near(y,100);assert(cursor.x0-x>=5.99f);
+  assert((bounds[3]-bounds[1])*h/512<=22.001f);
  }
  assert(live==62 && allocations==62);controller_glyphs_dispose();assert(!live && unbound==62);
  controller_glyphs_dispose();assert(unbound==62);

@@ -87,6 +87,8 @@ every game the server sets up */
 void network_game_server_port_set_settings(
 	wchar_t const *name,
 	long maximum_players);
+/* port: host camera rule, editable only before the match starts. */
+void network_game_server_port_set_camera_policy(short policy);
 /* port: a co-op level was won (main.c). Ends the round for everyone as in
 multiplayer; the next round is on next_map (NULL repeats the level). */
 void network_game_server_port_cooperative_won(

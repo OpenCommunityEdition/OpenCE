@@ -18,4 +18,6 @@ void enhanced_bots_aim(long index, short skill, long target_index, long weapon_i
 	real_point3d const *eye, real_point3d *point);
 real enhanced_bots_powerup_score(struct unit_datum *unit, long definition_index, real distance,
 	short skill, boolean fighting, boolean holding);
+void enhanced_bots_failed(long index);
+boolean enhanced_bots_capture_approach(long index, real_point3d const *position, real *direction, unsigned long *flags);
 #endif

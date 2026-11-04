@@ -332,6 +332,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 #include "errors.h"
 #include "cseries/profile.h"
 #include "cseries/cseries_windows.h"
@@ -408,6 +409,7 @@ symbols in this file:
 #include "mcc_cache.h"
 #include "mcc_main.h"
 #include "view_fov.h" /* port: display.fov, before the projection and culling */
+#include "frontend_menu.h" /* port: optional menu-tag lifecycle at the main menu */
 
 #if defined(HALO_WINDOWS) || defined(HALO_ANDROID) || defined(__linux__)
 #define HALO_NATIVE_BUILD_INFO 1
@@ -1132,6 +1134,9 @@ void main_menu_unload(
 void main_menu_load(
 	void)
 {
+	/* port: optional frontend tags are rebuilt only at the main-menu boundary. */
+	if (frontend_menu_reload_required())
+		main_menu_unload();
 	if (!main_globals.main_menu_scenario_loaded)
 		main_load_ui_scenario(FALSE);
 	main_screen_shell_load();
@@ -1169,12 +1174,12 @@ void set_window_camera_values(
 		window->rasterizer_camera.position = observer->position;
 		window->rasterizer_camera.forward = observer->forward;
 		window->rasterizer_camera.up = observer->up;
-		/* port: display.fov's view, the local render view only (view_fov.c) */
+		/* port: keep the stock FOV until the shoulder collision test below. */
 		window->rasterizer_camera.vertical_field_of_view =
-			render_fov_vertical(window->local_player_index, 2.0f * arctangent(
+			2.0f * arctangent(
 				0.75f * render_camera_get_adjusted_field_of_view_tangent(
 					observer->field_of_view),
-				1.0f));
+				1.0f);
 
 		if (window->local_player_index != NONE &&
 			!console_is_active() &&
@@ -1213,6 +1218,12 @@ void set_window_camera_values(
 				1.0f);
 	}
 
+	/* port: the shoulder view is applied after interpolation and camera effects. */
+	third_person_camera(window->local_player_index, observer ? &window->rasterizer_camera : NULL);
+	/* port: choose the FOV after collision has selected this frame's view. */
+	if (observer)
+		window->rasterizer_camera.vertical_field_of_view = render_fov_vertical(
+			window->local_player_index, window->rasterizer_camera.vertical_field_of_view);
 	window->rasterizer_camera.mirrored = FALSE;
 	window->rasterizer_camera.z_near = rasterizer_globals.near_clip_distance;
 	window->rasterizer_camera.z_far = rasterizer_globals.far_clip_distance;
@@ -3584,6 +3595,8 @@ static boolean main_loop_iteration(
 		input_frame_begin();
 		input_update();
 		input_abstraction_update();
+		/* port: camera shortcuts obey the host's match policy. */
+		third_person_input_update();
 		profile_scope_exit(main_input_section)
 		profile_scope_enter(main_platform_events_section)
 		shell_idle();

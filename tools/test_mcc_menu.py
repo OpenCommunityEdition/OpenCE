@@ -53,6 +53,8 @@ enum {MAP_STEP_MAPS, MAP_STEP_DIFFICULTIES};
 struct player_profile {int last_single_player_map_played;};
 struct widget_instance {struct {struct {short selected_index;struct widget_instance *extended_description;} list;} parameters;};
 static struct widget_instance spinner, description, list;
+/* Presentation belongs to the frontend module; this fixture checks map selection. */
+static void frontend_multiplayer_difficulty(struct widget_instance *widget,short chosen){(void)widget;(void)chosen;}
 static struct {short shown_level,saved_level;struct {boolean available;void *finished;} levels[10];} campaign;
 static int no_spinner, empty_catalog, failed, launched, deferred, cooperated, multiplayer;
 static int opened, backed, last_controller, last_difficulty, last_sound, focus_first, focus_chosen;

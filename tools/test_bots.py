@@ -1,7 +1,7 @@
 """The bots (port/linux/game/bots.c, bots.count) in the game: a local Slayer game on a stock map, played without a
 person (debug.network_test "local:", the scripted controller 1 of debug.test_input) for a minute and more, in which
 every bot walks the map, the bots kill and die, and the game ends cleanly; and a system link game, which no bot joins
-when bots.network is off. Enhanced Slayer/CTF/King cases use the same checks.
+when bots.network is off. Enhanced objective cases additionally require actual CTF capture or hill scores.
 Retail map/build/profile paths can be supplied through HALO_TEST_MAPS, HALO_TEST_GAME and HALO_TEST_SAVES. The game draws
 offscreen (SDL's offscreen video driver), with no audio, internet play or update check."""
 
@@ -18,7 +18,7 @@ RETAIL_MAPS = Path(os.environ.get("HALO_TEST_MAPS", "assets/maps"))
 GAME = Path(os.environ.get("HALO_TEST_GAME", "build/linux/halo"))
 # a player's line of the network test's each second (network_test.c): alive or dead, its kills, deaths, team and
 # machine (a bot's is BOTS_FIRST_MACHINE, 65, and up)
-PLAYER = re.compile(r"player (\d+): (?:\((-?[\d.]+) (-?[\d.]+) -?[\d.]+\)|dead).*? s-?\d+ k(-?\d+) d(-?\d+) f-?\d+ "
+PLAYER = re.compile(r"player (\d+): (?:\((-?[\d.]+) (-?[\d.]+) -?[\d.]+\)|dead).*? s(?P<score>-?\d+) k(-?\d+) d(-?\d+) f-?\d+ "
                     r"t-?\d+ m(\d+)")
 BOTS_FIRST_MACHINE = 65
 
@@ -52,8 +52,9 @@ def _play(tmp_path, test, seconds, **settings):
     env = {**os.environ, "SDL_VIDEODRIVER": "offscreen", "SDL_AUDIODRIVER": "dummy",
            "HALO_DATA_ROOT": str(tmp_path / "data"), "HALO_SAVE_ROOT": str(tmp_path / "save"),
            "HALO_HIDDEN_WINDOW": "1", "HALO_NULL_RENDERER": "1", "HALO_FULLSCREEN": "0", "HALO_NO_VSYNC": "1", "HALO_NO_AUDIO": "1",
-           "HALO_UPDATE_AUTO": "false", "HALO_NET_ONLINE": "false", "HALO_NET_ADDRESS": "127.0.0.1",
-           "HALO_NET_BROADCAST": "127.255.255.255", "HALO_NETWORK_TEST": test, "HALO_NETWORK_TEST_START": "5",
+           "HALO_UPDATE_AUTO": "false", "HALO_NET_ONLINE": "false",
+           "HALO_NET_ADDRESS": os.environ.get("HALO_TEST_NET_ADDRESS", "127.0.0.1"),
+           "HALO_NET_BROADCAST": os.environ.get("HALO_TEST_NET_BROADCAST", "127.255.255.255"), "HALO_NETWORK_TEST": test, "HALO_NETWORK_TEST_START": "5",
            "HALO_NETWORK_TEST_SCORE": "500", "HALO_TEST_INPUT": "bot:1", "HALO_EXIT_AFTER": str(seconds + 20)}
     env.update({name: str(value) for name, value in settings.items()})
     try:
@@ -83,7 +84,7 @@ def _players(output):
         for match in PLAYER.finditer(line):
             index = int(match.group(1))
             player = players.setdefault(index, {"walked": 0.0})
-            player.update(kills=int(match.group(4)), deaths=int(match.group(5)), machine=int(match.group(6)))
+            player.update(score=int(match.group("score")), kills=int(match.group(5)), deaths=int(match.group(6)), machine=int(match.group(7)))
             if match.group(2) is None:
                 last.pop(index, None)
                 continue
@@ -127,6 +128,8 @@ def test_enhanced_bots_play_objectives(tmp_path, variant):
     assert len(bots) == 6, output[-2000:]
     assert all(bot["walked"] >= 20 for bot in bots), bots
     assert sum(bot["kills"] for bot in bots) > 0, bots
+    if variant == "king":
+        assert sum(bot["score"] for bot in bots) > 0, f"no objective scores: {bots}"
 
 
 def test_no_bots_in_a_system_link_game(tmp_path):
@@ -137,3 +140,20 @@ def test_no_bots_in_a_system_link_game(tmp_path):
     assert players, "the system link game did not start"
     assert all(player["machine"] < BOTS_FIRST_MACHINE for player in players.values()), "a bot in a system link game"
     assert not re.search(r"\bbots: ", output), "the bots ran in a system link game"
+
+
+def test_enhanced_bots_capture_flag(tmp_path):
+    """An unopposed team must complete a flag run; kills do not satisfy it.
+
+    Balanced matches above exercise contested play. Requiring a capture in
+    every short balanced match confuses competent defense with AI failure.
+    """
+    _game("bloodgulch")
+    status, output, debug = _play(tmp_path, "local:bloodgulch:ctf", 180,
+        HALO_BOTS=6, HALO_BOTS_ENHANCED="true", HALO_BOT_TEAMS="against",
+        HALO_BOT_ROUTES="mixed", HALO_TEST_INPUT="")
+    assert status == 0, output[-2000:]
+    assert not re.search(r"assert|exception", output + debug, re.I), output[-2000:]
+    bots = [p for p in _players(output).values() if p["machine"] >= BOTS_FIRST_MACHINE]
+    assert len(bots) == 6, bots
+    assert sum(p["score"] for p in bots) > 0, f"no completed flag run: {bots}"

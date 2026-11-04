@@ -140,6 +140,9 @@ def items():
     protocol = (ROOT / "port/linux/game/mcc_protocol.h").read_text()
     for name, value in re.findall(r"^#define (MCC_PROTOCOL_\w+) ([^\n]+)", protocol, re.M):
         add(f"define {name}", value)
+    camera = (ROOT / "port/linux/game/third_person_protocol.h").read_text()
+    for name, value in re.findall(r"^#define (THIRD_PERSON_PROTOCOL_\w+) ([^\n]+)", camera, re.M):
+        add(f"define {name}", value)
     add("protocol OpenCE", re.search(r"#define HALO_PORT_NETWORK_VERSION (\d+)",
         (ROOT / "port/linux/include/halo_port_limits.h").read_text()).group(1))
     return result

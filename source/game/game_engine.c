@@ -538,6 +538,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "keyboard_glyphs.h" /* port: port/linux/game/keyboard_glyphs.c */
 #include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries_windows.h"
 #include "errors.h"
@@ -8969,6 +8970,10 @@ static boolean internal_rasterize_score(
 			buffer,
 			format,
 			buffer_size);
+		/* port: preserve the identified hint's wording and offer its score key
+		 * to the optional keyboard prompt feature before semantic context is lost. */
+		buffer[buffer_size - 1] = 0;
+		keyboard_score_hint(player_index, buffer, buffer_size);
 		break;
 	default:
 		result = FALSE;

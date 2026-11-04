@@ -347,7 +347,10 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         command="$web_emcc $ldflags -o $out @$out.rsp",
         description="WEB LINK $out",
         rspfile="$out.rsp",
-        rspfile_content="$in_newline",
+        # Emscripten parses response files as shell words even on Windows.
+        # Native backslashes are escapes there; quote portable paths so both
+        # separators and source directories containing spaces survive.
+        rspfile_content=" ".join(f'"{obj.as_posix()}"' for obj in objects),
     )
     n.build(outputs=halo_js, implicit_outputs=[halo_wasm], rule="web_link", inputs=objects,
             implicit=[library_js, pre_js, SDL_PORT, sdl_stamp], variables={"ldflags": " ".join(link_flags)})

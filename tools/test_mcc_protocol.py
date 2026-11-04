@@ -170,7 +170,8 @@ def test_loopback_host_and_remote_capability_selection(tmp_path):
 struct network_advertised_game {int dummy;};
 struct network_game_client {struct network_advertised_game available_games[4];};
 struct transport_address {struct {unsigned long long_words[1];} address;};
-static struct {unsigned int flags;} network_game_client_advertised_versions[4];
+static struct {unsigned int flags,version;} network_game_client_advertised_versions[4];
+static void third_person_session_client_begin(unsigned int version){(void)version;}
 static int local_server;
 static unsigned int selected;
 static int global_network_game_server_get(void) {return local_server;}
@@ -231,11 +232,12 @@ enum {_message_client_join_game_request, _network_game_packet_class_client_prega
  _message_server_machine_accepted, _message_server_machine_rejected,
  _network_game_server_rejection_reason_bad_join_token, _rejection_code_game_is_full,
  _network_game_server_rejection_reason_game_not_open};
-struct network_game {int unused;};
+struct network_game {int machine_count;};
 struct network_game_server {int unused;};
 struct network_game_server_client_machine {int unused;};
 struct network_connection {int unused;};
-struct transport_address {int unused;};
+struct transport_address {struct {unsigned long long_words[1];} address;};
+#define IPV4_LOOPBACK_ADDRESS 0x7f000001UL
 struct network_machine {wchar_t name[16];};
 struct message_client_join_game_request {wchar_t machine_name[16];char hardware_id[32];byte join_game_token[16];byte link_pass[192];byte link_proof[64];};
 struct message_server_machine_accepted {short machine_index;long random_seed;};
@@ -245,6 +247,9 @@ static struct network_game game;
 static struct network_machine machine;
 static struct network_message fake_reply;
 static int state,late,joined,decode_ok,token_ok,slots,open_game,banned,accepted,capable,requires_mcc,name_blocked;
+static int camera_locked;
+static unsigned long peer_address;
+static void third_person_session_lock(void) {camera_locked=1;}
 static int decode(void *out) {
  struct message_client_join_game_request *q=out;
  memset(q,0,sizeof(*q));memset(q->join_game_token,token_ok?7:8,16);return decode_ok;
@@ -262,7 +267,7 @@ static int accept(void) {if(banned)return 0;accepted++;return 1;}
 #define network_game_server_set_machine_link(...) ((void)0)
 #define network_game_server_clean_name(...) ((void)0)
 #define wide_to_ascii(...) ((void)0)
-#define network_connection_get_address(...) ((void)0)
+#define network_connection_get_address(c,a,l) ((a)->address.long_words[0]=peer_address)
 #define network_game_server_game_is_open(s) open_game
 #define network_game_generate_join_game_token(t) memset(t,7,16)
 #define network_game_server_accept_client_machine_into_game(s,m) accept()
@@ -282,6 +287,7 @@ static int accept(void) {if(banned)return 0;accepted++;return 1;}
 ''' + join + r'''
 static void reset(void) {
  state=0;late=joined=banned=accepted=capable=requires_mcc=name_blocked=0;
+ camera_locked=0;peer_address=2;game.machine_count=1;
  decode_ok=token_ok=slots=open_game=1;
 }
 static int try_join(int capability) {
@@ -291,7 +297,11 @@ static int try_join(int capability) {
 int main(void) {
  int cap,mcc;
  for(mcc=0;mcc<2;mcc++) for(cap=0;cap<2;cap++) {
-  reset();requires_mcc=mcc;CHECK(try_join(cap)==(!mcc||cap));CHECK(accepted==(!mcc||cap));
+  reset();requires_mcc=mcc;CHECK(try_join(cap)==(!mcc||cap));CHECK(accepted==(!mcc||cap));CHECK(camera_locked==accepted);
+  reset();requires_mcc=mcc;peer_address=IPV4_LOOPBACK_ADDRESS;
+  CHECK(try_join(cap)==(!mcc||cap));CHECK(!camera_locked);
+  reset();requires_mcc=mcc;peer_address=IPV4_LOOPBACK_ADDRESS;game.machine_count=2;
+  CHECK(try_join(cap)==(!mcc||cap));CHECK(camera_locked==accepted);
   reset();requires_mcc=mcc;decode_ok=0;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;token_ok=0;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;slots=0;CHECK(!try_join(cap) && !accepted);
@@ -300,7 +310,7 @@ int main(void) {
   reset();requires_mcc=mcc;name_blocked=1;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;state=1;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;state=1;late=1;CHECK(try_join(cap)==(!mcc||cap));CHECK(accepted==(!mcc||cap));
-  reset();requires_mcc=mcc;joined=1;try_join(cap);CHECK(!accepted && !capable);
+  reset();requires_mcc=mcc;joined=1;try_join(cap);CHECK(!accepted && !capable && !camera_locked);
  }
  return 0;
 }
@@ -435,7 +445,7 @@ static int game_modes_kind(int const *variant,int const *options) {(void)options
 static int network_game_server_get_state(void *server,void *state) {(void)server;(void)state;return 0;}
 static int network_game_server_game_is_loading(void *server) {(void)server;return 0;}
 ''' + defines + '\n#define BASE_VERSION ' + base + r'''
-unsigned int mcc_protocol_version(char const *map) {return map[0] ? MCC_PROTOCOL_VERSION : BASE_VERSION;}
+unsigned int third_person_session_version(char const *map) {return map[0] ? MCC_PROTOCOL_VERSION : BASE_VERSION;}
 static void write_advertisement(byte *bytes,int kind,int mcc) {
     struct {byte reserved[26];} advertisement={{0}};
     struct game data={{""},0,0};
