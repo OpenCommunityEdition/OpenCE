@@ -1376,7 +1376,7 @@ not.
 
 The host's Session Compatibility selector defaults to OpenCE Crossplay.
 Xbox/CE use the exact pinned OpenCE 41 contract; MCC remains independently
-versioned at 63. In this mode the optional shoulder camera, its input and
+versioned at 64. In this mode the optional shoulder camera, its input and
 muzzle behavior, and its checkpoint recovery extensions do not execute.
 GulchCE Third Person instead advertises camera agreement 32712 (Xbox/CE) or
 32713 (MCC), requires a kind 101 envelope before admission and adds the
