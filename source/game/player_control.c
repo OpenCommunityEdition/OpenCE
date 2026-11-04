@@ -212,6 +212,7 @@ symbols in this file:
 #include "real_math.h"
 #include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c; after the limit2d alias above */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "dualsense_game.h" /* port: port/linux/game/dualsense_game.c */
 
 /* ---------- constants */
 
@@ -764,6 +765,10 @@ static void handle_one_player_input(
 				current_weapon_index,
 				player->zoom_level);
 		}
+
+		/* port: a DualSense's adaptive triggers, lightbar and player lights
+		(input.adaptive_triggers, input.lightbar) follow this player */
+		dualsense_player(local_player_index, current_weapon_index, player->zoom_level);
 
 		if (!director_inhibited_facing(local_player_index))
 		{
