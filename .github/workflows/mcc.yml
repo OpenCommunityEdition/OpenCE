@@ -96,7 +96,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Python test dependencies
-        run: python -m pip install pytest numpy --only-binary=:all: -r tools/requirements-frontend.txt
+        run: |
+          python -m pip install pytest numpy --only-binary=:all: -r tools/requirements-frontend.txt
       - name: Check native x86 MCC adapters and legacy isolation
         shell: cmd
         run: |
