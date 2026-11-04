@@ -17,10 +17,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, mutated, read, run  # noqa: E402
 
 SOURCE = "port/linux/src/dsound_sdl.c"
-CASES = ["reference", "impulse", "sines", "aliases", "silent-voice", "mono", "linear", "doppler"]
+CASES = ["reference", "impulse", "sines", "aliases", "silent-voice", "mono", "linear", "doppler",
+         "doppler-limits", "doppler-stereo"]
 
 # a fault in the mixer, and the case that must catch it
 NEGATIVE_CONTROLS = {
+    "doppler-old-pitch-below-minimum": (("else if (base_step * doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)",
+                                        "else if (0)"), "doppler-limits"),
+    "doppler-old-pitch-unbounded": (("if (base_step * doppler * OUTPUT_RATE > VOICE_FREQUENCY_MAXIMUM)",
+                                    "if (0)"), "doppler-limits"),
+    "doppler-stereo-always-on": (("stereo_doppler_enabled && !stream->has_3d", "!stream->has_3d"),
+                                "doppler-stereo"),
     "taps-off-by-one": (("(stream->center + 1 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY",
                          "(stream->center + 2 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY"), "reference"),
     "phase-not-blended": (("for (phase = 0; phase <= RESAMPLER_TABLE_STEPS; phase++)",

@@ -19,7 +19,8 @@ resampling) and applies:
 	  and occlusion levels, their high frequency levels a low pass at the
 	  environment's HF reference: a sound behind a wall is muffled,
 	- for 3D voices, the Doppler shift of the voice's and the listener's
-	  velocities, which moves the resampling step (doppler_ratio).
+	  velocities, which moves the resampling step (doppler_ratio). Positioned
+	  stereo sources also shift when audio.stereo_doppler is enabled.
 3D voices also send to an I3DL2 reverb of the environment the listener is in
 (reverb). Cones are not modelled. A look-ahead limiter keeps the sum under
 full scale (limit).
@@ -203,6 +204,7 @@ static float master_volume = 1.0f;
 /* 2 or 6 (audio.channels), chosen when the device first opens; the game
 sets its mix bins by it, so it holds while the game runs */
 static unsigned long output_channels = 2;
+static BOOL stereo_doppler_enabled;
 
 /* the I3DL2 listener properties (SetI3DL2Listener), which the reverb models:
 DirectSound's defaults until the game sets an environment, their room level
@@ -407,7 +409,7 @@ static float doppler_ratio(const struct sdl_stream *stream)
 
 	/* (a positioned stereo voice: the game gives how fast it comes towards
 	the listener, which is still) */
-	if (!stream->has_3d && stream->stereo_positioned)
+	if (stereo_doppler_enabled && !stream->has_3d && stream->stereo_positioned)
 	{
 		towards = stream->stereo_approach * listener.distance_factor * listener.doppler_factor;
 		if (towards >= SPEED_OF_SOUND)
@@ -962,6 +964,12 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	else if (base_step * target_doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)
 		target_doppler = (float)(VOICE_FREQUENCY_MINIMUM / OUTPUT_RATE / base_step);
 	doppler = stream->doppler > 0.0f ? stream->doppler : target_doppler;
+	/* The saved ratio belongs to the previous authored pitch. Bound both
+	ends of the ramp against the current pitch, including after SetFrequency. */
+	if (base_step * doppler * OUTPUT_RATE > VOICE_FREQUENCY_MAXIMUM)
+		doppler = (float)(VOICE_FREQUENCY_MAXIMUM / OUTPUT_RATE / base_step);
+	else if (base_step * doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)
+		doppler = (float)(VOICE_FREQUENCY_MINIMUM / OUTPUT_RATE / base_step);
 	step = base_step * doppler;
 	ramp_step = base_step * (target_doppler - doppler) / (double)frames;
 	/* the low pass narrowed for a voice taking frames faster than the output
@@ -1724,6 +1732,7 @@ static void audio_start(void)
 	audio_started = TRUE;
 	master_volume = (float)config_real("audio.volume");
 	reverb_enabled = config_boolean("audio.reverb");
+	stereo_doppler_enabled = config_boolean("audio.stereo_doppler");
 	resampler_mode = resampler_mode_read();
 	resampler_initialize();
 	resampler_phases_initialize();
@@ -2075,7 +2084,7 @@ VOID WINAPI DirectSoundDoWork(void)
 {
 	static unsigned long volume_read_at = (unsigned long)-1;
 
-	/* (audio.volume, audio.reverb and audio.resampler read again when the
+	/* (audio settings read again when the
 	settings change: on the game's thread, not the mixer's, whose lock the
 	config's file I/O would hold) */
 	if (volume_read_at != config_changes())
@@ -2083,6 +2092,13 @@ VOID WINAPI DirectSoundDoWork(void)
 		volume_read_at = config_changes();
 		master_volume = (float)config_real("audio.volume");
 		reverb_enabled = config_boolean("audio.reverb");
+		{
+			BOOL enabled = config_boolean("audio.stereo_doppler");
+
+			pthread_mutex_lock(&mixer_lock);
+			stereo_doppler_enabled = enabled;
+			pthread_mutex_unlock(&mixer_lock);
+		}
 		resampler_mode = resampler_mode_read();
 	}
 	streams_complete_finished();

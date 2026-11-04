@@ -48,6 +48,7 @@ static struct director directors[4];
 static int available[4],active[4],following,seat,passenger;
 static int passenger_camera_enabled(short p){return p==0&&passenger;}
 static struct director *director_get(short p){return &directors[p];}
+static void sound_listener_motion_reset(short p){(void)p;}
 static int third_person_available(short p){return available[p];}
 static int third_person_active(short p){return active[p];}
 static long player_control_get_unit_index(short p){return p;}

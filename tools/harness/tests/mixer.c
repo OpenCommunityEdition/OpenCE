@@ -796,6 +796,7 @@ int main(int argc, char **argv)
 			voice_delete(stream);
 		}
 		listener.velocity[2] = 0.0f;
+		stereo_doppler_enabled = TRUE;
 		/* a positioned stereo voice (2D), shifted as one would be by how
 		fast the game says it comes towards the listener: 10 units a second */
 		{
@@ -832,7 +833,8 @@ int main(int argc, char **argv)
 			for (frame = 0; frame < CHUNK; frame++)
 				left[frame] = buffer[frame * 2];
 			for (part = 0; part < 4; part++)
-				quarter[part] = measured_frequency(left, part * CHUNK / 4, (part + 1) * CHUNK / 4 + 1);
+				quarter[part] = measured_frequency(left, part * CHUNK / 4,
+					part == 3 ? CHUNK : (part + 1) * CHUNK / 4 + 1);
 			memset(buffer, 0, sizeof(buffer));
 			mix_voice(stream, buffer, send, CHUNK);
 			for (frame = 0; frame < CHUNK; frame++)
@@ -846,6 +848,83 @@ int main(int argc, char **argv)
 			voice_delete(stream);
 		}
 		listener.distance_factor = 1.0f;
+		return 0;
+	}
+	CASE("doppler-limits")
+	{
+		unsigned long mode, limit;
+
+		for (mode = 0; mode < 2; mode++)
+		for (limit = 0; limit < 2; limit++)
+		{
+			struct sdl_stream *stream = voice_ahead(10.0f);
+			float buffer[CHUNK * 2] = { 0 }, send[CHUNK] = { 0 };
+			double phase, rate;
+			unsigned long center;
+
+			resampler_mode = mode ? RESAMPLER_LINEAR : RESAMPLER_SINC;
+			listener.distance_factor = 3.048f;
+			/* Source at supersonic approach, or listener outrunning sound. */
+			stream->velocity[2] = limit ? -200.0f : 0.0f;
+			listener.velocity[2] = limit ? 0.0f : -200.0f;
+			stream->frequency = limit ? 24000 : 48000;
+			mix_voice(stream, buffer, send, CHUNK);
+			stream->frequency = limit ? 48000 : 24000;
+			center = stream->center;
+			phase = stream->phase;
+			mix_voice(stream, buffer, send, CHUNK);
+			rate = ((double)(stream->center - center) + stream->phase - phase) * OUTPUT_RATE / CHUNK;
+			CHECK(fabs(rate - (limit ? 191983.0 : 188.0)) < 0.1,
+				"pitch change escaped frequency limit: %.3f Hz (mode %lu)", rate, mode);
+			voice_delete(stream);
+		}
+		listener.velocity[2] = 0.0f;
+		return 0;
+	}
+	CASE("doppler-stereo")
+	{
+		unsigned long mode, speakers, enabled, frame, chunk;
+		short samples[48000 * 2];
+		float buffer[CHUNK * 6], send[CHUNK], left[8192];
+
+		/* Two actual source channels: identical frequency, unequal amplitude. */
+		for (frame = 0; frame < 48000; frame++)
+		{
+			samples[frame * 2] = (short)(16000.0 * sin(2.0 * PI * 1000.0 * frame / 48000.0));
+			samples[frame * 2 + 1] = samples[frame * 2] / 2;
+		}
+		CHECK(!stereo_doppler_enabled, "stereo Doppler must initially be off");
+		for (mode = 0; mode < 2; mode++)
+		for (speakers = 2; speakers <= 6; speakers += 4)
+		{
+			struct sdl_stream *stream = voice_new(samples, 48000, 2, 48000, 0);
+
+			stream->stereo_positioned = TRUE;
+			stream->stereo_approach = 10.0f;
+			stream->stereo_distance_fade = 1.0f;
+			listener.distance_factor = 3.048f;
+			resampler_mode = mode ? RESAMPLER_LINEAR : RESAMPLER_SINC;
+			output_channels = speakers;
+			/* Enable and then disable on the same playing voice. */
+			for (enabled = 0; enabled < 3; enabled++)
+			{
+				double hertz, wanted = enabled == 1 ? 1000.0 * 343.3 / (343.3 - 30.48) : 1000.0;
+
+				stereo_doppler_enabled = enabled == 1;
+				for (chunk = 0; chunk < 8192 / CHUNK; chunk++)
+				{
+					memset(buffer, 0, sizeof(buffer));
+					memset(send, 0, sizeof(send));
+					mix_voice(stream, buffer, send, CHUNK);
+					for (frame = 0; frame < CHUNK; frame++)
+						left[chunk * CHUNK + frame] = buffer[frame * speakers];
+				}
+				hertz = measured_frequency(left, 2048, 8192);
+				CHECK(fabs(hertz - wanted) < 0.2, "stereo setting %lu, speakers %lu, mode %lu: %.2f Hz expected %.2f",
+					enabled, speakers, mode, hertz, wanted);
+			}
+			voice_delete(stream);
+		}
 		return 0;
 	}
 	CASE("metrics")
