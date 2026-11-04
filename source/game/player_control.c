@@ -214,6 +214,7 @@ symbols in this file:
 #include "real_math.h"
 #include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c; after the limit2d alias above */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "dualsense_game.h" /* port: port/linux/game/dualsense_game.c */
 
 /* ---------- constants */
 
@@ -446,6 +447,7 @@ void player_control_dispose(
 void player_control_dispose_from_old_map(
 	void)
 {
+	dualsense_game_reset(); /* port: release feature feedback before the map goes */
 	return;
 }
 
@@ -876,6 +878,7 @@ boolean player_control_update(
 	{
 		handle_one_player_input(local_player_index, time_delta_sec);
 	}
+	dualsense_game_update(); /* port: feedback also observes menus and players without units */
 	collision_log_end_period();
 	profile_exit(player_control_update_section);
 
@@ -1931,6 +1934,7 @@ void player_control_initialize_for_new_map(
 {
 	short local_player_index;
 
+	dualsense_game_reset(); /* port: no feedback history crosses map loads */
 	player_control_globals->action_test_flags = 0;
 	player_control_globals->action_flags = 0;
 	player_control_globals->suppressed_action_flags = 0;

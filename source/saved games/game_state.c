@@ -95,6 +95,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "dualsense_game.h" /* port: port/linux/game/dualsense_game.c */
 #include "cseries_windows.h"
 #include "cseries/errors.h"
 #include "real_math.h"
@@ -192,6 +193,7 @@ static game_state_before_save_proc before_save_procs[] =
 
 static game_state_before_load_proc before_load_procs[] =
 {
+	dualsense_game_reset, /* port: cancel feedback before restoring object identities */
 	game_sound_clear,
 	/* port: where the cluster lists' references are, which the game state
 	being loaded does not hold */

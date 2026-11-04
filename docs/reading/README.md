@@ -22,6 +22,7 @@ the menu to the camera, reticle and first-person weapon.
 | 6 | [Maps and resources](maps_and_resources.md) | Load a package level: how do Xbox, CE and MCC readers keep their data and lifetimes separate? |
 | 7 | [Platforms and testing](platforms_and_testing.md) | Follow platform entry points and investigate an elevator regression: what evidence reaches the behaviour? |
 | Worked detail | [Field of view](field_of_view.md) | Trace a setting through the actual calculations and temporary rendering state. |
+| Optional hardware | [DualSense feedback](dualsense.md) | Map physical trigger actions to feedback and clear it across gameplay and device lifecycles. |
 | Feature prototype | [Modern frontend](menu_redesign.md) | Isolated Settings/hosting/lobby views, native browsers and main-menu-only legacy switching. |
 | Branch feature | [Shoulder camera](third_person.md) | Director selection, cover-aware aiming, controls and host-owned hit validation. |
 | Reference | [Glossary](glossary.md) | Engine concepts and recurring C conventions, with source examples. |
