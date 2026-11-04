@@ -64,6 +64,7 @@ static int coop_presentation,coop_events,host_devices,client_devices,client_name
 static int host_sent_transforms[1],host_sent_looks[1],host_sent_devices[1],host_player_structure_bsps[1],host_friendly_fire[1];
 static int host_sent_screen_effect,host_resend,players_vitality,host_attachment_count,host_looping_sound_count;
 static struct {int definition_indices[4];} client_script_sounds;
+static struct {int count;} client_looping_sounds;
 static struct {int objective,nav_point_count;} host_hud_state;
 static struct {boolean offered,skip_save_written;int voters,cooldown_until;} skip_vote;
 static void skip_vote_clear(void){}
@@ -118,10 +119,10 @@ int main(int argc,char **argv)
   setup();game_state_globals.saved_game_valid=FALSE;wipe();CHECK(!reverts&&respawns==1,"missing saved state rewound");
  } else CASE("new-map") {
   CHECK(network_coop_wipe_reverts(),"valid checkpoint rejected");
-  host_attachment_count=3;host_looping_sound_count=2;
+  host_attachment_count=3;host_looping_sound_count=2;client_looping_sounds.count=2;
   network_coop_new_game();
   CHECK(!network_coop_wipe_reverts(),"checkpoint metadata survived a new game/map");
-  CHECK(host_attachment_count==0&&host_looping_sound_count==0,"attachment or sound history survived a new game/map");
+  CHECK(host_attachment_count==0&&host_looping_sound_count==0&&client_looping_sounds.count==0,"attachment or sound history survived a new game/map");
  } else CASE("delay") {
   main_lost_map();tick=91;main_lost_map_private();CHECK(!reverts&&!respawns,"rewound early");
   tick=92;main_lost_map_private();CHECK(reverts==1&&!main_globals.lost_map&&!main_globals.loss_timer,"wipe did not clear loss state");
