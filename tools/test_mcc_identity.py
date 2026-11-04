@@ -73,6 +73,7 @@ def test_session_resolution_and_validation(tmp_path):
 #include "cseries.h"
 #include "mcc_identity.h"
 #include "mcc_precache.h"
+#include "mcc_workshop.h"
 #include "networking/network_game_manager.h"
 #include <string.h>
 #include <stdio.h>
@@ -84,7 +85,8 @@ static int count,probes,errors,connection,changing,denied,clears,hash_loads;
 int csstrcasecmp(char const *a,char const *b){while(*a && tolower(*a)==tolower(*b)){a++;b++;}return tolower(*a)-tolower(*b);}
 int game_connection(void){return connection;}
 void error(short level,char const *format,...){(void)level;(void)format;}
-void display_error_text_when_main_menu_loaded(wchar_t const *text){(void)text;errors++;}
+static char last_error[256];
+void display_error_text_when_main_menu_loaded(wchar_t const *text){int k;errors++;for(k=0;text[k] && k<255;k++)last_error[k]=(char)text[k];last_error[k]=0;}
 void mcc_cache_validation_clear(void) {}
 void mcc_validation_cancel(void) {}
 void mcc_cache_precache_clear(void){clears++;}
@@ -173,11 +175,28 @@ int main(void){
  strcpy(game.map.name,"mcc_maps\\Host\\a10");memcpy(game.mcc_content_sha256,wanted,32);count=17;
  for(i=0;i<count;i++)sprintf(files[i].name,"mcc_maps\\folder%d\\a10",i);
  old=probes;CHECK(!mcc_identity_accept(&game));CHECK(probes==old+1);
- CHECK(errors && clears);return 0;
+ CHECK(errors && clears);
+ /* The joiner is told which Workshop item: lacking it, or holding it with other content. */
+ {
+  struct mcc_workshop_item item;
+  memset(game.map.name,0,sizeof(game.map.name));strcpy(game.map.name,"mcc_maps\\2899609719\\pat_beavercreek");
+  strcpy(item.id,"2899609719");strcpy(item.title,"Better Creek");mcc_workshop_wire_pack(game.map.name,&item);
+  count=1;strcpy(files[0].name,"mcc_maps\\Other\\pat_beavercreek");memset(files[0].digest,9,32);
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(!strcmp(last_error,"Your copy of Better Creek differs from the host's: let Steam update Workshop item 2899609719, then join again."));
+  count=1;strcpy(files[0].name,"mcc_maps\\Other\\a10");
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(!strcmp(last_error,"Subscribe to Better Creek on the Steam Workshop (item 2899609719) to join."));
+  memset(game.map.name+64,0,64);
+  CHECK(!mcc_identity_accept(&game));
+  CHECK(strstr(last_error,"pat_beavercreek.map") && strstr(last_error,"SHA-256"));
+ }
+ return 0;
 }
 ''')
     exe = compile_tool(tmp_path, [source, ROOT / "port/linux/game/mcc_identity.c",
-                                  ROOT / "port/linux/game/mcc_package.c"])
+                                  ROOT / "port/linux/game/mcc_package.c",
+                                  ROOT / "port/linux/game/mcc_workshop.c"])
     result = subprocess.run([str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
