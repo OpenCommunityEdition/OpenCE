@@ -15,6 +15,7 @@ def test_combat(case):
         "bots_random", "bots_random_real", "bots_distance2d", "bots_distance3d", "enhanced_bots_aim", "enhanced_bots_retreat", "enhanced_bots_powerup_score"))
     code += "\n" + function(read("port/linux/game/bots_combat.c"), "bots_combat_aim_head")
     code += "\n" + function(read("port/linux/game/bots.c"), "bots_level_aim_point")
+    code += "\n" + function(read("port/linux/game/enhanced_bots_controller.c"), "bots_level_aim_point").replace("bots_level_aim_point", "enhanced_level_aim_point")
     code += "\n" + read("port/linux/game/bots_infection.inl")
     status, output = run(build("bots_combat", (("under_test.inc", code), ("bots_combat.h", read("port/linux/game/bots_combat.h")))), case)
     assert status == 0, output

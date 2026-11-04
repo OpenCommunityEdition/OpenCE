@@ -3,7 +3,7 @@ via thelinkin3000/halo-ce-universal 18a94774a73ca275e9c0ab4f281e492ad8bb656e.
 The inherited vehicle definitions and seat checks are GPL-3.0-only.
 See docs/reading/bots_and_android_features.md for provenance.
 
-The base bots own paths and combat. This module chooses an accessible seat,
+The standalone enhanced controller owns paths and combat. This module chooses an accessible seat,
 uses the action button to enter/leave, and translates a path direction into
 driving controls. No new attachment, vehicle or network rules are needed. */
 #include "cseries.h"
@@ -19,6 +19,8 @@ driving controls. No new attachment, vehicle or network rules are needed. */
 #include "bots_tactics.h"
 #include "bots_vehicles.h"
 #include "infection.h"
+#include "enhanced_bots_flight.h"
+#include "mcc_seats.h"
 #include "items/weapons.h"
 #include "items/weapon_definitions.h"
 #include <math.h>
@@ -41,10 +43,12 @@ static struct bots_vehicle_state
 {
 	long sought, ridden, avoided;
 	short seat;
-	long next_scan, deadline, next_press, stuck_tick, reverse_until, stuck_count;
+	long next_scan, next_companion_scan, deadline, next_press, stuck_tick, reverse_until, stuck_count;
 	long unit_index, spawn_tick, sought_tick, ride_tick, avoided_until;
 	long boarding_until, driverless_tick, off_arc_tick, last_enemy_tick, charge_tick;
 	long target_unit;
+	long last_progress;
+	real best_distance;
 	boolean flipping;
 	real_point3d entrance, last_position;
 } vehicles[BOTS_MAXIMUM];
@@ -65,14 +69,26 @@ static real angle(real value)
 
 static struct bots_vehicle_definition *definition(long index)
 {
+	static struct bots_vehicle_definition seated_biped;
+	if (mcc_seat_parent(index))
+	{
+		seated_biped.type = -1;
+		return &seated_biped;
+	}
 	return (struct bots_vehicle_definition *)tag_get(VEHICLE_DEFINITION_TAG, object_get(index)->definition_index);
+}
+
+static long vehicle_driver(long index)
+{
+	long controller = mcc_seat_controller(index);
+	return controller != NONE ? controller : unit_get(index)->unit.driver_object_index;
 }
 
 static boolean drivable(long index)
 {
 	short type = definition(index)->type;
-	/* The engine's human tank, human jeep and alien scout tag values. */
-	return type == 0 || type == 1 || type == 4;
+	/* Authored ground and flying physics supported by the engine. */
+	return type == 0 || type == 1 || type == 3 || type == 4 || type == 5;
 }
 
 void bots_vehicles_reset_player(long index)
@@ -82,6 +98,7 @@ void bots_vehicles_reset_player(long index)
 	vehicles[index].seat = NONE;
 	vehicles[index].unit_index = NONE;
 	vehicles[index].target_unit = NONE;
+	enhanced_flight_reset(index);
 }
 
 void bots_vehicles_reset(void)
@@ -95,19 +112,48 @@ long bots_vehicle_parent(long unit_index)
 {
 	struct object_datum *object = object_try_and_get(unit_index);
 	long parent = object ? object->object.parent_object_index : NONE;
-	return parent != NONE && object_try_and_get_and_verify_type(parent, _object_mask_vehicle) ? parent : NONE;
+	return parent != NONE && (object_try_and_get_and_verify_type(parent, _object_mask_vehicle) || mcc_seat_parent(parent)) ? parent : NONE;
 }
 
 long bots_vehicle_navigation(long unit_index, real *radius)
 {
 	long parent = bots_vehicle_parent(unit_index);
-	if (parent != NONE && unit_get(parent)->unit.driver_object_index == unit_index && drivable(parent))
+	if (parent != NONE && vehicle_driver(parent) == unit_index && drivable(parent))
 	{
 		real width = definition(parent)->radius;
-		*radius = width > 0.1f ? MIN(width, 2.0f) : 1.0f;
+		*radius = width > 0.1f && width < 64.0f ? width : MAX(1.0f, MIN(object_get(parent)->object.bounding_sphere_radius, 64.0f));
 		return parent;
 	}
 	return unit_index;
+}
+
+boolean bots_vehicle_flying(long unit_index)
+{
+	long parent = bots_vehicle_parent(unit_index);
+	return parent != NONE && (definition(parent)->type == 3 || definition(parent)->type == 5);
+}
+
+boolean bots_vehicle_seeking(long index)
+{
+	return config_boolean("bots.vehicles") && vehicles[index].sought != NONE;
+}
+
+long bots_vehicle_sought(long index)
+{
+	return vehicles[index].sought;
+}
+
+void bots_vehicle_cancel(long index)
+{
+	struct bots_vehicle_state *state = &vehicles[index];
+	if (state->sought != NONE)
+	{
+		state->avoided = state->sought;
+		state->avoided_until = game_time_get() + 10 * TICKS_PER_SECOND;
+	}
+	state->sought = NONE;
+	state->flipping = FALSE;
+	state->next_scan = game_time_get() + TICKS_PER_SECOND;
 }
 
 long bots_vehicle_weapon(long unit_index, long weapon_index)
@@ -152,9 +198,9 @@ static boolean seat_available(long index, long unit_index, long vehicle_index, s
 	if (TEST_FLAG(seat->flags, _unit_seat_driver_bit) && !drivable(vehicle_index) &&
 		turret_seat(vehicle_index) != seat_index) return FALSE;
 	if (!TEST_FLAG(seat->flags, _unit_seat_driver_bit) && !TEST_FLAG(seat->flags, _unit_seat_gunner_bit) &&
-		vehicle->unit.driver_object_index == NONE) return FALSE;
+		vehicle_driver(vehicle_index) == NONE) return FALSE;
 	/* A seat marked as requiring a driver follows the engine's player check. */
-	if (TEST_FLAG(seat->flags, 9) && vehicle->unit.driver_object_index == NONE) return FALSE;
+	if (TEST_FLAG(seat->flags, 9) && vehicle_driver(vehicle_index) == NONE) return FALSE;
 	for (other = 0; other < BOTS_MAXIMUM; other++)
 		if (other != index && vehicles[other].sought == vehicle_index && vehicles[other].seat == seat_index &&
 			!seat_takeover(other, unit_index, vehicle_index))
@@ -165,12 +211,19 @@ static boolean seat_available(long index, long unit_index, long vehicle_index, s
 
 static boolean friendly_driver(long unit_index, long vehicle_index)
 {
-	long driver = unit_get(vehicle_index)->unit.driver_object_index;
+	long driver = vehicle_driver(vehicle_index);
 	struct player_datum *player, *other;
 	if (driver == NONE || !game_engine_has_teams()) return FALSE;
 	player = player_try_and_get(unit_get(unit_index)->unit.player_index);
 	other = player_try_and_get(unit_get(driver)->unit.player_index);
 	return player && other && player->team_index == other->team_index;
+}
+
+static boolean human_driver(long vehicle_index)
+{
+	long driver = vehicle_driver(vehicle_index);
+	struct player_datum *player = driver != NONE ? player_try_and_get(unit_get(driver)->unit.player_index) : NULL;
+	return player && !bots_player_owned(player->network_player_data.machine_index);
 }
 
 static boolean vehicle_free(long vehicle_index)
@@ -196,7 +249,7 @@ static short turret_seat(long vehicle_index)
 		if (TEST_FLAG(entry->flags, _unit_seat_gunner_bit) && gunner == NONE) gunner = seat;
 	}
 	if (definition(vehicle_index)->type == 6) return gunner != NONE ? gunner : driver;
-	return driver == NONE ? gunner : NONE;
+	return driver == NONE && definition(vehicle_index)->type != -1 ? gunner : NONE;
 }
 
 /* Tank, jeep, scout: reach, share of the journey, nearby exception,
@@ -208,24 +261,28 @@ static struct { real reach, share, close, slack, bonus; } const vehicle_worth[3]
 	{ 40.0f, 0.8f, 10.0f, 10.0f, 5.0f },
 };
 
-boolean bots_vehicle_goal(long index, long unit_index, real_point3d const *destination,
-	real_point3d *goal, long *surface)
+static boolean bots_vehicle_choose_goal(long index, long unit_index, real_point3d const *destination,
+	real_point3d *goal, long *surface, boolean companion)
 {
 	struct bots_vehicle_state *state = &vehicles[index];
 	struct object_datum *unit = object_get(unit_index);
 	long now = game_time_get();
-	if (!config_boolean("bots.vehicles") || bots_vehicle_parent(unit_index) != NONE) return FALSE;
+	if (!config_boolean("bots.vehicles") || bots_vehicle_parent(unit_index) != NONE)
+	{
+		state->sought = NONE;
+		return FALSE;
+	}
 	if (infection_enabled() && infection_unit_is_zombie(unit_index)) return FALSE;
 	if (state->unit_index != unit_index) state->spawn_tick = now;
 	state->unit_index = unit_index;
 	if (state->sought != NONE && state->flipping &&
-		object_try_and_get_and_verify_type(state->sought, _object_mask_vehicle) && object_get(state->sought)->object.up.k >= 0.5f)
+		(object_try_and_get_and_verify_type(state->sought, _object_mask_vehicle) || mcc_seat_parent(state->sought)) && object_get(state->sought)->object.up.k >= 0.5f)
 	{
 		state->sought = NONE;
 		state->flipping = FALSE;
 		state->next_scan = now;
 	}
-	if (state->sought != NONE && (!object_try_and_get_and_verify_type(state->sought, _object_mask_vehicle) ||
+	if (state->sought != NONE && (!(object_try_and_get_and_verify_type(state->sought, _object_mask_vehicle) || mcc_seat_parent(state->sought)) ||
 		now >= state->deadline || (state->flipping ? !vehicle_free(state->sought) :
 		!seat_available(index, unit_index, state->sought, state->seat))))
 	{
@@ -234,22 +291,31 @@ boolean bots_vehicle_goal(long index, long unit_index, real_point3d const *desti
 		state->sought = NONE;
 		state->next_scan = now + TICKS_PER_SECOND * 10;
 	}
-	if (state->sought == NONE && now >= state->next_scan)
+	if (state->sought == NONE && now >= (companion ? state->next_companion_scan : state->next_scan))
 	{
 		struct object_iterator iterator;
 		struct object_datum *vehicle;
 		real best = REAL_MAX;
 		real journey = distance(&unit->object.position, destination);
-		state->next_scan = now + TICKS_PER_SECOND * 2;
-		object_iterator_new(&iterator, _object_mask_vehicle, 0);
+		if (companion) state->next_companion_scan = now + TICKS_PER_SECOND;
+		else state->next_scan = now + TICKS_PER_SECOND * 2;
+		object_iterator_new(&iterator, _object_mask_unit, 0);
 		while ((vehicle = object_iterator_next(&iterator)) != NULL)
 		{
 			struct unit_definition *tag;
 			short seat;
 			real reach = distance(&unit->object.position, &vehicle->object.position);
-			short turret = turret_seat(iterator.index), type = definition(iterator.index)->type;
-			short kind = type == 0 ? 0 : type == 4 ? 2 : 1;
-			real close = vehicle_worth[kind].close;
+			short turret, type, kind;
+			real close;
+			boolean friendly;
+			if (iterator.index == unit_index || (!object_try_and_get_and_verify_type(iterator.index, _object_mask_vehicle) &&
+				!mcc_seat_parent(iterator.index))) continue;
+			turret = turret_seat(iterator.index);
+			type = definition(iterator.index)->type;
+			friendly = friendly_driver(unit_index, iterator.index);
+			if (companion && (!friendly || !human_driver(iterator.index))) continue;
+			kind = type == 0 ? 0 : type == 4 ? 2 : 1;
+			close = vehicle_worth[kind].close;
 			if ((iterator.index == state->avoided && now < state->avoided_until) ||
 				TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit) ||
 				TEST_FLAG(unit_get(iterator.index)->unit.flags, _unit_not_enterable_by_player_bit))
@@ -261,9 +327,11 @@ boolean bots_vehicle_goal(long index, long unit_index, real_point3d const *desti
 				if (!target || reach > 12.0f || now - state->last_enemy_tick > 5 * TICKS_PER_SECOND ||
 					distance(&target->object.position, &vehicle->object.position) > 60.0f) continue;
 			}
-			else if (!drivable(iterator.index) || journey < 35.0f || reach > MIN(vehicle_worth[kind].reach,
+			else if (!friendly && (!drivable(iterator.index) || journey < 35.0f || reach > MIN(vehicle_worth[kind].reach,
 				MAX(close, journey * vehicle_worth[kind].share)) || (reach > close &&
-				distance(&vehicle->object.position, destination) > journey + vehicle_worth[kind].slack)) continue;
+				distance(&vehicle->object.position, destination) > journey + vehicle_worth[kind].slack))) continue;
+			/* A large custom hull can have an entrance far from its origin. */
+			if (friendly && reach > 25.0f + MAX(0.0f, vehicle->object.bounding_sphere_radius)) continue;
 			if (vehicle->object.up.k < 0.5f)
 			{
 				long other;
@@ -287,17 +355,14 @@ boolean bots_vehicle_goal(long index, long unit_index, real_point3d const *desti
 				real score = reach - (driver ? vehicle_worth[kind].bonus :
 					TEST_FLAG(entry->flags, _unit_seat_gunner_bit) ? 3.5f : -3.0f);
 				if (score >= best || (turret != NONE && seat != turret)) continue;
-				if (turret == NONE && !driver && (type != 1 || !friendly_driver(unit_index, iterator.index))) continue;
-				if (turret == NONE && magnitude3d(&vehicle->object.translational_velocity) > 0.03f)
-				{
-					long driver_unit = unit_get(iterator.index)->unit.driver_object_index;
-					struct player_datum *driver_player = driver_unit != NONE ?
-						player_try_and_get(unit_get(driver_unit)->unit.player_index) : NULL;
-					if (driver || !driver_player || !bots_player_owned(driver_player->network_player_data.machine_index)) continue;
-				}
+				if (turret == NONE && !driver && !friendly) continue;
+				/* A human may creep forward while teammates approach. Do not
+				chase a vehicle travelling faster than a running biped. */
+				if (turret == NONE && magnitude3d(&vehicle->object.translational_velocity) > 0.08f) continue;
 				if (seat_available(index, unit_index, iterator.index, seat) &&
 					unit_get_seat_entrance_point(unit_index, iterator.index, seat, &entrance, &seat_point, NULL))
 				{
+					if (friendly && distance(&unit->object.position, &entrance) > 25.0f) continue;
 					best = score;
 					state->sought = iterator.index;
 					state->seat = seat;
@@ -317,6 +382,8 @@ boolean bots_vehicle_goal(long index, long unit_index, real_point3d const *desti
 					vehicles[other].next_scan = now + 3 * TICKS_PER_SECOND;
 				}
 			state->sought_tick = now;
+			state->last_progress = now;
+			state->best_distance = distance(&unit->object.position, &state->entrance);
 			state->deadline = now + (long)(MAX(25.0f, distance(&unit->object.position, &state->entrance) / 1.6f + 8.0f) * TICKS_PER_SECOND);
 		}
 	}
@@ -326,8 +393,35 @@ boolean bots_vehicle_goal(long index, long unit_index, real_point3d const *desti
 		real_point3d seat_point;
 		if (!unit_get_seat_entrance_point(unit_index, state->sought, state->seat, &state->entrance, &seat_point, NULL)) return FALSE;
 	}
+	{
+		real remaining = distance(&unit->object.position, &state->entrance);
+		if (remaining < state->best_distance - 0.5f)
+		{
+			state->best_distance = remaining;
+			state->last_progress = now;
+		}
+		if (now - state->last_progress > 8 * TICKS_PER_SECOND)
+		{
+			bots_vehicle_cancel(index);
+			return FALSE;
+		}
+	}
 	*surface = bots_routes_ground(&state->entrance, goal);
 	return *surface != NONE;
+}
+
+boolean bots_vehicle_goal(long index, long unit_index, real_point3d const *destination,
+	real_point3d *goal, long *surface)
+{
+	return bots_vehicle_choose_goal(index, unit_index, destination, goal, surface, FALSE);
+}
+
+/* Nearby human transports take precedence over an optional weapon detour.
+Carriers and bots already holding a hill keep their objective responsibilities. */
+boolean bots_vehicle_player_goal(long index, long unit_index, real_point3d const *destination,
+	real_point3d *goal, long *surface)
+{
+	return bots_vehicle_choose_goal(index, unit_index, destination, goal, surface, TRUE);
 }
 
 static boolean boarding(long index, long vehicle_index)
@@ -397,7 +491,7 @@ void bots_vehicle_action(long index, long unit_index, real_point3d const *goal,
 	struct bots_vehicle_state *state = &vehicles[index];
 	long parent = bots_vehicle_parent(unit_index), now = game_time_get();
 	struct unit_datum *vehicle;
-	boolean leave = FALSE;
+	boolean leave = FALSE, human_transport;
 	if (state->unit_index != unit_index) state->spawn_tick = now;
 	state->unit_index = unit_index;
 	if (target_unit != NONE) { state->target_unit = target_unit; state->last_enemy_tick = now; }
@@ -407,12 +501,13 @@ void bots_vehicle_action(long index, long unit_index, real_point3d const *goal,
 		{
 			platform_log("bots: bot %ld left vehicle %ld", index + 1, state->ridden);
 			state->avoided = state->ridden;
-			state->avoided_until = now + 30 * TICKS_PER_SECOND;
+			state->avoided_until = now + (enhanced_flight_failed(index) ? 120 : 30) * TICKS_PER_SECOND;
+			enhanced_flight_reset(index);
 			state->ridden = state->sought = NONE;
 			state->next_scan = now + TICKS_PER_SECOND * 15;
 		}
 		if (config_boolean("bots.vehicles") && state->sought != NONE && now >= state->next_press &&
-			object_try_and_get_and_verify_type(state->sought, _object_mask_vehicle))
+			(object_try_and_get_and_verify_type(state->sought, _object_mask_vehicle) || mcc_seat_parent(state->sought)))
 		{
 			short nearest;
 			if (state->flipping)
@@ -439,8 +534,22 @@ void bots_vehicle_action(long index, long unit_index, real_point3d const *goal,
 			else if (distance(&object_get(unit_index)->object.position, &state->entrance) < 3.0f)
 			{
 				real_point3d *position = &object_get(unit_index)->object.position;
-				real toward = (real)atan2(state->entrance.y - position->y, state->entrance.x - position->x);
-				real relative = angle(toward - action->desired_facing.yaw);
+				real_point3d aim = state->entrance;
+				real_point3d const *center = &object_get(state->sought)->object.position;
+				real dx = aim.x - position->x, dy = aim.y - position->y;
+				real vx = center->x - position->x, vy = center->y - position->y;
+				real length = MAX(0.01f, (real)sqrt(dx * dx + dy * dy));
+				real along = (dx * vx + dy * vy) / (length * length);
+				real width = distance(center, &state->entrance);
+				real toward, relative;
+				if (length > 1.2f && along > 0.0f && along < 1.2f && fabs(dx * vy - dy * vx) / length < width * 0.9f)
+				{
+					real side = -dy * vx + dx * vy > 0.0f ? -1.0f : 1.0f;
+					aim.x = center->x - dy / length * width * 1.1f * side;
+					aim.y = center->y + dx / length * width * 1.1f * side;
+				}
+				toward = (real)atan2(aim.y - position->y, aim.x - position->x);
+				relative = angle(toward - action->desired_facing.yaw);
 				action->throttle.i = (real)cos(relative) * 0.5f;
 				action->throttle.j = (real)sin(relative) * 0.5f;
 			}
@@ -448,6 +557,7 @@ void bots_vehicle_action(long index, long unit_index, real_point3d const *goal,
 		return;
 	}
 	vehicle = unit_get(parent);
+	human_transport = vehicle_driver(parent) != unit_index && friendly_driver(unit_index, parent) && human_driver(parent);
 	if (state->ridden != parent)
 	{
 		state->ridden = parent;
@@ -457,12 +567,42 @@ void bots_vehicle_action(long index, long unit_index, real_point3d const *goal,
 		state->boarding_until = state->driverless_tick = state->off_arc_tick = state->charge_tick = 0;
 		state->last_position = vehicle->object.position;
 		state->stuck_count = state->reverse_until = 0;
-		platform_log("bots: bot %ld entered vehicle %ld seat %d", index + 1, parent, unit_get(unit_index)->unit.parent_seat_index);
+		platform_log("bots: bot %ld entered vehicle %ld seat %d type %d (%s)", index + 1, parent,
+			unit_get(unit_index)->unit.parent_seat_index, definition(parent)->type, tag_get_name(vehicle->definition_index));
 	}
 	action->control_flags &= ~(FLAG(_unit_control_jump_bit) | FLAG(_unit_control_throw_grenade_bit) |
 		FLAG(_unit_control_use_equipment_bit));
 	action->throttle.i = action->throttle.j = 0.0f;
-	if (vehicle->unit.driver_object_index == unit_index && drivable(parent))
+	if (bots_vehicle_flying(unit_index))
+	{
+		boolean landing = (objective && !human_transport) || !config_boolean("bots.vehicles");
+		real dx = goal->x - vehicle->object.position.x, dy = goal->y - vehicle->object.position.y;
+		real landing_radius = MAX(10.0f, vehicle->object.bounding_sphere_radius);
+		if (vehicle_driver(parent) == unit_index)
+		{
+			real_point3d destination = config_boolean("bots.vehicles") ? *goal : vehicle->object.position;
+			real aimed_yaw = action->desired_facing.yaw, aimed_pitch = action->desired_facing.pitch;
+			real trigger = action->primary_trigger;
+			unsigned long firing = action->control_flags & FLAG(_unit_control_weapon_primary_trigger_bit);
+			enhanced_flight_action(index, parent, definition(parent)->type == 3, &destination, landing, boarding(index, parent), action);
+			/* Retain an aimed shot only when flight steering still faces it. */
+			if (target_unit != NONE && fabs(angle(action->desired_facing.yaw - aimed_yaw)) < 0.15f &&
+				fabs(action->desired_facing.pitch - aimed_pitch) < 0.15f)
+			{
+				action->primary_trigger = trigger;
+				action->control_flags |= firing;
+			}
+		}
+		if ((landing || vehicle_driver(parent) == NONE || enhanced_flight_failed(index)) && enhanced_flight_can_exit(parent) &&
+			(!config_boolean("bots.vehicles") || !objective || vehicle_driver(parent) == NONE || enhanced_flight_failed(index) || enhanced_flight_landing(index) ||
+			 dx * dx + dy * dy < landing_radius * landing_radius) && now >= state->next_press)
+		{
+			action->control_flags |= FLAG(_unit_control_action_bit);
+			state->next_press = now + TICKS_PER_SECOND / 2;
+		}
+		return;
+	}
+	if (vehicle_driver(parent) == unit_index && drivable(parent))
 	{
 		real heading = (real)atan2(vehicle->object.forward.j, vehicle->object.forward.i);
 		real aimed_yaw = action->desired_facing.yaw, aimed_pitch = action->desired_facing.pitch;
@@ -532,8 +672,12 @@ void bots_vehicle_action(long index, long unit_index, real_point3d const *goal,
 		}
 	}
 	else if (turret_seat(parent) == unit_get(unit_index)->unit.parent_seat_index)
-		leave = hurt || turret_action(state, parent, target_unit, action);
-	else if (vehicle->unit.driver_object_index == NONE)
+	{
+		leave = turret_action(state, parent, target_unit, action);
+		/* A human may be driving toward the fight; keep the gunner aboard. */
+		leave = hurt || (leave && !human_transport);
+	}
+	else if (vehicle_driver(parent) == NONE)
 	{
 		if (!state->driverless_tick) state->driverless_tick = now;
 		leave = now - state->driverless_tick > 3 * TICKS_PER_SECOND && now - state->last_enemy_tick > 2 * TICKS_PER_SECOND;
@@ -541,7 +685,7 @@ void bots_vehicle_action(long index, long unit_index, real_point3d const *goal,
 	else state->driverless_tick = 0;
 	if ((leave || !config_boolean("bots.vehicles") || vehicle->object.up.k < 0.3f || state->stuck_count >= 6 ||
 		TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit) ||
-		(objective && distance(goal, &vehicle->object.position) < 10.0f && turret_seat(parent) == NONE)) && now >= state->next_press)
+		(objective && !human_transport && distance(goal, &vehicle->object.position) < 10.0f && turret_seat(parent) == NONE)) && now >= state->next_press)
 	{
 		action->control_flags |= FLAG(_unit_control_action_bit);
 		state->next_press = now + TICKS_PER_SECOND / 2;

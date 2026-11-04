@@ -18,15 +18,17 @@ def test_objectives(case):
     assert status == 0, output
 
 
-@pytest.mark.parametrize("case", ["seat", "driver", "disable", "gunner", "stuck", "ghost", "claim", "boarding", "turret", "flip"])
+@pytest.mark.parametrize("case", ["seat", "driver", "disable", "gunner", "stuck", "ghost", "claim", "boarding", "turret", "flip", "human", "fast", "aircraft", "progress", "aircombat", "humanride", "humangunner", "large", "airfailure", "airdriverless"])
 def test_vehicles(case):
     source = read("port/linux/game/bots_vehicles.c")
     code = structure(source, "bots_vehicle_definition") + "\n"
     # The declaration includes the vehicles array after the structure body.
     code += "static " + structure(source.replace("static struct bots_vehicle_state", "struct bots_vehicle_state"), "bots_vehicle_state") + "\n"
+    start = source.index("static struct { real reach")
+    code += source[start:source.index("};", start) + 2] + "\n"
     code += "\n".join(function(source, name) for name in (
-        "distance", "angle", "definition", "drivable", "bots_vehicles_reset_player", "bots_vehicles_reset",
-        "bots_vehicle_parent", "bots_vehicle_navigation", "bots_vehicle_weapon", "turret_seat", "seat_takeover", "seat_available",
-        "friendly_driver", "vehicle_free", "boarding", "turret_action", "bots_vehicle_action"))
+        "distance", "angle", "definition", "vehicle_driver", "drivable", "bots_vehicles_reset_player", "bots_vehicles_reset",
+        "bots_vehicle_parent", "bots_vehicle_flying", "bots_vehicle_navigation", "bots_vehicle_weapon", "turret_seat", "seat_takeover", "seat_available",
+        "friendly_driver", "human_driver", "vehicle_free", "bots_vehicle_cancel", "bots_vehicle_choose_goal", "bots_vehicle_goal", "bots_vehicle_player_goal", "boarding", "turret_action", "bots_vehicle_action"))
     status, output = run(build("bot_vehicles", (("under_test.inc", code),)), case)
     assert status == 0, output

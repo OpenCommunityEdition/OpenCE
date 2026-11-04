@@ -14,7 +14,7 @@ def implementation():
         "bots_navigation_cost", "bots_navigation_remaining", "bots_navigation_drop", "bots_navigation_claimers",
         "bots_navigation_query", "bots_navigation_answer", "bots_navigation_update", "bots_navigation_follow",
         "bots_navigation_action"))
-    code += function(read("port/linux/game/bots.c"), "bots_bot_unstick")
+    code += function(read("port/linux/game/enhanced_bots_controller.c"), "bots_bot_unstick")
     return code
 
 

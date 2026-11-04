@@ -44,7 +44,6 @@ static struct {struct {int powerup_type;} equipment;} equipment_definition;
 #define equipment_definition_get(index) (&equipment_definition)
 static struct {int game_engine_index;} variant;
 #define game_engine_get_variant() (&variant)
-static boolean bots_enhanced_running;
 enum {_bots_combat_count_head_aims};
 struct bots_tick {long weapon_index,now;struct object_datum *object;real_point3d eye;};
 static struct {boolean precision;} weapon_kind={TRUE};
@@ -119,8 +118,8 @@ int main(int argc, char **argv)
         bots_globals.skill=_bots_skill_normal;
         bots_level_aim_point(bot,&tick,1,&aim);
         CHECK(aim.z==1.5f,"base Normal head selection changed");
-        bots_enhanced_running=TRUE;aim.z=1;
-        bots_level_aim_point(bot,&tick,1,&aim);
+        aim.z=1;
+        enhanced_level_aim_point(bot,&tick,1,&aim);
         bot->random=1234567;bot->aim_until=0;
         enhanced_bots_aim(0,_bots_skill_normal,1,0,&eye,&aim);
         CHECK(!bot->aim_head&&aim.z==1,"base head aim bypassed enhanced chance");
@@ -129,7 +128,7 @@ int main(int argc, char **argv)
         CHECK(bot->aim_head&&aim.z==1.5f,"enhanced head choice lost");
         bot->combat.throw_until_tick=101;bot->combat.throw_lead=1;
         units[1].object.translational_velocity.i=.1f;aim.x=5;
-        bots_level_aim_point(bot,&tick,1,&aim);
+        enhanced_level_aim_point(bot,&tick,1,&aim);
         CHECK(aim.x>5&&aim.x<=8.5f,"enhanced mode disabled bounded grenade lead");
     }
     else if (!strcmp(argv[1], "precision") || !strcmp(argv[1], "swat"))

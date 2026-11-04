@@ -26,6 +26,7 @@ struct object_datum { struct { long parent_object_index; } object; };
 struct bots_tick { long now; boolean moving; real_point3d position; real move_direction;
     struct object_datum *object; unsigned long flags; };
 static real bots_random_real(struct bots_bot *bot) { (void)bot; return 0.0f; }
+static void bots_goal_failed(struct bots_bot *bot) { bot->goal_kind = _bots_goal_none; }
 static void bots_pick_roam_goal(struct bots_bot *bot, real_point3d const *position)
 { (void)bot; (void)position; }
 struct bots_tactics_bot { short role, lane; boolean lane_given_up; };
@@ -152,9 +153,7 @@ int main(int argc, char **argv)
         route->phase = _bots_nav_none; tick.now += 30;
         bots_bot_unstick(bot, &tick);
         CHECK(bots_globals.stuck_events == 1, "ordinary stuck recovery suppressed");
-        bots_enhanced_running = FALSE; route->phase = _bots_nav_going; tick.now += 30;
-        bots_bot_unstick(bot, &tick);
-        CHECK(bots_globals.stuck_events == 2, "disabled behavior changed");
+
     }
     else if (!strcmp(argv[1], "lifecycle"))
     {

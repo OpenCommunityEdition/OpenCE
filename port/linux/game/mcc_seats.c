@@ -28,6 +28,14 @@ struct unit_datum *mcc_seat_parent(long object_index)
     return definition->unit.seats.count > 0 && definition->unit.seats.count <= 16 ? unit : NULL;
 }
 
+/* A player-controlled seated biped is itself the transport controller;
+ * it need not have a separate vehicle driver datum. */
+long mcc_seat_controller(long object_index)
+{
+    struct unit_datum *unit = mcc_seat_parent(object_index);
+    return unit && unit->unit.player_index != NONE ? object_index : NONE;
+}
+
 boolean mcc_seat_nearby(long player_index, long target_index, short *seat_index)
 {
     struct player_datum *player;

@@ -1,5 +1,5 @@
 /* Powerup decisions adapted from BirchWoodGod/halo-ce-vita via
-thelinkin3000/halo-ce-universal 18a94774 (GPL-3.0-only). Included by bots.c
+thelinkin3000/halo-ce-universal 18a94774 (GPL-3.0-only). Included by enhanced_bots_controller.c
 to reuse its item ownership, unreachable-item memory and path lifecycle. */
 static struct
 {

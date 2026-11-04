@@ -32,7 +32,7 @@ enum {_object_dead_bit=0,_unit_control_action_bit=1,_object_mask_biped=1,_object
       _object_mask_unit=3,_game_connection_network_client=2,_unit_nearby_seat_available=2};
 struct object_data {long parent_object_index;unsigned long damage_flags;int type;};
 struct object_datum {long definition_index;struct object_data object;};
-struct unit_datum {long definition_index;struct object_data object;struct {short parent_seat_index;unsigned long control_flags;} unit;};
+struct unit_datum {long definition_index;struct object_data object;struct {short parent_seat_index;long player_index;unsigned long control_flags;} unit;};
 struct unit_camera {int unused;};
 struct unit_seat {struct unit_camera camera;};
 static struct unit_seat seats[16];
@@ -68,16 +68,21 @@ static int network_objects_client_has(long i){return i>=0&&i<20&&known[i];}
 static int unit_has_animation_to_enter_seat(long u,long p,short s){(void)u;return animation&&s>=0&&s<definitions[p].unit.seats.count;}
 static void *datum_try_and_get(void *d,long i){(void)d;return i>=0&&i<20&&exists[i]?&headers[i]:NULL;}
 static int unit_can_enter_seat(long u,long p,short s,long *out){(void)u;(void)p;(void)s;*out=occupant;return occupant==NONE;}
-''' + '\n'.join(function(adapter, n) for n in ("mcc_seat_parent", "mcc_seat_nearby", "mcc_seat_action", "mcc_seat_update", "mcc_seat_camera")) + '\n' + function(network, "network_objects_set_seat") + r'''
+''' + '\n'.join(function(adapter, n) for n in ("mcc_seat_parent", "mcc_seat_controller", "mcc_seat_nearby", "mcc_seat_action", "mcc_seat_update", "mcc_seat_camera")) + '\n' + function(network, "network_objects_set_seat") + r'''
 #define CHECK(v) do{if(!(v)){fprintf(stderr,"line %d\n",__LINE__);return 1;}}while(0)
 int main(int argc,char **argv){
     int i;short s;
     if(argc!=2)return 2;
     for(i=0;i<20;++i){exists[i]=known[i]=1;units[i].definition_index=i;
         units[i].object.type=1;units[i].object.parent_object_index=NONE;
-        units[i].unit.parent_seat_index=NONE;headers[i].datum=(struct object_datum *)&units[i];}
+        units[i].unit.parent_seat_index=NONE;units[i].unit.player_index=NONE;headers[i].datum=(struct object_datum *)&units[i];}
     definitions[1].unit.seats.count=1;
-    if(!strcmp(argv[1],"isolation")){
+    if(!strcmp(argv[1],"controller")){
+        CHECK(mcc_seat_controller(1)==NONE);
+        units[1].unit.player_index=0;CHECK(mcc_seat_controller(1)==1);
+        active=0;reads=0;CHECK(mcc_seat_controller(1)==NONE&&reads==0);
+        active=1;units[1].object.type=2;CHECK(mcc_seat_controller(1)==NONE);
+    }else if(!strcmp(argv[1],"isolation")){
         active=0;CHECK(!mcc_seat_nearby(0,1,&s));CHECK(reads==0);
         CHECK(!mcc_seat_action(0,1,0));network_objects_set_seat(0,1,0);CHECK(!boarded);
         units[1].object.type=2;network_objects_set_seat(0,1,0);CHECK(boarded==1);
@@ -148,7 +153,7 @@ int main(int argc,char **argv){
     return exe
 
 
-@pytest.mark.parametrize("case", ["isolation", "interaction", "authority", "dead", "invalid", "cycles", "replication", "seat_update", "camera", "network_bounds"])
+@pytest.mark.parametrize("case", ["controller", "isolation", "interaction", "authority", "dead", "invalid", "cycles", "replication", "seat_update", "camera", "network_bounds"])
 def test_mcc_seats(seats, case):
     result = subprocess.run([str(seats), case], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

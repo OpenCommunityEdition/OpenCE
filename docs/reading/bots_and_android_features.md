@@ -8,8 +8,8 @@ their existing map loaders, limits, rules and resource ownership.
 
 - `bots.enhanced = true` adds CTF and King of the Hill goals, team roles,
   precision-weapon vantage choices and powerup selection. It is read at map
-  load. Slayer combat, spawning, pathfinding and unstick behavior remain
-  owned by the existing bot implementation.
+  load. Enhanced combat, pathfinding and recovery have their own controller and
+  state; stock Slayer decisions remain in `bots.c`. Spawning uses the engine.
 - `bots.routes` selects `direct` (default), `lanes` or `mixed`. A lane is an
   alternate route through two intermediate destinations. Unreachable lanes
   are abandoned for that bot's current life.
@@ -17,10 +17,11 @@ their existing map loaders, limits, rules and resource ownership.
   background worker. **Path Worker** in Bot settings controls it; it is off
   by default and takes effect on the next map. Collision queries and action
   decisions still run on the game thread.
-- `bots.vehicles = true` lets enhanced bots seek ground-vehicle seats and
-  turrets. They use ordinary player controls to enter, steer and leave.
-  Aircraft navigation is not implemented. Switching this option off asks
-  seated bots to leave; disabling enhanced bots takes effect on the next map.
+- `bots.vehicles = true` lets enhanced bots seek ground-vehicle seats, aircraft and
+  turrets, including nearby friendly player transports. They use ordinary
+  player controls to enter, steer and leave. Aircraft have bounded 3D routes
+  and require a slow grounded landing before exit. Switching this option off
+  asks ground riders to leave and aircraft pilots to land; disabling enhanced bots takes effect on the next map.
 - `bots.network = true` permits bots on a network host. Set it before
   creating the host or apply it with **OK** in the lobby's Bots settings;
   `bots.count`, `bots.skill` and `bots.teams` still apply.
@@ -102,13 +103,12 @@ The complete settings and environment variables are in
    failed encoding rolls back the unannounced record. A departing bot's
    machine identity stays unavailable until after the scheduled quit tick.
 3. [bots.c](../../port/linux/game/bots.c): `bots_update_actions` runs only
-   on the host. Upstream `bots_combat.c` supplies six skill levels: Recruit,
-   Easy, Normal, Heroic, Veteran and Legendary. `bots_level_may_fire`,
-   `bots_level_melee` and `bots_level_grenade` apply their combat rules.
-   GulchCE retains Infection zombies' no-gun/no-grenade rule and close-range
-   melee cadence; enhanced navigation, vehicles and objectives stay optional.
-   `bots_choose_goal` asks the enhanced module for urgent
-   objectives before the inherited combat/item/roaming decisions.
+   on the host and selects exactly one controller. Stock decisions stay in this
+   file; [enhanced_bots_controller.c](../../port/linux/game/enhanced_bots_controller.c)
+   owns enhanced decisions, paths, recovery and per-bot state. Both use upstream
+   `bots_combat.c` for the six skill levels: Recruit, Easy, Normal, Heroic,
+   Veteran and Legendary. Enhanced policy preserves Infection zombies' melee
+   behavior and arbitrates objectives, items and committed seat approaches.
 4. [enhanced_bots.c](../../port/linux/game/enhanced_bots.c):
    Its enhanced aiming, healing, powerup reach and retreat thresholds use
    the same six-level enum as upstream combat. Easy, Normal, Heroic and
@@ -130,7 +130,7 @@ The complete settings and environment variables are in
    [bots_routes.c](../../port/linux/game/bots_routes.c) and
    [bots_vantage.c](../../port/linux/game/bots_vantage.c):
    `bots_tactics_update` advances bounded graph preparation;
-   `bots_routes_search_goal` supplies lane waypoints to the original path
+   `bots_routes_search_goal` supplies lane waypoints to the enhanced path
    search. A vantage point is a position overlooking useful map locations;
    `bots_tactics_goal` chooses one suited to a bot's weapon and role.
 6. [bots_vehicles.c](../../port/linux/game/bots_vehicles.c):
@@ -142,9 +142,10 @@ The complete settings and environment variables are in
    existing update for the tick it executed. Clients replay the same
    player actions through the existing simulation.
 
-The ~7,000-line fork bot core is not imported. The focused objective module
-extends the existing core; it does not duplicate combat, respawning,
-path search or collision handling. Route/vantage preparation retains
+The enhanced controller derives from the existing OpenCE/GulchCE core, with
+independent state and lifecycle. It does not include or call the stock controller's
+decision functions. See the [standalone controller walkthrough](enhanced_bots.md)
+for navigation, boarding, aircraft, validation and limits. Route/vantage preparation retains
 bounded working memory (32,768 walkable nodes and a 262,144-entry surface
 lookup at most) and releases it when finished. The optional worker only
 traverses private graph snapshots; bot decisions stay on the host's game
@@ -154,7 +155,7 @@ is added. This bot extension does not add to the current upstream Xbox/CE protoc
 
 Map initialization resets objective, precision-cache and vehicle state.
 Map disposal frees graph/grid allocations, including partial preparation.
-Respawn releases seat reservations and vantage claims. Session disposal
+Respawn and live removal release seat reservations and vantage claims. Session disposal
 clears bot ownership and the network reservation. Map-loading and MCC
 cleanup paths remain unchanged.
 

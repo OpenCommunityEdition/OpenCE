@@ -2,7 +2,7 @@
 thelinkin3000/halo-ce-universal 18a94774a73ca275e9c0ab4f281e492ad8bb656e.
 Derived navigation retains GPL-3.0-only; see the provenance guide.
 
-Included by bots.c to share its bounded path search and geometry readers.
+Included by enhanced_bots_controller.c to share its bounded path search and geometry readers.
 Links belong to this map, reservations to a bot's life. Only ordinary player
 controls traverse them; neither the level's graph nor teleport rules change. */
 #define BOTS_NAV_LINKS 64
@@ -69,10 +69,10 @@ void bots_vehicle_obstacle(long vehicle_index, real_point3d const *goal)
 	real_vector3d vector;
 	real_point3d start;
 	real reach;
-	long now = game_time_get();
+	long now = game_time_get(), index;
 	unsigned long flags = FLAG(_collision_test_structure_bit) | FLAG(_collision_test_front_facing_surfaces_bit) |
 		FLAG(_collision_test_objects_bit) | FLAG(_collision_test_objects_scenery_bit) | FLAG(_collision_test_objects_machines_bit);
-	if (!vehicle || !bots_enhanced_running || bots_navigation.obstacle_tick == now) return;
+	if (!vehicle || bots_navigation.obstacle_tick == now) return;
 	bots_navigation.obstacle_tick = now;
 	reach = MAX(2.5f, vehicle->object.bounding_sphere_radius + 0.6f);
 	vector.i = vehicle->object.forward.i * reach;
@@ -82,6 +82,14 @@ void bots_vehicle_obstacle(long vehicle_index, real_point3d const *goal)
 	start.z += 0.25f;
 	if (!collision_test_vector(flags, &vehicle->object.bounding_sphere_center, &vector, vehicle_index, &hit) &&
 		!collision_test_vector(flags, &start, &vector, vehicle_index, &hit)) return;
+	/* Completed and in-flight routes through this obstruction are stale. */
+	for (index = 0; index < BOTS_MAXIMUM; index++)
+		if (bots_globals.bots[index].navigation_parent == vehicle_index)
+		{
+			bots_globals.bots[index].path.valid = FALSE;
+			bots_globals.bots[index].path_tick = now - TICKS_PER_SECOND;
+			bots_globals.bots[index].goal_serial++;
+		}
 	if (hit.type == _collision_result_object)
 		bots_paths_learn(&vehicle->object.position, goal);
 	else if (hit.type == _collision_result_structure && bots_navigation_vehicle_structure())

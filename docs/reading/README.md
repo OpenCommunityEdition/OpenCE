@@ -160,3 +160,6 @@ automatic family filtering and gameplay glyph ownership.
 submenu, P1-P4 layouts, physical input isolation and prompt updates.
 
 - [Keyboard and mouse prompt glyphs](keyboard_prompts.md): manual style, automatic input switching, binding-aware gameplay and smooth keycap rendering.
+
+The [standalone enhanced bot controller](enhanced_bots.md) explains stock/enhanced
+ownership, goal arbitration, boarding, aircraft routes and validation limits.

@@ -408,11 +408,14 @@ follow the teams' changes in the lobby. They look for enemies, aim, fire,
 throw grenades and pick up better weapons, as well as `bots.skill` lets
 them, and walk the paths that the campaign's AI finds on the maps' walkable
 surfaces (`game/bots.c`). These remain the defaults, including Slayer-derived
-SWAT, Infection and Gun Game. Optional `bots.enhanced` adds CTF/King goals,
+SWAT, Infection and Gun Game. Optional `bots.enhanced` selects an independent controller with CTF/King goals,
 team roles, vantage points, skill-based aiming, powerup claims and Infection
 goals. Bots can plan through teleporters and climbable ladders; `bots.routes`
 selects direct paths or side lanes, and `bots.vehicles` enables ground vehicles
-and turrets, with passenger waits, flipping and vehicle-width obstacle learning.
+and turrets plus aircraft using authored vehicle types and seats, with passenger
+waits, flipping, hull clearance and bounded 3D aircraft routes. Nearby bots can
+board friendly player vehicles. Map-specific scripts and water-only boat routes
+are not inferred; see the [controller guide](../../docs/reading/enhanced_bots.md).
 The optional `bots.thread` path worker uses private snapshots; it defaults off
 and fixed-tick benchmarks always use synchronous searches.
 Enhanced policy takes effect at map load. `bots.network` permits host-controlled
@@ -613,10 +616,10 @@ the setting for one start of the game. It has priority over the file.
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |
 | `game.enhanced_animations` | `true` | `HALO_ENHANCED_ANIMATIONS` | `true`: the player bipeds' grenade throws keep their legs moving, blended by speed and direction (crouched throws stay crouched, throws in the air use the jump's legs), Warthog and Scorpion riders stay seated to throw and let go of the grips to throw and reload, and a player turns with the aim while throwing, as while meleeing, and in the air, as while running (the original froze the body in a jump and kept the aim within its aiming screen about it, so a shot after turning in the air went between the jump's facing and the crosshair). `false`: the original animations, which freeze the legs during a throw and stand a rider up and the body in the air. The turning with the aim (throwing, in the air) moves where shots go, so in a network game every player turns so whatever this says; `false` turns it off only in a game of one machine. Only in config.toml, not in the menus. |
 | `game.unlock_all_levels` | `false` | `HALO_UNLOCK_ALL_LEVELS` | `true`: a profile created afterward starts with all the campaign levels finished on all the difficulties. `false`: a new profile starts at The Pillar of Autumn, and each level opens when you finish the level before it, as on the Xbox. Existing profiles keep their progress. To start a profile over, type `profile_reset_campaign` in the console. |
-| `bots.enhanced` | `false` | `HALO_BOTS_ENHANCED` | Optional goals, roles, vantage points and powerup choices. Read at map load. |
+| `bots.enhanced` | `false` | `HALO_BOTS_ENHANCED` | Independent enhanced controller, goals, roles, navigation and powerup choices. Read at map load. |
 | `bots.network` | `false` | `HALO_BOTS_NETWORK` | Host bots through ordinary player replication. Read when creating the host or applying lobby Bots settings. Enabling reserves 63 free machine IDs until that host closes. |
 | `bots.routes` | `"direct"` | `HALO_BOT_ROUTES` | Enhanced bot routes: `direct`, `lanes` or `mixed`; unreadable/unreachable routes fall back to the base pathfinder. |
-| `bots.vehicles` | `false` | `HALO_BOT_VEHICLES` | Enhanced ground-vehicle and turret use through ordinary controls; no aircraft navigation. |
+| `bots.vehicles` | `false` | `HALO_BOT_VEHICLES` | Enhanced ground vehicles, turrets, aircraft and friendly-player boarding through ordinary controls; requires usable authored seats and physics. |
 | `bots.thread` | `false` | `HALO_BOT_THREAD` | Optional snapshot path worker for enhanced bots. Read at map load; fixed-tick benchmarks remain synchronous. |
 | `android.cheat_menu` | `false` | `HALO_ANDROID_CHEAT_MENU` | Android: show a CHEATS touch button and Options entry during offline gameplay or while hosting co-op/multiplayer. Joining clients cannot use cheats. |
 | `bots.count` | `0` | `HALO_BOTS` | Computer players: `0` to `63` join the lobby as room permits. Local Slayer by default; `bots.enhanced` adds CTF/King and `bots.network` allows network hosts. `0`: none, as in the stock game. Refer to "Bots". |
