@@ -103,6 +103,16 @@ static int admission_reads;
 static int identities_prepared;
 static unsigned reads, largest, scans, closed;
 void mcc_cache_precache_clear(void) {}
+#include "../src/steam_workshop.h"
+static int workshop_items;
+static struct steam_workshop_map workshop_item;
+int steam_workshop_scan(void) {return workshop_items;}
+int steam_workshop_count(void) {return workshop_items;}
+struct steam_workshop_map const *steam_workshop_map(int index) {return index==0 && workshop_items ? &workshop_item : NULL;}
+int steam_workshop_item_title(char const *id,char *title,unsigned long size) {
+    if(!workshop_items || strcmp(id,workshop_item.item_id))return 0;
+    snprintf(title,size,"%s",workshop_item.item_title);return 1;
+}
 char const *mcc_identity_local_name(char const *name) {return name;}
 int mcc_identity_check(char const *name) {(void)name;return 1;}
 int mcc_identity_prepare_host(char const *name) {(void)name;identities_prepared++;return 1;}
@@ -223,7 +233,25 @@ int main(int argc,char **argv) {
         if(accepted)printf("path=%s\n",path);
         return 0;
     }
-    root=argv[1];count=mcc_maps_count(FALSE);
+    root=argv[1];
+    if(argc>2 && !strcmp(argv[2],"workshop")) {
+        /* one subscribed item: its maps folder is root/mcc_maps/2899609719, as the platform's path translation has it */
+        workshop_items=1;
+        strcpy(workshop_item.item_id,"2899609719");strcpy(workshop_item.item_title,"Pro Edition");
+        strcpy(workshop_item.name,"pat_beavercreek");strcpy(workshop_item.title,"Better Creek");
+        argc=2;
+    }
+    count=mcc_maps_count(FALSE);
+    if(workshop_items) {
+        struct mcc_map_browser browser;wchar_t text[64];
+        memset(&browser,0,sizeof(browser));
+        mcc_map_browser_open(&browser,FALSE);
+        mcc_map_browser_text(&browser,0,text);
+        {wchar_t const *d=mcc_maps_description(0);
+         printf("folder=%ls\ndescription=",text);
+         while(*d && *d!='\r')putchar((int)*d++);
+         printf("\n");}
+    }
     printf("count=%d\nmultiplayer=%d\nsingleplayer=%d\n",count,mcc_maps_count(TRUE),mcc_maps_type_count(TRUE));
     if(mcc_maps_type_count(FALSE)!=mcc_maps_count(TRUE) ||
        mcc_maps_type_count(TRUE)+mcc_maps_type_count(FALSE)!=count)return 30;
@@ -586,3 +614,21 @@ def test_browser_full_catalog_and_long_labels(catalog_tool, tmp_path):
     assert fields["row0_0"] == f"[{package}]|folder"
     assert fields["view3"] == f"{package}|1024|1023"
     assert fields["view4"] == "|1|0"
+
+
+def test_workshop_item_maps_are_listed_by_title(catalog_tool, tmp_path):
+    """A subscribed Workshop item's map is the level mcc_maps\\<item id>\\<name>, shown by its Workshop title."""
+    install(tmp_path, {"a10.map": header()})
+    item = tmp_path / "mcc_maps" / "2899609719"
+    item.mkdir()
+    (item / "pat_beavercreek.map").write_bytes(header(scenario=1))
+    fields, maps = run(catalog_tool, tmp_path, "workshop")
+    assert maps == ["mcc_maps\\2899609719\\pat_beavercreek|0", "mcc_maps\\a10|1"]
+    # the title, not the file name and not a "[package]" suffix
+    assert fields["label_0"] == "Better Creek"
+    # the package folder is named by the item's title, and the description says where it is from
+    assert fields["folder"] == "[Pro Edition]"
+    assert fields["description"].startswith("Steam Workshop")
+    # the same data root without the item: only the ordinary map
+    fields, maps = run(catalog_tool, tmp_path)
+    assert maps == ["mcc_maps\\a10|1"]

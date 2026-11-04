@@ -19,6 +19,8 @@ wchar_t const *mcc_maps_name(short index);
 wchar_t const *mcc_maps_description(short index);
 boolean mcc_maps_campaign(short index);
 boolean mcc_maps_level_campaign(char const *level_name);
+/* The title of the Steam Workshop item with this id when it is subscribed here and has one. */
+boolean mcc_maps_workshop_title(char const *item_id, char *title, unsigned size);
 
 /* Menu-only views. Identities, not catalog indices, survive a rescan. */
 struct mcc_map_browser

@@ -11,9 +11,15 @@ def test_workshop_identity(tmp_path):
         "#include <stddef.h>\ntypedef int boolean;\ntypedef unsigned char byte;\n")
     source = tmp_path / "test.c"
     source.write_text(r'''
+#include "cseries.h"
 #include "mcc_workshop.h"
 #include <stdio.h>
 #include <string.h>
+static char steam_title[64];
+boolean mcc_maps_workshop_title(char const *id,char *title,unsigned size){
+ if(strcmp(id,"2899609719") || !steam_title[0])return 0;
+ snprintf(title,size,"%s",steam_title);return 1;
+}
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
 int main(void) {
  struct mcc_workshop_item item,back;char name[128],text[256],folder[64],title[MCC_WORKSHOP_TITLE_SIZE];
@@ -25,6 +31,13 @@ int main(void) {
  CHECK(!mcc_workshop_parse_sidecar("12ab",&item));
  CHECK(!mcc_workshop_parse_sidecar("123456789012345678901",&item));
  CHECK(!mcc_workshop_parse_sidecar("..\\evil",&item));
+ /* a package folder named by an item id is that item; its title is Steam's when this machine has the item */
+ CHECK(mcc_workshop_local_item("mcc_maps\\2899609719\\pat_beavercreek",&item) && !strcmp(item.id,"2899609719"));
+ CHECK(!strcmp(item.title,"Pat Beavercreek"));
+ strcpy(steam_title,"Pro Edition \xc3\xa9 of Halo");
+ CHECK(mcc_workshop_local_item("mcc_maps\\2899609719\\pat_beavercreek",&item) && !strcmp(item.title,"Pro Edition  of Halo"));
+ steam_title[0]=0;
+ CHECK(!mcc_workshop_local_item("mcc_maps\\notitem\\pat_beavercreek",&item));
  /* package folders */
  CHECK(mcc_workshop_package_folder("mcc_maps\\2899609719\\pat_beavercreek",folder) && !strcmp(folder,"2899609719"));
  CHECK(!mcc_workshop_package_folder("mcc_maps\\a10",folder));

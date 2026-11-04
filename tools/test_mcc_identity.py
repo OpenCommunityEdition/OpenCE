@@ -91,6 +91,7 @@ void mcc_cache_validation_clear(void) {}
 void mcc_validation_cancel(void) {}
 void mcc_cache_precache_clear(void){clears++;}
 void mcc_maps_rescan(void){}
+boolean mcc_maps_workshop_title(char const *id,char *title,unsigned size){(void)id;(void)title;(void)size;return 0;}
 short mcc_maps_count(boolean multiplayer){(void)multiplayer;return (short)count;}
 char const *mcc_maps_level_name(short i){return files[i].name;}
 boolean mcc_level_name(char const *s){return !strncmp(s,"mcc_maps",8);}

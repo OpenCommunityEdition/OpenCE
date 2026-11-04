@@ -14,6 +14,7 @@ list, loader, resource directory or display index is used here.
 #include "mcc_cache.h"
 #include "mcc_identity.h"
 #include "mcc_package.h"
+#include "../src/steam_workshop.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -153,6 +154,59 @@ static int mcc_map_order(void const *left, void const *right)
 		((struct mcc_menu_map const *)right)->file_name);
 }
 
+static boolean mcc_map_package_is_item(char const *package)
+{
+	size_t length;
+
+	for (length = 0; package[length]; length++)
+	{
+		if (package[length] < '0' || package[length] > '9')
+			return FALSE;
+	}
+	return length > 0;
+}
+
+/* The Workshop title and description of a level in an item's package folder: TRUE if the catalog has it. */
+static boolean mcc_map_workshop_title(struct mcc_menu_map *map)
+{
+	char const *base = strrchr(map->file_name, '\\');
+	char package[64];
+	size_t length = base ? (size_t)(base - map->file_name) : 0, index, used;
+	short item;
+
+	if (!base || length >= sizeof(package))
+		return FALSE;
+	memcpy(package, map->file_name, length);
+	package[length] = 0;
+	if (!mcc_map_package_is_item(package))
+		return FALSE;
+	for (item = 0; item < steam_workshop_count(); item++)
+	{
+		struct steam_workshop_map const *entry = steam_workshop_map(item);
+		char const *title, *item_title;
+
+		if (strcmp(entry->item_id, package) || csstrcasecmp(entry->name, base + 1))
+			continue;
+		title = entry->title;
+		item_title = entry->item_title;
+		for (index = 0; title[index] && index < 63; index++)
+			map->name[index] = (unsigned char)title[index] >= 32 && (unsigned char)title[index] < 127 ? title[index] : '?';
+		map->name[index] = 0;
+		{
+			static char const heading[] = "Steam Workshop\r\n";
+
+			for (used = 0; heading[used]; used++)
+				map->description[used] = heading[used];
+			for (index = 0; item_title[index] && used < MCC_MAP_DESCRIPTION_MAXIMUM; index++)
+				map->description[used++] = (unsigned char)item_title[index] >= 32 && (unsigned char)item_title[index] < 127 ?
+					item_title[index] : '?';
+			map->description[used] = 0;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
 /* Exactly one package level; directory entries never become arbitrary paths. */
 static void mcc_maps_scan_directory(char const *package)
 {
@@ -193,11 +247,19 @@ static void mcc_maps_scan(void)
     mcc_menu_catalog.scanned=TRUE;
     mcc_menu_catalog.count=0;
     mcc_maps_scan_directory("");
+    /* The subscribed Steam Workshop items: each map is the level mcc_maps\<item id>\<map name>. */
+    for (i=0;i<steam_workshop_count();i++) {
+        struct steam_workshop_map const *item=steam_workshop_map(i);
+        char relative[64];
+        snprintf(relative,sizeof(relative),"%s\\%s",item->item_id,item->name);
+        mcc_map_register(relative);
+    }
     qsort(mcc_menu_catalog.maps,(size_t)mcc_menu_catalog.count,sizeof(mcc_menu_catalog.maps[0]),mcc_map_order);
-    /* Show the owning package for every packaged level. */
+    /* Show the owning package for every packaged level; a Workshop map shows its own title instead. */
     for (i=0;i<mcc_menu_catalog.count;i++) {
         struct mcc_menu_map *map=&mcc_menu_catalog.maps[i];
         char const *base=strrchr(map->file_name,'\\');
+        if (base && mcc_map_workshop_title(map)) continue;
         if (base) {
             size_t n,k;
             for (n=0;map->name[n];n++) {}
@@ -212,6 +274,7 @@ static void mcc_maps_scan(void)
 void mcc_maps_rescan(void)
 {
 	mcc_cache_precache_clear();
+	steam_workshop_scan();
 	mcc_menu_catalog.scanned = FALSE;
 }
 
@@ -432,6 +495,14 @@ void mcc_map_browser_text(struct mcc_map_browser const *browser, short row, wcha
 	{
 		mcc_map_package(index, package);
 		text[used++] = '[';
+		if (mcc_map_package_is_item(package))
+		{
+			char title[STEAM_WORKSHOP_TITLE_SIZE];
+
+			/* a Workshop item's folder is named by its title */
+			if (steam_workshop_item_title(package, title, sizeof(title)) && title[0])
+				snprintf(package, sizeof(package), "%s", title);
+		}
 		for (length = 0; package[length] && used < 62; length++)
 		{
 			unsigned char c = (unsigned char)package[length];
@@ -453,4 +524,9 @@ void mcc_map_browser_text(struct mcc_map_browser const *browser, short row, wcha
 		}
 	}
 	text[used] = 0;
+}
+
+boolean mcc_maps_workshop_title(char const *item_id, char *title, unsigned size)
+{
+	return steam_workshop_item_title(item_id, title, size) && title[0];
 }
