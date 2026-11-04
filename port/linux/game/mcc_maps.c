@@ -15,6 +15,7 @@ list, loader, resource directory or display index is used here.
 #include "mcc_identity.h"
 #include "mcc_package.h"
 #include "../src/steam_workshop.h"
+#include "../src/workshop_collections.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -389,10 +390,48 @@ static void mcc_map_package(short index, char package[64])
 	package[length] = 0;
 }
 
+/* The collections that hold a map: those of its Workshop item (workshop_collections.h); none for any other map. */
+static int mcc_map_collections(short index, int collections[WORKSHOP_COLLECTION_MAXIMUM_PER_ITEM])
+{
+	char package[64];
+
+	mcc_map_package(index, package);
+	return mcc_map_package_is_item(package) ?
+		workshop_collections_of_item(package, collections, WORKSHOP_COLLECTION_MAXIMUM_PER_ITEM) : 0;
+}
+
+static boolean mcc_map_in_collection(short index, short group)
+{
+	int collections[WORKSHOP_COLLECTION_MAXIMUM_PER_ITEM], count = mcc_map_collections(index, collections), at;
+
+	for (at = 0; at < count; at++)
+	{
+		if (collections[at] == group)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+static boolean mcc_map_in_a_collection(short index)
+{
+	int collections[WORKSHOP_COLLECTION_MAXIMUM_PER_ITEM];
+
+	return mcc_map_collections(index, collections) > 0;
+}
+
+/* A folder row's name: its collection's, or its package's. */
+static void mcc_map_folder_name(struct mcc_map_browser const *browser, short row, char name[64])
+{
+	if (browser->groups[row] != NONE)
+		snprintf(name, 64, "%s", workshop_collection_name(browser->groups[row]));
+	else
+		mcc_map_package(browser->entries[row], name);
+}
+
 static void mcc_map_browser_key(struct mcc_map_browser const *browser, short row, char key[64])
 {
 	if (browser->folders[row])
-		mcc_map_package(browser->entries[row], key);
+		mcc_map_folder_name(browser, row, key);
 	else
 		snprintf(key, 64, "%s", mcc_maps_level_name(browser->entries[row]));
 }
@@ -405,47 +444,103 @@ void mcc_map_browser_select(struct mcc_map_browser *browser, short row)
 	mcc_map_browser_key(browser, row, browser->selected);
 }
 
+/* Adds a folder row, once: `group` is its collection, or NONE for the package of map `index`. */
+static void mcc_map_browser_add_folder(struct mcc_map_browser *browser, short index, short group)
+{
+	char name[64], other[64];
+	short row;
+
+	browser->entries[browser->count] = index;
+	browser->groups[browser->count] = group;
+	mcc_map_folder_name(browser, browser->count, name);
+	for (row = 0; row < browser->count; row++)
+	{
+		if (browser->folders[row])
+		{
+			mcc_map_folder_name(browser, row, other);
+			if (!csstrcasecmp(name, other))
+				return;
+		}
+	}
+	browser->folders[browser->count++] = TRUE;
+}
+
 void mcc_map_browser_open(struct mcc_map_browser *browser, boolean campaign)
 {
-	char package[64], previous[64] = "", key[64];
+	char package[64], key[64];
 	short index, pass, row;
 
 	mcc_maps_scan();
 	browser->campaign = campaign;
 	browser->count = browser->chosen = 0;
-	/* Folder rows precede loose maps. The catalog already sorts package/map
-	identities case-insensitively and admits only one package depth. */
+	/* At the top, folder rows (a Workshop collection's, or a package's: an item in no collection is its own
+	folder) precede loose maps. In a folder, its maps. The catalog already sorts package/map identities
+	case-insensitively and admits only one package depth. */
+	if (!browser->package[0])
+	{
+		/* the collections the player has an item of, in the table's order, come first */
+		short group;
+
+		for (group = 0; group < workshop_collection_count(); group++)
+		{
+			for (index = 0; index < mcc_menu_catalog.count; index++)
+			{
+				if (mcc_menu_catalog.maps[index].campaign == campaign && mcc_map_in_collection(index, group))
+				{
+					mcc_map_browser_add_folder(browser, index, group);
+					break;
+				}
+			}
+		}
+	}
 	for (pass = 0; pass < 2; pass++)
 	{
 		for (index = 0; index < mcc_menu_catalog.count; index++)
 		{
-			boolean folder;
-
 			if (mcc_menu_catalog.maps[index].campaign != campaign)
 				continue;
 			mcc_map_package(index, package);
-			folder = !browser->package[0] && package[0];
 			if (browser->package[0])
 			{
-				if (pass || csstrcasecmp(browser->package, package))
+				if (pass || (browser->collection ? !mcc_map_in_collection(index, browser->group) :
+					(csstrcasecmp(browser->package, package) || mcc_map_in_a_collection(index))))
 					continue;
 			}
-			else if ((pass == 0) != folder || (folder && !csstrcasecmp(previous, package)))
+			else if (package[0])
+			{
+				if (pass || mcc_map_in_a_collection(index))
+					continue;
+				mcc_map_browser_add_folder(browser, index, NONE);
+				continue;
+			}
+			else if (!pass)
+				continue;
+			if (browser->count == MCC_MAPS_MAXIMUM)
 				continue;
 			row = browser->count++;
 			browser->entries[row] = index;
-			browser->folders[row] = folder;
-			if (folder)
-				snprintf(previous, sizeof(previous), "%s", package);
+			browser->groups[row] = NONE;
+			browser->folders[row] = FALSE;
 			mcc_map_browser_key(browser, row, key);
 			if (!csstrcasecmp(browser->selected, key))
 				browser->chosen = row;
+		}
+		if (!pass && !browser->package[0])
+		{
+			/* the folder rows are in, find the selected one among them */
+			for (row = 0; row < browser->count; row++)
+			{
+				mcc_map_browser_key(browser, row, key);
+				if (!csstrcasecmp(browser->selected, key))
+					browser->chosen = row;
+			}
 		}
 	}
 	/* A removed/now-empty package returns safely to its parent. */
 	if (!browser->count && browser->package[0])
 	{
 		browser->package[0] = 0;
+		browser->collection = FALSE;
 		mcc_map_browser_open(browser, campaign);
 		return;
 	}
@@ -459,7 +554,9 @@ boolean mcc_map_browser_enter(struct mcc_map_browser *browser, short row)
 {
 	if (row < 0 || row >= browser->count || !browser->folders[row])
 		return FALSE;
-	mcc_map_package(browser->entries[row], browser->package);
+	mcc_map_folder_name(browser, row, browser->package);
+	browser->collection = browser->groups[row] != NONE;
+	browser->group = browser->groups[row];
 	browser->selected[0] = 0;
 	mcc_map_browser_open(browser, browser->campaign);
 	return TRUE;
@@ -471,6 +568,7 @@ boolean mcc_map_browser_back(struct mcc_map_browser *browser)
 		return FALSE;
 	snprintf(browser->selected, sizeof(browser->selected), "%s", browser->package);
 	browser->package[0] = 0;
+	browser->collection = FALSE;
 	mcc_map_browser_open(browser, browser->campaign);
 	return TRUE;
 }
@@ -493,9 +591,9 @@ void mcc_map_browser_text(struct mcc_map_browser const *browser, short row, wcha
 	index = browser->entries[row];
 	if (browser->folders[row])
 	{
-		mcc_map_package(index, package);
+		mcc_map_folder_name(browser, row, package);
 		text[used++] = '[';
-		if (mcc_map_package_is_item(package))
+		if (browser->groups[row] == NONE && mcc_map_package_is_item(package))
 		{
 			char title[STEAM_WORKSHOP_TITLE_SIZE];
 
