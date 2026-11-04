@@ -8,10 +8,11 @@
 #define MCC_WORKSHOP_SIDECAR "workshop_id.txt"
 
 /* Where the item travels: the bytes of the 128-byte map name after the name's
- * own terminator (names stop at 63 characters). Older builds compare names to
- * their first NUL and never read these bytes. */
+ * own terminator (names stop at 63 characters). MCC protocol 64 introduces
+ * this advisory record; content fingerprints alone still decide admission. */
 #define MCC_WORKSHOP_WIRE_OFFSET 64
 #define MCC_WORKSHOP_WIRE_SIZE 64
+#define MCC_WORKSHOP_WIRE_VERSION 1
 
 struct mcc_workshop_item {
     char id[MCC_WORKSHOP_ID_SIZE];        /* decimal digits; "" when the package is not a Workshop item */
@@ -20,8 +21,8 @@ struct mcc_workshop_item {
 
 enum mcc_workshop_refusal {
     MCC_WORKSHOP_NOT_WORKSHOP,   /* the host's map has no item id */
-    MCC_WORKSHOP_MISSING,        /* this machine lacks the item */
-    MCC_WORKSHOP_DIFFERS         /* this machine has the item, with other content */
+    MCC_WORKSHOP_MISSING,        /* no local package positively identifies the item */
+    MCC_WORKSHOP_DIFFERS         /* an identified package lacks the matching level/content */
 };
 
 /* A sidecar's text: line 1 the item id (1 to 20 digits), optional line 2 its

@@ -11,7 +11,6 @@
 #include "mcc_precache.h"
 #include "mcc_validation.h"
 #include "mcc_workshop.h"
-#include <stdio.h>
 #include <string.h>
 
 #define MCC_IDENTITY_MAX_CANDIDATES 16
@@ -119,7 +118,7 @@ void const *mcc_identity_host_settings(void const *settings,long bytes,struct ne
         !mcc_validation_lookup(canonical,&checksum,NULL) ||
         checksum!=(uint32_t)game->map.version) return NULL;
     memcpy(copy->mcc_content_sha256,mcc_host_identity.digest,32);
-    /* The Workshop item rides in the name's unused bytes; older builds never read them. */
+    /* MCC protocol 64 reserves the name tail for advisory Workshop metadata. */
     mcc_workshop_wire_pack(copy->map.name,&mcc_host_identity.item);
     return copy;
 }
@@ -148,22 +147,22 @@ static int mcc_identity_matches(char const *name,unsigned char const digest[32],
     return ok;
 }
 
-/* Why no local package matches the host's, in the joiner's words. A local
- * package of the host's level that is the host's item (or carries no item id)
- * is the item with other content; otherwise the item is missing. */
+/* Only a known item ID establishes presence. Its older package may not yet
+ * contain the requested level, so search independently of the filename. */
 static int mcc_identity_refusal(struct network_game const *game,char const *session)
 {
     struct mcc_workshop_item host,local;
     enum mcc_workshop_refusal kind=MCC_WORKSHOP_MISSING;
-    char const *leaf=strrchr(session,'\\')+1,*candidate,*candidate_leaf;
+    char const *leaf=strrchr(session,'\\')+1,*candidate;
     char text[256];
     short i,count=mcc_maps_count(FALSE);
     if (!mcc_workshop_wire_unpack(game->map.name,&host)) kind=MCC_WORKSHOP_NOT_WORKSHOP;
     else for (i=0;i<count;i++) {
         candidate=mcc_maps_level_name(i);
-        candidate_leaf=strrchr(candidate,'\\')+1;
-        if (csstrcasecmp(leaf,candidate_leaf)) continue;
-        if (!mcc_workshop_local_item(candidate,&local) || !strcmp(local.id,host.id)) kind=MCC_WORKSHOP_DIFFERS;
+        if (mcc_workshop_local_item(candidate,&local) && !strcmp(local.id,host.id)) {
+            kind=MCC_WORKSHOP_DIFFERS;
+            break;
+        }
     }
     mcc_workshop_refusal_text(kind,&host,leaf,text,sizeof(text));
     return mcc_identity_error(text);

@@ -36,6 +36,25 @@ little-endian reads. The host reporting tool and tests use the same parser
 as the game. MCC has its own parser and conversion modules; a shared runtime
 tag shape does not imply a shared on-disk format or resource owner.
 
+## Workshop identity in join refusals
+
+For MCC join refusals, also follow `mcc_identity_prepare_host`,
+`mcc_identity_host_settings` and `mcc_identity_refusal` in
+[`mcc_identity.c`](../../port/linux/game/mcc_identity.c), then the sidecar reader
+and bounded record helpers in [`mcc_workshop.c`](../../port/linux/game/mcc_workshop.c).
+A package named `2899609719`, or a descriptive package with that id in
+`workshop_id.txt`, can identify its Workshop item to a joiner. An older local
+copy of that item may lack the requested level; item presence is therefore
+checked independently of level names. An unidentified same-name level is not
+evidence that the item is installed. SHA-256 and level matching remain
+authoritative even when ids differ. Metadata is cached with host preparation
+and cleared on disconnect; changing a sidecar during a session requires fresh
+host preparation after disconnect. The feature does not scan Steam libraries.
+See [installation and messages](../mcc_maps.md#installation-and-menus) and the
+[MCC wire contract](../../port/linux/NETCODE.md#gulchce-crossplay-boundary).
+Focused checks are `test_mcc_workshop.py`, `test_mcc_identity.py` and
+`test_mcc_protocol.py` under [`tools`](../../tools/).
+
 ## Follow an MCC package level
 
 Consider selecting `mcc_maps\solar_flare\m0`. This is an illustrative

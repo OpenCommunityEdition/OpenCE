@@ -102,7 +102,7 @@ void mcc_workshop_wire_pack(char name[128], struct mcc_workshop_item const *item
     if (title_length>MCC_WORKSHOP_WIRE_SIZE-3-id_length-2) title_length=MCC_WORKSHOP_WIRE_SIZE-3-id_length-2;
     tail[0]='W';
     tail[1]='S';
-    tail[2]=1;
+    tail[2]=MCC_WORKSHOP_WIRE_VERSION;
     memcpy(tail+3,item->id,id_length);
     memcpy(tail+4+id_length,item->title,title_length);
 }
@@ -112,7 +112,7 @@ int mcc_workshop_wire_unpack(char const name[128], struct mcc_workshop_item *ite
     char const *tail=name+MCC_WORKSHOP_WIRE_OFFSET,*end;
     unsigned id_length;
     memset(item,0,sizeof(*item));
-    if (tail[0]!='W' || tail[1]!='S' || tail[2]!=1) return 0;
+    if (tail[0]!='W' || tail[1]!='S' || tail[2]!=MCC_WORKSHOP_WIRE_VERSION) return 0;
     end=memchr(tail+3,0,MCC_WORKSHOP_WIRE_SIZE-3);
     if (!end) return 0;
     id_length=(unsigned)(end-(tail+3));
@@ -134,10 +134,12 @@ void mcc_workshop_refusal_text(enum mcc_workshop_refusal kind, struct mcc_worksh
     else mcc_workshop_title_from_level(level,title);
     switch (kind) {
     case MCC_WORKSHOP_MISSING:
-        snprintf(text,size,"Subscribe to %s on the Steam Workshop (item %s) to join.",title,item->id);
+        snprintf(text,size,"No identified local copy of %s (Steam Workshop item %s). "
+            "Download the host's version and copy its map and required resources into mcc_maps.",title,item->id);
         break;
     case MCC_WORKSHOP_DIFFERS:
-        snprintf(text,size,"Your copy of %s differs from the host's: let Steam update Workshop item %s, then join again.",
+        snprintf(text,size,"Your local package for %s (Steam Workshop item %s) does not match the host. "
+            "Check versions and copy the matching map and required resources into mcc_maps.",
             title,item->id);
         break;
     default:

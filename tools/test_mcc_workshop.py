@@ -52,18 +52,85 @@ int main(void) {
  /* the texts */
  strcpy(item.id,"2899609719");strcpy(item.title,"Better Creek");
  mcc_workshop_refusal_text(MCC_WORKSHOP_MISSING,&item,"pat_beavercreek",text,sizeof(text));
- CHECK(!strcmp(text,"Subscribe to Better Creek on the Steam Workshop (item 2899609719) to join."));
+ CHECK(!strcmp(text,"No identified local copy of Better Creek (Steam Workshop item 2899609719). "
+     "Download the host's version and copy its map and required resources into mcc_maps."));
  mcc_workshop_refusal_text(MCC_WORKSHOP_DIFFERS,&item,"pat_beavercreek",text,sizeof(text));
- CHECK(!strcmp(text,"Your copy of Better Creek differs from the host's: let Steam update Workshop item 2899609719, then join again."));
+ CHECK(!strcmp(text,"Your local package for Better Creek (Steam Workshop item 2899609719) does not match the host. "
+     "Check versions and copy the matching map and required resources into mcc_maps."));
  item.title[0]=0;
  mcc_workshop_refusal_text(MCC_WORKSHOP_MISSING,&item,"pat_beavercreek",text,sizeof(text));
- CHECK(strstr(text,"Subscribe to Pat Beavercreek on"));
+ CHECK(strstr(text,"No identified local copy of Pat Beavercreek"));
  mcc_workshop_refusal_text(MCC_WORKSHOP_NOT_WORKSHOP,&item,"pat_beavercreek",text,sizeof(text));
  CHECK(strstr(text,"pat_beavercreek.map") && strstr(text,"SHA-256"));
+ /* Long metadata still leaves the actionable installation instruction. */
+ memset(item.id,'7',20);item.id[20]=0;memset(item.title,'T',39);item.title[39]=0;
+ mcc_workshop_refusal_text(MCC_WORKSHOP_DIFFERS,&item,"level",text,sizeof(text));
+ CHECK(strstr(text,"resources into mcc_maps.") && strlen(text)<sizeof(text)-1);
  return 0;
 }
 ''')
     game = ROOT / "port/linux/game"
     exe = compile_tool(tmp_path, [source, game / "mcc_workshop.c", game / "mcc_package.c"])
     result = subprocess.run([str(exe)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_workshop_sidecar_files(tmp_path):
+    """Read real files; replace only the platform's Xbox-path translation."""
+    (tmp_path / "cseries.h").write_text(
+        "#include <stddef.h>\ntypedef int boolean;\ntypedef unsigned char byte;\n")
+    (tmp_path / "stdio.h").write_text(
+        '#include_next <stdio.h>\nFILE *workshop_test_fopen(char const *,char const *);\n'
+        '#define fopen workshop_test_fopen\n')
+    for folder, contents in {
+        "Named": b"2899609719\r\nBetter Creek\r\n",
+        "12345": b"67890\nSidecar wins\n",
+        "Bad": b"not-an-id\n",
+        "42": b"not-an-id\n",
+        "TitleOnly": b"\nNot an ID\n",
+        "Long": b"7\n" + b"T" * 300,
+        "IdOnly": b"2899609719\n",
+    }.items():
+        package = tmp_path / "mcc_maps" / folder
+        package.mkdir(parents=True)
+        (package / "workshop_id.txt").write_bytes(contents)
+    source = tmp_path / "sidecar.c"
+    source.write_text(r'''
+#include "mcc_workshop.h"
+#include <stdio.h>
+#include <string.h>
+#undef fopen
+#define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
+FILE *workshop_test_fopen(char const *path,char const *mode) {
+ char local[160];unsigned i;
+ if(strncmp(path,"d:\\mcc_maps\\",12))return NULL;
+ for(i=3;path[i] && i-3<sizeof(local)-1;i++) {
+  local[i-3]=path[i]=='\\' ? '/' : path[i];
+ }
+ local[i-3]=0;
+ return fopen(local,mode);
+}
+int main(void) {
+ struct mcc_workshop_item item;
+ CHECK(mcc_workshop_local_item("mcc_maps\\Named\\level",&item));
+ CHECK(!strcmp(item.id,"2899609719") && !strcmp(item.title,"Better Creek"));
+ CHECK(mcc_workshop_local_item("mcc_maps\\12345\\level",&item));
+ CHECK(!strcmp(item.id,"67890") && !strcmp(item.title,"Sidecar wins"));
+ CHECK(mcc_workshop_local_item("mcc_maps\\42\\old_level",&item));
+ CHECK(!strcmp(item.id,"42") && !strcmp(item.title,"Old Level"));
+ CHECK(!mcc_workshop_local_item("mcc_maps\\Bad\\level",&item) && !item.id[0]);
+ CHECK(!mcc_workshop_local_item("mcc_maps\\TitleOnly\\level",&item) && !item.id[0]);
+ CHECK(!mcc_workshop_local_item("mcc_maps\\Absent\\level",&item) && !item.id[0]);
+ CHECK(!mcc_workshop_local_item("mcc_maps\\level",&item));
+ CHECK(!mcc_workshop_local_item("custom_maps\\Named\\level",&item));
+ CHECK(mcc_workshop_local_item("mcc_maps\\Long\\level",&item));
+ CHECK(!strcmp(item.id,"7") && strlen(item.title)==39);
+ CHECK(mcc_workshop_local_item("mcc_maps\\IdOnly\\level",&item));
+ CHECK(!strcmp(item.id,"2899609719") && !item.title[0]);
+ return 0;
+}
+''')
+    game = ROOT / "port/linux/game"
+    exe = compile_tool(tmp_path, [source, game / "mcc_workshop.c", game / "mcc_package.c"])
+    result = subprocess.run([str(exe)], cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
