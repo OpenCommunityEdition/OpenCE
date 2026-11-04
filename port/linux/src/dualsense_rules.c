@@ -3,7 +3,8 @@ DUALSENSE_RULES.C
 
 A PS5 DualSense's output bytes (dualsense_rules.h). The zone-based trigger effects are packed as in John "Nielk1"
 Klein's TriggerEffectGenerator (MIT licence, 2021-2022); the body layout, the player lights' patterns and the report
-framing follow SDL3's PS5 driver (zlib licence). Pure: no SDL, no game.
+framing follow SDL3's PS5 driver (zlib licence). Notices and pinned references are in
+port/third_party/dualsense/README.md. Pure: no SDL, no game.
 */
 
 #include <errno.h>

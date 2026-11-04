@@ -13,7 +13,8 @@ to the pad:
   other's fields alone.
 A pad gets at most one report a frame, only of the fields that changed, and on Bluetooth at most one every 50 ms. A
 pad whose hidraw node goes (ENODEV, EIO: the Bluetooth link lost) has it closed, looked for again each second and,
-back, everything sent again. A kick is R2's shape for a round, sent once, then the held one again after its time. The
+back, everything sent again. A kick is the firing trigger's shape for a round; its duration starts after delivery,
+then the held shape returns. Pending kicks are discarded when their gameplay context changes. The
 triggers are sent again though unchanged, while both are up, once a second and after the game's rumble changes. The
 triggers are let go (and the lightbar given back) at exit, when a pad leaves and when a setting is turned off.
 debug.txt says how each DualSense is driven, or why not.
@@ -42,15 +43,20 @@ struct dualsense_settings
 /* what one controller port's player wants on its pad (the game side, each frame it has a player) */
 struct dualsense_wish
 {
+	/* A changed context cancels pending feedback (weapon, mapping, player or map). */
+	unsigned long context;
+	int playing;
 	unsigned char red, green, blue;
 	/* the player lights' bits (dualsense_player_lights; 0: none) */
 	unsigned char player_lights;
 	unsigned char right[DUALSENSE_EFFECT_SIZE];
 	unsigned char left[DUALSENSE_EFFECT_SIZE];
-	/* each trigger's last event kick (ms 0: none) and its events so far (a change = a kick) */
-	unsigned char kick_right[DUALSENSE_EFFECT_SIZE];
-	int kick_right_ms;
-	unsigned long kicks_right;
+	/* the weapon's last event kick (ms 0: none) and its events so far (a change = a kick) */
+	unsigned char kick[DUALSENSE_EFFECT_SIZE];
+	int kick_ms;
+	unsigned long kicks;
+	/* 0: no weapon trigger, 1: R2, 2: L2. */
+	int kick_trigger;
 };
 
 #ifndef DUALSENSE_NONE
@@ -61,6 +67,8 @@ int dualsense_on(void);
 int dualsense_port_active(int port);
 /* the game: controller port `port`'s player wants this (copied) */
 void dualsense_wish_set(int port, struct dualsense_wish const *wish);
+/* Discard requests at a map/checkpoint boundary without touching SDL on the game thread. */
+void dualsense_clear(void);
 /* xinput_sdl.c XInputSetState: the SDL pad that drives controller port `port` (NULL: none), and whether the game's
 rumble is on (the triggers are sent again after it changes) */
 void dualsense_port(int port, struct SDL_Gamepad *gamepad, unsigned short left_motor, unsigned short right_motor);
@@ -73,6 +81,7 @@ void dualsense_removed(struct SDL_Gamepad *gamepad);
 #define dualsense_on() 0
 #define dualsense_port_active(port) 0
 #define dualsense_wish_set(port, wish) ((void)0)
+#define dualsense_clear() ((void)0)
 #define dualsense_port(port, gamepad, left_motor, right_motor) ((void)0)
 #define dualsense_frame() ((void)0)
 #define dualsense_removed(gamepad) ((void)0)

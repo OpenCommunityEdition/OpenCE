@@ -458,9 +458,10 @@ static const struct config_setting config_settings[] =
 		"at start-up." },
 	{ "input.adaptive_triggers", _config_boolean, "false", "HALO_ADAPTIVE_TRIGGERS", _environment_value,
 		_platform_desktop,
-		"A PS5 DualSense's adaptive triggers (dualsense.c): R2 a feel for each\n"
-		"weapon and a kick at each shot, free while reloading or switching,\n"
-		"a dry click when empty; L2 light while zoomed. Other controllers are never touched. On\n"
+		"A PS5 DualSense's adaptive triggers (dualsense.c): the trigger mapped\n"
+		"to fire feels like the weapon; grenade/zoom effects follow their\n"
+		"trigger. Only L2/R2 have actuators. Free while paused, in menus,\n"
+		"reloading or switching. Other controllers are never touched. On\n"
 		"Linux with input.playstation_kernel_driver it needs write access to the\n"
 		"controller's hidraw device (Steam's udev rules)." },
 	{ "input.trigger_strength", _config_string, "\"normal\"", "HALO_TRIGGER_STRENGTH", _environment_value,

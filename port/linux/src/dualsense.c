@@ -75,7 +75,10 @@ struct pad
 	int failed_logged;
 	/* the trigger's kick under way (until kick_until, SDL_GetTicks ms) and the events seen */
 	int events_known;
-	unsigned long kicks_right;
+	unsigned long kicks;
+	unsigned long context;
+	int kick_pending, kick_ms, kick_trigger;
+	Uint64 kick_wait_since;
 	Uint64 kick_until;
 	unsigned char kick[DUALSENSE_EFFECT_SIZE];
 	/* the rumble seen, and when the triggers are next sent again though unchanged */
@@ -84,6 +87,7 @@ struct pad
 	Uint64 triggers_sent_at;
 	/* the fields to be given back (a busy write keeps them for the next frame) */
 	int reset_pending;
+	int lights_owned, saved_player_index, restoring;
 };
 
 /* shared with the game's thread and XInputSetState's (spinlock); the pads are the event thread's */
@@ -167,14 +171,31 @@ void dualsense_wish_set(int port, struct dualsense_wish const *wish)
 	SDL_UnlockSpinlock(&shared_lock);
 }
 
+void dualsense_clear(void)
+{
+	SDL_LockSpinlock(&shared_lock);
+	memset(shared.wished, 0, sizeof(shared.wished));
+	SDL_UnlockSpinlock(&shared_lock);
+}
+
 void dualsense_port(int port, struct SDL_Gamepad *gamepad, unsigned short left_motor, unsigned short right_motor)
 {
 	SDL_JoystickID id;
+	int other;
 
 	if (port < 0 || port >= PORTS)
 		return;
 	id = gamepad ? SDL_GetGamepadID(gamepad) : 0;
 	SDL_LockSpinlock(&shared_lock);
+	for (other = 0; other < PORTS; other++)
+	{
+		if ((other == port && shared.bound[other] != id) ||
+			(other != port && id && shared.bound[other] == id))
+		{
+			shared.wished[other] = 0;
+			shared.active[other] = 0;
+		}
+	}
 	/* (one pad, one port: a pad that moved here is no longer its old port's) */
 	dualsense_bind(shared.bound, PORTS, port, id);
 	shared.rumble_left[port] = left_motor;
@@ -297,6 +318,8 @@ static enum dualsense_write_result pad_send(struct pad *pad, SDL_Gamepad *gamepa
 	{
 		int ok = 1;
 
+		if (!gamepad)
+			return DUALSENSE_WRITE_GONE;
 		if (gamepad && (body[DUALSENSE_BODY_ENABLE1] &
 			(DUALSENSE_ENABLE1_RIGHT_TRIGGER | DUALSENSE_ENABLE1_LEFT_TRIGGER)))
 		{
@@ -312,13 +335,16 @@ static enum dualsense_write_result pad_send(struct pad *pad, SDL_Gamepad *gamepa
 				body[DUALSENSE_BODY_BLUE]) && ok;
 		if (gamepad && (body[DUALSENSE_BODY_ENABLE2] & DUALSENSE_ENABLE2_PLAYER_LIGHTS))
 			ok = SDL_SetGamepadPlayerIndex(gamepad,
+				pad->restoring ? pad->saved_player_index :
 				dualsense_player_index_of_lights(body[DUALSENSE_BODY_PLAYER_LIGHTS])) && ok;
 		if (!ok && !pad->failed_logged)
 		{
 			platform_log("dualsense: SDL refused the effect: %s", SDL_GetError());
 			pad->failed_logged = 1;
 		}
-		return ok ? DUALSENSE_WRITE_SENT : DUALSENSE_WRITE_REFUSED;
+		/* SDL has no portable busy/error classification. Keep the desired fields for a bounded-rate retry,
+		including a reset after a partially successful LED/trigger batch. */
+		return ok ? DUALSENSE_WRITE_SENT : DUALSENSE_WRITE_BUSY;
 	}
 #ifdef __linux__
 	if (pad->backend == BACKEND_HIDRAW)
@@ -433,19 +459,40 @@ static int pad_write(struct pad *pad, SDL_Gamepad *gamepad, Uint64 now, int imme
 	return 0;
 }
 
-/* these fields given back, at once (the window ignored), where the pad has them from us: the triggers let go, the
-player lights off (SDL: player index -1, its lights off), the lightbar the kernel's own blue (hid-playstation's default;
-the hidraw way only: SDL's driver keeps the last colour set). Returns the fields still to give back: those a busy
-write kept, to be tried again; 0 when all are sent or the pad is gone */
+/* SDL's default lightbar palette, indexed as its PS5 driver does (SDL 3.4.16, zlib;
+see port/third_party/dualsense/README.md). SDL cannot report a previous application's custom RGB. */
+static void default_lightbar(struct pad *pad)
+{
+	static unsigned char const rgb[7][3] = {
+		{0, 0, 64}, {64, 0, 0}, {0, 64, 0}, {32, 0, 32},
+		{32, 16, 0}, {0, 16, 16}, {16, 16, 16}
+	};
+	int index = pad->saved_player_index < 0 ? 0 : pad->saved_player_index % 7;
+
+	if (pad->backend == BACKEND_SDL)
+		dualsense_link_want_lightbar(&pad->link, rgb[index][0], rgb[index][1], rgb[index][2]);
+	else
+		dualsense_link_want_lightbar(&pad->link, 0, 0, 128);
+}
+
+static void pad_cancel_kick(struct pad *pad)
+{
+	pad->events_known = 0;
+	pad->kick_pending = 0;
+	pad->kick_until = 0;
+}
+
+/* Restore owned fields, retrying busy writes; never leave a pending kick after a reset. */
 static int pad_reset(struct pad *pad, SDL_Gamepad *gamepad, int fields, Uint64 now)
 {
 	unsigned char body[DUALSENSE_BODY_SIZE];
 	unsigned char off[DUALSENSE_EFFECT_SIZE];
 	int wanted, forced, sent;
 
-	fields &= pad->link.known & DUALSENSE_FIELDS;
-	if (pad->backend != BACKEND_HIDRAW)
-		fields &= ~DUALSENSE_FIELD_LIGHTBAR;
+	if (fields & DUALSENSE_FIELD_TRIGGERS)
+		pad_cancel_kick(pad);
+	/* A batch may have partly succeeded before SDL reported it busy. */
+	fields &= (pad->link.known | pad->link.wanted) & DUALSENSE_FIELDS;
 	if (!fields || pad->gone || (pad->backend != BACKEND_SDL && pad->backend != BACKEND_HIDRAW))
 		return 0;
 	wanted = pad->link.wanted;
@@ -456,20 +503,29 @@ static int pad_reset(struct pad *pad, SDL_Gamepad *gamepad, int fields, Uint64 n
 		dualsense_link_want_triggers(&pad->link, off, off);
 	}
 	if (fields & DUALSENSE_FIELD_LIGHTBAR)
-		dualsense_link_want_lightbar(&pad->link, 0, 0, 128);
+		default_lightbar(pad);
 	if (fields & DUALSENSE_FIELD_PLAYER_LIGHTS)
 		dualsense_link_want_player_lights(&pad->link, 0);
 	/* (only these fields, sent though the pad may have them already) */
 	pad->link.wanted = fields;
 	pad->link.forced = fields;
+	pad->restoring = 1;
 	sent = pad_write(pad, gamepad, now, 1, body);
+	pad->restoring = 0;
 	pad->link.wanted = wanted & ~fields;
 	pad->link.forced = forced & ~fields;
 	if (!sent)
 		/* (busy: kept; gone or refused: nothing more to give back) */
-		return pad->gone || pad->backend == BACKEND_NONE ? 0 : fields;
+	{
+		if (pad->gone || pad->backend == BACKEND_NONE)
+			return 0;
+		pad->link.wanted |= fields;
+		return fields;
+	}
 	/* (driven again later: sent again then) */
 	pad->link.known &= ~sent;
+	if (sent & DUALSENSE_FIELD_PLAYER_LIGHTS)
+		pad->lights_owned = 0;
 	return fields & ~sent;
 }
 
@@ -488,7 +544,6 @@ static void pad_reset_wait(struct pad *pad, SDL_Gamepad *gamepad, int fields, Ui
 
 static void dualsense_exit(void)
 {
-	Uint64 now = SDL_GetTicks();
 	int i;
 
 	for (i = 0; i < PADS; i++)
@@ -509,6 +564,8 @@ static struct pad *pad_for(SDL_JoystickID id, int port)
 	{
 		if (pads[i].used && pads[i].id == id)
 		{
+			if (pads[i].port != port)
+				pad_cancel_kick(&pads[i]);
 			pads[i].port = port;
 			return &pads[i];
 		}
@@ -539,12 +596,12 @@ static void pad_frame(struct pad *pad, SDL_Gamepad *gamepad, struct dualsense_wi
 {
 	unsigned char body[DUALSENSE_BODY_SIZE];
 	unsigned char right[DUALSENSE_EFFECT_SIZE], left[DUALSENSE_EFFECT_SIZE];
-	int written;
+	int written, wanted;
 
 	/* (driven again: nothing more to give back of what is wanted) */
 	if (settings->triggers)
 		pad->reset_pending &= ~DUALSENSE_FIELD_TRIGGERS;
-	if (settings->lights)
+	if (settings->lights && fresh && wish->player_lights)
 		pad->reset_pending &= ~(DUALSENSE_FIELD_LIGHTBAR | DUALSENSE_FIELD_PLAYER_LIGHTS);
 
 	/* the rumble changed: it is the kernel's or SDL's own report, so the trigger effects are sent again once both
@@ -559,24 +616,31 @@ static void pad_frame(struct pad *pad, SDL_Gamepad *gamepad, struct dualsense_wi
 	{
 		int unchanged, kicking = 0;
 
-		if (fresh)
+		if (!fresh || !wish->playing || !pad->events_known || pad->context != wish->context ||
+			pad->kick_trigger != wish->kick_trigger)
+			pad_cancel_kick(pad);
+		if (fresh && wish->playing)
 		{
-			/* an event: its kick now, the held shape again after its time */
-			if (pad->events_known && wish->kicks_right != pad->kicks_right && wish->kick_right_ms > 0)
+			if (pad->events_known && wish->kicks != pad->kicks && wish->kick_ms > 0 && wish->kick_trigger)
 			{
-				pad->kick_until = now + (Uint64)wish->kick_right_ms;
-				memcpy(pad->kick, wish->kick_right, sizeof(pad->kick));
+				/* Only the latest event waits. Its duration starts on successful delivery, not observation. */
+				pad->kick_pending = 1;
+				pad->kick_wait_since = now;
+				pad->kick_ms = wish->kick_ms;
+				memcpy(pad->kick, wish->kick, sizeof(pad->kick));
 			}
-			pad->kicks_right = wish->kicks_right;
+			pad->kicks = wish->kicks;
+			pad->context = wish->context;
+			pad->kick_trigger = wish->kick_trigger;
 			pad->events_known = 1;
-			kicking = now < pad->kick_until;
-			memcpy(right, kicking ? pad->kick : wish->right, sizeof(right));
-			memcpy(left, wish->left, sizeof(left));
+			if (pad->kick_pending && now - pad->kick_wait_since >= WISH_STALE_MS)
+				pad->kick_pending = 0;
+			kicking = pad->kick_pending || now < pad->kick_until;
+			memcpy(right, kicking && pad->kick_trigger == 1 ? pad->kick : wish->right, sizeof(right));
+			memcpy(left, kicking && pad->kick_trigger == 2 ? pad->kick : wish->left, sizeof(left));
 		}
 		else
 		{
-			pad->kick_until = 0;
-			pad->events_known = 0;
 			dualsense_effect_off(right);
 			dualsense_effect_off(left);
 		}
@@ -593,25 +657,48 @@ static void pad_frame(struct pad *pad, SDL_Gamepad *gamepad, struct dualsense_wi
 			dualsense_link_force(&pad->link, DUALSENSE_FIELD_TRIGGERS);
 			pad->refresh_at = 0;
 		}
+		if (pad->kick_pending)
+			dualsense_link_force(&pad->link, DUALSENSE_FIELD_TRIGGERS);
 	}
 	else
-		dualsense_link_drop(&pad->link, DUALSENSE_FIELD_TRIGGERS);
+	{
+		pad_cancel_kick(pad);
+		dualsense_link_drop(&pad->link, DUALSENSE_FIELD_TRIGGERS & ~pad->reset_pending);
+	}
 
 	if (settings->lights)
 	{
-		if (fresh)
+		if (fresh && wish->player_lights)
 		{
+			if (!pad->lights_owned)
+			{
+				pad->saved_player_index = SDL_GetGamepadPlayerIndex(gamepad);
+				pad->lights_owned = 1;
+			}
 			dualsense_link_want_lightbar(&pad->link, wish->red, wish->green, wish->blue);
-			if (wish->player_lights)
-				dualsense_link_want_player_lights(&pad->link, wish->player_lights);
+			dualsense_link_want_player_lights(&pad->link, wish->player_lights);
 		}
+		else if (pad->lights_owned)
+			pad->reset_pending |= DUALSENSE_FIELD_LIGHTBAR | DUALSENSE_FIELD_PLAYER_LIGHTS;
 	}
 	else
-		dualsense_link_drop(&pad->link, DUALSENSE_FIELD_LIGHTBAR | DUALSENSE_FIELD_PLAYER_LIGHTS);
+		dualsense_link_drop(&pad->link,
+			(DUALSENSE_FIELD_LIGHTBAR | DUALSENSE_FIELD_PLAYER_LIGHTS) & ~pad->reset_pending);
 
+	/* Restorations must go through pad_reset, which restores SDL's saved player index. */
+	wanted = pad->link.wanted;
+	pad->link.wanted &= ~pad->reset_pending;
 	written = pad_write(pad, gamepad, now, 0, body);
+	pad->link.wanted = wanted;
 	if ((written & DUALSENSE_FIELD_TRIGGERS) != 0)
+	{
 		pad->triggers_sent_at = now;
+		if (pad->kick_pending)
+		{
+			pad->kick_pending = 0;
+			pad->kick_until = now + (Uint64)pad->kick_ms;
+		}
+	}
 }
 
 void dualsense_frame(void)
@@ -651,6 +738,7 @@ void dualsense_frame(void)
 	{
 		SDL_LockSpinlock(&shared_lock);
 		memset(shared.active, 0, sizeof(shared.active));
+		memset(shared.wished, 0, sizeof(shared.wished));
 		SDL_UnlockSpinlock(&shared_lock);
 		return;
 	}
@@ -682,8 +770,11 @@ void dualsense_frame(void)
 			continue;
 		for (port = 0; port < PORTS; port++)
 			still |= bound[port] == pads[i].id && pads[i].port == port;
-		if (!still && (pads[i].link.known & DUALSENSE_FIELD_TRIGGERS))
-			pads[i].reset_pending |= DUALSENSE_FIELD_TRIGGERS;
+		if (!still)
+		{
+			pad_cancel_kick(&pads[i]);
+			pads[i].reset_pending |= DUALSENSE_FIELDS;
+		}
 	}
 
 	for (port = 0; port < PORTS; port++)
@@ -709,7 +800,6 @@ void dualsense_frame(void)
 
 void dualsense_removed(struct SDL_Gamepad *gamepad)
 {
-	Uint64 now = SDL_GetTicks();
 	SDL_JoystickID id;
 	int i;
 
@@ -737,6 +827,7 @@ void dualsense_removed(struct SDL_Gamepad *gamepad)
 		{
 			shared.bound[i] = 0;
 			shared.active[i] = 0;
+			shared.wished[i] = 0;
 		}
 	}
 	SDL_UnlockSpinlock(&shared_lock);

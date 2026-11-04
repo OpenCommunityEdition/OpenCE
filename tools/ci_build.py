@@ -156,6 +156,10 @@ def main() -> int:
             print(f"{pdb.relative_to(ROOT)} -> {symbols.relative_to(ROOT)}", flush=True)
     # OpenCE's own licence, the AGPL, which asks each copy to carry its text
     shutil.copy2(ROOT / "LICENSE", dist / "LICENSE.txt")
+    # DualSense effect packing and SDL's PS5 output format/palette.
+    for name in ("TriggerEffectGenerator", "SDL"):
+        shutil.copy2(ROOT / f"port/third_party/dualsense/{name}-LICENSE.txt",
+                     dist / f"dualsense-{name}-LICENSE.txt")
     # Enhanced bot tactics retain the Vita author's GPL 3.0 licence.
     shutil.copy2(ROOT / "LICENSES/GPL-3.0-only.txt", dist / "bots-GPL-3.0.txt")
     shutil.copy2(ROOT / "docs/reading/bots_and_android_features.md", dist / "bots-and-android-credits.md")

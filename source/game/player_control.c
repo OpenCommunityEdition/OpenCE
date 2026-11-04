@@ -447,6 +447,7 @@ void player_control_dispose(
 void player_control_dispose_from_old_map(
 	void)
 {
+	dualsense_game_reset(); /* port: release feature feedback before the map goes */
 	return;
 }
 
@@ -770,10 +771,6 @@ static void handle_one_player_input(
 				player->zoom_level);
 		}
 
-		/* port: a DualSense's adaptive triggers, lightbar and player lights
-		(input.adaptive_triggers, input.lightbar) follow this player */
-		dualsense_player(local_player_index, current_weapon_index, player->zoom_level);
-
 		if (!director_inhibited_facing(local_player_index))
 		{
 			player_control_angle_step_ticks = time_delta_sec * TICKS_PER_SECOND;
@@ -881,6 +878,7 @@ boolean player_control_update(
 	{
 		handle_one_player_input(local_player_index, time_delta_sec);
 	}
+	dualsense_game_update(); /* port: feedback also observes menus and players without units */
 	collision_log_end_period();
 	profile_exit(player_control_update_section);
 
@@ -1936,6 +1934,7 @@ void player_control_initialize_for_new_map(
 {
 	short local_player_index;
 
+	dualsense_game_reset(); /* port: no feedback history crosses map loads */
 	player_control_globals->action_test_flags = 0;
 	player_control_globals->action_flags = 0;
 	player_control_globals->suppressed_action_flags = 0;

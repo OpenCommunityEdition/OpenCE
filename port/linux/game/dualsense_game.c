@@ -5,10 +5,11 @@ Each local player's DualSense wish (dualsense_game.h), for a controller port who
 can drive (port/linux/src/dualsense.c):
 - the lightbar in the player's colour (the team's in a team game, the armour's otherwise; a campaign's Chief green),
   and the player lights the split-screen number;
-- R2 by the weapon in hand: its profile (dualsense_rules.c) from the tag's own numbers, and the weapon's state each
+- the physical trigger mapped to fire by the weapon in hand: its profile (dualsense_rules.c) from the tag's own numbers, and the weapon's state each
   frame; each new round (the weapon's last-fired game time moved) is a shot the platform side turns into a kick. In a
   vehicle, a gunner's seat takes the vehicle's weapon; any other seat has none;
-- L2 a light resistance while zoomed, or a hair trigger while there are grenades to throw.
+- the grenade/zoom trigger a light resistance while zoomed, or a hair trigger while there are grenades to throw.
+Only L2 and R2 have actuators. Other mapped actions leave them free; non-playing contexts release both.
 */
 
 #include <string.h>
@@ -19,6 +20,9 @@ can drive (port/linux/src/dualsense.c):
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "game/players.h"
+#include "camera/director.h"
+#include "controller_remap.h"
+#include "controller_buttons.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "items/weapon_datum_flags.h"
@@ -40,18 +44,37 @@ static unsigned char channel(real value)
 /* a round in this many ticks counts as firing (the slowest automatic, 6 rounds a second, fires every 5) */
 #define FIRING_TICKS 5
 
-/* each controller port's memory of last frame: the weapon, and R2's last event (its kick and count: the platform
-kicks on a change of the count) */
+/* Game-thread history is separate from checkpoint data. Context changes discard old shots. */
 static struct
 {
-	long weapon_index;
-	long last_fired;
-	/* the charge last frame (the plasma pistol's blast: the charge is gone by the frame its round is seen) */
+	int valid;
+	long player_index, unit_index, weapon_index, last_fired;
+	unsigned int instance;
+	unsigned long context, kicks;
+	int percent;
+	unsigned char layout[CONTROLLER_REMAP_ACTIONS];
 	float last_charge;
-	unsigned char kick_right[DUALSENSE_EFFECT_SIZE];
-	int kick_right_ms;
-	unsigned long kicks_right;
+	unsigned char kick[DUALSENSE_EFFECT_SIZE];
+	int kick_ms;
 } rounds[MAXIMUM_LOCAL_PLAYERS];
+static unsigned long next_context;
+static int tracking;
+
+static void clear_round(short port)
+{
+	memset(&rounds[port], 0, sizeof(rounds[port]));
+	rounds[port].context = ++next_context;
+}
+
+void dualsense_game_reset(void)
+{
+	short port;
+
+	for (port = 0; port < MAXIMUM_LOCAL_PLAYERS; port++)
+		clear_round(port);
+	dualsense_clear();
+	tracking = 0;
+}
 
 /* a weapon definition's kind from its tag's numbers (and its first trigger, NULL: none) */
 static enum dualsense_weapon_kind definition_kind(long definition_index, float *rate_of_fire,
@@ -170,50 +193,41 @@ static long seated_weapon(long unit_index, long weapon_index)
 	return unit_inventory_get_weapon(unit->object.parent_object_index, parent->unit.current_weapon_index);
 }
 
-/* an event on R2: its kick kept until the next */
-static void event(short gamepad_index, enum dualsense_weapon_kind kind, enum dualsense_event what, int percent)
+/* Only physical triggers can produce resistance. Other actions leave them free. */
+static void mapped_effect(unsigned char *effect, int button, unsigned char const *layout,
+	struct dualsense_weapon_state const *state, int zoomed, int grenades, int winding, int percent)
 {
-	unsigned char effect[DUALSENSE_EFFECT_SIZE];
-	int ms = dualsense_event(effect, kind, what, percent);
-
-	if (ms > 0)
-	{
-		memcpy(rounds[gamepad_index].kick_right, effect, sizeof(effect));
-		rounds[gamepad_index].kick_right_ms = ms;
-		rounds[gamepad_index].kicks_right++;
-	}
+	if (layout[PAD_FIRE] == button)
+		dualsense_right_held(effect, state, percent);
+	else if (layout[PAD_GRENADE] == button)
+		dualsense_left_effect(effect, zoomed, grenades, winding, percent);
+	else if (layout[PAD_ZOOM] == button && zoomed)
+		dualsense_left_effect(effect, 1, 0, 0, percent);
+	else
+		dualsense_effect_off(effect);
 }
 
-void dualsense_player(short local_player_index, long weapon_index, short zoom_level)
+static void dualsense_player(short port, short local, struct dualsense_settings const *settings)
 {
 	struct dualsense_wish wish;
 	struct dualsense_weapon_state state;
-	struct dualsense_settings settings;
-	long player_index;
-	short gamepad_index;
+	struct controller_device device;
+	unsigned char layout[CONTROLLER_REMAP_ACTIONS];
+	long player_index = local_player_get_player_index(local);
+	long unit_index = player_get(player_index)->unit_index;
+	long weapon_index = NONE;
+	struct unit_datum *unit = unit_index != NONE ? unit_get(unit_index) : NULL;
 	real_rgb_color color;
-	long unit_index;
-	struct unit_datum *unit;
-	int winding, grenades;
+	int winding, grenades, zoomed;
 
-	if (!dualsense_on())
-		return;
-	settings = dualsense_settings_get();
-	player_index = local_player_get_player_index(local_player_index);
-	if (player_index == NONE)
-		return;
-	gamepad_index = player_get(player_index)->local_player_index;
-	/* (only a port whose pad is a DualSense the platform can drive: nothing to do for any other pad) */
-	if (gamepad_index < 0 || gamepad_index >= MAXIMUM_LOCAL_PLAYERS || !dualsense_port_active(gamepad_index))
-		return;
-	weapon_index = seated_weapon(player_get(player_index)->unit_index, weapon_index);
 	memset(&wish, 0, sizeof(wish));
-	wish.player_lights = dualsense_player_lights(local_player_index + 1);
+	dualsense_effect_off(wish.right);
+	dualsense_effect_off(wish.left);
+	wish.player_lights = dualsense_player_lights(local + 1);
 	if (game_engine_running())
 		game_engine_player_get_change_color(&color, player_index);
 	else
 	{
-		/* (a campaign: the Chief's armour green) */
 		color.red = 0.25f;
 		color.green = 0.45f;
 		color.blue = 0.15f;
@@ -221,31 +235,95 @@ void dualsense_player(short local_player_index, long weapon_index, short zoom_le
 	wish.red = channel(color.red);
 	wish.green = channel(color.green);
 	wish.blue = channel(color.blue);
+	wish.playing = settings->triggers && unit && controller_remap_playing(port) &&
+		!game_time_get_paused() && !director_inhibited_input(local);
+	if (!wish.playing)
+	{
+		if (rounds[port].valid)
+			clear_round(port);
+		wish.context = rounds[port].context;
+		dualsense_wish_set(port, &wish);
+		return;
+	}
+
+	if (!controller_remap_read(port, layout))
+		controller_remap_profile(port, layout);
+	controller_device_get(port, &device);
+	weapon_index = seated_weapon(unit_index, unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index));
+	if (!rounds[port].valid || rounds[port].player_index != player_index || rounds[port].unit_index != unit_index ||
+		rounds[port].weapon_index != weapon_index || rounds[port].instance != device.instance ||
+		rounds[port].percent != settings->percent || memcmp(rounds[port].layout, layout, sizeof(layout)))
+	{
+		clear_round(port);
+		rounds[port].player_index = player_index;
+		rounds[port].unit_index = unit_index;
+		rounds[port].weapon_index = weapon_index;
+		rounds[port].instance = device.instance;
+		rounds[port].percent = settings->percent;
+		memcpy(rounds[port].layout, layout, sizeof(layout));
+	}
 	weapon_state(weapon_index, &state);
 	state.ticks = game_time_get();
-	dualsense_right_held(wish.right, &state, settings.percent);
-	/* a round (the weapon's last-fired time moved) is a shot, on the same weapon as last frame: a switch is no shot */
+	zoomed = player_control_get_zoom_level(local) != NONE;
+	winding = unit->unit.grenade_throw_state == _unit_grenade_throw_wind_up ||
+		unit->unit.grenade_throw_state == _unit_grenade_throw_in_hand;
+	grenades = unit->unit.current_grenade_index >= 0 ? unit_get_grenade_count(unit_index, unit->unit.current_grenade_index) : 0;
+	mapped_effect(wish.right, 7, layout, &state, zoomed, grenades, winding, settings->percent);
+	mapped_effect(wish.left, 6, layout, &state, zoomed, grenades, winding, settings->percent);
+	if (!state.readying && !state.reloading && !state.overheated)
+		wish.kick_trigger = layout[PAD_FIRE] == 7 ? 1 : layout[PAD_FIRE] == 6 ? 2 : 0;
 	if (weapon_index != NONE)
 	{
 		long last_fired = weapon_get(weapon_index)->weapon.game_time_last_fired;
 
-		if (rounds[gamepad_index].weapon_index == weapon_index && rounds[gamepad_index].last_fired != last_fired)
-			event(gamepad_index, state.kind, rounds[gamepad_index].last_charge >= 0.95f ?
-				DUALSENSE_EVENT_SHOT_CHARGED : DUALSENSE_EVENT_SHOT, settings.percent);
-		rounds[gamepad_index].last_fired = last_fired;
+		if (rounds[port].valid && last_fired > rounds[port].last_fired && wish.kick_trigger)
+		{
+			rounds[port].kick_ms = dualsense_event(rounds[port].kick, state.kind,
+				rounds[port].last_charge >= 0.95f ? DUALSENSE_EVENT_SHOT_CHARGED : DUALSENSE_EVENT_SHOT, settings->percent);
+			if (rounds[port].kick_ms > 0)
+				rounds[port].kicks++;
+		}
+		rounds[port].last_fired = last_fired;
 	}
-	rounds[gamepad_index].weapon_index = weapon_index;
-	rounds[gamepad_index].last_charge = state.charge;
-	/* L2: whether there are grenades to throw, and a throw wound up */
-	unit_index = player_get(player_index)->unit_index;
-	unit = unit_index != NONE ? unit_get(unit_index) : NULL;
-	winding = unit && (unit->unit.grenade_throw_state == _unit_grenade_throw_wind_up ||
-		unit->unit.grenade_throw_state == _unit_grenade_throw_in_hand);
-	grenades = unit && unit->unit.current_grenade_index >= 0 ?
-		unit_get_grenade_count(unit_index, unit->unit.current_grenade_index) : 0;
-	dualsense_left_effect(wish.left, zoom_level != NONE, grenades, winding, settings.percent);
-	memcpy(wish.kick_right, rounds[gamepad_index].kick_right, sizeof(wish.kick_right));
-	wish.kick_right_ms = rounds[gamepad_index].kick_right_ms;
-	wish.kicks_right = rounds[gamepad_index].kicks_right;
-	dualsense_wish_set(gamepad_index, &wish);
+	rounds[port].valid = 1;
+	rounds[port].last_charge = state.charge;
+	wish.context = rounds[port].context;
+	memcpy(wish.kick, rounds[port].kick, sizeof(wish.kick));
+	wish.kick_ms = rounds[port].kick_ms;
+	wish.kicks = rounds[port].kicks;
+	dualsense_wish_set(port, &wish);
+}
+
+/* After every local player's input update, including dead players and menus. */
+void dualsense_game_update(void)
+{
+	struct dualsense_settings settings = dualsense_settings_get();
+	short port;
+
+	if ((!settings.triggers && !settings.lights) || !game_time_initialized() || !game_in_progress() || main_menu_is_active())
+	{
+		if (tracking)
+			dualsense_game_reset();
+		return;
+	}
+	tracking = 1;
+	for (port = 0; port < MAXIMUM_LOCAL_PLAYERS; port++)
+	{
+		short local = controller_remap_local_player(port);
+
+		if (local != NONE && dualsense_port_active(port))
+			dualsense_player(port, local, &settings);
+		else
+		{
+			struct dualsense_wish wish;
+
+			if (rounds[port].valid)
+				clear_round(port);
+			memset(&wish, 0, sizeof(wish));
+			wish.context = rounds[port].context;
+			dualsense_effect_off(wish.right);
+			dualsense_effect_off(wish.left);
+			dualsense_wish_set(port, &wish);
+		}
+	}
 }
