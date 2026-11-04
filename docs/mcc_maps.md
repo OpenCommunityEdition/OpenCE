@@ -101,6 +101,38 @@ naming the level file. A mismatch does not establish which player's copy is
 newer. This does not discover Steam libraries or synchronize manually copied
 packages; those require separate Workshop catalog integration.
 
+### Subscribed Steam Workshop items
+
+Halo CE maps from the Workshop items a player is subscribed to are listed
+without copying anything into the data root. `steam_workshop.c` looks in Steam's
+libraries for `steamapps/workshop/content/976730/<item id>/`: the usual Steam
+folders (on Windows `%ProgramFiles(x86)%\Steam`; on Linux `~/.steam/steam`,
+`~/.local/share/Steam`, and the Flatpak and Snap places), the `paths.steam`
+setting (`HALO_STEAM_ROOT`), and every library their `libraryfolders.vdf`
+names. An item is used when its `ModInfo.json` says `"Engine": "Halo1"`; each
+path in `GameModContents.MultiplayerMaps` is a map json whose `ScenarioFile`
+names the `.map` file in the item's `maps` folder, whose `Title.Neutral` is the
+map's title and whose `Images.Thumbnail` is its preview picture. Folder names
+inside an item are found without regard to case, as Steam's files are spelled
+by their makers. An item seen through two paths to one library is listed once.
+
+Each map is the level `mcc_maps\<item id>\<map name>`, so it is the same
+package identity as a folder named by the item id (above), and the host's item
+id and title and a joiner's refusal text work as for any such package. The path
+translation (`platform_translate_path`) opens `mcc_maps\<item id>\` as the
+item's `maps` folder in Steam's library. A package folder of that name in the
+data root's `mcc_maps` wins, so a player can still override an item by hand.
+The MCC menus show the map's Workshop title, and a package folder shows the
+item's title instead of its id. The resources a map needs (`bitmaps.map`,
+`sounds.map`) are chosen as for any package: beside the level, then the shared
+sets above.
+
+The catalog is read the first time MCC maps are needed, and again when a joiner
+cannot find the host's map (so an item subscribed just now is found). The json
+files are the item makers' text: one that is too large (256 KB), too deep, not
+an object, or that names a path leaving its item, refuses that item or map and
+nothing else.
+
 The two MCC categories show package folders first (alphabetically, in brackets),
 then loose maps. Open a folder to choose one of its levels; the rows omit the
 repeated package suffix, while the selected map's details retain its identity.

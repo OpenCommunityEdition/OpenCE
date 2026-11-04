@@ -69,8 +69,12 @@ int mcc_workshop_local_item(char const *name, struct mcc_workshop_item *item)
         if (mcc_workshop_parse_sidecar(text,item)) return 1;
     }
     if (mcc_workshop_digits(folder,(unsigned)strlen(folder))) {
+        char title[MCC_WORKSHOP_TITLE_SIZE*2];
         strcpy(item->id,folder);
-        mcc_workshop_title_from_level(name,item->title);
+        /* the Steam item's own title when this machine has the item */
+        if (mcc_maps_workshop_title(folder,title,sizeof(title)))
+            mcc_workshop_title_copy(title,(unsigned)strlen(title),item->title);
+        if (!item->title[0]) mcc_workshop_title_from_level(name,item->title);
         return 1;
     }
     memset(item,0,sizeof(*item));
