@@ -59,7 +59,9 @@ EDITORS = {
 
 # The stock UI fonts have very different widths. Measure against the narrowest
 # supported layout so captions never run into arrows at 4:3.
-FONTS = {size: ImageFont.truetype(str(ROOT / "port/assets/fonts" / file), 128)
+# Keep the original Windows generator's basic layout on runners that also
+# provide RAQM. Its optional shaping backend otherwise changes title pixels.
+FONTS = {size: ImageFont.truetype(str(ROOT / "port/assets/fonts" / file), 128, layout_engine=ImageFont.Layout.BASIC)
          for size, file in ((13, "Overpass-900.ttf"), (10, "Overpass-750.ttf"))}
 
 def text_width(value, size):
@@ -245,7 +247,7 @@ def generate(folder=MENUS):
                 box((0, 70, width, 70.5), fill=blue)
                 box((0, 410, width, 410.5), fill=blue)
             elif name.startswith("title"):
-                font = ImageFont.truetype(str(ROOT / "port/assets/fonts/OpenCE-Regular.ttf"), 128)
+                font = ImageFont.truetype(str(ROOT / "port/assets/fonts/OpenCE-Regular.ttf"), 128, layout_engine=ImageFont.Layout.BASIC)
                 caption = "SETTINGS" if name == "title" else frontend_multiplayer.TITLES[name] if name in frontend_multiplayer.TITLES else frontend_navigation.SCREENS[name[6:]][0]
                 bounds = font.getbbox(caption)
                 ink = Image.new("RGBA", (bounds[2] - bounds[0], bounds[3] - bounds[1]), (0, 0, 0, 0))
