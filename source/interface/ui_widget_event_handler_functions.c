@@ -940,7 +940,9 @@ the port runs for it; the others of Halo PC's succeed and do nothing */
 enum
 {
 	_halo_pc_function_back = 109,
+	_halo_pc_function_change_settings = 137,
 	_halo_pc_function_map_row = 160,
+	_halo_pc_function_restart = 163,
 	_halo_pc_function_map_ok = 164
 };
 
@@ -3198,12 +3200,10 @@ static boolean player_profile_color_picker_menu_initialize(
 	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
 	long index;
 
-	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3576,
-		definition->type == 2,
-		"expected a spinner list widget for 'player color picker list' widget");
-	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3577,
-		definition->child_count == 3,
-		"expected 3 list items for 'player color picker list' widget");
+	/* port: a Custom Edition map's colour screen is laid out as its own, not
+	as the Xbox's spinner list of three: it is left as it is */
+	if (definition->type != 2 || definition->child_count != 3)
+		return TRUE;
 	widget->generated_list = ui_widget_realloc(widget->generated_list, color_count,
 		"c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3581);
 	if (widget->generated_list)
@@ -3432,6 +3432,7 @@ static boolean ui_widget_function_denied(
 		68, 69, 70, 71, /* player profile controller settings */
 		74, 75, 76, 77, 78, 79, 80, /* profile deletion and creation */
 		86, 87, /* the demos */
+		153 /* Halo PC's controls screen's advanced settings: not wired, its button is disabled as Custom Edition has it */
 	};
 	static boolean logged = FALSE;
 	boolean denied = FALSE;
@@ -3459,6 +3460,13 @@ static boolean ui_widget_function_denied(
 	}
 
 	return denied;
+}
+
+/* port: ui_widget_function_denied, for ui_widget.c (a widget whose handlers
+only run denied functions is shown disabled) */
+boolean ui_widget_port_function_denied(struct widget_instance *widget, word function_index)
+{
+	return ui_widget_function_denied(widget, function_index);
 }
 
 boolean ui_widget_event_handler_function_invoke(
@@ -3511,6 +3519,78 @@ boolean ui_widget_event_handler_function_invoke(
 			struct event_record *event, boolean *widget_deleted);
 
 		return pc_menu_activate_screen(widget, event, widget_deleted);
+	}
+	if (function_index == _halo_pc_function_restart)
+	{
+		extern boolean pc_menu_restart_game(boolean *widget_deleted);
+
+		return pc_menu_restart_game(widget_deleted);
+	}
+	if (function_index == _halo_pc_function_change_settings)
+	{
+		/* port: the settings screen the pause menu opens closes at once unless
+		a profile is being edited ("close if not editing profile"), so
+		player 1's is begun first; with none, the screen is not opened */
+		return pc_menu_profile_edit_begin();
+	}
+		if (function_index == 113)
+	{
+		extern boolean pc_menu_controls_load(void);
+		struct widget_instance *panel;
+
+		/* port: a Custom Edition map's controls screen holds its advanced
+		settings (the mouse's sensitivities) as a second panel over the first,
+		shown when they are asked for: it starts hidden, and disabled so that
+		it takes no focus (this runs on the screen's created event, before
+		the focus is given) */
+		for (panel = widget->child; panel; panel = panel->next)
+		{
+			if (!strcmp(panel->name, "advanced_settings_screen"))
+			{
+				panel->visible = FALSE;
+				panel->disabled = TRUE;
+			}
+			else if (!strcmp(panel->name, "controls_options_menu") && panel->child &&
+				!strcmp(panel->child->name, "op_device"))
+			{
+				/* port: the first device row has nothing to choose in a
+				map's controls screen: the command groups' row is the second */
+				panel->child->visible = FALSE;
+				panel->child->disabled = TRUE;
+			}
+		}
+		return pc_menu_controls_load();
+	}
+	if (function_index == 115)
+	{
+		extern boolean pc_menu_controls_begin_binding(struct widget_instance *widget);
+
+		return pc_menu_controls_begin_binding(widget);
+	}
+	if (function_index == 127)
+	{
+		extern boolean pc_menu_controls_save(void);
+
+		return pc_menu_controls_save();
+	}
+	if (function_index == 136)
+	{
+		extern boolean pc_menu_controls_defaults(void);
+
+		return pc_menu_controls_defaults();
+	}
+
+	/* port: a Custom Edition map's colour screen (its list is named
+	color_select_list; the port's own is color_select_list_2) runs the Xbox's
+	functions 61 (created) and 63 (OK), which assume the Xbox's spinner list:
+	the port's colour functions run instead */
+	if ((function_index == 61 || function_index == 63) && widget->name &&
+		!strcmp(widget->name, "color_select_list"))
+	{
+		extern boolean pc_menu_color_initialize(struct widget_instance *list);
+		extern boolean pc_menu_color_choose(void);
+
+		return function_index == 61 ? pc_menu_color_initialize(widget) : pc_menu_color_choose();
 	}
 	if (function_index >= 102 && function_index < PC_MENU_FUNCTION_BASE)
 		return TRUE;

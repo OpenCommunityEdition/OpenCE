@@ -1904,6 +1904,27 @@ static short list_scroll(struct widget_instance *list, short *first, short count
 	return row == NONE || row >= rows ? NONE : (short)(*first + row);
 }
 
+static boolean color_list_initialize(struct widget_instance *list);
+static boolean color_choose(void);
+static void color_list_update(struct widget_instance *list);
+
+/* port: a Custom Edition map's colour screen runs Halo PC's own functions
+(61 on creation, 63 on OK, and the Xbox's game data update), which the
+port's colour screen's functions stand in for */
+boolean pc_menu_color_initialize(struct widget_instance *list)
+{
+	return color_list_initialize(list);
+}
+
+boolean pc_menu_color_choose(void)
+{
+	return color_choose();
+}
+
+void pc_menu_color_update(struct widget_instance *list)
+{
+	color_list_update(list);
+}
 /* "color picker update": the list scrolled on at its ends, the colour's
 name and picture */
 static void color_list_update(struct widget_instance *list)
@@ -2383,6 +2404,20 @@ static short controls_group(struct widget_instance *screen)
 {
 	struct widget_instance *spinner = named(screen, "group_spinner", 0);
 
+	/* port: a Custom Edition map's controls screen has its command groups'
+	spinner beside the "command_group_label" of its second row */
+	if (!spinner)
+	{
+		struct widget_instance *label = named(screen, "command_group_label", 0);
+
+		if (label && label->parent)
+		{
+			spinner = label->parent->child;
+			/* (2 is a spinner list: the type's name is not visible here) */
+			while (spinner && spinner->type != 2)
+				spinner = spinner->next;
+		}
+	}
 	return spinner ? spinner->parameters.list.selected_index : 0;
 }
 
@@ -2449,6 +2484,30 @@ static boolean controls_back(struct widget_instance *widget, boolean *widget_del
 	return TRUE;
 }
 
+/* port: "controls screen init" and "controls screen change set" for a map's
+own controls screen (ui_widget_event_handler_functions.c: Halo PC's 113 and 127) */
+boolean pc_menu_controls_load(void)
+{
+	return controls_load(FALSE);
+}
+
+boolean pc_menu_controls_save(void)
+{
+	return controls_save();
+}
+
+boolean pc_menu_controls_defaults(void)
+{
+	return controls_load(TRUE);
+}
+
+/* port: the string of a map's own action label (its list, in the map's
+tag) for each of controls[], in order; NONE where it has none */
+static short const control_label_strings[] =
+{
+	1, 2, 3, 4, 16, 17, 9, 10, 14, 13, 19, 12, 11, 20, 18, 26, 0x7000, 27, 23, 23, 24, 0x7001, 0x7002
+};
+
 /* "controls update menu": the group's rows, their bindings (the one left
 and right choose marked on the row chosen), and the help */
 static void controls_update(struct widget_instance *list)
@@ -2462,6 +2521,7 @@ static void controls_update(struct widget_instance *list)
 	{
 		short control = control_of_row(row, group);
 		short slot;
+		struct widget_instance *label;
 
 		if (strncmp(row->name, "op_command_", 11))
 			continue;
@@ -2472,7 +2532,17 @@ static void controls_update(struct widget_instance *list)
 				focus_row(list, 0);
 			continue;
 		}
-		text_set(named(row, "command_label", 0), controls[control].label);
+		label = named(row, "command_label", 0);
+		if (label)
+			text_set(label, controls[control].label);
+		else
+		{
+			/* port: a map's own label draws from its string list */
+			label = named(row, "command_1_label", 0);
+			if (label)
+				label->parameters.text_box.string_list_index =
+					control < (short)NUMBEROF(control_label_strings) ? control_label_strings[control] : NONE;
+		}
 		for (slot = 0; slot < CONTROL_BINDINGS; slot++)
 		{
 			char const *binding = controls_screen.bindings[control][slot];
@@ -2480,6 +2550,7 @@ static void controls_update(struct widget_instance *list)
 			char name[CONTROL_NAME_LENGTH];
 			char shown[64];
 			short index;
+			struct widget_instance *field;
 
 			/* (the key as the keyboard's layout labels it: xinput_sdl.c) */
 			if (*binding)
@@ -2495,7 +2566,11 @@ static void controls_update(struct widget_instance *list)
 			for (index = 0; shown[index] && index < ROW_TEXT_LENGTH - 1; index++)
 				text[index] = (wchar_t)(unsigned char)shown[index];
 			text[index] = 0;
-			text_set(named(row, "command_binding", slot), text);
+			field = named(row, "command_binding", slot);
+			if (!field)
+				field = named(row, "command_mk_button_text", slot);
+			if (field)
+				text_set(field, text);
 		}
 	}
 	if (list->parameters.list.extended_description)
@@ -2503,6 +2578,18 @@ static void controls_update(struct widget_instance *list)
 		list->parameters.list.extended_description->parameters.text_box.string_list_index =
 			controls_screen.capturing_control != NONE ? 2 : focused_row ? 1 : 0;
 	}
+}
+
+/* port: "controls update menu" and "controls begin binding" for a map's own
+controls screen (ui_widget_event_handler_functions.c: Halo PC's 43 and 115) */
+void pc_menu_controls_update(struct widget_instance *list)
+{
+	controls_update(list);
+}
+
+boolean pc_menu_controls_begin_binding(struct widget_instance *widget)
+{
+	return control_capture_begin(widget);
 }
 
 #include "controller_remap_menu.inl"
@@ -8390,6 +8477,7 @@ void pc_menu_map_row_click(struct widget_instance *row)
 	}
 }
 
+static boolean restart_pending = FALSE;
 static long pending_gametype = NONE;
 /* port: the gametype chosen is kept and the game ends as its time limit would */
 boolean pc_menu_new_game_begin(struct widget_instance *list, boolean *widget_deleted)
@@ -8403,10 +8491,20 @@ boolean pc_menu_new_game_begin(struct widget_instance *list, boolean *widget_del
 	*widget_deleted = TRUE;
 	return TRUE;
 }
+/* port: the match is restarted: the game ends as for a new game, with nothing chosen, so the server returns to pregame with its map and gametype and starts at once */
+boolean pc_menu_restart_game(boolean *widget_deleted)
+{
+	if (!global_network_game_server_get() || !game_engine_running())
+		return FALSE;
+	restart_pending = TRUE;
+	game_engine_end_game();
+	*widget_deleted = TRUE;
+	return TRUE;
+}
 /* port: the kept map and gametype are given to the server once it is in pregame; TRUE if there were any */
 boolean pc_menu_new_game_apply(void)
 {
-	boolean applied = pending_map_index >= 0 && pending_gametype != NONE;
+	boolean applied = restart_pending || (pending_map_index >= 0 && pending_gametype != NONE);
 
 	if (pending_map_index >= 0)
 		ui_widget_port_multiplayer_map_choose(pending_map_index);
@@ -8414,6 +8512,7 @@ boolean pc_menu_new_game_apply(void)
 		ui_widget_port_gametype_choose(pending_gametype);
 	pending_map_index = -1;
 	pending_gametype = NONE;
+	restart_pending = FALSE;
 	return applied;
 }
 

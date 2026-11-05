@@ -867,10 +867,12 @@ struct bitmap_data *custom_edition_maps_picture(
 {
 	struct custom_edition_map *map;
 	short level = campaign_level_get(*frame_index);
+	/* port: a tag with no name (the name is compared below) is not the pictures */
+	char const *name = bitmap_tag_index != NONE ? tag_get_name(bitmap_tag_index) : NULL;
 
 	if (level != NONE &&
-		bitmap_tag_index != NONE &&
-		!csstrcasecmp(tag_get_name(bitmap_tag_index), LEVEL_PICTURES_TAG_NAME))
+		name &&
+		!csstrcasecmp(name, LEVEL_PICTURES_TAG_NAME))
 	{
 		long pictures = tag_loaded('bitm', CAMPAIGN_LEVEL_PICTURES_TAG_NAME);
 
@@ -878,8 +880,8 @@ struct bitmap_data *custom_edition_maps_picture(
 		return pictures != NONE ? bitmap_group_get_bitmap_from_sequence(pictures, 0, level) : NULL;
 	}
 	if (*frame_index < FIRST_DISPLAY_INDEX ||
-		bitmap_tag_index == NONE ||
-		csstrcasecmp(tag_get_name(bitmap_tag_index), LEVEL_PICTURES_TAG_NAME))
+		!name ||
+		csstrcasecmp(name, LEVEL_PICTURES_TAG_NAME))
 	{
 		return NULL;
 	}
