@@ -1679,13 +1679,28 @@ static long pause_list_patch(struct cache_file_tag_instance *instances, struct u
 	Xbox's of two rows does, and draws within its bounds) */
 	{
 		short room = (short)(list->bounds.y1 - list->bounds.y0);
-		short column = (short)((count + added - 1) * spacing + model->bounds.y1 - model->bounds.y0);
+		short height = (short)(model->bounds.y1 - model->bounds.y0);
+		short column = (short)((count + added - 1) * spacing + height);
+		short old_column = (short)((count - 1) * spacing + height);
+		short off_centre = (short)(children[0].vertical_offset - (room - old_column) / 2);
 
 		*growth = 0;
-		if (column <= room)
+		if (column <= room && off_centre >= -4 && off_centre <= 4)
 		{
 			for (child = 0; child < count + added; child++)
 				grown[child].vertical_offset = (short)((room - column) / 2 + child * spacing);
+		}
+		else if (column <= room)
+		{
+			/* the map placed its own rows (a staircase, say): they keep their places,
+			and the new buttons follow the same steps */
+			short step = count >= 2 ?
+				(short)(children[count - 1].horizontal_offset - children[count - 2].horizontal_offset) : 0;
+
+			for (child = 0; child < added; child++)
+				grown[quit + child].horizontal_offset = (short)(children[quit].horizontal_offset + child * step);
+			for (child = quit + added; child < count + added; child++)
+				grown[child].horizontal_offset = (short)(children[child - added].horizontal_offset + added * step);
 		}
 		else
 		{

@@ -1304,7 +1304,9 @@ long tag_validate_custom_edition_infer_groups(
 	struct inference_context context;
 	long absolute_index;
 	boolean walked_any;
+	//long unknown_count = 0;
 	char message[MAXIMUM_MESSAGE_LENGTH];
+	//char group_text[5];
 	char reference_text[5];
 	char instance_text[5];
 
@@ -1377,6 +1379,24 @@ long tag_validate_custom_edition_infer_groups(
 	tag_to_text(tag_validate_inference.example_instance_group, instance_text),
 	tag_validate_inference.mismatched);
 	tag_validate_report(message);
+	/*for (absolute_index = 0; absolute_index < header->tag_count; absolute_index++)
+	{
+		struct tag_validate_instance *instance = &header->instances[absolute_index];
+
+		if (!schema_group_get(instance->group_tag))
+		{
+			if (unknown_count < 40)
+			{
+				snprintf(message, sizeof(message), "unresolved tag %ld: group '%s', name '%s', %s",
+					absolute_index, tag_to_text(instance->group_tag, group_text),
+					tag_name(instance->tag_index), instance->base_address ? "has data" : "no data");
+				tag_validate_report(message);
+			}
+			unknown_count++;
+		}
+	}
+	snprintf(message, sizeof(message), "group inference: %ld tags still have no known group", unknown_count);
+	tag_validate_report(message);*/
 	return tag_validate_inference.regrouped;
 }
 
