@@ -38,8 +38,11 @@ See the [settings table](../../port/linux/README.md) for persistent keys.
 2. [plasma_lighting.c](../../port/linux/game/plasma_lighting.c):
    `plasma_lighting_prepare` saves attachment state and refreshes the rendered
    pose; `plasma_lighting_frame_end` restores radius, flags and attachment
-   position before simulation resumes. The existing private-light hook in
-   [object_lights.c](../../source/objects/object_lights.c) now supplies the
+   position before simulation resumes. Attachments disconnected by the engine
+   remain disconnected: `light_port_refresh_attachment` refuses the refresh,
+   and preparation restores the dynamic flag and discards the render entry.
+   This preserves map membership for hidden or inactive objects. The private-light
+   hook in [object_lights.c](../../source/objects/object_lights.c) now supplies the
    definition identity. The feature module cannot obtain that private field
    through the existing public object interface; this is the only additional
    game-source argument needed for exact selection.

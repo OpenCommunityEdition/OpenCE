@@ -99,7 +99,13 @@ void plasma_lighting_prepare(long light_index, long object_index, long definitio
 		!strcmp(name, "weapons\\plasma rifle\\charged bolt") ? 2.75f : 1.75f;
 	plasma_lighting_attachments[plasma_lighting_count].category = category;
 	plasma_lighting_count++;
-	light_port_refresh_attachment(light_index, object_index);
+	if (!light_port_refresh_attachment(light_index, object_index))
+	{
+		/* Disconnected engine attachments stay out of render selection. */
+		plasma_lighting_count--;
+		light_port_dynamic_set(light_index, object_index,
+			plasma_lighting_attachments[plasma_lighting_count].was_dynamic);
+	}
 }
 
 float plasma_lighting_radius(long light_index, long object_index, float radius)

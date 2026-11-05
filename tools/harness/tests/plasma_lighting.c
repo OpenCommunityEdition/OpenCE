@@ -3,7 +3,8 @@
 #include <string.h>
 
 enum { _object_type_projectile = 5 };
-enum { _point_light_dynamic_bit = 0 };
+enum { _point_light_dynamic_bit = 0, _point_light_connects_to_map_bit = 1,
+	_point_light_connected_to_map_bit = 2 };
 #define SET_FLAG(value, bit, enabled) ((value) = (enabled) ? ((value) | (1 << (bit))) : ((value) & ~(1 << (bit))))
 struct object_datum { long definition_index; struct { short type; } object; };
 static struct object_datum projectile = { 1, { _object_type_projectile } };
@@ -33,10 +34,20 @@ static struct point_light_definition *light_definition_get(long i) { return &lig
 static struct light_datum *light_get(long i) { return datum_try_and_get(light_data,i); }
 float rocket_lighting_radius(long l,long o,float r) { return r; }
 static void light_compute_bounding_sphere(long i,boolean m,boolean s,boolean f,real_point3d *p,real *r);
-static void light_disconnect_from_map(long index) {}
+static void light_disconnect_from_map(long index)
+{
+	struct light_datum *light = light_get(index);
+	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
+	{
+		CHECK(TEST_FLAG(light->flags, _point_light_connected_to_map_bit), "disconnect requires map membership");
+		SET_FLAG(light->flags, _point_light_connected_to_map_bit, FALSE);
+	}
+}
 static void light_reconnect_to_map(long index)
 {
 	refreshes++;
+	if (TEST_FLAG(light_get(index)->flags, _point_light_connects_to_map_bit))
+		SET_FLAG(light_get(index)->flags, _point_light_connected_to_map_bit, TRUE);
 	rendered_pose = interpolation_rendering;
 	{ real_point3d p; light_compute_bounding_sphere(index, TRUE, FALSE, TRUE, &p, &connected_radius); }
 }
@@ -171,13 +182,13 @@ int main(int argc, char **argv)
 		{
 			tag_name = names[i];
 			interpolation_rendering = 1;
-			datum_try_and_get(light_data, 1)->flags = i ? 3 : 0;
+			datum_try_and_get(light_data, 1)->flags = i ? 7 : 0;
 			plasma_lighting_prepare(1, 1, NONE);
 			plasma_lighting_submitted(1, 3);
 			CHECK(plasma_lighting_selected(3), "pistol projectile attachment selected");
 			render_interpolation_frame_end();
 			CHECK(!plasma_lighting_selected(3), "pistol light expires with render frame");
-			CHECK(datum_try_and_get(light_data, 1)->flags == (i ? 3 : 0), "pistol authored flags restored");
+			CHECK(datum_try_and_get(light_data, 1)->flags == (i ? 7 : 0), "pistol authored flags restored");
 		}
 		tag_name = "weapons\\plasma pistol\\muzzle flash";
 		plasma_lighting_prepare(1, 1, NONE);
@@ -288,6 +299,23 @@ int main(int argc, char **argv)
 		plasma_model_lighting_reset();
 		plasma_model_lighting_slot(22, 0);
 		CHECK(plasma_model_lighting_mask() == 1, "emitter-only option reaches model lighting");
+	}
+	else if (!strcmp(test, "disconnected"))
+	{
+		struct light_datum *light = light_get(1);
+		int flags = 1 << _point_light_connects_to_map_bit;
+		light->flags = flags;
+		plasma_lighting_prepare(1, 1, NONE);
+		CHECK(!refreshes && light->flags == flags, "disconnected attachment stays outside the map");
+		CHECK(!plasma_lighting_count, "failed refresh does not admit a render attachment");
+		plasma_lighting_frame_end();
+		CHECK(!refreshes && light->flags == flags, "frame cleanup preserves disconnected state");
+		SET_FLAG(light->flags, _point_light_connected_to_map_bit, TRUE);
+		flags = light->flags;
+		plasma_lighting_prepare(1, 1, NONE);
+		CHECK(refreshes == 1 && plasma_lighting_count == 1, "engine reconnect permits later admission");
+		plasma_lighting_frame_end();
+		CHECK(refreshes == 2 && light->flags == flags, "connected attachment restores authored flags");
 	}
 	else if (!strcmp(test, "existing"))
 	{

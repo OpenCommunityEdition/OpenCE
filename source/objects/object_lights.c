@@ -830,6 +830,11 @@ int light_port_refresh_attachment(long light_index, long object_index)
 	if (!light || light->object_index != object_index ||
 		light->parent_light_index != NONE || !object_try_and_get(object_index))
 		return FALSE;
+	/* port: the engine can retain attachments while their object is outside
+	   the map. Render interpolation must not reconnect those lights. */
+	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit) &&
+		!TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
+		return FALSE;
 	light_disconnect_from_map(light_index);
 	light_reconnect_to_map(light_index);
 	return TRUE;
