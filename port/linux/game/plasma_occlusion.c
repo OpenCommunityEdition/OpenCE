@@ -8,6 +8,7 @@
 #include "cseries.h"
 #include "physics/collisions.h"
 #include "plasma_lighting.h"
+#include "authored_emitter_lighting.h"
 #include "muzzle_lighting.h"
 #include "shield_glow.h"
 #include "covenant_emitter_lighting.h"
@@ -18,7 +19,7 @@
 #include <string.h>
 #include <xtl.h>
 
-int config_boolean(const char *name);
+#include "lighting_config.h"
 enum
 {
 	OCC_SIZE = 16,
@@ -36,6 +37,12 @@ static struct occlusion_field
 	real visibility[OCC_COUNT];
 	real depths[6][OCC_SIZE * OCC_SIZE], trace_center[3], trace_extent;
 	IDirect3DVolumeTexture8 *texture[3];
+	/* Exact last successful uploads, bounded to 384 KiB across all fields.
+	   Identical texels need no memory-watch fault, decoding or GPU upload. */
+	unsigned long uploaded[3][OCC_COUNT];
+	int uploaded_mask;
+	int directional;
+	real direction[3];
 	int valid;
 } fields[OCC_LIGHTS];
 static struct
@@ -73,13 +80,14 @@ static void remember_overflow(long identity, unsigned long now)
 }
 static int submitted_count;
 static int updates_this_window;
+static int fields_dirty;
 static unsigned long current_window;
 static long model_slots[2] = {NONE, NONE};
 static int enabled(void)
 {
-	return ((config_boolean("display.plasma_lighting") || covenant_emitter_lighting_enabled() || shield_glow_enabled()) &&
-		config_boolean("display.plasma_occlusion")) ||
-		config_boolean("display.muzzle_lighting");
+	return ((lighting_config_boolean("display.plasma_lighting") || authored_emitter_lighting_enabled() || covenant_emitter_lighting_enabled() || shield_glow_enabled()) &&
+		lighting_config_boolean("display.plasma_occlusion")) ||
+		lighting_config_boolean("display.muzzle_lighting") || lighting_config_boolean("display.vehicle_lighting");
 }
 struct sample_axis
 {
@@ -238,6 +246,7 @@ static struct occlusion_field *field_for(long rasterizer_index)
 		for (i = 0; i < OCC_COUNT; i++)
 			field->visibility[i] = 1;
 	}
+	fields_dirty = 1;
 	field->used = now;
 	light = &rasterizer_lights.lights[rasterizer_index];
 	specular = plasma_occlusion_specular_scale(rasterizer_index);
@@ -255,7 +264,8 @@ static struct occlusion_field *field_for(long rasterizer_index)
 		trace_dx * trace_dx + trace_dy * trace_dy + trace_dz * trace_dz > extent * extent * 0.015625f)
 	{
 		trace_depths(extent, &light->position, covenant_emitter_lighting_occlusion_ignore(field->identity),
-			muzzle_lighting_vehicle_occlusion(field->identity), field->depths);
+			muzzle_lighting_vehicle_occlusion(field->identity) || plasma_lighting_vehicle_occlusion(field->identity) ||
+			covenant_emitter_lighting_vehicle_occlusion(field->identity), field->depths);
 		field->traced = now;
 		field->trace_extent = extent;
 		field->trace_center[0] = light->position.x;
@@ -308,6 +318,14 @@ static struct occlusion_field *field_for(long rasterizer_index)
 				alpha = target < history ? block_alpha : clear_alpha;
 				field->visibility[i] = history + (target - history) * alpha;
 			}
+	/* Texture coordinates are light-local. A changed world position alone
+	   does not change texels if the projected visibility stayed identical. */
+	if (!field->valid || field->radius != light->radius || field->specular != specular ||
+		field->extent != extent || field->admission != admission ||
+		memcmp(previous, field->visibility, sizeof(previous)))
+		field->texture_mask = 0;
+	else
+		field->texture_mask &= 7; /* failed uploads retry next view */
 	field->center[0] = light->position.x;
 	field->center[1] = light->position.y;
 	field->center[2] = light->position.z;
@@ -315,7 +333,6 @@ static struct occlusion_field *field_for(long rasterizer_index)
 	field->specular = specular;
 	field->extent = extent;
 	field->admission = admission;
-	field->texture_mask = 0;
 	field->updated = now;
 	field->window = current_window;
 	field->valid = 1;
@@ -331,6 +348,15 @@ static void *field_texture(struct occlusion_field *field, int pass, long rasteri
 	int directional = covenant_emitter_lighting_cone(rasterizer, axis, origin, &radius);
 	if (!field)
 		return NULL;
+	/* Directional profiles can rotate without changing collision visibility.
+	   Needler's lower-height fade is independent of the weapon's aim. */
+	if (directional != field->directional ||
+		(directional == 1 && memcmp(axis, field->direction, sizeof(field->direction))))
+	{
+		field->texture_mask = 0;
+		field->directional = directional;
+		if (directional == 1) memcpy(field->direction, axis, sizeof(field->direction));
+	}
 	/* Equal radii produce identical diffuse/specular texels, including the
 	   directional mask. Share that upload; different extents stay independent. */
 	if (pass == 2 && field->specular == 1.0f)
@@ -366,10 +392,17 @@ static void *field_texture(struct occlusion_field *field, int pass, long rasteri
 					value *= remaining * remaining;
 				pixels[i] = (unsigned long)(255 * value + 0.5f) * 0x01010101UL;
 			}
-	if (!upload(&field->texture[pass], pixels))
+	if (!(field->uploaded_mask & (1 << pass)) || memcmp(field->uploaded[pass], pixels, sizeof(pixels)))
 	{
-		field->texture_mask |= 8 << pass;
-		return NULL;
+		if (!upload(&field->texture[pass], pixels))
+		{
+			/* A failed unlock may have changed backing storage. */
+			field->uploaded_mask &= ~(1 << pass);
+			field->texture_mask |= 8 << pass;
+			return NULL;
+		}
+		memcpy(field->uploaded[pass], pixels, sizeof(pixels));
+		field->uploaded_mask |= 1 << pass;
 	}
 	field->texture_mask |= 1 << pass;
 	return field->texture[pass];
@@ -378,14 +411,22 @@ void plasma_occlusion_reset(void)
 {
 	int i, j;
 	ammo_counter_falloff_dispose();
-	for (i = 0; i < OCC_LIGHTS; i++)
-		for (j = 0; j < 3; j++)
-			if (fields[i].texture[j])
-				D3DResource_Release((D3DResource *)fields[i].texture[j]);
-	memset(fields, 0, sizeof(fields));
+	/* The disabled frame-end path may request reset repeatedly. Clear the
+	   bounded upload/visibility storage only after it has actually been used. */
+	if (fields_dirty)
+	{
+		for (i = 0; i < OCC_LIGHTS; i++)
+			for (j = 0; j < 3; j++)
+				if (fields[i].texture[j])
+					D3DResource_Release((D3DResource *)fields[i].texture[j]);
+		memset(fields, 0, sizeof(fields));
+		fields_dirty = 0;
+	}
 	memset(overflow, 0, sizeof(overflow));
 	plasma_occlusion_window();
 }
+
+
 void plasma_occlusion_window(void)
 {
 	ammo_counter_falloff_window();
@@ -396,9 +437,10 @@ void plasma_occlusion_window(void)
 }
 void plasma_occlusion_submit(long light, long rasterizer_index)
 {
-	if (((config_boolean("display.plasma_lighting") && config_boolean("display.plasma_occlusion")) ||
+	if ((((lighting_config_boolean("display.plasma_lighting") || authored_emitter_lighting_enabled()) && lighting_config_boolean("display.plasma_occlusion")) ||
+		plasma_lighting_vehicle_occlusion(light) || covenant_emitter_lighting_vehicle_occlusion(light) ||
 		muzzle_lighting_selected(rasterizer_index) ||
-		((covenant_emitter_lighting_selected(rasterizer_index) || shield_glow_selected(rasterizer_index)) && config_boolean("display.plasma_occlusion"))) &&
+		((covenant_emitter_lighting_selected(rasterizer_index) || shield_glow_selected(rasterizer_index)) && lighting_config_boolean("display.plasma_occlusion"))) &&
 		submitted_count < OCC_SUBMITTED)
 	{
 		submitted[submitted_count].identity = light;

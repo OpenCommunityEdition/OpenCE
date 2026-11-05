@@ -8,6 +8,7 @@ void covenant_emitter_lighting_forget(void);
 void covenant_emitter_lighting_window_begin(void);
 void covenant_emitter_lighting_submitted(long light, long rasterizer);
 int covenant_emitter_lighting_selected(long rasterizer);
+int covenant_emitter_lighting_vehicle_occlusion(long light);
 long covenant_emitter_lighting_occlusion_ignore(long light);
 float covenant_emitter_lighting_radius(long light, float radius);
 

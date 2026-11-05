@@ -286,9 +286,12 @@ Android. These CPU tests do not establish driver performance or visual parity.
 These optional features are available on `main` and `testing`. The
 [plasma lighting source](../../port/linux/game/plasma_lighting.c)
 is a useful second example after FOV. `plasma_lighting_prepare` selects
-eligible authored projectile-light attachments and records temporary state;
+eligible authored projectile and energy-emitter attachments and records temporary state;
 `plasma_lighting_frame_end` restores it. Window and reset functions delimit
 view-specific selection and longer-lived feature state.
+
+The [emitter expansion walkthrough](emitter_expansion.md) covers sword/charge/heat
+attachments, vehicle and world emitters, flame aggregation and consolidated controls.
 
 For world reflections, read `plasma_specular_begin` and
 `plasma_specular_color` in [plasma_falloff.c](../../port/linux/game/plasma_falloff.c).

@@ -1,9 +1,12 @@
 #include "harness.h"
 #include <limits.h>
+#include <math.h>
+#define MAX(a,b) ((a)>(b)?(a):(b))
 #define MAXIMUM_OBJECTS_PER_MAP 1024
 #define MAXIMUM_CLUSTERS_PER_STRUCTURE 4
 #define MAXIMUM_BREAKABLE_SURFACES_PER_MAP 256
 #define REAL_MAX 3.402823466e38F
+#define MAXIMUM_BSP3D_TRAVERSAL_DEPTH 128
 #define TAG_BLOCK_GET_ELEMENT(b,i,t) (&((t *)(b)->address)[i])
 #define _object_invisible_bit 0
 enum { _collision_test_structure_bit, _collision_test_objects_bit,
@@ -16,6 +19,17 @@ struct collision_model_test_vector_result { struct collision_bsp_test_vector_res
 struct collision_result { real t; };
 struct structure_leaf { short cluster_index; };
 struct structure_bsp { struct { long count; void *address; } leaves; };
+typedef struct { real_vector3d n; real d; } real_plane3d;
+struct bsp3d_node { long plane_designator, children[2]; };
+struct collision_bsp { struct { struct { long count; void *address; } nodes, planes; } bsp3d; };
+struct collision_bsp_vector_cache { int unused; };
+static struct collision_bsp bsp;
+static struct bsp3d_node nodes[4];
+static real_plane3d planes[4];
+static long queried_node;
+static short queried_depth;
+static real plane3d_distance_to_point(const real_plane3d *p,const real_point3d *v)
+{ return p->n.i*v->x+p->n.j*v->y+p->n.k*v->z-p->d; }
 struct object_datum { struct { long next_object_index, first_child_object_index; real_point3d bounding_sphere_center;
  real bounding_sphere_radius; unsigned long flags; int type; } object; };
 static struct object_datum objects[1024];
@@ -26,11 +40,11 @@ static float object_depth[1024], structure_depth;
 static int bad_leaf, debug_collision_skip_objects, debug_collision_skip_vectors;
 static struct object_datum *object_get(long index) { reads++; return &objects[index]; }
 static struct structure_bsp *global_structure_bsp_get(void) { return &structure; }
-static void *global_collision_bsp_get(void) { return NULL; }
+static struct collision_bsp *global_collision_bsp_get(void) { return &bsp; }
 static void *breakable_surface_flags_get(void) { return NULL; }
-static int collision_bsp_test_vector(unsigned long flags,void *bsp,int breaks,void *bits,
- const real_point3d *p,const real_vector3d *v,float limit,struct collision_bsp_test_vector_result *r)
-{ r->t=structure_depth;r->leaf_count=2;r->leaf_indices[0]=bad_leaf?9:0;r->leaf_indices[1]=1;return structure_depth<1; }
+static int collision_bsp_test_vector_from_node(unsigned long flags,const struct collision_bsp *bsp,int breaks,void *bits,
+ const real_point3d *p,const real_vector3d *v,float limit,struct collision_bsp_test_vector_result *r,long start,short depth,struct collision_bsp_vector_cache *cache)
+{ queried_node=start;queried_depth=depth;r->t=structure_depth;r->leaf_count=2;r->leaf_indices[0]=bad_leaf?9:0;r->leaf_indices[1]=1;return structure_depth<1; }
 static long cluster_get_first_collideable_object(long *reference,short cluster)
 { cluster_reads++;*reference=0;return root_count?roots[0]:NONE; }
 static long cluster_get_next_collideable_object(long *reference)
@@ -52,6 +66,9 @@ static void setup(void)
  objects[i].object.bounding_sphere_radius=1;objects[i].object.type=0;object_depth[i]=.8f;roots[i]=i;}
  root_count=3;leaves[0].cluster_index=0;leaves[1].cluster_index=1;structure.leaves.count=2;structure.leaves.address=leaves;
  reads=model_builds=cluster_reads=stock_calls=bad_leaf=debug_collision_skip_vectors=debug_collision_skip_objects=0;structure_depth=1;
+ memset(&bsp,0,sizeof(bsp));memset(nodes,0,sizeof(nodes));memset(planes,0,sizeof(planes));
+ bsp.bsp3d.nodes.count=bsp.bsp3d.planes.count=4;bsp.bsp3d.nodes.address=nodes;bsp.bsp3d.planes.address=planes;
+ for(i=0;i<4;i++){nodes[i].plane_designator=i;nodes[i].children[0]=nodes[i].children[1]=NONE;planes[i].n.i=1;}
 }
 int main(int argc,char **argv)
 {
@@ -92,5 +109,20 @@ int main(int argc,char **argv)
  CHECK(plasma_collision_depth(flags,&p,&v,1)==.123f,"changed owner cannot use stale batch");
  CHECK(plasma_collision_depth(flags|FLAG(_collision_test_objects_vehicles_bit),&p,&v,NONE)==.123f,"changed flags cannot use stale batch");
  plasma_collision_end();
+ /* A whole ray cube follows two planes, but straddles the third. */
+ setup();planes[0].d=-10;nodes[0].children[1]=1;planes[1].d=10;nodes[1].children[0]=2;
+ plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==2 && queried_depth==2,"common prefix retains original traversal depth");
+ v.i=20;plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==0 && queried_depth==0,"larger later ray falls back to root");v.i=1;plasma_collision_end();
+ planes[0].d=-1;plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==0,"cube touching a plane retains stock arithmetic");plasma_collision_end();
+ planes[0].d=-10;nodes[0].children[1]=0;
+ plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==0 && queried_depth==0,"cycle falls back without bypassing safety budget");plasma_collision_end();
+ nodes[0].children[1]=99;plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==0 && queried_depth==0,"invalid descendant falls back");plasma_collision_end();
+ nodes[0].children[1]=NONE;plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==NONE && queried_depth==1,"contained solid leaf preserves entry depth");plasma_collision_end();
  return 0;
 }

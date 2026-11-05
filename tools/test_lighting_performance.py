@@ -1,8 +1,18 @@
 """Check that benchmark reports retain real stalls and separate capture overhead."""
 import pytest
 from lighting_performance_run import distribution, summarize, memory_window_mib
-from lighting_performance_build import ROOT, instrument_shader_stalls
+from lighting_performance_build import ROOT, instrument_shader_stalls, instrument_renderer_profile
 from harness import function
+
+
+@pytest.mark.parametrize('name', ['prepare_draw', 'buffer_upload'])
+def test_renderer_timers_preserve_the_production_body(name):
+    source = (ROOT/'port/linux/src/d3d8_gl.c').read_text()
+    timed = instrument_renderer_profile(source)
+    assert function(timed, 'lighting_timed_'+name).replace('lighting_timed_'+name+'(', name+'(', 1) == function(source, name)
+    wrapper = function(timed, name)
+    assert wrapper.count('lighting_profile_begin(') == wrapper.count('lighting_profile_end(') == 1
+    assert wrapper.index('lighting_profile_begin(') < wrapper.index('lighting_timed_'+name+'(') < wrapper.index('lighting_profile_end(')
 
 
 @pytest.mark.parametrize('name,kind', [('xgpu_compile_shader', 0),

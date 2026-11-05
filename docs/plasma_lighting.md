@@ -1,8 +1,10 @@
 # Dynamic lighting implementation history
 
-The current implementation is on `dynamic-lighting-test`. See the
-[release-candidate guide](dynamic_lighting_release.md) for the current feature
-set, menu controls, known limitations and acceptance status. Muzzle lighting,
+See the
+[release guide](dynamic_lighting_release.md) for the current feature
+set, menu controls, known limitations and acceptance status. The
+[emitter additions](reading/emitter_expansion.md) describe the subsequent sword,
+charge/heat, grenade, flame, vehicle and world-light extension. Muzzle lighting,
 Covenant projectiles, held-weapon emitters and shield lighting are implemented;
 CStencil and Modern remain separate work. `chesters-cool-stuff` remains a local
 reference.

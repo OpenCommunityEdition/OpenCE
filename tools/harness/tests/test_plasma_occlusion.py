@@ -16,7 +16,7 @@ def test_visibility_field():
 
 def test_stale_pass_upload_is_detected():
     code = re.sub(r'^#include.*$', '', read('port/linux/game/ammo_counter_falloff.c') + '\n' + read('port/linux/game/plasma_occlusion.c'), flags=re.M)
-    assert code.count('field->texture_mask = 0;') == 1
+    assert code.count('field->texture_mask = 0;') == 2
     code = code.replace('field->texture_mask = 0;', '(void)0;')
     status, output = run(build('plasma_occlusion', (('under_test.inc', code),)), 'visibility')
     assert status == CHECK_FAILED, output

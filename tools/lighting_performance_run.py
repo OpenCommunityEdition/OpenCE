@@ -23,7 +23,8 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parents[1]
 LIGHTS = ['plasma_lighting', 'muzzle_lighting', 'jackal_shield_lighting',
           'covenant_shield_lighting', 'fuel_rod_lighting', 'ammo_counter_lighting',
-          'needler_lighting', 'plasma_occlusion', 'shield_glow']
+          'needler_lighting', 'plasma_occlusion', 'shield_glow',
+          'weapon_glow', 'vehicle_lighting', 'world_lighting']
 QUALITY = ['anti_aliasing', 'anisotropic_filtering', 'shadow_resolution',
            'per_pixel_lighting', 'model_detail', 'hdr', 'hdr_output',
            'viewmodel_shield', 'shield_look', 'fov', 'viewmodel_fov']
@@ -117,6 +118,7 @@ def main():
     parser.add_argument('--data-root', type=Path, required=True)
     parser.add_argument('--settings', type=Path)
     parser.add_argument('--fps', type=int, choices=[30,60,120], required=True)
+    parser.add_argument('--uncapped', action='store_true', help='Measure headroom without the limiter; --fps remains the reporting budget')
     parser.add_argument('--enabled', type=int, choices=[0,1], required=True)
     parser.add_argument('--seconds', type=int, default=300)
     parser.add_argument('--warmup', type=int, default=30)
@@ -146,7 +148,7 @@ def main():
     (out/'config.toml').write_text('[display]\n'+''.join(f'{k} = {json.dumps(v)}\n' for k,v in settings.items()))
     env.update(HALO_DATA_ROOT=str(out), HALO_SAVE_ROOT=str(out/'saves'), HALO_HIDDEN_WINDOW='1',
                HALO_WINDOW_SIZE=args.resolution, HALO_RESOLUTION_SCALING='native', HALO_NO_AUDIO='1',
-               HALO_MAX_FPS=str(args.fps), HALO_NO_VSYNC='1', HALO_EXIT_AFTER=str(args.warmup+args.seconds+25),
+               HALO_MAX_FPS='-1' if args.uncapped else str(args.fps), HALO_NO_VSYNC='1', HALO_EXIT_AFTER=str(args.warmup+args.seconds+25),
                HALO_NET_ONLINE='0', HALO_NET_PUBLIC_LOBBY='0', HALO_NET_ALLOW_UPNP='0',
                HALO_NET_JOIN_FROM_CLIPBOARD='0',
                HALO_NET_ADDRESS=f'127.0.0.{81+args.enabled}', HALO_NET_BROADCAST=f'127.0.0.{81+args.enabled}',
@@ -163,7 +165,8 @@ def main():
     build=args.build_dir.resolve()
     assert build.is_relative_to((ROOT/'build').resolve())
     shutil.copy2(build/'manifest.json', out/'build-manifest.json')
-    (out/'settings.json').write_text(json.dumps(dict(resolution=args.resolution, fps=args.fps,
+    (out/'settings.json').write_text(json.dumps(dict(resolution=args.resolution, fps=args.fps, uncapped=args.uncapped,
+        frame_limit=int(env['HALO_MAX_FPS']),
         warmup=args.warmup, seconds=args.seconds, bots=args.bots, map=args.map,
         shader_dump=args.dump_shaders, captures=not (args.dump_shaders or args.no_captures), display=settings),indent=2))
     memory=[]; start=time.monotonic(); process=None
@@ -196,15 +199,17 @@ def main():
         except ValueError as error:
             report['measurement_error']=str(error)
         log=(out/'stderr.log').read_text(errors='replace')
-        report.update(exit=process.returncode, fps=args.fps, enabled=args.enabled, shader_dump=args.dump_shaders,
+        report.update(exit=process.returncode, fps=args.fps, uncapped=args.uncapped, frame_limit=int(env['HALO_MAX_FPS']), enabled=args.enabled, shader_dump=args.dump_shaders,
                       captures=not (args.dump_shaders or args.no_captures),
                       unexpected_players=bool(re.search(r'\bplayer '+str(args.bots+1)+r':', log)),
                       bots_lines=[line for line in log.splitlines() if 'bots: tick' in line],
                       errors=re.findall(r'(?im)^.*(?:crash: exception|exception halt|assertion failed|GL_INVALID|shader.*(?:error|failed)).*$',log),
                       peak_private_mib=max((m['private']/2**20 for m in memory),default=None),
                       peak_rss_mib=max((m['rss']/2**20 for m in memory),default=None),
-                      first_minute_private_mib=memory_window_mib(memory,args.warmup+15,args.warmup+75),
-                      last_minute_private_mib=memory_window_mib(memory,args.warmup+args.seconds-45))
+                      # Memory uses the runner clock. Bound both windows before
+                      # the exit deadline; shutdown deallocation is not a plateau.
+                      first_minute_private_mib=memory_window_mib(memory,args.warmup+15,min(args.warmup+75,args.warmup+args.seconds)),
+                      last_minute_private_mib=memory_window_mib(memory,max(args.warmup+15,args.warmup+args.seconds-60),args.warmup+args.seconds))
         (out/'report.json').write_text(json.dumps(report,indent=2))
         print(json.dumps(dict(label=args.label, **report)),flush=True)
         assert report['exit']==0 and not report['errors'], 'Game failed; retained report and logs describe the failure'

@@ -22,7 +22,7 @@ struct light_datum { long object_index,definition_index; int flags; real_point3d
 static struct light_datum lights[64];
 static struct { int valid; } data={1},*light_data=&data;
 static long light_port_glow_definition=99;
-int config_boolean(const char *n) { return on; }
+int lighting_config_boolean(const char *n) { return on; }
 static long game_time_get(void) { return tick; }
 real render_interpolation_game_time_sec(long t) { return render_time; }
 static struct weapon_datum *weapon_try_and_get(long w) { return present && w>=0 && w<12 ? &weapons[w] : NULL; }

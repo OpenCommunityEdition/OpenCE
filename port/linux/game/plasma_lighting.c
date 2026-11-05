@@ -5,6 +5,7 @@
 #include "objects/objects.h"
 #include "tag_files/tag_files.h"
 #include "plasma_lighting.h"
+#include "authored_emitter_lighting.h"
 #include "plasma_model_shader.h"
 #include "plasma_occlusion.h"
 #include "rocket_lighting.h"
@@ -14,7 +15,7 @@
 #include "shield_glow.h"
 #include <string.h>
 
-int config_boolean(const char *name);
+#include "lighting_config.h"
 
 enum { PLASMA_LIGHTING_MAXIMUM = 128 };
 static struct
@@ -22,7 +23,7 @@ static struct
 	long light_index;
 	long object_index;
 	long rasterizer_index;
-	int was_dynamic;
+	int was_dynamic, category;
 	float radius_scale, saved_radius;
 } plasma_lighting_attachments[PLASMA_LIGHTING_MAXIMUM];
 static int plasma_lighting_count;
@@ -47,32 +48,35 @@ void plasma_model_lighting_slot(long light_index, short slot)
 
 unsigned int plasma_model_lighting_mask(void)
 {
-	return (config_boolean("display.plasma_lighting") || config_boolean("display.muzzle_lighting") ||
-		covenant_emitter_lighting_enabled() || shield_glow_enabled()) ? plasma_model_mask : 0;
+	return (lighting_config_boolean("display.plasma_lighting") || lighting_config_boolean("display.muzzle_lighting") ||
+		covenant_emitter_lighting_enabled() || authored_emitter_lighting_enabled() || shield_glow_enabled()) ? plasma_model_mask : 0;
 }
 
-void plasma_lighting_prepare(long light_index, long object_index)
+void plasma_lighting_prepare(long light_index, long object_index, long definition_index)
 {
 	struct object_datum *object;
 	const char *name;
-	int index;
-	float covenant_scale;
+	int index, category;
+	float covenant_scale, authored_scale = 1.0f;
 
-	if (!config_boolean("display.plasma_lighting") || object_index == NONE)
+	if ((!lighting_config_boolean("display.plasma_lighting") && !authored_emitter_lighting_enabled()) || object_index == NONE)
 		return;
 	if (covenant_lighting_owns(light_index, object_index))
 		return; /* Owned glows have their own radius and frame cleanup. */
 	object = object_try_and_get(object_index);
-	if (!object || object->object.type != _object_type_projectile)
+	if (!object)
+		return;
+	category = authored_emitter_lighting_profile(object_index, definition_index, &authored_scale);
+	if (!category && (!lighting_config_boolean("display.plasma_lighting") || object->object.type != _object_type_projectile))
 		return;
 	name = tag_get_name(object->definition_index);
 	covenant_scale = covenant_lighting_scale(name);
 	/* Exact tag policies keep unrelated custom projectiles stock. */
 	/* The pistol overcharge uses a tag in the rifle directory. */
-	if (!name || (!covenant_scale && strcmp(name, "weapons\\plasma rifle\\bolt") &&
+	if (!category && (!name || (!covenant_scale && strcmp(name, "weapons\\plasma rifle\\bolt") &&
 		strcmp(name, "weapons\\plasma pistol\\bolt") &&
 		strcmp(name, "weapons\\plasma rifle\\charged bolt") &&
-		strcmp(name, "weapons\\rocket launcher\\rocket")))
+		strcmp(name, "weapons\\rocket launcher\\rocket"))))
 		return;
 	for (index = 0; index < plasma_lighting_count; index++)
 		if (plasma_lighting_attachments[index].light_index == light_index &&
@@ -90,9 +94,10 @@ void plasma_lighting_prepare(long light_index, long object_index)
 	/* Wider soft falloff increases useful illumination without clipping colour.
 	   Pistol shots start with smaller authored radii than rifle bolts. */
 	plasma_lighting_attachments[plasma_lighting_count].radius_scale =
-		covenant_scale ? covenant_scale :
+		category ? authored_scale : covenant_scale ? covenant_scale :
 		!strcmp(name, "weapons\\plasma pistol\\bolt") ? 2.25f :
 		!strcmp(name, "weapons\\plasma rifle\\charged bolt") ? 2.75f : 1.75f;
+	plasma_lighting_attachments[plasma_lighting_count].category = category;
 	plasma_lighting_count++;
 	light_port_refresh_attachment(light_index, object_index);
 }
@@ -100,11 +105,12 @@ void plasma_lighting_prepare(long light_index, long object_index)
 float plasma_lighting_radius(long light_index, long object_index, float radius)
 {
 	int index;
-	if (!config_boolean("display.plasma_lighting"))
+	if (!lighting_config_boolean("display.plasma_lighting") && !authored_emitter_lighting_enabled())
 		return radius;
 	for (index = 0; index < plasma_lighting_count; index++)
 		if (plasma_lighting_attachments[index].light_index == light_index &&
-			plasma_lighting_attachments[index].object_index == object_index)
+			plasma_lighting_attachments[index].object_index == object_index &&
+			authored_emitter_lighting_category_enabled(plasma_lighting_attachments[index].category))
 			return radius * plasma_lighting_attachments[index].radius_scale;
 	return radius;
 }
@@ -133,11 +139,11 @@ void plasma_lighting_frame_end(void)
 			plasma_lighting_attachments[index].object_index);
 	}
 	plasma_lighting_reset();
-	if (!config_boolean("display.plasma_occlusion") && !config_boolean("display.muzzle_lighting") &&
-		!covenant_emitter_lighting_enabled() && !shield_glow_enabled())
+	if (!lighting_config_boolean("display.plasma_occlusion") && !lighting_config_boolean("display.muzzle_lighting") &&
+		!covenant_emitter_lighting_enabled() && !authored_emitter_lighting_enabled() && !shield_glow_enabled())
 		plasma_occlusion_reset();
-	if (!config_boolean("display.plasma_lighting") && !config_boolean("display.muzzle_lighting") &&
-		!covenant_emitter_lighting_enabled() && !shield_glow_enabled())
+	if (!lighting_config_boolean("display.plasma_lighting") && !lighting_config_boolean("display.muzzle_lighting") &&
+		!covenant_emitter_lighting_enabled() && !authored_emitter_lighting_enabled() && !shield_glow_enabled())
 		plasma_falloff_dispose();
 }
 
@@ -183,12 +189,27 @@ int plasma_lighting_selected(long rasterizer_index)
 	int index;
 	if (shield_glow_selected(rasterizer_index) || muzzle_lighting_selected(rasterizer_index) || covenant_emitter_lighting_selected(rasterizer_index))
 		return TRUE;
-	if (rasterizer_index == NONE || !config_boolean("display.plasma_lighting"))
+	if (rasterizer_index == NONE || (!lighting_config_boolean("display.plasma_lighting") && !authored_emitter_lighting_enabled()))
 		return FALSE;
 	if (covenant_lighting_selected(rasterizer_index) || rocket_lighting_selected(rasterizer_index))
 		return TRUE;
 	for (index = 0; index < plasma_lighting_count; index++)
-		if (plasma_lighting_attachments[index].rasterizer_index == rasterizer_index)
+		if (plasma_lighting_attachments[index].rasterizer_index == rasterizer_index &&
+			authored_emitter_lighting_category_enabled(plasma_lighting_attachments[index].category))
+			return TRUE;
+	return FALSE;
+}
+
+/* Headlights include their own vehicle in the collision field, even when
+   the general emitter occlusion option is off. Keep the authored beam cone. */
+int plasma_lighting_vehicle_occlusion(long light_index)
+{
+	int index;
+	if (light_index == NONE || !lighting_config_boolean("display.vehicle_lighting"))
+		return FALSE;
+	for (index = 0; index < plasma_lighting_count; index++)
+		if (plasma_lighting_attachments[index].light_index == light_index &&
+			plasma_lighting_attachments[index].category == 2)
 			return TRUE;
 	return FALSE;
 }

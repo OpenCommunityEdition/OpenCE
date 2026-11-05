@@ -74,7 +74,7 @@ DYNAMIC_LIGHTING_GAME_SOURCES = {
     "plasma_lighting.c", "plasma_falloff.c", "plasma_occlusion.c", "plasma_collision.c",
     "rocket_lighting.c", "muzzle_lighting.c", "covenant_lighting.c",
     "covenant_emitter_lighting.c", "ammo_counter_lighting.c", "ammo_counter_falloff.c",
-    "needler_lighting.c", "shield_glow.c",
+    "needler_lighting.c", "authored_emitter_lighting.c", "ambient_emitter_lighting.c", "shield_glow.c", "lighting_config.c",
 }
 DYNAMIC_LIGHTING_PLATFORM_SOURCES = {"plasma_model_shader.c", "plasma_occlusion_gl.c"}
 

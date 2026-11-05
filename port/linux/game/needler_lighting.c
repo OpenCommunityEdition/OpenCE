@@ -10,7 +10,7 @@
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include <string.h>
 
-int config_boolean(const char *name);
+#include "lighting_config.h"
 
 int needler_lighting_position(long index, real_point3d *position, real_vector3d *direction)
 {
@@ -19,7 +19,7 @@ int needler_lighting_position(long index, real_point3d *position, real_vector3d 
 	struct object_marker marker;
 	real_vector3d forward, up;
 	const char *name;
-	if (!config_boolean("display.needler_lighting"))
+	if (!lighting_config_boolean("display.needler_lighting"))
 		return FALSE;
 	weapon = weapon_try_and_get(index);
 	if (!weapon || TEST_FLAG(weapon->object.flags, _object_invisible_bit))
@@ -63,7 +63,7 @@ void needler_lighting_forget(void)
 void needler_lighting_material(struct shader *shader, real_rgb_color *color)
 {
 	long index;
-	if (!config_boolean("display.needler_lighting"))
+	if (!lighting_config_boolean("display.needler_lighting"))
 		return;
 	if (!needler_material_checked)
 	{
@@ -86,7 +86,7 @@ void needler_lighting_transparent(struct shader *shader, struct pixel_shader_def
 {
 	long index;
 	unsigned long *output;
-	if (!config_boolean("display.needler_lighting") || stages < 1 || stages > 8)
+	if (!lighting_config_boolean("display.needler_lighting") || stages < 1 || stages > 8)
 		return;
 	if (!needler_crystals_checked)
 	{
