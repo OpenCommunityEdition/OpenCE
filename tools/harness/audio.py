@@ -51,7 +51,9 @@ def stream_types():
 typedef long LONG, HRESULT;
 typedef int BOOL;
 typedef void *LPVOID, *LPDIRECTSOUND, *LPDIRECTSOUNDBUFFER;
+#ifndef _MSC_VER
 typedef long long __int64;
+#endif
 typedef void (*LPFNXMEDIAOBJECTCALLBACK)(void *, void *, unsigned long);
 #define CALLBACK
 #define STDMETHODCALLTYPE

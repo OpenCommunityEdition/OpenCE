@@ -29,8 +29,9 @@ worth of voices.
 #ifdef _WIN32
 #include <io.h>
 #include <fcntl.h>
-/* The platform startup's crash reporter check; this executable only tests audio. */
+/* Startup services are unused by this audio-only executable. */
 int crash_reporter_process(void) { return 1; }
+void mcc_memory_log_startup(void) { }
 #endif
 
 typedef int BOOL;
@@ -55,7 +56,7 @@ typedef const XMEDIAPACKET *LPCXMEDIAPACKET;
 #define S_OK 0
 #define DS_OK 0
 #define E_INVALIDARG (-1)
-#define E_OUTOFMEMORY (-2)
+#define E_OUTOFMEMORY ((HRESULT)0x8007000eL)
 #define XMEDIAPACKET_STATUS_PENDING 1
 #define XMEDIAPACKET_STATUS_FLUSHED 2
 #define DSSTREAMPAUSE_PAUSE 1

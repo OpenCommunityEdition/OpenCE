@@ -20,7 +20,6 @@ typedef struct {
 typedef struct {unsigned long dwSize, dwFlags, dwBufferBytes; WAVEFORMATEX *lpwfxFormat;} DSBUFFERDESC;
 typedef const DSBUFFERDESC *LPCDSBUFFERDESC;
 #define DS_OK 0
-#define E_OUTOFMEMORY ((HRESULT)0x8007000eL)
 #define DSERR_INVALIDCALL ((HRESULT)0x88780032L)
 #define DSERR_UNSUPPORTED ((HRESULT)0x80004001L)
 #define WAVE_FORMAT_PCM 1
