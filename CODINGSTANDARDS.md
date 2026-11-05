@@ -67,6 +67,63 @@ requirements still apply.
   to make a map load. An intentional compatibility fallback needs a defined
   rationale, evidence, diagnostics and verification within authorized scope.
 
+## Investigating systemic fixes
+
+Apply AGENTS.md's systemic-fix policy to behavior changes. Scale the
+investigation to the defect; keep durable findings in the relevant existing
+guide, test or concise code comment.
+
+### Establish the behavior
+
+- Describe the observed failure and expected result. Identify the reference:
+  the existing engine contract, documented format semantics or observed
+  behavior of a specified reference implementation and configuration.
+  Distinguish stock behavior from fixes introduced by extensions.
+- Trace the relevant input through loading, conversion and runtime use.
+  Inspect authored values, flags, units, ownership and lifetime. Check for
+  omitted interpretation, repeated conversion and interactions with existing
+  exceptions before adding another correction.
+- Separate independent causes even when one map exposes them together.
+  For example, HUD glyph size, digit advance and meter channel ordering
+  require their own evidence; a correct screenshot does not establish that
+  all three follow the same rule.
+- State why the proposed selector identifies the affected class of inputs.
+  Map format alone may not identify an author's historical workaround.
+  Texture resolution alone does not establish intended display size.
+  If evidence is insufficient, report the uncertainty rather than treating
+  a plausible heuristic as established semantics.
+
+### Verify the general rule
+
+- Prefer a minimal synthetic reproduction exercising the real implementation.
+  For a defect, demonstrate failure before the fix where feasible. Retain
+  the reported map as a runtime regression case when available.
+- Check identity independence: equivalent relevant content must receive the
+  same correction under unrelated map names and checksums. Change only
+  identity fields that are not themselves part of the required semantics,
+  keeping fixtures valid.
+- Include counterexamples that must remain unchanged, boundary and malformed
+  inputs where relevant, and interactions with existing conversion rules.
+  Verify observable results rather than only selected flags or table entries.
+- For a retained exception, test both the intended match and near misses.
+  Tests proving that an exception activates do not establish that its
+  behavior is correct or that a general replacement is impossible.
+- Verify relevant load, failed-load, unload and map-family transitions.
+  Renderer changes require actual visual checks alongside automated coverage.
+  The platform, networking and regression requirements in AGENTS.md still apply.
+
+### Make remaining exceptions explainable
+
+- Keep exception selection and rationale discoverable in the owning module.
+  Expose the selected behavior and reason through appropriate load or debug
+  diagnostics without logging repeatedly in draw or simulation loops.
+- Record unresolved root-cause work in an existing project document or issue,
+  including the evidence needed to resolve it. Do not describe an exception
+  as temporary without recording what remains to be established.
+- When replacing an exception, remove obsolete selection logic and update
+  its tests and documentation in the same change. Preserve behavioral
+  coverage, attribution and useful evidence.
+
 ## Code and comments
 
 - Match the surrounding naming, layout and comment density. Follow the
