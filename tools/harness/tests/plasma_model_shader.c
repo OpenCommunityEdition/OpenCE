@@ -23,8 +23,37 @@ void xgpu_text_append(struct xgpu_text *text, const char *format, ...)
 int main(int argc, char **argv)
 {
 	unsigned int i, recognized = 0;
-	int enabled, per_pixel, packed;
+	int enabled, per_pixel, packed, reversed;
 	struct xgpu_text pixel = {0};
+	if (argc == 6 && strcmp(argv[1], "translated") == 0)
+	{
+		struct nv2a_vertex_lighting lighting;
+		char *shader;
+		int model;
+		i = atoi(argv[3]);
+		CHECK(i < sizeof(lengths)/sizeof(lengths[0]), "valid program");
+#ifndef HALO_GLES
+		xgpu_reversed_depth = atoi(argv[2]);
+#endif
+		model = nv2a_vertex_shader_lighting(programs[i], lengths[i], &lighting);
+		shader = nv2a_vertex_shader_to_glsl(programs[i], lengths[i], atoi(argv[5]) ? 2 : 0,
+			model ? &lighting : NULL, atoi(argv[4]));
+		fputs(shader, stdout);
+		free(shader);
+		return 0;
+	}
+	if (argc == 3 && strcmp(argv[1], "fixed") == 0)
+	{
+		char *shader;
+#ifndef HALO_GLES
+		xgpu_reversed_depth = atoi(argv[2]);
+#endif
+		shader = nv2a_fixed_function_glsl();
+		fputs(shader, stdout);
+		free(shader);
+		return 0;
+	}
+	for (reversed = 0; reversed < 2; reversed++)
 	for (enabled = 0; enabled < 2; enabled++)
 	for (per_pixel = 0; per_pixel < 2; per_pixel++)
 	for (packed = 0; packed < 2; packed++)
@@ -33,8 +62,14 @@ int main(int argc, char **argv)
 		struct nv2a_vertex_lighting lighting;
 		int model = nv2a_vertex_shader_lighting(programs[i], lengths[i], &lighting);
 		int point = model && lighting.lights == 2;
-		char *shader = nv2a_vertex_shader_to_glsl(programs[i], lengths[i], packed ? 2 : 0,
+		char *shader;
+#ifndef HALO_GLES
+		xgpu_reversed_depth = reversed;
+#endif
+		shader = nv2a_vertex_shader_to_glsl(programs[i], lengths[i], packed ? 2 : 0,
 			per_pixel && model ? &lighting : NULL, enabled);
+		CHECK((strstr(shader, "position.z += depth_bias * position.w") != NULL) == xgpu_reversed_depth,
+			"depth bias follows the desktop depth mode in program %u", i);
 		if (point && enabled)
 		{
 			recognized++;

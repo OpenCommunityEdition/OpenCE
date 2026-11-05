@@ -20,6 +20,10 @@ and the [FOV walkthrough](field_of_view.md) for the timing and camera inputs.
 
 ## Prepare a view before drawing objects
 
+The [depth and decal walkthrough](reversed_depth.md) follows the desktop's
+default reversed depth through projection, depth tests and decal offsets,
+including the conventional-depth fallback and interaction with dynamic lighting.
+
 OpenCE's `convex_polygon2d_clip_to_plane` in
 [geometry.c](../../source/math/geometry.c) keeps a corner on the clip line
 when a rounding error would otherwise produce a NaN crossing. This prevents
