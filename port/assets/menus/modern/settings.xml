@@ -867,8 +867,8 @@
 		<child widget="modern/interface/row_display_hud_button_style_xbox5" x="28" y="287" />
 		<child widget="modern/interface/row_display_hud_button_style_ps6" x="28" y="317" />
 		<child widget="modern/interface/row_display_hud_button_style_switch7" x="28" y="347" />
-		<child widget="modern/interface/row_display_hud_bumper_style8" x="28" y="377" />
-		<child widget="modern/interface/row_display_keyboard_glyphs9" x="28" y="407" />
+		<child widget="modern/interface/row_detected_button_style" x="28" y="377" />
+		<child widget="modern/interface/row_display_hud_bumper_style9" x="28" y="407" />
 		<child widget="modern/interface/row_link_12" x="28" y="437" />
 		<child widget="modern/interface/row_link_13" x="28" y="467" />
 		<child widget="modern/interface/button_bar" x="26" y="414" />
@@ -975,20 +975,18 @@
 	<widget name="modern/interface/spinner_display_hud_button_style_switch7" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SWITCH CLASSIC|SWITCH GEMS|SWITCH MODERN" values="switch_classic|switch_gems|switch_modern" setting="display.hud_button_style_switch" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/interface/row_display_hud_bumper_style8" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_hud_bumper_style8" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_hud_bumper_style8" x="180" y="3" />
+	<widget name="modern/interface/row_detected_button_style" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_detected_button_style" x="12" y="3" />
+		<child widget="modern/interface/detected_button_style_value" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/label_display_hud_bumper_style8" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_hud_bumper_style8" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ORIGINAL XBOX|MODERN XBOX" values="original|modern" setting="display.hud_bumper_style" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
-		<on event="created" run="port setting load" />
+	<widget name="modern/interface/label_detected_button_style" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/detected_button_style_value" type="text" text="KEYBOARD" controller="1" width="140" height="20" font="ui\large_ui" color="#FFDDDDDD" align="center" />
+	<widget name="modern/interface/row_display_hud_bumper_style9" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_display_hud_bumper_style9" x="12" y="3" />
+		<child widget="modern/interface/spinner_display_hud_bumper_style9" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/row_display_keyboard_glyphs9" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_keyboard_glyphs9" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_keyboard_glyphs9" x="180" y="3" />
-	</widget>
-	<widget name="modern/interface/label_display_keyboard_glyphs9" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_keyboard_glyphs9" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.keyboard_glyphs" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/interface/label_display_hud_bumper_style9" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/spinner_display_hud_bumper_style9" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ORIGINAL XBOX|MODERN XBOX" values="original|modern" setting="display.hud_bumper_style" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/interface/row_link_12" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
@@ -1014,8 +1012,8 @@
 		<string text="XBOX STYLE" />
 		<string text="PLAYSTATION STYLE" />
 		<string text="SWITCH STYLE" />
+		<string text="BUTTON STYLE" />
 		<string text="BUMPER STYLE" />
-		<string text="KEYBOARD GLYPHS" />
 		<string text="MULTIPLAYER HUD &gt;" />
 		<string text="STREAMER MODE &gt;" />
 	</strings>
@@ -1024,13 +1022,13 @@
 		<string text="Choose the Settings and submenu style. Saved changes take effect on return to the main menu. The starting menu, pause menu and map UI keep their existing layout." />
 		<string text="Draw text and titles with high-res fonts; off draws the game's own." />
 		<string text="Draw the HUD from the high-res redraws; off draws the game's own pictures." />
-		<string text="Show styles for your controller's family. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
+		<string text="Follow keyboard/mouse or controller activity. Controllers use their family's saved artwork." />
 		<string text="Manual style when auto detection is off. Keyboard uses current bindings; controllers need High-Res HUD." />
 		<string text="Preferred Xbox artwork for automatic detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
 		<string text="Preferred PlayStation artwork for auto detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
 		<string text="Preferred Switch artwork for automatic detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
+		<string text="Keyboard/mouse is active. Prompts use your current bindings. Turn detection off to choose a fixed style." />
 		<string text="Original: black/white buttons. Modern: LB/RB. Kept when automatic detection is on." />
-		<string text="Automatic keyboard/mouse glyphs in menus and play. Manual Keyboard style works even with this off." />
 		<string text="Open multiplayer hud settings. Pending changes stay until OK or Cancel." />
 		<string text="Open streamer mode settings. Pending changes stay until OK or Cancel." />
 	</strings>

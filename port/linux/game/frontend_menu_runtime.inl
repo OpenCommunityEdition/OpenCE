@@ -543,20 +543,24 @@ static void frontend_button_rows_show(struct widget_instance *list)
 		"display.hud_button_style_ps", "display.hud_button_style_switch"};
 	struct widget_instance *hud = frontend_setting_row(list, "display.high_res_hud");
 	struct widget_instance *automatic = frontend_setting_row(list, "input.auto_button_detection");
-	struct widget_instance *keyboard = frontend_setting_row(list, "display.keyboard_glyphs");
+	struct widget_instance *keyboard = named(list, "row_detected_button_style", 0);
 	struct widget_instance *bumper = frontend_setting_row(list, "display.hud_bumper_style");
 	struct widget_instance *shown, *row;
 	struct controller_device device;
 	boolean enabled, detect;
-	short family = 0, index;
+	short family = 0, index, port;
+	int active;
 	if (!hud || !automatic) return;
 	enabled = !strcmp(frontend_row_value(hud), "true");
 	detect = !strcmp(frontend_row_value(automatic), "true");
-	controller_device_get(controller_of(list), &device);
+	active = frontend_input_device();
+	port = active >= 0 && active < 4 ? (short)active : controller_of(list);
+	controller_device_get(port, &device);
 	if (detect && device.family >= 0 && device.family <= 3) family = (short)device.family;
 	shown = frontend_setting_row(list, styles[family]);
+	if (detect && active == -1 && keyboard) shown = keyboard;
 	automatic->visible = enabled;
-	if (keyboard) keyboard->visible = enabled && detect;
+	if (keyboard) keyboard->visible = enabled && shown == keyboard;
 	for (index = 0; index < 4; index++)
 	{
 		row = frontend_setting_row(list, styles[index]);

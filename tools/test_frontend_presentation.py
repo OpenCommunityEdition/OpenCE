@@ -383,3 +383,50 @@ int main(void){
     return 0;
 }
 """)
+
+
+def test_keyboard_footer_draws_keycaps_for_manual_and_detected_input(tmp_path):
+    text = (ROOT/'port/linux/game/frontend_prompts.c').read_text()
+    header = (ROOT/'port/linux/game/frontend_prompts.h').read_text()
+    enum = re.search(r'enum frontend_prompt_action.*?;', header).group()
+    run_c(tmp_path, r'''
+#include <assert.h>
+#include <string.h>
+#define TRUE 1
+typedef struct {short x0,y0,x1,y1;} rectangle2d;
+typedef unsigned long pixel32;
+typedef struct {float alpha,red,green,blue;} real_argb_color;
+static int automatic=1,hud=1,device=-1,keycaps,pads,plain_keys,touch_text;
+static char const *manual="classic";
+static int config_boolean(char const *n){return !strcmp(n,"display.high_res_hud")?hud:!strcmp(n,"input.auto_button_detection")?automatic:0;}
+static char const *config_string(char const *n){(void)n;return manual;}
+static int frontend_menu_available(void){return 1;}
+static char const *tag_get_name(long tag){(void)tag;return "pc\\modern\\prompts";}
+static int frontend_input_device(void){return device;}
+static void draw_string_get_color(real_argb_color *c){c->alpha=1.0f;}
+static int frontend_glyph_draw(short d,short b,rectangle2d *r,pixel32 c){(void)d;(void)b;(void)r;(void)c;pads++;return 1;}
+static void halo_input_shown_name(char const *s,char *out,unsigned int n){(void)n;strcpy(out,s);}
+static void keyboard_glyph_draw(char const *s,rectangle2d *r,pixel32 c,int m){(void)s;(void)r;(void)c;assert(m);keycaps++;}
+static void frontend_prompt_text(rectangle2d *r,char const *s){
+ (void)r;if(!strcmp(s,"Return")||!strcmp(s,"Escape")||!strcmp(s,"Tab")||!strcmp(s,"Arrows: MOVE"))plain_keys++;
+ if(strstr(s,"Tap "))touch_text++;
+}
+''' + enum + function((ROOT/'port/linux/src/keyboard_prompts.c').read_text(), 'keyboard_prompt_menu_enabled') +
+          ''.join(function(text, n) for n in ('frontend_prompt_button','frontend_prompt_key','frontend_prompt_action','frontend_prompts_draw')) + r'''
+int main(void){
+ rectangle2d bounds={0,0,640,22};int i;
+ for(hud=0;hud<2;hud++) {
+  automatic=1;device=-1;manual="classic";keycaps=pads=plain_keys=0;
+  frontend_prompts_draw(1,&bounds);assert(keycaps==7&&!pads&&!plain_keys);
+  automatic=0;manual="keyboard";
+  for(i=-2;i<4;i++) {device=i;keycaps=pads=plain_keys=0;
+   frontend_prompts_draw(1,&bounds);assert(keycaps==7&&!pads&&!plain_keys);
+  }
+  automatic=1;device=2;keycaps=pads=0;
+  frontend_prompts_draw(1,&bounds);assert(!keycaps&&pads==4);
+  device=-2;keycaps=pads=touch_text=0;
+  frontend_prompts_draw(1,&bounds);assert(!keycaps&&!pads&&touch_text==1);
+ }
+ return 0;
+}
+''')

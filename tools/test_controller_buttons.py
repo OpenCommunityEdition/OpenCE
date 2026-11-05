@@ -84,6 +84,7 @@ def test_pending_menu_filter_visibility_and_focus(tmp_path):
 #define NUMBEROF(a) (sizeof(a)/sizeof(*(a)))
 #define usnprintf swprintf
 #define FALSE 0
+#define TRUE 1
 typedef int boolean;
 struct widget_instance {
  char const *name;short vertical_offset;int visible,definition_tag_index;
@@ -97,7 +98,8 @@ static struct pc_menu_setting settings[]={
  {4,{"classic","gems","menu_gems","xbox_modern"}},
  {4,{"ps_classic","ps_gems","ps_dark_gems","ps_modern"}},
  {3,{"switch_classic","switch_gems","switch_modern"}}};
-static struct widget_instance automatic,labels[4],styles[4];static int family;
+static struct widget_instance automatic,labels[4],styles[4];static int family,keyboard;
+static int keyboard_prompt_active(short port){assert(port==1);return keyboard;}
 static struct pc_menu_setting *pc_menu_setting_get(int id){return &settings[id];}
 static struct widget_instance *named(struct widget_instance *list,char const *name,int n){
  struct widget_instance *p;int i;
@@ -114,11 +116,12 @@ static void text_set(struct widget_instance *w,wchar_t const *s){assert(!wcscmp(
 void controller_device_get(short port,struct controller_device *device){assert(port==1);device->family=family;}
 ''' + (ROOT / 'port/linux/game/controller_button_menu.inl').read_text() + r'''
 int main(void){
- struct widget_instance list={0},a={0},r[4]={{0}},bumper={0},bar={0};int i,j,k,repeat;
+ struct widget_instance list={0},a={0},r[4]={{0}},detected={0},bumper={0},bar={0};int i,j,k,repeat;
  char const *names[]={"op_hud_button_style","op_hud_button_style_xbox","op_hud_button_style_ps","op_hud_button_style_switch"};
  list.child=&a;a.next=&r[0];a.name="op_auto_button_detection";
  a.visible=1;automatic.parent=&a;
- for(i=0;i<4;i++){r[i].name=names[i];r[i].next=i<3?&r[i+1]:&bumper;r[i].visible=1;r[i].child=&labels[i];r[i].vertical_offset=103;styles[i].definition_tag_index=i+1;}
+ for(i=0;i<4;i++){r[i].name=names[i];r[i].next=i<3?&r[i+1]:&detected;r[i].visible=1;r[i].child=&labels[i];r[i].vertical_offset=103;styles[i].definition_tag_index=i+1;}
+ detected.name="op_detected_button_style";detected.next=&bumper;
  bumper.name="op_hud_bumper_style";bumper.next=&bar;bumper.vertical_offset=133;
  bar.name="button_bar";bar.vertical_offset=414;
  for(repeat=0;repeat<40;repeat++)for(k=0;k<4;k++)for(j=0;j<settings[k+1].value_count;j++){
@@ -139,6 +142,11 @@ int main(void){
  styles[0].parameters.list.selected_index=-1;controller_button_rows_show(&list);assert(!bumper.visible);
  styles[0].parameters.list.selected_index=11;controller_button_rows_show(&list);assert(!bumper.visible);
  automatic.parameters.list.selected_index=0;family=99;controller_button_rows_show(&list);assert(r[0].visible);
+ keyboard=1;list.focused_child=&r[0];controller_button_rows_show(&list);
+ assert(detected.visible&&!bumper.visible&&list.focused_child==&detected);
+ for(i=0;i<4;i++)assert(!r[i].visible);
+ automatic.parameters.list.selected_index=1;controller_button_rows_show(&list);
+ assert(!detected.visible&&r[0].visible&&list.focused_child==&r[0]);
  return 0;
 }
 '''
@@ -172,6 +180,7 @@ def test_menu_generated_and_default_on():
     menu = ET.parse(ROOT / f'port/assets/menus/ce/{prefix}.controller_appearance.xml')
     labels = [w for w in menu.getroot().findall('widget')
               if '/hud_button_style' in w.get('name', '') and w.get('name', '').endswith('_label')]
+    assert not any(w.get('setting') in ('display.keyboard_glyphs', 'display.detected_button_style') for w in menu.getroot().findall('widget'))
     assert len(labels) == 4
     assert all('string_list' not in w.attrib and 'string_index' in w.attrib for w in labels)
     rows = port_settings.SCREENS['controller_appearance']['rows']

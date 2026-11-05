@@ -158,6 +158,7 @@ def document():
         labels=[]; helps=["OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs."]
         for index, (label, setting, choices, help_text, platform, *_) in enumerate(rows):
             key = "style" if setting=="display.menu_frontend" else setting.replace(".","_")+str(index)
+            if setting == "display.detected_button_style": key = "detected_button_style"
             label = SHORT_LABELS.get(setting, label).rstrip(":")
             if setting == "input.auto_button_detection" or setting.startswith("display.hud_button_style"):
                 help_text = help_text.replace("Requires High-Res HUD in Graphics.", "Gameplay artwork requires High-Res HUD; menu glyphs work independently.").replace("Requires High-Res HUD.", "Gameplay artwork requires High-Res HUD; menu glyphs work independently.")
@@ -170,10 +171,15 @@ def document():
             w(f"label_{key}",type="text",controller=1,width=94 if wide_value else 152,height=24,string_list=base+"/labels",string_index=index,font="ui\\large_ui",color="#FF2896FF")
 
             if choices is None:
-                # Reuse the existing read-only master-server status service.
                 row.remove(row.findall("child")[1])
-                c(row,"master_servers_value",180,3)
-                w("master_servers_value",type="text",controller=1,width=140,height=20,font="ui\\large_ui",color="#FFDDDDDD",align="center")
+                if setting == "display.detected_button_style":
+                    # A display-only row must never save over the manual preference.
+                    c(row,"detected_button_style_value",180,3)
+                    w("detected_button_style_value",type="text",text="KEYBOARD",controller=1,width=140,height=20,font="ui\\large_ui",color="#FFDDDDDD",align="center")
+                else:
+                    # Reuse the existing read-only master-server status service.
+                    c(row,"master_servers_value",180,3)
+                    w("master_servers_value",type="text",controller=1,width=140,height=20,font="ui\\large_ui",color="#FFDDDDDD",align="center")
                 continue
             spinner=w(f"spinner_{key}",type="spinner",width=value_width,height=20,flags="pass_unhandled_to_focused_child left_right_tabs_items",
                       strings="|".join(caption if wide_value else value_caption(caption) for caption,_ in choices),values="|".join(value for _,value in choices),setting=setting,

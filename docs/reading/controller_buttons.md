@@ -2,9 +2,9 @@
 
 Gamepads > Button Appearance contains AUTO BUTTON DETECTION, on by default for
 new configurations. Existing saved choices are preserved. The manual Button Style
-row offers eleven controller styles and KEYBOARD. Turning detection on restricts that row to the
-controller assigned to the player editing the menu;
-the caption identifies P1 through P4. Devices are identified even while the
+row offers eleven controller styles and KEYBOARD. Turning detection on shows
+Keyboard for active keyboard/mouse input or restricts artwork choices to the
+controller family. Controller style captions identify P1 through P4. Devices are identified even while the
 option is off. Detection and style selection do not change input;
 [controller remapping](controller_remapping.md) is a separate Gamepad Setup submenu.
 
@@ -25,14 +25,16 @@ PlayStation player keeps PlayStation artwork. The option changes no bindings.
 Controller artwork choices can be saved while High-Res HUD is off, but affect
 gameplay only when it is enabled in Graphics. The selectable KEYBOARD style
 works independently; see [keyboard/mouse prompts](keyboard_prompts.md).
-With automatic detection on, KEYBOARD GLYPHS enables keyboard/mouse activity
-switching; it defaults off. With detection off, manual KEYBOARD stays selected.
+Automatic detection includes keyboard/mouse activity without a second toggle.
+The detected Keyboard row is read-only and never overwrites the saved manual
+choice. With detection off, manual KEYBOARD stays selected.
 
-The opt-in [modern frontend](menu_redesign.md) also uses these saved styles.
+The [modern frontend](menu_redesign.md) also uses these saved styles.
 Its Interface page starts with Menu Style, High-Res Text and High-Res HUD.
 Auto Detection and glyph appearance controls populate below High-Res HUD only
-while its pending value is enabled. Detection shows only the assigned controller
-family's style, falling back to Manual Style for an unknown device; turning
+while its pending value is enabled. Detection follows the active menu input: a
+read-only Keyboard row or the active physical controller's family preference,
+falling back to Manual Style for an unknown controller; turning
 detection off restores Manual Style. Hiding controls preserves their pending and
 saved choices. These visibility rules do not change the legacy submenu above.
 Its navigation prompts follow the most recently used physical controller port,
@@ -77,8 +79,9 @@ is a family description and the other identity fields are zero.
 
 Detection describes the device visible to SDL. Steam Input or another controller
 wrapper can present a PlayStation pad as an Xbox pad; the game cannot recover the
-hidden physical identity. An unknown or disconnected controller falls back to the
-manual selection instead of guessing. Input polling refreshes snapshots and clears
+hidden physical identity. An unknown controller falls back to the manual
+selection instead of guessing. Disconnecting the keyboard owner restores its
+last keyboard/touch presentation. Input polling refreshes snapshots and clears
 disconnected ports, including existing keyboard/gamepad split-screen assignments.
 
 Automatic detection and each family preference are global configuration settings.

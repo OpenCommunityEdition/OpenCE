@@ -908,8 +908,9 @@ details. Native and MCC host services keep their existing selection state.
 Leaving `ui.map` latches the current choice; gameplay map loads, including CE
 and MCC, retain it. Saving a different style in Settings does not replace tags
 or rebuild menus. Returning to `ui.map` adopts the saved choice. Stock remains
-available explicitly; new configurations default to Modern. Automatic keyboard
-glyphs remain disabled by default, with controller auto detection enabled.
+available explicitly; new configurations default to Modern. Auto Detection remains enabled by default and includes keyboard/mouse keycaps
+in modern menu footers and supported gameplay prompts. The former separate
+Keyboard Glyphs toggle has been removed; manual Keyboard remains available.
 
 Only the known generated profile Settings root is redirected. Modern paused
 page roots share the settings inventory but omit `main menu intialize` and use

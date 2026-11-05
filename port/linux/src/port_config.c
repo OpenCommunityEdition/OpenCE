@@ -210,18 +210,14 @@ static const struct config_setting config_settings[] =
 		"PlayStation: ps_classic, ps_gems, ps_dark_gems, ps_modern.\n"
 		"Switch: switch_classic, switch_gems, switch_modern. Controllers require high_res_hud.\n"
 		"keyboard selects binding-aware keyboard/mouse glyphs without that requirement." },
-	{ "display.keyboard_glyphs", _config_boolean, "false", "HALO_KEYBOARD_GLYPHS", _environment_value, _platform_all,
-		"With auto button detection on, show keyboard/mouse glyphs after keyboard\n"
-		"or mouse input. Applies to modern menus and semantic gameplay prompts.\n"
-		"Off preserves existing presentation. Manual keyboard style works independently." },
 	{ "display.hud_bumper_style", _config_string, "\"original\"", "HALO_HUD_BUMPER_STYLE", _environment_value, _platform_all,
 		"Xbox Classic, Gems and Dark Gems bumpers: original (black/white) or modern\n"
 		"(LB/RB). Shared by local players, including automatic button detection.\n"
 		"Requires high_res_hud; other button styles keep their own artwork." },
 	{ "input.auto_button_detection", _config_boolean, "true", "HALO_AUTO_BUTTON_DETECTION", _environment_value, _platform_all,
-		"Limit Button Style to the assigned controller's family. Unknown devices\n"
-		"keep the manual choice. With display.keyboard_glyphs, keyboard/mouse input\n"
-		"selects keycaps. Off uses the manual style. Device detection always runs." },
+		"Follow active keyboard/mouse or controller input for button prompts.\n"
+		"Controllers use their family's saved artwork; unknown controllers keep\n"
+		"the manual choice. Off uses the manual style. Device detection always runs." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
 		"P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
 		"Button Remapping. v3: stores 26 physical-button names, including unbound.\n"

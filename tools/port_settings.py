@@ -292,10 +292,10 @@ SCREENS = {
     "controller_appearance": {
         "screen": "controller_appearance_screen", "spacing": 30,
         "header": ("header_profile_controller_setting", f"{PE}/controller_edit/header_profile_controller_setting"),
-        "same_place": ["hud_button_style_xbox", "hud_button_style_ps", "hud_button_style_switch"],
+        "same_place": ["hud_button_style_xbox", "hud_button_style_ps", "hud_button_style_switch", "detected_button_style"],
         "rows": [
             ("AUTO BUTTON DETECTION:", "input.auto_button_detection", ON_OFF,
-             "Show styles for your controller's family.\nRequires High-Res HUD in Graphics.", None),
+             "Follow keyboard/mouse or controller activity.\nControllers use their family's saved artwork.", None),
             ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES + [("KEYBOARD", "keyboard")],
              "Manual style when auto detection is off. Keyboard\nuses current bindings; controllers need High-Res HUD.", None),
             ("BUTTON STYLE:", "display.hud_button_style_xbox", XBOX_BUTTON_STYLES,
@@ -304,11 +304,11 @@ SCREENS = {
              "Preferred PlayStation artwork for auto detection.\nRequires High-Res HUD in Graphics.", None),
             ("BUTTON STYLE:", "display.hud_button_style_switch", SWITCH_BUTTON_STYLES,
              "Preferred Switch artwork for automatic detection.\nRequires High-Res HUD in Graphics.", None),
+            ("BUTTON STYLE:", "display.detected_button_style", None,
+             "Keyboard/mouse is active. Prompts use your current\nbindings. Turn detection off to choose a fixed style.", None),
             ("BUMPER STYLE:", "display.hud_bumper_style",
              [("ORIGINAL XBOX", "original"), ("MODERN XBOX", "modern")],
              "Original: black/white buttons. Modern: LB/RB.\nKept when automatic detection is on.", None),
-            ("KEYBOARD GLYPHS:", "display.keyboard_glyphs", ON_OFF,
-             "Automatic keyboard/mouse glyphs in menus and play.\nManual Keyboard style works even with this off.", None),
         ],
     },
     "controller_remapping": {
@@ -839,6 +839,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
                               ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
             extra += _widget(f"{base}/{key}_value",
                              [("type", "text"), ("controller", 1), ("width", value_width), ("height", 22),
+                              ("text", "KEYBOARD" if key == "detected_button_style" else None),
                               ("font", "ui\\small_ui" if wide_value else "ui\\large_ui"), ("color", "#FF2896FF"),
                               ("align", "left" if wide_value else "center"), ("text_y", 5 if wide_value else 1),
                               ("text_flags", "no_focus_test")], [])

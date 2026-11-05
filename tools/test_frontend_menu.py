@@ -224,6 +224,8 @@ struct widget_instance {
     struct {short current_frame_index;} animation;
 };
 struct controller_device {int family;};
+static int test_device=0;
+static int frontend_input_device(void) {return test_device;}
 static short controller_of(struct widget_instance *w) {(void)w;return 0;}
 static void controller_device_get(short port,struct controller_device *d) {(void)port;d->family=0;}
 static int controller_button_style_index(char const *name) {return strcmp(name,"classic")?3:0;}
@@ -244,7 +246,11 @@ static int spinner_item(struct widget_instance *widget) {(void)widget;return 0;}
 static struct pc_menu_setting *pc_menu_setting_get(long id) {return id==5?&setting:0;}
 static int setting_write(char const *key,char const *value) {assert(!strcmp(key,"display.menu_frontend"));assert(!strcmp(value,"xbox"));writes++;return !fail;}
 static struct widget_instance *screen_of(struct widget_instance *widget) {while(widget->parent)widget=widget->parent;return widget;}
-static struct widget_instance *named(struct widget_instance *root,char const *name,int n) {(void)root;(void)name;(void)n;return 0;}
+static struct widget_instance *named(struct widget_instance *root,char const *name,int n) {
+    struct widget_instance *row;(void)n;
+    for(row=root->child;row;row=row->next) if(row->name&&!strcmp(row->name,name))return row;
+    return 0;
+}
 static void text_set(struct widget_instance *widget,wchar_t const *text) {(void)widget;if(wcsstr(text,L"Save failed"))message++;}
 static void text_set_length(struct widget_instance *widget,wchar_t const *text,short length) {(void)length;text_set(widget,text);}
 static void platform_display_apply(void) {display++;}
@@ -320,7 +326,7 @@ int main(void) {
     struct widget_instance list={0},rows[8]={{0}},spinners[8]={{0}};
     char const *keys[]={"display.high_res_hud","input.auto_button_detection",
         "display.hud_button_style","display.hud_button_style_xbox","display.hud_button_style_ps",
-        "display.hud_button_style_switch","display.hud_bumper_style","display.keyboard_glyphs"};
+        "display.hud_button_style_switch","display.hud_bumper_style","unused"};
     int i,family,repeat;
     list.child=rows;
     for(i=0;i<8;i++) {
@@ -330,15 +336,23 @@ int main(void) {
         options[i].values[0]=i<2?"true":"classic";
         options[i].values[1]=i<2?"false":"keyboard";
     }
+    rows[7].name="row_detected_button_style";spinners[7].type=1;
     for(repeat=0;repeat<10;repeat++) for(family=-1;family<5;family++) {
         int selected=family>0&&family<=3?family:0;
         test_family=family;spinners[0].parameters.list.selected_index=0;
         spinners[1].parameters.list.selected_index=0;list.focused_child=&rows[2];
         frontend_button_rows_show(&list);
-        assert(rows[1].visible&&rows[7].visible&&rows[6].visible);
+        assert(rows[1].visible&&!rows[7].visible&&rows[6].visible);
         for(i=0;i<4;i++) assert(rows[2+i].visible==(i==selected));
         assert(list.focused_child==&rows[2+selected]);
         assert(list.parameters.list.selected_index==2+selected);
+        /* Keyboard activity shows a read-only result, leaving pending choices intact. */
+        test_device=-1;frontend_button_rows_show(&list);
+        assert(rows[7].visible&&!rows[6].visible&&list.focused_child==&rows[7]);
+        for(i=2;i<6;i++)assert(!rows[i].visible);
+        assert(!writes&&spinners[2].parameters.list.selected_index==0);
+        test_device=2;frontend_button_rows_show(&list);
+        assert(!rows[7].visible&&rows[2+selected].visible);
         /* Manual mode restores its own choice, including Keyboard. */
         spinners[1].parameters.list.selected_index=1;
         spinners[2].parameters.list.selected_index=1;
@@ -366,6 +380,10 @@ def test_interface_rendering_order_and_unique_placement():
     doc = ET.fromstring(frontend_menu.document())
     settings = [w.get('setting') for w in doc.findall('widget')
                 if w.get('name', '').startswith('modern/interface/') and w.get('setting')]
+    assert 'display.keyboard_glyphs' not in settings
+    assert 'display.detected_button_style' not in settings
+    detected = next(w for w in doc.findall('widget') if w.get('name') == 'modern/interface/detected_button_style_value')
+    assert detected.get('type') == 'text' and detected.get('text') == 'KEYBOARD'
     assert settings[:4] == ['display.menu_frontend', 'display.high_res_text',
                             'display.high_res_hud', 'input.auto_button_detection']
     for key in ('display.high_res_text', 'display.high_res_hud'):
@@ -654,8 +672,8 @@ int main(void) {
 ''')
 
 
-def test_new_install_defaults_preserve_controller_prompts():
+def test_new_install_defaults_follow_active_input():
     config = (ROOT / "port/linux/src/port_config.c").read_text()
     assert r'"display.menu_frontend", _config_string, "\"modern\""' in config
-    assert '"display.keyboard_glyphs", _config_boolean, "false"' in config
+    assert '"display.keyboard_glyphs"' not in config
     assert '"input.auto_button_detection", _config_boolean, "true"' in config

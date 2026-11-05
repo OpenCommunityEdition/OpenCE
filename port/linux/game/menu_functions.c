@@ -2037,6 +2037,8 @@ static void discord_account_show(struct widget_instance *list)
 The remaining options close the gap; the help and bottom buttons stay put. */
 /* Button Appearance filters its rows in the controller feature module. */
 #include "controller_buttons.h"
+#include "keyboard_prompts.h"
+#include "frontend_input.h"
 #include "controller_button_menu.inl"
 
 static void hud_button_style_row_show(struct widget_instance *list)
