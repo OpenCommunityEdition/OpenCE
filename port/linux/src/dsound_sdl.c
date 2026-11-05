@@ -109,6 +109,8 @@ struct sdl_stream
 	DWORD frequency;
 
 	BOOL paused;
+	/* live packets cannot mix while Flush releases the lock for callbacks */
+	BOOL flushing;
 
 	/* 2D gains */
 	float volume;             /* SetVolume */
@@ -883,7 +885,7 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	float ramp_surround[2][MAXIMUM_OUTPUT_CHANNELS];
 	unsigned long speaker;
 
-	if (stream->paused || !stream->packet_count || !stream->sample_rate)
+	if (stream->flushing || stream->paused || !stream->packet_count || !stream->sample_rate)
 		return;
 	step = (double)(stream->frequency ? stream->frequency : stream->sample_rate) / OUTPUT_RATE;
 	/* the low pass narrowed for a voice taking frames faster than the output
@@ -1962,7 +1964,15 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	struct sdl_stream *stream = stream_from_interface(object);
 
 	pthread_mutex_lock(&mixer_lock);
+	if (stream->flushing)
+	{
+		pthread_mutex_unlock(&mixer_lock);
+		return S_OK;
+	}
 	voice_cut(stream);
+	/* Completion callbacks release the lock. Only the captured fade may
+	play then, not the packets still awaiting cancellation. */
+	stream->flushing = TRUE;
 	while (stream->packet_count)
 	{
 		struct voice_packet *head = &stream->packets[stream->packet_head];
@@ -1976,6 +1986,7 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	resampler_reset(stream);
 	/* (the next sound on the channel says where it is) */
 	stream->stereo_positioned = FALSE;
+	stream->flushing = FALSE;
 	pthread_mutex_unlock(&mixer_lock);
 	return S_OK;
 }
