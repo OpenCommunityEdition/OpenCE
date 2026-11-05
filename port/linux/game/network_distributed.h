@@ -166,6 +166,10 @@ enum
 	/* MCC host-authorized speed, ordered on the reliable stream, even paused. */
 	_distributed_message_mcc_game_speed = 100,
 
+	/* MCC host-only package transfer; 101/102 remain join envelopes. */
+	_distributed_message_mcc_share_request = 103,
+	_distributed_message_mcc_share_response = 104,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 

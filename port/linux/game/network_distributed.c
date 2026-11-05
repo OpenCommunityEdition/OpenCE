@@ -87,6 +87,7 @@ machine (their datum identifiers need not be).
 #include "network_aim_assist.h"
 #include "network_shield_effects.h"
 #include "map_share.h"
+#include "mcc_share.h"
 #include "network_afk.h"
 #include "network_map_vote.h"
 #include "latency_meter.h"
@@ -4918,6 +4919,13 @@ void network_distributed_handle_message(
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);
+		return;
+	}
+	/* (MCC package sharing's, the same way: mcc_share.c) */
+	if (mcc_share_game_handles_message(message, size))
+	{
+		mcc_share_game_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
 	}
 	/* (map sharing's, in the lobby too, over the host's connection alone:

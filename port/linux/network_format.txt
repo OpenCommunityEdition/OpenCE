@@ -339,4 +339,7 @@ struct distributed_voice_up 3d74ee44e4cb
 struct distributed_votekick_request 7e29ffd54bd1
 struct distributed_votekick_status b94458cdc180
 struct game_variant_options 0e258e4cf85b
+struct mcc_share_entry 66c2657ada44
+struct mcc_share_request 327320bc7edb
+struct mcc_share_response 3c288efa85b1
 struct network_game b3ed48577869

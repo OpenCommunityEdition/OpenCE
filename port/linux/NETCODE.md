@@ -1029,6 +1029,49 @@ its name alone beside it, has its name given back as the map lists find it.
   answer in 30 seconds, leaves the game, saying why.
 - The download's progress is drawn at the top of the screen.
 
+## MCC package sharing
+
+A joiner whose host plays a hand-placed MCC package it does not have can fetch the
+package from the host (`port/linux/game/mcc_share.c`, `mcc_share_session.c`,
+`mcc_share_stage.c`; the admission is `mcc_share_rules.c`, unchanged). This is a
+message pair of its own, not the Custom Edition map sharing (83-86) and not a kind
+byte in it. Both travel on the host's reliable connection, in the lobby too, and only
+from the sender's own stream.
+
+- **Who may send what.** The host is off by default (`network.mcc_map_share`). It offers
+  only the package its own game is on, and only when `mcc_share_decide` allows it for the
+  facts the host established locally: a Steam Workshop item (numeric folder or a valid
+  `workshop_id.txt`), a stock or loose map, `_shared`, an unreadable sidecar or an
+  unclassified package is never sent, and a joiner is told which of those it was. The
+  content is classed custom only when the package's whole-content SHA-256 (the identity
+  in the game record) is listed with a maker in the host's `mcc_share.txt`
+  (`mcc_share_list.c`); a listing without a maker gives the joiner "get it from the
+  maker". Nothing a joiner sends changes this.
+- **The messages.** The request is message 102, the host's response 103. `MANIFEST` asks for the package's file
+  list; `CHUNK` asks for up to 3072 bytes of one file at an offset; `DONE` says the joiner
+  has installed it or given up. The manifest lists the files (the map, the package's own
+  bitmaps.map and sounds.map, and up to four credit files: ModInfo.json, credits.txt,
+  readme.txt, license.txt), each with its size and SHA-256, and the maker's credit. The
+  host hashes a few MiB a frame, keeps up to four transfers, queues at most 32 chunks a
+  joiner and serves them no faster than `network.map_share_upload`. A host that does not
+  hear from a joiner for 30 seconds drops the transfer; the host does not drop a machine
+  for adding no players while its transfer moves (the same hooks as Custom Edition
+  downloads).
+- **Staging.** The joiner (with `network.map_download` on) writes the files to
+  `mcc_staging/<package>/`, one at a time and in order, each checked against its manifest
+  size and SHA-256 and renamed from `.part` only when it matches. When all are there, the
+  package is fingerprinted where it is (the package's own files read from the staging
+  folder, everything else as usual) and must equal the game record's identity. Only then
+  are the files moved into `mcc_maps/<package>/`, the map last. A package folder that
+  already exists (any case) is never written to. Before the first byte the joiner checks
+  that the disk has room for the files and 64 MiB more. Cancel, failure, a host that goes quiet,
+  a game left or a map the host changes delete the staging files and nothing else.
+- **Names.** The package and level names are judged by the same name checks as the host's
+  (`mcc_share_decide`), so a name that is a device, has separators, a leading dot or space,
+  is numeric (a Workshop item) or is `_shared` is refused on the joiner.
+- **Not here.** Campaign transfers, multi-package maps, and fetching from other players
+  (the Custom Edition swarm): the host is the only source.
+
 ## Stages
 
 1. (Done) Decoupled ticks: clients tick on their own clock with local input

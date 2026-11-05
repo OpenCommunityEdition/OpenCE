@@ -868,6 +868,13 @@ static const struct config_setting config_settings[] =
 		"download it (and the resource maps it needs) from the game's players\n"
 		"into custom_maps, if its host shares it (network.map_share); false\n"
 		"leaves the game, saying which map is missing." },
+	{ "network.mcc_map_share", _config_boolean, "false", "HALO_NET_MCC_MAP_SHARE", _environment_value, _platform_all,
+		"Hosting a game on an MCC map: send a player who joins without the map's\n"
+		"package (its map file and its own bitmaps.map and sounds.map, with the\n"
+		"maker's credit files) to it. Off by default. Only a hand-placed package whose\n"
+		"exact fingerprint is listed with its maker in mcc_share.txt is sent; Steam\n"
+		"Workshop items and stock maps never are. The joiner needs\n"
+		"network.map_download." },
 	{ "network.coop_public", _config_boolean, "false", "HALO_NET_COOP_PUBLIC", _environment_value, _platform_all,
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"

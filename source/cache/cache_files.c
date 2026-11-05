@@ -139,6 +139,7 @@ symbols in this file:
 #include "mcc_cache.h" /* independent MCC dispatch */
 #include "cache_file_formats.h" /* port: CUSTOM_EDITION_TAG_CACHE_BYTES */
 #include "map_share.h" /* port: port/linux/game/map_share.c */
+#include "mcc_share.h" /* port: port/linux/game/mcc_share.c */
 #ifdef HALO_ANDROID
 /* port: geometry the map holds and does not write, drawn on Android from
 GL buffers of its own (port/linux/src/d3d8_gl.c) */
@@ -1138,7 +1139,14 @@ boolean cache_files_map_present(
 	if (!map_name || !map_name[0])
 		return TRUE;
 	if (mcc_level_name(map_name))
+	{
+		/* port: a package being fetched from the host (MCC package sharing,
+		port/linux/game/mcc_share.c) is taken as present, as a Custom Edition map is,
+		and precached once it is there */
+		if (mcc_share_game_downloading(map_name))
+			return TRUE;
 		return mcc_cache_require(map_name, version);
+	}
 	if (custom_edition_level_name(map_name))
 	{
 		if (custom_edition_cache_present(map_name, version, message, sizeof(message)) ||
@@ -1189,7 +1197,12 @@ boolean cache_files_give_time_to_precache(
 	boolean result = FALSE;
 
 	if (mcc_level_name(map_name))
+	{
+		/* port: not while it is being fetched from the host (mcc_share.c) */
+		if (mcc_share_game_downloading(map_name))
+			return FALSE;
 		return mcc_cache_precache_ready(map_name); /* port: MCC readiness polling, not admission */
+	}
 
 	/* port: no map named yet is nothing to precache. A client joining over
 	the internet asks for its multiplayer map (network_game_client_update_precache_status)

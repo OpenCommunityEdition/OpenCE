@@ -192,6 +192,7 @@ symbols in this file:
 #include "rasterizer/rasterizer.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 #include "mcc_cache.h" /* independent MCC reads and namespace */
+#include "mcc_share.h" /* port: port/linux/game/mcc_share.c */
 
 #include <xtl.h>
 
@@ -603,7 +604,13 @@ boolean cache_files_precache_map_begin(
 	const char *cache_map_name = tag_name_strip_path(map_name);
 
 	if (mcc_level_name(map_name))
+	{
+		/* port: a package being fetched from the host (port/linux/game/mcc_share.c)
+		is validated once it is there */
+		if (mcc_share_game_downloading(map_name))
+			return TRUE;
 		return mcc_cache_require(map_name, 0);
+	}
 
 	/* port: a Halo Custom Edition map (custom_maps\<name>) this machine has
 	not is missing, as a map not on the DVD is: never the game's own map of

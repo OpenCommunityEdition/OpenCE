@@ -27,6 +27,16 @@ static struct {
     struct mcc_precache_snapshot files;
 } mcc_client_identity;
 
+/* MCC package sharing (mcc_share.c) may offer to fetch a package that matches nothing
+ * here, instead of the join being refused. It registers itself; the identity
+ * rules below stay the only judge of what is installed and matches. */
+static int (*mcc_identity_missing)(char const name[128],unsigned char const digest[32]);
+
+void mcc_identity_set_missing(int (*handler)(char const name[128],unsigned char const digest[32]))
+{
+    mcc_identity_missing=handler;
+}
+
 static int mcc_identity_error(char const *message)
 {
     wchar_t text[256];
@@ -95,6 +105,15 @@ int mcc_identity_prepare_host(char const *map)
     return 1;
 }
 
+int mcc_identity_host_package(char const *level,unsigned char digest[32])
+{
+    char canonical[64];
+    if (!mcc_host_identity.valid || !mcc_package_name(level,canonical) ||
+        csstrcasecmp(canonical,mcc_host_identity.name)) return 0;
+    memcpy(digest,mcc_host_identity.digest,32);
+    return 1;
+}
+
 void const *mcc_identity_host_settings(void const *settings,long bytes,struct network_game *copy)
 {
     struct network_game const *game=settings;
@@ -149,14 +168,14 @@ static int mcc_identity_matches(char const *name,unsigned char const digest[32],
 
 /* Only a known item ID establishes presence. Its older package may not yet
  * contain the requested level, so search independently of the filename. */
-static int mcc_identity_refusal(struct network_game const *game,char const *session)
+static int mcc_identity_refusal(char const name[128],char const *session)
 {
     struct mcc_workshop_item host,local;
     enum mcc_workshop_refusal kind=MCC_WORKSHOP_MISSING;
     char const *leaf=strrchr(session,'\\')+1,*candidate;
     char text[256];
     short i,count=mcc_maps_count(FALSE);
-    if (!mcc_workshop_wire_unpack(game->map.name,&host)) kind=MCC_WORKSHOP_NOT_WORKSHOP;
+    if (!mcc_workshop_wire_unpack(name,&host)) kind=MCC_WORKSHOP_NOT_WORKSHOP;
     else for (i=0;i<count;i++) {
         candidate=mcc_maps_level_name(i);
         if (mcc_workshop_local_item(candidate,&local) && !strcmp(local.id,host.id)) {
@@ -168,7 +187,9 @@ static int mcc_identity_refusal(struct network_game const *game,char const *sess
     return mcc_identity_error(text);
 }
 
-int mcc_identity_accept(struct network_game const *game)
+/* allow_offer: a package that matches nothing may be fetched from the host
+ * (mcc_share.c); after a download it may not be fetched again. */
+static int mcc_identity_resolve(char const name[128],unsigned char const digest[32],int allow_offer)
 {
     char session[64],selected[64];
     char const *leaf,*candidate,*candidate_leaf;
@@ -178,11 +199,11 @@ int mcc_identity_accept(struct network_game const *game)
     struct mcc_precache_snapshot selected_files;
     memset(&mcc_client_identity,0,sizeof(mcc_client_identity));
     mcc_cache_precache_clear();
-    if (!mcc_level_name(game->map.name)) return !memcmp(game->mcc_content_sha256,zero,32);
-    if (!mcc_package_name(game->map.name,session) || !memcmp(game->mcc_content_sha256,zero,32))
+    if (!mcc_level_name(name)) return !memcmp(digest,zero,32);
+    if (!mcc_package_name(name,session) || !memcmp(digest,zero,32))
         return mcc_identity_error("The host did not supply a valid MCC content identity.");
     /* A verified exact installation is unambiguous even with duplicate copies. */
-    if (mcc_identity_matches(session,game->mcc_content_sha256,&selected_files)) {
+    if (mcc_identity_matches(session,digest,&selected_files)) {
         strcpy(selected,session);
         matches=1;
     } else {
@@ -191,7 +212,7 @@ int mcc_identity_accept(struct network_game const *game)
         count=mcc_maps_count(FALSE);
         /* Discovery may have made the exact package available since the first
          * probe. Prefer it before looking for aliases with the same leaf. */
-        if (mcc_identity_matches(session,game->mcc_content_sha256,&selected_files)) {
+        if (mcc_identity_matches(session,digest,&selected_files)) {
             strcpy(selected,session);
             matches=1;
         }
@@ -207,20 +228,33 @@ int mcc_identity_accept(struct network_game const *game)
                 candidate=mcc_maps_level_name(i);
                 candidate_leaf=strrchr(candidate,'\\')+1;
                 if (csstrcasecmp(leaf,candidate_leaf) || !csstrcasecmp(candidate,session)) continue;
-                if (mcc_identity_matches(candidate,game->mcc_content_sha256,&selected_files)) {
+                if (mcc_identity_matches(candidate,digest,&selected_files)) {
                     strcpy(selected,candidate);
                     if (++matches>1) return mcc_identity_error("Several local MCC packages match the host. Keep one matching copy, or use the host's package folder name.");
                 }
             }
         }
     }
-    if (!matches) return mcc_identity_refusal(game,session);
+    if (!matches) {
+        if (allow_offer && mcc_identity_missing && mcc_identity_missing(name,digest)) return 1;
+        return mcc_identity_refusal(name,session);
+    }
     mcc_client_identity.files=selected_files;
     strcpy(mcc_client_identity.session,session);
     strcpy(mcc_client_identity.local,selected);
-    memcpy(mcc_client_identity.digest,game->mcc_content_sha256,32);
+    memcpy(mcc_client_identity.digest,digest,32);
     error(_error_silent,"mcc identity: %s resolved to %s (SHA-256 matched)",session,selected);
     return 1;
+}
+
+int mcc_identity_accept(struct network_game const *game)
+{
+    return mcc_identity_resolve(game->map.name,game->mcc_content_sha256,1);
+}
+
+int mcc_identity_accept_installed(char const name[128],unsigned char const digest[32])
+{
+    return mcc_identity_resolve(name,digest,0);
 }
 
 int mcc_identity_check(char const *name)

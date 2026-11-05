@@ -279,6 +279,9 @@ boolean network_voice_handles_message(word const *message, word size);
 void network_voice_handle_message(long machine_index, word const *message, word size);
 /* port/linux/game/map_share.c's: map sharing, in the lobby too */
 boolean map_share_handles_message(word const *message, word size);
+/* port/linux/game/mcc_share.c's: MCC package sharing, in the lobby too */
+boolean mcc_share_game_handles_message(word const *message, word size);
+void mcc_share_game_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 boolean network_map_vote_handles_message(word const *message, word size);
 void network_map_vote_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void map_share_handle_message(long machine_index, word const *message, word size, boolean from_stream);
@@ -1450,6 +1453,19 @@ boolean network_game_server_handle_client_message(
 						network_game_server_get_client_machine(server, machine, &machine_index))
 					{
 						network_voice_handle_message(machine_index, message, message_buffer_size);
+					}
+					break;
+				}
+				/* (port: MCC package sharing's, the same way: mcc_share.c) */
+				if (mcc_share_game_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						mcc_share_game_handle_message(machine_index, message, message_buffer_size, TRUE);
 					}
 					break;
 				}
