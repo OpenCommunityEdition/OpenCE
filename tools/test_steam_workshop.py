@@ -113,12 +113,45 @@ int main(int argc, char **argv)
 '''
 
 
-@pytest.fixture(scope="module")
-def tool(tmp_path_factory):
+WINDOWS_REGISTRY = r'''
+#include <windows.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+static LSTATUS WINAPI test_registry(HKEY key, LPCSTR subkey, LPCSTR value, DWORD flags,
+                                   LPDWORD type, PVOID data, LPDWORD size)
+{
+    const char *path;
+    DWORD needed;
+    assert(!getenv("TEST_REGISTRY_MUST_NOT_READ"));
+    assert(!strcmp(subkey, "Software\\Valve\\Steam"));
+    assert(type == NULL && (flags & RRF_RT_REG_SZ));
+    if (key == HKEY_CURRENT_USER) {
+        assert(!strcmp(value, "SteamPath") && flags == RRF_RT_REG_SZ);
+        path = getenv("TEST_STEAM_REG_USER");
+    } else {
+        assert(key == HKEY_LOCAL_MACHINE && !strcmp(value, "InstallPath"));
+        assert(flags == (RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY) ||
+               flags == (RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY));
+        path = getenv(flags & RRF_SUBKEY_WOW6432KEY ? "TEST_STEAM_REG_32" : "TEST_STEAM_REG_64");
+    }
+    if (!path) return ERROR_FILE_NOT_FOUND;
+    if (!strcmp(path, "!denied")) return ERROR_ACCESS_DENIED;
+    if (!strcmp(path, "!type")) return ERROR_UNSUPPORTED_TYPE;
+    needed = (DWORD)strlen(path) + 1;
+    if (needed > *size) return ERROR_MORE_DATA;
+    memcpy(data, path, needed);
+    *size = needed;
+    return ERROR_SUCCESS;
+}
+#define RegGetValueA test_registry
+'''
+
+
+def build_tool(work, *, mock_registry=True):
     compiler = os.environ.get("CC") or shutil.which("clang") or shutil.which("gcc")
     if not compiler:
         pytest.skip("a C compiler is needed")
-    work = tmp_path_factory.mktemp("steam-workshop")
     native = (SRC / "xbox_files.c").read_text()
     translation = r'''
 #include "posix.h"
@@ -136,13 +169,25 @@ static void make_directories(char const *path) {(void)path;}
     exe = work / ("driver.exe" if sys.platform == "win32" else "driver")
     windows = sys.platform == "win32"
     flags = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"] if windows else []
+    workshop = SRC / "steam_workshop.c"
+    if windows and mock_registry:
+        # Mock only the registry API: production discovery and filesystem code
+        # still run, without scanning the developer's installed Steam packages.
+        workshop = work / "workshop.c"
+        workshop.write_text(WINDOWS_REGISTRY + '\n#include "steam_workshop.c"\n')
     files = ROOT / "port/windows/src/win32_files.c" if windows else SRC / "posix_files.c"
     result = subprocess.run([compiler, *flags, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-I", str(SRC), str(work / "driver.c"),
-                             str(SRC / "steam_workshop.c"), str(files), str(SRC / "server_json.c"),
+                             str(workshop), str(files), str(SRC / "server_json.c"),
                              str(SRC / "mcc_manifest.c"),
+                             *(["-ladvapi32"] if windows and not mock_registry else []),
                              "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
+
+
+@pytest.fixture(scope="module")
+def tool(tmp_path_factory):
+    return build_tool(tmp_path_factory.mktemp("steam-workshop"))
 
 
 def run(tool, *args, home=None, setting="", enabled=True, data_root=None):
@@ -306,6 +351,50 @@ def test_setting_names_a_steam_folder(tool, tmp_path):
     assert row[:4] == ["888", "From the setting", "beaver", "Better Creek"] and row[5] == ""
     # no Steam at all: an empty catalog, no error
     assert run(tool, "scan", home=tmp_path / "nothing")[0]["count"] == "0"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows registry discovery")
+@pytest.mark.parametrize("key", ["USER", "32", "64"])
+def test_windows_registry_installation_and_library(tool, tmp_path, monkeypatch, key):
+    steam, library = tmp_path / "Custom Steam", tmp_path / "Other Drive Library"
+    make_item(steam, "111", "Registered installation")
+    make_item(library, "222", "Registered library")
+    (steam / "steamapps/libraryfolders.vdf").write_text(
+        '"libraryfolders" { "0" { "path" "%s" } }' % library.as_posix())
+    monkeypatch.setenv("TEST_STEAM_REG_" + key, str(steam))
+    fields, rows = run(tool, "scan")
+    assert fields["count"] == "2"
+    assert [row.split("|")[1] for row in rows["map"]] == ["Registered installation", "Registered library"]
+    # A disabled feature must not even query the registry.
+    monkeypatch.setenv("TEST_REGISTRY_MUST_NOT_READ", "1")
+    assert run(tool, "scan", enabled=False)[0]["count"] == "0"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows registry discovery")
+def test_windows_manual_root_precedes_registry_and_registry_precedes_defaults(tool, tmp_path, monkeypatch):
+    manual, registered, defaults = (tmp_path / name for name in ("manual", "registered", "defaults"))
+    make_item(manual, "111", "Manual wins")
+    make_item(registered, "111", "Registry wins")
+    make_item(defaults / "Steam", "111", "Default loses")
+    for key in ("USER", "32", "64"):
+        monkeypatch.setenv("TEST_STEAM_REG_" + key, str(registered))
+    monkeypatch.setenv("ProgramFiles(x86)", str(defaults))
+    for setting, title in ((str(manual), "Manual wins"), ("", "Registry wins")):
+        fields, rows = run(tool, "scan", setting=setting)
+        assert fields["count"] == "1"
+        assert rows["map"][0].split("|")[1] == title
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows registry discovery")
+@pytest.mark.parametrize("bad", ["", "!denied", "!type", "x" * 512, "Z:/missing-steam-installation"])
+def test_windows_bad_registry_value_keeps_fallbacks(tool, tmp_path, monkeypatch, bad):
+    make_item(tmp_path / "Steam", "111", "Fallback")
+    monkeypatch.setenv("ProgramFiles(x86)", str(tmp_path))
+    for key in ("USER", "32", "64"):
+        monkeypatch.setenv("TEST_STEAM_REG_" + key, bad)
+    fields, rows = run(tool, "scan")
+    assert fields["count"] == "1"
+    assert rows["map"][0].split("|")[1] == "Fallback"
 
 
 def test_scan_keeps_short_map_names(tool, tmp_path):

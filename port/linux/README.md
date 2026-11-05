@@ -632,7 +632,7 @@ the setting for one start of the game. It has priority over the file.
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
 | `paths.logs` | `""` | `HALO_LOG_ROOT` | The folder of `debug.txt`, `bans.txt` and `cheaters.txt`. Empty: the data root. With it, the data root can be read-only (a dedicated server's maps mounted so). |
 | `paths.custom_maps` | `""` | `HALO_CUSTOM_MAPS_ROOT` | The `custom_maps` folder (Custom Edition maps, with their `bitmaps.map`, `sounds.map` and `loc.map`). Empty: the one in the data root. |
-| `paths.steam` | `""` | `HALO_STEAM_ROOT` | A Steam folder or library to look in for subscribed Halo CE Workshop items, besides the usual Steam folders and the libraries they name. Empty: just those. |
+| `paths.steam` | `""` | `HALO_STEAM_ROOT` | A Steam folder or library to check first for subscribed Halo CE Workshop items. Automatic discovery also checks Windows registry installations, usual Steam folders and their library lists. Empty: automatic discovery only. |
 | `game.workshop_maps` | `false` | `HALO_WORKSHOP_MAPS` | Discover installed Halo CE Steam Workshop maps on desktop. Local MCC packages take precedence. Android and web use local packages. |
 | `game.mcc_collections` | `false` | `HALO_MCC_COLLECTIONS` | Group MCC packages by the bundled Workshop collection list, including imported packages identified by a sidecar. Reopen the map list after changing this. |
 | `game.mcc_campaigns` | `false` | `HALO_MCC_CAMPAIGNS` | Use explicit MCC campaign metadata for discovery, mission titles, authored ordering and progression. In co-op only the host chooses the next mission. Reopen the map list after changing this. |

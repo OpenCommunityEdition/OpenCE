@@ -110,7 +110,17 @@ libraries for `steamapps/workshop/content/976730/<item id>/`: the usual Steam
 folders (on Windows `%ProgramFiles(x86)%\Steam`; on Linux `~/.steam/steam`,
 `~/.local/share/Steam`, and the Flatpak and Snap places), the `paths.steam`
 setting (`HALO_STEAM_ROOT`), and every library their `libraryfolders.vdf`
-names. An item is used when its `ModInfo.json` says `"Engine": "Halo1"`; each
+names. On Windows it also reads `SteamPath` from the current user's
+`Software\Valve\Steam` registry key and `InstallPath` from both the 32-bit and
+64-bit machine-wide views of that key. Thus an installation such as `C:\Steam`
+is discovered without editing the configuration or running Steam. The manual
+`paths.steam` root is checked first, followed by registered installations and
+standard folders; its copy of a duplicate item takes precedence. Missing,
+unreadable, non-string or oversized registry values are ignored. The detected
+path is not written to the configuration: an empty setting continues to use
+automatic discovery on the next scan.
+
+An item is used when its `ModInfo.json` says `"Engine": "Halo1"`; each
 path in `GameModContents.MultiplayerMaps` is a map json whose `ScenarioFile`
 names the `.map` file in the item's `maps` folder, whose `Title.Neutral` is the
 map's title and whose `Images.Thumbnail` is its preview picture. Folder names
