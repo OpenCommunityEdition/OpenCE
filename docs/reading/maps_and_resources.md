@@ -60,8 +60,9 @@ Desktop discovery is separately enabled by `game.workshop_maps`. Follow
 from library manifests to installed map records, then `mcc_maps_scan` and
 `mcc_map_browser_open` in [mcc_maps.c](../../port/linux/game/mcc_maps.c).
 The `libraries` function checks `paths.steam` first, then Windows Steam registry
-installations and standard folders. `registry_steam_root` reads the current-user
-path and both machine-wide registry views without changing them. For example,
+installations and standard folders. `steam_workshop_windows_roots` in
+[win32_steam_workshop.c](../../port/windows/src/win32_steam_workshop.c) reads the
+current-user path and both machine-wide registry views without changing them. For example,
 an installation registered at `C:\Steam` is found with `paths.steam` empty;
 its `libraryfolders.vdf` adds libraries on other drives. Missing or invalid
 registry values leave the existing fallback discovery available. Android and

@@ -169,16 +169,18 @@ static void make_directories(char const *path) {(void)path;}
     exe = work / ("driver.exe" if sys.platform == "win32" else "driver")
     windows = sys.platform == "win32"
     flags = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"] if windows else []
-    workshop = SRC / "steam_workshop.c"
+    registry = ROOT / "port/windows/src/win32_steam_workshop.c"
     if windows and mock_registry:
         # Mock only the registry API: production discovery and filesystem code
         # still run, without scanning the developer's installed Steam packages.
-        workshop = work / "workshop.c"
-        workshop.write_text(WINDOWS_REGISTRY + '\n#include "steam_workshop.c"\n')
+        wrapper = work / "registry.c"
+        wrapper.write_text(WINDOWS_REGISTRY + '\n#include "%s"\n' % registry.as_posix())
+        registry = wrapper
     files = ROOT / "port/windows/src/win32_files.c" if windows else SRC / "posix_files.c"
     result = subprocess.run([compiler, *flags, "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-I", str(SRC), str(work / "driver.c"),
-                             str(workshop), str(files), str(SRC / "server_json.c"),
+                             str(SRC / "steam_workshop.c"), str(files), str(SRC / "server_json.c"),
                              str(SRC / "mcc_manifest.c"),
+                             *([str(registry)] if windows else []),
                              *(["-ladvapi32"] if windows and not mock_registry else []),
                              "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

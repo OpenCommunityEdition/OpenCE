@@ -74,8 +74,13 @@ int steam_workshop_read_libraries(const char *text, int length, char (*paths)[ST
 
 /* ---------- the catalog */
 
-/* looks in the Steam libraries again (paths.steam first, Windows registry installations, usual folders, and the libraries their
-libraryfolders.vdf names) and returns how many maps were found. Each item once, by its id */
+#ifdef _WIN32
+/* Windows-only registry reader; keeps Windows SDK headers out of Xbox-facing units. */
+int steam_workshop_windows_roots(char (*paths)[STEAM_WORKSHOP_PATH_SIZE], int maximum);
+#endif
+
+/* looks in the Steam libraries again (paths.steam first, Windows registry installations, usual folders,
+and the libraries their libraryfolders.vdf names). Returns how many maps were found. Each item once, by its id */
 int steam_workshop_scan(void);
 /* the same, the first time only; then the last scan's count */
 int steam_workshop_count(void);

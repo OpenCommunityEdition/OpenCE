@@ -7,6 +7,7 @@ on:
     paths:
       - "port/linux/game/**"
       - "port/linux/src/**"
+      - "port/windows/src/win32_steam_workshop.c"
       - "port/tools/**"
       - "port/third_party/bcdec/**"
       - "source/**"
