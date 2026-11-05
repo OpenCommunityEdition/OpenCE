@@ -249,6 +249,12 @@ static boolean client_scripts_decided(
 			mutator_share.state = _share_prompting;
 			mutator_share.prompt_at = system_milliseconds();
 			mutator_share.prompt_held = halo_chat_pad_buttons();
+			/* (no tap from before it was asked) */
+			{
+				float x, y;
+
+				halo_chat_taps(&x, &y);
+			}
 			return FALSE;
 		}
 	}
@@ -315,10 +321,14 @@ static void client_prompt_update(
 	unsigned long buttons = halo_chat_pad_buttons();
 	/* (a press in its first moments is no answer: a player going through the menus with
 	A has not read it) */
-	unsigned long pressed = system_milliseconds() - mutator_share.prompt_at < PROMPT_READ_TIME ? 0 :
-		buttons & ~mutator_share.prompt_held;
-	boolean yes = (pressed & (1UL << HALO_CHAT_PAD_A)) != 0;
-	boolean no = (pressed & (1UL << HALO_CHAT_PAD_B)) != 0 ||
+	boolean reading = system_milliseconds() - mutator_share.prompt_at < PROMPT_READ_TIME;
+	unsigned long pressed = reading ? 0 : buttons & ~mutator_share.prompt_held;
+	/* (and on a touchscreen, without a controller, a tap: on the left half yes, on
+	the right no; one while it is read is no answer either) */
+	float tap_x, tap_y;
+	boolean tapped = halo_chat_taps(&tap_x, &tap_y) > 0 && !reading;
+	boolean yes = (pressed & (1UL << HALO_CHAT_PAD_A)) != 0 || (tapped && tap_x < 0.5f);
+	boolean no = (pressed & (1UL << HALO_CHAT_PAD_B)) != 0 || (tapped && tap_x >= 0.5f) ||
 		system_milliseconds() - mutator_share.prompt_at > PROMPT_TIMEOUT;
 
 	if (system_milliseconds() - mutator_share.prompt_at < PROMPT_READ_TIME)
@@ -461,7 +471,12 @@ void mutator_share_prompt_text(
 	unsigned long waited = system_milliseconds() - mutator_share.prompt_at;
 
 	snprintf(question, size, "The host's mutator %s runs a Lua script.", mutator_share.entries[mutator_share.prompt].id);
+#if defined(HALO_ANDROID) || defined(HALO_WEB)
+	snprintf(answers, size, "Download and run it?  Tap left or A: yes   Tap right or B: no (%lu)",
+		waited < PROMPT_TIMEOUT ? (PROMPT_TIMEOUT - waited) / 1000 : 0UL);
+#else
 	snprintf(answers, size, "Download and run it?  A or Enter: yes   B or Esc: no (%lu)", waited < PROMPT_TIMEOUT ? (PROMPT_TIMEOUT - waited) / 1000 : 0UL);
+#endif
 }
 
 void mutator_share_block(

@@ -692,8 +692,9 @@ it.
 - `network.mutator_download` false fetches none: the host's add-ons this machine
   lacks are not played, and what it sees of them is not the host's.
 - The first time a host's script would be fetched, the player is asked: A or Enter
-  for yes, B or Esc for no, and no after 30 seconds, with the game held for it (a press
-  in its first second and a half is no answer). A yes
+  for yes, B or Esc for no (on a touchscreen, a tap on the left half of the screen for
+  yes, on the right for no), and no after 30 seconds, with the game held for it (a press
+  or tap in its first second and a half is no answer). A yes
   is kept for that script, by its SHA-256. A script in the player's own folders is not
   asked about. One refused is not fetched, if its mutator is only that; a mutator with
   an add-on too needs the script to be checked, so it is fetched and not run.

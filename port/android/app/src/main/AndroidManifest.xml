@@ -26,7 +26,7 @@
          system would take them and the game would never see them -->
     <application
         android:name=".HaloApplication"
-        android:label="@string/app_name"
+        android:label="${appLabel}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:isGame="true"
@@ -87,7 +87,7 @@
         <!-- the downloaded new version, for the package installer (Updater) -->
         <provider
             android:name=".UpdateProvider"
-            android:authorities="com.halo.decomp.update"
+            android:authorities="${applicationId}.update"
             android:exported="false"
             android:grantUriPermissions="true" />
 

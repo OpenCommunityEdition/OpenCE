@@ -137,6 +137,27 @@ void touch_input_event(unsigned int type, const SDL_TouchFingerEvent *finger)
 	}
 }
 
+/* port/linux/game/network_chat.c: its on-screen keyboard is up, which
+takes the taps outside the menus; port/linux/game/mutator_share.c: its
+question about a host's script is up, which takes them in the menus too */
+extern short network_chat_controller(void);
+extern unsigned char mutator_share_prompt_open(void);
+
+/* the taps for that keyboard or that question since it last took them, and
+the latest's place (0 to 1 of the window) */
+static int chat_taps;
+static float chat_tap_x, chat_tap_y;
+
+static void chat_tap_add(int clicks, int x, int y)
+{
+	int width = 0, height = 0;
+
+	platform_video_drawable_size(&width, &height);
+	chat_taps += clicks;
+	chat_tap_x = width > 0 ? x / (float)width : 0.0f;
+	chat_tap_y = height > 0 ? y / (float)height : 0.0f;
+}
+
 void touch_input_cancel(void)
 {
 	menu_setup();
@@ -158,6 +179,13 @@ void touch_input_menu_read(struct platform_ui_pointer *pointer)
 
 	menu_setup();
 	touch_menu_read(&menu, &output);
+	/* (a tap answers the question about a host's script, drawn over the
+	menus, not a menu under it) */
+	if (output.clicks && mutator_share_prompt_open())
+	{
+		chat_tap_add(output.clicks, output.click_x, output.click_y);
+		output.clicks = 0;
+	}
 	pointer->x = output.x;
 	pointer->y = output.y;
 	pointer->click_x = output.click_x;
@@ -171,15 +199,6 @@ void touch_input_menu_read(struct platform_ui_pointer *pointer)
 	pointer->down_y = output.down_y;
 	pointer->touch = TRUE;
 }
-
-/* port/linux/game/network_chat.c: its on-screen keyboard is up, which
-takes the taps outside the menus */
-extern short network_chat_controller(void);
-
-/* the taps for that keyboard since it last took them, and the latest's
-place (0 to 1 of the window) */
-static int chat_taps;
-static float chat_tap_x, chat_tap_y;
 
 int touch_input_chat_taps(float *x, float *y)
 {
@@ -201,16 +220,10 @@ void touch_input_gamepad(XINPUT_GAMEPAD *pad)
 
 		menu_setup();
 		touch_menu_read(&menu, &output);
-		/* (or, while the text chat's on-screen keyboard is up, its keys) */
-		if (output.clicks && (network_chat_controller() == 0))
-		{
-			int width = 0, height = 0;
-
-			platform_video_drawable_size(&width, &height);
-			chat_taps += output.clicks;
-			chat_tap_x = width > 0 ? output.click_x / (float)width : 0.0f;
-			chat_tap_y = height > 0 ? output.click_y / (float)height : 0.0f;
-		}
+		/* (or, while the text chat's on-screen keyboard is up, its keys, and
+		while the question about a host's script is, its answers) */
+		if (output.clicks && (network_chat_controller() == 0 || mutator_share_prompt_open()))
+			chat_tap_add(output.clicks, output.click_x, output.click_y);
 		else if (output.clicks && touch_game_cinematic_skippable())
 		{
 			skip_polls = TOUCH_PRESS_POLLS;
