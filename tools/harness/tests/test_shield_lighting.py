@@ -33,9 +33,9 @@ def test_menu_ownership_and_generated_layout():
     import port_settings
     spec = port_settings.SCREENS['video_settings/dynamic_lighting']
     rows = spec['rows']
-    assert len(rows) == 9
-    assert [row[1] for row in rows[2:6]] == [
-        'lighting.weapon_glow', 'lighting.shield_emitters',
+    assert len(rows) == 10
+    assert [row[1] for row in rows[2:7]] == [
+        'lighting.weapon_glow', 'display.plasma_prong_lighting', 'lighting.shield_emitters',
         'display.vehicle_lighting', 'display.world_lighting']
     assert rows[-2][1] == 'display.shield_glow'
     assert rows[-1][1] == 'display.shield_glow_intensity'

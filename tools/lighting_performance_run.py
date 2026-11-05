@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LIGHTS = ['plasma_lighting', 'muzzle_lighting', 'jackal_shield_lighting',
           'covenant_shield_lighting', 'fuel_rod_lighting', 'ammo_counter_lighting',
           'needler_lighting', 'plasma_occlusion', 'shield_glow',
-          'weapon_glow', 'vehicle_lighting', 'world_lighting']
+          'weapon_glow', 'plasma_prong_lighting', 'vehicle_lighting', 'world_lighting']
 QUALITY = ['anti_aliasing', 'anisotropic_filtering', 'shadow_resolution',
            'per_pixel_lighting', 'model_detail', 'hdr', 'hdr_output',
            'viewmodel_shield', 'shield_look', 'fov', 'viewmodel_fov']
@@ -38,6 +38,8 @@ def distribution(values, cap):
     return dict(frames=len(values), average_fps=1000/statistics.mean(values),
                 p50_ms=percentile(.5), p95_ms=percentile(.95), p99_ms=percentile(.99),
                 worst_ms=ordered[-1], low_1pct_fps=1000/statistics.mean(ordered[-max(1, math.ceil(len(ordered)*.01)):]),
+                budget_ms=1000/cap,
+                over_budget_percent=100*sum(v>1000/cap for v in values)/len(values),
                 over_1_5_budget_percent=100*sum(v>1500/cap for v in values)/len(values),
                 over_50ms=sum(v>50 for v in values), over_100ms=sum(v>100 for v in values))
 
@@ -117,19 +119,32 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-root', type=Path, required=True)
     parser.add_argument('--settings', type=Path)
-    parser.add_argument('--fps', type=int, choices=[30,60,120], required=True)
+    parser.add_argument('--fps', type=int, choices=[30,60,120,240], required=True)
     parser.add_argument('--uncapped', action='store_true', help='Measure headroom without the limiter; --fps remains the reporting budget')
     parser.add_argument('--enabled', type=int, choices=[0,1], required=True)
     parser.add_argument('--seconds', type=int, default=300)
     parser.add_argument('--warmup', type=int, default=30)
     parser.add_argument('--resolution', default='2560x1440')
-    parser.add_argument('--map', default='carousel', choices=['carousel','bloodgulch'])
+    parser.add_argument('--map', default='carousel', choices=['carousel','bloodgulch','c40'])
+    parser.add_argument('--checkpoint-root', type=Path, help='Copy an existing campaign profile/save root; never run against the original')
+    parser.add_argument('--stationary-shield', action='store_true', help='Isolated stationary emitter, no bots or other enhanced lights')
+    parser.add_argument('--advance-seconds', type=float, default=0, help='Walk forward in the copied campaign checkpoint with normal controller input')
+    parser.add_argument('--turn-seconds', type=float, default=0, help='Route inspection: turn right after walking, using normal controller input')
+    parser.add_argument('--route-captures', action='store_true', help='Route inspection only: capture every two seconds instead of once a minute')
     parser.add_argument('--bots', type=int, default=15)
     parser.add_argument('--label', required=True)
     parser.add_argument('--build-dir', type=Path, default=ROOT/'build/lighting-performance-build')
     parser.add_argument('--dump-shaders', action='store_true', help='Retain GLSL instead of screenshots for cache diagnosis; not an FPS acceptance run')
     parser.add_argument('--no-captures', action='store_true', help='Disable screenshot allocations/readback for memory and stall diagnostics')
     args=parser.parse_args()
+    if (args.map == 'c40') != bool(args.checkpoint_root):
+        parser.error('c40 requires --checkpoint-root; bot maps do not use a campaign save')
+    if args.stationary_shield and args.map != 'c40':
+        parser.error('--stationary-shield requires c40, which contains the shield tag')
+    if args.advance_seconds and (args.map != 'c40' or not 0 < args.advance_seconds <= 30):
+        parser.error('--advance-seconds requires c40 and a duration up to 30 seconds')
+    if args.turn_seconds and (not args.advance_seconds or not 0 < args.turn_seconds <= 3):
+        parser.error('--turn-seconds requires --advance-seconds and a duration up to three seconds')
     assert re.fullmatch(r'[A-Za-z0-9_-]+', args.label)
     assert re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', args.resolution)
     assert args.seconds>=30 and args.warmup>=0 and 1<=args.bots<=15
@@ -145,6 +160,9 @@ def main():
         settings={k:display[k] for k in QUALITY if k in display}
     settings.update({k:bool(args.enabled) for k in LIGHTS})
     settings.update(overshield_effect=bool(args.enabled), shield_glow_intensity='default')
+    if args.stationary_shield:
+        settings.update({k:False for k in LIGHTS})
+        settings.update(covenant_shield_lighting=bool(args.enabled), plasma_occlusion=bool(args.enabled), overshield_effect=False)
     (out/'config.toml').write_text('[display]\n'+''.join(f'{k} = {json.dumps(v)}\n' for k,v in settings.items()))
     env.update(HALO_DATA_ROOT=str(out), HALO_SAVE_ROOT=str(out/'saves'), HALO_HIDDEN_WINDOW='1',
                HALO_WINDOW_SIZE=args.resolution, HALO_RESOLUTION_SCALING='native', HALO_NO_AUDIO='1',
@@ -155,6 +173,20 @@ def main():
                HALO_UPDATE_ANSWER='never', HALO_CRASH_REPORTS='no', HALO_NETWORK_TEST=f'local:{args.map}:slayer',
                HALO_NETWORK_TEST_START='5', HALO_NETWORK_TEST_SCORE='10000', HALO_BOTS=str(args.bots),
                HALO_BOT_SKILL='heroic', HALO_TEST_INPUT='bot:1', HALO_SCREENSHOT_DIR=str(out/'screenshots'))
+    if args.checkpoint_root:
+        for key in ['HALO_NETWORK_TEST', 'HALO_NETWORK_TEST_START', 'HALO_NETWORK_TEST_SCORE', 'HALO_BOTS', 'HALO_BOT_SKILL']:
+            env.pop(key, None)
+        env.update(HALO_MENU_OPEN='main_menu/campaign_select/campaign_menu',
+                   HALO_TEST_INPUT='menu:'+','.join(['wait']*8+['a']),
+                   HALO_EXIT_AFTER=str(args.warmup+args.seconds+25))
+    if args.stationary_shield:
+        env.update(HALO_BOTS='0', HALO_LIGHTING_BENCH_SHIELD='1')
+    if args.advance_seconds:
+        env['HALO_LIGHTING_BENCH_ADVANCE'] = str(args.advance_seconds)
+    if args.turn_seconds:
+        env['HALO_LIGHTING_BENCH_TURN'] = str(args.turn_seconds)
+    if args.route_captures:
+        env['HALO_LIGHTING_BENCH_ROUTE_CAPTURES'] = '1'
     if args.dump_shaders:
         (out/'shaders').mkdir()
         env['HALO_GPU_DUMP_SHADERS']=str(out/'shaders')
@@ -167,10 +199,24 @@ def main():
     shutil.copy2(build/'manifest.json', out/'build-manifest.json')
     (out/'settings.json').write_text(json.dumps(dict(resolution=args.resolution, fps=args.fps, uncapped=args.uncapped,
         frame_limit=int(env['HALO_MAX_FPS']),
-        warmup=args.warmup, seconds=args.seconds, bots=args.bots, map=args.map,
+        warmup=args.warmup, seconds=args.seconds, bots=0 if args.stationary_shield else args.bots, map=args.map,
+        stationary_shield=args.stationary_shield,
+        campaign_advance_seconds=args.advance_seconds, campaign_turn_seconds=args.turn_seconds, route_captures=args.route_captures,
         shader_dump=args.dump_shaders, captures=not (args.dump_shaders or args.no_captures), display=settings),indent=2))
     memory=[]; start=time.monotonic(); process=None
     try:
+        if args.checkpoint_root:
+            source = args.checkpoint_root.resolve()
+            manifest = []
+            for path in (source/'u').rglob('*'):
+                if not path.is_file(): continue
+                relative = path.relative_to(source)
+                target = safe(out/'saves'/relative, out)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, target)
+                manifest.append(dict(path=relative.as_posix(), sha256=hashlib.sha256(target.read_bytes()).hexdigest()))
+            assert any(item['path'].endswith('/savegame.bin') for item in manifest), 'No campaign checkpoint found'
+            (out/'checkpoint-source.json').write_text(json.dumps(dict(source=str(source), files=manifest), indent=2))
         for name in ['ui.map', args.map+'.map']:
             shutil.copy2(args.data_root/'maps'/name, out/'maps'/name)
         # Desktop configuration is next to the executable, not the data root.
@@ -179,6 +225,7 @@ def main():
         with (out/'stdout.log').open('wb') as stdout, (out/'stderr.log').open('wb') as stderr:
             process=subprocess.Popen([str(out/'halo-performance.exe')], cwd=out, env=env,
                 stdout=stdout, stderr=stderr, creationflags=subprocess.CREATE_NO_WINDOW)
+            (out/'process.json').write_text(json.dumps(dict(pid=process.pid, executable=str(out/'halo-performance.exe'))))
             try:
                 while process.poll() is None:
                     if time.monotonic()-start>args.warmup+args.seconds+120:
@@ -216,7 +263,9 @@ def main():
         assert not report.get('measurement_error') and report['measured_span']>=args.seconds-.2, 'Incomplete measurement'
         assert not report['unexpected_players'], 'Unexpected player joined the isolated workload'
         assert bool(report['selected_max'])==bool(args.enabled), 'Light activation mismatch'
-        if args.seconds>=120: assert len(report['bots_lines'])>=args.seconds//60-1, 'Insufficient combat telemetry'
+        if args.stationary_shield:
+            assert re.search(r'BENCH shield created (?!-1\b)-?\d+', log), 'Stationary emitter was not created'
+        if args.seconds>=120 and not args.checkpoint_root and not args.stationary_shield: assert len(report['bots_lines'])>=args.seconds//60-1, 'Insufficient combat telemetry'
     finally:
         cleanup(out)
 

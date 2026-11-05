@@ -646,6 +646,9 @@ static const struct config_setting config_settings[] =
 		"Stock shield effects remain intact. Optional occlusion uses plasma_occlusion." },
 	{ "display.weapon_glow", _config_boolean, "false", "HALO_WEAPON_GLOW", _environment_value, _platform_desktop,
 		"Held energy weapons cast soft light. Disabled by default." },
+	{ "display.plasma_prong_lighting", _config_boolean, "false", "HALO_PLASMA_PRONG_LIGHTING", _environment_value, _platform_desktop,
+		"Short, soft forward spill from plasma-weapon prongs. Separate from Weapon Glow.\n"
+		"Off by default; uses the shared eight-light occlusion budget when enabled." },
 	{ "display.vehicle_lighting", _config_boolean, "false", "HALO_VEHICLE_LIGHTING", _environment_value, _platform_desktop,
 		"Vehicle engines and headlights illuminate nearby surfaces. Disabled by default." },
 	{ "display.world_lighting", _config_boolean, "false", "HALO_WORLD_LIGHTING", _environment_value, _platform_desktop,

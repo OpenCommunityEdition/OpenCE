@@ -21,6 +21,7 @@ static struct
 	{"display.covenant_shield_lighting", 0},
 	{"display.fuel_rod_lighting", 0},
 	{"display.weapon_glow", 0},
+	{"display.plasma_prong_lighting", 0},
 	{"display.vehicle_lighting", 0},
 	{"display.world_lighting", 0}
 };

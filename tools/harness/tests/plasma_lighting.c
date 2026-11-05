@@ -17,6 +17,8 @@ int lighting_config_boolean(const char *name) { return strcmp(name, "display.muz
 static struct object_datum *object_try_and_get(long index) { return present ? &projectile : NULL; }
 static const char *tag_get_name(long index) { return tag_name; }
 struct light_datum { long object_index, parent_light_index; int flags; float radius; long definition_index; real_point3d position; real_vector3d forward; };
+struct rasterizer_light_submit_parameters { real_point3d position; real_vector3d forward; real radius; };
+static struct { long light_count; struct rasterizer_light_submit_parameters lights[32]; } rasterizer_lights;
 static struct { int valid; } storage = { 1 }, *light_data = &storage;
 static int stale;
 static struct light_datum *datum_try_and_get(void *data, long index)

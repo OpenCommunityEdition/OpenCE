@@ -6,14 +6,15 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
 from harness import build,read,run,CHECK_FAILED,function,structure
 
 def code():
-    return re.sub(r'^#include.*$','',read('port/linux/game/plasma_collision.c'),flags=re.M)
+    return (function(read('source/math/real_math.c'), 'fast_vector_intersects_sphere') + '\n' +
+            re.sub(r'^#include.*$','',read('port/linux/game/plasma_collision.c'),flags=re.M))
 
 def test_depth_batch():
     status,output=run(build('plasma_collision',(('under_test.inc',code()),)),'batch')
     assert status==0,output
 
 def test_child_gating_regression():
-    broken=code().replace('object->eligible && fast_vector_intersects_sphere(batch.point, vector, &object->center, object->radius)', 'object->eligible')
+    broken=code().replace('object->eligible && trace_sphere(object, vector)', 'object->eligible')
     status,output=run(build('plasma_collision',(('under_test.inc',broken),)),'batch')
     assert status==CHECK_FAILED,output
 

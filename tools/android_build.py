@@ -71,7 +71,7 @@ ANDROID_API = 28
 # devices. Its existing engine hooks link to dynamic_lighting_disabled.c;
 # none of the added light pools, traces, textures or shader emitters are built.
 DYNAMIC_LIGHTING_GAME_SOURCES = {
-    "plasma_lighting.c", "plasma_falloff.c", "plasma_occlusion.c", "plasma_collision.c",
+    "plasma_lighting.c", "plasma_falloff.c", "plasma_occlusion.c", "plasma_collision.c", "plasma_collision_scene.c", "plasma_collision_models.c",
     "rocket_lighting.c", "muzzle_lighting.c", "covenant_lighting.c",
     "covenant_emitter_lighting.c", "ammo_counter_lighting.c", "ammo_counter_falloff.c",
     "needler_lighting.c", "authored_emitter_lighting.c", "ambient_emitter_lighting.c", "shield_glow.c", "lighting_config.c",

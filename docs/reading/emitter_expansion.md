@@ -13,7 +13,8 @@ Video Setup > Dynamic Lighting groups related sources:
 | --- | --- |
 | Projectile Lights | Existing projectiles, armed plasma grenades and flamethrower streams |
 | Muzzle Flash Lights | Existing handheld, Warthog and Scorpion flashes |
-| Weapon Glow | Energy sword, plasma charge/heat, fuel rods, AR counter and Needler crystals |
+| Weapon Glow | Energy sword, plasma charge, fuel rods, AR counter and Needler crystals |
+| Plasma Prong Lighting | Independent short, soft outward spill from Plasma Rifle/Pistol prongs; off by default |
 | Shield Emitters | Jackal shields and Covenant stationary shields |
 | Vehicle Lights | Supported Covenant running/engine lights and Warthog/Scorpion headlights |
 | World Emitters | Overshield/active-camouflage pickups and the green teleporter surface |
@@ -120,7 +121,7 @@ existing configuration API.
 
 [plasma_collision.c](../../port/linux/game/plasma_collision.c) owns synchronous
 ray-batch state. `trace_start` conservatively finds a collision-tree subtree
-containing the entire ray cube. The shared
+containing each octant of the ray cube. The shared
 [collision_bsp.c](../../source/physics/collision_bsp.c) extension,
 `collision_bsp_test_vector_from_node`, is needed because the existing public
 query always starts at the root. It reuses the original intersection and leaf
@@ -139,8 +140,96 @@ fields on reset. Failed uploads invalidate it before retrying.
 If visibility, radius, specular extent and admission are unchanged, successful
 pass textures also remain valid across views. Directional profile/axis changes
 invalidate them independently, so rotating an AR cannot reuse its old cone.
-Visibility projection and collision refresh still run at their original cadence.
+Moving geometry retains the 12 ms collision refresh cadence. Unchanged stationary
+fields reuse exact collision inputs through
+[plasma_collision_scene.c](../../port/linux/game/plasma_collision_scene.c):
+`plasma_collision_scene_revision` snapshots nearby blocker identities, bounds,
+cluster membership, permutations and collision-node poses, plus map identity,
+breakable surfaces and collision debug flags. It stores values, not borrowed
+pointers. Each field has a bounded 64 KiB snapshot; overflow refuses reuse.
+New blockers or changed geometry invalidate reuse at the next normal refresh.
+The visibility filter still advances at every rendered pose. Its seven linear
+interpolations agree with the weighted form within the tested floating-point
+rounding tolerance before 8-bit upload.
+
+`trace_object` rejects spheres disjoint from the batch ray cube once per batch,
+with conservative margins. Borderline/invalid bounds use the original sphere
+query; a later ray outside the cube uses the stock query. This changes only the
+feature-owned batch, not simulation collision or map-family adapters.
+`trace_sphere` retains the engine's finite-segment sphere predicate, reusing
+origin/sphere terms per batch and vector length per ray. Its regression test
+compares the predicate against the actual engine implementation. `trace_start`
+proves an independent common BSP prefix for each of eight ray octants. Each
+endpoint box includes the origin, so its plane bounds cover the whole ray.
+Boundary planes and malformed trees retain the checked engine traversal.
+
+`plasma_collision_depths` gathers eligible object/ray pairs using the same
+cluster, sphere and parent/child gates. The bounded pending bitsets add 96 KiB
+to synchronous batch scratch. [plasma_collision_models.c](../../port/linux/game/plasma_collision_models.c)
+then visits each model node once, reusing its inverse transform, transformed
+origin and BSP cache for those rays. Node order, nearest-hit limits and the
+clear-ray sentinel remain unchanged. Unsupported batches rerun stock queries;
+invalid model regions retain the original diagnostics and model queries.
+No model pointers or matrices survive the batch. The shared model query is
+unchanged, and Android excludes this feature module.
+
+Plasma Prong Lighting is independent of Weapon Glow, including saved preferences.
+Its Plasma Rifle/Pistol profiles reach 0.3 world units in the stock maps, with a
+broad forward angular fade. Spill radius eases away between three and six world
+units from the nearest local camera; stock flares remain visible. The short
+prong volume uses a 4-by-4 ray grid per cube face (96 rays), retaining the 16-cubed
+filtered output. Other emitters retain their 16-by-16 face grids (1536 rays).
+Prongs still share the eight-field budget; this setting does not reserve slots.
+
+[plasma_occlusion_gl.c](../../port/linux/src/plasma_occlusion_gl.c) resolves each
+immutable model-mask texture once per view and skips identical per-program
+uniform writes. Its bounded texture-name cache expires at each view/reset;
+failed lookups retry. Units 6/7 remain separate from the four stock stages.
+Unchanged material bindings reuse those exclusively owned units. A resource
+upload or new view invalidates that binding state. Desktop multi-bind changes
+only these two units without querying or changing the active unit; OpenGL ES
+and sampler-allocation failure retain the explicit bind-and-restore path.
 Repeated reset requests while disabled skip clearing already-empty field storage.
+
+Moving-field history uses `reproject_rows` to share x/y interpolation between
+adjacent cells, then interpolates z in the update loop. Its calculation order
+matches `sample_axes` exactly. Only the source rows reached by the sample axes
+are prepared. `half_sample_axes` lets the common half-size texture pass reuse
+that interpolation at exact quarter-texel weights; other scales retain
+`sample_field`. These paths are compared against the original per-cell
+calculations by the occlusion tests.
+
+`field_for` and `field_texture` handle cache lookup without large local buffers.
+Only `update_field` and `prepare_field_texture` reserve reconstruction/pixel
+scratch on a miss. Reconstruction uses 32 KiB of cell scratch; a collision
+refresh adds a 24 KiB ray/depth batch and roughly 14 KiB for one model
+node's nearest depths and BSP cache, plus the engine traversal stack.
+The helpers explicitly prevent inlining: source-level separation alone allowed
+Clang to put their stack allocation back into frequent cache hits. The storage
+is temporary and render-local. Unchanged stationary targets use a flat fade loop;
+ordinary model masks and half/unit-scale radial masks use conversion loops
+without per-cell directional-profile branches. Other profiles/scales retain
+the general calculation. Tests compare every specialized output pixel against
+that calculation. Fade history below `1e-20` settles
+to zero before it can persist as subnormal floating-point values (values below
+the normal float range). This is far below an 8-bit mask step; visible fades,
+ray cadence and the simulation's floating-point mode are unchanged. The tests
+cover long blocked fades and reopening at 30/60/120/240 FPS.
+
+`depth_visibility` avoids distance feathering only when all four sampled ray
+depths prove the cell clear. It still returns the original ordered sum of
+weights, including floating-point rounding; blocked or boundary samples retain
+the original square root and feather calculations. The comparison test runs
+both paths against the same field updates.
+
+`reconstruct_visibility` prepares one row at a time. On SSE2 CPUs,
+`depth_visibility_row` computes four receiver cells together, retaining exact
+divides, square roots, strict face-selection ties and weight order. Other
+architectures retain scalar reconstruction. The 16-cubed output, ray grids,
+refresh cadence, history reprojection and fades are unchanged. Tests compare
+every cell against scalar arithmetic, including translated origins, both ray
+grids and the scalar fallback. This is render-only arithmetic; it does not
+change the simulation's floating-point mode or network state.
 
 The [local validation record](../dynamic_emitter_expansion_acceptance.md)
 distinguishes implementation checks, rendered observations and remaining
@@ -159,8 +248,8 @@ The capture-only [fixture](../../tools/fixtures/plasma_lighting_capture.c) and
 [runner](../../tools/plasma_visual_run.py) create ordinary objects in isolated
 local maps, record selection/occlusion and capture rendered frames. Neither
 the fixture nor its input controls is linked into normal builds. FPS from
-captures includes readback and logging; it does not establish sustained
-120+ FPS or universal device compatibility.
+captures includes readback and logging; it does not establish the current
+sustained 240 FPS target or universal device compatibility.
 
 Baseline first-use shader hitches, local occlusion approximation and the
 remaining performance/memory limitations documented in the

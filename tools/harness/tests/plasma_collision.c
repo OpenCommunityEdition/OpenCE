@@ -2,10 +2,12 @@
 #include <limits.h>
 #include <math.h>
 #define MAX(a,b) ((a)>(b)?(a):(b))
+#define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAXIMUM_OBJECTS_PER_MAP 1024
 #define MAXIMUM_CLUSTERS_PER_STRUCTURE 4
 #define MAXIMUM_BREAKABLE_SURFACES_PER_MAP 256
 #define REAL_MAX 3.402823466e38F
+enum { PLASMA_COLLISION_RAYS=1536, PLASMA_COLLISION_WORDS=48 };
 #define MAXIMUM_BSP3D_TRAVERSAL_DEPTH 128
 #define TAG_BLOCK_GET_ELEMENT(b,i,t) (&((t *)(b)->address)[i])
 #define _object_invisible_bit 0
@@ -49,8 +51,6 @@ static long cluster_get_first_collideable_object(long *reference,short cluster)
 { cluster_reads++;*reference=0;return root_count?roots[0]:NONE; }
 static long cluster_get_next_collideable_object(long *reference)
 { return ++*reference<root_count?roots[*reference]:NONE; }
-static int fast_vector_intersects_sphere(const real_point3d *p,const real_vector3d *v,const real_point3d *c,float radius)
-{ return radius>0 && v->i>=c->x; }
 static int collision_model_instance_new(struct collision_model_instance *m,long index)
 { model_builds++;m->object_index=index;return object_depth[index]>=0; }
 static int collision_model_test_vector(const struct collision_model_instance *m,unsigned long flags,
@@ -58,6 +58,10 @@ static int collision_model_test_vector(const struct collision_model_instance *m,
 { r->bsp_result.t=object_depth[m->object_index];return r->bsp_result.t<1; }
 static int collision_test_vector(unsigned long flags,const real_point3d *p,const real_vector3d *v,long ignore,struct collision_result *r)
 { stock_calls++;r->t=.123f;return 1; }
+static void plasma_collision_model_depths(const struct collision_model_instance *m,const real_point3d *p,
+ const real_vector3d *v,int count,const unsigned int *mask,float *depths)
+{ int i;for(i=0;i<count;i++)if(mask[i/32]&(1U<<(i%32))) { float d=object_depth[m->object_index];if(d>=0&&d<1&&d<depths[i])depths[i]=d; } }
+void plasma_collision_end(void);
 #include "under_test.inc"
 static void setup(void)
 {
@@ -109,14 +113,26 @@ int main(int argc,char **argv)
  CHECK(plasma_collision_depth(flags,&p,&v,1)==.123f,"changed owner cannot use stale batch");
  CHECK(plasma_collision_depth(flags|FLAG(_collision_test_objects_vehicles_bit),&p,&v,NONE)==.123f,"changed flags cannot use stale batch");
  plasma_collision_end();
+ setup();objects[0].object.bounding_sphere_center.y=100;object_depth[0]=.1f;
+ plasma_collision_begin(flags,&p,NONE);
+ CHECK(plasma_collision_depth(flags,&p,&v,NONE)==.8f&&model_builds==2,"disjoint sphere is excluded before per-ray model work");
+ plasma_collision_end();
  /* A whole ray cube follows two planes, but straddles the third. */
  setup();planes[0].d=-10;nodes[0].children[1]=1;planes[1].d=10;nodes[1].children[0]=2;
  plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
  CHECK(queried_node==2 && queried_depth==2,"common prefix retains original traversal depth");
- v.i=20;plasma_collision_depth(flags,&p,&v,NONE);
- CHECK(queried_node==0 && queried_depth==0,"larger later ray falls back to root");v.i=1;plasma_collision_end();
- planes[0].d=-1;plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
- CHECK(queried_node==0,"cube touching a plane retains stock arithmetic");plasma_collision_end();
+ v.i=20;
+ CHECK(plasma_collision_depth(flags,&p,&v,NONE)==.123f&&stock_calls==1,"larger later ray uses stock instead of culled objects");v.i=1;plasma_collision_end();
+ planes[0].d=-1;v.i=-1;plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==0,"octant touching a plane retains stock arithmetic");plasma_collision_end();v.i=1;
+ setup();planes[0].d=-.1f;nodes[0].children[1]=1;planes[1].d=0;
+ plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==1&&queried_depth==1,"positive rays skip a plane behind the origin");
+ v.i=-1;plasma_collision_depth(flags,&p,&v,NONE);
+ CHECK(queried_node==0&&queried_depth==0,"negative rays retain their independent root traversal");
+ plasma_collision_end();v.i=1;
+
+ setup();planes[0].d=-.1f;nodes[0].children[1]=1;
  planes[0].d=-10;nodes[0].children[1]=0;
  plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
  CHECK(queried_node==0 && queried_depth==0,"cycle falls back without bypassing safety budget");plasma_collision_end();
@@ -124,5 +140,49 @@ int main(int argc,char **argv)
  CHECK(queried_node==0 && queried_depth==0,"invalid descendant falls back");plasma_collision_end();
  nodes[0].children[1]=NONE;plasma_collision_begin(flags,&p,NONE);plasma_collision_depth(flags,&p,&v,NONE);
  CHECK(queried_node==NONE && queried_depth==1,"contained solid leaf preserves entry depth");plasma_collision_end();
+ /* Compare the moved invariant arithmetic against the engine predicate,
+    including inside starts, zero vectors, tangencies and large origins. */
+ for(i=0;i<10000;i++)
+ {
+  struct trace_object *cached;
+  setup();root_count=1;
+  p.x=(i%13)*100.f;p.y=(i%17)*-.25f;p.z=(i%19)*.125f;
+  objects[0].object.bounding_sphere_center.x=p.x+(i%23-11)*.125f;
+  objects[0].object.bounding_sphere_center.y=p.y+(i%29-14)*.125f;
+  objects[0].object.bounding_sphere_center.z=p.z+(i%31-15)*.125f;
+  objects[0].object.bounding_sphere_radius=(i%7)*.25f;
+  v.i=(i%11-5)*.5f;v.j=(i%13-6)*.25f;v.k=(i%17-8)*.125f;
+  plasma_collision_begin(flags,&p,NONE);
+  cached=trace_object(0);
+  batch.vector_squared=v.i*v.i+v.j*v.j+v.k*v.k;
+  CHECK(trace_sphere(cached,&v)==fast_vector_intersects_sphere(&p,&v,&cached->center,cached->radius),"cached sphere matches engine predicate");
+  plasma_collision_end();
+ }
+ {
+  real_vector3d vectors[PLASMA_COLLISION_RAYS+1];
+  real expected[PLASMA_COLLISION_RAYS+1],actual[PLASMA_COLLISION_RAYS+1];
+  setup();p.x=p.y=p.z=0;root_count=2;object_depth[0]=-1;
+  objects[0].object.first_child_object_index=1;objects[1].object.next_object_index=2;
+  object_depth[1]=.4f;object_depth[2]=.2f;objects[2].object.bounding_sphere_center.y=.8f;
+  objects[2].object.bounding_sphere_radius=.3f;
+  plasma_collision_begin(flags,&p,NONE);
+  for(i=0;i<PLASMA_COLLISION_RAYS;i++)
+  {
+   vectors[i].i=1;vectors[i].j=(i%9-4)*.25f;vectors[i].k=(i%7-3)*.25f;
+   expected[i]=plasma_collision_depth(flags,&p,&vectors[i],NONE);
+  }
+  plasma_collision_end();
+  plasma_collision_depths(flags,&p,vectors,PLASMA_COLLISION_RAYS,NONE,actual);
+  CHECK(!memcmp(expected,actual,PLASMA_COLLISION_RAYS*sizeof(real)),"model-major collection preserves every sphere/child/cluster gate");
+  CHECK(!batch.active&&!batch.point&&!batch.objects[0].pending[0],"model-major completion clears borrowed state and pending rays");
+  bad_leaf=1;plasma_collision_depths(flags,&p,vectors,PLASMA_COLLISION_RAYS,NONE,actual);
+  for(i=0;i<PLASMA_COLLISION_RAYS;i++)CHECK(actual[i]==.123f,"invalid geometry falls back for the complete batch");
+  setup();debug_collision_skip_vectors=1;
+  plasma_collision_depths(flags,&p,vectors,PLASMA_COLLISION_RAYS,NONE,actual);
+  for(i=0;i<PLASMA_COLLISION_RAYS;i++)CHECK(actual[i]==2,"vector debug skip remains clear");
+  setup();vectors[PLASMA_COLLISION_RAYS]=vectors[0];
+  plasma_collision_depths(flags,&p,vectors,PLASMA_COLLISION_RAYS+1,NONE,actual);
+  for(i=0;i<=PLASMA_COLLISION_RAYS;i++)CHECK(actual[i]==.123f,"oversized batch uses scalar stock queries without bitset writes");
+ }
  return 0;
 }

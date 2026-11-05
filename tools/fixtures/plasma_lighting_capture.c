@@ -568,7 +568,7 @@ void plasma_capture_tick(void)
 			capture_bolts[i] = NONE;
 	}
 	capture_last_time = now;
-	if (!game_in_progress())
+	if (!game_in_progress() || game_time_menu_scene())
 		return;
 	if ((getenv("HALO_PLASMA_CAPTURE_DOOR") || getenv("HALO_COVENANT_CAPTURE_CAMPAIGN")) && cinematic_in_progress())
 		return;
@@ -680,6 +680,8 @@ void plasma_capture_tick(void)
 		tag = tag_loaded('weap', capture_kind() == 3 ? "weapons\\rocket launcher\\rocket launcher" : capture_kind() ? "weapons\\plasma pistol\\plasma pistol" : "weapons\\plasma rifle\\plasma rifle");
 		if (getenv("HALO_MUZZLE_CAPTURE_WEAPON"))
 			tag = tag_loaded('weap', getenv("HALO_MUZZLE_CAPTURE_WEAPON"));
+		if (unit == NONE || tag == NONE)
+			platform_log("PLASMA combat unavailable unit %ld weapon tag %ld", unit, tag);
 		if (unit != NONE && tag != NONE && (!role || strncmp(role, "join", 4)))
 		{
 			long weapon;
@@ -710,6 +712,8 @@ void plasma_capture_tick(void)
 						player_control_set_desired_weapon(unit, (short)i);
 				platform_log("PLASMA combat equipped %ld tag %s", weapon, tag_get_name(tag));
 			}
+			else
+				platform_log("PLASMA combat inventory rejected weapon %ld tag %s", weapon, tag_get_name(tag));
 		}
 	}
 	if (capture_ticks == 70 && getenv("HALO_PLASMA_CAPTURE_DOOR"))
@@ -871,7 +875,7 @@ void plasma_capture_frame(void)
 {
 	long index, selected = 0;
 	real_matrix4x3 *matrix;
-	if (capture_ticks < 85 || capture_ticks > 240)
+	if (!game_in_progress() || game_time_menu_scene() || capture_ticks < 85 || capture_ticks > 240)
 		return;
 	platform_log("PLASMA draws model %lu specular %lu", capture_model_draws, capture_specular_draws);
 	capture_model_draws = capture_specular_draws = 0;
