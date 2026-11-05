@@ -79,6 +79,37 @@ for an OpenGL ES capability condition. The Vulkan work discussed in
 [rendering](rendering.md) has its own supported scope and does not establish
 an Android or web Vulkan implementation.
 
+## A sound stopped between mixer callbacks
+
+The shared [DirectSound mixer](../../port/linux/src/dsound_sdl.c) implements
+the sound streams used by Xbox, Custom Edition and converted MCC audio.
+The map readers and MCC conversion ownership remain separate. This OpenCE
+fix changes how an already-playing stream stops, without changing game
+simulation or network messages.
+
+For example, firing a weapon again can reuse the previous shot's channel.
+Read `stream_flush`, `voice_cut`, `mix_voice` and `mix_cut`: the mixer
+captures the next 240 output frames (5 ms at 48 kHz) before returning packet
+memory, fades them to silence, and mixes them beside the next shot. A second
+cut preserves the unplayed part of the first fade, including its reverb send.
+
+GulchCE's flush guard addresses a callback boundary: `stream_complete_head`
+unlocks the mixer for the game's completion callback. The stream's
+`flushing` flag prevents the audio thread from mixing remaining live packets
+over the captured fade during that interval. Cancellation remains synchronous,
+the fade owns its samples, and the guard clears before a later sound starts.
+Paused or never-played voices do not acquire a new fade. Releasing a stream
+removes it and its remaining fade from the mixer.
+
+The [mixer harness](../../tools/harness/tests/test_mixer.py) uses the real
+mixer and stream functions. Its flush case schedules a real worker during
+completion callbacks; its overlap case checks output samples and reverb sends
+for both resamplers, mono/stereo sources and stereo/5.1 output. Negative
+controls remove the flush guard or discard a previous fade and must fail.
+Run `python -m pytest -q tools/harness/tests/test_mixer.py` on Linux or Windows
+with clang and the platform's 32-bit compiler prerequisites. These asset-free
+checks do not replace listening tests, platform builds or map transitions.
+
 ## Choose evidence that reaches the suspected behaviour
 
 | Layer | What actually runs | What it cannot establish alone |
