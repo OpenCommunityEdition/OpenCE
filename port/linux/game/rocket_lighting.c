@@ -11,7 +11,7 @@
 #include "plasma_occlusion.h"
 #include <string.h>
 
-int config_boolean(const char *name);
+#include "lighting_config.h"
 long light_port_glow_definition_get(void);
 boolean light_port_glow_set(long light_index, long object_index, real_rgb_color const *color, real radius);
 
@@ -68,7 +68,7 @@ void rocket_lighting_update(void)
 {
 	struct object_iterator iterator;
 	int i, slot;
-	int enabled = config_boolean("display.plasma_lighting");
+	int enabled = lighting_config_boolean("display.plasma_lighting");
 	for (i = 0; i < ROCKET_LIGHTS; i++)
 		if (rocket_lights[i].active && (!enabled || !rocket_visible(rocket_lights[i].object_index)))
 			rocket_release(&rocket_lights[i]);
@@ -125,7 +125,7 @@ void rocket_lighting_frame_end(void)
 		struct rocket_light *light = &rocket_lights[i];
 		if (!light->active)
 			continue;
-		if (!config_boolean("display.plasma_lighting"))
+		if (!lighting_config_boolean("display.plasma_lighting"))
 			rocket_release(light);
 		else if (light_port_glow_set(light->light_index, light->object_index, &rocket_black, 0.0f) && light->connected)
 		{
@@ -164,7 +164,7 @@ void rocket_lighting_submitted(long light_index, long rasterizer_index)
 int rocket_lighting_selected(long rasterizer_index)
 {
 	int i;
-	if (rasterizer_index == NONE || !config_boolean("display.plasma_lighting"))
+	if (rasterizer_index == NONE || !lighting_config_boolean("display.plasma_lighting"))
 		return FALSE;
 	for (i = 0; i < ROCKET_LIGHTS; i++)
 		if (rocket_lights[i].active && rocket_lights[i].rasterizer_index == rasterizer_index)
@@ -177,7 +177,7 @@ int rocket_lighting_selected(long rasterizer_index)
 float rocket_lighting_radius(long light_index, long object_index, float radius)
 {
 	int i;
-	if (!config_boolean("display.plasma_lighting"))
+	if (!lighting_config_boolean("display.plasma_lighting"))
 		return radius;
 	for (i = 0; i < ROCKET_LIGHTS; i++)
 		if (rocket_lights[i].active && rocket_lights[i].light_index == light_index &&

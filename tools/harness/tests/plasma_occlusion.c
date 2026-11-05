@@ -40,9 +40,9 @@ static struct
 } rasterizer_lights;
 static int on = 1, queries, allocations, blocked = 1, door, fail_upload;
 static unsigned long time_ms = 1000;
-static int uploads;
+static int uploads, fail_unlock;
 static real specular_scale = 1;
-static int muzzle_on, emitter_on, emitter_occlusion, shield_on, shield_occlusion;
+static int muzzle_on, emitter_on, emitter_occlusion, shield_on, shield_occlusion, vehicle_on;
 static long last_ignore;
 static unsigned long last_flags;
 static int directional_on, vehicle_only;
@@ -64,10 +64,11 @@ void shield_glow_frame_end(void) {}
 void shield_glow_window_begin(void) {}
 void shield_glow_submitted(long l,long r) {}
 float shield_glow_radius(long l,float r) { return r; }
-int config_boolean(const char *name)
+int lighting_config_boolean(const char *name)
 {
 	if (!strcmp(name, "display.plasma_occlusion") && shield_on) return shield_occlusion;
 	if (!strcmp(name, "display.muzzle_lighting")) return muzzle_on;
+	if (!strcmp(name, "display.vehicle_lighting")) return vehicle_on;
 	if (!strcmp(name, "display.plasma_occlusion") && emitter_on) return emitter_occlusion;
 	return on;
 }
@@ -121,7 +122,7 @@ static int IDirect3DVolumeTexture8_LockBox(IDirect3DVolumeTexture8 *t, int l, D3
 }
 static int IDirect3DVolumeTexture8_UnlockBox(IDirect3DVolumeTexture8 *t, int l)
 {
-	return 0;
+	return fail_unlock ? -1 : 0;
 }
 static void D3DResource_Release(D3DResource *p)
 {
@@ -133,6 +134,9 @@ static void rasterizer_xbox_bitmap_swizzle3d_long(void *d, void *s, int w, int h
 	memcpy(d, s, 4096 * sizeof(long));
 }
 void plasma_occlusion_window(void);
+int plasma_lighting_vehicle_occlusion(long i) { return vehicle_on && i == 500; }
+int authored_emitter_lighting_enabled(void) { return vehicle_on; }
+int covenant_emitter_lighting_vehicle_occlusion(long light) { return vehicle_on && light == 502; }
 #include "under_test.inc"
 /* Match the renderer's linear filtering between vertical texel centres. */
 static float filtered_height(IDirect3DVolumeTexture8 *texture, float height, float radius)
@@ -253,6 +257,7 @@ int main(int argc, char **argv)
 	for (n = 0; n < 8; n++)
 		CHECK(field_for(n), "rejected overflow does not consume an admitted light's update budget");
 	CHECK(queries == 8 * 1536, "only admitted fields spend the query budget");
+
 	time_ms += 120;
 	plasma_occlusion_window();
 	plasma_occlusion_submit(18, 8);
@@ -358,6 +363,26 @@ int main(int argc, char **argv)
 		plasma_occlusion_reset();
 		CHECK(!allocations,"all lazy passes released");
 	}
+	/* Exact texture reuse is independent of visibility/history updates. */
+	specular_scale=1;plasma_occlusion_submit(700,0);f=field_for(0);
+	CHECK(field_texture(f,0,0),"initial model mask upload");n=uploads;
+	f->texture_mask=0;
+	CHECK(field_texture(f,0,0)&&uploads==n,"identical texels skip backing-memory and GPU work");
+	f->visibility[0]=.37f;f->texture_mask=0;
+	CHECK(field_texture(f,0,0)&&uploads==n+1,"changed texel still uploads");
+	f->visibility[0]=.61f;f->texture_mask=0;fail_unlock=1;
+	CHECK(!field_texture(f,0,0),"failed changed upload falls back");
+	f->visibility[0]=.37f;f->texture_mask=0;fail_unlock=0;
+	CHECK(field_texture(f,0,0)&&uploads==n+3,"failure invalidates byte cache even when old pixels return");
+	for(n=0;n<OCC_COUNT;n++) f->visibility[n]=1;
+	f->texture_mask=0;directional_on=1;
+	CHECK((field_texture(f,0,0) && (f->texture[0]->pixels[(8*16+8)*16]&255)>200),
+		"occluded counter mask lights its facing side");
+	directional_axis[0]=.8f;
+	CHECK((field_texture(f,0,0) && (f->texture[0]->pixels[(8*16+8)*16]&255)==0),
+		"rotating a counter invalidates cached texels even with identical visibility");
+	directional_axis[0]=-.8f;directional_on=0;
+	plasma_occlusion_reset();CHECK(!allocations,"cached upload textures disposed");
 	on=0; muzzle_on=1; time_ms+=200;
 	plasma_occlusion_window(); plasma_occlusion_submit(500,0);
 	CHECK(plasma_occlusion_texture(0,0), "muzzle occlusion works with projectile lighting off");
@@ -472,6 +497,17 @@ int main(int argc, char **argv)
 	CHECK(f&&!(last_flags&FLAG(_collision_test_objects_vehicles_bit)),"other muzzle profiles retain original blockers");
 	CHECK(f->visibility[4095]>.99f,"vehicle-only blocker does not change unrelated lights");
 	plasma_occlusion_reset();
+	muzzle_on=0;vehicle_on=1;
+	for(n=0;n<2;n++)
+	{
+		plasma_occlusion_reset();time_ms+=200;plasma_occlusion_window();
+		plasma_occlusion_submit(n?502:500,0);f=field_for(0);
+		CHECK(f&&(last_flags&FLAG(_collision_test_objects_vehicles_bit)),"headlights and engine emitters include chassis with general occlusion off");
+		CHECK(f->visibility[4095]<.1f,"vehicle emitter cannot illuminate through its hull");
+		plasma_occlusion_submit(501,1);CHECK(!field_for(1),"vehicle switch cannot select unrelated lights");
+	}
+	vehicle_on=0;n=queries;
+	CHECK(!plasma_occlusion_texture(0,0)&&queries==n,"vehicle disable skips GPU texture and collision work");
 	plasma_occlusion_reset();
 	on = muzzle_on = emitter_on = directional_on = 0; shield_on = shield_occlusion = 1;
 	plasma_occlusion_window(); plasma_occlusion_submit(600, 0);

@@ -7,12 +7,18 @@ from harness import CHECK_FAILED, build, read, run
 
 
 def source():
-    return re.sub(r'^#include.*$', '', read('port/linux/game/needler_lighting.c') + '\n' + read('port/linux/game/ammo_counter_lighting.c') + '\n' + read('port/linux/game/covenant_emitter_lighting.c'), flags=re.M)
+    return re.sub(r'^#include.*$', '', read('port/linux/game/ambient_emitter_lighting.h') + '\n' + read('port/linux/game/needler_lighting.c') + '\n' + read('port/linux/game/ammo_counter_lighting.c') + '\n' + read('port/linux/game/covenant_emitter_lighting.c'), flags=re.M)
 
 
 def test_emitters():
     status, output = run(build('covenant_emitter_lighting', (('under_test.inc', source()),)), 'emitters')
     assert status == 0, output
+
+
+def test_ambient_saturation_preserves_existing_emitters():
+    code = source().replace('sample.kind < EMITTER_VEHICLE && sample.strength > 0.0f', 'FALSE')
+    status, output = run(build('covenant_emitter_lighting', (('under_test.inc', code),)), 'emitters')
+    assert status == CHECK_FAILED, output
 
 
 def test_shield_permutation_guard_is_required():

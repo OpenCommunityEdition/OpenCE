@@ -87,7 +87,7 @@ int main(void)
         muzzle_lighting_shot(42, 0); muzzle_lighting_shot(42, 1);
         muzzle_lighting_update(); covenant_lighting_update();
         covenant_emitter_lighting_update(); rocket_lighting_update(); shield_glow_update();
-        plasma_lighting_prepare(17, 42); plasma_lighting_submitted(17, 1);
+        plasma_lighting_prepare(17, 42, NONE); plasma_lighting_submitted(17, 1);
         muzzle_lighting_submitted(17, 1); covenant_lighting_submitted(17, 1);
         covenant_emitter_lighting_submitted(17, 1); rocket_lighting_submitted(17, 1);
         shield_glow_submitted(17, 1); plasma_model_lighting_reset();
@@ -114,7 +114,8 @@ int main(void)
             needler_lighting_position(42, &position, &direction) ||
             memcmp(&position, &old_position, sizeof(position)) ||
             memcmp(&direction, &old_direction, sizeof(direction))) return 5;
-        if (muzzle_lighting_vehicle_occlusion(17) ||
+        if (muzzle_lighting_vehicle_occlusion(17) || plasma_lighting_vehicle_occlusion(17) ||
+            covenant_emitter_lighting_vehicle_occlusion(17) ||
             covenant_emitter_lighting_occlusion_ignore(17) != NONE ||
             covenant_emitter_lighting_cone(1, axis, origin, &radius) || radius != 2.5f) return 6;
         plasma_lighting_frame_end(); muzzle_lighting_frame_end(); covenant_lighting_frame_end();
@@ -140,9 +141,15 @@ def test_android_menu_and_default_config_exclude_dynamic_lighting():
     assert category[3] == 'desktop web'
     for _, setting, _, _, platform in spec['rows']:
         assert platform == 'desktop web'
-        declaration = re.search(r'\{ "' + re.escape(setting) + r'",[^\n]+', config)[0]
-        assert '_platform_desktop,' in declaration
-        assert '"false"' in declaration or setting == 'display.shield_glow_intensity'
+        groups = {
+            'lighting.weapon_glow': ['display.weapon_glow', 'display.fuel_rod_lighting',
+                                    'display.ammo_counter_lighting', 'display.needler_lighting'],
+            'lighting.shield_emitters': ['display.jackal_shield_lighting', 'display.covenant_shield_lighting'],
+        }
+        for member in groups.get(setting, [setting]):
+            declaration = re.search(r'\{ "' + re.escape(member) + r'",[^\n]+', config)[0]
+            assert '_platform_desktop,' in declaration
+            assert '"false"' in declaration or member == 'display.shield_glow_intensity'
     for name, lines in port_settings.settings_files().items():
         if name.endswith(('video_settings.xml', 'dynamic_lighting.xml')):
             assert (ROOT / 'port/assets/menus/ce' / name).read_text() == '\n'.join(lines)

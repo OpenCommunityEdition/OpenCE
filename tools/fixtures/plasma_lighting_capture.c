@@ -18,6 +18,7 @@
 #include "game/game.h"
 #include "units/units.h"
 #include "units/bipeds.h"
+#include "units/vehicles.h"
 #include "devices/devices.h"
 #include "cache/cache_files.h"
 #include "cutscene/cinematics.h"
@@ -107,6 +108,32 @@ void plasma_capture_camera(void)
 	scenario_location_from_point(&camera->location, &camera->position);
 }
 
+/* Apply after ordinary camera interpolation, so the capture sees the same
+   vehicle pose as the renderer instead of having its observer edit replaced. */
+struct observer_result const *plasma_capture_view(struct observer_result const *source)
+{
+	static struct observer_result view;
+	struct object_datum *vehicle;
+	real_point3d target;
+	real_vector3d right;
+	real distance;
+	const char *kind = getenv("HALO_AMBIENT_CAPTURE");
+	if (!kind || capture_vehicle == NONE || !(vehicle = object_try_and_get(capture_vehicle))) return source;
+	view = *source;
+	target = vehicle->object.position;
+	target.z += !strcmp(kind, "dropship") ? -0.5f : 0.4f;
+	distance = !strcmp(kind,"dropship") ? 9.0f : !strcmp(kind,"scorpion") ? 5.0f : 3.0f;
+	cross_product3d(&vehicle->object.forward, &vehicle->object.up, &right);
+	view.position.x = target.x + distance * vehicle->object.forward.i + distance * .6f * right.i;
+	view.position.y = target.y + distance * vehicle->object.forward.j + distance * .6f * right.j;
+	view.position.z = target.z + (!strcmp(kind,"dropship") ? 0.0f : 1.0f);
+	vector_from_points3d(&view.position, &target, &view.forward);
+	normalize3d(&view.forward);
+	observer_up_from_forward(&view.forward, &view.up);
+	scenario_location_from_point(&view.location, &view.position);
+	return &view;
+}
+
 static void capture_ground(real_point3d *position)
 {
 	struct collision_result ground;
@@ -118,19 +145,93 @@ static void capture_ground(real_point3d *position)
 		position->z = ground.point.z + 0.03f;
 }
 
+/* Create ordinary objects; exercise their stock functions and deletion. */
+static void ambient_capture_tick(const char *kind)
+{
+	static const struct { const char *kind, *name, *alternate; long group; } profiles[] = {
+		{"ghost", "vehicles\\ghost\\ghost_mp", "vehicles\\ghost\\ghost", 'vehi'},
+		{"banshee", "vehicles\\banshee\\banshee_mp", "vehicles\\banshee\\banshee", 'vehi'},
+		{"dropship", "vehicles\\c_dropship\\c_dropship", NULL, 'vehi'},
+		{"warthog", "vehicles\\warthog\\mp_warthog", "vehicles\\warthog\\warthog", 'vehi'},
+		{"scorpion", "vehicles\\scorpion\\scorpion_mp", "vehicles\\scorpion\\scorpion", 'vehi'},
+		{"overshield", "powerups\\over shield", NULL, 'eqip'},
+		{"camo", "powerups\\active camouflage", NULL, 'eqip'},
+		{"teleporter", "scenery\\teleporter_shield\\teleporter", NULL, 'scen'},
+	};
+	int i;
+	for (i = 0; i < NUMBEROF(profiles); i++)
+		if (!strcmp(kind, profiles[i].kind)) break;
+	if (i == NUMBEROF(profiles)) return;
+	if (capture_ticks == 65)
+	{
+		struct object_placement_data placement;
+		long tag = tag_loaded(profiles[i].group, profiles[i].name);
+		if (tag == NONE && profiles[i].alternate) tag = tag_loaded(profiles[i].group, profiles[i].alternate);
+		if (tag == NONE) { platform_log("AMBIENT missing %s", kind); return; }
+		object_placement_data_new(&placement, tag, NONE);
+		placement.position = capture_camera.position;
+		placement.position.x += capture_camera.forward.i * (!strcmp(kind, "dropship") ? 9 : 3);
+		placement.position.y += capture_camera.forward.j * (!strcmp(kind, "dropship") ? 9 : 3);
+		capture_ground(&placement.position);
+		if (!strcmp(kind, "dropship")) placement.position.z += 3.0f;
+		placement.forward = capture_camera.forward;
+		placement.forward.i = -placement.forward.i;
+		placement.forward.j = -placement.forward.j;
+		placement.forward.k = 0;
+		normalize3d(&placement.forward);
+		observer_up_from_forward(&placement.forward, &placement.up);
+		capture_emitter = object_new(&placement);
+		platform_log("AMBIENT created %ld %s", capture_emitter, kind);
+		if (capture_emitter != NONE && profiles[i].group == 'vehi')
+		{
+			capture_vehicle = capture_emitter;
+			vehicle_hover(capture_vehicle, TRUE);
+			/* Use a real driver so engine functions and headlights remain on. */
+			if (strcmp(kind, "dropship"))
+			{
+				long driver_tag = tag_loaded('bipd', "characters\\cyborg\\cyborg");
+				if (driver_tag != NONE)
+				{
+					object_placement_data_new(&placement, driver_tag, NONE);
+					placement.position = object_get(capture_vehicle)->object.position;
+					capture_emitter_holder = object_new(&placement);
+					unit_scripting_enter_vehicle(capture_emitter_holder, capture_vehicle,
+						!strcmp(kind,"ghost") ? "G-driver" : !strcmp(kind,"banshee") ? "B-driver" :
+						!strcmp(kind,"scorpion") ? "scorpion-driver" : "W-driver");
+					platform_log("AMBIENT driver %ld parent %ld", capture_emitter_holder, object_get(capture_emitter_holder)->object.parent_object_index);
+				}
+			}
+		}
+	}
+	if (capture_emitter != NONE && object_try_and_get(capture_emitter))
+	{
+		if (capture_ticks % 30 == 0)
+		{
+			struct object_datum *object = object_get(capture_emitter);
+			platform_log("AMBIENT functions %ld %.4f %.4f %.4f %.4f", capture_ticks,
+				object->object.outgoing_function_values[0], object->object.outgoing_function_values[1],
+				object->object.outgoing_function_values[2], object->object.outgoing_function_values[3]);
+		}
+		if (capture_ticks == 200 && profiles[i].group == 'vehi') vehicle_hover(capture_emitter, FALSE);
+		if (capture_ticks == 225) { object_delete(capture_emitter); capture_emitter = capture_vehicle = NONE; platform_log("AMBIENT deleted"); }
+	}
+}
+
 static void ammo_capture_tick(const char *kind)
 {
 	struct object_placement_data placement;
 	long tag, holder;
 	int i;
+	int sword = !strncmp(kind, "sword-", 6);
 	int needler = !strncmp(kind, "needler-", 8);
-	const char *pose = needler ? kind + 8 : kind + 5;
+	const char *pose = sword ? kind + 6 : needler ? kind + 8 : kind + 5;
 	if (capture_ticks == 65)
 	{
 		holder = player_control_get_unit_index(0);
 		if (strcmp(pose, "fp"))
 		{
-			tag = tag_loaded('bipd', !strcmp(pose, "marine") ? "characters\\marine_armored\\marine_armored" :
+			tag = tag_loaded('bipd', !strcmp(pose, "elite") ? "characters\\elite\\elite" :
+				!strcmp(pose, "marine") ? "characters\\marine_armored\\marine_armored" :
 				!strcmp(pose, "grunt") ? "characters\\grunt\\grunt" : "characters\\cyborg\\cyborg");
 			if (tag == NONE) { platform_log("EMITTER missing actor"); return; }
 			object_placement_data_new(&placement, tag, NONE);
@@ -151,7 +252,7 @@ static void ammo_capture_tick(const char *kind)
 			observer_up_from_forward(&placement.forward, &placement.up);
 			holder = object_new(&placement);
 		}
-		tag = tag_loaded('weap', needler ? "weapons\\needler\\needler" : "weapons\\assault rifle\\assault rifle");
+		tag = tag_loaded('weap', sword ? "weapons\\energy sword\\energy sword" : needler ? "weapons\\needler\\needler" : "weapons\\assault rifle\\assault rifle");
 		if (holder == NONE || tag == NONE) return;
 		capture_emitter_holder = holder;
 		unit_drop_current_weapon(holder, TRUE);
@@ -203,7 +304,7 @@ static void emitter_capture_tick(void)
 	const char *kind = getenv("HALO_EMITTER_CAPTURE");
 	struct object_placement_data placement;
 	long tag;
-	if (!strncmp(kind, "ammo-", 5) || !strncmp(kind, "needler-", 8))
+	if (!strncmp(kind, "ammo-", 5) || !strncmp(kind, "needler-", 8) || !strncmp(kind, "sword-", 6))
 	{
 		ammo_capture_tick(kind);
 		return;
@@ -336,7 +437,8 @@ static const char *capture_projectile_tags[] = {
 	"weapons\\needler\\mp_needle",
 	"vehicles\\banshee\\mp_banshee fuel rod",
 	"vehicles\\c gun turret\\mp gun turret",
-	"weapons\\plasma_cannon\\plasma_cannon"
+	"weapons\\plasma_cannon\\plasma_cannon",
+	"weapons\\plasma grenade\\plasma grenade"
 };
 static int capture_kind(void)
 {
@@ -355,6 +457,7 @@ static int capture_kind(void)
 	if (kind && !strcmp(kind, "mp-banshee-fuel")) return 12;
 	if (kind && !strcmp(kind, "mp-shade")) return 13;
 	if (kind && !strcmp(kind, "ce-fuel")) return 14;
+	if (kind && !strcmp(kind, "grenade")) return 15;
 	return 0;
 }
 int config_write_boolean(const char *name, int value);
@@ -477,6 +580,18 @@ void plasma_capture_tick(void)
 		cheat.deathless_player = TRUE;
 	}
 	capture_ticks++;
+	if (getenv("HALO_WEAPON_GLOW") && capture_ticks % 15 == 0)
+	{
+		long holder = player_control_get_unit_index(0);
+		struct unit_datum *unit = unit_try_and_get(holder);
+		if (unit && unit->unit.current_weapon_index >= 0 && unit->unit.current_weapon_index < MAXIMUM_WEAPONS_PER_UNIT)
+		{
+			struct weapon_datum *weapon = weapon_try_and_get(unit_inventory_get_weapon(holder, unit->unit.current_weapon_index));
+			if (weapon) platform_log("EMITTER weapon tick %ld heat %.4f charged %.4f state %d effect %ld", capture_ticks,
+				weapon->weapon.heat, weapon->weapon.overcharged, weapon->weapon.triggers[0].state, weapon->weapon.overheated_effect_index);
+		}
+	}
+
 	if ((getenv("HALO_WARTHOG_CAPTURE_EXTERIOR") || getenv("HALO_SCORPION_CAPTURE")) && capture_vehicle != NONE &&
 		object_try_and_get(capture_vehicle))
 	{
@@ -523,6 +638,7 @@ void plasma_capture_tick(void)
 					 capture_camera.position.y, capture_camera.position.z, capture_camera.forward.i,
 					 capture_camera.forward.j, capture_camera.forward.k);
 	}
+	if (getenv("HALO_AMBIENT_CAPTURE")) { ambient_capture_tick(getenv("HALO_AMBIENT_CAPTURE")); return; }
 	if (getenv("HALO_SHIELD_CAPTURE")) { shield_capture_tick(); return; }
 	if (getenv("HALO_EMITTER_CAPTURE"))
 	{
@@ -779,7 +895,7 @@ int plasma_capture_should_capture(void)
 	if (getenv("HALO_SHIELD_CAPTURE") || getenv("HALO_LIGHTING_CAPTURE_SPARSE"))
 	{
 		if (getenv("HALO_PLASMA_CAPTURE_NO_IMAGES") || capture_ticks < 85 || capture_ticks > 240 ||
-			capture_ticks % (getenv("HALO_LIGHTING_CAPTURE_SPARSE") ? 3 : 5) || shield_captured_tick == capture_ticks) return FALSE;
+			capture_ticks % (getenv("HALO_LIGHTING_CAPTURE_SPARSE") ? (int)capture_option("HALO_LIGHTING_CAPTURE_IMAGE_STEP", 3) : 5) || shield_captured_tick == capture_ticks) return FALSE;
 		shield_captured_tick = capture_ticks;
 		return TRUE;
 	}

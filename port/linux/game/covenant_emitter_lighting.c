@@ -12,11 +12,13 @@
 #include "covenant_emitter_lighting.h"
 #include "ammo_counter_lighting.h"
 #include "needler_lighting.h"
+#include "authored_emitter_lighting.h"
+#include "ambient_emitter_lighting.h"
 #include "plasma_occlusion.h"
 #include <math.h>
 #include <string.h>
 
-int config_boolean(const char *name);
+#include "lighting_config.h"
 real render_interpolation_game_time_sec(long ticks);
 long light_port_glow_definition_get(void);
 boolean light_port_glow_set(long light, long owner, real_rgb_color const *color, real radius);
@@ -25,32 +27,25 @@ boolean light_port_glow_move(long light, real_point3d const *position);
 enum { EMITTER_LIGHTS = 8 };
 static struct emitter_light
 {
-	int active, connected, seen, kind;
+	int active, connected, seen, kind, component;
 	long object, light, rasterizer;
 	real strength, last_time, radius;
 	real_point3d position;
 	real_vector3d direction;
 } emitters[EMITTER_LIGHTS];
 static const real_rgb_color emitter_black = {0, 0, 0};
-struct emitter_sample
-{
-	int kind;
-	real strength, radius, view_gain;
-	real_rgb_color color;
-	real_point3d position;
-	real_vector3d direction;
-};
 
 int covenant_emitter_lighting_enabled(void)
 {
-	return config_boolean("display.jackal_shield_lighting") || config_boolean("display.fuel_rod_lighting") ||
-		config_boolean("display.covenant_shield_lighting") || config_boolean("display.ammo_counter_lighting") ||
-		config_boolean("display.needler_lighting");
+	return lighting_config_boolean("display.jackal_shield_lighting") || lighting_config_boolean("display.fuel_rod_lighting") ||
+		lighting_config_boolean("display.covenant_shield_lighting") || lighting_config_boolean("display.ammo_counter_lighting") ||
+		lighting_config_boolean("display.needler_lighting") || ambient_emitter_lighting_enabled();
 }
 
 static int emitter_kind_enabled(int kind)
 {
-	return config_boolean(kind == 4 ? "display.needler_lighting" : kind == 3 ? "display.ammo_counter_lighting" : kind == 2 ? "display.covenant_shield_lighting" :
+	return lighting_config_boolean(kind == EMITTER_VEHICLE ? "display.vehicle_lighting" :
+		kind == EMITTER_WORLD ? "display.world_lighting" : kind == EMITTER_FLAME ? "display.plasma_lighting" : kind == 4 ? "display.needler_lighting" : kind == 3 ? "display.ammo_counter_lighting" : kind == 2 ? "display.covenant_shield_lighting" :
 		kind == 1 ? "display.fuel_rod_lighting" : "display.jackal_shield_lighting");
 }
 
@@ -77,7 +72,7 @@ static int emitter_shield_visible(struct object_datum *object)
 	return FALSE;
 }
 
-static int emitter_sample(long index, struct emitter_sample *sample)
+static int emitter_sample(long index, int component, struct emitter_sample *sample)
 {
 	struct object_datum *object = object_try_and_get(index);
 	struct object_marker marker;
@@ -93,7 +88,11 @@ static int emitter_sample(long index, struct emitter_sample *sample)
 	name = tag_get_name(object->definition_index);
 	if (!name)
 		return FALSE;
-	if ((object->object.type == _object_type_biped &&
+	if (ambient_emitter_lighting_sample(index, component, sample))
+		marker_name = NULL;
+	else if (component)
+		return FALSE;
+	else if ((object->object.type == _object_type_biped &&
 		(!strcmp(name, "characters\\jackal\\jackal") || !strcmp(name, "characters\\jackal\\jackal major"))) ||
 		(object->object.type == _object_type_scenery && !strcmp(name, "scenery\\c_field_generator\\c_field_generator")))
 	{
@@ -205,7 +204,9 @@ static void emitter_release(struct emitter_light *emitter)
 void covenant_emitter_lighting_update(void)
 {
 	struct object_iterator iterator;
-	int i, slot;
+	struct object_datum *object;
+	unsigned long mask;
+	int i, slot, component;
 	real now = render_interpolation_game_time_sec(game_time_get());
 	for (i = 0; i < EMITTER_LIGHTS; i++)
 	{
@@ -215,26 +216,48 @@ void covenant_emitter_lighting_update(void)
 	}
 	if (!covenant_emitter_lighting_enabled())
 		return;
-	object_iterator_new(&iterator, _object_mask_biped | _object_mask_weapon | _object_mask_scenery, 0);
-	while (object_iterator_next(&iterator))
+	mask = ambient_emitter_lighting_begin();
+	if (lighting_config_boolean("display.jackal_shield_lighting") || lighting_config_boolean("display.fuel_rod_lighting"))
+		mask |= _object_mask_biped;
+	if (lighting_config_boolean("display.fuel_rod_lighting") || lighting_config_boolean("display.ammo_counter_lighting") ||
+		lighting_config_boolean("display.needler_lighting"))
+		mask |= _object_mask_weapon;
+	if (lighting_config_boolean("display.covenant_shield_lighting")) mask |= _object_mask_scenery;
+	/* With no live stream and no enabled object emitters, skip the object
+	   walk. Still release unseen stream lights below. */
+	object_iterator_new(&iterator, mask, 0);
+	while (mask && (object = object_iterator_next(&iterator)) != NULL)
+	for (component = 0; component < (object->object.type == _object_type_vehicle ? 2 : 1); component++)
 	{
 		struct emitter_sample sample;
 		struct emitter_light *emitter;
 		real_rgb_color color;
 		real blend;
 		long definition;
-		if (!emitter_sample(iterator.index, &sample))
+		if (!emitter_sample(iterator.index, component, &sample))
 			continue;
 		slot = NONE;
 		for (i = 0; i < EMITTER_LIGHTS; i++)
 		{
-			if (emitters[i].active && emitters[i].object == iterator.index)
+			if (emitters[i].active && emitters[i].object == iterator.index && emitters[i].component == component)
 			{
 				slot = i;
+				if (emitters[i].kind != sample.kind) emitter_release(&emitters[i]);
 				break;
 			}
 			if (!emitters[i].active && slot == NONE)
 				slot = i;
+		}
+		/* New ambient sources must not displace the baseline's held-weapon
+		   and shield lights. Reclaim the weakest ambient slot only when a
+		   visible baseline emitter needs one; the eight-light budget stays. */
+		if (slot == NONE && sample.kind < EMITTER_VEHICLE && sample.strength > 0.0f)
+		{
+			for (i = 0; i < EMITTER_LIGHTS; i++)
+				if (emitters[i].kind >= EMITTER_VEHICLE &&
+					(slot == NONE || emitters[i].strength < emitters[slot].strength))
+					slot = i;
+			if (slot != NONE) emitter_release(&emitters[slot]);
 		}
 		if (slot == NONE || (!emitters[slot].active && sample.strength <= 0.0f))
 			continue;
@@ -244,6 +267,8 @@ void covenant_emitter_lighting_update(void)
 			emitter->active = TRUE;
 			emitter->object = iterator.index;
 			emitter->kind = sample.kind;
+			emitter->position = sample.position;
+			emitter->component = component;
 			emitter->light = emitter->rasterizer = NONE;
 			emitter->last_time = now;
 		}
@@ -253,6 +278,15 @@ void covenant_emitter_lighting_update(void)
 		blend = 1.0f - (real)exp(-(double)PIN(now - emitter->last_time, 0.0f, 0.25f) / 0.08);
 		emitter->strength += (sample.strength - emitter->strength) * blend;
 		emitter->last_time = now;
+		if (sample.kind == EMITTER_FLAME)
+		{
+			/* Particle-only objects have no model pose to interpolate. Smooth
+			   their bounded centroid with the same render-time response. */
+			emitter->position.x += (sample.position.x - emitter->position.x) * blend;
+			emitter->position.y += (sample.position.y - emitter->position.y) * blend;
+			emitter->position.z += (sample.position.z - emitter->position.z) * blend;
+			sample.position = emitter->position;
+		}
 		emitter->radius = sample.radius;
 		if (sample.kind == 3 || sample.kind == 4)
 		{
@@ -310,6 +344,8 @@ void covenant_emitter_lighting_forget(void)
 {
 	ammo_counter_lighting_forget();
 	needler_lighting_forget();
+	authored_emitter_lighting_forget();
+	ambient_emitter_lighting_forget();
 	memset(emitters, 0, sizeof(emitters));
 }
 
@@ -381,5 +417,15 @@ int covenant_emitter_lighting_cone(long rasterizer, float axis[3], float origin[
 			*radius = emitters[i].radius;
 			return emitters[i].kind == 4 ? 2 : 1;
 		}
+	return FALSE;
+}
+
+int covenant_emitter_lighting_vehicle_occlusion(long light)
+{
+	int i;
+	for (i = 0; i < EMITTER_LIGHTS; i++)
+		if (emitters[i].active && emitters[i].kind == EMITTER_VEHICLE &&
+			emitters[i].light == light && light != NONE && emitter_kind_enabled(EMITTER_VEHICLE))
+			return TRUE;
 	return FALSE;
 }

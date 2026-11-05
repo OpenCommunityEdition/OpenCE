@@ -17,7 +17,7 @@ the menu to the camera, reticle and first-person weapon.
 | 1 | [Startup and the game loop](startup_and_loop.md) | Launch, enter a local map and draw between ticks: what runs when? |
 | 2 | [Settings, input and menus](settings_input_and_menus.md) | Save a setting and push a stick forward: how does an action reach the game? |
 | 3 | [Objects and gameplay](objects_and_gameplay.md) | Spawn, control and retire a player's body: who owns its state? |
-| 4 | [Rendering](rendering.md) | Draw a room and moving player: how do poses become pixels? Includes dynamic lighting 1.0 and separate Vulkan branch notes. |
+| 4 | [Rendering](rendering.md) | Draw a room and moving player: how do poses become pixels? Includes dynamic lighting 1.0, [emitter additions](emitter_expansion.md), and separate Vulkan branch notes. |
 | 5 | [Networking](networking.md) | Move a client player: what is predicted, validated, relayed and corrected? |
 | 6 | [Maps and resources](maps_and_resources.md) | Load a package level: how do Xbox, CE and MCC readers keep their data and lifetimes separate? |
 | 7 | [Platforms and testing](platforms_and_testing.md) | Follow platform entry points and investigate an elevator regression: what evidence reaches the behaviour? |

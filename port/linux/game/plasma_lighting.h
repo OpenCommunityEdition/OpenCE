@@ -1,9 +1,10 @@
 #ifndef PLASMA_LIGHTING_H
 #define PLASMA_LIGHTING_H
 
-void plasma_lighting_prepare(long light_index, long object_index);
+void plasma_lighting_prepare(long light_index, long object_index, long definition_index);
 float plasma_lighting_radius(long light_index, long object_index, float radius);
 int light_port_attachment_radius(long light_index, long object_index, float *radius, int restore);
+int plasma_lighting_vehicle_occlusion(long light_index);
 void plasma_lighting_frame_end(void);
 void plasma_lighting_reset(void);
 void plasma_lighting_window_begin(void);

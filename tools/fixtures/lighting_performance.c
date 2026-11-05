@@ -16,8 +16,9 @@ static long selected, lights, occlusion_updates;
 static double occlusion_started, occlusion_seconds;
 static int screenshot_frames;
 static FILE *profile;
-static double phase_start[4], phase_time[4];
-static long phase_calls[4];
+enum { LIGHTING_PROFILE_PHASES = 8 };
+static double phase_start[LIGHTING_PROFILE_PHASES], phase_time[LIGHTING_PROFILE_PHASES];
+static long phase_calls[LIGHTING_PROFILE_PHASES];
 static double clock_seconds(void)
 {
 	LARGE_INTEGER counter, frequency;
@@ -92,7 +93,7 @@ void lighting_performance_frame(void)
 		setvbuf(timings, NULL, _IOFBF, 65536);
 		fprintf(timings, "seconds,frame_ms,selected,scene_lights,occlusion_updates,capture_excluded,tick,occlusion_ms\n");
 	}
-	if (phase_calls[0] || phase_calls[1] || phase_calls[2] || phase_calls[3])
+	if (phase_calls[0] || phase_calls[1] || phase_calls[2] || phase_calls[3] || phase_calls[7])
 	{
 		if (!profile)
 		{
@@ -100,15 +101,17 @@ void lighting_performance_frame(void)
 			if (profile)
 			{
 				setvbuf(profile, NULL, _IOFBF, 65536);
-				fprintf(profile, "seconds,trace_ms,field_ms,texture_ms,bind_ms,traces,fields,textures,binds\n");
+				fprintf(profile, "seconds,trace_ms,field_ms,texture_ms,bind_ms,prepare_ms,light_scene_ms,upload_ms,render_ms,traces,fields,textures,binds,prepares,light_scenes,uploads,renders\n");
 			}
 		}
 		if (profile)
-			fprintf(profile, "%.6f,%.6f,%.6f,%.6f,%.6f,%ld,%ld,%ld,%ld\n", now-origin,
+			fprintf(profile, "%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n", now-origin,
 				phase_time[0]*1000, phase_time[1]*1000, phase_time[2]*1000, phase_time[3]*1000,
-				phase_calls[0],phase_calls[1],phase_calls[2],phase_calls[3]);
+				phase_time[4]*1000, phase_time[5]*1000, phase_time[6]*1000, phase_time[7]*1000,
+				phase_calls[0],phase_calls[1],phase_calls[2],phase_calls[3],
+				phase_calls[4],phase_calls[5],phase_calls[6],phase_calls[7]);
 	}
-	for (i = 0; i < 4; i++) { phase_time[i] = 0; phase_calls[i] = 0; }
+	for (i = 0; i < LIGHTING_PROFILE_PHASES; i++) { phase_time[i] = 0; phase_calls[i] = 0; }
 	if (timings)
 	{
 		fprintf(timings, "%.6f,%.6f,%ld,%ld,%ld,%d,%ld,%.6f\n", now - origin,

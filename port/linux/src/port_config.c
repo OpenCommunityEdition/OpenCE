@@ -646,6 +646,12 @@ static const struct config_setting config_settings[] =
 	{ "display.jackal_shield_lighting", _config_boolean, "false", "HALO_JACKAL_SHIELD_LIGHTING", _environment_value, _platform_desktop,
 		"Soft illumination from visible Jackal shields, following their colour and pose.\n"
 		"Stock shield effects remain intact. Optional occlusion uses plasma_occlusion." },
+	{ "display.weapon_glow", _config_boolean, "false", "HALO_WEAPON_GLOW", _environment_value, _platform_desktop,
+		"Held energy weapons cast soft light. Disabled by default." },
+	{ "display.vehicle_lighting", _config_boolean, "false", "HALO_VEHICLE_LIGHTING", _environment_value, _platform_desktop,
+		"Vehicle engines and headlights illuminate nearby surfaces. Disabled by default." },
+	{ "display.world_lighting", _config_boolean, "false", "HALO_WORLD_LIGHTING", _environment_value, _platform_desktop,
+		"Visible powerups and teleporters cast soft light. Disabled by default." },
 	{ "display.needler_lighting", _config_boolean, "false", "HALO_NEEDLER_LIGHTING", _environment_value, _platform_desktop,
 	  "Soft pink-purple spill and luminous crystals on held Needlers." },
 	{ "display.ammo_counter_lighting", _config_boolean, "false", "HALO_AMMO_COUNTER_LIGHTING", _environment_value, _platform_desktop,

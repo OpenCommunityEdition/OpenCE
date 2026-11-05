@@ -1,6 +1,12 @@
 """Compare and time complete ray batches against the original query in one pose."""
 from pathlib import Path
 
+def instrument_collision(text):
+    assert text.count('&batch.cache);') == 1
+    return ('extern int lighting_trace_uncached; /* test build only */\n'+
+            text.replace('&batch.cache);', 'lighting_trace_uncached ? NULL : &batch.cache);'))
+
+
 def instrument(text):
     marker='static void trace_depths('
     assert text.count(marker)==1

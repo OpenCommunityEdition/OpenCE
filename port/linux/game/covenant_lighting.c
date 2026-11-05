@@ -11,7 +11,7 @@
 #include "plasma_occlusion.h"
 #include <string.h>
 
-int config_boolean(const char *name);
+#include "lighting_config.h"
 long light_port_glow_definition_get(void);
 boolean light_port_glow_set(long light_index, long object_index, real_rgb_color const *color, real radius);
 
@@ -66,7 +66,7 @@ void covenant_lighting_color(long object_index, long definition_index, real_rgb_
 {
 	struct object_datum *object;
 	const char *name;
-	if (!config_boolean("display.plasma_lighting"))
+	if (!lighting_config_boolean("display.plasma_lighting"))
 		return;
 	object = object_try_and_get(object_index);
 	if (!object || object->object.type != _object_type_projectile)
@@ -131,7 +131,7 @@ void covenant_lighting_update(void)
 {
 	struct object_iterator iterator;
 	int i, slot, profile;
-	int enabled = config_boolean("display.plasma_lighting");
+	int enabled = lighting_config_boolean("display.plasma_lighting");
 	for (i = 0; i < COVENANT_LIGHTS; i++)
 		if (covenant_lights[i].active && (!enabled || covenant_visible_profile(covenant_lights[i].object_index) == NONE))
 			covenant_release(&covenant_lights[i]);
@@ -191,7 +191,7 @@ void covenant_lighting_frame_end(void)
 		struct covenant_light *light = &covenant_lights[i];
 		if (!light->active)
 			continue;
-		if (!config_boolean("display.plasma_lighting"))
+		if (!lighting_config_boolean("display.plasma_lighting"))
 			covenant_release(light);
 		else if (light_port_glow_set(light->light_index, light->object_index, &covenant_black, 0.0f) && light->connected)
 		{
@@ -231,7 +231,7 @@ void covenant_lighting_submitted(long light_index, long rasterizer_index)
 int covenant_lighting_selected(long rasterizer_index)
 {
 	int i;
-	if (rasterizer_index == NONE || !config_boolean("display.plasma_lighting"))
+	if (rasterizer_index == NONE || !lighting_config_boolean("display.plasma_lighting"))
 		return FALSE;
 	for (i = 0; i < COVENANT_LIGHTS; i++)
 		if (covenant_lights[i].active && covenant_lights[i].rasterizer_index == rasterizer_index)
@@ -244,7 +244,7 @@ int covenant_lighting_selected(long rasterizer_index)
 float covenant_lighting_radius(long light_index, long object_index, float radius)
 {
 	int i;
-	if (!config_boolean("display.plasma_lighting"))
+	if (!lighting_config_boolean("display.plasma_lighting"))
 		return radius;
 	for (i = 0; i < COVENANT_LIGHTS; i++)
 		if (covenant_lights[i].active && covenant_lights[i].light_index == light_index &&

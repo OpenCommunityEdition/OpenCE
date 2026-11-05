@@ -15,8 +15,9 @@
 #include "shield_glow.h"
 #include "overshield_effect.h"
 
-void plasma_lighting_prepare(long light, long object) {}
+void plasma_lighting_prepare(long light, long object, long definition) {}
 float plasma_lighting_radius(long light, long object, float radius) { return radius; }
+int plasma_lighting_vehicle_occlusion(long light) { return FALSE; }
 void plasma_lighting_frame_end(void) {}
 void plasma_lighting_reset(void) {}
 void plasma_lighting_window_begin(void) {}
@@ -90,3 +91,5 @@ void shield_glow_window_begin(void) {}
 void shield_glow_submitted(long light, long rasterizer) {}
 boolean shield_glow_selected(long rasterizer) { return FALSE; }
 float shield_glow_radius(long light, float radius) { return radius; }
+
+int covenant_emitter_lighting_vehicle_occlusion(long light) { (void)light; return 0; }

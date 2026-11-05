@@ -17,6 +17,20 @@ header included in hcex build.
 
 /* ---------- structures */
 
+/* port: optional synchronous vector-batch scratch. Zero before use; all rays
+must share the same BSP and point. No pointers may survive the batch. */
+enum { COLLISION_VECTOR_CACHE_NODES = 512 };
+struct collision_bsp_vector_cache
+{
+	struct
+	{
+		long index_plus_one;
+		struct bsp3d_node const *node;
+		real_plane3d const *plane;
+		real distance;
+	} nodes[COLLISION_VECTOR_CACHE_NODES];
+};
+
 struct collision_bsp_test_vector_result
 {
 	real t;
@@ -86,6 +100,21 @@ struct collision_bsp_test_sphere_result
 };
 
 /* ---------- prototypes/COLLISION_BSP.C */
+
+/* port: render batches may skip a proven common prefix; callers retain the
+original depth and prove the entire segment lies in the requested subtree. */
+boolean collision_bsp_test_vector_from_node(
+	unsigned long flags,
+	struct collision_bsp const *bsp,
+	short breakable_surface_count,
+	byte const *breakable_surface_flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real maximum_t,
+	struct collision_bsp_test_vector_result *result,
+	long start_node,
+	short start_depth,
+	struct collision_bsp_vector_cache *cache);
 
 /* port: whether a surface's ring of edges (from the map) goes on to
 `edge_index` after `edge_count` of its edges (FALSE, reported once, if it

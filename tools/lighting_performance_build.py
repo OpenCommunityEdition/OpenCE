@@ -8,9 +8,30 @@ import shlex
 import shutil
 import subprocess
 import sys
-from lighting_trace_check import instrument
+from lighting_trace_check import instrument, instrument_collision
+from harness import function
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def instrument_renderer_profile(text):
+    # Time unchanged bodies, including early returns. These inclusive timers
+    # overlap lighting's field/binding phases; do not add them together.
+    for name, phase, signature, call, result in [
+        ('prepare_draw', 4, 'BOOL immediate', 'immediate', 'struct program_entry *'),
+        ('buffer_upload', 6, 'GLenum target, unsigned long offset, unsigned long size, const void *data',
+         'target, offset, size, data', 'void'),
+    ]:
+        body = function(text, name)
+        renamed = body.replace(name+'(', 'lighting_timed_'+name+'(', 1)
+        wrapper = f'\nstatic {result} {name}({signature})\n{{\n'
+        if result != 'void': wrapper += f'\t{result} value;\n'
+        wrapper += f'\tlighting_profile_begin({phase});\n'
+        wrapper += '\t' + ('value = ' if result != 'void' else '') + f'lighting_timed_{name}({call});\n'
+        wrapper += f'\tlighting_profile_end({phase});\n'
+        if result != 'void': wrapper += '\treturn value;\n'
+        text = text.replace(body, renamed+wrapper+'}\n', 1)
+    return text
 
 
 def instrument_shader_stalls(text):
@@ -48,6 +69,8 @@ def main():
     paths = ['source/main/main.c', 'port/linux/src/d3d8_gl.c',
              'port/linux/game/plasma_lighting.c', 'port/linux/game/plasma_occlusion.c',
              'port/linux/game/plasma_falloff.c', 'port/linux/game/plasma_collision.c']
+    if args.profile:
+        paths += ['source/objects/object_lights.c']
     if args.diagnose or args.resources:
         paths += ['source/physics/collision_usage.c', 'port/linux/src/xbox_textures.c']
     originals = {p: (ROOT/p).read_bytes() for p in paths}
@@ -56,8 +79,10 @@ def main():
                     configure_args=saved, production_hashes={p: hashlib.sha256(b).hexdigest() for p, b in originals.items()},
                     fixture_sha256=hashlib.sha256((ROOT/'tools/fixtures/lighting_performance.c').read_bytes()).hexdigest(),
                     profile=args.profile, diagnose=args.diagnose, resources=args.resources, stalls=args.stalls, verify_traces=args.verify_traces)
-    for path in ['port/linux/src/plasma_occlusion_gl.c', 'port/linux/include/plasma_occlusion.h',
-                 'port/linux/include/plasma_collision.h']:
+    for path in ['port/linux/game/authored_emitter_lighting.c', 'port/linux/game/ambient_emitter_lighting.c',
+                 'port/linux/game/covenant_emitter_lighting.c', 'port/linux/src/plasma_occlusion_gl.c', 'port/linux/include/plasma_occlusion.h',
+                 'port/linux/include/plasma_collision.h', 'source/physics/collision_bsp.c',
+                 'source/physics/collision_bsp.h', 'port/linux/game/lighting_config.c']:
         manifest['production_hashes'][path]=hashlib.sha256((ROOT/path).read_bytes()).hexdigest()
     diagnostic_sources=[]
     if args.diagnose or args.resources:
@@ -146,6 +171,19 @@ def main():
             replace(occlusion, '\tfield->texture_mask |= 1 << pass;', '\tlighting_profile_end(2);\n\tfield->texture_mask |= 1 << pass;')
             backend=ROOT/paths[1]
             backend.write_text(declarations+'int lighting_profile_model, lighting_profile_world;\n'+backend.read_text())
+            backend.write_text(instrument_renderer_profile(backend.read_text()))
+            scene = ROOT/'source/objects/object_lights.c'
+            text = scene.read_text()
+            anchor = 'void lights_preprocess_scene(\n\tvoid)'
+            assert text.count(anchor) == 1
+            text = text.replace(anchor, 'static void lighting_timed_preprocess_scene(void)', 1)
+            scene.write_text(declarations+text+'\n/* port: test-build-only inclusive scene timing. */\n'
+                'void lights_preprocess_scene(void) { lighting_profile_begin(5); '
+                'lighting_timed_preprocess_scene(); lighting_profile_end(5); }\n')
+            main = ROOT/paths[0]
+            main.write_text(declarations+main.read_text())
+            render = 'main_game_render((double)main_globals.seconds_elapsed);'
+            replace(main, render, 'lighting_profile_begin(7);\n\t\t\t\t\t'+render+'\n\t\t\t\t\tlighting_profile_end(7);')
             replace(backend, '\tif (plasma_mask && entry->plasma_model_slots >= 0)\n\t{', '\tlighting_profile_model = plasma_mask && entry->plasma_model_slots >= 0 ? 1 : 0;\n\tif (plasma_mask && entry->plasma_model_slots >= 0)\n\t{')
             bind='\t\tplasma_occlusion_bind_model(&entry->plasma_occlusion);'
             replace(backend, bind, '\t\tlighting_profile_begin(3);\n'+bind+'\n\t\tlighting_profile_end(3);')
@@ -163,6 +201,8 @@ def main():
             replace(falloff, '\tplasma_specular_tint = 0x00FFFFFFUL;\n\tif (!plasma_falloff_bound)', '\tlighting_profile_world = 0;\n\tplasma_specular_tint = 0x00FFFFFFUL;\n\tif (!plasma_falloff_bound)')
         if args.verify_traces:
             occlusion.write_text(instrument(occlusion.read_text()))
+            collision = ROOT/'port/linux/game/plasma_collision.c'
+            collision.write_text(instrument_collision(collision.read_text()))
         subprocess.run([sys.executable, 'configure.py', *saved], cwd=ROOT, check=True)
         subprocess.run(['ninja', 'windows'], cwd=ROOT, check=True)
         shutil.copy2(ROOT/'build/windows/halo.exe', output/'halo-performance.exe')
