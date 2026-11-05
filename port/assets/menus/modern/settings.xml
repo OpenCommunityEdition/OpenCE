@@ -1475,7 +1475,7 @@
 	<strings name="modern/graphics/help_strings">
 		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
 		<string text="Draw the frame rate at the bottom right of a game, counted over half a second." />
-		<string text="Fill the screen with the original loading art and a smooth sweep, including MCC loading." />
+		<string text="Widen the original loading screen, keeping its stock sweep and glow trails. Includes MCC." />
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA and SMAA are cheap; SSAA and MSAA are sharper." />
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA is cheap; MSAA is sharper." />
 		<string text="Keep floors and walls sharp at a grazing angle, which the Xbox did not. Off: as the Xbox." />

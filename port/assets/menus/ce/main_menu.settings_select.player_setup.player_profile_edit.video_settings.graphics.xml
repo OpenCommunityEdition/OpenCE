@@ -159,7 +159,7 @@
 		<string text="Draw the frame rate at the bottom right of a game,\ncounted over half a second."/>
 		<string text="Draw the HUD from the high-res redraws; off\ndraws the game's own pictures."/>
 		<string text="Draw text and titles with high-res fonts; off\ndraws the game's own."/>
-		<string text="Fill the screen with the original loading art\nand a smooth sweep, including MCC loading."/>
+		<string text="Widen the original loading screen, keeping its\nstock sweep and glow trails. Includes MCC."/>
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA\nand SMAA are cheap; SSAA and MSAA are sharper."/>
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA\nis cheap; MSAA is sharper."/>
 		<string text="Keep floors and walls sharp at a grazing angle,\nwhich the Xbox did not. Off: as the Xbox."/>

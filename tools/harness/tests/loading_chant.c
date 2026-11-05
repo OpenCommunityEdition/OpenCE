@@ -46,6 +46,7 @@ typedef int boolean;
 static struct {LPDIRECTSOUNDBUFFER sounds[4];} progress_bar_globals;
 static struct {int active, capture_frame;} progress_bar_mode;
 static void SetThreadPriority(void *thread, int priority) {(void)thread; (void)priority;}
+static void loading_widescreen_begin(void) { }
 static void loading_widescreen_end(void) { }
 /* LIFECYCLE */
 

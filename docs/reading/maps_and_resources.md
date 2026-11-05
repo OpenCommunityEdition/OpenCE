@@ -270,8 +270,9 @@ No new network message or readiness decision is introduced: peers still finish
 their own conversions and use the existing host-controlled loading protocol.
 
 The optional [widescreen presentation](loading_presentation.md) scales this
-same original picture to fill the render target and draws the sweep at its
-resolution. MCC retains the controller and ownership described above.
+same stock effect horizontally to fill the render target, retaining the
+original mask, feedback blur and glow trails. MCC retains the controller
+and ownership described above.
 
 The shared loading effect also plays the Xbox's embedded monk chant from
 [`progress_bar.c`](../../source/interface/progress_bar.c). Its four looping

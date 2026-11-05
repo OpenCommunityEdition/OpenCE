@@ -29,6 +29,7 @@ Conventions carried over from the Xbox:
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
+#include "loading_widescreen.h"
 #include "posix.h"
 #include "main/console.h"
 #ifdef HALO_ANDROID
@@ -2271,20 +2272,6 @@ static BOOL bind_targets(BOOL *has_depth)
 	return TRUE;
 }
 
-BOOL xgpu_presentation_target(unsigned long *width, unsigned long *height)
-{
-	struct xgpu_render_target *target;
-	BOOL has_depth;
-
-	if (!device.gl_ready || !device.render_target || !bind_targets(&has_depth))
-		return FALSE;
-	target = xgpu_render_target_find(device.render_target->Data);
-	if (!target || !target->gl_width || !target->gl_height)
-		return FALSE;
-	*width = target->gl_width;
-	*height = target->gl_height;
-	return TRUE;
-}
 
 /* ---------- display.hdr */
 
@@ -7906,7 +7893,9 @@ reads back (GetBackBuffer with -1, progress_bar.c) and draws again blurred,
 a little larger and fainter, under each new frame: the trails of its light.
 Here it is a render target of the menus' 640x480, which takes the 640
 columns in the middle of the frame (where the loading screen draws, as the
-menus do on a wide screen) once the loading screen has drawn it, while the
+menus do on a wide screen), or the whole width while widescreen loading is
+active. The effect and its feedback stay in their original 640x480 space;
+only their horizontal presentation changes. Capture happens while the
 screen asks for it: at its BlockUntilVerticalBlank, its last call, so that
 what is drawn over it after (the download screen's words) leaves no trail. */
 
@@ -7980,6 +7969,13 @@ static void front_buffer_take(void)
 	width = (GLint)(FRONT_BUFFER_WIDTH * back_buffer->target.scale[0] + 0.5f);
 	left = ((GLint)back_buffer->target.gl_width - width) / 2;
 	if (left < 0)
+	{
+		left = 0;
+		width = (GLint)back_buffer->target.gl_width;
+	}
+	/* The loading feature expands the original effect across this width.
+	Capture all of it back into the stock feedback texture, not its centre. */
+	if (loading_widescreen_active())
 	{
 		left = 0;
 		width = (GLint)back_buffer->target.gl_width;

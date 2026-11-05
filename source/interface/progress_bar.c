@@ -1585,7 +1585,7 @@ void progress_bar_dispose(
 	/* port: shutdown need not render another frame to retire the chant. */
 	long sound_index;
 
-	/* port: release presentation resources while the device is alive. */
+	/* port: retire the loading-only framing choice at shutdown too. */
 	loading_widescreen_end();
 	for (sound_index= 0; sound_index<NUMBER_OF_PROGRESS_BAR_SOUNDS; sound_index++)
 	{
@@ -1606,6 +1606,8 @@ void progress_bar_begin(
 	next eachframe cleanup. Restart the voices stopped at the last end. */
 	long sound_index;
 
+	/* port: drawing and feedback capture use the same framing this load. */
+	loading_widescreen_begin();
 	for (sound_index= 0; sound_index<NUMBER_OF_PROGRESS_BAR_SOUNDS; sound_index++)
 	{
 		if (progress_bar_globals.sounds[sound_index])
@@ -1628,7 +1630,7 @@ void progress_bar_end(
 	/* port: stop on success or failure, even if no normal frame follows. */
 	long sound_index;
 
-	/* port: enhanced presentation keeps no resources across loads. */
+	/* port: normal rendering keeps its established front-buffer framing. */
 	loading_widescreen_end();
 	for (sound_index= 0; sound_index<NUMBER_OF_PROGRESS_BAR_SOUNDS; sound_index++)
 	{
@@ -2066,26 +2068,19 @@ static void progress_bar_render(
 		}
 	}
 
-	/* port: optional full-width presentation, after the stock chant's
-	volume envelopes; disabled or unavailable leaves the stock effect. */
-	if (loading_widescreen_draw(progress, progress_bar_mode.texture0))
-	{
-		rasterizer_forget_hardware_state();
-		return;
-	}
 	current_time= GetTickCount();
 	IDirect3DDevice8_GetTransform(global_d3d_device, D3DTS_WORLD, &progress_bar_globals.saved_world);
 	IDirect3DDevice8_GetTransform(global_d3d_device, D3DTS_VIEW, &progress_bar_globals.saved_view);
 	IDirect3DDevice8_GetTransform(global_d3d_device, D3DTS_PROJECTION, &progress_bar_globals.saved_projection);
 	IDirect3DDevice8_SetTransform(global_d3d_device, D3DTS_WORLD, &progress_bar_globals.world);
 	IDirect3DDevice8_SetTransform(global_d3d_device, D3DTS_VIEW, &progress_bar_globals.view);
-	/* port: on a wide screen, the 640 columns in its middle, as the menus are
-	drawn (the frame before, which the trails are, is those columns:
-	d3d8_gl.c's front buffer) */
+	/* port: widescreen expands the stock effect horizontally; otherwise
+	keep its central 640 columns. The front-buffer capture matches this. */
 	{
 		D3DXMATRIX projection= progress_bar_globals.projection;
 
-		projection._11*= 640.f/(real)halo_screen_width();
+		if (!loading_widescreen_active())
+			projection._11*= 640.f/(real)halo_screen_width();
 		IDirect3DDevice8_SetTransform(global_d3d_device, D3DTS_PROJECTION, &projection);
 	}
 	IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_ALPHABLENDENABLE, TRUE);

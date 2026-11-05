@@ -108,7 +108,7 @@ SCREENS = {
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
             ("WIDESCREEN LOADING:", "display.widescreen_loading", ON_OFF,
-             "Fill the screen with the original loading art\nand a smooth sweep, including MCC loading.", None),
+             "Widen the original loading screen, keeping its\nstock sweep and glow trails. Includes MCC.", None),
             ("ANTI-ALIASING:", "display.anti_aliasing",
              [("OFF", "off"), ("FXAA", "fxaa"), ("SMAA", "smaa"), ("SSAA 2X", "ssaa2x"), ("MSAA 2X", "msaa2x"),
               ("MSAA 4X", "msaa4x"), ("MSAA 8X", "msaa8x")],

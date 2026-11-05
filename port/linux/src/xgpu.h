@@ -290,10 +290,6 @@ struct xgpu_render_target
 /* the GL texture holding a render target with this physical address, or 0 */
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data);
 
-/* Bind the device's current color target for a standalone presentation pass,
- * preserving MSAA/write tracking; return its physical pixel dimensions. */
-BOOL xgpu_presentation_target(unsigned long *width, unsigned long *height);
-
 /* ---------- anti-aliasing
 
 display.anti_aliasing's passes (xgpu_post.c): FXAA or SMAA antialias each
