@@ -13,6 +13,8 @@
 #include "covenant_emitter_lighting.h"
 #include "muzzle_lighting.h"
 #include "shield_glow.h"
+#include "rasterizer/rasterizer.h"
+#include "rasterizer/rasterizer_lights.h"
 #include <string.h>
 
 #include "lighting_config.h"
@@ -203,6 +205,24 @@ int plasma_lighting_selected(long rasterizer_index)
 		if (plasma_lighting_attachments[index].rasterizer_index == rasterizer_index &&
 			authored_emitter_lighting_category_enabled(plasma_lighting_attachments[index].category))
 			return TRUE;
+	return FALSE;
+}
+
+int plasma_lighting_prong_cone(long rasterizer, float axis[3], float origin[3], float *radius)
+{
+	int i;
+	struct rasterizer_light_submit_parameters *light;
+	if (!lighting_config_boolean("display.plasma_prong_lighting") || rasterizer < 0 || rasterizer >= rasterizer_lights.light_count)
+		return FALSE;
+	for (i = 0; i < plasma_lighting_count; i++)
+		if (plasma_lighting_attachments[i].category == 4 && plasma_lighting_attachments[i].rasterizer_index == rasterizer)
+		{
+			light = &rasterizer_lights.lights[rasterizer];
+			axis[0] = light->forward.i; axis[1] = light->forward.j; axis[2] = light->forward.k;
+			origin[0] = light->position.x; origin[1] = light->position.y; origin[2] = light->position.z;
+			*radius = light->radius;
+			return 3;
+		}
 	return FALSE;
 }
 

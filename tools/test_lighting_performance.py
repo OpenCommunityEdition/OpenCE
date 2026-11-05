@@ -77,3 +77,10 @@ def test_early_exit_keeps_missing_memory_windows_distinct_from_zero():
     samples=[dict(seconds=45,private=100*2**20),dict(seconds=50,private=120*2**20)]
     assert memory_window_mib(samples,45,75)==110
     assert memory_window_mib(samples,585) is None
+
+
+def test_240_fps_budget_counts_sub_120_stalls():
+    result = distribution([4.0, 4.16, 4.18, 8.0], 240)
+    assert result['budget_ms'] == pytest.approx(1000 / 240)
+    assert result['over_budget_percent'] == 50
+    assert result['over_1_5_budget_percent'] == 25

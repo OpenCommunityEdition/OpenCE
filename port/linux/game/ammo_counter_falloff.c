@@ -6,6 +6,7 @@
 #include "covenant_emitter_lighting.h"
 #include "ammo_counter_falloff.h"
 #include "plasma_occlusion.h"
+#include "plasma_lighting.h"
 #include <math.h>
 #include <string.h>
 
@@ -41,6 +42,17 @@ float needler_falloff_factor(float height)
 	return 1.0f - t*t*(3.0f - 2.0f*t);
 }
 
+/* Exposed prongs illuminate a broad forward lobe, with a soft transition
+   just behind the emitter plane rather than the counter's focused mask. */
+float plasma_prong_falloff_factor(const float axis[3], float x, float y, float z)
+{
+	float length = sqrtf(x*x + y*y + z*z);
+	float t;
+	if (length < 0.00001f) return 0.0f;
+	t = PIN(((axis[0]*x + axis[1]*y + axis[2]*z) / length + 0.2f) / 0.7f, 0.0f, 1.0f);
+	return t*t*(3.0f - 2.0f*t);
+}
+
 void *ammo_counter_falloff_texture(long rasterizer, int radial, float transform[4])
 {
 	float axis[3], origin[3], radius, scale = 1.0f;
@@ -49,6 +61,7 @@ void *ammo_counter_falloff_texture(long rasterizer, int radial, float transform[
 	unsigned long pixels[COUNTER_COUNT];
 	int i, x, y, z;
 	int profile = covenant_emitter_lighting_cone(rasterizer, axis, origin, &radius);
+	if (!profile) profile = plasma_lighting_prong_cone(rasterizer, axis, origin, &radius);
 	if (!profile || radius <= 0.0f)
 		return NULL;
 	if (transform)
@@ -71,7 +84,7 @@ void *ammo_counter_falloff_texture(long rasterizer, int radial, float transform[
 	if (!counter)
 		return NULL;
 	/* Translation and radius change the transform, not the normalized mask. */
-	if (counter->profile != profile || (profile == 1 && (counter->axis[0] != axis[0] ||
+	if (counter->profile != profile || (profile != 2 && (counter->axis[0] != axis[0] ||
 		counter->axis[1] != axis[1] || counter->axis[2] != axis[2])))
 	{
 		counter->mask = 0;
@@ -102,7 +115,7 @@ void *ammo_counter_falloff_texture(long rasterizer, int radial, float transform[
 				float dx = 2.0f*(x+0.5f)/COUNTER_SIZE - 1.0f;
 				float dy = 2.0f*(y+0.5f)/COUNTER_SIZE - 1.0f;
 				float dz = 2.0f*(z+0.5f)/COUNTER_SIZE - 1.0f;
-				float value = profile == 2 ? needler_falloff_factor(dz * scale) :
+				float value = profile == 3 ? plasma_prong_falloff_factor(axis, dx, dy, dz) : profile == 2 ? needler_falloff_factor(dz * scale) :
 					ammo_counter_falloff_factor(axis, dx, dy, dz);
 				float remaining = MAX(0.0f, 1.0f - dx*dx - dy*dy - dz*dz);
 				if (radial) value *= remaining*remaining;

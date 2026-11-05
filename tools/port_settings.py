@@ -371,15 +371,17 @@ _video["categories"] = [
      "Visual modifiers the stock game does not\nhave, such as HDR and overshields."),
 ]
 SCREENS["video_settings/dynamic_lighting"] = {
-    "screen": "dynamic_lighting_settings_screen", "header": _video["header"], "spacing": 28,
-    "help_top": 360, "help_height": 50,
+    "screen": "dynamic_lighting_settings_screen", "header": _video["header"], "spacing": 26,
+    "help_top": 370, "help_height": 40,
     "rows": [
         ("PROJECTILE LIGHTS:", "display.plasma_lighting", ON_OFF,
          "Plasma, grenades, rockets and flame streams cast\nsoft light on nearby surfaces and models.", None),
         ("MUZZLE FLASH LIGHTS:", "display.muzzle_lighting", ON_OFF,
          "Weapon flashes light nearby surfaces, including\nWarthog and Scorpion guns. Stock effects remain.", None),
         ("WEAPON GLOW:", "lighting.weapon_glow", ON_OFF + [("CUSTOM", "custom")],
-         "Swords, plasma charge/heat, fuel rods, Needler\nand AR screens. CUSTOM keeps individual choices.", None),
+         "Swords, plasma charge, fuel rods, Needler and AR\nscreens. CUSTOM keeps individual choices.", None),
+        ("PLASMA PRONG LIGHTING:", "display.plasma_prong_lighting", ON_OFF,
+         "Short, soft spill from plasma-weapon prongs.\nUses the shared eight-light occlusion budget.", None),
         ("SHIELD EMITTERS:", "lighting.shield_emitters", ON_OFF + [("CUSTOM", "custom")],
          "Jackal and stationary shields light surroundings.\nCUSTOM keeps individual choices.", None),
         ("VEHICLE LIGHTS:", "display.vehicle_lighting", ON_OFF,

@@ -23,6 +23,7 @@ void plasma_lighting_reset(void) {}
 void plasma_lighting_window_begin(void) {}
 void plasma_lighting_submitted(long light, long rasterizer) {}
 int plasma_lighting_selected(long rasterizer) { return FALSE; }
+int plasma_lighting_prong_cone(long rasterizer, float axis[3], float origin[3], float *radius) { return FALSE; }
 void plasma_model_lighting_reset(void) {}
 void plasma_model_lighting_slot(long light, short slot) {}
 unsigned int plasma_model_lighting_mask(void) { return 0; }
