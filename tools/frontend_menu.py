@@ -75,6 +75,7 @@ def value_caption(value):
     return value.rstrip() + "..."
 
 SHORT_LABELS = {
+    "display.widescreen_loading": "WIDE LOADING",
     "input.mouse_sensitivity": "HORIZONTAL SENS.", "input.mouse_vertical_sensitivity": "VERTICAL SENS.",
     "input.invert_mouse": "INVERT MOUSE", "network.allow_upnp": "UPNP FORWARDING",
     "network.join_from_clipboard": "CLIPBOARD INVITES", "input.auto_button_detection": "AUTO DETECTION",

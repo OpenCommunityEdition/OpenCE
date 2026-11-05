@@ -1324,15 +1324,16 @@
 		<data input="port frontend update" />
 		<child widget="modern/graphics/tabs" x="28" y="76" />
 		<child widget="modern/graphics/row_display_show_fps0" x="28" y="137" />
-		<child widget="modern/graphics/row_display_anti_aliasing1" x="28" y="167" platform="desktop" />
-		<child widget="modern/graphics/row_display_anti_aliasing2" x="28" y="197" platform="android web" />
-		<child widget="modern/graphics/row_display_anisotropic_filtering3" x="28" y="227" />
-		<child widget="modern/graphics/row_display_shadow_resolution4" x="28" y="257" />
-		<child widget="modern/graphics/row_display_per_pixel_lighting5" x="28" y="287" />
-		<child widget="modern/graphics/row_display_model_detail6" x="28" y="317" />
-		<child widget="modern/graphics/row_link_8" x="28" y="347" platform="desktop web" />
-		<child widget="modern/graphics/row_link_16" x="28" y="377" />
-		<child widget="modern/graphics/row_link_0" x="28" y="407" />
+		<child widget="modern/graphics/row_display_widescreen_loading1" x="28" y="167" />
+		<child widget="modern/graphics/row_display_anti_aliasing2" x="28" y="197" platform="desktop" />
+		<child widget="modern/graphics/row_display_anti_aliasing3" x="28" y="227" platform="android web" />
+		<child widget="modern/graphics/row_display_anisotropic_filtering4" x="28" y="257" />
+		<child widget="modern/graphics/row_display_shadow_resolution5" x="28" y="287" />
+		<child widget="modern/graphics/row_display_per_pixel_lighting6" x="28" y="317" />
+		<child widget="modern/graphics/row_display_model_detail7" x="28" y="347" />
+		<child widget="modern/graphics/row_link_8" x="28" y="377" platform="desktop web" />
+		<child widget="modern/graphics/row_link_16" x="28" y="407" />
+		<child widget="modern/graphics/row_link_0" x="28" y="437" />
 		<child widget="modern/graphics/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/graphics/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -1381,52 +1382,60 @@
 	<widget name="modern/graphics/spinner_display_show_fps0" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.show_fps" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_anti_aliasing1" width="336" height="26" bitmap="modern/row" platform="desktop" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_anti_aliasing1" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_anti_aliasing1" x="180" y="3" />
+	<widget name="modern/graphics/row_display_widescreen_loading1" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_widescreen_loading1" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_widescreen_loading1" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_anti_aliasing1" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_anti_aliasing1" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|SMAA|SSAA 2X|MSAA 2X|MSAA 4X|MSAA 8X" values="off|fxaa|smaa|ssaa2x|msaa2x|msaa4x|msaa8x" setting="display.anti_aliasing" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_widescreen_loading1" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_widescreen_loading1" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.widescreen_loading" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_anti_aliasing2" width="336" height="26" bitmap="modern/row" platform="android web" flags="pass_unhandled_to_focused_child nifty_fx">
+	<widget name="modern/graphics/row_display_anti_aliasing2" width="336" height="26" bitmap="modern/row" platform="desktop" flags="pass_unhandled_to_focused_child nifty_fx">
 		<child widget="modern/graphics/label_display_anti_aliasing2" x="12" y="3" />
 		<child widget="modern/graphics/spinner_display_anti_aliasing2" x="180" y="3" />
 	</widget>
 	<widget name="modern/graphics/label_display_anti_aliasing2" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_anti_aliasing2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|MSAA 2X|MSAA 4X" values="off|fxaa|msaa2x|msaa4x" setting="display.anti_aliasing" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/spinner_display_anti_aliasing2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|SMAA|SSAA 2X|MSAA 2X|MSAA 4X|MSAA 8X" values="off|fxaa|smaa|ssaa2x|msaa2x|msaa4x|msaa8x" setting="display.anti_aliasing" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_anisotropic_filtering3" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_anisotropic_filtering3" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_anisotropic_filtering3" x="180" y="3" />
+	<widget name="modern/graphics/row_display_anti_aliasing3" width="336" height="26" bitmap="modern/row" platform="android web" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_anti_aliasing3" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_anti_aliasing3" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_anisotropic_filtering3" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_anisotropic_filtering3" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|2X|4X|8X|16X" values="0|2|4|8|16" setting="display.anisotropic_filtering" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_anti_aliasing3" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_anti_aliasing3" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|MSAA 2X|MSAA 4X" values="off|fxaa|msaa2x|msaa4x" setting="display.anti_aliasing" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_shadow_resolution4" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_shadow_resolution4" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_shadow_resolution4" x="180" y="3" />
+	<widget name="modern/graphics/row_display_anisotropic_filtering4" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_anisotropic_filtering4" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_anisotropic_filtering4" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_shadow_resolution4" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_shadow_resolution4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="128|256|512|1024" values="128|256|512|1024" setting="display.shadow_resolution" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_anisotropic_filtering4" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_anisotropic_filtering4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|2X|4X|8X|16X" values="0|2|4|8|16" setting="display.anisotropic_filtering" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_per_pixel_lighting5" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_per_pixel_lighting5" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_per_pixel_lighting5" x="180" y="3" />
+	<widget name="modern/graphics/row_display_shadow_resolution5" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_shadow_resolution5" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_shadow_resolution5" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_per_pixel_lighting5" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_per_pixel_lighting5" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.per_pixel_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_shadow_resolution5" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_shadow_resolution5" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="128|256|512|1024" values="128|256|512|1024" setting="display.shadow_resolution" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_model_detail6" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_model_detail6" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_model_detail6" x="180" y="3" />
+	<widget name="modern/graphics/row_display_per_pixel_lighting6" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_per_pixel_lighting6" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_per_pixel_lighting6" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_model_detail6" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_model_detail6" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STOCK|NATIVE|HIGHEST" values="stock|native|highest" setting="display.model_detail" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_per_pixel_lighting6" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_per_pixel_lighting6" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.per_pixel_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/graphics/row_display_model_detail7" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_model_detail7" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_model_detail7" x="180" y="3" />
+	</widget>
+	<widget name="modern/graphics/label_display_model_detail7" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_model_detail7" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STOCK|NATIVE|HIGHEST" values="stock|native|highest" setting="display.model_detail" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/graphics/row_link_8" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="nifty_fx">
@@ -1435,23 +1444,24 @@
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/graphics/label_link_8" x="12" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_link_8" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/label_link_8" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/graphics/row_link_16" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend page" />
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/graphics/label_link_16" x="12" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_link_16" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/label_link_16" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/graphics/row_link_0" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend page" />
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/graphics/label_link_0" x="12" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_link_0" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/label_link_0" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" />
 	<strings name="modern/graphics/labels">
 		<string text="SHOW FRAMES" />
+		<string text="WIDE LOADING" />
 		<string text="ANTI-ALIASING" />
 		<string text="ANTI-ALIASING" />
 		<string text="TEXTURE FILTERING" />
@@ -1465,6 +1475,7 @@
 	<strings name="modern/graphics/help_strings">
 		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
 		<string text="Draw the frame rate at the bottom right of a game, counted over half a second." />
+		<string text="Fill the screen with the original loading art and a smooth sweep, including MCC loading." />
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA and SMAA are cheap; SSAA and MSAA are sharper." />
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA is cheap; MSAA is sharper." />
 		<string text="Keep floors and walls sharp at a grazing angle, which the Xbox did not. Off: as the Xbox." />
