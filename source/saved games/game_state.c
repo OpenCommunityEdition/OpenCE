@@ -107,6 +107,7 @@ symbols in this file:
 #include "scenario.h"
 #include "main.h"
 #include "objects.h"
+#include "objects/widgets/lightning.h" /* port: reset render seeds after a load */
 #include "game_sound.h"
 #include "sound_manager.h"
 #include "observer.h"
@@ -200,6 +201,8 @@ static game_state_before_load_proc before_load_procs[] =
 
 static game_state_after_load_proc after_load_procs[] =
 {
+	/* port: restored lightning slots and times must not reuse discarded seeds. */
+	lightnings_reset_render_state,
 	scenario_reload_structure_bsp_if_necessary,
 	sound_stop_all,
 	game_sound_restore,

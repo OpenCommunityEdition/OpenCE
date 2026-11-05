@@ -194,13 +194,20 @@ void lightnings_dispose(
 	return;
 }
 
+/* port: render-only seeds are not part of a restored game state's pool. */
+void lightnings_reset_render_state(
+	void)
+{
+	csmemset(lightning_tick_seeds, 0, sizeof(lightning_tick_seeds));
+}
+
 void lightnings_initialize_for_new_map(
 	void)
 {
 	if (lightning_globals.lightning_data)
 		data_make_valid(lightning_globals.lightning_data);
 	/* port: (lightning_submit) */
-	csmemset(lightning_tick_seeds, 0, sizeof(lightning_tick_seeds));
+	lightnings_reset_render_state();
 
 	return;
 }
@@ -210,6 +217,8 @@ void lightnings_dispose_from_old_map(
 {
 	if (lightning_globals.lightning_data)
 		data_make_invalid(lightning_globals.lightning_data);
+	/* port: discard the old map's render-only cache. */
+	lightnings_reset_render_state();
 
 	return;
 }

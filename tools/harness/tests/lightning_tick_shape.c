@@ -122,8 +122,12 @@ draws them */
 struct object_marker { short node_index; real_matrix4x3 node_matrix; real_matrix4x3 matrix; };
 static real_point3d marker_start = { 0.0f, 0.0f, 0.0f };
 static real_point3d marker_end = { 2.0f, 0.0f, 0.0f };
+/* Fail before random generation, or after it at vertex allocation. */
+static short draw_failure;
 static short object_get_marker_by_name(long object_index, char const *name, struct object_marker *marker, short count)
 {
+	if (draw_failure == 1)
+		return 0;
 	memset(marker, 0, sizeof(*marker));
 	marker->matrix.scale = 1.0f;
 	marker->matrix.forward.i = marker->matrix.left.j = marker->matrix.up.k = 1.0f;
@@ -139,7 +143,7 @@ static struct bitmap_group bolt_bitmaps = { { 1, &bolt_bitmap, NULL } };
 static struct bitmap_group *bitmap_group_get(long index) { return &bolt_bitmaps; }
 static boolean _texture_cache_bitmap_get_hardware_format(struct bitmap_data *bitmap, boolean a, boolean b)
 {
-	return TRUE;
+	return draw_failure != 2;
 }
 struct shader { long type; };
 struct shader_effect_definition { struct shader shader; };
@@ -163,6 +167,8 @@ static long drawn_count;
 static long vertex_buffer_count;
 static long rasterizer_dynamic_vertices_new(short type, long count)
 {
+	if (draw_failure == 3)
+		return NONE;
 	CHECK(count <= MAXIMUM_VERTICES, "a bolt of %ld vertices", count);
 	vertex_buffer_count = count;
 	return 0;
@@ -191,6 +197,7 @@ static struct lightning_definition bolt_definition;
 #define lightning_definition_get(definition_index) (&bolt_definition)
 
 #include "under_test.inc"
+#include "after_load.inc"
 
 static void define_bolt(void)
 {
@@ -199,7 +206,7 @@ static void define_bolt(void)
 	for (index = 0; index < 2; index++)
 	{
 		memset(&markers[index], 0, sizeof(markers[index]));
-		strcpy(markers[index].attachment_marker, index ? "end" : "start");
+		memcpy(markers[index].attachment_marker, index ? "end" : "start", index ? 4 : 6);
 		markers[index].octaves_to_next_marker = 3;
 		set_real_vector3d(&markers[index].random_position_bounds, 0.1f, 0.1f, 0.1f);
 		markers[index].random_jitter_offset = 0.2f;
@@ -320,16 +327,21 @@ int main(int argc, char **argv)
 	/* split screen: each window's bolt is its own, kept for the tick */
 	CASE("windows-apart")
 	{
-		struct bolt first0, first1, again0, again1;
+		struct bolt first[4], again;
+		short window, previous;
 
 		game_time = 10;
-		first0 = frame(lightning, 0, 0);
-		first1 = frame(lightning, 1, 0);
-		CHECK(!same_shape(&first0, &first1, 0.0f), "the second window drew the first window's bolt");
-		again0 = frame(lightning, 0, 3);
-		again1 = frame(lightning, 1, 3);
-		CHECK(same_shape(&first0, &again0, 0.0f) && same_shape(&first1, &again1, 0.0f),
-			"a window's later frame drew another bolt than its first");
+		for (window = 0; window < 4; window++)
+		{
+			first[window] = frame(lightning, window, 0);
+			for (previous = 0; previous < window; previous++)
+				CHECK(!same_shape(&first[window], &first[previous], 0.0f), "windows share a seed");
+		}
+		for (window = 3; window >= 0; window--)
+		{
+			again = frame(lightning, window, 3);
+			CHECK(same_shape(&first[window], &again, 0.0f), "window %d changed shape", window);
+		}
 		return 0;
 	}
 	/* a lightning made where another was, in the same tick, draws its own
@@ -345,6 +357,104 @@ int main(int argc, char **argv)
 		CHECK(DATUM_INDEX_TO_ABSOLUTE_INDEX(lightning) == 0, "the new lightning is not where the old one was");
 		renewed = frame(lightning, 0, 0);
 		CHECK(!same_shape(&old, &renewed, 0.0f), "the new lightning drew the old one's bolt");
+		return 0;
+	}
+	CASE("tick-zero")
+	{
+		struct bolt first, again;
+		unsigned long before = local_random_seed;
+
+		game_time = 0;
+		first = frame(lightning, 0, 0);
+		CHECK(local_random_seed != before, "tick zero was mistaken for an initialized seed");
+		again = frame(lightning, 0, 7);
+		CHECK(same_shape(&first, &again, 0.f), "tick zero changed shape");
+		return 0;
+	}
+	/* A new map can start at the same time and reuse the same datum slot.
+	A checkpoint also restores the pool without calling lightning_new. */
+	CASE("map-reset")
+	{
+		struct bolt first, reset;
+
+		game_time = 0;
+		first = frame(lightning, 0, 0);
+		lightnings_initialize_for_new_map();
+		reset = frame(lightning, 0, 0);
+		CHECK(!same_shape(&first, &reset, 0.f), "a new map retained the old map's seed");
+		return 0;
+	}
+	CASE("checkpoint-load")
+	{
+		struct bolt first, restored;
+
+		game_time = 10;
+		first = frame(lightning, 0, 0);
+		game_state_call_after_load_procs();
+		restored = frame(lightning, 0, 0);
+		CHECK(!same_shape(&first, &restored, 0.f), "a checkpoint retained a seed from the discarded state");
+		return 0;
+	}
+	CASE("multiple-lightnings")
+	{
+		struct bolt first, last, again;
+		long other = NONE;
+		short index;
+
+		game_time = 10;
+		first = frame(lightning, 0, 0);
+		for (index = 1; index < 256; index++)
+			other = lightning_new(0);
+		CHECK(DATUM_INDEX_TO_ABSOLUTE_INDEX(other) == 255, "did not reach last pool slot");
+		CHECK(lightning_new(0) == NONE, "full pool did not refuse allocation");
+		last = frame(other, 0, 0);
+		CHECK(!same_shape(&first, &last, 0.f), "independent lightnings share a seed");
+		again = frame(lightning, 0, 3);
+		CHECK(same_shape(&first, &again, 0.f), "another lightning overwrote the first seed");
+		again = frame(other, 0, 3);
+		CHECK(same_shape(&last, &again, 0.f), "last pool slot did not retain its seed");
+		return 0;
+	}
+	CASE("failed-redraw")
+	{
+		struct bolt first, recovered;
+		unsigned long before;
+		short failure;
+
+		game_time = 10;
+		first = frame(lightning, 0, 0);
+		for (failure = 1; failure <= 3; failure++)
+		{
+			draw_failure = failure;
+			drawn_count = 0;
+			before = local_random_seed;
+			lightning_submit(7, lightning, NULL, NULL);
+			CHECK(drawn_count == 0, "failure %d unexpectedly drew geometry", failure);
+			CHECK(local_random_seed == before, "failure %d leaked the cached seed", failure);
+			CHECK(rasterizer_globals.current_lock_operation == _rasterizer_lock_none, "lock leaked");
+			draw_failure = 0;
+			recovered = frame(lightning, 0, 4);
+			CHECK(same_shape(&first, &recovered, 0.f), "failure %d lost the tick's shape", failure);
+		}
+		return 0;
+	}
+	CASE("failed-first-draw")
+	{
+		struct bolt recovered, again;
+		short failure;
+
+		for (failure = 1; failure <= 3; failure++)
+		{
+			game_time = failure;
+			draw_failure = failure;
+			drawn_count = 0;
+			lightning_submit(7, lightning, NULL, NULL);
+			CHECK(drawn_count == 0, "failure %d unexpectedly drew geometry", failure);
+			draw_failure = 0;
+			recovered = frame(lightning, 0, 3);
+			again = frame(lightning, 0, 5);
+			CHECK(same_shape(&recovered, &again, 0.f), "first-draw failure %d prevented recovery", failure);
+		}
 		return 0;
 	}
 	fprintf(stderr, "unknown case '%s'\n", case_name);
