@@ -495,8 +495,8 @@ these generated strings is not implemented.
 
 ## Preliminary sharing restriction
 
-PR #94 supplies an MCC-owned eligibility helper only. MCC peer downloads are
-not enabled by it. The temporary policy covers hand-placed packages and excludes
+PR #94 supplied an MCC-owned eligibility helper; [sharing a package with a joiner](#sharing-a-package-with-a-joiner)
+below is its caller. The policy covers hand-placed packages and excludes
 recognized Workshop content (numeric package folders or a valid
 `workshop_id.txt`), stock content, loose maps and `_shared`. Desktop players
 continue installing Workshop content through Steam or manually; Android players
@@ -511,8 +511,8 @@ classify stock content: renaming a stock package cannot change an established
 stock classification, and a custom package may use a stock-looking name. A
 missing sidecar remains allowed under the original policy, but is not proof of
 origin or redistribution permission. Removing metadata is not a supported way
-to establish eligibility. The classification provider and transfer integration
-are future work; this phase does not automatically classify installed files.
+to establish eligibility. The game does not classify installed files by itself:
+the classification provider is the host's own list (`mcc_share.txt`), below.
 
 The additional-resource allowlist contains only `bitmaps.map` and `sounds.map`.
 It neither validates their contents nor authorizes reading global fallback
@@ -521,6 +521,39 @@ contract. Eligibility and a matching hash must never bypass receiver-side map
 validation, path containment, bounded transfers or safe installation. See the
 [reader's guide](reading/maps_and_resources.md#preliminary-mcc-sharing-policy)
 for the API, trust boundaries and regression checks.
+
+
+## Sharing a package with a joiner
+
+A joiner whose host plays a hand-placed package it does not have can fetch the
+package from the host, over a message pair of its own (MCC protocol 65; see
+[NETCODE.md](../port/linux/NETCODE.md#mcc-package-sharing)). Custom Edition map
+sharing, its messages and its downloads are separate and unchanged. Campaign
+transfers are not part of this: the manifests and follow-on missions need their
+own design.
+
+- **Admission** is the maintained policy above plus the host's own list. The host
+  has `network.mcc_map_share` on (off by default) and lists the package's
+  whole-content SHA-256 with a maker in `mcc_share.txt` (one line,
+  `<64 hexadecimal digits> <maker>`; the game logs the fingerprint of a package it
+  declined). Only then is the exact content classed custom. A package with no line,
+  a line without a maker (the joiner is told to get it from the maker), a Workshop
+  item, a stock or loose map, `_shared` or an unreadable sidecar is never sent.
+- **Files** are the map, the package's own `bitmaps.map` and `sounds.map`, and up to
+  four credit files (`ModInfo.json`, `credits.txt`, `readme.txt`, `license.txt`);
+  nothing else in the folder. Credit files are installed with the package.
+- **Staging** writes each file to `mcc_staging/<package>` as `.part`, checks its size and
+  SHA-256 against the host's manifest, and only then keeps it. The package is then
+  fingerprinted in the staging folder, with the same code as an installed package, and
+  must equal the identity in the host's game record. Only then are the files moved into
+  `mcc_maps/<package>`, the map last. A name already taken (any case) is never written
+  to; cancel, failure or leaving the game delete the staging files and nothing else.
+- **Android** compiles the same code and needs no Steam; it has not been run on a device.
+
+[`test_mcc_share.py`](../tools/test_mcc_share.py) runs the staging, list and session code
+over real files, with a host and a joiner exchanging the real messages, and
+[`test_mcc_share_game.py`](../tools/test_mcc_share_game.py) the game side against stub
+engine headers. They do not play a game on a real MCC map or use two machines.
 
 ## Repository architecture and isolation
 

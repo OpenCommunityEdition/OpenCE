@@ -160,8 +160,8 @@ and host opt-in. A caller must classify the exact content independently of its
 name, for example using locally maintained evidence tied to its fingerprint.
 Merely calculating a hash, failing to match a stock name or reading an untrusted
 manifest cannot establish custom content. This phase supplies neither that
-classification provider nor a transfer caller; unknown classification stays
-blocked. Known stock content remains blocked after a folder rename, while a
+classification provider nor a transfer caller (the next section does); unknown
+classification stays blocked. Known stock content remains blocked after a folder rename, while a
 custom package named `bloodgulch` is not rejected just for its name.
 
 Name buffers carry their readable byte lengths, excluding a terminator. Embedded
@@ -172,16 +172,58 @@ inspect bytes, resolve paths or establish ownership. A future transfer must
 independently bound and validate messages, map/resource data and destinations,
 prevent link escapes and file replacement races, and stage installation without
 overwriting existing packages or saves. A matching hash does not make hostile
-bytes safe. No shared-engine hooks, session state or protocol changes are added.
+bytes safe. This module adds no shared-engine hooks, session state or protocol
+changes; its caller, below, does.
 
 Android continues to use its importer; this helper neither requires Steam nor
 enables Workshop transfers there. Campaign metadata and subsequent missions are
 not covered by the resource allowlist. Their transfer needs a separate design.
-See [the restriction](../mcc_maps.md#preliminary-sharing-restriction).
+See [the restriction](../mcc_maps.md#preliminary-sharing-restriction) and
+[the transfer that uses it](#mcc-package-sharing-between-machines).
 [`test_mcc_share_rules.py`](../../tools/test_mcc_share_rules.py) exercises the real
 module with boundary cases, negative controls, and Linux ASan/UBSan and bounded
 libFuzzer runs. These are policy and memory-access checks, not end-to-end transfer
 validation or proof that arbitrary maps are safe to execute.
+
+
+## MCC package sharing between machines
+
+A joiner without the host's hand-placed package can fetch it instead of being refused.
+Follow one join: a host on `mcc_maps\solar_flare\m0` with `network.mcc_map_share` on and
+the package's fingerprint listed in `mcc_share.txt`; a joiner with `network.map_download` on
+and no such package.
+
+1. The joiner's settings update reaches `mcc_identity_accept` in
+   [`mcc_identity.c`](../../port/linux/game/mcc_identity.c). Nothing installed matches, so
+   where it used to refuse, `mcc_identity_resolve` asks the handler `mcc_share_missing`
+   in [`mcc_share.c`](../../port/linux/game/mcc_share.c). That handler declines (and the
+   refusal text appears as before) for a Workshop item, a name the rules do not accept, a
+   package folder already installed, or the setting off. Otherwise it asks the host and the join
+   waits, as a Custom Edition download does: `cache_files_map_present` takes the map as
+   present and `cache_files_give_time_to_precache` does not start before it is there.
+2. The host's `mcc_share_host_package_files` decides: `mcc_share_admit` in
+   [`mcc_share_session.c`](../../port/linux/game/mcc_share_session.c) applies
+   `mcc_share_decide` (unchanged) to facts the host gathered from its own files, with the list
+   in [`mcc_share_list.c`](../../port/linux/game/mcc_share_list.c) as the classification.
+   A refusal goes back as a reason, which `mcc_share_refusal_text` turns into the joiner's text.
+3. An admitted request is hashed a few MiB a frame (`host_hash`), answered with a manifest
+   (file names, sizes, SHA-256) and then served a chunk at a time (`host_serve`) at the
+   upload limit. The host does not drop a machine whose transfer moves (`mcc_share_game_machine_active`).
+4. The joiner writes the chunks through `mcc_share_stage_write` in
+   [`mcc_share_stage.c`](../../port/linux/game/mcc_share_stage.c): in order, to `.part`, SHA-256
+   running, renamed only when it matches. At the end `mcc_share_identity_check` fingerprints the
+   staged package, with `mcc_package_stage_redirect` pointing the package's own paths at
+   the staging folder, and compares it with the host's game record. `mcc_share_stage_install`
+   then makes the package folder (it must not exist) and moves the files, the map last.
+5. `mcc_share_finished` rescans the maps and runs the usual identity judgement once more
+   (`mcc_identity_accept_installed`), which now finds the package. A failure at any step
+   deletes the staging files, shows why and leaves the game, as a failed Custom Edition
+   download does.
+
+Limits: the host is the only source (no swarm); one download at a time; at most 8 files and
+1 GiB; campaigns are not shared. The tests (`test_mcc_share.py`, `test_mcc_share_game.py`)
+run the real code over real files with a host and joiner in one process; a game on a real MCC
+map between two machines is not covered by them.
 
 ## Explicit MCC campaigns and Android imports
 

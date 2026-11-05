@@ -690,6 +690,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `10240`, 10 MB/s). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
 | `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | When you join a game on a Custom Edition map that you do not have: download it from the players of the game. `false`: leave the game and show which map is missing. DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. |
+| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | When you host a game on an MCC map: send a player who joins without the map's package its files (the map, the package's own `bitmaps.map` and `sounds.map`, and its credit files). Off by default; no menu entry. Only a hand-placed package whose fingerprint is listed with its maker in `mcc_share.txt` is sent. Steam Workshop items and stock maps never are. The joiner needs `network.map_download`. Refer to "MCC package sharing". |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
 | `network.coop_team_wipe` | `"auto"` | `HALO_NET_COOP_TEAM_WIPE` | TEAM WIPE in Server Setup > Co-op Options: `"auto"` reverts the checkpoint in a PRIVATE game and only respawns the team in a PUBLIC game (a dedicated server's: `server.public` with internet play). `"revert"` or `"respawn"` overrides visibility; a password does not make a PUBLIC game private. Changed players/machine assignments fall back to position-only respawn with a host diagnostic. A missing checkpoint also uses position-only respawn. Scripted mission failures keep their existing revert behavior. |
 | `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
@@ -1353,6 +1354,36 @@ MQTT 5 if the broker has it, else MQTT 3.1.1. A broker that does not keep
 retained messages, or does not let clients subscribe with wildcards, carries
 only invites, not listings.
 
+### MCC package sharing
+
+A game on an MCC map has a second, separate kind of sharing. When you join a game
+on a hand-placed MCC package that you do not have (a folder in `mcc_maps` that is
+not a Steam Workshop item, for example `mcc_maps\solar_flare`), the game can fetch
+the package from the host instead of refusing the join, if both sides allow it.
+It does not use the Custom Edition map sharing above and does not change it.
+
+- The host turns it on with `network.mcc_map_share` (off by default; in `config.toml`
+  or `HALO_NET_MCC_MAP_SHARE`). It sends only the package its game is on, and only
+  a package whose whole-content fingerprint (the SHA-256 that every MCC player's game
+  record carries) it lists with a maker in `mcc_share.txt` in the data root: one line,
+  `<64 hexadecimal digits> <the maker to credit>`. The game logs the fingerprint of a
+  package it did not send. A package with no line, or a line without a maker, a Steam
+  Workshop item, a stock map, `_shared`, or a loose map is not sent, and the joiner is
+  told why and to get the package from its maker.
+- The joiner uses `network.map_download` (on by default). The files go to
+  `mcc_staging/<package>`, each is checked against its SHA-256 as it arrives, and
+  the package is checked as a whole against the host's fingerprint before it is moved
+  into `mcc_maps/<package>`. A failure, a cancel or leaving the game deletes the
+  staging files and nothing else. A package folder you already have is never written to.
+  The maker's credit files (`ModInfo.json`, `credits.txt`, `readme.txt`, `license.txt`)
+  are installed with the package. A line at the top of the screen shows the progress.
+- The host sends at most `network.map_share_upload` (1024 KB/s). The host is the only
+  source; players do not send it on. The Android build compiles the same code and needs
+  no Steam (not yet run on a device).
+
+The messages, limits and what each side checks are in [NETCODE.md](NETCODE.md), "MCC
+package sharing". This needs MCC protocol 65 on both machines.
+
 ### Map sharing
 
 When you join a game on a Custom Edition map that you do not have, the game
@@ -1967,6 +1998,7 @@ Other changes:
 | `objects/object_lights.c` | A flashlight not on a first-person weapon (your own with no weapon in hand, as another player's in a match) shines from the marker on the pose the frame draws (`render_interpolation.c`), not from where the tick left it, which stepped at 30 a second. |
 | `structures/structure_render.c` | The structure's visible surfaces are put in order by a radix sort, not `qsort_4byte`: the same order. |
 | `cache/cache_files.c`, `networking/network_client_manager.c`, `networking/network_server_manager.c`, `networking/network_server_message_handler.c`, `main/main.c`, `interface/interface.c` | Map sharing (`game/map_share.c`): a client that does not have the game's Custom Edition map asks the host for it instead of leaving, is not given time to precache it until it has it, and adds its players to a game in progress only then; the host gives the game's map its own name and its version (its hash's start), takes the requests from any machine in the game, lobby too, and does not drop a machine that downloads; the transfers run each frame, and their progress is drawn over the screen. |
+| `cache/cache_files.c`, `cache/cache_files_windows.c`, `networking/network_server_message_handler.c` | MCC package sharing (`game/mcc_share.c`): a package being fetched from the host is taken as present and not precached until it is there, and the host's lobby takes the sharing requests of the machines that joined (from their streams alone, as map sharing's). Everything else of it is in the MCC modules and in four one-line hooks in `game/map_share.c`'s counters (the players held, the machine downloading) and per-frame and render calls, so that the existing holds apply. |
 | `cutscene/cinematics.c` | A scenario's titles (some Custom Edition maps show their name for the whole game) are not drawn over a menu, as the letterbox is not: the screen's overlays are drawn after the players' menus. On a screen wider than 640 columns, a title is moved so the edge it is justified to (its middle, if centered) keeps its place relative to the screen's sides, as on the Xbox's 4:3 screen: a right-justified chapter title ends near the right side, not short of it. |
 | `tag_files/tag_groups.h` | `TAG_BLOCK_GET_ELEMENT` returns an element in the block without a call, and calls `tag_block_get_element_with_size` for anything else. |
 | `game/players.c`, `networking/network_server_manager.c` | Bots (`game/bots.c`, `bots.count`): the lobby of a local Slayer game takes the bot players, each the one player of a machine of its own that no real machine is, and every tick their actions come from `game/bots.c` instead of their empty queues. System link and internet bots remain off unless explicitly enabled before host creation; live controls use the same ordinary player messages. |
