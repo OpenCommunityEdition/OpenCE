@@ -11,6 +11,7 @@ list, loader, resource directory or display index is used here.
 #include "errors.h"
 #include "mcc_cache_format.h"
 #include "mcc_maps.h"
+#include "mcc_menu_preview.h"
 #include "mcc_cache.h"
 #include "mcc_identity.h"
 #include "mcc_package.h"
@@ -19,6 +20,7 @@ list, loader, resource directory or display index is used here.
 #include "../src/workshop_collections.h"
 #include "../src/port_config.h"
 #include "../src/mcc_manifest.h"
+#include "../src/mcc_menu_metadata.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +42,7 @@ struct mcc_menu_map
 	short mission_order, next_state;
 	char next_mission[64];
 	char campaign_title[64];
+	char package_title[64];
 };
 
 static struct
@@ -224,6 +227,42 @@ static void mcc_maps_campaign_metadata(void)
 	qsort(mcc_menu_catalog.maps, (size_t)mcc_menu_catalog.count, sizeof(mcc_menu_catalog.maps[0]), mcc_map_order);
 }
 
+static void mcc_maps_menu_metadata(void)
+{
+	static struct mcc_menu_metadata metadata[2];
+	char previous[64] = "", package[64], root[1024];
+	boolean loaded[2] = { FALSE, FALSE };
+	short index;
+	for (index = 0; index < mcc_menu_catalog.count; index++)
+	{
+		struct mcc_menu_map *map = &mcc_menu_catalog.maps[index];
+		struct steam_workshop_map_text const *text;
+		int family = map->campaign ? 1 : 0;
+		size_t n;
+		if (map->campaign && !config_boolean("game.mcc_campaigns")) continue;
+		if (!mcc_workshop_package_folder(map->level_name, package)) continue;
+		if (csstrcasecmp(previous, package))
+		{
+			strcpy(previous, package);
+			loaded[0] = loaded[1] = FALSE;
+			memset(metadata, 0, sizeof(metadata));
+		}
+		if (!loaded[family])
+		{
+			loaded[family] = TRUE;
+			if (mcc_manifest_package_root(map->level_name, root))
+				mcc_menu_metadata_load(root, family, &metadata[family]);
+		}
+		strcpy(map->package_title, metadata[family].title);
+		text = mcc_menu_metadata_find(&metadata[family], strrchr(map->level_name, '\\') + 1);
+		if (!text || !text->title[0]) continue;
+		for (n = 0; text->title[n] && n < 63; n++)
+			map->name[n] = (unsigned char)text->title[n] >= 32 && (unsigned char)text->title[n] < 127 ? text->title[n] : '?';
+		map->name[n] = 0;
+		map->titled = TRUE;
+	}
+}
+
 static boolean mcc_map_package_is_item(char const *package)
 {
 	size_t length;
@@ -332,20 +371,26 @@ static void mcc_maps_scan(void)
         mcc_map_register(relative);
     }
     qsort(mcc_menu_catalog.maps,(size_t)mcc_menu_catalog.count,sizeof(mcc_menu_catalog.maps[0]),mcc_map_order);
-    /* Show the owning package for every packaged level; a Workshop map shows its own title instead. */
+    /* Read supplied titles independently of Steam (also for Android imports).
+     * Identities stay in level_name, never in the level's display label. */
     for (i=0;i<mcc_menu_catalog.count;i++) {
         struct mcc_menu_map *map=&mcc_menu_catalog.maps[i];
         char const *base=strrchr(map->file_name,'\\');
         if (base && mcc_map_workshop_title(map)) continue;
         if (base) {
-            size_t n,k;
+            char package[64];
+            size_t n,k,length=(size_t)(base-map->file_name);
+            memcpy(package,map->file_name,length);package[length]=0;
+            if (mcc_map_package_is_item(package)) continue;
+            /* Preserve the established human-named package disambiguator. */
             for (n=0;map->name[n];n++) {}
             map->name[n++]=' ';map->name[n++]='[';
-            for (k=0;k<(size_t)(base-map->file_name);k++) map->name[n++]=(unsigned char)map->file_name[k];
+            for (k=0;k<length;k++) map->name[n++]=(unsigned char)package[k];
             map->name[n++]=']';map->name[n]=0;
         }
     }
     mcc_maps_campaign_metadata();
+    mcc_maps_menu_metadata();
     error(_error_silent,"mcc maps: %d maps found in mcc_maps and its packages",mcc_menu_catalog.count);
 }
 
@@ -367,6 +412,7 @@ int mcc_maps_next_mission(char const *level_name, char next[64])
 
 void mcc_maps_rescan(void)
 {
+	mcc_menu_preview_clear();
 	mcc_cache_precache_clear();
 	steam_workshop_scan();
 	mcc_menu_catalog.scanned = FALSE;
@@ -711,6 +757,10 @@ void mcc_map_browser_text(struct mcc_map_browser const *browser, short row, wcha
 		}
 		if (browser->groups[row] == NONE && mcc_menu_catalog.maps[index].campaign_title[0])
 			snprintf(package, sizeof(package), "%s", mcc_menu_catalog.maps[index].campaign_title);
+		else if (browser->groups[row] == NONE && mcc_menu_catalog.maps[index].package_title[0])
+			snprintf(package, sizeof(package), "%s", mcc_menu_catalog.maps[index].package_title);
+		else if (browser->groups[row] == NONE && mcc_map_package_is_item(package))
+			snprintf(package, sizeof(package), "MCC package");
 		for (length = 0; package[length] && used < 62; length++)
 		{
 			unsigned char c = (unsigned char)package[length];

@@ -59,6 +59,11 @@ When a button appears to do nothing, trace its event name into
 [unwired-function list](../../port/assets/menus/UNWIRED.md) records known
 gaps. A visible widget alone does not establish that its action is implemented.
 
+[MCC level previews](mcc_level_previews.md) follows package metadata into a
+bounded image reader, the menu texture cache and style-specific thumbnail
+rectangles. It also explains wrapping of MCC titles and descriptions without
+changing the Xbox or Custom Edition text paths.
+
 ## Follow the forward stick
 
 [Controller button remapping](controller_remapping.md) adds a Gamepad Setup

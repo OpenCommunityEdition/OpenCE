@@ -79,6 +79,10 @@ copies the on-disk spelling into result and returns nonzero if found */
 int posix_find_entry_case_insensitive(const char *directory, const char *name,
 	char *result, posix_ulong result_size);
 
+/* MCC-owned bounded package reads (posix_mcc_preview.c). Returns bytes read,
+ * or zero; metadata paths cannot escape root or traverse links. */
+int posix_mcc_preview_read(const char *root, const char *relative, void *buffer, posix_ulong capacity);
+
 /* ---------- sockets
 
 Winsock and BSD share the sockaddr_in layout, so addresses pass through as

@@ -138,18 +138,18 @@ int mcc_manifest_load(const char *folder, struct mcc_manifest *manifest, char re
 	return 1;
 }
 
-int mcc_manifest_for_level(const char *level, struct mcc_manifest *manifest, char reason[128])
+int mcc_manifest_package_root(const char *level, char path[1024])
 {
-	char request[96], path[1024], steam[STEAM_WORKSHOP_PATH_SIZE], package[64], *last;
+	char request[96], steam[STEAM_WORKSHOP_PATH_SIZE], package[64], *last;
 	const char *separator;
 	size_t n;
-	memset(manifest, 0, sizeof(*manifest)); reason[0] = 0;
+	path[0] = 0;
 	if (!level || strncmp(level, "mcc_maps\\", 9) || !(separator = strchr(level + 9, '\\'))) return 0;
 	n = (size_t)(separator - level - 9);
 	if (!n || n >= sizeof(package) || strlen(level) > 63 || !relative_path(level)) return 0;
 	memcpy(package, level + 9, n); package[n] = 0;
 	snprintf(request, sizeof(request), "d:\\%s.map", level);
-	platform_translate_path(request, path, sizeof(path));
+	platform_translate_path(request, path, 1024);
 	for (last = path; *last; last++) if (*last == '\\') *last = '/';
 	last = strrchr(path, '/'); if (!last) return 0; *last = 0;
 	/* Compare the actual resolution, not just the item id: local overrides
@@ -158,5 +158,12 @@ int mcc_manifest_for_level(const char *level, struct mcc_manifest *manifest, cha
 	{
 		last = strrchr(path, '/'); if (!last) return 0; *last = 0;
 	}
-	return mcc_manifest_load(path, manifest, reason);
+	return 1;
+}
+
+int mcc_manifest_for_level(const char *level, struct mcc_manifest *manifest, char reason[128])
+{
+	char path[1024];
+	memset(manifest, 0, sizeof(*manifest)); reason[0] = 0;
+	return mcc_manifest_package_root(level, path) ? mcc_manifest_load(path, manifest, reason) : 0;
 }

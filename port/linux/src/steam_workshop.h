@@ -62,6 +62,8 @@ struct steam_workshop_map_text
 	char title[STEAM_WORKSHOP_TITLE_SIZE];
 	/* Images.Thumbnail, item-relative, '/' separators; "" if absent or not a plain relative path */
 	char thumbnail[128];
+	/* Images.Large, with the same relative-path contract. */
+	char large[128];
 };
 
 /* a ModInfo.json's text: 1 if it is an object whose lists are sound, else 0. A MultiplayerMaps path that is

@@ -1250,7 +1250,7 @@ static void mcc_map_description_show(struct widget_instance *description, short 
 	map_description_show(description, NONE, index == NONE ? NONE : (short)(MCC_MAPS_FIRST_DISPLAY_INDEX + index));
 	picture = named(description, "mp_map_right_pic", 0);
 	if (picture)
-		picture->animation.current_frame_index = 13;
+		picture->animation.current_frame_index = index == NONE ? 13 : MCC_MAPS_FIRST_DISPLAY_INDEX + index;
 }
 
 static void mcc_solo_map_text(short row, wchar_t *text)
@@ -6529,7 +6529,7 @@ static void lobby_map_show(struct widget_instance *description, char const *map_
 		visible_set(named(description, "replay_level_right_pic", 0), FALSE);
 		visible_set(named(description, "replay_level_right_name", 0), FALSE);
 		if ((widget = named(description, "lobby_map_pic", 0)) != NULL)
-			widget->animation.current_frame_index = 13;
+			widget->animation.current_frame_index = MCC_MAPS_FIRST_DISPLAY_INDEX + mcc_index;
 		if ((widget = named(description, "lobby_map_name", 0)) != NULL)
 			widget->parameters.text_box.string_list_index = MCC_MAPS_FIRST_DISPLAY_INDEX + mcc_index;
 		return;

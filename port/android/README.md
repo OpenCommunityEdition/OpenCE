@@ -25,6 +25,14 @@ or a ZIP on the phone. Select **Workshop package**, then **Choose folder** or
 **Choose ZIP**. Keep `ModInfo.json`, `CampaignInfo.json`, the mission JSON files
 and maps together. Steam is not needed on Android.
 
+Keep the supplied PNG previews too, including `assets` when present. Folder
+and ZIP imports preserve these images and their relative metadata paths.
+MCC level panels automatically use `Images.Large`, falling back to
+`Images.Thumbnail` or the question-mark picture. The image fits inside the
+existing thumbnail box in each menu style. Supported PNGs are 8-bit RGB/RGBA,
+non-interlaced, at most 2048 by 2048 pixels and 8 MiB per file; other encodings
+keep the placeholder. See [MCC previews](../../docs/reading/mcc_level_previews.md).
+
 The importer defaults to the Workshop ID as its destination folder; an optional
 name can use letters, digits, spaces, underscores and hyphens. It checks package
 paths, metadata, campaign completeness and MCC cache headers before offering

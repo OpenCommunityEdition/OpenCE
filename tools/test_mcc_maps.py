@@ -103,11 +103,24 @@ static int admission_reads;
 static int identities_prepared;
 static unsigned reads, largest, scans, closed;
 void mcc_cache_precache_clear(void) {}
+void mcc_menu_preview_clear(void) {}
 int config_boolean(char const *name) {
  if(!strcmp(name,"game.mcc_campaigns"))return getenv("TEST_MISSIONS")!=NULL;
  char const *disabled=getenv("TEST_COLLECTIONS_DISABLED");(void)name;return !disabled;
 }
 #include "../src/mcc_manifest.h"
+#include "../src/mcc_menu_metadata.h"
+int mcc_manifest_package_root(char const *level,char path[1024]) {
+ (void)level;path[0]=0;return getenv("TEST_MENU_METADATA")!=NULL;
+}
+int mcc_menu_metadata_load(char const *folder,int campaign,struct mcc_menu_metadata *metadata) {
+ (void)folder;(void)campaign;memset(metadata,0,sizeof(*metadata));
+ strcpy(metadata->title,"Offline package title");metadata->count=1;
+ strcpy(metadata->maps[0].name,"arena");strcpy(metadata->maps[0].title,"Authored offline level");return 1;
+}
+struct steam_workshop_map_text const *mcc_menu_metadata_find(struct mcc_menu_metadata const *metadata,char const *name) {
+ return metadata->count && !strcmp(name,metadata->maps[0].name) ? &metadata->maps[0] : NULL;
+}
 int mcc_manifest_for_level(char const *level,struct mcc_manifest *manifest,char reason[128]) {
  char buffer[512],*name;int count=0;(void)level;reason[0]=0;
  memset(manifest,0,sizeof(*manifest));
@@ -788,7 +801,7 @@ def test_disabled_collections_keep_package_folders(catalog_tool, tmp_path, monke
     monkeypatch.setenv("TEST_COLLECTIONS_DISABLED", "1")
     fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0")
     assert fields["view0"] == "|1|0"
-    assert fields["row0_0"] == "[2899747345]|folder"
+    assert fields["row0_0"] == "[MCC package]|folder"
     assert fields["row1_0"] == "Arena|mcc_maps\\2899747345\\arena"
 
 
@@ -823,3 +836,19 @@ def test_workshop_browser_keeps_title_longer_than_filename(catalog_tool, tmp_pat
     local_packages(tmp_path, ["12345"])
     fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0", items=[("12345", "Item", "arena", "A much longer mission title")])
     assert fields["row1_0"] == "A much longer mission title|mcc_maps\\12345\\arena"
+
+
+def test_imported_package_titles_do_not_depend_on_steam(catalog_tool,tmp_path,monkeypatch):
+    install(tmp_path,{})
+    root=tmp_path/"mcc_maps"
+    (root/"list.txt").write_text("/12345\n")
+    (root/"12345").mkdir()
+    (root/"12345/list.txt").write_text("arena.map\n")
+    (root/"12345/arena.map").write_bytes(header(scenario=1))
+    fields,_=run(catalog_tool,tmp_path,"browse","0","enter:0")
+    assert fields["row0_0"].startswith("[MCC package]|")
+    assert fields["row1_0"]=="Arena|mcc_maps\\12345\\arena"
+    monkeypatch.setenv("TEST_MENU_METADATA","1")
+    fields,_=run(catalog_tool,tmp_path,"browse","0","enter:0")
+    assert fields["row0_0"].startswith("[Offline package title]|")
+    assert fields["row1_0"]=="Authored offline level|mcc_maps\\12345\\arena"

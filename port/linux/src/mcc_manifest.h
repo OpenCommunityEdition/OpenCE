@@ -18,5 +18,7 @@ int mcc_manifest_load(const char *folder, struct mcc_manifest *manifest, char re
 /* Resolve the owning metadata folder through the existing MCC path mapping.
  * A local override never borrows its campaign from the Steam installation. */
 int mcc_manifest_for_level(const char *level, struct mcc_manifest *manifest, char reason[128]);
+/* Actual selected package root, shared by MCC metadata consumers only. */
+int mcc_manifest_package_root(const char *level, char path[1024]);
 
 #endif

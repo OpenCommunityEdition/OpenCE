@@ -103,6 +103,13 @@ packages; those require separate Workshop catalog integration.
 
 ### Subscribed Steam Workshop items
 
+Installed packages can also supply [level previews](reading/mcc_level_previews.md).
+Keep their listed map/mission metadata and PNGs together. Modern, Classic PC,
+Stock and Xbox-style panels use `Images.Large`, then `Images.Thumbnail`, with
+the question mark as fallback. Pictures fit and clip to the existing thumbnail
+rectangle, and MCC titles/descriptions wrap within their text boxes. This also
+works for complete Android imports without Steam and does not enable sharing.
+
 With `game.workshop_maps = true` (`HALO_WORKSHOP_MAPS=1`), desktop builds list
 Halo CE maps from the Workshop items a player is subscribed to
 without copying anything into the data root. `steam_workshop.c` looks in Steam's

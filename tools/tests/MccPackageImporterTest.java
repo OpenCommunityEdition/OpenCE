@@ -10,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -35,10 +37,16 @@ public final class MccPackageImporterTest {
         entries.put("2915693904/ModInfo.json", bytes("{\"Engine\":\"Halo1\",\"Title\":{\"Neutral\":\"Example\"},\"ModIdentifier\":{\"HostedModIds\":{\"SteamWorkshopId\":2915693904}},\"GameModContents\":{\"HasCampaign\":true}}"));
         entries.put("2915693904/CampaignInfo.json", bytes("{\"CampaignMaps\":[\"Campaign/Z10.json\",\"campaign/a10.json\"]}"));
         entries.put("2915693904/campaign/z10.json", bytes("{\"ScenarioFile\":\"levels/test/z10\",\"CampaignMapKind\":\"Default\"}"));
-        entries.put("2915693904/campaign/a10.json", bytes("{\"ScenarioFile\":\"a10\"}"));
+        entries.put("2915693904/campaign/a10.json", bytes("{\"ScenarioFile\":\"a10\",\"Images\":{\"Large\":\"Assets/Level Large.PNG\",\"Thumbnail\":\"Thumb.PNG\"}}"));
+        entries.put("2915693904/Assets/Level Large.PNG", preview());
+        entries.put("2915693904/Thumb.PNG", preview());
         entries.put("2915693904/Maps/z10.map", map(0));
         entries.put("2915693904/Maps/a10.map", map(0));
         return entries;
+    }
+    static byte[] preview() {
+        // Generated one-pixel PNG; no game or Workshop artwork in the tests.
+        return Base64.getDecoder().decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGPgNgitAgAB5QELSSf/aQAAAABJRU5ErkJggg==");
     }
     static MccPackageImporter.Source source(Map<String,byte[]> entries) {
         return receiver -> { for (Map.Entry<String,byte[]> entry : entries.entrySet()) receiver.file(entry.getKey(), new ByteArrayInputStream(entry.getValue())); };
@@ -70,11 +78,16 @@ public final class MccPackageImporterTest {
             Path installed = root.resolve("mcc_maps/2915693904");
             check(Files.readString(installed.resolve("workshop_id.txt")).startsWith("2915693904\nExample\n"));
             check(Files.exists(installed.resolve("campaign/z10.json")) && Files.exists(installed.resolve("z10.map")));
+            check(Arrays.equals(preview(), Files.readAllBytes(installed.resolve("assets/level large.png"))));
+            check(Arrays.equals(preview(), Files.readAllBytes(installed.resolve("thumb.png"))));
+            check(Files.readString(installed.resolve("campaign/a10.json")).contains("Assets/Level Large.PNG"));
             noStaging(root);
             try (MccPackageImporter.Prepared prepared = MccPackageImporter.prepare(root.toFile(), zip(campaign()), "Mobile copy", 0)) {
                 prepared.install(root.toFile(), false);
             }
             check(Files.exists(root.resolve("mcc_maps/Mobile copy/a10.map")));
+            check(Arrays.equals(preview(), Files.readAllBytes(root.resolve("mcc_maps/Mobile copy/assets/level large.png"))));
+            check(Arrays.equals(preview(), Files.readAllBytes(root.resolve("mcc_maps/Mobile copy/thumb.png"))));
             Files.writeString(installed.resolve("old-marker"), "previous");
             try (MccPackageImporter.Prepared prepared = MccPackageImporter.prepare(root.toFile(), source(campaign()), "", 0)) {
                 refuses(() -> prepared.install(root.toFile(), false));

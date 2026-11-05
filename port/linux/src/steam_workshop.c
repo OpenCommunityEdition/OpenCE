@@ -187,6 +187,12 @@ int steam_workshop_read_map(const char *text, int length, struct steam_workshop_
 		slashes(thumbnail);
 		strcpy(map->thumbnail, thumbnail);
 	}
+	if (server_json_get_string(&document, server_json_member(&document, server_json_member(&document, 0, "Images"),
+		"Large"), thumbnail, (int)sizeof(thumbnail)) && path_is_plain(thumbnail))
+	{
+		slashes(thumbnail);
+		strcpy(map->large, thumbnail);
+	}
 	server_json_document_free(&document);
 	return 1;
 }
