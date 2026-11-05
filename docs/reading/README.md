@@ -25,6 +25,7 @@ the menu to the camera, reticle and first-person weapon.
 | Optional hardware | [DualSense feedback](dualsense.md) | Map physical trigger actions to feedback and clear it across gameplay and device lifecycles. |
 | Feature prototype | [Modern frontend](menu_redesign.md) | Isolated Settings/hosting/lobby views, native browsers and main-menu-only legacy switching. |
 | Branch feature | [Shoulder camera](third_person.md) | Director selection, cover-aware aiming, controls and host-owned hit validation. |
+| Worked detail | [Loading presentation](loading_presentation.md) | Fill the screen with the original loading artwork while preserving map-family ownership and the Xbox chant. |
 | Reference | [Glossary](glossary.md) | Engine concepts and recurring C conventions, with source examples. |
 
 The chapters form a guide to the major systems, not an inventory of every

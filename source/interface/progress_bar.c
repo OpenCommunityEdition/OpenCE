@@ -172,6 +172,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "interface/progress_bar.h"
+#include "loading_widescreen.h" /* port: port/linux/src/loading_widescreen.c */
 #include "cache/cache_files.h"
 /* The January object retains out-of-line copies of the D3D and D3DX inline
  * wrappers.  The stock XDK definitions of D3DINLINE (static __forceinline) and
@@ -1581,12 +1582,39 @@ void progress_bar_initialize(
 void progress_bar_dispose(
 	void)
 {
+	/* port: shutdown need not render another frame to retire the chant. */
+	long sound_index;
+
+	/* port: release presentation resources while the device is alive. */
+	loading_widescreen_end();
+	for (sound_index= 0; sound_index<NUMBER_OF_PROGRESS_BAR_SOUNDS; sound_index++)
+	{
+		if (progress_bar_globals.sounds[sound_index])
+		{
+			IDirectSoundBuffer_Stop(progress_bar_globals.sounds[sound_index]);
+			IDirectSoundBuffer_Release(progress_bar_globals.sounds[sound_index]);
+			progress_bar_globals.sounds[sound_index]= NULL;
+		}
+	}
 	return;
 }
 
 void progress_bar_begin(
 	boolean skip_frame_capture)
 {
+	/* port: a quick second load can reuse textures and voices before the
+	next eachframe cleanup. Restart the voices stopped at the last end. */
+	long sound_index;
+
+	for (sound_index= 0; sound_index<NUMBER_OF_PROGRESS_BAR_SOUNDS; sound_index++)
+	{
+		if (progress_bar_globals.sounds[sound_index])
+		{
+			IDirectSoundBuffer_SetCurrentPosition(progress_bar_globals.sounds[sound_index], 0);
+			IDirectSoundBuffer_SetVolume(progress_bar_globals.sounds[sound_index], -5000);
+			IDirectSoundBuffer_Play(progress_bar_globals.sounds[sound_index], 0, 0, DSBPLAY_LOOPING);
+		}
+	}
 	progress_bar_mode.capture_frame= !skip_frame_capture;
 	progress_bar_mode.active= TRUE;
 	SetThreadPriority((void *)-2, 2);
@@ -1597,6 +1625,16 @@ void progress_bar_begin(
 void progress_bar_end(
 	void)
 {
+	/* port: stop on success or failure, even if no normal frame follows. */
+	long sound_index;
+
+	/* port: enhanced presentation keeps no resources across loads. */
+	loading_widescreen_end();
+	for (sound_index= 0; sound_index<NUMBER_OF_PROGRESS_BAR_SOUNDS; sound_index++)
+	{
+		if (progress_bar_globals.sounds[sound_index])
+			IDirectSoundBuffer_Stop(progress_bar_globals.sounds[sound_index]);
+	}
 	progress_bar_mode.active= FALSE;
 	SetThreadPriority((void *)-2, 0);
 
@@ -2028,6 +2066,13 @@ static void progress_bar_render(
 		}
 	}
 
+	/* port: optional full-width presentation, after the stock chant's
+	volume envelopes; disabled or unavailable leaves the stock effect. */
+	if (loading_widescreen_draw(progress, progress_bar_mode.texture0))
+	{
+		rasterizer_forget_hardware_state();
+		return;
+	}
 	current_time= GetTickCount();
 	IDirect3DDevice8_GetTransform(global_d3d_device, D3DTS_WORLD, &progress_bar_globals.saved_world);
 	IDirect3DDevice8_GetTransform(global_d3d_device, D3DTS_VIEW, &progress_bar_globals.saved_view);

@@ -103,6 +103,7 @@ this list to generate the guest's entry points */
 	X(glBindBufferBase) \
 	X(glBindBufferRange) \
 	X(glGenVertexArrays) \
+	X(glDeleteVertexArrays) \
 	X(glBindVertexArray) \
 	X(glEnableVertexAttribArray) \
 	X(glDisableVertexAttribArray) \
@@ -220,6 +221,7 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glMapBufferRange) \
 	X(glBindBufferBase) \
 	X(glGenVertexArrays) \
+	X(glDeleteVertexArrays) \
 	X(glBindVertexArray) \
 	X(glEnableVertexAttribArray) \
 	X(glDisableVertexAttribArray) \
@@ -357,6 +359,7 @@ pointers, sees the declarations without these aliases */
 #define glBindBufferBase halo_glBindBufferBase
 #define glBindBufferRange halo_glBindBufferRange
 #define glGenVertexArrays halo_glGenVertexArrays
+#define glDeleteVertexArrays halo_glDeleteVertexArrays
 #define glBindVertexArray halo_glBindVertexArray
 #define glEnableVertexAttribArray halo_glEnableVertexAttribArray
 #define glDisableVertexAttribArray halo_glDisableVertexAttribArray
@@ -466,6 +469,7 @@ pointers, sees the declarations without these aliases */
 #define glMapBufferRange halo_glMapBufferRange
 #define glBindBufferBase halo_glBindBufferBase
 #define glGenVertexArrays halo_glGenVertexArrays
+#define glDeleteVertexArrays halo_glDeleteVertexArrays
 #define glBindVertexArray halo_glBindVertexArray
 #define glEnableVertexAttribArray halo_glEnableVertexAttribArray
 #define glDisableVertexAttribArray halo_glDisableVertexAttribArray

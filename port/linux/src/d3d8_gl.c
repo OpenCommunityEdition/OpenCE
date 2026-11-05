@@ -2271,6 +2271,21 @@ static BOOL bind_targets(BOOL *has_depth)
 	return TRUE;
 }
 
+BOOL xgpu_presentation_target(unsigned long *width, unsigned long *height)
+{
+	struct xgpu_render_target *target;
+	BOOL has_depth;
+
+	if (!device.gl_ready || !device.render_target || !bind_targets(&has_depth))
+		return FALSE;
+	target = xgpu_render_target_find(device.render_target->Data);
+	if (!target || !target->gl_width || !target->gl_height)
+		return FALSE;
+	*width = target->gl_width;
+	*height = target->gl_height;
+	return TRUE;
+}
+
 /* ---------- display.hdr */
 
 static const char *const tone_mapping_names[NUMBER_OF_XGPU_TONE_MAPPINGS] =

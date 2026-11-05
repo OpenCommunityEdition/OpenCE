@@ -207,6 +207,28 @@ only headers and descriptions. Menu probes do not begin a loading screen.
 No new network message or readiness decision is introduced: peers still finish
 their own conversions and use the existing host-controlled loading protocol.
 
+The optional [widescreen presentation](loading_presentation.md) scales this
+same original picture to fill the render target and draws the sweep at its
+resolution. MCC retains the controller and ownership described above.
+
+The shared loading effect also plays the Xbox's embedded monk chant from
+[`progress_bar.c`](../../source/interface/progress_bar.c). Its four looping
+Xbox ADPCM voices use the buffer API in
+[`dsound_sdl.c`](../../port/linux/src/dsound_sdl.c): `SetBufferData` decodes an
+owned copy, `SetPitch` selects each voice's pitch, and `progress_bar_render`
+swells their volumes with progress. Xbox pitch is absolute: zero means 48 kHz,
+with 4096 units per octave, as described in the public
+[APU research](https://xboxdevwiki.net/APU#Pitch_calculation).
+`mix_buffers` adds them to the front
+speakers under the master and effects volumes, without the map's reverb.
+`progress_bar_end` stops them on success or failure; a quick subsequent
+`progress_bar_begin` restarts retained voices, and `progress_bar_dispose`
+releases them if shutdown precedes normal frame cleanup. MCC uses this
+existing presentation service without changing its map or resource ownership.
+`tools/test_loading_chant.py` checks the actual mixer, buffer controls and
+loading audio lifetime without maps or a sound device; it does not establish
+device playback quality or campaign compatibility.
+
 Host selection uses [mcc_validation.inl](../../port/linux/game/mcc_validation.inl),
 included by `mcc_cache.c`, and the existing pregame update in
 [mcc_ui_network.inl](../../port/linux/game/mcc_ui_network.inl). A click schedules
