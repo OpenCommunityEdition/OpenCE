@@ -321,7 +321,8 @@ def test_menus_are_well_formed():
 
 def test_menu_settings_exist():
     """Every setting a menu's spinner sets is one of config.toml's
-    (port/linux/src/port_config.c), of the profile or an action of a row's
+    (port/linux/src/port_config.c), a group of those settings, of the profile
+    or an action of a row's
     (menu_functions.c), and
     the keyboard's controls are the same in the settings, in the controls'
     screen and in the input code."""
@@ -332,9 +333,17 @@ def test_menu_settings_exist():
     profile = set(re.findall(r'\{ "(profile\.[a-z_]+)", \d', functions))
     # (and the actions a row does on OK rather than a setting: DISCORD ACCOUNT's LINK, setting_write's)
     actions = set(re.findall(r'!strcmp\(name, "([a-z_]+\.action)"\)', functions))
+    # Grouped lighting rows are implemented by a separate menu module. Check
+    # their actual member keys too, rather than accepting a whole namespace.
+    lighting = (root / "port/linux/game/lighting_menu.c").read_text()
+    groups = dict(re.findall(r'\{\s*"(lighting\.[a-z_]+)",\s*\{([^}]+)\}\}', lighting))
+    assert groups
+    for name, body in groups.items():
+        members = set(re.findall(r'"([a-z_]+\.[a-z_]+)"', body))
+        assert members and members <= known, f"{name}: {members - known}"
     for path in (MENUS / "ce").glob("*.xml"):
         for setting in re.findall(r'setting="([^"]+)"', path.read_text()):
-            assert setting in known | profile | actions, f"{path.name}: {setting}"
+            assert setting in known | profile | actions | groups.keys(), f"{path.name}: {setting}"
     controls = set(re.findall(r'"(controls\.[a-z_]+)"', (root / "port/linux/src/xinput_sdl.c").read_text()))
     assert controls == {name for name in known if name.startswith("controls.")}
     assert controls == set(re.findall(r'\{ "(controls\.[a-z_]+)", L"', functions))
