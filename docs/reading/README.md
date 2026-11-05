@@ -23,6 +23,7 @@ the menu to the camera, reticle and first-person weapon.
 | 7 | [Platforms and testing](platforms_and_testing.md) | Follow platform entry points and investigate an elevator regression: what evidence reaches the behaviour? |
 | Worked detail | [Field of view](field_of_view.md) | Trace a setting through the actual calculations and temporary rendering state. |
 | Optional hardware | [DualSense feedback](dualsense.md) | Map physical trigger actions to feedback and clear it across gameplay and device lifecycles. |
+| Worked detail | [Doppler audio](audio_doppler.md) | Follow source and camera motion into pitch, and distinguish Xbox behavior from optional stereo-source Doppler. |
 | Feature prototype | [Modern frontend](menu_redesign.md) | Isolated Settings/hosting/lobby views, native browsers and main-menu-only legacy switching. |
 | Branch feature | [Shoulder camera](third_person.md) | Director selection, cover-aware aiming, controls and host-owned hit validation. |
 | Worked detail | [Loading presentation](loading_presentation.md) | Fill the screen with the original loading artwork while preserving map-family ownership and the Xbox chant. |

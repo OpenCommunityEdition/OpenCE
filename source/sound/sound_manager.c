@@ -233,11 +233,13 @@ symbols in this file:
 #include "sound_environment_definitions.h"
 #include "game_sound.h"
 #include "sound_preferences.h"
+#include "camera/director.h" /* port: director_get_followed_unit */
 #include "camera/observer.h"
 #include "effects/player_effects.h"
 #include "game/game.h"
 #include "game/game_globals.h"
 #include "game/players.h"
+#include "objects/objects.h" /* port: object_get_point_velocity */
 #include "render/render_debug.h"
 #include "scenario/scenario.h"
 #include "tag_files/tag_files.h"
@@ -249,7 +251,7 @@ symbols in this file:
 and reverberated as a 3D channel's is (sound_dsound_xbox.c; update_channels) */
 void dsound_port_set_channel_stereo_position(short virtual_channel_index, boolean positioned, real pan,
 	real distance, real minimum_distance, real distance_fade, real occlusion, real obstruction,
-	boolean attenuate_direct_path);
+	boolean attenuate_direct_path, real approach);
 
 /* ---------- constants */
 
@@ -877,6 +879,7 @@ boolean sound_scripted_dialog_is_playing(
 void sound_initialize_for_new_map(
 	void)
 {
+	sound_listener_motion_reset(NONE); /* port: no motion from the previous map */
 	return;
 }
 
@@ -3601,6 +3604,8 @@ static void update_channels(
 				real stereo_obstruction = 0.f;
 				real stereo_occlusion = 0.f;
 				boolean stereo_underwater = FALSE;
+				/* port: and its velocity from the listener, for its Doppler effect */
+				real_vector3d stereo_velocity = *global_zero_vector3d;
 
 				switch (sound->source.spatialization_mode)
 				{
@@ -3609,7 +3614,7 @@ static void update_channels(
 					if (TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit))
 					{
 						dsound_port_set_channel_stereo_position(channel_index, FALSE, 0.f, 0.f, 0.f, 1.f,
-							0.f, 0.f, FALSE);
+							0.f, 0.f, FALSE, 0.f);
 					}
 					break;
 
@@ -3629,6 +3634,14 @@ static void update_channels(
 						stereo_obstruction = sound->source.obstruction;
 						stereo_occlusion = sound->source.occlusion;
 						stereo_underwater = listener->underwater;
+						/* port: as a 3D channel's velocity is given (above) */
+						matrix4x3_inverse_transform_vector(
+							&listener->matrix,
+							&sound->source.location.translational_velocity,
+							&stereo_velocity);
+						stereo_velocity.i = TICKS_PER_SECOND * stereo_velocity.i - listener->velocity.i;
+						stereo_velocity.j = TICKS_PER_SECOND * stereo_velocity.j - listener->velocity.j;
+						stereo_velocity.k = TICKS_PER_SECOND * stereo_velocity.k - listener->velocity.k;
 					}
 					/* fall through */
 
@@ -3674,6 +3687,14 @@ static void update_channels(
 								relative_position.x * relative_position.x +
 								relative_position.y * relative_position.y);
 							real pan = horizontal > 1.0e-4f ? -relative_position.y / horizontal : 0.f;
+							/* port: how fast it comes towards the listener, for
+							its Doppler effect, as a 3D channel's (dsound_sdl.c,
+							doppler_ratio) */
+							real approach = distance > 1.0e-4f ?
+								-(stereo_velocity.i * relative_position.x +
+									stereo_velocity.j * relative_position.y +
+									stereo_velocity.k * relative_position.z) / distance :
+								0.f;
 
 							if (distance < minimum_distance && minimum_distance > 0.f)
 							{
@@ -3681,7 +3702,7 @@ static void update_channels(
 							}
 							dsound_port_set_channel_stereo_position(channel_index, TRUE, 0.75f * pan,
 								distance, minimum_distance, distance_fade,
-								stereo_obstruction, stereo_occlusion, stereo_underwater);
+								stereo_obstruction, stereo_occlusion, stereo_underwater, approach);
 						}
 					}
 					break;
@@ -3865,6 +3886,82 @@ void sound_idle(
 	return;
 }
 
+/* port: a followed unit supplies rigid-body point velocity for both the
+listener and its attached sounds, so rotation cancels along the line between
+them. Measuring a chase camera instead would add orbit motion and network
+corrections. Other cameras use focus displacement per game tick: observer
+velocity is frame-rate dependent in the port and absent on scripted tracks.
+Explicit cuts and lifecycle changes reset this history; the distance limit
+below is a fallback for other teleports. See docs/reading/audio_doppler.md. */
+#define LISTENER_SNAP_DISTANCE 10.f
+
+static struct
+{
+	boolean valid;
+	long game_time;
+	long player_index; /* port: a reused listener slot starts a fresh measurement */
+	real_point3d position;
+	real_vector3d velocity;
+} listener_motion[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+
+/* port: explicit cuts can be shorter than the displacement safety limit,
+and restored game ticks need not run backwards. */
+void sound_listener_motion_reset(short local_player_index)
+{
+	if (local_player_index == NONE)
+		memset(listener_motion, 0, sizeof(listener_motion));
+	else if (local_player_index >= 0 && local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		memset(&listener_motion[local_player_index], 0, sizeof(listener_motion[local_player_index]));
+}
+
+static void listener_measure_velocity(
+	short local_player_index,
+	real_point3d const *position,
+	real_vector3d *velocity)
+{
+	long game_time = game_time_get();
+	long ticks = game_time - listener_motion[local_player_index].game_time;
+	long player_index = local_player_get_player_index(local_player_index); /* port: listener ownership */
+
+	if (!listener_motion[local_player_index].valid || ticks < 0 ||
+		listener_motion[local_player_index].player_index != player_index) /* port: listener ownership */
+	{
+		listener_motion[local_player_index].valid = TRUE;
+		listener_motion[local_player_index].player_index = player_index; /* port: listener ownership */
+		listener_motion[local_player_index].game_time = game_time;
+		listener_motion[local_player_index].position = *position;
+		listener_motion[local_player_index].velocity = *global_zero_vector3d;
+	}
+	else if (ticks > 0)
+	{
+		real_vector3d displacement;
+
+		vector_from_points3d(
+			&listener_motion[local_player_index].position,
+			position,
+			&displacement);
+
+		if (magnitude3d(&displacement) < LISTENER_SNAP_DISTANCE*ticks)
+		{
+			scale_vector3d(
+				&displacement,
+				(real)TICKS_PER_SECOND/(real)ticks,
+				&listener_motion[local_player_index].velocity);
+		}
+		else
+		{
+			listener_motion[local_player_index].velocity = *global_zero_vector3d;
+		}
+
+		listener_motion[local_player_index].game_time = game_time;
+		listener_motion[local_player_index].position = *position;
+	}
+
+	*velocity = listener_motion[local_player_index].velocity;
+
+	return;
+}
+
 static void refresh_listener(
 	void)
 {
@@ -3874,6 +3971,7 @@ static void refresh_listener(
 
 	if (!game_in_progress())
 	{
+		sound_listener_motion_reset(NONE); /* port: do not carry motion through a session gap */
 		return;
 	}
 
@@ -3887,6 +3985,7 @@ static void refresh_listener(
 		{
 			struct observer_result const *camera =
 				observer_get_camera(local_player_index);
+			real_vector3d velocity; /* port: listener_measure_velocity */
 			boolean underwater;
 
 			match_assert(
@@ -3955,14 +4054,40 @@ static void refresh_listener(
 				&camera->position,
 				&camera->forward,
 				&camera->up);
+			/* port: not the observer's velocity (camera->velocity) but the
+			game's for the camera's point as if fixed to the unit it follows,
+			or, with none, the focus's motion measured
+			(listener_measure_velocity) */
+			{
+				long followed_unit_index = director_get_followed_unit(local_player_index);
+
+				if (followed_unit_index != NONE && object_try_and_get(followed_unit_index))
+				{
+					object_get_point_velocity(
+						followed_unit_index,
+						&camera->position,
+						&velocity);
+					scale_vector3d(&velocity, (real)TICKS_PER_SECOND, &velocity);
+					listener_motion[local_player_index].valid = FALSE;
+				}
+				else
+				{
+					listener_measure_velocity(
+						local_player_index,
+						observer_get_focus_position(local_player_index),
+						&velocity);
+				}
+			}
 			matrix4x3_inverse_transform_vector(
 				&listener->matrix,
-				&camera->velocity,
+				&velocity,
 				&listener->velocity);
 		}
 		else
 		{
 			listener->valid = FALSE;
+			/* port: measured again from nothing once there is a camera */
+			listener_motion[local_player_index].valid = FALSE;
 		}
 	}
 
