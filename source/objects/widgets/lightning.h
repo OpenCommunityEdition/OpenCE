@@ -42,6 +42,9 @@ typedef char lightning_datum_size_assert[
 
 /* ---------- prototypes/LIGHTNING.C */
 
+/* port: invalidate render-only seeds after restoring the game state. */
+void lightnings_reset_render_state(void);
+
 void lightnings_initialize(
 	void);
 
