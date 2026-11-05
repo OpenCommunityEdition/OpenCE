@@ -188,15 +188,23 @@ void render_particles(
 					particle->location.cluster_index;
 				/* port: a charge stuck to the viewmodel is drawn with it.
 				One that also shows on the body was left on the world's
-				view, and the near plane cut it down. */
+				view, and the near plane cut it down. Only while it is stuck
+				there (its object): a particle the first-person weapon threw
+				off keeps the flag, and a pistol's, an assault rifle's or a
+				sniper rifle's casings (shown in both views) were drawn with
+				the weapon, away from it without the depth test
+				(rasterizer_xbox_transparent_geometry.c), through floors and
+				walls. Free in the world, they are drawn in it, as on the
+				Xbox. */
 				rendered_particle->attached_to_first_person_weapon =
 					owned_by_local_player &&
 					(TEST_FLAG(
 						particle->flags,
 						_particle_datum_dont_draw_third_person_bit) ||
-					TEST_FLAG(
+					(TEST_FLAG(
 						particle->flags,
-						_particle_datum_attached_to_local_player_bit));
+						_particle_datum_attached_to_local_player_bit) &&
+					particle->object_index != NONE));
 			}
 		}
 
