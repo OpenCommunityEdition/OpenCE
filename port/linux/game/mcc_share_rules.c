@@ -13,17 +13,30 @@ static int mcc_share_same(char const *a, char const *b)
     return !*a && !*b;
 }
 
-static int mcc_share_stock_name(char const *folder)
+/* Sharing names must be portable even when the sender is not on Windows.
+ * This is stricter than local discovery and does not change its accepted names. */
+static int mcc_share_component(char const *name)
 {
-    static char const *const names[]={
-        "a10","a30","a50","b30","b40","c10","c20","c40","d20","d40",
-        "beavercreek","bloodgulch","boardingaction","carousel","chillout","damnation",
-        "dangercanyon","deathisland","gephyrophobia","hangemhigh","icefields","infinity",
-        "longest","prisoner","putput","ratrace","sidewinder","timberland","wizard"};
-    unsigned i;
-    for (i=0;i<sizeof(names)/sizeof(names[0]);i++)
-        if (mcc_share_same(folder,names[i])) return 1;
-    return 0;
+    char device[64];
+    size_t i,length=0;
+    if (!*name || *name=='.' || *name==' ') return 0;
+    for (i=0;name[i];i++) {
+        unsigned char c=(unsigned char)name[i];
+        if (c<32 || c>126) return 0;
+    }
+    /* A device name remains a device before an extension or trailing spaces. */
+    while (name[length] && name[length]!='.') length++;
+    while (length && name[length-1]==' ') length--;
+    memcpy(device,name,length);
+    device[length]=0;
+    if (mcc_share_same(device,"con") || mcc_share_same(device,"prn") ||
+        mcc_share_same(device,"aux") || mcc_share_same(device,"nul") ||
+        mcc_share_same(device,"conin$") || mcc_share_same(device,"conout$")) return 0;
+    if (length==4 && device[3]>='0' && device[3]<='9') {
+        device[3]=0;
+        if (mcc_share_same(device,"com") || mcc_share_same(device,"lpt")) return 0;
+    }
+    return 1;
 }
 
 static int mcc_share_digits(char const *text)
@@ -35,21 +48,26 @@ static int mcc_share_digits(char const *text)
 
 enum mcc_share_reason mcc_share_decide(struct mcc_share_package const *package)
 {
-    char canonical[64],folder[64];
-    char const *start,*end;
-    size_t length;
-    if (!package || !package->name || !mcc_package_name(package->name,canonical)) return MCC_SHARE_BAD_NAME;
-    start=canonical+9;
-    end=strchr(start,'\\');
-    if (!end) return MCC_SHARE_NOT_A_PACKAGE;
-    length=(size_t)(end-start);
-    memcpy(folder,start,length);
-    folder[length]=0;
+    char input[64],canonical[64];
+    char *folder,*level;
+    if (!package || !package->name || !package->name_length ||
+        package->name_length>=sizeof(input) ||
+        memchr(package->name,0,package->name_length)) return MCC_SHARE_BAD_NAME;
+    memcpy(input,package->name,package->name_length);
+    input[package->name_length]=0;
+    if (!mcc_package_name(input,canonical)) return MCC_SHARE_BAD_NAME;
+    folder=canonical+9;
+    level=strchr(folder,'\\');
+    if (!level) return MCC_SHARE_NOT_A_PACKAGE;
+    *level++=0;
+    if (!mcc_share_component(folder) || !mcc_share_component(level) ||
+        mcc_share_same(level,"bitmaps") || mcc_share_same(level,"sounds") ||
+        mcc_share_same(level,"loc")) return MCC_SHARE_BAD_NAME;
     if (mcc_share_same(folder,"_shared")) return MCC_SHARE_SHARED_RESOURCES;
-    if (mcc_share_stock_name(folder)) return MCC_SHARE_STOCK;
+    if (package->content==MCC_SHARE_CONTENT_STOCK) return MCC_SHARE_STOCK;
     if (mcc_share_digits(folder) || package->sidecar==MCC_SHARE_SIDECAR_VALID) return MCC_SHARE_WORKSHOP;
-    if (package->sidecar==MCC_SHARE_SIDECAR_UNREADABLE) return MCC_SHARE_UNKNOWN_ORIGIN;
-    if (!package->content_known) return MCC_SHARE_UNKNOWN_CONTENT;
+    if (package->sidecar!=MCC_SHARE_SIDECAR_ABSENT) return MCC_SHARE_UNKNOWN_ORIGIN;
+    if (package->content!=MCC_SHARE_CONTENT_CUSTOM || !package->content_known) return MCC_SHARE_UNKNOWN_CONTENT;
     if (!package->host_opt_in) return MCC_SHARE_NOT_OPTED_IN;
     return MCC_SHARE_ELIGIBLE;
 }
@@ -75,8 +93,11 @@ char const *mcc_share_reason_word(enum mcc_share_reason reason)
     return "unknown";
 }
 
-int mcc_share_file_allowed(char const *leaf)
+int mcc_share_file_allowed(char const *leaf, size_t length)
 {
-    if (!leaf) return 0;
-    return mcc_share_same(leaf,"bitmaps.map") || mcc_share_same(leaf,"sounds.map");
+    char name[12];
+    if (!leaf || (length!=10 && length!=11) || memchr(leaf,0,length)) return 0;
+    memcpy(name,leaf,length);
+    name[length]=0;
+    return mcc_share_same(name,"bitmaps.map") || mcc_share_same(name,"sounds.map");
 }

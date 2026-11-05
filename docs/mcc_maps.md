@@ -266,7 +266,7 @@ package name and separator. Deeper nesting, traversal and invalid names are
 rejected. Moving an existing loose map into a package changes its saved-game
 identity; keep it at its old location to continue an existing checkpoint. A description is optional;
 the default identifies the scenario type. MCC thumbnail sidecars, Workshop
-downloads and MCC package manifests are not implemented. There is no
+downloads and network transfer manifests are not implemented. There is no
 dependency on the Custom Edition setting or its resource directories.
 
 The loader opens source maps read-only. A rejected map reports the failing
@@ -413,6 +413,35 @@ and embedded widgets remain present. Scripts that explicitly open embedded
 widgets can still use the MCC callback adapter described below. The new
 pause labels and confirmation text are currently English; localization of
 these generated strings is not implemented.
+
+## Preliminary sharing restriction
+
+PR #94 supplies an MCC-owned eligibility helper only. MCC peer downloads are
+not enabled by it. The temporary policy covers hand-placed packages and excludes
+recognized Workshop content (numeric package folders or a valid
+`workshop_id.txt`), stock content, loose maps and `_shared`. Desktop players
+continue installing Workshop content through Steam or manually; Android players
+continue using the [package importer](../port/android/README.md#importing-mcc-packages).
+Steam is not required on Android. This is a scope restriction, not a claim that
+Workshop maps are unsafe or that manually copied maps are safe.
+
+The helper requires host opt-in, a known SHA-256 content identity and an explicit
+local classification of that exact content as custom. Unknown classification,
+unreadable sidecars and invalid enum values are refused. Folder names do not
+classify stock content: renaming a stock package cannot change an established
+stock classification, and a custom package may use a stock-looking name. A
+missing sidecar remains allowed under the original policy, but is not proof of
+origin or redistribution permission. Removing metadata is not a supported way
+to establish eligibility. The classification provider and transfer integration
+are future work; this phase does not automatically classify installed files.
+
+The additional-resource allowlist contains only `bitmaps.map` and `sounds.map`.
+It neither validates their contents nor authorizes reading global fallback
+resources. Campaign metadata and later mission files need a separate transfer
+contract. Eligibility and a matching hash must never bypass receiver-side map
+validation, path containment, bounded transfers or safe installation. See the
+[reader's guide](reading/maps_and_resources.md#preliminary-mcc-sharing-policy)
+for the API, trust boundaries and regression checks.
 
 ## Repository architecture and isolation
 

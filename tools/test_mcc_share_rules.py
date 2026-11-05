@@ -1,66 +1,131 @@
-"""Which MCC packages a host may offer: hand-placed only, never stock, Workshop or unknown."""
+"""Preliminary MCC sharing policy, portable names and bounded untrusted strings."""
 from pathlib import Path
+import shutil
 import subprocess
+import sys
+
+import pytest
 from test_mcc_identity import compile_tool
 
 ROOT = Path(__file__).resolve().parents[1]
+RULES = ROOT / "port/linux/game/mcc_share_rules.c"
+PACKAGE = ROOT / "port/linux/game/mcc_package.c"
+DRIVER = ROOT / "tools/tests/mcc_share_rules.c"
+CASES = ["policy", "stock", "workshop", "states", "names", "lengths", "resources", "reasons"]
 
 
-def test_share_rules(tmp_path):
-    source = tmp_path / "test.c"
+@pytest.fixture(scope="module")
+def share_tool(tmp_path_factory):
+    return compile_tool(tmp_path_factory.mktemp("mcc-share"), [DRIVER, RULES, PACKAGE])
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_share_rules(share_tool, case):
+    result = subprocess.run([str(share_tool), case], capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("before,after,case", [
+    ("package->sidecar!=MCC_SHARE_SIDECAR_ABSENT",
+     "package->sidecar==MCC_SHARE_SIDECAR_UNREADABLE", "states"),
+    ("package->content==MCC_SHARE_CONTENT_STOCK", "0", "stock"),
+    ("memchr(package->name,0,package->name_length)", "0", "lengths"),
+    ('mcc_share_same(device,"con")', '0', "names"),
+    ('mcc_share_same(level,"bitmaps")', '0', "names"),
+    ('if (!package->host_opt_in)', 'if (0)', "policy"),
+])
+def test_negative_controls(tmp_path, before, after, case):
+    """Each selected regression must detect its intended fault in the real code."""
+    source = RULES.read_text()
+    assert source.count(before) == 1
+    changed = tmp_path / "rules.c"
+    changed.write_text(source.replace(before, after))
+    exe = compile_tool(tmp_path, [DRIVER, changed, PACKAGE])
+    result = subprocess.run([str(exe), case], capture_output=True, text=True, timeout=30)
+    assert result.returncode == 1, result.stderr
+
+
+def test_sanitized_rules(tmp_path):
+    """Linux CI executes every case with address/undefined-behaviour checks."""
+    if not sys.platform.startswith("linux"):
+        pytest.skip("sanitizer runtime exercised by Linux CI")
+    clang = shutil.which("clang")
+    assert clang, "clang is required for the Linux security checks"
+    exe = tmp_path / "sanitized"
+    result = subprocess.run([clang, "-std=gnu89", "-g", "-O1", "-Wall", "-Wextra", "-Werror",
+                             "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
+                             "-I", str(RULES.parent), str(DRIVER), str(RULES), str(PACKAGE),
+                             "-o", str(exe)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    for case in CASES:
+        result = subprocess.run([str(exe), case], capture_output=True, text=True, timeout=30)
+        assert result.returncode == 0, result.stderr
+
+
+def test_fuzzed_rules(tmp_path):
+    """Bounded libFuzzer run over exact-length buffers, states and resource leaves."""
+    if not sys.platform.startswith("linux"):
+        pytest.skip("libFuzzer runtime exercised by Linux CI")
+    clang = shutil.which("clang")
+    assert clang, "clang is required for the Linux security checks"
+    source = tmp_path / "fuzz.c"
     source.write_text(r'''
 #include "mcc_share_rules.h"
-#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
-#define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-static enum mcc_share_reason why(char const *name,enum mcc_share_sidecar sidecar,int known,int opt){
- struct mcc_share_package p;p.name=name;p.sidecar=sidecar;p.content_known=known;p.host_opt_in=opt;
- return mcc_share_decide(&p);
-}
-#define ABSENT MCC_SHARE_SIDECAR_ABSENT
-int main(void) {
+int LLVMFuzzerTestOneInput(uint8_t const *data,size_t size) {
  struct mcc_share_package p;
- /* a hand-placed, non-numeric package with known content is offered */
- CHECK(why("mcc_maps\\solar_flare\\solar_flare",ABSENT,1,1)==MCC_SHARE_ELIGIBLE);
- CHECK(why("MCC_MAPS/Solar_Flare/solar_flare",ABSENT,1,1)==MCC_SHARE_ELIGIBLE);
- p.name="mcc_maps\\solar_flare\\solar_flare";p.sidecar=ABSENT;p.content_known=1;p.host_opt_in=1;
- CHECK(mcc_share_eligible(&p));p.host_opt_in=0;CHECK(!mcc_share_eligible(&p));
- CHECK(!mcc_share_eligible(NULL));
- /* sharing is opt-in */
- CHECK(why("mcc_maps\\solar_flare\\solar_flare",ABSENT,1,0)==MCC_SHARE_NOT_OPTED_IN);
- /* Workshop items: numeric folder, or a valid sidecar in a named folder */
- CHECK(why("mcc_maps\\2899609719\\pat_beavercreek",ABSENT,1,1)==MCC_SHARE_WORKSHOP);
- CHECK(why("mcc_maps\\solar_flare\\solar_flare",MCC_SHARE_SIDECAR_VALID,1,1)==MCC_SHARE_WORKSHOP);
- /* an unreadable sidecar means the origin is unknown */
- CHECK(why("mcc_maps\\solar_flare\\solar_flare",MCC_SHARE_SIDECAR_UNREADABLE,1,1)==MCC_SHARE_UNKNOWN_ORIGIN);
- /* no content identity */
- CHECK(why("mcc_maps\\solar_flare\\solar_flare",ABSENT,0,1)==MCC_SHARE_UNKNOWN_CONTENT);
- /* stock maps, loose maps and shared resources */
- CHECK(why("mcc_maps\\bloodgulch\\bloodgulch",ABSENT,1,1)==MCC_SHARE_STOCK);
- CHECK(why("mcc_maps\\BloodGulch\\x",ABSENT,1,1)==MCC_SHARE_STOCK);
- CHECK(why("mcc_maps\\a10",ABSENT,1,1)==MCC_SHARE_NOT_A_PACKAGE);
- CHECK(why("mcc_maps\\solar_flare",ABSENT,1,1)==MCC_SHARE_NOT_A_PACKAGE);
- CHECK(why("mcc_maps\\_shared\\multiplayer",ABSENT,1,1)==MCC_SHARE_SHARED_RESOURCES);
- CHECK(why("mcc_maps\\_SHARED\\x",ABSENT,1,1)==MCC_SHARE_SHARED_RESOURCES);
- /* unsafe or foreign identities */
- CHECK(why("maps\\solar_flare\\x",ABSENT,1,1)==MCC_SHARE_BAD_NAME);
- CHECK(why("mcc_maps\\..\\x\\y",ABSENT,1,1)==MCC_SHARE_BAD_NAME);
- CHECK(why("mcc_maps\\a\\b\\c",ABSENT,1,1)==MCC_SHARE_BAD_NAME);
- CHECK(why("mcc_maps\\a:b\\c",ABSENT,1,1)==MCC_SHARE_BAD_NAME);
- CHECK(why("mcc_maps\\\\c",ABSENT,1,1)==MCC_SHARE_BAD_NAME);
- CHECK(why("",ABSENT,1,1)==MCC_SHARE_BAD_NAME);
- CHECK(why(NULL,ABSENT,1,1)==MCC_SHARE_BAD_NAME);
- /* reason words are distinct */
- CHECK(!strcmp(mcc_share_reason_word(MCC_SHARE_WORKSHOP),"workshop"));
- CHECK(!strcmp(mcc_share_reason_word(MCC_SHARE_STOCK),"stock"));
- /* the files that go with a package */
- CHECK(mcc_share_file_allowed("bitmaps.map") && mcc_share_file_allowed("SOUNDS.MAP"));
- CHECK(!mcc_share_file_allowed("..\\bitmaps.map") && !mcc_share_file_allowed("x/sounds.map"));
- CHECK(!mcc_share_file_allowed("loc.map") && !mcc_share_file_allowed("") && !mcc_share_file_allowed(NULL));
+ enum mcc_share_reason reason;
+ size_t length;
+ char *name;
+ if(size<4)return 0;
+ length=size-4;
+ /* ASan catches even a one-byte overread beyond the declared string. */
+ name=(char *)malloc(length ? length : 1);
+ if(!name)abort();
+ memcpy(name,data+4,length);
+ memset(&p,0,sizeof(p));
+ p.name=name;p.name_length=length;
+ p.sidecar=(enum mcc_share_sidecar)(int8_t)data[0];
+ p.content=(enum mcc_share_content)(int8_t)data[1];
+ p.content_known=(int8_t)data[2];p.host_opt_in=(int8_t)data[3];
+ reason=mcc_share_decide(&p);
+ if(mcc_share_eligible(&p)!=(reason==MCC_SHARE_ELIGIBLE))abort();
+ if(reason==MCC_SHARE_ELIGIBLE &&
+    (p.sidecar!=MCC_SHARE_SIDECAR_ABSENT || p.content!=MCC_SHARE_CONTENT_CUSTOM ||
+     !p.content_known || !p.host_opt_in || length>63 || memchr(name,0,length)))abort();
+ if(!mcc_share_reason_word(reason))abort();
+ if(mcc_share_file_allowed(name,length) && (length<10 || length>11 || memchr(name,0,length)))abort();
+ p.name_length=(size_t)-1;
+ if(mcc_share_decide(&p)!=MCC_SHARE_BAD_NAME || mcc_share_file_allowed(name,(size_t)-1))abort();
+ free(name);
  return 0;
 }
 ''')
-    exe = compile_tool(tmp_path, [source, ROOT / "port/linux/game/mcc_share_rules.c",
-                                  ROOT / "port/linux/game/mcc_package.c"])
-    result = subprocess.run([str(exe)], capture_output=True, text=True)
+    exe = tmp_path / "fuzz"
+    built = subprocess.run([clang, "-std=gnu89", "-g", "-O1", "-Wall", "-Wextra", "-Werror",
+                            "-fsanitize=fuzzer,address,undefined", "-fno-sanitize-recover=all",
+                            "-I", str(RULES.parent), str(source), str(RULES), str(PACKAGE),
+                            "-o", str(exe)], capture_output=True, text=True)
+    assert built.returncode == 0, built.stderr
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    seeds = [b"mcc_maps/custom/level", b"mcc_maps/custom/CON", b"mcc_maps/123/a10",
+             b"mcc_maps/BloodGulch/x", b"mcc_maps/_shared/x", b"mcc_maps/custom/bitmaps",
+             b"mcc_maps/a/../b", b"mcc_maps/a/b\0suffix", b"bitmaps.map", b"SOUNDS.MAP"]
+    for i, name in enumerate(seeds):
+        (corpus / str(i)).write_bytes(bytes([0, 1, 1, 1]) + name)
+    result = subprocess.run([str(exe), "-runs=100000", "-seed=94", "-max_len=132",
+                             "-timeout=5", "-rss_limit_mb=512", str(corpus)],
+                            cwd=tmp_path, capture_output=True, text=True, timeout=90)
+    print(result.stderr)
     assert result.returncode == 0, result.stderr
+
+
+def test_ci_runs_share_rules():
+    """The dedicated Windows and Linux jobs must run this suite, not just trigger."""
+    workflow = (ROOT / ".github/workflows/mcc.yml").read_text()
+    for job in ("reader-and-validator", "windows-adapters"):
+        body = workflow.split(f"  {job}:", 1)[1].split("\n  windows-adapters:", 1)[0]
+        assert "tools/test_mcc_share_rules.py" in body

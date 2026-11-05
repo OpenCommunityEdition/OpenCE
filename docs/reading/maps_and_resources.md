@@ -113,6 +113,47 @@ The asset-free regressions in `test_steam_workshop.py` and `test_mcc_maps.py`
 check these paths, bounds, selection restoration and disabled settings; they
 do not establish gameplay compatibility for every discovered map.
 
+## Preliminary MCC sharing policy
+
+PR #94 adds an unused, pure policy module, not a downloader. Read
+[`mcc_share_rules.h`](../../port/linux/game/mcc_share_rules.h) for the caller's
+contract, then `mcc_share_decide` and `mcc_share_file_allowed` in
+[`mcc_share_rules.c`](../../port/linux/game/mcc_share_rules.c).
+The current phase considers hand-placed packages only. Numeric package folders
+and valid Workshop sidecars are excluded; unreadable or invalid sidecar states,
+loose maps, `_shared`, stock content and unknown content classification are
+also refused. A missing sidecar is allowed, but does not prove the package's
+origin. This temporary scope restriction is not a security or licensing verdict.
+
+For example, `mcc_maps\solar_flare\m0` passes only with locally established
+custom-content classification, a known fingerprint, an absent Workshop sidecar
+and host opt-in. A caller must classify the exact content independently of its
+name, for example using locally maintained evidence tied to its fingerprint.
+Merely calculating a hash, failing to match a stock name or reading an untrusted
+manifest cannot establish custom content. This phase supplies neither that
+classification provider nor a transfer caller; unknown classification stays
+blocked. Known stock content remains blocked after a folder rename, while a
+custom package named `bloodgulch` is not rejected just for its name.
+
+Name buffers carry their readable byte lengths, excluding a terminator. Embedded
+NULs, oversized names, non-ASCII characters, device names and resource-name
+collisions are refused. Ordinary local discovery retains its existing rules.
+The resource helper matches only `bitmaps.map` and `sounds.map`; it does not
+inspect bytes, resolve paths or establish ownership. A future transfer must
+independently bound and validate messages, map/resource data and destinations,
+prevent link escapes and file replacement races, and stage installation without
+overwriting existing packages or saves. A matching hash does not make hostile
+bytes safe. No shared-engine hooks, session state or protocol changes are added.
+
+Android continues to use its importer; this helper neither requires Steam nor
+enables Workshop transfers there. Campaign metadata and subsequent missions are
+not covered by the resource allowlist. Their transfer needs a separate design.
+See [the restriction](../mcc_maps.md#preliminary-sharing-restriction).
+[`test_mcc_share_rules.py`](../../tools/test_mcc_share_rules.py) exercises the real
+module with boundary cases, negative controls, and Linux ASan/UBSan and bounded
+libFuzzer runs. These are policy and memory-access checks, not end-to-end transfer
+validation or proof that arbitrary maps are safe to execute.
+
 ## Explicit MCC campaigns and Android imports
 
 Enable `game.mcc_campaigns` to use an installed campaign's metadata. Start with
