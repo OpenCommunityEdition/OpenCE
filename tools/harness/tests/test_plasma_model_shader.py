@@ -8,8 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import build, function, read, run, structure
 
 
-@pytest.mark.parametrize('platform', ['desktop', 'android', 'web'])
-def test_stock_programs(platform):
+def shader_source(platform):
     header = read('port/linux/src/xgpu.h')
     code = '' if platform == 'desktop' else '#define HALO_GLES 1\n'
     if platform == 'android':
@@ -36,5 +35,10 @@ def test_stock_programs(platform):
     code += '\nstatic const unsigned long programs[][544] = {\n' + ',\n'.join(
         '{' + ','.join(str(w)+'UL' for w in p) + '}' for p in programs) + '};\n'
     code += 'static const unsigned long lengths[] = {' + ','.join(str(len(p)//4) for p in programs) + '};\n'
-    status, output = run(build('plasma_model_shader', (('under_test.inc', code),)), 'programs')
+    return code
+
+
+@pytest.mark.parametrize('platform', ['desktop', 'android', 'web'])
+def test_stock_programs(platform):
+    status, output = run(build('plasma_model_shader', (('under_test.inc', shader_source(platform)),)), 'programs')
     assert status == 0, output

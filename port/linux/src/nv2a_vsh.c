@@ -775,6 +775,6 @@ char *nv2a_fixed_function_glsl(void)
 		"\txFog = 1.0;\n"
 		"}\n",
 		/* (display.reversed_depth) */
-		xgpu_reversed_depth ? "\tgl_Position.z = gl_Position.w - gl_Position.z;\n" : "");
+		xgpu_reversed_depth ? "\tgl_Position.z = gl_Position.w - gl_Position.z + depth_bias * gl_Position.w;\n" : "");
 	return text.buffer;
 }
