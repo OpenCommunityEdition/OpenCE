@@ -60,3 +60,16 @@ def test_loading_presenter(tmp_path, gles):
     result = subprocess.run([str(binary)], cwd=tmp_path, capture_output=True, text=True, timeout=40,
                             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_loading_presenter_calls_use_android_guest_bridges():
+    from android_gl_stubs import android_functions
+
+    source = (ROOT / "port/linux/src/loading_widescreen.c").read_text()
+    source = re.sub(r"#ifndef HALO_GLES.*?#endif", "", source, flags=re.S)
+    calls = set(re.findall(r"\b(gl[A-Z]\w+)\s*\(", source))
+    header = ROOT / "port/linux/src/gl.h"
+    assert calls <= set(android_functions(header))
+    aliases = header.read_text().split("#ifndef GL_FUNCTIONS_DEFINE", 1)[1].split("#else", 1)[0]
+    for name in calls:
+        assert f"#define {name} halo_{name}" in aliases
