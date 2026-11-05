@@ -16,6 +16,7 @@ The subscribed Steam Workshop items' Halo CE maps, found in place (steam_worksho
 
 #define STEAM_APP "976730"
 #define CONTENT_FOLDER "steamapps/workshop/content/" STEAM_APP
+#define MAXIMUM_STEAM_ROOTS 10
 
 static struct
 {
@@ -410,12 +411,54 @@ static void scan_library(const char *library)
 	posix_directory_close(directory);
 }
 
+#ifndef _WIN32
+static int linux_root(char *path, const char *base, const char *suffix)
+{
+	int written;
+	const char *c;
+
+	/* Environment hints are literal absolute paths, never shell expressions.
+	 * Reject long values rather than looking in a truncated, different folder. */
+	if (!base || base[0] != '/')
+		return 0;
+	for (c = base; *c; c++)
+	{
+		if ((unsigned char)*c < 0x20 || *c == 0x7F)
+			return 0;
+	}
+	written = snprintf(path, STEAM_WORKSHOP_PATH_SIZE, "%s%s%s", base, suffix[0] ? "/" : "", suffix);
+	return written > 0 && written < STEAM_WORKSHOP_PATH_SIZE;
+}
+
+static int linux_roots(char (*paths)[STEAM_WORKSHOP_PATH_SIZE], int maximum)
+{
+	static const char *const places[] = { ".steam/steam", ".steam/root", ".local/share/Steam",
+		".steam/debian-installation", ".var/app/com.valvesoftware.Steam/.local/share/Steam",
+		"snap/steam/common/.local/share/Steam" };
+	const char *home = getenv("HOME");
+	int count = 0, index;
+
+	/* Steam launch contexts can supply their client root. XDG relocates the
+	 * user's data directory; old home locations remain available as fallbacks. */
+	if (count < maximum && linux_root(paths[count], getenv("STEAM_COMPAT_CLIENT_INSTALL_PATH"), ""))
+		count++;
+	if (count < maximum && linux_root(paths[count], getenv("XDG_DATA_HOME"), "Steam"))
+		count++;
+	for (index = 0; index < (int)(sizeof(places) / sizeof(places[0])) && count < maximum; index++)
+	{
+		if (linux_root(paths[count], home, places[index]))
+			count++;
+	}
+	return count;
+}
+#endif
+
 /* the Steam folders to look in, then the libraries those name: library paths, each once */
 static int libraries(char (*paths)[STEAM_WORKSHOP_PATH_SIZE], int maximum)
 {
-	char roots[8][STEAM_WORKSHOP_PATH_SIZE];
+	char roots[MAXIMUM_STEAM_ROOTS][STEAM_WORKSHOP_PATH_SIZE];
 	int root_count = 0, count = 0, root, index;
-	const char *setting = config_string("paths.steam"), *home = getenv("HOME");
+	const char *setting = config_string("paths.steam");
 
 	if (setting && setting[0])
 		snprintf(roots[root_count++], STEAM_WORKSHOP_PATH_SIZE, "%s", setting);
@@ -424,26 +467,18 @@ static int libraries(char (*paths)[STEAM_WORKSHOP_PATH_SIZE], int maximum)
 		const char *program_files[] = { getenv("ProgramFiles(x86)"), getenv("ProgramFiles") };
 
 		/* Keep the configured root ahead of automatic discovery. */
-		root_count += steam_workshop_windows_roots(roots + root_count, 8 - root_count);
+		root_count += steam_workshop_windows_roots(roots + root_count, MAXIMUM_STEAM_ROOTS - root_count);
 		for (index = 0; index < 2; index++)
 		{
-			if (program_files[index] && program_files[index][0] && root_count < 8)
+			if (program_files[index] && program_files[index][0] && root_count < MAXIMUM_STEAM_ROOTS)
 				snprintf(roots[root_count++], STEAM_WORKSHOP_PATH_SIZE, "%s/Steam", program_files[index]);
 		}
-		if (root_count < 8)
+		if (root_count < MAXIMUM_STEAM_ROOTS)
 			snprintf(roots[root_count++], STEAM_WORKSHOP_PATH_SIZE, "C:/Program Files (x86)/Steam");
 	}
 #else
-	if (home && home[0])
-	{
-		static const char *const places[] = { ".steam/steam", ".steam/root", ".local/share/Steam",
-			".var/app/com.valvesoftware.Steam/.local/share/Steam", "snap/steam/common/.local/share/Steam" };
-
-		for (index = 0; index < (int)(sizeof(places) / sizeof(places[0])) && root_count < 8; index++)
-			snprintf(roots[root_count++], STEAM_WORKSHOP_PATH_SIZE, "%s/%s", home, places[index]);
-	}
+	root_count += linux_roots(roots + root_count, MAXIMUM_STEAM_ROOTS - root_count);
 #endif
-	(void)home;
 	for (root = 0; root < root_count && count < maximum; root++)
 	{
 		char vdf[STEAM_WORKSHOP_PATH_SIZE], (*named)[STEAM_WORKSHOP_PATH_SIZE];

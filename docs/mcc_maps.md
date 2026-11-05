@@ -120,6 +120,24 @@ unreadable, non-string or oversized registry values are ignored. The detected
 path is not written to the configuration: an empty setting continues to use
 automatic discovery on the next scan.
 
+On Linux, after the manual override, discovery checks the literal absolute path
+in `STEAM_COMPAT_CLIENT_INSTALL_PATH` when the launch environment supplies it,
+then `$XDG_DATA_HOME/Steam`. It also keeps the home-folder fallbacks above and
+adds `~/.steam/debian-installation`. The existing `~/.steam/steam` and
+`~/.steam/root` links can point to an installation anywhere the user can read;
+each discovered root's library list can locate libraries on other drives.
+For example, `XDG_DATA_HOME=/mnt/data/player` finds
+`/mnt/data/player/Steam` with `paths.steam` empty. Missing, stale, relative,
+control-character or oversized environment hints do not prevent fallback
+discovery. Paths are not expanded as shell expressions or written to config.
+
+The location evidence is the [XDG base-directory specification](https://specifications.freedesktop.org/basedir/0.8/),
+Valve's use of the client-install hint in [Proton's launcher](https://github.com/ValveSoftware/Proton/blob/proton_10.0/proton),
+and the [Valve maintainer's description of Debian's installation folder](https://github.com/ValveSoftware/steam-for-linux/issues/9347).
+These are discovery hints, not an exhaustive drive search. An installation with
+no accessible hint, link or known location still needs `paths.steam`; sandbox
+filesystem permissions can also prevent discovery.
+
 An item is used when its `ModInfo.json` says `"Engine": "Halo1"`; each
 path in `GameModContents.MultiplayerMaps` is a map json whose `ScenarioFile`
 names the `.map` file in the item's `maps` folder, whose `Title.Neutral` is the

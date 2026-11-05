@@ -67,6 +67,14 @@ an installation registered at `C:\Steam` is found with `paths.steam` empty;
 its `libraryfolders.vdf` adds libraries on other drives. Missing or invalid
 registry values leave the existing fallback discovery available. Android and
 web keep discovery disabled and do not call Windows APIs.
+On Linux, `linux_roots` checks the Steam launch environment and XDG data location
+before the home-folder fallbacks, including Debian, Flatpak and Snap. `linux_root`
+rejects relative, control-character and oversized paths rather than truncating
+them. For example, `XDG_DATA_HOME=/mnt/data/player` adds
+`/mnt/data/player/Steam`; the existing Steam symlinks can point elsewhere, and
+library manifests add other drives. Manual `paths.steam` stays first. Tests
+exercise root bounds on all hosts and native filesystem/symlink discovery on
+Linux; these checks do not establish gameplay or sandbox access permissions.
 For example, a Workshop item becomes `mcc_maps\2899609719\pat_beavercreek`;
 the MCC-only branch in `platform_translate_path` resolves it in place unless a
 local package already owns that folder. A rescan retries an exact host identity

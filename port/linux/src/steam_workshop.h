@@ -79,7 +79,7 @@ int steam_workshop_read_libraries(const char *text, int length, char (*paths)[ST
 int steam_workshop_windows_roots(char (*paths)[STEAM_WORKSHOP_PATH_SIZE], int maximum);
 #endif
 
-/* looks in the Steam libraries again (paths.steam first, Windows registry installations, usual folders,
+/* looks in the Steam libraries again (paths.steam first, Windows registry or Linux environment hints, usual folders,
 and the libraries their libraryfolders.vdf names). Returns how many maps were found. Each item once, by its id */
 int steam_workshop_scan(void);
 /* the same, the first time only; then the last scan's count */

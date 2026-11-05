@@ -93,6 +93,20 @@ int main(int argc, char **argv)
 		printf("title=%d %s\n", steam_workshop_item_title("222", title, sizeof(title)), title);
 		printf("small=%d\n", steam_workshop_package_folder("111", folder, 8));
 	}
+	else if (argc == 3 && !strcmp(argv[1], "linux-roots"))
+	{
+		char paths[11][STEAM_WORKSHOP_PATH_SIZE];
+		int maximum = atoi(argv[2]), count, guard = 1;
+		unsigned byte;
+		if (maximum < 0 || maximum > 10) return 2;
+		memset(paths, 'Z', sizeof(paths));
+		count = linux_roots(paths, maximum);
+		printf("count=%d\n", count);
+		for (index = 0; index < count; index++) printf("root=%s\n", paths[index]);
+		for (byte = maximum * STEAM_WORKSHOP_PATH_SIZE; byte < sizeof(paths); byte++)
+			if (((char *)paths)[byte] != 'Z') guard = 0;
+		printf("guard=%d\n", guard);
+	}
 	else if (argc == 3 && !strcmp(argv[1], "translate"))
 	{
 		char path[1024];
@@ -165,6 +179,11 @@ static void make_directories(char const *path) {(void)path;}
 '''
     for name in ("trim_separators", "names_match", "translate_workshop", "translate_elsewhere", "platform_translate_path"):
         translation += function(native, name) + "\n"
+    # Exercise the actual Linux candidate builder on every host. Linux scans
+    # below additionally use the full implementation with real symlinks/files.
+    discovery = (SRC / "steam_workshop.c").read_text()
+    for name in ("linux_root", "linux_roots"):
+        translation += function(discovery, name) + "\n"
     (work / "driver.c").write_text(DRIVER.replace("int main(", translation + "\nint main("))
     exe = work / ("driver.exe" if sys.platform == "win32" else "driver")
     windows = sys.platform == "win32"
@@ -192,9 +211,11 @@ def tool(tmp_path_factory):
     return build_tool(tmp_path_factory.mktemp("steam-workshop"))
 
 
-def run(tool, *args, home=None, setting="", enabled=True, data_root=None):
+def run(tool, *args, home=None, setting="", enabled=True, data_root=None, hints=None):
     env = dict(os.environ, HOME=str(home or "/nonexistent"), TEST_STEAM_SETTING=setting,
-               TEST_WORKSHOP_ENABLED=str(int(enabled)), TEST_DATA_ROOT=str(data_root or "/nonexistent"))
+               TEST_WORKSHOP_ENABLED=str(int(enabled)), TEST_DATA_ROOT=str(data_root or "/nonexistent"),
+               XDG_DATA_HOME="", STEAM_COMPAT_CLIENT_INSTALL_PATH="")
+    env.update(hints or {})
     result = subprocess.run([str(tool), *map(str, args)], capture_output=True, text=True, timeout=20, env=env)
     assert result.returncode == 0, result.stderr
     fields, lists = {}, {}
@@ -353,6 +374,99 @@ def test_setting_names_a_steam_folder(tool, tmp_path):
     assert row[:4] == ["888", "From the setting", "beaver", "Better Creek"] and row[5] == ""
     # no Steam at all: an empty catalog, no error
     assert run(tool, "scan", home=tmp_path / "nothing")[0]["count"] == "0"
+
+
+@pytest.mark.parametrize("maximum", [0, 1, 2, 7, 8, 10])
+def test_linux_root_candidates_are_bounded_and_ordered(tool, maximum):
+    fields, rows = run(tool, "linux-roots", maximum, home="/home/player", hints={
+        "XDG_DATA_HOME": "/custom user data", "STEAM_COMPAT_CLIENT_INSTALL_PATH": "/games/Steam"})
+    expected = ["/games/Steam", "/custom user data/Steam", "/home/player/.steam/steam",
+                "/home/player/.steam/root", "/home/player/.local/share/Steam",
+                "/home/player/.steam/debian-installation",
+                "/home/player/.var/app/com.valvesoftware.Steam/.local/share/Steam",
+                "/home/player/snap/steam/common/.local/share/Steam"]
+    assert rows.get("root", []) == expected[:maximum]
+    assert fields["count"] == str(min(maximum, len(expected))) and fields["guard"] == "1"
+
+
+@pytest.mark.parametrize("bad", ["", "relative/path", "~/Steam", "$HOME/Steam", "/bad\npath", "/" + "x" * 511])
+def test_linux_invalid_hints_keep_home_fallbacks(tool, bad):
+    _, rows = run(tool, "linux-roots", 10, home="/home/player", hints={
+        "XDG_DATA_HOME": bad, "STEAM_COMPAT_CLIENT_INSTALL_PATH": bad})
+    assert len(rows["root"]) == 6
+    assert all(path.startswith("/home/player/") for path in rows["root"])
+
+
+def test_linux_hints_work_without_home_and_do_not_truncate(tool):
+    _, rows = run(tool, "linux-roots", 10, hints={"HOME": "", "XDG_DATA_HOME": "/data",
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH": "/" + "x" * 510})
+    assert rows["root"] == ["/" + "x" * 510, "/data/Steam"]
+    # XDG suffix must also fit; an invalid HOME must not become a relative scan.
+    fields, rows = run(tool, "linux-roots", 10, hints={"HOME": "relative",
+        "XDG_DATA_HOME": "/" + "x" * 505})
+    assert fields["count"] == "0" and "root" not in rows
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Native Linux filesystem discovery")
+@pytest.mark.parametrize("source", ["xdg", "client", "debian", "flatpak", "snap", "relocated-link"])
+def test_linux_nonstandard_installations_and_libraries(tool, tmp_path, source):
+    home, steam, library = tmp_path / "home", tmp_path / "relocated Steam", tmp_path / "other library"
+    hints = {}
+    if source == "xdg":
+        steam = tmp_path / "custom data/Steam"
+        hints["XDG_DATA_HOME"] = str(steam.parent)
+    elif source == "client":
+        hints["STEAM_COMPAT_CLIENT_INSTALL_PATH"] = str(steam)
+    elif source == "relocated-link":
+        (home / ".steam").mkdir(parents=True)
+        (home / ".steam/root").symlink_to(steam)
+        (home / ".steam/steam").symlink_to(steam)
+    else:
+        steam = home / {"debian": ".steam/debian-installation",
+            "flatpak": ".var/app/com.valvesoftware.Steam/.local/share/Steam",
+            "snap": "snap/steam/common/.local/share/Steam"}[source]
+    make_item(steam, "111", "Automatic")
+    make_item(library, "222", "Secondary library")
+    (steam / "steamapps/libraryfolders.vdf").write_text(
+        '"libraryfolders" { "0" { "path" "%s" } "1" { "path" "%s" } }'
+        % (steam.as_posix(), library.as_posix()))
+    fields, rows = run(tool, "scan", home=home, hints=hints)
+    assert fields["count"] == "2"
+    assert [row.split("|")[1] for row in rows["map"]] == ["Automatic", "Secondary library"]
+    assert run(tool, "scan", home=home, hints=hints, enabled=False)[0]["count"] == "0"
+    manual = tmp_path / "manual"
+    make_item(manual, "111", "Manual wins")
+    _, rows = run(tool, "scan", home=home, hints=hints, setting=str(manual))
+    assert [row.split("|")[1] for row in rows["map"]] == ["Manual wins", "Secondary library"]
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Native Linux filesystem discovery")
+def test_linux_all_candidates_fit_with_manual_override(tool, tmp_path):
+    home, manual, client, xdg = (tmp_path / name for name in ("home", "manual", "client", "data"))
+    roots = [manual, client, xdg / "Steam", home / ".steam/steam", home / ".steam/root",
+             home / ".local/share/Steam", home / ".steam/debian-installation",
+             home / ".var/app/com.valvesoftware.Steam/.local/share/Steam",
+             home / "snap/steam/common/.local/share/Steam"]
+    for index, root in enumerate(roots):
+        make_item(root, str(100 + index), str(index))
+    fields, rows = run(tool, "scan", home=home, setting=str(manual), hints={
+        "XDG_DATA_HOME": str(xdg), "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(client)})
+    assert fields["count"] == "9"
+    assert [row.split("|")[1] for row in rows["map"]] == list(map(str, range(9)))
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Native Linux filesystem discovery")
+def test_linux_stale_hints_and_broken_symlinks_keep_fallbacks(tool, tmp_path):
+    home = tmp_path / "home"
+    (home / ".steam").mkdir(parents=True)
+    (home / ".steam/root").symlink_to(tmp_path / "missing")
+    (home / ".steam/steam").symlink_to(home / ".steam/steam")
+    make_item(home / ".local/share/Steam", "111", "Fallback")
+    not_a_directory = tmp_path / "not a directory"
+    not_a_directory.write_text("not Steam")
+    fields, rows = run(tool, "scan", home=home, hints={
+        "XDG_DATA_HOME": str(not_a_directory), "STEAM_COMPAT_CLIENT_INSTALL_PATH": str(tmp_path / "missing")})
+    assert fields["count"] == "1" and rows["map"][0].split("|")[1] == "Fallback"
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows registry discovery")

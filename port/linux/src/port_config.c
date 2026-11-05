@@ -714,8 +714,8 @@ static const struct config_setting config_settings[] =
 		"sounds.map and loc.map); empty for the one in the data folder." },
 	{ "paths.steam", _config_string, "\"\"", "HALO_STEAM_ROOT", _environment_value, _platform_desktop,
 		"A Steam folder (or Steam library) to check first for subscribed Halo CE\n"
-		"Workshop items. Empty uses automatic discovery: Windows registry, usual\n"
-		"Steam folders and their libraries. Windows paths are easiest in single\n"
+		"Workshop items. Empty uses automatic discovery: Windows registry, Linux\n"
+		"Steam/XDG hints, usual folders and their libraries. Windows paths use single\n"
 		"quotes: 'D:\\Steam'." },
 	{ "game.mcc_campaigns", _config_boolean, "false", "HALO_MCC_CAMPAIGNS", _environment_value, _platform_all,
 		"Use explicit MCC campaign manifests for mission discovery, ordering and\n"
