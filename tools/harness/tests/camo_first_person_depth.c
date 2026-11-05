@@ -113,7 +113,7 @@ static void rasterizer_set_stencil_mode(long mode)
 /* the cloaked group and its shader */
 struct render_lighting { long unused; };
 struct render_animation { long unused; };
-struct shader { long unused; };
+struct shader { struct { short type; } base; };
 struct shader_model_definition
 {
 	struct
@@ -141,6 +141,7 @@ struct transparent_geometry_group
 	long triangle_count;
 	void *vertex_buffer;
 	long dynamic_vertex_buffer_index;
+	struct transparent_geometry_group *next; /* (the test's: the next drawn) */
 };
 struct rasterizer_model_begin_parameters
 {
@@ -181,6 +182,14 @@ static struct { real first_person_weapon_near_clip_distance, first_person_weapon
 	{ 0.01171875f, 1024.0f };
 
 static void rasterizer_set_frustum_z(real z_near, real z_far) { }
+/* the transparent groups after one, and the screen copies the cloak made */
+static struct transparent_geometry_group *rasterizer_transparent_geometry_next_group(
+	struct transparent_geometry_group const *group)
+{
+	return group->next;
+}
+static long screen_copies;
+static void rasterizer_active_camouflage_cache_primary_render_target(void) { screen_copies++; }
 static void rasterizer_set_vertex_shader_permutation(short shader, short vertex_type, short permutation) { }
 static short rasterizer_transparent_geometry_get_primary_vertex_type(struct transparent_geometry_group const *group)
 {
@@ -324,6 +333,7 @@ static void cloaked(boolean first_person, real intensity, real depth)
 
 	memset(&group, 0, sizeof(group));
 	group.shader = &shader;
+	shader.base.type = _shader_type_model;
 	group.geometry_flags = first_person ? FLAG(_rasterizer_geometry_first_person_bit) : 0;
 	group.effect.type = _render_model_effect_type_active_camouflage;
 	group.effect.intensity = intensity;
@@ -445,6 +455,35 @@ int main(int argc, char **argv)
 		CHECK(draws[0].z_function == D3DCMP_LESSEQUAL && draws[1].z_function == D3DCMP_EQUAL,
 			"another unit's cloak is not drawn as the Xbox drew it");
 		shows(NONE, "another unit's cloak behind a wall");
+		return 0;
+	}
+	/* the first-person weapon's transparent geometry: its muzzle flash (an
+	effect shader) as it fires, then its cloaked gun and arms. The screen
+	they distort is copied once, before any of it is drawn */
+	CASE("first-person-copy")
+	{
+		struct transparent_geometry_group groups[3];
+		struct shader flash = { { _shader_type_effect } }, model = { { _shader_type_model } };
+		short index;
+
+		memset(groups, 0, sizeof(groups));
+		for (index = 0; index < 3; index++)
+		{
+			groups[index].geometry_flags = FLAG(_rasterizer_geometry_first_person_bit);
+			groups[index].shader = index ? &model : &flash;
+			groups[index].effect.type = index ? _render_model_effect_type_active_camouflage : 0;
+			groups[index].next = index < 2 ? &groups[index + 1] : NULL;
+		}
+		screen_copies = 0;
+		rasterizer_active_camouflage_cache_for_first_person(&groups[0]);
+		CHECK(screen_copies == 1, "the screen is copied %ld times before the first-person weapon, not once",
+			screen_copies);
+		/* the weapon uncloaked: no copy */
+		groups[1].effect.type = groups[2].effect.type = 0;
+		screen_copies = 0;
+		rasterizer_active_camouflage_cache_for_first_person(&groups[0]);
+		CHECK(screen_copies == 0, "the screen is copied %ld times for an uncloaked first-person weapon",
+			screen_copies);
 		return 0;
 	}
 	/* a split screen's lower right window */

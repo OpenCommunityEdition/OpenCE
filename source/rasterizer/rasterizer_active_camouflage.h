@@ -14,5 +14,8 @@ void rasterizer_active_camouflage_cache_primary_render_target(
 	void);
 void rasterizer_active_camouflage_draw(
 	struct transparent_geometry_group *group);
+/* port: (rasterizer_xbox_active_camouflage.c) */
+void rasterizer_active_camouflage_cache_for_first_person(
+	struct transparent_geometry_group const *group);
 
 #endif /* __RASTERIZER_ACTIVE_CAMOUFLAGE_H */

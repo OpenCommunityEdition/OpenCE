@@ -481,6 +481,32 @@ void rasterizer_active_camouflage_cache_primary_render_target(
 	return;
 }
 
+/* port: the screen a cloaked first-person weapon and arms distort, copied
+before any of the first-person weapon's transparent geometry is drawn (from
+group, the first of it, on), if any of them is cloaked; the copy made for
+each cloaked object as it comes (rasterizer_xbox_transparent_geometry.c) is
+not made for them. Copied there, as on the Xbox, the screen had the
+first-person groups drawn before their cloaked parts in it (the weapon's
+muzzle flash as it fired), which their cloak refracted onto them. */
+void rasterizer_active_camouflage_cache_for_first_person(
+	struct transparent_geometry_group const *group)
+{
+	for (; group; group = rasterizer_transparent_geometry_next_group(group))
+	{
+		if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit) &&
+			!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit) &&
+			group->effect.type == _render_model_effect_type_active_camouflage &&
+			group->shader &&
+			group->shader->base.type == _shader_type_model)
+		{
+			rasterizer_active_camouflage_cache_primary_render_target();
+			break;
+		}
+	}
+
+	return;
+}
+
 void rasterizer_active_camouflage_draw(
 	struct transparent_geometry_group *group)
 {

@@ -85,6 +85,7 @@ symbols in this file:
 #include "cseries.h"
 #include "cseries/errors.h"
 #include "rasterizer.h"
+#include "rasterizer_active_camouflage.h" /* port: rasterizer_active_camouflage_cache_for_first_person */
 #include "rasterizer_console_vars.h"
 #include "rasterizer_geometry.h"
 #include "rasterizer_transparent_geometry.h"
@@ -587,6 +588,10 @@ void rasterizer_transparent_geometry_draw(
 					global_window_parameters.rasterizer_target==_rasterizer_target_render_primary);
 				if (!first_person_flag)
 				{
+					/* port: the screen behind the first-person weapon, before
+					any of it is drawn, for its cloak
+					(rasterizer_active_camouflage_cache_for_first_person) */
+					rasterizer_active_camouflage_cache_for_first_person(group);
 					/* port: the first-person weapon's projection (view_fov.c) */
 					viewmodel_projection_begin();
 					rasterizer_set_stencil_mode(0);

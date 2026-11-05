@@ -2,7 +2,8 @@
 states and viewport and a pixel's depth, stencil and color: a cloaked first-person weapon and arms, fully cloaked or
 fading, first set the depth under them to the far plane where none of their groups has been drawn (marking the
 stencil), which on the Xbox was the world's and cut them, and are then drawn as the Xbox drew them; the pixel shows the
-nearest part in front of the world whatever order the parts are drawn in, and another unit's cloak is drawn as before."""
+nearest part in front of the world whatever order the parts are drawn in, and another unit's cloak is drawn as before;
+the screen the cloaked first-person weapon distorts is copied once, before any of its transparent geometry is drawn."""
 
 import sys
 from pathlib import Path
@@ -13,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run  # noqa: E402
 
 CASES = ["cloaked-first-person", "fading-first-person", "parts-in-order", "parts-out-of-order", "another-unit",
-         "split-screen"]
+         "first-person-copy", "split-screen"]
 
 # a fault in the code and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -35,6 +36,12 @@ NEGATIVE_CONTROLS = {
                            "cloaked-first-person"),
     # the depth range left pinned to the far plane after the clearing draw
     "not-restored": (("\t\trasterizer_active_camouflage_window_depth(0.0f);\n", ""), "cloaked-first-person"),
+    # the screen not copied before the first-person weapon (its cloak then refracts its muzzle flash onto it)
+    "no-first-person-copy": (("\t\t\trasterizer_active_camouflage_cache_primary_render_target();\n", ""),
+                             "first-person-copy"),
+    # copied for any first-person weapon, cloaked or not
+    "copied-uncloaked": (("\t\t\tgroup->effect.type == _render_model_effect_type_active_camouflage &&\n", ""),
+                         "first-person-copy"),
     # the whole screen's viewport, not the window's
     "whole-screen": (("viewport.X = global_window_parameters.camera.viewport_bounds.x0;", "viewport.X = 0;"),
                      "split-screen"),
@@ -45,7 +52,7 @@ ENUMERATIONS = ("_rasterizer_target_render_primary", "_rasterizer_geometry_first
                 "_active_camouflage_tint_edge_density_bit", "_rasterizer_vertex_shader_active_camouflage",
                 "RASTERIZER_STENCIL_MODE_NONE", "ACTIVE_CAMOUFLAGE_SCREEN_WIDTH")
 FUNCTIONS = ("rasterizer_active_camouflage_window_depth", "rasterizer_active_camouflage_draw_depth",
-             "rasterizer_active_camouflage_draw")
+             "rasterizer_active_camouflage_cache_for_first_person", "rasterizer_active_camouflage_draw")
 
 
 def generated(fault=None):
