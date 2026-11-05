@@ -10,7 +10,6 @@
 #define FALSE 0
 #define WINAPI
 typedef unsigned char byte;
-typedef long HRESULT;
 typedef void *LPDIRECTSOUND, *LPDIRECTSOUNDBUFFER, *LPUNKNOWN;
 typedef struct {
     unsigned short wFormatTag, nChannels;
@@ -27,7 +26,9 @@ typedef const DSBUFFERDESC *LPCDSBUFFERDESC;
 #define DSBPLAY_LOOPING 1
 #define DSBFREQUENCY_MIN 188
 #define DSBFREQUENCY_MAX 191983
-typedef int pthread_mutex_t;
+/* libc may expose pthread_mutex_t through stdlib.h on Linux. */
+#define pthread_mutex_t chant_mutex_t
+typedef int chant_mutex_t;
 #define PTHREAD_MUTEX_INITIALIZER 0
 static void pthread_mutex_lock(pthread_mutex_t *lock) {assert(!*lock); *lock = 1;}
 static void pthread_mutex_unlock(pthread_mutex_t *lock) {assert(*lock); *lock = 0;}
