@@ -4,7 +4,7 @@ MENDICANT_MODELS.C
 MENDICANT AI's runtime (M1): the trained models answer the game's requests
 in the game's own process, in place of brain.py.
 
-The weights are one file, models.aibw (tools/export_models.py), found
+The weights are one file, models.aibw (tools/mendicant/export_models.py), found
 through the mods folder: ai.mendicant.weights is its tag-file key, by
 default "mendicant\models.aibw", which is the file
 mods/<mod>/tags/mendicant/models.aibw of a mod with no `maps =` in its
@@ -38,8 +38,8 @@ they were.
 #include "math/real_math.h"
 #include "main/main.h"
 
-#include "../mods.h"
-#include "mendicant.h"
+#include "mods.h" /* port/linux/game/mods.c (-iquote port/linux/game) */
+#include "mendicant_internal.h"
 #include "mendicant_infer.h"
 
 #include <stdlib.h>

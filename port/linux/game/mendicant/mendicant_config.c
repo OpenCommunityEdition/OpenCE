@@ -16,7 +16,7 @@ this build with no change but the binary's path.
 #include <stdlib.h>
 #include <string.h>
 
-#include "mendicant.h"
+#include "mendicant_internal.h"
 
 /* port/linux/src/port_config.c */
 int config_boolean(char const *name);
@@ -143,6 +143,11 @@ boolean mendicant_config_read(
 		config->individuals = atoi(legacy) > 0;
 	if ((legacy = mendicant_legacy("HALO_AI_MENDICANT_VARIETY", "AI_BRAIN_VARIETY")) != NULL)
 		config->variety = (real)atof(legacy);
+	/* training as the hook library trained: the per-soldier models only when asked
+	for (trainer.py's --mode individual sets AI_BRAIN_INDIVIDUALS), so strategy
+	episodes have no stance requests of theirs */
+	if (config->training && !getenv("HALO_AI_MENDICANT_INDIVIDUALS") && !getenv("AI_BRAIN_INDIVIDUALS"))
+		config->individuals = FALSE;
 #endif
 
 	/* the hook library kept the Marines' rate of fire at a tenth or more */
@@ -155,4 +160,28 @@ boolean mendicant_config_read(
 		return TRUE;
 	}
 	return memcmp(&previous, config, sizeof(previous)) != 0;
+}
+
+/* the settings screens wrote ai.mendicant.* (mendicant.h) */
+void mendicant_settings_changed(
+	void)
+{
+	struct mendicant_config map_start = mendicant_config;
+
+	mendicant_config_read();
+	mendicant_config.enabled = map_start.enabled;
+	mendicant_config.models = map_start.models;
+	mendicant_config.seed = map_start.seed;
+	mendicant_config.training = map_start.training;
+	mendicant_config.training_skip = map_start.training_skip;
+	mendicant_config.vehicle_test = map_start.vehicle_test;
+	mendicant_config.aim_debug = map_start.aim_debug;
+	memcpy(mendicant_config.bridge, map_start.bridge, sizeof(mendicant_config.bridge));
+	memcpy(mendicant_config.weights, map_start.weights, sizeof(mendicant_config.weights));
+	memcpy(mendicant_config.sample_log, map_start.sample_log, sizeof(mendicant_config.sample_log));
+	memcpy(mendicant_config.drill_log, map_start.drill_log, sizeof(mendicant_config.drill_log));
+	memcpy(mendicant_config.player_log, map_start.player_log, sizeof(mendicant_config.player_log));
+	memcpy(mendicant_config.move_test_log, map_start.move_test_log, sizeof(mendicant_config.move_test_log));
+
+	return;
 }

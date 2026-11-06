@@ -22,7 +22,7 @@ and the answer the models give, in one of two places.
 #include <stddef.h>
 #include <string.h>
 
-#include "mendicant.h"
+#include "mendicant_internal.h"
 
 /* port/linux/src/platform.h */
 void platform_log(char const *format, ...);

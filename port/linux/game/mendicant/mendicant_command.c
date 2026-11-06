@@ -30,7 +30,7 @@ command parts); its behaviour is the same.
 #include <stdio.h>
 #include <string.h>
 
-#include "mendicant.h"
+#include "mendicant_internal.h"
 
 /* source/ai/actions.c (declared there, not in a header) */
 boolean actor_action_handle_lost_contact(long actor_index);

@@ -1,0 +1,2690 @@
+{
+ "meta": {
+  "title": "ai_brain battle-drill doctrine (synthesis of draft_smallunit, draft_covenant, draft_feasible)",
+  "sources": {
+   "tactics": "draft_smallunit (US Army ATP 3-21.8 / USMC MCWP 3-11.2 squad battle drills) and draft_covenant (caste-based area defense)",
+   "limits": "draft_feasible: every destination is a firing position of the actor's encounter picked by a computable rule; every end condition is measurable; every step has a time cap and a scripted fallback; at most 6 successors per step; at most 3 elements per unit"
+  },
+  "units": "ranges in world units (1 wu ~ 3 m); times in seconds (30 ticks = 1 s; the strategy's tempo scales every max_seconds by 0.8 fast / 1.2 slow, as step_ticks() does today); angles in degrees.",
+  "angles": "contact steps: drill_position angles measured at the reference point (LKP, OBJ or ECP) from the reference-to-unit-centre axis: 0 = on our side, between it and us; 90 = beside it on the strategy's side; 180 = behind it. 'side' = the strategy's signed side (+1/-1), '-side' = the other one. Postures: angles measured at C from D (0 = toward expected contact, 180 = directly away).",
+  "reference_points": {
+   "LKP": "the unit's last known enemy position (squad_target): what the unit knows, not where the enemy is.",
+   "OBJ": "the LKP frozen when an assault step starts (cmd_obj[key]); consolidation steps use it after the enemy is dead.",
+   "C": "the Covenant guard centre: the centroid of the encounter's firing positions within 15 wu of the unit centre when the unit first takes a posture (falls back to the unit centre). Fixed for a defending unit.",
+   "D": "the Covenant expected-contact bearing at C, in order of preference: toward the unit's LKP; toward the LKP of another Covenant unit within 40 wu that is in contact; toward the nearest Marine or player position rounded to 30 deg and refreshed only at a posture refresh (a scouting report, see the open decision in doctrine.md); toward the previous encounter's centre.",
+   "ECP": "expected contact point = C + 20 wu along D. It stands in for the enemy in Covenant no-contact steps so drill_position bands still work.",
+   "ADV": "the Marine advance point: the Chief's position + 15 wu along (Chief - Marine centre) when the Chief is more than 5 wu ahead, else along the Chief's facing; the nearest encounter with live Covenant within 40 wu when the Chief is stationary. It stands in for the enemy in Marine no-contact steps.",
+   "CHIEF": "the AI Master Chief (or the player): the Marines' head leader, never commanded, used as their formation reference.",
+   "HUNT": "the Covenant hunt point: the LKP frozen when the unit lost contact with an enemy that was inside its area (cmd_hunt[key]); falls back to ECP. The reference for a Covenant sweep (c_sweep's overwatch steps)."
+  },
+  "conventions": [
+   "'arrived' = 70% of the step's movers within 2.5 wu of their ordered positions, where a mover is a member whose order this step came from drill_position / drill_move_near / drill_ring / drill_beyond and was accepted (a per-member mover flag). Holders of every role (SUPPORT, HIDDEN, SECURITY, OVERWATCH, SHIFT_FIRE, GRENADIER, drill_hold of any kind) are not movers. A step with no movers is never 'arrived': it ends on its other conditions, its moved = 0 rule or its cap. (Today's step_arrived() excludes only SUPPORT and HIDDEN, so SECURITY or OVERWATCH holders would count as arrived and end a bound early.)",
+   "'contact' = a member sees an enemy (0x1ed > 0), or a member's shield or health drops, or an enemy becomes known that was not known when the step began. An enemy the unit already knew (a remembered prop of the enemy it has just beaten or broken contact with) is not new contact, so regroup, reorganize and the postures after a fight are not interrupted at once by the memory of the last enemy. 'new contact' in consolidation steps means the same.",
+   "'objective cleared' = no known live enemy within 10 wu of OBJ and none visible for 2 s, or kills since the step began (by anyone, the Chief included) >= the enemy count known at its start.",
+   "'enemy fixed' = the nearest enemy's range to us (to C for Covenant defenders) changed by less than 3 wu in 6 s; 'closing' / 'retreating' = it fell / rose by 3 wu or more in 6 s.",
+   "'penetration' = an enemy within 10 wu of C.",
+   "Every position pick obeys today's drill_position limits: travel <= 40 wu, |dz| to the reference <= 8 wu, not owned, not used this tick; two attempts with the band widened by 30 deg / 5 wu; no position = drill_hold.",
+   "Spacing: no two members of a unit ordered to positions closer than 3 wu, so one grenade cannot take two.",
+   "A step whose precondition fails at its start (no flank position, no grenades, no eligible runner) ends after one tick and takes its fallback_next instead of waiting for its cap.",
+   "Element minimum: no element has fewer than 2 members; if a split would leave 1, the step runs unit-wide. The RUNNER detail is the only exception, and only for one step.",
+   "A strategy is complete when it enters a no-contact step (post_perimeter, post_depth, post_ambush, follow_lead, overwatch_a/b). No-contact steps loop until contact and do not count toward MAX_CHAIN_STEPS; the first contact afterwards opens a new strategy.",
+   "Measured terms used in 'when' clauses: 'enemy located' = enemy count known >= 1 with an LKP; 'weakened' = 1-2 known enemies left, or we outnumber the known enemies 3:1; 'broken' = weakened and retreating; 'repulsed' = the assaulting element lost half its members, or 2, with no kill since the step began; 'counterattack' / 'closing on X' = the nearest enemy's range to X fell 3+ wu in 6 s and is under 15 wu; 'stalled' = enemy fixed for 6 s; 'clustered' = 2+ known enemies within 5 wu of each other; 'dug in' = the target stationary for 3+ s (and, once the LOS test exists, with crouch-height cover from us); 'hit by an unseen attacker' = a member's shield or health drops while no member sees an enemy, with a known enemy within 10 wu; 'outnumbered 2:1' = known enemies >= 2 x our members (the Chief counts as 3 Marines); 'anti-vehicle weapon' = a rocket launcher or a held plasma grenade.",
+   "Opening in contact: a strategy chosen while the unit is already in contact does not run its leading no-contact steps (nobody re-posts under fire). Covenant chains start at stand_to (or spring_ambush / counterattack when their starts_when holds), with each member's current position as its post and C and D as they are; Marine and sweep chains start at react_contact (react_near_ambush when forced).",
+   "Covenant guard leash: in a defending unit (C set), base and reserve never take a position more than 25 wu from C, and the strike element (maneuver) never more than 35 wu from C (inside the 35 wu command range of the security Elite at C); a position beyond is treated as not free. Withdrawals keep their 35 wu limit. This bounds every Covenant attack step (flank_move, pincer, shock_assault, secure_objective) as well as the postures.",
+   "Small units (2-3 members, e.g. an Elite with 1-2 Grunts, the commonest Halo group): the only splitting steps allowed are bound_a/b, overwatch_a/b and withdraw_a/b, as buddy bounds: each element may be 1 member, a bound is at most 8 wu, and no mover ends more than 10 wu from the other element (inside SOLO_DISTANCE 15, so nobody is solo). flank_move, pincer_move/close, link_up and suicide_runner are masked out; every other step runs unit-wide. For Covenant the Elite is maneuver and the Grunts are base.",
+   "Nobody left alone: at every step boundary an element with fewer than 2 members (outside the small-unit and runner exceptions) merges into the nearest other element; during a step, a member whose element is gone and who is more than 15 wu from every friend is ordered at once to drill_move_near(the nearest element's centre, 8) and takes that element's role. Full evening-out of the teams happens in reorganize and regroup.",
+   "Posture refresh keeps posts: when a posture refresh re-chooses the same posture, members stay on their posts (drill_hold); a member is moved only if its post is now invalid (owned by another, outside the guard leash) or D has turned 30+ deg. Only a change of posture re-posts the unit, so the Grunts do not shuffle about every 60 s.",
+   "Scripted fallback: when the model is not asked or does not answer, the next step is the chain's planned step while on the chain; off the chain, the step's default_rules (evaluated in order, the first whose 'if' holds) and then its default_next. A transition's 'default_for' names the faction for which it is the default when the faction defaults differ.",
+   "Cover before the LOS test exists: the level's firing positions are themselves the cover proxy (the designers placed them at cover); drill_ring and the other pickers score range, angle and spacing only, and the cover/concealment terms are added when the LOS test lands (P2 note)."
+  ]
+ },
+ "elements": [
+  {
+   "name": "base",
+   "team": 0,
+   "marines": "The Marines nearest the enemy axis (the lower half by lateral angle * side, as assign_teams sorts today, rounded up); on a tie within 3 wu, the Marines with the longest-range or most sustained weapons (assault rifle, sniper rifle, rocket launcher). With 6+ Marines the nearest 40%.",
+   "covenant": "The security element: every Grunt and Jackal not detailed elsewhere, plus the security Elite: the leader when the unit has 1 or 2 Elites, the lowest-ranked Elite when it has 3 or more. Jackals take the sectors facing D (their shields face the threat) and act as the forward screen in post_depth and post_ambush.",
+   "purpose": "Base of fire, overwatch and perimeter security: the element that fixes the enemy and stays put. In the Covenant defense it is the Grunt 360 and the base of fire once contact is made."
+  },
+  {
+   "name": "maneuver",
+   "team": 1,
+   "marines": "The rest of the Marines, on the strategy's side of the unit; shotgun carriers preferred.",
+   "covenant": "The strike element: with 2 Elites, the non-leader Elite plus one escort (a Jackal if the unit has 3+ Jackals, else the needler Grunt nearest it), formed only when the unit has 4+ Grunts and Jackals, otherwise the second Elite stays at the centre in base. With 3+ Elites, every Elite except the leader and the security Elite, each paired with one escort while escorts last (2 Elites with no escort post together). For attacks by a 1-Elite unit: the leader plus the flank-side half of the Grunts (today's split).",
+   "purpose": "Flank, assault, bound and ambush element: moves while base fires. After a successful assault it is the security element on the objective. In the Covenant defense these are the Elite ambush or flank teams posted out along the approach."
+  },
+  {
+   "name": "reserve",
+   "team": 2,
+   "marines": "Only with 6+ Marines: the 1-2 Marines furthest from the enemy (20%, min 1, max 2; may be 1 because the Chief fights beside the Marines). Otherwise empty and its tasks fall to base.",
+   "covenant": "The Hunter pair, always (never split). With 3+ Elites the leader joins the Hunters here as the commander's reserve. Otherwise empty and its tasks fall to base.",
+   "purpose": "Marines: rear and open-flank security during the attack, last to move in the link-up, first to the rally point. Covenant: the counterattack reserve near the centre, furthest from expected contact."
+  },
+  {
+   "name": "runner",
+   "team": "detail",
+   "marines": "never",
+   "covenant": "A detail of exactly 1, taken from base for one step (suicide_runner) only: the Grunt holding a plasma grenade that is nearest the target (target 6-18 wu away). Never an Elite, never one of the last 3 Grunts, never in a unit of fewer than 4, at most once per strategy and once per 30 s per unit. He does not return: he is expended.",
+   "purpose": "The plasma-grenade suicide runner, when it is the plan: a one-way assault that breaks a Marine position or a Chief camping in cover. Not counted as an element."
+  }
+ ],
+ "new_roles": [
+  {
+   "name": "SECURITY",
+   "maps_to": "stationary crouch 1; shoot only while the actor sees an enemy (FLANKER's rule); burst 0.8 s; override restrictions 1; while it sees nothing, manual target point = its sector point (8 wu out from its position along its sector bearing, chest high), so it watches its sector without firing.",
+   "use": "360 security in postures, assault-position security, reorganize, rear security. (draft_feasible's SENTRY and SECURITY are the same thing and are merged here.)"
+  },
+  {
+   "name": "OVERWATCH",
+   "maps_to": "SUPPORT's flags but shoot only while it sees an enemy or knew one in the last 3 s; burst 1.5 s; manual target point = the bounding element's destination + 10 wu further along the axis of advance.",
+   "use": "the stationary element in bounding overwatch with no contact yet: covers the bounders without firing at nothing."
+  },
+  {
+   "name": "SHIFT_FIRE",
+   "maps_to": "SUPPORT's flags; while a friendly assaulter is within 8 wu of the target, the manual target point moves 4 wu to the -side of it (away from the assaulters) and 3 wu deeper; when an assaulter is within 4 wu of it, shoot 0 (fire lifted).",
+   "use": "the base of fire during every assault, so it does not hit its own assault element (plasma and grenades make that real)."
+  },
+  {
+   "name": "GRENADIER",
+   "maps_to": "stationary crouch 1, shoot 1, actor_grenade_due set; ORDERS_THROW_GRENADE once when the target point is 5-15 wu away (the manual target point = LKP when not seen, so a defilade enemy can be hit).",
+   "use": "grenade_volley right before an assault; a grenade not followed up is wasted."
+  },
+  {
+   "name": "RUNNER",
+   "maps_to": "ASSAULT's flags (upright, moving crouch 0), shoot 0, disciplined (no flee), actor_grenade_due forced; ORDERS_THROW_GRENADE when within 4 wu of the target; ordered to the free position nearest the target (within 3 wu), not a band.",
+   "use": "the Grunt plasma-grenade suicide runner (suicide_runner only)."
+  }
+ ],
+ "steps": [
+  {
+   "name": "follow_lead",
+   "phase": "no_contact",
+   "for": "marines",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "NONE",
+     "destination": "drill_move_near(CHIEF + 6 wu toward ADV, radius 6): the lead element, ahead of the Chief within +/-40 deg of ADV",
+     "facing": "ADV"
+    },
+    "base": {
+     "role": "NONE",
+     "destination": "drill_move_near(CHIEF - 4 wu along the ADV direction, radius 6)",
+     "facing": "ADV and its own flank"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_move_near(CHIEF - 8 wu along the ADV direction, radius 5): trail",
+     "facing": "rear (-ADV)"
+    }
+   },
+   "ends_when": [
+    "contact (immediate interrupt)",
+    "the expected enemy is near: the Chief stationary for 5 s or firing, or a live Covenant encounter's centre within 30 wu of the Chief (the same mild scouting cheat as D option 3: a briefing tells the Marines where the enemy should be). (ADV alone cannot be the test: it is 15 wu ahead of the Chief by construction, so 'ADV within 18 wu' would end the wedge at once.)",
+    "20 s (refresh: the Chief has moved)"
+   ],
+   "max_seconds": 20,
+   "fails_when": [
+    "no Chief alive and no ADV computable: the unit holds (hold)"
+   ],
+   "default_next": "overwatch_a",
+   "fallback_next": "hold",
+   "failure_rule": "suspended"
+  },
+  {
+   "name": "overwatch_a",
+   "phase": "no_contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "FLANKER",
+     "destination": "bound toward the reference (ADV for Marines, HUNT for Covenant): drill_position(reference, side 0, angle 0-40, range = current range - 12 to current range - 8); never more than 15 wu from base (the overwatch's reach); prefer positions with cover from the reference at crouch height once the LOS test exists",
+     "facing": "the reference"
+    },
+    "base": {
+     "role": "OVERWATCH",
+     "destination": "drill_hold (stays where it bounded to last)",
+     "facing": "the bounders' destination + 10 wu ahead"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold, or drill_move_near(base centre, 5) when more than 8 wu from it",
+     "facing": "rear and the open flank"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)",
+    "contact (immediate interrupt)"
+   ],
+   "max_seconds": 12,
+   "fails_when": [
+    "moved = 0 (no position forward): swap to overwatch_b at once",
+    "moved = 0 in two consecutive overwatch steps (the reference reached or no ground forward): Marines follow_lead (ADV is recomputed), Covenant post_perimeter. Without this the two steps would swap every tick forever."
+   ],
+   "default_next": "overwatch_b",
+   "fallback_next": "overwatch_b",
+   "failure_rule": "suspended"
+  },
+  {
+   "name": "overwatch_b",
+   "phase": "no_contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "FLANKER",
+     "destination": "bound past maneuver: drill_position(reference, side 0, angle 0-40, range = maneuver's range - 10 to maneuver's range - 6), at most 15 wu from maneuver",
+     "facing": "the reference"
+    },
+    "maneuver": {
+     "role": "OVERWATCH",
+     "destination": "drill_hold",
+     "facing": "the bounders' destination + 10 wu ahead"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "follows base: drill_move_near(base's new centre, 5) once base has arrived",
+     "facing": "rear and the open flank"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)",
+    "contact (immediate interrupt)"
+   ],
+   "max_seconds": 12,
+   "fails_when": [
+    "moved = 0 (no position forward): swap to overwatch_a at once",
+    "moved = 0 in two consecutive overwatch steps (the reference reached or no ground forward): Marines follow_lead (ADV is recomputed), Covenant post_perimeter. Without this the two steps would swap every tick forever."
+   ],
+   "default_next": "overwatch_a",
+   "fallback_next": "overwatch_a",
+   "failure_rule": "suspended"
+  },
+  {
+   "name": "post_perimeter",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "SECURITY",
+     "destination": "drill_ring(C): Grunts and Jackals one per sector (360/n deg, at least 45 deg each, at most 8 sectors; extra members double up the 2 sectors nearest D), 6-12 wu from C, spacing >= 3; Jackals take the sectors within +/-60 deg of D. Score: cover from outside (LOS from the point 20 wu out along the sector bisector blocked at crouch height 0.6) -10, concealment (blocked at standing height 1.2) -5, |range - 9| x2. The security Elite: drill_position(ECP, angle 0-30, range = |ECP - C| + 3 to + 6), i.e. 3-6 wu behind C, the point furthest from expected contact within the ring. Until the LOS test exists the cover and concealment terms are 0 and the firing positions themselves are the cover proxy",
+     "facing": "Grunts outward along their sector bisector; the Elite toward D, over the Grunts"
+    },
+    "maneuver": {
+     "role": "SECURITY",
+     "destination": "in a perimeter the strike Elites stay in: 0-5 wu from C on the opposite side of C from the security Elite; escorts fill ring sectors",
+     "facing": "D"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "Hunters: the pair side by side within 4 wu, 4-8 wu from C at 0-30 deg from D (the most likely approach, as an anchor); with a leader in reserve: the leader 3-6 wu from C at 150-180 deg",
+     "facing": "D"
+    }
+   },
+   "ends_when": [
+    "contact (immediate interrupt)",
+    "60 s (refresh: the posture is re-chosen, possibly the same; members keep their posts if the same posture is chosen)"
+   ],
+   "max_seconds": 60,
+   "fails_when": [
+    "an Elite dies with no contact (sniped): re-posture at once"
+   ],
+   "default_next": "post_perimeter",
+   "fallback_next": "post_perimeter",
+   "failure_rule": "suspended",
+   "starts_when": "the default posture: 1 Elite, no reliable D, open ground, or the other postures cannot be formed"
+  },
+  {
+   "name": "post_depth",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "SECURITY",
+     "destination": "screen: the Jackals (else 2 Grunts) at drill_position(ECP, angle 0-45, range = |ECP - C| - 16 to - 10), i.e. 10-16 wu out toward D, spacing >= 4. Main line: the other Grunts 2-8 wu from C within +/-70 deg of D, and 25% of them (at least 1, 2 with 6+) as rear security 6-10 wu from C at 150-210 deg. Reverse-slope variant: when the positions within +/-30 deg of D at 8-15 wu stand 2+ wu higher than C, the screen takes that crest and the main line takes positions 2-6 wu lower than it with standing-height LOS toward ECP blocked, so the enemy must come over the crest into close fire. The security Elite 4-8 wu behind C (angle 0-30 about ECP, range |ECP - C| + 4 to + 8)",
+     "facing": "screen and main line toward D; rear security -D"
+    },
+    "maneuver": {
+     "role": "HIDDEN",
+     "destination": "the strike team as the counterattack force: 6-10 wu from C at 120-150 deg from D on the side with more free positions, concealed from ECP at standing height",
+     "facing": "the main line's open flank"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "Hunters: 2-6 wu behind the main line's centre (a gate the enemy must pass); leader in reserve: 6-10 wu from C at 160-180 deg",
+     "facing": "D"
+    }
+   },
+   "ends_when": [
+    "contact (immediate interrupt)",
+    "60 s (refresh; members keep their posts if the same posture is chosen)"
+   ],
+   "max_seconds": 60,
+   "fails_when": [
+    "an Elite dies with no contact: re-posture",
+    "fewer than 6 members: re-posture as post_perimeter"
+   ],
+   "default_next": "post_depth",
+   "fallback_next": "post_perimeter",
+   "failure_rule": "suspended",
+   "starts_when": "D known and stable for 60 s (a known approach lane) and 6+ members"
+  },
+  {
+   "name": "post_ambush",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "SECURITY",
+     "destination": "security ring: drill_ring(C) at 5-10 wu, 60% of the members in the sectors within +/-90 deg of D and 40% covering the rear half, scored for cover then concealment as in post_perimeter; the Jackals (2+) as pickets 12-16 wu from C within 0-25 deg of D, in front of the kill zone (the bait). The security Elite 0-4 wu from C, offset 2-4 wu away from D: it holds and commands the ring",
+     "facing": "Grunts outward; pickets and the Elite toward D"
+    },
+    "maneuver": {
+     "role": "HIDDEN",
+     "destination": "one wing per Elite team: drill_position(ECP, angle 50-100, alternating side +1/-1 by team, the first team on the strategy's side), with range chosen so the post is 15-25 wu from C and at most 28 wu from the commanding Elite (inside the 35 wu command range, so the unit never splits by its own posture). Prefer posts concealed from ECP at standing height but with a clear crouch-height line into the kill zone (C + 12 to 18 wu along D). Each wing is an Elite and its escort (or two Elites) on posts 3-5 wu apart; the commanding Elite is the security Elite at C",
+     "facing": "the kill zone: the midpoint of ECP and C"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "4-10 wu from C at 150-180 deg from D (Hunters together; leader with them when it is in reserve)",
+     "facing": "D"
+    }
+   },
+   "ends_when": [
+    "contact (immediate interrupt)",
+    "75 s (refresh; members keep their posts if the same posture is chosen)"
+   ],
+   "max_seconds": 75,
+   "fails_when": [
+    "fewer than 2 Elites alive, or maneuver below 2 members: re-posture as post_perimeter",
+    "no wing post 15-25 wu out on either side: re-posture as post_depth"
+   ],
+   "default_next": "post_ambush",
+   "fallback_next": "post_perimeter",
+   "failure_rule": "suspended",
+   "starts_when": "2+ Elites and a strike element of 2+ can be formed (the user's 'one stays near the grunts holding security, while the others position themselves further away to ambush or flank')"
+  },
+  {
+   "name": "stand_to",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold. Grunts in the rear half of the ring (more than 120 deg from the contact bearing at C) stay SECURITY facing outward: the first contact may be only the enemy's fixing force",
+     "facing": "the contact; rear half: their sectors"
+    },
+    "maneuver": {
+     "role": "HIDDEN",
+     "destination": "drill_hold; if the contact bearing differs from D by more than 60 deg, re-post: drill_position(LKP, angle 60-100, side nearest the wing, range 12-20), still at most 28 wu from the commanding Elite",
+     "facing": "the contact"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "the contact"
+    }
+   },
+   "ends_when": [
+    "2 s with the enemy located (enemy count known >= 1)"
+   ],
+   "max_seconds": 4,
+   "fails_when": [],
+   "default_next": "hold_and_fix",
+   "fallback_next": "hold_and_fix",
+   "failure_rule": "defense",
+   "starts_when": "contact while in a post_* step with no enemy inside 10 wu of C. D is reset to the contact bearing."
+  },
+  {
+   "name": "screen_fall_back",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "BAIT",
+     "destination": "screen and pickets only: fire 3-5 s from their posts, then drill_move_near(C, radius 8) restricted to positions at 0-45 deg from D, 6-10 wu from C (back into the main line beside the kill zone, never across it); the rest of base drill_hold as SUPPORT",
+     "facing": "the enemy"
+    },
+    "maneuver": {
+     "role": "HIDDEN",
+     "destination": "drill_hold",
+     "facing": "the kill zone"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "the enemy"
+    }
+   },
+   "ends_when": [
+    "screen arrived (70%)",
+    "an enemy within 15 wu of C"
+   ],
+   "max_seconds": 12,
+   "fails_when": [
+    "half the screen lost"
+   ],
+   "default_next": "hold_and_fix",
+   "fallback_next": "hold_and_fix",
+   "failure_rule": "defense",
+   "starts_when": "a forward screen or pickets are posted (post_depth / post_ambush) and the enemy is within 30 wu of C"
+  },
+  {
+   "name": "hold_and_fix",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold; a Grunt with no crouch-height LOS to the LKP for 5 s moves to the free position in its own sector, 6-12 wu from C, nearest the enemy's bearing. The 2 rear-sector Grunts stay SECURITY facing outward. The security Elite stays 0-8 wu from C",
+     "facing": "the enemy; the 2 rear Grunts outward"
+    },
+    "maneuver": {
+     "role": "HIDDEN",
+     "destination": "drill_hold: the wings wait for the enemy to come within 12 wu of a wing or to be fixed. A wing Elite whose shields fall below 25% falls back with its escort to drill_move_near(C, 8) on the side away from the enemy and both join base (the escort is never left alone on the wing)",
+     "facing": "the kill zone"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold behind C",
+     "facing": "the enemy"
+    }
+   },
+   "ends_when": [
+    "enemy fixed",
+    "an enemy within 12 wu of a hidden maneuver member",
+    "penetration (an enemy within 10 wu of C)",
+    "enemy retreating",
+    "30 s (re-decide)"
+   ],
+   "max_seconds": 30,
+   "fails_when": [
+    "half of base lost (the failure rule takes over)"
+   ],
+   "default_next": "hold_and_fix",
+   "fallback_next": "hold_and_fix",
+   "failure_rule": "defense",
+   "default_rules": [
+    {
+     "if": "90 s in hold_and_fix (3 refreshes) with no kill either side, the enemy known 15-30 wu from C, a strike element of 2+ and a free flank position",
+     "to": "flank_move"
+    },
+    {
+     "if": "otherwise",
+     "to": "hold_and_fix"
+    }
+   ]
+  },
+  {
+   "name": "spring_ambush",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "ASSAULT",
+     "destination": "from the wing posts into the enemy's flank: drill_position(LKP, wing side, angle 60-120, range 3-8), grenade first",
+     "facing": "the enemy"
+    },
+    "base": {
+     "role": "SHIFT_FIRE",
+     "destination": "drill_hold (the ring keeps the enemy pinned and lifts fire as the wings close); rear Grunts stay SECURITY",
+     "facing": "the enemy"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "the enemy"
+    }
+   },
+   "ends_when": [
+    "objective cleared",
+    "maneuver arrived (70%) and 3 s",
+    "enemy retreating"
+   ],
+   "max_seconds": 12,
+   "fails_when": [
+    "maneuver loses half its members with no kill: the wings fall back to the ring (hold_and_fix)"
+   ],
+   "default_next": "secure_objective",
+   "fallback_next": "hold_and_fix",
+   "failure_rule": "defense",
+   "starts_when": "an enemy within 12 wu of a hidden maneuver member, or the enemy fixed in the kill zone"
+  },
+  {
+   "name": "counterattack",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "reserve": {
+     "role": "ASSAULT",
+     "destination": "into the penetration from its flank: drill_position(LKP, side of the reserve, angle 45-100, range 2-8); Hunters lead and stay within 5 wu of each other; with no reserve, maneuver does this; with neither, the security Elite and the 2 Grunts nearest it (never the Elite alone)",
+     "facing": "the enemy"
+    },
+    "maneuver": {
+     "role": "ASSAULT",
+     "destination": "if within 15 wu of the penetration: drill_position(LKP, -side of the reserve, angle 45-100, range 3-8); otherwise drill_hold HIDDEN",
+     "facing": "the enemy"
+    },
+    "base": {
+     "role": "SHIFT_FIRE",
+     "destination": "drill_hold in the sectors not penetrated; the Grunts the enemy is on top of fall back 4-6 wu toward C (drill_move_near(C, 6))",
+     "facing": "the enemy; rear sectors outward"
+    }
+   },
+   "ends_when": [
+    "penetration cleared (no enemy within 10 wu of C for 3 s)",
+    "objective cleared",
+    "movers arrived (70%) and 3 s"
+   ],
+   "max_seconds": 12,
+   "fails_when": [
+    "the counterattack force loses half its members"
+   ],
+   "default_next": "secure_objective",
+   "fallback_next": "hold_and_fix",
+   "failure_rule": "defense",
+   "starts_when": "penetration: an enemy within 10 wu of C (12 wu at first contact)"
+  },
+  {
+   "name": "last_stand",
+   "phase": "defense",
+   "for": "covenant",
+   "splits": false,
+   "roles": {
+    "all": {
+     "role": "SUPPORT",
+     "destination": "the last Elite drill_move_near(C or its own position if C is lost, radius 5); everyone else drill_move_near(the Elite, radius 6) in a tight 360",
+     "facing": "outward; toward the enemy when seen"
+    }
+   },
+   "ends_when": [
+    "no enemy known for 15 s",
+    "60 s (refresh)"
+   ],
+   "max_seconds": 60,
+   "fails_when": [
+    "the last Elite dies: the unit breaks (every Grunt for himself): the only time anyone fights solo"
+   ],
+   "default_next": "reorganize",
+   "fallback_next": "last_stand",
+   "failure_rule": "suspended",
+   "starts_when": "forced: the last living Elite has 3 or fewer members with it AND the unit is a remnant (it has lost its other Elites or half its starting strength). A unit that starts small (1 Elite and 1-2 Grunts, the commonest Halo group) uses small_post and the ordinary drills instead; otherwise it would never do anything but last_stand."
+  },
+  {
+   "name": "react_contact",
+   "phase": "contact",
+   "for": "both",
+   "splits": false,
+   "roles": {
+    "all": {
+     "role": "SUPPORT",
+     "destination": "members who see the enemy: drill_hold; members with no cover from the LKP (or in the kill zone, within 30 deg of the enemy axis and seen): drill_nearest_cover (a free position within 5 wu, not closer to the LKP, with cover from it at crouch height once the LOS test exists, else the nearest)",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "rear and open flank"
+    }
+   },
+   "ends_when": [
+    "3 s and the enemy located (enemy count known >= 1)"
+   ],
+   "max_seconds": 5,
+   "fails_when": [],
+   "default_next": "suppress",
+   "fallback_next": "suppress",
+   "failure_rule": "normal",
+   "starts_when": "first contact while moving or holding (not in a Covenant posture)"
+  },
+  {
+   "name": "react_near_ambush",
+   "phase": "contact",
+   "for": "both",
+   "splits": false,
+   "roles": {
+    "all": {
+     "role": "ASSAULT",
+     "destination": "straight into the ambush: drill_position(LKP, side 0, angle 0-50, range 2-6), grenade first: running from a near ambush is what kills a unit",
+     "facing": "the nearest enemy"
+    },
+    "reserve": {
+     "role": "SUPPORT",
+     "destination": "anyone more than 12 wu from the enemy: drill_hold, firing into the ambushers' flank",
+     "facing": "the LKP"
+    }
+   },
+   "ends_when": [
+    "objective cleared",
+    "movers arrived (70%)",
+    "enemy range > 10 wu (the ambushers fell back)"
+   ],
+   "max_seconds": 8,
+   "fails_when": [
+    "own losses >= 50% of the unit (the failure rule)"
+   ],
+   "default_next": "secure_objective",
+   "fallback_next": "suppress",
+   "failure_rule": "normal",
+   "starts_when": "forced: 2+ enemies within 8 wu at first contact, or a member hit by an unseen attacker (shield/health drop, no enemy seen, a known enemy within 10 wu)"
+  },
+  {
+   "name": "suppress",
+   "phase": "contact",
+   "for": "both",
+   "splits": false,
+   "roles": {
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold; the Covenant ring fires from its front sectors and the 2 rear Grunts stay SECURITY",
+     "facing": "the LKP"
+    },
+    "maneuver": {
+     "role": "SUPPORT",
+     "destination": "drill_hold (it gets ready to move; the enemy's head must be down before it goes)",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "rear and open flank (Marines: the side away from the Chief)"
+    }
+   },
+   "ends_when": [
+    "4 s with the enemy visible to half of base, or 8 s"
+   ],
+   "max_seconds": 8,
+   "fails_when": [],
+   "default_next": "flank_move",
+   "fallback_next": "bound_a",
+   "failure_rule": "normal"
+  },
+  {
+   "name": "flank_move",
+   "phase": "contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold",
+     "facing": "the LKP"
+    },
+    "maneuver": {
+     "role": "FLANKER",
+     "destination": "drill_position(LKP, side, angle 60-110, range 8-20) (today's flank_move); Marines flank on the side away from the Chief so his fire and the flank's never cross; the move never crosses base's line of fire (angle at the enemy between base and maneuver stays below 150 deg)",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "the open flank"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)"
+   ],
+   "max_seconds": 20,
+   "fails_when": [
+    "moved = 0 (no flank position): bound_a",
+    "maneuver loses 2 with no kill: suppress"
+   ],
+   "default_next": "grenade_volley",
+   "fallback_next": "suppress",
+   "failure_rule": "normal",
+   "starts_when": "4+ members and a free flank position on the strategy's side"
+  },
+  {
+   "name": "grenade_volley",
+   "phase": "contact",
+   "for": "both",
+   "splits": false,
+   "roles": {
+    "maneuver": {
+     "role": "GRENADIER",
+     "destination": "drill_hold (from the assault position); in a pincer both arms throw",
+     "facing": "the LKP"
+    },
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "every holder in range has thrown, or 3 s"
+   ],
+   "max_seconds": 4,
+   "fails_when": [
+    "no grenades held in the throwing element, or the LKP more than 15 wu from all of them: skip (1 tick)"
+   ],
+   "default_next": "flank_assault",
+   "fallback_next": "flank_assault",
+   "failure_rule": "normal",
+   "starts_when": "the throwing element holds 2+ grenades and the LKP is 5-15 wu from it"
+  },
+  {
+   "name": "flank_assault",
+   "phase": "contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "ASSAULT",
+     "destination": "drill_position(LKP, side, angle 30-90, range 3-9) (today's flank_assault). OBJ is frozen here",
+     "facing": "the enemy"
+    },
+    "base": {
+     "role": "SHIFT_FIRE",
+     "destination": "drill_hold",
+     "facing": "the LKP, shifted away from maneuver"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "rear and open flank"
+    }
+   },
+   "ends_when": [
+    "objective cleared",
+    "movers arrived (70%) and no enemy visible for 2 s"
+   ],
+   "max_seconds": 15,
+   "fails_when": [
+    "maneuver loses 2 with no kill and the enemy still at least our strength: suppress"
+   ],
+   "default_next": "secure_objective",
+   "fallback_next": "suppress",
+   "failure_rule": "normal"
+  },
+  {
+   "name": "pincer_move",
+   "phase": "contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "FLANKER",
+     "destination": "drill_position(LKP, side, angle 50-100, range 8-20)",
+     "facing": "the LKP"
+    },
+    "base": {
+     "role": "FLANKER",
+     "destination": "the rest of base: drill_position(LKP, -side, angle 50-100, range 8-20); the two arms stay at least 100 deg apart at the enemy so they cannot fire into each other",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SUPPORT",
+     "destination": "fixes from the centre: drill_hold. Marines: the reserve, or with none the Chief when he is engaging within 15 wu of the unit. Covenant with no Hunters: the security Elite and the 2 Grunts nearest C are detached from base into reserve for the pincer (returned in reorganize), so the ring still fixes the enemy while both arms move",
+     "facing": "the LKP"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)"
+   ],
+   "max_seconds": 18,
+   "fails_when": [
+    "one arm has moved = 0: suppress"
+   ],
+   "default_next": "pincer_close",
+   "fallback_next": "suppress",
+   "failure_rule": "normal",
+   "starts_when": "6+ members, free positions on both sides, and a fixing element of 2+ (the reserve, the detached Covenant fixing group, or the Chief engaging within 15 wu) left in the centre"
+  },
+  {
+   "name": "pincer_close",
+   "phase": "contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "ASSAULT",
+     "destination": "drill_position(LKP, side, angle 20-80, range 3-10); the arms stop at 3 wu. OBJ is frozen here",
+     "facing": "the enemy"
+    },
+    "base": {
+     "role": "ASSAULT",
+     "destination": "drill_position(LKP, -side, angle 20-80, range 3-10)",
+     "facing": "the enemy"
+    },
+    "reserve": {
+     "role": "SHIFT_FIRE",
+     "destination": "drill_hold",
+     "facing": "the LKP"
+    }
+   },
+   "ends_when": [
+    "objective cleared",
+    "movers arrived (70%) and no enemy visible for 2 s"
+   ],
+   "max_seconds": 15,
+   "fails_when": [
+    "half the arms lost with no kill: suppress"
+   ],
+   "default_next": "secure_objective",
+   "fallback_next": "suppress",
+   "failure_rule": "normal"
+  },
+  {
+   "name": "bound_a",
+   "phase": "contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "FLANKER",
+     "destination": "a bound of at most 10 wu toward the enemy: drill_position(LKP, side 0, angle 0-45, range = max(range x 0.6, range - 10) to range x 0.85)",
+     "facing": "the LKP"
+    },
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "follows base",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)"
+   ],
+   "max_seconds": 10,
+   "fails_when": [
+    "moved = 0: bound_b"
+   ],
+   "default_next": "bound_b",
+   "fallback_next": "bound_b",
+   "failure_rule": "normal",
+   "starts_when": "no flank position (corridor, bridge) or too few members to flank",
+   "default_rules": [
+    {
+     "if": "within 15 wu of the LKP and the element about to assault holds 2+ grenades",
+     "to": "grenade_volley"
+    },
+    {
+     "if": "within 8 wu of the LKP, the enemy broken, or 4 bounds taken this strategy",
+     "to": "shock_assault"
+    },
+    {
+     "if": "otherwise",
+     "to": "bound_b"
+    }
+   ]
+  },
+  {
+   "name": "bound_b",
+   "phase": "contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "FLANKER",
+     "destination": "drill_position(LKP, side 0, angle 0-45, range = max(range x 0.6, range - 10) to range x 0.85)",
+     "facing": "the LKP"
+    },
+    "maneuver": {
+     "role": "SUPPORT",
+     "destination": "drill_hold",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "follows base",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)"
+   ],
+   "max_seconds": 10,
+   "fails_when": [
+    "moved = 0: bound_a"
+   ],
+   "default_next": "bound_a",
+   "fallback_next": "bound_a",
+   "failure_rule": "normal",
+   "default_rules": [
+    {
+     "if": "within 15 wu of the LKP and the element about to assault holds 2+ grenades",
+     "to": "grenade_volley"
+    },
+    {
+     "if": "within 8 wu of the LKP, the enemy broken, or 4 bounds taken this strategy",
+     "to": "shock_assault"
+    },
+    {
+     "if": "otherwise",
+     "to": "bound_a"
+    }
+   ]
+  },
+  {
+   "name": "shock_assault",
+   "phase": "contact",
+   "for": "both",
+   "splits": false,
+   "roles": {
+    "all": {
+     "role": "ASSAULT",
+     "destination": "drill_position(LKP, side 0, angle 0-60, range 2-7) (today's rush); Covenant: Elites and Hunters lead, Grunts follow 2-4 wu behind them. OBJ is frozen here",
+     "facing": "the enemy"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "Marines with 6+: drill_hold facing rear; Covenant Hunters join the assault",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "objective cleared",
+    "movers arrived (70%) and no enemy visible for 2 s"
+   ],
+   "max_seconds": 15,
+   "fails_when": [
+    "half the assaulters lost with no kill: suppress"
+   ],
+   "default_next": "secure_objective",
+   "fallback_next": "suppress",
+   "failure_rule": "normal",
+   "starts_when": "the enemy is weakened or broken (1-2 enemies left, or we outnumber it 3:1, or it is retreating), or a runner's blast or a grenade volley just landed. Covenant defenders never pursue more than 25 wu from C"
+  },
+  {
+   "name": "suicide_runner",
+   "phase": "contact",
+   "for": "covenant",
+   "splits": false,
+   "roles": {
+    "runner": {
+     "role": "RUNNER",
+     "destination": "the free position nearest the target, within 3 wu of it, approaching from the side it does not face where computable (angle 60-180); target = the clump of 2+ Marines within 5 wu of each other, else the Chief dug in (stationary 3+ s), 6-18 wu away",
+     "facing": "the target"
+    },
+    "base": {
+     "role": "SHIFT_FIRE",
+     "destination": "drill_hold: pins the target so it cannot dodge the runner, lifting fire as the runner closes (SHIFT_FIRE treats the runner as an assaulter) so the base does not kill its own runner",
+     "facing": "the target"
+    },
+    "maneuver": {
+     "role": "SUPPORT",
+     "destination": "drill_hold, ready to assault on the blast",
+     "facing": "the target"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "the runner has thrown or is dead, plus 1.5 s (the detonation)"
+   ],
+   "max_seconds": 8,
+   "fails_when": [
+    "no eligible runner (see elements): skip (1 tick)"
+   ],
+   "default_next": "shock_assault",
+   "fallback_next": "hold_and_fix",
+   "failure_rule": "normal",
+   "starts_when": "a runner is eligible, the target is clustered or dug in (stationary 3+ s) 6-18 wu away, and no runner went this strategy"
+  },
+  {
+   "name": "secure_objective",
+   "phase": "consolidation",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "SECURITY",
+     "destination": "drill_beyond(OBJ): positions on the far side of the objective as seen from base's original position, angle 120-200 at OBJ, 4-10 wu out. Half the members get sectors facing forward (the axis of advance continued past OBJ), half facing outward (the open flank, 90 deg on the strategy's side)",
+     "facing": "forward and outward, sector points 8 wu out"
+    },
+    "base": {
+     "role": "SECURITY",
+     "destination": "drill_hold: it covers the objective's flanks while maneuver settles",
+     "facing": "45 deg either side of OBJ"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "4 s with no new contact"
+   ],
+   "max_seconds": 8,
+   "fails_when": [
+    "contact with a new enemy group (enemy count known rises, or contact on a bearing 60+ deg from OBJ)"
+   ],
+   "default_next": "link_up",
+   "fallback_next": "react_contact",
+   "failure_rule": "suspended",
+   "starts_when": "every successful assault ends here (the user's 'the flanking element might lay down a security base of fire facing forward and outwards')"
+  },
+  {
+   "name": "link_up",
+   "phase": "consolidation",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "SECURITY",
+     "destination": "drill_hold: it is the far recognition point",
+     "facing": "forward and outward, as in secure_objective"
+    },
+    "base": {
+     "role": "FLANKER",
+     "destination": "drill_move_near(maneuver centre, radius 8), using only positions nearer base's original position than maneuver's centre is, so base comes up from behind and never walks across maneuver's sectors of fire; on arrival it takes the rear 180 deg and the near flank. Covenant defenders with OBJ within 15 wu of C (a counterattack or an ambush sprung close in): the link-up runs the other way, base holds the ring on C as SECURITY and maneuver comes back to it, drill_move_near(C, 8) through positions nearer C than OBJ, taking the sectors facing the enemy's last bearing: the guarded area is where the unit belongs, and moving the whole ring out to the wings would only march it back again in the posture that follows. Beyond 15 wu (c_elite_flank, a far wing) base comes up as written",
+     "facing": "rear and near flank on arrival"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "moves last, 4 s after base starts: drill_move_near(maneuver centre, radius 8)",
+     "facing": "rear while moving"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%) and the team centres within 10 wu"
+   ],
+   "max_seconds": 20,
+   "fails_when": [
+    "contact during the move: react_contact (base is now the element in contact)"
+   ],
+   "default_next": "reorganize",
+   "fallback_next": "react_contact",
+   "failure_rule": "suspended",
+   "starts_when": "the user's 'while the stationary base of fire element moves up to regroup with them'"
+  },
+  {
+   "name": "reorganize",
+   "phase": "consolidation",
+   "for": "both",
+   "splits": false,
+   "roles": {
+    "all": {
+     "role": "SECURITY",
+     "destination": "a 360 around the unit centre: each member a sector of 360/N deg starting at the axis of advance (Marines: ADV; Covenant: D), drill_move_near(unit centre + 6 wu along its sector bearing, radius 4), cover from that sector preferred. When the movers have arrived and 3 s have passed, assign_teams runs again on the survivors: the teams are evened out (by type for Covenant, Hunters kept together, Elites spread across base and maneuver), a team of 1 merges, a unit of 3 or fewer stops splitting, the reserve is re-formed only if the unit still qualifies. Covenant re-elect the leader if needed and reset D to the last enemy bearing. Detached fixing groups (pincer) return to their element here",
+     "facing": "own sector, outward"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%) and 3 s, then teams reassigned"
+   ],
+   "max_seconds": 10,
+   "fails_when": [],
+   "default_next": {
+    "marines": "overwatch_a",
+    "covenant": "post_perimeter"
+   },
+   "fallback_next": {
+    "marines": "overwatch_a",
+    "covenant": "post_perimeter"
+   },
+   "failure_rule": "suspended",
+   "starts_when": "the user's 'they'd regroup and redistribute soldiers as needed'"
+  },
+  {
+   "name": "withdraw_a",
+   "phase": "break_contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "NONE",
+     "destination": "drill_position(LKP, side 0, angle 0-40, range = range + 8 to range + 20); Covenant defenders move toward the depth line (C moved 10-15 wu away from the enemy) and never more than 35 wu from C",
+     "facing": "the LKP"
+    },
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold: covers the others as they fall back",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "first to the rally point: drill_move_near(rally, 7)",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)"
+   ],
+   "max_seconds": 10,
+   "fails_when": [],
+   "default_next": "withdraw_b",
+   "fallback_next": "withdraw_b",
+   "failure_rule": "suspended",
+   "starts_when": "the failure rule (forced), or a deliberate break contact: outnumbered 2:1, or a vehicle and no anti-vehicle weapon"
+  },
+  {
+   "name": "withdraw_b",
+   "phase": "break_contact",
+   "for": "both",
+   "splits": true,
+   "roles": {
+    "base": {
+     "role": "NONE",
+     "destination": "drill_position(LKP, side 0, angle 0-40, range = range + 8 to range + 20), passing behind maneuver; Covenant as in withdraw_a",
+     "facing": "the LKP"
+    },
+    "maneuver": {
+     "role": "SUPPORT",
+     "destination": "drill_hold",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold at the rally point",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)"
+   ],
+   "max_seconds": 10,
+   "fails_when": [],
+   "default_next": "regroup",
+   "fallback_next": "withdraw_a",
+   "failure_rule": "suspended",
+   "default_rules": [
+    {
+     "if": "the enemy within 15 wu and following (closing)",
+     "to": "withdraw_a"
+    },
+    {
+     "if": "otherwise",
+     "to": "regroup"
+    }
+   ]
+  },
+  {
+   "name": "regroup",
+   "phase": "break_contact",
+   "for": "both",
+   "splits": false,
+   "roles": {
+    "all": {
+     "role": "NONE",
+     "destination": "drill_move_near(rally, 7): Marines 15 wu behind the Chief on the side away from the enemy; Covenant at C, or the depth line if C is within 10 wu of the LKP",
+     "facing": "the LKP"
+    }
+   },
+   "ends_when": [
+    "movers arrived (70%)"
+   ],
+   "max_seconds": 15,
+   "fails_when": [],
+   "default_next": "reorganize",
+   "fallback_next": "reorganize",
+   "failure_rule": "suspended"
+  },
+  {
+   "name": "hold",
+   "phase": "contact",
+   "for": "both",
+   "splits": false,
+   "roles": {
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold (hasty defense from the positions held); Covenant defenders hold within 14 wu of C",
+     "facing": "the enemy"
+    },
+    "maneuver": {
+     "role": "NONE",
+     "destination": "the game's own fighting on a 10 wu leash near its team",
+     "facing": "the enemy"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "rear and open flank"
+    }
+   },
+   "ends_when": [
+    "enemy attack stalls (enemy fixed for 6 s)",
+    "no enemy known for 10 s",
+    "20 s"
+   ],
+   "max_seconds": 20,
+   "fails_when": [],
+   "default_next": "suppress",
+   "fallback_next": "suppress",
+   "failure_rule": "normal",
+   "starts_when": "the enemy is assaulting us and we cannot out-fight it on the move (enemy closing and at least our strength)"
+  },
+  {
+   "name": "cut_off",
+   "phase": "contact",
+   "for": "covenant",
+   "splits": true,
+   "roles": {
+    "maneuver": {
+     "role": "HIDDEN",
+     "destination": "drill_position(LKP, strategy side, angle 110-160, range 8-18), concealed from the enemy: behind the enemy's flank, across its line of withdrawal",
+     "facing": "the enemy's line of withdrawal"
+    },
+    "base": {
+     "role": "SUPPORT",
+     "destination": "drill_hold: keeps the enemy fixed while the wing slips round",
+     "facing": "the LKP"
+    },
+    "reserve": {
+     "role": "SECURITY",
+     "destination": "drill_hold",
+     "facing": "rear"
+    }
+   },
+   "ends_when": [
+    "wing arrived (70%) and the enemy falls back or comes within 12 wu of the wing",
+    "30 s"
+   ],
+   "max_seconds": 30,
+   "fails_when": [
+    "the wing loses half its members: hold"
+   ],
+   "default_next": "spring_ambush",
+   "fallback_next": "hold",
+   "failure_rule": "normal",
+   "starts_when": "contact, an Elite with an escort free for the strike element"
+  }
+ ],
+ "transitions": [
+  {
+   "from": "follow_lead",
+   "to": "overwatch_a",
+   "when": "the Chief stationary 5 s or firing, or a live Covenant encounter within 30 wu of the Chief",
+   "why": "Travel is for when contact is unlikely; near the expected enemy the unit slows to bounding overwatch.",
+   "default": true
+  },
+  {
+   "from": "follow_lead",
+   "to": "follow_lead",
+   "when": "20 s refresh, no contact, ADV still far",
+   "why": "Keep the wedge on the Chief as he moves."
+  },
+  {
+   "from": "follow_lead",
+   "to": "react_contact",
+   "when": "contact",
+   "why": "Contact on the move goes first to react to contact."
+  },
+  {
+   "from": "follow_lead",
+   "to": "react_near_ambush",
+   "when": "2+ enemies within 8 wu at contact, or hit by an unseen attacker within 10 wu",
+   "why": "A near ambush is assaulted through at once."
+  },
+  {
+   "from": "overwatch_a",
+   "to": "overwatch_b",
+   "when": "movers arrived, no contact",
+   "why": "Bounding overwatch: the teams leapfrog until the enemy is spotted or engages (the user's 'continue bounding overwatch to move forward until spotting or being engaged').",
+   "default": true
+  },
+  {
+   "from": "overwatch_a",
+   "to": "react_contact",
+   "when": "contact",
+   "why": "Spotted or engaged: react to contact."
+  },
+  {
+   "from": "overwatch_a",
+   "to": "react_near_ambush",
+   "when": "2+ enemies within 8 wu, or hit by an unseen attacker within 10 wu",
+   "why": "Near ambush: assault through."
+  },
+  {
+   "from": "overwatch_a",
+   "to": "follow_lead",
+   "when": "Marines: the Chief more than 20 wu away, ADV reached with no Covenant encounter within 40 wu, or both teams moved = 0 in turn",
+   "why": "Marines never drift from the Chief; open ground goes back to travel.",
+   "for": "marines"
+  },
+  {
+   "from": "overwatch_a",
+   "to": "post_perimeter",
+   "when": "Covenant: 25 wu from C reached, 30 s of sweeping with no contact, or both teams moved = 0 in turn",
+   "why": "Covenant guard ground: a sweep ends back on the post.",
+   "for": "covenant"
+  },
+  {
+   "from": "overwatch_b",
+   "to": "overwatch_a",
+   "when": "movers arrived, no contact",
+   "why": "Bounding overwatch: the teams leapfrog until the enemy is spotted or engages (the user's 'continue bounding overwatch to move forward until spotting or being engaged').",
+   "default": true
+  },
+  {
+   "from": "overwatch_b",
+   "to": "react_contact",
+   "when": "contact",
+   "why": "Spotted or engaged: react to contact."
+  },
+  {
+   "from": "overwatch_b",
+   "to": "react_near_ambush",
+   "when": "2+ enemies within 8 wu, or hit by an unseen attacker within 10 wu",
+   "why": "Near ambush: assault through."
+  },
+  {
+   "from": "overwatch_b",
+   "to": "follow_lead",
+   "when": "Marines: the Chief more than 20 wu away, ADV reached with no Covenant encounter within 40 wu, or both teams moved = 0 in turn",
+   "why": "Marines never drift from the Chief; open ground goes back to travel.",
+   "for": "marines"
+  },
+  {
+   "from": "overwatch_b",
+   "to": "post_perimeter",
+   "when": "Covenant: 25 wu from C reached, 30 s of sweeping with no contact, or both teams moved = 0 in turn",
+   "why": "Covenant guard ground: a sweep ends back on the post.",
+   "for": "covenant"
+  },
+  {
+   "from": "post_perimeter",
+   "to": "post_perimeter",
+   "when": "refresh (60-75 s), the situation unchanged",
+   "why": "The defense loops until contact.",
+   "default": true
+  },
+  {
+   "from": "post_depth",
+   "to": "post_depth",
+   "when": "refresh (60-75 s), the situation unchanged",
+   "why": "The defense loops until contact.",
+   "default": true
+  },
+  {
+   "from": "post_ambush",
+   "to": "post_ambush",
+   "when": "refresh (60-75 s), the situation unchanged",
+   "why": "The defense loops until contact.",
+   "default": true
+  },
+  {
+   "from": "post_perimeter",
+   "to": "post_depth",
+   "when": "refresh, D stable 60 s and 6+ members",
+   "why": "A known approach lane justifies depth over a uniform ring."
+  },
+  {
+   "from": "post_perimeter",
+   "to": "post_ambush",
+   "when": "refresh, 2+ Elites and a strike element of 2+",
+   "why": "Spare Elites are wasted in the centre: send them out to ambush (user requirement)."
+  },
+  {
+   "from": "post_perimeter",
+   "to": "stand_to",
+   "when": "contact with no enemy within 12 wu of C",
+   "why": "Turn to the threat but keep the rear watched."
+  },
+  {
+   "from": "post_perimeter",
+   "to": "counterattack",
+   "when": "contact with an enemy already within 12 wu of C",
+   "why": "The enemy is inside the ring: hit it before it rolls up the Grunts."
+  },
+  {
+   "from": "post_depth",
+   "to": "post_perimeter",
+   "when": "refresh, fewer than 6 members or D lost",
+   "why": "Too few for depth."
+  },
+  {
+   "from": "post_depth",
+   "to": "post_ambush",
+   "when": "refresh, 2+ Elites and a strike element of 2+",
+   "why": "The Elites choose to ambush instead."
+  },
+  {
+   "from": "post_depth",
+   "to": "stand_to",
+   "when": "contact with no enemy within 12 wu of C",
+   "why": "The screen sees them first."
+  },
+  {
+   "from": "post_depth",
+   "to": "counterattack",
+   "when": "contact with an enemy within 12 wu of C",
+   "why": "Penetration at first contact."
+  },
+  {
+   "from": "post_ambush",
+   "to": "post_perimeter",
+   "when": "fewer than 2 Elites, or maneuver below 2",
+   "why": "No one left to ambush with: tighten into a ring."
+  },
+  {
+   "from": "post_ambush",
+   "to": "post_depth",
+   "when": "no wing post available 15-25 wu out",
+   "why": "Ground does not allow wings."
+  },
+  {
+   "from": "post_ambush",
+   "to": "stand_to",
+   "when": "contact, no enemy within 12 wu of C or of a wing",
+   "why": "The pickets see them first."
+  },
+  {
+   "from": "post_ambush",
+   "to": "spring_ambush",
+   "when": "contact with an enemy within 12 wu of a hidden maneuver member",
+   "why": "They walked into the kill zone: spring it."
+  },
+  {
+   "from": "post_ambush",
+   "to": "counterattack",
+   "when": "contact with an enemy within 12 wu of C",
+   "why": "Penetration at first contact."
+  },
+  {
+   "from": "stand_to",
+   "to": "hold_and_fix",
+   "when": "enemy located",
+   "why": "Defend from the posts and let the enemy come.",
+   "default": true
+  },
+  {
+   "from": "stand_to",
+   "to": "screen_fall_back",
+   "when": "a screen or pickets are posted and the enemy is within 30 wu of C",
+   "why": "The screen draws the enemy into the kill zone, then joins the main line."
+  },
+  {
+   "from": "stand_to",
+   "to": "spring_ambush",
+   "when": "an enemy within 12 wu of a hidden maneuver member",
+   "why": "Spring the ambush the moment it is in range."
+  },
+  {
+   "from": "stand_to",
+   "to": "counterattack",
+   "when": "penetration",
+   "why": "Hit the penetration at once."
+  },
+  {
+   "from": "stand_to",
+   "to": "suppress",
+   "when": "the enemy halted 20+ wu from C (it will not come in) and a strike element of 2+ exists",
+   "why": "Go out to them: the ring fixes, the Elites flank (the user's 'ambush or flank approaching Marine elements')."
+  },
+  {
+   "from": "screen_fall_back",
+   "to": "hold_and_fix",
+   "when": "screen arrived",
+   "why": "The main line takes over.",
+   "default": true
+  },
+  {
+   "from": "screen_fall_back",
+   "to": "spring_ambush",
+   "when": "an enemy within 12 wu of a hidden maneuver member",
+   "why": "The lure worked."
+  },
+  {
+   "from": "screen_fall_back",
+   "to": "counterattack",
+   "when": "penetration",
+   "why": "The enemy followed the screen in too far."
+  },
+  {
+   "from": "hold_and_fix",
+   "to": "hold_and_fix",
+   "when": "30 s, nothing has changed",
+   "why": "Keep holding: the Covenant wait for the Marines.",
+   "default": true
+  },
+  {
+   "from": "hold_and_fix",
+   "to": "spring_ambush",
+   "when": "an enemy within 12 wu of a wing, or the enemy fixed with a wing on its flank",
+   "why": "The base of fire has fixed them; the wings strike the flank."
+  },
+  {
+   "from": "hold_and_fix",
+   "to": "counterattack",
+   "when": "penetration",
+   "why": "The reserve hits the penetration."
+  },
+  {
+   "from": "hold_and_fix",
+   "to": "suicide_runner",
+   "when": "enemy clustered (2+ within 5 wu of each other) or the Chief dug in (stationary 3+ s), 6-18 wu from an eligible runner, no runner this strategy",
+   "why": "One planned suicide runner breaks a position the Grunts cannot."
+  },
+  {
+   "from": "hold_and_fix",
+   "to": "flank_move",
+   "when": "enemy fixed 15-30 wu from C, a strike element of 2+ and a free flank position",
+   "why": "The Elites leave the ring to flank Marines who will not come in."
+  },
+  {
+   "from": "hold_and_fix",
+   "to": "shock_assault",
+   "when": "enemy weakened (1-2 left, or we outnumber it 3:1) or retreating, within 25 wu of C",
+   "why": "Finish them; never chase more than 25 wu from C."
+  },
+  {
+   "from": "spring_ambush",
+   "to": "secure_objective",
+   "when": "objective cleared",
+   "why": "Consolidate on the objective.",
+   "default": true
+  },
+  {
+   "from": "spring_ambush",
+   "to": "shock_assault",
+   "when": "enemy broken and retreating, within 25 wu of C",
+   "why": "Run down the survivors."
+  },
+  {
+   "from": "spring_ambush",
+   "to": "hold_and_fix",
+   "when": "maneuver lost half with no kill",
+   "why": "The wings fall back into the ring rather than die alone."
+  },
+  {
+   "from": "counterattack",
+   "to": "secure_objective",
+   "when": "penetration cleared",
+   "why": "Consolidate on the ground retaken.",
+   "default": true
+  },
+  {
+   "from": "counterattack",
+   "to": "shock_assault",
+   "when": "enemy retreating, within 25 wu of C",
+   "why": "Exploit."
+  },
+  {
+   "from": "counterattack",
+   "to": "hold_and_fix",
+   "when": "penetration cleared but more enemies 15+ wu out",
+   "why": "Back to the line: the main body is still coming."
+  },
+  {
+   "from": "last_stand",
+   "to": "reorganize",
+   "when": "no enemy for 15 s",
+   "why": "Survived: reorganize and re-post.",
+   "default": true
+  },
+  {
+   "from": "last_stand",
+   "to": "last_stand",
+   "when": "60 s, enemy still about",
+   "why": "Stay tight around the last Elite."
+  },
+  {
+   "from": "last_stand",
+   "to": "shock_assault",
+   "when": "one enemy left within 10 wu with shields down",
+   "why": "Kill the last of them."
+  },
+  {
+   "from": "react_contact",
+   "to": "suppress",
+   "when": "enemy located",
+   "why": "Win the fire fight before anything else.",
+   "default": true
+  },
+  {
+   "from": "react_contact",
+   "to": "react_near_ambush",
+   "when": "2+ enemies within 8 wu",
+   "why": "Near ambush: assault through."
+  },
+  {
+   "from": "react_contact",
+   "to": "flank_move",
+   "when": "far ambush: casualties in the first 2 s at 12-30 wu and a free flank position",
+   "why": "The element in the kill zone takes cover and fires; the unengaged element flanks at once."
+  },
+  {
+   "from": "react_contact",
+   "to": "shock_assault",
+   "when": "a lone enemy within 10 wu, or we outnumber it 3:1",
+   "why": "Overwhelm a weak enemy before it settles."
+  },
+  {
+   "from": "react_contact",
+   "to": "hold",
+   "when": "enemy closing and at least our strength",
+   "why": "Hasty defense: let its attack break on us first."
+  },
+  {
+   "from": "react_contact",
+   "to": "withdraw_a",
+   "when": "outnumbered 2:1, or a vehicle and no anti-vehicle weapon",
+   "why": "Break contact rather than lose the unit."
+  },
+  {
+   "from": "react_near_ambush",
+   "to": "secure_objective",
+   "when": "objective cleared",
+   "why": "Consolidate where the ambush was.",
+   "default": true
+  },
+  {
+   "from": "react_near_ambush",
+   "to": "suppress",
+   "when": "the ambushers fell back beyond 10 wu",
+   "why": "Now an ordinary fight: fix them."
+  },
+  {
+   "from": "react_near_ambush",
+   "to": "shock_assault",
+   "when": "1-2 ambushers left running",
+   "why": "Finish them."
+  },
+  {
+   "from": "suppress",
+   "to": "flank_move",
+   "when": "4+ members and a free flank position on the strategy's side",
+   "why": "Fix and flank: the basic squad attack.",
+   "default": true
+  },
+  {
+   "from": "suppress",
+   "to": "pincer_move",
+   "when": "6+ members, free positions on both sides, and a fixing element of 2+ stays in the centre",
+   "why": "Envelop from both sides."
+  },
+  {
+   "from": "suppress",
+   "to": "bound_a",
+   "when": "no flank position (corridor, bridge)",
+   "why": "Bounding assault down the only axis."
+  },
+  {
+   "from": "suppress",
+   "to": "grenade_volley",
+   "when": "the enemy known but not visible (defilade) 5-15 wu away and 2+ grenades held",
+   "why": "Grenades into the defilade, then assault."
+  },
+  {
+   "from": "suppress",
+   "to": "suicide_runner",
+   "when": "Covenant, enemy clustered or the Chief dug in (stationary 3+ s) 6-18 wu away, a runner eligible",
+   "why": "The planned runner.",
+   "for": "covenant"
+  },
+  {
+   "from": "suppress",
+   "to": "withdraw_a",
+   "when": "outnumbered 2:1 after the fire fight, or a vehicle and no anti-vehicle weapon",
+   "why": "Break contact."
+  },
+  {
+   "from": "flank_move",
+   "to": "grenade_volley",
+   "when": "arrived, maneuver holds 2+ grenades, LKP 5-15 wu away",
+   "why": "A grenade volley right before the assault.",
+   "default": true
+  },
+  {
+   "from": "flank_move",
+   "to": "flank_assault",
+   "when": "arrived, no grenades or out of throwing range",
+   "why": "Assault straight from the flank."
+  },
+  {
+   "from": "flank_move",
+   "to": "suppress",
+   "when": "maneuver lost 2 with no kill",
+   "why": "The flank is covered by the enemy: back to the base of fire and re-plan."
+  },
+  {
+   "from": "flank_move",
+   "to": "bound_a",
+   "when": "moved = 0 (no flank position)",
+   "why": "No way round: bound."
+  },
+  {
+   "from": "flank_move",
+   "to": "hold",
+   "when": "the enemy is counterattacking base",
+   "why": "Base must hold before the flank can go on."
+  },
+  {
+   "from": "grenade_volley",
+   "to": "flank_assault",
+   "when": "maneuver is on the flank",
+   "why": "Assault on the blast.",
+   "default": true
+  },
+  {
+   "from": "grenade_volley",
+   "to": "pincer_close",
+   "when": "in a pincer",
+   "why": "Both arms close on the blast."
+  },
+  {
+   "from": "grenade_volley",
+   "to": "shock_assault",
+   "when": "no flank (after bounds, or a frontal attack)",
+   "why": "Rush on the blast."
+  },
+  {
+   "from": "flank_assault",
+   "to": "secure_objective",
+   "when": "objective cleared",
+   "why": "Every successful assault consolidates.",
+   "default": true
+  },
+  {
+   "from": "flank_assault",
+   "to": "shock_assault",
+   "when": "1-2 enemies left and retreating",
+   "why": "Finish them, at most 10 wu past OBJ."
+  },
+  {
+   "from": "flank_assault",
+   "to": "suppress",
+   "when": "maneuver lost 2 with no kill and the enemy still at least our strength",
+   "why": "Repulsed: back to the base of fire."
+  },
+  {
+   "from": "flank_assault",
+   "to": "hold",
+   "when": "an enemy counterattack closing on maneuver",
+   "why": "Hold what was gained."
+  },
+  {
+   "from": "pincer_move",
+   "to": "pincer_close",
+   "when": "arrived, no grenades",
+   "why": "Close both arms.",
+   "default": true
+  },
+  {
+   "from": "pincer_move",
+   "to": "grenade_volley",
+   "when": "arrived and 2+ grenades held",
+   "why": "Volley first."
+  },
+  {
+   "from": "pincer_move",
+   "to": "suppress",
+   "when": "one arm blocked (moved = 0)",
+   "why": "Back to a single base of fire."
+  },
+  {
+   "from": "pincer_close",
+   "to": "secure_objective",
+   "when": "objective cleared",
+   "why": "Consolidate.",
+   "default": true
+  },
+  {
+   "from": "pincer_close",
+   "to": "shock_assault",
+   "when": "1-2 enemies left",
+   "why": "Finish them."
+  },
+  {
+   "from": "pincer_close",
+   "to": "suppress",
+   "when": "repulsed",
+   "why": "Back to the base of fire."
+  },
+  {
+   "from": "bound_a",
+   "to": "bound_b",
+   "when": "movers arrived",
+   "why": "The other team bounds while this one covers.",
+   "default": true
+  },
+  {
+   "from": "bound_a",
+   "to": "grenade_volley",
+   "when": "within 15 wu of the LKP and 2+ grenades held",
+   "why": "Volley before the last rush."
+  },
+  {
+   "from": "bound_a",
+   "to": "shock_assault",
+   "when": "within 8 wu, or the enemy broken",
+   "why": "Rush the last distance."
+  },
+  {
+   "from": "bound_a",
+   "to": "suppress",
+   "when": "the bounders lost 2 with no kill",
+   "why": "Stop and re-fix."
+  },
+  {
+   "from": "bound_a",
+   "to": "flank_move",
+   "when": "a free flank position has opened",
+   "why": "Switch to a flank."
+  },
+  {
+   "from": "bound_b",
+   "to": "bound_a",
+   "when": "movers arrived",
+   "why": "The other team bounds while this one covers.",
+   "default": true
+  },
+  {
+   "from": "bound_b",
+   "to": "grenade_volley",
+   "when": "within 15 wu of the LKP and 2+ grenades held",
+   "why": "Volley before the last rush."
+  },
+  {
+   "from": "bound_b",
+   "to": "shock_assault",
+   "when": "within 8 wu, or the enemy broken",
+   "why": "Rush the last distance."
+  },
+  {
+   "from": "bound_b",
+   "to": "suppress",
+   "when": "the bounders lost 2 with no kill",
+   "why": "Stop and re-fix."
+  },
+  {
+   "from": "bound_b",
+   "to": "flank_move",
+   "when": "a free flank position has opened",
+   "why": "Switch to a flank."
+  },
+  {
+   "from": "shock_assault",
+   "to": "secure_objective",
+   "when": "objective cleared",
+   "why": "Consolidate.",
+   "default": true
+  },
+  {
+   "from": "shock_assault",
+   "to": "suppress",
+   "when": "repulsed and the enemy at least half our strength",
+   "why": "Back to the base of fire."
+  },
+  {
+   "from": "shock_assault",
+   "to": "hold",
+   "when": "an enemy counterattack",
+   "why": "Hold."
+  },
+  {
+   "from": "suicide_runner",
+   "to": "shock_assault",
+   "when": "the grenade went off",
+   "why": "Exploit the blast at once.",
+   "default": true
+  },
+  {
+   "from": "suicide_runner",
+   "to": "hold_and_fix",
+   "when": "defending unit, the blast did not break them",
+   "why": "Back to the posts."
+  },
+  {
+   "from": "suicide_runner",
+   "to": "suppress",
+   "when": "attacking unit, the blast did not break them",
+   "why": "Back to the base of fire."
+  },
+  {
+   "from": "secure_objective",
+   "to": "link_up",
+   "when": "4 s with no new contact",
+   "why": "The base of fire moves up to the security element.",
+   "default": true
+  },
+  {
+   "from": "secure_objective",
+   "to": "reorganize",
+   "when": "the teams already within 10 wu of each other (after a shock, bounding assault or near ambush)",
+   "why": "No link-up needed."
+  },
+  {
+   "from": "secure_objective",
+   "to": "react_contact",
+   "when": "a new enemy group",
+   "why": "A counterattack or a second position: react to contact."
+  },
+  {
+   "from": "secure_objective",
+   "to": "hold",
+   "when": "an enemy counterattack closing on the objective",
+   "why": "The security element is in place: hold."
+  },
+  {
+   "from": "link_up",
+   "to": "reorganize",
+   "when": "the team centres within 10 wu",
+   "why": "Linked up: reorganize.",
+   "default": true
+  },
+  {
+   "from": "link_up",
+   "to": "react_contact",
+   "when": "contact during the move",
+   "why": "Base is now the element in contact."
+  },
+  {
+   "from": "link_up",
+   "to": "hold",
+   "when": "an enemy counterattack",
+   "why": "Hold together."
+  },
+  {
+   "from": "reorganize",
+   "to": "overwatch_a",
+   "when": "Marines, or a Covenant unit with no guard post: continue the mission",
+   "why": "The user's 'continue bounding overwatch to move forward until spotting or being engaged'.",
+   "default": true,
+   "default_for": "marines"
+  },
+  {
+   "from": "reorganize",
+   "to": "follow_lead",
+   "when": "Marines with the Chief more than 20 wu away",
+   "why": "Rejoin the Chief.",
+   "for": "marines"
+  },
+  {
+   "from": "reorganize",
+   "to": "post_perimeter",
+   "when": "Covenant: 1 Elite or fewer than 6 members",
+   "why": "Back to guarding, the ring faced toward the last enemy bearing.",
+   "for": "covenant",
+   "default": true,
+   "default_for": "covenant"
+  },
+  {
+   "from": "reorganize",
+   "to": "post_depth",
+   "when": "Covenant: D known and 6+ members",
+   "why": "Back to guarding in depth.",
+   "for": "covenant"
+  },
+  {
+   "from": "reorganize",
+   "to": "post_ambush",
+   "when": "Covenant: 2+ Elites and a strike element of 2+",
+   "why": "Back to guarding with ambush wings.",
+   "for": "covenant"
+  },
+  {
+   "from": "reorganize",
+   "to": "react_contact",
+   "when": "contact",
+   "why": "A new fight."
+  },
+  {
+   "from": "withdraw_a",
+   "to": "withdraw_b",
+   "when": "movers arrived",
+   "why": "Fighting withdrawal: the teams alternate.",
+   "default": true
+  },
+  {
+   "from": "withdraw_a",
+   "to": "regroup",
+   "when": "the enemy is not following (range above 20 wu) or contact lost",
+   "why": "Contact broken: rally."
+  },
+  {
+   "from": "withdraw_a",
+   "to": "hold",
+   "when": "enemy closing fast within 10 wu",
+   "why": "Cannot break: hasty defense."
+  },
+  {
+   "from": "withdraw_b",
+   "to": "withdraw_a",
+   "when": "movers arrived",
+   "why": "Fighting withdrawal: the teams alternate."
+  },
+  {
+   "from": "withdraw_b",
+   "to": "regroup",
+   "when": "movers arrived (the second bound), or the enemy is not following (range above 20 wu), or contact lost",
+   "why": "Contact broken: rally.",
+   "default": true
+  },
+  {
+   "from": "withdraw_b",
+   "to": "hold",
+   "when": "enemy closing fast within 10 wu",
+   "why": "Cannot break: hasty defense."
+  },
+  {
+   "from": "regroup",
+   "to": "reorganize",
+   "when": "arrived",
+   "why": "Reorganize the survivors.",
+   "default": true
+  },
+  {
+   "from": "regroup",
+   "to": "react_contact",
+   "when": "contact during the regroup",
+   "why": "React."
+  },
+  {
+   "from": "regroup",
+   "to": "hold",
+   "when": "the enemy pursuing within 15 wu",
+   "why": "Hold at the rally point."
+  },
+  {
+   "from": "hold",
+   "to": "suppress",
+   "when": "the enemy fixed but not stalled",
+   "why": "Back to a deliberate base of fire.",
+   "default": true
+  },
+  {
+   "from": "hold",
+   "to": "flank_move",
+   "when": "the enemy's attack stalled (fixed 6 s), a free flank position",
+   "why": "Counter-flank once the attack loses momentum."
+  },
+  {
+   "from": "hold",
+   "to": "shock_assault",
+   "when": "the enemy weakened within 10 wu",
+   "why": "Counterattack."
+  },
+  {
+   "from": "hold",
+   "to": "withdraw_a",
+   "when": "outnumbered 2:1 and losing members",
+   "why": "Break contact."
+  },
+  {
+   "from": "hold",
+   "to": "regroup",
+   "when": "no enemy known for 10 s",
+   "why": "The fight is over."
+  },
+  {
+   "from": "hold",
+   "to": "hold",
+   "when": "20 s, the enemy still attacking",
+   "why": "Keep holding."
+  },
+  {
+   "from": "follow_lead",
+   "to": "hold",
+   "when": "no Chief alive and no ADV computable",
+   "why": "Without the Chief there is nothing to follow: hold where the unit is until contact or a new strategy (it was the fallback_next but had no transition)."
+  },
+  {
+   "from": "stand_to",
+   "to": "cut_off",
+   "when": "the enemy is fixed and a strike element is free",
+   "why": "Elites slip round to cut off the enemy's withdrawal",
+   "for": "covenant"
+  },
+  {
+   "from": "hold_and_fix",
+   "to": "cut_off",
+   "when": "the enemy is fixed and a strike element is free",
+   "why": "Elites slip round to cut off the enemy's withdrawal",
+   "for": "covenant"
+  },
+  {
+   "from": "suppress",
+   "to": "cut_off",
+   "when": "the enemy is fixed and a strike element is free",
+   "why": "Elites slip round to cut off the enemy's withdrawal",
+   "for": "covenant"
+  },
+  {
+   "from": "hold",
+   "to": "cut_off",
+   "when": "the enemy is fixed and a strike element is free",
+   "why": "Elites slip round to cut off the enemy's withdrawal",
+   "for": "covenant"
+  },
+  {
+   "from": "cut_off",
+   "to": "spring_ambush",
+   "when": "the wing is in place, or the enemy falls back into it",
+   "why": "the cut-off springs, or the fight goes on",
+   "for": "covenant"
+  },
+  {
+   "from": "cut_off",
+   "to": "counterattack",
+   "when": "the wing is in place, or the enemy falls back into it",
+   "why": "the cut-off springs, or the fight goes on",
+   "for": "covenant"
+  },
+  {
+   "from": "cut_off",
+   "to": "flank_assault",
+   "when": "the wing is in place, or the enemy falls back into it",
+   "why": "the cut-off springs, or the fight goes on",
+   "for": "covenant"
+  },
+  {
+   "from": "cut_off",
+   "to": "grenade_volley",
+   "when": "the wing is in place, or the enemy falls back into it",
+   "why": "the cut-off springs, or the fight goes on",
+   "for": "covenant"
+  },
+  {
+   "from": "cut_off",
+   "to": "hold",
+   "when": "the wing is in place, or the enemy falls back into it",
+   "why": "the cut-off springs, or the fight goes on",
+   "for": "covenant"
+  },
+  {
+   "from": "stand_to",
+   "to": "grenade_volley",
+   "when": "the enemy falls back",
+   "why": "a withdrawing enemy is hit first with grenades",
+   "for": "covenant"
+  },
+  {
+   "from": "hold_and_fix",
+   "to": "grenade_volley",
+   "when": "the enemy falls back",
+   "why": "a withdrawing enemy is hit first with grenades",
+   "for": "covenant"
+  },
+  {
+   "from": "flank_assault",
+   "to": "pincer_close",
+   "when": "the retreating element is caught",
+   "why": "both arms close on the enemy's forward element",
+   "for": "both"
+  },
+  {
+   "from": "suppress",
+   "to": "shock_assault",
+   "when": "the enemy breaks",
+   "why": "pursuit: everyone presses a retreating enemy",
+   "for": "both"
+  },
+  {
+   "from": "react_contact",
+   "to": "grenade_volley",
+   "for": "marines",
+   "when": "contact with a group 8-20 wu off and grenades held",
+   "why": "Grenades into the group before anyone moves on it."
+  }
+ ],
+ "chains": [
+  {
+   "name": "m_movement_to_contact",
+   "for": "marines",
+   "situation": "no enemy known; the Chief advancing into unknown ground",
+   "based_on": "movement techniques: traveling, then bounding overwatch near the expected contact",
+   "steps": [
+    "follow_lead",
+    "overwatch_a",
+    "overwatch_b",
+    "overwatch_a",
+    "overwatch_b"
+   ]
+  },
+  {
+   "name": "m_fix_and_flank",
+   "for": "marines",
+   "situation": "a fixed enemy 12-30 wu away with a flank position open; own strength at least the enemy's",
+   "based_on": "squad attack: react to contact, support by fire, flank, assault, consolidate, reorganize",
+   "steps": [
+    "react_contact",
+    "suppress",
+    "flank_move",
+    "grenade_volley",
+    "flank_assault",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "overwatch_a"
+   ]
+  },
+  {
+   "name": "m_far_ambush",
+   "for": "marines",
+   "situation": "casualties in the first 2 s from 12-30 wu",
+   "based_on": "react to a far ambush",
+   "steps": [
+    "react_contact",
+    "flank_move",
+    "grenade_volley",
+    "flank_assault",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "overwatch_a"
+   ]
+  },
+  {
+   "name": "m_pincer",
+   "for": "marines",
+   "situation": "6+ members with positions on both sides of the enemy",
+   "based_on": "double envelopment with a fixing element",
+   "steps": [
+    "react_contact",
+    "suppress",
+    "pincer_move",
+    "grenade_volley",
+    "pincer_close",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "overwatch_a"
+   ]
+  },
+  {
+   "name": "m_bounding_assault",
+   "for": "marines",
+   "situation": "no flank position (corridor, bridge)",
+   "based_on": "fire and movement by bounds",
+   "steps": [
+    "react_contact",
+    "suppress",
+    "bound_a",
+    "bound_b",
+    "bound_a",
+    "grenade_volley",
+    "shock_assault",
+    "secure_objective",
+    "reorganize",
+    "overwatch_a"
+   ]
+  },
+  {
+   "name": "m_shock",
+   "for": "marines",
+   "situation": "a lone or broken enemy, or a 3:1 advantage",
+   "based_on": "hasty attack against a weak enemy",
+   "steps": [
+    "react_contact",
+    "grenade_volley",
+    "shock_assault",
+    "secure_objective",
+    "reorganize",
+    "overwatch_a"
+   ]
+  },
+  {
+   "name": "m_near_ambush",
+   "for": "marines",
+   "situation": "forced: 2+ enemies within 8 wu at contact",
+   "based_on": "react to a near ambush: assault through",
+   "steps": [
+    "react_near_ambush",
+    "secure_objective",
+    "reorganize",
+    "overwatch_a"
+   ]
+  },
+  {
+   "name": "m_break_contact",
+   "for": "marines",
+   "situation": "outnumbered 2:1, or a vehicle and no anti-vehicle weapon",
+   "based_on": "break contact",
+   "steps": [
+    "react_contact",
+    "withdraw_a",
+    "withdraw_b",
+    "withdraw_a",
+    "regroup",
+    "reorganize",
+    "follow_lead"
+   ]
+  },
+  {
+   "name": "m_hasty_defense_counter",
+   "for": "marines",
+   "situation": "a superior enemy assaulting us",
+   "based_on": "hasty defense, then a counterattack by a flank when the attack stalls",
+   "steps": [
+    "react_contact",
+    "hold",
+    "flank_move",
+    "grenade_volley",
+    "flank_assault",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "overwatch_a"
+   ]
+  },
+  {
+   "name": "c_perimeter_defense",
+   "for": "covenant",
+   "situation": "1 Elite, or no reliable approach direction",
+   "based_on": "perimeter (360) defense with a counterattack against a penetration",
+   "steps": [
+    "post_perimeter",
+    "stand_to",
+    "hold_and_fix",
+    "counterattack",
+    "secure_objective",
+    "reorganize",
+    "post_perimeter"
+   ]
+  },
+  {
+   "name": "c_defense_in_depth",
+   "for": "covenant",
+   "situation": "a known approach lane and 6+ members",
+   "based_on": "defense in depth: security screen, main line, reserve counterattack",
+   "steps": [
+    "post_depth",
+    "stand_to",
+    "screen_fall_back",
+    "hold_and_fix",
+    "counterattack",
+    "secure_objective",
+    "reorganize",
+    "post_depth"
+   ]
+  },
+  {
+   "name": "c_elite_ambush",
+   "for": "covenant",
+   "situation": "2+ Elites; the area lies on the Marines' route",
+   "based_on": "area ambush with a fixing force: the Grunt ring fixes, the Elite wings strike the flank",
+   "steps": [
+    "post_ambush",
+    "stand_to",
+    "hold_and_fix",
+    "spring_ambush",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "post_ambush"
+   ]
+  },
+  {
+   "name": "c_lure",
+   "for": "covenant",
+   "situation": "2+ Elites and 2+ Jackals as pickets",
+   "based_on": "baited ambush: the pickets draw the Marines past the hidden wings",
+   "steps": [
+    "post_ambush",
+    "stand_to",
+    "screen_fall_back",
+    "spring_ambush",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "post_ambush"
+   ]
+  },
+  {
+   "name": "c_kill_zone",
+   "for": "covenant",
+   "situation": "the Marines walk straight into a wing's kill zone",
+   "based_on": "point ambush sprung on first contact",
+   "steps": [
+    "post_ambush",
+    "spring_ambush",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "post_ambush"
+   ]
+  },
+  {
+   "name": "c_elite_flank",
+   "for": "covenant",
+   "situation": "the Marines halt out of reach of the post",
+   "based_on": "spoiling attack: the ring is the base of fire, the Elites flank",
+   "steps": [
+    "post_ambush",
+    "stand_to",
+    "hold_and_fix",
+    "flank_move",
+    "grenade_volley",
+    "flank_assault",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "post_ambush"
+   ]
+  },
+  {
+   "name": "c_stick_and_blow",
+   "for": "covenant",
+   "situation": "the Marines clustered or the Chief dug in, a runner eligible",
+   "based_on": "a planned suicide runner exploited by an assault",
+   "steps": [
+    "post_perimeter",
+    "stand_to",
+    "hold_and_fix",
+    "suicide_runner",
+    "shock_assault",
+    "secure_objective",
+    "reorganize",
+    "post_perimeter"
+   ]
+  },
+  {
+   "name": "c_hunter_gate",
+   "for": "covenant",
+   "situation": "Hunters present on the approach",
+   "based_on": "a heavy reserve counterattack (the Hunter pair)",
+   "steps": [
+    "post_depth",
+    "stand_to",
+    "hold_and_fix",
+    "counterattack",
+    "shock_assault",
+    "secure_objective",
+    "reorganize",
+    "post_depth"
+   ]
+  },
+  {
+   "name": "c_pincer",
+   "for": "covenant",
+   "situation": "the Marines halt out of reach and the unit has 6+ members with ground on both sides",
+   "based_on": "double envelopment, one Elite-led arm per side",
+   "steps": [
+    "post_perimeter",
+    "stand_to",
+    "suppress",
+    "pincer_move",
+    "pincer_close",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "post_perimeter"
+   ]
+  },
+  {
+   "name": "c_sweep",
+   "for": "covenant",
+   "situation": "contact lost with an enemy that was in the area",
+   "based_on": "a short security patrol by bounds, then back on the post",
+   "steps": [
+    "overwatch_a",
+    "overwatch_b",
+    "overwatch_a",
+    "post_perimeter"
+   ]
+  },
+  {
+   "name": "c_fall_back",
+   "for": "covenant",
+   "situation": "the failure rule, or a deliberate break contact",
+   "based_on": "withdrawal to the depth line",
+   "steps": [
+    "withdraw_a",
+    "withdraw_b",
+    "regroup",
+    "reorganize",
+    "post_depth"
+   ]
+  },
+  {
+   "name": "c_last_officer",
+   "for": "covenant",
+   "situation": "forced: the last Elite of a remnant unit (other Elites dead or half the unit lost) with 3 or fewer members",
+   "based_on": "the officer rallies the survivors on himself",
+   "steps": [
+    "last_stand",
+    "reorganize",
+    "post_perimeter"
+   ]
+  },
+  {
+   "name": "c_counter_pursuit",
+   "for": "covenant",
+   "situation": "the Marines fall back from a failed attack: hit them as they go",
+   "steps": [
+    "stand_to",
+    "grenade_volley",
+    "flank_assault",
+    "pincer_close",
+    "secure_objective",
+    "reorganize",
+    "post_perimeter"
+   ]
+  },
+  {
+   "name": "c_cut_off",
+   "for": "covenant",
+   "situation": "fix the enemy, slip Elites round behind it, then close the trap",
+   "steps": [
+    "post_ambush",
+    "stand_to",
+    "hold_and_fix",
+    "cut_off",
+    "spring_ambush",
+    "secure_objective",
+    "link_up",
+    "reorganize",
+    "post_ambush"
+   ]
+  },
+  {
+   "name": "m_pursuit",
+   "for": "marines",
+   "situation": "the Covenant break: press them before they regroup",
+   "steps": [
+    "react_contact",
+    "suppress",
+    "grenade_volley",
+    "shock_assault",
+    "secure_objective",
+    "reorganize",
+    "overwatch_a"
+   ]
+  }
+ ],
+ "postures": [
+  {
+   "name": "perimeter_360",
+   "for": "covenant",
+   "step": "post_perimeter",
+   "chosen_when": "the default; 1 Elite, or no reliable D, or open ground",
+   "layout": "Grunts and Jackals one per sector around C (360/n deg, at least 45 deg each, at most 8 sectors; extras double the 2 sectors nearest D) at 6-12 wu, spacing >= 3, cover from outside at crouch height first, concealment at standing height second; Jackals in the sectors within +/-60 deg of D. The leader 3-6 wu behind C, away from D (furthest from expected contact); a second Elite 0-5 wu from C on the other side. Hunters 4-8 wu out on D as an anchor. Leash: 4 wu around each post, Elites 6 wu."
+  },
+  {
+   "name": "defense_in_depth",
+   "for": "covenant",
+   "step": "post_depth",
+   "chosen_when": "D known and stable for 60 s, 6+ members",
+   "layout": "Screen (Jackals, else 2 Grunts) 10-16 wu out toward D; main line 2-8 wu from C within +/-70 deg of D; 25% of the Grunts as rear security 6-10 wu at 150-210 deg; the security Elite 4-8 wu behind C; the strike Elites hidden 6-10 wu at 120-150 deg as the counterattack force; Hunters behind the main line's centre. Reverse-slope variant when a crest 2+ wu above C lies on D: the screen holds the crest, the main line waits 2-6 wu below it out of sight."
+  },
+  {
+   "name": "elite_ambush_screen",
+   "for": "covenant",
+   "step": "post_ambush",
+   "chosen_when": "2+ Elites and a strike element of 2+",
+   "layout": "The security Elite 0-4 wu from C, offset away from D, holding a Grunt ring at 5-10 wu (60% front, 40% rear); Jackal pickets 12-16 wu out on D as bait; each wing team (an Elite and an escort) hidden 15-25 wu from C at 50-100 deg off D, alternating sides, concealed from ECP, facing the kill zone 12-18 wu out on D, at most 28 wu from the commanding Elite; the reserve 4-10 wu at 150-180 deg."
+  },
+  {
+   "name": "small_post",
+   "for": "covenant",
+   "step": "post_perimeter",
+   "chosen_when": "3 or fewer members",
+   "layout": "No ring: the Grunts 3-6 wu from the Elite toward D, 60-90 deg apart, behind cover from D; the Elite 2-4 wu behind them. No ambush, no runner (the last Grunts are never sent)."
+  },
+  {
+   "name": "travelling_wedge",
+   "for": "marines",
+   "step": "follow_lead",
+   "chosen_when": "no contact, the Chief moving",
+   "layout": "Maneuver 4-8 wu ahead of the Chief within +/-40 deg of ADV; base 2-6 wu behind him within +/-60 deg; reserve 6-10 wu behind facing the rear; spacing >= 3; nobody more than 20 wu from the Chief."
+  },
+  {
+   "name": "bounding_overwatch",
+   "for": "both",
+   "step": "overwatch_a / overwatch_b",
+   "chosen_when": "ADV (or the hunt point) within 18 wu, or the Chief halted near live Covenant",
+   "layout": "One team bounds 8-12 wu toward the reference, never beyond 15 wu of the other; the other team OVERWATCH from its last position watching the bounders' destination; the reserve trails the overwatching team facing the rear."
+  },
+  {
+   "name": "consolidation_360",
+   "for": "both",
+   "step": "secure_objective / link_up / reorganize",
+   "chosen_when": "after every successful assault",
+   "layout": "Maneuver 4-10 wu beyond OBJ, half facing forward and half outward; base comes up from behind into the rear and near flank; then a 360 at 6 wu around the unit centre, one sector each, and teams reassigned from the survivors."
+  }
+ ],
+ "interrupts": [
+  {
+   "name": "contact_interrupt",
+   "applies_to": "follow_lead, overwatch_a, overwatch_b, post_perimeter, post_depth, post_ambush, regroup, reorganize",
+   "rule": "the step ends the moment of contact as defined in the conventions (a member sees an enemy, is damaged, or a new enemy becomes known; a remembered enemy does not count), not at its time boundary; the model is asked at once and may choose only among that step's contact successors. A strategy chosen in contact skips its leading no-contact steps (see 'Opening in contact')."
+  },
+  {
+   "name": "near_ambush",
+   "applies_to": "Marines and non-defending Covenant units",
+   "rule": "2+ enemies within 8 wu at first contact, or a member hit by an unseen attacker (as defined in the conventions), forces react_near_ambush (Covenant in a posture: counterattack)."
+  },
+  {
+   "name": "failure_rule",
+   "applies_to": "steps with failure_rule 'normal' or 'defense'",
+   "rule": "today's rule (after 30 s committed, friends dying and no enemy killed for 30 s, or half the unit lost) forces withdraw_a -> withdraw_b -> regroup -> reorganize -> a new strategy. 'defense' steps use a 45 s window counted over the whole defense; 'suspended' steps never trigger it. A Covenant defender's withdrawal goes to the depth line and never more than 35 wu from C, and its new strategy is a posture."
+  },
+  {
+   "name": "last_officer",
+   "applies_to": "Covenant, any step",
+   "rule": "the last living Elite with 3 or fewer members, in a unit that has lost its other Elites or half its starting strength, forces last_stand. A unit that started this small fights the ordinary drills under the small-unit rule."
+  },
+  {
+   "name": "leader_succession",
+   "applies_to": "both",
+   "rule": "when the leader dies and another Elite lives, command passes at once (highest rank, then nearest C) and the step continues with its timers; the unit breaks only when its last Elite dies (Marines: when the Chief dies, ADV falls back to the Marine centre and facing, and follow_lead is masked out)."
+  }
+ ],
+ "notes": [
+  {
+   "priority": "P0",
+   "change": "step_arrived(): count only members flagged as movers this step (set when drill_move / drill_move_near / the new pickers return 1); every holding role is excluded, not only SUPPORT and HIDDEN.",
+   "why": "With SECURITY, OVERWATCH, SHIFT_FIRE and GRENADIER holders counted as arrived, 'movers arrived (70%)' would be true before the bounders moved."
+  },
+  {
+   "priority": "P0",
+   "change": "Planning without a target: unit_update/unit_geometry must produce geometry when no enemy is known, using a stand-in reference (ECP for Covenant, ADV for Marines) so drill_position bands work; step_orders must not skip members when the target is the stand-in. The same applies to step boundaries: unit_update only advances a step when has_target, so with the enemy dead secure_objective, link_up, reorganize and regroup would never advance; their stand-in reference is OBJ (consolidation) or the rally point (regroup).",
+   "why": "every no-contact step (postures, follow_lead, overwatch) needs it; today step_orders skips everyone without a target except regroup."
+  },
+  {
+   "priority": "P0",
+   "change": "actor_can_drill must accept guard and idle actors (not only ACTION_FIGHT / ACTION_UNCOVER with a target).",
+   "why": "Covenant waiting at their post are guarding, so posture orders would never be issued."
+  },
+  {
+   "priority": "P0",
+   "change": "Store per unit: C (cmd_guard[key][3]), D (cmd_threat[key][2]), OBJ (cmd_obj[key][3], frozen at each assault step) and ADV; compute D in the documented order.",
+   "why": "postures measure at C from D; consolidation needs OBJ after the enemy is dead."
+  },
+  {
+   "priority": "P0",
+   "change": "NO_TARGET_TICKS (15 s without a target ends the chain) must not apply to no_contact, defense or consolidation steps.",
+   "why": "the defense must loop until contact and consolidation happens after the enemy is dead."
+  },
+  {
+   "priority": "P0",
+   "change": "Raise command_radius from 20 to 35 wu (AI_BRAIN_COMMAND_RADIUS already overrides it) and keep wing posts at most 28 wu from the commanding Elite.",
+   "why": "the ambush wings 15-25 wu out must stay in the unit (the user's 'increasing the command distance of Elites')."
+  },
+  {
+   "priority": "P0",
+   "change": "Contact interrupt: no-contact steps end immediately on contact and ask the model, masked to the step's contact successors.",
+   "why": "a posture that waits 60 s for its boundary while being shot is useless."
+  },
+  {
+   "priority": "P0",
+   "change": "Replace the 13-step enum, chains[], step_successors[] and step_default_next[] with tables generated from doctrine.json: 31 steps + STEP_END = 32 bits, fits the uint32_t mask exactly (use uint64_t if any step is added); add a per-step faction mask ANDed into the model's step mask and per-faction default_next for reorganize.",
+   "why": "the doctrine is the single source of truth."
+  },
+  {
+   "priority": "P0",
+   "change": "CHAIN_STEPS 6 -> 10; MAX_CHAIN_STEPS 8 -> 12, with no-contact steps not counted; a strategy completes when it enters a no-contact step.",
+   "why": "the longest chains (m_bounding_assault, c_elite_flank) are 10 steps."
+  },
+  {
+   "priority": "P1",
+   "change": "Three teams: actor_team_of 0/1/2 (it is already int8); assign_teams gains the by-type Covenant rules and the Marine weapon/range rules in 'elements', and runs again in reorganize and regroup; the 2-member element minimum; step_splits becomes the per-step 'splits' flag; set_leashes keeps a centre per team (and per post in defense steps: 4 wu, wings 8 wu, unit 14 wu around C).",
+   "why": "security / strike / reserve, teams evened out after losses (user requirement)."
+  },
+  {
+   "priority": "P1",
+   "change": "Leader succession without breaking the unit (re-elect highest rank, then nearest C; keep the step and timers).",
+   "why": "nobody fights solo unless the leadership is dead."
+  },
+  {
+   "priority": "P1",
+   "change": "New roles in apply_role: SECURITY, OVERWATCH, SHIFT_FIRE, GRENADIER, RUNNER, all on the existing order flags (crouch, shoot, burst, grenade, manual target point). SECURITY's facing uses the manual target point; if that does not turn an actor that is not shooting, those members get no facing and keep the rest of the role. actor_may_charge() must also accept RUNNER (and SHIFT_FIRE must treat a RUNNER as an assaulter), or discipline will decline the runner's charge.",
+   "why": "postures need watchers that do not waste fire; assaults need fire that lifts."
+  },
+  {
+   "priority": "P1",
+   "change": "New destination rules: drill_ring(C, sectors, range band, weighting toward D), drill_beyond(OBJ, axis, angle band, range), drill_nearest_cover(radius 5, not closer to the LKP); drill_move_near with an allowed-side filter (link-up from behind, screen fall-back beside the kill zone); a height filter for the reverse-slope variant.",
+   "why": "postures, consolidation and react_contact."
+  },
+  {
+   "priority": "P1",
+   "change": "Step end conditions and successor filters: objective cleared, enemy fixed / closing / retreating (range trend over 6 s), penetration, enemy clustered, losses and kills per step and per element, grenades held per element, runner eligibility and budget (once per strategy, once per 30 s). Filter the model's mask by each transition's 'when'; a 'when' not yet measurable counts as allowed.",
+   "why": "steps end on what happened, not only on time, and the model only sees sensible moves."
+  },
+  {
+   "priority": "P1",
+   "change": "Failure rule: suspended in steps marked 'suspended', a 45 s whole-defense window for 'defense' steps; a Covenant withdrawal goes to the depth line (C moved 10-15 wu away from the enemy), never more than 35 wu from C, and its next strategy is a posture.",
+   "why": "losses from the last fight must not trigger a pointless withdrawal during consolidation; Covenant guard ground."
+  },
+  {
+   "priority": "P1",
+   "change": "Forced openings: near ambush and last_officer; runner budget.",
+   "why": "doctrine, not choice."
+  },
+  {
+   "priority": "P2",
+   "change": "Cover scoring once the LOS test lands: for SUPPORT and SECURITY positions, blocked at crouch height (0.6) and clear at standing height (1.2) from the threat point (a fighting position); fully blocked at both for HIDDEN posts and movers' intermediate positions; weight 5-10 in the position score.",
+   "why": "the user's 'optimally against cover or concealment'."
+  },
+  {
+   "priority": "P2",
+   "change": "Marines and the Chief: stay within 20 wu of him, count him as part of the base of fire when he fires within 15 wu of base, flank on the side away from him.",
+   "why": "Marines always follow a reasonable plan that fits around the Chief."
+  },
+  {
+   "priority": "P2",
+   "change": "Strategic model inputs: phase one-hot, current step, team sizes x3, nearest enemy range / 30, closing rate, visible enemy count / 6, grenades held, shields mean, Elites alive, posture id, steps since contact, runner available. Strategy = opening chain x side x tempo as today.",
+   "why": "the step model needs to see what the 'when' clauses measure."
+  },
+  {
+   "priority": "P2",
+   "change": "Fratricide guard: no step places two firing elements 150-210 deg apart at the enemy, except pincer_close where the arms stop at 3 wu and SHIFT_FIRE lifts the centre's fire.",
+   "why": "plasma and grenades make friendly fire real."
+  },
+  {
+   "priority": "P2",
+   "change": "Log per step: the chain, step, elements' sizes, moved, kills and losses in step, runner outcome (kills within 2 s of the throw) and posture chosen, for training and review.",
+   "why": "the training run must be able to tell which drills pay."
+  },
+  {
+   "priority": "P1",
+   "change": "Opening in contact, the small-unit rule (2-3 members: buddy bounds only), the nobody-left-alone merge, the 25/35 wu Covenant guard leash, posture refresh that keeps posts, and default_rules / default_for in the scripted fallback (see conventions).",
+   "why": "Found in the adversarial review: without them a strategy re-posts under fire, a 1-Elite-2-Grunt group runs splitting drills with elements of 1, a flank survivor is left alone, Covenant flankers wander out of command range, the ring shuffles every refresh and an off-chain bound loops forever."
+  }
+ ]
+}

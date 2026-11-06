@@ -97,6 +97,7 @@ their handlers open opens.
 #include "../src/player_link.h" /* port: port/linux/src/player_link.c */
 #include "../src/server_master.h"
 #include "text_filter.h"
+#include "mendicant/mendicant.h" /* (Campaign AI's settings: mendicant_settings_changed) */
 
 #include <stdlib.h>
 #include <string.h>
@@ -7941,6 +7942,7 @@ boolean pc_menu_event_function_invoke(
 		{
 			settings_each(screen_of(widget), setting_changed_save);
 			platform_display_apply();
+			mendicant_settings_changed();
 		}
 		else if (!strcmp(name, "port settings defaults"))
 		{

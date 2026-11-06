@@ -1,7 +1,62 @@
 # MENDICANT AI: port specification (ai_brain hook library to OpenCE source)
 
-Fork: `/home/adam/kraken-projects/halo-3/opence` (OpenCE build-337, commit 899219c).
-Source of the port: `/home/adam/kraken-projects/halo-3/mods/ai_brain` (`ai_brain.c`, `command.inc`,
+This is the specification the port was written from, kept as its design record. The files as
+built differ from the plan in places:
+
+| Planned | As built (`port/linux/game/mendicant/`) |
+| --- | --- |
+| `mendicant.c`, `mendicant_training.c`, `mendicant_logs.c` | `mendicant_main.c`, `mendicant_config.c` |
+| `mendicant_runtime.c` | `mendicant_models.c`, `mendicant_infer.c` |
+| `mendicant_movement.c`, `mendicant_maneuver.c`, `mendicant_positions.c` | `mendicant_move.c` |
+| `mendicant_bridge.h` | gone: the bridge is declared in `mendicant_internal.h` |
+| `doctrine_table.h` | `mendicant_doctrine.h` |
+| the struct-offset static asserts | left out: the code uses the members; only the model bridge's layout is checked (`mendicant_bridge.c`) |
+
+`mendicant.h` declares only the calls the game's sources make; everything the modules share is
+in `mendicant_internal.h`.
+
+## Regenerating the doctrine and the models
+
+The doctrine (the steps, what may follow each, the chains) is `tools/mendicant/doctrine.json`.
+After changing it:
+
+```sh
+python3 tools/mendicant/doctrine_gen.py --table <ai_brain mod>/data/doctrine/doctrine_table.json
+ninja linux
+```
+
+`doctrine_gen.py` writes `port/linux/game/mendicant/mendicant_doctrine.h` (and, with `--table`,
+the `doctrine_table.json` the trainer's `policy.py` reads), and fails if a step has no case in
+`mendicant_units.c`; `--check` only checks that the header is up to date. The strategic models
+must then be trained for the new doctrine and exported again: the game refuses a models file
+made for another doctrine (`mendicant_doctrine_hash`). The models are exported with the mod's
+Python:
+
+```sh
+<mod>/.venv/bin/python -I tools/mendicant/export_models.py --mod <mod> \
+    --out <data root>/mods/mendicant/tags/mendicant/models.aibw
+```
+
+## The settings screen
+
+Video Setup > CAMPAIGN AI (`tools/port_settings.py`'s
+`video_settings/campaign_ai` and its AIM AND FIRE page, written by
+`python3 tools/ce_menus.py --settings-only`) sets the player's
+`ai.mendicant.*` settings: on, the trained models, individuals, drill
+variety, discipline, threat targeting, unit radius, aim spread, spread by
+difficulty, moving targets and the Marines' rate of fire. It is reached from
+the main menu's player profile and from a campaign's pause menu (SETTINGS),
+and works with a controller as the other settings screens do. OK writes the
+changes to config.toml; `menu_functions.c`'s "port settings save" then calls
+`mendicant_settings_changed`, which reads them again at once, keeping on, the
+models, the seed, the bridge, training and the logs as the map started with
+them until the next map's start. The weights, the seed, the bridge, training,
+the logs and the tests stay in config.toml only.
+
+## The specification
+
+Fork: OpenCE build-337, commit 899219c.
+Source of the port: the ai_brain hook library (`ai_brain.c`, `command.inc`,
 `maneuver.inc`, `vehicles.inc`, `actor_go.inc`, `doctrine_table.h`, `brain.py`, `policy.py`),
 bound today to OpenCE build 273 by hard-coded addresses.
 
@@ -1127,10 +1182,14 @@ Only the game sources under `source/` use `rglob` (`linux_build.py:36`).
 
 ### 10.7 Deliberate differences from the hook library
 
-1. **No default sample log.** Nothing is written unless `ai.mendicant.sample_log` is set.
-2. **In-process answers are synchronous.** They are applied at the next `drill_update`; brain.py
-   answered one or more ticks later. The shared-memory path keeps the asynchronous behaviour and
-   the 30-tick timeout.
+1. **No default sample log.** Nothing is written unless `ai.mendicant.sample_log` is set; the
+   hook library wrote `ai_brain_samples.csv` outside training by default. Play is unaffected
+   (`play.sh` sets `AI_BRAIN_LOG`, which the port reads as `ai.mendicant.sample_log`).
+2. **In-process answers are synchronous.** The models answer inside `mendicant_bridge_submit`,
+   and the answer is applied at the next `drill_update`; brain.py answered one or more ticks
+   later. So the drill log's latency figures of a game with the models in it are 0 and are not
+   comparable with the hook build's; reports should say which was measured. The shared-memory
+   path keeps the asynchronous behaviour and the 30-tick timeout.
 3. **Angle maths.** `atan2f`, `cosf` and `sinf` become the musl double versions cast to `real`,
    which may differ by one ulp. `sqrt` and `fabs` are exact.
 4. **State resets at map dispose.** The hook library noticed a new map only when the scenario
@@ -1143,6 +1202,23 @@ Only the game sources under `source/` use `rglob` (`linux_build.py:36`).
    off.
 8. **Stances when a side's per-enemy model is missing** are written as 0; brain.py left them
    stale. Sampling uses the port's seeded splitmix64 in place of torch's RNG.
+9. **No unit starts with a last drill.** At each map's start (and a checkpoint revert) every
+   unit's last drill and plan memory are -1 and its chain -1, as a training episode starts them;
+   the hook library's 0 told the strategic model every unit's last plans were drill 0.
+10. **An actor of an unlisted type is not sampled.** The hook library never wrapped one; the
+    port would have logged it as type 12.
+11. **Training as the hook trained.** With training on, `ai.mendicant.individuals` is off unless
+    `HALO_AI_MENDICANT_INDIVIDUALS` or `AI_BRAIN_INDIVIDUALS` is set (`trainer.py --mode
+    individual`).
+12. **Saved games and checkpoints.** Before a save the encounters the go orders hold
+    `force_active` are let go (they are held again at the next tick); after a load no actor keeps
+    a firing position index beyond the level's own lists, AI on or off, and with the AI on its
+    orders, units, timers, go orders and following start over (the maneuver copies stay). The hook
+    library kept all of it across a revert.
+13. **The editor's map restart** (`ai_handle_editing`, which starts a map without ending it)
+    puts the level's own firing position lists back before the copies are freed.
+14. **The mixer's skip** (`training_skip` 4) follows the frame's and the sound's: training on with
+    the trainer's bridge open (`mendicant_skip_mixer`), not the settings alone.
 
 ---
 

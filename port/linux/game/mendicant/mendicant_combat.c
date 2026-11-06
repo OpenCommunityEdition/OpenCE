@@ -46,9 +46,7 @@ aim, targeting and individuals_update) with the same behaviour.
 #include "units/units.h"
 #include "tag_files/tag_files.h"
 
-#include "mendicant.h"
 #include "mendicant_internal.h"
-#include "mendicant_bridge.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -189,13 +187,25 @@ static boolean grenade_clear(struct actor_datum *actor, struct prop_datum *prop)
 		if (x * x + y * y < 5.0f * 5.0f)
 			return FALSE;
 	}
-	chief = side == SIDE_MARINES ? combat_unit(mendicant_player_unit()) : NULL;
-	if (chief)
+	if (side == SIDE_MARINES)
 	{
-		real x = chief->object.position.x - target->x, y = chief->object.position.y - target->y;
+		/* nor on any player (every one in co-op) */
+		long players[MENDICANT_MAX_PLAYERS];
+		int player_count = mendicant_player_units(players, MENDICANT_MAX_PLAYERS);
+		int player;
 
-		if (x * x + y * y < 5.0f * 5.0f)
-			return FALSE;
+		for (player = 0; player < player_count; player++)
+		{
+			real x, y;
+
+			chief = combat_unit(players[player]);
+			if (!chief)
+				continue;
+			x = chief->object.position.x - target->x;
+			y = chief->object.position.y - target->y;
+			if (x * x + y * y < 5.0f * 5.0f)
+				return FALSE;
+		}
 	}
 	from.x = actor->input.pathfinding_point.x;
 	from.y = actor->input.pathfinding_point.y;

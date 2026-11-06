@@ -126,7 +126,7 @@ The game retains the original look and feel as it did on the Xbox by default. Th
 | RESOLUTION SCALING | Draw at the window's resolution, or at the Xbox's 640x480 and scale it up | Native resolution |
 | V-SYNC, FRAME RATE LIMIT | Wait for the display, or run free up to a frame cap; works with G-Sync and FreeSync | V-sync on |
 | SMOOTH MOTION | A frame for every refresh of the display (60, 120, 240 Hz and more), blended between the game's 30 ticks a second | On |
-| INSTANT AIM | In first person, the view turns the frame the mouse moves, not up to two ticks later | On |
+| INSTANT AIM | In first person, the view turns the frame the mouse moves, not up to two ticks later (Mouse Setup) | On |
 | FOV, VIEWMODEL FOV | Field of view of the view and of the weapon and hands, from 80 to 150 degrees | Stock |
 
 **Image quality**

@@ -4,7 +4,7 @@ runtime reads in the game (port/linux/game/mendicant/mendicant_infer.c), on ever
 Run it with the mod's Python (it needs torch, and the mod's policy.py for the per-enemy models);
 it only reads the mod:
 
-    <mod>/.venv/bin/python -I port/linux/game/mendicant/tools/export_models.py --mod <mod> \\
+    <mod>/.venv/bin/python -I tools/mendicant/export_models.py --mod <mod> \\
         --out <data root>/mods/mendicant/tags/mendicant/models.aibw
 
 The models are chosen as play.sh chooses them: data/frozen when both per-enemy weights are there
@@ -30,7 +30,7 @@ enemy_step) are left out, and so is the AI Chief's model, which MENDICANT AI doe
 
 The doctrine hash is FNV-1a over the doctrine's chains (name and side) and steps, the decisions
 the strategic models were trained for; the game refuses a file made for another doctrine
-(mendicant_doctrine_hash, from doctrine_table.h).
+(mendicant_doctrine_hash, from mendicant_doctrine.h).
 """
 import argparse
 import json

@@ -7,7 +7,7 @@ choose_stances, decision_mask, Strategy.sample) and brain.py (assign)
 operation for operation, and was checked bit for bit against PyTorch's
 answers (make_golden.py).
 
-The file (tools/export_models.py), all little-endian:
+The file (tools/mendicant/export_models.py), all little-endian:
   0  magic 'AIBW'   4 version (1)   8 tensor count   12 doctrine hash
   16 decisions      20 chains       24 step choices  28 data offset
   32 the CRC-32 of the data         36..63 zero

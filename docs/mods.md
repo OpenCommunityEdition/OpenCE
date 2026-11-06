@@ -177,7 +177,7 @@ plays), and `debug.txt` and the console say why.
 
 A mod may also carry MENDICANT AI's models, `tags/mendicant/models.aibw`
 (the file `ai.mendicant.weights` names, written by
-`port/linux/game/mendicant/tools/export_models.py`). It is no tag: only the
+`tools/mendicant/export_models.py`). It is no tag: only the
 host of a campaign or co-op game with `ai.mendicant.enabled` reads it, and
 it changes only that host's AI.
 

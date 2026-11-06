@@ -45,7 +45,7 @@ episodes end at episode_ticks with the fight at the level's start.
 #include <stdio.h>
 #include <string.h>
 
-#include "mendicant.h"
+#include "mendicant_internal.h"
 
 /* port/linux/src/platform.h */
 void platform_log(char const *format, ...);
@@ -88,130 +88,6 @@ enum
 	_mendicant_flag_playfighting = 8,
 };
 
-/* ---------- the members that replace the hook library's raw offsets
-(checked with the game's flags: a change upstream fails the build, not the game) */
-
-#define MENDICANT_CHECK(name, type, member, offset) typedef char mendicant_offset_##name[offsetof(struct type, member) == (offset) ? 1 : -1];
-MENDICANT_CHECK(a1, actor_datum, meta.type, 0x4)
-MENDICANT_CHECK(a2, actor_datum, meta.swarm, 0x6)
-MENDICANT_CHECK(a3, actor_datum, meta.active, 0x8)
-MENDICANT_CHECK(a4, actor_datum, meta.unit_index, 0x18)
-MENDICANT_CHECK(a5, actor_datum, meta.encounter_index, 0x34)
-MENDICANT_CHECK(a6, actor_datum, meta.squad_index, 0x3a)
-MENDICANT_CHECK(a7, actor_datum, meta.platoon_index, 0x3c)
-MENDICANT_CHECK(a8, actor_datum, meta.team_index, 0x3e)
-MENDICANT_CHECK(a9, actor_datum, meta.first_prop_index, 0x50)
-MENDICANT_CHECK(a10, actor_datum, meta.variant_definition_index, 0x5c)
-MENDICANT_CHECK(a11, actor_datum, state.action, 0x6c)
-MENDICANT_CHECK(a12, actor_datum, state.combat_status, 0x6e)
-MENDICANT_CHECK(a13, actor_datum, state.action_data.fight.firing_position_timer, 0x9c)
-MENDICANT_CHECK(a14, actor_datum, state.action_data.uncover.uncover_done, 0x9d)
-MENDICANT_CHECK(a15, actor_datum, state.action_data.uncover.pursuit_location.type, 0xa4)
-MENDICANT_CHECK(a16, actor_datum, input.vehicle_index, 0x158)
-MENDICANT_CHECK(a17, actor_datum, input.vehicle_passenger, 0x160)
-MENDICANT_CHECK(a18, actor_datum, input.pathfinding_surface_index, 0x164)
-MENDICANT_CHECK(a19, actor_datum, input.pathfinding_point, 0x168)
-MENDICANT_CHECK(a20, actor_datum, input.body_vitality, 0x1b8)
-MENDICANT_CHECK(a21, actor_datum, input.shield_vitality, 0x1bc)
-MENDICANT_CHECK(a22, actor_datum, input.recent_body_damage, 0x1c0)
-MENDICANT_CHECK(a23, actor_datum, input.recent_shield_damage, 0x1c4)
-MENDICANT_CHECK(a24, actor_datum, external_orders.playfighting, 0x1ca)
-MENDICANT_CHECK(a25, actor_datum, external_orders.disable_charging, 0x1cb)
-MENDICANT_CHECK(a26, actor_datum, situation.known_enemies, 0x1ec)
-MENDICANT_CHECK(a27, actor_datum, situation.visible_reachable_enemies, 0x1ed)
-MENDICANT_CHECK(a28, actor_datum, situation.area_friends, 0x200)
-MENDICANT_CHECK(a29, actor_datum, situation.close_friends, 0x245)
-MENDICANT_CHECK(a30, actor_datum, target.target_type, 0x268)
-MENDICANT_CHECK(a31, actor_datum, target.target_prop_index, 0x270)
-MENDICANT_CHECK(a32, actor_datum, emotions.forced_to_charge, 0x375)
-MENDICANT_CHECK(a33, actor_datum, emotions.berserk, 0x378)
-MENDICANT_CHECK(a34, actor_datum, firing_positions.current_position_index, 0x3b8)
-MENDICANT_CHECK(a35, actor_datum, orders.move.stationary_crouch, 0x426)
-MENDICANT_CHECK(a36, actor_datum, orders.move.moving_crouch, 0x427)
-MENDICANT_CHECK(a37, actor_datum, orders.combat.shoot_at_target, 0x454)
-MENDICANT_CHECK(a38, actor_datum, orders.combat.override_firing_restrictions, 0x457)
-MENDICANT_CHECK(a39, actor_datum, orders.combat.override_burst_duration, 0x458)
-MENDICANT_CHECK(a40, actor_datum, orders.combat.throw_grenade, 0x45c)
-MENDICANT_CHECK(a41, actor_datum, orders.combat.use_manual_target_point, 0x45d)
-MENDICANT_CHECK(a42, actor_datum, orders.combat.target_point, 0x460)
-MENDICANT_CHECK(a43, actor_datum, control.path.destination_orders.destination_type, 0x46c)
-MENDICANT_CHECK(a44, actor_datum, control.path.path.valid, 0x4a8)
-MENDICANT_CHECK(a45, actor_datum, control.moving, 0x504)
-MENDICANT_CHECK(a46, actor_datum, control.grenade_trying_to_throw, 0x6a0)
-MENDICANT_CHECK(a47, actor_datum, control.grenade_current_target, 0x6a8)
-MENDICANT_CHECK(a48, actor_datum, control.grenade_current_aim_vector, 0x6bc)
-MENDICANT_CHECK(a49, actor_datum, control.grenade_current_aim_speed, 0x6c8)
-MENDICANT_CHECK(p1, prop_datum, next_prop_index, 0x8)
-MENDICANT_CHECK(p2, prop_datum, unit_index, 0x18)
-MENDICANT_CHECK(p3, prop_datum, actor_index, 0x1c)
-MENDICANT_CHECK(p4, prop_datum, enemy, 0x60)
-MENDICANT_CHECK(p5, prop_datum, currently_damaging_me, 0x74)
-MENDICANT_CHECK(p6, prop_datum, last_perceived_body_position, 0x80)
-MENDICANT_CHECK(p7, prop_datum, vehicle_index, 0x110)
-MENDICANT_CHECK(p8, prop_datum, distance, 0x11c)
-MENDICANT_CHECK(p9, prop_datum, player, 0x12e)
-MENDICANT_CHECK(d1, data_array, maximum_count, 0x20)
-MENDICANT_CHECK(d2, data_array, size, 0x22)
-MENDICANT_CHECK(d3, data_array, valid, 0x24)
-MENDICANT_CHECK(d4, data_array, count, 0x2e)
-MENDICANT_CHECK(d5, data_array, data, 0x34)
-MENDICANT_CHECK(o1, object_header_datum, type, 3)
-MENDICANT_CHECK(o2, object_header_datum, datum, 8)
-MENDICANT_CHECK(u1, unit_datum, object.position, 12)
-MENDICANT_CHECK(u2, unit_datum, object.translational_velocity, 24)
-MENDICANT_CHECK(u3, unit_datum, object.up.k, 56)
-MENDICANT_CHECK(u4, unit_datum, object.angular_velocity, 60)
-MENDICANT_CHECK(u5, unit_datum, object.maximum_body_vitality, 0x88)
-MENDICANT_CHECK(u6, unit_datum, object.maximum_shield_vitality, 0x8c)
-MENDICANT_CHECK(u7, unit_datum, object.body_vitality, 144)
-MENDICANT_CHECK(u8, unit_datum, object.shield_vitality, 148)
-MENDICANT_CHECK(u9, unit_datum, object.parent_object_index, 204)
-MENDICANT_CHECK(u10, unit_datum, unit.desired_facing_vector, 468)
-MENDICANT_CHECK(u11, unit_datum, unit.aiming_vector, 492)
-MENDICANT_CHECK(u12, unit_datum, unit.throttle, 552)
-MENDICANT_CHECK(u13, unit_datum, unit.current_weapon_index, 674)
-MENDICANT_CHECK(u14, unit_datum, unit.weapon_object_indices, 680)
-MENDICANT_CHECK(u15, unit_datum, unit.grenade_counts, 718)
-MENDICANT_CHECK(u16, unit_datum, unit.current_zoom_level, 720)
-MENDICANT_CHECK(u17, unit_datum, unit.driver_object_index, 0x2d4)
-MENDICANT_CHECK(u18, unit_datum, unit.gunner_object_index, 0x2d8)
-MENDICANT_CHECK(pl1, player_datum, unit_index, 52)
-MENDICANT_CHECK(s1, scenario, ai_encounters.count, 0x42c)
-MENDICANT_CHECK(s2, scenario, ai_encounters.address, 0x430)
-MENDICANT_CHECK(e1, encounter_definition, runtime_structure_bsp_reference_index, 0x7e)
-MENDICANT_CHECK(e2, encounter_definition, squads, 0x80)
-MENDICANT_CHECK(e3, encounter_definition, firing_positions, 0x98)
-MENDICANT_CHECK(q1, squad_definition, firing_position_groups, 0x54)
-MENDICANT_CHECK(f1, firing_position_definition, group_index, 0xc)
-MENDICANT_CHECK(f2, firing_position_definition, cluster_index, 0xe)
-MENDICANT_CHECK(f3, firing_position_definition, surface_index, 0x14)
-MENDICANT_CHECK(ed1, encounter_datum, force_active, 0xc)
-MENDICANT_CHECK(v1, actor_variant_definition, ranged_combat.projectile_error_angle, 124)
-MENDICANT_CHECK(v2, actor_variant_definition, ranged_combat.burst_geometry.burst_origin_radius, 204)
-MENDICANT_CHECK(v3, actor_variant_definition, ranged_combat.burst_geometry.burst_duration_lower_bound, 224)
-MENDICANT_CHECK(v4, actor_variant_definition, ranged_combat.burst_geometry.burst_separation_lower_bound, 232)
-MENDICANT_CHECK(v5, actor_variant_definition, ranged_combat.special_fire_mode, 340)
-MENDICANT_CHECK(v6, actor_variant_definition, ranged_combat.special_fire_situation, 342)
-MENDICANT_CHECK(v7, actor_variant_definition, ranged_combat.special_fire_chance, 344)
-MENDICANT_CHECK(v8, actor_variant_definition, ranged_combat.special_fire_delay, 348)
-MENDICANT_CHECK(c1, collision_result, location.cluster_index, 0x10)
-MENDICANT_CHECK(c2, collision_result, surface_index, 0x44)
-MENDICANT_CHECK(ps1, path_state, input.start_valid, 16)
-MENDICANT_CHECK(ps2, path_state, input.start_point, 20)
-MENDICANT_CHECK(ps3, path_state, input.start_surface_index, 32)
-MENDICANT_CHECK(ps4, path_state, debug, 72)
-MENDICANT_CHECK(ps5, path_state, destination_valid, 76)
-MENDICANT_CHECK(ps6, path_state, destination.point, 80)
-MENDICANT_CHECK(ps7, path_state, destination.surface_index, 92)
-MENDICANT_CHECK(ps8, path_state, destination.target_radius, 96)
-MENDICANT_CHECK(ps9, path_state, structure, 100)
-MENDICANT_CHECK(pr1, path_result, endpoint.point, 4)
-MENDICANT_CHECK(pr2, path_result, endpoint.surface_index, 16)
-typedef char mendicant_size_path_state[sizeof(struct path_state) == 82060 ? 1 : -1];
-typedef char mendicant_size_path_result[sizeof(struct path_result) <= 92 ? 1 : -1];
-typedef char mendicant_size_firing_position_definition[sizeof(struct firing_position_definition) == 0x18 ? 1 : -1];
-typedef char mendicant_size_encounter_definition[sizeof(struct encounter_definition) == 0xb0 ? 1 : -1];
-typedef char mendicant_size_squad_definition[sizeof(struct squad_definition) == 0xe8 ? 1 : -1];
 
 /* ---------- the actor types (actor_types.c:93-104), in the hook library's
 order: the sample log's type column */
@@ -325,11 +201,13 @@ static struct object_datum *mendicant_object_get(
 }
 
 /* the AI runs here: a campaign or co-op game (no multiplayer game engine),
-and not a client of another's */
+not a client of another's, and not a film played back (the models' seed comes
+from the clock, so a replay would not play as it was recorded) */
 static boolean mendicant_host_runs_ai(
 	void)
 {
-	return !game_engine_running() && !network_game_distributed_client();
+	return !game_engine_running() && !network_game_distributed_client() &&
+		game_connection() != _game_connection_film_playback;
 }
 
 /* ---------- private code: the sample and player logs */
@@ -823,6 +701,57 @@ long mendicant_player_unit(
 	return player->identifier ? player->unit_index : NONE;
 }
 
+int mendicant_player_units(
+	long *units,
+	int maximum)
+{
+	int found = 0;
+	short index;
+
+	if (!player_data || !player_data->valid)
+		return 0;
+	for (index = 0; index < player_data->count && found < maximum; index++)
+	{
+		struct player_datum *player = (struct player_datum *)((byte *)player_data->data + index * player_data->size);
+		struct object_datum *unit;
+
+		if (!player->identifier || player->unit_index == NONE)
+			continue;
+		unit = mendicant_object_get(player->unit_index);
+		if (!unit || unit->object.body_vitality <= 0.0f)
+			continue;
+		units[found++] = player->unit_index;
+	}
+	return found;
+}
+
+long mendicant_player_unit_nearest(
+	real_point3d const *point)
+{
+	long units[MENDICANT_MAX_PLAYERS];
+	int count = mendicant_player_units(units, MENDICANT_MAX_PLAYERS);
+	long nearest = NONE;
+	real best = 0.0f;
+	int index;
+
+	if (count == 0)
+		return mendicant_player_unit();
+	for (index = 0; index < count; index++)
+	{
+		struct object_datum *unit = mendicant_object_get(units[index]);
+		real dx = unit->object.position.x - point->x, dy = unit->object.position.y - point->y;
+		real dz = unit->object.position.z - point->z;
+		real distance = dx * dx + dy * dy + dz * dz;
+
+		if (nearest == NONE || distance < best)
+		{
+			nearest = units[index];
+			best = distance;
+		}
+	}
+	return nearest;
+}
+
 void mendicant_training_tally(
 	long actor_index,
 	struct actor_datum *actor)
@@ -837,6 +766,10 @@ void mendicant_training_tally(
 void mendicant_initialize_for_new_map(
 	void)
 {
+	/* ai_handle_editing (the editor) starts the map again without ending it:
+	the level's own firing position lists go back before the copies are freed */
+	if (mendicant_map_ready)
+		mendicant_movement_dispose();
 	mendicant_config_read();
 	mendicant_active = FALSE;
 	mendicant_map_ready = FALSE;
@@ -879,6 +812,59 @@ void mendicant_dispose_from_old_map(
 	mendicant_active = FALSE;
 	mendicant_map_ready = FALSE;
 	mendicant_tick_began = FALSE;
+
+	return;
+}
+
+/* A loaded game state (a checkpoint revert, a saved game, a core): actors may
+hold firing position indices of our maneuver slots, beyond the level's own
+lists, from this process or the one that saved. They are flushed whether or not
+the AI is on, so the game never reads past a list (a stock state has none). With
+the AI on, its orders, units and timers are from another time and start over;
+the maneuver copies stay. */
+void mendicant_game_state_after_load(
+	void)
+{
+	short index;
+
+	if (actor_data && actor_data->valid && global_scenario)
+	{
+		for (index = 0; index < actor_data->count; index++)
+		{
+			struct actor_datum *actor = mendicant_actor_at(index);
+			short own, guard = NONE, flee = NONE;
+
+			if (!actor->identifier || actor->meta.encounter_index == NONE)
+				continue;
+			own = mendicant_encounter_own_position_count(actor->meta.encounter_index);
+			if (actor->state.action == _actor_action_guard && actor->state.action_data.guard.guard_location_type == 3)
+				guard = actor->state.action_data.guard.guard_firing_position_index;
+			if (actor->state.action == _actor_action_flee)
+				flee = actor->state.action_data.flee.flee_firing_position_index;
+			if (actor->firing_positions.current_position_index >= own || guard >= own || flee >= own)
+				actor_flush_position_indices(
+					(long)(((unsigned long)(unsigned short)actor->identifier << 16) | (unsigned short)index));
+		}
+	}
+	if (mendicant_map_ready)
+	{
+		mendicant_command_reset();
+		mendicant_combat_reset();
+		mendicant_movement_revert();
+	}
+
+	return;
+}
+
+/* A checkpoint or saved game is written (between ticks): the encounters this
+module holds force_active are let go first, so a state loaded later (the AI off,
+or in another process) has none held by nobody. The go orders hold them again
+at the next tick's start, before the AI updates. */
+void mendicant_game_state_before_save(
+	void)
+{
+	if (mendicant_map_ready)
+		mendicant_movement_before_save();
 
 	return;
 }
@@ -939,7 +925,9 @@ void mendicant_decide_before(
 		if (mendicant_actor_type_slots[type] == definition)
 			break;
 	}
-	mendicant_sample_actor(type, actor_index);
+	/* (an actor of a type not listed is not sampled: the hook library never saw one) */
+	if (type < MENDICANT_ACTOR_TYPE_SLOTS)
+		mendicant_sample_actor(type, actor_index);
 	mendicant_discipline_before_decide(actor_index);
 	mendicant_aim_actor(actor_index);
 	if (mendicant_config.vehicle_test)
@@ -1104,4 +1092,14 @@ boolean mendicant_skip_sound_render(
 	void)
 {
 	return mendicant_training && (mendicant_config.training_skip & _mendicant_skip_sound_bit) != 0;
+}
+
+/* the mixer's thread without a device (port/linux/src/dsound_sdl.c), each pass:
+the same rule as the frame and the sound (training on, through the trainer's
+bridge), so a game with training set and no bridge still mixes. (int: the
+platform layer has no boolean; mendicant_training is set between maps.) */
+int mendicant_skip_mixer(
+	void)
+{
+	return mendicant_training && (mendicant_config.training_skip & _mendicant_skip_mixer_bit) != 0;
 }

@@ -1,7 +1,7 @@
 /*
 MENDICANT_MOVE.C
 
-MENDICANT AI's movement (PORT_SPEC.md section 8, module M3):
+MENDICANT AI's movement (docs/mendicant_port.md section 8, module M3):
 
 - free movement (actor_go): any actor, Marine or Covenant, in an encounter or
   not, walks to any point of the loaded structure BSP, not only to its
@@ -19,7 +19,7 @@ MENDICANT AI's movement (PORT_SPEC.md section 8, module M3):
 - the position services the drills use: firing positions of an encounter,
   leashed and ordered selection, cover scoring by ray tests, the drill's
   position search, holding and assigning positions.
-- the Marines follow the Chief (absolute player 0's unit).
+- the Marines follow the Chief (the nearest living player: any player in co-op).
 - the move test (ai.mendicant.move_test_log).
 
 Ported from the ai_brain hook library (actor_go.inc, maneuver.inc and
@@ -46,119 +46,12 @@ from source/.
 #include <stdlib.h>
 #include <string.h>
 
-#include "mendicant.h"
+#include "mendicant_internal.h"
 
 /* the maneuver copies are calloc'd and freed with the C library's own free,
 not cseries.h's debug_free */
 #undef malloc
 #undef free
-
-/* ---------- the declarations between modules (PORT_SPEC.md section 5.2)
-
-mendicant_internal.h carries the shared types once the modules are put
-together; until then this unit defines the ones it uses, exactly as the
-specification does. The functions and globals are declared here in either case
-(a second identical declaration is allowed). */
-
-#if defined(__has_include)
-#if __has_include("mendicant_internal.h")
-#include "mendicant_internal.h"
-#define MENDICANT_MOVE_HAVE_INTERNAL_HEADER
-#endif
-#endif
-
-#ifndef MENDICANT_MAX_ACTORS
-#define MENDICANT_MAX_ACTORS 1024
-#endif
-#ifndef MENDICANT_MAX_ENCOUNTERS
-#define MENDICANT_MAX_ENCOUNTERS 256
-#endif
-#ifndef MENDICANT_MAX_POSITIONS
-#define MENDICANT_MAX_POSITIONS 512
-#endif
-#ifndef TEAM_HUMAN
-#define TEAM_HUMAN 2
-#endif
-#ifndef TEAM_COVENANT
-#define TEAM_COVENANT 3
-#endif
-#ifndef MODE_GAME
-#define MODE_GAME 0
-#endif
-
-#ifndef MENDICANT_MOVE_HAVE_INTERNAL_HEADER
-struct mendicant_member { long actor_index; struct actor_datum *actor; };
-struct mendicant_geometry { real_point3d const *target; real axis_x, axis_y; };
-
-enum { GO_STATUS_NONE = 0, GO_STATUS_MOVING, GO_STATUS_ARRIVED, GO_STATUS_YIELDING,
-	GO_STATUS_NO_GROUND = -1, GO_STATUS_NO_PATH = -2, GO_STATUS_GONE = -3 };
-#endif
-
-struct model_bridge;
-
-/* M5 platform */
-extern FILE *mendicant_drill_file;
-long mendicant_player_unit(void);
-
-/* M2 command */
-extern long order_actor[MENDICANT_MAX_ACTORS];
-extern short order_position[MENDICANT_MAX_ACTORS];
-extern real actor_leash[MENDICANT_MAX_ACTORS][4];
-extern long leash_corrections;
-int mendicant_team_mode(short team);
-int mendicant_side_of(short team);
-boolean mendicant_actor_can_drill(struct actor_datum *actor);
-void mendicant_order(long actor_index, short position);
-unsigned long mendicant_drill_rand(void);
-
-/* M3 movement (this unit) */
-int actor_go_to(long actor_index, real_point3d const *point, real tolerance, int urgency);
-int actor_go_status(long actor_index);
-void actor_go_cancel(long actor_index);
-void mendicant_movement_reset(void);
-void mendicant_movement_dispose(void);
-void mendicant_movement_tick_begin(void);
-void mendicant_movement_tick_end(void);
-void mendicant_maneuver_check_map(void);
-short mendicant_select_position(long actor_index,
-	struct firing_position_evaluation_context *evaluation_context,
-	struct firing_position *best_firing_position, long *current_owner,
-	struct path_state *area_path_state, boolean *area_path_state_valid);
-void mendicant_guard_change(long actor_index, short *firing_position_index,
-	long *previous_owner, boolean *cached_path_available);
-boolean mendicant_go_redirect(short kind, long actor_index, real_point3d const *point, boolean *result);
-void mendicant_follow_chief(long time);
-void mendicant_follow_cancel(long actor_index);
-void mendicant_go_release_drill(long actor_index);
-void mendicant_cover_want(int cover, real_point3d const *threat);
-struct firing_position_definition *mendicant_encounter_firing_positions(long encounter_index, int *count);
-boolean mendicant_firing_position_owned(long encounter_index, short position);
-boolean mendicant_position_usable(long encounter_index, short position, struct firing_position_definition const *entry);
-int mendicant_drill_position(struct actor_datum *actor, struct mendicant_geometry const *geometry, int side,
-	real angle_low, real angle_high, real range_low, real range_high, long *used);
-boolean mendicant_drill_move(struct mendicant_member *member, struct mendicant_geometry const *geometry, int side,
-	real angle_low, real angle_high, real range_low, real range_high, long *used);
-void mendicant_drill_hold(struct mendicant_member *member, long *used);
-boolean mendicant_assign_position(struct mendicant_member *member, short position);
-boolean mendicant_go_fallback(struct mendicant_member *member, real_point3d const *point, real tolerance);
-int mendicant_maneuver_slot(long encounter_index, real_point3d const *point);
-int mendicant_maneuver_near(real_point3d const *point, real radius);
-int mendicant_line_blocked(real_point3d const *from, real_point3d const *to);
-void mendicant_move_test(long actor_index);
-void mendicant_movement_report(struct model_bridge *bridge);
-
-/* Beyond section 5.2: what command.inc's move_near, step orders and plan
-entities read directly in the hook library (the cover enum, the reach, the
-borrowed ground, the cover score), and the move test's log. */
-#ifndef MENDICANT_MOVE_HAVE_INTERNAL_HEADER
-enum { MENDICANT_COVER_NONE = 0, MENDICANT_COVER_FIGHTING, MENDICANT_COVER_CONCEALED };
-#endif
-extern real position_reach_centre[3], position_reach; /* M2: a Covenant defender's post */
-extern FILE *mendicant_move_test_file;                /* M5: NULL unless ai.mendicant.move_test_log */
-boolean mendicant_within_reach(real_point3d const *point);
-int mendicant_cover_score(real_point3d const *position, real_point3d const *threat);
-real mendicant_cover_bonus(real_point3d const *position);
-real_point3d const *mendicant_maneuver_pool_point(int candidate);
 
 /* not in a header (scenario.c) */
 extern struct structure_bsp *global_structure_bsp;
@@ -1514,6 +1407,52 @@ boolean mendicant_firing_position_owned(long encounter_index, short position)
 	return FALSE;
 }
 
+/* the actor (other than actor_index) holding a firing position of the
+encounter, NONE when it is free: actor_change_firing_position's previous owner */
+static long move_position_owner(long encounter_index, short position, long actor_index)
+{
+	short index;
+
+	if (!actor_data || position < 0)
+		return NONE;
+	for (index = 0; index < actor_data->count; index++)
+	{
+		struct actor_datum *actor = move_actor_at(index);
+		long owner;
+
+		if (!actor || actor->meta.encounter_index != encounter_index ||
+			actor->firing_positions.current_position_index != position)
+			continue;
+		owner = move_actor_index(actor->identifier, index);
+		if (owner != actor_index)
+			return owner;
+	}
+	return NONE;
+}
+
+/* An ordered post another actor holds: the holder gives it up (it is halted and
+looks again) unless it holds it under the same order, when the game's own choice
+stands. Returns FALSE when the post cannot be taken. */
+static boolean move_ordered_post_owner(long actor_index, short position, long *owner)
+{
+	struct actor_datum *actor = move_actor(actor_index);
+	long holder;
+	short holder_slot;
+
+	if (!actor || actor->meta.encounter_index == NONE)
+		return FALSE;
+	holder = move_position_owner(actor->meta.encounter_index, position, actor_index);
+	if (holder != NONE)
+	{
+		holder_slot = move_slot(holder);
+		if (holder_slot >= 0 && holder_slot < MENDICANT_MAX_ACTORS && order_actor[holder_slot] == holder &&
+			order_position[holder_slot] == position)
+			return FALSE;
+	}
+	*owner = holder;
+	return TRUE;
+}
+
 /* A member of a unit fights where the game wants, but never far from its team: a
 choice beyond the leash is replaced by the free position nearest to it within
 the leash. */
@@ -1559,8 +1498,13 @@ static short move_leashed_position(long actor_index, short chosen, long *owner, 
 			best = position;
 		}
 	}
-	if (best < 0) /* stays put */
-		return actor->firing_positions.current_position_index >= 0 ? actor->firing_positions.current_position_index : chosen;
+	if (best < 0) /* stays put (its own post: the game's owner was for its choice) */
+	{
+		if (actor->firing_positions.current_position_index < 0)
+			return chosen;
+		*owner = NONE;
+		return actor->firing_positions.current_position_index;
+	}
 	leash_corrections++;
 	*owner = NONE;
 	*path_valid = FALSE;
@@ -1577,12 +1521,15 @@ short mendicant_select_position(long actor_index,
 {
 	int index = move_slot(actor_index);
 	short chosen;
+	long owner = NONE;
 
-	if (index >= 0 && index < MENDICANT_MAX_ACTORS && order_actor[index] == actor_index)
+	/* (an ordered post held under the same order by another: the game's choice) */
+	if (index >= 0 && index < MENDICANT_MAX_ACTORS && order_actor[index] == actor_index &&
+		(order_position[index] < 0 || move_ordered_post_owner(actor_index, order_position[index], &owner)))
 	{
 		/* (the hook library left the candidate unset; action_uncover reads it) */
 		memset(best_firing_position, 0, sizeof(*best_firing_position));
-		*current_owner = NONE;
+		*current_owner = owner;
 		*area_path_state_valid = FALSE;
 		return order_position[index];
 	}
@@ -1598,13 +1545,16 @@ void mendicant_guard_change(long actor_index, short *firing_position_index,
 	long *previous_owner, boolean *cached_path_available)
 {
 	int slot = move_slot(actor_index);
+	long owner = NONE;
 
 	if (slot >= 0 && slot < MENDICANT_MAX_ACTORS && order_actor[slot] == actor_index && order_position[slot] >= 0 &&
-		order_position[slot] != *firing_position_index)
+		order_position[slot] != *firing_position_index &&
+		move_ordered_post_owner(actor_index, order_position[slot], &owner))
 	{
-		/* the game's path led to its own choice: for ours, no owner and no path, so it finds one */
+		/* the game's path led to its own choice: for ours, its holder gives it up
+		and no path, so it finds one (a post held under the same order: the game's choice) */
 		*firing_position_index = order_position[slot];
-		*previous_owner = NONE;
+		*previous_owner = owner;
 		*cached_path_available = FALSE;
 	}
 }
@@ -1799,7 +1749,9 @@ boolean mendicant_assign_position(struct mendicant_member *member, short positio
 		mendicant_order(member->actor_index, position);
 		return TRUE;
 	}
-	if (actor_change_firing_position(member->actor_index, position, NULL, NONE, NULL, FALSE) == position)
+	/* (a holder gives the post up, as with the game's own previous owner: encounters.c asserts one owner) */
+	if (actor_change_firing_position(member->actor_index, position, NULL,
+			move_position_owner(member->actor->meta.encounter_index, position, member->actor_index), NULL, FALSE) == position)
 	{
 		mendicant_order(member->actor_index, position);
 		return TRUE;
@@ -1941,27 +1893,27 @@ static boolean follow_hop(long actor_index, struct actor_datum *actor, real_poin
 	mendicant_order(actor_index, (short)slot);
 	action = actor->state.action;
 	if (action == _actor_action_fight || action == _actor_action_uncover)
-		actor_change_firing_position(actor_index, (short)slot, NULL, NONE, NULL, FALSE);
+		actor_change_firing_position(actor_index, (short)slot, NULL,
+			move_position_owner(encounter, (short)slot, actor_index), NULL, FALSE);
 	else
 		actor_move_to_point(actor_index, &positions[slot].position, positions[slot].surface_index, NONE);
 	return TRUE;
 }
 
+/* each Marine follows the nearest living player (in co-op, whichever is nearer) */
 void mendicant_follow_chief(long time)
 {
-	long chief_unit = mendicant_player_unit();
-	struct object_datum *chief = move_object(chief_unit);
-	real_point3d const *at;
+	long players[MENDICANT_MAX_PLAYERS];
+	int player_count = mendicant_player_units(players, MENDICANT_MAX_PLAYERS);
 	short index;
 
-	if (!chief || chief->object.body_vitality <= 0.0f || !actor_data || !actor_data->valid)
+	if (player_count == 0 || !actor_data || !actor_data->valid)
 		return;
-	at = &chief->object.position;
 	for (index = 0; index < actor_data->count && index < MENDICANT_MAX_ACTORS; index++)
 	{
 		struct actor_datum *actor = move_actor_at(index);
-		struct object_datum *unit;
-		real_point3d const *from;
+		struct object_datum *unit, *chief;
+		real_point3d const *from, *at;
 		real_point3d target;
 		real dx, dy, distance;
 		boolean fighting;
@@ -1971,9 +1923,13 @@ void mendicant_follow_chief(long time)
 			mendicant_team_mode(actor->meta.team_index) == MODE_GAME)
 			continue;
 		unit = move_object(actor->meta.unit_index);
-		if (!unit || actor->meta.unit_index == chief_unit || unit->object.body_vitality <= 0.0f ||
-			actor->input.vehicle_index != NONE)
-			continue; /* the Chief himself, the dead, and riders (the vehicles have their own rules) */
+		if (!unit || unit->object.body_vitality <= 0.0f || actor->input.vehicle_index != NONE)
+			continue; /* the dead, and riders (the vehicles have their own rules) */
+		chief = player_count == 1 ? move_object(players[0]) :
+			move_object(mendicant_player_unit_nearest(&unit->object.position));
+		if (!chief || chief == unit)
+			continue; /* a player himself */
+		at = &chief->object.position;
 		if (follow_identifier[index] != actor->identifier)
 		{
 			follow_identifier[index] = actor->identifier;
@@ -2191,6 +2147,71 @@ void mendicant_movement_reset(void)
 	memset(follow_goal, 0, sizeof(follow_goal));
 	move_test_actor = NONE;
 	move_reset_done = TRUE;
+}
+
+/* A checkpoint revert or saved game: the go orders and following are from
+another time (the encounters' force_active is the loaded state's own, so ours is
+forgotten, not cleared). The maneuver copies and the graph stay: same level. */
+void mendicant_movement_revert(void)
+{
+	int i;
+
+	for (i = 0; i < GO_MAX_ORDERS; i++)
+	{
+		memset(&go_orders[i], 0, sizeof(go_orders[i]));
+		go_orders[i].actor = NONE;
+		go_orders[i].encounter = NONE;
+	}
+	go_inside = FALSE;
+	memset(go_forced_by_us, 0, sizeof(go_forced_by_us));
+	go_planner.order = -1;
+	memset(go_by_drill, 0, sizeof(go_by_drill));
+	memset(follow_going, 0, sizeof(follow_going));
+	memset(follow_identifier, 0, sizeof(follow_identifier));
+	memset(follow_met, 0, sizeof(follow_met));
+	memset(follow_time, 0, sizeof(follow_time));
+	memset(follow_goal, 0, sizeof(follow_goal));
+	move_test_actor = NONE;
+}
+
+/* A checkpoint or saved game is written: every force_active this module set is
+cleared, and the orders forget their encounters, so go_update holds them again
+next tick (go_hold_encounter) and the saved state holds none of ours. */
+void mendicant_movement_before_save(void)
+{
+	int absolute, i;
+
+	for (absolute = 0; absolute < GO_FORCED_ENCOUNTERS; absolute++)
+	{
+		struct encounter_datum *datum;
+
+		if (!go_forced_by_us[absolute])
+			continue;
+		go_forced_by_us[absolute] = 0;
+		/* (the absolute index alone: any identifier) */
+		datum = (struct encounter_datum *)move_datum(encounter_data, absolute);
+		if (datum)
+			datum->force_active = FALSE;
+	}
+	for (i = 0; i < GO_MAX_ORDERS; i++)
+		go_orders[i].encounter = NONE;
+}
+
+/* the level's own firing position count of an encounter, our maneuver slots
+swapped in or not (a saved game must only hold indices below it) */
+short mendicant_encounter_own_position_count(long encounter_index)
+{
+	struct scenario *scenario = global_scenario;
+	int index;
+
+	if (!scenario || encounter_index == NONE)
+		return 0;
+	index = DATUM_INDEX_TO_ABSOLUTE_INDEX(encounter_index);
+	if (index < 0 || index >= scenario->ai_encounters.count)
+		return 0;
+	if (scenario == maneuver_scenario && index < MENDICANT_MAX_ENCOUNTERS && maneuver_original[index])
+		return (short)maneuver_original[index];
+	return (short)((struct encounter_definition *)scenario->ai_encounters.address + index)->firing_positions.count;
 }
 
 /* The map goes (the start of ai_dispose_from_old_map): the level's own firing

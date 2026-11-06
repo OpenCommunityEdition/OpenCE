@@ -5,7 +5,7 @@ MENDICANT AI's models without Python or PyTorch (mendicant_infer.c): the
 strategic model (policy.Strategy), the per-enemy model (policy.Brain: the
 team model, the enemy model and the stance model), brain.py's assignment and
 the decision mask and sampling of policy.py, read from one models.aibw file
-(tools/export_models.py).
+(tools/mendicant/export_models.py).
 
 Plain C, with no allocation after the load, no system maths (only + - * /,
 so every build rounds alike: -ffp-contract=off) and the same order of sums

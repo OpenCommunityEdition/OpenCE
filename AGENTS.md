@@ -26,7 +26,7 @@ end.
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
 | `port/tools/` | Stand-alone tools (`cache_file_report.c`) |
 | `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `server_ui_embed.py`, `xdk_headers.py`), the dedicated server's protocol simulator and remote console (`server_sim.py`, `opence_rcon.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
-| `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`, `dedicated_server.md`, `master_protocol.md`) |
+| `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`, `dedicated_server.md`, `master_protocol.md`, `mendicant_port.md`) |
 | `pgo/` | Profile-guided optimisation profiles |
 | `deploy/` | Running a dedicated server: systemd, Docker, Pterodactyl, Helm, PufferPanel, MCSManager, example gametypes |
 | `assets/` | Game data for local runs (gitignored: `maps/`, `custom_maps/`) |
@@ -240,6 +240,7 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [docs/dedicated_server.md](docs/dedicated_server.md) | The dedicated server: its command line, exit codes, commands, HTTP API, RCON, events and files |
 | [docs/master_protocol.md](docs/master_protocol.md) | The master servers' protocol: publishing, the probe, the signed list |
 | [docs/mods.md](docs/mods.md) | Mods: folders of Halo PC tag files whose sounds, bitmaps, text and models play over a map's on one machine |
+| [docs/mendicant_port.md](docs/mendicant_port.md) | MENDICANT AI (`port/linux/game/mendicant`): how the ai_brain hook library became source hooks; regenerating its doctrine (`tools/mendicant/doctrine_gen.py`) and exporting its models (`tools/mendicant/export_models.py`) |
 | [port/assets/text_filter/README.md](port/assets/text_filter/README.md) | Streamer mode's words: Surge AI's list, the review, the allowed words |
 | [port/assets/menus/README.md](port/assets/menus/README.md) | The menu files' format and how to write them again |
 | [port/assets/menus/NON_HANDDRAWN.md](port/assets/menus/NON_HANDDRAWN.md) | Menu pictures that are not redraws |

@@ -99,8 +99,6 @@ SCREENS = {
              "max_fps_android"),
             ("SMOOTH MOTION:", "display.interpolation", ON_OFF,
              "Draw a frame for every display refresh, blending\nbetween the game's 30 ticks a second.", None),
-            ("INSTANT AIM:", "display.direct_camera", ON_OFF,
-             "In first person, turn the view the moment the\nmouse moves, not up to two ticks later.", "desktop web"),
             # (Graphics', with the HUD's rows: Video Setup's own has no room
             # left above its help on the desktop. The game's own counter, main.c's main_framerate_render, which
             # display.show_fps turns on: port/linux/game/frame_rate_display.c)
@@ -162,6 +160,10 @@ SCREENS = {
              "Moving the mouse forward looks down.", None),
             ("AIM ASSIST:", "input.mouse_aim_assist", ON_OFF,
              "Slow and drag the view along with a target while\naiming with the mouse, as with a controller.", None),
+            # (Video Setup's until its place went to Campaign AI: the mouse's
+            # turning, which Android has not)
+            ("INSTANT AIM:", "display.direct_camera", ON_OFF,
+             "In first person, turn the view the moment the\nmouse moves, not up to two ticks later.", "desktop web"),
             # (port/linux/src/sdl_platform.c's menu_cursor_size; last, as the
             # other platforms have no row in its place)
             ("MENU CURSOR:", "display.menu_cursor",
@@ -329,7 +331,57 @@ _video["categories"] = [
      "The field of view and the first-person\nweapon. Their defaults keep the stock view."),
     ("EXTRA EFFECTS:", "video_settings/extra_effects",
      "Visual modifiers the stock game does not\nhave, such as the shield glow."),
+    ("CAMPAIGN AI:", "video_settings/campaign_ai",
+     "MENDICANT AI: Marines and Covenant fighting\nas units, and how well they aim and fire."),
 ]
+# Campaign AI (port/linux/game/mendicant): the ai.mendicant.* settings a
+# player sets, a category of Video Setup's (the only settings screen shown in
+# a campaign's pause menu with a place left; it carries Video Setup's header,
+# as its other pages do). On and Trained Models take effect at the next
+# map's start; the others at once (menu_functions.c's "port settings save"
+# calls mendicant_settings_changed)
+SCREENS["video_settings/campaign_ai"] = {
+    "screen": "campaign_ai_settings_screen", "header": _video["header"], "spacing": 30,
+    "rows": [
+        ("MENDICANT AI:", "ai.mendicant.enabled", ON_OFF,
+         "Marines and Covenant fight as units, led through\ndrills. From the next map; off: the stock AI.", None),
+        ("TRAINED MODELS:", "ai.mendicant.models", ON_OFF,
+         "Trained models choose the drills and each\nsoldier's way of fighting. From the next map.", None),
+        ("INDIVIDUALS:", "ai.mendicant.individuals", ON_OFF,
+         "Soldiers outside a unit's drill choose their own\nway of fighting.", None),
+        ("DRILL VARIETY:", "ai.mendicant.variety",
+         [("BEST", "0"), ("0.25", "0.25"), ("0.5", "0.5"), ("0.75", "0.75"), ("TRAINED", "1"), ("1.5", "1.5"),
+          ("2", "2")],
+         "How freely units choose among the drills they\nrate well. Best: always the best one.",
+         None),
+        ("DISCIPLINE:", "ai.mendicant.discipline", ON_OFF,
+         "Commanded soldiers hold their nerve: fewer\npanics, berserk charges and lone pursuits.", None),
+        ("THREAT TARGETING:", "ai.mendicant.targeting", ON_OFF,
+         "Soldiers choose targets by threat: what is\nhurting them, Elites first.", None),
+        ("UNIT RADIUS:", "ai.mendicant.command_radius",
+         [(str(units), str(units)) for units in (15, 20, 25, 30, 35, 40, 50, 60)],
+         "How far from its leader, in world units, a\nsoldier is still in its unit.", None),
+    ],
+    "categories": [
+        ("AIM AND FIRE:", "video_settings/campaign_ai/aim_fire",
+         "How widely the AI's shots spread, and how fast\nthe Marines fire."),
+    ],
+}
+SCREENS["video_settings/campaign_ai/aim_fire"] = {
+    "screen": "campaign_ai_aim_fire_settings_screen", "header": _video["header"], "spacing": 30,
+    "rows": [
+        ("AIM SPREAD:", "ai.mendicant.aim",
+         [(f"{value:g}", f"{value:g}") for value in (0.5, 0.65, 0.8, 1, 1.25, 1.5, 2)],
+         "How widely the AI's shots spread: 1 as the stock\ngame; less is sharper.", None),
+        ("SPREAD BY DIFFICULTY:", "ai.mendicant.aim_difficulty", ON_OFF,
+         "Wider on Easy, sharper on Heroic and Legendary.", None),
+        ("MOVING TARGETS:", "ai.mendicant.aim_moving", [("HARDER", "true"), ("SAME", "false")],
+         "Aim worse at a target moving fast, and from a\nvehicle as it swerves.", None),
+        ("MARINE FIRE RATE:", "ai.mendicant.marine_fire",
+         [(f"{value:g}", f"{value:g}") for value in (0.5, 1, 1.25, 1.5, 1.8, 2, 2.5, 3)],
+         "How fast the Marines fire, against the stock\ngame's 1.", None),
+    ],
+}
 SCREENS["video_settings/fov_viewmodels"] = {
     "screen": "fov_viewmodel_settings_screen", "header": _video["header"], "spacing": 30,
     "rows": [

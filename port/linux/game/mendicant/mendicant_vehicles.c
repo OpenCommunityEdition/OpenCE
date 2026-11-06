@@ -32,7 +32,6 @@ vehicle_try) with the same behaviour.
 #include "units/units.h"
 #include "tag_files/tag_files.h"
 
-#include "mendicant.h"
 #include "mendicant_internal.h"
 
 #include <math.h>
