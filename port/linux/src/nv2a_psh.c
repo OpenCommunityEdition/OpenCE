@@ -289,6 +289,28 @@ static unsigned long stage_mode(const struct nv2a_pixel_shader_key *key, int sta
 	return (key->texture_modes >> (5 * stage)) & 0x1f;
 }
 
+/* whether texture coordinates 1 and 2 are places on the screen,
+interpolated linearly across it. The active camouflage's distortion
+(rasterizer_xbox_active_camouflage.c), the game's only shader with a dot
+product stage then a DOT_ST one, reads the copy of the screen at them: its
+vertex program puts each vertex's place on the screen there, its clip
+position over its own w. Divided so, they are linear across the screen; the
+NV2A, and OpenGL by default, interpolate them with the perspective, so across
+a triangle reaching toward the camera (a rocket launcher's tube as it is
+reloaded) they were nearly the near vertex's, far off the copy, and the
+triangle showed the copy's edge, flat. Interpolated linearly, each pixel
+reads its own place. OpenGL ES has no such interpolation: there they are
+interpolated as the Xbox did. */
+static BOOL screen_place_coordinates(const struct nv2a_pixel_shader_key *key)
+{
+#ifdef HALO_GLES
+	(void)key;
+	return FALSE;
+#else
+	return stage_mode(key, 1) == _mode_dot_product && stage_mode(key, 2) == _mode_dot_st;
+#endif
+}
+
 /* whether a stage replaces the fragment's depth (DOT_ZW) */
 static BOOL replaces_depth(const struct nv2a_pixel_shader_key *key)
 {
@@ -641,12 +663,16 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		"in vec4 xB0;\n"
 		"in vec4 xB1;\n"
 		"in vec4 xT0;\n"
-		"in vec4 xT1;\n"
-		"in vec4 xT2;\n"
+		"%sin vec4 xT1;\n"
+		"%sin vec4 xT2;\n"
 		"in vec4 xT3;\n"
 		"in float xFog;\n"
 		"layout(location = 0) out vec4 fragment_color;\n"
-		XGPU_PIXEL_UNIFORMS);
+		XGPU_PIXEL_UNIFORMS,
+		/* (GLSL 4.30 and later take a fragment input's interpolation from
+		the fragment shader: the vertex shader's outputs stay as they are) */
+		screen_place_coordinates(key) ? "noperspective " : "",
+		screen_place_coordinates(key) ? "noperspective " : "");
 	for (stage = 0; stage < 4; stage++)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
 	if (key->source_blend)
