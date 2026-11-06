@@ -71,30 +71,111 @@ if they would like the MCC map support feature on their own, main repo.
 
 ## How do I install MCC maps?
 
-MCC custom maps use the separate `mcc_maps` directory and the
-**MCC SINGLEPLAYER** and **MCC MULTIPLAYER** menu options. Maps appear in
-the appropriate category automatically.
+GulchCE can discover installed **Halo 1 MCC Workshop maps** on Windows and
+Linux, or import complete packages on Android. Manual installation remains
+available through the separate `mcc_maps` folder, beside `maps` and
+`custom_maps` in your game data folder.
 
-Inside `mcc_maps`, you need to create a `_shared` folder, and two subfolders inside
-the `_shared` folder: `singleplayer` and `multiplayer`. From your existing Halo 1 MCC
-installation, you need to take:
+You still need the [Xbox game data](#a-copy-of-halo-combat-evolved-is-required)
+to run GulchCE. Obtain any required MCC resources from your own legally owned,
+installed copy of Halo: Combat Evolved in Halo: The Master Chief Collection.
 
-- The bitmaps.map file from `halo1/maps` and put it into `mcc_maps/_shared/singleplayer`.
-- You then need to take the bitmaps.map AND sounds.map files from `halo1/maps/custom_edition`
-and put these into `mcc_maps/_shared/multiplayer`.
+### Windows and Linux: discover your Workshop maps
 
-You must obtain these files from an legally-owned installed copy of Halo 1 on the Halo: The Master Chief Collection.
+1. Subscribe to the Halo 1 maps or campaigns you want in the MCC Steam
+   Workshop, and let Steam finish downloading them.
+2. Open **Settings > Online > Map Sharing > MCC Packages** in the Modern
+   menu style. In Stock, Classic PC and Xbox styles, use
+   **Settings > Network Setup > Map Sharing > MCC Packages**.
+3. Turn **STEAM DISCOVERY** on. For campaigns such as Ruby Rebalanced, also
+   turn **CAMPAIGN MISSIONS** on to use the package's mission order and
+   progression. Both settings are off by default.
+4. Reopen the map list. If a newly downloaded package is missing, restart
+   GulchCE. Install the [shared resources](#shared-mcc-resources) below when
+   required by the map.
 
-**Some custom maps come with their own bitmaps.map and sounds.map resources. These are separate from the `_shared` folder.**
+GulchCE reads the installed Workshop package directly, including its supplied
+resources, titles and supported level previews. You do not need to copy its
+maps into `mcc_maps` or keep Steam running while playing.
 
-- These resources can be found inside `workshop/content/976730/[workshop ID]/halo1/maps`.
-- Install these along the custom level .map files in your specific custom map folder, e.g. `mcc_maps\MercuryRising`.
-- If you don't do this, the MCC compatibility layer will recognise this and refuse to load the map until these resources are installed.
+Steam installations and their library folders are detected automatically where
+possible, including registered Windows installations such as `C:\Steam` and
+Linux's standard, Flatpak and Snap locations. If yours is not found, set the
+`steam` entry under `[paths]` in `config.toml` to your Steam installation or
+library folder, for example `steam = 'C:\Steam'`. Leave it empty to use
+automatic discovery.
 
-Not every custom map will come with their own custom resources, and will instead rely on what's inside the `_shared` folder if necessary.
+### Android: import a package without Steam
 
-See [MCC map support](docs/mcc_maps.md) for installation, supported formats,
-validation results and remaining compatibility limits.
+1. Copy the **complete Workshop package folder or a ZIP of it** from your
+   computer to your phone. The package root is
+   `steamapps/workshop/content/976730/<workshop ID>`. Keep `ModInfo.json`, any
+   campaign/mission JSON files, maps, package resources and the supplied
+   `assets` folder together.
+2. Quit GulchCE, long-press its launcher icon and select **Import MCC maps**.
+3. Select **Workshop package**, then **Choose folder** or **Choose ZIP**.
+   Follow the importer's installation prompts.
+4. Import any required shared resources separately using **Singleplayer
+   shared resources** or **Multiplayer shared resources**. Start the game
+   and enable **CAMPAIGN MISSIONS** for campaign ordering and progression.
+
+Steam is not needed on the phone. The importer installs the package into
+`mcc_maps` and retains its metadata and supported previews. See the
+[Android import guide](port/android/README.md#importing-mcc-packages) for details.
+
+### Manual installation
+
+Create a separate folder for each package, such as `mcc_maps/MercuryRising`,
+and copy its level `.map` files there. Workshop packages commonly keep these
+under `steamapps/workshop/content/976730/<workshop ID>/halo1/maps`.
+
+**Keep any supplied `bitmaps.map` and `sounds.map` beside that package's
+levels.** These belong to the individual package, not `_shared`. Do not mix
+resources from different packages.
+
+For campaign ordering, titles and previews, also retain `ModInfo.json`,
+`CampaignInfo.json` when supplied, and the referenced mission/map metadata
+and PNGs. Preserve their metadata and image subfolders; the level `.map`
+files go directly in your package folder. Enable **CAMPAIGN MISSIONS** in
+MCC Packages to use campaign ordering and progression. Copying only the maps
+loses those metadata features. See the
+[package layout guide](docs/mcc_maps.md#installation-and-menus).
+
+### Shared MCC resources
+
+Some maps rely on MCC's standard resources instead of supplying their own.
+Install these sets once in your game data folder, creating the destination
+folders as needed. **Steam discovery does not install these shared sets.**
+
+| File in your MCC installation | Destination in GulchCE |
+| --- | --- |
+| `halo1/maps/bitmaps.map` | `mcc_maps/_shared/singleplayer/bitmaps.map` |
+| `halo1/maps/custom_edition/bitmaps.map` | `mcc_maps/_shared/multiplayer/bitmaps.map` |
+| `halo1/maps/custom_edition/sounds.map` | `mcc_maps/_shared/multiplayer/sounds.map` |
+
+Use the files from **MCC**, including its `custom_edition` subfolder, rather
+than a standalone Halo Custom Edition installation. On Android, the shared
+resource import modes create these destination folders for you.
+
+A package's own resources take precedence over the shared sets. Self-contained
+maps need neither set. If a required resource is missing or incompatible,
+GulchCE refuses to load the map and reports what needs attention.
+
+### Choose a map and play
+
+- **Modern, Stock and Classic PC:** choose **MCC SINGLEPLAYER** or
+  **MCC MULTIPLAYER** in the map selector, then open the package folder and
+  select a level.
+- **Xbox style:** with **CAMPAIGN MISSIONS** enabled, choose **MCC CAMPAIGNS**
+  on the main menu, then your profile, campaign, level and difficulty. For
+  multiplayer maps, use the **X — MCC Maps** prompt in the multiplayer map
+  selector.
+
+Supported package images appear automatically in the level cards; missing or
+unsupported images keep the question-mark thumbnail. MCC compatibility is
+still experimental: appearing in the menu does not guarantee that every map
+or campaign works fully. See [MCC map support](docs/mcc_maps.md) for supported
+formats, validation results and remaining limits.
 
 ## About upstream OpenCE
 
