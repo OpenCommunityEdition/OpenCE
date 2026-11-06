@@ -158,8 +158,6 @@ guide, test or concise code comment.
 - Use relevant available skills through the tools the environment actually
   provides, reading their instructions when applying them. Do not require
   Superpowers, a particular skill tool or a plugin installation by default.
-- Work directly as the primary agent. Use subagents only when the user
-  explicitly requests them for the assignment.
 - Mutation tests can establish that a regression test catches the intended
   fault. Use them selectively in isolated temporary copies; never leave
   intentional faults in a shared working tree or run them concurrently with
