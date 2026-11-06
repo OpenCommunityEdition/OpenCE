@@ -17,7 +17,12 @@ What runs, and what does not yet:
 - Their sounds are silent: MCC keeps them in its FMOD sound banks
   (`halo1/sound/pc`), which are not read yet.
 - MCC's `ui.map` holds Halo PC's menus, not the Xbox's: the game's own
-  menus that are not in it (the network pregame screen) do not open.
+  menus that are not in it (the network pregame screen) do not open, and
+  Halo PC's list widgets stop the game. Until the menus run on it, a
+  temporary launcher takes the main menu's place
+  (`port/linux/game/mcc_launcher.c`): a list of the campaign's levels and
+  the multiplayer maps, each played as the console's `map_name` plays a
+  level or as a local slayer game for controller 1.
 - The HUD is drawn at the Xbox's size, from MCC's remastered bitmaps.
 - Not on the web build, which runs no Custom Edition map either (its tag
   cache is not reserved there).
