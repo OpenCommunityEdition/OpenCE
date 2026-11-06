@@ -110,6 +110,30 @@ an empty name for tags whose own is unusable */
 /* the scenario's structure BSP block (OpenSauce scenario_definitions.hpp;
 the offset holds in every map examined) */
 #define SCENARIO_STRUCTURE_BSPS_OFFSET 0x5A4
+/* the scenario's scripts (hs_scenario_definitions.h, scenario_definitions.h):
+its syntax nodes, a data array of hs_syntax_node, and the scripts' and
+globals' roots in them */
+#define SCENARIO_HS_SYNTAX_DATA_OFFSET 0x474
+#define SCENARIO_HS_SCRIPTS_OFFSET 0x49C
+#define SCENARIO_HS_GLOBALS_OFFSET 0x4A8
+#define HS_SCRIPT_BYTES 0x5C
+#define HS_SCRIPT_ROOT_OFFSET 0x24
+#define HS_GLOBAL_BYTES 0x5C
+#define HS_GLOBAL_ROOT_OFFSET 0x28
+#define HS_SYNTAX_NODE_BYTES 0x14
+#define HS_SYNTAX_NODE_FLAGS_OFFSET 0x06
+#define HS_SYNTAX_NODE_NEXT_OFFSET 0x08
+#define HS_SYNTAX_NODE_DATA_OFFSET 0x10
+#define HS_SYNTAX_NODE_PRIMITIVE_BIT 0
+#define DATA_ARRAY_BYTES 0x38
+#define DATA_ARRAY_MAXIMUM_COUNT_OFFSET 0x20
+#define DATA_ARRAY_ELEMENT_SIZE_OFFSET 0x22
+#define DATA_ARRAY_SIGNATURE_OFFSET 0x28
+#define DATA_ARRAY_COUNT_OFFSET 0x2E
+#define DATA_ARRAY_SIGNATURE 'd@t@'
+/* the game's most syntax nodes (hs.h), where an MCC map's array has room
+for 32767 */
+#define MAXIMUM_HS_SYNTAX_NODES 19001
 #define SCENARIO_BYTES 0x5B0
 
 #define STRUCTURE_BSP_REFERENCE_BYTES 0x20
@@ -126,6 +150,10 @@ pointer, two vertex buffer arrays (Xbox only) and the signature */
 #define STRUCTURE_BSP_HEADER_VERTEX_BUFFERS_OFFSET 0x04
 #define STRUCTURE_BSP_HEADER_LIGHTMAP_VERTEX_BUFFERS_OFFSET 0x0C
 #define STRUCTURE_BSP_HEADER_SIGNATURE_OFFSET 0x14
+/* an MCC BSP's header: its vertex region's size and file offset, where the
+Xbox's has its vertex buffers' count and address (observed) */
+#define MCC_STRUCTURE_BSP_HEADER_REGION_SIZE_OFFSET 0x04
+#define MCC_STRUCTURE_BSP_HEADER_REGION_OFFSET_OFFSET 0x08
 /* the structure BSP's lightmaps and their materials (OpenSauce
 structure_bsp_definitions.hpp: structure_bsp 0x288, structure_bsp_lightmap
 0x20, structure_bsp_material 0x100; this build's structure_bsp_definitions.h
@@ -366,6 +394,10 @@ bitmaps' offsets are their own (timberland's waterfall has one) */
 #define BITMAP_DATA_TYPE_OFFSET 0x0A
 #define BITMAP_DATA_FORMAT_OFFSET 0x0C
 #define BITMAP_DATA_FLAGS_OFFSET 0x0E
+/* an MCC map's bitmaps whose pixels are in the map itself (its lightmaps)
+have this flag, which no other map's do (observed); the game takes no flag
+from bit 8 up */
+#define MCC_BITMAP_DATA_IN_MAP_BIT 9
 #define BITMAP_TYPE_2D 0
 /* the first of the formats a linear bitmap cannot have: DXT1, 3 and 5, and P8 */
 #define BITMAP_FORMAT_DXT1 14
@@ -473,6 +505,9 @@ struct load_state
 	struct resource_map *const *resource_maps;
 	struct custom_edition_load_report *report;
 	uint8_t *tag_cache;
+	/* the address tag_cache stands for: CUSTOM_EDITION_TAG_CACHE_ADDRESS, or
+	an MCC cache's MCC_TAG_DATA_ADDRESS until its tags are moved there */
+	uint32_t base_address;
 	/* the bytes of tag_cache in use, and the most that may be used: the
 	lowest structure BSP address, relative to the tag cache */
 	uint32_t used_bytes;
@@ -764,6 +799,16 @@ void custom_edition_structure_bsp_proc_set(
 
 	return;
 }
+
+static cache_file_rebase_proc rebase_proc = NULL;
+
+void cache_file_rebase_proc_set(
+	cache_file_rebase_proc proc)
+{
+	rebase_proc = proc;
+
+	return;
+}
 /* The value of the type field each shader group has in Custom Edition, which
 inserted transparent chicago extended at 7 (OpenSauce
 shader_definitions.hpp, e_shader_type), and in this build (shaders.c); a
@@ -820,6 +865,9 @@ static char const *const cache_file_status_descriptions[NUMBER_OF_CACHE_FILE_STA
 	"a tag held by a resource map does not have the documented layout",
 	"bitmap pixels or sound samples lie outside their file",
 	"the tag data and the tags held by resource maps do not fit below the structure BSP",
+	"an MCC structure BSP's vertices do not lie just before it in the file, or are not of the size its materials give",
+	"an MCC map's tags must be moved by the game's tag schemas, which this program does not have",
+	"an MCC map's tags could not be moved: a pointer lies outside the tags",
 };
 
 static char const *const cache_file_format_descriptions[NUMBER_OF_CACHE_FILE_FORMATS] =
@@ -829,6 +877,7 @@ static char const *const cache_file_format_descriptions[NUMBER_OF_CACHE_FILE_FOR
 	"cache of an unknown version",
 	"Custom Edition cache",
 	"Custom Edition resource map",
+	"MCC cache",
 };
 
 static char const *const resource_map_type_descriptions[NUMBER_OF_RESOURCE_MAP_TYPES] =
@@ -1091,6 +1140,9 @@ static enum cache_file_status cache_header_identify(
 	case CACHE_FILE_VERSION_CUSTOM_EDITION:
 		identity->format = _cache_file_format_custom_edition_cache;
 		break;
+	case CACHE_FILE_VERSION_MCC:
+		identity->format = _cache_file_format_mcc_cache;
+		break;
 	default:
 		identity->format = _cache_file_format_other_cache;
 		break;
@@ -1107,6 +1159,8 @@ static enum cache_file_status cache_header_identify(
 		judges it */
 		return _cache_file_status_ok;
 	case _cache_file_format_custom_edition_cache:
+	/* (an MCC header is Custom Edition's, its OpenSauce padding zero) */
+	case _cache_file_format_mcc_cache:
 		return custom_edition_header_verify(bytes, identity);
 	default:
 		return _cache_file_status_unsupported_version;
@@ -1163,12 +1217,12 @@ static int tag_cache_offset(
 	uint32_t size,
 	uint32_t *offset)
 {
-	if (address < CUSTOM_EDITION_TAG_CACHE_ADDRESS ||
-		!range_fits(address - CUSTOM_EDITION_TAG_CACHE_ADDRESS, size, state->used_bytes))
+	if (address < state->base_address ||
+		!range_fits(address - state->base_address, size, state->used_bytes))
 	{
 		return 0;
 	}
-	*offset = address - CUSTOM_EDITION_TAG_CACHE_ADDRESS;
+	*offset = address - state->base_address;
 
 	return 1;
 }
@@ -1250,6 +1304,14 @@ static enum cache_file_status sound_permutation_check(
 	{
 		struct resource_map const *sounds = state->resource_maps[_resource_map_sounds];
 
+		/* an MCC map's samples name a sounds.map MCC does not ship (Halo PC's,
+		observed): its sounds are in MCC's FMOD banks, found by the tag's name,
+		and are no sound's until they are taken from there */
+		if (state->report->identity.format == _cache_file_format_mcc_cache)
+		{
+			state->report->mcc_sound_permutations++;
+			return _cache_file_status_ok;
+		}
 		if (!sounds)
 		{
 			return load_fail(state, _cache_file_status_missing_resource_map, element_offset);
@@ -1779,14 +1841,21 @@ static int unit_vectors_valid(
 `bsp`, which load at `address`) and their materials, whose vertices are
 converted for this build when the BSP is loaded (custom_edition_cache.h):
 each material's uncompressed vertices within the BSP, of the size its vertex
-counts give, and lightmap vertices exactly when its lightmap has a bitmap. */
+counts give, and lightmap vertices exactly when its lightmap has a bitmap.
+An MCC BSP's materials name no vertices: theirs are the `region_size` bytes
+at `region`, which lie before the BSP in the file, each material's in turn,
+its environment vertices then its lightmap vertices (observed in every BSP
+of every MCC map: the sizes add up to the region's exactly). */
 static enum cache_file_status structure_bsp_geometry_verify(
 	struct load_state *state,
 	uint8_t const *bsp,
 	uint32_t size,
-	uint32_t address)
+	uint32_t address,
+	uint8_t const *region,
+	uint32_t region_size)
 {
 	uint32_t structure_offset = read_u32(bsp + STRUCTURE_BSP_HEADER_BSP_OFFSET) - address;
+	uint32_t region_used = 0;
 	uint32_t lightmaps_offset;
 	int32_t lightmap_count;
 	int32_t lightmap_index;
@@ -1829,7 +1898,48 @@ static enum cache_file_status structure_bsp_geometry_verify(
 			int32_t lightmap_vertex_count = read_s32(material + STRUCTURE_BSP_MATERIAL_LIGHTMAP_VERTEX_COUNT_OFFSET);
 			int32_t vertices_size = read_s32(vertices + TAG_DATA_SIZE_OFFSET);
 			uint32_t vertices_address = read_u32(vertices + TAG_DATA_ADDRESS_OFFSET);
+			uint8_t const *region_vertices;
+			uint32_t region_vertices_size;
 
+			if (region)
+			{
+				/* the material names none of its own; its counts give its
+				share of the region (at most 64000 of each: no overflow) */
+				if (read_s16(material + STRUCTURE_BSP_MATERIAL_VERTEX_TYPE_OFFSET) != VERTEX_TYPE_ENVIRONMENT_UNCOMPRESSED ||
+					vertex_count < 0 ||
+					vertex_count > MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL ||
+					lightmap_vertex_count != (has_bitmap ? vertex_count : 0) ||
+					vertices_size ||
+					vertices_address)
+				{
+					return load_fail(state, _cache_file_status_bad_structure_bsp_geometry, address + material_offset);
+				}
+				region_vertices_size = (uint32_t)vertex_count * STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES +
+					(uint32_t)lightmap_vertex_count * STRUCTURE_BSP_LIGHTMAP_VERTEX_BYTES;
+				if (!range_fits(region_used, region_vertices_size, region_size))
+				{
+					return load_fail(state, _cache_file_status_bad_structure_bsp_vertices, address + material_offset);
+				}
+				region_vertices = region + region_used;
+				if (!unit_vectors_valid(
+					region_vertices,
+					vertex_count,
+					STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES,
+					STRUCTURE_BSP_ENVIRONMENT_VERTEX_VECTORS_OFFSET,
+					STRUCTURE_BSP_ENVIRONMENT_VERTEX_VECTOR_COUNT) ||
+					!unit_vectors_valid(
+					region_vertices + (uint32_t)vertex_count * STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES,
+					lightmap_vertex_count,
+					STRUCTURE_BSP_LIGHTMAP_VERTEX_BYTES,
+					STRUCTURE_BSP_LIGHTMAP_VERTEX_VECTORS_OFFSET,
+					STRUCTURE_BSP_LIGHTMAP_VERTEX_VECTOR_COUNT))
+				{
+					return load_fail(state, _cache_file_status_bad_structure_bsp_geometry, address + material_offset);
+				}
+				region_used += region_vertices_size;
+				state->report->structure_bsp_materials_checked++;
+				continue;
+			}
 			/* the counts bound the size, which bounds the counts */
 			if (read_s16(material + STRUCTURE_BSP_MATERIAL_VERTEX_TYPE_OFFSET) != VERTEX_TYPE_ENVIRONMENT_UNCOMPRESSED ||
 				vertex_count < 0 ||
@@ -1863,6 +1973,11 @@ static enum cache_file_status structure_bsp_geometry_verify(
 			state->report->structure_bsp_materials_checked++;
 		}
 	}
+	/* (the region holds the materials' vertices and nothing else) */
+	if (region && region_used != region_size)
+	{
+		return load_fail(state, _cache_file_status_bad_structure_bsp_vertices, address);
+	}
 
 	return _cache_file_status_ok;
 }
@@ -1879,6 +1994,7 @@ static enum cache_file_status structure_bsps_verify(
 	uint32_t address = read_u32(block + TAG_BLOCK_ADDRESS_OFFSET);
 	uint32_t tag_cache_bytes = state->report->tag_cache_bytes;
 	uint32_t checksum_offset = CACHE_FILE_HEADER_BYTES;
+	int mcc = state->report->identity.format == _cache_file_format_mcc_cache;
 	uint32_t block_offset;
 	int32_t bsp_index;
 
@@ -1899,6 +2015,9 @@ static enum cache_file_status structure_bsps_verify(
 		uint32_t tag_handle = read_u32(reference + STRUCTURE_BSP_REFERENCE_TAG_INDEX_OFFSET);
 		uint32_t tag_index = tag_handle & ABSOLUTE_INDEX_MASK;
 		uint8_t *bsp;
+		uint8_t *region = NULL;
+		uint32_t region_size = 0;
+		uint32_t region_offset;
 		uint32_t bsp_pointer;
 		enum cache_file_status status;
 
@@ -1928,12 +2047,14 @@ static enum cache_file_status structure_bsps_verify(
 			return load_fail(state, _cache_file_status_bad_structure_bsp_block, tag_handle);
 		}
 		/* in the file, and at the top of the tag cache above the tag data,
-		where it is loaded when the game switches to it */
+		where it is loaded when the game switches to it (an MCC BSP: above
+		the tag data in the map's own window, and small enough that it fits
+		above them at the top of this tag cache, where it is moved) */
 		if (file_offset < CACHE_FILE_HEADER_BYTES ||
 			size < STRUCTURE_BSP_HEADER_BYTES ||
 			!range_fits((uint32_t)file_offset, (uint32_t)size, state->file_length) ||
-			bsp_address < CUSTOM_EDITION_TAG_CACHE_ADDRESS + state->used_bytes ||
-			!range_fits(bsp_address - CUSTOM_EDITION_TAG_CACHE_ADDRESS, (uint32_t)size, tag_cache_bytes))
+			bsp_address < state->base_address + state->used_bytes ||
+			!range_fits(bsp_address - state->base_address, (uint32_t)size, mcc ? MCC_ADDRESS_WINDOW_BYTES : tag_cache_bytes))
 		{
 			return load_fail(state, _cache_file_status_bad_structure_bsp_range, (uint32_t)file_offset);
 		}
@@ -1948,15 +2069,50 @@ static enum cache_file_status structure_bsps_verify(
 			return load_fail(state, _cache_file_status_read_failed, (uint32_t)file_offset);
 		}
 		bsp_pointer = read_u32(bsp + STRUCTURE_BSP_HEADER_BSP_OFFSET);
-		/* PC caches have no Xbox vertex buffer arrays */
+		/* PC caches have no Xbox vertex buffer arrays; an MCC BSP's header
+		has the size and file offset of its vertex region where the Xbox has
+		its vertex buffers' (observed in every MCC map) */
 		if (read_u32(bsp + STRUCTURE_BSP_HEADER_SIGNATURE_OFFSET) != STRUCTURE_BSP_SIGNATURE ||
-			read_u32(bsp + STRUCTURE_BSP_HEADER_VERTEX_BUFFERS_OFFSET) ||
+			(!mcc && read_u32(bsp + STRUCTURE_BSP_HEADER_VERTEX_BUFFERS_OFFSET)) ||
 			read_u32(bsp + STRUCTURE_BSP_HEADER_LIGHTMAP_VERTEX_BUFFERS_OFFSET) ||
 			bsp_pointer < bsp_address + STRUCTURE_BSP_HEADER_BYTES ||
 			bsp_pointer - bsp_address >= (uint32_t)size)
 		{
 			free(bsp);
 			return load_fail(state, _cache_file_status_bad_structure_bsp_header, (uint32_t)file_offset);
+		}
+		/* the region ends where the BSP starts */
+		if (mcc)
+		{
+			region_size = read_u32(bsp + MCC_STRUCTURE_BSP_HEADER_REGION_SIZE_OFFSET);
+			region_offset = read_u32(bsp + MCC_STRUCTURE_BSP_HEADER_REGION_OFFSET_OFFSET);
+			/* (and the BSP and its region fit together above the tag data, at
+			the top of this tag cache, where both are read) */
+			if (region_offset < CACHE_FILE_HEADER_BYTES ||
+				region_size > (uint32_t)file_offset ||
+				region_offset != (uint32_t)file_offset - region_size ||
+				region_size > tag_cache_bytes - state->used_bytes ||
+				(uint32_t)size > tag_cache_bytes - state->used_bytes - region_size ||
+				!range_fits((uint32_t)file_offset, (uint32_t)size + region_size, state->file_length))
+			{
+				free(bsp);
+				return load_fail(state, _cache_file_status_bad_structure_bsp_vertices, (uint32_t)file_offset);
+			}
+			region = malloc(region_size ? (size_t)region_size : 1);
+			if (!region)
+			{
+				free(bsp);
+				return load_fail(state, _cache_file_status_out_of_memory, region_size);
+			}
+			if (region_size && !state->map->read(state->map->context, region_offset, region_size, region))
+			{
+				free(region);
+				free(bsp);
+				return load_fail(state, _cache_file_status_read_failed, region_offset);
+			}
+			state->report->mcc_structure_bsp_addresses[bsp_index] = bsp_address;
+			state->report->mcc_structure_bsp_region_offsets[bsp_index] = region_offset;
+			state->report->mcc_structure_bsp_region_sizes[bsp_index] = region_size;
 		}
 		/* port: the references a protected map's bsp holds name the groups of
 		tags whose own are scrambled (tag_validate.c) */
@@ -1971,7 +2127,8 @@ static enum cache_file_status structure_bsps_verify(
 				bsp_address,
 				state->report->identity.name);
 		}
-		status = structure_bsp_geometry_verify(state, bsp, (uint32_t)size, bsp_address);
+		status = structure_bsp_geometry_verify(state, bsp, (uint32_t)size, bsp_address, region, region_size);
+		free(region);
 		free(bsp);
 		if (status != _cache_file_status_ok)
 		{
@@ -1981,26 +2138,269 @@ static enum cache_file_status structure_bsps_verify(
 		{
 			state->report->largest_structure_bsp_bytes = (uint32_t)size;
 		}
-		if (bsp_address - CUSTOM_EDITION_TAG_CACHE_ADDRESS < state->usable_bytes)
+		/* (an MCC BSP is to load at the top of this tag cache, its region
+		after it) */
+		if (mcc && tag_cache_bytes - (uint32_t)size - region_size < state->usable_bytes)
+		{
+			state->usable_bytes = tag_cache_bytes - (uint32_t)size - region_size;
+			state->report->lowest_structure_bsp_address = CUSTOM_EDITION_TAG_CACHE_ADDRESS + state->usable_bytes;
+		}
+		else if (!mcc && bsp_address - CUSTOM_EDITION_TAG_CACHE_ADDRESS < state->usable_bytes)
 		{
 			state->usable_bytes = bsp_address - CUSTOM_EDITION_TAG_CACHE_ADDRESS;
 			state->report->lowest_structure_bsp_address = bsp_address;
 		}
 		/* OpenSauce's CalculateChecksum takes the structure BSPs as packed
-		one after another from the end of the header */
-		if (!range_fits(checksum_offset, (uint32_t)size, state->map->size))
+		one after another from the end of the header; an MCC map's checksum
+		takes each BSP's vertex region before it, as they lie in the file
+		(observed: it matches the header of every MCC map only so) */
+		if (!range_fits(checksum_offset, region_size, state->map->size) ||
+			!range_fits(checksum_offset + region_size, (uint32_t)size, state->map->size))
 		{
 			return load_fail(state, _cache_file_status_bad_structure_bsp_range, checksum_offset);
 		}
-		status = crc32_update_from_file(state->map, checksum, checksum_offset, (uint32_t)size);
+		status = crc32_update_from_file(state->map, checksum, checksum_offset, region_size + (uint32_t)size);
 		if (status != _cache_file_status_ok)
 		{
 			return load_fail(state, status, checksum_offset);
 		}
-		checksum_offset += (uint32_t)size;
+		checksum_offset += region_size + (uint32_t)size;
 	}
 
 	return _cache_file_status_ok;
+}
+
+/* Moves an MCC cache's tags (checked at MCC_TAG_DATA_ADDRESS) to
+CUSTOM_EDITION_TAG_CACHE_ADDRESS: the tag index and instances here, every
+tag's own pointers by the game's schemas (rebase_proc), and gives each
+structure BSP reference the top of the tag cache, where its BSP is moved as
+it loads (custom_edition_cache.h). */
+static enum cache_file_status mcc_tags_rebase(
+	struct load_state *state,
+	uint8_t *tag_instances,
+	int32_t tag_count,
+	uint32_t scenario_offset)
+{
+	uint32_t old_address = state->base_address;
+	uint32_t new_address = CUSTOM_EDITION_TAG_CACHE_ADDRESS;
+	uint32_t difference = old_address - new_address;
+	uint32_t tag_cache_bytes = state->report->tag_cache_bytes;
+	uint8_t const *block;
+	uint32_t block_offset;
+	int32_t bsp_count;
+	int32_t bsp_index;
+	int32_t tag_index_value;
+
+	if (!rebase_proc)
+	{
+		return load_fail(state, _cache_file_status_rebase_unavailable, old_address);
+	}
+	write_u32(state->tag_cache + TAG_INDEX_INSTANCES_OFFSET,
+		read_u32(state->tag_cache + TAG_INDEX_INSTANCES_OFFSET) - difference);
+	for (tag_index_value = 0; tag_index_value < tag_count; tag_index_value++)
+	{
+		uint8_t *instance = tag_instances + (uint32_t)tag_index_value * TAG_INSTANCE_BYTES;
+		uint32_t name_address = read_u32(instance + TAG_INSTANCE_NAME_OFFSET);
+		uint32_t address = read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET);
+
+		/* (a name or address outside the tags is left for the checks after
+		this, which find it outside the moved tags too) */
+		if (name_address - old_address < state->tag_data_bytes)
+		{
+			write_u32(instance + TAG_INSTANCE_NAME_OFFSET, name_address - difference);
+		}
+		if (address && address - old_address < state->tag_data_bytes)
+		{
+			write_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET, address - difference);
+		}
+	}
+	if (!rebase_proc(state->tag_cache, state->tag_data_bytes, old_address, new_address))
+	{
+		return load_fail(state, _cache_file_status_rebase_failed, old_address);
+	}
+	state->base_address = new_address;
+
+	/* the BSP references, found again in the moved scenario */
+	block = state->tag_cache + scenario_offset + SCENARIO_STRUCTURE_BSPS_OFFSET;
+	bsp_count = read_s32(block + TAG_BLOCK_COUNT_OFFSET);
+	if (bsp_count != state->report->structure_bsp_count ||
+		(bsp_count && !tag_cache_offset(
+			state,
+			read_u32(block + TAG_BLOCK_ADDRESS_OFFSET),
+			(uint32_t)bsp_count * STRUCTURE_BSP_REFERENCE_BYTES,
+			&block_offset)))
+	{
+		return load_fail(state, _cache_file_status_rebase_failed, read_u32(block + TAG_BLOCK_ADDRESS_OFFSET));
+	}
+	for (bsp_index = 0; bsp_index < bsp_count; bsp_index++)
+	{
+		uint8_t *reference = state->tag_cache + block_offset + (uint32_t)bsp_index * STRUCTURE_BSP_REFERENCE_BYTES;
+		uint32_t size = read_u32(reference + STRUCTURE_BSP_REFERENCE_SIZE_OFFSET) +
+			state->report->mcc_structure_bsp_region_sizes[bsp_index];
+
+		/* the BSP, and room after it for its region (structure_bsps_verify
+		checked that both fit there): the game reads this many bytes from
+		the BSP's offset, and the region is read over what follows the BSP
+		in the file (custom_edition_cache.c) */
+		write_u32(reference + STRUCTURE_BSP_REFERENCE_SIZE_OFFSET, size);
+		write_u32(reference + STRUCTURE_BSP_REFERENCE_ADDRESS_OFFSET, new_address + tag_cache_bytes - size);
+	}
+
+	return _cache_file_status_ok;
+}
+
+/* An MCC map's scripts: its syntax node array has room for 32767 nodes, the
+game's for MAXIMUM_HS_SYNTAX_NODES, and hs.c runs no script of an array
+that is not of its own size (nor the validator lets one be larger). The
+array is made the game's size; when nodes are past its last slot (a10's are:
+its 18837 nodes use 20076 slots), each is moved to a free slot below it and
+every reference to it (a node's next and its first argument, a script's and
+a global's root) follows it, its identifier kept. A map whose nodes are too
+many for the game is left as it is, and runs no scripts. */
+static void mcc_scripts_fit(
+	struct load_state *state,
+	uint32_t scenario_offset)
+{
+	uint8_t *scenario = state->tag_cache + scenario_offset;
+	uint8_t *syntax = scenario + SCENARIO_HS_SYNTAX_DATA_OFFSET;
+	uint32_t syntax_bytes = read_u32(syntax + TAG_DATA_SIZE_OFFSET);
+	uint32_t syntax_offset;
+	uint8_t *array;
+	uint8_t *nodes;
+	int16_t *new_index;
+	int32_t maximum;
+	int32_t count;
+	int32_t live = 0;
+	int32_t free_slot = 0;
+	int32_t index;
+
+	if (syntax_bytes < DATA_ARRAY_BYTES ||
+		!tag_cache_offset(state, read_u32(syntax + TAG_DATA_ADDRESS_OFFSET), syntax_bytes, &syntax_offset))
+	{
+		return;
+	}
+	array = state->tag_cache + syntax_offset;
+	maximum = read_s16(array + DATA_ARRAY_MAXIMUM_COUNT_OFFSET);
+	count = read_s16(array + DATA_ARRAY_COUNT_OFFSET);
+	if (read_u32(array + DATA_ARRAY_SIGNATURE_OFFSET) != DATA_ARRAY_SIGNATURE ||
+		read_s16(array + DATA_ARRAY_ELEMENT_SIZE_OFFSET) != HS_SYNTAX_NODE_BYTES ||
+		maximum <= MAXIMUM_HS_SYNTAX_NODES ||
+		count < 0 || count > maximum ||
+		(uint32_t)maximum > (syntax_bytes - DATA_ARRAY_BYTES) / HS_SYNTAX_NODE_BYTES)
+	{
+		return;
+	}
+	nodes = array + DATA_ARRAY_BYTES;
+	for (index = 0; index < count; index++)
+	{
+		live += read_u16(nodes + (uint32_t)index * HS_SYNTAX_NODE_BYTES) != 0;
+	}
+	if (live > MAXIMUM_HS_SYNTAX_NODES)
+	{
+		return;
+	}
+	if (count > MAXIMUM_HS_SYNTAX_NODES)
+	{
+		new_index = malloc((size_t)count * sizeof(*new_index));
+		if (!new_index)
+		{
+			return;
+		}
+		for (index = 0; index < count; index++)
+		{
+			new_index[index] = -1;
+		}
+		/* each node past the game's last slot, to the lowest free one */
+		for (index = MAXIMUM_HS_SYNTAX_NODES; index < count; index++)
+		{
+			uint8_t *node = nodes + (uint32_t)index * HS_SYNTAX_NODE_BYTES;
+
+			if (!read_u16(node))
+			{
+				continue;
+			}
+			while (read_u16(nodes + (uint32_t)free_slot * HS_SYNTAX_NODE_BYTES))
+			{
+				free_slot++;
+			}
+			/* (live nodes are no more than the slots below the last: one is
+			free while a node remains) */
+			memcpy(nodes + (uint32_t)free_slot * HS_SYNTAX_NODE_BYTES, node, HS_SYNTAX_NODE_BYTES);
+			memset(node, 0, HS_SYNTAX_NODE_BYTES);
+			new_index[index] = (int16_t)free_slot;
+		}
+		/* every reference, to where its node is now (a moved node's old slot
+		is empty, so a reference is looked up by its old index before any
+		changes) */
+		for (index = 0; index < MAXIMUM_HS_SYNTAX_NODES; index++)
+		{
+			uint8_t *node = nodes + (uint32_t)index * HS_SYNTAX_NODE_BYTES;
+			uint32_t next = read_u32(node + HS_SYNTAX_NODE_NEXT_OFFSET);
+			uint32_t data = read_u32(node + HS_SYNTAX_NODE_DATA_OFFSET);
+
+			if (!read_u16(node))
+			{
+				continue;
+			}
+			if (next != 0xFFFFFFFFUL && (next & 0xFFFF) < (uint32_t)count && new_index[next & 0xFFFF] >= 0)
+			{
+				write_u32(node + HS_SYNTAX_NODE_NEXT_OFFSET, (next & 0xFFFF0000UL) | (uint32_t)new_index[next & 0xFFFF]);
+			}
+			if (!flag_is_set(read_u16(node + HS_SYNTAX_NODE_FLAGS_OFFSET), HS_SYNTAX_NODE_PRIMITIVE_BIT) &&
+				data != 0xFFFFFFFFUL && (data & 0xFFFF) < (uint32_t)count && new_index[data & 0xFFFF] >= 0)
+			{
+				write_u32(node + HS_SYNTAX_NODE_DATA_OFFSET, (data & 0xFFFF0000UL) | (uint32_t)new_index[data & 0xFFFF]);
+			}
+		}
+		{
+			uint8_t const *blocks[2];
+			uint32_t const element_bytes[2] = { HS_SCRIPT_BYTES, HS_GLOBAL_BYTES };
+			uint32_t const root_offsets[2] = { HS_SCRIPT_ROOT_OFFSET, HS_GLOBAL_ROOT_OFFSET };
+			int block_index;
+
+			blocks[0] = scenario + SCENARIO_HS_SCRIPTS_OFFSET;
+			blocks[1] = scenario + SCENARIO_HS_GLOBALS_OFFSET;
+			for (block_index = 0; block_index < 2; block_index++)
+			{
+				int32_t element_count;
+				uint32_t elements_offset;
+				int32_t element_index;
+
+				if (!loaded_block_get(blocks[block_index], state->base_address, state->used_bytes,
+					element_bytes[block_index], &element_count, &elements_offset))
+				{
+					continue;
+				}
+				for (element_index = 0; element_index < element_count; element_index++)
+				{
+					uint8_t *root = state->tag_cache + elements_offset +
+						(uint32_t)element_index * element_bytes[block_index] + root_offsets[block_index];
+					uint32_t reference = read_u32(root);
+
+					if (reference != 0xFFFFFFFFUL && (reference & 0xFFFF) < (uint32_t)count &&
+						new_index[reference & 0xFFFF] >= 0)
+					{
+						write_u32(root, (reference & 0xFFFF0000UL) | (uint32_t)new_index[reference & 0xFFFF]);
+					}
+				}
+			}
+		}
+		state->report->mcc_script_nodes_moved = 0;
+		for (index = 0; index < count; index++)
+		{
+			state->report->mcc_script_nodes_moved += new_index[index] >= 0;
+		}
+		free(new_index);
+		/* the slots in use: up to the highest node */
+		for (count = MAXIMUM_HS_SYNTAX_NODES; count > 0 && !read_u16(nodes + (uint32_t)(count - 1) * HS_SYNTAX_NODE_BYTES); count--)
+		{
+		}
+		write_u16(array + DATA_ARRAY_COUNT_OFFSET, (uint16_t)count);
+	}
+	write_u16(array + DATA_ARRAY_MAXIMUM_COUNT_OFFSET, MAXIMUM_HS_SYNTAX_NODES);
+	write_u32(syntax + TAG_DATA_SIZE_OFFSET, DATA_ARRAY_BYTES + MAXIMUM_HS_SYNTAX_NODES * HS_SYNTAX_NODE_BYTES);
+
+	return;
 }
 
 /* ---------- public code */
@@ -2027,6 +2427,165 @@ char const *resource_map_type_describe(
 	return type >= 0 && type < NUMBER_OF_RESOURCE_MAP_TYPES ?
 		resource_map_type_descriptions[type] :
 		"unknown";
+}
+
+enum cache_file_status mcc_structure_bsp_vertices_attach(
+	uint8_t *bsp,
+	uint32_t bsp_bytes,
+	uint32_t address,
+	uint32_t region_bytes)
+{
+	uint32_t structure_offset;
+	uint32_t region_used = 0;
+	uint32_t lightmaps_offset;
+	int32_t lightmap_count;
+	int32_t lightmap_index;
+
+	if (bsp_bytes < STRUCTURE_BSP_HEADER_BYTES)
+	{
+		return _cache_file_status_bad_structure_bsp_header;
+	}
+	structure_offset = read_u32(bsp + STRUCTURE_BSP_HEADER_BSP_OFFSET) - address;
+	if (!range_fits(structure_offset, STRUCTURE_BSP_BYTES, bsp_bytes) ||
+		!loaded_block_get(bsp + structure_offset + STRUCTURE_BSP_LIGHTMAPS_OFFSET, address, bsp_bytes,
+			STRUCTURE_BSP_LIGHTMAP_BYTES, &lightmap_count, &lightmaps_offset))
+	{
+		return _cache_file_status_bad_structure_bsp_geometry;
+	}
+	for (lightmap_index = 0; lightmap_index < lightmap_count; lightmap_index++)
+	{
+		uint8_t const *lightmap = bsp + lightmaps_offset + (uint32_t)lightmap_index * STRUCTURE_BSP_LIGHTMAP_BYTES;
+		uint32_t materials_offset;
+		int32_t material_count;
+		int32_t material_index;
+
+		if (!loaded_block_get(lightmap + STRUCTURE_BSP_LIGHTMAP_MATERIALS_OFFSET, address, bsp_bytes,
+			STRUCTURE_BSP_MATERIAL_BYTES, &material_count, &materials_offset))
+		{
+			return _cache_file_status_bad_structure_bsp_geometry;
+		}
+		for (material_index = 0; material_index < material_count; material_index++)
+		{
+			uint8_t *material = bsp + materials_offset + (uint32_t)material_index * STRUCTURE_BSP_MATERIAL_BYTES;
+			uint8_t *vertices = material + STRUCTURE_BSP_MATERIAL_UNCOMPRESSED_VERTICES_OFFSET;
+			int32_t vertex_count = read_s32(material + STRUCTURE_BSP_MATERIAL_VERTEX_COUNT_OFFSET);
+			int32_t lightmap_vertex_count = read_s32(material + STRUCTURE_BSP_MATERIAL_LIGHTMAP_VERTEX_COUNT_OFFSET);
+			uint32_t vertices_bytes;
+
+			/* (the counts as the loader checked them: at most 64000 each) */
+			if (vertex_count < 0 || vertex_count > MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL ||
+				lightmap_vertex_count < 0 || lightmap_vertex_count > MAXIMUM_VERTICES_PER_STRUCTURE_MATERIAL)
+			{
+				return _cache_file_status_bad_structure_bsp_geometry;
+			}
+			vertices_bytes = (uint32_t)vertex_count * STRUCTURE_BSP_ENVIRONMENT_VERTEX_BYTES +
+				(uint32_t)lightmap_vertex_count * STRUCTURE_BSP_LIGHTMAP_VERTEX_BYTES;
+			if (!range_fits(region_used, vertices_bytes, region_bytes))
+			{
+				return _cache_file_status_bad_structure_bsp_vertices;
+			}
+			write_u32(vertices + TAG_DATA_SIZE_OFFSET, vertices_bytes);
+			write_u32(vertices + TAG_DATA_FILE_OFFSET_OFFSET, 0);
+			write_u32(vertices + TAG_DATA_ADDRESS_OFFSET, vertices_bytes ? address + bsp_bytes + region_used : 0);
+			region_used += vertices_bytes;
+		}
+	}
+	if (region_used != region_bytes)
+	{
+		return _cache_file_status_bad_structure_bsp_vertices;
+	}
+	/* (the Xbox's vertex buffers there, which this BSP has none of) */
+	write_u32(bsp + MCC_STRUCTURE_BSP_HEADER_REGION_SIZE_OFFSET, 0);
+	write_u32(bsp + MCC_STRUCTURE_BSP_HEADER_REGION_OFFSET_OFFSET, 0);
+
+	return _cache_file_status_ok;
+}
+
+int32_t mcc_bitmaps_prepare(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes)
+{
+	int32_t tag_index = NO_TAG_INDEX;
+	int32_t cleared = 0;
+	uint8_t *bitmap;
+
+	while ((bitmap = custom_edition_cache_tag_next(tag_cache, loaded_bytes, BITMAP_GROUP_TAG, BITMAP_GROUP_BYTES,
+		&tag_index)) != NULL)
+	{
+		int32_t count;
+		uint32_t offset;
+		int32_t index;
+
+		if (!loaded_block_get(bitmap + BITMAP_GROUP_BITMAPS_OFFSET, CUSTOM_EDITION_TAG_CACHE_ADDRESS, loaded_bytes,
+			BITMAP_DATA_BYTES, &count, &offset))
+		{
+			continue;
+		}
+		for (index = 0; index < count; index++)
+		{
+			uint8_t *data = tag_cache + offset + (uint32_t)index * BITMAP_DATA_BYTES;
+			uint16_t flags = read_u16(data + BITMAP_DATA_FLAGS_OFFSET);
+
+			if (flag_is_set(flags, MCC_BITMAP_DATA_IN_MAP_BIT))
+			{
+				write_u16(data + BITMAP_DATA_FLAGS_OFFSET, (uint16_t)(flags & ~(1u << MCC_BITMAP_DATA_IN_MAP_BIT)));
+				cleared++;
+			}
+		}
+	}
+
+	return cleared;
+}
+
+int32_t mcc_sounds_mute(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes)
+{
+	int32_t tag_index = NO_TAG_INDEX;
+	int32_t muted = 0;
+	uint8_t *sound;
+
+	while ((sound = custom_edition_cache_tag_next(tag_cache, loaded_bytes, SOUND_GROUP_TAG, SOUND_DEFINITION_BYTES,
+		&tag_index)) != NULL)
+	{
+		int32_t pitch_range_count;
+		uint32_t pitch_ranges_offset;
+		int32_t pitch_range_index;
+		int in_banks = 0;
+
+		if (!loaded_block_get(sound + SOUND_PITCH_RANGES_OFFSET, CUSTOM_EDITION_TAG_CACHE_ADDRESS, loaded_bytes,
+			SOUND_PITCH_RANGE_BYTES, &pitch_range_count, &pitch_ranges_offset))
+		{
+			continue;
+		}
+		for (pitch_range_index = 0; pitch_range_index < pitch_range_count && !in_banks; pitch_range_index++)
+		{
+			uint8_t const *pitch_range = tag_cache + pitch_ranges_offset + (uint32_t)pitch_range_index * SOUND_PITCH_RANGE_BYTES;
+			int32_t permutation_count;
+			uint32_t permutations_offset;
+			int32_t permutation_index;
+
+			if (!loaded_block_get(pitch_range + SOUND_PITCH_RANGE_PERMUTATIONS_OFFSET, CUSTOM_EDITION_TAG_CACHE_ADDRESS,
+				loaded_bytes, SOUND_PERMUTATION_BYTES, &permutation_count, &permutations_offset))
+			{
+				continue;
+			}
+			for (permutation_index = 0; permutation_index < permutation_count && !in_banks; permutation_index++)
+			{
+				uint8_t const *samples = tag_cache + permutations_offset +
+					(uint32_t)permutation_index * SOUND_PERMUTATION_BYTES + SOUND_PERMUTATION_SAMPLES_OFFSET;
+
+				in_banks = flag_is_set(read_u32(samples + TAG_DATA_FLAGS_OFFSET), SOUND_SAMPLES_IN_RESOURCE_MAP_BIT);
+			}
+		}
+		if (in_banks)
+		{
+			write_u32(sound + SOUND_PITCH_RANGES_OFFSET + TAG_BLOCK_COUNT_OFFSET, 0);
+			muted++;
+		}
+	}
+
+	return muted;
 }
 
 enum cache_file_status cache_file_identify(
@@ -2072,6 +2631,9 @@ enum cache_file_format cache_file_header_format(
 		break;
 	case CACHE_FILE_VERSION_CUSTOM_EDITION:
 		format = _cache_file_format_custom_edition_cache;
+		break;
+	case CACHE_FILE_VERSION_MCC:
+		format = _cache_file_format_mcc_cache;
 		break;
 	default:
 		format = _cache_file_format_other_cache;
@@ -2177,6 +2739,12 @@ enum cache_file_status cache_file_resource_maps_needed(
 	enum cache_file_status status = cache_file_identify(source, &identity);
 
 	*types = 0;
+	/* an MCC cache holds every tag itself (its bitmaps' pixels are in its
+	own bitmaps.map, which no tag entry names) */
+	if (status == _cache_file_status_ok && identity.format == _cache_file_format_mcc_cache)
+	{
+		return _cache_file_status_ok;
+	}
 	if (status == _cache_file_status_ok && identity.format != _cache_file_format_custom_edition_cache)
 	{
 		status = _cache_file_status_unsupported_version;
@@ -2287,7 +2855,9 @@ enum cache_file_status custom_edition_cache_load(
 	report->problem_tag_index = NO_TAG_INDEX;
 
 	status = cache_file_identify(map, identity);
-	if (status == _cache_file_status_ok && identity->format != _cache_file_format_custom_edition_cache)
+	if (status == _cache_file_status_ok &&
+		identity->format != _cache_file_format_custom_edition_cache &&
+		identity->format != _cache_file_format_mcc_cache)
 	{
 		status = _cache_file_status_unsupported_version;
 	}
@@ -2295,6 +2865,11 @@ enum cache_file_status custom_edition_cache_load(
 	{
 		return load_fail(&state, status, 0);
 	}
+	/* (an MCC cache's tags are checked where the map puts them, then moved:
+	mcc_tags_rebase) */
+	state.base_address = identity->format == _cache_file_format_mcc_cache ?
+		MCC_TAG_DATA_ADDRESS :
+		CUSTOM_EDITION_TAG_CACHE_ADDRESS;
 	report->tag_cache_bytes = CUSTOM_EDITION_TAG_CACHE_BYTES;
 	if (tag_cache_bytes < report->tag_cache_bytes)
 	{
@@ -2452,6 +3027,18 @@ enum cache_file_status custom_edition_cache_load(
 		report->warnings |= 1UL << _custom_edition_warning_checksum_mismatch_bit;
 	}
 
+	/* an MCC cache's tags, moved to where a Custom Edition cache's are: from
+	here it is checked and converted as one */
+	if (identity->format == _cache_file_format_mcc_cache)
+	{
+		status = mcc_tags_rebase(&state, tag_instances, tag_count, scenario_offset);
+		if (status != _cache_file_status_ok)
+		{
+			return status;
+		}
+		mcc_scripts_fit(&state, scenario_offset);
+	}
+
 	/* port: a name that lies outside the tag data or is not terminated (map
 	protection scrambles them; Halo PC never needed them) becomes an empty
 	one: a zero byte in the tag's own instance. tag_validate.c then makes
@@ -2592,6 +3179,8 @@ static void loaded_state_initialize(
 {
 	memset(state, 0, sizeof(*state));
 	state->tag_cache = tag_cache;
+	/* (an MCC cache's tags too: they were moved there as they loaded) */
+	state->base_address = CUSTOM_EDITION_TAG_CACHE_ADDRESS;
 	state->used_bytes = loaded_bytes;
 	state->tag_index = NO_TAG_INDEX;
 

@@ -12,9 +12,12 @@ in DIRECTORY (by default the cache's own directory): bitmaps.map, sounds.map
 and loc.map. OpenSauce caches are refused. A cache that loads is then
 converted for this build as far as its bytes alone go
 (custom_edition_cache_convert), and --dump-tags writes the converted tags,
-as they would sit at 0x40440000, to FILE. Every file gets a block of
-"key: value" lines; the exit status is 0 when every file was recognized and
-every Custom Edition cache loaded and converted.
+as they would sit at 0x40440000, to FILE. An MCC cache (version 13) is
+checked as far as the move of its tags, which only the game can make (it
+needs the game's tag schemas: cache_file_formats.h, cache_file_rebase_proc).
+Every file gets a block of "key: value" lines; the exit status is 0 when
+every file was recognized, every Custom Edition cache loaded and converted
+and every MCC cache checked.
 */
 
 /* ---------- headers */
@@ -308,7 +311,18 @@ static int report_custom_edition_cache(
 		free(tag_cache);
 	}
 	printf("milestone.recognize: yes\n");
-	printf("milestone.load: %s\n", status == _cache_file_status_ok ? "yes" : "no");
+	/* an MCC cache is checked as far as the move of its tags, which needs the
+	game's tag schemas (cache_file_rebase_proc): that far is all this tool
+	can do with one */
+	if (status == _cache_file_status_rebase_unavailable)
+	{
+		printf("milestone.load: checked up to the move of its tags, which only the game can make\n");
+		status = _cache_file_status_ok;
+	}
+	else
+	{
+		printf("milestone.load: %s\n", status == _cache_file_status_ok ? "yes" : "no");
+	}
 	printf("milestone.run: not observed by this tool (the game converts the rest as it loads a map; docs/custom_edition_caches.md)\n");
 
 	for (type = _resource_map_bitmaps; type < NUMBER_OF_RESOURCE_MAP_TYPES; type++)
@@ -344,7 +358,8 @@ static int report_file(
 	printf("identify: %s\n", cache_file_status_describe(status));
 	print_identity(&identity);
 	succeeded = status == _cache_file_status_ok && identity.format != _cache_file_format_unrecognized;
-	if (succeeded && identity.format == _cache_file_format_custom_edition_cache)
+	if (succeeded &&
+		(identity.format == _cache_file_format_custom_edition_cache || identity.format == _cache_file_format_mcc_cache))
 	{
 		if (maps_directory_option)
 		{

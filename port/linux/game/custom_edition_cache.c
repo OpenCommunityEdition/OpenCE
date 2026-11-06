@@ -91,6 +91,16 @@ struct custom_edition_cache_globals
 	struct resource_map resource_map_storage[NUMBER_OF_RESOURCE_MAP_TYPES];
 	struct resource_map *resource_maps[NUMBER_OF_RESOURCE_MAP_TYPES];
 	byte read_staging[READ_STAGING_BYTES];
+	/* an MCC map (mcc_level_name): its tag data's size and, for each
+	structure BSP, where it was in the map and its vertex region, which its
+	BSP is moved and given as it loads (custom_edition_structure_bsp_read) */
+	boolean mcc;
+	uint32_t mcc_tag_data_bytes;
+	int32_t mcc_structure_bsp_count;
+	uint32_t mcc_structure_bsp_file_offsets[MCC_MAXIMUM_STRUCTURE_BSPS];
+	uint32_t mcc_structure_bsp_addresses[MCC_MAXIMUM_STRUCTURE_BSPS];
+	uint32_t mcc_structure_bsp_region_offsets[MCC_MAXIMUM_STRUCTURE_BSPS];
+	uint32_t mcc_structure_bsp_region_sizes[MCC_MAXIMUM_STRUCTURE_BSPS];
 };
 
 /* ---------- globals */
@@ -688,7 +698,15 @@ static boolean custom_edition_cache_tags_convert(
 			"custom edition: %ld tags had their group (scrambled by map protection) taken from the references to them",
 			regrouped);
 	}
-	
+	/* an MCC map's sounds are in MCC's sound banks, not in a sounds.map:
+	silent until they are taken from there (before the offsets are combined,
+	which would point them into a sounds.map there is none of) */
+	if (custom_edition_cache_globals.mcc)
+	{
+		error(_error_silent, "mcc: %ld sounds are silent (MCC's sound banks are not read yet), %ld bitmaps in the map",
+			(long)mcc_sounds_mute(tag_cache, loaded_bytes), (long)mcc_bitmaps_prepare(tag_cache, loaded_bytes));
+	}
+
 	custom_edition_cache_combine_resource_offsets(
 		tag_cache,
 		loaded_bytes,
@@ -868,6 +886,95 @@ boolean custom_edition_level_name(
 {
 	return level_name &&
 		!_strnicmp(level_name, CUSTOM_EDITION_LEVEL_NAME_PREFIX, csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX));
+}
+
+/* the file of the game's own map `level_name` names, in its maps folder */
+static boolean mcc_map_path(
+	char const *level_name,
+	char *path)
+{
+	char const *name = tag_name_strip_path(level_name);
+	char const *directory = cache_files_map_directory();
+
+	if (csstrlen(directory) + csstrlen(name) + csstrlen(MAP_FILE_EXTENSION) >= MAP_PATH_SIZE)
+	{
+		return FALSE;
+	}
+	sprintf(path, "%s%s%s", directory, name, MAP_FILE_EXTENSION);
+
+	return TRUE;
+}
+
+/* the answer for the level last asked about: the game asks many times a
+frame (the menus, the network), and a map's file changes only when maps are
+imported */
+static struct
+{
+	char name[MAP_PATH_SIZE];
+	boolean mcc;
+	unsigned long looked_at;
+} mcc_level_lookup;
+
+boolean mcc_level_name(
+	char const *level_name)
+{
+	char const *name;
+	char path[MAP_PATH_SIZE];
+	byte header[CACHE_FILE_HEADER_BYTES];
+	unsigned long now = GetTickCount() | 1;
+	FILE *file;
+
+	if (!level_name || !level_name[0] || custom_edition_level_name(level_name))
+	{
+		return FALSE;
+	}
+	name = tag_name_strip_path(level_name);
+	if (mcc_level_lookup.looked_at && now - mcc_level_lookup.looked_at < 1000 &&
+		!csstrcasecmp(mcc_level_lookup.name, name))
+	{
+		return mcc_level_lookup.mcc;
+	}
+	if (csstrlen(name) >= MAP_PATH_SIZE)
+	{
+		return FALSE;
+	}
+	mcc_level_lookup.mcc = FALSE;
+	if (mcc_map_path(level_name, path) && (file = fopen(path, "rb")) != NULL)
+	{
+		mcc_level_lookup.mcc = fread(header, 1, sizeof(header), file) == sizeof(header) &&
+			cache_file_header_format(header) == _cache_file_format_mcc_cache;
+		fclose(file);
+	}
+	strcpy(mcc_level_lookup.name, name);
+	mcc_level_lookup.looked_at = now;
+
+	return mcc_level_lookup.mcc;
+}
+
+unsigned long mcc_map_version(
+	void)
+{
+	return MCC_MAP_VERSION;
+}
+
+/* (cache_file_rebase_proc: its type exactly, which the web build's linker
+holds callers to) */
+static int mcc_tags_rebase_proc(
+	void *tag_cache,
+	unsigned long tag_data_bytes,
+	unsigned long old_address,
+	unsigned long new_address)
+{
+	long moved = tag_validate_rebase(tag_cache, tag_data_bytes, old_address, new_address);
+
+	if (moved == NONE)
+	{
+		error(_error_silent, "mcc: a block of the map's tags lies outside them: the map cannot be moved");
+		return 0;
+	}
+	error(_error_silent, "mcc: the map's tags moved from 0x%08lX to 0x%08lX (%ld pointers)", old_address, new_address, moved);
+
+	return 1;
 }
 
 boolean custom_edition_map_file_path(
@@ -1133,16 +1240,20 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 			custom_edition_unavailable_reason());
 		return NULL;
 	}
-	if (!custom_edition_map_path(map_name, path) || !custom_edition_file_open(&globals->map, path))
+	/* an MCC map is the game's own map's file, in its maps folder */
+	globals->mcc = mcc_level_name(map_name);
+	if (globals->mcc ?
+		!mcc_map_path(map_name, path) || !custom_edition_file_open(&globals->map, path) :
+		!custom_edition_map_path(map_name, path) || !custom_edition_file_open(&globals->map, path))
 	{
-		error(_error_silent, "custom edition: cannot open the map '%s' (it is looked for in the custom_maps folder)",
-			map_name);
+		error(_error_silent, "custom edition: cannot open the map '%s' (it is looked for in the %s folder)",
+			map_name, globals->mcc ? "maps" : "custom_maps");
 		return NULL;
 	}
 	strcpy(globals->map_path, path);
 	status = cache_file_identify(&globals->map.source, &identity);
 	if (status != _cache_file_status_ok ||
-		identity.format != _cache_file_format_custom_edition_cache ||
+		identity.format != (globals->mcc ? _cache_file_format_mcc_cache : _cache_file_format_custom_edition_cache) ||
 		identity.file_size > COMBINED_DECODED_OFFSET ||
 		!globals->map.source.read(globals->map.source.context, 0, CACHE_FILE_HEADER_BYTES, header))
 	{
@@ -1162,7 +1273,18 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 	{
 		char resource_path[MAP_PATH_SIZE];
 
-		if (!custom_edition_resource_map_path((enum resource_map_type)type, resource_path) ||
+		/* an MCC map's only resource map is MCC's own bitmaps.map, beside it,
+		which holds its bitmaps' pixels (its sounds are in MCC's sound banks,
+		its text in its tags) */
+		if (globals->mcc)
+		{
+			if (type != _resource_map_bitmaps || !mcc_map_path("bitmaps", resource_path) ||
+				!custom_edition_file_open(&globals->resource_files[type], resource_path))
+			{
+				continue;
+			}
+		}
+		else if (!custom_edition_resource_map_path((enum resource_map_type)type, resource_path) ||
 			!custom_edition_file_open(&globals->resource_files[type], resource_path))
 		{
 			error(_error_silent, "custom edition: no resource map '%s'", resource_path);
@@ -1192,12 +1314,33 @@ struct cache_file_tag_header *custom_edition_cache_tags_load(
 		return NULL;
 	}
 
+	/* (an MCC map's tags are moved by the validator's schemas as they load) */
+	cache_file_rebase_proc_set(globals->mcc ? mcc_tags_rebase_proc : NULL);
 	status = custom_edition_cache_load(
 		&globals->map.source,
 		globals->resource_maps,
 		tag_cache,
 		CUSTOM_EDITION_TAG_CACHE_BYTES,
 		&report);
+	if (status == _cache_file_status_ok && globals->mcc)
+	{
+		short bsp_index;
+
+		globals->mcc_tag_data_bytes = report.tag_data_bytes;
+		globals->mcc_structure_bsp_count = MIN(report.structure_bsp_count, MCC_MAXIMUM_STRUCTURE_BSPS);
+		for (bsp_index = 0; bsp_index < globals->mcc_structure_bsp_count; bsp_index++)
+		{
+			globals->mcc_structure_bsp_addresses[bsp_index] = report.mcc_structure_bsp_addresses[bsp_index];
+			globals->mcc_structure_bsp_region_offsets[bsp_index] = report.mcc_structure_bsp_region_offsets[bsp_index];
+			globals->mcc_structure_bsp_region_sizes[bsp_index] = report.mcc_structure_bsp_region_sizes[bsp_index];
+			/* (the BSP's offset in the file: just after its region) */
+			globals->mcc_structure_bsp_file_offsets[bsp_index] =
+				report.mcc_structure_bsp_region_offsets[bsp_index] + report.mcc_structure_bsp_region_sizes[bsp_index];
+		}
+		error(_error_silent, "mcc: '%s': %ld structure bsps, %ld script nodes moved, %ld sound permutations in MCC's banks",
+			path, (long)report.structure_bsp_count, (long)report.mcc_script_nodes_moved,
+			(long)report.mcc_sound_permutations);
+	}
 	if (status != _cache_file_status_ok)
 	{
 		error(
@@ -1293,8 +1436,76 @@ void custom_edition_cache_tags_unload(
 	custom_edition_cache_globals.behaviours = 0;
 	custom_edition_cache_globals.tag_cache = NULL;
 	custom_edition_cache_globals.loaded_bytes = 0;
+	custom_edition_cache_globals.mcc = FALSE;
+	custom_edition_cache_globals.mcc_structure_bsp_count = 0;
 
 	return;
+}
+
+boolean custom_edition_structure_bsp_read(
+	struct scenario_structure_bsp_reference const *reference)
+{
+	struct custom_edition_cache_globals *globals = &custom_edition_cache_globals;
+	unsigned long address = (unsigned long)reference->base_address;
+	enum cache_file_status status;
+	uint32_t bsp_bytes;
+	long moved;
+	short bsp_index;
+
+	if (!globals->tags_loaded || !globals->mcc)
+	{
+		return TRUE;
+	}
+	/* the BSP, by where it is in the file */
+	for (bsp_index = 0; bsp_index < globals->mcc_structure_bsp_count; bsp_index++)
+	{
+		if (globals->mcc_structure_bsp_file_offsets[bsp_index] == (uint32_t)reference->file_offset)
+		{
+			break;
+		}
+	}
+	if (bsp_index == globals->mcc_structure_bsp_count ||
+		(uint32_t)reference->file_size < globals->mcc_structure_bsp_region_sizes[bsp_index])
+	{
+		error(_error_silent, "mcc: the structure bsp at %08lx is not one the map's loader checked",
+			(unsigned long)reference->file_offset);
+		return FALSE;
+	}
+	/* the reference covers the BSP and room for its region after it (the
+	loader made it so): what the game read past the BSP was the file's next
+	bytes, and the region is read over them */
+	bsp_bytes = (uint32_t)reference->file_size - globals->mcc_structure_bsp_region_sizes[bsp_index];
+	custom_edition_cache_read(
+		NONE,
+		(long)globals->mcc_structure_bsp_region_offsets[bsp_index],
+		(long)globals->mcc_structure_bsp_region_sizes[bsp_index],
+		(byte *)reference->base_address + bsp_bytes);
+	/* its pointers, from where the map had it to where it is */
+	moved = tag_validate_rebase_structure_bsp(
+		reference->base_address,
+		bsp_bytes,
+		globals->mcc_structure_bsp_addresses[bsp_index],
+		address,
+		MCC_TAG_DATA_ADDRESS,
+		CUSTOM_EDITION_TAG_CACHE_ADDRESS,
+		globals->mcc_tag_data_bytes);
+	if (moved == NONE)
+	{
+		error(_error_silent, "mcc: structure bsp %d cannot be moved: a block lies outside it", bsp_index);
+		return FALSE;
+	}
+	/* and its materials given their vertices, as a Custom Edition BSP's are */
+	status = mcc_structure_bsp_vertices_attach(reference->base_address, bsp_bytes, (uint32_t)address,
+		globals->mcc_structure_bsp_region_sizes[bsp_index]);
+	if (status != _cache_file_status_ok)
+	{
+		error(_error_silent, "mcc: structure bsp %d: %s", bsp_index, cache_file_status_describe(status));
+		return FALSE;
+	}
+	error(_error_silent, "mcc: structure bsp %d moved to %08lx (%ld pointers), its vertices after it", bsp_index, address,
+		moved);
+
+	return TRUE;
 }
 
 struct resource_map const *custom_edition_cache_bitmap_resources(void)

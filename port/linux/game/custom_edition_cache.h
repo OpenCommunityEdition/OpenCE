@@ -75,6 +75,28 @@ the Custom Edition maps folders alone, never from the game's own. */
 boolean custom_edition_level_name(
 	char const *level_name);
 
+/* Whether the game's own level `level_name` names (not a Custom Edition
+map's) is, in its maps folder, a map of Halo: The Master Chief Collection
+(cache version 13), as an MCC import leaves them: it is then loaded as a
+Custom Edition map is, once its tags are moved (cache_file_formats.h). */
+boolean mcc_level_name(
+	char const *level_name);
+/* The version a network game on an MCC map is on (network_game_map's
+version): the same for every MCC map, and none of the game's own maps'
+(0), so that a machine with MCC's maps never plays one with the disc's,
+whose multiplayer maps (seven of them rebuilt for Halo PC) differ. */
+#define MCC_MAP_VERSION 0x4D434331UL
+unsigned long mcc_map_version(
+	void);
+/* An MCC map's structure BSP the game has just read for `reference` (to
+its base address, the reference's size of bytes): its vertex region read
+after it, its pointers moved and its materials given their vertices, so
+that it is checked and converted as a Custom Edition BSP is. TRUE for any
+other map's. */
+struct scenario_structure_bsp_reference;
+boolean custom_edition_structure_bsp_read(
+	struct scenario_structure_bsp_reference const *reference);
+
 /* TRUE when Custom Edition maps may run (game.custom_edition) and the level
 `level_name` is a Custom Edition map's whose file is a Custom Edition cache:
 it is then read in place, never copied to the cache partition. */

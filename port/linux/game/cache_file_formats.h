@@ -35,6 +35,11 @@ against the file or buffer it refers to before it is used.
 
 #define CACHE_FILE_VERSION_XBOX 5
 #define CACHE_FILE_VERSION_CUSTOM_EDITION 609
+/* the Halo 1 maps of Halo: The Master Chief Collection (build string
+01.03.43.0000): Custom Edition's tag index and tags, with their tag data at
+another address and their structure BSPs' vertices outside the BSPs
+(docs/mcc_caches.md) */
+#define CACHE_FILE_VERSION_MCC 13
 
 /* Halo PC and Custom Edition keep tag data at a fixed address, as the Xbox
 does at 0x803A6000: 0x40440000, above a 0x440000-byte game state at
@@ -47,6 +52,14 @@ that Chimera runs. This build reads a map by its offsets, so the map need
 only fit before the sounds it decodes in the combined offset space
 (custom_edition_cache.c) */
 #define CUSTOM_EDITION_CACHE_FILE_MAXIMUM_BYTES 0x30000000UL
+/* An MCC map's tag data is at 0x50000000, and every map examined puts each
+structure BSP so that it ends 64 MB above that. The loader checks the map
+there, then moves its tags to CUSTOM_EDITION_TAG_CACHE_ADDRESS
+(cache_file_rebase_proc) and each BSP to the top of that tag cache. */
+#define MCC_TAG_DATA_ADDRESS 0x50000000UL
+#define MCC_ADDRESS_WINDOW_BYTES 0x04000000UL
+/* the game's most structure BSPs in a scenario */
+#define MCC_MAXIMUM_STRUCTURE_BSPS 32
 
 enum cache_file_format
 {
@@ -58,6 +71,8 @@ enum cache_file_format
 	_cache_file_format_other_cache,
 	_cache_file_format_custom_edition_cache,
 	_cache_file_format_resource_map,
+	/* version 13: loaded as a Custom Edition cache is, once moved */
+	_cache_file_format_mcc_cache,
 
 	NUMBER_OF_CACHE_FILE_FORMATS
 };
@@ -139,6 +154,11 @@ enum cache_file_status
 	_cache_file_status_bad_resource_layout,
 	_cache_file_status_bad_resource_data_range,
 	_cache_file_status_tag_cache_overflow,
+
+	/* MCC caches */
+	_cache_file_status_bad_structure_bsp_vertices,
+	_cache_file_status_rebase_unavailable,
+	_cache_file_status_rebase_failed,
 
 	NUMBER_OF_CACHE_FILE_STATUSES
 };
@@ -233,6 +253,19 @@ struct custom_edition_load_report
 	/* 1 when the scenario tag had another group (map protection renames it)
 	and was given the scenario's */
 	int32_t scenario_regrouped;
+	/* an MCC cache: the address each structure BSP had in the map, before
+	its reference was given its place at the top of the tag cache (the BSP's
+	own pointers are moved by the difference as it loads), and its vertex
+	region's size and offset in the file. The reference is made to cover the
+	BSP and, after it, room for the region, which is read there as the BSP
+	loads (mcc_structure_bsp_vertices_attach) */
+	uint32_t mcc_structure_bsp_addresses[MCC_MAXIMUM_STRUCTURE_BSPS];
+	uint32_t mcc_structure_bsp_region_offsets[MCC_MAXIMUM_STRUCTURE_BSPS];
+	uint32_t mcc_structure_bsp_region_sizes[MCC_MAXIMUM_STRUCTURE_BSPS];
+	/* ... and its sound permutations whose samples are in MCC's sound banks */
+	int32_t mcc_sound_permutations;
+	/* ... and its script syntax nodes moved down into the game's array */
+	int32_t mcc_script_nodes_moved;
 };
 
 /* Where Halo PC keeps what a texture holds in other channels than this
@@ -529,5 +562,50 @@ typedef void (*custom_edition_structure_bsp_proc)(
 
 void custom_edition_structure_bsp_proc_set(
 	custom_edition_structure_bsp_proc proc);
+
+/* A procedure that moves every pointer in the tags of an MCC cache, whose
+`tag_data_bytes` bytes of tag data are at `tag_cache`, by
+`new_address` - `old_address`: each tag's blocks, data and references as its
+group's schema lists them (tag_validate_rebase, set by cache_files.c). The
+tag index and the tag instances are the loader's own to move. Nonzero when
+every pointer was within the tags and was moved. This module cannot move
+them itself: only a schema says which words are pointers (in an MCC map's
+animations and sounds, many words that are not pointers lie in the tags'
+address range). Without one, custom_edition_cache_load stops an MCC cache
+once it has checked it (_cache_file_status_rebase_unavailable). */
+typedef int (*cache_file_rebase_proc)(
+	void *tag_cache,
+	unsigned long tag_data_bytes,
+	unsigned long old_address,
+	unsigned long new_address);
+
+void cache_file_rebase_proc_set(
+	cache_file_rebase_proc proc);
+
+/* An MCC structure BSP read to `address` (`bsp_bytes` at `bsp`, its pointers
+already moved there) with its vertex region read right after it
+(`region_bytes` at bsp + bsp_bytes): gives each material its vertices in the
+region, in turn, as a Custom Edition BSP's materials have theirs, and clears
+the header's words that named the region. From then on it is checked and
+converted as a Custom Edition BSP is. */
+/* In the tags of an MCC cache custom_edition_cache_load loaded, makes every
+sound whose samples are in MCC's sound banks unplayable (no pitch ranges),
+as custom_edition_cache_convert makes those it cannot decode, until they are
+taken from the banks; returns how many. Called before the resource offsets
+are combined, which would point them into a sounds.map there is none of. */
+int32_t mcc_sounds_mute(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes);
+/* ... and clears the flag MCC gives the bitmaps whose pixels are in the map
+itself (its lightmaps), which the game would refuse; returns how many. */
+int32_t mcc_bitmaps_prepare(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes);
+
+enum cache_file_status mcc_structure_bsp_vertices_attach(
+	uint8_t *bsp,
+	uint32_t bsp_bytes,
+	uint32_t address,
+	uint32_t region_bytes);
 
 #endif

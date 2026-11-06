@@ -587,6 +587,9 @@ boolean cache_files_precache_map_loaded(
 	of that file name (port/linux/game/custom_edition_cache.c) */
 	if (custom_edition_level_name(map_name))
 		return custom_edition_cache_playable(map_name);
+	/* port: so is the game's own map when its file is MCC's (mcc_level_name) */
+	if (mcc_level_name(map_name))
+		return TRUE;
 	return cached_map_files_find_map(tag_name_strip_path(map_name)) != NONE;
 }
 
