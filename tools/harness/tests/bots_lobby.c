@@ -232,6 +232,8 @@ int main(int argc, char **argv)
 		CHECK(bots_human_count(&server.game) == 1 && bots_population_count(&server.game) == 3, "initial population");
 		CASE("human-count") {
 			CHECK(bots_human_count(NULL) == 0, "null game");
+			wcscpy(server.game.players[0].name, L"BOT Johnson");
+			CHECK(bots_human_count(&server.game) == 1, "bot-like human name hidden");
 			server.game.players[0].machine_index = BOTS_FIRST_MACHINE + 20;
 			CHECK(bots_human_count(&server.game) == 1, "high-ID human hidden");
 			CHECK(server.game.player_count == 4, "reporting modified roster");
@@ -734,6 +736,13 @@ int main(int argc, char **argv)
 			if (slot->name[0])
 				named++;
 			CHECK(slot->name[NUMBEROF(slot->name) - 1] == 0, "unterminated bot name");
+			CHECK(!wcsncmp(slot->name, L"BOT ", 4), "missing bot prefix");
+			if (slot->machine_index == BOTS_FIRST_MACHINE)
+				CHECK(!wcscmp(slot->name, L"BOT Johnson"), "first bot name changed");
+			if (slot->machine_index == BOTS_FIRST_MACHINE + 3)
+				CHECK(!wcscmp(slot->name, L"BOT Bisenti"), "Bisenti name changed");
+			if (slot->machine_index == BOTS_FIRST_MACHINE + 15)
+				CHECK(!wcscmp(slot->name, L"BOT Johns16"), "numbered bot name lost identity");
 			for (other = 0; other < index; other++)
 				if (bots_player_owned(server.game.players[other].machine_index))
 					CHECK(wcscmp(slot->name, server.game.players[other].name), "duplicate bot name");

@@ -434,25 +434,25 @@ int bots_machine_is_bot(long machine_index)
 
 void bots_network_player(long bot_index, struct network_player *player)
 {
-	/* (the Marines of Halo's campaign; eleven characters at most) */
+	/* The Marines of Halo's campaign, identified as bots in player displays. */
 	static char const *const names[] =
 	{
 		"Johnson", "Jenkins", "Mendoza", "Bisenti", "Stacker", "Polaski", "Chips", "Kojo",
 		"Rawley", "Riley", "Wellsley", "Hall", "Fitzgerald", "Locklear", "Mitchell",
 	};
 	char const *name = names[bot_index % NUMBEROF(names)];
-	char numbered[12];
+	char display_name[NUMBEROF(player->name)];
 	long index;
 
-	/* Preserve the original names; additional bots have distinct bounded names. */
+	/* The wire name has eleven visible characters: four for the prefix,
+	seven for a name, or five and a unique two-digit suffix for additional bots. */
 	if (bot_index >= (long)NUMBEROF(names))
-	{
-		snprintf(numbered, sizeof(numbered), "%.8s%02ld", name, bot_index + 1);
-		name = numbered;
-	}
+		snprintf(display_name, sizeof(display_name), "BOT %.5s%02ld", name, bot_index + 1);
+	else
+		snprintf(display_name, sizeof(display_name), "BOT %.7s", name);
 	csmemset(player, 0, sizeof(*player));
-	for (index = 0; index < (long)NUMBEROF(player->name) - 1 && name[index]; index++)
-		player->name[index] = (wchar_t)name[index];
+	for (index = 0; index < (long)NUMBEROF(player->name) - 1 && display_name[index]; index++)
+		player->name[index] = (wchar_t)display_name[index];
 	player->name[index] = 0;
 	player->primary_color_index = NONE;
 	player->icon_index = 0;
