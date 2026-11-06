@@ -922,9 +922,10 @@ void game_sound_set_mouth_aperture(
 
 /* The native ports draw several frames per game tick (port/linux/game/
 render_interpolation.c), and the sound manager refreshes every sound each
-frame; on the Xbox, frames and ticks were one. A sound's obstruction, a
-collision test from the camera, is computed once per tick and reused by the
-tick's other frames. */
+frame; on the Xbox, frames and ticks were one. Sounds whose positions share
+a slot share one collision test for the tick. Each sound's own result for
+the tick is kept in sound_manager.c, so a full mixer does not crowd this
+table into testing again every frame. */
 #define OBSTRUCTION_CACHE_SLOTS 128
 
 static struct
