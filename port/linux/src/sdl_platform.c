@@ -219,10 +219,17 @@ static void platform_choose_video_driver(void)
 
 BOOL platform_sdl_initialize(void)
 {
-	SDL_InitFlags flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS;
+	SDL_InitFlags flags = SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_EVENTS;
 
 	if (platform_sdl_started)
 		return TRUE;
+	/* the sound system only with sound (audio.enabled, HALO_NO_AUDIO=1 off):
+	a game without it never opens a connection to the system's sound server
+	(PipeWire, PulseAudio, WASAPI), and the voice chat's microphone and the
+	Audio menu's device lists find no device. The setting applies at the next
+	start, as this runs once */
+	if (config_boolean("audio.enabled"))
+		flags |= SDL_INIT_AUDIO;
 #if !defined(_WIN32) && !defined(HALO_ANDROID)
 	/* a write to a connection the other end closed fails instead of ending
 	the game (the game's sockets and Discord's pass MSG_NOSIGNAL, but UPnP's
