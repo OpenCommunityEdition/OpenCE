@@ -111,7 +111,7 @@ excessive ... trim down to sub 1-2k lines".
 | Address space for the renderer and assets | Unlimited in the host. The host reads guest memory **at the same virtual addresses** (a guest pointer zero-extended is a valid host pointer), so a host-side renderer reads vertex and index buffers and textures in the Xbox window with no copy. Upscaled textures, lightmap re-bakes, RT acceleration structures and streaming caches all live in host memory or VRAM. The guest keeps only IDs. The guest's own budget is about 4 GB minus the image (0x70000000), and it holds only simulation data. |
 | No 32-bit libraries | The process is a plain x86-64 binary. It needs no multilib SDL, Mesa or NVIDIA user-space. Arch derivatives and Fedora are dropping these, and Valve's own long-term direction is away from them. |
 | Steam Deck | x86-64 Linux, SteamOS 3. Same binary as desktop Linux, with a 64-bit Vulkan WSI under gamescope. |
-| Windows | Needs a Windows x64 host for the same guest image ("Windows" below). This is the main new work. |
+| Windows | A Windows x64 host for the same guest image (`port/windows/host`, "Windows x64 host" below). |
 | Android | Already this model. A host-side Vulkan backend serves Android `libmain.so` and desktop with the same code (`vulkan.md` §8). |
 | Larger maps and a new map format | Not limited by route (a). The limits today are the fixed tag window `0x803A6000`/22 MB (`physical_memory_map.h:15`, `cache_files.c`), 16-bit indices, UVs and skinning, and pool sizes. That is format work, not pointer width. See "Larger maps". |
 
@@ -304,6 +304,17 @@ host, `port/windows/host`, built with clang `--target=x86_64-pc-windows-msvc`.
    (`HOME`/XDG equivalents) that the guest already reads from the host.
 6. **SDL3 and GL.** SDL3 x64 DLL and `opengl32` for the GL path. The
    Vulkan backend lives in the host anyway.
+
+**Status.** `port/windows/host` is built by `tools/windows_x64_build.py`
+(`ninja windows_x64`: `configure.py --windows-x64-wine` from Linux against
+Wine's headers and import libraries, or the CI's `windows_x64` job on
+windows-2025 with clang and lld-link, Visual Studio's libraries and the
+Windows SDK). It loads the `linux_x64` build's guest image (its Windows kit),
+reserves the ranges first thing and starts again when the window or the
+image's range is taken (`HALO_HOST_TEST_RELAUNCH=1` tests this), and reaches
+the main menu and loads a level under Wine headless.
+`tools/test_windows_host_thunks.py` checks the stack switches and thunks
+under Wine.
 
 ## Renderer placement (how Vulkan fits)
 

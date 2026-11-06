@@ -49,7 +49,7 @@ def test_windows_host_thunks(tmp_path):
                     *[str(WINE_LIBRARIES / f"lib{name}.a") for name in ("ucrtbase", "kernel32", "ntdll", "compiler-rt")]],
                    check=True)
     environment = dict(os.environ, WINEPREFIX=str(tmp_path / "prefix"), WINEDEBUG="-all",
-                       WINEDLLOVERRIDES="mscoree,mshtml=")
+                       WINEDLLOVERRIDES="winepulse.drv=d;winealsa.drv=d;wineoss.drv=d;mscoree,mshtml=")
     for name in ("DISPLAY", "WAYLAND_DISPLAY"):
         environment.pop(name, None)
     try:
