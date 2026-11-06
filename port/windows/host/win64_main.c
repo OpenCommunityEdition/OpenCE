@@ -206,6 +206,7 @@ static int relaunch(void)
 {
 	STARTUPINFOW startup;
 	PROCESS_INFORMATION process;
+	HANDLE job;
 	wchar_t path[MAX_PATH];
 	DWORD code = 1;
 	int index;
@@ -231,6 +232,22 @@ static int relaunch(void)
 		{
 			host_logf(HOST_LOG_WARN, "cannot reserve %08llx-%08llx in the new process either (error %lu)",
 				(unsigned long long)base, (unsigned long long)(base + size), (unsigned long)GetLastError());
+		}
+	}
+	/* (the new process ends with this one: a job that kills it when its last
+	handle, this process's, closes) */
+	job = CreateJobObjectW(NULL, NULL);
+	if (job)
+	{
+		JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
+
+		memset(&limits, 0, sizeof(limits));
+		limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+		if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof(limits)) ||
+			!AssignProcessToJobObject(job, process.hProcess))
+		{
+			CloseHandle(job);
+			job = NULL;
 		}
 	}
 	ResumeThread(process.hThread);
@@ -267,16 +284,20 @@ int main(int argc, char *argv[])
 
 	(void)argc;
 	(void)argv;
-	/* first, before this process allocates anything more */
-	if (host_memory_reserve_fixed(relaunched) != 0)
+	/* (a test of the start again below: HALO_HOST_TEST_RELAUNCH takes part of
+	the image's range first, as something injected into the process might) */
+	if (!relaunched && GetEnvironmentVariableW(L"HALO_HOST_TEST_RELAUNCH", NULL, 0) > 0)
+		VirtualAlloc((void *)(uintptr_t)HALO_GUEST_IMAGE_BASE, 0x10000, MEM_RESERVE, PAGE_NOACCESS);
+	/* first, before this process allocates anything more (Custom Edition's
+	range is only needed by Custom Edition's maps, and not worth starting
+	again for) */
+	host_memory_reserve_fixed(relaunched);
+	if (host_memory_fixed_unavailable() && !relaunched)
 	{
 		log_open();
 		host_log_set_sink(log_line);
-		if (!relaunched)
-		{
-			host_logf(HOST_LOG_WARN, "the game's memory below 4 GB is taken; starting again with it reserved");
-			return relaunch();
-		}
+		host_logf(HOST_LOG_WARN, "the game's memory below 4 GB is taken; starting again with it reserved");
+		return relaunch();
 	}
 	SetEnvironmentVariableW(RELAUNCHED_VARIABLE, NULL);
 	if (log_handle == INVALID_HANDLE_VALUE)

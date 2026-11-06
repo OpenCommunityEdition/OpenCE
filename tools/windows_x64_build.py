@@ -185,13 +185,13 @@ def generate_windows_x64_build(n: Writer, sln: Any) -> None:
         add(source, " ".join([*common, "-std=gnu11", mbedtls_include, f"-I{MBEDTLS_DIR / 'library'}", "-w"]),
             "mbedtls_" + source.name + ".o")
 
-    # the executable's icon (port/windows/halo.rc)
+    # the executable's icon and manifest (port/windows/host/halo_x64.rc)
     n.variable("windows_x64_rc", windows_rc(cc))
     n.rule(name="windows_x64_rc", command="$windows_x64_rc /no-preprocess /FO $out $in",
            description="WINDOWS X64 RC $out")
     resources = BUILD / "halo.res"
-    n.build(outputs=resources, rule="windows_x64_rc", inputs=WINDOWS_DIR / "halo.rc",
-            implicit=[WINDOWS_DIR / "opence-icon.ico"])
+    n.build(outputs=resources, rule="windows_x64_rc", inputs=HOST_DIR / "halo_x64.rc",
+            implicit=[WINDOWS_DIR / "opence-icon.ico", HOST_DIR / "halo_x64.manifest"])
 
     output = BUILD / "halo.exe"
     sdl_import = sdl_lib / "SDL3.lib"

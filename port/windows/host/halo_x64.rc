@@ -1,0 +1,7 @@
+/* the Windows x64 build's halo.exe resources (tools/windows_x64_build.py): the
+32-bit build's icon (port/windows/halo.rc), and a manifest that makes UTF-8
+the code page of the narrow (ANSI) Windows functions, which the guest's
+paths, UTF-8, reach through posix.h's functions (port/windows/src/win32_*.c),
+as they reach the host's own system calls (win64_syscall.c) */
+1 ICON "../opence-icon.ico"
+1 24 "halo_x64.manifest"
