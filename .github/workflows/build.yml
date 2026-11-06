@@ -89,9 +89,17 @@ jobs:
       - name: Release
         run: python tools/ci_build.py linux release
 
+      # Both builds started with no window, sound or game data: the log of
+      # their start-up (tools/ci_smoke.py) shows a program that does not load
+      # or crashes in a constructor, which no test of the build can
+      - name: Start the game
+        run: |
+          python tools/ci_smoke.py -- "$PWD/dist/halo-linux-release/halo"
+          python tools/ci_smoke.py -- "$PWD/dist/halo-linux-debug/halo"
+
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
+          python -m pytest -q tools/test_ci_smoke.py tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
           # the dedicated server: --version, and --server without maps refused (exit code 2); its cases with
           # clients need the retail maps, and are skipped
           python -m pytest -q tools/test_dedicated_server.py
