@@ -657,6 +657,12 @@ typedef char rasterizer_xbox_transparent_geometry_globals_size_assert[
 static void transparent_geometry_layer_draw(
 	struct transparent_geometry_group *layer_group,
 	boolean dirty);
+static boolean active_camouflage_next_part(
+	struct transparent_geometry_group const *group,
+	struct transparent_geometry_group const *next_group);
+static boolean active_camouflage_transparent_part(
+	struct transparent_geometry_group const *group,
+	struct transparent_geometry_group const *part);
 
 /* ---------- globals */
 
@@ -1403,11 +1409,8 @@ void rasterizer_transparent_geometry_group_draw(
 				struct transparent_geometry_group const *next_group =
 					rasterizer_transparent_geometry_next_group(group);
 
-				if (!next_group ||
-					next_group->effect_type != _render_model_effect_type_active_camouflage ||
-					next_group->source_object_index != group->source_object_index ||
-					!next_group->shader ||
-					next_group->shader->base.type != _shader_type_model)
+				/* port: (active_camouflage_next_part) */
+				if (!active_camouflage_next_part(group, next_group))
 					draw_active_camouflage_groups2 = TRUE;
 			}
 
@@ -3577,10 +3580,8 @@ void rasterizer_transparent_geometry_group_draw(
 
 			for (group_index = 0; group_index < group_count; group_index++)
 			{
-				if (groups2[group_index].active_camouflage_transparent_source_object_index ==
-						group->source_object_index &&
-					groups2[group_index].effect_type ==
-						_render_model_effect_type_active_camouflage)
+				/* port: (active_camouflage_transparent_part) */
+				if (active_camouflage_transparent_part(group, &groups2[group_index]))
 				{
 					rasterizer_transparent_geometry_group_draw(&groups2[group_index], TRUE);
 
@@ -3598,6 +3599,49 @@ void rasterizer_transparent_geometry_group_draw(
 	}
 
 	return;
+}
+
+/* port: whether next_group goes on with the cloak group is a part of (the
+cloaked parts are drawn together, and the cloak's transparent parts after
+the last of them): the next part of the same cloaked object, as on the
+Xbox, and drawn in the same view, with the first-person weapon or in the
+world. The player's own legs (display.first_person_legs,
+port/linux/game/first_person_legs.c) are cloaked by the unit that cloaks
+the first-person weapon and arms; as one cloak, the legs and a weapon right
+after them had the legs' transparent parts drawn with the weapon's
+projection, after it. */
+static boolean active_camouflage_next_part(
+	struct transparent_geometry_group const *group,
+	struct transparent_geometry_group const *next_group)
+{
+	return next_group &&
+		next_group->effect_type == _render_model_effect_type_active_camouflage &&
+		next_group->source_object_index == group->source_object_index &&
+		next_group->shader &&
+		next_group->shader->base.type == _shader_type_model &&
+		TEST_FLAG(next_group->geometry_flags, _rasterizer_geometry_first_person_bit) ==
+			TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit);
+}
+
+/* port: whether part, a transparent part of a cloaked model (an assault
+rifle's display: its numbers, icons, compass and data, which are drawn
+after the cloaked parts, rasterizer_xbox_models.c), is drawn at the end of
+the cloak group is the last part of: of the same cloaked object, as on the
+Xbox, and drawn in the same view. These parts are not marked once drawn,
+and are drawn at each end of a cloak of their object: the legs' cloak, ended
+in the world when anything came between it and the first-person weapon's
+(the weapon's muzzle flash as it fired), drew the weapon's display there
+too, before the copy of the screen the weapon's cloak distorts, which had
+the display in it, and the cloaked assault rifle showed its display again,
+refracted onto the gun. */
+static boolean active_camouflage_transparent_part(
+	struct transparent_geometry_group const *group,
+	struct transparent_geometry_group const *part)
+{
+	return part->active_camouflage_transparent_source_object_index == group->source_object_index &&
+		part->effect_type == _render_model_effect_type_active_camouflage &&
+		TEST_FLAG(part->geometry_flags, _rasterizer_geometry_first_person_bit) ==
+			TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit);
 }
 
 /* port: use only a static BSP glass surface with a usable supplied plane. */
