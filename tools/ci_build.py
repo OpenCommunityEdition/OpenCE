@@ -6,6 +6,8 @@
     python tools/ci_build.py android release
     python tools/ci_build.py linux_arm64 release   (on a 64-bit ARM computer)
     python tools/ci_build.py linux_x86_64 release  (on a 64-bit x86 computer)
+    python tools/ci_build.py windows_x64 release   (on Windows, with build/linux_x86_64/windows_kit
+                                                    from a linux_x86_64 build: tools/windows_x64_build.py)
     python tools/ci_build.py linux profile
     python tools/ci_build.py web release
 
@@ -54,6 +56,7 @@ OUTPUTS = {
     "linux_x86_64": ["build/linux_x86_64/halo", "build/linux_x86_64/libSDL3.so.0",
                      "build/linux_x86_64/SDL3-LICENSE.txt"],
     "windows": ["build/windows/halo.exe", "build/windows/SDL3.dll"],
+    "windows_x64": ["build/windows_x64/halo.exe", "build/windows_x64/SDL3.dll"],
     "android": [],  # the APK, below
     "web": [],  # the site, below
 }
@@ -148,6 +151,16 @@ def main() -> int:
     for output in outputs:
         shutil.copy2(ROOT / output, dist)
         print(f"{output} -> {dist.relative_to(ROOT)}", flush=True)
+    if args.platform == "windows_x64":
+        # (the host's symbols, apart, as the 32-bit build's below; the
+        # guest's are the linux_x86_64 build's halo_guest.elf)
+        symbols = ROOT / "dist" / f"halo-windows-x64-{args.config}-symbols"
+        if symbols.exists():
+            shutil.rmtree(symbols)
+        symbols.mkdir(parents=True)
+        for pdb in [ROOT / "build/windows_x64/halo.pdb"]:
+            if pdb.exists():
+                shutil.copy2(pdb, symbols)
     if args.platform == "windows":
         # the symbols of halo.exe and SDL3.dll, apart (players do not need
         # them): the workflow uploads them to Sentry, which turns the crash

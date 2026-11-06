@@ -1,5 +1,5 @@
-# MendicantCE builds: the Linux (32-bit and 64-bit x86) and Windows release
-# builds, each packaged with the MENDICANT AI mod folder
+# MendicantCE builds: the Linux (32-bit and 64-bit x86) and Windows (32-bit
+# and 64-bit) release builds, each packaged with the MENDICANT AI mod folder
 # (tools/mendicant/package.py), for every pushed commit; a push to main
 # also publishes them as a release, mendicant-<run number>, marked latest.
 # Fork-only: OpenCE's own workflows (build.yml, server-image.yml) run only by
@@ -115,6 +115,14 @@ jobs:
           path: dist/mendicant/*.zip
           retention-days: 7
 
+      # the guest image and the import thunks, which the Windows x64 build
+      # carries (tools/windows_x64_build.py)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-kit
+          path: build/linux_x86_64/windows_kit
+          retention-days: 7
+
   windows:
     # as build.yml's windows job: the runner has LLVM, Python and Visual
     # Studio's x86 libraries and Windows SDK
@@ -162,9 +170,63 @@ jobs:
           path: dist/mendicant/*.zip
           retention-days: 7
 
+  windows_x64:
+    # the Windows x64 build: the linux_x64 job's guest image (its Windows
+    # kit) in a 64-bit Windows host (port/windows/host), with the runner's
+    # LLVM and Visual Studio's x64 libraries and Windows SDK
+    needs: linux_x64
+    runs-on: windows-2025
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install the toolchain
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -OutFile ninja.zip https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip
+          Invoke-WebRequest -OutFile ccache.zip https://github.com/ccache/ccache/releases/download/v4.10.2/ccache-4.10.2-windows-x86_64.zip
+          if ((Get-FileHash ninja.zip -Algorithm SHA256).Hash -ne "F550FEC705B6D6FF58F2DB3C374C2277A37691678D6ABA463ADCBB129108467A") { throw "ninja.zip: unexpected SHA-256" }
+          if ((Get-FileHash ccache.zip -Algorithm SHA256).Hash -ne "6252F081876A9A9F700FAE13A5AEC5D0D486B28261D7F1F72AC11C7AD9DF4DA9") { throw "ccache.zip: unexpected SHA-256" }
+          Expand-Archive ninja.zip -DestinationPath "$env:RUNNER_TEMP\tools"
+          Expand-Archive ccache.zip -DestinationPath $env:RUNNER_TEMP
+          Copy-Item "$env:RUNNER_TEMP\ccache-4.10.2-windows-x86_64\ccache.exe" "$env:RUNNER_TEMP\tools"
+          Remove-Item ninja.zip, ccache.zip
+          "$env:RUNNER_TEMP\tools" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-kit
+          path: build/linux_x86_64/windows_kit
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-mendicant-windows-x64-${{ github.sha }}
+          restore-keys: ccache-mendicant-windows-x64-
+
+      - uses: actions/cache@v4
+        with:
+          path: build/windows/third_party
+          key: mendicant-windows-third-party-${{ hashFiles('tools/windows_build.py') }}
+
+      - name: Release
+        run: python tools/ci_build.py windows_x64 release
+
+      - name: Package
+        run: python tools/mendicant/package.py --game dist/halo-windows-x64-release --models "$MODELS" --out dist/mendicant
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mendicantce-windows-x64
+          path: dist/mendicant/*.zip
+          retention-days: 7
+
   release:
-    # the three packages as a release, for main only, when all built
-    needs: [linux, linux_x64, windows]
+    # the four packages as a release, for main only, when all built
+    needs: [linux, linux_x64, windows, windows_x64]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

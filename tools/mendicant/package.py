@@ -13,8 +13,10 @@ Fork-only (not part of the upstream pull request).
   - a release folder or zip (the workflow's halo-<platform>-release artifact, dist/halo-...): its
     files as they are, less anything a player's run leaves (settings, maps, saves, logs).
 
-The platform is the executable's: halo.exe is Windows; halo a 32-bit ELF file is the x86 Linux
-build ("linux"), a 64-bit one the 64-bit x86 Linux build ("linux-x86_64": the game as an x32 guest
+The platform is the executable's: halo.exe a 32-bit program is the Windows build ("windows"), a
+64-bit one the Windows x64 build ("windows-x64": the 64-bit Linux build's guest image inside a
+64-bit Windows host, tools/windows_x64_build.py); halo a 32-bit ELF file is the x86 Linux build
+("linux"), a 64-bit one the 64-bit x86 Linux build ("linux-x86_64": the game as an x32 guest
 inside the 64-bit halo, tools/linux_guest_build.py, whose guest image, halo_guest.elf, is built
 into the executable and so not shipped beside it).
 
@@ -57,6 +59,7 @@ BUILD_OUTPUTS = {
     "linux": ["halo", "libSDL3.so.0", "SDL3-LICENSE.txt"],
     "linux-x86_64": ["halo", "libSDL3.so.0", "SDL3-LICENSE.txt"],
     "windows": ["halo.exe", "SDL3.dll"],
+    "windows-x64": ["halo.exe", "SDL3.dll"],
 }
 REPOSITORY_FILES = [
     ("LICENSE", "LICENSE.txt"),
@@ -74,7 +77,8 @@ REPOSITORY_FILES = [
 REPOSITORY_FOLDERS = [("deploy/gametypes", "gametypes")]
 LINUX_ONLY_FILES = [("deploy/halo-server", "halo-server")]
 LINUX_ONLY_FOLDERS = [("deploy", "deploy")]
-# (tools/ci_build.py gives the dedicated server's examples to the x86 Linux and the Windows builds only)
+# (tools/ci_build.py gives the dedicated server's examples to the x86 Linux and the 32-bit Windows
+# builds only)
 SERVER_EXAMPLES = {"init.txt.example", "gametypes"}
 
 # what a player's run leaves in the game's folder, never packaged from a release folder
@@ -86,18 +90,22 @@ EXECUTABLE_NAMES = {"halo", "halo-server"}
 
 
 def readme(platform):
-    executable = "halo.exe" if platform == "windows" else "./halo"
-    build = {"windows": "Windows", "linux": "32-bit x86 Linux",
+    windows = platform.startswith("windows")
+    executable = "halo.exe" if windows else "./halo"
+    build = {"windows": "Windows", "windows-x64": "64-bit Windows", "linux": "32-bit x86 Linux",
              "linux-x86_64": "64-bit x86 Linux"}[platform]
     requirements = {
         "windows": "",
+        "windows-x64": ("  This build is a 64-bit program (the game runs inside it as a 32-bit guest, the same one\n"
+                        "  as the linux-x86_64 package's). It is new: if it does not start, use the windows\n"
+                        "  package instead, and send halo.log.\n"),
         "linux": ("  This build needs the distribution's 32-bit OpenGL libraries; a computer without them can\n"
                   "  use the linux-x86_64 package instead.\n"),
         "linux-x86_64": ("  This build is a 64-bit program (the game runs inside it as a 32-bit guest): it needs\n"
                          "  no 32-bit libraries, only the 64-bit OpenGL libraries of GLVND (libOpenGL.so.0,\n"
                          "  libEGL.so.1), which Mesa and NVIDIA's driver use.\n"),
     }[platform]
-    log = ("halo.log, beside halo.exe" if platform == "windows"
+    log = ("halo.log, beside halo.exe" if windows
            else "the terminal's output (run ./halo from a terminal: ./halo 2>&1 | tee halo.log)")
     return f"""MENDICANT AI {MOD_VERSION} (test build, {build})
 ==================================
@@ -250,11 +258,21 @@ class Package:
                 self.add(f"{prefix}/{relative}", path.read_bytes(), os.access(path, os.X_OK))
 
 
-def platform_of(names, halo=None):
+def pe_machine(data):
+    """a Windows program's machine (0x14c 32-bit x86, 0x8664 x86-64), or None"""
+    if data[:2] != b"MZ" or len(data) < 0x40:
+        return None
+    offset = int.from_bytes(data[0x3c:0x40], "little")
+    if data[offset:offset + 4] != b"PE\0\0":
+        return None
+    return int.from_bytes(data[offset + 4:offset + 6], "little")
+
+
+def platform_of(names, halo=None, exe=None):
     """the package's platform from the game's file names, and halo's first bytes (an ELF file's
-    class: 1 32-bit, 2 64-bit)"""
+    class: 1 32-bit, 2 64-bit) or halo.exe's headers (its machine)"""
     if "halo.exe" in names:
-        return "windows"
+        return "windows-x64" if exe is not None and pe_machine(exe) == 0x8664 else "windows"
     if "halo" in names:
         if halo is None or not is_elf(halo):
             raise SystemExit("halo in --game is not an ELF file")
@@ -270,7 +288,7 @@ def from_build_folder(game, package):
             raise SystemExit(f"{path}: missing (built with ninja {package.platform}?)")
         package.add(name, path.read_bytes(), name in EXECUTABLE_NAMES)
     files, folders = list(REPOSITORY_FILES), list(REPOSITORY_FOLDERS)
-    if package.platform == "linux-x86_64":
+    if package.platform in ("linux-x86_64", "windows-x64"):
         files = [(source, name) for source, name in files if name not in SERVER_EXAMPLES]
         folders = [(source, name) for source, name in folders if name not in SERVER_EXAMPLES]
     if package.platform == "linux":
@@ -347,11 +365,13 @@ def main():
     build_folder = game.is_dir() and not (game / "LICENSE.txt").exists()
     if build_folder:
         names = {path.name for path in game.iterdir()}
-        package = Package(platform_of(names, (game / "halo").read_bytes()[:8] if "halo" in names else None))
+        package = Package(platform_of(names, (game / "halo").read_bytes()[:8] if "halo" in names else None,
+                                      (game / "halo.exe").read_bytes()[:4096] if "halo.exe" in names else None))
         from_build_folder(game, package)
     else:
         entries = release_entries(game)
-        package = Package(platform_of(set(entries), entries["halo"][0][:8] if "halo" in entries else None))
+        package = Package(platform_of(set(entries), entries["halo"][0][:8] if "halo" in entries else None,
+                                      entries["halo.exe"][0][:4096] if "halo.exe" in entries else None))
         from_release(entries, package)
         if "LICENSE.txt" in package.files:
             del package.files["LICENSE.txt"]
@@ -366,7 +386,7 @@ def main():
                      for name, (data, executable) in package.files.items()}
     package.add(f"{MOD_FOLDER}/mod.toml", mod_toml().encode())
     package.add(f"{MOD_FOLDER}/tags/mendicant/models.aibw", models)
-    newline = "\r\n" if package.platform == "windows" else "\n"
+    newline = "\r\n" if package.platform.startswith("windows") else "\n"
     package.add("README_MENDICANT.txt", readme(package.platform).replace("\n", newline).encode())
     package.add("SOURCE.txt", scrub(source_notice(revision_text(), args.contact).replace("\n", newline)
                                     .encode(), "SOURCE.txt", symbols))
