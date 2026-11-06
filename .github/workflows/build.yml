@@ -30,6 +30,10 @@ on:
         description: "Also build the profiling flavour (configure.py --profile) on Linux"
         type: boolean
         default: false
+      movies:
+        description: "Also build the disc's movies (configure.py --with-ffmpeg) into an Android APK"
+        type: boolean
+        default: false
 
 concurrency:
   group: build-${{ github.ref }}
@@ -60,7 +64,7 @@ jobs:
         run: |
           printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
           pacman -Syu --noconfirm --needed git zstd python python-pytest python-pillow python-numpy python-scipy ninja ccache \
-            clang lld gcc lib32-glibc lib32-gcc-libs cmake pkgconf wayland
+            clang lld gcc lib32-glibc lib32-gcc-libs cmake pkgconf wayland make
 
       - uses: actions/checkout@v4
 
@@ -78,6 +82,15 @@ jobs:
 
       - name: Debug
         run: python tools/ci_build.py linux debug
+
+      # (the disc's movies, configure.py --with-ffmpeg: FFmpeg is opt-in, so no
+      # other step compiles tools/linux_ffmpeg.py or bink_ffmpeg.c; a run
+      # started by hand asks for it, that a build nobody makes does not rot)
+      - name: Movies
+        if: github.event_name == 'workflow_dispatch' && inputs.movies
+        run: |
+          python configure.py --portable --with-ffmpeg --lto=off --pgo=off
+          ninja linux
 
       # (the profiling build, configure.py --profile, which no other step
       # compiles: only when a run started by hand asks for it, as it costs a
@@ -178,6 +191,23 @@ jobs:
         env:
           HALO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: python3 tools/ci_build.py android release
+
+      # (the disc's movies, opt-in: FFmpeg built for the guest's ABI and an APK
+      # that carries it, only when a run started by hand asks for it)
+      - name: Movies
+        if: github.event_name == 'workflow_dispatch' && inputs.movies
+        env:
+          HALO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          python3 configure.py --with-ffmpeg --lto=off --pgo=off
+          ninja android_apk
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.movies
+        with:
+          name: halo-android-movies
+          path: port/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 3
 
       # the touch controls' layout and gyroscope maths (the runner's JDK)
       - name: Test the touch layout

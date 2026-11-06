@@ -65,7 +65,9 @@ of the whole `save` folder stops there.
 ## Build and install the app
 
 1. Go to the root folder of the repository.
-2. Enter `python configure.py`.
+2. Enter `python configure.py`. Add `--with-ffmpeg` to play the disc's movies
+   (`tools/android_ffmpeg.py` builds FFmpeg for the guest's ABI, its tarball
+   checked against its SHA-256); without it the game skips them.
 3. Enter `ninja android_apk`.
 4. Connect the device with adb.
 5. Enter `adb install -r port/android/app/build/outputs/apk/debug/app-debug.apk`.
@@ -569,7 +571,9 @@ and reload, address reuse and allocation failure.
 
 ## Limits
 
-- Bink video is not available. The game skips the movies.
+- Bink video plays with `configure.py --with-ffmpeg` (FFmpeg built for the
+  guest's ABI, `tools/android_ffmpeg.py`); without it the game skips the
+  movies. The app's importer copies the disc's `bink` folder beside `maps`.
 - The device must let the app reserve the fixed guest addresses, from
   `0x80000000` to `0x8c000000`. If ART uses them, the app shows a message
   (refer to "The fixed addresses").

@@ -95,6 +95,16 @@ parser.add_argument(
     help="Emscripten's emcc for `ninja web` (default: emcc on the PATH, then EMSDK's or ~/emsdk's)",
 )
 
+parser.add_argument(
+    "--with-ffmpeg",
+    action="store_true",
+    help="build the disc's movies into the game: the Bink videos play through the engine, as on the "
+    "Xbox, decoded with FFmpeg behind the SDK's own entry points (port/linux/src/bink_ffmpeg.c). "
+    "Opt-in: the build downloads FFmpeg's release tarball (checked against its SHA-256, LGPL) and "
+    "builds its libraries for the target, on Linux and Android. Without it bink_null.c keeps the "
+    "stubs and the game skips the movies, as it always did",
+)
+
 # no need to spam those extra flags when running on Windows
 if not is_windows():
     parser.add_argument(
@@ -146,6 +156,7 @@ sln = SimpleNamespace(
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
     web_emcc=args.web_emcc,
+    with_ffmpeg=args.with_ffmpeg,
 )
 if not is_windows():
     sln.windows_cc = args.windows_cc
