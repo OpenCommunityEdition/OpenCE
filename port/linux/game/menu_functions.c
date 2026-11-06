@@ -4063,10 +4063,10 @@ static short browser_row_index(struct widget_instance *row)
 	return row && !strncmp(row->name, "server_item_", 12) ? (short)(atoi(row->name + 12) - 1) : NONE;
 }
 
-/* the ping each row shows (-1: none), coloured by pc_menu_text_color: green
-under PING_GOOD milliseconds, yellow under PING_FAIR, red above; a row's
-status word (JOINING, NEWER, OLDER) in yellow (marked), and a game of
-another network version's row grey */
+/* unavailable campaign levels are dark blue; the ping each server row shows
+(-1: none) is green under PING_GOOD milliseconds, yellow under PING_FAIR,
+red above; a row's status word (JOINING, NEWER, OLDER) is yellow (marked),
+and a game of another network version's row grey */
 static short browser_row_pings[BROWSER_ROWS];
 static boolean browser_row_marked[BROWSER_ROWS];
 static boolean browser_row_greyed[BROWSER_ROWS];
@@ -4080,14 +4080,33 @@ enum
 #define PING_COLOR_POOR 0xE86A5AFFUL
 #define ROW_COLOR_GREYED 0x8A8F99FFUL
 
-/* ui_widget.c: a text's colour in place of its own (FALSE: its own): a
-server browser row's ping by how good it is */
+/* ui_widget.c: a text's colour in place of its own: unavailable campaign
+levels and the server browser's ping and status rows */
 boolean pc_menu_text_color(struct widget_instance *widget, real_argb_color *color)
 {
 	short row = widget->parent ? browser_row_index(widget->parent) : NONE;
+	short campaign_row, level;
 	short ping;
 	unsigned long rgba;
 
+	if (widget->parent && widget->parent->parent && !strcmp(widget->name, "list_item_text") &&
+		!strcmp(widget->parent->parent->name, "solo_level_select_list") &&
+		!strncmp(widget->parent->name, "list_item_", 10) && level_list.kind == MAP_KIND_SINGLEPLAYER)
+	{
+		campaign_row = (short)atoi(widget->parent->name + 10);
+		if (campaign_row > 0 && campaign_row < MAXIMUM_ROWS)
+		{
+			level = (short)(level_list.first + campaign_row - 1);
+			if (level >= 0 && level < NUMBER_OF_SINGLE_PLAYER_LEVELS && !campaign.levels[level].available)
+			{
+				rgba = 0x0C3D70FFUL;
+				color->red = (real)((rgba >> 24) & 0xFF) / 255.0f;
+				color->green = (real)((rgba >> 16) & 0xFF) / 255.0f;
+				color->blue = (real)((rgba >> 8) & 0xFF) / 255.0f;
+				return TRUE;
+			}
+		}
+	}
 	if (row < 0 || row >= BROWSER_ROWS || strncmp(widget->name, "server_item_", 12))
 		return FALSE;
 	ping = browser_row_pings[row];
