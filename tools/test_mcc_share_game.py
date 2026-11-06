@@ -164,6 +164,8 @@ def test_game_side(game_tool, tmp_path, case):
     ("if (!mcc_workshop_package_folder(level, folder))\n\t\treturn TRUE;", "if (!mcc_workshop_package_folder(level, folder))\n\t\treturn FALSE;\n\treturn FALSE;", "gate"),
 ])
 def test_negative_controls(tmp_path, before, after, case):
+    if not sys.platform.startswith("linux"):
+        pytest.skip("two copies of the game file in one process are built on Linux")
     source = (GAME / "mcc_share.c").read_text()
     assert source.count(before) == 1, before
     changed = tmp_path / "changed_mcc_share.c"
