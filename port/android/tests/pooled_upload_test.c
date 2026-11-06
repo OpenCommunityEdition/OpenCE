@@ -18,7 +18,7 @@ typedef long GLintptr;
 #define HALO_GLES 1
 #ifndef HALO_WEB
 #define HALO_ANDROID 1
-static int android_geometry_fixes = 1;
+static int halo_geometry_fixes = 1;
 #endif
 #define GL_ARRAY_BUFFER 0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 0x8893
@@ -178,7 +178,7 @@ int main(int argc, char **argv)
 #ifdef HALO_ANDROID
 	if (!strcmp(argv[1], "disabled"))
 	{
-		android_geometry_fixes = 0;
+		halo_geometry_fixes = 0;
 		CHECK(!stream_uses_chunks());
 		stream_reserve(64);
 		CHECK(stream_upload(bytes, 32) == 0);

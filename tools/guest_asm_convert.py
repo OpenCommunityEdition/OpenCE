@@ -14,7 +14,7 @@ to an integer that stays in a SIMD register (``fcvtzs s0, s1``). The ARM
 translation of the x86 Android emulator does not have these, and stops the
 app with SIGILL at the first one (the HUD's, once a game is drawn).
 
-Usage: android_asm_convert.py input.s output.s
+Usage: guest_asm_convert.py input.s output.s
 """
 
 import re
@@ -95,8 +95,7 @@ class Converter:
     def sym(self, name: str) -> str:
         if name.startswith('"'):
             inner = name[1:-1]
-            if inner.startswith("_"):
-                inner = inner[1:]
+            inner = inner.removeprefix("_")
             return '"' + inner + '"'
         if name.startswith("_"):
             return name[1:]
@@ -152,7 +151,7 @@ class Converter:
         parts = [a.strip() for a in args.split(",")]
         if len(parts) < 4:
             return
-        segment, name, symbol, size = parts[:4]
+        _segment, _name, symbol, size = parts[:4]
         align = int(parts[4]) if len(parts) > 4 else 0
         symbol = self.sym(symbol)
         # a definition in either section: tentative definitions (-fcommon)

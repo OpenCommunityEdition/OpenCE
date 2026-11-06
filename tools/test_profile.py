@@ -34,7 +34,7 @@ def test_configuration_defines():
 def test_every_native_build_takes_the_configuration_defines():
     # (the guest, the game and the platform layer of all three: one place
     # decides what --release and --profile define)
-    for name in ("linux_build.py", "windows_build.py", "android_build.py"):
+    for name in ("linux_build.py", "windows_build.py", "guest_build.py"):
         text = (ROOT / "tools" / name).read_text(encoding="utf-8")
         assert "configuration_defines(sln)" in text, name
         assert '["-DHALO_RELEASE"] if' not in text, name

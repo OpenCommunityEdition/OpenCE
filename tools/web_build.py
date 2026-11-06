@@ -41,7 +41,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .android_build import VARIADIC_PROTOTYPE_FILES
+from .guest_build import VARIADIC_PROTOTYPE_FILES
 from .embed_assets import hud_assets_build, hud_configure_inputs
 from .linux_build import (EXPAT_DIR, EXPAT_SOURCES, KCP_DIR, MONOCYPHER_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, TOML_DIR,
                           XDK_INCLUDE, ZLIB_DEFINES, ZLIB_DIR, ZLIB_SOURCES, compile_launcher, configuration_defines,
@@ -52,6 +52,7 @@ from .ninja_syntax import Writer
 PORT_DIR = Path("port/web")
 LINUX_DIR = Path("port/linux")
 ANDROID_DIR = Path("port/android")
+GUEST_DIR = Path("port/guest")
 PORT_CONFIG = LINUX_DIR / "port.json"
 SDL_PORT = PORT_DIR / "halo_sdl3.py"
 # (the release port/web/halo_sdl3.py fetches, as the other builds')
@@ -239,7 +240,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         if name == "source/main/main.c":
             cflags += " " + updater_defines(release)
         if name in VARIADIC_PROTOTYPE_FILES:
-            cflags += f" -include {ANDROID_DIR}/include/halo_android_variadic_prototypes.h"
+            cflags += f" -include {GUEST_DIR}/include/halo_guest_variadic_prototypes.h"
         if name in PROTOTYPE_FILES:
             cflags += f" -include {PROTOTYPE_FILES[name]}"
         if name == "source/shell/shell_xbox.c":
