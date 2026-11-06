@@ -303,5 +303,48 @@ def _generate(n: Writer, sln: Any, target: LinuxGuest, config_path: Path, third_
     # internet play's MQTT brokers, a file beside the game (network.brokers_file)
     brokers = build / "brokers.txt"
     n.build(outputs=brokers, rule=f"{prefix}_copy", inputs=Path("port/assets/network/brokers.txt"))
-    n.build(outputs=target.name, rule="phony", inputs=[output, staged_sdl, sdl_license, brokers])
+    staged = [output, staged_sdl, sdl_license, brokers]
+    if target.arch == X32:
+        staged += windows_kit(n, prefix, label, build, guest["image"], guest["checked"])
+    n.build(outputs=target.name, rule="phony", inputs=staged)
     n.newline()
+
+
+# what the Windows x64 host generates from the guest's declarations
+# (tools/windows_host_thunks.py): the functions it serves in place of the
+# shared host files' (a path in the guest's form, the OpenGL entry points
+# once a context exists), and the files that declare the imports
+WINDOWS_OVERRIDES = {
+    "host_sdl_get_base_path": "win64_sdl_get_base_path",
+    "host_sdl_gl_create_context": "win64_sdl_gl_create_context",
+    "host_sdl_gl_make_current": "win64_sdl_gl_make_current",
+}
+WINDOWS_DECLARATIONS = [
+    ANDROID_DIR / "guest" / "runtime" / "guest_host.h", PORT_DIR / "guest_desktop.c", LINUX_DIR / "src" / "xgpu.h",
+    LINUX_DIR / "src" / "posix.h", LINUX_DIR / "src" / "posix_server.h",
+]
+
+
+def windows_kit(n: Writer, prefix: str, label: str, build: Path, image: Path, checked: Path) -> List[Path]:
+    """build/<name>/windows_kit: the guest image and the import thunks of
+    the Windows x64 host (tools/windows_x64_build.py), which builds from
+    them on Windows"""
+    kit = build / "windows_kit"
+    gen = build / "guest" / "gen"
+    lists = [ANDROID_DIR / "host_imports.list", PORT_DIR / "host_imports.list", gen / "posix_imports.list",
+             gen / "gl_imports.list"]
+    declarations = [*WINDOWS_DECLARATIONS, gen / "guest_gl.c"]
+    thunks, table = kit / "host_thunks.S", kit / "host_thunk_table.c"
+    n.rule(
+        name=f"{prefix}_windows_thunks",
+        command=("$python tools/windows_host_thunks.py "
+                 + "".join(f"--override {name}={symbol} " for name, symbol in WINDOWS_OVERRIDES.items())
+                 + "--declarations " + " ".join(str(path) for path in declarations)
+                 + f" --gl {gen / 'guest_gl.c'} {thunks} {table} " + " ".join(str(path) for path in lists)),
+        description=f"{label} WINDOWS THUNKS",
+    )
+    n.build(outputs=[thunks, table], rule=f"{prefix}_windows_thunks", inputs=lists,
+            implicit=[Path("tools/windows_host_thunks.py"), Path("tools/check_host_imports.py"), *declarations])
+    kit_image = kit / "halo_guest.elf"
+    n.build(outputs=kit_image, rule=f"{prefix}_copy", inputs=image, implicit=[checked])
+    return [kit_image, thunks, table]

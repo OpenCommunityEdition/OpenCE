@@ -1,0 +1,225 @@
+"""Ninja rules for the Windows x64 build (``ninja windows_x64``).
+
+The game runs as the 64-bit x86 Linux build's guest image (x32 code,
+tools/linux_guest_build.py), unchanged, inside a 64-bit Windows program
+(port/windows/host; docs/x64_route.md, "Windows x64 host"). The image and
+what the Windows host generates from the guest's declarations come from the
+Linux build, as its "Windows kit" (build/linux_x86_64/windows_kit, which
+``ninja linux_x86_64`` writes):
+
+- halo_guest.elf, the image, which the executable carries;
+- host_thunks.S and host_thunk_table.c, the import thunks
+  (tools/windows_host_thunks.py).
+
+The host is compiled with clang for x86_64-pc-windows-msvc and linked with
+lld: on Windows against Visual Studio's x64 libraries and the Windows SDK,
+as the 32-bit build (tools/windows_build.py), from a kit that CI hands over
+from its Linux job (.github/workflows/mendicant.yml), or the one in
+build/linux_x86_64 (--windows-x64-kit DIR otherwise); or, for testing on
+Linux under Wine (configure.py --windows-x64-wine), against Wine's own
+Windows headers and import libraries, which need no Microsoft licence.
+
+Output: build/windows_x64/halo.exe, SDL3.dll (SDL's x64 one, from the
+32-bit build's SDL package), brokers.txt and masters.txt.
+"""
+
+import sys
+from pathlib import Path
+from typing import Any, List
+
+from .linux_build import MBEDTLS_DIR, MINIUPNPC_DIR, compile_launcher, miniupnpc_sources
+from .ninja_syntax import Writer
+from .windows_build import SDL_DIR, TOML_DIR, fetch_sdl, updater_defines, windows_rc
+
+BUILD = Path("build/windows_x64")
+DEFAULT_KIT = Path("build/linux_x86_64/windows_kit")
+HOST_DIR = Path("port/windows/host")
+ANDROID_DIR = Path("port/android")
+LINUX_DIR = Path("port/linux")
+WINDOWS_DIR = Path("port/windows")
+KIT_FILES = ("halo_guest.elf", "host_thunks.S", "host_thunk_table.c")
+
+# the files the Windows host shares with the Linux and Android hosts
+SHARED_HOST_SOURCES = [
+    ANDROID_DIR / "host" / "host_common.c",
+    ANDROID_DIR / "host" / "host_loader.c",
+    ANDROID_DIR / "host" / "host_sdl.c",
+    ANDROID_DIR / "host" / "host_watch_hash.c",
+    LINUX_DIR / "host" / "host_desktop.c",
+]
+# posix.h, posix_server.h and update.h on Windows: the 32-bit build's
+WIN32_SOURCES = ["win32_files.c", "win32_net.c", "win32_p2p.c", "win32_server.c", "win32_update.c"]
+LIBRARIES = ["ws2_32", "iphlpapi", "bcrypt", "winmm", "user32", "advapi32", "winhttp", "shell32", "ole32",
+             "kernel32"]
+
+# Wine's headers and PE import libraries (configure.py --windows-x64-wine)
+WINE_INCLUDE = Path("/usr/include/wine")
+WINE_LIBRARIES = Path("/usr/lib/wine/x86_64-windows")
+
+
+def windows_x64_configure_inputs() -> List[Path]:
+    return [Path(__file__), HOST_DIR]
+
+
+def requested(sln: Any) -> bool:
+    if getattr(sln, "windows_x64_wine", False) or getattr(sln, "windows_x64_kit", None):
+        return True
+    return sys.platform == "win32" and (DEFAULT_KIT / KIT_FILES[0]).is_file()
+
+
+def _quote(path: Any) -> str:
+    text = str(path).replace("\\", "/")
+    return f'"{text}"' if " " in text else text
+
+
+def generate_windows_x64_build(n: Writer, sln: Any) -> None:
+    if not requested(sln):
+        return
+    wine = bool(getattr(sln, "windows_x64_wine", False))
+    kit = Path(getattr(sln, "windows_x64_kit", None) or DEFAULT_KIT)
+    try:
+        fetch_sdl()
+    except OSError as error:
+        print(f"Windows x64 build disabled: cannot fetch SDL3 ({error})", file=sys.stderr)
+        return
+    release = bool(getattr(sln, "port_release", False))
+    cc = getattr(sln, "windows_cc", None) or "clang"
+    sdl_include = SDL_DIR / "include"
+    sdl_lib = SDL_DIR / "lib" / "x64"
+    obj_dir = BUILD / "obj"
+
+    n.comment("Windows x64 build (ninja windows_x64): the 64-bit Linux build's guest image in a Windows host")
+    n.variable("windows_x64_cc", cc)
+    target = ["--target=x86_64-pc-windows-msvc"]
+    if wine:
+        # Wine's Windows headers and its C runtime's (the universal one's)
+        target += ["-nostdinc", f"-isystem $$({cc} -print-resource-dir)/include",
+                   f"-isystem {WINE_INCLUDE / 'msvcrt'}", f"-isystem {WINE_INCLUDE / 'windows'}", "-D_UCRT",
+                   # (what Wine's headers lack of the Windows SDK's: a SAL
+                   # annotation SDL's headers use, a security flag)
+                   "-D_Scanf_format_string_impl_=", "-DPROTECTED_DACL_SECURITY_INFORMATION=0x80000000L"]
+    common = [
+        *target, "-O2", "-g", "-gcodeview", "-fno-omit-frame-pointer", "-D_CRT_SECURE_NO_WARNINGS",
+        "-D_CRT_NONSTDC_NO_WARNINGS", "-D_WINSOCK_DEPRECATED_NO_WARNINGS", "-DWIN32_LEAN_AND_MEAN", "-DNOMINMAX",
+        "-D_WIN32_WINNT=0x0A00",
+    ]
+    n.rule(
+        name="windows_x64_cc",
+        command=f"{compile_launcher(sln)}$windows_x64_cc -MMD -MF $out.d $cflags -c $in -o $out",
+        description="WINDOWS X64 CC $out",
+        depfile="$out.d",
+        deps="gcc",
+    )
+    n.rule(
+        name="windows_x64_copy",
+        command="$python -c \"import shutil,sys; shutil.copyfile(sys.argv[1], sys.argv[2])\" $in $out",
+        description="WINDOWS X64 COPY $out",
+    )
+
+    host_cflags = " ".join([
+        *common, "-std=gnu11", "-Wall", "-Wno-unused-function",
+        f"-I{HOST_DIR / 'include'}", f"-I{HOST_DIR}", f"-I{ANDROID_DIR / 'include'}", f"-I{ANDROID_DIR / 'host'}",
+        f"-I{_quote(sdl_include)}", f"-I{LINUX_DIR / 'src'}", f"-I{TOML_DIR}",
+    ])
+    win32_cflags = " ".join([
+        *common, "-std=gnu11", "-Wall", f"-I{WINDOWS_DIR / 'include' / 'posix'}", f"-I{LINUX_DIR / 'src'}",
+        f"-I{_quote(sdl_include)}",
+    ])
+    objects: List[Path] = []
+
+    def add(source: Path, cflags: str, name: str = "", implicit: List[Path] = None) -> None:
+        obj = obj_dir / (name or source.name + ".o")
+        n.build(outputs=obj, rule="windows_x64_cc", inputs=source, implicit=implicit or [],
+                variables={"cflags": cflags})
+        objects.append(obj)
+
+    for source in sorted(HOST_DIR.glob("win64_*.c")):
+        add(source, host_cflags)
+    add(HOST_DIR / "win64_switch.S", " ".join(target))
+    for source in SHARED_HOST_SOURCES:
+        add(source, host_cflags)
+    add(TOML_DIR / "tomlc17.c", " ".join([*common, "-std=gnu11", "-w"]))
+    # the kit's
+    kit_files = [kit / name for name in KIT_FILES]
+    add(kit / "host_thunks.S", " ".join(target), "host_thunks.S.o")
+    add(kit / "host_thunk_table.c", host_cflags, "host_thunk_table.c.o")
+    add(HOST_DIR / "win64_guest_image.S", " ".join(target) + f' -DGUEST_IMAGE=\\"{_quote(kit_files[0])}\\"',
+        implicit=[kit_files[0]])
+    # posix.h's functions, and the self-updater's system side (update.h),
+    # as the 32-bit build has them
+    for name in WIN32_SOURCES:
+        add(WINDOWS_DIR / "src" / name,
+            win32_cflags + (" " + updater_defines(release) if name == "win32_update.c" else ""))
+    miniupnpc_include = f"-I{MINIUPNPC_DIR / 'include'} -DMINIUPNP_STATICLIB"
+    add(WINDOWS_DIR / "src" / "win32_upnp.c", f"{win32_cflags} {miniupnpc_include}")
+    for source in miniupnpc_sources():
+        add(source, " ".join([*common, "-std=gnu11", miniupnpc_include, f"-I{MINIUPNPC_DIR / 'src'}", "-w"]),
+            "miniupnpc_" + source.name + ".o")
+    mbedtls_include = f"-I{MBEDTLS_DIR / 'include'}"
+    add(LINUX_DIR / "src" / "posix_dtls.c", f"{win32_cflags} {mbedtls_include}")
+    for source in sorted((MBEDTLS_DIR / "library").glob("*.c")):
+        add(source, " ".join([*common, "-std=gnu11", mbedtls_include, f"-I{MBEDTLS_DIR / 'library'}", "-w"]),
+            "mbedtls_" + source.name + ".o")
+
+    # the executable's icon (port/windows/halo.rc)
+    n.variable("windows_x64_rc", windows_rc(cc))
+    n.rule(name="windows_x64_rc", command="$windows_x64_rc /no-preprocess /FO $out $in",
+           description="WINDOWS X64 RC $out")
+    resources = BUILD / "halo.res"
+    n.build(outputs=resources, rule="windows_x64_rc", inputs=WINDOWS_DIR / "halo.rc",
+            implicit=[WINDOWS_DIR / "opence-icon.ico"])
+
+    output = BUILD / "halo.exe"
+    sdl_import = sdl_lib / "SDL3.lib"
+    subsystem = ["/SUBSYSTEM:WINDOWS", "/ENTRY:mainCRTStartup"] if release and not wine else ["/SUBSYSTEM:CONSOLE"]
+    if wine:
+        # (the C runtime's start-up from Wine's ucrtbase import library,
+        # which wants the initializer sections' bounds the Visual C++
+        # runtime would give)
+        crt_sections = BUILD / "wine_crt_sections.c"
+        crt_sections.parent.mkdir(parents=True, exist_ok=True)
+        text = ("/* generated by tools/windows_x64_build.py (a --windows-x64-wine build's) */\n"
+                "typedef void (*entry)(void);\n"
+                "int _fltused = 0;\n"
+                + "".join(f'__attribute__((section(".CRT$X{s}{e}"), used)) entry __x{s.lower()}_{e.lower()}[] = {{0}};\n'
+                          for s in "ICT" for e in "AZ")
+                # (and thread-local storage's directory, the Visual C++
+                # runtime's tlssup)
+                + "unsigned int _tls_index = 0;\n"
+                + '__attribute__((section(".tls"), used)) char _tls_start = 0;\n'
+                + '__attribute__((section(".tls$ZZZ"), used)) char _tls_end = 0;\n'
+                + '__attribute__((section(".CRT$XLA"), used)) entry __xl_a = 0;\n'
+                + '__attribute__((section(".CRT$XLZ"), used)) entry __xl_z = 0;\n'
+                + "struct tls_directory { unsigned long long start, end, index, callbacks; unsigned int zero_fill, "
+                + "characteristics; };\n"
+                + "const struct tls_directory _tls_used = { (unsigned long long)&_tls_start, "
+                + "(unsigned long long)&_tls_end, (unsigned long long)&_tls_index, (unsigned long long)(&__xl_a + 1), "
+                + "0, 0 };\n")
+        if not crt_sections.is_file() or crt_sections.read_text(encoding="utf-8") != text:
+            crt_sections.write_text(text, encoding="utf-8")
+        add(crt_sections, " ".join(common), "wine_crt_sections.c.o")
+        libraries = [WINE_LIBRARIES / f"lib{name}.a" for name in
+                     ["ucrtbase", *LIBRARIES, "kernelbase", "ntdll", "compiler-rt"]]
+        link = (f"lld-link /nologo /out:$out {' '.join(subsystem)} /entry:mainCRTStartup /nodefaultlib "
+                f"/stack:0x800000 /debug /pdb:{BUILD / 'halo.pdb'} @$out.rsp "
+                + " ".join(_quote(path) for path in [sdl_import, *libraries]))
+    else:
+        link = (f"$windows_x64_cc --target=x86_64-pc-windows-msvc -fuse-ld=lld -g -o $out @$out.rsp "
+                f"{_quote(sdl_import)} " + " ".join(f"-l{name}" for name in [*LIBRARIES, "synchronization"])
+                + " " + " ".join(f"-Wl,{flag}" for flag in [*subsystem, "/STACK:0x800000"]))
+    n.rule(
+        name="windows_x64_link",
+        command=link,
+        description="WINDOWS X64 LINK $out",
+        rspfile="$out.rsp",
+        rspfile_content="$in_newline",
+    )
+    n.build(outputs=output, rule="windows_x64_link", inputs=[*objects, resources], implicit=[sdl_import])
+    staged = [output]
+    for source, name in [(sdl_lib / "SDL3.dll", "SDL3.dll"),
+                         (Path("port/assets/network/brokers.txt"), "brokers.txt"),
+                         (Path("port/assets/network/masters.txt"), "masters.txt")]:
+        n.build(outputs=BUILD / name, rule="windows_x64_copy", inputs=source)
+        staged.append(BUILD / name)
+    n.build(outputs="windows_x64", rule="phony", inputs=staged)
+    n.newline()

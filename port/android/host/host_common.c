@@ -1,8 +1,10 @@
 /*
 HOST_COMMON.C
 
-What every host's main shares (the Android app's, port/android/host, and
-the Linux executable's, port/linux/host): logging and termination, the
+What every host's main shares (the Android app's, port/android/host, the
+Linux executable's, port/linux/host, and the Windows x64 one's,
+port/windows/host, which sees its few POSIX names through
+port/windows/host/include): logging and termination, the
 guest's environment and boot block, and the debugging settings of
 config.toml that the host reads itself.
 
@@ -77,7 +79,10 @@ void host_fatal(const char *format, ...)
 	vsnprintf(message, sizeof(message), format, arguments);
 	va_end(arguments);
 	log_sink(HOST_LOG_FATAL, message);
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", message, NULL);
+	/* (not for a game that shows no window: HALO_HIDDEN_WINDOW, as the
+	game's debug.hidden_window) */
+	if (!getenv("HALO_HIDDEN_WINDOW") || !*getenv("HALO_HIDDEN_WINDOW"))
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", message, NULL);
 	_exit(1);
 }
 
@@ -165,8 +170,15 @@ void host_time_zone(char *buffer, size_t size)
 	struct tm local;
 	long offset;
 
+#ifdef _WIN32
+	/* (the C runtime's struct tm has no tm_gmtoff: the local time read as
+	UTC is that far ahead) */
+	localtime_s(&local, &now);
+	offset = -(long)(_mkgmtime(&local) - now);
+#else
 	localtime_r(&now, &local);
 	offset = -local.tm_gmtoff;
+#endif
 	snprintf(buffer, size, "<L>%s%ld:%02ld", offset < 0 ? "-" : "", labs(offset) / 3600, (labs(offset) / 60) % 60);
 }
 

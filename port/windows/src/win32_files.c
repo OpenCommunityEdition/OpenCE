@@ -11,6 +11,7 @@ turn into Xbox error codes.
 #include <windows.h>
 #include <errno.h>
 #include <io.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -213,7 +214,7 @@ struct directory
 	BOOL pending; /* data holds an entry not returned yet */
 };
 
-void *posix_directory_open(const char *path)
+static void *directory_open(const char *path)
 {
 	struct directory *directory = malloc(sizeof(*directory));
 	char pattern[MAX_PATH + 3];
@@ -254,7 +255,7 @@ void *posix_directory_open(const char *path)
 	return directory;
 }
 
-int posix_directory_next(void *handle, char *name, posix_ulong name_size)
+static int directory_next(void *handle, char *name, posix_ulong name_size)
 {
 	struct directory *directory = handle;
 
@@ -274,7 +275,7 @@ int posix_directory_next(void *handle, char *name, posix_ulong name_size)
 	}
 }
 
-void posix_directory_close(void *handle)
+static void directory_close(void *handle)
 {
 	struct directory *directory = handle;
 
@@ -284,6 +285,79 @@ void posix_directory_close(void *handle)
 		FindClose(directory->find);
 	free(directory);
 }
+
+#ifdef _WIN64
+/* The Windows x64 build (port/windows/host) calls this file from 32-bit
+guest code, which cannot hold a 64-bit pointer: directory streams are small
+handles there, as posix_files.c's are in the Linux and Android hosts. */
+#define DIRECTORY_HANDLE_COUNT 64
+
+static void *directory_handles[DIRECTORY_HANDLE_COUNT];
+static SRWLOCK directory_handle_lock = SRWLOCK_INIT;
+
+void *posix_directory_open(const char *path)
+{
+	void *directory = directory_open(path);
+	unsigned long index;
+
+	if (!directory)
+		return NULL;
+	AcquireSRWLockExclusive(&directory_handle_lock);
+	for (index = 0; index < DIRECTORY_HANDLE_COUNT; index++)
+	{
+		if (!directory_handles[index])
+		{
+			directory_handles[index] = directory;
+			ReleaseSRWLockExclusive(&directory_handle_lock);
+			return (void *)(uintptr_t)(index + 1);
+		}
+	}
+	ReleaseSRWLockExclusive(&directory_handle_lock);
+	directory_close(directory);
+	errno = EMFILE;
+	return NULL;
+}
+
+static void *directory_of(void *handle, int release)
+{
+	uintptr_t index = (uintptr_t)handle - 1;
+	void *directory;
+
+	if (index >= DIRECTORY_HANDLE_COUNT)
+		return NULL;
+	AcquireSRWLockExclusive(&directory_handle_lock);
+	directory = directory_handles[index];
+	if (release)
+		directory_handles[index] = NULL;
+	ReleaseSRWLockExclusive(&directory_handle_lock);
+	return directory;
+}
+
+int posix_directory_next(void *handle, char *name, posix_ulong name_size)
+{
+	return directory_next(directory_of(handle, 0), name, name_size);
+}
+
+void posix_directory_close(void *handle)
+{
+	directory_close(directory_of(handle, 1));
+}
+#else
+void *posix_directory_open(const char *path)
+{
+	return directory_open(path);
+}
+
+int posix_directory_next(void *handle, char *name, posix_ulong name_size)
+{
+	return directory_next(handle, name, name_size);
+}
+
+void posix_directory_close(void *handle)
+{
+	directory_close(handle);
+}
+#endif
 
 int posix_find_entry_case_insensitive(const char *directory, const char *name,
 	char *result, posix_ulong result_size)

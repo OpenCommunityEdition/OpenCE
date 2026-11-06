@@ -16,6 +16,7 @@ from tools.linux_guest_build import generate_linux_guest_builds, linux_guest_con
 from tools.linux_build import check_profile_options, generate_linux_build, linux_configure_inputs
 from tools.web_build import generate_web_build, web_configure_inputs
 from tools.windows_build import generate_windows_build, windows_configure_inputs
+from tools.windows_x64_build import generate_windows_x64_build, windows_x64_configure_inputs
 
 
 def is_windows() -> bool:
@@ -116,6 +117,20 @@ parser.add_argument(
     help="clang (with the x32 target) for `ninja linux_x86_64`, the 64-bit x86 Linux build (default: clang)",
 )
 parser.add_argument(
+    "--windows-x64-kit",
+    metavar="DIR",
+    type=Path,
+    help="generate `ninja windows_x64`, the Windows x64 build (port/windows/host), from this Windows kit: the "
+    "64-bit x86 Linux build's guest image and import thunks (default: build/linux_x86_64/windows_kit, which "
+    "`ninja linux_x86_64` writes; on Windows the build is generated when it is there)",
+)
+parser.add_argument(
+    "--windows-x64-wine",
+    action="store_true",
+    help="generate `ninja windows_x64` on Linux, against Wine's Windows headers and import libraries "
+    "(/usr/include/wine, /usr/lib/wine/x86_64-windows), for testing the Windows x64 build under Wine",
+)
+parser.add_argument(
     "--web-emcc",
     type=str,
     help="Emscripten's emcc for `ninja web` (default: emcc on the PATH, then EMSDK's or ~/emsdk's)",
@@ -175,6 +190,8 @@ sln = SimpleNamespace(
     linux_arm64_gl=args.linux_arm64_gl,
     linux_x86_64=args.linux_x86_64,
     linux_x86_64_cc=args.linux_x86_64_cc,
+    windows_x64_kit=args.windows_x64_kit,
+    windows_x64_wine=args.windows_x64_wine,
     web_emcc=args.web_emcc,
 )
 if not is_windows():
@@ -203,6 +220,7 @@ generate_linux_build(n, sln)
 generate_android_build(n, sln)
 generate_linux_guest_builds(n, sln)
 generate_windows_build(n, sln)
+generate_windows_x64_build(n, sln)
 generate_web_build(n, sln)
 
 n.comment("Reconfigure on change")
@@ -222,6 +240,7 @@ n.build(
         *android_configure_inputs(),
         *linux_guest_configure_inputs(),
         *windows_configure_inputs(),
+        *windows_x64_configure_inputs(),
         *web_configure_inputs(),
     ],
 )
