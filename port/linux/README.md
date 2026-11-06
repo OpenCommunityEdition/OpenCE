@@ -92,6 +92,10 @@ To see the glibc version that a build needs, enter
 2. Enter `python configure.py`.
 3. Enter `ninja linux`.
 
+For 32-bit ARM Linux, `ninja linux_armv7` builds the same game with
+`python configure.py --linux-arch armv7 --linux-sysroot DIR`: refer to
+[port/linux-armv7/README.md](../linux-armv7/README.md).
+
 ## Start the game
 
 Enter `build/linux/halo`.

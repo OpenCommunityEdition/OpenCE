@@ -21,6 +21,7 @@ end.
 | `port/include/xdk/` | Stand-ins for the Xbox SDK's headers (declarations only) |
 | `port/windows/` | The Windows build's own files (`win32_*.c`, headers) |
 | `port/android/` | The Android app: the guest runtime, the host library (`host/`), the Java app (`app/`), host imports (`host_imports.list`) |
+| `port/linux-armv7/` | The native Linux armv7 port: the Linux build compiled for armv7-linux-gnueabihf with clang and lld, on OpenGL ES (a root of armhf libraries from `--linux-sysroot`) |
 | `port/web/` | The web build: its runtime (`src/`: entry, sockets inside the page, memory watch), the page and its service worker (`site/`), the SDL port, tests |
 | `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers and master servers, the dedicated server's web page (`server_ui/`) |
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
@@ -39,6 +40,7 @@ python configure.py            # debug build; add --release, --portable, --profi
 ninja linux                    # build/linux/halo
 ninja android                  # the Android guest image and native libraries
 ninja android_apk              # the APK (Gradle)
+ninja linux_armv7              # build/linux-armv7/halo (configure with --linux-arch armv7 and --linux-sysroot DIR)
 ninja web                      # build/web/site (Emscripten: port/web/README.md)
 ninja windows                  # on Windows, or on Linux after configure.py --windows-cross
 python tools/ci_build.py linux release   # what CI builds
@@ -72,6 +74,7 @@ python tools/ci_build.py linux release   # what CI builds
 | `HALO_ARM64_GUEST` | Android | The guest's ABI (ILP32 AArch64) |
 | `HALO_WEB` | Web | The browser: its frames, storage, sockets and WebGL 2's limits (with `HALO_GLES`, not `HALO_ANDROID`) |
 | `HALO_WINDOWS` | Windows (`halo_windows_prefix.h`) | The Windows build |
+| `HALO_LINUX_ARMV7` | Linux armv7 | The 32-bit ARM Linux build: the aligned script stack (`hs_runtime.c`), the Custom Edition window (`xbox_memory.c`), the GLES host (`gles_host.c`) |
 | `HALO_RELEASE` | `--release` | No assertions checked |
 | `HALO_PROFILE` | `--profile` | The profiling build; a normal build must be unchanged by it |
 
@@ -234,6 +237,7 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [port/linux/NETCODE.md](port/linux/NETCODE.md) | The distributed netcode, network versions, joining a game in progress, map sharing, transport, testing |
 | [port/windows/README.md](port/windows/README.md) | The Windows build, its headers, inline functions, crash reports |
 | [port/android/README.md](port/android/README.md) | The Android build, the guest and host, touch controls, Android settings, finding problems |
+| [port/linux-armv7/README.md](port/linux-armv7/README.md) | The Linux armv7 build: the AArch32 game, building, the alignment rules, limits, tests |
 | [port/web/README.md](port/web/README.md) | The web build, the page, the game data in the browser, limits, how it operates, hosting on GitHub Pages |
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |

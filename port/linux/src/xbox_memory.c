@@ -50,6 +50,13 @@ static BOOL arena_reserved = FALSE;
 static pthread_mutex_t arena_lock = PTHREAD_MUTEX_INITIALIZER;
 static void *custom_edition_tag_cache = NULL;
 
+#ifdef HALO_LINUX_ARMV7
+/* The armv7 executable carries the window as a segment of its own, which the
+kernel maps before the loader can put a library there (the linker script
+tools/linux_armv7_tag_cache.ld); no other build defines this. */
+extern char __ce_tag_cache_start[];
+#endif
+
 static int protection_to_host(DWORD protect)
 {
 	switch (protect & 0xff)
@@ -110,6 +117,13 @@ static void custom_edition_tag_cache_reserve(void)
 #endif
 	if (!config_boolean("game.custom_edition"))
 		return;
+#ifdef HALO_LINUX_ARMV7
+	if ((void *)__ce_tag_cache_start == wanted)
+	{
+		custom_edition_tag_cache = wanted;
+		return;
+	}
+#endif
 	result = mmap(wanted, CUSTOM_EDITION_TAG_CACHE_BYTES, PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED_NOREPLACE, -1, 0);
 	if (result == wanted)

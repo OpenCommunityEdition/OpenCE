@@ -309,7 +309,13 @@ enum
 
 enum
 {
+#ifdef HALO_LINUX_ARMV7
+	/* port: the frames and allocations are kept to multiples of 4 below
+	(hs_stack_frame, hs_stack_allocate): a little more room for that */
+	HS_THREAD_STACK_SIZE = 0x280
+#else
 	HS_THREAD_STACK_SIZE = 0x200
+#endif
 };
 
 /* port: the size of the text an inspector writes (hs_evaluate_inspect) */
@@ -407,8 +413,23 @@ struct hs_stack_frame
 	long expression_index;
 	void *result;
 	short size;
+#ifdef HALO_LINUX_ARMV7
+	/* port: the scripts' arguments are read as structures of floats and
+	longs, which 32-bit ARM loads with instructions that fault on an address
+	that is not a multiple of 4 (x86 and AArch64 do not): the data starts on
+	one, here, and every allocation from it is a multiple of 4 */
+	short align;
+	byte data[4];
+#else
 	byte data[2];
+#endif
 };
+
+#ifdef HALO_LINUX_ARMV7
+#include <stddef.h>
+typedef char hs_stack_frame_alignment_assert[
+	(offsetof(struct hs_stack_frame, data) % 4 == 0 && sizeof(struct hs_stack_frame) % 4 == 0) ? 1 : -1];
+#endif
 
 struct hs_global_datum
 {
@@ -427,11 +448,11 @@ struct hs_thread_datum
 	long previous_sleep_until;
 	struct hs_stack_frame *stack;
 	long result;
-	byte stack_data[0x200];
+	byte stack_data[HS_THREAD_STACK_SIZE];
 };
 
 typedef char hs_thread_datum_size_assert[
-	sizeof(struct hs_thread_datum) == 0x218 ? 1 : -1];
+	sizeof(struct hs_thread_datum) == 0x18 + HS_THREAD_STACK_SIZE ? 1 : -1];
 
 /* ---------- prototypes */
 
@@ -2862,6 +2883,12 @@ static void *hs_stack_allocate(
 	struct hs_thread_datum *thread = hs_thread_get(thread_index);
 	struct hs_stack_frame *frame = thread->stack;
 	void *result;
+
+#ifdef HALO_LINUX_ARMV7
+	/* port: a multiple of 4, as the frames are (hs_stack_frame) */
+	if (size>0)
+		size = (size+3) & ~3L;
+#endif
 
 	match_hs_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x37d, thread_index,
 		valid_thread(thread), "corrupted stack.");

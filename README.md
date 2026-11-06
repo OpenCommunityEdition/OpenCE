@@ -169,6 +169,7 @@ To build the game:
 | Target | Result |
 | --- | --- |
 | `ninja linux` | `build/linux/halo` |
+| `ninja linux_armv7` (after `configure.py --linux-arch armv7 --linux-sysroot DIR`) | `build/linux-armv7/halo`, for 32-bit ARM Linux |
 | `ninja windows` (on Windows, or on Linux after `configure.py --windows-cross`) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
 | `ninja web` | `build/web/site/`, the web site (`python tools/web_serve.py` serves it) |
