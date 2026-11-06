@@ -254,6 +254,8 @@ static struct network_machine machine;
 static struct network_message fake_reply;
 static int state,late,joined,decode_ok,token_ok,slots,open_game,banned,accepted,capable,requires_mcc,name_blocked;
 static int camera_locked;
+static int replaceable_bots;
+static int bots_population_can_join(struct network_game_server *s) {(void)s;return replaceable_bots;}
 static unsigned long peer_address;
 static void third_person_session_lock(void) {camera_locked=1;}
 static int decode(void *out) {
@@ -293,7 +295,7 @@ static int accept(void) {if(banned)return 0;accepted++;return 1;}
 ''' + join + r'''
 static void reset(void) {
  state=0;late=joined=banned=accepted=capable=requires_mcc=name_blocked=0;
- camera_locked=0;peer_address=2;game.machine_count=1;
+ camera_locked=replaceable_bots=0;peer_address=2;game.machine_count=1;
  decode_ok=token_ok=slots=open_game=1;
 }
 static int try_join(int capability) {
@@ -311,6 +313,11 @@ int main(void) {
   reset();requires_mcc=mcc;decode_ok=0;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;token_ok=0;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;slots=0;CHECK(!try_join(cap) && !accepted);
+  reset();requires_mcc=mcc;slots=0;replaceable_bots=1;
+  CHECK(try_join(cap)==(!mcc||cap));CHECK(accepted==(!mcc||cap));
+  reset();requires_mcc=mcc;slots=0;replaceable_bots=1;token_ok=0;CHECK(!try_join(cap) && !accepted);
+  reset();requires_mcc=mcc;slots=0;replaceable_bots=1;open_game=0;CHECK(!try_join(cap) && !accepted);
+  reset();requires_mcc=mcc;slots=0;replaceable_bots=1;banned=1;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;open_game=0;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;banned=1;CHECK(!try_join(cap) && !accepted);
   reset();requires_mcc=mcc;name_blocked=1;CHECK(!try_join(cap) && !accepted);

@@ -27,12 +27,16 @@ their existing map loaders, limits, rules and resource ownership.
   `bots.count`, `bots.skill` and `bots.teams` still apply.
   Up to 63 bots join, subject to the lobby's player limit (63 bots plus one
   human need at least 64 player slots). The default count remains zero.
+  Network bots automatically yield to joining humans and return when humans
+  leave; the browser counts humans only. The [population walkthrough](bot_population.md)
+  explains the target, join ordering and OpenCE compatibility.
 - In the CE menus, **Settings > Network > Bots** configures count, network
   admission, difficulty, teams, enhanced tactics, vehicles and routes.
   **Create Game** and the host's lobby also have a **Bots** button. During
   a match, open **Settings > Network > Bots > Manage Current Bots** to add
   or remove one bot on either team, or let Any Team balance a team game.
-  Live changes do not change the saved lobby count. Clients cannot manage
+  Live changes adjust the session population target without changing the
+  saved lobby count. Clients cannot manage
   the host's bots. Xbox menu artwork and navigation remain unchanged.
 - Android's **Settings > Gamepad > Android Controls > Gyro Aim** offers
   **Touch Settings**, **Off**, **On** and **Zoom Only**. Touch Settings is

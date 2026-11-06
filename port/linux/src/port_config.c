@@ -630,7 +630,9 @@ static const struct config_setting config_settings[] =
 	{ "bots.count", _config_integer, "0", "HALO_BOTS", _environment_value, _platform_all,
 		"Computer players (bots): 0 to 63. Local Slayer by default; bots.enhanced\n"
 		"also allows CTF/King, and bots.network enables host-controlled network\n"
-		"bots. They join the lobby as room permits. 0: none, as in the stock game." },
+		"bots. Network humans replace bots, which return when humans leave.\n"
+		"The initial humans plus this count set the session population target.\n"
+		"0: no initial bots, as in the stock game." },
 	{ "bots.skill", _config_string, "\"normal\"", "HALO_BOT_SKILL", _environment_value, _platform_all,
 		"How well the bots play: \"recruit\", \"easy\", \"normal\", \"heroic\",\n"
 		"\"veteran\" or \"legendary\" (how soon they react, how well they aim,\n"

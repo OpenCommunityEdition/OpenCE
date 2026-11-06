@@ -429,6 +429,14 @@ unchanged and are read when creating the next host.
 The CE menus expose these settings at **Settings > Network > Bots**, with
 shortcuts in Create Game and the host's lobby. During a match, **Manage
 Current Bots** adds/removes bots by team without changing the saved count.
+Network bots automatically make room for arriving humans and return after
+humans leave. The first admitted humans plus Bot Count establish a session
+population target, bounded by the player limit. Live add/drop commands adjust
+that target for this session. There is no separate replacement toggle.
+Internet and LAN browser populations, master listings and Discord presence
+count humans only; bots remain ordinary players in the match and scoreboard.
+See [population and crossplay](../../docs/reading/bot_population.md) for
+join ordering, restoration and limits.
 The lobby's player limit still applies: allow at least 64 slots for 63 bots
 and one human. Xbox menu defaults and navigation are unchanged.
 Clients receive ordinary player records and actions. All additions default
@@ -631,7 +639,7 @@ the setting for one start of the game. It has priority over the file.
 | `bots.vehicles` | `false` | `HALO_BOT_VEHICLES` | Enhanced ground vehicles, turrets, aircraft and friendly-player boarding through ordinary controls; requires usable authored seats and physics. |
 | `bots.thread` | `false` | `HALO_BOT_THREAD` | Optional snapshot path worker for enhanced bots. Read at map load; fixed-tick benchmarks remain synchronous. |
 | `android.cheat_menu` | `false` | `HALO_ANDROID_CHEAT_MENU` | Android: show a CHEATS touch button and Options entry during offline gameplay or while hosting co-op/multiplayer. Joining clients cannot use cheats. |
-| `bots.count` | `0` | `HALO_BOTS` | Computer players: `0` to `63` join the lobby as room permits. Local Slayer by default; `bots.enhanced` adds CTF/King and `bots.network` allows network hosts. `0`: none, as in the stock game. Refer to "Bots". |
+| `bots.count` | `0` | `HALO_BOTS` | Initial computer players: `0` to `63`, subject to capacity. Network hosts automatically replace bots with joining humans and restore them on departures, maintaining the session population target. Local Slayer by default; `bots.enhanced` adds CTF/King. Refer to "Bots". |
 | `bots.skill` | `"normal"` | `HALO_BOT_SKILL` | How well the bots play: `"recruit"`, `"easy"`, `"normal"`, `"heroic"`, `"veteran"` or `"legendary"`: how soon they react, how far and how wide they see, how large their aim error is and how fast it settles, how fast they turn. |
 | `bots.teams` | `"even"` | `HALO_BOT_TEAMS` | In a team game: `"even"` puts the bots on both teams, evening them with the players; `"against"` puts them all on the team the players are not on. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |

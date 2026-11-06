@@ -18,6 +18,9 @@ int config_boolean(const char *name);
 static int network_bots;
 static int network_bots_enabled;
 static byte owned[BOTS_MAXIMUM];
+static long population_target = -1;
+static long population_configured = -1;
+static long population_limit;
 
 int bots_console_command(char const *expression)
 {
@@ -40,6 +43,7 @@ int bots_console_command(char const *expression)
 void bots_network_session_begin(void)
 {
 	bots_management_reset();
+	population_target = population_configured = -1;
 	network_bots = config_boolean("bots.network");
 	network_bots_enabled = network_bots;
 	csmemset(owned, 0, sizeof(owned));
@@ -48,6 +52,7 @@ void bots_network_session_begin(void)
 void bots_network_session_end(void)
 {
 	bots_management_reset();
+	population_target = population_configured = -1;
 	network_bots = FALSE;
 	network_bots_enabled = FALSE;
 	csmemset(owned, 0, sizeof(owned));
@@ -78,8 +83,59 @@ int bots_session_allowed(void)
 Keep the reservation when disabled: peers may still be processing removals. */
 void bots_network_lobby_enable(int enabled)
 {
+	if (network_bots_enabled != (enabled != 0))
+		population_target = population_configured = -1;
 	network_bots_enabled = enabled != 0;
 	if (enabled) network_bots = TRUE;
+}
+
+long bots_human_count(struct network_game *game)
+{
+	long index, count = 0;
+	for (index = 0; game && index < (long)NUMBEROF(game->players); index++)
+		if (network_player_is_valid(&game->players[index]) &&
+			!bots_player_owned(game->players[index].machine_index))
+			count++;
+	return count;
+}
+
+/* The first admitted humans and the requested bots establish the session's
+population. Later humans replace bots, including across successive maps.
+Changing Bot Count deliberately establishes a new target from this lobby. */
+long bots_population_wanted(struct network_game *game)
+{
+	long humans = bots_human_count(game);
+	long configured = bots_wanted_count();
+	if (network_game_is_splitscreen_local())
+		return configured;
+	if (!bots_session_allowed())
+		return 0;
+	if (humans > 0 && (population_target < 0 || population_configured != configured))
+	{
+		population_configured = configured;
+		population_limit = configured;
+		population_target = MIN(game->maximum_players, humans + configured);
+	}
+	return population_target < 0 ? 0 :
+		MAX(0, MIN(population_limit, MIN(population_target, game->maximum_players) - humans));
+}
+
+void bots_population_changed(struct network_game *game, int change)
+{
+	if (network_game_is_splitscreen_local() || !bots_session_allowed())
+		return;
+	bots_population_wanted(game);
+	/* Humans may have grown past the original target. An explicit addition
+	must retain the bot just admitted rather than immediately removing it. */
+	population_target = PIN(MAX(population_target + change, game->player_count), 0, game->maximum_players);
+	population_limit = PIN(population_limit + change, 0, BOTS_MAXIMUM);
+}
+
+long bots_population_after_join(struct network_game *game)
+{
+	bots_population_wanted(game);
+	return population_target < 0 ? 0 : MAX(0,
+		MIN(population_limit, MIN(population_target, game->maximum_players) - bots_human_count(game) - 1));
 }
 
 int bots_lobby_can_start(struct network_game *game)

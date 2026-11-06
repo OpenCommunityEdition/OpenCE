@@ -263,6 +263,7 @@ symbols in this file:
 #include "mcc_protocol.h" /* port: MCC-only admission and settings envelope */
 #include "third_person_protocol.h" /* port: port/linux/game/third_person_protocol.c */
 #include "mcc_identity.h" /* port: attach MCC content identity to host settings */
+#include "bots.h" /* port: host-owned population reporting and replaceable capacity */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager_internal.h"
@@ -1834,7 +1835,7 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			advertisement.engine_type = (short)game->variant.game_engine_index;
 			csmemcpy(&advertisement.map, &game->map, sizeof(game->map));
 			advertisement.machine_count = game->machine_count;
-			advertisement.player_count = game->player_count;
+			advertisement.player_count = bots_human_count(game); /* port: browser population counts humans */
 			advertisement.maximum_player_count = game->maximum_players;
 			advertisement.variant_setting = (short)game->variant.universal_variant.score_to_win;
 			advertisement.flags = 0;
@@ -1875,7 +1876,8 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			once it is over, nor in progress when no player can join it) */
 			if (network_game_server_get_state(server, NULL) == _network_game_server_state_ingame
 				? network_game_server_accepts_late_joins(server)
-				: network_game_server_game_is_open(server) && network_game_has_free_player_slot(game))
+				: network_game_server_game_is_open(server) &&
+					(network_game_has_free_player_slot(game) || bots_population_can_join(server))) /* port: replaceable bots */
 			{
 				advertisement.flags |= FLAG(_game_advertisement_open_bit);
 			}
@@ -2034,7 +2036,8 @@ static boolean network_game_server_handle_message_client_join_game_request(
 			fill it) is full: a machine that joined could add none, and held
 			the countdown for ever */
 			boolean full = network_game_server_get_state(server, NULL) == _network_game_server_state_pregame &&
-				!network_game_has_free_player_slot(network_game_server_get_game(server));
+				!network_game_has_free_player_slot(network_game_server_get_game(server)) &&
+				!bots_population_can_join(server); /* port: validated humans can replace lobby bots */
 
 			/* port: bind capability to this connection before the normal admission.
 			 * A failed join is removed through the same lifecycle as any other peer. */

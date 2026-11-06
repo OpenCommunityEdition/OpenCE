@@ -13,6 +13,7 @@ drawn for them. */
 struct player_action;
 struct network_player;
 struct network_game;
+struct network_game_server;
 
 /* Optional host bots: 63 plus one human, within the existing 128 slots. */
 #define BOTS_MAXIMUM 63
@@ -48,6 +49,12 @@ int bots_lobby_settings_apply(char *status, long size);
 int bots_session_allowed(void);
 void bots_player_ownership(long machine_index, int present);
 int bots_player_owned(long machine_index);
+/* Browser population excludes host-owned bots; the gameplay roster does not. */
+long bots_human_count(struct network_game *game);
+long bots_population_wanted(struct network_game *game);
+long bots_population_after_join(struct network_game *game);
+void bots_population_changed(struct network_game *game, int change);
+int bots_population_can_join(struct network_game_server *server);
 /* One human machine with owned bots can start the ordinary lobby countdown. */
 int bots_lobby_can_start(struct network_game *game);
 void bots_network_record_actions(struct player_action *actions);
