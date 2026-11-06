@@ -18,6 +18,9 @@ What runs, and what does not yet:
   (`halo1/sound/pc`), which are not read yet.
 - MCC's `ui.map` holds Halo PC's menus, not the Xbox's: the game's own
   menus that are not in it (the network pregame screen) do not open.
+- The HUD is drawn at the Xbox's size, from MCC's remastered bitmaps.
+- Not on the web build, which runs no Custom Edition map either (its tag
+  cache is not reserved there).
 
 ## Loading
 
@@ -69,6 +72,23 @@ version 13 cache as it takes a Custom Edition one, but for these:
 8. A sound's samples name a `sounds.map` MCC does not ship (Halo PC's). Its
    sounds are made unplayable (`mcc_sounds_mute`) until they are taken from
    MCC's banks.
+9. The HUD is laid out at twice the Xbox's size, with bitmaps four times the
+   Xbox's (`mcc_hud_convert`): every placement's offset is doubled (but the
+   few with Halo PC's high resolution scale flag, all vehicles' health,
+   whose offsets are the Xbox's), the digits' metrics and the damage
+   indicators' offsets are doubled, and every bitmap a placement draws has
+   the half HUD scale flag. Each placement's offset and scale is halved, the
+   weapons' numbers' and the grenade count's too; the Custom Edition
+   conversion then halves those of flagged bitmaps again, as it does a
+   Custom Edition map's; the digits' bitmap is given the flag, and
+   `hud_draw_numbers` halves an MCC map's digits once more.
+10. Its bitmaps' channels are the Xbox's, not Halo PC's: its model shaders'
+    multipurpose maps are not reordered as a Custom Edition map's are
+    (`custom_edition_bitmaps_orders_set`). Its HUD meters keep the fill
+    order in color as the Xbox's do, but their alpha is the shape alone, a
+    flat 225 to 255, where the Xbox's carries the fill order too; the meter
+    reads both, so the color is sampled for alpha as well
+    (`_custom_edition_channels_hud_meter_mcc`).
 
 `port/tools/cache_file_report.c` checks a version 13 cache as far as the move
 of its tags, which needs the game's schemas.

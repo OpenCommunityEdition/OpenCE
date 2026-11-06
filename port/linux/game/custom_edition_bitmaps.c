@@ -200,6 +200,11 @@ struct custom_edition_bitmaps_globals
 	unsigned long behaviours;
 	long reordered_bitmap_count;
 	long reordered_bitmap_capacity;
+	/* a map whose model shaders' multipurpose maps are in this build's order,
+	not Halo PC's, and whose HUD meters are MCC's (an MCC map's:
+	custom_edition_bitmaps_orders_set) */
+	boolean xbox_multipurpose_maps;
+	boolean mcc_hud_meters;
 };
 
 /* ---------- globals */
@@ -480,7 +485,8 @@ static boolean meter_bitmaps_mark(
 	struct tag_view const *view,
 	struct meter_hud_element_definition const *meter)
 {
-	short order = _custom_edition_channels_hud_meter;
+	short order = custom_edition_bitmaps_globals.mcc_hud_meters ? _custom_edition_channels_hud_meter_mcc :
+		_custom_edition_channels_hud_meter;
 
 	/* Open v1.1 changed this shared weapon sheet to Xbox channel order.
 	Keep the explicit identity even when static elements use it too. */
@@ -642,9 +648,10 @@ static boolean reordered_bitmaps_find(
 	long bitmap_index;
 
 	/* the bitmaps drawn in Halo PC's orders: model shaders' multipurpose
-	maps and HUD meters */
+	maps and HUD meters (none of a map whose are this build's) */
 	tag_index = NONE;
-	while ((shader = view_tag_next(view, SHADER_MODEL_GROUP_TAG, sizeof(*shader), &tag_index)) != NULL)
+	while (!globals->xbox_multipurpose_maps &&
+		(shader = view_tag_next(view, SHADER_MODEL_GROUP_TAG, sizeof(*shader), &tag_index)) != NULL)
 	{
 		if (!reordered_bitmaps_mark(view, shader->multipurpose_map.index, NONE, _custom_edition_channels_multipurpose))
 		{
@@ -799,6 +806,16 @@ boolean custom_edition_reordered_bitmaps_find(
 	return reordered_bitmaps_find(&view);
 }
 
+void custom_edition_bitmaps_orders_set(
+	boolean xbox_multipurpose_maps,
+	boolean mcc_hud_meters)
+{
+	custom_edition_bitmaps_globals.xbox_multipurpose_maps = xbox_multipurpose_maps;
+	custom_edition_bitmaps_globals.mcc_hud_meters = mcc_hud_meters;
+
+	return;
+}
+
 boolean custom_edition_loaded_reordered_bitmaps_find(
 	void)
 {
@@ -838,6 +855,8 @@ void custom_edition_bitmaps_dispose(
 	globals->reordered_bitmap_count = 0;
 	globals->reordered_bitmap_capacity = 0;
 	globals->behaviours = 0;
+	globals->xbox_multipurpose_maps = FALSE;
+	globals->mcc_hud_meters = FALSE;
 	/* the pixels it was told of are the texture cache's to reuse */
 	halo_custom_edition_texels_forget();
 

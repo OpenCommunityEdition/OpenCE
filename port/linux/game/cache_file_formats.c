@@ -273,6 +273,8 @@ weapon_hud_interface_definition.hpp agree): an element's offset, scale and
 scaling flags, of which Halo PC added the high resolution scale. Where they
 lie in the unit, weapon and grenade HUD interfaces, in the elements of
 their blocks and in the HUD globals' messages. */
+#define HUD_PLACEMENT_OFFSET_X_OFFSET 0x00
+#define HUD_PLACEMENT_OFFSET_Y_OFFSET 0x02
 #define HUD_PLACEMENT_WIDTH_SCALE_OFFSET 0x04
 #define HUD_PLACEMENT_HEIGHT_SCALE_OFFSET 0x08
 #define HUD_PLACEMENT_SCALING_FLAGS_OFFSET 0x0C
@@ -299,6 +301,13 @@ bitmap.json: "half hud scale", "force hud use highres scale") */
 #define WEAPON_HUD_INTERFACE_BYTES 0x17C
 #define WEAPON_HUD_INTERFACE_STATICS_OFFSET 0x60
 #define WEAPON_HUD_INTERFACE_METERS_OFFSET 0x6C
+/* a weapon's numbers (tag_schema_effects.c, struct weapon_hud_number_element:
+its header, then its number's placement) */
+#define WEAPON_HUD_INTERFACE_NUMBERS_OFFSET 0x78
+#define WEAPON_HUD_NUMBER_BYTES 0xA0
+#define WEAPON_HUD_NUMBER_PLACEMENT_OFFSET 0x24
+/* the grenade count's number's placement (struct grenade_count_panel_definition) */
+#define GRENADE_HUD_INTERFACE_COUNT_NUMBERS_OFFSET 0xF4
 #define WEAPON_HUD_INTERFACE_CROSSHAIRS_OFFSET 0x84
 #define WEAPON_HUD_INTERFACE_OVERLAYS_OFFSET 0x90
 #define WEAPON_HUD_STATIC_OR_METER_BYTES 0xB4
@@ -328,6 +337,8 @@ weapon HUD meter's after its 0x24-byte header. */
 #define HUD_GLOBALS_GROUP_TAG 'hudg'
 #define HUD_GLOBALS_BYTES 0x450
 #define HUD_GLOBALS_MESSAGING_PLACEMENT_OFFSET 0x24
+/* the damage indicators' top, bottom, left and right offsets (shorts) */
+#define HUD_GLOBALS_DAMAGE_INDICATOR_OFFSETS_OFFSET 0x310
 /* the HUD digits, named by the first of the globals' interface bitmaps
 (Chimera's jason_jones_hacks.cpp): their bitmap, then their metrics in
 bytes (character width, screen width, x and y offset, decimal point and
@@ -545,6 +556,10 @@ static enum cache_file_status animation_graph_check(
 static enum cache_file_status animation_check(
 	struct load_state *state,
 	uint32_t element_offset);
+static void loaded_state_initialize(
+	struct load_state *state,
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes);
 
 /* ---------- globals */
 
@@ -2499,6 +2514,155 @@ enum cache_file_status mcc_structure_bsp_vertices_attach(
 	write_u32(bsp + MCC_STRUCTURE_BSP_HEADER_REGION_OFFSET_OFFSET, 0);
 
 	return _cache_file_status_ok;
+}
+
+/* the walk of an MCC map's HUD placements (mcc_hud_convert) */
+struct mcc_hud_walk_context
+{
+	struct load_state const *state;
+	int32_t *placements;
+};
+
+/* an MCC HUD placement made the Xbox's size: its offset and its scale
+halved, as the whole HUD is laid out at twice the Xbox's size (its bitmaps,
+four times the Xbox's, are halved again for their half HUD scale flag, as
+custom_edition_cache_convert halves them: hud_placement_convert) */
+static void mcc_hud_walk_placement(
+	void *context,
+	uint8_t *placement,
+	uint8_t const *bitmap,
+	int items)
+{
+	struct mcc_hud_walk_context *walk_context = context;
+	int32_t *count = walk_context->placements;
+	uint16_t flags = read_u16(placement + HUD_PLACEMENT_SCALING_FLAGS_OFFSET);
+
+	(void)bitmap;
+	(void)items;
+	/* (a placement with the high resolution scale flag has its offset in
+	the Xbox's units already, observed: every one is a vehicle's health) */
+	if (!flag_is_set(flags, HUD_SCALING_USE_HIGH_RESOLUTION_SCALE_BIT))
+	{
+		write_u16(placement + HUD_PLACEMENT_OFFSET_X_OFFSET, (uint16_t)(read_s16(placement + HUD_PLACEMENT_OFFSET_X_OFFSET) / 2));
+		write_u16(placement + HUD_PLACEMENT_OFFSET_Y_OFFSET, (uint16_t)(read_s16(placement + HUD_PLACEMENT_OFFSET_Y_OFFSET) / 2));
+	}
+	write_f32(placement + HUD_PLACEMENT_WIDTH_SCALE_OFFSET, read_f32(placement + HUD_PLACEMENT_WIDTH_SCALE_OFFSET) * 0.5f);
+	write_f32(placement + HUD_PLACEMENT_HEIGHT_SCALE_OFFSET, read_f32(placement + HUD_PLACEMENT_HEIGHT_SCALE_OFFSET) * 0.5f);
+	(*count)++;
+
+	return;
+}
+
+static uint8_t *mcc_hud_walk_block_elements(
+	void *context,
+	uint8_t const *block,
+	uint32_t element_bytes,
+	int32_t *count)
+{
+	struct load_state const *state = ((struct mcc_hud_walk_context *)context)->state;
+	uint32_t elements_offset;
+
+	if (!loaded_block_get(block, CUSTOM_EDITION_TAG_CACHE_ADDRESS, state->used_bytes, element_bytes, count,
+		&elements_offset) || !*count)
+	{
+		return NULL;
+	}
+
+	return state->tag_cache + elements_offset;
+}
+
+int32_t mcc_hud_convert(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes)
+{
+	static uint32_t const groups[] =
+	{
+		UNIT_HUD_INTERFACE_GROUP_TAG,
+		WEAPON_HUD_INTERFACE_GROUP_TAG,
+		GRENADE_HUD_INTERFACE_GROUP_TAG,
+		HUD_GLOBALS_GROUP_TAG,
+	};
+	struct load_state state;
+	struct custom_edition_hud_walk walk;
+	int32_t placements = 0;
+	int32_t tag_index;
+	uint8_t *definition;
+	size_t group_index;
+
+	loaded_state_initialize(&state, tag_cache, loaded_bytes);
+	for (group_index = 0; group_index < sizeof(groups) / sizeof(groups[0]); group_index++)
+	{
+		tag_index = NO_TAG_INDEX;
+		while ((definition = custom_edition_cache_tag_next(tag_cache, loaded_bytes, groups[group_index],
+			custom_edition_hud_definition_bytes(groups[group_index]), &tag_index)) != NULL)
+		{
+			struct mcc_hud_walk_context context;
+
+			context.state = &state;
+			context.placements = &placements;
+			walk.block_elements = mcc_hud_walk_block_elements;
+			walk.placement = mcc_hud_walk_placement;
+			walk.context = &context;
+			custom_edition_hud_placements_walk(definition, groups[group_index], &walk);
+			/* and the numbers', which the walk leaves (they draw no bitmap of
+			their own): a weapon's numbers and the grenade count */
+			if (groups[group_index] == WEAPON_HUD_INTERFACE_GROUP_TAG)
+			{
+				int32_t count;
+				uint8_t *numbers = mcc_hud_walk_block_elements(&context, definition + WEAPON_HUD_INTERFACE_NUMBERS_OFFSET,
+					WEAPON_HUD_NUMBER_BYTES, &count);
+				int32_t number_index;
+
+				for (number_index = 0; numbers && number_index < count; number_index++)
+				{
+					mcc_hud_walk_placement(&context, numbers + (uint32_t)number_index * WEAPON_HUD_NUMBER_BYTES +
+						WEAPON_HUD_NUMBER_PLACEMENT_OFFSET, NULL, 0);
+				}
+			}
+			else if (groups[group_index] == GRENADE_HUD_INTERFACE_GROUP_TAG)
+			{
+				mcc_hud_walk_placement(&context, definition + GRENADE_HUD_INTERFACE_COUNT_NUMBERS_OFFSET, NULL, 0);
+			}
+			/* the HUD globals' damage indicators' offsets from the screen's
+			edges */
+			if (groups[group_index] == HUD_GLOBALS_GROUP_TAG)
+			{
+				int edge;
+
+				for (edge = 0; edge < 4; edge++)
+				{
+					uint8_t *offset = definition + HUD_GLOBALS_DAMAGE_INDICATOR_OFFSETS_OFFSET + edge * 2;
+
+					write_u16(offset, (uint16_t)(read_s16(offset) / 2));
+				}
+			}
+		}
+	}
+	/* the digits' metrics, the size and spacing of each digit in pixels */
+	tag_index = NO_TAG_INDEX;
+	while ((definition = custom_edition_cache_tag_next(tag_cache, loaded_bytes, HUD_NUMBER_GROUP_TAG, HUD_NUMBER_BYTES,
+		&tag_index)) != NULL)
+	{
+		uint8_t *bitmap;
+		int metric;
+
+		for (metric = 0; metric < HUD_NUMBER_METRIC_COUNT; metric++)
+		{
+			definition[HUD_NUMBER_METRICS_OFFSET + metric] = (uint8_t)((int8_t)definition[HUD_NUMBER_METRICS_OFFSET + metric] / 2);
+		}
+		/* and its digits, four times the Xbox's as the HUD's bitmaps are, drawn
+		at half size for half HUD scale, as those are (hud_draw_numbers halves
+		them again for the layout's size) */
+		bitmap = custom_edition_cache_tag_get(tag_cache, loaded_bytes, read_u32(definition + TAG_REFERENCE_INDEX_OFFSET),
+			BITMAP_GROUP_TAG, BITMAP_GROUP_BYTES);
+		if (bitmap)
+		{
+			write_u16(bitmap + BITMAP_GROUP_FLAGS_OFFSET,
+				(uint16_t)(read_u16(bitmap + BITMAP_GROUP_FLAGS_OFFSET) | 1U << BITMAP_HALF_HUD_SCALE_BIT));
+		}
+	}
+
+	return placements;
 }
 
 int32_t mcc_bitmaps_prepare(

@@ -287,6 +287,12 @@ enum custom_edition_channel_order
 	_custom_edition_channels_hud_meter,
 	/* Authored Xbox-order meters, including sheets also used as artwork. */
 	_custom_edition_channels_hud_meter_xbox,
+	/* an MCC map's HUD meter: the fill order in color as the Xbox's, but its
+	alpha the shape alone (a flat 225 to 255), where the Xbox's alpha holds
+	the fill order too, which the meter's shader reads: the fill order is
+	sampled for alpha as well (observed: MCC's meters drew always empty
+	otherwise) */
+	_custom_edition_channels_hud_meter_mcc,
 
 	NUMBER_OF_CUSTOM_EDITION_CHANNEL_ORDERS
 };
@@ -594,6 +600,16 @@ as custom_edition_cache_convert makes those it cannot decode, until they are
 taken from the banks; returns how many. Called before the resource offsets
 are combined, which would point them into a sounds.map there is none of. */
 int32_t mcc_sounds_mute(
+	uint8_t *tag_cache,
+	uint32_t loaded_bytes);
+/* ... and makes its HUD the Xbox's size: MCC lays the HUD out at twice the
+Xbox's size (offsets, the digits' metrics, the damage indicators' offsets
+doubled) with bitmaps four times the Xbox's, flagged with half HUD scale.
+Every placement's offset and scale is halved (hud_draw_numbers halves the
+digits once more: mcc_cache_loaded), and custom_edition_cache_convert, run
+after it, halves the flagged bitmaps' placements again. Returns how many
+placements. */
+int32_t mcc_hud_convert(
 	uint8_t *tag_cache,
 	uint32_t loaded_bytes);
 /* ... and clears the flag MCC gives the bitmaps whose pixels are in the map

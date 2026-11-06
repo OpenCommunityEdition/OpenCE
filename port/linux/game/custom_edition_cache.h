@@ -88,6 +88,10 @@ whose multiplayer maps (seven of them rebuilt for Halo PC) differ. */
 #define MCC_MAP_VERSION 0x4D434331UL
 unsigned long mcc_map_version(
 	void);
+/* Whether the map loaded is an MCC map (its HUD's digits are drawn at half
+the size others' are: hud_draw.c) */
+boolean mcc_cache_loaded(
+	void);
 /* An MCC map's structure BSP the game has just read for `reference` (to
 its base address, the reference's size of bytes): its vertex region read
 after it, its pointers moved and its materials given their vertices, so
@@ -248,6 +252,15 @@ boolean custom_edition_reordered_bitmaps_find(
 	byte *tag_cache,
 	unsigned long loaded_bytes,
 	unsigned long behaviours);
+/* Says whether the map to be loaded keeps its model shaders' multipurpose
+maps in this build's order (custom_edition_reordered_bitmaps_find then finds
+none of them), and whether its HUD meters are MCC's, in the Xbox's order with
+the fill order in color alone (_custom_edition_channels_hud_meter_mcc): an
+MCC map's are both, its bitmaps being the Xbox's, not Halo PC's.
+custom_edition_bitmaps_dispose makes both Halo PC's again. */
+void custom_edition_bitmaps_orders_set(
+	boolean xbox_multipurpose_maps,
+	boolean mcc_hud_meters);
 /* As custom_edition_reordered_bitmaps_find, in the loaded map's tags, which
 the validator has checked: for the bitmaps of mods (mod_bitmaps.c), Halo
 PC's on any map. FALSE after logging why it cannot. */

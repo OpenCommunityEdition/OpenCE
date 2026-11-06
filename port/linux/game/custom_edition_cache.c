@@ -705,6 +705,7 @@ static boolean custom_edition_cache_tags_convert(
 	{
 		error(_error_silent, "mcc: %ld sounds are silent (MCC's sound banks are not read yet), %ld bitmaps in the map",
 			(long)mcc_sounds_mute(tag_cache, loaded_bytes), (long)mcc_bitmaps_prepare(tag_cache, loaded_bytes));
+		error(_error_silent, "mcc: %ld HUD placements made the Xbox's size", (long)mcc_hud_convert(tag_cache, loaded_bytes));
 	}
 
 	custom_edition_cache_combine_resource_offsets(
@@ -781,6 +782,10 @@ static boolean custom_edition_cache_tags_convert(
 			(long)conversion.widget_functions_cleared,
 			conversion.pause_menu_trimmed ? "; the multiplayer pause menu is the Xbox's resume and quit" : "");
 	}
+
+	/* an MCC map's multipurpose maps and HUD meters are the Xbox's, in this
+	build's order (docs/mcc_caches.md) */
+	custom_edition_bitmaps_orders_set(custom_edition_cache_globals.mcc, custom_edition_cache_globals.mcc);
 
 	return custom_edition_cache_tags_validate(tag_cache, report) &&
 		custom_edition_bitmaps_verify(tag_cache, loaded_bytes) &&
@@ -955,6 +960,12 @@ unsigned long mcc_map_version(
 	void)
 {
 	return MCC_MAP_VERSION;
+}
+
+boolean mcc_cache_loaded(
+	void)
+{
+	return custom_edition_cache_globals.tags_loaded && custom_edition_cache_globals.mcc;
 }
 
 /* (cache_file_rebase_proc: its type exactly, which the web build's linker
