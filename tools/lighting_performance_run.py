@@ -159,7 +159,8 @@ def main():
         display=tomllib.loads(args.settings.read_text())['display']
         settings={k:display[k] for k in QUALITY if k in display}
     settings.update({k:bool(args.enabled) for k in LIGHTS})
-    settings.update(overshield_effect=bool(args.enabled), shield_glow_intensity='default')
+    # These are deliberate test settings, not a player's legacy preferences.
+    settings.update(dynamic_lighting_reset=True, overshield_effect=bool(args.enabled), shield_glow_intensity='default')
     if args.stationary_shield:
         settings.update({k:False for k in LIGHTS})
         settings.update(covenant_shield_lighting=bool(args.enabled), plasma_occlusion=bool(args.enabled), overshield_effect=False)

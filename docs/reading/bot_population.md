@@ -5,6 +5,15 @@ listings and Discord presence. Bots still occupy the normal gameplay roster,
 score and consume player slots. The browser adds advertised human counts for
 its population total; it does not infer bots from names or machine numbers.
 
+Both stock and enhanced bots have a `BOT ` display-name prefix, for example
+`BOT Johnson` and `BOT Bisenti`. The existing network name holds eleven visible
+characters, so longer names are shortened. Additional bots retain a unique
+number, for example `BOT Johns16`. `bots_network_player` in
+[bots.c](../../port/linux/game/bots.c) creates these names for lobby admissions,
+live additions and restored bots. This uses the ordinary player-name field;
+OpenCE clients receive the same names without a protocol change. A human using
+a `BOT ` name is still a human because population policy uses host ownership.
+
 When `bots.network` is enabled, both stock and enhanced bots automatically
 make room for humans and return when humans leave. There is no additional
 toggle. Existing local-only bot behaviour and each controller's decisions are

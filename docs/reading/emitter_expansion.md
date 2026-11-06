@@ -176,6 +176,19 @@ proves an independent common BSP prefix for each of eight ray octants. Each
 endpoint box includes the origin, so its plane bounds cover the whole ray.
 Boundary planes and malformed trees retain the checked engine traversal.
 
+`trace_prepare` also collapses one-sided chains below branching nodes. It
+prepares at most 512 nodes per octant, using the same conservative volume
+test as `trace_start` through `trace_side`. Eight bounded caches occupy 96 KiB
+of synchronous scratch (88 KiB more than the former single cache). Preparation
+and eviction can reduce cache coverage without changing the query result.
+The shared traversal consumes these optional hints because feature modules
+cannot skip private internal traversal steps through the existing root-entry
+interface alone. It still charges every skipped node to the original depth
+and visit budgets, and falls back to normal traversal if either budget would
+be exceeded. It preserves plane crossings, ordered leaf visits and all
+surface tests. Stock callers supply no cache; model batches leave skip counts
+zero. No map data is modified, and batch cleanup clears all borrowed pointers.
+
 `plasma_collision_depths` gathers eligible object/ray pairs using the same
 cluster, sphere and parent/child gates. The bounded pending bitsets add 96 KiB
 to synchronous batch scratch. [plasma_collision_models.c](../../port/linux/game/plasma_collision_models.c)
@@ -215,7 +228,7 @@ calculations by the occlusion tests.
 `field_for` and `field_texture` handle cache lookup without large local buffers.
 Only `update_field` and `prepare_field_texture` reserve reconstruction/pixel
 scratch on a miss. Reconstruction uses 32 KiB of cell scratch; a collision
-refresh adds a 24 KiB ray/depth batch and roughly 14 KiB for one model
+refresh adds a 24 KiB ray/depth batch and roughly 18 KiB for one model
 node's nearest depths and BSP cache, plus the engine traversal stack.
 The helpers explicitly prevent inlining: source-level separation alone allowed
 Clang to put their stack allocation back into frequent cache hits. The storage

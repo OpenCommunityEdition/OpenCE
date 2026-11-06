@@ -28,6 +28,10 @@ struct collision_bsp_vector_cache
 		struct bsp3d_node const *node;
 		real_plane3d const *plane;
 		real distance;
+		/* port: optional caller-proven one-sided chain for every batch ray.
+		Skipped nodes must be valid, and never cross a plane or visit a leaf. */
+		long skip_node;
+		short skip_count;
 	} nodes[COLLISION_VECTOR_CACHE_NODES];
 };
 

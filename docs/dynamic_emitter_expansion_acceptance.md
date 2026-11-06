@@ -505,3 +505,110 @@ and the older normal candidate were removed after hash verification, reclaiming
 418.1 MiB. Test maps/caches were removed; test saves were losslessly archived
 with verified manifests. Logs and captures remain. The current normal Windows
 candidate (26.8 MiB) and passive timing build (24.5 MiB) remain for ongoing work.
+
+## World collision traversal, 6 November 2026
+
+The retained optimisation prepares one-sided internal BSP chains for each
+ray octant, including chains below branching nodes. Preparation belongs to
+`plasma_collision.c`; the small shared traversal extension consumes caller-
+proven skip counts through the existing optional batch cache. A feature-only
+root entry cannot skip these private internal traversal steps. Every skipped
+node still consumes the original depth and visit budgets. Boundary planes,
+leaf ordering, surface tests, breakable state and cache-miss traversal retain
+the engine's existing behaviour. No map-family conversion or shader changes
+are involved. Simulation callers use no cache; model batches use zero skip
+counts. All scratch is bounded and cleared between batches. Lighting defaults,
+host policy, Android exclusion and AMD/NVIDIA shader paths are unchanged.
+
+Review consolidated the identical prefix/preparation plane bounds in
+`trace_side`. Regression cases compare complete traversal results and state,
+including exhausted budgets, cyclic nodes and cache-slot eviction. Deliberately
+broken bounds, budget accounting and eviction must fail those checks.
+
+The whole-cube trial matched 19,466,976 live Two Betrayals rays but saved only
+1.98% of tracing time. The retained octant trial matched all 19,312,992 rays:
+6326.253 ms prepared versus 6966.486 ms without preparation, a 9.19% reduction.
+The comparison rotates execution order on identical rays and poses, outside
+simulation updates, and compares outputs outside the timed intervals. The
+unprepared variant retains model batching and uses one node cache; both
+variants include the new bounded scratch allocation/clearing. These are CPU
+batch timings, not gameplay FPS. A further leaf/plane lookup cache matched
+19,652,544 rays but did not establish an additional gain, so it was removed.
+
+The reviewed release build used full LTO/PGO at 2560x1440, AA off, 16x AF,
+highest models and per-pixel lighting. The copied checkpoint/save hashes
+matched the preceding phase. Normal controller input advances five seconds
+and turns right for 0.6 seconds into incoming Covenant fire on the snowy
+stairs. All optional lighting, including prongs, was enabled. After 15 seconds
+of warmup, the 120-second run measured:
+
+| Metric | Reviewed traversal | Previous phase |
+| --- | ---: | ---: |
+| Average FPS | 228.52 | 219.50 |
+| 1% low FPS | 149.95 | 123.68 |
+| p95 frame time | 5.607 ms | 6.119 ms |
+| p99 frame time | 6.164 ms | 7.123 ms |
+| Frames above 4.167 ms | 59.39% | 63.18% |
+| Mean occlusion update time per frame | 1.218 ms | 1.286 ms |
+
+The two one-minute windows averaged 223.00 and 234.04 FPS. Selected lights
+averaged 11.53, peaked at 19, and were present throughout. Six screenshot
+frames were excluded from pacing statistics; no frame exceeded 50 ms. Both
+retained screenshots show the snowy combat encounter with active shield and
+weapon lighting. This is a sustained fixed-view encounter check, not a
+playthrough of every busy area. Independently evolving fights prevent claiming
+the entire FPS difference as an exact A/B gain; the identical-ray comparison
+establishes the traversal improvement separately.
+
+A separate 60-second lighting-off control averaged 624.57 FPS with 403.77 FPS
+1% lows, no selected enhanced lights and zero occlusion updates. Both runs
+exited normally without reported runtime errors. Their reports and settings
+are under `build/lighting-performance/c40-world-final-on` and
+`c40-world-final-off`. The enabled run's private-memory window means rose
+from 663.27 to 666.54 MiB; this short run does not establish a memory plateau.
+**Sustained 240+ FPS is not achieved.** The stock control supports continued
+work on enabled-feature overhead; the traversal improvement does not close
+the remaining frame-time gap or resolve the previously tracked memory issue.
+
+The performance runner now marks its deliberately authored lighting settings
+as current, avoiding the one-time legacy-preference reset introduced on
+testing. Player preferences and migration behaviour are unchanged.
+
+Final validation passed 163 lighting, collision, menu, isolation and build-graph
+checks, with one POSIX-pthread socket harness skipped on Windows. The local
+test runner needed UTF-8 mode and a compiler wrapper with a consistent CRT
+warning macro; neither required a production change. Light-storage checks
+passed ordinary and full-LTO COFF builds, including their corruption control.
+
+Two-peer CE Death Island and Workshop Bigass sessions used lighting on at the
+host, off at the client, and host shield policy `players`. Ordinary release
+runs compared 60 and 55 seconds respectively, with normal exits and no
+sustained divergence. Both covered joining, shooting, respawning and weapon
+pickup. The first, instrumented CE attempt reported a brief scripted-pickup
+position difference; the ordinary release repeat passed without mismatches.
+Its collision comparison independently matched 1,118,208 rays. Bigass was
+loaded through Workshop item `3010816711`; its matching `halo1/maps` resources
+were copied only into the isolated test's shared-resource folder after an
+initial missing-resource refusal. The installed Workshop files were unchanged.
+
+Testing advanced to `d91cd8599` during validation. That bot/lobby update was
+fast-forwarded without conflicts; it changes none of this optimisation's
+rendering or collision files. Its 128 focused integration checks passed, and
+the combined state rebuilt successfully as Windows full LTO/PGO. The final
+MCC mixed-setting run compared 55 seconds with no state mismatches or
+divergences and matched all 1,559,040 live collision rays. Xbox snowy combat,
+CE and MCC captures were inspected; these are representative checks, not
+exhaustive map/device compatibility coverage. The sustained FPS measurements
+above predate the unrelated bot/lobby integration.
+
+Local Android and web builds were attempted but remain blocked by the local
+toolchain launch failures recorded in the preceding phase (NDK executable
+wrapper and missing Unix commands respectively). Build arguments were
+restored. The published commit's Linux/Android/web/Windows CI must be checked
+separately; no local Android device, AMD GPU or Linux runtime test is claimed.
+
+Cleanup removed 98.80 MiB of superseded diagnostic executables after verifying
+their recorded hashes. No loose test map files remain. Test saves are preserved
+in verified lossless archives. About 89.62 MiB remains for this phase's logs,
+captures, archives and two measurement executables; normal build outputs and
+the user's installed maps/saves were preserved.

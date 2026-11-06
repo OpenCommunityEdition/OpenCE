@@ -2198,6 +2198,18 @@ static boolean collision_bsp_test_vector_recursive(
 			node = data->cache->nodes[cache_slot].node;
 			plane = data->cache->nodes[cache_slot].plane;
 			distance = data->cache->nodes[cache_slot].distance;
+			/* port: batch preparation can prove an entire one-sided chain.
+			Charge every skipped node to the original depth/visit limits; if
+			the remaining budget is insufficient, use the original traversal. */
+			if (data->cache->nodes[cache_slot].skip_count > 0 &&
+				depth + data->cache->nodes[cache_slot].skip_count <= MAXIMUM_BSP3D_TRAVERSAL_DEPTH &&
+				data->nodes_left >= data->cache->nodes[cache_slot].skip_count - 1)
+			{
+				data->nodes_left -= data->cache->nodes[cache_slot].skip_count - 1;
+				return collision_bsp_test_vector_recursive(data,
+					data->cache->nodes[cache_slot].skip_node, t0, t1,
+					depth + data->cache->nodes[cache_slot].skip_count);
+			}
 		}
 		else
 		{
@@ -2216,6 +2228,7 @@ static boolean collision_bsp_test_vector_recursive(
 				data->cache->nodes[cache_slot].node = node;
 				data->cache->nodes[cache_slot].plane = plane;
 				data->cache->nodes[cache_slot].distance = distance;
+				data->cache->nodes[cache_slot].skip_count = 0; /* port: slot replacement */
 			}
 		}
 		dot = dot_product3d(data->vector, &plane->n);
