@@ -83,7 +83,7 @@ struct mcc_share_host_package {
     struct {
         uint8_t kind;
         char leaf[MCC_SHARE_LEAF_SIZE];
-        char path[160];              /* where to read it */
+        char path[260];              /* where to read it */
     } files[MCC_SHARE_STAGE_FILES];
 };
 
@@ -104,7 +104,7 @@ struct mcc_share_env {
     /* joiner: the bytes free where the package will go, or 0 when that is not known */
     uint64_t (*free_bytes)(void *user);
     struct mcc_share_io io;
-    char root[96];                   /* prefix of the staging and mcc_maps folders, "" or ending in / */
+    char root[200];                  /* prefix of the staging and mcc_maps folders, "" or ending in / */
 };
 
 struct mcc_share_host_transfer {

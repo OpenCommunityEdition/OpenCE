@@ -132,7 +132,7 @@ enum mcc_share_stage_result mcc_share_stage_begin(struct mcc_share_stage *stage,
     struct mcc_share_io const *io, char const *root, char const *folder, char const *level,
     struct mcc_share_file const *files, int count)
 {
-    char staging[200];
+    char staging[260];
     int length;
     memset(stage,0,sizeof(*stage));
     if (!io || !io->make_directory || !io->remove_directory || !io->directory_exists || !io->move_file || !io->delete_file || !root || !folder ||
@@ -231,7 +231,7 @@ enum mcc_share_stage_result mcc_share_stage_verify(struct mcc_share_stage *stage
 
 enum mcc_share_stage_result mcc_share_stage_install(struct mcc_share_stage *stage)
 {
-    char from[320],to[320],maps[200];
+    char from[320],to[320],maps[260];
     int i,moved[MCC_SHARE_STAGE_FILES],moved_count=0,pass;
     if (stage->state!=MCC_SHARE_STAGE_STAGED) return MCC_SHARE_STAGE_BAD_STATE;
     /* An existing package is never written to: the name is checked again now,

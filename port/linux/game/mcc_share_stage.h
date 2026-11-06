@@ -71,11 +71,11 @@ enum mcc_share_stage_result {
 struct mcc_share_stage {
     struct mcc_share_io io;
     enum mcc_share_stage_state state;
-    char root[96];                    /* prefix of every path, "" or ending in a separator */
+    char root[200];                   /* prefix of every path, "" or ending in a separator */
     char folder[64];                  /* the package folder name, one component */
     char level[MCC_SHARE_LEAF_SIZE];  /* the level's file name without .map */
-    char stage_dir[200];              /* <root>mcc_staging/<folder> */
-    char package_dir[200];            /* <root>mcc_maps/<folder> */
+    char stage_dir[260];              /* <root>mcc_staging/<folder> */
+    char package_dir[260];            /* <root>mcc_maps/<folder> */
     struct mcc_share_file files[MCC_SHARE_STAGE_FILES];
     int count;
     int current;                      /* the file being written */
