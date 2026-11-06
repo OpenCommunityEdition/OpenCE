@@ -15,7 +15,7 @@ typedef long GLsizeiptr;
 #define TRUE 1
 #define FALSE 0
 #define HALO_ANDROID 1
-static int android_geometry_fixes = 1;
+static int halo_geometry_fixes = 1;
 /* debug.gpu_stats: the cache logs its map-sized events only with it */
 static struct
 {
@@ -408,7 +408,7 @@ int main(int argc, char **argv)
 		return 2;
 	if (!strcmp(argv[1], "disabled"))
 	{
-		android_geometry_fixes = 0;
+		halo_geometry_fixes = 0;
 		xgpu_static_range_add(window + 0x1000, 0x400, 0);
 		xgpu_static_range_add(window + 0x2000, 0x400, 1);
 		CHECK(!static_buffer_lists[0].count && !static_buffer_lists[1].count);

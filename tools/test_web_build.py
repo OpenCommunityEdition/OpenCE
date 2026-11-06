@@ -80,7 +80,7 @@ def test_the_game_is_compiled_as_the_web_port():
     assert "-flto" not in text
     assert "-DHALO_RELEASE" not in flags
     assert "-Dmain=halo_game_main" in compile_flags(text, "source/shell/shell_xbox.c")
-    assert "halo_android_variadic_prototypes.h" in compile_flags(text, "source/hs/hs.c")
+    assert "halo_guest_variadic_prototypes.h" in compile_flags(text, "source/hs/hs.c")
     assert "-include time.h" in compile_flags(text, "source/bungie_net/common/random_numbers.c")
 
 

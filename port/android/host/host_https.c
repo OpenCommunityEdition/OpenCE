@@ -2,7 +2,7 @@
 HOST_HTTPS.C
 
 The server browser's requests to the master servers (host_https_get,
-port/android/guest/runtime/guest_host.h; port/linux/src/master_list.c), made
+port/guest/runtime/guest_host.h; port/linux/src/master_list.c), made
 in the host with the desktop's HTTPS client (port/linux/src/posix_update.c's
 update_https_request, Mbed TLS, the system's certificate authorities): the
 guest has no TLS of its own, and its memory is the host's to read and write.

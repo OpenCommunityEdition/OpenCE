@@ -54,7 +54,7 @@ python tools/ci_build.py linux release   # what CI builds
   game computes the same results. Do not call the system's maths functions.
 - Android: the game is an ILP32 AArch64 guest (`arm64_32`) in a 64-bit app.
   Guest code can call only the host imports declared in
-  `port/android/host_imports.list` and `port/android/guest/runtime/guest_host.h`,
+  `port/guest/host_imports.list` and `port/guest/runtime/guest_host.h`,
   and only the SDL functions `guest_sdl.c` bridges. Run `ninja android`
   after changing anything it compiles: `port/linux/src`, `port/linux/game`,
   `port/android`, `source/`, the build scripts.

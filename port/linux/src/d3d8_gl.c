@@ -28,7 +28,7 @@ Conventions carried over from the Xbox:
 #include "posix.h"
 #include "main/console.h"
 #ifdef HALO_ANDROID
-#include "../../android/include/android_render_policy.h"
+#include "../../guest/include/halo_render_policy.h"
 #endif
 
 #include <SDL3/SDL.h>
@@ -2432,7 +2432,7 @@ static void gl_initialize(void)
 	glGetIntegerv(GL_MAJOR_VERSION, &major);
 #ifdef HALO_ANDROID
 	platform_log("Android render policy: chip=%d geometry=%s CE textures=%s per-draw refresh=off",
-		android_render_chip, android_geometry_fixes ? "on" : "off", android_texture_fixes ? "on" : "off");
+		halo_render_chip, halo_geometry_fixes ? "on" : "off", halo_texture_fixes ? "on" : "off");
 #endif
 	glGetIntegerv(GL_MINOR_VERSION, &minor);
 #ifdef HALO_GLES
@@ -5534,7 +5534,7 @@ static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buff
 
 #ifdef HALO_ANDROID
 	/* Affected and unknown chips use static buffers or current CPU bytes. */
-	if (android_geometry_fixes)
+	if (halo_geometry_fixes)
 		return FALSE;
 #endif
 	if (!size || address < PLATFORM_CONTIGUOUS_BASE || start + size > PLATFORM_CONTIGUOUS_SIZE)
@@ -5762,7 +5762,7 @@ static void static_buffer_note(struct static_buffer_list *list, unsigned long st
 	unsigned long index;
 	struct static_buffer *entry;
 
-	if (!android_geometry_fixes || !start || !size)
+	if (!halo_geometry_fixes || !start || !size)
 		return;
 	static_buffer_forget(list, start);
 	index = static_buffer_upper(list, start);
@@ -5971,7 +5971,7 @@ static BOOL static_buffer_range(unsigned long address, unsigned long size, BOOL 
 	unsigned long index = static_buffer_upper(list, address);
 	struct static_buffer *entry;
 
-	if (!android_geometry_fixes || !index || !size)
+	if (!halo_geometry_fixes || !index || !size)
 		return FALSE;
 	entry = &list->entries[index - 1];
 	if (address - entry->start > entry->size || size > entry->size - (address - entry->start))
@@ -6045,7 +6045,7 @@ time. */
 static BOOL stream_uses_chunks(void)
 {
 #ifdef HALO_ANDROID
-	return android_geometry_fixes;
+	return halo_geometry_fixes;
 #else
 	return TRUE;
 #endif
