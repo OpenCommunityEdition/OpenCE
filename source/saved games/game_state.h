@@ -85,6 +85,10 @@ struct lruv_cache *game_state_lruv_cache_new(
 (game_state.c), each game tick */
 void game_state_check_data_arrays(
 	void);
+/* port: debug.state_hash's line of the game state's hashes (game_state.c),
+each game tick */
+void game_state_port_hash_tick(
+	void);
 void game_state_try_and_load_from_persistent_storage(
 	void);
 void game_state_load_core(

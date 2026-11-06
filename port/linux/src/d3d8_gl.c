@@ -7245,9 +7245,9 @@ void halo_screen_tone_map(short x0, short y0, short x1, short y1)
 
 /* ---------- presentation */
 
-#ifndef HALO_GLES
-/* the screenshot key's PNG (controls.screenshot; the Android guest has none
-of the SDL calls it takes) */
+#if !defined(HALO_GLES) && !defined(HALO_GUEST)
+/* the screenshot key's PNG (controls.screenshot; a guest has none of the
+SDL calls it takes) */
 static void write_key_screenshot(struct render_target_entry *target)
 {
 	char directory[512], path[640], timestamp[32], filename[64];
@@ -7788,7 +7788,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 #endif
 		if (screenshot_every > 0 && device.frame % (unsigned long)screenshot_every == 0)
 			write_screenshot(back_buffer);
-#ifndef HALO_GLES
+#if !defined(HALO_GLES) && !defined(HALO_GUEST)
 		if (platform_screenshot_take_request())
 			write_key_screenshot(back_buffer);
 #endif

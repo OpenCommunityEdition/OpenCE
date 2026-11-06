@@ -64,6 +64,10 @@ enum
 	/* (a dedicated server's, of the Linux and Windows builds: written into
 	config.toml only in server mode) */
 	_platform_server = 16,
+	/* (the Linux builds whose game runs as a guest of the Android port's
+	host, port/linux/host, which have the desktop's settings, and the
+	host's own) */
+	_platform_guest = 32,
 };
 
 struct config_setting
@@ -1176,6 +1180,19 @@ static const struct config_setting config_settings[] =
 		"up and down; \"menu:<buttons>\" presses menu buttons one a second (a,\n"
 		"b, x, y, up, down, left, right, start, back or wait, separated by\n"
 		"spaces or commas), for testing the menus; empty for none." },
+	{ "debug.random_seed", _config_integer, "0", "HALO_RANDOM_SEED", _environment_value, _platform_all,
+		"When not 0, the local random seed at startup and at each map's start,\n"
+		"in place of the clock's (the effects', the menus' and a hosted network\n"
+		"game's randomness), so that a test plays the same every run; 0 the\n"
+		"clock's." },
+	{ "debug.state_hash", _config_integer, "0", "HALO_STATE_HASH", _environment_value, _platform_all,
+		"Every this many game ticks, a line in state_hash.txt (the data root):\n"
+		"the tick and a hash of each of the game state's allocations, for\n"
+		"proving two builds play the same seeded game alike; 0 off." },
+	{ "debug.state_hash_dump", _config_string, "\"\"", "HALO_STATE_HASH_DUMP", _environment_value, _platform_all,
+		"With debug.state_hash, game ticks (separated by commas) at which the\n"
+		"whole game state is written to state_<map>_<tick>.bin (the data root),\n"
+		"for finding the bytes two builds differ in; empty for none." },
 	{ "debug.virtual_gamepads", _config_integer, "0", "HALO_VIRTUAL_GAMEPADS", _environment_value, _platform_desktop,
 		"Attach this many SDL virtual gamepads (0 to 4), which the game takes for\n"
 		"gamepads plugged in, for testing split screen; debug.virtual_gamepad_script\n"
@@ -1241,14 +1258,14 @@ static const struct config_setting config_settings[] =
 		"Log texture uploads." },
 	{ "debug.texture_no_cache", _config_boolean, "false", "HALO_TEXTURE_NO_CACHE", _environment_set_is_true, _platform_all,
 		"Upload textures again every time they are used." },
-	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android,
+	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android | _platform_guest,
 		"Log where every game thread is this often, in seconds (read by the\n"
-		"app, port/android/host/host_debug.c); 0 never." },
-	{ "debug.memory_watch", _config_boolean, "true", NULL, _environment_value, _platform_android,
+		"host, port/android/host/host_debug.c); 0 never." },
+	{ "debug.memory_watch", _config_boolean, "true", "HALO_MEMORY_WATCH", _environment_value, _platform_android | _platform_guest,
 		"Notice the game's writes to cached textures and vertices by page\n"
 		"protection; false compares page contents once a frame instead, which is\n"
 		"slower. Under ARM translation (the x86 emulator) the app always compares\n"
-		"contents. Read by the app from the file (port/android/host/host_main.c)." },
+		"contents. Read by the host from the file (port/android/host/host_common.c)." },
 #ifdef HALO_PROFILE
 	{ "debug.profile_record", _config_boolean, "false", "HALO_PROFILE_RECORD", _environment_value, _platform_all,
 		"Record a profile with no command (configure.py --profile builds): from\n"
@@ -1274,6 +1291,8 @@ static const struct config_setting config_settings[] =
 #define CONFIG_BUILD_PLATFORM (_platform_desktop | _platform_web)
 #elif defined(_WIN32)
 #define CONFIG_BUILD_PLATFORM (_platform_desktop | _platform_windows)
+#elif defined(HALO_GUEST)
+#define CONFIG_BUILD_PLATFORM (_platform_desktop | _platform_guest)
 #else
 #define CONFIG_BUILD_PLATFORM _platform_desktop
 #endif
@@ -1356,7 +1375,7 @@ static void config_path(char *path, size_t size)
 /* the whole file, NUL terminated, or NULL; free() it */
 static char *config_read_file(const char *path, size_t *size)
 {
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	FILE *file = fopen(path, "rb");
 	char *text = NULL;
 	long length;
@@ -1399,7 +1418,7 @@ static char *config_read_file(const char *path, size_t *size)
 
 static int config_write_file(const char *path, const char *text)
 {
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	FILE *file = fopen(path, "wb");
 	int written;
 
@@ -1476,7 +1495,9 @@ static void config_append_setting(struct config_text *text, const struct config_
 			line++;
 	}
 #ifndef HALO_ANDROID
-	/* (Android apps have no environment to set) */
+	/* (Android apps have no environment to set; a setting without a variable
+	names none) */
+	if (setting->environment)
 	switch (setting->environment_style)
 	{
 	case _environment_value:

@@ -802,13 +802,13 @@ static int text_file_write(const char *path, const char *text)
 {
 	char temporary[MAXIMUM_PATH_LENGTH];
 	int written;
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	FILE *file;
 #endif
 
 	if (snprintf(temporary, sizeof(temporary), "%s.new", path) >= (int)sizeof(temporary))
 		return 0;
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	/* (the guest's own C library: SDL's are the host's) */
 	file = fopen(temporary, "wb");
 	if (!file)
@@ -1036,7 +1036,7 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 	unsigned char *staging = NULL;
 	unsigned long done = 0;
 	int read = 1;
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	FILE *stream;
 #else
 	SDL_IOStream *stream;
@@ -1047,7 +1047,7 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 	path = port_mods.files[file].path;
 	if (bounce && !(staging = malloc(READ_BOUNCE_SIZE)))
 		return 0;
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 	stream = fopen(path, "rb");
 	if (!stream || fseek(stream, (long)offset, SEEK_SET) != 0)
 		read = 0;
@@ -1064,7 +1064,7 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 
 		if (bounce && wanted > READ_BOUNCE_SIZE)
 			wanted = READ_BOUNCE_SIZE;
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 		read = fread(bounce ? staging : destination, 1, wanted, stream) == wanted;
 #else
 		read = SDL_ReadIO(stream, bounce ? staging : destination, wanted) == wanted;
@@ -1078,7 +1078,7 @@ int port_mods_file_read(long file, unsigned long offset, void *buffer, unsigned 
 	}
 	if (stream)
 	{
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 		fclose(stream);
 #else
 		SDL_CloseIO(stream);

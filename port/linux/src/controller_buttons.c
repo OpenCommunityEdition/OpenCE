@@ -43,7 +43,7 @@ void controller_device_read(void *handle, struct controller_device *device)
     if (!gamepad) return;
     device->type = SDL_GetGamepadType(gamepad);
     device->family = controller_family_from_type((SDL_GamepadType)device->type);
-#ifndef HALO_ARM64_GUEST
+#ifndef HALO_GUEST
     {
         char const *name = SDL_GetGamepadName(gamepad);
         device->instance = SDL_GetGamepadID(gamepad);

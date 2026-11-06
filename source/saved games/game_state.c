@@ -155,6 +155,10 @@ static void game_state_allocation_record(
 	const char *type,
 	long size,
 	boolean gpu);
+static void game_state_port_hash_record(
+	const char *name,
+	long offset,
+	long size);
 static void game_state_set_revert_time(
 	void);
 
@@ -304,6 +308,8 @@ void game_state_initialize_for_new_map(
 	object_function_inputs_forget();
 	game_state_note_event("map start");
 	game_state_data_arrays_new_map();
+	/* port: debug.random_seed, the local random seed set again for the map */
+	random_math_port_seed();
 
 	game_state_globals.locked = TRUE;
 	game_state_globals.saved_game_valid = FALSE;
@@ -548,6 +554,11 @@ static void game_state_allocation_record(
 		fprintf(file, "% 40s% 20s% 10d%s\n", name, type, size, gpu ? "*" : "");
 		fflush(bss_004d27b0);
 	}
+
+	/* port: where it lies, for debug.state_hash (game_state_port_hash_tick) */
+	game_state_port_hash_record(name, gpu
+		? GAME_STATE_SIZE-game_state_globals.gpu_allocation_size-size
+		: game_state_globals.cpu_allocation_size, size);
 
 	return;
 }
@@ -952,6 +963,115 @@ void game_state_check_data_arrays(
 			game_state_last_event_time);
 		error(_error_silent, "game state: %.31s went wrong between ticks %ld and %ld (last rewritten by %s at tick %ld)",
 			data->name, allocation->good_time, now, game_state_last_event, game_state_last_event_time);
+	}
+}
+
+/* port: debug.state_hash (HALO_STATE_HASH), every that many game ticks a
+line in state_hash.txt (the data root): the tick, then a hash (FNV-1a over
+32-bit words) of each of the game state's allocations, in the order they
+were made (gamestate.txt names them). The game state has the same layout
+in every build of the same sources, the x86-64 guest's and i686's, so two
+runs of the same seeded input must log the same lines: the first that
+differs names the tick and the allocation where they part. */
+long config_integer(const char *name);
+const char *config_string(const char *name);
+
+enum
+{
+	MAXIMUM_GAME_STATE_HASH_ALLOCATIONS = 256,
+};
+
+static struct
+{
+	const char *name;
+	long offset;
+	long size;
+} game_state_hash_allocations[MAXIMUM_GAME_STATE_HASH_ALLOCATIONS];
+static long game_state_hash_allocation_count;
+static FILE *game_state_hash_file;
+static long game_state_hash_period = NONE;
+
+static void game_state_port_hash_record(
+	const char *name,
+	long offset,
+	long size)
+{
+	if (game_state_hash_allocation_count < MAXIMUM_GAME_STATE_HASH_ALLOCATIONS)
+	{
+		game_state_hash_allocations[game_state_hash_allocation_count].name = name;
+		game_state_hash_allocations[game_state_hash_allocation_count].offset = offset;
+		game_state_hash_allocations[game_state_hash_allocation_count].size = size;
+		game_state_hash_allocation_count++;
+	}
+}
+
+void game_state_port_hash_tick(
+	void)
+{
+	long tick = game_time_get();
+	unsigned long total = 2166136261UL;
+	long index;
+
+	if (game_state_hash_period == NONE)
+		game_state_hash_period = config_integer("debug.state_hash");
+	if (game_state_hash_period <= 0 || tick % game_state_hash_period)
+		return;
+	if (!game_state_hash_file)
+	{
+		game_state_hash_file = fopen("d:\\state_hash.txt", "w");
+		if (!game_state_hash_file)
+		{
+			game_state_hash_period = 0;
+			return;
+		}
+	}
+
+	fprintf(game_state_hash_file, "%ld %.31s", tick, game_state_globals.header->map_name);
+	for (index = 0; index < game_state_hash_allocation_count; index++)
+	{
+		unsigned long const *words = (unsigned long const *)
+			((byte const *)game_state_globals.base_address + game_state_hash_allocations[index].offset);
+		long count = game_state_hash_allocations[index].size / 4;
+		unsigned long hash = 2166136261UL;
+		long word;
+
+		for (word = 0; word < count; word++)
+			hash = (hash ^ words[word]) * 16777619UL;
+		total = (total ^ hash) * 16777619UL;
+		fprintf(game_state_hash_file, " %08lx", hash & 0xFFFFFFFFUL);
+	}
+	fprintf(game_state_hash_file, " = %08lx\n", total & 0xFFFFFFFFUL);
+	fflush(game_state_hash_file);
+
+	/* and at the ticks debug.state_hash_dump lists, the whole game state in
+	state_<map>_<tick>.bin, for finding the bytes that differ */
+	{
+		const char *ticks = config_string("debug.state_hash_dump");
+
+		while (ticks && *ticks)
+		{
+			char *end;
+			long dump_tick = strtol(ticks, &end, 10);
+
+			if (end == ticks)
+				break;
+			if (dump_tick == tick)
+			{
+				const char *map_name = strrchr(game_state_globals.header->map_name, '\\');
+				char path[300];
+				FILE *dump;
+
+				snprintf(path, sizeof(path), "d:\\state_%.64s_%ld.bin",
+					map_name ? map_name + 1 : game_state_globals.header->map_name, tick);
+				dump = fopen(path, "wb");
+				if (dump)
+				{
+					fwrite(game_state_globals.base_address, 1, GAME_STATE_SIZE, dump);
+					fclose(dump);
+				}
+			}
+			ticks = *end ? end + 1 : end;
+		}
 	}
 }
 

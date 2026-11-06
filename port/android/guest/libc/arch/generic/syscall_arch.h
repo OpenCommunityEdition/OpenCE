@@ -1,6 +1,7 @@
 /* The guest cannot enter the kernel directly with its own structure
 layouts, so every system call musl makes goes to the runtime's dispatcher
-(guest/runtime/guest_syscall.c), which performs it through the host. */
+(guest/runtime/guest_syscall.c), which performs it through the host: the
+same for every guest architecture. */
 #define __SYSCALL_LL_E(x) (x)
 #define __SYSCALL_LL_O(x) (x)
 

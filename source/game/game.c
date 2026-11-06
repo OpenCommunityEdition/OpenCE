@@ -395,6 +395,8 @@ void game_tick(
 	/* port: and at its end, before the frame draws the lights */
 	game_state_check_data_arrays();
 	lights_port_recover();
+	/* port: debug.state_hash, the tick's game state hashed */
+	game_state_port_hash_tick();
 
 	profile_exit(game_update_section);
 	collision_log_end_period();

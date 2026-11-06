@@ -34,7 +34,7 @@ void win32_window_borderless_apply(SDL_Window *window);
 #if !defined(_WIN32) && !defined(HALO_ANDROID)
 #include <signal.h>
 #endif
-#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID)
+#if defined(__linux__) && !defined(HALO_GUEST) && !defined(HALO_ANDROID)
 #include <dlfcn.h>
 #include <unistd.h>
 #endif
@@ -187,7 +187,7 @@ static void data_check_maps(void)
 }
 #endif
 
-#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID)
+#if defined(__linux__) && !defined(HALO_GUEST) && !defined(HALO_ANDROID)
 /* NVIDIA's driver draws into a Wayland window through its egl-wayland
 library, which distributions ship 64-bit only (Arch has no lib32 package
 of it). In this 32-bit game, OpenGL on Wayland (EGL) then falls back to
@@ -234,7 +234,7 @@ BOOL platform_sdl_initialize(void)
 	if (p2p_hand_off_invite())
 		exit(EXIT_SUCCESS);
 	SDL_SetHint(SDL_HINT_APP_NAME, "Halo");
-#if defined(__linux__) && !defined(HALO_ARM64_GUEST) && !defined(HALO_ANDROID)
+#if defined(__linux__) && !defined(HALO_GUEST) && !defined(HALO_ANDROID)
 	platform_choose_video_driver();
 #endif
 #ifdef HALO_ANDROID
@@ -1293,9 +1293,10 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		return FALSE;
 	}
 #ifndef HALO_ANDROID
-#ifndef HALO_GLES
 	/* the game's icon, which the desktop shows for the window (on Windows
-	also halo.exe's own, port/windows/halo.rc; a web page has its own) */
+	also halo.exe's own, port/windows/halo.rc; a web page has its own; not
+	a guest's, which reaches no SDL surfaces) */
+#if !defined(HALO_GLES) && !defined(HALO_GUEST)
 	if (platform_window_icon_size)
 	{
 		SDL_Surface *icon = SDL_LoadPNG_IO(SDL_IOFromConstMem(platform_window_icon, platform_window_icon_size), true);
@@ -2521,7 +2522,7 @@ void platform_pump_events(void)
 			break;
 #endif
 		case SDL_EVENT_GAMEPAD_ADDED:
-#ifdef HALO_ARM64_GUEST
+#ifdef HALO_GUEST
 			/* (the guest reaches SDL only through host_imports.list, which
 			has no SDL_GetGamepadName) */
 			SDL_OpenGamepad(event.gdevice.which);

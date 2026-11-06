@@ -852,6 +852,11 @@ void scenario_location_from_point(
 	}
 
 	location->cluster_index = (short)cluster_index;
+	/* port: the original leaves the bonus as the caller's stack had it.
+	Nothing reads it (scenario_location_award_bonus only sets it), so a
+	defined value changes nothing but lets two builds' game states be
+	compared byte for byte (debug.state_hash) */
+	location->bonus = 0;
 
 	return;
 }
