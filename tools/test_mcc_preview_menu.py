@@ -80,22 +80,31 @@ static void rasterizer_draw_unicode_string(const rectangle2d *b,const rectangle2
     code += function((ROOT / "port/linux/src/mcc_preview_image.c").read_text(), "mcc_preview_fit")
     code += r'''
 int main(void) {
- rectangle2d box,clip;real_argb_color color={1,1,1,1};int i;
+ rectangle2d box,clip;real_argb_color color={1,1,1,1};int i;wchar_t row_text[64];
+ wcscpy(row_text,L"Short title");mcc_menu_text_row(row_text);assert(!wcscmp(row_text,L"Short title"));
+ wcscpy(row_text,L"A long MCC title which needs to fit inside the map list row");
+ mcc_menu_text_row(row_text);assert(width_of(row_text)<=310&&wcsstr(row_text,L"..."));
  assert(mcc_menu_preview_index(0,0)==NONE);assert(mcc_menu_preview_index(0,0x4000)==NONE);
  assert(mcc_menu_preview_index(0,0x6000)==NONE);assert(mcc_menu_preview_index(0,0x1000)==0);
  tag_name="unrelated";assert(mcc_menu_preview_index(0,0x1000)==NONE);tag_name="ui\\shell\\bitmaps\\mp_map_grafix";
  set_rectangle2d(&box,419,87,559,201);set_rectangle2d(&clip,420,90,550,199);
- assert(mcc_menu_preview_draw(0,&box,&clip,0,NULL));assert(live==1&&loads==1&&draws==1);
+ assert(mcc_menu_preview_draw(0,NONE,&box,&clip,0,NULL));assert(live==1&&loads==1&&draws==1);
  assert(drawn.x0>=box.x0&&drawn.x1<=box.x1&&drawn.y0>=box.y0&&drawn.y1<=box.y1);
  assert(drawn.x1-drawn.x0==140&&drawn.y1-drawn.y0==60);
  assert(clipped.x0==420&&clipped.x1==550&&clipped.y0==90&&clipped.y1==199);
  assert(drawn_texels.x1==512&&drawn_texels.y1==223);
- assert(mcc_menu_preview_draw(0,&box,NULL,0,NULL));assert(loads==1);
- for(i=1;i<8;i++) assert(mcc_menu_preview_draw((short)i,&box,NULL,0,NULL));
+ assert(mcc_menu_preview_draw(0,NONE,&box,NULL,0,NULL));assert(loads==1);
+ tag_name="pc\\mcc_xbox\\card_0\\picture";
+ assert(mcc_menu_preview_draw(0,0,&box,&clip,0,NULL));
+ assert(!memcmp(&drawn,&box,sizeof(box)));assert(drawn_texels.x0>0&&drawn_texels.x1<512);
+ assert(drawn_texels.y0==0&&drawn_texels.y1==223);
+ assert(clipped.x0==420&&clipped.x1==550&&clipped.y0==90&&clipped.y1==199);
+ tag_name="ui\\shell\\bitmaps\\mp_map_grafix";
+ for(i=1;i<8;i++) assert(mcc_menu_preview_draw((short)i,NONE,&box,NULL,0,NULL));
  assert(live==4&&loads==8);mcc_menu_preview_clear();assert(live==0);
- fail_image=1;assert(!mcc_menu_preview_draw(0,&box,NULL,0,NULL));assert(loads==9);
- assert(!mcc_menu_preview_draw(0,&box,NULL,0,NULL));assert(loads==9);mcc_menu_preview_clear();
- fail_image=0;assert(mcc_menu_preview_draw(0,&box,NULL,0,NULL));assert(loads==10);mcc_menu_preview_clear();assert(live==0);
+ fail_image=1;assert(!mcc_menu_preview_draw(0,NONE,&box,NULL,0,NULL));assert(loads==9);
+ assert(!mcc_menu_preview_draw(0,NONE,&box,NULL,0,NULL));assert(loads==9);mcc_menu_preview_clear();
+ fail_image=0;assert(mcc_menu_preview_draw(0,NONE,&box,NULL,0,NULL));assert(loads==10);mcc_menu_preview_clear();assert(live==0);
  tag_name="pc\\main_menu\\mp_map_right_data";set_rectangle2d(&box,417,258,563,394);
  assert(!mcc_menu_text_draw(0,1,L"Xbox",1,0,&color,&box,NULL));assert(!text_draws);
  assert(!mcc_menu_text_draw(0,0x4000,L"CE",1,0,&color,&box,NULL));assert(!text_draws);
@@ -108,6 +117,9 @@ int main(void) {
  assert(wcsstr(drawn_text,L"...")!=NULL);
  tag_name="pc\\modern\\campaign\\mcc_folder_name";
  assert(mcc_menu_text_draw(0,NONE,L"Workshop folder with a long package title",1,0,&color,&box,NULL));
+ tag_name="pc\\mcc_xbox\\card_0\\mcc_folder_help";set_rectangle2d(&box,83,258,227,394);
+ assert(mcc_menu_text_draw(0,NONE,L"A long description must not cover the earned completion badges at the bottom of the native Xbox level card even when every difficulty has been completed.",2,0,&color,&box,NULL));
+ assert(drawn.y0==258&&drawn.y1==341&&clipped.y1==341&&wcsstr(drawn_text,L"..."));
  puts("MCC preview bounds, cache lifecycle, text wrapping and Xbox/CE isolation passed");return 0;
 }
 '''
@@ -130,7 +142,7 @@ def test_authored_thumbnail_boxes_and_hooks():
     assert len(widgets)>=6
     assert all((w.get("width"),w.get("height"))==("140","114") for w in widgets)
     ui=(ROOT/"source/interface/ui_widget.c").read_text()
-    assert 'mcc_menu_preview_draw(mcc_picture_index, &bounds, clip' in ui
+    assert 'mcc_menu_preview_draw(mcc_picture_index, widget->definition_tag_index, &bounds, clip' in ui
     assert 'mcc_menu_text_draw(widget->definition_tag_index' in ui
     for file in ("mcc_maps.c","menu_tags.c"):
         assert 'mcc_menu_preview_clear();' in (ROOT/"port/linux/game"/file).read_text()

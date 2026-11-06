@@ -41,6 +41,12 @@ checked-in title art; the generator explicitly uses basic font layout instead of
 the optional RAQM shaping backend. CI uses the same pinned wheel and compares
 decoded pixels.
 
+That generator also calls `tools/mcc_xbox_menu.py` for the separate Xbox-style
+MCC profile, campaign, mission and multiplayer wrappers. They retain native
+Xbox card geometry and use existing profile/difficulty services. See the
+[MCC preview walkthrough](../../../docs/reading/mcc_level_previews.md) for
+image bounds, completion badges and lifecycle boundaries.
+
 `tools/ce_menus.py` writes every file in `ce/` and `menus.json` again,
 the settings screens too (it runs `tools/port_settings.py`'s):
 

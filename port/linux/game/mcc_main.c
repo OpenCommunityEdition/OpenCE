@@ -9,6 +9,7 @@
 #include "mcc_main.h"
 #include "mcc_errors.h"
 #include "mcc_maps.h"
+#include "mcc_progress.h"
 #include "game/game.h"
 #include "networking/network_server_manager.h"
 #include "networking/network_game_manager.h"
@@ -29,6 +30,7 @@ boolean mcc_main_campaign_won(void)
     server = game_connection() == _game_connection_network_server;
     game = server ? network_game_get_game() : NULL;
     current = game ? game->map.name : main_get_map_name();
+    mcc_progress_complete(current, game_difficulty_level_get());
     state = mcc_maps_next_mission(current, next);
     if (state < 0) {
         error(_error_silent, "mcc campaign: next mission for %s is unavailable: %s", current, next);

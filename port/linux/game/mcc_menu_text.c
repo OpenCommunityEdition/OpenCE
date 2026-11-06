@@ -15,6 +15,7 @@ static boolean field(long tag, short index)
     char const *name, *leaf;
     if (tag == NONE) return FALSE;
     name=tag_get_name(tag); leaf=strrchr(name,'\\'); leaf=leaf ? leaf+1 : name;
+    if (!strncmp(name,"pc\\mcc_xbox\\",12) && !strcmp(leaf,"status")) return TRUE;
     if (!strcmp(leaf,"mcc_folder_name") || !strcmp(leaf,"mcc_folder_help")) return TRUE;
     if (index < MCC_MAPS_FIRST_DISPLAY_INDEX || index >= MCC_MAPS_FIRST_DISPLAY_INDEX+MCC_MAPS_MAXIMUM) return FALSE;
     return !strcmp(leaf,"mp_map_right_name") || !strcmp(leaf,"mp_map_right_data") || !strcmp(leaf,"lobby_map_name");
@@ -28,6 +29,23 @@ static int width_of(wchar_t const *text)
     set_rectangle2d(&measure,0,0,SHORT_MAX,SHORT_MAX);
     draw_unicode_string_compute_bounds(&measure,text,&ink,&cursor);
     return MAX(cursor.x0,ink.x1);
+}
+
+/* MCC's PC-style list callbacks provide a draw-only label, not the catalog
+ * title. Fit the narrowest row (Modern: 312, Stock/Classic PC: 330), keeping
+ * its native single-line large font and leaving selection arrows unobscured. */
+void mcc_menu_text_row(wchar_t text[64])
+{
+    real_argb_color color={1,1,1,1};
+    long font=tag_loaded('font',"ui\\large_ui");
+    int used;
+    if (font==NONE) return;
+    draw_string_set_draw_mode(font,NONE,0,0,&color);
+    if (width_of(text)<=310) return;
+    for (used=0; used<60 && text[used]; used++) {}
+    do {
+        text[used]='.'; text[used+1]='.'; text[used+2]='.'; text[used+3]=0;
+    } while (width_of(text)>310 && used-- > 0);
 }
 
 static int wrap(wchar_t const *text, wchar_t output[512], int width)
@@ -60,10 +78,19 @@ boolean mcc_menu_text_draw(long tag, short index, wchar_t const *text, long font
     real_argb_color const *color, rectangle2d const *bounds, rectangle2d const *parent_clip)
 {
     wchar_t wrapped[512];
-    rectangle2d clip=*bounds;
+    rectangle2d area=*bounds, clip;
     int width=bounds->x1-bounds->x0-2, height=bounds->y1-bounds->y0, used;
     long small;
+    char const *name;
     if (!field(tag,index)) return FALSE;
+    name=tag_get_name(tag);
+    /* Xbox cards reserve their lower row for earned badges. Keep the native
+     * text origin, but never let an authored description draw over that row. */
+    if (!strncmp(name,"pc\\mcc_xbox\\",12) && strstr(name,"\\mcc_folder_help")) {
+        area.y1=(short)MIN(area.y1,area.y0+83);
+        height=area.y1-area.y0;
+    }
+    clip=area;
     if (width<=0 || height<=0) return TRUE;
     draw_string_set_draw_mode(font,NONE,0,0,color);
     used=wrap(text,wrapped,width);
@@ -90,6 +117,6 @@ boolean mcc_menu_text_draw(long tag, short index, wchar_t const *text, long font
         clip.x1=MIN(clip.x1,parent_clip->x1); clip.y1=MIN(clip.y1,parent_clip->y1);
     }
     draw_string_set_draw_mode(font,NONE,justification,0,color);
-    if (clip.x1>clip.x0 && clip.y1>clip.y0) rasterizer_draw_unicode_string(bounds,&clip,NULL,0,wrapped);
+    if (clip.x1>clip.x0 && clip.y1>clip.y0) rasterizer_draw_unicode_string(&area,&clip,NULL,0,wrapped);
     return TRUE;
 }

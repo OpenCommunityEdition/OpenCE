@@ -26,6 +26,13 @@ does not run gameplay or alter network readiness, authority or map validation.
 
 ## Installation and menus
 
+The Xbox frontend has separate **MCC Campaigns** and **MCC Maps** entries.
+MCC Campaigns selects a profile, a campaign folder, a mission and a difficulty,
+using native Xbox-style cards and completion badges. Package previews and
+long-title handling also work in Modern, Classic PC and Stock menus. See
+[MCC menu images and badges](reading/mcc_level_previews.md) for the flow,
+metadata requirements and completion-record limits.
+
 Put the map in the game data root's `mcc_maps` directory, beside `maps` and
 `custom_maps`. For example:
 

@@ -7429,7 +7429,7 @@ static void widget_instance_render_recursive(
 
 			/* port: MCC art fits and clips to this style's authored thumbnail
 			 * rectangle; only the MCC module decodes or owns its texture. */
-			if (mcc_picture_index != NONE && mcc_menu_preview_draw(mcc_picture_index, &bounds, clip, color, &multitexture_params))
+			if (mcc_picture_index != NONE && mcc_menu_preview_draw(mcc_picture_index, widget->definition_tag_index, &bounds, clip, color, &multitexture_params))
 				shown = FALSE;
 			if (shown && pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
 			{

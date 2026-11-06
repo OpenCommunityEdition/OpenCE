@@ -2,9 +2,11 @@
 
 MCC map and mission panels display the image declared by their installed
 package. Modern, Classic PC, Stock and Xbox-style frontends keep their existing
-thumbnail rectangles and typography. Images preserve their aspect ratio and
-are centered inside the 140 by 114 logical-pixel thumbnail area; extra space
-remains transparent. An explicit clip prevents drawing outside that rectangle.
+thumbnail rectangles and typography. PC-style images preserve their aspect ratio
+and are centered inside the 140 by 114 logical-pixel thumbnail area; extra space
+remains transparent. The separate Xbox MCC browser uses a centered crop to fill
+the native Xbox thumbnail rectangle, without stretching. An explicit clip
+prevents drawing outside that rectangle.
 The lobby's locally installed map uses the same provider.
 
 This is interpretation of the selected MCC package, with no additional toggle.
@@ -64,6 +66,8 @@ folder, saved mission identity or network map name is renamed.
    `mcc_menu_text_draw` measures package text in the active font, wraps it at
    word boundaries and breaks oversized words. It uses the existing small font
    when necessary and an ellipsis when the fixed panel still cannot fit it.
+   MCC-only PC list callbacks also use `mcc_menu_text_row` to fit a single-line
+   label beside the navigation arrows; the catalog title itself is unchanged.
 
 The minimal hooks in [ui_widget.c](../../source/interface/ui_widget.c) are
 necessary because the shared widget renderer otherwise treats a picture's
@@ -71,7 +75,62 @@ display index as a frame in the loaded tag and draws text without MCC-aware
 wrapping. Only MCC indices on the level-picture tag enter the new image path;
 the original frame is the fallback. Text hooks accept MCC catalog fields and
 dedicated MCC folder fields. Neither hook repurposes the Xbox/CE providers.
-No generated menu layout changes are needed.
+The Xbox browser adds independently generated wrappers; existing selectors and
+their definitions are unchanged.
+
+## Xbox campaign and multiplayer flow
+
+With `display.menu_frontend = "xbox"` and `game.mcc_campaigns = true`, the main
+menu's X prompt opens **MCC Campaigns → Choose Profile → Choose Campaign →
+Load Level → Choose Difficulty**. Campaign folders and missions use the native
+three-card geometry, oversized arrows, fonts, plasma backing and thumbnail size.
+Long descriptions stop above the reserved badge row and use an ellipsis when
+needed. Long titles wrap within the native title area.
+The profile chooser, difficulty descriptions, difficulty artwork, existing
+headings and button key are native UI services/art from the player's `ui.map`.
+The new MCC Campaigns heading is rendered with the project's OpenCE font.
+Back first leaves difficulty selection, then the campaign folder, then returns
+to profile selection. It never selects a mission by an Xbox level number.
+
+The native multiplayer map selector gains an X **MCC Maps** prompt. This opens
+the separate MCC browser and returns a selected MCC identity to the existing
+native gametype flow. The Xbox/CE map selector remains available and unchanged.
+
+[mcc_xbox_menu.inl](../../port/linux/game/mcc_xbox_menu.inl) owns browser state,
+selection and routing. It uses the existing frontend instance-attachment and
+session-reset services; no widget pointers survive a screen change. The
+input hooks are necessary because generated XML cannot append an entry to the native root or consume
+X before its native handlers. [mcc_xbox_menu.py](../../tools/mcc_xbox_menu.py),
+called by the frontend generator, owns the additional XML and heading redraw.
+Geometry was checked against the Xbox build's `solo_level_select` widget tags
+in the local `ui.map`; retail tag contents and images are not shipped.
+
+## MCC completion badges
+
+[mcc_progress.c](../../port/linux/game/mcc_progress.c) stores completion in
+`mcc_completed.dat` beside each player's native profile. Records identify the
+full `mcc_maps\\package\\mission` path, so equally named missions in different
+packages and different profiles do not share awards. Normal, Heroic and Legendary
+use the native 44 by 48 completion glyphs at the native card positions. Easy is
+recorded but has no card badge, matching the native selector. Higher difficulty
+does not invent awards for lower difficulties. Existing playthroughs cannot be
+reconstructed into completion records; awards begin with this version.
+
+The existing MCC campaign-win hook records actual completion before advancing
+or returning to the menu. It follows the existing native authority model: local
+players on a solo/couch-co-op game or the host receive records; remote clients
+do not infer completion from a map change. No new network messages are added.
+The journal is append-only, limited to 4,096 records of 76 bytes, with duplicate
+awards suppressed. Version, bounded mission identity, flags and checksum are
+checked. A damaged tail preserves earlier readable awards and blocks further
+appends; it is not silently replaced. A checksum detects corruption, not cheating.
+
+Profile rename normally copies only native save files before deleting the old
+directory. One guarded call in
+[saved_game_files.c](../../source/saved%20games/saved_game_files.c) therefore
+copies the MCC companion through `mcc_progress_copy` before deletion. An absent
+companion leaves native behavior intact; a failed copy preserves the old profile.
+This lifecycle boundary cannot be handled solely when awarding/displaying badges.
 
 ## Ownership, limits and checks
 
@@ -100,3 +159,10 @@ that folder and ZIP imports retain metadata and image bytes. CI runs preview
 reader checks on Windows and Linux, including Linux address/undefined-behavior
 sanitizers. These automated checks do not replace rendered menu inspection or
 Android device testing.
+
+[test_mcc_xbox_menu.py](../../tools/test_mcc_xbox_menu.py) checks the native
+geometry, profile/folder/difficulty/back routes, host handoff and entry guards.
+[test_mcc_progress.py](../../tools/test_mcc_progress.py) executes journal reads
+and writes, profile/mission isolation, duplicate awards, corruption, capacity
+and profile-rename copying. The existing MCC lifecycle test checks that awards
+are gated by MCC campaign activation and host/local authority.

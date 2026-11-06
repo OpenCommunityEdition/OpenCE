@@ -92,9 +92,11 @@ int posix_mcc_preview_read(const char *root, const char *relative, void *buffer,
 #else
         /* Lookup through the held parent descriptor, including on case-sensitive
          * Android imports. Reject ambiguous case aliases rather than guess. */
-        DIR *entries; struct dirent *entry; char found[256]; int matches = 0;
-        entries = fdopendir(dup(directory));
-        if (!entries) goto done;
+        DIR *entries; struct dirent *entry; char found[256]; int matches = 0, scan;
+        scan = dup(directory);
+        if (scan < 0) goto done;
+        entries = fdopendir(scan);
+        if (!entries) { close(scan); goto done; }
         while ((entry = readdir(entries)) != NULL) if (!strcasecmp(part, entry->d_name)) {
             if (strlen(entry->d_name) < sizeof(found)) { strcpy(found, entry->d_name); matches++; }
         }

@@ -10,6 +10,8 @@
 boolean network_game_is_active(void);
 boolean ui_widget_port_open(struct widget_instance *, char const *, boolean *);
 
+#include "mcc_xbox_menu.inl"
+
 static boolean frontend_menu_can_edit(void)
 {
 	return frontend_menu_available();
@@ -33,6 +35,7 @@ void frontend_menu_attach(struct widget_instance *widget)
     char path[96];
     struct widget_instance *entry, *last, *save, *before, *description;
     int index;
+    mcc_xbox_attach(widget);
     if (!widget || !frontend_menu_can_edit() || strcmp(frontend_menu_style(), "xbox")) return;
     name = tag_get_name(widget->definition_tag_index);
     if (!name) return;
@@ -145,6 +148,7 @@ int frontend_menu_shortcut(struct widget_instance *widget, struct event_record *
 	char const *name, *target = NULL;
 	char path[256];
 	boolean deleted = FALSE;
+	if (mcc_xbox_shortcut(widget, event)) return TRUE;
 	if (widget && !widget->parent && frontend_menu_can_edit() &&
 		!strcmp(frontend_menu_style(), "xbox") &&
 		frontend_menu_legacy_footer_action(widget, event)) return TRUE;
@@ -244,6 +248,7 @@ static void master_servers_show(struct widget_instance *list);
 
 void frontend_menu_session_reset(void)
 {
+	mcc_xbox_reset();
 	if (frontend_session.owns_profile)
 		player_ui_end_editing_profile();
 	memset(&frontend_session, 0, sizeof(frontend_session));

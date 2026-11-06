@@ -28,6 +28,11 @@ struct network_game {struct {char name[64];} map;};
 static struct network_game game={{"mcc_maps\\Host\\z10"}};
 static int active=1,type,enabled=1,connection,state=1,lookups,queued,persistent,rounds,errors;
 static char selected[64];
+static int completions;
+static int game_difficulty_level_get(void){return 2;}
+static void mcc_progress_complete(char const *name,short difficulty){
+ if(difficulty==2 && !strcmp(name,connection==1 ? game.map.name : "mcc_maps\\Local\\z10"))completions++;
+}
 static int mcc_cache_tags_loaded(void){return active;}
 static int mcc_cache_scenario_type(void){return type;}
 static int config_boolean(char const *key){(void)key;return enabled;}
@@ -51,7 +56,7 @@ int main(void) {
  int i;
  for(i=0;i<3;i++) {
   active=i!=0;type=i==1;enabled=i!=2;
-  if(mcc_main_campaign_won() || lookups || queued || rounds)return 1;
+  if(mcc_main_campaign_won() || lookups || queued || rounds || completions)return 1;
  }
  active=enabled=1;type=0;
  if(!mcc_main_campaign_won() || strcmp(selected,"mcc_maps\\Pack\\a10") || persistent!=1 || queued)return 2;
@@ -63,7 +68,7 @@ int main(void) {
  state=2;if(!mcc_main_campaign_won() || rounds!=2 || strcmp(selected,"lobby"))return 7;
  state=-1;if(!mcc_main_campaign_won() || rounds!=3 || errors!=2)return 8;
  connection=2;i=lookups;
- if(!mcc_main_campaign_won() || lookups!=i || rounds!=3 || queued!=3)return 9;
+ if(!mcc_main_campaign_won() || lookups!=i || rounds!=3 || queued!=3 || completions!=7)return 9;
  /* Switching back to an unaffected family cannot retain campaign state. */
  active=0;connection=0;if(mcc_main_campaign_won() || lookups!=i)return 10;
  return 0;

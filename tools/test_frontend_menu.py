@@ -230,6 +230,10 @@ static short controller_of(struct widget_instance *w) {(void)w;return 0;}
 static void controller_device_get(short port,struct controller_device *d) {(void)port;d->family=0;}
 static int controller_button_style_index(char const *name) {return strcmp(name,"classic")?3:0;}
 struct event_record {short type,controller_index;struct {struct {unsigned char index,value;} button;} data;};
+/* MCC routing is covered independently by test_mcc_xbox_menu.py. */
+static void mcc_xbox_reset(void) {}
+static void mcc_xbox_attach(struct widget_instance *w) {(void)w;}
+static int mcc_xbox_shortcut(struct widget_instance *w,struct event_record *e) {(void)w;(void)e;return 0;}
 struct pc_menu_setting {short value_count,loaded_index;char const *setting;char const *values[3];};
 static int available=1,main_menu=1,network=0,writes=0,transitions=0,opens=0,message=0,fail=0,display=0,ended=0;
 static char const *config_string(char const *key) {(void)key;return "modern";}
@@ -414,6 +418,11 @@ def test_generated_assets_routes_and_platform_filter(tmp_path):
     for file in (menus / 'ce').glob('*.xml'):
         destinations.update(node.get('name') for node in ET.parse(file).getroot().findall('widget'))
     assert doc.get('root') is None  # must not override the legacy root
+    # MCC wrappers use unchanged native profile and difficulty services/art.
+    destinations.update('ui\\shell\\main_menu\\'+name for name in (
+        'player_profiles_select\\player_profile_select_list',
+        'player_profiles_select\\header_select_profile', 'button_key', 'y_butn', '=create_new',
+        'settings_select\\player_setup\\create_and_edit_player_profile_screen'))
     for node in doc.findall('.//child'):
         assert node.get('widget') in destinations
     for node in doc.findall('.//on'):

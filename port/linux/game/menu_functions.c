@@ -92,6 +92,7 @@ their handlers open opens.
 #include "mcc_ui.h"
 #include "custom_edition_maps.h"
 #include "mcc_maps.h"
+#include "mcc_menu_text.h"
 #include "mcc_cache.h"
 #include "game_modes.h"
 #include "network_voice.h"
@@ -1256,6 +1257,7 @@ static void mcc_map_description_show(struct widget_instance *description, short 
 static void mcc_solo_map_text(short row, wchar_t *text)
 {
 	mcc_map_browser_text(&mcc_solo_browsers[mcc_solo_list.campaign], row, text);
+	mcc_menu_text_row(text);
 }
 
 static void mcc_browser_description(struct widget_instance *description, struct mcc_map_browser *browser)
@@ -3672,6 +3674,7 @@ static struct mcc_map_browser mcc_host_browsers[2];
 static void mcc_host_map_text(short row, wchar_t *text)
 {
 	mcc_map_browser_text(&mcc_host_browsers[mcc_host_list.campaign], row, text);
+	mcc_menu_text_row(text);
 }
 
 static void mcc_host_list_update(struct widget_instance *list)
@@ -8437,6 +8440,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port map list back"))
 		{
 			return map_list_back(widget, widget_deleted);
+		}
+		else if (!strncmp(name, "port mcc xbox ", 14))
+		{
+			return mcc_xbox_event(name + 14, widget, event, widget_deleted);
 		}
 		else if (!strcmp(name, "port mcc host folder back"))
 		{

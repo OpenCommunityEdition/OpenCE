@@ -63,12 +63,13 @@ static struct preview_entry *picture(short index)
     return entry;
 }
 
-boolean mcc_menu_preview_draw(short index, rectangle2d const *box, rectangle2d const *parent_clip,
+boolean mcc_menu_preview_draw(short index, long widget_tag, rectangle2d const *box, rectangle2d const *parent_clip,
     pixel32 color, struct rasterizer_dynamic_screen_geometry_parameters *parameters)
 {
     struct preview_entry *entry=picture(index);
     rectangle2d bounds=*box, clip=*box, texels;
     int width, height;
+    boolean crop;
     if (!entry || !entry->bitmap || !mcc_preview_fit(entry->width,entry->height,box->x1-box->x0,box->y1-box->y0,&width,&height)) return FALSE;
     bounds.x0 += (short)((box->x1-box->x0-width)/2);
     bounds.y0 += (short)((box->y1-box->y0-height)/2);
@@ -78,6 +79,22 @@ boolean mcc_menu_preview_draw(short index, rectangle2d const *box, rectangle2d c
         clip.x1=MIN(clip.x1,parent_clip->x1); clip.y1=MIN(clip.y1,parent_clip->y1);
     }
     set_rectangle2d(&texels,0,0,entry->width,entry->height);
+    /* Native Xbox cards fill their 140x114 thumbnail. Crop only this MCC
+     * presentation to that aspect; PC-style panels retain their fitted image. */
+    crop = widget_tag != NONE && !strncmp(tag_get_name(widget_tag), "pc\\mcc_xbox\\", 12);
+    if (crop) {
+        bounds = *box;
+        width = entry->width;
+        height = entry->height;
+        if (width * (box->y1-box->y0) > height * (box->x1-box->x0))
+            width = height * (box->x1-box->x0) / (box->y1-box->y0);
+        else
+            height = width * (box->y1-box->y0) / (box->x1-box->x0);
+        texels.x0 = (short)((entry->width-width)/2);
+        texels.y0 = (short)((entry->height-height)/2);
+        texels.x1 = texels.x0+(short)MAX(width,1);
+        texels.y1 = texels.y0+(short)MAX(height,1);
+    }
     if (clip.x1 > clip.x0 && clip.y1 > clip.y0)
         draw_bitmap_in_rect(entry->bitmap,&bounds,&texels,&clip,color,parameters,FALSE);
     return TRUE;

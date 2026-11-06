@@ -4112,6 +4112,229 @@
 		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/controller_appearance/controller_appearance_screen" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
+	<widget name="mcc_xbox/campaign" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/connected" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/split" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/connected_postgame" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/split_postgame" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/heading_campaigns" left="35" top="11" width="605" height="59" bitmap="mcc_xbox/heading_campaigns" />
+	<bitmap name="mcc_xbox/heading_campaigns">
+		<frame png="modern/mcc_campaigns.png" width="512" height="64" />
+	</bitmap>
+	<widget name="mcc_xbox/heading_levels" left="35" top="11" width="306" height="59" bitmap="ui\shell\main_menu\solo_level_select\header_load_level" />
+	<widget name="mcc_xbox/heading_maps" left="35" top="11" width="605" height="59" bitmap="ui\shell\main_menu\multiplayer_type_select\mp_map_select\header_select_map" />
+	<widget name="mcc_xbox/heading_difficulty" left="35" top="11" width="390" height="59" bitmap="ui\shell\main_menu\difficulty_select\header_choose_difficulty" />
+	<widget name="mcc_xbox/status" type="text" left="64" top="414" width="280" height="28" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_0" left="72" top="75" width="165" height="330" flags="nifty_fx" bitmap="ui\shell\bitmaps\spinner_list_3_wide_item_background">
+		<on event="left_mouse" run="port mcc xbox card" />
+		<child widget="mcc_xbox/card_0/picture" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/mcc_folder_name" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/mcc_folder_help" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/badge_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/badge_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/badge_2" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/card_0/picture" left="85" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix" />
+	<widget name="mcc_xbox/card_0/mcc_folder_name" type="text" left="83" top="204" width="144" height="43" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_0/mcc_folder_help" type="text" left="83" top="258" width="144" height="136" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_0/badge_0" left="82" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_0/badge_1" left="132" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_0/badge_2" left="182" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_1" left="239" top="75" width="163" height="326" flags="nifty_fx" bitmap="ui\shell\bitmaps\spinner_list_3_wide_item_background">
+		<on event="left_mouse" run="port mcc xbox card" />
+		<child widget="mcc_xbox/card_1/picture" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/mcc_folder_name" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/mcc_folder_help" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/badge_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/badge_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/badge_2" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/card_1/picture" left="252" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix" />
+	<widget name="mcc_xbox/card_1/mcc_folder_name" type="text" left="250" top="204" width="145" height="43" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_1/mcc_folder_help" type="text" left="250" top="258" width="145" height="136" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_1/badge_0" left="249" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_1/badge_1" left="299" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_1/badge_2" left="349" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_2" left="406" top="75" width="162" height="326" flags="nifty_fx" bitmap="ui\shell\bitmaps\spinner_list_3_wide_item_background">
+		<on event="left_mouse" run="port mcc xbox card" />
+		<child widget="mcc_xbox/card_2/picture" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/mcc_folder_name" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/mcc_folder_help" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/badge_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/badge_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/badge_2" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/card_2/picture" left="419" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix" />
+	<widget name="mcc_xbox/card_2/mcc_folder_name" type="text" left="417" top="204" width="146" height="43" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_2/mcc_folder_help" type="text" left="417" top="258" width="146" height="136" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_2/badge_0" left="416" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_2/badge_1" left="466" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_2/badge_2" left="516" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/previous" left="50" top="174" width="18" height="170" bitmap="ui\shell\bitmaps\arrow_big_left">
+		<on event="left_mouse" run="port mcc xbox left" />
+	</widget>
+	<widget name="mcc_xbox/next" left="575" top="174" width="35" height="170" bitmap="ui\shell\bitmaps\arrow_big_right">
+		<on event="left_mouse" run="port mcc xbox right" />
+	</widget>
+	<widget name="mcc_xbox/campaign_entry" type="text" left="64" top="414" width="280" height="28" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" text="=MCC CAMPAIGNS" text_x="22">
+		<child widget="frontend_legacy/footer_glyph_x" x="64" y="414" />
+		<on event="left_mouse" run="port mcc xbox open" />
+	</widget>
+	<widget name="mcc_xbox/multiplayer_entry" type="text" left="64" top="414" width="280" height="28" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" text="=MCC MAPS" text_x="22">
+		<child widget="frontend_legacy/footer_glyph_x" x="64" y="414" />
+		<on event="left_mouse" run="port mcc xbox open" />
+	</widget>
+	<widget name="mcc_xbox/profiles" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="sp reset controller choices" />
+		<on event="a" run="port mcc xbox profile" />
+		<on event="start" run="port mcc xbox profile" />
+		<on event="b" back="true" />
+		<on event="back" back="true" />
+		<child widget="ui\shell\main_menu\player_profiles_select\player_profile_select_list" />
+		<child widget="ui\shell\main_menu\player_profiles_select\header_select_profile" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<on event="y" run="create&amp;edit player profile" open="ui\shell\main_menu\settings_select\player_setup\create_and_edit_player_profile_screen" />
+		<child widget="ui\shell\main_menu\y_butn" x="78" y="414" />
+		<child widget="ui\shell\main_menu\=create_new" x="100" y="414" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="ui\shell\main_menu\difficulty_select\difficulty_ext_desc">
+		<data input="difficulty menu update desc" />
+		<on event="created" run="difficulty menu init" />
+		<child widget="mcc_xbox/difficulty_0" x="0" y="0" />
+		<child widget="mcc_xbox/difficulty_1" x="0" y="0" />
+		<child widget="mcc_xbox/difficulty_2" x="0" y="0" />
+		<child widget="mcc_xbox/difficulty_3" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_0" type="text" left="51" top="78" width="232" height="32" bitmap="ui\shell\bitmaps\list_item_bkd_top" string_list="ui\shell\main_menu\difficulty_select\difficulty_options" string_index="0" font="ui\large_ui" color="#FF0080FF" text_x="13" text_y="5">
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_1" type="text" left="51" top="111" width="232" height="32" bitmap="ui\shell\bitmaps\list_item_bkd" string_list="ui\shell\main_menu\difficulty_select\difficulty_options" string_index="1" font="ui\large_ui" color="#FF0080FF" text_x="13" text_y="5">
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_2" type="text" left="51" top="144" width="232" height="32" bitmap="ui\shell\bitmaps\list_item_bkd" string_list="ui\shell\main_menu\difficulty_select\difficulty_options" string_index="2" font="ui\large_ui" color="#FF0080FF" text_x="13" text_y="5">
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_3" type="text" left="51" top="177" width="232" height="32" bitmap="ui\shell\bitmaps\list_item_bkd" string_list="ui\shell\main_menu\difficulty_select\difficulty_options" string_index="3" font="ui\large_ui" color="#FF0080FF" text_x="13" text_y="5">
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
 	<widget name="modern/network/maps/0/connected_map_select_wrapper" width="640" height="480" flags="pass_unhandled_to_focused_child main_menu_if_no_history tag_controller_index force_handle_mouse">
 		<on event="b" run="port mcc host folder back" />
 		<on event="back" run="port mcc host folder back" />

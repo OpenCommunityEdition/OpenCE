@@ -23,13 +23,13 @@ inventory when an authorized change makes it inaccurate.
 | --- | --- |
 | Map selection, loading, packages and resources | `mcc_main`, `mcc_maps`, `mcc_cache`, `mcc_loading`, `mcc_errors`, `mcc_precache`, `mcc_identity`, `mcc_sha256`, `mcc_cache_format`, `mcc_package`, `mcc_resources`, `mcc_tags`, `mcc_tag_validate` |
 | Script interpretation, parameters and object names | `mcc_scripts`, `mcc_syntax`, `mcc_script_parameters`, `mcc_script_runtime.inl`, `mcc_script_threads.inl`, `mcc_object_names`, `mcc_game_speed` |
-| Checkpoints and campaign state | `mcc_checkpoint`, `mcc_campaign`, `mcc_script_effects` |
+| Checkpoints and campaign state | `mcc_checkpoint`, `mcc_campaign`, `mcc_script_effects`, `mcc_progress` |
 | Explicit campaign packages and progression | `mcc_maps`, `mcc_main`, with `port/linux/src/mcc_manifest.c`; Android imports in `MccPackageImporter` and `MccImportActivity` |
 | Weapon-authored camera selection | `mcc_camera` |
 | Networking and named-object synchronization | `mcc_network`, `mcc_object_names_network`, `mcc_protocol`, `mcc_workshop` |
 | Player inventory, objects, movement penalties, damage impulses, boat controls, seats and recordings | `mcc_player`, `mcc_first_person.inl`, `mcc_grenades`, `mcc_objects`, `mcc_movement`, `mcc_damage`, `mcc_seats`, `mcc_recordings` |
 | Rendering, HUD and audio conversion | `mcc_geometry`, `mcc_bitmaps`, `mcc_texture_cache`, `mcc_environment_shader` (with `port/linux/src/mcc_environment_shader_gl.c`), `mcc_chicago.inl`, `mcc_hud`, `mcc_hud_draw`, `mcc_sprites`, `mcc_particles`, `mcc_audio`, `mcc_vorbis` |
-| Menus and pause UI | `mcc_ui`, `mcc_ui_teams`, `mcc_pause`, `mcc_pause_runtime` |
+| Menus and pause UI | `mcc_ui`, `mcc_ui_teams`, `mcc_pause`, `mcc_pause_runtime`, `mcc_menu_preview`, `mcc_menu_text`, `mcc_xbox_menu.inl` |
 
 Preserve established activation guards, legacy fallbacks and cleanup on
 map unload or failed load. Do not route Xbox or Custom Edition maps through
