@@ -26,6 +26,13 @@ does not run gameplay or alter network readiness, authority or map validation.
 
 ## Installation and menus
 
+The Xbox frontend has separate **MCC Campaigns** and **MCC Maps** entries.
+MCC Campaigns selects a profile, a campaign folder, a mission and a difficulty,
+using native Xbox-style cards and completion badges. Package previews and
+long-title handling also work in Modern, Classic PC and Stock menus. See
+[MCC menu images and badges](reading/mcc_level_previews.md) for the flow,
+metadata requirements and completion-record limits.
+
 Put the map in the game data root's `mcc_maps` directory, beside `maps` and
 `custom_maps`. For example:
 
@@ -81,6 +88,118 @@ complete map/required resource contents must match the host. Optional
 `.txt` descriptions remain beside the corresponding level. No manifest is
 required.
 
+A package from the Steam Workshop can say which item it is, so a joiner who
+cannot match the host's map is told what to do. The item is the package folder
+when Steam's own name (the item id, all digits) is kept, or a `workshop_id.txt`
+in the folder: the id on the first line and, optionally, the title on the
+second. The host sends the id and title in the map name's reserved tail
+(`mcc_workshop.c`). MCC protocol 64 versions this extension without changing
+the settings record's size; older MCC peers are refused. Xbox/CE retain
+OpenCE protocol 41. See the [wire contract](../port/linux/NETCODE.md#gulchce-crossplay-boundary).
+
+The item is advisory: the level filename and content fingerprint still decide
+admission. A known local item is recognized even if its older package lacks
+the requested level. A matching filename without an item id does not prove
+the item is installed. The refusal distinguishes an identified package that
+does not match from a package that cannot be identified locally. Both messages
+name the item and tell the player to copy the host's matching map and required
+resources into `mcc_maps`; a map with no item id gets the fingerprint text,
+naming the level file. A mismatch does not establish which player's copy is
+newer. This does not discover Steam libraries or synchronize manually copied
+packages; those require separate Workshop catalog integration.
+
+### Subscribed Steam Workshop items
+
+Installed packages can also supply [level previews](reading/mcc_level_previews.md).
+Keep their listed map/mission metadata and PNGs together. Modern, Classic PC,
+Stock and Xbox-style panels use `Images.Large`, then `Images.Thumbnail`, with
+the question mark as fallback. Pictures fit and clip to the existing thumbnail
+rectangle, and MCC titles/descriptions wrap within their text boxes. This also
+works for complete Android imports without Steam and does not enable sharing.
+
+With `game.workshop_maps = true` (`HALO_WORKSHOP_MAPS=1`), desktop builds list
+Halo CE maps from the Workshop items a player is subscribed to
+without copying anything into the data root. `steam_workshop.c` looks in Steam's
+libraries for `steamapps/workshop/content/976730/<item id>/`: the usual Steam
+folders (on Windows `%ProgramFiles(x86)%\Steam`; on Linux `~/.steam/steam`,
+`~/.local/share/Steam`, and the Flatpak and Snap places), the `paths.steam`
+setting (`HALO_STEAM_ROOT`), and every library their `libraryfolders.vdf`
+names. On Windows it also reads `SteamPath` from the current user's
+`Software\Valve\Steam` registry key and `InstallPath` from both the 32-bit and
+64-bit machine-wide views of that key. Thus an installation such as `C:\Steam`
+is discovered without editing the configuration or running Steam. The manual
+`paths.steam` root is checked first, followed by registered installations and
+standard folders; its copy of a duplicate item takes precedence. Missing,
+unreadable, non-string or oversized registry values are ignored. The detected
+path is not written to the configuration: an empty setting continues to use
+automatic discovery on the next scan.
+
+On Linux, after the manual override, discovery checks the literal absolute path
+in `STEAM_COMPAT_CLIENT_INSTALL_PATH` when the launch environment supplies it,
+then `$XDG_DATA_HOME/Steam`. It also keeps the home-folder fallbacks above and
+adds `~/.steam/debian-installation`. The existing `~/.steam/steam` and
+`~/.steam/root` links can point to an installation anywhere the user can read;
+each discovered root's library list can locate libraries on other drives.
+For example, `XDG_DATA_HOME=/mnt/data/player` finds
+`/mnt/data/player/Steam` with `paths.steam` empty. Missing, stale, relative,
+control-character or oversized environment hints do not prevent fallback
+discovery. Paths are not expanded as shell expressions or written to config.
+
+The location evidence is the [XDG base-directory specification](https://specifications.freedesktop.org/basedir/0.8/),
+Valve's use of the client-install hint in [Proton's launcher](https://github.com/ValveSoftware/Proton/blob/proton_10.0/proton),
+and the [Valve maintainer's description of Debian's installation folder](https://github.com/ValveSoftware/steam-for-linux/issues/9347).
+These are discovery hints, not an exhaustive drive search. An installation with
+no accessible hint, link or known location still needs `paths.steam`; sandbox
+filesystem permissions can also prevent discovery.
+
+An item is used when its `ModInfo.json` says `"Engine": "Halo1"`; each
+path in `GameModContents.MultiplayerMaps` is a map json whose `ScenarioFile`
+names the `.map` file in the item's `maps` folder, whose `Title.Neutral` is the
+map's title and whose `Images.Thumbnail` is its preview picture. Folder names
+inside an item are found without regard to case, as Steam's files are spelled
+by their makers. An item seen through two paths to one library is listed once.
+
+Discovery defaults to off. Android and web use installed `mcc_maps` packages;
+they do not search for Steam. Local package folders take precedence regardless
+of their letter case. The path translation hook is necessary because the shared
+file reader opens virtual Xbox paths; it handles only `mcc_maps` requests and
+leaves `maps` and `custom_maps` on their established paths.
+
+Each map is the level `mcc_maps\<item id>\<map name>`, so it is the same
+package identity as a folder named by the item id (above), and the host's item
+id and title and a joiner's refusal text work as for any such package. The path
+translation (`platform_translate_path`) opens `mcc_maps\<item id>\` as the
+item's `maps` folder in Steam's library. A package folder of that name in the
+data root's `mcc_maps` wins, so a player can still override an item by hand.
+The MCC menus show the map's Workshop title, and a package folder shows the
+item's title instead of its id. The resources a map needs (`bitmaps.map`,
+`sounds.map`) are chosen as for any package: beside the level, then the shared
+sets above.
+
+The catalog is read the first time MCC maps are needed, and again when a joiner
+cannot find the host's map (so an item subscribed just now is found). The json
+files are the item makers' text: one that is too large (256 KB), too deep, not
+an object, or that names a path leaving its item, refuses that item or map and
+nothing else.
+
+### Workshop collections
+
+Several Workshop items belong to a collection that their makers published as a
+set (a competitive pack, a social pack, a 2v2 set). `workshop_collections.c`
+holds a fixed, curated set of Halo CE collections as data: a name and the ids of
+its items. It does not query current Steam collection membership. Enable
+`game.mcc_collections` (`HALO_MCC_COLLECTIONS=1`, default off) and reopen the
+map list to use these groups. Imported packages can identify their collection
+through `workshop_id.txt`, without Steam. At the
+top of the MCC map menus a collection the player has an item of is a folder
+(`[PRO EDITION]`), before the package folders; it holds the maps of the
+player's items that are in it, by their Workshop titles. An item that is in two
+collections is in both folders; an item in none keeps the package folder of its
+own, named by its title. A collection with no subscribed item has no folder.
+Only the menu changes: levels are still `mcc_maps\<item id>\<map name>`, so
+a host's map and a joiner's messages do not depend on collections. A collection
+the table does not know is shown as its items' own folders.
+
 The two MCC categories show package folders first (alphabetically, in brackets),
 then loose maps. Open a folder to choose one of its levels; the rows omit the
 repeated package suffix, while the selected map's details retain its identity.
@@ -111,9 +230,43 @@ to gametypes. Split-screen multiplayer skips **MCC SINGLEPLAYER**, just as
 it skips the existing singleplayer categories. These
 are menu routes in the implementation; multiplayer interoperability and
 complete campaigns require gameplay testing.
-Each selected MCC campaign map is treated as an independent scenario.
-Automatic progression through a package's campaign map sequence is not
-implemented; the MCC package manifest is not interpreted.
+Without campaign metadata enabled, each selected MCC campaign map remains an
+independent scenario. Enable **CAMPAIGN MISSIONS** under Settings > Network
+Setup > Map Sharing > MCC Packages (`game.mcc_campaigns`, default false) to
+discover Workshop campaigns and use their authored mission order. The same
+screen exposes desktop Steam discovery and optional collection folders.
+
+`ModInfo.json` must identify `Halo1` and `GameModContents.HasCampaign = true`.
+`CampaignInfo.json` supplies an explicit `CampaignMaps` list; each referenced
+mission JSON supplies `ScenarioFile` and an optional `Title.Neutral`.
+The order in that list is authoritative, even when filenames sort differently.
+The last component of `ScenarioFile` names the compiled map, following the
+[public Excession format](https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/creatingmodpackage/specifyingproperties).
+A package contains one campaign, whose mission list can be reordered in
+[Excession](https://learn.microsoft.com/en-us/halo-master-chief-collection/excession/creatingmodpackage/campaignmod).
+The bounded reader supports 1-64 missions, rejects duplicate paths or filenames,
+and accepts the default mission kind. Hub/flashback semantics and insertion-point
+selection are not implemented; missions start normally at their beginning.
+
+For local packages, keep `ModInfo.json`, `CampaignInfo.json` and the referenced
+mission metadata beside the flattened maps, retaining the metadata subfolders.
+The Android importer performs this layout conversion and preserves the Workshop
+ID in `workshop_id.txt`. Metadata never redirects loading to another package,
+Xbox or CE. A local override never borrows metadata from its Steam counterpart.
+Missing map binaries remain in the declared order: completion stops with a
+diagnostic instead of skipping a mission. Unlisted maps remain independently
+selectable and do not acquire an inferred next mission.
+
+Solo completion queues the next explicit MCC level with the current difficulty;
+the last mission returns to the menu. In co-op only the host chooses the next
+mission, using the existing round transition and content-admission messages.
+The lobby selects that mission; the final mission returns to the lobby without
+wrapping to the first. Clients need matching map/resource content, not identical
+metadata or package folder names. No network fields or agreement rules changed.
+The minimal `main_won_map_private` hook is necessary because the established
+completion table cannot represent MCC package identities; all selection logic
+remains in MCC modules, behind loaded-campaign and setting guards. Xbox and CE
+completion paths are preserved.
 
 MCC checkpoints retain the canonical `mcc_maps\[package\]<filename>` scenario
 identity, including when the original tag names an Xbox campaign level.
@@ -127,7 +280,7 @@ package name and separator. Deeper nesting, traversal and invalid names are
 rejected. Moving an existing loose map into a package changes its saved-game
 identity; keep it at its old location to continue an existing checkpoint. A description is optional;
 the default identifies the scenario type. MCC thumbnail sidecars, Workshop
-downloads and MCC package manifests are not implemented. There is no
+downloads and network transfer manifests are not implemented. There is no
 dependency on the Custom Edition setting or its resource directories.
 
 The loader opens source maps read-only. A rejected map reports the failing
@@ -274,6 +427,35 @@ and embedded widgets remain present. Scripts that explicitly open embedded
 widgets can still use the MCC callback adapter described below. The new
 pause labels and confirmation text are currently English; localization of
 these generated strings is not implemented.
+
+## Preliminary sharing restriction
+
+PR #94 supplies an MCC-owned eligibility helper only. MCC peer downloads are
+not enabled by it. The temporary policy covers hand-placed packages and excludes
+recognized Workshop content (numeric package folders or a valid
+`workshop_id.txt`), stock content, loose maps and `_shared`. Desktop players
+continue installing Workshop content through Steam or manually; Android players
+continue using the [package importer](../port/android/README.md#importing-mcc-packages).
+Steam is not required on Android. This is a scope restriction, not a claim that
+Workshop maps are unsafe or that manually copied maps are safe.
+
+The helper requires host opt-in, a known SHA-256 content identity and an explicit
+local classification of that exact content as custom. Unknown classification,
+unreadable sidecars and invalid enum values are refused. Folder names do not
+classify stock content: renaming a stock package cannot change an established
+stock classification, and a custom package may use a stock-looking name. A
+missing sidecar remains allowed under the original policy, but is not proof of
+origin or redistribution permission. Removing metadata is not a supported way
+to establish eligibility. The classification provider and transfer integration
+are future work; this phase does not automatically classify installed files.
+
+The additional-resource allowlist contains only `bitmaps.map` and `sounds.map`.
+It neither validates their contents nor authorizes reading global fallback
+resources. Campaign metadata and later mission files need a separate transfer
+contract. Eligibility and a matching hash must never bypass receiver-side map
+validation, path containment, bounded transfers or safe installation. See the
+[reader's guide](reading/maps_and_resources.md#preliminary-mcc-sharing-policy)
+for the API, trust boundaries and regression checks.
 
 ## Repository architecture and isolation
 
@@ -1350,8 +1532,9 @@ compatibility-version change is involved. This is an MCC-specific avoidance
 of the credits/cache interaction, not a general change to the movie player
 or background I/O. Xbox and CE completion remain unchanged.
 
-Automatic MCC campaign-package progression remains unsupported: after M0
-finishes, select M1 manually. An unrelated saved-map identity rejection is
+At the time of that fix, automatic MCC campaign progression was unsupported.
+Packages without an enabled explicit campaign manifest still require manual
+mission selection. An unrelated saved-map identity rejection is
 normal, and the map's equipment/grenade warnings are not suppressed here.
 
 Regression tests cover camera bounds, default and supported lenses, wide

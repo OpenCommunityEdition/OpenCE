@@ -10,6 +10,7 @@
 #include "mcc_package.h"
 #include "mcc_precache.h"
 #include "mcc_validation.h"
+#include "mcc_workshop.h"
 #include <string.h>
 
 #define MCC_IDENTITY_MAX_CANDIDATES 16
@@ -17,6 +18,7 @@ static struct {
     char name[64];
     unsigned char digest[32];
     struct mcc_precache_snapshot files;
+    struct mcc_workshop_item item;
     int valid;
 } mcc_host_identity;
 static struct {
@@ -87,6 +89,7 @@ int mcc_identity_prepare_host(char const *map)
         strcpy(mcc_host_identity.name,name);
         memcpy(mcc_host_identity.digest,digest,32);
         mcc_host_identity.files=after;
+        mcc_workshop_local_item(name,&mcc_host_identity.item);
         mcc_host_identity.valid=1;
     }
     return 1;
@@ -115,6 +118,8 @@ void const *mcc_identity_host_settings(void const *settings,long bytes,struct ne
         !mcc_validation_lookup(canonical,&checksum,NULL) ||
         checksum!=(uint32_t)game->map.version) return NULL;
     memcpy(copy->mcc_content_sha256,mcc_host_identity.digest,32);
+    /* MCC protocol 64 reserves the name tail for advisory Workshop metadata. */
+    mcc_workshop_wire_pack(copy->map.name,&mcc_host_identity.item);
     return copy;
 }
 
@@ -142,6 +147,27 @@ static int mcc_identity_matches(char const *name,unsigned char const digest[32],
     return ok;
 }
 
+/* Only a known item ID establishes presence. Its older package may not yet
+ * contain the requested level, so search independently of the filename. */
+static int mcc_identity_refusal(struct network_game const *game,char const *session)
+{
+    struct mcc_workshop_item host,local;
+    enum mcc_workshop_refusal kind=MCC_WORKSHOP_MISSING;
+    char const *leaf=strrchr(session,'\\')+1,*candidate;
+    char text[256];
+    short i,count=mcc_maps_count(FALSE);
+    if (!mcc_workshop_wire_unpack(game->map.name,&host)) kind=MCC_WORKSHOP_NOT_WORKSHOP;
+    else for (i=0;i<count;i++) {
+        candidate=mcc_maps_level_name(i);
+        if (mcc_workshop_local_item(candidate,&local) && !strcmp(local.id,host.id)) {
+            kind=MCC_WORKSHOP_DIFFERS;
+            break;
+        }
+    }
+    mcc_workshop_refusal_text(kind,&host,leaf,text,sizeof(text));
+    return mcc_identity_error(text);
+}
+
 int mcc_identity_accept(struct network_game const *game)
 {
     char session[64],selected[64];
@@ -163,24 +189,32 @@ int mcc_identity_accept(struct network_game const *game)
         leaf=strrchr(session,'\\')+1;
         mcc_maps_rescan();
         count=mcc_maps_count(FALSE);
-        /* Bound work before hashing any fallback candidates. */
-        for (i=0;i<count;i++) {
-            candidate=mcc_maps_level_name(i);
-            candidate_leaf=strrchr(candidate,'\\')+1;
-            if (!csstrcasecmp(leaf,candidate_leaf) && ++candidates>MCC_IDENTITY_MAX_CANDIDATES)
-                return mcc_identity_error("Too many MCC maps share this filename. Keep one matching package installed and retry.");
+        /* Discovery may have made the exact package available since the first
+         * probe. Prefer it before looking for aliases with the same leaf. */
+        if (mcc_identity_matches(session,game->mcc_content_sha256,&selected_files)) {
+            strcpy(selected,session);
+            matches=1;
         }
-        for (i=0;i<count;i++) {
-            candidate=mcc_maps_level_name(i);
-            candidate_leaf=strrchr(candidate,'\\')+1;
-            if (csstrcasecmp(leaf,candidate_leaf) || !csstrcasecmp(candidate,session)) continue;
-            if (mcc_identity_matches(candidate,game->mcc_content_sha256,&selected_files)) {
-                strcpy(selected,candidate);
-                if (++matches>1) return mcc_identity_error("Several local MCC packages match the host. Keep one matching copy, or use the host's package folder name.");
+        if (!matches) {
+            /* Bound work before hashing any fallback candidates. */
+            for (i=0;i<count;i++) {
+                candidate=mcc_maps_level_name(i);
+                candidate_leaf=strrchr(candidate,'\\')+1;
+                if (!csstrcasecmp(leaf,candidate_leaf) && ++candidates>MCC_IDENTITY_MAX_CANDIDATES)
+                    return mcc_identity_error("Too many MCC maps share this filename. Keep one matching package installed and retry.");
+            }
+            for (i=0;i<count;i++) {
+                candidate=mcc_maps_level_name(i);
+                candidate_leaf=strrchr(candidate,'\\')+1;
+                if (csstrcasecmp(leaf,candidate_leaf) || !csstrcasecmp(candidate,session)) continue;
+                if (mcc_identity_matches(candidate,game->mcc_content_sha256,&selected_files)) {
+                    strcpy(selected,candidate);
+                    if (++matches>1) return mcc_identity_error("Several local MCC packages match the host. Keep one matching copy, or use the host's package folder name.");
+                }
             }
         }
     }
-    if (!matches) return mcc_identity_error("No local MCC map and required resources match the host's SHA-256 fingerprint. Install the same complete package; its folder name may differ.");
+    if (!matches) return mcc_identity_refusal(game,session);
     mcc_client_identity.files=selected_files;
     strcpy(mcc_client_identity.session,session);
     strcpy(mcc_client_identity.local,selected);

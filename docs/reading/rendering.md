@@ -20,6 +20,10 @@ and the [FOV walkthrough](field_of_view.md) for the timing and camera inputs.
 
 ## Prepare a view before drawing objects
 
+The [depth and decal walkthrough](reversed_depth.md) follows the desktop's
+default reversed depth through projection, depth tests and decal offsets,
+including the conventional-depth fallback and interaction with dynamic lighting.
+
 OpenCE's `convex_polygon2d_clip_to_plane` in
 [geometry.c](../../source/math/geometry.c) keeps a corner on the clip line
 when a rounding error would otherwise produce a NaN crossing. This prevents
@@ -114,6 +118,35 @@ Xbox, Custom Edition and MCC loading paths. The asset-free
 [picture-function tests](../../tools/harness/tests/test_picture_function_inputs.py)
 cover overwritten inputs, additive functions, reused handles and invalidation;
 they do not establish GPU visibility or lens-flare occlusion correctness.
+
+## Lightning changes shape once per tick
+
+OpenCE's lightning correction keeps the random offsets of a bolt stable
+between simulation ticks. For example, Assault on the Control Room's light
+bridges should not flicker nearly five times faster at 144 FPS than at 30 FPS.
+Read `lightning_submit` in [lightning.c](../../source/objects/widgets/lightning.c):
+the first submission in a tick saves the local random seed for that lightning
+slot and split-screen window. Later submissions replay it, then restore the
+seed they found. Marker positions and the camera-facing geometry are still
+evaluated for each rendered frame; the cache stores no vertices or map pointers.
+
+`lightning_new` clears a reused slot. `lightnings_reset_render_state` clears
+all seeds on map initialization, map unload and through the post-load callback
+list in [game_state.c](../../source/saved%20games/game_state.c). GulchCE adds
+the unload and post-load resets because restoring a checkpoint can replace
+the lightning pool without calling `lightning_new`, including at the same tick.
+The callback only clears rendering state; saved data and network messages
+are unchanged. Xbox, Custom Edition and MCC retain their existing loading
+and conversion paths and use this shared renderer through its existing interface.
+
+The [lightning harness](../../tools/harness/tests/test_lightning_tick_shape.py)
+executes the real submission code and post-load callback list with fake
+renderer services. It covers tick zero, moving markers, independent bolts,
+all four views, pool reuse, map and checkpoint resets, and failed draw recovery.
+It does not establish visual parity or platform compatibility; those require
+real-game captures and builds as well. The
+[integration validation record](../lightning_tick_shape_validation.md)
+separates the completed checks from remaining platform and visual limits.
 
 ## Draw passes have an order and temporary state
 
@@ -286,9 +319,12 @@ Android. These CPU tests do not establish driver performance or visual parity.
 These optional features are available on `main` and `testing`. The
 [plasma lighting source](../../port/linux/game/plasma_lighting.c)
 is a useful second example after FOV. `plasma_lighting_prepare` selects
-eligible authored projectile-light attachments and records temporary state;
+eligible authored projectile and energy-emitter attachments and records temporary state;
 `plasma_lighting_frame_end` restores it. Window and reset functions delimit
 view-specific selection and longer-lived feature state.
+
+The [emitter expansion walkthrough](emitter_expansion.md) covers sword/charge/heat
+attachments, vehicle and world emitters, flame aggregation and consolidated controls.
 
 For world reflections, read `plasma_specular_begin` and
 `plasma_specular_color` in [plasma_falloff.c](../../port/linux/game/plasma_falloff.c).

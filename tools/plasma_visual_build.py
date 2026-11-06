@@ -12,7 +12,7 @@ import shlex
 import json
 import hashlib
 import argparse
-from lighting_trace_check import instrument
+from lighting_trace_check import instrument, instrument_collision
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -36,6 +36,8 @@ occlusion = ROOT/'port/linux/game/plasma_occlusion.c'
 occlusion_original = occlusion.read_bytes()
 collision=ROOT/'port/linux/game/plasma_collision.c'
 collision_original=collision.read_bytes()
+collision_models=ROOT/'port/linux/game/plasma_collision_models.c'
+collision_models_original=collision_models.read_bytes()
 input_source=ROOT/'port/linux/src/xinput_sdl.c'
 input_original=input_source.read_bytes()
 rocket=ROOT/'port/linux/game/rocket_lighting.c'
@@ -56,12 +58,13 @@ saved_args = shlex.split(re.search(r'^configure_args = (.*)$',
                                   (ROOT / 'build.ninja').read_text(), re.M).group(1))
 manifest = dict(configure_args=saved_args, base_commit=subprocess.check_output(
     ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(), source_hashes={})
-for path in [ROOT/'source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c', ROOT/'port/linux/game/needler_lighting.c', ROOT/'port/linux/game/ammo_counter_falloff.c', ROOT/'source/rasterizer/xbox/rasterizer_xbox_models.c', ROOT/'port/linux/game/ammo_counter_lighting.c', covenant, muzzle, ROOT/'source/items/weapons.c', ROOT/'port/linux/src/port_config.c', rocket, input_source, ROOT/'tools/fixtures/plasma_lighting_capture.c', source, main, backend, plasma, ROOT/'port/linux/game/plasma_falloff.c',
+for path in [ROOT/'port/linux/game/plasma_collision_scene.c', ROOT/'port/linux/game/lighting_config.c', ROOT/'source/physics/collision_bsp.c', ROOT/'source/physics/collision_bsp.h', ROOT/'source/physics/collision_models.c', ROOT/'source/physics/collision_models.h', ROOT/'port/linux/game/ambient_emitter_lighting.c', ROOT/'port/linux/game/ambient_emitter_lighting.h', ROOT/'port/linux/game/lighting_menu.c', ROOT/'port/linux/game/authored_emitter_lighting.c', ROOT/'port/linux/game/authored_emitter_lighting.h', ROOT/'source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c', ROOT/'port/linux/game/needler_lighting.c', ROOT/'port/linux/game/ammo_counter_falloff.c', ROOT/'source/rasterizer/xbox/rasterizer_xbox_models.c', ROOT/'port/linux/game/ammo_counter_lighting.c', covenant, muzzle, ROOT/'source/items/weapons.c', ROOT/'port/linux/src/port_config.c', rocket, input_source, ROOT/'tools/fixtures/plasma_lighting_capture.c', source, main, backend, plasma, ROOT/'port/linux/game/plasma_falloff.c',
              occlusion, ROOT/'port/linux/src/plasma_occlusion_gl.c', ROOT/'source/objects/object_lights.c', ROOT/'source/rasterizer/xbox/rasterizer_xbox.c',
              ROOT/'port/linux/src/plasma_model_shader.c', ROOT/'port/linux/src/nv2a_vsh.c', ROOT/'port/linux/src/nv2a_psh.c', ROOT/'source/rasterizer/xbox/rasterizer_xbox_environment.c']:
     manifest['source_hashes'][path.relative_to(ROOT).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
 try:
     manifest['source_hashes'][collision.relative_to(ROOT).as_posix()]=hashlib.sha256(collision_original).hexdigest()
+    manifest['source_hashes'][collision_models.relative_to(ROOT).as_posix()]=hashlib.sha256(collision_models_original).hexdigest()
     header=ROOT/'port/linux/include/plasma_collision.h'
     manifest['source_hashes'][header.relative_to(ROOT).as_posix()]=hashlib.sha256(header.read_bytes()).hexdigest()
     manifest['verify_traces']=args.verify_traces
@@ -103,6 +106,10 @@ try:
     input_source.write_text(text)
     shutil.copy2(ROOT / 'tools/fixtures/plasma_lighting_capture.c', fixture)
     text = original.decode().replace('\r\n', '\n')
+    text = 'struct observer_result;\nstruct observer_result const *plasma_capture_view(struct observer_result const *source);\n' + text
+    camera = 'return render_interpolation_direct_camera(local_player_index,\n\t\trender_interpolation_blended_camera(local_player_index, observer));'
+    assert text.count(camera) == 1
+    text = text.replace(camera, 'return plasma_capture_view(render_interpolation_direct_camera(local_player_index,\n\t\trender_interpolation_blended_camera(local_player_index, observer)));')
     text = text.replace('void render_interpolation_tick(void)',
                         'void plasma_capture_tick(void);\nvoid plasma_capture_frame(void);\n\nvoid render_interpolation_tick(void)', 1)
     text = text.replace('long previous_tick = interpolation_tick++;',
@@ -121,6 +128,9 @@ try:
     assert text.count(marker) == 1
     text = text.replace(marker, marker+'\n\tplatform_log("PLASMA occlusion extent %.3f sample %.3f",field->extent,field->visibility[0]);')
     occlusion.write_text(instrument(text) if args.verify_traces else text)
+    if args.verify_traces:
+        collision.write_text(instrument_collision(collision.read_text()))
+        collision_models.write_text(instrument_collision(collision_models.read_text()))
     text = main_original.decode().replace('\r\n', '\n')
     text = 'void plasma_capture_frame(void);\nvoid plasma_capture_camera(void);\n' + text
     text = text.replace('main_game_render((double)main_globals.seconds_elapsed);',
@@ -147,7 +157,7 @@ try:
     environment.write_text(text)
     text = plasma_original.decode().replace('\r\n', '\n')
     text = 'void platform_log(const char *format, ...);\n' + text
-    marker = '\tlight_port_refresh_attachment(light_index, object_index);'
+    marker = '\tif (!light_port_refresh_attachment(light_index, object_index))'
     assert text.count(marker) == 1
     text = text.replace(marker, '\tplatform_log("PLASMA prepare %ld owner %ld tag %s", light_index, object_index, name);\n' + marker)
     text = text.replace('plasma_lighting_attachments[index].rasterizer_index = rasterizer_index;',
@@ -194,6 +204,7 @@ finally:
     projectiles.write_bytes(projectiles_original)
     occlusion.write_bytes(occlusion_original)
     collision.write_bytes(collision_original)
+    collision_models.write_bytes(collision_models_original)
     fixture.unlink(missing_ok=True)
     subprocess.run([sys.executable, 'configure.py', *saved_args], cwd=ROOT, check=True)
     subprocess.run(['ninja', 'windows'], cwd=ROOT, check=True)

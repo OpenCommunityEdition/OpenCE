@@ -103,6 +103,7 @@ this list to generate the guest's entry points */
 	X(glBindBufferBase) \
 	X(glBindBufferRange) \
 	X(glGenVertexArrays) \
+	X(glDeleteVertexArrays) \
 	X(glBindVertexArray) \
 	X(glEnableVertexAttribArray) \
 	X(glDisableVertexAttribArray) \
@@ -125,6 +126,7 @@ this list to generate the guest's entry points */
 	X(glLinkProgram) \
 	X(glGetProgramiv) \
 	X(glGetProgramInfoLog) \
+	X(glDeleteProgram) \
 	X(glUseProgram) \
 	X(glGetUniformLocation) \
 	X(glUniform1i) \
@@ -220,6 +222,7 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glMapBufferRange) \
 	X(glBindBufferBase) \
 	X(glGenVertexArrays) \
+	X(glDeleteVertexArrays) \
 	X(glBindVertexArray) \
 	X(glEnableVertexAttribArray) \
 	X(glDisableVertexAttribArray) \
@@ -357,6 +360,7 @@ pointers, sees the declarations without these aliases */
 #define glBindBufferBase halo_glBindBufferBase
 #define glBindBufferRange halo_glBindBufferRange
 #define glGenVertexArrays halo_glGenVertexArrays
+#define glDeleteVertexArrays halo_glDeleteVertexArrays
 #define glBindVertexArray halo_glBindVertexArray
 #define glEnableVertexAttribArray halo_glEnableVertexAttribArray
 #define glDisableVertexAttribArray halo_glDisableVertexAttribArray
@@ -379,6 +383,7 @@ pointers, sees the declarations without these aliases */
 #define glLinkProgram halo_glLinkProgram
 #define glGetProgramiv halo_glGetProgramiv
 #define glGetProgramInfoLog halo_glGetProgramInfoLog
+#define glDeleteProgram halo_glDeleteProgram
 #define glUseProgram halo_glUseProgram
 #define glGetUniformLocation halo_glGetUniformLocation
 #define glUniform1i halo_glUniform1i
@@ -466,6 +471,7 @@ pointers, sees the declarations without these aliases */
 #define glMapBufferRange halo_glMapBufferRange
 #define glBindBufferBase halo_glBindBufferBase
 #define glGenVertexArrays halo_glGenVertexArrays
+#define glDeleteVertexArrays halo_glDeleteVertexArrays
 #define glBindVertexArray halo_glBindVertexArray
 #define glEnableVertexAttribArray halo_glEnableVertexAttribArray
 #define glDisableVertexAttribArray halo_glDisableVertexAttribArray

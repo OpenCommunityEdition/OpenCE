@@ -3,7 +3,8 @@
 #include <string.h>
 
 enum { _object_type_projectile = 5 };
-enum { _point_light_dynamic_bit = 0 };
+enum { _point_light_dynamic_bit = 0, _point_light_connects_to_map_bit = 1,
+	_point_light_connected_to_map_bit = 2 };
 #define SET_FLAG(value, bit, enabled) ((value) = (enabled) ? ((value) | (1 << (bit))) : ((value) & ~(1 << (bit))))
 struct object_datum { long definition_index; struct { short type; } object; };
 static struct object_datum projectile = { 1, { _object_type_projectile } };
@@ -12,10 +13,12 @@ static int muzzle_on, emitter_on, shield_on;
 static int enabled = 1, refreshes, present = 1, interpolation_rendering = 1;
 static int rendered_pose;
 static float connected_radius;
-int config_boolean(const char *name) { return strcmp(name, "display.muzzle_lighting") ? enabled : muzzle_on; }
+int lighting_config_boolean(const char *name) { return strcmp(name, "display.muzzle_lighting") ? enabled : muzzle_on; }
 static struct object_datum *object_try_and_get(long index) { return present ? &projectile : NULL; }
 static const char *tag_get_name(long index) { return tag_name; }
 struct light_datum { long object_index, parent_light_index; int flags; float radius; long definition_index; real_point3d position; real_vector3d forward; };
+struct rasterizer_light_submit_parameters { real_point3d position; real_vector3d forward; real radius; };
+static struct { long light_count; struct rasterizer_light_submit_parameters lights[32]; } rasterizer_lights;
 static struct { int valid; } storage = { 1 }, *light_data = &storage;
 static int stale;
 static struct light_datum *datum_try_and_get(void *data, long index)
@@ -33,10 +36,20 @@ static struct point_light_definition *light_definition_get(long i) { return &lig
 static struct light_datum *light_get(long i) { return datum_try_and_get(light_data,i); }
 float rocket_lighting_radius(long l,long o,float r) { return r; }
 static void light_compute_bounding_sphere(long i,boolean m,boolean s,boolean f,real_point3d *p,real *r);
-static void light_disconnect_from_map(long index) {}
+static void light_disconnect_from_map(long index)
+{
+	struct light_datum *light = light_get(index);
+	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
+	{
+		CHECK(TEST_FLAG(light->flags, _point_light_connected_to_map_bit), "disconnect requires map membership");
+		SET_FLAG(light->flags, _point_light_connected_to_map_bit, FALSE);
+	}
+}
 static void light_reconnect_to_map(long index)
 {
 	refreshes++;
+	if (TEST_FLAG(light_get(index)->flags, _point_light_connects_to_map_bit))
+		SET_FLAG(light_get(index)->flags, _point_light_connected_to_map_bit, TRUE);
 	rendered_pose = interpolation_rendering;
 	{ real_point3d p; light_compute_bounding_sphere(index, TRUE, FALSE, TRUE, &p, &connected_radius); }
 }
@@ -76,6 +89,9 @@ void shield_glow_frame_end(void) {}
 void shield_glow_window_begin(void) {}
 void shield_glow_submitted(long l,long r) {}
 float shield_glow_radius(long l,float r) { return r; }
+int authored_emitter_lighting_enabled(void) { return 0; }
+int authored_emitter_lighting_profile(long o,long d,float *s) { return 0; }
+int authored_emitter_lighting_category_enabled(int c) { return enabled; }
 #include "under_test.inc"
 
 int main(int argc, char **argv)
@@ -109,12 +125,12 @@ int main(int argc, char **argv)
   const char *names[] = {"vehicles\\ghost\\ghost bolt", "vehicles\\banshee\\banshee bolt", "vehicles\\banshee\\banshee fuel rod", "vehicles\\c gun turret\\c gun turret", "weapons\\fuel rod gun\\fuel rod", "weapons\\needler\\needle", "vehicles\\wraith\\wraith mortar", "weapons\\plasma_cannon\\plasma_cannon"};
   float scales[] = {1.75f,1.75f,2.75f,2.5f,2.75f,1.5f,1.75f,2.75f};
   for(i=0;i<8;i++) {
-   tag_name=names[i];plasma_lighting_prepare(1,1);
+   tag_name=names[i];plasma_lighting_prepare(1,1, NONE);
    CHECK(plasma_lighting_radius(1,1,1)==scales[i],"Covenant authored radius");
    plasma_lighting_frame_end();
    CHECK(plasma_lighting_radius(1,1,1)==1,"Covenant restore");
   }
-  plasma_lighting_prepare(21,21);CHECK(plasma_lighting_count==0,"owned glow bypasses authored restore");
+  plasma_lighting_prepare(21,21, NONE);CHECK(plasma_lighting_count==0,"owned glow bypasses authored restore");
  }
  else if (!strcmp(test, "radius"))
 	{
@@ -127,7 +143,7 @@ int main(int argc, char **argv)
 		{
 			tag_name = names[i]; enabled = 1;
 			datum_try_and_get(light_data, 1)->radius = 0.5f;
-			plasma_lighting_prepare(1, 1);
+			plasma_lighting_prepare(1, 1, NONE);
 			CHECK(plasma_lighting_radius(1, 1, 1.0f) == scales[i], "per-projectile reach");
 			CHECK(connected_radius == 2.0f * scales[i], "partition sees tuned radius before submission");
 			datum_try_and_get(light_data, 1)->radius = scales[i];
@@ -135,7 +151,7 @@ int main(int argc, char **argv)
 			CHECK(radius == scales[i], "actual bounds do not scale twice");
 			light_compute_bounding_sphere(1, FALSE, TRUE, FALSE, &position, &radius);
 			CHECK(radius == 2.0f * scales[i], "specular keeps authored multiplier");
-			plasma_lighting_prepare(1, 1);
+			plasma_lighting_prepare(1, 1, NONE);
 			CHECK(plasma_lighting_radius(1, 1, 1.0f) == scales[i], "split views do not compound radius");
 			CHECK(plasma_lighting_radius(1, 2, 1.0f) == 1.0f, "wrong owner untouched");
 			datum_try_and_get(light_data, 1)->radius = 9.0f;
@@ -149,16 +165,16 @@ int main(int argc, char **argv)
 	else if (!strcmp(test, "rocket"))
 	{
 		tag_name = "weapons\\rocket launcher\\rocket";
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		plasma_lighting_submitted(1, 3);
 		CHECK(plasma_lighting_selected(3), "rocket flight attachment selected");
 		render_interpolation_frame_end();
 		CHECK(!plasma_lighting_selected(3), "rocket selection expires with frame");
 		CHECK(!datum_try_and_get(light_data, 1)->flags, "rocket dynamic state restored");
 		tag_name = "weapons\\rocket launcher\\explosion";
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		tag_name = "weapons\\rocket launcher\\effects\\rocket explosion";
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		CHECK(refreshes == 2, "explosion attachments stay stock");
 	}
 	else if (!strcmp(test, "pistol"))
@@ -168,21 +184,21 @@ int main(int argc, char **argv)
 		{
 			tag_name = names[i];
 			interpolation_rendering = 1;
-			datum_try_and_get(light_data, 1)->flags = i ? 3 : 0;
-			plasma_lighting_prepare(1, 1);
+			datum_try_and_get(light_data, 1)->flags = i ? 7 : 0;
+			plasma_lighting_prepare(1, 1, NONE);
 			plasma_lighting_submitted(1, 3);
 			CHECK(plasma_lighting_selected(3), "pistol projectile attachment selected");
 			render_interpolation_frame_end();
 			CHECK(!plasma_lighting_selected(3), "pistol light expires with render frame");
-			CHECK(datum_try_and_get(light_data, 1)->flags == (i ? 3 : 0), "pistol authored flags restored");
+			CHECK(datum_try_and_get(light_data, 1)->flags == (i ? 7 : 0), "pistol authored flags restored");
 		}
 		tag_name = "weapons\\plasma pistol\\muzzle flash";
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		CHECK(refreshes == 4, "muzzle effects excluded");
 	}
 	else if (!strcmp(test, "model"))
 	{
-		plasma_lighting_prepare(1,1); plasma_lighting_submitted(1,3);
+		plasma_lighting_prepare(1,1, NONE); plasma_lighting_submitted(1,3);
 		plasma_model_lighting_slot(3,0); plasma_model_lighting_slot(7,1);
 		CHECK(plasma_model_lighting_mask()==1,"only selected slot is softened");
 		plasma_model_lighting_slot(3,1);
@@ -208,21 +224,21 @@ int main(int argc, char **argv)
 	else if (!strcmp(test, "off"))
 	{
 		enabled = 0;
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		CHECK(!refreshes, "disabled changes no attachments");
 	}
 	else if (!strcmp(test, "filter"))
 	{
 		tag_name = "weapons\\rocket launcher\\explosion";
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		tag_name = "weapons\\plasma rifle\\bolt";
 		projectile.object.type = 0;
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		CHECK(!refreshes, "other projectile tags and object types stay stock");
 	}
 	else if (!strcmp(test, "restore"))
 	{
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		CHECK(rendered_pose && refreshes == 1, "draw uses render pose");
 		CHECK(datum_try_and_get(light_data, 1)->flags == 1, "lens-flare attachment promoted only for rendering");
 		enabled = 0;
@@ -234,20 +250,20 @@ int main(int argc, char **argv)
 	}
 	else if (!strcmp(test, "split"))
 	{
-		plasma_lighting_prepare(1, 1);
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
+		plasma_lighting_prepare(1, 1, NONE);
 		CHECK(refreshes == 1, "two views share one attachment refresh");
 	}
 	else if (!strcmp(test, "capacity"))
 	{
-		for (i = 0; i < 130; i++) plasma_lighting_prepare(i, i);
+		for (i = 0; i < 130; i++) plasma_lighting_prepare(i, i, NONE);
 		CHECK(refreshes == 128, "overflow leaves excess lights untouched");
 		render_interpolation_frame_end();
 		CHECK(refreshes == 256 && !rendered_pose, "every accepted light restored");
 	}
 	else if (!strcmp(test, "unload"))
 	{
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		plasma_lighting_reset();
 		render_interpolation_frame_end();
 		CHECK(refreshes == 1, "old map handles never revisited");
@@ -255,23 +271,23 @@ int main(int argc, char **argv)
 	else if (!strcmp(test, "missing"))
 	{
 		present = 0;
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		plasma_lighting_frame_end();
 		CHECK(!refreshes, "deleted projectile cannot acquire a render light");
 	}
 	else if (!strcmp(test, "stale"))
 	{
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		stale = 1;
 		render_interpolation_frame_end();
 		CHECK(refreshes == 1, "changed light owner is not restored");
 		storage.valid = 0;
-		plasma_lighting_prepare(2, 2);
+		plasma_lighting_prepare(2, 2, NONE);
 		CHECK(refreshes == 1, "invalid light storage is untouched");
 	}
 	else if (!strcmp(test, "selection"))
 	{
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		plasma_lighting_submitted(1, 3);
 		CHECK(plasma_lighting_selected(3) && !plasma_lighting_selected(2), "only submitted plasma lights selected");
 		CHECK(!plasma_lighting_selected(NONE), "failed submission excluded");
@@ -286,10 +302,27 @@ int main(int argc, char **argv)
 		plasma_model_lighting_slot(22, 0);
 		CHECK(plasma_model_lighting_mask() == 1, "emitter-only option reaches model lighting");
 	}
+	else if (!strcmp(test, "disconnected"))
+	{
+		struct light_datum *light = light_get(1);
+		int flags = 1 << _point_light_connects_to_map_bit;
+		light->flags = flags;
+		plasma_lighting_prepare(1, 1, NONE);
+		CHECK(!refreshes && light->flags == flags, "disconnected attachment stays outside the map");
+		CHECK(!plasma_lighting_count, "failed refresh does not admit a render attachment");
+		plasma_lighting_frame_end();
+		CHECK(!refreshes && light->flags == flags, "frame cleanup preserves disconnected state");
+		SET_FLAG(light->flags, _point_light_connected_to_map_bit, TRUE);
+		flags = light->flags;
+		plasma_lighting_prepare(1, 1, NONE);
+		CHECK(refreshes == 1 && plasma_lighting_count == 1, "engine reconnect permits later admission");
+		plasma_lighting_frame_end();
+		CHECK(refreshes == 2 && light->flags == flags, "connected attachment restores authored flags");
+	}
 	else if (!strcmp(test, "existing"))
 	{
 		datum_try_and_get(light_data, 1)->flags = 1;
-		plasma_lighting_prepare(1, 1);
+		plasma_lighting_prepare(1, 1, NONE);
 		render_interpolation_frame_end();
 		CHECK(datum_try_and_get(light_data, 1)->flags == 1, "authored dynamic lighting stays dynamic");
 	}

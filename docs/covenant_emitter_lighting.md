@@ -3,12 +3,16 @@
 Three independent options default to false: `display.jackal_shield_lighting`,
 `display.fuel_rod_lighting` and `display.covenant_shield_lighting`. Their environment
 variables are `HALO_JACKAL_SHIELD_LIGHTING`, `HALO_FUEL_ROD_LIGHTING` and
-`HALO_COVENANT_SHIELD_LIGHTING`. Projectile lighting is not required.
+`HALO_COVENANT_SHIELD_LIGHTING`. Projectile lighting is not required. The menu now groups the two shield
+preferences under **Shield Emitters** and fuel rods under **Weapon Glow**;
+the individual configuration keys remain available.
 `display.plasma_occlusion` optionally adds the existing approximate collision
 visibility filter. CStencil and Modern are separate work.
 
 `port/linux/game/covenant_emitter_lighting.c` owns eight additional render lights
-shared by these options, the optional Assault Rifle counter and held Needler.
+shared by these options, the optional Assault Rifle counter, held Needler and
+the [vehicle/world/flame additions](reading/emitter_expansion.md). The additions
+reuse the pool; they do not increase its capacity.
 Stock effects, tag data, damage, weapons, explosions and
 network state are unchanged. Excess emitters retain stock appearance. Stable
 admission avoids swapping lights every frame when the budget is full. Lights

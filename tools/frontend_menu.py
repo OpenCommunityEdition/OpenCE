@@ -18,6 +18,7 @@ from port_settings import SCREENS
 import frontend_navigation
 import frontend_multiplayer
 import frontend_legacy
+import mcc_xbox_menu
 
 # Each page: key, tab, parent, heading, source inventories. Page zero is the
 # stable entry tag used by the main-menu policy.
@@ -39,11 +40,12 @@ PAGES = [
     ("touch", 2, 2, "TOUCH CONTROLS", ["gamepad_setup/android", "gamepad_setup/gyro"]),
     ("third_person", 0, 0, "THIRD PERSON", ["video_settings/shoulder_camera"]),
     ("extra_effects", 0, 6, "EXTRA EFFECTS", ["video_settings/extra_effects"]),
+    ("mcc_packages", 3, 10, "MCC PACKAGES", ["network_setup/mcc_packages"]),
 ]
 TABS = ("VIDEO", "AUDIO", "CONTROLS", "ONLINE", "INTERFACE", "PROFILE")
 LINKS = {0: [(6, None), (7, None), (15, None)], 6: [(8, "desktop web"), (16, None)],
          3: [(9, None), (10, "desktop android"), (11, None)], 4: [(12, None), (13, None)],
-         2: [(14, "android")]}
+         2: [(14, "android")], 10: [(17, None)]}
 STYLE = ("MENU STYLE", "display.menu_frontend",
          [("MODERN", "modern"), ("CLASSIC PC", "pc"), ("XBOX", "xbox"), ("STOCK", "off")],
          "Choose the Settings and submenu style. Saved changes take effect on return to the main menu. The starting menu, pause menu and map UI keep their existing layout.", None)
@@ -58,7 +60,9 @@ EDITORS = {
 
 # The stock UI fonts have very different widths. Measure against the narrowest
 # supported layout so captions never run into arrows at 4:3.
-FONTS = {size: ImageFont.truetype(str(ROOT / "port/assets/fonts" / file), 128)
+# Keep the original Windows generator's basic layout on runners that also
+# provide RAQM. Its optional shaping backend otherwise changes title pixels.
+FONTS = {size: ImageFont.truetype(str(ROOT / "port/assets/fonts" / file), 128, layout_engine=ImageFont.Layout.BASIC)
          for size, file in ((13, "Overpass-900.ttf"), (10, "Overpass-750.ttf"))}
 
 def text_width(value, size):
@@ -72,6 +76,8 @@ def value_caption(value):
     return value.rstrip() + "..."
 
 SHORT_LABELS = {
+    "display.plasma_prong_lighting": "PLASMA PRONGS",
+    "display.widescreen_loading": "WIDE LOADING",
     "input.mouse_sensitivity": "HORIZONTAL SENS.", "input.mouse_vertical_sensitivity": "VERTICAL SENS.",
     "input.invert_mouse": "INVERT MOUSE", "network.allow_upnp": "UPNP FORWARDING",
     "network.join_from_clipboard": "CLIPBOARD INVITES", "input.auto_button_detection": "AUTO DETECTION",
@@ -154,6 +160,7 @@ def document():
         labels=[]; helps=["OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs."]
         for index, (label, setting, choices, help_text, platform, *_) in enumerate(rows):
             key = "style" if setting=="display.menu_frontend" else setting.replace(".","_")+str(index)
+            if setting == "display.detected_button_style": key = "detected_button_style"
             label = SHORT_LABELS.get(setting, label).rstrip(":")
             if setting == "input.auto_button_detection" or setting.startswith("display.hud_button_style"):
                 help_text = help_text.replace("Requires High-Res HUD in Graphics.", "Gameplay artwork requires High-Res HUD; menu glyphs work independently.").replace("Requires High-Res HUD.", "Gameplay artwork requires High-Res HUD; menu glyphs work independently.")
@@ -166,10 +173,15 @@ def document():
             w(f"label_{key}",type="text",controller=1,width=94 if wide_value else 152,height=24,string_list=base+"/labels",string_index=index,font="ui\\large_ui",color="#FF2896FF")
 
             if choices is None:
-                # Reuse the existing read-only master-server status service.
                 row.remove(row.findall("child")[1])
-                c(row,"master_servers_value",180,3)
-                w("master_servers_value",type="text",controller=1,width=140,height=20,font="ui\\large_ui",color="#FFDDDDDD",align="center")
+                if setting == "display.detected_button_style":
+                    # A display-only row must never save over the manual preference.
+                    c(row,"detected_button_style_value",180,3)
+                    w("detected_button_style_value",type="text",text="KEYBOARD",controller=1,width=140,height=20,font="ui\\large_ui",color="#FFDDDDDD",align="center")
+                else:
+                    # Reuse the existing read-only master-server status service.
+                    c(row,"master_servers_value",180,3)
+                    w("master_servers_value",type="text",controller=1,width=140,height=20,font="ui\\large_ui",color="#FFDDDDDD",align="center")
                 continue
             spinner=w(f"spinner_{key}",type="spinner",width=value_width,height=20,flags="pass_unhandled_to_focused_child left_right_tabs_items",
                       strings="|".join(caption if wide_value else value_caption(caption) for caption,_ in choices),values="|".join(value for _,value in choices),setting=setting,
@@ -202,6 +214,7 @@ def document():
     frontend_navigation.append(doc)
     frontend_navigation.append_legacy(doc)
     frontend_legacy.append(doc)
+    mcc_xbox_menu.append(doc)
     frontend_multiplayer.append(doc)
     for name,width,height in ART:
         bitmap=ET.SubElement(doc,"bitmap",name="modern/"+name)
@@ -221,6 +234,7 @@ def generate(folder=MENUS):
     target = folder / "modern"
     target.mkdir(parents=True, exist_ok=True)
     frontend_legacy.copy_art(target)
+    mcc_xbox_menu.generate_art(target)
     (target / "settings.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<!-- Generated by tools/frontend_menu.py -->\n' + document(), encoding="utf-8")
     if Path(folder).resolve() == MENUS.resolve():
         frontend_multiplayer.write_metadata(*frontend_multiplayer.append(ET.Element("menus")))
@@ -244,7 +258,7 @@ def generate(folder=MENUS):
                 box((0, 70, width, 70.5), fill=blue)
                 box((0, 410, width, 410.5), fill=blue)
             elif name.startswith("title"):
-                font = ImageFont.truetype(str(ROOT / "port/assets/fonts/OpenCE-Regular.ttf"), 128)
+                font = ImageFont.truetype(str(ROOT / "port/assets/fonts/OpenCE-Regular.ttf"), 128, layout_engine=ImageFont.Layout.BASIC)
                 caption = "SETTINGS" if name == "title" else frontend_multiplayer.TITLES[name] if name in frontend_multiplayer.TITLES else frontend_navigation.SCREENS[name[6:]][0]
                 bounds = font.getbbox(caption)
                 ink = Image.new("RGBA", (bounds[2] - bounds[0], bounds[3] - bounds[1]), (0, 0, 0, 0))

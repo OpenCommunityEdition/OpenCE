@@ -36,6 +36,170 @@ little-endian reads. The host reporting tool and tests use the same parser
 as the game. MCC has its own parser and conversion modules; a shared runtime
 tag shape does not imply a shared on-disk format or resource owner.
 
+For CE bitmap admission, read `custom_edition_bitmaps_verify` and
+`custom_edition_bitmap_raw_2d` in
+[custom_edition_bitmaps.c](../../port/linux/game/custom_edition_bitmaps.c).
+A synthetic single-level DXT1 texture of 200 by 112 pixels needs 11,200
+bytes of compressed blocks. Its sides cannot be represented by the Xbox
+descriptor's power-of-two fields. The narrow CE-owned branch in
+`texture_cache_initialize_hardware_format` in
+[xbox_texture_cache.c](../../source/cache/xbox_texture_cache.c) records its
+exact dimensions in the Size word; `xgpu_texture_describe` in
+[xbox_textures.c](../../port/linux/src/xbox_textures.c) keeps compressed
+textures addressed with normalized coordinates. These shared additions are
+necessary because the existing cache constructs and decodes the hardware
+header outside the CE module. Admission and layout selection remain CE-owned.
+
+`custom_edition_cache_contains` checks the loaded tag allocation rather than
+just a global CE setting. The loader publishes that allocation after successful
+conversion and clears it on unload, so unrelated resources and later Xbox
+sessions cannot inherit this exception. The MCC guard preserves its independent
+texture bridge. See the [bitmap restrictions](../custom_edition_caches.md)
+and [synthetic regression checks](../../tools/test_ce_npot_bitmaps.py).
+
+## Workshop identity in join refusals
+
+For MCC join refusals, also follow `mcc_identity_prepare_host`,
+`mcc_identity_host_settings` and `mcc_identity_refusal` in
+[`mcc_identity.c`](../../port/linux/game/mcc_identity.c), then the sidecar reader
+and bounded record helpers in [`mcc_workshop.c`](../../port/linux/game/mcc_workshop.c).
+A package named `2899609719`, or a descriptive package with that id in
+`workshop_id.txt`, can identify its Workshop item to a joiner. An older local
+copy of that item may lack the requested level; item presence is therefore
+checked independently of level names. An unidentified same-name level is not
+evidence that the item is installed. SHA-256 and level matching remain
+authoritative even when ids differ. Metadata is cached with host preparation
+and cleared on disconnect; changing a sidecar during a session requires fresh
+host preparation after disconnect. Identity checks do not require Steam.
+See [installation and messages](../mcc_maps.md#installation-and-menus) and the
+[MCC wire contract](../../port/linux/NETCODE.md#gulchce-crossplay-boundary).
+Focused checks are `test_mcc_workshop.py`, `test_mcc_identity.py` and
+`test_mcc_protocol.py` under [`tools`](../../tools/).
+
+Desktop discovery is separately enabled by `game.workshop_maps`. Follow
+`steam_workshop_scan` in [steam_workshop.c](../../port/linux/src/steam_workshop.c)
+from library manifests to installed map records, then `mcc_maps_scan` and
+`mcc_map_browser_open` in [mcc_maps.c](../../port/linux/game/mcc_maps.c).
+The `libraries` function checks `paths.steam` first, then Windows Steam registry
+installations and standard folders. `steam_workshop_windows_roots` in
+[win32_steam_workshop.c](../../port/windows/src/win32_steam_workshop.c) reads the
+current-user path and both machine-wide registry views without changing them. For example,
+an installation registered at `C:\Steam` is found with `paths.steam` empty;
+its `libraryfolders.vdf` adds libraries on other drives. Missing or invalid
+registry values leave the existing fallback discovery available. Android and
+web keep discovery disabled and do not call Windows APIs.
+On Linux, `linux_roots` checks the Steam launch environment and XDG data location
+before the home-folder fallbacks, including Debian, Flatpak and Snap. `linux_root`
+rejects relative, control-character and oversized paths rather than truncating
+them. For example, `XDG_DATA_HOME=/mnt/data/player` adds
+`/mnt/data/player/Steam`; the existing Steam symlinks can point elsewhere, and
+library manifests add other drives. Manual `paths.steam` stays first. Tests
+exercise root bounds on all hosts and native filesystem/symlink discovery on
+Linux; these checks do not establish gameplay or sandbox access permissions.
+For example, a Workshop item becomes `mcc_maps\2899609719\pat_beavercreek`;
+the MCC-only branch in `platform_translate_path` resolves it in place unless a
+local package already owns that folder. A rescan retries an exact host identity
+before searching aliases. Xbox and CE roots retain their own resolution.
+
+`game.mcc_collections` optionally groups installed items using the fixed table in
+[workshop_collections.c](../../port/linux/src/workshop_collections.c).
+An imported package's `workshop_id.txt` also supplies its group without Steam.
+Folder selections store their kind and collection number as well as their name,
+so a package named `PRO EDITION` remains distinct from that collection. Browser
+storage allows each map to belong to every supported group. Discovery and
+grouping both default off; reopen the map list after changing settings.
+See [Workshop installation](../mcc_maps.md#subscribed-steam-workshop-items).
+The asset-free regressions in `test_steam_workshop.py` and `test_mcc_maps.py`
+check these paths, bounds, selection restoration and disabled settings; they
+do not establish gameplay compatibility for every discovered map.
+
+## Preliminary MCC sharing policy
+
+PR #94 adds an unused, pure policy module, not a downloader. Read
+[`mcc_share_rules.h`](../../port/linux/game/mcc_share_rules.h) for the caller's
+contract, then `mcc_share_decide` and `mcc_share_file_allowed` in
+[`mcc_share_rules.c`](../../port/linux/game/mcc_share_rules.c).
+The current phase considers hand-placed packages only. Numeric package folders
+and valid Workshop sidecars are excluded; unreadable or invalid sidecar states,
+loose maps, `_shared`, stock content and unknown content classification are
+also refused. A missing sidecar is allowed, but does not prove the package's
+origin. This temporary scope restriction is not a security or licensing verdict.
+
+For example, `mcc_maps\solar_flare\m0` passes only with locally established
+custom-content classification, a known fingerprint, an absent Workshop sidecar
+and host opt-in. A caller must classify the exact content independently of its
+name, for example using locally maintained evidence tied to its fingerprint.
+Merely calculating a hash, failing to match a stock name or reading an untrusted
+manifest cannot establish custom content. This phase supplies neither that
+classification provider nor a transfer caller; unknown classification stays
+blocked. Known stock content remains blocked after a folder rename, while a
+custom package named `bloodgulch` is not rejected just for its name.
+
+Name buffers carry their readable byte lengths, excluding a terminator. Embedded
+NULs, oversized names, non-ASCII characters, device names and resource-name
+collisions are refused. Ordinary local discovery retains its existing rules.
+The resource helper matches only `bitmaps.map` and `sounds.map`; it does not
+inspect bytes, resolve paths or establish ownership. A future transfer must
+independently bound and validate messages, map/resource data and destinations,
+prevent link escapes and file replacement races, and stage installation without
+overwriting existing packages or saves. A matching hash does not make hostile
+bytes safe. No shared-engine hooks, session state or protocol changes are added.
+
+Android continues to use its importer; this helper neither requires Steam nor
+enables Workshop transfers there. Campaign metadata and subsequent missions are
+not covered by the resource allowlist. Their transfer needs a separate design.
+See [the restriction](../mcc_maps.md#preliminary-sharing-restriction).
+[`test_mcc_share_rules.py`](../../tools/test_mcc_share_rules.py) exercises the real
+module with boundary cases, negative controls, and Linux ASan/UBSan and bounded
+libFuzzer runs. These are policy and memory-access checks, not end-to-end transfer
+validation or proof that arbitrary maps are safe to execute.
+
+## Explicit MCC campaigns and Android imports
+
+Enable `game.mcc_campaigns` to use an installed campaign's metadata. Start with
+[`mcc_manifest.c`](../../port/linux/src/mcc_manifest.c): `mcc_manifest_load`
+reads the complete mission list, rejects ambiguous names and keeps missing
+binary entries in the authored sequence. `mcc_manifest_for_level` selects the
+metadata belonging to the actual resolved package, so an overridden Steam item
+cannot supply unrelated local campaign metadata. The parser shares the existing
+Workshop mission-text reader; it does not require Steam on Android or web.
+
+Next read `mcc_maps_campaign_metadata` and `mcc_maps_next_mission` in
+[`mcc_maps.c`](../../port/linux/game/mcc_maps.c). The catalog stores mission
+order, display titles and explicit next-level identities; package selections
+remain stable across sorting. For example, a manifest listing `z10` followed by
+`a10` displays and advances in that order. An absent `a10` stops progression;
+an unrelated map with a similar name is never substituted. Settings changes
+invalidate the catalog when it is next used.
+
+The small completion hook in `main_won_map_private` delegates to
+[`mcc_main_campaign_won`](../../port/linux/game/mcc_main.c), guarded by a loaded
+MCC campaign and the setting. Solo games retain difficulty and queue the next
+map. Network clients do not choose; hosts use the existing co-op lobby/settings
+transition. No progression cursor survives unload: the current level and its
+own package identify the next mission. Standalone and final levels return to
+the menu or lobby. Xbox and CE still use their existing completion code.
+
+For Android, follow
+[`MccImportActivity`](../../port/android/app/src/main/java/com/halo/decomp/MccImportActivity.java)
+from the document picker into
+[`MccPackageImporter.prepare`](../../port/android/app/src/main/java/com/halo/decomp/MccPackageImporter.java).
+ZIP and document-tree streams enter the same bounded staging path. The importer
+flattens only the package's maps, retains metadata, and records its Workshop ID.
+The pure Java [`MccJson`](../../port/android/app/src/main/java/com/halo/decomp/MccJson.java)
+reader retains numeric IDs exactly. `Prepared.install` publishes a complete
+directory, with replacement rollback and next-import recovery after an
+interruption. It never installs into `maps`, `custom_maps` or saved-game folders.
+
+Checks cover authored order, malformed/duplicate/missing metadata, local
+precedence, full-length titles, completion ownership, import traversal,
+cancellation, replacement recovery and legacy/save preservation. Native Ruby
+checks establish parsing of ten real mission records and forced A10-to-A30 and
+final-mission transitions; they are not a complete campaign playthrough.
+The Java importer tests do not substitute for Android document-provider and
+device testing. See [Android importing](../../port/android/README.md#importing-mcc-packages)
+and [campaign constraints](../mcc_maps.md#installation-and-menus).
+
 ## Follow an MCC package level
 
 Consider selecting `mcc_maps\solar_flare\m0`. This is an illustrative
@@ -104,6 +268,29 @@ only headers and descriptions. Menu probes do not begin a loading screen.
 `mcc_resources_inspect` can still pulse an enclosing actual map load.
 No new network message or readiness decision is introduced: peers still finish
 their own conversions and use the existing host-controlled loading protocol.
+
+The optional [widescreen presentation](loading_presentation.md) scales this
+same stock effect horizontally to fill the render target, retaining the
+original mask, feedback blur and glow trails. MCC retains the controller
+and ownership described above.
+
+The shared loading effect also plays the Xbox's embedded monk chant from
+[`progress_bar.c`](../../source/interface/progress_bar.c). Its four looping
+Xbox ADPCM voices use the buffer API in
+[`dsound_sdl.c`](../../port/linux/src/dsound_sdl.c): `SetBufferData` decodes an
+owned copy, `SetPitch` selects each voice's pitch, and `progress_bar_render`
+swells their volumes with progress. Xbox pitch is absolute: zero means 48 kHz,
+with 4096 units per octave, as described in the public
+[APU research](https://xboxdevwiki.net/APU#Pitch_calculation).
+`mix_buffers` adds them to the front
+speakers under the master and effects volumes, without the map's reverb.
+`progress_bar_end` stops them on success or failure; a quick subsequent
+`progress_bar_begin` restarts retained voices, and `progress_bar_dispose`
+releases them if shutdown precedes normal frame cleanup. MCC uses this
+existing presentation service without changing its map or resource ownership.
+`tools/test_loading_chant.py` checks the actual mixer, buffer controls and
+loading audio lifetime without maps or a sound device; it does not establish
+device playback quality or campaign compatibility.
 
 Host selection uses [mcc_validation.inl](../../port/linux/game/mcc_validation.inl),
 included by `mcc_cache.c`, and the existing pregame update in

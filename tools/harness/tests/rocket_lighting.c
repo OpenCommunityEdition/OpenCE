@@ -29,7 +29,7 @@ static struct object_definition *object_definition_get(long i) { return &definit
 static short local_player_get_next(short i) { return i == NONE ? 0 : NONE; }
 static const struct observer_result *observer_get_camera(short i) { return &camera; }
 static real distance3d(const real_point3d *a, const real_point3d *b) { return a->x - b->x; }
-int config_boolean(const char *n) { return enabled; }
+int lighting_config_boolean(const char *n) { return enabled; }
 long light_port_glow_definition_get(void) { return missing ? NONE : 99; }
 static long light_new_unattached(long d,long o,short n,const real_point3d *p,const real_vector3d *v,real s)
 {

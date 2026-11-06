@@ -230,10 +230,12 @@ struct collision_bsp_test_vector_context
 	long last_plane_index;
 	/* port: (as in collision_bsp_test_pill_new_context) */
 	long nodes_left;
+	/* port: only an explicit synchronous batch reuses node/point data. */
+	struct collision_bsp_vector_cache *cache;
 };
 
 typedef char collision_bsp_test_vector_context_size_assert[
-	sizeof(struct collision_bsp_test_vector_context) == 0x28 + 4 ? 1 : -1];
+	sizeof(struct collision_bsp_test_vector_context) == 0x28 + 8 ? 1 : -1]; /* port: batch scratch */
 
 struct collision_bsp_usage_times
 {
@@ -1217,7 +1219,9 @@ boolean collision_bsp_test_sphere(
 	return result->surface_count > 0 || result->edge_count > 0;
 }
 
-boolean collision_bsp_test_vector(
+/* port: a render-only batch may prove a common prefix of the tree. Keep the
+same traversal, leaf order, intersection tests and remaining safety budgets. */
+static boolean collision_bsp_test_vector_at_node(
 	unsigned long flags,
 	struct collision_bsp const *bsp,
 	short breakable_surface_count,
@@ -1225,7 +1229,10 @@ boolean collision_bsp_test_vector(
 	real_point3d const *point,
 	real_vector3d const *vector,
 	real maximum_t,
-	struct collision_bsp_test_vector_result *result)
+	struct collision_bsp_test_vector_result *result,
+	long start_node,
+	short start_depth,
+	struct collision_bsp_vector_cache *cache)
 {
 	struct collision_bsp_test_vector_context context;
 	short collision_function = 4 + (bsp == global_collision_bsp);
@@ -1242,21 +1249,56 @@ boolean collision_bsp_test_vector(
 	context.point = point;
 	context.vector = vector;
 	context.result = result;
+	context.cache = cache; /* port: stock callers pass NULL */
 	result->t = maximum_t < 0.f ? 0.f : maximum_t;
 	context.last_leaf_index = NONE;
 	context.last_plane_index = NONE;
 	result->leaf_count = 0;
 	context.last_contents = _contents_unknown;
 	/* port: (collision_bsp3d_enter_node) */
-	context.nodes_left = bsp->bsp3d.nodes.count;
+	context.nodes_left = bsp->bsp3d.nodes.count - start_depth;
 
 	t = PIN(maximum_t, 0.f, 1.f);
-	return_value = collision_bsp_test_vector_recursive(&context, 0, 0.f, t, 0);
+	return_value = collision_bsp_test_vector_recursive(&context, start_node, 0.f, t, start_depth);
 	collision_log_end_time(
 		collision_function,
 		collision_bsp_usage_times.vector.QuadPart);
 
 	return return_value;
+}
+
+/* port: stock callers always start at the root, as before. */
+boolean collision_bsp_test_vector(
+	unsigned long flags,
+	struct collision_bsp const *bsp,
+	short breakable_surface_count,
+	byte const *breakable_surface_flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real maximum_t,
+	struct collision_bsp_test_vector_result *result)
+{
+	return collision_bsp_test_vector_at_node(flags, bsp, breakable_surface_count,
+		breakable_surface_flags, point, vector, maximum_t, result, 0, 0, NULL);
+}
+
+/* port: only callers that proved the entire segment stays in this subtree
+may skip its prefix. No global state or change to simulation callers. */
+boolean collision_bsp_test_vector_from_node(
+	unsigned long flags,
+	struct collision_bsp const *bsp,
+	short breakable_surface_count,
+	byte const *breakable_surface_flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real maximum_t,
+	struct collision_bsp_test_vector_result *result,
+	long start_node,
+	short start_depth,
+	struct collision_bsp_vector_cache *cache)
+{
+	return collision_bsp_test_vector_at_node(flags, bsp, breakable_surface_count,
+		breakable_surface_flags, point, vector, maximum_t, result, start_node, start_depth, cache);
 }
 
 /* ---------- private code */
@@ -2140,6 +2182,7 @@ static boolean collision_bsp_test_vector_recursive(
 		real distance1;
 		boolean reaches_back;
 		boolean reaches_front;
+		unsigned long cache_slot; /* port: batch-only node/point reuse */
 
 		/* port: (collision_bsp3d_enter_node: the test ends with no more
 		hits) */
@@ -2147,15 +2190,34 @@ static boolean collision_bsp_test_vector_recursive(
 		{
 			return FALSE;
 		}
-		node = TAG_BLOCK_GET_ELEMENT(
-			&data->bsp->bsp3d.nodes,
-			node_index,
-			struct bsp3d_node);
-		plane = TAG_BLOCK_GET_ELEMENT(
-			&data->bsp->bsp3d.planes,
-			node->plane_designator,
-			real_plane3d);
-		distance = plane3d_distance_to_point(plane, data->point);
+		/* port: identical BSP and origin throughout the batch. Keep the
+		original checked lookup and arithmetic on a miss or a stock query. */
+		cache_slot = (unsigned long)node_index % COLLISION_VECTOR_CACHE_NODES;
+		if (data->cache && data->cache->nodes[cache_slot].index_plus_one == node_index + 1)
+		{
+			node = data->cache->nodes[cache_slot].node;
+			plane = data->cache->nodes[cache_slot].plane;
+			distance = data->cache->nodes[cache_slot].distance;
+		}
+		else
+		{
+			node = TAG_BLOCK_GET_ELEMENT(
+				&data->bsp->bsp3d.nodes,
+				node_index,
+				struct bsp3d_node);
+			plane = TAG_BLOCK_GET_ELEMENT(
+				&data->bsp->bsp3d.planes,
+				node->plane_designator,
+				real_plane3d);
+			distance = plane3d_distance_to_point(plane, data->point);
+			if (data->cache)
+			{
+				data->cache->nodes[cache_slot].index_plus_one = node_index + 1;
+				data->cache->nodes[cache_slot].node = node;
+				data->cache->nodes[cache_slot].plane = plane;
+				data->cache->nodes[cache_slot].distance = distance;
+			}
+		}
 		dot = dot_product3d(data->vector, &plane->n);
 		distance0 = dot*t0 + distance;
 		distance1 = dot*t1 + distance;

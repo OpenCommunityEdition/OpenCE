@@ -86,12 +86,14 @@ int main(void) {
     word join[256]={0},outer[260],inner[260],size;
     byte saved;
     int i,bytes;
-    CHECK(HALO_PORT_NETWORK_VERSION==41 && MCC_PROTOCOL_VERSION==63);
+    CHECK(HALO_PORT_NETWORK_VERSION==41 && MCC_PROTOCOL_VERSION==64);
     host=&server;third_person_session_host_begin();CHECK(!third_person_session_active());
     network_game_server_open_game(&server);CHECK(!third_person_session_locked());
     CHECK(third_person_session_set(1));CHECK(third_person_session_set(0));
     CHECK(third_person_session_version("bloodgulch")==41);
-    CHECK(third_person_session_version("mcc_maps\\test")==63);
+    CHECK(third_person_session_version("mcc_maps\\test")==64);
+    CHECK(third_person_session_compatible("mcc_maps\\test",64,9));
+    CHECK(!third_person_session_compatible("mcc_maps\\test",63,9));
     CHECK(third_person_session_compatible("bloodgulch",41,1));
     CHECK(third_person_session_compatible("bloodgulch",32712,1));
     CHECK(!third_person_session_compatible("bloodgulch",32713,1));

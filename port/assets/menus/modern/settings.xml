@@ -867,8 +867,8 @@
 		<child widget="modern/interface/row_display_hud_button_style_xbox5" x="28" y="287" />
 		<child widget="modern/interface/row_display_hud_button_style_ps6" x="28" y="317" />
 		<child widget="modern/interface/row_display_hud_button_style_switch7" x="28" y="347" />
-		<child widget="modern/interface/row_display_hud_bumper_style8" x="28" y="377" />
-		<child widget="modern/interface/row_display_keyboard_glyphs9" x="28" y="407" />
+		<child widget="modern/interface/row_detected_button_style" x="28" y="377" />
+		<child widget="modern/interface/row_display_hud_bumper_style9" x="28" y="407" />
 		<child widget="modern/interface/row_link_12" x="28" y="437" />
 		<child widget="modern/interface/row_link_13" x="28" y="467" />
 		<child widget="modern/interface/button_bar" x="26" y="414" />
@@ -975,20 +975,18 @@
 	<widget name="modern/interface/spinner_display_hud_button_style_switch7" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SWITCH CLASSIC|SWITCH GEMS|SWITCH MODERN" values="switch_classic|switch_gems|switch_modern" setting="display.hud_button_style_switch" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/interface/row_display_hud_bumper_style8" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_hud_bumper_style8" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_hud_bumper_style8" x="180" y="3" />
+	<widget name="modern/interface/row_detected_button_style" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_detected_button_style" x="12" y="3" />
+		<child widget="modern/interface/detected_button_style_value" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/label_display_hud_bumper_style8" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_hud_bumper_style8" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ORIGINAL XBOX|MODERN XBOX" values="original|modern" setting="display.hud_bumper_style" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
-		<on event="created" run="port setting load" />
+	<widget name="modern/interface/label_detected_button_style" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/detected_button_style_value" type="text" text="KEYBOARD" controller="1" width="140" height="20" font="ui\large_ui" color="#FFDDDDDD" align="center" />
+	<widget name="modern/interface/row_display_hud_bumper_style9" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_display_hud_bumper_style9" x="12" y="3" />
+		<child widget="modern/interface/spinner_display_hud_bumper_style9" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/row_display_keyboard_glyphs9" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_keyboard_glyphs9" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_keyboard_glyphs9" x="180" y="3" />
-	</widget>
-	<widget name="modern/interface/label_display_keyboard_glyphs9" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_keyboard_glyphs9" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.keyboard_glyphs" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/interface/label_display_hud_bumper_style9" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/spinner_display_hud_bumper_style9" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ORIGINAL XBOX|MODERN XBOX" values="original|modern" setting="display.hud_bumper_style" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/interface/row_link_12" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
@@ -1014,8 +1012,8 @@
 		<string text="XBOX STYLE" />
 		<string text="PLAYSTATION STYLE" />
 		<string text="SWITCH STYLE" />
+		<string text="BUTTON STYLE" />
 		<string text="BUMPER STYLE" />
-		<string text="KEYBOARD GLYPHS" />
 		<string text="MULTIPLAYER HUD &gt;" />
 		<string text="STREAMER MODE &gt;" />
 	</strings>
@@ -1024,13 +1022,13 @@
 		<string text="Choose the Settings and submenu style. Saved changes take effect on return to the main menu. The starting menu, pause menu and map UI keep their existing layout." />
 		<string text="Draw text and titles with high-res fonts; off draws the game's own." />
 		<string text="Draw the HUD from the high-res redraws; off draws the game's own pictures." />
-		<string text="Show styles for your controller's family. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
+		<string text="Follow keyboard/mouse or controller activity. Controllers use their family's saved artwork." />
 		<string text="Manual style when auto detection is off. Keyboard uses current bindings; controllers need High-Res HUD." />
 		<string text="Preferred Xbox artwork for automatic detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
 		<string text="Preferred PlayStation artwork for auto detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
 		<string text="Preferred Switch artwork for automatic detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
+		<string text="Keyboard/mouse is active. Prompts use your current bindings. Turn detection off to choose a fixed style." />
 		<string text="Original: black/white buttons. Modern: LB/RB. Kept when automatic detection is on." />
-		<string text="Automatic keyboard/mouse glyphs in menus and play. Manual Keyboard style works even with this off." />
 		<string text="Open multiplayer hud settings. Pending changes stay until OK or Cancel." />
 		<string text="Open streamer mode settings. Pending changes stay until OK or Cancel." />
 	</strings>
@@ -1324,15 +1322,16 @@
 		<data input="port frontend update" />
 		<child widget="modern/graphics/tabs" x="28" y="76" />
 		<child widget="modern/graphics/row_display_show_fps0" x="28" y="137" />
-		<child widget="modern/graphics/row_display_anti_aliasing1" x="28" y="167" platform="desktop" />
-		<child widget="modern/graphics/row_display_anti_aliasing2" x="28" y="197" platform="android web" />
-		<child widget="modern/graphics/row_display_anisotropic_filtering3" x="28" y="227" />
-		<child widget="modern/graphics/row_display_shadow_resolution4" x="28" y="257" />
-		<child widget="modern/graphics/row_display_per_pixel_lighting5" x="28" y="287" />
-		<child widget="modern/graphics/row_display_model_detail6" x="28" y="317" />
-		<child widget="modern/graphics/row_link_8" x="28" y="347" platform="desktop web" />
-		<child widget="modern/graphics/row_link_16" x="28" y="377" />
-		<child widget="modern/graphics/row_link_0" x="28" y="407" />
+		<child widget="modern/graphics/row_display_widescreen_loading1" x="28" y="167" />
+		<child widget="modern/graphics/row_display_anti_aliasing2" x="28" y="197" platform="desktop" />
+		<child widget="modern/graphics/row_display_anti_aliasing3" x="28" y="227" platform="android web" />
+		<child widget="modern/graphics/row_display_anisotropic_filtering4" x="28" y="257" />
+		<child widget="modern/graphics/row_display_shadow_resolution5" x="28" y="287" />
+		<child widget="modern/graphics/row_display_per_pixel_lighting6" x="28" y="317" />
+		<child widget="modern/graphics/row_display_model_detail7" x="28" y="347" />
+		<child widget="modern/graphics/row_link_8" x="28" y="377" platform="desktop web" />
+		<child widget="modern/graphics/row_link_16" x="28" y="407" />
+		<child widget="modern/graphics/row_link_0" x="28" y="437" />
 		<child widget="modern/graphics/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/graphics/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -1381,52 +1380,60 @@
 	<widget name="modern/graphics/spinner_display_show_fps0" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.show_fps" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_anti_aliasing1" width="336" height="26" bitmap="modern/row" platform="desktop" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_anti_aliasing1" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_anti_aliasing1" x="180" y="3" />
+	<widget name="modern/graphics/row_display_widescreen_loading1" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_widescreen_loading1" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_widescreen_loading1" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_anti_aliasing1" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_anti_aliasing1" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|SMAA|SSAA 2X|MSAA 2X|MSAA 4X|MSAA 8X" values="off|fxaa|smaa|ssaa2x|msaa2x|msaa4x|msaa8x" setting="display.anti_aliasing" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_widescreen_loading1" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_widescreen_loading1" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.widescreen_loading" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_anti_aliasing2" width="336" height="26" bitmap="modern/row" platform="android web" flags="pass_unhandled_to_focused_child nifty_fx">
+	<widget name="modern/graphics/row_display_anti_aliasing2" width="336" height="26" bitmap="modern/row" platform="desktop" flags="pass_unhandled_to_focused_child nifty_fx">
 		<child widget="modern/graphics/label_display_anti_aliasing2" x="12" y="3" />
 		<child widget="modern/graphics/spinner_display_anti_aliasing2" x="180" y="3" />
 	</widget>
 	<widget name="modern/graphics/label_display_anti_aliasing2" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_anti_aliasing2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|MSAA 2X|MSAA 4X" values="off|fxaa|msaa2x|msaa4x" setting="display.anti_aliasing" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/spinner_display_anti_aliasing2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|SMAA|SSAA 2X|MSAA 2X|MSAA 4X|MSAA 8X" values="off|fxaa|smaa|ssaa2x|msaa2x|msaa4x|msaa8x" setting="display.anti_aliasing" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_anisotropic_filtering3" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_anisotropic_filtering3" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_anisotropic_filtering3" x="180" y="3" />
+	<widget name="modern/graphics/row_display_anti_aliasing3" width="336" height="26" bitmap="modern/row" platform="android web" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_anti_aliasing3" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_anti_aliasing3" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_anisotropic_filtering3" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_anisotropic_filtering3" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|2X|4X|8X|16X" values="0|2|4|8|16" setting="display.anisotropic_filtering" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_anti_aliasing3" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_anti_aliasing3" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FXAA|MSAA 2X|MSAA 4X" values="off|fxaa|msaa2x|msaa4x" setting="display.anti_aliasing" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_shadow_resolution4" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_shadow_resolution4" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_shadow_resolution4" x="180" y="3" />
+	<widget name="modern/graphics/row_display_anisotropic_filtering4" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_anisotropic_filtering4" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_anisotropic_filtering4" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_shadow_resolution4" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_shadow_resolution4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="128|256|512|1024" values="128|256|512|1024" setting="display.shadow_resolution" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_anisotropic_filtering4" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_anisotropic_filtering4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|2X|4X|8X|16X" values="0|2|4|8|16" setting="display.anisotropic_filtering" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_per_pixel_lighting5" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_per_pixel_lighting5" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_per_pixel_lighting5" x="180" y="3" />
+	<widget name="modern/graphics/row_display_shadow_resolution5" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_shadow_resolution5" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_shadow_resolution5" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_per_pixel_lighting5" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_per_pixel_lighting5" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.per_pixel_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_shadow_resolution5" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_shadow_resolution5" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="128|256|512|1024" values="128|256|512|1024" setting="display.shadow_resolution" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/graphics/row_display_model_detail6" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/graphics/label_display_model_detail6" x="12" y="3" />
-		<child widget="modern/graphics/spinner_display_model_detail6" x="180" y="3" />
+	<widget name="modern/graphics/row_display_per_pixel_lighting6" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_per_pixel_lighting6" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_per_pixel_lighting6" x="180" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_display_model_detail6" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/graphics/spinner_display_model_detail6" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STOCK|NATIVE|HIGHEST" values="stock|native|highest" setting="display.model_detail" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/graphics/label_display_per_pixel_lighting6" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_per_pixel_lighting6" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.per_pixel_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/graphics/row_display_model_detail7" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/graphics/label_display_model_detail7" x="12" y="3" />
+		<child widget="modern/graphics/spinner_display_model_detail7" x="180" y="3" />
+	</widget>
+	<widget name="modern/graphics/label_display_model_detail7" type="text" controller="1" width="152" height="24" string_list="modern/graphics/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/spinner_display_model_detail7" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STOCK|NATIVE|HIGHEST" values="stock|native|highest" setting="display.model_detail" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/graphics/row_link_8" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="nifty_fx">
@@ -1435,23 +1442,24 @@
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/graphics/label_link_8" x="12" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_link_8" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/label_link_8" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/graphics/row_link_16" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend page" />
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/graphics/label_link_16" x="12" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_link_16" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/label_link_16" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/graphics/row_link_0" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend page" />
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/graphics/label_link_0" x="12" y="3" />
 	</widget>
-	<widget name="modern/graphics/label_link_0" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/graphics/label_link_0" type="text" controller="1" width="312" height="24" string_list="modern/graphics/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" />
 	<strings name="modern/graphics/labels">
 		<string text="SHOW FRAMES" />
+		<string text="WIDE LOADING" />
 		<string text="ANTI-ALIASING" />
 		<string text="ANTI-ALIASING" />
 		<string text="TEXTURE FILTERING" />
@@ -1465,6 +1473,7 @@
 	<strings name="modern/graphics/help_strings">
 		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
 		<string text="Draw the frame rate at the bottom right of a game, counted over half a second." />
+		<string text="Widen the original loading screen, keeping its stock sweep and glow trails. Includes MCC." />
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA and SMAA are cheap; SSAA and MSAA are sharper." />
 		<string text="Smooth jagged edges, which the Xbox did not. FXAA is cheap; MSAA is sharper." />
 		<string text="Keep floors and walls sharp at a grazing angle, which the Xbox did not. Off: as the Xbox." />
@@ -1735,11 +1744,11 @@
 		<child widget="modern/lighting/tabs" x="28" y="76" />
 		<child widget="modern/lighting/row_display_plasma_lighting0" x="28" y="137" platform="desktop web" />
 		<child widget="modern/lighting/row_display_muzzle_lighting1" x="28" y="167" platform="desktop web" />
-		<child widget="modern/lighting/row_display_jackal_shield_lighting2" x="28" y="197" platform="desktop web" />
-		<child widget="modern/lighting/row_display_covenant_shield_lighting3" x="28" y="227" platform="desktop web" />
-		<child widget="modern/lighting/row_display_fuel_rod_lighting4" x="28" y="257" platform="desktop web" />
-		<child widget="modern/lighting/row_display_ammo_counter_lighting5" x="28" y="287" platform="desktop web" />
-		<child widget="modern/lighting/row_display_needler_lighting6" x="28" y="317" platform="desktop web" />
+		<child widget="modern/lighting/row_lighting_weapon_glow2" x="28" y="197" platform="desktop web" />
+		<child widget="modern/lighting/row_display_plasma_prong_lighting3" x="28" y="227" platform="desktop web" />
+		<child widget="modern/lighting/row_lighting_shield_emitters4" x="28" y="257" platform="desktop web" />
+		<child widget="modern/lighting/row_display_vehicle_lighting5" x="28" y="287" platform="desktop web" />
+		<child widget="modern/lighting/row_display_world_lighting6" x="28" y="317" platform="desktop web" />
 		<child widget="modern/lighting/row_display_plasma_occlusion7" x="28" y="347" platform="desktop web" />
 		<child widget="modern/lighting/row_display_shield_glow8" x="28" y="377" platform="desktop web" />
 		<child widget="modern/lighting/row_display_shield_glow_intensity9" x="28" y="407" platform="desktop web" />
@@ -1800,44 +1809,44 @@
 	<widget name="modern/lighting/spinner_display_muzzle_lighting1" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.muzzle_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/lighting/row_display_jackal_shield_lighting2" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/lighting/label_display_jackal_shield_lighting2" x="12" y="3" />
-		<child widget="modern/lighting/spinner_display_jackal_shield_lighting2" x="180" y="3" />
+	<widget name="modern/lighting/row_lighting_weapon_glow2" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/lighting/label_lighting_weapon_glow2" x="12" y="3" />
+		<child widget="modern/lighting/spinner_lighting_weapon_glow2" x="180" y="3" />
 	</widget>
-	<widget name="modern/lighting/label_display_jackal_shield_lighting2" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/lighting/spinner_display_jackal_shield_lighting2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.jackal_shield_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/lighting/label_lighting_weapon_glow2" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/lighting/spinner_lighting_weapon_glow2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="lighting.weapon_glow" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/lighting/row_display_covenant_shield_lighting3" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/lighting/label_display_covenant_shield_lighting3" x="12" y="3" />
-		<child widget="modern/lighting/spinner_display_covenant_shield_lighting3" x="180" y="3" />
+	<widget name="modern/lighting/row_display_plasma_prong_lighting3" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/lighting/label_display_plasma_prong_lighting3" x="12" y="3" />
+		<child widget="modern/lighting/spinner_display_plasma_prong_lighting3" x="180" y="3" />
 	</widget>
-	<widget name="modern/lighting/label_display_covenant_shield_lighting3" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/lighting/spinner_display_covenant_shield_lighting3" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.covenant_shield_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/lighting/label_display_plasma_prong_lighting3" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/lighting/spinner_display_plasma_prong_lighting3" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.plasma_prong_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/lighting/row_display_fuel_rod_lighting4" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/lighting/label_display_fuel_rod_lighting4" x="12" y="3" />
-		<child widget="modern/lighting/spinner_display_fuel_rod_lighting4" x="180" y="3" />
+	<widget name="modern/lighting/row_lighting_shield_emitters4" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/lighting/label_lighting_shield_emitters4" x="12" y="3" />
+		<child widget="modern/lighting/spinner_lighting_shield_emitters4" x="180" y="3" />
 	</widget>
-	<widget name="modern/lighting/label_display_fuel_rod_lighting4" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/lighting/spinner_display_fuel_rod_lighting4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.fuel_rod_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/lighting/label_lighting_shield_emitters4" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/lighting/spinner_lighting_shield_emitters4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="lighting.shield_emitters" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/lighting/row_display_ammo_counter_lighting5" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/lighting/label_display_ammo_counter_lighting5" x="12" y="3" />
-		<child widget="modern/lighting/spinner_display_ammo_counter_lighting5" x="180" y="3" />
+	<widget name="modern/lighting/row_display_vehicle_lighting5" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/lighting/label_display_vehicle_lighting5" x="12" y="3" />
+		<child widget="modern/lighting/spinner_display_vehicle_lighting5" x="180" y="3" />
 	</widget>
-	<widget name="modern/lighting/label_display_ammo_counter_lighting5" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/lighting/spinner_display_ammo_counter_lighting5" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.ammo_counter_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/lighting/label_display_vehicle_lighting5" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/lighting/spinner_display_vehicle_lighting5" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.vehicle_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/lighting/row_display_needler_lighting6" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/lighting/label_display_needler_lighting6" x="12" y="3" />
-		<child widget="modern/lighting/spinner_display_needler_lighting6" x="180" y="3" />
+	<widget name="modern/lighting/row_display_world_lighting6" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/lighting/label_display_world_lighting6" x="12" y="3" />
+		<child widget="modern/lighting/spinner_display_world_lighting6" x="180" y="3" />
 	</widget>
-	<widget name="modern/lighting/label_display_needler_lighting6" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/lighting/spinner_display_needler_lighting6" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.needler_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/lighting/label_display_world_lighting6" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/lighting/spinner_display_world_lighting6" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.world_lighting" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/lighting/row_display_plasma_occlusion7" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
@@ -1874,11 +1883,11 @@
 	<strings name="modern/lighting/labels">
 		<string text="PROJECTILE LIGHTS" />
 		<string text="MUZZLE LIGHTS" />
-		<string text="JACKAL SHIELDS" />
-		<string text="STATIONARY SHIELDS" />
-		<string text="FUEL ROD GLOW" />
-		<string text="AR COUNTER GLOW" />
-		<string text="NEEDLER GLOW" />
+		<string text="WEAPON GLOW" />
+		<string text="PLASMA PRONGS" />
+		<string text="SHIELD EMITTERS" />
+		<string text="VEHICLE LIGHTS" />
+		<string text="WORLD EMITTERS" />
 		<string text="LIGHT OCCLUSION" />
 		<string text="SHIELD GLOW" />
 		<string text="GLOW INTENSITY" />
@@ -1886,14 +1895,14 @@
 	</strings>
 	<strings name="modern/lighting/help_strings">
 		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
-		<string text="Plasma, rockets and Covenant projectiles cast soft light on nearby surfaces and models." />
+		<string text="Plasma, grenades, rockets and flame streams cast soft light on nearby surfaces and models." />
 		<string text="Weapon flashes light nearby surfaces, including Warthog and Scorpion guns. Stock effects remain." />
-		<string text="Jackal shields light their surroundings, matching their colour and damage flashes." />
-		<string text="Covenant stationary shields cast coloured light that follows damage flashes and shield strength." />
-		<string text="Exposed Grunt and Hunter fuel rods cast green light on the holder and nearby surfaces." />
-		<string text="The AR ammo screen glows and lights the weapon and holder in first and third person." />
-		<string text="Exposed needles glow and spill light around the held weapon, with a soft fade below it." />
-		<string text="Block projectile and emitter light behind walls. Muzzle flashes always use collision blocking." />
+		<string text="Swords, plasma charge, fuel rods, Needler and AR screens cast light on nearby surfaces." />
+		<string text="Short, soft spill from plasma-weapon prongs. Uses the shared eight-light occlusion budget." />
+		<string text="Jackal and stationary shields cast light on nearby surfaces." />
+		<string text="Engine glow and directional headlights illuminate vehicles and nearby surfaces." />
+		<string text="Visible powerups and teleporters cast soft light. Stock effects and gameplay remain unchanged." />
+		<string text="Block projectile and emitter light behind walls. Muzzle and vehicle lights always use blocking." />
 		<string text="Shields light their surroundings as they flare. Online: the host's choice." />
 		<string text="Light Show: three times as far, at full from a third of the flare. Online: the host's choice." />
 		<string text="Return to the parent page, keeping pending changes." />
@@ -2170,7 +2179,8 @@
 		<child widget="modern/sharing/row_network_map_download0" x="28" y="137" />
 		<child widget="modern/sharing/row_network_map_seed1" x="28" y="167" />
 		<child widget="modern/sharing/row_network_map_seed_upload2" x="28" y="197" />
-		<child widget="modern/sharing/row_link_3" x="28" y="227" />
+		<child widget="modern/sharing/row_link_17" x="28" y="227" />
+		<child widget="modern/sharing/row_link_3" x="28" y="257" />
 		<child widget="modern/sharing/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/sharing/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -2235,17 +2245,25 @@
 	<widget name="modern/sharing/spinner_network_map_seed_upload2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="64 KB/S|128 KB/S|256 KB/S|512 KB/S|1 MB/S|2 MB/S|4 MB/S|8 MB/S|10 MB/S" values="64|128|256|512|1024|2048|4096|8192|10240" setting="network.map_seed_upload" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
+	<widget name="modern/sharing/row_link_17" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
+		<on event="a" run="port frontend page" />
+		<on event="start" run="port frontend page" />
+		<on event="left_mouse" run="mouse emit accept event" />
+		<child widget="modern/sharing/label_link_17" x="12" y="3" />
+	</widget>
+	<widget name="modern/sharing/label_link_17" type="text" controller="1" width="312" height="24" string_list="modern/sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/sharing/row_link_3" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend page" />
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/sharing/label_link_3" x="12" y="3" />
 	</widget>
-	<widget name="modern/sharing/label_link_3" type="text" controller="1" width="312" height="24" string_list="modern/sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/sharing/label_link_3" type="text" controller="1" width="312" height="24" string_list="modern/sharing/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
 	<strings name="modern/sharing/labels">
 		<string text="DOWNLOAD MAPS" />
 		<string text="HELP SEND MAPS" />
 		<string text="UPLOAD LIMIT" />
+		<string text="MCC PACKAGES &gt;" />
 		<string text="&lt; BACK" />
 	</strings>
 	<strings name="modern/sharing/help_strings">
@@ -2253,6 +2271,7 @@
 		<string text="Joining a game on a Custom Edition map you do not have: download it from the players (if shared)." />
 		<string text="In another's game, send its map to players who join without it, as a torrent's peers do." />
 		<string text="The most you send of maps to other players, so that the game keeps the rest of your upload." />
+		<string text="Open mcc packages settings. Pending changes stay until OK or Cancel." />
 		<string text="Return to the parent page, keeping pending changes." />
 	</strings>
 	<widget name="modern/sharing/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -3403,6 +3422,157 @@
 		<child widget="modern/extra_effects/status" x="28" y="389" />
 		<child widget="modern/extra_effects/prompts" x="28" y="450" />
 	</widget>
+	<widget name="modern/mcc_packages/settings" width="640" height="480" bitmap="modern/panel" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="main menu intialize" label="ring_loop" />
+		<on event="created" run="port frontend init" />
+		<on event="b" run="port frontend back" />
+		<on event="back" run="port frontend back" />
+		<on event="y" run="port frontend next tab" />
+		<child widget="modern/mcc_packages/title" x="70" y="40" />
+		<child widget="modern/mcc_packages/section" x="32" y="108" />
+		<child widget="modern/mcc_packages/rule_display" x="28" y="130" />
+		<child widget="modern/mcc_packages/help_panel" x="380" y="106" />
+		<child widget="modern/mcc_packages/options" x="0" y="0" />
+		<child widget="modern/mcc_packages/help_title" x="396" y="119" />
+		<child widget="modern/mcc_packages/help_value" x="396" y="138" />
+		<child widget="modern/mcc_packages/status" x="28" y="389" />
+		<child widget="modern/mcc_packages/prompts" x="28" y="450" />
+	</widget>
+	<widget name="modern/mcc_packages/title" width="200" height="28" bitmap="modern/title" controller="1" />
+	<widget name="modern/mcc_packages/section" type="text" text="MCC PACKAGES" width="336" height="24" font="ui\large_ui" color="#FF80A2C0" controller="1" />
+	<widget name="modern/mcc_packages/rule_display" width="336" height="1" bitmap="modern/rule" controller="1" />
+	<widget name="modern/mcc_packages/help_panel" width="232" height="294" bitmap="modern/help_panel" controller="1" flags="nifty_fx" />
+	<widget name="modern/mcc_packages/help_title" type="text" controller="1" width="200" height="22" string_list="modern/mcc_packages/labels" font="ui\large_ui" color="#FF80A2C0" />
+	<widget name="modern/mcc_packages/help_value" type="text" controller="1" width="200" height="46" font="ui\large_ui" color="#FFDDDDDD" />
+	<widget name="modern/mcc_packages/status" type="text" controller="1" width="336" height="20" font="ui\small_ui" color="#FF80A2C0" />
+	<widget name="modern/mcc_packages/prompts" type="text" text=" " width="580" height="22" font="ui\small_ui" color="#FF2896FF" />
+	<widget name="modern/mcc_packages/help" type="text" controller="1" left="396" top="193" width="200" height="194" string_list="modern/mcc_packages/help_strings" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/mcc_packages/options" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/mcc_packages/help">
+		<data input="port frontend update" />
+		<child widget="modern/mcc_packages/tabs" x="28" y="76" />
+		<child widget="modern/mcc_packages/row_game_workshop_maps0" x="28" y="137" platform="desktop" />
+		<child widget="modern/mcc_packages/row_game_mcc_campaigns1" x="28" y="167" />
+		<child widget="modern/mcc_packages/row_game_mcc_collections2" x="28" y="197" />
+		<child widget="modern/mcc_packages/row_link_10" x="28" y="227" />
+		<child widget="modern/mcc_packages/button_bar" x="26" y="414" />
+	</widget>
+	<widget name="modern/mcc_packages/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="modern/mcc_packages/tab_0" x="0" y="0" />
+		<child widget="modern/mcc_packages/tab_1" x="98" y="0" />
+		<child widget="modern/mcc_packages/tab_2" x="196" y="0" />
+		<child widget="modern/mcc_packages/tab_3" x="294" y="0" />
+		<child widget="modern/mcc_packages/tab_4" x="392" y="0" />
+		<child widget="modern/mcc_packages/tab_5" x="490" y="0" />
+	</widget>
+	<widget name="modern/mcc_packages/tab_0" type="text" text="VIDEO" width="94" height="26" font="ui\small_ui" color="#FF2896FF" align="center" text_y="3" flags="nifty_fx">
+		<on event="a" run="port frontend page" />
+		<on event="start" run="port frontend page" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/mcc_packages/tab_1" type="text" text="AUDIO" width="94" height="26" font="ui\small_ui" color="#FF2896FF" align="center" text_y="3" flags="nifty_fx">
+		<on event="a" run="port frontend page" />
+		<on event="start" run="port frontend page" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/mcc_packages/tab_2" type="text" text="CONTROLS" width="94" height="26" font="ui\small_ui" color="#FF2896FF" align="center" text_y="3" flags="nifty_fx">
+		<on event="a" run="port frontend page" />
+		<on event="start" run="port frontend page" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/mcc_packages/tab_3" type="text" text="ONLINE" width="94" height="26" font="ui\small_ui" color="#FF2896FF" align="center" text_y="3" bitmap="modern/tab" flags="nifty_fx">
+		<on event="a" run="port frontend page" />
+		<on event="start" run="port frontend page" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/mcc_packages/tab_4" type="text" text="INTERFACE" width="94" height="26" font="ui\small_ui" color="#FF2896FF" align="center" text_y="3" flags="nifty_fx">
+		<on event="a" run="port frontend page" />
+		<on event="start" run="port frontend page" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/mcc_packages/tab_5" type="text" text="PROFILE" width="94" height="26" font="ui\small_ui" color="#FF2896FF" align="center" text_y="3" flags="nifty_fx">
+		<on event="a" run="port frontend page" />
+		<on event="start" run="port frontend page" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/mcc_packages/row_game_workshop_maps0" width="336" height="26" bitmap="modern/row" platform="desktop" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/mcc_packages/label_game_workshop_maps0" x="12" y="3" />
+		<child widget="modern/mcc_packages/spinner_game_workshop_maps0" x="180" y="3" />
+	</widget>
+	<widget name="modern/mcc_packages/label_game_workshop_maps0" type="text" controller="1" width="152" height="24" string_list="modern/mcc_packages/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/mcc_packages/spinner_game_workshop_maps0" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="game.workshop_maps" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/mcc_packages/row_game_mcc_campaigns1" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/mcc_packages/label_game_mcc_campaigns1" x="12" y="3" />
+		<child widget="modern/mcc_packages/spinner_game_mcc_campaigns1" x="180" y="3" />
+	</widget>
+	<widget name="modern/mcc_packages/label_game_mcc_campaigns1" type="text" controller="1" width="152" height="24" string_list="modern/mcc_packages/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/mcc_packages/spinner_game_mcc_campaigns1" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="game.mcc_campaigns" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/mcc_packages/row_game_mcc_collections2" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/mcc_packages/label_game_mcc_collections2" x="12" y="3" />
+		<child widget="modern/mcc_packages/spinner_game_mcc_collections2" x="180" y="3" />
+	</widget>
+	<widget name="modern/mcc_packages/label_game_mcc_collections2" type="text" controller="1" width="152" height="24" string_list="modern/mcc_packages/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/mcc_packages/spinner_game_mcc_collections2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="game.mcc_collections" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/mcc_packages/row_link_10" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
+		<on event="a" run="port frontend page" />
+		<on event="start" run="port frontend page" />
+		<on event="left_mouse" run="mouse emit accept event" />
+		<child widget="modern/mcc_packages/label_link_10" x="12" y="3" />
+	</widget>
+	<widget name="modern/mcc_packages/label_link_10" type="text" controller="1" width="312" height="24" string_list="modern/mcc_packages/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
+	<strings name="modern/mcc_packages/labels">
+		<string text="STEAM DISCOVERY" />
+		<string text="CAMPAIGN MISSIONS" />
+		<string text="COLLECTION FOLDERS" />
+		<string text="&lt; BACK" />
+	</strings>
+	<strings name="modern/mcc_packages/help_strings">
+		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
+		<string text="Find installed Halo CE Workshop maps on this PC. Local MCC packages take precedence." />
+		<string text="Use campaign metadata for mission order and progression. Online, the host chooses the next map." />
+		<string text="Group installed MCC packages using the bundled collection list. Works without Steam." />
+		<string text="Return to the parent page, keeping pending changes." />
+	</strings>
+	<widget name="modern/mcc_packages/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="modern/mcc_packages/button_defaults" x="0" y="0" />
+		<child widget="modern/mcc_packages/button_apply" x="332" y="0" />
+		<child widget="modern/mcc_packages/button_cancel" x="462" y="0" />
+	</widget>
+	<widget name="modern/mcc_packages/button_defaults" type="text" text="DEFAULTS" width="124" height="26" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3" bitmap="modern/button" flags="nifty_fx">
+		<on event="a" run="port frontend defaults" />
+		<on event="start" run="port frontend defaults" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/mcc_packages/button_apply" type="text" text="OK" width="124" height="26" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3" bitmap="modern/button" flags="nifty_fx">
+		<on event="a" run="port frontend apply" />
+		<on event="start" run="port frontend apply" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/mcc_packages/button_cancel" type="text" text="CANCEL" width="124" height="26" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3" bitmap="modern/button" flags="nifty_fx">
+		<on event="a" run="port frontend cancel" />
+		<on event="start" run="port frontend cancel" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/paused/mcc_packages/settings" width="640" height="480" bitmap="modern/panel" flags="pass_unhandled_to_focused_child pause_game">
+		<on event="created" run="port frontend init" />
+		<on event="b" run="port frontend back" />
+		<on event="back" run="port frontend back" />
+		<on event="y" run="port frontend next tab" />
+		<child widget="modern/mcc_packages/title" x="70" y="40" />
+		<child widget="modern/mcc_packages/section" x="32" y="108" />
+		<child widget="modern/mcc_packages/rule_display" x="28" y="130" />
+		<child widget="modern/mcc_packages/help_panel" x="380" y="106" />
+		<child widget="modern/mcc_packages/options" x="0" y="0" />
+		<child widget="modern/mcc_packages/help_title" x="396" y="119" />
+		<child widget="modern/mcc_packages/help_value" x="396" y="138" />
+		<child widget="modern/mcc_packages/status" x="28" y="389" />
+		<child widget="modern/mcc_packages/prompts" x="28" y="450" />
+	</widget>
 	<widget name="modern/multiplayer/screen" width="640" height="480" bitmap="modern/panel" flags="pass_unhandled_to_focused_child main_menu_if_no_history">
 		<on event="created" run="main menu intialize" />
 		<on event="created" run="port frontend navigation init" />
@@ -3737,6 +3907,16 @@
 		<on event="start" run="port settings save" back="true" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
+	<widget name="frontend_legacy/footer/main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/button_defaults" type="text" width="180" height="28" font="ui\large_ui" color="#FF2896FF" align="left" text_y="0" text="=DEFAULTS" text_x="22">
+		<on event="a" run="port settings defaults" />
+		<on event="start" run="port settings defaults" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="frontend_legacy/footer/main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/button_ok" type="text" width="128" height="28" font="ui\large_ui" color="#FF2896FF" align="left" text_y="0" text="=OK" text_x="22">
+		<on event="a" run="port settings save" back="true" />
+		<on event="start" run="port settings save" back="true" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
 	<widget name="frontend_legacy/footer/main_menu/settings_select/player_setup/player_profile_edit/network_setup/multiplayer_hud/button_defaults" type="text" width="180" height="28" font="ui\large_ui" color="#FF2896FF" align="left" text_y="0" text="=DEFAULTS" text_x="22">
 		<on event="a" run="port settings defaults" />
 		<on event="start" run="port settings defaults" />
@@ -3930,6 +4110,234 @@
 	<widget name="frontend_legacy/paused/row_7" type="text" left="64" top="309" width="512" height="30" bitmap="bitmaps/list_item_bkd" text="BUTTON GLYPHS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/controller_appearance/controller_appearance_screen" />
 		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/controller_appearance/controller_appearance_screen" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="mcc_xbox/campaign" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/connected" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/split" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/connected_postgame" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/split_postgame" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="port mcc xbox init" />
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="b" run="port mcc xbox back" />
+		<on event="back" run="port mcc xbox back" />
+		<on event="left" run="port mcc xbox left" />
+		<on event="stick_left" run="port mcc xbox left" />
+		<on event="right" run="port mcc xbox right" />
+		<on event="stick_right" run="port mcc xbox right" />
+		<child widget="mcc_xbox/heading_campaigns" x="0" y="0" />
+		<child widget="mcc_xbox/heading_levels" x="0" y="0" />
+		<child widget="mcc_xbox/heading_maps" x="0" y="0" />
+		<child widget="mcc_xbox/heading_difficulty" x="0" y="0" />
+		<child widget="mcc_xbox/card_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2" x="0" y="0" />
+		<child widget="mcc_xbox/status" x="0" y="0" />
+		<child widget="mcc_xbox/previous" x="0" y="0" />
+		<child widget="mcc_xbox/next" x="0" y="0" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<child widget="mcc_xbox/difficulty_list" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/heading_campaigns" left="35" top="11" width="605" height="59" bitmap="mcc_xbox/heading_campaigns" />
+	<bitmap name="mcc_xbox/heading_campaigns">
+		<frame png="modern/mcc_campaigns.png" width="512" height="64" />
+	</bitmap>
+	<widget name="mcc_xbox/heading_levels" left="35" top="11" width="306" height="59" bitmap="ui\shell\main_menu\solo_level_select\header_load_level" />
+	<widget name="mcc_xbox/heading_maps" left="35" top="11" width="605" height="59" bitmap="ui\shell\main_menu\multiplayer_type_select\mp_map_select\header_select_map" />
+	<widget name="mcc_xbox/heading_difficulty" left="35" top="11" width="390" height="59" bitmap="ui\shell\main_menu\difficulty_select\header_choose_difficulty" />
+	<widget name="mcc_xbox/status" type="text" left="64" top="414" width="280" height="28" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_0" left="72" top="75" width="165" height="330" flags="nifty_fx" bitmap="ui\shell\bitmaps\spinner_list_3_wide_item_background">
+		<on event="left_mouse" run="port mcc xbox card" />
+		<child widget="mcc_xbox/card_0/picture" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/mcc_folder_name" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/mcc_folder_help" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/badge_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/badge_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_0/badge_2" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/card_0/picture" left="85" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix" />
+	<widget name="mcc_xbox/card_0/mcc_folder_name" type="text" left="83" top="204" width="144" height="43" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_0/mcc_folder_help" type="text" left="83" top="258" width="144" height="136" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_0/badge_0" left="82" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_0/badge_1" left="132" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_0/badge_2" left="182" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_1" left="239" top="75" width="163" height="326" flags="nifty_fx" bitmap="ui\shell\bitmaps\spinner_list_3_wide_item_background">
+		<on event="left_mouse" run="port mcc xbox card" />
+		<child widget="mcc_xbox/card_1/picture" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/mcc_folder_name" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/mcc_folder_help" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/badge_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/badge_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_1/badge_2" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/card_1/picture" left="252" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix" />
+	<widget name="mcc_xbox/card_1/mcc_folder_name" type="text" left="250" top="204" width="145" height="43" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_1/mcc_folder_help" type="text" left="250" top="258" width="145" height="136" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_1/badge_0" left="249" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_1/badge_1" left="299" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_1/badge_2" left="349" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_2" left="406" top="75" width="162" height="326" flags="nifty_fx" bitmap="ui\shell\bitmaps\spinner_list_3_wide_item_background">
+		<on event="left_mouse" run="port mcc xbox card" />
+		<child widget="mcc_xbox/card_2/picture" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/mcc_folder_name" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/mcc_folder_help" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/badge_0" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/badge_1" x="0" y="0" />
+		<child widget="mcc_xbox/card_2/badge_2" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/card_2/picture" left="419" top="87" width="140" height="114" bitmap="ui\shell\bitmaps\mp_map_grafix" />
+	<widget name="mcc_xbox/card_2/mcc_folder_name" type="text" left="417" top="204" width="146" height="43" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_2/mcc_folder_help" type="text" left="417" top="258" width="146" height="136" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test" />
+	<widget name="mcc_xbox/card_2/badge_0" left="416" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_2/badge_1" left="466" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/card_2/badge_2" left="516" top="343" width="44" height="48" bitmap="ui\shell\main_menu\difficulty_select\difficulty_options_small" />
+	<widget name="mcc_xbox/previous" left="50" top="174" width="18" height="170" bitmap="ui\shell\bitmaps\arrow_big_left">
+		<on event="left_mouse" run="port mcc xbox left" />
+	</widget>
+	<widget name="mcc_xbox/next" left="575" top="174" width="35" height="170" bitmap="ui\shell\bitmaps\arrow_big_right">
+		<on event="left_mouse" run="port mcc xbox right" />
+	</widget>
+	<widget name="mcc_xbox/campaign_entry" type="text" width="256" height="33" bitmap="mcc_xbox/menu_campaigns" font="ui\small_ui" color="#000080FF">
+		<on event="a" run="port mcc xbox open" />
+		<on event="start" run="port mcc xbox open" />
+		<on event="left_mouse" run="port mcc xbox open" />
+	</widget>
+	<bitmap name="mcc_xbox/menu_campaigns">
+		<frame png="modern/mcc_campaigns_entry_0.png" width="256" height="64" />
+		<frame png="modern/mcc_campaigns_entry_1.png" width="256" height="64" />
+	</bitmap>
+	<widget name="mcc_xbox/multiplayer_entry" type="text" left="64" top="414" width="280" height="28" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" text="=MCC MAPS" text_x="22">
+		<child widget="frontend_legacy/footer_glyph_x" x="64" y="414" />
+		<on event="left_mouse" run="port mcc xbox open" />
+	</widget>
+	<widget name="mcc_xbox/profiles" width="640" height="480" bitmap="ui\shell\bitmaps\gradient" flags="pass_unhandled_to_focused_child">
+		<on event="created" run="sp reset controller choices" />
+		<on event="a" run="port mcc xbox profile" />
+		<on event="start" run="port mcc xbox profile" />
+		<on event="b" back="true" />
+		<on event="back" back="true" />
+		<child widget="ui\shell\main_menu\player_profiles_select\player_profile_select_list" />
+		<child widget="ui\shell\main_menu\player_profiles_select\header_select_profile" />
+		<child widget="ui\shell\main_menu\button_key" />
+		<on event="y" run="create&amp;edit player profile" open="ui\shell\main_menu\settings_select\player_setup\create_and_edit_player_profile_screen" />
+		<child widget="ui\shell\main_menu\y_butn" x="78" y="414" />
+		<child widget="ui\shell\main_menu\=create_new" x="100" y="414" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="ui\shell\main_menu\difficulty_select\difficulty_ext_desc">
+		<data input="difficulty menu update desc" />
+		<on event="created" run="difficulty menu init" />
+		<child widget="mcc_xbox/difficulty_0" x="0" y="0" />
+		<child widget="mcc_xbox/difficulty_1" x="0" y="0" />
+		<child widget="mcc_xbox/difficulty_2" x="0" y="0" />
+		<child widget="mcc_xbox/difficulty_3" x="0" y="0" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_0" type="text" left="51" top="78" width="232" height="32" bitmap="ui\shell\bitmaps\list_item_bkd_top" string_list="ui\shell\main_menu\difficulty_select\difficulty_options" string_index="0" font="ui\large_ui" color="#FF0080FF" text_x="13" text_y="5">
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_1" type="text" left="51" top="111" width="232" height="32" bitmap="ui\shell\bitmaps\list_item_bkd" string_list="ui\shell\main_menu\difficulty_select\difficulty_options" string_index="1" font="ui\large_ui" color="#FF0080FF" text_x="13" text_y="5">
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_2" type="text" left="51" top="144" width="232" height="32" bitmap="ui\shell\bitmaps\list_item_bkd" string_list="ui\shell\main_menu\difficulty_select\difficulty_options" string_index="2" font="ui\large_ui" color="#FF0080FF" text_x="13" text_y="5">
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="mcc_xbox/difficulty_3" type="text" left="51" top="177" width="232" height="32" bitmap="ui\shell\bitmaps\list_item_bkd" string_list="ui\shell\main_menu\difficulty_select\difficulty_options" string_index="3" font="ui\large_ui" color="#FF0080FF" text_x="13" text_y="5">
+		<on event="a" run="port mcc xbox choose" />
+		<on event="start" run="port mcc xbox choose" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
 	<widget name="modern/network/maps/0/connected_map_select_wrapper" width="640" height="480" flags="pass_unhandled_to_focused_child main_menu_if_no_history tag_controller_index force_handle_mouse">
@@ -4861,12 +5269,13 @@
 		<child widget="modern/network/sharing/prompts" />
 		<child widget="modern/network/sharing/status" />
 	</widget>
-	<widget name="modern/network/sharing/2/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/sharing/16/help">
+	<widget name="modern/network/sharing/2/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/sharing/18/help">
 		<data input="port settings help" />
 		<child widget="modern/network/sharing/3/op_map_download" x="28" y="110" />
 		<child widget="modern/network/sharing/6/op_map_seed" x="28" y="140" />
 		<child widget="modern/network/sharing/9/op_map_seed_upload" x="28" y="170" />
-		<child widget="modern/network/sharing/12/button_bar" y="414" x="26" />
+		<child widget="modern/network/sharing/12/op_mcc_packages" x="28" y="200" />
+		<child widget="modern/network/sharing/14/button_bar" y="414" x="26" />
 		<data input="port frontend multiplayer update" />
 	</widget>
 	<widget name="modern/network/sharing/3/op_map_download" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
@@ -4896,27 +5305,35 @@
 	<widget name="modern/network/sharing/11/map_seed_upload_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="64 KB/S|128 KB/S|256 KB/S|512 KB/S|1 MB/S|2 MB/S|4 MB/S|8 MB/S|10 MB/S" setting="network.map_seed_upload" values="64|128|256|512|1024|2048|4096|8192|10240" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/network/sharing/12/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items" left="0" top="0">
-		<child widget="modern/network/sharing/13/button_defaults" y="0" x="198" />
-		<child widget="modern/network/sharing/14/button_ok" x="328" y="0" />
-		<child widget="modern/network/sharing/15/common_button_cancel" x="458" y="0" />
+	<widget name="modern/network/sharing/12/op_mcc_packages" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/mcc_packages_screen" />
+		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/mcc_packages_screen" />
+		<on event="left_mouse" run="mouse emit accept event" />
+		<child widget="modern/network/sharing/13/mcc_packages_label" x="12" y="3" />
 	</widget>
-	<widget name="modern/network/sharing/13/button_defaults" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+	<widget name="modern/network/sharing/13/mcc_packages_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	</widget>
+	<widget name="modern/network/sharing/14/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items" left="0" top="0">
+		<child widget="modern/network/sharing/15/button_defaults" y="0" x="198" />
+		<child widget="modern/network/sharing/16/button_ok" x="328" y="0" />
+		<child widget="modern/network/sharing/17/common_button_cancel" x="458" y="0" />
+	</widget>
+	<widget name="modern/network/sharing/15/button_defaults" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
 		<on event="a" run="port settings defaults" />
 		<on event="start" run="port settings defaults" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
-	<widget name="modern/network/sharing/14/button_ok" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+	<widget name="modern/network/sharing/16/button_ok" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
 		<on event="a" run="port settings save" back="true" />
 		<on event="start" run="port settings save" back="true" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
-	<widget name="modern/network/sharing/15/common_button_cancel" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+	<widget name="modern/network/sharing/17/common_button_cancel" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
 		<on event="a" run="mouse emit back event" />
 		<on event="start" run="mouse emit back event" />
 		<on event="left_mouse" run="mouse emit back event" />
 	</widget>
-	<widget name="modern/network/sharing/16/help" type="text" controller="1" left="396" top="108" width="200" height="278" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/help_strings" font="ui\large_ui" color="#FF2896FF" flags="">
+	<widget name="modern/network/sharing/18/help" type="text" controller="1" left="396" top="108" width="200" height="278" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/help_strings" font="ui\large_ui" color="#FF2896FF" flags="">
 	</widget>
 	<widget name="modern/network/sharing/title" left="70" top="40" width="300" height="28" controller="1" bitmap="modern/title_sharing" flags="" />
 	<widget name="modern/network/sharing/help_panel" left="380" top="82" width="232" height="318" controller="1" bitmap="modern/help_panel" flags="nifty_fx" />
@@ -4924,6 +5341,80 @@
 	<widget name="modern/network/sharing/section" type="text" left="32" top="82" width="332" height="22" controller="1" text="MAP SHARING" font="ui\large_ui" color="#FF80A2C0" />
 	<widget name="modern/network/sharing/prompts" type="text" left="28" top="450" width="584" height="22" controller="1" text=" " font="ui\small_ui" color="#FF80A2C0" />
 	<widget name="modern/network/sharing/status" type="text" left="28" top="387" width="336" height="22" controller="1" text="" font="ui\small_ui" color="#FF80A2C0" />
+	<widget name="modern/network/mcc_packages/0/mcc_packages_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="modern/panel">
+		<child widget="modern/network/mcc_packages/rule" />
+		<child widget="modern/network/mcc_packages/help_panel" />
+		<child widget="modern/network/mcc_packages/title" />
+		<on event="b" back="true" />
+		<on event="back" back="true" />
+		<child widget="modern/network/mcc_packages/2/options_menu" />
+		<child widget="modern/network/mcc_packages/section" />
+		<child widget="modern/network/mcc_packages/prompts" />
+		<child widget="modern/network/mcc_packages/status" />
+	</widget>
+	<widget name="modern/network/mcc_packages/2/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/mcc_packages/16/help">
+		<data input="port settings help" />
+		<child widget="modern/network/mcc_packages/3/op_workshop_maps" x="28" y="110" platform="desktop" />
+		<child widget="modern/network/mcc_packages/6/op_mcc_campaigns" x="28" y="140" />
+		<child widget="modern/network/mcc_packages/9/op_mcc_collections" x="28" y="170" />
+		<child widget="modern/network/mcc_packages/12/button_bar" y="414" x="26" />
+		<data input="port frontend multiplayer update" />
+	</widget>
+	<widget name="modern/network/mcc_packages/3/op_workshop_maps" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" platform="desktop" left="0" top="0">
+		<child widget="modern/network/mcc_packages/4/workshop_maps_label" x="12" y="3" />
+		<child widget="modern/network/mcc_packages/5/workshop_maps_spinner" x="180" y="3" />
+	</widget>
+	<widget name="modern/network/mcc_packages/4/workshop_maps_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	</widget>
+	<widget name="modern/network/mcc_packages/5/workshop_maps_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="game.workshop_maps" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/network/mcc_packages/6/op_mcc_campaigns" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<child widget="modern/network/mcc_packages/7/mcc_campaigns_label" x="12" y="3" />
+		<child widget="modern/network/mcc_packages/8/mcc_campaigns_spinner" x="180" y="3" />
+	</widget>
+	<widget name="modern/network/mcc_packages/7/mcc_campaigns_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	</widget>
+	<widget name="modern/network/mcc_packages/8/mcc_campaigns_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="game.mcc_campaigns" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/network/mcc_packages/9/op_mcc_collections" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<child widget="modern/network/mcc_packages/10/mcc_collections_label" x="12" y="3" />
+		<child widget="modern/network/mcc_packages/11/mcc_collections_spinner" x="180" y="3" />
+	</widget>
+	<widget name="modern/network/mcc_packages/10/mcc_collections_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	</widget>
+	<widget name="modern/network/mcc_packages/11/mcc_collections_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="game.mcc_collections" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/network/mcc_packages/12/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items" left="0" top="0">
+		<child widget="modern/network/mcc_packages/13/button_defaults" y="0" x="198" />
+		<child widget="modern/network/mcc_packages/14/button_ok" x="328" y="0" />
+		<child widget="modern/network/mcc_packages/15/common_button_cancel" x="458" y="0" />
+	</widget>
+	<widget name="modern/network/mcc_packages/13/button_defaults" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+		<on event="a" run="port settings defaults" />
+		<on event="start" run="port settings defaults" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/network/mcc_packages/14/button_ok" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+		<on event="a" run="port settings save" back="true" />
+		<on event="start" run="port settings save" back="true" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="modern/network/mcc_packages/15/common_button_cancel" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+		<on event="a" run="mouse emit back event" />
+		<on event="start" run="mouse emit back event" />
+		<on event="left_mouse" run="mouse emit back event" />
+	</widget>
+	<widget name="modern/network/mcc_packages/16/help" type="text" controller="1" left="396" top="108" width="200" height="278" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/help_strings" font="ui\large_ui" color="#FF2896FF" flags="">
+	</widget>
+	<widget name="modern/network/mcc_packages/title" left="70" top="40" width="300" height="28" controller="1" bitmap="modern/title_mcc_packages" flags="" />
+	<widget name="modern/network/mcc_packages/help_panel" left="380" top="82" width="232" height="318" controller="1" bitmap="modern/help_panel" flags="nifty_fx" />
+	<widget name="modern/network/mcc_packages/rule" left="28" top="104" width="336" height="1" controller="1" bitmap="modern/rule" flags="" />
+	<widget name="modern/network/mcc_packages/section" type="text" left="32" top="82" width="332" height="22" controller="1" text="MCC PACKAGES" font="ui\large_ui" color="#FF80A2C0" />
+	<widget name="modern/network/mcc_packages/prompts" type="text" left="28" top="450" width="584" height="22" controller="1" text=" " font="ui\small_ui" color="#FF80A2C0" />
+	<widget name="modern/network/mcc_packages/status" type="text" left="28" top="387" width="336" height="22" controller="1" text="" font="ui\small_ui" color="#FF80A2C0" />
 	<widget name="modern/network/coop/0/coop_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="modern/panel">
 		<child widget="modern/network/coop/rule" />
 		<child widget="modern/network/coop/help_panel" />
@@ -5437,6 +5928,9 @@
 	</bitmap>
 	<bitmap name="modern/title_sharing">
 		<frame png="modern/title_sharing_0.png" width="300" height="28" />
+	</bitmap>
+	<bitmap name="modern/title_mcc_packages">
+		<frame png="modern/title_mcc_packages_0.png" width="300" height="28" />
 	</bitmap>
 	<bitmap name="modern/title_coop">
 		<frame png="modern/title_coop_0.png" width="300" height="28" />

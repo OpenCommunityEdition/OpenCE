@@ -71,6 +71,7 @@ their handlers open opens.
 
 #include "cseries.h"
 #include "third_person.h"
+#include "lighting_menu.h"
 #include "third_person_protocol.h"
 #include "input/input.h"
 #include "interface/event_manager.h"
@@ -91,6 +92,7 @@ their handlers open opens.
 #include "mcc_ui.h"
 #include "custom_edition_maps.h"
 #include "mcc_maps.h"
+#include "mcc_menu_text.h"
 #include "mcc_cache.h"
 #include "game_modes.h"
 #include "network_voice.h"
@@ -351,6 +353,8 @@ or the profile's */
 static boolean setting_text(char const *name, char *text, unsigned int size, boolean default_value)
 {
 	short index;
+	int grouped = lighting_menu_text(name, text, size, default_value);
+	if (grouped >= 0) return grouped;
 
 	/* (DISCORD ACCOUNT's LINK: no change, until one is chosen; the master a
 	server that refused this machine for its VPN is listed by, chosen
@@ -420,6 +424,8 @@ static boolean setting_text(char const *name, char *text, unsigned int size, boo
 static boolean setting_write(char const *name, char const *value)
 {
 	short index;
+	int grouped = lighting_menu_write(name, value);
+	if (grouped >= 0) return grouped;
 
 	if (!strcmp(name, "display.third_person") && third_person_policy() != _third_person_player_choice)
 		return TRUE;
@@ -477,6 +483,7 @@ static boolean setting_load(struct widget_instance *widget)
 static boolean setting_save(struct widget_instance *widget)
 {
 	struct pc_menu_setting *setting = pc_menu_setting_get(widget->definition_tag_index);
+	int written;
 
 	if (spinner_item(widget))
 		return TRUE;
@@ -487,7 +494,9 @@ static boolean setting_save(struct widget_instance *widget)
 		return TRUE;
 	if (widget->parameters.list.selected_index == setting->loaded_index)
 		return TRUE;
-	if (!config_write(setting->setting, setting->values[widget->parameters.list.selected_index]))
+	written = lighting_menu_write(setting->setting, setting->values[widget->parameters.list.selected_index]);
+	if (written < 0) written = config_write(setting->setting, setting->values[widget->parameters.list.selected_index]);
+	if (!written)
 	{
 		platform_log("menus: could not write %s to config.toml", setting->setting);
 		return FALSE;
@@ -1242,12 +1251,13 @@ static void mcc_map_description_show(struct widget_instance *description, short 
 	map_description_show(description, NONE, index == NONE ? NONE : (short)(MCC_MAPS_FIRST_DISPLAY_INDEX + index));
 	picture = named(description, "mp_map_right_pic", 0);
 	if (picture)
-		picture->animation.current_frame_index = 13;
+		picture->animation.current_frame_index = index == NONE ? 13 : MCC_MAPS_FIRST_DISPLAY_INDEX + index;
 }
 
 static void mcc_solo_map_text(short row, wchar_t *text)
 {
 	mcc_map_browser_text(&mcc_solo_browsers[mcc_solo_list.campaign], row, text);
+	mcc_menu_text_row(text);
 }
 
 static void mcc_browser_description(struct widget_instance *description, struct mcc_map_browser *browser)
@@ -2029,6 +2039,8 @@ static void discord_account_show(struct widget_instance *list)
 The remaining options close the gap; the help and bottom buttons stay put. */
 /* Button Appearance filters its rows in the controller feature module. */
 #include "controller_buttons.h"
+#include "keyboard_prompts.h"
+#include "frontend_input.h"
 #include "controller_button_menu.inl"
 
 static void hud_button_style_row_show(struct widget_instance *list)
@@ -3662,6 +3674,7 @@ static struct mcc_map_browser mcc_host_browsers[2];
 static void mcc_host_map_text(short row, wchar_t *text)
 {
 	mcc_map_browser_text(&mcc_host_browsers[mcc_host_list.campaign], row, text);
+	mcc_menu_text_row(text);
 }
 
 static void mcc_host_list_update(struct widget_instance *list)
@@ -6519,7 +6532,7 @@ static void lobby_map_show(struct widget_instance *description, char const *map_
 		visible_set(named(description, "replay_level_right_pic", 0), FALSE);
 		visible_set(named(description, "replay_level_right_name", 0), FALSE);
 		if ((widget = named(description, "lobby_map_pic", 0)) != NULL)
-			widget->animation.current_frame_index = 13;
+			widget->animation.current_frame_index = MCC_MAPS_FIRST_DISPLAY_INDEX + mcc_index;
 		if ((widget = named(description, "lobby_map_name", 0)) != NULL)
 			widget->parameters.text_box.string_list_index = MCC_MAPS_FIRST_DISPLAY_INDEX + mcc_index;
 		return;
@@ -8427,6 +8440,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port map list back"))
 		{
 			return map_list_back(widget, widget_deleted);
+		}
+		else if (!strncmp(name, "port mcc xbox ", 14))
+		{
+			return mcc_xbox_event(name + 14, widget, event, widget_deleted);
 		}
 		else if (!strcmp(name, "port mcc host folder back"))
 		{

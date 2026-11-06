@@ -13,7 +13,7 @@
 #include "plasma_occlusion.h"
 #include <string.h>
 
-int config_boolean(const char *name);
+#include "lighting_config.h"
 real render_interpolation_game_time_sec(long ticks);
 long light_port_glow_definition_get(void);
 boolean light_port_glow_set(long light, long owner, real_rgb_color const *color, real radius);
@@ -79,7 +79,7 @@ void muzzle_lighting_shot(long weapon_index, short trigger_index)
 	const char *name;
 	struct muzzle_pulse *pulse;
 	int i, profile, slot = NONE;
-	if (!config_boolean("display.muzzle_lighting") || trigger_index < 0 || trigger_index > 1)
+	if (!lighting_config_boolean("display.muzzle_lighting") || trigger_index < 0 || trigger_index > 1)
 		return;
 	weapon = weapon_try_and_get(weapon_index);
 	if (!weapon || !unit_try_and_get(weapon->object.parent_object_index))
@@ -181,7 +181,7 @@ void muzzle_lighting_update(void)
 		long definition;
 		if (!pulse->active)
 			continue;
-		if (!config_boolean("display.muzzle_lighting") || game_time_get() < pulse->shot_tick ||
+		if (!lighting_config_boolean("display.muzzle_lighting") || game_time_get() < pulse->shot_tick ||
 			(pulse->pending && game_time_get() - pulse->shot_tick > 2) ||
 			!muzzle_position(pulse, &position))
 		{
@@ -227,7 +227,7 @@ void muzzle_lighting_frame_end(void)
 		struct muzzle_pulse *pulse = &pulses[i];
 		if (!pulse->active)
 			continue;
-		if (!config_boolean("display.muzzle_lighting"))
+		if (!lighting_config_boolean("display.muzzle_lighting"))
 			muzzle_release(pulse);
 		else if (pulse->connected && light_port_glow_set(pulse->light, NONE, &muzzle_black, 0.0f))
 		{
@@ -264,7 +264,7 @@ void muzzle_lighting_submitted(long light_index, long rasterizer_index)
 int muzzle_lighting_selected(long rasterizer_index)
 {
 	int i;
-	if (!config_boolean("display.muzzle_lighting") || rasterizer_index == NONE)
+	if (!lighting_config_boolean("display.muzzle_lighting") || rasterizer_index == NONE)
 		return FALSE;
 	for (i = 0; i < MUZZLE_LIGHTS; i++)
 		if (pulses[i].active && pulses[i].rasterizer == rasterizer_index)
@@ -275,7 +275,7 @@ int muzzle_lighting_selected(long rasterizer_index)
 float muzzle_lighting_radius(long light_index, float radius)
 {
 	int i;
-	if (!config_boolean("display.muzzle_lighting"))
+	if (!lighting_config_boolean("display.muzzle_lighting"))
 		return radius;
 	for (i = 0; i < MUZZLE_LIGHTS; i++)
 		if (pulses[i].active && pulses[i].light == light_index)
@@ -286,7 +286,7 @@ float muzzle_lighting_radius(long light_index, float radius)
 int muzzle_lighting_vehicle_occlusion(long light)
 {
 	int i;
-	if (light == NONE || !config_boolean("display.muzzle_lighting"))
+	if (light == NONE || !lighting_config_boolean("display.muzzle_lighting"))
 		return FALSE;
 	for (i = 0; i < MUZZLE_LIGHTS; i++)
 		if (pulses[i].active && pulses[i].light == light &&

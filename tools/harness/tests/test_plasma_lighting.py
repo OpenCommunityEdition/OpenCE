@@ -24,7 +24,7 @@ def generated(fault=None):
     return (('under_test.inc', code),)
 
 
-@pytest.mark.parametrize('case', ['shield', 'counter_cache', 'covenant', 'muzzle', 'radius', 'rocket', 'pistol', 'model', 'off', 'filter', 'restore', 'split', 'capacity', 'unload', 'missing', 'stale', 'selection', 'existing'])
+@pytest.mark.parametrize('case', ['shield', 'counter_cache', 'covenant', 'muzzle', 'radius', 'rocket', 'pistol', 'model', 'off', 'filter', 'restore', 'split', 'capacity', 'unload', 'missing', 'stale', 'selection', 'disconnected', 'existing'])
 def test_case(case):
     status, output = run(build('plasma_lighting', generated()), case)
     assert status == 0, output
@@ -36,8 +36,17 @@ def test_case(case):
     ('return radius * plasma_lighting_attachments[index].radius_scale;', 'return radius;', 'radius'),
     ('interpolation_rendering = FALSE;', 'interpolation_rendering = TRUE;', 'restore'),
     ('plasma_lighting_count = 0;', '(void)0;', 'unload'),
-    ('!config_boolean("display.plasma_lighting") || object_index == NONE', 'object_index == NONE', 'off'),
 ])
 def test_negative_control(before, after, case):
     status, output = run(build('plasma_lighting', generated((before, after))), case)
+    assert status == CHECK_FAILED, output
+
+
+def test_disabled_projectile_policy_is_required():
+    # Authored emitters add a second category gate. Removing only the early
+    # return is no longer a fault: the second gate still preserves stock.
+    name, code = generated()[0]
+    assert code.count('lighting_config_boolean("display.plasma_lighting")') > 1
+    code = code.replace('lighting_config_boolean("display.plasma_lighting")', 'TRUE')
+    status, output = run(build('plasma_lighting', ((name, code),)), 'off')
     assert status == CHECK_FAILED, output

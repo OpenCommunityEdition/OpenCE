@@ -3,6 +3,8 @@
 Gamepad Setup > **Button Remapping** edits separate P1–P4 layouts. These belong
 to input slots on this installation, not device serial numbers or player profiles.
 Empty settings keep the profile preset and stock shortcuts.
+Optional [DualSense feedback](dualsense.md) follows these physical L2/R2 assignments;
+actions on buttons without actuators do not produce adaptive-trigger effects.
 
 Choose Movement, Combat, General, Communication or Debug. Select an action, release
 the opening press, then press the desired button on that player's controller.

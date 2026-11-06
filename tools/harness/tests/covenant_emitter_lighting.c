@@ -4,8 +4,8 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define PIN(a,b,c) MIN(MAX(a,b),c)
-enum { _object_type_biped=0, _object_type_weapon=2, _object_type_scenery=6,
- _object_mask_biped=1, _object_mask_weapon=4, _object_mask_scenery=64,
+enum { _object_type_biped=0, _object_type_vehicle=1, _object_type_weapon=2, _object_type_scenery=6,
+ _object_mask_vehicle=2, _object_mask_equipment=8, _object_mask_biped=1, _object_mask_weapon=4, _object_mask_scenery=64,
  _object_invisible_bit=0, _object_shield_depleted_bit=2,
  MAXIMUM_REGIONS_PER_OBJECT=8, MAXIMUM_WEAPONS_PER_UNIT=4 };
 typedef struct { real red,green,blue; } real_rgb_color;
@@ -32,7 +32,8 @@ static const char *names[10];
 static real now,marker_x=1;
 static int count=1,shield_on=1,fuel_on,stationary_on,allocs,deletes,disconnects,missing,fail,marker_missing;
 static long inventory=0;
-static int ammo_on,needler_on,first_person;
+static int ammo_on,needler_on,first_person,ambient_mode,ambient_count=1,stream_live=1;
+static real stream_x=10;
 static const char *last_marker;
 static void *global_d3d_device;
 enum { D3DRS_PSRGBOUTPUTS7=7 };
@@ -65,13 +66,15 @@ static const struct observer_result *observer_get_camera(short i) { return &came
 static real distance3d(const real_point3d *a,const real_point3d *b) { return (real)fabs(a->x-b->x); }
 static long game_time_get(void) { return (long)(now*30); }
 real render_interpolation_game_time_sec(long ticks) { return now; }
-int config_boolean(const char *name)
+int lighting_config_boolean(const char *name)
 {
  if (!strcmp(name,"display.jackal_shield_lighting")) return shield_on;
  if (!strcmp(name,"display.fuel_rod_lighting")) return fuel_on;
  if (!strcmp(name,"display.covenant_shield_lighting")) return stationary_on;
  if (!strcmp(name,"display.ammo_counter_lighting")) return ammo_on;
  if (!strcmp(name,"display.needler_lighting")) return needler_on;
+ if (!strcmp(name,"display.vehicle_lighting")) return ambient_mode==1;
+ if (!strcmp(name,"display.plasma_lighting")) return ambient_mode==2;
  return 0;
 }
 long light_port_glow_definition_get(void) { return missing?NONE:99; }
@@ -91,7 +94,21 @@ static struct shader screen_shader, needle_shader, core_shader, crystal_shader, 
 static int screen_present=1;
 static long tag_loaded(long group,const char *name) { if (screen_present && group=='sotr') return 97; if (screen_present && group=='schi') return 96; if (screen_present && group=='soso' && !strcmp(name,"weapons\\needler\\shaders\\needler dull")) return 98; return screen_present&&group=='soso'&&!strcmp(name,"weapons\\assault rifle\\fp\\shaders\\display")?99:NONE; }
 static struct shader *shader_definition_get(long i) { return i==97?&core_shader:i==96?&crystal_shader:i==98?&needle_shader:&screen_shader; }
+void authored_emitter_lighting_forget(void) {}
+struct emitter_sample;
+int ambient_emitter_lighting_enabled(void) { return ambient_mode!=0; }
+unsigned long ambient_emitter_lighting_begin(void) { return ambient_mode==1?_object_mask_vehicle:ambient_mode==2&&stream_live?_object_mask_biped:0; }
+void ambient_emitter_lighting_forget(void) {}
+int ambient_emitter_lighting_sample(long i,int c,struct emitter_sample *s);
 #include "under_test.inc"
+int ambient_emitter_lighting_sample(long i,int c,struct emitter_sample *s)
+{
+ if(!ambient_mode||i>=ambient_count||(ambient_mode==2&&(!stream_live||c)))return 0;
+ s->kind=ambient_mode==1?EMITTER_VEHICLE:EMITTER_FLAME;
+ s->radius=2;s->strength=.8f;s->color.red=1;s->color.green=.4f;s->color.blue=.1f;
+ memset(&s->position,0,sizeof(s->position));s->position.x=ambient_mode==1?(real)(1+c*3):stream_x;
+ return 1;
+}
 static void frame(real dt) { now+=dt;covenant_emitter_lighting_update(); }
 int main(int argc,char **argv)
 {
@@ -124,47 +141,47 @@ int main(int argc,char **argv)
   objects[i].object.body_vitality=objects[i].object.shield_vitality=1;
   objects[i].object.outgoing_change_colors[2].blue=1;
  }
- CHECK(emitter_sample(0,&sample)&&sample.kind==0&&sample.radius==3.6f&&sample.color.green>=.42f,"minor shield profile");
+ CHECK(emitter_sample(0,0,&sample)&&sample.kind==0&&sample.radius==3.6f&&sample.color.green>=.42f,"minor shield profile");
  names[0]="characters\\jackal\\jackal major";objects[0].object.outgoing_change_colors[2].red=1;
- CHECK(emitter_sample(0,&sample)&&sample.color.red==1,"major uses authored colour");
+ CHECK(emitter_sample(0,0,&sample)&&sample.color.red==1,"major uses authored colour");
  objects[0].object.outgoing_change_colors[2].blue=.10f;
  objects[0].object.outgoing_change_colors[2].green=.68f;
- CHECK(emitter_sample(0,&sample)&&sample.radius==3.6f&&sample.color.green==.78f&&sample.color.blue==.24f,"gold shares broader brighter spill");
+ CHECK(emitter_sample(0,0,&sample)&&sample.radius==3.6f&&sample.color.green==.78f&&sample.color.blue==.24f,"gold shares broader brighter spill");
  objects[0].object.outgoing_change_colors[2].blue=1;
  objects[0].object.outgoing_change_colors[2].green=0;
  objects[0].object.outgoing_function_values[0]=1;
- CHECK(emitter_sample(0,&sample)&&sample.color.red==1&&sample.color.blue==0&&sample.color.green==0,"shield light follows full shader hit flash");
+ CHECK(emitter_sample(0,0,&sample)&&sample.color.red==1&&sample.color.blue==0&&sample.color.green==0,"shield light follows full shader hit flash");
  objects[0].object.outgoing_function_values[0]=.5f;
- CHECK(emitter_sample(0,&sample)&&sample.color.blue==.5f,"shield flash blends with the evaluated shader value");
+ CHECK(emitter_sample(0,0,&sample)&&sample.color.blue==.5f,"shield flash blends with the evaluated shader value");
  objects[0].object.outgoing_function_values[0]=0;
  objects[0].object.body_vitality=0;
- CHECK(emitter_sample(0,&sample)&&sample.strength==0,"dead Jackal has no shield illumination");
+ CHECK(emitter_sample(0,0,&sample)&&sample.strength==0,"dead Jackal has no shield illumination");
  objects[0].object.body_vitality=1;
- marker_x=24;CHECK(emitter_sample(0,&sample)&&sample.strength>0&&sample.strength<0.4f,"distance boundary fades before admission cutoff");
- marker_x=26;CHECK(emitter_sample(0,&sample)&&sample.strength==0,"distant emitter stays stock");marker_x=1;
+ marker_x=24;CHECK(emitter_sample(0,0,&sample)&&sample.strength>0&&sample.strength<0.4f,"distance boundary fades before admission cutoff");
+ marker_x=26;CHECK(emitter_sample(0,0,&sample)&&sample.strength==0,"distant emitter stays stock");marker_x=1;
  objects[0].object.type=_object_type_scenery;names[0]="scenery\\c_field_generator\\c_field_generator";
- CHECK(!emitter_sample(0,&sample),"stationary setting independent");stationary_on=1;
+ CHECK(!emitter_sample(0,0,&sample),"stationary setting independent");stationary_on=1;
  objects[0].object.maximum_body_vitality=objects[0].object.body_vitality=0;
- CHECK(emitter_sample(0,&sample)&&sample.strength>0&&sample.kind==2,"indestructible shield base eligible");
+ CHECK(emitter_sample(0,0,&sample)&&sample.strength>0&&sample.kind==2,"indestructible shield base eligible");
  objects[0].object.outgoing_function_values[0]=1;
- CHECK(emitter_sample(0,&sample)&&sample.color.red==1&&sample.color.blue==0,"stationary flash matches shader too");
+ CHECK(emitter_sample(0,0,&sample)&&sample.color.red==1&&sample.color.blue==0,"stationary flash matches shader too");
  objects[0].object.outgoing_function_values[0]=0;
  objects[0].object.region_permutations[0]=1;
- CHECK(emitter_sample(0,&sample)&&sample.strength==0,"shield-off permutation overrides marker");
+ CHECK(emitter_sample(0,0,&sample)&&sample.strength==0,"shield-off permutation overrides marker");
  objects[0].object.region_permutations[0]=0;
  objects[0].object.type=_object_type_weapon;names[0]="weapons\\fuel rod gun\\fuel rod";
- CHECK(!emitter_sample(0,&sample),"fuel setting independent");fuel_on=1;
- CHECK(emitter_sample(0,&sample)&&sample.kind==1,"dropped rods remain luminous");
+ CHECK(!emitter_sample(0,0,&sample),"fuel setting independent");fuel_on=1;
+ CHECK(emitter_sample(0,0,&sample)&&sample.kind==1,"dropped rods remain luminous");
  objects[0].object.parent_object_index=42;inventory=1;
- CHECK(!emitter_sample(0,&sample),"holstered weapon rejected");inventory=0;
- CHECK(emitter_sample(0,&sample),"held current weapon eligible");
+ CHECK(!emitter_sample(0,0,&sample),"holstered weapon rejected");inventory=0;
+ CHECK(emitter_sample(0,0,&sample),"held current weapon eligible");
  names[0]="weapons\\fuel rod gun\\hunter fuel rod";
- CHECK(!emitter_sample(0,&sample),"no phantom rods on model-less Hunter gun");
+ CHECK(!emitter_sample(0,0,&sample),"no phantom rods on model-less Hunter gun");
  names[0]="characters\\hunter\\hunter";objects[0].object.type=_object_type_biped;objects[0].object.parent_object_index=NONE;
- CHECK(emitter_sample(0,&sample)&&sample.kind==1&&sample.color.green==1,"Hunter rods share fuel-rod setting and profile");
+ CHECK(emitter_sample(0,0,&sample)&&sample.kind==1&&sample.color.green==1,"Hunter rods share fuel-rod setting and profile");
  CHECK(!strcmp(last_marker,"rodflare")&&sample.position.x==marker_x,"Hunter source follows the forearm rod marker");
- marker_missing=1;CHECK(!emitter_sample(0,&sample),"missing Hunter rods do not invent a light");marker_missing=0;
- fuel_on=0;CHECK(!emitter_sample(0,&sample),"Hunter glow off with existing fuel-rod switch");fuel_on=1;
+ marker_missing=1;CHECK(!emitter_sample(0,0,&sample),"missing Hunter rods do not invent a light");marker_missing=0;
+ fuel_on=0;CHECK(!emitter_sample(0,0,&sample),"Hunter glow off with existing fuel-rod switch");fuel_on=1;
  names[0]="characters\\jackal\\jackal";objects[0].object.type=0;objects[0].object.parent_object_index=NONE;
  objects[0].object.maximum_body_vitality=objects[0].object.body_vitality=1;
  covenant_emitter_lighting_update();
@@ -206,17 +223,17 @@ int main(int argc,char **argv)
  stationary_on=0;CHECK(covenant_emitter_lighting_occlusion_ignore(emitters[0].light)==NONE,"disabled source has no exclusion");
  objects[0].object.type=_object_type_weapon;names[0]="weapons\\assault rifle\\assault rifle";
  objects[0].object.parent_object_index=42;inventory=0;marker_x=1;
- CHECK(!emitter_sample(0,&sample),"ammo setting independent and off");ammo_on=1;
- CHECK(emitter_sample(0,&sample)&&sample.kind==3&&sample.radius>.9f&&sample.strength==.65f,"third person counter strength unchanged");
+ CHECK(!emitter_sample(0,0,&sample),"ammo setting independent and off");ammo_on=1;
+ CHECK(emitter_sample(0,0,&sample)&&sample.kind==3&&sample.radius>.9f&&sample.strength==.65f,"third person counter strength unchanged");
  CHECK(fabs(sample.position.x-.82f)<.0001&&fabs(sample.position.z-.027744f)<.0001,"third person counter offset");
  first_person=1;
- CHECK(emitter_sample(0,&sample)&&sample.position.x==5&&fabs(sample.position.y+.18f)<.0001,"first person follows rotated rendered marker");
+ CHECK(emitter_sample(0,0,&sample)&&sample.position.x==5&&fabs(sample.position.y+.18f)<.0001,"first person follows rotated rendered marker");
  CHECK(fabs(sample.position.z-.025f)<.0001,"first person has separate offset");
  CHECK(fabs(sample.strength*sample.view_gain-1.35f)<.0001,"first person counter has brighter spill");
  CHECK(sample.direction.i==0&&fabs(sample.direction.j+.8f)<.0001&&fabs(sample.direction.k-.6f)<.0001,"screen direction rotates with rendered weapon");
- inventory=1;CHECK(!emitter_sample(0,&sample),"holstered counter rejected");inventory=0;
- objects[0].object.parent_object_index=NONE;CHECK(!emitter_sample(0,&sample),"dropped counter is off");
- objects[0].object.parent_object_index=42;marker_missing=1;CHECK(!emitter_sample(0,&sample),"missing counter marker stays stock");marker_missing=0;
+ inventory=1;CHECK(!emitter_sample(0,0,&sample),"holstered counter rejected");inventory=0;
+ objects[0].object.parent_object_index=NONE;CHECK(!emitter_sample(0,0,&sample),"dropped counter is off");
+ objects[0].object.parent_object_index=42;marker_missing=1;CHECK(!emitter_sample(0,0,&sample),"missing counter marker stays stock");marker_missing=0;
  first_person=1;frame(.01f);frame(.1f);
  slow=storage[emitters[0].light-100].color.blue;
  first_person=0;frame(0);
@@ -226,14 +243,14 @@ int main(int argc,char **argv)
  first_person=0;ammo_on=0;old=deletes;frame(.01f);
  CHECK(deletes>old,"counter disable releases owned light");
  needler_on=1;names[0]="weapons\\needler\\needler";
- CHECK(emitter_sample(0,&sample)&&sample.kind==4,"held Needler admitted independently of AR");
+ CHECK(emitter_sample(0,0,&sample)&&sample.kind==4,"held Needler admitted independently of AR");
  CHECK(sample.position.x==marker_x&&sample.direction.k==1,"world needle marker and up axis");
  first_person=1;
- CHECK(emitter_sample(0,&sample)&&sample.position.x==5&&sample.position.y==0,"first person needle marker follows rendered pose");
+ CHECK(emitter_sample(0,0,&sample)&&sample.position.x==5&&sample.position.y==0,"first person needle marker follows rendered pose");
  CHECK(sample.direction.k==1,"needle spill follows model up");
- inventory=1;CHECK(!emitter_sample(0,&sample),"holstered Needler rejected");inventory=0;
- objects[0].object.parent_object_index=NONE;CHECK(!emitter_sample(0,&sample),"dropped Needler rejected");
- objects[0].object.parent_object_index=42;marker_missing=1;CHECK(!emitter_sample(0,&sample),"missing needle marker stays stock");marker_missing=0;
+ inventory=1;CHECK(!emitter_sample(0,0,&sample),"holstered Needler rejected");inventory=0;
+ objects[0].object.parent_object_index=NONE;CHECK(!emitter_sample(0,0,&sample),"dropped Needler rejected");
+ objects[0].object.parent_object_index=42;marker_missing=1;CHECK(!emitter_sample(0,0,&sample),"missing needle marker stays stock");marker_missing=0;
  screen.red=screen.green=screen.blue=0;
  needler_lighting_material(&other_shader,&screen);CHECK(screen.red==0,"other materials unchanged");
  needler_lighting_material(&needle_shader,&screen);CHECK(screen.red==1&&screen.blue==.85f,"needle mask emits pink");
@@ -251,5 +268,27 @@ int main(int argc,char **argv)
  screen.red=0;needler_lighting_material(&needle_shader,&screen);CHECK(screen.red==0,"disabled needle material stock");
  needler_on=1;screen_present=0;covenant_emitter_lighting_forget();
  needler_lighting_material(&needle_shader,&screen);CHECK(screen.red==0,"map change invalidates needle material cache");
+ needler_on=0;ambient_mode=1;count=1;objects[0].object.type=_object_type_vehicle;
+ objects[0].object.parent_object_index=NONE;names[0]="fixture vehicle";frame(.01f);frame(.1f);
+ CHECK(emitters[0].active&&emitters[1].active&&emitters[0].light!=emitters[1].light,"two components retain distinct bounded identities");
+ CHECK(storage[emitters[0].light-100].position.x==1&&storage[emitters[1].light-100].position.x==4,"component positions do not overwrite one another");
+ CHECK(covenant_emitter_lighting_vehicle_occlusion(emitters[0].light)&&covenant_emitter_lighting_vehicle_occlusion(emitters[1].light),"both components request chassis blocking");
+ ambient_mode=0;covenant_emitter_lighting_frame_end();CHECK(!emitters[0].active&&!emitters[1].active,"vehicle disable releases both components");
+ ambient_mode=2;objects[0].object.type=_object_type_biped;frame(.01f);frame(.1f);
+ stream_x=20;frame(.05f);slow=emitters[0].position.x;
+ CHECK(slow>10&&slow<20,"flame centroid eases between tick positions");
+ frame(0);CHECK(emitters[0].position.x==slow,"repeated view does not advance centroid");
+ stream_live=0;old=deletes;frame(.01f);CHECK(!emitters[0].active&&deletes>old,"empty owner mask still releases expired stream light");
+ ambient_mode=1;ambient_count=count=4;
+ for(i=0;i<4;i++) { objects[i].object.type=_object_type_vehicle;names[i]="fixture vehicle"; }
+ frame(.01f);frame(.1f);
+ for(i=0,old=0;i<8;i++)old+=emitters[i].active;CHECK(old==8,"ambient sources can fill the shared budget");
+ count=5;ammo_on=1;inventory=4;objects[4].object.type=_object_type_weapon;
+ objects[4].object.parent_object_index=42;names[4]="weapons\\assault rifle\\assault rifle";
+ frame(.01f);frame(.1f);
+ for(i=0,old=0;i<8;i++)old+=emitters[i].active&&emitters[i].kind==3&&emitters[i].object==4;
+ CHECK(old==1,"ambient saturation must not starve an existing held-weapon light");
+ old=allocs;frame(.1f);CHECK(allocs==old,"priority admission does not churn stable lights");
+ for(i=0,old=0;i<8;i++)old+=emitters[i].active;CHECK(old==8,"priority retains the original allocation budget");
  return 0;
 }

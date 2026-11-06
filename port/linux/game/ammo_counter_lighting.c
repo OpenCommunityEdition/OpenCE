@@ -11,7 +11,7 @@
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include <string.h>
 
-int config_boolean(const char *name);
+#include "lighting_config.h"
 
 int ammo_counter_lighting_position(long index, real_point3d *position, real_vector3d *direction)
 {
@@ -22,7 +22,7 @@ int ammo_counter_lighting_position(long index, real_point3d *position, real_vect
 	real height;
 	int pose = 1;
 	const char *name;
-	if (!config_boolean("display.ammo_counter_lighting"))
+	if (!lighting_config_boolean("display.ammo_counter_lighting"))
 		return FALSE;
 	weapon = weapon_try_and_get(index);
 	if (!weapon || TEST_FLAG(weapon->object.flags, _object_invisible_bit))
@@ -80,7 +80,7 @@ void ammo_counter_lighting_forget(void)
 static int ammo_counter_is_screen(struct shader *shader)
 {
 	long index;
-	if (!config_boolean("display.ammo_counter_lighting"))
+	if (!lighting_config_boolean("display.ammo_counter_lighting"))
 		return FALSE;
 	if (!ammo_counter_screen_checked)
 	{

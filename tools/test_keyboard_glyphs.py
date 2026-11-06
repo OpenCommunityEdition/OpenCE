@@ -1,5 +1,6 @@
 """Production keyboard prompt selection, semantic mapping and drawing contracts."""
 import re
+import pytest
 from pathlib import Path
 
 from harness import function
@@ -12,18 +13,25 @@ def code(path):
     return re.sub(r'^#include .*$', '', (ROOT / path).read_text(encoding='utf-8'), flags=re.M)
 
 
-def test_manual_auto_activity_disconnect_and_split_screen(tmp_path):
-    run_c(tmp_path, r'''
+@pytest.mark.parametrize("android", [False, True])
+def test_manual_auto_activity_disconnect_and_split_screen(tmp_path, android):
+    run_c(tmp_path, ("#define HALO_ANDROID 1\n" if android else "") + r'''
 #include <assert.h>
 #include <string.h>
-static int automatic=1, enabled;
+static int automatic=1;
 static char const *manual="classic";
-int config_boolean(char const *n){return !strcmp(n,"input.auto_button_detection")?automatic:enabled;}
+int config_boolean(char const *n){assert(!strcmp(n,"input.auto_button_detection"));return automatic;}
 char const *config_string(char const *n){(void)n;return manual;}
 ''' + code('port/linux/src/keyboard_prompts.c') + r'''
 int main(void){
  unsigned char keys[512]={0};
- assert(!keyboard_prompt_enabled(0)); enabled=1;
+#ifdef HALO_ANDROID
+ assert(!keyboard_prompt_enabled(0));
+#else
+ assert(keyboard_prompt_enabled(0));
+#endif
+ keyboard_prompt_keys(keys,512,0x100);
+ assert(keyboard_prompt_active(0)&&!keyboard_prompt_active(1));
  assert(keyboard_prompt_enabled(0)&&!keyboard_prompt_enabled(1));
  keyboard_prompt_pad(0,0,0,1);assert(!keyboard_prompt_enabled(0));
  keys[4]=1;keyboard_prompt_keys(keys,512,0);assert(keyboard_prompt_enabled(0));
@@ -38,7 +46,11 @@ int main(void){
  keyboard_prompt_pad(0,0,0,1);keyboard_prompt_pad(0,0,1,1);assert(!keyboard_prompt_enabled(0));
  keyboard_prompt_pad(0,0,0,0);assert(keyboard_prompt_enabled(0));
  assert(keyboard_prompt_menu_enabled(-1)&&!keyboard_prompt_menu_enabled(0)&&!keyboard_prompt_menu_enabled(-2));
- automatic=0;assert(!keyboard_prompt_enabled(0));manual="keyboard";enabled=0;
+ keyboard_prompt_touch();assert(!keyboard_prompt_enabled(0));
+ keyboard_prompt_pad(0,0,0,0);assert(!keyboard_prompt_enabled(0));
+ keyboard_prompt_pad(0,1,0,1);keyboard_prompt_pad(0,0,0,0);assert(!keyboard_prompt_enabled(0));
+ keyboard_prompt_keys(keys,512,0x100);assert(keyboard_prompt_enabled(0));
+ automatic=0;assert(!keyboard_prompt_enabled(0));manual="keyboard";
  assert(keyboard_prompt_enabled(0)&&keyboard_prompt_enabled(3));
  assert(keyboard_prompt_menu_enabled(0)&&keyboard_prompt_menu_enabled(-1));
  keyboard_prompt_pad(0,1,1,1);assert(keyboard_prompt_enabled(0));
@@ -175,7 +187,7 @@ def test_optional_hook_precedes_controller_translation_and_preserves_custom_path
     assert hook < text.index('icon_index = preferences.game_control_to_xbox_buttons', start)
     assert 'mcc_cache_tags_loaded()' in text
     config = (ROOT/'port/linux/src/port_config.c').read_text(encoding='utf-8')
-    assert '"display.keyboard_glyphs", _config_boolean, "false"' in config
+    assert '"display.keyboard_glyphs"' not in config
 
 
 def test_score_hint_only_rewrites_known_token_with_room(tmp_path):

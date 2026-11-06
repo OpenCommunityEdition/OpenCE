@@ -107,6 +107,8 @@ SCREENS = {
              "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
+            ("WIDESCREEN LOADING:", "display.widescreen_loading", ON_OFF,
+             "Widen the original loading screen, keeping its\nstock sweep and glow trails. Includes MCC.", None),
             ("ANTI-ALIASING:", "display.anti_aliasing",
              [("OFF", "off"), ("FXAA", "fxaa"), ("SMAA", "smaa"), ("SSAA 2X", "ssaa2x"), ("MSAA 2X", "msaa2x"),
               ("MSAA 4X", "msaa4x"), ("MSAA 8X", "msaa8x")],
@@ -290,10 +292,10 @@ SCREENS = {
     "controller_appearance": {
         "screen": "controller_appearance_screen", "spacing": 30,
         "header": ("header_profile_controller_setting", f"{PE}/controller_edit/header_profile_controller_setting"),
-        "same_place": ["hud_button_style_xbox", "hud_button_style_ps", "hud_button_style_switch"],
+        "same_place": ["hud_button_style_xbox", "hud_button_style_ps", "hud_button_style_switch", "detected_button_style"],
         "rows": [
             ("AUTO BUTTON DETECTION:", "input.auto_button_detection", ON_OFF,
-             "Show styles for your controller's family.\nRequires High-Res HUD in Graphics.", None),
+             "Follow keyboard/mouse or controller activity.\nControllers use their family's saved artwork.", None),
             ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES + [("KEYBOARD", "keyboard")],
              "Manual style when auto detection is off. Keyboard\nuses current bindings; controllers need High-Res HUD.", None),
             ("BUTTON STYLE:", "display.hud_button_style_xbox", XBOX_BUTTON_STYLES,
@@ -302,11 +304,11 @@ SCREENS = {
              "Preferred PlayStation artwork for auto detection.\nRequires High-Res HUD in Graphics.", None),
             ("BUTTON STYLE:", "display.hud_button_style_switch", SWITCH_BUTTON_STYLES,
              "Preferred Switch artwork for automatic detection.\nRequires High-Res HUD in Graphics.", None),
+            ("BUTTON STYLE:", "display.detected_button_style", None,
+             "Keyboard/mouse is active. Prompts use your current\nbindings. Turn detection off to choose a fixed style.", None),
             ("BUMPER STYLE:", "display.hud_bumper_style",
              [("ORIGINAL XBOX", "original"), ("MODERN XBOX", "modern")],
              "Original: black/white buttons. Modern: LB/RB.\nKept when automatic detection is on.", None),
-            ("KEYBOARD GLYPHS:", "display.keyboard_glyphs", ON_OFF,
-             "Automatic keyboard/mouse glyphs in menus and play.\nManual Keyboard style works even with this off.", None),
         ],
     },
     "controller_remapping": {
@@ -321,7 +323,7 @@ SCREENS = {
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
 _graphics = {"display.show_fps", "display.high_res_hud",
-             "display.high_res_text", "display.anti_aliasing",
+             "display.high_res_text", "display.widescreen_loading", "display.anti_aliasing",
              "display.anisotropic_filtering", "display.shadow_resolution", "display.per_pixel_lighting",
              "display.model_detail"}
 # (the visual modifiers: a screen of their own, Extra Effects)
@@ -369,25 +371,25 @@ _video["categories"] = [
      "Visual modifiers the stock game does not\nhave, such as HDR and overshields."),
 ]
 SCREENS["video_settings/dynamic_lighting"] = {
-    "screen": "dynamic_lighting_settings_screen", "header": _video["header"], "spacing": 28,
-    "help_top": 360, "help_height": 50,
+    "screen": "dynamic_lighting_settings_screen", "header": _video["header"], "spacing": 26,
+    "help_top": 370, "help_height": 40,
     "rows": [
         ("PROJECTILE LIGHTS:", "display.plasma_lighting", ON_OFF,
-         "Plasma, rockets and Covenant projectiles cast\nsoft light on nearby surfaces and models.", None),
+         "Plasma, grenades, rockets and flame streams cast\nsoft light on nearby surfaces and models.", None),
         ("MUZZLE FLASH LIGHTS:", "display.muzzle_lighting", ON_OFF,
          "Weapon flashes light nearby surfaces, including\nWarthog and Scorpion guns. Stock effects remain.", None),
-        ("JACKAL SHIELDS:", "display.jackal_shield_lighting", ON_OFF,
-         "Jackal shields light their surroundings,\nmatching their colour and damage flashes.", None),
-        ("STATIONARY SHIELDS:", "display.covenant_shield_lighting", ON_OFF,
-         "Covenant stationary shields cast coloured light\nthat follows damage flashes and shield strength.", None),
-        ("FUEL ROD GLOW:", "display.fuel_rod_lighting", ON_OFF,
-         "Exposed Grunt and Hunter fuel rods cast green\nlight on the holder and nearby surfaces.", None),
-        ("AR COUNTER GLOW:", "display.ammo_counter_lighting", ON_OFF,
-         "The AR ammo screen glows and lights the weapon\nand holder in first and third person.", None),
-        ("NEEDLER GLOW:", "display.needler_lighting", ON_OFF,
-         "Exposed needles glow and spill light around the\nheld weapon, with a soft fade below it.", None),
+        ("WEAPON GLOW:", "lighting.weapon_glow", ON_OFF,
+         "Swords, plasma charge, fuel rods, Needler and AR\nscreens cast light on nearby surfaces.", None),
+        ("PLASMA PRONG LIGHTING:", "display.plasma_prong_lighting", ON_OFF,
+         "Short, soft spill from plasma-weapon prongs.\nUses the shared eight-light occlusion budget.", None),
+        ("SHIELD EMITTERS:", "lighting.shield_emitters", ON_OFF,
+         "Jackal and stationary shields cast light\non nearby surfaces.", None),
+        ("VEHICLE LIGHTS:", "display.vehicle_lighting", ON_OFF,
+         "Engine glow and directional headlights illuminate\nvehicles and nearby surfaces.", None),
+        ("WORLD EMITTERS:", "display.world_lighting", ON_OFF,
+         "Visible powerups and teleporters cast soft light.\nStock effects and gameplay remain unchanged.", None),
         ("LIGHT OCCLUSION:", "display.plasma_occlusion", ON_OFF,
-         "Block projectile and emitter light behind walls.\nMuzzle flashes always use collision blocking.", None),
+         "Block projectile and emitter light behind walls.\nMuzzle and vehicle lights always use blocking.", None),
     ] + _shield_rows,
 }
 # Android builds omit this renderer. Keep both the entry and its controls
@@ -515,6 +517,8 @@ SCREENS["network_setup/bots"] = {
 }
 SCREENS["network_setup/map_sharing"] = {
     "screen": "map_sharing_settings_screen", "header": _network["header"], "spacing": 30,
+    "categories": [("MCC PACKAGES:", "network_setup/mcc_packages",
+                    "Installed MCC maps, campaign mission order and\noptional Workshop collection folders.")],
     "rows": [
         ("DOWNLOAD MAPS:", "network.map_download", ON_OFF,
          "Joining a game on a Custom Edition map you do not\nhave: download it from the players (if shared).",
@@ -524,6 +528,18 @@ SCREENS["network_setup/map_sharing"] = {
         ("UPLOAD LIMIT:", "network.map_seed_upload",
          [(f"{kb} KB/S" if kb < 1024 else f"{kb // 1024} MB/S", str(kb)) for kb in SEED_UPLOADS],
          "The most you send of maps to other players, so\nthat the game keeps the rest of your upload.", None),
+    ],
+}
+
+SCREENS["network_setup/mcc_packages"] = {
+    "screen": "mcc_packages_screen", "header": _network["header"], "title": "MCC PACKAGES", "spacing": 30,
+    "rows": [
+        ("STEAM DISCOVERY:", "game.workshop_maps", ON_OFF,
+         "Find installed Halo CE Workshop maps on this PC.\nLocal MCC packages take precedence.", "desktop"),
+        ("CAMPAIGN MISSIONS:", "game.mcc_campaigns", ON_OFF,
+         "Use campaign metadata for mission order and\nprogression. Online, the host chooses the next map.", None),
+        ("COLLECTION FOLDERS:", "game.mcc_collections", ON_OFF,
+         "Group installed MCC packages using the bundled\ncollection list. Works without Steam.", None),
     ],
 }
 
@@ -825,6 +841,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
                               ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
             extra += _widget(f"{base}/{key}_value",
                              [("type", "text"), ("controller", 1), ("width", value_width), ("height", 22),
+                              ("text", "KEYBOARD" if key == "detected_button_style" else None),
                               ("font", "ui\\small_ui" if wide_value else "ui\\large_ui"), ("color", "#FF2896FF"),
                               ("align", "left" if wide_value else "center"), ("text_y", 5 if wide_value else 1),
                               ("text_flags", "no_focus_test")], [])

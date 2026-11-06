@@ -82,6 +82,15 @@ modules remain unchanged. No map paths are renamed or redirected.
 
 ## Trying the prototype
 
+MCC package options use the same setting inventory in each frontend. Modern
+Settings > Online > Map Sharing > MCC Packages is a Modern page with its own
+help panel, tab navigation and pending Save/Cancel state. Stock and Classic PC
+use the generated Network Setup screen; Xbox applies its generated controller
+footers to that screen. Steam Discovery is desktop-only in every style.
+Campaign and package folders use the existing map selector callbacks through
+the Modern map/mission layouts, retaining MCC-owned ordering and identity.
+See [campaign discovery and importing](maps_and_resources.md#explicit-mcc-campaigns-and-android-imports).
+
 Set `display.menu_frontend = "modern"` in the isolated run's `config.toml`
 before loading `ui.map`. Modern is now the default; `"off"` preserves the
 established Settings presentation.
@@ -899,8 +908,9 @@ details. Native and MCC host services keep their existing selection state.
 Leaving `ui.map` latches the current choice; gameplay map loads, including CE
 and MCC, retain it. Saving a different style in Settings does not replace tags
 or rebuild menus. Returning to `ui.map` adopts the saved choice. Stock remains
-available explicitly; new configurations default to Modern. Automatic keyboard
-glyphs remain disabled by default, with controller auto detection enabled.
+available explicitly; new configurations default to Modern. Auto Detection remains enabled by default and includes keyboard/mouse keycaps
+in modern menu footers and supported gameplay prompts. The former separate
+Keyboard Glyphs toggle has been removed; manual Keyboard remains available.
 
 Only the known generated profile Settings root is redirected. Modern paused
 page roots share the settings inventory but omit `main menu intialize` and use

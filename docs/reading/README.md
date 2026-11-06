@@ -17,13 +17,17 @@ the menu to the camera, reticle and first-person weapon.
 | 1 | [Startup and the game loop](startup_and_loop.md) | Launch, enter a local map and draw between ticks: what runs when? |
 | 2 | [Settings, input and menus](settings_input_and_menus.md) | Save a setting and push a stick forward: how does an action reach the game? |
 | 3 | [Objects and gameplay](objects_and_gameplay.md) | Spawn, control and retire a player's body: who owns its state? |
-| 4 | [Rendering](rendering.md) | Draw a room and moving player: how do poses become pixels? Includes dynamic lighting 1.0 and separate Vulkan branch notes. |
+| 4 | [Rendering](rendering.md) | Draw a room and moving player: how do poses become pixels? Includes dynamic lighting 1.0, [emitter additions](emitter_expansion.md), and separate Vulkan branch notes. |
 | 5 | [Networking](networking.md) | Move a client player: what is predicted, validated, relayed and corrected? |
 | 6 | [Maps and resources](maps_and_resources.md) | Load a package level: how do Xbox, CE and MCC readers keep their data and lifetimes separate? |
 | 7 | [Platforms and testing](platforms_and_testing.md) | Follow platform entry points and investigate an elevator regression: what evidence reaches the behaviour? |
 | Worked detail | [Field of view](field_of_view.md) | Trace a setting through the actual calculations and temporary rendering state. |
+| Optional hardware | [DualSense feedback](dualsense.md) | Map physical trigger actions to feedback and clear it across gameplay and device lifecycles. |
+| Worked detail | [Doppler audio](audio_doppler.md) | Follow source and camera motion into pitch, and distinguish Xbox behavior from optional stereo-source Doppler. |
 | Feature prototype | [Modern frontend](menu_redesign.md) | Isolated Settings/hosting/lobby views, native browsers and main-menu-only legacy switching. |
 | Branch feature | [Shoulder camera](third_person.md) | Director selection, cover-aware aiming, controls and host-owned hit validation. |
+| Worked detail | [Loading presentation](loading_presentation.md) | Fill the screen with the original loading artwork while preserving map-family ownership and the Xbox chant. |
+| Worked detail | [MCC level previews](mcc_level_previews.md) | Resolve installed package images, fit them inside existing menu thumbnails, and wrap package text. |
 | Reference | [Glossary](glossary.md) | Engine concepts and recurring C conventions, with source examples. |
 
 The chapters form a guide to the major systems, not an inventory of every

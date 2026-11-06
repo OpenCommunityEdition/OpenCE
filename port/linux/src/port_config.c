@@ -210,18 +210,14 @@ static const struct config_setting config_settings[] =
 		"PlayStation: ps_classic, ps_gems, ps_dark_gems, ps_modern.\n"
 		"Switch: switch_classic, switch_gems, switch_modern. Controllers require high_res_hud.\n"
 		"keyboard selects binding-aware keyboard/mouse glyphs without that requirement." },
-	{ "display.keyboard_glyphs", _config_boolean, "false", "HALO_KEYBOARD_GLYPHS", _environment_value, _platform_all,
-		"With auto button detection on, show keyboard/mouse glyphs after keyboard\n"
-		"or mouse input. Applies to modern menus and semantic gameplay prompts.\n"
-		"Off preserves existing presentation. Manual keyboard style works independently." },
 	{ "display.hud_bumper_style", _config_string, "\"original\"", "HALO_HUD_BUMPER_STYLE", _environment_value, _platform_all,
 		"Xbox Classic, Gems and Dark Gems bumpers: original (black/white) or modern\n"
 		"(LB/RB). Shared by local players, including automatic button detection.\n"
 		"Requires high_res_hud; other button styles keep their own artwork." },
 	{ "input.auto_button_detection", _config_boolean, "true", "HALO_AUTO_BUTTON_DETECTION", _environment_value, _platform_all,
-		"Limit Button Style to the assigned controller's family. Unknown devices\n"
-		"keep the manual choice. With display.keyboard_glyphs, keyboard/mouse input\n"
-		"selects keycaps. Off uses the manual style. Device detection always runs." },
+		"Follow active keyboard/mouse or controller input for button prompts.\n"
+		"Controllers use their family's saved artwork; unknown controllers keep\n"
+		"the manual choice. Off uses the manual style. Device detection always runs." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
 		"P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
 		"Button Remapping. v3: stores 26 physical-button names, including unbound.\n"
@@ -243,6 +239,9 @@ static const struct config_setting config_settings[] =
 		"Draw the menus' and HUD's text with the fonts in port/assets/fonts\n"
 		"(Overpass) at the resolution the game draws at, and the menus' titles\n"
 		"from port/assets/titles; false draws the maps' bitmap fonts and titles." },
+	{ "display.widescreen_loading", _config_boolean, "true", "HALO_WIDESCREEN_LOADING", _environment_value, _platform_all,
+		"Widen the stock loading screen, keeping its original picture, sweep\n"
+		"and glow trails, including MCC. False keeps the central 4:3 framing." },
 	{ "display.shadow_resolution", _config_integer, "128", "HALO_SHADOW_RESOLUTION", _environment_value,
 		_platform_all,
 		"The size the objects' shadows are drawn at, in pixels each way: 128 as\n"
@@ -343,10 +342,10 @@ static const struct config_setting config_settings[] =
 		"resolutions; \"highest\" draws the models \"native\" does, each at its most\n"
 		"detailed level." },
 	{ "display.reversed_depth", _config_boolean, "true", "HALO_REVERSED_DEPTH", _environment_value, _platform_desktop,
-		"Keep depth in 32-bit floats, reversed (1 near, 0 far), as precise far\n"
-		"away as near: surfaces a few millimetres apart (the lights on Blood\n"
-		"Gulch's base) stay apart at any distance in place of flickering\n"
-		"through each other. false: 24 bits, as the Xbox's. Taken up when the\n"
+		"Keep depth in 32-bit floats, reversed (1 near, 0 far), improving\n"
+		"precision at a distance. This reduces flickering between closely\n"
+		"spaced surfaces, such as the lights on Blood Gulch's base.\n"
+		"false: 24 bits, as the Xbox's. Taken up when the\n"
 		"game starts." },
 	{ "display.hdr", _config_boolean, "false", "HALO_HDR", _environment_value, _platform_all,
 		"Draw the 3D view into a floating-point back buffer, which keeps what\n"
@@ -401,6 +400,8 @@ static const struct config_setting config_settings[] =
 		"Reverberate the world's sounds as the place the player is in does (the\n"
 		"maps' sound environments, as the Xbox's I3DL2 reverb did); false keeps\n"
 		"them dry." },
+	{ "audio.stereo_doppler", _config_boolean, "false", "HALO_STEREO_DOPPLER", _environment_value, _platform_all,
+		"Apply Doppler pitch changes to positioned stereo sounds (an extension to Xbox behavior)." },
 	{ "audio.resampler", _config_string, "\"sinc\"", "HALO_AUDIO_RESAMPLER", _environment_value, _platform_all,
 		"How sounds are converted to the output's rate: \"sinc\" with a\n"
 		"band-limited low pass; \"linear\" between neighbouring samples,\n"
@@ -456,6 +457,23 @@ static const struct config_setting config_settings[] =
 		"kernel's driver of it (hid-playstation, hid-sony), which needs no setup;\n"
 		"false: through SDL's own, which needs Steam's udev rules to open it. Read\n"
 		"at start-up." },
+	{ "input.adaptive_triggers", _config_boolean, "false", "HALO_ADAPTIVE_TRIGGERS", _environment_value,
+		_platform_desktop,
+		"A PS5 DualSense's adaptive triggers (dualsense.c): the trigger mapped\n"
+		"to fire feels like the weapon; grenade/zoom effects follow their\n"
+		"trigger. Only L2/R2 have actuators. Free while paused, in menus,\n"
+		"reloading or switching. Other controllers are never touched. On\n"
+		"Linux with input.playstation_kernel_driver it needs write access to the\n"
+		"controller's hidraw device (Steam's udev rules)." },
+	{ "input.trigger_strength", _config_string, "\"normal\"", "HALO_TRIGGER_STRENGTH", _environment_value,
+		_platform_desktop,
+		"How strong a DualSense's trigger effects are: \"light\" (a hair\n"
+		"trigger: every hold or click a short light break at the top of the\n"
+		"pull), \"normal\", \"strong\" (every effect two steps firmer)." },
+	{ "input.lightbar", _config_string, "\"off\"", "HALO_LIGHTBAR", _environment_value, _platform_desktop,
+		"A PS5 DualSense's lightbar and player lights: \"player_color\", the\n"
+		"lightbar in your color (your team's in a team game) and the player\n"
+		"lights your split-screen number. \"off\": left alone." },
 	{ "input.invert_mouse", _config_boolean, "false", "HALO_MOUSE_INVERT", _environment_set_is_true, _platform_desktop,
 		"Moving the mouse forward looks down." },
 	{ "network.block_mouse_aim_assist", _config_boolean, "false", "HALO_NET_BLOCK_MOUSE_AIM_ASSIST", _environment_value,
@@ -620,12 +638,24 @@ static const struct config_setting config_settings[] =
 	{ "bots.teams", _config_string, "\"even\"", "HALO_BOT_TEAMS", _environment_value, _platform_all,
 		"In team games: \"even\" puts the bots on both teams, evening them with\n"
 		"the players; \"against\" puts them all on the team the players are not on." },
+	{ "display.dynamic_lighting_reset", _config_boolean, "true", "HALO_DYNAMIC_LIGHTING_RESET", _environment_value, _platform_all,
+		"Migration marker: old saved dynamic-lighting preferences were reset to off.\n"
+		"Leave true to retain lighting choices made after that one-time reset." },
 	{ "display.plasma_occlusion", _config_boolean, "false", "HALO_PLASMA_OCCLUSION", _environment_value, _platform_desktop,
 		"Collision-filtered projectile, Covenant emitter and Shield Glow visibility.\n"
 		"Off preserves unoccluded plasma lighting. At most eight occluded lights." },
 	{ "display.jackal_shield_lighting", _config_boolean, "false", "HALO_JACKAL_SHIELD_LIGHTING", _environment_value, _platform_desktop,
 		"Soft illumination from visible Jackal shields, following their colour and pose.\n"
 		"Stock shield effects remain intact. Optional occlusion uses plasma_occlusion." },
+	{ "display.weapon_glow", _config_boolean, "false", "HALO_WEAPON_GLOW", _environment_value, _platform_desktop,
+		"Held energy weapons cast soft light. Disabled by default." },
+	{ "display.plasma_prong_lighting", _config_boolean, "false", "HALO_PLASMA_PRONG_LIGHTING", _environment_value, _platform_desktop,
+		"Short, soft forward spill from plasma-weapon prongs. Separate from Weapon Glow.\n"
+		"Off by default; uses the shared eight-light occlusion budget when enabled." },
+	{ "display.vehicle_lighting", _config_boolean, "false", "HALO_VEHICLE_LIGHTING", _environment_value, _platform_desktop,
+		"Vehicle engines and headlights illuminate nearby surfaces. Disabled by default." },
+	{ "display.world_lighting", _config_boolean, "false", "HALO_WORLD_LIGHTING", _environment_value, _platform_desktop,
+		"Visible powerups and teleporters cast soft light. Disabled by default." },
 	{ "display.needler_lighting", _config_boolean, "false", "HALO_NEEDLER_LIGHTING", _environment_value, _platform_desktop,
 	  "Soft pink-purple spill and luminous crystals on held Needlers." },
 	{ "display.ammo_counter_lighting", _config_boolean, "false", "HALO_AMMO_COUNTER_LIGHTING", _environment_value, _platform_desktop,
@@ -695,6 +725,20 @@ static const struct config_setting config_settings[] =
 	{ "paths.custom_maps", _config_string, "\"\"", "HALO_CUSTOM_MAPS_ROOT", _environment_value, _platform_desktop,
 		"The custom_maps folder (Custom Edition maps, and their bitmaps.map,\n"
 		"sounds.map and loc.map); empty for the one in the data folder." },
+	{ "paths.steam", _config_string, "\"\"", "HALO_STEAM_ROOT", _environment_value, _platform_desktop,
+		"A Steam folder (or Steam library) to check first for subscribed Halo CE\n"
+		"Workshop items. Empty uses automatic discovery: Windows registry, Linux\n"
+		"Steam/XDG hints, usual folders and their libraries. Windows paths use single\n"
+		"quotes: 'D:\\Steam'." },
+	{ "game.mcc_campaigns", _config_boolean, "false", "HALO_MCC_CAMPAIGNS", _environment_value, _platform_all,
+		"Use explicit MCC campaign manifests for mission discovery, ordering and\n"
+		"progression. Reopen the map list after changing this." },
+	{ "game.workshop_maps", _config_boolean, "false", "HALO_WORKSHOP_MAPS", _environment_value, _platform_desktop,
+		"Discover installed Halo CE Steam Workshop maps. Read-only desktop\n"
+		"discovery; manually installed mcc_maps packages always remain available." },
+	{ "game.mcc_collections", _config_boolean, "false", "HALO_MCC_COLLECTIONS", _environment_value, _platform_all,
+		"Group identified MCC packages into the bundled Workshop collections.\n"
+		"Works with imported packages without Steam; reopen the map list after changing." },
 
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
@@ -2411,6 +2455,8 @@ static void config_apply_server_mode(void)
 }
 #endif
 
+#include "lighting_settings_migration.inl"
+
 static void config_load(void)
 {
 	char path[1024];
@@ -2479,8 +2525,27 @@ static void config_load(void)
 		if (result.ok)
 		{
 			char *completed;
+			int reset_lighting = lighting_settings_legacy(result.toptab);
+			int lighting_migrated = !reset_lighting;
+			if (reset_lighting)
+			{
+				char *migrated = lighting_settings_migrate(text, result.toptab);
+				if (migrated)
+				{
+					toml_result_t checked = toml_parse(migrated, (int)strlen(migrated));
+					if (checked.ok)
+					{
+						toml_free(result); result = checked;
+						free(text); text = migrated;
+						lighting_migrated = 1;
+					}
+					else { toml_free(checked); free(migrated); }
+				}
+				platform_log("settings: reset old dynamic-lighting preferences to off%s",
+					lighting_migrated ? "" : " in memory; the file could not be migrated");
+			}
 
-			if (joined && !skipped && !config_answer_only)
+			if (joined && !skipped && !config_answer_only && lighting_migrated)
 			{
 				if (config_write_file(path, text))
 					platform_log("settings: joined the sections %s had twice", path);
@@ -2488,7 +2553,12 @@ static void config_load(void)
 					platform_log("settings: cannot write %s", path);
 			}
 			for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+			{
 				config_set_from_file(&config_values[index], &config_settings[index], result.toptab);
+				if (reset_lighting && lighting_settings_reset_key(config_settings[index].name))
+					config_set_from_text(&config_values[index], config_settings[index].type,
+						config_settings[index].type == _config_string ? "default" : "false");
+			}
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
 			if (config_values[config_setting_index("server.enabled")].boolean && !config_probe_mode)
 				config_server_mode = 1;
@@ -2502,10 +2572,10 @@ static void config_load(void)
 				platform_log("settings: %d line%s of config.toml skipped; every other setting in it is used", skipped,
 					skipped == 1 ? "" : "s");
 			}
-			else if (!config_answer_only)
+			else if (!config_answer_only && lighting_migrated)
 			{
 				completed = config_add_missing(text, result.toptab);
-				if (completed && !config_write_file(path, completed))
+				if ((completed || reset_lighting) && !config_write_file(path, completed ? completed : text))
 					platform_log("settings: cannot write %s", path);
 				free(completed);
 			}

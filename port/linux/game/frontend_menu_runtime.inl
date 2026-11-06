@@ -10,6 +10,8 @@
 boolean network_game_is_active(void);
 boolean ui_widget_port_open(struct widget_instance *, char const *, boolean *);
 
+#include "mcc_xbox_menu.inl"
+
 static boolean frontend_menu_can_edit(void)
 {
 	return frontend_menu_available();
@@ -33,6 +35,7 @@ void frontend_menu_attach(struct widget_instance *widget)
     char path[96];
     struct widget_instance *entry, *last, *save, *before, *description;
     int index;
+    mcc_xbox_attach(widget);
     if (!widget || !frontend_menu_can_edit() || strcmp(frontend_menu_style(), "xbox")) return;
     name = tag_get_name(widget->definition_tag_index);
     if (!name) return;
@@ -145,6 +148,7 @@ int frontend_menu_shortcut(struct widget_instance *widget, struct event_record *
 	char const *name, *target = NULL;
 	char path[256];
 	boolean deleted = FALSE;
+	if (mcc_xbox_shortcut(widget, event)) return TRUE;
 	if (widget && !widget->parent && frontend_menu_can_edit() &&
 		!strcmp(frontend_menu_style(), "xbox") &&
 		frontend_menu_legacy_footer_action(widget, event)) return TRUE;
@@ -244,6 +248,7 @@ static void master_servers_show(struct widget_instance *list);
 
 void frontend_menu_session_reset(void)
 {
+	mcc_xbox_reset();
 	if (frontend_session.owns_profile)
 		player_ui_end_editing_profile();
 	memset(&frontend_session, 0, sizeof(frontend_session));
@@ -543,20 +548,24 @@ static void frontend_button_rows_show(struct widget_instance *list)
 		"display.hud_button_style_ps", "display.hud_button_style_switch"};
 	struct widget_instance *hud = frontend_setting_row(list, "display.high_res_hud");
 	struct widget_instance *automatic = frontend_setting_row(list, "input.auto_button_detection");
-	struct widget_instance *keyboard = frontend_setting_row(list, "display.keyboard_glyphs");
+	struct widget_instance *keyboard = named(list, "row_detected_button_style", 0);
 	struct widget_instance *bumper = frontend_setting_row(list, "display.hud_bumper_style");
 	struct widget_instance *shown, *row;
 	struct controller_device device;
 	boolean enabled, detect;
-	short family = 0, index;
+	short family = 0, index, port;
+	int active;
 	if (!hud || !automatic) return;
 	enabled = !strcmp(frontend_row_value(hud), "true");
 	detect = !strcmp(frontend_row_value(automatic), "true");
-	controller_device_get(controller_of(list), &device);
+	active = frontend_input_device();
+	port = active >= 0 && active < 4 ? (short)active : controller_of(list);
+	controller_device_get(port, &device);
 	if (detect && device.family >= 0 && device.family <= 3) family = (short)device.family;
 	shown = frontend_setting_row(list, styles[family]);
+	if (detect && active == -1 && keyboard) shown = keyboard;
 	automatic->visible = enabled;
-	if (keyboard) keyboard->visible = enabled && detect;
+	if (keyboard) keyboard->visible = enabled && shown == keyboard;
 	for (index = 0; index < 4; index++)
 	{
 		row = frontend_setting_row(list, styles[index]);

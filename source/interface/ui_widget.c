@@ -628,6 +628,8 @@ symbols in this file:
 struct widget_instance;
 
 #include "mcc_hud_draw.h"
+#include "mcc_menu_preview.h" /* port: port/linux/game/mcc_menu_preview.c */
+#include "mcc_menu_text.h" /* port: port/linux/game/mcc_menu_text.c */
 #include "cseries.h"
 #include "frontend_menu.h" /* port: port/linux/game/frontend_menu.c and frontend_menu_runtime.inl */
 #include "keyboard_glyphs.h" /* port: optional semantic HUD prompts, not widget/menu icons */
@@ -5603,6 +5605,11 @@ static void widget_instance_render_text_box(
 		ui_widget_port_text_wrap(*text, &measure, (short)(bounds.x1 - bounds.x0 - 2));
 		draw_string_set_draw_mode(font_index, NONE, justification, 0, &color);
 	}
+	/* port: authored MCC catalog text needs measured wrapping in every
+	 * frontend. The MCC module owns formatting and clips to this text box. */
+	if (mcc_menu_text_draw(widget->definition_tag_index, widget->parameters.text_box.string_list_index,
+		*text, font_index, justification, &color, &bounds, &clip))
+		return;
 	if (string_has_icons_to_draw(*text))
 		draw_string_and_hack_in_icons(&bounds, &clip, NULL, 0, *text, FALSE);
 	else
@@ -7251,6 +7258,7 @@ static void widget_instance_render_recursive(
 	short frame_index;
 	/* port: a local modern definition supplies identical drawing and pointer bounds. */
 	struct ui_widget_definition frontend_definition;
+	short mcc_picture_index; /* port: MCC owns its picture selection and cache. */
 	rectangle2d frontend_clip;
 	short frontend_shift = 0;
 	short frontend_left = definition->bounds.x0, frontend_right = definition->bounds.x1;
@@ -7310,7 +7318,16 @@ static void widget_instance_render_recursive(
 	the unknown level's frame for a map without one
 	(port/linux/game/custom_edition_maps.c) */
 	frame_index = widget->animation.current_frame_index;
-	custom_edition_picture = custom_edition_maps_picture(definition->background_bitmap.index, &frame_index);
+	/* port: MCC display indices never enter the CE provider. A failed MCC
+	 * preview retains the existing unknown frame in every menu style. */
+	mcc_picture_index = mcc_menu_preview_index(definition->background_bitmap.index, frame_index);
+	if (mcc_picture_index != NONE)
+	{
+		frame_index = 13;
+		custom_edition_picture = NULL;
+	}
+	else
+		custom_edition_picture = custom_edition_maps_picture(definition->background_bitmap.index, &frame_index);
 	bitmap = custom_edition_picture ? custom_edition_picture : bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -7410,7 +7427,11 @@ static void widget_instance_render_recursive(
 			 * gametype previews retain their native padded-bitmap texel placement. */
 			stretched = stretched || (frontend_layout && frontend_menu_stretch_bitmap(widget->definition_tag_index));
 
-			if (pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
+			/* port: MCC art fits and clips to this style's authored thumbnail
+			 * rectangle; only the MCC module decodes or owns its texture. */
+			if (mcc_picture_index != NONE && mcc_menu_preview_draw(mcc_picture_index, &bounds, clip, color, &multitexture_params))
+				shown = FALSE;
+			if (shown && pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
 			{
 				bounds.x0 += frame_x;
 				bounds.y0 += frame_y;

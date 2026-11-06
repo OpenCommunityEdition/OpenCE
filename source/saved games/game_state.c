@@ -95,6 +95,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "dualsense_game.h" /* port: port/linux/game/dualsense_game.c */
 #include "cseries_windows.h"
 #include "cseries/errors.h"
 #include "real_math.h"
@@ -108,6 +109,7 @@ symbols in this file:
 #include "scenario.h"
 #include "main.h"
 #include "objects.h"
+#include "objects/widgets/lightning.h" /* port: reset render seeds after a load */
 #include "game_sound.h"
 #include "sound_manager.h"
 #include "observer.h"
@@ -192,6 +194,7 @@ static game_state_before_save_proc before_save_procs[] =
 
 static game_state_before_load_proc before_load_procs[] =
 {
+	dualsense_game_reset, /* port: cancel feedback before restoring object identities */
 	game_sound_clear,
 	/* port: where the cluster lists' references are, which the game state
 	being loaded does not hold */
@@ -205,6 +208,8 @@ static game_state_before_load_proc before_load_procs[] =
 
 static game_state_after_load_proc after_load_procs[] =
 {
+	/* port: restored lightning slots and times must not reuse discarded seeds. */
+	lightnings_reset_render_state,
 	scenario_reload_structure_bsp_if_necessary,
 	/* port: the session roster is not part of a gameplay checkpoint. */
 	network_coop_restore_players,

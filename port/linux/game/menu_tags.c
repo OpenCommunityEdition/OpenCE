@@ -45,6 +45,7 @@ menu gets FRIENDLY FIRE too.
 #include "frontend_menu.h"
 #include "mcc_ui.h"
 #include "mcc_cache.h"
+#include "mcc_menu_preview.h"
 #include "custom_edition_cache.h"
 
 #include <stdlib.h>
@@ -371,6 +372,9 @@ static char const *const port_function_names[] =
 	"port map list back",
 	"port mcc solo folder back",
 	"port mcc host folder back",
+	"port mcc xbox init", "port mcc xbox open", "port mcc xbox choose", "port mcc xbox back",
+	"port mcc xbox left", "port mcc xbox right", "port mcc xbox card",
+	"port mcc xbox profile",
 	"port pause end game", "port coop friendly fire",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
@@ -2689,6 +2693,7 @@ done:
 void menu_tags_unloaded(
 	void)
 {
+	mcc_menu_preview_clear();
 	frontend_menu_unloaded();
 	if (menu_tags.loaded || menu_tags.block_count)
 		menu_tags_release();

@@ -155,16 +155,23 @@ choices for this screen. Saved choices persist across launches.
 
 | Menu row | What it controls |
 | --- | --- |
-| Projectile Lights | Plasma, rockets and the supported Covenant projectile profiles, including Needler, Shade, greener Grunt/Hunter fuel-rod illumination, Ghost, Banshee, Wraith and dropship fire. |
+| Projectile Lights | Existing plasma, rocket and Covenant projectile profiles, armed plasma grenades and flamethrower streams. |
 | Muzzle Flash Lights | Extra short-lived weapon illumination, including the Warthog turret and both Scorpion guns; stock flash and explosion effects remain intact. |
-| Jackal Shields | Blue/orange shield spill, following the shield's damage colour. |
-| Stationary Shields | Covenant shield-emitter spill, including the red damage flash. |
-| Fuel Rod Glow | Illumination from the held/dropped fuel rod weapon and exposed Hunter cannon rods. |
-| AR Counter Glow | Screen emission and directed spill in first and third person. |
-| Needler Glow | Needle emission and soft outward spill on the weapon and its holder. |
-| Light Occlusion | Optional blocking for projectile and emitter lights. Muzzle lights retain their own collision blocking, including Warthog and Scorpion chassis. |
+| Weapon Glow | Energy swords, plasma charge/heat, Grunt/Hunter fuel rods, AR counters and Needler crystals. |
+| Shield Emitters | Blue/orange Jackal shields and Covenant stationary shields, including damage colours. |
+| Vehicle Lights | Supported Covenant running/engine glow and directional Warthog/Scorpion headlights. |
+| World Emitters | Overshield/active-camouflage pickups and visible green teleporter surfaces. |
+| Light Occlusion | Optional blocking for projectiles and emitters. Muzzle and vehicle lights always request collision blocking, including their chassis. |
 | Shield Glow | Player/unit shield spill, subject to the host's shield-effects policy. |
 | Glow Intensity | Default or Light Show intensity for Shield Glow; this does not enable it. |
+
+Weapon Glow and Shield Emitters consolidate the old per-effect menu rows.
+Both rows offer only OFF and ON. Older saved dynamic-lighting preferences
+reset to OFF once; later player choices persist. There is no CUSTOM state.
+See the [emitter expansion walkthrough](reading/emitter_expansion.md)
+for exact scope, lifecycle, budgets and map-asset limits. The historical 1.0
+acceptance results below predate these additions; they are not evidence for
+the expansion's runtime acceptance.
 
 **Animated Overshield** remains in **Video Setup > Extra Effects**, also off
 by default. First-person shield surfaces additionally depend on **Arm

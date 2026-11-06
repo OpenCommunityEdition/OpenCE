@@ -37,6 +37,8 @@ static struct pc_menu_setting *pc_menu_setting_get(long definition_index){return
 static boolean main_menu_is_active(void){return FALSE;}
 static boolean network_game_is_active(void){return FALSE;}
 static void main_goto_main_menu(void){CHECK(0,"link action unexpectedly reloaded the frontend");}
+int lighting_menu_text(const char *n,char *t,unsigned int s,int d) { return -1; }
+int lighting_menu_write(const char *n,const char *v) { return -1; }
 #include "under_test.inc"
 static struct widget_instance spinner;
 /* the screen opened (the spinner's "port setting load"), the spinner moved

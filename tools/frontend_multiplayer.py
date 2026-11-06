@@ -22,6 +22,7 @@ PAGES = {
     "preview": (MP + "lobby/preview_screen", "JOIN GAME", "GAME IN PROGRESS"),
     "bots": ("main_menu/settings_select/player_setup/player_profile_edit/network_setup/bots/bots_screen", "BOTS", "BOT OPTIONS"),
     "sharing": ("main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_sharing_settings_screen", "MAP SHARING", "MAP SHARING"),
+    "mcc_packages": ("main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/mcc_packages_screen", "MCC PACKAGES", "MCC PACKAGES"),
     "coop": (MP + "server_settings/coop_options/coop_options_screen", "CO-OP OPTIONS", "CO-OP OPTIONS"),
     "voice": (MP + "server_settings/voice_options/voice_options_screen", "VOICE AND VOTING", "VOICE AND VOTING"),
     "campaign": ("main_menu/solo_level_select/solo_level_select_screen", "SELECT MISSION", "MISSIONS"),

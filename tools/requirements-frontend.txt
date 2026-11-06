@@ -1,0 +1,2 @@
+# Match the Pillow/FreeType wheels used to generate the checked-in menu art.
+Pillow==12.3.0

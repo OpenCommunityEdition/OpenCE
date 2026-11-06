@@ -103,6 +103,69 @@ static int admission_reads;
 static int identities_prepared;
 static unsigned reads, largest, scans, closed;
 void mcc_cache_precache_clear(void) {}
+void mcc_menu_preview_clear(void) {}
+int config_boolean(char const *name) {
+ if(!strcmp(name,"game.mcc_campaigns"))return getenv("TEST_MISSIONS")!=NULL;
+ char const *disabled=getenv("TEST_COLLECTIONS_DISABLED");(void)name;return !disabled;
+}
+#include "../src/mcc_manifest.h"
+#include "../src/mcc_menu_metadata.h"
+int mcc_manifest_package_root(char const *level,char path[1024]) {
+ (void)level;path[0]=0;return getenv("TEST_MENU_METADATA")!=NULL;
+}
+int mcc_menu_metadata_load(char const *folder,int campaign,struct mcc_menu_metadata *metadata) {
+ (void)folder;(void)campaign;memset(metadata,0,sizeof(*metadata));
+ strcpy(metadata->title,"Offline package title");metadata->count=1;
+ strcpy(metadata->maps[0].name,"arena");strcpy(metadata->maps[0].title,"Authored offline level");return 1;
+}
+struct steam_workshop_map_text const *mcc_menu_metadata_find(struct mcc_menu_metadata const *metadata,char const *name) {
+ return metadata->count && !strcmp(name,metadata->maps[0].name) ? &metadata->maps[0] : NULL;
+}
+int mcc_manifest_for_level(char const *level,struct mcc_manifest *manifest,char reason[128]) {
+ char buffer[512],*name;int count=0;(void)level;reason[0]=0;
+ memset(manifest,0,sizeof(*manifest));
+ if(!getenv("TEST_MISSIONS"))return 0;
+ snprintf(buffer,sizeof(buffer),"%s",getenv("TEST_MISSIONS"));
+ for(name=strtok(buffer,",");name&&count<64;name=strtok(NULL,",")) {
+  snprintf(manifest->missions[count].name,64,"%s",name);
+  snprintf(manifest->missions[count].title,64,"Explicit mission %s",name);count++;
+ }
+ strcpy(manifest->title,"Example campaign");manifest->count=count;return 1;
+}
+#include "../src/steam_workshop.h"
+static int workshop_items;
+static struct steam_workshop_map workshop_list[4];
+#define workshop_item workshop_list[0]
+int steam_workshop_scan(void) {return workshop_items;}
+int steam_workshop_count(void) {return workshop_items;}
+struct steam_workshop_map const *steam_workshop_map(int index) {return index>=0 && index<workshop_items ? &workshop_list[index] : NULL;}
+int steam_workshop_item_title(char const *id,char *title,unsigned long size) {
+    int i;
+    for(i=0;i<workshop_items;i++) if(!strcmp(id,workshop_list[i].item_id)) {
+        snprintf(title,size,"%s",workshop_list[i].item_title);return 1;
+    }
+    return 0;
+}
+/* the CATALOG_ITEMS environment: "id:item title:map name:map title;..." */
+static void workshop_from_environment(void) {
+    char *text=getenv("CATALOG_ITEMS"),*field[4];
+    static char copy[512];
+    if(!text)return;
+    snprintf(copy,sizeof(copy),"%s",text);text=copy;
+    while(*text && workshop_items<4) {
+        char *end=strchr(text,';');int f;
+        if(end)*end=0;
+        field[0]=text;
+        for(f=1;f<4;f++){text=strchr(text,':');if(!text)exit(50);*text++=0;field[f]=text;}
+        strcpy(workshop_list[workshop_items].item_id,field[0]);
+        strcpy(workshop_list[workshop_items].item_title,field[1]);
+        strcpy(workshop_list[workshop_items].name,field[2]);
+        strcpy(workshop_list[workshop_items].title,field[3]);
+        workshop_items++;
+        if(!end)break;
+        text=end+1;
+    }
+}
 char const *mcc_identity_local_name(char const *name) {return name;}
 int mcc_identity_check(char const *name) {(void)name;return 1;}
 int mcc_identity_prepare_host(char const *name) {(void)name;identities_prepared++;return 1;}
@@ -165,7 +228,7 @@ int main(int argc,char **argv) {
     if(argc<2)return 2;
     if(argc>=4 && !strcmp(argv[2],"browse")) {
         struct mcc_map_browser b={0};int step;
-        root=argv[1];mcc_map_browser_open(&b,atoi(argv[3]));
+        root=argv[1];workshop_from_environment();mcc_map_browser_open(&b,atoi(argv[3]));
         for(step=4;step<=argc;step++) {
             int row;wchar_t text[64];
             printf("view%d=%s|%d|%d\n",step-4,b.package,b.count,b.chosen);
@@ -223,7 +286,25 @@ int main(int argc,char **argv) {
         if(accepted)printf("path=%s\n",path);
         return 0;
     }
-    root=argv[1];count=mcc_maps_count(FALSE);
+    root=argv[1];
+    if(argc>2 && !strcmp(argv[2],"workshop")) {
+        /* one subscribed item: its maps folder is root/mcc_maps/2899609719, as the platform's path translation has it */
+        workshop_items=1;
+        strcpy(workshop_item.item_id,"2899609719");strcpy(workshop_item.item_title,"Pro Edition");
+        strcpy(workshop_item.name,"pat_beavercreek");strcpy(workshop_item.title,"Better Creek");
+        argc=2;
+    }
+    count=mcc_maps_count(FALSE);
+    if(workshop_items) {
+        struct mcc_map_browser browser;wchar_t text[64];
+        memset(&browser,0,sizeof(browser));
+        mcc_map_browser_open(&browser,FALSE);
+        mcc_map_browser_text(&browser,0,text);
+        {wchar_t const *d=mcc_maps_description(0);
+         printf("folder=%ls\ndescription=",text);
+         while(*d && *d!='\r')putchar((int)*d++);
+         printf("\n");}
+    }
     printf("count=%d\nmultiplayer=%d\nsingleplayer=%d\n",count,mcc_maps_count(TRUE),mcc_maps_type_count(TRUE));
     if(mcc_maps_type_count(FALSE)!=mcc_maps_count(TRUE) ||
        mcc_maps_type_count(TRUE)+mcc_maps_type_count(FALSE)!=count)return 30;
@@ -248,6 +329,10 @@ int main(int argc,char **argv) {
         if(found!=i || row!=i || !level || strlen(level)>63)return 25;
         printf("map=%s|%d\n",level,mcc_maps_campaign(i));
         printf("label_%d=%ls\n",i,mcc_maps_name(i));
+        if(getenv("TEST_MISSIONS")) {
+            char next[64];int state=mcc_maps_next_mission(level,next);
+            printf("next_%d=%d|%s\n",i,state,next);
+        }
     }
     for(i=0;i<mcc_maps_count(TRUE);i++) {
         short index=mcc_maps_index(i,TRUE);
@@ -277,7 +362,8 @@ int main(int argc,char **argv) {
     command = [compiler, "-include", str(ROOT / "port/linux/game/mcc_loading.h"), str(ROOT / "tools/mcc_loading_stub.c"), "-std=c99", "-Wall", "-Wextra", "-Werror",
                "-I", str(work), "-I", str(ROOT / "port/linux/game"), str(source),
                str(ROOT / "port/linux/game/mcc_maps.c"),
-               str(ROOT / "port/linux/game/mcc_package.c"),
+               str(ROOT / "port/linux/game/mcc_workshop.c"),
+               str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/src/workshop_collections.c"),
                str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), "-o", str(output)]
     if sys.platform == "win32":
         command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
@@ -294,8 +380,12 @@ def install(root, entries):
     (directory / "list.txt").write_text("\n".join(entries))
 
 
-def run(tool, root, *args):
-    result = subprocess.run([str(tool), str(root), *args], capture_output=True, text=True, timeout=10, cwd=root)
+def run(tool, root, *args, items=None):
+    environment = dict(os.environ)
+    if items:
+        environment["CATALOG_ITEMS"] = ";".join(":".join(item) for item in items)
+    result = subprocess.run([str(tool), str(root), *args], capture_output=True, text=True, timeout=10, cwd=root,
+                            env=environment)
     assert result.returncode == 0, result.stdout + result.stderr
     fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if not line.startswith("map="))
     maps = [line[4:] for line in result.stdout.splitlines() if line.startswith("map=")]
@@ -586,3 +676,179 @@ def test_browser_full_catalog_and_long_labels(catalog_tool, tmp_path):
     assert fields["row0_0"] == f"[{package}]|folder"
     assert fields["view3"] == f"{package}|1024|1023"
     assert fields["view4"] == "|1|0"
+
+
+def test_workshop_item_maps_are_listed_by_title(catalog_tool, tmp_path):
+    """A subscribed Workshop item's map is the level mcc_maps\\<item id>\\<name>, shown by its Workshop title."""
+    install(tmp_path, {"a10.map": header()})
+    item = tmp_path / "mcc_maps" / "2899609719"
+    item.mkdir()
+    (item / "pat_beavercreek.map").write_bytes(header(scenario=1))
+    fields, maps = run(catalog_tool, tmp_path, "workshop")
+    assert maps == ["mcc_maps\\2899609719\\pat_beavercreek|0", "mcc_maps\\a10|1"]
+    # the title, not the file name and not a "[package]" suffix
+    assert fields["label_0"] == "Better Creek"
+    # the package folder is named by the item's title, and the description says where it is from
+    assert fields["folder"] == "[Pro Edition]"
+    assert fields["description"].startswith("Steam Workshop")
+    # the same data root without the item: only the ordinary map
+    fields, maps = run(catalog_tool, tmp_path)
+    assert maps == ["mcc_maps\\a10|1"]
+
+
+COLLECTION_ITEMS = [
+    # in PRO EDITION
+    ("2899666869", "Item One", "alpha_map_file", "Alpha Arena"),
+    # in SOCIAL MAP PACK and 2V2 MAPS
+    ("2899747345", "Item Two", "beta_map_file", "Beta Arena"),
+    # in no collection
+    ("12345", "Lone Item", "gamma_map_file", "Gamma Arena"),
+]
+
+
+def collection_install(tmp_path):
+    install(tmp_path, {"solo.map": header(scenario=0), "arena.map": header(scenario=1)})
+    base = tmp_path / "mcc_maps"
+    for item, _, name, _ in COLLECTION_ITEMS:
+        (base / item).mkdir()
+        (base / item / f"{name}.map").write_bytes(header(scenario=1))
+
+
+def test_workshop_collections_are_folders_of_their_items_maps(catalog_tool, tmp_path):
+    """An item in a collection is listed in that collection's folder; an item in none keeps its own."""
+    collection_install(tmp_path)
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0", "back", items=COLLECTION_ITEMS)
+    # the folders: collections in the table's order, then an uncollected item's, then the loose map
+    assert fields["row0_0"] == "[PRO EDITION]|folder"
+    assert fields["row0_1"] == "[SOCIAL MAP PACK]|folder"
+    assert fields["row0_2"] == "[2V2 MAPS]|folder"
+    assert fields["row0_3"] == "[Lone Item]|folder"
+    assert fields["row0_4"].endswith("|mcc_maps\\arena")
+    assert fields["view0"] == "|5|0"
+    # inside a collection, the maps of its items by their Workshop titles
+    assert fields["view1"] == "PRO EDITION|1|0"
+    assert fields["row1_0"] == "Alpha Arena|mcc_maps\\2899666869\\alpha_map_file"
+    # back lands on the collection's own row
+    assert fields["view2"] == "|5|0"
+
+
+def test_an_item_in_two_collections_is_in_both(catalog_tool, tmp_path):
+    collection_install(tmp_path)
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:1", "back", "enter:2", items=COLLECTION_ITEMS)
+    assert fields["row1_0"] == "Beta Arena|mcc_maps\\2899747345\\beta_map_file"
+    assert fields["view2"] == "|5|1"
+    assert fields["row3_0"] == "Beta Arena|mcc_maps\\2899747345\\beta_map_file"
+
+
+def test_an_item_in_no_collection_keeps_its_own_folder(catalog_tool, tmp_path):
+    collection_install(tmp_path)
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:3", "back", items=COLLECTION_ITEMS)
+    assert fields["view1"] == "12345|1|0"
+    assert fields["row1_0"] == "Gamma Arena|mcc_maps\\12345\\gamma_map_file"
+    assert fields["view2"] == "|5|3"
+
+
+def test_a_collection_folder_shows_only_items_the_player_has(catalog_tool, tmp_path):
+    collection_install(tmp_path)
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", items=COLLECTION_ITEMS[2:])
+    # nothing subscribed from any collection: no collection folder
+    assert fields["view0"] == "|2|0"
+    assert fields["row0_0"] == "[Lone Item]|folder"
+
+
+def local_packages(root, names):
+    install(root, {})
+    base = root / "mcc_maps"
+    for name in names:
+        folder = base / name
+        folder.mkdir()
+        (folder / "arena.map").write_bytes(header(scenario=1))
+        (folder / "list.txt").write_text("arena.map\n")
+    (base / "list.txt").write_text("\n".join("/" + name for name in names))
+    return base
+
+
+def test_collection_rows_do_not_exceed_browser_storage(catalog_tool, tmp_path):
+    # One map in two groups plus 1023 independent package folders: 1025 rows.
+    local_packages(tmp_path, ["2899747345"] + [f"package{i:04}" for i in range(1023)])
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:1024", "back")
+    assert fields["view0"] == "|1025|0"
+    assert fields["view1"] == "package1022|1|0"
+    assert fields["row1_0"] == "Arena|mcc_maps\\package1022\\arena"
+    assert fields["view2"] == "|1025|1024"
+
+
+def test_collection_and_package_names_have_distinct_selection_keys(catalog_tool, tmp_path):
+    local_packages(tmp_path, ["2899666869", "PRO EDITION"])
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:1", "back", "enter:0", "back")
+    assert fields["view0"] == "|2|0"
+    assert fields["row1_0"] == "Arena|mcc_maps\\PRO EDITION\\arena"
+    assert fields["view2"] == "|2|1"
+    assert fields["row3_0"] == "Arena|mcc_maps\\2899666869\\arena"
+    assert fields["view4"] == "|2|0"
+
+
+def test_collection_identity_uses_sidecar_without_steam(catalog_tool, tmp_path):
+    base = local_packages(tmp_path, ["MyPack"])
+    (base / "MyPack/workshop_id.txt").write_text("2899666869\nPro Edition\n")
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0")
+    assert fields["row0_0"] == "[PRO EDITION]|folder"
+    assert fields["row1_0"] == "Arena|mcc_maps\\MyPack\\arena"
+
+
+def test_disabled_collections_keep_package_folders(catalog_tool, tmp_path, monkeypatch):
+    local_packages(tmp_path, ["2899747345"])
+    monkeypatch.setenv("TEST_COLLECTIONS_DISABLED", "1")
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0")
+    assert fields["view0"] == "|1|0"
+    assert fields["row0_0"] == "[MCC package]|folder"
+    assert fields["row1_0"] == "Arena|mcc_maps\\2899747345\\arena"
+
+
+def test_campaign_browser_orders_explicit_missions_and_keeps_full_titles(catalog_tool, tmp_path, monkeypatch):
+    base = local_packages(tmp_path, ["Campaign"])
+    for name in ("z10", "a10", "extra"):
+        (base / f"Campaign/{name}.map").write_bytes(header(scenario=0))
+    (base / "Campaign/list.txt").write_text("z10.map\na10.map\nextra.map\n")
+    monkeypatch.setenv("TEST_MISSIONS", "z10,a10")
+    fields, maps = run(catalog_tool, tmp_path)
+    assert [m.split("|")[0] for m in maps] == ["mcc_maps\\Campaign\\z10", "mcc_maps\\Campaign\\a10", "mcc_maps\\Campaign\\extra"]
+    assert fields["next_0"] == "1|mcc_maps\\Campaign\\a10"
+    assert fields["next_1"] == "2|" and fields["next_2"] == "0|"
+    fields, _ = run(catalog_tool, tmp_path, "browse", "1", "enter:0", "back")
+    assert fields["row0_0"] == "[Example campaign]|folder"
+    assert fields["row1_0"] == "Explicit mission z10|mcc_maps\\Campaign\\z10"
+    assert fields["view2"] == "|1|0"
+
+
+def test_missing_campaign_mission_is_not_skipped(catalog_tool, tmp_path, monkeypatch):
+    base = local_packages(tmp_path, ["Campaign"])
+    for name in ("z10", "a10"):
+        (base / f"Campaign/{name}.map").write_bytes(header(scenario=0))
+    (base / "Campaign/list.txt").write_text("z10.map\na10.map\n")
+    monkeypatch.setenv("TEST_MISSIONS", "z10,missing,a10")
+    fields, _ = run(catalog_tool, tmp_path)
+    assert fields["next_0"] == "-1|mcc_maps\\Campaign\\missing"
+    assert fields["next_1"] == "2|"
+
+
+def test_workshop_browser_keeps_title_longer_than_filename(catalog_tool, tmp_path):
+    local_packages(tmp_path, ["12345"])
+    fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0", items=[("12345", "Item", "arena", "A much longer mission title")])
+    assert fields["row1_0"] == "A much longer mission title|mcc_maps\\12345\\arena"
+
+
+def test_imported_package_titles_do_not_depend_on_steam(catalog_tool,tmp_path,monkeypatch):
+    install(tmp_path,{})
+    root=tmp_path/"mcc_maps"
+    (root/"list.txt").write_text("/12345\n")
+    (root/"12345").mkdir()
+    (root/"12345/list.txt").write_text("arena.map\n")
+    (root/"12345/arena.map").write_bytes(header(scenario=1))
+    fields,_=run(catalog_tool,tmp_path,"browse","0","enter:0")
+    assert fields["row0_0"].startswith("[MCC package]|")
+    assert fields["row1_0"]=="Arena|mcc_maps\\12345\\arena"
+    monkeypatch.setenv("TEST_MENU_METADATA","1")
+    fields,_=run(catalog_tool,tmp_path,"browse","0","enter:0")
+    assert fields["row0_0"].startswith("[Offline package title]|")
+    assert fields["row1_0"]=="Authored offline level|mcc_maps\\12345\\arena"

@@ -1,8 +1,18 @@
 """Check that benchmark reports retain real stalls and separate capture overhead."""
 import pytest
 from lighting_performance_run import distribution, summarize, memory_window_mib
-from lighting_performance_build import ROOT, instrument_shader_stalls
+from lighting_performance_build import ROOT, instrument_shader_stalls, instrument_renderer_profile
 from harness import function
+
+
+@pytest.mark.parametrize('name', ['prepare_draw', 'buffer_upload'])
+def test_renderer_timers_preserve_the_production_body(name):
+    source = (ROOT/'port/linux/src/d3d8_gl.c').read_text()
+    timed = instrument_renderer_profile(source)
+    assert function(timed, 'lighting_timed_'+name).replace('lighting_timed_'+name+'(', name+'(', 1) == function(source, name)
+    wrapper = function(timed, name)
+    assert wrapper.count('lighting_profile_begin(') == wrapper.count('lighting_profile_end(') == 1
+    assert wrapper.index('lighting_profile_begin(') < wrapper.index('lighting_timed_'+name+'(') < wrapper.index('lighting_profile_end(')
 
 
 @pytest.mark.parametrize('name,kind', [('xgpu_compile_shader', 0),
@@ -67,3 +77,10 @@ def test_early_exit_keeps_missing_memory_windows_distinct_from_zero():
     samples=[dict(seconds=45,private=100*2**20),dict(seconds=50,private=120*2**20)]
     assert memory_window_mib(samples,45,75)==110
     assert memory_window_mib(samples,585) is None
+
+
+def test_240_fps_budget_counts_sub_120_stalls():
+    result = distribution([4.0, 4.16, 4.18, 8.0], 240)
+    assert result['budget_ms'] == pytest.approx(1000 / 240)
+    assert result['over_budget_percent'] == 50
+    assert result['over_1_5_budget_percent'] == 25

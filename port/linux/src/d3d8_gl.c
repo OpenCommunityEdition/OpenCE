@@ -29,6 +29,7 @@ Conventions carried over from the Xbox:
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
+#include "loading_widescreen.h"
 #include "posix.h"
 #include "main/console.h"
 #ifdef HALO_ANDROID
@@ -588,6 +589,8 @@ struct draw_uniforms
 	float texture_lod_bias[4];
 	float height_fade[4];
 	float shield_honeycomb[3][4];
+	/* display.reversed_depth: a z bias's depth units (nv2a_vsh.c) */
+	float depth_bias;
 };
 
 struct program_entry
@@ -607,6 +610,7 @@ struct program_entry
 	GLint screen_offset;
 	GLint height_fade;
 	GLint shield_honeycomb;
+	GLint depth_bias;
 	/* nv2a_pixel_shader_key's source_blend's color, and what it last had */
 	GLint blend_constant;
 	float blend_constant_value[4];
@@ -2270,6 +2274,7 @@ static BOOL bind_targets(BOOL *has_depth)
 	*has_depth = depth != NULL;
 	return TRUE;
 }
+
 
 /* ---------- display.hdr */
 
@@ -4127,6 +4132,7 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	entry->screen_offset = glGetUniformLocation(entry->program, "screen_offset");
 	entry->height_fade = glGetUniformLocation(entry->program, "height_fade");
 	entry->shield_honeycomb = glGetUniformLocation(entry->program, "shield_honeycomb");
+	entry->depth_bias = glGetUniformLocation(entry->program, "depth_bias");
 	entry->blend_constant = glGetUniformLocation(entry->program, "blend_constant");
 	entry->model_lights = glGetUniformLocation(entry->program, "model_lights");
 #ifndef HALO_ANDROID
@@ -4983,11 +4989,20 @@ static void apply_raster_state(BOOL has_depth)
 
 		offset[0] = dword_to_float(rs[D3DRS_POLYGONOFFSETZSLOPESCALE]);
 		offset[1] = dword_to_float(rs[D3DRS_POLYGONOFFSETZOFFSET]);
-		/* (display.reversed_depth: toward the camera is up) */
+		/* The slope is the depth's change across a pixel, and a target drawn
+		at several pixels to the game's one (render_target_get) has that many
+		times less depth across each: the Xbox's slope term, taken across its
+		own pixels, is that many times the scale. On a surface seen at an
+		angle it is most of the bias (the Pelican's lights on its curved hull
+		sank in at 1080 lines with it a 2.25th as large). */
+		offset[0] *= target_scale[0] > target_scale[1] ? target_scale[0] : target_scale[1];
+		/* (display.reversed_depth: toward the camera is up, and the units,
+		which a floating-point depth buffer measures by the depth itself,
+		are the vertex program's, in the Xbox's measure: depth_bias) */
 		if (xgpu_reversed_depth)
 		{
 			offset[0] = -offset[0];
-			offset[1] = -offset[1];
+			offset[1] = 0.0f;
 		}
 		if (memcmp(gl_state.polygon_offset, offset, sizeof(offset)))
 		{
@@ -5022,7 +5037,7 @@ static void gl_check_errors(const char *where)
 
 /* the uniforms of the latest draws, converted from these inputs; the serial
 counts the conversions */
-#define DRAW_UNIFORM_INPUT_COUNT (4 + 4 + 16 + 1 + 16 + 2 + 4 + 1 + 1 + 7 * D3DTSS_MAXSTAGES + 4 + 12)
+#define DRAW_UNIFORM_INPUT_COUNT (4 + 4 + 16 + 1 + 16 + 2 + 4 + 1 + 1 + 7 * D3DTSS_MAXSTAGES + 4 + 12 + 2)
 
 /* the height fade of the draws that follow (d3d8_gl_set_height_fade): off
 while its scale is zero */
@@ -5359,6 +5374,8 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		count += 4;
 		memcpy(&inputs[count], shield_honeycomb_value, sizeof(shield_honeycomb_value));
 		count += 12;
+		inputs[count++] = D3D__RenderState[D3DRS_SOLIDOFFSETENABLE];
+		inputs[count++] = D3D__RenderState[D3DRS_POLYGONOFFSETZOFFSET];
 		if (!draw_uniforms_serial || !words_equal(inputs, draw_uniform_inputs, sizeof(inputs)))
 		{
 			struct draw_uniforms *converted = &draw_uniforms;
@@ -5399,6 +5416,13 @@ static struct program_entry *prepare_draw(BOOL immediate)
 			converted->screen_offset = (float)UI_OFFSET;
 			memcpy(converted->height_fade, height_fade_value, sizeof(converted->height_fade));
 			memcpy(converted->shield_honeycomb, shield_honeycomb_value, sizeof(converted->shield_honeycomb));
+			/* (display.reversed_depth: the z bias's units, the Xbox's depth
+			units toward the camera, in the depth the vertex program writes:
+			one is 1 / viewport_scale.z, the depth buffer's range over the
+			viewport's) */
+			converted->depth_bias = xgpu_reversed_depth && D3D__RenderState[D3DRS_SOLIDOFFSETENABLE] &&
+				device.viewport_scale[2] != 0.0f ?
+				-dword_to_float(D3D__RenderState[D3DRS_POLYGONOFFSETZOFFSET]) / device.viewport_scale[2] : 0.0f;
 		}
 	}
 	/* and a program that has had them since needs none of them */
@@ -5422,6 +5446,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	uniform_vec4(entry->texture_lod_bias, entry->uniforms.texture_lod_bias, draw_uniforms.texture_lod_bias, 1);
 	uniform_vec4(entry->height_fade, entry->uniforms.height_fade, draw_uniforms.height_fade, 1);
 	uniform_vec4(entry->shield_honeycomb, entry->uniforms.shield_honeycomb[0], draw_uniforms.shield_honeycomb[0], 3);
+	uniform_float(entry->depth_bias, &entry->uniforms.depth_bias, draw_uniforms.depth_bias);
 	return entry;
 }
 
@@ -7891,7 +7916,9 @@ reads back (GetBackBuffer with -1, progress_bar.c) and draws again blurred,
 a little larger and fainter, under each new frame: the trails of its light.
 Here it is a render target of the menus' 640x480, which takes the 640
 columns in the middle of the frame (where the loading screen draws, as the
-menus do on a wide screen) once the loading screen has drawn it, while the
+menus do on a wide screen), or the whole width while widescreen loading is
+active. The effect and its feedback stay in their original 640x480 space;
+only their horizontal presentation changes. Capture happens while the
 screen asks for it: at its BlockUntilVerticalBlank, its last call, so that
 what is drawn over it after (the download screen's words) leaves no trail. */
 
@@ -7965,6 +7992,13 @@ static void front_buffer_take(void)
 	width = (GLint)(FRONT_BUFFER_WIDTH * back_buffer->target.scale[0] + 0.5f);
 	left = ((GLint)back_buffer->target.gl_width - width) / 2;
 	if (left < 0)
+	{
+		left = 0;
+		width = (GLint)back_buffer->target.gl_width;
+	}
+	/* The loading feature expands the original effect across this width.
+	Capture all of it back into the stock feedback texture, not its centre. */
+	if (loading_widescreen_active())
 	{
 		left = 0;
 		width = (GLint)back_buffer->target.gl_width;

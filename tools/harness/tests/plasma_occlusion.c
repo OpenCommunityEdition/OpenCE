@@ -1,5 +1,8 @@
 #include "harness.h"
 #include <math.h>
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define PIN(a,b,c) MIN(MAX(a,b),c)
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -40,12 +43,23 @@ static struct
 } rasterizer_lights;
 static int on = 1, queries, allocations, blocked = 1, door, fail_upload;
 static unsigned long time_ms = 1000;
-static int uploads;
+static int uploads, fail_unlock;
 static real specular_scale = 1;
-static int muzzle_on, emitter_on, emitter_occlusion, shield_on, shield_occlusion;
+static int muzzle_on, emitter_on, emitter_occlusion, shield_on, shield_occlusion, vehicle_on;
 static long last_ignore;
 static unsigned long last_flags;
 static int directional_on, vehicle_only;
+static int prong_on;
+struct plasma_collision_scene { int unused; };
+int plasma_lighting_prong_cone(long r,float axis[3],float origin[3],float *radius)
+{ axis[0]=1;axis[1]=axis[2]=0;origin[0]=origin[1]=origin[2]=0;*radius=.3f;return prong_on?3:0; }
+unsigned long plasma_collision_scene_revision(struct plasma_collision_scene *scene,const real_point3d *point,float extent,int vehicles)
+{
+ static int last=-1; static unsigned long revision;
+ int state=blocked+2*door+4*vehicle_only;
+ if(state!=last){last=state;revision++;}
+ return revision;
+}
 static float directional_axis[3]={-.8f,0,.6f}, directional_origin, directional_radius=1;
 int muzzle_lighting_vehicle_occlusion(long light) { return muzzle_on && light==500; }
 int covenant_emitter_lighting_cone(long r,float axis[3],float origin[3],float *radius)
@@ -64,10 +78,11 @@ void shield_glow_frame_end(void) {}
 void shield_glow_window_begin(void) {}
 void shield_glow_submitted(long l,long r) {}
 float shield_glow_radius(long l,float r) { return r; }
-int config_boolean(const char *name)
+int lighting_config_boolean(const char *name)
 {
 	if (!strcmp(name, "display.plasma_occlusion") && shield_on) return shield_occlusion;
 	if (!strcmp(name, "display.muzzle_lighting")) return muzzle_on;
+	if (!strcmp(name, "display.vehicle_lighting")) return vehicle_on;
 	if (!strcmp(name, "display.plasma_occlusion") && emitter_on) return emitter_occlusion;
 	return on;
 }
@@ -103,6 +118,10 @@ static float plasma_collision_depth(unsigned long flags, const real_point3d *p, 
 	struct collision_result hit;
 	return collision_test_vector(flags, p, v, ignore, &hit) ? hit.t : 2.0f;
 }
+enum { PLASMA_COLLISION_RAYS = 1536 };
+static void plasma_collision_depths(unsigned long flags, const real_point3d *p,
+ const real_vector3d *vectors, int count, long ignore, float *depths)
+{ int i;for(i=0;i<count;i++)depths[i]=plasma_collision_depth(flags,p,&vectors[i],ignore); }
 static int D3DDevice_CreateVolumeTexture(int w, int h, int d, int levels, int usage, int format, int pool,
 										 IDirect3DVolumeTexture8 **t)
 {
@@ -121,7 +140,7 @@ static int IDirect3DVolumeTexture8_LockBox(IDirect3DVolumeTexture8 *t, int l, D3
 }
 static int IDirect3DVolumeTexture8_UnlockBox(IDirect3DVolumeTexture8 *t, int l)
 {
-	return 0;
+	return fail_unlock ? -1 : 0;
 }
 static void D3DResource_Release(D3DResource *p)
 {
@@ -133,6 +152,9 @@ static void rasterizer_xbox_bitmap_swizzle3d_long(void *d, void *s, int w, int h
 	memcpy(d, s, 4096 * sizeof(long));
 }
 void plasma_occlusion_window(void);
+int plasma_lighting_vehicle_occlusion(long i) { return vehicle_on && i == 500; }
+int authored_emitter_lighting_enabled(void) { return vehicle_on; }
+int covenant_emitter_lighting_vehicle_occlusion(long light) { return vehicle_on && light == 502; }
 #include "under_test.inc"
 /* Match the renderer's linear filtering between vertical texel centres. */
 static float filtered_height(IDirect3DVolumeTexture8 *texture, float height, float radius)
@@ -149,7 +171,7 @@ int main(int argc, char **argv)
 	struct occlusion_field *f;
 	real previous;
 	int n, cap, step;
-	real temporal[3];
+	real temporal[4];
 	float transform[4];
 	rasterizer_lights.light_count = 1;
 	rasterizer_lights.lights[0].radius = 1;
@@ -252,7 +274,8 @@ int main(int argc, char **argv)
 	CHECK(!field_for(8), "overflow cannot replace an active field");
 	for (n = 0; n < 8; n++)
 		CHECK(field_for(n), "rejected overflow does not consume an admitted light's update budget");
-	CHECK(queries == 8 * 1536, "only admitted fields spend the query budget");
+	CHECK(queries == 0, "unchanged stationary fields reuse exact collision inputs without retracing");
+
 	time_ms += 120;
 	plasma_occlusion_window();
 	plasma_occlusion_submit(18, 8);
@@ -285,16 +308,16 @@ int main(int argc, char **argv)
 	plasma_occlusion_reset();
 	fail_upload = 0;
 	time_ms = 1000;
-	for (cap = 0; cap < 3; cap++)
+	for (cap = 0; cap < 4; cap++)
 	{
 		blocked = 1;
 		door = 0;
 		plasma_occlusion_submit(40 + cap, 0);
 		f = field_for(0);
 		blocked = 0;
-		for (step = 1; step <= (cap == 0 ? 3 : cap == 1 ? 6 : 12); step++)
+		for (step = 1; step <= (3 << cap); step++)
 		{
-			unsigned long next = 1000 + (unsigned long)(100.0f * step / (cap == 0 ? 3 : cap == 1 ? 6 : 12));
+			unsigned long next = 1000 + (unsigned long)(100.0f * step / (3 << cap));
 			if (step == 1)
 				time_ms = 1000;
 			time_ms = next;
@@ -306,8 +329,8 @@ int main(int argc, char **argv)
 		plasma_occlusion_reset();
 		time_ms = 1000;
 	}
-	CHECK(fabsf(temporal[0] - temporal[1]) < 0.025f && fabsf(temporal[1] - temporal[2]) < 0.025f,
-		  "30/60/120 response agrees within the bounded collision refresh interval");
+	CHECK(fabsf(temporal[0] - temporal[1]) < 0.025f && fabsf(temporal[1] - temporal[2]) < 0.025f && fabsf(temporal[2] - temporal[3]) < 0.025f,
+		  "30/60/120/240 response agrees within the bounded collision refresh interval");
 	blocked = 0;
 	plasma_occlusion_submit(99, 0);
 	f = field_for(0);
@@ -358,6 +381,26 @@ int main(int argc, char **argv)
 		plasma_occlusion_reset();
 		CHECK(!allocations,"all lazy passes released");
 	}
+	/* Exact texture reuse is independent of visibility/history updates. */
+	specular_scale=1;plasma_occlusion_submit(700,0);f=field_for(0);
+	CHECK(field_texture(f,0,0),"initial model mask upload");n=uploads;
+	f->texture_mask=0;
+	CHECK(field_texture(f,0,0)&&uploads==n,"identical texels skip backing-memory and GPU work");
+	f->visibility[0]=.37f;f->texture_mask=0;
+	CHECK(field_texture(f,0,0)&&uploads==n+1,"changed texel still uploads");
+	f->visibility[0]=.61f;f->texture_mask=0;fail_unlock=1;
+	CHECK(!field_texture(f,0,0),"failed changed upload falls back");
+	f->visibility[0]=.37f;f->texture_mask=0;fail_unlock=0;
+	CHECK(field_texture(f,0,0)&&uploads==n+3,"failure invalidates byte cache even when old pixels return");
+	for(n=0;n<OCC_COUNT;n++) f->visibility[n]=1;
+	f->texture_mask=0;directional_on=1;
+	CHECK((field_texture(f,0,0) && (f->texture[0]->pixels[(8*16+8)*16]&255)>200),
+		"occluded counter mask lights its facing side");
+	directional_axis[0]=.8f;
+	CHECK((field_texture(f,0,0) && (f->texture[0]->pixels[(8*16+8)*16]&255)==0),
+		"rotating a counter invalidates cached texels even with identical visibility");
+	directional_axis[0]=-.8f;directional_on=0;
+	plasma_occlusion_reset();CHECK(!allocations,"cached upload textures disposed");
 	on=0; muzzle_on=1; time_ms+=200;
 	plasma_occlusion_window(); plasma_occlusion_submit(500,0);
 	CHECK(plasma_occlusion_texture(0,0), "muzzle occlusion works with projectile lighting off");
@@ -472,6 +515,17 @@ int main(int argc, char **argv)
 	CHECK(f&&!(last_flags&FLAG(_collision_test_objects_vehicles_bit)),"other muzzle profiles retain original blockers");
 	CHECK(f->visibility[4095]>.99f,"vehicle-only blocker does not change unrelated lights");
 	plasma_occlusion_reset();
+	muzzle_on=0;vehicle_on=1;
+	for(n=0;n<2;n++)
+	{
+		plasma_occlusion_reset();time_ms+=200;plasma_occlusion_window();
+		plasma_occlusion_submit(n?502:500,0);f=field_for(0);
+		CHECK(f&&(last_flags&FLAG(_collision_test_objects_vehicles_bit)),"headlights and engine emitters include chassis with general occlusion off");
+		CHECK(f->visibility[4095]<.1f,"vehicle emitter cannot illuminate through its hull");
+		plasma_occlusion_submit(501,1);CHECK(!field_for(1),"vehicle switch cannot select unrelated lights");
+	}
+	vehicle_on=0;n=queries;
+	CHECK(!plasma_occlusion_texture(0,0)&&queries==n,"vehicle disable skips GPU texture and collision work");
 	plasma_occlusion_reset();
 	on = muzzle_on = emitter_on = directional_on = 0; shield_on = shield_occlusion = 1;
 	plasma_occlusion_window(); plasma_occlusion_submit(600, 0);
@@ -479,6 +533,42 @@ int main(int argc, char **argv)
 	shield_occlusion = 0; n = queries;
 	plasma_occlusion_window(); plasma_occlusion_submit(600, 0);
 	CHECK(!field_for(0) && queries == n, "shield occlusion obeys its independent toggle");
+	plasma_occlusion_reset();
+	on=1;shield_on=shield_occlusion=emitter_on=directional_on=vehicle_only=0;
+	prong_on=1;blocked=0;rasterizer_lights.lights[0].radius=.3f;specular_scale=2;
+	queries=0;plasma_occlusion_submit(800,0);f=field_for(0);
+	CHECK(f&&queries==96,"short prongs use the smaller ray grid only");
+	{
+		float axis[3]={1,0,0};
+		IDirect3DVolumeTexture8 *t=field_texture(f,0,0);
+		CHECK(plasma_prong_falloff_factor(axis,1,0,0)==1,"outward prong spill remains full");
+		CHECK(plasma_prong_falloff_factor(axis,-1,0,0)==0,"prongs do not illuminate their rear hemisphere");
+		CHECK(plasma_prong_falloff_factor(axis,0,1,0)>0&&plasma_prong_falloff_factor(axis,0,1,0)<.3f,"side spill fades broadly and softly");
+		CHECK(t&&(t->pixels[(8*16+8)*16]&255)==0&&(t->pixels[(8*16+8)*16+15]&255)>240,"actual model texture carries the outward mask");
+	}
+	blocked=1;time_ms+=16;plasma_occlusion_window();plasma_occlusion_submit(800,0);f=field_for(0);
+	CHECK(f&&queries==192&&f->visibility[4095]<.3f,"small prong grid still blocks a nearby wall");
+	plasma_occlusion_reset();CHECK(!allocations,"prong reset releases GPU resources");
+	/* A permanently blocked cell must settle to black, not retain subnormal
+	   fade history forever at high frame rates. Reopening still fades normally. */
+	prong_on=directional_on=emitter_on=muzzle_on=vehicle_on=shield_on=0;
+	on=blocked=1;specular_scale=1;rasterizer_lights.lights[0].radius=1;
+	for(cap=0;cap<4;cap++)
+	{
+		int rates[4]={30,60,120,240};
+		plasma_occlusion_reset();
+		blocked=0;time_ms+=100;plasma_occlusion_window();plasma_occlusion_submit(900,0);f=field_for(0);
+		blocked=1;
+		for(n=0;n<rates[cap]*3;n++)
+		{
+			time_ms+=1000/rates[cap];plasma_occlusion_window();plasma_occlusion_submit(900,0);
+			f=field_for(0);
+		}
+		CHECK(f->visibility[4095]==0,"blocked history settles without denormal residue");
+		blocked=0;time_ms+=16;plasma_occlusion_window();plasma_occlusion_submit(900,0);f=field_for(0);
+		CHECK(f->visibility[4095]>0&&f->visibility[4095]<.5f,"settled cells reopen with the normal fade");
+		blocked=1;
+	}
 	plasma_occlusion_reset();
 	return 0;
 }

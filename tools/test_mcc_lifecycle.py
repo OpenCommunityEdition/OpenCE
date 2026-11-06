@@ -10,6 +10,75 @@ from harness import function
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_explicit_campaign_completion_is_host_owned_and_has_no_retained_state(tmp_path):
+    from test_mcc_identity import compile_tool
+    adapter = function((ROOT / "port/linux/game/mcc_main.c").read_text(), "mcc_main_campaign_won")
+    source = tmp_path / "campaign_completion.c"
+    source.write_text(r'''
+#include <string.h>
+#include <wchar.h>
+typedef int boolean;
+#define FALSE 0
+#define TRUE 1
+#define _error_silent 0
+#define _game_connection_local 0
+#define _game_connection_network_server 1
+#define _game_connection_network_client 2
+struct network_game {struct {char name[64];} map;};
+static struct network_game game={{"mcc_maps\\Host\\z10"}};
+static int active=1,type,enabled=1,connection,state=1,lookups,queued,persistent,rounds,errors;
+static char selected[64];
+static int completions;
+static int game_difficulty_level_get(void){return 2;}
+static void mcc_progress_complete(char const *name,short difficulty){
+ if(difficulty==2 && !strcmp(name,connection==1 ? game.map.name : "mcc_maps\\Local\\z10"))completions++;
+}
+static int mcc_cache_tags_loaded(void){return active;}
+static int mcc_cache_scenario_type(void){return type;}
+static int config_boolean(char const *key){(void)key;return enabled;}
+static int game_connection(void){return connection;}
+static struct network_game *network_game_get_game(void){return &game;}
+static char const *main_get_map_name(void){return "mcc_maps\\Local\\z10";}
+static int mcc_maps_next_mission(char const *name,char next[64]) {
+ lookups++;
+ if(strcmp(name,connection==1 ? game.map.name : main_get_map_name()))return -1;
+ strcpy(next,"mcc_maps\\Pack\\a10");return state;
+}
+static void error(int severity,char const *message,...){(void)severity;(void)message;}
+static void mcc_error_text(char const *name,char const *reason,wchar_t *text,int size){(void)name;(void)reason;(void)size;text[0]=0;}
+static void display_error_text_deferred(wchar_t const *text,int controller){(void)text;(void)controller;errors++;}
+static void network_game_server_port_cooperative_won(char const *next){rounds++;strcpy(selected,next ? next : "lobby");}
+static void main_set_map_name(char const *next){strcpy(selected,next);}
+static void main_disallow_persistent_storage(void){persistent++;}
+static void main_goto_main_menu(void){queued++;}
+''' + adapter + r'''
+int main(void) {
+ int i;
+ for(i=0;i<3;i++) {
+  active=i!=0;type=i==1;enabled=i!=2;
+  if(mcc_main_campaign_won() || lookups || queued || rounds || completions)return 1;
+ }
+ active=enabled=1;type=0;
+ if(!mcc_main_campaign_won() || strcmp(selected,"mcc_maps\\Pack\\a10") || persistent!=1 || queued)return 2;
+ state=2;if(!mcc_main_campaign_won() || queued!=1)return 3;
+ state=-1;if(!mcc_main_campaign_won() || queued!=2 || errors!=1)return 4;
+ state=0;if(!mcc_main_campaign_won() || queued!=3)return 5;
+ connection=1;state=1;
+ if(!mcc_main_campaign_won() || rounds!=1 || strcmp(selected,"mcc_maps\\Pack\\a10") || persistent!=1)return 6;
+ state=2;if(!mcc_main_campaign_won() || rounds!=2 || strcmp(selected,"lobby"))return 7;
+ state=-1;if(!mcc_main_campaign_won() || rounds!=3 || errors!=2)return 8;
+ connection=2;i=lookups;
+ if(!mcc_main_campaign_won() || lookups!=i || rounds!=3 || queued!=3 || completions!=7)return 9;
+ /* Switching back to an unaffected family cannot retain campaign state. */
+ active=0;connection=0;if(mcc_main_campaign_won() || lookups!=i)return 10;
+ return 0;
+}
+''')
+    binary = compile_tool(tmp_path, [source])
+    result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_network_mcc_load_failure_schedules_abort_without_initializing_players(tmp_path):
     from test_mcc_identity import compile_tool
 

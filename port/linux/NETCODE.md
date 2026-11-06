@@ -219,7 +219,24 @@ names and synchronized its opening sequence; the short run did not provide
 enough on-foot samples for the comparator's full drift verdict. These checks
 do not establish full campaign or public internet transport compatibility.
 
-MCC sessions use separate MCC protocol version 63. Version 63 extends campaign
+MCC sessions use separate MCC protocol version 64. Version 64 reserves bytes
+64-127 of the 128-byte MCC map name for advisory Workshop metadata. Valid MCC
+paths occupy at most 63 characters plus their NUL. The tail contains `WS`,
+record version 1, a 1-20 digit item id and NUL, then an ASCII title and NUL;
+the remaining bytes are zero. The title is at most 39 characters. Missing or
+malformed metadata falls back to the fingerprint diagnostic. The metadata
+never substitutes for the level filename or SHA-256 admission checks.
+
+Only `mcc_identity_host_settings` writes this tail in the outgoing MCC copy;
+the host's original settings and Xbox/CE settings are untouched. The record's
+size is unchanged, but its transmitted meaning is new, so MCC 63 peers are
+rejected by the existing version gates. Xbox/CE retain OpenCE protocol 41.
+`tools/test_mcc_workshop.py` checks the bounded record and sidecar reads;
+`tools/test_mcc_identity.py` checks host publication, refusal classification
+and lifecycle; `tools/test_mcc_protocol.py` checks admission and legacy layout.
+These harness checks do not establish full runtime or browser compatibility.
+
+Version 63 extends campaign
 snapshots from 768 to 772 bytes (state version 6) to replicate the host's
 `rasterizer_model_lighting_ambient` value for Mission Z9. Older MCC peers are
 rejected. Xbox/Custom Edition retain the pinned upstream 41 contract and
@@ -1359,7 +1376,7 @@ not.
 
 The host's Session Compatibility selector defaults to OpenCE Crossplay.
 Xbox/CE use the exact pinned OpenCE 41 contract; MCC remains independently
-versioned at 63. In this mode the optional shoulder camera, its input and
+versioned at 64. In this mode the optional shoulder camera, its input and
 muzzle behavior, and its checkpoint recovery extensions do not execute.
 GulchCE Third Person instead advertises camera agreement 32712 (Xbox/CE) or
 32713 (MCC), requires a kind 101 envelope before admission and adds the

@@ -830,6 +830,11 @@ int light_port_refresh_attachment(long light_index, long object_index)
 	if (!light || light->object_index != object_index ||
 		light->parent_light_index != NONE || !object_try_and_get(object_index))
 		return FALSE;
+	/* port: the engine can retain attachments while their object is outside
+	   the map. Render interpolation must not reconnect those lights. */
+	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit) &&
+		!TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
+		return FALSE;
 	light_disconnect_from_map(light_index);
 	light_reconnect_to_map(light_index);
 	return TRUE;
@@ -1081,7 +1086,7 @@ void lights_preprocess_scene(
 	lights_port_recover();
 	muzzle_lighting_update(); /* port: render-time muzzle poses and pulse fade */
 	covenant_lighting_update(); /* port: missing Covenant flight lights */
-	covenant_emitter_lighting_update(); /* port: rendered shield and exposed-rod poses */
+	covenant_emitter_lighting_update(); /* port: feature-owned rendered emitter poses */
 	rocket_lighting_update(); /* port: create flight lights before visibility collection */
 	shield_glow_update(); /* port: port/linux/game/shield_glow.c */
 	for (light_index = data_next_index(light_data, NONE);
@@ -1096,10 +1101,11 @@ void lights_preprocess_scene(
 			FALSE);
 		light->rasterizer_light_index = NONE;
 		lights_port.radius_writes++;
-		/* port: refresh selected persistent plasma attachments at the render pose,
+		/* port: pass the private definition identity for exact emitter selection;
+		   refresh selected persistent attachments at the render pose,
 		   before visibility and receiver selection (plasma_lighting.c). */
 		if (light->parent_light_index == NONE)
-			plasma_lighting_prepare(light_index, light->object_index);
+			plasma_lighting_prepare(light_index, light->object_index, light->definition_index);
 		if (light->parent_light_index != NONE)
 		{
 			struct point_light_definition *definition = light_definition_get(

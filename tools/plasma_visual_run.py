@@ -15,14 +15,17 @@ import statistics
 parser = argparse.ArgumentParser()
 parser.add_argument('--data-root', required=True, type=Path)
 parser.add_argument('--capture-dir', type=Path, help='Directory containing halo-capture.exe and its build manifest')
-parser.add_argument('--fps', required=True, type=int, choices=[30, 60, 120])
+parser.add_argument('--fps', required=True, type=int, choices=[30, 60, 120, 240])
 parser.add_argument('--enabled', required=True, type=int, choices=[0, 1])
 parser.add_argument('--label', default='')
-parser.add_argument('--map', choices=['bloodgulch', 'carousel', 'a10', 'b40', 'c40', 'ce-deathisland'])
-parser.add_argument('--kind', choices=['rifle','pistol','charged','rocket','needle','ghost','banshee','banshee-fuel','shade','fuel','wraith','mp-needle','mp-banshee-fuel','mp-shade','ce-fuel'], default='rifle')
+parser.add_argument('--map', choices=['bloodgulch', 'carousel', 'a10', 'b40', 'c40', 'ce-deathisland', 'mcc-digsite', 'mcc-ruby-c40'])
+parser.add_argument('--kind', choices=['rifle','pistol','charged','rocket','needle','ghost','banshee','banshee-fuel','shade','fuel','wraith','mp-needle','mp-banshee-fuel','mp-shade','ce-fuel','grenade'], default='rifle')
 parser.add_argument('--muzzle', choices=['ar','handgun','shotgun','sniper','rifle','pistol','charged','needler','rocket','flamethrower','warthog','scorpion'])
 parser.add_argument('--both-lighting', action='store_true')
-parser.add_argument('--emitter', choices=['jackal','major','fuel','hunter','stationary','ammo-fp','ammo-marine','ammo-player','needler-fp','needler-marine','needler-player','needler-grunt'])
+parser.add_argument('--prong-lighting', action='store_true', help='Isolate the standalone plasma prong spill in a rifle/pistol combat capture')
+parser.add_argument('--weapon-glow', action='store_true', help='Exercise authored sword and charge lights')
+parser.add_argument('--emitter', choices=['sword-elite','jackal','major','fuel','hunter','stationary','ammo-fp','ammo-marine','ammo-player','needler-fp','needler-marine','needler-player','needler-grunt'])
+parser.add_argument('--ambient', choices=['ghost','banshee','dropship','warthog','scorpion','overshield','camo','teleporter'])
 parser.add_argument('--shield', choices=['normal', 'charge', 'fp', 'elite'])
 parser.add_argument('--glow-intensity', choices=['default','light_show'], default='default')
 parser.add_argument('--shield-look', default='classic', choices=['classic','enhanced','classic_with_sprinkles','classic_honeycomb2'])
@@ -33,6 +36,7 @@ parser.add_argument('--grounded', action='store_true', help='Place the held-weap
 parser.add_argument('--crouch', action='store_true', help='Exercise a held-weapon actor crouching and standing again')
 parser.add_argument('--exterior', action='store_true', help='View the vehicle fixture from outside to inspect chassis blocking')
 parser.add_argument('--sparse-images', action='store_true', help='Retain one image every three simulation ticks')
+parser.add_argument('--image-step', type=int, choices=range(1,31), default=3, help='Simulation ticks between sparse captures')
 parser.add_argument('--counter-detail', action='store_true', help='View a held world-model AR display over its holder\'s shoulder')
 parser.add_argument('--resolution', default='640x480', help='Capture window size, for example 1280x720')
 parser.add_argument('--mixed', action='store_true')
@@ -52,6 +56,11 @@ parser.add_argument('--height', type=float)
 parser.add_argument('--drop', type=float)
 parser.add_argument('--receiver-distance', type=float)
 args = parser.parse_args()
+if args.prong_lighting:
+    if not args.combat or args.kind not in ('rifle', 'pistol') or args.weapon_glow or args.muzzle:
+        parser.error('--prong-lighting requires rifle/pistol --combat, without other weapon-light options')
+if args.toggle and (args.emitter or args.ambient or args.shield or args.muzzle):
+    parser.error('--toggle requires a projectile capture; emitter, shield and muzzle fixtures use separate tick handlers')
 if not re.fullmatch(r'[1-9][0-9]{2,3}x[1-9][0-9]{2,3}', args.resolution):
     parser.error('--resolution must be WIDTHxHEIGHT')
 if args.counter_detail and args.emitter not in ('ammo-player', 'ammo-marine'):
@@ -83,6 +92,18 @@ if args.map=='ce-deathisland':
     for name in [ce_map+'.map','bitmaps.map','sounds.map','loc.map']:
         shutil.copy2(args.data_root/'custom_maps'/name,out/'custom_maps'/name)
     level='custom_maps\\'+ce_map
+elif args.map=='mcc-digsite':
+    for name in ['1.map','bitmaps.map','sounds.map']:
+        target=out/'mcc_maps'/'DigsiteMP'/name
+        target.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(args.data_root/'mcc_maps'/'DigsiteMP'/name,target)
+    level=r'mcc_maps\DigsiteMP\1'
+elif args.map=='mcc-ruby-c40':
+    for name in ['RubyRebalanced/c40.map', '_shared/singleplayer/bitmaps.map']:
+        target=out/'mcc_maps'/name
+        target.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(args.data_root/'mcc_maps'/name,target)
+    level=r'mcc_maps\RubyRebalanced\c40'
 else:
     shutil.copy2(args.data_root/'maps'/(args.map+'.map'),out/'maps'/(args.map+'.map'))
     level=f'levels\\{args.map}\\{args.map}' if args.map in ('a10','b40','c40') else f'levels\\test\\{args.map}\\{args.map}'
@@ -99,9 +120,21 @@ env.update(HALO_DATA_ROOT=str(out), HALO_SAVE_ROOT=str(out/'saves'), HALO_HIDDEN
            HALO_NET_JOIN_FROM_CLIPBOARD='0', HALO_NET_ALLOW_UPNP='0',
            HALO_CRASH_REPORTS='no', HALO_WINDOW_SIZE=args.resolution, HALO_PLASMA_LIGHTING=str(args.enabled),
            HALO_SCREENSHOT_DIR=str(out/'screenshots'), HALO_PLASMA_OCCLUSION=str(args.occlusion))
-if args.map in ('b40', 'c40'):
+if args.map == 'mcc-digsite':
+    # This multiplayer package's scenario script is not a player-spawn path.
+    # Start an ordinary isolated local match, as the compatibility runner does,
+    # rather than capturing its empty campaign-style map_name session.
+    (out/'init.txt').write_text('')
+    env.update(HALO_NETWORK_TEST='local:'+level+':slayer', HALO_NETWORK_TEST_START='3',
+               HALO_NET_ADDRESS='127.0.0.86', HALO_NET_BROADCAST='127.0.0.86',
+               HALO_EXIT_AFTER='35')
+if args.map in ('b40', 'c40', 'mcc-ruby-c40'):
     env['HALO_COVENANT_CAPTURE_CAMPAIGN'] = '1'
-    env['HALO_EXIT_AFTER'] = '70' if args.map == 'b40' else '35'
+    env['HALO_EXIT_AFTER'] = '70' if args.map in ('b40', 'mcc-ruby-c40') else '35'
+if args.prong_lighting:
+    env.update(HALO_PLASMA_PRONG_LIGHTING=str(args.enabled), HALO_PLASMA_LIGHTING='0')
+if args.weapon_glow:
+    env['HALO_WEAPON_GLOW'] = str(args.enabled)
 if args.turn:
     env['HALO_LIGHTING_CAPTURE_TURN'] = '1'
 if args.hide_viewmodel:
@@ -116,10 +149,11 @@ if args.exterior and args.muzzle == 'warthog':
     env['HALO_WARTHOG_CAPTURE_EXTERIOR'] = '1'
 if args.sparse_images:
     env['HALO_LIGHTING_CAPTURE_SPARSE'] = '1'
+    env['HALO_LIGHTING_CAPTURE_IMAGE_STEP'] = str(args.image_step)
 if args.counter_detail:
     env['HALO_EMITTER_CAPTURE_COUNTER_DETAIL'] = '1'
 if args.emitter:
-    env['HALO_EXIT_AFTER'] = '70' if args.map == 'b40' else '35'
+    env['HALO_EXIT_AFTER'] = '70' if args.map in ('b40', 'mcc-ruby-c40') else '35'
     env['HALO_EMITTER_CAPTURE'] = args.emitter
     env['HALO_PLASMA_LIGHTING'] = '0'
     env[{'jackal':'HALO_JACKAL_SHIELD_LIGHTING', 'major':'HALO_JACKAL_SHIELD_LIGHTING',
@@ -127,7 +161,11 @@ if args.emitter:
          'ammo-fp':'HALO_AMMO_COUNTER_LIGHTING','ammo-marine':'HALO_AMMO_COUNTER_LIGHTING',
          'ammo-player':'HALO_AMMO_COUNTER_LIGHTING', 'needler-fp':'HALO_NEEDLER_LIGHTING',
          'needler-player':'HALO_NEEDLER_LIGHTING','needler-marine':'HALO_NEEDLER_LIGHTING',
-         'needler-grunt':'HALO_NEEDLER_LIGHTING'}[args.emitter]] = str(args.enabled)
+         'needler-grunt':'HALO_NEEDLER_LIGHTING', 'sword-elite':'HALO_WEAPON_GLOW'}[args.emitter]] = str(args.enabled)
+if args.ambient:
+    env['HALO_AMBIENT_CAPTURE']=args.ambient
+    env['HALO_PLASMA_LIGHTING']='0'
+    env['HALO_VEHICLE_LIGHTING' if args.ambient in ('ghost','banshee','dropship','warthog','scorpion') else 'HALO_WORLD_LIGHTING']=str(args.enabled)
 if args.shield:
     env.update(HALO_SHIELD_CAPTURE=args.shield, HALO_SHIELD_GLOW=str(args.enabled),
                HALO_OVERSHIELD_EFFECT=str(int(args.shield in ('charge','fp'))), HALO_VIEWMODEL_SHIELD='1',
@@ -174,7 +212,7 @@ with (out/'stdout.log').open('wb') as so, (out/'stderr.log').open('wb') as se:
     process = subprocess.Popen([str(capture_executable)], cwd=out,
                                env=env, stdout=so, stderr=se, creationflags=subprocess.CREATE_NO_WINDOW)
     try:
-        process.wait(timeout=145 if args.map in ('b40', 'c40') else 45)
+        process.wait(timeout=145 if args.map in ('b40', 'c40', 'mcc-ruby-c40') else 45)
     finally:
         if process.poll() is None:
             process.terminate()
@@ -205,6 +243,8 @@ report['shield'] = args.shield
 report['shield_look'] = args.shield_look
 report['glow_intensity'] = args.glow_intensity
 report['shield_created'] = bool(re.search(r'SHIELD created (?!-1 )', logs))
+report['ambient'] = args.ambient
+report['ambient_created'] = bool(re.search(r'AMBIENT created (?!-1 )', logs))
 report['emitter'] = args.emitter
 report['hide_viewmodel'] = args.hide_viewmodel
 report['face_camera'] = args.face_camera
@@ -225,12 +265,16 @@ print(json.dumps(report), flush=True)
 for path in out.rglob('*.map'):
     assert path.resolve().is_relative_to(out.resolve())
     path.unlink()
-if process.returncode or (report['shots'] != 3 and not args.combat and not args.emitter and not args.shield) or (not args.no_images and not report['screenshots']):
+if process.returncode or (report['shots'] != 3 and not args.combat and not args.emitter and not args.shield and not args.ambient) or (not args.no_images and not report['screenshots']):
     raise SystemExit('Capture incomplete; inspect report.json and logs')
+if args.ambient and not report['ambient_created']:
+    raise SystemExit('Ambient fixture missing; this is not a passing capture')
 if args.shield and not report['shield_created']:
     raise SystemExit('Shield fixture did not create its actor')
-if args.emitter and (not report['emitter_created'] or bool(report['emitter_samples']) != bool(args.enabled)):
+if args.emitter and (not report['emitter_created'] or (args.emitter != 'sword-elite' and bool(report['emitter_samples']) != bool(args.enabled))):
     raise SystemExit('Emitter creation or activation failed')
+if args.emitter == 'sword-elite' and args.enabled and r'weapons\energy sword\energy sword' not in report['selected_tags']:
+    raise SystemExit('Sword attachment never entered enhanced lighting')
 if args.crouch and not args.shield and report['holder_crouch_samples'] != [1.0, 1.0, 0.0]:
     raise SystemExit('Holder did not crouch and return to standing')
 if bool(report['selected_frames']) != bool(args.enabled or (args.muzzle and args.both_lighting)):
@@ -269,6 +313,7 @@ if args.toggle:
             raise SystemExit('Occlusion updated while disabled')
 
 expected_tags = {
+    'grenade': r'weapons\plasma grenade\plasma grenade',
     'rifle': r'weapons\plasma rifle\bolt',
     'pistol': r'weapons\plasma pistol\bolt',
     'charged': r'weapons\plasma rifle\charged bolt',
@@ -285,7 +330,7 @@ expected_tags = {
     'mp-shade': 'vehicles\\c gun turret\\mp gun turret',
     'ce-fuel': 'weapons\\plasma_cannon\\plasma_cannon',
 }
-if args.enabled and not args.muzzle and not args.emitter and not args.shield:
+if args.enabled and not args.prong_lighting and not args.muzzle and not args.emitter and not args.shield and not args.ambient:
     expected = {expected_tags[args.kind]}
     if args.mixed:
         expected = {expected_tags[kind] for kind in ('rifle', 'pistol', 'charged', 'rocket') if args.kind == 'rocket' or kind != 'rocket'}
@@ -306,3 +351,8 @@ if args.muzzle == "warthog" and args.enabled and r"MUZZLE profile vehicles\warth
 if args.muzzle == 'scorpion' and args.enabled:
     if r'MUZZLE profile vehicles\scorpion\scorpion cannon' not in logs or set(re.findall(r'MUZZLE sample[^\r\n]+ trigger ([01])', logs)) != {'0', '1'}:
         raise SystemExit('Capture did not fire both Scorpion guns')
+
+if args.prong_lighting and args.enabled:
+    expected = 'weapons\\plasma '+args.kind+'\\plasma '+args.kind
+    if expected not in report['selected_tags']:
+        raise SystemExit('Prong capture never selected the intended weapon attachment')
