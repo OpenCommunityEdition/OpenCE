@@ -2,6 +2,11 @@
 #include "harness.h"
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
+/* tomlc17 uses C11 assertions; the harness compiles as C99. */
+#ifndef static_assert
+#define static_assert _Static_assert
+#endif
 #include "toml.inc"
 #include "under_test.inc"
 
