@@ -75,15 +75,27 @@ so a reservation at start-up fails. The armv7 executable therefore carries the
 window as a segment of its own, which the kernel maps before the loader runs
 (`tools/linux_armv7_tag_cache.ld`; `port/linux/src/xbox_memory.c` uses it).
 
-## Running on a 64-bit ARM computer
+## Packages
+
+`OpenCE-armv7.AppImage` is built by the Linux packages workflow. There is no Flatpak: its runtime has no 32-bit ARM version. The
+AppImage needs glibc 2.38 or later and a 32-bit ARM system; refer to
+[port/linux/README.md](../linux/README.md#appimage-and-flatpak-packages).
+
+Its runtime is built in CI from the AppImage project's source (a pinned
+commit, `runtime-armv7` in the workflow) in Alpine's ARMv7 container. The
+runtime that the project publishes is ARMv6 code with the ARMv6 memory barrier
+(`mcr p15, 0, r0, c7, c10, 5`), which a 64-bit kernel without CP15 barrier
+emulation traps, so that AppImage stopped before the game started. The job
+checks that the runtime is ARMv7 and has none of that barrier.
 
 To run the game on a 64-bit ARM computer that has the 32-bit mode but no armhf
 libraries, use an armhf root: for example a Debian 13 armhf container
 (`podman run --platform linux/arm/v7 debian:trixie`) with the libraries named
 under "Building" and `libwayland-client0`, `libwayland-egl1`,
-`libxkbcommon0` and Mesa's drivers (`libgl1-mesa-dri`, `libegl-mesa0`). Start
-`build/linux-armv7/halo` in the container, with the container's libraries, the
-Wayland socket and `/dev/dri`.
+`libxkbcommon0` and Mesa's drivers (`libgl1-mesa-dri`, `libegl-mesa0`). Unpack
+the AppImage with `unsquashfs -o OFFSET` (the offset is the end of the ELF
+runtime at the start of the file) and start `usr/bin/halo` with the
+container's libraries, the Wayland socket and `/dev/dri`.
 
 SDL3 is built with Wayland and X11 support (the build needs
 `wayland-scanner` on the build computer, and `wayland-protocols` and
@@ -103,6 +115,8 @@ needs XWayland).
   arm64 build's 102 to 120 on the same maps, since only the cores with a
   32-bit mode (the Cortex-A510 and A710 there) can run it. A controller
   worked in play.
+- The AppImage ran on a 64-bit ARM CPU in its 32-bit mode (in an armhf
+  container) and under qemu-user, not on a 32-bit ARM computer.
 - The game needs a GPU with OpenGL ES 3.0 or later.
 - Custom Edition maps are not tested on this build.
 

@@ -24,11 +24,12 @@ end.
 | `port/android/` | The Android app: the host library (`host/`), the Java app (`app/`) |
 | `port/linux-arm64/` | The native Linux arm64 port: its host (`host/`), which runs the guest image on the system's SDL3 and OpenGL ES |
 | `port/linux-armv7/` | The native Linux armv7 port: the Linux build compiled for armv7-linux-gnueabihf with clang and lld, on OpenGL ES (a root of armhf libraries from `--linux-sysroot`) |
+| `packaging/linux/` | The desktop file and the AppStream metadata of the AppImages and Flatpaks (`tools/linux_package.py` makes them) |
 | `port/web/` | The web build: its runtime (`src/`: entry, sockets inside the page, memory watch), the page and its service worker (`site/`), the SDL port, tests |
 | `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers and master servers, the dedicated server's web page (`server_ui/`) |
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
 | `port/tools/` | Stand-alone tools (`cache_file_report.c`) |
-| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py` (which calls `guest_build.py`), `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `server_ui_embed.py`, `xdk_headers.py`), the dedicated server's protocol simulator and remote console (`server_sim.py`, `opence_rcon.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
+| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py` (which calls `guest_build.py`), `web_build.py`, `ci_build.py`, `web_serve.py`), the CI checks (`ci_smoke.py` starts a build headless and reads its log, `check_glibc.py` the glibc a file needs), the packages (`linux_package.py`: AppImages and Flatpaks), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `server_ui_embed.py`, `xdk_headers.py`), the dedicated server's protocol simulator and remote console (`server_sim.py`, `opence_rcon.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
 | `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`, `dedicated_server.md`, `master_protocol.md`) |
 | `pgo/` | Profile-guided optimisation profiles |
 | `deploy/` | Running a dedicated server: systemd, Docker, Pterodactyl, Helm, PufferPanel, MCSManager, example gametypes |
@@ -97,6 +98,7 @@ python -m pytest -q tools/test_linux_port.py                # the build, the map
 python -m pytest -q tools/test_mods.py                      # mods played over a map (needs assets/maps)
 python -m pytest -q tools/test_bots.py                      # the bots in local games (needs assets/maps)
 python -m pytest -q tools/test_cache_file_formats.py tools/test_bmp_files.py tools/test_profile.py
+python -m pytest -q tools/test_ci_smoke.py tools/test_check_glibc.py tools/test_linux_packaging.py   # the CI checks of the built game, the glibc a file needs, the AppImages and Flatpaks
 python tools/test_touch_layout.py                           # the Android touch layout (JDK 17+)
 python tools/test_light_storage.py
 python tools/test_death_timing.py

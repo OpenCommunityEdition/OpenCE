@@ -49,12 +49,19 @@ same flow as the x86 build.
 Run these with pytest from the `tools` folder:
 
 - `test_linux_arm64_build.py`: the build graph of the guest and the host.
+- `test_linux_packaging.py`: the packaging files.
 - `test_host_boot.py`: the host's boot helpers.
 - `test_host_page_size.py`: the page size handling, Linux only.
 - `test_linux_arm64_host.py`: a start-up smoke test, on Linux arm64 with
   the host built.
 
-## CI
+## Packaging
+
+The Linux packages workflow builds an AppImage and a Flatpak of the game
+for Linux arm64 (`OpenCE-aarch64.AppImage` and `.flatpak`) as release
+builds, started by hand or by a version tag. Refer to
+[port/linux/README.md](../linux/README.md#appimage-and-flatpak-packages): the
+AppImage needs glibc 2.38 or later.
 
 `tools/ci_smoke.py` starts the host in CI with no window or game data and
 checks that it loads and quits at the missing data.

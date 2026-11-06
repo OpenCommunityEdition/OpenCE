@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.opencommunityedition.OpenCE</id>
+  <name>OpenCE</name>
+  <summary>Halo: Combat Evolved port for Linux</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+  <description>
+    <p>OpenCE is a port of the Halo: Combat Evolved decompilation. It needs the game data from your own copy of the game.</p>
+  </description>
+  <url type="homepage">https://github.com/OpenCommunityEdition/OpenCE</url>
+  <launchable type="desktop-id">io.github.opencommunityedition.OpenCE.desktop</launchable>
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">mild</content_attribute>
+  </content_rating>
+  <releases>
+    <release version="0.1" date="2026-11-03"/>
+  </releases>
+</component>

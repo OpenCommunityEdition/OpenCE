@@ -59,8 +59,14 @@ Release build is recommended for regular play.
 
 The debug build stops at the first failed check (assertion) and writes it to the log, so use it when you want to find and report problems.
 
-The game updates itself. At start-up it looks for a newer release, and asks
-if you want to install it. Refer to "Updates" in
+The Linux game is also built as an AppImage and a Flatpak for each
+architecture (x86_64, arm64 and armv7): refer to "AppImage and Flatpak
+packages" in
+[port/linux/README.md](port/linux/README.md#appimage-and-flatpak-packages).
+
+The game (the zip builds) updates itself. At start-up it looks for a newer
+release, and asks if you want to install it. The AppImages and Flatpaks do
+not: download the new file. Refer to "Updates" in
 [port/linux/README.md](port/linux/README.md#updates). The web site offers
 each new build when it is out.
 
