@@ -310,7 +310,7 @@ def test_menu_settings_exist():
     root = MENUS.parent.parent.parent
     config = (root / "port/linux/src/port_config.c").read_text()
     functions = (root / "port/linux/game/menu_functions.c").read_text()
-    known = set(re.findall(r'^\t\{ "([a-z_]+\.[a-z_]+)", _config_', config, re.M))
+    known = set(re.findall(r'^\t\{ "([a-z_]+(?:\.[a-z_]+)+)", _config_', config, re.M))
     profile = set(re.findall(r'\{ "(profile\.[a-z_]+)", \d', functions))
     # (and the actions a row does on OK rather than a setting: DISCORD ACCOUNT's LINK, setting_write's)
     actions = set(re.findall(r'!strcmp\(name, "([a-z_]+\.action)"\)', functions))
