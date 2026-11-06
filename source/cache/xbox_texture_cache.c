@@ -827,10 +827,11 @@ static boolean texture_cache_bitmap_valid(
 static void texture_cache_read_android_ce(struct bitmap_data *bitmap, void *header)
 {
 	extern boolean mod_bitmaps_read(struct bitmap_data *bitmap, void *buffer);
+	extern boolean addons_bitmaps_read(struct bitmap_data *bitmap, void *buffer);
 	boolean loaded = FALSE;
 
 	texture_cache_initialize_hardware_format(bitmap, header);
-	if (!mod_bitmaps_read(bitmap, bitmap->base_address))
+	if (!mod_bitmaps_read(bitmap, bitmap->base_address) && !addons_bitmaps_read(bitmap, bitmap->base_address))
 		cache_file_read(bitmap->tag_index, bitmap->pixels_offset, bitmap->pixels_size,
 			bitmap->base_address, &loaded, TRUE);
 }
@@ -880,11 +881,13 @@ static boolean texture_cache_start_loading_bitmap(
 		texture->bitmap = bitmap;
 		texture_cache_initialize_hardware_format(bitmap, &texture->hardware_format);
 		/* port: or, the bitmap of a mod played over the map's, from its
-		file, at once (port/linux/game/mod_bitmaps.c) */
+		file, at once (port/linux/game/mod_bitmaps.c), or an add-on's, from
+		its file (port/linux/game/addons.c) */
 		{
 			extern boolean mod_bitmaps_read(struct bitmap_data *bitmap, void *buffer);
+			extern boolean addons_bitmaps_read(struct bitmap_data *bitmap, void *buffer);
 
-			if (mod_bitmaps_read(bitmap, base_address))
+			if (mod_bitmaps_read(bitmap, base_address) || addons_bitmaps_read(bitmap, base_address))
 			{
 				texture->loaded = TRUE;
 				texture->read_request_handle = NONE;

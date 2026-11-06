@@ -4,7 +4,10 @@ MODS-WORKER.JS
 Copies a mod into the site's Origin Private File System, where the game
 finds it (/data/mods/<its folder>: port/linux/src/port_mods.c, docs/mods.md),
 from the folder the player chose: its mod.toml and its tags folder of Halo PC
-tag files (the rest of the folder is not the game's). It runs in a Worker,
+tag files (the rest of the folder is not the game's). Or a mutator
+(/data/mutators/<its folder>: port/linux/src/port_mutators.c,
+docs/mutators.md): its mutator.toml and the files beside it (its script,
+add-on and settings). It runs in a Worker,
 which can write with synchronous OPFS access handles, and replaces a mod of
 the same folder's name. The folder is the player's, so its paths are
 checked: no part of one empty, hidden, a parent's or with a separator in it,
@@ -12,7 +15,8 @@ and no more files than the game lists; a folder without mod.toml at its top
 is not a mod.
 
 Messages from the page: { type: 'add', files } (the chosen folder's File
-objects, each with its webkitRelativePath) or { type: 'remove', name }. To
+objects, each with its webkitRelativePath) or { type: 'remove', name }, each
+with kind: 'mutators' for a mutator (else a mod). To
 the page: { type: 'progress', file, done, total }, then { type: 'done',
 name, files, bytes } or { type: 'error', message }.
 */
@@ -62,6 +66,34 @@ function modFiles(list) {
   return { name, files };
 }
 
+// The mutator in a chosen folder's files: { name, files: [{ parts, file }] }
+// of its mutator.toml and the files beside it (not those in folders under it,
+// which the game does not read); throws why it is not one.
+function mutatorFiles(list) {
+  let name = null;
+  const files = [];
+  let toml = false;
+  for (const file of list) {
+    const parts = (file.webkitRelativePath || file.name).split('/');
+    if (!parts.every(plainPart)) continue;
+    if (name === null) name = parts[0];
+    if (parts[0] !== name) throw new Error('Choose one mutator\'s folder.');
+    if (parts.length !== 2) continue;
+    if (parts[1] === 'mutator.toml') toml = true;
+    files.push({ parts: parts.slice(1), file });
+  }
+  if (name === null) throw new Error('The folder is empty.');
+  if (!plainFolder(name)) throw new Error(`"${name}" cannot be a mutator's folder name: it must not be hidden, and be ${MAXIMUM_FOLDER_LENGTH} bytes at most.`);
+  if (!toml) throw new Error(`${name} has no mutator.toml: it is not a mutator.`);
+  return { name, files };
+}
+
+// what a kind of folder is: how its files are found, and its folder in the storage
+const KINDS = {
+  mods: { files: modFiles, folder: 'mods', what: 'mod' },
+  mutators: { files: mutatorFiles, folder: 'mutators', what: 'mutator' },
+};
+
 async function directoryOf(root, parts) {
   let directory = root;
   for (const part of parts) directory = await directory.getDirectoryHandle(part, { create: true });
@@ -93,18 +125,18 @@ async function writeFile(directory, name, file, onChunk) {
   }
 }
 
-async function add(list) {
-  const mod = modFiles(list);
+async function add(list, kind) {
+  const mod = kind.files(list);
   const total = mod.files.reduce((sum, entry) => sum + entry.file.size, 0);
   const storage = await navigator.storage.getDirectory();
   if (navigator.storage.estimate) {
     const { quota, usage } = await navigator.storage.estimate();
     if (quota && quota - usage < total) {
       throw new Error(`The browser lets this site keep ${Math.floor((quota - usage) / 1e6)} MB more, ` +
-        `and the mod takes ${Math.ceil(total / 1e6)} MB.`);
+        `and the ${kind.what} takes ${Math.ceil(total / 1e6)} MB.`);
     }
   }
-  const mods = await storage.getDirectoryHandle('mods', { create: true });
+  const mods = await storage.getDirectoryHandle(kind.folder, { create: true });
   // (a mod of the same name is replaced whole)
   await mods.removeEntry(mod.name, { recursive: true }).catch(() => {});
   const root = await mods.getDirectoryHandle(mod.name, { create: true });
@@ -130,10 +162,10 @@ async function add(list) {
   return { name: mod.name, files: mod.files.length, bytes: total };
 }
 
-async function remove(name) {
-  if (!plainFolder(name)) throw new Error('No such mod.');
+async function remove(name, kind) {
+  if (!plainFolder(name)) throw new Error(`No such ${kind.what}.`);
   const storage = await navigator.storage.getDirectory();
-  const mods = await storage.getDirectoryHandle('mods', { create: true });
+  const mods = await storage.getDirectoryHandle(kind.folder, { create: true });
   await mods.removeEntry(name, { recursive: true });
   return { name, files: 0, bytes: 0 };
 }
@@ -141,7 +173,9 @@ async function remove(name) {
 if (typeof onmessage !== 'undefined' || typeof WorkerGlobalScope !== 'undefined') {
   onmessage = async (event) => {
     try {
-      const result = event.data.type === 'remove' ? await remove(event.data.name) : await add(event.data.files);
+      const kind = KINDS[event.data.kind] || KINDS.mods;
+      const result = event.data.type === 'remove' ? await remove(event.data.name, kind) :
+        await add(event.data.files, kind);
       postMessage({ type: 'done', ...result });
     } catch (error) {
       postMessage({ type: 'error', message: error && error.message ? error.message : String(error) });
@@ -151,5 +185,5 @@ if (typeof onmessage !== 'undefined' || typeof WorkerGlobalScope !== 'undefined'
 
 // (for the tests: port/web/tests)
 if (typeof module !== 'undefined') {
-  module.exports = { modFiles, plainPart, plainFolder };
+  module.exports = { modFiles, mutatorFiles, plainPart, plainFolder };
 }

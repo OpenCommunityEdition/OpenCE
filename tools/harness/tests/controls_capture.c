@@ -27,6 +27,10 @@ static void halo_input_name(int input,char *name,unsigned size){snprintf(name,si
 static int went_back;
 static void ui_widget_port_go_back(struct widget_instance *w){(void)w;went_back++;}
 #include "under_test.inc"
+/* no mutator's script has controls of its own */
+long port_mutators_script_controls(struct port_mutator_control *controls, long maximum){(void)controls;(void)maximum;return 0;}
+int port_mutators_script_control_write(long index, char const *name, char const *value){(void)index;(void)name;(void)value;return 0;}
+void mutator_scripts_settings_changed(void){}
 /* sdl_platform.c's key event while a binding is waited for */
 static void key_down(int scancode,int result)
 {

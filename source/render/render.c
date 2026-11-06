@@ -90,6 +90,7 @@ symbols in this file:
 /* port: static transparent part links for the newly loaded model tags. */
 #include "models/models.h"
 #include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
+#include "mutator_scripts.h" /* port: port/linux/game/mutator_scripts.c */
 
 /* ---------- constants */
 
@@ -333,6 +334,10 @@ static void render_window(
 	parameters.window_index = render.window_index;
 	parameters.fog = render.fog;
 
+	/* port: a mutator's script's models posed from this camera
+	(port/linux/game/mutator_scripts.c) */
+	mutator_scripts_render_begin(local_player_index, &render.camera.position, &render.camera.forward,
+		&render.camera.up);
 	structure_visibility_compute();
 	player_effect_get_screen_flash(local_player_index, &parameters.screen_flash);
 	rasterizer_window_begin(&parameters);
@@ -442,6 +447,9 @@ static void render_window(
 	bink_playback_render();
 	render_camera_debug_frustum(&render.camera, &render.frustum);
 	render_debug();
+	/* port: the lines of a mutator's script (port/linux/game/mutator_scripts.c) */
+	mutator_scripts_render(render.local_player_index, &render.camera.position, &render.camera.forward,
+		&render.camera.up);
 	editor_render();
 	rasterizer_debug_draw();
 	rasterizer_window_end();

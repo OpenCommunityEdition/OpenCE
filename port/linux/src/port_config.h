@@ -32,6 +32,10 @@ void config_folder(char *path, size_t size);
 /* a whole file (a UTF-8 path), NUL terminated, or NULL; free() it (the Android
 guest has no SDL_LoadFile) */
 char *config_file_read(const char *path, size_t *size);
+/* writes text to a file (a UTF-8 path), whole: to a file beside it first,
+which then takes its place, so that a write cut short leaves the file as it
+was; 1 on success */
+int config_file_write(const char *path, const char *text);
 /* a setting's default, as text; 0 if there is no such setting */
 int config_default(const char *name, char *text, size_t size);
 /* how many times config_write has changed a setting: what keeps one reads

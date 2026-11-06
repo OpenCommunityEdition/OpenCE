@@ -27,6 +27,20 @@ assets/
 # (but the high-res assets, drawn for the port: tools/hud_assets.py)
 !port/assets/
 original/
+noship/
 
 # CI build outputs (tools/ci_build.py)
 dist/
+
+# tools
+claude.sh
+# (this machine's build scripts, its toolchains' paths)
+build-env.sh
+build-linux.sh
+build-windows.sh
+build-android.sh
+build-web.sh
+
+# add-ons built from maps (tools/addon_build.c): rebuilt, never committed
+addons/**/*.cevehicle
+addons/**/*.ceweapon

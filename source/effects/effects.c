@@ -172,6 +172,7 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "units/bipeds.h"
 #include "units/units.h"
+#include "explosion_decals.h" /* port: port/linux/game/explosion_decals.c */
 #undef real_local_random
 
 /* ---------- constants */
@@ -1757,6 +1758,9 @@ static void effect_generate_part(
 			damage.direction = *world_forward;
 
 			area_of_effect_cause_damage(&damage, NONE);
+			/* port: and the decal a mutator's [explosion] leaves, as big as
+			the damage reaches (port/linux/game/explosion_decals.c) */
+			explosion_decal(part_definition->reference.index, world_point, world_forward);
 			break;
 		}
 

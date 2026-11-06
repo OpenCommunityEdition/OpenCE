@@ -4,8 +4,8 @@ tools/hud_assets.py), the menus' titles (port/assets/titles, made by
 tools/title_assets.py), their controller button icons (port/assets/buttons,
 made by tools/button_assets.py), the fonts the text is drawn with
 (port/assets/fonts), the menus' files (port/assets/menus, made by
-tools/ce_menus.py) and SMAA's shader and lookup textures
-(port/third_party/smaa) in the game as C data:
+tools/ce_menus.py), the stock mutators (port/assets/mutators) and SMAA's
+shader and lookup textures (port/third_party/smaa) in the game as C data:
 
     python tools/embed_assets.py OUTPUT.c
 
@@ -13,9 +13,9 @@ writes OUTPUT.c with each PNG and the bitmap it stands for (its tag, index
 and checksum of its pixels, from port/assets/hud/layout.json,
 port/assets/titles/titles.json and port/assets/buttons/buttons.json), the
 fonts and their tags from port/assets/fonts/fonts.json, the menu files
-listed in port/assets/menus/menus.json, and SMAA's shader and lookup
-textures, as port/linux/src/hud_hires.h, text_hires.h, menu_files.h and
-xgpu_post.c declare them. The builds generate it
+listed in port/assets/menus/menus.json, each stock mutator's mutator.toml,
+and SMAA's shader and lookup textures, as port/linux/src/hud_hires.h,
+text_hires.h, menu_files.h, mutator_files.h and xgpu_post.c declare them. The builds generate it
 (hud_assets_build, called by tools/linux_build.py, windows_build.py and
 android_build.py), so the assets are the committed source and Android needs
 no files beside its guest image.
@@ -48,6 +48,8 @@ FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
 MENU_ASSETS = Path("port/assets/menus")
 MENU_LIST = MENU_ASSETS / "menus.json"
+# the stock mutators, a folder each with a mutator.toml (port/linux/src/port_mutators.c)
+MUTATOR_ASSETS = Path("port/assets/mutators")
 # SMAA's files and the names port/linux/src/xgpu_post.c declares them by
 SMAA_ASSETS = Path("port/third_party/smaa")
 SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
@@ -87,6 +89,13 @@ def menu_files() -> List[str]:
     return json.loads((ROOT / MENU_LIST).read_text())["files"]
 
 
+def mutator_folders() -> List[str]:
+    """The stock mutators' folders that have a mutator.toml, by name."""
+    if not (ROOT / MUTATOR_ASSETS).is_dir():
+        return []
+    return sorted(path.parent.name for path in (ROOT / MUTATOR_ASSETS).glob("*/mutator.toml"))
+
+
 def smaa_files() -> List[tuple]:
     """SMAA's files that the checkout has, with their symbols."""
     return [(name, symbol) for name, symbol in SMAA_FILES if (ROOT / SMAA_ASSETS / name).is_file()]
@@ -98,6 +107,7 @@ def hud_asset_inputs() -> List[Path]:
               if (ROOT / listing).is_file()]
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
             *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
+            *(MUTATOR_ASSETS / name / "mutator.toml" for name in mutator_folders()),
             *(SMAA_ASSETS / name for name, _ in smaa_files()),
             *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else []),
             *([MENU_CURSOR] if (ROOT / MENU_CURSOR).is_file() else [])]
@@ -113,6 +123,8 @@ def hud_configure_inputs() -> List[Path]:
                             (FONT_ASSETS, FONT_LIST), (MENU_ASSETS, MENU_LIST)):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
+    if (ROOT / MUTATOR_ASSETS).is_dir():
+        inputs += [MUTATOR_ASSETS, *(MUTATOR_ASSETS / name for name in mutator_folders())]
     if (ROOT / SMAA_ASSETS).is_dir():
         inputs.append(SMAA_ASSETS)
     return inputs
@@ -266,6 +278,28 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
+    lines.append("")
+    # the stock mutators' mutator.toml, each ending in a NUL (mutator_files.h)
+    lines.append('#include "mutator_files.h"')
+    lines.append("")
+    mutators = mutator_folders()
+    for index, name in enumerate(mutators):
+        data = (ROOT / MUTATOR_ASSETS / name / "mutator.toml").read_bytes()
+        if b"\0" in data or b'"' in name.encode() or b"\\" in name.encode():
+            sys.exit(f"{name}: a mutator.toml with a NUL, or a folder name with a quote or backslash")
+        lines.append(f"static const unsigned int mutator{index}[] = {{")
+        lines.extend(words(data + b"\0"))
+        lines.append("};")
+        lines.append("")
+    lines.append("const struct mutator_file_embedded mutator_files_embedded[] =")
+    lines.append("{")
+    for index, name in enumerate(mutators):
+        size = (ROOT / MUTATOR_ASSETS / name / "mutator.toml").stat().st_size
+        lines.append(f'\t{{ "{name}", mutator{index}, {size} }},')
+    if not mutators:
+        lines.append("\t{ 0 },")
+    lines.append("};")
+    lines.append(f"const unsigned int mutator_files_embedded_count = {len(mutators)};")
     lines.append("")
     # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
     # and its lookup textures (xgpu_post.c); each of size 0 that the

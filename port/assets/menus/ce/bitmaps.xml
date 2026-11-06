@@ -341,6 +341,12 @@
 	<bitmap name="main_menu/multiplayer_type_select/server_settings/map_share_options/header_map_share_options">
 		<frame png="ce/port/main_menu/multiplayer_type_select/server_settings/map_share_options/header_map_share_options.png" width="512" height="64"/>
 	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/server_settings/mutator_options/header_mutator_options">
+		<frame png="ce/port/main_menu/multiplayer_type_select/server_settings/mutator_options/header_mutator_options.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings">
+		<frame png="ce/port/main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings.png" width="512" height="64"/>
+	</bitmap>
 	<bitmap name="main_menu/multiplayer_type_select/server_settings/voice_options/header_voice_options">
 		<frame png="ce/port/main_menu/multiplayer_type_select/server_settings/voice_options/header_voice_options.png" width="512" height="64"/>
 	</bitmap>

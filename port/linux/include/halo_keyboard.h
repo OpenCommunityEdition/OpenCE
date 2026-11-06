@@ -99,4 +99,9 @@ int halo_chat_touch_layout(void);
 last call (up positive): they scroll the lines, not the weapons */
 int halo_chat_wheel_steps(void);
 
+/* whether a key, a mouse button (controls.*'s names) or a D-pad direction ("DPad Up",
+"DPad Down", "DPad Left", "DPad Right") is held, in the game: for a mutator's
+script (port/linux/src/xinput_sdl.c) */
+int halo_input_held_named(const char *name);
+
 #endif

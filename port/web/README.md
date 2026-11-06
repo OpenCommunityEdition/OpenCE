@@ -48,6 +48,14 @@ checked as it is copied (`mods-worker.js`). Every mod is on; the game's main
 menu, Mods, orders them and turns them off. The game asks in a dialog of the
 page when mods say they cannot be played together (`web_js_ask`).
 
+Mutators (`docs/mutators.md`): under **Mutators**, **Add a mutator folder…**
+copies a mutator's `mutator.toml` and the files beside it (its Lua script,
+its add-on, its settings) into the browser's storage (`mutators/`, the data
+root's for the game), replacing one of the same folder's name, and
+**Remove** deletes one. The stock mutators are in the game already. They are
+turned on in the game: the main menu's Mods (MUTATORS), or Server Setup's
+MUTATOR OPTIONS, with their SETTINGS.
+
 The page asks the browser to keep the site's data. A browser that is short
 of space may delete it otherwise; **Settings and data** says which. The
 storage belongs to the site's address: `halocombatevolved.com` and the
@@ -430,7 +438,7 @@ jsDelivr).
 | `port/web/src/web_stubs.c` | UPnP and an MSVC intrinsic |
 | `port/web/src/web_shared.h`, `web_touch.c` | The words of memory the page reads and writes: frames shown, the touch controls' state |
 | `port/web/src/web_library.js`, `web_pre.js` | The JavaScript halves: messages to the page, the brokers' WebSockets, the workers' errors |
-| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), internet play's WebRTC (`p2p.js`), its service worker (`sw.js`), the importers (`xiso-worker.js`, the maps; `mods-worker.js`, the mods), the web app's manifest and icons |
+| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), internet play's WebRTC (`p2p.js`), its service worker (`sw.js`), the importers (`xiso-worker.js`, the maps; `mods-worker.js`, the mods and mutators), the web app's manifest and icons |
 | `port/web/stamp_version.py`, `licenses.py` | `version.json` and `licenses.txt` |
 | `port/web/tests/` | The tests above |
 | `tools/web_serve.py` | A local server for the site |

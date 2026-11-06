@@ -857,6 +857,18 @@ short cache_file_read(
 	short request_index = cache_request_next_free_index();
 	struct cache_file_request *request = cache_request_get(request_index);
 
+	/* port: the reads of an add-on's tags' pixels and samples are served from
+	its file, at once; the request stays free (port/linux/game/addons.c) */
+	{
+		extern boolean addons_read(long tag_index, long offset, long size, void *buffer);
+
+		if (addons_read(tag_index, offset, size, buffer))
+		{
+			*completion_flag_reference = TRUE;
+
+			return request_index;
+		}
+	}
 	/* port: the reads of a Halo Custom Edition map are served in place, at
 	once; the request stays free (port/linux/game/custom_edition_cache.c) */
 	if (custom_edition_cache_tags_loaded())

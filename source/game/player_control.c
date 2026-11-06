@@ -211,6 +211,7 @@ symbols in this file:
 
 #include "real_math.h"
 #include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c; after the limit2d alias above */
+#include "mutator_scripts.h" /* port: port/linux/game/mutator_scripts.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
@@ -748,8 +749,10 @@ static void handle_one_player_input(
 		}
 
 		/* port: this local passenger view has no weapon zoom, including a
-		scope held before entering the seat or enabling the setting. */
-		if (passenger_camera_enabled(local_player_index))
+		scope held before entering the seat or enabling the setting; nor the
+		view a mutator's script asks for (port/linux/game/mutator_scripts.c). */
+		if (passenger_camera_enabled(local_player_index) ||
+			mutator_view_active(local_player_index))
 		{
 			player->zoom_level = NONE;
 			if (unit->unit.current_zoom_level != NONE || unit->unit.desired_zoom_level != NONE)

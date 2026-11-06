@@ -43,6 +43,7 @@ menu gets FRIENDLY FIRE too.
 
 #include "halo_menus.h"
 #include "custom_edition_cache.h"
+#include "stock_tags.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -398,6 +399,13 @@ static char const *const port_function_names[] =
 	/* (the main menu's Mods: menu_functions.c) */
 	"port mods init", "port mods close", "port mods toggle", "port mods move up", "port mods move down",
 	"port mods save",
+	/* (its MUTATORS and MODS: the rows the mutators', or the mods' again) */
+	"port mods switch",
+	/* (Server Setup's MUTATOR OPTIONS: the Mods screen's rows, the mutators') */
+	"port mutators init", "port mutators save",
+	/* (MUTATOR OPTIONS' SETTINGS: the mutators' options) */
+	"port mutator settings init", "port mutator settings left", "port mutator settings right",
+	"port mutator settings save",
 	"port controller init", "port controller close", "port controller defaults", "port controller save", "port controller bind", "port controller left", "port controller right",
 	/* (a dedicated server's map vote: menu_functions.c) */
 	"port map vote open", "port map vote choose",
@@ -430,6 +438,8 @@ static char const *const port_game_data_input_names[] =
 	/* (the gametype editor's description, with OPENCE OPTIONS' row) */
 	"port playlist edit desc",
 	"port controller update",
+	/* (MUTATOR SETTINGS' rows: menu_functions.c's mutator_settings_show) */
+	"port mutator settings update",
 	/* (a dedicated server's map vote's screen) */
 	"port map vote update",
 	/* (HDR Calibration's patterns, drawn by the renderer) */
@@ -2648,8 +2658,24 @@ done:
 void menu_tags_unloaded(
 	void)
 {
+	/* (the stock tags added after these go first: stock_tags.c) */
+	stock_tags_menus_unloading();
 	if (menu_tags.loaded || menu_tags.block_count)
 		menu_tags_release();
+}
+
+/* the index the menus' tags begin at: the count of the tags before them,
+every machine's alike (the table's whole count if they were not added) */
+long menu_tags_first_index(
+	void)
+{
+	long count;
+
+	if (menu_tags.original_instances)
+		return menu_tags.original_count;
+	cache_files_tag_instances(&count);
+
+	return count;
 }
 
 char const *pc_menus_root_name(

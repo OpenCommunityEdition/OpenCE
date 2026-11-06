@@ -72,6 +72,14 @@ of the whole `save` folder stops there.
 
 `ninja android` builds only the game image and the native libraries.
 
+With the environment variable `ORG_GRADLE_PROJECT_haloAppIdSuffix` (a Gradle
+property, `haloAppIdSuffix`) set to `.beta`, the app is `com.halo.decomp.beta`,
+named "Halo Beta": another app, which installs beside `com.halo.decomp`, with
+its own data (`/sdcard/Android/data/com.halo.decomp.beta/files`). Its update
+provider's authority follows its id, as two apps cannot share one. A change of
+the variable needs the APK removed first, for `ninja android_apk` to make it
+again.
+
 ## Game data
 
 The game needs the `maps/` folder from an Xbox disc image (`.xiso` or
@@ -503,6 +511,10 @@ assembly of the port is necessary:
   address.
 - The symbol aliases in `guest/libc/src_include/features.h`. The Darwin
   target does not accept alias attributes.
+- `setjmp` and `longjmp` (`guest/runtime/guest_setjmp.c`), which Lua's
+  errors need (the mutators' scripts): musl's AArch64 ones, the guest's
+  32-bit buffer pointer zero-extended first. The musl of the guest does not
+  build its own, which are assembly.
 
 ## Geometry uploads
 

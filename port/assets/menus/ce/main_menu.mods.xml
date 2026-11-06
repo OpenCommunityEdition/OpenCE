@@ -161,9 +161,10 @@
 	</widget>
 	<widget name="main_menu/mods/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		<child widget="main_menu/mods/button_up" y="1"/>
-		<child widget="main_menu/mods/button_down" x="130" y="1"/>
-		<child widget="main_menu/mods/button_ok" x="380" y="1"/>
-		<child widget="common_button_cancel" x="510" y="1"/>
+		<child widget="main_menu/mods/button_down" x="128" y="1"/>
+		<child widget="main_menu/mods/button_mutators" x="256" y="1"/>
+		<child widget="main_menu/mods/button_ok" x="384" y="1"/>
+		<child widget="common_button_cancel" x="512" y="1"/>
 	</widget>
 	<widget name="main_menu/mods/button_up" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="MOVE UP" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port mods move up"/>
@@ -173,6 +174,11 @@
 	<widget name="main_menu/mods/button_down" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="MOVE DOWN" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port mods move down"/>
 		<on event="start" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/mods/button_mutators" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="MUTATORS" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mods switch"/>
+		<on event="start" run="port mods switch"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/mods/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">

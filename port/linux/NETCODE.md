@@ -329,6 +329,54 @@ game's flags also tell its clients whether the host is a dedicated server
 (`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
 most of the living players).
 
+Then version 49 adds the mutators (`docs/mutators.md`), made beside the
+versions above as 39 to 48 of their own; each step is told here by that
+number. Version 39 sends the host's mutators (distributed
+message 112, `network_mutators.c`, `docs/mutators.md`) to each client as it
+is ready, which the client plays instead of its own. Then version 40 sends
+before them the host's mutators' tag edits (distributed message 113,
+`mutator_tags.c`): their bytes in pieces of 4000, in order, which the client
+takes only from the host and only where the last piece ended, and makes in
+its map's tags once it has them all. Then version 41 lets the edits set more fields
+(a weapon's heat, age and camouflage, a trigger's rates of fire and times, a
+projectile's speeds and damage ranges, a damage effect's damage): a build of
+40 would refuse a host's edits of them, and play the stock tags. Then version
+42 lets them set a weapon's magazines (its rounds and chamber time) and a
+projectile's gravity, which a build of 41 would refuse. Then version 43 adds
+the add-ons of the mutators on (`docs/addons.md`) to the map's tags as it
+loads, after its own: an add-on's vehicle is named in messages by its index
+there, and a build of 42 has no add-ons, so the tables differ. The messages
+are unchanged; each machine adds the add-ons of its own mutators, so until
+the host sends its add-ons, every machine of a game must have the same ones
+on. Then version 44 adds weapon add-ons (`.ceweapon`), which the host spawns
+as the map's netgame equipment, and gives the gametype's options a custom
+loadout's add-on weapons (from 16 in its weapons' bytes) and a custom
+vehicle set's counts of the first two add-on vehicles (in two of its spare
+bytes); the weapon sets of one kind leave the add-ons' out, and version 49's
+vehicle sets of one kind place them. A
+build of 43 would read those options otherwise. Then version 45 gives Custom
+Edition maps the add-ons of the mutators on, and the stock tags those and the
+tag edits name that such a map lacks (`docs/mutators.md`, "Stock tags"), and
+places a vehicle add-on with no place on a map beside the map's vehicles, after
+the game's other objects (`docs/addons.md`): the messages are unchanged, but the
+tables and the objects are not a build of 44's. The host's keys also name its
+mutators' Lua scripts (`script.` and digits of their SHA-256), which each machine
+runs for itself (`docs/mutators.md`, "Scripts"). Messages 114 to 117 list the host's
+mutators' files, and map sharing's connections carry them (`_frame_mutator_request`,
+`_frame_mutator_block`). Then version 46 sends the buttons of those scripts: a client's
+in the pad of its input's action, and the host's relayed actions have a byte of them,
+so that a script's `tick()` moves a player alike on every machine. What a host's
+script sends a client's player is noted as a throw is
+(`distributed_note_script_velocity`), so that the host takes that client's prediction
+of it. Then version 47 takes the big head out of the game: the host's tag
+edits carry poses (`object_pose.c`), a node of objects scaled and moved, and a big
+head is one of them; the host's keys name no effects, which a build of 46 would play.
+Then version 48 sends a relayed action's script buttons only when one is set (bit 7 of
+its parts), so that a game without a mutator's script sends what it did before them.
+Version 49's tag edits also carry a kind for a unit's death (`object_death.c`), the
+decals' fields and the `all` element, and a vehicle set of one kind places the
+add-ons' vehicles; a mutator's options scale the host's edits before they are sent.
+
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
 sources' messages, kinds, bits, structs sent whole or the sizes of their

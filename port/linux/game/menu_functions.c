@@ -2237,6 +2237,22 @@ bindings each */
 #define CONTROL_BINDINGS 2
 #define CONTROL_ROWS 7
 #define CONTROL_NAME_LENGTH 32
+/* the rows the mutators on can have: those groups' left */
+#define MUTATOR_CONTROLS 6
+
+/* (port/linux/src/port_mutators.c's) */
+struct port_mutator_control
+{
+	long mutator;
+	char name[32];
+	char label[32];
+	char value[64];
+	char fallback[64];
+};
+long port_mutators_script_controls(struct port_mutator_control *controls, long maximum);
+int port_mutators_script_control_write(long index, char const *name, char const *value);
+/* (mutator_scripts.c) */
+void mutator_scripts_settings_changed(void);
 
 static struct
 {
@@ -2273,12 +2289,36 @@ static struct
 static struct
 {
 	/* the bindings shown, until OK writes them */
-	char bindings[NUMBEROF(controls)][CONTROL_BINDINGS][CONTROL_NAME_LENGTH];
+	char bindings[NUMBEROF(controls) + MUTATOR_CONTROLS][CONTROL_BINDINGS][CONTROL_NAME_LENGTH];
+	/* the mutators' rows, after the game's */
+	struct port_mutator_control mutator_controls[MUTATOR_CONTROLS];
+	wchar_t mutator_labels[MUTATOR_CONTROLS][32];
+	short mutator_control_count;
 	/* the binding left and right choose, and the one being set */
 	short slot;
 	short capturing_control;
 	short capturing_slot;
-} controls_screen = { { { { 0 } } }, 0, NONE, 0 };
+} controls_screen = { .capturing_control = NONE };
+
+/* the game's controls, and after them the mutators', in the groups with rows left */
+static short controls_count(void)
+{
+	return (short)(NUMBEROF(controls) + controls_screen.mutator_control_count);
+}
+
+static short control_group_of(short control)
+{
+	if (control < (short)NUMBEROF(controls))
+		return controls[control].group;
+	return control - (short)NUMBEROF(controls) < 2 ? 2 : 3;
+}
+
+static wchar_t const *control_label(short control)
+{
+	if (control < (short)NUMBEROF(controls))
+		return controls[control].label;
+	return controls_screen.mutator_labels[control - NUMBEROF(controls)];
+}
 
 /* a setting's bindings ("Left Ctrl, C") into the control's */
 static void control_bindings_read(short control, char const *text)
@@ -2315,7 +2355,20 @@ static void control_bindings_text(short control, char *text, unsigned int size)
 static boolean controls_load(boolean defaults)
 {
 	short control;
+	short mutator_control;
 
+	controls_screen.mutator_control_count = (short)port_mutators_script_controls(controls_screen.mutator_controls,
+		MUTATOR_CONTROLS);
+	for (mutator_control = 0; mutator_control < controls_screen.mutator_control_count; mutator_control++)
+	{
+		struct port_mutator_control const *row = &controls_screen.mutator_controls[mutator_control];
+		short index;
+
+		for (index = 0; row->label[index] && index < 31; index++)
+			controls_screen.mutator_labels[mutator_control][index] = (wchar_t)(unsigned char)row->label[index];
+		controls_screen.mutator_labels[mutator_control][index] = 0;
+		control_bindings_read((short)(NUMBEROF(controls) + mutator_control), defaults ? row->fallback : row->value);
+	}
 	for (control = 0; control < NUMBEROF(controls); control++)
 	{
 		char text[128];
@@ -2334,8 +2387,32 @@ static boolean controls_load(boolean defaults)
 static boolean controls_save(void)
 {
 	short control;
+	short mutator_control;
 	boolean result = TRUE;
+	boolean mutator_changed = FALSE;
 
+	for (mutator_control = 0; mutator_control < controls_screen.mutator_control_count; mutator_control++)
+	{
+		struct port_mutator_control *row = &controls_screen.mutator_controls[mutator_control];
+		char text[128];
+
+		control_bindings_text((short)(NUMBEROF(controls) + mutator_control), text, sizeof(text));
+		if (strcmp(text, row->value))
+		{
+			if (port_mutators_script_control_write(row->mutator, row->name, text))
+			{
+				platform_log("menus: %s = %s", row->name, text);
+				snprintf(row->value, sizeof(row->value), "%s", text);
+				mutator_changed = TRUE;
+			}
+			else
+			{
+				result = FALSE;
+			}
+		}
+	}
+	if (mutator_changed)
+		mutator_scripts_settings_changed();
 	for (control = 0; control < NUMBEROF(controls); control++)
 	{
 		char text[128];
@@ -2368,9 +2445,9 @@ static short control_of_row(struct widget_instance *row, short group)
 	short wanted = row ? (short)(atoi(row->name + 11) - 1) : NONE;
 	short control;
 
-	for (control = 0; control < NUMBEROF(controls) && wanted >= 0; control++)
+	for (control = 0; control < controls_count() && wanted >= 0; control++)
 	{
-		if (controls[control].group == group && wanted-- == 0)
+		if (control_group_of(control) == group && wanted-- == 0)
 			return control;
 	}
 	return NONE;
@@ -2415,7 +2492,7 @@ static void control_capture_poll(void)
 		halo_input_name(input, name, sizeof(name));
 		if (!*name)
 			return;
-		for (other = 0; other < NUMBEROF(controls); other++)
+		for (other = 0; other < controls_count(); other++)
 		{
 			for (other_slot = 0; other_slot < CONTROL_BINDINGS; other_slot++)
 			{
@@ -2469,7 +2546,7 @@ static void controls_update(struct widget_instance *list)
 				focus_row(list, 0);
 			continue;
 		}
-		text_set(named(row, "command_label", 0), controls[control].label);
+		text_set(named(row, "command_label", 0), control_label(control));
 		for (slot = 0; slot < CONTROL_BINDINGS; slot++)
 		{
 			char const *binding = controls_screen.bindings[control][slot];
@@ -2510,7 +2587,12 @@ resource pack list is, the one that plays over the others at the top (the
 load order upside down: the mod loaded last first), turned on or off and
 moved up or down there, and in the frame beside them the mod chosen's
 details; OK keeps it (port/linux/src/port_mods.c's load_order.toml) and
-plays them on the map now (mods.c), Cancel forgets it */
+plays them on the map now (mods.c), Cancel forgets it. MUTATORS shows the
+mutators in the rows instead (port/linux/src/port_mutators.c), in the order
+they are found, and MODS the mods again: each turned on or off there, kept
+by OK (game.mutators) as the mods are, and played from the next game.
+Server Setup's MUTATOR OPTIONS is a screen of the same rows, the mutators'
+only ("port mutators init", "port mutators save") */
 
 #define MOD_ROWS 11
 #define MOD_DETAILS_LENGTH 1024
@@ -2556,6 +2638,25 @@ int port_mods_save(void);
 void port_mods_revert(void);
 /* (mods.c) */
 void mods_apply(void);
+/* (port/linux/src/port_mutators.c, port_mutators.h's) */
+long port_mutators_scan(void);
+long port_mutators_count(void);
+char const *port_mutators_name(long index);
+int port_mutators_on(long index);
+int port_mutators_status(long index, char *text, unsigned long size);
+int port_mutators_details(long index, char *text, unsigned long size);
+void port_mutators_turn(long index, int on);
+int port_mutators_save(void);
+void port_mutators_revert(void);
+int port_mutators_addon_kind(long index);
+char const *port_mutators_addon_name(long index);
+long port_mutators_option_count(void);
+int port_mutators_option(long index, char *name, unsigned long size, long *value, long *minimum, long *maximum,
+	long *step);
+int port_mutators_option_set(long index, long value);
+/* (below: ui_widget.c's too) */
+long menus_loadout_addon_count(void);
+wchar_t const *menus_loadout_addon_name(long index);
 
 static struct
 {
@@ -2574,7 +2675,31 @@ static struct
 	char shown[128];
 	long row_mods[MOD_ROWS];
 	long row_fonts[MOD_ROWS];
+	/* whether the rows are the mutators' (MUTATORS), not the mods' */
+	boolean mutators;
 } mods_screen;
+
+/* the list's: the mods', or the mutators' (whose status is _port_mod_fine
+or _port_mod_unplayable) */
+static long mods_list_count(void)
+{
+	return mods_screen.mutators ? port_mutators_count() : port_mods_count();
+}
+
+static char const *mods_list_name(long index)
+{
+	return mods_screen.mutators ? port_mutators_name(index) : port_mods_name(index);
+}
+
+static int mods_list_on(long index)
+{
+	return mods_screen.mutators ? port_mutators_on(index) : port_mods_on(index);
+}
+
+static int mods_list_status(long index, char *text, unsigned long size)
+{
+	return mods_screen.mutators ? port_mutators_status(index, text, size) : port_mods_status(index, text, size);
+}
 
 /* the row (op_mod_<n>) a widget is or is in, else NULL */
 static struct widget_instance *mod_row(struct widget_instance *widget)
@@ -2592,15 +2717,18 @@ static short mod_row_place(struct widget_instance *row)
 {
 	short place = row ? (short)(mods_screen.first + atoi(row->name + 7) - 1) : NONE;
 
-	return place >= 0 && place < port_mods_count() ? place : NONE;
+	return place >= 0 && place < mods_list_count() ? place : NONE;
 }
 
 /* the mod at a place on the list (its place in the load order counted from
 the end), else NONE */
 static long mod_at_place(short place)
 {
-	long count = port_mods_count();
+	long count = mods_list_count();
 
+	/* (the mutators in the order they are found) */
+	if (mods_screen.mutators)
+		return place >= 0 && place < count ? place : NONE;
 	return place >= 0 && place < count ? port_mods_at(count - 1 - place) : NONE;
 }
 
@@ -2753,6 +2881,8 @@ static boolean mods_screen_reset(void)
 	short index;
 
 	port_mods_revert();
+	port_mutators_revert();
+	mods_screen.mutators = FALSE;
 	mods_screen.first = 0;
 	mods_screen.chosen = 0;
 	mods_screen.shown[0] = 0;
@@ -2766,6 +2896,16 @@ static boolean mods_screen_reset(void)
 	return TRUE;
 }
 
+/* "port mutators init" (MUTATOR OPTIONS' list's created): the mutators
+folder found again, and the rows the mutators' */
+static boolean mutators_screen_initialize(void)
+{
+	port_mutators_scan();
+	mods_screen_reset();
+	mods_screen.mutators = TRUE;
+	return TRUE;
+}
+
 /* "port mods toggle" (A on a row; a mod that cannot be played stays as it
 is, so that it is still off when it can be) */
 static boolean mods_toggle(struct widget_instance *widget)
@@ -2775,8 +2915,33 @@ static boolean mods_toggle(struct widget_instance *widget)
 
 	if (place == NONE)
 		return FALSE;
-	if (port_mods_status(mod, NULL, 0) != _port_mod_unplayable)
+	if (mods_list_status(mod, NULL, 0) == _port_mod_unplayable)
+		return TRUE;
+	if (mods_screen.mutators)
+		port_mutators_turn(mod, !port_mutators_on(mod));
+	else
 		port_mods_turn(mod, !port_mods_on(mod));
+	return TRUE;
+}
+
+/* "port mods switch" (MUTATORS, and MODS): the rows the mutators', or the
+mods' again, from the top; what each has turned on or moved stays until
+OK or Cancel */
+static boolean mods_switch(struct widget_instance *widget)
+{
+	struct widget_instance *list = widget;
+	short index;
+
+	mods_screen.mutators = !mods_screen.mutators;
+	mods_screen.first = 0;
+	mods_screen.chosen = 0;
+	mods_screen.shown[0] = 0;
+	for (index = 0; index < MOD_ROWS; index++)
+		mods_screen.row_mods[index] = NONE;
+	while (list && strcmp(list->name, "mods_list"))
+		list = list->parent;
+	if (list)
+		focus_row(list, mods_list_count() ? 0 : NONE);
 	return TRUE;
 }
 
@@ -2791,8 +2956,8 @@ static boolean mods_move(struct widget_instance *widget, short places)
 	short place = row ? mod_row_place(row) : mods_screen.chosen;
 	short moved;
 
-	/* (no mods: nothing to move) */
-	if (!count)
+	/* (no mods: nothing to move; the mutators have no order) */
+	if (!count || mods_screen.mutators)
 		return TRUE;
 	if (place == NONE || place >= count)
 		return FALSE;
@@ -2824,8 +2989,8 @@ static void mods_details_show(struct widget_instance *details, short place, shor
 	char shown[sizeof(mods_screen.shown)];
 
 	/* (wrapped again only when what they show, or its fonts, change) */
-	snprintf(shown, sizeof(shown), "%ld %d %d %d %d %ld %d %ld %d", mod, port_mods_status(mod, NULL, 0),
-		port_mods_on(mod), place, count, mods_screen.fonts[_mod_details_name],
+	snprintf(shown, sizeof(shown), "%d %ld %d %d %d %d %ld %d %ld %d", mods_screen.mutators, mod,
+		mods_list_status(mod, NULL, 0), mods_list_on(mod), place, count, mods_screen.fonts[_mod_details_name],
 		mods_screen.widths[_mod_details_name], mods_screen.fonts[_mod_details_text],
 		mods_screen.widths[_mod_details_text]);
 	if (!strcmp(shown, mods_screen.shown))
@@ -2834,12 +2999,14 @@ static void mods_details_show(struct widget_instance *details, short place, shor
 	if (mod < 0)
 	{
 		/* (no mods: where they go) */
-		mods_wide_text(count ? "" : "No mods", wide, NUMBEROF(wide));
+		mods_wide_text(count ? "" : mods_screen.mutators ? "No mutators" : "No mods", wide, NUMBEROF(wide));
 		text_set_length(named(details, "mod_details_name", 0), wide, NUMBEROF(wide));
 		text[0] = 0;
 		if (!count)
 		{
-			mods_wrap("Each mod is a folder of its own in the mods folder, beside the maps folder.", text,
+			mods_wrap(mods_screen.mutators ?
+				"Each mutator is a folder of its own in the mutators folder, beside the maps folder." :
+				"Each mod is a folder of its own in the mods folder, beside the maps folder.", text,
 				sizeof(text), _mod_details_text, MOD_DETAILS_LINES, 0);
 		}
 		mods_wide_text(text, wide, NUMBEROF(wide));
@@ -2847,9 +3014,9 @@ static void mods_details_show(struct widget_instance *details, short place, shor
 		visible_set(icon, FALSE);
 		return;
 	}
-	status = port_mods_status(mod, problem, sizeof(problem));
+	status = mods_list_status(mod, problem, sizeof(problem));
 	text[0] = 0;
-	mods_wrap(port_mods_name(mod), text, sizeof(text), _mod_details_name, 2, 0);
+	mods_wrap(mods_list_name(mod), text, sizeof(text), _mod_details_name, 2, 0);
 	mods_wide_text(text, wide, NUMBEROF(wide));
 	text_set_length(named(details, "mod_details_name", 0), wide, NUMBEROF(wide));
 	visible_set(icon, status != _port_mod_fine);
@@ -2866,11 +3033,22 @@ static void mods_details_show(struct widget_instance *details, short place, shor
 		line = mods_wrap(problem, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 		line = mods_wrap(" ", text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	}
-	snprintf(about, sizeof(about), "%s\nPriority: %d of %d", status == _port_mod_unplayable ? "Cannot be played" :
-		port_mods_on(mod) ? "On" : "Off", place + 1, count);
+	if (mods_screen.mutators)
+	{
+		snprintf(about, sizeof(about), "%s", status == _port_mod_unplayable ? "Cannot be played" :
+			port_mutators_on(mod) ? "On" : "Off");
+	}
+	else
+	{
+		snprintf(about, sizeof(about), "%s\nPriority: %d of %d", status == _port_mod_unplayable ? "Cannot be played" :
+			port_mods_on(mod) ? "On" : "Off", place + 1, count);
+	}
 	line = mods_wrap(about, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	line = mods_wrap(" ", text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
-	port_mods_details(mod, about, sizeof(about));
+	if (mods_screen.mutators)
+		port_mutators_details(mod, about, sizeof(about));
+	else
+		port_mods_details(mod, about, sizeof(about));
 	mods_wrap(about, text, sizeof(text), _mod_details_text, MOD_DETAILS_LINES, line);
 	mods_wide_text(text, wide, NUMBEROF(wide));
 	text_set_length(named(details, "mod_details_text", 0), wide, NUMBEROF(wide));
@@ -2885,7 +3063,7 @@ static void mods_update(struct widget_instance *list)
 {
 	struct widget_instance *row;
 	struct widget_instance *focused = mod_row(list->focused_child);
-	short count = (short)port_mods_count();
+	short count = (short)mods_list_count();
 	short focused_index = focused ? (short)(atoi(focused->name + 7) - 1) : NONE;
 
 	if (focused_index == MOD_ROWS - 1 && mods_screen.first + MOD_ROWS < count && list_scrolls_at_end())
@@ -2924,12 +3102,12 @@ static void mods_update(struct widget_instance *list)
 			continue;
 		}
 		mod = mod_at_place(place);
-		status = port_mods_status(mod, NULL, 0);
+		status = mods_list_status(mod, NULL, 0);
 		row_index = (short)PIN(atoi(row->name + 7) - 1, 0, MOD_ROWS - 1);
 		if (mods_screen.row_mods[row_index] != mod ||
 			mods_screen.row_fonts[row_index] != mods_screen.fonts[_mod_row_name])
 		{
-			char const *name = port_mods_name(mod);
+			char const *name = mods_list_name(mod);
 			char shortened[MOD_DETAILS_LENGTH];
 			wchar_t wide[ROW_TEXT_LENGTH];
 
@@ -2942,13 +3120,15 @@ static void mods_update(struct widget_instance *list)
 			mods_screen.row_mods[row_index] = mod;
 			mods_screen.row_fonts[row_index] = mods_screen.fonts[_mod_row_name];
 		}
-		text_set(named(row, "mod_state", 0), port_mods_on(mod) ? L"ON" : L"OFF");
+		text_set(named(row, "mod_state", 0), mods_list_on(mod) ? L"ON" : L"OFF");
 		icon = named(row, "mod_status", 0);
 		visible_set(icon, status != _port_mod_fine);
 		if (icon)
 			icon->animation.current_frame_index = status == _port_mod_out_of_order ? 1 : 2;
 	}
 	mods_details_show(list->parameters.list.extended_description, count ? mods_screen.chosen : NONE, count);
+	/* (the button to the other list) */
+	text_set(named(list, "button_mutators", 0), mods_screen.mutators ? L"MODS" : L"MUTATORS");
 }
 
 /* "port mods save" (OK): kept, and played at once (port_mods_save keeps
@@ -2956,7 +3136,111 @@ what it cannot write until the game quits) */
 static boolean mods_save(void)
 {
 	port_mods_save();
+	port_mutators_save();
 	mods_apply();
+	return TRUE;
+}
+
+/* "port mutators save" (MUTATOR OPTIONS' OK): kept, and played from the
+next game */
+static boolean mutators_save(void)
+{
+	port_mutators_save();
+	return TRUE;
+}
+
+/* MUTATOR SETTINGS (MUTATOR OPTIONS' SETTINGS: tools/port_settings.py's
+_mutator_settings): the options of the mutators on, as MUTATOR OPTIONS has
+them turned on, a row each, its name and its percent, which left and right
+step; OK keeps them (game.mutator_options) for the next game the host plays,
+Cancel forgets them */
+#define MUTATOR_SETTING_ROWS 4
+
+static struct
+{
+	short count;
+	long values[MUTATOR_SETTING_ROWS];
+} mutator_settings;
+
+/* "port mutator settings update" (its list's, each frame): the rows */
+static void mutator_settings_show(struct widget_instance *screen)
+{
+	short index;
+
+	for (index = 0; index < MUTATOR_SETTING_ROWS; index++)
+	{
+		char row_name[32];
+		char name[64] = "";
+		char value[16] = "";
+		wchar_t wide[64];
+		struct widget_instance *row;
+		long current, minimum, maximum, step;
+
+		snprintf(row_name, sizeof(row_name), "op_mutator_setting_%d", index + 1);
+		row = named(screen, row_name, 0);
+		if (!row)
+			continue;
+		if (index < mutator_settings.count &&
+			port_mutators_option(index, name, sizeof(name), &current, &minimum, &maximum, &step))
+		{
+			snprintf(value, sizeof(value), "%ld%%", mutator_settings.values[index]);
+		}
+		else if (!index && !mutator_settings.count)
+		{
+			snprintf(name, sizeof(name), "NO MUTATOR ON HAS OPTIONS");
+		}
+		mods_wide_text(name, wide, NUMBEROF(wide));
+		text_set(named(row, "mutator_setting_name", 0), wide);
+		mods_wide_text(value, wide, NUMBEROF(wide));
+		text_set(named(row, "mutator_setting_value", 0), wide);
+	}
+}
+
+/* "port mutator settings init" (its list's created) */
+static boolean mutator_settings_initialize(struct widget_instance *widget)
+{
+	short index;
+
+	mutator_settings.count = (short)MIN(port_mutators_option_count(), MUTATOR_SETTING_ROWS);
+	for (index = 0; index < mutator_settings.count; index++)
+	{
+		long minimum, maximum, step;
+
+		port_mutators_option(index, NULL, 0, &mutator_settings.values[index], &minimum, &maximum, &step);
+	}
+	(void)widget;
+	return TRUE;
+}
+
+/* "port mutator settings left" and "right" (on a row): its percent a step
+down or up, kept to its least and most */
+static boolean mutator_settings_step(struct widget_instance *widget, short direction)
+{
+	struct widget_instance *row = widget;
+	long current, minimum, maximum, step;
+	short index;
+
+	while (row && strncmp(row->name, "op_mutator_setting_", 19))
+		row = row->parent;
+	if (!row)
+		return FALSE;
+	index = (short)(atoi(row->name + 19) - 1);
+	if (index < 0 || index >= mutator_settings.count ||
+		!port_mutators_option(index, NULL, 0, &current, &minimum, &maximum, &step))
+	{
+		return TRUE;
+	}
+	mutator_settings.values[index] = PIN(mutator_settings.values[index] + direction * step, minimum, maximum);
+	return TRUE;
+}
+
+/* "port mutator settings save" (OK) */
+static boolean mutator_settings_save(void)
+{
+	short index;
+
+	for (index = 0; index < mutator_settings.count; index++)
+		port_mutators_option_set(index, mutator_settings.values[index]);
 	return TRUE;
 }
 
@@ -3713,13 +3997,15 @@ static char const *const server_settings_gametype_rows[] =
 /* the most players a co-op game hosted starts with (maximum_players') */
 #define COOPERATIVE_DEFAULT_PLAYERS 16
 /* Server Setup's help for co-op's options' rows (CO-OP OPTIONS, VOICE AND
-VOTING), PASSWORD's and MAP SHARING's (its help_strings, tools/port_settings.py) */
+VOTING), PASSWORD's, MAP SHARING's and MUTATOR OPTIONS' (its help_strings,
+tools/port_settings.py) */
 #define COOPERATIVE_OPTIONS_HELP 12
 #define COOPERATIVE_VOICE_OPTIONS_HELP 13
 #define SERVER_PASSWORD_HELP 14
 #define MAP_SHARE_OPTIONS_HELP 15
 /* (LISTING's PUBLIC on a machine with a publisher key: server_master.c) */
 #define SERVER_LISTING_PUBLISHER_HELP 16
+#define MUTATOR_OPTIONS_HELP 17
 
 /* whether this machine has a publisher key (read as Server Setup opens) */
 static boolean server_settings_publisher;
@@ -3871,6 +4157,9 @@ static void server_settings_update(struct widget_instance *list)
 			/* (MAP SHARING's, any game's: map_share.c) */
 			else if (help && list->focused_child == named(list, "op_map_share_options", 0))
 				help->parameters.text_box.string_list_index = MAP_SHARE_OPTIONS_HELP;
+			/* (MUTATOR OPTIONS', any game's: port_mutators.c) */
+			else if (help && list->focused_child == named(list, "op_mutator_options", 0))
+				help->parameters.text_box.string_list_index = MUTATOR_OPTIONS_HELP;
 		}
 	}
 	/* LISTING (an internet game's): PUBLIC, listed in everyone's server
@@ -7139,6 +7428,13 @@ static short gametype_option_index(struct gametype_option const *option, long va
 	return best;
 }
 
+/* whether the option is a custom loadout's weapon */
+static boolean loadout_weapon_option(struct gametype_option const *option)
+{
+	return option->kind == _option_option_byte &&
+		(option->offset == OPTIONS_FIELD(primary_weapon) || option->offset == OPTIONS_FIELD(secondary_weapon));
+}
+
 /* each of the screen's option rows' spinner, with the option */
 static void gametype_options_each(struct widget_instance *list, boolean save)
 {
@@ -7180,6 +7476,30 @@ static void gametype_options_each(struct widget_instance *list, boolean save)
 				{
 					platform_log("menus: could not set %s", option->setting);
 				}
+				continue;
+			}
+			/* (a custom loadout's weapons: the stock ones', then the add-ons'
+			of the mutators on, which a gametype naming one whose mutator is
+			off shows as none) */
+			if (loadout_weapon_option(option))
+			{
+				long addons = menus_loadout_addon_count();
+				long value = gametype_option_value(option, variant, options);
+
+				if (save)
+				{
+					short index = (short)PIN(spinner->parameters.list.selected_index, 0, option->count + addons - 1);
+
+					gametype_option_value_set(option, index < option->count ? option->values[index] :
+						_loadout_weapon_addon_first + index - option->count, variant, options);
+				}
+				else if (LOADOUT_WEAPON_ADDON(value))
+				{
+					spinner->parameters.list.selected_index = value - _loadout_weapon_addon_first < addons ?
+						(short)(option->count + value - _loadout_weapon_addon_first) : 0;
+				}
+				else
+					spinner->parameters.list.selected_index = gametype_option_index(option, value);
 				continue;
 			}
 			if (save)
@@ -7250,6 +7570,76 @@ static struct widget_instance *gametype_options_list(struct widget_instance *wid
 /* ---- the vehicle options: a side's (red's, blue's) set and counts, on
 the spinners while its side is shown */
 
+/* ---- the add-ons of the mutators on (port_mutators.c), by their mutators'
+names: the weapons a custom loadout lists after the stock ones (its
+spinners' extra items: ui_widget.c), and the vehicles a custom vehicle set
+counts, rows of their own (vehicles_layout) */
+
+/* (port_mutators.h's kinds) */
+enum
+{
+	_menu_addon_vehicle = 1,
+	_menu_addon_weapon,
+};
+
+#define ADDON_NAME_LENGTH 48
+/* the help of an add-on vehicle's row (ui_widget.c's
+SPINNER_EXTRA_DESCRIPTION_BASE + 0x81, as a text box's string list index) */
+#define ADDON_VEHICLE_DESCRIPTION (0x7000 + 0x81)
+
+/* the add-on (port_mutators.c's index) of the kind at the place among those
+of its kind, or NONE */
+static long addon_of_kind(int kind, long place)
+{
+	long index;
+	int each;
+
+	for (index = 0; (each = port_mutators_addon_kind(index)) != 0; index++)
+	{
+		if (each == kind && !place--)
+			return index;
+	}
+	return NONE;
+}
+
+static long addons_of_kind(int kind)
+{
+	long count = 0;
+
+	while (addon_of_kind(kind, count) != NONE)
+		count++;
+	return count;
+}
+
+/* an add-on's name in upper case, as the stock weapons' and vehicles' are */
+static void addon_name_wide(long addon, wchar_t *wide, short length)
+{
+	short character;
+
+	mods_wide_text(port_mutators_addon_name(addon), wide, length);
+	for (character = 0; wide[character]; character++)
+	{
+		if (wide[character] >= 'a' && wide[character] <= 'z')
+			wide[character] = (wchar_t)(wide[character] - 'a' + 'A');
+	}
+}
+
+long menus_loadout_addon_count(void)
+{
+	return MIN(addons_of_kind(_menu_addon_weapon), MAXIMUM_LOADOUT_ADDON_WEAPONS);
+}
+
+wchar_t const *menus_loadout_addon_name(long index)
+{
+	static wchar_t names[MAXIMUM_LOADOUT_ADDON_WEAPONS][ADDON_NAME_LENGTH];
+	long addon = VALID_INDEX(index, MAXIMUM_LOADOUT_ADDON_WEAPONS) ? addon_of_kind(_menu_addon_weapon, index) : NONE;
+
+	if (addon == NONE)
+		return L"";
+	addon_name_wide(addon, names[index], ADDON_NAME_LENGTH);
+	return names[index];
+}
+
 static char const *const vehicle_spinners[NUMBER_OF_VARIANT_VEHICLES] =
 {
 	"warthog_spinner", "ghost_spinner", "scorpion_spinner", "rwarthog_spinner", "banshee_spinner", "cgturret_spinner"
@@ -7257,6 +7647,17 @@ static char const *const vehicle_spinners[NUMBER_OF_VARIANT_VEHICLES] =
 /* (the presets' spinner: the vehicle sets 0 to 7, then PC and CUSTOM) */
 #define VEHICLE_PRESET_PC 8
 #define VEHICLE_PRESET_CUSTOM 9
+/* the add-on vehicles' rows (tools/port_settings.py's _vehicle_options_extras)
+and their spinners */
+static char const *const addon_vehicle_rows[MAXIMUM_VARIANT_ADDON_VEHICLES] =
+{
+	"op_addon_vehicle_1", "op_addon_vehicle_2"
+};
+static char const *const addon_vehicle_spinners[MAXIMUM_VARIANT_ADDON_VEHICLES] =
+{
+	"addon_vehicle_1_spinner", "addon_vehicle_2_spinner"
+};
+#define ADDON_VEHICLE_ROW_PREFIX "pc\\main_menu\\settings_select\\multiplayer_setup\\vehicle_options_edit\\"
 
 static struct widget_instance *vehicle_spinner(struct widget_instance *list, char const *name)
 {
@@ -7292,6 +7693,65 @@ static void vehicles_show(struct widget_instance *list)
 			spinner->parameters.list.selected_index =
 				(short)MIN(options->vehicle_counts[side][index], MAXIMUM_VARIANT_VEHICLE_COUNT);
 	}
+	for (index = 0; index < MAXIMUM_VARIANT_ADDON_VEHICLES; index++)
+	{
+		if ((spinner = vehicle_spinner(list, addon_vehicle_spinners[index])) != NULL)
+			spinner->parameters.list.selected_index = (short)(MAXIMUM_VARIANT_VEHICLE_COUNT -
+				MIN(options->addon_vehicles_fewer[side][index], MAXIMUM_VARIANT_VEHICLE_COUNT));
+	}
+}
+
+/* the add-on vehicles' rows, one for each the mutators on add (their labels
+their mutators' names), added to the list after the stock vehicles', which
+move up into the gap below the respawn time's to make room; the help below
+them when both are there */
+static void vehicles_layout(struct widget_instance *list)
+{
+	struct widget_instance *bar = named(list, "vehicle_button_bar", 0);
+	struct widget_instance *row;
+	long count = MIN(addons_of_kind(_menu_addon_vehicle), MAXIMUM_VARIANT_ADDON_VEHICLES);
+	short place = 0;
+	short index;
+
+	if (!count || !bar || named(list, addon_vehicle_rows[0], 0))
+		return;
+	for (row = list->child; row; row = row->next)
+	{
+		if (row != bar && row != named(list, "op_vehicles_respawn", 0))
+		{
+			row->vertical_offset -= 27;
+			place = MAX(place, row->vertical_offset);
+		}
+	}
+	for (index = 0; index < count; index++)
+	{
+		char name[256];
+		wchar_t label[ADDON_NAME_LENGTH + 1];
+		short length;
+
+		snprintf(name, sizeof(name), "%s%s", ADDON_VEHICLE_ROW_PREFIX, addon_vehicle_rows[index]);
+		row = ui_widget_load_by_name_or_tag(name, NONE, list, list->local_player_index, NONE, NONE, 0);
+		if (!row)
+			break;
+		/* (before the buttons, as the generated rows are) */
+		row->previous = bar->previous;
+		row->next = bar;
+		if (bar->previous)
+			bar->previous->next = row;
+		else
+			list->child = row;
+		bar->previous = row;
+		row->horizontal_offset = 54;
+		row->vertical_offset = (short)(place + 26 * (index + 1));
+		addon_name_wide(addon_of_kind(_menu_addon_vehicle, index), label, ADDON_NAME_LENGTH - 1);
+		length = (short)wcslen(label);
+		label[length] = ':';
+		label[length + 1] = 0;
+		snprintf(name, sizeof(name), "addon_vehicle_%d_label", index + 1);
+		text_set(named(row, name, 0), label);
+	}
+	if (index == MAXIMUM_VARIANT_ADDON_VEHICLES && list->parameters.list.extended_description)
+		list->parameters.list.extended_description->vertical_offset += 22;
 }
 
 /* the side shown's spinners kept (and the Xbox's vehicle set: red's, if it
@@ -7314,6 +7774,12 @@ static void vehicles_keep(struct widget_instance *list)
 		if ((spinner = vehicle_spinner(list, vehicle_spinners[index])) != NULL)
 			options->vehicle_counts[side][index] =
 				(byte)PIN(spinner->parameters.list.selected_index, 0, MAXIMUM_VARIANT_VEHICLE_COUNT);
+	}
+	for (index = 0; index < MAXIMUM_VARIANT_ADDON_VEHICLES; index++)
+	{
+		if ((spinner = vehicle_spinner(list, addon_vehicle_spinners[index])) != NULL)
+			options->addon_vehicles_fewer[side][index] = (byte)(MAXIMUM_VARIANT_VEHICLE_COUNT -
+				PIN(spinner->parameters.list.selected_index, 0, MAXIMUM_VARIANT_VEHICLE_COUNT));
 	}
 	variant->universal_variant.vehicle_set = options->vehicle_set[0] <= 4 ? options->vehicle_set[0] : 0;
 }
@@ -7347,6 +7813,18 @@ static void vehicles_update(struct widget_instance *list)
 			preset->parameters.list.selected_index = VEHICLE_PRESET_CUSTOM;
 		}
 	}
+	for (index = 0; preset && index < MAXIMUM_VARIANT_ADDON_VEHICLES; index++)
+	{
+		struct widget_instance *spinner = vehicle_spinner(list, addon_vehicle_spinners[index]);
+		byte fewer = spinner ? (byte)(MAXIMUM_VARIANT_VEHICLE_COUNT -
+			PIN(spinner->parameters.list.selected_index, 0, MAXIMUM_VARIANT_VEHICLE_COUNT)) : 0;
+
+		if (spinner && fewer != options->addon_vehicles_fewer[gametype_edit.vehicle_side][index])
+		{
+			options->addon_vehicles_fewer[gametype_edit.vehicle_side][index] = fewer;
+			preset->parameters.list.selected_index = VEHICLE_PRESET_CUSTOM;
+		}
+	}
 }
 
 /* "mp profile init X" (the list's creation): its spinners from the gametype */
@@ -7356,7 +7834,10 @@ static boolean gametype_options_init(struct widget_instance *list)
 		return campaign_fail();
 	gametype_options_each(list, FALSE);
 	if (named(list, "op_team", 0))
+	{
+		vehicles_layout(list);
 		vehicles_show(list);
+	}
 	return TRUE;
 }
 
@@ -7658,12 +8139,22 @@ static void gametype_option_help(struct widget_instance *list)
 			;
 		if (row == list->focused_child)
 		{
-			if (spinner)
+			/* (an add-on vehicle's row, and a spinner's extra item: their own
+			helps, past the list's) */
+			if (spinner && !strncmp(row->name, "op_addon_vehicle_", 17))
+				description->parameters.text_box.string_list_index = ADDON_VEHICLE_DESCRIPTION;
+			else if (spinner && ui_widget_spinner_extra_description(spinner,
+				spinner->parameters.list.selected_index) != NONE)
+			{
+				description->parameters.text_box.string_list_index =
+					ui_widget_spinner_extra_description(spinner, spinner->parameters.list.selected_index);
+			}
+			else if (spinner)
 				description->parameters.text_box.string_list_index = (short)(index + spinner->parameters.list.selected_index);
 			return;
 		}
 		if (spinner)
-			index += spinner->parameters.list.number_of_items;
+			index += ui_widget_spinner_own_item_count(spinner);
 	}
 }
 
@@ -7986,7 +8477,34 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "port mods init") || !strcmp(name, "port mods close"))
 		{
+			/* (the mutators folder found again as the screen opens) */
+			if (!strcmp(name, "port mods init"))
+				port_mutators_scan();
 			return mods_screen_reset();
+		}
+		else if (!strcmp(name, "port mutators init"))
+		{
+			return mutators_screen_initialize();
+		}
+		else if (!strcmp(name, "port mutators save"))
+		{
+			return mutators_save();
+		}
+		else if (!strcmp(name, "port mutator settings init"))
+		{
+			return mutator_settings_initialize(widget);
+		}
+		else if (!strcmp(name, "port mutator settings left") || !strcmp(name, "port mutator settings right"))
+		{
+			return mutator_settings_step(widget, (short)(!strcmp(name, "port mutator settings left") ? -1 : 1));
+		}
+		else if (!strcmp(name, "port mutator settings save"))
+		{
+			return mutator_settings_save();
+		}
+		else if (!strcmp(name, "port mods switch"))
+		{
+			return mods_switch(widget);
 		}
 		else if (!strcmp(name, "port mods toggle"))
 		{
@@ -8255,6 +8773,8 @@ void pc_menu_game_data_function_invoke(
 		pad_editor_update(widget);
 	else if (!strcmp(name, "port mods update"))
 		mods_update(widget);
+	else if (!strcmp(name, "port mutator settings update"))
+		mutator_settings_show(widget);
 	else if (!strcmp(name, "color picker update"))
 		color_list_update(widget);
 	else if (!strcmp(name, "3wide player profile list update"))

@@ -800,13 +800,14 @@ boolean custom_edition_reordered_bitmaps_find(
 }
 
 boolean custom_edition_loaded_reordered_bitmaps_find(
-	void)
+	unsigned long behaviours)
 {
 	struct custom_edition_bitmaps_globals *globals = &custom_edition_bitmaps_globals;
 	struct tag_view view;
 
 	/* (found again: the tags may have changed) */
 	globals->reordered_bitmap_count = 0;
+	globals->behaviours |= behaviours;
 	view.tag_cache = NULL;
 	view.loaded_bytes = 0;
 

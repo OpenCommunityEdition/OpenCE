@@ -47,6 +47,7 @@ tick, such as a nav marker, is moved as far as the object is drawn from there
 #include "game/players.h"
 #include "render/render_cameras.h"
 #include "units/units.h"
+#include "mutator_scripts.h"
 
 /* port/linux/src/port_config.c */
 int config_boolean(const char *name);
@@ -532,8 +533,12 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 	struct interpolated_object *record;
 	long absolute_index;
 
-	if (!interpolation_rendering || !interpolated_objects || object_index == NONE)
+	/* (a script's model is drawn as its script poses it, each frame) */
+	if (!interpolation_rendering || !interpolated_objects || object_index == NONE ||
+		mutator_scripts_object_local(object_index))
+	{
 		return NULL;
+	}
 	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
 	if (absolute_index >= MAXIMUM_INTERPOLATED_OBJECTS)
 		return NULL;

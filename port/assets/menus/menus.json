@@ -81,6 +81,8 @@
   "ce/port/main_menu/multiplayer_type_select/lobby/header_lobby.png",
   "ce/port/main_menu/multiplayer_type_select/server_settings/coop_options/header_coop_options.png",
   "ce/port/main_menu/multiplayer_type_select/server_settings/map_share_options/header_map_share_options.png",
+  "ce/port/main_menu/multiplayer_type_select/server_settings/mutator_options/header_mutator_options.png",
+  "ce/port/main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings.png",
   "ce/port/main_menu/multiplayer_type_select/server_settings/voice_options/header_voice_options.png",
   "ce/port/mods/status__0.png",
   "ce/port/mods/status__1.png",

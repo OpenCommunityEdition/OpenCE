@@ -531,6 +531,9 @@ __inline void object_get_bounding_sphere(
 	return;
 }
 
+/* port: port/linux/game/object_pose.c's */
+real object_pose_render_radius(long object_index, real render_radius);
+
 __inline void object_get_render_bounding_sphere(
 	long object_index,
 	real_point3d *center,
@@ -549,6 +552,8 @@ __inline void object_get_render_bounding_sphere(
 	{
 		*radius *= object->object.scale;
 	}
+	/* port: and to hold the nodes a mutator's poses moved */
+	*radius = object_pose_render_radius(object_index, *radius);
 
 	return;
 }

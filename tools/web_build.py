@@ -43,7 +43,7 @@ from typing import Any, Dict, List, Optional
 
 from .android_build import VARIADIC_PROTOTYPE_FILES
 from .embed_assets import hud_assets_build, hud_configure_inputs
-from .linux_build import (EXPAT_DIR, EXPAT_SOURCES, KCP_DIR, MONOCYPHER_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, TOML_DIR,
+from .linux_build import (LUA_DIR, LUA_SOURCES, EXPAT_DIR, EXPAT_SOURCES, KCP_DIR, MONOCYPHER_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, TOML_DIR,
                           XDK_INCLUDE, ZLIB_DEFINES, ZLIB_DIR, ZLIB_SOURCES, compile_launcher, configuration_defines,
                           game_defines_and_includes, game_sources, musl_math_cflags, musl_math_sources,
                           opus_cflags, opus_sources, updater_defines, xdk_headers)
@@ -285,6 +285,8 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         add_object(source, opus_cflags(abi))
     for name in ("monocypher.c", "monocypher-ed25519.c"):
         add_object(MONOCYPHER_DIR / name, " ".join([abi, "-std=gnu11", "-w"]))
+    for name in LUA_SOURCES:
+        add_object(LUA_DIR / name, " ".join([abi, "-std=gnu11", "-w"]))
     for name in ZLIB_SOURCES:
         add_object(ZLIB_DIR / name, " ".join([abi, "-std=gnu11", *ZLIB_DEFINES, "-w"]))
     for source in musl_math_sources():

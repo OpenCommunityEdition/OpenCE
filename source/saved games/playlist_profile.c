@@ -974,10 +974,11 @@ static boolean playlist_profile_options_from_block(
 	options->loadout = (byte)PIN(options->loadout, 0, NUMBER_OF_LOADOUTS - 1);
 	options->no_map_weapons = options->no_map_weapons != FALSE;
 	/* (the gravity rifle, a cut weapon, and the flamethrower, once loadout
-	weapons: rocket launchers, as the game makes them) */
-	if (options->primary_weapon >= NUMBER_OF_LOADOUT_WEAPONS)
+	weapons: rocket launchers, as the game makes them; port: an add-on's
+	weapon kept) */
+	if (options->primary_weapon >= NUMBER_OF_LOADOUT_WEAPONS && !LOADOUT_WEAPON_ADDON(options->primary_weapon))
 		options->primary_weapon = _loadout_weapon_rocket_launcher;
-	if (options->secondary_weapon >= NUMBER_OF_LOADOUT_WEAPONS)
+	if (options->secondary_weapon >= NUMBER_OF_LOADOUT_WEAPONS && !LOADOUT_WEAPON_ADDON(options->secondary_weapon))
 		options->secondary_weapon = _loadout_weapon_rocket_launcher;
 	return TRUE;
 }

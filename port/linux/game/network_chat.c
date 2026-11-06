@@ -91,6 +91,7 @@ mutes.
 #include "network_chat.h"
 #include "text_filter.h"
 #include "halo_keyboard.h"
+#include "mutator_scripts.h"
 #include "server_director.h"
 
 #include <stdio.h>
@@ -2009,6 +2010,11 @@ void network_chat_update(
 	for (port = 0; port < 4; port++)
 	{
 		unsigned int actions = controller_remap_pressed(port, chat_mask);
+		/* (not the first controller's D-pad Up when a mutator's script has
+		taken it) */
+		if (port == 0 && TEST_FLAG(halo_chat_pad_buttons_for_port(0), HALO_CHAT_PAD_UP) &&
+			mutator_scripts_control_claimed("DPad Up"))
+			actions = 0;
 		if (actions && requested_port == NONE)
 		{
 			requested_port = port;
@@ -2079,8 +2085,10 @@ void network_chat_update(
 		pressed = held & ~chat_actions_held;
 		chat_actions_held = held;
 		/* (or the controller's D-pad Up, the touch controls' too, which opens
-		the on-screen keyboard) */
-		if ((pressed || requested_port != NONE || TEST_FLAG(pad_pressed, HALO_CHAT_PAD_UP)) && !console_is_active())
+		the on-screen keyboard, unless a mutator's script has taken it) */
+		if ((pressed || requested_port != NONE ||
+			(TEST_FLAG(pad_pressed, HALO_CHAT_PAD_UP) && !mutator_scripts_control_claimed("DPad Up"))) &&
+			!console_is_active())
 		{
 			/* (no typing where the host has the chat off: it says so, once a
 			while) */

@@ -1,0 +1,158 @@
+# GoldenEye's paintball mode, from the game's own tags: every weapon fires slow,
+# dropping paint (350 to 600 feet a second, at 10 feet a world unit), each hit
+# leaves a splotch of a colour of its own in place of a bullet hole and its flash,
+# an explosion leaves one as big as its blast, and a player who dies is teleported
+# out (the co-op teleport) instead of falling. It names no weapon it needs: every
+# projectile and decal of the map is edited (tag = '*', an add-on's too), and the
+# stock weapons then get speeds of their own. PAINT SPEED and PAINT DROP (Server
+# Setup's MUTATOR OPTIONS > SETTINGS) scale every weapon's.
+
+name = "Paintball"
+id = "paintball"
+version = "2"
+description = "GoldenEye's paintball mode: slow, dropping paint rounds from every weapon, bright splotches where they hit and as big as an explosion's blast, and players teleported out as they die. PAINT SPEED and PAINT DROP are in MUTATOR OPTIONS > SETTINGS."
+format = 7
+
+[[option]]
+id = "speed"
+name = "PAINT SPEED"
+default = 100
+minimum = 25
+maximum = 200
+step = 25
+
+[[option]]
+id = "drop"
+name = "PAINT DROP"
+default = 100
+minimum = 0
+maximum = 300
+step = 25
+
+# every mark is paint (but the map's painted signs): each decal drawn with the
+# hunter's glowing splat (a bitmap of every colour's), added to what is behind it,
+# its colour any hue
+[[tags]]
+group = "decal"
+tag = '*'
+where = { type = ["scratch", "splatter", "burn"] }
+map = 'effects\decals\blood splats\bitmaps\blood splat hunter glow'
+framebuffer_blend_function = "add"
+flags = ["color_interpolate_in_hsv", "color_interpolate_along_farthest_hue_path"]
+[tags.color_lower_bound]
+red = 1
+green = 0
+blue = 0
+[tags.color_upper_bound]
+red = 1
+green = 0
+blue = 0.1
+
+# every projectile a weapon fires, an add-on's too (not one a vehicle throws out by
+# itself, as the Falcon's rotors do, nor a grenade, which a unit throws): a ball
+# (the plasma grenade), 450 feet a second, the drop, and a hit on anything a spray
+# of paint and its splotch (the assault rifle's hit on a grunt). It flies until it
+# hits something (a range of 1000): one with no range and no timer (the Warthog's
+# gun's) would vanish past its damage's reach once it no longer slows, as paint
+# does not
+[[tags]]
+group = "projectile"
+tag = '*'
+where = { fired = true }
+maximum_range = 1000
+initial_velocity = { value = 45, option = "speed" }
+final_velocity = { value = 45, option = "speed" }
+air_gravity_scale = { value = 1.5, option = "drop" }
+model = 'weapons\plasma grenade\plasma grenade'
+[tags.material_responses.all]
+default_effect = 'weapons\assault rifle\effects\impact grunt'
+potential_effect = 'weapons\assault rifle\effects\impact grunt'
+
+# an explosion's splotch, as big as its blast
+[explosion]
+decal = 'effects\decals\blood splats\blood grunt splat'
+
+[death]
+objects = "biped"
+effect = 'effects\coop teleport'
+body = "vanish"
+
+# the stock weapons' own speeds, in feet a second
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\pistol\bullet'
+initial_velocity = { value = 50, option = "speed" }
+final_velocity = { value = 50, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\assault rifle\bullet'
+initial_velocity = { value = 45, option = "speed" }
+final_velocity = { value = 45, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\shotgun\pellet'
+initial_velocity = { value = 35, option = "speed" }
+final_velocity = { value = 35, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\sniper rifle\sniper bullet'
+initial_velocity = { value = 60, option = "speed" }
+final_velocity = { value = 60, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\needler\needle'
+initial_velocity = { value = 40, option = "speed" }
+final_velocity = { value = 40, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\plasma pistol\bolt'
+initial_velocity = { value = 40, option = "speed" }
+final_velocity = { value = 40, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\plasma rifle\bolt'
+initial_velocity = { value = 45, option = "speed" }
+final_velocity = { value = 45, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\plasma rifle\charged bolt'
+initial_velocity = { value = 35, option = "speed" }
+final_velocity = { value = 35, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\rocket launcher\rocket'
+initial_velocity = { value = 35, option = "speed" }
+final_velocity = { value = 35, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'vehicles\warthog\bullet'
+initial_velocity = { value = 50, option = "speed" }
+final_velocity = { value = 50, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'vehicles\ghost\ghost bolt'
+initial_velocity = { value = 45, option = "speed" }
+final_velocity = { value = 45, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'vehicles\scorpion\bullet'
+initial_velocity = { value = 50, option = "speed" }
+final_velocity = { value = 50, option = "speed" }
+
+[[tags]]
+group = "projectile"
+tag = 'vehicles\scorpion\tank shell'
+initial_velocity = { value = 35, option = "speed" }
+final_velocity = { value = 35, option = "speed" }

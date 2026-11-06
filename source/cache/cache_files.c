@@ -625,6 +625,13 @@ void scenario_tags_unload(
 
 		menu_tags_unloaded();
 	}
+	/* port: the add-ons' tags go, after the menus', which were added after
+	them (port/linux/game/addons.c) */
+	{
+		extern void addons_tags_unloaded(void);
+
+		addons_tags_unloaded();
+	}
 	cache_file_close();
 	/* port: a Halo Custom Edition map has no Xbox vertex or index buffers
 	(port/linux/game/custom_edition_cache.c) */
@@ -1233,6 +1240,14 @@ long scenario_tags_load(
 			global_tag_instances = cache_file_globals.tag_header->tag_instances;
 			global_tag_count = cache_file_globals.tag_header->tag_count;
 			cache_file_globals.tags_loaded = TRUE;
+			/* port: the add-ons' tags, as for this build's maps below, by the
+			map's file's name, which is what a mutator's places name
+			(port/linux/game/addons.c) */
+			{
+				extern void addons_tags_loaded(char const *map_name, long scenario_index);
+
+				addons_tags_loaded(stripped_scenario_name, cache_file_globals.tag_header->scenario_tag_index);
+			}
 			/* (the menus' tags, as for this build's maps below) */
 			{
 				extern void menu_tags_loaded(char const *map_name);
@@ -1251,6 +1266,12 @@ long scenario_tags_load(
 				extern void mods_tags_loaded(char const *map_name);
 
 				mods_tags_loaded(stripped_scenario_name);
+			}
+			/* (and none of the mutators' tag edits made yet, as below) */
+			{
+				extern void mutator_tags_loaded(void);
+
+				mutator_tags_loaded();
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}
@@ -1353,6 +1374,14 @@ long scenario_tags_load(
 
 				powerup_render_bounds_tags_loaded();
 			}
+			/* port: the add-ons' tags (the mutators' .cevehicle files), after
+			the map's and before the menus', whose number is this machine's
+			alone (port/linux/game/addons.c) */
+			{
+				extern void addons_tags_loaded(char const *map_name, long scenario_index);
+
+				addons_tags_loaded(cache_file_globals.header.name, cache_file_globals.tag_header->scenario_tag_index);
+			}
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{
 				extern void menu_tags_loaded(char const *map_name);
@@ -1373,6 +1402,14 @@ long scenario_tags_load(
 				extern void mods_tags_loaded(char const *map_name);
 
 				mods_tags_loaded(stripped_scenario_name);
+			}
+			/* port: the map's own tags, none of the mutators' tag edits made
+			in them yet (each game's are made as it starts:
+			port/linux/game/mutator_tags.c) */
+			{
+				extern void mutator_tags_loaded(void);
+
+				mutator_tags_loaded();
 			}
 			result = cache_file_globals.tag_header->scenario_tag_index;
 		}

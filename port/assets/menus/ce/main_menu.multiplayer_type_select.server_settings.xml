@@ -15,18 +15,19 @@
 		<data input="server settings update"/>
 		<on event="created" run="server settings init"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_server_name" x="54" y="73"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_max_players" x="54" y="97"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_invite" x="54" y="121"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_listing" x="54" y="145"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_password" x="54" y="169"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_map_share_options" x="54" y="193"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_coop_options" x="54" y="217"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_voice_options" x="54" y="241"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_game_type" x="54" y="217"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_player_options" x="54" y="241"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_item_options" x="54" y="265"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_vehicle_options" x="54" y="289"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/op_indicator_options" x="54" y="313"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_max_players" x="54" y="95"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_invite" x="54" y="117"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_listing" x="54" y="139"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_password" x="54" y="161"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_map_share_options" x="54" y="183"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_mutator_options" x="54" y="205"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_coop_options" x="54" y="227"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_voice_options" x="54" y="249"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_game_type" x="54" y="227"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_player_options" x="54" y="249"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_item_options" x="54" y="271"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_vehicle_options" x="54" y="293"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/op_indicator_options" x="54" y="315"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/op_team_options" x="54" y="337"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/button_bar" y="414"/>
 	</widget>
@@ -98,6 +99,14 @@
 		<child widget="main_menu/multiplayer_type_select/server_settings/map_share_options_label"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/map_share_options_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="13" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/op_mutator_options" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" open="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_options_screen"/>
+		<on event="start" open="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_options_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options_label"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/labels" string_index="14" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/op_coop_options" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" open="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_screen"/>
@@ -204,6 +213,7 @@
 		<string text="VOICE AND VOTING:"/>
 		<string text="PASSWORD:"/>
 		<string text="MAP SHARING:"/>
+		<string text="MUTATOR OPTIONS:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/help_strings">
 		<string text=""/>
@@ -223,6 +233,7 @@
 		<string text="Players from the Server Browser must type it to\njoin (an invite link needs none). Enter sets it."/>
 		<string text="Sending players who join without the game's\nCustom Edition map the map, and how fast."/>
 		<string text="Listed for everyone through the brokers, and on\nthe master servers with your publisher key."/>
+		<string text="The mutators that change this game's rules, and\nthe stock game's when none are on."/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/header_coop_options"/>
@@ -655,5 +666,233 @@
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
 		<string text="The most you send of maps, so that the game\nkeeps the rest of your upload."/>
+	</strings>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mods_list"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/header_mutator_options"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/header_mutator_options" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/server_settings/mutator_options/header_mutator_options">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mods_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details">
+		<data input="port mods update"/>
+		<on event="created" run="port mutators init"/>
+		<on event="deleted" run="port mods close"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_1" x="20" y="73"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_2" x="20" y="103"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_3" x="20" y="133"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_4" x="20" y="163"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_5" x="20" y="193"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_6" x="20" y="223"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_7" x="20" y="253"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_8" x="20" y="283"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_9" x="20" y="313"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_10" x="20" y="343"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_11" x="20" y="373"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_1" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd_top" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_2" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_3" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_4" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_5" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_6" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_7" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_8" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_9" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_10" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/op_mod_11" width="390" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/sel_list_item_bkd" color="#FF2896FF">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="left" run="port mods move up"/>
+		<on event="right" run="port mods move down"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" x="8" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" x="34"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" x="318"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_status" controller="1" width="24" height="24" bitmap="mods/status">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_name" type="text" controller="1" width="284" height="22" font="ui\large_ui" color="#FF2896FF" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_state" type="text" controller="1" width="66" height="22" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details" width="640" height="480">
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details_status"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details_text"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details_name" type="text" controller="1" left="412" top="84" width="200" height="44" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details_status" controller="1" left="411" top="132" width="16" height="16" bitmap="mods/status_small">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mod_details_text" type="text" controller="1" left="412" top="130" width="200" height="272" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/button_settings" x="256" y="1"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/button_ok" x="384" y="1"/>
+		<child widget="common_button_cancel" x="512" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/button_settings" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="SETTINGS" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" open="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_screen"/>
+		<on event="start" open="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mutators save" back="true"/>
+		<on event="start" run="port mutators save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_menu"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/header_mutator_settings">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_help" type="text" controller="1" left="68" top="341" width="482" height="79" string_list="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/cap_mutator_settings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_help">
+		<data input="port mutator settings update"/>
+		<on event="created" run="port mutator settings init"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_1" x="54" y="73"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_2" x="54" y="103"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_3" x="54" y="133"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_4" x="54" y="163"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_settings_button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mutator settings save" back="true"/>
+		<on event="start" run="port mutator settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_1" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port mutator settings left"/>
+		<on event="right" run="port mutator settings right"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" x="286"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_2" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port mutator settings left"/>
+		<on event="right" run="port mutator settings right"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" x="286"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_3" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port mutator settings left"/>
+		<on event="right" run="port mutator settings right"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" x="286"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/op_mutator_setting_4" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port mutator settings left"/>
+		<on event="right" run="port mutator settings right"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" x="286"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_name" type="text" controller="1" width="286" height="22" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/mutator_setting_value" type="text" controller="1" width="206" height="22" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" text_flags="no_focus_test">
+	</widget>
+	<strings name="main_menu/multiplayer_type_select/server_settings/mutator_options/mutator_settings/cap_mutator_settings">
+		<string text="The options of the mutators on, for the games\nyou host. Left and right change one."/>
 	</strings>
 </menus>

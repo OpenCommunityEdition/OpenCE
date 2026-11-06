@@ -61,6 +61,8 @@ OBJECTS.C
 void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
 /* port: port/linux/game/first_person_legs.c's */
 void first_person_legs_reset(void);
+/* port: port/linux/game/object_pose.c's */
+real object_pose_bounding_radius(long object_index, real bounding_radius);
 
 /* ---------- constants */
 
@@ -182,6 +184,8 @@ long network_objects_new_object_index(void);
 boolean network_objects_creating_host_object(void);
 boolean network_objects_may_delete(long object_index);
 boolean network_objects_client_deleting(void);
+/* port/linux/game/mutator_scripts.c's: a script's model, made as its tag is */
+boolean mutator_scripts_creating_model(void);
 /* port/linux/game/network_coop.c's: the scripts' attaching, on co-op's clients */
 void network_coop_note_attach(long parent_index, char const *parent_marker_name, long child_index,
 	char const *child_marker_name);
@@ -3110,6 +3114,9 @@ void object_compute_node_matrices(
 	{
 		object->object.bounding_sphere_radius *= object->object.scale;
 	}
+	/* port: grown to hold the nodes a mutator's poses moved */
+	object->object.bounding_sphere_radius = object_pose_bounding_radius(object_index,
+		object->object.bounding_sphere_radius);
 	/* port: (and in the packed copy collision reads: object_bounds_cache.c) */
 	object_bounds_cache_update(object_index, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius);
 
@@ -3611,6 +3618,8 @@ long object_new(
 	if (game_engine_running() && definition_index!=NONE
 		/* (the host's object, which the host made as the game type has it) */
 		&& !network_objects_creating_host_object()
+		/* port: (a script's model, which only shows what its script does) */
+		&& !mutator_scripts_creating_model()
 		)
 	{
 		definition_index = game_engine_remap_object_definition(definition_index);

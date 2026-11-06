@@ -29,8 +29,8 @@ def test_case(case):
 @pytest.mark.parametrize('fault,case', [
     (('row->vertical_offset = y;', 'row->vertical_offset = y; row->child->vertical_offset = y;'), 'layout'),
     (('if (row->visible && !strncmp(row->name, "op_coop_", 8))', 'if (!strncmp(row->name, "op_coop_", 8))'), 'layout'),
-    (('index += spinner->parameters.list.number_of_items;',
-      'if (row->visible) index += spinner->parameters.list.number_of_items;'), 'help'),
+    (('index += ui_widget_spinner_own_item_count(spinner);',
+      'if (row->visible) index += ui_widget_spinner_own_item_count(spinner);'), 'help'),
     (('struct widget_instance *pickups = named(list, "coop_extra_pickups_spinner", 0);',
       'struct widget_instance *pickups = NULL;'), 'layout'),
     (('struct widget_instance *vehicles = named(list, "coop_extra_vehicles_spinner", 0);',

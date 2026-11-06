@@ -123,6 +123,12 @@ MUSL_MATH_DIR = Path("port/third_party/musl-math")
 # the port's zlib (port/third_party/zlib/zlib_prefixed.h): what inflates the
 # maps, the menus' and the HUD's PNGs and the updates, data from anywhere,
 # instead of the game's own 1.1.3 (its inflate only, its names prefixed z_)
+# what a mutator's scripts run on (port/third_party/lua), without the libraries
+# they do not have
+LUA_DIR = Path("port/third_party/lua")
+LUA_SOURCES = ("lapi.c", "lauxlib.c", "lbaselib.c", "lcode.c", "lctype.c", "ldebug.c", "ldo.c", "ldump.c", "lfunc.c", "lgc.c",
+               "llex.c", "lmathlib.c", "lmem.c", "lobject.c", "lopcodes.c", "lparser.c", "lstate.c", "lstring.c", "lstrlib.c",
+               "ltable.c", "ltablib.c", "ltm.c", "lundump.c", "lvm.c", "lzio.c")
 ZLIB_DIR = Path("port/third_party/zlib")
 ZLIB_SOURCES = ("adler32.c", "crc32.c", "inffast.c", "inflate.c", "inftrees.c", "uncompr.c", "zutil.c")
 # (its names prefixed, and the one Z_PREFIX leaves, its error messages, which
@@ -658,6 +664,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # the port's zlib
         for name in ZLIB_SOURCES:
             add_object(ZLIB_DIR / name, " ".join([abi, "-std=gnu11", *ZLIB_DEFINES, "-w"]))
+        # (port/third_party/lua; mutator_scripts.c)
+        for name in LUA_SOURCES:
+            add_object(LUA_DIR / name, " ".join([abi, "-std=gnu11", "-w"]))
         # the game's sin, pow and the rest, the same on every port
         # (port/include/halo_math.h)
         for source in musl_math_sources():
@@ -707,6 +716,28 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 variables={"ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *sysroot_ldflags,
                                                 *extra_ldflags])},
             )
+            # the add-ons' builder (tools/addon_build.c): the same, with
+            # the schemas' walk (tag_walk.c) and the Custom Edition maps'
+            # sounds' decoder (custom_edition_sounds.c, with stb_vorbis)
+            builder = Path("tools/addon_build.c")
+            builder_object = obj_dir / builder.with_suffix(".o")
+            n.build(
+                outputs=builder_object,
+                rule="linux_cc",
+                inputs=builder,
+                implicit=sysroot_inputs,
+                variables={"cflags": " ".join([posix_cflags, f"-I{ZLIB_DIR}", *ZLIB_DEFINES, posix_extra])},
+            )
+            n.build(
+                outputs=validator.parent / "addon_build",
+                rule="linux_tool_link",
+                inputs=[builder_object, obj_dir / (game_dir / "tag_walk.o"),
+                        obj_dir / (game_dir / "custom_edition_sounds.o"), obj_dir / STB_VORBIS_SOURCE.with_suffix(".o"),
+                        *(obj_dir / source.with_suffix(".o") for source in musl_math_sources()),
+                        *tool_objects[1:]],
+                variables={"ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *sysroot_ldflags,
+                                                *extra_ldflags])},
+            )
 
     # Profile-guided optimisation: with the committed profile, or with
     # --pgo=train one that an instrumented build records while playing
@@ -738,5 +769,5 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     masters = build_dir / "masters.txt"
     n.build(outputs=masters, rule="linux_copy", inputs=Path("port/assets/network/masters.txt"))
     n.build(outputs="linux", rule="phony",
-            inputs=[output, brokers, masters, validator, *sdl_outputs])
+            inputs=[output, brokers, masters, validator, build_dir / "addon_build", *sdl_outputs])
     n.newline()

@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .linux_build import (LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, XDK_INCLUDE,
+from .linux_build import (LUA_DIR, LUA_SOURCES, LINUX_PROFILE, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, STB_VORBIS_SOURCE, XDK_INCLUDE,
                           compile_launcher, configuration_defines, game_defines_and_includes, game_sources,
                           miniupnpc_sources, musl_math_sources, opus_cflags, opus_sources, pgo_mode, pgo_profile,
                           profile_use_flags, updater_defines, xdk_headers)
@@ -499,6 +499,9 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     # library
     for source in opus_sources():
         objects.append(guest_object(source, " ".join([opus_cflags(guest_abi), *libc_includes])))
+    # (port/third_party/lua; mutator_scripts.c)
+    for name in LUA_SOURCES:
+        objects.append(guest_object(LUA_DIR / name, platform_cflags))
     # internet play's signatures, for public games' listings
     # (port/third_party/monocypher; p2p_crypto.c)
     for name in ("monocypher.c", "monocypher-ed25519.c"):

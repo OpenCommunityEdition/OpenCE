@@ -128,6 +128,7 @@ symbols in this file:
 #include "flying_camera.h"
 #include "following_camera.h"
 #include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
+#include "mutator_scripts.h" /* port: port/linux/game/mutator_scripts.c */
 #include "observer.h"
 #include "orbiting_camera.h"
 
@@ -656,12 +657,17 @@ static void director_choose_game_perspective(
 {
 	/* port: remember only local display choices, never a shared seat flag */
 	static boolean passenger_views[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
-	boolean passenger = passenger_camera_enabled(local_player_index);
+	boolean passenger;
 	director_perspective perspective;
 	short following;
 	long unit_index;
 	struct director *director = director_get(local_player_index);
 
+	/* port: and the view a mutator's script asks for, as local as that one
+	(port/linux/game/mutator_scripts.c) */
+	mutator_scripts_update(local_player_index);
+	passenger = passenger_camera_enabled(local_player_index) ||
+		mutator_view_active(local_player_index);
 	unit_index = player_control_get_unit_index(local_player_index);
 	following = director_desired_perspective(unit_index, &perspective);
 	/* port: the local passenger view must not change the deterministic
@@ -954,7 +960,8 @@ static boolean director_update_controls(
 
 		switch_camera = input_key_is_down(_key_backspace) == TRUE;
 		/* port: the passenger follows their aim, never the debug mouse orbit */
-		if (!passenger_camera_enabled(local_player_index) && ((director->camera_proc !=
+		if (!passenger_camera_enabled(local_player_index) &&
+			!mutator_view_active(local_player_index) && ((director->camera_proc !=
 				(director_camera_update_proc)first_person_camera_update &&
 			mouse->buttons[1]) || input_key_is_down(_key_tab)))
 		{

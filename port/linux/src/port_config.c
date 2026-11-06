@@ -568,6 +568,16 @@ static const struct config_setting config_settings[] =
 		"every map. A downloaded map's scripts may not change the player's\n"
 		"settings or other players' games (debug.txt names what they were\n"
 		"refused)." },
+	{ "game.mutators", _config_string, "\"\"", "HALO_MUTATORS", _environment_value, _platform_all,
+		"The mutators played in the games you host or play alone: their ids\n"
+		"(big_head), separated by commas; empty plays none, the stock game. A\n"
+		"game you join plays its host's. The Mods menu's MUTATORS sets this\n"
+		"(docs/mutators.md)." },
+	{ "game.mutator_options", _config_string, "\"\"", "HALO_MUTATOR_OPTIONS", _environment_value, _platform_all,
+		"The options of the mutators you host or play alone, each a percent:\n"
+		"<mutator's id>.<option's id>=<percent>, separated by commas; one not\n"
+		"here is at its default. Server Setup's MUTATOR SETTINGS sets this\n"
+		"(docs/mutators.md)." },
 
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"
@@ -696,6 +706,15 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"Playing in another's game: the most kilobytes a second this machine\n"
 		"sends of maps to other players (16 to 10240: 10 MB/s)." },
+	{ "network.mutator_download", _config_boolean, "true", "HALO_NET_MUTATOR_DOWNLOAD", _environment_value, _platform_all,
+		"Fetch the files of a host's mutators this machine lacks (mutator.toml, Lua\n"
+		"scripts, .cevehicle, .ceweapon) into mutator_downloads, and play them in that\n"
+		"host's games." },
+	{ "network.mutator_host_scripts", _config_string, "\"ask\"", "HALO_NET_MUTATOR_HOST_SCRIPTS", _environment_value,
+		_platform_all,
+		"The Lua scripts of mutators a host sent, which run in their sandbox: \"ask\" the\n"
+		"first time for each, \"always\" run them, or \"never\". This machine's own\n"
+		"mutators' scripts always run." },
 	{ "network.map_download", _config_boolean, "true", "HALO_NET_MAP_DOWNLOAD", _environment_value, _platform_all,
 		"Joining a game on a Custom Edition map this machine does not have:\n"
 		"download it (and the resource maps it needs) from the game's players\n"
@@ -1405,6 +1424,37 @@ static char *config_read_file(const char *path, size_t *size)
 #endif
 }
 
+int config_file_write(const char *path, const char *text)
+{
+	char temporary[1024];
+	int written;
+#ifdef HALO_ARM64_GUEST
+	FILE *file;
+#endif
+
+	if (snprintf(temporary, sizeof(temporary), "%s.new", path) >= (int)sizeof(temporary))
+		return 0;
+#ifdef HALO_ARM64_GUEST
+	/* (the guest's own C library: SDL's are the host's) */
+	file = fopen(temporary, "wb");
+	if (!file)
+		return 0;
+	written = fwrite(text, 1, strlen(text), file) == strlen(text);
+	written = fclose(file) == 0 && written;
+	if (written)
+		written = rename(temporary, path) == 0;
+	if (!written)
+		remove(temporary);
+#else
+	written = SDL_SaveFile(temporary, text, strlen(text));
+	if (written)
+		written = SDL_RenamePath(temporary, path);
+	if (!written)
+		SDL_RemovePath(temporary);
+#endif
+	return written;
+}
+
 static int config_write_file(const char *path, const char *text)
 {
 #ifdef HALO_ARM64_GUEST
@@ -2046,6 +2096,7 @@ static const struct
 	{ "audio.resampler", { "sinc", "linear", NULL }, NULL },
 	{ "audio.voice_chat", { "push_to_talk", "open_mic", "off", NULL }, NULL },
 	{ "input.touch_controls", { "auto", "on", "off", NULL }, NULL },
+	{ "network.mutator_host_scripts", { "ask", "always", "never", NULL }, NULL },
 	{ "game.console_log", { "important", "all", "none", NULL }, NULL },
 	{ "game.language", { "", "ja", "de", "fr", "es", "it", NULL }, NULL },
 	{ "network.text_chat", { "on", "links", "off", NULL }, NULL },

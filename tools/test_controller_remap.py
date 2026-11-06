@@ -569,6 +569,7 @@ struct key_stroke{int key;};
 static int input_get_key(struct key_stroke *key){return 0;}
 static WORD chat_held_buttons[4];
 static unsigned char chat_held_analog[4];
+static unsigned char mutator_share_prompt_open(void){return 0;}
 '''
     code+='\n'.join(function(chat,n) for n in ['chat_speaker','chat_input_begin','network_chat_controller','chat_input_end','chat_keyboard_buttons'])
     code+=function(xinput,'chat_pad_hold_over')+r'''

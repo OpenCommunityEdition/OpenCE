@@ -1451,6 +1451,10 @@ static void widget_instance_process_one_event_recursive(
 	boolean *return_widget_deleted);
 static boolean ui_check_for_pause_game(
 	void);
+static boolean spinner_string_list_kills_to_win(
+	long string_list_index);
+static boolean spinner_string_list_loadout_weapons(
+	long string_list_index);
 static long spinner_string_list_extra_count(
 	long string_list_index);
 static wchar_t *spinner_string_list_get_string(
@@ -1465,6 +1469,17 @@ Edition maps' display indices (custom_edition_maps.c keeps them below 0x7000) */
 #define SPINNER_EXTRA_DESCRIPTION_BASE 0x7000
 /* ... and the pixels a spinner with extra items is wider (for three digits) */
 #define SPINNER_EXTRA_WIDTH 12
+/* ... and the description of a custom loadout's add-on weapons, and of the
+custom vehicle set's add-on vehicles' rows (port/linux/game/menu_functions.c's
+ADDON_VEHICLE_DESCRIPTION) */
+#define SPINNER_ADDON_WEAPON_DESCRIPTION (SPINNER_EXTRA_DESCRIPTION_BASE + 0x80)
+#define SPINNER_ADDON_VEHICLE_DESCRIPTION (SPINNER_EXTRA_DESCRIPTION_BASE + 0x81)
+
+/* port: a custom loadout's weapons' spinners list the weapon add-ons of the
+mutators on after the stock weapons: how many, and their names
+(port/linux/game/menu_functions.c) */
+long menus_loadout_addon_count(void);
+wchar_t const *menus_loadout_addon_name(long index);
 
 /* port: the strings a spinner's string list has past the tag's own, as more
 items: the higher kills to win of the Slayer game type editor
@@ -5326,6 +5341,10 @@ static void widget_instance_render_text_box(
 		{
 			string = (wchar_t *)kills_to_win_extra_descriptions[string_list_index - SPINNER_EXTRA_DESCRIPTION_BASE];
 		}
+		if (string_list_index == SPINNER_ADDON_WEAPON_DESCRIPTION)
+			string = L"A weapon a mutator adds. Each player starts\r\nwith it, where the map has it.";
+		if (string_list_index == SPINNER_ADDON_VEHICLE_DESCRIPTION)
+			string = L"Up to this many of a mutator's vehicle spawn\r\nwhere the mutator places it.";
 		length = ustrlen(string);
 		widget->parameters.text_box.text = pool_resize_pointer(
 			widget_memory_pool,
@@ -5516,9 +5535,9 @@ static void widget_instance_render_spinner_list(
 
 		csmemset(&parameters, 0, sizeof(parameters));
 		bounds = definition->list_header_bounds;
-		/* port: a spinner with extra items is wider, to the left, its arrow
-		with it */
-		if (spinner_string_list_extra_count(definition->text_label_string_list.index))
+		/* port: a spinner with extra items of three digits is wider, to the
+		left, its arrow with it */
+		if (spinner_string_list_kills_to_win(definition->text_label_string_list.index))
 		{
 			bounds.x0 -= SPINNER_EXTRA_WIDTH;
 			bounds.x1 -= SPINNER_EXTRA_WIDTH;
@@ -5644,7 +5663,7 @@ static void widget_instance_render_spinner_list(
 				bounds.y0 += offset.y;
 				/* port: a spinner with extra items (three digits) is wider, to the
 				left */
-				if (spinner_string_list_extra_count(definition->text_label_string_list.index))
+				if (spinner_string_list_kills_to_win(definition->text_label_string_list.index))
 				{
 					bounds.x0 -= SPINNER_EXTRA_WIDTH;
 					clip.x0 -= SPINNER_EXTRA_WIDTH;
@@ -7545,14 +7564,30 @@ void render_ui_widgets(
 /* ---------- private code */
 
 
+/* whether the string list is the Slayer editor's kills to win (its extra
+items three digits: a wider spinner), and a custom loadout's weapons' (the
+port's menus' own, port/linux/game/menu_tags.c's pc\ tags) */
+static boolean spinner_string_list_kills_to_win(
+	long string_list_index)
+{
+	return string_list_index != NONE && !csstrcmp(tag_get_name(string_list_index),
+		"ui\\shell\\main_menu\\settings_select\\multiplayer_setup\\playlist_edit\\slayer_edit\\var_kills_to_win");
+}
+
+static boolean spinner_string_list_loadout_weapons(
+	long string_list_index)
+{
+	return string_list_index != NONE && !csstrcmp(tag_get_name(string_list_index),
+		"pc\\main_menu\\settings_select\\multiplayer_setup\\item_options_edit\\var_loadout_weapon");
+}
+
 static long spinner_string_list_extra_count(
 	long string_list_index)
 {
-	if (string_list_index != NONE && !csstrcmp(tag_get_name(string_list_index),
-		"ui\\shell\\main_menu\\settings_select\\multiplayer_setup\\playlist_edit\\slayer_edit\\var_kills_to_win"))
-	{
+	if (spinner_string_list_kills_to_win(string_list_index))
 		return NUMBEROF(kills_to_win_extra_strings);
-	}
+	if (spinner_string_list_loadout_weapons(string_list_index))
+		return menus_loadout_addon_count();
 	return 0;
 }
 
@@ -7573,10 +7608,13 @@ short ui_widget_spinner_extra_description(
 	struct widget_instance *spinner,
 	short item_index)
 {
+	struct ui_widget_definition *definition = ui_widget_definition_get(spinner->definition_tag_index);
 	short own = ui_widget_spinner_own_item_count(spinner);
 
 	if (item_index < own)
 		return NONE;
+	if (spinner_string_list_loadout_weapons(definition->text_label_string_list.index))
+		return SPINNER_ADDON_WEAPON_DESCRIPTION;
 	return (short)(SPINNER_EXTRA_DESCRIPTION_BASE + item_index - own);
 }
 
@@ -7590,6 +7628,8 @@ static wchar_t *spinner_string_list_get_string(
 	if (string_list && string_index >= string_list->strings.count &&
 		string_index - string_list->strings.count < spinner_string_list_extra_count(string_list_index))
 	{
+		if (spinner_string_list_loadout_weapons(string_list_index))
+			return (wchar_t *)menus_loadout_addon_name(string_index - string_list->strings.count);
 		return (wchar_t *)kills_to_win_extra_strings[string_index - string_list->strings.count];
 	}
 	return unicode_string_list_get_string(string_list_index, string_index);

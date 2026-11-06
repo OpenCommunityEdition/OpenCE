@@ -58,3 +58,28 @@ test('no part of a path leaves the mod', () => {
   const mod = mods.modFiles(chosen(['m/mod.toml', 'm/tags/../../escape.sound', 'm/tags/a/../b.sound']));
   assert.deepStrictEqual(mod.files.map((entry) => entry.parts.join('/')), ['mod.toml']);
 });
+
+test('a mutator: its mutator.toml and the files beside it, not those under it', () => {
+  const mutator = mods.mutatorFiles(chosen([
+    'grappling_hook/mutator.toml',
+    'grappling_hook/main.lua',
+    'grappling_hook/grappling_hook.ceweapon',
+    'grappling_hook/settings.toml',
+    'grappling_hook/notes/readme.txt',
+    'grappling_hook/.git/config',
+  ]));
+  assert.strictEqual(mutator.name, 'grappling_hook');
+  assert.deepStrictEqual(mutator.files.map((entry) => entry.parts.join('/')).sort(), [
+    'grappling_hook.ceweapon', 'main.lua', 'mutator.toml', 'settings.toml',
+  ]);
+});
+
+test('a folder without mutator.toml is not a mutator, and one at a time', () => {
+  assert.throws(() => mods.mutatorFiles(chosen(['hook/main.lua'])), /no mutator\.toml/);
+  assert.throws(() => mods.mutatorFiles(chosen(['hook/scripts/mutator.toml'])), /no mutator\.toml/);
+  assert.throws(() => mods.mutatorFiles(chosen(['a/mutator.toml', 'b/mutator.toml'])), /one mutator/);
+  assert.throws(() => mods.mutatorFiles(chosen([`${'x'.repeat(64)}/mutator.toml`])), /cannot be a mutator's folder name/);
+  assert.throws(() => mods.mutatorFiles([]), /empty/);
+  // (a mod is not a mutator)
+  assert.throws(() => mods.mutatorFiles(chosen(['m/mod.toml', 'm/tags/a.sound'])), /no mutator\.toml/);
+});

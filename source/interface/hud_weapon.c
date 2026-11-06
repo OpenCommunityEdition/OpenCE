@@ -54,6 +54,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
+#include "mutator_scripts.h" /* port: port/linux/game/mutator_scripts.c */
 #include "cseries/errors.h"
 #include "bitmaps/bitmap_group.h"
 #include "cache/texture_cache.h"
@@ -981,6 +982,10 @@ static void crosshairs_draw(
 	long stack_buffer[STACK_BUFFER_LENGTH];
 	boolean firing_active = FALSE;
 
+	/* port: no reticle if a mutator's script's view has none
+	(port/linux/game/mutator_scripts.c) */
+	if (!mutator_view_crosshair(player->local_player_index))
+		return;
 	/* port: project the passenger's shot once for all pieces of its reticle */
 	if (!passenger_camera_reticle_begin(player->local_player_index, weapon_index))
 		return;

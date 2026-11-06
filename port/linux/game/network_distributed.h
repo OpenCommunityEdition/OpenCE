@@ -156,6 +156,22 @@ enum
 	stream */
 	_distributed_message_map_vote = 94,
 	_distributed_message_map_vote_choice = 95,
+	/* the host's mutators (network_mutators.c): each effect's and
+	parameter's key and value, to each client, reliably, when it is ready.
+	A number of its own, as actor_states', clear of the kinds upstream and
+	its forks add after it */
+	_distributed_message_mutators = 112,
+	/* the host's tag edits (network_mutators.c, mutator_tags.c): their
+	bytes in pieces, to each client, reliably, as it is ready, before the
+	host's mutators' keys */
+	_distributed_message_mutator_tag_edits = 113,
+	/* the host's mutators' files (mutator_share.c): a client asks, the host lists them,
+	a client says it is fetching them (map_share.c's connections carry them), and has
+	them */
+	_distributed_message_mutator_share_ask = 114,
+	_distributed_message_mutator_share_entry = 115,
+	_distributed_message_mutator_share_fetching = 116,
+	_distributed_message_mutator_share_done = 117,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

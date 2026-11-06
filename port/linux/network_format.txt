@@ -1,4 +1,4 @@
-version 41
+version 49
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -8,7 +8,7 @@ bound DISTRIBUTED_CLIENT_BUILD_NUMBER_SIZE 12
 bound DISTRIBUTED_CLIENT_BUILD_REPOSITORY_SIZE 144
 bound DISTRIBUTED_CLIENT_BUILD_VERSION_SIZE 64
 bound DISTRIBUTED_INPUT_HISTORY 4
-bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)
+bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE 15 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)
 bound DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE 14
 bound DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 + 2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1
 bound DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE 3
@@ -20,6 +20,7 @@ bound MAXIMUM_DEVICE_GROUPS 1024
 bound MAXIMUM_DEVICE_STATES_PER_MESSAGE 64
 bound MAXIMUM_ENTRIES_PER_MESSAGE 64
 bound MAXIMUM_LOCAL_PLAYERS 4
+bound MAXIMUM_MUTATOR_KEYS 32
 bound MAXIMUM_OBJECT_LOOKS_PER_MESSAGE 64
 bound MAXIMUM_OBJECT_NAMES_PER_SCENARIO 0x200
 bound MAXIMUM_OBJECT_TRANSFORMS_PER_MESSAGE 64
@@ -29,6 +30,8 @@ bound MAXIMUM_QUEUED_EVENTS 128
 bound MAXIMUM_REGIONS_PER_OBJECT 8
 bound MAXIMUM_STATISTICS_PER_MESSAGE 64
 bound MAXIMUM_WEAPONS_PER_UNIT 4
+bound MUTATOR_KEY_LENGTH 32
+bound MUTATOR_TAG_EDIT_PIECE_BYTES 4000
 bound NETWORK_MAP_VOTE_GAMETYPE_SIZE 24
 bound NETWORK_MAP_VOTE_MAP_SIZE 32
 bound NETWORK_MAP_VOTE_MAXIMUM_CHOICES 8
@@ -39,6 +42,7 @@ bound NUMBER_OF_UNIT_GRENADE_TYPES enum a0462dbcbdd9
 bound OBJECT_NAME_BYTES MAXIMUM_OBJECT_NAMES_PER_SCENARIO / 8
 bound P2P_PLAYER_KEY_HASH_SIZE 16
 define DISTRIBUTED_ANGULAR_VELOCITY_SCALE 4096.0f
+define DISTRIBUTED_RELAYED_ACTION_SCRIPT_BUTTONS_BIT 7
 define DISTRIBUTED_TIME_WINDOW_TICKS (15 * TICKS_PER_SECOND)
 define DISTRIBUTED_UNIT_SCALE 32767.0f
 define DISTRIBUTED_VELOCITY_SCALE 1024.0f
@@ -89,6 +93,12 @@ enum _distributed_message_map_share_request 83
 enum _distributed_message_map_share_sources 85
 enum _distributed_message_map_vote 94
 enum _distributed_message_map_vote_choice 95
+enum _distributed_message_mutator_share_ask 114
+enum _distributed_message_mutator_share_done 117
+enum _distributed_message_mutator_share_entry 115
+enum _distributed_message_mutator_share_fetching 116
+enum _distributed_message_mutator_tag_edits 113
+enum _distributed_message_mutators 112
 enum _distributed_message_notice 17
 enum _distributed_message_object_changes 5
 enum _distributed_message_object_states 6
@@ -292,6 +302,9 @@ struct distributed_map_vote_choice e0aa3fb40224
 struct distributed_map_vote_choice_entry b8e5a595dbad
 struct distributed_map_vote_status 524c63fc37e2
 struct distributed_message_header 0e026a4933a1
+struct distributed_mutator_entry 1977cdd280fe
+struct distributed_mutator_tag_edits_message 777e7e7af7e2
+struct distributed_mutators_message 63b6304230c4
 struct distributed_object_change 343e570cfa1d
 struct distributed_object_change_message 4c3679cd4dae
 struct distributed_object_state 1b656bbda892
@@ -310,4 +323,4 @@ struct distributed_voice_down e3751d692f16
 struct distributed_voice_up 3d74ee44e4cb
 struct distributed_votekick_request 7e29ffd54bd1
 struct distributed_votekick_status b94458cdc180
-struct game_variant_options 0e258e4cf85b
+struct game_variant_options 363dea4d8bb6

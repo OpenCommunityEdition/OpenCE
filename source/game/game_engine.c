@@ -597,6 +597,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "units/units.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
+#include "addons.h" /* port: port/linux/game/addons.c */
 #include "touch_postgame.h" /* port: port/linux/game/touch_postgame.c */
 
 /* network_game_globals.c's */
@@ -7736,13 +7737,16 @@ real game_engine_get_starting_location_rating(
 	return default_starting_location_rate_function(player_index, starting_location);
 }
 
-/* port: the gametype's vehicles of each team (game_variant_options) */
+/* port: the gametype's vehicles of each team (game_variant_options), and
+its add-on vehicles (port/linux/game/addons.c) */
 static byte game_engine_vehicles_placed[2][NUMBER_OF_VARIANT_VEHICLES];
+static byte game_engine_addon_vehicles_placed[2][MAXIMUM_VARIANT_ADDON_VEHICLES];
 
 void game_engine_vehicle_placement_begin(
 	void)
 {
 	csmemset(game_engine_vehicles_placed, 0, sizeof(game_engine_vehicles_placed));
+	csmemset(game_engine_addon_vehicles_placed, 0, sizeof(game_engine_addon_vehicles_placed));
 }
 
 /* a vehicle definition's type: the globals' multiplayer vehicles (warthog,
@@ -7822,6 +7826,7 @@ boolean game_engine_vehicle_placement_allowed(
 {
 	struct game_variant_options const *options = game_variant_options_get();
 	short side, type;
+	long definition_index;
 	byte set;
 
 	if (!game_engine || placement->palette_entry_index == NONE)
@@ -7830,8 +7835,31 @@ boolean game_engine_vehicle_placement_allowed(
 	set = options->vehicle_set[side];
 	if (set == VARIANT_VEHICLE_SET_PC)
 		return TRUE;
-	type = game_engine_variant_vehicle_type(TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
-		struct scenario_object_palette_entry)->reference.index);
+	definition_index = TAG_BLOCK_GET_ELEMENT(palette, placement->palette_entry_index,
+		struct scenario_object_palette_entry)->reference.index;
+	/* an add-on's vehicle: placed by every set but none (those of one kind
+	too, as the stock gametypes' are: a mutator that adds a vehicle is on
+	to play it), and counted by a custom one (the first add-ons' only: the
+	rest as placed) */
+	if (addons_vehicle(definition_index))
+	{
+		short slot = addons_vehicle_slot(definition_index);
+
+		if (set == _game_engine_vehicles_none)
+			return FALSE;
+		if (set != VARIANT_VEHICLE_SET_CUSTOM)
+			return TRUE;
+		if (!VALID_INDEX(slot, MAXIMUM_VARIANT_ADDON_VEHICLES))
+			return TRUE;
+		if (game_engine_addon_vehicles_placed[side][slot] >=
+			MAXIMUM_VARIANT_VEHICLE_COUNT - MIN(options->addon_vehicles_fewer[side][slot], MAXIMUM_VARIANT_VEHICLE_COUNT))
+		{
+			return FALSE;
+		}
+		game_engine_addon_vehicles_placed[side][slot]++;
+		return TRUE;
+	}
+	type = game_engine_variant_vehicle_type(definition_index);
 	/* (the map's own: the multiplayer ones of the globals, as the Xbox
 	game's remap allows) */
 	if (set == _game_engine_vehicles_default)
@@ -7940,6 +7968,18 @@ long game_engine_remap_vehicle(
 	(port/linux/game/custom_edition_objects.c) */
 	if (custom_edition_vehicles_by_placement())
 		return result;
+	/* port: and an add-on's vehicle, which no vehicle set names, is placed
+	where its mutator places it, unless the variant has no vehicles (each
+	team's set decides: game_engine_vehicle_placement_allowed;
+	port/linux/game/addons.c) */
+	{
+		if (addons_vehicle(result) && !(game_engine &&
+			game_variant_options_get()->vehicle_set[0] == _game_engine_vehicles_none &&
+			game_variant_options_get()->vehicle_set[1] == _game_engine_vehicles_none))
+		{
+			return result;
+		}
+	}
 	/* port: and the PC vehicle set's are every one the map places
 	(game_engine_vehicle_placement_allowed) */
 	if (game_engine && (game_variant_options_get()->vehicle_set[0] == VARIANT_VEHICLE_SET_PC ||
@@ -8000,6 +8040,17 @@ long game_engine_remap_weapon(
 {
 	long weapon_list_index =
 		weapon_definition_index_to_list_index(weapon_definition_index);
+
+	/* port: an add-on's weapon, which no weapon set names: kept by a custom
+	loadout and by the sets of every kind (normal, no sniping), and left out
+	by those of one kind (port/linux/game/addons.c) */
+	if (addons_weapon(weapon_definition_index))
+	{
+		return game_variant_options_get()->loadout == _loadout_custom ||
+			global_variant.universal_variant.weapon_set == _game_engine_weapons_normal ||
+			global_variant.universal_variant.weapon_set == _game_engine_weapons_no_sniping ?
+			weapon_definition_index : NONE;
+	}
 
 	if (weapon_list_index == _weapon_list_ball ||
 		weapon_list_index == _weapon_list_flag ||
@@ -9220,8 +9271,9 @@ static void handle_custom_starting_equipment(
 }
 
 /* port: a custom loadout's weapon's place in the globals' weapon list
-(game_engine_h's _loadout_weapon_*, from the assault rifle); random: one
-of those the map has (and port/linux/game/gun_game.c's weapons) */
+(game_engine_h's _loadout_weapon_*, from the assault rifle), or an add-on's
+weapon; random: one of those the map has (and port/linux/game/gun_game.c's
+weapons) */
 long game_engine_loadout_weapon_definition(
 	byte weapon)
 {
@@ -9232,6 +9284,11 @@ long game_engine_loadout_weapon_definition(
 	};
 	short index;
 
+	/* (an add-on's: NONE if this map has it not) */
+	if (LOADOUT_WEAPON_ADDON(weapon))
+	{
+		return addons_weapon_definition((short)(weapon - _loadout_weapon_addon_first));
+	}
 	if (weapon == _loadout_weapon_random)
 	{
 		long available[NUMBEROF(list_indices)];

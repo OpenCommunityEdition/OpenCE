@@ -33,6 +33,7 @@
         <a href="#play-panel" class="menu-current">Play</a>
         <a href="#data-panel">Game data</a>
         <a href="#mods-panel">Mods</a>
+        <a href="#mutators-panel">Mutators</a>
         <a href="#room-panel">Play together</a>
         <a href="#servers-panel">Servers</a>
         <a href="#checks-panel">This browser</a>
@@ -52,6 +53,8 @@
               <span class="row-value" id="summary-data-value">Looking…</span></div>
             <div class="row" id="summary-mods"><span class="row-label">Mods</span>
               <span class="row-value" id="summary-mods-value">None yet</span></div>
+            <div class="row" id="summary-mutators"><span class="row-label">Mutators</span>
+              <span class="row-value" id="summary-mutators-value">None yet</span></div>
           </div>
           <p class="help">The game starts in this tab. Its own menus, saved games and settings stay in this browser.</p>
           <p id="play-note" class="help note"></p>
@@ -94,6 +97,24 @@
           <div class="button-bar">
             <label class="button" id="mod-label">Add a mod folder…
               <input type="file" id="mod-input" webkitdirectory multiple hidden>
+            </label>
+          </div>
+        </section>
+
+        <section class="screen" id="mutators-panel" aria-labelledby="mutators-title">
+          <h2 id="mutators-title">Mutators</h2>
+          <div class="rows">
+            <p id="mutators-status" class="row status">No mutators yet.</p>
+            <ul id="mutators-list" class="mods"></ul>
+          </div>
+          <p class="help">A mutator is a folder with a mutator.toml, and the files it names beside it (a Lua script,
+            a vehicle's or weapon's add-on): it changes a game's rules for everyone in it. The game has its own
+            built in (big head, paintball, ...). Turn them on in the game's main menu's Mods (MUTATORS), or in
+            Server Setup's MUTATOR OPTIONS, which also has their SETTINGS. A game you join plays its host's, which
+            the game fetches for you.</p>
+          <div class="button-bar">
+            <label class="button" id="mutator-label">Add a mutator folder…
+              <input type="file" id="mutator-input" webkitdirectory multiple hidden>
             </label>
           </div>
         </section>

@@ -20,6 +20,12 @@ game is listed: none here */
 #define TEXT_CHAT_SPINNER "text_chat_spinner"
 #define TEXT_CHAT_OFF 2
 static int p2p_hosting_listed(void){return 0;}
+/* ui_widget.c's spinners' extra items (a custom loadout's add-on weapons,
+the higher kills to win) and menu_functions.c's add-on vehicles' rows' help:
+none here, every item a spinner's own */
+#define ADDON_VEHICLE_DESCRIPTION (0x7000+0x81)
+static short ui_widget_spinner_extra_description(struct widget_instance *s,short item){(void)s;(void)item;return NONE;}
+static short ui_widget_spinner_own_item_count(struct widget_instance *s){return s->parameters.list.number_of_items;}
 #include "under_test.inc"
 #define ROWS 8
 static char const *rows[]={"op_coop_friendly_fire","op_coop_extra_enemies","op_coop_extra_pickups","op_coop_extra_vehicles",

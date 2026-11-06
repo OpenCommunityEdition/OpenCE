@@ -201,8 +201,16 @@ enum
 	_loadout_weapon_plasma_pistol,
 	_loadout_weapon_plasma_rifle,
 	_loadout_weapon_needler,
-	NUMBER_OF_LOADOUT_WEAPONS
+	NUMBER_OF_LOADOUT_WEAPONS,
+	/* port: the weapons of the weapon add-ons of the mutators on, in their
+	order (port/linux/game/addons.c's addons_weapon_definition) */
+	_loadout_weapon_addon_first = 16,
+	MAXIMUM_LOADOUT_ADDON_WEAPONS = 8
 };
+
+/* port: whether a loadout weapon is an add-on's */
+#define LOADOUT_WEAPON_ADDON(weapon) \
+	((weapon) >= _loadout_weapon_addon_first && (weapon) < _loadout_weapon_addon_first + MAXIMUM_LOADOUT_ADDON_WEAPONS)
 
 enum
 {
@@ -214,6 +222,9 @@ enum
 	_variant_vehicle_gun_turret,
 	NUMBER_OF_VARIANT_VEHICLES,
 	MAXIMUM_VARIANT_VEHICLE_COUNT = 4,
+	/* port: the vehicle add-ons of the mutators on that a custom vehicle set
+	counts (port/linux/game/addons.c's addons_vehicle_slot) */
+	MAXIMUM_VARIANT_ADDON_VEHICLES = 2,
 	/* a team's vehicles: those of a vehicle set (universal_variant's
 	vehicle_set values), else every one the map places, as Halo PC places
 	them (PC), else its counts */
@@ -259,7 +270,8 @@ struct game_variant_options
 	byte vehicle_set[2];
 	byte vehicle_counts[2][NUMBER_OF_VARIANT_VEHICLES];
 	/* the weapons: the weapon set's (category), else each player starts
-	with these (custom: _loadout_weapon_none, _random, or a weapon) */
+	with these (custom: _loadout_weapon_none, _random, a weapon, or from
+	_loadout_weapon_addon_first an add-on's) */
 	byte loadout;
 	byte primary_weapon;
 	byte secondary_weapon;
@@ -289,7 +301,12 @@ struct game_variant_options
 	of their own team (game_engine_get_starting_location_rating). Taken from
 	reserved, which older builds zero and ignore: the host alone picks spawns */
 	boolean force_team_spawns;
-	byte reserved[5];
+	/* port: a custom vehicle set's add-on vehicles of each team (red's and
+	blue's), as MAXIMUM_VARIANT_VEHICLE_COUNT less their count: 0, a
+	gametype's from before them, is the most (those of a set of another
+	kind: game_engine_vehicle_placement_allowed) */
+	byte addon_vehicles_fewer[2][MAXIMUM_VARIANT_ADDON_VEHICLES];
+	byte reserved[1];
 };
 
 typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x2C ? 1 : -1];

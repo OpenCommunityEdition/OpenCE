@@ -66,6 +66,7 @@ what it says it has grows.
 #include "custom_edition_cache.h"
 #include "custom_edition_maps.h"
 #include "map_share.h"
+#include "mutator_share.h"
 #include "server_director.h"
 #include "../src/p2p.h"
 
@@ -200,6 +201,11 @@ enum
 	_frame_hashes_request,
 	_frame_hashes,
 	_frame_keep_alive,
+	/* a mutator's file asked for from an offset to its end (the mutator, the file,
+	the offset), on a connection about no map's files, and part of it (the same,
+	the bytes): mutator_share.c */
+	_frame_mutator_request,
+	_frame_mutator_block,
 };
 
 #define FRAME_MAGIC 0x3153484DUL /* 'MHS1' */
@@ -461,6 +467,12 @@ struct connection
 	struct request requests[REQUESTS_PER_CONNECTION];
 	short serving_count;
 	struct serving serving[SERVING_PER_CONNECTION];
+	/* a mutator's file this end is sending: which, how far, and to where */
+	boolean mutator_serving;
+	long mutator_index;
+	long mutator_file;
+	unsigned long mutator_offset;
+	unsigned long mutator_size;
 	/* (allocated with the connection: INPUT_BYTES, OUTPUT_BYTES) */
 	byte *input;
 	long input_size;
@@ -663,6 +675,13 @@ static unsigned long map_share_host_address(
 	network_connection_get_address(connection, &reliable, &unreliable);
 	return reliable.address_length == IPV4_ADDRESS_LENGTH ? reliable.address.long_words[0] : 0;
 }
+
+/* (port_mutators.c's) */
+long port_mutators_share_count(void);
+int port_mutators_share_any(void);
+int port_mutators_share_read(long index, long file, unsigned long offset, void *buffer, long size);
+int port_mutators_share_file_size(long index, long file, unsigned long *size);
+static boolean map_share_mutators_shared(void);
 
 static long upload_limit(
 	void)
@@ -1182,7 +1201,8 @@ static void connection_accept(
 		csmemset(&address, 0, sizeof(address));
 		if (set_endpoint_blocking(endpoint, FALSE) != _transport_error_none ||
 			get_endpoint_address(endpoint, &address) != _transport_error_none ||
-			(!map_share_sending() && map_share_globals.download.state != _download_transferring) ||
+			(!map_share_sending() && map_share_globals.download.state != _download_transferring &&
+				!map_share_mutators_shared()) ||
 			(map_share_host() && !host_machine_address(address.address.long_words[0])))
 		{
 			delete_transport_endpoint(endpoint);
@@ -1236,7 +1256,7 @@ static void listener_update(
 {
 	struct map_share_globals *globals = &map_share_globals;
 	boolean want = map_share_network_game() &&
-		(map_share_sending() || globals->download.state == _download_transferring);
+		(map_share_sending() || globals->download.state == _download_transferring || map_share_mutators_shared());
 	unsigned long now = system_milliseconds();
 
 	if (!want)
@@ -1499,6 +1519,9 @@ boolean map_share_downloading(
 {
 	struct download *download = &map_share_globals.download;
 
+	/* (the host's mutators' files hold a game's load as its map does) */
+	if (mutator_share_busy())
+		return TRUE;
 	return (download->state == _download_asking || download->state == _download_transferring) &&
 		level_name && !csstrcmp(download->level_name, level_name);
 }
@@ -1513,6 +1536,8 @@ boolean map_share_holds_players(
 	machine has it is not known, and a game in progress would start it at
 	once. Asking: whether the game is in progress is not known yet) */
 	if (!map_share_host() && game && !game->map.name[0])
+		return TRUE;
+	if (mutator_share_holds_players())
 		return TRUE;
 	/* (failed: the game is being left) */
 	return download->state == _download_asking || download->state == _download_failed ||
@@ -2210,7 +2235,13 @@ static void frame_hello(
 		return;
 	}
 	count = body[5];
-	if (count < 1 || count > MAXIMUM_FILES || size != 6 + count * MAP_SHARE_HASH_BYTES)
+	/* (none: a connection for a mutator's files, of a host that has some) */
+	if (count < 1 && !connection->outgoing && !map_share_mutators_shared())
+	{
+		connection_close(connection, "a bad hello");
+		return;
+	}
+	if (count > MAXIMUM_FILES || size != 6 + count * MAP_SHARE_HASH_BYTES)
 	{
 		connection_close(connection, "a bad hello");
 		return;
@@ -2490,6 +2521,44 @@ static void frame_hashes(
 }
 
 /* the frames read in, handled */
+/* (the host) a mutator's file asked for */
+static void frame_mutator_request(
+	struct connection *connection,
+	byte const *body,
+	long size)
+{
+	long mutator;
+	long file;
+	unsigned long offset;
+
+	if (size != 12 || !map_share_host() || connection->outgoing)
+		return;
+	mutator = (long)get_long(body);
+	file = (long)get_long(body + 4);
+	offset = get_long(body + 8);
+	connection->mutator_serving = FALSE;
+	if (mutator < 0 || mutator >= port_mutators_share_count() || file < 0 ||
+		!port_mutators_share_file_size(mutator, file, &connection->mutator_size) || offset > connection->mutator_size)
+	{
+		return;
+	}
+	connection->mutator_index = mutator;
+	connection->mutator_file = file;
+	connection->mutator_offset = offset;
+	connection->mutator_serving = TRUE;
+}
+
+static void frame_mutator_block(
+	struct connection *connection,
+	byte const *body,
+	long size)
+{
+	if (size < 12 || !connection->outgoing || map_share_host())
+		return;
+	connection->bytes_in += size - 12;
+	mutator_share_block((long)get_long(body), (long)get_long(body + 4), get_long(body + 8), body + 12, size - 12);
+}
+
 static void connection_read(
 	struct connection *connection)
 {
@@ -2548,6 +2617,8 @@ static void connection_read(
 			case _frame_refuse: frame_refuse(connection, body, size); break;
 			case _frame_hashes_request: frame_hashes_request(connection, body, size); break;
 			case _frame_hashes: frame_hashes(connection, body, size); break;
+			case _frame_mutator_request: frame_mutator_request(connection, body, size); break;
+			case _frame_mutator_block: frame_mutator_block(connection, body, size); break;
 			}
 		}
 		if (!connection->used)
@@ -2694,6 +2765,47 @@ static boolean block_read(
 
 /* the pieces asked of this machine, a block at a time, round all the
 connections, as the upload's allowance lets */
+/* each mutator's file being sent, as the allowance lets it */
+static void serve_mutator_blocks(
+	void)
+{
+	struct map_share_globals *globals = &map_share_globals;
+	short index;
+
+	for (index = 0; index < MAXIMUM_CONNECTIONS; index++)
+	{
+		struct connection *connection = &globals->connections[index];
+
+		while (connection->used && connection->state == _connection_open && connection->mutator_serving &&
+			globals->upload_tokens >= MAP_SHARE_BLOCK_BYTES && frame_room(connection, 12 + MAP_SHARE_BLOCK_BYTES))
+		{
+			unsigned long left = connection->mutator_size - connection->mutator_offset;
+			long bytes = left < MAP_SHARE_BLOCK_BYTES ? (long)left : MAP_SHARE_BLOCK_BYTES;
+			byte *body;
+
+			if (!bytes)
+			{
+				connection->mutator_serving = FALSE;
+				break;
+			}
+			body = frame_begin(connection, _frame_mutator_block, 12 + bytes);
+			put_long(body, (unsigned long)connection->mutator_index);
+			put_long(body + 4, (unsigned long)connection->mutator_file);
+			put_long(body + 8, connection->mutator_offset);
+			if (!port_mutators_share_read(connection->mutator_index, connection->mutator_file, connection->mutator_offset,
+				body + 12, bytes))
+			{
+				connection_close(connection, "a mutator's file cannot be read");
+				break;
+			}
+			connection->mutator_offset += bytes;
+			connection->bytes_out += bytes;
+			globals->upload_tokens -= bytes;
+			connection_flush(connection);
+		}
+	}
+}
+
 static void serve_blocks(
 	void)
 {
@@ -2751,6 +2863,7 @@ static void serve_blocks(
 		}
 		globals->next_connection = (short)((globals->next_connection + 1) % MAXIMUM_CONNECTIONS);
 	}
+	serve_mutator_blocks();
 }
 
 /* whether a download's file's pieces' hashes may be asked of the
@@ -2868,7 +2981,8 @@ static void connections_update(
 				break;
 			}
 		}
-		if (file_index == connection->file_count && !connection->serving_count && !connection->output_size)
+		if (connection->file_count && file_index == connection->file_count && !connection->serving_count &&
+			!connection->output_size)
 		{
 			connection_close(connection, NULL);
 			continue;
@@ -2880,7 +2994,8 @@ static void connections_update(
 			if (!connection->state_heard[file_index] || connection->remote_has[file_index] != _have_none)
 				break;
 		}
-		if (file_index == connection->file_count && !connection->serving_count && !connection->output_size)
+		if (connection->file_count && file_index == connection->file_count && !connection->serving_count &&
+			!connection->output_size)
 		{
 			connection_close(connection, "it has none of the files");
 			continue;
@@ -3056,6 +3171,8 @@ boolean map_share_machine_downloading(
 	struct host_machine const *machine = host_machine_valid(machine_index) ?
 		&map_share_globals.machines[machine_index] : NULL;
 
+	if (mutator_share_machine_fetching(machine_index))
+		return TRUE;
 	return machine && host_machine_downloading(machine);
 }
 
@@ -3065,6 +3182,8 @@ boolean map_share_machine_needs_map(
 	struct host_machine const *machine = host_machine_valid(machine_index) ?
 		&map_share_globals.machines[machine_index] : NULL;
 
+	if (mutator_share_machine_fetching(machine_index))
+		return TRUE;
 	return machine && !machine->downloaded && host_machine_downloading(machine);
 }
 
@@ -3403,6 +3522,8 @@ boolean map_share_handles_message(
 	if (size < sizeof(header))
 		return FALSE;
 	csmemcpy(&header, message, sizeof(header));
+	if (mutator_share_handles_message(message, size))
+		return TRUE;
 	return header.type == _distributed_message_map_share_request || header.type == _distributed_message_map_share_offer ||
 		header.type == _distributed_message_map_share_sources || header.type == _distributed_message_map_share_progress;
 }
@@ -3421,6 +3542,11 @@ void map_share_handle_message(
 	anyone) */
 	if (!map_share_handles_message(message, size) || !from_stream)
 		return;
+	if (mutator_share_handles_message(message, size))
+	{
+		mutator_share_handle_message(machine_index, message, size);
+		return;
+	}
 	csmemcpy(&header, message, sizeof(header));
 	switch (header.type)
 	{
@@ -3489,6 +3615,78 @@ void map_share_handle_message(
 	}
 }
 
+/* ---------- the host's mutators' files (mutator_share.c) */
+
+boolean map_share_host_in_game(
+	void)
+{
+	return host_in_game();
+}
+
+/* whether this machine is a host with mutators' files to send */
+static boolean map_share_mutators_shared(
+	void)
+{
+	return map_share_host() && port_mutators_share_any();
+}
+
+/* the client's connection to the host for them, or NULL */
+static struct connection *mutator_connection(
+	void)
+{
+	short index;
+
+	for (index = 0; index < MAXIMUM_CONNECTIONS; index++)
+	{
+		struct connection *connection = &map_share_globals.connections[index];
+
+		if (connection->used && connection->outgoing && !connection->file_count && connection->source == NONE)
+			return connection;
+	}
+	return NULL;
+}
+
+boolean map_share_mutator_connected(
+	void)
+{
+	struct connection *connection = mutator_connection();
+
+	return connection && connection->state == _connection_open && connection->hello_heard;
+}
+
+boolean map_share_mutator_request(
+	long mutator,
+	long file,
+	unsigned long offset)
+{
+	static unsigned long connected_at;
+	struct connection *connection = mutator_connection();
+	unsigned long address = map_share_host_address();
+	unsigned long now = system_milliseconds();
+	byte *body;
+
+	if (!connection)
+	{
+		if (!address || (connected_at && !elapsed(connected_at, now, SOURCE_RETRY_INTERVAL)))
+			return FALSE;
+		connected_at = now | 1;
+		connection = connection_new();
+		if (!connection)
+			return FALSE;
+		connection->outgoing = TRUE;
+		connection_connect(connection, address);
+		return FALSE;
+	}
+	if (connection->state != _connection_open || !connection->hello_heard || !frame_room(connection, 12))
+		return FALSE;
+	body = frame_begin(connection, _frame_mutator_request, 12);
+	put_long(body, (unsigned long)mutator);
+	put_long(body + 4, (unsigned long)file);
+	put_long(body + 8, offset);
+	connection_flush(connection);
+	return TRUE;
+}
+
 /* ---------- every frame */
 
 void map_share_update(
@@ -3500,6 +3698,7 @@ void map_share_update(
 	short index;
 
 	map_share_files_update();
+	mutator_share_update();
 	/* (internet play: a player that shares answers the others, who reach it
 	by its key hash) */
 	p2p_set_answering_players(!map_share_host() && address_internet(host_address) && map_share_sending());
@@ -3542,6 +3741,29 @@ void map_share_render(
 	short base_length;
 	long percent;
 
+	/* (a question about a host's script, in the middle of the screen, over all else) */
+	if (mutator_share_prompt_open())
+	{
+		char question[160];
+		char answers[160];
+		short center;
+
+		font_tag_index = interface_get_tag_index(_interface_font_terminal);
+		if (font_tag_index == NONE)
+			return;
+		mutator_share_prompt_text(question, answers, sizeof(question));
+		bounds = render.camera.window_bounds;
+		offset_rectangle2d(&bounds, -render.camera.viewport_bounds.x0, -render.camera.viewport_bounds.y0);
+		center = (bounds.y0 + bounds.y1) / 2;
+		bounds.y0 = center - 18;
+		bounds.y1 = center;
+		draw_string_set_draw_mode(font_tag_index, NONE, _map_share_text_centered, 0, &color);
+		rasterizer_draw_string(&bounds, NULL, NULL, 0, question);
+		bounds.y0 = center + 2;
+		bounds.y1 = center + 20;
+		rasterizer_draw_string(&bounds, NULL, NULL, 0, answers);
+		return;
+	}
 	if (download->state != _download_asking && download->state != _download_transferring)
 		return;
 	font_tag_index = interface_get_tag_index(_interface_font_terminal);

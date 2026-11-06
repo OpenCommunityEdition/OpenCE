@@ -1,0 +1,27 @@
+# The Falcon from bigass_open_v1.1.map, a fan asset without a licence: kept
+# here until it has a repository of its own, and never in OpenCE's. Its
+# falcon.cevehicle is built from the map, not kept (.gitignore):
+#
+#   build/linux/addon_build --map <custom_maps>/bigass_open_v1.1.map \
+#       --maps <custom_maps> --vehicle 'vehicles\falcon\falcon' \
+#       --riders 'characters\cyborg_mp\bigass with grackle' \
+#       --stock <maps>/beavercreek.map --stock <maps>/bloodgulch.map ... \
+#       --out addons/falcon/falcon.cevehicle --report
+#
+# (--stock: each of the twelve multiplayer maps). To play it, copy this folder
+# into the data root's mutators folder.
+
+name = "Falcon"
+id = "falcon"
+version = "1"
+description = "A UH-144 Falcon on Blood Gulch, ten world units in front of the red base's Warthog. Its pilot flies it and fires its chin gun; its passengers fire their own weapons."
+format = 3
+addon = "falcon.cevehicle"
+
+# Blood Gulch's first Warthog is at (29.137, -90.834, 0.286), facing -48.6
+# degrees: ten world units on along its facing, a little above the ground
+[[place]]
+map = "bloodgulch"
+vehicle = 'vehicles\falcon\falcon'
+position = [35.750, -98.335, 1.0]
+facing = -48.6

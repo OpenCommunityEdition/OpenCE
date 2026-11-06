@@ -1,0 +1,11 @@
+name = "Big head"
+id = "big_head"
+version = "2"
+description = "Every biped's head, the players' and the AI's, is drawn and hit at two and a half times its size."
+format = 6
+
+# every biped's head node ("head": whatever its model names it), scaled
+[[pose]]
+objects = "biped"
+node = "head"
+scale = 2.5

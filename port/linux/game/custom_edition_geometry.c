@@ -74,6 +74,9 @@ each checked alone (cache_file_formats.c), so the file's size does not bound
 what they add up to */
 #define MAXIMUM_GEOMETRY_BYTES 0x8000000
 
+/* the most add-ons with models played at once (addons.c's) */
+#define MAXIMUM_ADDON_GEOMETRIES 16
+
 /* ---------- structures */
 
 /* this build's model geometry and part, as models.c and rasterizer.c each
@@ -197,6 +200,9 @@ struct custom_edition_geometry_globals
 /* ---------- globals */
 
 static struct custom_edition_geometry_globals custom_edition_geometry_globals;
+
+/* the add-ons' models' geometry (port/linux/game/addons.c), each its own */
+static struct custom_edition_geometry_globals *custom_edition_addon_geometries[MAXIMUM_ADDON_GEOMETRIES];
 
 /* ---------- private code */
 
@@ -621,6 +627,7 @@ static boolean custom_edition_model_part_convert(
 Custom Edition's size to this build's in place, and records them in the
 globals; the geometry goes to `*vertices` and `*strips`, which advance. */
 static boolean custom_edition_model_convert(
+	struct custom_edition_geometry_globals *globals,
 	struct model *model,
 	struct custom_edition_load_report const *report,
 	byte const *model_data,
@@ -628,7 +635,6 @@ static boolean custom_edition_model_convert(
 	struct model_vertex_compressed **vertices,
 	word **strips)
 {
-	struct custom_edition_geometry_globals *globals = &custom_edition_geometry_globals;
 	boolean local_nodes = TEST_FLAG(model->flags, _gbxmodel_parts_have_local_nodes_bit);
 	/* (the renderer skins with the model's nodes, or a part's own when the
 	model has more than it skins at once) */
@@ -876,7 +882,7 @@ boolean custom_edition_models_convert(
 	while (success &&
 		(model = custom_edition_cache_tag_next(tag_cache, loaded_bytes, GBXMODEL_GROUP_TAG, sizeof(*model), &tag_index)) != NULL)
 	{
-		success = custom_edition_model_convert(model, report, model_data, scratch, &vertices, &strips);
+		success = custom_edition_model_convert(globals, model, report, model_data, scratch, &vertices, &strips);
 		if (!success)
 		{
 			error(
@@ -907,6 +913,8 @@ short custom_edition_part_palette(
 	struct custom_edition_geometry_globals *globals = &custom_edition_geometry_globals;
 	long index;
 
+	short geometry_index;
+
 	for (index = 0; index < globals->palette_count; index++)
 	{
 		if (globals->palettes[index].vertex_buffer == vertex_buffer)
@@ -915,15 +923,28 @@ short custom_edition_part_palette(
 			return globals->palettes[index].node_count;
 		}
 	}
+	/* (an add-on's, as a Custom Edition map's) */
+	for (geometry_index = 0; geometry_index < MAXIMUM_ADDON_GEOMETRIES; geometry_index++)
+	{
+		struct custom_edition_geometry_globals const *addon = custom_edition_addon_geometries[geometry_index];
+
+		for (index = 0; addon && index < addon->palette_count; index++)
+		{
+			if (addon->palettes[index].vertex_buffer == vertex_buffer)
+			{
+				*nodes = addon->palettes[index].nodes;
+				return addon->palettes[index].node_count;
+			}
+		}
+	}
 	/* (a mod's model of many nodes, drawn its parts' nodes at a time too:
 	mod_models.c) */
 	return mod_models_part_palette(vertex_buffer, nodes);
 }
 
-void custom_edition_models_dispose(
-	void)
+static void models_dispose(
+	struct custom_edition_geometry_globals *globals)
 {
-	struct custom_edition_geometry_globals *globals = &custom_edition_geometry_globals;
 	long part_index;
 
 	for (part_index = 0; part_index < globals->model_part_count; part_index++)
@@ -952,6 +973,278 @@ void custom_edition_models_dispose(
 	globals->palette_count = 0;
 
 	return;
+}
+
+void custom_edition_models_dispose(
+	void)
+{
+	models_dispose(&custom_edition_geometry_globals);
+
+	return;
+}
+
+/* whether each part of the model names vertices and a strip within the
+model_data_bytes of model data, the strips from index_data_offset (a Custom
+Edition map's loader checks its own: cache_file_formats.c) */
+static boolean addon_model_geometry_within(
+	struct model const *model,
+	unsigned long model_data_bytes,
+	unsigned long index_data_offset)
+{
+	long uncompressed_vertex_size = rasterizer_geometry_get_vertex_size(_rasterizer_vertex_type_model_uncompressed);
+	long geometry_index;
+
+	if (index_data_offset > model_data_bytes)
+		return FALSE;
+	for (geometry_index = 0; geometry_index < model->geometries.count; geometry_index++)
+	{
+		struct model_geometry const *geometry = TAG_BLOCK_GET_ELEMENT(
+			&model->geometries,
+			geometry_index,
+			struct model_geometry);
+		long part_index;
+
+		for (part_index = 0; part_index < geometry->parts.count; part_index++)
+		{
+			struct custom_edition_model_part const *part = TAG_BLOCK_GET_ELEMENT(
+				&geometry->parts,
+				part_index,
+				struct custom_edition_model_part);
+			unsigned long strips_bytes = model_data_bytes - index_data_offset;
+
+			if (part->vertex_count < 0 || part->strip_triangle_count < 0 ||
+				part->vertex_count > MAXIMUM_GEOMETRY_BYTES / uncompressed_vertex_size ||
+				part->strip_triangle_count > MAXIMUM_GEOMETRY_BYTES / (long)sizeof(word) ||
+				part->vertex_offset > index_data_offset ||
+				(unsigned long)(part->vertex_count * uncompressed_vertex_size) > index_data_offset - part->vertex_offset ||
+				part->strip_offset > strips_bytes ||
+				(unsigned long)(part->strip_triangle_count + 2) * sizeof(word) > strips_bytes - part->strip_offset)
+			{
+				return FALSE;
+			}
+		}
+	}
+
+	return TRUE;
+}
+
+void *custom_edition_addon_models_convert(
+	struct model **models,
+	char const *const *names,
+	long count,
+	byte *model_data,
+	unsigned long model_data_bytes,
+	unsigned long index_data_offset)
+{
+	struct custom_edition_geometry_globals *globals;
+	struct custom_edition_load_report report;
+	struct model_geometry_totals totals = { 0, 0, 0, 0, 0, 0 };
+	struct model_vertex_uncompressed *scratch;
+	struct model_vertex_compressed *vertices;
+	word *strips;
+	short slot;
+	long index;
+	boolean success = TRUE;
+
+	for (slot = 0; slot < MAXIMUM_ADDON_GEOMETRIES && custom_edition_addon_geometries[slot]; slot++)
+		;
+	if (slot == MAXIMUM_ADDON_GEOMETRIES)
+	{
+		error(_error_silent, "add-ons: more than %d add-ons have models", MAXIMUM_ADDON_GEOMETRIES);
+		return NULL;
+	}
+	globals = malloc(sizeof(*globals));
+	if (!globals)
+		return NULL;
+	csmemset(globals, 0, sizeof(*globals));
+	/* (what custom_edition_model_verify and _convert read of a map's report) */
+	csmemset(&report, 0, sizeof(report));
+	report.model_index_data_offset = index_data_offset;
+	report.model_data_bytes = model_data_bytes;
+	/* (as custom_edition_models_convert: every model's local nodes made
+	before any is verified) */
+	for (index = 0; index < count; index++)
+	{
+		struct model *model = models[index];
+
+		if (!addon_model_geometry_within(model, model_data_bytes, index_data_offset))
+		{
+			error(_error_silent, "add-ons: the model '%s' names geometry outside its add-on's model data", names[index]);
+			free(globals);
+			return NULL;
+		}
+		if (model_has_many_nodes(model) && !TEST_FLAG(model->flags, _gbxmodel_parts_have_local_nodes_bit) &&
+			model->nodes.count <= MAXIMUM_NODES_PER_MODEL && model_local_nodes_make(model, model_data))
+		{
+			error(_error_silent, "add-ons: the model '%s', of %ld nodes, is drawn a part's nodes at a time",
+				names[index], model->nodes.count);
+		}
+	}
+	for (index = 0; index < count; index++)
+	{
+		custom_edition_model_part_shaders_bound(models[index], names[index]);
+		if (!custom_edition_model_verify(models[index], names[index], &report, model_data, &totals))
+		{
+			free(globals);
+			return NULL;
+		}
+	}
+	globals->model_parts = malloc((totals.part_count + 1) * sizeof(*globals->model_parts));
+	globals->palettes = malloc((totals.many_node_part_count + 1) * sizeof(*globals->palettes));
+	globals->model_geometry = geometry_allocate(totals.geometry_bytes + 1, &globals->model_geometry_contiguous);
+	scratch = malloc(totals.largest_part_vertex_count * sizeof(*scratch) + 1);
+	if (!globals->model_parts || !globals->model_geometry || !globals->palettes || !scratch)
+	{
+		error(_error_silent, "add-ons: out of memory for the geometry of %ld model parts", totals.part_count);
+		if (scratch)
+			free(scratch);
+		models_dispose(globals);
+		free(globals);
+		return NULL;
+	}
+	vertices = (struct model_vertex_compressed *)globals->model_geometry;
+	strips = (word *)(vertices + totals.vertex_count);
+	for (index = 0; success && index < count; index++)
+	{
+		success = custom_edition_model_convert(globals, models[index], &report, model_data, scratch, &vertices,
+			&strips);
+		if (!success)
+			error(_error_silent, "add-ons: cannot make the buffers of the model '%s'", names[index]);
+	}
+	free(scratch);
+	if (!success)
+	{
+		models_dispose(globals);
+		free(globals);
+		return NULL;
+	}
+	custom_edition_addon_geometries[slot] = globals;
+
+	return globals;
+}
+
+void custom_edition_addon_models_dispose(
+	void *geometry)
+{
+	short slot;
+
+	for (slot = 0; slot < MAXIMUM_ADDON_GEOMETRIES; slot++)
+	{
+		if (custom_edition_addon_geometries[slot] == geometry)
+			custom_edition_addon_geometries[slot] = NULL;
+	}
+	models_dispose(geometry);
+	free(geometry);
+
+	return;
+}
+
+/* the indices a part's triangle buffer draws (as tag_schema_models.c's
+model_geometry_part_check counts them) */
+static long stock_part_index_count(
+	struct triangle_buffer const *triangles)
+{
+	if (triangles->type == _triangle_buffer_type_precompiled_strip)
+		return triangles->count > 0 ? triangles->count + 2 : 0;
+
+	return triangles->type == _triangle_buffer_type_triangles ? triangles->count * 3 : 0;
+}
+
+/* the bytes a D3D buffer's Data names, before it is registered (tag_validate.c's
+buffer_data) */
+static void const *stock_buffer_data(
+	void const *hardware_format)
+{
+	return *(void const *const *)((byte const *)hardware_format + 4);
+}
+
+void *custom_edition_stock_model_make(
+	struct model *model,
+	char const *name)
+{
+	struct custom_edition_geometry_globals *globals = malloc(sizeof(*globals));
+	unsigned long geometry_bytes = 0;
+	long part_count = 0;
+	long geometry_index;
+	byte *next;
+	boolean success = TRUE;
+
+	if (!globals)
+		return NULL;
+	csmemset(globals, 0, sizeof(*globals));
+	for (geometry_index = 0; geometry_index < model->geometries.count; geometry_index++)
+	{
+		struct model_geometry const *geometry = TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry_index,
+			struct model_geometry);
+		long part_index;
+
+		for (part_index = 0; part_index < geometry->parts.count; part_index++)
+		{
+			struct model_geometry_part const *part = TAG_BLOCK_GET_ELEMENT(&geometry->parts, part_index,
+				struct model_geometry_part);
+
+			part_count++;
+			if (part->vertex_buffer.hardware_format && part->triangle_buffer.hardware_format)
+			{
+				geometry_bytes += (part->vertex_buffer.count * rasterizer_geometry_get_vertex_size(part->vertex_buffer.type) +
+					3UL) & ~3UL;
+				geometry_bytes += (stock_part_index_count(&part->triangle_buffer) * sizeof(word) + 3UL) & ~3UL;
+			}
+		}
+	}
+	globals->model_parts = malloc((part_count + 1) * sizeof(*globals->model_parts));
+	globals->model_geometry = geometry_allocate(geometry_bytes + 1, &globals->model_geometry_contiguous);
+	if (!globals->model_parts || !globals->model_geometry)
+	{
+		error(_error_silent, "stock tags: out of memory for the geometry of the model '%s'", name);
+		models_dispose(globals);
+		free(globals);
+		return NULL;
+	}
+	next = globals->model_geometry;
+	for (geometry_index = 0; success && geometry_index < model->geometries.count; geometry_index++)
+	{
+		struct model_geometry const *geometry = TAG_BLOCK_GET_ELEMENT(&model->geometries, geometry_index,
+			struct model_geometry);
+		long part_index;
+
+		for (part_index = 0; success && part_index < geometry->parts.count; part_index++)
+		{
+			struct model_geometry_part *part = TAG_BLOCK_GET_ELEMENT(&geometry->parts, part_index,
+				struct model_geometry_part);
+			struct vertex_buffer vertex_source = part->vertex_buffer;
+			struct triangle_buffer triangle_source = part->triangle_buffer;
+			unsigned long vertex_bytes;
+			unsigned long index_bytes;
+			byte *vertices = next;
+			byte *indices;
+
+			/* (none, as the validator leaves a part whose buffers it refused) */
+			csmemset(&part->vertex_buffer, 0, sizeof(part->vertex_buffer));
+			csmemset(&part->triangle_buffer, 0, sizeof(part->triangle_buffer));
+			if (!vertex_source.hardware_format || !triangle_source.hardware_format)
+				continue;
+			vertex_bytes = vertex_source.count * rasterizer_geometry_get_vertex_size(vertex_source.type);
+			index_bytes = stock_part_index_count(&triangle_source) * sizeof(word);
+			indices = vertices + ((vertex_bytes + 3UL) & ~3UL);
+			next = indices + ((index_bytes + 3UL) & ~3UL);
+			csmemcpy(vertices, stock_buffer_data(vertex_source.hardware_format), vertex_bytes);
+			csmemcpy(indices, stock_buffer_data(triangle_source.hardware_format), index_bytes);
+			success = rasterizer_vertex_buffer_new(&part->vertex_buffer, vertex_source.type, vertex_source.count,
+					vertices, vertex_bytes) &&
+				rasterizer_triangle_buffer_new(&part->triangle_buffer, triangle_source.type, triangle_source.count, indices);
+			globals->model_parts[globals->model_part_count++] = part;
+		}
+	}
+	if (!success)
+	{
+		error(_error_silent, "stock tags: cannot make the buffers of the model '%s'", name);
+		models_dispose(globals);
+		free(globals);
+		return NULL;
+	}
+
+	return globals;
 }
 
 boolean custom_edition_structure_bsp_load(

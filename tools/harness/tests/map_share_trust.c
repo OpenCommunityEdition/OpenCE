@@ -153,6 +153,13 @@ static void connection_close(struct connection *connection, char const *reason)
 	connection->used = FALSE;
 }
 
+/* (mutator_share.c's: no machine here is fetching a mutator's files) */
+static boolean mutator_share_machine_fetching(long machine_index)
+{
+	(void)machine_index;
+	return FALSE;
+}
+
 #include "under_test.inc"
 
 #define ADDRESS(a, b, c, d) \

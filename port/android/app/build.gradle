@@ -16,13 +16,17 @@ def buildNumber = buildNumberText.isInteger() ? buildNumberText.toInteger() : 0
 // main signed with it can install over the one before; without it, the
 // debug key of the computer that builds
 def signingKey = System.getenv("HALO_ANDROID_KEYSTORE")
+// a suffix of the app's id (-PhaloAppIdSuffix=.beta, or ORG_GRADLE_PROJECT_haloAppIdSuffix):
+// another app, beside the one without it, with its own data and its name "Halo Beta"
+def appIdSuffix = (project.findProperty("haloAppIdSuffix") ?: "").toString()
 
 android {
     namespace "com.halo.decomp"
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.halo.decomp"
+        applicationId "com.halo.decomp" + appIdSuffix
+        manifestPlaceholders = [appLabel: appIdSuffix ? "Halo Beta" : "@string/app_name"]
         minSdk 28
         targetSdk 35
         versionCode Math.max(1, buildNumber)
