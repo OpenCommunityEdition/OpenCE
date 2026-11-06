@@ -154,6 +154,37 @@ symbols in this file:
 #include "models/model_definitions.h"
 #include "objects/objects.h"
 
+#include <string.h>
+
+/* port: a compressed animation's keyframes and defaults are a byte stream in
+its tag's data, where a float can sit at an address that is a multiple of 2
+but not of 4. x86 and AArch64 load it there; 32-bit ARM faults on its
+floating-point loads and multiple-register copies. So these are read through
+memcpy. */
+static real animation_real(real const *source)
+{
+	real value;
+
+	memcpy(&value, source, sizeof(value));
+	return value;
+}
+
+static real_vector2d animation_vector2d(real_vector2d const *source)
+{
+	real_vector2d value;
+
+	memcpy(&value, source, sizeof(value));
+	return value;
+}
+
+static real_point3d animation_point3d(real_point3d const *source)
+{
+	real_point3d value;
+
+	memcpy(&value, source, sizeof(value));
+	return value;
+}
+
 /* ---------- constants */
 
 enum
@@ -675,10 +706,10 @@ void animation_frame_get_xy_translation(
 {
 	if (animation->frame_info_type == 1)
 	{
-		*translation = *(real_vector2d const *)animation_get_frame_info(
+		*translation = animation_vector2d((real_vector2d const *)animation_get_frame_info(
 			animation,
 			frame_index,
-			sizeof(struct animation_frame_info_dx_dy));
+			sizeof(struct animation_frame_info_dx_dy)));
 	}
 	else
 	{
@@ -949,7 +980,7 @@ void animation_get_node_orientations(
 					1,
 					sizeof(real_point3d)))
 				{
-					orientation->translation = *((real_point3d *)(data+header->default_translations_offset)+node_index);
+					orientation->translation = animation_point3d((real_point3d *)(data+header->default_translations_offset)+node_index);
 				}
 				else
 				{
@@ -2339,7 +2370,7 @@ static void animation_get_keyframe_translation(
 
 	if (keyframe_count==0)
 	{
-		*translation = default_translations[node_index];
+		*translation = animation_point3d(&default_translations[node_index]);
 	}
 	else
 	{
@@ -2364,7 +2395,7 @@ static void animation_get_keyframe_translation(
 		frame) holds the last one */
 		if (frame_index>keyframe_frame_indices[keyframe_count-1])
 		{
-			*translation = keyframe_translations[keyframe_count-1];
+			*translation = animation_point3d(&keyframe_translations[keyframe_count-1]);
 			return;
 		}
 
@@ -2399,7 +2430,7 @@ static void animation_get_keyframe_translation(
 
 		if (real_frame_index==(real)this_keyframe_frame_index)
 		{
-			*translation = *this_keyframe;
+			*translation = animation_point3d(this_keyframe);
 		}
 		else
 		{
@@ -2414,7 +2445,12 @@ static void animation_get_keyframe_translation(
 				1584,
 				real_frame_index< (real)next_keyframe_frame_index);
 
-			points_interpolate(this_keyframe, next_keyframe, fraction, translation);
+			{
+				real_point3d this_point = animation_point3d(this_keyframe);
+				real_point3d next_point = animation_point3d(next_keyframe);
+
+				points_interpolate(&this_point, &next_point, fraction, translation);
+			}
 		}
 	}
 
@@ -2473,7 +2509,7 @@ static void animation_get_keyframe_scale(
 
 	if (keyframe_count==0)
 	{
-		*scale = default_scales[adjusted_node_index];
+		*scale = animation_real(&default_scales[adjusted_node_index]);
 	}
 	else
 	{
@@ -2498,23 +2534,23 @@ static void animation_get_keyframe_scale(
 		frame) holds the last one */
 		if (frame_index>keyframe_frame_indices[keyframe_count-1])
 		{
-			*scale = keyframe_scales[keyframe_count-1];
+			*scale = animation_real(&keyframe_scales[keyframe_count-1]);
 			return;
 		}
 
 		if (frame_index<keyframe_frame_indices[0])
 		{
 			this_keyframe_frame_index = 0;
-			this_keyframe_scale = default_scales[adjusted_node_index];
+			this_keyframe_scale = animation_real(&default_scales[adjusted_node_index]);
 			next_keyframe_frame_index = keyframe_frame_indices[0];
-			next_keyframe_scale = keyframe_scales[0];
+			next_keyframe_scale = animation_real(&keyframe_scales[0]);
 		}
 		else if (frame_index==keyframe_frame_indices[keyframe_count-1])
 		{
 			this_keyframe_frame_index = keyframe_frame_indices[keyframe_count-1];
-			this_keyframe_scale = keyframe_scales[keyframe_count-1];
+			this_keyframe_scale = animation_real(&keyframe_scales[keyframe_count-1]);
 			next_keyframe_frame_index = this_keyframe_frame_index+1;
-			next_keyframe_scale = default_scales[adjusted_node_index];
+			next_keyframe_scale = animation_real(&default_scales[adjusted_node_index]);
 		}
 		else
 		{
@@ -2526,9 +2562,9 @@ static void animation_get_keyframe_scale(
 				keyframe_index>=0 && keyframe_index<keyframe_count-1);
 
 			this_keyframe_frame_index = keyframe_frame_indices[keyframe_index];
-			this_keyframe_scale = keyframe_scales[keyframe_index];
+			this_keyframe_scale = animation_real(&keyframe_scales[keyframe_index]);
 			next_keyframe_frame_index = keyframe_frame_indices[keyframe_index+1];
-			next_keyframe_scale = keyframe_scales[keyframe_index+1];
+			next_keyframe_scale = animation_real(&keyframe_scales[keyframe_index+1]);
 		}
 
 		if (real_frame_index==(real)this_keyframe_frame_index)

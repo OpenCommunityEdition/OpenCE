@@ -59,8 +59,14 @@ Release build is recommended for regular play.
 
 The debug build stops at the first failed check (assertion) and writes it to the log, so use it when you want to find and report problems.
 
-The game updates itself. At start-up it looks for a newer release, and asks
-if you want to install it. Refer to "Updates" in
+The Linux game is also built as an AppImage and a Flatpak for each
+architecture (x86_64, arm64 and armv7): refer to "AppImage and Flatpak
+packages" in
+[port/linux/README.md](port/linux/README.md#appimage-and-flatpak-packages).
+
+The game (the zip builds) updates itself. At start-up it looks for a newer
+release, and asks if you want to install it. The AppImages and Flatpaks do
+not: download the new file. Refer to "Updates" in
 [port/linux/README.md](port/linux/README.md#updates). The web site offers
 each new build when it is out.
 
@@ -169,6 +175,7 @@ To build the game:
 | Target | Result |
 | --- | --- |
 | `ninja linux` | `build/linux/halo` |
+| `ninja linux_armv7` (after `configure.py --linux-arch armv7 --linux-sysroot DIR`) | `build/linux-armv7/halo`, for 32-bit ARM Linux |
 | `ninja windows` (on Windows, or on Linux after `configure.py --windows-cross`) | `build/windows/halo.exe` and `SDL3.dll` |
 | `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
 | `ninja web` | `build/web/site/`, the web site (`python tools/web_serve.py` serves it) |

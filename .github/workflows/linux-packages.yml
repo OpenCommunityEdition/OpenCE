@@ -1,0 +1,320 @@
+name: Linux packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-x86_64:
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
+          pacman -Syu --noconfirm --needed git zstd python python-pytest python-pillow python-numpy python-scipy ninja ccache clang lld gcc lib32-glibc lib32-gcc-libs cmake pkgconf wayland
+      - uses: actions/checkout@v5
+      - name: Build
+        run: python tools/ci_build.py linux release
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bin-x86_64
+          path: dist/halo-linux-release
+
+  build-aarch64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 curl git libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxtst-dev libxss-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libgl-dev libpulse-dev libasound2-dev libpipewire-0.3-dev libdecor-0-dev libudev-dev libdbus-1-dev
+      - uses: actions/checkout@v5
+      - name: Build SDL 3
+        run: |
+          git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
+          cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/sdl-prefix"
+          cmake --build "$RUNNER_TEMP/SDL/build" -j"$(nproc)"
+          cmake --install "$RUNNER_TEMP/SDL/build"
+          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/sdl-prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+      # A build of main knows its number, which names its release and which
+      # the game shows (tools/ci_build.py does the same for the x86_64 build)
+      - name: Build number
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: echo "HALO_BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+      - name: Build the game
+        run: |
+          python3 configure.py --guest-lld-bin /usr/bin --release
+          ninja linux_arm64_guest linux_arm64_host
+      - name: Collect the binaries
+        run: |
+          mkdir bin
+          cp build/linux-arm64/halo_host build/linux-arm64/halo_guest.elf bin/
+          cp -a sdl-prefix/lib/libSDL3.so* bin/
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bin-aarch64
+          path: bin
+
+  build-armv7:
+    # The 32-bit ARM (armhf) game, cross-compiled with clang and lld against a
+    # Debian armhf root. Needs the armv7 build target (configure.py --linux-arch).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 curl git debootstrap qemu-user-static binfmt-support libwayland-bin
+      - uses: actions/checkout@v5
+      - name: Make an armhf root
+        run: |
+          sudo debootstrap --foreign --arch=armhf --variant=minbase trixie "$RUNNER_TEMP/armhf" http://deb.debian.org/debian
+          sudo cp /usr/bin/qemu-arm-static "$RUNNER_TEMP/armhf/usr/bin/"
+          sudo chroot "$RUNNER_TEMP/armhf" /debootstrap/debootstrap --second-stage
+          sudo chroot "$RUNNER_TEMP/armhf" apt-get install -y --no-install-recommends libc6-dev libgcc-14-dev linux-libc-dev libgles-dev libegl-dev libgl-dev libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxtst-dev libxss-dev libxkbcommon-dev libwayland-dev libdrm-dev libgbm-dev libasound2-dev libpulse-dev libudev-dev libdbus-1-dev libffi-dev wayland-protocols libdecor-0-dev
+      - name: Build SDL 3
+        run: |
+          git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
+          cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/tools/linux_armv7.cmake" -DHALO_SYSROOT="$RUNNER_TEMP/armhf" -DCMAKE_C_COMPILER=clang -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/armhf/usr" -DCMAKE_INSTALL_LIBDIR=lib/arm-linux-gnueabihf
+          cmake --build "$RUNNER_TEMP/SDL/build" -j"$(nproc)"
+          sudo cmake --install "$RUNNER_TEMP/SDL/build"
+      # A build of main knows its number, which names its release and which
+      # the game shows (tools/ci_build.py does the same for the x86_64 build)
+      - name: Build number
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: echo "HALO_BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+      - name: Build the game
+        run: |
+          python3 configure.py --linux-arch armv7 --linux-sysroot "$RUNNER_TEMP/armhf" --lto=off --pgo=off --release
+          ninja linux_armv7
+      - name: Collect the binaries
+        run: |
+          mkdir bin
+          cp build/linux-armv7/halo bin/
+          cp -a "$RUNNER_TEMP"/armhf/usr/lib/arm-linux-gnueabihf/libSDL3.so* bin/
+          if [ -f "$RUNNER_TEMP/SDL/LICENSE.txt" ]; then cp "$RUNNER_TEMP/SDL/LICENSE.txt" bin/SDL3-LICENSE.txt; fi
+      - uses: actions/upload-artifact@v6
+        with:
+          name: bin-armv7
+          path: bin
+
+  package-x86_64:
+    runs-on: ubuntu-24.04
+    needs: build-x86_64
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: bin-x86_64
+          path: bin
+      # The oldest glibc the files need is the oldest computer the AppImage
+      # starts on (port/linux/README.md, "AppImage and Flatpak packages"):
+      # a build that needs a newer one fails here, not for a user
+      - name: Check the glibc the files need
+        run: python3 tools/check_glibc.py 2.29 bin/halo bin/libSDL3.so.0
+      - name: Install the packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder python3
+      - name: Install the Flatpak runtimes
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 org.freedesktop.Platform.Compat.i386//25.08 org.freedesktop.Platform.GL32.default//25.08
+      - name: Download appimagetool
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+      - name: Pack the AppImage
+        run: python3 tools/linux_package.py appimage --arch x86_64 --bin-dir bin --out OpenCE-x86_64.AppImage --appimagetool ./appimagetool
+      # The AppImage itself started, in a 32-bit x86 container: its runtime unpacks
+      # it, AppRun starts the game, which must find its libraries and reach
+      # its start-up log (tools/ci_smoke.py)
+      - name: Start the AppImage
+        run: |
+          python3 tools/ci_smoke.py --seconds 150 -- docker run --rm --platform linux/386 -v "$PWD":/pkg:ro \
+            -e SDL_VIDEODRIVER=dummy -e SDL_AUDIODRIVER=dummy -e HALO_UPDATE_AUTO=false -e HALO_DATA_ROOT=/tmp/data debian:trixie \
+            sh -c 'mkdir -p /tmp/data && cd /tmp/data && timeout 120 /pkg/OpenCE-x86_64.AppImage --appimage-extract-and-run'
+      - name: Pack the Flatpak
+        run: python3 tools/linux_package.py flatpak --arch x86_64 --bin-dir bin --out OpenCE-x86_64.flatpak
+      # The package run in its sandbox, with no display: the loader and the
+      # mount points of the extensions are there (/app/lib/i386-linux-gnu/GL), and the libraries
+      # the program names are found (the first x86_64 Flatpaks had no mount
+      # points, and the sandbox killed the 32-bit program's system calls)
+      - name: Check the Flatpak
+        run: |
+          flatpak install --user -y --bundle OpenCE-x86_64.flatpak
+          flatpak run --command=sh io.github.opencommunityedition.OpenCE -c 'test -d /app/lib/i386-linux-gnu/GL && ldd /app/bin/halo' > ldd.txt
+          cat ldd.txt
+          if awk '/not found/ { missing = 1 } END { exit !missing }' ldd.txt; then
+            echo "::error::the program names libraries that the package does not have"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages-x86_64
+          path: |
+            OpenCE-x86_64.AppImage
+            OpenCE-x86_64.flatpak
+
+  package-aarch64:
+    runs-on: ubuntu-24.04-arm
+    needs: build-aarch64
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: bin-aarch64
+          path: bin
+      # The oldest glibc the files need is the oldest computer the AppImage
+      # starts on (port/linux/README.md, "AppImage and Flatpak packages"):
+      # a build that needs a newer one fails here, not for a user
+      - name: Check the glibc the files need
+        run: python3 tools/check_glibc.py 2.38 bin/halo_host bin/libSDL3.so.0
+      - name: Install the packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder python3
+      - name: Install the Flatpak runtimes
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+      - name: Download appimagetool
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-aarch64.AppImage
+          chmod +x appimagetool
+      - name: Pack the AppImage
+        run: python3 tools/linux_package.py appimage --arch aarch64 --bin-dir bin --out OpenCE-aarch64.AppImage --appimagetool ./appimagetool
+      # The AppImage itself started (tools/ci_smoke.py): its runtime unpacks it,
+      # AppRun starts the host, which must load its libraries
+      - name: Start the AppImage
+        run: |
+          # (the host links the system's OpenGL ES and EGL; a desktop has them with Mesa)
+          sudo apt-get install -y libgles2 libegl1
+          python3 tools/ci_smoke.py --seconds 120 --no-defaults --require "Halo for Linux starting" -- ./OpenCE-aarch64.AppImage --appimage-extract-and-run
+      - name: Pack the Flatpak
+        run: python3 tools/linux_package.py flatpak --arch aarch64 --bin-dir bin --out OpenCE-aarch64.flatpak
+      # The package run in its sandbox, with no display: the loader and the
+      # mount points of the extensions are there, and the libraries
+      # the program names are found (the first x86_64 Flatpaks had no mount
+      # points, and the sandbox killed the 32-bit program's system calls)
+      - name: Check the Flatpak
+        run: |
+          flatpak install --user -y --bundle OpenCE-aarch64.flatpak
+          flatpak run --command=sh io.github.opencommunityedition.OpenCE -c 'ldd /app/bin/halo_host' > ldd.txt
+          cat ldd.txt
+          if awk '/not found/ { missing = 1 } END { exit !missing }' ldd.txt; then
+            echo "::error::the program names libraries that the package does not have"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages-aarch64
+          path: |
+            OpenCE-aarch64.AppImage
+            OpenCE-aarch64.flatpak
+
+  # The AppImage runtime for ARMv7. The one the AppImage project publishes
+  # (runtime-armhf) is built for ARMv6 and uses the ARMv6 memory barrier
+  # (mcr p15, 0, r0, c7, c10, 5), which a 64-bit kernel without CP15 barrier
+  # emulation traps: "Illegal instruction", before the game starts. The
+  # project builds it in an Alpine container for linux/arm/v6; this builds
+  # the same source, at the pinned commit, in the linux/arm/v7 one (qemu-user
+  # runs the container on the build computer). Cached: it changes only with
+  # the commit.
+  runtime-armv7:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      TYPE2_RUNTIME_COMMIT: fedfad51acc2860b2916a1eef32ba4a500ff31ef
+    steps:
+      - uses: actions/cache@v5
+        id: cache
+        with:
+          path: runtime-armhf
+          key: type2-runtime-armv7-${{ env.TYPE2_RUNTIME_COMMIT }}-1
+      - name: Install the tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support git llvm binutils
+      - name: Build the runtime
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/AppImage/type2-runtime.git "$RUNNER_TEMP/type2-runtime"
+          git -C "$RUNNER_TEMP/type2-runtime" checkout --detach "$TYPE2_RUNTIME_COMMIT"
+          sed -i 's#docker_platform=linux/arm/v6#docker_platform=linux/arm/v7#' "$RUNNER_TEMP/type2-runtime/scripts/docker/create-build-container.sh"
+          mkdir "$RUNNER_TEMP/out"
+          cd "$RUNNER_TEMP/out"
+          ARCH=armhf bash "$RUNNER_TEMP/type2-runtime/scripts/docker/build-with-docker.sh"
+          cp runtime-armhf "$GITHUB_WORKSPACE/runtime-armhf"
+      # ARMv7 code, and none of the ARMv6 barrier; and it starts
+      - name: Check the runtime
+        run: |
+          readelf -A runtime-armhf | awk '/Tag_CPU_arch/'
+          if ! readelf -A runtime-armhf | awk '/Tag_CPU_arch: v7/ { ok = 1 } END { exit !ok }'; then
+            echo "::error::the runtime is not built for ARMv7"
+            exit 1
+          fi
+          OBJDUMP="$(command -v llvm-objdump || ls /usr/lib/llvm-*/bin/llvm-objdump | tail -n 1)"
+          if "$OBJDUMP" -d runtime-armhf | awk '/mcr[ \t]+p15.*c7, c10, #0x5/ { bad = 1 } END { exit !bad }'; then
+            echo "::error::the runtime uses the ARMv6 memory barrier"
+            exit 1
+          fi
+          qemu-arm-static ./runtime-armhf --appimage-version
+      - uses: actions/upload-artifact@v6
+        with:
+          name: runtime-armv7
+          path: runtime-armhf
+
+  # No armv7 Flatpak: the freedesktop 25.08 runtime has no 32-bit ARM arch.
+  package-armv7:
+    runs-on: ubuntu-24.04
+    needs: [build-armv7, runtime-armv7]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: bin-armv7
+          path: bin
+      # The oldest glibc the files need is the oldest computer the AppImage
+      # starts on (port/linux/README.md, "AppImage and Flatpak packages"):
+      # a build that needs a newer one fails here, not for a user
+      - name: Check the glibc the files need
+        run: python3 tools/check_glibc.py 2.38 bin/halo bin/libSDL3.so.0
+      - uses: actions/download-artifact@v7
+        with:
+          name: runtime-armv7
+          path: .
+      - name: Download appimagetool
+        run: |
+          curl -fsSL -o appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+      - name: Pack the AppImage
+        run: python3 tools/linux_package.py appimage --arch armv7 --bin-dir bin --out OpenCE-armv7.AppImage --appimagetool ./appimagetool --runtime-file ./runtime-armhf
+      # The AppImage itself started, in an armhf container (qemu-user runs it):
+      # its runtime unpacks it, AppRun starts the game, which must find its
+      # bundled SDL3 and reach its start-up log (tools/ci_smoke.py). The first
+      # armv7 AppImage had no library path, and died here. qemu-arm-static is
+      # named because binfmt would not run the AppImage itself: the format puts
+      # "AI\x02" in the ELF header bytes 8 to 10, which qemu's rule wants zero
+      # (a real ARM kernel ignores them)
+      - name: Start the AppImage
+        run: |
+          sudo apt-get install -y qemu-user-static binfmt-support
+          python3 tools/ci_smoke.py --seconds 300 -- docker run --rm --platform linux/arm/v7 -v "$PWD":/pkg:ro \
+            -v /usr/bin/qemu-arm-static:/usr/bin/qemu-arm-static:ro \
+            -e SDL_VIDEODRIVER=dummy -e SDL_AUDIODRIVER=dummy -e HALO_UPDATE_AUTO=false -e HALO_DATA_ROOT=/tmp/data debian:trixie \
+            sh -c 'mkdir -p /tmp/data && cd /tmp/data && timeout 240 qemu-arm-static /pkg/OpenCE-armv7.AppImage --appimage-extract-and-run'
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages-armv7
+          path: OpenCE-armv7.AppImage

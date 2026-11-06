@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=OpenCE
+Comment=Halo: Combat Evolved port
+Exec=opence
+Icon=io.github.opencommunityedition.OpenCE
+Categories=Game;ActionGame;
+Terminal=false

@@ -20,12 +20,16 @@ end.
 | `port/linux/include/` | The port's headers: the limits (`halo_port_limits.h`, with `HALO_PORT_NETWORK_VERSION`), capacities (`halo_port_capacity.h`), the prefix header, `halo_linux_source_fixups.h` (port functions the game's sources call) |
 | `port/include/xdk/` | Stand-ins for the Xbox SDK's headers (declarations only) |
 | `port/windows/` | The Windows build's own files (`win32_*.c`, headers) |
-| `port/android/` | The Android app: the guest runtime, the host library (`host/`), the Java app (`app/`), host imports (`host_imports.list`) |
+| `port/guest/` | The guest the Android port runs: its runtime, libc, linker script, host imports (`host_imports.list`) and shared headers (`include/`); built by `tools/guest_build.py` |
+| `port/android/` | The Android app: the host library (`host/`), the Java app (`app/`) |
+| `port/linux-arm64/` | The native Linux arm64 port: its host (`host/`), which runs the guest image on the system's SDL3 and OpenGL ES |
+| `port/linux-armv7/` | The native Linux armv7 port: the Linux build compiled for armv7-linux-gnueabihf with clang and lld, on OpenGL ES (a root of armhf libraries from `--linux-sysroot`) |
+| `packaging/linux/` | The desktop file and the AppStream metadata of the AppImages and Flatpaks (`tools/linux_package.py` makes them) |
 | `port/web/` | The web build: its runtime (`src/`: entry, sockets inside the page, memory watch), the page and its service worker (`site/`), the SDL port, tests |
 | `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers and master servers, the dedicated server's web page (`server_ui/`) |
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
 | `port/tools/` | Stand-alone tools (`cache_file_report.c`) |
-| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `server_ui_embed.py`, `xdk_headers.py`), the dedicated server's protocol simulator and remote console (`server_sim.py`, `opence_rcon.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
+| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py` (which calls `guest_build.py`), `web_build.py`, `ci_build.py`, `web_serve.py`), the CI checks (`ci_smoke.py` starts a build headless and reads its log, `check_glibc.py` the glibc a file needs), the packages (`linux_package.py`: AppImages and Flatpaks), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `server_ui_embed.py`, `xdk_headers.py`), the dedicated server's protocol simulator and remote console (`server_sim.py`, `opence_rcon.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
 | `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`, `dedicated_server.md`, `master_protocol.md`) |
 | `pgo/` | Profile-guided optimisation profiles |
 | `deploy/` | Running a dedicated server: systemd, Docker, Pterodactyl, Helm, PufferPanel, MCSManager, example gametypes |
@@ -39,6 +43,9 @@ python configure.py            # debug build; add --release, --portable, --profi
 ninja linux                    # build/linux/halo
 ninja android                  # the Android guest image and native libraries
 ninja android_apk              # the APK (Gradle)
+ninja linux_arm64_guest        # build/linux-arm64/halo_guest.elf (configure with --guest-lld-bin DIR holding ld.lld and llvm-ar)
+ninja linux_arm64_host         # build/linux-arm64/halo_host, on Linux arm64 only
+ninja linux_armv7              # build/linux-armv7/halo (configure with --linux-arch armv7 and --linux-sysroot DIR)
 ninja web                      # build/web/site (Emscripten: port/web/README.md)
 ninja windows                  # on Windows, or on Linux after configure.py --windows-cross
 python tools/ci_build.py linux release   # what CI builds
@@ -54,7 +61,7 @@ python tools/ci_build.py linux release   # what CI builds
   game computes the same results. Do not call the system's maths functions.
 - Android: the game is an ILP32 AArch64 guest (`arm64_32`) in a 64-bit app.
   Guest code can call only the host imports declared in
-  `port/android/host_imports.list` and `port/android/guest/runtime/guest_host.h`,
+  `port/guest/host_imports.list` and `port/guest/runtime/guest_host.h`,
   and only the SDL functions `guest_sdl.c` bridges. Run `ninja android`
   after changing anything it compiles: `port/linux/src`, `port/linux/game`,
   `port/android`, `source/`, the build scripts.
@@ -69,9 +76,11 @@ python tools/ci_build.py linux release   # what CI builds
 | --- | --- | --- |
 | `HALO_ANDROID` | Android | The app: its display, input, files and lifecycle |
 | `HALO_GLES` | Android, web | The OpenGL ES renderer |
-| `HALO_ARM64_GUEST` | Android | The guest's ABI (ILP32 AArch64) |
+| `HALO_ARM64_GUEST` | Android, Linux arm64 | The guest's ABI (ILP32 AArch64) |
+| `HALO_LINUX_ARM64_HOST` | Linux arm64 (host build) | The native Linux arm64 host: shared sources leave out the Xbox SDK headers and Android-only code |
 | `HALO_WEB` | Web | The browser: its frames, storage, sockets and WebGL 2's limits (with `HALO_GLES`, not `HALO_ANDROID`) |
 | `HALO_WINDOWS` | Windows (`halo_windows_prefix.h`) | The Windows build |
+| `HALO_LINUX_ARMV7` | Linux armv7 | The 32-bit ARM Linux build: the aligned script stack (`hs_runtime.c`), the Custom Edition window (`xbox_memory.c`), the GLES host (`gles_host.c`) |
 | `HALO_RELEASE` | `--release` | No assertions checked |
 | `HALO_PROFILE` | `--profile` | The profiling build; a normal build must be unchanged by it |
 
@@ -89,6 +98,7 @@ python -m pytest -q tools/test_linux_port.py                # the build, the map
 python -m pytest -q tools/test_mods.py                      # mods played over a map (needs assets/maps)
 python -m pytest -q tools/test_bots.py                      # the bots in local games (needs assets/maps)
 python -m pytest -q tools/test_cache_file_formats.py tools/test_bmp_files.py tools/test_profile.py
+python -m pytest -q tools/test_ci_smoke.py tools/test_check_glibc.py tools/test_linux_packaging.py   # the CI checks of the built game, the glibc a file needs, the AppImages and Flatpaks
 python tools/test_touch_layout.py                           # the Android touch layout (JDK 17+)
 python tools/test_light_storage.py
 python tools/test_death_timing.py
@@ -234,6 +244,8 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [port/linux/NETCODE.md](port/linux/NETCODE.md) | The distributed netcode, network versions, joining a game in progress, map sharing, transport, testing |
 | [port/windows/README.md](port/windows/README.md) | The Windows build, its headers, inline functions, crash reports |
 | [port/android/README.md](port/android/README.md) | The Android build, the guest and host, touch controls, Android settings, finding problems |
+| [port/linux-arm64/README.md](port/linux-arm64/README.md) | The Linux arm64 build: the guest image and its host, building, game data, tests |
+| [port/linux-armv7/README.md](port/linux-armv7/README.md) | The Linux armv7 build: the AArch32 game, building, the alignment rules, limits, tests |
 | [port/web/README.md](port/web/README.md) | The web build, the page, the game data in the browser, limits, how it operates, hosting on GitHub Pages |
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |

@@ -89,9 +89,17 @@ jobs:
       - name: Release
         run: python tools/ci_build.py linux release
 
+      # Both builds started with no window, sound or game data: the log of
+      # their start-up (tools/ci_smoke.py) shows a program that does not load
+      # or crashes in a constructor, which no test of the build can
+      - name: Start the game
+        run: |
+          python tools/ci_smoke.py -- "$PWD/dist/halo-linux-release/halo"
+          python tools/ci_smoke.py -- "$PWD/dist/halo-linux-debug/halo"
+
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
+          python -m pytest -q tools/test_ci_smoke.py tools/test_check_glibc.py tools/test_linux_port.py tools/test_guest_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_halo_render_policy.py tools/test_host_boot.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
           # the dedicated server: --version, and --server without maps refused (exit code 2); its cases with
           # clients need the retail maps, and are skipped
           python -m pytest -q tools/test_dedicated_server.py
@@ -197,6 +205,97 @@ jobs:
           name: halo-android-release
           path: dist/halo-android-release
           retention-days: 3
+
+  linux-arm64:
+    # The Linux arm64 host and guest on an arm64 runner, then their tests.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 python3-pytest python3-yaml curl git libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxtst-dev libxss-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libgl-dev libpulse-dev libasound2-dev libpipewire-0.3-dev libdecor-0-dev libudev-dev libdbus-1-dev
+
+      - uses: actions/checkout@v5
+
+      - name: Build SDL 3
+        run: |
+          git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
+          cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/sdl-prefix"
+          cmake --build "$RUNNER_TEMP/SDL/build" -j"$(nproc)"
+          cmake --install "$RUNNER_TEMP/SDL/build"
+          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/sdl-prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - name: Build the game
+        run: |
+          python3 configure.py --guest-lld-bin /usr/bin
+          ninja linux_arm64_guest linux_arm64_host
+
+      # The host started with no window or game data: it quits at the missing
+      # data, after it has loaded its libraries (tools/ci_smoke.py)
+      - name: Start the game
+        run: |
+          HALO_GUEST_ELF="$PWD/build/linux-arm64/halo_guest.elf" LD_LIBRARY_PATH="$GITHUB_WORKSPACE/sdl-prefix/lib" \
+            python3 tools/ci_smoke.py --no-defaults --require "Halo for Linux starting" -- "$PWD/build/linux-arm64/halo_host"
+
+      - name: Test
+        run: python3 -m pytest -q tools/test_linux_arm64*.py tools/test_linux_pack*.py tools/test_host_[bp]*.py
+
+  linux-armv7:
+    # The 32-bit ARM (armhf) Linux build, cross-compiled with clang and lld
+    # against a Debian armhf root.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 python3-pytest python3-yaml curl git debootstrap qemu-user-static binfmt-support libwayland-bin
+
+      - uses: actions/checkout@v5
+
+      - name: Make an armhf root
+        run: |
+          sudo debootstrap --foreign --arch=armhf --variant=minbase trixie "$RUNNER_TEMP/armhf" http://deb.debian.org/debian
+          sudo cp /usr/bin/qemu-arm-static "$RUNNER_TEMP/armhf/usr/bin/"
+          sudo chroot "$RUNNER_TEMP/armhf" /debootstrap/debootstrap --second-stage
+          sudo chroot "$RUNNER_TEMP/armhf" apt-get install -y --no-install-recommends libc6-dev libgcc-14-dev linux-libc-dev libgles-dev libegl-dev libgl-dev libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxtst-dev libxss-dev libxkbcommon-dev libwayland-dev libdrm-dev libgbm-dev libasound2-dev libpulse-dev libudev-dev libdbus-1-dev wayland-protocols libdecor-0-dev
+
+      - name: Build SDL 3
+        run: |
+          git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
+          cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/tools/linux_armv7.cmake" -DHALO_SYSROOT="$RUNNER_TEMP/armhf" -DCMAKE_C_COMPILER=clang -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/armhf/usr" -DCMAKE_INSTALL_LIBDIR=lib/arm-linux-gnueabihf
+          cmake --build "$RUNNER_TEMP/SDL/build" -j"$(nproc)"
+          sudo cmake --install "$RUNNER_TEMP/SDL/build"
+
+      - name: Build the game
+        run: |
+          python3 configure.py --linux-arch armv7 --linux-sysroot "$RUNNER_TEMP/armhf" --lto=off --pgo=off
+          ninja linux_armv7
+
+      # The whole program started under qemu-user with no window or game
+      # data (tools/ci_smoke.py): it must load, and reserve the Custom Edition
+      # window at start-up (xbox_memory.c), which the libraries qemu-user maps
+      # from 0x40000000 upwards took before the window was part of the
+      # executable (tools/linux_armv7_tag_cache.ld)
+      - name: Start the game
+        run: |
+          LD_LIBRARY_PATH=/usr/lib/arm-linux-gnueabihf python3 tools/ci_smoke.py --seconds 180 -- \
+            qemu-arm-static -L "$RUNNER_TEMP/armhf" "$PWD/build/linux-armv7/halo"
+
+      # The rounding mode and exception flags the game sets and reads
+      # (msvc_crt.c), checked on the VFP unit as qemu-user emulates it: the
+      # test is linked statically with the build's own msvc_crt.o
+      - name: Test the floating-point control
+        run: |
+          clang --target=armv7-linux-gnueabihf -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=hard \
+            --sysroot="$RUNNER_TEMP/armhf" -O0 -static -fuse-ld=lld -Wl,-z,muldefs \
+            -Wl,--unresolved-symbols=ignore-all port/linux-armv7/tests/fenv_test.c \
+            build/linux-armv7/obj/port/linux/src/msvc_crt.o -lm -o "$RUNNER_TEMP/fenv_test"
+          qemu-arm-static "$RUNNER_TEMP/fenv_test"
+
+      - name: Test
+        run: python3 -m pytest -q tools/test_linux_armv7_build.py
 
   windows:
     # The runner image has LLVM, Python and Visual Studio's x86 libraries and
