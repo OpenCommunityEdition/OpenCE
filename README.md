@@ -1,3 +1,65 @@
+# MendicantCE
+
+<p align="center">
+  <img src="port/assets/icon/mendicant-ai.png" alt="MENDICANT AI" width="160">
+</p>
+
+MendicantCE is a fork of [OpenCE](https://github.com/OpenCommunityEdition/OpenCE)
+that adds **MENDICANT AI**: a new campaign AI for the Covenant and the Marines.
+Everything else is OpenCE, and the rest of this README is OpenCE's.
+
+## MENDICANT AI
+
+- **Squads that fight as units.** An Elite commands the Grunts and Jackals
+  around him, and Marines fight as a squad. Each unit picks a strategy from a
+  doctrine of drills (bounding overwatch, flanks, pincers, ambushes, lures,
+  fighting withdrawals, counterattacks) and carries it through.
+- **Trained models.** Small neural networks choose the strategy for each unit
+  and how each soldier on his own fights. They run inside the game; nothing
+  else is needed.
+- **Marines stay with the Chief.** They follow him over the whole level,
+  board his vehicle, and take other vehicles to keep up.
+- **Free movement.** Soldiers can walk to any reachable ground, not only the
+  level's firing positions.
+- **Saner grenades.** Throws go through the game's own aiming, and none land
+  at the thrower's feet or on friends.
+
+Hunters and the Flood keep the original AI.
+
+### Install
+
+1. Download the build for your platform from
+   [Releases](https://github.com/Adam-AtlasSoftware/MendicantCE/releases).
+2. Unzip it into a new folder. It contains the game and the `mods/mendicant_ai`
+   folder with the trained models.
+3. Start the game and give it your own Halo: Combat Evolved Xbox disc image, as
+   for OpenCE (see below).
+
+MENDICANT AI is on by default. Its settings are under
+**Settings → Player Profile → Video Setup → CAMPAIGN AI**
+(`ai.mendicant.*` in `config.toml`).
+
+### Multiplayer
+
+The campaign AI runs on the host only. In co-op, the host's settings decide the
+AI and the other players need nothing extra; multiplayer games are unchanged.
+
+### Building
+
+As for OpenCE (see [How to build the game](#how-to-build-the-game)). The AI is
+in `port/linux/game/mendicant/`, with about 30 small `port:` hooks in `source/`;
+[docs/mendicant_port.md](docs/mendicant_port.md) describes the module, its
+settings and the tools in `tools/mendicant/` (doctrine generator, model
+exporter, packager).
+
+### Credits and licence
+
+MENDICANT AI is by Adam Wiley. MendicantCE is licensed like OpenCE, under the
+GNU AGPL v3 or later (see [Licence](#licence)). Halo is a trademark of
+Microsoft; this project is not affiliated with or endorsed by Microsoft.
+
+---
+
 # OpenCE - Halo: Combat Evolved for Linux, Windows, Android and the web
 
 <p align="center">

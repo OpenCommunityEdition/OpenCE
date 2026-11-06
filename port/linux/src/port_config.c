@@ -98,6 +98,18 @@ a phone's GPU draws with time to spare, elsewhere the window's resolution */
 #define RESOLUTION_SCALING "\"native\""
 #endif
 
+/* fork: the MENDICANT AI fork's release settings (HALO_FORK_MENDICANT, from
+tools/linux_build.py's configuration_defines; docs/mendicant_port.md): no
+update looked for (upstream's releases would replace the fork), MENDICANT AI
+on. Without the define, upstream's defaults. */
+#ifdef HALO_FORK_MENDICANT
+#define FORK_UPDATE_AUTO_DEFAULT "false"
+#define FORK_MENDICANT_ENABLED_DEFAULT "true"
+#else
+#define FORK_UPDATE_AUTO_DEFAULT "true"
+#define FORK_MENDICANT_ENABLED_DEFAULT "false"
+#endif
+
 static const struct config_setting config_settings[] =
 {
 	{ "display.fullscreen", _config_boolean, "true", "HALO_FULLSCREEN", _environment_value, _platform_desktop,
@@ -520,7 +532,7 @@ static const struct config_setting config_settings[] =
 	{ "bots.teams", _config_string, "\"even\"", "HALO_BOT_TEAMS", _environment_value, _platform_all,
 		"In team games: \"even\" puts the bots on both teams, evening them with\n"
 		"the players; \"against\" puts them all on the team the players are not on." },
-	{ "ai.mendicant.enabled", _config_boolean, "false", "HALO_AI_MENDICANT", _environment_value, _platform_all,
+	{ "ai.mendicant.enabled", _config_boolean, FORK_MENDICANT_ENABLED_DEFAULT, "HALO_AI_MENDICANT", _environment_value, _platform_all,
 		"MENDICANT AI: the campaign's Marines and Covenant fight as units, an\n"
 		"Elite or a sergeant leading each through drills (bounding, flanking,\n"
 		"suppressing, falling back), and each soldier picks its own way of\n"
@@ -528,8 +540,9 @@ static const struct config_setting config_settings[] =
 	{ "ai.mendicant.models", _config_boolean, "true", "HALO_AI_MENDICANT_MODELS", _environment_value, _platform_all,
 		"Let the trained models (ai.mendicant.weights) choose the drills and each\n"
 		"soldier's way of fighting; false, or no weights found: the scripted drill." },
-	{ "ai.mendicant.weights", _config_string, "\"mendicant\\\\models.aibw\"", "HALO_AI_MENDICANT_WEIGHTS", _environment_value, _platform_all,
-		"The models' file, looked up in the mods folder's mods as a tag file is." },
+	{ "ai.mendicant.weights", _config_string, "\"mendicant/models.aibw\"", "HALO_AI_MENDICANT_WEIGHTS", _environment_value, _platform_all,
+		"The models' file, looked up in the mods folder's mods as a tag file is\n"
+		"(mods/<mod>/tags/mendicant/models.aibw)." },
 	{ "ai.mendicant.variety", _config_real, "1.0", "HALO_AI_MENDICANT_VARIETY", _environment_value, _platform_all,
 		"How freely the models choose among the drills they rate well: 0 always\n"
 		"the best, 1 as trained, more for more variety." },
@@ -877,7 +890,7 @@ static const struct config_setting config_settings[] =
 		"The Discord application internet play invites go through while the\n"
 		"Discord desktop client runs; empty for none." },
 
-	{ "update.auto", _config_boolean, "true", "HALO_UPDATE_AUTO", _environment_value, _platform_all,
+	{ "update.auto", _config_boolean, FORK_UPDATE_AUTO_DEFAULT, "HALO_UPDATE_AUTO", _environment_value, _platform_all,
 		"Look for a new version when the game starts, and offer to update to it;\n"
 		"false never looks (the game's \"Do not ask again\" writes false here)." },
 	/* (a dedicated server's: halo --server, port/linux/src/server_mode.c;

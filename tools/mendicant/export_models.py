@@ -14,7 +14,7 @@ best kept (<side>_strategy_best.pt), else the latest (<side>_strategy.pt). --cov
 out, and the game lets the drill decide for it, as brain.py did.
 
 The game finds the file through the mods folder under the key ai.mendicant.weights
-("mendicant\\models.aibw" by default): mods/<mod>/tags/mendicant/models.aibw, in a mod whose
+("mendicant/models.aibw" by default): mods/<mod>/tags/mendicant/models.aibw, in a mod whose
 mod.toml has no `maps =`.
 
 The file (all little-endian):

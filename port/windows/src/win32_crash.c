@@ -731,6 +731,11 @@ static void crash_uploader(void)
 
 static int crash_reports_enabled(void)
 {
+#ifdef HALO_FORK_MENDICANT
+	/* fork: the MENDICANT AI fork sends nothing to upstream's Sentry (the
+	backtrace still goes into debug.txt and halo.log: docs/mendicant_port.md) */
+	return 0;
+#endif
 	return HALO_BUILD_NUMBER > 0 || GetEnvironmentVariableW(L"HALO_CRASH_REPORTS_ANY_BUILD", NULL, 0) > 0;
 }
 

@@ -25,10 +25,14 @@ GIT = os.environ.get("HALO_GIT", "git")
 
 
 def test_configuration_defines():
-    assert linux_build.configuration_defines(SimpleNamespace()) == []
-    assert linux_build.configuration_defines(SimpleNamespace(port_release=True)) == ["-DHALO_RELEASE"]
-    assert linux_build.configuration_defines(SimpleNamespace(port_release=True, port_profile=True)) == [
-        "-DHALO_RELEASE", "-DHALO_PROFILE"]
+    # fork: the MENDICANT AI fork's builds all add -DHALO_FORK_MENDICANT
+    # (docs/mendicant_port.md, "Fork release settings"), left out here
+    def defines(**options):
+        return [d for d in linux_build.configuration_defines(SimpleNamespace(**options))
+                if d != "-DHALO_FORK_MENDICANT"]
+    assert defines() == []
+    assert defines(port_release=True) == ["-DHALO_RELEASE"]
+    assert defines(port_release=True, port_profile=True) == ["-DHALO_RELEASE", "-DHALO_PROFILE"]
 
 
 def test_every_native_build_takes_the_configuration_defines():

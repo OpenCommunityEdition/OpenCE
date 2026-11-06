@@ -20,18 +20,9 @@ name: Server image
 #   cosign verify ghcr.io/opencommunityedition/opence-server:latest \
 #     --certificate-identity-regexp '^https://github\.com/OpenCommunityEdition/OpenCE/\.github/workflows/server-image\.yml@' \
 #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+# fork: OpenCE's own workflow, by hand only in MendicantCE (see mendicant.yml)
 on:
-  workflow_run:
-    workflows: [Build]
-    types: [completed]
-    branches: [main]
-  schedule:
-    - cron: "23 5 * * 1"
   workflow_dispatch:
-    inputs:
-      release:
-        description: "The release to build the image of: a tag (build-206) or latest"
-        default: latest
 
 concurrency:
   group: server-image-${{ github.event_name }}-${{ github.ref }}

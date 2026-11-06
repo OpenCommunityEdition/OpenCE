@@ -182,6 +182,8 @@ void mendicant_settings_changed(
 	memcpy(mendicant_config.drill_log, map_start.drill_log, sizeof(mendicant_config.drill_log));
 	memcpy(mendicant_config.player_log, map_start.player_log, sizeof(mendicant_config.player_log));
 	memcpy(mendicant_config.move_test_log, map_start.move_test_log, sizeof(mendicant_config.move_test_log));
+	if (mendicant_config.aim == 1.0f && !mendicant_config.aim_difficulty && !mendicant_config.aim_moving)
+		mendicant_aim_restore();
 
 	return;
 }

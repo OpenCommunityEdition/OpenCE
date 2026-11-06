@@ -53,6 +53,48 @@ models, the seed, the bridge, training and the logs as the map started with
 them until the next map's start. The weights, the seed, the bridge, training,
 the logs and the tests stay in config.toml only.
 
+## Fork release settings
+
+The fork's own builds (the MENDICANT AI test builds) differ from upstream in three settings and
+nothing else. They hang on one define, `HALO_FORK_MENDICANT`, which `tools/linux_build.py`'s
+`configuration_defines` adds to every unit of every native build (Linux, Windows, Android, web);
+each place that reads it is marked `fork:`. The upstream pull request leaves out that line of
+`configuration_defines` (or the whole `#ifdef` blocks), and the builds are then upstream's.
+
+| Setting | Upstream | Fork build | Where |
+| --- | --- | --- | --- |
+| Self-update | `update.auto` true; numbered builds ask GitHub for `OpenCommunityEdition/OpenCE`'s latest release and offer to install it | never looked for (`updater_start` and `updater_server_check` return at once and log `update: not looked for: the MENDICANT AI fork does not update itself`); `update.auto` defaults to false so the menu shows OFF | `port/linux/src/updater.c`, `port/linux/src/port_config.c` |
+| Crash reports (Windows) | numbered builds write a minidump and, with the player's yes, send it to upstream's Sentry | none: `crash_reports_enabled` is 0, so no minidump, no consent box, no upload; the backtrace still goes into `debug.txt` and `halo.log` | `port/windows/src/win32_crash.c` |
+| MENDICANT AI | `ai.mendicant.enabled` false | true | `port/linux/src/port_config.c` (`FORK_MENDICANT_ENABLED_DEFAULT`) |
+
+The AI's code path is the same in both: only the default changes, and `ai.mendicant.enabled =
+false` (or `HALO_AI_MENDICANT=false`) gives the stock AI exactly as before.
+`tools/mendicant/ai_off_parity.py` sets `HALO_AI_MENDICANT=false` itself for that reason. `tools/test_profile.py`'s
+`test_configuration_defines` leaves the fork's define out of what it checks (marked `fork:`).
+
+### The test build's package
+
+```sh
+<mod>/.venv/bin/python -I tools/mendicant/export_models.py --mod <mod> \
+    --covenant <mod>/data/frozen/covenant.pt --marines <mod>/data/frozen/marines.pt \
+    --covenant-strategy <mod>/data/frozen/covenant_strategy_best.pt \
+    --marines-strategy <mod>/data/frozen/marines_strategy_best.pt \
+    --out build/release/mods/mendicant_ai/tags/mendicant/models.aibw
+python3 tools/mendicant/package.py --game build/linux \
+    --models build/release/mods/mendicant_ai/tags/mendicant/models.aibw --out build/release
+python3 tools/mendicant/package.py --game halo-windows-release.zip \
+    --models build/release/mods/mendicant_ai/tags/mendicant/models.aibw --out build/release
+```
+
+`package.py` (fork-only) makes `mendicant-ai-<version>-<platform>.zip`: the files the platform's
+release zip has (from a build folder, as `tools/ci_build.py` collects them; from the workflow's
+release artifact, as they are), `mods/mendicant_ai/` (`mod.toml`, and the models where
+`ai.mendicant.weights` finds them: `tags/mendicant/models.aibw`), `README_MENDICANT.txt`,
+`LICENSE.txt` (the AGPL) and `SOURCE.txt` (the source offer, AGPL section 13). It leaves out maps,
+settings, saves and logs, strips debug information from ELF files (the full copies go to
+`<zip stem>-symbols/` beside the zip) and overwrites any path of the packaging machine left in a
+binary's strings with one of the same length.
+
 ## The specification
 
 Fork: OpenCE build-337, commit 899219c.
@@ -110,7 +152,8 @@ The ordinary scenario fights (`scenario_mode` 1 with no Chief) keep working.
   - Every `FIELD(type, base, 0x...)` becomes `actor->member` (section 4).
   - `datum_try_and_get` replaces the hand-written datum lookups `actor_get`, `prop_get`,
     `go_datum` and `object_pointer`. They return NULL for a stale index, as the mod's do.
-- **Off by default.** With `ai.mendicant.enabled = false`, every hook in `source/` is a call that
+- **Off by default** (upstream's default; the fork's release builds turn it on: "Fork release
+  settings" below). With `ai.mendicant.enabled = false`, every hook in `source/` is a call that
   returns at once and does exactly what stock does:
   - the wrappers (`mendicant_select_firing_position`, `mendicant_action_charge_setup`,
     `mendicant_handle_lost_contact`) call the original function with the same arguments
@@ -781,7 +824,7 @@ Two additions:
    writes these tensors, since it copies every key of `covenant.pt`/`marines.pt`.
 2. **Loading through `port_mods`.**
    - Find the file with `port_mods_file_find(mendicant_config.weights, NULL)`. The default key is
-     `"mendicant\\models.aibw"`: file `mods/<mod>/tags/mendicant/models.aibw`. A NULL map name
+     `"mendicant/models.aibw"` (a slash: the defaults are TOML basic strings without escapes, `config_load`): file `mods/<mod>/tags/mendicant/models.aibw`. A NULL map name
      means the mod must not use `maps =` in its `mod.toml`.
    - Read it with `port_mods_file_stamp` (size) and `port_mods_file_read` into a `malloc`'d buffer.
      These are declared for game units in `port/linux/game/mods.h:42-47`.
@@ -986,7 +1029,7 @@ unknown. Teach it to descend one more level when a section's value is itself a t
 |---|---|---|
 | `AI_BRAIN_DRILL` (and `TRAINING` implies it) | `ai.mendicant.enabled` (boolean, `false`, all) | `HALO_AI_MENDICANT` |
 | (brain.py present or not) | `ai.mendicant.models` (boolean, `true`, all): use `models.aibw` when found | `HALO_AI_MENDICANT_MODELS` |
-| `play.sh` `COVENANT_WEIGHTS`, `MARINE_WEIGHTS`, `COVENANT_STRATEGY`, `MARINE_STRATEGY`, `FROZEN` | `ai.mendicant.weights` (string, `"mendicant\\models.aibw"`, all): the mod file. The weights themselves are bundled by `export_weights.py`. | `HALO_AI_MENDICANT_WEIGHTS` |
+| `play.sh` `COVENANT_WEIGHTS`, `MARINE_WEIGHTS`, `COVENANT_STRATEGY`, `MARINE_STRATEGY`, `FROZEN` | `ai.mendicant.weights` (string, `"mendicant/models.aibw"`, all): the mod file. The weights themselves are bundled by `export_weights.py`. | `HALO_AI_MENDICANT_WEIGHTS` |
 | `AI_BRAIN_VARIETY` (brain.py) | `ai.mendicant.variety` (real, `1.0`, all) | `HALO_AI_MENDICANT_VARIETY` |
 | (torch RNG) | `ai.mendicant.seed` (integer, `0` = from the clock, all) | `HALO_AI_MENDICANT_SEED` |
 | `AI_BRAIN_INDIVIDUALS` | `ai.mendicant.individuals` (boolean, `true`, all). The hook defaulted to off, play.sh to on (section 10.7). | `HALO_AI_MENDICANT_INDIVIDUALS` |

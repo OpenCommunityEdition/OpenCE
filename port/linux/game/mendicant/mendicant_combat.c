@@ -564,6 +564,40 @@ int mendicant_weapon_class(
 	return 5;
 }
 
+/* The firing variants back as the level had them (aim settings neutral again,
+or the map going): only where the tag still holds what we wrote, since
+anything else is the game's fresh load and already original. */
+void mendicant_aim_restore(
+	void)
+{
+	int slot;
+
+	for (slot = 0; slot < aimed_count; slot++)
+	{
+		struct actor_variant_definition *variant = aim_original[slot].variant;
+
+		if (!variant || variant->ranged_combat.projectile_error_angle != aim_original[slot].written_error ||
+			variant->ranged_combat.burst_geometry.burst_origin_radius != aim_original[slot].written_radius)
+			continue;
+		variant->ranged_combat.projectile_error_angle = aim_original[slot].error;
+		variant->ranged_combat.burst_geometry.burst_origin_radius = aim_original[slot].radius;
+		if (aim_original[slot].special_saved)
+		{
+			variant->ranged_combat.special_fire_mode = aim_original[slot].special_mode;
+			variant->ranged_combat.special_fire_situation = aim_original[slot].special_situation;
+			variant->ranged_combat.special_fire_chance = aim_original[slot].special_chance;
+			variant->ranged_combat.special_fire_delay = aim_original[slot].special_delay;
+			variant->ranged_combat.burst_geometry.burst_duration_lower_bound = aim_original[slot].burst_duration[0];
+			variant->ranged_combat.burst_geometry.burst_duration_upper_bound = aim_original[slot].burst_duration[1];
+			variant->ranged_combat.burst_geometry.burst_separation_lower_bound = aim_original[slot].burst_separation[0];
+			variant->ranged_combat.burst_geometry.burst_separation_upper_bound = aim_original[slot].burst_separation[1];
+		}
+	}
+	if (mendicant_config.aim_debug && aimed_count > 0)
+		platform_log("mendicant: aim restored on %d variants", aimed_count);
+	aimed_count = 0;
+}
+
 /* Each actor's aim, set just before it decides. */
 void mendicant_aim_actor(
 	long actor_index)
@@ -577,7 +611,11 @@ void mendicant_aim_actor(
 	real marine_fire;
 
 	if (!actor || (mendicant_config.aim == 1.0f && !mendicant_config.aim_difficulty && !mendicant_config.aim_moving))
+	{
+		if (aimed_count > 0)
+			mendicant_aim_restore();
 		return;
+	}
 	variant = actor_combat_get_firing_variant_definition(actor_index);
 	if (!variant)
 		return;

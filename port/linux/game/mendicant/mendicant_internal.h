@@ -224,6 +224,7 @@ void mendicant_movement_report(struct model_bridge *bridge);
 /* M4 combat (mendicant_combat.c, mendicant_vehicles.c) */
 void mendicant_combat_reset(void);
 void mendicant_aim_actor(long actor_index);
+void mendicant_aim_restore(void);
 void mendicant_apply_role(long actor_index);
 real mendicant_targeting_scale(long actor_index, long prop_index, real weight);
 boolean mendicant_grenade_lands_on_friends(struct actor_datum *actor);

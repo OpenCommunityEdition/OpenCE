@@ -20,16 +20,9 @@ name: Build
 # https://github.com/<repository>/releases/latest/download/<file> always
 # gives the latest build; the last five are kept. Its web build is then the
 # site on GitHub Pages (https://halocombatevolved.com/, port/web/README.md).
+# fork: OpenCE's own workflow, by hand only in MendicantCE (see mendicant.yml)
 on:
-  push:
-    paths-ignore:
-      - "**.md"
   workflow_dispatch:
-    inputs:
-      profile:
-        description: "Also build the profiling flavour (configure.py --profile) on Linux"
-        type: boolean
-        default: false
 
 concurrency:
   group: build-${{ github.ref }}

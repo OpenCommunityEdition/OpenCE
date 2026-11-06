@@ -809,6 +809,7 @@ void mendicant_dispose_from_old_map(
 		/* first: the level's own firing position lists back before its tags go */
 		mendicant_movement_dispose();
 	}
+	mendicant_aim_restore();
 	mendicant_active = FALSE;
 	mendicant_map_ready = FALSE;
 	mendicant_tick_began = FALSE;

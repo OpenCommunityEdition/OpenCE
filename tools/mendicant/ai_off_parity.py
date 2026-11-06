@@ -17,7 +17,8 @@ and the like.
         --candidate build/linux/halo --maps <the game's maps folder>
 
 Every MENDICANT AI and ai_brain environment variable is cleared for every
-copy, so the candidate runs with the AI off (its default). Exit status: 0 when
+copy and HALO_AI_MENDICANT=false set, so the candidate runs with the AI off
+(upstream's default; the fork's release builds default it on). Exit status: 0 when
 the candidate differs from the reference nowhere outside the noise, 1 when it
 does, 2 when a copy could not be run.
 
@@ -131,6 +132,8 @@ def run_copy(binary: Path, directory: Path, maps: Path, level: str, seconds: lis
         "HALO_CONFIG_FILE": str(directory / "config.toml"),
         "HALO_DATA_ROOT": str(data), "HALO_SAVE_ROOT": str(directory / "saves"),
         "HALO_LOG_ROOT": str(directory / "logs"),
+        # (off by name: the fork's builds default it on, docs/mendicant_port.md)
+        "HALO_AI_MENDICANT": "false",
     })
     with open(directory / "out.txt", "wb") as output:
         process = subprocess.Popen([str(binary.resolve())], cwd=directory, env=environment,

@@ -710,6 +710,12 @@ void updater_start(void)
 		return;
 	*slash = 0;
 	updater_clean_up();
+#ifdef HALO_FORK_MENDICANT
+	/* fork: the MENDICANT AI fork never looks (UPDATE_REPOSITORY's releases
+	are upstream's, which would replace it: docs/mendicant_port.md) */
+	platform_log("update: not looked for: the MENDICANT AI fork does not update itself");
+	return;
+#endif
 	/* (not for builds without a number, the player's no, or runs nobody is
 	watching, but for a test with its answer) */
 	if (HALO_BUILD_NUMBER <= 0)
@@ -748,6 +754,10 @@ int updater_server_check(void)
 {
 	char *slash;
 
+#ifdef HALO_FORK_MENDICANT
+	/* fork: as updater_start */
+	return 0;
+#endif
 	if (HALO_BUILD_NUMBER <= 0)
 		return 0;
 	if (!updater_directory[0])

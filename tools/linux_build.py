@@ -183,6 +183,11 @@ def configuration_defines(sln: Any) -> List[str]:
         defines.append("-DHALO_RELEASE")
     if getattr(sln, "port_profile", False):
         defines.append("-DHALO_PROFILE")
+    # fork: the MENDICANT AI fork's release settings (no self-update to
+    # upstream's releases, no crash reports to upstream's Sentry, MENDICANT
+    # AI on by default: docs/mendicant_port.md, "Fork release settings").
+    # Not part of the upstream pull request.
+    defines.append("-DHALO_FORK_MENDICANT")
     return defines
 
 
