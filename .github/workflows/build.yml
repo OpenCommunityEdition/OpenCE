@@ -206,6 +206,41 @@ jobs:
           path: dist/halo-android-release
           retention-days: 3
 
+  linux-arm64:
+    # The Linux arm64 host and guest on an arm64 runner, then their tests.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 python3-pytest python3-yaml curl git libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxtst-dev libxss-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libgl-dev libpulse-dev libasound2-dev libpipewire-0.3-dev libdecor-0-dev libudev-dev libdbus-1-dev
+
+      - uses: actions/checkout@v5
+
+      - name: Build SDL 3
+        run: |
+          git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
+          cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/sdl-prefix"
+          cmake --build "$RUNNER_TEMP/SDL/build" -j"$(nproc)"
+          cmake --install "$RUNNER_TEMP/SDL/build"
+          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/sdl-prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - name: Build the game
+        run: |
+          python3 configure.py --guest-lld-bin /usr/bin
+          ninja linux_arm64_guest linux_arm64_host
+
+      # The host started with no window or game data: it quits at the missing
+      # data, after it has loaded its libraries (tools/ci_smoke.py)
+      - name: Start the game
+        run: |
+          HALO_GUEST_ELF="$PWD/build/linux-arm64/halo_guest.elf" LD_LIBRARY_PATH="$GITHUB_WORKSPACE/sdl-prefix/lib" \
+            python3 tools/ci_smoke.py --no-defaults --require "Halo for Linux starting" -- "$PWD/build/linux-arm64/halo_host"
+
+      - name: Test
+        run: python3 -m pytest -q tools/test_linux_arm64*.py tools/test_host_[bp]*.py
+
   windows:
     # The runner image has LLVM, Python and Visual Studio's x86 libraries and
     # Windows SDK.

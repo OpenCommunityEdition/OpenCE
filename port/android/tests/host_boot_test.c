@@ -1,7 +1,7 @@
 /*
 HOST_BOOT_TEST.C
 
-Tests of the host's boot code
+Tests of the boot code the Android and Linux hosts share
 (port/android/host/host_boot.c).
 Built and run by tools/test_host_boot.py with a temporary directory as
 argv[1]; exits nonzero on a failure.

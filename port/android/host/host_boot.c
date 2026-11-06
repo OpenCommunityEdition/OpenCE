@@ -1,13 +1,12 @@
 /*
 HOST_BOOT.C
 
-The host's boot code, apart from the Android app's: finding the game data,
+The boot code the Android and Linux hosts share: finding the game data,
 building the environment the guest starts with (argv, environment and the
 page size, copied into guest memory), reading the few settings of config.toml
 the host needs, and the POSIX time zone for the local offset.
 
-host_main.c uses it; it is a file of its own so that a host that is not an
-Android app can share it.
+host_main.c (Android) and host_linux_main.c (Linux) both use it.
 */
 
 #include "host.h"

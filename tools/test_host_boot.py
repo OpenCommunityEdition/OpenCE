@@ -1,6 +1,6 @@
-"""Runs the C tests of the host's boot code (port/android/host/host_boot.c)
-with the build machine's C compiler. The unit includes SDL3/SDL.h, so the
-test is skipped without pkg-config and SDL3."""
+"""Runs the C tests of the boot code the Android and Linux hosts share
+(port/android/host/host_boot.c) with the build machine's C compiler. The unit
+includes SDL3/SDL.h, so the test is skipped without pkg-config and SDL3."""
 
 import shutil
 import subprocess

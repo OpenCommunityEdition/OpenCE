@@ -1,9 +1,10 @@
 /*
 HOST.H
 
-Internals of the Android port's host library (libmain.so). See
-port/android/README.md for the overall design and
-port/guest/include/halo_guest_abi.h for the guest contract.
+Internals of the host library: libmain.so on Android,
+halo_host on Linux arm64 (port/linux-arm64). See port/android/README.md
+for the overall design and port/guest/include/halo_guest_abi.h for the
+guest contract.
 */
 
 #ifndef __HALO_HOST_H
@@ -41,6 +42,12 @@ the process allows: from JNI_OnLoad, before the Java side of the game's
 process allocates much (host_main.c); a failure is reported again by
 host_memory_initialize */
 void host_memory_reserve_early(void);
+/* sets the host's page size from the kernel's page size; called by
+host_memory_reserve_early and host_memory_initialize (and safe to call
+more than once) */
+void host_memory_page_size_init(void);
+/* the page size the host uses for its allocations */
+uint64_t host_page_size(void);
 /* takes the fixed ranges for the image; returns 0 on success */
 int host_memory_initialize(uint32_t image_base, uint32_t image_size);
 /* 1 if the fixed ranges could not be reserved (something else holds them) */
