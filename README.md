@@ -318,6 +318,9 @@ version (`AGPL-3.0-or-later`). It comes with no warranty. The full text is in
   next to them (`port/third_party`, `port/assets/fonts`,
   `port/assets/icons`, `port/assets/text_filter`). The release downloads and
   the web site's `licenses.txt` carry their notices.
+- **The talking timer's voice** is recorded by Rose on Toast
+  (https://www.instagram.com/NyxFinSharkCat/), under CC BY 4.0
+  (`port/assets/sound/talking_timer`).
 - **Halo is not covered.** The licence covers the work of OpenCE's authors.
   It gives no rights in Halo, its maps or anything else that Microsoft owns.
 

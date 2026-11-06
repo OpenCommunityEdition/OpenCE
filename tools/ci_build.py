@@ -174,6 +174,9 @@ def main() -> int:
     # (port/assets/icons/lucide, drawn into the menus' bitmaps), whose ISC
     # license asks copies to carry its notice
     shutil.copy2(ROOT / "port/assets/icons/lucide/LICENSE", dist / "lucide-LICENSE.txt")
+    # the talking timer's voice, embedded in every build: CC BY 4.0 asks
+    # copies to credit its creator
+    shutil.copy2(ROOT / "port/assets/sound/talking_timer/LICENSE", dist / "talking-timer-voice-LICENSE.txt")
     # internet play's MQTT brokers, a file beside the game (network.brokers_file;
     # Android's APK has its own copy)
     if args.platform != "android":

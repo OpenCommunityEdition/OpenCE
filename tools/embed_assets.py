@@ -4,7 +4,8 @@ tools/hud_assets.py), the menus' titles (port/assets/titles, made by
 tools/title_assets.py), their controller button icons (port/assets/buttons,
 made by tools/button_assets.py), the fonts the text is drawn with
 (port/assets/fonts), the menus' files (port/assets/menus, made by
-tools/ce_menus.py) and SMAA's shader and lookup textures
+tools/ce_menus.py), the talking timer's clips (port/assets/sound/talking_timer)
+and SMAA's shader and lookup textures
 (port/third_party/smaa) in the game as C data:
 
     python tools/embed_assets.py OUTPUT.c
@@ -13,9 +14,10 @@ writes OUTPUT.c with each PNG and the bitmap it stands for (its tag, index
 and checksum of its pixels, from port/assets/hud/layout.json,
 port/assets/titles/titles.json and port/assets/buttons/buttons.json), the
 fonts and their tags from port/assets/fonts/fonts.json, the menu files
-listed in port/assets/menus/menus.json, and SMAA's shader and lookup
-textures, as port/linux/src/hud_hires.h, text_hires.h, menu_files.h and
-xgpu_post.c declare them. The builds generate it
+listed in port/assets/menus/menus.json, the talking timer's clips, and
+SMAA's shader and lookup textures, as port/linux/src/hud_hires.h,
+text_hires.h, menu_files.h, talking_timer_clips.h and xgpu_post.c declare
+them. The builds generate it
 (hud_assets_build, called by tools/linux_build.py, windows_build.py and
 android_build.py), so the assets are the committed source and Android needs
 no files beside its guest image.
@@ -48,6 +50,8 @@ FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
 MENU_ASSETS = Path("port/assets/menus")
 MENU_LIST = MENU_ASSETS / "menus.json"
+TIMER_ASSETS = Path("port/assets/sound/talking_timer")
+TIMER_LINES = 42
 # SMAA's files and the names port/linux/src/xgpu_post.c declares them by
 SMAA_ASSETS = Path("port/third_party/smaa")
 SMAA_FILES = (("SMAA.hlsl", "xgpu_smaa_shader"), ("area_tex.zlib", "xgpu_smaa_area_texture"),
@@ -87,6 +91,14 @@ def menu_files() -> List[str]:
     return json.loads((ROOT / MENU_LIST).read_text())["files"]
 
 
+def timer_clips() -> List[Path]:
+    clips = [TIMER_ASSETS / f"{line:02d}.opus.bin" for line in range(TIMER_LINES)]
+    for clip in clips:
+        if not (ROOT / clip).is_file():
+            sys.exit(f"{clip}: missing (the talking timer has {TIMER_LINES} lines)")
+    return clips
+
+
 def smaa_files() -> List[tuple]:
     """SMAA's files that the checkout has, with their symbols."""
     return [(name, symbol) for name, symbol in SMAA_FILES if (ROOT / SMAA_ASSETS / name).is_file()]
@@ -98,7 +110,7 @@ def hud_asset_inputs() -> List[Path]:
               if (ROOT / listing).is_file()]
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
             *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
-            *(SMAA_ASSETS / name for name, _ in smaa_files()),
+            *timer_clips(), *(SMAA_ASSETS / name for name, _ in smaa_files()),
             *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else []),
             *([MENU_CURSOR] if (ROOT / MENU_CURSOR).is_file() else [])]
 
@@ -113,6 +125,7 @@ def hud_configure_inputs() -> List[Path]:
                             (FONT_ASSETS, FONT_LIST), (MENU_ASSETS, MENU_LIST)):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
+    inputs.append(TIMER_ASSETS)
     if (ROOT / SMAA_ASSETS).is_dir():
         inputs.append(SMAA_ASSETS)
     return inputs
@@ -128,8 +141,9 @@ def words(data: bytes) -> List[str]:
 
 def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
     """Emits the rule that generates output; returns [output]. It is made
-    whatever assets the checkout has (with none, its tables are empty), so
-    that the symbols the platform layer refers to are always defined."""
+    whatever HUD and menu assets the checkout has (with none, their tables
+    are empty), so that the symbols the platform layer refers to are always
+    defined; the talking timer's 42 clips are required."""
     inputs = hud_asset_inputs()
     n.rule(
         name=f"{prefix}_embed_assets",
@@ -266,6 +280,20 @@ def main() -> None:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int menu_files_embedded_count = {len(menus)};")
+    lines.append("")
+    lines.append('#include "talking_timer_clips.h"')
+    lines.append("")
+    clips = timer_clips()
+    for index, clip in enumerate(clips):
+        lines.append(f"static const unsigned int timer_clip{index}[] = {{")
+        lines.extend(words((ROOT / clip).read_bytes()))
+        lines.append("};")
+        lines.append("")
+    lines.append("const struct talking_timer_clip talking_timer_clips[NUMBER_OF_TALKING_TIMER_LINES] =")
+    lines.append("{")
+    for index, clip in enumerate(clips):
+        lines.append(f"\t{{ timer_clip{index}, {(ROOT / clip).stat().st_size} }},")
+    lines.append("};")
     lines.append("")
     # SMAA's shader, as text a GLSL compiler takes (ASCII, ending in a NUL),
     # and its lookup textures (xgpu_post.c); each of size 0 that the

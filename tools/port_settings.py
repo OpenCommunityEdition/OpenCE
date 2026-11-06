@@ -410,7 +410,7 @@ _network["categories"] = [
      "Downloading Custom Edition maps you do not have,\nand helping send them to other players.",
      "desktop android"),
     ("MULTIPLAYER HUD:", "network_setup/multiplayer_hud",
-     "Players' names above their heads, the\nscoreboard, the text chat and the match clock."),
+     "Players' names above their heads, the\nscoreboard, the text chat, the match clock and\nthe talking timer."),
     ("STREAMER MODE:", "network_setup/streamer_mode",
      "Hide offensive words in names and text from\nother players, maps and mods, as stars."),
     ("SERVER BROWSER:", "network_setup/server_browser",
@@ -504,6 +504,10 @@ SCREENS["network_setup/multiplayer_hud"] = {
          "The text chat's colors: COLORS, names in their\nteam's color; WHITE, as Custom Edition.", None),
         ("MATCH TIMER:", "display.match_timer", ON_OFF,
          "Draw a clock at the bottom right in multiplayer,\ncounting up from the start of the game.", None),
+        ("TALKING TIMER:", "audio.talking_timer", ON_OFF,
+         "Call the game clock aloud in multiplayer: the\nseconds left, a countdown, and each new minute.", None),
+        ("TIMER VOLUME:", "audio.timer_volume", VOLUMES,
+         "The talking timer's voice: 8 plays it as\nrecorded, 10 is 25% louder.", None),
     ],
 }
 
