@@ -5644,6 +5644,10 @@ draw can read a buffer while it changes:
 An entry goes when the game releases or unloads it; its GL buffer is
 deleted at the next Present. */
 
+#define STATIC_SAMPLES 128
+/* (a registration or release of at least this many bytes is logged: a map's) */
+#define STATIC_LOG_SIZE 0x40000
+
 struct static_buffer
 {
 	unsigned long start;
@@ -5654,6 +5658,14 @@ struct static_buffer
 	BOOL failed;
 	/* (a value of its own, for index_extent's cache of this range) */
 	unsigned long serial;
+	/* words of the range's memory as the buffer was filled, to tell a later
+	map's bytes in the same place (static_buffers_verify) */
+	unsigned long sample_count;
+	unsigned long samples[STATIC_SAMPLES];
+	/* the frame it was registered in, and how often its buffer has been made
+	again because the memory changed under it */
+	unsigned long frame;
+	unsigned long retired;
 };
 
 /* sorted by start, one list of vertices (0) and one of indices (1); the
@@ -5668,6 +5680,8 @@ static struct static_buffer_list
 static struct
 {
 	unsigned long serial;
+	unsigned long frame;
+	unsigned long reports;
 	GLuint *doomed;
 	unsigned long doomed_count;
 	unsigned long doomed_capacity;
@@ -5701,33 +5715,46 @@ static unsigned long static_buffer_start(const void *resource, BOOL indices)
 	return indices ? (unsigned long)data : (unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(data);
 }
 
-static void static_buffer_forget(struct static_buffer_list *list, unsigned long start)
+/* an entry's GL buffer, deleted at the next Present (from the thread that draws) */
+static void static_buffer_doom(struct static_buffer *entry)
+{
+	if (!entry->buffer)
+		return;
+	if (static_buffers.doomed_count == static_buffers.doomed_capacity)
+	{
+		unsigned long capacity = static_buffers.doomed_capacity ? static_buffers.doomed_capacity * 2 : 64;
+		GLuint *doomed = realloc(static_buffers.doomed, capacity * sizeof(*doomed));
+
+		if (doomed)
+		{
+			static_buffers.doomed = doomed;
+			static_buffers.doomed_capacity = capacity;
+		}
+	}
+	if (static_buffers.doomed_count < static_buffers.doomed_capacity)
+		static_buffers.doomed[static_buffers.doomed_count++] = entry->buffer;
+	entry->buffer = 0;
+}
+
+/* BOOL: an entry was there */
+static BOOL static_buffer_forget(struct static_buffer_list *list, unsigned long start)
 {
 	unsigned long index = static_buffer_upper(list, start);
 	struct static_buffer *entry;
 
 	if (!index || list->entries[index - 1].start != start)
-		return;
+		return FALSE;
 	entry = &list->entries[index - 1];
-	if (entry->buffer)
+	if (debug_settings.statistics && entry->size >= STATIC_LOG_SIZE)
 	{
-		/* (deleted at Present, from the thread that draws) */
-		if (static_buffers.doomed_count == static_buffers.doomed_capacity)
-		{
-			unsigned long capacity = static_buffers.doomed_capacity ? static_buffers.doomed_capacity * 2 : 64;
-			GLuint *doomed = realloc(static_buffers.doomed, capacity * sizeof(*doomed));
-
-			if (doomed)
-			{
-				static_buffers.doomed = doomed;
-				static_buffers.doomed_capacity = capacity;
-			}
-		}
-		if (static_buffers.doomed_count < static_buffers.doomed_capacity)
-			static_buffers.doomed[static_buffers.doomed_count++] = entry->buffer;
+		platform_log("GPU: static %s range %08lx+%lu released (frame %lu, %lu left)",
+			list == &static_buffer_lists[1] ? "index" : "vertex", entry->start, entry->size, static_buffers.frame,
+			list->count - 1);
 	}
+	static_buffer_doom(entry);
 	memmove(entry, entry + 1, (list->count - index) * sizeof(*entry));
 	list->count--;
+	return TRUE;
 }
 
 static void static_buffer_note(struct static_buffer_list *list, unsigned long start, unsigned long size)
@@ -5740,16 +5767,32 @@ static void static_buffer_note(struct static_buffer_list *list, unsigned long st
 	static_buffer_forget(list, start);
 	index = static_buffer_upper(list, start);
 	/* (a bsp's vertices and lightmap vertices both run to its end: the one
-	that starts lower covers the other) */
-	if (index && list->entries[index - 1].start + list->entries[index - 1].size == start + size)
-		return;
-	if (index < list->count && list->entries[index].start + list->entries[index].size == start + size)
-		static_buffer_forget(list, list->entries[index].start);
-	/* (a range that would overlap another is left to stream) */
-	if ((index && list->entries[index - 1].start + list->entries[index - 1].size > start) ||
-		(index < list->count && start + size > list->entries[index].start))
+	that starts lower covers the other. Both are registered in one load: a
+	range of an earlier frame that runs to the same end is the last map's, and
+	its bytes are gone) */
+	if (index && list->entries[index - 1].start + list->entries[index - 1].size == start + size &&
+		list->entries[index - 1].frame == static_buffers.frame)
 	{
 		return;
+	}
+	if (index < list->count && list->entries[index].start + list->entries[index].size == start + size)
+		static_buffer_forget(list, list->entries[index].start);
+	/* (a range that overlaps another: the loader says this memory holds new
+	bytes now, so the other, whose buffer has old ones, goes: left in place,
+	draws inside it would read the old map's geometry) */
+	while ((index && list->entries[index - 1].start + list->entries[index - 1].size > start) ||
+		(index < list->count && start + size > list->entries[index].start))
+	{
+		unsigned long other = (index && list->entries[index - 1].start + list->entries[index - 1].size > start) ?
+			list->entries[index - 1].start : list->entries[index].start;
+
+		if (debug_settings.statistics)
+		{
+			platform_log("GPU: static %s range %08lx+%lu replaces an older one at %08lx (frame %lu)",
+				list == &static_buffer_lists[1] ? "index" : "vertex", start, size, other, static_buffers.frame);
+		}
+		static_buffer_forget(list, other);
+		index = static_buffer_upper(list, start);
 	}
 	if (list->count == list->capacity)
 	{
@@ -5769,6 +5812,14 @@ static void static_buffer_note(struct static_buffer_list *list, unsigned long st
 	entry->buffer = 0;
 	entry->failed = FALSE;
 	entry->serial = ++static_buffers.serial;
+	entry->sample_count = 0;
+	entry->frame = static_buffers.frame;
+	entry->retired = 0;
+	if (debug_settings.statistics && size >= STATIC_LOG_SIZE)
+	{
+		platform_log("GPU: static %s range %08lx+%lu registered (frame %lu, %lu in the list)",
+			list == &static_buffer_lists[1] ? "index" : "vertex", start, size, static_buffers.frame, list->count);
+	}
 }
 
 void xgpu_static_buffer_add(const void *resource, unsigned long size, int indices)
@@ -5811,8 +5862,12 @@ void xgpu_static_buffers_remove(const void *buffers, long count, unsigned long s
 {
 	unsigned long first = static_buffers_first(buffers, count, stride, indices != 0);
 
-	if (first)
-		static_buffer_forget(&static_buffer_lists[indices != 0], first);
+	if (first && !static_buffer_forget(&static_buffer_lists[indices != 0], first) && count > 1 && debug_settings.statistics)
+	{
+		/* (its range was covered by another's, or is not the one registered) */
+		platform_log("GPU: no static %s range starts at %08lx to release (frame %lu)", indices ? "index" : "vertex",
+			first, static_buffers.frame);
+	}
 }
 
 void xgpu_static_range_add(const void *start, unsigned long size, int indices)
@@ -5834,6 +5889,76 @@ static void static_buffers_collect(void)
 	glDeleteBuffers((GLsizei)static_buffers.doomed_count, static_buffers.doomed);
 	static_buffers.doomed_count = 0;
 	xgpu_gl_state_invalidate();
+}
+
+/* up to STATIC_SAMPLES words of the entry's memory, spread over all of it */
+static unsigned long static_buffer_sample(const struct static_buffer *entry, unsigned long *words)
+{
+	unsigned long total = entry->size / sizeof(unsigned long);
+	unsigned long count = total < STATIC_SAMPLES ? total : STATIC_SAMPLES;
+	unsigned long step = count ? total / count : 0;
+	unsigned long index;
+
+	for (index = 0; index < count; index++)
+		memcpy(&words[index], (const unsigned char *)entry->start + index * step * sizeof(unsigned long), sizeof(unsigned long));
+	return count;
+}
+
+/* Once a frame, before the swap: a range whose memory no longer holds what its
+buffer was filled with (more than a sixteenth of the words sampled differ: a
+smaller map's bytes cover only the start of a larger one's range) is a map's
+bytes replaced by another's with the range still registered: its buffer goes,
+and the next draw fills one from the memory as it is now. A range that keeps
+changing is left to stream. A few words changed is data the game writes; they
+are noted and left. */
+static void static_buffers_verify(unsigned long frame)
+{
+	unsigned long kind, index, word, count, changed;
+	unsigned long words[STATIC_SAMPLES];
+
+	static_buffers.frame = frame;
+	for (kind = 0; kind < 2; kind++)
+	{
+		struct static_buffer_list *list = &static_buffer_lists[kind];
+
+		for (index = 0; index < list->count; index++)
+		{
+			struct static_buffer *entry = &list->entries[index];
+
+			if (!entry->buffer || !entry->sample_count)
+				continue;
+			count = static_buffer_sample(entry, words);
+			for (word = 0, changed = 0; word < count; word++)
+			{
+				if (words[word] != entry->samples[word])
+					changed++;
+			}
+			if (!changed)
+				continue;
+			if (changed * 16 > count)
+			{
+				if (debug_settings.statistics)
+				{
+					platform_log("GPU: static %s range %08lx+%lu holds other bytes than its buffer (%lu of %lu words): "
+						"uploaded again (frame %lu)", kind ? "index" : "vertex", entry->start, entry->size, changed,
+						count, frame);
+				}
+				static_buffer_doom(entry);
+				entry->sample_count = 0;
+				entry->failed = ++entry->retired > 3;
+				entry->serial = ++static_buffers.serial;
+			}
+			else
+			{
+				if (debug_settings.statistics && static_buffers.reports++ < 40)
+				{
+					platform_log("GPU: static %s range %08lx+%lu changed in %lu of %lu sampled words (frame %lu)",
+						kind ? "index" : "vertex", entry->start, entry->size, changed, count, frame);
+				}
+				memcpy(entry->samples, words, count * sizeof(unsigned long));
+			}
+		}
+	}
 }
 
 /* as mirror_range, for [address, address + size) inside one static range
@@ -5888,6 +6013,7 @@ static BOOL static_buffer_range(unsigned long address, unsigned long size, BOOL 
 			xgpu_gl_state_invalidate();
 			return FALSE;
 		}
+		entry->sample_count = static_buffer_sample(entry, entry->samples);
 	}
 	*buffer = entry->buffer;
 	*offset = address - entry->start;
@@ -7911,6 +8037,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
 		}
 #ifdef HALO_ANDROID
+		static_buffers_verify(device.frame);
 		static_buffers_collect();
 #endif
 		host_gl_fence_frame((unsigned int)device.buffer_ring);
