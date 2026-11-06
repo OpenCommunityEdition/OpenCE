@@ -1,0 +1,8 @@
+# port/windows/tests/thunk_test.h's imports
+host_test_integers
+host_test_mixed
+host_test_floats
+host_test_pointer
+host_test_nested
+host_test_raise
+host_test_unwind

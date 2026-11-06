@@ -34,7 +34,7 @@ other import is the host function of its name (posix_<name> for
 hostposix_<name>), or the one --override names.
 
 Usage: windows_host_thunks.py [--override NAME=SYMBOL]... --declarations FILE...
-           --gl guest_gl.c thunks.S table.c LIST...
+           [--gl guest_gl.c] thunks.S table.c LIST...
 """
 
 import argparse
@@ -219,7 +219,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--override", action="append", default=[], metavar="NAME=SYMBOL")
     parser.add_argument("--declarations", nargs="+", required=True)
-    parser.add_argument("--gl", required=True)
+    parser.add_argument("--gl")
     parser.add_argument("thunks")
     parser.add_argument("table")
     parser.add_argument("lists", nargs="+")
@@ -228,7 +228,8 @@ def main() -> int:
     overrides = dict(item.split("=", 1) for item in options.override)
     names = read_lists(options.lists)
     signatures = host_signatures(options.declarations)
-    signatures.update(gl_signatures(options.gl))
+    if options.gl:
+        signatures.update(gl_signatures(options.gl))
     missing = [name for name in names if name not in signatures]
     if missing:
         raise SystemExit("windows_host_thunks: no declaration of " + ", ".join(missing))
