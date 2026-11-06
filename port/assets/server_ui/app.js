@@ -30,19 +30,16 @@ const BAN_PRESETS = [['1h', '1 hour'], ['1d', '1 day'], ['7d', '7 days'], ['30d'
 // alone: the builders' of source/game/game_engine.c for the built-ins
 // (port/linux/game/server_gametypes.c), with their aliases, and game_modes.c's
 // for OpenCE's
-const ENGINES = {
-  slayer: 'slayer', team_slayer: 'slayer', slayer_pro: 'slayer', elimination: 'slayer', phantoms: 'slayer',
-  endurance: 'slayer', rockets: 'slayer', snipers: 'slayer',
-  ctf: 'ctf', ironctf: 'ctf', ctf_pro: 'ctf', invasion: 'ctf',
-  oddball: 'oddball', team_oddball: 'oddball', reverse_tag: 'oddball', accumulation: 'oddball', juggernaut: 'oddball',
-  stalker: 'oddball',
-  king: 'king', team_king: 'king', king_pro: 'king', crazy_king: 'king',
-  race: 'race', team_race: 'race', rally: 'race', team_rally: 'race',
-  ffa: 'slayer', ffa_slayer: 'slayer', teamslayer: 'slayer', tslayer: 'slayer', koth: 'king', team_koth: 'king',
-  iron_ctf: 'ctf', teamrace: 'race', teamoddball: 'oddball',
-  swat: 'slayer', infection: 'slayer', gun_game: 'slayer', hardcore: 'slayer', hardcore_ctf: 'ctf',
-  hardcore_oddball: 'oddball', hardcore_king: 'king',
-};
+const ENGINES = {};
+for (const [engine, names] of Object.entries({
+  slayer: 'slayer team_slayer slayer_pro elimination phantoms endurance rockets snipers ffa ffa_slayer teamslayer tslayer ' +
+    'swat infection gun_game hardcore one_in_the_chamber frag_nation snowball_fight melee_only needles',
+  ctf: 'ctf ironctf ctf_pro invasion iron_ctf hardcore_ctf',
+  oddball: 'oddball team_oddball reverse_tag accumulation juggernaut stalker teamoddball hardcore_oddball',
+  king: 'king team_king king_pro crazy_king koth team_koth hardcore_king',
+  race: 'race team_race rally team_rally teamrace',
+})) for (const name of names.split(' ')) ENGINES[name] = engine;
+
 // the settings the server's own console alone changes (server_commands.c's
 // owner_settings): the page's admin is refused them
 const OWNER_SETTINGS = ['server.status_file', 'server.auto_update', 'server.log_addresses'];
