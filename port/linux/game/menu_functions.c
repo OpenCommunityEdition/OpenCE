@@ -6616,7 +6616,7 @@ static boolean join4_open(struct widget_instance *screen)
 			continue;
 		if (lobby_controller_playing(controller))
 			ui_widget_port_dispatch_event(quarters[index], JOIN4_EVENT_PLAYING, controller, &deleted);
-		else if (controller > 0 && controller == join4.opener && input_has_gamepad(controller))
+		else if (controller == join4.opener && input_has_gamepad(controller))
 			ui_widget_port_dispatch_event(quarters[index], JOIN4_EVENT_OPENER, controller, &deleted);
 	}
 	join4.opener = NONE;
@@ -6624,10 +6624,10 @@ static boolean join4_open(struct widget_instance *screen)
 }
 
 /* "port join4 join" (A, START): a controller not playing joins (FALSE:
-its quarter stays) */
+its quarter stays), port 0 included, whichever controller opened the menu */
 static boolean join4_join(short controller)
 {
-	return controller > 0 && controller < MAXIMUM_LOCAL_PLAYERS && input_has_gamepad(controller) &&
+	return controller >= 0 && controller < MAXIMUM_LOCAL_PLAYERS && input_has_gamepad(controller) &&
 		!lobby_controller_playing(controller);
 }
 
@@ -6690,10 +6690,11 @@ static boolean join4_set(short controller, unsigned char state)
 }
 
 /* "port join4 back" (player 1's B): back to the lobby, nobody added
-(FALSE for another player's) */
+(FALSE for another player's, but when port 0 is not playing, the B of a
+playing controller, which then has the screen) */
 static boolean join4_back(short controller)
 {
-	if (controller > 0)
+	if (controller > 0 && (lobby_controller_playing(0) || !lobby_controller_playing(controller)))
 		return FALSE;
 	lobby_join_reset();
 	return TRUE;
@@ -6709,7 +6710,7 @@ static boolean join4_done(short pressed_by)
 
 	if (pressed_by == 0 && halo_keyboard_join_held())
 		return FALSE;
-	for (controller = 1; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
 	{
 		if (join4.state[controller] == _join4_choosing)
 		{
@@ -6717,7 +6718,7 @@ static boolean join4_done(short pressed_by)
 			return FALSE;
 		}
 	}
-	for (controller = 1; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
 	{
 		long profile = player_ui_get_active_player_profile_index(controller);
 
