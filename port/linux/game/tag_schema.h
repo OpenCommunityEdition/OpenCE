@@ -326,6 +326,29 @@ long tag_validate_custom_edition_infer_groups(
 	long loaded_size,
 	unsigned long tag_cache_size,
 	char const *map_name);
+/* An MCC map's tags, loaded at tag_header (tag_data_bytes of them) with
+their header and instances moved to new_address by custom_edition_cache_load:
+moves every block, data and reference pointer their groups' schemas list
+from old_address to new_address. Returns how many were moved, or NONE if a
+block's elements lie outside the tags (the map cannot be used). A tag of a
+group with no schema is one the game never reads, and is left as it is. */
+long tag_validate_rebase(
+	void *tag_header,
+	unsigned long tag_data_bytes,
+	unsigned long old_address,
+	unsigned long new_address);
+/* ... and a structure bsp of one, read to new_bsp_address (bsp_bytes at
+bsp, its header there): its own pointers moved from old_bsp_address, and
+its references' names, which are in the tags, from old_tags_address to
+new_tags_address (tag_data_bytes of them). */
+long tag_validate_rebase_structure_bsp(
+	void *bsp,
+	unsigned long bsp_bytes,
+	unsigned long old_bsp_address,
+	unsigned long new_bsp_address,
+	unsigned long old_tags_address,
+	unsigned long new_tags_address,
+	unsigned long tag_data_bytes);
 void tag_validate_custom_edition_note_structure_bsp(
 	void *tag_header,
 	unsigned long tag_data_bytes,

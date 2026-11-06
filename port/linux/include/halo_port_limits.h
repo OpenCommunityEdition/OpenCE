@@ -67,8 +67,10 @@ in its game's advertisement's reserved bytes (network_server_message_handler.c),
 which hosts built before there was a version send as zeros: version 0.
 Raise it with any change to what the machines send each other. */
 /* Version 42 integrates MCC admission/sharing and shared checkpoint, boat,
-clock and scripted-pose agreement. Every map family uses the same version. */
-#define HALO_PORT_NETWORK_VERSION 42
+clock and scripted-pose agreement. Every map family uses the same version.
+Version 43 gives the game's own maps MCC's map version when they are MCC's
+(MCC_MAP_VERSION). */
+#define HALO_PORT_NETWORK_VERSION 43
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags, then the game's kind (an OpenCE gametype's mode, and Hardcore:
 port/linux/game/game_modes.h's game_modes_kind), for the server browser */
