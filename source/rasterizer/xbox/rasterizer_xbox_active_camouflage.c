@@ -250,6 +250,13 @@ typedef char verify_transparent_geometry_group_animation_offset[
 
 /* ---------- prototypes */
 
+static void rasterizer_active_camouflage_draw_depth(
+	struct transparent_geometry_group *group,
+	struct shader_model_definition *model,
+	boolean clear);
+static void rasterizer_active_camouflage_window_depth(
+	real min_z);
+
 /* ---------- globals */
 
 
@@ -474,6 +481,32 @@ void rasterizer_active_camouflage_cache_primary_render_target(
 	return;
 }
 
+/* port: the screen a cloaked first-person weapon and arms distort, copied
+before any of the first-person weapon's transparent geometry is drawn (from
+group, the first of it, on), if any of them is cloaked; the copy made for
+each cloaked object as it comes (rasterizer_xbox_transparent_geometry.c) is
+not made for them. Copied there, as on the Xbox, the screen had the
+first-person groups drawn before their cloaked parts in it (the weapon's
+muzzle flash as it fired), which their cloak refracted onto them. */
+void rasterizer_active_camouflage_cache_for_first_person(
+	struct transparent_geometry_group const *group)
+{
+	for (; group; group = rasterizer_transparent_geometry_next_group(group))
+	{
+		if (TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit) &&
+			!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_no_queue_bit) &&
+			group->effect.type == _render_model_effect_type_active_camouflage &&
+			group->shader &&
+			group->shader->base.type == _shader_type_model)
+		{
+			rasterizer_active_camouflage_cache_primary_render_target();
+			break;
+		}
+	}
+
+	return;
+}
+
 void rasterizer_active_camouflage_draw(
 	struct transparent_geometry_group *group)
 {
@@ -525,127 +558,19 @@ void rasterizer_active_camouflage_draw(
 			rasterizer_set_frustum_z(
 				rasterizer_globals.first_person_weapon_near_clip_distance,
 				rasterizer_globals.first_person_weapon_far_clip_distance);
+			/* port: the world's depth under them cleared first
+			(rasterizer_active_camouflage_draw_depth); the stencil, which
+			that marks, is not tested while they are drawn, as nothing had
+			marked it on the Xbox */
+			rasterizer_set_stencil_mode(RASTERIZER_STENCIL_MODE_NONE);
+			rasterizer_active_camouflage_draw_depth(group, model, TRUE);
 		}
 
 		if (group->effect.intensity==1.0f)
 		{
 			/* fully cloaked: lay down depth only, alpha tested against the base map */
-			rasterizer_set_texture(
-				0,
-				0,
-				1,
-				model->model.base_map.index,
-				group->shader_permutation_index);
-			IDirect3DDevice8_SetTextureStageState(
-				global_d3d_device,
-				0,
-				D3DTSS_ADDRESSU,
-				D3DTADDRESS_WRAP);
-			IDirect3DDevice8_SetTextureStageState(
-				global_d3d_device,
-				0,
-				D3DTSS_ADDRESSV,
-				D3DTADDRESS_WRAP);
-			IDirect3DDevice8_SetTextureStageState(
-				global_d3d_device,
-				0,
-				D3DTSS_MAGFILTER,
-				D3DTEXF_LINEAR);
-			IDirect3DDevice8_SetTextureStageState(
-				global_d3d_device,
-				0,
-				D3DTSS_MINFILTER,
-				D3DTEXF_LINEAR);
-			IDirect3DDevice8_SetTextureStageState(
-				global_d3d_device,
-				0,
-				D3DTSS_MIPFILTER,
-				D3DTEXF_LINEAR);
-
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_CULLMODE,
-				TEST_FLAG(model->model.flags, _shader_model_two_sided_bit) ?
-					D3DCULL_NONE : D3DCULL_CCW);
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_COLORWRITEENABLE,
-				0);
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_ALPHABLENDENABLE,
-				FALSE);
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_ALPHATESTENABLE,
-				TRUE);
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_ALPHAREF,
-				127);
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_ZENABLE,
-				TRUE);
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_ZWRITEENABLE,
-				TRUE);
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_ZFUNC,
-				D3DCMP_LESSEQUAL);
-			IDirect3DDevice8_SetRenderState(
-				global_d3d_device,
-				D3DRS_ZBIAS,
-				0);
-
-			rasterizer_set_vertex_shader_permutation(
-				_rasterizer_vertex_shader_active_camouflage_model,
-				rasterizer_transparent_geometry_get_primary_vertex_type(group),
-				0);
-
-			{
-				real_vector4d vertex_constants[3] =
-				{
-					{model->model.detail_map_scale, model->model.detail_map_v_scale*model->model.detail_map_scale, 1.0f, 1.0f},
-					{1.0f, 0.0f, 0.0f, 0.0f},
-					{0.0f, 1.0f, 0.0f, 0.0f}
-				};
-
-				shader_texture_animation_evaluate(
-					&model->model.texture_animation,
-					group->animation,
-					model->model.map_u_scale*group->model_base_map_scale.i,
-					model->model.map_v_scale*group->model_base_map_scale.j,
-					0.0f,
-					0.0f,
-					0.0f,
-					global_frame_parameters.game_time_sec,
-					&vertex_constants[1],
-					&vertex_constants[2]);
-				IDirect3DDevice8_SetVertexShaderConstant(
-					global_d3d_device,
-					-84,
-					vertex_constants,
-					NUMBEROF(vertex_constants));
-			}
-
-			csmemset(&pixel_shader, 0, sizeof(pixel_shader));
-			pixel_shader.texture_modes = PS_TEXTUREMODES(
-				PS_TEXTUREMODES_PROJECT2D,
-				PS_TEXTUREMODES_NONE,
-				PS_TEXTUREMODES_NONE,
-				PS_TEXTUREMODES_NONE);
-			pixel_shader.combiner_count = PS_COMBINERCOUNT(1, 0);
-			pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
-				PS_REGISTER_ZERO,
-				PS_REGISTER_ZERO,
-				PS_REGISTER_T0 | PS_CHANNEL_ALPHA,
-				0);
-			rasterizer_set_pixel_shader(&pixel_shader);
-
-			rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+			/* port: (rasterizer_active_camouflage_draw_depth) */
+			rasterizer_active_camouflage_draw_depth(group, model, FALSE);
 		}
 		/* port: not when its node matrices did not fit in the rasterizer's
 		memory pool (rasterizer_memory_alloc_const returned NULL): the model
@@ -911,3 +836,192 @@ void rasterizer_active_camouflage_draw(
 }
 
 /* ---------- private code */
+
+/* port: a cloaked model's depth, alpha tested against its base map: laid
+down where it is nearest, the fully cloaked model's depth (as the Xbox did,
+in rasterizer_active_camouflage_draw), or with clear, set to the far plane
+wherever the model is, whatever is in front of it.
+
+Uncloaked, the first-person weapon and arms are drawn before the world and
+mark the stencil, and the world is not drawn over them
+(rasterizer_xbox_models.c), so a floor or a wall within reach never cuts
+them. Cloaked, they are drawn after the world and tested against its depth,
+at the first-person weapon's near clip distance, where a point is as deep
+as one of the world's about 2.7 times as far: the Xbox cut them with a
+floor or a wall in front of the camera, unlike uncloaked. So the world's
+depth under them is cleared first, and they are drawn as the Xbox drew
+them, their depth then the Xbox's: what is drawn after them (the assault
+rifle's and the sniper rifle's screens) is tested against it as there.
+Each of their groups (the assault rifle's gun, grip and display, the arms)
+clears only where none has been drawn, which the clearing marks in the
+stencil: cleared under each, the depth of the parts drawn before it was
+lost, and a part behind them was drawn over them (plainly when firing
+fades the cloak and the model is drawn under it). The stencil is marked
+then as under the first-person weapon uncloaked, for what is drawn on it
+after (rasterizer_xbox_transparent_geometry.c). */
+static void rasterizer_active_camouflage_draw_depth(
+	struct transparent_geometry_group *group,
+	struct shader_model_definition *model,
+	boolean clear)
+{
+	rasterizer_set_texture(
+		0,
+		0,
+		1,
+		model->model.base_map.index,
+		group->shader_permutation_index);
+	IDirect3DDevice8_SetTextureStageState(
+		global_d3d_device,
+		0,
+		D3DTSS_ADDRESSU,
+		D3DTADDRESS_WRAP);
+	IDirect3DDevice8_SetTextureStageState(
+		global_d3d_device,
+		0,
+		D3DTSS_ADDRESSV,
+		D3DTADDRESS_WRAP);
+	IDirect3DDevice8_SetTextureStageState(
+		global_d3d_device,
+		0,
+		D3DTSS_MAGFILTER,
+		D3DTEXF_LINEAR);
+	IDirect3DDevice8_SetTextureStageState(
+		global_d3d_device,
+		0,
+		D3DTSS_MINFILTER,
+		D3DTEXF_LINEAR);
+	IDirect3DDevice8_SetTextureStageState(
+		global_d3d_device,
+		0,
+		D3DTSS_MIPFILTER,
+		D3DTEXF_LINEAR);
+
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_CULLMODE,
+		TEST_FLAG(model->model.flags, _shader_model_two_sided_bit) ?
+			D3DCULL_NONE : D3DCULL_CCW);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_COLORWRITEENABLE,
+		0);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ALPHABLENDENABLE,
+		FALSE);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ALPHATESTENABLE,
+		TRUE);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ALPHAREF,
+		127);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ZENABLE,
+		TRUE);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ZWRITEENABLE,
+		TRUE);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ZFUNC,
+		clear ? D3DCMP_ALWAYS : D3DCMP_LESSEQUAL);
+	IDirect3DDevice8_SetRenderState(
+		global_d3d_device,
+		D3DRS_ZBIAS,
+		0);
+
+	rasterizer_set_vertex_shader_permutation(
+		_rasterizer_vertex_shader_active_camouflage_model,
+		rasterizer_transparent_geometry_get_primary_vertex_type(group),
+		0);
+
+	{
+		real_vector4d vertex_constants[3] =
+		{
+			{model->model.detail_map_scale, model->model.detail_map_v_scale*model->model.detail_map_scale, 1.0f, 1.0f},
+			{1.0f, 0.0f, 0.0f, 0.0f},
+			{0.0f, 1.0f, 0.0f, 0.0f}
+		};
+
+		shader_texture_animation_evaluate(
+			&model->model.texture_animation,
+			group->animation,
+			model->model.map_u_scale*group->model_base_map_scale.i,
+			model->model.map_v_scale*group->model_base_map_scale.j,
+			0.0f,
+			0.0f,
+			0.0f,
+			global_frame_parameters.game_time_sec,
+			&vertex_constants[1],
+			&vertex_constants[2]);
+		IDirect3DDevice8_SetVertexShaderConstant(
+			global_d3d_device,
+			-84,
+			vertex_constants,
+			NUMBEROF(vertex_constants));
+	}
+
+	csmemset(&pixel_shader, 0, sizeof(pixel_shader));
+	pixel_shader.texture_modes = PS_TEXTUREMODES(
+		PS_TEXTUREMODES_PROJECT2D,
+		PS_TEXTUREMODES_NONE,
+		PS_TEXTUREMODES_NONE,
+		PS_TEXTUREMODES_NONE);
+	pixel_shader.combiner_count = PS_COMBINERCOUNT(1, 0);
+	pixel_shader.final_combiner_inputs_efg = PS_COMBINERINPUTS(
+		PS_REGISTER_ZERO,
+		PS_REGISTER_ZERO,
+		PS_REGISTER_T0 | PS_CHANNEL_ALPHA,
+		0);
+	rasterizer_set_pixel_shader(&pixel_shader);
+
+	if (clear)
+	{
+		/* only where no cloaked first-person group has been drawn yet,
+		which it marks in the stencil as the first-person weapon's
+		uncloaked are (rasterizer_set_stencil_mode's write): one drawn
+		before keeps its depth, and one behind it is hidden by it */
+		rasterizer_active_camouflage_window_depth(1.0f);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILENABLE, TRUE);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILFAIL, D3DSTENCILOP_KEEP);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILZFAIL, D3DSTENCILOP_KEEP);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILPASS, D3DSTENCILOP_REPLACE);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILFUNC, D3DCMP_GREATER);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILREF, 1);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILMASK, 1);
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILWRITEMASK, 1);
+	}
+	rasterizer_transparent_geometry_group_draw__internal(group, FALSE);
+	if (clear)
+	{
+		/* (as rasterizer_set_stencil_mode left it: none) */
+		IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_STENCILENABLE, FALSE);
+		rasterizer_active_camouflage_window_depth(0.0f);
+	}
+
+	return;
+}
+
+/* port: the window's viewport, as rasterizer_set_target gives it (the only
+target a cloak is drawn to), with its depth from min_z to the far plane */
+static void rasterizer_active_camouflage_window_depth(
+	real min_z)
+{
+	D3DVIEWPORT8 viewport;
+
+	viewport.X = global_window_parameters.camera.viewport_bounds.x0;
+	viewport.Y = global_window_parameters.camera.viewport_bounds.y0;
+	viewport.Width = global_window_parameters.camera.viewport_bounds.x1 -
+		global_window_parameters.camera.viewport_bounds.x0;
+	viewport.Height = global_window_parameters.camera.viewport_bounds.y1 -
+		global_window_parameters.camera.viewport_bounds.y0;
+	viewport.MinZ = min_z;
+	viewport.MaxZ = 1.0f;
+	IDirect3DDevice8_SetViewport(global_d3d_device, &viewport);
+
+	return;
+}

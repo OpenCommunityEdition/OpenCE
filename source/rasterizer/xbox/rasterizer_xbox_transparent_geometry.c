@@ -1379,10 +1379,14 @@ void rasterizer_transparent_geometry_group_draw(
 				global_window_parameters.rasterizer_target == 0 &&
 				!dirty)
 			{
+				/* port: not for the first-person weapon's, whose screen was
+				copied before any of it was drawn
+				(rasterizer_active_camouflage_cache_for_first_person) */
 				if (rasterizer_debug_options.active_camouflage_multipass_enabled ?
 					(group->shader &&
 						group->shader->base.type == _shader_type_model &&
 						group->effect_type == _render_model_effect_type_active_camouflage &&
+						!TEST_FLAG(group->geometry_flags, _rasterizer_geometry_first_person_bit) &&
 						group->source_object_index !=
 							rasterizer_xbox_transparent_geometry_globals.last_source_object_index) :
 					(!group->shader ||
