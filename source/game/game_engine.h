@@ -229,6 +229,9 @@ enum
 	_game_mode_swat,
 	_game_mode_infection,
 	_game_mode_gun_game,
+	_game_mode_one_in_the_chamber,
+	_game_mode_frag_nation,
+	_game_mode_snowball_fight,
 	NUMBER_OF_GAME_MODES
 };
 
@@ -289,10 +292,30 @@ struct game_variant_options
 	of their own team (game_engine_get_starting_location_rating). Taken from
 	reserved, which older builds zero and ignore: the host alone picks spawns */
 	boolean force_team_spawns;
-	byte reserved[5];
+	/* port: reserved[0], at 0x27, is used by a downstream build: keep it
+	free, and take new options from the end of reserved */
+	byte reserved[2];
+	/* port: Bottomless: weapons never run dry, as the host refills the
+	magazine as it empties (game_modes.c). Taken from the end of reserved
+	(0x29), which older builds zero and ignore: the host alone decides, and
+	a guest's ammunition is the host's */
+	boolean bottomless;
+	/* port: One in the Chamber: whether a kill sets the killer's pistol back
+	to one round (else it adds one); Frag Nation: whether the map's grenades
+	are left off it. Taken from the end of reserved (0x2A, 0x2B), which older
+	builds zero and ignore: the host alone gives rounds and places the map's
+	grenades (game_modes.c) */
+	boolean chamber_kill_resets;
+	boolean frag_nation_no_map_grenades;
 };
 
 typedef char verify_game_variant_options_size[sizeof(struct game_variant_options) == 0x2C ? 1 : -1];
+typedef char verify_game_variant_options_reserved_offset[
+	offsetof(struct game_variant_options, reserved) == 0x27 ? 1 : -1];
+typedef char verify_game_variant_options_bottomless_offset[
+	offsetof(struct game_variant_options, bottomless) == 0x29 ? 1 : -1];
+typedef char verify_game_variant_options_chamber_kill_resets_offset[
+	offsetof(struct game_variant_options, chamber_kill_resets) == 0x2A ? 1 : -1];
 /* (builds before OpenCE's gametypes saved and sent only the first 0x1C bytes) */
 #define GAME_VARIANT_OPTIONS_V1_SIZE 0x1C
 
