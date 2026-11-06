@@ -40,13 +40,77 @@ static struct
 	real extent;
 	real vector_squared;
 	struct { int ready; long node; short depth; } prefixes[8];
-	struct collision_bsp_vector_cache cache;
+	struct collision_bsp_vector_cache cache[8];
 	struct trace_object objects[TRACE_OBJECTS];
 	unsigned short lookup[MAXIMUM_OBJECTS_PER_MAP];
 	unsigned long visited[MAXIMUM_OBJECTS_PER_MAP];
 	struct { int ready, first, count; unsigned long visited; } clusters[MAXIMUM_CLUSTERS_PER_STRUCTURE];
 	long roots[TRACE_REFERENCES];
 } batch;
+
+/* All endpoints, and the origin, must lie strictly on the same side.
+   The margin leaves rounding and borderline planes to engine traversal. */
+static int trace_side(real_plane3d const *plane, real distance, int octant)
+{
+	real bound, margin, low, high, components[3];
+	int axis;
+	bound = batch.extent * (fabsf(plane->n.i) + fabsf(plane->n.j) + fabsf(plane->n.k));
+	margin = 0.0001f * (1 + bound + fabsf(plane->d) + fabsf(plane->n.i * batch.point->x) +
+		fabsf(plane->n.j * batch.point->y) + fabsf(plane->n.k * batch.point->z));
+	low = high = distance;
+	components[0] = plane->n.i;
+	components[1] = plane->n.j;
+	components[2] = plane->n.k;
+	for (axis = 0; axis < 3; axis++)
+	{
+		real endpoint = components[axis] * ((octant & (1 << axis)) ? batch.extent : -batch.extent);
+		if (endpoint < 0) low += endpoint;
+		else high += endpoint;
+	}
+	return low > margin ? 1 : high < -margin ? 0 : -1;
+}
+
+/* Prepare only the part of the world tree that this ray octant can reach.
+   One-sided chains below branches are just as invariant as the common root
+   prefix. Keep exact engine traversal at intersecting/borderline planes.
+   The bounded cache may evict entries; a miss only loses the optimisation. */
+static void trace_prepare(long index, short depth, int octant, int *work, long *target, short *skipped)
+{
+	struct bsp3d_node const *node;
+	real_plane3d const *plane;
+	real distance;
+	long child_target, slot;
+	short child_skipped;
+	int side;
+	*target = index;
+	*skipped = 0;
+	if (index & LONG_MIN) return;
+	if (*work <= 0 || index >= batch.bsp->bsp3d.nodes.count ||
+		depth >= MAXIMUM_BSP3D_TRAVERSAL_DEPTH || depth >= batch.bsp->bsp3d.nodes.count) return;
+	--*work;
+	node = TAG_BLOCK_GET_ELEMENT(&batch.bsp->bsp3d.nodes, index, struct bsp3d_node);
+	if (node->plane_designator < 0 || node->plane_designator >= batch.bsp->bsp3d.planes.count) return;
+	plane = TAG_BLOCK_GET_ELEMENT(&batch.bsp->bsp3d.planes, node->plane_designator, real_plane3d);
+	distance = plane3d_distance_to_point(plane, batch.point);
+	side = trace_side(plane, distance, octant);
+	if (side >= 0)
+	{
+		trace_prepare(node->children[side], depth + 1, octant, work, target, skipped);
+		++*skipped;
+	}
+	else
+	{
+		trace_prepare(node->children[0], depth + 1, octant, work, &child_target, &child_skipped);
+		trace_prepare(node->children[1], depth + 1, octant, work, &child_target, &child_skipped);
+	}
+	slot = (unsigned long)index % COLLISION_VECTOR_CACHE_NODES;
+	batch.cache[octant].nodes[slot].index_plus_one = index + 1;
+	batch.cache[octant].nodes[slot].node = node;
+	batch.cache[octant].nodes[slot].plane = plane;
+	batch.cache[octant].nodes[slot].distance = distance;
+	batch.cache[octant].nodes[slot].skip_node = *target;
+	batch.cache[octant].nodes[slot].skip_count = *skipped;
+}
 
 /* Each octant shares the origin and one eighth of the batch's endpoint cube.
    Prove its common tree prefix once, then retain the original traversal below
@@ -63,8 +127,8 @@ static void trace_start(int octant)
 	{
 		struct bsp3d_node const *node;
 		real_plane3d const *plane;
-		real distance, bound, margin, low, high, components[3];
-		int axis;
+		real distance;
+		int side;
 		if (node_index >= batch.bsp->bsp3d.nodes.count ||
 			depth >= MAXIMUM_BSP3D_TRAVERSAL_DEPTH || depth >= batch.bsp->bsp3d.nodes.count)
 			return;
@@ -73,23 +137,9 @@ static void trace_start(int octant)
 			return;
 		plane = TAG_BLOCK_GET_ELEMENT(&batch.bsp->bsp3d.planes, node->plane_designator, real_plane3d);
 		distance = plane3d_distance_to_point(plane, batch.point);
-		bound = extent * (fabsf(plane->n.i) + fabsf(plane->n.j) + fabsf(plane->n.k));
-		margin = 0.0001f * (1 + bound + fabsf(plane->d) +
-			fabsf(plane->n.i * batch.point->x) + fabsf(plane->n.j * batch.point->y) +
-			fabsf(plane->n.k * batch.point->z));
-		components[0] = plane->n.i;
-		components[1] = plane->n.j;
-		components[2] = plane->n.k;
-		low = high = distance;
-		for (axis = 0; axis < 3; axis++)
-		{
-			real endpoint = components[axis] * ((octant & (1 << axis)) ? extent : -extent);
-			if (endpoint < 0) low += endpoint;
-			else high += endpoint;
-		}
-		if (low > margin) node_index = node->children[1];
-		else if (high < -margin) node_index = node->children[0];
-		else break;
+		side = trace_side(plane, distance, octant);
+		if (side < 0) break;
+		node_index = node->children[side];
 		depth++;
 	}
 	batch.prefixes[octant].node = node_index;
@@ -254,15 +304,20 @@ float plasma_collision_depth(unsigned long flags, real_point3d const *point, rea
 	octant = (vector->i >= 0) | ((vector->j >= 0) << 1) | ((vector->k >= 0) << 2);
 	if (!batch.prefixes[octant].ready)
 	{
+		long target;
+		short skipped;
+		int work = COLLISION_VECTOR_CACHE_NODES;
 		batch.prefixes[octant].ready = 1;
 		trace_start(octant);
+		if (batch.extent > 0 && batch.extent < 1000)
+			trace_prepare(batch.prefixes[octant].node, batch.prefixes[octant].depth, octant, &work, &target, &skipped);
 	}
 	batch.ray++;
 	batch.vector_squared = vector->i * vector->i + vector->j * vector->j + vector->k * vector->k;
 	hit = collision_bsp_test_vector_from_node(FLAG(_collision_test_front_facing_surfaces_bit) |
 		FLAG(_collision_test_back_facing_surfaces_bit), batch.bsp,
 		MAXIMUM_BREAKABLE_SURFACES_PER_MAP, breakable_surface_flags_get(), point, vector, REAL_MAX, &result,
-		batch.prefixes[octant].node, batch.prefixes[octant].depth, &batch.cache);
+		batch.prefixes[octant].node, batch.prefixes[octant].depth, &batch.cache[octant]);
 	if (hit) depth = result.t;
 	if (!debug_collision_skip_objects)
 		for (i = 0; i < result.leaf_count && !batch.failed; i++)

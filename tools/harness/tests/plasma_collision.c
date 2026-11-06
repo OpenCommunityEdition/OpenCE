@@ -24,7 +24,7 @@ struct structure_bsp { struct { long count; void *address; } leaves; };
 typedef struct { real_vector3d n; real d; } real_plane3d;
 struct bsp3d_node { long plane_designator, children[2]; };
 struct collision_bsp { struct { struct { long count; void *address; } nodes, planes; } bsp3d; };
-struct collision_bsp_vector_cache { int unused; };
+struct collision_bsp_vector_cache;
 static struct collision_bsp bsp;
 static struct bsp3d_node nodes[4];
 static real_plane3d planes[4];
