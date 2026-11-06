@@ -1,9 +1,9 @@
-# MendicantCE builds: the Linux and Windows release builds, each packaged with
-# the MENDICANT AI mod folder (tools/mendicant/package.py), for every pushed
-# commit; a push to main also publishes them as a release, mendicant-<run
-# number>, marked latest. Fork-only: OpenCE's own workflows (build.yml,
-# server-image.yml) run only by hand here, as they publish OpenCE's site and
-# server image.
+# MendicantCE builds: the Linux (32-bit and 64-bit x86) and Windows release
+# builds, each packaged with the MENDICANT AI mod folder
+# (tools/mendicant/package.py), for every pushed commit; a push to main
+# also publishes them as a release, mendicant-<run number>, marked latest.
+# Fork-only: OpenCE's own workflows (build.yml, server-image.yml) run only by
+# hand here, as they publish OpenCE's site and server image.
 name: MendicantCE
 
 on:
@@ -68,6 +68,53 @@ jobs:
           path: dist/mendicant/*.zip
           retention-days: 7
 
+  linux_x64:
+    # the 64-bit x86 Linux build (ninja linux_x86_64, tools/linux_guest_build.py):
+    # the game as an x32 guest inside a 64-bit host, which needs no 32-bit
+    # libraries; clang's x32 target, lld and llvm's tools, the system's
+    # OpenGL, OpenGL ES and EGL headers, and SDL3's X11, Wayland and sound
+    # development files (port/linux/README.md, "64-bit x86")
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          pacman -Syu --noconfirm --needed git zstd zip python python-pytest ninja ccache \
+            clang lld llvm gcc cmake pkgconf libglvnd mesa \
+            libx11 libxext libxrandr libxcursor libxi libxfixes libxss libxtst libxkbcommon \
+            wayland wayland-protocols libdecor alsa-lib libpulse pipewire dbus
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-mendicant-linux-x64-${{ github.sha }}
+          restore-keys: ccache-mendicant-linux-x64-
+
+      - uses: actions/cache@v4
+        with:
+          path: build/linux_x86_64/third_party
+          key: mendicant-linux-x64-third-party-${{ hashFiles('tools/android_build.py') }}
+
+      - name: Release
+        run: python tools/ci_build.py linux_x86_64 release
+
+      - name: Test
+        run: |
+          python -m pytest -q tools/test_host_units.py tools/test_check_host_imports.py tools/test_host_syscall.py \
+            tools/test_guest_image_check.py tools/test_guest_layout.py tools/test_linux_guest_build.py
+
+      - name: Package
+        run: python tools/mendicant/package.py --game dist/halo-linux-x86_64-release --models "$MODELS" --out dist/mendicant
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mendicantce-linux-x64
+          path: dist/mendicant/*.zip
+          retention-days: 7
+
   windows:
     # as build.yml's windows job: the runner has LLVM, Python and Visual
     # Studio's x86 libraries and Windows SDK
@@ -116,8 +163,8 @@ jobs:
           retention-days: 7
 
   release:
-    # the two packages as a release, for main only, when both built
-    needs: [linux, windows]
+    # the three packages as a release, for main only, when all built
+    needs: [linux, linux_x64, windows]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10

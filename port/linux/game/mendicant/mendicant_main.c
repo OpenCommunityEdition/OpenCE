@@ -52,8 +52,10 @@ void platform_log(char const *format, ...);
 
 /* ---------- constants */
 
-/* the training bridge, its runs and the logs: desktop Linux only */
-#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(HALO_WEB)
+/* the training bridge, its runs and the logs: desktop Linux only (the
+32-bit build: not the 64-bit builds' guest, whose system calls are the
+host's, nor Windows, Android or the web) */
+#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(HALO_WEB) && !defined(HALO_GUEST)
 #define MENDICANT_DESKTOP 1
 #endif
 

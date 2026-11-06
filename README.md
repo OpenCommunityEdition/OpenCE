@@ -29,7 +29,9 @@ Hunters and the Flood keep the original AI.
 ### Install
 
 1. Download the build for your platform from
-   [Releases](https://github.com/Adam-AtlasSoftware/MendicantCE/releases).
+   [Releases](https://github.com/Adam-AtlasSoftware/MendicantCE/releases):
+   `windows`, `linux` (32-bit, needs the distribution's 32-bit OpenGL
+   libraries) or `linux-x86_64` (64-bit, no 32-bit libraries needed).
 2. Unzip it into a new folder. It contains the game and the `mods/mendicant_ai`
    folder with the trained models.
 3. Start the game and give it your own Halo: Combat Evolved Xbox disc image, as

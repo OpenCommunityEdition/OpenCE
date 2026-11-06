@@ -12,7 +12,7 @@ from harness import CHECK_FAILED, build, mutated, read, run  # noqa: E402
 
 CASES = ["eof-quit", "eof-quit-terminated", "eof-go-on", "input-limits", "init-limits"]
 
-HEADERS = ("server_console.h", "server_mode.h", "server_log.h", "posix_server.h")
+HEADERS = ("server_console.h", "server_mode.h", "server_log.h", "posix_server.h", "posix.h")
 
 # a fault in server_console.c and the case that must catch it
 NEGATIVE_CONTROLS = {

@@ -29,7 +29,9 @@ void platform_log(char const *format, ...);
 
 /* ---------- constants */
 
-#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(HALO_WEB)
+/* (the 32-bit desktop Linux build's: not the 64-bit builds' guest, nor
+Windows, Android or the web) */
+#if !defined(HALO_WINDOWS) && !defined(HALO_ANDROID) && !defined(HALO_WEB) && !defined(HALO_GUEST)
 #define MENDICANT_SHARED_MEMORY 1
 #endif
 

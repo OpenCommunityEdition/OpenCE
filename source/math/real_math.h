@@ -846,6 +846,9 @@ void random_seed_debug_log(
 	boolean log);
 void random_math_initialize(
 	void);
+/* port: debug.random_seed's seed put in place (random_math.c) */
+void random_math_port_seed(
+	void);
 void random_math_dispose(
 	void);
 void lock_global_random_seed(

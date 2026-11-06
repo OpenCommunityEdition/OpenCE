@@ -15,7 +15,7 @@ CASES = [
     "past-latest-largest", "private",
 ]
 
-HEADERS = ("server_log.h", "server_mode.h", "server_json.h", "posix_server.h")
+HEADERS = ("server_log.h", "server_mode.h", "server_json.h", "posix_server.h", "posix.h")
 
 # a fault in server_log.c and the case that must catch it
 NEGATIVE_CONTROLS = {

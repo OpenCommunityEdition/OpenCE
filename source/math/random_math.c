@@ -92,11 +92,11 @@ direction3d_from_table(
 
 /* ---------- globals */
 
-#ifndef HALO_ARM64_GUEST /* Mach-O section names differ; the default is .bss anyway */
+#ifndef HALO_GUEST_MACHO /* port: Mach-O section names differ; the default is .bss anyway */
 #pragma bss_seg(".bss")
 #endif
 static struct random_math_globals random_math_globals;
-#ifndef HALO_ARM64_GUEST
+#ifndef HALO_GUEST_MACHO
 #pragma bss_seg()
 #endif
 
@@ -178,7 +178,24 @@ random_math_initialize(
 		random_math_globals.random_direction_table[index]=
 			*((real_vector3d *)random_direction_geosphere->vertices + index);
 	geosphere_dispose(random_direction_geosphere);
+	/* port: debug.random_seed */
+	random_math_port_seed();
 	return;
+}
+
+/* port: debug.random_seed (HALO_RANDOM_SEED), when not 0, is the local
+random seed at startup and again at each map's start, in place of the
+clock's: the menus' and effects' randomness, and the seed a network game's
+host draws its game's from, are then the same every run (tests) */
+long config_integer(const char *name);
+
+void random_math_port_seed(
+	void)
+{
+	long seed = config_integer("debug.random_seed");
+
+	if (seed)
+		random_math_globals.global_local_random_seed = (unsigned long)seed;
 }
 
 void

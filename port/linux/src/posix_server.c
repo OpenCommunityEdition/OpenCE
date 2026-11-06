@@ -2,7 +2,8 @@
 POSIX_SERVER.C
 
 A dedicated server's signals, standard input and output, and the process's
-use of memory and processor (posix_server.h), on Linux. None on Android and
+use of memory and processor (posix_server.h), on Linux, and in the desktop
+guest builds' 64-bit host (tools/linux_guest_build.py). None on Android and
 the web, which have no dedicated server.
 */
 
@@ -119,7 +120,7 @@ int posix_server_stdin_read(char *buffer, int size)
 	return count == 0 ? -1 : (int)count;
 }
 
-unsigned long posix_server_resident_bytes(void)
+posix_ulong posix_server_resident_bytes(void)
 {
 	FILE *file = fopen("/proc/self/statm", "r");
 	unsigned long pages = 0, resident = 0;
@@ -132,7 +133,7 @@ unsigned long posix_server_resident_bytes(void)
 	return resident * (unsigned long)sysconf(_SC_PAGESIZE);
 }
 
-unsigned long posix_server_cpu_milliseconds(void)
+posix_ulong posix_server_cpu_milliseconds(void)
 {
 	struct rusage usage;
 
@@ -147,7 +148,7 @@ int posix_server_rename(const char *from, const char *to)
 	return rename(from, to) == 0;
 }
 
-int posix_server_write_file(const char *path, const char *text, unsigned long size)
+int posix_server_write_file(const char *path, const char *text, posix_ulong size)
 {
 	char temporary[4200];
 	FILE *file;
@@ -172,7 +173,7 @@ int posix_server_private_file(const char *path)
 	return chmod(path, S_IRUSR | S_IWUSR) == 0;
 }
 
-int posix_server_write_private_file(const char *path, const void *data, unsigned long size)
+int posix_server_write_private_file(const char *path, const void *data, posix_ulong size)
 {
 	const char *bytes = data;
 	unsigned long written = 0;
@@ -204,7 +205,7 @@ int posix_server_remove(const char *path)
 	return unlink(path) == 0;
 }
 
-unsigned long posix_server_unix_seconds(void)
+posix_ulong posix_server_unix_seconds(void)
 {
 	return (unsigned long)time(NULL);
 }
@@ -217,22 +218,22 @@ long long posix_server_unix_milliseconds(void)
 	return (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
 
-void posix_server_utc_text(unsigned long seconds, char *text, int size)
+void posix_server_utc_text(posix_ulong seconds, char *text, int size)
 {
 	time_t when = (time_t)seconds;
 	struct tm utc;
 
 	if (!gmtime_r(&when, &utc) || !strftime(text, (size_t)size, "%Y-%m-%dT%H:%M:%SZ", &utc))
-		snprintf(text, (size_t)size, "%lu", seconds);
+		snprintf(text, (size_t)size, "%lu", (unsigned long)seconds);
 }
 
-void posix_server_local_text(unsigned long seconds, char *text, int size)
+void posix_server_local_text(posix_ulong seconds, char *text, int size)
 {
 	time_t when = (time_t)seconds;
 	struct tm local;
 
 	if (!localtime_r(&when, &local) || !strftime(text, (size_t)size, "%Y-%m-%d %H:%M:%S", &local))
-		snprintf(text, (size_t)size, "%lu", seconds);
+		snprintf(text, (size_t)size, "%lu", (unsigned long)seconds);
 }
 
 #endif

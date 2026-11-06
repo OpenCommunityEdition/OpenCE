@@ -4,13 +4,19 @@ Fork-only (not part of the upstream pull request).
 
     python3 tools/mendicant/package.py --game build/linux \\
         --models build/release/mods/mendicant_ai/tags/mendicant/models.aibw --out build/release
+    python3 tools/mendicant/package.py --game build/linux_x86_64 --models ... --out build/release
     python3 tools/mendicant/package.py --game halo-windows-release.zip --models ... --out build/release
 
 --game is one of:
-  - a build folder (build/linux, build/windows): the files tools/ci_build.py puts in dist/ are taken
+  - a build folder (build/linux, build/linux_x86_64, build/windows): the files tools/ci_build.py puts in dist/ are taken
     from it and from the repository, as that script takes them (keep the two lists alike);
   - a release folder or zip (the workflow's halo-<platform>-release artifact, dist/halo-...): its
     files as they are, less anything a player's run leaves (settings, maps, saves, logs).
+
+The platform is the executable's: halo.exe is Windows; halo a 32-bit ELF file is the x86 Linux
+build ("linux"), a 64-bit one the 64-bit x86 Linux build ("linux-x86_64": the game as an x32 guest
+inside the 64-bit halo, tools/linux_guest_build.py, whose guest image, halo_guest.elf, is built
+into the executable and so not shipped beside it).
 
 The zip holds, at its top (unzipped into a new folder, as the platform's release zip is):
   the game's files; mods/mendicant_ai/ (mod.toml and tags/mendicant/models.aibw, where the game
@@ -49,6 +55,7 @@ UPSTREAM = "https://github.com/OpenCommunityEdition/OpenCE"
 # tools/ci_build.py's OUTPUTS and the files its main() adds to dist/ (source, name in the release)
 BUILD_OUTPUTS = {
     "linux": ["halo", "libSDL3.so.0", "SDL3-LICENSE.txt"],
+    "linux-x86_64": ["halo", "libSDL3.so.0", "SDL3-LICENSE.txt"],
     "windows": ["halo.exe", "SDL3.dll"],
 }
 REPOSITORY_FILES = [
@@ -67,6 +74,8 @@ REPOSITORY_FILES = [
 REPOSITORY_FOLDERS = [("deploy/gametypes", "gametypes")]
 LINUX_ONLY_FILES = [("deploy/halo-server", "halo-server")]
 LINUX_ONLY_FOLDERS = [("deploy", "deploy")]
+# (tools/ci_build.py gives the dedicated server's examples to the x86 Linux and the Windows builds only)
+SERVER_EXAMPLES = {"init.txt.example", "gametypes"}
 
 # what a player's run leaves in the game's folder, never packaged from a release folder
 LEFT_OUT = re.compile(r"(?i)^(maps|custom_maps|mods|saves|profiles|crashes|update\.partial|logs)(/|$)|"
@@ -78,9 +87,19 @@ EXECUTABLE_NAMES = {"halo", "halo-server"}
 
 def readme(platform):
     executable = "halo.exe" if platform == "windows" else "./halo"
+    build = {"windows": "Windows", "linux": "32-bit x86 Linux",
+             "linux-x86_64": "64-bit x86 Linux"}[platform]
+    requirements = {
+        "windows": "",
+        "linux": ("  This build needs the distribution's 32-bit OpenGL libraries; a computer without them can\n"
+                  "  use the linux-x86_64 package instead.\n"),
+        "linux-x86_64": ("  This build is a 64-bit program (the game runs inside it as a 32-bit guest): it needs\n"
+                         "  no 32-bit libraries, only the 64-bit OpenGL libraries of GLVND (libOpenGL.so.0,\n"
+                         "  libEGL.so.1), which Mesa and NVIDIA's driver use.\n"),
+    }[platform]
     log = ("halo.log, beside halo.exe" if platform == "windows"
            else "the terminal's output (run ./halo from a terminal: ./halo 2>&1 | tee halo.log)")
-    return f"""MENDICANT AI {MOD_VERSION} (test build)
+    return f"""MENDICANT AI {MOD_VERSION} (test build, {build})
 ==================================
 
 What it is
@@ -97,7 +116,7 @@ Install
      image placed next to the executable is used without asking. This build includes no game
      data.
   This build does not update itself and sends no crash reports anywhere.
-
+{requirements}
 Campaign AI settings
   Settings > Player Profile > Video Setup > CAMPAIGN AI (also from a campaign's pause menu,
   SETTINGS). MENDICANT AI: ON/OFF turns it on or off (OFF is the stock AI); the other rows set
@@ -231,11 +250,15 @@ class Package:
                 self.add(f"{prefix}/{relative}", path.read_bytes(), os.access(path, os.X_OK))
 
 
-def platform_of(names):
+def platform_of(names, halo=None):
+    """the package's platform from the game's file names, and halo's first bytes (an ELF file's
+    class: 1 32-bit, 2 64-bit)"""
     if "halo.exe" in names:
         return "windows"
     if "halo" in names:
-        return "linux"
+        if halo is None or not is_elf(halo):
+            raise SystemExit("halo in --game is not an ELF file")
+        return "linux-x86_64" if halo[4] == 2 else "linux"
     raise SystemExit("no halo or halo.exe in --game: not a game folder")
 
 
@@ -247,6 +270,9 @@ def from_build_folder(game, package):
             raise SystemExit(f"{path}: missing (built with ninja {package.platform}?)")
         package.add(name, path.read_bytes(), name in EXECUTABLE_NAMES)
     files, folders = list(REPOSITORY_FILES), list(REPOSITORY_FOLDERS)
+    if package.platform == "linux-x86_64":
+        files = [(source, name) for source, name in files if name not in SERVER_EXAMPLES]
+        folders = [(source, name) for source, name in folders if name not in SERVER_EXAMPLES]
     if package.platform == "linux":
         files += LINUX_ONLY_FILES
         folders += LINUX_ONLY_FOLDERS
@@ -304,7 +330,7 @@ def write_zip(package, out):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--game", required=True, type=Path,
-                        help="build/linux, build/windows, or a release folder or zip")
+                        help="build/linux, build/linux_x86_64, build/windows, or a release folder or zip")
     parser.add_argument("--models", required=True, type=Path,
                         help="models.aibw (tools/mendicant/export_models.py)")
     parser.add_argument("--out", required=True, type=Path, help="the folder the zip goes in")
@@ -321,11 +347,11 @@ def main():
     build_folder = game.is_dir() and not (game / "LICENSE.txt").exists()
     if build_folder:
         names = {path.name for path in game.iterdir()}
-        package = Package(platform_of(names))
+        package = Package(platform_of(names, (game / "halo").read_bytes()[:8] if "halo" in names else None))
         from_build_folder(game, package)
     else:
         entries = release_entries(game)
-        package = Package(platform_of(set(entries)))
+        package = Package(platform_of(set(entries), entries["halo"][0][:8] if "halo" in entries else None))
         from_release(entries, package)
         if "LICENSE.txt" in package.files:
             del package.files["LICENSE.txt"]

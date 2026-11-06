@@ -102,24 +102,39 @@ bool SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags flags, const char *title, cons
 	return host_sdl_show_simple_message_box((unsigned int)flags, title, message) != 0;
 }
 
+/* host_sdl.c's struct host_message_box: guest addresses as 32-bit values */
+struct message_box
+{
+	unsigned int flags;
+	unsigned int title;
+	unsigned int message;
+	int default_index;
+	unsigned int buttons[3];
+};
+
+typedef char message_box_size_check[sizeof(struct message_box) == 28 ? 1 : -1];
+
 /* (up to three buttons, their ids those of the guest's) */
 bool SDL_ShowMessageBox(const SDL_MessageBoxData *data, int *buttonid)
 {
-	const char *labels[3] = { NULL, NULL, NULL };
-	int default_index = -1;
+	struct message_box question;
 	int index;
 	int chosen;
 
 	if (!data || data->numbuttons < 1 || data->numbuttons > 3)
 		return false;
+	memset(&question, 0, sizeof(question));
+	question.flags = (unsigned int)data->flags;
+	question.title = (unsigned int)(uintptr_t)data->title;
+	question.message = (unsigned int)(uintptr_t)data->message;
+	question.default_index = -1;
 	for (index = 0; index < data->numbuttons; index++)
 	{
-		labels[index] = data->buttons[index].text;
+		question.buttons[index] = (unsigned int)(uintptr_t)data->buttons[index].text;
 		if (data->buttons[index].flags & SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT)
-			default_index = index;
+			question.default_index = index;
 	}
-	chosen = host_sdl_show_message_box((unsigned int)data->flags, data->title, data->message, default_index,
-		labels[0], labels[1], labels[2]);
+	chosen = host_sdl_show_message_box(&question);
 	if (chosen < 0 || chosen >= data->numbuttons)
 		return false;
 	if (buttonid)

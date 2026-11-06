@@ -5,14 +5,19 @@ What a dedicated server (server_mode.c) needs of the system beyond posix.h:
 its signals, its standard input and output, and what the process uses.
 posix_server.c does it on Linux, port/windows/src/win32_server.c on Windows
 (Ctrl+C and the console's close for the signals). The Android and web builds
-have no dedicated server, and none of these.
+have no dedicated server, and none of these. The desktop guest builds
+(tools/linux_guest_build.py) compile posix_server.c into their 64-bit host
+and call it as they call posix.h's (tools/android_posix_stubs.py).
 
 Only integers and strings cross here (the two sides are compiled with
-different structure layouts), as in posix.h.
+different structure layouts), as in posix.h; posix_ulong is 32-bit on both
+sides of a guest's boundary.
 */
 
 #ifndef __HALO_LINUX_POSIX_SERVER_H
 #define __HALO_LINUX_POSIX_SERVER_H
+
+#include "posix.h"
 
 enum
 {
@@ -44,30 +49,30 @@ int posix_server_stdin_read(char *buffer, int size);
 
 /* the process's resident memory, in bytes, and its processor time (user
 and system), in milliseconds */
-unsigned long posix_server_resident_bytes(void);
-unsigned long posix_server_cpu_milliseconds(void);
+posix_ulong posix_server_resident_bytes(void);
+posix_ulong posix_server_cpu_milliseconds(void);
 
 /* renames from to to, replacing to (a file written whole, then put in
 place); 1 on success */
 int posix_server_rename(const char *from, const char *to);
 /* the file at path (the host's, not the game's Xbox path) written whole:
 size bytes of text into path.tmp, put in place of path; 1 if it was */
-int posix_server_write_file(const char *path, const char *text, unsigned long size);
+int posix_server_write_file(const char *path, const char *text, posix_ulong size);
 /* makes the file readable and writable by its owner alone (a key); 1 on
 success */
 int posix_server_private_file(const char *path);
 /* the file at path written whole (size bytes of data), readable and
 writable by its owner alone from its creation (a key): created so, or made
 so if it was there; 1 if it was */
-int posix_server_write_private_file(const char *path, const void *data, unsigned long size);
+int posix_server_write_private_file(const char *path, const void *data, posix_ulong size);
 /* removes a file; 1 on success */
 int posix_server_remove(const char *path);
 /* the seconds since the Unix epoch, and the milliseconds */
-unsigned long posix_server_unix_seconds(void);
+posix_ulong posix_server_unix_seconds(void);
 long long posix_server_unix_milliseconds(void);
 /* the time as UTC text: "2026-10-19T18:03:11Z" */
-void posix_server_utc_text(unsigned long seconds, char *text, int size);
+void posix_server_utc_text(posix_ulong seconds, char *text, int size);
 /* local time as "2026-10-19 18:03:11" (bans.txt's) */
-void posix_server_local_text(unsigned long seconds, char *text, int size);
+void posix_server_local_text(posix_ulong seconds, char *text, int size);
 
 #endif

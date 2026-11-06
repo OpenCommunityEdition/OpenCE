@@ -7,7 +7,12 @@ int android_render_chip = _android_chip_unknown;
 
 void android_render_policy_initialize(void)
 {
+#ifdef HALO_ANDROID
 	android_render_chip = host_android_chip_family();
+#else
+	/* (a desktop guest, port/linux/host: no phone's chip to ask the host about) */
+	android_render_chip = _android_chip_other;
+#endif
 	if (android_render_chip < _android_chip_unknown || android_render_chip > _android_chip_other)
 		android_render_chip = _android_chip_unknown;
 	android_geometry_fixes = android_render_chip == _android_chip_unknown ||

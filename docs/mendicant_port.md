@@ -82,11 +82,16 @@ false` (or `HALO_AI_MENDICANT=false`) gives the stock AI exactly as before.
     --out build/release/mods/mendicant_ai/tags/mendicant/models.aibw
 python3 tools/mendicant/package.py --game build/linux \
     --models build/release/mods/mendicant_ai/tags/mendicant/models.aibw --out build/release
+python3 tools/mendicant/package.py --game build/linux_x86_64 \
+    --models build/release/mods/mendicant_ai/tags/mendicant/models.aibw --out build/release
 python3 tools/mendicant/package.py --game halo-windows-release.zip \
     --models build/release/mods/mendicant_ai/tags/mendicant/models.aibw --out build/release
 ```
 
-`package.py` (fork-only) makes `mendicant-ai-<version>-<platform>.zip`: the files the platform's
+`package.py` (fork-only) makes `mendicant-ai-<version>-<platform>.zip`, the platform `linux`
+(32-bit x86), `linux-x86_64` (the 64-bit build, `configure.py --x64` and `ninja linux_x86_64`: the
+game as an x32 guest built into the 64-bit `halo`, so its `halo_guest.elf` is not shipped) or
+`windows`, told apart by the executable: the files the platform's
 release zip has (from a build folder, as `tools/ci_build.py` collects them; from the workflow's
 release artifact, as they are), `mods/mendicant_ai/` (`mod.toml`, and the models where
 `ai.mendicant.weights` finds them: `tags/mendicant/models.aibw`), `README_MENDICANT.txt`,
@@ -1064,7 +1069,11 @@ AI screen in `tools/port_settings.py` (`setting=`, `values=`), regenerated with
 
 ### 10.2 Training bridge
 
-Desktop Linux only. It lives in `mendicant_bridge.c` and `mendicant_bridge.h`.
+Desktop Linux only, and of the Linux builds only the 32-bit one (`ninja linux`): the 64-bit
+builds' guest (`HALO_GUEST`, `ninja linux_x86_64`) leaves the bridge, the training runs and the
+logs out, as Windows, Android and the web do, and does not write their settings
+(`_platform_linux` in `port_config.c`). The models themselves run in every build. It lives in
+`mendicant_bridge.c` and `mendicant_bridge.h`.
 
 **The layout.** `struct model_bridge` is copied field for field from `ai_brain.c:157-262`: magic
 0x41494231, 34948 bytes. It must be wrapped in `#pragma pack(push, 4)` / `#pragma pack(pop)`.

@@ -3,7 +3,10 @@ GUEST_HOST.H
 
 The host services the guest imports (the guest's view; the host defines
 them in port/android/host). Every name here must also be listed in
-port/android/host_imports.list, which generates the import stubs.
+port/android/host_imports.list, or for the Android app's own (the last two
+sections) in port/android/android_imports.list; the lists generate the
+import stubs, and tools/check_host_imports.py checks them against this
+file.
 
 Parameter types follow the rules in halo_android_abi.h: 32-bit values are
 int or unsigned int, 64-bit values long long, and pointers are passed as
@@ -81,9 +84,10 @@ int host_sdl_scancode_from_name(const char *name);
 int host_sdl_show_toast(const char *message, int duration, int gravity, int x, int y);
 int host_sdl_show_simple_message_box(unsigned int flags, const char *title, const char *message);
 /* SDL_ShowMessageBox of up to three buttons (SDL_MessageBoxData has not the
-guest's layout): the index of the one chosen, else -1 */
-int host_sdl_show_message_box(unsigned int flags, const char *title, const char *message, int default_index,
-	const char *button0, const char *button1, const char *button2);
+guest's layout; guest_sdl.c's struct message_box, host_sdl.c's struct
+host_message_box: x86-64 passes a 7th pointer on the stack): the index of the
+one chosen, else -1 */
+int host_sdl_show_message_box(void *question);
 int host_sdl_get_gamepads(unsigned int *ids, int capacity);
 unsigned int host_sdl_open_gamepad(unsigned int id);
 unsigned int host_sdl_gamepad_from_id(unsigned int id);
@@ -118,7 +122,7 @@ the GPU to finish the work last fenced for a slot */
 void host_gl_fence_frame(unsigned int slot);
 void host_gl_wait_frame(unsigned int slot);
 
-/* ---------- Android */
+/* ---------- Android (android_imports.list) */
 
 /* SoC classification for the immutable rendering policy. */
 int host_android_chip_family(void);
@@ -130,7 +134,7 @@ void host_android_path(int which, char *buffer, unsigned int size);
 in pixels of the current orientation, into insets[4]; all 0 when unknown */
 void host_gesture_insets(int *insets);
 
-/* ---------- the on-screen touch controls (host_touch.c) */
+/* ---------- the on-screen touch controls (host_touch.c, android_imports.list) */
 
 /* the overlay's controller: the SDL axes (left x, y, right x, y, left
 trigger, right trigger) and the SDL button bits, into state[7] */
@@ -153,8 +157,9 @@ int host_touch_devices(void);
 
 /* a GET of an https:// url (port/linux/src/master_list.c): 1 with the
 status, the headers ("Name: value" lines) and up to body_capacity bytes of
-the body (its size in body_size), else 0 and why in error */
-int host_https_get(const char *url, int *status, char *headers, int headers_size, char *body, int body_capacity,
-	int *body_size, char *error, int error_size);
+the body (its size in body_size), else 0 and why in error (master_list.c's
+struct https_get, host_https.c's struct host_https_get: x86-64 passes a 7th
+pointer on the stack) */
+int host_https_get(void *request);
 
 #endif

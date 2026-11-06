@@ -145,6 +145,9 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glDrawElementsBaseVertexOES)
 /* ANDROID_GL_FUNCTIONS_END */
 #else
+/* OpenGL 4.5 core; tools/android_gl_stubs.py --desktop reads this list for
+the desktop guest builds' desktop renderer (tools/linux_guest_build.py) */
+/* DESKTOP_GL_FUNCTIONS_BEGIN */
 #define GL_FUNCTIONS(X) \
 	X(glGetString) \
 	X(glGetIntegerv) \
@@ -271,6 +274,7 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glClientWaitSync) \
 	X(glDeleteSync) \
 	X(glDebugMessageCallback)
+/* DESKTOP_GL_FUNCTIONS_END */
 #endif
 
 #define GL_DECLARE_FUNCTION(name) extern __typeof__(&name) halo_##name;

@@ -450,9 +450,24 @@ static int fetch(const char *url, struct fetched *fetched)
 	return fetched_one;
 }
 #elif defined(HALO_ANDROID)
-/* the app's host (port/android/host/host_https.c) */
-int host_https_get(const char *url, int *status, char *headers, int headers_size, char *body, int body_capacity,
-	int *body_size, char *error, int error_size);
+/* the app's host (port/android/host/host_https.c's struct host_https_get:
+the guest's addresses as 32-bit values) */
+struct https_get
+{
+	unsigned int url;
+	int status;
+	unsigned int headers;
+	int headers_size;
+	unsigned int body;
+	int body_capacity;
+	int body_size;
+	unsigned int error;
+	int error_size;
+};
+
+typedef char https_get_size_check[sizeof(struct https_get) == 36 ? 1 : -1];
+
+int host_https_get(void *request);
 
 static int fetch(const char *url, struct fetched *fetched)
 {
@@ -461,19 +476,28 @@ static int fetch(const char *url, struct fetched *fetched)
 	be fetching too) */
 	char *headers = malloc(HEADERS_SIZE);
 	char error[256];
-	int body_size = 0;
+	struct https_get request;
 
+	fetched->status = 0;
 	fetched->body = malloc(MAXIMUM_ANSWER + 1);
-	if (!headers || !fetched->body || !host_https_get(url, &fetched->status, headers, HEADERS_SIZE, fetched->body,
-		MAXIMUM_ANSWER, &body_size, error, sizeof(error)))
+	memset(&request, 0, sizeof(request));
+	request.url = (unsigned int)(uintptr_t)url;
+	request.headers = (unsigned int)(uintptr_t)headers;
+	request.headers_size = HEADERS_SIZE;
+	request.body = (unsigned int)(uintptr_t)fetched->body;
+	request.body_capacity = MAXIMUM_ANSWER;
+	request.error = (unsigned int)(uintptr_t)error;
+	request.error_size = (int)sizeof(error);
+	if (!headers || !fetched->body || !host_https_get(&request))
 	{
 		free(headers);
 		free(fetched->body);
 		fetched->body = NULL;
 		return 0;
 	}
-	fetched->body[body_size] = 0;
-	fetched->size = (unsigned long)body_size;
+	fetched->status = request.status;
+	fetched->body[request.body_size] = 0;
+	fetched->size = (unsigned long)request.body_size;
 	header_value(headers, "Signature", fetched->signature, sizeof(fetched->signature));
 	header_value(headers, "Signature-Key", fetched->key, sizeof(fetched->key));
 	free(headers);
