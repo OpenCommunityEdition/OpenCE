@@ -13,6 +13,14 @@ def test_native_card_geometry_and_separate_routes():
     doc = ET.Element('menus')
     mcc_xbox_menu.append(doc)
     widgets = {w.get('name'): w for w in doc.findall('widget')}
+    entry = widgets['mcc_xbox/campaign_entry']
+    assert (entry.get('width'), entry.get('height')) == ('256', '33')
+    assert entry.get('bitmap') == 'mcc_xbox/menu_campaigns'
+    assert entry.get('text') is None and entry.find('child') is None
+    assert {e.get('event') for e in entry.findall('on')} == {'a', 'start', 'left_mouse'}
+    frames = doc.find("bitmap[@name='mcc_xbox/menu_campaigns']").findall('frame')
+    assert len(frames) == 2
+    assert all((f.get('width'), f.get('height')) == ('256', '64') for f in frames)
     for i, (x, width, height) in enumerate(((72, 165, 330), (239, 163, 326), (406, 162, 326))):
         card = widgets[f'mcc_xbox/card_{i}']
         assert tuple(int(card.get(k)) for k in ('left', 'top', 'width', 'height')) == (x, 75, width, height)
@@ -67,6 +75,7 @@ typedef int boolean;
 #define FRONTEND_MENU_XBOX "ui\\shell\\main_menu\\main_menu"
 struct widget_instance {
  long definition_tag_index;const char *name;short local_player_index;int visible;
+ short horizontal_offset,vertical_offset;
  struct widget_instance *parent,*child,*next,*previous,*focused_child;
  struct {short current_frame_index;} animation;
  struct {struct {short selected_index;} list;} parameters;
@@ -91,7 +100,7 @@ static struct widget_instance *named(struct widget_instance *w,const char *name,
  for(c=w->child;c;c=c->next){if(!strcmp(c->name,name))return c;found=named(c,name,0);if(found)return found;}return NULL;
 }
 static struct widget_instance *ui_widget_load_by_name_or_tag(const char *name,long tag,struct widget_instance *parent,short player,long a,long b,short c){
- (void)tag;(void)player;(void)a;(void)b;(void)c;strcpy(opened,name);memset(&entry,0,sizeof(entry));entry.parent=parent;return &entry;
+ (void)tag;(void)player;(void)a;(void)b;(void)c;strcpy(opened,name);memset(&entry,0,sizeof(entry));entry.parent=parent;entry.name="campaign_entry";return &entry;
 }
 static int ui_widget_port_open(struct widget_instance *w,const char *path,boolean *deleted){(void)w;strcpy(opened,path);*deleted=1;return 1;}
 static void ui_widget_port_go_back(struct widget_instance *w){(void)w;backs++;}
@@ -120,19 +129,35 @@ static int ui_widget_port_mcc_multiplayer_map_choose(const char *level){assert(!
 ''' + body + r'''
 int main(void){
  struct widget_instance root={0},children[12]={{0}},cards[3]={{0}},parts[3][6]={{{0}}};
+ struct widget_instance menu={0},rows[3]={{0}};
  const char *names[]={"heading_campaigns","heading_levels","heading_maps","heading_difficulty","previous","next","difficulty_list","status"};
  const char *leaves[]={"picture","mcc_folder_name","mcc_folder_help","badge_0","badge_1","badge_2"};
  struct event_record event={3,0,{{2,1}}};int deleted=0,i,j;
  root.child=children;for(i=0;i<8;i++){children[i].name=names[i];children[i].parent=&root;children[i].next=i<7?children+i+1:cards;}
  for(i=0;i<3;i++){cards[i].name=i==0?"card_0":i==1?"card_1":"card_2";cards[i].definition_tag_index=i+1;cards[i].parent=&root;cards[i].next=i<2?cards+i+1:NULL;cards[i].child=parts[i];
   for(j=0;j<6;j++){parts[i][j].name=leaves[j];parts[i][j].parent=cards+i;parts[i][j].next=j<5?parts[i]+j+1:NULL;}}
- assert(mcc_xbox_shortcut(&root,&event)&&!strcmp(opened,"pc\\mcc_xbox\\profiles"));
+ assert(!mcc_xbox_shortcut(&root,&event));
+ assert(mcc_xbox_event("open",&root,&event,&deleted)&&!strcmp(opened,"pc\\mcc_xbox\\profiles"));
  event.data.button.value=2;assert(!mcc_xbox_shortcut(&root,&event));event.data.button.value=1;
  style="modern";assert(!mcc_xbox_shortcut(&root,&event));style="xbox";
  enabled=0;assert(!mcc_xbox_shortcut(&root,&event));enabled=1;
  main_menu=0;assert(!mcc_xbox_shortcut(&root,&event));main_menu=1;
  root_tag="pc\\main_menu\\main_menu";assert(!mcc_xbox_shortcut(&root,&event));
- root_tag=FRONTEND_MENU_XBOX;mcc_xbox_attach(&root);assert(cards[2].next==&entry&&entry.previous==cards+2&&root.child==children);cards[2].next=NULL;
+ root_tag=FRONTEND_MENU_XBOX;
+ root.child=&menu;menu.name="main_menu_select_list";menu.parent=&root;menu.child=rows;menu.focused_child=rows;
+ for(i=0;i<3;i++){rows[i].name=i==0?"load_campaign_item_":i==1?"multiplayer_item":"settings_item";
+  rows[i].parent=&menu;rows[i].previous=i?rows+i-1:NULL;rows[i].next=i<2?rows+i+1:NULL;rows[i].horizontal_offset=192;rows[i].vertical_offset=247+i*36;}
+ enabled=0;mcc_xbox_attach(&root);assert(rows[0].next==rows+1&&rows[1].vertical_offset==283);enabled=1;
+ style="modern";mcc_xbox_attach(&root);assert(rows[0].next==rows+1);style="xbox";
+ mcc_xbox_attach(&root);assert(rows[0].next==&entry&&entry.previous==rows&&entry.next==rows+1&&rows[1].previous==&entry);
+ assert(entry.parent==&menu&&entry.horizontal_offset==192&&entry.vertical_offset==283);
+ assert(rows[0].vertical_offset==247&&rows[1].vertical_offset==319&&rows[2].vertical_offset==355&&menu.focused_child==rows);
+ mcc_xbox_attach(&root);assert(rows[1].vertical_offset==319&&entry.next==rows+1);
+ assert(mcc_xbox_event("open",&entry,&event,&deleted)&&!strcmp(opened,"pc\\mcc_xbox\\profiles"));
+ root.child=children;
+ root_tag=MCC_XBOX_NATIVE "connected\\connected_map_select_wrapper";
+ assert(mcc_xbox_shortcut(&root,&event)&&!strcmp(opened,"pc\\mcc_xbox\\connected"));
+ mcc_xbox_attach(&root);assert(cards[2].next==&entry&&entry.previous==cards+2);cards[2].next=NULL;
  root_tag="pc\\mcc_xbox\\profiles";assert(mcc_xbox_event("profile",&root,&event,&deleted)&&native_calls==2&&!strcmp(opened,"pc\\mcc_xbox\\campaign"));
  root_tag="pc\\mcc_xbox\\campaign";assert(mcc_xbox_event("init",&root,&event,&deleted)&&rescans==1);
  assert(children[0].visible&&!children[1].visible&&!children[6].visible);

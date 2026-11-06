@@ -81,7 +81,8 @@ their definitions are unchanged.
 ## Xbox campaign and multiplayer flow
 
 With `display.menu_frontend = "xbox"` and `game.mcc_campaigns = true`, the main
-menu's X prompt opens **MCC Campaigns → Choose Profile → Choose Campaign →
+menu's selectable **MCC CAMPAIGNS** row, between **CAMPAIGN** and **MULTIPLAYER**,
+opens **MCC Campaigns → Choose Profile → Choose Campaign →
 Load Level → Choose Difficulty**. Campaign folders and missions use the native
 three-card geometry, oversized arrows, fonts, plasma backing and thumbnail size.
 Long descriptions stop above the reserved badge row and use an ellipsis when
@@ -89,6 +90,11 @@ needed. Long titles wrap within the native title area.
 The profile chooser, difficulty descriptions, difficulty artwork, existing
 headings and button key are native UI services/art from the player's `ui.map`.
 The new MCC Campaigns heading is rendered with the project's OpenCE font.
+The main-menu entry uses that same title font at the native 19.5-pixel capital
+height, with unselected blue and selected white/glow bitmap states. It is
+inserted into the live native list with its 36-pixel row spacing, preserving
+the existing choices and their actions. Disabling MCC campaigns leaves the
+native list untouched. X no longer opens campaigns from the main menu.
 Back first leaves difficulty selection, then the campaign folder, then returns
 to profile selection. It never selects a mission by an Xbox level number.
 

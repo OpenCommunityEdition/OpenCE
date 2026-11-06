@@ -35,13 +35,32 @@ static boolean mcc_xbox_available(void)
 
 static void mcc_xbox_attach(struct widget_instance *widget)
 {
-    struct widget_instance *entry, *last;
+    struct widget_instance *entry, *last, *list, *before, *row;
     char const *route;
     if (!widget || widget->parent || !mcc_xbox_available()) return;
     route = mcc_xbox_route(tag_get_name(widget->definition_tag_index));
     if (!route) return;
-    entry = ui_widget_load_by_name_or_tag(!strcmp(route, "campaign") ?
-        MCC_XBOX_ROOT "campaign_entry" : MCC_XBOX_ROOT "multiplayer_entry",
+    if (!strcmp(route, "campaign"))
+    {
+        list = named(widget, "main_menu_select_list", 0);
+        before = named(list, "multiplayer_item", 0);
+        if (!list || !before || named(list, "campaign_entry", 0)) return;
+        entry = ui_widget_load_by_name_or_tag(MCC_XBOX_ROOT "campaign_entry",
+            NONE, list, widget->local_player_index, NONE, NONE, NONE);
+        if (!entry) return;
+        /* Insert only a live MCC row. Native definitions and actions remain
+         * intact; subsequent rows retain the main menu's 36-pixel spacing. */
+        entry->horizontal_offset = before->horizontal_offset;
+        entry->vertical_offset = before->vertical_offset;
+        entry->previous = before->previous;
+        entry->next = before;
+        if (before->previous) before->previous->next = entry;
+        else list->child = entry;
+        before->previous = entry;
+        for (row = before; row; row = row->next) row->vertical_offset += 36;
+        return;
+    }
+    entry = ui_widget_load_by_name_or_tag(MCC_XBOX_ROOT "multiplayer_entry",
         NONE, widget, widget->local_player_index, NONE, NONE, NONE);
     if (!entry) return;
     last = widget->child;
@@ -68,6 +87,7 @@ static boolean mcc_xbox_shortcut(struct widget_instance *widget, struct event_re
     boolean deleted = FALSE;
     if (!widget || widget->parent || event->type != 3 || event->data.button.index != BUTTON_X ||
         event->data.button.value != 1) return FALSE;
+    if (!strcmp(tag_get_name(widget->definition_tag_index), FRONTEND_MENU_XBOX)) return FALSE;
     return mcc_xbox_open(widget, &deleted);
 }
 

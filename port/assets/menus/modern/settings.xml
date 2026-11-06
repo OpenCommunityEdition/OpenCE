@@ -4286,10 +4286,15 @@
 	<widget name="mcc_xbox/next" left="575" top="174" width="35" height="170" bitmap="ui\shell\bitmaps\arrow_big_right">
 		<on event="left_mouse" run="port mcc xbox right" />
 	</widget>
-	<widget name="mcc_xbox/campaign_entry" type="text" left="64" top="414" width="280" height="28" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" text="=MCC CAMPAIGNS" text_x="22">
-		<child widget="frontend_legacy/footer_glyph_x" x="64" y="414" />
+	<widget name="mcc_xbox/campaign_entry" type="text" width="256" height="33" bitmap="mcc_xbox/menu_campaigns" font="ui\small_ui" color="#000080FF">
+		<on event="a" run="port mcc xbox open" />
+		<on event="start" run="port mcc xbox open" />
 		<on event="left_mouse" run="port mcc xbox open" />
 	</widget>
+	<bitmap name="mcc_xbox/menu_campaigns">
+		<frame png="modern/mcc_campaigns_entry_0.png" width="256" height="64" />
+		<frame png="modern/mcc_campaigns_entry_1.png" width="256" height="64" />
+	</bitmap>
 	<widget name="mcc_xbox/multiplayer_entry" type="text" left="64" top="414" width="280" height="28" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test" text="=MCC MAPS" text_x="22">
 		<child widget="frontend_legacy/footer_glyph_x" x="64" y="414" />
 		<on event="left_mouse" run="port mcc xbox open" />

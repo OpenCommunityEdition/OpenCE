@@ -72,11 +72,16 @@ def append(doc):
                        bitmap='ui\\shell\\bitmaps\\arrow_big_'+direction)
         on(arrow, 'left_mouse', 'left' if name=='previous' else 'right')
     # Appended instances only: original Xbox tag definitions are never edited.
-    for name, caption in (('campaign_entry', '=MCC CAMPAIGNS'), ('multiplayer_entry', '=MCC MAPS')):
-        entry = text(name, caption, 64, 414, 280, 28)
-        entry.set('text_x', '22')
-        ET.SubElement(entry, 'child', widget='frontend_legacy/footer_glyph_x', x='64', y='414')
-        on(entry, 'left_mouse', 'open')
+    entry = widget('campaign_entry', type='text', width=256, height=33,
+                   bitmap='mcc_xbox/menu_campaigns', font='ui\\small_ui', color='#000080FF')
+    for event in ('a', 'start', 'left_mouse'): on(entry, event, 'open')
+    bitmap = ET.SubElement(doc, 'bitmap', name='mcc_xbox/menu_campaigns')
+    for frame in range(2):
+        ET.SubElement(bitmap, 'frame', png=f'modern/mcc_campaigns_entry_{frame}.png', width='256', height='64')
+    entry = text('multiplayer_entry', '=MCC MAPS', 64, 414, 280, 28)
+    entry.set('text_x', '22')
+    ET.SubElement(entry, 'child', widget='frontend_legacy/footer_glyph_x', x='64', y='414')
+    on(entry, 'left_mouse', 'open')
 
     # Profile and difficulty presentation borrow unchanged native UI components
     # through their existing services. Only the MCC wrappers decide destinations.
@@ -123,3 +128,30 @@ def generate_art(target):
     image = Image.new('RGBA', (512*4, 64*4))
     image.alpha_composite(ink, (29*4, 32*4))
     image.save(target/'mcc_campaigns.png')
+    generate_entry_art(target)
+
+
+def generate_entry_art(target):
+    """Match the native main-menu title redraws: 19.5px capitals, two states."""
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    root = Path(__file__).resolve().parents[1]
+    font = ImageFont.truetype(str(root/'port/assets/fonts/OpenCE-Regular.ttf'), 128,
+                              layout_engine=ImageFont.Layout.BASIC)
+    caption = 'MCC CAMPAIGNS'
+    box = font.getbbox(caption)
+    ink = Image.new('L', (box[2]-box[0], box[3]-box[1]))
+    ImageDraw.Draw(ink).text((-box[0], -box[1]), caption, font=font, fill=255)
+    ink = ink.resize((round(78*ink.width/ink.height), 78), Image.Resampling.LANCZOS)
+    # Native titles are centered in 256x64 bitmaps, with their capitals at
+    # y=6.75. Widget hit boxes remain 256x33, matching the existing choices.
+    mask = Image.new('L', (1024, 256))
+    mask.paste(ink, ((1024-ink.width)//2, 27))
+    normal = Image.new('RGBA', mask.size, (35, 149, 255, 0))
+    normal.putalpha(mask.point(lambda a: round(a*119/255)))
+    normal.save(target/'mcc_campaigns_entry_0.png')
+    selected = Image.new('RGBA', mask.size, (41, 149, 255, 0))
+    selected.putalpha(mask.filter(ImageFilter.GaussianBlur(8)).point(lambda a: min(255, a*2)))
+    letters = Image.new('RGBA', mask.size, (255, 255, 255, 0))
+    letters.putalpha(mask)
+    selected.alpha_composite(letters)
+    selected.save(target/'mcc_campaigns_entry_1.png')
