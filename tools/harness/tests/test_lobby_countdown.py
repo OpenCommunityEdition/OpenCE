@@ -140,6 +140,7 @@ def generated(fault=None, faulty_function=None):
     config += "#define BOTS_FIRST_MACHINE (MAXIMUM_NETWORK_MACHINE_COUNT - BOTS_MAXIMUM)\n"
     text = ""
     network_bots = read("port/linux/game/bots_network.c")
+    text += "\n".join(re.findall(r"^static long population_.*;", network_bots, re.M)) + "\n"
     text += function(read("port/linux/game/bots.c"), "bots_machine_is_bot") + "\n"
     for name in ("bots_network_session_begin", "bots_network_session_end", "bots_player_ownership",
                  "bots_player_owned", "bots_session_allowed", "bots_lobby_can_start"):

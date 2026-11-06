@@ -7,6 +7,7 @@ actions for a bot; enabling enhanced mode does not run the stock decision loop.
 `bots.vehicles` and `bots.thread` remain off by default. Network admission,
 player creation, engine physics and player action replication remain shared
 engine services. Clients replay host actions and never run bot decisions.
+Both controllers use the same [network population policy](bot_population.md).
 
 ## Ownership and reading order
 

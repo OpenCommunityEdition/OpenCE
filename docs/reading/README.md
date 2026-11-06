@@ -167,3 +167,6 @@ submenu, P1-P4 layouts, physical input isolation and prompt updates.
 
 The [standalone enhanced bot controller](enhanced_bots.md) explains stock/enhanced
 ownership, goal arbitration, boarding, aircraft routes and validation limits.
+
+The [network bot population walkthrough](bot_population.md) explains human-only
+listings, automatic replacement/restoration and the OpenCE crossplay boundary.

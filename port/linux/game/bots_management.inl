@@ -3,10 +3,12 @@ d92cc933's add/drop commands, built on BirchWoodGod's OpenCE bots.
 Included by network_server_manager.c because the server record and its
 join/quit dispatch are private there. Clients use ordinary player messages. */
 static long bots_reuse_after[BOTS_MAXIMUM];
+static void bots_population_map_reset(void);
 
 void bots_management_reset(void)
 {
 	csmemset(bots_reuse_after, 0, sizeof(bots_reuse_after));
+	bots_population_map_reset();
 }
 
 static boolean bots_lobby_slots_available(struct network_game_server *server)
@@ -48,7 +50,7 @@ int bots_lobby_settings_apply(char *status, long size)
 	return TRUE;
 }
 
-int bots_manage(int add, int team, char *status, long size)
+static int bots_manage_change(int add, int team, char *status, long size)
 {
 	struct network_game_server *server = global_network_game_server_get();
 	long index, slot, chosen = NONE;
@@ -158,4 +160,14 @@ int bots_manage(int add, int team, char *status, long size)
 	}
 	network_event("bots: %s", status);
 	return TRUE;
+}
+
+int bots_manage(int add, int team, char *status, long size)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	int result;
+	if (server) bots_population_wanted(&server->game);
+	result = bots_manage_change(add, team, status, size);
+	if (result) bots_population_changed(&server->game, add ? 1 : -1);
+	return result;
 }

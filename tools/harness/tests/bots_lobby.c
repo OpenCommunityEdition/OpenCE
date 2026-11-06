@@ -14,6 +14,8 @@ constants and structures (config.inc) and the code (under_test.inc).
 
 typedef unsigned short word;
 #define VALID_INDEX(index, count) ((index) >= 0 && (index) < (count))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define PIN(value, low, high) ((value) < (low) ? (low) : (value) > (high) ? (high) : (value))
 #define NUMBEROF(array) (sizeof(array) / sizeof((array)[0]))
 #define csmemset memset
@@ -45,7 +47,9 @@ struct network_game_server
 	word state;
 	struct network_game game;
 	boolean sent_start_game_message;
-	struct { short machine_index; } client_machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	struct client_machine { short machine_index; } client_machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	boolean queued_player_valid;
+	long waiting_player_count;
 };
 
 /* the world the lobby asks */
@@ -65,6 +69,18 @@ struct message_server_remove_player_ingame { struct network_player player; long 
 static long game_time_get(void) { return tick; }
 static boolean game_engine_has_teams(void) { return has_teams; }
 static int bots_enhanced_running;
+static boolean slots_held, additions_allowed = TRUE;
+static unsigned long milliseconds;
+#define TICKS_PER_SECOND 30
+static unsigned long system_milliseconds(void) { return milliseconds; }
+static int network_game_server_get_state(struct network_game_server *s, void *unused)
+{ (void)unused; return s->state; }
+static struct network_game *network_game_server_get_game(struct network_game_server *s)
+{ return &s->game; }
+static boolean network_game_server_client_machine_is_joined_to_game(struct network_game_server *s, struct client_machine *m)
+{ (void)s; return m->machine_index != NONE; }
+static boolean network_game_server_machine_may_add_player_ingame(struct network_game_server *s, long m)
+{ (void)s; (void)m; return additions_allowed; }
 void bots_management_reset(void);
 static void *create_network_game_message(int type, const void *record, short size)
 {
@@ -97,7 +113,7 @@ static int config_boolean(const char *name) { return !strcmp(name, "bots.network
 static struct network_game_server *global_network_game_server_get(void) { return is_host ? &server : NULL; }
 static long bots_wanted_count(void) { return wanted; }
 static short bots_teams(void) { return teams_setting; }
-static boolean network_game_player_slot_held(long player_index) { (void)player_index; return FALSE; }
+static boolean network_game_player_slot_held(long player_index) { (void)player_index; return slots_held; }
 static void get_unique_random_color(struct network_game_server *server, struct network_player *player)
 {
 	(void)server;
@@ -197,6 +213,179 @@ int main(int argc, char **argv)
 	char const *case_name = argc > 1 ? argv[1] : "";
 	long team0, team1, count;
 	char status[180];
+	if (!strncmp(case_name, "population-", 11) || !strcmp(case_name, "human-count"))
+	{
+		struct network_player joining, leaving;
+		lobby(game_engine_slayer, 4);
+		player(0, 0);
+		server.client_machines[0].machine_index = 0;
+		local_game = FALSE;
+		network_option = TRUE;
+		wanted = 3;
+		bots_network_session_begin();
+		network_game_server_port_bots(&server);
+		memset(&joining, 0, sizeof(joining));
+		joining.machine_index = 1;
+		joining.controller_index = 0;
+		joining.player_list_index = NONE;
+		server.client_machines[1].machine_index = 1;
+		CHECK(bots_human_count(&server.game) == 1 && bots_population_count(&server.game) == 3, "initial population");
+		CASE("human-count") {
+			CHECK(bots_human_count(NULL) == 0, "null game");
+			server.game.players[0].machine_index = BOTS_FIRST_MACHINE + 20;
+			CHECK(bots_human_count(&server.game) == 1, "high-ID human hidden");
+			CHECK(server.game.player_count == 4, "reporting modified roster");
+			return 0;
+		}
+		CASE("population-lobby") {
+			CHECK(!lobby_join_full(&server), "bot-filled lobby rejected connection before admission");
+			CHECK(bots_population_can_join(&server), "bot-filled lobby closed");
+			bots_population_pregame_join(&server, &joining);
+			CHECK(network_game_add_player(&server.game, &joining), "human cannot replace bot");
+			network_game_server_port_bots(&server);
+			CHECK(server.game.player_count == 4 && bots_human_count(&server.game) == 2, "lobby did not retain human capacity");
+			CHECK(network_game_remove_player(&server.game, &joining), "human departure");
+			network_game_server_port_bots(&server);
+			CHECK(server.game.player_count == 4 && bots_population_count(&server.game) == 3, "lobby restoration");
+			return 0;
+		}
+		server.state = _network_game_server_state_ingame;
+		CASE("population-empty") {
+			leaving = server.game.players[0];
+			CHECK(network_game_remove_player(&server.game, &leaving), "last human left");
+			bots_population_update(&server);
+			CHECK(bots_human_count(&server.game) == 0 && bots_population_count(&server.game) == 3, "empty human count or bot ceiling");
+			CHECK(!bots_population_wait_for_slot(&server, &joining), "empty space unnecessarily reserved");
+			CHECK(network_game_add_player(&server.game, &joining), "human return");
+			CHECK(bots_population_count(&server.game) == 3, "vacant space displaced an extra bot");
+			return 0;
+		}
+		CASE("population-invalid") {
+			joining.controller_index = MAXIMUM_LOCAL_PLAYERS;
+			CHECK(!bots_population_wait_for_slot(&server, &joining), "invalid controller reserved");
+			joining.controller_index = 0;
+			server.client_machines[1].machine_index = NONE;
+			CHECK(!bots_population_wait_for_slot(&server, &joining), "unvalidated machine reserved");
+			server.client_machines[1].machine_index = 1;
+			additions_allowed = FALSE;
+			CHECK(!bots_population_wait_for_slot(&server, &joining), "rate-limited machine reserved");
+			CHECK(bots_population_count(&server.game) == 3, "invalid join removed bots");
+			return 0;
+		}
+		CASE("population-manual") {
+			CHECK(bots_manage(FALSE, NONE, status, sizeof(status)), "manual drop");
+			tick += 90;
+			bots_population_update(&server);
+			CHECK(bots_population_count(&server.game) == 2, "manual drop restored");
+			CHECK(bots_manage(TRUE, NONE, status, sizeof(status)), "manual add");
+			tick += 90;
+			bots_population_update(&server);
+			CHECK(bots_population_count(&server.game) == 3, "manual add removed");
+			return 0;
+		}
+		CASE("population-manual-crowded") {
+			long i;
+			server.game.maximum_players = 8;
+			for (i = 1; i <= 4; i++) {
+				joining.machine_index = (char)i;
+				joining.player_list_index = NONE;
+				server.client_machines[i].machine_index = (short)i;
+				CHECK(!bots_population_wait_for_slot(&server, &joining), "vacant slot delayed");
+				CHECK(network_game_add_player(&server.game, &joining), "humans could not exceed initial target");
+			}
+			CHECK(bots_human_count(&server.game) == 5 && !bots_population_count(&server.game), "crowded setup");
+			tick += 90;
+			CHECK(bots_manage(TRUE, NONE, status, sizeof(status)), "manual add above target");
+			bots_population_update(&server);
+			CHECK(bots_population_count(&server.game) == 1, "manual addition immediately removed");
+			return 0;
+		}
+		CASE("population-human-full") {
+			long i;
+			for (i = 0; i < 128; i++) if (bots_player_owned(server.game.players[i].machine_index))
+				bots_player_ownership(server.game.players[i].machine_index, FALSE);
+			CHECK(!bots_population_can_join(&server), "full-human game advertised open");
+			server.state = _network_game_server_state_pregame;
+			CHECK(lobby_join_full(&server), "full-human lobby admitted connection");
+			server.state = _network_game_server_state_ingame;
+			CHECK(!bots_population_wait_for_slot(&server, &joining), "full-human join deferred");
+			CHECK(server.game.player_count == 4, "human removed");
+			return 0;
+		}
+		if (!strcmp(case_name, "population-wait") || !strcmp(case_name, "population-cancel")) {
+			slots_held = TRUE;
+			CHECK(bots_population_wait_for_slot(&server, &joining), "held departure not awaited");
+			CHECK(bots_population_count(&server.game) == 2, "wrong number evicted");
+			milliseconds += 100;
+			CHECK(bots_population_wait_for_slot(&server, &joining), "reservation lost");
+			CHECK(bots_population_count(&server.game) == 2, "repeat evicted another bot");
+			if (!strcmp(case_name, "population-wait")) {
+				milliseconds += 10000;
+				CHECK(!bots_population_wait_for_slot(&server, &joining), "unbounded reservation");
+			} else {
+				server.client_machines[1].machine_index = NONE;
+				CHECK(!bots_population_wait_for_slot(&server, &joining), "cancelled connection retained");
+			}
+			slots_held = FALSE;
+			tick += 90;
+			bots_population_update(&server);
+			CHECK(bots_population_count(&server.game) == 3, "failed join permanently removed bot");
+			return 0;
+		}
+		if (!strcmp(case_name, "population-split")) {
+			joining.machine_index = 0;
+			joining.controller_index = 1;
+		}
+		/* A target below the server limit must not grow when a human joins. */
+		if (!strcmp(case_name, "population-live")) server.game.maximum_players = 8;
+		CHECK(!bots_population_wait_for_slot(&server, &joining), "free slot delayed");
+		CHECK(network_game_add_player(&server.game, &joining), "join after departure");
+		CHECK(bots_human_count(&server.game) == 2 && bots_population_count(&server.game) == 2, "one-in one-out");
+		CHECK(!bots_population_wait_for_slot(&server, &joining), "duplicate join reserved");
+		CHECK(bots_population_count(&server.game) == 2, "duplicate join displaced bot");
+		tick += 90;
+		bots_population_update(&server);
+		CHECK(bots_population_count(&server.game) == 2, "restoration ignored the newly joined human");
+		CASE("population-concurrent") {
+			struct network_player second = joining;
+			second.controller_index = 1;
+			second.player_list_index = NONE;
+			CHECK(!bots_population_wait_for_slot(&server, &second), "second queued human delayed");
+			CHECK(network_game_add_player(&server.game, &second), "second human join");
+			CHECK(bots_human_count(&server.game) == 3 && bots_population_count(&server.game) == 1, "two joins did not replace two bots");
+			CHECK(network_game_remove_player(&server.game, &second), "second human departure");
+			CHECK(network_game_remove_player(&server.game, &joining), "first human departure");
+			tick += 90;
+			bots_population_update(&server);
+			tick += 90;
+			bots_population_update(&server);
+			CHECK(bots_population_count(&server.game) == 3, "two humans did not restore two bots");
+			return 0;
+		}
+		CASE("population-lifecycle") {
+			bots_management_reset();
+			server.state = _network_game_server_state_pregame;
+			network_game_server_port_bots(&server);
+			CHECK(bots_population_count(&server.game) == 2, "map change reset target");
+			bots_network_session_end();
+			bots_network_session_begin();
+			server.game.maximum_players = 8;
+			CHECK(bots_population_wanted(&server.game) == 3, "old session target leaked");
+			return 0;
+		}
+		leaving = joining;
+		CHECK(network_game_remove_player(&server.game, &leaving), "human remove");
+		tick += 90;
+		CASE("population-queue") {
+			server.waiting_player_count = 1;
+			bots_population_update(&server);
+			CHECK(bots_population_count(&server.game) == 2, "restoration stole queued human slot");
+			server.waiting_player_count = 0;
+		}
+		bots_population_update(&server);
+		CHECK(bots_population_count(&server.game) == 3 && server.game.player_count == 4, "live restoration");
+		return 0;
+	}
 
 	CASE("lobby-enable")
 	{

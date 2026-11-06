@@ -1554,7 +1554,8 @@ static void network_game_server_list(
 	char gametype[NUMBEROF(game->variant.human_readable_game_description) + 1];
 	boolean in_progress = state != _network_game_server_state_pregame || network_game_server_game_is_loading(server);
 	boolean open = state == _network_game_server_state_ingame ? network_game_server_accepts_late_joins(server) :
-		network_game_server_game_is_open(server) && network_game_has_free_player_slot(game);
+		network_game_server_game_is_open(server) &&
+		(network_game_has_free_player_slot(game) || bots_population_can_join(server)); /* port: bots yield to humans */
 
 	listing_text(name, sizeof(name), game->name, NUMBEROF(game->name));
 	listing_text(gametype, sizeof(gametype), game->variant.human_readable_game_description,
@@ -1598,7 +1599,7 @@ static void network_game_server_port_bots(
 		return;
 	/* port: optional bot objectives are selected by the feature module. */
 	if (bots_session_allowed() && bots_gametype_allowed(server->game.variant.game_engine_index))
-		wanted = PIN(bots_wanted_count(), 0, BOTS_MAXIMUM);
+		wanted = PIN(bots_population_wanted(&server->game), 0, BOTS_MAXIMUM); /* port: humans replace network bots */
 	for (bot_index = 0; bot_index < BOTS_MAXIMUM; bot_index++)
 		slot_of_bot[bot_index] = NONE;
 	for (slot = 0; slot < MAXIMUM_NETWORK_PLAYER_COUNT; slot++)
@@ -1677,6 +1678,8 @@ static void network_game_server_port_bots(
 
 /* port: host bot controls need this module's private player dispatch. */
 #include "bots_management.inl"
+/* port: automatic replacement/restoration owns its state in the bot feature. */
+#include "bots_population.inl"
 
 boolean network_game_server_idle(
 	struct network_game_server *server)
@@ -1697,9 +1700,10 @@ boolean network_game_server_idle(
 	mcc_ui_network_update_map(server); /* port: apply pending MCC selection after local admission */
 	/* port: the bots of a local game (port/linux/game/bots.c) */
 	network_game_server_port_bots(server);
+	bots_population_update(server); /* port: restore network bots after humans leave */
 	/* (what Discord shows of a game hosted for internet play, and the
 	server browser's listing) */
-	p2p_set_game_player_counts(server->game.player_count, server->game.maximum_players);
+	p2p_set_game_player_counts(bots_human_count(&server->game), server->game.maximum_players); /* port: advertise humans */
 	network_game_server_list(server);
 
 	if (network_game_server_game_is_valid(server))
@@ -2687,6 +2691,7 @@ boolean network_game_server_add_player_to_game(
 
 	if (machine->machine_index == player->machine_index)
 	{
+		bots_population_pregame_join(server, player); /* port: a validated human can replace a lobby bot */
 		/* port: the smaller team (the Xbox game took turns with a counter of
 		its own, which a failed add or an earlier game moved on) */
 		{
@@ -2830,6 +2835,7 @@ void network_game_server_update_ticks(
 			}
 			if (server->queued_player_valid)
 			{
+				boolean waiting_for_bot = FALSE; /* port: retain joins while a bot's departure completes */
 				/* (a machine's slot is its index; the handlers queued only a
 				machine's own players) */
 				client_machine_index = server->queued_player.machine_index;
@@ -2849,6 +2855,10 @@ void network_game_server_update_ticks(
 				if (client_machine && map_share_machine_needs_map(client_machine->machine_index))
 				{
 					network_game_server_hold_requested_player(client_machine_index, &server->queued_player);
+				}
+				else if (client_machine && bots_population_wait_for_slot(server, &server->queued_player))
+				{
+					waiting_for_bot = TRUE; /* port: bounded wait, ordinary departure and addition messages */
 				}
 				else if (client_machine &&
 					network_game_server_machine_may_add_player_ingame(server, client_machine_index) &&
@@ -2899,7 +2909,7 @@ void network_game_server_update_ticks(
 					}
 				}
 
-				server->queued_player_valid = FALSE;
+				if (!waiting_for_bot) server->queued_player_valid = FALSE; /* port: retry the reserved human */
 			}
 		}
 		break;
@@ -2931,7 +2941,7 @@ boolean network_game_server_accepts_late_joins(
 	refused, network_game_server_refuse_late_joiner) */
 	return server->state == _network_game_server_state_ingame &&
 		network_game_server_game_is_open(server) &&
-		network_game_has_free_player_slot(&server->game);
+		(network_game_has_free_player_slot(&server->game) || bots_population_can_join(server)); /* port: replaceable bots */
 }
 
 boolean network_game_server_client_machine_is_loaded(
@@ -5359,7 +5369,7 @@ static boolean network_game_server_idle_pregame_tasks(
 				!network_game_server_client_machine_is_local(server, client_machine) &&
 				!network_game_server_machine_has_players(server, client_machine->machine_index) &&
 				!map_share_machine_downloading(client_machine->machine_index) &&
-				(!network_game_has_free_player_slot(&server->game) ||
+				((!network_game_has_free_player_slot(&server->game) && !bots_population_can_join(server)) || /* port: allow bot replacement */
 					system_milliseconds() - network_game_server_client_machine_join_times[client_machine->machine_index] >
 						NETWORK_GAME_SERVER_PLAYERLESS_MACHINE_TIMEOUT))
 			{

@@ -39,6 +39,7 @@ Called from the main loop every frame (main.c).
 #include "network_map_vote.h"
 #include "server_director.h"
 #include "server_gametypes.h"
+#include "bots.h"
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
 #include "../src/server_console.h" /* port: port/linux/src/server_console.c */
@@ -2138,7 +2139,7 @@ static void server_publish_state(
 	server_json_object_begin(&json, NULL);
 	server_json_string(&json, "variant", variant);
 	server_json_string(&json, "state", server_status_state_name(server.state));
-	server_json_integer(&json, "players", server_player_count());
+	server_json_integer(&json, "players", bots_human_count(game));
 	server_json_string(&json, "map", server.current_set ? server.current.map_name : "");
 	server_json_string(&json, "gametype", server.current_set ? server.current.gametype : "");
 	server_json_object_end(&json);
