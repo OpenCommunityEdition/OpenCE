@@ -2,11 +2,11 @@
 
 MCC map and mission panels display the image declared by their installed
 package. Modern, Classic PC, Stock and Xbox-style frontends keep their existing
-thumbnail rectangles and typography. PC-style images preserve their aspect ratio
-and are centered inside the 140 by 114 logical-pixel thumbnail area; extra space
-remains transparent. The separate Xbox MCC browser uses a centered crop to fill
-the native Xbox thumbnail rectangle, without stretching. An explicit clip
-prevents drawing outside that rectangle.
+thumbnail rectangles and typography. All MCC images are center-cropped and
+resized to fill the same 140 by 114 logical-pixel area as the question-mark
+placeholder, without stretching. An explicit clip prevents drawing outside
+that rectangle. Cropping happens while preparing the texture: the native
+bitmap helper samples from the texture origin and cannot select an offset crop.
 The lobby's locally installed map uses the same provider.
 
 This is interpretation of the selected MCC package, with no additional toggle.
@@ -61,7 +61,7 @@ folder, saved mission identity or network map name is renamed.
    and the opened file's final path. This file runs in the Android host through
    the generated `posix.h` guest bridge.
 6. [mcc_menu_preview.c](../../port/linux/game/mcc_menu_preview.c):
-   `mcc_menu_preview_draw` owns texture caching, aspect fit and clipping.
+   `mcc_menu_preview_draw` owns texture caching, centered cropping and clipping.
 7. [mcc_menu_text.c](../../port/linux/game/mcc_menu_text.c):
    `mcc_menu_text_draw` measures package text in the active font, wraps it at
    word boundaries and breaks oversized words. It uses the existing small font

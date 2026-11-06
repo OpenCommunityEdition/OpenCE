@@ -51,7 +51,10 @@ static void error(int severity,const char *format,...) {(void)severity;(void)for
 static long size(const char *path) {FILE *f=fopen(path,"rb");long n;assert(f);fseek(f,0,SEEK_END);n=ftell(f);fclose(f);return n;}
 int main(void) {
  const char *a="mcc_maps\\one\\a10",*b="mcc_maps\\two\\a10";
- char path[300],renamed[300],original[300];FILE *f;unsigned char record[76]={0};unsigned checksum;int i;
+ char path[300],renamed[300],destination[300],original[300];FILE *f;unsigned char record[76]={0};unsigned checksum;int i;
+ snprintf(original,sizeof(original),"%s/0/blam.sav",TEST_ROOT);
+ snprintf(destination,sizeof(destination),"%s/2/",TEST_ROOT);
+ assert(mcc_progress_copy(original,destination)); /* no companion leaves native rename untouched */
  assert(!mcc_progress_flags(0,a));
  mcc_progress_complete(a,1);
  assert(mcc_progress_flags(0,a)==2&&mcc_progress_flags(1,a)==2&&!mcc_progress_flags(0,b));
@@ -73,7 +76,8 @@ int main(void) {
  snprintf(renamed,sizeof(renamed),"%s/2/",TEST_ROOT);
  assert(mcc_progress_copy(original,renamed)); /* rename preserves even a damaged tail */
  strcat(renamed,"mcc_completed.dat");assert(size(renamed)==235&&size(path)==235);
- assert(!mcc_progress_copy(original,renamed)); /* failure cannot delete the original */
+ assert(!mcc_progress_copy(original,destination)); /* exclusive copy refuses an existing companion */
+ assert(size(path)==235); /* failure cannot delete the original */
  /* A checksum mismatch and unsupported version cannot manufacture badges. */
  assert(mcc_progress_path(1,path));f=fopen(path,"r+b");assert(f);fputc('X',f);fclose(f);
  assert(!mcc_progress_flags(1,a)&&!mcc_progress_save(1,a,1));
