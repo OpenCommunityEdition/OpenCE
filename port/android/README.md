@@ -93,12 +93,12 @@ To install the data from a computer:
 1. Start the app one time. The app makes its folders.
 2. Enter `adb push <folder>/. /sdcard/Android/data/com.halo.decomp/files/`.
 
-| Item | Location in `/sdcard/Android/data/com.halo.decomp/files` |
-| --- | --- |
-| Saved games (`z:\` and `u:\`) | `save` |
-| Mods (`docs/mods.md`) | `mods`: `adb push <mod folder> /sdcard/Android/data/com.halo.decomp/files/mods/`; the main menu's Mods orders them and turns them off |
-| Log | `debug.txt` |
-| Settings | `config.toml` |
+| Item                          | Location in `/sdcard/Android/data/com.halo.decomp/files`                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Saved games (`z:\` and `u:\`) | `save`                                                                                                                                |
+| Mods (`docs/mods.md`)         | `mods`: `adb push <mod folder> /sdcard/Android/data/com.halo.decomp/files/mods/`; the main menu's Mods orders them and turns them off |
+| Log                           | `debug.txt`                                                                                                                           |
+| Settings                      | `config.toml`                                                                                                                         |
 
 To make a copy of the saved games, enter
 `adb pull /sdcard/Android/data/com.halo.decomp/files/save/u` (the profiles).
@@ -112,21 +112,21 @@ controllers that Android knows operate. The first controller is player 1.
 The other controllers are players 2 to 4 (split screen). The buttons agree
 with the positions on the Xbox controller:
 
-| DualSense | Xbox | Function in the game |
-| --- | --- | --- |
-| left stick, right stick | left stick, right stick | move, look |
-| R2 | right trigger | fire |
-| L2 | left trigger | throw a grenade |
-| Cross | A | jump, accept |
-| Circle | B | melee, back |
-| Square | X | action, reload |
-| Triangle | Y | change the weapon |
-| L1 | white | flashlight |
-| R1 | black | change the grenade |
-| L3, R3 | left and right stick clicks | crouch, zoom |
-| D-pad | D-pad | |
-| Options | start | pause menu |
-| Create | back | |
+| DualSense               | Xbox                        | Function in the game |
+| ----------------------- | --------------------------- | -------------------- |
+| left stick, right stick | left stick, right stick     | move, look           |
+| R2                      | right trigger               | fire                 |
+| L2                      | left trigger                | throw a grenade      |
+| Cross                   | A                           | jump, accept         |
+| Circle                  | B                           | melee, back          |
+| Square                  | X                           | action, reload       |
+| Triangle                | Y                           | change the weapon    |
+| L1                      | white                       | flashlight           |
+| R1                      | black                       | change the grenade   |
+| L3, R3                  | left and right stick clicks | crouch, zoom         |
+| D-pad                   | D-pad                       |                      |
+| Options                 | start                       | pause menu           |
+| Create                  | back                        |                      |
 
 The controller gets the rumble. The back gesture of Android is the B
 button. A Bluetooth or USB keyboard operates as on Linux.
@@ -170,17 +170,17 @@ controls (`input.touch_controls`): while a controller is connected, or with
 In a game, the app shows touch controls over the picture. They are a
 controller for player 1. With the default buttons of the profile:
 
-| Control | Function in the game |
-| --- | --- |
-| stick (lower left) | move |
-| swipe on the screen away from the buttons | look |
-| Fire | right trigger |
-| Grenade | left trigger |
-| A / Jump, B / Melee, X / Reload, Y / Weapon | A, B, X, Y |
-| Crouch, Zoom | left and right stick clicks |
-| Light, Gren. type | white, black |
-| Pause, Back | start, back |
-| Up, Down, Left, Right | D-pad (in a network game, Up opens the text chat's keyboard) |
+| Control                                     | Function in the game                                         |
+| ------------------------------------------- | ------------------------------------------------------------ |
+| stick (lower left)                          | move                                                         |
+| swipe on the screen away from the buttons   | look                                                         |
+| Fire                                        | right trigger                                                |
+| Grenade                                     | left trigger                                                 |
+| A / Jump, B / Melee, X / Reload, Y / Weapon | A, B, X, Y                                                   |
+| Crouch, Zoom                                | left and right stick clicks                                  |
+| Light, Gren. type                           | white, black                                                 |
+| Pause, Back                                 | start, back                                                  |
+| Up, Down, Left, Right                       | D-pad (in a network game, Up opens the text chat's keyboard) |
 
 The names on the buttons follow the profile's "Button layout" (Settings >
 Gamepads): with "Swap triggers", the right trigger's button says "Grenade".
@@ -263,15 +263,15 @@ have rows of their own in Video Setup:
 
 These settings are only for Android:
 
-| Setting | Function |
-| --- | --- |
-| `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
-| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The carnage report's CONTINUE and LEAVE buttons follow the same rule (otherwise it shows its A and B prompt). The menus take taps in any case. |
-| `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
-| `display.stats_log` | `false` (the default): `true` writes a line a second to the log with the frame rate, the mode, the map, the renderer and the size of the 3D view, for a bug report or to compare two builds. |
+| Setting                      | Function                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `input.touch_aim_assist`     | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays.                                                                                                                                                                                                                                               |
+| `input.touch_controls`       | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The carnage report's CONTINUE and LEAVE buttons follow the same rule (otherwise it shows its A and B prompt). The menus take taps in any case.                                                                                       |
+| `display.screen_width`       | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox.                                                                                                                                                                                                                                                                                                             |
+| `display.stats_log`          | `false` (the default): `true` writes a line a second to the log with the frame rate, the mode, the map, the renderer and the size of the 3D view, for a bug report or to compare two builds.                                                                                                                                                                                                                                                                     |
 | `display.resolution_scaling` | Also Linux's, with another default on Android. `"original"` (the default): the game draws the 480 lines of the Xbox, which the display scales up. `"native"`: the game draws at the display's resolution (1080 lines on a 1080p phone). `"75%"`, `"50%"` or `"25%"`: that part of the display's resolution each way, scaled up: less for the GPU to draw, for more frames a second and less heat. Video Setup's Resolution Scaling sets it, from the next frame. |
-| `debug.sample_seconds` | Refer to "Find problems". |
-| `debug.memory_watch` | `true` (the default): the app notices the game's writes to cached textures by page protection. `false`: it compares page contents once a frame instead, which is slower. Geometry uses the streaming path in either mode. Refer to "Limits". |
+| `debug.sample_seconds`       | Refer to "Find problems".                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `debug.memory_watch`         | `true` (the default): the app notices the game's writes to cached textures by page protection. `false`: it compares page contents once a frame instead, which is slower. Geometry uses the streaming path in either mode. Refer to "Limits".                                                                                                                                                                                                                     |
 
 ## Internet play
 
@@ -350,21 +350,21 @@ The guest is the game, the platform layer and a small runtime:
 1. clang compiles the guest for `arm64_32-apple-watchos`, the only ILP32
    AArch64 target of clang. The options `-U__APPLE__` and
    `-fno-define-target-os-macros` hide the Darwin environment.
-2. `tools/android_asm_convert.py` changes the Mach-O assembly to ELF
+2. `tools/guest_asm_convert.py` changes the Mach-O assembly to ELF
    assembly. It renames symbols, but keeps string literals (`.ascii`,
    `.asciz`) byte for byte: they hold tables as well as text
-   (`tools/test_android_asm_convert.py`).
+   (`tools/test_guest_asm_convert.py`).
 3. The AArch64 assembler makes the objects.
-4. `ld.lld` links the objects with `guest/guest.ld` to a static image,
+4. `ld.lld` links the objects with `port/guest/guest.ld` to a static image,
    `build/android/halo_guest.elf`, at a fixed address above the Xbox memory
-   (`include/halo_android_abi.h`).
+   (`port/guest/include/halo_guest_abi.h`).
 
 The APK contains the image as an asset.
 
 The C library of the guest is a part of musl for a new `arm64_32`
-architecture (`guest/libc/arch/arm64_32`). It has ILP32 types and a 32-bit
+architecture (`port/guest/libc/arch/arm64_32`). It has ILP32 types and a 32-bit
 `time_t`, as in the MSVC runtime of the game. Its system calls go to the
-host (`syscall_arch.h`). `guest/runtime/guest_thread.c` makes the threads
+host (`syscall_arch.h`). `port/guest/runtime/guest_thread.c` makes the threads
 and supplies the thread pointer and TLS.
 
 ### The host library
@@ -386,10 +386,10 @@ and supplies the thread pointer and TLS.
   UPnP and DTLS functions of `port/linux/src/posix_*.c` (DTLS with Mbed TLS,
   for internet play with browsers: `posix_dtls.c`).
 
-The guest calls the host through stubs (`tools/android_imports.py`). The
+The guest calls the host through stubs (`tools/guest_imports.py`). The
 two ABIs use the same registers for 32-bit integers, floats and pointers.
-`tools/android_gl_stubs.py` makes the OpenGL ES stubs from
-`port/linux/src/gl.h`. `tools/android_posix_stubs.py` makes the stubs of the
+`tools/guest_gl_stubs.py` makes the OpenGL ES stubs from
+`port/linux/src/gl.h`. `tools/guest_posix_stubs.py` makes the stubs of the
 `posix_*` functions, which copy the `errno` of the host.
 
 ### The fixed addresses
@@ -470,10 +470,10 @@ in the LLVM IR. The problems are repaired:
 
 - `hs.c` declared the red component of the script fades as `long`.
 - Some files call `error`, `console_printf` or `terminal_printf` without a
-  prototype. `include/halo_android_variadic_prototypes.h` gives the
+  prototype. `port/guest/include/halo_guest_variadic_prototypes.h` gives the
   prototypes.
 
-`guest/runtime/guest_misc.c` supplies the Darwin library functions that the
+`port/guest/runtime/guest_misc.c` supplies the Darwin library functions that the
 target calls (`__sincos_stret`, `__exp10f`). The guest compiles without
 floating-point contraction, as on x86.
 
@@ -501,19 +501,19 @@ assembly of the port is necessary:
 
 - The import stubs. A 32-bit guest cannot keep or go to a 64-bit host
   address.
-- The symbol aliases in `guest/libc/src_include/features.h`. The Darwin
+- The symbol aliases in `port/guest/libc/src_include/features.h`. The Darwin
   target does not accept alias attributes.
 
 ## Geometry uploads
 
 Android selects its rendering fixes once at startup from the chip identity:
 
-| Chip | Geometry fixes | Custom Edition texture fixes |
-| --- | --- | --- |
-| Qualcomm Snapdragon | On | On |
-| MediaTek | Off | On |
-| Other identified vendors, including Google Tensor and Samsung Exynos | Off | Off |
-| Unknown or conflicting identity | On | On |
+| Chip                                                                 | Geometry fixes | Custom Edition texture fixes |
+| -------------------------------------------------------------------- | -------------- | ---------------------------- |
+| Qualcomm Snapdragon                                                  | On             | On                           |
+| MediaTek                                                             | Off            | On                           |
+| Other identified vendors, including Google Tensor and Samsung Exynos | Off            | Off                          |
+| Unknown or conflicting identity                                      | On             | On                           |
 
 The host reads `ro.soc.manufacturer` and `ro.soc.model`, falling back to
 `ro.hardware` and `ro.board.platform` on older devices. Phone brand is not
@@ -538,7 +538,7 @@ Xbox and Custom Edition maps keep their existing loaders and resource
 paths. `tools/test_android_mirror_uploads.py` checks the bypass with large
 and reused ranges, frame-counter rollover and desktop/web cache controls;
 it does not substitute for device gameplay validation. The chip and policy
-matrix is covered by `tools/test_android_render_policy.py`.
+matrix is covered by `tools/test_halo_render_policy.py`.
 
 Streamed vertices and indices go into pooled buffers, a buffer for each
 draw that no queued draw reads, written with `glBufferSubData` and reused
@@ -587,7 +587,7 @@ and reload, address reuse and allocation failure.
   `debug.memory_watch = false` does the same on a device. The translation
   also has no scalar conversion from floating
   point to an integer in a SIMD register (`fcvtzs s0, s1`, an illegal
-  instruction there), so `tools/android_asm_convert.py` writes each as the
+  instruction there), so `tools/guest_asm_convert.py` writes each as the
   vector form, which leaves the register and the exception flags the same.
 
 ## Custom Edition texture storage
