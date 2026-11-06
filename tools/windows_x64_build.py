@@ -204,7 +204,11 @@ def generate_windows_x64_build(n: Writer, sln: Any) -> None:
                 f"/stack:0x800000 /debug /pdb:{BUILD / 'halo.pdb'} @$out.rsp "
                 + " ".join(_quote(path) for path in [sdl_import, *libraries]))
     else:
-        link = (f"$windows_x64_cc --target=x86_64-pc-windows-msvc -fuse-ld=lld -g -o $out @$out.rsp "
+        # (ninja quotes the response file's paths for the shell that runs the
+        # rule: Windows quoting on Windows)
+        quoting = "windows" if sys.platform == "win32" else "posix"
+        link = (f"$windows_x64_cc --target=x86_64-pc-windows-msvc -fuse-ld=lld -g -o $out --rsp-quoting={quoting} "
+                f"@$out.rsp "
                 f"{_quote(sdl_import)} " + " ".join(f"-l{name}" for name in [*LIBRARIES, "synchronization"])
                 + " " + " ".join(f"-Wl,{flag}" for flag in [*subsystem, "/STACK:0x800000"]))
     n.rule(
