@@ -232,7 +232,7 @@ int main(int argc, char **argv)
 		CHECK(bots_human_count(&server.game) == 1 && bots_population_count(&server.game) == 3, "initial population");
 		CASE("human-count") {
 			CHECK(bots_human_count(NULL) == 0, "null game");
-			wcscpy(server.game.players[0].name, L"BOT Johnson");
+			memcpy(server.game.players[0].name, L"BOT Johnson", sizeof(L"BOT Johnson"));
 			CHECK(bots_human_count(&server.game) == 1, "bot-like human name hidden");
 			server.game.players[0].machine_index = BOTS_FIRST_MACHINE + 20;
 			CHECK(bots_human_count(&server.game) == 1, "high-ID human hidden");
