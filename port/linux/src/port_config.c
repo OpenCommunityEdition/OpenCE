@@ -638,6 +638,9 @@ static const struct config_setting config_settings[] =
 	{ "bots.teams", _config_string, "\"even\"", "HALO_BOT_TEAMS", _environment_value, _platform_all,
 		"In team games: \"even\" puts the bots on both teams, evening them with\n"
 		"the players; \"against\" puts them all on the team the players are not on." },
+	{ "display.dynamic_lighting_reset", _config_boolean, "true", "HALO_DYNAMIC_LIGHTING_RESET", _environment_value, _platform_all,
+		"Migration marker: old saved dynamic-lighting preferences were reset to off.\n"
+		"Leave true to retain lighting choices made after that one-time reset." },
 	{ "display.plasma_occlusion", _config_boolean, "false", "HALO_PLASMA_OCCLUSION", _environment_value, _platform_desktop,
 		"Collision-filtered projectile, Covenant emitter and Shield Glow visibility.\n"
 		"Off preserves unoccluded plasma lighting. At most eight occluded lights." },
@@ -2452,6 +2455,8 @@ static void config_apply_server_mode(void)
 }
 #endif
 
+#include "lighting_settings_migration.inl"
+
 static void config_load(void)
 {
 	char path[1024];
@@ -2520,8 +2525,27 @@ static void config_load(void)
 		if (result.ok)
 		{
 			char *completed;
+			int reset_lighting = lighting_settings_legacy(result.toptab);
+			int lighting_migrated = !reset_lighting;
+			if (reset_lighting)
+			{
+				char *migrated = lighting_settings_migrate(text, result.toptab);
+				if (migrated)
+				{
+					toml_result_t checked = toml_parse(migrated, (int)strlen(migrated));
+					if (checked.ok)
+					{
+						toml_free(result); result = checked;
+						free(text); text = migrated;
+						lighting_migrated = 1;
+					}
+					else { toml_free(checked); free(migrated); }
+				}
+				platform_log("settings: reset old dynamic-lighting preferences to off%s",
+					lighting_migrated ? "" : " in memory; the file could not be migrated");
+			}
 
-			if (joined && !skipped && !config_answer_only)
+			if (joined && !skipped && !config_answer_only && lighting_migrated)
 			{
 				if (config_write_file(path, text))
 					platform_log("settings: joined the sections %s had twice", path);
@@ -2529,7 +2553,12 @@ static void config_load(void)
 					platform_log("settings: cannot write %s", path);
 			}
 			for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+			{
 				config_set_from_file(&config_values[index], &config_settings[index], result.toptab);
+				if (reset_lighting && lighting_settings_reset_key(config_settings[index].name))
+					config_set_from_text(&config_values[index], config_settings[index].type,
+						config_settings[index].type == _config_string ? "default" : "false");
+			}
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
 			if (config_values[config_setting_index("server.enabled")].boolean && !config_probe_mode)
 				config_server_mode = 1;
@@ -2543,10 +2572,10 @@ static void config_load(void)
 				platform_log("settings: %d line%s of config.toml skipped; every other setting in it is used", skipped,
 					skipped == 1 ? "" : "s");
 			}
-			else if (!config_answer_only)
+			else if (!config_answer_only && lighting_migrated)
 			{
 				completed = config_add_missing(text, result.toptab);
-				if (completed && !config_write_file(path, completed))
+				if ((completed || reset_lighting) && !config_write_file(path, completed ? completed : text))
 					platform_log("settings: cannot write %s", path);
 				free(completed);
 			}

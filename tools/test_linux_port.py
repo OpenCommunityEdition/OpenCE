@@ -443,7 +443,7 @@ def test_config_has_each_section_once(tmp_path):
     (stubs / "SDL3" / "SDL.h").write_text("")
     (stubs / "platform.h").write_text("void platform_log(const char *format, ...);\n")
     # (beside the stubs, which it then includes instead of the platform layer's)
-    for name in ("port_config.c", "port_config.h"):
+    for name in ("port_config.c", "port_config.h", "lighting_settings_migration.inl"):
         shutil.copy(root / "port/linux/src" / name, stubs / name)
     (tmp_path / "main.c").write_text(CONFIG_PROGRAM)
     program = tmp_path / "config_program"
@@ -479,6 +479,19 @@ def test_config_has_each_section_once(tmp_path):
     assert sections().count("display") == 1
     assert run("get", "display.vsync")[0] == "false"
     assert run("get", "game.console_log")[0] == "all"
+
+    # Legacy lighting resets before any menu or game reads it; the marker is
+    # written with the reset and later explicit choices survive fresh loads.
+    config.write_text('[display]\nvsync = false\nweapon_glow = true\n'
+                      'shield_glow = true\nshield_glow_intensity = "light_show"\n')
+    assert run("get", "display.weapon_glow")[0] == "false"
+    assert run("get", "display.shield_glow")[0] == "false"
+    assert run("get", "display.shield_glow_intensity")[0] == "default"
+    assert run("get", "display.dynamic_lighting_reset")[0] == "true"
+    assert 'weapon_glow = false' in config.read_text()
+    assert run("get", "display.vsync")[0] == "false"
+    run("write", "display.weapon_glow", "true")
+    assert run("get", "display.weapon_glow")[0] == "true"
 
 
 # ---------- system link's stand-in machines (tools/system_link_bots.py)

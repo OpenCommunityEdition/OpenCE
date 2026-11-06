@@ -23,12 +23,25 @@ Video Setup > Dynamic Lighting groups related sources:
 Shield Glow and its host-policy controls remain separate. Consolidation does
 not grant a client control over host-authoritative shield effects.
 
-The old individual fuel-rod, AR, Needler and shield-emitter configuration
-keys remain supported. Mixed values display **CUSTOM**. Opening, cancelling
-or saving an unchanged CUSTOM group preserves those values. Choosing ON or
-OFF and saving writes each group member; Defaults stages OFF until saved.
+Weapon Glow and Shield Emitters offer only **OFF** and **ON**. The first load
+of an older configuration resets all optional dynamic-lighting switches to
+OFF and Shield Glow intensity to Default. The configuration loader records
+`display.dynamic_lighting_reset = true`; subsequent player choices survive
+restarts. Other graphics settings, shield appearance and overshield effects
+are unchanged. Explicit environment overrides still apply after migration.
+The individual configuration keys remain available; a group displays ON if
+any member is enabled. Choosing OFF disables every member, and choosing ON
+from OFF enables them all. Defaults stages OFF until saved.
 The `lighting.*` names are menu controls, not new persistent config keys.
 See the [settings table](../../port/linux/README.md) for persistent keys.
+
+The bounded migration in
+[lighting_settings_migration.inl](../../port/linux/src/lighting_settings_migration.inl)
+uses the TOML parser's source positions to replace just lighting values.
+`config_load` calls it before loading settings and applying environment overrides.
+If migration cannot be prepared, old lights remain OFF in memory and the file
+is left unmarked for a later retry. Invalid files and read-only command modes
+retain the configuration loader's existing no-write behaviour.
 
 ## Reading order
 

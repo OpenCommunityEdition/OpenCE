@@ -1,4 +1,4 @@
-"""Grouped controls preserve mixed preferences and only write on Save."""
+"""Grouped ON/OFF controls only write on Save; migration is tested separately."""
 import re
 import sys
 from pathlib import Path

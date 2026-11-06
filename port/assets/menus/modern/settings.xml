@@ -1814,7 +1814,7 @@
 		<child widget="modern/lighting/spinner_lighting_weapon_glow2" x="180" y="3" />
 	</widget>
 	<widget name="modern/lighting/label_lighting_weapon_glow2" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/lighting/spinner_lighting_weapon_glow2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF|CUSTOM" values="true|false|custom" setting="lighting.weapon_glow" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/lighting/spinner_lighting_weapon_glow2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="lighting.weapon_glow" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/lighting/row_display_plasma_prong_lighting3" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
@@ -1830,7 +1830,7 @@
 		<child widget="modern/lighting/spinner_lighting_shield_emitters4" x="180" y="3" />
 	</widget>
 	<widget name="modern/lighting/label_lighting_shield_emitters4" type="text" controller="1" width="152" height="24" string_list="modern/lighting/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/lighting/spinner_lighting_shield_emitters4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF|CUSTOM" values="true|false|custom" setting="lighting.shield_emitters" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/lighting/spinner_lighting_shield_emitters4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="lighting.shield_emitters" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/lighting/row_display_vehicle_lighting5" width="336" height="26" bitmap="modern/row" platform="desktop web" flags="pass_unhandled_to_focused_child nifty_fx">
@@ -1897,9 +1897,9 @@
 		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
 		<string text="Plasma, grenades, rockets and flame streams cast soft light on nearby surfaces and models." />
 		<string text="Weapon flashes light nearby surfaces, including Warthog and Scorpion guns. Stock effects remain." />
-		<string text="Swords, plasma charge, fuel rods, Needler and AR screens. CUSTOM keeps individual choices." />
+		<string text="Swords, plasma charge, fuel rods, Needler and AR screens cast light on nearby surfaces." />
 		<string text="Short, soft spill from plasma-weapon prongs. Uses the shared eight-light occlusion budget." />
-		<string text="Jackal and stationary shields light surroundings. CUSTOM keeps individual choices." />
+		<string text="Jackal and stationary shields cast light on nearby surfaces." />
 		<string text="Engine glow and directional headlights illuminate vehicles and nearby surfaces." />
 		<string text="Visible powerups and teleporters cast soft light. Stock effects and gameplay remain unchanged." />
 		<string text="Block projectile and emitter light behind walls. Muzzle and vehicle lights always use blocking." />

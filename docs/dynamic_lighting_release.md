@@ -166,9 +166,9 @@ choices for this screen. Saved choices persist across launches.
 | Glow Intensity | Default or Light Show intensity for Shield Glow; this does not enable it. |
 
 Weapon Glow and Shield Emitters consolidate the old per-effect menu rows.
-Existing configuration keys remain supported: mixed preferences display
-**CUSTOM** and remain unchanged until the player explicitly saves ON, OFF or
-Defaults. See the [emitter expansion walkthrough](reading/emitter_expansion.md)
+Both rows offer only OFF and ON. Older saved dynamic-lighting preferences
+reset to OFF once; later player choices persist. There is no CUSTOM state.
+See the [emitter expansion walkthrough](reading/emitter_expansion.md)
 for exact scope, lifecycle, budgets and map-asset limits. The historical 1.0
 acceptance results below predate these additions; they are not evidence for
 the expansion's runtime acceptance.

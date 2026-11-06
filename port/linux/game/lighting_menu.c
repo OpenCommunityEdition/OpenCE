@@ -1,5 +1,5 @@
-/* Consolidated controls retain old per-effect preferences until the player
-   explicitly chooses ON, OFF or Defaults and saves the screen. */
+/* Consolidated ON/OFF controls stage changes until the player saves. Old
+   preferences are reset once by the platform configuration loader. */
 #include "lighting_menu.h"
 #include <string.h>
 #include <stdio.h>
@@ -29,7 +29,7 @@ static const struct lighting_menu_group *lighting_menu_group(const char *name)
 int lighting_menu_text(const char *name, char *text, unsigned int size, int defaults)
 {
 	const struct lighting_menu_group *group = lighting_menu_group(name);
-	int i, any = 0, all = 1;
+	int i, any = 0;
 	if (!group)
 		return -1;
 	if (!defaults)
@@ -37,9 +37,8 @@ int lighting_menu_text(const char *name, char *text, unsigned int size, int defa
 		{
 			int value = config_boolean(group->members[i]);
 			any |= value;
-			all &= value;
 		}
-	snprintf(text, size, "%s", defaults || !any ? "false" : all ? "true" : "custom");
+	snprintf(text, size, "%s", defaults || !any ? "false" : "true");
 	return 1;
 }
 
@@ -49,8 +48,6 @@ int lighting_menu_write(const char *name, const char *value)
 	int i;
 	if (!group)
 		return -1;
-	if (!strcmp(value, "custom"))
-		return 1;
 	if (strcmp(value, "true") && strcmp(value, "false"))
 		return 0;
 	for (i = 0; group->members[i]; i++)
