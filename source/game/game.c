@@ -187,6 +187,7 @@ struct game_options;
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
 #include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
+#include "mendicant/mendicant.h" /* port: port/linux/game/mendicant/mendicant_main.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -360,7 +361,12 @@ void game_tick(
 	distributed netcode has from the host: its own would fight the host's
 	positions, and could place objects of their own) */
 	if (!network_game_distributed_client())
+	{
 		profile_scope(game_tick_ai_section, ai_update();)
+		/* port: MENDICANT AI's vehicles and training after the AI
+		(port/linux/game/mendicant) */
+		mendicant_ai_update_end();
+	}
 	else
 		profile_scope(game_tick_actors_drive_section, network_actors_drive();)
 	profile_scope(game_tick_players_before_section, players_update_before_game();)

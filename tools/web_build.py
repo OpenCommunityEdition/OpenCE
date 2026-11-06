@@ -131,6 +131,7 @@ WEB_EXCLUDE = {
     "posix_upnp.c",         # internet play's router (port/web/src/web_stubs.c)
     "posix_trace_marker.c", # a Linux GPU driver's trace markers
     "posix_dtls.c",         # internet play's WebRTC: the browser's own
+    "posix_mendicant.c",    # MENDICANT AI's training bridge (desktop Linux)
     "p2p_webrtc.c",         # (port/web/src/web_p2p.c)
 }
 
@@ -247,7 +248,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
             # (port/web/src/web_main.c)
             cflags += " -Dmain=halo_game_main"
         add_object(source, cflags)
-    for source in sorted(Path(config["game_sources"]).glob("*.c")):
+    for source in sorted([*Path(config["game_sources"]).glob("*.c"), *Path(config["game_sources"]).glob("mendicant/*.c")]):
         add_object(source, game_cflags)
     add_object(STB_VORBIS_SOURCE, game_cflags)
 

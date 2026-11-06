@@ -421,7 +421,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
             if source.as_posix() == "source/main/main.c":
                 flags += " " + updater_defines(getattr(sln, "port_release", False))
             add_object(source, flags)
-        for source in sorted(Path(linux_config["game_sources"]).glob("*.c")):
+        for source in sorted([*Path(linux_config["game_sources"]).glob("*.c"), *Path(linux_config["game_sources"]).glob("mendicant/*.c")]):
             add_object(source, game_cflags)
         add_object(STB_VORBIS_SOURCE, game_cflags)
 

@@ -1581,12 +1581,17 @@ static void *silent_clock_thread(void *parameter)
 {
 	float buffer[480 * MAXIMUM_OUTPUT_CHANNELS];
 	struct timespec next;
+	/* MENDICANT AI's training without the mixer (ai.mendicant.training_skip 4;
+	port/linux/game/mendicant): the voices are left to drain unmixed */
+	int skip_mix = config_boolean("ai.mendicant.enabled") && config_boolean("ai.mendicant.training") &&
+		(config_integer("ai.mendicant.training_skip") & 4);
 
 	(void)parameter;
 	clock_gettime(CLOCK_MONOTONIC, &next);
 	for (;;)
 	{
-		mix(buffer, 480);
+		if (!skip_mix)
+			mix(buffer, 480);
 		next.tv_nsec += 10000000L;
 		if (next.tv_nsec >= 1000000000L)
 		{

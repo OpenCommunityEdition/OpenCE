@@ -237,6 +237,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "tag_files/tag_files.h"
 #include "tag_files/tag_groups.h"
+#include "mendicant/mendicant.h" /* port: port/linux/game/mendicant/mendicant_main.c */
 
 #include <stddef.h>
 
@@ -531,6 +532,9 @@ void ai_dispose(
 void ai_dispose_from_old_map(
 	void)
 {
+	/* port: MENDICANT AI puts the level's own firing positions back before
+	the tags go (port/linux/game/mendicant) */
+	mendicant_dispose_from_old_map();
 	ai_communication_dispose_from_old_map();
 	ai_script_dispose_from_old_map();
 	encounters_dispose_from_old_map();
@@ -1930,6 +1934,9 @@ void ai_initialize_for_new_map(
 	ai_flush_spatial_effects();
 
 	ai_globals->ai_initialized_for_map = TRUE;
+	/* port: MENDICANT AI reads its settings and resets for the map
+	(port/linux/game/mendicant) */
+	mendicant_initialize_for_new_map();
 
 	return;
 }

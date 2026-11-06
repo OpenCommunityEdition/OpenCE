@@ -75,6 +75,7 @@ symbols in this file:
 
 #include "actors.h"
 #include "actor_types.h"
+#include "mendicant/mendicant.h" /* port: port/linux/game/mendicant/mendicant_main.c */
 
 /* ---------- constants */
 
@@ -215,7 +216,11 @@ void actor_type_decide_action(
 	struct actor_type_definition *actor_type_definition = actor_type_definition_get(actor_get(actor_index)->meta.type);
 
 	match_assert("c:\\halo\\SOURCE\\ai\\actor_types.c", 129, actor_type_definition->decide_action);
+	/* port: MENDICANT AI samples, disciplines and aims each actor before its
+	decision, and commands its unit after it (port/linux/game/mendicant) */
+	mendicant_decide_before(actor_index, actor_type_definition);
 	actor_type_definition->decide_action(actor_index);
+	mendicant_decide_after(actor_index);
 
 	return;
 }

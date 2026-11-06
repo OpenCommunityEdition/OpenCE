@@ -584,7 +584,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             add_object(source, flags)
         # Port-specific units that must see the game exactly as its own
         # sources do (port/linux/game).
-        for source in sorted(Path(config["game_sources"]).glob("*.c")):
+        for source in sorted([*Path(config["game_sources"]).glob("*.c"), *Path(config["game_sources"]).glob("mendicant/*.c")]):
             add_object(source, game_cflags)
         add_object(STB_VORBIS_SOURCE, game_cflags)
 

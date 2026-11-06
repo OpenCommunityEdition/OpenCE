@@ -467,7 +467,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         if source.as_posix() in VARIADIC_PROTOTYPE_FILES:
             cflags += f" -include {PORT_DIR}/include/halo_android_variadic_prototypes.h"
         objects.append(guest_object(source, cflags))
-    for source in sorted(Path(config["game_sources"]).glob("*.c")):
+    for source in sorted([*Path(config["game_sources"]).glob("*.c"), *Path(config["game_sources"]).glob("mendicant/*.c")]):
         objects.append(guest_object(source, game_cflags))
     objects.append(guest_object(STB_VORBIS_SOURCE, game_cflags))
 

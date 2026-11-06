@@ -29,6 +29,7 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "math/real_math.h"
+#include "mendicant/mendicant.h" /* port: port/linux/game/mendicant/mendicant_main.c */
 
 /* ---------- macros */
 
@@ -134,7 +135,9 @@ boolean action_uncover_perform(
 			search.use_last_visible_target_position = state_data->no_target_sight_available;
 		}
 
-		selected_firing_position_index = actor_active_select_firing_position(
+		/* port: MENDICANT AI gives an actor it ordered its post
+		(port/linux/game/mendicant) */
+		selected_firing_position_index = mendicant_select_firing_position(
 			actor_index,
 			&search,
 			&candidate,

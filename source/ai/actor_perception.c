@@ -274,6 +274,7 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 #include "units/biped_definitions.h"
+#include "mendicant/mendicant.h" /* port: port/linux/game/mendicant/mendicant_main.c */
 
 /* ---------- constants */
 
@@ -2218,10 +2219,11 @@ range_weight_done:
 		(knowledge_weight + range_weight);
 
 	/* Preserve January's swapped target/distance scale constants. */
-	return
+	/* port: MENDICANT AI weighs targets by threat (port/linux/game/mendicant) */
+	return mendicant_target_weight(actor_index, prop_index,
 		weights.target_weight * 10.0f +
 		(5.0f / (prop->distance * 0.1f + 1.0f) +
-			weights.bonus_weight);
+			weights.bonus_weight));
 }
 
 

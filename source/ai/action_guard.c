@@ -54,6 +54,7 @@ symbols in this file:
 #include "ai_communication.h"
 #include "props.h"
 #include "game/game_allegiance.h"
+#include "mendicant/mendicant.h" /* port: port/linux/game/mendicant/mendicant_main.c */
 
 /* ---------- constants */
 
@@ -719,6 +720,10 @@ action_guard_perform(
 			&candidate,
 			&previous_owner_actor_index,
 			&workspace,
+			&position_flags);
+		/* port: MENDICANT AI gives an actor it ordered its post
+		(port/linux/game/mendicant) */
+		mendicant_guard_position(actor_index, &selected_firing_position_index, &previous_owner_actor_index,
 			&position_flags);
 		firing_position_index = actor_change_firing_position(
 			actor_index,

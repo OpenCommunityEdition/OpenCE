@@ -567,6 +567,24 @@ the setting for one start of the game. It has priority over the file.
 | `bots.count` | `0` | `HALO_BOTS` | Computer players (bots) in a local (split screen) Slayer game: `0` to `15` join its lobby with the players, as far as the game has room. Not in system link or internet games. `0`: none, as in the stock game. Refer to "Bots". |
 | `bots.skill` | `"normal"` | `HALO_BOT_SKILL` | How well the bots play: `"recruit"`, `"easy"`, `"normal"`, `"heroic"`, `"veteran"` or `"legendary"`: how soon they react, how far and how wide they see, how large their aim error is and how fast it settles, how fast they turn, and how they fight. `"easy"`, `"normal"`, `"heroic"` and `"legendary"` keep their numbers; `"recruit"` is below `"easy"`, and `"veteran"` halfway from `"heroic"` to `"legendary"`. Refer to "Bots". |
 | `bots.teams` | `"even"` | `HALO_BOT_TEAMS` | In a team game: `"even"` puts the bots on both teams, evening them with the players; `"against"` puts them all on the team the players are not on. |
+| `ai.mendicant.enabled` | `false` | `HALO_AI_MENDICANT` | MENDICANT AI: the campaign's Marines and Covenant fight as units, an Elite or a sergeant leading each through drills (bounding, flanking, suppressing, falling back), and each soldier picks its own way of fighting. On the host of a campaign or co-op game only. `false`: the stock AI, exactly. |
+| `ai.mendicant.models` | `true` | `HALO_AI_MENDICANT_MODELS` | The trained models (`ai.mendicant.weights`) choose the drills and each soldier's way of fighting; `false`, or no weights found: the scripted drill. |
+| `ai.mendicant.weights` | `"mendicant\\models.aibw"` | `HALO_AI_MENDICANT_WEIGHTS` | The models' file, looked up in the mods as a tag file is (a mod's `tags/mendicant/models.aibw`; `game/mendicant/tools/export_models.py` writes it). |
+| `ai.mendicant.variety` | `1.0` | `HALO_AI_MENDICANT_VARIETY` | How freely the models choose among the drills they rate well: 0 always the best, 1 as trained. |
+| `ai.mendicant.seed` | `0` | `HALO_AI_MENDICANT_SEED` | The models' random seed; 0: a new one each map. |
+| `ai.mendicant.individuals` | `true` | `HALO_AI_MENDICANT_INDIVIDUALS` | Soldiers not in a unit's drill choose their own way of fighting (the per-soldier models). |
+| `ai.mendicant.discipline` | `true` | `HALO_AI_MENDICANT_DISCIPLINE` | Commanded soldiers hold their nerve: fewer panics, berserk charges and lone pursuits. |
+| `ai.mendicant.targeting` | `true` | `HALO_AI_MENDICANT_TARGETING` | Soldiers choose targets by threat. |
+| `ai.mendicant.aim` | `1.0` | `HALO_AI_MENDICANT_AIM` | The AI's aim, against the stock game's 1.0. |
+| `ai.mendicant.aim_difficulty` | `true` | `HALO_AI_MENDICANT_AIM_DIFFICULTY` | The aim follows the difficulty. |
+| `ai.mendicant.aim_moving` | `true` | `HALO_AI_MENDICANT_AIM_MOVING` | Aim worse at a target that moves fast. |
+| `ai.mendicant.marine_fire` | `1.8` | `HALO_AI_MENDICANT_MARINE_FIRE` | The Marines' rate of fire, against the stock game's 1.0 (0.1 or more). |
+| `ai.mendicant.command_radius` | `35.0` | `HALO_AI_MENDICANT_COMMAND_RADIUS` | How far (world units) from its leader a soldier is still in its unit. |
+| `ai.mendicant.bridge` | `""` | `HALO_AI_MENDICANT_BRIDGE` | Linux only: a file the models are asked through instead (a trainer maps it); empty: the models in the game. |
+| `ai.mendicant.training` | `false` | `HALO_AI_MENDICANT_TRAINING` | Linux only: training episodes for the trainer on `ai.mendicant.bridge`. |
+| `ai.mendicant.training_skip` | `7` | `HALO_AI_MENDICANT_TRAINING_SKIP` | Linux only: in training, what is skipped: the sum of 1 the picture, 2 the sound, 4 the mixer. |
+| `ai.mendicant.sample_log`, `ai.mendicant.drill_log`, `ai.mendicant.player_log`, `ai.mendicant.move_test_log` | `""` | `HALO_AI_MENDICANT_SAMPLE_LOG`, … | Linux only: files (host paths) to log each actor's decisions, the units' drills, the player's fighting and a free-movement test in; empty: none. |
+| `ai.mendicant.vehicle_test`, `ai.mendicant.aim_debug` | `false` | `HALO_AI_MENDICANT_VEHICLE_TEST`, `HALO_AI_MENDICANT_AIM_DEBUG` | Linux only: tests: soldiers try the nearest vehicle; the aim each actor is given is logged. |
 | `paths.data` | `""` | `HALO_DATA_ROOT` | The data root. Refer to "Start the game". |
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
 | `paths.logs` | `""` | `HALO_LOG_ROOT` | The folder of `debug.txt`, `bans.txt` and `cheaters.txt`. Empty: the data root. With it, the data root can be read-only (a dedicated server's maps mounted so). |
@@ -1843,6 +1861,7 @@ Other changes:
 | `rasterizer/rasterizer.c` | The 128 KB of vertices of the debug display of a model's vertices are static, not on the stack: the compiler inlines the function in `render_model`, and the Windows build probed the stack a page at a time for every model drawn. |
 | `render/render.c` | The 3D view of each window is tone mapped (`display.hdr`) and antialiased (`display.anti_aliasing`) before the HUD is drawn. |
 | `render/render.c` | `render_initialize` reads the structure culling tests from `display.structure_culling`. |
+| `ai/actor_types.c`, `ai/actions.c`, `ai/action_fight.c`, `ai/action_uncover.c`, `ai/action_guard.c`, `ai/actor_perception.c`, `ai/actor_moving.c`, `ai/ai.c`, `game/game.c`, `game/game_time.c`, `main/main.c` | MENDICANT AI (`ai.mendicant.enabled`, `game/mendicant/`): calls before and after each actor's decision, after the fight, uncover and guard actions' control, at a panic, a berserk, a charge, a lost contact, a grenade throw, a firing position's choice, the five `actor_move_*` entries and a target's weight, around each tick and after the host's `ai_update`, at a map's start and end, and before the frame and the sound are drawn (training). Off, each call returns at once and the game does what it did. |
 | `models/models.c` | A model's size, which chooses its level of detail and whether it is drawn, is scaled as `display.model_detail` says (`halo_model_detail_scale`, `src/d3d8_gl.c`), and each permutation draws the level `game/model_detail.c` chooses from the model's (stock: the model's). |
 | `interface/hud.c` | In multiplayer, players' names are drawn above their heads (`display.player_names`, `display.player_name_scale`). |
 | `text/draw_string.c`, `interface/terminal.c`, `interface/virtual_keyboard.c` | Streamer mode's words are hidden in every string drawn or measured (`game/text_filter.c`), but in the console's line and the virtual keyboard's text being typed. |

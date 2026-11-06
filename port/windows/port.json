@@ -9,7 +9,8 @@
     "posix_update.c",
     "posix_upnp.c",
     "posix_trace_marker.c",
-    "posix_server.c"
+    "posix_server.c",
+    "posix_mendicant.c"
   ],
   "libraries": [
     "ws2_32",

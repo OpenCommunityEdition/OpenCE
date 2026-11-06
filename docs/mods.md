@@ -175,6 +175,12 @@ in it against the file, and every value against what the game reads, before
 it uses the file. A file that fails a check is left out (the map's tag
 plays), and `debug.txt` and the console say why.
 
+A mod may also carry MENDICANT AI's models, `tags/mendicant/models.aibw`
+(the file `ai.mendicant.weights` names, written by
+`port/linux/game/mendicant/tools/export_models.py`). It is no tag: only the
+host of a campaign or co-op game with `ai.mendicant.enabled` reads it, and
+it changes only that host's AI.
+
 ### Sounds
 
 - The samples can be 16-bit PCM, Xbox ADPCM or Ogg Vorbis, mono or stereo,

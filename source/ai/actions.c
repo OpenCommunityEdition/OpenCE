@@ -250,6 +250,7 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
+#include "mendicant/mendicant.h" /* port: port/linux/game/mendicant/mendicant_main.c */
 
 /* ---------- constants */
 
@@ -738,14 +739,19 @@ void actor_action_control(
 	long actor_index)
 {
 	struct actor_datum *actor = actor_get(actor_index);
+	short controlled_action; /* port: MENDICANT AI */
 
 	match_assert(
 		"c:\\halo\\SOURCE\\ai\\actions.c",
 		173,
 		(actor->state.action >= 0) && (actor->state.action < NUMBER_OF_ACTOR_ACTIONS));
 
+	/* port: MENDICANT AI applies a commanded actor's role after the fight,
+	uncover and guard actions' control (port/linux/game/mendicant) */
+	controlled_action = actor->state.action;
 	if (global_action_functions[actor->state.action].control)
 		global_action_functions[actor->state.action].control(actor_index);
+	mendicant_action_control_after(actor_index, controlled_action);
 
 	return;
 }
@@ -2260,7 +2266,8 @@ boolean actor_action_handle_combat_selection(
 						FALSE);
 				}
 
-				if (!action_changed)
+				/* port: MENDICANT AI's discipline may decline the berserk */
+				if (!action_changed && !mendicant_veto_berserk(actor_index))
 					actor_berserk(actor_index, TRUE);
 			}
 		}
@@ -2343,7 +2350,8 @@ boolean actor_action_handle_combat_selection(
 					{
 						actor->emotions.last_melee_check_time = current_time;
 
-						if (action_charge_setup(
+						/* port: MENDICANT AI's discipline may decline the charge */
+						if (mendicant_action_charge_setup(
 							actor_index,
 							_charge_goal_melee,
 							&new_action_data.charge))
@@ -2498,7 +2506,8 @@ boolean actor_action_handle_combat_selection(
 			(restart_charge ||
 				actor->state.action != _actor_action_charge))
 		{
-			if (action_charge_setup(
+			/* port: MENDICANT AI's discipline may decline the charge */
+			if (mendicant_action_charge_setup(
 				actor_index,
 				_charge_goal_close_range,
 				&new_action_data.charge))
@@ -3068,7 +3077,9 @@ boolean actor_action_handle_combat_status(
 					(actor->external_orders.stand_down ||
 						actor->external_orders.postcombat_type > 0)))
 			{
-				result = actor_action_handle_lost_contact(actor_index);
+				/* port: MENDICANT AI's discipline keeps a commanded actor from a lone
+				pursuit here and below (port/linux/game/mendicant) */
+				result = mendicant_handle_lost_contact(actor_index);
 			}
 		}
 		break;
@@ -3076,7 +3087,7 @@ boolean actor_action_handle_combat_status(
 	case 4:
 		result = actor->state.combat_status >= 4 ?
 			actor_action_handle_combat_selection(actor_index) :
-			actor_action_handle_lost_contact(actor_index);
+			mendicant_handle_lost_contact(actor_index);
 		break;
 
 	case 3:
@@ -3086,7 +3097,7 @@ boolean actor_action_handle_combat_status(
 		}
 		else if (actor->state.combat_status < 2)
 		{
-			result = actor_action_handle_lost_contact(actor_index);
+			result = mendicant_handle_lost_contact(actor_index);
 		}
 		else if (actor->target.target_prop_index != NONE)
 		{
@@ -3103,7 +3114,7 @@ boolean actor_action_handle_combat_status(
 					(actor->state.action != _actor_action_search ||
 						actor->state.action_data.search.pursuit_location.type)))
 			{
-				result = actor_action_handle_lost_contact(actor_index);
+				result = mendicant_handle_lost_contact(actor_index);
 			}
 		}
 		break;
@@ -3119,7 +3130,7 @@ boolean actor_action_handle_combat_status(
 	}
 
 	if (!result && force_decision)
-		result = actor_action_handle_lost_contact(actor_index);
+		result = mendicant_handle_lost_contact(actor_index);
 
 	return result;
 }
@@ -3165,7 +3176,9 @@ boolean actor_action_handle_berserk_transition(
 	if (actor->stimuli.berserk_type >= berserk_level &&
 		!actor->emotions.berserk)
 	{
-		actor_berserk(actor_index, TRUE);
+		/* port: MENDICANT AI's discipline may decline the berserk */
+		if (!mendicant_veto_berserk(actor_index))
+			actor_berserk(actor_index, TRUE);
 
 		if (actor->state.combat_status >= 4)
 			result = actor_action_handle_combat_selection(actor_index);
@@ -3249,8 +3262,9 @@ boolean actor_action_handle_exit_pursuit(
 		break;
 	}
 
+	/* port: MENDICANT AI's discipline (port/linux/game/mendicant) */
 	if (reported)
-		reported = actor_action_handle_lost_contact(actor_index);
+		reported = mendicant_handle_lost_contact(actor_index);
 
 	return reported;
 }
@@ -3306,6 +3320,7 @@ boolean actor_action_try_to_throw_grenade(
 	struct actor_datum *actor = actor_get(actor_index);
 	struct unit_datum *unit = unit_get(actor->meta.unit_index);
 	boolean result = FALSE;
+	boolean throw_ordered_before = actor->orders.combat.throw_grenade; /* port: MENDICANT AI */
 
 	if (!unit_is_busy(actor->meta.unit_index) &&
 		!(unit->object.current_body_damage > 0.0f))
@@ -3345,6 +3360,10 @@ boolean actor_action_try_to_throw_grenade(
 			}
 		}
 	}
+
+	/* port: MENDICANT AI refuses a throw this call ordered that would land
+	on the thrower or a friend (port/linux/game/mendicant) */
+	mendicant_grenade_throw_checked(actor_index, throw_ordered_before);
 
 	return result;
 }
@@ -3693,6 +3712,11 @@ boolean actor_action_try_to_panic(
 {
 	struct action_state_data state;
 	boolean result = FALSE;
+
+	/* port: MENDICANT AI's discipline: a commanded actor holds its nerve
+	(port/linux/game/mendicant) */
+	if (mendicant_veto_panic(actor_index))
+		return FALSE;
 
 	if (action_flee_setup(
 		actor_index,
