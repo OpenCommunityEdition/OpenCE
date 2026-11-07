@@ -1355,7 +1355,10 @@ static boolean mcc_import_map(
 	mcc_import_fixes_apply(&mcc_import_globals.table);
 	mcc_import_globals.operations = mcc_import_operations_read(map_name);
 	if (mcc_import_globals.operations)
+	{
 		mcc_import_operations_apply(&mcc_import_globals.table, NULL, NULL);
+		mcc_import_models_complete(&mcc_import_globals.table);
+	}
 	else
 		mcc_import_error("mcc import: %s: no operations (d:\\mcc_patches\\%s.p2): MCC's values kept", map_name, map_name);
 	mcc_import_globals.instances = mcc_import_globals.table.instances;
@@ -1477,6 +1480,8 @@ int mcc_import_run(
 	answered: the tags are written into the tag cache at 0x803A6000, where
 	tag_validate_tags checks them */
 	physical_memory_allocate();
+	/* (the messages as they come: a failure must not lose the last) */
+	setvbuf(stderr, NULL, _IONBF, 0);
 	custom_edition_geometry_import = TRUE;
 	for (index = 0; index < map_count; index++)
 	{

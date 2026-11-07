@@ -87,6 +87,21 @@ static struct
 
 #define mcc_patch_log(...) (error(_error_silent, __VA_ARGS__), fprintf(stderr, __VA_ARGS__), fputc(10, stderr))
 
+/* ---------- private code: strings */
+
+/* a string's length: the operations' hex runs past the most the game's
+strlen (csstrlen) takes */
+static unsigned long mcc_patch_length(
+	char const *text)
+{
+	unsigned long length = 0;
+
+	while (text[length])
+		length++;
+
+	return length;
+}
+
 /* ---------- private code: the schemas */
 
 static struct tag_schema_group const *mcc_patch_schema(
@@ -315,7 +330,7 @@ static long mcc_patch_tag(
 	unsigned long group;
 	long index;
 
-	if (!strcmp(text, "NONE") || strlen(text) < 6 || text[4] != ':')
+	if (!strcmp(text, "NONE") || mcc_patch_length(text) < 6 || text[4] != ':')
 		return NONE;
 	group = mcc_patch_group(text);
 	for (index = 0; index < tags->count; index++)
@@ -354,7 +369,7 @@ static boolean mcc_patch_set_reference(
 		{
 			reference->group_tag = (unsigned long)tags->instances[index].group_tag;
 			reference->name = tags->instances[index].name;
-			reference->name_length = (long)strlen(tags->instances[index].name);
+			reference->name_length = (long)mcc_patch_length(tags->instances[index].name);
 		}
 		else
 		{
@@ -552,7 +567,7 @@ static byte *mcc_patch_resolve(
 		/* (a field's name may hold dots, "unit.unit": the longest that fits) */
 		for (field = current->fields; field->type != _tag_schema_terminator; field++)
 		{
-			long field_length = field->name ? (long)strlen(field->name) : 0;
+			long field_length = field->name ? (long)mcc_patch_length(field->name) : 0;
 
 			if (field_length > length && !strncmp(name, field->name, (size_t)field_length) &&
 				(name[field_length] == 0 || name[field_length] == '.' || name[field_length] == '['))
@@ -612,7 +627,7 @@ static boolean mcc_patch_add_tag(
 	struct tag_schema_group const *schema = mcc_patch_schema(group);
 	struct mcc_patch_reader reader;
 	struct mcc_import_tag_instance *instance;
-	size_t length = strlen(operation->tag + 5);
+	size_t length = mcc_patch_length(operation->tag + 5);
 	byte *root;
 	char *name;
 
@@ -735,8 +750,9 @@ static boolean mcc_patch_apply(
 	struct mcc_patch_operation const *operation = &mcc_patch_globals.operations[operation_index];
 	struct tag_schema_definition const *definition = NULL;
 	struct tag_schema_field const *field = NULL;
-	byte *target = mcc_patch_resolve(root_definition, root, operation->path, &definition, &field);
+	byte *target;
 
+	target = mcc_patch_resolve(root_definition, root, operation->path, &definition, &field);
 	if (!target)
 	{
 		mcc_patch_log("mcc import: no %s in %s", operation->path, operation->tag);
@@ -745,7 +761,7 @@ static boolean mcc_patch_apply(
 	if (!strcmp(operation->kind, "set") && !field)
 	{
 		struct mcc_patch_reader reader;
-		long offset = strtol(operation->a, NULL, 16), size = (long)strlen(operation->b) / 2;
+		long offset = strtol(operation->a, NULL, 16), size = (long)mcc_patch_length(operation->b) / 2;
 
 		if (offset < 0 || offset + size > definition->size)
 			return FALSE;
@@ -764,9 +780,12 @@ static boolean mcc_patch_apply(
 	if (!strcmp(operation->kind, "data") && field && field->type == _tag_schema_data)
 	{
 		struct tag_data *data = (struct tag_data *)target;
-		unsigned long size = operation->a ? (unsigned long)strlen(operation->a) / 2 : 0;
+		unsigned long size;
 		struct mcc_patch_reader reader;
-		byte *bytes = size ? mcc_patch_allocate(size) : NULL;
+		byte *bytes;
+
+		size = operation->a ? (unsigned long)mcc_patch_length(operation->a) / 2 : 0;
+		bytes = size ? mcc_patch_allocate(size) : NULL;
 
 		if (size && !bytes)
 			return FALSE;
@@ -821,7 +840,102 @@ static boolean mcc_patch_apply(
 	return FALSE;
 }
 
+/* ---------- private code: models */
+
+static struct tag_schema_field const *mcc_patch_field(
+	struct tag_schema_definition const *definition,
+	char const *name)
+{
+	struct tag_schema_field const *field;
+
+	for (field = definition->fields; field->type != _tag_schema_terminator; field++)
+	{
+		if (field->name && !strcmp(field->name, name))
+			return field;
+	}
+
+	return NULL;
+}
+
+/* A model whose permutations name a level of detail past its geometries
+(the disc's indices, set by the operations, on MCC's model, which has fewer
+levels: the flamethrower's) gets its last geometry again in their place, so
+that the indices stay the disc's and name a geometry of its own. */
+static long mcc_patch_model_complete(
+	byte *model,
+	struct tag_schema_definition const *definition)
+{
+	struct tag_schema_field const *regions_field = mcc_patch_field(definition, "regions");
+	struct tag_schema_field const *permutations_field = regions_field ?
+		mcc_patch_field(regions_field->definition, "permutations") : NULL;
+	struct tag_schema_field const *indices_field = permutations_field ?
+		mcc_patch_field(permutations_field->definition, "geometry_indices") : NULL;
+	struct tag_schema_field const *geometries_field = mcc_patch_field(definition, "geometries");
+	struct tag_block *regions, *geometries;
+	long region_index, highest = NONE, index;
+	byte *grown;
+
+	if (!indices_field || indices_field->size != sizeof(short) || !geometries_field)
+		return 0;
+	regions = (struct tag_block *)(model + regions_field->offset);
+	geometries = (struct tag_block *)(model + geometries_field->offset);
+	for (region_index = 0; regions->address && region_index < regions->count; region_index++)
+	{
+		byte *region = (byte *)regions->address + region_index * ((struct tag_schema_definition const *)regions_field->definition)->size;
+		struct tag_block *permutations = (struct tag_block *)(region + permutations_field->offset);
+		long permutation_index;
+
+		for (permutation_index = 0; permutations->address && permutation_index < permutations->count; permutation_index++)
+		{
+			byte *permutation = (byte *)permutations->address + permutation_index * ((struct tag_schema_definition const *)permutations_field->definition)->size;
+			short level;
+
+			for (level = 0; level < indices_field->count; level++)
+			{
+				short geometry_index = *(short *)(permutation + indices_field->offset + level * indices_field->size);
+
+				if (geometry_index > highest)
+					highest = geometry_index;
+			}
+		}
+	}
+	if (highest < geometries->count || geometries->count <= 0 || !geometries->address)
+		return 0;
+	grown = mcc_patch_allocate((unsigned long)(highest + 1) * ((struct tag_schema_definition const *)geometries_field->definition)->size);
+	if (!grown)
+		return 0;
+	csmemcpy(grown, geometries->address, (unsigned long)geometries->count * ((struct tag_schema_definition const *)geometries_field->definition)->size);
+	for (index = geometries->count; index <= highest; index++)
+	{
+		csmemcpy(grown + index * ((struct tag_schema_definition const *)geometries_field->definition)->size,
+			(byte *)geometries->address + (geometries->count - 1) * ((struct tag_schema_definition const *)geometries_field->definition)->size,
+			((struct tag_schema_definition const *)geometries_field->definition)->size);
+	}
+	index = highest + 1 - geometries->count;
+	geometries->count = highest + 1;
+	geometries->address = grown;
+
+	return index;
+}
+
 /* ---------- public code */
+
+void mcc_import_models_complete(
+	struct mcc_import_tags *tags)
+{
+	struct tag_schema_group const *schema = mcc_patch_schema('mode');
+	long index, added = 0;
+
+	for (index = 0; schema && schema->definition && index < tags->count; index++)
+	{
+		if (tags->instances[index].group_tag == 'mode' && tags->instances[index].base_address)
+			added += mcc_patch_model_complete(tags->instances[index].base_address, schema->definition);
+	}
+	if (added)
+		mcc_patch_log("mcc import: %ld levels of detail the disc's permutations name given a model's last geometry", added);
+
+	return;
+}
 
 void mcc_import_fixes_apply(
 	struct mcc_import_tags *tags)
@@ -949,6 +1063,8 @@ long mcc_import_operations_apply(
 
 		if (!strcmp(operation->kind, "tag"))
 		{
+			if (getenv("HALO_MCC_IMPORT_TRACE"))
+				fprintf(stderr, "mcc import: adding %s\n", operation->tag);
 			if (mcc_patch_add_tag(tags, operation))
 				mcc_patch_globals.applied[6]++;
 			else
@@ -989,6 +1105,8 @@ long mcc_import_operations_apply(
 			schema = mcc_patch_schema((unsigned long)tags->instances[tag_index].group_tag);
 			root = tags->instances[tag_index].base_address;
 		}
+		if (getenv("HALO_MCC_IMPORT_TRACE"))
+			fprintf(stderr, "mcc import: %s %s %s\n", operation->kind, operation->tag, operation->path);
 		if (!schema || !schema->definition || !root || !mcc_patch_apply(tags, index, schema->definition, root))
 		{
 			mcc_patch_log("mcc import: the operation %s %s %s failed", operation->kind, operation->tag, operation->path);

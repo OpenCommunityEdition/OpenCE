@@ -62,6 +62,11 @@ long mcc_import_operations_apply(
 	char const *bsp_name,
 	void *bsp_root);
 
+/* Gives each model whose permutations name more levels of detail than it
+has geometries its last geometry again in their place. */
+void mcc_import_models_complete(
+	struct mcc_import_tags *tags);
+
 /* Releases the operations and what they made. */
 void mcc_import_operations_dispose(
 	void);
