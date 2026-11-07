@@ -1309,10 +1309,20 @@ static struct
 } host_hud_state;
 
 /* host: the looping sounds the scripts have started (music, ambience).
-They are resent every OBJECT_REFRESH_TICKS so a late joiner hears them. */
+They are resent every OBJECT_REFRESH_TICKS so a late joiner hears them.
+One that plays once (a cutscene's music or dialogue: a fake impulse one)
+ends when the sound system has played it, which a host that draws nothing
+(a dedicated server: debug_no_drawing) never does: there it is ended once
+it has had the time to play (length, the most its sounds can take, and
+LOOPING_SOUND_END_MARGIN_TICKS), as the scripts' stop would end it, and is
+not resent in that margin's time before then, when a client's copy may
+have ended and a client of an earlier build would start it again. */
 enum
 {
 	MAXIMUM_LOOPING_SOUNDS = 32,
+	LOOPING_SOUND_END_MARGIN_TICKS = 2 * TICKS_PER_SECOND,
+	/* (a sound's longest permutation, as a map gives it, taken as an hour at most) */
+	MAXIMUM_LOOPING_SOUND_PART_MILLISECONDS = 60 * 60 * 1000,
 };
 
 static struct
@@ -1320,6 +1330,9 @@ static struct
 	long definition_index;
 	long object_index;
 	real scale;
+	long start_time;
+	/* (ticks; 0: it is never ended here) */
+	long length;
 } host_looping_sounds[MAXIMUM_LOOPING_SOUNDS];
 static short host_looping_sound_count;
 
@@ -2551,9 +2564,53 @@ static short host_looping_sound_find(
 	return NONE;
 }
 
+/* a sound's longest permutation (its linked ones together, at its slowest
+pitch, as the tools measure it) in milliseconds, or 0 for none */
+static long looping_sound_part_milliseconds(
+	long sound_index)
+{
+	long length;
+
+	if (sound_index == NONE)
+		return 0;
+	length = sound_definition_get(sound_index)->longest_permutation_length;
+	return PIN(length, 0, MAXIMUM_LOOPING_SOUND_PART_MILLISECONDS);
+}
+
+/* the most ticks a looping sound that plays once can take (each track's
+start, loop and stop sounds, the longer of a loop or stop and its
+alternate), or 0 for one that does not play once or whose sounds give no
+length */
+static long looping_sound_play_once_ticks(
+	long definition_index)
+{
+	struct looping_sound_definition *definition = looping_sound_definition_get(definition_index);
+	long longest = 0;
+	long track_index;
+
+	if (!TEST_FLAG(definition->flags, _looping_sound_fake_impulse_sound_bit))
+		return 0;
+	for (track_index = 0; track_index < definition->tracks.count && track_index < MAXIMUM_TRACKS_PER_LOOPING_SOUND;
+		track_index++)
+	{
+		struct looping_sound_track *track =
+			TAG_BLOCK_GET_ELEMENT(&definition->tracks, track_index, struct looping_sound_track);
+		long length = looping_sound_part_milliseconds(track->start_sound.index) +
+			MAX(looping_sound_part_milliseconds(track->loop_sound.index),
+				looping_sound_part_milliseconds(track->alternate_loop_sound.index)) +
+			MAX(looping_sound_part_milliseconds(track->stop_sound.index),
+				looping_sound_part_milliseconds(track->alternate_stop_sound.index));
+
+		longest = MAX(longest, length);
+	}
+	return longest * TICKS_PER_SECOND / 1000;
+}
+
 /* host, each tick: a looping sound that stopped without the scripts
 stopping it (it ended, or a skipped cutscene's revert took it) is stopped on
-the clients too; the rest are started again with the resent state */
+the clients too; one that plays once is ended where nothing draws once it
+has had the time to play (host_looping_sounds); the rest are started again
+with the resent state */
 static void host_send_looping_sounds(
 	void)
 {
@@ -2562,8 +2619,18 @@ static void host_send_looping_sounds(
 	while (index < host_looping_sound_count)
 	{
 		long definition_index = host_looping_sounds[index].definition_index;
+		long length = debug_no_drawing ? host_looping_sounds[index].length : 0;
+		long played = game_time_get() - host_looping_sounds[index].start_time;
 		struct distributed_coop_event *event;
 
+		if (length > 0 && played >= length + LOOPING_SOUND_END_MARGIN_TICKS &&
+			looping_sound_definition_get(definition_index)->runtime_scripting_sound_index != NONE)
+		{
+			/* (its stop, sent and taken out of the list as the scripts' is;
+			the next pass takes it out if no stop could be sent) */
+			scripted_looping_sound_stop(definition_index);
+			continue;
+		}
 		if (looping_sound_definition_get(definition_index)->runtime_scripting_sound_index == NONE)
 		{
 			if ((event = event_new(_coop_event_sound)) != NULL)
@@ -2574,7 +2641,8 @@ static void host_send_looping_sounds(
 			host_looping_sounds[index] = host_looping_sounds[--host_looping_sound_count];
 			continue;
 		}
-		if (host_resend.refresh && (event = event_new(_coop_event_sound)) != NULL)
+		if (host_resend.refresh && !(length > 0 && played + LOOPING_SOUND_END_MARGIN_TICKS >= length) &&
+			(event = event_new(_coop_event_sound)) != NULL)
 		{
 			event->type = _coop_sound_looping_start;
 			event->tag_index = definition_index;
@@ -2615,6 +2683,8 @@ void network_coop_note_sound(
 			host_looping_sounds[index].definition_index = definition_index;
 			host_looping_sounds[index].object_index = object_index;
 			host_looping_sounds[index].scale = scale;
+			host_looping_sounds[index].start_time = game_time_get();
+			host_looping_sounds[index].length = looping_sound_play_once_ticks(definition_index);
 		}
 	}
 }
