@@ -137,11 +137,11 @@ the build/runtime prerequisites described in its README.
 
 For the MCC refactor's current milestones and concrete baseline, see
 [MCC refactor milestones and validation](../mcc_refactor_validation.md). Its
-overview separates completed stages, planned investigations and the deferred
-boat fix. The evidence sections record the starting revision, the
-installed-Workshop smoke runner, the distinction
-between pytest coverage and direct GPU execution, and actual validation
-limits. Read `parse_args`, `case_environment`, `run_case` and `check_result`
+overview separates completed work, deferred fixes and retained compatibility
+limits, including the shared co-op recovery finding. The evidence sections
+record the starting revision, the installed-Workshop smoke runner, the
+distinction between pytest coverage and direct GPU execution, and actual
+validation limits. Read `parse_args`, `case_environment`, `run_case` and `check_result`
 in [mcc_native_smoke.py](../../tools/mcc_native_smoke.py) to follow a virtual
 Workshop level name through an isolated hidden game run and its evidence.
 The verdict checks debug, console, stdout and stderr diagnostics. Cache and

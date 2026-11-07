@@ -4,8 +4,11 @@
 
 Updated 7 November 2026. Milestones retain the existing stage numbers, so
 "Stage 6" and "Milestone 6" refer to the same work. Stages 1–8 are complete;
-Stage 9 is in progress. The shared boat and console-syntax corrections
-remain explicitly deferred, as distinguished from their completed investigations.
+Stage 9's combined review, testing and cleanup are complete. Ruby co-op
+recovery failed on both original main and current, so its compatibility
+sign-off remains withheld.
+The shared boat and console-syntax corrections remain explicitly deferred,
+as distinguished from their completed investigations.
 The stage evidence below records the changes, actual validation and limits.
 
 | Milestone | Scope and outcome | Status |
@@ -18,20 +21,21 @@ The stage evidence below records the changes, actual validation and limits.
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
 | 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
-| 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | In progress; final verification |
+| 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; Ruby co-op recovery sign-off withheld |
 
-The latest verified revision is `15d2ef130`, including the Linux test-fixture
-correction to implementation `99341deeb`. All four debug platforms and the
-unchanged MCC workflow inputs passed on the exact revisions recorded below.
-Stage 8 recorded 2,123 local passes, nineteen skips and twelve existing boat
-expected failures, four real-asset checks, matched Ruby/Descent/Quarantine
-runs, a two-peer Quarantine branch comparison and Xbox/CE/MCC transitions.
+The latest verified implementation revision is `f25c4886a`, with fresh passing
+MCC and four-platform debug workflows. Stage 9 recorded 2,193 local passes,
+24 skips and twelve existing boat expected failures, four real-asset checks,
+64 successful matched loads, sixteen failed-load recoveries, standalone
+save/restore/reset checks, Mercury co-op and all four Xbox/CE mixed-build host
+directions. Ruby co-op recovery remains a failed observation, including an
+original-main reproduction; completion of the investigation does not fix it.
 All 21 structural HUD profiles remain with measured evidence and removal
 conditions. MCC protocol is 65; OpenCE remains 41. The shared console-syntax
-defect remains unfixed, as explicitly requested.
-The detailed sections distinguish these bounded checks from full compatibility.
-Eight completed milestones are not an estimate of percentage effort remaining,
-and do not establish that every MCC module has received the same depth of audit.
+defect remains unfixed, as explicitly requested. The detailed sections
+distinguish these bounded checks from full compatibility. Milestone counts
+are not an estimate of percentage effort remaining, and do not establish
+that every MCC module has received the same depth of audit.
 
 All future changes remain evidence-backed, with general engine defects fixed
 in the responsible implementation and MCC format defects fixed systemically
@@ -120,8 +124,13 @@ devices and browser-map gameplay remain unverified until specifically tested;
 build success alone does not close those limits. This milestone prepares the
 branch for delivery review; PR descriptions and merging remain separate.
 
-The combined review has completed; extended runtime and final verification
-are in progress. Its findings and coverage are recorded in
+The combined review and planned runtime observations have completed. Platform
+and representative runtime checks pass, but Ruby co-op recovery does not meet
+the all-passing compatibility criterion above. It also fails on original main;
+repairing the shared recovery path requires a separate contract/version review
+under the standing OpenCE-crossplay constraint. This exception is recorded,
+not silently accepted or converted into a passing check. Final documentation
+and cleanup are complete. Findings and coverage are recorded in
 [Stage 9 evidence](#stage-9-combined-review-and-extended-validation).
 
 ### Explicitly deferred: unconditional shared boat fix
@@ -1665,5 +1674,250 @@ the complete selection rerun with native Windows operations available.
 `port/linux/NETCODE.md` also corrects one stale current MCC version from 64 to
 65; historical version statements remain unchanged. OpenCE remains 41.
 
-Extended runtime, matched loading/memory measurements and final platform
-results are pending. This section does not yet mark Milestone 9 complete.
+### Local and platform validation
+
+Implementation revision `f25c4886a0ee1567b8b3808eee4bd8b4e1e3e6be`
+passed the combined local selection: 2,193 tests, 24 skips and the twelve
+unchanged strict boat expected failures. The selection includes all MCC test
+modules, MCC harness cases, frontend tests, CE cache readers, Workshop/startup,
+camera admission, network-comparison and HUD threshold checks. Four additional
+installed Ruby B40/CE reader, geometry and resource checks passed. Windows
+release was already up to date; the wire-format manifest matches its record.
+Local skips include unavailable file-symlink privilege, opt-in assets,
+Linux discovery and POSIX process-lifecycle checks; the four selected asset
+checks were then run with explicit inputs. The document check covered 232
+local links, eleven named symbols, changed Python syntax and the combined
+MCC-only production boundary.
+
+Both fresh workflows passed on that exact revision, attempt 1:
+
+- [MCC map validation, run 42403748356](https://github.com/chestahh/GulchCE/actions/runs/42403748356):
+  Linux reader/validator 1,802 passes and nineteen skips, plus 38 sanitizer
+  passes; Windows adapters 2,046 passes and seventeen skips; 36 real
+  software-GL meter-render checks.
+- [Build, run 42403748394](https://github.com/chestahh/GulchCE/actions/runs/42403748394):
+  Linux, Windows, Android and web debug builds passed. Linux recorded 2,824
+  passes, 52 skips, twelve boat expected failures and seven subtests across
+  its invocations. Windows storage, Android touch/gyro/importer, web startup,
+  Node and Chromium/Firefox native-WebRTC checks passed, including configured
+  packet loss. Branch release jobs were intentionally skipped; the local
+  Windows runtime build is release.
+
+These selections overlap and are not a unique-test total. Nine decoded job
+logs, ten job records and six artifact metadata records are retained under
+`build/stage9/ci`; all six artifact IDs, revision identities and upload digests
+match their logs. No CI binaries were downloaded. Build and transport checks
+do not establish physical Android play, browser-map gameplay or an official
+upstream-executable crossplay result.
+
+### Repeated loading, timing and memory
+
+Four sequential, matched Windows sessions completed 64 valid loads and sixteen
+deliberately invalid MCC loads with actual menu recovery. Each process repeated
+Mercury Falling, Xbox Blood Gulch, CE Death Island, refusal/menu and Ruby A10
+four times: one warm-up and three measured cycles. Original main and the
+current build ran in both orders. All valid phases advanced at least 150 fresh
+logged ticks; every process closed normally. Workshop originals stayed in
+place. Renderer, 640x480 resolution, high-resolution HUD, 30 FPS cap, audio-off
+settings and SDL DLL matched; captures were disabled during measurement.
+
+The original-main executable remains SHA-256
+`f1ec0dca876aa3cf746a4095ac9115cc026902f4679d1c3941deb20928c85d56`;
+the unchanged current game executable is
+`816055002eeb8f5434ec78d5dad817e5397d443e8ccb58e66d9d852e755cafbb`.
+Milestone 9 changes validation tools/documentation, not that game implementation.
+Private Win32 measurements use the owned process handle for private memory,
+working set and handle counts. A read of the source-defined game-state header
+confirms each actual map; it performs no process write, scan or save operation.
+
+Six measured samples per build give the following median seconds and observed
+minimum–maximum ranges. These include command queueing, log publication and
+approximately 100 ms observer cadence; they are not engine-only loading timers
+or statistical confidence intervals.
+
+| Boundary | Original main | Current |
+| --- | ---: | ---: |
+| Mercury first logged tick | 13.567 (12.239–15.926) | 13.916 (11.657–14.467) |
+| Xbox first logged tick | 1.613 (1.574–1.626) | 1.634 (1.583–1.680) |
+| CE first logged tick | 2.035 (2.019–2.061) | 2.007 (1.984–2.072) |
+| Ruby A10 first logged tick | 13.449 (11.796–14.949) | 14.606 (11.990–15.127) |
+| Exact refusal/menu diagnostic | 0.444 (0.434–0.459) | 0.443 (0.430–0.451) |
+
+Time order materially affects the result: original-main Mercury/Ruby medians
+fell from approximately fifteen seconds in its first process to twelve in its
+last; the second current process also became faster during its sequence.
+Neither the first apparent improvement nor the pooled Ruby increase isolates
+a build effect. The Xbox median difference is below observer cadence and its
+ranges overlap. These observations demonstrate no clear attributable loading
+regression, but do not statistically establish speed gains or performance
+parity. File-cache state and scheduling were uncontrolled.
+
+The first pair's measured menu-memory growth was 1.49 MiB on main and 10.11 MiB
+on current, which prompted the reverse-order repeat. That pair grew 12.45 MiB
+on main and 2.86 MiB on current. Current's observed menu maximum was 563.75 MiB
+versus main's 564.72 MiB; Mercury maxima were 1,220.06 versus 1,223.80 MiB.
+Some boundaries decreased, both builds released hundreds of MiB between MCC
+and menu, and handle counts declined. There is no repeatable current-only
+retention excess. This is not a universal plateau, attribution of every
+retained byte, GPU-memory measurement or proof against long-duration leaks.
+
+Logical converted-tag storage is separately bounded and identical on every
+repeat: Mercury adds 7,152 occupied arena bytes and Ruby A10 adds 6,832, chiefly
+the required HUD ownership copies. Bitmap counts and pixel bytes are unchanged.
+Temporary planner arrays are freed; retained copies belong to the map arena's
+unload/decommit path. Windows commits the same fixed 64 MiB arena in both
+builds, so these occupied-byte deltas are not equivalent extra PrivateUsage
+and do not explain the larger process-memory variation.
+
+The first collector attempt remains failed: it incorrectly required a second
+Xbox precache-start message, although a cached load does not emit that message.
+The corrected observer verifies actual scenario identity/checksum from the
+fixed native header and fresh tick epochs. Thirty-seven helper controls and
+96 receipt-invalidation controls passed. Full trajectories, source identities,
+raw logs and limitations are in `build/stage9/cycle-summary.md` and
+`cycle-verification.json`; the initial failure was not relabelled successful.
+
+### Saves, restarts and co-op findings
+
+Current Ruby B40 and Mercury passed standalone save/revert, core save/load and
+map-reset checks. Each restore proves a saved boolean's true–false–restored
+round trip and at least 300 further fresh simulation ticks. Independent
+decoding validates the retained 20 MiB checkpoint/core images and their MCC
+footer/thread checksums. Xbox Blood Gulch and CE Death Island reset controls
+also passed. These checks use completed standalone commands; they do not
+snapshot a sleeping temporary console expression or close the separately
+deferred console-syntax lifetime defect.
+
+The first Mercury attempt correctly stopped when its checkpoint image changed
+before the planned revert. Both images remain retained. The original helper
+called this an auto-save, but the evidence establishes replacement, not its
+writer. Removing the optional idle window between capture and revert allowed
+the retry to verify the same captured image; all post-restore tick checks stayed.
+The helper did not overwrite the live checkpoint with its retained copy, and
+no authored script was disabled for that retry.
+
+Extended current/current Mercury co-op passed admission, two living-player
+checks and 1,800 further ticks. The unchanged strict network comparator passed
+with sixty paired seconds and 1,799 on-foot drift samples, no threshold breaches
+and normal exit of both peers. Nonzero drift remains recorded; this is not a
+claim of bit-identical views or full campaign compatibility.
+
+Ruby B40 exposed a separate **pre-existing shared co-op checkpoint-recovery
+failure** in the OpenCE Crossplay profile. Both current/current and
+original-main/original-main runs fail the unchanged strict comparator after
+team-wipe reverts, with sufficient samples (1,031 and 1,271 respectively).
+An additional current idle-input run also fails after reverts with 744 samples;
+the finding is not an insufficient-sampling verdict or restricted to bot combat.
+Both peers stay connected, but the client lacks a player-unit binding while
+the host has a positive-vitality unit. The logger's `alive` field represents a
+unit binding, not a direct client health measurement.
+
+In the current bot run, mismatches span 21 and nine consecutive paired samples,
+approximately twenty and eight seconds. Three samples is the failure trigger,
+not their total duration. The baseline also crosses that threshold; subsequent
+raw logs still disagree after their clock offset exceeds the comparator's
+pairing tolerance. These runs prove the failure class predates the refactor;
+they do not establish identical recovery timing or severity. A final one-shot
+`(players)` conditional also failed in the current cases; it tests unit objects,
+not session membership or continuous absence throughout its wait.
+
+A final aim-only control completed 900 fresh ticks (1110–2010), using only
+right-stick test input. Its strict verdict is also failed, with 840 drift
+samples and no insufficient-sampling problem. The host reverted at tick 2012,
+just after that window; fifteen paired samples then disagreed from 2040 to
+2461, approximately fourteen seconds through shutdown. An earlier isolated
+mismatch at 1920 did not reach the unchanged threshold. Thus the sustained
+failure in this run occurred during the final confirmation wait, not within
+the completed 900-tick window. The absent final unit-count receipt and failed
+judge remain recorded; this is not an ordinary-co-op pass.
+
+The responsible shared `network_coop`, `network_objects` and
+`network_distributed` implementations are unchanged across this refactor.
+Source inspection finds the live-unit recovery/replacement operations guarded
+by `third_person_session_active`; both peers' recorded profile is
+`opence_crossplay`. As documented in `NETCODE.md`, that profile retains the
+existing checkpoint behavior and does not execute the separately versioned
+recovery extensions. This supports a shared profile/recovery classification;
+the exact stale-handle mechanism remains an inference because these logs do
+not expose every object handle. It is distinct from console-syntax ownership.
+
+No map bypass, profile change or guard broadening was made. Preserving OpenCE
+crossplay and feature isolation precludes silently importing those extensions
+into this cleanup. A separate shared-engine contract/version review is needed
+before repairing or qualifying this recovery path. This is a retained failure,
+not an MCC refactor fix or full co-op checkpoint compatibility sign-off.
+
+### Legacy mixed-build checks and evidence audit
+
+Original-main/current pairs passed on Xbox Blood Gulch and CE Death Island
+in both host directions. Each completed 1,800 fresh post-admission ticks and
+61 paired seconds with the unchanged strict comparator, normal process exits,
+and no reported divergence or comparator problem.
+
+| Map family | Host build | On-foot drift samples | Maximum position difference |
+| --- | --- | ---: | ---: |
+| Xbox | Original main | 1,822 | 0.079467 |
+| Xbox | Current | 1,828 | 0.079051 |
+| Custom Edition | Original main | 1,496 | 0.159609 |
+| Custom Edition | Current | 1,518 | 0.079756 |
+
+These establish bounded mixed-build behavior on the identified OpenCE 41
+paths. They are not tests against an official upstream executable. Original
+and current MCC peers were tested separately within their own protocol
+versions; the earlier MCC version bump intentionally prevents mixed admission.
+
+Independent verification binds every runtime session, raw logs, source
+snapshots, settings, binary identities and supporting files. The final ledger
+contains nineteen sessions: thirteen positive observations and six retained
+failures (the first collector, the replaced Mercury checkpoint, and four Ruby
+co-op runs). Its coverage-completed flag is true; its overall runtime-pass flag
+is false. Archive readiness establishes integrity and process inactivity,
+not compatibility. Additional support files are explicitly identified as
+preservation-only where they received hashing rather than semantic decoding.
+The state/pair verifier passed 37 negative/positive controls, the inventory
+merger twenty, the frozen state/pair helper twenty and the cleanup gate 41.
+These controls supplement the cycle controls; they are not gameplay samples.
+
+### Final review, cleanup and delivery limits
+
+The final combined implementation, integration, tests and reader documentation
+were reviewed before the required regression checks. The resulting smoke-tool
+correction received focused failure injection, the full local selection and
+both fresh CI workflows. Subsequent changes record the completed runtime
+observations and limits; they do not modify the tested implementation, workflow
+or test inputs. Both workflows exclude documentation-only pushes, so their
+successful results remain attributed to `f25c4886a`. The final document check
+validates 232 local links, eleven named symbols, changed Python syntax and
+the combined production boundary. No further game-code change or speculative
+trim is justified by the review.
+
+All 28 owned game processes exited normally. Their 168 generated map caches,
+totalling 21,491,613,696 bytes, were removed after each run; none remain.
+Cleanup removed 7,102 verified disposable fixtures and private input copies,
+totalling another 440,218,858 bytes. No original maps or saves were removed.
+The 1,097 inactive runtime save/support files and fifteen literal test-save
+fixtures (745,741,325 bytes combined) were preserved losslessly in
+`build/stage9/inactive-runtime-evidence.zip` (7,455,234 bytes). Its manifest
+records original paths and SHA-256 values. Every archive member and loose
+source was verified before removal of the loose copy.
+
+The separate final delivery check reverified archive inventory, CRCs, sizes
+and hashes, all 309 remaining loose runtime evidence files, exact session
+inventory, process inactivity, missing disposable files and the cleanup
+receipts. All fifteen original map/resource inputs and four executable/DLL
+records were rehashed unchanged after cleanup. Roughly 29 MB remains under
+`build/stage9`, including the archive, raw runtime/CI logs, small fixture-source
+evidence and the original and final verification/cleanup receipts. Required
+baseline and current builds remain at their existing locations.
+
+Milestone 9's review and planned validation work are complete. The all-passing
+runtime acceptance criterion remains unmet for Ruby co-op recovery; that
+shared path is left unchanged under the standing crossplay and feature-isolation
+constraints. Its original-main reproduction establishes a pre-existing failure
+class, not parity of severity or proof against an indirect timing regression.
+The branch is ready for delivery review with that explicit exception, not
+unconditional compatibility sign-off. Full campaigns, live split-screen,
+physical Android, browser-map gameplay, official upstream-binary crossplay and
+long-duration leak/performance qualification remain unverified. The explicitly
+deferred shared boat and console-syntax corrections remain unfixed. No pull
+request description or merge is part of this milestone.
