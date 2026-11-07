@@ -6757,7 +6757,16 @@ static boolean ui_mouse_menus_active(
 
 	/* (and the scores after a game, which take A and B like the menus:
 	game_engine_update_non_deterministic) */
-	return virtual_keyboard_active() || ui_mouse_menu() != NULL || game_engine_showing_postgame();
+	if (virtual_keyboard_active() || ui_mouse_menu() != NULL || game_engine_showing_postgame())
+		return TRUE;
+	/* port: and the launcher shown on MCC's main menu in place of its screens,
+	which the keys and the controller drive as they do the menus
+	(port/linux/game/mcc_launcher.c) */
+	{
+		extern boolean mcc_launcher_active(void);
+
+		return mcc_launcher_active();
+	}
 }
 
 /* port: a row of a list to choose from (the PC version's menus' lists of
