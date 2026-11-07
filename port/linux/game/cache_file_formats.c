@@ -325,6 +325,9 @@ starting with its placement */
 #define GRENADE_HUD_INTERFACE_OVERLAY_BITMAP_OFFSET 0x14C
 #define GRENADE_HUD_INTERFACE_OVERLAY_ITEMS_OFFSET 0x15C
 #define UNIT_HUD_INTERFACE_BLIPS_OFFSET 0x35C
+/* the motion sensor's background and foreground (unit_hud_interface_elements) */
+#define UNIT_HUD_INTERFACE_MOTION_SENSOR_BACKGROUND_OFFSET 0x26C
+#define UNIT_HUD_INTERFACE_MOTION_SENSOR_FOREGROUND_OFFSET 0x2D4
 /* Where a meter element of the Xbox's has its multitexture overlays (a
 block, which the Xbox's tags leave empty), Halo PC's meters have a minimum
 alpha and padding (Invader's unit_hud_interface.json and
@@ -2622,6 +2625,31 @@ int32_t mcc_hud_convert(
 			else if (groups[group_index] == GRENADE_HUD_INTERFACE_GROUP_TAG)
 			{
 				mcc_hud_walk_placement(&context, definition + GRENADE_HUD_INTERFACE_COUNT_NUMBERS_OFFSET, NULL, 0);
+			}
+			else if (groups[group_index] == UNIT_HUD_INTERFACE_GROUP_TAG)
+			{
+				uint8_t *blips = definition + UNIT_HUD_INTERFACE_BLIPS_OFFSET;
+				uint8_t *sensor[3];
+				int16_t inset_x;
+				int16_t inset_y;
+				int element;
+
+				/* (the walk halved the blips' centre with the rest) MCC moves the
+				motion sensor in from its corner (its background
+				and foreground at 20 by 20, where every Xbox HUD's are at 0 by 0,
+				and its blips' centre with them): put back where the Xbox has it */
+				sensor[0] = definition + UNIT_HUD_INTERFACE_MOTION_SENSOR_BACKGROUND_OFFSET;
+				sensor[1] = definition + UNIT_HUD_INTERFACE_MOTION_SENSOR_FOREGROUND_OFFSET;
+				sensor[2] = blips;
+				inset_x = read_s16(sensor[0] + HUD_PLACEMENT_OFFSET_X_OFFSET);
+				inset_y = read_s16(sensor[0] + HUD_PLACEMENT_OFFSET_Y_OFFSET);
+				for (element = 0; element < 3; element++)
+				{
+					write_u16(sensor[element] + HUD_PLACEMENT_OFFSET_X_OFFSET,
+						(uint16_t)(read_s16(sensor[element] + HUD_PLACEMENT_OFFSET_X_OFFSET) - inset_x));
+					write_u16(sensor[element] + HUD_PLACEMENT_OFFSET_Y_OFFSET,
+						(uint16_t)(read_s16(sensor[element] + HUD_PLACEMENT_OFFSET_Y_OFFSET) - inset_y));
+				}
 			}
 			/* the HUD globals' damage indicators' offsets from the screen's
 			edges */
