@@ -236,19 +236,25 @@ separate qualification limit. Main was not promoted at that point.
 ## Subsequent promotion to main
 
 On 7 November 2026, the user explicitly requested merging current testing into
-main and monitoring CI. The reviewed inputs are testing
+main and monitoring CI. The initial merge inputs were testing
 `9bf9554aa86dbeba9fa49f5d8ff1b99f2ba82c1b` and main
-`c5ae133ff69701ca9d48d32808969c13afe00d9f`. Testing additionally contains the CPU
-mask-conversion and collision-continuation optimization documented in
-[its acceptance record](dynamic_emitter_expansion_acceptance.md). Its
+`c5ae133ff69701ca9d48d32808969c13afe00d9f`. That testing revision's
 [platform builds and regression checks](https://github.com/chestahh/GulchCE/actions/runs/42324288419)
 and [MCC validation](https://github.com/chestahh/GulchCE/actions/runs/42324288332)
-passed before promotion.
+passed before the conflict-free merge.
 
-The merge is conflict-free. The resulting engine, platform, tools and build
-configuration match that exact testing revision; main's existing README and
-agent/coding guidance remain intact. No new implementation changes or unrelated
-refactoring were needed. The Workshop diagnostic branch is excluded. CI on the
-main merge additionally builds the release configurations and publishes their
-artifacts. The b40 co-op comparison discrepancy remains an explicitly recorded
+Before release publication, the user clarified that the CPU mask-conversion and
+collision-continuation optimization is still being developed and must be left
+out. The initial Build/release run was cancelled. A focused revert on main
+removes all changes from `9bf9554aa`; testing and its ongoing work are untouched.
+The corrected engine, platform, tools and build configuration exactly match
+the previously reviewed testing revision
+`045cb99bce3fba18a3ddb61f88e327ba4544d09e`. Main's existing README and agent/coding
+guidance remain intact, and the Workshop diagnostic branch is excluded.
+
+The optimization commit remains in Git ancestry because main was already pushed;
+when that work is ready, its full intended change must be deliberately restored
+and validated. Merging later descendants alone will not restore reverted lines.
+Fresh CI on corrected main builds debug and release configurations before
+publication. The b40 co-op comparison discrepancy remains an explicitly recorded
 pre-existing qualification limit, not a resolved defect or a clean network pass.

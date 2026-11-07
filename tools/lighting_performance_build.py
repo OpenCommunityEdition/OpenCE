@@ -78,8 +78,6 @@ def main():
     paths += ['port/linux/game/plasma_collision_models.c']
     if args.profile:
         paths += ['source/objects/object_lights.c', 'port/linux/src/plasma_occlusion_gl.c']
-    if args.verify_traces:
-        paths += ['source/physics/collision_bsp.c']
     if args.diagnose or args.resources:
         paths += ['source/physics/collision_usage.c', 'port/linux/src/xbox_textures.c']
     originals = {p: (ROOT/p).read_bytes() for p in paths}
@@ -103,7 +101,7 @@ def main():
         diagnostic_sources += ['tools/fixtures/'+name for name in ('lighting_diagnostics.inc',
             'lighting_resource_diagnostics.inc','lighting_texture_diagnostics.inc')]
     if args.verify_traces:
-        diagnostic_sources += ['tools/lighting_trace_check.py','tools/collision_traversal_check.py','tools/fixtures/lighting_trace_check.inc']
+        diagnostic_sources += ['tools/lighting_trace_check.py','tools/fixtures/lighting_trace_check.inc']
     if args.verify_textures:
         diagnostic_sources += ['tools/lighting_texture_check.py']
     if args.verify_visibility:
@@ -253,9 +251,6 @@ def main():
             replace(falloff, '\tplasma_falloff_bound = TRUE;', '\tlighting_profile_world = stage == 1 ? 3 : 2;\n\tplasma_falloff_bound = TRUE;')
             replace(falloff, '\tplasma_specular_tint = 0x00FFFFFFUL;\n\tif (!plasma_falloff_bound)', '\tlighting_profile_world = 0;\n\tplasma_specular_tint = 0x00FFFFFFUL;\n\tif (!plasma_falloff_bound)')
         if args.verify_traces:
-            from collision_traversal_check import instrument as instrument_traversal
-            bsp = ROOT/'source/physics/collision_bsp.c'
-            bsp.write_text(instrument_traversal(bsp.read_text()))
             occlusion.write_text(instrument(occlusion.read_text()))
             collision = ROOT/'port/linux/game/plasma_collision.c'
             collision.write_text(instrument_collision(collision.read_text()))

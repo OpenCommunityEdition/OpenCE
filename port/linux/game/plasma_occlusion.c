@@ -575,65 +575,6 @@ static struct occlusion_field *field_for(long rasterizer_index)
 	}
 	return update_field(field, rasterizer_index, now);
 }
-/* Convert four neighbouring receiver samples together. Keep the scalar order
-   of interpolation, admission, angular mask and radial falloff; no approximate
-   reciprocals or square roots. Other architectures retain the same formulas. */
-static void texture_row(unsigned long *pixels, real const *a, real const *b, real blend,
-	real admission, int radial, int directional, real const axis[3], real dy, real dz, real height_scale)
-{
-	int x;
-#if defined(__SSE2__)
-	__m128 zero = _mm_setzero_ps(), one = _mm_set1_ps(1), two = _mm_set1_ps(2), three = _mm_set1_ps(3);
-	__m128 yy = _mm_set1_ps(dy * dy), zz = _mm_set1_ps(dz * dz);
-	__m128 weight = _mm_set1_ps(admission), base = _mm_set1_ps(1 - admission), mix = _mm_set1_ps(blend);
-	for (x = 0; x < OCC_SIZE; x += 4)
-	{
-		__m128 dx = _mm_setr_ps((x + 0.5f) * 0.125f - 1, (x + 1.5f) * 0.125f - 1,
-			(x + 2.5f) * 0.125f - 1, (x + 3.5f) * 0.125f - 1);
-		__m128 xx = _mm_mul_ps(dx, dx), first = _mm_loadu_ps(a + x);
-		__m128 value = _mm_add_ps(first, _mm_mul_ps(_mm_sub_ps(_mm_loadu_ps(b + x), first), mix));
-		__m128 remaining, t, dot, length;
-		__m128i bytes;
-		value = _mm_add_ps(base, _mm_mul_ps(weight, value));
-		if (directional == 2)
-			value = _mm_mul_ps(value, _mm_set1_ps(needler_falloff_factor(dz * height_scale)));
-		else if (directional)
-		{
-			length = _mm_sqrt_ps(_mm_add_ps(_mm_add_ps(xx, yy), zz));
-			dot = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_mm_set1_ps(axis[0]), dx),
-				_mm_set1_ps(axis[1] * dy)), _mm_set1_ps(axis[2] * dz));
-			t = directional == 3 ? _mm_div_ps(_mm_add_ps(_mm_div_ps(dot, length), _mm_set1_ps(0.2f)), _mm_set1_ps(0.7f)) :
-				_mm_div_ps(dot, _mm_mul_ps(length, _mm_set1_ps(0.6f)));
-			t = _mm_min_ps(_mm_max_ps(t, zero), one);
-			value = _mm_mul_ps(value, _mm_mul_ps(_mm_mul_ps(t, t), _mm_sub_ps(three, _mm_mul_ps(two, t))));
-		}
-		if (radial)
-		{
-			remaining = _mm_max_ps(zero, _mm_sub_ps(_mm_sub_ps(_mm_sub_ps(one, xx), yy), zz));
-			value = _mm_mul_ps(value, _mm_mul_ps(remaining, remaining));
-		}
-		/* Visibility is in [0,1], so signed conversion is exact for [0,255]. */
-		bytes = _mm_cvttps_epi32(_mm_add_ps(_mm_mul_ps(_mm_set1_ps(255), value), _mm_set1_ps(0.5f)));
-		bytes = _mm_or_si128(bytes, _mm_slli_epi32(bytes, 8));
-		bytes = _mm_or_si128(bytes, _mm_slli_epi32(bytes, 16));
-		_mm_storeu_si128((__m128i *)(pixels + x), bytes);
-	}
-#else
-	for (x = 0; x < OCC_SIZE; x++)
-	{
-		real dx = 2.0f * (x + 0.5f) / OCC_SIZE - 1;
-		real value = a[x] + (b[x] - a[x]) * blend;
-		real remaining = MAX(0.0f, 1 - dx * dx - dy * dy - dz * dz);
-		value = 1 - admission + admission * value;
-		if (directional)
-			value *= directional == 3 ? plasma_prong_falloff_factor(axis, dx, dy, dz) : directional == 2 ?
-				needler_falloff_factor(dz * height_scale) : ammo_counter_falloff_factor(axis, dx, dy, dz);
-		if (radial) value *= remaining * remaining;
-		pixels[x] = (unsigned long)(255 * value + 0.5f) * 0x01010101UL;
-	}
-#endif
-}
-
 /* Build only a texture actually consumed by this view. CPU visibility history
    stays independent of pass order, and each pass uploads at most once. */
 /* Keep the pixel/row scratch out of cache hits, including under LTO. */
@@ -657,22 +598,30 @@ static __attribute__((noinline)) void *prepare_field_texture(struct occlusion_fi
 		for (i = 0; i < OCC_COUNT; i++)
 			pixels[i] = (unsigned long)(255 * (1 - field->admission + field->admission * field->visibility[i]) + 0.5f) * 0x01010101UL;
 	}
-	else if (!pass || scale == 0.5f || scale == 1.0f)
+	else if (pass && !directional && (scale == 0.5f || scale == 1.0f))
 	{
-		/* Resolve half/unit-size source slices once per output slice. The
-		   contiguous rows share the packed conversion, including angular masks. */
+		/* Ordinary radial masks use half-size or unit-size sampling. Resolve
+		   the source slices once per output slice, leaving contiguous
+		   rows and no profile/resampling branches in the conversion loop. */
 		for (z = 0; z < OCC_SIZE; z++)
 		{
-			real const *a = !pass || scale == 1.0f ? field->visibility + z * OCC_SIZE * OCC_SIZE : rows + half_axes[2][z].a * OCC_SIZE * OCC_SIZE;
-			real const *b = !pass || scale == 1.0f ? a : rows + half_axes[2][z].b * OCC_SIZE * OCC_SIZE;
-			real blend = !pass || scale == 1.0f ? 0 : half_axes[2][z].t;
+			real const *a = scale == 1.0f ? field->visibility + z * OCC_SIZE * OCC_SIZE : rows + half_axes[2][z].a * OCC_SIZE * OCC_SIZE;
+			real const *b = scale == 1.0f ? a : rows + half_axes[2][z].b * OCC_SIZE * OCC_SIZE;
+			real blend = scale == 1.0f ? 0 : half_axes[2][z].t;
 			real dz = 2.0f * (z + 0.5f) / OCC_SIZE - 1;
 			for (y = 0; y < OCC_SIZE; y++)
 			{
 				real dy = 2.0f * (y + 0.5f) / OCC_SIZE - 1;
-				texture_row(pixels + (z * OCC_SIZE + y) * OCC_SIZE, a + y * OCC_SIZE, b + y * OCC_SIZE,
-					blend, field->admission, pass != 0, directional, axis, dy, dz,
-					pass == 0 ? field->extent / field->radius : pass == 2 ? field->specular : 1.0f);
+				for (x = 0; x < OCC_SIZE; x++)
+				{
+					int row = y * OCC_SIZE + x;
+					real dx = 2.0f * (x + 0.5f) / OCC_SIZE - 1;
+					real remaining = MAX(0.0f, 1 - dx * dx - dy * dy - dz * dz);
+					real value = a[row] + (b[row] - a[row]) * blend;
+					value = 1 - field->admission + field->admission * value;
+					value *= remaining * remaining;
+					pixels[z * OCC_SIZE * OCC_SIZE + row] = (unsigned long)(255 * value + 0.5f) * 0x01010101UL;
+				}
 			}
 		}
 	}

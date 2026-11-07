@@ -17,7 +17,7 @@ def instrument(text):
     calculation = calculation.replace('\tunsigned long pixels[OCC_COUNT];', '\tunsigned long *pixels = output;')
     calculation += '}\n'
     generic = calculation.replace('check_texture_pixels(', 'check_texture_generic(', 1)
-    generic = generic.replace('if (!pass && !directional)', 'if (FALSE)').replace('else if (!pass || scale == 0.5f || scale == 1.0f)', 'else if (FALSE)')
+    generic = generic.replace('if (!pass && !directional)', 'if (FALSE)').replace('else if (pass && !directional && (scale == 0.5f || scale == 1.0f))', 'else if (FALSE)')
     wrapper = r'''
 static void check_texture(struct occlusion_field *field, int pass, int directional, real const axis[3])
 {
