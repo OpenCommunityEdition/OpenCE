@@ -70,7 +70,7 @@ def test_main_accepts_workshop_and_runs_cases_in_order(tmp_path, monkeypatch):
     def run(args, name, binary):
         assert binary.read_bytes() == b"executable"
         calls.append(name)
-        return {"map": name, "passed": True}
+        return {"map": name, "passed": True, "process_stopped": True}
     monkeypatch.setattr(smoke, "run_case", run)
     monkeypatch.setattr(sys, "argv", ["mcc_native_smoke.py", *argv])
     assert smoke.main() == 0
@@ -86,7 +86,8 @@ def test_launcher_error_stops_following_cases(tmp_path, monkeypatch):
     calls = []
     def fail(args, name, binary):
         calls.append(name)
-        return {"map": name, "passed": False, "launcher_error": "cannot restore init"}
+        return {"map": name, "passed": False, "process_stopped": True,
+                "launcher_error": "cannot restore init"}
     monkeypatch.setattr(smoke, "run_case", fail)
     monkeypatch.setattr(sys, "argv", ["mcc_native_smoke.py", *argv])
     assert smoke.main() == 1
@@ -363,3 +364,114 @@ def test_init_restore_failure_keeps_logs_and_cache_cleanup(tmp_path, monkeypatch
     assert result["cleanup"]["removed_files"] == 1
     assert list(args.output.rglob("result.json")) and list(args.output.rglob("console.log"))
     assert (Path(result["output"]) / "init.original.txt").read_bytes() == b"original startup"
+
+
+@pytest.mark.parametrize("stop_failure", [None, "kill", "wait"])
+def test_cache_cleanup_requires_observed_child_exit(tmp_path, monkeypatch, stop_failure):
+    args = smoke.parse_args(arguments(tmp_path, "12345/a10", options=("--workshop",)))
+    init = args.data_root / "init.txt"
+    init.write_bytes(b"original startup")
+    monkeypatch.setattr(smoke, "check_console_port", lambda port: None)
+    process = SimpleNamespace(pid=1234, returncode=None)
+    process.poll = lambda: process.returncode
+    def kill():
+        if stop_failure == "kill":
+            raise PermissionError("simulated kill failure")
+        if stop_failure is None:
+            process.returncode = -1
+    def wait(**kwargs):
+        if stop_failure == "wait":
+            raise smoke.subprocess.TimeoutExpired("halo", 10)
+        return process.returncode
+    process.kill, process.wait = kill, wait
+    def launch(*a, **k):
+        output = Path(k["env"]["HALO_LOG_ROOT"])
+        (output / "debug.txt").write_text("EXCEPTION halt")
+        cache = Path(k["env"]["HALO_SAVE_ROOT"]) / "z"
+        cache.mkdir(parents=True)
+        (cache / "cache000.map").write_bytes(b"owned cache")
+        (cache / "savegame.bin").write_bytes(b"preserved save")
+        return process
+    monkeypatch.setattr(smoke.subprocess, "Popen", launch)
+    result = smoke.run_case(args, args.maps[0], args.executable)
+    cache = Path(result["output"]) / "saves" / "z"
+    assert (cache / "cache000.map").exists() == (stop_failure is not None)
+    assert (cache / "savegame.bin").read_bytes() == b"preserved save"
+    assert init.read_bytes() == b"original startup"
+    assert result["process_stopped"] == (stop_failure is None)
+    assert result["pid"] == process.pid and not result["passed"]
+    assert bool(result["cleanup"]["errors"]) == (stop_failure is not None)
+    assert bool(result["launcher_error"]) == (stop_failure is not None)
+
+
+@pytest.mark.parametrize("failure", [None, "stdout", "close"])
+def test_console_completion_checks_all_logs_and_survives_close_error(tmp_path, monkeypatch, failure):
+    args = smoke.parse_args(arguments(tmp_path, "12345/a10", options=("--workshop",)))
+    init = args.data_root / "init.txt"
+    init.write_bytes(b"original startup")
+    monkeypatch.setattr(smoke, "check_console_port", lambda port: None)
+    monkeypatch.setattr(smoke, "verify_console_owner", lambda *a: None)
+    monkeypatch.setattr(smoke.time, "sleep", lambda seconds: None)
+    process = SimpleNamespace(pid=1234, returncode=None)
+    process.poll = lambda: process.returncode
+    killed, commands = [], []
+    def kill():
+        killed.append(True)
+        process.returncode = -1
+    process.kill = kill
+    process.wait = lambda **k: process.returncode
+    output = []
+    def launch(*a, **k):
+        output.append(Path(k["env"]["HALO_LOG_ROOT"]))
+        (output[0] / "debug.txt").write_text("mcc: loaded mcc_maps\\12345\\a10 (100 tags)")
+        if failure == "stdout":
+            k["stdout"].write(b"EXCEPTION halt\n")
+        return process
+    def receive(size):
+        marker = commands[0].decode("ascii").split('"')[1]
+        if failure == "close":
+            (output[0] / "debug.txt").write_text("EXCEPTION halt")
+        else:
+            process.returncode = 0
+        return ("\r\n" + marker + "\r\n").encode("ascii")
+    def close():
+        if failure == "close":
+            raise OSError("simulated console close failure")
+    connection = SimpleNamespace(settimeout=lambda value: None, close=close,
+                                 sendall=commands.append, recv=receive)
+    monkeypatch.setattr(smoke.subprocess, "Popen", launch)
+    monkeypatch.setattr(smoke.socket, "create_connection", lambda *a: connection)
+    result = smoke.run_case(args, args.maps[0], args.executable)
+    assert result["passed"] == (failure is None)
+    assert result["process_stopped"]
+    assert init.read_bytes() == b"original startup"
+    assert (Path(result["output"]) / "console.log").is_file()
+    if failure == "stdout":
+        assert "exception halt" in result["failures"]
+    if failure == "close":
+        assert killed and "simulated console close failure" in result["launcher_error"]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows launcher")
+@pytest.mark.parametrize("completion", ["survivor", "unknown", "exception"])
+def test_main_retains_binary_until_child_completion_is_known(tmp_path, monkeypatch, completion):
+    argv = arguments(tmp_path, "12345/a10", "67890/b40", options=("--workshop",))
+    calls = []
+    def run(args, name, binary):
+        calls.append(name)
+        if completion == "exception":
+            raise OSError("simulated evidence write failure")
+        result = {"map": name, "passed": True}
+        if completion == "survivor":
+            result["process_stopped"] = False
+        return result
+    monkeypatch.setattr(smoke, "run_case", run)
+    monkeypatch.setattr(sys, "argv", ["mcc_native_smoke.py", *argv])
+    if completion == "exception":
+        with pytest.raises(OSError, match="evidence write failure"):
+            smoke.main()
+    else:
+        assert smoke.main() == 1
+    assert calls == ["12345/a10"]
+    assert [path.read_bytes() for path in (tmp_path / "runs").rglob("*.exe")] == [b"executable"]
+    assert [path.read_bytes() for path in (tmp_path / "runs").rglob("*.dll")] == [b"library"]

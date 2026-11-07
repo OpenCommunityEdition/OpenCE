@@ -4,7 +4,8 @@ Use a disposable data root containing maps/ui.map. Local levels use mcc_maps;
 --workshop accepts installed numeric-package/map names without copying maps.
 --steam-root selects a Steam library and --campaigns enables mission discovery.
 Never commit assets or generated logs. The data root's init.txt is restored.
-Each case retains isolated saves/logs; only its generated map caches are removed.
+Each case retains isolated saves/logs; generated map caches are removed only
+after child exit. Uncertain shutdown also retains the copied executable.
 Only one hidden game runs at a time. Success requires a console expression to
 finish after 150 simulation ticks, not just the tag-loader's 'loaded' message.
 """
@@ -196,7 +197,10 @@ def run_case(args, name, binary):
         launcher_errors.append(str(error))
     finally:
         if connection is not None:
-            connection.close()
+            try:
+                connection.close()
+            except OSError as error:
+                launcher_errors.append(f"Cannot close console: {error}")
         try:
             if process is not None and process.poll() is None:
                 process.kill()
@@ -215,11 +219,20 @@ def run_case(args, name, binary):
                 launcher_errors.append(f"Cannot restore {init}: {error}")
             (output / "debug.log").write_text(trace(), encoding="utf-8")
             (output / "console.log").write_text(transcript, encoding="utf-8")
-            cleanup = cleanup_map_caches(output)
-    stderr = output / "stderr.log"
-    diagnostics = trace() + (stderr.read_text(errors="replace") if stderr.exists() else "")
+            process_stopped = process is None or process.poll() is not None
+            if process_stopped:
+                cleanup = cleanup_map_caches(output)
+            else:
+                cleanup = dict(removed_files=0, removed_bytes=0,
+                               errors=[f"Process {process.pid} is still running; preserving {output}"])
+    diagnostics = trace()
+    for name_log in ("stdout.log", "stderr.log"):
+        path = output / name_log
+        if path.exists():
+            diagnostics += "\n" + path.read_text(errors="replace")
     result = check_result(diagnostics, transcript, marker, name, process.returncode if process else None)
     result.update(output=str(output), launcher_error="; ".join(launcher_errors), cleanup=cleanup,
+                  pid=process.pid if process else None, process_stopped=process_stopped,
                   settings={key: value for key, value in env.items() if key.startswith("HALO_")})
     result["passed"] = result["passed"] and not launcher_errors and not cleanup["errors"]
     result["elapsed_seconds"] = round(time.monotonic() - started, 2)
@@ -282,21 +295,27 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     binary = Path(tempfile.mkdtemp(prefix="bin-", dir=args.output)) / "halo.exe"
     results = []
+    process_stopped = True
     try:
         shutil.copy2(args.executable, binary)
         shutil.copy2(args.executable.parent / "SDL3.dll", binary.parent / "SDL3.dll")
         for name in args.maps:
             print(f"{name}: hidden startup and simulation check", flush=True)
+            # An exception can prevent run_case from reporting child shutdown.
+            # Retain its executable until completion is positively established.
+            process_stopped = False
             result = run_case(args, name, binary)
+            process_stopped = result.get("process_stopped", False)
             results.append(result)
             print(json.dumps(result), flush=True)
             (args.output / "results.json").write_text(json.dumps(results, indent=2) + "\n")
-            if result.get("launcher_error"):
+            if result.get("launcher_error") or not process_stopped:
                 break
     finally:
-        binary.unlink(missing_ok=True)
-        (binary.parent / "SDL3.dll").unlink(missing_ok=True)
-    return 0 if all(result["passed"] for result in results) else 1
+        if process_stopped:
+            binary.unlink(missing_ok=True)
+            (binary.parent / "SDL3.dll").unlink(missing_ok=True)
+    return 0 if process_stopped and all(result["passed"] for result in results) else 1
 
 
 if __name__ == "__main__":

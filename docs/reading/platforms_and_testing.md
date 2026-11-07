@@ -144,6 +144,9 @@ between pytest coverage and direct GPU execution, and actual validation
 limits. Read `parse_args`, `case_environment`, `run_case` and `check_result`
 in [mcc_native_smoke.py](../../tools/mcc_native_smoke.py) to follow a virtual
 Workshop level name through an isolated hidden game run and its evidence.
+The verdict checks debug, console, stdout and stderr diagnostics. Cache and
+executable cleanup require observed child exit; uncertain shutdown retains
+the outputs and stops subsequent cases so they can be investigated safely.
 
 ## Work through a suspected movement regression
 

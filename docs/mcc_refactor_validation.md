@@ -4,7 +4,7 @@
 
 Updated 7 November 2026. Milestones retain the existing stage numbers, so
 "Stage 6" and "Milestone 6" refer to the same work. Stages 1–8 are complete;
-Stage 9 has not started. The shared boat and console-syntax corrections
+Stage 9 is in progress. The shared boat and console-syntax corrections
 remain explicitly deferred, as distinguished from their completed investigations.
 The stage evidence below records the changes, actual validation and limits.
 
@@ -18,7 +18,7 @@ The stage evidence below records the changes, actual validation and limits.
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
 | 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
-| 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Planned; final verification |
+| 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | In progress; final verification |
 
 The latest verified revision is `15d2ef130`, including the Linux test-fixture
 correction to implementation `99341deeb`. All four debug platforms and the
@@ -119,6 +119,10 @@ temporary outputs are cleaned. Full campaigns, live split-screen, Android
 devices and browser-map gameplay remain unverified until specifically tested;
 build success alone does not close those limits. This milestone prepares the
 branch for delivery review; PR descriptions and merging remain separate.
+
+The combined review has completed; extended runtime and final verification
+are in progress. Its findings and coverage are recorded in
+[Stage 9 evidence](#stage-9-combined-review-and-extended-validation).
 
 ### Explicitly deferred: unconditional shared boat fix
 
@@ -1581,5 +1585,85 @@ usable under `build/windows`.
 Milestone 8 is complete. Its remaining limits are explicit: no full campaign,
 full multiplayer synchronization, old-checkpoint migration, live split-screen,
 physical Android or browser-map gameplay qualification; no correction of the
-shared boat, console-syntax or native flush bookkeeping behavior. Milestone 9
-has not begun.
+shared boat, console-syntax or native flush bookkeeping behavior.
+
+## Stage 9: combined review and extended validation
+
+This milestone reviews the resulting branch against original main
+`db1697c9b0c46289596f22213a5bef8ee327be24`, including all earlier production
+changes, tests, build integration and reader documentation. The shared boat
+and console-syntax corrections remain explicitly deferred. No additional
+game-code change is justified by this review; the demonstrated corrections
+below affect validation tooling and a stale documentation statement.
+
+### Combined review and boundary coverage
+
+The resource directory sort had no ordering-dependent consumer; complete
+name scans and duplicate refusal remain. Bitmap cursor correctness follows
+from checked original handles and complete fresh-handle clone groups, with
+reuse appending nothing. HUD planning snapshots shared owners before writes
+or pointer publication, and temporary planning storage is freed on failure
+and success. The remaining tag pass clears meter metadata after placement
+normalization. Checksum callers preserve their distinct framing and seeds.
+Script resolution retains preparation/runtime separation; checkpoint
+validation rejects freed slots before copying live state. AI deselection
+uses the existing native service through the MCC registry.
+
+The final pass also inspected relevant activation, failure, unloading,
+worker-join and GPU-before-pixel cleanup routes. These ownership boundaries,
+required stubs, malformed-input checks and distinct regression cases remain
+necessary. There is no production `source/` change across this refactor.
+There is no new map-name, map-checksum or package-specific gameplay bypass.
+The 21 structural HUD exceptions and separate message-frame rule retain the
+evidence and removal conditions recorded in Stage 8. Existing optional HUD
+artwork CRC selectors identify two known replacement sheets, after format
+and size checks; they are not map selectors. Bridge tests use mocked CRCs,
+so they do not independently verify those original artwork fingerprints.
+
+This reconciles the navigation inventory in `CODINGSTANDARDS.md` with the
+actual review. "Partial" identifies a bounded inspection, not a known defect
+or a claim that the remaining implementation has been audited.
+
+| Boundary | Changed and reviewed across the branch | Reviewed and retained; remaining limits |
+| --- | --- | --- |
+| Selection, loading, packages and resources | Resource ordering/checksums and HUD metadata conversion | Cache load/unload, validation worker teardown, relevant handle/root-alias checks and bitmap access reviewed. Catalog, loading UI, package/identity/SHA implementations and remaining parser/converter behavior are partial or unaudited. |
+| Scripts, parameters and object names | Resolver, thread checksum, MCC AI deselection | Syntax, parameters, runtime/thread ownership, name tables and game speed reviewed. Full-capacity local-global reuse and every legacy interpreter route remain unestablished. |
+| Checkpoints and campaign state | Checksum and unused-unit preflight | Campaign snapshot/lifecycle, script effects and progress journal reviewed. Individual campaign evaluators/rendering are partial; older disabled-script checkpoint migration remains unverified. |
+| Explicit packages and progression | None | Full manifest, map-catalog and Android importer audit remains outside this review. Their automated checks are separate evidence. |
+| Weapon-authored cameras | None | Existing camera/MCC admission-envelope composition reviewed as a network dependency; camera implementation not deeply audited. |
+| Networking and names | MCC protocol version and combined manifest | Protocol, network adapter, names synchronization and relevant shared admission/cleanup routes reviewed. Workshop metadata and every native transport implementation not deeply audited. |
+| Player, inventory, movement, damage, boats, seats and recordings | None | Boat initializer/native force consumers and checkpoint grenade lookup dependency reviewed. Remaining gameplay modules not fully audited. |
+| Rendering, HUD and audio | Bitmap conversion/access, HUD ownership/layout and redundant normalization | Texture registry/bridge, relevant HUD frame/glyph cleanup and native decal-flush attribution reviewed. Geometry, shader, particles, sprites, audio/Vorbis and remaining HUD draw behavior not fully audited. |
+| Menus and pause | None | Implementation audit remains outside this review; existing executable tests remain in the regression selection. |
+
+No further production trim is supported by these findings. Removing required
+family boundaries or retained exceptions merely to reduce code would lose
+supported behavior. Private review notes are retained under
+`build/stage9/reviews/`.
+
+### Validation-tool corrections
+
+Failure injection into the real `mcc_native_smoke.run_case` and `main`
+reproduced seven adverse cases: kill failure, wait timeout, console-close
+failure, stdout-only fatal diagnostics, and survivor/unknown/exception
+completion from a case. Previously, caches or staged executables could be
+deleted despite uncertain child exit; a close error bypassed shutdown and
+init restoration; stdout-only failure could be reported as success.
+
+Cleanup now requires observed exit or no launched child, uncertain completion
+stops subsequent cases and preserves staged binaries, close errors retain
+diagnostics while shutdown/restoration continues, and all four log sinks
+contribute to the verdict. Results retain PID, output path and shutdown state.
+Two normal-completion controls accompany the seven adverse cases. These tests
+use fake processes and literal fixture bytes; they do not leave live games.
+The before-fix log records the adverse behavior; the two normal controls
+initially failed only because the new shutdown-result fields were absent.
+
+The focused suite passed 56 tests, with one unavailable file-symlink privilege
+skip. Two earlier sandbox-denied junction setup failures were retained and
+the complete selection rerun with native Windows operations available.
+`port/linux/NETCODE.md` also corrects one stale current MCC version from 64 to
+65; historical version statements remain unchanged. OpenCE remains 41.
+
+Extended runtime, matched loading/memory measurements and final platform
+results are pending. This section does not yet mark Milestone 9 complete.
