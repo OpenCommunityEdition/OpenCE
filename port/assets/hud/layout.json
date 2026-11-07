@@ -2620,6 +2620,41 @@
    ]
   },
   {
+   "name": "hud_reticle_warnings__0",
+   "tag": "ui\\hud\\bitmaps\\combined\\hud_reticle_warnings",
+   "bitmap": 0,
+   "width": 128,
+   "height": 128,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 1728930376,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      128
+     ],
+     "svg": "warnings__Overpass-750.svg",
+     "alpha_svg": "warnings__Overpass-750__alpha.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      512
+     ],
+     "kind": "alpha",
+     "score": 0.981
+    }
+   ]
+  },
+  {
    "name": "hud_health_base__0",
    "tag": "ui\\hud\\bitmaps\\hud_health_base",
    "bitmap": 0,
