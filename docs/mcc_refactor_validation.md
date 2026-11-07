@@ -3,8 +3,9 @@
 ## Milestones and current position
 
 Updated 7 November 2026. Milestones retain the existing stage numbers, so
-"Stage 6" and "Milestone 6" refer to the same work. Stages 1–6 are complete;
-Stage 7 is undergoing final validation. Stages 8–9 have not started.
+"Stage 6" and "Milestone 6" refer to the same work. Stages 1–7 are complete;
+Stages 8–9 have not started. The shared boat and console-syntax corrections
+remain explicitly deferred, as distinguished from their completed investigations.
 The stage evidence below records the changes, actual validation and limits.
 
 | Milestone | Scope and outcome | Status |
@@ -15,17 +16,18 @@ The stage evidence below records the changes, actual validation and limits.
 | 4 | Replace repeated per-texture stream scans with a local per-tag cursor. | Complete |
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
-| 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Final validation in progress; shared console lifetime fix deferred |
+| 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
 | 8 | Investigate remaining compatibility exceptions and the Quarantine script gap. | Planned; evidence required |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Planned; final verification |
 
-The latest completed implementation is `71dcfe6dd`; its four debug platform
-builds and all three MCC CI jobs passed. Stage 6 recorded 2,059 local test passes,
+The latest completed implementation is `f8e621acf`; its four debug platform
+builds and all three MCC CI jobs passed. Stage 7 recorded 2,108 local test passes,
 nineteen skips and twelve existing boat expected failures, four additional
-real-asset checks, exact before/after save-byte comparisons, paired Ruby/Mercury
-save/revert/core checks and Xbox/CE/MCC transitions.
+real-asset checks, exact resolver comparisons, paired Ruby/Mercury save/revert/core
+checks, four map restarts and Xbox/CE/MCC transitions. The shared console-syntax
+defect was reproduced across all three families and remains unfixed.
 The detailed sections distinguish these bounded checks from full compatibility.
-Six completed milestones are not an estimate of percentage effort remaining,
+Seven completed milestones are not an estimate of percentage effort remaining,
 and do not establish that every MCC module has received the same depth of audit.
 
 All future changes remain evidence-backed, with general engine defects fixed
@@ -1049,8 +1051,8 @@ usable under `build/windows`.
 
 These checks establish bounded native loading, save/revert/core behavior and
 map-family transitions. They do not establish full campaign, multiplayer,
-live split-screen, Android-device or browser-map compatibility. Milestone 7
-implementation has not begun.
+live split-screen, Android-device or browser-map compatibility. At this Stage 6
+completion point, Milestone 7 implementation had not begun.
 
 ### Platform CI and completion
 
@@ -1197,6 +1199,85 @@ agreement tests. It is separate from Milestone 8's compatibility exceptions.
 ### Final validation and completion
 
 The combined production/test/reader-guide review found no further justified
-change within this milestone. Windows release, broad regression, real Workshop
-lifecycle checks, platform CI and cleanup results are being recorded here before
-completion.
+change within this milestone. The final local regression selection passed
+**2,108 tests**, with nineteen skips and the twelve unchanged strict boat
+expected failures. Four additional real MCC/CE reader/resource checks passed.
+The Windows release built with the existing portable/release/PGO-off/LTO-off
+configuration; a post-review rebuild required no work. Existing Expat import
+warnings remain. Executable SHA-256 is
+`5786761be690e78678c97ce8c3dc241934d30d33a49db524efc3d2315e7956f3`.
+
+The baseline and current releases each passed standalone save/revert/core-load
+checks on Ruby B40 and Mercury Falling from their installed Workshop folders.
+Each saved a changed campaign flag, proved the subsequent mutation, accepted
+the saved image, confirmed the restored value and advanced another 150 ticks.
+The current release also passed native `map_reset` on both MCC maps, Xbox
+Blood Gulch and CE Death Island: a fresh low-tick epoch and 150 further ticks
+distinguish a restart from merely continuing the old simulation. These restart
+checks do not establish reset semantics for every campaign field.
+
+One current-build process traversed Mercury, Xbox Blood Gulch, CE Death Island,
+an invalid MCC tag-index fixture and Ruby A10. The invalid map was refused and
+the later MCC load recovered; each valid phase produced fresh simulation and
+a rendered capture. Inspection of the four captures confirmed coherent scenes
+and the expected HUD where visible, not exhaustive visual equivalence.
+All nine successful runtime checks exited normally. The three baseline console
+assertion reproductions above are separate failing gameplay cases. Runs were
+sequential, hidden and used isolated saves; no multiplayer gameplay is claimed.
+
+Independent verification checked exact commands/results, map and executable
+identity, paired settings, fresh epochs, normal exits, failure diagnostics and
+all eight successful 20 MiB save/core images' protected MCC blocks. The three
+reproducer cores retain their identities and hashes; the Ruby reproducer also
+has valid MCC CRCs. All 188 host-only verifier controls passed. An initial
+checker incorrectly required restart cues at exactly tick 1 and assumed CE's
+launch path was its saved scenario name. Source inspection and the authenticated
+CE tag index established the actual contracts; the corrected checks retain
+strict epoch/order/identity requirements. Both checker versions and the initial
+failed verification are preserved. No game rerun or production change was used
+to hide those checker assumptions.
+
+All twelve owned game processes stopped. Their 72 generated map-cache files
+(9,210,691,584 bytes) were removed after each attempt. The 113 inactive
+save/support/capture files (429,544,430 bytes) were archived losslessly to
+`build/stage7/inactive-runtime-evidence.zip` (6,732,992 bytes). Every member and
+loose file was hash-verified before removing the loose copy; the manifest records
+original paths. Useful logs and reproducible proof sources remain available.
+Final cleanup removed 431,648,191 bytes of disposable synthetic fixtures,
+test binaries and the six copied map/resource inputs; earlier proof-binary
+cleanup is recorded separately. All eleven original map/resource inputs were
+rehashed unchanged. About 44 MB remains under `build/stage7`, principally the
+27 MB baseline build, 6.7 MB verified archive, proof sources, manifests and CI
+logs. No generated game caches or active owned game processes remain. The
+current release stays usable under `build/windows`.
+
+Both push workflows passed on implementation revision
+`f8e621acf6505e1a414e4e52142c7efcbb7b61a9`, attempt 1, without repairs or reruns.
+The [MCC workflow](https://github.com/chestahh/GulchCE/actions/runs/42394316405)
+passed Linux readers/validators (1,795 checks, sixteen skips), 38 separate
+ASan/UBSan preview checks, Windows adapters (2,032 passes and seventeen skips
+across invocations), and 36 software-GL meter renders.
+
+The [Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42394316106)
+passed all four debug platforms. Linux's main invocation passed 2,498 checks
+with 27 skips, the twelve existing boat expected failures and seven passing
+subtests; its nine pytest invocations totalled 2,814 passes and 52 skips, with
+the same expected failures/subtests. Ordinary and full-LTO ELF/COFF storage
+checks and the Windows deliberate-corruption control passed. Android built
+the guest, host and debug APK and passed signing, touch/gyro and importer
+checks. Web passed Node/page tests, asset-free browser startup and native
+Chromium/Firefox WebRTC checks with and without configured packet loss.
+These are transport checks, not real-map multiplayer qualification. The main-only
+release job was skipped; Windows release was validated locally.
+Overlapping job counts are not unique test totals.
+
+Complete job logs, revision/attempt metadata, artifact metadata and local hashes
+are retained in `build/stage7/ci`. Upload digests were matched to job logs;
+CI binaries were not downloaded or independently rehashed. Final documentation
+review checked 134 local links, the Stage 7 anchor, seventeen named functions,
+test syntax and the two-file MCC production boundary. The final resulting
+implementation, tests, integration and reader documentation were reviewed;
+no further justified changes remain within this milestone. Full campaigns,
+real-map co-op, live split-screen and physical Android/browser-map gameplay
+remain unverified by these bounded checks. Milestone 7 is complete with the
+shared console correction explicitly deferred; Milestones 8–9 have not begun.
