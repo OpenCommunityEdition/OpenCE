@@ -1,4 +1,126 @@
-# MCC refactor validation baseline
+# MCC refactor milestones and validation
+
+## Milestones and current position
+
+Updated 7 November 2026. Milestones retain the existing stage numbers, so
+"Stage 6" and "Milestone 6" refer to the same work. Stages 1–5 are complete;
+Stage 6 is next. Stages 6–9 are planned and implementation has not started.
+This update incorporates the follow-up recommendations into the roadmap;
+the completed-stage evidence below remains unchanged.
+
+| Milestone | Scope and outcome | Status |
+| --- | --- | --- |
+| 1 | Establish executable regression coverage, CI and Workshop runtime baselines. | Complete |
+| 2 | Reproduce the shared boat defect and establish the crossplay constraint. | Investigation complete; shared fix deferred |
+| 3 | Remove redundant MCC resource ordering and bitmap ownership lookup work. | Complete |
+| 4 | Replace repeated per-texture stream scans with a local per-tag cursor. | Complete |
+| 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
+| 6 | Consolidate duplicate checksum work where exact compatibility and linkage can be proved. | Next; candidate identified |
+| 7 | Audit scripts, campaign/checkpoint state and lifecycle ownership; implement justified corrections and cleanup. | Planned; investigation first |
+| 8 | Investigate remaining compatibility exceptions and the Quarantine script gap. | Planned; evidence required |
+| 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Planned; final verification |
+
+The latest completed implementation is `809f8b8cd`; its four debug platform
+builds and all three MCC CI jobs passed. Stage 5 recorded 2,004 local test passes,
+nineteen skips and twelve existing boat expected failures, ten paired
+normalized-HUD comparisons, Ruby/Descent gameplay HUD checks and Xbox/CE/MCC
+transitions.
+The detailed sections distinguish these bounded checks from full compatibility.
+Five completed milestones are not an estimate of percentage effort remaining,
+and do not establish that every MCC module has received the same depth of audit.
+
+All future changes remain evidence-backed, with general engine defects fixed
+in the responsible implementation and MCC format defects fixed systemically
+inside MCC-owned modules. Preserve Xbox/CE behavior, map-family ownership and
+OpenCE crossplay. Each milestone includes design review, meaningful regression
+coverage, the applicable platform/network checks, final review and cleanup.
+Later integration checks supplement these checks; they do not postpone them.
+
+### Milestone 6: checksum consolidation
+
+Source inspection found repeated CRC32 calculation or table construction in
+[`mcc_checkpoint.c`](../port/linux/game/mcc_checkpoint.c),
+[`mcc_script_threads.inl`](../port/linux/game/mcc_script_threads.inl),
+[`mcc_resources.c`](../port/linux/game/mcc_resources.c) and
+[`mcc_resource_check.inl`](../port/linux/game/mcc_resource_check.inl).
+The existing `crc_checksum_buffer` in
+[`crc.c`](../source/memory/crc.c) is a candidate service, not a predetermined
+replacement. Check initialization/threading requirements, integer widths and
+standalone-tool linkage before choosing the boundary.
+
+Complete when old/new tests prove identical seeds, complements, empty and
+chunked input results, resource ordering/type framing, checkpoint bytes and
+failure behavior; required platforms and consumers link and pass; and any
+claimed speed or allocation benefit is measured. Consolidate only the portions
+supported by that evidence. Preserve justified duplication where boundaries
+or consumers require it, recording why.
+
+### Milestone 7: scripts and state lifecycle
+
+Review script resolution/execution, campaign and checkpoint restoration,
+script-thread and named-object ownership, and failed-load/unload cleanup.
+The relevant routes include `mcc_scripts`, `mcc_script_runtime.inl`,
+`mcc_script_threads.inl`, `mcc_checkpoint`, `mcc_campaign` and
+`mcc_object_names`. These are investigation areas, not established new defects
+or promised deletions. Keep host/client authority and saved-state contracts
+explicit when evaluating a change.
+
+Complete when reviewed paths and ownership rules are recorded, demonstrated
+defects/redundancy are addressed within scope, and affected save/revert,
+restart, failure and unload behavior has been checked. Retain supported code
+when no practical benefit from changing it is established. Any unresolved
+semantic or compatibility question must have an explicit disposition and the
+evidence needed to revisit it.
+
+### Milestone 8: compatibility exceptions and known gaps
+
+Review the 21 retained HUD structural profiles and other content selectors
+encountered in the affected MCC paths. The immediate HUD question is whether
+validated authored information or usage context can reliably distinguish
+native and MCC safe margins. A replacement needs intended matches, near
+misses and actual stock/custom HUD checks, including Ruby and Descent.
+Record retained exceptions' rationale, activation/cleanup, regression evidence
+and removal conditions; do not remove a profile merely to shorten the table.
+
+Separately diagnose Quarantine's `life_lost_0` refusal at `ai_deselect`.
+Establish the operation's intended semantics and implementation boundary
+before enabling it. A systemic MCC fix must benefit any map using those
+semantics; accepting an unproven no-op or a map-specific bypass is insufficient.
+Complete this milestone with validated fixes where justified and explicit
+retention/deferral decisions where evidence or supported scope is insufficient.
+An investigation completed with a deferral does not mean the defect is fixed.
+
+### Milestone 9: combined review and extended validation
+
+Review the resulting implementation across all stages, including code, tests,
+integration and reader documentation. Reconcile the MCC boundary inventory in
+`CODINGSTANDARDS.md` with the work actually reviewed: identify changed,
+reviewed-and-retained, and unaudited/deferred areas. Further code changes need
+their own demonstrated benefit and must receive affected regression checks.
+
+Extend representative Workshop checks with save/revert/restart, two-instance
+co-op, repeated load/unload and failed-load recovery across map families.
+Use Ruby's Rebalanced and other maps selected for the affected behavior, with
+isolated saves and at most two hidden game instances. Compare loading cost
+and memory retention under matched conditions; distinguish intended bounded
+storage costs from leaks and do not infer speed gains from fewer lines.
+
+Complete when the final combined state has passed the applicable platform,
+network and runtime checks, evidence and remaining limits are recorded, and
+temporary outputs are cleaned. Full campaigns, live split-screen, Android
+devices and browser-map gameplay remain unverified until specifically tested;
+build success alone does not close those limits. This milestone prepares the
+branch for delivery review; PR descriptions and merging remain separate.
+
+### Explicitly deferred: unconditional shared boat fix
+
+The defect is reproduced, but the user chose to preserve OpenCE crossplay.
+Keep the existing MCC correction and twelve strict legacy expected failures.
+Revisit the shared fix only when compatible upstream support exists or the
+user explicitly changes that compatibility requirement. This is a recorded
+deferred defect, not unfinished implementation within completed Stage 2.
+
+## Stage 1: validation baseline
 
 Stage 1 of `mcc-code-refactor` establishes repeatable checks before changing
 engine or MCC compatibility behaviour. It changes test tooling, CI and this

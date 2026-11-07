@@ -135,9 +135,11 @@ the build/runtime prerequisites described in its README.
 
 ## MCC refactor baseline
 
-For the MCC refactor's concrete baseline, see
-[MCC refactor validation](../mcc_refactor_validation.md). It records the
-starting revision, the installed-Workshop smoke runner, the distinction
+For the MCC refactor's current milestones and concrete baseline, see
+[MCC refactor milestones and validation](../mcc_refactor_validation.md). Its
+overview separates completed stages, planned investigations and the deferred
+boat fix. The evidence sections record the starting revision, the
+installed-Workshop smoke runner, the distinction
 between pytest coverage and direct GPU execution, and actual validation
 limits. Read `parse_args`, `case_environment`, `run_case` and `check_result`
 in [mcc_native_smoke.py](../../tools/mcc_native_smoke.py) to follow a virtual
