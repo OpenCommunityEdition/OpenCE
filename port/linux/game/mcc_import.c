@@ -40,6 +40,7 @@ sound banks, which are not read yet.
 #include "cache_file_formats.h"
 #include "custom_edition_cache.h"
 #include "tag_schema.h"
+#include "mcc_import.h"
 #include "memory/zlib/zlib.h"
 
 #include <stdio.h>
@@ -120,15 +121,6 @@ struct mcc_import_header
 	unsigned long footer_signature;
 };
 
-struct mcc_import_tag_instance
-{
-	long group_tag;
-	long parent_group_tags[2];
-	long tag_index;
-	char *name;
-	void *base_address;
-	unsigned long unused[2];
-};
 
 struct mcc_import_tag_header
 {
@@ -155,7 +147,6 @@ struct mcc_import_structure_bsp_header
 
 typedef char mcc_import_header_size[sizeof(struct mcc_import_header) == 0x800 ? 1 : -1];
 typedef char mcc_import_tag_header_size[sizeof(struct mcc_import_tag_header) == 0x24 ? 1 : -1];
-typedef char mcc_import_tag_instance_size[sizeof(struct mcc_import_tag_instance) == 0x20 ? 1 : -1];
 typedef char mcc_import_structure_bsp_header_size[sizeof(struct mcc_import_structure_bsp_header) == 0x18 ? 1 : -1];
 
 /* a buffer as Xbox caches carry them (Direct3D's resource: its common word,
@@ -194,6 +185,9 @@ static struct
 {
 	struct mcc_import_tag_instance *instances;
 	long tag_count;
+	/* the loaded tag table, copied (the operations add tags to it) */
+	struct mcc_import_tags table;
+	boolean operations;
 	/* each tag's name in the copy */
 	unsigned long *name_addresses;
 	/* an empty string in the copy, the name of a reference to no tag (the
@@ -381,11 +375,8 @@ static void mcc_import_keep_walk(
 				struct tag_schema_definition const *block_definition = field->definition;
 				long index;
 
-				if (block->count <= 0 || (unsigned long)block->address - CUSTOM_EDITION_TAG_CACHE_ADDRESS >=
-					CUSTOM_EDITION_TAG_CACHE_BYTES)
-				{
+				if (block->count <= 0 || !block->address)
 					continue;
-				}
 				for (index = 0; index < block->count; index++)
 					mcc_import_keep_walk(block_definition, (byte const *)block->address + index * block_definition->size);
 			}
@@ -879,6 +870,15 @@ static boolean mcc_import_structure_bsp(
 		mcc_import_error("mcc import: structure bsp %d cannot be converted", bsp_index);
 		return FALSE;
 	}
+	/* the BSP's operations (the disc's values) */
+	if (mcc_import_globals.operations && reference->structure_bsp.index != NONE &&
+		(reference->structure_bsp.index & 0xFFFF) < mcc_import_globals.tag_count)
+	{
+		char name[300];
+
+		snprintf(name, sizeof(name), "sbsp:%s", mcc_import_globals.instances[reference->structure_bsp.index & 0xFFFF].name);
+		mcc_import_operations_apply(&mcc_import_globals.table, name, structure_bsp);
+	}
 	/* the Xbox's: the materials' compressed vertices only (their
 	uncompressed ones are left out: custom_edition_structure_bsp_load put the
 	compressed ones in compressed_vertex_data) */
@@ -1338,8 +1338,28 @@ static boolean mcc_import_map(
 		fprintf(stderr, "mcc import: %s: cannot be loaded (the log says why)\n", map_name);
 		return FALSE;
 	}
-	mcc_import_globals.instances = loaded->tag_instances;
-	mcc_import_globals.tag_count = loaded->tag_count;
+	/* the table copied, then the fixes and the map's operations, which may
+	add tags to it */
+	mcc_import_globals.table.maximum_count = loaded->tag_count + 64;
+	mcc_import_globals.table.instances = mcc_import_calloc((size_t)mcc_import_globals.table.maximum_count,
+		sizeof(struct mcc_import_tag_instance));
+	if (!mcc_import_globals.table.instances)
+	{
+		custom_edition_cache_tags_unload();
+		return FALSE;
+	}
+	csmemcpy(mcc_import_globals.table.instances, loaded->tag_instances,
+		(unsigned long)loaded->tag_count * sizeof(struct mcc_import_tag_instance));
+	mcc_import_globals.table.count = loaded->tag_count;
+	mcc_import_globals.table.scenario_index = loaded->scenario_tag_index & 0xFFFF;
+	mcc_import_fixes_apply(&mcc_import_globals.table);
+	mcc_import_globals.operations = mcc_import_operations_read(map_name);
+	if (mcc_import_globals.operations)
+		mcc_import_operations_apply(&mcc_import_globals.table, NULL, NULL);
+	else
+		mcc_import_error("mcc import: %s: no operations (d:\\mcc_patches\\%s.p2): MCC's values kept", map_name, map_name);
+	mcc_import_globals.instances = mcc_import_globals.table.instances;
+	mcc_import_globals.tag_count = mcc_import_globals.table.count;
 	if (!mcc_import_order(map_name))
 	{
 		fprintf(stderr, "mcc import: %s: out of memory for the tag order\n", map_name);
@@ -1432,6 +1452,8 @@ static boolean mcc_import_map(
 	mcc_import_free(mcc_import_globals.out_names);
 	mcc_import_free(mcc_import_globals.old_to_new);
 	mcc_import_free(mcc_import_globals.out_names_text);
+	mcc_import_free(mcc_import_globals.table.instances);
+	mcc_import_operations_dispose();
 	custom_edition_cache_tags_unload();
 	if (!success)
 	{
