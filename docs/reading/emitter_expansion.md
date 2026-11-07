@@ -189,17 +189,6 @@ be exceeded. It preserves plane crossings, ordered leaf visits and all
 surface tests. Stock callers supply no cache; model batches leave skip counts
 zero. No map data is modified, and batch cleanup clears all borrowed pointers.
 
-The shared `collision_bsp_test_vector_recursive` now iterates its tail
-continuations: a one-sided child, a prepared chain and the far side after a
-split. Only the near side needs a recursive call. This is a general engine
-optimisation under the user's shared-engine scope, rather than new lighting
-logic. It preserves the original plane arithmetic, near/far order, leaf
-results, cached state and logical depth/visit budgets. The Windows compiler
-had retained full stack frames for those tail calls. Tests compare the
-complete results and continuation state with the prior recursive form;
-negative controls omit a depth increment or use the wrong far-side interval.
-No new cache, API or map-family condition is required.
-
 `plasma_collision_depths` gathers eligible object/ray pairs using the same
 cluster, sphere and parent/child gates. The bounded pending bitsets add 96 KiB
 to synchronous batch scratch. [plasma_collision_models.c](../../port/linux/game/plasma_collision_models.c)

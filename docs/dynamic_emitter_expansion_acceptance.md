@@ -615,20 +615,20 @@ the user's installed maps/saves were preserved.
 
 ## CPU mask conversion and collision continuations, 7 November 2026
 
-This follow-up retains two measured CPU changes. `texture_row` converts four
+The initial candidate combined two CPU changes. `texture_row` converts four
 visibility-mask pixels together on SSE2, including the AR, Needler and prong
 angular profiles. It preserves the scalar operation order, exact division and
 square roots, with a scalar fallback elsewhere. The general conversion remains
 for arbitrary radial scales. No shader, texture format, radius, ray grid,
 refresh cadence or light-admission limit changes.
 
-The shared vector traversal now iterates tail continuations while retaining
+The candidate's shared vector traversal iterated tail continuations, retaining
 recursion for the near side of a split. Compiler output showed that Windows
-still created full stack frames for these calls. The rewrite preserves plane
+still created full stack frames for these calls. The rewrite preserved plane
 arithmetic, ordered leaf results, cache contents and logical depth/visit
-budgets. It affects the general collision service used by Xbox, CE and MCC,
-including lighting-disabled gameplay; it adds no new API, cache or feature
-logic to the shared engine. The comparison harness checks complete results
+budgets. It affected the general collision service used by Xbox, CE and MCC,
+including lighting-disabled gameplay; it added no new API, cache or feature
+logic to the shared engine. The comparison harness checked complete results
 and continuation state against the prior recursive form.
 
 The live `c40-visibility-packed-verify` comparison checked 223,962 masks with
@@ -735,3 +735,75 @@ their manifest hashes. No loose test map files remain. Saves are retained in
 verified lossless archives, and about 116.55 MiB remains for this phase's logs,
 captures, archives and final measurement executable. Original maps, saves,
 toolchains and the ordinary production build were preserved.
+
+## Controlled comparison and retained change, 7 November 2026
+
+The user challenged whether the CPU microbenchmarks justified the slower
+whole-frame results. Eight new runs compared four variants on exactly the
+`9bf9554aa` source base: both changes, neither change, mask conversion alone,
+and traversal alone. Removing a change used its exact pre-`9bf9554aa` source;
+other production-source hashes matched. All used Windows full-LTO/PGO release
+settings, the same compiler and timing fixture, a frozen copy of the checkpoint,
+2560x1440, AA off, 16x AF, all lighting enabled, 15 seconds of warm-up and a
+120-second measured window. Screenshot capture was off for every run. Builds
+finished before measurement; games ran one at a time. The Windows Balanced
+power policy was left unchanged.
+
+Order was neither, both, mask, traversal, then traversal, mask, both, neither.
+This balances a linear drift in conditions; it does not make live combat
+identical or turn individual frames into independent experimental trials.
+Every run is retained, including the two long frames in the first combined run.
+
+| Production variant | First two-minute average | Reverse-order average |
+| --- | ---: | ---: |
+| Neither change | 228.5 FPS | 225.0 FPS |
+| Mask conversion only | 240.3 FPS | 242.8 FPS |
+| Traversal only | 221.7 FPS | 236.0 FPS |
+| Both changes | 220.3 FPS | 228.6 FPS |
+
+Mask conversion improved the round-matched averages by 5.1% and 7.9%; its
+two-run mean was 241.5 FPS against 226.8 FPS for neither change, a 6.5% gain.
+Its 1% lows also improved: 164.9/168.0 FPS against 158.7/154.1 FPS. Its p99
+frame times were 5.657/5.550 ms against 5.863/6.033 ms. Selected-light means
+were similar (11.52/11.69 versus 11.51/11.64), without reducing light budgets,
+quality, ray counts or refresh cadence. These results support retaining the
+mask conversion in this encounter; they are not a universal hardware claim.
+
+Traversal alone varied by 14.3 FPS between runs and did not show a repeatable
+gain. Adding it to the mask conversion was slower in both rounds. The original
+same-input 1.36% collision timing result therefore did not justify retaining
+that shared-engine rewrite. The recursive traversal was restored exactly,
+along with its existing verification path. Candidate-only traversal comparison
+instrumentation and tests were removed; the established cache, depth/budget,
+eligibility and malformed-input coverage remains. No network contract, map
+family boundary, host policy, Android exclusion, default setting or AMD/NVIDIA
+shader workaround changed.
+
+The final retained implementation is **mask conversion only**. Sustained
+240 FPS is still not achieved: 50.7% and 45.0% of its frames exceeded 4.17 ms,
+and its 1% lows remain below the target. This resolves the retention decision;
+it does not complete performance acceptance. All eight runs exited normally
+without recorded rendering errors. Evidence is under
+`build/lighting-240/controlled-comparison` and the `c40-controlled-*` run folders;
+the plan records executable/source hashes, checkpoint hashes and run order.
+The earlier candidate's [Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42324288419)
+and [MCC validation](https://github.com/chestahh/GulchCE/actions/runs/42324288332)
+passed; the follow-up commit's checks are separate.
+
+Final review confirmed that the retained production code matches the measured
+mask-only variant, and the shared collision source matches the pre-candidate
+version. The final 164 focused checks passed with one Windows POSIX-pthread
+skip; ordinary/full-LTO light storage and its corruption control also passed.
+The ordinary Windows full-LTO/PGO executable rebuilt successfully. Android and
+web were attempted again but hit the same local NDK-wrapper and missing Unix
+command failures; no local platform success is claimed. Documentation links
+and named retained functions were checked. The preceding CE/MCC network runs
+tested the initial candidate; they were not repeated after restoring the
+previous shared traversal.
+
+Comparison cleanup removed another 74.11 MiB of superseded executables after
+hash checks. The frozen checkpoint was archived losslessly and verified before
+removing its loose copy. Original maps/saves were unchanged, and no loose test
+maps remain. About 137.27 MiB remains across this phase and its comparison runs
+for logs, captures, save archives and the retained mask-only measurement build;
+normal build outputs and toolchains remain available separately.

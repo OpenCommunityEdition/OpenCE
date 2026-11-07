@@ -2172,9 +2172,7 @@ static boolean collision_bsp_test_vector_recursive(
 	real t1,
 	short depth)
 {
-	/* port: iterate tail continuations; only the near side of a split needs
-	another stack frame. Keep the original visit order and depth budgets. */
-	while (!(node_index & LONG_MIN))
+	if (!(node_index & LONG_MIN))
 	{
 		struct bsp3d_node const *node;
 		real_plane3d const *plane;
@@ -2208,9 +2206,9 @@ static boolean collision_bsp_test_vector_recursive(
 				data->nodes_left >= data->cache->nodes[cache_slot].skip_count - 1)
 			{
 				data->nodes_left -= data->cache->nodes[cache_slot].skip_count - 1;
-				depth += data->cache->nodes[cache_slot].skip_count;
-				node_index = data->cache->nodes[cache_slot].skip_node;
-				continue;
+				return collision_bsp_test_vector_recursive(data,
+					data->cache->nodes[cache_slot].skip_node, t0, t1,
+					depth + data->cache->nodes[cache_slot].skip_count);
 			}
 		}
 		else
@@ -2258,18 +2256,27 @@ static boolean collision_bsp_test_vector_recursive(
 				return FALSE;
 			}
 			data->last_plane_index = node->plane_designator;
-			/* port: the far side is a tail continuation after the near side. */
-			node_index = node->children[front];
-			t0 = t;
+			if (collision_bsp_test_vector_recursive(
+				data,
+				node->children[front],
+				t,
+				t1,
+				depth + 1))
+			{
+				return TRUE;
+			}
 		}
-		else
+		else if (collision_bsp_test_vector_recursive(
+			data,
+			node->children[reaches_front],
+			t0,
+			t1,
+			depth + 1))
 		{
-			/* port: a one-sided segment has no work to resume at this node. */
-			node_index = node->children[reaches_front];
+			return TRUE;
 		}
-		depth++;
 	}
-	/* port: the final leaf has the same incoming state as the recursive path. */
+	else
 	{
 		long leaf_index = NONE;
 		byte contents = _contents_solid;
