@@ -42,13 +42,6 @@ static void mcc_resource_close(struct mcc_resource_file *file)
     free(file->names);free(file->items);memset(file,0,sizeof(*file));
 }
 
-static int mcc_resource_compare(void const *a,void const *b)
-{
-    uint32_t x=((struct mcc_resource_item const *)a)->offset;
-    uint32_t y=((struct mcc_resource_item const *)b)->offset;
-    return x<y ? -1 : x>y;
-}
-
 static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char const *level,char const *explicit_path,
     char *reason,size_t reason_size)
 {
@@ -91,7 +84,6 @@ static int mcc_resource_open(struct mcc_resource_file *file,unsigned type,char c
     }
     file->count=count;
     file->data_bytes=names;
-    qsort(file->items,count,sizeof(*file->items),mcc_resource_compare);
     strcpy(file->path,path);
     return 1;
 failed:

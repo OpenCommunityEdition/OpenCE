@@ -5,6 +5,7 @@ import struct
 import subprocess
 import sys
 import hashlib
+import zlib
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,8 +19,10 @@ def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_pa
     name = b"res_0\0" if kind == 1 else b"res__0__0\0"
     offset = 0x818 if kind == 1 else 0x898
     struct.pack_into("<I", data, TAG_OFFSET+offset, 16)
-    resource = bytearray(struct.pack("<4I", kind, 20, 20+len(name), 1)+b"abcd"+name+
-                         struct.pack("<3I", 0, 4, 16))
+    names = name + b"unrelated\0"
+    # Identity covers the original bytes, including an unsorted directory.
+    resource = bytearray(struct.pack("<4I", kind, 24, 24+len(names), 2)+b"abcdefgh"+names+
+                         struct.pack("<6I", len(name), 4, 20, 0, 4, 16))
     resource.extend(bytes(range(256))*32768)  # More than one bounded validation slice.
     filename = "bitmaps.map" if kind == 1 else "sounds.map"
     def digest(package):
@@ -155,29 +158,35 @@ int main(int argc,char **argv) {
     return exe
 
 
-def fixture_blob(kind=2):
+def fixture_blob(kind=2, reverse=False):
     names = b"sound\\test__0__0\0second\0"
-    # Deliberately reverse the directory's offset order.
+    entries = [(17, 4, 20), (0, 4, 16)]
+    if reverse:
+        entries.reverse()
     return bytearray(struct.pack("<4I", kind, 24, 24+len(names), 2) + b"abcdefgh" + names +
-                     struct.pack("<6I", 17, 4, 20, 0, 4, 16))
+                     b"".join(struct.pack("<3I", *entry) for entry in entries))
 
+@pytest.mark.parametrize("reverse", [False, True], ids=["descending-offsets", "ascending-offsets"])
 @pytest.mark.parametrize("case", ["valid", "bitmap", "prefix", "wrong_name", "wrong_type", "truncated",
     "metadata_overlap", "past_end", "names_outside", "unterminated", "large_count", "inner_offset",
-    "too_long", "missing", "ce_only", "wrap_offset", "relocated", "relocated_prefix", "ambiguous"])
-def test_resource_reader(resource_tool, tmp_path, case):
+    "too_long", "missing", "ce_only", "wrap_offset", "relocated", "relocated_prefix", "ambiguous",
+    "equal_offsets", "duplicate_equal_offsets"])
+def test_resource_reader(resource_tool, tmp_path, case, reverse):
     folder = tmp_path / ("custom_maps" if case == "ce_only" else "mcc_maps")
     folder.mkdir()
     kind = 1 if case == "bitmap" else 2
-    blob = fixture_blob(kind)
-    expected = case in {"valid", "bitmap", "prefix", "inner_offset", "relocated"}
+    blob = fixture_blob(kind, reverse)
+    expected = case in {"valid", "bitmap", "prefix", "inner_offset", "relocated", "equal_offsets"}
     offset, length, name = 16, 4, r"sound\test__0__0"
     index = struct.unpack_from("<I", blob, 8)[0]
+    other_entry = index + (12 if reverse else 0)
+    target_entry = index + (0 if reverse else 12)
     if case == "wrong_name": name = "different"
     if case == "wrong_type": struct.pack_into("<I", blob, 0, 1)
     if case == "truncated": blob = blob[:-1]
-    if case == "metadata_overlap": struct.pack_into("<I", blob, index+20, 24)
+    if case == "metadata_overlap": struct.pack_into("<I", blob, target_entry+8, 24)
     if case == "past_end": struct.pack_into("<I", blob, 8, 0x7fffffff)
-    if case == "names_outside": struct.pack_into("<I", blob, index, 0xffffffff)
+    if case == "names_outside": struct.pack_into("<I", blob, other_entry, 0xffffffff)
     if case == "unterminated": blob[24:index] = b"x"*(index-24)
     if case == "large_count": struct.pack_into("<I", blob, 12, 0xffffffff)
     if case == "inner_offset": offset = 17
@@ -188,7 +197,10 @@ def test_resource_reader(resource_tool, tmp_path, case):
     if case == "relocated_prefix": offset, length = 20, 2
     if case == "ambiguous":
         offset = 18
-        struct.pack_into("<I", blob, index, 0)
+        struct.pack_into("<I", blob, other_entry, 0)
+    if case in {"equal_offsets", "duplicate_equal_offsets"}:
+        struct.pack_into("<I", blob, other_entry+8, 16)
+        if case == "duplicate_equal_offsets": struct.pack_into("<I", blob, other_entry, 0)
     if case != "missing": (folder / ("bitmaps.map" if kind == 1 else "sounds.map")).write_bytes(blob)
     result = subprocess.run([str(resource_tool), str(kind), name, str(offset), str(length), str(int(expected))],
                             cwd=tmp_path, capture_output=True, timeout=10)
@@ -230,6 +242,7 @@ def test_package_fingerprints_cover_contents_not_paths(resource_tool, tmp_path):
         assert result.returncode == 0, result.stderr
         return int(result.stdout)
     initial = checksum("one/a10")
+    assert initial == (zlib.crc32(b"\x02" + fixture_blob() + b"\xff", 1234) or 1)
     assert initial == checksum("two/a10")
     assert initial != checksum("one/a10", "1235")
     blob = fixture_blob()
@@ -307,15 +320,17 @@ def test_effective_resources_determine_fingerprint(resource_tool, tmp_path):
 
 
 @pytest.mark.parametrize("kind,suffix", [(1, "__pixels"), (2, "__permutations")])
+@pytest.mark.parametrize("reverse", [False, True], ids=["directory-order", "reversed-directory"])
 @pytest.mark.parametrize("case", ["whole", "slice", "past_end", "before", "wrong_group", "duplicate", "member_conflict"])
-def test_standard_grouped_payloads(resource_tool, tmp_path, kind, suffix, case):
+def test_standard_grouped_payloads(resource_tool, tmp_path, kind, suffix, case, reverse):
     root = tmp_path / "mcc_maps"
     (root / "package").mkdir(parents=True)
     group = "tag"+suffix
-    names = (group+"\0member\0").encode()
-    entries = [(0, 8, 16)]
+    names = (group+"\0member\0unrelated\0").encode()
+    entries = [(len(group)+8, 4, 20), (0, 8, 16)]
     if case == "duplicate": entries.append((0, 8, 16))
     if case == "member_conflict": entries.append((len(group)+1, 1, 16))
+    if reverse: entries.reverse()
     blob = struct.pack("<4I", kind, 24, 24+len(names), len(entries))+b"abcdefgh"+names
     blob += b"".join(struct.pack("<3I", *entry) for entry in entries)
     (root / ("bitmaps.map" if kind == 1 else "sounds.map")).write_bytes(blob)

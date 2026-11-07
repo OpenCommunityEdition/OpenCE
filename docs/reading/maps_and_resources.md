@@ -124,6 +124,12 @@ identical resources between supported locations does not change network identity
 The synthetic path and resource-reader tests establish discovery and admission
 rules; runtime loading and map-family transitions require separate checks.
 
+Within the selected file, `mcc_resource_read` finds a unique member or group by
+name and validates the requested range. Directory entries need no offset sort:
+overlapping ranges do not imply ownership, and duplicate names remain ambiguous
+regardless of entry order. CRC and SHA identities cover the original file bytes,
+including its directory, rather than this private in-memory metadata.
+
 `game.mcc_collections` optionally groups installed items using the fixed table in
 [workshop_collections.c](../../port/linux/src/workshop_collections.c).
 An imported package's `workshop_id.txt` also supplies its group without Steam.
@@ -480,6 +486,13 @@ filtered edges and sharp fill cutoffs through existing renderer interfaces.
 The descriptor belongs to that clone and is released on MCC texture teardown.
 Xbox-order meters and the Xbox/CE loaders do not take this conversion path.
 See [MCC conversion details](../mcc_maps.md) for the layout evidence and tests.
+
+`mcc_bitmap_valid_texture` in `mcc_bitmaps.c` finds the exact owned descriptor
+and checks its handle, byte range, format and required storage. Both
+`mcc_bitmaps_valid` and `mcc_bitmaps_pixels` use that result; the latter returns
+the already validated allocation without searching the texture table again.
+Copied descriptors and changed ranges cannot borrow another texture's pixels.
+The lookup retains no state across calls or map unloads.
 
 The Xbox cache/scenario machinery is inherited. CE conversion is a port
 addition, documented in [Custom Edition caches](../custom_edition_caches.md).

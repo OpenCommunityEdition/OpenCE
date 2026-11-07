@@ -108,7 +108,7 @@ static void test_bitmap_free(void *p) {if(!p)abort();test_live--;free(p);}
     source += "\n" + "\n".join(function(bitmap, name) for name in [
         "mcc_bitmap_bytes", "mcc_pixel", "mcc_channels", "mcc_bitmap_decode",
         "mcc_morton_axis", "mcc_bitmap_pack", "mcc_bitmap_lightmap_flags", "mcc_bitmap_complete_mips",
-        "mcc_texture_prepare", "mcc_bitmaps_read", "mcc_bitmaps_valid", "mcc_bitmaps_group_valid"])
+        "mcc_texture_prepare", "mcc_bitmaps_read", "mcc_bitmap_valid_texture", "mcc_bitmaps_valid", "mcc_bitmaps_group_valid"])
     source += r'''
 #undef malloc
 #undef free

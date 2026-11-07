@@ -301,3 +301,79 @@ checking their resolved paths and rejecting links. About 1.9 MB of diagnostic
 logs and supporting evidence remain under `build/stage2`; no generated game
 caches or test executables remain there. The Stage 1 build, environment and
 verified save archive remain available as described above.
+
+## Stage 3: resource ordering and bitmap ownership lookup
+
+This stage removes two demonstrated sources of unnecessary work within
+MCC-owned code. It changes no format interpretation, map-family dispatch,
+simulation, network version, content-identity framing or resource lifetime.
+
+`mcc_resource_open` no longer sorts its private directory by byte offset.
+Every consumer finds entries by name and checks the whole directory for
+duplicates; none depends on offset order. The comparator and sort call were
+removed, while all bounds, duplicate-name and grouped-slice checks remain.
+The expanded resource suite passed 117 checks before and after the change.
+Compiled old/new readers also returned identical payloads, CRC32 and SHA256
+for four fixed-input comparisons covering bitmap/sound files and both directory
+orders. Different on-disk directory orders still have distinct raw identities;
+only the unused in-memory reordering was removed.
+
+`mcc_bitmap_valid_texture` now returns the owned, validated texture to both
+`mcc_bitmaps_valid` and `mcc_bitmaps_pixels`. A successful pixels request no
+longer searches the table twice. Validation order, first-match behavior,
+failure-output clearing, descriptor identity, handles, ranges, channel flags
+and storage checks remain intact. No lookup cache or new persistent state was
+added. The ownership fixture checks both public entry points, copied/foreign
+and mutated descriptors, missing storage, unchanged descriptor bytes, verifier
+short-circuiting, duplicate entries, pressure beyond the legacy cache budget
+and disposal. The media/flags/bridge selection passed 59 checks.
+
+In isolated extracted old/new routines, the same 39 successful bindings over
+13 descriptors required 546 pointer comparisons before and 273 after; returned
+allocations, sizes and sampled pixel bytes matched. This measures removed
+traversals, not frame rate or map-loading speed. The separate per-conversion
+stream-offset scan and content-specific HUD exceptions were not changed.
+
+Private evidence is retained under `build/stage3`. The original Stage 1 Windows
+executable was preserved at `build/stage3/baseline/halo.exe` before rebuilding
+`build/windows/halo.exe`; its recorded SHA-256 remains unchanged. Runtime
+checks use installed Workshop maps directly and isolated Xbox/CE fixture
+copies, saves and logs. Final review, build and runtime results follow below.
+
+Self-review and an independent read-only review covered all Stage 3 code,
+callers, lifecycle paths, tests and documentation; no further correction was
+needed. After that review, the broad local MCC, Workshop, CE-format, protocol
+and neighboring MCC harness selection passed 1,909 checks with nineteen skips
+and the twelve previously documented boat expected failures. Skips covered
+the JDK missing from this shell's PATH, Linux-specific checks, file-symlink
+privilege and optional map fixtures. Four optional checks were then run with
+Ruby's Workshop `a10` and the available CE Death Island/resources; all passed.
+The Windows release build succeeded with the original configure options;
+the existing Expat import warnings remained. Its executable SHA-256 is
+`7608089e8b1c003ba7ff15c3120392d07342af473f93a50b3471e0f60e330c3d`.
+The direct GPU runners passed 36 MCC meter cases and 15,360 stock HUD ammunition
+cases on the local NVIDIA renderer.
+
+The baseline and updated executables each completed this sequence in one
+hidden 640x480 process, with fresh saves and actual rendering:
+
+1. Workshop `3021510694/mercury_falling`, selecting package-owned resources.
+2. Xbox `levels/test/bloodgulch/bloodgulch`.
+3. Custom Edition `custom_maps/deathisland`.
+4. A disposable, header-valid MCC fixture with an invalid tag index; the
+   loader refused it and returned to the menu.
+5. Workshop `2915693904/a10`, restoring MCC operation after the failed load.
+   Ruby's log reports no external resource selection in this run.
+
+Each valid map required a fresh simulation-tick epoch, an exact console marker
+after 150 simulation ticks, and a subsequent rendered capture. Both processes
+exited normally with no fatal diagnostic. Before/after captures were visually
+inspected: the MCC intros and Xbox/CE gameplay rendered their expected scenes
+and textures. They are not frame-synchronized image-equivalence tests; moving
+cinematics and unique console markers differ. The malformed fixture tests early
+load recovery before resource allocation, not every possible allocation failure.
+These runs establish the named transitions and bounded rendering/simulation,
+not campaign completion or new multiplayer, save/revert or device compatibility.
+
+Cross-platform CI results and final cleanup are recorded after the pushed
+implementation has completed its own workflows.

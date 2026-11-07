@@ -655,18 +655,24 @@ int mcc_bitmaps_contains(struct mcc_runtime *runtime,uint32_t offset,uint32_t by
     return 0;
 }
 
-int mcc_bitmaps_valid(struct mcc_runtime *runtime,struct bitmap_data *bitmap)
+static struct mcc_texture const *mcc_bitmap_valid_texture(struct mcc_textures const *textures,
+    struct bitmap_data const *bitmap)
 {
-    struct mcc_textures *textures=runtime->bitmaps;
     uint32_t index;
     for (index=0;textures && index<textures->count;index++) {
         struct mcc_texture const *texture=&textures->items[index];
         if (texture->bitmap!=bitmap) continue;
         return texture->pixels && (uint32_t)bitmap->tag_index==texture->handle &&
             (uint32_t)bitmap->pixels_offset==texture->offset && (uint32_t)bitmap->pixels_size==texture->size &&
-            bitmap_verify(bitmap,FALSE) && rasterizer_xbox_bitmap_get_pixel_data_size(bitmap)<=(long)texture->size;
+            bitmap_verify(texture->bitmap,FALSE) &&
+            rasterizer_xbox_bitmap_get_pixel_data_size(texture->bitmap)<=(long)texture->size ? texture : NULL;
     }
-    return 0;
+    return NULL;
+}
+
+int mcc_bitmaps_valid(struct mcc_runtime *runtime,struct bitmap_data *bitmap)
+{
+    return mcc_bitmap_valid_texture(runtime->bitmaps,bitmap)!=NULL;
 }
 
 /* MCC pixels are owned allocations, not the legacy file stream (whose
@@ -695,19 +701,16 @@ int mcc_bitmaps_group_valid(struct mcc_runtime *runtime,void *address)
  * this storage. The caller receives bytes only after ownership validation. */
 void const *mcc_bitmaps_pixels(struct mcc_runtime *runtime,struct bitmap_data const *bitmap,uint32_t *bytes,int *coverage)
 {
-    struct mcc_textures *textures=runtime ? runtime->bitmaps : NULL;
-    uint32_t index;
+    struct mcc_textures const *textures=runtime ? runtime->bitmaps : NULL;
+    struct mcc_texture const *texture;
     if (bytes) *bytes=0;
     if (coverage) *coverage=0;
-    if (!textures || !bitmap || !mcc_bitmaps_valid(runtime,(struct bitmap_data *)bitmap)) return NULL;
-    for (index=0;index<textures->count;index++) {
-        struct mcc_texture const *texture=&textures->items[index];
-        if (texture->bitmap!=bitmap) continue;
-        if (bytes) *bytes=texture->size;
-        if (coverage) *coverage=texture->channels==4;
-        return texture->pixels;
-    }
-    return NULL;
+    if (!textures || !bitmap) return NULL;
+    texture=mcc_bitmap_valid_texture(textures,bitmap);
+    if (!texture) return NULL;
+    if (bytes) *bytes=texture->size;
+    if (coverage) *coverage=texture->channels==4;
+    return texture->pixels;
 }
 
 #ifndef HALO_GLES
