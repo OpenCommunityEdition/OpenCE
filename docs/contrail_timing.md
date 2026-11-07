@@ -6,10 +6,10 @@ shared effect implementation, not an MCC data conversion or a new feature.
 
 ## Cause and correction
 
-`contrails_update` in [contrails.c](../source/effects/contrails.c) already
-batches point emission on the first frame after a simulation tick, using
-accumulated frame time. Previously it passed only the current frame time
-to `contrail_update_points` for aging existing points.
+Before GulchCE's original fix, `contrails_update` in
+[contrails.c](../source/effects/contrails.c) batched point emission using
+accumulated frame time, but passed only the current frame time to
+`contrail_update_points` for aging existing points.
 
 Point-state transitions reset their normalized time to zero, discarding
 overshoot. Consequently, a short state lasts until the next update boundary.
@@ -23,14 +23,43 @@ argument. The 30 Hz transition behavior remains; point physics, bitmap
 sequence animation and texture scrolling still use frame time. Calling the
 point updater with zero state time remains necessary: a point created by an
 attachment change or collision must have a valid state before it is rendered.
-The existing emission clock now resets in `contrails_initialize_for_new_map`
-and `contrails_dispose_from_old_map` rather than persisting across maps.
+The original fix also reset the emission clock on map initialization and disposal.
 
 This changes no tags, loader, map-family dispatch, projectile simulation,
 network messages or shared random seed. Contrail state durations use the
 local random stream. No network version change is needed. Xbox, Custom Edition
 and MCC keep their existing loaders and use the same effect timing afterward.
 No feature-owned hook is necessary for a correction within this implementation.
+
+## Integration with OpenCE PR 546
+
+The November upstream integration retains GulchCE's separate state-aging and
+per-frame motion arguments. It adopts upstream's nominal tick duration for
+emission and aging: 1/30 second per elapsed game tick, halved in double-speed
+mode. At 144 FPS, four or five render frames can fall between ticks; their
+accumulated time therefore varies even though each game tick has equal duration.
+Nominal tick time removes that variation in short bright states.
+
+When a render frame spans several ticks, existing point states advance one
+tick at a time because each transition discards the remainder of its step.
+Point physics still runs once with the frame delta. This does not reconstruct
+historical attachment positions or reproduce every intermediate emission at
+low frame rates. New points still initialize when state time is zero.
+
+`contrails_reset_render_state` owns the clock reset. Map initialization,
+disposal and the existing `after_load_procs` table in
+[game_state.c](../source/saved%20games/game_state.c) call it. A checkpoint can
+restore a different point pool at the same tick, so comparing tick numbers
+alone cannot invalidate the old clock. This is a general saved-state lifecycle
+fix, shared by existing map families; it adds no MCC conversion logic.
+
+The [original harness](../tools/harness/tests/test_contrails.py) now also checks
+same-tick checkpoint restoration through the real callback table, two-tick
+state aging, and double speed. The
+[upstream harness](../tools/harness/tests/test_contrail_tick_points.py) checks
+steady 144 FPS, uneven frame intervals and time jumps with real point emission.
+Both compile production functions; attachment/physics stubs do not establish
+visual equivalence or full map compatibility.
 
 ## Validation on Windows, 1 November 2026
 

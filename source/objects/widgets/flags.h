@@ -46,4 +46,7 @@ extern struct data_array *flag_data;
 
 /* ---------- public code */
 
+/* port: clear render-only state after a checkpoint load. */
+void flags_reset_render_state(void);
+
 #endif // __FLAGS_H

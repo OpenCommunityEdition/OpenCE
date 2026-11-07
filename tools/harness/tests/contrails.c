@@ -7,6 +7,7 @@ struct location { short cluster_index; };
 struct tag_reference { long index; };
 #include "config.inc"
 #define SET_FLAG(v,b,on) ((on) ? ((v) |= FLAG(b)) : ((v) &= ~FLAG(b)))
+#define TICKS_PER_SECOND 30
 #define MAXIMUM_CONTRAIL_INSTANCES 4
 #define MAXIMUM_CONTRAIL_POINTS 512
 #define TAG_BLOCK_GET_ELEMENT(block,index,type) (&((type *)(block)->address)[(int)(index)])
@@ -22,6 +23,8 @@ static struct contrail_point_state states[3];
 static long tick, trail_index;
 static int active = TRUE;
 static real physics_dt;
+static boolean double_speed;
+static boolean game_players_are_double_speed(void) { return double_speed; }
 #define contrail_get(i) ((struct contrail_datum *)datum_get(contrail_data,i))
 #define contrail_point_get(i) ((struct contrail_point_datum *)datum_get(contrail_point_data,i))
 #define contrail_definition_get(i) (&test_definition)
@@ -63,6 +66,7 @@ static void contrail_add_points(long i, short count, boolean force)
     }
 }
 #include "under_test.inc"
+#include "after_load.inc"
 
 static void setup(void)
 {
@@ -86,7 +90,7 @@ static void setup(void)
     states[0].width=0.15f;
     states[1].transition_duration_lower_bound=states[1].transition_duration_upper_bound=0.005f;
     for(i=0;i<3;++i) states[i].physics.index=NONE;
-    tick=0; active=TRUE; physics_dt=0;
+    tick=0; active=TRUE; physics_dt=0; double_speed=FALSE;
     trail_index=datum_new(contrail_data);
     trail=contrail_get(trail_index);
     trail->object_index=1; trail->density=1; trail->flags=FLAG(_contrail_active_bit);
@@ -154,14 +158,16 @@ static void irregular_rate(void)
 }
 static void lifecycle(void)
 {
+    short before;
     setup(); contrails_update(0); contrails_update(0.02f);
+    before=contrail_get(trail_index)->contrail_point_counts[0];
     contrails_dispose_from_old_map();
-    CHECK(last_point_game_time==NONE && pending_point_dt==0, "unload resets clock");
-    last_point_game_time=0; pending_point_dt=1;
+    CHECK(last_point_game_time==NONE, "unload resets clock");
+    last_point_game_time=0;
     contrails_initialize_for_new_map();
-    CHECK(last_point_game_time==NONE && pending_point_dt==0, "new map resets clock even at same tick");
+    CHECK(last_point_game_time==NONE, "new map resets clock even at same tick");
     contrails_update(1.0f/30);
-    CHECK(contrail_get(trail_index)->contrail_point_counts[0]==3, "initial deadline and next deadline both emit");
+    CHECK(contrail_get(trail_index)->contrail_point_counts[0]==before+1, "first draw after reset emits a tick of points");
 }
 static void new_point(void)
 {
@@ -174,7 +180,7 @@ static void new_point(void)
     CHECK(p->time==0, "render-only frame does not age point");
     states[0].physics.index=1;
     contrails_update(1.0f/120);
-    CHECK(close_to(physics_dt,2.0f/120), "both initialized points move between ticks");
+    CHECK(close_to(physics_dt,contrail_get(trail_index)->contrail_point_counts[0]/120.0f), "all initialized points move between ticks");
     CHECK(close_to(contrail_get(trail_index)->texture_offset_u,-4.0f/120), "texture moves between ticks");
 }
 static void pause_and_activation(void)
@@ -199,6 +205,47 @@ static void detached(void)
     for(i=0;i<120;++i) { if(i%4==3) ++tick; contrails_update(1.0f/120); }
     CHECK(contrail_data->count==0 && contrail_point_data->count==0, "detached trail expires and is reclaimed");
 }
+static void checkpoint(void)
+{
+    setup(); contrails_update(0);
+    /* A saved trail can have a fresh point even at the current tick. */
+    contrail_get(trail_index)->time_until_point=0;
+    game_state_call_after_load_procs();
+    contrails_update(1.0f/120);
+    CHECK(last_point_game_time==tick, "restored clock catches up");
+    CHECK(contrail_get(trail_index)->time_until_point>0, "same-tick restore emits on its first draw");
+}
+static void catch_up(void)
+{
+    struct contrail_point_datum *p;
+    short state;
+    real time, motion;
+    setup(); contrails_update(0);
+    contrail_get(trail_index)->object_index=NONE;
+    p=contrail_point_get(contrail_get(trail_index)->first_contrail_point_indices[0]);
+    states[0].physics.index=states[1].physics.index=1;
+    contrail_update_points(trail_index,1.0f/30,1.0f/30);
+    contrail_update_points(trail_index,1.0f/30,1.0f/30);
+    state=p->state_index; time=p->time; motion=physics_dt;
+    setup(); contrails_update(0);
+    contrail_get(trail_index)->object_index=NONE;
+    p=contrail_point_get(contrail_get(trail_index)->first_contrail_point_indices[0]);
+    states[0].physics.index=states[1].physics.index=1;
+    contrail_update_points(trail_index,2.0f/30,2.0f/30);
+    CHECK(p->state_index==state && close_to(p->time,time), "two-tick frame follows individual state transitions");
+    CHECK(close_to(physics_dt,motion), "catch-up moves points once for elapsed frame time");
+}
+static void double_speed_case(void)
+{
+    struct contrail_point_datum *p;
+    setup(); double_speed=TRUE;
+    states[0].duration_lower_bound=states[0].duration_upper_bound=1;
+    contrail_get(trail_index)->time_until_point=2;
+    contrails_update(0);
+    p=contrail_point_get(contrail_get(trail_index)->first_contrail_point_indices[0]);
+    ++tick; contrails_update(1.0f/60);
+    CHECK(p->state_index==0 && close_to(p->time,1.0f/60), "double-speed tick ages half a normal tick");
+}
 int main(int argc,char **argv)
 {
     CHECK(argc==2,"case required");
@@ -208,6 +255,9 @@ int main(int argc,char **argv)
     else if(!strcmp(argv[1],"lifecycle")) lifecycle();
     else if(!strcmp(argv[1],"new-point")) new_point();
     else if(!strcmp(argv[1],"detached")) detached();
+    else if(!strcmp(argv[1],"checkpoint")) checkpoint();
+    else if(!strcmp(argv[1],"catch-up")) catch_up();
+    else if(!strcmp(argv[1],"double-speed")) double_speed_case();
     else CHECK(FALSE,"unknown case");
     return 0;
 }

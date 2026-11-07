@@ -3,6 +3,11 @@
 Gamepad Setup > **Button Remapping** edits separate P1–P4 layouts. These belong
 to input slots on this installation, not device serial numbers or player profiles.
 Empty settings keep the profile preset and stock shortcuts.
+The separate **Dead Zones** screen sets left/right stick thresholds shared by
+the input path. Its stock defaults preserve the original game thresholds.
+`halo_stick_dead_range` in [xinput_sdl.c](../../port/linux/src/xinput_sdl.c)
+supplies them to [input_xbox.c](../../source/input/input_xbox.c); button
+remapping remains independent of these axis settings.
 Optional [DualSense feedback](dualsense.md) follows these physical L2/R2 assignments;
 actions on buttons without actuators do not produce adaptive-trigger effects.
 

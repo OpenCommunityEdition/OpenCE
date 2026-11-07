@@ -24,8 +24,10 @@ def scope_cells(kind):
     if kind == 'ce':
         return [cell([0, 0, 25, 18], 'scope', [50, 26, 188, 112]),
                 cell([51.5, 0.5, 61.5, 10.5], 'scope', [241, 12, 301, 73])]
+    # Xbox labels fill the stock glyph bounds, not the padded sprite cells.
+    # Keep the independently packed MCC sheet in its own coordinate system.
     rectangles = ([[4, 4, 100, 64], [4, 76, 148, 140], [110, 2, 150, 42]] if kind == 'mcc' else
-                  [[0, 0, 31, 24], [0, 24, 43, 48], [35.5, 3.5, 45.5, 13.5]])
+                  [[4.125, 4.875, 26.75, 19.0], [5.25, 28.75, 38.5, 43.125], [35.5, 3.5, 45.5, 13.5]])
     return [cell(rect, 'scope', crop) for rect, crop in zip(rectangles,
         [[50, 26, 188, 112], [50, 168, 247, 253], [241, 12, 301, 73]])]
 

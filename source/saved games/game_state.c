@@ -110,6 +110,9 @@ symbols in this file:
 #include "main.h"
 #include "objects.h"
 #include "objects/widgets/lightning.h" /* port: reset render seeds after a load */
+#include "objects/widgets/flags.h" /* port: reset cloth timing after a load */
+#include "effects/contrails.h" /* port: reset point timing after a load */
+#include "effects/player_effects.h" /* port: reset camera shake after a load */
 #include "game_sound.h"
 #include "sound_manager.h"
 #include "observer.h"
@@ -210,6 +213,10 @@ static game_state_after_load_proc after_load_procs[] =
 {
 	/* port: restored lightning slots and times must not reuse discarded seeds. */
 	lightnings_reset_render_state,
+	/* port: these render caches also live outside the saved game buffer. */
+	flags_reset_render_state,
+	contrails_reset_render_state,
+	player_effect_reset_render_state,
 	scenario_reload_structure_bsp_if_necessary,
 	/* port: the session roster is not part of a gameplay checkpoint. */
 	network_coop_restore_players,
