@@ -3681,6 +3681,8 @@ static char const **enumeration_results = NULL;
 static char const *hs_enumeration_substring = NULL;
 static boolean hs_recompile_pending = FALSE;
 static boolean hs_syntax_data_allocated = FALSE;
+/* the loaded map's scripts set rider_ejection */
+static boolean hs_scenario_sets_rider_ejection_flag;
 /* port: the map's scripts and global initializers that call a function
 maps may not (hs_scenario_functions_check) */
 static unsigned long hs_scenario_disabled_scripts[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_HS_SCRIPTS_PER_SCENARIO)];
@@ -13722,7 +13724,8 @@ void hs_dispose_from_old_map(
 	}
 	/* port: the old map's disabled scripts and globals are not the next's
 	(whose scripts may not be postprocessed: hs_scenario_postprocess clears
-	them only then) */
+	them only then). Nor is whether that map set rider_ejection. */
+	hs_scenario_sets_rider_ejection_flag = FALSE;
 	csmemset(hs_scenario_disabled_scripts, 0, sizeof(hs_scenario_disabled_scripts));
 	csmemset(hs_scenario_disabled_globals, 0, sizeof(hs_scenario_disabled_globals));
 	hs_runtime_dispose_from_old_map();
@@ -15295,6 +15298,72 @@ static void real_random_range_evaluate(
 	return;
 }
 
+/* the external global rider_ejection, or NONE */
+static short hs_rider_ejection_global_index(
+	void)
+{
+	extern boolean rider_ejection;
+	short index;
+
+	for (index = 0; index<hs_external_global_count; index++)
+	{
+		if (hs_external_globals[index] && hs_external_globals[index]->address==&rider_ejection)
+			return index;
+	}
+	return NONE;
+}
+
+/* a set of rider_ejection in the map's scripts: the map owns that switch */
+static void hs_scenario_note_rider_ejection(
+	void)
+{
+	short global_index = hs_rider_ejection_global_index();
+	long expression_index;
+
+	hs_scenario_sets_rider_ejection_flag = FALSE;
+	if (global_index==NONE || !hs_syntax_data)
+		return;
+	for (expression_index = data_next_index(hs_syntax_data, NONE);
+		expression_index!=NONE;
+		expression_index = data_next_index(hs_syntax_data, expression_index))
+	{
+		struct hs_syntax_node const *expression = hs_syntax_try_get(expression_index);
+		struct hs_syntax_node const *predicate;
+		struct hs_syntax_node const *variable;
+		short designator;
+
+		if (!expression ||
+			TEST_FLAG(expression->flags, _hs_syntax_node_primitive_bit) ||
+			TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) ||
+			expression->function_index!=_hs_function_set)
+		{
+			continue;
+		}
+		predicate = hs_syntax_try_get(expression->data);
+		if (!predicate)
+			continue;
+		variable = hs_syntax_try_get(predicate->next_node_index);
+		if (!variable ||
+			!TEST_FLAG(variable->flags, _hs_syntax_node_primitive_bit) ||
+			!TEST_FLAG(variable->flags, _hs_syntax_node_variable_bit))
+		{
+			continue;
+		}
+		designator = (short)variable->data;
+		if ((designator & 0x8000) && (designator & 0x7FFF)==global_index)
+		{
+			hs_scenario_sets_rider_ejection_flag = TRUE;
+			return;
+		}
+	}
+}
+
+boolean hs_scenario_sets_rider_ejection(
+	void)
+{
+	return hs_scenario_sets_rider_ejection_flag;
+}
+
 boolean hs_scenario_postprocess(
 	boolean restore_syntax_data)
 {
@@ -15308,6 +15377,7 @@ boolean hs_scenario_postprocess(
 	scenario = global_scenario_get();
 	saved_syntax_data = hs_syntax_data;
 	/* port: the last map's are let go of (hs_scenario_functions_check) */
+	hs_scenario_sets_rider_ejection_flag = FALSE;
 	csmemset(hs_scenario_disabled_scripts, 0, sizeof(hs_scenario_disabled_scripts));
 	csmemset(hs_scenario_disabled_globals, 0, sizeof(hs_scenario_disabled_globals));
 	hs_allocate();
@@ -15374,6 +15444,7 @@ boolean hs_scenario_postprocess(
 		/* port: before the console's expressions are compiled into the
 		same nodes */
 		hs_scenario_functions_check(scenario);
+		hs_scenario_note_rider_ejection();
 		if (scenario->hs_string_constants.size<0x400)
 		{
 			success = tag_data_resize(

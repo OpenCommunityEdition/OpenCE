@@ -247,6 +247,9 @@ boolean hs_scenario_script_disabled(
 	short script_index);
 boolean hs_scenario_global_initializer_disabled(
 	short global_index);
+/* the loaded map's scripts set rider_ejection, so that switch is the map's */
+boolean hs_scenario_sets_rider_ejection(
+	void);
 
 /* ---------- prototypes/HS_GLOBALS_EXTERNAL.C */
 
