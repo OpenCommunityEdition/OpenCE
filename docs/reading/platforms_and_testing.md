@@ -149,8 +149,10 @@ executable cleanup require observed child exit; uncertain shutdown retains
 the outputs and stops subsequent cases so they can be investigated safely.
 
 [Milestone 10](../mcc_refactor_validation.md#milestone-10-shared-co-op-checkpoint-recovery)
-tracks the planned shared co-op recovery investigation, compatibility decision
-and required regression evidence. Its proposed checks are not completed tests.
+tracks shared co-op recovery, and
+[Milestone 11](../mcc_refactor_validation.md#milestone-11-shared-boat-control-initialization)
+tracks the deferred shared boat correction. Both require a compatible repair
+strategy and regression evidence; their proposed checks are not completed tests.
 
 ## Work through a suspected movement regression
 

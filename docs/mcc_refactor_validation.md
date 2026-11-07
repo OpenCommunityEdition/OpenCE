@@ -8,8 +8,9 @@ Stage 9's combined review, testing and cleanup are complete. Ruby co-op
 recovery failed on both original main and current, so its compatibility
 sign-off remains withheld. Shared co-op checkpoint recovery is now planned
 as Milestone 10; implementation has not started.
-The shared boat and console-syntax corrections remain explicitly deferred,
-as distinguished from their completed investigations.
+The shared boat correction is tracked separately as Milestone 11 and remains
+explicitly deferred under the crossplay constraint. The console-syntax
+correction also remains deferred, distinct from its completed investigation.
 The stage evidence below records the changes, actual validation and limits.
 
 | Milestone | Scope and outcome | Status |
@@ -24,6 +25,7 @@ The stage evidence below records the changes, actual validation and limits.
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; Ruby co-op recovery sign-off withheld |
 | 10 | Diagnose and correct shared co-op checkpoint recovery while preserving OpenCE crossplay. | Planned; establish the root cause and compatible repair strategy first |
+| 11 | Correct shared boat control initialization under a compatible engine/network contract. | Planned; shared repair remains deferred pending compatible upstream support or an explicit policy change |
 
 The latest verified implementation revision is `f25c4886a`, with fresh passing
 MCC and four-platform debug workflows. Stage 9 recorded 2,193 local passes,
@@ -184,7 +186,56 @@ recovery sign-off withheld. Stage 9's historical failures remain recorded.
 Adding this milestone schedules the work; it does not begin implementation
 or relax the existing crossplay and isolation requirements.
 
-### Explicitly deferred: unconditional shared boat fix
+### Milestone 11: shared boat control initialization
+
+Use the [Stage 2 evidence](#stage-2-boat-proof-and-preserved-crossplay) and
+[boat investigation](mcc_maps.md#shared-engine-investigation-7-november-2026)
+as the starting proof. The three-point boat controller leaves two temporary
+water-friction control values uninitialized; both physics paths can consume
+them for accepted inputs. The bounded harness demonstrates non-finite forces
+and incorrect finite friction with MCC inactive, and the existing MCC
+initialization prevents both. This proves a shared producer defect, not that
+stock Xbox maps contain affected boats or that full vehicle behavior is tested.
+
+1. **Establish a compatible repair strategy.** Recheck the responsible engine
+   and simulation contract against the designated upstream revision. The
+   unconditional correction changes accepted Xbox/CE simulation, including
+   client prediction of a driven vehicle. Preserve OpenCE crossplay and host
+   authority; document compatible upstream support and any required agreement,
+   version separation and rollout before implementation. A version bump alone
+   does not preserve crossplay with existing peers. Keep the repair deferred
+   if the standing compatibility requirement cannot be met.
+2. **Correct the producer systemically.** Within an established compatible
+   contract, initialize exactly the three temporary records in the existing
+   three-point branch, preserving its arithmetic, active controls and other
+   point-count paths. Retain required `port:` markers for shared source edits.
+   Preserve the working MCC correction; retire its helper/hook only when the
+   shared implementation demonstrably replaces it for every supported MCC
+   path. Do not select the fix by map identity, route legacy maps through MCC
+   code, or attach correct initialization to an optional camera/cosmetic mode.
+3. **Validate behavior and agreement.** Preserve the existing regression
+   coverage and demonstrate failure before the fix and success afterward.
+   Check finite and non-finite stale controls, observable forces and resulting
+   motion in both physics paths, zero/reverse propeller values, scratch bounds,
+   unpowered controls, alternate point counts and unaffected controllers.
+   Exercise the Mercury2/Doozy reproduction and relevant installed Workshop
+   maps, plus Xbox/CE controls and supported-input fixtures where stock maps
+   lack boats. Test actual driving, client prediction and seat replication in
+   both host directions, with matching/mixed builds where their contracts
+   permit, and verify map-family transitions. Run affected regressions, all
+   required platform builds and native/web transport checks. Support crossplay
+   claims with an identified upstream executable on supported map contracts;
+   a main/current GulchCE comparison alone is insufficient.
+
+Complete the repair only after the compatible strategy and combined change
+are reviewed, applicable checks pass, and evidence and cleanup are recorded.
+Convert the twelve strict legacy expected failures to ordinary passing
+regressions only when the authorized correction fixes those paths; preserve
+their behavioral coverage and historical failures. A compatibility-dependent
+deferral leaves this repair milestone open. Adding it records future work;
+it does not start implementation or change the existing compatibility policy.
+
+#### Explicitly deferred: unconditional shared boat fix
 
 The defect is reproduced, but the user chose to preserve OpenCE crossplay.
 Keep the existing MCC correction and twelve strict legacy expected failures.
