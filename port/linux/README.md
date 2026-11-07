@@ -823,7 +823,8 @@ running and crouching as everyone else sees them. It is the body others
 see, posed as they see it: the upper body is folded away, and the body is
 set back behind the eye as far as keeps the open waist below the view
 (the way Halo 2 keeps its first-person body's open top out of sight), more
-the further down you look. It is drawn with the world's camera, so it keeps
+the further down you look, and as far as keeps the legs clear of the eye
+(the knees of a crouched walk rise to it). It is drawn with the world's camera, so it keeps
 its place and size at any field of view. Hit boxes, markers and everything
 the game does with the body are unchanged.
 
