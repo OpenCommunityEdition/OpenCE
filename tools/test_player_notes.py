@@ -95,6 +95,20 @@ def test_historical_prefix_correction_keeps_note_validation(repo, monkeypatch):
         repo.collect()
 
 
+def test_published_withdrawal_omits_only_its_original_note(repo, monkeypatch):
+    original = repo.commit("Optimization\n\nPlayer-Note: Reduced CPU work.")
+    kept = repo.commit("Resource fix\n\nPlayer-Note: Fixed resource discovery.")
+    withdrawal = repo.commit("Withdraw the unfinished optimization")
+    monkeypatch.setattr(player_notes, "HISTORICAL_NOTE_WITHDRAWALS",
+                        {withdrawal: original}, raising=False)
+    assert texts(repo.collect()[0]) == ["Fixed resource discovery."]
+    # Testing/history without the withdrawal still describes its own contents.
+    assert texts(repo.collect(head=kept)[0]) == ["Reduced CPU work.", "Fixed resource discovery."]
+    # A later reviewed restoration can author the same note again.
+    repo.commit("Restore the completed optimization\n\nPlayer-Note: Reduced CPU work.")
+    assert texts(repo.collect()[0]) == ["Fixed resource discovery.", "Reduced CPU work."]
+
+
 def test_prose_mentioning_annotation_syntax_is_not_an_annotation(repo):
     repo.commit("Document Player-Note usage\n\nPlayer-Note approach is authored, not inferred.\n"
                 "Write Player-Note: short text in the body.\n"

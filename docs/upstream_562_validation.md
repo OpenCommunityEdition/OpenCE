@@ -247,10 +247,16 @@ Before release publication, the user clarified that the CPU mask-conversion and
 collision-continuation optimization is still being developed and must be left
 out. The initial Build/release run was cancelled. A focused revert on main
 removes all changes from `9bf9554aa`; testing and its ongoing work are untouched.
-The corrected engine, platform, tools and build configuration exactly match
+The corrected engine, platform and build configuration exactly match
 the previously reviewed testing revision
 `045cb99bce3fba18a3ddb61f88e327ba4544d09e`. Main's existing README and agent/coding
 guidance remain intact, and the Workshop diagnostic branch is excluded.
+
+The release-note collector additionally suppresses the withdrawn optimization's
+original annotation only in histories containing its withdrawal, as documented
+in [the changelog guide](changelog.md). A real Git-history regression reproduces
+the stale note before correction and checks retained testing previews and later
+restoration notes. This bookkeeping change does not alter game code.
 
 The optimization commit remains in Git ancestry because main was already pushed;
 when that work is ready, its full intended change must be deliberately restored

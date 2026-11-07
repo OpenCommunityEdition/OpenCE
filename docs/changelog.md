@@ -51,6 +51,14 @@ to `[ANDROID]` before normal validation, preserving its notes without rewriting
 shared history. This historical exception does not accept mixed-case categories
 in new commits or relax note-text validation.
 
+The CPU optimization `9bf9554aa86dbeba9fa49f5d8ff1b99f2ba82c1b` was withdrawn
+from main by `192ba0b5c0c1549b76bc7b21de786c9fd7202711` before publication,
+while remaining on testing for ongoing development. The collector omits that
+original note only for histories containing the withdrawal. Testing previews
+without it retain the note. This is a recorded correction to published history,
+not inference from commit subjects or general detection of reverts. A later
+reviewed restoration must carry its own annotation, which may reuse the note.
+
 Use `Player-Note: none` to explicitly omit a commit, including any catch-up
 entry for it. Do not combine `none` with another note in the same commit.
 The omission marker has no category.
