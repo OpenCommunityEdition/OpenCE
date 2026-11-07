@@ -1,22 +1,24 @@
 """Exercise MCC traversal and the real shared callback dispatch without assets."""
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 
 import pytest
 
+from harness import constant, structure
+
 ROOT = Path(__file__).resolve().parents[1]
 GAME = ROOT / "port/linux/game"
 
 
-@pytest.fixture(scope="module")
-def validation_tool(tmp_path_factory):
+def build_validation_tool(tmp_path_factory, hud=False):
     compiler = shutil.which("clang")
     if compiler is None:
         pytest.skip("clang is required for native MCC validation tests")
-    directory = tmp_path_factory.mktemp("mcc-validation")
+    directory = tmp_path_factory.mktemp("mcc-hud-validation" if hud else "mcc-validation")
     (directory / "cache").mkdir()
     (directory / "tag_files").mkdir()
     (directory / "cseries.h").write_text("""
@@ -67,7 +69,7 @@ void *validation_malloc(size_t size) {
 }
 void validation_free(void *p) {
     unsigned i;
-    if (!p) return;
+    if (!p) abort(); /* cseries.h routes free to debug_free, which requires a pointer. */
     for (i = 0; i < 100000; i++) if (allocations[i] == p) {
         allocations[i] = NULL; free(p); return;
     }
@@ -81,8 +83,65 @@ void validation_free(void *p) {
                f"-I{directory}", f"-I{GAME}", str(GAME / "mcc_tag_validate.c"),
                str(GAME / "tag_validate.c"), str(ROOT / "tools/harness/tests/mcc_tag_validation.c"), str(allocator),
                "-o", str(binary)]
+    if hud:
+        declarations = []
+        for path in ["source/interface/hud_definitions.h",
+                     "source/interface/weapon_hud_interface_definition.h",
+                     "source/bitmaps/bitmap_group.h"]:
+            header = (ROOT / path).read_text()
+            declarations.extend(structure(header, name) for name in re.findall(r"^struct (\w+)\s*\{", header, re.M))
+        effects = (GAME / "tag_schema_effects.c").read_text()
+        for name in ["weapon_hud_overlay_item", "weapon_hud_overlay_definition",
+                     "weapon_hud_overlays_element", "weapon_hud_crosshair_definition",
+                     "weapon_hud_crosshairs_element", "weapon_hud_crosshair_item"]:
+            declarations.append(structure(effects, name))
+        types = '''
+#include "cseries.h"
+#include "tag_files/tag_groups.h"
+#include <stdint.h>
+typedef unsigned short word;
+typedef union point2d {struct {short x,y;};uint32_t value;} point2d;
+typedef struct {float i,j;} real_vector2d;
+typedef struct {short x0,y0,x1,y1;} rectangle2d;
+typedef struct {float alpha,red,green,blue;} real_argb_color;
+typedef struct {float red,green,blue;} real_rgb_color;
+typedef struct {float x0,x1,y0,y1;} real_rectangle2d;
+typedef struct {float x,y;} real_point2d;
+#define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))
+#define _hud_anchor_center 4
+#define _error_silent 0
+#define MCC_HUD_NATIVE_FRAME 0x4D53
+'''
+        (directory / "hud_test_types.h").write_text(types + "\n".join(declarations))
+        schemas = []
+        for name in ["NUMBER_OF_WEAPON_HUD_FLASH_REFERENCES", "NUMBER_OF_WEAPON_HUD_MAP_TYPES",
+                     "NUMBER_OF_WEAPON_HUD_CROSSHAIR_STATES", "MAXIMUM_ITEMS_PER_HUD_OVERLAY",
+                     "MAXIMUM_ITEMS_PER_HUD_CROSSHAIR", "MAXIMUM_ELEMENTS_PER_WEAPON_HUD",
+                     "MAXIMUM_CROSSHAIRS_PER_WEAPON_HUD"]:
+            schemas.append(f"#define {name} {constant(effects, name)}")
+        for name in ["weapon_hud_overlay_item", "weapon_hud_overlay", "weapon_hud_overlays_element",
+                     "weapon_hud_crosshair_item", "weapon_hud_crosshairs_element"]:
+            fields = re.search(r"static struct tag_schema_field const " + name + r"_fields\[\]\s*=\s*\{.*?\n\};", effects, re.S)
+            schema = re.search(r"static struct tag_schema_definition const " + name + r"_schema\s*=.*?;", effects, re.S)
+            assert fields and schema, name
+            schemas.extend([fields.group(), schema.group()])
+        (directory / "hud_test_schemas.inc").write_text("\n".join(schemas))
+        hud_source = (GAME / "mcc_hud.c").read_text()
+        # Keep production helper includes; replace only platform/header dependencies.
+        hud_source = "\n".join(line for line in hud_source.splitlines()
+                               if not line.startswith("#include ") or line.endswith('.inl"'))
+        hud_file = directory / "hud.c"
+        hud_file.write_text('''
+#include "hud_test_types.h"
+#include "mcc_runtime.h"
+#include <string.h>
+void error(short level,char const *text,...);
+''' + hud_source)
+        command[1:1] = ["-DMCC_HUD_VALIDATION", str(hud_file)]
     built = subprocess.run(command, capture_output=True, text=True)
     assert built.returncode == 0, built.stdout + built.stderr
+    if hud:
+        return binary
     # The existing map_validate executable links tag_validate.c without any
     # game runtime adapters. MCC callback routing must retain that property.
     legacy = directory / "legacy.c"
@@ -101,6 +160,26 @@ int main(void) { return tag_validate_corrections() != 0; }
     assert linked.returncode == 0, linked.stdout + linked.stderr
     assert subprocess.run([str(legacy_binary)], timeout=30).returncode == 0
     return binary
+
+
+@pytest.fixture(scope="module")
+def validation_tool(tmp_path_factory):
+    return build_validation_tool(tmp_path_factory)
+
+
+@pytest.fixture(scope="module")
+def hud_validation_tool(tmp_path_factory):
+    return build_validation_tool(tmp_path_factory, hud=True)
+
+
+@pytest.mark.parametrize("case", [
+    "hud_scalar_first", "hud_scalar_last", "hud_raw_scalar_first", "hud_raw_scalar_last",
+    "hud_root_alias", "hud_root_partial", "hud_root_schema", "hud_owner_partial", "hud_owner_schema",
+    "hud_prefix_short_first", "hud_prefix_long_first", "hud_tail_short_first", "hud_tail_long_first",
+])
+def test_hud_conversion_preserves_validation(hud_validation_tool, case):
+    result = subprocess.run([str(hud_validation_tool), case], capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize("case", ["jet_pair", "jet_state", "jet_complete", "jet_unused", "jet_short", "jet_outside", "jet_capacity", "jet_explosion", "valid", "collision_valid", "collision_swapped", "collision_no_owner", "collision_short_ring", "collision_open_ring", "collision_bad_next", "collision_bad_owner", "collision_outside", "overlap", "outside", "negative", "cycle", "alias", "alias_partial", "alias_group", "alias_bad_child", "alias_block", "alias_block_partial",

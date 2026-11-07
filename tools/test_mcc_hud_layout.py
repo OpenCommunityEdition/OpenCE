@@ -21,6 +21,7 @@ def layout_tool(tmp_path_factory):
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #define NUMBEROF(x) (sizeof(x)/sizeof((x)[0]))
 struct bitmap_group {short type,format,usage;unsigned short flags;char rest[100];};
 struct mcc_runtime {unsigned char *tag_index;struct {uint32_t tag_count;} report;unsigned used;unsigned char *tags;};
@@ -30,13 +31,21 @@ static void *mcc_runtime_pointer(struct mcc_runtime *r,uint32_t p,uint32_t bytes
 }
 ''' + function(source, "mcc_hud_word") + '\n' + function(source, "mcc_hud_block") + '\n'
     code += (ROOT / "port/linux/game/mcc_hud_layout.inl").read_text() + r'''
+static uint64_t visit(struct mcc_runtime *r,uint32_t const *entry) {
+    unsigned char original[sizeof(arena)];
+    uint64_t hash;
+    memcpy(original,arena,sizeof(arena));
+    hash=mcc_hud_layout_visit(r,entry);
+    assert(!memcmp(original,arena,sizeof(arena)));
+    return hash;
+}
 static void word(unsigned at,uint32_t value) {memcpy(arena+at,&value,4);}
 int main(int argc,char **argv) {
     struct mcc_runtime r={arena,{2},sizeof(arena),arena};
     uint32_t entry[8]={'wphi',0,0,0,0,256,0,0};
     uint64_t baseline,modified;int test;
     unsigned p=256,e=1024,b=2048;
-    short mark=0x4d53,stored;
+    short mark=0x4d53;
     if(argc!=2)return 1;test=atoi(argv[1]);
     /* One corner static element, one sprite bitmap and empty other blocks. */
     word(p+0x60,1);word(p+0x64,e);
@@ -52,20 +61,20 @@ int main(int argc,char **argv) {
         memset(arena+p,0,0x56c);entry[0]='unhi';
         for(j=0;j<sizeof(elements)/sizeof(*elements);j++)word(p+elements[j]+0x30,UINT32_MAX);
         word(p+0x24+0x30,0xe0000001);
-        baseline=mcc_hud_layout_visit(&r,entry,0);if(!baseline)return 18;
+        baseline=visit(&r,entry);if(!baseline)return 18;
         if(test==21)arena[4000]='X';
         else if(test==22)word(3000+4,64);
         else if(test==23)word(3000+16,7);
         else if(test==24)word(3200+8,0x3f800000);
         else if(test==25)word(p+0x24+0x54,2);
-        modified=mcc_hud_layout_visit(&r,entry,0);
-        return !modified || modified==baseline;
+        modified=visit(&r,entry);
+        return !modified || (test==21 ? modified!=baseline : modified==baseline);
     }
     if(test>=15) {
         entry[0]='grhi';
         word(p+0x24+0x30,0xe0000001);word(p+0x8c+0x30,0xe0000001);
         word(p+0x158,0xe0000001);word(p+0x15c,1);word(p+0x160,5000);
-        baseline=mcc_hud_layout_visit(&r,entry,0);if(!baseline)return 12;
+        baseline=visit(&r,entry);if(!baseline)return 12;
         if(test==15) { /* Icon artwork/scale/offset/sequence are not the counter frame. */
             word(p+0x158,UINT32_MAX);word(5000,0xfffe00a9);
             word(5000+4,0x3faa3d71);word(5000+0x48,7);
@@ -74,16 +83,14 @@ int main(int argc,char **argv) {
         else if(test==18)word(p+0x138,3); /* digit layout */
         else if(test==19)word(p+0x160,8190); /* truncated overlay */
         else if(test==20)word(p+0x158,0xe0010001); /* stale icon reference */
-        modified=mcc_hud_layout_visit(&r,entry,mark);
+        modified=visit(&r,entry);
         if(test==15) {
             if(modified!=baseline)return 13;
-            memcpy(&stored,arena+5000+14,2);if(stored!=mark)return 14;
-            memcpy(&stored,arena+p+0xf4+14,2);if(stored!=mark)return 15;
         } else if(test<=18) {if(!modified || modified==baseline)return 16;}
         else if(modified)return 17;
         return 0;
     }
-    baseline=mcc_hud_layout_visit(&r,entry,0);
+    baseline=visit(&r,entry);
     if(!baseline || mcc_hud_layout_stock(baseline))return 2;
     if(test==0) { /* Colors, padding and crosshairs do not select the corner frame. */
         word(e+0x24+0x34,0xff123456);word(p+0x84,999);word(p+0x88,0xffffffff);
@@ -103,17 +110,13 @@ int main(int argc,char **argv) {
     else if(test==12) {word(32+16,4096);memset(arena+4096,'x',256);} /* unterminated name */
     else if(test==13)word(3000+16,7); /* bitmap registration point */
     else if(test==14)word(e+0x24+0x58,1); /* authored overlay count */
-    modified=mcc_hud_layout_visit(&r,entry,0);
+    modified=visit(&r,entry);
     if(test==0 && modified!=baseline)return 3;
     if((test==1 || test==2 || test==14) && (!modified || modified==baseline))return 4;
     if(((test>=3 && test<=6) || test==13) && modified!=baseline)return 19;
     if(test>=7 && test<=12 && modified)return 5;
-    memcpy(&stored,arena+p+0x3e,2);if(stored)return 6;
     if(test==0) {
-        memcpy(&stored,arena+e+0x24+14,2);if(stored)return 7;
-        if(mcc_hud_layout_visit(&r,entry,mark)!=baseline)return 8;
-        memcpy(&stored,arena+e+0x24+14,2);if(stored!=mark)return 9;
-        memcpy(&stored,arena+p+0x3e,2);if(stored!=mark)return 10;
+        if(visit(&r,entry)!=baseline)return 8;
     }
     return 0;
 }
@@ -129,6 +132,6 @@ int main(int argc,char **argv) {
 
 
 @pytest.mark.parametrize("case", range(26))
-def test_layout_identity_bounds_and_owned_markers(layout_tool, case):
+def test_layout_identity_bounds_and_read_only_hashing(layout_tool, case):
     result = subprocess.run([str(layout_tool), str(case)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

@@ -702,10 +702,29 @@ Each draw resolves a temporary placement without changing the parent tag.
 This places A50_Revisited's visor at the screen edges; invalid child anchors
 retain the parent placement. Xbox/CE returns the original parent untouched.
 
+HUD normalization first plans ownership from pristine loaded bytes in
+`mcc_hud_ownership.inl`. Same-group aliases of a root are converted once.
+Shared mutable blocks receive separate consumer storage before any placement
+or pointer is written. Pointer-free crosshair and overlay items are always
+snapshotted: an MCC cache can intern them within storage used outside the HUD
+tree. This prevents one consumer's scaling or frame marker from changing the
+authored input seen by another. It also makes supported scalar interning
+independent of the later validator's traversal order. This is a correction
+within the MCC compatibility engine, not a map-specific exception.
+
+Pointer-bearing aliases retain their largest original extent so the later
+validator still rejects conflicting owners, cross-schema roots and partial
+overlaps. Planning is bounded by the validator's four-million-visit budget.
+All copies precede pointer publication; allocation failure refuses the load.
+Planning records are freed on every exit, and copied blocks belong to the
+runtime tag arena, released by normal unload or failed-load cleanup. Neither
+original map files nor Xbox/CE conversion paths are changed.
+
 Stock corner HUDs use the native safe frame instead of the wider MCC frame.
 `mcc_hud_layout.inl` recognizes component layouts before conversion from their
 anchors, placements, number layout and overlay counts. Unit HUD recognition
-also includes bitmap names/dimensions/registration points and sprite geometry.
+also includes bitmap dimensions/registration points and sprite geometry.
+Bitmap names remain bounded and validated but do not select the frame.
 Weapon and grenade counter panels deliberately exclude artwork identity and
 sprite choices: a custom replacement bitmap does not relocate a stock counter.
 Grenade icons retain their own authored size and offset within the counter's
@@ -716,8 +735,21 @@ b30, b40, d40, bloodgulch, deathisland and carousel caches. No map assets are
 embedded. Unknown layouts retain the authored MCC frame; this is deliberately
 conservative and is not a security or content-identity check.
 
-Recognition writes a marker into runtime-owned MCC placement padding, clearing
-map-supplied values first. A weapon and its inherited parent HUDs share one
+These structural profiles remain a compatibility exception: the supported
+anchor and scale fields do not establish whether an author intended the native
+or wider safe margin. Removing the profiles requires evidence of a reliable
+format or usage rule that preserves both stock and custom layouts, with
+near-miss coverage. The Stage 5 inventory found the same classification for all
+487 component HUDs in ten installed Workshop maps after removing bitmap-name
+dependence; changing only names also preserved classification. This bounded
+result does not establish that the profiles recognize every stock derivative.
+One load diagnostic reports native/authored frame counts and ownership copies;
+no diagnostic runs per draw. See [the refactor validation record](mcc_refactor_validation.md)
+for map identities, regression evidence and runtime limits.
+
+Recognition is read-only and runs once on each distinct pristine root.
+Conversion then writes the chosen marker into runtime-owned MCC placement
+padding, replacing map-supplied values. A weapon and its inherited parent HUDs share one
 frame: `mcc_hud_weapon_frame_begin` follows the outermost populated parent
 layout in the bounded chain, ignoring empty/crosshair-only parents. A chain
 with distinct authored anchors retains the MCC frame. This lets a custom ammo
@@ -737,7 +769,12 @@ retain their existing geometry. Mercury Falling's pistol, ability counters
 and vehicle prompts exposed these separate cases; the rules do not depend
 on map or weapon names. Descent's custom layouts remain separate.
 
-The asset-free layout, channel and texture-ownership tests are in
+The asset-free ownership and normalization cases in
+`tools/test_mcc_hud_normalization.py` exercise the whole converter, including
+shared roots/blocks, order independence, separate frames and allocation failure.
+`tools/test_mcc_tag_validation.py` combines conversion with the actual validator
+to check supported scalar interning and malformed pointer-bearing overlaps.
+The layout, channel and texture-ownership tests are in
 `tools/test_mcc_hud_layout.py`, `tools/test_mcc_shader_channels.py` and
 `tools/test_mcc_texture_bridge.py`. `tools/test_mcc_hud_meter_render.py` renders
 synthetic converted meters through the production GPU shader, checking full,

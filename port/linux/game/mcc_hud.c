@@ -8,6 +8,7 @@
 #include "errors.h"
 #include "mcc_runtime.h"
 #include "mcc_hud_draw.h"
+#include <stdlib.h>
 #include <string.h>
 
 char const *config_string(char const *name);
@@ -61,6 +62,7 @@ static unsigned char *mcc_hud_block(struct mcc_runtime *r,unsigned char *p,uint3
 }
 
 #include "mcc_hud_layout.inl"
+#include "mcc_hud_ownership.inl"
 
 static int mcc_hud_multiplayer_text(struct mcc_runtime *r,uint32_t const *entry)
 {
@@ -139,21 +141,25 @@ static void mcc_hud_scale(struct hud_placement_definition *placement,int half)
     placement->scale.j*=factor;
 }
 
-static int mcc_hud_bitmap_element(struct mcc_runtime *r,unsigned char *element)
+static int mcc_hud_bitmap_element(struct mcc_runtime *r,unsigned char *element,short marker)
 {
     int half;
     if (!mcc_hud_half_bitmap(r,mcc_hud_word(element+0x30),&half)) return 0;
     mcc_hud_scale((void *)element,half);
+    ((struct hud_placement_definition *)element)->pad=marker;
     return 1;
 }
 
-static int mcc_hud_items(struct mcc_runtime *r,unsigned char *definition,uint32_t stride)
+static int mcc_hud_items(struct mcc_runtime *r,unsigned char *definition,uint32_t stride,short marker)
 {
     uint32_t i,count;
     unsigned char *items=mcc_hud_block(r,definition+16,stride,&count);
     int half;
     if (!items || !mcc_hud_half_bitmap(r,mcc_hud_word(definition+12),&half)) return 0;
-    for (i=0;i<count;i++) mcc_hud_scale((void *)(items+i*stride),half);
+    for (i=0;i<count;i++) {
+        struct hud_placement_definition *placement=(void *)(items+i*stride);
+        mcc_hud_scale(placement,half);placement->pad=marker;
+    }
     return 1;
 }
 
@@ -191,48 +197,57 @@ static int mcc_hud_default(struct mcc_runtime *r,struct hud_globals_definition *
     return 1;
 }
 
-int mcc_hud_bitmaps_prepare(struct mcc_runtime *r)
+static int mcc_hud_convert(struct mcc_runtime *r,struct mcc_hud_plan const *plan)
 {
     uint32_t i,empty=UINT32_MAX;
     for (i=0;i<r->report.tag_count;i++) {
         uint32_t *entry=(uint32_t *)(r->tag_index+i*32),n,count;
-        uint64_t layout=mcc_hud_layout_visit(r,entry,0);
+        short marker=i<plan->tag_count && plan->frames[i]==1 ? MCC_HUD_NATIVE_FRAME : 0;
         unsigned char *p,*block;
+        if (i<plan->tag_count && plan->frames[i]==2) continue;
         if (entry[0]=='unhi') {
             static unsigned const elements[]={0x24,0x8C,0xF4,0x17C,0x1E4,0x26C,0x2D4};
             p=mcc_runtime_pointer(r,entry[5],0x56C);
             if (!p) return 0;
-            for (n=0;n<NUMBEROF(elements);n++) if (!mcc_hud_bitmap_element(r,p+elements[n])) return 0;
+            memcpy(p+2,&marker,2);
+            for (n=0;n<NUMBEROF(elements);n++) if (!mcc_hud_bitmap_element(r,p+elements[n],marker)) return 0;
             mcc_hud_offset((void *)(p+0x35C)); /* radar blip anchor */
+            ((struct hud_placement_definition *)(p+0x35C))->pad=marker;
             block=mcc_hud_block(r,p+0x3A4,0x84,&count);
             if (!block) return 0;
-            for (n=0;n<count;n++) if (!mcc_hud_bitmap_element(r,block+n*0x84)) return 0;
+            for (n=0;n<count;n++) if (!mcc_hud_bitmap_element(r,block+n*0x84,marker)) return 0;
             block=mcc_hud_block(r,p+0x3CC,0x144,&count);
             if (!block) return 0;
             for (n=0;n<count;n++) {
-                if (!mcc_hud_bitmap_element(r,block+n*0x144+0x14) ||
-                    !mcc_hud_bitmap_element(r,block+n*0x144+0x7C)) return 0;
+                if (!mcc_hud_bitmap_element(r,block+n*0x144+0x14,marker) ||
+                    !mcc_hud_bitmap_element(r,block+n*0x144+0x7C,marker)) return 0;
             }
         } else if (entry[0]=='wphi') {
             unsigned k;
             p=mcc_runtime_pointer(r,entry[5],0x17C);
             if (!p) return 0;
+            memcpy(p+0x3E,&marker,2);
             for (k=0;k<2;k++) {
                 block=mcc_hud_block(r,p+0x60+k*12,0xB4,&count);
                 if (!block) return 0;
-                for (n=0;n<count;n++) if (!mcc_hud_bitmap_element(r,block+n*0xB4+0x24)) return 0;
+                for (n=0;n<count;n++) if (!mcc_hud_bitmap_element(r,block+n*0xB4+0x24,marker)) return 0;
                 block=mcc_hud_block(r,p+0x84+k*12,0x68,&count);
                 if (!block) return 0;
-                for (n=0;n<count;n++) if (!mcc_hud_items(r,block+n*0x68+0x24,k ? 0x88 : 0x6C)) return 0;
+                for (n=0;n<count;n++) if (!mcc_hud_items(r,block+n*0x68+0x24,k ? 0x88 : 0x6C,k ? marker : 0)) return 0;
             }
             block=mcc_hud_block(r,p+0x78,0xA0,&count);
             if (!block) return 0;
-            for (n=0;n<count;n++) mcc_hud_offset((void *)(block+n*0xA0+0x24));
+            for (n=0;n<count;n++) {
+                struct hud_placement_definition *placement=(void *)(block+n*0xA0+0x24);
+                mcc_hud_offset(placement);placement->pad=marker;
+            }
         } else if (entry[0]=='grhi') {
             p=mcc_runtime_pointer(r,entry[5],0x1F8);
-            if (!p || !mcc_hud_bitmap_element(r,p+0x24) || !mcc_hud_bitmap_element(r,p+0x8C) ||
-                !mcc_hud_items(r,p+0x14C,0x88)) return 0;
+            if (!p || !mcc_hud_bitmap_element(r,p+0x24,marker) || !mcc_hud_bitmap_element(r,p+0x8C,marker) ||
+                !mcc_hud_items(r,p+0x14C,0x88,marker)) return 0;
+            memcpy(p+2,&marker,2);
             mcc_hud_offset((void *)(p+0xF4));
+            ((struct hud_placement_definition *)(p+0xF4))->pad=marker;
         } else if (entry[0]=='hudg') {
             struct hud_globals_definition *globals=mcc_runtime_pointer(r,entry[5],sizeof(*globals));
             if (!globals || !mcc_hud_default(r,globals,&empty)) return 0;
@@ -262,8 +277,15 @@ int mcc_hud_bitmaps_prepare(struct mcc_runtime *r)
         } else if (entry[0]=='ustr') {
             if (!mcc_hud_multiplayer_text(r,entry)) return 0;
         }
-        if (mcc_hud_layout_stock(layout))
-            mcc_hud_layout_visit(r,entry,MCC_HUD_NATIVE_FRAME);
     }
     return 1;
+}
+
+int mcc_hud_bitmaps_prepare(struct mcc_runtime *r)
+{
+    struct mcc_hud_plan plan={0};
+    int ok=mcc_hud_plan_prepare(&plan,r) && mcc_hud_convert(r,&plan);
+    if (ok) mcc_hud_plan_report(&plan);
+    mcc_hud_plan_dispose(&plan);
+    return ok;
 }

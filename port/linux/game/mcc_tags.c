@@ -21,22 +21,6 @@ static void *mcc_block(struct mcc_runtime *r, unsigned char *p, uint32_t stride,
     return *count ? mcc_runtime_pointer(r, mcc_word(p + 4), *count * stride) : NULL;
 }
 
-static void mcc_hud_placement(unsigned char *p)
-{
-    uint16_t flags;
-    float x, y;
-    memcpy(&flags, p + 12, 2);
-    if (!(flags & 4)) return;
-    memcpy(&x, p + 4, 4);
-    memcpy(&y, p + 8, 4);
-    x *= 0.5f;
-    y *= 0.5f;
-    memcpy(p + 4, &x, 4);
-    memcpy(p + 8, &y, 4);
-    flags &= ~4u;
-    memcpy(p + 12, &flags, 2);
-}
-
 static int mcc_scenario_recordings(struct mcc_runtime *r, unsigned char *scenario)
 {
     uint32_t count, i;
@@ -97,36 +81,20 @@ static int mcc_hud(struct mcc_runtime *r, uint32_t group, unsigned char *p)
 {
     unsigned char *block;
     uint32_t count, i;
+    /* mcc_hud_bitmaps_prepare has already normalized every placement and
+     * consumed its high-resolution flag. Only meter metadata remains here. */
     if (group == 'unhi') {
-        static unsigned const placements[] = {0x24, 0x8C, 0xF4, 0x17C, 0x1E4, 0x26C, 0x2D4};
-        for (i = 0; i < NUMBEROF(placements); ++i) mcc_hud_placement(p + placements[i]);
         memset(p + 0xF4 + 0x58, 0, 12);
         memset(p + 0x1E4 + 0x58, 0, 12);
-        block = mcc_block(r, p + 0x3A4, 0x84, &count);
-        if (count && !block) return FALSE;
-        for (i = 0; i < count; ++i) mcc_hud_placement(block + i * 0x84);
         block = mcc_block(r, p + 0x3CC, 0x144, &count);
         if (count && !block) return FALSE;
         for (i = 0; i < count; ++i) {
-            mcc_hud_placement(block + i * 0x144 + 0x14);
-            mcc_hud_placement(block + i * 0x144 + 0x7C);
             memset(block + i * 0x144 + 0x7C + 0x58, 0, 12);
         }
     } else if (group == 'wphi') {
-        unsigned k;
-        for (k = 0; k < 2; ++k) {
-            block = mcc_block(r, p + 0x60 + 12 * k, 0xB4, &count);
-            if (count && !block) return FALSE;
-            for (i = 0; i < count; ++i) {
-                mcc_hud_placement(block + i * 0xB4 + 0x24);
-                if (k) memset(block + i * 0xB4 + 0x24 + 0x58, 0, 12);
-            }
-        }
-    } else if (group == 'grhi') {
-        mcc_hud_placement(p + 0x24);
-        mcc_hud_placement(p + 0x8C);
-    } else if (group == 'hudg') {
-        mcc_hud_placement(p + 0x24);
+        block = mcc_block(r, p + 0x6C, 0xB4, &count);
+        if (count && !block) return FALSE;
+        for (i = 0; i < count; ++i) memset(block + i * 0xB4 + 0x24 + 0x58, 0, 12);
     }
     return TRUE;
 }

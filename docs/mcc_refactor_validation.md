@@ -559,3 +559,114 @@ implementation revision above without changing its code or tests. About 60 MB
 remains under `build/stage4`, primarily the 27 MB baseline build, 23.5 MB verified
 archive and diagnostic logs. No disposable map copies, generated game caches
 or temporary test/probe binaries remain there.
+
+## Stage 5: HUD ownership and identity-independent normalization
+
+Stage 5 starts at `a9aaa8b3ae70c7d0ac7490f0c5c181d45e663eae`. The preserved
+Windows release baseline has the Stage 4 executable hash above. This stage
+corrects an MCC compatibility-engine defect: supported interned HUD storage
+was normalized in place for each consumer, so earlier writes could become
+later consumers' input. Same-group root aliases could halve offsets, scales,
+digit advances or margins twice. Shared item storage could also inherit the
+wrong bitmap factor or frame marker. These are ownership errors, independent
+of map names, Workshop IDs or checksums.
+
+`mcc_hud_ownership.inl` plans from pristine data, identifies root aliases and
+isolates mutable block consumers before normalization. Pointer-free overlay
+and crosshair items receive snapshots even when no second HUD reference is
+visible: their storage can be interned inside a different tag allocation.
+This intentionally makes supported scalar interning independent of validator
+traversal order. It does not preserve the old order-dependent rejection of
+otherwise supported scalar storage. The actual-validator regression cases
+retain rejection of conflicting pointer-bearing/root owners and partial
+overlaps. For shared pointer-bearing prefixes, the largest original extent
+remains reachable so a copy cannot hide a conflicting tail.
+
+All snapshots finish before pointer publication. Temporary planning storage
+is freed on success and failure; copies use the existing MCC runtime arena
+and its normal teardown. The four-million-record budget is checked before
+layout recognition; bitmap geometry walks retain their existing range checks.
+No new shared-engine hook, persistent state, setting or network-version
+change is involved. Xbox and Custom Edition loading and normalization remain
+unchanged, as does the explicitly deferred shared boat fix.
+
+The first whole-converter reproduction used production structures and source
+with synthetic tag storage. Unchanged Stage 4 code failed 30 of 45 cases;
+fifteen independent-storage controls passed. A separate fixture combines the
+actual converter and actual MCC validator. Its baseline failed five cases:
+scalar-first admission, scalar-last source corruption, repeated root conversion
+and both shared-prefix orders. Eight controls passed. Replacing largest-owner
+retention with shortest-owner retention in a private mutation made both
+conflicting-tail tests fail, showing that these negative cases detect hidden
+overlaps. No original map file was modified for these reproductions.
+
+An inventory read ten installed Workshop maps in place: Ruby's Rebalanced
+`2915693904/a10`, `b40` and `d40`; Mercury `3021510694/mercury2` and
+`mercury_falling`; Cursed `2962107814/a10`; Tiny Halo `3675162225/halo`; Spasm
+`3003419983/spasm_playground`; Descent `3042265379/firefight_descent_mcc`; and
+Descent Quarantine `2963835242/firefight_descent_quarantine_mcc`. None contained
+shared roots or placement blocks within the inspected HUD graph. The inventory
+did not compare scalar addresses against every non-HUD allocation. These maps
+are unchanged-behavior controls, not claimed reproductions of the
+ownership bug. BioHalo was not installed and was not runtime-tested.
+
+The inventory contains 487 component HUDs, including 92 unit HUDs: 71 recognized
+and 21 unrecognized unit layouts. All eleven existing unit profiles were
+represented. Removing bitmap names from recognition preserved all 487 original
+classifications and introduced no recognized/unrecognized class collision in
+this sample. Private production-C visitor checks passed 100 cases comparing
+3,896 component records, including name-only changes, placement and bitmap
+registration near misses, and unterminated names. Names remain bounds-checked.
+The ten weapon/grenade profiles were already independent of bitmap names.
+
+The 21 structural profiles remain a documented compatibility exception.
+Supported anchors and scale flags do not establish the author's intended safe
+frame; the unused canvas field supplies no demonstrated replacement rule.
+Unknown layouts therefore retain the authored MCC frame. Replacing these
+profiles requires evidence distinguishing stock and custom margins, including
+near misses. This stage removes an irrelevant identity dependency without
+claiming that every pre-existing exception is now eliminated or necessary.
+
+Layout recognition now reads each distinct pristine root once. Conversion
+writes frame markers alongside the corresponding placement changes, removing
+the repeated geometry/name walk previously used to stamp recognized layouts.
+The later `mcc_tags.c` placement pass was also redundant: successful HUD
+conversion had already consumed every high-resolution placement flag it
+tested. A private comparison of the actual old and trimmed metadata functions
+restored the same arena before each call and matched every byte and return
+value across 56 cases. The retained pass still clears unsupported meter
+overlay metadata and checks the affected roots and meter blocks.
+The ten-map inventory requires 798 scalar block copies containing 935 items,
+104,732 bytes in total before arena alignment. This small added storage buys
+correct consumer ownership; no loading-time or peak-memory improvement is
+claimed. Private sources, inventories, reproduction logs and build manifests
+are retained under `build/stage5`.
+
+The first updated native probe exposed a fixture gap: `cseries.h` maps `free`
+to `debug_free`, whose contract rejects NULL. The planner's initial nullable
+free crashed before probe output. The batch stopped and its useful evidence
+was retained. Nullable releases are now guarded. Both converter fixtures
+enforce the engine's non-NULL free contract; the normalization fixture also
+fills allocations with `0xCA` and enforces the allocator's individual size
+limit. A strict private fixture fails the original planner and passes the
+correction, including bitmaps-only input and every injected planning-allocation
+failure. Final focused checks pass 579 cases, including 70 whole-normalization
+cases and 132 validator cases. Independent re-review checked the correction,
+remaining allocation bounds, ownership lifecycle, metadata trim, tests and
+documentation before the final combined checks.
+
+The final local MCC, Workshop, CE-format, protocol and neighboring harness
+selection passed 2,004 tests, with nineteen skips and the same twelve deferred
+boat expected failures. Skips cover unavailable JDK/symlink privileges,
+Linux-only checks and optional assets. Four optional real-map checks then
+passed using Ruby's `a10` and isolated CE fixtures. Direct GPU checks passed
+36 MCC meter renders and 15,360 stock ammunition renders. Documentation checks
+validated 136 local links, named routes and changed Python syntax; production
+changes are confined to the four MCC HUD/metadata files.
+
+The Windows release build passed with unchanged
+`--portable --release --pgo=off --lto=off` options and the existing Expat import
+warnings. Its executable SHA-256 is
+`3e563cd2291cb72196350e68dac471f6f5b96799164177f4ecf9309dd647893a`.
+Paired runtime comparisons, final cleanup and remote platform checks are
+recorded below when complete; these local results alone do not establish them.

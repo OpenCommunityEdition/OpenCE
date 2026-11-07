@@ -445,7 +445,24 @@ MCC HUD conversion also owns layout and texture interpretation. In
 [`mcc_hud.c`](../../port/linux/game/mcc_hud.c),
 `mcc_hud_bitmaps_prepare` converts the canvas while
 [`mcc_hud_layout.inl`](../../port/linux/game/mcc_hud_layout.inl) recognizes
-known stock layouts for the native safe margins. Replacement ammo/grenade
+known stock layouts for the native safe margins. First read
+`mcc_hud_plan_prepare` in
+[`mcc_hud_ownership.inl`](../../port/linux/game/mcc_hud_ownership.inl): it plans
+from pristine data, marks aliased roots for a single conversion, and snapshots mutable block
+consumers before publishing their pointers. For example, two overlay definitions
+sharing one authored placement must each receive the original offset and scale;
+the first conversion must not become the second one's input. Pointer-free
+items can be interned outside the HUD tree, so each consumer receives a copy.
+The later validator still rejects malformed pointer-bearing overlaps.
+Planning records are temporary; copies live in the MCC tag arena and follow
+its unload and failed-load cleanup.
+
+Layout recognition reads each distinct root once, and conversion applies the
+chosen marker alongside normalization. Bitmap names are validated but do not
+select safe margins. The retained structural profiles are a conservative
+compatibility exception: anchor and scale fields alone do not establish the
+author's intended safe frame. Their evidence and removal condition are in
+[the MCC format notes](../mcc_maps.md). Replacement ammo/grenade
 artwork can still use a stock panel layout; genuinely custom placements keep
 the wider MCC frame. `mcc_hud_weapon_frame_begin` follows the outermost
 populated parent layout, and `mcc_hud_weapon_frame_end` clears that choice.
