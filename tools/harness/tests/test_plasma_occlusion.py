@@ -8,6 +8,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, read, run
 
 
+def test_packed_texture_rows_match_scalar_conversion():
+    from harness import function
+    masks=read('port/linux/game/ammo_counter_falloff.c')
+    code='\n'.join(function(masks,name) for name in ('ammo_counter_falloff_factor','needler_falloff_factor','plasma_prong_falloff_factor'))
+    row=function(read('port/linux/game/plasma_occlusion.c'),'texture_row')
+    reference=row.replace('texture_row(', 'reference_texture_row(', 1).replace('#if defined(__SSE2__)', '#if 0')
+    status,output=run(build('plasma_texture_rows',(('under_test.inc',code+'\n'+row+'\n'+reference),)),'rows')
+    assert status==0,output
+
+
 def test_visibility_field():
     code = re.sub(r'^#include.*$', '', read('port/linux/game/ammo_counter_falloff.c') + '\n' + read('port/linux/game/plasma_occlusion.c'), flags=re.M)
     status, output = run(build('plasma_occlusion', (('under_test.inc', code),)), 'visibility')

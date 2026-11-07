@@ -189,6 +189,17 @@ be exceeded. It preserves plane crossings, ordered leaf visits and all
 surface tests. Stock callers supply no cache; model batches leave skip counts
 zero. No map data is modified, and batch cleanup clears all borrowed pointers.
 
+The shared `collision_bsp_test_vector_recursive` now iterates its tail
+continuations: a one-sided child, a prepared chain and the far side after a
+split. Only the near side needs a recursive call. This is a general engine
+optimisation under the user's shared-engine scope, rather than new lighting
+logic. It preserves the original plane arithmetic, near/far order, leaf
+results, cached state and logical depth/visit budgets. The Windows compiler
+had retained full stack frames for those tail calls. Tests compare the
+complete results and continuation state with the prior recursive form;
+negative controls omit a depth increment or use the wrong far-side interval.
+No new cache, API or map-family condition is required.
+
 `plasma_collision_depths` gathers eligible object/ray pairs using the same
 cluster, sphere and parent/child gates. The bounded pending bitsets add 96 KiB
 to synchronous batch scratch. [plasma_collision_models.c](../../port/linux/game/plasma_collision_models.c)
@@ -233,10 +244,13 @@ node's nearest depths and BSP cache, plus the engine traversal stack.
 The helpers explicitly prevent inlining: source-level separation alone allowed
 Clang to put their stack allocation back into frequent cache hits. The storage
 is temporary and render-local. Unchanged stationary targets use a flat fade loop;
-ordinary model masks and half/unit-scale radial masks use conversion loops
-without per-cell directional-profile branches. Other profiles/scales retain
-the general calculation. Tests compare every specialized output pixel against
-that calculation. Fade history below `1e-20` settles
+ordinary model masks use a flat conversion. `texture_row` converts four pixels
+together on SSE2 CPUs for half/unit-scale radial masks and angular model masks.
+It retains interpolation, admission, directional and radial multiplication
+order, exact division and square roots. Other architectures use the scalar row;
+arbitrary radial scales retain the general calculation. Tests compare every
+specialized output pixel against that calculation, including AR, Needler and
+prong profiles. Fade history below `1e-20` settles
 to zero before it can persist as subnormal floating-point values (values below
 the normal float range). This is far below an 8-bit mask step; visible fades,
 ray cadence and the simulation's floating-point mode are unchanged. The tests
