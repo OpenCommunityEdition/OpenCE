@@ -1281,6 +1281,21 @@ void weapon_build_weapon_interface_state(
 	weapon's own count read as empty rather than as whatever was there */
 	csmemset(state, 0, sizeof(*state));
 	state->heat = weapon->weapon.heat;
+	/* port: while the first trigger charges, as much of the heat its charged
+	shot adds (the second trigger's, fired as the charge is let go:
+	weapon_trigger_release_charge) as it has charged, so that the heat meter
+	fills with the charge: it showed none of it until the shot, and then
+	jumped, a plasma pistol's to full. Only the hud reads this state */
+	if (weapon_definition->weapon.triggers.count>1 && !cheat.bottomless_clip)
+	{
+		real charged = weapon_trigger_get_charged_fraction(weapon_index, 0);
+
+		if (charged>0.0f)
+		{
+			state->heat = MIN(1.0f, state->heat+charged*TAG_BLOCK_GET_ELEMENT(
+				&weapon_definition->weapon.triggers, 1, struct weapon_trigger_definition)->heat_generated_per_round);
+		}
+	}
 	state->age = weapon->weapon.age;
 	state->overheated = TEST_FLAG(weapon->weapon.flags, 0);
 	/* port: the state's magazines are the two the hud keeps on its stack,
