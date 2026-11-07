@@ -3,8 +3,8 @@
 ## Milestones and current position
 
 Updated 7 November 2026. Milestones retain the existing stage numbers, so
-"Stage 6" and "Milestone 6" refer to the same work. Stages 1–7 are complete;
-Stage 8 is in progress; Stage 9 has not started. The shared boat and console-syntax corrections
+"Stage 6" and "Milestone 6" refer to the same work. Stages 1–8 are complete;
+Stage 9 has not started. The shared boat and console-syntax corrections
 remain explicitly deferred, as distinguished from their completed investigations.
 The stage evidence below records the changes, actual validation and limits.
 
@@ -17,17 +17,20 @@ The stage evidence below records the changes, actual validation and limits.
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
 | 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
-| 8 | Investigate remaining compatibility exceptions and the Quarantine script gap. | Investigation and validation in progress |
+| 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Planned; final verification |
 
-The latest completed implementation is `f8e621acf`; its four debug platform
-builds and all three MCC CI jobs passed. Stage 7 recorded 2,108 local test passes,
-nineteen skips and twelve existing boat expected failures, four additional
-real-asset checks, exact resolver comparisons, paired Ruby/Mercury save/revert/core
-checks, four map restarts and Xbox/CE/MCC transitions. The shared console-syntax
-defect was reproduced across all three families and remains unfixed.
+The latest verified revision is `15d2ef130`, including the Linux test-fixture
+correction to implementation `99341deeb`. All four debug platforms and the
+unchanged MCC workflow inputs passed on the exact revisions recorded below.
+Stage 8 recorded 2,123 local passes, nineteen skips and twelve existing boat
+expected failures, four real-asset checks, matched Ruby/Descent/Quarantine
+runs, a two-peer Quarantine branch comparison and Xbox/CE/MCC transitions.
+All 21 structural HUD profiles remain with measured evidence and removal
+conditions. MCC protocol is 65; OpenCE remains 41. The shared console-syntax
+defect remains unfixed, as explicitly requested.
 The detailed sections distinguish these bounded checks from full compatibility.
-Seven completed milestones are not an estimate of percentage effort remaining,
+Eight completed milestones are not an estimate of percentage effort remaining,
 and do not establish that every MCC module has received the same depth of audit.
 
 All future changes remain evidence-backed, with general engine defects fixed
@@ -1281,7 +1284,8 @@ implementation, tests, integration and reader documentation were reviewed;
 no further justified changes remain within this milestone. Full campaigns,
 real-map co-op, live split-screen and physical Android/browser-map gameplay
 remain unverified by these bounded checks. Milestone 7 is complete with the
-shared console correction explicitly deferred; Milestones 8–9 have not begun.
+shared console correction explicitly deferred. At that completion point,
+Milestones 8–9 had not begun.
 
 ## Stage 8: compatibility exceptions and known gaps
 
@@ -1328,8 +1332,8 @@ extracts the current C visitor and checks every fingerprint against an
 independent bounded numeric inventory. All 670 bitmap-name controls retained
 their fingerprint. All 670 private root-anchor perturbations changed it, and
 all 495 recognized components became unknown. Original map files were opened
-read-only, and the private tag arena was compared byte-for-byte after restoring
-each mutation. The regeneration script, input identities, source hashes,
+read-only, and the private tag arena was compared byte-for-byte after all
+private mutations were restored. The regeneration script, input identities, source hashes,
 compiler invocation and per-component metadata are retained under
 `build/stage8/hud`; run `audit_profiles.py` there using the recorded stage1
 environment. These controls establish classification coverage and sensitivity,
@@ -1369,8 +1373,8 @@ authored near miss and aliased mutable blocks. Eleven stock-message cases cover
 both coordinate units, nearby positions, other anchors and erasure of a seeded
 marker. Together with the fresh all-profile audit, no material test gap was
 found that justifies duplicating all authored profile layouts in tracked tests.
-Current milestone runtime/rendering results remain pending and are recorded
-separately; classification checks alone do not validate visual intent.
+Runtime/rendering results are recorded separately below; classification
+checks alone do not validate visual intent.
 
 Remove or reduce either layout exception only after a demonstrated authored
 field or usage rule expresses the intended margin and preserves recognized
@@ -1392,3 +1396,190 @@ title policy to authored flags/alignment, without selecting Warthog Rally or a
 160-unit box. No adjacent map-name/checksum dispatch or justified selector trim
 was found in the inspected HUD/script paths. This bounded result is not a
 repository-wide audit; the broader combined review remains Milestone 9.
+
+### MCC-wide script admission
+
+The installed Quarantine map (`2963835242`, SHA-256
+`5b89b330291e7cd2a5c098b2c379aee3335e1349bc85aa1677638883b26ac8cf`)
+contains 114 scripts and 19,331 syntax nodes. Its continuous `life_lost_0`
+contains one valid, permanent, zero-argument `ai_deselect` call. Native map
+policy deliberately excludes that operation, so the previous build disabled
+the entire script. This was an MCC language-compatibility gap, not malformed
+map data or evidence that Xbox/CE's policy should change.
+
+The existing native `ai_scripting_deselect` service performs real selection
+clearing when AI is initialized, including the native debug record/idle-look
+cleanup. An eighteen-line addition to `mcc_scripts.c`, plus its private ID,
+exposes that service through the existing MCC registry and validator. It adds
+no persistent state, save fields, shared hook, map-name selector or no-op.
+Existing loaded-MCC guards and unload ownership apply. Xbox/CE's allowlist,
+adjacent `ai_select` refusal and client console authority remain unchanged.
+
+MCC protocol advances from 64 to 65 because previously disabled authored
+gameplay now executes. OpenCE stays at 41; packet layouts and the camera
+envelope versions remain unchanged. The composed admission regression compiles
+the complete actual server dispatcher and both envelope implementations:
+MCC 64 is refused before the ordinary join handler with or without a camera
+wrapper; MCC 65 reaches it with MCC capability. Camera-only requests do not
+gain MCC access, and legacy control joins retain their path. Removing the
+inner revision check makes the negative control fail. This routing harness
+uses an observed join sink; separate existing actual-handler tests cover
+decoding, tokens, bans, slots and session authorization.
+
+Four focused resolver/admission cases failed before the adapter and pass
+afterward. The final focused selection passed 121 checks, including real-source
+native clearing and inactive-AI behavior, malformed calls, unload guards,
+unchanged native/client policy and three deliberate-fault controls. The combined
+review found no further necessary production change or justified HUD trimming.
+It reviewed the final implementation, integration, tests and reader guides;
+no shared `source/` implementation changed in this milestone.
+
+### Runtime and local validation
+
+The reviewed Windows release builds with the unchanged portable/release,
+PGO-off/LTO-off configuration. Its SHA-256 is
+`816055002eeb8f5434ec78d5dad817e5397d443e8ccb58e66d9d852e755cafbb`;
+existing Expat import warnings remain. The local regression selection passed
+2,123 tests, with nineteen skips and the twelve unchanged strict boat expected
+failures. Four additional real MCC/CE reader/resource checks passed.
+
+Matched baseline/current standalone runs on Workshop Ruby B40, Descent and
+Quarantine each advanced at least 1,800 ticks and produced a fresh complete
+capture. Baseline Quarantine deliberately records `passed=false` for its exact
+script refusal, despite completing the observation; the current run has no such
+refusal. The other five runs pass and all six exit normally. Visual inspection
+found coherent scenes and no apparent HUD placement/clipping regression in
+these views. Ruby used 640x480 and Descent 1280x720; this is bounded rendering
+evidence, not pixel-identical animation or proof of all authored layout intent.
+
+The baseline/current two-peer Quarantine comparison used separate saves and
+authenticated host consoles. Both runs first established real cooperative mode,
+two living players, fresh simulation, completed authored introduction, untouched
+start device (`game_started=false`), positive lives and false end/cinematic
+flags. The only assigned scenario value was `lives=0`, with immediate readback.
+The baseline still had false end/cinematic flags after 1,000 additional ticks.
+The current host reached `game_ended` at logged tick 1,770, the unique authored
+`one_time_cinematic` marker at 2,640 and continued to 2,730. Source inspection
+places `ai_deselect` after that unique marker and `ai_erase_all`, without an
+intervening sleep.
+Both peers continued and exited normally. This demonstrates the authored branch
+after condition injection, not player death, life decrement, a full campaign
+or a full synchronization verdict.
+
+Two earlier baseline setup failures are retained. The first lacked stock
+Carousel, which native network fast setup loads before choosing the requested
+MCC map; adding one verified private input copy resolved that prerequisite.
+The second stopped waiting for a living second player at 45 seconds. Quarantine's
+authored co-op introduction lasts 1,430 ticks, and native cooperative spawning
+holds extra players during a cinematic. A 75-second wait accommodates that
+existing behavior. Neither failure required a production change or was relabeled
+as a gameplay pass.
+
+One current process traversed Mercury Falling, Xbox Blood Gulch, CE Death Island,
+a bounded invalid MCC fixture and Ruby A10. All four valid phases produced a
+fresh tick epoch, 150 further ticks and a complete capture. The invalid map was
+refused, returned to the menu and did not prevent the subsequent MCC load.
+Visual inspection confirmed coherent scenes and the native HUD where visible;
+Mercury and Ruby were cinematic views. The process exited normally and its
+unique invalid fixture was removed after containment/content checks.
+
+The newly reached authored `garbage_man` calls the existing native
+`rasterizer_decals_flush` operation, whose documented effect is to flush all
+decals. The current branch emits two permanent-decal deletion diagnostics during
+that operation, before `ai_deselect`. Source inspection traces them through the
+native cache flush and decal deletion callbacks; removal is consistent with
+the command's stated effect, while permanent bookkeeping/logging remains
+inconsistent. These are the only new unique error/warning classes in the
+baseline/current branch comparison, on the host; no new client class appears.
+They are explicitly retained findings, not an assertion that the logs are clean.
+A separate baseline control waited 1,800 ticks, called only authored
+`garbage_man`, then advanced another 150 ticks. Neither diagnostic existed
+before that call; both appeared once afterward, reproducing the same native
+behavior without the new adapter. The control completed and exited normally,
+while retaining `passed=false` for the baseline's original script refusal.
+No shared decal implementation was changed. Repeated flush bookkeeping and
+longer-term rendering effects remain outside this bounded attribution test.
+Independent verification covers twelve sessions and sixteen stopped processes,
+with no forced termination or nonzero exit. It checks executable/map identity,
+settings, ordered commands and response frames, tick epochs, complete captures,
+all log sinks, actual failure verdicts and diagnostic inventories. Fourteen
+isolated negative controls reject altered outcomes, identities, missing responses
+with echoes retained, hidden fatal messages, missing transitions, partial captures
+and an incomplete flush control. `archive_ready` means evidence integrity and
+inactive processes; it does not turn a known refusal or warning into a pass.
+
+No old-checkpoint migration is established:
+a checkpoint created when a continuous script had been disabled is not proven
+to acquire its missing thread on restore. The supported admission path being
+tested here is a fresh map load. Shared console-syntax and boat corrections
+remain explicitly deferred; Milestone 9 has not begun.
+
+### Platform validation
+
+The [MCC workflow](https://github.com/chestahh/GulchCE/actions/runs/42399542277)
+passed on implementation revision `99341deebf53cafdb82c9c901dfa31091a7b85a0`,
+attempt 1: 1,796 Linux reader/validator passes with sixteen skips, 38 separate
+ASan/UBSan preview checks, 2,037 Windows adapter passes with seventeen skips
+across invocations, and 36 software-GL meter renders.
+
+The initial Build workflow exposed one Linux compilation failure in the new
+camera admission test: its helper had static linkage after a public external
+declaration. Windows' MSVC-target compiler had accepted it. The one-word fixture
+correction matches that header; no production code or runtime binary changed.
+Ten targeted camera/MCC protocol checks passed after correction, and a
+Linux-target front-end control reproduces the old error and accepts the fix.
+The original failed job/logs remain in the evidence.
+
+The [corrected Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42400612375)
+passed all four debug platforms on `15d2ef13096751ba266d8845f18b4caae2f217e8`,
+attempt 1. Linux's nine invocations totalled 2,824 passes and 52 skips, with
+the twelve existing boat expected failures and seven passing subtests.
+Windows storage/linkage checks, Android guest/host/debug-APK and importer/input
+checks, and web Node/page/startup and Chromium/Firefox native WebRTC checks
+passed, including configured packet-loss transport controls. These are not
+full real-map internet/co-op or physical-device gameplay qualification. The
+main-only release job was skipped; Windows release was validated locally.
+
+The repair changes only the camera fixture; exact revision comparison proves
+production, MCC workflow YAML and its test inputs unchanged. That file is
+outside the MCC workflow's path filters and invocations, so its earlier green
+result is reported on its actual revision rather than attributed to the repair.
+Overlapping job counts are not unique test totals. Complete logs, revision and
+attempt metadata, the original failure, revision proof and artifact metadata
+are retained under `build/stage8/ci`. All six Build artifact upload digests
+match their logs; binaries were not downloaded or independently rehashed.
+
+### Final review, cleanup and completion
+
+The final combined Stage 8 implementation, integration, tests and documentation
+were reviewed before the required checks. The CI-discovered fixture correction
+was reviewed and its affected local/platform checks rerun. The final document
+check validates 170 local links, eight named symbols, Python syntax and the
+MCC-owned production boundary. No additional code change or speculative
+profile trimming is justified by this milestone's evidence.
+
+All sixteen owned game processes exited normally. Their 96 generated map
+caches, totalling 12,280,922,112 bytes, were removed after each attempt. The
+462 inactive save/support/capture files (490,433,888 bytes) were archived
+losslessly to `build/stage8/inactive-runtime-evidence.zip` (38,048,459 bytes).
+Every archive member and loose file was hash-verified before loose removal;
+the manifest records original paths. Cleanup removed another 439,092,050 bytes
+of disposable fixtures, generated bytecode and seven private input copies.
+All 26 original map/resource inputs, including the full seventeen-map HUD audit
+corpus, were rehashed unchanged after cleanup. No generated map caches remain.
+
+The cleanup gate checks session result and supporting-evidence hashes, resolved
+path containment, linked ancestors and process identity. Windows reused one old
+test PID for an unrelated application process; cleanup first refused it, then
+verified its different executable and later creation timestamp without stopping
+that process. Both failed preflight logs and the identity proof remain available.
+Thirty-two private cleanup safety controls passed. About 79 MB remains under
+`build/stage8`, chiefly the 38 MB verified archive, 27 MB baseline build, CI logs
+and reproducible metadata/source evidence. The current Windows release remains
+usable under `build/windows`.
+
+Milestone 8 is complete. Its remaining limits are explicit: no full campaign,
+full multiplayer synchronization, old-checkpoint migration, live split-screen,
+physical Android or browser-map gameplay qualification; no correction of the
+shared boat, console-syntax or native flush bookkeeping behavior. Milestone 9
+has not begun.
