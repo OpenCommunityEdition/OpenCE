@@ -148,6 +148,10 @@ The verdict checks debug, console, stdout and stderr diagnostics. Cache and
 executable cleanup require observed child exit; uncertain shutdown retains
 the outputs and stops subsequent cases so they can be investigated safely.
 
+[Milestone 10](../mcc_refactor_validation.md#milestone-10-shared-co-op-checkpoint-recovery)
+tracks the planned shared co-op recovery investigation, compatibility decision
+and required regression evidence. Its proposed checks are not completed tests.
+
 ## Work through a suspected movement regression
 
 Suppose a player unexpectedly falls through an elevator. First record the

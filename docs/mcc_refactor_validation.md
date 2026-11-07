@@ -6,7 +6,8 @@ Updated 7 November 2026. Milestones retain the existing stage numbers, so
 "Stage 6" and "Milestone 6" refer to the same work. Stages 1–8 are complete;
 Stage 9's combined review, testing and cleanup are complete. Ruby co-op
 recovery failed on both original main and current, so its compatibility
-sign-off remains withheld.
+sign-off remains withheld. Shared co-op checkpoint recovery is now planned
+as Milestone 10; implementation has not started.
 The shared boat and console-syntax corrections remain explicitly deferred,
 as distinguished from their completed investigations.
 The stage evidence below records the changes, actual validation and limits.
@@ -22,6 +23,7 @@ The stage evidence below records the changes, actual validation and limits.
 | 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; Ruby co-op recovery sign-off withheld |
+| 10 | Diagnose and correct shared co-op checkpoint recovery while preserving OpenCE crossplay. | Planned; establish the root cause and compatible repair strategy first |
 
 The latest verified implementation revision is `f25c4886a`, with fresh passing
 MCC and four-platform debug workflows. Stage 9 recorded 2,193 local passes,
@@ -132,6 +134,55 @@ under the standing OpenCE-crossplay constraint. This exception is recorded,
 not silently accepted or converted into a passing check. Final documentation
 and cleanup are complete. Findings and coverage are recorded in
 [Stage 9 evidence](#stage-9-combined-review-and-extended-validation).
+
+### Milestone 10: shared co-op checkpoint recovery
+
+Follow up the [Stage 9 recovery finding](#saves-restarts-and-co-op-findings):
+after a team-wipe revert, Ruby B40's host has a living player unit while its
+connected client lacks the corresponding player-unit binding. The failure
+reproduces on original main and current in the OpenCE Crossplay profile.
+Reusing a restored object's identifier while the client retains its dead
+version is a suspected mechanism, not yet a confirmed per-object diagnosis.
+This milestone is planned shared-engine work arising from MCC validation;
+it is separate from the explicitly deferred console-syntax lifetime defect.
+
+1. **Establish the cause.** Trace checkpoint restoration, authoritative object
+   descriptions, client object replacement and player attachment in
+   `network_coop`, `network_objects` and `network_distributed`. Capture object
+   identifiers, lifetime, inventory and player ownership across the failure.
+   Add a minimal regression exercising the real implementation and retain
+   Ruby as the runtime reproduction. Compare original and current behavior
+   without weakening the strict judge or discarding failed observations.
+2. **Establish a compatible repair.** Evaluate the recovery extensions behind
+   the GulchCE Third Person session profile as evidence, not a proven remedy.
+   Correct the responsible shared engine contract where demonstrated; preserve
+   Xbox/CE/MCC ownership, host authority and OpenCE crossplay. Validate object
+   descriptions before replacing client state. Correct supported behavior
+   must not require enabling a cosmetic feature. Review messages, simulation
+   agreement and required version separation before implementation. If a
+   repair cannot preserve the standing compatibility contract, record the
+   unresolved dependency on compatible upstream support or an explicit change
+   of scope; do not broaden profile guards or add a map-specific bypass.
+3. **Validate the resulting behavior.** Demonstrate failure before and recovery
+   after the fix, including actual player reattachment and restored inventory,
+   not only a successful load. Cover repeated team wipes and checkpoint
+   reverts, ordinary co-op, join/rejoin, map/session transitions and failed-load
+   cleanup, plus stale/malformed descriptions and unaffected live objects.
+   Use Ruby's Rebalanced, Mercury and representative Xbox/CE paths,
+   both host directions, and matching/mixed builds where their contracts
+   permit. Check the existing optional profile as well as default Crossplay.
+   Run affected regression suites, all required platform builds and native/web
+   transport checks. Validate claims of OpenCE crossplay against an identified
+   upstream executable on the map families/contracts it supports; a
+   main/current GulchCE pair alone is insufficient.
+
+Complete the repair only when its root cause and compatibility strategy are
+established, the combined implementation is reviewed, and applicable checks
+pass with evidence and cleanup recorded. An investigation ending in a
+compatibility-dependent deferral leaves the repair milestone open and Ruby's
+recovery sign-off withheld. Stage 9's historical failures remain recorded.
+Adding this milestone schedules the work; it does not begin implementation
+or relax the existing crossplay and isolation requirements.
 
 ### Explicitly deferred: unconditional shared boat fix
 
