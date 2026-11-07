@@ -116,7 +116,7 @@ static int mcc_checkpoint_units(void const *image, void const *current,
         struct object_header_datum const *object;
         if (index >= (unsigned)array->count) return 0;
         object = headers + index;
-        if ((uint16_t)object->identifier != (uint16_t)(handle >> 16) ||
+        if (!(uint16_t)object->identifier || (uint16_t)object->identifier != (uint16_t)(handle >> 16) ||
             object->type >= 32 || !(_object_mask_unit & (1u << object->type)) ||
             !mcc_checkpoint_incoming(image, current, used, object->datum, sizeof(struct object_datum)) ||
             (record[4] && mcc_grenades_type_count() < 3) ||

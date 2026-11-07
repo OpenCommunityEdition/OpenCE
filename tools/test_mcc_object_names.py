@@ -24,8 +24,10 @@ def names_tool(tmp_path_factory):
         "object_set_object_index_for_name_index", "object_index_from_name_index",
         "object_name_list_clear", "object_name_list_new", "object_claim_scenario_name",
         "object_name_list_delete", "object_name_list_lookup"))
+    unload = function((game / "mcc_cache.c").read_text(), "mcc_cache_tags_unload")
     source = (ROOT / "tools/harness/tests/mcc_object_names.c").read_text()
     source = source.replace("/* IMPLEMENTATION */", implementations + "\n" + hooks)
+    source = source.replace("/* CACHE_UNLOAD */", unload)
     (work / "names.c").write_text(source)
     output = work / ("names.exe" if os.name == "nt" else "names")
     target = (["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if os.name == "nt" else ["-m32"])
@@ -36,7 +38,16 @@ def names_tool(tmp_path_factory):
     return output
 
 
-@pytest.mark.parametrize("case", ["legacy", "boundary", "aliases", "maximum", "network", "invalid", "bsp"])
+@pytest.mark.parametrize("case", ["legacy", "boundary", "aliases", "maximum", "network", "invalid", "bsp",
+                                  "restart", "unload", "failed_unload"])
 def test_names(names_tool, case):
+    result = subprocess.run([str(names_tool), case], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("count", [513, 640, 32767])
+@pytest.mark.parametrize("invalid", [False, True], ids=["roundtrip", "invalid"])
+def test_name_snapshots(names_tool, count, invalid):
+    case = ("invalid_snapshot_" if invalid else "snapshot_") + str(count)
     result = subprocess.run([str(names_tool), case], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr

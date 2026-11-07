@@ -531,7 +531,8 @@ valid and malformed CE inputs, resource dependencies and conversion cases.
 [test_mcc_cache_format.py](../../tools/test_mcc_cache_format.py) checks the
 independent MCC reader, including invalid ranges.
 [test_mcc_checkpoint.py](../../tools/test_mcc_checkpoint.py) addresses another
-boundary: saved state and native hooks. These were inspected, not run here.
+boundary: saved state and native hooks. Actual validation and its limits are
+recorded in the [refactor evidence](../mcc_refactor_validation.md).
 
 See the [MCC implementation reference](../mcc_maps.md) for its boundaries.
 Recognition, conversion, loading, reaching gameplay, crossing a
@@ -601,8 +602,14 @@ those require a real game run with local assets.
 ## MCC script and animation compatibility
 
 [`mcc_scripts_prepare`](../../port/linux/game/mcc_scripts.c) links MCC
-script names to native services or MCC-owned adapters. `debug_score` gets
-ordinary map-local long-integer storage, like the existing `developer_mode`
+script names to native services or MCC-owned adapters. Its private
+`mcc_script_resolve` also serves `mcc_script_find`, keeping one name mapping.
+Preparation runs before MCC activation and permits native fallback; runtime
+lookup retains its loaded-MCC and null-name guards. A recognized alias such as
+`player_effect_set_max_vibrate` resolves only its canonical rumble target. If
+that target is missing, it must not fall back to a native function under the
+original alias. Existing native tables and unsupported-name refusals remain.
+`debug_score` gets ordinary map-local long-integer storage, like the existing `developer_mode`
 adapter; it does not grant developer access or change multiplayer scores.
 [`mcc_campaign.c`](../../port/linux/game/mcc_campaign.c) implements
 `players_on_multiplayer_team` by selecting living player units on the requested
@@ -641,6 +648,17 @@ array and original bytes. Xbox/CE stack layouts and capacities are unchanged.
 The interpreter needs only array-selection and stack-end hooks; the save system
 provides a read-only arena-bounds accessor.
 
+[`mcc_script_parameters.c`](../../port/linux/game/mcc_script_parameters.c)
+retains validated signatures and lexical owners, not live argument values.
+`mcc_parameters_prepare` clears publication counts before preparing metadata;
+failed preparation and cache unload clear them again. Live arguments, recursion
+and sleeping calls remain in each saved stack through
+[`mcc_script_runtime.inl`](../../port/linux/game/mcc_script_runtime.inl).
+`mcc_hs_release_thread` releases parameter-held object lists on cancellation,
+thread deletion and overflow; normal returns use `mcc_hs_release_arguments`.
+The [runtime tests](../../tools/test_mcc_parameters.py) cover recursion, sleep,
+cancellation and overflow.
+
 Follow `mcc_checkpoint_capture`, `mcc_script_threads_validate`, and
 `mcc_script_threads_restore` for saves and the host's co-op revert image.
 Validation checks array and frame bounds before accepting pointers. Old inline-stack checkpoints
@@ -650,6 +668,28 @@ are not transmitted as a new message. This does not permit clients to submit
 scripts or authoritative state. Asset-free coverage is in
 [`test_mcc_script_threads.py`](../../tools/harness/tests/test_mcc_script_threads.py);
 runtime race progress and pickup behavior require the actual maps as well.
+
+`game_state_image_accept` in
+[`game_state.c`](../../source/saved%20games/game_state.c) calls MCC preflight
+before copying the saved image over live state. `mcc_checkpoint_units` in
+[`mcc_checkpoint.c`](../../port/linux/game/mcc_checkpoint.c) requires a nonzero
+object identifier as well as matching salt, unit type and bounded storage.
+For example, deleting slot 0 while slot 1 remains live leaves a valid native
+array with an unused first slot. A CRC-correct grenade record with handle zero
+must still be refused: matching zeroes do not identify a live unit. The
+[checkpoint tests](../../tools/test_mcc_checkpoint.py) exercise the real native
+lookup and grenade restore, checking refusal before live bytes or names change,
+alongside a valid saved-unit control.
+
+A separate shared syntax-lifetime defect remains unresolved. A core save made
+inside a sleeping temporary console expression can retain its thread after
+the expression finishes and its syntax nodes are collected. Loading that core
+then restores references to expired nodes. Baseline native runs reproduced the
+assertion on Xbox Blood Gulch, CE Death Island and MCC Ruby B40; an isolated
+proof using the actual interpreter and collector confirms the lifetime mismatch.
+Permanent scenario expressions and standalone-save controls remain distinct.
+No correction to this shared behavior or networking contract is included here;
+see the [investigation and limits](../mcc_refactor_validation.md).
 
 Halo Kart also exposes seated passengers attempting to find a danger-avoidance
 destination, which the native position selector disallows. Follow

@@ -52,6 +52,28 @@ def test_mcc_script_linking(scripts_tool, case):
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.parametrize("name,index", [
+    ("objects_distance_to_object", 0x7000), ("mcc_mission_segment", 0x7001),
+    ("core_save_name", 0x7002), ("player_add_equipment", 0x7003),
+    ("abs_integer", 0x7004), ("get_executing_running_thread", 0x7005),
+    ("kill_thread", 0x7006), ("player_effect_set_max_vibrate", 322),
+    ("physics_set_gravity", 0x7010), ("sleep", -1), ("unknown_script_name", -1),
+])
+@pytest.mark.parametrize("spelling", [str.lower, str.upper, str.title], ids=["lower", "upper", "mixed"])
+def test_mcc_preparation_and_runtime_resolution(scripts_tool, name, index, spelling):
+    result = subprocess.run([str(scripts_tool), "resolver", spelling(name), str(index)],
+                            capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("name", ["player_effect_set_max_vibrate", "PLAYER_EFFECT_SET_MAX_VIBRATE",
+                                 "Player_Effect_Set_Max_Vibrate"])
+def test_mcc_missing_alias_target_does_not_use_native_alias(scripts_tool, name):
+    result = subprocess.run([str(scripts_tool), "resolver_missing_alias", name, "-1"],
+                            capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_mcc_authoritative_game_speed(native_mcc_harness):
     result = subprocess.run([str(native_mcc_harness("mcc_game_speed"))], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr

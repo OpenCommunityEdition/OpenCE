@@ -4,7 +4,7 @@
 
 Updated 7 November 2026. Milestones retain the existing stage numbers, so
 "Stage 6" and "Milestone 6" refer to the same work. Stages 1–6 are complete;
-Stage 7 is next. Stages 7–9 remain planned and have not started.
+Stage 7 is undergoing final validation. Stages 8–9 have not started.
 The stage evidence below records the changes, actual validation and limits.
 
 | Milestone | Scope and outcome | Status |
@@ -15,7 +15,7 @@ The stage evidence below records the changes, actual validation and limits.
 | 4 | Replace repeated per-texture stream scans with a local per-tag cursor. | Complete |
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
-| 7 | Audit scripts, campaign/checkpoint state and lifecycle ownership; implement justified corrections and cleanup. | Planned; investigation first |
+| 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Final validation in progress; shared console lifetime fix deferred |
 | 8 | Investigate remaining compatibility exceptions and the Quarantine script gap. | Planned; evidence required |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Planned; final verification |
 
@@ -64,7 +64,9 @@ explicit when evaluating a change.
 Stage 6 also retained a baseline assertion when a checkpoint captured a
 sleeping temporary console expression. Investigate that expression's syntax
 lifetime separately from CRC validity; the recorded standalone-save controls
-pass. This finding is queued here, not an implemented Stage 7 correction.
+pass. Stage 7 reproduced this on Xbox, CE and MCC and isolated a shared
+syntax-lifetime defect. Its correction is explicitly deferred pending a shared
+save/ownership design; see [Stage 7 evidence](#stage-7-scripts-and-state-lifecycle).
 
 Complete when reviewed paths and ownership rules are recorded, demonstrated
 defects/redundancy are addressed within scope, and affected save/revert,
@@ -1080,3 +1082,121 @@ confined to four MCC-owned files, with no shared-source, vendor, build-graph,
 protocol or map changes. The combined review found no further justified change
 within this milestone. Final evidence records both successful checks and the
 retained baseline finding; Milestone 6 is complete.
+
+## Stage 7: scripts and state lifecycle
+
+Stage 7 starts from `42176d5423cf6430b29ac39549a034a8feebb7bd` in the same
+dedicated worktree. The preserved Windows release has SHA-256
+`5f3f449c13fddf4198157bd94fed9cdc1fad02290ec34d966c3d420d0aa998c7`.
+The initial checkpoint, campaign, names, progress, scripts, syntax and thread
+selection passed 229 tests before production edits. Private commands, extracted
+sources, logs and hashes are retained under `build/stage7`.
+
+### Justified changes and boundaries
+
+Two production files change, both MCC-owned. No map name, package ID, checksum
+or asset fingerprint selects either behavior. No shared hook, native Xbox/CE
+implementation, serialized format, network message or protocol version changes.
+OpenCE version 41 and MCC protocol 64 remain unchanged: valid resolution and
+checkpoint behavior are preserved; the correction rejects malformed saved data.
+
+[`mcc_scripts.c`](../port/linux/game/mcc_scripts.c) had two copies of seven
+MCC function mappings, the vibration alias and campaign fallback. The private
+`mcc_script_resolve` now owns that mapping. Preparation still runs before MCC
+activation and may use native fallback; public runtime lookup retains its
+loaded-MCC/null guard and does not gain fallback. A recognized vibration alias
+whose rumble target is absent still returns `NONE`, even if the native table
+contains the original alias. Thirty-six source-based before/after traces match
+exactly, including function IDs, rewritten call/predicate IDs, refusal and lookup
+counts. The scripts/parameters/syntax selection passed 188 checks before and
+after. This removes duplicate maintenance and drift risk; no game-speed or
+frame-time improvement is claimed.
+
+[`mcc_checkpoint.c`](../port/linux/game/mcc_checkpoint.c) now rejects a zero
+object identifier in `mcc_checkpoint_units`. Native `datum_try_and_get` treats
+an identifier of zero as an unused slot. A freed header can retain a bounded
+datum pointer and unit type; matching a saved handle's zero salt therefore
+does not establish a live unit. The old MCC preflight allowed that record
+through. Native `game_state_image_accept` then copied the incoming image and
+MCC names before the real grenade restore rejected it. This is an MCC
+checkpoint-admission defect; fixing its preflight benefits every MCC checkpoint
+using the format and requires no native change.
+
+The new regression extracts the real native array layout, array validation,
+datum deletion/lookup and grenade snapshot/restore. It deletes slot 0 while
+slot 1 remains live, producing a legal high-water count of two and one active
+entry, then recomputes both MCC CRCs. On the old code, generic validation and
+MCC preflight succeeded, acceptance failed, and live bytes/names changed;
+campaign restoration was not reached. The focused baseline had 59 passes and
+that one intended failure. With the one-condition fix, the malformed image is
+refused before copying anything, while a valid salted unit restores normally.
+Stale-salt and out-of-range-pointer controls also pass. Checkpoint, grenades and
+thread checks passed all 105 cases. Names/campaign and unrelated pool validation
+remain adapters in this fixture; this is not a claim to validate every native
+checkpoint allocation or every runtime state.
+
+### Ownership reviewed and retained
+
+The combined review examined the following routes before final checks. Sound
+code was retained where removing it would lose an established contract or where
+no practical benefit was demonstrated.
+
+| Owner and route | Retained contract and evidence |
+| --- | --- |
+| `mcc_scripts_prepare`, `mcc_script_find`, `mcc_script_call_valid` | Preparation and guarded runtime resolution have different fallback rules. Unsupported names and malformed calls still refuse. Exact resolver traces and scripts/syntax tests cover the changed route. |
+| `mcc_parameters_prepare`, `mcc_hs_release_arguments`, `mcc_hs_release_thread` | Prepared signatures/lexical owners are separate from live saved stack arguments. Publication counts clear on preparation failure/unload; return, cancellation, deletion and overflow release held object-list references. Existing recursion/sleep/overflow tests are retained. Full-capacity local-global reuse is not established by this audit. |
+| `mcc_script_threads_prepare`, `mcc_hs_threads_activate`, `mcc_script_threads_dispose` | Reserved CPU storage owns extended frames; disposal restores the previous array and arena bytes before releasing MCC storage. Save-version bridges and address checks remain necessary. Thread lifecycle and checkpoint tests exercise these contracts. |
+| `mcc_checkpoint_validate`, `mcc_checkpoint_restore` | Pre-copy validation and post-copy restoration are separate responsibilities. Preserve format/version, fixed saved-pointer addresses, CRC and bounds checks; the unused-unit correction closes one demonstrated preflight gap without a speculative transaction rewrite. |
+| `mcc_campaign_validate`, `mcc_campaign_restore`, `mcc_campaign_dispose` | Validate the full supported snapshot before publishing campaign fields; restore owned engine globals and effects at lifecycle boundaries. Existing snapshot-version and malformed-state coverage remains. |
+| MCC effects, game speed and progress | Keep host authority, reliable host-packet/size/stale-tick checks, map-owned restoration and progress journal's valid-prefix recovery with refusal to append after corruption. Inspection did not establish safe further trimming. |
+| `mcc_object_names_*`, native name dispatch, `mcc_cache_tags_unload` | Extended names activate only for MCC scenarios beyond the native 512-name table. Deletion must scan aliases even for an object whose native name is `NONE`; checkpoint restoration intentionally restores mappings while restart/unload clears them. |
+
+Named-object coverage grew from seven to sixteen passing cases. It checks
+complete snapshots at 513, 640 and 32,767 names, output sentinels, refused
+null/length restores preserving mappings, unnamed aliases, native restart
+clearing, repeated unload, and partial cleanup with the loaded flag already
+false. Four private negative controls caused nine expected failures while two
+unaffected controls stayed green. The actual cache-unload function is extracted,
+but other owners are inert there; the loader's failure funnel was source-reviewed.
+These tests do not replace the native transition checks or prove network play.
+
+### Shared console syntax finding: investigated, fix deferred
+
+Three baseline runs reproduced an accepted core load followed by an expired
+script-node assertion: Xbox Blood Gulch, CE Death Island and Ruby's Rebalanced
+`b40`. Each saved inside a sleeping temporary console expression, let that
+expression finish, waited externally through at least two collection
+opportunities, then loaded the core. The assertions and abnormal exits are
+retained as defect reproductions, never counted as passing gameplay checks.
+
+Native `hs_runtime_initialize` stores threads in saved CPU state; MCC extended
+threads use their reserved saved arena. Temporary console syntax lives outside
+that saved state. `hs_thread_main` deletes a completed console thread, and
+`hs_runtime_update` later runs `hs_node_gc`, which removes nonpermanent nodes.
+Restoring the saved thread can therefore restore references to already-collected
+syntax. A ten-case private proof uses the actual allocator, interpreter,
+collector and MCC thread capture/restore. Native and MCC fail after collection,
+with or without slot reuse, but resume the sleeping expression before collection.
+Permanent scenario nodes and completed standalone commands are controls. Parser,
+core admission and networking are outside that isolated proof; the native runs
+establish the real admission/assertion sequence.
+
+This is a shared engine ownership defect, not an MCC-only compatibility need.
+Discarding all saved console threads would also remove working replay behavior;
+retaining all temporary nodes would consume the bounded syntax pool. A correct
+fix needs a defined shared lifetime/admission design for syntax and strings,
+saved-image compatibility, and comparison with upstream OpenCE's checkpoint
+contract. No network-version requirement has yet been established by this
+investigation. Preserve the user's crossplay requirement while resolving those
+questions; do not introduce an MCC-only bypass or claim the defect is fixed.
+The scoped investigation is complete, and that shared correction is explicitly
+deferred. The evidence needed to reopen it is a reviewed ownership design with
+legacy/MCC replay, collection, slot reuse, save compatibility and relevant peer
+agreement tests. It is separate from Milestone 8's compatibility exceptions.
+
+### Final validation and completion
+
+The combined production/test/reader-guide review found no further justified
+change within this milestone. Windows release, broad regression, real Workshop
+lifecycle checks, platform CI and cleanup results are being recorded here before
+completion.
