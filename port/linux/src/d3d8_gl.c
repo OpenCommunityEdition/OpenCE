@@ -590,6 +590,8 @@ struct program_entry
 	/* nv2a_pixel_shader_key's source_blend's color, and what it last had */
 	GLint blend_constant;
 	float blend_constant_value[4];
+	/* nv2a_pixel_shader_key's hdr_alpha_clamp's pass (alpha_clamp_begin) */
+	GLint alpha_clamp_pass;
 	/* the lights of a draw lit for each pixel (XGPU_MODEL_LIGHT_COUNT), and
 	constants_serial at their last upload */
 	GLint model_lights;
@@ -2056,6 +2058,10 @@ stops being multisampled. */
 /* the samples a pixel of the bound targets: their renderbuffers' (or 1) */
 static int target_samples = 1;
 
+/* the bound color target holds values past one (display.hdr's half-float
+back buffer), which no blend clamps */
+static BOOL target_unclamped;
+
 /* the multisampled pixels of a target drawn into since into its texture */
 static void render_target_resolve(struct xgpu_render_target *target)
 {
@@ -2201,6 +2207,7 @@ static BOOL bind_targets(BOOL *has_depth)
 		state_framebuffer(framebuffer_get(color ? color->target.texture : 0, depth ? depth->target.texture : 0));
 		target_samples = 1;
 	}
+	target_unclamped = color && color->target.format == GL_RGBA16F;
 	*has_depth = depth != NULL;
 	return TRUE;
 }
@@ -4007,6 +4014,7 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	entry->height_fade = glGetUniformLocation(entry->program, "height_fade");
 	entry->depth_bias = glGetUniformLocation(entry->program, "depth_bias");
 	entry->blend_constant = glGetUniformLocation(entry->program, "blend_constant");
+	entry->alpha_clamp_pass = glGetUniformLocation(entry->program, "alpha_clamp_pass");
 	entry->model_lights = glGetUniformLocation(entry->program, "model_lights");
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
@@ -4931,6 +4939,122 @@ static unsigned long model_light_register(int light)
 	return (unsigned long)(XGPU_VERTEX_CONSTANT_BIAS + (light ? -80 + light : -82));
 }
 
+/* ---------- display.hdr's alpha */
+
+/* The game keeps values of its own in the back buffer's alpha: the
+reflections of the environment take it as their mask (the mask pass
+multiplies the lightmap's into it; the reflection pass adds the cube map
+times it). The Xbox's back buffer held 8 bits a channel, so a blend left
+alpha at one at most; display.hdr's half-float back buffer does not stop
+it. A blend that can leave it past one, the double multiply (destination
+times twice the source: decals, a vehicle's tread marks many to a patch of
+snow, whose bitmaps' alpha is one), doubled it with each decal laid over
+another, and the snow's reflection under them was drawn that many times as
+bright. So such a draw (prepare_draw's key, hdr_alpha_clamp) is drawn
+again after itself, its program's alpha_clamp_pass set, the fragment one,
+with GL_MIN into the alpha alone, nothing else written: alpha stops at one,
+as on the Xbox; the colors keep the light past white. The location of the
+draw's program's alpha_clamp_pass, or -1: drawn once. */
+static GLint alpha_clamp_uniform = -1;
+
+/* a blend factor's alpha, of the source's and the destination's alphas and
+the blend color's */
+static float blend_factor_alpha(DWORD factor, float source, float destination, float constant)
+{
+	switch (factor)
+	{
+	case D3DBLEND_ZERO: return 0.0f;
+	case D3DBLEND_SRCCOLOR: case D3DBLEND_SRCALPHA: return source;
+	case D3DBLEND_INVSRCCOLOR: case D3DBLEND_INVSRCALPHA: return 1.0f - source;
+	case D3DBLEND_DESTCOLOR: case D3DBLEND_DESTALPHA: return destination;
+	case D3DBLEND_INVDESTCOLOR: case D3DBLEND_INVDESTALPHA: return 1.0f - destination;
+	case D3DBLEND_CONSTANTCOLOR: case D3DBLEND_CONSTANTALPHA: return constant;
+	case D3DBLEND_INVCONSTANTCOLOR: case D3DBLEND_INVCONSTANTALPHA: return 1.0f - constant;
+	default: return 1.0f; /* (D3DBLEND_ONE, and D3DBLEND_SRCALPHASAT's alpha) */
+	}
+}
+
+/* whether an added blend can leave alpha past one, the source's and the
+destination's no more than one (each factor's alpha is at most of second
+order in them, so a grid of quarters finds its largest) */
+static BOOL blend_alpha_past_one(DWORD source_factor, DWORD destination_factor, float constant)
+{
+	int s, d;
+
+	for (s = 0; s <= 4; s++)
+	{
+		for (d = 0; d <= 4; d++)
+		{
+			float source = (float)s * 0.25f, destination = (float)d * 0.25f;
+
+			if (source * blend_factor_alpha(source_factor, source, destination, constant) +
+				destination * blend_factor_alpha(destination_factor, source, destination, constant) > 1.0f + 1.0e-4f)
+			{
+				return TRUE;
+			}
+		}
+	}
+	return FALSE;
+}
+
+static BOOL alpha_clamp_begin(void)
+{
+	if (alpha_clamp_uniform < 0)
+		return FALSE;
+	glUniform1i(alpha_clamp_uniform, 1);
+	glBlendEquation(GL_MIN);
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+	if (gl_state.depth_mask)
+		glDepthMask(GL_FALSE);
+	if (gl_state.stencil_write_mask)
+		glStencilMask(0);
+	return TRUE;
+}
+
+static void alpha_clamp_end(void)
+{
+	glUniform1i(alpha_clamp_uniform, 0);
+	glBlendEquation(gl_state.blend_equation);
+	glColorMask((gl_state.color_mask & 1) != 0, (gl_state.color_mask & 2) != 0, (gl_state.color_mask & 4) != 0,
+		(gl_state.color_mask & 8) != 0);
+	if (gl_state.depth_mask)
+		glDepthMask(GL_TRUE);
+	if (gl_state.stencil_write_mask)
+		glStencilMask(gl_state.stencil_write_mask);
+}
+
+/* the game's draws, and after one that can leave alpha past one in the
+half-float back buffer the pass that stops it (alpha_clamp_begin) */
+static void draw_arrays(GLenum mode, GLint first, GLsizei count)
+{
+	glDrawArrays(mode, first, count);
+	if (alpha_clamp_begin())
+	{
+		glDrawArrays(mode, first, count);
+		alpha_clamp_end();
+	}
+}
+
+static void draw_elements(GLenum mode, GLsizei count, GLenum type, const void *indices)
+{
+	glDrawElements(mode, count, type, indices);
+	if (alpha_clamp_begin())
+	{
+		glDrawElements(mode, count, type, indices);
+		alpha_clamp_end();
+	}
+}
+
+static void draw_elements_base_vertex(GLenum mode, GLsizei count, GLenum type, const void *indices, GLint base_vertex)
+{
+	glDrawElementsBaseVertex(mode, count, type, indices, base_vertex);
+	if (alpha_clamp_begin())
+	{
+		glDrawElementsBaseVertex(mode, count, type, indices, base_vertex);
+		alpha_clamp_end();
+	}
+}
+
 static struct program_entry *prepare_draw(BOOL immediate)
 {
 	/* (the fixed-function program compiled only with OpenGL there: not by
@@ -5002,6 +5126,15 @@ static struct program_entry *prepare_draw(BOOL immediate)
 #ifdef HALO_GLES
 	key.count_samples = device.visibility_test_active && xgpu_capabilities.atomic_counters;
 #endif
+	/* a blend into the half-float back buffer that can leave alpha past
+	one, drawn again to stop it there (alpha_clamp_begin); not inside a
+	visibility test, which would count the second pass's samples */
+	key.hdr_alpha_clamp = target_unclamped && D3D__RenderState[D3DRS_ALPHABLENDENABLE] &&
+		(D3D__RenderState[D3DRS_COLORWRITEENABLE] & D3DCOLORWRITEENABLE_ALPHA) &&
+		D3D__RenderState[D3DRS_BLENDOP] == D3DBLENDOP_ADD && !device.visibility_test_active &&
+		blend_alpha_past_one(D3D__RenderState[D3DRS_SRCBLEND], D3D__RenderState[D3DRS_DESTBLEND],
+			(float)(D3D__RenderState[D3DRS_BLENDCOLOR] >> 24) / 255.0f);
+	alpha_clamp_uniform = -1;
 
 	entry = NULL;
 	if (program->lighting.lights && !program->lighting_failed && per_pixel_lighting())
@@ -5036,6 +5169,8 @@ static struct program_entry *prepare_draw(BOOL immediate)
 #endif
 	draw_flush();
 	state_program(entry->program);
+	if (key.hdr_alpha_clamp)
+		alpha_clamp_uniform = entry->alpha_clamp_pass;
 	if (key.source_blend && entry->blend_constant >= 0)
 	{
 		float blend_constant[4];
@@ -6607,13 +6742,13 @@ void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_v
 		unsigned long count;
 		WORD *indices = quad_indices(NULL, vertex_count, &count);
 
-		glDrawElements(GL_TRIANGLES, (GLsizei)count, GL_UNSIGNED_SHORT,
+		draw_elements(GL_TRIANGLES, (GLsizei)count, GL_UNSIGNED_SHORT,
 			(const void *)index_upload(indices, count * sizeof(WORD)));
 		free(indices);
 	}
 	else
 	{
-		glDrawArrays(primitive_mode(primitive_type), 0, (GLsizei)vertex_count);
+		draw_arrays(primitive_mode(primitive_type), 0, (GLsizei)vertex_count);
 	}
 	gl_check_errors("draw");
 }
@@ -6829,7 +6964,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		trace_draw("indexed", primitive_type, vertex_count, NULL);
 		setup_streams(device.base_vertex_index + minimum, maximum - minimum + 1);
 		state_element_array_buffer(index_cache.buffers[device.buffer_ring]);
-		glDrawElements(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT, (const void *)index_offset);
+		draw_elements(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT, (const void *)index_offset);
 		return;
 	}
 #endif
@@ -6841,7 +6976,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 	{
 		/* the attributes start at vertex minimum */
 		state_element_array_buffer(index_buffer);
-		glDrawElementsBaseVertex(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT,
+		draw_elements_base_vertex(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT,
 			(const void *)index_offset, -(GLint)minimum);
 		return;
 	}
@@ -6860,7 +6995,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 
 		for (index = 0; index < count; index++)
 			rebased[index] = (WORD)(source[index] - minimum);
-		glDrawElements(primitive_mode(primitive_type), (GLsizei)count, GL_UNSIGNED_SHORT,
+		draw_elements(primitive_mode(primitive_type), (GLsizei)count, GL_UNSIGNED_SHORT,
 			(const void *)index_upload(rebased, count * sizeof(WORD)));
 		free(rebased);
 		free(indices);
@@ -6868,7 +7003,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 	}
 #endif
 	(void)index;
-	glDrawElementsBaseVertex(primitive_mode(primitive_type), (GLsizei)count, GL_UNSIGNED_SHORT,
+	draw_elements_base_vertex(primitive_mode(primitive_type), (GLsizei)count, GL_UNSIGNED_SHORT,
 		(const void *)index_upload(source, count * sizeof(WORD)), -(GLint)minimum);
 	free(indices);
 }
@@ -7073,21 +7208,21 @@ void WINAPI D3DDevice_End(void)
 			{
 				for (index = 0; index < index_count; index++)
 					placed[index] = (GLuint)(first_vertex + indices[index]);
-				glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_INT,
+				draw_elements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_INT,
 					(const void *)index_upload(placed, index_count * sizeof(GLuint)));
 				free(placed);
 			}
 		}
 		else
 		{
-			glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_SHORT,
+			draw_elements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_SHORT,
 				(const void *)index_upload(indices, index_count * sizeof(WORD)));
 		}
 		free(indices);
 	}
 	else
 	{
-		glDrawArrays(primitive_mode(type), (GLint)first_vertex, (GLsizei)count);
+		draw_arrays(primitive_mode(type), (GLint)first_vertex, (GLsizei)count);
 	}
 	gl_check_errors("immediate draw");
 }

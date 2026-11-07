@@ -175,6 +175,12 @@ struct nv2a_pixel_shader_key
 	blend of a constant color factor with a constant alpha one, as the
 	meters' (shader_transparent_meter) */
 	unsigned char source_blend;
+	/* display.hdr: a draw into the half-float back buffer whose blend can
+	leave alpha past one (the double multiply: destination times twice the
+	source), which d3d8_gl.c draws a second time with alpha_clamp_pass set,
+	the fragment then one, with GL_MIN into the alpha alone: alpha stops at
+	one, as the Xbox's 8-bit buffer held it */
+	unsigned char hdr_alpha_clamp;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
