@@ -329,6 +329,15 @@ game's flags also tell its clients whether the host is a dedicated server
 (`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
 most of the living players).
 
+Then version 42 numbers a race track's flags as `race_flags_make_unique`
+(`game/game_engine_race.c`) was meant to: a flag whose number another has
+is given a free number, now marked used, so that no later flag shares it
+(the next flag of a track numbered on, a third of one number). A map with
+two flags of one number can have its flags numbered otherwise than by a
+build before it, and the race's state, which names the flags by their
+numbers (the flags of each player's lap, the first flag, the rally flag),
+would show them on other flags.
+
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
 sources' messages, kinds, bits, structs sent whole or the sizes of their
