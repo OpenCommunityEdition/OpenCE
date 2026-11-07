@@ -292,8 +292,10 @@ short network_link_address_limit(
 	if (!halo_server_mode() || local || limit <= 0 || !real_address || !game)
 		return NONE;
 	/* (the machines in the game from the same real address: an internet play
-	peer's endpoint, a LAN's address) */
-	for (other = 0; other < game->machine_count && other < HALO_PORT_MAXIMUM_NETWORK_MACHINES; other++)
+	peer's endpoint, a LAN's address. Each is in the slot of its index
+	(network_game_add_machine), with a gap where one left, so every slot is
+	looked at: the first machine_count missed those in the slots after a gap) */
+	for (other = 0; other < HALO_PORT_MAXIMUM_NETWORK_MACHINES; other++)
 	{
 		long slot = game->machines[other].machine_index;
 
