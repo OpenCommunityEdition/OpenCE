@@ -314,6 +314,22 @@ static void rasterizer_screen_effect_set_texture_transforms(
 		constants[3][1] = scanline_scale.j;
 		constants[3][2] = 0.0f;
 		constants[3][3] = (scanline_size.j + 1.0f - viewport_map.height) * scanline_scale.j * 0.5f;
+		/* port: the video's mask (rasterizer\video mask: a 1024x512 bitmap
+		with the picture, its tint, vignette and scanlines, in the middle 640
+		columns and black past them) is laid a texel to a column, centered,
+		so the Xbox's 640 columns showed its whole picture and the recording
+		filled the screen. On a wider screen it covered only the middle 640
+		columns and showed its black past them. Its middle 640 columns are
+		laid across the whole width instead, the recording filling the screen
+		as on the Xbox; its rows are as before, one a line, so the scanlines
+		are the Xbox's */
+		if (parameters->video_on &&
+			scanline_bitmap == parameters->video_scanline_map &&
+			viewport_map.width > 640)
+		{
+			constants[2][0] = scanline_scale.i * 640.0f / (real)viewport_map.width;
+			constants[2][3] = (scanline_size.i + 1.0f - 640.0f) * scanline_scale.i * 0.5f;
+		}
 		constants[4][0] = noise_scale.i;
 		constants[4][1] = 0.0f;
 		constants[4][2] = 0.0f;
@@ -498,56 +514,6 @@ static real rasterizer_screen_effect_pass_radius(
 	for (refinement = stock_pass_count; refinement <= pass; refinement++)
 		radius /= 3.0f;
 	return radius;
-}
-
-
-/* port: the video mask was authored for the Xbox's 640-wide view. A wider
-viewport exposes its black side margins, whose original noise-dependent
-alpha still admits bright parts of the sampled scene. Keep the video and
-its noise unchanged inside that view, and cover only the added margins.
-The existing screen-effect shader and RGB-only write mask stay in force;
-zero blend factors blacken the margins without changing scratch alpha. */
-static boolean rasterizer_screen_effect_video_borders(
-	boolean video_on,
-	short viewport_width,
-	short viewport_height)
-{
-	boolean success = TRUE;
-	short side;
-	real inner;
-	real half_pixel_x;
-	real half_pixel_y;
-
-	if (!video_on || viewport_width <= 640 || viewport_height <= 0)
-		return TRUE;
-
-	inner = 640.0f / (real)viewport_width;
-	/* The shader translator adds half a logical pixel when converting the
-	Xbox's integer pixel centers. Counter it here so every margin pixel is
-	covered and neither inner edge moves into the authored picture. */
-	half_pixel_x = 1.0f / (real)viewport_width;
-	half_pixel_y = 1.0f / (real)viewport_height;
-	success = IDirect3DDevice8_SetRenderState(global_d3d_device, D3DRS_SRCBLEND, D3DBLEND_ZERO) >= 0;
-	for (side = 0; side < 2; side++)
-	{
-		real left = (side ? inner : -1.0f) - half_pixel_x;
-		real right = (side ? 1.0f : -inner) - half_pixel_x;
-
-		success = IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN) >= 0 && success;
-		success = IDirect3DDevice8_SetVertexData2s(global_d3d_device, 4, 0, 0) >= 0 && success;
-		success = IDirect3DDevice8_SetVertexData2f(
-			global_d3d_device, _rasterizer_vertex_register_position, left, -1.0f + half_pixel_y) >= 0 && success;
-		success = IDirect3DDevice8_SetVertexData2f(
-			global_d3d_device, _rasterizer_vertex_register_position, right, -1.0f + half_pixel_y) >= 0 && success;
-		success = IDirect3DDevice8_SetVertexData2f(
-			global_d3d_device, _rasterizer_vertex_register_position, right, 1.0f + half_pixel_y) >= 0 && success;
-		success = IDirect3DDevice8_SetVertexData2f(
-			global_d3d_device, _rasterizer_vertex_register_position, left, 1.0f + half_pixel_y) >= 0 && success;
-		success = IDirect3DDevice8_End(global_d3d_device) >= 0 && success;
-	}
-	success = IDirect3DDevice8_SetRenderState(
-		global_d3d_device, D3DRS_SRCBLEND, D3DBLEND_INVSRCALPHA) >= 0 && success;
-	return success;
 }
 
 /* port: the shader translator turns Direct3D's pixel centers (on integers)
@@ -1330,7 +1296,6 @@ void _rasterizer_screen_effect(
 			}
 		}
 
-		success = rasterizer_screen_effect_video_borders(parameters->video_on, viewport_width, viewport_height) && success;
 		rasterizer_set_target(
 			global_window_parameters.rasterizer_target,
 			FALSE,
