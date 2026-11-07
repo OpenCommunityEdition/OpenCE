@@ -697,6 +697,7 @@ static void map_share_fill_header(
 	header->type = type;
 	header->count = 1;
 	header->game_time = game_in_progress() ? game_time_get() : 0;
+	header->checkpoint_epoch = 0; /* Transfers belong to the connection, not a checkpoint. */
 }
 
 /* a level name copied into a message's field, ended within it */

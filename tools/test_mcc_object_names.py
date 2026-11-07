@@ -4,7 +4,7 @@ import os
 import shutil
 import subprocess
 import pytest
-from harness import function
+from harness import enum_with, function, structure
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,6 +26,9 @@ def names_tool(tmp_path_factory):
         "object_name_list_delete", "object_name_list_lookup"))
     unload = function((game / "mcc_cache.c").read_text(), "mcc_cache_tags_unload")
     source = (ROOT / "tools/harness/tests/mcc_object_names.c").read_text()
+    distributed = (game / "network_distributed.h").read_text()
+    source = source.replace("/* DISTRIBUTED_HEADER */", structure(distributed, "distributed_message_header")
+                            + enum_with(distributed, "_distributed_message_player_prediction"))
     source = source.replace("/* IMPLEMENTATION */", implementations + "\n" + hooks)
     source = source.replace("/* CACHE_UNLOAD */", unload)
     (work / "names.c").write_text(source)

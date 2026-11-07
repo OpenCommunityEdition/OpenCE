@@ -1,21 +1,13 @@
-"""A same-handle corpse through real replica creation and player binding.
+"""Same-handle reconstruction, binding and old-life damage through the real gate.
 
-The default-profile expected failure records an unresolved defect; the optional
-profile is a positive control, not a complete checkpoint-compatibility claim.
+The dispatcher/transport ordering is tested separately; this fixture couples
+its production epoch gate to real replica lifecycle and damage handlers.
 """
 import re
 
 import pytest
 
 from harness import build, constant, enum_with, function, mutated, read, run, structure
-
-
-class KnownDeadReplica(Exception):
-    """Only the demonstrated default-profile dead/unbound result."""
-
-
-class KnownLateKill(Exception):
-    """An accepted old-life kill can affect a recreated same-handle unit."""
 
 
 def define_value(source, name):
@@ -40,21 +32,27 @@ def generated(fault=None):
     objects_h = read("source/objects/objects.h")
     damage_h = read("source/objects/damage.h")
     config = [f"#define TICKS_PER_SECOND {constant(read('source/cseries/cseries.h'), 'TICKS_PER_SECOND')}",
+              f"#define MAXIMUM_MESSAGE_SIZE {constant(read('source/bungie_net/common/message_header.h'), 'MAXIMUM_MESSAGE_SIZE')}",
+              f"#define MAXIMUM_ENTRIES_PER_MESSAGE {constant(objects, 'MAXIMUM_ENTRIES_PER_MESSAGE')}",
               f"#define TAG_STRING_LENGTH {constant(read('source/tag_files/tag_files.h'), 'TAG_STRING_LENGTH')}",
               f"#define MAXIMUM_WEAPONS_PER_UNIT {constant(units_h, 'MAXIMUM_WEAPONS_PER_UNIT')}",
               f"#define MAXIMUM_REGIONS_PER_OBJECT {constant(read('source/objects/object_definitions.h'), 'MAXIMUM_REGIONS_PER_OBJECT')}"]
+    config.append(re.search(r"^#define RELIABLE_ENTRIES\(type\) \\\n[^\n]+", distributed_h, re.M).group(0))
     for source, names in (
         (objects, ("MAXIMUM_CLIENT_RETRIED_INVENTORIES", "INVENTORY_INTERVAL_TICKS", "INVENTORY_REFRESH_TICKS",
                    "EMPTY_INVENTORY_TICKS", "OWN_INVENTORY_MARGIN_TICKS", "MAXIMUM_INVENTORY_GRENADES",
                    "DEFAULT_OWN_ROUND_TRIP_TICKS", "MAXIMUM_OWN_ROUND_TRIP_TICKS", "AGE_SCALE",
                    "OBJECT_WORLD_BOUND", "HOST_OBJECTS_RESEND_TICKS", "CLIENT_RETRY_TICKS",
-                   "CLIENT_RETRY_MAXIMUM_TICKS", "CTF_FLAG_TEAMS", "ODDBALL_TEAMS", "NETWORKED_OBJECT_TYPES")),
+                   "CLIENT_RETRY_MAXIMUM_TICKS", "CLIENT_READY_MAXIMUM_INTERVAL_TICKS", "MAXIMUM_CLIENT_NEW_OBJECTS",
+                   "CTF_FLAG_TEAMS", "ODDBALL_TEAMS", "NETWORKED_OBJECT_TYPES")),
         (distributed, ("DEATH_BLOW_WAIT_TICKS", "SEAT_DISAGREEMENT_TICKS", "SEAT_DISAGREEMENT_SLACK_TICKS")),
         (distributed_h, ("REMOTE_CORRECTION_TOLERANCE", "REMOTE_BLEND_DISTANCE", "NO_PLAYER")),
         (damage, ("REPORT_WORLD_BOUND", "REPORT_IMPACT_TOLERANCE")),
     ):
         config.extend(define_value(source, name) for name in names)
     types = "\n".join([
+        enum_with(distributed_h, "_distributed_message_player_prediction ="),
+        structure(distributed_h, "distributed_message_header"),
         enum_with(read("source/objects/object_types.h"), "_object_mask_all ="),
         enum_with(objects_h, "_object_dead_bit,"),
         enum_with(objects_h, "_object_connected_to_map_bit,"),
@@ -71,12 +69,15 @@ def generated(fault=None):
         structure(read("source/memory/data.h"), "datum_header"),
         structure(read("source/memory/data.h"), "data_iterator"),
         enum_with(objects, "_object_change_create,"),
+        enum_with(objects, "_send_rank_player_unit,"),
         enum_with(objects, "_distributed_object_carried_bit ="),
         enum_with(distributed, "_distributed_unit_alive_bit ="),
         enum_with(distributed, "_distributed_unit_camouflaged_bit ="),
         structure(distributed_h, "distributed_vector"),
         structure(objects, "distributed_object_change"),
         structure(objects, "distributed_inventory"),
+        structure(objects, "distributed_object_change_message"),
+        structure(objects, "distributed_inventory_message"),
         structure(objects.replace("static struct", "struct"), "distributed_own_inventory"),
         structure(objects.replace("static struct", "struct"), "distributed_retried_inventory"),
         structure(distributed, "distributed_unit_state"),
@@ -106,7 +107,8 @@ def generated(fault=None):
         "network_objects_expect_live_unit", "distributed_client_own_object",
         "distributed_client_change_valid", "distributed_client_apply_change",
         "distributed_client_reuses_object", "distributed_client_create",
-        "network_objects_handle_changes", "network_objects_handle_synchronized"))
+        "network_objects_handle_changes", "network_objects_handle_synchronized",
+        "network_objects_discard_client_effects"))
     code += "\n" + function(distributed, "distributed_handle_unit_state")
     code += "\n" + "\n".join(function(objects, name) for name in (
         "distributed_client_note_own_inventory", "distributed_client_own_settled",
@@ -116,6 +118,13 @@ def generated(fault=None):
     code += "\n" + "\n".join(function(damage, name) for name in (
         "distributed_damage_to_data", "distributed_damage_indices_valid",
         "distributed_damage_numbers_valid", "network_damage_handle_events"))
+    code += "\n" + function(distributed, "distributed_message_epoch_valid")
+    code += "\n" + "\n".join(function(objects, name) for name in (
+        "distributed_inventory_from_unit", "distributed_host_send_inventories_to_machine",
+        "distributed_object_send_rank", "network_objects_client_asked"))
+    code += "\n" + function(distributed, "distributed_checkpoint_ready")
+    code += "\n" + "\n".join(function(objects, name) for name in (
+        "distributed_client_note_own_inventories", "network_objects_client_tick"))
     if fault:
         code = mutated(code, *fault)
     return (("config.inc", "\n".join(config)), ("types.inc", types), ("data.inc", data_code),
@@ -128,21 +137,13 @@ def test_optional_profile_reconstructs_and_rebinds():
     assert status == 0, output
 
 
-@pytest.mark.xfail(strict=True, raises=KnownDeadReplica,
-                   reason="OpenCE Crossplay reuses a same-handle dead replica; Milestone10 remains open")
 def test_default_profile_recovers_authoritative_live_unit():
     status, output = run(build("coop_checkpoint_recovery", generated()), "default")
-    if status == 41 and output == "known defect: validated live create leaves same-handle corpse unbound":
-        raise KnownDeadReplica(output)
     assert status == 0, output
 
 
-@pytest.mark.xfail(strict=True, raises=KnownLateKill,
-                   reason="Same-handle reconstruction has no prior-life kill fence; direct-handler proof only")
-def test_reconstructed_unit_survives_accepted_old_life_kill():
+def test_reconstructed_unit_rejects_old_life_kill():
     status, output = run(build("coop_checkpoint_recovery", generated()), "late-kill")
-    if status == 42 and output == "known limitation: accepted old-life kill affects reconstructed same-handle unit":
-        raise KnownLateKill(output)
     assert status == 0, output
 
 
@@ -150,7 +151,7 @@ def test_reconstructed_unit_survives_accepted_old_life_kill():
     "live", "host-dead", "host-kills-live", "bound-corpse", "different-handle", "unknown", "unknown-player", "stale-delete",
     "invalid-tag", "invalid-team", "invalid-color", "invalid-position", "invalid-axes",
     "invalid-identifier", "outside-pool", "allocation-failure", "repeat", "retry",
-    "inventory", "hierarchy", "late-inventory",
+    "inventory", "hierarchy", "late-inventory", "projectiles", "same-epoch-create", "snapshot-empty", "snapshot-batches",
     "kill-current", "kill-unknown", "kill-invalid-number", "kill-invalid-tag", "kill-invalid-node",
 ])
 def test_replica_controls(case):
@@ -167,6 +168,16 @@ def test_replica_controls(case):
     ("unit_exit_seat_end(child_index);", "(void)child_index;", "hierarchy"),
     ("distributed_client_apply_inventory(&inventory);", "(void)inventory;", "late-inventory"),
     ("!distributed_damage_numbers_valid(&event->damage)", "FALSE", "kill-invalid-number"),
+    ("header->checkpoint_epoch != distributed_checkpoint_epoch", "FALSE", "late-kill"),
+    ("checkpoint_pending && network_coop_active()", "network_coop_active()", "same-epoch-create"),
+    ("distributed_host_send_inventories_to_machine(machine_index);", "(void)machine_index;", "snapshot-empty"),
+    ("if (!distributed_checkpoint_ready())\n\t\treturn;", "(void)0;", "snapshot-empty"),
+    ("short limit = MIN(MAXIMUM_ENTRIES_PER_MESSAGE, RELIABLE_ENTRIES(struct distributed_inventory));",
+     "short limit = MAXIMUM_ENTRIES_PER_MESSAGE;", "snapshot-batches"),
+    ("if (!unit || TEST_FLAG(unit->object.damage_flags, _object_dead_bit))\n\t\t\tcontinue;\n\t\tdistributed_inventory_from_unit",
+     "if (!unit || !unit->unit.grenade_counts[0] || TEST_FLAG(unit->object.damage_flags, _object_dead_bit))\n\t\t\tcontinue;\n\t\tdistributed_inventory_from_unit", "snapshot-empty"),
+    ("if (!network_game_distributed_client())\n\t\treturn;\n\tobject_iterator_new(&iterator, _object_mask_projectile, 0);",
+     "object_iterator_new(&iterator, _object_mask_projectile, 0);", "projectiles"),
     ("damage_replay_kill(event->object_index, &damage, event->node_index, event->region_index,\n"
      "\t\t\t\t\tevent->material_index);", "(void)victim_player_index;", "kill-current"),
 ])

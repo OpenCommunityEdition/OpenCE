@@ -101,9 +101,10 @@ cannot match the host's map is told what to do. The item is the package folder
 when Steam's own name (the item id, all digits) is kept, or a `workshop_id.txt`
 in the folder: the id on the first line and, optionally, the title on the
 second. The host sends the id and title in the map name's reserved tail
-(`mcc_workshop.c`). MCC protocol 64 versions this extension without changing
-the settings record's size; older MCC peers are refused. Xbox/CE retain
-OpenCE protocol 41. See the [wire contract](../port/linux/NETCODE.md#gulchce-crossplay-boundary).
+(`mcc_workshop.c`). MCC protocol 64 introduced this extension without changing
+the settings record's size. The current MCC and shared GulchCE agreements
+also require checkpoint lifetime fencing; see the
+[wire contract](../port/linux/NETCODE.md#gulchce-network-agreement).
 
 The item is advisory: the level filename and content fingerprint still decide
 admission. A known local item is recognized even if its older package lacks
@@ -387,8 +388,8 @@ resource selection/framing, saved checksum bytes and zero-identity handling
 remain unchanged. See the [checksum reading route](reading/maps_and_resources.md)
 and [Milestone 6 evidence](mcc_refactor_validation.md#stage-6-checksum-consolidation).
 MCC peers need matching GulchCE MCC protocols. Xbox and Custom Edition retain
-their original matching/loading behavior and the OpenCE protocol baseline
-specified in [the crossplay boundary](../port/linux/NETCODE.md#gulchce-crossplay-boundary). Network
+their original matching/loading behavior and require the shared GulchCE agreement
+specified in [the network boundary](../port/linux/NETCODE.md#gulchce-network-agreement). Network
 support uses OpenCE's host-authoritative engine, not official MCC clients.
 
 The shared identity integration uses the settings record's appended digest,
@@ -2511,7 +2512,7 @@ There is no persistent state to clean up across map-family transitions.
 The original fix introduced MCC protocol 47 to require this initialization on
 every peer, including a client predicting a boat it drives; OpenCE's separate
 protocol was then 29. The current agreements are recorded in
-[NETCODE.md](../port/linux/NETCODE.md#gulchce-crossplay-boundary).
+[NETCODE.md](../port/linux/NETCODE.md#gulchce-network-agreement).
 
 The [boat harness](../tools/harness/tests/test_mcc_boat.py) extracts the real
 controller, scratch structure, MCC initializer and force consumers. It uses
@@ -2775,9 +2776,11 @@ loading paths are unchanged.
 Campaign state version 6 is 772 bytes, with the new real after the previous
 768-byte version 5. Older checkpoint states default the absent lighting value
 to the captured pre-load value. Snapshot validation rejects nonfinite and
-out-of-range values. MCC protocol 63 requires the larger snapshot on both peers;
-OpenCE's `HALO_PORT_NETWORK_VERSION` remains 41 because Xbox/CE retain the pinned
-upstream wire contract. This is an MCC-only peer-agreement change.
+out-of-range values. MCC protocol 63 introduced the larger snapshot on both peers
+while the shared agreement remained OpenCE 41. That was an MCC-only agreement
+change. The current shared checkpoint lifetime fix separately requires updated
+GulchCE peers for every map family; see the
+[current protocol boundary](../port/linux/NETCODE.md#gulchce-network-agreement).
 
 `mcc_checkpoint.c` keeps the existing 768-byte campaign reservation and all
 thread/object-name arena addresses. Checkpoint footer version 3 uses four of

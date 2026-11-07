@@ -84,26 +84,53 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   threads' wake times along with it. The object, device and name syncs
   bring the clients up to date.
 
-  In GulchCE Third Person sessions, checkpoint loading retains the host's current session
+  Checkpoint loading retains the host's current session
   roster (`network_coop_restore_players`), before rebuilding view and input
   caches. Saved players who left lose their restored units and remain quit;
   current players missing from the save are created in their authoritative
   slots and use the normal co-op spawn rules. The machine-to-player table
   is rebuilt too: it lives outside the checkpoint, whose datum identifiers
   may differ. This fixes restores after reconnects, with either camera perspective.
-  OpenCE Crossplay retains the upstream checkpoint behavior.
   If an authoritative sample says a unit is alive but the client's copy is
   dead, the client requests the existing full object description, with the
   existing retry backoff and host rate limit. A validated create replaces
   that dead co-op copy instead of reusing it. This also handles a restored
   object keeping its checkpoint handle; no client decides to resurrect it.
-  These guarded extensions are not a full recovery guarantee. The shared
-  [checkpoint regression](../../tools/test_coop_checkpoint_recovery.py) records
-  two unresolved conditions: Crossplay reuses a same-handle corpse, and an
-  accepted old-life kill can affect a reconstructed unit with that same handle.
-  The latter exercises the real handler with a saved payload, not socket
-  reordering. See the [Milestone 10 evidence](../../docs/mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-investigation)
-  before changing recovery guards or claiming compatible checkpoint recovery.
+  Recovery is independent of camera mode. Each distributed gameplay header
+  carries the host's checkpoint epoch, a 32-bit world generation outside the
+  saved game. It advances on new maps and host reverts, including two restores
+  at the same tick. Before any fresh object descriptions, the host sends a
+  reliable checkpoint boundary to every loaded client. Only this exact,
+  nonbatched host message can advance a client's epoch. Old-generation damage,
+  object descriptions, inventories, input and prediction are refused before
+  clock or gameplay processing. New-generation datagrams that overtake the
+  boundary are also refused; their periodic updates arrive again.
+
+  Until the reliable snapshot end marker arrives, clients accept only its
+  ordered object descriptions and ordinary inventories. Gameplay sends are
+  held too, so surviving old replicas cannot generate new-world predictions
+  or hit reports during a partial snapshot. Client chat/vote actions during
+  that brief interval are not sent. The snapshot includes empty ordinary
+  inventories, which the normal periodic sender eventually stops repeating.
+  MCC extra grenade slots retain their separate periodic snapshots. The end
+  marker establishes ordering, not successful construction of every object;
+  failed creations retain the existing retry path. Only the first validated
+  description of a slot in an epoch may reconstruct an old corpse: a later
+  resend cannot revive a unit already killed in the current world.
+
+  Adoption clears transient prediction, death, inventory, animation, input and
+  queued-effect histories. Client projectiles from the discarded prediction
+  and delayed effects capable of damage/object creation are deleted through
+  their normal lifecycle; host checkpoint projectiles and effects are
+  preserved. Existing live replicas and identity tracking remain, so a valid
+  description rebuilds a corpse without replacing healthy units unnecessarily.
+  Connection identity, authority and the current roster survive. A late joiner's
+  reliable ready request may carry epoch zero; the rate-limited snapshot reply
+  supplies the current boundary first. Duplicate boundaries do not reset state.
+  The [checkpoint regression](../../tools/test_coop_checkpoint_recovery.py) and
+  [dispatcher regression](../../tools/test_checkpoint_epoch.py) cover the earlier
+  dead-replica and old-life-kill failures. Actual runtime checks and their limits
+  are recorded in the [Milestone 10 fix evidence](../../docs/mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-fix).
 
   The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies_mode`)
   give each squad of enemies a level places more of itself: PER PLAYER, a
@@ -188,14 +215,25 @@ A host's game advertisement says that it plays this netcode. A client does
 not join a host that does not (one of network version 4 built before the
 lockstep netcode was removed, set to play it): it tells the player why.
 
-## GulchCE crossplay boundary
+## GulchCE network agreement
 
-Xbox and Custom Edition sessions use OpenCE network version 41, pinned to
-OpenCommunityEdition/OpenCE commit `c507cb26b6ea7e89c7669fb7c911e27b80d5d779`.
-This is an explicit protocol baseline, not automatic compatibility with future
-OpenCE releases. Do not change the base version without auditing its wire format,
-simulation rules and admission behavior and testing unmodified upstream clients.
-The pinned fixture and settings-prefix check are in `tools/test_mcc_protocol.py`.
+Standard Xbox/Custom Edition sessions require GulchCE agreement 32714; MCC
+requires 66. Camera sessions require 32716/32717 respectively. The common
+distributed header grows from 8 to 12 bytes with its checkpoint epoch, and
+message 96 is the reliable host boundary. MCC gameplay uses 97–100 and its
+join envelope 101; the camera envelope is 102. The ordinary join request also
+appends a 16-bit shared agreement, checked before host admission. Discovery
+alone is insufficient because an older or modified client can send a direct
+join request. Old/truncated requests fail decoding; wrong agreements are
+refused before capability or roster mutation.
+
+The user explicitly permitted this separation for Milestones 10 and 11 on
+7 November 2026. Existing OpenCE 41 clients cannot join. The fixture pinned to
+OpenCommunityEdition/OpenCE `c507cb26b6ea7e89c7669fb7c911e27b80d5d779`
+remains historical evidence, with the intentional wire differences checked
+in `tools/test_mcc_protocol.py`. This branch makes no crossplay promise for an
+unmodified upstream build or an untested future upstream agreement. The
+following OpenCE integrations describe earlier revisions.
 
 The f2597b70 merge retains upstream's protocol 39: Force Team Spawns uses
 one reserved options byte without moving the settings prefix. CTF kill
@@ -226,7 +264,8 @@ names and synchronized its opening sequence; the short run did not provide
 enough on-foot samples for the comparator's full drift verdict. These checks
 do not establish full campaign or public internet transport compatibility.
 
-MCC sessions use separate MCC protocol version 65. Version 65 requires the
+MCC version 66 requires the shared checkpoint generation and revised admission.
+Version 65 required the
 MCC-owned `ai_deselect` script operation. It performs the existing native debug
 selection clear, but admitting the call also enables authored gameplay scripts
 that older MCC builds disabled in full. Peers must agree on that execution;
@@ -1311,10 +1350,10 @@ so a legitimate shot from beside cover is not judged only from the head.
 Both the eye-to-muzzle and muzzle-to-impact routes must be clear; weapon
 ownership, rate, target history and damage limits still apply. Scoped, dead,
 seated, Forced Off and ordinary first-person paths do not add this history.
-These rules, current-roster checkpoint restoration and immediate host object
-refresh after a restore use experimental
-camera agreement versions 32712/32713. The latter changes simulation agreement, so older
-camera builds are excluded too; it adds no packet fields or client authority.
+The camera rules use agreement versions 32716/32717. Shared checkpoint recovery
+also applies in Standard sessions and no longer depends on camera permission.
+Older camera builds are excluded from the new common header and recovery
+agreement too.
 The host independently excludes weapon-authored following cameras from the
 shoulder solver; stale or forged input bits cannot override that priority.
 The relay rejects non-boolean shoulder values and truncated messages.
@@ -1388,15 +1427,16 @@ action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
 
-The host's Session Compatibility selector defaults to OpenCE Crossplay.
-Xbox/CE use the exact pinned OpenCE 41 contract; MCC remains independently
-versioned at 65. In this mode the optional shoulder camera, its input and
-muzzle behavior, and its checkpoint recovery extensions do not execute.
-GulchCE Third Person instead advertises camera agreement 32712 (Xbox/CE) or
-32713 (MCC), requires a kind 101 envelope before admission and adds the
+The host's Session Compatibility selector defaults to GulchCE Standard.
+The stored `opence_crossplay` value is retained for existing configuration files;
+its name no longer promises OpenCE 41 compatibility. Xbox/CE use agreement
+32714 and MCC uses 66. The optional shoulder camera, its input and muzzle
+behavior remain disabled in Standard mode. GulchCE Third Person advertises
+camera agreement 32716 (Xbox/CE) or 32717 (MCC), requires a kind 102 envelope
+before admission and adds the
 shoulder byte to relayed actions. The envelope's bound is 520 bytes, including
 MCC's optional 512-byte inner envelope and upstream account-link credentials.
-Its header carries revision 1, camera base version 32712 and zero reserved
+Its header carries revision 1, camera base version 32716 and zero reserved
 bytes. Ordinary authorization and map-family checks still apply.
 
 Session mode is selected before opening the lobby and locked until disposal,

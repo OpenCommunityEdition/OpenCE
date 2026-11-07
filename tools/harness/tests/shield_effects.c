@@ -7,7 +7,7 @@ checked whole. */
 typedef unsigned short word;
 typedef word message_header;
 #define GET_MESSAGE_TYPE(message) (((message) >> 2) & 3)
-struct distributed_message_header { message_header header; byte type; byte count; long game_time; };
+#include "message_header.inc"
 static char const *setting = "stock";
 static unsigned long changes = 1;
 static short connection = _game_connection_local;

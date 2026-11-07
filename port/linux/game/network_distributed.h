@@ -155,15 +155,17 @@ enum
 	stream */
 	_distributed_message_map_vote = 94,
 	_distributed_message_map_vote_choice = 95,
+	/* Ordered host boundary for a new world or restored checkpoint. */
+	_distributed_message_checkpoint = 96,
 
 	/* MCC-only extra grenade slots; ordinary inventory packets stay exact. */
-	_distributed_message_mcc_grenades = 96,
+	_distributed_message_mcc_grenades = 97,
 	/* MCC-only campaign gravity and breadcrumb state. */
-	_distributed_message_mcc_campaign = 97,
+	_distributed_message_mcc_campaign = 98,
 	/* Expanded MCC scenario-name presence, in bounded chunks. */
-	_distributed_message_mcc_object_names = 98,
+	_distributed_message_mcc_object_names = 99,
 	/* MCC host-authorized speed, ordered on the reliable stream, even paused. */
-	_distributed_message_mcc_game_speed = 99,
+	_distributed_message_mcc_game_speed = 100,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -227,6 +229,7 @@ struct distributed_message_header
 	byte type;
 	byte count;
 	long game_time;
+	unsigned long checkpoint_epoch;
 };
 
 /* a vector in 16-bit parts: a unit vector's of 1/32767, a velocity's of
@@ -240,9 +243,11 @@ struct distributed_vector
 
 /* (what goes on the wire, as it is on every machine) */
 typedef char distributed_message_header_size_assert[
-	sizeof(struct distributed_message_header) == 8 ? 1 : -1];
+	sizeof(struct distributed_message_header) == 12 ? 1 : -1];
 typedef char distributed_message_header_game_time_offset_assert[
 	offsetof(struct distributed_message_header, game_time) == 4 ? 1 : -1];
+typedef char distributed_message_header_epoch_offset_assert[
+	offsetof(struct distributed_message_header, checkpoint_epoch) == 8 ? 1 : -1];
 typedef char distributed_vector_size_assert[sizeof(struct distributed_vector) == 6 ? 1 : -1];
 
 /* ---------- macros */
@@ -269,6 +274,11 @@ void distributed_client_send_build(void);
 void distributed_send_to_machine(long machine_index, void *message, byte type, short count, word size);
 /* ... reliably to one client (the host) */
 void distributed_send_to_machine_reliably(long machine_index, void *message, byte type, short count, word size);
+/* The host's ordered world boundary, before a full object snapshot. */
+void distributed_checkpoint_to_machine(long machine_index);
+void network_distributed_reverted(void);
+/* A client has received this epoch's ordered snapshot end (creation may retry). */
+boolean distributed_checkpoint_ready(void);
 /* the player at an absolute index, or NULL */
 struct player_datum *distributed_player(short player_index);
 /* a player's absolute index for a message, NO_PLAYER for none; and back */
@@ -456,6 +466,8 @@ void network_coop_note_sound(short kind, long definition_index, long object_inde
 /* ---------- prototypes/NETWORK_OBJECTS.C */
 
 void network_objects_new_game(void);
+void network_objects_reverted(void);
+void network_objects_discard_client_effects(void);
 /* after each tick */
 void network_objects_host_tick(void);
 word network_objects_damage_animation_entry_size(void);

@@ -146,6 +146,7 @@ boolean network_coop_vote_skip(void);
 cinematic, or because the mission failed); now is the game time before the
 revert */
 void network_coop_reverted(long now);
+void network_coop_reset_recovery(void);
 /* main.c: the skip vote is over once the skip has reverted */
 void network_coop_skip_done(void);
 /* the vote count to show, if a skippable cinematic is playing */

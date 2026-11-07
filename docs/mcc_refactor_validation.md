@@ -7,10 +7,11 @@ Updated 7 November 2026. Milestones retain the existing stage numbers, so
 Stage 9's combined review, testing and cleanup are complete. Ruby co-op
 recovery failed on both original main and current, so its compatibility
 sign-off remains withheld. Milestone 10 has confirmed a shared co-op replica
-lifetime defect and added executable regressions. A compatible recovery
-repair remains open; the production recovery paths are unchanged.
+lifetime defect and added executable regressions. Its shared recovery repair
+is now in implementation and validation under an updated network agreement.
 The shared boat correction is tracked separately as Milestone 11 and remains
-explicitly deferred under the crossplay constraint. The console-syntax
+planned after Milestone 10. On 7 November the user explicitly removed the
+old-client crossplay constraint for both milestones. The console-syntax
 correction also remains deferred, distinct from its completed investigation.
 The stage evidence below records the changes, actual validation and limits.
 
@@ -25,19 +26,22 @@ The stage evidence below records the changes, actual validation and limits.
 | 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; Ruby co-op recovery sign-off withheld |
-| 10 | Diagnose and correct shared co-op checkpoint recovery while preserving OpenCE crossplay. | Root cause confirmed; compatible repair remains open |
-| 11 | Correct shared boat control initialization under a compatible engine/network contract. | Planned; shared repair remains deferred pending compatible upstream support or an explicit policy change |
+| 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Implementation and validation in progress |
+| 11 | Correct shared boat control initialization under a separated engine/network agreement. | Authorized policy change recorded; implementation follows Milestone 10 |
 
-The latest verified revision is `f1a0d6e1b`, with fresh passing MCC and
-four-platform debug workflows. Stage 10 adds regression coverage while
-leaving the game implementation unchanged. Stage 9 recorded 2,193 local passes,
+The latest completed verification is `f1a0d6e1b`, with passing MCC and
+four-platform debug workflows. That Stage 10 investigation added regression
+coverage without changing the game. The subsequent fix is being validated
+separately below. Stage 9 recorded 2,193 local passes,
 24 skips and twelve existing boat expected failures, four real-asset checks,
 64 successful matched loads, sixteen failed-load recoveries, standalone
 save/restore/reset checks, Mercury co-op and all four Xbox/CE mixed-build host
 directions. Ruby co-op recovery remains a failed observation, including an
 original-main reproduction; completion of the investigation does not fix it.
 All 21 structural HUD profiles remain with measured evidence and removal
-conditions. MCC protocol is 65; OpenCE remains 41. The shared console-syntax
+conditions. The pending shared fix uses base agreement 32714, MCC 66 and camera
+agreements 32716/32717; the earlier verification used OpenCE 41/MCC 65.
+The shared console-syntax
 defect remains unfixed, as explicitly requested. The detailed sections
 distinguish these bounded checks from full compatibility. Milestone counts
 are not an estimate of percentage effort remaining, and do not establish
@@ -46,7 +50,9 @@ that every MCC module has received the same depth of audit.
 All future changes remain evidence-backed, with general engine defects fixed
 in the responsible implementation and MCC format defects fixed systemically
 inside MCC-owned modules. Preserve Xbox/CE behavior, map-family ownership and
-OpenCE crossplay. Each milestone includes design review, meaningful regression
+unrelated functionality. Milestones 10 and 11 may separate incompatible
+network versions; the earlier crossplay-dependent deferrals below are historical
+evidence. Each milestone includes design review, meaningful regression
 coverage, the applicable platform/network checks, final review and cleanup.
 Later integration checks supplement these checks; they do not postpone them.
 
@@ -157,16 +163,15 @@ it is separate from the explicitly deferred console-syntax lifetime defect.
    Add a minimal regression exercising the real implementation and retain
    Ruby as the runtime reproduction. Compare original and current behavior
    without weakening the strict judge or discarding failed observations.
-2. **Establish a compatible repair.** Evaluate the recovery extensions behind
+2. **Establish the recovery agreement.** Evaluate the recovery extensions behind
    the GulchCE Third Person session profile as evidence, not a proven remedy.
    Correct the responsible shared engine contract where demonstrated; preserve
-   Xbox/CE/MCC ownership, host authority and OpenCE crossplay. Validate object
+   Xbox/CE/MCC ownership and host authority. Validate object
    descriptions before replacing client state. Correct supported behavior
    must not require enabling a cosmetic feature. Review messages, simulation
-   agreement and required version separation before implementation. If a
-   repair cannot preserve the standing compatibility contract, record the
-   unresolved dependency on compatible upstream support or an explicit change
-   of scope; do not broaden profile guards or add a map-specific bypass.
+   agreement and required version separation before implementation. The user's
+   7 November policy change permits excluding old peers; enforce that boundary
+   at discovery and admission. Do not add a map-specific bypass.
 3. **Validate the resulting behavior.** Demonstrate failure before and recovery
    after the fix, including actual player reattachment and restored inventory,
    not only a successful load. Cover repeated team wipes and checkpoint
@@ -174,7 +179,7 @@ it is separate from the explicitly deferred console-syntax lifetime defect.
    cleanup, plus stale/malformed descriptions and unaffected live objects.
    Use Ruby's Rebalanced, Mercury and representative Xbox/CE paths,
    both host directions, and matching/mixed builds where their contracts
-   permit. Check the existing optional profile as well as default Crossplay.
+   permit. Check the existing optional profile as well as the default profile.
    Run affected regression suites, all required platform builds and native/web
    transport checks. Validate claims of OpenCE crossplay against an identified
    upstream executable on the map families/contracts it supports; a
@@ -185,8 +190,8 @@ established, the combined implementation is reviewed, and applicable checks
 pass with evidence and cleanup recorded. An investigation ending in a
 compatibility-dependent deferral leaves the repair milestone open and Ruby's
 recovery sign-off withheld. Stage 9's historical failures remain recorded.
-The investigation and regression additions do not relax the existing
-crossplay and isolation requirements or constitute a completed repair.
+The policy change permits agreement separation; isolation, host authority,
+meaningful validation and cleanup remain required.
 
 ### Milestone 11: shared boat control initialization
 
@@ -199,14 +204,13 @@ and incorrect finite friction with MCC inactive, and the existing MCC
 initialization prevents both. This proves a shared producer defect, not that
 stock Xbox maps contain affected boats or that full vehicle behavior is tested.
 
-1. **Establish a compatible repair strategy.** Recheck the responsible engine
+1. **Establish the repair agreement.** Recheck the responsible engine
    and simulation contract against the designated upstream revision. The
    unconditional correction changes accepted Xbox/CE simulation, including
-   client prediction of a driven vehicle. Preserve OpenCE crossplay and host
-   authority; document compatible upstream support and any required agreement,
-   version separation and rollout before implementation. A version bump alone
-   does not preserve crossplay with existing peers. Keep the repair deferred
-   if the standing compatibility requirement cannot be met.
+   client prediction of a driven vehicle. Preserve host authority and document
+   the required agreement, version separation and rollout before implementation.
+   The user's 7 November policy change permits excluding incompatible old peers;
+   it does not establish compatibility with an unmodified upstream build.
 2. **Correct the producer systemically.** Within an established compatible
    contract, initialize exactly the three temporary records in the existing
    three-point branch, preserving its arithmetic, active controls and other
@@ -234,16 +238,15 @@ are reviewed, applicable checks pass, and evidence and cleanup are recorded.
 Convert the twelve strict legacy expected failures to ordinary passing
 regressions only when the authorized correction fixes those paths; preserve
 their behavioral coverage and historical failures. A compatibility-dependent
-deferral leaves this repair milestone open. Adding it records future work;
-it does not start implementation or change the existing compatibility policy.
+deferral leaves this repair milestone open. This remains separate work after
+Milestone 10; its implementation has not begun.
 
-#### Explicitly deferred: unconditional shared boat fix
+#### Former deferral: unconditional shared boat fix
 
-The defect is reproduced, but the user chose to preserve OpenCE crossplay.
-Keep the existing MCC correction and twelve strict legacy expected failures.
-Revisit the shared fix only when compatible upstream support exists or the
-user explicitly changes that compatibility requirement. This is a recorded
-deferred defect, not unfinished implementation within completed Stage 2.
+Stage 2 retained the MCC correction and twelve strict legacy expected failures
+under the user's earlier crossplay requirement. That constraint was explicitly
+lifted on 7 November for Milestone 11. Preserve this evidence and the working
+MCC path until the separately validated shared correction replaces it.
 
 ## Stage 1: validation baseline
 
@@ -2230,6 +2233,10 @@ failure. The earlier Stage 9 records and archives remain untouched.
 
 ### Compatibility decision and remaining repair work
 
+This section records the investigation's earlier compatibility decision.
+The user subsequently lifted the old-client crossplay constraint for
+Milestones 10 and 11; the fix below uses explicit agreement separation.
+
 The authoritative upstream check on 7 November found the relevant shared
 recovery modules unchanged between pinned OpenCE 41 commit `c507cb26b` and
 then-current upstream `fc9deb0b1`. Official build 334 identifies the pinned
@@ -2260,3 +2267,85 @@ necessary agreement separation. Keep the original failures and meaningful
 regressions. Neither the new tests nor an optional-profile positive observation
 would establish default recovery, all-map compatibility or completion of the
 required post-fix join/rejoin, transition, platform and transport matrix.
+
+## Stage 10: shared checkpoint recovery fix
+
+The user authorized incompatible old-peer separation on 7 November 2026 for
+Milestones 10 and 11, with Milestone 10 implemented first. This supersedes the
+prior crossplay blocker, without relaxing map-family ownership, authority,
+validation or cleanup. Console-syntax work remains deferred and the shared
+boat implementation remains separate.
+
+### Design and evidence
+
+The earlier real-map observation and extracted-function failures establish
+two shared defects: a host restores a living object under a full handle that
+the client still owns as a corpse, and a previous-life kill can act on a
+reconstructed object with that same handle. Both paths use the shared co-op
+replication contract; neither depends on an MCC layout, map identity or authored
+workaround. The repair therefore belongs in `network_distributed`,
+`network_objects` and `network_coop`, with existing MCC-owned cache cleanup
+retained through `mcc_network_new_game`.
+
+Each distributed gameplay header carries a 32-bit checkpoint epoch. The host
+advances its nonzero epoch outside saved game memory on new maps and restores.
+Clients adopt only an exact, reliable, nonbatched host boundary, before any
+fresh object snapshot. Message time alone cannot distinguish a restore at the
+same tick; independent per-kind clocks also cannot protect a new object life
+against a later-arriving reliable kill. Epoch checks precede message clock and
+gameplay handling. A late joiner's reliable ready request is the narrow
+exception: it may solicit the rate-limited current boundary/snapshot, but
+contributes no clock or prediction evidence.
+
+The ordered snapshot must finish before the client receives or sends gameplay.
+This prevents a current-epoch kill overtaking an earlier live description.
+Only the first validated description of a slot may reconstruct its old corpse;
+a later same-epoch resend must preserve a newly killed unit. Full snapshots
+also carry reliable ordinary inventories, including empty ones: the existing
+periodic sender deliberately stops sending empties after three seconds and
+cannot clear retained future-world equipment after a slow snapshot. The
+existing serializer and inventory lifecycle are reused; that periodic
+optimisation remains. MCC extra grenades/campaign state remain independently
+owned periodic updates. The ordered end marker does not prove every object
+was constructed; failed creation retries remain required.
+
+Transient input, prediction, inventory, death, animation and queued effect
+history is reset. Connection identity, current roster and object ownership are
+preserved. The host immediately sends fresh descriptions; a validated live
+description reconstructs a dead replica through the normal delete/construct
+lifecycle, while healthy replicas remain. Host-known carried weapons and
+riders retain their established detach/reattach handling. Current-roster
+restoration and dead-replica recovery no longer depend on camera permission.
+
+Inspection found another old-world producer: client projectiles and delayed
+effect parts can create a fresh hit report after adopting the new epoch. The
+client discards its predicted projectiles through normal deletion. The small
+`effects_discard_gameplay` service uses the same validated object/damage part
+classes as `effect_generate_part` and normal `effect_delete`, including later
+events; harmless visual-only effects remain. Its data and lifecycle are private
+to `effects.c`, so this cannot be implemented safely by manipulating effect
+storage from an MCC module. Host checkpoint projectiles/effects are retained.
+
+Base agreement 32714, MCC 66 and camera 32716/32717 separate these semantics
+from earlier clients. A version field appended to the ordinary join request
+is checked before admission: advertisements alone did not protect direct
+joins. The default UI label is now GulchCE Standard; the stored
+`opence_crossplay` token is retained for configuration continuity. This does
+not claim compatibility with OpenCE 41 or an untested future upstream release.
+
+### Validation in progress
+
+Historical failures and archives under `build/stage10` are unchanged. New
+private evidence is isolated under `build/stage10-fix`. The original executable,
+PDB and SDL library were copied and authenticated before rebuilding. Workshop
+Ruby B40 and Mercury originals remain read-only; eight bounded Xbox/CE setup
+files occupy 403,621,461 bytes in the isolated data folder.
+
+The Windows portable release build passes. The production dispatcher up to its
+gameplay handlers passes six initial controls for boundary validation, old and
+new epochs at the same tick, old reliable and unreliable messages, batch
+recursion, readiness, clock contamination and rollover. Its final gameplay
+handlers are observation stubs; the separate lifecycle regression executes
+actual object replacement, player binding, inventory and damage-handler paths.
+Further runtime, platform and transport validation remains required before
+this milestone can be marked complete.

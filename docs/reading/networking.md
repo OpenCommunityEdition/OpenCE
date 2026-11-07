@@ -38,8 +38,10 @@ not establish that the next succeeded.
 
 The client's [input path](settings_input_and_menus.md) produces its player's
 action. It advances its own player promptly instead of waiting for a round
-trip. In `network_distributed_tick`, the client records its own positions,
-sends inputs and sends predictions, then performs other client network work.
+trip. After the host's initial snapshot finishes, `network_distributed_tick`
+records its own positions, sends inputs and sends predictions, then performs
+other client network work. The checkpoint boundary below explains the brief
+send pause while a snapshot is arriving.
 
 The input says what the player attempted. The prediction says where the
 client's simulation put them. The host does not grant authority simply
@@ -145,8 +147,9 @@ arrive on the reliable stream, despite the host's send order. OpenCE's
 `distributed_client_retry_inventory` retains the latest inventory for each
 unit in a bounded queue. `distributed_client_apply_retried_inventories`
 checks it each client tick, applies entries once their objects
-exist, and expires entries after `EMPTY_INVENTORY_TICKS`. A new game clears
-the queue in `network_objects_new_game`. For example, a newly spawned player
+exist, and expires entries after `EMPTY_INVENTORY_TICKS`. A checkpoint clears
+the queue in `network_objects_reverted`; `network_objects_new_game` uses that
+same reset. For example, a newly spawned player
 can receive their weapon inventory before the weapon object; retaining it
 lets the client equip that weapon when it arrives without granting the
 client authority over inventory. The
@@ -157,15 +160,61 @@ extracted engine functions and deliberate broken variants.
 A checkpoint can restore an earlier living object with the same full handle
 that identifies its corpse on a client. Follow `network_coop_reverted` in
 [network_coop.c](../../port/linux/game/network_coop.c), then
-`network_objects_host_reverted`, `distributed_client_reuses_object` and
-`distributed_client_create` in `network_objects.c`. In Crossplay, the corpse
-is reused; `distributed_handle_unit_state` refuses to attach a player to it.
-The optional camera session can reconstruct it, but identical handles alone
-do not distinguish messages from its previous life. The
-[checkpoint regression](../../tools/test_coop_checkpoint_recovery.py) and
-[Milestone 10 evidence](../mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-investigation)
-separate that real-function proof, Ruby's observed state and the unresolved
-crossplay/lifetime contract. No shared recovery repair has been enabled.
+`network_distributed_reverted` in `network_distributed.c` and
+`network_objects_host_reverted` in `network_objects.c`. This is shared network
+co-op behavior, independent of camera policy or map family.
+
+Every distributed header includes a world epoch: a host-owned counter outside
+checkpointed game state. `network_distributed_reverted` advances it and
+`distributed_restore_checkpoint` clears old prediction, recovery, damage and
+actor state. `distributed_message_epoch_valid` accepts a new epoch only from
+an exact, standalone reliable host boundary. Gameplay messages with another
+epoch are rejected before simulation clocks, stale tracking or handlers run.
+Thus an old reliable kill cannot kill a restored object merely because its
+handle matches.
+Late-join readiness can request the current boundary within the existing
+resend limit; it cannot adopt an epoch or authorize gameplay itself.
+
+Read `network_objects_client_asked` next. Its reliable snapshot sends the
+boundary, object descriptions, ordinary inventories, then an exact
+`objects_synchronized` end marker. `distributed_host_send_inventories_to_machine`
+includes empty inventories of living units. For example, a healthy retained
+unit may still carry a weapon picked up after the saved checkpoint; explicit
+empty slots remove it even after the periodic sender's empty-inventory window
+has elapsed. MCC's additional grenade slots and campaign state retain their
+separate periodic synchronization in `mcc_network.c`.
+
+Before the end marker, the client accepts ordered object descriptions and
+ordinary inventories, while refusing other gameplay and suppressing outgoing
+gameplay in `distributed_fill_header`. `network_objects_client_tick` continues
+readiness, inventory retries and cleanup bookkeeping, but uses
+`distributed_checkpoint_ready` to postpone local inventory and vehicle
+prediction notes. Old replicas therefore cannot supply new-world input or
+make the restored inventory look like an acknowledgement of a local shot.
+The marker confirms ordered delivery; failed object creation still uses the
+existing retry path rather than being declared successful.
+
+In `distributed_client_create`, only the first validated description for an
+object slot in the new epoch may replace a same-handle dead co-op unit with
+the host's live copy. `distributed_client_reuses_object` applies that rule;
+`distributed_handle_unit_state` subsequently binds the player. A later live
+description in the same epoch cannot undo a newer death. Another checkpoint
+explicitly renews eligibility. Existing healthy replicas retain their normal
+reuse path.
+
+The reset also calls `network_objects_discard_client_effects`: old client
+projectiles and effects with delayed object or damage parts are deleted
+through their existing lifecycle. Host checkpoint projectiles remain intact.
+This boundary does not comprehensively reset or reconstruct authored HUD,
+navigation-point and attachment caches. Those pre-existing presentation paths
+need separate evidence before claiming complete authored checkpoint rollback.
+
+The [checkpoint regression](../../tools/test_coop_checkpoint_recovery.py) and
+[epoch dispatch tests](../../tools/test_checkpoint_epoch.py) exercise actual
+engine functions. The [original investigation](../mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-investigation)
+retains the old default-profile failure and the earlier camera-only limits;
+the [shared recovery validation record](../mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-fix)
+reports checks completed for the new contract, separately from source intent.
 
 ## Transport has its own contracts
 
@@ -184,16 +233,20 @@ following packet details into those files.
 
 ## GulchCE compatibility and teardown
 
-Xbox/CE crossplay and MCC sessions have separate protocol boundaries.
-The current baseline is OpenCE 41 and MCC 65. Map-vote messages remain
-upstream IDs 94-95; MCC owns IDs 96-99 and join kind 100. The 512-byte MCC
-admission envelope also fits OpenCE's account-link credentials. This bound
+GulchCE Standard uses shared agreement 32714 for Xbox/CE and MCC agreement 66
+for MCC maps. These require updated GulchCE peers, not OpenCE 41 or older
+GulchCE builds. Map-vote messages remain IDs 94-95; the shared checkpoint
+boundary is 96; MCC owns IDs 97-100 and join kind 101. The 512-byte MCC
+admission envelope fits account-link credentials and the shared join version. This bound
 applies to the host's local join as well as remote MCC clients.
 `mcc_protocol.c` handles capability negotiation, settings sizing and
 connection-scoped admission. Its checks supplement ordinary host authority;
-a capability claim is not trusted identity. MCC-only gameplay messages must
+a capability claim is not trusted identity. After decoding the ordinary join,
+the host checks its appended shared version before granting capability or
+performing ordinary admission. The [join codec test](../../tools/test_join_protocol.py)
+checks that old and truncated requests cannot omit this field. MCC-only gameplay messages must
 not execute on Xbox or CE maps. See the
-[crossplay boundary](../../port/linux/NETCODE.md#gulchce-crossplay-boundary)
+[network agreement](../../port/linux/NETCODE.md#gulchce-network-agreement)
 and the current version constants rather than hard-coding a number from
 this guide.
 
@@ -210,11 +263,12 @@ then read `server_director.c` for rotation and session ownership and
 `server_commands.c` for administration. These are upstream additions; they
 do not make an MCC capability claim sufficient to pass normal admission.
 
-`online-third-person` selects its contract per session. OpenCE Crossplay uses
-the upstream 41 relay and disables shoulder-camera gameplay. GulchCE Third
-Person uses camera versions 32712/32713, the additional shoulder relay byte,
-and a mandatory kind 101 join envelope. MCC retains its independent version
-65 and kind 100 admission inside that envelope. Forced Off remains a camera
+`online-third-person` selects its contract per session. GulchCE Standard
+disables shoulder-camera gameplay. Its stored `opence_crossplay` setting name
+is retained for configuration compatibility, not an OpenCE compatibility claim.
+GulchCE Third Person uses camera versions 32716/32717, the additional shoulder
+relay byte, and a mandatory kind 102 join envelope. MCC retains its independent
+version 66 and kind 101 admission inside that envelope. Forced Off remains a camera
 session; it does not relax admission.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c):
@@ -223,7 +277,7 @@ validate camera admission. The shared join send/dispatch hooks are necessary
 because the engine owns those boundaries. Host create/open/dispose hooks own
 the session lifetime; client join/disconnect hooks clear prior permissions.
 A camera server requires the envelope before the ordinary token, bans, slots
-and MCC checks. A crossplay server retains the ordinary admission path.
+and MCC checks. A Standard server uses the ordinary shared-version admission path.
 The selected mode cannot change after the lobby opens. See the
 [camera walkthrough](third_person.md#session-compatibility) for behavior,
 state ownership and tests. Public listings retain the common discovery

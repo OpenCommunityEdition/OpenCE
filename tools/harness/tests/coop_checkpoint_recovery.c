@@ -18,6 +18,7 @@
 #include <math.h>
 
 typedef unsigned short word;
+typedef word message_header;
 typedef struct { real red, green, blue; } real_rgb_color;
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -25,6 +26,7 @@ typedef struct { real red, green, blue; } real_rgb_color;
 #define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))
 #define csmemset memset
 #define csmemcpy memcpy
+#define csmemcmp memcmp
 #define csstrncpy strncpy
 #define SET_FLAG(v,b,on) ((v) = (on) ? (v)|FLAG(b) : (v)&~FLAG(b))
 #define DATUM_INDEX_TO_IDENTIFIER(i) ((short)((i)>>16))
@@ -33,8 +35,11 @@ typedef struct { real red, green, blue; } real_rgb_color;
 #define platform_log(...) ((void)0)
 /* Only world capacities are reduced. Behavior limits and flags come from the
    owning production definitions, including the inventory-to-player capacity. */
-#define MAXIMUM_TRACKED_OBJECTS 16
+#define MAXIMUM_TRACKED_OBJECTS 128
 #define MAXIMUM_TRACKED_PLAYERS 2
+#define HALO_PORT_MAXIMUM_NETWORK_MACHINES 2
+enum {_game_connection_network_client=1,_game_connection_network_server=2};
+enum {_distributed_to_host_reliably};
 #include "config.inc"
 enum { _player_action_result_reload, _netgame_flag_teleporter_source };
 enum { OBJECT_DEFINITION_TAG=1, BIPED_DEFINITION_TAG, VEHICLE_DEFINITION_TAG,
@@ -101,7 +106,8 @@ struct collision_model {struct {struct {short count;} regions,materials;} resist
 struct damage_effect_definition {real cutoff_radius;};
 
 static struct data_array *object_header_data,*player_data;
-static struct object_datum world[16];
+static struct object_datum world[MAXIMUM_TRACKED_OBJECTS];
+static int world_capacity=16;
 static struct object_definition definitions[4];
 static struct weapon_definition weapon_definition;
 static struct weapon_magazine_definition magazine_definition={60,120,12};
@@ -110,13 +116,20 @@ static struct { int game_engine_index; } variant;
 static struct distributed_death distributed_deaths[2];
 static short distributed_seat_disagreements[2];
 static real distributed_own_round_trip;
-static long objects_client_has[16],objects_client_creating_index=NONE;
+static long objects_client_has[MAXIMUM_TRACKED_OBJECTS],objects_client_creating_index=NONE;
+static boolean objects_client_checkpoint_pending[MAXIMUM_TRACKED_OBJECTS];
 static int objects_client_deleting,objects_client_creating;
 static int objects_client_failed_time=NONE,objects_client_ready_time=NONE;
 static int objects_client_ready_interval,objects_client_retry_ticks=CLIENT_RETRY_TICKS;
 static int objects_client_ask_again,objects_client_synchronized=1;
+static int objects_client_new_object_count,objects_client_check_all;
 static struct { int creates,deletes,create_failures; } objects_statistics;
-static int profile,client=1,coop=1,now=1000,constructed,deleted,controls_changed;
+static int client=1,coop=1,now=1000,constructed,deleted,controls_changed;
+static unsigned long distributed_checkpoint_epoch=1;
+static boolean distributed_checkpoint_synchronized;
+static boolean distributed_handling_batch,distributed_handling_stream_message;
+static boolean distributed_identity_sent,distributed_build_sent;
+static int recovery_barriers;
 static long control_unit=NONE;
 static boolean fail_allocation;
 static boolean require_detached,detached_before_construction;
@@ -133,6 +146,13 @@ static void unit_kill(long index);
 static void unit_kill_silent(long index);
 static void unit_kill_no_statistics(long index);
 static short objects_client_retried_inventory_count;
+static long objects_host_told[MAXIMUM_TRACKED_OBJECTS],objects_host_told_count;
+static struct {long time,player_indices[MAXIMUM_LOCAL_PLAYERS];} objects_host_machines[2];
+static struct {unsigned long checksum,weapons_checksum;} objects_host_inventories[MAXIMUM_TRACKED_OBJECTS];
+static union {long alignment;byte bytes[MAXIMUM_MESSAGE_SIZE];} snapshot_packets[32];
+static word snapshot_sizes[32];
+static int snapshot_count;
+static struct distributed_object_change description(long index);
 
 #include "data.inc"
 
@@ -159,7 +179,18 @@ static boolean tag_index_is_group(long index,long group) {
     if(group==DAMAGE_EFFECT_DEFINITION_TAG)return index==10;
     return index>=0&&index<4&&(group==OBJECT_DEFINITION_TAG||group==BIPED_DEFINITION_TAG+definitions[index].object.type);
 }
-static int third_person_session_active(void) {return profile;}
+static int game_connection(void) {return client?_game_connection_network_client:_game_connection_network_server;}
+static int network_connection_last_read_was_unreliable(void) {return 0;}
+/* Explicit fake reset boundary; the real network_objects_reverted reset is
+   exercised separately with its ownership and transient histories. */
+static void distributed_restore_checkpoint(void) {
+    int i;
+    recovery_barriers++;memset(objects_client_checkpoint_pending,TRUE,sizeof(objects_client_checkpoint_pending));
+    for(i=0;i<MAXIMUM_LOCAL_PLAYERS;i++)objects_client_own_inventories[i].unit_index=NONE;
+    objects_client_synchronized=FALSE;
+}
+static int effect_cleanups;
+static void effects_discard_gameplay(void) {effect_cleanups++;}
 static int network_game_distributed_client(void) {return client;}
 static int network_coop_active(void) {return coop;}
 static long game_time_get(void) {return now;}
@@ -171,7 +202,7 @@ static int weapon_is_flag(long index) {(void)index;return 0;}
 static void game_engine_objective_weapon_deleted(long index) {(void)index;CHECK(0,"unexpected objective");}
 static void object_iterator_new(struct object_iterator *it,int mask,int flags) {it->next=0;it->mask=mask;(void)flags;}
 static void *object_iterator_next(struct object_iterator *it) {
-    while(it->next<16){int slot=it->next++;struct object_header *h=(struct object_header *)object_header_data->data+slot;
+    while(it->next<world_capacity){int slot=it->next++;struct object_header *h=(struct object_header *)object_header_data->data+slot;
         if(h->identifier&&TEST_FLAG(it->mask,h->datum->object.type)){it->index=DATUM_INDEX_NEW(slot,h->identifier);return h->datum;}}
     return NULL;
 }
@@ -211,7 +242,8 @@ static void object_damage_update(long index) {
     SET_FLAG(o->object.damage_flags,_object_dead_bit,TRUE);
 }
 static void object_delete_immediately(long index) {
-    CHECK(objects_client_deleting,"delete must be authorized by host path");
+    CHECK(objects_client_deleting || (client&&object_get(index)->object.type==_object_type_projectile),
+        "delete must be authorized host replica work or client projectile cleanup");
     object_delete_recursive(index,FALSE);
 }
 static void object_deleted_procs_call(long index) {(void)index;}
@@ -286,8 +318,60 @@ static void damage_replay_static(long index,struct damage_data *data,short node,
     (void)index;(void)data;(void)node;(void)region;(void)material;CHECK(0,"not a static fixture");
 }
 
+/* Transport capture, host membership and descriptor serialization are fixture
+   boundaries. The ordered snapshot sender and inventory serializer/replay are
+   production functions; central transport stamping has separate tests. */
+static long *machine_get_player_list(long machine) {
+    static long list[MAXIMUM_LOCAL_PLAYERS];CHECK(machine==1,"snapshot recipient");return list;
+}
+static void distributed_host_update_objects(void) { }
+static void distributed_change_from_object(long index,struct distributed_object_change *change) {
+    struct object_datum *object=object_get(index);
+    *change=description(index);change->definition_index=object->definition_index;
+    SET_FLAG(change->flags,_distributed_object_dead_bit,TEST_FLAG(object->object.damage_flags,_object_dead_bit));
+}
+static void distributed_send_to_machine_reliably(long machine,void *message,short type,short count,word size) {
+    struct distributed_message_header *header=message;
+    CHECK(machine==1&&snapshot_count<32&&size<=MAXIMUM_MESSAGE_SIZE,"bounded reliable capture");
+    header->type=(byte)type;header->count=(byte)count;header->checkpoint_epoch=distributed_checkpoint_epoch;
+    memcpy(snapshot_packets[snapshot_count].bytes,message,size);snapshot_sizes[snapshot_count++]=size;
+}
+static void distributed_checkpoint_to_machine(long machine) {
+    struct distributed_message_header header={0};
+    distributed_send_to_machine_reliably(machine,&header,_distributed_message_checkpoint,0,sizeof(header));
+}
+static long local_player_get_player_index(short local) {return local==0?DATUM_INDEX_NEW(0,7):NONE;}
+static int client_ready_sends,prediction_ticks;
+static void distributed_send(void *message,short type,short count,word size,short destination) {
+    (void)message;CHECK(type==_distributed_message_client_ready&&count<=1&&size==sizeof(struct distributed_message_header)&&
+        destination==_distributed_to_host_reliably,"client tick keeps bounded readiness alive");client_ready_sends++;
+}
+static void distributed_client_remove_own_objects(void) { }
+static void distributed_client_ready_picked_up_weapons(void) {prediction_ticks++;}
+static void mcc_network_client_tick(void) {prediction_ticks++;}
+static void distributed_client_send_vehicles(void) {prediction_ticks++;}
+static void distributed_client_carry_unsteered_vehicles(void) {prediction_ticks++;}
+static void distributed_client_send_identity(void) {prediction_ticks++;}
+static void distributed_client_send_build(void) {prediction_ticks++;}
+
 #include "engine.inc"
 #include "under_test.inc"
+
+static void begin_checkpoint(void) {
+    struct distributed_message_header barrier={0};
+    int before=recovery_barriers;
+    barrier.type=_distributed_message_checkpoint;barrier.checkpoint_epoch=distributed_checkpoint_epoch+1;
+    distributed_identity_sent=distributed_build_sent=TRUE;
+    CHECK(!distributed_message_epoch_valid(NONE,&barrier,sizeof(barrier)),"barrier consumed before gameplay dispatch");
+    CHECK(distributed_checkpoint_epoch==barrier.checkpoint_epoch&&recovery_barriers==before+1,"host barrier begins new lifetime");
+    CHECK(!distributed_identity_sent&&!distributed_build_sent,"initial identity may be sent again");
+}
+static void finish_snapshot(void) {
+    struct distributed_message_header marker={0};
+    marker.type=_distributed_message_objects_synchronized;marker.checkpoint_epoch=distributed_checkpoint_epoch;
+    CHECK(distributed_message_epoch_valid(NONE,&marker,sizeof(marker))&&distributed_checkpoint_synchronized,
+        "ordered snapshot marker admits current world gameplay");
+}
 
 static struct data_array *new_array(char const *name,int capacity,int size) {
     struct data_array *array=calloc(1,sizeof(*array)+(size_t)capacity*size);
@@ -306,7 +390,7 @@ static struct distributed_unit_state live_state(long index) {
 }
 static void setup(void) {
     int i;long player_index=DATUM_INDEX_NEW(0,7);struct player_datum *player;
-    object_header_data=new_array("objects",16,sizeof(struct object_header));
+    object_header_data=new_array("objects",world_capacity,sizeof(struct object_header));
     player_data=new_array("players",2,sizeof(struct player_datum));
     CHECK(datum_new_at_index(player_data,player_index)==player_index,"player allocation");
     player=player_get(player_index);player->unit_index=NONE;player->local_player_index=0;
@@ -314,7 +398,9 @@ static void setup(void) {
     for(i=0;i<4;i++){definitions[i].object.type=(short)i;
         definitions[i].object.model.index=definitions[i].object.collision_model.index=NONE;}
     weapon_definition.weapon.magazines.count=1;weapon_definition.weapon.magazines.elements=&magazine_definition;
-    for(i=0;i<16;i++)objects_client_has[i]=NONE;
+    for(i=0;i<MAXIMUM_TRACKED_OBJECTS;i++){
+        objects_client_has[i]=objects_host_told[i]=NONE;objects_client_checkpoint_pending[i]=TRUE;
+    }
     for(i=0;i<MAXIMUM_TRACKED_PLAYERS;i++)distributed_deaths[i].dead_since=NONE;
     for(i=0;i<MAXIMUM_LOCAL_PLAYERS;i++)objects_client_own_inventories[i].unit_index=NONE;
 }
@@ -336,6 +422,75 @@ static struct distributed_damage_event kill_for(long index) {
     event.damage.scale=event.damage.multiplier=event.damage.material_effect_scale=1.0f;
     event.node_index=event.region_index=event.material_index=NONE;return event;
 }
+static int snapshot_inventory_case(long unit,boolean many) {
+    long weapon=add_replica(4,_object_type_weapon);
+    struct distributed_inventory future=inventory_for(unit,weapon);
+    unsigned long old_epoch=distributed_checkpoint_epoch;
+    int i,received=0,batches=0,described=0,phase=0;
+    int expected=many?world_capacity-5:1;
+    int limit=MIN(MAXIMUM_ENTRIES_PER_MESSAGE,RELIABLE_ENTRIES(struct distributed_inventory));
+    objects_host_told[3]=unit;objects_host_told[4]=weapon;objects_host_told_count=5;
+    if(many){
+        for(i=5;i<world_capacity;i++)objects_host_told[i]=add_replica((short)i,_object_type_biped);
+        /* One host corpse must not acquire an inventory or change rank counts. */
+        SET_FLAG(object_get(objects_host_told[5])->object.damage_flags,_object_dead_bit,TRUE);
+        objects_host_told_count=world_capacity;
+    }
+    client=0;distributed_checkpoint_epoch++;objects_host_machines[1].time=NONE;
+    network_objects_client_asked(1,TRUE);
+    CHECK(snapshot_count>2,"full snapshot captured");
+    /* The retained client has future-world equipment; no sender timing or
+       checksum state may prevent the checkpoint's explicit empty inventory. */
+    client=1;distributed_checkpoint_epoch=old_epoch;
+    distributed_client_apply_inventory(&future);
+    {
+        struct distributed_unit_state state=live_state(unit);
+        distributed_handle_unit_state(&state);
+        CHECK(player_get(DATUM_INDEX_NEW(0,7))->unit_index==unit,"retained healthy unit remains locally bound");
+    }
+    CHECK(object_get(unit)->unit.grenade_counts[0]==2&&object_get(unit)->unit.weapon_object_indices[0]==weapon,"future equipment established");
+    now+=4*TICKS_PER_SECOND;
+    for(i=0;i<snapshot_count;i++){
+        struct distributed_message_header *header=(struct distributed_message_header *)snapshot_packets[i].bytes;
+        void *entries=snapshot_packets[i].bytes+sizeof(*header);
+        if(header->type==_distributed_message_checkpoint){
+            int ticks;
+            CHECK(i==0&&!distributed_message_epoch_valid(NONE,header,snapshot_sizes[i]),"ordered host barrier first");
+            objects_client_new_object_count=MAXIMUM_CLIENT_NEW_OBJECTS;
+            for(ticks=0;ticks<3;ticks++){
+                now++;network_objects_client_tick();
+                CHECK(objects_client_own_inventories[0].unit_index==NONE&&!prediction_ticks&&objects_client_check_all,
+                    "old bound replica does not seed predictions; deferred own-object cleanup remains requested");
+            }
+            CHECK(client_ready_sends>0,"partial snapshot does not stall ready handshake");continue;
+        }
+        CHECK(distributed_message_epoch_valid(NONE,header,snapshot_sizes[i]),"ordered snapshot admitted while gameplay is frozen");
+        if(header->type==_distributed_message_object_changes){
+            CHECK(!phase&&!distributed_checkpoint_synchronized,"descriptions precede inventory and marker");
+            described+=header->count;network_objects_handle_changes(entries,header->count);
+        }else if(header->type==_distributed_message_inventories){
+            struct distributed_inventory *inventories=entries;int j;
+            CHECK(phase<=1&&!distributed_checkpoint_synchronized&&header->count>0&&header->count<=limit,"inventory within reliable batch bounds before marker");
+            phase=1;batches++;received+=header->count;
+            CHECK(snapshot_sizes[i]==sizeof(*header)+header->count*sizeof(*inventories),"exact inventory bytes");
+            for(j=0;j<header->count;j++)distributed_client_apply_inventory(&inventories[j]);
+        }else{
+            CHECK(header->type==_distributed_message_objects_synchronized&&i==snapshot_count-1&&phase==1&&distributed_checkpoint_synchronized,"marker follows complete inventories");
+            network_objects_handle_synchronized();
+            phase=2;
+        }
+    }
+    CHECK(phase==2&&described==(many?world_capacity-3:2),"all known descriptions precede completion");
+    CHECK(received==expected&&batches==(expected+limit-1)/limit,"every live inventory exactly once, including partial final batch");
+    CHECK(object_get(unit)->unit.grenade_counts[0]==0&&object_get(unit)->unit.weapon_object_indices[0]==NONE&&
+        object_get(weapon)->object.parent_object_index==NONE,"empty snapshot clears future grenades and detaches future weapon");
+    network_objects_client_tick();
+    CHECK(prediction_ticks==6&&objects_client_own_inventories[0].unit_index==unit,"ordinary prediction history resumes after ordered marker");
+    snapshot_count=0;client=0;network_objects_client_asked(1,FALSE);
+    CHECK(snapshot_count==2&&((struct distributed_message_header *)snapshot_packets[1].bytes)->type==_distributed_message_objects_synchronized,
+        "already-requested snapshot retains bounded synchronized-only path");
+    return 0;
+}
 static int exercise(char const *name) {
     long index=DATUM_INDEX_NEW(3,0x1234),player_index=DATUM_INDEX_NEW(0,7);
     struct distributed_object_change change;
@@ -344,11 +499,26 @@ static int exercise(char const *name) {
     long weapon=NONE,rider=NONE,cosmetic=NONE;
     struct distributed_inventory inventory;
     struct distributed_damage_event saved_kill;
+    struct distributed_message_header kill_header={0};
     int constructed_before,deleted_before,controls_before;
     boolean bound_before;
-    profile=strcmp(name,"default")!=0;setup();change=description(index);
-    network_objects_handle_changes(&change,1);CHECK(constructed==1,"initial replica");
+    if(!strcmp(name,"snapshot-batches"))world_capacity=MAXIMUM_TRACKED_OBJECTS;
+    setup();change=description(index);
+    network_objects_handle_changes(&change,1);finish_snapshot();CHECK(constructed==1,"initial replica");
     corpse=object_get(index);state=live_state(index);
+    if(!strncmp(name,"snapshot-",9))return snapshot_inventory_case(index,!strcmp(name,"snapshot-batches"));
+    if(!strcmp(name,"projectiles")){
+        long projectile=add_replica(4,_object_type_equipment);
+        long child=add_replica(5,_object_type_equipment);
+        object_get(projectile)->object.type=_object_type_projectile;
+        attach_child(projectile,child);
+        client=0;network_objects_discard_client_effects();
+        CHECK(object_try_and_get(projectile)&&object_try_and_get(child)&&!deleted&&!effect_cleanups,"host restored projectiles and effects are retained");
+        client=1;network_objects_discard_client_effects();
+        CHECK(!object_try_and_get(projectile)&&!object_try_and_get(child)&&deleted==2,"client old shot follows real recursive object deletion");
+        CHECK(object_try_and_get(index)&&constructed==3,"unrelated live unit survives");
+        network_objects_discard_client_effects();CHECK(deleted==2&&effect_cleanups==2,"repeated cleanup is harmless; effect lifetime also retires");return 0;
+    }
     if(!strcmp(name,"live")){
         distributed_handle_unit_state(&state);network_objects_handle_changes(&change,1);
         CHECK(constructed==1&&!deleted,"unchanged live replica is reused");
@@ -390,11 +560,15 @@ static int exercise(char const *name) {
     }
     if(!strcmp(name,"late-kill")){
         distributed_handle_unit_state(&state);saved_kill=kill_for(index);
+        kill_header.type=_distributed_message_damage_events;kill_header.count=1;
+        kill_header.checkpoint_epoch=distributed_checkpoint_epoch;
+        CHECK(distributed_message_epoch_valid(NONE,&kill_header,sizeof(kill_header)+sizeof(saved_kill)),"old life was current at first delivery");
         network_damage_handle_events(&saved_kill,1);
         CHECK(kill_calls==1&&damage_replayed_events==1,"first delivery legitimately kills old bound life");
         CHECK(TEST_FLAG(corpse->object.damage_flags,_object_dead_bit)&&player_get(player_index)->unit_index==NONE&&
             control_unit==NONE,"first delivery detaches the old life");
     }else SET_FLAG(corpse->object.damage_flags,_object_dead_bit,TRUE);
+    begin_checkpoint();
     if(!strncmp(name,"invalid-",8)||!strcmp(name,"outside-pool")){
         struct object_datum before=*corpse;
         if(!strcmp(name,"invalid-tag"))change.definition_index=99;
@@ -406,7 +580,9 @@ static int exercise(char const *name) {
         else change.object_index=DATUM_INDEX_NEW(16,0x1234);
         network_objects_handle_changes(&change,1);
         CHECK(constructed==1&&!deleted&&network_objects_client_has(index),"invalid description must not destroy replica");
-        CHECK(!memcmp(&before,corpse,sizeof(before)),"invalid description leaves object unchanged");return 0;
+        CHECK(!memcmp(&before,corpse,sizeof(before))&&objects_client_checkpoint_pending[3],"invalid description preserves object and recovery eligibility");
+        change=description(index);network_objects_handle_changes(&change,1);distributed_handle_unit_state(&state);
+        CHECK(constructed==2&&deleted==1&&control_unit==index&&!objects_client_checkpoint_pending[3],"next valid descriptor still reconstructs");return 0;
     }
     if(!strcmp(name,"host-dead")){
         SET_FLAG(change.flags,_distributed_object_dead_bit,TRUE);network_objects_handle_changes(&change,1);
@@ -420,8 +596,8 @@ static int exercise(char const *name) {
     }
     distributed_handle_unit_state(&state);
     CHECK(player_get(player_index)->unit_index==(require_detached?index:NONE),"alive state alone cannot replace a corpse");
-    CHECK(objects_client_ask_again==profile&&objects_client_synchronized==!profile,"profile request activation");
-    CHECK(objects_client_ready_interval==(profile?CLIENT_RETRY_TICKS:0),"ordinary retry delay");
+    CHECK(objects_client_ask_again&&!objects_client_synchronized,"authoritative recovery request");
+    CHECK(objects_client_ready_interval==CLIENT_RETRY_TICKS,"ordinary retry delay");
     if(!strcmp(name,"retry")){
         int i;long interval=objects_client_ready_interval;
         for(i=0;i<20;i++){now++;distributed_handle_unit_state(&state);}
@@ -447,18 +623,14 @@ static int exercise(char const *name) {
         CHECK(player_get(player_index)->unit_index==NONE&&control_unit==NONE,"failed replacement never binds");
         CHECK(objects_statistics.create_failures==1&&objects_client_ask_again,"failed allocation retains retry");return 0;
     }
-    if(!profile&&TEST_FLAG(object_get(index)->object.damage_flags,_object_dead_bit)){
-        CHECK(constructed==1&&deleted==0,"known failure must reuse the replica");
-        CHECK(TEST_FLAG(object_get(index)->object.damage_flags,_object_dead_bit),"known corpse");
-        CHECK(player_get(player_index)->unit_index==NONE&&control_unit==NONE,"known unbound player");
-        puts("known defect: validated live create leaves same-handle corpse unbound");return 41;
-    }
     CHECK(constructed==constructed_before+1&&deleted==deleted_before+(cosmetic!=NONE?2:1),"replacement constructor and destructor");
     CHECK(!TEST_FLAG(object_get(index)->object.damage_flags,_object_dead_bit),"new live replica");
     CHECK(player_get(player_index)->unit_index==index&&object_get(index)->unit.player_index==player_index,"reciprocal binding");
     CHECK(control_unit==index&&controls_changed==controls_before+1+(bound_before?1:0),"local control restored");
     CHECK(!require_detached||detached_before_construction,"bound corpse cleanup precedes reconstruction");
     CHECK(objects_client_has[3]==index&&network_objects_client_has(index),"exact authoritative handle");
+    CHECK(!objects_client_checkpoint_pending[3],"validated snapshot consumes recovery eligibility");
+    finish_snapshot();
     if(weapon!=NONE){
         CHECK(object_get(index)->unit.grenade_counts[0]==0,"replacement waits for host grenades");
         if(!strcmp(name,"late-inventory")){
@@ -478,35 +650,47 @@ static int exercise(char const *name) {
     if(!strcmp(name,"repeat")){
         SET_FLAG(object_get(index)->object.damage_flags,_object_dead_bit,TRUE);
         player_get(player_index)->action_object_index=index;
+        begin_checkpoint();
         network_objects_handle_changes(&change,1);distributed_handle_unit_state(&state);
         CHECK(constructed==3&&deleted==2,"second restore reconstructs again");
         CHECK(control_unit==index&&controls_changed==3,"bound corpse detaches then rebinds");
         CHECK(player_get(player_index)->action_object_index==NONE,"discarded action target cleared");
     }
-    if(!strncmp(name,"kill-",5)||!strcmp(name,"late-kill")){
+    if(!strncmp(name,"kill-",5)||!strcmp(name,"late-kill")||!strcmp(name,"same-epoch-create")){
         struct distributed_damage_event event=!strcmp(name,"late-kill")?saved_kill:kill_for(index);
         int kills_before=kill_calls,events_before=damage_replayed_events;
         if(!strcmp(name,"kill-unknown"))event.object_index=DATUM_INDEX_NEW(4,0x1234);
         if(!strcmp(name,"kill-invalid-number"))event.damage.scale=NAN;
         if(!strcmp(name,"kill-invalid-tag"))event.damage.definition_index=99;
         if(!strcmp(name,"kill-invalid-node"))event.node_index=1;
-        /* late-kill delivers the identical payload which killed the old life,
-           captured before reconstruction. No incarnation or timestamp is in this
-           payload. Transport acceptance/order is reviewed separately, not run. */
-        network_damage_handle_events(&event,1);
-        if(!strcmp(name,"late-kill")&&kill_calls==kills_before){
+        /* Deliver the identical old payload through the production lifetime
+           gate. The complete dispatcher/transport has separate coverage. */
+        if(strcmp(name,"late-kill")){
+            kill_header.type=_distributed_message_damage_events;kill_header.count=1;
+            kill_header.checkpoint_epoch=distributed_checkpoint_epoch;
+        }
+        if(distributed_message_epoch_valid(NONE,&kill_header,sizeof(kill_header)+sizeof(event)))
+            network_damage_handle_events(&event,1);
+        if(!strcmp(name,"late-kill")){
+            CHECK(kill_calls==kills_before&&damage_replayed_events==events_before,"old kill never reaches replay");
             CHECK(!TEST_FLAG(object_get(index)->object.damage_flags,_object_dead_bit)&&
                 player_get(player_index)->unit_index==index&&object_get(index)->unit.player_index==player_index&&
                 control_unit==index&&network_objects_client_has(index),"rejected old-life kill preserves reconstructed life");
-            return 0; /* A future correction becomes a strict XPASS, requiring review. */
+            return 0;
         }
-        if(!strcmp(name,"kill-current")||!strcmp(name,"late-kill")){
+        if(!strcmp(name,"kill-current")||!strcmp(name,"same-epoch-create")){
             CHECK(kill_calls==kills_before+1&&damage_replayed_events==events_before+1,"valid event reached real replay dispatch");
             CHECK(TEST_FLAG(object_get(index)->object.damage_flags,_object_dead_bit)&&
                 player_get(player_index)->unit_index==NONE,"accepted kill affects reconstructed life");
             network_damage_handle_events(&event,1);CHECK(kill_calls==kills_before+1,"already-dead duplicate not replayed");
-            if(!strcmp(name,"late-kill")){
-                puts("known limitation: accepted old-life kill affects reconstructed same-handle unit");return 42;
+            if(!strcmp(name,"same-epoch-create")){
+                int count=constructed;
+                network_objects_handle_changes(&change,1);distributed_handle_unit_state(&state);
+                CHECK(constructed==count&&TEST_FLAG(object_get(index)->object.damage_flags,_object_dead_bit)&&
+                    player_get(player_index)->unit_index==NONE,"later live description cannot revive a same-epoch death");
+                begin_checkpoint();network_objects_handle_changes(&change,1);distributed_handle_unit_state(&state);
+                CHECK(constructed==count+1&&!TEST_FLAG(object_get(index)->object.damage_flags,_object_dead_bit)&&
+                    control_unit==index,"next checkpoint explicitly permits same-handle recovery");
             }
         }else{
             CHECK(!kill_calls&&!TEST_FLAG(object_get(index)->object.damage_flags,_object_dead_bit),"refused kill leaves replica alive");

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""The combined OpenCE/MCC wire manifest (port/linux/network_format.txt).
+"""The combined GulchCE/MCC wire manifest (port/linux/network_format.txt).
 
-OpenCE protocol 41 is pinned separately by test_mcc_protocol.py. The combined
-manifest is versioned with MCC_PROTOCOL_VERSION; changing legacy wire items
-requires a verified upstream update as well, not merely an MCC version bump.
+OpenCE protocol 41 remains a historical baseline in test_mcc_protocol.py, with
+explicit audited shared differences. The combined manifest is versioned with
+MCC_PROTOCOL_VERSION; shared wire changes also require a new
+HALO_PORT_NETWORK_VERSION and both camera agreements, not merely an MCC bump.
 
 Taken from the sources: the game's message numbers, sizes and fields
 (network_messages.c, .h), the distributed netcode's (network_*.c, .h,
@@ -146,7 +147,7 @@ def items():
     camera = (ROOT / "port/linux/game/third_person_protocol.h").read_text()
     for name, value in re.findall(r"^#define (THIRD_PERSON_PROTOCOL_\w+) ([^\n]+)", camera, re.M):
         add(f"define {name}", value)
-    add("protocol OpenCE", re.search(r"#define HALO_PORT_NETWORK_VERSION (\d+)",
+    add("protocol GulchCE", re.search(r"#define HALO_PORT_NETWORK_VERSION (\d+)",
         (ROOT / "port/linux/include/halo_port_limits.h").read_text()).group(1))
     return result
 
@@ -189,7 +190,7 @@ def record():
     recorded_version, old = recorded()
     breaking = changes(old, new)[0]
     if breaking and recorded_version == version():
-        sys.exit("changed or removed: " + ", ".join(breaking) + "\nraise MCC_PROTOCOL_VERSION first (and verify the pinned OpenCE contract)")
+        sys.exit("changed or removed: " + ", ".join(breaking) + "\nraise MCC_PROTOCOL_VERSION first (and every affected shared/camera agreement)")
     RECORD.write_text(f"version {version()}\n" + "".join(f"{name} {new[name]}\n" for name in sorted(new)))
 
 

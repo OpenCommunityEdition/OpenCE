@@ -25,7 +25,8 @@ def generated(fault=None):
                       function(source, 'network_shield_effects_handle_message')])
     if fault:
         code = mutated(code, *fault)
-    return (('enums.inc', enums), ('under_test.inc', code))
+    return (('enums.inc', enums), ('under_test.inc', code),
+            ('message_header.inc', structure(read('port/linux/game/network_distributed.h'), 'distributed_message_header')))
 
 
 @pytest.mark.parametrize('case', ['offline', 'host', 'client', 'client_untrusted', 'coop'])

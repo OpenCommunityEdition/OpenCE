@@ -626,6 +626,7 @@ struct message_client_join_game_request
 	zero for none (port/linux/src/player_link.c) */
 	byte link_pass[170];
 	byte link_proof[64];
+	word network_version; /* port: shared agreement before host admission */
 };
 
 struct message_client_map_is_precached_pregame
@@ -754,7 +755,7 @@ typedef char message_client_ping_size_assert[
 	sizeof(struct message_client_ping) == 8 ? 1 : -1];
 /* (port: and a Discord account's pass and proof after the Xbox's 0x70) */
 typedef char message_client_join_game_request_size_assert[
-	sizeof(struct message_client_join_game_request) == 0x70 + 170 + 64 ? 1 : -1];
+	sizeof(struct message_client_join_game_request) == 0x70 + 170 + 64 + 2 ? 1 : -1];
 typedef char network_game_client_seconds_to_game_start_offset_assert[
 	offsetof(struct network_game_client, seconds_to_game_start) == NETWORK_GAME_CLIENT_TAIL_OFFSET + 0x10 ? 1 : -1];
 typedef char network_game_client_error_offset_assert[
@@ -2982,6 +2983,7 @@ static boolean network_game_client_idle_joining(
 				word camera_join[THIRD_PERSON_PROTOCOL_JOIN_MAX / sizeof(word)]; /* port: required camera admission */
 
 				csmemset(&join_game_request, 0, sizeof(join_game_request));
+				join_game_request.network_version = HALO_PORT_NETWORK_VERSION; /* port: explicit shared agreement */
 				network_game_generate_local_machine_name(join_game_request.machine_name);
 				csmemcpy(
 					join_game_request.join_token,
@@ -3369,7 +3371,7 @@ void network_game_client_tell_version(
 	}
 	/* port: numeric ordering alone cannot explain this branch's reserved versions. */
 	csstrcat(message, "\n\nGulchCE Third Person sessions require a matching camera build. "
-		"OpenCE Crossplay sessions require the supported OpenCE protocol.");
+		"GulchCE Standard sessions also require a matching GulchCE build; OpenCE clients are not compatible.");
 	network_event("not joining a host of network version %u%s (this machine's is %u)", theirs,
 		distributed ? "" : " with the lockstep netcode", ours);
 	platform_show_message("Halo: cannot join this game", message);

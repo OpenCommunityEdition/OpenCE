@@ -1,8 +1,9 @@
-"""Admission, framing and the pinned OpenCE 41 wire contract.
+"""Admission, framing and the audited differences from OpenCE 41.
 
 The AGPL-3.0-or-later baseline fixture comes unchanged from OpenCommunityEdition/OpenCE
 c507cb26b6ea7e89c7669fb7c911e27b80d5d779, port/linux/network_format.txt.
-Update it only after auditing and testing a new upstream protocol.
+Keep this historical fixture unchanged; GulchCE's shared checkpoint agreement
+has explicit differences below and does not claim OpenCE crossplay.
 """
 from pathlib import Path
 import re
@@ -15,7 +16,7 @@ import network_format
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_opence_41_contract():
+def test_audited_changes_from_opence_41_contract():
     lines = (ROOT / "tools/fixtures/opence_network_41.txt").read_text().splitlines()
     assert lines[0] == "version 41"
     expected = {f"{kind} {name}": value for kind, name, value in
@@ -25,9 +26,16 @@ def test_opence_41_contract():
     # Compare the upstream size separately rather than accepting a fork size.
     assert actual["layout HALO_PORT_NETWORK_GAME_SIZE"] == "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 32) /* MCC SHA-256 */"
     actual["layout HALO_PORT_NETWORK_GAME_SIZE"] = "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A)"
-    assert {key: actual.get(key) for key in expected} == expected
+    # The appended join agreement and distributed world epoch are the only
+    # changes to existing upstream wire items. New kinds are checked separately.
+    changed = {
+        "fields client_join_game_request": "d7dd965724e6",
+        "size message_client_join_game_request": "0x70 + 170 + 64 + 2",
+        "struct distributed_message_header": "5bc35a4ad92a",
+    }
+    assert {key: actual.get(key) for key in expected if actual.get(key) != expected[key]} == changed
     limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
-    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 41\b", limits)
+    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 32714\b", limits)
     # All fields of the transmitted prefix match upstream, including names,
     # types and order. The Windows build also asserts the actual ABI offsets.
     header = (ROOT / "source/networking/network_game_manager.h").read_text()
@@ -54,7 +62,7 @@ typedef int boolean;
 #define TRUE 1
 #define FALSE 0
 #define HALO_PORT_NETWORK_GAME_PLAYERS_END 6
-#define HALO_PORT_NETWORK_VERSION 41
+#define HALO_PORT_NETWORK_VERSION 32714
 #define HALO_PORT_MAXIMUM_NETWORK_MACHINES 4
 #define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))
 #define csmemcpy memcpy
@@ -93,7 +101,7 @@ int main(void) {
     byte saved;
     int i;
     memset(&game,0,sizeof(game));strcpy(game.map.name,"levels\\test\\bloodgulch\\bloodgulch");
-    CHECK(mcc_protocol_version(game.map.name)==41);
+    CHECK(mcc_protocol_version(game.map.name)==32714);
     CHECK(mcc_protocol_settings_size(&game)==64);
     CHECK(mcc_protocol_settings_valid(&game,64));CHECK(!mcc_protocol_settings_valid(&game,96));
     build_message_header(original,sizeof(original),3,0);
@@ -102,10 +110,10 @@ int main(void) {
     mcc_protocol_client_begin(MCC_PROTOCOL_ADVERTISED_FLAG);
     CHECK(mcc_protocol_join(original,sizeof(original),outer)==outer);
     CHECK(mcc_protocol_unwrap(outer,40,inner,&size));CHECK(size==32 && !memcmp(inner,original,32));
-    /* Script admission changes gameplay without changing packet sizes.
+    /* Shared checkpoint epochs change all sessions' wire agreement.
      * Reject the previous MCC revision before interpreting settings. */
-    CHECK(MCC_PROTOCOL_VERSION==65);
-    ((byte *)outer)[4]=64;
+    CHECK(MCC_PROTOCOL_VERSION==66);
+    ((byte *)outer)[4]=65;
     CHECK(!mcc_protocol_unwrap(outer,40,inner,&size));
     ((byte *)outer)[4]=MCC_PROTOCOL_VERSION;
     for(i=0;i<257;i++) if(i!=40) CHECK(!mcc_protocol_unwrap(outer,(word)i,inner,&size));
@@ -230,6 +238,7 @@ typedef unsigned short word;
 #define MAXIMUM_MACHINE_NAME_LENGTH 16
 #define JOIN_GAME_TOKEN_LENGTH 16
 #define NETWORK_GAME_MESSAGE_VERSION 1
+#define HALO_PORT_NETWORK_VERSION 32714
 #define csmemcmp memcmp
 #define csmemcpy memcpy
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}} while(0)
@@ -245,7 +254,7 @@ struct network_connection {int unused;};
 struct transport_address {struct {unsigned long long_words[1];} address;};
 #define IPV4_LOOPBACK_ADDRESS 0x7f000001UL
 struct network_machine {wchar_t name[16];};
-struct message_client_join_game_request {wchar_t machine_name[16];char hardware_id[32];byte join_game_token[16];byte link_pass[192];byte link_proof[64];};
+struct message_client_join_game_request {wchar_t machine_name[16];char hardware_id[32];byte join_game_token[16];byte link_pass[192];byte link_proof[64];word network_version;};
 struct message_server_machine_accepted {short machine_index;long random_seed;};
 struct message_server_machine_rejected {int reason;};
 struct network_message {word header;};
@@ -254,13 +263,15 @@ static struct network_machine machine;
 static struct network_message fake_reply;
 static int state,late,joined,decode_ok,token_ok,slots,open_game,banned,accepted,capable,requires_mcc,name_blocked;
 static int camera_locked;
+static word join_version;
 static int replaceable_bots;
 static int bots_population_can_join(struct network_game_server *s) {(void)s;return replaceable_bots;}
 static unsigned long peer_address;
 static void third_person_session_lock(void) {camera_locked=1;}
 static int decode(void *out) {
  struct message_client_join_game_request *q=out;
- memset(q,0,sizeof(*q));memset(q->join_game_token,token_ok?7:8,16);return decode_ok;
+ memset(q,0,sizeof(*q));memset(q->join_game_token,token_ok?7:8,16);
+ q->network_version=join_version;return decode_ok;
 }
 static int accept(void) {if(banned)return 0;accepted++;return 1;}
 #define network_game_server_accepts_late_joins(s) late
@@ -297,14 +308,20 @@ static void reset(void) {
  state=0;late=joined=banned=accepted=capable=requires_mcc=name_blocked=0;
  camera_locked=replaceable_bots=0;peer_address=2;game.machine_count=1;
  decode_ok=token_ok=slots=open_game=1;
+ join_version=HALO_PORT_NETWORK_VERSION;
 }
 static int try_join(int capability) {
  word packet[16]={0};struct network_game_server s;struct network_game_server_client_machine m;
  return network_game_server_handle_message_client_join_game_request(&s,&m,packet,sizeof(packet),capability);
 }
 int main(void) {
- int cap,mcc;
+ int cap,mcc,i;
+ word invalid_versions[]={0,41,42,65,66,32712,32713,32716,32717,65535};
  for(mcc=0;mcc<2;mcc++) for(cap=0;cap<2;cap++) {
+  for(i=0;i<(int)(sizeof(invalid_versions)/sizeof(invalid_versions[0]));i++) {
+   reset();requires_mcc=mcc;join_version=invalid_versions[i];
+   CHECK(!try_join(cap) && !accepted && !capable && !camera_locked);
+  }
   reset();requires_mcc=mcc;CHECK(try_join(cap)==(!mcc||cap));CHECK(accepted==(!mcc||cap));CHECK(camera_locked==accepted);
   reset();requires_mcc=mcc;peer_address=IPV4_LOOPBACK_ADDRESS;
   CHECK(try_join(cap)==(!mcc||cap));CHECK(!camera_locked);
@@ -341,7 +358,7 @@ def test_gameplay_direction_and_mcc_boundary(tmp_path):
     family = dispatch[dispatch.index("\tif (header.type >= _distributed_message_mcc_grenades"):
                       dispatch.index("\t/* a tick's messages in one:")]
     direction = dispatch[dispatch.index("\t/* (each kind from the host, or from a client) */"):
-                         dispatch.index("\tif (!distributed_message_time_bounded")]
+                         dispatch.index("\tif (!distributed_message_epoch_valid")]
     kinds = enum_with((ROOT / "port/linux/game/network_distributed.h").read_text(),
                       "_distributed_message_player_prediction")
     code = r'''
@@ -420,11 +437,16 @@ def test_chat_and_mcc_message_ids_are_disjoint():
     join_kind = int(re.search(r"#define MCC_PROTOCOL_JOIN_KIND (\d+)", protocol).group(1))
     assert join_kind not in messages.values()
     header = (ROOT / "port/linux/game/network_distributed.h").read_text()
-    assert header.index("_distributed_message_aim_assist_policy = 90") < header.index("_distributed_message_mcc_grenades = 96")
+    assert messages["enum _distributed_message_checkpoint"] == 96
+    assert join_kind == 101
+    camera = (ROOT / "port/linux/game/third_person_protocol.h").read_text()
+    camera_join = int(re.search(r"#define THIRD_PERSON_PROTOCOL_JOIN_KIND (\d+)", camera).group(1))
+    assert camera_join == 102 and camera_join not in messages.values()
+    assert header.index("_distributed_message_aim_assist_policy = 90") < header.index("_distributed_message_mcc_grenades = 97")
     assert [messages["enum _distributed_message_chat_" + name]
             for name in ("up", "down", "config")] == [87, 88, 89]
     assert [messages["enum _distributed_message_mcc_" + name]
-            for name in ("grenades", "campaign", "object_names", "game_speed")] == [96, 97, 98, 99]
+            for name in ("grenades", "campaign", "object_names", "game_speed")] == [97, 98, 99, 100]
     # The receive boundary must admit chat in ordinary sessions while rejecting
     # MCC data before dispatch; it also applies recursively to batched messages.
     receiver = function((ROOT / "port/linux/game/network_distributed.c").read_text(),

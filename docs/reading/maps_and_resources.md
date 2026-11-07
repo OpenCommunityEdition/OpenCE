@@ -72,7 +72,7 @@ authoritative even when ids differ. Metadata is cached with host preparation
 and cleared on disconnect; changing a sidecar during a session requires fresh
 host preparation after disconnect. Identity checks do not require Steam.
 See [installation and messages](../mcc_maps.md#installation-and-menus) and the
-[MCC wire contract](../../port/linux/NETCODE.md#gulchce-crossplay-boundary).
+[MCC wire contract](../../port/linux/NETCODE.md#gulchce-network-agreement).
 Focused checks are `test_mcc_workshop.py`, `test_mcc_identity.py` and
 `test_mcc_protocol.py` under [`tools`](../../tools/).
 

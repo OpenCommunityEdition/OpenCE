@@ -86,25 +86,31 @@ The upstream optional client-hand origins remain separately controlled.
 
 ## Session compatibility
 
-See the [crossplay qualification](third_person_crossplay_qualification.md)
-for the tested revisions, menu checks and remaining validation limits.
+The [earlier crossplay qualification](third_person_crossplay_qualification.md)
+records its tested revisions and menu checks; it does not qualify the current
+shared checkpoint agreement. See the
+[shared recovery validation record](../mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-fix)
+for the updated contract's checks and limits.
 
 Host setup keeps its existing layout; **Session Options** opens the
 compatibility and camera-policy controls plus the invite link. Moving that
 link leaves room for two lines of host-menu help without shrinking the rows.
 Both camera rows use the standard menu
 font and full-size selection background. The compatibility selector defaults
-to **OpenCE Crossplay**. On Xbox and Custom
-Edition maps this uses the pinned OpenCE 41 wire format and simulation paths.
-The optional shoulder camera, its input bit, muzzle solver and checkpoint
-recovery extensions are disabled, regardless of the saved preference.
+to **GulchCE Standard** (STANDARD in the menu). The stored configuration value
+`opence_crossplay` is retained so existing settings still select this mode;
+it no longer promises OpenCE interoperability. Xbox and Custom Edition maps
+require shared agreement 32714, and MCC maps require MCC agreement 66.
+The optional shoulder camera, its input bit and muzzle solver are disabled,
+regardless of the saved preference. Shared checkpoint recovery is active in
+both session modes.
 Normal vehicles, scripted cameras and MCC weapon-authored cameras are unchanged.
-MCC maps still require the separate MCC 63 capability; the crossplay selector
-does not make MCC maps compatible with OpenCE.
+All network peers need matching updated GulchCE contracts. The selector does
+not make MCC maps compatible with OpenCE or older GulchCE builds.
 
 **GulchCE Third Person** enables Player Choice / Forced On / Forced Off and
-requires camera agreement 32712 (Xbox/CE) or 32713 (MCC). It uses bounded join
-kind 101 around the normal join, or around MCC's own kind 100 envelope. The
+requires camera agreement 32716 (Xbox/CE) or 32717 (MCC). It uses bounded join
+kind 102 around the normal join, or around MCC's own kind 101 envelope. The
 larger bound includes OpenCE 41's account-link credentials. Camera policy uses
 bits 3-4, leaving OpenCE's co-op flags in bits 0-2. Forced Off is still a camera
 session and requires the same admission proof and relay format.
@@ -121,15 +127,15 @@ and teardown hooks bind permission to the selected host and clear it at the
 connection boundary. Settings validate policy bits against that permission;
 settings and personal preferences cannot enable a camera extension themselves.
 
-For example, a player with third person saved as on joins an OpenCE host:
+For example, a player with third person saved as on joins a GulchCE Standard host:
 the ordinary join and relay are used, N cannot enable the shoulder camera,
 and the saved preference remains on. Disconnecting clears the session state;
 offline play can use that preference again. A matching GulchCE camera host
 instead supplies the authoritative camera policy. A stale or unsupported
-camera revision is rejected, rather than treated as OpenCE-compatible.
+camera revision is rejected. An OpenCE 41 advertisement is incompatible.
 
-The common internet discovery transport remains OpenCE 41, as with MCC.
-The subsequent game advertisement and admission establish actual support;
+Internet discovery advertises the shared GulchCE revision. The subsequent
+game advertisement and admission establish the map and camera agreements;
 a listing is never permission to enable the camera. There is no change to
 WebRTC framing or signalling. Separate-computer/WAN checks remain a release
 validation requirement, not something established by local two-peer tests.
@@ -149,23 +155,40 @@ host roster when a checkpoint predates a join or departure. The small
 [game_state.c](../../source/saved%20games/game_state.c) after-load hook must
 run before observer, director and input restoration: those caches need the
 live players, rather than the saved membership. This co-op
-lifecycle extension runs only in GulchCE camera sessions, including Forced Off;
-OpenCE Crossplay retains the upstream checkpoint behavior. It is not an MCC adapter.
+lifecycle fix runs in all network co-op sessions, independently of camera
+preferences or policy. It is not an MCC adapter.
 It uses the established player, unit and session interfaces; Xbox, Custom
 Edition and MCC discovery/loading remain separate. Clients do not choose
 membership or restore a checkpoint themselves. `tools/test_coop_checkpoint.py`
 checks departed players, added/reused slots, local viewports, stale machine
-handles, invalid roster entries, repeat restores and the inactive guard.
-After the restore, `network_objects_host_reverted` immediately sends loaded
-peers fresh object descriptions. This covers objects restored under an old
-handle without making clients wait for the normal resynchronization backoff.
+handles, invalid roster entries, repeat restores and the non-host guard.
+After the restore, `network_distributed_reverted` advances the host's world
+epoch, clears pending recovery state and sends a reliable boundary before
+`network_objects_host_reverted` immediately sends loaded peers fresh object
+descriptions, complete ordinary inventories including empty ones, and an
+ordered end marker. This covers objects restored under an old handle without
+making clients wait for the normal resynchronization backoff.
 Only the host's checkpoint path bypasses the resend interval; client requests
-retain their limits. The host's live-unit samples also trigger bounded object resynchronization
-when a co-op client's copy remains dead. `network_objects_expect_live_unit`
-and `distributed_client_reuses_object` in
-[network_objects.c](../../port/linux/game/network_objects.c) request and
-apply a fresh validated host description instead of clearing death flags
-locally. The checkpoint tests cover this recovery and its retry limits.
+retain their limits. While that snapshot arrives, the client admits its
+ordered descriptions and ordinary inventories, suppresses other incoming and
+outgoing gameplay, and postpones local inventory and vehicle prediction notes.
+Readiness and inventory retries continue. Receipt of the end marker does not
+claim that a failed object creation has succeeded.
+
+`network_objects_expect_live_unit` in
+[network_objects.c](../../port/linux/game/network_objects.c) requests bounded
+resynchronization when the host says a co-op unit is alive but the local copy
+is dead. `distributed_client_reuses_object` permits reconstruction only for
+the first validated description of that slot in the checkpoint epoch. A later
+live description cannot resurrect a unit killed in the same epoch; a new
+checkpoint renews eligibility. Old-epoch messages cannot mutate the restored
+world even when they name the same object handle. These rules apply with
+either camera perspective. The
+[networking guide](networking.md#authority-also-governs-hits-and-object-lifetime)
+explains the ordering, client effect cleanup and the remaining limits of
+authored HUD, navigation-point and attachment rollback. The checkpoint tests cover recovery and retry
+limits; the [shared recovery validation record](../mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-fix)
+records the checks actually completed for the updated contracts.
 
 `tools/test_third_person.py` exercises the production camera and muzzle
 solver with controlled collision worlds, including near cover, FOV, scope,

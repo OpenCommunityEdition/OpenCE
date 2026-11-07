@@ -9,9 +9,12 @@ seconds apart at most. test_map_share_trust.py takes the constants and
 structures (config.inc) and the code (under_test.inc).
 */
 
+#define _CRT_SECURE_NO_WARNINGS
 #include "harness.h"
 
 typedef unsigned short word;
+typedef word message_header;
+#include "message_header.inc"
 
 #include "config.inc"
 
@@ -29,14 +32,6 @@ typedef unsigned short word;
 
 /* the fake world: a clock, the host's game and its machines, a catalog of one
 file, and what the code under test did */
-struct distributed_message_header
-{
-	word header;
-	byte type;
-	byte count;
-	long game_time;
-};
-
 struct network_game
 {
 	struct

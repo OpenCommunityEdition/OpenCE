@@ -12,16 +12,16 @@
   <a href="https://www.youtube.com/channel/UC9Hn6j6BdKwoyu_hGXdfzvw">check out the youtube</a>
   <br>
   <br>
-  forever <strong>compatible</strong>, for <strong>everyone</strong>
+  built for <strong>Windows, Linux, Android and the web</strong>
 </p>
 <hr>
 
 <h3 align="center">
-GulchCE will always be compatible with OpenCE, so everyone can play together.
+This development branch requires matching GulchCE network builds.
 </h3>
 <br>
 <p align="center">
-Any fork compatible with OpenCE is also compatible with GulchCE. Crossplay galore!
+Shared checkpoint recovery uses a new network agreement across all map families.
 </p>
 <br>
 <p align="center">
@@ -52,19 +52,19 @@ release signing is configured, `SHA256SUMS.sig` carries the Ed25519 signature;
 
 The Linux binary release is available on the [AUR](https://aur.archlinux.org/packages/gulchce-bin).
 
-## Will you always stay compatible with OpenCE?
+## Can I play with OpenCE clients?
 
-GulchCE and OpenCE players can play together on Xbox and Custom Edition maps
-in **OpenCE Crossplay** sessions. This branch also offers **GulchCE Third
-Person** sessions, which require matching camera builds. MCC maps require
-compatible GulchCE clients in either session mode.
+This development branch requires matching GulchCE clients on Xbox, Custom
+Edition and MCC maps. Shared checkpoint recovery changes the network agreement
+so delayed messages cannot affect a restored player's earlier object handle.
+Existing OpenCE 41 clients cannot join these sessions.
 
-This is due to MCC-specific netcode additions that only function when an
-MCC map is being played online. OpenCE clients wouldn't recognise the
-network messages.
+**GulchCE Standard** keeps the optional shoulder camera disabled. **GulchCE
+Third Person** uses its own matching camera agreement. Recovery works in both
+modes; changing the camera setting does not restore old-client compatibility.
 
-Once MCC map support is fully ironed out on GulchCE, OpenCE will be asked
-if they would like the MCC map support feature on their own, main repo.
+An upstream contribution is planned. Compatibility with a future OpenCE
+release depends on the agreement it adopts and must be validated separately.
 
 ## How do I install MCC maps?
 

@@ -4881,7 +4881,7 @@
 	</widget>
 	<widget name="modern/network/session/4/session_compatibility_label" type="text" controller="1" width="152" height="24" text="COMPATIBILITY" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
 	</widget>
-	<widget name="modern/network/session/5/session_compatibility_spinner" type="spinner" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="CROSSPLAY|GULCHCE" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" left="0" text_x="0" text_y="0">
+	<widget name="modern/network/session/5/session_compatibility_spinner" type="spinner" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STANDARD|THIRD PERSON" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" left="0" text_x="0" text_y="0">
 		<on event="left_mouse" run="mouse spinner 1wide click" />
 	</widget>
 	<widget name="modern/network/session/6/op_camera_policy" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">

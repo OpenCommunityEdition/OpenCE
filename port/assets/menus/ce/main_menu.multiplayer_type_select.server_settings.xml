@@ -113,7 +113,7 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_label" type="text" controller="1" width="260" height="22" text="SESSION COMPATIBILITY:" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_spinner" type="spinner" top="3" width="237" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="CROSSPLAY|GULCHCE" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 0 19 6" footer_bounds="7 231 19 237">
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_spinner" type="spinner" top="3" width="237" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STANDARD|THIRD PERSON" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 0 19 6" footer_bounds="7 231 19 237">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/op_camera_policy" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">

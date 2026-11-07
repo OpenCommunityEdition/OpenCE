@@ -453,6 +453,7 @@ struct message_client_join_game_request
 	refused the machine for its VPN asks for it) */
 	byte link_pass[170];
 	byte link_proof[64];
+	word network_version; /* port: shared agreement before host admission */
 };
 
 struct message_client_settings_request
@@ -1245,7 +1246,7 @@ boolean network_game_server_handle_client_message(
 								server,
 								machine,
 								message,
-								message_buffer_size, FALSE); /* port: ordinary OpenCE join */
+								message_buffer_size, FALSE); /* port: ordinary shared join */
 							if (!result)
 							{
 								network_event("network_game_server_handle_message_client_join_game_request() failed");
@@ -1855,7 +1856,7 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			older builds had: network_client_manager.c) */
 			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(third_person_session_version(game->map.name) & 0xFF);
 			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(third_person_session_version(game->map.name) >> 8);
-			/* port: capability version is separate even in an OpenCE lobby. */
+			/* port: MCC capability version is separate in either session profile. */
 			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET] = MCC_PROTOCOL_VERSION & 255;
 			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET + 1] = MCC_PROTOCOL_VERSION >> 8;
 			advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] =
@@ -2038,6 +2039,15 @@ static boolean network_game_server_handle_message_client_join_game_request(
 			boolean full = network_game_server_get_state(server, NULL) == _network_game_server_state_pregame &&
 				!network_game_has_free_player_slot(network_game_server_get_game(server)) &&
 				!bots_population_can_join(server); /* port: validated humans can replace lobby bots */
+
+			/* port: discovery is advisory; direct joins must prove the same
+			shared recovery agreement before capability or ordinary admission. */
+			if (join_game_request.network_version != HALO_PORT_NETWORK_VERSION)
+			{
+				network_event("join requires GulchCE network version %u (client %u)",
+					HALO_PORT_NETWORK_VERSION, join_game_request.network_version);
+				return FALSE;
+			}
 
 			/* port: bind capability to this connection before the normal admission.
 			 * A failed join is removed through the same lifecycle as any other peer. */

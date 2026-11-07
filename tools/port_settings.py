@@ -1754,7 +1754,7 @@ def _bots_link(base, name, host_only=False):
 def _session_options(base: str, host: str) -> list:
     rows, extra = [], []
     for key, label, values in [
-        ("session_compatibility", "SESSION COMPATIBILITY:", "CROSSPLAY|GULCHCE"),
+        ("session_compatibility", "SESSION COMPATIBILITY:", "STANDARD|THIRD PERSON"),
         ("camera_policy", "CAMERA POLICY:", "PLAYER CHOICE|FORCED ON|FORCED OFF"),
     ]:
         extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
