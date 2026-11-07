@@ -6,6 +6,11 @@ menus. It is an experimental
 runtime adapter, with explicit format limits below. A successful menu
 probe or file audit is not proof that a map plays correctly.
 
+The [MCC refactor validation baseline](mcc_refactor_validation.md) records
+Stage 1's build, checks and installed-Workshop smoke procedure. Its bounded
+results supplement the historical evidence here; they do not establish full
+campaign compatibility.
+
 ## Loading feedback
 
 MCC map conversion displays OpenCE's original animated loading effect. Its

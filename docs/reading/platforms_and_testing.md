@@ -133,6 +133,16 @@ stands on the floor, moves and jumps using positions sampled from the run.
 Those samples are not every physics step. Stagekit is Linux-only and needs
 the build/runtime prerequisites described in its README.
 
+## MCC refactor baseline
+
+For the MCC refactor's concrete baseline, see
+[MCC refactor validation](../mcc_refactor_validation.md). It records the
+starting revision, the installed-Workshop smoke runner, the distinction
+between pytest coverage and direct GPU execution, and actual validation
+limits. Read `parse_args`, `case_environment`, `run_case` and `check_result`
+in [mcc_native_smoke.py](../../tools/mcc_native_smoke.py) to follow a virtual
+Workshop level name through an isolated hidden game run and its evidence.
+
 ## Work through a suspected movement regression
 
 Suppose a player unexpectedly falls through an elevator. First record the
@@ -173,10 +183,8 @@ Name skipped tests and missing prerequisites. For rendering, include the
 backend and a real image check; for maps, distinguish loading from campaign
 completion; for networking, name roles, transports and relevant transitions.
 
-This documentation pass inspected the cited code and test contracts and
-checked documentation consistency. It did not launch games, run these
-gameplay suites, measure performance or produce new compatibility results.
-Existing test and design documents remain the source for their own recorded
-evidence. The reader's guide explains how to interpret that evidence.
+The linked test, design and baseline documents record their own validation.
+Example commands in this chapter are not claims that those checks ran.
+The reader's guide explains how to interpret the evidence and its limits.
 
 Return to the [guide](README.md) for the full reading route.

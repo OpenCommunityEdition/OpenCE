@@ -2,7 +2,7 @@
 
 Uses the existing hidden-GL test builder. Covers all 256 authored shape values,
 fill thresholds, empty/full/partial meters and fractional placement at 1440p HUD
-scale. Run directly in an environment with SDL3, clang, NumPy and Pillow.
+scale. Run directly in an environment with SDL3, clang, NumPy, Pillow and SciPy.
 """
 from pathlib import Path
 import test_hud_ammo_thresholds as gpu
