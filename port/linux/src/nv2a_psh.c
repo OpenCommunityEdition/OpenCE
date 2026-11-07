@@ -651,6 +651,8 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 		xgpu_text_append(&text, "uniform %s tex%d;\n", sampler_declaration(key->sampler_type[stage]), stage);
 	if (key->source_blend)
 		xgpu_text_append(&text, "uniform vec4 blend_constant;\n");
+	if (key->hdr_alpha_clamp)
+		xgpu_text_append(&text, "uniform bool alpha_clamp_pass;\n");
 	if (key->per_pixel_lighting)
 		model_lighting(&text, key->per_pixel_lighting == 2);
 	xgpu_text_append(&text,
@@ -792,6 +794,11 @@ char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key)
 			factors[(key->source_blend - 1) & 3]);
 		return text.buffer;
 	}
-	xgpu_text_append(&text, "\tfragment_color = clamp(result, 0.0, 1.0);\n}\n");
+	xgpu_text_append(&text, "\tfragment_color = clamp(result, 0.0, 1.0);\n");
+	/* (the pass that stops alpha at one in the half-float back buffer: the
+	key's hdr_alpha_clamp) */
+	if (key->hdr_alpha_clamp)
+		xgpu_text_append(&text, "\tif (alpha_clamp_pass)\n\t\tfragment_color = vec4(1.0);\n");
+	xgpu_text_append(&text, "}\n");
 	return text.buffer;
 }
