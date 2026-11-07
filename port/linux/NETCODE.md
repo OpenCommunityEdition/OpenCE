@@ -118,6 +118,16 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   description of a slot in an epoch may reconstruct an old corpse: a later
   resend cannot revive a unit already killed in the current world.
 
+  Client simulation continues during transfer. On the first validated ordered
+  end marker for the current epoch, `distributed_message_epoch_valid` retires
+  client projectiles and delayed gameplay effects created while the snapshot
+  was incomplete, clears queued hits through `network_damage_new_game`, and
+  resets provisional input, prediction and send histories through
+  `distributed_reset_checkpoint_state(FALSE)` before ordinary gameplay messages
+  resume. Already applied objects and inventories remain intact. Sender and per-message receive
+  times also remain, so older same-epoch datagrams cannot overwrite the ordered
+  snapshot. Duplicate end markers do not erase current gameplay or its histories.
+
   Adoption clears transient prediction, death, inventory, animation, input and
   queued-effect histories. Client projectiles from the discarded prediction
   and delayed effects capable of damage/object creation are deleted through

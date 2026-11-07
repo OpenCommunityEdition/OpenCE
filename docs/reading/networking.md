@@ -194,6 +194,18 @@ make the restored inventory look like an acknowledgement of a local shot.
 The marker confirms ordered delivery; failed object creation still uses the
 existing retry path rather than being declared successful.
 
+Client simulation continues during the transfer, so it can create projectiles,
+delayed effects and hit reports from replicas that are only partly restored.
+On the first validated ordered host end marker for the current epoch,
+`distributed_message_epoch_valid` retires those projectiles and effects with
+`network_objects_discard_client_effects`, clears hit queues through
+`network_damage_new_game`, and clears provisional input, prediction and send
+histories through `distributed_reset_checkpoint_state(FALSE)` before ordinary
+gameplay messages resume. This preserves the object descriptions and inventories
+already applied from the snapshot. It also retains sender and per-message receive times, so
+older datagrams in the same epoch remain stale. A duplicate end marker does
+not repeat this cleanup or erase current gameplay.
+
 In `distributed_client_create`, only the first validated description for an
 object slot in the new epoch may replace a same-handle dead co-op unit with
 the host's live copy. `distributed_client_reuses_object` applies that rule;
@@ -202,8 +214,8 @@ description in the same epoch cannot undo a newer death. Another checkpoint
 explicitly renews eligibility. Existing healthy replicas retain their normal
 reuse path.
 
-The reset also calls `network_objects_discard_client_effects`: old client
-projectiles and effects with delayed object or damage parts are deleted
+The initial boundary reset also calls `network_objects_discard_client_effects`:
+old client projectiles and effects with delayed object or damage parts are deleted
 through their existing lifecycle. Host checkpoint projectiles remain intact.
 This boundary does not comprehensively reset or reconstruct authored HUD,
 navigation-point and attachment caches. Those pre-existing presentation paths

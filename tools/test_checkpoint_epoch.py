@@ -8,7 +8,7 @@ from test_hud_button_style import run_c
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def generated():
+def generated(checkpoint_reset=None):
     source = (ROOT / "port/linux/game/network_distributed.c").read_text()
     header = (ROOT / "port/linux/game/network_distributed.h").read_text()
     enum_start = header.index("enum\n{")
@@ -63,6 +63,8 @@ static int mcc_cache_tags_loaded(void){return mcc;}
 static int network_connection_last_read_was_unreliable(void){return unreliable;}
 static unsigned long system_milliseconds(void){return 1000;}
 static void distributed_restore_checkpoint(void){resets++;}
+static void network_objects_discard_client_effects(void){}
+static void network_damage_new_game(void){}
 static void distributed_note_client_clock(long m,long t){(void)m;(void)t;clock_notes++;}
 static int distributed_machine_clock_fast(long m){(void)m;return 0;}
 static void error(int level,char const *fmt,...){(void)level;(void)fmt;}
@@ -85,6 +87,7 @@ static void error(int level,char const *fmt,...){(void)level;(void)fmt;}
 static long distributed_sender_times[MAXIMUM_SENDERS];
 static long distributed_received_times[MAXIMUM_SENDERS][NUMBER_OF_DISTRIBUTED_MESSAGES];
 '''
+    code += checkpoint_reset or "static void distributed_reset_checkpoint_state(boolean receive){(void)receive;}\n"
     for name in ("distributed_advance_checkpoint", "distributed_message_epoch_valid",
                  "distributed_message_time_bounded", "distributed_message_stale"):
         code += function(source, name)
@@ -272,6 +275,87 @@ int main(void){
  connection=1;in_game=0;
  distributed_send(&message,_distributed_message_chat_up,0,sizeof(message),_distributed_to_host_reliably);
  assert(wire_calls==7);return 0;
+}
+'''
+    run_c(tmp_path, code)
+
+
+def test_snapshot_completion_retires_predictions_but_keeps_receive_history(tmp_path):
+    source = (ROOT / "port/linux/game/network_distributed.c").read_text()
+    # Bounded fake storage for the real reset and dispatcher; the separate
+    # lifecycle fixture owns actual object/inventory and damage-queue behavior.
+    storage = r'''
+#define MAXIMUM_TRACKED_PLAYERS 2
+#define MAXIMUM_LOCAL_PLAYERS 2
+#define OWN_POSITION_TICKS 4
+static long distributed_last_sent_time;
+static struct {boolean valid;long dead_since;} distributed_deaths[2];
+static int distributed_seat_disagreements[2],distributed_accepted[2];
+static struct {boolean valid;long taken_host_time;} distributed_predictions[2];
+static struct {long unit_index;} distributed_host_speeds[2];
+static int distributed_input_facings[2],distributed_seen[2],distributed_viewers[2];
+static int distributed_sends[2],distributed_host_states[2],distributed_host_actions[2];
+static int distributed_sent_statistics[2],distributed_statistics_cursor,distributed_statistics_due;
+static long distributed_game_state_checksum,distributed_game_state_time,distributed_host_update_number;
+static long distributed_sent_structure_bsp_index,distributed_pickup_count;
+static struct {boolean valid;} distributed_machines;
+static struct {long flags,unit_index,vehicle_index,seat_index;} distributed_sent_units[2];
+static long distributed_player_machines[2];
+static struct {long taken_time[2],taken_host_time[2],input_time[2];} distributed_divergence;
+static struct {long size;} distributed_batches[MAXIMUM_SENDERS];
+static struct {long time,unit_index;} distributed_own_positions[2][4];
+static int provisional_inputs;
+static void update_queues_distributed_reset(void){provisional_inputs=0;}
+'''
+    code = generated(storage + function(source, "distributed_reset_checkpoint_state"))
+    code += r'''
+static void provisional(void){
+ int i,j;
+ provisional_inputs=3;distributed_last_sent_time=111;distributed_pickup_count=3;
+ distributed_machines.valid=TRUE;
+ for(i=0;i<2;i++){
+  distributed_predictions[i].valid=TRUE;distributed_predictions[i].taken_host_time=111;
+  distributed_host_states[i]=9;distributed_accepted[i]=9;distributed_sends[i]=9;
+  distributed_divergence.input_time[i]=111;distributed_sent_units[i].unit_index=77;
+  for(j=0;j<4;j++){distributed_own_positions[i][j].time=111;distributed_own_positions[i][j].unit_index=77;}
+ }
+ for(i=0;i<MAXIMUM_SENDERS;i++)distributed_batches[i].size=17;
+}
+int main(void){
+ int i,j;long received,sender;
+ setup();send(NONE,_distributed_message_checkpoint,2,100,0,12);
+ send(NONE,_distributed_message_inventories,2,100,1,13);
+ assert(delivered[_distributed_message_inventories]==1);
+ received=distributed_received_times[HOST_SENDER][_distributed_message_inventories];
+ sender=distributed_sender_times[HOST_SENDER];assert(received==100);
+ provisional();
+ send(NONE,_distributed_message_objects_synchronized,2,100,1,12);
+ assert(!distributed_checkpoint_synchronized && provisional_inputs==3);
+ send(NONE,_distributed_message_objects_synchronized,2,100,0,12);
+ assert(distributed_checkpoint_synchronized && !provisional_inputs && !distributed_pickup_count);
+ assert(distributed_last_sent_time==NONE && !distributed_machines.valid);
+ for(i=0;i<2;i++){
+  assert(!distributed_predictions[i].valid && distributed_predictions[i].taken_host_time==NONE);
+  assert(!distributed_host_states[i] && !distributed_accepted[i] && !distributed_sends[i]);
+  assert(distributed_divergence.input_time[i]==NONE && distributed_sent_units[i].unit_index==NONE);
+  for(j=0;j<4;j++)assert(distributed_own_positions[i][j].time==NONE && distributed_own_positions[i][j].unit_index==NONE);
+ }
+ for(i=0;i<MAXIMUM_SENDERS;i++)assert(!distributed_batches[i].size);
+ assert(distributed_received_times[HOST_SENDER][_distributed_message_inventories]==received);
+ assert(distributed_sender_times[HOST_SENDER]==sender);
+ unreliable=1;send(NONE,_distributed_message_inventories,2,99,1,13);unreliable=0;
+ assert(delivered[_distributed_message_inventories]==1); /* Snapshot remains newer. */
+ send(NONE,_distributed_message_inventories,2,101,1,13);
+ assert(delivered[_distributed_message_inventories]==2);
+ provisional();send(NONE,_distributed_message_objects_synchronized,2,101,0,12);
+ assert(provisional_inputs==3 && distributed_own_positions[0][0].time==111);
+ assert(distributed_batches[HOST_SENDER].size==17); /* Duplicate marker preserves current work. */
+ distributed_reset_checkpoint_state(TRUE);
+ for(i=0;i<MAXIMUM_SENDERS;i++){
+  assert(distributed_sender_times[i]==NONE);
+  for(j=0;j<NUMBER_OF_DISTRIBUTED_MESSAGES;j++)assert(distributed_received_times[i][j]==NONE);
+ }
+ return 0;
 }
 '''
     run_c(tmp_path, code)

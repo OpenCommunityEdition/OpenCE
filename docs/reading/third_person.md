@@ -174,6 +174,10 @@ ordered descriptions and ordinary inventories, suppresses other incoming and
 outgoing gameplay, and postpones local inventory and vehicle prediction notes.
 Readiness and inventory retries continue. Receipt of the end marker does not
 claim that a failed object creation has succeeded.
+The first validated marker also retires projectiles, delayed gameplay effects,
+queued hits and prediction histories produced during the partial snapshot.
+Already applied objects, inventories and receive-time history remain; duplicate
+markers do not repeat this cleanup. These lifecycle rules are camera-independent.
 
 `network_objects_expect_live_unit` in
 [network_objects.c](../../port/linux/game/network_objects.c) requests bounded

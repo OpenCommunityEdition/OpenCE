@@ -3791,7 +3791,7 @@ static void distributed_send_game_state(
 /* Predictions, delayed effects and send caches belong to one world, even
 when a checkpoint restores the same object handles. Connection identity,
 permissions, round trips and the host's current roster do not. */
-static void distributed_reset_checkpoint_state(void)
+static void distributed_reset_checkpoint_state(boolean reset_received_times)
 {
 	short sender, type, player_index;
 
@@ -3833,9 +3833,12 @@ static void distributed_reset_checkpoint_state(void)
 	for (sender = 0; sender < MAXIMUM_SENDERS; sender++)
 	{
 		distributed_batches[sender].size = 0;
-		distributed_sender_times[sender] = NONE;
-		for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
-			distributed_received_times[sender][type] = NONE;
+		if (reset_received_times)
+		{
+			distributed_sender_times[sender] = NONE;
+			for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
+				distributed_received_times[sender][type] = NONE;
+		}
 	}
 	for (sender = 0; sender < MAXIMUM_LOCAL_PLAYERS; sender++)
 	{
@@ -3858,7 +3861,7 @@ static void distributed_advance_checkpoint(void)
 
 static void distributed_restore_checkpoint(void)
 {
-	distributed_reset_checkpoint_state();
+	distributed_reset_checkpoint_state(TRUE);
 	network_objects_discard_client_effects();
 	network_objects_reverted();
 	network_damage_new_game();
@@ -3898,7 +3901,7 @@ void network_distributed_new_game(
 	distributed_checkpoint_synchronized = FALSE;
 
 	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
-	distributed_reset_checkpoint_state();
+	distributed_reset_checkpoint_state(TRUE);
 	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
 	csmemset(distributed_client_clocks, 0, sizeof(distributed_client_clocks));
 	csmemset(distributed_client_identities, 0, sizeof(distributed_client_identities));
@@ -4862,10 +4865,17 @@ static boolean distributed_message_epoch_valid(
 			if (network_connection_last_read_was_unreliable() || distributed_handling_batch ||
 				size != sizeof(*header) || header->count != 0)
 				return FALSE;
-			/* These producers remember a send before calling the common
-			sender, which suppresses it while the snapshot is incomplete. */
 			if (!distributed_checkpoint_synchronized)
 			{
+				/* The client still simulates during transfer. Retire hits,
+				projectiles and delayed effects produced by those provisional
+				replicas before gameplay resumes. Keep the ordered snapshot's
+				receive times: older same-epoch datagrams must remain stale. */
+				network_objects_discard_client_effects();
+				network_damage_new_game();
+				distributed_reset_checkpoint_state(FALSE);
+				/* These producers remember a send before the common sender
+				can suppress it during an incomplete snapshot. */
 				distributed_identity_sent = FALSE;
 				distributed_build_sent = FALSE;
 			}

@@ -47,7 +47,10 @@ def generated(fault=None):
                    "CTF_FLAG_TEAMS", "ODDBALL_TEAMS", "NETWORKED_OBJECT_TYPES")),
         (distributed, ("DEATH_BLOW_WAIT_TICKS", "SEAT_DISAGREEMENT_TICKS", "SEAT_DISAGREEMENT_SLACK_TICKS")),
         (distributed_h, ("REMOTE_CORRECTION_TOLERANCE", "REMOTE_BLEND_DISTANCE", "NO_PLAYER")),
-        (damage, ("REPORT_WORLD_BOUND", "REPORT_IMPACT_TOLERANCE")),
+        (damage, ("REPORT_WORLD_BOUND", "REPORT_IMPACT_TOLERANCE", "TARGET_HISTORY_TICKS",
+                  "MAXIMUM_RECENT_WEAPONS", "MAXIMUM_GRENADE_THROWS", "MAXIMUM_STUCK_PROJECTILES",
+                  "RECENT_WEAPON_TICKS", "HIT_REPORT_BURST_SECONDS", "PLAYER_TRAIL_POINTS",
+                  "DAMAGE_RATE_CACHE_SIZE", "MAXIMUM_HIT_REPORTS_PER_TICK")),
     ):
         config.extend(define_value(source, name) for name in names)
     types = "\n".join([
@@ -85,6 +88,8 @@ def generated(fault=None):
         enum_with(damage, "_damage_event_friendly_fire_bit ="),
         structure(damage, "distributed_damage"),
         structure(damage, "distributed_damage_event"),
+        structure(damage, "distributed_hit_report"),
+        structure(damage, "distributed_hit_report_message"),
     ])
     data_code = "\n".join(function(data, name) for name in (
         "data_initialize", "data_verify", "data_usable", "datum_initialize",
@@ -117,7 +122,8 @@ def generated(fault=None):
         "distributed_client_apply_inventory", "distributed_client_apply_retried_inventories"))
     code += "\n" + "\n".join(function(damage, name) for name in (
         "distributed_damage_to_data", "distributed_damage_indices_valid",
-        "distributed_damage_numbers_valid", "network_damage_handle_events"))
+        "distributed_damage_numbers_valid", "network_damage_handle_events",
+        "network_damage_new_game", "network_damage_client_tick"))
     code += "\n" + function(distributed, "distributed_message_epoch_valid")
     code += "\n" + "\n".join(function(objects, name) for name in (
         "distributed_inventory_from_unit", "distributed_host_send_inventories_to_machine",
@@ -151,7 +157,7 @@ def test_reconstructed_unit_rejects_old_life_kill():
     "live", "host-dead", "host-kills-live", "bound-corpse", "different-handle", "unknown", "unknown-player", "stale-delete",
     "invalid-tag", "invalid-team", "invalid-color", "invalid-position", "invalid-axes",
     "invalid-identifier", "outside-pool", "allocation-failure", "repeat", "retry",
-    "inventory", "hierarchy", "late-inventory", "projectiles", "same-epoch-create", "snapshot-empty", "snapshot-batches",
+    "inventory", "hierarchy", "late-inventory", "projectiles", "partial-producers", "same-epoch-create", "snapshot-empty", "snapshot-batches",
     "kill-current", "kill-unknown", "kill-invalid-number", "kill-invalid-tag", "kill-invalid-node",
 ])
 def test_replica_controls(case):
@@ -172,6 +178,9 @@ def test_replica_controls(case):
     ("checkpoint_pending && network_coop_active()", "network_coop_active()", "same-epoch-create"),
     ("distributed_host_send_inventories_to_machine(machine_index);", "(void)machine_index;", "snapshot-empty"),
     ("if (!distributed_checkpoint_ready())\n\t\treturn;", "(void)0;", "snapshot-empty"),
+    ("network_objects_discard_client_effects();", "(void)0;", "partial-producers"),
+    ("network_damage_new_game();", "(void)0;", "partial-producers"),
+    ("if (!distributed_checkpoint_synchronized)\n\t\t\t{", "if (TRUE)\n\t\t\t{", "partial-producers"),
     ("short limit = MIN(MAXIMUM_ENTRIES_PER_MESSAGE, RELIABLE_ENTRIES(struct distributed_inventory));",
      "short limit = MAXIMUM_ENTRIES_PER_MESSAGE;", "snapshot-batches"),
     ("if (!unit || TEST_FLAG(unit->object.damage_flags, _object_dead_bit))\n\t\t\tcontinue;\n\t\tdistributed_inventory_from_unit",

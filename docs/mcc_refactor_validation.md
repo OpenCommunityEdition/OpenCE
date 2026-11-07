@@ -139,8 +139,8 @@ branch for delivery review; PR descriptions and merging remain separate.
 The combined review and planned runtime observations have completed. Platform
 and representative runtime checks pass, but Ruby co-op recovery does not meet
 the all-passing compatibility criterion above. It also fails on original main;
-repairing the shared recovery path requires a separate contract/version review
-under the standing OpenCE-crossplay constraint. This exception is recorded,
+repairing the shared recovery path required a separate contract/version review
+under the then-standing OpenCE-crossplay constraint. This exception is recorded,
 not silently accepted or converted into a passing check. Final documentation
 and cleanup are complete. Findings and coverage are recorded in
 [Stage 9 evidence](#stage-9-combined-review-and-extended-validation).
@@ -211,7 +211,7 @@ stock Xbox maps contain affected boats or that full vehicle behavior is tested.
    the required agreement, version separation and rollout before implementation.
    The user's 7 November policy change permits excluding incompatible old peers;
    it does not establish compatibility with an unmodified upstream build.
-2. **Correct the producer systemically.** Within an established compatible
+2. **Correct the producer systemically.** Under the reviewed, version-separated
    contract, initialize exactly the three temporary records in the existing
    three-point branch, preserving its arithmetic, active controls and other
    point-count paths. Retain required `port:` markers for shared source edits.
@@ -233,7 +233,7 @@ stock Xbox maps contain affected boats or that full vehicle behavior is tested.
    claims with an identified upstream executable on supported map contracts;
    a main/current GulchCE comparison alone is insufficient.
 
-Complete the repair only after the compatible strategy and combined change
+Complete the repair only after the new agreement and combined change
 are reviewed, applicable checks pass, and evidence and cleanup are recorded.
 Convert the twelve strict legacy expected failures to ordinary passing
 regressions only when the authorized correction fixes those paths; preserve
@@ -2260,13 +2260,14 @@ an unchanged old client's receive implementation in the reverse host direction.
 This is a specific unresolved contract, not a claim that all client corrections
 are inherently incompatible.
 
-Milestone 10's repair remains **open** under the standing crossplay condition.
-Proceed only with a demonstrated compatible lifetime/recovery contract, or an
-explicit scope decision permitting recovery limited to updated peers with the
-necessary agreement separation. Keep the original failures and meaningful
-regressions. Neither the new tests nor an optional-profile positive observation
-would establish default recovery, all-map compatibility or completion of the
-required post-fix join/rejoin, transition, platform and transport matrix.
+At the end of this investigation, Milestone 10's repair remained **open** under
+the crossplay condition. Proceeding required either a demonstrated compatible
+lifetime/recovery contract or an explicit scope decision permitting updated
+peers with agreement separation. The user subsequently chose the latter, as
+recorded below. The original failures and meaningful regressions remain;
+the investigation's tests and optional-profile observation alone did not
+establish default recovery, all-map compatibility or completion of the
+post-fix join/rejoin, transition, platform and transport matrix.
 
 ## Stage 10: shared checkpoint recovery fix
 
@@ -2341,11 +2342,140 @@ PDB and SDL library were copied and authenticated before rebuilding. Workshop
 Ruby B40 and Mercury originals remain read-only; eight bounded Xbox/CE setup
 files occupy 403,621,461 bytes in the isolated data folder.
 
-The Windows portable release build passes. The production dispatcher up to its
-gameplay handlers passes six initial controls for boundary validation, old and
-new epochs at the same tick, old reliable and unreliable messages, batch
-recursion, readiness, clock contamination and rollover. Its final gameplay
-handlers are observation stubs; the separate lifecycle regression executes
-actual object replacement, player binding, inventory and damage-handler paths.
+The first implementation is committed and pushed as
+`6666464c12c9fcc8f446cc21a324cee6f6096a61`. Its Windows portable release build
+uses `--portable --release --pgo=off --lto=off`. The retained runtime candidate
+has PE/PDB GUID `693AC064-21FC-7FD0-4C4C-44205044422E`, age 1; the exact
+executable/PDB hashes, nine globals and ten decoded layouts are authenticated
+in `build/stage10-fix/symbol-receipt-v3/layout.json`. It was built immediately
+before the commit from the same gameplay sources. CI builds the committed
+revision independently. Earlier candidate receipts remain historical evidence.
+
+The focused checkpoint, recovery, retried-inventory and epoch selection passes
+**82 tests**. Seven epoch tests extract the production dispatcher through its
+gameplay-handler switch, preserving framing, direction, batch recursion,
+simulation clocks and stale-message handling. Final gameplay handlers are
+observation stubs and some entry-size constants are mocked; this is not a whole
+network stack. The separate lifecycle fixture executes actual object
+replacement, player binding, inventory and damage-handler paths. It passes the
+two former strict expected failures as ordinary regressions.
+
+Controls include old/new messages at the same tick, reliable old kills and
+inventories, malformed boundaries and markers, serial rollover, a current-life
+death followed by a late live description, outgoing-send suppression and packer
+discard, and identity/build retries. An actual snapshot serializer/replay test
+delays a retained healthy replica's empty inventory beyond the old three-second
+resend window; its future weapons/grenades are cleared before the ordered end
+marker. A 123-unit case crosses the real inventory batch limit. Actual client
+tick checks keep readiness/retry work active while preventing unsynchronized
+local ammo history from rejecting that authoritative inventory. Mutation
+controls demonstrate that the guards, empty inventory and later-event effect
+cleanup matter. Host checkpoint effects and harmless visual effects are retained.
+
+The version/admission and related wire selection passes **91 tests**; workflow
+and menu/protocol selection passes **67**. These are separate selections, not
+an assertion that their totals are unique. The real join codec/field table
+establishes a 348-byte structure and 349-byte encoded packet, rejecting the old
+codec, missing suffix bytes and wrong explicit agreement before host admission.
+Legacy fixtures now extract the owning distributed header instead of retaining
+an obsolete eight-byte copy. Earlier failed runs are retained: one related-test
+run still used hard-coded MCC message numbers, and initial Windows fixture
+compilation exposed encoding/CRT declaration issues. Targeted corrected runs
+pass; those first commands are not relabelled successful.
+
+The first full Linux job on `6666464c1` found one further stale producer:
+`tools/system_link_bots.py` still emitted the old 346-byte join payload. The
+engine codec expected 348 bytes. That job recorded 2,506 passes, 27 skips,
+twelve existing boat expected failures, seven passing subtests and this one
+failure. Follow-up `4fdaedd66017fd17385a0d471855375837776992` updates the utility
+to read the canonical agreement and append its two bytes. Its existing test
+now checks their value/order and preservation of the account fields as well as
+all six message sizes. The failure was reproduced locally before correction;
+the bot and wire-format checks then passed. This utility deliberately emits
+only system-link updates, so it has no distributed-header/epoch producer to
+convert. The follow-up changes no game, build or web-site inputs; runtime
+artifacts remain explicitly bound to `6666464c1`, with that two-file source
+equivalence recorded, rather than being relabelled as a later build.
+
+Primary and independent combined review covered the production modules,
+source additions, all callers of the changed header filler, test fixtures,
+admission/version integration, generated labels and reader documentation.
+Review identified and resolved the outgoing gameplay window, empty inventory
+resend limit and delayed gameplay-effect producers before the final focused
+checks. Existing object ownership, failed-create retry and MCC-owned sidecars
+remain. No line-count or speed improvement is claimed for this correctness fix.
+The explicit costs are four extra bytes per distributed header and an 8,192-byte
+per-slot recovery-eligibility array at the configured object capacity. Full
+ordinary inventory snapshots add bounded reliable traffic when a snapshot is
+sent. Existing resend rate limits and the periodic empty-inventory cutoff
+remain; there is no new per-frame scan or perpetual empty-inventory resend.
+These are required correctness costs, not a claimed bandwidth optimisation.
+
+The first implementation's default-profile Ruby B40 and Mercury runs both pass the unchanged strict
+comparison, two controlled wipe sequences and raw-memory replay. Ruby supplies
+2,194 drift samples, with maximum drift 0.006164 and no reported divergences;
+Mercury supplies 1,884 samples with zero measured drift. Both peers recover
+living player bindings and ordinary inventory after restores. Ruby's same
+client handle `0xe53a02cb`, which remained a corpse in the pre-fix observation,
+is alive and bound after each observed new checkpoint epoch. The separate
+host-authoritative player restores/spawns also acquire matching handles on both
+peers. Ruby observes four restores in total, including authored recovery; its
+three-reverts-per-minute fallback remains in the logs. Each controlled sequence
+requires a new revert and 300 fresh recovered ticks, but this does not prove
+every restore was immediately caused by its preceding kill command.
+
+The retained observer performs bounded double reads with explicit race gaps;
+cross-peer pairing is asynchronous, not atomic or a packet trace. Both runs'
+complete inventories, source/PDB receipts and raw reads verify, with no
+qualifying same-epoch dead-client/live-host window. This does not establish
+the absence of all transient states. A client death-cache reset at an epoch
+boundary is not evidence that an alive packet was received.
+
+### Completing the transfer boundary
+
+Final review found a further producer path before sign-off. Client game ticks
+continue while the ordered snapshot arrives. A retained living unit can create
+a projectile or delayed gameplay effect after boundary cleanup; ordinary
+remove-own-object cleanup excludes projectiles. Its later impact can produce
+a current-epoch report after the marker. Host ownership, weapon/rate and
+geometry checks do not universally reject that report, because they do not
+identify the projectile's generation. This is a source-established lifetime
+gap, not a claim that it caused one of the earlier real-map failures.
+
+The new real-function regression first fails on the surviving partial-transfer
+projectile. The correction retires client gameplay effects/projectiles again
+at the first validated ordered marker, then clears damage queues and provisional
+prediction/input histories. It preserves restored objects, inventories and
+ownership. It also preserves snapshot receive timestamps: erasing them would
+let an older same-epoch inventory datagram evade the stale-message check.
+`distributed_reset_checkpoint_state` now takes an explicit receive-history
+reset flag; new maps/epochs clear it, snapshot completion retains it. Duplicate
+markers leave current gameplay producers and prediction work intact.
+
+The final focused selection passes **87 tests** after combined review. The
+expanded recovery fixture runs actual recursive projectile deletion, damage
+reset/report sending and inventory/binding paths; creation and transport remain
+explicit fake-world boundaries. Its three new mutations omit producer cleanup,
+omit damage reset or repeat cleanup on duplicate markers, and each fails the
+behavioral assertions. The dispatcher test uses the actual common reset:
+partial prediction/input state is cleared, a received inventory at tick 100
+still rejects tick 99 after completion, and duplicate markers preserve fresh
+work. Existing real effect selector/deletion tests cover delayed gameplay
+parts separately. This is not a whole-engine delayed-effect reproduction.
+
+The rebuilt Windows candidate has PE/PDB GUID
+`FB4E538B-B88F-E0C9-4C4C-44205044422E`, authenticated in
+`build/stage10-fix/symbol-receipt-v4/layout.json`. The preceding executed
+candidate was frozen and hashed in `prior-candidate-6666464` before rebuilding;
+its earlier runtime and CI results remain pre-final evidence. Final real-map,
+platform and transport checks are being repeated on the corrected state.
+
 Further runtime, platform and transport validation remains required before
-this milestone can be marked complete.
+this milestone can be marked complete. Full campaigns, live split-screen and
+Android-device gameplay remain outside these bounded checks. Existing authored
+HUD, navigation-point and attachment caches are not comprehensively rebuilt
+from checkpoint state by this fix; complete authored campaign rollback remains
+a separate unverified limit. The ordered snapshot marker proves ordering, not
+successful creation of every replica. MCC extra grenade/campaign sidecars
+remain separate periodic updates, so ordinary inventory coverage is not a
+claim about every MCC sidecar.

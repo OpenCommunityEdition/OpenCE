@@ -135,6 +135,28 @@ static boolean fail_allocation;
 static boolean require_detached,detached_before_construction;
 static int damage_replayed_events,kill_calls,damage_replaying_kill,damage_replaying_killer_score;
 static long damage_replaying_killer=NONE;
+/* Narrow storage views for the real damage reset and report sender. The
+   source controls queue consumption; serialization/delivery ends at capture. */
+static short damage_event_count,damage_report_count;
+static int damage_dealing_report,damage_sent_reports,hit_reports_sent;
+static long last_hit_target=NONE;
+static struct distributed_hit_report damage_reports[MAXIMUM_HIT_REPORTS_PER_TICK];
+static struct {
+    long definition_indices[MAXIMUM_RECENT_WEAPONS],unarmed_melee_damage_index;
+    long throw_times[MAXIMUM_GRENADE_THROWS],driven_time;
+    struct {long time;} stuck[MAXIMUM_STUCK_PROJECTILES];
+    real hit_seconds;
+} damage_players[MAXIMUM_TRACKED_PLAYERS];
+static struct {long time;} damage_history[TARGET_HISTORY_TICKS];
+static struct {long time;short count;} damage_explosions[MAXIMUM_TRACKED_PLAYERS];
+static struct {long time;} damage_trails[MAXIMUM_TRACKED_PLAYERS][PLAYER_TRAIL_POINTS];
+static struct {long time;} damage_fire_origins[MAXIMUM_TRACKED_PLAYERS],damage_fire_origins_sent[MAXIMUM_LOCAL_PLAYERS];
+static struct {long source_index;} damage_rate_cache[DAMAGE_RATE_CACHE_SIZE];
+static int checkpoint_prediction_resets;
+static void distributed_reset_checkpoint_state(boolean reset_received_times) {
+    CHECK(!reset_received_times,"completion preserves ordered snapshot receive history");checkpoint_prediction_resets++;
+}
+static void distributed_send_fire_origins(void) { }
 static struct object_datum *object_get(long index);
 static struct object_datum *object_try_and_get(long index);
 static void object_delete_recursive(long index,boolean siblings);
@@ -343,6 +365,12 @@ static void distributed_checkpoint_to_machine(long machine) {
 static long local_player_get_player_index(short local) {return local==0?DATUM_INDEX_NEW(0,7):NONE;}
 static int client_ready_sends,prediction_ticks;
 static void distributed_send(void *message,short type,short count,word size,short destination) {
+    if(type==_distributed_message_hit_reports){
+        struct distributed_hit_report_message *reports=message;
+        CHECK(distributed_checkpoint_synchronized&&destination==_distributed_to_host_reliably&&count>0&&
+            size==sizeof(reports->header)+count*sizeof(reports->reports[0]),"current-world bounded hit report capture");
+        hit_reports_sent+=count;last_hit_target=reports->reports[count-1].object_index;return;
+    }
     (void)message;CHECK(type==_distributed_message_client_ready&&count<=1&&size==sizeof(struct distributed_message_header)&&
         destination==_distributed_to_host_reliably,"client tick keeps bounded readiness alive");client_ready_sends++;
 }
@@ -507,17 +535,58 @@ static int exercise(char const *name) {
     network_objects_handle_changes(&change,1);finish_snapshot();CHECK(constructed==1,"initial replica");
     corpse=object_get(index);state=live_state(index);
     if(!strncmp(name,"snapshot-",9))return snapshot_inventory_case(index,!strcmp(name,"snapshot-batches"));
+    if(!strcmp(name,"partial-producers")){
+        long projectile,child;
+        int prediction_resets;
+        weapon=add_replica(4,_object_type_weapon);inventory=inventory_for(index,weapon);
+        distributed_handle_unit_state(&state);
+        begin_checkpoint();
+        distributed_client_apply_inventory(&inventory);
+        CHECK(!distributed_checkpoint_synchronized&&corpse->unit.weapon_object_indices[0]==weapon,
+            "healthy restored inventory arrives before the ordered marker");
+        /* game_tick still updates objects while the reliable snapshot arrives.
+           Object creation is a fixture boundary; gate and deletion are real. */
+        projectile=add_replica(5,_object_type_equipment);child=add_replica(6,_object_type_equipment);
+        object_get(projectile)->object.type=_object_type_projectile;attach_child(projectile,child);
+        damage_report_count=damage_event_count=1;damage_reports[0].object_index=child;
+        damage_history[0].time=now;damage_players[0].definition_indices[0]=weapon;
+        prediction_resets=checkpoint_prediction_resets;
+        deleted_before=deleted;finish_snapshot();
+        CHECK(!object_try_and_get(projectile)&&!object_try_and_get(child)&&deleted==deleted_before+2,
+            "first snapshot marker retires partial-world projectile through normal deletion");
+        CHECK(object_get(index)==corpse&&player_get(player_index)->unit_index==index&&control_unit==index&&
+            corpse->unit.player_index==player_index&&network_objects_client_has(index),
+            "healthy authoritative unit and reciprocal ownership survive final producer cleanup");
+        CHECK(corpse->unit.weapon_object_indices[0]==weapon&&object_get(weapon)->object.parent_object_index==index&&
+            corpse->unit.grenade_counts[0]==2&&object_get(weapon)->weapon.magazines[0].rounds_loaded==11,
+            "restored inventory is not reset by final producer cleanup");
+        CHECK(!damage_report_count&&!damage_event_count&&!damage_dealing_report&&damage_history[0].time==NONE&&
+            damage_players[0].definition_indices[0]==NONE&&checkpoint_prediction_resets==prediction_resets+1,
+            "first marker clears partial-world damage and prediction histories");
+        network_damage_client_tick();CHECK(!hit_reports_sent,"partial-world queued hit is never sent after marker");
+        projectile=add_replica(7,_object_type_equipment);object_get(projectile)->object.type=_object_type_projectile;
+        damage_report_count=1;damage_reports[0].object_index=index;damage_history[0].time=now;
+        prediction_resets=checkpoint_prediction_resets;
+        deleted_before=deleted;finish_snapshot();
+        CHECK(object_try_and_get(projectile)&&deleted==deleted_before&&damage_report_count==1&&
+            damage_history[0].time==now&&checkpoint_prediction_resets==prediction_resets,
+            "duplicate marker preserves current-world projectile, queued hit and history");
+        network_damage_client_tick();CHECK(hit_reports_sent==1&&last_hit_target==index&&!damage_report_count&&damage_sent_reports==1,
+            "fresh current-world hit still reaches the ordinary sender");
+        return 0;
+    }
     if(!strcmp(name,"projectiles")){
         long projectile=add_replica(4,_object_type_equipment);
         long child=add_replica(5,_object_type_equipment);
+        int initial_effect_cleanups=effect_cleanups;
         object_get(projectile)->object.type=_object_type_projectile;
         attach_child(projectile,child);
         client=0;network_objects_discard_client_effects();
-        CHECK(object_try_and_get(projectile)&&object_try_and_get(child)&&!deleted&&!effect_cleanups,"host restored projectiles and effects are retained");
+        CHECK(object_try_and_get(projectile)&&object_try_and_get(child)&&!deleted&&effect_cleanups==initial_effect_cleanups,"host restored projectiles and effects are retained");
         client=1;network_objects_discard_client_effects();
         CHECK(!object_try_and_get(projectile)&&!object_try_and_get(child)&&deleted==2,"client old shot follows real recursive object deletion");
         CHECK(object_try_and_get(index)&&constructed==3,"unrelated live unit survives");
-        network_objects_discard_client_effects();CHECK(deleted==2&&effect_cleanups==2,"repeated cleanup is harmless; effect lifetime also retires");return 0;
+        network_objects_discard_client_effects();CHECK(deleted==2&&effect_cleanups==initial_effect_cleanups+2,"repeated cleanup is harmless; effect lifetime also retires");return 0;
     }
     if(!strcmp(name,"live")){
         distributed_handle_unit_state(&state);network_objects_handle_changes(&change,1);
