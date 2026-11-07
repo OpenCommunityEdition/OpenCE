@@ -382,6 +382,10 @@ time to validate; this does not make synchronous I/O immune to stalls.
 The previous 32-bit checksum
 remains for checkpoint identity and engine bookkeeping; it is no longer the
 MCC network content proof. Existing save identities are unchanged by SHA-256.
+The MCC checksum consumers share the port's prefixed zlib CRC implementation;
+resource selection/framing, saved checksum bytes and zero-identity handling
+remain unchanged. See the [checksum reading route](reading/maps_and_resources.md)
+and [Milestone 6 evidence](mcc_refactor_validation.md#stage-6-checksum-consolidation).
 MCC peers need matching GulchCE MCC protocols. Xbox and Custom Edition retain
 their original matching/loading behavior and the OpenCE protocol baseline
 specified in [the crossplay boundary](../port/linux/NETCODE.md#gulchce-crossplay-boundary). Network

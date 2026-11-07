@@ -5,6 +5,7 @@
 #include "mcc_checkpoint.h"
 #include "mcc_campaign.h"
 #include "saved games/game_state.h"
+#include "../../third_party/zlib/zlib_prefixed.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,12 +29,7 @@ static byte *mcc_hs_stack_end(struct hs_thread_datum *thread)
 
 static unsigned long mcc_threads_checksum(byte const *bytes, unsigned long count)
 {
-    unsigned long crc=0xFFFFFFFFu,i,bit;
-    for (i=0;i<count;i++) {
-        crc^=bytes[i];
-        for (bit=0;bit<8;bit++) crc=(crc>>1)^(0xEDB88320u&(0u-(crc&1u)));
-    }
-    return ~crc;
+    return (uint32_t)crc32(0, bytes, (uInt)count);
 }
 
 int mcc_script_threads_prepare(void)

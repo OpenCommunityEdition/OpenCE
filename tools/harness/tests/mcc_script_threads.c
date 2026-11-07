@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "zlib_prefixed.h"
 #define CHECK(x) do { if (!(x)) {fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;} } while (0)
 #define TAG_STRING_LENGTH 31
 #define NONE (-1)
@@ -53,7 +54,18 @@ int main(int argc,char **argv)
     struct hs_stack_frame *root;
     byte *storage,*saved_storage;
     unsigned long offset;
-    CHECK(argc==2 && sizeof(long)==4 && sizeof(void *)==4);
+    CHECK((argc==2 || argc==3) && sizeof(long)==4 && sizeof(void *)==4);
+    if (!strcmp(argv[1],"crc")) {
+        unsigned long i,bytes;
+        unsigned char *data;
+        CHECK(argc==3);
+        if (!strcmp(argv[2],"null")) {printf("%08lx\n",mcc_threads_checksum(NULL,0));return 0;}
+        if (!strcmp(argv[2],"known")) {printf("%08lx\n",mcc_threads_checksum((byte const *)"123456789",9));return 0;}
+        bytes=strtoul(argv[2],NULL,10);CHECK(bytes<=MCC_SCRIPT_THREAD_STORAGE);
+        data=malloc(bytes?bytes:1);CHECK(data);
+        for(i=0;i<bytes;i++)data[i]=(unsigned char)(i*37+(i>>8)+19);
+        printf("%08lx\n",mcc_threads_checksum(data,bytes));free(data);return 0;
+    }
     memset(image,0xA5,sizeof(image));memset(native,0,140000);
     data_initialize(native,"hs thread",256,sizeof(struct hs_thread_datum));
     hs_thread_data=native;
@@ -99,6 +111,13 @@ int main(int argc,char **argv)
         CHECK(mcc_hs_stack_end(t)==t->stack_data+4096);
         CHECK(mcc_script_threads_capture());
         memcpy(saved,image,sizeof(image));saved_storage=saved+offset;
+        if (!strcmp(argv[1],"snapshot")) {
+            FILE *output;
+            CHECK(argc==3);
+            output=fopen(argv[2],"wb");CHECK(output);
+            CHECK(fwrite(saved,1,sizeof(saved),output)==sizeof(saved));CHECK(!fclose(output));
+            mcc_script_threads_dispose();return 0;
+        }
         incoming=(void *)(saved_storage+16);copy=(void *)(incoming+1);
         root=(void *)copy->stack_data;
         CHECK(mcc_script_threads_validate(saved,image,used,capacity));

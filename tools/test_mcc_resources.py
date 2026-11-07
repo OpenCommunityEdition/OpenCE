@@ -9,6 +9,80 @@ import zlib
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+ZLIB = ROOT / "port/third_party/zlib"
+
+
+def identity_fixture(mask, resource_size, seed):
+    from test_mcc_cache_format import resource_dependency_map, TAG_OFFSET, BASE, fourcc
+    data = resource_dependency_map("snd!" if mask == 2 else "bitm", int(bool(mask)), 4)
+    struct.pack_into("<I", data, TAG_OFFSET + (0x898 if mask == 2 else 0x818), 16)
+    if mask == 3:
+        # Add a separately owned sound tag beside the existing bitmap tag.
+        sound = resource_dependency_map("snd!")
+        data.extend(bytes(0x200))
+        data[TAG_OFFSET+0x940:TAG_OFFSET+0xB00] = sound[TAG_OFFSET+0x740:TAG_OFFSET+0x900]
+        for offset, value in {8: len(data), 20: 0xB00, TAG_OFFSET+12: 4,
+                              TAG_OFFSET+0x9DC: BASE+0xA00,
+                              TAG_OFFSET+0xA40: BASE+0xA50,
+                              TAG_OFFSET+0xA98: 16}.items():
+            struct.pack_into("<I", data, offset, value)
+        for index, name in enumerate((0xD0, 0xD5, 0xD9)):
+            struct.pack_into("<I", data, TAG_OFFSET+40+index*32+16, BASE+name)
+        data[TAG_OFFSET+0xD0:TAG_OFFSET+0xDD] = b"scnr\0bsp\0res\0"
+        struct.pack_into("<8I", data, TAG_OFFSET+136, fourcc("snd!"), 0xFFFFFFFF, 0xFFFFFFFF,
+                         0xE1770003, BASE+0xD9, BASE+0x940, 0, 0)
+    struct.pack_into("<I", data, 0x64, seed)
+    resources = {}
+    for kind in (1, 2):
+        if not mask & (1 << (kind-1)):
+            continue
+        names = b"res_0\0" if kind == 1 else b"res__0__0\0"
+        blob = struct.pack("<4I", kind, 20, 20+len(names), 1) + b"data" + names + struct.pack("<3I", 0, 4, 16)
+        resources[kind] = blob + (bytes(range(256))*((resource_size-len(blob)+255)//256))[:resource_size-len(blob)]
+    return data, resources
+
+
+@pytest.mark.parametrize("mask,seed,size", [
+    (0, 0, 0), (0, 0xFFFFFFFF, 0), (0, 0x89ABCDEF, 0),
+    (1, 0, 16383), (2, 0x80000000, 16384), (3, 0xFFFFFFFF, 16385),
+    (1, 0x89ABCDEF, 32767), (2, 0, 32768), (3, 0x80000000, 32769),
+    # This seed produces CRC zero after the first complete resource. Only the
+    # final published value is remapped, never a value chained into file two.
+    (1, 0x9484ECB9, 32768), (3, 0x9484ECB9, 32768),
+])
+def test_crc_framing_seed_and_chunk_boundaries(resource_tool, tmp_path, mask, seed, size):
+    data, resources = identity_fixture(mask, size, seed)
+    folder = tmp_path / "mcc_maps/package"
+    folder.mkdir(parents=True)
+    path = folder / "a10.map"
+    path.write_bytes(data)
+    expected = seed
+    framed = b"GulchCE MCC content v1" + struct.pack("<BQ", 0, len(data)) + data
+    for kind, resource in resources.items():
+        (folder / ("bitmaps.map" if kind == 1 else "sounds.map")).write_bytes(resource)
+        expected = zlib.crc32(bytes([kind]) + resource + b"\xff", expected)
+        if seed == 0x9484ECB9 and kind == 1:
+            assert expected == 0
+        framed += struct.pack("<BQ", kind, len(resource)) + resource
+    result = subprocess.run([str(resource_tool), "incremental_crc", str(path), "mcc_maps/package/a10"],
+                            cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    checksum, digest = result.stdout.split()
+    assert int(checksum) == (expected or 1)
+    assert digest == hashlib.sha256(framed).hexdigest()
+
+
+def test_incremental_read_failure_does_not_publish_partial_identity(resource_tool, tmp_path):
+    data, _ = identity_fixture(0, 0, 0x89ABCDEF)
+    data.extend(bytes(4*1024*1024))
+    struct.pack_into("<I", data, 8, len(data))
+    folder = tmp_path / "mcc_maps/package"
+    folder.mkdir(parents=True)
+    path = folder / "a10.map"
+    path.write_bytes(data)
+    result = subprocess.run([str(resource_tool), "incremental_failure", str(path), "mcc_maps/package/a10"],
+                            cwd=tmp_path, capture_output=True, timeout=10)
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("kind", [0, 1, 2])
@@ -77,8 +151,9 @@ def resource_tool(tmp_path_factory):
 #include <string.h>
 #include <stdlib.h>
 void error(short level,const char *format,...) {(void)level;(void)format;}
+static int fail_read;
 static int read_map(void *context,uint32_t offset,uint32_t size,void *out) {
-    return !fseek(context,(long)offset,SEEK_SET) && fread(out,1,size,context)==size;
+    return !fail_read && !fseek(context,(long)offset,SEEK_SET) && fread(out,1,size,context)==size;
 }
 int main(int argc,char **argv) {
     struct mcc_runtime runtime={0};unsigned char bytes[32]={0};int ok;
@@ -91,19 +166,36 @@ int main(int argc,char **argv) {
         printf("%s",reason);
         return ok==atoi(argv[3]) ? 0 : 9;
     }
-    if(argc==4 && !strcmp(argv[1],"incremental")) {
+    if(argc==4 && (!strcmp(argv[1],"incremental") || !strcmp(argv[1],"incremental_crc") ||
+                  !strcmp(argv[1],"incremental_failure"))) {
         struct mcc_cache_source source;struct mcc_resource_check *check;
-        uint32_t sum,expected;unsigned i,steps=0;char reason[320];
+        uint32_t sum=0x12345678,expected;unsigned i,steps=0;char reason[320];
         FILE *f=fopen(argv[2],"rb");if(!f)return 8;
         fseek(f,0,SEEK_END);source.size=(uint64_t)ftell(f);source.context=f;source.read=read_map;
-        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));if(!check)return 10;
+        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));
+        if(!check){fprintf(stderr,"%s",reason);return 10;}
         /* Cancelling a partial check releases only its own resources. */
-        mcc_resources_check_step(check,&sum,bytes);mcc_resources_check_end(check);
+        memset(bytes,0xA5,sizeof(bytes));
+        ok=mcc_resources_check_step(check,&sum,bytes);
+        if(!ok) {
+            if(sum!=0x12345678)return 13;
+            for(i=0;i<sizeof(bytes);i++)if(bytes[i]!=0xA5)return 14;
+        }
+        if(!strcmp(argv[1],"incremental_failure")) {
+            if(ok)return 15;
+            fail_read=1;
+            if(mcc_resources_check_step(check,&sum,bytes)!=-1 || sum!=0x12345678)return 16;
+            for(i=0;i<sizeof(bytes);i++)if(bytes[i]!=0xA5)return 17;
+            fail_read=0;
+        }
+        mcc_resources_check_end(check);
         check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));if(!check)return 11;
         do {ok=mcc_resources_check_step(check,&sum,bytes);steps++;} while(!ok && steps<100);
         mcc_resources_check_end(check);
         if(ok!=1 || !mcc_resources_probe(argv[3],&source,&expected) || sum!=expected)return 12;
-        fclose(f);for(i=0;i<32;i++)printf("%02x",bytes[i]);return 0;
+        fclose(f);
+        if(!strcmp(argv[1],"incremental_crc"))printf("%u ",sum);
+        for(i=0;i<32;i++)printf("%02x",bytes[i]);return 0;
     }
     if(argc==4 && !strcmp(argv[1],"fingerprint")) {
         struct mcc_cache_source source;unsigned i;
@@ -152,8 +244,8 @@ int main(int argc,char **argv) {
     exe = work / "resources.exe"
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else []
     # Match the game's GNU89 mode, including libc's snprintf declaration on Linux.
-    result = subprocess.run([clang] + target + [str(ROOT / "tools/mcc_loading_stub.c"), "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-D_CRT_SECURE_NO_WARNINGS", "-I"+str(ROOT / "port/linux/game"),
-                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), "-o", str(exe)], capture_output=True, text=True)
+    result = subprocess.run([clang] + target + [str(ROOT / "tools/mcc_loading_stub.c"), "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-D_CRT_SECURE_NO_WARNINGS", "-DZ_PREFIX", "-I"+str(ZLIB), "-I"+str(ROOT / "port/linux/game"),
+                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ZLIB / "crc32.c"), "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
 

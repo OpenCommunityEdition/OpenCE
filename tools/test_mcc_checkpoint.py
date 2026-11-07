@@ -1,8 +1,10 @@
 """Actual MCC snapshot module and native save dispatch behavior, without assets."""
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
+import zlib
 
 import pytest
 from harness import function
@@ -125,7 +127,18 @@ int main(int argc,char **argv) {
     unsigned long used=4096;
     int result=0;
     struct game_state_header *header=(void *)live,*incoming=(void *)saved;
-    if(argc!=2)return 2;
+    if(argc<2||argc>3)return 2;
+    if(!strcmp(argv[1],"crc")) {
+        unsigned long i,bytes;
+        unsigned char *data;
+        if(argc!=3)return 2;
+        if(!strcmp(argv[2],"null")) {printf("%08x\n",mcc_checkpoint_checksum(NULL,0));return 0;}
+        if(!strcmp(argv[2],"known")) {printf("%08x\n",mcc_checkpoint_checksum((unsigned char const *)"123456789",9));return 0;}
+        bytes=strtoul(argv[2],NULL,10);if(bytes>MCC_OBJECT_NAMES_SNAPSHOT_MAXIMUM)return 2;
+        data=malloc(bytes?bytes:1);if(!data)return 2;
+        for(i=0;i<bytes;i++)data[i]=(unsigned char)(i*37+(i>>8)+19);
+        printf("%08x\n",mcc_checkpoint_checksum(data,(uint32_t)bytes));free(data);return 0;
+    }
     memset(live,0xA5,sizeof(live));
     memset(header,0,sizeof(*header));strcpy(header->map_name,"mcc_maps\\one\\a10");
     header->cache_file_checksum=0x12345678;
@@ -137,6 +150,19 @@ int main(int argc,char **argv) {
     {struct object_header_datum *unit=object_header_data->data;
      memset(unit,0,sizeof(*unit));unit->identifier=1;unit->datum=(void *)(live+768);}
     game_state_globals.base_address=live;game_state_globals.cpu_allocation_size=used;
+    if(!strncmp(argv[1],"snapshot",8)) {
+        FILE *output;
+        if(argc!=3)return 2;
+        if(!strcmp(argv[1],"snapshot_maximum"))payload_size=MCC_CHECKPOINT_PAYLOAD_LIMIT;
+        if(!strcmp(argv[1],"snapshot_names")||!strcmp(argv[1],"snapshot_names_maximum")) {
+            name_bytes=!strcmp(argv[1],"snapshot_names_maximum")?MCC_OBJECT_NAMES_SNAPSHOT_MAXIMUM:640*4;
+            memset(name_state,255,name_bytes);mcc_checkpoint_put(name_state+513*4,0x00010000);
+        }
+        if(!mcc_checkpoint_capture(live,sizeof(live),used,GAME_STATE_CPU_SIZE))return 25;
+        output=fopen(argv[2],"wb");if(!output)return 26;
+        if(fwrite(live,1,sizeof(live),output)!=sizeof(live)||fclose(output))return 27;
+        mcc_checkpoint_dispose();return 0;
+    }
     if(!strncmp(argv[1],"names_",6)) {
         unsigned char *name_tail;
         name_bytes=!strcmp(argv[1],"names_maximum")?MCC_OBJECT_NAMES_SNAPSHOT_MAXIMUM:640*4;
@@ -255,7 +281,10 @@ int main(int argc,char **argv) {
     path = work / "checkpoint.c"
     path.write_text(source)
     output = work / ("checkpoint.exe" if sys.platform == "win32" else "checkpoint")
-    command = [compiler, "-std=c99", "-Wall", "-Wextra", "-Werror", "-I", str(work), str(path), "-o", str(output)]
+    zlib_dir = ROOT / "port/third_party/zlib"
+    command = [compiler, "-std=c99", "-Wall", "-Wextra", "-Werror", "-DZ_PREFIX",
+               "-Dz_errmsg=z_port_errmsg", "-I", str(work), "-I", str(zlib_dir),
+               str(path), str(zlib_dir / "crc32.c"), "-o", str(output)]
     if sys.platform == "win32":
         command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
     result = subprocess.run(command, capture_output=True, text=True)
@@ -270,3 +299,45 @@ int main(int argc,char **argv) {
 def test_mcc_checkpoint_and_native_hooks(checkpoint_tool, case):
     result = subprocess.run([str(checkpoint_tool), case], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr + f" ({case}: {result.returncode})"
+
+
+@pytest.mark.parametrize("size", ["null", "known", 0, 1, 7, 8, 9, 15, 16, 17, 255, 256, 257,
+                                  32767, 32768, 32769, 65544, 66312, 131068])
+def test_checkpoint_checksum_matches_independent_oracle(checkpoint_tool, size):
+    data = b"" if size == "null" else b"123456789" if size == "known" else bytes(
+        (i * 37 + (i >> 8) + 19) & 255 for i in range(size))
+    result = subprocess.run([str(checkpoint_tool), "crc", str(size)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert int(result.stdout, 16) == zlib.crc32(data)
+
+
+@pytest.mark.parametrize("case,payload_bytes,name_bytes", [
+    ("snapshot", 16, 0), ("snapshot_maximum", 65544, 0),
+    ("snapshot_names", 16, 2560), ("snapshot_names_maximum", 16, 131068),
+])
+def test_checkpoint_persisted_bytes(checkpoint_tool, tmp_path, case, payload_bytes, name_bytes):
+    output = tmp_path / "image.bin"
+    result = subprocess.run([str(checkpoint_tool), case, str(output)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    image = output.read_bytes()
+    assert len(image) == 524288
+    # The persisted format keeps its CPU tail and 96-byte footer at fixed offsets.
+    tail, footer = 393216 - (65544 + 768 + 96), 393216 - 96
+    payload = bytearray(payload_bytes + 768)
+    payload[:6] = b"GMC4\1\0"
+    payload[payload_bytes] = 1
+    expected = bytearray(96)
+    struct.pack_into("<4s5I", expected, 0, b"MCCS", 3, len(payload), zlib.crc32(payload), 0x12345678, 768)
+    name = b"mcc_maps\\one\\a10\0"
+    expected[24:24 + len(name)] = name
+    expected[88] = 42
+    struct.pack_into("<I", expected, 92, zlib.crc32(expected[:92]))
+    assert image[tail:tail + len(payload)] == payload
+    assert image[tail + len(payload):footer] == b"\xa5" * (footer - tail - len(payload))
+    assert image[footer:footer + 96] == expected
+    if name_bytes:
+        names = bytearray(b"\xff" * name_bytes)
+        struct.pack_into("<I", names, 513 * 4, 0x00010000)
+        expected_names = struct.pack("<4s3I", b"MCCN", 1, name_bytes, zlib.crc32(names)) + names
+        assert image[tail - len(expected_names):tail] == expected_names
+    assert image[393216:] == b"\xa5" * (524288 - 393216)

@@ -4,7 +4,7 @@
 
 Updated 7 November 2026. Milestones retain the existing stage numbers, so
 "Stage 6" and "Milestone 6" refer to the same work. Stages 1–5 are complete;
-Stage 6 is next. Stages 6–9 are planned and implementation has not started.
+Stage 6 is in progress. Stages 7–9 remain planned and have not started.
 This update incorporates the follow-up recommendations into the roadmap;
 the completed-stage evidence below remains unchanged.
 
@@ -15,7 +15,7 @@ the completed-stage evidence below remains unchanged.
 | 3 | Remove redundant MCC resource ordering and bitmap ownership lookup work. | Complete |
 | 4 | Replace repeated per-texture stream scans with a local per-tag cursor. | Complete |
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
-| 6 | Consolidate duplicate checksum work where exact compatibility and linkage can be proved. | Next; candidate identified |
+| 6 | Consolidate duplicate checksum work where exact compatibility and linkage can be proved. | In progress; exact compatibility validation |
 | 7 | Audit scripts, campaign/checkpoint state and lifecycle ownership; implement justified corrections and cleanup. | Planned; investigation first |
 | 8 | Investigate remaining compatibility exceptions and the Quarantine script gap. | Planned; evidence required |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Planned; final verification |
@@ -905,3 +905,85 @@ no further justified structural change within this stage. Local links, named
 symbols, Python syntax and whitespace checks passed. This documentation-only
 completion records results for the implementation revision above; it changes
 no production code or tests.
+
+## Stage 6: checksum consolidation
+
+### Boundary and exact compatibility contract
+
+The baseline is `18c01ec34`, with Windows release executable SHA-256
+`3e563cd2291cb72196350e68dac471f6f5b96799164177f4ecf9309dd647893a`.
+The initial checkpoint, resource, saved-game, identity, precache, protocol and
+script-thread selection passed all 213 tests before implementation.
+
+The four MCC consumers implement the same reflected CRC32 polynomial
+(`0xedb88320`). Checkpoint and thread blocks begin with an all-one internal
+seed and complement the result. Resource checks begin with the complemented
+stored map checksum and append selected bitmap then sound resources, each
+framed by its one-byte type and a `0xff` terminator. Only the published zero
+is changed to one. SHA-256 separately hashes the map and selected resources
+with length/type framing; it is not replaced by CRC.
+
+Design review rejected a direct use of `source/memory/crc.c`: its
+`unsigned long *` interface does not match portable `uint32_t` storage on
+LP64 standalone readers, and its lazy mutable table would introduce an
+initialization dependency. The existing port-prefixed zlib CRC is already
+linked by Windows, Linux, Android and web. Their build configuration uses
+its static tables; Android includes the implementation in the ILP32 guest
+without adding host imports. Explicit relative header includes select this
+port library rather than the separate original game zlib. No vendored code,
+shared engine implementation or build graph needs modification.
+
+The MCC callers use zlib's finalized CRC convention: seed zero for saved
+blocks, the map checksum for resource chaining, and no extra complement.
+Resource framing bytes remain explicit unsigned bytes. Bounds, selected
+resources, file errors, loading pulses, incremental work budgets and SHA
+framing retain their existing paths. There is no new mutable checksum state
+to initialize or dispose. This is content-independent MCC code maintenance;
+no map identities or compatibility exceptions select the change.
+
+### Implementation review and local evidence
+
+Review covered the four consumers, their callers, standalone linkage, test
+oracles and reader documentation. The prefixed header must follow `cseries.h`
+in the resource translation unit: the first release build caught a collision
+between C-library limits macros and the engine's enum names. Correcting that
+include order required no shared-source or build changes. The resulting
+Windows release build passed with the existing Expat linker warnings.
+Independent review found no further production or test blocker before the
+final local regression selection.
+
+The new checkpoint/thread characterization passed 96 checks on both old and
+refactored implementations. A private same-process comparison using extracted
+old/current functions compared 4,194,304 persisted bytes exactly across five
+cases: ordinary/max inventory, ordinary/max extended names, and the expanded
+thread image. The committed tests independently check payloads, footer fields,
+little-endian checksums, reserved bytes and thread coverage against Python's
+zlib, retaining existing corruption/refusal and migration cases.
+
+Resource/catalog characterization passed 196 checks before production edits;
+the final focused selection passed 238 checks. CRC oracles cover every resource
+mask, zero/high-bit/all-one seeds, 16/32 KiB boundaries, final-zero remapping,
+an intermediate zero before the second resource, cancellation and failed reads
+without publishing partial output. SHA-256 and package-isolation coverage
+remain in place. The complete original Mercury bitmap (429,799,299 bytes) and
+sound (257,054,056 bytes) resources produced identical baseline/current/Python
+checksums for bitmap-only, sound-only and combined masks. They were read in
+their installed Workshop folder and rehashed unchanged. This private comparator
+tests the actual reader/checksum with explicit resource paths; it does not
+claim to exercise Workshop discovery or network admission.
+
+The removed incremental table reduces the x86 check object from 2,680 to
+1,656 bytes, measured with `sizeof`; the synchronous 1,024-byte local table and
+both per-check table-construction loops are also removed. No new allocation
+or table is introduced. An isolated Windows x86 `-O2` comparison passed 24
+old/new/oracle vectors. Seven alternating-order trials over 128 MiB per sample
+measured median CRC time of 0.3883 to 0.03890 seconds for 256-byte calls and
+0.3867 to 0.01832 seconds for 1 MiB calls (about 10x and 21x). These are checksum
+microbenchmarks, not whole-game loading, checkpoint or frame-rate measurements.
+
+The final broad local selection passed **2,057 tests**, with nineteen skips and
+the twelve unchanged strict boat expected failures. Production changes remain
+entirely in MCC-owned files. Serialized formats, SHA content proof, network
+version 41, OpenCE crossplay and Xbox/CE implementations are unchanged.
+Private proof sources, commands, logs and hashes are under `build/stage6`.
+Runtime and CI completion results follow after their final checks.

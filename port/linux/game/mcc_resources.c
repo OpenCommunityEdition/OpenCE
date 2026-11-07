@@ -9,6 +9,7 @@
 #include "mcc_errors.h"
 #include "cseries.h"
 #include "errors.h"
+#include "../../third_party/zlib/zlib_prefixed.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -242,21 +243,18 @@ void mcc_resources_dispose(struct mcc_runtime *runtime)
 }
 int mcc_resources_checksum(struct mcc_runtime *runtime,unsigned resources,uint32_t *checksum)
 {
-    unsigned char buffer[32768];
-    uint32_t table[256],crc,i,j;
+    unsigned char buffer[32768],marker;
+    uint32_t crc;
     unsigned type;
-    size_t bytes,k;
+    size_t bytes;
     FILE *file;
     struct mcc_resource_file *selected;
     if (!runtime || !checksum || (resources&~3u)) return 0;
-    crc=~runtime->report.identity.checksum;
+    /* zlib chains finalized CRC values; framing and the published value stay
+     * identical to the former complemented accumulator. */
+    crc=runtime->report.identity.checksum;
     /* Self-contained maps neither open nor fingerprint unrelated resources. */
     if (!resources) { *checksum=runtime->report.identity.checksum ? runtime->report.identity.checksum : 1;return 1; }
-    for (i=0;i<256;i++) {
-        uint32_t value=i;
-        for (j=0;j<8;j++) value=(value>>1)^(0xEDB88320u & (0u-(value&1u)));
-        table[i]=value;
-    }
     for (type=1;type<=2;type++) {
         if (!(resources&(1u<<(type-1)))) continue;
         selected=mcc_resource_get(runtime,type);
@@ -264,15 +262,17 @@ int mcc_resources_checksum(struct mcc_runtime *runtime,unsigned resources,uint32
         file=selected->stream;
         if (fseek(file,0,SEEK_SET)) return 0;
         /* Fingerprint the selected contents, not their installation location. */
-        crc=(crc>>8)^table[(crc^type)&255];
+        marker=(unsigned char)type;
+        crc=(uint32_t)crc32(crc,&marker,1);
         while ((bytes=fread(buffer,1,sizeof(buffer),file))!=0) {
-            for (k=0;k<bytes;k++) crc=(crc>>8)^table[(crc^buffer[k])&255];
+            crc=(uint32_t)crc32(crc,buffer,(uInt)bytes);
             mcc_loading_pulse();
         }
         if (ferror(file)) return 0;
-        crc=(crc>>8)^table[(crc^0xff)&255];
+        marker=0xff;
+        crc=(uint32_t)crc32(crc,&marker,1);
     }
-    *checksum=~crc;
+    *checksum=crc;
     if (!*checksum) *checksum=1; /* Zero means no comparison in native admission. */
     return 1;
 }

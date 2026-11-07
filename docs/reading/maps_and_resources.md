@@ -563,6 +563,18 @@ not become a failure when a later candidate succeeds. The menu queue retains
 the first error, so generic recovery text cannot replace a specific refusal.
 MCC's existing menu return and network abort ordering remain intact.
 
+The MCC resource CRC and save-state CRCs use the port's existing prefixed
+zlib through [`zlib_prefixed.h`](../../port/third_party/zlib/zlib_prefixed.h).
+`mcc_resources_checksum` and the bounded checker in
+[`mcc_resource_check.inl`](../../port/linux/game/mcc_resource_check.inl) start
+with the map's stored checksum, then feed each selected resource's type byte,
+complete file bytes and `0xff` terminator, in bitmap-then-sound order. zlib's
+CRC interface applies the complements itself. Only the final published zero
+becomes one, preserving the engine's reserved zero identity. The separate
+SHA-256 content fingerprint retains its length/type framing and map bytes.
+`mcc_checkpoint_checksum` and `mcc_threads_checksum` start at zero for each
+saved block. The serialized layouts and the Xbox/CE CRC paths are unchanged.
+
 For CE, follow `custom_edition_cache_present`, `custom_edition_cache_tags_load`,
 `custom_edition_cache_load_error` and `custom_edition_cache_display_error` in
 [`custom_edition_cache.c`](../../port/linux/game/custom_edition_cache.c).
