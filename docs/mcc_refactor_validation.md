@@ -3,10 +3,9 @@
 ## Milestones and current position
 
 Updated 7 November 2026. Milestones retain the existing stage numbers, so
-"Stage 6" and "Milestone 6" refer to the same work. Stages 1–5 are complete;
-Stage 6 is in progress. Stages 7–9 remain planned and have not started.
-This update incorporates the follow-up recommendations into the roadmap;
-the completed-stage evidence below remains unchanged.
+"Stage 6" and "Milestone 6" refer to the same work. Stages 1–6 are complete;
+Stage 7 is next. Stages 7–9 remain planned and have not started.
+The stage evidence below records the changes, actual validation and limits.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -15,18 +14,18 @@ the completed-stage evidence below remains unchanged.
 | 3 | Remove redundant MCC resource ordering and bitmap ownership lookup work. | Complete |
 | 4 | Replace repeated per-texture stream scans with a local per-tag cursor. | Complete |
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
-| 6 | Consolidate duplicate checksum work where exact compatibility and linkage can be proved. | In progress; exact compatibility validation |
+| 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
 | 7 | Audit scripts, campaign/checkpoint state and lifecycle ownership; implement justified corrections and cleanup. | Planned; investigation first |
 | 8 | Investigate remaining compatibility exceptions and the Quarantine script gap. | Planned; evidence required |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Planned; final verification |
 
-The latest completed implementation is `809f8b8cd`; its four debug platform
-builds and all three MCC CI jobs passed. Stage 5 recorded 2,004 local test passes,
-nineteen skips and twelve existing boat expected failures, ten paired
-normalized-HUD comparisons, Ruby/Descent gameplay HUD checks and Xbox/CE/MCC
-transitions.
+The latest completed implementation is `71dcfe6dd`; its four debug platform
+builds and all three MCC CI jobs passed. Stage 6 recorded 2,059 local test passes,
+nineteen skips and twelve existing boat expected failures, four additional
+real-asset checks, exact before/after save-byte comparisons, paired Ruby/Mercury
+save/revert/core checks and Xbox/CE/MCC transitions.
 The detailed sections distinguish these bounded checks from full compatibility.
-Five completed milestones are not an estimate of percentage effort remaining,
+Six completed milestones are not an estimate of percentage effort remaining,
 and do not establish that every MCC module has received the same depth of audit.
 
 All future changes remain evidence-backed, with general engine defects fixed
@@ -38,22 +37,20 @@ Later integration checks supplement these checks; they do not postpone them.
 
 ### Milestone 6: checksum consolidation
 
-Source inspection found repeated CRC32 calculation or table construction in
+Consolidated repeated CRC32 calculation and table construction in
 [`mcc_checkpoint.c`](../port/linux/game/mcc_checkpoint.c),
 [`mcc_script_threads.inl`](../port/linux/game/mcc_script_threads.inl),
 [`mcc_resources.c`](../port/linux/game/mcc_resources.c) and
 [`mcc_resource_check.inl`](../port/linux/game/mcc_resource_check.inl).
-The existing `crc_checksum_buffer` in
-[`crc.c`](../source/memory/crc.c) is a candidate service, not a predetermined
-replacement. Check initialization/threading requirements, integer widths and
-standalone-tool linkage before choosing the boundary.
+The existing `crc_checksum_buffer` in [`crc.c`](../source/memory/crc.c) was
+evaluated; the already-linked port-prefixed zlib service was selected after
+checking initialization, integer widths and standalone-tool linkage.
 
-Complete when old/new tests prove identical seeds, complements, empty and
-chunked input results, resource ordering/type framing, checkpoint bytes and
-failure behavior; required platforms and consumers link and pass; and any
-claimed speed or allocation benefit is measured. Consolidate only the portions
-supported by that evidence. Preserve justified duplication where boundaries
-or consumers require it, recording why.
+Old/new and independent-oracle checks establish unchanged seeds, complements,
+empty and chunked results, resource ordering/framing, checkpoint bytes and
+failure behavior. Required platforms and consumers pass. The saved per-check
+storage and isolated checksum timing are measured, with their practical limits
+recorded in [Stage 6 evidence](#stage-6-checksum-consolidation).
 
 ### Milestone 7: scripts and state lifecycle
 
@@ -64,6 +61,10 @@ The relevant routes include `mcc_scripts`, `mcc_script_runtime.inl`,
 `mcc_object_names`. These are investigation areas, not established new defects
 or promised deletions. Keep host/client authority and saved-state contracts
 explicit when evaluating a change.
+Stage 6 also retained a baseline assertion when a checkpoint captured a
+sleeping temporary console expression. Investigate that expression's syntax
+lifetime separately from CRC validity; the recorded standalone-save controls
+pass. This finding is queued here, not an implemented Stage 7 correction.
 
 Complete when reviewed paths and ownership rules are recorded, demonstrated
 defects/redundancy are addressed within scope, and affected save/revert,
@@ -981,9 +982,101 @@ measured median CRC time of 0.3883 to 0.03890 seconds for 256-byte calls and
 0.3867 to 0.01832 seconds for 1 MiB calls (about 10x and 21x). These are checksum
 microbenchmarks, not whole-game loading, checkpoint or frame-rate measurements.
 
-The final broad local selection passed **2,057 tests**, with nineteen skips and
+The final broad local selection passed **2,059 tests**, with nineteen skips and
 the twelve unchanged strict boat expected failures. Production changes remain
 entirely in MCC-owned files. Serialized formats, SHA content proof, network
 version 41, OpenCE crossplay and Xbox/CE implementations are unchanged.
 Private proof sources, commands, logs and hashes are under `build/stage6`.
-Runtime and CI completion results follow after their final checks.
+The final focused checkpoint/thread selection includes two additional exact
+thread-length boundary cases and passed 98 checks. Four optional real MCC/CE
+asset checks also passed. The post-review release rebuild required no further
+work; its executable SHA-256 is
+`5f3f449c13fddf4198157bd94fed9cdc1fad02290ec34d966c3d420d0aa998c7`.
+
+### Native runtime, retained findings and cleanup
+
+The preserved baseline and final release each passed the same hidden,
+singleplayer save/revert/core sequence on Ruby's Rebalanced `b40` and Mercury
+Falling, loaded from their installed Workshop packages. Each run advanced
+150 ticks, saved a changed MCC campaign flag, proved a subsequent mutation,
+restored the checkpoint and confirmed the saved flag after another 150 ticks.
+It repeated mutation/restoration through `core_save`/`core_load` and exited
+normally. The paired executable hashes, settings, runner and map checksums
+were checked independently. All eight retained 20 MiB images passed an
+independent check of their protected MCC payload/footer/thread/name blocks.
+These independently validated runtime images are not claimed byte-identical
+across runs; the controlled five-case comparison above establishes exact
+before/after serialized-byte equivalence.
+
+The final release also passed Mercury Falling, Xbox Blood Gulch, CE Death
+Island, a deliberately invalid MCC tag-index fixture, then Ruby `a10` in one
+process. Each valid phase required a new simulation epoch, an exact delayed
+output marker and a complete rendered capture. The invalid map was refused
+and the later MCC load recovered. Independent review checked the complete
+logs, expected refusal, marker ordering, settings, captures and normal exit.
+The runtime verifier additionally passed 83 negative controls for missing or
+echoed outputs, extra acceptance events and changed protected bytes.
+
+Four earlier attempts are retained as failed/incomplete evidence. Two Ruby
+attempts exposed runner command-length and repeated-log-observation problems;
+an earlier transition collector could not encode one received character.
+The other Ruby baseline attempt asserted on a stale script-node index after
+revert. Its MCC checksums are valid. The runner had requested a save from a
+temporary console expression that remained asleep during capture; another
+baseline run reprinted that saved expression's marker after restoration.
+Source inspection shows finished console threads are deleted and unreferenced
+syntax is collected. This is a baseline console-expression lifetime finding,
+not evidence of a CRC regression, and is retained for Stage 7 investigation.
+The final paired recipe issues standalone save commands and waits outside
+the game before checking completion. No production workaround was added.
+
+Nine sequential game attempts were stopped; all five final accepted runs
+exited normally. Their generated caches, including those from failed attempts,
+were removed (6,908,018,688 bytes). All six original Xbox/CE fixtures, three
+tested Workshop maps and Mercury's two resource files were rehashed unchanged.
+The 142 inactive save/support/capture files (338,155,372 bytes) were archived
+losslessly to `build/stage6/inactive-runtime-evidence.zip` (9,989,586 bytes).
+Every archive member was hash-verified before removal of the loose copy;
+the adjacent manifest records original paths. Original maps and saves were
+not modified. Disposable synthetic pytest fixtures, duplicate map copies and
+test/probe binaries were removed; useful logs, proof sources and the baseline
+build remain. There are no generated game caches or active owned game processes.
+About 39 MB remains under `build/stage6`, primarily the 27 MB baseline build,
+10 MB verified archive and 1.4 MB of CI evidence. The final release remains
+usable under `build/windows`.
+
+These checks establish bounded native loading, save/revert/core behavior and
+map-family transitions. They do not establish full campaign, multiplayer,
+live split-screen, Android-device or browser-map compatibility. Milestone 7
+implementation has not begun.
+
+### Platform CI and completion
+
+Both push workflows passed on implementation revision
+`71dcfe6dd74c59fd8ab2f54d8b9fa112e04d1a36`, attempt 1, without CI repairs or
+reruns. The [MCC workflow](https://github.com/chestahh/GulchCE/actions/runs/42390735879)
+passed Linux readers/validators (1,782 checks, sixteen skips), 38 separate
+ASan/UBSan preview checks, Windows adapters (1,983 passes and seventeen skips
+across invocations), and 36 software-GL meter renders.
+
+The [Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42390735872)
+passed all four debug platforms. Linux's main invocation passed 2,498 checks
+with 27 skips, the twelve existing boat expected failures and seven passing
+subtests; all its pytest invocations totalled 2,814 passes and 52 skips, with
+the same expected failures/subtests. Ordinary and full-LTO ELF/COFF
+light-storage checks and the Windows corruption negative control passed.
+Android built its guest, host and debug APK and passed touch, gyro and MCC
+importer checks. Web passed page/server tests, browser startup without retail
+assets, and native Chromium/Firefox WebRTC checks with and without configured
+packet loss. These are transport checks, not real-map multiplayer qualification.
+Main-only release/profile jobs were skipped; the Windows release was built
+and exercised locally. Counts from overlapping jobs are not unique test totals.
+
+CI logs, metadata and local log hashes are retained in `build/stage6/ci`.
+Artifact metadata names the exact revision; CI binaries were not downloaded
+or independently rehashed. Final documentation review checked 145 local links,
+the new section anchor, named functions and test syntax. Production remains
+confined to four MCC-owned files, with no shared-source, vendor, build-graph,
+protocol or map changes. The combined review found no further justified change
+within this milestone. Final evidence records both successful checks and the
+retained baseline finding; Milestone 6 is complete.
