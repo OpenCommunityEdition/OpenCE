@@ -149,6 +149,7 @@ symbols in this file:
 #include "text/unicode.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
+#include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 
 #include <stddef.h>
 
@@ -538,6 +539,7 @@ static void render_state_bitmap(
 	struct bitmap_data const *bitmap = NULL;
 	real_rectangle2d const *clip = NULL;
 	real scale;
+	real bitmap_scale;
 	point2d point;
 
 	/* port: keep gameplay prompts on the high-resolution HUD path, which
@@ -565,6 +567,11 @@ static void render_state_bitmap(
 			return;
 		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
 		scale = local_player_count() > 1 ? 0.75f : 1.0f;
+		/* port: an MCC map's message icons are four times the Xbox's (half
+		HUD scale, on a HUD laid out at twice the Xbox's size:
+		port/linux/game/cache_file_formats.c, mcc_import_hud_convert), its icons'
+		offsets the Xbox's: the bitmap drawn at a quarter */
+		bitmap_scale = mcc_cache_loaded() ? scale * 0.25f : scale;
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale);
 		hud_draw_bitmap_direct(
@@ -572,7 +579,7 @@ static void render_state_bitmap(
 			_hud_corner_bottom_left,
 			&point,
 			clip,
-			scale,
+			bitmap_scale,
 			0.0f,
 			TEST_FLAG(icon->flags, _hud_icon_use_color_bit) ? icon->color : color,
 			FALSE);
@@ -581,12 +588,12 @@ static void render_state_bitmap(
 		else if (clip)
 		{
 			cursor_bounds->x0 = (short)(
-				((clip->x1 - clip->x0) * bitmap->width + icon->width_offset) * scale + point.x);
+				(clip->x1 - clip->x0) * bitmap->width * bitmap_scale + icon->width_offset * scale + point.x);
 		}
 		else
 		{
 			cursor_bounds->x0 = (short)(
-				(bitmap->width + icon->width_offset) * scale + point.x);
+				bitmap->width * bitmap_scale + icon->width_offset * scale + point.x);
 		}
 	}
 

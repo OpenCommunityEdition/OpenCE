@@ -110,6 +110,7 @@ symbols in this file:
 #include "rasterizer_xbox.h"
 #include "rasterizer_xbox_pixel_shader.h"
 #include "mcc_campaign.h" /* port: MCC scripted fades survive damage-flash suppression */
+#include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
 
 /* ---------- constants */
 
@@ -278,6 +279,14 @@ static void rasterizer_screen_effect_set_texture_transforms(
 
 		convolution_size.i = convolution_bitmap->width;
 		convolution_size.j = convolution_bitmap->height;
+		/* port: an MCC map's masks (the scopes') are twice the Xbox's size,
+		as its HUD is laid out (port/linux/game/cache_file_formats.c,
+		mcc_import_hud_convert): mapped at the Xbox's size */
+		if (convolution_bitmap == parameters->convolution_mask && mcc_cache_loaded())
+		{
+			convolution_size.i *= 0.5f;
+			convolution_size.j *= 0.5f;
+		}
 		scanline_size.i = scanline_bitmap->width;
 		scanline_size.j = scanline_bitmap->height;
 		noise_size.i = noise_bitmap->width;
