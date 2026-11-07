@@ -34,6 +34,18 @@ reticles: puts the reticle redraws that match the Xbox's exactly (RETICLES,
 
         python tools/hud_assets.py reticles --map assets/maps/bloodgulch.map \\
             --reticles ../halo-pc-restored/HUD2_left_reticles
+warnings: sets the crosshair's warnings (hud_reticle_warnings: Reload, No
+    Ammo, No Grenades...) in Overpass (WARNINGS), each line on the Xbox's,
+    as tall and as wide, in the weight that matches the Xbox's letters best,
+    and fits the other shapes beside them to the Xbox's texels, into
+    port/assets/hud/svg: the sheet's grey (what the crosshair shows: the
+    words, and the dots the Scorpion's reload counts in) and its alpha (the
+    words, and arrows where the grey has its dots), apart; adds the sheet to
+    layout.json, its alpha redraw as the cell's alpha_svg. Needs the map only;
+    run it after layout, which leaves the sheet out (its PC redraw has
+    English text, which the Xbox's other languages do not).
+
+        python tools/hud_assets.py warnings --map assets/maps/bloodgulch.map
 build: renders port/assets/hud/svg with layout.json into port/assets/hud/*.png
     (committed; the builds embed them).
 check: compares each PNG, reduced to the tag's size, with the map's bitmap
@@ -83,7 +95,8 @@ METERS = {
                                        "extra/xbox_order_hud_meters/tags/ui/hud/bitmaps/combined/hud_ammo_meters.bitmap"),
 }
 # redraws not used: those with English text (other languages' maps have
-# their own; the Xbox message icons all have some), the sniper's zoom labels
+# their own; the Xbox message icons all have some; the crosshair's warnings
+# are set in a font instead: WARNINGS), the sniper's zoom labels
 # (2x and 8x, where the Xbox's are 2x and 10x), and the meters in the PC
 # channel order
 UNUSED = {
@@ -153,6 +166,19 @@ LABELS = {
 }
 LABEL_FONT = Path("port/assets/fonts/Overpass-900.ttf")
 LABEL_SPACINGS = (-10, -8, -6, -4, -2, 0, 2, 4)
+# the warnings a weapon's crosshair shows (Reload, No Ammo...), which no
+# redraw has but in English, by sequence, a line each: set in a font, each
+# line on the Xbox's, with the weight that matches the Xbox's letters best;
+# the shapes beside them (the dots the Scorpion's reload counts in) are
+# fitted to the Xbox's texels, in the sheet's grey and its alpha apart
+WARNINGS_TAG = HUD + "combined\\hud_reticle_warnings"
+WARNINGS = {10: ("Battery", "Depleted"), 6: ("No", "Weapon"), 0: ("Low", "Battery"), 4: ("No", "Fuel"),
+            3: ("Low", "Fuel"), 2: ("No", "Ammo"), 5: ("No", "Grenades"), 7: ("Low", "Ammo"), 1: ("Reload",)}
+WARNING_FONTS = (Path("port/assets/fonts/Overpass-750.ttf"), Path("port/assets/fonts/Overpass-900.ttf"))
+# (the Xbox's lines: a line every 11 texels, capitals 9 tall)
+WARNING_LINE_PITCH = 11
+# redraw units a texel
+WARNINGS_UNITS = 4
 # render texels per Xbox texel while fitting one, and the scales tried
 # around the one its extent gives
 FIT_TEXELS = 8
@@ -704,12 +730,169 @@ def reticles(arguments) -> None:
                 if position is None:
                     position = max(i for i, e in enumerate(entries) if e["tag"].startswith(folder))
                 entries.insert(position + 1, entry)
-    used = {cell["svg"] for entry in entries for cell in entry["cells"] if "svg" in cell}
+    used = {cell[key] for entry in entries for cell in entry["cells"] for key in ("svg", "alpha_svg") if key in cell}
     for svg in (ASSETS / "svg").glob("*.svg"):
         if svg.name not in used:
             svg.unlink()
             print(f"{svg.name}: no longer used")
     LAYOUT.write_text(json.dumps(description, indent=1) + "\n")
+
+
+def glyph_run(font: Path, text: str) -> tuple:
+    """text's glyphs in a font: each one's advance from the first (font
+    units), outline (SVG path data, y up), the ink's left and right, and the
+    font's capital height"""
+    from fontTools.pens.boundsPen import BoundsPen
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.ttLib import TTFont
+
+    face = TTFont(str(font))
+    glyphs = face.getGlyphSet()
+    cmap = face.getBestCmap()
+    run, x, ink = [], 0, [None, None]
+    for character in text:
+        name = cmap[ord(character)]
+        pen = SVGPathPen(glyphs)
+        glyphs[name].draw(pen)
+        bounds = BoundsPen(glyphs)
+        glyphs[name].draw(bounds)
+        if bounds.bounds:
+            ink[0] = x + bounds.bounds[0] if ink[0] is None else ink[0]
+            ink[1] = x + bounds.bounds[2]
+        run.append((x, pen.getCommands()))
+        x += face["hmtx"][name][0]
+    return run, ink, face["OS/2"].sCapHeight
+
+
+def warning_lines(alpha: np.ndarray, group: dict, sequence: int) -> list:
+    """each line of a warning's sprite as the Xbox has it, in texels: its
+    words, its ink's left and right, its capitals' top and its baseline
+    (measured on its first letter, a capital)"""
+    size = alpha.shape[0]
+    left, top, right, bottom = [round(value * size) for value in group["sequences"][sequence][0][1:5]]
+    cell = alpha[top:bottom, left:right] > 127
+    first_row = np.nonzero(cell.any(axis=1))[0][0]
+    lines = []
+    for index, text in enumerate(WARNINGS[sequence]):
+        guess = first_row + index * WARNING_LINE_PITCH
+        columns = np.nonzero(cell[guess:guess + WARNING_LINE_PITCH - 2].any(axis=0))[0]
+        end = columns[0]
+        while end < cell.shape[1] and cell[guess:guess + WARNING_LINE_PITCH - 2, end].any():
+            end += 1
+        from_row = max(guess - 2, 0)
+        rows = np.nonzero(cell[from_row:guess + WARNING_LINE_PITCH, columns[0]:end].any(axis=1))[0] + from_row
+        lines.append({"text": text, "left": left + columns[0], "right": left + columns[-1] + 1,
+                      "cap_top": top + rows[0], "baseline": top + rows[-1] + 1})
+    return lines
+
+
+def warning_line_svg(font: Path, line: dict) -> str:
+    """a line set in a font, in redraw units: its capitals as tall as the
+    Xbox's, on its baseline, from its ink's left to its right (the space
+    between the letters made up to that width)"""
+    run, ink, capitals = glyph_run(font, line["text"])
+    scale = (line["baseline"] - line["cap_top"]) / capitals
+    spacing = (line["right"] - line["left"] - (ink[1] - ink[0]) * scale) / max(len(line["text"]) - 1, 1)
+    units = WARNINGS_UNITS
+    return "\n".join(
+        f'<path transform="translate({(line["left"] + (x - ink[0]) * scale + index * spacing) * units:.3f} '
+        f'{line["baseline"] * units:.3f}) scale({scale * units:.6f} {-scale * units:.6f})" d="{commands}"/>'
+        for index, (x, commands) in enumerate(run))
+
+
+def warning_shapes_svg(channel: np.ndarray, words: list) -> str:
+    """the shapes outside the words in one of the sheet's channels (its
+    grey's dots, the reload's count; its alpha's arrows), in redraw units: a
+    round one (as wide at its foot as at its top) a circle as large as its
+    texels' coverage, about their middle; another a polygon whose sides are
+    the lines through its rows' edges, meeting at its top"""
+    from scipy import ndimage
+
+    outside = channel > 127
+    for left, top, right, bottom in words:
+        outside[top:bottom, left:right] = False
+    labels, count = ndimage.label(outside)
+    paths = []
+    for index in range(1, count + 1):
+        rows, columns = np.nonzero(labels == index)
+        top, bottom = rows.min(), rows.max() + 1
+        if len(rows) < 3 or bottom - top < 2:
+            continue
+        widths = [np.count_nonzero(rows == row) for row in range(top, bottom)]
+        if widths[0] == widths[-1] and max(widths) > widths[0]:
+            # (with its fringe: the texels about it that the channel covers in part)
+            near = ndimage.binary_dilation(labels == index, iterations=1)
+            weights = np.where(near, channel / 255.0, 0.0)
+            ys, xs = np.nonzero(weights)
+            middle_x = (weights[ys, xs] * (xs + 0.5)).sum() / weights[ys, xs].sum()
+            middle_y = (weights[ys, xs] * (ys + 0.5)).sum() / weights[ys, xs].sum()
+            radius = np.sqrt(weights.sum() / np.pi)
+            paths.append(f'<circle cx="{middle_x * WARNINGS_UNITS:.3f}" cy="{middle_y * WARNINGS_UNITS:.3f}" '
+                         f'r="{radius * WARNINGS_UNITS:.3f}"/>')
+            continue
+        middles = np.arange(top, bottom) + 0.5
+        left_slope, left_at = np.polyfit(middles, [columns[rows == row].min() for row in range(top, bottom)], 1)
+        right_slope, right_at = np.polyfit(middles, [columns[rows == row].max() + 1 for row in range(top, bottom)], 1)
+        meet = top if abs(left_slope - right_slope) < 1e-6 else \
+            max(top - 0.5, min(top, (right_at - left_at) / (left_slope - right_slope)))
+        points = [(left_at + left_slope * meet, meet), (right_at + right_slope * meet, meet),
+                  (right_at + right_slope * bottom, bottom), (left_at + left_slope * bottom, bottom)]
+        paths.append('<path d="M' + " L".join(f"{x * WARNINGS_UNITS:.3f},{y * WARNINGS_UNITS:.3f}"
+                                              for x, y in points) + ' Z"/>')
+    return "\n".join(paths)
+
+
+def warnings(arguments) -> None:
+    xbox_map = XboxMap(Path(arguments.map))
+    group = xbox_map.bitmap_group(WARNINGS_TAG)
+    bitmap = group["bitmaps"][0]
+    texels = decode_bitmap(bitmap).astype(float)
+    # (the sheet's grey, which the crosshair shows, and its alpha, which differ in the reload's count: dots in the
+    # grey, arrows in the alpha)
+    channels = {"grey": texels[..., 0], "alpha": texels[..., 3]}
+    size = texels.shape[0]
+    side = size * WARNINGS_UNITS
+    words = [[round(value * size) for value in group["sequences"][sequence][0][1:5]] for sequence in WARNINGS]
+    best = None
+    for font in WARNING_FONTS:
+        lines = "\n".join(warning_line_svg(font, line)
+                          for sequence in WARNINGS for line in warning_lines(channels["alpha"], group, sequence))
+        scores = []
+        for channel, picture in channels.items():
+            svg = ASSETS / "svg" / f"warnings__{font.stem}{'' if channel == 'grey' else '__alpha'}.svg"
+            svg.write_text(f'<svg xmlns="http://www.w3.org/2000/svg" width="{side}" height="{side}" '
+                           f'viewBox="0 0 {side} {side}">\n'
+                           f'<!-- hud_reticle_warnings\' {channel}: its words in {font.name}, its other shapes '
+                           f'fitted to the Xbox\'s -->\n<g fill="#ffffff">\n{lines}\n'
+                           f'{warning_shapes_svg(picture, words)}\n</g>\n</svg>\n')
+            render = render_svg(svg, SCALE / WARNINGS_UNITS)[..., 3].astype(float)
+            reduced = render.reshape(size, SCALE, size, SCALE).mean(axis=(1, 3))
+            scores.append(likeness(soften(reduced / 255.0), soften(picture / 255.0)))
+        score = sum(scores) / len(scores)
+        print(f"warnings in {font.name}: likeness {score:.4f} (grey {scores[0]:.4f}, alpha {scores[1]:.4f})")
+        if best is None or score > best[0]:
+            best = (score, font)
+    for font in WARNING_FONTS:
+        if font != best[1]:
+            for suffix in ("", "__alpha"):
+                (ASSETS / "svg" / f"warnings__{font.stem}{suffix}.svg").unlink()
+    name = WARNINGS_TAG[len(HUD):].replace("combined\\", "") + "__0"
+    entry = {"name": name, "tag": WARNINGS_TAG, "bitmap": 0, "width": bitmap["width"], "height": bitmap["height"],
+             "format": FORMATS[bitmap["format"]], "scale": SCALE,
+             "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]),
+             "cells": [{"xbox": [0, 0, size, size], "svg": f"warnings__{best[1].stem}.svg",
+                        "alpha_svg": f"warnings__{best[1].stem}__alpha.svg", "source_scale": WARNINGS_UNITS,
+                        "source": [0, 0], "clip": [0, 0, side, side], "kind": "alpha", "score": round(best[0], 3)}]}
+    description = json.loads(LAYOUT.read_text())
+    entries = description["assets"]
+    old = next((index for index, other in enumerate(entries) if other["name"] == name), None)
+    if old is not None:
+        entries[old] = entry
+    else:
+        # (after the other sheets of its folder)
+        entries.insert(max(i for i, e in enumerate(entries) if e["tag"].startswith(HUD + "combined\\")) + 1, entry)
+    LAYOUT.write_text(json.dumps(description, indent=1) + "\n")
+    print(f"{name}: warnings__{best[1].stem}.svg, its alpha warnings__{best[1].stem}__alpha.svg")
 
 
 # ---------- building
@@ -861,7 +1044,17 @@ def build_asset(entry: dict, renders: dict) -> np.ndarray:
         width, height = (right - left) * scale, (bottom - top) * scale
         texels = window(clipped(renders[key], [round(value * zoom) for value in cell["clip"]]),
                         round(cell["source"][0] * zoom), round(cell["source"][1] * zoom), width, height)
-        image[top * scale:top * scale + height, left * scale:left * scale + width] = recipe(texels, cell["kind"])
+        texels = recipe(texels, cell["kind"])
+        if "alpha_svg" in cell:
+            # (a sheet whose alpha is another picture than its grey, the
+            # crosshair's warnings': the alpha is that redraw's coverage)
+            key = (cell["alpha_svg"], zoom)
+            if key not in renders:
+                renders[key] = render_svg(ASSETS / "svg" / cell["alpha_svg"], zoom)
+            texels[..., 3] = window(clipped(renders[key], [round(value * zoom) for value in cell["clip"]]),
+                                    round(cell["source"][0] * zoom), round(cell["source"][1] * zoom),
+                                    width, height)[..., 3]
+        image[top * scale:top * scale + height, left * scale:left * scale + width] = texels
     if any(cell["kind"] in ("meter", "dxt") for cell in entry["cells"]):
         image = bleed(image)
     if any(cell["kind"] == "meter" for cell in entry["cells"]):
@@ -933,6 +1126,8 @@ def main() -> None:
     command.add_argument("--map", required=True)
     command.add_argument("--hek", required=True)
     command.add_argument("--svg", required=True)
+    command = commands.add_parser("warnings")
+    command.add_argument("--map", required=True)
     command = commands.add_parser("reticles")
     command.add_argument("--map", required=True)
     command.add_argument("--reticles", required=True)
@@ -942,7 +1137,7 @@ def main() -> None:
     command.add_argument("--map", required=True)
     command.add_argument("--out", required=True)
     arguments = parser.parse_args()
-    {"layout": layout, "reticles": reticles, "build": build, "thresholds": thresholds,
+    {"layout": layout, "reticles": reticles, "warnings": warnings, "build": build, "thresholds": thresholds,
      "check": check}[arguments.command](arguments)
 
 

@@ -202,6 +202,8 @@ void hud_hires_tags_loaded(
 	{
 		static struct { char const *tag; short first, last; } const sheets[] = {
 			{ "ui\\hud\\bitmaps\\combined\\hud_unit_backgrounds", 8, 12 },
+			/* (the English maps' has a high-res texture, which comes first:
+			this is for other languages') */
 			{ "ui\\hud\\bitmaps\\combined\\hud_reticle_warnings", 0, 0 },
 			{ "ui\\hud\\bitmaps\\combined\\hud_msg_icons", 0, 3 },
 			{ "ui\\hud\\bitmaps\\hud_msg_icons_sm", 0, 1 }
