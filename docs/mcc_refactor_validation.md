@@ -157,7 +157,8 @@ The hidden GPU harness passed 36 MCC meter renders; the shared stock HUD
 builder passed 15,360 ammunition renders. These compare output pixels for
 their specified conditions, not full-map screenshots. The Windows machine
 used NVIDIA OpenGL 4.5 on an RTX 5070 Ti. The new Linux Xvfb/Mesa job was
-reviewed but has not run locally; its result must be obtained from CI.
+reviewed but had not run at local Stage 1 completion; its subsequent remote
+result is recorded under Stage 2 below.
 
 The first sandboxed Workshop attempt loaded and rendered Ruby and Cursed,
 but loopback connections failed with Windows error 10013. Neither run counted
@@ -261,5 +262,42 @@ passed Windows, Linux, Android and web debug builds. Android included its APK
 and importer checks; web included the browser/native transport harness.
 The [MCC run](https://github.com/chestahh/GulchCE/actions/runs/42373756545)
 passed its Linux/Windows pytest jobs but failed SDL configuration in the new
-GPU job as described above. The dependency repair and expanded boat coverage
-require a subsequent remote run; the original run cannot validate them.
+GPU job as described above.
+
+The subsequent [Build run at `24fc89cdd`](https://github.com/chestahh/GulchCE/actions/runs/42374909776)
+passed all four platform jobs with the expanded boat coverage. These are debug
+builds; this workflow builds releases only on main. Android compiled the guest
+and host, built its APK and passed the importer checks. Web passed its build
+and browser/native transport checks with Chromium and Firefox, including the
+configured packet-loss cases. These transport fixtures do not exercise a real
+map or establish crossplay gameplay compatibility.
+
+Linux's combined regression invocation passed 2,478 checks with 27 skips,
+twelve expected failures and seven passing subtests. Across its pytest
+invocations the job recorded 2,794 passes, 52 skips and the same twelve expected
+failures; its ordinary and full-LTO ELF light-storage checks also passed.
+The expected failures are the explicitly deferred boat defect described above.
+Skips are retained as skips, including checks requiring unavailable retail
+assets; they are not evidence of gameplay coverage.
+
+The corresponding [MCC run](https://github.com/chestahh/GulchCE/actions/runs/42374909804)
+passed all three jobs: Linux readers/validators, Windows adapters and Linux
+GPU rendering. The corrected GPU job built the pinned SDL version with X11
+enabled and passed all 36 meter render checks under Xvfb/Mesa. The Linux
+reader/validator job passed 1,615 checks with sixteen skips; its separate
+ASan/UBSan invocation passed 38 checks.
+
+These results validate code and test revision
+`24fc89cdd46761f010d81a41f16ad5ba6170487e`. The following documentation-only
+commit records the completed runs; it does not change that implementation.
+No production source or protocol changed in either stage. The twelve deferred
+legacy boat failures remain unresolved, and the Stage 1 runtime limits still
+apply. No Android-device gameplay, browser-map gameplay, full campaign,
+save/revert or new map-family transition result is claimed.
+
+Stage 2 launched no game instances and created no map copies or saves.
+Temporary harness binaries and pytest fixtures/cache were removed after
+checking their resolved paths and rejecting links. About 1.9 MB of diagnostic
+logs and supporting evidence remain under `build/stage2`; no generated game
+caches or test executables remain there. The Stage 1 build, environment and
+verified save archive remain available as described above.
