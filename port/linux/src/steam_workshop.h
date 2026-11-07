@@ -6,7 +6,8 @@ A Halo CE Workshop item is a folder, <library>/steamapps/workshop/content/976730
 (its title, engine and multiplayer maps' json) and its .map files in a maps folder. The catalog lists them for
 mcc_maps.c as the level mcc_maps\<item id>\<map name>, and platform_translate_path (xbox_files.c) opens that
 package folder as the item's maps folder, so nothing is copied into the data root. A package folder of that name
-in the data root's mcc_maps folder wins over the item.
+in the data root's mcc_maps folder wins over the item. Resource requests also find the item's halo1/maps
+files and MCC's installed shared sets, while explicit local resources retain precedence.
 
 The json files are the item makers' text: too large, deep or odd ones refuse their item or map, never crash.
 */
@@ -90,6 +91,9 @@ const struct steam_workshop_map *steam_workshop_map(int index);
 /* the folder holding the .map files of an item (the package folder of mcc_maps\<item id>); 1 and the path, or 0
 if no scanned map belongs to that id */
 int steam_workshop_package_folder(const char *item_id, char *folder, unsigned long size);
+/* Resolve an MCC-relative package/shared resource in place; zero keeps the existing path.
+ * Explicit data-root packages/files and beside-level resources retain precedence. */
+int steam_workshop_resource_path(const char *request, const char *data_root, char *path, unsigned long size);
 /* the item's title; 1 if some scanned map belongs to the id (the title may still be "") */
 int steam_workshop_item_title(const char *item_id, char *title, unsigned long size);
 

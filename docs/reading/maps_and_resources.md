@@ -101,6 +101,29 @@ the MCC-only branch in `platform_translate_path` resolves it in place unless a
 local package already owns that folder. A rescan retries an exact host identity
 before searching aliases. Xbox and CE roots retain their own resolution.
 
+For resource discovery, follow `steam_workshop_resource_path` in
+[steam_workshop.c](../../port/linux/src/steam_workshop.c), called only inside the
+MCC branch of [xbox_files.c](../../port/linux/src/xbox_files.c)'s virtual path
+resolver. This small shared-file-service hook is necessary because the resource
+reader opens virtual paths through `fopen`; MCC map conversion does not own host
+file translation. Xbox and CE resolution is unchanged.
+
+For example, `mcc_maps/12345/bitmaps.map` first respects a local package, then
+its Workshop item's beside-level resource, then that item's `halo1/maps` file.
+If a required type is absent, `mcc_package_resource_open` retains the explicit
+MCC-root fallback; `mcc_resources_select` then checks the two shared sets.
+Missing local shared files can resolve to the installed MCC game through the
+same Steam libraries. A package may supply custom textures while its sounds
+come from a validated shared set. A present invalid package file is refused,
+not replaced. See [resource precedence](../mcc_maps.md#subscribed-steam-workshop-items).
+
+The resolver stores no selected resource or open stream. Existing MCC runtime
+ownership in `mcc_resources_dispose` handles failed loads and unloading; changing
+maps causes fresh selection. Content hashes cover the selected bytes, so moving
+identical resources between supported locations does not change network identity.
+The synthetic path and resource-reader tests establish discovery and admission
+rules; runtime loading and map-family transitions require separate checks.
+
 `game.mcc_collections` optionally groups installed items using the fixed table in
 [workshop_collections.c](../../port/linux/src/workshop_collections.c).
 An imported package's `workshop_id.txt` also supplies its group without Steam.

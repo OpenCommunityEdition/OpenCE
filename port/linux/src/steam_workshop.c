@@ -578,6 +578,74 @@ int steam_workshop_package_folder(const char *item_id, char *folder, unsigned lo
 	return 1;
 }
 
+/* Only the two resource names in MCC package/shared namespaces are redirected.
+ * Keep validation, complete-reference matching and fingerprints in mcc_resources.c. */
+int steam_workshop_resource_path(const char *request, const char *data_root, char *path, unsigned long size)
+{
+	char relative[128], local[160], package[STEAM_WORKSHOP_PATH_SIZE];
+	char found[STEAM_WORKSHOP_PATH_SIZE], resource[64], *separator;
+	char (*paths)[STEAM_WORKSHOP_PATH_SIZE];
+	const char *installed;
+	unsigned index;
+	int count, library, result = 0;
+
+	if (!discovery_enabled() || strlen(request) >= sizeof(relative) ||
+		strlen(data_root) >= STEAM_WORKSHOP_PATH_SIZE)
+		return 0;
+	for (index = 0; request[index]; index++)
+	{
+		char c = request[index];
+		relative[index] = c == '\\' ? '/' : c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c;
+	}
+	relative[index] = 0;
+	separator = strrchr(relative, '/');
+	if (!separator || (strcmp(separator + 1, "bitmaps.map") && strcmp(separator + 1, "sounds.map")))
+		return 0;
+	strcpy(resource, separator + 1);
+	*separator = 0;
+	if (digits(relative))
+	{
+		/* A manually installed package, or any beside-level resource entry,
+		 * stays authoritative even when incomplete, invalid or unreadable. */
+		snprintf(local, sizeof(local), "mcc_maps/%s", relative);
+		if (resolve(data_root, local, found, sizeof(found)) ||
+			!steam_workshop_package_folder(relative, package, sizeof(package)) ||
+			resolve(package, resource, found, sizeof(found)))
+			return 0;
+		slashes(package);
+		separator = strrchr(package, '/');
+		if (!separator) return 0;
+		*separator = 0;
+		snprintf(local, sizeof(local), "halo1/maps/%s", resource);
+		return resolve(package, local, path, size);
+	}
+	if (!strcmp(relative, "_shared/singleplayer"))
+		installed = "steamapps/common/Halo The Master Chief Collection/halo1/maps";
+	else if (!strcmp(relative, "_shared/multiplayer"))
+		installed = "steamapps/common/Halo The Master Chief Collection/halo1/maps/custom_edition";
+	else
+		return 0;
+	snprintf(local, sizeof(local), "mcc_maps/%s/%s", relative, resource);
+	if (resolve(data_root, local, found, sizeof(found)))
+		return 0;
+	/* The same ordered Steam libraries as map discovery. An explicit local
+	 * shared file wins; no other Workshop item's resources are searched. */
+	paths = malloc(sizeof(*paths) * 2 * STEAM_WORKSHOP_MAXIMUM_LIBRARIES);
+	if (!paths) return 0;
+	count = libraries(paths, 2 * STEAM_WORKSHOP_MAXIMUM_LIBRARIES);
+	for (library = 0; library < count; library++)
+	{
+		if (resolve(paths[library], installed, package, sizeof(package)) &&
+			resolve(package, resource, path, size))
+		{
+			result = 1;
+			break;
+		}
+	}
+	free(paths);
+	return result;
+}
+
 int steam_workshop_item_title(const char *item_id, char *title, unsigned long size)
 {
 	const struct steam_workshop_map *map = item_map(item_id);
