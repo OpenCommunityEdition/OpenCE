@@ -3396,6 +3396,40 @@
    "correction": true
   },
   {
+   "name": "sniper__caption__0",
+   "tag": "ui\\hud\\bitmaps\\sniper\\caption",
+   "bitmap": 0,
+   "width": 128,
+   "height": 128,
+   "format": "a8y8",
+   "scale": 8,
+   "crc": 800277554,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      128,
+      128
+     ],
+     "svg": "hud__bitmaps__sniper__caption.svg",
+     "source_scale": 4,
+     "source": [
+      0,
+      0
+     ],
+     "clip": [
+      0,
+      0,
+      512,
+      512
+     ],
+     "kind": "alpha",
+     "score": 0.984
+    }
+   ]
+  },
+  {
    "name": "sniper_rifle__angle_ticks__0",
    "tag": "weapons\\sniper rifle\\bitmaps\\angle_ticks",
    "bitmap": 0,

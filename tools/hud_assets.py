@@ -46,6 +46,16 @@ warnings: sets the crosshair's warnings (hud_reticle_warnings: Reload, No
     English text, which the Xbox's other languages do not).
 
         python tools/hud_assets.py warnings --map assets/maps/bloodgulch.map
+caption: draws the sniper rifle's scope caption (sniper\\caption: TARGET
+    DISTANCE:, TARGET ELEVATION:) in the counter digits' segments, as the
+    Xbox's letters are (CAPTION_*), each line on the Xbox's, each letter's
+    width and place fitted to the Xbox's texels, into
+    port/assets/hud/svg; adds the bitmap to layout.json. Needs the map only;
+    run it after layout, which leaves the caption out (its PC redraw is not
+    used: UNUSED). Like the other English bitmaps, it is drawn only for the
+    English maps' pixels (crc).
+
+        python tools/hud_assets.py caption --map assets/maps/bloodgulch.map
 build: renders port/assets/hud/svg with layout.json into port/assets/hud/*.png
     (committed; the builds embed them).
 check: compares each PNG, reduced to the tag's size, with the map's bitmap
@@ -179,6 +189,26 @@ WARNING_FONTS = (Path("port/assets/fonts/Overpass-750.ttf"), Path("port/assets/f
 WARNING_LINE_PITCH = 11
 # redraw units a texel
 WARNINGS_UNITS = 4
+# the sniper rifle's scope caption, beside its target's distance and
+# elevation (counter digits): its letters drawn in the digits' segments, as
+# the Xbox's are (the counter digits' redraw: their height, bars, stems and
+# middle, upright and then sheared as they are), each line on the Xbox's,
+# each letter's width and each letter's place fitted to the Xbox's texels
+CAPTION_TAG = HUD + "sniper\\caption"
+CAPTION_LINES = (("TARGET DISTANCE:", 10), ("TARGET ELEVATION:", 25))  # (and its baseline, in texels)
+CAPTION_SVG = "hud__bitmaps__sniper__caption.svg"
+CAPTION_UNITS = 4
+# the digits' (hud__bitmaps__combined__hud_counter_numbers.svg), in units
+CAPTION_HEIGHT, CAPTION_BAR, CAPTION_STEM = 39.9, 3.95, 5.35
+CAPTION_MIDDLE = (-21.94, -17.99)
+CAPTION_SHEAR = 0.474
+# the cut of D's top right corner, and a diagonal stroke's width along a line
+CAPTION_CORNER, CAPTION_DIAGONAL = 6.0, 6.5
+# render texels per Xbox texel while fitting, the widths tried for a letter
+# and the places tried about the one its ink gives (texels)
+CAPTION_FIT_TEXELS = 16
+CAPTION_WIDTHS = np.arange(10.0, 28.01, 1.0)
+CAPTION_PLACES = np.arange(-1.0, 1.01, 0.125)
 # render texels per Xbox texel while fitting one, and the scales tried
 # around the one its extent gives
 FIT_TEXELS = 8
@@ -895,6 +925,159 @@ def warnings(arguments) -> None:
     print(f"{name}: warnings__{best[1].stem}.svg, its alpha warnings__{best[1].stem}__alpha.svg")
 
 
+def caption_shapes(letter: str, width: float) -> list:
+    """A caption letter's shapes (CAPTION_TAG), upright, as polygons in units
+    from its left end on the baseline: the counter digits' segments, and a
+    diagonal where the Xbox's letter has one (R's leg, N's and V's)."""
+    h, b, s, d, c = CAPTION_HEIGHT, CAPTION_BAR, CAPTION_STEM, CAPTION_DIAGONAL, CAPTION_CORNER
+    middle_top, middle_bottom = CAPTION_MIDDLE
+    w = s if letter in "I:" else width
+
+    def box(x0, y0, x1, y1):
+        return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+
+    top, bottom, middle = box(0, -h, w, -h + b), box(0, -b, w, 0), box(0, middle_top, w, middle_bottom)
+    left, right = box(0, -h, s, 0), box(w - s, -h, w, 0)
+    left_upper, right_upper, right_lower = box(0, -h, s, middle_bottom), box(w - s, -h, w, middle_bottom), \
+        box(w - s, middle_top, w, 0)
+    return {
+        "T": [top, box((w - s) / 2, -h, (w + s) / 2, 0)],
+        "A": [top, left, right, middle],
+        "R": [top, left, right_upper, middle, [(s - 1, middle_bottom), (s - 1 + d, middle_bottom), (w, 0), (w - d, 0)]],
+        "G": [top, left, bottom, right_lower, box(w / 2, middle_top, w, middle_bottom)],
+        "E": [top, left, box(0, middle_top, w - 2, middle_bottom), bottom],
+        "D": [box(0, -h, w - c, -h + b), left, bottom, box(w - s, -h + c, w, 0),
+              [(w - c, -h), (w, -h + c), (w - s, -h + c), (w - c, -h + b)]],
+        "I": [left],
+        "S": [top, left_upper, middle, right_lower, bottom],
+        "N": [left, right, [(0, -h), (d, -h), (w, -0.58 * h), (w - d, -0.58 * h)]],
+        "C": [top, left, bottom],
+        "L": [left, bottom],
+        "V": [left, box(w - s, -h, w, -h / 2), [(w - d, -h / 2), (w, -h / 2), (d, 0), (0, 0)]],
+        "O": [top, bottom, left, right],
+        ":": [box(0, middle_top, s, middle_bottom), box(0, -b, s, 0)],
+    }[letter]
+
+
+def caption_polygons(places: list, widths: dict) -> list:
+    """The caption's polygons in the sheet, in units: each letter at its
+    place (texels from the left, upright, on its line's baseline), sheared
+    about the baseline as the digits are."""
+    polygons = []
+    for (text, baseline), line in zip(CAPTION_LINES, places):
+        letters = [letter for letter in text if letter != " "]
+        for letter, place in zip(letters, line):
+            for shape in caption_shapes(letter, widths.get(letter, 0)):
+                polygons.append([(place * CAPTION_UNITS + x - CAPTION_SHEAR * y, baseline * CAPTION_UNITS + y)
+                                 for x, y in shape])
+    return polygons
+
+
+def caption_render(polygons: list, width: int, height: int) -> np.ndarray:
+    """How much of each texel the polygons cover (0 to 1)."""
+    from PIL import ImageDraw
+
+    scale = CAPTION_FIT_TEXELS / CAPTION_UNITS
+    image = Image.new("L", (width * CAPTION_FIT_TEXELS, height * CAPTION_FIT_TEXELS))
+    draw = ImageDraw.Draw(image)
+    for polygon in polygons:
+        draw.polygon([(x * scale, y * scale) for x, y in polygon], fill=255)
+    texels = np.asarray(image, dtype=float) / 255.0
+    return texels.reshape(height, CAPTION_FIT_TEXELS, width, CAPTION_FIT_TEXELS).mean(axis=(1, 3))
+
+
+def caption_ink(alpha: np.ndarray, baseline: int) -> list:
+    """Each letter's ink on a line of the Xbox's caption, upright (the shear
+    taken off about the baseline): its left and right, in texels."""
+    samples = 8
+    xs = np.arange(alpha.shape[1] * samples) / samples
+    upright = []
+    for row in range(baseline - 10, baseline):
+        shift = (baseline - row - 0.5) * CAPTION_SHEAR
+        upright.append(np.interp(xs + shift, np.arange(alpha.shape[1]) + 0.5, alpha[row], left=0, right=0))
+    inked = np.max(upright, axis=0) > 64
+    runs, start = [], None
+    for index, value in enumerate(np.append(inked, False)):
+        if value and start is None:
+            start = index
+        elif not value and start is not None:
+            runs.append((start / samples, index / samples))
+            start = None
+    return runs
+
+
+def caption(arguments) -> None:
+    xbox_map = XboxMap(Path(arguments.map))
+    group = xbox_map.bitmap_group(CAPTION_TAG)
+    bitmap = group["bitmaps"][0]
+    alpha = decode_bitmap(bitmap)[..., 3].astype(float)
+    # (its sprite: the bitmap's top quarter)
+    rows = round(group["sequences"][0][0][4] * bitmap["height"])
+    xbox = soften(alpha[:rows] / 255.0)
+    places, inks = [], {}
+    for text, baseline in CAPTION_LINES:
+        letters = [letter for letter in text if letter != " "]
+        runs = caption_ink(alpha, baseline)
+        assert len(runs) == len(letters), f"{text}: {len(runs)} letters inked where the caption has {len(letters)}"
+        places.append([left + 0.5 for left, _ in runs])
+        for letter, (left, right) in zip(letters, runs):
+            inks.setdefault(letter, []).append((right - left - 1.0) * CAPTION_UNITS)
+    widths = {letter: float(CAPTION_WIDTHS[np.abs(CAPTION_WIDTHS - np.median(values)).argmin()])
+              for letter, values in inks.items() if letter not in "I:"}
+
+    def score():
+        render = caption_render(caption_polygons(places, widths), bitmap["width"], rows)
+        return likeness(soften(render), xbox)
+
+    best = score()
+    for _ in range(3):
+        for letter in widths:
+            for width in CAPTION_WIDTHS:
+                kept, widths[letter] = widths[letter], float(width)
+                value = score()
+                if value > best:
+                    best = value
+                else:
+                    widths[letter] = kept
+        for line in places:
+            for index in range(len(line)):
+                start = line[index]
+                for offset in CAPTION_PLACES:
+                    kept, line[index] = line[index], start + float(offset)
+                    value = score()
+                    if value > best:
+                        best = value
+                    else:
+                        line[index] = kept
+    print(f"caption: likeness {best:.4f}, widths " + ", ".join(f"{k} {v:g}" for k, v in sorted(widths.items())))
+
+    side = bitmap["width"] * CAPTION_UNITS
+    paths = "\n".join('<path d="M' + " L".join(f"{x:.2f},{y:.2f}" for x, y in polygon) + ' Z"/>'
+                      for polygon in caption_polygons(places, widths))
+    (ASSETS / "svg" / CAPTION_SVG).write_text(
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{side}" height="{side}" viewBox="0 0 {side} {side}">\n'
+        f'<!-- the sniper rifle\'s scope caption: its letters in the counter digits\' segments '
+        f'(hud__bitmaps__combined__hud_counter_numbers.svg), sheared as they are, each fitted to the Xbox\'s -->\n'
+        f'<g fill="#ffffff">\n{paths}\n</g>\n</svg>\n')
+    name = CAPTION_TAG[len(HUD):].replace("\\", "__") + "__0"
+    entry = {"name": name, "tag": CAPTION_TAG, "bitmap": 0, "width": bitmap["width"], "height": bitmap["height"],
+             "format": FORMATS[bitmap["format"]], "scale": SCALE,
+             "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]),
+             "cells": [{"xbox": [0, 0, bitmap["width"], bitmap["height"]], "svg": CAPTION_SVG,
+                        "source_scale": CAPTION_UNITS, "source": [0, 0], "clip": [0, 0, side, side],
+                        "kind": "alpha", "score": round(best, 3)}]}
+    description = json.loads(LAYOUT.read_text())
+    entries = description["assets"]
+    old = next((index for index, other in enumerate(entries) if other["name"] == name), None)
+    if old is not None:
+        entries[old] = entry
+    else:
+        # (after the other sheets of its folder)
+        entries.insert(max(i for i, e in enumerate(entries) if e["tag"].startswith(HUD + "sniper\\")) + 1, entry)
+    LAYOUT.write_text(json.dumps(description, indent=1) + "\n")
+    print(f"{name}: {CAPTION_SVG}")
+
+
 # ---------- building
 
 
@@ -1128,6 +1311,8 @@ def main() -> None:
     command.add_argument("--svg", required=True)
     command = commands.add_parser("warnings")
     command.add_argument("--map", required=True)
+    command = commands.add_parser("caption")
+    command.add_argument("--map", required=True)
     command = commands.add_parser("reticles")
     command.add_argument("--map", required=True)
     command.add_argument("--reticles", required=True)
@@ -1137,8 +1322,8 @@ def main() -> None:
     command.add_argument("--map", required=True)
     command.add_argument("--out", required=True)
     arguments = parser.parse_args()
-    {"layout": layout, "reticles": reticles, "warnings": warnings, "build": build, "thresholds": thresholds,
-     "check": check}[arguments.command](arguments)
+    {"layout": layout, "reticles": reticles, "warnings": warnings, "caption": caption, "build": build,
+     "thresholds": thresholds, "check": check}[arguments.command](arguments)
 
 
 if __name__ == "__main__":
