@@ -848,10 +848,6 @@ static const unsigned char custom_edition_channel_sources[NUMBER_OF_CUSTOM_EDITI
 	{ 3, 3, 3, 0 },
 	/* Explicit Xbox-order HUD artwork must not be converted per draw. */
 	{ 0, 1, 2, 3 },
-	/* an MCC meter: the fill order in color, as the Xbox's, and there alone
-	(its alpha is the shape, flat), where the meter also reads it from
-	alpha */
-	{ 0, 1, 2, 0 },
 };
 
 struct custom_edition_texels

@@ -287,12 +287,6 @@ enum custom_edition_channel_order
 	_custom_edition_channels_hud_meter,
 	/* Authored Xbox-order meters, including sheets also used as artwork. */
 	_custom_edition_channels_hud_meter_xbox,
-	/* an MCC map's HUD meter: the fill order in color as the Xbox's, but its
-	alpha the shape alone (a flat 225 to 255), where the Xbox's alpha holds
-	the fill order too, which the meter's shader reads: the fill order is
-	sampled for alpha as well (observed: MCC's meters drew always empty
-	otherwise) */
-	_custom_edition_channels_hud_meter_mcc,
 
 	NUMBER_OF_CUSTOM_EDITION_CHANNEL_ORDERS
 };
