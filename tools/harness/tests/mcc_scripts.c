@@ -39,6 +39,8 @@ static long equipment_unit;
 static short equipment_profile;
 static boolean equipment_reset;
 static unsigned equipment_calls;
+static unsigned deselect_calls;
+void ai_scripting_deselect(void) { ++deselect_calls; }
 void mcc_player_add_equipment(long unit, short profile, boolean reset) {
     equipment_unit=unit;equipment_profile=profile;equipment_reset=reset;++equipment_calls;
 }
@@ -98,6 +100,8 @@ short hs_find_function_by_name(char const *name) {
         /* Deliberate legacy collisions check MCC precedence and alias misses. */
         if (!_stricmp(name,"core_save_name")) return 323;
         if (!_stricmp(name,"player_effect_set_max_vibrate")) return 324;
+        if (!_stricmp(name,"ai_select")) return 200;
+        if (!_stricmp(name,"ai_deselect")) return 201;
         return NONE;
     }
     if (!strcmp(name, "sleep") || !strcmp(name,"set")) return 321;
@@ -169,6 +173,7 @@ static int check_resolver(struct mcc_runtime *runtime, struct data_array *syntax
     /* A later legacy lookup retains the native implementation. */
     CHECK(hs_find_function_by_name("core_save_name")==323);
     CHECK(hs_find_function_by_name("player_effect_set_max_vibrate")==324);
+    CHECK(hs_find_function_by_name("ai_deselect")==201);
     free(runtime->tags);
     return 0;
 }
@@ -251,6 +256,34 @@ int main(int argc, char **argv) {
         CHECK(argc==4);
         return check_resolver(&runtime,syntax,nodes,strings,argv[2],(short)strtol(argv[3],NULL,10),
             !strcmp(argv[1],"resolver_missing_alias"));
+    }
+    if (!strcmp(argv[1],"ai_deselect")) {
+        strcpy(strings,"ai_deselect");resolver_case=TRUE;
+        nodes[0].type=_hs_type_void;nodes[1].next_node_index=NONE;
+        CHECK(!loaded && !mcc_script_function(0x7007));
+        CHECK(mcc_scripts_prepare(&runtime));
+        CHECK(nodes[0].function_index==0x7007 && nodes[1].function_index==0x7007);
+        loaded=TRUE;extension=mcc_script_function(0x7007);CHECK(extension);
+        CHECK(extension->return_type==_hs_type_void && extension->parameter_count==0);
+        CHECK(mcc_script_find("ai_select")==NONE && hs_find_function_by_name("ai_select")==200);
+        CHECK(mcc_script_call_valid(nodes,syntax));
+        returned=123;extension->evaluate(0x7007,0,TRUE);
+        CHECK(deselect_calls==1 && returned==0);
+        /* Like native zero-argument evaluators, completion does not depend on
+         * an argument frame or the initialize flag. */
+        returned=123;extension->evaluate(0x7007,0,FALSE);
+        CHECK(deselect_calls==2 && returned==0);
+        nodes[1].next_node_index=0x10002;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[1].next_node_index=NONE;
+        nodes[0].data=0x20001;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[0].data=0x10001;
+        nodes[0].flags=0;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[0].flags=9;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[0].flags=10;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[0].flags=8;loaded=FALSE;
+        CHECK(!mcc_script_call_valid(nodes,syntax) && !mcc_script_function(0x7007));
+        CHECK(mcc_script_find("ai_deselect")==NONE && hs_find_function_by_name("ai_deselect")==201);
+        free(runtime.tags);return 0;
     }
     if (!strncmp(argv[1], "issue89_link_", 13)) {
         strcpy(strings,argv[1]+13);

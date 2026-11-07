@@ -616,6 +616,29 @@ adapter; it does not grant developer access or change multiplayer scores.
 player team, including remote players. The team is not the unit's AI allegiance.
 These adapters do not add names to the Xbox/Custom Edition function table.
 
+For MCC `(ai_deselect)`, follow `mcc_script_resolve`, `mcc_script_function` and
+`mcc_ai_deselect_evaluate` in
+[`mcc_scripts.c`](../../port/linux/game/mcc_scripts.c), then
+`ai_scripting_deselect` in [`ai_script.c`](../../source/ai/ai_script.c) and
+`ai_debug_select_actor` in [`ai_debug.c`](../../source/ai/ai_debug.c).
+The zero-argument adapter invokes the real native selection-clearing service
+when AI is initialized; it adds no saved state or new cleanup owner. Loaded-MCC
+registry guards and existing unload behavior bound its availability.
+`hs_syntax_node_refusal` in [`hs.c`](../../source/hs/hs.c) already validates
+MCC definitions separately. Its native map allowlist remains unchanged,
+including the refusal of `ai_deselect` and `ai_select` in Xbox/CE maps.
+
+Quarantine's authored `life_lost_0` is a concrete example: its valid call was
+enough to disable the whole cooperative game-over script under native policy.
+The MCC adapter applies to any accepted MCC map. This script-admission change
+requires MCC protocol 65 despite adding no message fields; OpenCE 41 remains
+unchanged. [`test_mcc_ai_deselect.py`](../../tools/harness/tests/test_mcc_ai_deselect.py)
+extracts the actual native operation, adapter and policy functions, including
+deliberate-fault controls. [`test_mcc_scripts.py`](../../tools/test_mcc_scripts.py)
+checks name resolution, zero-argument validation and inactive registry guards.
+Runtime observations and their limits belong to the
+[refactor validation record](../mcc_refactor_validation.md).
+
 `sound_set_music_gain` multiplies the map's music volume by a finite value in
 0 to 1, in addition to the player's volume setting. Only a local game or the host
 can change it. Follow `mcc_campaign_mix_gain`, the campaign snapshot functions,

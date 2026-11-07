@@ -102,10 +102,10 @@ int main(void) {
     mcc_protocol_client_begin(MCC_PROTOCOL_ADVERTISED_FLAG);
     CHECK(mcc_protocol_join(original,sizeof(original),outer)==outer);
     CHECK(mcc_protocol_unwrap(outer,40,inner,&size));CHECK(size==32 && !memcmp(inner,original,32));
-    /* The metadata extension is versioned even though settings retain their
-     * size. Reject the previous MCC revision before interpreting settings. */
-    CHECK(MCC_PROTOCOL_VERSION==64);
-    ((byte *)outer)[4]=63;
+    /* Script admission changes gameplay without changing packet sizes.
+     * Reject the previous MCC revision before interpreting settings. */
+    CHECK(MCC_PROTOCOL_VERSION==65);
+    ((byte *)outer)[4]=64;
     CHECK(!mcc_protocol_unwrap(outer,40,inner,&size));
     ((byte *)outer)[4]=MCC_PROTOCOL_VERSION;
     for(i=0;i<257;i++) if(i!=40) CHECK(!mcc_protocol_unwrap(outer,(word)i,inner,&size));

@@ -176,6 +176,22 @@ static struct hs_function_definition mcc_kill_thread_definition = {
     NULL, 1, { _hs_type_long_integer }
 };
 
+/* MCC scenarios may clear the debug selection. Use the existing operation;
+ * the Xbox/CE map allowlist still excludes it and other debug controls. */
+static void mcc_ai_deselect_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;
+    (void)initialize;
+    ai_scripting_deselect();
+    hs_return(thread, 0);
+}
+
+static struct hs_function_definition mcc_ai_deselect_definition = {
+    _hs_type_void, 0, "ai_deselect", hs_macro_function_parse,
+    mcc_ai_deselect_evaluate, "Clears the selected AI encounter.",
+    NULL, 0, { 0 }
+};
+
 struct hs_function_definition *mcc_script_function(short index)
 {
     if (!mcc_cache_tags_loaded()) return NULL;
@@ -186,6 +202,7 @@ struct hs_function_definition *mcc_script_function(short index)
     if (index == MCC_HS_ABS_INTEGER) return &mcc_abs_integer_definition;
     if (index == MCC_HS_EXECUTING_THREAD) return &mcc_executing_thread_definition;
     if (index == MCC_HS_KILL_THREAD) return &mcc_kill_thread_definition;
+    if (index == MCC_HS_AI_DESELECT) return &mcc_ai_deselect_definition;
     return mcc_campaign_function(index);
 }
 
@@ -203,6 +220,7 @@ static short mcc_script_resolve(char const *name, boolean native_fallback)
     if (!csstrcasecmp(name, "abs_integer")) return MCC_HS_ABS_INTEGER;
     if (!csstrcasecmp(name, "get_executing_running_thread")) return MCC_HS_EXECUTING_THREAD;
     if (!csstrcasecmp(name, "kill_thread")) return MCC_HS_KILL_THREAD;
+    if (!csstrcasecmp(name, "ai_deselect")) return MCC_HS_AI_DESELECT;
     index = mcc_campaign_find(name);
     return index == NONE && native_fallback ? hs_find_function_by_name(name) : index;
 }

@@ -4,7 +4,7 @@
 
 Updated 7 November 2026. Milestones retain the existing stage numbers, so
 "Stage 6" and "Milestone 6" refer to the same work. Stages 1–7 are complete;
-Stages 8–9 have not started. The shared boat and console-syntax corrections
+Stage 8 is in progress; Stage 9 has not started. The shared boat and console-syntax corrections
 remain explicitly deferred, as distinguished from their completed investigations.
 The stage evidence below records the changes, actual validation and limits.
 
@@ -17,7 +17,7 @@ The stage evidence below records the changes, actual validation and limits.
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
 | 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
-| 8 | Investigate remaining compatibility exceptions and the Quarantine script gap. | Planned; evidence required |
+| 8 | Investigate remaining compatibility exceptions and the Quarantine script gap. | Investigation and validation in progress |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Planned; final verification |
 
 The latest completed implementation is `f8e621acf`; its four debug platform
@@ -1192,7 +1192,8 @@ contract. No network-version requirement has yet been established by this
 investigation. Preserve the user's crossplay requirement while resolving those
 questions; do not introduce an MCC-only bypass or claim the defect is fixed.
 The scoped investigation is complete, and that shared correction is explicitly
-deferred. The evidence needed to reopen it is a reviewed ownership design with
+deferred. The user confirmed this deferral before starting Milestone 8; it does
+not block the remaining MCC refactor. The evidence needed to reopen it is a reviewed ownership design with
 legacy/MCC replay, collection, slot reuse, save compatibility and relevant peer
 agreement tests. It is separate from Milestone 8's compatibility exceptions.
 
@@ -1281,3 +1282,113 @@ no further justified changes remain within this milestone. Full campaigns,
 real-map co-op, live split-screen and physical Android/browser-map gameplay
 remain unverified by these bounded checks. Milestone 7 is complete with the
 shared console correction explicitly deferred; Milestones 8–9 have not begun.
+
+## Stage 8: compatibility exceptions and known gaps
+
+### Retained HUD selectors
+
+The 21 structural profiles in
+[`mcc_hud_layout.inl`](../port/linux/game/mcc_hud_layout.inl) remain unchanged.
+No simpler replacement was justified by the inspected authored fields or parent
+usage. This is a retention decision with explicit limits, not proof that the
+table is the only possible implementation or that every unknown layout intends
+the wider MCC safe frame.
+
+The fresh production-visitor audit covered **670 HUD components across seventeen
+installed MCC maps**, with 495 recognized components. Inputs were seven stock
+MCC maps and ten Workshop maps, including Ruby's Rebalanced A10/B40/D40,
+Mercury, Descent and Quarantine. Every retained profile had an installed match:
+
+| Profile label | Matching components |
+| --- | ---: |
+| assault rifle | 17 |
+| master rounds | 23 |
+| empty weapon/vehicle layouts | 210 |
+| cyborg | 15 |
+| cyborg_mp | 15 |
+| warthog driver | 15 |
+| passenger_2 | 15 |
+| gunner | 15 |
+| scorpion | 3 |
+| passenger_4 | 11 |
+| passenger | 9 |
+| passenger_3 | 9 |
+| pistol | 19 |
+| master plasma | 15 |
+| grenade counter panel | 36 |
+| banshee | 8 |
+| ghost | 4 |
+| rocket launcher/needler | 26 |
+| sniper rifle | 10 |
+| shotgun | 13 |
+| master fuel | 7 |
+
+These labels describe evidence; names do not select the frame. The audit
+extracts the current C visitor and checks every fingerprint against an
+independent bounded numeric inventory. All 670 bitmap-name controls retained
+their fingerprint. All 670 private root-anchor perturbations changed it, and
+all 495 recognized components became unknown. Original map files were opened
+read-only, and the private tag arena was compared byte-for-byte after restoring
+each mutation. The regeneration script, input identities, source hashes,
+compiler invocation and per-component metadata are retained under
+`build/stage8/hud`; run `audit_profiles.py` there using the recorded stage1
+environment. These controls establish classification coverage and sensitivity,
+not how hypothetical edited maps ought to render.
+
+Seven combinations of tag group, root anchor, the set of scaling flags and the
+set of scales occurred in both recognized and unknown components. Examples
+include stock gunner geometry versus Ruby B40's shadow gunner, and stock master
+plasma versus Ruby's master sword. That evidence defeats this particular
+aggregate selector; it does not disprove every richer authored-field rule or
+establish unknown layouts' intended margins. Parent inheritance also propagates
+an already classified marker: `mcc_hud_weapon_frame_begin` cannot supply the
+initial decision for a populated root without a parent.
+
+`mcc_hud_plan_prepare` fingerprints validated pristine bytes once at load time,
+before normalization. The ownership plan isolates mutable aliases; temporary
+plan arrays are freed on success or failure. Runtime-owned markers and converted
+data are released by failed-load/unload cleanup. Authored padding is cleared
+before the converter writes its own marker. Drawing remains guarded by loaded
+MCC tags. The sole weapon-frame caller brackets rendering with begin/end, without
+an intervening return or goto; both boundaries clear transient state. No new
+lifetime defect or cleanup edit was justified by this review.
+
+A separate retained exception is `mcc_hud_message_frame` in
+[`mcc_hud.c`](../port/linux/game/mcc_hud.c): top-left messages at normalized
+offset `(0, 60)` use native safe margins. This recognizes stock placement
+independently of replacement fonts or icon art; it is not an explicit authored
+safe-frame flag. Integer coordinate conversion can map distinct raw positions
+to that same normalized offset. A custom author choosing that geometry with
+different intended margins remains indistinguishable. Its marker has the same
+MCC runtime ownership and cleanup as other converted placements.
+
+Existing public coverage includes 26 actual-visitor layout cases for geometry,
+name independence, excluded fields, malformed references, bounds and read-only
+hashing. Normalization tests cover a positive grenade profile, a two-pixel
+authored near miss and aliased mutable blocks. Eleven stock-message cases cover
+both coordinate units, nearby positions, other anchors and erasure of a seeded
+marker. Together with the fresh all-profile audit, no material test gap was
+found that justifies duplicating all authored profile layouts in tracked tests.
+Current milestone runtime/rendering results remain pending and are recorded
+separately; classification checks alone do not validate visual intent.
+
+Remove or reduce either layout exception only after a demonstrated authored
+field or usage rule expresses the intended margin and preserves recognized
+layouts, nearby custom layouts, parent ownership and independently centered
+components. Check renamed resources, bounds, aliases, failure cleanup and
+MCC-to-Xbox/CE transitions, with actual rendered comparisons on Ruby's
+Rebalanced, Descent and other affected maps. Rarity or line count alone is not
+evidence for removing a profile.
+
+The bounded adjacent-selector review distinguished these exceptions from
+semantic contracts. `mcc_hud_multiplayer_text` selects
+`ui\multiplayer_game_text`, string 100, because the existing score-hint consumer
+in [`game_engine.c`](../source/game/game_engine.c) reads that exact resource and
+index; resolving its MCC formatting argument is not a per-map bypass. Script
+function/global names identify language operations, controller-entry ownership
+identifies glyph roles, and structure offsets, bitmap flags and child anchors
+describe validated formats. `mcc_hud_title_bounds` applies its non-wrapping
+title policy to authored flags/alignment, without selecting Warthog Rally or a
+160-unit box. No adjacent map-name/checksum dispatch or justified selector trim
+was found in the inspected HUD/script paths. This bounded result is not a
+repository-wide audit; the broader combined review remains Milestone 9.

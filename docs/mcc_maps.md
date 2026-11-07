@@ -872,6 +872,31 @@ the conditional `sleep` calls used in shipped and Ruby campaign scripts.
 It does not call `core_save_name`: that Xbox function writes a raw debug
 save, and remains unchanged and unavailable to map scripts.
 
+MCC scenarios may call the zero-argument, void `ai_deselect` operation through
+the MCC registry in [`mcc_scripts.c`](../port/linux/game/mcc_scripts.c).
+Its evaluator calls the existing `ai_scripting_deselect` service in
+[`ai_script.c`](../source/ai/ai_script.c). When AI is initialized for the map,
+that service clears the selected encounter and actor through the native debug
+selection routines, retaining their evaluation-record and idle-look cleanup.
+The adapter adds no persistent state or checkpoint fields. Registry lookup
+requires loaded MCC tags, so unloading removes access through the existing
+lifecycle. Xbox/CE keep their original map-function allowlist; `ai_select`
+and other debug operations receive no new permission. Client console authority
+checks also remain unchanged.
+
+The installed Quarantine Workshop map has one valid `(ai_deselect)` call in
+its continuous `life_lost_0` script. The previous native map-policy refusal
+disabled that entire script, including its cooperative game-over sequence.
+The fix admits the operation for every accepted MCC map, without selecting a
+map name or replacing it with a no-op. Enabling previously refused authored
+gameplay requires MCC protocol 65; message layouts and Xbox/CE's OpenCE 41
+contract remain unchanged. Source-derived tests exercise native selection
+clearing, inactive-AI behavior, native map refusal and client console policy;
+the MCC script harness covers linking, malformed arguments and unload guards.
+These checks establish the operation and its boundaries, not a complete
+Quarantine playthrough. See the [refactor validation record](mcc_refactor_validation.md)
+for separately recorded runtime evidence and limits.
+
 Additional MCC campaign operations include `local_players`,
 `game_is_authoritative`, `objects_distance_to_position`, `sleep_forever`
 (current or named script), gravity setting/reset and breadcrumb navigation

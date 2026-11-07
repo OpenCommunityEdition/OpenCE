@@ -56,7 +56,7 @@ def test_mcc_script_linking(scripts_tool, case):
     ("objects_distance_to_object", 0x7000), ("mcc_mission_segment", 0x7001),
     ("core_save_name", 0x7002), ("player_add_equipment", 0x7003),
     ("abs_integer", 0x7004), ("get_executing_running_thread", 0x7005),
-    ("kill_thread", 0x7006), ("player_effect_set_max_vibrate", 322),
+    ("kill_thread", 0x7006), ("ai_deselect", 0x7007), ("player_effect_set_max_vibrate", 322),
     ("physics_set_gravity", 0x7010), ("sleep", -1), ("unknown_script_name", -1),
 ])
 @pytest.mark.parametrize("spelling", [str.lower, str.upper, str.title], ids=["lower", "upper", "mixed"])
@@ -71,6 +71,11 @@ def test_mcc_preparation_and_runtime_resolution(scripts_tool, name, index, spell
 def test_mcc_missing_alias_target_does_not_use_native_alias(scripts_tool, name):
     result = subprocess.run([str(scripts_tool), "resolver_missing_alias", name, "-1"],
                             capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_mcc_ai_deselect_admission_and_completion(scripts_tool):
+    result = subprocess.run([str(scripts_tool), "ai_deselect"], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr
 
 

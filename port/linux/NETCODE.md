@@ -219,7 +219,14 @@ names and synchronized its opening sequence; the short run did not provide
 enough on-foot samples for the comparator's full drift verdict. These checks
 do not establish full campaign or public internet transport compatibility.
 
-MCC sessions use separate MCC protocol version 64. Version 64 reserves bytes
+MCC sessions use separate MCC protocol version 65. Version 65 requires the
+MCC-owned `ai_deselect` script operation. It performs the existing native debug
+selection clear, but admitting the call also enables authored gameplay scripts
+that older MCC builds disabled in full. Peers must agree on that execution;
+packet layouts and OpenCE version 41 remain unchanged. The MCC join envelope
+rejects older versions before admission.
+
+Version 64 reserves bytes
 64-127 of the 128-byte MCC map name for advisory Workshop metadata. Valid MCC
 paths occupy at most 63 characters plus their NUL. The tail contains `WS`,
 record version 1, a 1-20 digit item id and NUL, then an ASCII title and NUL;

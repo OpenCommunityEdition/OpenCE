@@ -12,6 +12,7 @@ struct mcc_runtime;
 #define MCC_HS_ABS_INTEGER 0x7004
 #define MCC_HS_EXECUTING_THREAD 0x7005
 #define MCC_HS_KILL_THREAD 0x7006
+#define MCC_HS_AI_DESELECT 0x7007
 /* Implemented beside the interpreter's private thread and stack types. */
 void mcc_executing_thread_evaluate(short function, long thread, boolean initialize);
 void mcc_kill_thread_evaluate(short function, long thread, boolean initialize);
