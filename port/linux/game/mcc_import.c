@@ -29,6 +29,7 @@ sound banks, which are not read yet.
 #include "errors.h"
 #include "tag_files/tag_groups.h"
 #include "bitmaps/bitmap_group.h"
+#include "hs/hs.h"
 #include "models/model_definitions.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
@@ -59,6 +60,11 @@ enum
 	V5_SCENARIO_STRUCTURE_BSPS_OFFSET = 0x5A4,
 	V5_SCENARIO_TYPE_OFFSET = 0x3C,
 	V5_BITMAP_CACHED_BIT = 7,
+	/* the scenario's script syntax data: a data array of nodes */
+	V5_SCENARIO_SCRIPT_SYNTAX_DATA_OFFSET = 0x474,
+	V5_SCRIPT_NODE_COUNT_OFFSET = 0x2E,
+	V5_SCRIPT_NODES_OFFSET = 0x38,
+	V5_SCRIPT_NODE_BYTES = 0x14,
 	V5_IO_BYTES = 1 << 16,
 };
 
@@ -196,6 +202,19 @@ static struct
 	long schemaless;
 	long bitmaps;
 	long sounds_silenced;
+	/* the tags written, in the disc's order (mcc_import_order): each the
+	loaded tag it is (NONE: a tag of the disc's MCC has none of, written
+	empty), and each loaded tag's place among them (NONE: one MCC added) */
+	long out_count;
+	long *out_sources;
+	unsigned long *out_groups;
+	char **out_names;
+	long *old_to_new;
+	long references_dropped;
+	long placeholders;
+	/* loaded tags kept after the disc's (mcc_import_keep) */
+	long kept;
+	char *out_names_text;
 } mcc_import_globals;
 
 /* ---------- private code: messages */
@@ -232,11 +251,36 @@ static void mcc_import_free(
 
 /* ---------- private code: the schemas */
 
+/* a meter ('metr', the HUD's shield and body meters), which the checks have
+no schema of (the game reads it as it is): its two bitmap references and its
+encoded stencil, as the disc's maps lay it out (0xAC bytes, the data after
+it) */
+static struct tag_schema_field const mcc_import_meter_fields[] =
+{
+	{ _tag_schema_reference, sizeof(struct tag_reference), 1, 0, 0x04, 0, 0, 0, NULL, NULL, "stencil_bitmaps" },
+	{ _tag_schema_reference, sizeof(struct tag_reference), 1, 0, 0x14, 0, 0, 0, NULL, NULL, "source_bitmap" },
+	{ _tag_schema_data, sizeof(struct tag_data), 1, 0, 0x98, 0x10000, 0, 0, NULL, NULL, "encoded_stencil" },
+	TAG_SCHEMA_END
+};
+
+static struct tag_schema_definition const mcc_import_meter_definition =
+{
+	"meter", 0xAC, mcc_import_meter_fields
+};
+
+static struct tag_schema_group const mcc_import_meter_group =
+{
+	'metr', { NONE, NONE }, &mcc_import_meter_definition
+};
+
 static struct tag_schema_group const *mcc_import_schema(
 	unsigned long group_tag)
 {
 	struct tag_schema_group const *const *list;
 	struct tag_schema_group const *group;
+
+	if (group_tag == 'metr')
+		return &mcc_import_meter_group;
 
 	for (list = tag_schema_group_lists; *list; list++)
 	{
@@ -248,6 +292,274 @@ static struct tag_schema_group const *mcc_import_schema(
 	}
 
 	return NULL;
+}
+
+/* ---------- private code: the order */
+
+/* the tag index of the tag written `new_index`th, as the Xbox's tools number
+them */
+static long mcc_import_new_handle(
+	long new_index)
+{
+	return (long)(((unsigned long)(0xE174 + new_index) << 16) | (unsigned long)new_index);
+}
+
+/* a loaded tag's index as the written tag's (NONE for a tag left out) */
+static long mcc_import_renumber(
+	long handle)
+{
+	long old_index;
+
+	if (handle == NONE)
+		return NONE;
+	old_index = handle & 0xFFFF;
+	if (old_index >= mcc_import_globals.tag_count || mcc_import_globals.old_to_new[old_index] == NONE)
+	{
+		mcc_import_globals.references_dropped++;
+		return NONE;
+	}
+
+	return mcc_import_new_handle(mcc_import_globals.old_to_new[old_index]);
+}
+
+static void mcc_import_keep_walk(
+	struct tag_schema_definition const *definition,
+	byte const *element);
+
+/* a loaded tag that a written one names, written too (after the disc's
+tags, which keep their indices) if the order left it out */
+static void mcc_import_keep_tag(
+	long handle)
+{
+	long old_index;
+
+	if (handle == NONE)
+		return;
+	old_index = handle & 0xFFFF;
+	if (old_index >= mcc_import_globals.tag_count || mcc_import_globals.old_to_new[old_index] != NONE)
+		return;
+	mcc_import_globals.old_to_new[old_index] = mcc_import_globals.out_count;
+	mcc_import_globals.out_sources[mcc_import_globals.out_count] = old_index;
+	mcc_import_globals.out_groups[mcc_import_globals.out_count] =
+		(unsigned long)mcc_import_globals.instances[old_index].group_tag;
+	mcc_import_globals.out_names[mcc_import_globals.out_count] = mcc_import_globals.instances[old_index].name;
+	mcc_import_globals.out_count++;
+	mcc_import_globals.kept++;
+
+	return;
+}
+
+static void mcc_import_keep_walk(
+	struct tag_schema_definition const *definition,
+	byte const *element)
+{
+	struct tag_schema_field const *field;
+
+	for (field = definition->fields; field->type != _tag_schema_terminator; field++)
+	{
+		short element_index;
+
+		for (element_index = 0; element_index < field->count; element_index++)
+		{
+			byte const *at = element + field->offset + element_index * field->size;
+
+			if (field->type == _tag_schema_reference)
+			{
+				mcc_import_keep_tag(((struct tag_reference const *)at)->index);
+			}
+			else if (field->type == _tag_schema_tag_index)
+			{
+				mcc_import_keep_tag(*(long const *)at);
+			}
+			else if (field->type == _tag_schema_struct)
+			{
+				mcc_import_keep_walk(field->definition, at);
+			}
+			else if (field->type == _tag_schema_block)
+			{
+				struct tag_block const *block = (struct tag_block const *)at;
+				struct tag_schema_definition const *block_definition = field->definition;
+				long index;
+
+				if (block->count <= 0 || (unsigned long)block->address - CUSTOM_EDITION_TAG_CACHE_ADDRESS >=
+					CUSTOM_EDITION_TAG_CACHE_BYTES)
+				{
+					continue;
+				}
+				for (index = 0; index < block->count; index++)
+					mcc_import_keep_walk(block_definition, (byte const *)block->address + index * block_definition->size);
+			}
+		}
+	}
+
+	return;
+}
+
+/* Until the patch names the disc's tags in their place, the loaded tags the
+written ones name (by reference, tag index or script) are written too, after
+the disc's; the rest of what MCC added is left out. */
+static boolean mcc_import_keep(
+	void)
+{
+	long out_index;
+
+	/* (the list grows as it is walked: a kept tag's own are kept) */
+	for (out_index = 0; out_index < mcc_import_globals.out_count; out_index++)
+	{
+		long old_index = mcc_import_globals.out_sources[out_index];
+		struct mcc_import_tag_instance const *instance;
+		struct tag_schema_group const *schema;
+
+		if (old_index == NONE)
+			continue;
+		instance = &mcc_import_globals.instances[old_index];
+		schema = mcc_import_schema((unsigned long)instance->group_tag);
+		if (!instance->base_address || !schema || !schema->definition)
+			continue;
+		mcc_import_keep_walk(schema->definition, instance->base_address);
+		if (instance->group_tag == 'scnr')
+		{
+			struct tag_data const *syntax_data = (struct tag_data const *)((byte const *)instance->base_address +
+				V5_SCENARIO_SCRIPT_SYNTAX_DATA_OFFSET);
+			byte const *syntax = syntax_data->address;
+			short node_count = syntax && syntax_data->size >= V5_SCRIPT_NODES_OFFSET ?
+				*(short const *)(syntax + V5_SCRIPT_NODE_COUNT_OFFSET) : 0;
+			short node_index;
+
+			for (node_index = 0; node_index < node_count &&
+				V5_SCRIPT_NODES_OFFSET + (node_index + 1) * V5_SCRIPT_NODE_BYTES <= syntax_data->size; node_index++)
+			{
+				byte const *node = syntax + V5_SCRIPT_NODES_OFFSET + node_index * V5_SCRIPT_NODE_BYTES;
+				short type = *(short const *)(node + 4);
+
+				if (*(short const *)node && (*(short const *)(node + 6) & 1) && type >= _hs_type_sound &&
+					type <= _hs_type_object_definition)
+				{
+					mcc_import_keep_tag(*(long const *)(node + 0x10));
+				}
+			}
+		}
+	}
+
+	return TRUE;
+}
+
+/* The tags to write and their order: the disc's, from the map's operations
+(d:\mcc_patches\<map>.p2, the prototype's: .local/mcc_check/patch_make.c),
+whose `order` line names every tag of the disc's map as group:path (a group's
+spaces written as underscores); else the loaded tags as they are. */
+static boolean mcc_import_order(
+	char const *map_name)
+{
+	char path[256];
+	char *text = NULL;
+	char *order = NULL;
+	FILE *file;
+	long index, count;
+
+	snprintf(path, sizeof(path), "d:\\mcc_patches\\%s.p2", map_name);
+	file = fopen(path, "rb");
+	if (file)
+	{
+		long size;
+
+		fseek(file, 0, SEEK_END);
+		size = ftell(file);
+		fseek(file, 0, SEEK_SET);
+		text = size > 0 ? mcc_import_calloc((size_t)size + 1, 1) : NULL;
+		if (text && fread(text, 1, (size_t)size, file) != (size_t)size)
+		{
+			mcc_import_free(text);
+			text = NULL;
+		}
+		fclose(file);
+	}
+	if (text)
+	{
+		char *line = text;
+
+		while (line && *line)
+		{
+			if (!strncmp(line, "order\t-\t-\t", 10))
+			{
+				order = line + 10;
+				break;
+			}
+			line = strchr(line, '\n');
+			if (line)
+				line++;
+		}
+		if (order && strchr(order, '\n'))
+			*strchr(order, '\n') = 0;
+	}
+
+	count = order ? 1 : mcc_import_globals.tag_count;
+	for (index = 0; order && order[index]; index++)
+		count += order[index] == '|';
+	mcc_import_globals.out_count = count;
+	/* (room for the loaded tags kept after the disc's: mcc_import_keep) */
+	mcc_import_globals.out_sources = mcc_import_calloc((size_t)(count + mcc_import_globals.tag_count), sizeof(long));
+	mcc_import_globals.out_groups = mcc_import_calloc((size_t)(count + mcc_import_globals.tag_count), sizeof(unsigned long));
+	mcc_import_globals.out_names = mcc_import_calloc((size_t)(count + mcc_import_globals.tag_count), sizeof(char *));
+	mcc_import_globals.old_to_new = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(long));
+	if (!mcc_import_globals.out_sources || !mcc_import_globals.out_groups || !mcc_import_globals.out_names ||
+		!mcc_import_globals.old_to_new)
+	{
+		mcc_import_free(text);
+		return FALSE;
+	}
+	for (index = 0; index < mcc_import_globals.tag_count; index++)
+		mcc_import_globals.old_to_new[index] = order ? NONE : index;
+	if (!order)
+	{
+		for (index = 0; index < count; index++)
+		{
+			mcc_import_globals.out_sources[index] = index;
+			mcc_import_globals.out_groups[index] = (unsigned long)mcc_import_globals.instances[index].group_tag;
+			mcc_import_globals.out_names[index] = mcc_import_globals.instances[index].name;
+		}
+		mcc_import_error("mcc import: %s: no tag order (%s): the loaded tags written as they are", map_name, path);
+		mcc_import_free(text);
+		return TRUE;
+	}
+
+	for (index = 0; index < count; index++)
+	{
+		char *end = strchr(order, '|');
+		unsigned long group = 0;
+		long old_index;
+		short character;
+
+		if (end)
+			*end = 0;
+		for (character = 0; character < 4 && order[character]; character++)
+			group = group << 8 | (unsigned char)(order[character] == '_' ? ' ' : order[character]);
+		mcc_import_globals.out_groups[index] = group;
+		mcc_import_globals.out_names[index] = order + 5;
+		mcc_import_globals.out_sources[index] = NONE;
+		for (old_index = 0; old_index < mcc_import_globals.tag_count; old_index++)
+		{
+			struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[old_index];
+
+			if ((unsigned long)instance->group_tag == group && mcc_import_globals.old_to_new[old_index] == NONE &&
+				!strcmp(instance->name, order + 5))
+			{
+				mcc_import_globals.out_sources[index] = old_index;
+				mcc_import_globals.old_to_new[old_index] = index;
+				break;
+			}
+		}
+		if (mcc_import_globals.out_sources[index] == NONE)
+			mcc_import_globals.placeholders++;
+		if (!end)
+			break;
+		order = end + 1;
+	}
+	/* (the names stay in `text`, which lives as long as the import of the
+	map: freed with the order) */
+	mcc_import_globals.out_names_text = text;
+
+	return mcc_import_keep();
 }
 
 /* ---------- private code: the space */
@@ -353,9 +665,23 @@ static void mcc_import_copy_pointers(
 				struct tag_data const *data = (struct tag_data const *)source_field;
 				struct tag_data *copied = (struct tag_data *)copy_field;
 				unsigned long address = 0;
+				unsigned long source_address = (unsigned long)data->address;
 
-				if (data->size > 0 && data->address)
+				/* (a tag of a group the move had no schema of, a meter, still
+				names MCC's addresses) */
+				if (source_address - MCC_TAG_DATA_ADDRESS < CUSTOM_EDITION_TAG_CACHE_BYTES)
+					source_address = source_address - MCC_TAG_DATA_ADDRESS + CUSTOM_EDITION_TAG_CACHE_ADDRESS;
+				if (data->size > 0 && source_address - CUSTOM_EDITION_TAG_CACHE_ADDRESS < CUSTOM_EDITION_TAG_CACHE_BYTES &&
+					(unsigned long)data->size <= CUSTOM_EDITION_TAG_CACHE_BYTES - (source_address - CUSTOM_EDITION_TAG_CACHE_ADDRESS))
 				{
+					address = mcc_import_allocate(space, (unsigned long)data->size, 4);
+					if (address)
+						csmemcpy(mcc_import_at(space, address), (void const *)source_address, data->size);
+				}
+				else if (data->size > 0 && data->address)
+				{
+					/* (the BSPs' compressed vertices, made for the import
+					outside the tags) */
 					address = mcc_import_allocate(space, (unsigned long)data->size, 4);
 					if (address)
 						csmemcpy(mcc_import_at(space, address), data->address, data->size);
@@ -380,13 +706,17 @@ static void mcc_import_copy_pointers(
 			case _tag_schema_reference:
 			{
 				struct tag_reference *copied = (struct tag_reference *)copy_field;
-				long index = copied->index == NONE ? NONE : (long)(copied->index & 0xFFFF);
 
-				copied->name = index != NONE && index < mcc_import_globals.tag_count ?
-					(char *)mcc_import_globals.name_addresses[index] : (char *)mcc_import_globals.empty_name_address;
+				copied->index = mcc_import_renumber(copied->index);
+				copied->name = copied->index != NONE ?
+					(char *)mcc_import_globals.name_addresses[copied->index & 0xFFFF] :
+					(char *)mcc_import_globals.empty_name_address;
 				copied->name_length = 0;
 				break;
 			}
+			case _tag_schema_tag_index:
+				*(long *)copy_field = mcc_import_renumber(*(long const *)source_field);
+				break;
 			case _tag_schema_struct:
 				mcc_import_copy_pointers(space, field->definition, source_field, copy_field);
 				break;
@@ -659,8 +989,11 @@ static boolean mcc_import_bitmaps(
 		struct bitmap_group *group;
 		long bitmap_index;
 
-		if (instance->group_tag != 'bitm' || !instance->base_address)
+		if (instance->group_tag != 'bitm' || !instance->base_address ||
+			mcc_import_globals.old_to_new[tag_index] == NONE)
+		{
 			continue;
+		}
 		group = (struct bitmap_group *)instance->base_address;
 		for (bitmap_index = 0; bitmap_index < group->bitmaps.count; bitmap_index++)
 		{
@@ -685,7 +1018,7 @@ static boolean mcc_import_bitmaps(
 			bitmap->base_address = NULL;
 			bitmap->hardware_format = NULL;
 			bitmap->cache_block_index = NONE;
-			bitmap->tag_index = instance->tag_index;
+			bitmap->tag_index = mcc_import_new_handle(mcc_import_globals.old_to_new[tag_index]);
 			bitmap->flags |= FLAG(V5_BITMAP_CACHED_BIT);
 			mcc_import_globals.bitmaps++;
 		}
@@ -748,42 +1081,7 @@ static boolean mcc_import_model_buffers(
 	return TRUE;
 }
 
-/* the models' parts of the loaded tags (the converted models, whose
-buffers custom_edition_geometry_import left naming their geometry) */
-static long mcc_import_model_parts(
-	struct mcc_import_model_part **parts,
-	long maximum)
-{
-	long tag_index, count = 0;
-
-	for (tag_index = 0; tag_index < mcc_import_globals.tag_count; tag_index++)
-	{
-		struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[tag_index];
-		struct model const *model;
-		long geometry_index;
-
-		if (instance->group_tag != 'mode' || !instance->base_address)
-			continue;
-		model = (struct model const *)instance->base_address;
-		for (geometry_index = 0; geometry_index < model->geometries.count; geometry_index++)
-		{
-			struct mcc_import_model_geometry const *geometry =
-				(struct mcc_import_model_geometry const *)model->geometries.address + geometry_index;
-			long part_index;
-
-			for (part_index = 0; part_index < geometry->parts.count; part_index++)
-			{
-				if (parts && count < maximum)
-					parts[count] = (struct mcc_import_model_part *)geometry->parts.address + part_index;
-				count++;
-			}
-		}
-	}
-
-	return count;
-}
-
-/* the copied models' parts, in the order of mcc_import_model_parts */
+/* the copied models' parts (their buffers still name the loaded geometry) */
 static long mcc_import_copied_model_parts(
 	struct mcc_import_space *space,
 	struct mcc_import_model_part **parts,
@@ -833,35 +1131,97 @@ static unsigned long mcc_import_names(
 	unsigned long instances_address;
 	long tag_index;
 
+	long count = mcc_import_globals.out_count;
+
+	(void)loaded;
 	mcc_import_allocate(space, sizeof(struct mcc_import_tag_header), 4);
-	instances_address = mcc_import_allocate(space, (unsigned long)loaded->tag_count * sizeof(*instances), 4);
+	instances_address = mcc_import_allocate(space, (unsigned long)count * sizeof(*instances), 4);
 	if (!instances_address)
 		return 0;
 	instances = mcc_import_at(space, instances_address);
 	mcc_import_globals.empty_name_address = mcc_import_allocate(space, 1, 1);
-	mcc_import_globals.name_addresses = mcc_import_calloc((size_t)loaded->tag_count, sizeof(unsigned long));
+	mcc_import_globals.name_addresses = mcc_import_calloc((size_t)count, sizeof(unsigned long));
 	if (!mcc_import_globals.name_addresses)
 		return 0;
-	for (tag_index = 0; tag_index < loaded->tag_count; tag_index++)
+	for (tag_index = 0; tag_index < count; tag_index++)
 	{
-		struct mcc_import_tag_instance const *source = &mcc_import_globals.instances[tag_index];
-		unsigned long length = (unsigned long)strlen(source->name) + 1;
+		long source_index = mcc_import_globals.out_sources[tag_index];
+		char const *source_name = mcc_import_globals.out_names[tag_index];
+		unsigned long length = (unsigned long)strlen(source_name) + 1;
 		unsigned long name = mcc_import_allocate(space, length, 1);
+		struct tag_schema_group const *schema = mcc_import_schema(mcc_import_globals.out_groups[tag_index]);
 
 		if (!name)
 			return 0;
-		csmemcpy(mcc_import_at(space, name), source->name, length);
+		csmemcpy(mcc_import_at(space, name), source_name, length);
 		mcc_import_globals.name_addresses[tag_index] = name;
-		instances[tag_index] = *source;
+		if (source_index != NONE)
+		{
+			instances[tag_index] = mcc_import_globals.instances[source_index];
+		}
+		else
+		{
+			/* a tag of the disc's MCC has none of: in its place, empty */
+			csmemset(&instances[tag_index], 0, sizeof(instances[tag_index]));
+			instances[tag_index].group_tag = (long)mcc_import_globals.out_groups[tag_index];
+			instances[tag_index].parent_group_tags[0] = schema ? (long)schema->parent_group_tags[0] : NONE;
+			instances[tag_index].parent_group_tags[1] = schema ? (long)schema->parent_group_tags[1] : NONE;
+		}
+		instances[tag_index].tag_index = mcc_import_new_handle(tag_index);
 		instances[tag_index].name = (char *)name;
 		instances[tag_index].base_address = NULL;
 		instances[tag_index].unused[0] = 0;
 		instances[tag_index].unused[1] = 0;
 	}
 	((struct mcc_import_tag_header *)space->bytes)->tag_instances = (struct mcc_import_tag_instance *)instances_address;
-	((struct mcc_import_tag_header *)space->bytes)->tag_count = loaded->tag_count;
+	((struct mcc_import_tag_header *)space->bytes)->tag_count = count;
 
 	return instances_address;
+}
+
+/* The scenario's script nodes that are tags (sound to object definition,
+_hs_type_sound.._hs_type_object_definition) given the written tags'
+indices: the syntax data is copied as bytes. */
+static boolean mcc_import_scripts_renumber(
+	struct mcc_import_space *space)
+{
+	struct mcc_import_tag_header const *header = (struct mcc_import_tag_header const *)space->bytes;
+	struct mcc_import_tag_instance const *instances = mcc_import_at(space, (unsigned long)header->tag_instances);
+	long tag_index;
+
+	for (tag_index = 0; tag_index < header->tag_count; tag_index++)
+	{
+		byte *scenario;
+		struct tag_data const *syntax_data;
+		byte *syntax;
+		short node_count, node_index;
+
+		if (instances[tag_index].group_tag != 'scnr' || !instances[tag_index].base_address)
+			continue;
+		scenario = mcc_import_at(space, (unsigned long)instances[tag_index].base_address);
+		syntax_data = (struct tag_data const *)(scenario + V5_SCENARIO_SCRIPT_SYNTAX_DATA_OFFSET);
+		if (syntax_data->size < V5_SCRIPT_NODES_OFFSET || !syntax_data->address)
+			continue;
+		syntax = mcc_import_at(space, (unsigned long)syntax_data->address);
+		/* (the node array's last index, its data array's) */
+		node_count = *(short *)(syntax + V5_SCRIPT_NODE_COUNT_OFFSET);
+		if (V5_SCRIPT_NODES_OFFSET + node_count * V5_SCRIPT_NODE_BYTES > syntax_data->size)
+		{
+			mcc_import_error("mcc import: the script nodes (%d) do not fit their data", (int)node_count);
+			return FALSE;
+		}
+		for (node_index = 0; node_index < node_count; node_index++)
+		{
+			byte *node = syntax + V5_SCRIPT_NODES_OFFSET + node_index * V5_SCRIPT_NODE_BYTES;
+			short type = *(short *)(node + 4);
+			short flags = *(short *)(node + 6);
+
+			if (*(short *)node && (flags & 1) && type >= _hs_type_sound && type <= _hs_type_object_definition)
+				*(long *)(node + 0x10) = mcc_import_renumber(*(long *)(node + 0x10));
+		}
+	}
+
+	return TRUE;
 }
 
 /* The tags into the Xbox's tag cache (`space`, at 0x803A6000): its header,
@@ -878,13 +1238,34 @@ static boolean mcc_import_tags(
 	long tag_index, part_count, copied_count;
 	boolean success = TRUE;
 
-	/* the tags, each by its schema (a structure BSP's is in the body) */
-	for (tag_index = 0; tag_index < loaded->tag_count && success; tag_index++)
+	/* the tags, each by its schema, in the order written (a structure BSP's
+	is in the body) */
+	for (tag_index = 0; tag_index < mcc_import_globals.out_count && success; tag_index++)
 	{
-		struct mcc_import_tag_instance const *source = &mcc_import_globals.instances[tag_index];
+		struct mcc_import_tag_instance const *source;
 		struct tag_schema_group const *schema;
 		unsigned long root;
 
+		if (mcc_import_globals.out_sources[tag_index] == NONE)
+		{
+			/* a tag of the disc's MCC has none of: zeros of its group's size
+			in its place, for the code that asks for it by name (a stand-in,
+			until the import makes or copies the tag) */
+			unsigned long group = mcc_import_globals.out_groups[tag_index];
+
+			schema = mcc_import_schema(group);
+			if (group != 'sbsp')
+			{
+				root = mcc_import_allocate(space, schema && schema->definition ?
+					(unsigned long)schema->definition->size : 0x100, 4);
+				if (!root)
+					return FALSE;
+				instances = mcc_import_at(space, instances_address);
+				instances[tag_index].base_address = (void *)root;
+			}
+			continue;
+		}
+		source = &mcc_import_globals.instances[mcc_import_globals.out_sources[tag_index]];
 		if (source->group_tag == 'sbsp' || !source->base_address)
 			continue;
 		schema = mcc_import_schema((unsigned long)source->group_tag);
@@ -910,23 +1291,22 @@ static boolean mcc_import_tags(
 
 	/* the models' buffers, after the tags (the game looks them up by the
 	header's arrays and the parts' fields) */
-	part_count = mcc_import_model_parts(NULL, 0);
+	part_count = mcc_import_copied_model_parts(space, NULL, 0);
 	parts = mcc_import_calloc((size_t)part_count + 1, sizeof(*parts));
 	if (!parts)
 		return FALSE;
 	copied_count = mcc_import_copied_model_parts(space, parts, part_count);
-	if (copied_count != part_count)
-		mcc_import_error("mcc import: %ld model parts loaded, %ld copied", part_count, copied_count);
 	success = copied_count == part_count && mcc_import_model_buffers(space, parts, part_count);
 	if (!success)
 		mcc_import_error("mcc import: the models' buffers cannot be written (%ld parts)", part_count);
 	mcc_import_free(parts);
+	success = success && mcc_import_scripts_renumber(space);
 
 	header = (struct mcc_import_tag_header *)space->bytes;
 	header->tag_instances = (struct mcc_import_tag_instance *)instances_address;
-	header->scenario_tag_index = loaded->scenario_tag_index;
+	header->scenario_tag_index = mcc_import_renumber(loaded->scenario_tag_index);
 	header->checksum = loaded->checksum;
-	header->tag_count = loaded->tag_count;
+	header->tag_count = mcc_import_globals.out_count;
 	header->signature = 'tags';
 
 	return success && !space->overflowed;
@@ -960,6 +1340,12 @@ static boolean mcc_import_map(
 	}
 	mcc_import_globals.instances = loaded->tag_instances;
 	mcc_import_globals.tag_count = loaded->tag_count;
+	if (!mcc_import_order(map_name))
+	{
+		fprintf(stderr, "mcc import: %s: out of memory for the tag order\n", map_name);
+		custom_edition_cache_tags_unload();
+		return FALSE;
+	}
 	scenario = mcc_import_globals.instances[loaded->scenario_tag_index & 0xFFFF].base_address;
 	scenario_type = *(short *)(scenario + V5_SCENARIO_TYPE_OFFSET);
 	references = (struct tag_block *)(scenario + V5_SCENARIO_STRUCTURE_BSPS_OFFSET);
@@ -1031,14 +1417,21 @@ static boolean mcc_import_map(
 		}
 		fseek(body->file, 0, SEEK_SET);
 		success = success && fwrite(&header, 1, sizeof(header), body->file) == sizeof(header);
-		fprintf(stdout, "mcc import: %s: %d structure bsps, %ld bitmaps, %ld tags (0x%lX bytes, %ld left out), "
-			"0x%lX bytes before compression\n", map_name, (int)references->count, mcc_import_globals.bitmaps,
-			loaded->tag_count, tags.used, mcc_import_globals.schemaless, (unsigned long)header.file_length);
+		fprintf(stdout, "mcc import: %s: %d structure bsps, %ld bitmaps, %ld tags (0x%lX bytes; %ld empty in the "
+			"disc's place, %ld of MCC's kept after the disc's, %ld without a schema; %ld references to tags left out), 0x%lX bytes before compression\n",
+			map_name, (int)references->count, mcc_import_globals.bitmaps, mcc_import_globals.out_count, tags.used,
+			mcc_import_globals.placeholders, mcc_import_globals.kept, mcc_import_globals.schemaless, mcc_import_globals.references_dropped,
+			(unsigned long)header.file_length);
 	}
 	deflateEnd(&body->stream);
 	fclose(body->file);
 	mcc_import_free(body);
 	mcc_import_free(mcc_import_globals.name_addresses);
+	mcc_import_free(mcc_import_globals.out_sources);
+	mcc_import_free(mcc_import_globals.out_groups);
+	mcc_import_free(mcc_import_globals.out_names);
+	mcc_import_free(mcc_import_globals.old_to_new);
+	mcc_import_free(mcc_import_globals.out_names_text);
 	custom_edition_cache_tags_unload();
 	if (!success)
 	{
