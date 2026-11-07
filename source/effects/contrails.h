@@ -106,4 +106,7 @@ extern struct data_array *contrail_point_data;
 
 /* ---------- public code */
 
+/* port: clear render-only state after a checkpoint load. */
+void contrails_reset_render_state(void);
+
 #endif // __CONTRAILS_H

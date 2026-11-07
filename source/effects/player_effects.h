@@ -114,4 +114,7 @@ void player_telefrag_effect_start(
 	long player_index,
 	real intensity);
 
+/* port: clear render-only state after a checkpoint load. */
+void player_effect_reset_render_state(void);
+
 #endif // __PLAYER_EFFECTS_H

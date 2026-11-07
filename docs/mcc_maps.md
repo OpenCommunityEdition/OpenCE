@@ -51,8 +51,11 @@ an example: its filename is `a10.map`, while its header names
 `mercury_falling`. The namespaces prevent it replacing either Xbox `a10`
 or Custom Edition `custom_maps\a10`.
 
-Some campaigns keep audio and textures in separate resource files. Keep each
-package's supplied files beside its levels. Install MCC's two standard sets once:
+Some campaigns keep audio and textures in separate resource files. For manual
+packages, keep each package's supplied files beside its levels. With desktop
+Workshop discovery enabled, packaged and installed MCC resources are found in
+place as described below. For installations without Steam discovery, install
+MCC's two standard sets once:
 
 ```text
 mcc_maps/_shared/singleplayer/bitmaps.map
@@ -173,8 +176,43 @@ item's `maps` folder in Steam's library. A package folder of that name in the
 data root's `mcc_maps` wins, so a player can still override an item by hand.
 The MCC menus show the map's Workshop title, and a package folder shows the
 item's title instead of its id. The resources a map needs (`bitmaps.map`,
-`sounds.map`) are chosen as for any package: beside the level, then the shared
-sets above.
+`sounds.map`) are selected independently. A Workshop resource beside the level
+in the item's `maps` folder takes precedence; when absent, the same item's
+`halo1/maps` file is used. An existing entry remains authoritative even if it
+is damaged or unreadable. Nothing borrows another Workshop item's resources.
+A local `mcc_maps/<item id>` package also prevents borrowing that item's files.
+
+If package and legacy root resources are absent, the existing shared-set
+selection checks both standard sets. A manually installed file under
+`mcc_maps/_shared` wins. Otherwise, with Workshop discovery enabled, each set
+resolves in the first discovered Steam library containing the corresponding
+MCC file, under `steamapps/common/Halo The Master Chief Collection/`:
+
+- `halo1/maps/bitmaps.map` for the singleplayer set;
+- `halo1/maps/custom_edition/bitmaps.map` and `sounds.map` for the multiplayer set.
+
+These are MCC installation directories, not the separate Custom Edition game
+or the data root's `custom_maps`. The setting's existing library order applies;
+`libraryfolders.vdf` includes installations on other drives. Disabling discovery
+keeps manually installed package/root/shared paths. Android and web retain
+installed/imported packages and do not search Steam.
+
+Discovery only supplies paths. `mcc_resources_select` still validates the file
+and every external reference, rejects partial matches and ambiguous different
+matching shared files, and fingerprints the selected bytes rather than their
+location. Self-contained maps open no unrelated resources. Selected streams
+are owned by the current MCC runtime and closed on unload or failed loading.
+No map names, checksums or Workshop-ID exceptions select this behavior.
+
+The layout evidence is the installed Halo 1 MCC shared directories and multiple
+Workshop items with authored resources under `halo1/maps`. Their metadata can
+say `HasSharedFiles: false` while those files are present, so discovery uses the
+bounded, conventional resource paths and the reader validates the contents;
+that metadata flag does not override an installed package resource. The synthetic
+regressions in `tools/test_steam_workshop.py` exercise unrelated item identities,
+case-insensitive paths, overrides, missing types, library roots and bounds.
+`tools/test_mcc_resources.py` checks complete-reference matching, ambiguity,
+malformed resources, independent bitmap/sound selection and content identity.
 
 The catalog is read the first time MCC maps are needed, and again when a joiner
 cannot find the host's map (so an item subscribed just now is found). The json

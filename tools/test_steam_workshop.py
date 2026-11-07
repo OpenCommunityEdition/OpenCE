@@ -107,6 +107,17 @@ int main(int argc, char **argv)
 			if (((char *)paths)[byte] != 'Z') guard = 0;
 		printf("guard=%d\n", guard);
 	}
+	else if (argc == 4 && !strcmp(argv[1], "resource"))
+	{
+		char path[1025];
+		unsigned size = (unsigned)atoi(argv[3]), index;
+		int result, guard = 1;
+		if (size > 1024) return 2;
+		memset(path, 'Z', sizeof(path));
+		result = steam_workshop_resource_path(argv[2], getenv("TEST_DATA_ROOT"), path, size);
+		for (index = size; index < sizeof(path); index++) if (path[index] != 'Z') guard = 0;
+		printf("result=%d\nguard=%d\n", result, guard);
+	}
 	else if (argc == 3 && !strcmp(argv[1], "translate"))
 	{
 		char path[1024];
@@ -597,3 +608,97 @@ def test_campaign_manifest_refuses_partial_or_ambiguous_metadata(tool, tmp_path,
     elif fault == "too_many": campaign.write_text(json.dumps({"CampaignMaps": [f"campaign/{i}.json" for i in range(65)]}))
     fields, _ = run(tool, "manifest", tmp_path)
     assert fields["result"] == "-1" and fields["count"] == "0" and fields["reason"]
+
+@pytest.mark.parametrize("item_id", ["111", "982734"])
+@pytest.mark.parametrize("resource", ["bitmaps.map", "sounds.map"])
+def test_workshop_authored_resources_are_found_in_item_halo1_folder(tool, tmp_path, item_id, resource):
+    library, data = tmp_path / "steam", tmp_path / "data"
+    package = make_item(library, item_id)
+    data.mkdir()
+    authored = package / "HaLo1/MaPs"
+    authored.mkdir(parents=True)
+    target = authored / resource.upper()
+    target.write_bytes(b"authored resource")
+    fields, _ = run(tool, "translate", f"mcc_maps/{item_id}/{resource}", setting=str(library), data_root=data)
+    assert Path(fields["path"]) == target
+    fields, _ = run(tool, "translate", f"d:\\MCC_MAPS\\{item_id}\\{resource.upper()}", setting=str(library), data_root=data)
+    assert Path(fields["path"]) == target
+    # A local package never borrows the Workshop item's authored resources.
+    override = data / "MCC_MAPS" / item_id
+    override.mkdir(parents=True)
+    fields, _ = run(tool, "translate", f"mcc_maps/{item_id}/{resource}", setting=str(library), data_root=data)
+    assert Path(fields["path"]) == override / resource
+    override.rmdir()
+    # Beside-level overrides stay authoritative, including invalid files.
+    beside = package / "Maps" / resource
+    beside.write_bytes(b"invalid override")
+    fields, _ = run(tool, "translate", f"mcc_maps/{item_id}/{resource}", setting=str(library), data_root=data)
+    assert Path(fields["path"]) == beside
+
+
+@pytest.mark.parametrize("group,subfolder,resource", [
+    ("singleplayer", "", "bitmaps.map"),
+    ("multiplayer", "custom_edition", "bitmaps.map"),
+    ("multiplayer", "custom_edition", "sounds.map"),
+])
+def test_workshop_shared_resources_use_mcc_installation(tool, tmp_path, group, subfolder, resource):
+    library, data = tmp_path / "steam", tmp_path / "data"
+    library.mkdir()
+    data.mkdir()
+    installed = library / "steamapps/common/Halo The Master Chief Collection/halo1/maps" / subfolder
+    installed.mkdir(parents=True)
+    target = installed / resource
+    target.write_bytes(b"MCC shared resource")
+    request = f"mcc_maps/_shared/{group}/{resource}"
+    fields, _ = run(tool, "translate", request, setting=str(library), data_root=data)
+    assert Path(fields["path"]) == target
+    # Explicit installed shared files win; disabling discovery restores local paths.
+    local = data / request
+    local.parent.mkdir(parents=True)
+    local.write_bytes(b"invalid override")
+    fields, _ = run(tool, "translate", request, setting=str(library), data_root=data)
+    assert Path(fields["path"]) == local
+    local.unlink()
+    fields, _ = run(tool, "translate", request, setting=str(library), data_root=data, enabled=False)
+    assert Path(fields["path"]) == local
+
+
+@pytest.mark.parametrize("resource_request", ["111/loc.map", "111/sub/bitmaps.map", "111/../bitmaps.map",
+    "_shared/other/bitmaps.map", "_shared/singleplayer/../sounds.map", "x" * 128 + "/bitmaps.map"])
+def test_resource_discovery_rejects_other_names_and_paths(tool, tmp_path, resource_request):
+    make_item(tmp_path, "111")
+    fields, _ = run(tool, "resource", resource_request, "1024", setting=str(tmp_path), data_root=tmp_path)
+    assert fields == {"result": "0", "guard": "1"}
+
+
+@pytest.mark.parametrize("size", [0, 1, 8, 32])
+def test_resource_discovery_does_not_truncate_host_paths(tool, tmp_path, size):
+    package = make_item(tmp_path, "111")
+    resources = package / "halo1/maps"
+    resources.mkdir(parents=True)
+    (resources / "bitmaps.map").write_bytes(b"authored")
+    fields, _ = run(tool, "resource", "111/bitmaps.map", str(size), setting=str(tmp_path), data_root=tmp_path)
+    assert fields == {"result": "0", "guard": "1"}
+
+
+def test_shared_discovery_checks_other_steam_libraries_and_types_independently(tool, tmp_path):
+    steam, library, data = (tmp_path / part for part in ("steam", "library", "data"))
+    (steam / "steamapps").mkdir(parents=True)
+    data.mkdir()
+    (steam / "steamapps/libraryfolders.vdf").write_text(
+        '"libraryfolders" { "0" { "path" "%s" } }' % library.as_posix())
+    shared = library / "steamapps/common/Halo The Master Chief Collection/halo1/maps/custom_edition"
+    shared.mkdir(parents=True)
+    (shared / "sounds.map").write_bytes(b"shared sounds")
+    package = make_item(steam, "111")
+    authored = package / "halo1/maps"
+    authored.mkdir(parents=True)
+    (authored / "bitmaps.map").write_bytes(b"authored bitmaps")
+    args = dict(setting=str(steam), data_root=data)
+    assert Path(run(tool, "translate", "mcc_maps/111/bitmaps.map", **args)[0]["path"]) == authored / "bitmaps.map"
+    assert Path(run(tool, "translate", "mcc_maps/_shared/multiplayer/sounds.map", **args)[0]["path"]) == shared / "sounds.map"
+    # Missing package resources are not borrowed from an unrelated Workshop item.
+    make_item(steam, "222")
+    assert Path(run(tool, "translate", "mcc_maps/222/bitmaps.map", **args)[0]["path"]) == package.parent / "222/Maps/bitmaps.map"
+    for folder in ("maps", "custom_maps"):
+        assert Path(run(tool, "translate", folder + "/sounds.map", **args)[0]["path"]) == data / folder / "sounds.map"

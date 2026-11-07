@@ -71,6 +71,7 @@ symbols in this file:
 #include "bitmaps/bitmap_group.h"
 #include "cseries/errors.h"
 #include "effects/contrail_definitions.h"
+#include "game/game.h" /* port: game_players_are_double_speed */
 #include "memory/data.h"
 #include "objects/object_definitions.h"
 #include "physics/point_physics.h"
@@ -154,9 +155,14 @@ static void contrail_verify(
 
 /* port: emission and point aging share a map-local tick clock. */
 static long last_point_game_time = NONE;
-static real pending_point_dt = 0.0f;
 
 /* ---------- public code */
+
+/* port: point emission and aging do not inherit another state's clock. */
+void contrails_reset_render_state(void)
+{
+	last_point_game_time = NONE;
+}
 
 real contrail_scale_value(
 	real value,
@@ -220,9 +226,7 @@ void contrails_initialize(
 void contrails_initialize_for_new_map(
 	void)
 {
-	/* port: do not carry a partial frame across map loads. */
-	last_point_game_time = NONE;
-	pending_point_dt = 0.0f;
+	contrails_reset_render_state(); /* port: reset the render clock */
 	data_make_valid(contrail_data);
 	data_make_valid(contrail_point_data);
 
@@ -232,9 +236,7 @@ void contrails_initialize_for_new_map(
 void contrails_dispose_from_old_map(
 	void)
 {
-	/* port: discard the old map's emission and aging clock. */
-	last_point_game_time = NONE;
-	pending_point_dt = 0.0f;
+	contrails_reset_render_state(); /* port: reset the render clock */
 	data_make_invalid(contrail_point_data);
 	data_make_invalid(contrail_data);
 
@@ -386,12 +388,24 @@ void contrails_update(
 	than a tick. Texture animation below still advances every frame. */
 	real point_dt;
 
-	pending_point_dt += dt;
+	/* port: the ticks' own time, a 30th of a second each, as the Xbox's
+	frames were (a frame a tick, a 29.97th of a second at 30 frames a
+	second): the frames' time since the last tick was four or five frames'
+	at 144 frames a second, 28 or 35 ms, so the points were made and aged by
+	uneven steps and a short trail's fades (a plasma turret's) flickered from
+	tick to tick. A game time gone back or jumping (a new map, a checkpoint)
+	counts as a tick. A tick is half as long while the players are double
+	speed, as game_frame halves the frame's time. */
 	if (last_point_game_time != game_time_get())
 	{
+		long ticks = (long)((unsigned long)game_time_get() - (unsigned long)last_point_game_time);
+
+		if (last_point_game_time == NONE || ticks < 1 || ticks > TICKS_PER_SECOND)
+			ticks = 1;
 		last_point_game_time = game_time_get();
-		point_dt = pending_point_dt;
-		pending_point_dt = 0.0f;
+		point_dt = (real)ticks / TICKS_PER_SECOND;
+		if (game_players_are_double_speed())
+			point_dt *= 0.5f;
 	}
 	else
 	{
@@ -604,6 +618,16 @@ static void contrail_update_points(
 	struct contrail_definition *definition = contrail_definition_get(contrail->definition_index);
 	long contrail_point_indices[MAXIMUM_CONTRAIL_POINTS];
 	short instance_index;
+	/* port: a slow frame may span several ticks. State transitions discard
+	the remainder of a step, so age each tick separately without stepping
+	point physics more than once per rendered frame. Zero still initializes
+	new points and zero-duration transitions. */
+	short state_steps = (short)(state_dt * TICKS_PER_SECOND *
+		(game_players_are_double_speed() ? 2.0f : 1.0f) + 0.5f);
+
+	if (state_steps < 1)
+		state_steps = 1;
+	state_dt /= state_steps;
 
 	for (instance_index = 0;
 		instance_index < MAXIMUM_CONTRAIL_INSTANCES;
@@ -616,7 +640,10 @@ static void contrail_update_points(
 		{
 			struct contrail_point_datum *contrail_point = contrail_point_get(contrail_point_index);
 
-			if (!TEST_FLAG(contrail_point->flags, _contrail_point_expired_bit))
+			short state_step;
+
+			for (state_step = 0; state_step < state_steps &&
+				!TEST_FLAG(contrail_point->flags, _contrail_point_expired_bit); state_step++)
 			{
 				/* port: match state lifetimes to tick-batched point emission. */
 				contrail_point->time = state_dt * contrail_point->delta + contrail_point->time;

@@ -272,17 +272,44 @@ show why a delayed GPU result must not be treated as a zero or why asking
 for a result too soon can stall the frame. The test uses fake driver
 behaviour; it does not measure real GPU performance.
 
+## Camera and cloth timing
+
+`player_effect_get_camera_effect_matrix` in
+[player_effects.c](../../source/effects/player_effects.c) caches each local
+player's first camera-effect matrix for the tick. Repeated render frames keep
+the weapon impulse or shake at that tick's strength instead of consuming its
+decay early. Windows have separate caches; rendering restores the local random
+seed afterward. `player_effect_reset_render_state` clears only these matrices.
+
+`flags_update` in [flags.c](../../source/objects/widgets/flags.c) accumulates
+render time but advances cloth only on a new game tick. Cloth constraints used
+to run once per render frame, making flags stiffer at high refresh rates.
+`flags_reset_render_state` discards both the previous tick and partial frame time.
+
+Both resets run at map initialization/disposal and through the existing
+`after_load_procs` table in [game_state.c](../../source/saved%20games/game_state.c).
+For example, restoring a checkpoint at tick 100 must draw its camera impulse,
+not a cached matrix from the previous state at tick 100. These caches belong
+to their effect modules, outside saved game state; the dispatcher is the
+necessary shared lifecycle connection. Xbox, CE and MCC retain their loaders.
+The [lifecycle harness](../../tools/harness/tests/test_render_effect_lifecycle.py)
+executes actual update functions and the callback table; removing either
+checkpoint hook makes its regression fail. It stubs rendering and cloth physics.
+
 ## Contrail timing
 
 Projectile trails are chains of points. Read `contrails_update` and
 `contrail_update_points` in [contrails.c](../../source/effects/contrails.c),
 then `render_contrail` in [render_contrails.c](../../source/render/render_contrails.c).
-Emission and point-state aging share the time accumulated between simulation
-ticks. Point motion and texture animation still use each rendered frame's time.
+Emission and point-state aging use elapsed game ticks at 1/30 second per tick
+(half that in double-speed mode), independent of uneven render-frame spacing.
+Point motion and texture animation still use each rendered frame's time.
 This preserves short bright states at high refresh rates; aging every frame
 previously shortened trails whose state transitions discard excess time.
-The timing accumulator resets on map initialization and disposal. New points
-still initialize on frames without a tick so the renderer has a valid state.
+The clock resets on map initialization, disposal and checkpoint restoration,
+including a restore at the same tick. Multiple elapsed ticks advance existing
+point states separately; this does not reconstruct earlier attachment poses.
+New points still initialize on frames without a tick so the renderer has a valid state.
 See the [contrail fix record](../contrail_timing.md) for evidence and limits.
 
 ## Dynamic lighting 1.0

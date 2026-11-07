@@ -122,7 +122,7 @@ static struct {
     float query_area[8];
     struct visibility_batch visibility_batches[VISIBILITY_BATCH_COUNT];
     unsigned long visibility_batch, frame;
-    ULONGLONG visibility_serial;
+    ULONGLONG visibility_serial, visibility_ended[8], visibility_counted[8];
     BOOL visibility_logging, visibility_unavailable;
     GLuint visibility_buffer;
     volatile GLuint *visibility_mapped;

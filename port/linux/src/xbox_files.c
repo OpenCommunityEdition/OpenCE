@@ -238,6 +238,12 @@ static int translate_workshop(const char *cursor, char *resolved, unsigned long 
 	if (!names_match(cursor, "mcc_maps", 8) || (cursor[8] != '\\' && cursor[8] != '/'))
 		return 0;
 	cursor += 9;
+	/* MCC-owned resource discovery also serves the virtual fopen path. */
+	if (steam_workshop_resource_path(cursor, platform_data_root(), resolved, size))
+	{
+		*rest = cursor + strlen(cursor);
+		return 1;
+	}
 	while (cursor[length] >= '0' && cursor[length] <= '9' && length + 1 < sizeof(id))
 	{
 		id[length] = cursor[length];

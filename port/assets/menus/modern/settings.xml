@@ -3832,6 +3832,16 @@
 		<on event="start" run="port settings save" back="true" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
+	<widget name="frontend_legacy/footer/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/dead_zones/button_defaults" type="text" width="180" height="28" font="ui\large_ui" color="#FF2896FF" align="left" text_y="0" text="=DEFAULTS" text_x="22">
+		<on event="a" run="port settings defaults" />
+		<on event="start" run="port settings defaults" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
+	<widget name="frontend_legacy/footer/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/dead_zones/button_ok" type="text" width="128" height="28" font="ui\large_ui" color="#FF2896FF" align="left" text_y="0" text="=OK" text_x="22">
+		<on event="a" run="port settings save" back="true" />
+		<on event="start" run="port settings save" back="true" />
+		<on event="left_mouse" run="mouse emit accept event" />
+	</widget>
 	<widget name="frontend_legacy/footer/main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/gyro/button_defaults" type="text" width="180" height="28" font="ui\large_ui" color="#FF2896FF" align="left" text_y="0" text="=DEFAULTS" text_x="22">
 		<on event="a" run="port settings defaults" />
 		<on event="start" run="port settings defaults" />

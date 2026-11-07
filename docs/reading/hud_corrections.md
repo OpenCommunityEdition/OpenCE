@@ -16,7 +16,10 @@ These are display changes; input bindings, simulation and networking are unchang
    sprite cell: 9x9 texels on Xbox/CE and 36x36 on MCC's four-times-resolution
    sheet. These bounds were measured from stock alpha coverage; the supplied
    image matches their size and centre within one generated high-resolution
-   pixel. Sprite geometry and zoom-label placement remain unchanged.
+   pixel. Sprite geometry remains unchanged. Xbox 2x and 10x label pixels fit the stock
+   glyph bounds rather than their padded sprites: 10x within one high-resolution
+   pixel, 2x within three because the supplied glyph is proportionally wider.
+   CE and MCC retain their separate label placements.
 2. Xbox retains its existing texture replacement path and atlas layout.
    [hud_hires.c](../../port/linux/src/hud_hires.c), `hud_hires_override_find`, checks
    the setting and original pixel signature. CE's rocket uses its existing
