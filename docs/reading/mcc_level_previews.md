@@ -22,6 +22,13 @@ match exactly one listed `ScenarioFile` basename. The image resolver tries
 `Images.Large`, then `Images.Thumbnail`. A missing, unsupported or damaged
 image leaves the normal question-mark picture.
 
+Multiplayer lists support up to 1,024 entries, matching the Workshop catalog;
+campaign lists retain their separate 64-mission bound. These are reader
+capacities, not authored format limits. The item path buffer and per-preview
+metadata are allocated on the heap and released on success or failure, so a
+large collection does not grow the preview-loading stack. Catalog label
+metadata remains in its existing static package/family cache.
+
 For example, a mission declaring `Images.Large: "assets/1.png"` reads that
 file from its own package root. A map declaring `"frogfoot_mid.png"` reads
 from the root itself. There is no guessed filename or recursive image search.

@@ -64,7 +64,7 @@ int main(int argc,char **argv) {
  struct mcc_preview_image image; unsigned char *data; FILE *file; unsigned length; int ok,w,h;
  if(argc<3) return 2;
  if(!strcmp(argv[1],"labels")) {
-  struct mcc_menu_metadata metadata;const struct steam_workshop_map_text *map;
+  static struct mcc_menu_metadata metadata;const struct steam_workshop_map_text *map;
   if(!mcc_menu_metadata_load(argv[2],0,&metadata))return 4;
   map=mcc_menu_metadata_find(&metadata,"level");if(!map)return 5;
   printf("%s|%s\n",metadata.title,map->title);return 0;
@@ -182,6 +182,24 @@ def test_package_identity_and_missing_metadata(preview_tool, tmp_path):
 def test_authored_offline_labels(preview_tool,tmp_path):
     package(tmp_path)
     assert subprocess.check_output([str(preview_tool),"labels",str(tmp_path)],text=True).strip()=="Offline package|Authored level"
+
+
+@pytest.mark.parametrize("count", [75, 1024])
+def test_large_package_preserves_late_labels_and_preview(preview_tool, tmp_path, count):
+    package(tmp_path)
+    names = []
+    for index in range(count - 1):
+        name = f"meta/other{index}.json"
+        (tmp_path / name).write_text(json.dumps({"ScenarioFile": f"other{index}"}))
+        names.append(name)
+    names.append("meta/level.json")
+    mod = tmp_path / "ModInfo.json"
+    data = json.loads(mod.read_text())
+    data["GameModContents"]["MultiplayerMaps"] = names
+    mod.write_text(json.dumps(data))
+    assert subprocess.check_output([str(preview_tool), "labels", str(tmp_path)], text=True).strip() == "Offline package|Authored level"
+    assert run(preview_tool, "load", r"mcc_maps\package\level", 0,
+               TEST_MAP_FILE=str(tmp_path / "level.map"))[:3] == (1, 6, 3)
 
 
 def test_ambiguous_or_wrong_metadata(preview_tool,tmp_path):

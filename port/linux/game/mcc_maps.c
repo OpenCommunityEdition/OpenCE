@@ -171,8 +171,8 @@ static int mcc_map_order(void const *left, void const *right)
 		mcc_workshop_package_folder(a->level_name, package_a) &&
 		mcc_workshop_package_folder(b->level_name, package_b) && !csstrcasecmp(package_a, package_b))
 	{
-		int order_a = a->mission_order ? a->mission_order : STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS + 1;
-		int order_b = b->mission_order ? b->mission_order : STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS + 1;
+		int order_a = a->mission_order ? a->mission_order : MCC_MANIFEST_MAXIMUM_MISSIONS + 1;
+		int order_b = b->mission_order ? b->mission_order : MCC_MANIFEST_MAXIMUM_MISSIONS + 1;
 		if (order_a != order_b) return order_a - order_b;
 	}
 	return csstrcasecmp(((struct mcc_menu_map const *)left)->file_name,

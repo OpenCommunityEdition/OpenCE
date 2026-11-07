@@ -89,7 +89,7 @@ static int document_read(const char *root, const char *relative, struct server_j
 int mcc_manifest_load(const char *folder, struct mcc_manifest *manifest, char reason[128])
 {
 	struct server_json_document document;
-	char *text, paths[STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS][128], engine[32];
+	char *text, paths[MCC_MANIFEST_MAXIMUM_MISSIONS][128], engine[32];
 	char found[256];
 	int maps, count, index, other, enabled = 0, token;
 	memset(manifest, 0, sizeof(*manifest)); reason[0] = 0;
@@ -104,7 +104,7 @@ int mcc_manifest_load(const char *folder, struct mcc_manifest *manifest, char re
 	if (!document_read(folder, "CampaignInfo.json", &document, &text)) return -1;
 	maps = server_json_member(&document, 0, "CampaignMaps");
 	count = maps >= 0 && document.tokens[maps].type == _server_json_array ? document.tokens[maps].size : 0;
-	if (count < 1 || count > STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS) count = 0;
+	if (count < 1 || count > MCC_MANIFEST_MAXIMUM_MISSIONS) count = 0;
 	server_json_get_string(&document, server_json_member(&document, server_json_member(&document, 0, "Title"), "Neutral"),
 		manifest->title, sizeof(manifest->title));
 	for (index = 0; index < count; index++)

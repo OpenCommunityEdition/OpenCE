@@ -118,6 +118,9 @@ int steam_workshop_read_item(const char *text, int length, struct steam_workshop
 	{
 		if (document.tokens[maps].type != _server_json_array || document.tokens[maps].size > STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS)
 		{
+			if (item->halo1 && document.tokens[maps].type == _server_json_array)
+				fprintf(stderr, "MCC package '%s': MultiplayerMaps has %d entries; the supported limit is %d. Split the collection into smaller packages.\n",
+					item->title, document.tokens[maps].size, STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS);
 			server_json_document_free(&document);
 			return 0;
 		}

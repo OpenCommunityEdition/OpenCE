@@ -162,6 +162,23 @@ map's title and whose `Images.Thumbnail` is its preview picture. Folder names
 inside an item are found without regard to case, as Steam's files are spelled
 by their makers. An item seen through two paths to one library is listed once.
 
+A multiplayer item may list up to 1,024 maps, matching the existing total
+Workshop catalog capacity. The former 64-entry item limit rejected whole
+collections, including an inspected 75-entry Halo 1 package; it was a reader
+capacity, not an MCC format restriction. The reader validates every listed
+path and retains the 256 KiB JSON limit. Larger lists are refused with a
+diagnostic naming the package title, entry count and supported limit. The
+combined catalog still holds at most 1,024 maps across all packages. Campaign
+progression retains its independent 64-mission limit.
+
+`tools/test_steam_workshop.py` exercises 64/65/75/1,024-entry manifests,
+unrelated package identities, late malformed paths, catalog saturation and
+disable/re-enable/rescan behavior through the real reader and discovery code.
+Local menu metadata and previews use the same multiplayer bound, including
+Android/web packages; `tools/test_mcc_previews.py` checks titles and images
+from entries beyond the old limit. Discovery does not establish that every
+map's gameplay content is supported.
+
 Discovery defaults to off. Android and web use installed `mcc_maps` packages;
 they do not search for Steam. Local package folders take precedence regardless
 of their letter case. The path translation hook is necessary because the shared
