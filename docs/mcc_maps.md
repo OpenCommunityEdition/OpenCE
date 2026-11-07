@@ -2442,16 +2442,19 @@ no-op; other vehicle controllers and boat point counts retain their paths.
 No authored tags, network permissions, packet fields or seat rules change.
 There is no persistent state to clean up across map-family transitions.
 
-MCC protocol 47 requires this initialization on every peer, including a
-client predicting a boat it drives. The separate OpenCE protocol stays 29.
-The regression harness extracts the real boat routine, real scratch structure
-and MCC initializer, starts the scratch storage with NaNs, and checks the
-controls delivered to physics. Removing the hook reproduces the failure.
-It also checks the inactive MCC guard, unchanged alternate point-count path,
-rotations/lift/propeller outputs and the adjacent scratch-array canary. This
-is a control-initialization test, not a simulation of the complete physics.
+The original fix introduced MCC protocol 47 to require this initialization on
+every peer, including a client predicting a boat it drives; OpenCE's separate
+protocol was then 29. The current agreements are recorded in
+[NETCODE.md](../port/linux/NETCODE.md#gulchce-crossplay-boundary).
 
-Validation: the Windows release builds, 78 focused boat/script/protocol/network
+The [boat harness](../tools/harness/tests/test_mcc_boat.py) extracts the real
+controller, scratch structure, MCC initializer and force consumers. It uses
+non-finite and finite stale control values, checks observable forces, active
+controls, alternate point counts and adjacent storage, and removes the
+initializer in an isolated negative control. Its world queries and transforms
+are controlled fixtures; this is not a complete vehicle simulation.
+
+Original validation: the Windows release builds, 78 focused boat/script/protocol/network
 tests pass, and the recorded network-format check passes. A hidden two-instance
 Mercury2 co-op check switched to the plains BSP and created the authored `d1`
 boat at its original position. Host-authorized script calls seated the client
@@ -2472,6 +2475,45 @@ Linux was not executed. Browser/native transport testing could not start
 because Playwright is absent. Those platform checks remain for CI. Temporary
 map copies and generated caches were removed; logs and verified compressed
 private test saves were retained.
+
+#### Shared-engine investigation, 7 November 2026
+
+The refactor audit confirmed that this is a general controller defect, rather
+than an MCC layout difference. `vehicle_update` in
+[vehicles.c](../source/units/vehicles.c) allocates the powered-point array on
+each call. Its boat branch assigns all rotations and lift ratios but only
+point zero's water-friction velocity. Native vehicle validation accepts boat
+type 2, and native physics validation accepts three powered points with these
+flags. The unchanged functions in
+[physics.c](../source/physics/physics.c) consume those controls independently
+of map family. They clear the separate mass-point output array and derive
+rotation matrices; neither action initializes the control scalars. No prior
+tick's state belongs in this local array.
+
+The new reproduction feeds identical accepted content through the controller
+and force consumer with MCC inactive and active. With MCC inactive, poisoned
+hydrofoil controls produce non-finite forces or incorrect finite friction.
+The current MCC initialization avoids both failures. This establishes a class
+of supported inputs, without a map name, checksum or asset selector; it does
+not establish that stock Xbox maps contain such boats.
+
+The minimal shared correction would initialize exactly three records inside
+the existing three-point branch, retaining its arithmetic and the other-count
+fallback, then retire the MCC helper. It is **deferred**: the pinned OpenCE 41
+implementation has the same omission, and clients predict driven vehicles.
+Changing accepted Xbox/CE simulation requires agreement/version separation;
+keeping version 41 would falsely claim compatibility, while changing it would
+end the existing crossplay contract. The user chose to preserve that contract.
+Production code, the MCC workaround and all network versions remain unchanged.
+Do not attach this generic correction to an optional camera mode or map identity.
+
+Legacy force failures are explicit known failures in the harness, not passing
+compatibility results. The deferred correction can be reconsidered when an
+upstream agreement includes it, or when a separate compatibility policy is
+explicitly authorized. It then needs the shared fix's platform, map-family,
+vehicle-prediction and transport validation. See the
+[refactor validation record](mcc_refactor_validation.md) for this investigation's
+actual checks and limits.
 
 ## Cutscene title layout
 

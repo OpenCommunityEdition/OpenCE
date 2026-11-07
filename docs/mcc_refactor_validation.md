@@ -203,3 +203,63 @@ generator changed, so Android/web rebuilds and transport interoperability runs
 were not required for these tooling changes. Later engine changes still need
 their affected platform, networking and cross-family checks under
 [AGENTS.md](../AGENTS.md) and [CODINGSTANDARDS.md](../CODINGSTANDARDS.md).
+
+## Stage 2: boat proof and preserved crossplay
+
+The [boat investigation](mcc_maps.md#shared-engine-investigation-7-november-2026)
+establishes a shared producer-initialization defect. The user chose to preserve
+the pinned OpenCE 41 crossplay contract and defer an unconditional engine fix.
+This stage therefore changes regression coverage and documentation, with no
+production or protocol change. The existing MCC correction remains active.
+
+The initial expanded test ran against unchanged production code and reported
+eight failures with eighteen passes. Non-MCC NaN controls reached the real
+force consumer; finite stale values produced incorrect friction. The finished
+harness also exercises the actual radius-based dispatch and `physics_update_old`,
+checking its resulting linear velocity. The newer path checks computed forces
+before its separately stubbed integrator. Both use an axis-aligned fixture with
+controlled transforms and world queries, not a real map or a whole game.
+
+The boat suite passed 52 checks and recorded twelve strict expected failures.
+The latter are the identified legacy force defect, not successful compatibility
+checks. Only its dedicated force-failure exception is eligible for an expected
+failure; compilation, active-control and scratch-boundary errors remain failures.
+Mutations verify that distinction. Removing the expected-failure handling for
+the two legacy water/NaN cases reproduced failures in both physics paths.
+
+```powershell
+python -m pytest -q -rx tools/harness/tests/test_mcc_boat.py
+# Deliberately reproduces the two deferred failures:
+python -m pytest -q --runxfail tools/harness/tests/test_mcc_boat.py -k legacy_nan_water
+```
+
+Eight additional cases remove the MCC guard only from an extracted temporary
+test copy. They show that unconditional initialization corrects the measured
+forces with either poison pattern and both physics paths. This is evidence for
+the deferred change, not shipped behavior. Production still uses its original
+MCC guard. No performance improvement or new runtime compatibility is claimed.
+
+The first remote Stage 1 run exposed a missing `libxtst-dev` dependency while
+configuring SDL for the new Linux GPU job, before any render check ran. Commit
+`4acb59d66` adds that dependency; the job retains SDL's enabled X11 functionality.
+Workflow syntax and its 65 coverage checks passed locally. Remote results and
+the post-review checks are recorded below. Private investigation logs are
+retained under `build/stage2`.
+
+Self-review and an independent read-only review of the combined tests,
+documentation and CI dependency repair found no remaining corrections.
+The final local boat, neighboring MCC harness, protocol, camera-protocol and
+CI-coverage selection passed 167 checks with the twelve documented expected
+failures. Documentation checks verified 55 local links, the investigation
+anchor, named functions and Python syntax, and confirmed that no production
+file changed. No new game run was needed for these test/documentation changes;
+Stage 1's unchanged binary and runtime evidence remain applicable within
+their original limits.
+
+The original remote [Build run at `b8d2f0dc2`](https://github.com/chestahh/GulchCE/actions/runs/42373756516)
+passed Windows, Linux, Android and web debug builds. Android included its APK
+and importer checks; web included the browser/native transport harness.
+The [MCC run](https://github.com/chestahh/GulchCE/actions/runs/42373756545)
+passed its Linux/Windows pytest jobs but failed SDL configuration in the new
+GPU job as described above. The dependency repair and expanded boat coverage
+require a subsequent remote run; the original run cannot validate them.
