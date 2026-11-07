@@ -236,6 +236,12 @@ static void mcc_launcher_choose(
 
 /* ---------- public code */
 
+boolean mcc_launcher_active(
+	void)
+{
+	return mcc_launcher.active;
+}
+
 void mcc_launcher_update(
 	boolean main_menu_loaded,
 	real seconds)
@@ -272,7 +278,9 @@ void mcc_launcher_update(
 	/* (the main menu's own screens, which do not run on MCC's ui.map) */
 	ui_widgets_close_all();
 
-	gamepad = input_has_gamepad(0) ? input_get_gamepad_state(0) : NULL;
+	/* (port 0 is the keyboard too, which drives it as the menus' controller
+	while the launcher counts as a menu: ui_widget.c) */
+	gamepad = input_get_gamepad_state(0);
 	up = mcc_launcher_up(gamepad);
 	down = mcc_launcher_down(gamepad);
 	accept = mcc_launcher_accept(gamepad);
