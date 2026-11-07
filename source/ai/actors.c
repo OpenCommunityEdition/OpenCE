@@ -2869,8 +2869,11 @@ short actors_spawn_from_unit(
 
 		if (source_actor_index != NONE)
 		{
-			struct actor_datum *source_actor = actor_get(source_unit->unit.actor_index);
-			/* BUG: January reads actor_index even when source_actor_index selected swarm_actor_index. */
+			/* port: the actor source_actor_index chose, the swarm's for a unit
+			of a swarm. January read the unit's actor_index, which a unit of a
+			swarm does not have (NONE), and crashed as a unit of a swarm that
+			spawns actors died (a Custom Edition map's: no Xbox map has one). */
+			struct actor_datum *source_actor = actor_get(source_actor_index);
 			encounter_index = source_actor->meta.encounter_index;
 			squad_index = source_actor->meta.squad_index;
 		}
