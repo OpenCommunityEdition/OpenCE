@@ -537,6 +537,12 @@ def test_system_link_bots_messages_are_the_games():
     for data in sent:
         name = names[data[-1]]
         assert len(data) - 4 == sizes[name], name
+    limits = (root / "port/linux/include/halo_port_limits.h").read_text()
+    version = int(re.search(r"^#define HALO_PORT_NETWORK_VERSION (\d+)$", limits, re.M)[1])
+    join = sent[0][3:-1]
+    assert sent[0][-1] == bots.CLIENT_JOIN_GAME_REQUEST
+    assert join[-2:] == struct.pack(">H", version)
+    assert join[112:-2] == bytes(170 + 64), "agreement must not replace account credentials"
 
 
 # ---------- the wire format (tools/network_format.py)
