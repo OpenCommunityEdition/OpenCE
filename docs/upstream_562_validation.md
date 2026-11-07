@@ -147,9 +147,9 @@ judge/tolerances. Original maps, Workshop packages and user saves were untouched
 
 ## Promotion limits
 
-Keep main unchanged until the remaining runtime gaps are resolved or explicitly
-accepted with evidence. Green asset-free tests and builds do not establish full
-MCC or campaign compatibility. No visual A/B captures were added in this merge;
+The MCC resource-loading failure recorded above is resolved by the follow-up
+below. Keep main unchanged while campaign co-op qualification remains open.
+Green asset-free tests and builds do not establish full MCC or campaign compatibility. No visual A/B captures were added in this merge;
 the prior contrail captures documented in `contrail_timing.md` cover the earlier
 aging fix, not this exact integrated binary.
 
@@ -163,3 +163,71 @@ SDL runtime, and 5.1 MiB of runtime evidence including verified save archives.
 The temporary baseline source/build, copied maps, caches, build objects and
 qualification virtual environment were removed. Logs and package-version records
 remain available; no test game processes remain running.
+
+## MCC resource-discovery follow-up
+
+The user subsequently authorized fixing resource discovery generally, including
+both authored package resources and installed shared MCC resources. Code commit
+`2959e99b22f1079bf3bd9c63c11578d16928fa62` implements that rule without map-name,
+checksum or Workshop-ID exceptions. Read [resource installation](mcc_maps.md#subscribed-steam-workshop-items)
+and the [loading walkthrough](reading/maps_and_resources.md) for precedence,
+ownership and the small MCC-only virtual-file-service hook.
+
+Review covered the entire resolver, its host-file caller, package and shared
+precedence, independent types, bounded paths, disabled discovery, lifecycle,
+resource validation and content-based network identity. No shared simulation
+or wire format changed; resource contents still decide peer admission. No new
+cache or open-stream owner was introduced. The existing resource reader rejects
+invalid authored files and ambiguous shared matches rather than replacing them.
+No unrelated refactoring was needed.
+
+Seven synthetic cases failed before implementation. The final local Windows
+suite covering Steam discovery, MCC resources/identity/maps/protocol, Android
+imports and web build checks passed **259 tests**, with **10 platform/tool
+skips**. Tests cover unrelated package identities, mixed case, per-type lookup,
+local overrides, invalid/unmatched/ambiguous resources, other Steam libraries,
+path bounds, forbidden paths, disabled discovery and unchanged Xbox/CE roots.
+Windows portable release rebuilt successfully with PGO/LTO off.
+
+Code at `2959e99b2` passed the complete
+[Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42319635736):
+Windows, Linux, Android and web, including Chromium/Firefox and native WebRTC
+checks. Both jobs in the
+[MCC workflow](https://github.com/chestahh/GulchCE/actions/runs/42319635900)
+also passed: reader/validator commands reported 1,425 passed/14 skipped and
+36 passed; Windows adapters reported 40 passed/one skipped, 1,538 passed/16
+skipped and 38 passed. Platform debug/release scope is as documented above.
+
+Real-engine checks used the same hidden, isolated, at-most-two-instance rules:
+
+- Mercury Falling loaded its own bitmap and sound files directly from the
+  Workshop item's `halo1/maps`; player simulation advanced through tick 570.
+- Ring loaded the shared bitmap file directly from the installed MCC game;
+  player simulation advanced through tick 720.
+- Two-peer Ring: **45 matched seconds**, no divergences or judge problems,
+  maximum position difference 0.2002, normal exits.
+- Two-peer Bigass: **41 matched seconds**, no divergences or judge problems,
+  maximum position difference 0.0736, normal exits. Both peers selected the
+  package's authored bitmap and sound resources in place.
+- One process completed Xbox b40 checkpoint save/revert, refusal of a deliberately
+  invalid MCC package bitmap, Mercury with authored resources, Ring with shared
+  resources, CE Death Island and a return to Xbox Blood Gulch. Every post-load
+  simulation marker executed; the saved state restored, the invalid resource
+  was refused, all intended maps loaded, no exception was reported and exit was
+  normal. This closes the previously failed resource/transition check.
+
+The invalid package was a disposable fixture, not an edit to installed content.
+No Workshop resources were copied into shared folders to obtain these passes.
+The executable used for these runtime checks has SHA-256
+`6cb70d41816f35224b143007483c1234ca232eeecc01e33fb2c0eed2ab29f66f`.
+Logs/results are under `build/runtime-562-final`, including
+`workshop-mercury-fixed`, `workshop-ring-fixed`, `mcc-ring-network`,
+`mcc-bigass-network` and `lifecycle-resources-fixed`. Save archives are verified
+against SHA-256 manifests before removing loose inactive copies. Copied test
+maps and generated map caches were removed; originals remain untouched.
+
+These checks establish the repaired discovery paths and representative gameplay,
+not complete MCC campaign compatibility. Shared sound discovery/selection is
+covered synthetically; the installed shared-resource runtime example required
+external bitmaps only. The pre-existing b40 co-op comparison issue remains a
+separate qualification limit. Main was not promoted.
