@@ -494,6 +494,15 @@ the already validated allocation without searching the texture table again.
 Copied descriptors and changed ranges cannot borrow another texture's pixels.
 The lookup retains no state across calls or map unloads.
 
+During conversion, `mcc_bitmaps_prepare` gives each bitmap tag its own bounded
+virtual byte stream. Original descriptors are appended as complete tag groups;
+`mcc_bitmap_specialize` appends each clone as another complete group with a
+fresh runtime handle. Reusing a clone appends nothing. Preparation therefore
+keeps a local stream cursor, resets it when that handle changes, and advances
+it only after `mcc_texture_prepare` succeeds. The resource handle can be shared
+by clones and must not be used for this boundary. Per-texture, per-tag and
+aggregate storage limits still apply; no cursor survives preparation or unload.
+
 The Xbox cache/scenario machinery is inherited. CE conversion is a port
 addition, documented in [Custom Edition caches](../custom_edition_caches.md).
 MCC conversion, package identity and its compatibility boundaries are

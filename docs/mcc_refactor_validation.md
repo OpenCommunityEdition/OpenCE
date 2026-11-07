@@ -418,3 +418,84 @@ checked the claims against logs and archive metadata; local-link, named-symbol,
 Python-syntax and whitespace checks passed. Roughly 36 MB remains under
 `build/stage3`, including the 27 MB baseline build and 7.5 MB verified archive.
 No disposable map copies, game caches or temporary test binaries remain there.
+
+## Stage 4: per-tag bitmap stream preparation
+
+This stage simplifies MCC-owned conversion bookkeeping. It does not change
+pixel decoding, format interpretation, shader selection, simulation, network
+version or Xbox/Custom Edition implementations. The old private converter
+scanned every texture entry to recover the next stream offset for each texture.
+Preparation now passes a local cursor to `mcc_texture_prepare`, resets it when
+the full runtime handle changes, and advances it only after success.
+
+The ordering contract is established by the actual constructors: validated
+original handles have unique tag indices, `mcc_bitmaps_prepare` appends each
+original bitmap block contiguously, and `mcc_bitmap_specialize` appends each
+clone block under a fresh handle. Reusing a clone appends nothing. Empty blocks
+add no descriptors. The items are not reordered before conversion. A resource
+handle is not a runtime handle: clones can share the former while owning
+separate streams. No persistent index, extra allocation or new shared-engine
+hook is needed. Existing per-allocation, per-tag and aggregate bounds, failure
+publication, loading progress and disposal remain unchanged.
+
+The expanded extracted-source fixture exercises the actual preparation,
+tag/block and clone constructors, with controlled consumer selection. It covers
+multiple descriptors and original tags, both clone creation orders, clone
+reuse, empty groups, exact stream boundaries, aggregate storage, and failures
+in allocation, internal reads, external-resource reads and packing. Failed
+descriptors remain unpublished; disposal releases earlier successful textures.
+The same contracts were first checked against unchanged Stage 3 production
+code. Private evidence and baseline executables are under `build/stage4`.
+
+All 45 converter cases passed before and after. The construction cases also
+produced identical full descriptor/pixel traces, read counts and storage ends.
+Two deliberately broken private variants failed the expected offset assertion:
+using resource handles for boundaries, and omitting cursor advancement. The
+focused converter/media/channel/bridge selection passed 72 checks. Self-review
+and an independent combined review found no remaining production cleanup or
+structural correction justified within this stage.
+
+Private Windows release probes were built from Stage 3 revision `53fe6673b`
+and the updated bitmap module, replacing only that translation unit. Their
+other 999 link inputs, configure options and probe framing matched. After
+successful conversion, the probe hashes every initialized pixel-allocation byte
+and 21 explicitly framed semantic metadata fields for every texture, excluding
+addresses and structure padding. It also records ordered handle groups, total
+storage and the maximum per-tag stream end. The comparator verifies complete
+records, identities, counters and digests before comparing them. Instrumented
+timings are not used to claim a loading-speed improvement.
+
+All seven paired Workshop runs matched every recorded texture, handle group
+and stable summary field:
+
+| Installed Workshop map | Textures | Clones | Converted bytes | Old table visits | New cursor advances |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Ruby's Rebalanced `2915693904/a10` | 1,275 | 10 | 107,505,536 | 1,625,625 | 1,275 |
+| Ruby's Rebalanced `2915693904/b40` | 1,181 | 11 | 115,751,552 | 1,394,761 | 1,181 |
+| Ruby's Rebalanced `2915693904/d40` | 1,444 | 11 | 150,436,608 | 2,085,136 | 1,444 |
+| Cursed `2962107814/a10` | 1,531 | 29 | 265,864,960 | 2,343,961 | 1,531 |
+| Spasm `3003419983/spasm_playground` | 908 | 12 | 200,100,480 | 824,464 | 908 |
+| Mercury `3021510694/mercury2` | 1,577 | 47 | 606,337,280 | 2,486,929 | 1,577 |
+| Tiny Halo `3675162225/halo` | 846 | 9 | 138,963,328 | 715,716 | 846 |
+
+Together these compare 8,762 textures, 129 clones and 1,584,959,744 converted
+bytes. The removed scans made 11,476,592 table visits; the cursor advanced
+8,762 times. All fourteen hidden processes used the real NVIDIA renderer,
+required a fresh simulation-tick epoch and exact console output after 150
+ticks, captured a subsequent rendered frame, and exited normally. The complete
+native smoke failure-pattern scan passed for all log/console sinks. Before/after
+captures were visually inspected and showed the same expected scenes and
+textures; these are not synchronized image-equivalence tests. Ruby's runs are
+opening cinematics, while Spasm reaches its initial gameplay view. Installed
+Workshop maps were read in place, without package copies.
+
+After combined review, the broad local MCC, Workshop, CE-format, protocol and
+neighboring harness selection passed 1,920 checks with nineteen skips and the
+same twelve deferred boat expected failures. The skips retain their earlier
+meaning: unavailable JDK/symlink privileges, Linux-only checks and optional
+assets. Four optional real-map checks then passed with Ruby's `a10` and the
+isolated CE fixtures. Direct GPU checks passed 36 MCC meter cases and 15,360
+stock ammunition cases. The Windows release build succeeded with the unchanged
+`--portable --release --pgo=off --lto=off` configuration and existing Expat import
+warnings. Its executable SHA-256 is
+`2f22adeba256b26843cfb8375c55c26d95535ea47491d172b5aab85874edf52b`.
