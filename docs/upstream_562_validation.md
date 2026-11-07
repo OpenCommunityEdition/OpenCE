@@ -264,3 +264,18 @@ and validated. Merging later descendants alone will not restore reverted lines.
 Fresh CI on corrected main builds debug and release configurations before
 publication. The b40 co-op comparison discrepancy remains an explicitly recorded
 pre-existing qualification limit, not a resolved defect or a clean network pass.
+
+## Validated lighting follow-up
+
+Later on 7 November, eight controlled combat runs supported retaining only the
+CPU mask conversion. Testing `e96be13db711ad305cd812a8211d7894d13135ae` restored
+the previous recursive collision traversal and passed its
+[Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42328462980)
+and [MCC validation](https://github.com/chestahh/GulchCE/actions/runs/42328462944).
+The user then authorised promotion of that validated work. This later promotion
+deliberately restores the mask conversion, its tests and documentation; it does
+not restore the discarded shared collision rewrite or alter the preceding MCC
+resource work. The original withdrawn release note stays suppressed, while the
+follow-up supplies its own reviewed annotation. See the
+[controlled comparison](dynamic_emitter_expansion_acceptance.md#controlled-comparison-and-retained-change-7-november-2026)
+for all eight results and the remaining sustained-FPS limit.

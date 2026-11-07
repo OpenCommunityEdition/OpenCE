@@ -233,10 +233,13 @@ node's nearest depths and BSP cache, plus the engine traversal stack.
 The helpers explicitly prevent inlining: source-level separation alone allowed
 Clang to put their stack allocation back into frequent cache hits. The storage
 is temporary and render-local. Unchanged stationary targets use a flat fade loop;
-ordinary model masks and half/unit-scale radial masks use conversion loops
-without per-cell directional-profile branches. Other profiles/scales retain
-the general calculation. Tests compare every specialized output pixel against
-that calculation. Fade history below `1e-20` settles
+ordinary model masks use a flat conversion. `texture_row` converts four pixels
+together on SSE2 CPUs for half/unit-scale radial masks and angular model masks.
+It retains interpolation, admission, directional and radial multiplication
+order, exact division and square roots. Other architectures use the scalar row;
+arbitrary radial scales retain the general calculation. Tests compare every
+specialized output pixel against that calculation, including AR, Needler and
+prong profiles. Fade history below `1e-20` settles
 to zero before it can persist as subnormal floating-point values (values below
 the normal float range). This is far below an 8-bit mask step; visible fades,
 ray cadence and the simulation's floating-point mode are unchanged. The tests
