@@ -351,6 +351,12 @@ boolean custom_edition_vehicle_placement_allowed(
 
 /* ---------- prototypes/CUSTOM_EDITION_GEOMETRY.C */
 
+/* Set by the MCC import (mcc_import.c), which writes the geometry into an
+Xbox map instead of drawing it: no buffers are made, and each model part's
+and structure material's buffers record where its compressed vertices (and
+a part's strip) are, by base_address and count. */
+extern boolean custom_edition_geometry_import;
+
 /* The nodes a model part's vertices name, by its vertex buffer, when its
 model has more nodes than the renderer skins at once
 (rasterizer_model_part_skinning): their number, or 0 for any other part. */

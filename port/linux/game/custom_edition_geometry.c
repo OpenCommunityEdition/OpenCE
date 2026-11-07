@@ -603,6 +603,17 @@ static boolean custom_edition_model_part_convert(
 	csmemset(&part->triangles, 0, sizeof(part->triangles));
 	csmemset(&part->triangle_buffer, 0, sizeof(part->triangle_buffer));
 	csmemset(&part->vertex_buffer, 0, sizeof(part->vertex_buffer));
+	if (custom_edition_geometry_import)
+	{
+		/* (the import writes them into a map: custom_edition_cache.h) */
+		part->vertex_buffer.type = _rasterizer_vertex_type_model_compressed;
+		part->vertex_buffer.count = source->vertex_count;
+		part->vertex_buffer.base_address = vertices;
+		part->triangle_buffer.type = _triangle_buffer_type_precompiled_strip;
+		part->triangle_buffer.count = source->strip_triangle_count;
+		part->triangle_buffer.base_address = strip;
+		return TRUE;
+	}
 
 	return rasterizer_vertex_buffer_new(
 			&part->vertex_buffer,
@@ -780,7 +791,7 @@ static boolean structure_material_convert(
 			vertex_count * vertex_size,
 			uncompressed_vertices,
 			vertex_count * rasterizer_geometry_get_vertex_size(_rasterizer_vertex_type_environment_uncompressed));
-		success = rasterizer_vertex_buffer_new(
+		success = custom_edition_geometry_import || rasterizer_vertex_buffer_new(
 			&material->vertices,
 			_rasterizer_vertex_type_environment_compressed,
 			vertex_count,
@@ -796,7 +807,7 @@ static boolean structure_material_convert(
 			lightmap_vertex_count * lightmap_vertex_size,
 			uncompressed_vertices + vertex_count * rasterizer_geometry_get_vertex_size(_rasterizer_vertex_type_environment_uncompressed),
 			lightmap_vertex_count * rasterizer_geometry_get_vertex_size(_rasterizer_vertex_type_environment_lightmap_uncompressed));
-		success = rasterizer_vertex_buffer_new(
+		success = custom_edition_geometry_import || rasterizer_vertex_buffer_new(
 			&material->lightmap_vertices,
 			_rasterizer_vertex_type_environment_lightmap_compressed,
 			lightmap_vertex_count,
@@ -810,6 +821,8 @@ static boolean structure_material_convert(
 }
 
 /* ---------- public code */
+
+boolean custom_edition_geometry_import = FALSE;
 
 boolean custom_edition_models_convert(
 	byte *tag_cache,

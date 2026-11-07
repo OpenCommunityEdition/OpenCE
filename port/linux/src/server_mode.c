@@ -29,6 +29,9 @@ without a display to wait for, and its exits.
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
+
+/* port/linux/game/mcc_import.c */
+int mcc_import_run(char const *output_folder, char const *const *map_names, int map_count);
 #include <stdlib.h>
 #include <string.h>
 
@@ -191,6 +194,27 @@ static void answer_command_line(void)
 		}
 		if (!strcmp(argument, "--keygen"))
 			exit(server_master_keygen() ? EXIT_SUCCESS : SERVER_EXIT_CONFIGURATION);
+		if (!strcmp(argument, "--import-mcc"))
+		{
+			/* halo --import-mcc <output folder> [<map>...]: the data root's
+			MCC maps written as the Xbox's (port/linux/game/mcc_import.c) */
+			static char names[16][64];
+			char const *maps[16];
+			char output[1024];
+			int count = 0;
+
+			if (!posix_command_line_argument(index + 1, output, sizeof(output)))
+			{
+				fprintf(stderr, "--import-mcc: give the folder to write the maps to\n");
+				exit(SERVER_EXIT_CONFIGURATION);
+			}
+			while (count < 16 && posix_command_line_argument(index + 2 + count, names[count], sizeof(names[count])))
+			{
+				maps[count] = names[count];
+				count++;
+			}
+			exit(mcc_import_run(output, maps, count));
+		}
 		if (!strcmp(argument, "--sign"))
 		{
 			char text[1024];
