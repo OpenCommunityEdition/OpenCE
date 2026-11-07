@@ -97,6 +97,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   existing retry backoff and host rate limit. A validated create replaces
   that dead co-op copy instead of reusing it. This also handles a restored
   object keeping its checkpoint handle; no client decides to resurrect it.
+  These guarded extensions are not a full recovery guarantee. The shared
+  [checkpoint regression](../../tools/test_coop_checkpoint_recovery.py) records
+  two unresolved conditions: Crossplay reuses a same-handle corpse, and an
+  accepted old-life kill can affect a reconstructed unit with that same handle.
+  The latter exercises the real handler with a saved payload, not socket
+  reordering. See the [Milestone 10 evidence](../../docs/mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-investigation)
+  before changing recovery guards or claiming compatible checkpoint recovery.
 
   The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies_mode`)
   give each squad of enemies a level places more of itself: PER PLAYER, a

@@ -6,8 +6,9 @@ Updated 7 November 2026. Milestones retain the existing stage numbers, so
 "Stage 6" and "Milestone 6" refer to the same work. Stages 1–8 are complete;
 Stage 9's combined review, testing and cleanup are complete. Ruby co-op
 recovery failed on both original main and current, so its compatibility
-sign-off remains withheld. Shared co-op checkpoint recovery is now planned
-as Milestone 10; implementation has not started.
+sign-off remains withheld. Milestone 10 has confirmed a shared co-op replica
+lifetime defect and added executable regressions. A compatible recovery
+repair remains open; the production recovery paths are unchanged.
 The shared boat correction is tracked separately as Milestone 11 and remains
 explicitly deferred under the crossplay constraint. The console-syntax
 correction also remains deferred, distinct from its completed investigation.
@@ -24,11 +25,12 @@ The stage evidence below records the changes, actual validation and limits.
 | 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; Ruby co-op recovery sign-off withheld |
-| 10 | Diagnose and correct shared co-op checkpoint recovery while preserving OpenCE crossplay. | Planned; establish the root cause and compatible repair strategy first |
+| 10 | Diagnose and correct shared co-op checkpoint recovery while preserving OpenCE crossplay. | Root cause confirmed; compatible repair remains open |
 | 11 | Correct shared boat control initialization under a compatible engine/network contract. | Planned; shared repair remains deferred pending compatible upstream support or an explicit policy change |
 
-The latest verified implementation revision is `f25c4886a`, with fresh passing
-MCC and four-platform debug workflows. Stage 9 recorded 2,193 local passes,
+The latest verified revision is `f1a0d6e1b`, with fresh passing MCC and
+four-platform debug workflows. Stage 10 adds regression coverage while
+leaving the game implementation unchanged. Stage 9 recorded 2,193 local passes,
 24 skips and twelve existing boat expected failures, four real-asset checks,
 64 successful matched loads, sixteen failed-load recoveries, standalone
 save/restore/reset checks, Mercury co-op and all four Xbox/CE mixed-build host
@@ -143,9 +145,9 @@ Follow up the [Stage 9 recovery finding](#saves-restarts-and-co-op-findings):
 after a team-wipe revert, Ruby B40's host has a living player unit while its
 connected client lacks the corresponding player-unit binding. The failure
 reproduces on original main and current in the OpenCE Crossplay profile.
-Reusing a restored object's identifier while the client retains its dead
-version is a suspected mechanism, not yet a confirmed per-object diagnosis.
-This milestone is planned shared-engine work arising from MCC validation;
+The [Stage 10 investigation](#stage-10-shared-checkpoint-recovery-investigation)
+now confirms that the client retains the same full handle as a dead object
+while the host has restored its living version. This is shared-engine work arising from MCC validation;
 it is separate from the explicitly deferred console-syntax lifetime defect.
 
 1. **Establish the cause.** Trace checkpoint restoration, authoritative object
@@ -183,8 +185,8 @@ established, the combined implementation is reviewed, and applicable checks
 pass with evidence and cleanup recorded. An investigation ending in a
 compatibility-dependent deferral leaves the repair milestone open and Ruby's
 recovery sign-off withheld. Stage 9's historical failures remain recorded.
-Adding this milestone schedules the work; it does not begin implementation
-or relax the existing crossplay and isolation requirements.
+The investigation and regression additions do not relax the existing
+crossplay and isolation requirements or constitute a completed repair.
 
 ### Milestone 11: shared boat control initialization
 
@@ -2023,3 +2025,238 @@ physical Android, browser-map gameplay, official upstream-binary crossplay and
 long-duration leak/performance qualification remain unverified. The explicitly
 deferred shared boat and console-syntax corrections remain unfixed. No pull
 request description or merge is part of this milestone.
+
+## Stage 10: shared checkpoint recovery investigation
+
+### Confirmed defect and ownership
+
+The game implementation remains unchanged at `175c2e945` while this
+investigation adds tests and documentation. This is a shared replica-lifetime
+defect: restoring an accepted checkpoint can revive a unit under its existing
+full object handle. It does not depend on an MCC tag layout, filename, package
+or map-specific script. The responsible implementation is the shared
+`network_coop`, `network_objects`, `network_distributed` and `network_damage`
+path. No MCC bypass, production refactor, changed default or protocol bump
+has been introduced.
+
+The host's object tracker records handles, so a restored living object can
+remain indistinguishable from the previously advertised object. In default
+Crossplay, `distributed_client_reuses_object` accepts the same handle and
+definition. `distributed_client_apply_change` can make a living copy dead,
+but does not rebuild a dead copy as living. `distributed_handle_unit_state`
+then refuses that dead unit before player attachment. A new living sample
+alone therefore cannot restore the player's binding or inventory.
+
+The existing camera-profile extensions request full descriptions, reconstruct
+the dead copy and refresh host snapshots after restore. Their history bundles
+client replica handling with host roster/replication changes and explicitly
+separates agreement versions. That history does not independently prove that
+every possible client-only correction would require a new version.
+
+### Real-function regression and counterexamples
+
+[`test_coop_checkpoint_recovery.py`](../tools/test_coop_checkpoint_recovery.py)
+extracts the actual create/validation/delete, player-state, player attachment,
+inventory, datum and damage-handler functions. Its
+[C fixture](../tools/harness/tests/coop_checkpoint_recovery.c) supplies small
+object/player pools and explicit constructor, tag, graph-effect and damage-effect
+boundaries. It is not a copied network implementation, a wire-layout test or a
+full packet dispatcher. Behavioral constants and flags come from their owning
+sources; intentionally smaller fixture capacities remain explicit.
+
+The default-profile case verifies the exact known handle remains dead, no
+replacement construction/deletion occurs, and player/control bindings remain
+absent. The existing optional profile reconstructs and rebinds in this bounded
+case. Ordinary controls check healthy objects, authoritative death, initially
+bound corpses, different identifiers, malformed descriptions before deletion,
+allocation failure, repeated restoration, bounded retry, carried weapons and
+riders, and restored inventory/ammunition/grenades. Deferred inventory coverage
+establishes missing-weapon replay, not timestamp freshness.
+
+A second case captures a valid killing-blow payload while the first life is
+bound, delivers it through the actual damage validators/handler, reconstructs
+and rebinds the unit, then delivers the identical saved payload again. The
+handler reaches the kill-effect boundary for the restored life. This is an
+accepted-order handler reproduction; it does not claim an actual socket packet
+was reordered in Ruby. Normal current-life kills must still execute, while
+unknown handles and malformed numeric/tag/node data remain refused.
+
+Both unresolved outcomes have narrowly typed, strict expected failures with
+dedicated native statuses and exact markers. Compilation errors, unrelated
+assertions and unexpected exits remain failures. Correct recovery returns
+success and becomes strict XPASS, requiring review of the expected failure.
+Eight deliberate mutations of generated function copies confirm the tests
+detect lost validation, identity checks, attachment, weapon/rider preservation,
+deferred inventory application and damage replay. Production files are never
+mutated. The new suite is included beside the existing checkpoint tests in
+the Build workflow.
+
+### Ruby runtime observation
+
+The unchanged Windows release executable has SHA-256
+`816055002eeb8f5434ec78d5dad817e5397d443e8ccb58e66d9d852e755cafbb`.
+Its matching PDB GUID/age and relevant types/global offsets were frozen in a
+small receipt. Two hidden, isolated peers loaded Workshop Ruby B40 from package
+`2915693904`, used aim-only inputs, completed 900 fresh admitted ticks, and
+continued for at least twenty seconds. Both recorded `opence_crossplay`.
+
+A bounded external observer used only the owned process handles. It read
+full object identifiers, death flags, player bindings, inventory and supporting
+replication state without modifying or suspending the game. Unchanged ticks,
+player bindings, object headers and two matching semantic reads reject observed
+races; raw reads and gaps are retained. The decoder received independent source/
+PDB review and fourteen host-only controls. This is not atomic observation
+across machines and does not directly trace packet handles or executed branches.
+
+In `ruby-crossplay-observed-v2`, full handle `0xe53a02cb` was initially alive
+and bound on both peers, then died. After logged host reverts at ticks 2095
+and 2956, the host restored that same handle alive and bound. The client
+retained it as a dead, known object with no player binding. A witnessed
+client death-state true-to-false transition supports receipt of an alive
+state; an initially false flag would not establish that. Host-only state
+caches are not interpreted as received client packets.
+The affected slot is the client's own local player, as recorded by its
+player name and local-player index; the full player datum also matches.
+
+At the first matched restoration observation, the host unit carried weapons
+`0xe53d02ce` and `0xe53e02cf` with grenade counts `[4, 0]`; the client's corpse
+had no weapons and `[0, 0]` grenades. Twenty-seven matched observations show
+the same-handle mismatch across both restores. Their aggregate 31.33-second
+span includes another host death and must not be described as one continuous
+living-host mismatch.
+The two sampled episodes contain 23 observations spanning 17.024 seconds
+and four spanning 2.629 seconds, respectively.
+
+The observer accepted 912 host and 904 client samples, retaining state changes
+and one-second heartbeats. Nine host and seventeen client transient samples
+were rejected; the maximum gap between accepted samples was below 0.226 seconds.
+The unchanged strict comparator reports **FAIL**, with alive-state divergence
+at ticks 2100 and 2971 and no sample-insufficiency problem. Evidence collection
+completed; recovery acceptance did not. Both processes exited normally.
+An earlier sandbox attempt failed at process inventory before launching any
+game and remains recorded separately.
+
+The separate `ruby-camera-profile-control` used the same binary, map and
+input seeds with the existing `gulchce_third_person` session profile, camera
+policy `forced_off` and third-person preference disabled. Both peers' explicit
+environment settings are retained; the generated config file retains defaults
+and is not itself proof of the active overrides. No packet-version capture
+is claimed. After the authored revert at host tick 2104, the client first
+had the same live handle bound with an empty inventory, then both exact
+weapon handles and `[4, 0]` grenades approximately 0.110 seconds later.
+The strict comparison **passed** with 1,155 drift samples and no reported
+divergences or problems. It observed one revert, not full campaign recovery.
+
+The control accepted 772 host and 767 client samples, with thirteen/eighteen
+explicit race gaps and maximum accepted-sample gaps below 0.226 seconds.
+Both processes exited normally. Complete frozen file inventories, hashes,
+source receipts and raw decoded reads passed verification for both sessions.
+Six replay/receipt controls supplement the fourteen observer controls.
+The result supports the existing reconstruction mechanism but does not
+resolve its old-message lifetime hazard or justify changing profile guards.
+
+### Review and validation of the regression additions
+
+The combined test implementation, CI wiring, runtime helpers and documentation
+received primary and independent review. Review corrected two drifted fixture
+constants by extracting owning definitions, added initially bound-corpse and
+live-to-dead controls, and ensured a future correct duplicate rejection becomes
+strict XPASS. Source/PDB review checked the observer's actual layout and rejected
+interpretation of host caches as received client state. No production change
+or speculative reduction is justified by these findings.
+
+Windows validation covers the new recovery suite, existing checkpoint and
+inventory tests, camera policy/wire/protocol/director checks, MCC protocol/
+checkpoint/save/network checks, the comparison judge and co-op wipe controls.
+The new suite contributes 35 passes and two strict expected failures.
+The broader selection finished with 236 unique passes, five platform skips
+and those two expected failures, after retrying 27 existing account-link tests.
+Those initially failed while generating non-CP1252 source comments, then on
+MSVC's standard-`sscanf` deprecation diagnostic. Python UTF-8 and a private
+compiler wrapper defining `_CRT_SECURE_NO_WARNINGS` let all 27 execute and
+pass; no production or unrelated test source was changed. All failed and
+passing run logs are retained. This is an aggregate of the selected checks
+and the targeted retry, not a claim that the first command passed.
+
+The tests and workflow addition are committed as `f1a0d6e1b` and pushed to
+`mcc-code-refactor`. Both fresh workflows passed on that exact revision:
+
+- [MCC validation, run 42419694409](https://github.com/chestahh/GulchCE/actions/runs/42419694409):
+  Windows adapters, reader/validator checks and hidden HUD-meter rendering.
+- [Build, run 42419694396](https://github.com/chestahh/GulchCE/actions/runs/42419694396):
+  Linux, Windows, Android and web debug builds and their required checks.
+  The Linux log explicitly includes the new recovery test in the combined
+  camera/checkpoint command: **74 passed, 2 expected failures**. Its broader
+  suite reports 2,507 passes, 27 skips, twelve existing boat expected failures
+  and seven passing subtests. The web job passed Chromium/Firefox smoke and
+  room checks and the native WebRTC harness with both browsers. These are
+  transport checks without retail-map internet gameplay. Release steps are
+  skipped on this branch by the existing workflow conditions.
+
+The final documentation check validates 68 local links, fourteen anchors,
+twelve named source functions, changed Python syntax, the CI test selection
+and unchanged production scope/version constants. Subsequent documentation
+commits do not change the tested implementation or test inputs; the workflows
+exclude documentation-only pushes. Milestone 10 still lacks an enabled repair
+and its required post-fix gameplay matrix, irrespective of successful builds.
+
+### Evidence preservation and cleanup
+
+All four owned game processes exited normally. Their 24 generated map caches,
+totalling 3,070,230,528 bytes, were removed after the runs. A manifest-bound
+cleanup then removed nine verified input/binary copies and 86 generated test
+binaries, totalling 277,757,525 bytes. The user's original maps, Workshop inputs,
+required builds, existing worktrees and saves were not removed.
+
+All 156 inactive runtime save/support files and 132 generated test-evidence
+files were archived losslessly before removing their loose copies. Their
+97,565,831 bytes occupy 1,141,882 bytes in
+`build/stage10/inactive-saves-and-test-evidence.zip`, SHA-256
+`e9223e41f761769ea011651e2b66a5b2eeb504594ffa9943b3fd7900d76dce57`.
+The manifest records original paths and hashes. Exact ZIP inventory, CRCs,
+sizes and SHA-256 values were verified before removal and again afterward.
+Raw memory records, runtime logs, source/PDB receipts and failed observations
+remain available; `data/gamestate.txt` was explicitly retained as a diagnostic.
+
+Primary and independent cleanup review and 23 guard controls precede the
+applied cleanup. The final verifier checks unchanged originals, retained loose
+files, missing disposable targets, exact runtime inventories resolved through
+loose files plus archive members, and all four stopped PIDs. All seventeen
+original map/resource/executable records remain unchanged. Approximately 21 MB
+remains under `build/stage10`, including the archive and useful diagnostic
+evidence. The integrity result passes while the aggregate runtime gameplay
+result remains false; archival success does not erase Ruby's default-profile
+failure. The earlier Stage 9 records and archives remain untouched.
+
+### Compatibility decision and remaining repair work
+
+The authoritative upstream check on 7 November found the relevant shared
+recovery modules unchanged between pinned OpenCE 41 commit `c507cb26b` and
+then-current upstream `fc9deb0b1`. Official build 334 identifies the pinned
+revision, but no upstream executable was run for this investigation; no new
+claim of runtime crossplay qualification is made.
+
+Simply removing profile guards is not justified. Recreating the same handle
+does not distinguish its new life from earlier damage or inventory messages.
+The source dispatcher deliberately lets ordinary reliable/unbatched damage
+bypass its per-kind stale gate. Object changes have no corresponding lifetime
+fence. An empty reliable damage message therefore cannot advance that gate;
+the existing reverted event only stops script sounds. Ordered host delete/create
+alone does not repair these old-client semantics, and broad refresh would also
+detach healthy units and disturb seats and inventory.
+
+A narrower client-only correction using fresh authoritative descriptions and
+local lifetime tracking remains a possible research direction. It has not
+been proved safe against stale creates, old kills, pending inventories or
+same-tick events, and must retain the old host's resend limit. It cannot repair
+an unchanged old client's receive implementation in the reverse host direction.
+This is a specific unresolved contract, not a claim that all client corrections
+are inherently incompatible.
+
+Milestone 10's repair remains **open** under the standing crossplay condition.
+Proceed only with a demonstrated compatible lifetime/recovery contract, or an
+explicit scope decision permitting recovery limited to updated peers with the
+necessary agreement separation. Keep the original failures and meaningful
+regressions. Neither the new tests nor an optional-profile positive observation
+would establish default recovery, all-map compatibility or completion of the
+required post-fix join/rejoin, transition, platform and transport matrix.

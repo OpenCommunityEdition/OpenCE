@@ -154,6 +154,19 @@ client authority over inventory. The
 late units and weapons, replacement, capacity, forgetting and expiry using
 extracted engine functions and deliberate broken variants.
 
+A checkpoint can restore an earlier living object with the same full handle
+that identifies its corpse on a client. Follow `network_coop_reverted` in
+[network_coop.c](../../port/linux/game/network_coop.c), then
+`network_objects_host_reverted`, `distributed_client_reuses_object` and
+`distributed_client_create` in `network_objects.c`. In Crossplay, the corpse
+is reused; `distributed_handle_unit_state` refuses to attach a player to it.
+The optional camera session can reconstruct it, but identical handles alone
+do not distinguish messages from its previous life. The
+[checkpoint regression](../../tools/test_coop_checkpoint_recovery.py) and
+[Milestone 10 evidence](../mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-investigation)
+separate that real-function proof, Ruby's observed state and the unresolved
+crossplay/lifetime contract. No shared recovery repair has been enabled.
+
 ## Transport has its own contracts
 
 Inputs are sent unreliably, with recent button history repeated to tolerate
@@ -172,7 +185,7 @@ following packet details into those files.
 ## GulchCE compatibility and teardown
 
 Xbox/CE crossplay and MCC sessions have separate protocol boundaries.
-The current baseline is OpenCE 41 and MCC 63. Map-vote messages remain
+The current baseline is OpenCE 41 and MCC 65. Map-vote messages remain
 upstream IDs 94-95; MCC owns IDs 96-99 and join kind 100. The 512-byte MCC
 admission envelope also fits OpenCE's account-link credentials. This bound
 applies to the host's local join as well as remote MCC clients.
@@ -201,7 +214,7 @@ do not make an MCC capability claim sufficient to pass normal admission.
 the upstream 41 relay and disables shoulder-camera gameplay. GulchCE Third
 Person uses camera versions 32712/32713, the additional shoulder relay byte,
 and a mandatory kind 101 join envelope. MCC retains its independent version
-63 and kind 100 admission inside that envelope. Forced Off remains a camera
+65 and kind 100 admission inside that envelope. Forced Off remains a camera
 session; it does not relax admission.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c):
