@@ -227,7 +227,7 @@ static struct network_game_server_client_machine *mcc_protocol_peers[HALO_PORT_M
 static int mcc_protocol_client_capable;
 static int camera_active,join_calls,join_capable,unexpected_calls;
 static int unexpected(void) {unexpected_calls++;return FALSE;}
-static int third_person_session_active(void) {return camera_active;}
+int third_person_session_active(void) {return camera_active;}
 static int mcc_level_name(char const *map) {return !strncmp(map,"mcc_maps\\",9);}
 static int network_game_server_client_machine_is_joined_to_game(struct network_game_server *server,
     struct network_game_server_client_machine *machine) {(void)server;return machine->joined;}
