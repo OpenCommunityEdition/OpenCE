@@ -2096,6 +2096,13 @@ void hud_draw_numbers(
 			digit_scale = TEST_FLAG(numbers->placement.multiplayer_scaling_flags, _hud_use_high_resolution_scale_bit) ||
 				TEST_FLAG(bitmap_group->flags, _bitmap_group_half_hud_scale_bit) ?
 				scale*0.5f : scale;
+			/* port: and an MCC map's at half that again: its HUD is laid out
+			at twice the Xbox's size, its digits four times
+			(port/linux/game/cache_file_formats.c, mcc_hud_convert) */
+			if (mcc_cache_loaded())
+			{
+				digit_scale *= 0.5f;
+			}
 
 			if (TEST_FLAG(numbers->number_flags, _hud_number_show_trailing_m_bit))
 			{

@@ -329,6 +329,16 @@ game's flags also tell its clients whether the host is a dedicated server
 (`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
 most of the living players).
 
+Then version 42 gives the game's own maps a version when they are MCC's
+(Halo: The Master Chief Collection's maps, cache version 13, loaded in place
+of the disc's: `cache_files_map_version`, `MCC_MAP_VERSION` in
+`port/linux/game/custom_edition_cache.h`), where every stock map's was 0.
+Seven of MCC's multiplayer maps are Halo PC's rebuilds, with other collision
+than the disc's, so a machine with MCC's maps and one with the disc's never
+play together: a client whose map is of the other kind is told so and does
+not join. A build before it would take the version as nothing to check and
+join with the other kind's map.
+
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
 sources' messages, kinds, bits, structs sent whole or the sizes of their

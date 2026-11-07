@@ -1182,8 +1182,9 @@ static const struct config_setting config_settings[] =
 		"\"bot:<seed>\" plays controller 1 with a scripted pattern (automated\n"
 		"network tests); \"look:<seed>\" stands still, only turning and looking\n"
 		"up and down; \"menu:<buttons>\" presses menu buttons one a second (a,\n"
-		"b, x, y, up, down, left, right, start, back or wait, separated by\n"
-		"spaces or commas), for testing the menus; empty for none." },
+		"b, x, y, up, down, left, right, start, back, lthumb, rthumb or wait,\n"
+		"separated by spaces or commas; one with ! after it is held, x! say),\n"
+		"for testing the menus; empty for none." },
 	{ "debug.virtual_gamepads", _config_integer, "0", "HALO_VIRTUAL_GAMEPADS", _environment_value, _platform_desktop,
 		"Attach this many SDL virtual gamepads (0 to 4), which the game takes for\n"
 		"gamepads plugged in, for testing split screen; debug.virtual_gamepad_script\n"

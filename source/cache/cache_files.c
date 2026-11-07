@@ -1014,7 +1014,9 @@ boolean cache_files_map_plays_multiplayer(
 	/* port: a Halo Custom Edition map (custom_maps\<name>) is converted for
 	this build as it loads (port/linux/game/custom_edition_cache.c): its
 	header's build is Halo PC's, not one to check */
-	if (custom_edition_level_name(map_name))
+	/* port: nor is an MCC map's (its build is MCC's; a network game on one is
+	of MCC's maps alone: cache_files_map_version) */
+	if (custom_edition_level_name(map_name) || mcc_level_name(map_name))
 		return TRUE;
 	snprintf(path, sizeof(path), "%s%s.map", cache_files_map_directory(), tag_name_strip_path(map_name));
 	file = CreateFileA(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
@@ -1075,11 +1077,16 @@ in its game record (network_game_map's version, which the Xbox's left 0):
 a Custom Edition map's hash's first 32 bits (port/linux/game/map_share.h),
 which differ between versions of it, a client playing its file of that
 version whatever its name. 0, which a client checks nothing for, for the
-game's own maps, whose builds of other regions play together. */
+game's own maps, whose builds of other regions play together; MCC's version
+for an MCC map's (MCC_MAP_VERSION), so that MCC's maps and the disc's never
+meet in a game. */
 unsigned long cache_files_map_version(
 	char const *map_name)
 {
-	return custom_edition_level_name(map_name) ? custom_edition_map_version(map_name) : 0;
+	if (custom_edition_level_name(map_name))
+		return custom_edition_map_version(map_name);
+
+	return mcc_level_name(map_name) ? mcc_map_version() : 0;
 }
 
 /* port: whether this machine has the map a network game is on (a client
@@ -1123,14 +1130,23 @@ boolean cache_files_map_present(
 			return TRUE;
 		snprintf(path, sizeof(path), "%s%s.map", cache_files_map_directory(), name);
 		file = CreateFileA(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
-		if (file != INVALID_HANDLE_VALUE)
+		/* port: and of the host's kind, MCC's or the disc's
+		(cache_files_map_version): their multiplayer maps differ */
+		if (file != INVALID_HANDLE_VALUE && version != cache_files_map_version(map_name))
+		{
+			CloseHandle(file);
+			snprintf(message, sizeof(message), version == mcc_map_version() ?
+				"The host plays the Master Chief Collection's %.64s, and your maps are the disc's." :
+				"The host plays the disc's %.64s, and your maps are the Master Chief Collection's.", name);
+		}
+		else if (file != INVALID_HANDLE_VALUE)
 		{
 			CloseHandle(file);
 			return TRUE;
 		}
 		/* (a host of another version of this port, which names a Custom
 		Edition map as the game's own maps are named) */
-		if (custom_edition_map_file_present(name))
+		else if (custom_edition_map_file_present(name))
 		{
 			snprintf(message, sizeof(message),
 				"The host's map %.64s is a Custom Edition map named for another version of this game.", name);
@@ -1219,8 +1235,11 @@ long scenario_tags_load(
 	into a tag cache of its own, converted for this build and checked as its
 	own maps are (port/linux/game/custom_edition_cache.c). It has no Xbox
 	vertex or index buffers. It is never the game's own map of that file
-	name: a Custom Edition map that cannot load is not played at all. */
-	if (custom_edition_level_name(scenario_name))
+	name: a Custom Edition map that cannot load is not played at all.
+	port: so is the game's own map when its file is MCC's (mcc_level_name),
+	as an MCC import leaves the maps folder: its tags are moved to where a
+	Custom Edition map's are, then it loads as one */
+	if (custom_edition_level_name(scenario_name) || mcc_level_name(scenario_name))
 	{
 		/* port: a protected map's structure bsp names the groups of tags
 		whose own are scrambled (port/linux/game/tag_validate.c) */
@@ -1441,6 +1460,14 @@ boolean scenario_structure_bsp_load(
 			{
 				sound_idle();
 			}
+		}
+
+		/* port: an MCC map's bsp is moved to where it was read, and given its
+		vertices, which the map keeps outside it, before anything reads it
+		(port/linux/game/custom_edition_cache.c) */
+		if (read_complete == TRUE && !custom_edition_structure_bsp_read(reference))
+		{
+			return FALSE;
 		}
 
 		/* port: a bsp that did not all read, or whose header's pointers

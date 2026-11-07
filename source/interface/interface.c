@@ -394,6 +394,12 @@ void interface_draw_fullscreen_overlays(
 	map_share_render();
 	/* port: a network game's round trip to the host (display.latency_meter) */
 	latency_meter_draw();
+	/* port: the launcher shown on MCC's main menu (port/linux/game/mcc_launcher.c) */
+	{
+		extern void mcc_launcher_draw(void);
+
+		mcc_launcher_draw();
+	}
 	/* port: display.stats_log, a line a second in the log (stats_log.c) */
 	stats_log_tick();
 	/* port: the frame rate counter as display.show_fps says

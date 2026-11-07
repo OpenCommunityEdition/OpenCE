@@ -1286,6 +1286,190 @@ static void infer_walk(
 	return;
 }
 
+/* An MCC map's tags (and each of its structure bsps) are at other addresses
+than the tag cache this build gives them: every pointer is moved by the
+schemas, which alone say which words are pointers (many words of an MCC
+map's animations and sounds lie in its tags' address range and are not).
+A pointer is moved when it lies in one of the ranges being moved: the tags,
+or a bsp and the tags its references name. Only the walked range's blocks
+are followed, and each word is moved once (tag_validate_rebase_moved), so
+that a block named twice is walked once and the walk ends. */
+
+enum
+{
+	MAXIMUM_REBASE_RANGES = 2,
+	/* a bit for each word of the largest range walked */
+	REBASE_MOVED_WORDS = TAG_VALIDATE_MAXIMUM_TAG_CACHE_SIZE / 4 / 32
+};
+
+struct rebase_range
+{
+	/* the range's bytes, where they are now (NULL: not walked) */
+	byte *buffer;
+	unsigned long old_address;
+	unsigned long new_address;
+	unsigned long size;
+};
+
+struct rebase_context
+{
+	struct rebase_range ranges[MAXIMUM_REBASE_RANGES];
+	short range_count;
+	/* the range whose blocks are followed */
+	short walked_range;
+	boolean failed;
+	long moved;
+};
+
+static unsigned long tag_validate_rebase_moved[REBASE_MOVED_WORDS];
+
+/* moves the pointer at `field` (in the walked range) if it lies in a range
+and has not been moved yet: TRUE, with its old value in *old_value, if it
+was moved now */
+static boolean rebase_pointer(
+	struct rebase_context *context,
+	byte *field,
+	unsigned long *old_value)
+{
+	struct rebase_range const *walked = &context->ranges[context->walked_range];
+	unsigned long word = (unsigned long)(field - walked->buffer) / 4;
+	unsigned long value;
+	short range_index;
+
+	if (tag_validate_rebase_moved[word / 32] & (1UL << (word % 32)))
+		return FALSE;
+	memcpy(&value, field, sizeof(value));
+	for (range_index = 0; range_index < context->range_count; range_index++)
+	{
+		struct rebase_range const *range = &context->ranges[range_index];
+
+		if (value - range->old_address < range->size)
+		{
+			unsigned long moved_value = value - range->old_address + range->new_address;
+
+			memcpy(field, &moved_value, sizeof(moved_value));
+			tag_validate_rebase_moved[word / 32] |= 1UL << (word % 32);
+			context->moved++;
+			if (old_value)
+				*old_value = value;
+
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+static void rebase_walk(
+	struct rebase_context *context,
+	byte *base,
+	struct tag_schema_definition const *definition,
+	short depth)
+{
+	struct rebase_range const *walked = &context->ranges[context->walked_range];
+	struct tag_schema_field const *field;
+
+	if (depth >= MAXIMUM_VALIDATION_DEPTH)
+	{
+		context->failed = TRUE;
+		return;
+	}
+	for (field = definition->fields; field->type != _tag_schema_terminator && !context->failed; field++)
+	{
+		short index;
+
+		for (index = 0; index < field->count && !context->failed; index++)
+		{
+			byte *address = base + field->offset + index * field->size;
+
+			switch (field->type)
+			{
+			case _tag_schema_struct:
+				rebase_walk(context, address, field->definition, depth);
+				break;
+			case _tag_schema_reference:
+				rebase_pointer(context, address + offsetof(struct tag_reference, name), NULL);
+				break;
+			case _tag_schema_data:
+			case _tag_schema_file_data:
+				rebase_pointer(context, address + offsetof(struct tag_data, address), NULL);
+				break;
+			case _tag_schema_block:
+			{
+				struct tag_schema_definition const *element_definition = field->definition;
+				struct tag_block block;
+				unsigned long old_value;
+				unsigned long offset;
+				long element_index;
+
+				memcpy(&block, address, sizeof(block));
+				/* (a block outside every range is left for the validator,
+				which refuses it) */
+				if (!rebase_pointer(context, address + offsetof(struct tag_block, address), &old_value) ||
+					block.count <= 0)
+				{
+					break;
+				}
+				/* its elements must lie in the walked range to be walked */
+				offset = old_value - walked->old_address;
+				if (old_value < walked->old_address ||
+					element_definition->size <= 0 ||
+					(unsigned long)block.count > walked->size / (unsigned long)element_definition->size ||
+					offset > walked->size - (unsigned long)block.count * element_definition->size)
+				{
+					context->failed = TRUE;
+					break;
+				}
+				for (element_index = 0; element_index < block.count && !context->failed; element_index++)
+				{
+					rebase_walk(context, walked->buffer + offset + element_index * element_definition->size,
+						element_definition, depth + 1);
+				}
+				break;
+			}
+			default:
+				break;
+			}
+		}
+	}
+
+	return;
+}
+
+/* a group's schema for an MCC map, whose models are gbxmodels as a Custom
+Edition map's are */
+static struct tag_schema_group const *rebase_group_get(
+	unsigned long group_tag)
+{
+	struct tag_schema_group const *group;
+
+	for (group = tag_schema_custom_edition_groups; group->group_tag; group++)
+	{
+		if (group->group_tag == group_tag)
+			return group;
+	}
+
+	return schema_group_get(group_tag);
+}
+
+/* walks the root of `definition` at `offset` in the walked range */
+static void rebase_root(
+	struct rebase_context *context,
+	unsigned long offset,
+	struct tag_schema_definition const *definition)
+{
+	struct rebase_range const *walked = &context->ranges[context->walked_range];
+
+	if (definition->size <= 0 || offset > walked->size || (unsigned long)definition->size > walked->size - offset)
+	{
+		context->failed = TRUE;
+		return;
+	}
+	rebase_walk(context, walked->buffer + offset, definition, 0);
+
+	return;
+}
+
 /* A protected map's tags have their groups scrambled in the tag table
 (the extractors' "INVALID"), while the references to them keep the real
 ones, which is all Halo PC read. Every tag of a known group is walked once,
@@ -1896,4 +2080,89 @@ void *tag_validate_index_buffer_data(
 	void const *buffer)
 {
 	return buffer_data(validation->index_buffers, validation->index_buffer_count, buffer);
+}
+
+long tag_validate_rebase(
+	void *tag_header,
+	unsigned long tag_data_bytes,
+	unsigned long old_address,
+	unsigned long new_address)
+{
+	struct tag_validate_header *header = tag_header;
+	struct rebase_context context;
+	long tag_index;
+
+	if (tag_data_bytes < sizeof(struct tag_validate_custom_edition_header) ||
+		tag_data_bytes > TAG_VALIDATE_MAXIMUM_TAG_CACHE_SIZE)
+	{
+		return NONE;
+	}
+	memset(&context, 0, sizeof(context));
+	memset(tag_validate_rebase_moved, 0, (tag_data_bytes / 4 / 32 + 1) * sizeof(unsigned long));
+	context.ranges[0].buffer = tag_header;
+	context.ranges[0].old_address = old_address;
+	context.ranges[0].new_address = new_address;
+	context.ranges[0].size = tag_data_bytes;
+	context.range_count = 1;
+	/* (the loader moved the header's and instances' own pointers: the
+	instances are where it says, and give each tag's root where it is now) */
+	for (tag_index = 0; tag_index < header->tag_count && !context.failed; tag_index++)
+	{
+		struct tag_validate_instance const *instance;
+		struct tag_schema_group const *group;
+		unsigned long root_address;
+
+		instance = (struct tag_validate_instance const *)((byte *)tag_header +
+			((unsigned long)header->instances - new_address)) + tag_index;
+		root_address = (unsigned long)instance->base_address;
+		group = rebase_group_get(instance->group_tag);
+		/* (a tag of no group this build knows, or whose group has nothing
+		to check, is left as the validator leaves it; a structure bsp is
+		moved as it loads) */
+		if (!group || !group->definition || !root_address)
+			continue;
+		if (root_address < new_address)
+		{
+			context.failed = TRUE;
+			break;
+		}
+		rebase_root(&context, root_address - new_address, group->definition);
+	}
+
+	return context.failed ? NONE : context.moved;
+}
+
+long tag_validate_rebase_structure_bsp(
+	void *bsp,
+	unsigned long bsp_bytes,
+	unsigned long old_bsp_address,
+	unsigned long new_bsp_address,
+	unsigned long old_tags_address,
+	unsigned long new_tags_address,
+	unsigned long tag_data_bytes)
+{
+	struct tag_validate_structure_bsp_header *header = bsp;
+	struct tag_schema_group const *group = rebase_group_get(STRUCTURE_BSP_GROUP_TAG);
+	struct rebase_context context;
+	unsigned long old_root;
+
+	if (!group || !group->definition || bsp_bytes < sizeof(*header) || bsp_bytes > TAG_VALIDATE_MAXIMUM_TAG_CACHE_SIZE)
+		return NONE;
+	memset(&context, 0, sizeof(context));
+	memset(tag_validate_rebase_moved, 0, (bsp_bytes / 4 / 32 + 1) * sizeof(unsigned long));
+	/* the bsp's own pointers, and its references' names, which are in the
+	tags */
+	context.ranges[0].buffer = bsp;
+	context.ranges[0].old_address = old_bsp_address;
+	context.ranges[0].new_address = new_bsp_address;
+	context.ranges[0].size = bsp_bytes;
+	context.ranges[1].old_address = old_tags_address;
+	context.ranges[1].new_address = new_tags_address;
+	context.ranges[1].size = tag_data_bytes;
+	context.range_count = 2;
+	if (!rebase_pointer(&context, (byte *)&header->base_address, &old_root))
+		return NONE;
+	rebase_root(&context, old_root - old_bsp_address, group->definition);
+
+	return context.failed ? NONE : context.moved;
 }
