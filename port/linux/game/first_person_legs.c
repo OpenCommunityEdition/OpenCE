@@ -51,6 +51,14 @@ chest closes the waist as a low lid, flush with the belt (the body's model is
 a hollow shell: folded higher, it stood up as a cone before the eye; lower,
 it sank into a funnel) */
 #define FIRST_PERSON_LEGS_LID_UP 0.01f
+/* how far past the near clip plane the legs' surface is kept from the eye
+(world units: about 9 cm), more than a leg's triangles are across, so that
+none of them passes nearer: a crouched walk raises the knees to the eye,
+and the near clip plane cut them open, the legs seen from inside */
+#define FIRST_PERSON_LEGS_CLEARANCE 0.03f
+/* the most legs' vertices near the eye that are looked at (more: the set
+back is the most any of them needs) */
+#define FIRST_PERSON_LEGS_MAXIMUM_NEAR 512
 
 static real_matrix4x3 first_person_legs_matrices[FIRST_PERSON_LEGS_MAXIMUM_NODES];
 static boolean first_person_legs_enabled(
@@ -199,6 +207,99 @@ static boolean first_person_legs_waist(
 	return first_person_legs_waist_found;
 }
 
+/* the least set back, from set_back on, at which every vertex of the legs
+alone (bound to the hips, thighs, calves and feet only) is farther from the
+eye than the near clip plane and FIRST_PERSON_LEGS_CLEARANCE: set back level
+(back, a unit vector), a vertex within that of the line through the eye is
+too near for the set backs between where it comes that near and where it has
+gone that far behind */
+static real first_person_legs_clear_of_eye(
+	struct object_mesh const *mesh,
+	struct model const *model,
+	real_matrix4x3 const *nodes,
+	real_vector3d const *back,
+	real set_back)
+{
+	static real near_from[FIRST_PERSON_LEGS_MAXIMUM_NEAR];
+	static real near_to[FIRST_PERSON_LEGS_MAXIMUM_NEAR];
+	boolean legs[FIRST_PERSON_LEGS_MAXIMUM_NODES];
+	real_matrix4x3 skins[FIRST_PERSON_LEGS_MAXIMUM_NODES];
+	real clearance = global_window_parameters.frustum.z_near + FIRST_PERSON_LEGS_CLEARANCE;
+	real_point3d const *eye = &global_window_parameters.camera.position;
+	short near_count = 0;
+	boolean moved = TRUE;
+	short node;
+	long index;
+
+	for (node = 0; node < mesh->node_count && node < FIRST_PERSON_LEGS_MAXIMUM_NODES; node++)
+	{
+		legs[node] = node < model->nodes.count &&
+			first_person_legs_node(TAG_BLOCK_GET_ELEMENT(&model->nodes, node, struct model_node)->name);
+		if (legs[node])
+			matrix4x3_multiply(&nodes[node], &mesh->inverse[node], &skins[node]);
+	}
+	for (index = 0; index < mesh->vertex_count; index++)
+	{
+		struct object_mesh_vertex const *vertex = &mesh->vertices[index];
+		short first = vertex->nodes[0];
+		short second = vertex->nodes[1];
+		real_point3d point;
+		real_vector3d from_eye;
+		real along;
+		real across;
+
+		if (first >= mesh->node_count || first >= FIRST_PERSON_LEGS_MAXIMUM_NODES || !legs[first] ||
+			(vertex->weight < 32767 &&
+				(second >= mesh->node_count || second >= FIRST_PERSON_LEGS_MAXIMUM_NODES || !legs[second])))
+		{
+			continue;
+		}
+		matrix4x3_transform_point(&skins[first], &vertex->position, &point);
+		if (vertex->weight < 32767)
+		{
+			real weight = (real)vertex->weight / 32767.f;
+			real_point3d other;
+
+			matrix4x3_transform_point(&skins[second], &vertex->position, &other);
+			point.x = point.x * weight + other.x * (1.f - weight);
+			point.y = point.y * weight + other.y * (1.f - weight);
+			point.z = point.z * weight + other.z * (1.f - weight);
+		}
+		vector_from_points3d(eye, &point, &from_eye);
+		along = dot_product3d(&from_eye, back);
+		across = dot_product3d(&from_eye, &from_eye) - along * along;
+		if (across < clearance * clearance)
+		{
+			real reach = square_root(clearance * clearance - across);
+
+			if (near_count == FIRST_PERSON_LEGS_MAXIMUM_NEAR)
+			{
+				/* (too many to look at one by one: as far back as the farthest needs) */
+				if (reach - along > set_back)
+					set_back = reach - along;
+				continue;
+			}
+			near_from[near_count] = -along - reach;
+			near_to[near_count] = -along + reach;
+			near_count++;
+		}
+	}
+	/* (each set back a vertex is too near for moves it on past them) */
+	while (moved)
+	{
+		moved = FALSE;
+		for (index = 0; index < near_count; index++)
+		{
+			if (set_back > near_from[index] && set_back < near_to[index])
+			{
+				set_back = near_to[index];
+				moved = TRUE;
+			}
+		}
+	}
+	return set_back;
+}
+
 /* the pose to draw the legs with: the body's own (as it is drawn now), all
 but the legs folded into the hips, the whole set back behind the eye; NULL:
 none (a body without named legs) */
@@ -209,6 +310,7 @@ real_matrix4x3 const *first_person_legs_node_matrices(
 	struct object_datum *object = object_try_and_get(object_index);
 	struct object_definition *definition;
 	struct model const *model;
+	struct object_mesh const *mesh;
 	long count;
 	short pelvis = NONE;
 	short thighs = 0;
@@ -240,8 +342,8 @@ real_matrix4x3 const *first_person_legs_node_matrices(
 	if (pelvis == NONE || thighs == 0)
 		return NULL;
 	/* (the waist's middle as the hips are posed now) */
+	mesh = object_mesh_get(object_index);
 	{
-		struct object_mesh const *mesh = object_mesh_get(object_index);
 		real_point3d middle;
 
 		if (!mesh || pelvis >= mesh->node_count || !first_person_legs_waist(mesh, model, pelvis, &middle))
@@ -285,6 +387,10 @@ real_matrix4x3 const *first_person_legs_node_matrices(
 				}
 			}
 		}
+		/* (and as far back as keeps the legs clear of the eye: a crouched
+		walk's knees) */
+		if (back.i != 0.f || back.j != 0.f)
+			set_back = first_person_legs_clear_of_eye(mesh, model, nodes, &back, set_back);
 		if (set_back > FIRST_PERSON_LEGS_SET_BACK_MAXIMUM)
 			set_back = FIRST_PERSON_LEGS_SET_BACK_MAXIMUM;
 	}
