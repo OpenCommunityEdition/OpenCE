@@ -33,7 +33,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_controller_appearance" x="54" y="298" platform="desktop web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_controller_appearance" x="54" y="280" platform="android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_android" x="54" y="303" platform="android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_dead_zones" x="54" y="348" platform="desktop web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_dead_zones" x="54" y="323" platform="desktop web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/op_dead_zones" x="54" y="326" platform="android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/gamepad_setup/button_bar" y="414"/>
 	</widget>

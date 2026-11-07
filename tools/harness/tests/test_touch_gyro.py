@@ -26,9 +26,9 @@ def test_android_menu():
     setup = port_settings.SCREENS["gamepad_setup"]
     xml = ET.fromstring("<menus>" + "\n".join(port_settings._setting_screen("gamepad_setup", setup)) + "</menus>")
     children = next(w for w in xml if w.get("name", "").endswith("/options_menu")).findall("child")
-    for platform, count, spacing in [("desktop", 10, 27), ("web", 10, 27), ("android", 11, 24)]:
+    for platform, count, spacing in [("desktop", 11, 25), ("web", 11, 25), ("android", 12, 23)]:
         rows = [c for c in children if "/op_" in c.get("widget", "") and
                 (not c.get("platform") or platform in c.get("platform").split())]
         assert len(rows) == count
         assert [int(c.get("y")) for c in rows] == [73 + i * spacing for i in range(count)]
-        assert int(rows[-1].get("y")) + 28 <= 350
+        assert int(rows[-1].get("y")) + 28 <= setup["help_top"]
