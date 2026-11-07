@@ -29,7 +29,7 @@ def generated(fault=None):
     return (('types.inc', types), ('under_test.inc', code + apply))
 
 
-@pytest.mark.parametrize('case', ['played-out', 'playing', 'started-again', 'late-joiner', 'music', 'no-room', 'stopped'])
+@pytest.mark.parametrize('case', ['played-out', 'playing', 'started-again', 'late-joiner', 'joined-during', 'music', 'no-room', 'stopped'])
 def test_looping_sounds(case):
     status, output = run(build('coop_looping_sounds', generated()), case)
     assert status == 0, output

@@ -47,7 +47,7 @@ def generated(fault=None, faulty_function=None):
     types += host.group(0)
     code = ''
     for name in ('host_looping_sound_find', 'looping_sound_part_milliseconds', 'looping_sound_play_once_ticks',
-                 'host_send_looping_sounds', 'network_coop_note_sound'):
+                 'host_write_looping_start', 'host_send_looping_sounds', 'network_coop_note_sound'):
         text = function(coop, name)
         if fault and name == faulty_function:
             text = mutated(text, *fault)

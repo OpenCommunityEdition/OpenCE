@@ -67,6 +67,25 @@ static struct game_looping_sound_datum *game_looping_sound_get(long index)
  return &playing[index];
 }
 static void scripted_music_stop_all(void){}
+static void sound_looping_sync_begin(long definition_index, real start_pitch, real loop_pitch,
+ short start_permutation, short loop_permutation, long elapsed_milliseconds)
+{
+ (void)definition_index;(void)start_pitch;(void)loop_pitch;(void)start_permutation;(void)loop_permutation;
+ (void)elapsed_milliseconds;
+}
+static void sound_looping_sync_end(long definition_index){(void)definition_index;}
+static void sound_looping_choose(long sound_index, real scale, real *pitch, short *permutation)
+{
+ (void)scale;
+ if (sound_index == NONE)
+ {
+  if (pitch) *pitch = 0.f;
+  if (permutation) *permutation = NONE;
+  return;
+ }
+ if (pitch) *pitch = 1.f;
+ if (permutation) *permutation = 0;
+}
 
 /* the host's world: its clock, whether it draws, its resends and the events it sends */
 static long now;
@@ -157,6 +176,15 @@ int main(int argc,char **argv)
   long start=now;
   scripted_looping_sound_start(ONCE,NONE,1.0f);
   CHECK(is_playing(ONCE)&&host_looping_sound_count==1,"fixture: the scripts' start did not play");
+  /* (the stop that a start sends first is sent[0]; the start itself follows it) */
+  CHECK(sent[1].type==_coop_sound_looping_start,"the start was not the event after its stop");
+  CHECK(sent[1].reals[1]==1.f&&sent[1].reals[2]==1.f,"the pitches were not sent");
+  CHECK(sent[1].value==1&&sent[1].frame==1,"the permutations were not sent");
+  CHECK(sent[1].target==0,"a sound at its start was %ld ms in",sent[1].target);
+  run_to(start+2*TICKS_PER_SECOND);
+  CHECK(sent[sent_count-1].type==_coop_sound_looping_start&&
+   sent[sent_count-1].target==20*1000/TICKS_PER_SECOND,
+   "a resend 20 ticks in said %ld ms",sent[sent_count-1].target);
   run_to(start+70*TICKS_PER_SECOND);
   CHECK(is_playing(ONCE),"ended before it could have played out");
   run_to(start+72*TICKS_PER_SECOND+1);

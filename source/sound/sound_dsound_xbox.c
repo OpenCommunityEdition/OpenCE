@@ -2726,11 +2726,23 @@ static void dsound_channel_fill(
 	return;
 }
 
+/* port: the next idle queue starts this far into the permutation */
+static long dsound_pending_offset;
+
+void dsound_queue_from_offset(
+	long byte_offset)
+{
+	dsound_pending_offset= byte_offset<0 ? 0 : byte_offset;
+}
+
 static void dsound_channel_queue_sound(
 	short index,
 	struct sound_permutation *sound)
 {
 	struct sound_channel *channel= channel_get(index);
+	long pending_offset= dsound_pending_offset;
+
+	dsound_pending_offset= 0;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_dsound_xbox.c",
@@ -2750,6 +2762,11 @@ static void dsound_channel_queue_sound(
 			channel->state= _sound_channel_playing;
 			channel->playing_permutation= sound;
 			channel->sample_offset= 0;
+			if (pending_offset>0 &&
+				pending_offset<sound->samples.size)
+			{
+				channel->sample_offset= pending_offset;
+			}
 			channel->packet_count= 0;
 
 			result= IDirectSound_CommitDeferredSettings(dsound_globals.direct_sound);

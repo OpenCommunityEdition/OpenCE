@@ -60,6 +60,16 @@ static struct game_looping_sound_datum *game_looping_sound_get(long index)
 static void network_coop_note_sound(short kind,long definition_index,long object_index,real scale)
 {(void)kind;(void)definition_index;(void)object_index;(void)scale;}
 static void scripted_music_stop_all(void){}
+static long synced_elapsed;
+static int syncs;
+static void sound_looping_sync_begin(long definition_index, real start_pitch, real loop_pitch,
+ short start_permutation, short loop_permutation, long elapsed_milliseconds)
+{
+ (void)definition_index;(void)start_pitch;(void)loop_pitch;(void)start_permutation;(void)loop_permutation;
+ synced_elapsed=elapsed_milliseconds;
+ syncs++;
+}
+static void sound_looping_sync_end(long definition_index){(void)definition_index;}
 
 /* as game_sound.c's update when a fake impulse sound's permutations have all played */
 static void play_out(long definition_index)
@@ -125,6 +135,24 @@ int main(int argc,char **argv)
   CHECK(is_playing(ONCE)&&starts[ONCE]==2,"the scripts' new start was refused");
   play_out(ONCE);resend(ONCE);
   CHECK(!is_playing(ONCE)&&starts[ONCE]==2,"the second playing restarted after it ended");
+ }
+ else if(!strcmp(name,"joined-during"))
+ {
+  /* a host that says where the sound has reached: the client is told that place */
+  struct distributed_coop_event event;
+  memset(&event,0,sizeof(event));
+  event.type=(byte)_coop_sound_looping_start;
+  event.tag_index=ONCE;
+  event.object_index=NONE;
+  event.reals[0]=1.f;
+  event.reals[1]=0.9f;
+  event.reals[2]=1.1f;
+  event.value=1;
+  event.frame=2;
+  event.target=12500;
+  client_apply_sound(&event);
+  CHECK(is_playing(ONCE)&&syncs==1,"a join during the sound did not take its place");
+  CHECK(synced_elapsed==12500,"joined at %ld ms",synced_elapsed);
  }
  else if(!strcmp(name,"late-joiner"))
  {

@@ -322,6 +322,12 @@ struct distributed_coop_presentation_message
 /* Something that happens once. Which fields mean what depends on the kind:
 
 	sound             type: _coop_sound_ kind; tag_index; object_index (the source, or NONE); reals[0]: scale
+	                  a play-once sound also carries the pitch and permutation the host chose,
+	                  and how far it has played, so a machine that joins during it starts there.
+	                  reals[1]: the start sound's pitch (0 for none). reals[2]: the loop sound's pitch
+	                  (0 for none). value: the start permutation plus one (0 for none). frame: the loop
+	                  permutation plus one (0 for none). target: milliseconds since it started.
+	                  An older host leaves the pitches at 0, and a client then starts at the beginning
 	title             value: title index; reals[0]: delay in seconds
 	hud               type: _coop_hud_ kind; value
 	player_effect     type: _coop_player_effect_ kind; reals: the function's arguments
@@ -1333,6 +1339,12 @@ static struct
 	long start_time;
 	/* (ticks; 0: it is never ended here) */
 	long length;
+	/* (a play-once sound: the pitch and permutation every machine plays.
+	0 and NONE for a sound that loops, which each machine chooses itself) */
+	real start_pitch;
+	real loop_pitch;
+	short start_permutation;
+	short loop_permutation;
 } host_looping_sounds[MAXIMUM_LOOPING_SOUNDS];
 static short host_looping_sound_count;
 
@@ -1768,6 +1780,7 @@ static void client_looping_sound_forget(
 
 	if (index != NONE)
 		client_looping_sounds.definition_indices[index] = client_looping_sounds.definition_indices[--client_looping_sounds.count];
+	sound_looping_sync_end(definition_index);
 }
 
 static void client_apply_sound(
@@ -1794,6 +1807,18 @@ static void client_apply_sound(
 			looping_sound_definition_get(event->tag_index)->runtime_scripting_sound_index == NONE &&
 			client_looping_sound_find(event->tag_index) == NONE)
 		{
+			/* (a host that sends the pitches: play those, from where the sound
+			already is. An older host leaves them 0, and this starts at the beginning) */
+			if (event->reals[1] != 0.f || event->reals[2] != 0.f)
+			{
+				sound_looping_sync_begin(
+					event->tag_index,
+					event->reals[1],
+					event->reals[2],
+					(short)(event->value - 1),
+					(short)(event->frame - 1),
+					event->target < 0 ? 0 : event->target);
+			}
 			scripted_looping_sound_start(event->tag_index, object_index, scale);
 			client_looping_sound_started(event->tag_index);
 		}
@@ -2127,6 +2152,7 @@ void network_coop_new_game(
 	host_attachment_count = 0;
 	host_looping_sound_count = 0;
 	client_looping_sounds.count = 0;
+	sound_looping_sync_reset();
 	host_hud_state.objective = NONE;
 	host_hud_state.nav_point_count = 0;
 	skip_vote_clear();
@@ -2606,6 +2632,28 @@ static long looping_sound_play_once_ticks(
 	return longest * TICKS_PER_SECOND / 1000;
 }
 
+/* the start event for host_looping_sounds[index], including where a play-once
+sound has reached so a machine that joins during it starts there */
+static void host_write_looping_start(
+	struct distributed_coop_event *event,
+	short index)
+{
+	long played = game_time_get() - host_looping_sounds[index].start_time;
+
+	if (played < 0)
+		played = 0;
+	event->type = _coop_sound_looping_start;
+	event->tag_index = host_looping_sounds[index].definition_index;
+	event->object_index = host_looping_sounds[index].object_index;
+	event->reals[0] = host_looping_sounds[index].scale;
+	event->reals[1] = host_looping_sounds[index].start_pitch;
+	event->reals[2] = host_looping_sounds[index].loop_pitch;
+	event->value = (short)(host_looping_sounds[index].start_permutation + 1);
+	event->frame = (short)(host_looping_sounds[index].loop_permutation + 1);
+	event->target = host_looping_sounds[index].length > 0 ?
+		played * 1000 / TICKS_PER_SECOND : NONE;
+}
+
 /* host, each tick: a looping sound that stopped without the scripts
 stopping it (it ended, or a skipped cutscene's revert took it) is stopped on
 the clients too; one that plays once is ended where nothing draws once it
@@ -2639,15 +2687,13 @@ static void host_send_looping_sounds(
 				event->tag_index = definition_index;
 			}
 			host_looping_sounds[index] = host_looping_sounds[--host_looping_sound_count];
+			sound_looping_sync_end(definition_index);
 			continue;
 		}
 		if (host_resend.refresh && !(length > 0 && played + LOOPING_SOUND_END_MARGIN_TICKS >= length) &&
 			(event = event_new(_coop_event_sound)) != NULL)
 		{
-			event->type = _coop_sound_looping_start;
-			event->tag_index = definition_index;
-			event->object_index = host_looping_sounds[index].object_index;
-			event->reals[0] = host_looping_sounds[index].scale;
+			host_write_looping_start(event, index);
 		}
 		index++;
 	}
@@ -2673,6 +2719,7 @@ void network_coop_note_sound(
 	if (kind == _coop_sound_looping_stop && index != NONE)
 	{
 		host_looping_sounds[index] = host_looping_sounds[--host_looping_sound_count];
+		sound_looping_sync_end(definition_index);
 	}
 	else if (kind == _coop_sound_looping_start)
 	{
@@ -2680,11 +2727,45 @@ void network_coop_note_sound(
 			index = host_looping_sound_count++;
 		if (index != NONE)
 		{
+			struct looping_sound_definition *definition =
+				looping_sound_definition_get(definition_index);
+
 			host_looping_sounds[index].definition_index = definition_index;
 			host_looping_sounds[index].object_index = object_index;
 			host_looping_sounds[index].scale = scale;
 			host_looping_sounds[index].start_time = game_time_get();
 			host_looping_sounds[index].length = looping_sound_play_once_ticks(definition_index);
+			host_looping_sounds[index].start_pitch = 0.f;
+			host_looping_sounds[index].loop_pitch = 0.f;
+			host_looping_sounds[index].start_permutation = NONE;
+			host_looping_sounds[index].loop_permutation = NONE;
+			if (host_looping_sounds[index].length > 0 && definition->tracks.count > 0)
+			{
+				struct looping_sound_track *track = TAG_BLOCK_GET_ELEMENT(
+					&definition->tracks,
+					0,
+					struct looping_sound_track);
+
+				sound_looping_choose(
+					track->start_sound.index,
+					scale,
+					&host_looping_sounds[index].start_pitch,
+					&host_looping_sounds[index].start_permutation);
+				sound_looping_choose(
+					track->loop_sound.index,
+					scale,
+					&host_looping_sounds[index].loop_pitch,
+					&host_looping_sounds[index].loop_permutation);
+			}
+			/* this machine plays the same pitch and permutation it sends */
+			sound_looping_sync_begin(
+				definition_index,
+				host_looping_sounds[index].start_pitch,
+				host_looping_sounds[index].loop_pitch,
+				host_looping_sounds[index].start_permutation,
+				host_looping_sounds[index].loop_permutation,
+				0);
+			host_write_looping_start(event, index);
 		}
 	}
 }

@@ -41,6 +41,10 @@ long dsound_obstruction_from_obstruction(
 	real obstruction);
 struct IDirectSound *dsound_get(
 	void);
+/* the next sound queued on an idle channel starts this far into its samples
+(a block boundary; 0 starts at the beginning, which is the usual queue) */
+void dsound_queue_from_offset(
+	long byte_offset);
 
 /* ---------- globals */
 

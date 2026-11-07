@@ -83,6 +83,28 @@ boolean sound_refresh_looping(
 	short refresh_state,
 	boolean alternate,
 	real fade_time);
+/* port: the pitch and permutation a scripted looping sound will play, chosen
+once so every machine plays the same one. pitch and permutation are 0 and
+NONE when sound_index is NONE */
+void sound_looping_choose(
+	long sound_index,
+	real scale,
+	real *pitch,
+	short *permutation);
+/* port: a play-once looping sound a client is about to start. elapsed is how
+far it has already played, in milliseconds. The client plays the host's pitch
+and permutation, from that moment. permutation NONE is no such part */
+void sound_looping_sync_begin(
+	long looping_definition_index,
+	real start_pitch,
+	real loop_pitch,
+	short start_permutation,
+	short loop_permutation,
+	long elapsed_milliseconds);
+void sound_looping_sync_end(
+	long looping_definition_index);
+void sound_looping_sync_reset(
+	void);
 
 /* ---------- globals */
 

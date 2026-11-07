@@ -1520,20 +1520,478 @@ static long looping_sound_new(
 	return looping_sound_index;
 }
 
+/* port: a play-once looping sound whose pitch and permutation the host chose,
+and how far it had already played when this machine started it */
+enum
+{
+	LOOPING_SYNC_COUNT = 32,
+};
+
+struct looping_sync
+{
+	boolean used;
+	boolean placed;
+	long definition_index;
+	real start_pitch;
+	real loop_pitch;
+	short start_permutation;
+	short loop_permutation;
+	long elapsed_milliseconds;
+	long queue_sound[2];
+	short queue_permutation[2];
+	long queue_offset[2];
+};
+
+static struct looping_sync looping_syncs[LOOPING_SYNC_COUNT];
+
+static struct looping_sync *looping_sync_find(
+	long definition_index)
+{
+	long index;
+
+	for (index = 0; index < LOOPING_SYNC_COUNT; index++)
+	{
+		if (looping_syncs[index].used &&
+			looping_syncs[index].definition_index == definition_index)
+		{
+			return &looping_syncs[index];
+		}
+	}
+
+	return NULL;
+}
+
+static struct looping_sound_track *looping_sync_track(
+	long looping_definition_index)
+{
+	struct looping_sound_definition *definition =
+		looping_sound_definition_get(looping_definition_index);
+
+	if (definition->tracks.count < 1)
+		return NULL;
+
+	return TAG_BLOCK_GET_ELEMENT(
+		&definition->tracks,
+		0,
+		struct looping_sound_track);
+}
+
+static long permutation_milliseconds(
+	struct sound_definition *definition,
+	struct sound_permutation *permutation,
+	real played_pitch)
+{
+	long channels = definition->encoding == _sound_encoding_stereo ? 2 : 1;
+	unsigned long rate = sound_samples_per_second(definition->sample_rate);
+	long samples;
+	real seconds;
+
+	/* a compression this does not know (ogg) is left to start at the beginning */
+	if (definition->compression != _sound_compression_none &&
+		definition->compression != _sound_compression_xbox_adpcm &&
+		definition->compression != _sound_compression_ima_adpcm)
+	{
+		return 0;
+	}
+	if (played_pitch < 0.001f)
+		played_pitch = 0.001f;
+	if (rate == 0)
+		rate = 22050;
+	if (definition->compression == _sound_compression_none)
+	{
+		samples = permutation->samples.size / (2 * channels);
+	}
+	else
+	{
+		long block_bytes = 36 * channels;
+
+		if (block_bytes < 1)
+			return 0;
+		samples = (permutation->samples.size / block_bytes) * 64;
+	}
+	if (samples < 1)
+		return 0;
+	seconds = (real)samples / ((real)rate * played_pitch);
+	return (long)(seconds * 1000.f + 0.5f);
+}
+
+static long permutation_byte_offset(
+	struct sound_definition *definition,
+	struct sound_permutation *permutation,
+	real played_pitch,
+	long elapsed_ms)
+{
+	long channels = definition->encoding == _sound_encoding_stereo ? 2 : 1;
+	unsigned long rate = sound_samples_per_second(definition->sample_rate);
+	long block_bytes;
+	long bytes;
+	real samples;
+
+	if (definition->compression != _sound_compression_none &&
+		definition->compression != _sound_compression_xbox_adpcm &&
+		definition->compression != _sound_compression_ima_adpcm)
+	{
+		return 0;
+	}
+	if (played_pitch < 0.001f)
+		played_pitch = 0.001f;
+	if (rate == 0)
+		rate = 22050;
+	samples = (elapsed_ms / 1000.f) * (real)rate * played_pitch;
+	if (definition->compression == _sound_compression_none)
+	{
+		block_bytes = 2 * channels;
+		bytes = (long)samples * block_bytes;
+	}
+	else
+	{
+		block_bytes = 36 * channels;
+		bytes = ((long)samples / 64) * block_bytes;
+	}
+	if (bytes < 0)
+		bytes = 0;
+	if (block_bytes > 0 &&
+		permutation->samples.size > block_bytes &&
+		bytes > permutation->samples.size - block_bytes)
+	{
+		bytes = permutation->samples.size - block_bytes;
+	}
+	if (bytes >= permutation->samples.size)
+		bytes = 0;
+	return bytes;
+}
+
+/* the played pitch of pitch in sound_index at scale, and that pitch's range */
+static boolean sound_played_pitch(
+	long sound_index,
+	real pitch,
+	real scale,
+	real *played,
+	short *range_index)
+{
+	struct sound_definition *definition;
+	struct sound_pitch_range *range;
+	real scaled;
+
+	*played = 0.f;
+	*range_index = NONE;
+	if (sound_index == NONE || pitch == 0.f)
+		return FALSE;
+	definition = sound_definition_get(sound_index);
+	scaled = sound_scale_value(
+		pitch,
+		definition->zero_pitch_modifier,
+		definition->one_pitch_modifier,
+		scale);
+	*range_index = sound_definition_find_pitch_range_by_pitch(definition, scaled, NONE);
+	if (!VALID_INDEX(*range_index, definition->pitch_ranges.count))
+		return FALSE;
+	range = TAG_BLOCK_GET_ELEMENT(
+		&definition->pitch_ranges,
+		*range_index,
+		struct sound_pitch_range);
+	*played = scaled * range->playback_rate;
+	if (*played < 0.001f)
+		*played = 0.001f;
+	return TRUE;
+}
+
+static long sound_chain_milliseconds(
+	long sound_index,
+	real pitch,
+	short permutation,
+	real scale)
+{
+	struct sound_definition *definition;
+	struct sound_pitch_range *range;
+	struct sound_permutation *perm;
+	real played;
+	short range_index;
+	short index;
+	long total = 0;
+	long guard;
+	boolean linked;
+
+	if (!sound_played_pitch(sound_index, pitch, scale, &played, &range_index))
+		return 0;
+	definition = sound_definition_get(sound_index);
+	range = TAG_BLOCK_GET_ELEMENT(
+		&definition->pitch_ranges,
+		range_index,
+		struct sound_pitch_range);
+	linked = TEST_FLAG(definition->flags, _sound_definition_linked_permutations_bit);
+	index = permutation;
+	for (guard = 0; guard < 32 && VALID_INDEX(index, range->permutations.count); guard++)
+	{
+		perm = TAG_BLOCK_GET_ELEMENT(
+			&range->permutations,
+			index,
+			struct sound_permutation);
+		total += permutation_milliseconds(definition, perm, played);
+		if (!linked ||
+			perm->next_permutation_index == NONE ||
+			!VALID_INDEX(perm->next_permutation_index, range->permutations.count))
+		{
+			break;
+		}
+		index = perm->next_permutation_index;
+	}
+	return total;
+}
+
+/* where elapsed_ms falls in the permutation chain: the permutation to start
+and the byte offset in it. past is set when elapsed_ms is beyond the chain */
+static void sound_chain_seek(
+	long sound_index,
+	real pitch,
+	short permutation,
+	real scale,
+	long elapsed_ms,
+	short *landed,
+	long *byte_offset,
+	boolean *past)
+{
+	struct sound_definition *definition;
+	struct sound_pitch_range *range;
+	struct sound_permutation *perm;
+	real played;
+	short range_index;
+	short index;
+	long remaining;
+	long guard;
+	boolean linked;
+
+	*landed = permutation;
+	*byte_offset = 0;
+	*past = FALSE;
+	if (!sound_played_pitch(sound_index, pitch, scale, &played, &range_index))
+		return;
+	definition = sound_definition_get(sound_index);
+	range = TAG_BLOCK_GET_ELEMENT(
+		&definition->pitch_ranges,
+		range_index,
+		struct sound_pitch_range);
+	linked = TEST_FLAG(definition->flags, _sound_definition_linked_permutations_bit);
+	remaining = elapsed_ms < 0 ? 0 : elapsed_ms;
+	index = permutation;
+	for (guard = 0; guard < 32 && VALID_INDEX(index, range->permutations.count); guard++)
+	{
+		long part;
+
+		perm = TAG_BLOCK_GET_ELEMENT(
+			&range->permutations,
+			index,
+			struct sound_permutation);
+		part = permutation_milliseconds(definition, perm, played);
+		if (remaining < part)
+		{
+			*landed = index;
+			*byte_offset = permutation_byte_offset(definition, perm, played, remaining);
+			return;
+		}
+		remaining -= part;
+		if (!linked ||
+			perm->next_permutation_index == NONE ||
+			!VALID_INDEX(perm->next_permutation_index, range->permutations.count))
+		{
+			*past = TRUE;
+			*landed = index;
+			return;
+		}
+		index = perm->next_permutation_index;
+	}
+}
+
+static boolean looping_sync_finished(
+	long looping_definition_index,
+	real scale)
+{
+	struct looping_sync *sync = looping_sync_find(looping_definition_index);
+	struct looping_sound_track *track;
+	long total;
+
+	if (!sync || sync->placed)
+		return FALSE;
+	track = looping_sync_track(looping_definition_index);
+	if (!track)
+		return FALSE;
+	total = sound_chain_milliseconds(
+		track->start_sound.index,
+		sync->start_pitch,
+		sync->start_permutation,
+		scale);
+	if (TEST_FLAG(track->flags, _fade_in_at_start_bit))
+	{
+		long loop_ms = sound_chain_milliseconds(
+			track->loop_sound.index,
+			sync->loop_pitch,
+			sync->loop_permutation,
+			scale);
+
+		total = MAX(total, loop_ms);
+	}
+	else
+	{
+		total += sound_chain_milliseconds(
+			track->loop_sound.index,
+			sync->loop_pitch,
+			sync->loop_permutation,
+			scale);
+	}
+	return total > 0 && sync->elapsed_milliseconds >= total;
+}
+
+static void looping_sync_mark(
+	long definition_index)
+{
+	struct looping_sync *sync = looping_sync_find(definition_index);
+
+	if (sync)
+		sync->placed = TRUE;
+}
+
+void sound_looping_choose(
+	long sound_index,
+	real scale,
+	real *pitch,
+	short *permutation)
+{
+	struct sound_definition *definition;
+	struct sound_pitch_range *range;
+	real chosen;
+	real scaled;
+	short range_index;
+
+	if (pitch)
+		*pitch = 0.f;
+	if (permutation)
+		*permutation = NONE;
+	if (sound_index == NONE)
+		return;
+	definition = sound_definition_get(sound_index);
+	if (definition->pitch_ranges.count < 1)
+		return;
+	chosen = real_seed_random_range(
+		get_global_local_random_seed_address(),
+		definition->random_pitch_bounds.lower,
+		definition->random_pitch_bounds.upper);
+	if (chosen == 0.f)
+		chosen = 1.f;
+	if (pitch)
+		*pitch = chosen;
+	scaled = sound_scale_value(
+		chosen,
+		definition->zero_pitch_modifier,
+		definition->one_pitch_modifier,
+		scale);
+	range_index = sound_definition_find_pitch_range_by_pitch(definition, scaled, NONE);
+	if (!VALID_INDEX(range_index, definition->pitch_ranges.count))
+		return;
+	range = TAG_BLOCK_GET_ELEMENT(
+		&definition->pitch_ranges,
+		range_index,
+		struct sound_pitch_range);
+	if (range->actual_permutation_count < 1 || !permutation)
+		return;
+	*permutation = seed_random_range(
+		get_global_local_random_seed_address(),
+		0,
+		range->actual_permutation_count);
+	if (!VALID_INDEX(*permutation, range->permutations.count))
+		*permutation = 0;
+}
+
+void sound_looping_sync_begin(
+	long looping_definition_index,
+	real start_pitch,
+	real loop_pitch,
+	short start_permutation,
+	short loop_permutation,
+	long elapsed_milliseconds)
+{
+	struct looping_sync *sync = looping_sync_find(looping_definition_index);
+	long index;
+
+	if (!sync)
+	{
+		for (index = 0; index < LOOPING_SYNC_COUNT; index++)
+		{
+			if (!looping_syncs[index].used)
+			{
+				sync = &looping_syncs[index];
+				break;
+			}
+		}
+	}
+	if (!sync)
+		return;
+	csmemset(sync, 0, sizeof(*sync));
+	sync->used = TRUE;
+	sync->definition_index = looping_definition_index;
+	sync->start_pitch = start_pitch;
+	sync->loop_pitch = loop_pitch;
+	sync->start_permutation = start_permutation;
+	sync->loop_permutation = loop_permutation;
+	sync->elapsed_milliseconds = elapsed_milliseconds < 0 ? 0 : elapsed_milliseconds;
+	sync->queue_sound[0] = NONE;
+	sync->queue_sound[1] = NONE;
+	sync->queue_permutation[0] = NONE;
+	sync->queue_permutation[1] = NONE;
+}
+
+void sound_looping_sync_end(
+	long looping_definition_index)
+{
+	struct looping_sync *sync = looping_sync_find(looping_definition_index);
+
+	if (sync)
+		sync->used = FALSE;
+}
+
+void sound_looping_sync_reset(
+	void)
+{
+	csmemset(looping_syncs, 0, sizeof(looping_syncs));
+}
+
 static boolean sound_set_definition_end(
 	long sound_index)
 {
 	struct sound_datum *sound = sound_get(sound_index);
 	struct sound_definition *definition =
 		sound_definition_get(sound->next_definition_index);
+	struct looping_sync *sync = NULL;
+	struct looping_sound_datum *looping;
 
 	SET_FLAG(sound->flags, _sound_waiting_for_cache_bit, TRUE);
 	sound->definition_index = sound->next_definition_index;
 	sound->next_definition_index = NONE;
+	/* port: the loop that follows a start plays the pitch and permutation the
+	host chose, the same ones the other machines play */
+	if (sound->type == _sound_start_track)
+	{
+		looping = datum_try_and_get(looping_sound_data, sound->source_identifier);
+		if (looping)
+			sync = looping_sync_find(looping->definition_index);
+		if (sync && sync->loop_pitch != 0.f)
+			sound->pitch = sync->loop_pitch;
+	}
 	sound->pitch_range_index = sound_definition_find_pitch_range_by_pitch(
 		definition,
 		sound->pitch,
 		sound->pitch_range_index);
+	if (sync &&
+		sync->loop_permutation != NONE &&
+		VALID_INDEX(sound->pitch_range_index, definition->pitch_ranges.count))
+	{
+		struct sound_pitch_range *range = TAG_BLOCK_GET_ELEMENT(
+			&definition->pitch_ranges,
+			sound->pitch_range_index,
+			struct sound_pitch_range);
+
+		if (VALID_INDEX(sync->loop_permutation, range->permutations.count))
+			range->forced_permutation_index = sync->loop_permutation;
+	}
 	sound->permutation_index = sound_definition_next_permutation(
 		definition,
 		sound->pitch_range_index,
@@ -1591,6 +2049,24 @@ static long update_potentially_audible_looping_sound(
 		looping_sound_get(looping_sound_index);
 	real scale = looping_sound->source.scale;
 
+	/* port: the start has already finished, so this machine begins on the loop */
+	if (track_index == 0 && type == _sound_start_track)
+	{
+		struct looping_sync *sync = looping_sync_find(looping_sound->definition_index);
+		long start_ms;
+
+		if (sync && !sync->placed)
+		{
+			start_ms = sound_chain_milliseconds(
+				definition_index,
+				sync->start_pitch,
+				sync->start_permutation,
+				scale);
+			if (start_ms > 0 && sync->elapsed_milliseconds >= start_ms)
+				return NONE;
+		}
+	}
+
 	if (sound_definition_is_playable(definition_index))
 	{
 		struct sound_definition *definition =
@@ -1632,19 +2108,98 @@ static long update_potentially_audible_looping_sound(
 				sound->fade_stop_time = 0;
 				sound->fade_start_time = 0;
 				sound->next_definition_index = NONE;
-				sound->pitch_range_index =
-					sound_definition_find_pitch_range_by_pitch(
+				/* port: play the host's pitch and permutation, from where the
+				sound had already reached */
+				{
+					struct looping_sync *sync = track_index == 0 ?
+						looping_sync_find(looping_sound->definition_index) : NULL;
+					short forced_permutation = NONE;
+					long seek_bytes = 0;
+
+					if (sync && !sync->placed)
+					{
+						struct looping_sound_track *track =
+							looping_sync_track(looping_sound->definition_index);
+						real part_pitch = 0.f;
+						short part_permutation = NONE;
+						long into = sync->elapsed_milliseconds;
+						boolean past = FALSE;
+
+						if (type == _sound_start_track)
+						{
+							part_pitch = sync->start_pitch;
+							part_permutation = sync->start_permutation;
+						}
+						else if (type == _sound_loop_track)
+						{
+							part_pitch = sync->loop_pitch;
+							part_permutation = sync->loop_permutation;
+							if (track &&
+								track->start_sound.index != NONE &&
+								!TEST_FLAG(track->flags, _fade_in_at_start_bit))
+							{
+								long start_ms = sound_chain_milliseconds(
+									track->start_sound.index,
+									sync->start_pitch,
+									sync->start_permutation,
+									scale);
+
+								if (into > start_ms)
+									into -= start_ms;
+								else
+									into = 0;
+							}
+						}
+						if (part_pitch != 0.f)
+							sound->pitch = part_pitch;
+						if (part_permutation != NONE)
+						{
+							sound_chain_seek(
+								definition_index,
+								sound->pitch,
+								part_permutation,
+								scale,
+								into,
+								&forced_permutation,
+								&seek_bytes,
+								&past);
+							if (past)
+								forced_permutation = part_permutation;
+						}
+					}
+					sound->pitch_range_index =
+						sound_definition_find_pitch_range_by_pitch(
+							definition,
+							sound_scale_value(
+								sound->pitch,
+								definition->zero_pitch_modifier,
+								definition->one_pitch_modifier,
+								scale),
+							NONE);
+					if (forced_permutation != NONE &&
+						VALID_INDEX(sound->pitch_range_index, definition->pitch_ranges.count))
+					{
+						struct sound_pitch_range *range = TAG_BLOCK_GET_ELEMENT(
+							&definition->pitch_ranges,
+							sound->pitch_range_index,
+							struct sound_pitch_range);
+
+						if (VALID_INDEX(forced_permutation, range->permutations.count))
+							range->forced_permutation_index = forced_permutation;
+					}
+					sound->permutation_index = sound_definition_next_permutation(
 						definition,
-						sound_scale_value(
-							sound->pitch,
-							definition->zero_pitch_modifier,
-							definition->one_pitch_modifier,
-							scale),
+						sound->pitch_range_index,
 						NONE);
-				sound->permutation_index = sound_definition_next_permutation(
-					definition,
-					sound->pitch_range_index,
-					NONE);
+					if (sync && !sync->placed && seek_bytes > 0)
+					{
+						int slot = type == _sound_start_track ? 0 : 1;
+
+						sync->queue_sound[slot] = definition_index;
+						sync->queue_permutation[slot] = sound->permutation_index;
+						sync->queue_offset[slot] = seek_bytes;
+					}
+				}
 				_sound_cache_sound_request(
 					sound_permutation_get(
 						sound->definition_index,
@@ -2668,11 +3223,21 @@ boolean sound_refresh_looping(
 			loop->source = *source;
 			loop->flip_flop = sound_manager_globals.flip_flop;
 
+			/* port: a machine that joined after this play-once sound had
+			finished does not play it */
+			if (new_looping_sound &&
+				looping_sync_finished(definition_index, source->scale))
+			{
+				loop->ordered_sounds_finished = TRUE;
+			}
+
 			if ((refresh_state == _looping_sound_refresh_stop ||
 				loop->ordered_sounds_finished) &&
 				loop->component_sound_count == 0)
 			{
 				datum_delete(looping_sound_data, looping_sound_index);
+				if (new_looping_sound)
+					looping_sync_mark(definition_index);
 			}
 			else
 			{
@@ -2887,6 +3452,8 @@ boolean sound_refresh_looping(
 					datum_delete(looping_sound_data, looping_sound_index);
 				}
 
+				if (new_looping_sound)
+					looping_sync_mark(definition_index);
 				loop->alternate = alternate;
 				loop->state = refresh_state;
 			}
@@ -2952,6 +3519,9 @@ static void update_channel_for_looping_sound(
 	if (sound->playing_channel_index == NONE)
 	{
 		struct sound_permutation *permutation;
+		struct looping_sound_datum *looping;
+		struct looping_sync *sync;
+		int slot;
 
 		pitch_range = TAG_BLOCK_GET_ELEMENT(
 			&definition->pitch_ranges,
@@ -2969,6 +3539,22 @@ static void update_channel_for_looping_sound(
 			0x9DA,
 			sound_cache_sound_loaded(permutation));
 		channel_set_properties_hardware(channel_index, &properties, FALSE);
+		looping = datum_try_and_get(looping_sound_data, sound->source_identifier);
+		sync = looping ? looping_sync_find(looping->definition_index) : NULL;
+		if (sync)
+		{
+			for (slot = 0; slot < 2; slot++)
+			{
+				if (sync->queue_offset[slot] > 0 &&
+					sync->queue_sound[slot] == sound->definition_index &&
+					sync->queue_permutation[slot] == sound->permutation_index)
+				{
+					dsound_queue_from_offset(sync->queue_offset[slot]);
+					sync->queue_offset[slot] = 0;
+					break;
+				}
+			}
+		}
 		channel_queue_sound(channel_index, permutation);
 		sound->playing_channel_index = channel_index;
 	}
