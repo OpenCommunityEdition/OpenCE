@@ -1418,7 +1418,12 @@ static void glow_update(
 		rotation_per_unit_t = effect_rotational_velocity / effect_translational_velocity;
 	}
 
-	glow->accumulated_trailing_particle_generation_ticks += (short)game_time_get();
+	/* port: the ticks since the last frame (game_time_get_elapsed), not the
+	game's whole time (game_time_get), which made a glow with trailing
+	particles (no stock map's glow has them; a Custom Edition map's can)
+	make them up to the limit of glow particles and age each past its
+	lifetime by the next frame */
+	glow->accumulated_trailing_particle_generation_ticks += game_time_get_elapsed();
 
 	if (glow->number_of_markers > 1)
 	{
@@ -1442,7 +1447,7 @@ static void glow_update(
 	{
 		if (TEST_FLAG(particle->flags, _glow_particle_trailing_bit))
 		{
-			particle->ticks_in_existence += (short)game_time_get();
+			particle->ticks_in_existence += game_time_get_elapsed(); /* port: as above */
 			glow_trailing_particle_update_color(glow, particle);
 			glow_trailing_particle_update_size(glow, particle);
 			glow_trailing_particle_update_velocity(glow, particle);
