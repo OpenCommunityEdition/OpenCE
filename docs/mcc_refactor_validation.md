@@ -608,7 +608,8 @@ Descent Quarantine `2963835242/firefight_descent_quarantine_mcc`. None contained
 shared roots or placement blocks within the inspected HUD graph. The inventory
 did not compare scalar addresses against every non-HUD allocation. These maps
 are unchanged-behavior controls, not claimed reproductions of the
-ownership bug. BioHalo was not installed and was not runtime-tested.
+ownership bug. BioHalo was not found in the inspected `C:\Steam` library and
+was not runtime-tested.
 
 The inventory contains 487 component HUDs, including 92 unit HUDs: 71 recognized
 and 21 unrecognized unit layouts. All eleven existing unit profiles were
@@ -668,5 +669,117 @@ The Windows release build passed with unchanged
 `--portable --release --pgo=off --lto=off` options and the existing Expat import
 warnings. Its executable SHA-256 is
 `3e563cd2291cb72196350e68dac471f6f5b96799164177f4ecf9309dd647893a`.
-Paired runtime comparisons, final cleanup and remote platform checks are
-recorded below when complete; these local results alone do not establish them.
+
+Private Windows release probes compare the Stage 4 HUD module with the final
+Stage 5 HUD module. Their 999 other link inputs match exactly, including the
+old metadata object; the separate 56-case metadata proof and final
+uninstrumented build cover that trim. Probe includes are copied privately and
+hashed. The observer runs only after successful HUD conversion, reads without
+allocating or mutating game state, and records selected normalized HUD fields
+in a stable order rather than addresses or all tag data. Its comparator checks record framing, per-tag/aggregate
+digests, inventory coverage, executable identity, runtime settings, capture
+dimensions and all native smoke failure patterns across four log sinks.
+
+All ten pairs match every recorded normalized field and stable summary:
+
+| Workshop map | Records | Placements | Added arena bytes |
+| --- | ---: | ---: | ---: |
+| Ruby `2915693904/a10` | 847 | 180 | 6,832 |
+| Ruby `2915693904/b40` | 909 | 228 | 7,504 |
+| Ruby `2915693904/d40` | 1,019 | 221 | 7,616 |
+| Cursed `2962107814/a10` | 1,273 | 325 | 16,128 |
+| Quarantine `2963835242/firefight_descent_quarantine_mcc` | 983 | 169 | 7,520 |
+| Spasm `3003419983/spasm_playground` | 1,188 | 508 | 22,768 |
+| Mercury `3021510694/mercury2` | 1,425 | 324 | 12,992 |
+| Mercury `3021510694/mercury_falling` | 1,003 | 204 | 7,152 |
+| Descent `3042265379/firefight_descent_mcc` | 1,593 | 340 | 13,664 |
+| Tiny Halo `3675162225/halo` | 730 | 149 | 6,128 |
+
+Together these cover 10,970 records and 2,648 placements. The 108,304-byte
+arena increase includes scalar-copy alignment. These are allocation sizes,
+not measured peak-memory or loading-time improvements. All twenty hidden
+processes advanced through a delayed 150-tick console expression, captured a
+subsequent frame through the real NVIDIA renderer and exited normally.
+Before/after captures were visually inspected; most short runs show opening
+cinematics, Spasm shows gameplay, and Descent's short capture is still black.
+They are not synchronized pixel-equivalence tests or complete HUD gameplay
+qualification.
+
+Nine map pairs pass the full diagnostic scan. Quarantine has the same
+pre-existing refusal in both builds:
+`mcc: script validation refused life_lost_0 (ai_deselect); 1 scripts won't run, 0 globals start at their defaults`.
+Its normalized-output comparison passes, but its runtime is explicitly
+script-limited, not a clean smoke pass. The comparator requires the exact
+diagnostic and occurrence list to match and rejects additional failures.
+This unrelated script-compatibility gap was not changed or hidden.
+
+The final uninstrumented release and preserved baseline each passed the same
+one-process sequence: Mercury Falling with its package resources, Xbox Blood
+Gulch, CE Death Island, the deliberately invalid MCC tag-index fixture, then
+Ruby's `a10`. Every valid phase required a fresh tick epoch, delayed console
+output and a subsequent rendered capture. Both processes exited normally.
+This verifies the named family transitions and early failed-load recovery;
+synthetic allocation failures cover later conversion cleanup separately.
+
+Both builds also ran Ruby's `b40` at 640-by-480 with High-Res HUD enabled and
+1280-by-720 with it disabled, and Descent at 1280-by-720 with it enabled. Each
+completed a console expression after 1,800 simulation ticks and captured later
+gameplay, including the HUD, weapon and environment. Visual review found the
+expected placement, scale and custom layout preserved. Timing-dependent
+animation, camera and flashing meter differences are not pixel comparisons.
+The eight paired uninstrumented runs and one exploratory baseline Descent run
+passed an independent full diagnostic scan, executable/settings checks and
+capture/simulation checks. Only the exact requested invalid-map refusal is
+allowed in transition logs.
+
+No original map files, network fields, simulation logic or map-family boundaries
+changed. Network version 41 and the deferred boat behavior remain intact.
+These results do not establish full-campaign, save/revert, multiplayer gameplay,
+local split-screen, Android-device or browser-map compatibility. Existing
+asset-free layout checks cover split-screen geometry; no new live split-screen
+session was run.
+
+The [MCC workflow](https://github.com/chestahh/GulchCE/actions/runs/42385944116)
+passed all three jobs at implementation revision
+`809f8b8cdb9ba3dd9e5727cc261e8f3043eba931`. Linux readers/validators passed
+1,747 checks with sixteen skips, followed by 38 passing ASan/UBSan preview
+checks. Windows adapters passed 1,948 checks with seventeen skips across their
+invocations. The Xvfb/Mesa job passed all 36 MCC meter renders.
+
+The corresponding [Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42385944018)
+passed all four debug platform builds. The main-only release job was skipped;
+the local Windows release result is recorded above. Linux's main invocation
+passed 2,478 checks with 27 skips, twelve expected failures and seven passing
+subtests; its pytest invocations totalled 2,794 passes and 52 skips, with the
+same expected failures and subtests. Ordinary and full-LTO ELF light-storage
+checks passed. Windows COFF light-storage and corruption-negative checks
+passed. Android built the guest/host and debug APK and passed touch, gyro and
+MCC importer checks. Web passed its page/browser checks and native
+Chromium/Firefox WebRTC assertions, including configured packet loss. These
+transport checks do not constitute map-based multiplayer qualification.
+
+All six original Xbox/CE fixture files and their copies, ten Workshop maps,
+Mercury bitmap/sound resources and the installed shared singleplayer bitmap
+resource were rehashed and unchanged. Thirty sequential process attempts
+included the one diagnosed allocator crash and 29 normal exits; generated
+map caches were removed after every attempt, totalling 23,026,728,960 bytes.
+The 375 inactive save/support/capture files, including the failed attempt's
+useful evidence, totalled 942,965,724 bytes. They were archived losslessly to
+`build/stage5/inactive-runtime-evidence.zip` (66,518,323 bytes). Every archive
+member was hash-verified before loose copies were removed; the adjacent
+manifest records original paths and hashes.
+
+Verified disposable fixture copies, pytest outputs and private probe binaries,
+objects and debug symbols were removed without following links. About 108 MB
+remains under `build/stage5`, primarily the 66.5 MB archive, 27 MB preserved
+baseline build, inventories and diagnostic evidence. The final release build
+remains usable under `build/windows`. No disposable map copies, generated game
+caches or temporary test/probe binaries remain under this stage.
+
+Final evidence review checked the combined implementation, preserved caller
+boundaries, ownership/failure paths, tests, CI and documentation. It corrected
+the allocator-contract gap, removed the demonstrated redundant work, and found
+no further justified structural change within this stage. Local links, named
+symbols, Python syntax and whitespace checks passed. This documentation-only
+completion records results for the implementation revision above; it changes
+no production code or tests.
