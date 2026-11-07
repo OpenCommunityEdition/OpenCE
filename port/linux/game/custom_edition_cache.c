@@ -917,10 +917,13 @@ static struct
 {
 	char name[MAP_PATH_SIZE];
 	boolean mcc;
+	boolean imported_mcc;
 	unsigned long looked_at;
 } mcc_level_lookup;
 
-boolean mcc_source_level_name(
+/* the lookup of the game's own level `level_name` (FALSE for none, or a
+Custom Edition map's) */
+static boolean mcc_level_look_up(
 	char const *level_name)
 {
 	char const *name;
@@ -937,23 +940,42 @@ boolean mcc_source_level_name(
 	if (mcc_level_lookup.looked_at && now - mcc_level_lookup.looked_at < 1000 &&
 		!csstrcasecmp(mcc_level_lookup.name, name))
 	{
-		return mcc_level_lookup.mcc;
+		return TRUE;
 	}
 	if (csstrlen(name) >= MAP_PATH_SIZE)
 	{
 		return FALSE;
 	}
 	mcc_level_lookup.mcc = FALSE;
+	mcc_level_lookup.imported_mcc = FALSE;
 	if (mcc_map_path(level_name, path) && (file = fopen(path, "rb")) != NULL)
 	{
-		mcc_level_lookup.mcc = fread(header, 1, sizeof(header), file) == sizeof(header) &&
-			cache_file_header_format(header) == _cache_file_format_mcc_cache;
+		if (fread(header, 1, sizeof(header), file) == sizeof(header))
+		{
+			unsigned long mark;
+
+			csmemcpy(&mark, header + MCC_IMPORTED_MAP_MARK_OFFSET, sizeof(mark));
+			mcc_level_lookup.mcc = cache_file_header_format(header) == _cache_file_format_mcc_cache;
+			mcc_level_lookup.imported_mcc = !mcc_level_lookup.mcc && mark == MCC_MAP_VERSION;
+		}
 		fclose(file);
 	}
 	strcpy(mcc_level_lookup.name, name);
 	mcc_level_lookup.looked_at = now;
 
-	return mcc_level_lookup.mcc;
+	return TRUE;
+}
+
+boolean mcc_source_level_name(
+	char const *level_name)
+{
+	return mcc_level_look_up(level_name) && mcc_level_lookup.mcc;
+}
+
+boolean mcc_imported_level_name(
+	char const *level_name)
+{
+	return mcc_level_look_up(level_name) && mcc_level_lookup.imported_mcc;
 }
 
 unsigned long mcc_map_version(

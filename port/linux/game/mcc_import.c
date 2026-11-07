@@ -61,6 +61,7 @@ enum
 	V5_SCENARIO_STRUCTURE_BSPS_OFFSET = 0x5A4,
 	V5_SCENARIO_TYPE_OFFSET = 0x3C,
 	V5_BITMAP_CACHED_BIT = 7,
+	MCC_IMPORT_MAXIMUM_BSPS = 32,
 	/* the scenario's script syntax data: a data array of nodes */
 	V5_SCENARIO_SCRIPT_SYNTAX_DATA_OFFSET = 0x474,
 	V5_SCRIPT_NODE_COUNT_OFFSET = 0x2E,
@@ -208,6 +209,11 @@ static struct
 	long placeholders;
 	/* loaded tags kept after the disc's (mcc_import_keep) */
 	long kept;
+	/* the disc's tags, the first of those written */
+	long disc_count;
+	/* the structure BSPs written (for the fingerprint) */
+	struct mcc_fingerprint_bsp bsps[MCC_IMPORT_MAXIMUM_BSPS];
+	long bsp_count;
 	char *out_names_text;
 } mcc_import_globals;
 
@@ -488,6 +494,7 @@ static boolean mcc_import_order(
 	for (index = 0; order && order[index]; index++)
 		count += order[index] == '|';
 	mcc_import_globals.out_count = count;
+	mcc_import_globals.disc_count = count;
 	/* (room for the loaded tags kept after the disc's: mcc_import_keep) */
 	mcc_import_globals.out_sources = mcc_import_calloc((size_t)(count + mcc_import_globals.tag_count), sizeof(long));
 	mcc_import_globals.out_groups = mcc_import_calloc((size_t)(count + mcc_import_globals.tag_count), sizeof(unsigned long));
@@ -967,7 +974,17 @@ static boolean mcc_import_structure_bsp(
 		{
 			mcc_import_error("mcc import: structure bsp %d does not fit its measure", bsp_index);
 		}
-		mcc_import_free(space.bytes);
+		/* (kept for the fingerprint, made once the tags are written) */
+		if (success && bsp_index < MCC_IMPORT_MAXIMUM_BSPS)
+		{
+			mcc_import_globals.bsps[bsp_index].address = address;
+			mcc_import_globals.bsps[bsp_index].bytes = space.bytes;
+			mcc_import_globals.bsps[bsp_index].size = size;
+			if (bsp_index >= mcc_import_globals.bsp_count)
+				mcc_import_globals.bsp_count = bsp_index + 1;
+		}
+		else
+			mcc_import_free(space.bytes);
 	}
 	custom_edition_structure_bsp_unload();
 
@@ -1312,6 +1329,94 @@ static boolean mcc_import_tags(
 	return success && !space->overflowed;
 }
 
+/* ---------- private code: the fingerprint */
+
+/* Whether the written map is the disc's: its fingerprint
+(mcc_import_fingerprint.c) the disc map's, every part of it, from
+d:\mcc_patches\<map>.fp (the disc's maps', made by the prototype's
+sim_fingerprint). Without that file it cannot be shown. Logs the parts that
+differ. */
+static boolean mcc_import_stock(
+	char const *map_name,
+	struct mcc_import_space const *tags)
+{
+	char const *lines = mcc_import_fingerprint(tags->bytes, tags->used, mcc_import_globals.disc_count,
+		mcc_import_globals.bsps, mcc_import_globals.bsp_count);
+	char path[256];
+	char *expected = NULL;
+	char const *line;
+	FILE *file;
+	long differing = 0, parts = 0;
+
+	snprintf(path, sizeof(path), "d:\\mcc_patches\\%s.fp", map_name);
+	file = fopen(path, "rb");
+	if (file)
+	{
+		long size;
+
+		fseek(file, 0, SEEK_END);
+		size = ftell(file);
+		fseek(file, 0, SEEK_SET);
+		/* (a newline before the first line, so that every line is found
+		between two) */
+		expected = size > 0 ? mcc_import_calloc((size_t)size + 3, 1) : NULL;
+		if (expected && fread(expected + 1, 1, (size_t)size, file) != (size_t)size)
+		{
+			mcc_import_free(expected);
+			expected = NULL;
+		}
+		if (expected)
+		{
+			long from, to = 1;
+
+			expected[0] = '\n';
+			/* (without carriage returns: a file written on Windows has them) */
+			for (from = 1; from <= size; from++)
+			{
+				if (expected[from] != '\r')
+					expected[to++] = expected[from];
+			}
+			expected[to] = '\n';
+			expected[to + 1] = 0;
+		}
+		fclose(file);
+	}
+	if (!expected)
+	{
+		mcc_import_error("mcc import: %s: no fingerprint of the disc's map (%s): an MCC map", map_name, path);
+		return FALSE;
+	}
+	for (line = lines; *line; )
+	{
+		char const *end = strchr(line, '\n');
+		unsigned long length = end ? (unsigned long)(end - line) : 0;
+		char key[700];
+
+		if (!end)
+			break;
+		if (length + 3 < sizeof(key))
+		{
+			key[0] = '\n';
+			csmemcpy(key + 1, line, length);
+			key[length + 1] = '\n';
+			key[length + 2] = 0;
+			parts++;
+			if (!strstr(expected, key))
+			{
+				if (differing < 12)
+					fprintf(stderr, "mcc import: %s: differs from the disc's: %.*s\n", map_name, (int)length, line);
+				differing++;
+			}
+		}
+		line = end + 1;
+	}
+	mcc_import_free(expected);
+	fprintf(stdout, "mcc import: %s: %ld of %ld parts of the fingerprint differ from the disc's: %s\n", map_name,
+		differing, parts, differing || !parts ? "an MCC map (MCC's version)" : "the disc's map");
+
+	return parts && !differing;
+}
+
 /* ---------- private code: a map */
 
 static boolean mcc_import_map(
@@ -1330,6 +1435,7 @@ static boolean mcc_import_map(
 	short bsp_index;
 	short scenario_type;
 	boolean success = FALSE;
+	boolean stock = FALSE;
 
 	csmemset(&mcc_import_globals, 0, sizeof(mcc_import_globals));
 	loaded = (struct mcc_import_tag_header *)custom_edition_cache_tags_load(map_name, loaded_header);
@@ -1403,13 +1509,25 @@ static boolean mcc_import_map(
 		mcc_import_body_align(body, 0x800);
 		success = mcc_import_structure_bsp(body, reference, bsp_index);
 	}
+	if (getenv("HALO_MCC_IMPORT_TRACE"))
+		fprintf(stderr, "mcc import: %s: bitmaps (%d)\n", map_name, (int)success);
 	success = success && mcc_import_bitmaps(body);
+	if (getenv("HALO_MCC_IMPORT_TRACE"))
+		fprintf(stderr, "mcc import: %s: tags (%d)\n", map_name, (int)success);
 	success = success && mcc_import_tags(&tags, loaded, instances_address);
+	if (getenv("HALO_MCC_IMPORT_TRACE"))
+		fprintf(stderr, "mcc import: %s: checks (%d)\n", map_name, (int)success);
 	if (success && !tag_validate_tags(tags.bytes, (long)tags.used, 0x7FFFFFFF, map_name))
 	{
 		/* (written all the same for now: the game checks them again as it
 		loads the map, with its log open to say why) */
 		fprintf(stderr, "mcc import: %s: the written tags are refused (the game says why as it loads them)\n", map_name);
+	}
+	if (success)
+	{
+		if (getenv("HALO_MCC_IMPORT_TRACE"))
+			fprintf(stderr, "mcc import: %s: fingerprint\n", map_name);
+		stock = mcc_import_stock(map_name, &tags);
 	}
 	if (success)
 	{
@@ -1431,6 +1549,14 @@ static boolean mcc_import_map(
 		header.scenario_type = scenario_type;
 		header.checksum = body->crc;
 		header.footer_signature = 'foot';
+		/* a map not shown to be the disc's plays on MCC's version
+		(mcc_imported_level_name) */
+		if (!stock)
+		{
+			unsigned long mark = MCC_MAP_VERSION;
+
+			csmemcpy(header.reserved68 + (MCC_IMPORTED_MAP_MARK_OFFSET - 0x68), &mark, sizeof(mark));
+		}
 		{
 			/* the deflated body padded to 0x800, as the disc's maps are */
 			static byte const zeros[0x800];
@@ -1456,6 +1582,8 @@ static boolean mcc_import_map(
 	mcc_import_free(mcc_import_globals.old_to_new);
 	mcc_import_free(mcc_import_globals.out_names_text);
 	mcc_import_free(mcc_import_globals.table.instances);
+	for (bsp_index = 0; bsp_index < mcc_import_globals.bsp_count; bsp_index++)
+		mcc_import_free(mcc_import_globals.bsps[bsp_index].bytes);
 	mcc_import_operations_dispose();
 	custom_edition_cache_tags_unload();
 	if (!success)

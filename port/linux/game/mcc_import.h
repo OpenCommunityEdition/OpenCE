@@ -34,6 +34,14 @@ struct mcc_import_tags
 	long scenario_index;
 };
 
+/* a structure BSP as the import wrote it: its bytes, loaded at address */
+struct mcc_fingerprint_bsp
+{
+	unsigned long address;
+	unsigned char *bytes;
+	unsigned long size;
+};
+
 /* ---------- prototypes/MCC_IMPORT.C */
 
 int mcc_import_run(
@@ -70,5 +78,19 @@ void mcc_import_models_complete(
 /* Releases the operations and what they made. */
 void mcc_import_operations_dispose(
 	void);
+
+/* ---------- prototypes/MCC_IMPORT_FINGERPRINT.C */
+
+/* The fingerprint of the map whose tags are at tag_data (as an Xbox map's,
+at 0x803A6000), the disc's being its first disc_tag_count tags, and whose
+structure BSPs are bsps (in the scenario's order): its lines, one per part,
+the last the whole map's ("MAP\t<scenario>\t<hash>"). Valid until the next
+call. */
+char const *mcc_import_fingerprint(
+	void *tag_data,
+	unsigned long tag_data_size,
+	long disc_tag_count,
+	struct mcc_fingerprint_bsp const *bsps,
+	long bsp_count);
 
 #endif // __MCC_IMPORT_H

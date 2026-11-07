@@ -88,6 +88,14 @@ whose multiplayer maps (seven of them rebuilt for Halo PC) differ. */
 #define MCC_MAP_VERSION 0x4D434331UL
 unsigned long mcc_map_version(
 	void);
+/* Whether the game's own level `level_name` names is, in its maps folder, an
+MCC map the import wrote as an Xbox map but could not show to be the disc's
+(port/linux/game/mcc_import.c): its header holds MCC_MAP_VERSION at
+MCC_IMPORTED_MAP_MARK_OFFSET, in the area the disc's maps leave zero. It
+loads as the disc's maps do, and plays on MCC's version. */
+#define MCC_IMPORTED_MAP_MARK_OFFSET 0x68
+boolean mcc_imported_level_name(
+	char const *level_name);
 /* Whether the map loaded is an MCC map (its HUD's digits are drawn at half
 the size others' are: hud_draw.c) */
 boolean mcc_cache_loaded(

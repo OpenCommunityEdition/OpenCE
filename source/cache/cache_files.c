@@ -1108,7 +1108,9 @@ unsigned long cache_files_map_version(
 	if (custom_edition_level_name(map_name))
 		return custom_edition_map_version(map_name);
 
-	return mcc_source_level_name(map_name) ? mcc_map_version() : 0;
+	/* port: and an MCC map imported as an Xbox map but not the disc's (its
+	header's mark: port/linux/game/mcc_import.c) */
+	return mcc_source_level_name(map_name) || mcc_imported_level_name(map_name) ? mcc_map_version() : 0;
 }
 
 /* port: whether this machine has the map a network game is on (a client
