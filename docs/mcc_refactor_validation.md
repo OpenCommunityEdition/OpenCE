@@ -375,5 +375,46 @@ load recovery before resource allocation, not every possible allocation failure.
 These runs establish the named transitions and bounded rendering/simulation,
 not campaign completion or new multiplayer, save/revert or device compatibility.
 
-Cross-platform CI results and final cleanup are recorded after the pushed
-implementation has completed its own workflows.
+An additional 45-second hidden Tiny Halo run (`3675162225/halo`) passed the
+loaded-map, delayed simulation marker, diagnostic and normal-exit checks. Its
+log explicitly selects `mcc_maps/_shared/singleplayer/bitmaps.map`, covering
+the installed shared-resource path separately from Mercury's package resources
+and Ruby's recovery run.
+
+Input verification rehashed all six original Xbox/CE fixture files and their
+copies, the three exercised Workshop maps, Mercury's bitmap/sound resources
+and the installed shared singleplayer bitmap resource; all hashes matched.
+The three game runs removed 2,302,672,896 bytes of generated map caches.
+Temporary test binaries, fixture directories and asset copies were removed.
+The 107 inactive save/support/capture files (98,548,658 bytes) were archived
+losslessly to `build/stage3/inactive-runtime-evidence.zip` (7,455,474 bytes).
+Every member was hash-verified before removing its loose copy; the adjacent
+JSON manifest records original paths, sizes and hashes. The baseline executable
+and SDL DLL (about 27 MB) remain for later refactor comparisons, alongside the
+current Windows build, test environment and diagnostic evidence.
+
+The [MCC workflow at `829ef117b`](https://github.com/chestahh/GulchCE/actions/runs/42377561461)
+passed all three jobs. Its Linux reader/validator selection passed 1,652 checks
+with sixteen skips, followed by 38 passing ASan/UBSan checks; the Windows job
+passed 1,853 checks with seventeen skips across its invocations. The direct
+Xvfb/Mesa job passed all 36 MCC meter renders.
+
+In the corresponding [Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42377561452),
+all four debug platform builds passed. Branch builds do not run the main-only
+release job; the local Windows release build is recorded above. Android built
+its guest/host and APK and passed touch, gyro and importer checks. Web passed
+its JS/browser and native transport assertions for Chromium and Firefox, including configured packet
+loss. These remain asset-free transport checks, not multiplayer gameplay
+qualification. Linux's combined invocation passed 2,478 checks with 27 skips,
+twelve expected failures and seven passing subtests. Across its pytest
+invocations it recorded 2,794 passes, 52 skips and the same twelve expected
+failures; ordinary and full-LTO ELF light-storage checks also passed. The
+expected failures remain the deliberately deferred Stage 2 boat defect.
+
+Both workflows validated implementation revision
+`829ef117b945152dcffd61d9bba9994efcec5b66`. The following documentation-only
+commit records their completed results and cleanup. Final documentation review
+checked the claims against logs and archive metadata; local-link, named-symbol,
+Python-syntax and whitespace checks passed. Roughly 36 MB remains under
+`build/stage3`, including the 27 MB baseline build and 7.5 MB verified archive.
+No disposable map copies, game caches or temporary test binaries remain there.
