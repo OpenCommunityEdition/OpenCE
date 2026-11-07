@@ -457,7 +457,7 @@ structural correction justified within this stage.
 
 Private Windows release probes were built from Stage 3 revision `53fe6673b`
 and the updated bitmap module, replacing only that translation unit. Their
-other 999 link inputs, configure options and probe framing matched. After
+999 shared response-file inputs, configure options and probe framing matched. After
 successful conversion, the probe hashes every initialized pixel-allocation byte
 and 21 explicitly framed semantic metadata fields for every texture, excluding
 addresses and structure padding. It also records ordered handle groups, total
@@ -499,3 +499,63 @@ stock ammunition cases. The Windows release build succeeded with the unchanged
 `--portable --release --pgo=off --lto=off` configuration and existing Expat import
 warnings. Its executable SHA-256 is
 `2f22adeba256b26843cfb8375c55c26d95535ea47491d172b5aab85874edf52b`.
+
+The uninstrumented baseline and updated release executables each passed the
+same one-process sequence: Mercury Falling with package resources, Xbox Blood
+Gulch, CE Death Island, the intentionally invalid MCC tag-index fixture, then
+Ruby's `a10`. Every valid map required a fresh tick epoch, delayed console
+marker and rendered capture; both processes exited normally. This confirms
+early failed-load recovery and the named family transitions. The malformed
+fixture does not exercise late allocation failure; the extracted-source
+failure cases cover conversion publication/disposal separately.
+
+Both uninstrumented executables also ran Ruby's `b40` long enough to leave
+the opening cinematic and render the initial gameplay area, including its
+HUD, weapon and environment. Each completed the console marker after 1,800
+simulation ticks, saved a later frame and exited normally. Before/after
+captures were visually reviewed. All eighteen game runs passed the complete
+native smoke diagnostic scan, allowing only the deliberately requested
+`refactor_invalid` refusal in the two transition runs. No protocol version or
+simulation code changed; network version 41 and the deferred boat behavior
+remain intact. These are bounded runtime checks, not full-campaign, new
+multiplayer gameplay, save/revert, Android-device or browser-map qualification.
+
+All six original Xbox/CE fixture files and their copies, the eight exercised
+Workshop maps, Mercury's bitmap/sound resources and the installed shared
+singleplayer bitmap resource were rehashed and unchanged. Each game run cleaned
+its generated map caches: 13,816,037,376 bytes across eighteen sequential runs.
+The 254 inactive save/support/capture files (516,681,213 bytes) were archived
+losslessly to `build/stage4/inactive-runtime-evidence.zip` (23,450,825 bytes).
+Every member was hash-verified before removing loose copies; the adjacent JSON
+manifest records their original paths. Private probe executables, objects and
+debug symbols, disposable asset copies and pytest fixtures were removed after
+checking containment and rejecting links. The Stage 3 baseline executable/SDL
+pair remains for comparison, alongside the current release build and useful
+logs, reproducible proof sources and archive.
+
+The [MCC workflow](https://github.com/chestahh/GulchCE/actions/runs/42380303410)
+passed all three jobs at implementation revision
+`e670a18926acc4d69e574a6172f4d3e2ddd2bd62`. Linux readers/validators passed 1,663
+checks with sixteen skips, followed by 38 passing ASan/UBSan preview checks.
+Windows adapters passed 1,864 checks with seventeen skips across their
+invocations. The Linux Xvfb/Mesa job passed all 36 MCC meter renders.
+
+The corresponding [Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42380303636)
+passed all four debug platform builds; the main-only release job was skipped.
+The local Windows release result is recorded above. Linux's combined invocation
+passed 2,478 checks with 27 skips, twelve expected failures and seven passing
+subtests. Across its pytest invocations, it recorded 2,794 passes, 52 skips and
+the same expected failures and subtests; ordinary and full-LTO ELF light-storage
+checks passed. Windows COFF light-storage and corruption-negative checks passed.
+Android built its guest/host and APK and passed touch, gyro and MCC importer
+checks. Web passed its JS/browser checks and native Chromium/Firefox transport
+assertions, including configured packet loss. These remain asset-free transport
+tests, not multiplayer gameplay qualification.
+
+Final evidence review checked the combined Stage 4 claims against the retained
+logs, manifests and archive. Local-link, named-symbol, Python-syntax and
+whitespace checks passed. This documentation-only completion records CI for the
+implementation revision above without changing its code or tests. About 60 MB
+remains under `build/stage4`, primarily the 27 MB baseline build, 23.5 MB verified
+archive and diagnostic logs. No disposable map copies, generated game caches
+or temporary test/probe binaries remain there.
