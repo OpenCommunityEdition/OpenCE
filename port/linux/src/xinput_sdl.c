@@ -910,7 +910,9 @@ void test_input_press(unsigned long buttons)
 
 /* debug.test_input "menu:<buttons>": the buttons pressed one a second, from
 the first poll, for testing the menus: a, b, x, y, up, down, left, right,
-start, back, or wait (none), separated by spaces or commas */
+start, back, lthumb, rthumb (the sticks pressed in), or wait (none),
+separated by spaces or commas; a button with ! after it is held for most of
+its second, not tapped (x! swaps a weapon, which takes holding X) */
 static char test_input_menu[512];
 static Uint64 test_input_menu_since;
 
@@ -933,6 +935,8 @@ static void test_input_menu_gamepad(XINPUT_GAMEPAD *pad)
 		{ "right", -1, XINPUT_GAMEPAD_DPAD_RIGHT },
 		{ "start", -1, XINPUT_GAMEPAD_START },
 		{ "back", -1, XINPUT_GAMEPAD_BACK },
+		{ "lthumb", -1, XINPUT_GAMEPAD_LEFT_THUMB },
+		{ "rthumb", -1, XINPUT_GAMEPAD_RIGHT_THUMB },
 	};
 	Uint64 elapsed = SDL_GetTicks() - test_input_menu_since;
 	Uint64 step = elapsed / 1000;
@@ -940,9 +944,6 @@ static void test_input_menu_gamepad(XINPUT_GAMEPAD *pad)
 	size_t length;
 	unsigned int index;
 
-	/* (pressed for the first 150 ms of its second) */
-	if (elapsed % 1000 >= 150)
-		return;
 	for (;;)
 	{
 		token += strspn(token, " ,");
@@ -953,6 +954,17 @@ static void test_input_menu_gamepad(XINPUT_GAMEPAD *pad)
 			break;
 		step--;
 		token += length;
+	}
+	/* (pressed for the first 150 ms of its second, or held for 900) */
+	if (token[length - 1] == '!')
+	{
+		length--;
+		if (elapsed % 1000 >= 900)
+			return;
+	}
+	else if (elapsed % 1000 >= 150)
+	{
+		return;
 	}
 	for (index = 0; index < sizeof(buttons) / sizeof(buttons[0]); index++)
 	{
