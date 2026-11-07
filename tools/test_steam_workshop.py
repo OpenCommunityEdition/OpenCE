@@ -20,8 +20,10 @@ DRIVER = r'''
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+static int test_enabled = -1;
 int config_boolean(const char *name) {
  if(!strcmp(name,"game.mcc_campaigns")) return getenv("TEST_MCC_CAMPAIGNS") != NULL;
+ if(test_enabled >= 0) return test_enabled;
  const char *value=getenv("TEST_WORKSHOP_ENABLED");(void)name;
  return !value || strcmp(value,"0");
 }
@@ -92,6 +94,16 @@ int main(int argc, char **argv)
 		printf("none=%d\n", steam_workshop_package_folder("999", folder, sizeof(folder)));
 		printf("title=%d %s\n", steam_workshop_item_title("222", title, sizeof(title)), title);
 		printf("small=%d\n", steam_workshop_package_folder("111", folder, 8));
+	}
+	else if (argc == 2 && !strcmp(argv[1], "toggle"))
+	{
+		printf("initial=%d\n", steam_workshop_count());
+		test_enabled = 0;
+		printf("disabled=%d\n", steam_workshop_count());
+		printf("stale=%d\n", steam_workshop_map(0) != NULL);
+		test_enabled = 1;
+		printf("enabled=%d\n", steam_workshop_count());
+		printf("rescan=%d\n", steam_workshop_scan());
 	}
 	else if (argc == 3 && !strcmp(argv[1], "linux-roots"))
 	{
@@ -277,8 +289,50 @@ def test_item_too_large_or_too_many_maps(tool, tmp_path):
     path = tmp_path / "ModInfo.json"
     path.write_text(item_json(Padding="x" * (300 * 1024)))
     assert run(tool, "item", path)[0]["ok"] == "0"
-    path.write_text(item_json(GameModContents={"MultiplayerMaps": ["maps\\m%d.json" % n for n in range(65)]}))
+    path.write_text(item_json(GameModContents={"MultiplayerMaps": ["maps\\m%d.json" % n for n in range(1025)]}))
     assert run(tool, "item", path)[0]["ok"] == "0"
+    result = subprocess.run([str(tool), "item", str(path)], capture_output=True, text=True, check=True)
+    assert "Pro Edition" in result.stderr and "1025 entries" in result.stderr and "limit is 1024" in result.stderr
+
+
+@pytest.mark.parametrize("count", [64, 65, 75, 1024])
+def test_item_accepts_collections_up_to_catalog_capacity(tool, tmp_path, count):
+    path = tmp_path / "ModInfo.json"
+    names = [f"multiplayer/{n}.json" for n in range(count)]
+    path.write_text(item_json(GameModContents={"MultiplayerMaps": names}))
+    fields, lists = run(tool, "item", path)
+    assert fields["ok"] == "1" and int(fields["maps"]) == count
+    assert lists["json"] == names
+
+
+@pytest.mark.parametrize("bad", ["../outside.json", "C:/outside.json", "x" * 128, 7])
+def test_large_item_validates_every_path(tool, tmp_path, bad):
+    path = tmp_path / "ModInfo.json"
+    names = [f"maps/{n}.json" for n in range(74)] + [bad]
+    path.write_text(item_json(GameModContents={"MultiplayerMaps": names}))
+    fields, _ = run(tool, "item", path)
+    assert fields["ok"] == "0" and fields["maps"] == "0"
+
+
+@pytest.mark.parametrize("item_id,prefix", [("111", "alpha"), ("987654321", "unrelated")])
+def test_scan_large_collection(tool, tmp_path, item_id, prefix):
+    maps = [(f"{prefix}{n}", f"Authored title {n}") for n in range(75)]
+    make_item(tmp_path, item_id, maps=maps)
+    fields, lists = run(tool, "scan", setting=str(tmp_path))
+    assert fields["count"] == fields["again"] == "75"
+    assert [(parts[2], parts[3]) for parts in (row.split("|") for row in lists["map"])] == maps
+    assert run(tool, "scan", setting=str(tmp_path), enabled=False)[0]["count"] == "0"
+    assert run(tool, "toggle", setting=str(tmp_path))[0] == {
+        "initial": "75", "disabled": "0", "stale": "0", "enabled": "75", "rescan": "75"}
+
+
+def test_scan_keeps_global_catalog_bound(tool, tmp_path):
+    make_item(tmp_path, "111", maps=[(f"first{n}", f"First {n}") for n in range(600)], preview=False)
+    make_item(tmp_path, "222", maps=[(f"second{n}", f"Second {n}") for n in range(600)], preview=False)
+    fields, lists = run(tool, "scan", setting=str(tmp_path))
+    assert fields["count"] == "1024"
+    assert len(lists["map"]) == 1024
+    assert len({tuple(row.split("|")[i] for i in (0, 2)) for row in lists["map"]}) == 1024
 
 
 def test_map_text(tool, tmp_path):

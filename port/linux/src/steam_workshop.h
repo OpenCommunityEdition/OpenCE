@@ -24,7 +24,8 @@ enum
 	STEAM_WORKSHOP_MAXIMUM_MAPS = 1024,
 	/* the largest ModInfo.json or map json read */
 	STEAM_WORKSHOP_MAXIMUM_JSON = 256 * 1024,
-	STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS = 64,
+	/* One multiplayer collection can occupy the whole catalog. */
+	STEAM_WORKSHOP_MAXIMUM_ITEM_MAPS = STEAM_WORKSHOP_MAXIMUM_MAPS,
 	STEAM_WORKSHOP_MAXIMUM_LIBRARIES = 16,
 };
 

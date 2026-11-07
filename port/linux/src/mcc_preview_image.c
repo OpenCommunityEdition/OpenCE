@@ -114,22 +114,25 @@ int mcc_preview_fit(unsigned width, unsigned height, int box_width, int box_heig
 int mcc_preview_image_load(const char *level, int campaign, struct mcc_preview_image *image)
 {
     char root[1024];
-    struct mcc_menu_metadata metadata;
+    struct mcc_menu_metadata *metadata;
     const struct steam_workshop_map_text *selected;
     const char *name;
-    unsigned char *bytes;
+    unsigned char *bytes = NULL;
     int length, valid = 0;
     memset(image,0,sizeof(*image));
     if (!mcc_manifest_package_root(level,root) || !(name = strrchr(level,'\\'))) return 0;
     name++;
-    if (!mcc_menu_metadata_load(root,campaign,&metadata) || !(selected=mcc_menu_metadata_find(&metadata,name))) return 0;
+    metadata = malloc(sizeof(*metadata));
+    if (!metadata) return 0;
+    if (!mcc_menu_metadata_load(root,campaign,metadata) || !(selected=mcc_menu_metadata_find(metadata,name))) goto done;
     bytes = malloc(MCC_PREVIEW_FILE_LIMIT);
-    if (!bytes) return 0;
+    if (!bytes) goto done;
     length = posix_mcc_preview_read(root,selected->large,bytes,MCC_PREVIEW_FILE_LIMIT);
     valid = mcc_preview_png(bytes,(unsigned)length,image);
     if (!valid) {
         length = posix_mcc_preview_read(root,selected->thumbnail,bytes,MCC_PREVIEW_FILE_LIMIT);
         valid = mcc_preview_png(bytes,(unsigned)length,image);
     }
-    free(bytes); return valid;
+done:
+    free(bytes); free(metadata); return valid;
 }
