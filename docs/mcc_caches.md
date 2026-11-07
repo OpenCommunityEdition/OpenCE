@@ -88,12 +88,10 @@ version 13 cache as it takes a Custom Edition one, but for these:
    Custom Edition map's; the digits' bitmap is given the flag, and
    `hud_draw_numbers` halves an MCC map's digits once more.
 10. Its bitmaps' channels are the Xbox's, not Halo PC's: its model shaders'
-    multipurpose maps are not reordered as a Custom Edition map's are
-    (`custom_edition_bitmaps_orders_set`). Its HUD meters keep the fill
-    order in color as the Xbox's do, but their alpha is the shape alone, a
-    flat 225 to 255, where the Xbox's carries the fill order too; the meter
-    reads both, so the color is sampled for alpha as well
-    (`_custom_edition_channels_hud_meter_mcc`).
+    multipurpose maps are not reordered as a Custom Edition map's are, and
+    its HUD meters are taken in the Xbox's order (fill order in color, shape
+    in alpha: `custom_edition_bitmaps_orders_set`), where Halo PC's would be
+    read from alpha (a flat 225 to 255 in MCC's: the bars never emptied).
 
 `port/tools/cache_file_report.c` checks a version 13 cache as far as the move
 of its tags, which needs the game's schemas.

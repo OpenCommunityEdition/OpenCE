@@ -253,14 +253,14 @@ boolean custom_edition_reordered_bitmaps_find(
 	unsigned long loaded_bytes,
 	unsigned long behaviours);
 /* Says whether the map to be loaded keeps its model shaders' multipurpose
-maps in this build's order (custom_edition_reordered_bitmaps_find then finds
-none of them), and whether its HUD meters are MCC's, in the Xbox's order with
-the fill order in color alone (_custom_edition_channels_hud_meter_mcc): an
-MCC map's are both, its bitmaps being the Xbox's, not Halo PC's.
-custom_edition_bitmaps_dispose makes both Halo PC's again. */
+maps, and its HUD meters, in this build's order: custom_edition_reordered_bitmaps_find
+then finds no multipurpose map, and takes its meters for the Xbox's order
+(_custom_edition_channels_hud_meter_xbox). An MCC map's are both: its
+bitmaps are the Xbox's, not Halo PC's. custom_edition_bitmaps_dispose makes
+both Halo PC's again. */
 void custom_edition_bitmaps_orders_set(
 	boolean xbox_multipurpose_maps,
-	boolean mcc_hud_meters);
+	boolean xbox_hud_meters);
 /* As custom_edition_reordered_bitmaps_find, in the loaded map's tags, which
 the validator has checked: for the bitmaps of mods (mod_bitmaps.c), Halo
 PC's on any map. FALSE after logging why it cannot. */

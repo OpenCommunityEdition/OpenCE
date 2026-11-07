@@ -200,11 +200,11 @@ struct custom_edition_bitmaps_globals
 	unsigned long behaviours;
 	long reordered_bitmap_count;
 	long reordered_bitmap_capacity;
-	/* a map whose model shaders' multipurpose maps are in this build's order,
-	not Halo PC's, and whose HUD meters are MCC's (an MCC map's:
+	/* a map whose model shaders' multipurpose maps, and whose HUD meters, are
+	in this build's order, not Halo PC's (an MCC map's:
 	custom_edition_bitmaps_orders_set) */
 	boolean xbox_multipurpose_maps;
-	boolean mcc_hud_meters;
+	boolean xbox_hud_meters;
 };
 
 /* ---------- globals */
@@ -485,7 +485,7 @@ static boolean meter_bitmaps_mark(
 	struct tag_view const *view,
 	struct meter_hud_element_definition const *meter)
 {
-	short order = custom_edition_bitmaps_globals.mcc_hud_meters ? _custom_edition_channels_hud_meter_mcc :
+	short order = custom_edition_bitmaps_globals.xbox_hud_meters ? _custom_edition_channels_hud_meter_xbox :
 		_custom_edition_channels_hud_meter;
 
 	/* Open v1.1 changed this shared weapon sheet to Xbox channel order.
@@ -808,10 +808,10 @@ boolean custom_edition_reordered_bitmaps_find(
 
 void custom_edition_bitmaps_orders_set(
 	boolean xbox_multipurpose_maps,
-	boolean mcc_hud_meters)
+	boolean xbox_hud_meters)
 {
 	custom_edition_bitmaps_globals.xbox_multipurpose_maps = xbox_multipurpose_maps;
-	custom_edition_bitmaps_globals.mcc_hud_meters = mcc_hud_meters;
+	custom_edition_bitmaps_globals.xbox_hud_meters = xbox_hud_meters;
 
 	return;
 }
@@ -856,7 +856,7 @@ void custom_edition_bitmaps_dispose(
 	globals->reordered_bitmap_capacity = 0;
 	globals->behaviours = 0;
 	globals->xbox_multipurpose_maps = FALSE;
-	globals->mcc_hud_meters = FALSE;
+	globals->xbox_hud_meters = FALSE;
 	/* the pixels it was told of are the texture cache's to reuse */
 	halo_custom_edition_texels_forget();
 
