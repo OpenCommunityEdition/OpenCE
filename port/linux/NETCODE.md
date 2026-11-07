@@ -327,7 +327,11 @@ client reliably every second and as it changes), and a client's choice
 own stream, at most four a second, one counted per machine. A co-op
 game's flags also tell its clients whether the host is a dedicated server
 (`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
-most of the living players).
+most of the living players). A client tells the host that its own player
+was thrown from a vehicle that landed on its side or its roof
+(`_distributed_message_ejection`, 96, unreliably, each tick until the host's
+unit state shows them out). A build that does not know that message drops
+it. The network version stays 41.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the

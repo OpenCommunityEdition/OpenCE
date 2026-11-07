@@ -178,10 +178,14 @@ void cheats_network_client_enforce(
 
 	if (!network_game_distributed_client())
 		return;
-	changed = csmemcmp(&cheat, &none, sizeof(cheat)) != 0 || !rider_ejection || !player_autoaim_flag ||
-		!player_magnetism_flag;
+	changed = csmemcmp(&cheat, &none, sizeof(cheat)) != 0 || !player_autoaim_flag ||
+		!player_magnetism_flag ||
+		(!hs_scenario_sets_rider_ejection() && !rider_ejection);
 	csmemset(&cheat, 0, sizeof(cheat));
-	rider_ejection = TRUE;
+	/* a map whose scripts set rider_ejection owns that switch. One that
+	never mentions it stays on, so a console cheat cannot turn the throw off. */
+	if (!hs_scenario_sets_rider_ejection())
+		rider_ejection = TRUE;
 	player_autoaim_flag = TRUE;
 	player_magnetism_flag = TRUE;
 	changed |= game_time_reset_speed();

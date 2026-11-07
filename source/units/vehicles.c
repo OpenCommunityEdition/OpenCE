@@ -2750,6 +2750,10 @@ animate:
 		}
 	}
 
+	/* port: after this tick's wheels have said whether it is on the ground.
+	A rider attached this tick is not updated, so the throw is the vehicle's. */
+	unit_eject_flipped_riders(vehicle_index);
+
 	profile_exit(vehicle_update_section);
 
 	return TRUE;

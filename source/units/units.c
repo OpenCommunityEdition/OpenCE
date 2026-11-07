@@ -987,6 +987,10 @@ boolean network_objects_creating_host_object(void);
 void network_damage_note_grenade(long unit_index, short grenade_type);
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
+/* hs.c's: the loaded map's scripts set rider_ejection */
+boolean hs_scenario_sets_rider_ejection(void);
+/* network_coop.c's: a co-op client does not run the map's scripts */
+boolean network_coop_active(void);
 static void unit_drop_grenades(
 	long unit_index);
 static void unit_drop_inventory_weapons(
@@ -3237,9 +3241,14 @@ void unit_exit_seat_end(
 		root_inverse_matrix = &root_node->runtime_default_inverse_matrix;
 		root_translation = root_node->default_translation;
 
+		/* a driver stepping out plays the vehicle's opening. One thrown
+		because it has landed on its side or its roof does not: that
+		animation swings the vehicle for as long as it plays. */
 		if (parent_unit->unit.driver_object_index==unit_index &&
 			parent_unit->unit.animation.state!=_unit_state_opening &&
-			unit->object.parent_object_index!=NONE)
+			unit->object.parent_object_index!=NONE &&
+			(parent_unit->object.up.k>=0.2f ||
+				!TEST_FLAG(parent_unit->object.flags, _object_on_ground_bit)))
 		{
 			unit_animation_set_state(
 				unit->object.parent_object_index,
@@ -3307,6 +3316,57 @@ void unit_exit_seat_end(
 	}
 
 	return;
+}
+
+/* port: the riders of a vehicle that has landed on its side or its roof.
+Said from the vehicle's own update, and again when the host takes a
+client's roll, which arrives after the rider update that would have
+thrown them. */
+void unit_eject_flipped_riders(
+	long vehicle_index)
+{
+	struct unit_datum *vehicle;
+	long child_index;
+	extern boolean rider_ejection;
+	extern void network_distributed_note_ejection(long unit_index);
+
+	vehicle = (struct unit_datum *)object_try_and_get_and_verify_type(vehicle_index, _object_mask_vehicle);
+	/* vehicle_is_flipped's test: on its side or its roof, and on the ground.
+	A vehicle that has come to rest on its side has up.k near 0.
+	A co-op client does not run the map's scripts, so it does not have the
+	value they set. The host's seat is what takes the rider out, when the
+	map left the throw on. */
+	if (!rider_ejection || !vehicle || vehicle->object.up.k>=0.2f ||
+		!TEST_FLAG(vehicle->object.flags, _object_on_ground_bit) ||
+		(hs_scenario_sets_rider_ejection() && network_game_distributed_client() &&
+			network_coop_active()))
+	{
+		return;
+	}
+	child_index = vehicle->object.first_child_object_index;
+	while (child_index!=NONE)
+	{
+		struct object_datum *child = object_try_and_get(child_index);
+		long next_index;
+
+		if (!child)
+			break;
+		next_index = child->object.next_object_index;
+		if (child->object.type==_object_type_biped)
+		{
+			struct unit_datum *rider = (struct unit_datum *)child;
+
+			if (rider->unit.parent_seat_index!=NONE &&
+				rider->object.parent_object_index==vehicle_index)
+			{
+				/* the rider's own machine tells the host, before the exit
+				clears the seat the notice names */
+				network_distributed_note_ejection(child_index);
+				unit_exit_seat_end(child_index);
+			}
+		}
+		child_index = next_index;
+	}
 }
 
 void unit_impulse(

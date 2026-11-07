@@ -4237,18 +4237,13 @@ boolean biped_update(
 
 		if (parent->object.type==_object_type_vehicle)
 		{
-			struct unit_datum *vehicle = vehicle_get(biped->object.parent_object_index);
-
 			biped_vehicle_speech(biped_index);
 			if (TEST_FLAG(biped->unit.control_flags, _unit_control_action_bit))
 				unit_try_and_exit_seat(biped_index);
 
-			if (rider_ejection &&
-				vehicle->object.up.k<0.f &&
-				TEST_FLAG(vehicle->object.flags, _object_on_ground_bit))
-			{
-				unit_exit_seat_end(biped_index);
-			}
+			/* the host keeps this seat unless its own vehicle lands on its
+			side or its roof, or the rider's machine says it already did */
+			unit_eject_flipped_riders(biped->object.parent_object_index);
 		}
 		else if (parent->object.type==_object_type_biped)
 		{

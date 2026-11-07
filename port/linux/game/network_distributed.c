@@ -202,6 +202,11 @@ enum
 	/* ... and beyond it, the ticks a client's own player may ride otherwise
 	than the host has it */
 	SEAT_DISAGREEMENT_SLACK_TICKS = 6,
+	/* how long a client tells the host it was thrown from a vehicle, each
+	tick, until the host's unit state shows it out. Longer than the seat
+	correction waits, so a lost notice is said again before the client is
+	put back in the seat. */
+	EJECTION_NOTICE_TICKS = 2 * TICKS_PER_SECOND + MAXIMUM_ROUND_TRIP_TICKS,
 	/* the latency meter (latency_meter.c): the same round trips timed in
 	milliseconds, by when each of the last ticks was sent (a power of two,
 	more than the longest round trip); the longest shown; how often what is
@@ -551,6 +556,36 @@ static short distributed_pickup_count;
 /* a client: the ticks each of its own players has ridden other than as
 the host has it */
 static short distributed_seat_disagreements[MAXIMUM_TRACKED_PLAYERS];
+/* a client: an own player thrown from a vehicle, said to the host until
+the host's unit state shows them out of it */
+static struct distributed_ejection_notice
+{
+	boolean pending;
+	/* the vehicle's position stays this machine's until the host has it at
+	rest. The host's copies until then are from before the throw, and
+	taking them moves the vehicle back and forth. */
+	boolean settling;
+	byte player_index;
+	long unit_index;
+	long vehicle_index;
+	/* when it was noticed, for how long it is said again */
+	long time;
+	/* one number for this throw. A repeat uses it again. The next throw
+	is a new number, so a late repeat cannot throw them after they sit again. */
+	long stamp;
+} distributed_ejections[MAXIMUM_LOCAL_PLAYERS];
+static long distributed_ejection_stamp;
+/* the host: the throw it already took each player out for, or NONE */
+static long distributed_ejection_applied[MAXIMUM_TRACKED_PLAYERS];
+struct distributed_ejection
+{
+	byte player_index;
+	byte pad[3];
+	long unit_index;
+	long vehicle_index;
+	long stamp;
+};
+typedef char distributed_ejection_size_assert[sizeof(struct distributed_ejection) == 16 ? 1 : -1];
 
 /* the host: each client's player's latest prediction, taken at the next
 tick, and the client's tick of the one taken last and when */
@@ -2604,6 +2639,255 @@ static void distributed_apply_predictions(
 	}
 }
 
+/* the same object, including one each machine numbered alike */
+static boolean distributed_same_object(
+	long first,
+	long second)
+{
+	return first == second || (first != NONE && second != NONE &&
+		DATUM_INDEX_TO_ABSOLUTE_INDEX(first) == DATUM_INDEX_TO_ABSOLUTE_INDEX(second));
+}
+
+/* a client: the host's unit state still has this player in the vehicle
+they were thrown from */
+static boolean distributed_ejection_holding(
+	byte player_index,
+	long vehicle_index)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		struct distributed_ejection_notice *notice = &distributed_ejections[local_player_index];
+
+		if (notice->pending && notice->player_index == player_index &&
+			distributed_same_object(notice->vehicle_index, vehicle_index))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/* a client: the host's unit state shows this player out, or dead */
+static void distributed_ejection_hear(
+	byte player_index,
+	long vehicle_index,
+	boolean alive)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		struct distributed_ejection_notice *notice = &distributed_ejections[local_player_index];
+
+		if (notice->pending && notice->player_index == player_index &&
+			(!alive || !distributed_same_object(notice->vehicle_index, vehicle_index)))
+		{
+			notice->pending = FALSE;
+		}
+	}
+}
+
+boolean network_distributed_ejected_vehicle(
+	long vehicle_index)
+{
+	struct unit_datum *vehicle;
+	short local_player_index;
+	long now;
+
+	if (game_connection() != _game_connection_network_client || vehicle_index == NONE)
+		return FALSE;
+	vehicle = (struct unit_datum *)object_try_and_get_and_verify_type(vehicle_index, _object_mask_vehicle);
+	if (vehicle && vehicle->unit.driver_object_index != NONE)
+	{
+		struct unit_datum *driver = (struct unit_datum *)object_try_and_get_and_verify_type(
+			vehicle->unit.driver_object_index, _object_mask_unit);
+
+		if (driver && driver->unit.player_index != NONE &&
+			distributed_player_is_local(driver->unit.player_index))
+		{
+			for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+			{
+				struct distributed_ejection_notice *notice = &distributed_ejections[local_player_index];
+
+				if (notice->settling && distributed_same_object(notice->vehicle_index, vehicle_index))
+					notice->settling = FALSE;
+			}
+			return FALSE;
+		}
+	}
+	now = game_time_get();
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		struct distributed_ejection_notice *notice = &distributed_ejections[local_player_index];
+
+		if (!notice->settling || !distributed_same_object(notice->vehicle_index, vehicle_index))
+			continue;
+		if (now - notice->time >= EJECTION_NOTICE_TICKS)
+		{
+			notice->settling = FALSE;
+			continue;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+void network_distributed_ejected_vehicle_rested(
+	long vehicle_index)
+{
+	short local_player_index;
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		struct distributed_ejection_notice *notice = &distributed_ejections[local_player_index];
+
+		if (notice->settling && !notice->pending &&
+			distributed_same_object(notice->vehicle_index, vehicle_index))
+		{
+			notice->settling = FALSE;
+		}
+	}
+}
+
+void network_distributed_note_ejection(
+	long unit_index)
+{
+	struct unit_datum *unit;
+	struct player_datum *player;
+	long player_index;
+	long vehicle_index;
+	short local_player_index;
+
+	if (game_connection() != _game_connection_network_client || unit_index == NONE)
+		return;
+	unit = (struct unit_datum *)object_try_and_get_and_verify_type(unit_index, _object_mask_biped);
+	if (!unit || unit->object.parent_object_index == NONE || unit->unit.parent_seat_index == NONE)
+		return;
+	vehicle_index = unit->object.parent_object_index;
+	if (!object_try_and_get_and_verify_type(vehicle_index, _object_mask_vehicle))
+		return;
+	player_index = unit->unit.player_index;
+	player = player_index != NONE ? player_try_and_get(player_index) : NULL;
+	if (!player || player->local_player_index == NONE || player->unit_index != unit_index)
+		return;
+	local_player_index = player->local_player_index;
+	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+		return;
+	distributed_ejections[local_player_index].pending = TRUE;
+	distributed_ejections[local_player_index].settling = TRUE;
+	distributed_ejections[local_player_index].player_index = distributed_player_to_byte(player_index);
+	distributed_ejections[local_player_index].unit_index = unit_index;
+	distributed_ejections[local_player_index].vehicle_index = vehicle_index;
+	distributed_ejections[local_player_index].time = game_time_get();
+	distributed_ejections[local_player_index].stamp = ++distributed_ejection_stamp;
+}
+
+static void distributed_client_send_ejections(
+	void)
+{
+	struct
+	{
+		struct distributed_message_header header;
+		struct distributed_ejection notices[MAXIMUM_LOCAL_PLAYERS];
+	} message;
+	short count = 0;
+	short local_player_index;
+	long now = game_time_get();
+
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		struct distributed_ejection_notice *notice = &distributed_ejections[local_player_index];
+		struct player_datum *player;
+		struct distributed_ejection *entry;
+
+		if (!notice->pending)
+			continue;
+		player = distributed_player(notice->player_index);
+		if (!player || player->local_player_index != local_player_index ||
+			player->unit_index != notice->unit_index ||
+			now - notice->time >= EJECTION_NOTICE_TICKS)
+		{
+			notice->pending = FALSE;
+			continue;
+		}
+		entry = &message.notices[count];
+		csmemset(entry, 0, sizeof(*entry));
+		entry->player_index = notice->player_index;
+		entry->unit_index = notice->unit_index;
+		entry->vehicle_index = notice->vehicle_index;
+		entry->stamp = notice->stamp;
+		count++;
+	}
+	if (count)
+	{
+		distributed_send(&message, _distributed_message_ejection, count,
+			(word)(sizeof(message.header) + count * sizeof(struct distributed_ejection)),
+			_distributed_to_host);
+	}
+}
+
+/* bipeds.c's: false when the map's scripts have turned the throw off */
+extern boolean rider_ejection;
+
+static void distributed_handle_ejection(
+	long machine_index,
+	void const *entries,
+	short count)
+{
+	short index;
+
+	for (index = 0; index < count; index++)
+	{
+		struct distributed_ejection notice;
+		struct player_datum *player;
+		struct unit_datum *unit;
+		long unit_index;
+		long now;
+
+		csmemcpy(&notice, (byte const *)entries + index * sizeof(notice), sizeof(notice));
+		if (notice.player_index >= MAXIMUM_TRACKED_PLAYERS ||
+			!distributed_machine_has_player(machine_index, (short)notice.player_index))
+		{
+			continue;
+		}
+		player = distributed_player((short)notice.player_index);
+		if (!player)
+			continue;
+		/* the player as this machine has them, which is the unit the seat
+		correction will put back. The index they sent is theirs. */
+		unit_index = player->unit_index;
+		unit = (struct unit_datum *)object_try_and_get_and_verify_type(unit_index, _object_mask_unit);
+		if (!unit)
+			continue;
+		now = game_time_get();
+		if (unit->unit.parent_seat_index == NONE ||
+			!distributed_same_object(unit->object.parent_object_index, notice.vehicle_index))
+		{
+			/* already out of that vehicle: the throw is done. A copy that
+			arrives after they sit again must not throw them a second time. */
+			if (notice.stamp > distributed_ejection_applied[notice.player_index] &&
+				distributed_same_object(unit->unit.last_vehicle_index, notice.vehicle_index) &&
+				now - unit->unit.game_time_at_last_vehicle_exit >= 0 &&
+				now - unit->unit.game_time_at_last_vehicle_exit < EJECTION_NOTICE_TICKS)
+			{
+				distributed_ejection_applied[notice.player_index] = notice.stamp;
+			}
+			continue;
+		}
+		if (notice.stamp <= distributed_ejection_applied[notice.player_index])
+			continue;
+		if (!object_try_and_get_and_verify_type(unit->object.parent_object_index, _object_mask_vehicle))
+			continue;
+		/* the map turned the throw off. A notice does not put them out. */
+		if (!rider_ejection)
+			continue;
+		unit_exit_seat_end(unit_index);
+		distributed_ejection_applied[notice.player_index] = notice.stamp;
+	}
+}
+
 /* (a client) the host's word on a player's unit */
 static void distributed_handle_unit_state(
 	struct distributed_unit_state const *state)
@@ -2618,6 +2902,7 @@ static void distributed_handle_unit_state(
 		return;
 	player_index = DATUM_INDEX_NEW(state->player_index, player->identifier);
 	local = player->local_player_index != NONE;
+	distributed_ejection_hear(state->player_index, alive ? state->vehicle_index : NONE, alive);
 	/* how it died, for when this machine's copy dies
 	(network_distributed_player_killed) */
 	if (state->player_index < MAXIMUM_TRACKED_PLAYERS)
@@ -2680,7 +2965,9 @@ static void distributed_handle_unit_state(
 			(vehicle_index == NONE || unit->unit.parent_seat_index == state->seat_index);
 		short *disagreement = &distributed_seat_disagreements[state->player_index];
 
-		if (same)
+		if (distributed_ejection_holding(state->player_index, state->vehicle_index))
+			*disagreement = 0;
+		else if (same)
 			*disagreement = 0;
 		else if (!local || ++*disagreement > MAX(SEAT_DISAGREEMENT_TICKS,
 			(short)ceil(distributed_own_round_trip) + SEAT_DISAGREEMENT_SLACK_TICKS))
@@ -3744,6 +4031,8 @@ void network_distributed_new_game(
 	distributed_last_sent_time = NONE;
 	csmemset(distributed_deaths, 0, sizeof(distributed_deaths));
 	csmemset(distributed_seat_disagreements, 0, sizeof(distributed_seat_disagreements));
+	csmemset(distributed_ejections, 0, sizeof(distributed_ejections));
+	distributed_ejection_stamp = 0;
 	csmemset(distributed_predictions, 0, sizeof(distributed_predictions));
 	csmemset(distributed_accepted, 0, sizeof(distributed_accepted));
 	csmemset(distributed_host_speeds, 0, sizeof(distributed_host_speeds));
@@ -3774,6 +4063,7 @@ void network_distributed_new_game(
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 	{
 		distributed_deaths[player_index].dead_since = NONE;
+		distributed_ejection_applied[player_index] = NONE;
 		distributed_sent_units[player_index].flags = 0;
 		distributed_sent_units[player_index].unit_index = NONE;
 		distributed_sent_units[player_index].vehicle_index = NONE;
@@ -3907,6 +4197,7 @@ void network_distributed_tick(
 		profile_scope(distributed_tick_objects_client_tick_section, network_objects_client_tick();)
 		profile_scope(distributed_tick_damage_client_tick_section, network_damage_client_tick();)
 		profile_scope(distributed_tick_coop_client_tick_section, network_coop_client_tick();)
+		distributed_client_send_ejections();
 	}
 	/* (when this tick's messages were sent: the round trips that name it
 	are timed by it) */
@@ -3990,6 +4281,7 @@ static boolean distributed_message_stale(
 	case _distributed_message_object_states:
 	case _distributed_message_vehicle_prediction:
 	case _distributed_message_player_inputs:
+	case _distributed_message_ejection:
 	case _distributed_message_relayed_actions:
 	case _distributed_message_damage_events:
 	case _distributed_message_pings:
@@ -4814,6 +5106,7 @@ void network_distributed_handle_message(
 	case _distributed_message_chat_down: entry_size = network_chat_line_entry_size(); break;
 	case _distributed_message_chat_config: entry_size = network_chat_config_entry_size(); break;
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
+	case _distributed_message_ejection: entry_size = sizeof(struct distributed_ejection); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
 	case _distributed_message_game_state:
 	case _distributed_message_objects_synchronized:
@@ -4871,6 +5164,7 @@ void network_distributed_handle_message(
 	case _distributed_message_hit_reports:
 	case _distributed_message_vehicle_prediction:
 	case _distributed_message_player_inputs:
+	case _distributed_message_ejection:
 	case _distributed_message_coop_skip_vote:
 	case _distributed_message_votekick:
 	case _distributed_message_chat_up:
@@ -5132,6 +5426,9 @@ void network_distributed_handle_message(
 		break;
 	case _distributed_message_player_inputs:
 		distributed_handle_inputs(machine_index, (struct distributed_player_input const *)entries, header.count);
+		break;
+	case _distributed_message_ejection:
+		distributed_handle_ejection(machine_index, entries, header.count);
 		break;
 	case _distributed_message_relayed_actions:
 		distributed_handle_actions((byte const *)entries, (byte const *)message + size, header.count);

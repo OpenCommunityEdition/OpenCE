@@ -2062,6 +2062,9 @@ void network_objects_apply_vehicle_predictions(
 
 			network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity,
 				&angular_velocity, HOST_VEHICLE_BLEND_DISTANCE);
+			/* the client's roll is this pose. The vehicle update that would
+			throw the rider already ran, and the next one may have righted it. */
+			unit_eject_flipped_riders(state->object_index);
 			/* (a copy at rest runs no physics, and so neither falls nor
 			counts its ticks in the air: one the client moved from where it
 			came to rest (a little at a time too), or says moves, wakes, and
@@ -2815,6 +2818,16 @@ void network_objects_handle_states(
 		{
 			struct unit_datum *vehicle = unit_get(state->object_index);
 
+			/* thrown from it this moment: the host's word is still the
+			roll, and taking it fights this machine's copy until the host
+			has the vehicle at rest */
+			if (network_distributed_ejected_vehicle(state->object_index))
+			{
+				if (TEST_FLAG(state->flags, _distributed_object_at_rest_bit))
+					network_distributed_ejected_vehicle_rested(state->object_index);
+				if (network_distributed_ejected_vehicle(state->object_index))
+					continue;
+			}
 			if (blend_distance > 0.0f)
 				blend_distance = REMOTE_VEHICLE_BLEND_DISTANCE;
 			/* (one no player drives follows every move the host sends, however small) */

@@ -79,6 +79,7 @@ enum _distributed_message_coop_skip_vote 70
 enum _distributed_message_coop_sounds_retired 67
 enum _distributed_message_damage_animations 75
 enum _distributed_message_damage_events 10
+enum _distributed_message_ejection 96
 enum _distributed_message_fire_origins 93
 enum _distributed_message_game_state 7
 enum _distributed_message_hit_reports 11
@@ -275,6 +276,7 @@ struct distributed_damage_animation ae158e21c915
 struct distributed_damage_animations_message 863e25ca3614
 struct distributed_damage_event 659e4d49733b
 struct distributed_damage_event_message c954363dcf26
+struct distributed_ejection e4758b8e698d
 struct distributed_fire_origin 700dfdb20582
 struct distributed_fire_origin_message 7613e8f9d43e
 struct distributed_hit_report 9a44ca43a88b

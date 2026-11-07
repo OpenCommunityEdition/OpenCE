@@ -597,6 +597,11 @@ void unit_handle_region_destroyed(
 	unsigned long damage_flags);
 void unit_exit_seat_end(
 	long unit_index);
+/* a vehicle on its side or its roof, on the ground: every rider out. A
+seated unit is not updated the tick it is attached, and a client's
+predicted roll is on the host only after that check has run. */
+void unit_eject_flipped_riders(
+	long vehicle_index);
 void units_update(void);
 void unit_export_function_values(
 	long object_index);
