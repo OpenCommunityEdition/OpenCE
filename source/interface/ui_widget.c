@@ -7795,8 +7795,8 @@ static void column_list_update(
 
 	/* port: a map's own lists have rows of three frames */
 	boolean own_list = !strcmp(widget->name, "select_screen_list_template") ||
-		!strcmp(widget->name, "gametype_select_list");
-
+		!strcmp(widget->name, "gametype_select_list") ||
+		!strcmp(widget->name, "color_select_list");
 	for (child = widget->child; child; child = child->next)
 	{
 		boolean has_frames = child->animation.number_of_sprite_frames == 2 ||

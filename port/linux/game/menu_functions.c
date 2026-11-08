@@ -70,6 +70,8 @@ their handlers open opens.
 */
 
 #include "cseries.h"
+#include "cseries/errors.h"
+
 #include "input/input.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
@@ -1857,10 +1859,19 @@ static struct
 	short color;
 } color_list;
 
+/* port: a Custom Edition map has not the port's string list: the game's 18 primary colours by name */
+static wchar_t const *const color_names[COLOR_COUNT] =
+{
+	L"White", L"Black", L"Red", L"Blue", L"Gray", L"Yellow", L"Green", L"Pink", L"Purple",
+	L"Cyan", L"Cobalt", L"Orange", L"Teal", L"Sage", L"Brown", L"Tan", L"Maroon", L"Salmon"
+};
+
 static void color_row_text(short row, wchar_t *text)
 {
-	string_get("pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\color_edit\\colors_list",
-		(short)(color_list.first + row), text);
+	short color = (short)(color_list.first + row);
+
+	ustrncpy(text, color >= 0 && color < COLOR_COUNT ? color_names[color] : L"", ROW_TEXT_LENGTH - 1);
+	text[ROW_TEXT_LENGTH - 1] = 0;
 }
 
 /* "color picker menu initialize": on the profile's colour */
@@ -1872,6 +1883,13 @@ static boolean color_list_initialize(struct widget_instance *list)
 		return FALSE;
 	color_list.color = (short)PIN(profile->primary_color_index, 0, COLOR_COUNT - 1);
 	color_list.first = (short)PIN(color_list.color - COLOR_ROWS / 2, 0, COLOR_COUNT - COLOR_ROWS);
+	if (list->name && !strcmp(list->name, "color_select_list"))
+	{
+		/* port: rows 1 to 9 hold the colours */
+		color_list.first = (short)PIN(color_list.color - 4, 0, COLOR_COUNT - 9);
+		focus_row(list, (short)(color_list.color - color_list.first + 1));
+		return TRUE;
+	}
 	focus_row(list, (short)(color_list.color - color_list.first));
 	return TRUE;
 }
@@ -1911,6 +1929,7 @@ static short list_scroll(struct widget_instance *list, short *first, short count
 static boolean color_list_initialize(struct widget_instance *list);
 static boolean color_choose(void);
 static void color_list_update(struct widget_instance *list);
+static void hide_row_arrows(struct widget_instance *list);
 
 /* port: a Custom Edition map's colour screen runs Halo PC's own functions
 (61 on creation, 63 on OK, and the Xbox's game data update), which the
@@ -1928,15 +1947,105 @@ boolean pc_menu_color_choose(void)
 void pc_menu_color_update(struct widget_instance *list)
 {
 	color_list_update(list);
+	hide_row_arrows(list);
 }
+
+/* port: a Custom Edition map's colour screen is laid out as its map lists are: row 0 pages up, row 10 pages
+down, rows 1 to 9 hold the colours (nine a page) */
+#define COLOR_OWN_ROWS 9
+
+/* the row clicked (ui_widget_event_handler_functions.c, Halo PC's 160): FALSE if it paged, TRUE if it is a colour */
+static boolean color_row_click_paging(struct widget_instance *row);
+
+boolean pc_menu_color_row_click(struct widget_instance *row)
+{
+	if (color_row_click_paging(row))
+	{
+		short color = (short)(color_list.first + sibling_index(row) - 1);
+
+		if (color >= 0 && color < COLOR_COUNT && ((color_list.color = color), 0))
+		{
+			color_list.color = color;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static boolean color_row_click_paging(struct widget_instance *row)
+{
+	if (!strcmp(row->name, "list_item_0"))
+		color_list.first = (short)MAX(0, color_list.first - COLOR_OWN_ROWS);
+	else if (!strcmp(row->name, "list_item_10"))
+		color_list.first = (short)MIN(COLOR_COUNT - COLOR_OWN_ROWS, color_list.first + COLOR_OWN_ROWS);
+	else
+		return TRUE;
+	return FALSE;
+}
+
+static void color_own_list_update(struct widget_instance *list)
+{
+	struct widget_instance *description = list->parameters.list.extended_description;
+	struct widget_instance *widget;
+	struct widget_instance *row;
+	short focused = focused_row(list);
+	short index = 0;
+
+	if (focused == COLOR_OWN_ROWS && color_list.first + COLOR_OWN_ROWS < COLOR_COUNT && list_scrolls_at_end())
+	{
+		color_list.first++;
+		focus_row(list, --focused);
+	}
+	else if (focused == 1 && color_list.first > 0 && list_scrolls_at_end())
+	{
+		color_list.first--;
+		focus_row(list, ++focused);
+	}
+	if ((widget = named(description, "awards_right_pic", 0)) != NULL)
+		widget->animation.current_frame_index = color_list.color;
+	if (focused >= 1 && focused <= COLOR_OWN_ROWS && !ui_widget_port_hover_focused())
+		color_list.color = (short)(color_list.first + focused - 1);
+	for (row = list->child; row; row = row->next, index++)
+	{
+		short color = (short)(color_list.first + index - 1);
+		boolean is_color = index >= 1 && index <= COLOR_OWN_ROWS;
+
+		if (strncmp(row->name, "list_item_", 10))
+			break;
+		row->visible = !is_color || color < COLOR_COUNT;
+		if (is_color && color < COLOR_COUNT)
+			text_set(named(row, "list_item_text", 0), color_names[color]);
+		visible_set(named(row, "list_item_text", 0), is_color);
+		visible_set(named(row, "list_item_arrows", 0), FALSE);
+		visible_set(named(row, "scroll_up_button", 0), index == 0 && color_list.first > 0);
+		visible_set(named(row, "scroll_down_button", 0),
+			index == COLOR_OWN_ROWS + 1 && color_list.first + COLOR_OWN_ROWS < COLOR_COUNT);
+		/* the bitmap shows only the colour the profile has (the third frame); passing the focus over a row
+		changes its text's colour alone */
+		if (row->animation.number_of_sprite_frames == 2)
+			row->animation.current_frame_index = (row == list->focused_child) ? 1 : 0;
+	}
+	if ((widget = named(description, "color_right_name", 0)) != NULL)
+		widget->parameters.text_box.string_list_index = color_list.color;
+	if ((widget = named(description, "color_right_pic", 0)) != NULL)
+		widget->animation.current_frame_index = color_list.color;
+	profile_name_show(description);
+}
+
 /* "color picker update": the list scrolled on at its ends, the colour's
 name and picture */
 static void color_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
 	struct widget_instance *widget;
-	short color = list_scroll(list, &color_list.first, COLOR_COUNT, COLOR_ROWS);
+	short color;
 
+	if (list->name && !strcmp(list->name, "color_select_list"))
+	{
+		color_own_list_update(list);
+		return;
+	}
+	color = list_scroll(list, &color_list.first, COLOR_COUNT, COLOR_ROWS);
 	if (color != NONE)
 		color_list.color = color;
 	rows_update(list, COLOR_ROWS, color_row_text);
@@ -8439,14 +8548,14 @@ boolean pc_menu_map_list_initialize(struct widget_instance *widget)
 /* port: the map list's update for a map's own screen, with its arrows placed and the menus' row marks hidden */
 void pc_menu_map_list_update(struct widget_instance *widget)
 {
-	char const *const *dbg_names;
+	char const *const *names;
 	map_list_update(widget);
-	short dbg_last;
+	short last;
 	
 	{
 		struct widget_instance *row_top = named(widget, "list_item_0", 0);
 		struct widget_instance *row_end = named(widget, "list_item_10", 0);
-		short total = ui_widget_port_multiplayer_maps(&dbg_names, &dbg_last);
+		short total = ui_widget_port_multiplayer_maps(&names, &last);
 
 		if (row_top)
 		{

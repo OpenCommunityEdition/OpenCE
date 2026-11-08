@@ -3510,6 +3510,24 @@ boolean ui_widget_event_handler_function_invoke(
 	{
 		extern void pc_menu_map_row_click(struct widget_instance *row);
 
+		/* port: a Custom Edition map's colour screen's row: its first and last rows page the colours; the others
+		choose one and do the screen's OK */
+		if (widget->parent && widget->parent->name && !strcmp(widget->parent->name, "color_select_list"))
+		{
+			extern boolean pc_menu_color_row_click(struct widget_instance *row);
+
+			pc_menu_color_row_click(widget);
+			return TRUE;
+			if (0)
+				return TRUE;
+		}
+		if (widget->parent && widget->parent->name && !strcmp(widget->parent->name, "color_select_list"))
+		{
+			extern boolean pc_menu_activate_screen(struct widget_instance *widget,
+				struct event_record *event, boolean *widget_deleted);
+
+			return pc_menu_activate_screen(widget, event, widget_deleted);
+		}
 		pc_menu_map_row_click(widget);
 		return TRUE;
 	}
