@@ -64,6 +64,9 @@ static char mcc_share_prompt_message[512];
 static char mcc_share_installed[64];
 static char mcc_share_text[256];
 static unsigned long mcc_share_host_revision;
+static uint32_t mcc_share_admission_at[MCC_SHARE_HOST_MACHINES];
+static byte mcc_share_admission_pending[MCC_SHARE_HOST_MACHINES];
+static char mcc_share_admission_level[128];
 void platform_translate_path(char const *, char *, unsigned long);
 void platform_open_url(char const *);
 void ui_widget_port_go_back(struct widget_instance *widget);
@@ -71,6 +74,25 @@ static void mcc_share_offered(void *, uint64_t, char const *);
 static void mcc_share_host_lifecycle(void);
 struct network_game_server_client_machine *network_game_server_get_client_machine_at_index(struct network_game_server *,long);
 boolean network_game_server_client_machine_is_joined_to_game(struct network_game_server *,struct network_game_server_client_machine *);
+
+static void mcc_share_stop_host(void)
+{
+    mcc_share_host_stop(&mcc_share_globals);
+    memset(mcc_share_admission_pending,0,sizeof(mcc_share_admission_pending));
+    mcc_share_admission_level[0]=0;
+}
+
+static void mcc_share_host_finished(void *user,long machine)
+{
+    struct network_game *game=network_game_get_game();
+    (void)user;
+    if (!game || machine<0 || machine>=MCC_SHARE_HOST_MACHINES) return;
+    /* DONE precedes the joiner's identity resolution and AddPlayer. Its old
+     * joining deadline may already have elapsed during an honest download. */
+    mcc_share_admission_at[machine]=(uint32_t)system_milliseconds();
+    mcc_share_admission_pending[machine]=1;
+    snprintf(mcc_share_admission_level,sizeof(mcc_share_admission_level),"%s",game->map.name);
+}
 
 /* ---------- the engine's files and folders */
 
@@ -379,8 +401,21 @@ boolean mcc_share_game_holds_players(
 boolean mcc_share_game_machine_active(
 	long machine_index)
 {
-	return mcc_share_ready && machine_index >= 0 && machine_index < MCC_SHARE_HOST_MACHINES &&
-		mcc_share_host_active(&mcc_share_globals, machine_index);
+    struct network_game *game;
+    if (mcc_share_game_machine_needs_map(machine_index)) return TRUE;
+    if (!mcc_share_ready || machine_index<0 || machine_index>=MCC_SHARE_HOST_MACHINES ||
+        !mcc_share_admission_pending[machine_index]) return FALSE;
+    game=network_game_get_game();
+    return game && global_network_game_server_get() && config_boolean("network.mcc_map_share") &&
+        mcc_share_host_revision==mcc_identity_host_revision() &&
+        !strcmp(game->map.name,mcc_share_admission_level) &&
+        (uint32_t)((uint32_t)system_milliseconds()-mcc_share_admission_at[machine_index])<15000u;
+}
+
+boolean mcc_share_game_machine_needs_map(long machine_index)
+{
+    return mcc_share_ready && machine_index>=0 && machine_index<MCC_SHARE_HOST_MACHINES &&
+        mcc_share_host_active(&mcc_share_globals,machine_index);
 }
 
 static void mcc_share_offered(void *user,uint64_t bytes,char const *credit)
@@ -464,7 +499,7 @@ void mcc_share_game_disconnect(void)
     mcc_share_close_prompt();
     if (mcc_share_ready) {
         mcc_share_client_disconnect(&mcc_share_globals);
-        mcc_share_host_stop(&mcc_share_globals);
+        mcc_share_stop_host();
     }
     mcc_share_prompt_pending=mcc_share_prompt_visible=mcc_share_prompt_download=FALSE;
     mcc_share_name[0]=0;
@@ -476,8 +511,10 @@ void mcc_share_game_peer_left(struct network_game_server_client_machine *machine
     long index;
     if (!mcc_share_ready || !server || !machine) return;
     for (index=0;index<MCC_SHARE_HOST_MACHINES;index++)
-        if (network_game_server_get_client_machine_at_index(server,index)==machine)
+        if (network_game_server_get_client_machine_at_index(server,index)==machine) {
             mcc_share_host_forget(&mcc_share_globals,index);
+            mcc_share_admission_pending[index]=0;
+        }
 }
 
 static void mcc_share_host_lifecycle(void)
@@ -487,13 +524,26 @@ static void mcc_share_host_lifecycle(void)
     int i;
     unsigned long revision=mcc_identity_host_revision();
     if (revision!=mcc_share_host_revision) {
-        mcc_share_host_stop(&mcc_share_globals);
+        mcc_share_stop_host();
         mcc_share_host_revision=revision;
     }
     if (!server || !game || !config_boolean("network.mcc_map_share") || !mcc_level_name(game->map.name)) {
-        mcc_share_host_stop(&mcc_share_globals);
+        mcc_share_stop_host();
         return;
     }
+    if (strcmp(game->map.name,mcc_share_admission_level))
+        memset(mcc_share_admission_pending,0,sizeof(mcc_share_admission_pending));
+    for (i=0;i<NUMBEROF(game->players);i++) {
+        struct network_player *player=&game->players[i];
+        if (network_player_is_valid(player) && player->machine_index>=0 && player->machine_index<MCC_SHARE_HOST_MACHINES)
+            mcc_share_admission_pending[player->machine_index]=0;
+    }
+    for (i=0;i<MCC_SHARE_HOST_MACHINES;i++)
+        if (mcc_share_admission_pending[i] &&
+            ((uint32_t)((uint32_t)system_milliseconds()-mcc_share_admission_at[i])>=15000u ||
+             !network_game_server_client_machine_is_joined_to_game(server,
+                 network_game_server_get_client_machine_at_index(server,i))))
+            mcc_share_admission_pending[i]=0;
     for (i=0;i<MCC_SHARE_HOST_TRANSFERS;i++) {
         struct mcc_share_host_transfer *transfer=&mcc_share_globals.transfers[i];
         if (transfer->used && (strcmp(transfer->level,game->map.name) ||
@@ -523,6 +573,7 @@ void mcc_share_game_update(
 		env.send_response = mcc_share_send_response;
 		env.host_package = mcc_share_host_package_files;
 		env.upload_limit = mcc_share_upload_limit;
+        env.host_finished = mcc_share_host_finished;
 		env.free_bytes = mcc_share_free_bytes;
 		env.offered = mcc_share_offered;
 		env.destination = mcc_share_destination;

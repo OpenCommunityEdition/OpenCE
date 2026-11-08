@@ -3077,7 +3077,7 @@ boolean map_share_machine_needs_map(
 		&map_share_globals.machines[machine_index] : NULL;
 
 	/* (a machine fetching the game's MCC package: mcc_share.c) */
-	if (mcc_share_game_machine_active(machine_index))
+	if (mcc_share_game_machine_needs_map(machine_index))
 		return TRUE;
 	return machine && !machine->downloaded && host_machine_downloading(machine);
 }

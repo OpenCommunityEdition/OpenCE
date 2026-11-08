@@ -22,7 +22,7 @@ CASES = ["list", "admit", "manifest", "redirect", "stage_cancel", "stage_hash_an
          "terminal_failure", "terminal_disconnect", "terminal_expiry", "terminal_new_request",
          "prepare_success", "prepare_failure", "prepare_unverified", "reuse_files", "reuse_absent",
          "reuse_bounded", "reuse_cancel", "reuse_disconnect", "reuse_short_read", "reuse_bad_hash",
-         "reuse_missing", "reuse_backpressure", "have_fields"]
+         "reuse_missing", "reuse_backpressure", "have_fields", "done_expired", "done_cancelled"]
 
 
 @pytest.fixture(scope="module")

@@ -136,13 +136,14 @@ static struct {
     unsigned delivered_bytes, response_bytes;
     unsigned reuse_mask, reuse_candidates, have_requests, file_requests[MCC_SHARE_STAGE_FILES];
     int reuse_missing;
-    int offers;
+    int offers, host_completions;
     uint64_t offer_bytes;
     unsigned extra_metadata, manifest_pages;
     int stop_after_page;
 } W;
 
 static uint32_t env_now(void *u) { (void)u; return W.clock; }
+static void env_host_finished(void *u,long machine) { (void)u; if(machine!=MACHINE)exit(91); W.host_completions++; }
 static int env_request(void *u, struct mcc_share_request const *r)
 {
     (void)u;
@@ -287,6 +288,7 @@ static int setup(char const *base)
     env.now=env_now;env.send_request=env_request;env.send_response=env_response;
     env.package_taken=env_taken;env.identity_check=env_identity;env.finished=env_finished;
     env.host_package=env_package;env.upload_limit=env_limit;env.free_bytes=env_free;env.io=real_io;
+    env.host_finished=env_host_finished;
     snprintf(env.root,sizeof(env.root),"%s",J);
     mcc_share_init(&W.host,&env);
     mcc_share_init(&W.join,&env);
@@ -729,6 +731,24 @@ int main(int argc,char **argv)
         return 0;
     }
 
+    if (!strcmp(argv[1],"done_expired") || !strcmp(argv[1],"done_cancelled")) {
+        struct mcc_share_request request;
+        W.reject_done=1;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        CHECK(run_until_finished(2000) && W.finished_ok && !W.host_completions);
+        request=W.join.terminal;
+        CHECK(request.op==MCC_SHARE_OP_DONE && request.flags==1);
+        if (!strcmp(argv[1],"done_expired")) W.clock+=80001;
+        else request.flags=0;
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        CHECK(!W.host_completions);
+        mcc_share_update(&W.host);
+        CHECK(!mcc_share_host_active(&W.host,MACHINE));
+        request.flags=1;mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        CHECK(!W.host_completions);
+        return 0;
+    }
+
     CASE("transfer") {
         char a[400],b[400];
         CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
@@ -750,6 +770,9 @@ int main(int argc,char **argv)
         CHECK(!mcc_share_host_active(&W.host,MACHINE));                 /* the joiner's done ended it */
         CHECK(W.identity_calls==1);
         CHECK(native_reads==16 && !native_cached_reads); /* four hashes and twelve chunk reads */
+        CHECK(W.host_completions==1);
+        mcc_share_host_request(&W.host,MACHINE,&W.join.terminal,sizeof(W.join.terminal));
+        CHECK(W.host_completions==1); /* A replay cannot renew admission grace. */
         return 0;
     }
 
@@ -1220,6 +1243,7 @@ int main(int argc,char **argv)
         CHECK(transfer->queued==1 && transfer->request_offset==100);
         r.op=MCC_SHARE_OP_DONE;r.length=0;
         mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));CHECK(!transfer->used);
+        CHECK(!W.host_completions);
         return 0;
     }
 

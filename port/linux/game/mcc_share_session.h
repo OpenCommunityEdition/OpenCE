@@ -111,6 +111,9 @@ struct mcc_share_env {
      * The core still checks the manifest it builds. */
     void (*host_package)(void *user, char const *level, struct mcc_share_host_package *package);
     uint32_t (*upload_limit)(void *user);                        /* bytes a second */
+    /* Valid successful DONE, once after releasing its transfer slot. The
+     * adapter may allow bounded time for the client's following AddPlayer. */
+    void (*host_finished)(void *user, long machine);
     /* joiner: the bytes free where the package will go, or 0 when that is not known */
     uint64_t (*free_bytes)(void *user);
     /* No files are written before accept. NULL retains automatic acceptance for callers

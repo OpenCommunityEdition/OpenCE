@@ -1098,6 +1098,13 @@ header remains 12 bytes, including its checkpoint epoch.
   and consent. Requests remain bound to the host's current package. Required
   campaign JSON is delivered upfront; subsequent mission maps/resources are
   obtained before their own admission, under the same host-only policy.
+  A validated successful `DONE` releases its transfer slot and grants at most
+  15 seconds for the client's following player-add request. That admission
+  grace protects against the host's older playerless-machine deadline, but
+  does not report content as still missing or hold players out of the game.
+  Player admission, peer/session removal, map/identity changes, host opt-out
+  or expiry clears it. Cancelled, expired, premature or replayed `DONE`
+  messages cannot grant or renew the grace period.
 
 Implementation lives in `mcc_share.c`, `mcc_share_package.c`,
 `mcc_share_session.c`, `mcc_share_stage.c` and the MCC metadata helpers.

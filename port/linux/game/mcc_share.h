@@ -21,9 +21,11 @@ void mcc_share_game_render(void);
 boolean mcc_share_game_downloading(char const *level_name);
 /* whether this machine's players wait to join while it fetches (map_share_holds_players's) */
 boolean mcc_share_game_holds_players(void);
-/* (the host) whether that machine is fetching the game's package lately, and has not finished
- * (map_share_machine_downloading's and map_share_machine_needs_map's) */
+/* Host timeout protection while downloading or briefly admitting the player
+ * after verified successful completion (map_share_machine_downloading). */
 boolean mcc_share_game_machine_active(long machine_index);
+/* Actual content still pending; post-install admission grace must not hold players. */
+boolean mcc_share_game_machine_needs_map(long machine_index);
 
 /* The distributed messages 103 (a joiner's request, to the host) and 104 (the host's
  * response), from the sender's connection alone (from_stream). */

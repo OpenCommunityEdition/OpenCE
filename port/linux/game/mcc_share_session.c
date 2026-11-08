@@ -479,8 +479,12 @@ void mcc_share_host_request(struct mcc_share *share, long machine, void const *m
         transfer=host_find(share,machine);
         if (transfer && !transfer->hashing && request.session==transfer->session &&
             share_same(request.level,transfer->level) &&
-            (!request.flags || (transfer->request_file==transfer->package.count && !transfer->queued)))
+            (!request.flags || (transfer->request_file==transfer->package.count && !transfer->queued &&
+                               !host_expired(transfer,share_now(share))))) {
             mcc_share_host_forget(share,machine);
+            if (request.flags && share->env.host_finished)
+                share->env.host_finished(share->env.user,machine);
+        }
         break;
     case MCC_SHARE_OP_HAVE:
         if (request.flags || !request.session || request.offset || request.length) return;

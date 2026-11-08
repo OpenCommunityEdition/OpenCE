@@ -82,6 +82,7 @@ struct network_game_server_client_machine;
     boolean prefix##mcc_share_game_downloading(char const *); \
     boolean prefix##mcc_share_game_holds_players(void); \
     boolean prefix##mcc_share_game_machine_active(long); \
+    boolean prefix##mcc_share_game_machine_needs_map(long); \
     boolean prefix##mcc_share_game_handles_message(word const *, word); \
     void prefix##mcc_share_game_handle_message(long, word const *, word, boolean); \
     void prefix##mcc_share_game_disconnect(void); \
@@ -93,6 +94,9 @@ struct network_game_server_client_machine;
     void prefix##mcc_share_game_peer_left(struct network_game_server_client_machine *);
 COPY(h_)
 COPY(j_)
+int map_share_machine_downloading(long);
+int map_share_machine_needs_map(long);
+void fixture_ce_download(int,int);
 
 static char host_dir[1024],join_dir[1024];
 static unsigned clock_ms=1000;
@@ -293,6 +297,7 @@ static struct network_game_server server;
 static struct network_game_client client;
 static struct network_game_server_client_machine peer;
 static struct network_game host_game,join_game;
+int network_player_is_valid(struct network_player *p) { return p->valid; }
 struct network_game *h_network_game_client_get_game(struct network_game_client *c) { return &host_game; }
 struct network_game *j_network_game_client_get_game(struct network_game_client *c) { return &join_game; }
 struct network_game *h_network_game_get_game(void) { return &host_game; }
@@ -756,7 +761,10 @@ int main(int argc,char **argv)
         as_host();CHECK(write_text("mcc_maps/solar_flare/workshop_id.txt",(unsigned char *)"2915693904\nFixture\n",19));
     }
     CASE("only_listed_files") { CHECK(host_make("evil.dll",50,8));CHECK(host_make("notes.txt",50,9)); }
-    CHECK(joiner_asks(LEVEL,host_digest));CHECK(pump_until_done(2000));CHECK(accept_result && accepts==1 && !aborts && !errors_shown);
+    CASE("admission_wrap") {clock_ms=0xffffb000u;}
+    CHECK(joiner_asks(LEVEL,host_digest));
+    if(!strncmp(argv[1],"admission_",10))clock_ms+=16000; /* Past the original playerless deadline. */
+    CHECK(pump_until_done(2000));CHECK(accept_result && accepts==1 && !aborts && !errors_shown);
     CHECK(lobby_restores==1);
     CHECK(!j_mcc_share_game_holds_players());
     snprintf(a,sizeof(a),"%s/mcc_maps/solar_flare/m0.map",host_dir);
@@ -777,7 +785,32 @@ int main(int argc,char **argv)
     }
     CASE("only_listed_files") {snprintf(b,sizeof(b),"%s/mcc_maps/%s/evil.dll",join_dir,snapshot);CHECK(!exists(b));
         snprintf(b,sizeof(b),"%s/mcc_maps/%s/notes.txt",join_dir,snapshot);CHECK(!exists(b));}
-    for (i=0;i<5;i++) pump_once();CHECK(!h_mcc_share_game_machine_active(MACHINE));
+    for (i=0;i<5;i++) pump_once();
+    as_host();
+    CHECK(!map_share_machine_needs_map(MACHINE));
+    CHECK(map_share_machine_downloading(MACHINE));
+    fixture_ce_download(1,0);CHECK(map_share_machine_downloading(6)&&map_share_machine_needs_map(6));
+    fixture_ce_download(1,1);CHECK(map_share_machine_downloading(6)&&!map_share_machine_needs_map(6));
+    fixture_ce_download(0,1);CHECK(!map_share_machine_downloading(6)&&!map_share_machine_needs_map(6));
+    if(!strncmp(argv[1],"admission_",10)) {
+        /* The download outlasted the server's ordinary 15-second admission
+         * deadline. It must protect the following AddPlayer, without keeping
+         * completed content in the held-player path. */
+        CASE("admission_player") {host_game.players[0].valid=1;host_game.players[0].machine_index=MACHINE;}
+        CASE("admission_peer_left") {h_mcc_share_game_peer_left(&peer);}
+        CASE("admission_map") {strcpy(host_game.map.name,"mcc_maps\\other\\arena");}
+        CASE("admission_revision") {host_revision++;}
+        CASE("admission_off") {map_share_on=0;}
+        CASE("admission_disconnect") {h_mcc_share_game_disconnect();}
+        if(strcmp(argv[1],"admission_grace") && strcmp(argv[1],"admission_wrap")) {
+            h_mcc_share_game_update();CHECK(!h_mcc_share_game_machine_active(MACHINE));
+        } else {
+            clock_ms+=14000;CHECK(h_mcc_share_game_machine_active(MACHINE));
+            clock_ms+=1000;CHECK(!h_mcc_share_game_machine_active(MACHINE));
+            h_mcc_share_game_update();CHECK(!h_mcc_share_game_machine_active(MACHINE));
+        }
+        CHECK(!h_mcc_share_game_machine_needs_map(MACHINE));
+    }
     CHECK(engine_allocation_count==0);
     return 0;
 }

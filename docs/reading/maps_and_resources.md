@@ -225,6 +225,13 @@ The host is the only sender. CE sharing keeps its own messages and behavior;
 MCC borrows only the necessary lobby hold, per-frame and cache-admission hooks.
 Disconnects, changed identities, disabled downloads and host preparation
 revision changes cancel stale work. No stage or consent carries into Xbox/CE.
+Successful completion also crosses a small admission boundary: the client
+sends `DONE` before resolving the installed identity and adding its player.
+`mcc_share_host_finished` grants a maximum 15-second grace period for that
+following request. The existing timeout hook includes this grace, while
+`mcc_share_game_machine_needs_map` reports only an unfinished transfer, so
+completed downloads immediately release any held players. Admission or
+session/content changes clear the grace; replayed completion cannot renew it.
 The wire limits and protocol versions are in
 [NETCODE.md](../../port/linux/NETCODE.md#mcc-package-sharing).
 

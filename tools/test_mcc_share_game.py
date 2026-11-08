@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 import pytest
+from harness import function
 
 ROOT = Path(__file__).resolve().parents[1]
 GAME = ROOT / "port/linux/game"
@@ -19,9 +20,11 @@ CASES = ["transfer", "only_listed_files", "off", "unlisted", "listed_without_mak
          "handlers", "leave", "map_changes", "disk_space", "consent", "existing_version", "metadata_mismatch",
          "host_toggle", "peer_left", "client_toggle", "map_only", "cancel", "workshop_off", "workshop_client_off", "prompt_map_change", "prompt_disconnect", "prompt_content_change",
          "prompt_metadata_change", "stale_accept", "unused_resources", "bitmap_only",
-         "workshop_resource_fallback", "shared_resource", "invalid_resource", "host_revision", "prompt_overlay"]
+         "workshop_resource_fallback", "shared_resource", "invalid_resource", "host_revision", "prompt_overlay",
+         "admission_grace", "admission_player", "admission_peer_left", "admission_map", "admission_revision",
+         "admission_off", "admission_disconnect", "admission_wrap"]
 RENAMED = ["mcc_share_game_update", "mcc_share_game_render", "mcc_share_game_downloading",
-           "mcc_share_game_holds_players", "mcc_share_game_machine_active", "mcc_share_game_handles_message",
+           "mcc_share_game_holds_players", "mcc_share_game_machine_active", "mcc_share_game_machine_needs_map", "mcc_share_game_handles_message",
            "mcc_share_game_handle_message", "mcc_identity_set_missing", "mcc_identity_host_package",
            "mcc_identity_accept_installed", "display_error_text_when_main_menu_loaded", "network_game_abort",
            "global_network_game_server_get", "global_network_game_client_get",
@@ -80,11 +83,12 @@ struct network_game_client;
 struct network_game_server *global_network_game_server_get(void);
 struct network_game_client *global_network_game_client_get(void);
 """,
-    "networking/network_game_manager.h": "void network_game_abort(void);\nstruct network_game *network_game_get_game(void);\n",
+    "networking/network_game_manager.h": "void network_game_abort(void);\nstruct network_game *network_game_get_game(void);\nstruct network_player;\nint network_player_is_valid(struct network_player *);\n",
     "networking/network_client_manager.h": """struct network_game_client;
 #ifndef STUB_NETWORK_GAME
 #define STUB_NETWORK_GAME
-struct network_game { struct { char name[128]; } map; unsigned char mcc_content_sha256[32], mcc_metadata_sha256[32]; };
+struct network_player { int valid; long machine_index; };
+struct network_game { struct { char name[128]; } map; unsigned char mcc_content_sha256[32], mcc_metadata_sha256[32]; struct network_player players[8]; };
 #endif
 struct network_game *network_game_client_get_game(struct network_game_client *client);
 """,
@@ -151,8 +155,27 @@ def build(work, share_source=None, package_source=None):
     workshop = stubs / "mcc_workshop.c"
     workshop.write_text("#define fopen fixture_fopen\n" + (GAME / "mcc_workshop.c").read_text())
     exe = work / ("game_test.exe" if windows else "game_test")
+    hooks = work / "map_share_hooks.c"
+    legacy = (GAME / "map_share.c").read_text()
+    hooks.write_text('''#include <stddef.h>
+typedef int boolean;
+#define TRUE 1
+struct host_machine {int downloading,downloaded;};
+static struct {struct host_machine machines[128];} map_share_globals;
+static int host_machine_valid(long i){return i>=0&&i<128;}
+static int host_machine_downloading(struct host_machine const *m){return m->downloading;}
+int h_mcc_share_game_machine_active(long);
+int h_mcc_share_game_machine_needs_map(long);
+#define mcc_share_game_machine_active h_mcc_share_game_machine_active
+#define mcc_share_game_machine_needs_map h_mcc_share_game_machine_needs_map
+void fixture_ce_download(int downloading,int downloaded){
+ map_share_globals.machines[6].downloading=downloading;
+ map_share_globals.machines[6].downloaded=downloaded;
+}
+''' + function(legacy, "map_share_machine_downloading") + '\n' +
+                     function(legacy, "map_share_machine_needs_map"))
     result = subprocess.run([clang, *flags, *sanitize, "-std=gnu89", "-g", "-Wall", "-Wextra", "-Werror",
-                             "-Wno-unused-parameter", *includes, str(DRIVER), *map(str, objects),
+                             "-Wno-unused-parameter", *includes, str(DRIVER), str(hooks), *map(str, objects),
                              *[str(GAME / n) for n in ("mcc_share_session.c", "mcc_share_stage.c", "mcc_share_list.c",
                                                        "mcc_share_rules.c", "mcc_package.c", "mcc_sha256.c")],
                              str(workshop), str(ROOT / "port/linux/src/posix_mcc_share.c"), "-o", str(exe)],
@@ -188,6 +211,17 @@ def test_allocator_domain_negative_control(tmp_path):
     exe = build(tmp_path, changed)
     result = run_case(exe, "transfer", tmp_path / "work")
     assert result.returncode != 0 and "engine free received a non-engine allocation" in result.stderr
+
+
+def test_completed_download_needs_time_for_player_admission(tmp_path):
+    source = (GAME / "mcc_share.c").read_text()
+    statement = "mcc_share_admission_pending[machine]=1;"
+    assert source.count(statement) == 1
+    changed = tmp_path / "without_admission.c"
+    changed.write_text(source.replace(statement, "mcc_share_admission_pending[machine]=0;"))
+    exe = build(tmp_path, changed)
+    result = run_case(exe, "admission_grace", tmp_path / "work")
+    assert result.returncode == 1 and "map_share_machine_downloading(MACHINE)" in result.stderr
 
 
 @pytest.mark.parametrize("before,after,case", [
