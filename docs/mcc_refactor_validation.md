@@ -75,14 +75,102 @@ as current. Complete the campaign manifests, follow-on missions and host menu
 entry that the PR explicitly leaves out of scope.
 
 MCC transfers have one source: the host. Host sharing is opt-in and off by
-default; honor the joiner's download preference. Retain the PR's distinction
-between eligible hand-placed packages and Workshop subscription guidance.
-Do not silently broaden its content eligibility. Review the host-local
-classification list, attribution, manifest identity, staging, installation
-and failure cleanup. Campaign delivery must declare and validate mission
-dependencies and progression. Downloading missions as needed after obtaining
-the manifest is a proposed design to settle during review, not an implemented
-or separately confirmed policy.
+default; honor the joiner's download preference. The user has explicitly
+approved extending the PR to eligible Workshop packages as well as hand-placed
+packages. Use one transfer/validation implementation for both origins. Preserve
+Workshop attribution and links, apply content eligibility and redistribution
+restrictions, and retain subscription/manual installation as an alternative.
+Workshop presence alone does not establish eligibility or validate received
+bytes. Review the host-local classification list, manifest identity, staging,
+installation and failure cleanup. Campaign delivery must declare and validate
+mission dependencies and progression. The agreed policy is to obtain and verify
+the campaign manifest upfront, then download and verify each mission and its
+required resources before that mission starts. Reuse matching verified local
+content rather than downloading it again. This policy is approved for
+implementation; it is not yet implemented or runtime-validated.
+
+Keep host-delivered content separate from Steam-managed and manually installed
+packages. Identify the host's exact package/dependency snapshot by content
+hashes, reuse a matching local copy, and never overwrite another installed
+version to satisfy a join. Received content is a managed copy, not a Steam
+subscription or a promise of automatic Workshop updates. Show attribution,
+storage use and removal controls without treating saves as disposable data.
+
+The agreed join flow detects missing or differing
+content before gameplay and offers a size-labelled host download, the Workshop
+page when applicable, or cancellation. Host-download acceptance starts the
+validated transfer and resumes joining only after successful installation and
+identity checks. Use the existing `network.map_download` client permission and
+Download Maps menu switch for MCC as well as CE. Preserve its existing default
+(on) and CE behavior; update setting/menu help to explain MCC host-only downloads.
+For MCC, this permission allows the offer; accepting the prompt starts the
+package download. If either host sharing or client downloads is off, omit the
+host-download option, explain the applicable setting and direct Workshop users
+to the Workshop page. A matching local
+copy needs no download prompt. Workshop/manual installation must be rechecked:
+the current Workshop revision may still differ from the host's snapshot. On
+web, opening a Workshop page does not install files into OPFS; manual content
+must be imported through the browser's package importer. Keep this distinction
+explicit in the design and tests.
+
+The user has confirmed the sharing-disabled case: when the host has MCC map
+sharing off, a Workshop package mismatch offers only the Workshop page as a
+content-acquisition action, plus cancellation/dismissal. Omit the host-download
+option and explain that the host has disabled sharing. Do not label a differing
+package as older or newer unless reliable version information establishes that
+ordering. If no valid Workshop reference exists, explain that matching content
+must be obtained manually rather than presenting a broken Workshop action.
+These rules are agreed; final wording and layout remain implementation details.
+
+The user has approved sharing required JSON metadata and optional PNG previews
+as part of Milestone 13. Allow only recognized package metadata, including
+`ModInfo.json`, `CampaignInfo.json` and referenced mission/map metadata, plus
+explicitly referenced supported PNG previews. Do not transfer arbitrary JSON,
+images or other Workshop-folder contents. Apply the same host-only sharing
+permission and validated staging/install flow to these files.
+This explicitly includes version-mismatch downloads: accepting the host's
+version transfers its required JSON metadata and eligible optional PNG previews
+alongside the applicable maps/resources. Do not retain stale metadata or artwork
+from the client's differing package. Keep these files tied to the same host
+snapshot and preserve the agreed mission-by-mission campaign delivery policy.
+
+Local folders such as `mcc_maps/<package>/` use the same eligible-content,
+host-only transfer and client-permission rules without requiring Steam or a
+Workshop ID. Dedicated servers must be able to configure sharing and eligible
+packages without menus, with actionable validation/refusal logs. Serve an
+explicit package snapshot, not arbitrary folder contents; include supported
+metadata and previews when present. Simple standalone map packages need not
+invent campaign JSON or thumbnails; campaign progression requires valid campaign
+metadata. Use content identity rather than folder names to match existing copies.
+When downloads are unavailable, show a valid Workshop page if the local package
+has a Workshop reference; otherwise explain which package/content is required
+and that it must be obtained from the server operator and installed manually.
+Do not invent Workshop links or automatically fetch arbitrary host-supplied URLs.
+Retain the existing exclusions for loose root maps, stock content and `_shared`
+resource directories as transfer packages; report required unavailable
+dependencies instead of silently copying global resources.
+
+Validate received metadata fields and package-relative paths; prevent traversal,
+symlink/junction escapes and overwrites of existing installations. Bound file
+counts, individual and total byte sizes, parsing depth and decoded image memory.
+Retain the supported PNG subset and validate actual content, not just filenames.
+The existing readers provide a starting point: JSON is limited to 256 KiB per
+file, and PNG previews to 8 MiB and 2048 by 2048 pixels. Review aggregate budgets
+and enforce receiving-client checks before accepting network-delivered files.
+Treat descriptions as plain text; never execute metadata or automatically fetch
+its URLs. Content hashes establish agreement with the host's manifest, not
+safety. Keep optional preview failure separate from required-content admission:
+reject invalid artwork and use the existing placeholder; invalid required
+campaign metadata blocks installation with an actionable explanation.
+
+Validation must include malformed JSON and PNG inputs, parser/decoder fuzzing,
+path escapes, oversized and excessive files, truncated or hash-mismatched
+transfers, optional-image fallback and required-metadata rejection. Verify the
+resulting menus and campaign progression. Exercise all host-sharing/client-download
+setting combinations, differing-version metadata/artwork, local-only dedicated
+server packages, and packages with and without Workshop references. These are
+agreed implementation and
+validation requirements, not a completed security audit or test results.
 
 Validate real transfers and resulting gameplay, host/client authority,
 disabled settings, content changes, interrupted transfers, destination
