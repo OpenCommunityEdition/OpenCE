@@ -4243,8 +4243,11 @@ boolean biped_update(
 			if (TEST_FLAG(biped->unit.control_flags, _unit_control_action_bit))
 				unit_try_and_exit_seat(biped_index);
 
+			/* port: a vehicle on its side throws its riders too, as the retail
+			game does (vehicle_is_flipped: up.k below 0.2). This build threw
+			them only once the vehicle was upside down (up.k below 0). */
 			if (rider_ejection &&
-				vehicle->object.up.k<0.f &&
+				vehicle_is_flipped(biped->object.parent_object_index) &&
 				TEST_FLAG(vehicle->object.flags, _object_on_ground_bit))
 			{
 				unit_exit_seat_end(biped_index);
