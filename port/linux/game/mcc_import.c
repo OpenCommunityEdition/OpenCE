@@ -30,6 +30,7 @@ sound banks, which are not read yet.
 #include "tag_files/tag_groups.h"
 #include "bitmaps/bitmap_group.h"
 #include "hs/hs.h"
+#include "hs/hs_scenario_definitions.h"
 #include "models/model_definitions.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_geometry.h"
@@ -416,6 +417,90 @@ static void mcc_import_keep_walk(
 	return;
 }
 
+/* the loaded tag (its index) that is the disc's object of the name of the
+loaded object `handle` names, where that one is not the disc's (MCC's
+scripts take a10's and d20's pelican for scenery, the disc's for the vehicle
+it is), or NONE */
+static long mcc_import_disc_object(
+	long handle)
+{
+	static unsigned long const object_groups[] =
+	{
+		'bipd', 'vehi', 'weap', 'eqip', 'garb', 'proj', 'scen', 'mach', 'ctrl', 'lifi', 'plac', 'ssce'
+	};
+	long old_index = handle == NONE ? NONE : handle & 0xFFFF;
+	long index;
+
+	if (old_index == NONE || old_index >= mcc_import_globals.tag_count || mcc_import_globals.old_to_new[old_index] != NONE)
+		return NONE;
+	for (index = 0; index < mcc_import_globals.tag_count; index++)
+	{
+		struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[index];
+		short group;
+
+		if (mcc_import_globals.old_to_new[index] == NONE ||
+			strcmp(instance->name, mcc_import_globals.instances[old_index].name))
+		{
+			continue;
+		}
+		for (group = 0; group < NUMBEROF(object_groups); group++)
+		{
+			if ((unsigned long)instance->group_tag == object_groups[group])
+				return index;
+		}
+	}
+
+	return NONE;
+}
+
+/* the objects MCC's scripts name under another group than the disc's (the
+scenario's script references and syntax nodes), named as the disc's: the
+other is then not written, and the disc's tags are all the map simulates */
+static void mcc_import_scripts_disc_objects(
+	void)
+{
+	struct scenario *scenario = mcc_import_globals.instances[mcc_import_globals.table.scenario_index].base_address;
+	struct tag_data const *syntax_data;
+	byte *syntax;
+	short node_count, node_index;
+	long index;
+
+	if (!scenario)
+		return;
+	for (index = 0; scenario->hs_references.address && index < scenario->hs_references.count; index++)
+	{
+		struct tag_reference *reference = &((struct hs_reference *)scenario->hs_references.address)[index].reference;
+		long disc_index = mcc_import_disc_object(reference->index);
+
+		if (disc_index != NONE)
+		{
+			struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[disc_index];
+
+			reference->group_tag = (unsigned long)instance->group_tag;
+			reference->name = instance->name;
+			reference->index = instance->tag_index;
+		}
+	}
+	syntax_data = (struct tag_data const *)((byte const *)scenario + V5_SCENARIO_SCRIPT_SYNTAX_DATA_OFFSET);
+	syntax = syntax_data->address;
+	node_count = syntax && syntax_data->size >= V5_SCRIPT_NODES_OFFSET ? *(short const *)(syntax + V5_SCRIPT_NODE_COUNT_OFFSET) : 0;
+	for (node_index = 0; node_index < node_count &&
+		V5_SCRIPT_NODES_OFFSET + (node_index + 1) * V5_SCRIPT_NODE_BYTES <= syntax_data->size; node_index++)
+	{
+		byte *node = syntax + V5_SCRIPT_NODES_OFFSET + node_index * V5_SCRIPT_NODE_BYTES;
+
+		if (*(short const *)node && (*(short const *)(node + 6) & 1) && *(short const *)(node + 4) == _hs_type_object_definition)
+		{
+			long disc_index = mcc_import_disc_object(*(long const *)(node + 0x10));
+
+			if (disc_index != NONE)
+				*(long *)(node + 0x10) = mcc_import_globals.instances[disc_index].tag_index;
+		}
+	}
+
+	return;
+}
+
 /* Until the patch names the disc's tags in their place, the loaded tags the
 written ones name (by reference, tag index or script) are written too, after
 the disc's; the rest of what MCC added is left out. */
@@ -424,6 +509,7 @@ static boolean mcc_import_keep(
 {
 	long out_index;
 
+	mcc_import_scripts_disc_objects();
 	/* the structure BSPs' first (they are read only to be written: read here
 	too, as they are then, for the tags they name) */
 	{
