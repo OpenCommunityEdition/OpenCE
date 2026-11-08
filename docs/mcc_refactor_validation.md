@@ -20,8 +20,9 @@ revisions, verified cleanup and archived-evidence replay are complete. On
 for both milestones; the 8 November request also supersedes the console deferral.
 The stage evidence below records the changes, actual validation and limits.
 The subsequent delivery plan adds Milestone 13 for host sharing, Milestone 14
-for Custom Edition and MCC browser playability, and Milestone 15 for the
-upstream contribution. Milestone 13 is complete within the validation limits
+for Custom Edition and MCC browser playability, Milestone 15 for general MCC
+HUD corrections and shared cinematic aim, and Milestone 16 for the upstream
+contribution. Milestone 13 is complete within the validation limits
 recorded below. CI through `a972f450a`,
 native downloads, metadata-mismatch preservation, managed removal and Mercury
 follow-on gameplay have passed within the recorded limits. The dedicated
@@ -33,7 +34,8 @@ passes. Final Xbox/CE native controls, all three native/browser networking
 controls, combined implementation review and verified cleanup are complete.
 Milestone 14's browser implementation and Stock-menu acceptance checks are
 complete within the recorded limits below. The separate shared cinematic-state
-finding remains an upstream-delivery follow-up. Milestone 15 remains planned.
+finding is now part of the planned Milestone 15, alongside the three reported
+HUD issues. Milestone 15 implementation has not started; Milestone 16 follows it.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -50,7 +52,8 @@ finding remains an upstream-delivery follow-up. Milestone 15 remains planned.
 | 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
 | 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | Complete; final review, native/transport controls, CI and cleanup pass within recorded limits |
 | 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Complete within recorded limits; Stock browser target validated |
-| 15 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestones 13 and 14; previously numbered 14 |
+| 15 | Correct MCC HUD text placement, ballistic counters and scope-mask scaling, plus shared cinematic aim synchronization. | Planned; recommendations and acceptance criteria recorded, implementation not started |
+| 16 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestone 15; previously numbered 15, originally 14 |
 
 The completed Milestone 10 gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
 with passing MCC and four-platform debug workflows and 87 focused local passes.
@@ -763,7 +766,7 @@ remain available for the user. Completion means the agreed native M13 delivery
 and its bounded checks are complete, not proof of every map, full campaigns,
 two-physical-PC interoperability or Android-device play. MCC/CE browser
 playability, persistence and native/browser gameplay remain Milestone 14;
-the MCC-only upstream protocol contribution remains Milestone 15.
+the MCC-only upstream protocol contribution is now Milestone 16.
 
 ### Milestone 14: Custom Edition and MCC browser playability
 
@@ -1628,7 +1631,7 @@ storage, unchanged input/artifact hashes and normal native exit. Exact artifacts
 are recorded in `build/m14-runtime/combined-build-menu-parity.json`; its native
 SHA-256 is `4fa2c6385196cbc3807ebdff9479f144b39b230e5b36ef3b4be086c690a73aa0`.
 This is Stock/OpenCE functionality in the refactored fork; the actual upstream
-branch still requires its own validation in Milestone 15.
+branch still requires its own validation in Milestone 16.
 
 The user subsequently limits browser acceptance to Stock/OpenCE: Gulch does not
 host the browser build, and its Modern and styled menus are desktop features
@@ -1682,9 +1685,90 @@ the separate native cinematic evidence remains approximately 4 MB. Current
 native builds and installed toolchains remain usable. The final document review
 checks 567 local links across the milestone's changed Markdown with none missing.
 
-### Milestone 15: MCC-only upstream contribution
+### Milestone 15: MCC HUD corrections and shared cinematic aim
 
-After Milestones 13 and 14, create `GET-YOUR-MCC-HERE` against the then-current
+Planning scope agreed on 8 November 2026; implementation has not started.
+Continue on `mcc-code-refactor` as the sole primary agent. This milestone has
+three MCC compatibility-engine corrections and one shared co-op correction.
+Fix data interpretation and responsible engine behavior, with no map-name,
+Workshop-ID, weapon-name or resolution-specific placement patches. Preserve
+authored custom layouts and the established Xbox/CE paths. Evidence must
+justify each change; the screenshots establish symptoms, not their causes.
+
+#### 15A: Reproduce and trace the three HUD symptoms
+
+The user supplied three local screenshots after the Discord image URLs could
+not be retrieved. Source inspection and those images establish the following
+starting points; no new game run or map-tag inspection has yet been performed.
+
+| Issue | Observed/reported evidence | Investigation and intended correction |
+| --- | --- | --- |
+| Ruby's Rebalanced HUD strings | At 1280x720, the objective text “Follow the Monitor to the Index” touches the ammunition display. | Trace this text's actual draw path, authored anchor, offsets, line bounds and chosen safe frame against adjacent HUD geometry. Correct the general MCC placement rule if their coordinate handling differs. Do not assume every HUD string uses the messaging path or shift every string by a constant. |
+| Halo: Infinite Evolved ballistic ammunition | At 1280x720, the ballistic counter is above/left of the grenade counter. The user reports battery counters already align correctly. | Compare ballistic numbers, their background, battery meters and grenade elements under the same weapon-HUD hierarchy. Trace parent/child anchors, frame ownership and number origins. Restore the intended alignment for this authored layout without forcing every custom HUD to align with grenades. |
+| MCC scope masks | At 1280x800, the attached 2x scope's circular mask nearly spans the image height; the user reports excessive sizing while Xbox/CE scopes are correct. | Inspect authored bitmap/sprite bounds, registration, high-resolution and half-HUD flags, placement scale and zoom-overlay handling. Establish expected geometry from the map data and, where available, a matching reference capture. Correct conversion/draw scaling once at the responsible MCC boundary; preserve zoom/FOV and reticle behavior. |
+
+Likely reading routes are `mcc_hud_convert`, `mcc_hud_offset` and
+`mcc_hud_message_frame` in [mcc_hud.c](../port/linux/game/mcc_hud.c), frame
+classification in [mcc_hud_layout.inl](../port/linux/game/mcc_hud_layout.inl),
+and `mcc_hud_weapon_frame_begin`, `mcc_hud_anchor_point` and
+`mcc_hud_anchor_number` in [mcc_hud_draw.c](../port/linux/game/mcc_hud_draw.c).
+Existing code distinguishes bitmap scaling, number placement, messaging and
+weapon hierarchy frame selection. That makes inconsistent treatment a useful
+hypothesis, not a confirmed diagnosis. Follow the actual callers in
+[hud_draw.c](../source/interface/hud_draw.c),
+[hud_weapon.c](../source/interface/hud_weapon.c) and
+[hud_messaging.c](../source/interface/hud_messaging.c); existing Xbox/CE paths
+are references and regression controls, not implementations to repurpose.
+
+#### 15B: Correct and validate MCC layout and scope behavior
+
+Address text/counter placement together if evidence shows a common cause;
+keep independent defects in separately reviewable changes. Treat scope masks
+as a distinct scaling case until evidence demonstrates otherwise. Prefer an
+MCC-owned correction through the existing hooks. Any additional shared hook
+must be minimal, guarded and justified under the isolation rules.
+
+Add failing regressions against the real conversion/drawing implementation,
+covering both affected and deliberately different authored layouts. Extend the
+existing HUD layout/normalization tests rather than duplicating their model.
+Verify actual rendered output on Ruby's Rebalanced, Halo: Infinite Evolved and
+another affected MCC package, with Xbox/CE HUD and scope controls. Cover
+ballistic and battery weapons, weapon switching, pickup/objective messages,
+multiple supported zoom levels, and 4:3, 16:9 and 16:10 viewports. Check
+split-screen viewport ownership where supported and MCC-to-CE/Xbox transitions.
+Record exact maps, settings, revisions and matched before/after screenshots.
+Pure rendering corrections should not alter simulation or wire agreement;
+review that assumption against the actual changes.
+
+#### 15C: Correct shared cinematic aim synchronization
+
+Use the existing [native reproduction](#separate-shared-cinematic-state-finding)
+as the starting regression. Instrument the first divergent player creation or
+update, including input inhibition, authored aim/look, late-join ordering and
+checkpoint restoration. Define the smallest authoritative shared state contract
+that fixes the demonstrated gap and preserves normal input prediction. Do not
+substitute body-forward for authored aim, special-case Ruby or relax the judge.
+
+Validate early/late joins, both host roles, cinematic skip and natural completion,
+checkpoint/revert and subsequent controllable gameplay. Include representative
+Xbox, supported CE and affected MCC cases, native pairs and native/browser
+pairs. Version any changed wire data or simulation agreement as required;
+Milestone 16 must incorporate that contract into its unified upstream agreement.
+
+#### 15D: Combined review and completion gate
+
+Complete a primary-agent review of implementation, integration, documentation
+and regression coverage before the final affected checks. Run the required
+Windows/Linux/Android/web builds and CI, plus relevant rendering and networking
+controls. Browser menu acceptance remains Stock/OpenCE; Gulch styled menus
+retain their desktop scope. Preserve failures and uncertainties, clean verified
+test outputs, and archive inactive saves losslessly. Completion requires
+evidence-backed correction of all four issues and documented validation limits;
+a build or successful map load alone is insufficient. Only then start Milestone 16.
+
+### Milestone 16: MCC-only upstream contribution
+
+After Milestones 13–15, create `GET-YOUR-MCC-HERE` against the then-current
 OpenCE `main`. The completed `mcc-code-refactor` branch is the source of the
 contribution, including its MCC documentation and regression tests. Preserve
 provenance and exclude unrelated fork features, settings, assets and integration
