@@ -1344,6 +1344,9 @@ static void widget_instance_give_focus_by_tag(
 	struct widget_instance *widget,
 	long tag_index,
 	short local_player_index);
+/* port: (ui_mouse_targets) */
+static void ui_mouse_targets_forget(
+	void);
 
 static __inline struct widget_instance *widget_instance_get_tail_child_widget(
 	struct widget_instance *widget);
@@ -2301,6 +2304,11 @@ void ui_widget_delete(
 	if (widget->delete_recursion_lock)
 		return;
 	widget->delete_recursion_lock = TRUE;
+	/* port: the pointer's targets of the frame drawn last may name this
+	widget: forgotten until the next frame notes them again (a campaign's
+	pause menu, closed as the game goes back to the main menu, was given the
+	focus once the menus' map had loaded, with a tag index of the level's) */
+	ui_mouse_targets_forget();
 	if (widget->local_player_index != NONE && !widget->parent)
 		player_control_inhibit_buttons(
 			widget->local_player_index,
@@ -5858,6 +5866,16 @@ mirror (render.c), and a second render would note the same widgets again
 and widen the values once more, which moves their split off the arrows.
 Cleared with the targets, by ui_widgets_process_mouse */
 static boolean ui_mouse_targets_settled = FALSE;
+
+/* (a widget deleted: ui_widget_delete) */
+static void ui_mouse_targets_forget(
+	void)
+{
+	ui_mouse_target_count = 0;
+	ui_mouse_targets_settled = FALSE;
+
+	return;
+}
 
 /* The presses the mouse makes, posted one a frame: the event queue keeps
 only the latest event posted between two frames (queue_event). What they
