@@ -151,11 +151,19 @@ the outputs and stops subsequent cases so they can be investigated safely.
 [Milestone 10](../mcc_refactor_validation.md#milestone-10-shared-co-op-checkpoint-recovery)
 tracks shared co-op recovery, and
 [Milestone 11](../mcc_refactor_validation.md#milestone-11-shared-boat-control-initialization)
-tracks the shared boat correction and the separately authorized console
-lifetime repair. Milestone 10 is complete. Milestone 11's implementation and
-version separation are recorded in the Stage 11 evidence; consult its actual
-results and limits rather than treating the milestone's proposed checks as
-completed validation.
+tracks shared boat initialization, recovery from small client clock delays
+exposed by Mercury, and the separately authorized console lifetime repair.
+Read `update_human_boat_physics` in
+[vehicles.c](../../source/units/vehicles.c), `game_time_update` in
+[game_time.c](../../source/game/game_time.c), and the console state helpers
+included by [hs_runtime.c](../../source/hs/hs_runtime.c). These correct existing
+engine contracts across map families; none selects a fix by map name.
+The Stage 11 evidence separates the original failures, focused source tests,
+native runtime checks and three actual-map Internet cases. Mercury driving
+passes the unchanged comparison thresholds; the other affected Workshop B30
+check establishes static boat presence only. Network agreements are separated,
+and old-layout console saves are refused. Consult the recorded limits before
+inferring full campaign, every-map or old-peer compatibility.
 
 ## Work through a suspected movement regression
 

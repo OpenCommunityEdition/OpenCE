@@ -12,8 +12,10 @@ checkpoint checks, rejoin and native/browser transport controls pass within
 the limits below. Milestone 10's implementation, validation, combined review
 and verified cleanup are complete. This qualifies the demonstrated recovery
 repair without asserting full campaign or every-map compatibility.
-The shared boat correction and separately authorized console-syntax correction
-are implemented under Milestone 11 and undergoing final validation. On
+The shared boat correction, Mercury's shared clock-recovery correction and
+separately authorized console-syntax correction are implemented under
+Milestone 11. Its combined review, final native/Internet checks, both CI
+revisions, verified cleanup and archived-evidence replay are complete. On
 7 November the user explicitly removed the old-client crossplay constraint
 for both milestones; the 8 November request also supersedes the console deferral.
 The stage evidence below records the changes, actual validation and limits.
@@ -21,16 +23,16 @@ The stage evidence below records the changes, actual validation and limits.
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
 | 1 | Establish executable regression coverage, CI and Workshop runtime baselines. | Complete |
-| 2 | Reproduce the shared boat defect and establish the crossplay constraint. | Investigation complete; correction tracked in Milestone 11 |
+| 2 | Reproduce the shared boat defect and establish the crossplay constraint. | Investigation complete; corrected in Milestone 11 |
 | 3 | Remove redundant MCC resource ordering and bitmap ownership lookup work. | Complete |
 | 4 | Replace repeated per-texture stream scans with a local per-tag cursor. | Complete |
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
-| 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; console correction reopened alongside Milestone 11 |
+| 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; console defect corrected alongside Milestone 11 |
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; recovery failure addressed in Milestone 10 |
 | 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
-| 11 | Correct shared boat control initialization under a separated engine/network agreement; complete the separately authorized console lifetime correction. | In progress; implementation and validation |
+| 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
 
 The completed Milestone 10 gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
 with passing MCC and four-platform debug workflows and 87 focused local passes.
@@ -38,7 +40,7 @@ The comment-only follow-up `7ed70168a` also passes both workflows.
 Its [validation record](#stage-10-shared-checkpoint-recovery-fix) distinguishes
 the authenticated local native build from the exact-revision CI Web build,
 pre-final checks from final checks, and passing transport from unmeasured
-cross-log state equivalence. The new agreements are base 32714, MCC 66 and
+cross-log state equivalence. Its then-current agreements were base 32714, MCC 66 and
 camera 32716/32717; historical verification used OpenCE 41/MCC 65.
 All 21 structural HUD profiles remain with measured evidence and removal
 conditions. On 8 November the user explicitly authorized the shared console
@@ -85,8 +87,9 @@ Stage 6 also retained a baseline assertion when a checkpoint captured a
 sleeping temporary console expression. Investigate that expression's syntax
 lifetime separately from CRC validity; the recorded standalone-save controls
 pass. Stage 7 reproduced this on Xbox, CE and MCC and isolated a shared
-syntax-lifetime defect. Its correction is explicitly deferred pending a shared
-save/ownership design; see [Stage 7 evidence](#stage-7-scripts-and-state-lifecycle).
+syntax-lifetime defect. Its correction was deferred pending a shared
+save/ownership design, then explicitly reopened alongside Milestone 11;
+see [Stage 7 evidence](#stage-7-scripts-and-state-lifecycle).
 
 Complete when reviewed paths and ownership rules are recorded, demonstrated
 defects/redundancy are addressed within scope, and affected save/revert,
@@ -238,7 +241,9 @@ Convert the twelve strict legacy expected failures to ordinary passing
 regressions only when the authorized correction fixes those paths; preserve
 their behavioral coverage and historical failures. A compatibility-dependent
 deferral leaves this repair milestone open. This remains separate work after
-Milestone 10. Its implementation and validation are now in progress.
+Milestone 10. Implementation, validation and verified cleanup are complete;
+the Stage 11 record below includes Mercury's subsequently authorized shared
+clock correction and the console lifetime repair, with their actual limits.
 
 #### Former deferral: unconditional shared boat fix
 
@@ -2632,10 +2637,11 @@ and receive-history resets each prevent a separately covered regression.
 The review and raw-evidence audits are retained under
 `build/stage10-fix/reviews`; no map identity selects the recovery behavior.
 
-Milestone 10 is complete. Milestone 11 remains next under the authorized
-version-separation policy; its shared boat correction has not started and the
-twelve existing strict expected failures remain recorded. The separate
-console-syntax lifetime correction stays deferred.
+At Milestone 10 completion, Milestone 11 was next under the authorized
+version-separation policy: its shared boat correction had not started and the
+twelve strict expected failures remained. The separate console correction was
+still deferred then. Stage 11 below records their subsequently authorized and
+completed repairs.
 
 Verified cleanup is recorded in `build/stage10-fix/cleanup-plan-final-v6.json`,
 `cleanup-applied.json` and `cleanup-post-verification.log`. Across sixteen
@@ -2686,8 +2692,8 @@ claim about every MCC sidecar. Historical failures and archives under
 
 ## Stage 11: shared boat and console lifetime corrections
 
-Implementation and validation are in progress. The 8 November request includes
-both Milestone 11's shared boat fix and the separately investigated console
+Implementation, validation and verified cleanup are complete. The 8 November
+request includes both Milestone 11's shared boat fix and the separately investigated console
 syntax lifetime defect. The earlier console deferral is historical. Work stays
 in the existing `mcc-code-refactor` worktree; original maps and saves are untouched.
 The later request explicitly includes diagnosing and correcting Mercury's
@@ -2749,7 +2755,7 @@ survey selects runtime cases; it does not establish loading or gameplay success.
 The inspector, input hashes and authored tag/placement records are retained in
 `build/stage11-fix/validation`.
 
-### Actual boat observations and the remaining synchronization limit
+### Pre-clock boat observations and synchronization failure
 
 The original affected Workshop B30 map runs unchanged on two peers for 1,200
 fresh ticks. Read-only PDB-bound observations retain 351 host and 342 client
@@ -2791,11 +2797,12 @@ remain failed. No retry for favorable timing, shifted logs or relaxed tolerance
 is used to declare a pass.
 
 The shared control initialization is established independently by the failing
-legacy harness and passing corrected cases. These runtime runs establish
+legacy harness and passing corrected cases. These pre-clock runtime runs establish
 preserved finite MCC control production, occupied driving and client prediction
 within their observed windows. They leave the pre-existing host-driven network
-position discrepancy unresolved; complete boat synchronization is not signed
-off. The fixture, runner controls, raw observations and independent audits are
+position discrepancy unresolved at that revision. The later clock correction
+and its separate acceptance result follow below. The fixture, runner controls,
+raw observations and independent audits are
 under `boat`, `runtime` and `reviews` in the Stage 11 evidence root.
 
 ### Shared recovery from small clock delays
@@ -2837,14 +2844,48 @@ those 47. Eleven admission/codec checks pass with shared agreement 32722,
 MCC 68 and camera 32724/32725. Previous agreements remain refused, including
 direct joins and composed MCC/camera envelopes; the wire manifest changes
 only the agreement values. The Windows portable release build succeeds with
-the existing Expat import warnings. Platform CI and loaded-world checks for
-this timing change remain pending.
+the existing Expat import warnings. The completed platform and loaded-world
+checks for this timing change are recorded below.
 
 The pre-clock native build is preserved byte-for-byte under `baseline-clock`
 with its executable/PDB/SDL receipt. A fresh `mercury-clock` fixture has the
 same map bytes as the earlier name-only fixture; the historical fixture and
-cleanup receipt are not overwritten. Corrected-clock runtime validation is
-still pending; the implementation alone is not a passing Mercury result.
+cleanup receipt are not overwritten.
+
+On `6096b0b4f969ad24c4f664cf90f276593ed244ce`, Mercury passes both driving
+directions with the original two-tick pairing window, one-world-unit position
+limit and two-consecutive-sample failure rule. Client driving has 39 paired
+seconds and a maximum position difference of 0.278; host driving has 36 and
+0.343. All 1,353 raw driving observations retain finite occupied state and
+the correct player/driver/passenger identities. The host accepts 325 distinct
+fresh client boat predictions. Both processes exit normally.
+
+The authored BSP transition still produces a seven-tick clock delay. The
+client recovers to within two ticks in 3.192 seconds and remains within that
+bound for the remaining 668 nearby wall-time observations; both driving
+windows have median clock offset zero. Raw frame observations include actual
+two-tick catch-up frames. These clock observations explain the correction;
+the unshifted simulation-tick comparison above is the driving acceptance gate.
+A receipt proves that the runner, observer, input implementation and comparator
+are byte-identical between the failed pre-clock and passing clock runs.
+
+The broad on-foot comparison remains **INCONCLUSIVE** because the driving
+scenario supplies only twelve qualifying on-foot drift ticks. It has no
+persistent divergence across 84 paired seconds, but one isolated position
+mismatch reaches 1.073. That broad result is not relabeled as passing; the
+separate boat comparison supplies the occupied-driving evidence.
+See `runtime/boat-6096b0b4f-mercury-clock`,
+`reviews/boat-6096b0b4f-mercury-clock-clock-followup.json` and
+`reviews/6096-mercury-unchanged-method-receipt.json`.
+
+The unchanged original Workshop B30 also passes its 1,200-tick static boat
+control on this build: 342 host and 340 client observations in the fresh
+window, 39 paired seconds and zero position difference. Independent replay
+checks both guarded reads for 1,402 total observations and all 107 frozen
+evidence files. Movement, velocity, throttle and driver counts remain zero;
+this supplies synchronized static presence, not additional driving coverage.
+The original Workshop inputs are unchanged in both tests. Both private
+Mercury fixtures have been removed through their separate verified cleanup.
 
 ### Shared console ownership
 
@@ -2977,7 +3018,7 @@ not a full-coverage pass. The second round provides the stronger CE comparison;
 no retry or shifted log substitutes for the first round. These are same-map
 round transitions, not disconnected-client rejoin tests.
 
-The final test-bearing revision `ea2bef9bbd9fb9c8e18a2c9b718326c99dfce7de`
+The pre-clock test-bearing revision `ea2bef9bbd9fb9c8e18a2c9b718326c99dfce7de`
 passes [Build run 42439268449](https://github.com/chestahh/GulchCE/actions/runs/42439268449)
 on Windows, Linux, Android and Web, and
 [MCC run 42439268534](https://github.com/chestahh/GulchCE/actions/runs/42439268534)
@@ -2992,3 +3033,232 @@ each. Intentional ten-percent datagram-loss controls return 676/960 and 723/960
 respectively. These are transport controls, distinct from actual-map gameplay.
 The complete logs, metadata and source identities are retained under
 `build/stage11-fix/ci`, summarized in `summary-final-ea2bef9bb.json`.
+
+### Combined clock revision: final native checks and platform CI
+
+The complete gameplay implementation at
+`6096b0b4f969ad24c4f664cf90f276593ed244ce` passes the combined implementation
+review and 462 final focused tests, with no skips or failures. These include
+64 boat, 111 console-lifetime and 47 clock cases, plus neighboring vehicles,
+co-op wipes/recovery, native/MCC checkpoints, epochs, pause, saved-game routing
+and protocol admission/codec coverage. These overlap earlier selections and
+are not added to them as unique coverage. The receipt records the exact
+command, per-module counts and 128 source/test hashes.
+
+The separately invoked `tools/test_checkpoint_timing.py` CLI is not collected
+by pytest and is not one of those 462 passes. Its existing fake world still
+names `game_safe_to_save`, while the extracted caller now uses
+`coop_scripts_safe_to_save`; the standalone invocation fails to compile.
+The caller change predates this milestone. A private one-line fixture
+correction passes the timing assertions at four frame rates, and four
+selective faulty implementations are rejected by those assertions. The
+one-line fixture correction and explicit Linux CI invocation are now applied;
+the final Windows CLI run passes at 30, 60, 120 and 990 frames per second,
+including its timeout, rewind and pause assertions. The completed Linux CI log
+also executes the standalone command and passes all four frame rates. The
+original failure is retained in
+`reviews/final-checkpoint-timing-6096.log`.
+
+The review confirms that all twelve previously reviewed boat/console source
+files are unchanged by the clock work. Local and host clock behavior remains
+unchanged in the extracted-source checks; only distributed clients catch up.
+The earlier 17-process console matrix and map-family lifecycle run therefore
+retain their original provenance rather than being represented as reruns.
+The following new paired recovery tests exercise the combined implementation
+with the same fresh checkpoint, two-wipe and minimum tick-window requirements:
+
+| Map and session profile | Paired state seconds | Authoritative drift samples |
+| --- | ---: | ---: |
+| Ruby B40, Standard | 60 | 2,175 |
+| Xbox B30, Standard | 66 | 1,998 |
+| Mercury2, Third Person agreement with camera forced off | 71 | 2,111 |
+
+Each passes independent raw replay, live player-unit/attachment and inventory
+checks, checkpoint epochs and normal exits, with no comparison problems or
+divergences. Maximum paired position differences are respectively zero,
+0.003742 and 0.029275. The earlier limitation about authored replacement of
+the current checkpoint still applies. The Mercury camera remains disabled;
+this is agreement/recovery validation, not a shoulder-camera rendering test.
+
+The new Xbox Blood Gulch and CE Death Island Slayer → lobby → Slayer controls
+each supply **31 paired seconds and 930 drift samples in each round**, with
+no problems or divergences. Xbox's maximum paired position difference is
+0.002449 in each round; CE's is zero. Both have zero authoritative drift
+differences. Both peers have one
+actual clock reset, a fresh 60–960-tick window in each round and normal exits.
+These complete the twenty-pair coverage requirement independently of the
+earlier limited CE run; that historical twelve-pair result remains unchanged.
+Evidence is in `runtime/*6096b0b4f*` and the corresponding independent audits
+under `validation/`.
+
+The portable Windows release executable has SHA-256
+`da8fa9004787ace509dddd61480f739a66e27a4c8193c953254be49bd580c76f`
+and PE/PDB identity `E5251594-AC49-CA85-4C4C-44205044422E`, age one.
+The build retains `--portable --release --pgo=off --lto=off`.
+[Build run 42443616551](https://github.com/chestahh/GulchCE/actions/runs/42443616551)
+passes Windows, Linux, Android and Web debug builds, and
+[MCC run 42443616589](https://github.com/chestahh/GulchCE/actions/runs/42443616589)
+passes readers, Windows adapters and 36 actual GPU-render cases. Linux's broad
+selection reports 2,678 passed, 27 skipped and seven subtests; subsequent job
+commands also pass. Skipped asset cases and branch-skipped release jobs are
+not runtime validation. Web's native WebRTC controls return 320/320 messages
+with both Chromium and Firefox; the deliberate datagram-loss controls return
+710/960 with each. These transport controls remain distinct from loaded-map
+gameplay. `ci/6096b0b4f969-final-receipt.json` binds fourteen retained evidence
+files to these exact jobs and revision.
+
+The test-only follow-up `cafddf5d3cd77827c93feca1c9f967ad23daed35` passes
+[Build run 42448770208](https://github.com/chestahh/GulchCE/actions/runs/42448770208)
+and [MCC run 42448771192](https://github.com/chestahh/GulchCE/actions/runs/42448771192).
+All four platform debug builds and the three MCC jobs pass, including the
+standalone checkpoint timing command in the completed Linux log. Its broad
+Linux selection again reports 2,678 passed, 27 skipped and seven subtests;
+MCC retains 36 actual GPU-render passes. WebRTC controls return 320/320 with
+both browsers; deliberate-loss controls return 714/960 in Chromium and 706/960
+in Firefox. These counts overlap the prior revision and are not additional
+unique tests. The `source` and `port` Git trees are byte-identical to 6096;
+runtime receipts retain their actual 6096 build provenance.
+`ci/cafddf5d3-final-receipt.json` binds eleven retained metadata/log files,
+independently rehashed after collection.
+
+The current separated agreements are shared 32722, MCC 68 and camera
+32724/32725. Neither old upstream crossplay nor old-layout save compatibility
+is claimed. Full campaigns, every installed map, Android hardware and public
+relay/NAT traversal remain outside the observed coverage.
+
+### Internet gameplay setup and retained failures
+
+Actual-map Internet checks use two isolated processes at a time: a local
+Windows release build and the exact-revision CI Web artifact, connected through
+a local broker and real WebRTC data channels. The Web ZIP is artifact
+`13602867233` from Build run `42443616551`, SHA-256
+`a08c85a8a7f503107753afc42df1f42f279b36aea78c8c29be3dabc9b70353ae`.
+All 24 expanded site files are verified against that archive. The browser
+itself is headless; the browser-host case renders its normal SDL canvas so
+ordinary console key events can be exercised.
+
+Several private test setup failures are retained rather than reclassified:
+
+- The earlier pre-clock native cue had a space that the inherited command
+  wrapper interpreted incorrectly. The corrected input is `60(sv_end_game)`.
+- The earlier browser's no-window SDL mode discarded keyboard input. A real
+  rendered canvas is required for this input test.
+- The first rendered browser attempt typed `9sv-end-game0`, as its screenshot
+  shows. Actual SDL key conversion requires Shift with the physical digit and
+  minus keys. Explicit paced key presses now produce `(sv_end_game)`, with
+  missing/stuck-Shift controls and a required screenshot before submission.
+- A native-host attempt entered its first game before the scheduled
+  twelve-second test start. A separate PDB-bound
+  observation replays 849 accepted double-read samples, retaining 116 races
+  as gaps. The engine completed its postgame timer and continued frames for
+  over 122 seconds in the scores state, but the debug test's `started` flag
+  remained false. Its automatic next-round gate was therefore never armed.
+  This diagnostic was ended normally and remains failed. The input code's
+  bot A presses in menus explain the early start, but the individual press
+  was not sampled. Host-only `look:0` input cannot press A, and the corrected
+  run records its scheduled start. A positive scheduled-start event
+  before the first complete gameplay sample is now mandatory. Client input,
+  shooting and all comparison thresholds remain unchanged.
+- The rendered browser-host v5 run executes the verified command, completes
+  both rounds and yields 47 paired seconds without gameplay divergence,
+  but still **fails** the overall gate on an unhandled pointer-lock rejection.
+  An inert two-tab control reproduces the exact `WrongDocumentError` while
+  the canvas remains connected and `document.hasFocus()` is true. Bringing
+  that canvas tab forward makes the same request succeed. The final rendered
+  browser-host runs explicitly activate their owned page before Play and
+  console input, and have no such rejection. No pointer-lock override, error
+  suppression or game/site/WASM change is used.
+
+All three final cases independently pass on the unchanged 6096 gameplay
+implementation. Each peer has one actual round reset and 49 fresh second-round
+samples spanning 48 seconds. Both the recorded and independently rerun judges
+report 47 paired seconds, zero tick offset and no problems/divergences:
+
+| Host and joining route | Client input | Maximum paired position difference | Drift samples / apart |
+| --- | --- | ---: | ---: |
+| Native host, browser client (`native-host-…-v3`) | `bot:1` | 0.146769 | 1,262 / 341 |
+| Browser host, native invite (`browser-host-invite-…-v6`) | `bot:1` | 0.073770 | 1,316 / 314 |
+| Browser host, native public-game discovery (`browser-host-browse-look-…-v6`) | `look:1` | 0.001000 | 1,316 / 8 |
+
+All hosts use `look:0`, so these Internet controls do not demonstrate free
+host movement. The first two clients retain scripted movement; the discovery
+case isolates look input. Both sides retain the scripted firing behavior.
+The original drift share limit remains 0.6, with at least 300 drift samples
+and twenty paired seconds required. These results do not claim bit-exact
+positions. Raw corrections, transient mismatches and all tolerances remain
+in the receipts.
+
+For both browser hosts, the reviewed screenshot shows the exact console
+command before Enter. Game over follows after thirty simulation ticks
+(1,160 ms for invite; 372 ms for discovery), before the real lobby transition
+and second game. The actual renderer, physical key sequence, normal page
+activation and absence of PAGEERROR/fatal diagnostics are verified. The
+discovery log proves browsing and selection from the server browser; that
+client receives no invite argument. All cases establish bidirectional real
+WebRTC traffic, unchanged original inputs, verified saved exports, normal
+native exit and closed browser contexts. They remain local-broker tests,
+not public relay or NAT-traversal tests.
+
+Evidence is under `internet/runs/` and
+`validation/internet-*-6096b0b4f969-*-audit.json`. Every earlier failed verdict
+is preserved. The test-only checkpoint-timing follow-up also passes CI.
+
+### Combined review and evidence preservation
+
+The final implementation review covers the boat producer, console ownership
+and saved-image validation, client clock lifecycle, protocol admission,
+neighboring MCC integration, regression fixtures and reader documentation.
+The redundant MCC boat helper/hook and unreachable console disposal branch
+are removed because their replacements are demonstrated. No further production
+abstraction, trimming or optimization is justified by this review. Map-family
+limits, permission checks, cleanup, diagnostics and meaningful regression
+coverage remain. The combined source review precedes the 462 final focused
+checks and final runtime/CI validation; the later test-only correction has its
+own focused review and actual Windows/Linux standalone checks.
+
+Primary and independent documentation reviews check the resulting behavior,
+named symbols, local links and numerical claims against the retained evidence.
+The final CI follow-up changes no game-source tree, so the runtime results
+are not relabeled as executions of a different binary.
+
+Per-run cleanup removed 504 native generated map caches (64,474,841,088 bytes).
+Separate verified cleanup of the nine closed Internet attempts removed another
+54 caches (6,908,018,688 bytes), preserving every other run file at that stage.
+Both Mercury fixtures are inactive and removed; original Workshop maps and
+resources remain unchanged. These are generated caches, not player saves.
+
+The final reviewed plan archives **5,304 files**, totaling 11,227,077,161
+uncompressed bytes, into `inactive-evidence.zip` (1,217,001,463 bytes).
+Original paths, sizes and SHA-256 values are recorded. Every archive member is
+verified before its loose copy is removed. The archive preserves inactive
+saves/core images, browser profiles and exported saves, both executed baseline
+builds and necessary binary test inputs. Another **3,221 disposable files**
+(18,622,942,131 logical bytes) are removed after ownership/input verification.
+That logical total includes 344 map-copy hardlinks; it is not a disk-space claim.
+
+Final inventory accounting, including the last 54 Internet caches, releases
+about **18.18 GB of allocated space**, with about **1.99 GB retained** under
+Stage 11. Earlier per-run native cache removals are outside that comparison.
+The retained total includes the 1.22 GB archive, roughly 756 MB of loose raw
+captures, logs, source copies, executed CI Web ZIPs and other evidence, plus
+the cleanup manifests and final receipts. The active native build and installed
+toolchains remain outside this cleanup. Empty evidence directories are retained.
+
+The two cleanup operations each paused on a transient process-ID check. Fresh
+process queries found those IDs absent, and the same plans resumed without
+weakening guards or stopping unrelated processes. The final verifier rehashes
+all 5,304 archive members, 2,418 retained evidence files and sixteen protected
+original/current-build records, confirms every disposal target is absent and
+finds no remaining generated map cache or active game process. The Ruby, Xbox
+and Mercury recovery audits and Xbox/CE two-round audits replay successfully
+against archived evidence; all three retained Internet log pairs again yield
+47 paired seconds without problems or divergence. These are preservation
+checks, not additional game launches. See `cleanup-plan.json`,
+`cleanup-applied.json`, `validation/internet-cache-cleanup-applied.json` and
+`validation/post-cleanup-verification.json` under `build/stage11-fix`.
+
+Milestone 11 is complete within the stated runtime and platform limits.
+The branch contains shared fixes without map-name selectors; Xbox, CE and MCC
+ownership boundaries remain intact. Old network peers and old-layout saves
+are deliberately incompatible. No complete-campaign, every-map, physical
+Android-device or public-NAT compatibility claim follows from these checks.
