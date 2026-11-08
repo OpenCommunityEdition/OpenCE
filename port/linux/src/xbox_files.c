@@ -41,12 +41,20 @@ static BOOL directory_exists(const char *path)
 }
 
 /* whether directory has a maps folder, in any case */
+/* (a maps folder: a file of that name, ui.map copied before the folder was
+made, say, is none) */
 static BOOL has_maps(const char *directory)
 {
-	char on_disk[256];
+	char on_disk[256], path[1024];
+	struct posix_file_information information;
 
-	return directory_exists(directory) &&
-		posix_find_entry_case_insensitive(directory, "maps", on_disk, sizeof(on_disk));
+	if (!directory_exists(directory) ||
+		!posix_find_entry_case_insensitive(directory, "maps", on_disk, sizeof(on_disk)))
+	{
+		return FALSE;
+	}
+	snprintf(path, sizeof(path), "%s/%s", directory, on_disk);
+	return posix_stat(path, &information) == 0 && (information.flags & _posix_file_is_directory);
 }
 
 static void trim_separators(char *path)
