@@ -38,8 +38,10 @@ void mcc_share_menu_step(int direction)
 
 int mcc_share_menu_can_remove(void)
 {
-    /* Downloads may be selected for an imminent load before gameplay begins. */
-    return count>0 && !game_in_progress() && !global_network_game_client_get() && !global_network_game_server_get();
+    /* The main-menu scene also runs a game clock. A session can already own a
+       selected download there, before gameplay begins. */
+    return count>0 && (!game_in_progress() || game_time_menu_scene()) &&
+        !global_network_game_client_get() && !global_network_game_server_get();
 }
 
 int mcc_share_menu_confirming(void) { return confirming; }

@@ -2816,12 +2816,15 @@ def _mcc_download() -> list:
                      '<on event="back" run="port mcc share cancel"/>',
                      '<on event="deleted" run="port mcc share closed"/>',
                      '<data input="port mcc share update"/>',
-                     f'<child widget="{base}/description" x="40" y="60"/>',
+                     f'<child widget="{base}/description" x="40" y="80"/>',
                      f'<child widget="{base}/download" x="150" y="300"/>',
                      f'<child widget="{base}/workshop" x="150" y="340"/>',
-                     f'<child widget="{base}/cancel" x="150" y="380"/>'])
+                     f'<child widget="{base}/cancel" x="150" y="380"/>',
+                     f'<child widget="{base}/title" x="40" y="24"/>'])
+    lines += _widget(f"{base}/title", [("type", "text"), ("width", 560), ("height", 40),
+                     ("text", "MCC HOST DOWNLOAD"), ("font", "ui\\large_ui"), ("color", "#FF2896FF")], [])
     lines += _widget(f"{base}/description", [("type", "text"), ("controller", 1),
-                     ("width", 560), ("height", 220), ("font", "ui\\small_ui"),
+                     ("width", 560), ("height", 200), ("font", "ui\\small_ui"),
                      ("color", "#FFFFFFFF")], ['<data input="port mcc share text"/>'])
     for name, text, action in [("download", "DOWNLOAD FROM HOST", "download"),
                                ("workshop", "VISIT WORKSHOP PAGE", "workshop"),
@@ -2843,13 +2846,16 @@ def _mcc_downloads() -> list:
                     ['<on event="created" run="port mcc downloads open"/>',
                      '<on event="b" back="true"/>', '<on event="back" back="true"/>',
                      '<data input="port mcc downloads update"/>',
-                     f'<child widget="{base}/description" x="40" y="40"/>',
+                     f'<child widget="{base}/description" x="40" y="80"/>',
                      f'<child widget="{base}/previous" x="40" y="300"/>',
                      f'<child widget="{base}/next" x="340" y="300"/>',
                      f'<child widget="{base}/remove" x="195" y="340"/>',
-                     f'<child widget="{base}/back" x="195" y="390"/>'])
+                     f'<child widget="{base}/back" x="195" y="390"/>',
+                     f'<child widget="{base}/title" x="40" y="24"/>'])
+    lines += _widget(f"{base}/title", [("type", "text"), ("width", 560), ("height", 40),
+                     ("text", "MCC DOWNLOADS"), ("font", "ui\\large_ui"), ("color", "#FF2896FF")], [])
     lines += _widget(f"{base}/description", [("type", "text"), ("controller", 1),
-                     ("width", 560), ("height", 250), ("font", "ui\\small_ui"),
+                     ("width", 560), ("height", 210), ("font", "ui\\small_ui"),
                      ("color", "#FFFFFFFF")], ['<data input="port mcc downloads text"/>'])
     for name, text in [("previous", "PREVIOUS"), ("next", "NEXT"), ("remove", "REMOVE SELECTED"), ("back", "BACK")]:
         action = 'back="true"' if name == "back" else f'run="port mcc downloads {name}"'

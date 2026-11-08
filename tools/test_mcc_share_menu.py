@@ -11,7 +11,7 @@ GAME = ROOT / "port/linux/game"
 
 HEADERS = {
     "cseries.h": "#include <stddef.h>\n#include <wchar.h>\ntypedef int boolean;\n#define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))\n",
-    "game/game.h": "int game_in_progress(void);\n",
+    "game/game.h": "int game_in_progress(void);\nint game_time_menu_scene(void);\nint game_time_get_paused(void);\n",
     "networking/network_game_globals.h": """struct network_game_client;
 struct network_game_server;
 struct network_game_client *global_network_game_client_get(void);
@@ -31,11 +31,13 @@ static char const *native_maps="native-root/mcc_maps";
 static struct mcc_share_storage_item records[2];
 static int record_count=2,exists=1,list_error,list_truncated;
 static int initialized,stat_calls,list_calls,remove_calls,delete_calls,rescans;
-static int playing,client,server;
+static int playing,menu_scene,paused,client,server;
 static enum mcc_share_storage_result removal=MCC_SHARE_STORAGE_REMOVED;
 static char removed[64];
 
 int game_in_progress(void){return playing;}
+int game_time_menu_scene(void){return menu_scene;}
+int game_time_get_paused(void){return paused;}
 struct network_game_client *global_network_game_client_get(void){return client ? (void*)&client : NULL;}
 struct network_game_server *global_network_game_server_get(void){return server ? (void*)&server : NULL;}
 void mcc_maps_rescan(void){rescans++;}
@@ -90,6 +92,7 @@ int main(int argc,char **argv){
  if(!strcmp(mode,"list_error"))list_error=1;
  if(!strcmp(mode,"empty"))record_count=0;
  if(!strcmp(mode,"text"))list_truncated=1;
+ if(!strncmp(mode,"ui_",3)){playing=1;menu_scene=1;}
  mcc_share_menu_open();CHECK(initialized==1 && stat_calls==1);
  if(!strcmp(mode,"missing")||!strcmp(mode,"empty")||!strcmp(mode,"list_error")){
   CHECK(!mcc_share_menu_can_remove());mcc_share_menu_remove();mcc_share_menu_remove();mcc_share_menu_step(1);
@@ -116,8 +119,17 @@ int main(int argc,char **argv){
   mcc_share_menu_open();CHECK(initialized==2 && !mcc_share_menu_confirming());return 0;
  }
  if(!strcmp(mode,"playing"))active=&playing;
+ if(!strcmp(mode,"paused")){active=&playing;paused=1;CHECK(game_time_get_paused());}
  if(!strcmp(mode,"client"))active=&client;
  if(!strcmp(mode,"server"))active=&server;
+ if(!strcmp(mode,"ui_client"))active=&client;
+ if(!strcmp(mode,"ui_server"))active=&server;
+ if(!strcmp(mode,"ui_to_game")){
+  menu_scene=0;CHECK(playing && !mcc_share_menu_can_remove());
+  mcc_share_menu_remove();CHECK(!mcc_share_menu_confirming() && !remove_calls && !delete_calls && !rescans);
+  menu_scene=1;mcc_share_menu_remove();CHECK(mcc_share_menu_confirming() && !remove_calls);
+  mcc_share_menu_remove();CHECK(remove_calls==1 && !strcmp(removed,"dl_first"));return 0;
+ }
  if(active){
   *active=1;CHECK(!mcc_share_menu_can_remove());text(shown);CHECK(strstr(shown,"Leave the game/session"));
   mcc_share_menu_remove();CHECK(!mcc_share_menu_confirming() && !remove_calls && !delete_calls && !rescans);
@@ -151,7 +163,8 @@ def menu_tool(tmp_path_factory):
     return build(tmp_path_factory.mktemp("mcc-share-menu"))
 
 
-@pytest.mark.parametrize("case", ["selection", "playing", "client", "server", "text", "missing",
+@pytest.mark.parametrize("case", ["selection", "playing", "paused", "client", "server",
+                                  "ui_removed", "ui_client", "ui_server", "ui_to_game", "text", "missing",
                                   "empty", "list_error", "removed", "leftovers", "remove_error"])
 def test_download_management(menu_tool, case):
     result = subprocess.run([str(menu_tool), case], capture_output=True, text=True, timeout=10)
@@ -161,6 +174,8 @@ def test_download_management(menu_tool, case):
 @pytest.mark.parametrize("before,after,case", [
     ("if (!confirming) { confirming=1; return; }", "", "selection"),
     ("if (!mcc_share_menu_can_remove()) { confirming=0; return; }", "", "playing"),
+    ("(!game_in_progress() || game_time_menu_scene())", "!game_in_progress()", "ui_removed"),
+    ("(!game_in_progress() || game_time_menu_scene())", "(!game_in_progress() || game_time_get_paused() || game_time_menu_scene())", "paused"),
 ])
 def test_confirmation_and_session_guards_detect_removal_regressions(tmp_path, before, after, case):
     original = (GAME / "mcc_share_menu.c").read_text()

@@ -1037,7 +1037,7 @@ its name alone beside it, has its name given back as the map lists find it.
 
 Milestone 13 is implementing host-only delivery for eligible local and Workshop
 packages. It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83–86. The current agreements are base **32726**, MCC
+separate from CE sharing 83-86. The current agreements are base **32726**, MCC
 **69**, and camera **32728/32729**; old agreements are refused before admission.
 MCC settings add a 32-byte required-JSON digest beside the gameplay digest.
 Xbox/CE retain their existing settings prefix and sharing path. The distributed

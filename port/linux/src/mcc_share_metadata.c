@@ -73,6 +73,9 @@ static int add(struct mcc_share_metadata_plan *plan, const char *path, unsigned 
     unsigned total=size;
     int i;
     if (size>MCC_SHARE_METADATA_BYTES || !relative(path,canonical)) return 0;
+    /* References resolve without case, but staged files must share one spelling
+     * on case-sensitive hosts: META/a.json and meta/b.json own one directory. */
+    for (i=0; canonical[i]; i++) canonical[i]=(char)fold((unsigned char)canonical[i]);
     for (i=0; i<plan->count; i++) {
         if (same(plan->files[i].path,canonical))
             return plan->files[i].kind==kind && plan->files[i].size==size;

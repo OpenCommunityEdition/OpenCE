@@ -249,6 +249,7 @@ def test_mixed_package_selects_map_metadata(metadata_tool, tmp_path):
         "Images": {"Thumbnail": "assets/arena.png"}}))
     (tmp_path / "assets/arena.png").write_bytes(png()[0])
     ok, entries = plan(metadata_tool, tmp_path, -1, "arena")
+    assert all(name==name.lower() for _, _, name in entries)
     assert ok and {name.lower() for _, _, name in entries} == {
         "modinfo.json", "campaigninfo.json", "meta/first.json", "meta/second.json", "meta/arena.json",
         "assets/arena.png"}
@@ -272,7 +273,8 @@ def test_mixed_package_selects_map_metadata(metadata_tool, tmp_path):
     assert original_digest[:2] == received_digest[:2] and original_digest[0] == "1"
 
 
-@pytest.mark.parametrize("text", ["", "[]", "{", '{"Engine":"Halo2"}', '"' + "x" * (256 * 1024) + '"'])
+@pytest.mark.parametrize("text", ["", "[]", "{", '{"Engine":"Halo2"}', '"' + "x" * (256 * 1024) + '"'],
+                         ids=["empty", "array", "incomplete", "wrong-engine", "oversized"])
 def test_invalid_present_modinfo(metadata_tool, tmp_path, text):
     (tmp_path / "ModInfo.json").write_text(text)
     assert plan(metadata_tool, tmp_path)[0] == 0
