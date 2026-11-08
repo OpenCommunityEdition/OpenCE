@@ -237,7 +237,7 @@ real mcc_hud_bitmap_scale(long bitmap_group_index)
  * cinematic masks and the renderer's viewport fallback retain their units. */
 void mcc_hud_mask_begin(struct bitmap_data const *bitmap)
 {
-    mcc_hud_mask=mcc_cache_tags_loaded() ? bitmap : NULL;
+    mcc_hud_mask=mcc_cache_tags_loaded() && bitmap && bitmap->tag_index!=NONE ? bitmap : NULL;
     mcc_hud_mask_scale=mcc_hud_mask ?
         mcc_hud_bitmap_scale(bitmap->tag_index)/mcc_hud_canvas_scale() : 1.0f;
 }

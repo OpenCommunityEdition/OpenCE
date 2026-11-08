@@ -60,6 +60,9 @@ int main(void) {
     mcc_hud_mask_begin(&mask);mcc=0;check(&mask,1);
     mcc_hud_mask_end();mcc=1;check(&mask,1); /* Unload/reused pointer. */
     assert(mask.tag_index==7 && mask.flags==16); /* Original bitmap unchanged. */
+    mask.tag_index=NONE;reads=0;
+    mcc_hud_mask_begin(&mask);check(&mask,1);mcc_hud_mask_end();
+    assert(reads==0); /* A generated/render-target bitmap has no MCC tag units. */
     return 0;
 }
 '''.replace('FLAGS', str(flags)).replace('FACTOR', str(float(factor))+'f'))
