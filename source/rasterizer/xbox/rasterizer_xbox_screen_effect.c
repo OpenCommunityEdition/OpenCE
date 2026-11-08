@@ -97,6 +97,7 @@ symbols in this file:
 #include "cseries/errors.h"
 #include "interface/hud_draw.h"
 #include "custom_edition_hud_draw.h" /* port: port/linux/game/custom_edition_hud_draw.c */
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "bitmaps/bitmaps_inlines.h"
 #include "main/main.h"
 #include "math/integer_math.h"
@@ -292,6 +293,8 @@ static void rasterizer_screen_effect_set_texture_transforms(
 			default_scale : vector2d_reciprocal(&convolution_size);
 		/* port: only the CE HUD mask's scoped draw changes its texture transform. */
 		custom_edition_hud_mask_transform(convolution_bitmap, &convolution_size, &convolution_scale);
+		/* port: MCC HUD masks retain texels but honor their bitmap size flags. */
+		mcc_hud_mask_transform(convolution_bitmap, &convolution_size, &convolution_scale);
 
 		scanline_scale = TEST_FLAG(scanline_bitmap->flags, _bitmap_linear_bit) ?
 			default_scale : vector2d_reciprocal(&scanline_size);

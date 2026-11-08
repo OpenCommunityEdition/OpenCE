@@ -87,6 +87,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/hud.h"
 #include "custom_edition_hud_draw.h" /* port: port/linux/game/custom_edition_hud_draw.c */
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "interface/hud_definitions.h"
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
@@ -1480,6 +1481,8 @@ void hud_draw_screen(
 	if (player_index != NONE)
 	{
 		struct player_datum *player = player_get(player_index);
+		/* port: related MCC HUD elements share this player's unit safe frame. */
+		mcc_hud_view_begin(player->unit_index);
 
 		if ((!game_engine_running() || game_engine_display_team_indicators()) &&
 			!cinematic_in_progress())
@@ -1539,6 +1542,7 @@ void hud_draw_screen(
 		network_chat_draw(render.local_player_index);
 		/* port: the players' vote running, its box (F1 yes, F2 no) */
 		network_votekick_draw(render.local_player_index);
+		mcc_hud_view_end(); /* port: no frame choice leaks to another view */
 	}
 
 	rasterizer_hud_end();

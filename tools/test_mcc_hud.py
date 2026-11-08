@@ -333,6 +333,7 @@ struct hud_placement_definition {point2d offset;short pad;};
 #define MCC_HUD_NATIVE_FRAME 0x4D53
 #define NONE (-1)
 static short mcc_weapon_frame=NONE;
+static boolean mcc_native_view;
 #define TRUE 1
 #define FALSE 0
 #define MIN(a,b) ((a)<(b)?(a):(b))
