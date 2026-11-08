@@ -2291,8 +2291,11 @@ static void distributed_handle_predictions(
 		if (!size)
 			break;
 		data += size;
+		/* Scripted poses and suspension belong to the host, never predictions. */
 		if (state.player_index >= MAXIMUM_TRACKED_PLAYERS ||
 			!distributed_machine_has_player(machine_index, state.player_index) ||
+			state.scripted_pose ||
+			TEST_FLAG(state.unit_flags, _distributed_unit_suspended_bit) ||
 			!TEST_FLAG(state.flags, _distributed_unit_alive_bit) ||
 			!TEST_FLAG(state.flags, _distributed_unit_placed_bit))
 		{

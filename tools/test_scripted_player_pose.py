@@ -28,7 +28,7 @@ def generated():
         'distributed_vector_pack', 'distributed_vector_unpack', 'distributed_unit_vector_unpack',
         'distributed_put', 'distributed_take', 'distributed_scripted_pose_from_unit',
         'distributed_scripted_pose_valid', 'distributed_scripted_pose_apply',
-        'distributed_unit_state_write', 'distributed_unit_state_read'))
+        'distributed_unit_state_write', 'distributed_unit_state_read', 'distributed_handle_predictions'))
     return r'''
 #include <assert.h>
 #include <string.h>
@@ -60,7 +60,11 @@ struct unit_datum {struct {
     real_vector3d desired_facing_vector,desired_aiming_vector,desired_looking_vector;
     real_vector3d aiming_vector,looking_vector;
 } unit;};
-'''.replace('HISTORY_COUNT', str(history)) + types + routines + r'''
+'''.replace('HISTORY_COUNT', str(history)) + types + r'''
+#define MAXIMUM_TRACKED_PLAYERS 2
+static struct {boolean valid;long time;struct distributed_unit_state state;} distributed_predictions[2];
+static boolean distributed_machine_has_player(long machine,short player) {return machine==4 && player==0;}
+''' + routines + r'''
 static void near_vector(real_vector3d a,real_vector3d b) {
     assert(fabs(a.i-b.i)<.0001 && fabs(a.j-b.j)<.0001 && fabs(a.k-b.k)<.0001);
 }
@@ -116,6 +120,22 @@ int main(void) {
         assert(count<=DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE && bounded[DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE]==0xA5);
         assert(distributed_unit_state_read(bounded,bounded+count,&received)==count);
         for(i=0;i<count;i++) assert(!distributed_unit_state_read(bounded,bounded+i,&received));
+        /* Untrusted clients cannot inject the host-owned extension through
+           the prediction decoder shared with authoritative unit states. */
+        received=sent;received.flags|=FLAG(_distributed_unit_placed_bit);
+        count=distributed_unit_state_write(&received,TRUE,packet);
+        distributed_predictions[0].valid=FALSE;
+        distributed_handle_predictions(4,20,packet,packet+count,1);
+        assert(!distributed_predictions[0].valid);
+        received.scripted_pose=FALSE;received.unit_flags=FLAG(_distributed_unit_suspended_bit);
+        count=distributed_unit_state_write(&received,TRUE,packet);
+        distributed_handle_predictions(4,20,packet,packet+count,1);
+        assert(!distributed_predictions[0].valid);
+        received.unit_flags=0;count=distributed_unit_state_write(&received,TRUE,packet);
+        distributed_handle_predictions(5,20,packet,packet+count,1);
+        assert(!distributed_predictions[0].valid);
+        distributed_handle_predictions(4,20,packet,packet+count,1);
+        assert(distributed_predictions[0].valid && distributed_predictions[0].time==20);
         /* Releasing the script clears suspension but does not change aim. */
         unchanged=client;host.unit.flags=0;enabled=1;sent=ordinary;
         distributed_scripted_pose_from_unit(&host,&sent);assert(!sent.scripted_pose);
@@ -143,6 +163,8 @@ def test_scripted_pose_wire_and_ordinary_input(tmp_path):
 @pytest.mark.parametrize('before,after', [
     ('if (!state->scripted_pose)\n\t\treturn;', 'return;'),
     ('&unit->unit.aiming_vector);', '&unit->unit.desired_aiming_vector);'),
+    ('state.scripted_pose ||', ''),
+    ('TEST_FLAG(state.unit_flags, _distributed_unit_suspended_bit) ||', ''),
 ])
 def test_regression_detects_missing_or_conflated_pose(tmp_path, before, after):
     code = generated()
