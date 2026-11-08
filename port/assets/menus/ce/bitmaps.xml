@@ -72,6 +72,10 @@
 		<frame png="ce/shell/bitmaps/option_bkds__0.png" width="512" height="32"/>
 		<frame png="ce/shell/bitmaps/option_bkds__1.png" width="512" height="32"/>
 	</bitmap>
+	<bitmap name="bitmaps/option_bkds_short">
+		<frame png="ce/shell/bitmaps/option_bkds_short__0.png" width="512" height="20"/>
+		<frame png="ce/shell/bitmaps/option_bkds_short__1.png" width="512" height="20"/>
+	</bitmap>
 	<bitmap name="bitmaps/option_bkds_sm">
 		<frame png="ce/shell/bitmaps/option_bkds_sm__0.png" width="256" height="32"/>
 		<frame png="ce/shell/bitmaps/option_bkds_sm__1.png" width="256" height="32"/>
