@@ -167,15 +167,19 @@ static boolean hs_console_saved_graph(struct hs_console_state const *state, long
         unsigned child;
         node = state->nodes + index;
         if (!edge && !(node->flags & 8)) {
+            struct hs_syntax_node const *next;
             if (node->flags & ~15 || node->type < _hs_unparsed || node->type >= NUMBER_OF_HS_TYPES)
+                return FALSE;
+            /* Next links are value arguments; a function-name node belongs
+             * only behind a call's data link, including unbounded forms. */
+            if (node->next_node_index != NONE &&
+                (!(next = hs_console_saved_node(state, node->next_node_index)) || !hs_type_valid(next->type)))
                 return FALSE;
             if ((node->flags & 1) && !(node->flags & 4) && hs_type_valid(node->type)) {
                 if (!hs_type_valid(node->constant_type)) return FALSE;
                 if (node->constant_type == _hs_type_string && !hs_console_saved_string(state, node->data))
                     return FALSE;
             }
-            if ((node->flags & 1) && (node->flags & 4) &&
-                hs_global_get_type((short)node->data) == _hs_unparsed) return FALSE;
             if (!(node->flags & 1) && (node->flags & 2) &&
                 (global_scenario_index == NONE || node->script_index < 0 ||
                  node->script_index >= global_scenario_get()->hs_scripts.count)) return FALSE;

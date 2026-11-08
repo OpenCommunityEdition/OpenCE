@@ -518,14 +518,8 @@ static boolean game_state_header_valid(
 	}
 	else if (header->allocation_size_checksum != game_state_globals.allocation_size_checksum)
 	{
-		if (halt_on_error)
-		{
-			match_vassert(
-				"c:\\halo\\SOURCE\\saved games\\game_state.c",
-				413,
-				FALSE,
-				csprintf(temporary, "allocation checksum mismatch"));
-		}
+		/* port: a different build's saved allocation layout is an expected
+		refusal (including images without saved console syntax), not a crash. */
 	}
 	else if (header->player_count != player_spawn_count)
 	{

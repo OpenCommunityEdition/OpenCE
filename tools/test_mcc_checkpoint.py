@@ -14,6 +14,93 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="session")
+def core_header_tool(tmp_path_factory, request):
+    """Exercise the real core header gate before any state or callback is published."""
+    compiler = shutil.which("clang") or shutil.which("cc")
+    if not compiler:
+        pytest.skip("a C compiler is needed for core header tests")
+    work = tmp_path_factory.mktemp("core-header")
+    native = (ROOT / "source/saved games/game_state.c").read_text()
+    gate = function(native, "game_state_header_valid")
+    if getattr(request, "param", None) == "assert-old-layout":
+        gate = gate.replace("/* port: a different build's saved allocation layout",
+            'match_vassert("fault", 413, FALSE, "allocation mismatch");\n'
+            "\t\t/* port: a different build's saved allocation layout")
+    source = r'''
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+typedef unsigned char boolean;
+#define TRUE 1
+#define FALSE 0
+#define GAME_STATE_SIZE 64
+#define csstrcmp strcmp
+#define csprintf sprintf
+#define _error_silent 0
+static int assertions,diagnostics,reads,before,after;
+#define match_vassert(file,line,test,text) do {if(!(test))assertions++;} while(0)
+struct game_state_header {char map_name[256];uint32_t allocation_size_checksum,cache_file_checksum;short player_count;};
+static struct game_state_header incoming;
+static unsigned char live[GAME_STATE_SIZE],saved[GAME_STATE_SIZE];
+static struct {void *base_address;uint32_t allocation_size_checksum;} game_state_globals;
+static short player_spawn_count=1;
+static long global_scenario_index;
+static char map_name[256],temporary[512];
+static char const *tag_get_name(long index) {(void)index;return map_name;}
+static uint32_t cache_files_get_checksum(void) {return 0x12345678;}
+static void error(int level,char const *format,...) {(void)level;(void)format;diagnostics++;}
+static int game_state_read_core_header(char const *name,void *out,long size)
+{(void)name;memcpy(out,&incoming,size);return 1;}
+static void game_state_read_core(char const *name,void *out,long size)
+{(void)name;reads++;memcpy(out,saved,size);}
+static void game_state_note_event(char const *name) {(void)name;}
+static void game_state_call_before_load_procs(void) {before++;}
+static void game_state_call_after_load_procs(void) {after++;}
+static void console_printf(int flag,char const *format,...) {(void)flag;(void)format;}
+''' + gate + "\n" + function(native, "game_state_load_core") + r'''
+int main(int argc,char **argv) {
+    int valid,expected_assertions;
+    if(argc!=3)return 2;
+    strcpy(map_name,argv[1]);strcpy(incoming.map_name,map_name);
+    incoming.allocation_size_checksum=game_state_globals.allocation_size_checksum=0x272335b8;
+    incoming.cache_file_checksum=cache_files_get_checksum();incoming.player_count=player_spawn_count;
+    game_state_globals.base_address=live;memset(saved,0xA5,sizeof(saved));
+    valid=!strcmp(argv[2],"valid");expected_assertions=!valid&&strcmp(argv[2],"allocation");
+    if(!strcmp(argv[2],"allocation"))incoming.allocation_size_checksum=0x67ec7664;
+    else if(!strcmp(argv[2],"map"))strcpy(incoming.map_name,"another map");
+    else if(!strcmp(argv[2],"players"))incoming.player_count++;
+    else if(!strcmp(argv[2],"checksum"))incoming.cache_file_checksum++;
+    else if(!valid)return 2;
+    game_state_load_core("test");
+    if(assertions!=expected_assertions || diagnostics!=!valid || reads!=valid || before!=valid || after!=valid)return 1;
+    if(valid ? memcmp(live,saved,sizeof(live))!=0 : memcmp(live,(unsigned char[GAME_STATE_SIZE]){0},sizeof(live))!=0)return 1;
+    return 0;
+}
+'''
+    input_path = work / "core_header.c"
+    input_path.write_text(source)
+    binary = work / ("core_header.exe" if sys.platform == "win32" else "core_header")
+    result = subprocess.run([compiler, "-m32", "-std=gnu89", "-O2", "-Wall", "-Werror", "-D_CRT_SECURE_NO_WARNINGS",
+        "-Wno-unused-variable", str(input_path), "-o", str(binary)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return binary
+
+
+@pytest.mark.parametrize("family", [r"levels\test\test", r"custom_maps\test", r"mcc_maps\package\test"])
+@pytest.mark.parametrize("header", ["valid", "allocation", "map", "players", "checksum"])
+def test_core_header_admission(core_header_tool, family, header):
+    result = subprocess.run([str(core_header_tool), family, header], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("core_header_tool", ["assert-old-layout"], indirect=True)
+def test_core_layout_refusal_detects_assertion(core_header_tool):
+    result = subprocess.run([str(core_header_tool), r"levels\test\test", "allocation"], capture_output=True, text=True)
+    assert result.returncode == 1, result.stdout + result.stderr
+
+
+@pytest.fixture(scope="session")
 def checkpoint_tool(tmp_path_factory):
     compiler = shutil.which("clang") or shutil.which("cc")
     if not compiler:

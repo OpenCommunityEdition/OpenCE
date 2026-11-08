@@ -11,6 +11,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import ROOT, enum_with, function, mutated, read, structure
 
 
+def declaration(source, name):
+    return re.search(r"^[^\n]*\b" + re.escape(name) + r"\[.*?^};", source, re.M | re.S).group()
+
+
 @pytest.fixture(scope="session")
 def console_state_tool(tmp_path_factory, request):
     work = tmp_path_factory.mktemp("hs-console-state")
@@ -30,6 +34,9 @@ def console_state_tool(tmp_path_factory, request):
     types += "\n" + enum_with(syntax, "_hs_script_startup =")
     types += "\n" + enum_with(read("source/hs/hs.h"), "_hs_type_void")
     types += "\n" + enum_with(read("source/hs/hs.h"), "_hs_function_begin =")
+    types += "\n" + enum_with(read("source/hs/hs.h"), "NUMBER_OF_HS_OBJECT_TYPES =")
+    types += "\n" + "\n".join(line for line in read("source/hs/hs.h").splitlines()
+        if line.startswith("#define HS_TYPE_IS_OBJECT"))
     types += "\n" + enum_with(hs, "_hs_node_refusal_none")
     types += "\n" + structure(compiler, "hs_compile_globals") + "\n" + structure(compiler, "hs_tokenizer")
     definitions = "\n".join(line for text in (checkpoint, read("port/linux/game/mcc_campaign.h"),
@@ -47,9 +54,21 @@ def console_state_tool(tmp_path_factory, request):
         read("port/linux/game/hs_console_state.inl"), flags=re.M)
     policy = "\n".join(function(hs, name) for name in
         ("hs_syntax_try_get", "hs_syntax_node_check", "hs_console_syntax_node_valid"))
-    compile_code = "\n".join(function(compiler, name) for name in ("hs_parse_string", "hs_compile_expression"))
+    compile_code = "\n".join(function(compiler, name) for name in
+        ("hs_parse_string", "hs_compile_initialize", "hs_compile_dispose", "hs_compile_expression"))
     mcc_calls = "\n".join(function(read("port/linux/game/mcc_scripts.c"), name) for name in
         ("mcc_script_call_arguments_valid", "mcc_script_call_valid"))
+    # hs_can_cast only checks these function pointers for presence. Keep the
+    # real table's shape and NULL entries without linking conversion effects.
+    cast_table = declaration(runtime, "typecasting_procedures")
+    start = cast_table.index("=")
+    cast_table = cast_table[:start] + re.sub(r"\b(?:hs_|object_list_)\w+\b",
+        "test_cast_available", cast_table[start:])
+    casts = declaration(hs, "hs_object_type_masks") + "\n" + cast_table
+    casts += "\n" + "\n".join(function(read("port/linux/game/mcc_scripts.c"), name)
+        for name in ("mcc_script_ai_cast", "mcc_script_can_cast"))
+    casts += "\n" + "\n".join(function(runtime, name)
+        for name in ("hs_object_type_can_cast", "hs_can_cast"))
     fault = getattr(request, "param", None)
     if fault == "reuse-live-source":
         console = mutated(console, "if (!marked[slot])", "if (TRUE)")
@@ -61,10 +80,14 @@ def console_state_tool(tmp_path_factory, request):
         console = mutated(console, "memcpy(data, hs_console_state->nodes, hs_syntax_data->maximum_count * sizeof(struct hs_syntax_node));", "(void)data;")
     elif fault == "allow-foreign-result":
         console = mutated(console, "if (result != (uintptr_t)&live->result &&", "if (FALSE && result != (uintptr_t)&live->result &&")
+    elif fault == "allow-invalid-cast":
+        policy = mutated(policy, "hs_can_cast(actual_type, node->type);", "TRUE;")
+    elif fault == "allow-function-name-value":
+        console = mutated(console, "|| !hs_type_valid(next->type)))", "))")
     for name, text in {"types.inc": types, "definitions.inc": definitions, "data.inc": data_code,
                        "storage.inc": storage, "runtime.inc": runtime_code, "valid.inc": valid,
                        "console.inc": console, "policy.inc": policy, "compile.inc": compile_code,
-                       "mcc_calls.inc": mcc_calls}.items():
+                       "mcc_calls.inc": mcc_calls, "casts.inc": casts}.items():
         (work / name).write_text(text)
     zlib = ROOT / "port/third_party/zlib"
     binary = work / ("console.exe" if os.name == "nt" else "console")
@@ -79,11 +102,12 @@ def console_state_tool(tmp_path_factory, request):
 
 CASES = ["console_gc", "console_reuse", "scenario_gc", "standalone_gc", "console_no_gc",
          "repeat_restore", "reload", "concurrent_text", "global_text", "pool_full", "false_pin",
-         "unaligned_value", "discarded_frame", "source_bounds", "capacity_boundary", "compile_text", "compile_failure",
-         "inactive_permanent", "long_sleep_reuse", "mcc_console_call"]
+         "unaligned_value", "discarded_frame", "source_bounds", "capacity_boundary", "compile_text", "compile_failure", "compile_dispose",
+         "inactive_permanent", "long_sleep_reuse", "mcc_console_call", "valid_casts"]
 CASES += ["invalid_" + name for name in ("signature", "name", "capacity", "count", "actual", "data", "salt",
     "cycle", "string", "string_end", "source_root", "source_owner", "call", "stack", "frame_size", "result", "previous",
-    "thread_array", "permanent")]
+    "thread_array", "permanent", "literal_cast", "global_cast", "return_cast", "unparsed",
+    "predicate", "primitive_flags", "global_index", "script_index", "script_kind", "script_cast", "name_argument")]
 
 
 @pytest.mark.parametrize("mode", ["native", "mcc"])
@@ -97,6 +121,8 @@ def test_saved_console_lifetime(console_state_tool, mode, case):
     ("reuse-live-source", "compile_text"), ("ignore-console-root", "concurrent_text"),
     ("ignore-global-value", "global_text"), ("omit-syntax-restore", "console_reuse"),
     ("allow-foreign-result", "invalid_result"),
+    ("allow-invalid-cast", "invalid_literal_cast"),
+    ("allow-function-name-value", "invalid_name_argument"),
 ], indirect=["console_state_tool"])
 def test_console_regressions_detect_faults(console_state_tool, case):
     result = subprocess.run([str(console_state_tool), "native", case], capture_output=True, text=True)

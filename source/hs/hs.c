@@ -13159,7 +13159,49 @@ boolean hs_console_syntax_node_valid(
 	struct hs_syntax_node const *node)
 {
 	char const *name;
-	return hs_syntax_node_check(node, &name, FALSE) == _hs_node_refusal_none;
+	short actual_type;
+	if (TEST_FLAG(node->flags, _hs_syntax_node_primitive_bit))
+	{
+		if (TEST_FLAG(node->flags, _hs_syntax_node_script_bit))
+			return FALSE;
+		if (node->type == _hs_function_name)
+			return !TEST_FLAG(node->flags, _hs_syntax_node_variable_bit);
+		if (TEST_FLAG(node->flags, _hs_syntax_node_variable_bit))
+		{
+			if (global_scenario_index == NONE && !((short)node->data & 0x8000))
+				return FALSE;
+			actual_type = hs_global_get_type((short)node->data);
+		}
+		else
+			actual_type = node->constant_type;
+	}
+	else
+	{
+		struct hs_syntax_node const *predicate = hs_syntax_try_get(node->data);
+		if (!hs_type_valid(node->type) || TEST_FLAG(node->flags, _hs_syntax_node_variable_bit) ||
+			!predicate || !TEST_FLAG(predicate->flags, _hs_syntax_node_primitive_bit) ||
+			predicate->type != _hs_function_name ||
+			hs_syntax_node_check(node, &name, FALSE) != _hs_node_refusal_none)
+			return FALSE;
+		if (TEST_FLAG(node->flags, _hs_syntax_node_script_bit))
+		{
+			struct hs_script const *script;
+			if (global_scenario_index == NONE || node->script_index < 0 ||
+				node->script_index >= global_scenario_get()->hs_scripts.count)
+				return FALSE;
+			script = TAG_BLOCK_GET_ELEMENT(&global_scenario_get()->hs_scripts, node->script_index, struct hs_script);
+			if (script->script_type != _hs_script_static && script->script_type != _hs_script_stub)
+				return FALSE;
+			actual_type = script->return_type;
+		}
+		else
+			actual_type = hs_function_get(node->function_index)->return_type;
+	}
+	/* port: a saved expression must satisfy the compiler's cast contract
+	before the interpreter can use its value or return through its frame. */
+	return hs_type_valid(node->type) &&
+		(actual_type == _hs_passthrough || hs_type_valid(actual_type)) &&
+		hs_can_cast(actual_type, node->type);
 }
 
 /* port: whether a script's or global's root node is of the type the

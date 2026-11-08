@@ -484,7 +484,7 @@ struct hs_compile_globals
 	char const *error;
 	long error_offset;
 	char error_buffer[256];
-	boolean malloced;
+	boolean malloced; /* port: unused console allocation flag; retain the original layout. */
 	boolean compiling_scenario;
 	boolean disallow_blocks;
 	boolean disallow_sets;
@@ -882,15 +882,7 @@ void hs_compile_dispose(
 		}
 	}
 
-	if (hs_compile_globals.malloced)
-	{
-		match_free(
-			"c:\\halo\\SOURCE\\hs\\hs_compile.c",
-			0x8C,
-			hs_compile_globals.compiled_source);
-		hs_compile_globals.compiled_source = NULL;
-		hs_compile_globals.malloced = FALSE;
-	}
+	/* port: console source belongs to hs_console_state, not this compiler. */
 	hs_compile_globals.initialized = FALSE;
 
 	return;

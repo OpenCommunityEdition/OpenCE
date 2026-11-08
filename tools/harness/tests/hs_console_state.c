@@ -7,6 +7,7 @@
 #include <string.h>
 #include "zlib_prefixed.h"
 typedef unsigned char byte,boolean;
+typedef unsigned short word;
 typedef float real;
 #define TAG_STRING_LENGTH 31
 #define NONE (-1)
@@ -47,23 +48,28 @@ static void *game_state_port_cpu_region(unsigned long *u,unsigned long *c) {*u=u
 #include "definitions.inc"
 #include "storage.inc"
 #include "valid.inc"
-struct test_scenario {struct {long count;struct hs_script *address;} hs_scripts;};
+struct scenario {struct {long count;struct hs_script *address;} hs_scripts;
+    struct {long count;void *address;} hs_globals,hs_references;
+    struct {long size;void *address;} hs_string_constants;};
 static struct hs_script script;
-static struct test_scenario scenario;
+static struct scenario scenario;
 #define TAG_BLOCK_GET_ELEMENT(b,i,t) ((t *)(b)->address+(i))
-static struct test_scenario *global_scenario_get(void) {return &scenario;}
+static struct scenario *global_scenario_get(void) {return &scenario;}
 struct hs_function_definition {short return_type;void (*evaluate)(short,long,boolean);
     char const *name;boolean (*parse)(short,long);short parameter_count,parameter_types[1];};
 static void test_evaluate(short,long,boolean);
 static boolean hs_macro_function_parse(short f,long e) {(void)f;(void)e;return TRUE;}
 static struct hs_function_definition test_function={_hs_type_void,test_evaluate,"test",hs_macro_function_parse,1,{_hs_type_string}};
 static long hs_function_table_count=1;
-static struct hs_function_definition *hs_function_get(short i) {if(i!=0)abort();return &test_function;}
+static struct hs_function_definition *hs_function_get(short i) {if(i!=0&&!(loaded&&i==0x7000))abort();return &test_function;}
 static struct hs_function_definition *mcc_script_function(short i) {return loaded&&i==0x7000 ? &test_function : NULL;}
 static int hs_scenario_script_disabled(short i) {(void)i;return 0;}
 static long game_time_get(void) {return now;}
 static int game_in_progress(void) {return 1;}
 static int hs_type_valid(short type) {return type>=_hs_type_void && type<NUMBER_OF_HS_TYPES;}
+typedef void (*hs_typecasting_procedure)(void);
+static void test_cast_available(void) {}
+#include "casts.inc"
 static long hs_cast(long i,short a,short b,long value) {(void)i;(void)a;(void)b;return value;}
 static short hs_global_get_type(short i) {return i>=0 && i<1024 ? _hs_type_string : _hs_unparsed;}
 static long hs_global_evaluate(short i) {(void)i;abort();return 0;}
@@ -104,6 +110,11 @@ static struct {char const *name;} unused_global;
 
 static struct hs_compile_globals hs_compile_globals;
 static int parse_failure;
+static int source_frees;
+static void hs_compile_finish(void) {abort();}
+static void tag_block_resize(void *block,long count) {(void)block;(void)count;abort();}
+static void tag_data_resize(void *data,long bytes) {(void)data;(void)bytes;abort();}
+#define match_free(file,line,pointer) ((void)(pointer),source_frees++)
 #define HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES 1024
 static void skip_whitespace(char **cursor) {while(**cursor==' ')(*cursor)++;}
 static boolean hs_parse_string(long expression_index);
@@ -184,14 +195,21 @@ int main(int argc,char **argv)
     CHECK(sizeof(*hs_console_state)==918568);
     if(!strncmp(which,"compile_",8)) {
         char const *message=NULL,*error_source=NULL;
+        hs_compile_initialize(FALSE);
         root=hs_compile_expression(15,"original string",&message,&error_source);CHECK(root!=NONE);
         text=hs_compile_globals.compiled_source;
         hs_runtime_evaluate(root);
+        if(!strcmp(which,"compile_dispose")) {
+            hs_compile_dispose();CHECK(!hs_compile_globals.initialized&&!source_frees);
+            hs_compile_initialize(FALSE);
+            CHECK(!hs_compile_globals.compiled_source&&!hs_compile_globals.compiled_source_size);
+        }
         if(!strcmp(which,"compile_failure"))parse_failure=1;
         other=hs_compile_expression(7,"changed",&message,&error_source);
         if(parse_failure)CHECK(other==NONE&&message);
         else CHECK(other!=NONE&&hs_compile_globals.compiled_source!=text);
         CHECK(!strcmp(text,"original string"));
+        hs_compile_dispose();CHECK(!hs_compile_globals.initialized&&!source_frees);
         now=60;hs_runtime_update();CHECK(!strcmp(last_text,"original string"));
         return 0;
     }
@@ -206,6 +224,24 @@ int main(int argc,char **argv)
         thread=hs_thread_get(thread_index);thread->type=_hs_thread_type_script;thread->script_index=0;
         scenario.hs_scripts.count=1;scenario.hs_scripts.address=&script;
         script.script_type=_hs_script_startup;script.root_expression_index=root;
+    }
+    if(!strcmp(which,"valid_casts")) {
+        struct hs_syntax_node literal=*hs_syntax_get(hs_syntax_get(hs_syntax_get(root)->data)->next_node_index);
+        literal.constant_type=_hs_type_real;literal.type=_hs_type_boolean;
+        CHECK(hs_console_syntax_node_valid(&literal));
+        literal.constant_type=_hs_type_string;literal.type=_hs_type_void;
+        CHECK(hs_console_syntax_node_valid(&literal));
+        literal.flags=5;literal.data=0;literal.type=_hs_type_string;
+        CHECK(hs_console_syntax_node_valid(&literal));
+        literal.flags=1;literal.constant_type=_hs_type_short_integer;literal.type=_hs_type_long_integer;
+        CHECK(hs_console_syntax_node_valid(&literal)==use_mcc);
+        test_function.return_type=_hs_passthrough;hs_syntax_get(root)->type=_hs_type_string;
+        CHECK(hs_console_state_capture());
+        hs_syntax_get(root)->flags=2;
+        scenario.hs_scripts.count=1;scenario.hs_scripts.address=&script;
+        script.return_type=_hs_type_string;script.script_type=_hs_script_static;
+        CHECK(hs_console_state_capture());
+        script.script_type=_hs_script_stub;CHECK(hs_console_state_capture());return 0;
     }
     if(!strcmp(which,"concurrent_text")) {
         second=hs_console_source_acquire(8);CHECK(second&&second!=text);strcpy(second,"changed");
@@ -316,6 +352,32 @@ int main(int argc,char **argv)
         else if(!strcmp(which,"invalid_previous"))frame->previous=(void *)((byte *)frame->previous+1);
         else if(!strcmp(which,"invalid_thread_array"))saved_threads->data=(void *)1;
         else if(!strcmp(which,"invalid_permanent"))snapshot->nodes[(short)root].flags|=8;
+        else if(!strcmp(which,"invalid_literal_cast"))snapshot->nodes[2].constant_type=_hs_type_real;
+        else if(!strcmp(which,"invalid_global_cast")) {
+            snapshot->nodes[2].flags=5;snapshot->nodes[2].data=0;snapshot->nodes[2].type=_hs_type_real;
+            test_function.parameter_types[0]=_hs_type_real;
+        }
+        else if(!strcmp(which,"invalid_return_cast"))snapshot->nodes[(short)root].type=_hs_type_string;
+        else if(!strcmp(which,"invalid_unparsed"))snapshot->nodes[2].type=_hs_unparsed;
+        else if(!strcmp(which,"invalid_predicate"))snapshot->nodes[1].type=_hs_type_void;
+        else if(!strcmp(which,"invalid_name_argument")) {
+            test_function.parse=NULL;hs_special_form_argument_counts[0].maximum=NONE;
+            snapshot->nodes[2].type=_hs_function_name;
+        }
+        else if(!strcmp(which,"invalid_primitive_flags"))snapshot->nodes[2].flags|=2;
+        else if(!strcmp(which,"invalid_global_index")) {
+            snapshot->nodes[2].flags=5;snapshot->nodes[2].data=1024;
+        }
+        else if(!strncmp(which,"invalid_script_",15)) {
+            snapshot->nodes[(short)root].flags=2;
+            scenario.hs_scripts.count=1;scenario.hs_scripts.address=&script;
+            script.script_type=_hs_script_static;script.return_type=_hs_type_void;
+            if(!strcmp(which,"invalid_script_index"))snapshot->nodes[(short)root].script_index=1;
+            else if(!strcmp(which,"invalid_script_kind"))script.script_type=_hs_script_startup;
+            else if(!strcmp(which,"invalid_script_cast")) {
+                script.return_type=_hs_type_real;snapshot->nodes[(short)root].type=_hs_type_string;
+            } else CHECK(0);
+        }
         else CHECK(0);
         CHECK(!hs_console_state_validate(saved,image,sizeof(image)));
         CHECK(!memcmp(text,"original string",16));return 0;
