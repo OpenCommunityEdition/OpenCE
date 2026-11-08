@@ -142,6 +142,15 @@ BOOL platform_is_contiguous(const void *address)
 	return value >= PLATFORM_CONTIGUOUS_BASE && value - PLATFORM_CONTIGUOUS_BASE < PLATFORM_CONTIGUOUS_SIZE;
 }
 
+BOOL platform_contiguous_readable(const void *address, unsigned long size)
+{
+	unsigned long start = (unsigned long)address - PLATFORM_CONTIGUOUS_BASE;
+
+	if (!platform_is_contiguous(address) || !size || size > PLATFORM_CONTIGUOUS_SIZE - start)
+		return FALSE;
+	return page_protection[start / PAGE_SIZE_BYTES] && page_protection[(start + size - 1) / PAGE_SIZE_BYTES];
+}
+
 static BOOL pages_free(unsigned long first, unsigned long count)
 {
 	unsigned long page;

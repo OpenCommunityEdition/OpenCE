@@ -6407,6 +6407,65 @@ static BOOL vertex_array_cache_use(const struct vertex_shader_object *declaratio
 }
 #endif
 
+/* the streams of a draw's declaration whose vertices [first, first + count)
+do not lie in the window's allocated memory, as a bit each: a stream the
+game left set from an earlier draw (the BSP's lightmap vertices, say), which
+this draw's declaration names but which holds fewer vertices than it draws.
+The Xbox reads whatever lies past them; an imported MCC map's BSP has its
+vertices last, at the end of the memory the game has. The first few are
+logged. */
+static unsigned long streams_unreadable(unsigned long first, unsigned long count)
+{
+	static int logged = 0;
+	struct vertex_shader_object *declaration = device.vertex_shader;
+	unsigned long index, unreadable = 0;
+
+	for (index = 0; declaration && index < declaration->element_count; index++)
+	{
+		const struct vertex_element *element = &declaration->elements[index];
+		unsigned long stream = element->stream;
+		unsigned long stride = device.streams[stream].stride;
+		unsigned long bytes = stride ? stride * count : 64;
+		const unsigned char *base;
+
+		if (!device.streams[stream].data || element->type == D3DVSDT_NONE || (unreadable & (1UL << stream)))
+			continue;
+		base = (const unsigned char *)PLATFORM_PHYSICAL_TO_VIRTUAL(device.streams[stream].data) + first * stride;
+		if (!platform_is_contiguous(base) || platform_contiguous_readable(base, bytes))
+			continue;
+		unreadable |= 1UL << stream;
+		if (logged < 8)
+		{
+			platform_log("d3d8: a draw reads vertices outside the memory the game has: stream %lu at %p "
+				"(stride %lu, vertices %lu to %lu, %lu bytes to %p), register %lu of %lu elements; drawn without it",
+				stream, (const void *)device.streams[stream].data, stride, first, first + count, bytes,
+				(const void *)(base + bytes), (unsigned long)element->reg, (unsigned long)declaration->element_count);
+			logged++;
+		}
+	}
+	return unreadable;
+}
+
+static void setup_streams(unsigned long first, unsigned long count);
+
+/* setup_streams without the streams it cannot read (streams_unreadable),
+whose attributes are then constant, as for a stream that is not set */
+static void setup_readable_streams(unsigned long first, unsigned long count)
+{
+	unsigned long unreadable = streams_unreadable(first, count), stream;
+	DWORD data[16];
+
+	for (stream = 0; unreadable && stream < 16; stream++)
+	{
+		data[stream] = device.streams[stream].data;
+		if (unreadable & (1UL << stream))
+			device.streams[stream].data = 0;
+	}
+	setup_streams(first, count);
+	for (stream = 0; unreadable && stream < 16; stream++)
+		device.streams[stream].data = data[stream];
+}
+
 static void setup_streams(unsigned long first, unsigned long count)
 {
 	struct vertex_shader_object *declaration = device.vertex_shader;
@@ -6617,7 +6676,7 @@ void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_v
 	if (!vertex_count || !prepare_draw(FALSE))
 		return;
 	trace_draw("draw", primitive_type, vertex_count, NULL);
-	setup_streams(start_vertex, vertex_count);
+	setup_readable_streams(start_vertex, vertex_count);
 	if (primitive_type == D3DPT_QUADLIST)
 	{
 		unsigned long count;
@@ -6843,7 +6902,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		index_cache_get(index_data, vertex_count, &minimum, &maximum, &index_offset))
 	{
 		trace_draw("indexed", primitive_type, vertex_count, NULL);
-		setup_streams(device.base_vertex_index + minimum, maximum - minimum + 1);
+		setup_readable_streams(device.base_vertex_index + minimum, maximum - minimum + 1);
 		state_element_array_buffer(index_cache.buffers[device.buffer_ring]);
 		glDrawElements(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT, (const void *)index_offset);
 		return;
@@ -6852,7 +6911,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 	index_extent(index_data, vertex_count, generation, mirrored, &minimum, &maximum);
 	trace_draw("indexed", primitive_type, vertex_count, NULL);
 	/* (the streams from the base vertex on: index i is vertex base + i) */
-	setup_streams(device.base_vertex_index + minimum, maximum - minimum + 1);
+	setup_readable_streams(device.base_vertex_index + minimum, maximum - minimum + 1);
 	if (mirrored)
 	{
 		/* the attributes start at vertex minimum */

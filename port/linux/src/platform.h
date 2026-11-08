@@ -167,6 +167,10 @@ void *platform_contiguous_alloc(unsigned long size, unsigned long alignment,
 	unsigned long physical_address, DWORD protect);
 void platform_contiguous_free(void *address);
 BOOL platform_is_contiguous(const void *address);
+/* whether [address, address + size) of the window lies in allocated blocks
+at its first and last pages (read without the lock: for checks on the
+renderer's hot path, which allocation does not race with) */
+BOOL platform_contiguous_readable(const void *address, unsigned long size);
 #define PLATFORM_PHYSICAL_TO_VIRTUAL(physical) ((void *)((unsigned long)(physical) | PLATFORM_CONTIGUOUS_BASE))
 #define PLATFORM_VIRTUAL_TO_PHYSICAL(address) ((unsigned long)(address) & ~PLATFORM_CONTIGUOUS_BASE)
 
