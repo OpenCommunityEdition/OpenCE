@@ -155,6 +155,9 @@ int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, p
 /* stops the router forwarding that port (network byte order) of its, which
 posix_upnp_forward_udp set up; blocks */
 void posix_upnp_stop_forwarding_udp(unsigned short external_port);
+/* Process shutdown only: stop starting further router requests. Safe to
+call while forwarding runs; it cannot interrupt a library call in progress. */
+void posix_upnp_cancel(void);
 
 /* ---------- DTLS for WebRTC (internet play with browsers, p2p_webrtc.c;
 posix_dtls.c, with port/third_party/mbedtls) */

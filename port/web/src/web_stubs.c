@@ -30,6 +30,10 @@ void posix_upnp_stop_forwarding_udp(unsigned short external_port)
 	(void)external_port;
 }
 
+void posix_upnp_cancel(void)
+{
+}
+
 /* ---------- MSVC (scenario.c): a compiler barrier, an intrinsic clang knows
 only on x86 and ARM */
 

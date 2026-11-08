@@ -1580,8 +1580,9 @@ The game can ask the router to forward the port (UPnP,
   other machine.
 - The forward has a duration of one hour. The game makes it longer while
   it operates. When the game stops normally, it removes the forward. It
-  does not remove the forward after a crash, or if a request to the router
-  is still under way 3 seconds after the game starts to stop. Some routers only make forwards without a duration.
+  waits for its request worker before removing the forward; a router request
+  already in progress can delay exit. It does not remove the forward after
+  a crash. Some routers only make forwards without a duration.
 - When the game finds the router, it removes the forwards to this machine
   that have the description "Halo internet play" and that no copy of the
   game uses now (forwards that a copy of the game did not remove).
