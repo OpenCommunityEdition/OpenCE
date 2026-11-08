@@ -26,16 +26,22 @@ def generated(fault=None):
         apply = mutated(apply, ' &&\n\t\t\tclient_looping_sound_find(event->tag_index) == NONE)', ')')
     if fault == 'kept':
         apply = mutated(apply, '\t\t\tclient_looping_sound_forget(event->tag_index);\n', '')
+    if fault == 'any-time':
+        apply = mutated(apply, ' ? event->target : NONE', ' ? event->target : event->target')
+    if fault == 'kept-time':
+        apply = mutated(apply, '\t\t\tcoop_sound_sync_end(event->tag_index);\n', '')
     return (('types.inc', types), ('under_test.inc', code + apply))
 
 
-@pytest.mark.parametrize('case', ['played-out', 'playing', 'started-again', 'late-joiner', 'music', 'no-room', 'stopped'])
+@pytest.mark.parametrize('case', ['played-out', 'playing', 'started-again', 'late-joiner', 'music', 'no-room', 'stopped',
+                                  'joined-during', 'music-time', 'just-started'])
 def test_looping_sounds(case):
     status, output = run(build('coop_looping_sounds', generated()), case)
     assert status == 0, output
 
 
-@pytest.mark.parametrize('fault,case', [('resent', 'played-out'), ('resent', 'late-joiner'), ('kept', 'started-again')])
+@pytest.mark.parametrize('fault,case', [('resent', 'played-out'), ('resent', 'late-joiner'), ('kept', 'started-again'),
+                                        ('any-time', 'music-time'), ('kept-time', 'joined-during')])
 def test_negative(fault, case):
     status, output = run(build('coop_looping_sounds', generated(fault)), case)
     assert status == CHECK_FAILED, output

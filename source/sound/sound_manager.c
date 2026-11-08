@@ -233,6 +233,7 @@ symbols in this file:
 #include "game_sound.h"
 #include "sound_preferences.h"
 #include "camera/director.h" /* port: director_get_followed_unit */
+#include "coop_sound_sync.h" /* port: port/linux/game/coop_sound_sync.c */
 #include "camera/observer.h"
 #include "effects/player_effects.h"
 #include "game/game.h"
@@ -629,6 +630,11 @@ static void sound_channel_summary_build(
 static void channel_queue_sound(
 	short channel_index,
 	struct sound_permutation *permutation);
+/* port: and from byte_offset into the first permutation's samples */
+static void channel_queue_sound_from(
+	short channel_index,
+	struct sound_permutation *permutation,
+	long byte_offset);
 static void channel_set_properties_hardware(
 	short channel_index,
 	struct platform_sound_channel_properties *properties,
@@ -1336,6 +1342,28 @@ static void channel_queue_sound(
 	return;
 }
 
+/* port: channel_queue_sound, a channel that plays nothing starting its
+permutation byte_offset into its samples (coop_sound_sync.c) */
+static void channel_queue_sound_from(
+	short channel_index,
+	struct sound_permutation *permutation,
+	long byte_offset)
+{
+	struct sound_channel_datum *channel = channel_get(channel_index);
+
+	if (byte_offset <= 0 || channel->playing_permutation || channel->queued_permutation)
+	{
+		channel_queue_sound(channel_index, permutation);
+		return;
+	}
+
+	dsound_port_queue_sound_from(channel_index, permutation, byte_offset);
+	channel->playing_permutation = permutation;
+	channel->estimated_tick_time = 0.f;
+
+	return;
+}
+
 static void channel_set_properties_hardware(
 	short channel_index,
 	struct platform_sound_channel_properties *properties,
@@ -1625,6 +1653,7 @@ static long update_potentially_audible_looping_sound(
 			if (sound_index != NONE)
 			{
 				struct sound_datum *sound = sound_get(sound_index);
+				short placement;
 
 				sound->listener_index = listener_index;
 				sound->definition_index = definition_index;
@@ -1663,6 +1692,41 @@ static long update_potentially_audible_looping_sound(
 					definition,
 					sound->pitch_range_index,
 					NONE);
+				/* port: a co-op client that joins during a looping sound that
+				plays once starts it where the host has reached: a part that has
+				played out there does not play, and the sound stops with the
+				loop that has */
+				placement = coop_sound_sync_place(
+					looping_sound->definition_index,
+					looping_sound->loop_identifier,
+					track_index,
+					type == _sound_start_track ? _coop_sound_sync_start_part :
+						type == _sound_loop_track ? _coop_sound_sync_loop_part :
+						_coop_sound_sync_stop_part,
+					definition_index,
+					sound->pitch_range_index,
+					&sound->permutation_index,
+					VALID_INDEX(sound->pitch_range_index, definition->pitch_ranges.count) ?
+						sound_scale_value(
+							sound->pitch,
+							definition->zero_pitch_modifier,
+							definition->one_pitch_modifier,
+							scale) *
+						TAG_BLOCK_GET_ELEMENT(
+							&definition->pitch_ranges,
+							sound->pitch_range_index,
+							struct sound_pitch_range)->playback_rate :
+						0.f,
+					sound_index);
+				if (placement != _coop_sound_sync_play)
+				{
+					if (placement == _coop_sound_sync_finished)
+					{
+						looping_sound->ordered_sounds_finished = TRUE;
+					}
+					datum_delete(sound_data, sound_index);
+					return NONE;
+				}
 				_sound_cache_sound_request(
 					sound_permutation_get(
 						sound->definition_index,
@@ -2910,6 +2974,11 @@ boolean sound_refresh_looping(
 
 				loop->alternate = alternate;
 				loop->state = refresh_state;
+				/* port: whether its parts have been placed (coop_sound_sync_place) */
+				coop_sound_sync_refreshed(
+					definition_index,
+					looping_sound_identifier,
+					loop->component_sound_count > 0 || loop->ordered_sounds_finished);
 			}
 		}
 		else if (new_looping_sound)
@@ -2990,7 +3059,11 @@ static void update_channel_for_looping_sound(
 			0x9DA,
 			sound_cache_sound_loaded(permutation));
 		channel_set_properties_hardware(channel_index, &properties, FALSE);
-		channel_queue_sound(channel_index, permutation);
+		/* port: from where coop_sound_sync_place put it (0: its beginning) */
+		channel_queue_sound_from(
+			channel_index,
+			permutation,
+			coop_sound_sync_take_offset(channel->sound_index, permutation));
 		sound->playing_channel_index = channel_index;
 	}
 	else

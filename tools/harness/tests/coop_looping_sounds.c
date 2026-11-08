@@ -59,6 +59,20 @@ static struct game_looping_sound_datum *game_looping_sound_get(long index)
 }
 static void network_coop_note_sound(short kind,long definition_index,long object_index,real scale)
 {(void)kind;(void)definition_index;(void)object_index;(void)scale;}
+
+/* coop_sound_sync.c's: the host's time for each sound, as the client was told it */
+static long synced[DEFINITIONS];
+static int sync_begins;
+static void coop_sound_sync_begin(long definition_index,long elapsed_milliseconds)
+{
+ CHECK(definition_index>=0&&definition_index<DEFINITIONS,"synced no such sound %ld",definition_index);
+ synced[definition_index]=elapsed_milliseconds;sync_begins++;
+}
+static void coop_sound_sync_end(long definition_index)
+{
+ CHECK(definition_index>=0&&definition_index<DEFINITIONS,"ended no such sound %ld",definition_index);
+ synced[definition_index]=NONE;
+}
 static void scripted_music_stop_all(void){}
 
 /* as game_sound.c's update when a fake impulse sound's permutations have all played */
@@ -78,13 +92,16 @@ static void scripted_sound_new(long tag,long object,real scale){(void)tag;(void)
 
 #include "under_test.inc"
 
-static void send(int type,long definition_index)
+/* (target: the host's milliseconds since it started it, NONE for just now) */
+static void send_at(int type,long definition_index,long target)
 {
  struct distributed_coop_event event;
  memset(&event,0,sizeof(event));
  event.kind=0;event.type=(byte)type;event.tag_index=definition_index;event.object_index=NONE;event.reals[0]=1.0f;
+ event.target=target;
  client_apply_sound(&event);
 }
+static void send(int type,long definition_index){send_at(type,definition_index,NONE);}
 /* the host's two-second resend, or the one when a machine joins */
 static void resend(long definition_index){send(_coop_sound_looping_start,definition_index);}
 
@@ -96,6 +113,8 @@ static void setup(void)
  SET_FLAG(definitions[ONCE].flags,_looping_sound_fake_impulse_sound_bit,TRUE);
  memset(playing,0,sizeof(playing));memset(starts,0,sizeof(starts));full=FALSE;
  client_looping_sounds.count=0;
+ for(index=0;index<DEFINITIONS;index++)synced[index]=NONE;
+ sync_begins=0;
 }
 
 int main(int argc,char **argv)
@@ -154,6 +173,32 @@ int main(int argc,char **argv)
   /* the host stops it while it plays: stopped here and forgotten */
   send(_coop_sound_looping_start,ONCE);send(_coop_sound_looping_stop,ONCE);
   CHECK(!is_playing(ONCE)&&client_looping_sounds.count==0,"the host's stop left it playing or remembered");
+ }
+ else if(!strcmp(name,"joined-during"))
+ {
+  /* a client that joins 40 s into the cutscene's sound starts it from there */
+  send_at(_coop_sound_looping_start,ONCE,40000);
+  CHECK(is_playing(ONCE)&&synced[ONCE]==40000,"the host's 40 s became %ld",synced[ONCE]);
+  CHECK(sync_begins==1,"the time was given %d times for one start",sync_begins);
+  /* the resends while it plays change nothing */
+  send_at(_coop_sound_looping_start,ONCE,42000);
+  CHECK(synced[ONCE]==40000&&sync_begins==1,"a resend while it played moved it to %ld",synced[ONCE]);
+  /* and the host's stop forgets it */
+  send(_coop_sound_looping_stop,ONCE);
+  CHECK(synced[ONCE]==NONE,"the host's stop kept its time");
+ }
+ else if(!strcmp(name,"music-time"))
+ {
+  /* music that loops starts at its beginning, whatever time a host sends */
+  send_at(_coop_sound_looping_start,MUSIC,40000);
+  CHECK(is_playing(MUSIC)&&synced[MUSIC]==NONE,"music that loops was given the time %ld",synced[MUSIC]);
+ }
+ else if(!strcmp(name,"just-started"))
+ {
+  /* the scripts' own start, or an older host's resend: from its beginning */
+  synced[ONCE]=12345;
+  send(_coop_sound_looping_start,ONCE);
+  CHECK(is_playing(ONCE)&&synced[ONCE]==NONE,"a start with no time kept the time %ld",synced[ONCE]);
  }
  else
  {

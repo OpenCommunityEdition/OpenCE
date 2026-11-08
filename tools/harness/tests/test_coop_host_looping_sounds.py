@@ -24,6 +24,10 @@ NEGATIVE_CONTROLS = {
                          'looping_sound_part_milliseconds', 'length'),
     'start-time-kept': (('\t\t\thost_looping_sounds[index].start_time = game_time_get();\n', ''),
                         'network_coop_note_sound', 'started-again'),
+    'time-not-sent': (('\t\t\t\tevent->target = played * 1000 / TICKS_PER_SECOND;\n', '\t\t\t\t;\n'),
+                      'host_send_looping_sounds', 'resent-time'),
+    'music-time-sent': (('if (host_looping_sounds[index].length > 0 && played > 0)', 'if (played > 0)'),
+                        'host_send_looping_sounds', 'resent-time'),
 }
 
 
@@ -59,7 +63,7 @@ def generated(fault=None, faulty_function=None):
 
 
 @pytest.mark.parametrize('case', ['length', 'ended', 'not-resent-near-end', 'drawing-host', 'music', 'no-length',
-                                  'started-again', 'queue-full'])
+                                  'started-again', 'queue-full', 'resent-time'])
 def test_host_looping_sounds(case):
     status, output = run(build('coop_host_looping_sounds', generated()), case)
     assert status == 0, output

@@ -71,6 +71,8 @@ static void skip_vote_clear(void){}
 static void coop_enemies_new_game(void){}
 static void coop_pickups_new_game(void){}
 static void coop_vehicles_new_game(void){}
+static int sound_syncs;
+static void coop_sound_sync_reset(void){sound_syncs=0;}
 #include "under_test.inc"
 static long add_player(void){long id=datum_new(player_data);int slot=DATUM_INDEX_TO_ABSOLUTE_INDEX(id);CHECK(id!=NONE,"player fixture full");((struct player_datum *)datum_get(player_data,id))->unit_index=100+slot;live_machine_players[slot<2?slot:2][slot<3?0:1]=id;return id;}
 static struct player_datum *player(int slot){return (void *)(player_data->data+slot*player_data->size);}
@@ -119,10 +121,11 @@ int main(int argc,char **argv)
   setup();game_state_globals.saved_game_valid=FALSE;wipe();CHECK(!reverts&&respawns==1,"missing saved state rewound");
  } else CASE("new-map") {
   CHECK(network_coop_wipe_reverts(),"valid checkpoint rejected");
-  host_attachment_count=3;host_looping_sound_count=2;client_looping_sounds.count=2;
+  host_attachment_count=3;host_looping_sound_count=2;client_looping_sounds.count=2;sound_syncs=2;
   network_coop_new_game();
   CHECK(!network_coop_wipe_reverts(),"checkpoint metadata survived a new game/map");
   CHECK(host_attachment_count==0&&host_looping_sound_count==0&&client_looping_sounds.count==0,"attachment or sound history survived a new game/map");
+  CHECK(sound_syncs==0,"a host's time for a sound survived a new game/map");
  } else CASE("delay") {
   main_lost_map();tick=91;main_lost_map_private();CHECK(!reverts&&!respawns,"rewound early");
   tick=92;main_lost_map_private();CHECK(reverts==1&&!main_globals.lost_map&&!main_globals.loss_timer,"wipe did not clear loss state");

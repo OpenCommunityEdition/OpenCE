@@ -81,7 +81,7 @@ static struct distributed_coop_event *event_new(byte kind)
  if(queue_full||sent_count==1024)return NULL;
  event=&sent[sent_count++];
  memset(event,0,sizeof(*event));
- event->kind=kind;event->object_index=NONE;event->tag_index=NONE;
+ event->kind=kind;event->object_index=NONE;event->tag_index=NONE;event->target=NONE;
  return event;
 }
 
@@ -122,6 +122,15 @@ static int sent_of(int from,int type,long definition_index)
  for(index=from;index<sent_count;index++)
   if(sent[index].type==type&&sent[index].tag_index==definition_index)count++;
  return count;
+}
+
+/* the last event of a type for a sound, or NULL */
+static struct distributed_coop_event const *last_sent(int type,long definition_index)
+{
+ int index;
+ for(index=sent_count-1;index>=0;index--)
+  if(sent[index].type==type&&sent[index].tag_index==definition_index)return &sent[index];
+ return NULL;
 }
 
 /* the host's ticks from now to the tick at (now is then the tick after),
@@ -232,6 +241,27 @@ int main(int argc,char **argv)
   run_to(start+73*TICKS_PER_SECOND);
   CHECK(!is_playing(ONCE)&&host_looping_sound_count==1&&is_playing(MUSIC),
    "with the queue full: %d listed, once playing %d",host_looping_sound_count,is_playing(ONCE));
+ }
+ else if(!strcmp(name,"resent-time"))
+ {
+  /* the resends of one that plays once say how long ago it started, for a machine that joins during it */
+  long start=now;
+  struct distributed_coop_event const *event;
+  scripted_looping_sound_start(ONCE,NONE,1.0f);
+  event=last_sent(_coop_sound_looping_start,ONCE);
+  CHECK(event&&event->target==NONE,"the scripts' start said it began %ld ms ago",event?event->target:0);
+  run_to(start+30*TICKS_PER_SECOND);
+  event=last_sent(_coop_sound_looping_start,ONCE);
+  CHECK(event&&event->target>=28000&&event->target<=30000,"a resend 30 s in said %ld ms",event?event->target:0);
+  /* (resends fall on even seconds of the game's time: the last before now) */
+  CHECK(event->target==((now-1)/(2*TICKS_PER_SECOND)*(2*TICKS_PER_SECOND)-start)*1000/TICKS_PER_SECOND,
+   "a resend said %ld ms, not its tick's",event->target);
+  /* music that loops starts from its beginning everywhere, as it always has */
+  scripted_looping_sound_start(MUSIC,NONE,1.0f);
+  start=now;
+  run_to(start+10*TICKS_PER_SECOND);
+  event=last_sent(_coop_sound_looping_start,MUSIC);
+  CHECK(event&&event->target==NONE,"music that loops was resent with %ld ms",event?event->target:0);
  }
  else
  {

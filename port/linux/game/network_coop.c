@@ -120,6 +120,7 @@ index and tag, since the map placed them at the same index everywhere.
 #include "coop_pickups.h"
 #include "coop_vehicles.h"
 #include "coop_spectate.h"
+#include "coop_sound_sync.h"
 #include "network_coop.h"
 #include "network_distributed.h"
 #include "../src/server_events.h" /* port: port/linux/src/server_events.c */
@@ -321,7 +322,9 @@ struct distributed_coop_presentation_message
 
 /* Something that happens once. Which fields mean what depends on the kind:
 
-	sound             type: _coop_sound_ kind; tag_index; object_index (the source, or NONE); reals[0]: scale
+	sound             type: _coop_sound_ kind; tag_index; object_index (the source, or NONE); reals[0]: scale;
+	                  target: a looping sound's start that the host resends, one that plays once,
+	                  how many milliseconds ago it started it (NONE: just now; coop_sound_sync.c)
 	title             value: title index; reals[0]: delay in seconds
 	hud               type: _coop_hud_ kind; value
 	player_effect     type: _coop_player_effect_ kind; reals: the function's arguments
@@ -1794,6 +1797,10 @@ static void client_apply_sound(
 			looping_sound_definition_get(event->tag_index)->runtime_scripting_sound_index == NONE &&
 			client_looping_sound_find(event->tag_index) == NONE)
 		{
+			/* (one that plays once starts where the host has reached) */
+			coop_sound_sync_begin(event->tag_index,
+				TEST_FLAG(looping_sound_definition_get(event->tag_index)->flags,
+					_looping_sound_fake_impulse_sound_bit) ? event->target : NONE);
 			scripted_looping_sound_start(event->tag_index, object_index, scale);
 			client_looping_sound_started(event->tag_index);
 		}
@@ -1802,6 +1809,7 @@ static void client_apply_sound(
 		if (distributed_tag_of_group(event->tag_index, LOOPING_SOUND_DEFINITION_TAG))
 		{
 			client_looping_sound_forget(event->tag_index);
+			coop_sound_sync_end(event->tag_index);
 			scripted_looping_sound_stop(event->tag_index);
 		}
 		break;
@@ -2127,6 +2135,7 @@ void network_coop_new_game(
 	host_attachment_count = 0;
 	host_looping_sound_count = 0;
 	client_looping_sounds.count = 0;
+	coop_sound_sync_reset();
 	host_hud_state.objective = NONE;
 	host_hud_state.nav_point_count = 0;
 	skip_vote_clear();
@@ -2648,6 +2657,10 @@ static void host_send_looping_sounds(
 			event->tag_index = definition_index;
 			event->object_index = host_looping_sounds[index].object_index;
 			event->reals[0] = host_looping_sounds[index].scale;
+			/* (one that plays once: how long ago, so a machine that starts it
+			now starts it where this one is) */
+			if (host_looping_sounds[index].length > 0 && played > 0)
+				event->target = played * 1000 / TICKS_PER_SECOND;
 		}
 		index++;
 	}
