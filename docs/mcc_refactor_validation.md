@@ -19,6 +19,9 @@ revisions, verified cleanup and archived-evidence replay are complete. On
 7 November the user explicitly removed the old-client crossplay constraint
 for both milestones; the 8 November request also supersedes the console deferral.
 The stage evidence below records the changes, actual validation and limits.
+The subsequent delivery plan adds Milestone 13 for host sharing, Milestone 14
+for Custom Edition and MCC browser playability, and Milestone 15 for the
+upstream contribution. These are planned work, not completed validation.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -33,6 +36,9 @@ The stage evidence below records the changes, actual validation and limits.
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; recovery failure addressed in Milestone 10 |
 | 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
 | 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
+| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | Planned; review and contributor-response draft before implementation |
+| 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Planned; explicit requirement, not satisfied by a web build alone |
+| 15 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestones 13 and 14; previously numbered 14 |
 
 The completed Milestone 10 gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
 with passing MCC and four-platform debug workflows and 87 focused local passes.
@@ -56,6 +62,88 @@ network versions; the earlier crossplay-dependent deferrals below are historical
 evidence. Each milestone includes design review, meaningful regression
 coverage, the applicable platform/network checks, final review and cleanup.
 Later integration checks supplement these checks; they do not postpone them.
+
+### Milestone 13: host sharing and campaign delivery
+
+Analyze the actual changes and discussion in
+[PR #95](https://github.com/chestahh/GulchCE/pull/95), provide evidence-backed
+recommendations and draft answers to the contributor's questions before
+implementation. A draft response is not authorization to post it. Adapt the
+reviewed contribution to this refactored branch, preserving contributor
+attribution, rather than treating its older `testing` base or protocol numbers
+as current. Complete the campaign manifests, follow-on missions and host menu
+entry that the PR explicitly leaves out of scope.
+
+MCC transfers have one source: the host. Host sharing is opt-in and off by
+default; honor the joiner's download preference. Retain the PR's distinction
+between eligible hand-placed packages and Workshop subscription guidance.
+Do not silently broaden its content eligibility. Review the host-local
+classification list, attribution, manifest identity, staging, installation
+and failure cleanup. Campaign delivery must declare and validate mission
+dependencies and progression. Downloading missions as needed after obtaining
+the manifest is a proposed design to settle during review, not an implemented
+or separately confirmed policy.
+
+Validate real transfers and resulting gameplay, host/client authority,
+disabled settings, content changes, interrupted transfers, destination
+collisions, hostile input, resource ownership and follow-on missions.
+Preserve existing Xbox and CE behavior. Browser completion is an explicit
+Milestone 14 gate, not inferred from this PR's CI or native transfer tests.
+
+### Milestone 14: Custom Edition and MCC browser playability
+
+The user requires both Custom Edition and MCC maps to be playable in web
+browsers. This includes loading and playing locally, receiving shared content,
+and native/browser multiplayer. Review the necessary general browser/platform
+changes separately from MCC compatibility logic; preserve the established
+Xbox, CE and MCC ownership and loading boundaries.
+
+The starting web build explicitly disables Custom Edition because its tag
+address window conflicts with the C heap. Its existing filesystem is WasmFS
+backed by the site's Origin Private File System (OPFS), mounted at `/data`;
+this is persistent browser storage, not the ordinary Downloads folder. See
+[web startup](../port/web/src/web_main.c) and
+[web limitations](../port/web/README.md#limits).
+Establish an evidence-backed memory/loading design for each map family before
+claiming that filesystem access makes those maps playable.
+
+Provide appropriate browser import and discovery for user-supplied CE maps,
+resources and MCC packages/campaign manifests. Implement and verify downloads
+through the browser filesystem, with bounded staging, integrity checks,
+installation, cancellation and quota/write-failure handling. MCC downloads
+remain host-only. Existing native CE sharing includes peer seeding; preserve
+its established policy when supporting the browser rather than assuming CE
+is host-only. Keep `maps`, `custom_maps` and `mcc_maps` separate.
+
+Completion requires actual CE and MCC browser gameplay and visual/audio
+checks, not only compiling WebAssembly or saving downloaded bytes. Test
+native-host/browser-client and browser-host/native-client roles, browser peers,
+campaign follow-on missions, save/reload, browser reopening and retained
+content, failure cleanup and map-family transitions. Include representative
+Chromium and Firefox runs and native Xbox/CE/MCC regression controls. Record
+tested maps, browser versions, resource limits and unsupported cases precisely.
+Run the required platform and networking checks after the combined review.
+
+### Milestone 15: MCC-only upstream contribution
+
+After Milestones 13 and 14, create `GET-YOUR-MCC-HERE` against the then-current
+OpenCE `main`. The completed `mcc-code-refactor` branch is the source of the
+contribution, including its MCC documentation and regression tests. Preserve
+provenance and exclude unrelated fork features, settings, assets and integration
+such as optional shoulder-camera mode. Preserve authored MCC camera semantics
+required by the maps. Include shared fixes and browser foundations needed for
+MCC correctness; distinguish any CE-only browser work as a separate upstream
+dependency or contribution rather than silently expanding the MCC-only scope.
+
+Integrate MCC messages and admission into OpenCE's network agreement, removing
+the separate MCC protocol/version layer while preserving map-family validation
+and MCC-owned semantics. Audit message layouts, dispatch, identifiers,
+simulation changes and old-peer refusal; changing a version constant alone is
+insufficient. Use the then-current upstream network version plus one for the
+combined agreement and account for any upstream movement before integration.
+Revalidate the resulting branch across the required platforms and map families.
+Keep reviewable commits and all meaningful tests/documentation; the complete
+branch does not require presenting it as one oversized upstream PR.
 
 ### Milestone 6: checksum consolidation
 
