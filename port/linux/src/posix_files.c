@@ -7,6 +7,8 @@ the host ABI and _FILE_OFFSET_BITS=64.
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
@@ -230,4 +232,27 @@ int posix_find_entry_case_insensitive(const char *directory, const char *name,
 	}
 	closedir(handle);
 	return found;
+}
+
+int posix_steam_root(char *path, posix_ulong size)
+{
+	/* (the native package's link, its own folder, and the Flatpak's) */
+	static const char *const folders[] =
+	{
+		"/.steam/steam", "/.local/share/Steam", "/.var/app/com.valvesoftware.Steam/.local/share/Steam"
+	};
+	const char *home = getenv("HOME");
+	unsigned long index;
+
+	for (index = 0; home && home[0] && index < sizeof(folders) / sizeof(folders[0]); index++)
+	{
+		char steamapps[4096];
+		struct stat information;
+
+		snprintf(path, (size_t)size, "%s%s", home, folders[index]);
+		snprintf(steamapps, sizeof(steamapps), "%s/steamapps", path);
+		if (stat(steamapps, &information) == 0 && S_ISDIR(information.st_mode))
+			return 1;
+	}
+	return 0;
 }

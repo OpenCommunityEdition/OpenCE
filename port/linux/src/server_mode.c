@@ -198,10 +198,11 @@ static void answer_command_line(void)
 			exit(server_master_keygen() ? EXIT_SUCCESS : SERVER_EXIT_CONFIGURATION);
 		if (!strcmp(argument, "--import-mcc"))
 		{
-			/* halo --import-mcc <output folder> [--from <MCC's halo1 folder>]
-			[<map>...]: MCC's maps (the data root's, or those of the folder
-			--from names) written as the Xbox's (port/linux/game/mcc_import.c);
-			with no map named, every map the game has the disc's values of */
+			/* halo --import-mcc <output folder> [--from <MCC's halo1 folder> |
+			steam] [<map>...]: MCC's maps (the data root's, or those of the
+			folder --from names, or of the install Steam has) written as the
+			Xbox's (port/linux/game/mcc_import.c); with no map named, every map
+			the game has the disc's values of */
 			static char names[64][64];
 			char const *maps[64];
 			char output[1024], from[1024];
@@ -219,6 +220,13 @@ static void answer_command_line(void)
 					fprintf(stderr, "--import-mcc: --from names the Master Chief Collection's halo1 folder\n");
 					exit(SERVER_EXIT_CONFIGURATION);
 				}
+				/* ("steam": the install Steam's libraries have) */
+				if (!strcmp(from, "steam") && !mcc_install_find(from, sizeof(from)))
+				{
+					fprintf(stderr, "--import-mcc: no Steam library has the Master Chief Collection's halo1 folder\n");
+					exit(SERVER_EXIT_CONFIGURATION);
+				}
+				fprintf(stdout, "mcc import: from %s\n", from);
 				platform_set_mcc_source_root(from);
 				next += 2;
 			}

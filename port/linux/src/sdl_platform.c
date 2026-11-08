@@ -519,12 +519,84 @@ static BOOL data_choose_image(char *path, int size, BOOL *failed, char *error, i
 	return TRUE;
 }
 
+/* the Halo 1 folder of a Master Chief Collection install the player picks */
+static BOOL data_choose_mcc_folder(char *path, int size)
+{
+	static struct data_image_choice choice;
+
+	memset(&choice, 0, sizeof(choice));
+	SDL_ShowOpenFolderDialog(data_image_chosen, &choice, NULL, NULL, false);
+	while (!SDL_GetAtomicInt(&choice.done))
+	{
+		SDL_PumpEvents();
+		SDL_Delay(50);
+	}
+	if (!choice.path[0])
+		return FALSE;
+	snprintf(path, (size_t)size, "%s", choice.path);
+	return TRUE;
+}
+
+/* the maps imported from a Master Chief Collection install the player has
+(found through Steam, else picked); TRUE once destination has every map the
+game needs, FALSE when the player goes back or it fails. MCC has no Xbox
+menus' map (ui.map): until the import makes one, it comes from the disc, and
+the game quits asking for it. */
+static BOOL data_import_mcc(const char *destination)
+{
+	char halo1[1024], ui[1100], message[2600], error[1024];
+	SDL_PathInfo information;
+	BOOL found = mcc_install_find(halo1, sizeof(halo1));
+
+	if (found)
+	{
+		static const SDL_MessageBoxButtonData buttons[] =
+		{
+			{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Import" },
+			{ 0, 2, "Another folder" },
+			{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Back" },
+		};
+		SDL_MessageBoxData question = { SDL_MESSAGEBOX_INFORMATION, NULL, "Halo", message, 3, buttons, NULL };
+		int answer = 0;
+
+		snprintf(message, sizeof(message),
+			"The Master Chief Collection's Halo 1 is in %s.\n\n"
+			"Import its maps as the Xbox's? They are written to %s/maps (about 1.5 GB); MCC's files are only read.",
+			halo1, destination);
+		if (!SDL_ShowMessageBox(&question, &answer) || answer == 0)
+			return FALSE;
+		if (answer == 2)
+			found = FALSE;
+	}
+	if (!found && !data_choose_mcc_folder(halo1, sizeof(halo1)))
+		return FALSE;
+	platform_log("importing the maps of %s into %s", halo1, destination);
+	if (!mcc_install_import(halo1, destination, error, sizeof(error)))
+	{
+		platform_log("import failed: %s", error);
+		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Halo", error, NULL);
+		return FALSE;
+	}
+	platform_log("imported the maps");
+	snprintf(ui, sizeof(ui), "%s/maps/ui.map", destination);
+	if (SDL_GetPathInfo(ui, &information) && information.type == SDL_PATHTYPE_FILE)
+		return TRUE;
+	snprintf(message, sizeof(message),
+		"The maps are imported. The menus' map (ui.map) cannot be made from the Master Chief Collection yet: "
+		"put the ui.map of an Xbox disc image of Halo: Combat Evolved in %s/maps, then start Halo again.",
+		destination);
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Halo", message, NULL);
+	platform_log("imported maps without ui.map: quitting");
+	exit(EXIT_SUCCESS);
+}
+
 BOOL platform_offer_game_data(const char *destination)
 {
 	static const SDL_MessageBoxButtonData buttons[] =
 	{
-		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Yes" },
-		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "No" },
+		{ SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Disc image" },
+		{ 0, 2, "MCC (Steam)" },
+		{ SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Quit" },
 	};
 	char message[2600];
 	char found[1024];
@@ -543,6 +615,7 @@ BOOL platform_offer_game_data(const char *destination)
 			"Halo's game data (its maps folder) was not found.\n\n"
 			"Extract the maps folder from the Xbox disc image %s? "
 			"It is copied to %s/maps (about 2 GB).\n\n"
+			"Or import the maps from Halo: The Master Chief Collection on Steam.\n\n"
 			"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
 			found, destination);
 	}
@@ -552,21 +625,28 @@ BOOL platform_offer_game_data(const char *destination)
 			"Halo's game data (its maps folder) was not found.\n\n"
 			"Extract the maps folder from an Xbox disc image (.iso) of Halo: Combat Evolved? "
 			"It is copied to %s/maps (about 2 GB).\n\n"
+			"Or import the maps from Halo: The Master Chief Collection on Steam.\n\n"
 			"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
 			destination);
 	}
 	for (;;)
 	{
-		SDL_MessageBoxData question = { SDL_MESSAGEBOX_INFORMATION, NULL, "Halo", message, 2, buttons, NULL };
+		SDL_MessageBoxData question = { SDL_MESSAGEBOX_INFORMATION, NULL, "Halo", message, 3, buttons, NULL };
 		char image[1024];
 		char error[512];
 		int answer = 0;
 		BOOL failed = FALSE;
 
-		if (!SDL_ShowMessageBox(&question, &answer) || answer != 1)
+		if (!SDL_ShowMessageBox(&question, &answer) || answer == 0)
 		{
 			platform_log("no game data: quitting");
 			exit(EXIT_SUCCESS);
+		}
+		if (answer == 2)
+		{
+			if (data_import_mcc(destination))
+				return TRUE;
+			continue;
 		}
 		if (image_found)
 		{

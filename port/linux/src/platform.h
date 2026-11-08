@@ -114,6 +114,11 @@ const char *platform_mcc_source_root(void);
 out of an Xbox disc image into destination (sdl_platform.c), and quits if
 the player declines; nonzero once destination has one */
 BOOL platform_offer_game_data(const char *destination);
+/* a Steam installation's Halo: The Master Chief Collection Halo 1 folder
+(path), and the import of its maps into destination's maps folder, showing
+how far it has got (mcc_install.c, desktop only) */
+BOOL mcc_install_find(char *path, int size);
+BOOL mcc_install_import(const char *halo1, const char *destination, char *error, int error_size);
 /* what the data root's maps folder holds, which should be the Xbox maps
 (sdl_platform.c tells the player when it is not, rather than the game
 failing on Halo PC's ui.map) */

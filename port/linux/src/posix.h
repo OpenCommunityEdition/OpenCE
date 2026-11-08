@@ -78,6 +78,9 @@ void posix_directory_close(void *directory);
 copies the on-disk spelling into result and returns nonzero if found */
 int posix_find_entry_case_insensitive(const char *directory, const char *name,
 	char *result, posix_ulong result_size);
+/* Steam's folder (its steamapps folder's parent): the registry's SteamPath on
+Windows, else the folders Steam installs to; 0 if none is found */
+int posix_steam_root(char *path, posix_ulong size);
 
 /* MCC-owned bounded package reads (posix_mcc_preview.c). Returns bytes read,
  * or zero; metadata paths cannot escape root or traverse links. */

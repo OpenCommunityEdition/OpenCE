@@ -311,3 +311,23 @@ int posix_find_entry_case_insensitive(const char *directory, const char *name,
 	strcpy(result, data.cFileName);
 	return 1;
 }
+
+int posix_steam_root(char *path, posix_ulong size)
+{
+	/* (Steam writes its folder to the registry, with forward slashes) */
+	char value[MAX_PATH], steamapps[MAX_PATH + 16];
+	DWORD value_size = sizeof(value);
+	DWORD attributes;
+
+	if (RegGetValueA(HKEY_CURRENT_USER, "Software\\Valve\\Steam", "SteamPath", RRF_RT_REG_SZ, NULL, value,
+		&value_size) != ERROR_SUCCESS)
+	{
+		snprintf(value, sizeof(value), "C:\\Program Files (x86)\\Steam");
+	}
+	snprintf(steamapps, sizeof(steamapps), "%s\\steamapps", value);
+	attributes = GetFileAttributesA(steamapps);
+	if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY))
+		return 0;
+	snprintf(path, (size_t)size, "%s", value);
+	return 1;
+}
