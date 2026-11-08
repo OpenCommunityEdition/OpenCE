@@ -58,7 +58,7 @@ def test_sha256_vectors(sha_tool, tmp_path, data, chunk):
 
 def test_session_resolution_and_validation(tmp_path):
     headers = {
-        "cseries.h": "typedef int boolean;\ntypedef unsigned char byte;\ntypedef unsigned short word;\n#define FALSE 0\n#define TRUE 1\nint csstrcasecmp(char const *,char const *);\n",
+        "cseries.h": "#include <stdio.h>\ntypedef int boolean;\ntypedef unsigned char byte;\ntypedef unsigned short word;\n#define FALSE 0\n#define TRUE 1\nint csstrcasecmp(char const *,char const *);\nFILE *fixture_fopen(char const *,char const *);\n#define fopen fixture_fopen\n",
         "errors.h": "#define _error_silent 0\nvoid error(short,char const *,...);\n",
         "interface/ui_widget.h": "#include <stddef.h>\nvoid display_error_text_when_main_menu_loaded(wchar_t const *);\n",
         "game/game.h": "enum { _game_connection_local, _game_connection_network_client, _game_connection_network_server };\nint game_connection(void);\n",
@@ -79,9 +79,16 @@ def test_session_resolution_and_validation(tmp_path):
 #include <stdio.h>
 #include <ctype.h>
 #include <stddef.h>
+#undef fopen
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
 static struct {char name[64];unsigned char digest[32],metadata[32];unsigned stamp;int invalid_metadata;} files[20];
 static int count,probes,errors,connection,changing,denied,clears,hash_loads,rescan_install;
+static char const *sidecar;
+/* Controlled virtual filesystem, retaining the real sidecar parser/reader. */
+FILE *fixture_fopen(char const *path,char const *mode){
+ FILE *file;(void)mode;if(!sidecar || !strstr(path,"workshop_id.txt"))return NULL;
+ file=tmpfile();if(file){fputs(sidecar,file);rewind(file);}return file;
+}
 int csstrcasecmp(char const *a,char const *b){while(*a && tolower(*a)==tolower(*b)){a++;b++;}return tolower(*a)-tolower(*b);}
 int game_connection(void){return connection;}
 void error(short level,char const *format,...){(void)level;(void)format;}
@@ -300,6 +307,40 @@ int main(void){
   CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));
   CHECK(!mcc_identity_host_package(game.map.name,wanted));
   CHECK(mcc_identity_prepare_host(game.map.name) && mcc_identity_host_revision()!=revision);
+ }
+ /* Advisory sidecars are not part of either content digest. Changing their
+  * origin still invalidates prepared offers and refreshes the next wire copy. */
+ {
+  struct mcc_workshop_item item;
+  unsigned long revision=mcc_identity_host_revision();
+  unsigned char content[32],metadata[32];
+  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));
+  memcpy(content,copy.mcc_content_sha256,32);memcpy(metadata,copy.mcc_metadata_sha256,32);
+  old=probes;sidecar="111\nFirst origin\n";
+  CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));
+  CHECK(!mcc_identity_host_package(game.map.name,wanted));
+  CHECK(mcc_identity_prepare_host(game.map.name));CHECK(probes==old);
+  CHECK(mcc_identity_host_revision()!=revision);revision=mcc_identity_host_revision();
+  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));
+  CHECK(mcc_workshop_wire_unpack(copy.map.name,&item) && !strcmp(item.id,"111"));
+  CHECK(!memcmp(copy.mcc_content_sha256,content,32) && !memcmp(copy.mcc_metadata_sha256,metadata,32));
+  CHECK(mcc_identity_prepare_host(game.map.name));CHECK(mcc_identity_host_revision()==revision && probes==old);
+  sidecar="222\nCorrected origin\n";
+  CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));
+  CHECK(!mcc_identity_host_package(game.map.name,wanted));
+  CHECK(mcc_identity_prepare_host(game.map.name));CHECK(probes==old && mcc_identity_host_revision()!=revision);
+  revision=mcc_identity_host_revision();
+  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));
+  CHECK(mcc_workshop_wire_unpack(copy.map.name,&item) && !strcmp(item.id,"222") && !strcmp(item.title,"Corrected origin"));
+  CHECK(!memcmp(copy.mcc_content_sha256,content,32) && !memcmp(copy.mcc_metadata_sha256,metadata,32));
+  sidecar="222\nCorrected title\n";
+  CHECK(mcc_identity_prepare_host(game.map.name));CHECK(probes==old && mcc_identity_host_revision()!=revision);
+  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));
+  CHECK(mcc_workshop_wire_unpack(copy.map.name,&item) && !strcmp(item.title,"Corrected title"));
+  revision=mcc_identity_host_revision();sidecar=NULL;
+  CHECK(mcc_identity_prepare_host(game.map.name));CHECK(probes==old && mcc_identity_host_revision()!=revision);
+  CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy));CHECK(!mcc_workshop_wire_unpack(copy.map.name,&item));
+  CHECK(!memcmp(copy.mcc_content_sha256,content,32) && !memcmp(copy.mcc_metadata_sha256,metadata,32));
  }
  files[0].invalid_metadata=1;CHECK(!mcc_identity_prepare_host(game.map.name));
  CHECK(!mcc_identity_host_revision());

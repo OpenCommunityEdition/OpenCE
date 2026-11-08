@@ -53,6 +53,13 @@ static int mcc_identity_metadata(char const *name, unsigned char digest[32])
         mcc_share_metadata_digest(root,-1,leaf+1,digest,reason);
 }
 
+static int mcc_identity_origin_matches(char const *name)
+{
+    struct mcc_workshop_item item;
+    mcc_workshop_local_item(name,&item);
+    return !memcmp(&item,&mcc_host_identity.item,sizeof(item));
+}
+
 static int mcc_identity_error(char const *message)
 {
     wchar_t text[256];
@@ -98,6 +105,7 @@ static unsigned char const *mcc_identity_expected(char const *name)
 int mcc_identity_prepare_host(char const *map)
 {
     struct mcc_precache_snapshot before,after;
+    struct mcc_workshop_item item;
     char name[64];
     unsigned char digest[32],metadata[32];
     if (!mcc_package_name(map,name) || !mcc_precache_snapshot(name,&before)) {
@@ -116,7 +124,6 @@ int mcc_identity_prepare_host(char const *map)
         strcpy(mcc_host_identity.name,name);
         memcpy(mcc_host_identity.digest,digest,32);
         mcc_host_identity.files=after;
-        mcc_workshop_local_item(name,&mcc_host_identity.item);
         mcc_host_identity.valid=1;
         if (!++mcc_host_revision) ++mcc_host_revision;
     }
@@ -124,8 +131,13 @@ int mcc_identity_prepare_host(char const *map)
         mcc_host_identity.valid=0;
         return mcc_identity_error("The host package metadata is invalid.");
     }
-    if (memcmp(metadata,mcc_host_identity.metadata,32)) {
+    /* Advisory origin is outside both content identities, but an offer must
+     * not mix a cached wire ID with a newly read package sidecar. The existing
+     * revision hook cancels offers prepared under the previous attribution. */
+    mcc_workshop_local_item(name,&item);
+    if (memcmp(metadata,mcc_host_identity.metadata,32) || memcmp(&item,&mcc_host_identity.item,sizeof(item))) {
         memcpy(mcc_host_identity.metadata,metadata,32);
+        mcc_host_identity.item=item;
         if (!++mcc_host_revision) ++mcc_host_revision;
     }
     return 1;
@@ -144,6 +156,7 @@ int mcc_identity_host_package(char const *level,unsigned char digest[32])
     if (!mcc_host_identity.valid || !mcc_package_name(level,canonical) ||
         csstrcasecmp(canonical,mcc_host_identity.name) ||
         !mcc_precache_snapshot(canonical,&files) || memcmp(&files,&mcc_host_identity.files,sizeof(files)) ||
+        !mcc_identity_origin_matches(canonical) ||
         !mcc_identity_metadata(canonical,metadata) || memcmp(metadata,mcc_host_identity.metadata,32)) return 0;
     memcpy(digest,mcc_host_identity.digest,32);
     return 1;
@@ -171,6 +184,7 @@ void const *mcc_identity_host_settings(void const *settings,long bytes,struct ne
     if (!mcc_host_identity.valid || !mcc_package_name(game->map.name,canonical) ||
         strcmp(canonical,mcc_host_identity.name) || !mcc_precache_snapshot(canonical,&files) ||
         memcmp(&files,&mcc_host_identity.files,sizeof(files)) ||
+        !mcc_identity_origin_matches(canonical) ||
         !mcc_identity_metadata(canonical,metadata) || memcmp(metadata,mcc_host_identity.metadata,32) ||
         !mcc_validation_lookup(canonical,&checksum,NULL) ||
         checksum!=(uint32_t)game->map.version) return NULL;

@@ -228,12 +228,14 @@ revision changes cancel stale work. No stage or consent carries into Xbox/CE.
 The wire limits and protocol versions are in
 [NETCODE.md](../../port/linux/NETCODE.md#mcc-package-sharing).
 
-Managed-copy receipt, storage-use display and removal controls are being
-integrated through [`mcc_share_storage.c`](../../port/linux/game/mcc_share_storage.c).
+Managed-copy receipt, storage-use display and removal controls use
+[`mcc_share_storage.c`](../../port/linux/game/mcc_share_storage.c) and
+[`mcc_share_menu.c`](../../port/linux/game/mcc_share_menu.c).
 The ownership contract permits removal only of verified recorded files, keeps
 unrelated additions and saves, and requires the caller to exclude the active
-session package. This paragraph describes the integration contract, not a
-completed UI/runtime validation claim. Browser persistence and publication
+session package. The native UI inspection found and corrected a main-menu
+removal gate; the corrected confirmation/removal flow still needs runtime
+validation. Browser persistence and publication
 remain Milestone 14 work; a successful web compile does not establish sharing.
 
 The game harness compiles the real adapter, planner, session and stage over
@@ -478,6 +480,22 @@ while remote clients wait. Other machines compute their own fingerprints;
 actual loading always rehashes the opened content. This timing change is
 MCC-owned and changes neither Xbox/CE paths nor network timeouts or packet
 formats. It does not eliminate arbitrary storage or main-thread stalls.
+
+For an authored MCC campaign follow-on, `mcc_main_campaign_won` in
+[mcc_main.c](../../port/linux/game/mcc_main.c) passes the manifest-selected
+mission to `mcc_ui_network_campaign_won` in
+[mcc_ui_network.inl](../../port/linux/game/mcc_ui_network.inl). After the
+ordinary reliable round transition succeeds, an MCC-owned token identifies
+the server, new round and selected mission. The existing pregame UI hook
+consumes it after the current map unloads and opens the ready lobby instead
+of the multiplayer map picker. Its countdown still waits for package
+validation and every machine's precache readiness. A same-name checksum
+update during validation preserves the token; another selection, session
+disposal or mismatched round invalidates it. Campaign end and a missing next
+mission retain their existing postgame/error handling without automatically
+replaying the last mission. `test_mcc_ui_network.py` exercises the real UI
+dispatcher, including the former paused-map-picker failure;
+`test_mcc_lifecycle.py` covers the campaign completion adapter.
 
 ## Loading and unloading must agree about ownership
 

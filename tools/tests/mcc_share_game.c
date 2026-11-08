@@ -78,6 +78,7 @@ struct network_game_server_client_machine;
 /* both copies' entry points, renamed by the build: h_ for the host, j_ for the joiner */
 #define COPY(prefix) \
     void prefix##mcc_share_game_update(void); \
+    void prefix##mcc_share_game_render(void); \
     boolean prefix##mcc_share_game_downloading(char const *); \
     boolean prefix##mcc_share_game_holds_players(void); \
     boolean prefix##mcc_share_game_machine_active(long); \
@@ -102,6 +103,7 @@ static int (*join_missing)(char const[128],unsigned char const[32],unsigned char
 static unsigned char host_digest[32],host_metadata[32];
 static char snapshot[64],opened_url[128];
 static int role_host,peer_joined=1,peer_capable=1,prompts,lobby_restores;
+static int overlay_draws,allow_prompt=1;
 static unsigned resource_mask=3,host_revision=1;
 static int workshop_fallback,resource_shared,resource_invalid;
 FILE *fixture_fopen(char const *,char const *);
@@ -151,9 +153,9 @@ void offset_rectangle2d(void *r, short x, short y) { (void)r;(void)x;(void)y; }
 void build_message_header(word *header, word size, int type, int flags) { *header=(word)(size<<4|type<<2|flags); }
 int game_in_progress(void) { return 0; }
 long game_time_get(void) { return 0; }
-long interface_get_tag_index(int tag) { (void)tag; return -1; }
+long interface_get_tag_index(int tag) { (void)tag; return 1; }
 void draw_string_set_draw_mode(long a, long b, short c, short d, void const *e) { (void)a;(void)b;(void)c;(void)d;(void)e; }
-void rasterizer_draw_string(void *a, void *b, void *c, short d, char const *e) { (void)a;(void)b;(void)c;(void)d;(void)e; }
+void rasterizer_draw_string(void *a, void *b, void *c, short d, char const *e) { (void)a;(void)b;(void)c;(void)d;if (!e || !*e) exit(2);overlay_draws++; }
 struct { struct { rectangle2d window_bounds,viewport_bounds; } camera; } render;
 
 void mcc_maps_rescan(void) {}
@@ -265,6 +267,7 @@ struct widget_instance *ui_widget_load_by_name_or_tag(char const *name,long tag,
     static struct widget_instance widget;
     wchar_t text[512];
     unsigned i;
+    if (!allow_prompt) return NULL;
     if (!role_host) {
         prompts++;
         j_mcc_share_game_prompt_text(text);
@@ -571,6 +574,17 @@ int main(int argc,char **argv)
     as_join();j_mcc_share_game_update(); as_host();h_mcc_share_game_update();
     CHECK(host_missing && join_missing);
 
+    CASE("prompt_overlay") {
+        as_join();j_mcc_share_game_render();CHECK(!overlay_draws);
+        CHECK(joiner_asks(LEVEL,host_digest));j_mcc_share_game_render();CHECK(overlay_draws==1);
+        allow_prompt=0;
+        for (i=0;i<300 && !j_mcc_share_game_can_download();i++) pump_once();
+        CHECK(j_mcc_share_game_can_download() && !prompts);
+        j_mcc_share_game_render();CHECK(overlay_draws==1);
+        allow_prompt=1;CHECK(pump_prompt());as_join();j_mcc_share_game_render();CHECK(overlay_draws==1);
+        j_mcc_share_game_prompt_action(0);j_mcc_share_game_render();CHECK(overlay_draws==2);
+        j_mcc_share_game_disconnect();j_mcc_share_game_render();CHECK(overlay_draws==2);return 0;
+    }
     CASE("host_revision") {
         CHECK(transfer_started());as_host();host_revision++;h_mcc_share_game_update();
         CHECK(!h_mcc_share_game_machine_active(MACHINE));as_join();j_mcc_share_game_disconnect();return 0;

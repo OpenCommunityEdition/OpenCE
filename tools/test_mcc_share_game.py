@@ -19,7 +19,7 @@ CASES = ["transfer", "only_listed_files", "off", "unlisted", "listed_without_mak
          "handlers", "leave", "map_changes", "disk_space", "consent", "existing_version", "metadata_mismatch",
          "host_toggle", "peer_left", "client_toggle", "map_only", "cancel", "workshop_off", "workshop_client_off", "prompt_map_change", "prompt_disconnect", "prompt_content_change",
          "prompt_metadata_change", "stale_accept", "unused_resources", "bitmap_only",
-         "workshop_resource_fallback", "shared_resource", "invalid_resource", "host_revision"]
+         "workshop_resource_fallback", "shared_resource", "invalid_resource", "host_revision", "prompt_overlay"]
 RENAMED = ["mcc_share_game_update", "mcc_share_game_render", "mcc_share_game_downloading",
            "mcc_share_game_holds_players", "mcc_share_game_machine_active", "mcc_share_game_handles_message",
            "mcc_share_game_handle_message", "mcc_identity_set_missing", "mcc_identity_host_package",
@@ -195,6 +195,7 @@ def test_allocator_domain_negative_control(tmp_path):
     ('if (!config_boolean("network.map_download")) {', "if (0) {", "gate"),
     ("memcmp(actual,mcc_share_metadata,32)", "0", "metadata_mismatch"),
     ("!memcmp(actual,mcc_share_digest,32)", "1", "identity_mismatch"),
+    ("mcc_share_prompt_pending || mcc_share_prompt_visible)\n\t\treturn;", "0)\n\t\treturn;", "prompt_overlay"),
 ])
 def test_negative_controls(tmp_path, before, after, case):
     source = (GAME / "mcc_share.c").read_text()

@@ -574,7 +574,9 @@ void mcc_share_game_render(
 	char const *name;
 	int percent;
 
-	if (!mcc_share_ready || !mcc_share_client_busy(&mcc_share_globals))
+	/* The consent screen owns this space until the player accepts its offer. */
+	if (!mcc_share_ready || !mcc_share_client_busy(&mcc_share_globals) ||
+        mcc_share_prompt_pending || mcc_share_prompt_visible)
 		return;
 	font_tag_index = interface_get_tag_index(_interface_font_terminal);
 	if (font_tag_index == NONE)

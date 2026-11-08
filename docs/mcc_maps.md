@@ -551,8 +551,10 @@ existing manual and Steam copies. It rechecks that installed snapshot before
 joining. These filesystem checks protect against remote paths; they are not a
 sandbox against a malicious process with the same local filesystem authority.
 
-Managed snapshot storage/removal UI integration and the final runtime/platform
-matrix remain pending. See the
+Managed snapshot storage/removal UI is integrated; a main-menu removal gate
+found during native inspection has been corrected and awaits its runtime
+rerun. A native Ruby host download, metadata/artwork byte comparison and late
+join passed; the final runtime/platform matrix remains pending. See the
 [implementation walkthrough](reading/maps_and_resources.md#mcc-package-sharing-between-machines)
 and [validation record](mcc_refactor_validation.md#milestone-13-implementation-evidence).
 The fixture suites exercise production modules over synthetic files; they do

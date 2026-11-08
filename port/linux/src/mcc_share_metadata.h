@@ -29,7 +29,7 @@ struct mcc_share_metadata_plan {
  * Map-only folders succeed with no metadata. campaign=-1 selects authored
  * campaign metadata when the level belongs to it, independently of menu settings.
  * reason is always terminated.
- * Plan paths preserve authored spelling; source reads must remain contained
+ * Plan paths use lowercase ASCII spelling; source reads must remain contained
  * and case-insensitive (posix_mcc_preview_read), not plain root/path fopen. */
 int mcc_share_metadata_plan(const char *root, int campaign, const char *level,
     struct mcc_share_metadata_plan *plan, char reason[128]);

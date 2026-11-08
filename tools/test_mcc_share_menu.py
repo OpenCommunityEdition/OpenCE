@@ -1,6 +1,7 @@
 """Run the real download-management menu with observable storage/session boundaries."""
 from pathlib import Path
 import subprocess
+import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -8,6 +9,28 @@ from test_mcc_identity import compile_tool
 
 ROOT = Path(__file__).resolve().parents[1]
 GAME = ROOT / "port/linux/game"
+
+
+def test_generated_remove_button_has_one_text_owner():
+    import port_settings
+
+    base = port_settings.PE + "/network_setup/mcc_downloads"
+    name = base.replace("/", ".") + ".xml"
+    generated = "\n".join(port_settings.settings_files()[name])
+    assert (ROOT / "port/assets/menus/ce" / name).read_text(encoding="utf-8") == generated
+    document = ET.fromstring(generated)
+    remove = document.find(f"widget[@name='{base}/remove']")
+    assert remove is not None
+    # widget_instance_render_text_box replaces and resizes dynamic text when a
+    # definition has a string-list binding. The screen's live update owns this
+    # button's text buffer instead, for both removal and confirmation labels.
+    assert not {"text", "strings", "string_list"}.intersection(remove.attrib)
+    screen = document.find(f"widget[@name='{base}/screen']")
+    assert screen.find("data[@input='port mcc downloads update']") is not None
+    for event in ("a", "start"):
+        assert remove.find(f"on[@event='{event}'][@run='port mcc downloads remove']") is not None
+    for button, caption in (("previous", "PREVIOUS"), ("next", "NEXT"), ("back", "BACK")):
+        assert document.find(f"widget[@name='{base}/{button}']").get("text") == caption
 
 HEADERS = {
     "cseries.h": "#include <stddef.h>\n#include <wchar.h>\ntypedef int boolean;\n#define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))\n",

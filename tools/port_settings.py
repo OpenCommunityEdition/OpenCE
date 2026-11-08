@@ -2859,8 +2859,11 @@ def _mcc_downloads() -> list:
                      ("color", "#FFFFFFFF")], ['<data input="port mcc downloads text"/>'])
     for name, text in [("previous", "PREVIOUS"), ("next", "NEXT"), ("remove", "REMOVE SELECTED"), ("back", "BACK")]:
         action = 'back="true"' if name == "back" else f'run="port mcc downloads {name}"'
+        # The parent supplies the removal/confirmation label. Static text would
+        # replace and shrink its owned buffer again in the renderer.
+        label = [] if name == "remove" else [("text", text)]
         lines += _widget(f"{base}/{name}", [("type", "text"), ("width", 250), ("height", 32),
-                         ("text", text), ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center")],
+                         *label, ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center")],
                          [f'<on event="a" {action}/>', f'<on event="start" {action}/>',
                           '<on event="left_mouse" run="mouse emit accept event"/>'])
     return lines

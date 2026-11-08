@@ -21,9 +21,10 @@ for both milestones; the 8 November request also supersedes the console deferral
 The stage evidence below records the changes, actual validation and limits.
 The subsequent delivery plan adds Milestone 13 for host sharing, Milestone 14
 for Custom Edition and MCC browser playability, and Milestone 15 for the
-upstream contribution. Milestone 13 is now being implemented; its component
-evidence below is provisional, and storage/UI integration plus final runtime
-and platform checks remain open. Milestones 14 and 15 remain planned.
+upstream contribution. Milestone 13 remains in progress. Corrected-commit CI,
+native downloads, metadata-mismatch preservation and managed removal have
+passed; follow-on gameplay and final validation of the later identity/UI
+corrections remain open. Milestones 14 and 15 remain planned.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -38,7 +39,7 @@ and platform checks remain open. Milestones 14 and 15 remain planned.
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; recovery failure addressed in Milestone 10 |
 | 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
 | 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
-| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | In progress; contribution reviewed/adapted, component tests pass; storage/UI integration and final validation pending |
+| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | In progress; corrected CI and bounded native sharing/removal controls pass; follow-on gameplay and final validation pending |
 | 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Planned; explicit requirement, not satisfied by a web build alone |
 | 15 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestones 13 and 14; previously numbered 14 |
 
@@ -292,14 +293,16 @@ by adapting this PR. Mac remains outside the requested platform scope.
 
 ### Milestone 13 implementation evidence
 
-Status at this documentation pass: **in progress, not complete**. The following
-observations are component results from the evolving working tree above
-`153c607fc`; they are not a final revision-wide validation claim. Required
-storage receipts/removal UI are integrated and component-tested. Final
-regenerated-menu runtime inspection, platform builds, native/browser
-transport controls, real MCC host/client gameplay and follow-on mission checks
-remain outstanding. Earlier stages' runtime passes do not validate the changed
-M13 transfer/identity implementation.
+Status at this documentation pass: **in progress, not complete**. CI for
+`cdbe0460b` is green. Native Ruby download/late-join, metadata-mismatch
+preservation, Mercury's first mission and safe second-mission installation,
+Xbox/CE controls and managed snapshot confirmation/removal have passed within
+the limits below. The combined review then corrected stale Workshop
+attribution and two UI defects. Their focused tests pass, but the later
+candidate's `mercury_follow_on` run is still active and has no completed
+verdict here. Final runtime/platform checks and remaining admission/transport
+coverage remain outstanding. Earlier stages' runtime passes do not validate
+the changed M13 transfer/identity implementation.
 
 The current implementation includes host-only opt-ins, client consent and
 manual/Workshop alternatives; paged bounded manifests; independent gameplay and
@@ -308,8 +311,9 @@ validated package-resource selection; and exclusive stage publication into a
 separate `dl_<digest>` snapshot. The ownership record/removal API in
 [`mcc_share_storage.h`](../port/linux/game/mcc_share_storage.h) is an integration
 contract: listing/removing user-visible managed copies and preventing removal
-of the active package are covered by native storage and menu fixtures; the
-completed in-game UI still requires runtime validation.
+of the active package are covered by native storage and menu fixtures. Native
+managed removal is now observed; the later dynamic-label correction still
+requires its screenshot rerun.
 No network manifest may supply a local ownership receipt.
 
 Recorded component runs:
@@ -320,8 +324,8 @@ symbolized crash reached `mcc_share_identity_check` through `client_check`;
 the correction pairs engine `malloc`/`free` and explicitly zeros the entries.
 The adapter fixture now distinguishes these allocators, and a before-fix
 mutation reproduces the mismatch. Its 43 cases pass. This is an MCC adapter
-fix, not a change to the shared allocator. The corrected real-map rerun is
-still pending. Native consent inspection also caught clipped text and an
+fix, not a change to the shared allocator. The corrected Ruby download and
+late-join rerun passed as recorded below. Native consent inspection also caught clipped text and an
 incorrect lobby return; the existing MCC wrapping and engine go-back services
 now handle the prompt, with observable restoration covered in the adapter.
 
@@ -329,8 +333,9 @@ The later integrated component selection passed 248 cases with five explicit
 platform/privilege skips; its one failure was sandbox denial of junction
 creation. Rerunning the complete staging and storage suites with junction
 creation available passed 70 cases with one unavailable file-symlink skip.
-These are overlapping selections, not additional totals. The current Windows
-release executable builds; required cross-platform CI and gameplay remain open.
+These are overlapping selections, not additional totals. The Windows release
+executable builds and corrected-commit CI passes; the later follow-up changes
+still require final platform/runtime validation.
 
 | Evidence | Actual result and limit |
 | --- | --- |
@@ -365,6 +370,143 @@ worktree and checked for reparse points before cleanup. Small result logs are
 retained. These figures cover those component runs only, not the entire M13
 workspace or any final cleanup claim. Originals, saves and other agents' output
 were outside this cleanup.
+
+Native runtime and platform evidence recorded on 8 November 2026:
+
+- `build/m13-runtime/ruby_allocator_fixed/results.json` records two hidden
+  Windows instances, Ruby's Rebalanced Workshop item `2915693904`, mission
+  `a10`, co-op, host sharing/client downloads enabled and an initially missing
+  client package with Workshop discovery disabled. The executable SHA-256 was
+  `3491b03288c018e0487957c4213c6d00bee23d5ead6130dbe626629740ee3ff8`.
+  The client accepted the offer, installed the managed snapshot, then joined
+  the game in progress at tick 2768. Its final recorded state at tick 9398
+  contained both living players. Both processes exited with code 0. This is
+  same-machine loopback admission and bounded gameplay evidence, not a complete
+  mission, campaign transition, two-physical-machine or internet gameplay test.
+  Logs also retain late pregame keep-alive/weapon-deletion diagnostics and a
+  lens-flare-capacity warning; an exit code alone does not resolve those.
+- `ruby_allocator_fixed/installed-audit.json` under that runtime directory
+  records a read-only SHA-256 comparison against the original Workshop source.
+  All 15 transferred files match: one map, 12 JSON files (including all ten
+  mission records) and two PNGs. The other two files are locally generated
+  `download.receipt` and `workshop_id.txt`. The 17-file snapshot totals
+  275,925,015 bytes and remains retained for rejoin/removal validation. Original
+  Workshop files and all saves were left untouched. The run itself removed
+  12 generated map caches totaling 1,535,115,264 bytes, with no cleanup errors.
+- `ruby_storage_ui/results.json` records the initial menu inspection using
+  that snapshot. The menu incorrectly disabled removal because the main menu
+  itself has a running game clock. `cdbe0460b` corrects the gate to permit the
+  menu scene while still refusing an active network session; the focused menu
+  suite passed 20 tests. The subsequent `ruby_storage_removed/results.json`
+  run uses an isolated copy of the 17-file snapshot. Frame 01440 shows the
+  confirmation question after the first activation; frame 01920 shows
+  "Downloaded snapshot removed" after the second. The managed folder is absent
+  and the process exited with code 0. The original retained Ruby snapshot
+  remains present. The confirmation question worked, but its button still
+  displayed "REMOVE SELECTED": that separate dynamic-label defect is addressed
+  in the later correction below. The initial failed inspection remains evidence.
+- CI at `17ce5d6e8` passed Windows, Android and web debug builds, Android package
+  importer checks, web smoke/rooms in Chromium and Firefox, and MCC HUD render.
+  Native WebRTC passed clean delivery at 320/320 in both browsers; the 10% loss
+  exercises recorded 711/960 Chromium and 720/960 Firefox. Linux build tests
+  had 2677 passes/27 skips and one failure from invalid UTF-8 in NETCODE.md.
+  MCC Windows had 2019 passes/17 skips/eight missing-fixture-stub failures;
+  MCC Linux had 2083 passes/21 skips/ten failures: those eight, metadata case
+  ambiguity and an oversized pytest identifier. These were corrected before
+  `cdbe0460b`. The first run is not reported as a green matrix. See
+  `build/m13-platform-final/logs/ci-17ce5d6e8-summary.json`.
+- Corrected `cdbe0460b3ece923e278ddeda7f3fcf8802f6141` passes
+  [Build run 42486938113](https://github.com/chestahh/GulchCE/actions/runs/42486938113)
+  and [MCC run 42486938110](https://github.com/chestahh/GulchCE/actions/runs/42486938110):
+  Windows, Linux, Android and web debug builds and all three MCC jobs succeed.
+  Linux's build selection reports 2,678 passed, 27 skipped and seven subtests;
+  its MCC selection reports 2,100 passed/21 skipped. Windows MCC reports
+  2,034 passed/17 skipped. Separate Linux preview sanitizer checks pass 38
+  cases, and metadata/storage sanitizer checks pass 87 with two skips. Native
+  WebRTC clean delivery is 320/320 with each browser; intentional ten-percent
+  loss returns 737/960 in Chromium and 700/960 in Firefox. These are overlapping
+  job selections and transport controls, not additive coverage or MCC browser
+  download/gameplay proof. The retained receipt is
+  `build/m13-platform-final/logs/ci-cdbe0460b-summary.json`.
+- The Windows build at `cdbe0460b` has executable SHA-256
+  `3ef3dca26cd370bf5a32e0c2910946de17cc3a7b1148815b17b2506441988a7b`, recorded
+  in `build/m13-platform-final/logs/native-cdbe0460b.json`. This is a different
+  binary from the Ruby run above; that older runtime result does not validate
+  the complete current commit. The native cases below use this `cdbe0460b`
+  binary; none is relabeled as execution of the later uncommitted corrections.
+- `mercury_campaign/content-audit.json` and `results.json` record Workshop
+  item `3021510694`, `mercury_falling`, both opt-ins enabled and an initially
+  empty client. The first download installs at 13:56:07 UTC, resolves its
+  gameplay identity and enters co-op with both living players. The owner-verified
+  host console executes `(game_won)` after fresh paired gameplay. The next
+  offer is visually present by 13:56:44; an explicitly observed Return input
+  accepts it between the 13:57:40.010 prompt capture and first staged file
+  creation at 13:57:42.567. No exact wall-clock input event was recorded.
+  `mercury2` installs at 13:58:16 and resolves by SHA-256. Frame 47040 displays
+  its downloaded title and correct thumbnail in the lobby.
+  Each snapshot contains ten files including its local receipt. All 18
+  receipted content files match their recorded hashes; the 16 transferred files
+  also match the original Workshop files, while both generated sidecars contain
+  the verified item ID/title. The client staging folder is empty at completion and both
+  processes exit with code 0. First-file creation to receipt takes 249.515
+  seconds for the first snapshot and 33.492 seconds for the second. The shared
+  686,853,355 resource bytes have identical hashes in both snapshots and the
+  original; second-resource writes finish in approximately 5.46 seconds.
+  This supports local reuse, without claiming a measured network-byte saving.
+  The second mission does **not** enter gameplay in this run: the host remains
+  in its native campaign lobby/UI pause after installation. Logs retain
+  fresh-profile/no-audio diagnostics, authored animation normalization,
+  pregame-state messages and a client disconnect when the host exits; they are
+  not zero-error logs. No sharing/identity failure, assertion or access violation
+  was found. The separate follow-on gameplay run remains unjudged here.
+- `ruby_version_mismatch/content-audit.json` verifies a metadata-only mismatch:
+  the client has identical map bytes in a separate manual package, with
+  deliberate whitespace appended only to `campaign/a10.json`. The host's
+  version downloads into `dl_dddb5100a348fef34f7b`; all 15 original transferred
+  files match their Workshop sources. The older manual folder remains intact,
+  including its intentional metadata difference. Client samples span ticks
+  2563–4813, with 76 samples; both processes exit with code 0. This demonstrates
+  that gameplay identity alone cannot bypass required-JSON admission and that
+  the existing package is preserved. It is not a semantic campaign-order-change
+  or full-mission test.
+- `legacy-control-audit.json` records Xbox Blood Gulch and Custom Edition
+  Death Island Slayer controls with both MCC sharing switches enabled.
+  Each peer records 39 state samples spanning ticks 30–1170, with no MCC
+  transfer and no fatal diagnostic matches. These are bounded legacy-path
+  controls, not full matches or independent state-divergence comparisons.
+
+The final combined review then found a sidecar-only lifecycle defect:
+`mcc_identity_prepare_host` cached Workshop attribution with map/resource
+stamps, so a changed `workshop_id.txt` could disagree with the advertised
+origin without changing either content digest. The real identity/Workshop
+reader regression fails before the correction (`origin-before.log`).
+Preparation now refreshes advisory attribution separately, rejects stale
+prepared settings/offers and advances the existing revision that cancels active
+offers. Gameplay and required-JSON digests remain unchanged, and unchanged
+preparation retains its hash/revision fast path. The focused identity/adapter
+selection passes 60 checks (`origin-after.log`), with eight unrelated mutation
+controls deselected. No new network layout or Xbox/CE implementation is involved.
+
+Two UI follow-ups have 66 focused menu/adapter passes in
+`build/m13-ui-final-results.txt`. The generated removal button now has one
+dynamic text owner, preventing the renderer's static string binding from
+overwriting "CONFIRM REMOVAL". The download progress overlay is suppressed
+while consent is pending/visible, resumes after acceptance and clears on
+disconnect; a faulty-guard control fails. These counts overlap the identity
+and earlier component selections. The later combined local selection records
+89 passes in `build/m13-final-identity-ui-results.txt`; none of these component
+results replaces the outstanding native screenshot or final platform checks.
+Browser playability remains Milestone 14 work.
+
+Completed-run cleanup archived 266 BMP captures losslessly into
+`build/m13-runtime/completed-screenshots.zip` (106,967,746 bytes). The adjacent
+JSON records each original path/size/SHA-256; all ZIP contents were reread and
+verified before removing 326,875,164 loose bytes. Four selected menu/lobby/game
+captures remain loose. The failed `ruby_native_read` run's verified owned
+incomplete stage was removed (15 files, 275,922,109 bytes), retaining its logs
+and cleanup inventory. No active Mercury output, saves, installed Ruby snapshot
+or original/hardlinked map inputs were removed. These bounded cleanup figures
+do not describe the entire worktree's disk use.
 
 ### Milestone 14: Custom Edition and MCC browser playability
 

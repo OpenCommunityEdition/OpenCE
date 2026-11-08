@@ -81,6 +81,13 @@ static void main_set_multiplayer_map_name(char const *name) {strcpy(map_name,nam
 static void network_game_server_open_game(struct network_game_server *s) {(void)s;opened++;}
 static void third_person_session_lock(void) {}
 static void network_game_server_switch_to_postgame(struct network_game_server *s) {s->state=_network_game_server_state_postgame;switched++;}
+static void network_game_server_port_cooperative_won(char const *next) {
+    switched++;reset++;server.state=_network_game_server_state_postgame;
+    if(fail_reset)return;
+    server.game.number_of_games_played++;
+    if(next)strcpy(server.game.map.name,next);
+    server.state=_network_game_server_state_pregame;
+}
 static void network_event(char const *s) {(void)s;}
 static void countdown_timer_set_time_remaining(int *timer,long ms) {*timer=(int)ms;}
 static void network_game_server_countdown_started(struct network_game_server *s) {
@@ -194,6 +201,52 @@ int main(int argc,char **argv) {
     for(i=0;i<3;i++) {server.game.players[i].machine_index=i;server.game.players[i].controller_index=0;
       server.game.players[i].player_list_index=i;server.game.players[i].team_index=i%2;}
     original=server.game;
+    if(!strncmp(argv[1],"campaign-",9)) {
+      char const *next="mcc_maps\\Package\\mission_two";
+      int refuse=0,fallback=0;
+      if(!strcmp(argv[1],"campaign-end")){next=NULL;fallback=1;}
+      if(!strcmp(argv[1],"campaign-failure")){fail_reset=1;fallback=1;}
+      if(!strcmp(argv[1],"campaign-xbox")){strcpy(server.game.map.name,"levels\\a10\\a10");refuse=1;}
+      if(!strcmp(argv[1],"campaign-ce")){strcpy(server.game.map.name,"custom_maps\\a10");refuse=1;}
+      if(!strcmp(argv[1],"campaign-target-xbox")){next="levels\\a30\\a30";refuse=1;}
+      if(!strcmp(argv[1],"campaign-inactive")){loaded=0;refuse=1;}
+      if(!strcmp(argv[1],"campaign-client")){exists=0;refuse=1;}
+      if(!strcmp(argv[1],"campaign-not-ingame")){server.state=_network_game_server_state_pregame;refuse=1;}
+      mcc_ui_network_campaign_won(next);
+      if(refuse){CHECK(!reset&&!switched&&!mcc_ui_network_restart_pregame(),70);return 0;}
+      CHECK(reset==1&&switched==1&&!countdowns,71);
+      if(fallback){
+        CHECK(!mcc_ui_network_restart_pregame()&&!countdowns,72);
+        CHECK(!strcmp(server.game.map.name,original.map.name),73);return 0;
+      }
+      CHECK(!strcmp(server.game.map.name,next),74);
+      loaded=0; /* The intended unload must not invalidate the UI token. */
+      if(!strcmp(argv[1],"campaign-checksum")){
+        server.game.map.version++;local_machine=0;
+        CHECK(!mcc_ui_network_defer_map(&server,next),75);
+      }
+      if(!strcmp(argv[1],"campaign-dispose")){mcc_ui_network_server_dispose(&server);fallback=1;}
+      if(!strcmp(argv[1],"campaign-round")){server.game.number_of_games_played++;fallback=1;}
+      if(!strcmp(argv[1],"campaign-other-server")){selected_server=&other_server;fallback=1;}
+      if(!strcmp(argv[1],"campaign-reselect")){
+        mcc_ui_network_defer_map(&server,"custom_maps\\arena");
+        mcc_ui_network_defer_map(&server,next);fallback=1;
+      }
+      if(!strcmp(argv[1],"campaign-map")){strcpy(server.game.map.name,"mcc_maps\\different");fallback=1;}
+      if(!strcmp(argv[1],"campaign-state")){server.state=_network_game_server_state_ingame;fallback=1;}
+      if(fallback){
+        CHECK(!mcc_ui_network_restart_pregame()&&!countdowns,76);
+        selected_server=&server;CHECK(!mcc_ui_network_restart_pregame(),77);return 0;
+      }
+      network_game_reset_to_pregame_ui();
+      CHECK(closed_ui==1&&loaded_ui==1&&!errors&&countdowns==1,78);
+      CHECK(!server.countdown_state.paused&&server.countdown_state.active,79);
+      CHECK(strstr(screen_name,"connected_pregame_screen")&&!strstr(screen_name,"map_select"),80);
+      CHECK(!strcmp(server.game.map.name,next)&&!mcc_ui_network_restart_pregame(),81);
+      network_game_reset_to_pregame_ui();
+      CHECK(server.countdown_state.paused&&strstr(screen_name,"map_select_postgame"),82);
+      return 0;
+    }
     if(!strcmp(argv[1],"no-server"))exists=0;
     if(!strcmp(argv[1],"inactive"))loaded=0;
     if(!strcmp(argv[1],"xbox"))strcpy(server.game.map.name,"levels\\a10\\a10");
@@ -294,3 +347,30 @@ int main(int argc,char **argv) {
                                  "validation-started", "validation-back", "validation-xbox", "validation-ce"])
 def test_restart_transaction(restart_tool, case):
     subprocess.run([str(restart_tool), case], check=True, capture_output=True)
+
+
+@pytest.mark.parametrize("case", ["ready", "checksum", "end", "failure", "xbox", "ce", "target-xbox",
+                                 "inactive", "client", "not-ingame", "dispose", "round", "other-server",
+                                 "reselect", "map", "state"])
+def test_campaign_follow_on_lobby(restart_tool, case):
+    subprocess.run([str(restart_tool), "campaign-"+case], check=True, capture_output=True)
+
+
+def test_prior_campaign_handoff_exposes_paused_map_picker(restart_tool, tmp_path):
+    source = (restart_tool.parent / "restart.c").read_text()
+    # Previously mcc_main called this shared transition directly. Keep the
+    # real UI dispatcher and reproduce that path without the MCC UI token.
+    original = function(source, "mcc_ui_network_campaign_won")
+    source = source.replace(original, "void mcc_ui_network_campaign_won(char const *next) {"
+                            "network_game_server_port_cooperative_won(next);}\n")
+    path = tmp_path / "prior.c"
+    path.write_text(source)
+    executable = tmp_path / "prior.exe"
+    compiler = os.environ.get("CC") or shutil.which("clang") or shutil.which("cc")
+    command = [compiler, "-std=c99", "-I", str(restart_tool.parent), str(path), "-o", str(executable)]
+    if os.name == "nt":
+        command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
+    built = subprocess.run(command, capture_output=True, text=True)
+    assert built.returncode == 0, built.stderr
+    result = subprocess.run([str(executable), "campaign-ready"], capture_output=True, text=True)
+    assert result.returncode == 78, "The prior handoff must fail the ready-lobby/countdown assertion"

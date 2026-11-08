@@ -28,7 +28,7 @@
 		<on event="start" run="port mcc downloads next"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/remove" type="text" width="250" height="32" text="REMOVE SELECTED" font="ui\large_ui" color="#FF2896FF" align="center">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/remove" type="text" width="250" height="32" font="ui\large_ui" color="#FF2896FF" align="center">
 		<on event="a" run="port mcc downloads remove"/>
 		<on event="start" run="port mcc downloads remove"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
