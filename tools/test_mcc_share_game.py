@@ -23,7 +23,10 @@ CASES = ["transfer", "only_listed_files", "off", "unlisted", "listed_without_mak
          "workshop_resource_fallback", "shared_resource", "invalid_resource", "host_revision", "prompt_overlay",
          "admission_grace", "admission_player", "admission_peer_left", "admission_map", "admission_revision",
          "admission_off", "admission_disconnect", "admission_wrap", "local_validation_hold", "validation_pending_cancel",
-         "validation_handoff", "validation_stale_handoff"]
+         "validation_handoff", "validation_stale_handoff",
+         "manual_host_off", "manual_client_off", "manual_local", "manual_closed",
+         "manual_new_join", "manual_map_load", "manual_wait_menu", "manual_stale_accept",
+         "manual_cancel", "manual_disconnect", "manual_stale_workshop"]
 RENAMED = ["mcc_share_game_update", "mcc_share_game_render", "mcc_share_game_downloading",
            "mcc_share_game_holds_players", "mcc_share_game_machine_active", "mcc_share_game_machine_needs_map", "mcc_share_game_handles_message",
            "mcc_share_game_handle_message", "mcc_identity_set_missing", "mcc_identity_host_package",
@@ -73,6 +76,7 @@ void offset_rectangle2d(void *rectangle, short x, short y);
     "game/game.h": "int game_in_progress(void);\nlong game_time_get(void);\n",
     "interface/interface.h": "long interface_get_tag_index(int tag);\nenum { _interface_font_terminal };\n",
     "interface/ui_widget.h": """struct widget_instance;
+boolean main_menu_is_active(void);
 void display_error_text_when_main_menu_loaded(wchar_t const *text);
 struct widget_instance *ui_widget_load_by_name_or_tag(char const *,long,void *,int,int,int,int);
 void ui_widgets_pop_stack(int);

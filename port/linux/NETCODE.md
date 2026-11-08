@@ -1056,6 +1056,11 @@ header remains 12 bytes, including its checkpoint epoch.
   no file chunks. If either setting is off, the download action is absent.
   Valid Workshop IDs offer a Workshop page; other content requires manual
   installation. A Workshop page alone does not install anything in a browser.
+  Manual-install and failed-download guidance leaves the unjoinable session
+  before displaying at the main menu. Only its copied text and Workshop origin
+  survive that deliberate disconnect; it holds no host slot or transfer alive.
+  Dismissal, another session or leaving the menu clears it. Live download
+  consent still requires the current host's exact content identity.
 - **Messages and bounds.** `MANIFEST` responses carry up to 16 file entries per
   page. The full offer has at most 168 entries, each with kind, a 128-byte path
   buffer, size and SHA-256. Exactly one map is required. `CHUNK` requests up to

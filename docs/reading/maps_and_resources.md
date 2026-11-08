@@ -214,6 +214,11 @@ and lists its gameplay fingerprint and maker; the client enables the existing
    The prompt shows size and maker. Host sharing off or client downloads off
    removes the download action; a Workshop page and cancellation remain
    available when applicable. Differing content is not labelled older/newer.
+   When downloading cannot proceed, `mcc_share_game_update` leaves the session
+   and presents manual guidance at the main menu. Its copied text and Workshop
+   origin survive only that deliberate disconnect, so the host's playerless
+   timeout cannot replace the guidance. Dismissal, a new session or leaving the
+   menu clears it; no offline prompt can accept a download.
 4. [`mcc_share_stage.c`](../../port/linux/game/mcc_share_stage.c) exclusively
    creates an owned `mcc_staging/dl_<digest>` directory on native platforms.
    The browser uses a hidden journaled destination instead, as explained in
@@ -386,8 +391,9 @@ session around `game_load`'s `scenario_load` call. This small shared hook is
 needed because successful tag conversion is followed by menu integration and
 initial BSP setup; completing the screen inside `mcc_cache_tags_load` would
 report success too early. Non-MCC loads, headless runs and an already-owned
-native progress screen do not start an MCC session. Every normal success or
-failure return closes only the session it started.
+native progress screen do not start MCC visual feedback. Every normal success
+or failure return pairs `mcc_loading_begin` with `mcc_loading_end`; MCC network
+work reporting has its own lifetime even when visual feedback is unavailable.
 
 `mcc_cache_tags_load` advances the stage after resources, tags, scripts,
 geometry, audio, textures and validation. Converter loops report completed
@@ -402,15 +408,20 @@ does not render normal game frames, widgets or run the game/network loop:
 those paths can access partially converted tags. Presentation pumps existing
 platform window events. Refreshes are separated by at least 50 milliseconds;
 blocking file reads, allocation and individual codec operations can still
-pause the animation. The normal renderer installs its viewport on return.
+pause the animation. Before drawing, the controller selects the backbuffer
+with no depth surface, so an earlier scene's offscreen/depth targets cannot
+be paired with the loading effect. The next normal game window installs its
+own targets and viewport.
 
 The effect uses the installation's `maps/loading.tga`, imported by OpenCE from
 the Xbox disc image; MCC packages do not supply or replace it. Missing art has
 the existing loading renderer's black-texture behavior. Catalog browsing reads
 only headers and descriptions. Menu probes do not begin a loading screen.
 `mcc_resources_inspect` can still pulse an enclosing actual map load.
-No new network message or readiness decision is introduced: peers still finish
-their own conversions and use the existing host-controlled loading protocol.
+Presentation never signals readiness: peers still finish their own conversions
+and send the existing loaded acknowledgment. Conversion work separately feeds
+the [bounded MCC loading contract](../../port/linux/NETCODE.md#mcc-package-sharing),
+including on headless hosts, without dispatching incoming messages during a load.
 
 The optional [widescreen presentation](loading_presentation.md) scales this
 same stock effect horizontally to fill the render target, retaining the

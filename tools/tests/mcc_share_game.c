@@ -109,6 +109,7 @@ static unsigned char host_digest[32],host_metadata[32];
 static char snapshot[64],opened_url[128];
 static int role_host,peer_joined=1,peer_capable=1,prompts,lobby_restores;
 static int overlay_draws,allow_prompt=1;
+static int abort_pending,menu_loaded=1,manual_return;
 static char overlay_text[256];
 static unsigned resource_mask=3,host_revision=1;
 static int workshop_fallback,resource_shared,resource_invalid;
@@ -321,6 +322,7 @@ struct widget_instance *ui_widget_load_by_name_or_tag(char const *name,long tag,
     if (!allow_prompt) return NULL;
     if (!role_host) {
         prompts++;
+        manual_return=b==42;
         j_mcc_share_game_prompt_text(text);
         for (i=0;text[i] && i<sizeof(shown)-1;i++) shown[i]=(char)text[i];
         shown[i]=0;
@@ -333,10 +335,13 @@ void ui_widget_delete(struct widget_instance *widget)
 { if (role_host) h_mcc_share_game_prompt_closed(); else j_mcc_share_game_prompt_closed(); }
 void ui_widget_port_go_back(struct widget_instance *widget)
 { ui_widget_delete(widget);lobby_restores++; }
-long tag_loaded(unsigned long group,char const *name) { return -1; }
+long tag_loaded(unsigned long group,char const *name)
+{ return !strcmp(name,"fixture_main_menu") ? 42 : 41; }
 void platform_open_url(char const *url) { snprintf(opened_url,sizeof(opened_url),"%s",url); }
 void h_network_game_abort(void) {}
-void j_network_game_abort(void) { aborts++; }
+void j_network_game_abort(void) { aborts++;abort_pending=1; }
+int main_menu_is_active(void) { return menu_loaded; }
+char const *pc_menus_root_name(void) { return "fixture_main_menu"; }
 struct network_game_server { int unused; };
 struct network_game_client { int unused; };
 struct network_game_server_client_machine { int unused; };
@@ -566,6 +571,11 @@ static void pump_once(void)
     for (i=0;i<count;i++) j_mcc_share_game_handle_message(-1,(word const *)batch[i].data,(word)batch[i].bytes,1);
     as_host();h_mcc_share_game_update();
     as_join();j_mcc_share_game_update();
+    /* The real engine disposes the client after the adapter's frame update,
+     * then loads the main-menu screen on the following frame. */
+    if (abort_pending) {
+        j_mcc_share_game_disconnect();join_in_game=0;abort_pending=0;
+    }
     clock_ms+=20;
 }
 
@@ -626,6 +636,46 @@ int main(int argc,char **argv)
     snprintf(join_game.map.name,sizeof(join_game.map.name),"%s",LEVEL);
     as_join();j_mcc_share_game_update(); as_host();h_mcc_share_game_update();
     CHECK(host_missing && join_missing);
+
+    if (!strncmp(argv[1],"manual_",7)) {
+        map_share_on=0;
+        if (!strcmp(argv[1],"manual_client_off")) {map_share_on=1;map_download_on=0;}
+        if (!strcmp(argv[1],"manual_wait_menu")) menu_loaded=0;
+        if (!strcmp(argv[1],"manual_local")) CHECK(joiner_asks(LEVEL,host_digest));
+        else CHECK(workshop_asks());
+        for (i=0;i<10;i++) pump_once();
+        CHECK(aborts==1 && !join_in_game && !j_mcc_share_game_holds_players());
+        CHECK(!j_mcc_share_game_downloading(LEVEL) && !j_mcc_share_game_can_download());
+        if (!strcmp(argv[1],"manual_wait_menu")) {
+            CHECK(!prompts);menu_loaded=1;CHECK(pump_prompt());
+        }
+        CHECK(prompts==1 && manual_return);
+        clock_ms+=20000;for (i=0;i<5;i++) pump_once();
+        CHECK(prompts==1 && !accepts && aborts==1);
+        as_join();
+        if (!strcmp(argv[1],"manual_closed")) j_mcc_share_game_prompt_closed();
+        else if (!strcmp(argv[1],"manual_cancel")) j_mcc_share_game_prompt_action(2);
+        else if (!strcmp(argv[1],"manual_disconnect")) j_mcc_share_game_disconnect();
+        else if (!strcmp(argv[1],"manual_stale_workshop")) {
+            join_in_game=1;j_mcc_share_game_prompt_action(1);CHECK(!opened_url[0]);
+        }
+        else if (!strcmp(argv[1],"manual_new_join")) {
+            join_in_game=1;strcpy(join_game.map.name,"custom_maps\\bloodgulch");
+            j_mcc_share_game_update();
+        } else if (!strcmp(argv[1],"manual_map_load")) {
+            menu_loaded=0;j_mcc_share_game_update();
+        } else if (!strcmp(argv[1],"manual_stale_accept")) j_mcc_share_game_prompt_action(0);
+        else {
+            CHECK(j_mcc_share_game_has_workshop()==(strcmp(argv[1],"manual_local")!=0));
+            j_mcc_share_game_prompt_action(1);
+            CHECK(!strcmp(argv[1],"manual_local") ? !opened_url[0] :
+                !strcmp(opened_url,"https://steamcommunity.com/sharedfiles/filedetails/?id=2915693904"));
+        }
+        CHECK(!j_mcc_share_game_has_workshop() && !accepts && aborts==1);
+        for (i=0;i<5;i++) pump_once();CHECK(prompts==1);
+        snprintf(b,sizeof(b),"%s/mcc_maps",join_dir);CHECK(!exists(b));
+        snprintf(b,sizeof(b),"%s/mcc_staging",join_dir);CHECK(!exists(b));return 0;
+    }
 
     if(!strcmp(argv[1],"validation_handoff") || !strcmp(argv[1],"validation_stale_handoff")) {
         admission_pending=1;block_request=1;
@@ -780,6 +830,7 @@ int main(int argc,char **argv)
         as_join();j_mcc_share_game_update();
         if (!strcmp(argv[1],"client_toggle")) {
             CHECK(!j_mcc_share_game_can_download());
+            CHECK(pump_prompt());
             CHECK(strstr(shown,"OFF"));
             j_mcc_share_game_prompt_action(2);CHECK(aborts==1);aborts=0;
         }

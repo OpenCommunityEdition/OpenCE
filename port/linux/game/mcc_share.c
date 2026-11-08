@@ -65,6 +65,12 @@ static char mcc_share_name[128];
 static unsigned char mcc_share_digest[32], mcc_share_metadata[32];
 static boolean mcc_share_prompt_pending, mcc_share_prompt_visible;
 static boolean mcc_share_prompt_download;
+/* Manual guidance outlives the refused join, but never a new session. */
+static enum {
+    MCC_SHARE_MANUAL_NONE,
+    MCC_SHARE_MANUAL_LEAVING,
+    MCC_SHARE_MANUAL_MENU
+} mcc_share_manual;
 static struct widget_instance *mcc_share_prompt;
 static char mcc_share_prompt_message[512];
 static char mcc_share_installed[64];
@@ -79,6 +85,7 @@ static char mcc_share_admission_level[128];
 void platform_translate_path(char const *, char *, unsigned long);
 void platform_open_url(char const *);
 void ui_widget_port_go_back(struct widget_instance *widget);
+char const *pc_menus_root_name(void);
 static void mcc_share_offered(void *, uint64_t, char const *);
 static void mcc_share_host_lifecycle(void);
 struct network_game_server_client_machine *network_game_server_get_client_machine_at_index(struct network_game_server *,long);
@@ -432,7 +439,8 @@ boolean mcc_share_game_downloading(
 	char canonical[64];
 
 	if (mcc_identity_pending(level_name)) return TRUE;
-	return mcc_share_ready && level_name && mcc_package_name(level_name, canonical) &&
+	return mcc_share_ready && mcc_share_manual==MCC_SHARE_MANUAL_NONE &&
+        level_name && mcc_package_name(level_name, canonical) &&
 		(mcc_share_client_level(&mcc_share_globals, canonical) ||
         ((mcc_share_prompt_pending || mcc_share_prompt_visible) && !strcmp(canonical,mcc_share_name)));
 }
@@ -441,7 +449,7 @@ boolean mcc_share_game_holds_players(
 	void)
 {
 	return mcc_identity_pending(NULL) || mcc_admission_client_pending() ||
-        (mcc_share_ready && (mcc_share_client_busy(&mcc_share_globals) ||
+        (mcc_share_ready && mcc_share_manual==MCC_SHARE_MANUAL_NONE && (mcc_share_client_busy(&mcc_share_globals) ||
         mcc_share_prompt_pending || mcc_share_prompt_visible));
 }
 
@@ -510,7 +518,7 @@ int mcc_share_game_can_download(void)
 int mcc_share_game_has_workshop(void)
 {
     struct mcc_workshop_item item;
-    return mcc_workshop_wire_unpack(mcc_share_name,&item);
+    return mcc_share_name[0] && mcc_workshop_wire_unpack(mcc_share_name,&item);
 }
 void mcc_share_game_prompt_text(wchar_t text[512])
 {
@@ -523,31 +531,43 @@ void mcc_share_game_prompt_closed(void)
 {
     mcc_share_prompt=NULL;
     mcc_share_prompt_visible=FALSE;
+    if (mcc_share_manual==MCC_SHARE_MANUAL_MENU) {
+        mcc_share_manual=MCC_SHARE_MANUAL_NONE;
+        mcc_share_prompt_pending=FALSE;
+        mcc_share_name[0]=0;
+    }
 }
 void mcc_share_game_prompt_action(int action)
 {
     struct mcc_workshop_item item;
     char url[128];
+    int manual=mcc_share_manual==MCC_SHARE_MANUAL_MENU;
+    int current=manual ? !global_network_game_client_get() && !global_network_game_server_get() &&
+        main_menu_is_active() : mcc_share_client_current();
+    int download=mcc_share_game_can_download();
+    int workshop=mcc_workshop_wire_unpack(mcc_share_name,&item);
     mcc_share_close_prompt();
-    if (!mcc_share_client_current()) {
+    if (!current) {
         mcc_share_client_cancel(&mcc_share_globals);
         return;
     }
-    if (action==0 && mcc_share_game_can_download()) {
+    if (!manual && action==0 && download) {
         mcc_share_prompt_download=FALSE;
         mcc_share_client_accept(&mcc_share_globals);
         return;
     }
-    if (action==1 && mcc_workshop_wire_unpack(mcc_share_name,&item)) {
+    if (action==1 && workshop) {
         snprintf(url,sizeof(url),"https://steamcommunity.com/sharedfiles/filedetails/?id=%s",item.id);
         platform_open_url(url);
     }
+    if (manual) return;
     mcc_share_client_cancel(&mcc_share_globals);
     network_game_abort();
 }
 
 void mcc_share_game_disconnect(void)
 {
+    int manual=mcc_share_manual==MCC_SHARE_MANUAL_LEAVING;
     mcc_admission_disconnect();
     mcc_load_network_disconnect();
     mcc_share_validation_token=0;
@@ -557,7 +577,9 @@ void mcc_share_game_disconnect(void)
         mcc_share_stop_host();
     }
     mcc_share_prompt_pending=mcc_share_prompt_visible=mcc_share_prompt_download=FALSE;
-    mcc_share_name[0]=0;
+    mcc_share_manual=manual ? MCC_SHARE_MANUAL_MENU : MCC_SHARE_MANUAL_NONE;
+    if (manual) mcc_share_prompt_pending=TRUE;
+    else mcc_share_name[0]=0;
 }
 
 void mcc_share_game_peer_left(struct network_game_server_client_machine *machine)
@@ -651,10 +673,18 @@ void mcc_share_game_update(
 		mcc_share_ready = TRUE;
 		mcc_identity_set_missing(mcc_share_missing);
 	}
+    if (mcc_share_manual==MCC_SHARE_MANUAL_MENU &&
+        (global_network_game_client_get() || global_network_game_server_get() ||
+         (mcc_share_prompt_visible && !main_menu_is_active()))) {
+        mcc_share_close_prompt();
+        mcc_share_manual=MCC_SHARE_MANUAL_NONE;
+        mcc_share_name[0]=0;
+    }
     mcc_admission_update();
     mcc_identity_update();
     /* Consent belongs to this host's exact settings, including the metadata. */
-    if (mcc_share_client_busy(&mcc_share_globals) || mcc_share_prompt_pending || mcc_share_prompt_visible) {
+    if (mcc_share_manual==MCC_SHARE_MANUAL_NONE &&
+        (mcc_share_client_busy(&mcc_share_globals) || mcc_share_prompt_pending || mcc_share_prompt_visible)) {
         if (!mcc_share_client_current()) {
             if (global_network_game_client_get()) mcc_share_client_cancel(&mcc_share_globals);
             else mcc_share_client_disconnect(&mcc_share_globals);
@@ -672,11 +702,24 @@ void mcc_share_game_update(
     }
     mcc_share_host_lifecycle();
     mcc_share_update(&mcc_share_globals);
-    if (mcc_share_prompt_pending && !mcc_share_prompt_visible && global_network_game_client_get()) {
+    if ((mcc_share_prompt_pending || mcc_share_prompt_visible) && !mcc_share_prompt_download &&
+        mcc_share_manual==MCC_SHARE_MANUAL_NONE && mcc_share_client_current()) {
+        /* There is no admission path without this content. Leave now rather
+         * than letting the host's playerless timeout replace the guidance.
+         * Disconnect retains only the text/origin for the main-menu prompt. */
+        mcc_share_close_prompt();
+        mcc_share_manual=MCC_SHARE_MANUAL_LEAVING;
+        network_game_abort();
+        return;
+    }
+    if (mcc_share_prompt_pending && !mcc_share_prompt_visible &&
+        (mcc_share_manual==MCC_SHARE_MANUAL_MENU ? main_menu_is_active() :
+         mcc_share_manual==MCC_SHARE_MANUAL_NONE && mcc_share_client_current())) {
         /* Deferred until frame update: receiving a packet never opens a widget. */
         mcc_share_prompt=ui_widget_load_by_name_or_tag(
             "pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\mcc_download\\screen",
-            NONE,NULL,0,tag_loaded('DeLa',"pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen"),NONE,NONE);
+            NONE,NULL,0,tag_loaded('DeLa',mcc_share_manual==MCC_SHARE_MANUAL_MENU ? pc_menus_root_name() :
+                "pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen"),NONE,NONE);
         if (mcc_share_prompt) { mcc_share_prompt_pending=FALSE; mcc_share_prompt_visible=TRUE; }
     }
 }
