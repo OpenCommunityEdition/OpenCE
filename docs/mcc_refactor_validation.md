@@ -54,7 +54,7 @@ cleanup are complete within the limits below. Milestone 16 has not started.
 | 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | Complete; final review, native/transport controls, CI and cleanup pass within recorded limits |
 | 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Complete within recorded limits; Stock browser target validated |
 | 15 | Correct MCC HUD text placement, ballistic counters and scope-mask scaling, plus shared cinematic aim synchronization. | Complete within recorded runtime/platform limits; final review, CI and cleanup verified |
-| 16 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestone 15; previously numbered 15, originally 14 |
+| 16 | Establish Xbox a10 assertion provenance, fix any defect introduced by our work, then prepare the MCC-only upstream contribution and unified OpenCE agreement. | Planned after Milestone 15; validation gate added; previously numbered 15, originally 14 |
 
 The completed Milestone 10 gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
 with passing MCC and four-platform debug workflows and 87 focused local passes.
@@ -1826,13 +1826,16 @@ client predictions, with ordinary predictions covered by actual-source tests
 and the final browser/native run. The earlier native Ruby skip run used
 `9f3be1501`. These are local-broker tests, not public-NAT tests.
 
-An early-join Xbox `a10` natural-intro control encounters an inherited
+An early-join Xbox `a10` natural-intro control encounters a
 `structure_bsp_get_cluster_pvs` cluster-index assertion at a scene/BSP transition.
-The retained pre-M15 binary reproduces the same assertion at the same transition
+The retained pre-M15 **refactored-branch** binary reproduces the same assertion at the same transition
 (`xbox_natural_baseline_v1` versus `xbox_natural_revert_v1`). Neither counts as
 natural-completion coverage. The independent `b30` control supplies that check.
-The inherited BSP issue remains a separate follow-up; its diagnostic was not
-suppressed. This milestone does not claim complete campaigns, every map,
+This establishes that the assertion predates Milestone 15, not that it predates
+the refactor or our MCC support. Its root cause and introducing change remain
+unproven. Milestone 16 owns the provenance investigation and any correction
+required for a defect introduced by our work; its diagnostic was not suppressed.
+This milestone does not claim complete campaigns, every map,
 physical Android-device play or public-NAT coverage.
 
 #### Combined review, regression checks and preservation
@@ -1881,12 +1884,55 @@ and protected original hashes are rechecked. `cleanup-plan.json`,
 `cleanup-result.json` and retained per-run receipts distinguish final cleanup
 from the additional caches already removed after each native run.
 
-Milestone 15 is complete within these stated limits. The inherited Xbox `a10`
-BSP assertion remains a separate follow-up; no broader campaign or every-map
+Milestone 15 is complete within these stated limits. The Xbox `a10`
+BSP assertion is a Milestone 16 validation gate; no broader campaign or every-map
 compatibility claim follows from these bounded checks. Milestone 16 remains
 planned and has not begun.
 
 ### Milestone 16: MCC-only upstream contribution
+
+#### Xbox a10 provenance and regression gate
+
+Before finalizing the upstream contribution, complete the Xbox `a10`
+early-join co-op natural-intro investigation authorized by the user. The current
+evidence proves only that the assertion exists before Milestone 15 on the
+already-refactored branch. Do not label it an upstream or pre-refactor defect
+without further evidence.
+
+1. Identify and record the exact commit immediately before Stage 1. Reproduce
+   the same scene/BSP transition there and on the completed refactored branch,
+   using identical original map hashes, comparable build options, settings,
+   input and join timing. Run each revision with matching peers; do not mix
+   incompatible network agreements or weaken admission to permit comparison.
+2. Trace the invalid cluster index from its producer to
+   `structure_bsp_get_cluster_pvs`, including active BSP identity, unit/object
+   lifetime, host/client ordering and the first invalid state. Stale references
+   and transition ordering are hypotheses, not established causes. Check the
+   test fixture itself and distinguish a failed setup from game behavior.
+3. Locate the introducing change through source history and controlled revision
+   comparisons. If the pre-refactor revision also fails, use an appropriate
+   pre-MCC or OpenCE baseline where necessary: predating the refactor alone
+   does not prove that our earlier MCC work is uninvolved. Record limitations
+   if historical builds or timing prevent a conclusive comparison.
+4. If our MCC support or refactoring introduced the defect, correct its actual
+   producer/lifecycle contract in the responsible implementation. Add a failing
+   regression against the real implementation and demonstrate the corrected
+   transition. Preserve diagnostics and bounds checks; suppressing the assertion,
+   clamping the index or skipping visibility work is not a demonstrated fix.
+   Apply shared-engine versus MCC-owned boundaries according to the evidence.
+5. Validate any correction across Xbox campaign transitions/recovery, CE
+   multiplayer and affected MCC maps, including host/client behavior and the
+   required native/browser transport and platform checks. Version changed
+   simulation or wire agreement and carry required fixes into the upstream
+   contribution. Keep unrelated fork-specific fixes out of that contribution.
+
+Completion requires either an evidence-backed correction of our defect with
+passing affected checks, or evidence establishing an unrelated pre-existing
+cause and an explicit disposition. An inconclusive baseline run does not close
+the gate. Retain useful traces and failed outcomes, preserve original maps and
+saves, and clean verified test outputs under the two-game limit.
+
+#### Upstream branch and protocol integration
 
 After Milestones 13–15, create `GET-YOUR-MCC-HERE` against the then-current
 OpenCE `main`. The completed `mcc-code-refactor` branch is the source of the
