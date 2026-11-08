@@ -78,6 +78,7 @@ symbols in this file:
 #include "cseries/cseries.h"
 #include "bitmaps/bitmap_group.h"
 #include "camera/director.h"
+#include "clips.h"
 #include "cache/texture_cache.h"
 #include "cutscene/cinematics.h"
 #include "devices/device_controls.h"
@@ -1512,7 +1513,7 @@ void hud_draw_screen(
 				hud_render_nav_points(render.local_player_index);
 				hud_render_damage_indicators(render.local_player_index);
 			}
-			else
+			else if (!clips_flying())
 			{
 				hud_show_action_response(player_index);
 				hud_play_unit_sounds(player, hud_scripted_globals->show_hud);

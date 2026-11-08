@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A profile's clips, in the settings screens' frame. -->
+<menus>
+	<widget name="main_menu/clips/clips_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/clips/clips_title"/>
+		<child widget="main_menu/clips/clips_list"/>
+	</widget>
+	<widget name="main_menu/clips/clips_title" type="text" controller="1" left="35" top="16" width="400" height="36" text="CLIPS" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/clips/clips_help" type="text" controller="1" left="68" top="364" width="482" height="48" text="A plays the clip. DELETE removes it." font="ui\large_ui" color="#FFFFFFFF" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/clips/clips_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="main_menu/clips/clips_help">
+		<data input="port clips list"/>
+		<on event="left_trigger" run="port clips page up"/>
+		<on event="right_trigger" run="port clips page down"/>
+		<child widget="main_menu/clips/clip_row_0" x="54" y="78"/>
+		<child widget="main_menu/clips/clip_row_1" x="54" y="98"/>
+		<child widget="main_menu/clips/clip_row_2" x="54" y="118"/>
+		<child widget="main_menu/clips/clip_row_3" x="54" y="138"/>
+		<child widget="main_menu/clips/clip_row_4" x="54" y="158"/>
+		<child widget="main_menu/clips/clip_row_5" x="54" y="178"/>
+		<child widget="main_menu/clips/clip_row_6" x="54" y="198"/>
+		<child widget="main_menu/clips/clip_row_7" x="54" y="218"/>
+		<child widget="main_menu/clips/clips_keep" x="146" y="415"/>
+		<child widget="main_menu/clips/clips_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/clips/clip_row_0" type="text" width="512" height="20" bitmap="bitmaps/option_bkds_short" text="" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clip_row_1" type="text" width="512" height="20" bitmap="bitmaps/option_bkds_short" text="" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clip_row_2" type="text" width="512" height="20" bitmap="bitmaps/option_bkds_short" text="" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clip_row_3" type="text" width="512" height="20" bitmap="bitmaps/option_bkds_short" text="" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clip_row_4" type="text" width="512" height="20" bitmap="bitmaps/option_bkds_short" text="" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clip_row_5" type="text" width="512" height="20" bitmap="bitmaps/option_bkds_short" text="" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clip_row_6" type="text" width="512" height="20" bitmap="bitmaps/option_bkds_short" text="" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clip_row_7" type="text" width="512" height="20" bitmap="bitmaps/option_bkds_short" text="" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clips_keep" type="column_list" width="148" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" bitmap="bitmaps/text_button_background">
+		<child widget="main_menu/clips/clips_keep_down" x="14" y="5"/>
+		<child widget="main_menu/clips/clips_keep_label" x="38" y="0"/>
+		<child widget="main_menu/clips/clips_keep_up" x="118" y="5"/>
+	</widget>
+	<widget name="main_menu/clips/clips_keep_down" width="16" height="14" bitmap="bitmaps/arrow_sm_left">
+		<on event="a" run="port clips keep down"/>
+		<on event="start" run="port clips keep down"/>
+		<on event="left_mouse" run="port clips keep down"/>
+	</widget>
+	<widget name="main_menu/clips/clips_keep_label" type="text" width="72" height="20" text="KEEP 20" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="1" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/clips/clips_keep_up" width="16" height="14" bitmap="bitmaps/arrow_sm_right">
+		<on event="a" run="port clips keep up"/>
+		<on event="start" run="port clips keep up"/>
+		<on event="left_mouse" run="port clips keep up"/>
+	</widget>
+	<widget name="main_menu/clips/clips_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/clips/clips_button_view" x="302" y="1"/>
+		<child widget="main_menu/clips/clips_button_delete" x="406" y="1"/>
+		<child widget="main_menu/clips/clips_button_back" x="510" y="1"/>
+		<on event="right_trigger" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/clips/clips_button_view" type="text" width="96" height="20" bitmap="bitmaps/text_button_background" text="VIEW" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="1">
+		<on event="a" run="port clips play"/>
+		<on event="start" run="port clips play"/>
+		<on event="left_mouse" run="port clips play"/>
+	</widget>
+	<widget name="main_menu/clips/clips_button_delete" type="text" width="96" height="20" bitmap="bitmaps/text_button_background" text="DELETE" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="1">
+		<on event="a" run="port clips delete"/>
+		<on event="start" run="port clips delete"/>
+		<on event="left_mouse" run="port clips delete"/>
+	</widget>
+	<widget name="main_menu/clips/clips_button_back" type="text" width="96" height="20" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="1">
+		<on event="a" back="true"/>
+		<on event="start" back="true"/>
+		<on event="left_mouse" run="mouse emit back event"/>
+	</widget>
+</menus>

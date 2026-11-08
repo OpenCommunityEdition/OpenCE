@@ -74,6 +74,7 @@ their handlers open opens.
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
 #include "interface/ui_widget.h"
+#include "interface/ui_widget_definitions.h"
 #include "interface/ui_widget_event_handler_functions.h"
 #include "main/main.h"
 #include "networking/network_game_manager.h"
@@ -100,6 +101,7 @@ their handlers open opens.
 
 #include <stdlib.h>
 #include <string.h>
+#include "clips.h"
 #include <xtl.h>
 
 /* the platform layer's (port/linux/src) */
@@ -7725,6 +7727,139 @@ static void gametype_engine_name(struct widget_instance *text_box)
 		text_box->parameters.text_box.string_list_index = strings[PIN(variant->game_engine_index, 0, 5)];
 }
 
+/* ---------- CLIPS: one profile's recordings (port/linux/game/clips.c).
+the profiles screen does not grow a button here. a menu that wants the
+list runs "port clips open" on the highlighted profile. */
+
+static int clips_row_index(struct widget_instance *widget)
+{
+	char const *name;
+	int row = 0;
+
+	if (!widget || !widget->name || strncmp(widget->name, "clip_row_", 9))
+		return -1;
+	for (name = widget->name + 9; *name >= '0' && *name <= '9'; name++)
+		row = row * 10 + (*name - '0');
+	return row;
+}
+
+static boolean clips_open_named(struct widget_instance *widget, char const *name, boolean *widget_deleted)
+{
+	struct widget_instance *root = widget ? widget_instance_get_topmost_parent(widget) : NULL;
+	long tag = tag_loaded(UI_WIDGET_DEFINITION_TAG, name);
+	short player;
+
+	if (!root || tag == NONE)
+		return FALSE;
+	player = widget->local_player_index;
+	if (player != NONE && (player < 0 || player >= MAXIMUM_GAMEPADS))
+		player = 0;
+	if (!ui_widget_load_by_name_or_tag(NULL, tag, NULL, player, root->definition_tag_index,
+		widget->parent ? widget->parent->definition_tag_index : NONE,
+		(short)(widget->parent ? widget_instance_get_child_index_from_parent(widget) : 0)))
+		return FALSE;
+	if (widget_deleted)
+		*widget_deleted = TRUE;
+	return TRUE;
+}
+
+/* "port clips open": the highlighted profile's clips */
+static boolean clips_open_screen(struct widget_instance *widget, boolean *widget_deleted)
+{
+	if (profile_list.chosen < 0 || profile_list.chosen >= profile_list.count)
+		return TRUE;
+	clips_menu_set_profile(profile_list.indices[profile_list.chosen]);
+	clips_open_named(widget, "pc\\main_menu\\clips\\clips_screen", widget_deleted);
+	return TRUE;
+}
+
+static void clips_row_label(struct widget_instance *label, wchar_t const *text, short length)
+{
+	if (!label)
+		return;
+	label->parameters.text_box.string_list_index = CLIPS_OWN_TEXT;
+	text_set_length(label, text, length);
+}
+
+/* "port clips list" */
+static void clips_list_update(struct widget_instance *list)
+{
+	struct widget_instance *help = list ? list->parameters.list.extended_description : NULL;
+	struct widget_instance *focused = list ? list->focused_child : NULL;
+	int count;
+	int i;
+
+	count = clips_menu_count();
+	{
+		struct widget_instance *label = named(list, "clips_keep_label", 0);
+		wchar_t keep_text[16];
+
+		usnprintf(keep_text, NUMBEROF(keep_text) - 1, L"KEEP %d", clips_menu_keep());
+		keep_text[NUMBEROF(keep_text) - 1] = 0;
+		clips_row_label(label, keep_text, 16);
+	}
+	if (focused && focused->name && !strncmp(focused->name, "clip_row_", 9))
+		clips_menu_note_focus(clips_row_index(focused));
+	for (i = 0; i < 8; i++)
+	{
+		char name[16];
+		struct widget_instance *row;
+		wchar_t text[128];
+
+		snprintf(name, sizeof(name), "clip_row_%d", i);
+		row = named(list, name, 0);
+		if (!row)
+			continue;
+		text[0] = 0;
+		if (count > 0)
+			clips_menu_line(i, text, 128);
+		if (count == 0 && i == 0)
+			clips_row_label(row, L"This profile has no clips.", 64);
+		else if (text[0])
+			clips_row_label(row, text, 128);
+		visible_set(row, (count == 0 && i == 0) || text[0] ? TRUE : FALSE);
+		row->disabled = count == 0 ? TRUE : FALSE;
+	}
+	if (focused && focused->name && !strcmp(focused->name, "clips_keep"))
+		clips_row_label(help, L"Arrows change the limit.", 160);
+	else if (count == 0)
+		clips_row_label(help, L"This profile has no clips.", 64);
+	else
+		clips_row_label(help, L"A plays the clip. DELETE removes it.", 160);
+	{
+		struct widget_instance *view = named(list, "clips_button_view", 0);
+
+		if (view)
+			view->disabled = count == 0 ? TRUE : FALSE;
+	}
+}
+
+/* "port clips play" */
+static boolean clips_play_row(struct widget_instance *widget, short controller)
+{
+	char map[128];
+	short difficulty = 0;
+	struct player_profile profile;
+	long index;
+	int row;
+
+	row = clips_row_index(widget);
+	if (row < 0)
+		row = clips_menu_focused_row();
+	if (!clips_menu_play(row, map, (long)sizeof(map), &difficulty))
+		return FALSE;
+	index = clips_menu_profile();
+	if (player_profile_get(index, &profile))
+	{
+		player_ui_set_active_player_profile(0, index, &profile);
+		player_ui_remember_player1_profile(TRUE);
+	}
+	/* one window. a second local player would take a seat the clip recorded */
+	player_spawn_count = 1;
+	campaign_start(map, difficulty, controller);
+	return TRUE;
+}
+
 /* ---------- public code */
 
 boolean pc_menu_event_function_invoke(
@@ -8184,6 +8319,34 @@ boolean pc_menu_event_function_invoke(
 		{
 			return saved_game_delete(controller);
 		}
+		else if (!strcmp(name, "port clips open"))
+		{
+			return clips_open_screen(widget, widget_deleted);
+		}
+		else if (!strcmp(name, "port clips play"))
+		{
+			return clips_play_row(widget, controller);
+		}
+		else if (!strcmp(name, "port clips delete"))
+		{
+			clips_menu_delete(clips_menu_focused_row());
+		}
+		else if (!strcmp(name, "port clips page up"))
+		{
+			clips_menu_scroll(-8);
+		}
+		else if (!strcmp(name, "port clips page down"))
+		{
+			clips_menu_scroll(8);
+		}
+		else if (!strcmp(name, "port clips keep down"))
+		{
+			clips_menu_keep_adjust(-1);
+		}
+		else if (!strcmp(name, "port clips keep up"))
+		{
+			clips_menu_keep_adjust(1);
+		}
 		else if (!strcmp(name, "gamespy back handler") || !strcmp(name, "gamespy dismiss error") ||
 			!strcmp(name, "gamespy dismiss filters"))
 		{
@@ -8267,4 +8430,6 @@ void pc_menu_game_data_function_invoke(
 		coop_friendly_fire_text(widget);
 	else if (!strcmp(name, "port playlist edit desc"))
 		playlist_edit_description(widget);
+	else if (!strcmp(name, "port clips list"))
+		clips_list_update(widget);
 }

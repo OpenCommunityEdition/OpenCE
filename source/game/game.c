@@ -120,6 +120,7 @@ struct game_options;
 
 #include "cseries/cseries.h"
 #include "game/game.h"
+#include "clips.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "ai/ai.h"
 #include "bink/bink_playback.h"
@@ -431,6 +432,7 @@ void game_initial_pulse(
 	while (data_iterator_next(&iterator))
 		game_engine_player_added(iterator.datum_index);
 	game_engine_game_starting();
+	clips_map_started();
 
 	return;
 }
@@ -461,6 +463,25 @@ short game_difficulty_level_get(
 	void)
 {
 	return game_globals->options.difficulty;
+}
+
+void game_loaded_setup(
+	char *map_name,
+	long map_name_size,
+	short *difficulty,
+	unsigned long *random_seed)
+{
+	if (!game_globals)
+		return;
+	if (map_name && map_name_size > 0)
+	{
+		csstrncpy(map_name, game_globals->options.map_name, map_name_size - 1);
+		map_name[map_name_size - 1] = 0;
+	}
+	if (difficulty)
+		*difficulty = game_globals->options.difficulty;
+	if (random_seed)
+		*random_seed = game_globals->options.random_seed;
 }
 
 short game_difficulty_level_get_ignore_easy(
@@ -897,7 +918,9 @@ void game_precache_new_map(
 			"c:\\halo\\SOURCE\\game\\game.c",
 			0x123,
 			cache_files_precache_map_loaded(map_name));
-		main_save_current_solo_map(map_name);
+		/* a clip plays a level. it does not become the campaign to continue */
+		if (!clips_replaying())
+			main_save_current_solo_map(map_name);
 		main_queue_map_name(NULL);
 		if (cache_files_precache_in_progress())
 			cache_files_precache_map_end();
@@ -911,6 +934,7 @@ void game_precache_new_map(
 void game_dispose_from_old_map(
 	void)
 {
+	clips_map_ended();
 	rasterizer_dispose_from_old_map();
 	game_state_dispose_from_old_map();
 	cheats_dispose_from_old_map();

@@ -70,6 +70,7 @@ symbols in this file:
 #include "cseries_windows.h"
 #include "real_math.h"
 #include "game.h"
+#include "clips.h"
 #include "player_queues_new.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_game_globals.h"
@@ -451,6 +452,32 @@ void game_time_update(
 					game_time = ticks_elapsed_real/ticks_per_second;
 			}
 
+			{
+				int exact;
+				long allow;
+
+				exact = 0;
+				allow = clips_tick_allowance(&exact);
+				if (allow >= 0 && exact)
+				{
+					/* a live frame stays at the connection cap. a backward
+					scrub names its own batch, kept inside the update queue */
+					if (allow > 64)
+						allow = 64;
+					ticks_elapsed = allow;
+					ticks_elapsed_real = (real)allow;
+					if (ticks_per_second > 0.f)
+						game_time = ticks_elapsed_real/ticks_per_second;
+				}
+				else if (allow >= 0 && ticks_elapsed > allow)
+				{
+					ticks_elapsed = allow;
+					ticks_elapsed_real = (real)allow;
+					if (discard_leftover_time && ticks_per_second > 0.f)
+						game_time = ticks_elapsed_real/ticks_per_second;
+				}
+			}
+
 			game_time_globals->leftover_dt = game_time - ticks_elapsed_real/ticks_per_second;
 			if (game_time_globals->leftover_dt < 0.f)
 				game_time_globals->leftover_dt = 0.f;
@@ -510,7 +537,10 @@ void game_time_update(
 						game_tick();
 						profile_scope(game_time_render_interpolation_tick_section, render_interpolation_tick();)
 						game_time_globals->server_time++;
-						game_time_globals->local_time++;
+						/* a clip's opening writes several samples on one tick while
+						the match clock waits. playback keeps that clock. */
+						if (!clips_clock_held())
+							game_time_globals->local_time++;
 						/* the distributed netcode's per-tick state (port: none of
 						the main menu's scene, which a lobby's machines do not share) */
 						if (!game_time_menu_scene())

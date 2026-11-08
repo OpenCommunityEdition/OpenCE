@@ -422,7 +422,11 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
                 flags += " " + updater_defines(getattr(sln, "port_release", False))
             add_object(source, flags)
         for source in sorted(Path(linux_config["game_sources"]).glob("*.c")):
-            add_object(source, game_cflags)
+            # the guest clip recorder stamps this number into the file
+            flags = game_cflags
+            if source.name == "clips.c":
+                flags += " " + updater_defines(getattr(sln, "port_release", False))
+            add_object(source, flags)
         add_object(STB_VORBIS_SOURCE, game_cflags)
 
         linux_platform = Path(linux_config["platform_sources"])
