@@ -2004,6 +2004,101 @@ static boolean mcc_import_stock(
 
 /* ---------- private code: a map */
 
+/* the tags `tags` of the MCC map `donor_map`, as its fixes and operations
+leave them, written for the maps whose donor lines name them */
+static boolean mcc_import_donor_export(
+	char const *donor_map,
+	char const *const *tags,
+	long tag_count)
+{
+	static byte loaded_header[V5_HEADER_BYTES];
+	struct mcc_import_tag_header *loaded;
+	boolean success = TRUE;
+	long index;
+
+	csmemset(&mcc_import_globals, 0, sizeof(mcc_import_globals));
+	loaded = (struct mcc_import_tag_header *)custom_edition_cache_tags_load(donor_map, loaded_header);
+	if (!loaded)
+	{
+		fprintf(stderr, "mcc import: %s: cannot be loaded to give its tags (the log says why)\n", donor_map);
+		return FALSE;
+	}
+	mcc_import_globals.table.maximum_count = loaded->tag_count + 64;
+	mcc_import_globals.table.instances = mcc_import_calloc((size_t)mcc_import_globals.table.maximum_count,
+		sizeof(struct mcc_import_tag_instance));
+	if (mcc_import_globals.table.instances)
+	{
+		csmemcpy(mcc_import_globals.table.instances, loaded->tag_instances,
+			(unsigned long)loaded->tag_count * sizeof(struct mcc_import_tag_instance));
+		mcc_import_globals.table.count = loaded->tag_count;
+		mcc_import_globals.table.scenario_index = loaded->scenario_tag_index & 0xFFFF;
+		mcc_import_fixes_apply(&mcc_import_globals.table);
+		if (mcc_import_operations_read(donor_map))
+		{
+			mcc_import_operations_apply(&mcc_import_globals.table, NULL, NULL);
+			mcc_import_models_complete(&mcc_import_globals.table);
+		}
+		for (index = 0; index < tag_count; index++)
+		{
+			success = mcc_import_operations_export(&mcc_import_globals.table, donor_map, tags[index]) && success;
+			fprintf(stdout, "mcc import: %s: gave %s\n", donor_map, tags[index]);
+		}
+	}
+	else
+		success = FALSE;
+	mcc_import_free(mcc_import_globals.table.instances);
+	mcc_import_operations_dispose();
+	custom_edition_cache_tags_unload();
+
+	return success;
+}
+
+/* the tags the map's donor lines name (MCC has them in other maps: the
+warthog for the multiplayer maps), written first where they are not */
+static boolean mcc_import_donors(
+	char const *map_name)
+{
+	enum { MAXIMUM_DONORS = 16 };
+	static char donor_maps[MAXIMUM_DONORS][64];
+	static char tags[MAXIMUM_DONORS][300];
+	char const *missing_maps[MAXIMUM_DONORS], *missing_tags[MAXIMUM_DONORS];
+	long count = 0, index;
+	boolean success = TRUE;
+
+	if (mcc_import_operations_read(map_name))
+	{
+		count = mcc_import_operations_donors_missing(missing_maps, missing_tags, MAXIMUM_DONORS);
+		for (index = 0; index < count; index++)
+		{
+			snprintf(donor_maps[index], sizeof(donor_maps[index]), "%s", missing_maps[index]);
+			snprintf(tags[index], sizeof(tags[index]), "%s", missing_tags[index]);
+		}
+	}
+	mcc_import_operations_dispose();
+	/* (each donor map loaded once, for all the tags it gives) */
+	for (index = 0; index < count; index++)
+	{
+		char const *given[MAXIMUM_DONORS];
+		long given_count = 0, other;
+
+		if (!donor_maps[index][0])
+			continue;
+		for (other = index; other < count; other++)
+		{
+			if (!strcmp(donor_maps[other], donor_maps[index]))
+			{
+				given[given_count++] = tags[other];
+				if (other != index)
+					donor_maps[other][0] = 0;
+			}
+		}
+		success = mcc_import_donor_export(donor_maps[index], given, given_count) && success;
+		donor_maps[index][0] = 0;
+	}
+
+	return success;
+}
+
 static boolean mcc_import_map(
 	char const *map_name,
 	char const *output_folder)
@@ -2022,6 +2117,8 @@ static boolean mcc_import_map(
 	boolean success = FALSE;
 	boolean stock = FALSE;
 
+	if (!mcc_import_donors(map_name))
+		mcc_import_error("mcc import: %s: some tags of other maps it takes cannot be written: left out", map_name);
 	csmemset(&mcc_import_globals, 0, sizeof(mcc_import_globals));
 	loaded = (struct mcc_import_tag_header *)custom_edition_cache_tags_load(map_name, loaded_header);
 	if (!loaded)

@@ -19,8 +19,10 @@ tag's root ("root.unit_seats[3].weapon_classes[0]") and its values:
   block     a block's elements replaced (serialized, below)
   keyed     a block rebuilt from these names (its elements', or the
             "element" operations' that follow, for names it lacks)
-  tag       a whole tag added (serialized), a tag of the disc's MCC has
-            in another map, or one of the disc's assets
+  tag       a whole tag added (serialized), one of the disc's assets
+  donor     a whole tag added that MCC has in another map (the donor),
+            as that map's import leaves it: written by that import into
+            the user's data (mcc_import_operations_export), never carried
 and, read by the import itself (mcc_import.c, mcc_import_hud):
   bitmap_size  the disc's width and height of a HUD bitmap's first image
   sprite_sizes the disc's size of a HUD sprite sheet's sprites (the first
@@ -52,6 +54,7 @@ enum
 {
 	/* the room new blocks and data take, per map */
 	MCC_PATCH_ARENA_BYTES = 0x01000000,
+	MCC_PATCH_MAXIMUM_DONORS = 16,
 	MCC_PATCH_SCENARIO_TYPE_OFFSET = 0x3C,
 	MCC_PATCH_SCENARIO_SCRIPTS_OFFSET = 0x49C,
 	MCC_PATCH_SCENARIO_GLOBALS_OFFSET = 0x4A8,
@@ -87,6 +90,9 @@ struct mcc_patch_reader
 static struct
 {
 	char *text;
+	/* the files of the tags the donor lines name (mcc_patch_donor_path) */
+	char *donor_texts[MCC_PATCH_MAXIMUM_DONORS];
+	long donor_text_count;
 	struct mcc_patch_operation *operations;
 	long operation_count;
 	byte *arena;
@@ -550,6 +556,152 @@ static void mcc_patch_read_pointers(
 	return;
 }
 
+/* (an element written as mcc_patch_read_element reads it) */
+static void mcc_patch_write_bytes(
+	FILE *file,
+	byte const *bytes,
+	long size)
+{
+	static char const digits[] = "0123456789abcdef";
+	long index;
+
+	for (index = 0; index < size; index++)
+	{
+		fputc(digits[bytes[index] >> 4], file);
+		fputc(digits[bytes[index] & 15], file);
+	}
+
+	return;
+}
+
+static void mcc_patch_write_u32(
+	FILE *file,
+	unsigned long value)
+{
+	byte bytes[4];
+
+	bytes[0] = (byte)value;
+	bytes[1] = (byte)(value >> 8);
+	bytes[2] = (byte)(value >> 16);
+	bytes[3] = (byte)(value >> 24);
+	mcc_patch_write_bytes(file, bytes, 4);
+
+	return;
+}
+
+/* a tag handle written as the name of its tag ("group:path", NONE) */
+static void mcc_patch_write_name(
+	struct mcc_import_tags const *tags,
+	FILE *file,
+	long handle)
+{
+	char text[400];
+	byte length_bytes[2];
+	long index, length;
+
+	for (index = 0; handle != NONE && index < tags->count && tags->instances[index].tag_index != handle; index++)
+		;
+	if (handle == NONE || index == tags->count)
+		strcpy(text, "NONE");
+	else
+	{
+		unsigned long group = (unsigned long)tags->instances[index].group_tag;
+		short character;
+
+		snprintf(text, sizeof(text), "%c%c%c%c:%s", (char)(group >> 24), (char)(group >> 16), (char)(group >> 8),
+			(char)group, tags->instances[index].name);
+		for (character = 0; character < 4; character++)
+		{
+			if (text[character] == ' ')
+				text[character] = '_';
+		}
+	}
+	length = (long)mcc_patch_length(text);
+	length_bytes[0] = (byte)length;
+	length_bytes[1] = (byte)(length >> 8);
+	mcc_patch_write_bytes(file, length_bytes, 2);
+	mcc_patch_write_bytes(file, (byte const *)text, length);
+
+	return;
+}
+
+static void mcc_patch_write_pointers(
+	struct mcc_import_tags const *tags,
+	FILE *file,
+	struct tag_schema_definition const *definition,
+	byte const *element);
+
+static void mcc_patch_write_element(
+	struct mcc_import_tags const *tags,
+	FILE *file,
+	struct tag_schema_definition const *definition,
+	byte const *element)
+{
+	mcc_patch_write_bytes(file, element, definition->size);
+	mcc_patch_write_pointers(tags, file, definition, element);
+
+	return;
+}
+
+static void mcc_patch_write_pointers(
+	struct mcc_import_tags const *tags,
+	FILE *file,
+	struct tag_schema_definition const *definition,
+	byte const *element)
+{
+	struct tag_schema_field const *field;
+
+	for (field = definition->fields; field->type != _tag_schema_terminator; field++)
+	{
+		short index;
+
+		for (index = 0; index < field->count; index++)
+		{
+			byte const *at = element + field->offset + index * field->size;
+
+			switch (field->type)
+			{
+			case _tag_schema_block:
+			{
+				struct tag_block const *block = (struct tag_block const *)at;
+				struct tag_schema_definition const *element_definition = field->definition;
+				long count = block->count > 0 && block->address ? block->count : 0, element_index;
+
+				mcc_patch_write_u32(file, (unsigned long)count);
+				for (element_index = 0; element_index < count; element_index++)
+				{
+					mcc_patch_write_element(tags, file, element_definition,
+						(byte const *)block->address + element_index * element_definition->size);
+				}
+				break;
+			}
+			case _tag_schema_data:
+			{
+				struct tag_data const *data = (struct tag_data const *)at;
+				long size = data->size > 0 && data->address ? data->size : 0;
+
+				mcc_patch_write_u32(file, (unsigned long)size);
+				mcc_patch_write_bytes(file, data->address, size);
+				break;
+			}
+			case _tag_schema_reference:
+				mcc_patch_write_name(tags, file, ((struct tag_reference const *)at)->index);
+				break;
+			case _tag_schema_tag_index:
+				mcc_patch_write_name(tags, file, *(long const *)at);
+				break;
+			case _tag_schema_struct:
+				mcc_patch_write_pointers(tags, file, field->definition, at);
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
+	return;
+}
+
 /* ---------- private code: paths */
 
 /* resolves `path` ("root.a[1].b") from a tag's root: the element it ends on
@@ -1003,6 +1155,82 @@ void mcc_import_fixes_apply(
 	return;
 }
 
+/* where the import of the MCC map `donor_map` writes its tag `tag` for other
+maps' donor lines (mcc_import_operations_export): the user's own data, never
+carried with the game */
+#define MCC_PATCH_DONOR_FOLDER "d:\\mcc_import"
+
+static void mcc_patch_donor_path(
+	char *path,
+	size_t size,
+	char const *donor_map,
+	char const *tag)
+{
+	char *character;
+
+	snprintf(path, size, "%s\\%s %s.p2", MCC_PATCH_DONOR_FOLDER, donor_map, tag);
+	for (character = path + mcc_patch_length(MCC_PATCH_DONOR_FOLDER) + 1; *character; character++)
+	{
+		if (*character == '\\' || *character == ':')
+			*character = '_';
+	}
+
+	return;
+}
+
+/* each donor line made the tag operation its file holds, if it is written
+(left a donor line otherwise: mcc_import_operations_donors_missing) */
+static void mcc_patch_donors_read(
+	void)
+{
+	long index;
+
+	for (index = 0; index < mcc_patch_globals.operation_count; index++)
+	{
+		struct mcc_patch_operation *operation = &mcc_patch_globals.operations[index];
+		char path[512];
+		FILE *file;
+		long size;
+		char *text, *end, *hex;
+
+		if (strcmp(operation->kind, "donor") || mcc_patch_globals.donor_text_count >= MCC_PATCH_MAXIMUM_DONORS)
+			continue;
+		mcc_patch_donor_path(path, sizeof(path), operation->a, operation->tag);
+		file = fopen(path, "rb");
+		if (!file)
+			continue;
+		fseek(file, 0, SEEK_END);
+		size = ftell(file);
+		fseek(file, 0, SEEK_SET);
+		text = size > 0 ? malloc((size_t)size + 1) : NULL;
+		if (!text || fread(text, 1, (size_t)size, file) != (size_t)size)
+		{
+			free(text);
+			fclose(file);
+			continue;
+		}
+		fclose(file);
+		text[size] = 0;
+		/* (one line: tag, the tag, "-", its bytes) */
+		end = strchr(text, '\n');
+		if (end)
+			*end = 0;
+		hex = strrchr(text, '\t');
+		if (strncmp(text, "tag\t", 4) || !hex || strncmp(text + 4, operation->tag, mcc_patch_length(operation->tag)))
+		{
+			mcc_patch_log("mcc import: %s is not the tag %s", path, operation->tag);
+			free(text);
+			continue;
+		}
+		mcc_patch_globals.donor_texts[mcc_patch_globals.donor_text_count++] = text;
+		operation->kind = "tag";
+		operation->path = "-";
+		operation->a = hex + 1;
+	}
+
+	return;
+}
+
 boolean mcc_import_operations_read(
 	char const *map_name)
 {
@@ -1076,8 +1304,62 @@ boolean mcc_import_operations_read(
 		}
 		line = end ? end + 1 : NULL;
 	}
+	mcc_patch_donors_read();
 
 	return TRUE;
+}
+
+boolean mcc_import_operations_export(
+	struct mcc_import_tags const *tags,
+	char const *donor_map,
+	char const *tag)
+{
+	char path[512];
+	long index = mcc_patch_tag(tags, tag);
+	struct tag_schema_group const *schema = index >= 0 ?
+		mcc_patch_schema((unsigned long)tags->instances[index].group_tag) : NULL;
+	FILE *file;
+
+	if (!schema || !schema->definition || !tags->instances[index].base_address)
+	{
+		mcc_patch_log("mcc import: %s has no %s to give", donor_map, tag);
+		return FALSE;
+	}
+	CreateDirectoryA(MCC_PATCH_DONOR_FOLDER, NULL);
+	mcc_patch_donor_path(path, sizeof(path), donor_map, tag);
+	file = fopen(path, "wb");
+	if (!file)
+	{
+		mcc_patch_log("mcc import: cannot write %s", path);
+		return FALSE;
+	}
+	fprintf(file, "tag\t%s\t-\t", tag);
+	mcc_patch_write_element(tags, file, schema->definition, tags->instances[index].base_address);
+	fputc('\n', file);
+
+	return fclose(file) == 0;
+}
+
+long mcc_import_operations_donors_missing(
+	char const **donor_maps,
+	char const **tags,
+	long maximum_count)
+{
+	long index, count = 0;
+
+	for (index = 0; index < mcc_patch_globals.operation_count && count < maximum_count; index++)
+	{
+		struct mcc_patch_operation const *operation = &mcc_patch_globals.operations[index];
+
+		if (!strcmp(operation->kind, "donor"))
+		{
+			donor_maps[count] = operation->a;
+			tags[count] = operation->tag;
+			count++;
+		}
+	}
+
+	return count;
 }
 
 long mcc_import_operations_apply(
@@ -1116,7 +1398,8 @@ long mcc_import_operations_apply(
 		if (!strcmp(operation->kind, "order") || !strcmp(operation->kind, "tag") ||
 			!strcmp(operation->kind, "element") || !strcmp(operation->kind, "missing") ||
 			!strcmp(operation->kind, "handle") || !strcmp(operation->kind, "bitmap_size") ||
-			!strcmp(operation->kind, "hud_values") || !strcmp(operation->kind, "sprite_sizes"))
+			!strcmp(operation->kind, "hud_values") || !strcmp(operation->kind, "sprite_sizes") ||
+			!strcmp(operation->kind, "donor"))
 		{
 			continue;
 		}
@@ -1222,6 +1505,8 @@ void mcc_import_operations_dispose(
 		free(mcc_patch_globals.text);
 	if (mcc_patch_globals.arena)
 		free(mcc_patch_globals.arena);
+	while (mcc_patch_globals.donor_text_count > 0)
+		free(mcc_patch_globals.donor_texts[--mcc_patch_globals.donor_text_count]);
 	mcc_patch_globals.operations = NULL;
 	mcc_patch_globals.text = NULL;
 	mcc_patch_globals.arena = NULL;

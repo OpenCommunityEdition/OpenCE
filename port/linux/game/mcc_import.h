@@ -83,6 +83,20 @@ boolean mcc_import_operations_bitmap_size(
 	short *width,
 	short *height);
 
+/* Writes the tag `tag` ("group:path") of the MCC map `donor_map`, as its
+fixes and operations leave it, for the maps whose donor lines name it. */
+boolean mcc_import_operations_export(
+	struct mcc_import_tags const *tags,
+	char const *donor_map,
+	char const *tag);
+
+/* The donor lines of the operations read whose tags are not written yet:
+each one's map (donor_maps) and tag (tags), at most maximum_count. */
+long mcc_import_operations_donors_missing(
+	char const **donor_maps,
+	char const **tags,
+	long maximum_count);
+
 /* The disc's sizes of the HUD sprite sheet `name`'s sprites (the first of each
 sequence, "<width>x<height>" separated by commas: the operations' sprite_sizes
 line), or NULL. */
