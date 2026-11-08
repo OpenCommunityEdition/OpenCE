@@ -258,12 +258,13 @@ enum
 {
 	MAXIMUM_SOUND_CHANNELS = 256,
 	MAXIMUM_SOUND_CALLBACK_DATA = 0x30,
-	/* data_new of the mixer (sound_initialize). The obstruction results
-	are one per datum, so the two stay the same size. */
+	/* port: data_new of the mixer (sound_initialize). The obstruction
+	results are one per datum, so the two stay the same size. */
 	MAXIMUM_SOUND_DATUMS = 0x200,
 	MAXIMUM_LOOPING_SOUND_DATUMS = 0x80,
 };
 
+/* port: which datum's obstruction result a source keeps (source_audible) */
 enum sound_obstruction_cache_kind
 {
 	_sound_obstruction_cache_none,
@@ -698,6 +699,7 @@ static boolean sound_preempts_sound(
 	real challenger_distance_squared);
 static short sound_find_best_channel(
 	long sound_index);
+/* port: and the datum whose obstruction result it keeps */
 static short source_audible(
 	struct sound_source *source,
 	real maximum_distance,
@@ -949,6 +951,7 @@ void sound_initialize(
 	}
 
 	sound_manager_globals.platform_definition = platform_definition;
+	/* port: the sizes named, as the obstruction results' are */
 	sound_data = data_new("sounds", MAXIMUM_SOUND_DATUMS, sizeof(struct sound_datum));
 	if (!sound_data)
 	{
@@ -3324,6 +3327,8 @@ void sound_dispose_from_old_map(
 	return;
 }
 
+/* port: a sound's obstruction result for a tick, for its listener and
+position (source_audible) */
 struct sound_obstruction_cache_entry
 {
 	boolean valid;
@@ -3345,12 +3350,18 @@ static struct sound_obstruction_cache_entry *sound_obstruction_cache_entry(
 	long slot;
 
 	if (datum_index == NONE)
+	{
 		return NULL;
+	}
 	slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(datum_index);
 	if (kind == _sound_obstruction_cache_sound && slot < MAXIMUM_SOUND_DATUMS)
+	{
 		return &sound_obstruction_cache[slot];
+	}
 	if (kind == _sound_obstruction_cache_looping_sound && slot < MAXIMUM_LOOPING_SOUND_DATUMS)
+	{
 		return &looping_sound_obstruction_cache[slot];
+	}
 	return NULL;
 }
 
@@ -3375,7 +3386,9 @@ static boolean sound_obstruction_cache_recall(
 		entry->position.x != source->location.position.x ||
 		entry->position.y != source->location.position.y ||
 		entry->position.z != source->location.position.z)
+	{
 		return FALSE;
+	}
 	source->obstruction = entry->obstruction;
 	source->occlusion = entry->occlusion;
 	return TRUE;
@@ -3391,7 +3404,9 @@ static void sound_obstruction_cache_store(
 
 	entry = sound_obstruction_cache_entry(kind, datum_index);
 	if (!entry)
+	{
 		return;
+	}
 	entry->valid = TRUE;
 	entry->datum_index = datum_index;
 	entry->game_time = game_time_get();
