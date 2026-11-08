@@ -763,7 +763,9 @@ Each frame shows the world between the last two ticks
 - In cinematics, a camera set to a point moves there every frame. It is
   kept after each tick at the first frame drawn after it, some part of a
   tick late, and mixed for the moment the objects are drawn at, so that it
-  turns and moves as steadily as the script moves it.
+  turns and moves as steadily as the script moves it. It jumps only when it
+  leaves the way it was moving, not when it moves fast (d40's fly-over goes
+  further in a tick than a cut of a player's camera).
 
 Thus the frames are one tick (33 ms) after the calculation. The calculation
 does not change.
