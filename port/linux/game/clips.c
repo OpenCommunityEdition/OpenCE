@@ -2315,7 +2315,6 @@ void clips_draw(short local_player_index, union rectangle2d const *window)
 	short track_h;
 	short head;
 	real scale;
-	int fit;
 
 	(void)window;
 	if (!clips.replaying || local_player_index != 0)
@@ -2389,9 +2388,6 @@ void clips_draw(short local_player_index, union rectangle2d const *window)
 	clips_widen(pad_help, 160, clips.flying ?
 		"PAD    START pause    LEFT RIGHT scrub    UP DOWN speed    LT RT height    RB text    Y camera    B / BACK leave" :
 		"PAD    START pause    DPAD scrub    LT RT speed    RB picture    Y camera    B / BACK leave");
-	fit = rasterizer_screen_fit_drawing();
-	if (fit)
-		rasterizer_screen_fit_suspend(TRUE);
 	clips_feed_draw(font, scale, margin, top, pane_w);
 	clips_quad(0, top, pane_w, pane_h, 0xF0101824);
 	track_h = clips_px(scale, 4);
@@ -2493,8 +2489,6 @@ void clips_draw(short local_player_index, union rectangle2d const *window)
 			clips_draw_inputs(x, y, pscale, font, &clips.last[slot], slot);
 		}
 	}
-	if (fit)
-		rasterizer_screen_fit_suspend(FALSE);
 }
 
 void clips_menu_set_profile(long profile_index)

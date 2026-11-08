@@ -1119,6 +1119,8 @@ static boolean director_update_controls(
 	if (!controls->active && clips_flying() && local_player_index == 0 &&
 		director->camera_proc == (director_camera_update_proc)flying_camera_update)
 	{
+		extern unsigned long halo_linux_theatre_keys(void);
+		unsigned long keys;
 		unsigned long control_flags = 0;
 		real_vector2d throttle = player_control_port_debug_throttle[local_player_index];
 		real_euler_angles2d facing = player_control_port_debug_facing[local_player_index];
@@ -1126,9 +1128,15 @@ static boolean director_update_controls(
 		int rise;
 		int drop;
 
-		/* while the free camera is up, the triggers are not the speed controls */
+		/* while the free camera is up, the triggers and the brackets are not
+		the speed controls. R and F rise and drop, and so do ] and [ */
 		rise = key_up;
 		drop = key_down;
+		keys = halo_linux_theatre_keys();
+		if ((keys & 16UL) != 0)
+			rise = 1;
+		if ((keys & 8UL) != 0)
+			drop = 1;
 		if (player_index != NONE && input_has_gamepad((short)player_index))
 			gamepad = input_get_gamepad_state((short)player_index);
 		if (gamepad && gamepad->buttons[_gamepad_analog_button_right_trigger] != 0)
