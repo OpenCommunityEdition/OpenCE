@@ -83,6 +83,15 @@ def test_without_emscripten_the_graph_says_so():
     assert "\nbuild web:" not in text
 
 
+def test_sdk_discovery_uses_native_launcher(tmp_path, monkeypatch):
+    launcher = tmp_path / "upstream/emscripten" / ("emcc.exe" if sys.platform == "win32" else "emcc")
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("SDK launcher", encoding="ascii")
+    monkeypatch.setenv("EMSDK", str(tmp_path))
+    monkeypatch.setattr(web_build.shutil, "which", lambda name: None)
+    assert web_build.find_emcc(SimpleNamespace()) == str(launcher)
+
+
 def test_the_game_is_compiled_as_the_web_port():
     text = graph()
     flags = compile_flags(text, "source/main/main.c")
@@ -115,12 +124,66 @@ def test_the_link_makes_the_memory_the_window_needs():
     flags = link_flags(graph()).split()
     for flag in ("-sPROXY_TO_PTHREAD=1", "-sOFFSCREENCANVASES_TO_PTHREAD=#canvas", "-sMIN_WEBGL_VERSION=2",
                  "-sMAX_WEBGL_VERSION=2", "-sWASMFS=1", "-lopfs.js", "-sALLOW_MEMORY_GROWTH=0",
+                 "-sABORTING_MALLOC=0",
                  "-Wl,--fatal-warnings", "-sASSERTIONS=1", "--profiling-funcs"):
         assert flag in flags, flag
     assert f"-sINITIAL_MEMORY={0x88000000}" in flags
     release = graph(release=True)
     assert "-DHALO_RELEASE" in compile_flags(release, "source/main/main.c")
     assert "-sASSERTIONS=0" in link_flags(release).split()
+
+
+def test_web_staging_uses_portable_file_operations():
+    text = graph()
+    assert "tools/web_build_support.py sdl --emcc" in text
+    assert "tools/web_build_support.py copy $in $out" in text
+    assert "rm -f" not in text and "cp $in" not in text
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_sdl_bootstrap_preserves_arguments_and_cleans_failed_compile(tmp_path, fail):
+    from tools import web_build_support
+
+    sdk = tmp_path / "SDK with spaces"
+    sdk.mkdir()
+    cache = tmp_path / "cache with spaces"
+    license_source = cache / "ports/halo_sdl3/SDL-release-test/LICENSE.txt"
+    license_source.parent.mkdir(parents=True)
+    license_source.write_text("SDL licence", encoding="ascii")
+    trace = sdk / "arguments.json"
+    compiler = sdk / "emcc.py"
+    compiler.write_text(
+        "import json, pathlib, sys\n"
+        f"pathlib.Path({str(trace)!r}).write_text(json.dumps(sys.argv[1:]))\n"
+        "source = pathlib.Path(sys.argv[sys.argv.index('-c') + 1])\n"
+        "assert source.read_text() == '#include <SDL3/SDL.h>\\n'\n"
+        "pathlib.Path(sys.argv[sys.argv.index('-o') + 1]).write_bytes(b'object')\n"
+        f"sys.exit({1 if fail else 0})\n", encoding="utf-8")
+    (sdk / "em-config.py").write_text(f"print({str(cache)!r})\n", encoding="utf-8")
+    stamp = tmp_path / "output folder/sdl.stamp"
+    license_output = stamp.parent / "SDL-LICENSE.txt"
+    port = "port with spaces/halo_sdl3.py"
+    if fail:
+        with pytest.raises(subprocess.CalledProcessError):
+            web_build_support.sdl(compiler, port, stamp, license_output, "release-test")
+    else:
+        web_build_support.sdl(compiler, port, stamp, license_output, "release-test")
+    assert json.loads(trace.read_text())[0] == f"--use-port={port}"
+    assert stamp.exists() is not fail
+    assert license_output.exists() is not fail
+    if not fail:
+        assert license_output.read_text() == "SDL licence"
+    assert not Path(str(stamp) + ".c").exists()
+    assert not Path(str(stamp) + ".o").exists()
+
+
+def test_web_copy_creates_destination_directories(tmp_path):
+    source = tmp_path / "source file"
+    destination = tmp_path / "nested folder/file"
+    source.write_bytes(b"\x00\xffweb asset")
+    subprocess.run([sys.executable, str(ROOT / "tools/web_build_support.py"), "copy", str(source),
+                    str(destination)], check=True)
+    assert destination.read_bytes() == source.read_bytes()
 
 
 def test_the_link_exports_what_the_page_calls():
@@ -146,8 +209,11 @@ def test_the_memory_layout_agrees_with_the_sources():
                       r"(0x[0-9A-Fa-f]+)", platform, re.S)
     assert sizes, "platform.h gives the web build the 128 MB window"
     assert web_build.WEB_MEMORY_BYTES == base + int(sizes.group(1), 16)
-    main = (ROOT / "port/web/src/web_main.c").read_text()
-    assert int(re.search(r"#define WEB_HEAP_LIMIT (0x[0-9A-Fa-f]+)", main).group(1), 16) == base
+    memory = (ROOT / "port/web/src/web_memory.h").read_text()
+    assert "#define WEB_HEAP_LIMIT CUSTOM_EDITION_TAG_CACHE_ADDRESS" in memory
+    formats = (ROOT / "port/linux/game/cache_file_formats.h").read_text()
+    ce = int(re.search(r"#define CUSTOM_EDITION_TAG_CACHE_ADDRESS (0x[0-9A-Fa-f]+)", formats).group(1), 16)
+    assert ce < 0x42000000 < 0x74000000 < base
     app = (ROOT / "port/web/site/app.js").read_text()
     assert int(re.search(r"const WEB_MEMORY_BYTES = (0x[0-9A-Fa-f]+)", app).group(1), 16) == web_build.WEB_MEMORY_BYTES
 

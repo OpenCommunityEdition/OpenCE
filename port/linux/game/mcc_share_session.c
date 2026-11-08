@@ -696,7 +696,9 @@ int mcc_share_client_accept(struct mcc_share *share)
         return 0;
     }
     if (result!=MCC_SHARE_STAGE_OK) {
-        client_fail(share,"The host's list of files was not acceptable.");
+        client_fail(share,result==MCC_SHARE_STAGE_STORAGE_UNCERTAIN ?
+            "Browser storage stopped responding. Close this page and reopen it to recover the download. Existing packages were kept." :
+            "The host's list of files was not acceptable.");
         return 0;
     }
     share->state=MCC_SHARE_CLIENT_TRANSFERRING;
@@ -905,6 +907,8 @@ static void client_update(struct mcc_share *share)
             client_idle(share);
             share->env.finished(share->env.user,0,result==MCC_SHARE_STAGE_EXISTS ?
                 "A package of that name appeared during the download. Nothing was installed." :
+                result==MCC_SHARE_STAGE_STORAGE_UNCERTAIN ?
+                "Browser storage stopped responding. Close this page and reopen it to recover the download. Existing packages were kept." :
                 "The package could not be installed. Nothing was installed.");
             return;
         }

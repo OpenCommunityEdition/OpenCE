@@ -1141,6 +1141,12 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 #ifdef HALO_GLES
 	decode_compressed = description->compressed && !xgpu_capabilities.s3tc;
 #endif
+#ifdef HALO_WEB
+	/* WebGL S3TC accepts only 2D faces with block-aligned dimensions.
+	 * Decode other MCC shapes before uploading them as ordinary RGBA. */
+	decode_compressed |= description->compressed &&
+		(target == GL_TEXTURE_3D || (description->width & 3) || (description->height & 3));
+#endif
 	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
 	if (!converted && !(description->compressed && !decode_compressed))
 	{
@@ -1150,8 +1156,8 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 	}
 	glBindTexture(target, texture);
 	xgpu_gl_state_invalidate();
-	/* the channel of the texels each channel is sampled from, set on every
-	upload: a texture object can be reused for other texels */
+	/* WebGL has no texture swizzle; converted channels are ordered below. */
+#ifndef HALO_WEB
 	{
 		GLint channels[4] = { GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA };
 
@@ -1170,6 +1176,7 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 		glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, channels[2]);
 		glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, channels[3]);
 	}
+#endif
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, (GLint)description->levels - 1);
@@ -1208,6 +1215,19 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 					free(converted);
 					return FALSE;
 				}
+#ifdef HALO_WEB
+				/* Decoders produce ARGB words (BGRA bytes). Change only our
+				 * upload buffer, including every mip and volume slice. */
+				{
+					unsigned long texel, count = (unsigned long)width * height * depth;
+					for (texel = 0; texel < count; texel++)
+					{
+						unsigned long value = converted[texel];
+						converted[texel] = (value & 0xff00ff00UL) |
+							((value >> 16) & 0xffUL) | ((value & 0xffUL) << 16);
+					}
+				}
+#endif
 				if (target == GL_TEXTURE_3D)
 					glTexImage3D(image_target, (GLint)level, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, converted);
 				else

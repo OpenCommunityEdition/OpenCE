@@ -5,6 +5,9 @@
 #include "../src/posix.h"
 #include <stdlib.h>
 #include <string.h>
+#ifdef HALO_WEB
+#include "../../web/src/web_mcc_storage.h"
+#endif
 
 /* Header: magic[8], folder[24], source[64], maker[64], item id[24], title[40],
  * little-endian count[4]. Entry: kind[1], size[4], SHA-256[32], relative path[128]. */
@@ -154,6 +157,9 @@ static int receipt_read(char const *maps, struct mcc_share_io const *io,
     if (!maps || !io || !io->path_safe || !io->directory_exists || !io->open_native_read || !folder_valid(folder) ||
         !path_join(directory,maps,folder) || !io->path_safe(directory) || !io->directory_exists(directory) ||
         !path_join(path,directory,MCC_SHARE_STAGE_RECEIPT)) return 0;
+#ifdef HALO_WEB
+    if (!web_mcc_directory_visible(directory)) return 0;
+#endif
     bytes=malloc(MCC_SHARE_STAGE_COMPANION_BYTES);
     if (!bytes) return 0;
     read=io->path_safe(path) ? read_bytes(io->open_native_read(path),bytes,MCC_SHARE_STAGE_COMPANION_BYTES) : 0;
@@ -341,10 +347,17 @@ enum mcc_share_storage_result mcc_share_storage_remove(char const *maps,
     struct storage_receipt *receipt;
     char directory[512],path[512],*last;
     int i;
+#ifdef HALO_WEB
+    int lease=0;
+#endif
     enum mcc_share_storage_result result=MCC_SHARE_STORAGE_ERROR;
     if (!io || !io->delete_file || !io->remove_directory) return result;
     receipt=malloc(sizeof(*receipt));
     if (!receipt) return result;
+#ifdef HALO_WEB
+    if (!web_mcc_remove_begin(folder)) goto done;
+    lease=1;
+#endif
     if (!receipt_read(maps,io,folder,receipt) || !path_join(directory,maps,folder)) goto done;
     /* Complete verification first: a changed or missing file prevents all deletion. */
     for (i=0;i<receipt->count;i++) if (!file_matches(directory,io,&receipt->files[i])) goto done;
@@ -362,5 +375,8 @@ enum mcc_share_storage_result mcc_share_storage_remove(char const *maps,
     if (!path_join(path,directory,MCC_SHARE_STAGE_RECEIPT) || !io->path_safe(path) || !io->delete_file(path)) goto done;
     result=io->remove_directory(directory) ? MCC_SHARE_STORAGE_REMOVED : MCC_SHARE_STORAGE_LEFTOVERS;
 done:
+#ifdef HALO_WEB
+    if (lease) web_mcc_remove_end(folder);
+#endif
     free(receipt); return result;
 }

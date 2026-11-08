@@ -563,6 +563,10 @@ and [validation record](mcc_refactor_validation.md#milestone-13-implementation-e
 The fixture suites exercise production modules over synthetic files; they do
 not establish real-map two-machine gameplay, campaign completion, Android
 runtime behavior or browser playability. Milestone 14 owns the browser work.
+Its separate [browser import and storage walkthrough](reading/browser_imports.md)
+describes manual CE/MCC imports and OPFS download publication. The
+[Milestone 14 record](mcc_refactor_validation.md#milestone-14-custom-edition-and-mcc-browser-playability)
+distinguishes component checks from actual browser gameplay and networking.
 
 ## Repository architecture and isolation
 

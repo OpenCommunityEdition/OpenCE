@@ -80,8 +80,8 @@ int posix_mcc_share_publish(const char *from, const char *to)
 #elif defined(__linux__) && defined(SYS_renameat2)
     return syscall(SYS_renameat2,AT_FDCWD,from,AT_FDCWD,to,1 /* RENAME_NOREPLACE */)==0;
 #else
-    /* Browser persistence needs an equivalent no-replace publication primitive
-     * before MCC downloads can be enabled there (Milestone 14). */
+    /* OPFS uses the MCC direct-stage commit strategy instead. Never weaken
+     * native directory publication to a check followed by replacing rename. */
     errno=ENOTSUP;
     return 0;
 #endif

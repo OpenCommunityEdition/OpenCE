@@ -127,7 +127,7 @@ static void mcc_map_register(char const *name)
 		if (!csstrcasecmp(mcc_menu_catalog.maps[index].file_name, name))
 			return;
 	}
-	snprintf(path, sizeof(path), "%s%s.map", MCC_MAPS_DIRECTORY, name);
+	if (!mcc_package_map_path(canonical,path)) return;
 	file = fopen(path, "rb");
 	if (!file)
 		return;

@@ -23,6 +23,11 @@ def restart_tool(tmp_path_factory):
     implementation = (ROOT / "port/linux/game/mcc_ui_network.inl").read_text()
     server_source = (ROOT / "source/networking/network_server_manager.c").read_text()
     widget_source = (ROOT / "source/interface/ui_widget.c").read_text()
+    pregame = function(server_source, "network_game_server_idle_pregame_tasks")
+    # Keep the real countdown/start/heartbeat else-if chain: a mocked timer
+    # alone cannot expose a deferred start suppressing every keepalive.
+    heartbeat = pregame[pregame.index("\t\tif (server->countdown_state.active == TRUE)"):
+                        pregame.index("\n\t}\n\telse if (server->time_of_first_client_loading_completion)")]
     source = r'''
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,6 +49,7 @@ typedef int boolean;
 #define csstrcmp strcmp
 #define csmemcpy memcpy
 #define csmemset memset
+#define MILLISECONDS_PER_SECOND 1000
 enum { _network_game_server_state_pregame, _network_game_server_state_ingame, _network_game_server_state_postgame };
 struct network_player { int machine_index, controller_index, player_list_index, team_index; };
 struct network_game {
@@ -56,12 +62,28 @@ struct network_game {
 struct network_game_server_client_machine {int machine_index,flags,joined;};
 struct network_game_server { int state,sent_start_game_message; struct network_game game;
     struct network_game_server_client_machine client_machines[4];
-    struct {int timer;boolean active,paused,adjusted_time_this_tick;} countdown_state;
+    struct {int timer;boolean active,paused,adjusted_time_this_tick;long last_countdown_message_time;} countdown_state;
+    long time_of_last_keep_alive;
 } server,other_server;
 static int exists=1,loaded=1,fail_reset,countdowns,opened,switched,reset,leaver;
 static int splitscreen,quickstart,closed_ui,loaded_ui,errors;
 static int client_exists=1,local_machine=NONE,map_changes;
 static int validation=1,updates,cancels;
+static unsigned long heartbeat_clock,last_heartbeat;
+static int heartbeat_messages,start_attempts;
+struct network_message {int unused;};
+struct message_server_pregame_countdown {short seconds_to_start;};
+struct message_server_pregame_keep_alive {long unused;};
+enum {_message_server_pregame_countdown,_message_server_pregame_keep_alive};
+static unsigned long system_milliseconds(void) {return heartbeat_clock;}
+static boolean server_ok_to_countdown(struct network_game_server *s) {(void)s;return TRUE;}
+static struct network_message *create_network_game_message(int kind,void *packet,unsigned long size) {
+    static struct network_message message;(void)kind;(void)packet;(void)size;return &message;
+}
+static boolean network_game_server_send_message_to_all_machines(struct network_game_server *s,
+    struct network_message *message) {
+    (void)s;(void)message;heartbeat_messages++;last_heartbeat=heartbeat_clock;return TRUE;
+}
 static int download_active[4],download_needs[4];
 static int mcc_share_game_machine_active(long i) {return download_active[i];}
 static int map_share_machine_needs_map(long i) {return download_needs[i];}
@@ -149,12 +171,80 @@ static int network_game_server_reset_to_pregame(struct network_game_server *s) {
     ]) + '\n' + implementation + '\n' + function(widget_source, "network_game_reset_to_pregame_ui") + '\n' + (
         # Exercise the production early-return boundary without starting a world.
         function(server_source, "network_game_server_start_network_game").split(
-            "if (server->sent_start_game_message")[0] + "return FALSE;\n}\n"
+            "if (server->sent_start_game_message")[0] + "start_attempts++;return FALSE;\n}\n"
+    ) + "static boolean heartbeat_tick(struct network_game_server *server) {\n" + (
+        "long now=(long)heartbeat_clock;boolean success=TRUE;\n" + heartbeat + "\nreturn success;\n}\n"
     ) + r'''
 #define CHECK(c,n) do {if(!(c))return n;} while(0)
 int main(int argc,char **argv) {
     int i,result;struct network_game_server untouched;
     if(argc!=2)return 99;
+    if(!strncmp(argv[1],"heartbeat-",10)) {
+      char const *mode=argv[1]+10;
+      server.state=_network_game_server_state_pregame;local_machine=0;validation=0;
+      strcpy(server.game.map.name,"levels\\test\\carousel\\carousel");server.game.map.version=123;
+      server.game.players[0].machine_index=0;
+      server.game.players[1].machine_index=server.game.players[2].machine_index=NONE;
+      for(i=0;i<4;i++){server.client_machines[i].machine_index=i;server.client_machines[i].flags=1;}
+      CHECK(mcc_ui_network_defer_map(&server,"mcc_maps\\Package\\mission"),110);
+      network_game_server_begin_game_start_countdown(&server,1000);
+      if(!strcmp(mode,"long")) {
+        server.countdown_state.timer=30000;mcc_ui_network_update_map(&server);
+        CHECK(server.countdown_state.timer==30000,111);return 0;
+      }
+      if(!strcmp(mode,"ce")||!strcmp(mode,"xbox")||!strcmp(mode,"cancel")||
+         !strcmp(mode,"other-server")||!strcmp(mode,"disconnected")||
+         !strcmp(mode,"started")||!strcmp(mode,"ingame")) {
+        if(!strcmp(mode,"ce"))CHECK(!mcc_ui_network_defer_map(&server,"custom_maps\\arena"),112);
+        if(!strcmp(mode,"xbox"))CHECK(!mcc_ui_network_defer_map(&server,"levels\\a10\\a10"),113);
+        if(!strcmp(mode,"cancel"))mcc_ui_network_server_dispose(&server);
+        if(!strcmp(mode,"other-server"))selected_server=&other_server;
+        if(!strcmp(mode,"disconnected"))client_exists=0;
+        if(!strcmp(mode,"started"))server.sent_start_game_message=1;
+        if(!strcmp(mode,"ingame"))server.state=_network_game_server_state_ingame;
+        mcc_ui_network_update_map(&server);
+        CHECK(server.countdown_state.timer==1000&&!mcc_ui_network_map_pending(&server),114);return 0;
+      }
+      if(!strcmp(mode,"failed")||!strcmp(mode,"failed-cancel"))validation=-1;
+      if(!strcmp(mode,"paused"))network_game_server_pause_countdown(&server,TRUE);
+      if(!strcmp(mode,"stopped"))server.countdown_state.active=FALSE;
+      CHECK(network_game_server_have_all_machines_have_precached(&server),115);
+      for(i=1;i<=40;i++) {
+        heartbeat_clock=(unsigned long)i*1000;
+        if(server.countdown_state.active && server.countdown_state.timer>0)
+          server.countdown_state.timer-=1000;
+        mcc_ui_network_update_map(&server);heartbeat_tick(&server);
+        CHECK(heartbeat_clock-last_heartbeat<=15000,116);
+        CHECK(!start_attempts&&!server.sent_start_game_message,117);
+      }
+      CHECK(heartbeat_messages>=6&&!map_changes,118);
+      if(!strcmp(mode,"paused")||!strcmp(mode,"stopped")) {
+        CHECK(!server.countdown_state.active,119);
+        CHECK(server.countdown_state.paused==!strcmp(mode,"paused"),120);return 0;
+      }
+      CHECK(heartbeat_messages>=15&&server.countdown_state.timer==3000,121);
+      if(validation<0) {
+        CHECK(errors==1,122);
+        if(!strcmp(mode,"failed-cancel")) {
+          CHECK(!mcc_ui_network_defer_map(&server,"custom_maps\\arena"),123);
+          server.countdown_state.timer=1000;mcc_ui_network_update_map(&server);
+          CHECK(!mcc_ui_network_map_pending(&server)&&server.countdown_state.timer==1000,124);
+        }
+        return 0;
+      }
+      validation=1;mcc_ui_network_update_map(&server);
+      CHECK(map_changes==1&&!mcc_ui_network_map_pending(&server),125);
+      if(!strcmp(mode,"revision")) {
+        /* A changed current package is unvalidated even without a deferred
+         * selection token; its timer must resume the same heartbeat path. */
+        validation=0;server.countdown_state.timer=0;mcc_ui_network_update_map(&server);
+        CHECK(mcc_ui_network_map_pending(&server)&&server.countdown_state.timer==3000,126);
+        validation=1;mcc_ui_network_update_map(&server);
+        CHECK(!mcc_ui_network_map_pending(&server),127);
+      }
+      server.countdown_state.timer=0;heartbeat_tick(&server);
+      CHECK(start_attempts==1,128);return 0;
+    }
     if(!strncmp(argv[1],"validation-",11)) {
       char const *name="mcc_maps\\Package\\arena";
       server.state=_network_game_server_state_pregame;local_machine=0;validation=0;
@@ -462,6 +552,12 @@ def test_prior_campaign_handoff_exposes_paused_map_picker(restart_tool, tmp_path
                                  "stopped", "off", "ce", "xbox", "unjoined", "ingame", "started", "other-server"])
 def test_download_preload_barrier(restart_tool, case):
     subprocess.run([str(restart_tool), "download-"+case], check=True, capture_output=True)
+
+
+@pytest.mark.parametrize("case", ["pending", "failed", "failed-cancel", "revision", "long", "paused", "stopped",
+                                 "cancel", "ce", "xbox", "other-server", "disconnected", "started", "ingame"])
+def test_pending_validation_preserves_heartbeat(restart_tool, case):
+    subprocess.run([str(restart_tool), "heartbeat-"+case], check=True, capture_output=True)
 
 
 def test_without_barrier_playerless_downloader_does_not_hold_start(restart_tool, tmp_path):

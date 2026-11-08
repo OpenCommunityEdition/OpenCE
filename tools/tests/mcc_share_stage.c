@@ -20,7 +20,38 @@ static int exists(char const *p) { struct stat s;return !stat(p,&s) && S_ISDIR(s
 static int move(char const *a,char const *b) { return posix_mcc_share_publish(a,b); }
 static int erase(char const *p) { return remove(p)==0; }
 static int verified(void *user,char const *path) { (void)user;(void)path;return 1; }
-static struct mcc_share_io io={make,erase_directory,exists,move,erase,posix_mcc_share_path_safe,posix_mcc_share_publish,NULL};
+static struct mcc_share_io io={make,erase_directory,exists,move,erase,posix_mcc_share_path_safe,posix_mcc_share_publish,NULL,NULL};
+static char const *direct_mode;
+static int direct_pending,direct_committed,direct_flushes;
+static int direct_begin(char const *directory,struct mcc_share_file const *files,int count)
+{
+    char parent[512],*end;
+    if (count!=3 || strcmp(files[1].leaf,"metadata/m0.json")) return 0;
+    snprintf(parent,sizeof(parent),"%s",directory);end=strrchr(parent,'/');if (!end) return 0;*end=0;
+    if ((!exists(parent) && !make(parent)) || !make(directory)) return 0;
+    if (!strcmp(direct_mode,"direct_begin_uncertain")) return -1;
+    direct_pending=1;return 1;
+}
+static int direct_finish(char const *directory,int publish)
+{
+    (void)directory;
+    if (!direct_pending) return 0;
+    if (publish && !strcmp(direct_mode,"direct_commit_fail")) return 0;
+    if (publish && !strcmp(direct_mode,"direct_commit_uncertain")) {
+        direct_pending=0;direct_committed=1;return -1;
+    }
+    direct_pending=0;direct_committed=publish;return 1;
+}
+static int direct_flush(FILE *file)
+{
+    direct_flushes++;
+    return strcmp(direct_mode,"direct_flush_fail") && !fflush(file);
+}
+static int never_move(char const *from,char const *to)
+{
+    (void)from;(void)to;fprintf(stderr,"direct strategy attempted rename\n");exit(10);
+}
+static struct mcc_share_direct_io const direct_io={direct_begin,direct_finish,direct_flush};
 static void entry(struct mcc_share_file *f,unsigned kind,char const *name)
 {
     struct mcc_sha256 hash;
@@ -56,6 +87,9 @@ int main(int argc,char **argv)
         printf("%d %d\n",mcc_share_manifest_valid(many,5,"m0"),mcc_share_manifest_valid(many,6,"m0"));return 0;
     }
     snprintf(root,sizeof(root),"%s/",argv[2]);
+    if (!strncmp(argv[1],"direct_",7)) {
+        direct_mode=argv[1];io.direct=&direct_io;io.move_file=never_move;io.publish_directory=never_move;
+    }
     result=mcc_share_stage_begin(&stage,&io,root,"snapshot","m0",files,3);
     if (result!=MCC_SHARE_STAGE_OK) { printf("begin %d\n",result);return 0; }
     if (!strcmp(argv[1],"partial_collision")) {
@@ -68,11 +102,35 @@ int main(int argc,char **argv)
         printf("write %d\n",result);return 0;
     }
     result=mcc_share_stage_write(&stage,"x",1);
+    if (io.direct && !strcmp(direct_mode,"direct_flush_fail")) {
+        printf("write %d pending %d committed %d\n",result,direct_pending,direct_committed);return 0;
+    }
     if (result!=MCC_SHARE_STAGE_FILE_DONE) { printf("write %d\n",result);return 0; }
     result=mcc_share_stage_write(&stage,"x",1);
     if (result!=MCC_SHARE_STAGE_FILE_DONE) { printf("write %d\n",result);return 0; }
     result=mcc_share_stage_write(&stage,"x",1);
     if (result!=MCC_SHARE_STAGE_ALL_DONE) { printf("write %d\n",result);return 0; }
+    if (io.direct) {
+        if (!direct_pending || direct_committed || direct_flushes!=3) return 11;
+        if (!strcmp(direct_mode,"direct_cancel")) {
+            mcc_share_stage_cancel(&stage);
+            printf("cancel pending %d committed %d\n",direct_pending,direct_committed);return 0;
+        }
+        if (!strcmp(direct_mode,"direct_unverified")) {
+            result=mcc_share_stage_install(&stage);
+            if (!direct_pending || direct_committed) return 12;
+            mcc_share_stage_cancel(&stage);
+            printf("install %d pending %d committed %d\n",result,direct_pending,direct_committed);return 0;
+        }
+        if (mcc_share_stage_verify(&stage,verified,NULL)!=MCC_SHARE_STAGE_OK ||
+            !mcc_share_stage_companion(&stage,"download.receipt","receipt",7) || direct_flushes!=4) return 13;
+        result=mcc_share_stage_install(&stage);
+        if (!strcmp(direct_mode,"direct_commit_uncertain")) {
+            mcc_share_stage_cancel(&stage);mcc_share_stage_cancel(&stage);
+            if (!exists(stage.package_dir)) return 14;
+        }
+        printf("install %d pending %d committed %d\n",result,direct_pending,direct_committed);return 0;
+    }
     if (!strcmp(argv[1],"cancel")) { mcc_share_stage_cancel(&stage);printf("cancelled\n");return 0; }
     if (!strcmp(argv[1],"discard")) {
         if (!mcc_share_stage_discard_preview(&stage,2) || mcc_share_stage_discard_preview(&stage,1)) return 3;

@@ -45,7 +45,7 @@ static FILE *io_open_native(char const *path) {
 int posix_mcc_share_path_safe(char const *path);
 int posix_mcc_share_publish(char const *from,char const *to);
 static struct mcc_share_io const real_io={io_make,io_remove,io_exists,io_move,io_delete,
-    posix_mcc_share_path_safe,posix_mcc_share_publish,io_open_native};
+    posix_mcc_share_path_safe,posix_mcc_share_publish,io_open_native,NULL};
 static int stage_test_verified(void *user,char const *path) { (void)user;(void)path;return 1; }
 /* a folder check that misses a package folder made meanwhile (another process) */
 static int io_exists_late(char const *path)
@@ -55,7 +55,7 @@ static int io_exists_late(char const *path)
     return io_exists(path);
 }
 static struct mcc_share_io const late_io={io_make,io_remove,io_exists_late,io_move,io_delete,
-    posix_mcc_share_path_safe,posix_mcc_share_publish,io_open_native};
+    posix_mcc_share_path_safe,posix_mcc_share_publish,io_open_native,NULL};
 
 static int file_exists(char const *path) { struct stat s; return stat(path,&s)==0 && S_ISREG(s.st_mode); }
 

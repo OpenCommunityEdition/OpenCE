@@ -167,6 +167,11 @@ GulchCE refuses to load the map and reports what needs attention.
 
 ### Choose a map and play
 
+In the browser build, import Xbox base data first, then use **Custom maps**
+to add CE files or an MCC package folder to the site's private storage.
+See the [browser import guide](port/web/README.md#custom-edition-and-mcc-imports)
+for supported metadata, storage limits and recovery behavior.
+
 - **Modern, Stock and Classic PC:** choose **MCC SINGLEPLAYER** or
   **MCC MULTIPLAYER** in the map selector, then open the package folder and
   select a level.

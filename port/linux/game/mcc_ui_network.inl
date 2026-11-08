@@ -72,14 +72,6 @@ void mcc_ui_network_update_map(struct network_game_server *server)
     int status;
     wchar_t message[320];
     unsigned i;
-    /* Synchronous MCC conversion cannot service an offered download. Keep an
-     * already-running countdown alive until transfer/admission finishes; its
-     * ordinary updates also keep waiting clients connected. Never start a
-     * stopped timer, override a host pause or shorten a longer countdown. */
-    if (mcc_ui_network_download_pending(server) && server->countdown_state.active &&
-        !server->countdown_state.paused &&
-        countdown_timer_get_time_remaining(&server->countdown_state.timer) < 3000)
-        countdown_timer_set_time_remaining(&server->countdown_state.timer, 3000);
     if (server!=global_network_game_server_get() ||
         server->state!=_network_game_server_state_pregame || server->sent_start_game_message ||
         (server==mcc_pending_map_server && mcc_pending_local_client && !global_network_game_client_get())) {
@@ -90,6 +82,15 @@ void mcc_ui_network_update_map(struct network_game_server *server)
         }
         return;
     }
+    /* Validation and offered downloads must finish before synchronous load.
+     * A deferred start at zero otherwise skips the ordinary countdown's
+     * heartbeat branch on every frame. Keep that timer alive, including a
+     * pending MCC selection still showing the temporary stock lobby map.
+     * Never start a stopped timer, override a pause or shorten a longer one. */
+    if (server->countdown_state.active && !server->countdown_state.paused &&
+        countdown_timer_get_time_remaining(&server->countdown_state.timer) < 3000 &&
+        mcc_ui_network_map_pending(server))
+        countdown_timer_set_time_remaining(&server->countdown_state.timer, 3000);
     selected=server==mcc_pending_map_server ? mcc_pending_map : server->game.map.name;
     if (!mcc_level_name(selected)) return;
     status=mcc_validation_request(selected,&checksum,NULL);

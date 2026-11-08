@@ -32,6 +32,9 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef HALO_WEB
+#include "../../web/src/web_mcc_storage.h"
+#endif
 
 /* port_config.c's, network_game_globals.c's, network_server_message_handler.c's,
 cseries_windows.c's */
@@ -231,6 +234,10 @@ static uint32_t mcc_share_upload_limit(
 static uint64_t mcc_share_free_bytes(
 	void *user)
 {
+#ifdef HALO_WEB
+    (void)user;
+    return web_mcc_free_bytes();
+#else
 	ULARGE_INTEGER available;
 	ULARGE_INTEGER total;
 	ULARGE_INTEGER free_total;
@@ -239,6 +246,7 @@ static uint64_t mcc_share_free_bytes(
 	if (!GetDiskFreeSpaceExA("d:\\", &available, &total, &free_total))
 		return 0;
 	return available.QuadPart;
+#endif
 }
 
 static uint32_t mcc_share_now(
@@ -585,6 +593,9 @@ void mcc_share_game_update(
 		env.io.path_safe = mcc_share_io_safe;
 		env.io.publish_directory = mcc_share_io_publish;
         env.io.open_native_read = mcc_share_open_native;
+#ifdef HALO_WEB
+        web_mcc_share_io(&env.io);
+#endif
 		mcc_share_init(&mcc_share_globals, &env);
 		mcc_share_ready = TRUE;
 		mcc_identity_set_missing(mcc_share_missing);

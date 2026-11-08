@@ -28,6 +28,7 @@ the menu to the camera, reticle and first-person weapon.
 | Branch feature | [Shoulder camera](third_person.md) | Director selection, cover-aware aiming, controls and host-owned hit validation. |
 | Worked detail | [Loading presentation](loading_presentation.md) | Fill the screen with the original loading artwork while preserving map-family ownership and the Xbox chant. |
 | Worked detail | [MCC level previews](mcc_level_previews.md) | Resolve installed package images, fit them inside existing menu thumbnails, and wrap package text. |
+| Worked detail | [Browser map imports](browser_imports.md) | Keep Xbox, CE and MCC files separate while importing, sharing, recovering interrupted writes and coordinating tabs. |
 | Worked detail | [Console commands across checkpoints](console_checkpoints.md) | Preserve a sleeping command's syntax and text while restoring saved threads across all map families. |
 | Reference | [Glossary](glossary.md) | Engine concepts and recurring C conventions, with source examples. |
 

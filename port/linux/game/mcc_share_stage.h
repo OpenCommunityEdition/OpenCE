@@ -1,6 +1,7 @@
 /* Staged MCC package downloads: the files of a package a host sends are
- * written to a staging folder, checked there, and only then moved into
- * mcc_maps\<package>. Cancelling or failing deletes the staging files and
+ * written to an owned folder and checked before publication. Native builds
+ * move the directory into mcc_maps; OPFS uses an invisible final directory
+ * and a durable commit record. Cancelling or failing deletes owned files and
  * nothing else; no existing package or save is opened for writing.
  *
  * This module has no network or engine dependencies; tests use the same
@@ -47,6 +48,18 @@ struct mcc_share_file {
     uint8_t sha256[32];
 };
 
+/* OPFS cannot move directories. This optional strategy creates a fresh,
+ * undiscoverable destination and publishes it through a durable commit record.
+ * begin owns the directory on success; finish always releases its mutation
+ * lease on cancellation, and releases it on successful publication. A negative
+ * begin/finish result means the browser fenced further operations but cannot
+ * establish publication state; recovery, not live cancellation, owns the files. */
+struct mcc_share_direct_io {
+    int (*begin)(char const *directory, struct mcc_share_file const *files, int count);
+    int (*finish)(char const *directory, int publish);
+    int (*flush)(FILE *file);
+};
+
 /* Each operation returns nonzero on success. make_directory and move_file
  * fail when their destination exists. File contents use exclusive stdio
  * creation inside the owned stage. No callback may follow links. */
@@ -64,6 +77,7 @@ struct mcc_share_io {
     /* Native host paths bypass Xbox drive translation. Returned FILE belongs
      * to the game/guest ABI, not the host side of the Android boundary. */
     FILE *(*open_native_read)(char const *path);
+    struct mcc_share_direct_io const *direct;
 };
 
 enum mcc_share_stage_state {
@@ -85,7 +99,8 @@ enum mcc_share_stage_result {
     MCC_SHARE_STAGE_WRITE_FAILED,
     MCC_SHARE_STAGE_REFUSED,       /* the identity check failed */
     MCC_SHARE_STAGE_EXISTS,        /* the package folder or its name is already taken */
-    MCC_SHARE_STAGE_INSTALL_FAILED
+    MCC_SHARE_STAGE_INSTALL_FAILED,
+    MCC_SHARE_STAGE_STORAGE_UNCERTAIN
 };
 
 struct mcc_share_stage {
@@ -94,7 +109,7 @@ struct mcc_share_stage {
     char root[200];                   /* prefix of every path, "" or ending in a separator */
     char folder[64];                  /* the package folder name, one component */
     char level[MCC_SHARE_LEAF_SIZE];  /* the level's file name without .map */
-    char stage_dir[260];              /* <root>mcc_staging/<folder> */
+    char stage_dir[260];              /* native staging, or the hidden direct destination */
     char package_dir[260];            /* <root>mcc_maps/<folder> */
     struct mcc_share_file files[MCC_SHARE_STAGE_FILES];
     int count;
@@ -103,7 +118,7 @@ struct mcc_share_stage {
     uint32_t total, done;             /* every file's bytes, and written so far */
     struct mcc_sha256 hash;
     FILE *stream;
-    int owns_directory, owns_partial, verified;
+    int owns_directory, owns_partial, verified, direct_active;
     unsigned char owned[MCC_SHARE_STAGE_FILES];
     /* Locally generated only, after verification; never network manifest entries. */
     unsigned char companion_owned[MCC_SHARE_STAGE_COMPANIONS];
@@ -121,14 +136,16 @@ int mcc_share_credit_allowed(char const *leaf, unsigned length);
  * JSON/PNG references and contents are validated separately before install. */
 int mcc_share_manifest_valid(struct mcc_share_file const *files, int count, char const *level);
 
-/* Exclusively create <root>mcc_staging/<folder>. Existing paths are never
+/* Exclusively create <root>mcc_staging/<folder>, or an undiscoverable final
+ * destination through io.direct. Existing paths are never
  * reused or cleaned. The caller supplies a managed snapshot destination
  * distinct from original installations. The IO table and strings are copied. */
 enum mcc_share_stage_result mcc_share_stage_begin(struct mcc_share_stage *stage,
     struct mcc_share_io const *io, char const *root, char const *folder, char const *level,
     struct mcc_share_file const *files, int count);
 /* The next bytes of the current file, in order. FILE_DONE and ALL_DONE mean the
- * file just matched its size and SHA-256 and was renamed in the staging folder. */
+ * file just matched its size and SHA-256 and was closed/flushed; native staging
+ * also renames the completed .part file inside its owned directory. */
 enum mcc_share_stage_result mcc_share_stage_write(struct mcc_share_stage *stage,
     void const *data, uint32_t bytes);
 /* Bytes still wanted of the current file (0 when staged). */
@@ -137,10 +154,10 @@ uint32_t mcc_share_stage_wanted(struct mcc_share_stage const *stage);
  * folder, without a trailing separator). Nothing moves out of the staging folder. */
 enum mcc_share_stage_result mcc_share_stage_verify(struct mcc_share_stage *stage,
     int (*check)(void *user, char const *stage_dir), void *user);
-/* After successful verification, atomically publish the complete directory
- * at <root>mcc_maps/<folder>. An existing target is never replaced. */
+/* After successful verification, publish the complete directory through the
+ * platform strategy. Existing installations are never replaced. */
 enum mcc_share_stage_result mcc_share_stage_install(struct mcc_share_stage *stage);
-/* Delete only owned staging files/directories. Never touches mcc_maps. */
+/* Delete only this transfer's owned files/directories. */
 void mcc_share_stage_cancel(struct mcc_share_stage *stage);
 /* The metadata validator may discard an unsupported optional preview before
  * publication. Required content cannot be discarded through this interface. */

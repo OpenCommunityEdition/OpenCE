@@ -38,7 +38,7 @@ static int exists(char const *p){struct stat s;return !stat(p,&s)&&S_ISDIR(s.st_
 static int move(char const *a,char const *b){return posix_mcc_share_publish(a,b);}
 static int erase(char const *p){return remove(p)==0;}
 static int refuse_publish(char const *a,char const *b){(void)a;(void)b;return 0;}
-static struct mcc_share_io io={make,erase_directory,exists,move,erase,posix_mcc_share_path_safe,posix_mcc_share_publish,mcc_share_open_native};
+static struct mcc_share_io io={make,erase_directory,exists,move,erase,posix_mcc_share_path_safe,posix_mcc_share_publish,mcc_share_open_native,NULL};
 static int native_attempts;
 static FILE *refuse_native(char const *p){(void)p;native_attempts++;return NULL;}
 /* Metadata/gameplay verification is covered by the identity suites. This unit

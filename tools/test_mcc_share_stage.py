@@ -57,6 +57,49 @@ def test_atomic_nested_install(stage_tool, tmp_path):
     assert not (tmp_path / "mcc_staging/snapshot").exists()
 
 
+def test_direct_install_requires_no_file_or_directory_rename(stage_tool, tmp_path):
+    assert run(stage_tool, "direct_install", tmp_path) == "install 0 pending 0 committed 1"
+    package = tmp_path / "mcc_maps/snapshot"
+    assert {p.relative_to(package).as_posix(): p.read_bytes() for p in package.rglob("*") if p.is_file()} == {
+        "m0.map": b"x", "metadata/m0.json": b"x", "assets/m0.png": b"x", "download.receipt": b"receipt"}
+    assert not (tmp_path / "mcc_staging").exists()
+
+
+@pytest.mark.parametrize("mode,expected", [
+    ("direct_cancel", "cancel pending 0 committed 0"),
+    ("direct_unverified", "install 4 pending 0 committed 0"),
+    ("direct_flush_fail", "write 7 pending 0 committed 0"),
+    ("direct_commit_fail", "install 10 pending 0 committed 0"),
+])
+def test_direct_failure_cleans_owned_content_and_releases_lease(stage_tool, tmp_path, mode, expected):
+    original = tmp_path / "mcc_maps/original/savegame.bin"
+    original.parent.mkdir(parents=True)
+    original.write_bytes(b"preserve")
+    assert run(stage_tool, mode, tmp_path) == expected
+    assert not (tmp_path / "mcc_maps/snapshot").exists()
+    assert original.read_bytes() == b"preserve"
+
+
+def test_direct_existing_destination_is_never_owned(stage_tool, tmp_path):
+    original = tmp_path / "mcc_maps/snapshot/m0.map"
+    original.parent.mkdir(parents=True)
+    original.write_bytes(b"preserve")
+    assert run(stage_tool, "direct_install", tmp_path) == "begin 9"
+    assert original.read_bytes() == b"preserve"
+
+
+def test_uncertain_commit_is_retained_even_after_repeated_cancel(stage_tool, tmp_path):
+    assert run(stage_tool, "direct_commit_uncertain", tmp_path) == "install 11 pending 0 committed 1"
+    package = tmp_path / "mcc_maps/snapshot"
+    assert (package / "m0.map").read_bytes() == b"x"
+    assert (package / "download.receipt").read_bytes() == b"receipt"
+
+
+def test_uncertain_begin_leaves_recovery_ownership(stage_tool, tmp_path):
+    assert run(stage_tool, "direct_begin_uncertain", tmp_path) == "begin 11"
+    assert (tmp_path / "mcc_maps/snapshot").is_dir()
+
+
 def test_cancel_only_owned_nested_files(stage_tool, tmp_path):
     keep = tmp_path / "mcc_maps/original/savegame.bin"
     keep.parent.mkdir(parents=True)

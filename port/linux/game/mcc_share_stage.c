@@ -167,10 +167,10 @@ static void stage_forget(struct mcc_share_stage *stage)
     char path[512];
     int i;
     if (stage->stream) { fclose(stage->stream); stage->stream=NULL; }
-    if (!stage->owns_directory || !stage->stage_dir[0] || !stage->io.path_safe(stage->stage_dir)) return;
+    if (!stage->owns_directory || !stage->stage_dir[0] || !stage->io.path_safe(stage->stage_dir)) goto finish;
     for (i=0;i<stage->count;i++) {
         if (i==stage->current && stage->owns_partial &&
-            stage_path(path,sizeof(path),stage->stage_dir,stage->files[i].leaf,".part") && stage->io.path_safe(path))
+            stage_path(path,sizeof(path),stage->stage_dir,stage->files[i].leaf,stage->io.direct ? "" : ".part") && stage->io.path_safe(path))
             stage->io.delete_file(path);
         if (stage->owned[i] && stage_path(path,sizeof(path),stage->stage_dir,stage->files[i].leaf,"") && stage->io.path_safe(path))
             stage->io.delete_file(path);
@@ -181,6 +181,11 @@ static void stage_forget(struct mcc_share_stage *stage)
             stage->io.path_safe(path)) stage->io.delete_file(path);
     stage->io.remove_directory(stage->stage_dir);
     stage->owns_directory=0; stage->owns_partial=0;
+finish:
+    if (stage->direct_active) {
+        stage->io.direct->finish(stage->stage_dir,0);
+        stage->direct_active=0;
+    }
 }
 
 static enum mcc_share_stage_result stage_fail(struct mcc_share_stage *stage, enum mcc_share_stage_result result)
@@ -209,7 +214,8 @@ enum mcc_share_stage_result mcc_share_stage_begin(struct mcc_share_stage *stage,
     int length,i;
     memset(stage,0,sizeof(*stage));
     if (!io || !io->make_directory || !io->remove_directory || !io->directory_exists || !io->move_file ||
-        !io->delete_file || !io->path_safe || !io->publish_directory || !root || !folder ||
+        !io->delete_file || !io->path_safe || !io->publish_directory ||
+        (io->direct && (!io->direct->begin || !io->direct->finish || !io->direct->flush)) || !root || !folder ||
         strlen(root)>=sizeof(stage->root) || strlen(folder)>40 || !stage_component(folder,(unsigned)strlen(folder)) ||
         !stage_manifest(stage->files,files,count,level)) return MCC_SHARE_STAGE_BAD_MANIFEST;
     stage->io=*io;
@@ -219,11 +225,20 @@ enum mcc_share_stage_result mcc_share_stage_begin(struct mcc_share_stage *stage,
     length=snprintf(staging,sizeof(staging),"%smcc_staging",root);
     if (length<=0 || (unsigned)length>=sizeof(staging)) return stage_fail(stage,MCC_SHARE_STAGE_BAD_MANIFEST);
     if (!io->path_safe(stage->package_dir) || io->directory_exists(stage->package_dir)) return stage_fail(stage,MCC_SHARE_STAGE_EXISTS);
-    length=snprintf(stage->stage_dir,sizeof(stage->stage_dir),"%s/%s",staging,folder);
-    if (length<=0 || (unsigned)length>=sizeof(stage->stage_dir)) return stage_fail(stage,MCC_SHARE_STAGE_BAD_MANIFEST);
-    if (!io->path_safe(staging) || (!io->directory_exists(staging) && !io->make_directory(staging)) ||
-        !io->path_safe(stage->stage_dir) || !io->make_directory(stage->stage_dir))
-        return stage_fail(stage,MCC_SHARE_STAGE_WRITE_FAILED);
+    if (io->direct) {
+        int begun;
+        strcpy(stage->stage_dir,stage->package_dir);
+        begun=io->direct->begin(stage->stage_dir,stage->files,count);
+        if (begun<0) { stage->state=MCC_SHARE_STAGE_FAILED;return MCC_SHARE_STAGE_STORAGE_UNCERTAIN; }
+        if (!begun) return stage_fail(stage,MCC_SHARE_STAGE_WRITE_FAILED);
+        stage->direct_active=1;
+    } else {
+        length=snprintf(stage->stage_dir,sizeof(stage->stage_dir),"%s/%s",staging,folder);
+        if (length<=0 || (unsigned)length>=sizeof(stage->stage_dir)) return stage_fail(stage,MCC_SHARE_STAGE_BAD_MANIFEST);
+        if (!io->path_safe(staging) || (!io->directory_exists(staging) && !io->make_directory(staging)) ||
+            !io->path_safe(stage->stage_dir) || !io->make_directory(stage->stage_dir))
+            return stage_fail(stage,MCC_SHARE_STAGE_WRITE_FAILED);
+    }
     stage->owns_directory=1;
     for (i=0;i<count;i++) stage->total+=stage->files[i].size;
     stage->state=MCC_SHARE_STAGE_WRITING;
@@ -243,7 +258,7 @@ enum mcc_share_stage_result mcc_share_stage_write(struct mcc_share_stage *stage,
     file=&stage->files[stage->current];
     if (bytes>file->size-stage->written || (bytes && !data)) return stage_fail(stage,MCC_SHARE_STAGE_TOO_MUCH);
     if (!stage->stream) {
-        if (!stage_parents(stage,file->leaf) || !stage_path(path,sizeof(path),stage->stage_dir,file->leaf,".part") ||
+        if (!stage_parents(stage,file->leaf) || !stage_path(path,sizeof(path),stage->stage_dir,file->leaf,stage->io.direct ? "" : ".part") ||
             !stage->io.path_safe(path) || !(stage->stream=fopen(path,"wbx"))) return stage_fail(stage,MCC_SHARE_STAGE_WRITE_FAILED);
         stage->owns_partial=1;
         mcc_sha256_begin(&stage->hash); stage->written=0;
@@ -258,12 +273,14 @@ enum mcc_share_stage_result mcc_share_stage_write(struct mcc_share_stage *stage,
         char part[512],final[512];
         int closed;
         mcc_sha256_end(&stage->hash,digest);
-        closed=fclose(stage->stream); stage->stream=NULL;
+        closed=stage->io.direct && !stage->io.direct->flush(stage->stream);
+        if (fclose(stage->stream)) closed=1;
+        stage->stream=NULL;
         if (closed) return stage_fail(stage,MCC_SHARE_STAGE_WRITE_FAILED);
         if (memcmp(digest,file->sha256,32)) return stage_fail(stage,MCC_SHARE_STAGE_BAD_HASH);
-        if (!stage_path(part,sizeof(part),stage->stage_dir,file->leaf,".part") ||
+        if (!stage->io.direct && (!stage_path(part,sizeof(part),stage->stage_dir,file->leaf,".part") ||
             !stage_path(final,sizeof(final),stage->stage_dir,file->leaf,"") ||
-            !stage->io.path_safe(part) || !stage->io.path_safe(final) || !stage->io.move_file(part,final))
+            !stage->io.path_safe(part) || !stage->io.path_safe(final) || !stage->io.move_file(part,final)))
             return stage_fail(stage,MCC_SHARE_STAGE_WRITE_FAILED);
         stage->owned[stage->current]=1; stage->owns_partial=0;
     }
@@ -311,6 +328,7 @@ int mcc_share_stage_companion(struct mcc_share_stage *stage, char const *leaf,
     if (!file) return 0;
     stage->companion_owned[i]=1;
     ok=fwrite(data,1,bytes,file)==bytes;
+    if (ok && stage->io.direct && !stage->io.direct->flush(file)) ok=0;
     if (fclose(file)) ok=0;
     if (!ok) { stage_fail(stage,MCC_SHARE_STAGE_WRITE_FAILED); return 0; }
     stage->companion_size[i]=bytes;
@@ -343,12 +361,26 @@ enum mcc_share_stage_result mcc_share_stage_install(struct mcc_share_stage *stag
     for (i=0;i<MCC_SHARE_STAGE_COMPANIONS;i++) if (stage->companion_owned[i] &&
         !stage_file_present(stage,stage_companions[i],stage->companion_size[i]))
         return stage_fail(stage,MCC_SHARE_STAGE_INSTALL_FAILED);
-    if (!stage->io.path_safe(stage->package_dir) || stage->io.directory_exists(stage->package_dir))
+    if (!stage->io.path_safe(stage->package_dir) || (!stage->io.direct && stage->io.directory_exists(stage->package_dir)))
         return stage_fail(stage,MCC_SHARE_STAGE_EXISTS);
-    snprintf(maps,sizeof(maps),"%smcc_maps",stage->root);
-    if (!stage->io.path_safe(maps) || (!stage->io.directory_exists(maps) && !stage->io.make_directory(maps)) ||
-        !stage->io.path_safe(stage->stage_dir) || !stage->io.publish_directory(stage->stage_dir,stage->package_dir))
-        return stage_fail(stage,MCC_SHARE_STAGE_INSTALL_FAILED);
+    if (stage->io.direct) {
+        int published=stage->direct_active ? stage->io.direct->finish(stage->stage_dir,1) : 0;
+        if (published<0) {
+            /* A late durable commit must never race live cancellation. The
+             * browser has fenced mutations; startup recovery owns this record. */
+            stage->direct_active=0;stage->owns_directory=0;
+            stage->state=MCC_SHARE_STAGE_FAILED;
+            return MCC_SHARE_STAGE_STORAGE_UNCERTAIN;
+        }
+        if (!published)
+            return stage_fail(stage,MCC_SHARE_STAGE_INSTALL_FAILED);
+        stage->direct_active=0;
+    } else {
+        snprintf(maps,sizeof(maps),"%smcc_maps",stage->root);
+        if (!stage->io.path_safe(maps) || (!stage->io.directory_exists(maps) && !stage->io.make_directory(maps)) ||
+            !stage->io.path_safe(stage->stage_dir) || !stage->io.publish_directory(stage->stage_dir,stage->package_dir))
+            return stage_fail(stage,MCC_SHARE_STAGE_INSTALL_FAILED);
+    }
     stage->owns_directory=0; stage->state=MCC_SHARE_STAGE_INSTALLED;
     return MCC_SHARE_STAGE_OK;
 }

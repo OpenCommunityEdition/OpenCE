@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#ifdef HALO_WEB
+#include "../../web/src/web_mcc_storage.h"
+#endif
 
 int mcc_package_name(char const *name, char canonical[64])
 {
@@ -73,6 +76,9 @@ int mcc_package_map_path(char const *name, char path[128])
         for (i=3;i<(size_t)length;i++) if (path[i]=='/') path[i]='\\';
         return 1;
     }
+#ifdef HALO_WEB
+    if (!web_mcc_package_visible(canonical)) return 0;
+#endif
     sprintf(path,"d:\\%s.map",canonical);
     return 1;
 }
@@ -84,6 +90,9 @@ int mcc_package_resource_path(char const *name, unsigned type, char path[128])
     int staged;
     if (type<1 || type>2 || !mcc_package_name(name,canonical)) return 0;
     staged=mcc_package_staged(canonical);
+#ifdef HALO_WEB
+    if (!staged && !web_mcc_package_visible(canonical)) return 0;
+#endif
     separator=strrchr(canonical,'\\');
     *separator=0;
     for (i=0;canonical[i];i++) if (canonical[i]=='\\') canonical[i]='/';

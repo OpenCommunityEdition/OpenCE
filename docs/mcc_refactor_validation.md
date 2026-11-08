@@ -797,6 +797,128 @@ Chromium and Firefox runs and native Xbox/CE/MCC regression controls. Record
 tested maps, browser versions, resource limits and unsupported cases precisely.
 Run the required platform and networking checks after the combined review.
 
+Milestone 14 is **in progress**. The initial browser memory candidate keeps
+the existing 2,176 MiB linear memory and Xbox window, ends the ordinary heap
+at CE's linked tag address (`0x40440000`), and gives MCC one validated 64 MiB
+window in its existing accepted address range. CE initialization follows the
+page's arguments and OPFS/configuration setup. MCC reserve clears reused
+storage; invalid releases cannot relinquish another allocation. Independent
+review found no blocking ownership or initialization defect. Native allocation
+branches and the established CE loading/sharing implementation remain intact.
+
+On the working implementation after `b26f35fd0`, the isolated Windows-hosted
+Emscripten 6.0.10 build completes, including strict Wasm linking. Portable
+Python staging replaces shell-specific SDL/bootstrap copy commands; the SDL
+source remains pinned to 3.4.16 with its existing checksum. Allocation exhaustion
+returns failure (`ABORTING_MALLOC=0`) so loader cleanup can run. Existing native
+configure arguments remain `--portable --release --pgo=off --lto=off`.
+Ninja subsequently regenerated `build.ninja` for the changed build scripts;
+the graph's bytes changed without changing those options.
+
+The real production memory fixture passes in Node and in headless Chromium
+151.0.7922.34 and Firefox 153.0. Each browser refuses a 16 MiB memory, then
+preserves CE/Xbox boundary bytes while four worker threads exhaust the ordinary
+heap with 32 allocated 32 MiB blocks. The fixture also checks invalid MCC
+addresses/sizes, exclusive ownership, wrong releases, alternate bases and
+zeroed reuse. All four browser cases exit zero without page errors or stderr;
+the receipt is `build/m14-web/memory-browser-results.json`. Web CI now runs
+both the Node fixture and the two-browser fixture. Build/CI preflight reports
+93 passed and one explicit Windows POSIX-socket skip; this overlaps earlier
+component checks and is not an additional unique-test count.
+
+These are memory-layout checks, not CE/MCC gameplay or resource-headroom
+evidence. Large converted resources, browser graphics/audio storage, imports,
+download persistence and actual map-family transitions still require their
+runtime gates. Owned browser contexts, loopback servers and fixture outputs
+are closed/removed; the SDK, browser toolchains and current Web build remain
+for the continuing milestone.
+
+The first bounded CE browser gameplay control passes in Edge 157.0.4341.42:
+`custom_maps\deathisland`, Slayer, one browser host with its real WebGL renderer
+and audio enabled. The 100-second probe records 87 player-state lines and 99
+frame samples advancing from 6 to 2,831, with no page errors or fatal result.
+The retained third screenshot independently shows the rendered environment,
+weapon and HUD. The final thirty audio samples report a running 48 kHz context
+and nonzero signal (maximum peak 0.00300729, RMS 0.00099579); this establishes
+audio activity, not an exhaustive listening/quality test. All seven original
+Xbox/CE map and resource inputs retain their recorded hashes.
+
+Evidence is `build/m14-runtime/ce_memory_probe_5/{result.json,audit.json,
+browser.log,frame-3.png}`. Its closed profile remains available for a later
+persistence check; this run itself does not establish reopen/save restoration,
+host downloads, multiplayer agreement, MCC gameplay or measured heap headroom.
+The earlier four probes retain their actual failed/incomplete outcomes: two
+fixture setup failures, an observer's invalid non-exported `HEAP32` access,
+and a menu-only run missing a stock carousel fixture. They are not CE gameplay
+passes. The two started but inactive profiles are preserved as verified ZIPs
+before their loose copies are removed; no original maps or player saves are
+discarded. Milestone 14 remains in progress.
+
+The initial Mercury 2 solo browser probe (`build/m14-runtime/mercury_solo_memory`)
+establishes conversion/loading and simulation progress only: 30 player-state
+lines through tick 901 in 180 seconds, with unchanged original Workshop inputs.
+Its near-blank scene and repeated `mcc textures: upload failed, GL error 500`
+are a visual failure, despite the probe's simulation-only success flag. The
+MCC-owned uploader was issuing texture-swizzle parameters that
+[WebGL 2 removes](https://registry.khronos.org/webgl/specs/latest/2.0/).
+Its browser path now puts decoded BGRA bytes into RGBA order in the temporary
+upload buffer and omits those parameters; compressed 3D or unaligned base
+dimensions use the existing decoder under the
+[WebGL S3TC restrictions](https://registry.khronos.org/webgl/extensions/WEBGL_compressed_texture_s3tc/).
+The legacy uploader is unchanged. Actual-function boundary regressions failed
+all nine initial Web cases before the correction, with 29 existing/native cases
+passing; all 44 expanded upload/bridge checks then pass, including cube faces,
+mips, volumes, direct compressed upload, decoded fallback, channel values and
+immutable source pixels. Together with bitmap flags and HUD meter checks, the
+focused run passes 89 tests. These tests use a recording GPU boundary. A separate
+asset-free Edge 157.0.4341.42 WebGL probe confirms the extension's shifted-level
+rule: a 12-pixel base with 6/3/1-pixel mips uploads, while 1/2/6-pixel level-zero
+bases are refused (`build/m14-web/s3tc-browser.json`). Its disposable browser
+context is closed. Actual MCC browser visual validation remains required.
+
+A separate pregame probe (`build/m14-runtime/mercury_memory_probe`) never
+reached MCC loading: validation left a temporary stock lobby map selected,
+and an expired countdown repeatedly took the deferred-start branch instead
+of sending its ordinary heartbeat. The MCC-owned update now keeps an active,
+unpaused, nearly expired countdown alive for the full existing `map_pending`
+condition, including deferred selection/validation and downloads. It does not
+start stopped timers, shorten longer timers, or alter legacy-only sessions.
+Regressions exercise the real countdown/start/heartbeat branch for forty
+seconds: four relevant cases failed at the existing fifteen-second silence
+limit before the correction; the resulting UI/network suite passes 81 tests.
+Cancellation, failure, changed revisions and inactive/session transitions are
+covered. A combined browser pregame rerun remains necessary; the solo load is
+not evidence that this separate network failure was resolved at runtime.
+
+The combined implementation subsequently passes 2,559 unique component checks
+with 19 explicit skips, plus 70 Node browser-site checks. The initial broad run
+reported four Windows junction-creation permission failures and one CI-wiring
+failure; the targeted elevated filesystem rerun and corrected workflow resolve
+all five. These totals merge per-case XML results, rather than adding overlapping
+runs. Actual read-only Mercury header/geometry and available CE resource checks
+are included. Missing JDK/local optional fixtures and platform-specific cases
+remain explicit skips; CI must supply the relevant platform coverage.
+
+The final browser transaction component matrix passes 35 Chromium/Firefox
+WasmFS/OPFS cases. Independent review found and corrected two additional
+boundaries: a transferred Workshop sidecar must not also be journaled as a
+generated companion, and asynchronous page requests need stable argument
+storage plus generation checks before decoding as well as completion. The
+tests reproduce rehosting and proxy execution delayed beyond the C deadline.
+These are component results, not network download gameplay results.
+
+The corrected Mercury visual/reopen probe passes in Edge 157.0.4341.42 on the
+combined candidate: 106 player-state lines, 4,340 final rendered frames, no
+texture-upload errors or page errors, and nonzero audio samples. The reviewed
+third screenshot shows the environment, vehicle, textures and HUD. It reuses
+the previous isolated OPFS profile at its original origin after explicitly
+refreshing the test's code cache; this verifies retained imported content, not
+the service-worker update UI or checkpoint restoration. Evidence is
+`build/m14-runtime/mercury_visual_reopen`. The prior combined pregame run reaches
+43 player-state lines through tick 1,454, confirming the heartbeat correction
+gets beyond validation into the game; its still-broken textures predate the
+upload correction and are not counted as a visual pass.
+
 ### Milestone 15: MCC-only upstream contribution
 
 After Milestones 13 and 14, create `GET-YOUR-MCC-HERE` against the then-current
