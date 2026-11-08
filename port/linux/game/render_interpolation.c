@@ -134,6 +134,11 @@ struct interpolated_camera
 	struct observer_result previous;
 	struct observer_result latest;
 	struct observer_result blended;
+	/* how far into its tick each snapshot was taken (of 1), and whether the
+	two were taken a tick apart (camera_snapshot_blend) */
+	real previous_taken;
+	real latest_taken;
+	boolean taken_a_tick_apart;
 	/* its player's unit (or what it rides) corrected: as an object's */
 	real_vector3d correction;
 	real_vector3d correction_pending;
@@ -801,6 +806,23 @@ static boolean observer_cut(
 		!(a->forward.i * b->forward.i + a->forward.j * b->forward.j + a->forward.k * b->forward.k >= CAMERA_CUT_COSINE);
 }
 
+/* how far from the previous snapshot to the latest a camera that moves every
+frame is drawn (of 1; below 0 a little before the previous): at the frame's
+part of a tick after the previous tick, the moment the objects are drawn
+at. Its snapshots are taken at the first frames after the last two ticks,
+each some part of a tick (previous_taken, latest_taken) after its tick, so
+that they are 1 + latest_taken - previous_taken ticks apart, more or less
+than one from tick to tick: blended by the fraction itself, a camera moving
+steadily sped up and slowed down every tick. */
+static real camera_snapshot_blend(real fraction, real previous_taken, real latest_taken)
+{
+	real span = 1.0f + latest_taken - previous_taken;
+
+	if (!(span > 0.0f))
+		return fraction;
+	return (fraction - previous_taken) / span;
+}
+
 static struct observer_result const *render_interpolation_blended_camera(
 	short local_player_index,
 	struct observer_result const *observer)
@@ -862,6 +884,9 @@ static struct observer_result const *render_interpolation_blended_camera(
 		camera->has_previous = camera->valid;
 		camera->previous = camera->latest;
 		camera->latest = *observer;
+		camera->previous_taken = camera->latest_taken;
+		camera->latest_taken = t;
+		camera->taken_a_tick_apart = camera->has_previous && interpolation_tick - camera->tick == 1;
 		/* Several ticks since the last snapshot (a long frame): the objects
 		are drawn between the last two ticks, so the camera's previous is
 		where it was a tick ago, as nearly as a steady move from the last
@@ -884,6 +909,16 @@ static struct observer_result const *render_interpolation_blended_camera(
 		return observer;
 	}
 
+	/* A cinematic's camera set to a point (camera_set) moves there every
+	frame (observer_update, main.c): blended by the time its snapshots were
+	taken, not as though a tick apart. (A player's camera moves with its unit,
+	once a tick, and an animated camera by its animation's frames.) */
+	if (camera->taken_a_tick_apart &&
+		director_get_perspective(local_player_index) == _director_perspective_scripted &&
+		scripted_camera_moving_to_point())
+	{
+		t = camera_snapshot_blend(t, camera->previous_taken, camera->latest_taken);
+	}
 	observer_blend(&camera->previous, &camera->latest, t, &camera->blended);
 	if (correction_significant(&camera->correction) || correction_significant(&camera->correction_pending))
 	{

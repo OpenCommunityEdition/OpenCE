@@ -760,6 +760,10 @@ Each frame shows the world between the last two ticks
   last tick only, as the objects do.
 - In cinematics, a camera that moves with an object (the lifepod in a30,
   a Pelican) moves with the object as it is drawn.
+- In cinematics, a camera set to a point moves there every frame. It is
+  kept after each tick at the first frame drawn after it, some part of a
+  tick late, and mixed for the moment the objects are drawn at, so that it
+  turns and moves as steadily as the script moves it.
 
 Thus the frames are one tick (33 ms) after the calculation. The calculation
 does not change.
