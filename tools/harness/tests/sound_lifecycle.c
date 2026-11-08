@@ -108,6 +108,15 @@ int main(int argc,char **argv) {
   struct sound_source source={.scale=1.f,.gain=1.f};long i=sound_new_impulse(0,&source,0,NULL,NULL,0);
   CHECK(i!=NONE && sound_calculate_fade(i)==1.f,"new impulse audible");return 0;
  }
+ CASE("own-obstruction") {
+  struct sound_source source={.scale=1.f,.gain=1.f,.obstruction=NAN,.occlusion=NAN};
+  sound_refresh_looping(0,123,&source,_looping_sound_refresh_start,FALSE,0.f);
+  CHECK(loops[0].source.obstruction==0.f && loops[0].source.occlusion==0.f,"a new loop does not take its owner's unset obstruction");
+  loops[0].source.obstruction=.3f;loops[0].source.occlusion=.2f;
+  sound_refresh_looping(0,123,&source,_looping_sound_refresh_loop,FALSE,0.f);
+  CHECK(loops[0].source.obstruction==.3f && loops[0].source.occlusion==.2f,"a loop keeps its own obstruction across its owner's refresh");
+  return 0;
+ }
  if(!strcmp(case_name,"four-tracks")) test_loop_definition.tracks.count=4;
  refresh(_looping_sound_refresh_start);long primary=loops[0].tracks[0].primary_sound_index,secondary=NONE;
  CASE("fresh-loop") { CHECK(sound_calculate_fade(primary)==1.f,"new loop audible");return 0; }
