@@ -41,6 +41,10 @@ void network_chat_host_notice(char const *text);
 /* ... sent past this machine's own checks of the host's settings, as a
 changed build could send it, for the host to refuse (network_test.c) */
 void network_chat_say_unchecked(short channel, char const *text);
+/* a line this machine shows to its own players, the text alone and with a
+notice's colour, without sending anything (round_clock.c: the clock of the
+game running, which every machine computes for itself) */
+void network_chat_add_notice(char const *text);
 /* whether a line is being typed: the keyboard types into it, and drives no
 player (xinput_sdl.c), as with the console */
 boolean network_chat_typing(void);
