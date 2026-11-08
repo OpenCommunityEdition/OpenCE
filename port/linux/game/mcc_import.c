@@ -1381,6 +1381,66 @@ static void mcc_import_hud_others(
 	return;
 }
 
+/* how much smaller the disc's sprites of a sprite sheet are than those it is
+written with, at 1/factor of MCC's size (the median over its sequences, of
+their widths and heights: MCC drew some again, a little larger or smaller),
+from the disc's sizes `sizes` (mcc_import_operations_sprite_sizes); 0 when
+none can be compared */
+static real mcc_import_sprite_scale(
+	struct bitmap_group const *group,
+	short factor,
+	char const *sizes)
+{
+	real ratios[128];
+	short ratio_count = 0;
+	long sequence_index;
+	char const *cursor = sizes;
+
+	for (sequence_index = 0; cursor && *cursor && sequence_index < group->sequences.count &&
+		ratio_count + 2 <= NUMBEROF(ratios); sequence_index++)
+	{
+		struct bitmap_group_sequence const *sequence =
+			TAG_BLOCK_GET_ELEMENT(&group->sequences, sequence_index, struct bitmap_group_sequence);
+		char *end;
+		long disc_width = strtol(cursor, &end, 10), disc_height = *end == 'x' ? strtol(end + 1, &end, 10) : 0;
+
+		cursor = *end == ',' ? end + 1 : NULL;
+		if (disc_width > 0 && disc_height > 0 && sequence->sprites.count > 0)
+		{
+			struct bitmap_group_sprite const *sprite =
+				TAG_BLOCK_GET_ELEMENT(&sequence->sprites, 0, struct bitmap_group_sprite);
+			struct bitmap_data const *bitmap = sprite->bitmap_index >= 0 && sprite->bitmap_index < group->bitmaps.count ?
+				TAG_BLOCK_GET_ELEMENT(&group->bitmaps, sprite->bitmap_index, struct bitmap_data) : NULL;
+			real width = bitmap ? (sprite->bounds.x1 - sprite->bounds.x0) * bitmap->width / factor : 0.0f;
+			real height = bitmap ? (sprite->bounds.y1 - sprite->bounds.y0) * bitmap->height / factor : 0.0f;
+
+			if (width >= 1.0f && height >= 1.0f)
+			{
+				ratios[ratio_count++] = (real)disc_width / width;
+				ratios[ratio_count++] = (real)disc_height / height;
+			}
+		}
+	}
+	if (!ratio_count)
+		return 0.0f;
+	{
+		short i, j;
+
+		for (i = 1; i < ratio_count; i++)
+		{
+			for (j = i; j > 0 && ratios[j - 1] > ratios[j]; j--)
+			{
+				real swap = ratios[j];
+
+				ratios[j] = ratios[j - 1];
+				ratios[j - 1] = swap;
+			}
+		}
+	}
+
+	return ratio_count % 2 ? ratios[ratio_count / 2] : 0.5f * (ratios[ratio_count / 2 - 1] + ratios[ratio_count / 2]);
+}
+
 /* MCC's HUD bitmaps are four times the Xbox's, and its placements draw them
 at a half or a quarter (mcc_import_hud_convert, custom_edition_cache_convert): a
 bitmap drawn through placements alone is written at half its size, and its
@@ -1462,8 +1522,9 @@ static void mcc_import_hud(
 			mcc_import_globals.mask_factor = factor;
 	}
 	/* the disc's placements: scaled by how much smaller or larger than the
-	disc's each bitmap they draw is written (MCC's layout of a sprite sheet,
-	or one that cannot be halved), by the width of its first image */
+	disc's each bitmap they draw is written (one that cannot be halved), by
+	the width of its first image, or a sprite sheet's sprites (MCC drew the
+	meters' at twice the disc's size in sheets of its size) */
 	if (mcc_import_operations_hud_values(NULL))
 		mcc_import_globals.hud_scale = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(real));
 	for (tag_index = 0; mcc_import_globals.hud_scale && tag_index < mcc_import_globals.tag_count; tag_index++)
@@ -1472,6 +1533,8 @@ static void mcc_import_hud(
 		struct bitmap_group const *group = instance->group_tag == 'bitm' ? instance->base_address : NULL;
 		short disc_width, disc_height, factor = mcc_import_globals.hud_factor[tag_index];
 		struct bitmap_data const *first;
+		char const *sprite_sizes;
+		real sprite_scale;
 
 		mcc_import_globals.hud_scale[tag_index] = 1.0f;
 		if (!group || group->bitmaps.count <= 0 ||
@@ -1480,8 +1543,16 @@ static void mcc_import_hud(
 			continue;
 		}
 		first = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, 0, struct bitmap_data);
-		if (first->width > 0)
+		/* (a sprite sheet: by its sprites, which MCC may lay out again) */
+		sprite_sizes = mcc_import_operations_sprite_sizes(instance->name);
+		sprite_scale = sprite_sizes ? mcc_import_sprite_scale(group, factor > 1 ? factor : 1, sprite_sizes) : 0.0f;
+		if (sprite_scale > 0.0f)
+			mcc_import_globals.hud_scale[tag_index] = sprite_scale;
+		else if (first->width > 0)
 			mcc_import_globals.hud_scale[tag_index] = (real)disc_width * (real)(factor > 1 ? factor : 1) / (real)first->width;
+		if (getenv("HALO_MCC_IMPORT_TRACE"))
+			fprintf(stderr, "mcc import: hud %s: written at 1/%d, placements scaled %g\n", instance->name,
+				(int)(factor > 1 ? factor : 1), (double)mcc_import_globals.hud_scale[tag_index]);
 	}
 	hud.pass = 1;
 	mcc_import_hud_walk(&hud);

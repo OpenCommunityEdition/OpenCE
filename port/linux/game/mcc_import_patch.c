@@ -23,6 +23,8 @@ tag's root ("root.unit_seats[3].weapon_classes[0]") and its values:
             in another map, or one of the disc's assets
 and, read by the import itself (mcc_import.c, mcc_import_hud):
   bitmap_size  the disc's width and height of a HUD bitmap's first image
+  sprite_sizes the disc's size of a HUD sprite sheet's sprites (the first
+               of each sequence: "122x31,88x14,...")
   hud_values   a HUD interface whose placements the operations give as the
                disc's (only how the HUD looks: the fingerprint has none)
 An element is serialized as its bytes, then for each of its pointer fields
@@ -1114,7 +1116,7 @@ long mcc_import_operations_apply(
 		if (!strcmp(operation->kind, "order") || !strcmp(operation->kind, "tag") ||
 			!strcmp(operation->kind, "element") || !strcmp(operation->kind, "missing") ||
 			!strcmp(operation->kind, "handle") || !strcmp(operation->kind, "bitmap_size") ||
-			!strcmp(operation->kind, "hud_values"))
+			!strcmp(operation->kind, "hud_values") || !strcmp(operation->kind, "sprite_sizes"))
 		{
 			continue;
 		}
@@ -1174,6 +1176,25 @@ boolean mcc_import_operations_bitmap_size(
 	}
 
 	return FALSE;
+}
+
+char const *mcc_import_operations_sprite_sizes(
+	char const *name)
+{
+	long index;
+
+	for (index = 0; index < mcc_patch_globals.operation_count; index++)
+	{
+		struct mcc_patch_operation const *operation = &mcc_patch_globals.operations[index];
+
+		if (!strcmp(operation->kind, "sprite_sizes") && !strncmp(operation->tag, "bitm:", 5) &&
+			!strcmp(operation->tag + 5, name))
+		{
+			return operation->a;
+		}
+	}
+
+	return NULL;
 }
 
 boolean mcc_import_operations_hud_values(

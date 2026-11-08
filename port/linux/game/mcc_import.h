@@ -83,6 +83,12 @@ boolean mcc_import_operations_bitmap_size(
 	short *width,
 	short *height);
 
+/* The disc's sizes of the HUD sprite sheet `name`'s sprites (the first of each
+sequence, "<width>x<height>" separated by commas: the operations' sprite_sizes
+line), or NULL. */
+char const *mcc_import_operations_sprite_sizes(
+	char const *name);
+
 /* Whether the operations give the disc's HUD placements of the HUD interface
 `tag` ("group:path"), or of any when NULL (its hud_values line): their scales
 then stand for bitmaps of the disc's size. */
