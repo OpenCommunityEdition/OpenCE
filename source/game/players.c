@@ -1262,6 +1262,7 @@ long player_new(
 		player->squad_index = NONE;
 		player->cluster_index = NONE;
 		player->aim_assist_unit_index = NONE;
+		player->teleporter_index = NONE; /* port: single-player teleporters */
 		player->speed_multiplier = 1.0f;
 		player->team_index = 1;
 
@@ -1530,6 +1531,8 @@ static void player_spawn(
 	player2 = player_get(player_index);
 	player2->action_result = _player_action_result_reload;
 	player2->action_object_index = NONE;
+	if (!game_engine_running())
+		player2->teleporter_index = NONE; /* port: single-player teleporters */
 	if (player->local_player_index != NONE)
 		observer_obsolete_position(player->local_player_index);
 

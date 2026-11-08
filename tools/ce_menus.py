@@ -619,6 +619,7 @@ def regenerate_settings():
         (CE / name).write_text("\n".join(lines))
     from mcc_menu_patches import regenerate
     regenerate(CE)
+    port_settings.generate_forge_menu_assets()
     manifest = MENUS / "menus.json"
     data = json.loads(manifest.read_text())
     files = set(data["files"]) | {"ce/" + name for name in screens}
@@ -718,8 +719,11 @@ def main() -> None:
     # menu_tags.c)
     lines.append(art.port_picture("blank", [
         ('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4" viewBox="0 0 4 4"/>\n', 4, 4)]))
+    art.port_picture("gamemode/forge_logo", port_settings.forge_logo_frames())
+    art.port_picture("name_input_box", port_settings.name_input_box_frames())
     lines.append("</menus>")
     (CE / "bitmaps.xml").write_text("\n".join(lines) + "\n")
+    port_settings.generate_forge_menu_assets()
     # what is not hand-drawn
     report = [
         "# Menu pictures that are not redraws",

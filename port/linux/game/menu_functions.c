@@ -143,6 +143,31 @@ short main_get_solo_level_from_name(char const *name);
 boolean player_name_clean(wchar_t *name, long count);
 short players_port_local_player_count(void);
 
+#include "forge_net_override.h"
+short forge_menu_custom_edition_maps_count(boolean campaign);
+short forge_menu_custom_edition_maps_display_index_of(boolean campaign, short display_position);
+void forge_menu_custom_edition_maps_look_again(void);
+short forge_menu_multiplayer_maps(char const *const **names, short *last_used);
+boolean forge_menu_multiplayer_map_choose(short level_index);
+boolean forge_player_profile_get(long index, struct player_profile *profile);
+struct p2p_listing;
+int forge_p2p_join_listing(struct p2p_listing const *listing);
+int forge_p2p_lobby_games(struct p2p_listing *games, int maximum_count);
+wchar_t const *forge_game_modes_kind_name(long game_engine_index, byte kind, boolean abbreviated);
+wchar_t const *forge_game_modes_variant_kind_name(struct game_variant const *variant, struct game_variant_options const *options);
+#define game_modes_kind_name forge_game_modes_kind_name
+#define game_modes_variant_kind_name forge_game_modes_variant_kind_name
+#define custom_edition_maps_count forge_menu_custom_edition_maps_count
+#define custom_edition_maps_display_index_of forge_menu_custom_edition_maps_display_index_of
+#define custom_edition_maps_look_again forge_menu_custom_edition_maps_look_again
+#define ui_widget_port_multiplayer_maps forge_menu_multiplayer_maps
+#define ui_widget_port_multiplayer_map_choose forge_menu_multiplayer_map_choose
+#define player_profile_get forge_player_profile_get
+#define p2p_join_listing forge_p2p_join_listing
+#define p2p_lobby_games forge_p2p_lobby_games
+#define pc_menu_event_function_invoke orig_pc_menu_event_function_invoke
+#define pc_menu_game_data_function_invoke orig_pc_menu_game_data_function_invoke
+
 boolean pc_menu_event_function_invoke(struct widget_instance *widget, struct event_record *event,
 	long function_index, boolean *widget_deleted);
 void pc_menu_game_data_function_invoke(struct widget_instance *widget, long function);
@@ -725,6 +750,151 @@ static void text_set_length(struct widget_instance *text_box, wchar_t const *tex
 static void text_set(struct widget_instance *text_box, wchar_t const *text)
 {
 	text_set_length(text_box, text, ROW_TEXT_LENGTH);
+}
+
+/* ---------- GAMEMODE selection screen (Standard, Forge) */
+
+static void profile_name_show(struct widget_instance *description);
+static int s_selected_gamemode = 0; /* 0 = Standard, 1 = Forge */
+static short s_focused_gamemode = 0;
+
+static void gamemode_menu_init(struct widget_instance *list)
+{
+	if (!list)
+		return;
+
+	if (list->name && !strcmp(list->name, "forge_menu_select_list"))
+	{
+		list->focused_child = named(list, "forge_item_single_player", 0);
+		return;
+	}
+	if (list->name && !strcmp(list->name, "forge_tag_options_select_list"))
+	{
+		list->focused_child = named(list, "forge_item_add_tags", 0);
+		return;
+	}
+
+	s_focused_gamemode = (short)(s_selected_gamemode == 1 ? 1 : 0);
+	list->focused_child = (s_selected_gamemode == 1 && named(list, "gm_forge_item", 0)) ?
+		named(list, "gm_forge_item", 0) :
+		named(list, "gm_standard_item", 0);
+}
+
+static void gamemode_menu_update(struct widget_instance *list)
+{
+	struct widget_instance *desc = list ? list->parameters.list.extended_description : NULL;
+
+	if (!list)
+		return;
+
+	if (list->name &&
+		(!strcmp(list->name, "forge_menu_select_list") ||
+		 !strcmp(list->name, "forge_tag_options_select_list")))
+	{
+		if (desc)
+		{
+			struct widget_instance *pic = named(desc, "gamemode_options_pic", 0);
+			struct widget_instance *txt = named(desc, "gamemode_options_txt", 0);
+			char const *fc = (list->focused_child && list->focused_child->name) ? list->focused_child->name : "";
+
+			if (pic)
+				pic->animation.current_frame_index = 1;
+			if (txt)
+			{
+				text_set_length(
+					txt,
+					!strcmp(fc, "forge_item_multiplayer") ?
+						L"MULTIPLAYER FORGE\r\nHOST OR JOIN LIVE\r\nMAP EDITING SESSIONS" :
+					!strcmp(fc, "forge_item_edit_maps") ?
+						L"SAVED FORGE MAPS\r\nBROWSE & LOAD SAVED\r\nFORGE & CUSTOM MAPS" :
+					!strcmp(fc, "forge_item_tag_options") ?
+						L"TAG OPTIONS\r\nADD, PREVIEW OR RESET\r\nINSTALLED FORGE TAGS" :
+					!strcmp(fc, "forge_item_add_tags") ?
+						L"ADD TAGS\r\nEXTRACT TAGS FROM\r\nCUSTOM MAPS TO CACHE" :
+					!strcmp(fc, "forge_item_installed_tags") ?
+						L"INSTALLED TAGS\r\nPREVIEW & MANAGE TAGS\r\nIN THE FORGE CACHE" :
+					!strcmp(fc, "forge_item_reset_stock_tags") ?
+						L"RESET STOCK TAGS\r\nRESTORE DEFAULT STOCK\r\nTAGS IN THE CACHE" :
+					!strcmp(fc, "forge_item_reset_custom_tags") ?
+						L"RESET CUSTOM TAGS\r\nCLEAR ALL CUSTOM TAGS\r\nFROM THE CACHE" :
+					!strcmp(fc, "forge_item_snap_points") ?
+						L"SNAP POINTS\r\nASSIGN 3D SNAP FACES &\r\nALIGNMENT EDGES" :
+						L"SINGLE PLAYER FORGE\r\nEDIT STOCK, CUSTOM OR\r\nFORGE MAPS SOLO",
+					160);
+			}
+			profile_name_show(desc);
+		}
+		return;
+	}
+
+	if (list->focused_child && list->focused_child->name)
+	{
+		if (!strcmp(list->focused_child->name, "gm_standard_item"))
+			s_focused_gamemode = 0;
+		else if (!strcmp(list->focused_child->name, "gm_forge_item"))
+			s_focused_gamemode = 1;
+	}
+
+	if (desc)
+	{
+		struct widget_instance *pic = named(desc, "gamemode_options_pic", 0);
+		struct widget_instance *txt = named(desc, "gamemode_options_txt", 0);
+
+		if (pic)
+			pic->animation.current_frame_index = s_focused_gamemode;
+		if (txt)
+		{
+			text_set_length(
+				txt,
+				s_focused_gamemode == 1 ?
+					L"MAP & SANDBOX EDITOR\r\nSPAWN TAGS & EDIT MAPS\r\nSOLO OR TOGETHER" :
+					L"STANDARD MULTIPLAYER\r\nSLAYER, CTF, KING,\r\nODDBALL & RACE",
+				160);
+		}
+		profile_name_show(desc);
+	}
+}
+
+static void mp_type_screen_update(struct widget_instance *list)
+{
+	struct widget_instance *screen;
+	struct widget_instance *h_mp;
+	struct widget_instance *h_std;
+	struct widget_instance *h_frg;
+	struct widget_instance *desc;
+
+	if (!list || !list->parent)
+		return;
+	screen = list->parent;
+	h_mp = named(screen, "header_multiplayer", 0);
+	h_std = named(screen, "header_standard", 0);
+	h_frg = named(screen, "header_forge", 0);
+	if (h_mp)
+		h_mp->visible = FALSE;
+	if (h_std)
+		h_std->visible = (s_selected_gamemode == 0);
+	if (h_frg)
+		h_frg->visible = (s_selected_gamemode == 1);
+
+	desc = list->parameters.list.extended_description;
+	if (desc)
+	{
+		if (list->name && !strcmp(list->name, "forge_mp_type_select_list"))
+		{
+			struct widget_instance *pic = named(desc, "multiplayer_options_pic", 0);
+			struct widget_instance *txt = named(desc, "multiplayer_options_txt", 0);
+			char const *fc = (list->focused_child && list->focused_child->name) ? list->focused_child->name : "";
+
+			if (!strcmp(fc, "forge_type_edit_maps_item"))
+			{
+				if (pic)
+					pic->animation.current_frame_index = 2;
+				if (txt)
+					txt->parameters.text_box.string_list_index = 7;
+			}
+		}
+		profile_name_show(desc);
+	}
 }
 
 /* one of our string lists' strings, on one line (its line breaks spaces),
@@ -8642,6 +8812,18 @@ boolean pc_menu_event_function_invoke(
 			ui_widget_port_go_back(widget);
 			*widget_deleted = TRUE;
 		}
+		else if (!strcmp(name, "gamemode menu init"))
+		{
+			gamemode_menu_init(widget);
+		}
+		else if (!strcmp(name, "gamemode select standard"))
+		{
+			s_selected_gamemode = 0;
+		}
+		else if (!strcmp(name, "gamemode select forge"))
+		{
+			s_selected_gamemode = 1;
+		}
 		return TRUE;
 	}
 }
@@ -8657,7 +8839,11 @@ void pc_menu_game_data_function_invoke(
 	/* (a text field whose screen has gone: let go of) */
 	if (text_field.row && system_milliseconds() - text_field_shown_time > 500)
 		text_field_end(FALSE);
-	if (!strcmp(name, "solo map list update"))
+	if (!strcmp(name, "gamemode menu update"))
+		gamemode_menu_update(widget);
+	else if (!strcmp(name, "mp type screen update"))
+		mp_type_screen_update(widget);
+	else if (!strcmp(name, "solo map list update"))
 		level_list_update(widget);
 	else if (!strcmp(name, "mp map list update"))
 		map_list_update(widget);

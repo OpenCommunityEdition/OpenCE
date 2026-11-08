@@ -186,7 +186,8 @@ void cinematic_dispose_from_old_map(
 	return;
 }
 
-void cinematic_start(
+/* port: wrapped by cinematic_start in forge_hooks.c */
+void orig_cinematic_start(
 	void)
 {
 	player_input_enable(FALSE);

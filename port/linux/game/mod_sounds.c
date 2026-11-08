@@ -913,7 +913,7 @@ void mod_sounds_tags_unloaded(
 	return;
 }
 
-boolean mod_sounds_read(
+boolean orig_mod_sounds_read(
 	struct sound_permutation const *permutation,
 	void *buffer)
 {

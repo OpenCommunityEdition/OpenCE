@@ -9,19 +9,23 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/header_profile_controls_settings" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/header_profile_controls_settings">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/help" type="text" controller="1" left="68" top="350" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/help" type="text" controller="1" left="68" top="364" width="482" height="50" string_list="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/help_strings" font="ui\large_ui" color="#FFFFFFFF">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/help">
 		<data input="controls update menu"/>
 		<on event="created" run="controls screen init"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_group" x="54" y="73"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_1" x="54" y="103"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_2" x="54" y="133"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_3" x="54" y="163"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_4" x="54" y="193"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_5" x="54" y="223"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_6" x="54" y="253"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_7" x="54" y="283"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_1" x="54" y="99"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_2" x="54" y="125"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_3" x="54" y="151"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_4" x="54" y="177"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_5" x="54" y="203"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_6" x="54" y="229"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_7" x="54" y="255"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_8" x="54" y="281"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_9" x="54" y="307"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_10" x="54" y="333"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_11" x="54" y="339"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -35,7 +39,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/group_label" type="text" controller="1" width="200" height="22" text="SHOW:" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/group_spinner" type="spinner" left="3" top="2" width="297" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="MOVEMENT|WEAPONS|ACTIONS|COMMUNICATION" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 300 19 306">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/group_spinner" type="spinner" left="3" top="2" width="297" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="MOVEMENT|WEAPONS|ACTIONS|COMMUNICATION|FORGE|FORGE PAD" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 300 19 306">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_1" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" run="controls begin binding"/>
@@ -86,6 +90,38 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="356"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_7" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="controls begin binding"/>
+		<on event="start" run="controls begin binding"/>
+		<on event="left right" run="controls binding slot"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="200"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="356"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_8" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="controls begin binding"/>
+		<on event="start" run="controls begin binding"/>
+		<on event="left right" run="controls binding slot"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="200"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="356"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_9" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="controls begin binding"/>
+		<on event="start" run="controls begin binding"/>
+		<on event="left right" run="controls binding slot"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="200"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="356"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_10" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="controls begin binding"/>
+		<on event="start" run="controls begin binding"/>
+		<on event="left right" run="controls binding slot"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="200"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/command_binding" x="356"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controls_setup/op_command_11" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" run="controls begin binding"/>
 		<on event="start" run="controls begin binding"/>
 		<on event="left right" run="controls binding slot"/>

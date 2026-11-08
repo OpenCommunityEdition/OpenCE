@@ -446,6 +446,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "forge_net_override.h" /* port: port/linux/game/forge_net_override.h */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_address_constants.h"
@@ -4862,6 +4863,40 @@ long network_game_server_port_remote_machine_count(
 			count++;
 	}
 	return count;
+}
+
+/* port: refresh the pregame lobby's map version after saving or overwriting a custom map in Forge,
+and start the game once every remote machine has finished precaching */
+void custom_edition_map_paths_forget(void);
+
+void network_game_server_port_refresh_map_version(
+	void)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct network_game_client *client = global_network_game_client_get();
+
+	custom_edition_map_paths_forget();
+	if (server && server->game.map.name[0])
+	{
+		map_share_level_name_choose(server->game.map.name, sizeof(server->game.map.name));
+		server->game.map.version = (long)cache_files_map_version(server->game.map.name);
+		if (client)
+		{
+			struct network_game *cgame = network_game_client_get_game(client);
+			if (cgame)
+				cgame->map.version = server->game.map.version;
+		}
+	}
+}
+
+boolean network_game_server_port_start_immediately_if_precached(
+	struct network_game_server *server)
+{
+	if (!server || server->state != _network_game_server_state_pregame || server->sent_start_game_message)
+		return FALSE;
+	if (!network_game_server_have_all_machines_have_precached(server))
+		return FALSE;
+	return network_game_server_start_network_game(server);
 }
 
 /* port: a gametype's PC options: the menus' (player_ui_set_game_variant_options)

@@ -395,4 +395,21 @@
 	<bitmap name="blank">
 		<frame png="ce/port/blank__0.png" width="4" height="4"/>
 	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/header_standard">
+		<frame png="ce/port/main_menu/multiplayer_type_select/header_standard.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/header_forge">
+		<frame png="ce/port/main_menu/multiplayer_type_select/header_forge.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/gamemode/header_gamemode">
+		<frame png="ce/port/main_menu/multiplayer_type_select/gamemode/header_gamemode.png" width="512" height="64"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/gamemode/gamemode_options">
+		<frame png="ce/shell/main_menu/settings_select/multiplayer_setup/playlist_edit/game_type_select/rules_options__2.png" width="256" height="256"/>
+		<frame png="ce/port/gamemode/forge_logo__0.png" width="256" height="256"/>
+	</bitmap>
+	<bitmap name="main_menu/multiplayer_type_select/forge_name_input_box">
+		<frame png="ce/port/name_input_box__0.png" width="256" height="32"/>
+		<frame png="ce/port/name_input_box__1.png" width="256" height="32"/>
+	</bitmap>
 </menus>

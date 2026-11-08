@@ -28,6 +28,7 @@ pieces' hashes any player sends it, and each piece as it arrives.
 #include <stdlib.h>
 #include <string.h>
 #include <xtl.h>
+#include "forge_ce_io_redirect.h"
 
 /* (the C library's allocator, not the game's tracked one (cseries.h): the
 hashing thread allocates what the game's thread frees) */

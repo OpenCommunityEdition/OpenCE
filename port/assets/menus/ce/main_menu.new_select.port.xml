@@ -14,6 +14,7 @@
 		<string text="CUSTOM MULTIPLAYER"/>
 		<string text="MCC SINGLEPLAYER"/>
 		<string text="MCC MULTIPLAYER"/>
+		<string text="FORGE MAPS"/>
 	</strings>
 	<widget name="main_menu/new_select/mcc_folder_name" type="text" controller="1" left="417" top="204" width="146" height="54" font="ui\small_ui" color="#FF2896FF">
 	</widget>

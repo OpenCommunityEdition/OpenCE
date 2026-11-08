@@ -22,6 +22,8 @@ name: Build
 # site on GitHub Pages (https://halocombatevolved.com/, port/web/README.md).
 on:
   push:
+    branches:
+      - "**"
     paths-ignore:
       - "**.md"
   workflow_dispatch:
@@ -396,6 +398,7 @@ jobs:
             tools/release_sign.sh
             deploy/release-key.pub
             port/linux/include/halo_port_limits.h
+            port/linux/game/forge_engine.h
           sparse-checkout-cone-mode: false
 
       - uses: actions/download-artifact@v4
@@ -437,13 +440,14 @@ jobs:
         run: |
           tag="build-$GITHUB_RUN_NUMBER"
           subject="$(printf '%s' "${MESSAGE:-manual run}" | head -n 1)"
+          forge_version="$(sed -n 's/^#define FORGE_VERSION_STRING "\([^"]*\)".*/\1/p' port/linux/game/forge_engine.h)"
           # (the network version, which a dedicated server's server.auto_update
           # reads: a new one is started once the game being played is over)
           network_version="$(sed -n 's/^#define HALO_PORT_NETWORK_VERSION \([0-9]*\).*/\1/p' port/linux/include/halo_port_limits.h)"
-          printf '%s\n\nCommit: %s\nBuild: %s\nNetwork version: %s\n\nThe release builds are for playing; the debug builds stop at the first failed assertion and log it.\n' \
-            "$subject" "$COMMIT_URL" "$RUN_URL" "$network_version" > notes.md
+          printf '%s\n\nOpenCE : Forge v%s\nCommit: %s\nBuild: %s\nNetwork version: %s\n\nThe release builds are for playing; the debug builds stop at the first failed assertion and log it.\n' \
+            "$subject" "${forge_version:-2.3.2}" "$COMMIT_URL" "$RUN_URL" "$network_version" > notes.md
           gh release create "$tag" release/* --target "$GITHUB_SHA" --latest \
-            --title "Build $GITHUB_RUN_NUMBER (${GITHUB_SHA:0:7})" --notes-file notes.md
+            --title "OpenCE : Forge v${forge_version:-2.3.2} — Build $GITHUB_RUN_NUMBER (${GITHUB_SHA:0:7})" --notes-file notes.md
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       # The Windows builds' executables and PDBs to Sentry, which turns the
@@ -491,7 +495,7 @@ jobs:
     # and the release are one build), and a deployment is never cancelled
     # halfway. The repository's Pages source must be GitHub Actions.
     needs: [release]
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && github.repository == 'OpenCommunityEdition/OpenCE' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

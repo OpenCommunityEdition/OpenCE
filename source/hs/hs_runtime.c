@@ -1213,7 +1213,8 @@ void hs_runtime_port_shift_sleep_times(
 	}
 }
 
-void hs_runtime_update(
+/* port: wrapped by hs_runtime_update in forge_hooks.c */
+void orig_hs_runtime_update(
 	void)
 {
 	if (hs_runtime_globals.initialized)

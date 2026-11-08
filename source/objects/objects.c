@@ -1446,6 +1446,11 @@ void object_set_visibility(
 			object_connect_lights(object_index, TRUE, FALSE);
 		}
 	}
+	else if (!visible_flag && TEST_FLAG(object_header_get(object_index)->flags, _object_header_being_deleted_bit))
+	{
+		/* port: disconnect lights on model-less light objects when deleted */
+		object_connect_lights(object_index, TRUE, FALSE);
+	}
 
 	if (!visible_flag || object_definition->object.model.index!=NONE)
 	{
@@ -1989,6 +1994,31 @@ static void object_delete_initial_recursive(
 
 	object_set_visibility(object_index, FALSE);
 	object_name_list_delete(object_index);
+	light_delete_all_for_object(object_index);
+
+	/* port: also delete any secondary light/scenery objects spawned by this object's creation_effect */
+	if (object_header_data && object_header_data->valid)
+	{
+		short abs_idx;
+		struct object_header_datum *hdr = (struct object_header_datum *)object_header_data->data;
+		for (abs_idx = 0; abs_idx < object_header_data->count; ++abs_idx, ++hdr)
+		{
+			if (hdr->identifier && hdr->datum &&
+				!TEST_FLAG(hdr->flags, _object_header_being_deleted_bit) &&
+				(hdr->type == _object_type_scenery ||
+				 hdr->type == _object_type_light_fixture ||
+				 hdr->type == _object_type_sound_scenery ||
+				 hdr->type == _object_type_placeholder))
+			{
+				long owned_index = DATUM_INDEX_NEW(abs_idx, hdr->identifier);
+				if (owned_index != object_index &&
+					hdr->datum->object.owner_object_index == object_index)
+				{
+					object_delete_initial_recursive(owned_index, FALSE);
+				}
+			}
+		}
+	}
 
 	return;
 }
@@ -3508,6 +3538,8 @@ static void attachments_new(
 			if (attachment_index!=NONE)
 			{
 				SET_FLAG(object->object.flags, _object_has_attached_lights_bit, TRUE);
+				/* port: recompute attached light transforms when light-bearing objects move */
+				SET_FLAG(object->object.flags, _object_dynamic_lighting_recompute_bit, TRUE);
 			}
 			break;
 		case _object_attachment_type_looping_sound:
@@ -3552,6 +3584,9 @@ void object_set_position(
 	real_vector3d const *up)
 {
 	struct object_datum *object = object_get(object_index);
+	real_point3d old_position = object->object.position;
+	real_vector3d old_forward = object->object.forward;
+	real_vector3d old_up = object->object.up;
 
 	object_disconnect_from_map(object_index);
 
@@ -3583,6 +3618,55 @@ void object_set_position(
 	object_compute_node_matrices(object_index);
 	object_reconnect_to_map(object_index, NULL);
 
+	/* port: reconnect attached lights and move any secondary light/scenery objects spawned by creation_effect */
+	if (TEST_FLAG(object->object.flags, _object_has_attached_lights_bit) &&
+		(!TEST_FLAG(object->object.flags, _object_invisible_bit) ||
+		 object_definition_get(object->definition_index)->object.model.index==NONE))
+	{
+		object_connect_lights(object_index, TRUE, TRUE);
+	}
+	if (object_header_data && object_header_data->valid)
+	{
+		short abs_idx;
+		struct object_header_datum *hdr = (struct object_header_datum *)object_header_data->data;
+		real_matrix4x3 old_mat, old_inv, new_mat, xform;
+		boolean has_xform = FALSE;
+
+		for (abs_idx = 0; abs_idx < object_header_data->count; ++abs_idx, ++hdr)
+		{
+			if (hdr->identifier && hdr->datum &&
+				!TEST_FLAG(hdr->flags, _object_header_being_deleted_bit) &&
+				(hdr->type == _object_type_scenery ||
+				 hdr->type == _object_type_light_fixture ||
+				 hdr->type == _object_type_sound_scenery ||
+				 hdr->type == _object_type_placeholder))
+			{
+				long owned_index = DATUM_INDEX_NEW(abs_idx, hdr->identifier);
+				if (owned_index != object_index &&
+					hdr->datum->object.owner_object_index == object_index &&
+					hdr->datum->object.parent_object_index == NONE)
+				{
+					real_point3d child_pos;
+					real_vector3d child_fwd, child_up;
+					if (!has_xform)
+					{
+						matrix4x3_from_point_and_vectors(&old_mat, &old_position, &old_forward, &old_up);
+						matrix4x3_inverse(&old_mat, &old_inv);
+						matrix4x3_from_point_and_vectors(&new_mat, &object->object.position, &object->object.forward, &object->object.up);
+						matrix4x3_multiply(&new_mat, &old_inv, &xform);
+						has_xform = TRUE;
+					}
+					matrix4x3_transform_point(&xform, &hdr->datum->object.position, &child_pos);
+					matrix4x3_transform_normal(&xform, &hdr->datum->object.forward, &child_fwd);
+					matrix4x3_transform_normal(&xform, &hdr->datum->object.up, &child_up);
+					normalize3d(&child_fwd);
+					normalize3d(&child_up);
+					object_set_position(owned_index, &child_pos, &child_fwd, &child_up);
+				}
+			}
+		}
+	}
+
 	return;
 }
 
@@ -3592,15 +3676,57 @@ void object_translate(
 	struct location const *new_location)
 {
 	struct object_datum *object = object_get(object_index);
+	real_vector3d delta;
 
 	match_assert_valid_real_point3d(
 		"c:\\halo\\SOURCE\\objects\\objects.c",
 		562, 
 		new_position);
 
+	delta.i = new_position->x - object->object.position.x;
+	delta.j = new_position->y - object->object.position.y;
+	delta.k = new_position->z - object->object.position.z;
+
 	object_disconnect_from_map(object_index);
 	object->object.position = *new_position;
+	object_compute_node_matrices(object_index);
 	object_reconnect_to_map(object_index, new_location);
+
+	/* port: reconnect attached lights and translate any secondary light/scenery objects spawned by creation_effect */
+	if (TEST_FLAG(object->object.flags, _object_has_attached_lights_bit) &&
+		(!TEST_FLAG(object->object.flags, _object_invisible_bit) ||
+		 object_definition_get(object->definition_index)->object.model.index==NONE))
+	{
+		object_connect_lights(object_index, TRUE, TRUE);
+	}
+	if (object_header_data && object_header_data->valid &&
+		(delta.i != 0.f || delta.j != 0.f || delta.k != 0.f))
+	{
+		short abs_idx;
+		struct object_header_datum *hdr = (struct object_header_datum *)object_header_data->data;
+		for (abs_idx = 0; abs_idx < object_header_data->count; ++abs_idx, ++hdr)
+		{
+			if (hdr->identifier && hdr->datum &&
+				!TEST_FLAG(hdr->flags, _object_header_being_deleted_bit) &&
+				(hdr->type == _object_type_scenery ||
+				 hdr->type == _object_type_light_fixture ||
+				 hdr->type == _object_type_sound_scenery ||
+				 hdr->type == _object_type_placeholder))
+			{
+				long owned_index = DATUM_INDEX_NEW(abs_idx, hdr->identifier);
+				if (owned_index != object_index &&
+					hdr->datum->object.owner_object_index == object_index &&
+					hdr->datum->object.parent_object_index == NONE)
+				{
+					real_point3d child_pos;
+					child_pos.x = hdr->datum->object.position.x + delta.i;
+					child_pos.y = hdr->datum->object.position.y + delta.j;
+					child_pos.z = hdr->datum->object.position.z + delta.k;
+					object_translate(owned_index, &child_pos, NULL);
+				}
+			}
+		}
+	}
 
 	return;
 }
@@ -4047,6 +4173,7 @@ static boolean object_update(
 		object_compute_change_colors(object_index);
 
 		if (
+			!TEST_FLAG(header->flags, _object_header_being_deleted_bit) &&
 			TEST_FLAG(object->object.flags, _object_dynamic_lighting_recompute_bit) &&
 			(
 				!TEST_FLAG(object->object.flags, _object_invisible_bit) ||
@@ -4760,7 +4887,12 @@ static void object_connect_lights(
 	boolean disconnect,
 	boolean reconnect)
 {
+	struct object_header_datum *header = object_header_get(object_index);
 	struct object_datum *object = object_get(object_index);
+
+	/* port: do not reconnect lights for an object already marked for deletion */
+	if (header && TEST_FLAG(header->flags, _object_header_being_deleted_bit))
+		reconnect = FALSE;
 
 	if (TEST_FLAG(object->object.flags, _object_has_attached_lights_bit))
 	{
@@ -5251,6 +5383,9 @@ static void attachments_delete(
 			}
 		}
 	}
+
+	/* port: also delete any unattached lights owned by this object */
+	light_delete_all_for_object(object_index);
 
 	return;
 }

@@ -52,6 +52,7 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/multiplayer_type_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="main_menu/multiplayer_type_select/multiplayer_type_list_ext_desc">
 		<data input="multiplayer type menu update desc"/>
+		<data input="mp type screen update"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_join_item" x="-32" y="78"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_join_internet_item" y="111"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_join_lan_item" y="144"/>
@@ -66,7 +67,427 @@
 	<widget name="main_menu/multiplayer_type_select/multiplayer_type_select_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<on event="created" run="mp type menu initialize"/>
 		<child widget="main_menu/multiplayer_type_select/header_multiplayer"/>
+		<child widget="main_menu/multiplayer_type_select/header_standard"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
 		<child widget="main_menu/multiplayer_type_select/multiplayer_type_select_list"/>
 		<child widget="main_menu/blueline" x="64" y="349"/>
+	</widget>
+
+	<!-- GAMEMODE & FORGE SCREENS -->
+	<widget name="main_menu/multiplayer_type_select/header_standard" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/header_standard">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/header_forge" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/header_forge">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/header_gamemode" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/gamemode/header_gamemode">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/gamemode_options_pic" controller="1" left="307" top="90" width="256" height="250" bitmap="main_menu/multiplayer_type_select/gamemode/gamemode_options">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/gamemode_options_txt" type="text" controller="1" left="290" top="285" width="290" height="105" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/gamemode_ext_desc" controller="1" left="275" top="78" width="320" height="322" bitmap="bitmaps/list_field" color="#FF0080FF">
+		<child widget="main_menu/multiplayer_type_select/gamemode/gamemode_options_pic"/>
+		<child widget="main_menu/multiplayer_type_select/gamemode/gamemode_options_txt"/>
+		<child widget="main_menu/current_profile_name"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/gm_standard_item" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd_top" text="STANDARD" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="gamemode select standard" open="main_menu/multiplayer_type_select/multiplayer_type_select_screen"/>
+		<on event="start" run="gamemode select standard" open="main_menu/multiplayer_type_select/multiplayer_type_select_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/gm_forge_item" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="FORGE" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="gamemode select forge" open="main_menu/forge_select/forge_menu"/>
+		<on event="start" run="gamemode select forge" open="main_menu/forge_select/forge_menu"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/gamemode_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="common_button_back" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/gamemode_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="main_menu/multiplayer_type_select/gamemode/gamemode_ext_desc">
+		<data input="gamemode menu update"/>
+		<on event="created" run="gamemode menu init"/>
+		<child widget="main_menu/multiplayer_type_select/gamemode/gm_standard_item" y="78"/>
+		<child widget="main_menu/multiplayer_type_select/gamemode/gm_forge_item" y="111"/>
+		<child widget="main_menu/multiplayer_type_select/gamemode/gamemode_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/gamemode/gamemode_select_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/multiplayer_type_select/gamemode/header_gamemode"/>
+		<child widget="main_menu/multiplayer_type_select/gamemode/gamemode_select_list"/>
+		<child widget="main_menu/blueline" x="64" y="349"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_item_single_player" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd_top" text="SINGLE PLAYER" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/solo_level_select/solo_level_select_screen"/>
+		<on event="start" open="main_menu/solo_level_select/solo_level_select_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_item_multiplayer" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/forge_select/forge_mp_type_select_screen"/>
+		<on event="start" open="main_menu/forge_select/forge_mp_type_select_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_item_edit_maps" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="EDIT MAPS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/forge_select/forge_edit_maps_screen"/>
+		<on event="start" open="main_menu/forge_select/forge_edit_maps_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_item_tag_options" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="TAG OPTIONS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/forge_select/forge_tag_options_menu"/>
+		<on event="start" open="main_menu/forge_select/forge_tag_options_menu"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_menu_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="main_menu/multiplayer_type_select/gamemode/gamemode_ext_desc">
+		<data input="gamemode menu update"/>
+		<on event="created" run="gamemode menu init"/>
+		<child widget="main_menu/forge_select/forge_item_single_player" y="78"/>
+		<child widget="main_menu/forge_select/forge_item_multiplayer" y="111"/>
+		<child widget="main_menu/forge_select/forge_item_edit_maps" y="144"/>
+		<child widget="main_menu/forge_select/forge_item_tag_options" y="177"/>
+		<child widget="main_menu/multiplayer_type_select/gamemode/gamemode_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_menu" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
+		<child widget="main_menu/forge_select/forge_menu_select_list"/>
+		<child widget="main_menu/blueline" x="64" y="349"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_item_add_tags" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd_top" text="ADD TAGS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/forge_select/forge_add_tags_map_screen"/>
+		<on event="start" open="main_menu/forge_select/forge_add_tags_map_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_item_installed_tags" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="INSTALLED TAGS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/forge_select/forge_installed_tags_screen"/>
+		<on event="start" open="main_menu/forge_select/forge_installed_tags_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_item_reset_stock_tags" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="RESET STOCK TAGS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/forge_select/forge_confirm_reset_stock_screen"/>
+		<on event="start" open="main_menu/forge_select/forge_confirm_reset_stock_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_item_reset_custom_tags" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="RESET CUSTOM TAGS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/forge_select/forge_confirm_reset_custom_screen"/>
+		<on event="start" open="main_menu/forge_select/forge_confirm_reset_custom_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_tag_options_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="main_menu/multiplayer_type_select/gamemode/gamemode_ext_desc">
+		<data input="gamemode menu update"/>
+		<on event="created" run="gamemode menu init"/>
+		<child widget="main_menu/forge_select/forge_item_add_tags" y="78"/>
+		<child widget="main_menu/forge_select/forge_item_installed_tags" y="111"/>
+		<child widget="main_menu/forge_select/forge_item_reset_stock_tags" y="144"/>
+		<child widget="main_menu/forge_select/forge_item_reset_custom_tags" y="177"/>
+		<child widget="main_menu/multiplayer_type_select/gamemode/gamemode_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_tag_options_menu" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
+		<child widget="main_menu/forge_select/forge_tag_options_select_list"/>
+		<child widget="main_menu/blueline" x="64" y="349"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_button_choose" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="CHOOSE" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="emit custom activation event"/>
+		<on event="start" run="emit custom activation event"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_browser_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<data input="common button bar update"/>
+		<child widget="main_menu/forge_select/forge_button_choose" x="380" y="1"/>
+		<child widget="common_button_back" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/forge_select/tag_preview" controller="1" left="419" top="87" width="140" height="114">
+	</widget>
+	<widget name="main_menu/forge_select/forge_tag_right_name" type="text" controller="1" left="417" top="204" width="146" height="43" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/forge_select/forge_tag_right_data" type="text" controller="1" left="417" top="258" width="146" height="136" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/forge_select/forge_tag_right_item" controller="1" left="406" top="75" width="162" height="326" bitmap="bitmaps/spinner_list_3_wide_item_background">
+		<child widget="main_menu/forge_select/tag_preview"/>
+		<child widget="main_menu/forge_select/forge_tag_right_name"/>
+		<child widget="main_menu/forge_select/forge_tag_right_data"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_tag_browser_desc" width="640" height="480">
+		<child widget="main_menu/current_profile_name"/>
+		<child widget="main_menu/forge_select/forge_tag_right_item" x="22" y="2"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_add_tags_map_kind_spinner" type="spinner" width="238" height="22" flags="left_right_tabs_items" strings="CUSTOM SINGLEPLAYER|CUSTOM MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 238 19 244">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_add_tags_map_kind_row" width="256" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<child widget="main_menu/forge_select/forge_add_tags_map_kind_spinner" x="9" y="2"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_add_tags_map_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/solo_level_select/solo_level_extended_desc">
+		<data input="load game list update"/>
+		<on event="created" run="load game menu init"/>
+		<on event="custom_activation" run="load game menu activated"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/forge_select/forge_add_tags_map_kind_row" x="82" y="73"/>
+		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/new_select/list_item_4" x="20" y="193"/>
+		<child widget="main_menu/new_select/list_item_5" x="20" y="223"/>
+		<child widget="main_menu/new_select/list_item_6" x="20" y="253"/>
+		<child widget="main_menu/new_select/list_item_7" x="20" y="283"/>
+		<child widget="main_menu/new_select/list_item_8" x="20" y="313"/>
+		<child widget="main_menu/new_select/list_item_9" x="20" y="343"/>
+		<child widget="main_menu/new_select/list_item_10" x="20" y="373"/>
+		<child widget="main_menu/forge_select/forge_browser_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_add_tags_map_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/forge_select/forge_add_tags_map_list"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_tag_cat_spinner" type="spinner" width="238" height="22" flags="left_right_tabs_items" strings="SCENERY|VEHICLES|DEVICES|WEAPONS|EQUIPMENT" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 238 19 244">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_tag_cat_row" width="256" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<child widget="main_menu/forge_select/forge_tag_cat_spinner" x="9" y="2"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_add_tags_browser_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/forge_select/forge_tag_browser_desc">
+		<data input="load game list update"/>
+		<on event="created" run="load game menu init"/>
+		<on event="deleted" run="load game menu dispose"/>
+		<on event="custom_activation" run="load game menu activated"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/forge_select/forge_tag_cat_row" x="82" y="73"/>
+		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/new_select/list_item_4" x="20" y="193"/>
+		<child widget="main_menu/new_select/list_item_5" x="20" y="223"/>
+		<child widget="main_menu/new_select/list_item_6" x="20" y="253"/>
+		<child widget="main_menu/new_select/list_item_7" x="20" y="283"/>
+		<child widget="main_menu/new_select/list_item_8" x="20" y="313"/>
+		<child widget="main_menu/new_select/list_item_9" x="20" y="343"/>
+		<child widget="main_menu/new_select/list_item_10" x="20" y="373"/>
+		<child widget="main_menu/forge_select/forge_browser_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_add_tags_browser_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/forge_select/forge_add_tags_browser_list"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_name_tag_text_box" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" text="Enter Forge menu name for tag:" font="ui\small_ui" color="#FF2896FF" text_x="12" text_y="34">
+	</widget>
+	<widget name="main_menu/forge_select/forge_name_tag_backdrop" controller="1" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="main_menu/forge_select/forge_name_tag_text_box" x="192" y="176"/>
+		<child widget="error/header_attention" x="201" y="180"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_name_tag_input_btn" type="text" width="184" height="28" bitmap="main_menu/multiplayer_type_select/forge_name_input_box" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="6">
+		<on event="a" run="port mods toggle"/>
+		<on event="start" run="port mods toggle"/>
+		<on event="b" run="NULL"/>
+		<on event="back" run="NULL"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_name_tag_confirm_btn" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="CONFIRM" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mods save" back="true"/>
+		<on event="start" run="port mods save" back="true"/>
+		<on event="b" run="NULL"/>
+		<on event="back" run="NULL"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_name_tag_back_btn" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mods close" back="true"/>
+		<on event="start" run="port mods close" back="true"/>
+		<on event="b" run="NULL"/>
+		<on event="back" run="NULL"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_name_tag_button_bar" type="column_list" width="256" height="95" flags="pass_unhandled_to_focused_child up_down_tabs_items left_right_tabs_items">
+		<data input="load game list update"/>
+		<on event="b" run="NULL"/>
+		<on event="back" run="NULL"/>
+		<child widget="main_menu/forge_select/forge_name_tag_input_btn" x="24" y="0"/>
+		<child widget="main_menu/forge_select/forge_name_tag_confirm_btn" x="0" y="71"/>
+		<child widget="main_menu/forge_select/forge_name_tag_back_btn" x="128" y="71"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_name_tag_screen" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" run="NULL"/>
+		<on event="back" run="NULL"/>
+		<child widget="main_menu/forge_select/forge_name_tag_backdrop"/>
+		<child widget="main_menu/forge_select/forge_name_tag_button_bar" x="194" y="238"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_inst_cat_spinner" type="spinner" width="238" height="22" flags="left_right_tabs_items" strings="SCENERY|VEHICLES|DEVICES|WEAPONS|EQUIPMENT" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 238 19 244">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_inst_cat_row" width="256" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<child widget="main_menu/forge_select/forge_inst_cat_spinner" x="9" y="2"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_installed_tags_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/forge_select/forge_tag_browser_desc">
+		<data input="load game list update"/>
+		<on event="created" run="load game menu init"/>
+		<on event="deleted" run="load game menu dispose"/>
+		<on event="custom_activation" run="load game menu activated"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/forge_select/forge_inst_cat_row" x="82" y="73"/>
+		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/new_select/list_item_4" x="20" y="193"/>
+		<child widget="main_menu/new_select/list_item_5" x="20" y="223"/>
+		<child widget="main_menu/new_select/list_item_6" x="20" y="253"/>
+		<child widget="main_menu/new_select/list_item_7" x="20" y="283"/>
+		<child widget="main_menu/new_select/list_item_8" x="20" y="313"/>
+		<child widget="main_menu/new_select/list_item_9" x="20" y="343"/>
+		<child widget="main_menu/new_select/list_item_10" x="20" y="373"/>
+		<child widget="main_menu/forge_select/forge_browser_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_installed_tags_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/forge_select/forge_installed_tags_list"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_installed_tag_text_box" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" font="ui\small_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="main_menu/forge_select/forge_installed_tag_backdrop" controller="1" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="main_menu/forge_select/forge_installed_tag_text_box" x="192" y="176"/>
+		<child widget="error/header_warning" x="201" y="180"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_installed_tag_delete_btn" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="DELETE" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mods close" back="true"/>
+		<on event="start" run="port mods close" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_installed_tag_back_btn" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mouse emit back event"/>
+		<on event="start" run="mouse emit back event"/>
+		<on event="left_mouse" run="mouse emit back event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_installed_tag_button_bar" type="column_list" width="256" height="20" flags="pass_unhandled_to_focused_child up_down_tabs_items left_right_tabs_items">
+		<data input="load game list update"/>
+		<child widget="main_menu/forge_select/forge_installed_tag_delete_btn"/>
+		<child widget="main_menu/forge_select/forge_installed_tag_back_btn" x="128"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_installed_tag_action_screen" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/forge_select/forge_installed_tag_backdrop"/>
+		<child widget="main_menu/forge_select/forge_installed_tag_button_bar" x="194" y="309"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_stock_text" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" text="Are you sure you want\nto reset the stock tag\ncache? All stock tags\nwill be cleared." font="ui\small_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_stock_backdrop" controller="1" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="main_menu/forge_select/forge_confirm_reset_stock_text" x="192" y="176"/>
+		<child widget="error/header_are_you_sure" x="201" y="180"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_stock_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="CONFIRM" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mods close" back="true"/>
+		<on event="start" run="port mods close" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_stock_back" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mouse emit back event"/>
+		<on event="start" run="mouse emit back event"/>
+		<on event="left_mouse" run="mouse emit back event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_stock_bar" type="column_list" width="256" height="20" flags="pass_unhandled_to_focused_child up_down_tabs_items left_right_tabs_items">
+		<child widget="main_menu/forge_select/forge_confirm_reset_stock_ok"/>
+		<child widget="main_menu/forge_select/forge_confirm_reset_stock_back" x="128"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_stock_screen" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/forge_select/forge_confirm_reset_stock_backdrop"/>
+		<child widget="main_menu/forge_select/forge_confirm_reset_stock_bar" x="194" y="309"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_custom_text" type="text" controller="1" width="280" height="159" bitmap="bitmaps/alert_bkd" text="Are you sure you want\nto reset the custom tag\ncache? All custom tags\nwill be cleared." font="ui\small_ui" color="#FF2896FF" text_x="9" text_y="36">
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_custom_backdrop" controller="1" width="640" height="480" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="main_menu/forge_select/forge_confirm_reset_custom_text" x="192" y="176"/>
+		<child widget="error/header_are_you_sure" x="201" y="180"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_custom_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="CONFIRM" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port mods close" back="true"/>
+		<on event="start" run="port mods close" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_custom_back" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="BACK" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="mouse emit back event"/>
+		<on event="start" run="mouse emit back event"/>
+		<on event="left_mouse" run="mouse emit back event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_custom_bar" type="column_list" width="256" height="20" flags="pass_unhandled_to_focused_child up_down_tabs_items left_right_tabs_items">
+		<child widget="main_menu/forge_select/forge_confirm_reset_custom_ok"/>
+		<child widget="main_menu/forge_select/forge_confirm_reset_custom_back" x="128"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_confirm_reset_custom_screen" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/forge_select/forge_confirm_reset_custom_backdrop"/>
+		<child widget="main_menu/forge_select/forge_confirm_reset_custom_bar" x="194" y="309"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_type_edit_maps_item" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" text="EDIT MAPS" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" open="main_menu/forge_select/forge_edit_maps_screen"/>
+		<on event="start" open="main_menu/forge_select/forge_edit_maps_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_mp_type_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_items" description="main_menu/multiplayer_type_select/multiplayer_type_list_ext_desc">
+		<data input="multiplayer type menu update desc"/>
+		<data input="mp type screen update"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_join_item" x="-32" y="78"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_join_internet_item" y="111"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_join_lan_item" y="144"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_join_direct_item" y="177"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_create_item" x="-32" y="210"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_create_internet_item" y="243"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_create_lan_item" y="276"/>
+		<child widget="main_menu/forge_select/forge_type_edit_maps_item" y="358"/>
+		<child widget="main_menu/multiplayer_type_select/multiplayer_type_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_mp_type_select_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="created" run="mp type menu initialize"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
+		<child widget="main_menu/forge_select/forge_mp_type_select_list"/>
+		<child widget="main_menu/blueline" x="64" y="349"/>
+	</widget>
+	<widget name="main_menu/forge_select/edit_maps_kind_spinner" type="spinner" width="238" height="22" flags="left_right_tabs_items" strings="USER CREATED|DOWNLOADED" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 238 19 244">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/forge_select/edit_maps_kind_row" width="256" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+		<child widget="main_menu/forge_select/edit_maps_kind_spinner" x="9" y="2"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_edit_maps_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/solo_level_select/solo_level_extended_desc">
+		<data input="load game list update"/>
+		<on event="created" run="load game menu init"/>
+		<on event="custom_activation" run="load game menu activated"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/forge_select/edit_maps_kind_row" x="82" y="73"/>
+		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/new_select/list_item_4" x="20" y="193"/>
+		<child widget="main_menu/new_select/list_item_5" x="20" y="223"/>
+		<child widget="main_menu/new_select/list_item_6" x="20" y="253"/>
+		<child widget="main_menu/new_select/list_item_7" x="20" y="283"/>
+		<child widget="main_menu/new_select/list_item_8" x="20" y="313"/>
+		<child widget="main_menu/new_select/list_item_9" x="20" y="343"/>
+		<child widget="main_menu/new_select/list_item_10" x="20" y="373"/>
+		<child widget="main_menu/solo_level_select/solo_level_select_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_edit_maps_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/forge_select/forge_edit_maps_list"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
 	</widget>
 </menus>

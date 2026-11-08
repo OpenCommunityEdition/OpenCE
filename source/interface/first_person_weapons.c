@@ -474,7 +474,8 @@ long first_person_weapon_get_local_index(
 	return (local_player_index==MAXIMUM_NUMBER_OF_LOCAL_PLAYERS) ? NONE : local_player_index;
 }
 
-void first_person_weapon_draw(
+/* port: wrapped by first_person_weapon_draw in forge_hooks.c */
+void orig_first_person_weapon_draw(
 	void)
 {
 	/* port: not drawn with display.viewmodel_visible off (view_fov.c) */

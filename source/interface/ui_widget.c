@@ -654,6 +654,7 @@ struct widget_instance;
 #include "interface/progress_bar.h"
 #include "interface/ui_widget_game_data_input_functions.h"
 #include "custom_edition_maps.h" /* port: port/linux/game/custom_edition_maps.c */
+#include "tag_preview.h" /* port: port/linux/game/tag_preview.c */
 #include "interface/ui_widget_event_handler_functions.h"
 #include "interface/ui_widget_text_search_and_replace_functions.h"
 #include "interface/virtual_keyboard.h"
@@ -7197,6 +7198,7 @@ static void widget_instance_render_recursive(
 	struct bitmap_data *bitmap;
 	/* port: (custom_edition_maps_picture) */
 	struct bitmap_data *custom_edition_picture;
+	struct bitmap_data *tag_preview_picture_shown;
 	short frame_index;
 
 	short mcc_picture_index; /* port: MCC owns its preview cache. */
@@ -7236,6 +7238,11 @@ static void widget_instance_render_recursive(
 	}
 	else
 		custom_edition_picture = custom_edition_maps_picture(definition->background_bitmap.index, &frame_index);
+	/* port: 3D tag preview bitmap (port/linux/game/tag_preview.c) */
+	tag_preview_picture_shown = !custom_edition_picture && widget->name && !strcmp(widget->name, "tag_preview") ?
+		tag_preview_picture() : NULL;
+	if (tag_preview_picture_shown)
+		custom_edition_picture = tag_preview_picture_shown;
 	bitmap = custom_edition_picture ? custom_edition_picture : bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -7249,8 +7256,8 @@ static void widget_instance_render_recursive(
 		pixel32 color;
 		struct rasterizer_dynamic_screen_geometry_parameters multitexture_params;
 		struct bitmap_group *bitmap_group =
-			bitmap_group_get(definition->background_bitmap.index);
-		struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(
+			definition->background_bitmap.index != NONE ? bitmap_group_get(definition->background_bitmap.index) : NULL;
+		struct bitmap_group_sequence *sequence = !bitmap_group ? NULL : TAG_BLOCK_GET_ELEMENT(
 			&bitmap_group->sequences,
 			0,
 			struct bitmap_group_sequence);
@@ -7329,8 +7336,8 @@ static void widget_instance_render_recursive(
 			rectangle2d texels = bounds;
 			short frame_x, frame_y, frame_width, frame_height;
 			boolean shown = TRUE;
-			boolean stretched = custom_edition_picture &&
-				custom_edition_maps_campaign_level(widget->animation.current_frame_index) == NONE;
+			boolean stretched = tag_preview_picture_shown || (custom_edition_picture &&
+				custom_edition_maps_campaign_level(widget->animation.current_frame_index) == NONE);
 
 			/* port: MCC art fits and clips to this style's authored thumbnail
 			 * rectangle; only the MCC module decodes or owns its texture. */

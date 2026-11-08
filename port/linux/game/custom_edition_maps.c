@@ -53,6 +53,8 @@ Each map can have, beside it in its folder:
 #include <stdlib.h>
 #include <string.h>
 #include <xtl.h>
+#define FORGE_CE_IO_STDIO 1
+#include "forge_ce_io_redirect.h"
 
 /* ---------- constants */
 

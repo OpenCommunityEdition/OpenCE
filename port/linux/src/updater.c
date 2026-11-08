@@ -45,8 +45,16 @@ update.h's: posix_update.c on Linux, win32_update.c on Windows.
 #ifndef HALO_BUILD_FLAVOR
 #define HALO_BUILD_FLAVOR "release"
 #endif
+#ifndef HALO_BUILD_REPOSITORY
+#define HALO_BUILD_REPOSITORY "SutlabSol/HaloOpenCE-Forge"
+#endif
 
-#define UPDATE_REPOSITORY "OpenCommunityEdition/OpenCE"
+#define UPDATE_DEFAULT_REPOSITORY "SutlabSol/HaloOpenCE-Forge"
+
+static const char *updater_repository(void)
+{
+	return HALO_BUILD_REPOSITORY[0] ? HALO_BUILD_REPOSITORY : UPDATE_DEFAULT_REPOSITORY;
+}
 #ifdef _WIN32
 #define UPDATE_PLATFORM "windows"
 #define PATH_SEPARATOR "\\"
@@ -348,42 +356,72 @@ done:
 
 /* ---------- checking */
 
+static long updater_parse_build_release(const char *text, long *out_network_version)
+{
+	const char *cursor = text;
+
+	while ((cursor = strstr(cursor, "\"tag_name\"")) != NULL)
+	{
+		const char *quote = strchr(cursor + 10, '"');
+		if (quote && !strncmp(quote, "\"build-", 7))
+		{
+			long build = strtol(quote + 7, NULL, 10);
+			if (build > 0)
+			{
+				const char *network = strstr(quote, "Network version: ");
+				if (out_network_version)
+					*out_network_version = network ? strtol(network + 17, NULL, 10) : 0;
+				return build;
+			}
+		}
+		cursor += 10;
+	}
+	return 0;
+}
+
 /* the build number of GitHub's latest release, 0 if there is none */
 static long updater_latest_release(void)
 {
+	char url[512];
 	char path[1200];
 	char error[512] = "";
 	size_t size = 0;
 	char *text;
-	const char *tag;
 	long build = 0;
 
+	updater_release_network_version = 0;
 	updater_path(path, sizeof(path), "update-check.json");
-	if (!update_download("https://api.github.com/repos/" UPDATE_REPOSITORY "/releases/latest", path,
-		MAXIMUM_CHECK_SIZE, NULL, NULL, error, sizeof(error)))
+	snprintf(url, sizeof(url), "https://api.github.com/repos/%s/releases/latest", updater_repository());
+	if (update_download(url, path, MAXIMUM_CHECK_SIZE, NULL, NULL, error, sizeof(error)))
+	{
+		text = SDL_LoadFile(path, &size);
+		update_delete_file(path);
+		if (text)
+		{
+			build = updater_parse_build_release(text, &updater_release_network_version);
+			SDL_free(text);
+		}
+	}
+	else
 	{
 		platform_log("update: could not check for a new version: %s", error);
-		return 0;
 	}
-	text = SDL_LoadFile(path, &size);
-	update_delete_file(path);
-	if (!text)
-		return 0;
-	/* "tag_name": "build-<number>" */
-	tag = strstr(text, "\"tag_name\"");
-	if (tag)
-	{
-		tag = strchr(tag + 10, '"');
-		if (tag && !strncmp(tag, "\"build-", 7))
-			build = strtol(tag + 7, NULL, 10);
-	}
-	/* (and the network version its notes give, "Network version: <n>") */
-	{
-		const char *network = strstr(text, "Network version: ");
 
-		updater_release_network_version = network ? strtol(network + 17, NULL, 10) : 0;
+	if (build <= 0)
+	{
+		error[0] = 0;
+		snprintf(url, sizeof(url), "https://api.github.com/repos/%s/releases?per_page=10", updater_repository());
+		if (update_download(url, path, MAXIMUM_CHECK_SIZE, NULL, NULL, error, sizeof(error)))
+		{
+			text = SDL_LoadFile(path, &size);
+			update_delete_file(path);
+			if (text)
+			{
+				build = updater_parse_build_release(text, &updater_release_network_version);
+				SDL_free(text);
+			}
+		}
 	}
-	SDL_free(text);
 	return build;
 }
 
@@ -448,8 +486,8 @@ static int SDLCALL updater_download_thread(void *context)
 /* the release's zip's address */
 static void updater_zip_url(char *url, size_t size)
 {
-	snprintf(url, size, "https://github.com/" UPDATE_REPOSITORY "/releases/download/build-%ld/" UPDATE_ASSET,
-		updater_latest_build);
+	snprintf(url, size, "https://github.com/%s/releases/download/build-%ld/" UPDATE_ASSET,
+		updater_repository(), updater_latest_build);
 }
 
 /* downloads the release's zip, showing how far it has got in a window of its

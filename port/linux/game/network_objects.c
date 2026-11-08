@@ -2569,7 +2569,7 @@ static void distributed_client_create(
 	distributed_client_apply_change(object_index, change);
 }
 
-void network_objects_handle_changes(
+void orig_network_objects_handle_changes(
 	void const *entries,
 	short count)
 {

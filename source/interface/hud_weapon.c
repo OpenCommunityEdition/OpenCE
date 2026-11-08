@@ -2073,7 +2073,8 @@ void hud_update_weapon(
 	return;
 }
 
-void hud_render_weapon_interface(
+/* port: wrapped by hud_render_weapon_interface in forge_hooks.c */
+void orig_hud_render_weapon_interface(
 	struct player_datum *player)
 {
 	long weapon_index = unit_inventory_get_weapon(

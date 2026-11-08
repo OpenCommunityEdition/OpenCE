@@ -1434,6 +1434,19 @@ static void cache_copy_initialize_read_data(
 
 	cache_file_header_verify(&self->header, "blah", TRUE);
 
+	/* port: if the Xbox cache file has a Forge FLG1 trailer at 0x1FC, clamp read_file_size
+	 * to the trailer offset at 0x1E4 so zlib decompression stops at the compressed cache end. */
+	if (*(unsigned long const *)((byte const *)&self->header + 0x1FC) == 0x464C4731UL)
+	{
+		unsigned long flg1_off = *(unsigned long const *)((byte const *)&self->header + 0x1E4);
+		if (flg1_off >= sizeof(self->header) && flg1_off < self->read_file_size)
+		{
+			self->read_file_size = flg1_off;
+			self->read_bytes_left = flg1_off;
+			self->async_read_bytes_left = flg1_off;
+		}
+	}
+
 	self->read_bytes_left -= sizeof(self->header);
 	self->current_read_offset = sizeof(self->header);
 	self->current_write_offset = sizeof(self->header);

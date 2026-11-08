@@ -250,6 +250,7 @@ symbols in this file:
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
+#include "forge_net_override.h" /* port: port/linux/game/forge_net_override.h */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
