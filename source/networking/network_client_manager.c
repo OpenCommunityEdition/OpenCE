@@ -1692,6 +1692,11 @@ boolean network_game_client_handle_game_update(
 			message_packet->game_time);
 		game_time_set_distributed(message_packet->game_time);
 	}
+	else
+	{
+		/* port: smaller deficits need simulation ticks too, bounded per frame. */
+		game_time_synchronize_distributed(message_packet->game_time);
+	}
 
 	return TRUE;
 }

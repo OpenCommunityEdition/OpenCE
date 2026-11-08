@@ -2,9 +2,10 @@
 #ifndef THIRD_PERSON_PROTOCOL_H
 #define THIRD_PERSON_PROTOCOL_H
 
-/* Separate agreement versions; never advertise these as upstream compatibility. */
-#define THIRD_PERSON_PROTOCOL_VERSION 32720
-#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32721
+/* Separate agreements include bounded client clock recovery; never advertise
+ * these as upstream compatibility. */
+#define THIRD_PERSON_PROTOCOL_VERSION 32724
+#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32725
 
 struct network_game;
 void third_person_session_host_begin(void);

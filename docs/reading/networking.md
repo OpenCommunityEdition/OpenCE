@@ -105,6 +105,35 @@ by the same elevator can have a small vertical phase difference without
 having made an invalid jump. Read those guards before simplifying the
 position comparison.
 
+A client can also lose simulation time during a loading stall. Follow
+`network_game_client_handle_message_server_game_update` in
+[network_client_message_handler.c](../../source/networking/network_client_message_handler.c),
+then `network_game_client_handle_game_update` in
+[network_client_manager.c](../../source/networking/network_client_manager.c),
+and `game_time_synchronize_distributed` / `game_time_update` in
+[game_time.c](../../source/game/game_time.c). Only a decoded reliable update
+from the selected host while in game supplies this target; distributed
+datagram timestamps do not set it.
+
+For example, a client eight ticks behind remembers the host's timestamp and
+can run two ticks on a frame that normally runs one. Every added tick executes
+the normal simulation, interpolation snapshot and network publication. Extra
+work is capped at the frame's ordinary tick count and 30 total ticks, never
+past the observed target solely for catch-up. The fractional frame remainder
+is unchanged. A repeated or older target adds no new time; this is not an
+extrapolated moving clock. Local and host clocks, menus, startup holds, pauses
+and MCC zero speed do not gain extra ticks. MCC's approved nonzero speed
+determines the ordinary budget before catch-up.
+
+The target is transient, outside saved game state, and clears on initialization,
+map disposal, game end and explicit clock replacement. Co-op checkpoint recovery
+keeps the host clock monotonic; the target carries no object epoch or saved
+world data. Initial synchronization and the existing jump for delays over one
+second remain separate. The [frame-clock regression](../../tools/harness/tests/test_game_time_sync.py)
+exercises the actual handler and tick loop, including stale targets, work bounds,
+pause/speed transitions and lifecycle resets. Runtime results remain separate
+evidence; passing this harness does not establish all network compatibility.
+
 ## Authority also governs hits and object lifetime
 
 Movement prediction does not give the client authority over kills or
@@ -245,7 +274,7 @@ following packet details into those files.
 
 ## GulchCE compatibility and teardown
 
-GulchCE Standard uses shared agreement 32718 for Xbox/CE and MCC agreement 67
+GulchCE Standard uses shared agreement 32722 for Xbox/CE and MCC agreement 68
 for MCC maps. These require updated GulchCE peers, not OpenCE 41 or older
 GulchCE builds. Map-vote messages remain IDs 94-95; the shared checkpoint
 boundary is 96; MCC owns IDs 97-100 and join kind 101. The 512-byte MCC
@@ -278,9 +307,9 @@ do not make an MCC capability claim sufficient to pass normal admission.
 `online-third-person` selects its contract per session. GulchCE Standard
 disables shoulder-camera gameplay. Its stored `opence_crossplay` setting name
 is retained for configuration compatibility, not an OpenCE compatibility claim.
-GulchCE Third Person uses camera versions 32720/32721, the additional shoulder
+GulchCE Third Person uses camera versions 32724/32725, the additional shoulder
 relay byte, and a mandatory kind 102 join envelope. MCC retains its independent
-version 66 and kind 101 admission inside that envelope. Forced Off remains a camera
+version 68 and kind 101 admission inside that envelope. Forced Off remains a camera
 session; it does not relax admission.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c):

@@ -16,7 +16,14 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   client no longer runs only the ticks the host has sent. A client's clock
   starts with the host's first game update and takes the host's time from
   it (at a game's start as at a late join), so every machine reads the
-  game's timers alike.
+  game's timers alike. A smaller delay after a stall is recovered by running
+  extra simulation ticks toward a validated reliable host timestamp. Each
+  frame runs at most as many extra ticks as its normal time budget, with the
+  existing cap of 30 total ticks. Fractional frame time is preserved; the
+  target is never extrapolated. Paused, held and menu clocks do not catch up,
+  and MCC's host-approved speed still controls the normal budget. Initial
+  synchronization and the existing clock jump for deficits over 30 ticks
+  retain their separate paths.
 - **Own player predicted.** A client drives its own player (and the
   vehicle it drives) from its local input at once. Remote players are
   driven by the inputs the host relays every tick, the latest one held
@@ -227,15 +234,17 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## GulchCE network agreement
 
-Standard Xbox/Custom Edition sessions require GulchCE agreement 32718; MCC
-requires 67. Camera sessions require 32720/32721 respectively. These revisions
-require initialized three-point boat controls in the shared controller. The
-earlier MCC correction produced the same controls, but legacy hosts and clients
-could simulate a driven boat using uninitialized friction values. Matching
-agreements exclude those older peers in both host directions. Packet layouts
-are unchanged from the preceding checkpoint agreement (32714/66/32716/32717).
-MCC version 67 also requires the updated ordinary join agreement inside its
-envelope; it does not change MCC-only boat semantics. The common
+Standard Xbox/Custom Edition sessions require GulchCE agreement 32722; MCC
+requires 68. Camera sessions require 32724/32725 respectively. These revisions
+require bounded client clock recovery through actual simulation ticks after
+small stalls. The previous agreements 32718/67/32720/32721 are refused before
+admission; their clients could retain a small clock deficit indefinitely.
+Packet layouts are unchanged from those revisions, which introduced initialized
+three-point boat controls in the shared controller. That earlier MCC correction
+produced the same controls, but legacy hosts and clients could simulate a driven
+boat using uninitialized friction values. MCC version 68 also requires the new
+ordinary join agreement inside its envelope; clock recovery is shared across
+map families. The common
 distributed header retains its 12 bytes including the checkpoint epoch, and
 message 96 is the reliable host boundary. MCC gameplay uses 97–100 and its
 join envelope 101; the camera envelope is 102. The ordinary join request also
@@ -676,7 +685,7 @@ hack, which speeds up the machine's own clock, so that nothing on it can
 tell): every two seconds it measures how fast the ticks the client's
 messages are stamped with go by against its own clock's time, and how far
 ahead of its own time they are. A client's clock starts at the host's and
-only ever jumps forward to it when behind, so an honest one is never ahead
+recovers toward a reliable timestamp only when behind, so an honest one is never ahead
 while going faster (one that caught up, or a host that stalled, is one or
 the other, not both). One more than a tenth faster and half a second ahead
 has its players' predictions refused at once (the host's copies go as its
@@ -1370,7 +1379,7 @@ so a legitimate shot from beside cover is not judged only from the head.
 Both the eye-to-muzzle and muzzle-to-impact routes must be clear; weapon
 ownership, rate, target history and damage limits still apply. Scoped, dead,
 seated, Forced Off and ordinary first-person paths do not add this history.
-The camera rules use agreement versions 32720/32721. Shared checkpoint recovery
+The camera rules use agreement versions 32724/32725. Shared checkpoint recovery
 also applies in Standard sessions and no longer depends on camera permission.
 Older camera builds are excluded from the new common header and recovery
 agreement too.
@@ -1450,13 +1459,13 @@ not.
 The host's Session Compatibility selector defaults to GulchCE Standard.
 The stored `opence_crossplay` value is retained for existing configuration files;
 its name no longer promises OpenCE 41 compatibility. Xbox/CE use agreement
-32718 and MCC uses 67. The optional shoulder camera, its input and muzzle
+32722 and MCC uses 68. The optional shoulder camera, its input and muzzle
 behavior remain disabled in Standard mode. GulchCE Third Person advertises
-camera agreement 32720 (Xbox/CE) or 32721 (MCC), requires a kind 102 envelope
+camera agreement 32724 (Xbox/CE) or 32725 (MCC), requires a kind 102 envelope
 before admission and adds the
 shoulder byte to relayed actions. The envelope's bound is 520 bytes, including
 MCC's optional 512-byte inner envelope and upstream account-link credentials.
-Its header carries revision 1, camera base version 32720 and zero reserved
+Its header carries revision 1, camera base version 32724 and zero reserved
 bytes. Ordinary authorization and map-family checks still apply.
 
 Session mode is selected before opening the lobby and locked until disposal,

@@ -21,7 +21,7 @@ This development branch requires matching GulchCE network builds.
 </h3>
 <br>
 <p align="center">
-Shared checkpoint recovery and boat controls require matching simulation agreements.
+Shared checkpoint recovery, boat controls and clock recovery require matching simulation agreements.
 </p>
 <br>
 <p align="center">
@@ -58,6 +58,7 @@ This development branch requires matching GulchCE clients on Xbox, Custom
 Edition and MCC maps. Shared checkpoint recovery separates delayed messages
 from a restored player's earlier object handle. Boat controls also require
 matching simulation so hosts and predicting clients use initialized forces.
+Clients also recover small clock delays by running the missing simulation ticks.
 Existing OpenCE 41 clients cannot join these sessions.
 
 The shared console fix also changes the saved game allocation layout. Older

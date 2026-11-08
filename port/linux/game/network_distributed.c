@@ -138,7 +138,7 @@ void console_warning(const char *format, ...);
 speeds up the machine's own clock: nothing on it can tell), found by its
 ticks, which its messages are stamped with, going by faster than the
 host's own clock's time, and ahead of the host's (a client's clock never
-is: it starts at the host's, and only ever jumps forward to it, when it is
+is: it starts at the host's, and recovers toward reliable host time only when
 behind; a host that stalled has every client ahead, their ticks going by as
 fast as time). Measured over each window this long (milliseconds)... */
 #define CLIENT_CLOCK_WINDOW_MILLISECONDS 2000

@@ -151,8 +151,11 @@ the outputs and stops subsequent cases so they can be investigated safely.
 [Milestone 10](../mcc_refactor_validation.md#milestone-10-shared-co-op-checkpoint-recovery)
 tracks shared co-op recovery, and
 [Milestone 11](../mcc_refactor_validation.md#milestone-11-shared-boat-control-initialization)
-tracks the deferred shared boat correction. Both require a compatible repair
-strategy and regression evidence; their proposed checks are not completed tests.
+tracks the shared boat correction and the separately authorized console
+lifetime repair. Milestone 10 is complete. Milestone 11's implementation and
+version separation are recorded in the Stage 11 evidence; consult its actual
+results and limits rather than treating the milestone's proposed checks as
+completed validation.
 
 ## Work through a suspected movement regression
 

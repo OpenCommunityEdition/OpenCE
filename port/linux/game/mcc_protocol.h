@@ -3,8 +3,8 @@
 #define MCC_PROTOCOL_H
 
 /* Shared checkpoint epochs occupy message 96; MCC owns messages 97-100.
- * Version 67 requires the updated shared boat simulation agreement. */
-#define MCC_PROTOCOL_VERSION 67
+ * Version 68 requires the shared bounded client clock recovery agreement. */
+#define MCC_PROTOCOL_VERSION 68
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x08
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 4
 #define MCC_PROTOCOL_JOIN_KIND 101
