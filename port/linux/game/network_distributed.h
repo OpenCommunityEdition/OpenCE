@@ -66,9 +66,8 @@ enum
 	the scoreboard (unreliable) */
 	_distributed_message_pings,
 	/* the host's actors' units: their control and state (network_actors.c).
-	A number of its own, clear of the kinds upstream adds: a build without
-	it drops the message as a kind it does not know, so the network version
-	stays upstream's and its players join as before */
+	Retain its established number, separate from upstream's base kinds.
+	The shared checkpoint agreement now requires matching session versions. */
 	_distributed_message_actor_states = 64,
 	/* co-op (a campaign map, no game engine): the host's structure BSP,
 	twice a second, for a client to switch to; numbered as actor_states */
