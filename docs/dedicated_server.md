@@ -164,7 +164,7 @@ the game's console commands of those names.
 | `sv_masters`, `sv_publisher` | viewer | The master servers and how each answered; the publisher key's id and public key (never its seed) |
 | `say <text>` (`sv_say`) | moderator | A notice on every machine's screen |
 | `tell <player> <text>` | moderator | A notice on one player's machine |
-| `kick <player>` (`sv_kick`) | moderator | Drops the player's machine; it may join again |
+| `kick <player>` (`sv_kick`) | moderator | Drops the player's machine; it may join again. A player still in the game whose machine has gone is taken out (a ban of one is refused: there is nothing to ban) |
 | `ban <player> [<duration>] [<reason>]` (`sv_ban`) | moderator (a day at most), admin | Drops the player's machine and bans its address and hardware id, for the duration (else for ever). A moderator must give a duration of a day or less: a ban for ever, or longer, is refused |
 | `unban <number\|address\|hardware id>` (`sv_unban`) | admin | Takes a ban out of `bans.txt`; the machine may join again at once, by the LAN or the internet |
 | `sv_ban_address <address\|hardware id\|discord:<id>> [<duration>] [<reason>]` | admin | Bans an IPv4 address (`a.b.c.d`), a hardware id (up to 32 hex digits) or a verified Discord account (`discord:` and its id, below), its machine here or not: its line in `bans.txt` as `ban` writes it (the other part `none`), so that `sv_bans`, `unban` and `GET /api/bans` see it, and a machine present of that address or hardware id is dropped as `ban` drops it (`player_left`'s reason `banned`). Answers `ban <n> added` (`n`: its number in `sv_bans`) |
