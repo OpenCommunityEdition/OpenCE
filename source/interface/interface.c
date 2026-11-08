@@ -76,6 +76,7 @@ symbols in this file:
 #include "bitmaps/bitmap_utilities.h"
 #include "bitmaps/color_table_group.h"
 #include "camera/director.h"
+#include "clips.h"
 #include "cseries/profile.h"
 #include "cutscene/cinematics.h"
 #include "effects/effects.h"
@@ -399,6 +400,8 @@ void interface_draw_fullscreen_overlays(
 	/* port: the frame rate counter as display.show_fps says
 	(port/linux/game/frame_rate_display.c) */
 	frame_rate_display_update();
+	/* the clip bar is the screen's, under every pane */
+	clips_draw(0, &render.camera.viewport_bounds);
 	terminal_draw();
 	main_framerate_render();
 	render_debug_profile();
@@ -1239,7 +1242,7 @@ static void interface_splitscreen_render(
 	whose middle the windows split at (compute_window_bounds) */
 	short width = (short)halo_screen_width();
 
-	if (game_engine_force_single_screen() || cinematic_in_progress())
+	if (game_engine_force_single_screen() || cinematic_in_progress() || clips_flying())
 		return;
 
 	window_count = local_player_count();

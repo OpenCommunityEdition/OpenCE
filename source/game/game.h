@@ -148,6 +148,8 @@ void game_set_players_are_double_speed(boolean players_are_double_speed);
 boolean game_players_are_double_speed(void);
 void game_difficulty_level_set(short difficulty);
 short game_difficulty_level_get(void);
+/* the map, difficulty, and seed the loaded game was started with */
+void game_loaded_setup(char *map_name, long map_name_size, short *difficulty, unsigned long *random_seed);
 short game_difficulty_level_get_ignore_easy(void);
 void game_set_game_variant(struct game_variant *variant);
 /* port: the PC options the game plays by (game_engine.h): the variant's

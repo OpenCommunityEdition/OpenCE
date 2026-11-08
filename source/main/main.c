@@ -338,6 +338,7 @@ symbols in this file:
 #include "main.h"
 #include "real_math.h"
 #include "game.h"
+#include "clips.h"
 #include "game_engine.h"
 #include "camera/camera_scripting.h"
 #include "game/cheats.h"
@@ -1453,7 +1454,8 @@ void compute_window_bounds(
 short main_get_window_count(
 	void)
 {
-	boolean single_window = game_engine_force_single_screen() || cinematic_in_progress();
+	boolean single_window = game_engine_force_single_screen() || cinematic_in_progress() ||
+		clips_flying();
 
 	return single_window ? 1 : PIN(local_player_count(), 1, MAXIMUM_WINDOWS);
 }
@@ -1505,7 +1507,8 @@ static void main_new_map(
 	main_globals.load_core = main_globals.load_core_at_startup;
 	main_globals.load_core_at_startup = FALSE;
 
-	if (main_globals.allow_persistent_storage)
+	/* a clip starts the level fresh. a saved campaign would replace the tape */
+	if (main_globals.allow_persistent_storage && !clips_replaying())
 		game_state_try_and_load_from_persistent_storage();
 	ui_widgets_disable_pause_game(30);
 
@@ -1562,16 +1565,23 @@ static void main_change_map_name(
 				NUMBEROF(options.map_name) - 1);
 			options.map_name[NUMBEROF(options.map_name) - 1] = 0;
 			options.difficulty = global_difficulty_level;
+			clips_fill_options(options.map_name, sizeof(options.map_name),
+				&options.difficulty, &options.random_seed);
 			game_dispose_from_old_map();
 			game_precache_new_map(options.map_name, TRUE);
 			game_unload();
 			main_new_map(&options);
 
-			for (local_player_index = 0;
-				local_player_index < player_spawn_count;
-				local_player_index++)
+			/* a clip plays the level it recorded. it does not become this
+			profile's last campaign level */
+			if (!clips_replaying())
 			{
-				player_profile_save_last_level_played(local_player_index);
+				for (local_player_index = 0;
+					local_player_index < player_spawn_count;
+					local_player_index++)
+				{
+					player_profile_save_last_level_played(local_player_index);
+				}
 			}
 		}
 
@@ -2404,6 +2414,9 @@ static void main_won_map_private(
 	}
 	main_globals.want_to_be_at_main_menu = TRUE;
 	main_globals.won_map = FALSE;
+	/* finishing a clip is not finishing the mission */
+	if (clips_replaying())
+		return;
 	level = main_get_solo_level_from_name(main_globals.soloplayer_map_name);
 	/* port: a level not in the campaign (a Custom Edition map's) has no next
 	one, rather than the first */
@@ -3326,7 +3339,7 @@ static void main_game_render(
 	lock_global_random_seed();
 	collision_log_continue_period(TRUE);
 	sound_render();
-	force_single_screen = game_engine_force_single_screen();
+	force_single_screen = game_engine_force_single_screen() || clips_flying();
 	last_local_player_index = NONE;
 
 	window_count = PIN(local_player_count(), 1, MAXIMUM_LOCAL_PLAYERS);
@@ -3569,6 +3582,8 @@ static boolean main_loop_iteration(
 		profile_scope_enter(main_input_section)
 		input_frame_begin();
 		input_update();
+		/* the viewer's keys, before they become the player's */
+		clips_frame();
 		input_abstraction_update();
 		profile_scope_exit(main_input_section)
 		profile_scope_enter(main_platform_events_section)
@@ -3690,10 +3705,15 @@ static boolean main_loop_iteration(
 					if (halo_interpolation_enabled())
 						render_frame = main_globals.main_menu_scenario_loaded || main_globals.halt_time_scale;
 					render_frame &= !game_engine_running() || game_time_get()>=3;
+					/* a backward scrub runs the level up to its tick before the
+					picture moves, so the catch-up is not shown from the start */
+					if (clips_catching_up())
+						render_frame = FALSE;
 
 					profile_scope_enter(main_non_deterministic_update_section)
 					collision_log_continue_period(1);
 					director_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);
+					clips_after_director();
 					observer_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);
 					collision_log_end_period();
 					game_engine_update_non_deterministic((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);

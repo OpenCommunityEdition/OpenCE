@@ -122,6 +122,7 @@ symbols in this file:
 #include "cache/texture_cache.h"
 #include "cutscene/cinematics.h"
 #include "game/game.h"
+#include "clips.h"
 #include "game/game_engine.h"
 #include "game/players.h"
 #include "input/input_abstraction.h"
@@ -1426,6 +1427,12 @@ void hud_messaging_update(
 			hud_messaging_globals->help_message;
 		state_active = datum->state_message.valid &&
 			(datum->state_message.state_message || datum->state_message.message_buffer[0]);
+		/* one player's pickup line stays off the free camera */
+		if (clips_flying())
+		{
+			help_active = FALSE;
+			state_active = FALSE;
+		}
 
 		if (objective_active || help_active || state_active)
 		{
@@ -1838,6 +1845,10 @@ void hud_messaging_update(
 			}
 			maximum_message_count--;
 		}
+
+		/* the free camera keeps the killed-by lines off the glass */
+		if (clips_flying())
+			maximum_message_count = 0;
 
 		qsort(
 			datum->messages,

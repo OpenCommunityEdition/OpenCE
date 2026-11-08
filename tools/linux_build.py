@@ -585,7 +585,11 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # Port-specific units that must see the game exactly as its own
         # sources do (port/linux/game).
         for source in sorted(Path(config["game_sources"]).glob("*.c")):
-            add_object(source, game_cflags)
+            # the guest clip recorder stamps this number into the file
+            flags = game_cflags
+            if source.name == "clips.c":
+                flags += " " + updater_defines(getattr(sln, "port_release", False))
+            add_object(source, flags)
         add_object(STB_VORBIS_SOURCE, game_cflags)
 
         platform_dir = Path(config["platform_sources"])
