@@ -83,6 +83,12 @@ boolean mcc_import_operations_bitmap_size(
 	short *width,
 	short *height);
 
+/* Whether the operations give the disc's HUD placements of the HUD interface
+`tag` ("group:path"), or of any when NULL (its hud_values line): their scales
+then stand for bitmaps of the disc's size. */
+boolean mcc_import_operations_hud_values(
+	char const *tag);
+
 /* Releases the operations and what they made. */
 void mcc_import_operations_dispose(
 	void);

@@ -223,6 +223,10 @@ static struct
 	/* each HUD bitmap's factor: written at 1/factor of MCC's size
 	(mcc_import_hud), and the message icons' and the scopes' masks' */
 	short *hud_factor;
+	/* where the operations give the disc's placements (their scales for the
+	disc's bitmaps), how much they are scaled for each bitmap as written: the
+	disc's width over its own */
+	real *hud_scale;
 	short icon_factor;
 	short mask_factor;
 	long hud_bitmaps_halved;
@@ -1221,10 +1225,13 @@ static uint8_t *mcc_import_hud_block_elements(
 }
 
 /* the bitmap references HUD placements draw (pass 0), or those placements'
-scales doubled where their bitmap is halved (pass 1) */
+scales doubled where their bitmap is halved (pass 1), or, the disc's
+placements, scaled for their bitmap as written (mcc_import_hud) */
 struct mcc_import_hud_context
 {
 	short pass;
+	/* (pass 1) whether the interface walked has the disc's placements */
+	boolean disc_values;
 	void const **references;
 	long reference_count;
 	long maximum_references;
@@ -1251,9 +1258,11 @@ static void mcc_import_hud_placement(
 		if (hud->reference_count < hud->maximum_references)
 			hud->references[hud->reference_count++] = reference;
 	}
-	else if (mcc_import_globals.hud_factor[tag_index] > 1)
+	else if (hud->disc_values ? mcc_import_globals.hud_scale[tag_index] != 1.0f :
+		mcc_import_globals.hud_factor[tag_index] > 1)
 	{
-		float factor = (float)mcc_import_globals.hud_factor[tag_index];
+		float factor = hud->disc_values ? mcc_import_globals.hud_scale[tag_index] :
+			(float)mcc_import_globals.hud_factor[tag_index];
 		float scale;
 
 		csmemcpy(&scale, placement + 4, sizeof(scale));
@@ -1287,6 +1296,13 @@ static void mcc_import_hud_walk(
 			if ((unsigned long)instance->group_tag == groups[group_index] && instance->base_address &&
 				custom_edition_hud_definition_bytes(groups[group_index]))
 			{
+				char key[300];
+
+				snprintf(key, sizeof(key), "%c%c%c%c:%s", (char)(groups[group_index] >> 24),
+					(char)(groups[group_index] >> 16), (char)(groups[group_index] >> 8), (char)groups[group_index],
+					instance->name);
+				hud->disc_values = hud->pass == 1 && mcc_import_globals.hud_scale &&
+					mcc_import_operations_hud_values(key);
 				custom_edition_hud_placements_walk(instance->base_address, groups[group_index], &walk);
 			}
 		}
@@ -1444,6 +1460,28 @@ static void mcc_import_hud(
 			mcc_import_globals.icon_factor = factor;
 		else if (candidates[tag_index] == MCC_IMPORT_HUD_MASK)
 			mcc_import_globals.mask_factor = factor;
+	}
+	/* the disc's placements: scaled by how much smaller or larger than the
+	disc's each bitmap they draw is written (MCC's layout of a sprite sheet,
+	or one that cannot be halved), by the width of its first image */
+	if (mcc_import_operations_hud_values(NULL))
+		mcc_import_globals.hud_scale = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(real));
+	for (tag_index = 0; mcc_import_globals.hud_scale && tag_index < mcc_import_globals.tag_count; tag_index++)
+	{
+		struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[tag_index];
+		struct bitmap_group const *group = instance->group_tag == 'bitm' ? instance->base_address : NULL;
+		short disc_width, disc_height, factor = mcc_import_globals.hud_factor[tag_index];
+		struct bitmap_data const *first;
+
+		mcc_import_globals.hud_scale[tag_index] = 1.0f;
+		if (!group || group->bitmaps.count <= 0 ||
+			!mcc_import_operations_bitmap_size(instance->name, &disc_width, &disc_height))
+		{
+			continue;
+		}
+		first = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, 0, struct bitmap_data);
+		if (first->width > 0)
+			mcc_import_globals.hud_scale[tag_index] = (real)disc_width * (real)(factor > 1 ? factor : 1) / (real)first->width;
 	}
 	hud.pass = 1;
 	mcc_import_hud_walk(&hud);
@@ -2080,6 +2118,7 @@ static boolean mcc_import_map(
 	mcc_import_free(mcc_import_globals.out_names_text);
 	mcc_import_free(mcc_import_globals.table.instances);
 	mcc_import_free(mcc_import_globals.hud_factor);
+	mcc_import_free(mcc_import_globals.hud_scale);
 	for (bsp_index = 0; bsp_index < mcc_import_globals.bsp_count; bsp_index++)
 		mcc_import_free(mcc_import_globals.bsps[bsp_index].bytes);
 	mcc_import_operations_dispose();

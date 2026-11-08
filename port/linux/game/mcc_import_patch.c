@@ -21,6 +21,10 @@ tag's root ("root.unit_seats[3].weapon_classes[0]") and its values:
             "element" operations' that follow, for names it lacks)
   tag       a whole tag added (serialized), a tag of the disc's MCC has
             in another map, or one of the disc's assets
+and, read by the import itself (mcc_import.c, mcc_import_hud):
+  bitmap_size  the disc's width and height of a HUD bitmap's first image
+  hud_values   a HUD interface whose placements the operations give as the
+               disc's (only how the HUD looks: the fingerprint has none)
 An element is serialized as its bytes, then for each of its pointer fields
 in schema order: a block's count and elements, a data field's size and
 bytes, a reference's or tag index's name (16-bit length and text), an inline
@@ -1109,7 +1113,8 @@ long mcc_import_operations_apply(
 
 		if (!strcmp(operation->kind, "order") || !strcmp(operation->kind, "tag") ||
 			!strcmp(operation->kind, "element") || !strcmp(operation->kind, "missing") ||
-			!strcmp(operation->kind, "handle") || !strcmp(operation->kind, "bitmap_size"))
+			!strcmp(operation->kind, "handle") || !strcmp(operation->kind, "bitmap_size") ||
+			!strcmp(operation->kind, "hud_values"))
 		{
 			continue;
 		}
@@ -1166,6 +1171,22 @@ boolean mcc_import_operations_bitmap_size(
 			*height = (short)strtol(operation->b, NULL, 10);
 			return *width > 0 && *height > 0;
 		}
+	}
+
+	return FALSE;
+}
+
+boolean mcc_import_operations_hud_values(
+	char const *tag)
+{
+	long index;
+
+	for (index = 0; index < mcc_patch_globals.operation_count; index++)
+	{
+		struct mcc_patch_operation const *operation = &mcc_patch_globals.operations[index];
+
+		if (!strcmp(operation->kind, "hud_values") && (!tag || !strcmp(operation->tag, tag)))
+			return TRUE;
 	}
 
 	return FALSE;
