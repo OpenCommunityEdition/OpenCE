@@ -1551,7 +1551,14 @@ down); each machine logs every player's position, health and shields,
 where they aim and face, their animation state and how hard they move,
 weapons, grenades, score, kills and deaths every second, with the objects
 made and removed and the hits reported, dealt, rejected and replayed, so
-two machines' views of one game can be compared. `debug.network_test_kill`,
+two machines' views of one game can be compared. Observation uses the first
+frame in each absolute 30-tick simulation second and records its actual tick. A late
+first sample does not offset every following sample; missed states are never
+invented or backfilled. The comparison still requires samples within two ticks.
+The reported drift counters accumulate since the preceding observation and
+are reset when read; they do not drive simulation or correction. Scripted test
+actions keep their separate established cadence.
+`debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
 swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
