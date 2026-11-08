@@ -186,13 +186,13 @@ def test_paused_online_restrictions_keep_navigation_and_buttons(tmp_path):
     run_c(tmp_path, stubs + HEADER + (ROOT/'port/linux/game/frontend_pages.inl').read_text() +
           without_includes('port/linux/game/frontend_menu_runtime.inl') + r'''
 int main(void){
-    struct widget_instance root={0},list={0},rows[6]={{0}};int i;
-    char const *names[]={"tabs","row_network_online0","row_link_9","row_link_10","row_link_11","button_bar"};
+    struct widget_instance root={0},list={0},rows[7]={{0}};int i;
+    char const *names[]={"tabs","row_network_online0","row_link_9","row_link_10","row_link_11","button_bar","row_discord"};
     root.definition_tag_index=8;root.child=&list;list.parent=&root;list.name="options";list.child=rows;
-    for(i=0;i<6;i++){rows[i].name=names[i];rows[i].visible=1;rows[i].parent=&list;rows[i].next=i<5?rows+i+1:0;}
+    for(i=0;i<7;i++){rows[i].name=names[i];rows[i].visible=1;rows[i].parent=&list;rows[i].next=i<6?rows+i+1:0;}
     main_menu=0;list.focused_child=rows+1;frontend_menu_help(&list);
     assert(rows[0].visible&&rows[5].visible); /* tab and footer navigation survive */
-    assert(!rows[1].visible&&!rows[4].visible&&rows[2].visible&&rows[3].visible);
+    assert(!rows[1].visible&&!rows[4].visible&&!rows[6].visible&&rows[2].visible&&rows[3].visible);
     assert(list.focused_child==rows&&list.parameters.list.selected_index==0);
     return 0;
 }
@@ -514,10 +514,11 @@ def test_mcc_packages_have_modern_navigation_and_platform_scoping():
     assert widgets['modern/mcc_packages/row_link_10'].find("on[@event='a']").get('run') == 'port frontend page'
 
 
-@pytest.mark.parametrize('platform', ['desktop', 'android', 'web'])
-def test_modern_network_menu_reaches_sharing(platform):
-    widgets = {w.get('name'): w for w in ET.fromstring(frontend_menu.document()).findall('widget')}
-    pending, reached = ['modern/online/settings'], set()
+def reachable_menu_widgets(widgets, start, platform):
+    runtime = (ROOT / 'port/linux/game/frontend_menu_runtime.inl').read_text()
+    editors = dict(re.findall(r'!strcmp\(key, "([^"]+)"\)\) target = "([^"]+)"',
+                              function(runtime, 'frontend_editor')))
+    pending, reached = [start], set()
     visible = lambda node: platform in node.get('platform', 'desktop android web').split()
     while pending:
         name = pending.pop()
@@ -529,16 +530,73 @@ def test_modern_network_menu_reaches_sharing(platform):
                 continue
             if node.tag == 'child':
                 pending.append(node.get('widget'))
+            elif node.get('open'):
+                pending.append(node.get('open'))
             elif node.get('run') == 'port frontend page':
                 leaf = name.rsplit('/', 1)[1]
                 assert leaf.startswith(('row_link_', 'tab_'))
                 page = int(leaf.rsplit('_', 1)[1])
                 pending.append(frontend_menu.page_base(page) + '/settings')
+            elif node.get('run') == 'port frontend editor':
+                target = editors.get(name.rsplit('/', 1)[1])
+                if target:
+                    pending.append('main_menu/settings_select/player_setup/player_profile_edit/' +
+                                   target.replace('\\\\', '/'))
+    return reached
+
+
+@pytest.mark.parametrize('platform', ['desktop', 'android', 'web'])
+def test_modern_network_menu_reaches_sharing(platform):
+    widgets = {w.get('name'): w for w in ET.fromstring(frontend_menu.document()).findall('widget')}
+    reached = reachable_menu_widgets(widgets, 'modern/online/settings', platform)
     settings = {widgets[name].get('setting') for name in reached}
     assert {'network.mcc_map_share', 'network.map_download', 'network.map_seed',
             'game.mcc_campaigns', 'game.mcc_collections'} <= settings
     assert ('game.workshop_maps' in settings) == (platform == 'desktop')
     assert 'modern/sharing/row_mcc_downloads' in reached
+
+
+@pytest.mark.parametrize('platform', ['desktop', 'android', 'web'])
+def test_modern_settings_match_stock_functionality(platform):
+    stock = {w.get('name'): w for file in (ROOT / 'port/assets/menus/ce').glob('*.xml')
+             for w in ET.parse(file).getroot().findall('widget')}
+    modern = {**stock, **{w.get('name'): w for w in ET.fromstring(frontend_menu.document()).findall('widget')}}
+    stock_route = reachable_menu_widgets(stock,
+        'main_menu/settings_select/player_setup/player_profile_edit/player_profile_edit_screen', platform)
+    modern_route = reachable_menu_widgets(modern, 'modern/settings', platform)
+    settings = lambda widgets, route: {widgets[n].get('setting') for n in route if widgets[n].get('setting')}
+    assert settings(stock, stock_route) == settings(modern, modern_route)
+
+
+def test_stock_editors_preserve_pending_modern_settings(tmp_path):
+    stubs = RUNTIME_STUBS.replace(function(RUNTIME_STUBS, 'ui_widget_port_open'), r'''
+static char const *opened;
+boolean ui_widget_port_open(struct widget_instance *w,char const *s,boolean *d) {
+    (void)w;assert(strstr(s,opened));opens++;*d=1;return 1;
+}
+''')
+    run_c(tmp_path, stubs + HEADER + (ROOT/'port/linux/game/frontend_pages.inl').read_text() +
+          without_includes('port/linux/game/frontend_menu_runtime.inl') + r'''
+int main(void) {
+    struct widget_instance root={0},spinner={0},action={0};int deleted=0,i;
+    char const *names[]={"row_dead_zones","row_discord"};
+    char const *targets[]={"gamepad_setup\\dead_zones\\dead_zone_settings_screen",
+        "network_setup\\discord_account\\discord_account_settings_screen"};
+    root.definition_tag_index=3;root.child=&spinner;spinner.parent=&root;
+    spinner.type=2;spinner.definition_tag_index=5;spinner.parameters.list.selected_index=2;
+    spinner.next=&action;action.parent=&root;
+    for(i=0;i<2;i++) {
+        action.name=names[i];opened=targets[i];deleted=0;
+        assert(frontend_menu_event(&action,"port frontend editor",&deleted)&&deleted);
+        assert(frontend_session.count==1&&frontend_session.pending[0].index==2);
+        assert(!frontend_session.owns_profile&&!writes);
+    }
+    assert(opens==2);
+    assert(frontend_menu_event(&action,"port frontend cancel",&deleted));
+    assert(!frontend_session.count&&!writes&&transitions==1);
+    return 0;
+}
+''')
 
 
 def test_scroll_hook_precedes_pointer_registration():

@@ -51,8 +51,10 @@ STYLE = ("MENU STYLE", "display.menu_frontend",
          "Choose the Settings and submenu style. Saved changes take effect on return to the main menu. The starting menu, pause menu and map UI keep their existing layout.", None)
 INTERFACE_RENDERING = ("display.high_res_text", "display.high_res_hud")
 EDITORS = {
+    3: [("discord", "DISCORD ACCOUNT", "Manage account linking in its existing editor. That editor's OK saves changes independently of these Settings.")],
     10: [("mcc_downloads", "MCC DOWNLOADS", "View storage and remove copies received from hosts. Original packages and saves are kept.")],
     2: [("keyboard", "KEYBOARD BINDINGS", "Set the base game's keyboard and mouse bindings in its existing editor. That editor's OK saves bindings independently of these Settings."),
+        ("dead_zones", "STICK DEAD ZONES", "Adjust each stick's dead zone in its existing editor. That editor's OK saves changes independently of these Settings."),
         ("gamepad", "CONTROLLER REMAPPING", "Remap each player's controller in the existing editor. That editor's OK saves bindings independently of these Settings.")],
     5: [("profiles", "SELECT PROFILE", "Select or create a player profile using the existing profile manager. Save or cancel any profile edits before changing profiles."),
         ("name", "PLAYER NAME", "Edit the selected profile's name. Settings OK saves the profile; Cancel discards its pending changes."),

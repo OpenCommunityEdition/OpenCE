@@ -491,7 +491,8 @@
 		<child widget="modern/controls/row_display_menu_cursor4" x="28" y="257" platform="desktop" />
 		<child widget="modern/controls/row_link_14" x="28" y="287" platform="android" />
 		<child widget="modern/controls/row_keyboard" x="28" y="317" />
-		<child widget="modern/controls/row_gamepad" x="28" y="347" />
+		<child widget="modern/controls/row_dead_zones" x="28" y="347" />
+		<child widget="modern/controls/row_gamepad" x="28" y="377" />
 		<child widget="modern/controls/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/controls/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -586,13 +587,20 @@
 		<child widget="modern/controls/label_keyboard" x="12" y="3" />
 	</widget>
 	<widget name="modern/controls/label_keyboard" type="text" controller="1" width="312" height="24" string_list="modern/controls/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/controls/row_dead_zones" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
+		<on event="a" run="port frontend editor" />
+		<on event="start" run="port frontend editor" />
+		<on event="left_mouse" run="mouse emit accept event" />
+		<child widget="modern/controls/label_dead_zones" x="12" y="3" />
+	</widget>
+	<widget name="modern/controls/label_dead_zones" type="text" controller="1" width="312" height="24" string_list="modern/controls/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/controls/row_gamepad" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend editor" />
 		<on event="start" run="port frontend editor" />
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/controls/label_gamepad" x="12" y="3" />
 	</widget>
-	<widget name="modern/controls/label_gamepad" type="text" controller="1" width="312" height="24" string_list="modern/controls/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/controls/label_gamepad" type="text" controller="1" width="312" height="24" string_list="modern/controls/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
 	<strings name="modern/controls/labels">
 		<string text="HORIZONTAL SENS." />
 		<string text="VERTICAL SENS." />
@@ -601,6 +609,7 @@
 		<string text="MENU CURSOR" />
 		<string text="TOUCH CONTROLS &gt;" />
 		<string text="KEYBOARD BINDINGS &gt;" />
+		<string text="STICK DEAD ZONES &gt;" />
 		<string text="CONTROLLER REMAPPING &gt;" />
 	</strings>
 	<strings name="modern/controls/help_strings">
@@ -612,6 +621,7 @@
 		<string text="The menus' blue arrow for the mouse, and its size; Off shows the system's pointer." />
 		<string text="Open touch controls settings. Pending changes stay until OK or Cancel." />
 		<string text="Set the base game's keyboard and mouse bindings in its existing editor. That editor's OK saves bindings independently of these Settings." />
+		<string text="Adjust each stick's dead zone in its existing editor. That editor's OK saves changes independently of these Settings." />
 		<string text="Remap each player's controller in the existing editor. That editor's OK saves bindings independently of these Settings." />
 	</strings>
 	<widget name="modern/controls/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -684,6 +694,7 @@
 		<child widget="modern/online/row_link_9" x="28" y="257" />
 		<child widget="modern/online/row_link_10" x="28" y="287" />
 		<child widget="modern/online/row_link_11" x="28" y="317" />
+		<child widget="modern/online/row_discord" x="28" y="347" />
 		<child widget="modern/online/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/online/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -777,6 +788,13 @@
 		<child widget="modern/online/label_link_11" x="12" y="3" />
 	</widget>
 	<widget name="modern/online/label_link_11" type="text" controller="1" width="312" height="24" string_list="modern/online/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/online/row_discord" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
+		<on event="a" run="port frontend editor" />
+		<on event="start" run="port frontend editor" />
+		<on event="left_mouse" run="mouse emit accept event" />
+		<child widget="modern/online/label_discord" x="12" y="3" />
+	</widget>
+	<widget name="modern/online/label_discord" type="text" controller="1" width="312" height="24" string_list="modern/online/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
 	<strings name="modern/online/labels">
 		<string text="INTERNET PLAY" />
 		<string text="UPNP FORWARDING" />
@@ -785,6 +803,7 @@
 		<string text="BOTS &gt;" />
 		<string text="MAP SHARING &gt;" />
 		<string text="SERVER BROWSER &gt;" />
+		<string text="DISCORD ACCOUNT &gt;" />
 	</strings>
 	<strings name="modern/online/help_strings">
 		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
@@ -795,6 +814,7 @@
 		<string text="Open bots settings. Pending changes stay until OK or Cancel." />
 		<string text="Open map sharing settings. Pending changes stay until OK or Cancel." />
 		<string text="Open server browser settings. Pending changes stay until OK or Cancel." />
+		<string text="Manage account linking in its existing editor. That editor's OK saves changes independently of these Settings." />
 	</strings>
 	<widget name="modern/online/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		<child widget="modern/online/button_defaults" x="0" y="0" />

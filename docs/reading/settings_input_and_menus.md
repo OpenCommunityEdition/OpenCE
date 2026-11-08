@@ -61,7 +61,15 @@ gaps. A visible widget alone does not establish that its action is implemented.
 
 Stock/OpenCE-style settings expose **Network Setup > Map Sharing** on desktop,
 Android and web. Classic PC and Xbox-style settings reuse those services;
-Modern exposes the same controls under **Online > Map Sharing**. The page
+Modern exposes the same controls under **Online > Map Sharing**. Its
+**Controls > Stick Dead Zones** and **Online > Discord Account** actions open
+the existing Stock editors through `frontend_editor`; those editors save with
+their own OK buttons, while pending Modern settings remain pending. Account
+changes stay unavailable during gameplay, matching Stock's restrictions.
+`test_modern_settings_match_stock_functionality` compares reachable setting
+bindings on desktop, Android and web; callback tests also cover pending edits
+and the in-game restriction. These optional frontend routes are Gulch-specific.
+The sharing page
 includes client downloads, host MCC sharing, package settings and downloaded-copy
 management. Steam discovery alone is desktop-only. The Stock route is generated
 by `port_settings.settings_files` and loaded by `halo_menus_load` without the
