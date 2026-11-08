@@ -1169,9 +1169,57 @@ boolean network_game_server_kick_player(
 	return TRUE;
 }
 
+/* port: the players of a machine that is not in the game (whose machine
+left with them still in it: nothing else takes them out), out of the game
+as a leaving machine's go; FALSE if it has none, or is in the game, or the
+game is a split screen one (whose bots have machines of their own) */
+static boolean network_game_server_remove_players_of_gone_machine(
+	struct network_game_server *server,
+	long machine_index)
+{
+	boolean removed = FALSE;
+	long index;
+
+	if (!VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) ||
+		network_game_server_client_machine_is_joined_to_game(server, &server->client_machines[machine_index]) ||
+		network_game_is_splitscreen_local())
+	{
+		return FALSE;
+	}
+	for (index = 0; index < MAXIMUM_NETWORK_PLAYER_COUNT; index++)
+	{
+		struct network_player player = server->game.players[index];
+
+		if (!network_player_is_valid(&player) || player.machine_index != machine_index)
+			continue;
+		if (server->state == _network_game_server_state_ingame)
+		{
+			struct message_server_remove_player_ingame remove_player;
+			void *message;
+
+			remove_player.player = player;
+			remove_player.reason = game_time_get() + NETWORK_GAME_PLAYER_QUIT_DELAY;
+			message = create_network_game_message(_message_server_remove_player_ingame, &remove_player,
+				sizeof(remove_player));
+			if (message && !network_game_server_send_message_to_all_machines(server, message))
+				network_event("some machines missed the quit of a player whose machine had gone");
+		}
+		if (network_game_remove_player(&server->game, &player))
+			removed = TRUE;
+	}
+	if (removed)
+	{
+		network_event("the players of machine #%ld, which had gone, taken out of the game", machine_index);
+		if (network_game_server_lobby_is_open(server) && !network_game_server_send_game_data_pregame(server))
+			network_event("some machines missed the lobby without the players of a machine that had gone");
+	}
+	return removed;
+}
+
 /* port: the host's Kick and Ban on the scoreboard (game_engine.c): the
 machine of the player at the network machine index it has, kicked or
-banned as the commands do; FALSE (said) for none, or the host's own */
+banned as the commands do; FALSE (said) for none, or the host's own. A kick
+of a player whose machine has gone takes the player out */
 boolean network_game_server_kick_machine_of_player(
 	long machine_index,
 	boolean ban)
@@ -1188,6 +1236,15 @@ boolean network_game_server_kick_machine_of_player(
 		!network_game_server_client_machine_is_joined_to_game(server, &server->client_machines[machine_index]) ||
 		network_game_server_client_machine_is_local(server, &server->client_machines[machine_index]))
 	{
+		if (!ban && network_game_server_remove_players_of_gone_machine(server, machine_index))
+			return TRUE;
+		if (ban && VALID_INDEX(machine_index, MAXIMUM_NETWORK_MACHINE_COUNT) &&
+			!network_game_server_client_machine_is_joined_to_game(server, &server->client_machines[machine_index]) &&
+			network_game_server_machine_has_players(server, machine_index))
+		{
+			console_warning("ban: the player's machine has left the game, and has nothing to ban (kick takes the player out)");
+			return FALSE;
+		}
 		console_warning("%s: not a player of the host's own machine, nor one not joined", ban ? "ban" : "kick");
 		return FALSE;
 	}
@@ -3064,6 +3121,12 @@ static void network_game_server_restore_held_players(
 	{
 		struct network_player player = network_game_server_held_players[index];
 
+		/* (not one of a machine that has gone) */
+		if (!network_player_is_valid(&player) ||
+			!network_game_server_client_machine_is_joined_to_game(server, &server->client_machines[player.machine_index]))
+		{
+			continue;
+		}
 		if (!network_game_add_player(&server->game, &player))
 			network_event("failed to put back a player held for a map download");
 	}
@@ -3932,6 +3995,13 @@ boolean network_game_server_remove_client_machine_from_game(
 						waiting_index++;
 					}
 				}
+				/* port: and so do its players held out of the game for a map
+				download: put back as the game ends
+				(network_game_server_reset_to_pregame), they were the players
+				of a machine that had gone, which nothing took out */
+				network_game_server_discard_held_players(client->machine_index);
+				if (VALID_INDEX(client->machine_index, MAXIMUM_NETWORK_MACHINE_COUNT))
+					network_game_server_map_pending[client->machine_index] = FALSE;
 			}
 			server->client_machines[i].connection = NULL;
 			server->client_machines[i].last_received_update_sequence_number = 0;
