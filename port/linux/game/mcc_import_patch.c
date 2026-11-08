@@ -1109,7 +1109,7 @@ long mcc_import_operations_apply(
 
 		if (!strcmp(operation->kind, "order") || !strcmp(operation->kind, "tag") ||
 			!strcmp(operation->kind, "element") || !strcmp(operation->kind, "missing") ||
-			!strcmp(operation->kind, "handle"))
+			!strcmp(operation->kind, "handle") || !strcmp(operation->kind, "bitmap_size"))
 		{
 			continue;
 		}
@@ -1146,6 +1146,29 @@ long mcc_import_operations_apply(
 		mcc_patch_globals.applied[5], mcc_patch_globals.applied[6], mcc_patch_globals.failed);
 
 	return mcc_patch_globals.failed;
+}
+
+boolean mcc_import_operations_bitmap_size(
+	char const *name,
+	short *width,
+	short *height)
+{
+	long index;
+
+	for (index = 0; index < mcc_patch_globals.operation_count; index++)
+	{
+		struct mcc_patch_operation const *operation = &mcc_patch_globals.operations[index];
+
+		if (!strcmp(operation->kind, "bitmap_size") && !strncmp(operation->tag, "bitm:", 5) &&
+			!strcmp(operation->tag + 5, name))
+		{
+			*width = (short)strtol(operation->a, NULL, 10);
+			*height = (short)strtol(operation->b, NULL, 10);
+			return *width > 0 && *height > 0;
+		}
+	}
+
+	return FALSE;
 }
 
 void mcc_import_operations_dispose(

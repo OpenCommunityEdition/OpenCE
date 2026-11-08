@@ -75,8 +75,47 @@ has geometries its last geometry again in their place. */
 void mcc_import_models_complete(
 	struct mcc_import_tags *tags);
 
+/* The disc's size of the HUD bitmap `name` (its first image: the
+operations' bitmap_size lines), to which the import halves MCC's: FALSE when
+the operations do not give it. */
+boolean mcc_import_operations_bitmap_size(
+	char const *name,
+	short *width,
+	short *height);
+
 /* Releases the operations and what they made. */
 void mcc_import_operations_dispose(
+	void);
+
+/* ---------- prototypes/MCC_IMPORT_SOUNDS.C */
+
+/* writes `size` bytes of samples into the map's body: their offset in the
+file */
+typedef unsigned long (*mcc_import_sound_write_proc)(void *context, void const *bytes, unsigned long size);
+
+/* Reads MCC's sound banks (the data root's sound\pc): FALSE when they
+cannot be, and the maps' sounds are then silent. */
+boolean mcc_import_sounds_open(
+	void);
+void mcc_import_sounds_close(
+	void);
+/* (mcc_sounds_muted_proc) a sound MCC's load muted, and its pitch ranges */
+void mcc_import_sounds_muted(
+	unsigned char *sound,
+	long pitch_range_count);
+/* Writes the samples of every muted sound of the tags written
+(old_to_new: NONE for a tag left out), from the banks, and gives the
+sounds the disc's shape. Returns how many; mcc_import_sounds_silent how
+many stay silent. */
+long mcc_import_sounds_write(
+	struct mcc_import_tags *tags,
+	long const *old_to_new,
+	mcc_import_sound_write_proc write,
+	void *context);
+long mcc_import_sounds_silent(
+	void);
+/* Lets go of what the map's sounds needed, once the map is written. */
+void mcc_import_sounds_map_done(
 	void);
 
 /* ---------- prototypes/MCC_IMPORT_FINGERPRINT.C */

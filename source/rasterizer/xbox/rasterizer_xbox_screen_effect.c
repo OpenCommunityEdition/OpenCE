@@ -281,11 +281,13 @@ static void rasterizer_screen_effect_set_texture_transforms(
 		convolution_size.j = convolution_bitmap->height;
 		/* port: an MCC map's masks (the scopes') are twice the Xbox's size,
 		as its HUD is laid out (port/linux/game/cache_file_formats.c,
-		mcc_import_hud_convert): mapped at the Xbox's size */
+		mcc_import_hud_convert): mapped at the Xbox's size (an imported MCC map's
+		at that times how much smaller they are written:
+		port/linux/game/mcc_import.c) */
 		if (convolution_bitmap == parameters->convolution_mask && mcc_cache_loaded())
 		{
-			convolution_size.i *= 0.5f;
-			convolution_size.j *= 0.5f;
+			convolution_size.i *= 0.5f * mcc_imported_mask_factor();
+			convolution_size.j *= 0.5f * mcc_imported_mask_factor();
 		}
 		scanline_size.i = scanline_bitmap->width;
 		scanline_size.j = scanline_bitmap->height;

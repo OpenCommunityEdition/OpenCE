@@ -61,6 +61,10 @@ enum
 	V5_SCENARIO_STRUCTURE_BSPS_OFFSET = 0x5A4,
 	V5_SCENARIO_TYPE_OFFSET = 0x3C,
 	V5_BITMAP_CACHED_BIT = 7,
+	/* what draws a HUD bitmap (mcc_import_hud) */
+	MCC_IMPORT_HUD_PLACEMENT = 1,
+	MCC_IMPORT_HUD_ICONS,
+	MCC_IMPORT_HUD_MASK,
 	MCC_IMPORT_MAXIMUM_BSPS = 32,
 	/* the scenario's script syntax data: a data array of nodes */
 	V5_SCENARIO_SCRIPT_SYNTAX_DATA_OFFSET = 0x474,
@@ -216,9 +220,14 @@ static struct
 	/* the structure BSPs written (for the fingerprint) */
 	struct mcc_fingerprint_bsp bsps[MCC_IMPORT_MAXIMUM_BSPS];
 	long bsp_count;
-	/* the HUD bitmaps written at half their size (mcc_import_hud) */
-	boolean *hud_halved;
+	/* each HUD bitmap's factor: written at 1/factor of MCC's size
+	(mcc_import_hud), and the message icons' and the scopes' masks' */
+	short *hud_factor;
+	short icon_factor;
+	short mask_factor;
 	long hud_bitmaps_halved;
+	/* the sounds written, from MCC's banks */
+	long sounds;
 	char *out_names_text;
 } mcc_import_globals;
 
@@ -869,6 +878,33 @@ static unsigned long mcc_import_body_file_offset(
 	return V5_HEADER_BYTES + body->length;
 }
 
+/* (mcc_import_sound_write_proc) a sound's samples into the body, at a
+multiple of 0x200 as the disc's are: their offset in the file */
+static unsigned long mcc_import_body_sound(
+	void *context,
+	void const *bytes,
+	unsigned long size)
+{
+	struct mcc_import_body *body = context;
+	unsigned long offset;
+
+	mcc_import_body_align(body, 0x200);
+	offset = mcc_import_body_file_offset(body);
+	mcc_import_body_write(body, bytes, size);
+
+	return offset;
+}
+
+/* (mcc_sounds_muted_proc, of exactly its type) */
+static void mcc_import_sound_muted(
+	uint8_t *sound,
+	int32_t pitch_range_count)
+{
+	mcc_import_sounds_muted(sound, (long)pitch_range_count);
+
+	return;
+}
+
 /* ---------- private code: the structure BSPs */
 
 /* The BSP of `reference`, read and converted as the game does to draw it,
@@ -942,6 +978,31 @@ static boolean mcc_import_structure_bsp(
 	size = V5_BSP_HEADER_BYTES + 2 * material_count * V5_BUFFER_ENTRY_BYTES + 4 +
 		schema->definition->size + mcc_import_measure(schema->definition, (byte const *)structure_bsp);
 	size = (size + 0x7FF) & ~0x7FFUL;
+	/* (the measure is generous, 4 bytes an element: the BSP is copied once
+	to learn its size, so that it starts where the game reads it, the top of
+	the tag cache less that) */
+	space.bytes = mcc_import_calloc(1, size);
+	space.address = V5_BSP_TOP - size;
+	space.size = size;
+	space.used = 0;
+	space.overflowed = FALSE;
+	if (space.bytes)
+	{
+		long dropped = mcc_import_globals.references_dropped;
+
+		mcc_import_allocate(&space, V5_BSP_HEADER_BYTES, 4);
+		mcc_import_allocate(&space, 2 * material_count * V5_BUFFER_ENTRY_BYTES, 4);
+		root = mcc_import_allocate(&space, schema->definition->size, 4);
+		if (root)
+		{
+			mcc_import_copy_element(&space, schema->definition, (byte const *)structure_bsp,
+				(byte *)mcc_import_at(&space, root));
+		}
+		if (!space.overflowed && root)
+			size = (space.used + 0x7FF) & ~0x7FFUL;
+		mcc_import_globals.references_dropped = dropped;
+		mcc_import_free(space.bytes);
+	}
 	address = V5_BSP_TOP - size;
 	space.bytes = mcc_import_calloc(1, size);
 	space.address = address;
@@ -1190,15 +1251,16 @@ static void mcc_import_hud_placement(
 		if (hud->reference_count < hud->maximum_references)
 			hud->references[hud->reference_count++] = reference;
 	}
-	else if (mcc_import_globals.hud_halved[tag_index])
+	else if (mcc_import_globals.hud_factor[tag_index] > 1)
 	{
+		float factor = (float)mcc_import_globals.hud_factor[tag_index];
 		float scale;
 
 		csmemcpy(&scale, placement + 4, sizeof(scale));
-		scale *= 2.0f;
+		scale *= factor;
 		csmemcpy(placement + 4, &scale, sizeof(scale));
 		csmemcpy(&scale, placement + 8, sizeof(scale));
-		scale *= 2.0f;
+		scale *= factor;
 		csmemcpy(placement + 8, &scale, sizeof(scale));
 	}
 
@@ -1239,7 +1301,8 @@ static void mcc_import_hud_others(
 	struct mcc_import_hud_context const *hud,
 	struct tag_schema_definition const *definition,
 	byte const *element,
-	boolean *others)
+	boolean *others,
+	boolean *candidates)
 {
 	struct tag_schema_field const *field;
 
@@ -1261,6 +1324,17 @@ static void mcc_import_hud_others(
 				{
 					continue;
 				}
+				/* (the message icons and the scopes' masks, which the game
+				draws at half MCC's size, an imported map's too:
+				hud_messaging.c, rasterizer_xbox_screen_effect.c,
+				mcc_imported_hud_loaded) */
+				if (field->name && (!strcmp(field->name, "messaging.messaging_icons") ||
+					!strcmp(field->name, "mask_fullscreen") || !strcmp(field->name, "mask_splitscreen")))
+				{
+					candidates[reference->index & 0xFFFF] = !strcmp(field->name, "messaging.messaging_icons") ?
+						MCC_IMPORT_HUD_ICONS : MCC_IMPORT_HUD_MASK;
+					continue;
+				}
 				for (listed = 0; listed < hud->reference_count; listed++)
 				{
 					if (hud->references[listed] == (void const *)reference)
@@ -1271,7 +1345,7 @@ static void mcc_import_hud_others(
 			}
 			else if (field->type == _tag_schema_struct)
 			{
-				mcc_import_hud_others(hud, field->definition, at, others);
+				mcc_import_hud_others(hud, field->definition, at, others, candidates);
 			}
 			else if (field->type == _tag_schema_block)
 			{
@@ -1282,7 +1356,7 @@ static void mcc_import_hud_others(
 				for (element_index = 0; block->address && element_index < block->count; element_index++)
 				{
 					mcc_import_hud_others(hud, element_definition,
-						(byte const *)block->address + element_index * element_definition->size, others);
+						(byte const *)block->address + element_index * element_definition->size, others, candidates);
 				}
 			}
 		}
@@ -1300,20 +1374,24 @@ static void mcc_import_hud(
 	void)
 {
 	struct mcc_import_hud_context hud;
-	boolean *others;
+	boolean *others, *candidates;
 	long tag_index;
 
 	/* (HALO_MCC_IMPORT_NO_HUD: the HUD's bitmaps as MCC has them, to compare) */
 	if (getenv("HALO_MCC_IMPORT_NO_HUD"))
 		return;
-	mcc_import_globals.hud_halved = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(boolean));
+	mcc_import_globals.hud_factor = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(short));
+	mcc_import_globals.icon_factor = 1;
+	mcc_import_globals.mask_factor = 1;
 	others = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(boolean));
+	candidates = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(boolean));
 	csmemset(&hud, 0, sizeof(hud));
 	hud.maximum_references = 8192;
 	hud.references = mcc_import_calloc((size_t)hud.maximum_references, sizeof(void const *));
-	if (!mcc_import_globals.hud_halved || !others || !hud.references)
+	if (!mcc_import_globals.hud_factor || !others || !candidates || !hud.references)
 	{
 		mcc_import_free(others);
+		mcc_import_free(candidates);
 		mcc_import_free((void *)hud.references);
 		return;
 	}
@@ -1324,27 +1402,53 @@ static void mcc_import_hud(
 		struct tag_schema_group const *schema = mcc_import_schema((unsigned long)instance->group_tag);
 
 		if (instance->base_address && schema && schema->definition)
-			mcc_import_hud_others(&hud, schema->definition, instance->base_address, others);
+			mcc_import_hud_others(&hud, schema->definition, instance->base_address, others, candidates);
 	}
-	/* a bitmap the placements draw, and nothing else, each of whose images
-	can be halved */
 	for (tag_index = 0; tag_index < hud.reference_count; tag_index++)
 	{
 		long bitmap_tag = ((struct tag_reference const *)hud.references[tag_index])->index & 0xFFFF;
-		struct bitmap_group const *group = mcc_import_globals.instances[bitmap_tag].base_address;
-		long bitmap_index;
-		boolean halvable = group && !others[bitmap_tag] && group->bitmaps.count > 0;
 
-		for (bitmap_index = 0; halvable && bitmap_index < group->bitmaps.count; bitmap_index++)
+		if (!candidates[bitmap_tag])
+			candidates[bitmap_tag] = MCC_IMPORT_HUD_PLACEMENT;
+	}
+	/* a bitmap the placements (or the icons and masks) draw, and nothing
+	else: brought to the disc's size (the operations' bitmap_size), or half
+	MCC's where they do not give it, if each of its images can be */
+	for (tag_index = 0; tag_index < mcc_import_globals.tag_count; tag_index++)
+	{
+		struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[tag_index];
+		struct bitmap_group const *group = candidates[tag_index] && instance->group_tag == 'bitm' &&
+			!others[tag_index] ? instance->base_address : NULL;
+		struct bitmap_data const *first;
+		short disc_width, disc_height, factor = 2;
+		long bitmap_index;
+
+		if (!group || group->bitmaps.count <= 0)
+			continue;
+		first = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, 0, struct bitmap_data);
+		if (mcc_import_operations_bitmap_size(instance->name, &disc_width, &disc_height))
 		{
-			halvable = mcc_import_bitmap_halvable(TAG_BLOCK_GET_ELEMENT(&group->bitmaps, bitmap_index,
-				struct bitmap_data));
+			factor = first->width % disc_width == 0 ? (short)(first->width / disc_width) : 0;
+			if ((factor != 1 && factor != 2 && factor != 4) || first->height != disc_height * factor)
+				factor = 1;
 		}
-		mcc_import_globals.hud_halved[bitmap_tag] = halvable;
+		for (bitmap_index = 0; factor > 1 && bitmap_index < group->bitmaps.count; bitmap_index++)
+		{
+			struct bitmap_data const *bitmap = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, bitmap_index, struct bitmap_data);
+
+			if (!mcc_import_bitmap_halvable(bitmap) || bitmap->width % factor || bitmap->height % factor)
+				factor = 1;
+		}
+		mcc_import_globals.hud_factor[tag_index] = factor;
+		if (candidates[tag_index] == MCC_IMPORT_HUD_ICONS)
+			mcc_import_globals.icon_factor = factor;
+		else if (candidates[tag_index] == MCC_IMPORT_HUD_MASK)
+			mcc_import_globals.mask_factor = factor;
 	}
 	hud.pass = 1;
 	mcc_import_hud_walk(&hud);
 	mcc_import_free(others);
+	mcc_import_free(candidates);
 	mcc_import_free((void *)hud.references);
 
 	return;
@@ -1384,11 +1488,13 @@ static boolean mcc_import_bitmaps(
 			if (!pixels)
 				return FALSE;
 			custom_edition_cache_read(tag_index, bitmap->pixels_offset, bitmap->pixels_size, pixels);
-			/* a HUD bitmap drawn by placements alone, at half its size
-			(mcc_import_hud) */
-			if (mcc_import_globals.hud_halved && mcc_import_globals.hud_halved[tag_index] &&
-				mcc_import_bitmap_halve(bitmap, pixels))
+			/* a HUD bitmap at the disc's size (mcc_import_hud) */
+			if (mcc_import_globals.hud_factor && mcc_import_globals.hud_factor[tag_index] > 1)
 			{
+				short factor;
+
+				for (factor = mcc_import_globals.hud_factor[tag_index]; factor > 1; factor /= 2)
+					mcc_import_bitmap_halve(bitmap, pixels);
 				xbox_size = rasterizer_xbox_bitmap_get_pixel_data_size(bitmap);
 				mcc_import_globals.hud_bitmaps_halved++;
 			}
@@ -1883,6 +1989,13 @@ static boolean mcc_import_map(
 		fprintf(stderr, "mcc import: %s: bitmaps (%d)\n", map_name, (int)success);
 	mcc_import_hud();
 	success = success && mcc_import_bitmaps(body);
+	if (success)
+	{
+		/* the sounds, from MCC's banks */
+		mcc_import_globals.sounds = mcc_import_sounds_write(&mcc_import_globals.table, mcc_import_globals.old_to_new,
+			mcc_import_body_sound, body);
+		success = !body->failed;
+	}
 	if (getenv("HALO_MCC_IMPORT_TRACE"))
 		fprintf(stderr, "mcc import: %s: tags (%d)\n", map_name, (int)success);
 	success = success && mcc_import_tags(&tags, loaded, instances_address);
@@ -1920,11 +2033,16 @@ static boolean mcc_import_map(
 		header.scenario_type = scenario_type;
 		header.checksum = body->crc;
 		header.footer_signature = 'foot';
-		/* MCC's HUD, which is drawn as an MCC map's (mcc_cache_loaded) */
+		/* MCC's HUD, which is drawn as an MCC map's (mcc_cache_loaded), and
+		how much smaller its message icons and scopes' masks are written */
 		{
 			unsigned long mark = MCC_IMPORTED_HUD_MARK;
+			unsigned long icon_factor = (unsigned long)mcc_import_globals.icon_factor;
+			unsigned long mask_factor = (unsigned long)mcc_import_globals.mask_factor;
 
 			csmemcpy(header.reserved68 + (MCC_IMPORTED_HUD_MARK_OFFSET - 0x68), &mark, sizeof(mark));
+			csmemcpy(header.reserved68 + (MCC_IMPORTED_ICON_FACTOR_OFFSET - 0x68), &icon_factor, sizeof(icon_factor));
+			csmemcpy(header.reserved68 + (MCC_IMPORTED_MASK_FACTOR_OFFSET - 0x68), &mask_factor, sizeof(mask_factor));
 		}
 		/* a map not shown to be the disc's plays on MCC's version
 		(mcc_imported_level_name) */
@@ -1943,10 +2061,12 @@ static boolean mcc_import_map(
 		}
 		fseek(body->file, 0, SEEK_SET);
 		success = success && fwrite(&header, 1, sizeof(header), body->file) == sizeof(header);
-		fprintf(stdout, "mcc import: %s: %d structure bsps, %ld bitmaps, %ld tags (0x%lX bytes; %ld empty in the "
-			"disc's place, %ld of MCC's kept after the disc's, %ld without a schema; %ld references to tags left out; %ld HUD bitmaps halved), 0x%lX bytes before compression\n",
-			map_name, (int)references->count, mcc_import_globals.bitmaps, mcc_import_globals.out_count, tags.used,
-			mcc_import_globals.placeholders, mcc_import_globals.kept, mcc_import_globals.schemaless, mcc_import_globals.references_dropped,
+		fprintf(stdout, "mcc import: %s: %d structure bsps, %ld bitmaps, %ld sounds (%ld silent), %ld tags (0x%lX bytes; "
+			"%ld empty in the disc's place, %ld of MCC's kept after the disc's, %ld without a schema; %ld references to "
+			"tags left out; %ld HUD bitmaps halved), 0x%lX bytes before compression\n",
+			map_name, (int)references->count, mcc_import_globals.bitmaps, mcc_import_globals.sounds,
+			mcc_import_sounds_silent(), mcc_import_globals.out_count, tags.used, mcc_import_globals.placeholders,
+			mcc_import_globals.kept, mcc_import_globals.schemaless, mcc_import_globals.references_dropped,
 			mcc_import_globals.hud_bitmaps_halved, (unsigned long)header.file_length);
 	}
 	deflateEnd(&body->stream);
@@ -1959,10 +2079,11 @@ static boolean mcc_import_map(
 	mcc_import_free(mcc_import_globals.old_to_new);
 	mcc_import_free(mcc_import_globals.out_names_text);
 	mcc_import_free(mcc_import_globals.table.instances);
-	mcc_import_free(mcc_import_globals.hud_halved);
+	mcc_import_free(mcc_import_globals.hud_factor);
 	for (bsp_index = 0; bsp_index < mcc_import_globals.bsp_count; bsp_index++)
 		mcc_import_free(mcc_import_globals.bsps[bsp_index].bytes);
 	mcc_import_operations_dispose();
+	mcc_import_sounds_map_done();
 	custom_edition_cache_tags_unload();
 	if (!success)
 	{
@@ -1989,11 +2110,15 @@ int mcc_import_run(
 	/* (the messages as they come: a failure must not lose the last) */
 	setvbuf(stderr, NULL, _IONBF, 0);
 	custom_edition_geometry_import = TRUE;
+	mcc_import_sounds_open();
+	mcc_sounds_muted_proc = mcc_import_sound_muted;
 	for (index = 0; index < map_count; index++)
 	{
 		if (!mcc_import_map(map_names[index], output_folder))
 			failures++;
 	}
+	mcc_sounds_muted_proc = NULL;
+	mcc_import_sounds_close();
 	custom_edition_geometry_import = FALSE;
 
 	return failures ? 1 : 0;

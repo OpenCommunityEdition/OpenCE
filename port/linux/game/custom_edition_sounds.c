@@ -660,6 +660,38 @@ byte *custom_edition_sounds_encode(
 	return encoded;
 }
 
+byte *custom_edition_sounds_encode_frames(
+	short const *samples,
+	long frame_count,
+	long channels,
+	long rate,
+	long encoded_channels,
+	long encoded_rate,
+	unsigned long *encoded_bytes)
+{
+	struct frames frames = { 0 };
+	byte *encoded = NULL;
+
+	if (frame_count > 0 && channels >= 1 && channels <= 2 && encoded_channels >= 1 && encoded_channels <= 2 &&
+		(frames.samples = frames_allocate(frame_count, channels)) != NULL)
+	{
+		memcpy(frames.samples, samples, (size_t)frame_count * (size_t)channels * sizeof(short));
+		frames.count = frame_count;
+		frames.channels = channels;
+		frames.rate = rate;
+		if (frames_conform(&frames, encoded_channels, encoded_rate))
+		{
+			*encoded_bytes = adpcm_encoded_bytes(frames.count, encoded_channels);
+			encoded = malloc(*encoded_bytes);
+			if (encoded)
+				adpcm_encode(frames.samples, frames.count, encoded_channels, encoded);
+		}
+	}
+	frames_free(&frames);
+
+	return encoded;
+}
+
 unsigned long custom_edition_sounds_decoded_bytes(
 	void)
 {

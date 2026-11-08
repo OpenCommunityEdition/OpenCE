@@ -570,8 +570,10 @@ static void render_state_bitmap(
 		/* port: an MCC map's message icons are four times the Xbox's (half
 		HUD scale, on a HUD laid out at twice the Xbox's size:
 		port/linux/game/cache_file_formats.c, mcc_import_hud_convert), its icons'
-		offsets the Xbox's: the bitmap drawn at a quarter */
-		bitmap_scale = mcc_cache_loaded() ? scale * 0.25f : scale;
+		offsets the Xbox's: the bitmap drawn at a quarter (an imported MCC
+		map's at that times how much smaller its bitmap is written:
+		port/linux/game/mcc_import.c) */
+		bitmap_scale = mcc_cache_loaded() ? scale * 0.25f * mcc_imported_icon_factor() : scale;
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
 		point.y = (short)(cursor_bounds->y1 - icon->offset.y * scale);
 		hud_draw_bitmap_direct(

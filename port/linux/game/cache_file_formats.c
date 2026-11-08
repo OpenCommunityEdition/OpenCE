@@ -2729,6 +2729,8 @@ int32_t mcc_import_bitmaps_prepare(
 	return cleared;
 }
 
+void (*mcc_sounds_muted_proc)(uint8_t *sound, int32_t pitch_range_count) = NULL;
+
 int32_t mcc_sounds_mute(
 	uint8_t *tag_cache,
 	uint32_t loaded_bytes)
@@ -2772,6 +2774,8 @@ int32_t mcc_sounds_mute(
 		}
 		if (in_banks)
 		{
+			if (mcc_sounds_muted_proc)
+				mcc_sounds_muted_proc(sound, pitch_range_count);
 			write_u32(sound + SOUND_PITCH_RANGES_OFFSET + TAG_BLOCK_COUNT_OFFSET, 0);
 			muted++;
 		}

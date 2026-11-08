@@ -986,12 +986,38 @@ unsigned long mcc_map_version(
 
 /* source/cache/cache_files.c */
 boolean cache_files_mcc_hud(void);
+unsigned long cache_files_header_word(long offset);
 
 boolean mcc_cache_loaded(
 	void)
 {
 	/* (or an MCC map the import wrote as an Xbox map: its HUD is MCC's) */
 	return (custom_edition_cache_globals.tags_loaded && custom_edition_cache_globals.mcc) || cache_files_mcc_hud();
+}
+
+/* a factor of the header of a map the import wrote (1, 2 or 4), else 1 */
+static real mcc_imported_factor(
+	long offset)
+{
+	unsigned long factor;
+
+	if ((custom_edition_cache_globals.tags_loaded && custom_edition_cache_globals.mcc) || !cache_files_mcc_hud())
+		return 1.0f;
+	factor = cache_files_header_word(offset);
+
+	return factor == 2 || factor == 4 ? (real)factor : 1.0f;
+}
+
+real mcc_imported_icon_factor(
+	void)
+{
+	return mcc_imported_factor(MCC_IMPORTED_ICON_FACTOR_OFFSET);
+}
+
+real mcc_imported_mask_factor(
+	void)
+{
+	return mcc_imported_factor(MCC_IMPORTED_MASK_FACTOR_OFFSET);
 }
 
 /* (cache_file_rebase_proc: its type exactly, which the web build's linker

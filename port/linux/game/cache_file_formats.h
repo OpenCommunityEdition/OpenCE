@@ -596,6 +596,9 @@ are combined, which would point them into a sounds.map there is none of. */
 int32_t mcc_sounds_mute(
 	uint8_t *tag_cache,
 	uint32_t loaded_bytes);
+/* called by mcc_sounds_mute with each sound it mutes and the pitch range
+count it had (the MCC import takes the sounds from the banks: NULL else) */
+extern void (*mcc_sounds_muted_proc)(uint8_t *sound, int32_t pitch_range_count);
 /* ... and makes its HUD the Xbox's size: MCC lays the HUD out at twice the
 Xbox's size (offsets, the digits' metrics, the damage indicators' offsets
 doubled) with bitmaps four times the Xbox's, flagged with half HUD scale.

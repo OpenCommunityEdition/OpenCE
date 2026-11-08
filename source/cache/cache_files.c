@@ -717,6 +717,19 @@ boolean cache_files_mcc_hud(
 	return mark == MCC_IMPORTED_HUD_MARK;
 }
 
+/* port: a word of the loaded map's header (the MCC import's: port/linux/game/
+custom_edition_cache.h) */
+unsigned long cache_files_header_word(
+	long offset)
+{
+	unsigned long word = 0;
+
+	if (offset >= 0 && offset + (long)sizeof(word) <= (long)sizeof(cache_file_globals.header))
+		csmemcpy(&word, (byte const *)&cache_file_globals.header + offset, sizeof(word));
+
+	return word;
+}
+
 unsigned long tag_groups_checksum(
 	void)
 {

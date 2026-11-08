@@ -26,7 +26,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, STB_VORBIS
                           build_repository,
                           lto_mode, march_flag, miniupnpc_sources, pgo_mode, compile_launcher, configuration_defines,
                           game_defines_and_includes, game_sources, musl_math_cflags, musl_math_sources, opus_cflags,
-                          opus_sources, pgo_profile, profile_use_flags, xdk_headers)
+                          opus_sources, pgo_profile, profile_use_flags, xdk_headers, celt_cflags, celt_sources)
 from .embed_assets import hud_assets_build, hud_configure_inputs, server_ui_build
 from .ninja_syntax import Writer
 from .windows_cross_build import cross_toolchain_prefix
@@ -504,6 +504,9 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         # voice chat's codec (port/third_party/opus)
         for source in opus_sources():
             add_object(source, opus_cflags(abi))
+        # the MCC import's decoder (port/third_party/celt)
+        for source in celt_sources():
+            add_object(source, celt_cflags(abi))
         # internet play's signatures, for public games' listings
         # (port/third_party/monocypher; p2p_crypto.c)
         for name in ("monocypher.c", "monocypher-ed25519.c"):

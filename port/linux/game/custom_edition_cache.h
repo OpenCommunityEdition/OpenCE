@@ -103,11 +103,23 @@ drawn as an MCC map's is (mcc_cache_loaded). Not simulation: the
 fingerprint does not see it. */
 #define MCC_IMPORTED_HUD_MARK_OFFSET 0x6C
 #define MCC_IMPORTED_HUD_MARK 0x4D485544UL
+/* ... and how much smaller than MCC's its message icons and scopes' masks are
+written (1, 2 or 4) */
+#define MCC_IMPORTED_ICON_FACTOR_OFFSET 0x70
+#define MCC_IMPORTED_MASK_FACTOR_OFFSET 0x74
 /* Whether the map loaded is an MCC map, loaded as one or imported as an
 Xbox map with MCC's HUD (MCC_IMPORTED_HUD_MARK): its HUD's digits, message
 icons and scope masks are drawn smaller (hud_draw.c, hud_messaging.c,
 rasterizer_xbox_screen_effect.c) */
 boolean mcc_cache_loaded(
+	void);
+/* How much smaller than MCC's the loaded map's message icons and scopes'
+masks are (1, but for a map the MCC import wrote: mcc_import.c), which the
+game draws that much larger than an MCC map's (hud_messaging.c,
+rasterizer_xbox_screen_effect.c). */
+real mcc_imported_icon_factor(
+	void);
+real mcc_imported_mask_factor(
 	void);
 /* An MCC map's structure BSP the game has just read for `reference` (to
 its base address, the reference's size of bytes): its vertex region read
@@ -319,6 +331,20 @@ byte *custom_edition_sounds_encode(
 	boolean big_endian,
 	long channels,
 	long rate,
+	long encoded_rate,
+	unsigned long *encoded_bytes);
+/* `frame_count` frames of interleaved 16-bit samples (`channels` channels at
+`rate`) as Xbox ADPCM of `encoded_channels` channels at `encoded_rate` (a
+mono stream fills both channels, a stereo one is averaged, another rate is
+resampled by the nearest frame): a buffer of the game's allocator of
+*encoded_bytes; NULL when they cannot be (the MCC import:
+mcc_import_sounds.c) */
+byte *custom_edition_sounds_encode_frames(
+	short const *samples,
+	long frame_count,
+	long channels,
+	long rate,
+	long encoded_channels,
 	long encoded_rate,
 	unsigned long *encoded_bytes);
 /* the bytes of the samples custom_edition_sounds_decode made */

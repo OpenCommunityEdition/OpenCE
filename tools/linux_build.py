@@ -251,6 +251,24 @@ def opus_cflags(abi: str) -> str:
                                                             ("include", "celt", "silk", "silk/float")), "-w"])
 
 
+# the MCC import's decoder of MCC's dialogue and music (port/third_party/celt;
+# mcc_import_sounds.c): CELT 0.11.0, its names prefixed (celt_prefixed.h:
+# Opus has CELT's later code under many of them); desktop builds only
+CELT_DIR = Path("port/third_party/celt")
+CELT_DEFINES = ("-DFLOATING_POINT", "-DCUSTOM_MODES", "-DCELT_BUILD", "-DVAR_ARRAYS")
+
+
+def celt_sources() -> List[Path]:
+    """CELT's library sources (port/third_party/celt/sources.txt)"""
+    return [CELT_DIR / line.strip() for line in (CELT_DIR / "sources.txt").read_text().splitlines() if line.strip()]
+
+
+def celt_cflags(abi: str) -> str:
+    """the flags CELT's sources build with, on the platform layer's ABI"""
+    return " ".join([abi, "-std=gnu11", "-O2", *CELT_DEFINES, f"-I{CELT_DIR / 'libcelt'}",
+                     f"-include {CELT_DIR / 'celt_prefixed.h'}", "-w"])
+
+
 def musl_math_sources() -> List[Path]:
     """musl's maths functions the game uses (port/third_party/musl-math)"""
     return sorted((MUSL_MATH_DIR / "src").glob("*.c"))
@@ -651,6 +669,9 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # voice chat's codec (port/third_party/opus)
         for source in opus_sources():
             add_object(source, opus_cflags(abi))
+        # the MCC import's decoder (port/third_party/celt)
+        for source in celt_sources():
+            add_object(source, celt_cflags(abi))
         # internet play's signatures, for public games' listings
         # (port/third_party/monocypher; p2p_crypto.c)
         for name in ("monocypher.c", "monocypher-ed25519.c"):
