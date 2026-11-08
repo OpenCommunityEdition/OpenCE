@@ -682,7 +682,7 @@
 		<child widget="modern/online/row_network_join_from_clipboard2" x="28" y="197" platform="desktop android" />
 		<child widget="modern/online/row_update_auto3" x="28" y="227" platform="desktop android" />
 		<child widget="modern/online/row_link_9" x="28" y="257" />
-		<child widget="modern/online/row_link_10" x="28" y="287" platform="desktop android" />
+		<child widget="modern/online/row_link_10" x="28" y="287" />
 		<child widget="modern/online/row_link_11" x="28" y="317" />
 		<child widget="modern/online/button_bar" x="26" y="414" />
 	</widget>
@@ -763,7 +763,7 @@
 		<child widget="modern/online/label_link_9" x="12" y="3" />
 	</widget>
 	<widget name="modern/online/label_link_9" type="text" controller="1" width="312" height="24" string_list="modern/online/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/online/row_link_10" width="336" height="26" bitmap="modern/row" platform="desktop android" flags="nifty_fx">
+	<widget name="modern/online/row_link_10" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend page" />
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />

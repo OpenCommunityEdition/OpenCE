@@ -504,8 +504,7 @@ _network["rows"] = [row for row in _network["rows"] if row[1] not in _hud_settin
 _network["categories"] = [
     ("BOTS:", "network_setup/bots", "Configure optional bots and manage the host's bots\nduring a multiplayer match."),
     ("MAP SHARING:", "network_setup/map_sharing",
-     "Downloading Custom Edition maps you do not have,\nand helping send them to other players.",
-     "desktop android"),
+     "Download CE maps or approved MCC packages.\nManage sharing and downloaded MCC copies."),
     ("MULTIPLAYER HUD:", "network_setup/multiplayer_hud",
      "Players' names above their heads, the\nscoreboard, the text chat and the match clock."),
     ("STREAMER MODE:", "network_setup/streamer_mode",

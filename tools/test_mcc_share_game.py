@@ -74,6 +74,7 @@ void offset_rectangle2d(void *rectangle, short x, short y);
 #define GET_MESSAGE_SIZE(h) ((h)>>4)
 """,
     "game/game.h": "int game_in_progress(void);\nlong game_time_get(void);\n",
+    "main/main.h": "void main_goto_main_menu(void);\n",
     "interface/interface.h": "long interface_get_tag_index(int tag);\nenum { _interface_font_terminal };\n",
     "interface/ui_widget.h": """struct widget_instance;
 boolean main_menu_is_active(void);

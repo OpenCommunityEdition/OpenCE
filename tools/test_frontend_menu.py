@@ -514,6 +514,33 @@ def test_mcc_packages_have_modern_navigation_and_platform_scoping():
     assert widgets['modern/mcc_packages/row_link_10'].find("on[@event='a']").get('run') == 'port frontend page'
 
 
+@pytest.mark.parametrize('platform', ['desktop', 'android', 'web'])
+def test_modern_network_menu_reaches_sharing(platform):
+    widgets = {w.get('name'): w for w in ET.fromstring(frontend_menu.document()).findall('widget')}
+    pending, reached = ['modern/online/settings'], set()
+    visible = lambda node: platform in node.get('platform', 'desktop android web').split()
+    while pending:
+        name = pending.pop()
+        if name in reached or name not in widgets or not visible(widgets[name]):
+            continue
+        reached.add(name)
+        for node in widgets[name]:
+            if not visible(node):
+                continue
+            if node.tag == 'child':
+                pending.append(node.get('widget'))
+            elif node.get('run') == 'port frontend page':
+                leaf = name.rsplit('/', 1)[1]
+                assert leaf.startswith(('row_link_', 'tab_'))
+                page = int(leaf.rsplit('_', 1)[1])
+                pending.append(frontend_menu.page_base(page) + '/settings')
+    settings = {widgets[name].get('setting') for name in reached}
+    assert {'network.mcc_map_share', 'network.map_download', 'network.map_seed',
+            'game.mcc_campaigns', 'game.mcc_collections'} <= settings
+    assert ('game.workshop_maps' in settings) == (platform == 'desktop')
+    assert 'modern/sharing/row_mcc_downloads' in reached
+
+
 def test_scroll_hook_precedes_pointer_registration():
     render = function((ROOT / 'source/interface/ui_widget.c').read_text(), 'widget_instance_render_recursive')
     assert render.index('frontend_menu_row_drawable(widget)') < render.index('ui_mouse_note_target(widget, definition, offset)')

@@ -44,7 +44,7 @@ PAGES = [
 ]
 TABS = ("VIDEO", "AUDIO", "CONTROLS", "ONLINE", "INTERFACE", "PROFILE")
 LINKS = {0: [(6, None), (7, None), (15, None)], 6: [(8, "desktop web"), (16, None)],
-         3: [(9, None), (10, "desktop android"), (11, None)], 4: [(12, None), (13, None)],
+         3: [(9, None), (10, None), (11, None)], 4: [(12, None), (13, None)],
          2: [(14, "android")], 10: [(17, None)]}
 STYLE = ("MENU STYLE", "display.menu_frontend",
          [("MODERN", "modern"), ("CLASSIC PC", "pc"), ("XBOX", "xbox"), ("STOCK", "off")],

@@ -59,6 +59,21 @@ When a button appears to do nothing, trace its event name into
 [unwired-function list](../../port/assets/menus/UNWIRED.md) records known
 gaps. A visible widget alone does not establish that its action is implemented.
 
+Stock/OpenCE-style settings expose **Network Setup > Map Sharing** on desktop,
+Android and web. Classic PC and Xbox-style settings reuse those services;
+Modern exposes the same controls under **Online > Map Sharing**. The page
+includes client downloads, host MCC sharing, package settings and downloaded-copy
+management. Steam discovery alone is desktop-only. The Stock route is generated
+by `port_settings.settings_files` and loaded by `halo_menus_load` without the
+optional frontend asset set; `frontend_menu.document` supplies the separate
+Modern route. `test_stock_network_menu_reaches_sharing` and
+`test_modern_network_menu_reaches_sharing` traverse platform-visible widgets,
+including their links, rather than checking that a hidden definition exists.
+
+MCC's manual-download prompt uses the normal `main_goto_main_menu` route when
+dismissed. It does not choose a PC, Xbox or Modern root itself. Live consent
+still returns to its current lobby; see [MCC sharing](maps_and_resources.md#mcc-package-sharing-between-machines).
+
 [MCC level previews](mcc_level_previews.md) follows package metadata into a
 bounded image reader, the menu texture cache and style-specific thumbnail
 rectangles. It also explains wrapping of MCC titles and descriptions without

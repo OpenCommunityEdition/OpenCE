@@ -109,7 +109,7 @@ static unsigned char host_digest[32],host_metadata[32];
 static char snapshot[64],opened_url[128];
 static int role_host,peer_joined=1,peer_capable=1,prompts,lobby_restores;
 static int overlay_draws,allow_prompt=1;
-static int abort_pending,menu_loaded=1,manual_return;
+static int abort_pending,menu_loaded=1,manual_return,menu_returns;
 static char overlay_text[256];
 static unsigned resource_mask=3,host_revision=1;
 static int workshop_fallback,resource_shared,resource_invalid;
@@ -322,7 +322,7 @@ struct widget_instance *ui_widget_load_by_name_or_tag(char const *name,long tag,
     if (!allow_prompt) return NULL;
     if (!role_host) {
         prompts++;
-        manual_return=b==42;
+        manual_return=b==NONE;
         j_mcc_share_game_prompt_text(text);
         for (i=0;text[i] && i<sizeof(shown)-1;i++) shown[i]=(char)text[i];
         shown[i]=0;
@@ -335,13 +335,12 @@ void ui_widget_delete(struct widget_instance *widget)
 { if (role_host) h_mcc_share_game_prompt_closed(); else j_mcc_share_game_prompt_closed(); }
 void ui_widget_port_go_back(struct widget_instance *widget)
 { ui_widget_delete(widget);lobby_restores++; }
-long tag_loaded(unsigned long group,char const *name)
-{ return !strcmp(name,"fixture_main_menu") ? 42 : 41; }
+long tag_loaded(unsigned long group,char const *name) { return 41; }
 void platform_open_url(char const *url) { snprintf(opened_url,sizeof(opened_url),"%s",url); }
 void h_network_game_abort(void) {}
 void j_network_game_abort(void) { aborts++;abort_pending=1; }
 int main_menu_is_active(void) { return menu_loaded; }
-char const *pc_menus_root_name(void) { return "fixture_main_menu"; }
+void main_goto_main_menu(void) { menu_returns++; }
 struct network_game_server { int unused; };
 struct network_game_client { int unused; };
 struct network_game_server_client_machine { int unused; };
@@ -649,7 +648,7 @@ int main(int argc,char **argv)
         if (!strcmp(argv[1],"manual_wait_menu")) {
             CHECK(!prompts);menu_loaded=1;CHECK(pump_prompt());
         }
-        CHECK(prompts==1 && manual_return);
+        CHECK(prompts==1 && manual_return && !menu_returns);
         clock_ms+=20000;for (i=0;i<5;i++) pump_once();
         CHECK(prompts==1 && !accepts && aborts==1);
         as_join();
@@ -668,6 +667,7 @@ int main(int argc,char **argv)
         else {
             CHECK(j_mcc_share_game_has_workshop()==(strcmp(argv[1],"manual_local")!=0));
             j_mcc_share_game_prompt_action(1);
+            CHECK(menu_returns==1);
             CHECK(!strcmp(argv[1],"manual_local") ? !opened_url[0] :
                 !strcmp(opened_url,"https://steamcommunity.com/sharedfiles/filedetails/?id=2915693904"));
         }

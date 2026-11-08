@@ -11,6 +11,34 @@ ROOT = Path(__file__).resolve().parents[1]
 GAME = ROOT / "port/linux/game"
 
 
+@pytest.mark.parametrize("platform", ["desktop", "android", "web"])
+@pytest.mark.parametrize("in_game", [False, True])
+def test_stock_network_menu_reaches_sharing(platform, in_game):
+    """Traverse the shipped Stock widgets without loading optional frontend tags."""
+    base = "main_menu/settings_select/player_setup/player_profile_edit/network_setup/"
+    widgets = {w.get("name"): w for file in (ROOT / "port/assets/menus/ce").glob("*.xml")
+               for w in ET.parse(file).getroot().findall("widget")}
+    pending = [base + ("in_game/in_game_network_settings_screen" if in_game else "network_settings_screen")]
+    reached = set()
+    visible = lambda node: platform in node.get("platform", "desktop android web").split()
+    while pending:
+        name = pending.pop()
+        if name in reached or name not in widgets or not visible(widgets[name]):
+            continue
+        reached.add(name)
+        for node in widgets[name]:
+            if visible(node):
+                target = node.get("widget") if node.tag == "child" else node.get("open")
+                if target:
+                    pending.append(target)
+    settings = {widgets[name].get("setting") for name in reached}
+    assert {"network.mcc_map_share", "network.map_download", "network.map_seed",
+            "game.mcc_campaigns", "game.mcc_collections"} <= settings
+    assert ("game.workshop_maps" in settings) == (platform == "desktop")
+    assert base + "mcc_downloads/screen" in reached
+    assert base + "mcc_downloads/remove" in reached
+
+
 def test_generated_remove_button_has_one_text_owner():
     import port_settings
 

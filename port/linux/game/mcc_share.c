@@ -6,6 +6,7 @@
 #include "game/game.h"
 #include "interface/interface.h"
 #include "interface/ui_widget.h"
+#include "main/main.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 #include "networking/network_client_manager.h"
@@ -85,7 +86,6 @@ static char mcc_share_admission_level[128];
 void platform_translate_path(char const *, char *, unsigned long);
 void platform_open_url(char const *);
 void ui_widget_port_go_back(struct widget_instance *widget);
-char const *pc_menus_root_name(void);
 static void mcc_share_offered(void *, uint64_t, char const *);
 static void mcc_share_host_lifecycle(void);
 struct network_game_server_client_machine *network_game_server_get_client_machine_at_index(struct network_game_server *,long);
@@ -504,9 +504,12 @@ static int mcc_share_client_current(void)
 static void mcc_share_close_prompt(void)
 {
     mcc_share_prompt_pending=FALSE;
-    /* Go-back deletes the owned prompt and reloads its previous lobby. Merely
-     * popping history discards that route without restoring the screen. */
-    if (mcc_share_prompt) ui_widget_port_go_back(mcc_share_prompt);
+    /* Live consent returns to its lobby. Detached guidance has no lobby
+     * history; its action queues the engine's selected main-menu root. */
+    if (mcc_share_prompt) {
+        if (mcc_share_manual==MCC_SHARE_MANUAL_MENU) ui_widget_delete(mcc_share_prompt);
+        else ui_widget_port_go_back(mcc_share_prompt);
+    }
     mcc_share_prompt_visible=FALSE;
 }
 
@@ -560,7 +563,10 @@ void mcc_share_game_prompt_action(int action)
         snprintf(url,sizeof(url),"https://steamcommunity.com/sharedfiles/filedetails/?id=%s",item.id);
         platform_open_url(url);
     }
-    if (manual) return;
+    if (manual) {
+        main_goto_main_menu();
+        return;
+    }
     mcc_share_client_cancel(&mcc_share_globals);
     network_game_abort();
 }
@@ -718,8 +724,8 @@ void mcc_share_game_update(
         /* Deferred until frame update: receiving a packet never opens a widget. */
         mcc_share_prompt=ui_widget_load_by_name_or_tag(
             "pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\mcc_download\\screen",
-            NONE,NULL,0,tag_loaded('DeLa',mcc_share_manual==MCC_SHARE_MANUAL_MENU ? pc_menus_root_name() :
-                "pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen"),NONE,NONE);
+            NONE,NULL,0,mcc_share_manual==MCC_SHARE_MANUAL_MENU ? NONE :
+                tag_loaded('DeLa',"pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen"),NONE,NONE);
         if (mcc_share_prompt) { mcc_share_prompt_pending=FALSE; mcc_share_prompt_visible=TRUE; }
     }
 }
