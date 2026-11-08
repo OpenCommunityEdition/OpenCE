@@ -36,6 +36,8 @@ static void mcc_load_network_work(int stage,unsigned long done,unsigned long tot
 static void mcc_load_network_end(void) {network_ends++;}
 static int device, surface, null_renderer, native_active, starts, ends, frames, releases;
 static int failure, reenter;
+static int require_target, stale_color, stale_depth, target_sets;
+static IDirect3DSurface8 *draw_target=&stale_color, *draw_depth=&stale_depth;
 static DWORD clock_ms;
 static real drawn;
 static void *global_d3d_device=&device;
@@ -47,6 +49,7 @@ static void progress_bar_eachframe(void) { }
 static void progress_bar_begin(int skip) {(void)skip;starts++;native_active=1;}
 static void progress_bar_end(void) {ends++;native_active=0;}
 static void progress_bar_display(real value) {
+    if(require_target)assert(draw_target==&surface && draw_depth==NULL);
     assert(value>=0 && value<=1);assert(value>=drawn);drawn=value;
     if(reenter){clock_ms+=100;mcc_loading_pulse();}
 }
@@ -57,6 +60,9 @@ static int IDirect3DSurface8_GetDesc(IDirect3DSurface8 *s,D3DSURFACE_DESC *desc)
     assert(s==&surface);desc->Width=1280;desc->Height=720;return failure==3 ? -1 : 0;
 }
 static void IDirect3DSurface8_Release(IDirect3DSurface8 *s) {assert(s==&surface);releases++;}
+static void IDirect3DDevice8_SetRenderTarget(void *d,IDirect3DSurface8 *color,IDirect3DSurface8 *depth) {
+    (void)d;assert(color==&surface && depth==NULL);draw_target=color;draw_depth=depth;target_sets++;
+}
 static void IDirect3DDevice8_SetViewport(void *d,D3DVIEWPORT8 *v) {
     (void)d;assert(v->Width==1280 && v->Height==720 && v->MaxZ==1);
 }
@@ -68,13 +74,15 @@ static void IDirect3DDevice8_Present(void *d,void *a,void *b,void *c,void *e) {
 ''' + implementation + r'''
 int main(int argc,char **argv) {
     int test=argc>1 ? atoi(argv[1]) : -1, before;
+    require_target=test==12;
     if(test<4 || test==6 || test==7) {
         if(test==1)null_renderer=1;
         if(test==2)global_d3d_device=NULL;
         if(test==3)native_active=1;
         mcc_loading_begin(test==0 ? "maps/a10" : test==6 ? "custom_maps/a10" : test==7 ? NULL : "mcc_maps/a10");
         mcc_loading_pulse();mcc_loading_stage(MCC_LOADING_AUDIO);mcc_loading_end(1);
-        assert(!starts && !frames && !ends);assert(native_active==(test==3));
+        assert(!starts && !frames && !ends && !target_sets);assert(native_active==(test==3));
+        assert(draw_target==&stale_color && draw_depth==&stale_depth);
         assert(network_begins==(test>=1 && test<=3));assert(network_ends==1);
         if(test>=1 && test<=3)assert(network_work>0);return 0;
     }
@@ -88,6 +96,9 @@ int main(int argc,char **argv) {
         failure=0;clock_ms+=50;mcc_loading_pulse();assert(frames==1);
     }
     before=frames;mcc_loading_pulse();assert(frames==before);
+    /* The prior scene can leave an offscreen color/depth pair. Every standalone
+     * loading draw must select its own target, including later work pulses. */
+    if(require_target){draw_target=&stale_color;draw_depth=&stale_depth;}
     clock_ms+=50;mcc_loading_stage(MCC_LOADING_AUDIO);assert(frames==before+1);
     clock_ms+=50;mcc_loading_update(MCC_LOADING_AUDIO,5,10);assert(drawn>0.3f && drawn<0.55f);
     before=network_pulses;clock_ms+=5000;
@@ -105,6 +116,7 @@ int main(int argc,char **argv) {
     assert(test==5 ? drawn<1 : drawn==1);
     before=frames;clock_ms+=100;mcc_loading_pulse();mcc_loading_end(1);assert(frames==before && ends==1);
     drawn=0;mcc_loading_begin("mcc_maps/b30");assert(starts==2);mcc_loading_end(0);assert(ends==2);
+    if(require_target)assert(target_sets==frames && releases==target_sets);
     return 0;
 }
 '''
@@ -115,7 +127,7 @@ int main(int argc,char **argv) {
     return output
 
 
-@pytest.mark.parametrize("case", range(12))
+@pytest.mark.parametrize("case", range(13))
 def test_loading_lifetime_progress_and_device_failures(loading_tool, case):
     subprocess.run([str(loading_tool), str(case)], check=True, capture_output=True)
 

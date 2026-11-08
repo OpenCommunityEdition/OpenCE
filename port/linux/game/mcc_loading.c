@@ -48,6 +48,11 @@ void mcc_loading_pulse(void)
         mcc_loading.drawing = 0;
         return;
     }
+    /* A standalone draw can inherit a prior scene's offscreen/depth targets.
+     * The effect needs only the backbuffer; its capture must not pair that
+     * buffer with an unrelated depth surface. The next game window installs
+     * its own color/depth targets through the ordinary rasterizer setup. */
+    IDirect3DDevice8_SetRenderTarget(global_d3d_device, surface, NULL);
     IDirect3DSurface8_Release(surface);
     memset(&viewport, 0, sizeof(viewport));
     viewport.Width = description.Width;
