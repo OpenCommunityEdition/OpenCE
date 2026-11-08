@@ -165,6 +165,7 @@ def test_turn_in_place_reconciles_only_scripted_orientation(tmp_path):
     run_c(tmp_path, r'''
 #include <assert.h>
 #include <math.h>
+#include <stddef.h>
 typedef int boolean;
 typedef float real;
 typedef struct {real i,j,k;} real_vector3d;
