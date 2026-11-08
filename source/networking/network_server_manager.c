@@ -3908,6 +3908,10 @@ boolean network_game_server_remove_client_machine_from_game(
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x22F, server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x230, client);
 	mcc_protocol_forget(client); /* port: reused slots must renegotiate MCC */
+	{ /* port: release MCC transfers before this connection slot is reused. */
+		extern void mcc_share_game_peer_left(struct network_game_server_client_machine *);
+		mcc_share_game_peer_left(client);
+	}
 
 	if (_network_game_server_state_ingame == server->state)
 	{

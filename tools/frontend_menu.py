@@ -51,6 +51,7 @@ STYLE = ("MENU STYLE", "display.menu_frontend",
          "Choose the Settings and submenu style. Saved changes take effect on return to the main menu. The starting menu, pause menu and map UI keep their existing layout.", None)
 INTERFACE_RENDERING = ("display.high_res_text", "display.high_res_hud")
 EDITORS = {
+    10: [("mcc_downloads", "MCC DOWNLOADS", "View storage and remove copies received from hosts. Original packages and saves are kept.")],
     2: [("keyboard", "KEYBOARD BINDINGS", "Set the base game's keyboard and mouse bindings in its existing editor. That editor's OK saves bindings independently of these Settings."),
         ("gamepad", "CONTROLLER REMAPPING", "Remap each player's controller in the existing editor. That editor's OK saves bindings independently of these Settings.")],
     5: [("profiles", "SELECT PROFILE", "Select or create a player profile using the existing profile manager. Save or cancel any profile edits before changing profiles."),
@@ -76,6 +77,7 @@ def value_caption(value):
     return value.rstrip() + "..."
 
 SHORT_LABELS = {
+    "network.mcc_map_share": "SHARE MCC MAPS",
     "display.plasma_prong_lighting": "PLASMA PRONGS",
     "display.widescreen_loading": "WIDE LOADING",
     "input.mouse_sensitivity": "HORIZONTAL SENS.", "input.mouse_vertical_sensitivity": "VERTICAL SENS.",

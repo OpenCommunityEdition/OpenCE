@@ -125,6 +125,10 @@ int main(void) {
  tag_name="pc\\mcc_xbox\\card_0\\mcc_folder_help";set_rectangle2d(&box,83,258,227,394);
  assert(mcc_menu_text_draw(0,NONE,L"A long description must not cover the earned completion badges at the bottom of the native Xbox level card even when every difficulty has been completed.",2,0,&color,&box,NULL));
  assert(drawn.y0==258&&drawn.y1==341&&clipped.y1==341&&wcsstr(drawn_text,L"..."));
+ tag_name="pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\mcc_download\\description";
+ set_rectangle2d(&box,40,60,600,280);
+ assert(mcc_menu_text_draw(0,NONE,L"The host package is missing or differs. Downloads are disabled. Visit the Workshop page or obtain the exact package from the host.\\nExisting packages remain installed.",2,0,&color,&box,NULL));
+ assert(wcschr(drawn_text,'\r'));
  puts("MCC preview bounds, cache lifecycle, text wrapping and Xbox/CE isolation passed");return 0;
 }
 '''

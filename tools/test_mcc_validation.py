@@ -168,6 +168,9 @@ static int mcc_resources_check_step(struct mcc_resource_check *c,uint32_t *sum,u
     if(++c->step<3)return 0;
     *sum=123;memset(digest,42,32);if(changes)stamps.files[0].written_low++;return 1;
 }
+static int mcc_resources_check_paths(struct mcc_resource_check const *c,char paths[2][128]) {
+    (void)c;memset(paths,0,256);strcpy(paths[1],"mcc_maps/p/sounds.map");return 1;
+}
 static void mcc_resources_check_end(struct mcc_resource_check *c) {if(c){freed++;free(c);}}
 ''' + (ROOT / "port/linux/game/mcc_validation.inl").read_text() + r'''
 static void finish(char const *name) {
@@ -176,7 +179,8 @@ static void finish(char const *name) {
     assert(mcc_validation_lookup(name,NULL,NULL));
 }
 int main(void) {
-    char const *name="mcc_maps/p/a";uint32_t sum;unsigned char digest[32];int i,old;
+    char const *name="mcc_maps/p/a";uint32_t sum;unsigned char digest[32];char paths[2][128];int i,old;
+    assert(!mcc_validation_resources(name,paths));
     assert(!mcc_validation_request(name,NULL,NULL));assert(!opened&&!steps);
     mcc_validation_update();assert(opened==1 && !steps);
     if(worker_enabled) {worker_hold=1;mcc_validation_update();assert(!steps&&!closed);worker_hold=0;}
@@ -184,11 +188,13 @@ int main(void) {
     mcc_validation_cancel();assert(closed==opened && freed==allocated);
     /* Creating again does not accept the cancelled result. */
     finish(name);old=steps;
+    assert(mcc_validation_resources(name,paths) && !paths[0][0] && !strcmp(paths[1],"mcc_maps/p/sounds.map"));
     assert(mcc_validation_request(name,&sum,digest)==1 && sum==123 && digest[31]==42);
     mcc_validation_cancel();assert(mcc_validation_request(name,NULL,NULL)==1 && steps==old);
     /* Every resource candidate, including absent overrides, is part of validity. */
     for(i=0;i<MCC_PRECACHE_FILES;i++) {
-        stamps.files[i].present++;assert(!mcc_validation_lookup(name,NULL,NULL));finish(name);
+        stamps.files[i].present++;assert(!mcc_validation_resources(name,paths));
+        assert(!paths[0][0] && !paths[1][0]);assert(!mcc_validation_lookup(name,NULL,NULL));finish(name);
         stamps.files[i].written_low++;assert(!mcc_validation_lookup(name,NULL,NULL));finish(name);
     }
     assert(!mcc_validation_request("mcc_maps/p/b",NULL,NULL));mcc_validation_update();

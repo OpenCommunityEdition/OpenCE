@@ -864,17 +864,18 @@ static const struct config_setting config_settings[] =
 		"Playing in another's game: the most kilobytes a second this machine\n"
 		"sends of maps to other players (16 to 10240: 10 MB/s)." },
 	{ "network.map_download", _config_boolean, "true", "HALO_NET_MAP_DOWNLOAD", _environment_value, _platform_all,
-		"Joining a game on a Custom Edition map this machine does not have:\n"
+		"Allow map downloads when joining. MCC asks before downloading from\n"
+		"the host; Custom Edition downloads from the game's players.\n"
+		"For a Custom Edition map this machine does not have:\n"
 		"download it (and the resource maps it needs) from the game's players\n"
 		"into custom_maps, if its host shares it (network.map_share); false\n"
 		"leaves the game, saying which map is missing." },
 	{ "network.mcc_map_share", _config_boolean, "false", "HALO_NET_MCC_MAP_SHARE", _environment_value, _platform_all,
-		"Hosting a game on an MCC map: send a player who joins without the map's\n"
-		"package (its map file and its own bitmaps.map and sounds.map, with the\n"
-		"maker's credit files) to it. Off by default. Only a hand-placed package whose\n"
-		"exact fingerprint is listed with its maker in mcc_share.txt is sent; Steam\n"
-		"Workshop items and stock maps never are. The joiner needs\n"
-		"network.map_download." },
+        "Hosting: offer eligible local or Workshop MCC packages to joiners.\n"
+        "Off by default. List each map/resource fingerprint with its maker in\n"
+        "mcc_share.txt. Includes required package metadata and supported previews;\n"
+        "never shares stock/global resources. Joiners need network.map_download\n"
+        "and must accept the download prompt before files are transferred." },
 	{ "network.coop_public", _config_boolean, "false", "HALO_NET_COOP_PUBLIC", _environment_value, _platform_all,
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"

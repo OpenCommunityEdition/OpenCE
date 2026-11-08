@@ -2176,11 +2176,13 @@
 	<widget name="modern/sharing/options" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/sharing/help">
 		<data input="port frontend update" />
 		<child widget="modern/sharing/tabs" x="28" y="76" />
-		<child widget="modern/sharing/row_network_map_download0" x="28" y="137" />
-		<child widget="modern/sharing/row_network_map_seed1" x="28" y="167" />
-		<child widget="modern/sharing/row_network_map_seed_upload2" x="28" y="197" />
-		<child widget="modern/sharing/row_link_17" x="28" y="227" />
-		<child widget="modern/sharing/row_link_3" x="28" y="257" />
+		<child widget="modern/sharing/row_network_mcc_map_share0" x="28" y="137" />
+		<child widget="modern/sharing/row_network_map_download1" x="28" y="167" />
+		<child widget="modern/sharing/row_network_map_seed2" x="28" y="197" />
+		<child widget="modern/sharing/row_network_map_seed_upload3" x="28" y="227" />
+		<child widget="modern/sharing/row_link_17" x="28" y="257" />
+		<child widget="modern/sharing/row_mcc_downloads" x="28" y="287" />
+		<child widget="modern/sharing/row_link_3" x="28" y="317" />
 		<child widget="modern/sharing/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/sharing/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -2221,28 +2223,36 @@
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
-	<widget name="modern/sharing/row_network_map_download0" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/sharing/label_network_map_download0" x="12" y="3" />
-		<child widget="modern/sharing/spinner_network_map_download0" x="180" y="3" />
+	<widget name="modern/sharing/row_network_mcc_map_share0" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/sharing/label_network_mcc_map_share0" x="12" y="3" />
+		<child widget="modern/sharing/spinner_network_mcc_map_share0" x="180" y="3" />
 	</widget>
-	<widget name="modern/sharing/label_network_map_download0" type="text" controller="1" width="152" height="24" string_list="modern/sharing/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/sharing/spinner_network_map_download0" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="network.map_download" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/sharing/label_network_mcc_map_share0" type="text" controller="1" width="152" height="24" string_list="modern/sharing/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/sharing/spinner_network_mcc_map_share0" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="network.mcc_map_share" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/sharing/row_network_map_seed1" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/sharing/label_network_map_seed1" x="12" y="3" />
-		<child widget="modern/sharing/spinner_network_map_seed1" x="180" y="3" />
+	<widget name="modern/sharing/row_network_map_download1" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/sharing/label_network_map_download1" x="12" y="3" />
+		<child widget="modern/sharing/spinner_network_map_download1" x="180" y="3" />
 	</widget>
-	<widget name="modern/sharing/label_network_map_seed1" type="text" controller="1" width="152" height="24" string_list="modern/sharing/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/sharing/spinner_network_map_seed1" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="network.map_seed" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/sharing/label_network_map_download1" type="text" controller="1" width="152" height="24" string_list="modern/sharing/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/sharing/spinner_network_map_download1" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="network.map_download" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/sharing/row_network_map_seed_upload2" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/sharing/label_network_map_seed_upload2" x="12" y="3" />
-		<child widget="modern/sharing/spinner_network_map_seed_upload2" x="180" y="3" />
+	<widget name="modern/sharing/row_network_map_seed2" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/sharing/label_network_map_seed2" x="12" y="3" />
+		<child widget="modern/sharing/spinner_network_map_seed2" x="180" y="3" />
 	</widget>
-	<widget name="modern/sharing/label_network_map_seed_upload2" type="text" controller="1" width="152" height="24" string_list="modern/sharing/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/sharing/spinner_network_map_seed_upload2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="64 KB/S|128 KB/S|256 KB/S|512 KB/S|1 MB/S|2 MB/S|4 MB/S|8 MB/S|10 MB/S" values="64|128|256|512|1024|2048|4096|8192|10240" setting="network.map_seed_upload" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/sharing/label_network_map_seed2" type="text" controller="1" width="152" height="24" string_list="modern/sharing/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/sharing/spinner_network_map_seed2" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="network.map_seed" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/sharing/row_network_map_seed_upload3" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/sharing/label_network_map_seed_upload3" x="12" y="3" />
+		<child widget="modern/sharing/spinner_network_map_seed_upload3" x="180" y="3" />
+	</widget>
+	<widget name="modern/sharing/label_network_map_seed_upload3" type="text" controller="1" width="152" height="24" string_list="modern/sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/sharing/spinner_network_map_seed_upload3" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="64 KB/S|128 KB/S|256 KB/S|512 KB/S|1 MB/S|2 MB/S|4 MB/S|8 MB/S|10 MB/S" values="64|128|256|512|1024|2048|4096|8192|10240" setting="network.map_seed_upload" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/sharing/row_link_17" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
@@ -2251,27 +2261,38 @@
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/sharing/label_link_17" x="12" y="3" />
 	</widget>
-	<widget name="modern/sharing/label_link_17" type="text" controller="1" width="312" height="24" string_list="modern/sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/sharing/label_link_17" type="text" controller="1" width="312" height="24" string_list="modern/sharing/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/sharing/row_mcc_downloads" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
+		<on event="a" run="port frontend editor" />
+		<on event="start" run="port frontend editor" />
+		<on event="left_mouse" run="mouse emit accept event" />
+		<child widget="modern/sharing/label_mcc_downloads" x="12" y="3" />
+	</widget>
+	<widget name="modern/sharing/label_mcc_downloads" type="text" controller="1" width="312" height="24" string_list="modern/sharing/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/sharing/row_link_3" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend page" />
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/sharing/label_link_3" x="12" y="3" />
 	</widget>
-	<widget name="modern/sharing/label_link_3" type="text" controller="1" width="312" height="24" string_list="modern/sharing/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/sharing/label_link_3" type="text" controller="1" width="312" height="24" string_list="modern/sharing/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
 	<strings name="modern/sharing/labels">
+		<string text="SHARE MCC MAPS" />
 		<string text="DOWNLOAD MAPS" />
 		<string text="HELP SEND MAPS" />
 		<string text="UPLOAD LIMIT" />
 		<string text="MCC PACKAGES &gt;" />
+		<string text="MCC DOWNLOADS &gt;" />
 		<string text="&lt; BACK" />
 	</strings>
 	<strings name="modern/sharing/help_strings">
 		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
-		<string text="Joining a game on a Custom Edition map you do not have: download it from the players (if shared)." />
+		<string text="Host only: offer explicitly approved MCC packages. Off by default; configure mcc_share.txt first." />
+		<string text="Allow shared map downloads. CE uses players; MCC uses the host and asks before downloading." />
 		<string text="In another's game, send its map to players who join without it, as a torrent's peers do." />
 		<string text="The most you send of maps to other players, so that the game keeps the rest of your upload." />
 		<string text="Open mcc packages settings. Pending changes stay until OK or Cancel." />
+		<string text="View storage and remove copies received from hosts. Original packages and saves are kept." />
 		<string text="Return to the parent page, keeping pending changes." />
 	</strings>
 	<widget name="modern/sharing/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -5279,71 +5300,90 @@
 		<child widget="modern/network/sharing/prompts" />
 		<child widget="modern/network/sharing/status" />
 	</widget>
-	<widget name="modern/network/sharing/2/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/sharing/18/help">
+	<widget name="modern/network/sharing/2/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/sharing/23/help">
 		<data input="port settings help" />
-		<child widget="modern/network/sharing/3/op_map_download" x="28" y="110" />
-		<child widget="modern/network/sharing/6/op_map_seed" x="28" y="140" />
-		<child widget="modern/network/sharing/9/op_map_seed_upload" x="28" y="170" />
-		<child widget="modern/network/sharing/12/op_mcc_packages" x="28" y="200" />
-		<child widget="modern/network/sharing/14/button_bar" y="414" x="26" />
+		<child widget="modern/network/sharing/3/op_mcc_map_share" x="28" y="110" />
+		<child widget="modern/network/sharing/6/op_map_download" x="28" y="140" />
+		<child widget="modern/network/sharing/9/op_map_seed" x="28" y="170" />
+		<child widget="modern/network/sharing/12/op_map_seed_upload" x="28" y="200" />
+		<child widget="modern/network/sharing/15/op_mcc_packages" x="28" y="230" />
+		<child widget="modern/network/sharing/17/op_mcc_downloads" x="28" y="260" />
+		<child widget="modern/network/sharing/19/button_bar" y="414" x="26" />
 		<data input="port frontend multiplayer update" />
 	</widget>
-	<widget name="modern/network/sharing/3/op_map_download" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
-		<child widget="modern/network/sharing/4/map_download_label" x="12" y="3" />
-		<child widget="modern/network/sharing/5/map_download_spinner" x="180" y="3" />
+	<widget name="modern/network/sharing/3/op_mcc_map_share" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<child widget="modern/network/sharing/4/mcc_map_share_label" x="12" y="3" />
+		<child widget="modern/network/sharing/5/mcc_map_share_spinner" x="180" y="3" />
 	</widget>
-	<widget name="modern/network/sharing/4/map_download_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	<widget name="modern/network/sharing/4/mcc_map_share_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
 	</widget>
-	<widget name="modern/network/sharing/5/map_download_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.map_download" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
+	<widget name="modern/network/sharing/5/mcc_map_share_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.mcc_map_share" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/network/sharing/6/op_map_seed" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
-		<child widget="modern/network/sharing/7/map_seed_label" x="12" y="3" />
-		<child widget="modern/network/sharing/8/map_seed_spinner" x="180" y="3" />
+	<widget name="modern/network/sharing/6/op_map_download" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<child widget="modern/network/sharing/7/map_download_label" x="12" y="3" />
+		<child widget="modern/network/sharing/8/map_download_spinner" x="180" y="3" />
 	</widget>
-	<widget name="modern/network/sharing/7/map_seed_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	<widget name="modern/network/sharing/7/map_download_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
 	</widget>
-	<widget name="modern/network/sharing/8/map_seed_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.map_seed" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
+	<widget name="modern/network/sharing/8/map_download_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.map_download" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/network/sharing/9/op_map_seed_upload" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
-		<child widget="modern/network/sharing/10/map_seed_upload_label" x="12" y="3" />
-		<child widget="modern/network/sharing/11/map_seed_upload_spinner" x="180" y="3" />
+	<widget name="modern/network/sharing/9/op_map_seed" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<child widget="modern/network/sharing/10/map_seed_label" x="12" y="3" />
+		<child widget="modern/network/sharing/11/map_seed_spinner" x="180" y="3" />
 	</widget>
-	<widget name="modern/network/sharing/10/map_seed_upload_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	<widget name="modern/network/sharing/10/map_seed_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
 	</widget>
-	<widget name="modern/network/sharing/11/map_seed_upload_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="64 KB/S|128 KB/S|256 KB/S|512 KB/S|1 MB/S|2 MB/S|4 MB/S|8 MB/S|10 MB/S" setting="network.map_seed_upload" values="64|128|256|512|1024|2048|4096|8192|10240" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
+	<widget name="modern/network/sharing/11/map_seed_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.map_seed" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/network/sharing/12/op_mcc_packages" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+	<widget name="modern/network/sharing/12/op_map_seed_upload" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<child widget="modern/network/sharing/13/map_seed_upload_label" x="12" y="3" />
+		<child widget="modern/network/sharing/14/map_seed_upload_spinner" x="180" y="3" />
+	</widget>
+	<widget name="modern/network/sharing/13/map_seed_upload_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	</widget>
+	<widget name="modern/network/sharing/14/map_seed_upload_spinner" type="spinner" left="0" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="64 KB/S|128 KB/S|256 KB/S|512 KB/S|1 MB/S|2 MB/S|4 MB/S|8 MB/S|10 MB/S" setting="network.map_seed_upload" values="64|128|256|512|1024|2048|4096|8192|10240" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" text_x="0">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/network/sharing/15/op_mcc_packages" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/mcc_packages_screen" />
 		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_packages/mcc_packages_screen" />
 		<on event="left_mouse" run="mouse emit accept event" />
-		<child widget="modern/network/sharing/13/mcc_packages_label" x="12" y="3" />
+		<child widget="modern/network/sharing/16/mcc_packages_label" x="12" y="3" />
 	</widget>
-	<widget name="modern/network/sharing/13/mcc_packages_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	<widget name="modern/network/sharing/16/mcc_packages_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
 	</widget>
-	<widget name="modern/network/sharing/14/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items" left="0" top="0">
-		<child widget="modern/network/sharing/15/button_defaults" y="0" x="198" />
-		<child widget="modern/network/sharing/16/button_ok" x="328" y="0" />
-		<child widget="modern/network/sharing/17/common_button_cancel" x="458" y="0" />
+	<widget name="modern/network/sharing/17/op_mcc_downloads" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/screen" />
+		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/screen" />
+		<on event="left_mouse" run="mouse emit accept event" />
+		<child widget="modern/network/sharing/18/mcc_downloads_label" x="12" y="3" />
 	</widget>
-	<widget name="modern/network/sharing/15/button_defaults" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+	<widget name="modern/network/sharing/18/mcc_downloads_label" type="text" controller="1" width="152" height="24" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	</widget>
+	<widget name="modern/network/sharing/19/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items" left="0" top="0">
+		<child widget="modern/network/sharing/20/button_defaults" y="0" x="198" />
+		<child widget="modern/network/sharing/21/button_ok" x="328" y="0" />
+		<child widget="modern/network/sharing/22/common_button_cancel" x="458" y="0" />
+	</widget>
+	<widget name="modern/network/sharing/20/button_defaults" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
 		<on event="a" run="port settings defaults" />
 		<on event="start" run="port settings defaults" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
-	<widget name="modern/network/sharing/16/button_ok" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+	<widget name="modern/network/sharing/21/button_ok" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
 		<on event="a" run="port settings save" back="true" />
 		<on event="start" run="port settings save" back="true" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
-	<widget name="modern/network/sharing/17/common_button_cancel" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+	<widget name="modern/network/sharing/22/common_button_cancel" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
 		<on event="a" run="mouse emit back event" />
 		<on event="start" run="mouse emit back event" />
 		<on event="left_mouse" run="mouse emit back event" />
 	</widget>
-	<widget name="modern/network/sharing/18/help" type="text" controller="1" left="396" top="108" width="200" height="278" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/help_strings" font="ui\large_ui" color="#FF2896FF" flags="">
+	<widget name="modern/network/sharing/23/help" type="text" controller="1" left="396" top="108" width="200" height="278" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/help_strings" font="ui\large_ui" color="#FF2896FF" flags="">
 	</widget>
 	<widget name="modern/network/sharing/title" left="70" top="40" width="300" height="28" controller="1" bitmap="modern/title_sharing" flags="" />
 	<widget name="modern/network/sharing/help_panel" left="380" top="82" width="232" height="318" controller="1" bitmap="modern/help_panel" flags="nifty_fx" />

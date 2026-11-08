@@ -493,67 +493,71 @@ widgets can still use the MCC callback adapter described below. The new
 pause labels and confirmation text are currently English; localization of
 these generated strings is not implemented.
 
-## Preliminary sharing restriction
+## MCC sharing eligibility
 
-PR #94 supplied an MCC-owned eligibility helper; [sharing a package with a joiner](#sharing-a-package-with-a-joiner)
-below is its caller. The policy covers hand-placed packages and excludes
-recognized Workshop content (numeric package folders or a valid
-`workshop_id.txt`), stock content, loose maps and `_shared`. Desktop players
-continue installing Workshop content through Steam or manually; Android players
-continue using the [package importer](../port/android/README.md#importing-mcc-packages).
-Steam is not required on Android. This is a scope restriction, not a claim that
-Workshop maps are unsafe or that manually copied maps are safe.
+The MCC-owned policy in `mcc_share_rules.c` applies to local and Workshop
+packages. Host opt-in, a known gameplay SHA-256 and a host-local list entry
+with maker credit are required. Unknown/stock content, loose maps, `_shared`,
+unsafe names and invalid origin states are refused. A Workshop ID is advisory;
+it neither grants redistribution permission nor proves which bytes are present.
+The host's `mcc_share.txt` classifies exact map/used-resource content, not a
+filename. Required JSON is separately identified and validated.
 
-The helper requires host opt-in, a known SHA-256 content identity and an explicit
-local classification of that exact content as custom. Unknown classification,
-unreadable sidecars and invalid enum values are refused. Folder names do not
-classify stock content: renaming a stock package cannot change an established
-stock classification, and a custom package may use a stock-looking name. A
-missing sidecar remains allowed under the original policy, but is not proof of
-origin or redistribution permission. Removing metadata is not a supported way
-to establish eligibility. The game does not classify installed files by itself:
-the classification provider is the host's own list (`mcc_share.txt`), below.
-
-The additional-resource allowlist contains only `bitmaps.map` and `sounds.map`.
-It neither validates their contents nor authorizes reading global fallback
-resources. Campaign metadata and later mission files need a separate transfer
-contract. Eligibility and a matching hash must never bypass receiver-side map
-validation, path containment, bounded transfers or safe installation. See the
-[reader's guide](reading/maps_and_resources.md#preliminary-mcc-sharing-policy)
-for the API, trust boundaries and regression checks.
-
+The planner uses the loader's validated resource selection. Self-contained maps
+do not transfer unrelated resources; used package dependencies follow their
+actual resolved paths, including Workshop `halo1/maps`. A used root/shared
+resource refuses the offer and is named in the host log. An invalid package
+override cannot be silently skipped in favor of another resource.
 
 ## Sharing a package with a joiner
 
-A joiner whose host plays a hand-placed package it does not have can fetch the
-package from the host, over a message pair of its own (MCC protocol 65; see
-[NETCODE.md](../port/linux/NETCODE.md#mcc-package-sharing)). Custom Edition map
-sharing, its messages and its downloads are separate and unchanged. Campaign
-transfers are not part of this: the manifests and follow-on missions need their
-own design.
+Milestone 13 extends [PR #95](https://github.com/chestahh/GulchCE/pull/95)
+through MCC-owned host-only delivery, explicit consent, eligible Workshop
+packages, recognized JSON/PNG assets and separate managed snapshots. Current
+wire requirements are MCC **69**, request **103**, response **104**; see
+[NETCODE.md](../port/linux/NETCODE.md#mcc-package-sharing).
+Custom Edition sharing and its messages remain independent.
 
-- **Admission** is the maintained policy above plus the host's own list. The host
-  has `network.mcc_map_share` on (off by default) and lists the package's
-  whole-content SHA-256 with a maker in `mcc_share.txt` (one line,
-  `<64 hexadecimal digits> <maker>`; the game logs the fingerprint of a package it
-  declined). Only then is the exact content classed custom. A package with no line,
-  a line without a maker (the joiner is told to get it from the maker), a Workshop
-  item, a stock or loose map, `_shared` or an unreadable sidecar is never sent.
-- **Files** are the map, the package's own `bitmaps.map` and `sounds.map`, and up to
-  four credit files (`ModInfo.json`, `credits.txt`, `readme.txt`, `license.txt`);
-  nothing else in the folder. Credit files are installed with the package.
-- **Staging** writes each file to `mcc_staging/<package>` as `.part`, checks its size and
-  SHA-256 against the host's manifest, and only then keeps it. The package is then
-  fingerprinted in the staging folder, with the same code as an installed package, and
-  must equal the identity in the host's game record. Only then are the files moved into
-  `mcc_maps/<package>`, the map last. A name already taken (any case) is never written
-  to; cancel, failure or leaving the game delete the staging files and nothing else.
-- **Android** compiles the same code and needs no Steam; it has not been run on a device.
+Enable host `network.mcc_map_share` (default off), list
+`<gameplay SHA-256> <maker>` in `mcc_share.txt`, and have the joiner enable
+`network.map_download` (existing default on). A missing/differing package
+prompts before any chunk download or stage creation. When either permission
+is off, only manual installation or a valid Workshop page is offered as a
+content-acquisition action, plus cancellation. Matching installed content
+needs no download; content is not assumed newer/older solely from a mismatch.
 
-[`test_mcc_share.py`](../tools/test_mcc_share.py) runs the staging, list and session code
-over real files, with a host and a joiner exchanging the real messages, and
-[`test_mcc_share_game.py`](../tools/test_mcc_share_game.py) the game side against stub
-engine headers. They do not play a game on a real MCC map or use two machines.
+The current mission's map and selected resources travel with required package,
+campaign and mission JSON, supported referenced PNGs and attribution text.
+Local map-only folders are valid; no JSON, artwork or Steam identifier is
+invented as a prerequisite. Campaign metadata is delivered upfront and later
+mission binaries are obtained as needed. Received metadata cannot introduce
+arbitrary paths or remote downloads; invalid optional artwork is discarded,
+while invalid required metadata blocks installation.
+
+On-demand campaign progression uses the connected host's exact identity for
+each next mission. A downloaded mission remains individually selectable, but
+separate downloaded snapshots do not assemble an offline or rehosted campaign.
+Campaign JSON specifies names/order, not every mission's binary digest; even
+identical JSON and Workshop provenance cannot prove that another snapshot is
+the intended revision. If the current snapshot lacks its next mission, the
+existing progression handler refuses that transition. Install the complete
+campaign from Workshop or a manual package for offline/rehosted progression,
+or rejoin the original host for its next mission.
+
+The receiver verifies files, metadata references and both advertised identities
+inside its owned `mcc_staging/dl_<digest>` directory. Native publication moves
+the whole directory without replacement into `mcc_maps/dl_<digest>`, preserving
+existing manual and Steam copies. It rechecks that installed snapshot before
+joining. These filesystem checks protect against remote paths; they are not a
+sandbox against a malicious process with the same local filesystem authority.
+
+Managed snapshot storage/removal UI integration and the final runtime/platform
+matrix remain pending. See the
+[implementation walkthrough](reading/maps_and_resources.md#mcc-package-sharing-between-machines)
+and [validation record](mcc_refactor_validation.md#milestone-13-implementation-evidence).
+The fixture suites exercise production modules over synthetic files; they do
+not establish real-map two-machine gameplay, campaign completion, Android
+runtime behavior or browser playability. Milestone 14 owns the browser work.
 
 ## Repository architecture and isolation
 
@@ -923,8 +927,9 @@ its continuous `life_lost_0` script. The previous native map-policy refusal
 disabled that entire script, including its cooperative game-over sequence.
 The fix admits the operation for every accepted MCC map, without selecting a
 map name or replacing it with a no-op. Enabling previously refused authored
-gameplay requires MCC protocol 65; message layouts and Xbox/CE's OpenCE 41
-contract remain unchanged. Source-derived tests exercise native selection
+gameplay originally raised MCC to protocol 65, while that change left message
+layouts and Xbox/CE's then-current OpenCE 41 contract unchanged. Current
+agreements are listed in [NETCODE.md](../port/linux/NETCODE.md#gulchce-network-agreement). Source-derived tests exercise native selection
 clearing, inactive-AI behavior, native map refusal and client console policy;
 the MCC script harness covers linking, malformed arguments and unload guards.
 These checks establish the operation and its boundaries, not a complete

@@ -542,10 +542,14 @@ SCREENS["network_setup/bots"] = {
 SCREENS["network_setup/map_sharing"] = {
     "screen": "map_sharing_settings_screen", "header": _network["header"], "spacing": 30,
     "categories": [("MCC PACKAGES:", "network_setup/mcc_packages",
-                    "Installed MCC maps, campaign mission order and\noptional Workshop collection folders.")],
+                    "Installed MCC maps, campaign mission order and\noptional Workshop collection folders."),
+                   ("MCC DOWNLOADS:", "network_setup/mcc_downloads",
+                    "Storage and removal of copies received from hosts.\nOriginal packages and saves are kept.")],
     "rows": [
+        ("SHARE MCC PACKAGES:", "network.mcc_map_share", ON_OFF,
+         "Host only: offer explicitly approved MCC packages.\nOff by default; configure mcc_share.txt first.", None),
         ("DOWNLOAD MAPS:", "network.map_download", ON_OFF,
-         "Joining a game on a Custom Edition map you do not\nhave: download it from the players (if shared).",
+         "Allow shared map downloads. CE uses players; MCC\nuses the host and asks before downloading.",
          None),
         ("HELP SEND MAPS:", "network.map_seed", ON_OFF,
          "In another's game, send its map to players who\njoin without it, as a torrent's peers do.", None),
@@ -553,6 +557,9 @@ SCREENS["network_setup/map_sharing"] = {
          [(f"{kb} KB/S" if kb < 1024 else f"{kb // 1024} MB/S", str(kb)) for kb in SEED_UPLOADS],
          "The most you send of maps to other players, so\nthat the game keeps the rest of your upload.", None),
     ],
+}
+SCREENS["network_setup/mcc_downloads"] = {
+    "screen": "screen", "header": _network["header"], "title": "MCC DOWNLOADS", "rows": [],
 }
 
 SCREENS["network_setup/mcc_packages"] = {
@@ -1119,8 +1126,10 @@ def settings_files() -> dict:
     files = {}
     for folder, spec in SCREENS.items():
         files[f"{PE}/{folder}".replace("/", ".") + ".xml"] = (
+            _mcc_downloads() if folder == "network_setup/mcc_downloads" else
             _controller_screen() if folder == "controller_remapping" else
             _bots_manage_screen(folder, spec) if folder == "network_setup/bots/manage" else _setting_screen(folder, spec))
+    files[f"{PE}/network_setup/mcc_download".replace("/", ".") + ".xml"] = _mcc_download()
     files[f"{PE}/controls_setup".replace("/", ".") + ".xml"] = _controls_screen()
     return {name: ['<?xml version="1.0" encoding="UTF-8"?>',
                    "<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->",
@@ -2794,4 +2803,58 @@ def _mods() -> list:
                                                               '<on event="start" run="port mods move down"/>'])
     lines += _button(f"{base}/button_ok", 1, ['<on event="a" run="port mods save" back="true"/>',
                                               '<on event="start" run="port mods save" back="true"/>'])
+    return lines
+
+
+def _mcc_download() -> list:
+    """MCC-owned nonblocking consent screen: network updates continue behind it."""
+    base = f"{PE}/network_setup/mcc_download"
+    lines = _widget(f"{base}/screen", [("type", "column_list"), ("width", 640), ("height", 480),
+                    ("bitmap", "bitmaps/gradient"),
+                    ("flags", "pass_unhandled_to_focused_child up_down_tabs_children")],
+                    ['<on event="b" run="port mcc share cancel"/>',
+                     '<on event="back" run="port mcc share cancel"/>',
+                     '<on event="deleted" run="port mcc share closed"/>',
+                     '<data input="port mcc share update"/>',
+                     f'<child widget="{base}/description" x="40" y="60"/>',
+                     f'<child widget="{base}/download" x="150" y="300"/>',
+                     f'<child widget="{base}/workshop" x="150" y="340"/>',
+                     f'<child widget="{base}/cancel" x="150" y="380"/>'])
+    lines += _widget(f"{base}/description", [("type", "text"), ("controller", 1),
+                     ("width", 560), ("height", 220), ("font", "ui\\small_ui"),
+                     ("color", "#FFFFFFFF")], ['<data input="port mcc share text"/>'])
+    for name, text, action in [("download", "DOWNLOAD FROM HOST", "download"),
+                               ("workshop", "VISIT WORKSHOP PAGE", "workshop"),
+                               ("cancel", "CANCEL", "cancel")]:
+        lines += _widget(f"{base}/{name}", [("type", "text"), ("width", 340), ("height", 32),
+                         ("text", text), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
+                         ("align", "center")],
+                         [f'<on event="a" run="port mcc share {action}"/>',
+                          f'<on event="start" run="port mcc share {action}"/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>'])
+    return lines
+
+
+def _mcc_downloads() -> list:
+    base = f"{PE}/network_setup/mcc_downloads"
+    lines = _widget(f"{base}/screen", [("type", "column_list"), ("width", 640), ("height", 480),
+                    ("bitmap", "bitmaps/gradient"),
+                    ("flags", "pass_unhandled_to_focused_child up_down_tabs_children")],
+                    ['<on event="created" run="port mcc downloads open"/>',
+                     '<on event="b" back="true"/>', '<on event="back" back="true"/>',
+                     '<data input="port mcc downloads update"/>',
+                     f'<child widget="{base}/description" x="40" y="40"/>',
+                     f'<child widget="{base}/previous" x="40" y="300"/>',
+                     f'<child widget="{base}/next" x="340" y="300"/>',
+                     f'<child widget="{base}/remove" x="195" y="340"/>',
+                     f'<child widget="{base}/back" x="195" y="390"/>'])
+    lines += _widget(f"{base}/description", [("type", "text"), ("controller", 1),
+                     ("width", 560), ("height", 250), ("font", "ui\\small_ui"),
+                     ("color", "#FFFFFFFF")], ['<data input="port mcc downloads text"/>'])
+    for name, text in [("previous", "PREVIOUS"), ("next", "NEXT"), ("remove", "REMOVE SELECTED"), ("back", "BACK")]:
+        action = 'back="true"' if name == "back" else f'run="port mcc downloads {name}"'
+        lines += _widget(f"{base}/{name}", [("type", "text"), ("width", 250), ("height", 32),
+                         ("text", text), ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center")],
+                         [f'<on event="a" {action}/>', f'<on event="start" {action}/>',
+                          '<on event="left_mouse" run="mouse emit accept event"/>'])
     return lines

@@ -9,6 +9,20 @@ struct mcc_resource_check {
     int framed;
 };
 
+int mcc_resources_check_paths(struct mcc_resource_check const *check, char paths[2][128])
+{
+    unsigned type;
+    memset(paths,0,2*128);
+    if (!check) return 0;
+    for (type=1;type<=2;type++) {
+        struct mcc_resources const *resources=check->runtime.resources;
+        if (!(check->mask&(1u<<(type-1)))) continue;
+        if (!resources || !resources->files[type-1].stream) return 0;
+        strcpy(paths[type-1],resources->files[type-1].path);
+    }
+    return 1;
+}
+
 void mcc_resources_check_end(struct mcc_resource_check *check)
 {
     if (!check) return;

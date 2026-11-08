@@ -58,11 +58,11 @@ def test_sha256_vectors(sha_tool, tmp_path, data, chunk):
 
 def test_session_resolution_and_validation(tmp_path):
     headers = {
-        "cseries.h": "typedef int boolean;\ntypedef unsigned char byte;\n#define FALSE 0\n#define TRUE 1\nint csstrcasecmp(char const *,char const *);\n",
+        "cseries.h": "typedef int boolean;\ntypedef unsigned char byte;\ntypedef unsigned short word;\n#define FALSE 0\n#define TRUE 1\nint csstrcasecmp(char const *,char const *);\n",
         "errors.h": "#define _error_silent 0\nvoid error(short,char const *,...);\n",
         "interface/ui_widget.h": "#include <stddef.h>\nvoid display_error_text_when_main_menu_loaded(wchar_t const *);\n",
         "game/game.h": "enum { _game_connection_local, _game_connection_network_client, _game_connection_network_server };\nint game_connection(void);\n",
-        "networking/network_game_manager.h": "struct network_game {struct {long version;char name[128];} map;unsigned char mcc_content_sha256[32];};\n",
+        "networking/network_game_manager.h": "struct network_game {struct {long version;char name[128];} map;unsigned char mcc_content_sha256[32];unsigned char mcc_metadata_sha256[32];};\n",
     }
     for name, text in headers.items():
         path = tmp_path / name
@@ -80,13 +80,14 @@ def test_session_resolution_and_validation(tmp_path):
 #include <ctype.h>
 #include <stddef.h>
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-static struct {char name[64];unsigned char digest[32];unsigned stamp;} files[20];
+static struct {char name[64];unsigned char digest[32],metadata[32];unsigned stamp;int invalid_metadata;} files[20];
 static int count,probes,errors,connection,changing,denied,clears,hash_loads,rescan_install;
 int csstrcasecmp(char const *a,char const *b){while(*a && tolower(*a)==tolower(*b)){a++;b++;}return tolower(*a)-tolower(*b);}
 int game_connection(void){return connection;}
 void error(short level,char const *format,...){(void)level;(void)format;}
 static char last_error[256];
 void display_error_text_when_main_menu_loaded(wchar_t const *text){int k;errors++;for(k=0;text[k] && k<255;k++)last_error[k]=(char)text[k];last_error[k]=0;}
+void mcc_share_game_disconnect(void) {}
 void mcc_cache_validation_clear(void) {}
 void mcc_validation_cancel(void) {}
 void mcc_cache_precache_clear(void){clears++;}
@@ -98,6 +99,20 @@ short mcc_maps_count(boolean multiplayer){(void)multiplayer;return (short)count;
 char const *mcc_maps_level_name(short i){return files[i].name;}
 boolean mcc_level_name(char const *s){return !strncmp(s,"mcc_maps",8);}
 static int find(char const *s){int i;for(i=0;i<count;i++)if(!strcmp(s,files[i].name))return i;return -1;}
+/* The real metadata parser/digest has its own filesystem regressions. Here each
+ * virtual package supplies controlled JSON identities independently of map bytes. */
+int mcc_manifest_package_root(char const *name,char root[1024]){strcpy(root,name);return 1;}
+int mcc_share_metadata_digest(char const *root,int campaign,char const *level,
+ unsigned char digest[32],char reason[128]){
+ int i=find(root);(void)campaign;(void)level;(void)reason;memset(digest,0,32);
+ if(i<0)return 1;if(files[i].invalid_metadata)return 0;
+ memcpy(digest,files[i].metadata,32);return 1;
+}
+static int offers,allow_offer;
+static unsigned char offered_digest[32],offered_metadata[32];
+static int offer(char const name[128],unsigned char const digest[32],unsigned char const metadata[32]){
+ (void)name;offers++;memcpy(offered_digest,digest,32);memcpy(offered_metadata,metadata,32);return allow_offer;
+}
 int mcc_precache_snapshot(char const *s,struct mcc_precache_snapshot *out){
  int i=find(s);memset(out,0,sizeof(*out));if(denied)return 0;
  if(i>=0){out->files[0].present=1;out->files[0].written_low=files[i].stamp;}return 1;
@@ -236,6 +251,66 @@ int main(void){
  memcpy(game.mcc_content_sha256,wanted,32);count=0;rescan_install=1;
  CHECK(mcc_identity_accept(&game));CHECK(count==1);
  CHECK(!strcmp(mcc_identity_local_name(game.map.name),game.map.name));
+ /* Identical map/resource bytes with different required JSON are different
+  * packages. The complete expected pair reaches the download offer. */
+ rescan_install=0;mcc_identity_disconnect();memset(files,0,sizeof(files));count=1;
+ memset(&game,0,sizeof(game));game.map.version=123;
+ strcpy(game.map.name,"mcc_maps\\Host\\a10");memcpy(game.mcc_content_sha256,wanted,32);
+ strcpy(files[0].name,"mcc_maps\\Client\\a10");memcpy(files[0].digest,wanted,32);
+ memset(game.mcc_metadata_sha256,17,32);memset(files[0].metadata,17,32);
+ CHECK(mcc_identity_accept(&game));CHECK(!strcmp(mcc_identity_local_name(game.map.name),files[0].name));
+ files[0].metadata[31]^=1;
+ CHECK(!mcc_identity_check(game.map.name));
+ connection=1;CHECK(!mcc_identity_loaded(game.map.name,NULL));connection=0;
+ CHECK(!mcc_identity_accept(&game));CHECK(!strcmp(mcc_identity_local_name(game.map.name),game.map.name));
+ mcc_identity_set_missing(offer);allow_offer=0;old=offers;
+ CHECK(!mcc_identity_accept(&game));CHECK(offers==old+1);
+ CHECK(!memcmp(offered_digest,wanted,32) && !memcmp(offered_metadata,game.mcc_metadata_sha256,32));
+ allow_offer=1;CHECK(mcc_identity_accept(&game));CHECK(offers==old+2);
+ CHECK(!strcmp(mcc_identity_local_name(game.map.name),game.map.name));
+ old=offers;CHECK(!mcc_identity_accept_installed(game.map.name,wanted,game.mcc_metadata_sha256,NULL));CHECK(offers==old);
+ files[0].metadata[31]^=1;
+ CHECK(mcc_identity_accept_installed(game.map.name,wanted,game.mcc_metadata_sha256,NULL));CHECK(offers==old);
+ CHECK(!strcmp(mcc_identity_local_name(game.map.name),files[0].name));
+ /* A verified installed destination is unambiguous beside matching aliases. */
+ files[1]=files[0];strcpy(files[1].name,"mcc_maps\\Duplicate\\a10");count=2;
+ CHECK(mcc_identity_accept_installed(game.map.name,wanted,game.mcc_metadata_sha256,files[0].name));
+ CHECK(!strcmp(mcc_identity_local_name(game.map.name),files[0].name));
+ CHECK(!mcc_identity_accept_installed(game.map.name,wanted,game.mcc_metadata_sha256,"mcc_maps\\Missing\\a10"));
+ /* A stale exact path must not mask a fully matching alternate install. */
+ files[1]=files[0];count=2;strcpy(files[1].name,game.map.name);files[1].metadata[0]^=1;
+ CHECK(mcc_identity_accept(&game));CHECK(!strcmp(mcc_identity_local_name(game.map.name),files[0].name));
+ files[0].invalid_metadata=1;allow_offer=0;CHECK(!mcc_identity_accept(&game));
+ CHECK(!strcmp(mcc_identity_local_name(game.map.name),game.map.name));
+ files[0].invalid_metadata=0;count=1;mcc_identity_set_missing(NULL);
+ /* Metadata cannot survive either direction of a map-only transition. */
+ memset(files[0].metadata,0,32);CHECK(!mcc_identity_accept(&game));
+ memset(game.mcc_metadata_sha256,0,32);CHECK(mcc_identity_accept(&game));
+ files[0].metadata[0]=1;CHECK(!mcc_identity_accept(&game));
+ /* Host settings carry JSON identity without modifying the source settings. */
+ strcpy(game.map.name,files[0].name);memset(game.mcc_content_sha256,0,32);
+ CHECK(mcc_identity_prepare_host(game.map.name));
+ CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy)==&copy);
+ CHECK(!memcmp(copy.mcc_metadata_sha256,files[0].metadata,32) && !game.mcc_metadata_sha256[0]);
+ CHECK(!memcmp(copy.mcc_content_sha256,wanted,32) && !game.mcc_content_sha256[0]);
+ {
+  unsigned long revision=mcc_identity_host_revision();
+  CHECK(revision && mcc_identity_prepare_host(game.map.name) && mcc_identity_host_revision()==revision);
+  files[0].metadata[0]^=1;
+  CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));
+  CHECK(!mcc_identity_host_package(game.map.name,wanted));
+  CHECK(mcc_identity_prepare_host(game.map.name) && mcc_identity_host_revision()!=revision);
+ }
+ files[0].invalid_metadata=1;CHECK(!mcc_identity_prepare_host(game.map.name));
+ CHECK(!mcc_identity_host_revision());
+ CHECK(!mcc_identity_host_settings(&game,sizeof(game),&copy));
+ /* Legacy admission rejects either unexpected tail, and legacy transmission
+  * clears both tails while preserving every byte of the established prefix. */
+ strcpy(game.map.name,"custom_maps\\bloodgulch");game.mcc_metadata_sha256[31]=1;
+ CHECK(!mcc_identity_accept(&game));
+ CHECK(mcc_identity_host_settings(&game,sizeof(game),&copy)==&copy);
+ CHECK(!memcmp(&copy,&game,offsetof(struct network_game,mcc_content_sha256)));
+ CHECK(!copy.mcc_content_sha256[0] && !copy.mcc_metadata_sha256[31] && mcc_identity_accept(&copy));
  return 0;
 }
 ''')
@@ -273,7 +348,7 @@ int mcc_maps_workshop_title(char const *id,char *title,unsigned size) {
 #define csmemcpy memcpy
 #define csmemset memset
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-struct network_game {byte previous[1030];byte mcc_content_sha256[32];};
+struct network_game {byte previous[1030];byte mcc_content_sha256[32];byte mcc_metadata_sha256[32];};
 struct network_game_client {int dummy;};struct transport_address {int host;};
 static int applies,decodes,state=3;static struct network_game received;
 static struct network_game network_game_client_settings_staging;
@@ -293,6 +368,7 @@ int main(void){
  struct network_game_client c;struct transport_address address={0};word packet[4]={0};
  struct network_game original;struct mcc_workshop_item item,back;unsigned offset,n;
  memset(&original,42,sizeof(original));
+ memset(original.mcc_metadata_sha256,17,sizeof(original.mcc_metadata_sha256));
  strcpy((char *)original.previous,"mcc_maps\\2899609719\\pat_beavercreek");
  strcpy(item.id,"2899609719");strcpy(item.title,"Better Creek");
  mcc_workshop_wire_pack((char *)original.previous,&item);

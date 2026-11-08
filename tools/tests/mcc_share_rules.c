@@ -57,15 +57,23 @@ int main(int argc,char **argv)
         return 0;
     }
     CASE("workshop") {
-        p=package("mcc_maps/2915693904/a10");
-        CHECK(mcc_share_decide(&p)==MCC_SHARE_WORKSHOP);
-        p=package("mcc_maps/copied_ruby/a10");
-        p.sidecar=MCC_SHARE_SIDECAR_VALID;
-        CHECK(mcc_share_decide(&p)==MCC_SHARE_WORKSHOP);
-        p.sidecar=MCC_SHARE_SIDECAR_UNREADABLE;
-        CHECK(mcc_share_decide(&p)==MCC_SHARE_UNKNOWN_ORIGIN);
-        p.sidecar=MCC_SHARE_SIDECAR_ABSENT;
-        CHECK(mcc_share_eligible(&p)); /* Absence is allowed, not proof of provenance. */
+        static char const *const names[]={"mcc_maps/2915693904/a10","mcc_maps/copied_ruby/a10"};
+        for (i=0;i<sizeof(names)/sizeof(names[0]);i++) {
+            p=package(names[i]);
+            CHECK(mcc_share_eligible(&p)); /* Names and absent sidecars are not permission. */
+            p.sidecar=MCC_SHARE_SIDECAR_VALID;
+            CHECK(mcc_share_eligible(&p));
+            p.host_opt_in=0;
+            CHECK(mcc_share_decide(&p)==MCC_SHARE_NOT_OPTED_IN);
+            p.host_opt_in=1;p.content_known=0;
+            CHECK(mcc_share_decide(&p)==MCC_SHARE_UNKNOWN_CONTENT);
+            p.content_known=1;p.content=MCC_SHARE_CONTENT_UNKNOWN;
+            CHECK(mcc_share_decide(&p)==MCC_SHARE_UNKNOWN_CONTENT);
+            p.content=MCC_SHARE_CONTENT_STOCK;
+            CHECK(mcc_share_decide(&p)==MCC_SHARE_STOCK);
+            p.content=MCC_SHARE_CONTENT_CUSTOM;p.sidecar=MCC_SHARE_SIDECAR_UNREADABLE;
+            CHECK(mcc_share_decide(&p)==MCC_SHARE_UNKNOWN_ORIGIN);
+        }
         return 0;
     }
     CASE("states") {
@@ -73,7 +81,7 @@ int main(int argc,char **argv)
         for (state=-128;state<=255;state++) {
             p=package("mcc_maps/custom/level");
             p.sidecar=(enum mcc_share_sidecar)state;
-            CHECK(mcc_share_eligible(&p)==(state==MCC_SHARE_SIDECAR_ABSENT));
+            CHECK(mcc_share_eligible(&p)==(state==MCC_SHARE_SIDECAR_ABSENT || state==MCC_SHARE_SIDECAR_VALID));
             p=package("mcc_maps/custom/level");
             p.content=(enum mcc_share_content)state;
             CHECK(mcc_share_eligible(&p)==(state==MCC_SHARE_CONTENT_CUSTOM));

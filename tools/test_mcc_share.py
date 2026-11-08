@@ -11,11 +11,18 @@ from test_mcc_identity import compile_tool
 ROOT = Path(__file__).resolve().parents[1]
 GAME = ROOT / "port/linux/game"
 SOURCES = [ROOT / "tools/tests/mcc_share_session.c", GAME / "mcc_share_stage.c", GAME / "mcc_share_session.c",
-           GAME / "mcc_share_list.c", GAME / "mcc_share_rules.c", GAME / "mcc_package.c", GAME / "mcc_sha256.c"]
+           GAME / "mcc_share_list.c", GAME / "mcc_share_rules.c", GAME / "mcc_package.c", GAME / "mcc_sha256.c",
+           ROOT / "port/linux/src/posix_mcc_share.c"]
 CASES = ["list", "admit", "manifest", "redirect", "stage_cancel", "stage_hash_and_size", "stage_exists",
          "stage_install", "stage_race", "stage_move_failure", "stage_names", "transfer", "rate", "cancel",
          "bad_hash", "changed_size", "identity", "disk_space", "taken", "exists", "refusals", "busy", "host_requests",
-         "hostile_manifest", "hostile_chunk", "names", "timeouts"]
+         "hostile_manifest", "hostile_chunk", "names", "timeouts", "aggregate_rate", "offer_accept",
+         "offer_expiry", "offer_cancel", "backpressure", "request_fields", "response_fields", "manifest_pages", "clock_zero", "clock_wrap",
+         "manifest_rate", "offer_delivery_deadline", "progress_expiry", "terminal_cancel", "terminal_success",
+         "terminal_failure", "terminal_disconnect", "terminal_expiry", "terminal_new_request",
+         "prepare_success", "prepare_failure", "prepare_unverified", "reuse_files", "reuse_absent",
+         "reuse_bounded", "reuse_cancel", "reuse_disconnect", "reuse_short_read", "reuse_bad_hash",
+         "reuse_missing", "reuse_backpressure", "have_fields"]
 
 
 @pytest.fixture(scope="module")
@@ -37,22 +44,32 @@ def test_share(share_tool, tmp_path, case):
 @pytest.mark.parametrize("before,after,case", [
     # the downloaded files must match their SHA-256 and size before they are kept
     ("if (memcmp(digest,file->sha256,32)) return", "if (0 && memcmp(digest,file->sha256,32)) return", "bad_hash"),
-    ("if (bytes>file->size-stage->written) return", "if (0 && bytes>file->size-stage->written) return", "stage_hash_and_size"),
+    ("if (bytes>file->size-stage->written || (bytes && !data)) return", "if (bytes && !data) return", "stage_hash_and_size"),
     # the content identity is checked before anything moves into mcc_maps
     ("if (!check(user,stage->stage_dir)) return", "if (0 && !check(user,stage->stage_dir)) return", "identity"),
-    ("if (free_bytes && total+(64u<<20)>free_bytes) {", "if (0 && free_bytes && total+(64u<<20)>free_bytes) {", "disk_space"),
+    ("if (free_bytes && share->offer_total+(64u<<20)>free_bytes) {", "if (0 && free_bytes && share->offer_total+(64u<<20)>free_bytes) {", "disk_space"),
     # an existing package folder is never written to
-    ("if (io->directory_exists(stage->package_dir)) {", "if (0) {", "stage_exists"),
-    ("if (!stage->io.make_directory(stage->package_dir)) return", "if (0 && !stage->io.make_directory(stage->package_dir)) return", "stage_race"),
-    ("for (j=0;j<i;j++) if (stage_same(out[j].leaf,canonical)) return 0;", "for (j=0;j<i;j++) if (0 && stage_same(out[j].leaf,canonical)) return 0;", "manifest"),
+    ("if (!io->path_safe(stage->package_dir) || io->directory_exists(stage->package_dir)) return", "if (!io->path_safe(stage->package_dir)) return", "stage_exists"),
+    ("!stage->io.publish_directory(stage->stage_dir,stage->package_dir)", "0", "stage_race"),
+    ("if (stage_same(out[j].leaf,name)) return 0;", "if (0 && stage_same(out[j].leaf,name)) return 0;", "manifest"),
     # leaf names the sender picks are plain file names from the allowlists
-    ("if (file.kind==MCC_SHARE_FILE_CREDIT &&\n            (file.size>MCC_SHARE_MAXIMUM_CREDIT_BYTES || !mcc_share_credit_allowed(file.leaf,(unsigned)strlen(file.leaf)))) return 0;", "", "manifest"),
+    ("if (file.size>MCC_SHARE_MAXIMUM_CREDIT_BYTES || !mcc_share_credit_allowed(name,(unsigned)strlen(name))) return 0;", "", "manifest"),
     # the host's opt-in and the rules decide before anything is offered
     ("if (!opt_in) return MCC_SHARE_RESULT_OFF;", "if (0 && !opt_in) return MCC_SHARE_RESULT_OFF;", "admit"),
     ("package.content=listed ? MCC_SHARE_CONTENT_CUSTOM : MCC_SHARE_CONTENT_UNKNOWN;", "package.content=MCC_SHARE_CONTENT_CUSTOM;", "admit"),
     # the joiner takes only what it asked for
     ("head->offset!=share->stage.written ||", "", "hostile_chunk"),
     ("head->session!=share->session ||", "", "hostile_chunk"),
+    # Offer traffic shares the cap, heartbeats cannot reserve slots or extend consent,
+    # and reliable-stream backpressure must not lose the terminal notification.
+    ("share->budget-=(int32_t)(sizeof(struct mcc_share_response)+count*sizeof(entries[0]));", "", "manifest_rate"),
+    ("transfer->sent_bytes || transfer->reused_files ? share_elapsed(now,transfer->advanced_at,MCC_SHARE_ACTIVE_ADVANCED) :",
+     "transfer->sent_bytes ? 0 :", "progress_expiry"),
+    ("if (!transfer->manifest_pending && !transfer->offer_complete) {",
+     "if (!transfer->manifest_pending) {", "offer_delivery_deadline"),
+    ("client_retry_terminal(share);\n    client_update(share);", "client_update(share);", "terminal_cancel"),
+    ("if (kind!=MCC_SHARE_FILE_BITMAPS && kind!=MCC_SHARE_FILE_SOUNDS) return;", "(void)kind;", "have_fields"),
+    ("#define MCC_SHARE_REUSE_SLICE 0x100000u", "#define MCC_SHARE_REUSE_SLICE 0x800000u", "reuse_bounded"),
 ])
 def test_negative_controls(tmp_path, before, after, case):
     """Each selected check must detect its intended fault in the real code."""
@@ -82,7 +99,7 @@ def test_sanitized(tmp_path):
     clang = shutil.which("clang")
     assert clang, "clang is required for the Linux security checks"
     exe = tmp_path / "sanitized"
-    result = subprocess.run([clang, "-std=gnu89", "-g", "-O1", "-Wall", "-Wextra", "-Werror",
+    result = subprocess.run([clang, "-D_GNU_SOURCE", "-std=gnu89", "-g", "-O1", "-Wall", "-Wextra", "-Werror",
                              "-fsanitize=address,undefined", "-fno-sanitize-recover=all",
                              "-I", str(GAME), *map(str, SOURCES), "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

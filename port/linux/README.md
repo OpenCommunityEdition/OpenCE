@@ -689,8 +689,8 @@ the setting for one start of the game. It has priority over the file.
 | `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `20480`, 20 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `10240`, 10 MB/s). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
-| `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | When you join a game on a Custom Edition map that you do not have: download it from the players of the game. `false`: leave the game and show which map is missing. DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. |
-| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | When you host a game on an MCC map: send a player who joins without the map's package its files (the map, the package's own `bitmaps.map` and `sounds.map`, and its credit files). Off by default; no menu entry. Only a hand-placed package whose fingerprint is listed with its maker in `mcc_share.txt` is sent. Steam Workshop items and stock maps never are. The joiner needs `network.map_download`. Refer to "MCC package sharing". |
+| `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. CE downloads from players as before; MCC permits a host offer and asks before transferring files. Off: CE leaves a missing-map game; MCC offers manual/Workshop installation and cancellation. |
+| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | SHARE MCC PACKAGES in Settings > Network Setup > Map Sharing. Host-only, explicit-list sharing of eligible local or Workshop packages; requires a gameplay fingerprint and maker in `mcc_share.txt`. Includes used package resources and recognized metadata/previews. The joiner needs Download Maps enabled and must accept the offer. See "MCC package sharing" for implementation status and limits. |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
 | `network.coop_team_wipe` | `"auto"` | `HALO_NET_COOP_TEAM_WIPE` | TEAM WIPE in Server Setup > Co-op Options: `"auto"` reverts the checkpoint in a PRIVATE game and only respawns the team in a PUBLIC game (a dedicated server's: `server.public` with internet play). `"revert"` or `"respawn"` overrides visibility; a password does not make a PUBLIC game private. Changed players/machine assignments fall back to position-only respawn with a host diagnostic. A missing checkpoint also uses position-only respawn. Scripted mission failures keep their existing revert behavior. |
 | `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
@@ -1356,33 +1356,49 @@ only invites, not listings.
 
 ### MCC package sharing
 
-A game on an MCC map has a second, separate kind of sharing. When you join a game
-on a hand-placed MCC package that you do not have (a folder in `mcc_maps` that is
-not a Steam Workshop item, for example `mcc_maps\solar_flare`), the game can fetch
-the package from the host instead of refusing the join, if both sides allow it.
-It does not use the Custom Edition map sharing above and does not change it.
+MCC delivery is host-only and separate from Custom Edition sharing. The current
+Milestone 13 implementation supports eligible Workshop packages and local
+folders in `mcc_maps`, including map-only folders without JSON or thumbnails.
+Final storage/UI integration and runtime/platform validation are still in
+progress; see [the evidence record](../../docs/mcc_refactor_validation.md#milestone-13-implementation-evidence).
 
-- The host turns it on with `network.mcc_map_share` (off by default; in `config.toml`
-  or `HALO_NET_MCC_MAP_SHARE`). It sends only the package its game is on, and only
-  a package whose whole-content fingerprint (the SHA-256 that every MCC player's game
-  record carries) it lists with a maker in `mcc_share.txt` in the data root: one line,
-  `<64 hexadecimal digits> <the maker to credit>`. The game logs the fingerprint of a
-  package it did not send. A package with no line, or a line without a maker, a Steam
-  Workshop item, a stock map, `_shared`, or a loose map is not sent, and the joiner is
-  told why and to get the package from its maker.
-- The joiner uses `network.map_download` (on by default). The files go to
-  `mcc_staging/<package>`, each is checked against its SHA-256 as it arrives, and
-  the package is checked as a whole against the host's fingerprint before it is moved
-  into `mcc_maps/<package>`. A failure, a cancel or leaving the game deletes the
-  staging files and nothing else. A package folder you already have is never written to.
-  The maker's credit files (`ModInfo.json`, `credits.txt`, `readme.txt`, `license.txt`)
-  are installed with the package. A line at the top of the screen shows the progress.
-- The host sends at most `network.map_share_upload` (1024 KB/s). The host is the only
-  source; players do not send it on. The Android build compiles the same code and needs
-  no Steam (not yet run on a device).
+The host enables **SHARE MCC PACKAGES** in Settings > Network Setup > Map
+Sharing (`network.mcc_map_share`, off by default; also
+`HALO_NET_MCC_MAP_SHARE`). It must list the exact map/used-resource SHA-256 and
+maker in the data root's `mcc_share.txt`, one line per approved identity:
+`<64 hexadecimal digits> <maker>`. The host log reports an unlisted fingerprint.
+This explicit approval does not come from a package name or a Workshop ID.
+Stock, unclassified, loose and shared-root packages are not offered.
 
-The messages, limits and what each side checks are in [NETCODE.md](NETCODE.md), "MCC
-package sharing". This needs MCC protocol 65 on both machines.
+The joiner uses **DOWNLOAD MAPS** (`network.map_download`, on by default).
+Missing or differing content opens an offer showing size and maker; accepting
+starts the host download. Matching installed content is reused. If host sharing
+or client downloads is off, no host-download action is offered: use the
+Workshop page when available, or install matching content manually, or cancel.
+The latest Workshop package may still differ from the host's copy; installation
+must be checked again. The prompt does not infer which version is newer.
+
+The offer includes the current map and its actually used package resources,
+required recognized JSON, eligible referenced PNG previews and attribution
+files. Campaign metadata is obtained upfront; mission binaries/resources are
+obtained as needed. Unrelated resource files are omitted. A package depending
+on root/shared stock resources is refused with a host diagnostic, rather than
+silently redistributing those resources. A local dedicated-server folder needs
+no invented Workshop metadata or artwork to qualify.
+
+Each accepted download is checked in an exclusively owned staging directory,
+then published as a separate `mcc_maps/dl_<digest>` snapshot. Existing local
+packages, Steam installations and saves are not overwritten. Required metadata
+and gameplay identities must match the host; invalid optional art uses the
+placeholder. Cancelled or failed transfers remove only their owned staging
+files. A host-delivered snapshot is not a Steam subscription or an automatic
+Workshop update. Receipt-based storage/removal controls remain under integration.
+
+The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
+not seed MCC downloads. Android requires no Steam for these files, but device
+runtime validation remains a separate requirement. Browser import/download and
+persistence are Milestone 14 work. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
+for bounds, lifecycle and current MCC protocol **69**.
 
 ### Map sharing
 

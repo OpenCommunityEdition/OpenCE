@@ -22,9 +22,9 @@ def test_audited_changes_from_opence_41_contract():
     expected = {f"{kind} {name}": value for kind, name, value in
                 (line.split(" ", 2) for line in lines[1:])}
     actual = network_format.items()
-    # MCC appends a digest after the complete upstream settings prefix.
+    # MCC appends two digests after the complete upstream settings prefix.
     # Compare the upstream size separately rather than accepting a fork size.
-    assert actual["layout HALO_PORT_NETWORK_GAME_SIZE"] == "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 32) /* MCC SHA-256 */"
+    assert actual["layout HALO_PORT_NETWORK_GAME_SIZE"] == "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 64) /* MCC content and metadata SHA-256 */"
     actual["layout HALO_PORT_NETWORK_GAME_SIZE"] = "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A)"
     # The appended join agreement and distributed world epoch are the only
     # changes to existing upstream wire items. New kinds are checked separately.
@@ -35,13 +35,13 @@ def test_audited_changes_from_opence_41_contract():
     }
     assert {key: actual.get(key) for key in expected if actual.get(key) != expected[key]} == changed
     limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
-    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 32722\b", limits)
+    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 32726\b", limits)
     # All fields of the transmitted prefix match upstream, including names,
     # types and order. The Windows build also asserts the actual ABI offsets.
     header = (ROOT / "source/networking/network_game_manager.h").read_text()
     header = re.sub(r"/\*.*?\*/|//[^\n]*", " ", header, flags=re.S)
     block = next(network_format._blocks(header, r"^struct network_game\s*\{"))
-    block = re.sub(r"\s*byte mcc_content_sha256\[32\];", "", block)
+    block = re.sub(r"\s*byte mcc_(?:content|metadata)_sha256\[32\];", "", block)
     assert network_format._hash(block) == 'd0025984b339'
 
 
@@ -62,13 +62,13 @@ typedef int boolean;
 #define TRUE 1
 #define FALSE 0
 #define HALO_PORT_NETWORK_GAME_PLAYERS_END 6
-#define HALO_PORT_NETWORK_VERSION 32722
+#define HALO_PORT_NETWORK_VERSION 32726
 #define HALO_PORT_MAXIMUM_NETWORK_MACHINES 4
 #define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))
 #define csmemcpy memcpy
 #define csmemset memset
 #define CHECK(x) do { if (!(x)) {fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;} } while (0)
-struct network_game {struct {char name[64];} map;byte mcc_content_sha256[32];};
+struct network_game {struct {char name[64];} map;byte mcc_content_sha256[32];byte mcc_metadata_sha256[32];};
 struct network_game_client {int unused;};
 struct network_game_server {int unused;};
 struct network_game_server_client_machine {int joined;};
@@ -101,20 +101,22 @@ int main(void) {
     byte saved;
     int i;
     memset(&game,0,sizeof(game));strcpy(game.map.name,"levels\\test\\bloodgulch\\bloodgulch");
-    CHECK(mcc_protocol_version(game.map.name)==32722);
+    CHECK(mcc_protocol_version(game.map.name)==32726);
     CHECK(mcc_protocol_settings_size(&game)==64);
     CHECK(mcc_protocol_settings_valid(&game,64));CHECK(!mcc_protocol_settings_valid(&game,96));
+    CHECK(!mcc_protocol_settings_valid(&game,128));
     build_message_header(original,sizeof(original),3,0);
     ((byte *)original)[sizeof(original)-1]=_message_client_join_game_request;
     CHECK(mcc_protocol_join(original,sizeof(original),outer)==original);
     mcc_protocol_client_begin(MCC_PROTOCOL_ADVERTISED_FLAG);
     CHECK(mcc_protocol_join(original,sizeof(original),outer)==outer);
     CHECK(mcc_protocol_unwrap(outer,40,inner,&size));CHECK(size==32 && !memcmp(inner,original,32));
-    /* Shared clock recovery requires the updated join agreement.
+    /* Package transfer and required metadata identity need the updated join agreement.
      * Reject the previous MCC revision before interpreting settings. */
-    CHECK(MCC_PROTOCOL_VERSION==68);
-    ((byte *)outer)[4]=67;
-    CHECK(!mcc_protocol_unwrap(outer,40,inner,&size));
+    CHECK(MCC_PROTOCOL_VERSION==69);
+    for(i=67;i<=68;i++) {
+        ((byte *)outer)[4]=(byte)i;CHECK(!mcc_protocol_unwrap(outer,40,inner,&size));
+    }
     ((byte *)outer)[4]=MCC_PROTOCOL_VERSION;
     for(i=0;i<257;i++) if(i!=40) CHECK(!mcc_protocol_unwrap(outer,(word)i,inner,&size));
     for(i=0;i<10;i++) {
@@ -134,8 +136,9 @@ int main(void) {
     CHECK(!mcc_protocol_unwrap(outer,40,inner,&size));
     strcpy(game.map.name,"mcc_maps\\Package\\level");
     CHECK(mcc_protocol_version(game.map.name)==MCC_PROTOCOL_VERSION);
-    CHECK(!mcc_protocol_settings_valid(&game,64));CHECK(mcc_protocol_settings_valid(&game,96));
-    mcc_protocol_client_clear();CHECK(!mcc_protocol_settings_valid(&game,96));
+    CHECK(mcc_protocol_settings_size(&game)==128);CHECK(!mcc_protocol_settings_valid(&game,96));
+    CHECK(!mcc_protocol_settings_valid(&game,64));CHECK(mcc_protocol_settings_valid(&game,128));
+    mcc_protocol_client_clear();CHECK(!mcc_protocol_settings_valid(&game,128));
     CHECK(!mcc_protocol_allows(&game,peers));
     CHECK(mcc_protocol_peer(peers,1));CHECK(mcc_protocol_allows(&game,peers));
     mcc_protocol_forget(peers);CHECK(!mcc_protocol_allows(&game,peers));
@@ -150,7 +153,8 @@ int main(void) {
     piece.offset=48;piece.length=16;memset(piece.data,0,sizeof(piece.data));
     CHECK(network_game_client_receive_game_settings_piece(NULL,&piece));CHECK(applied==1);
     CHECK(network_game_client_settings_staging.mcc_content_sha256[0]==0);
-    piece.offset=0;piece.length=48;piece.total_size=96;
+    CHECK(network_game_client_settings_staging.mcc_metadata_sha256[0]==0);
+    piece.offset=0;piece.length=48;piece.total_size=128;
     strcpy((char *)piece.data,"mcc_maps\\level");
     CHECK(network_game_client_receive_game_settings_piece(NULL,&piece));
     piece.offset=48;piece.total_size=64;piece.length=16;
@@ -162,6 +166,26 @@ int main(void) {
     piece.offset=0;piece.length=0;CHECK(!network_game_client_receive_game_settings_piece(NULL,&piece));
     piece.length=48;piece.offset=48;piece.total_size=64;
     CHECK(!network_game_client_receive_game_settings_piece(NULL,&piece));
+    /* The real framing and protocol gates wait for both identities; the former
+     * one-digest size must never admit a truncated metadata agreement. */
+    mcc_protocol_client_begin(MCC_PROTOCOL_ADVERTISED_FLAG);
+    memset(game.mcc_content_sha256,42,32);memset(game.mcc_metadata_sha256,17,32);
+    piece.total_size=sizeof(game);
+    for(i=0;i<(int)sizeof(game);i+=piece.length) {
+        piece.offset=(word)i;piece.length=(word)(sizeof(game)-i);
+        if(piece.length>sizeof(piece.data))piece.length=sizeof(piece.data);
+        memcpy(piece.data,(byte *)&game+i,piece.length);
+        CHECK(network_game_client_receive_game_settings_piece(NULL,&piece));
+        CHECK(applied==1+(i+piece.length==sizeof(game)));
+    }
+    CHECK(!memcmp(&network_game_client_settings_staging,&game,sizeof(game)));
+    /* A subsequent CE prefix clears every byte of both MCC-only identities. */
+    memset(&game,0,sizeof(game));strcpy(game.map.name,"custom_maps\\bloodgulch");
+    piece.total_size=64;piece.offset=0;piece.length=48;memcpy(piece.data,&game,48);
+    CHECK(network_game_client_receive_game_settings_piece(NULL,&piece));
+    piece.offset=48;piece.length=16;memcpy(piece.data,(byte *)&game+48,16);
+    CHECK(network_game_client_receive_game_settings_piece(NULL,&piece));CHECK(applied==3);
+    CHECK(!memcmp(&network_game_client_settings_staging,&game,sizeof(game)));
     return 0;
 }
 '''
@@ -238,7 +262,7 @@ typedef unsigned short word;
 #define MAXIMUM_MACHINE_NAME_LENGTH 16
 #define JOIN_GAME_TOKEN_LENGTH 16
 #define NETWORK_GAME_MESSAGE_VERSION 1
-#define HALO_PORT_NETWORK_VERSION 32722
+#define HALO_PORT_NETWORK_VERSION 32726
 #define csmemcmp memcmp
 #define csmemcpy memcpy
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}} while(0)
@@ -316,7 +340,7 @@ static int try_join(int capability) {
 }
 int main(void) {
  int cap,mcc,i;
- word invalid_versions[]={0,41,42,65,66,67,68,32712,32713,32714,32716,32717,32718,32720,32721,32724,32725,65535};
+ word invalid_versions[]={0,41,42,65,66,67,68,69,32712,32713,32714,32716,32717,32718,32720,32721,32722,32724,32725,65535};
  for(mcc=0;mcc<2;mcc++) for(cap=0;cap<2;cap++) {
   for(i=0;i<(int)(sizeof(invalid_versions)/sizeof(invalid_versions[0]));i++) {
    reset();requires_mcc=mcc;join_version=invalid_versions[i];

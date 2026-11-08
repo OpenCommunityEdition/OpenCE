@@ -832,6 +832,34 @@ def test_missing_campaign_mission_is_not_skipped(catalog_tool, tmp_path, monkeyp
     assert fields["next_1"] == "2|"
 
 
+@pytest.mark.parametrize("candidates", [1, 2])
+def test_downloaded_campaign_does_not_splice_other_snapshots(catalog_tool, tmp_path, monkeypatch, candidates):
+    # The real catalog receives identical ordered metadata for every package.
+    # Even one same-Workshop candidate cannot prove the intended binary version:
+    # campaign JSON names missions but does not contain their gameplay digests.
+    # This is a catalog boundary test, not receipt validation or network testing.
+    first = "dl_" + "1" * 20
+    folders = [first] + ["dl_" + str(i + 2) * 20 for i in range(candidates)]
+    install(tmp_path, {})
+    root = tmp_path / "mcc_maps"
+    (root / "list.txt").write_text("\n".join("/" + name for name in folders))
+    for index, folder in enumerate(folders):
+        package = root / folder
+        package.mkdir()
+        mission = "z10" if index == 0 else "a10"
+        (package / "list.txt").write_text(mission + ".map\n")
+        (package / (mission + ".map")).write_bytes(header(scenario=0, internal=f"revision_{index}"))
+        (package / "workshop_id.txt").write_text("12345\nExample campaign\n")
+    monkeypatch.setenv("TEST_MISSIONS", "z10,a10")
+    fields, maps = run(catalog_tool, tmp_path)
+    assert len(maps) == candidates + 1
+    assert maps[0] == f"mcc_maps\\{first}\\z10|1"
+    assert fields["next_0"] == f"-1|mcc_maps\\{first}\\a10"
+    # The following mission remains available as an individual selection.
+    assert all(name.endswith("\\a10|1") for name in maps[1:])
+    assert all(fields[f"next_{i}"] == "2|" for i in range(1, candidates + 1))
+
+
 def test_workshop_browser_keeps_title_longer_than_filename(catalog_tool, tmp_path):
     local_packages(tmp_path, ["12345"])
     fields, _ = run(catalog_tool, tmp_path, "browse", "0", "enter:0", items=[("12345", "Item", "arena", "A much longer mission title")])

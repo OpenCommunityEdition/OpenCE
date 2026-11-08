@@ -9,6 +9,7 @@ static struct mcc_validation_result {
     struct mcc_precache_snapshot files;
     uint32_t checksum;
     unsigned char digest[32];
+    char resources[2][128];
 } mcc_validation_results[MCC_VALIDATION_RESULTS];
 static unsigned mcc_validation_next;
 static struct {
@@ -60,7 +61,7 @@ char const *mcc_validation_error(void)
     return mcc_validation_job.reason;
 }
 
-int mcc_validation_lookup(char const *name,uint32_t *checksum,unsigned char digest[32])
+static struct mcc_validation_result *mcc_validation_find(char const *name)
 {
     char canonical[64];
     struct mcc_precache_snapshot files;
@@ -74,11 +75,27 @@ int mcc_validation_lookup(char const *name,uint32_t *checksum,unsigned char dige
             memset(result,0,sizeof(*result));
             return 0;
         }
-        if (checksum) *checksum=result->checksum;
-        if (digest) memcpy(digest,result->digest,32);
-        return 1;
+        return result;
     }
     return 0;
+}
+
+int mcc_validation_lookup(char const *name,uint32_t *checksum,unsigned char digest[32])
+{
+    struct mcc_validation_result const *result=mcc_validation_find(name);
+    if (!result) return 0;
+    if (checksum) *checksum=result->checksum;
+    if (digest) memcpy(digest,result->digest,32);
+    return 1;
+}
+
+int mcc_validation_resources(char const *name,char paths[2][128])
+{
+    struct mcc_validation_result const *result=mcc_validation_find(name);
+    memset(paths,0,2*128);
+    if (!result) return 0;
+    memcpy(paths,result->resources,sizeof(result->resources));
+    return 1;
 }
 
 int mcc_validation_request(char const *name,uint32_t *checksum,unsigned char digest[32])
@@ -113,6 +130,7 @@ void mcc_validation_update(void)
         mcc_validation_job.check=mcc_resources_check_begin(mcc_validation_job.result.name,
             &mcc_validation_job.source,mcc_validation_job.reason,sizeof(mcc_validation_job.reason));
         if (!mcc_validation_job.check) goto failed;
+        if (!mcc_resources_check_paths(mcc_validation_job.check,mcc_validation_job.result.resources)) goto failed;
         mcc_validation_job.cancel=CreateEventA(NULL,TRUE,FALSE,NULL);
         if (mcc_validation_job.cancel)
             mcc_validation_job.thread=CreateThread(NULL,256*1024,mcc_validation_worker,NULL,0,NULL);

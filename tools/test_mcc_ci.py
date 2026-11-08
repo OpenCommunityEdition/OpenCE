@@ -61,3 +61,21 @@ def test_native_windows_reservation_checks_run_on_windows():
     assert job["runs-on"].startswith("windows-")
     inputs = set(pytest_inputs(step.get("run", "") for step in job["steps"]))
     assert {"tools/test_mcc_memory.py", "tools/test_windows_mcc_startup.py"} <= inputs
+
+
+@pytest.mark.parametrize("job_name", ["reader-and-validator", "windows-adapters"])
+def test_sharing_storage_and_metadata_run_on_both_native_platforms(job_name):
+    workflow = yaml.safe_load((ROOT / ".github/workflows/mcc.yml").read_text(encoding="utf-8"))
+    inputs = set(pytest_inputs(step.get("run", "") for step in workflow["jobs"][job_name]["steps"]))
+    assert {"tools/test_mcc_share.py", "tools/test_mcc_share_stage.py",
+            "tools/test_mcc_share_metadata.py", "tools/test_mcc_share_storage.py",
+            "tools/test_mcc_share_menu.py"} <= inputs
+
+
+@pytest.mark.parametrize("module", ["metadata", "storage"])
+def test_sharing_metadata_has_linux_sanitizer_runner(module):
+    workflow = yaml.safe_load((ROOT / ".github/workflows/mcc.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["reader-and-validator"]["steps"]
+    assert any(step.get("env", {}).get(f"MCC_SHARE_{module.upper()}_SANITIZE") == "1" and
+               f"tools/test_mcc_share_{module}.py" in set(pytest_inputs([step.get("run", "")]))
+               for step in steps)

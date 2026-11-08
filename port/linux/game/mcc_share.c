@@ -20,6 +20,13 @@
 #include "mcc_package.h"
 #include "mcc_share.h"
 #include "mcc_share_session.h"
+#include "mcc_share_package.h"
+#include "mcc_share_storage.h"
+#include "mcc_protocol.h"
+#include "../src/mcc_share_metadata.h"
+#include "../src/posix.h"
+#include "tag_files/tag_groups.h"
+#include <stdlib.h>
 #include "mcc_workshop.h"
 #include <xtl.h>
 #include <errno.h>
@@ -49,8 +56,21 @@ static struct mcc_share mcc_share_globals;
 static boolean mcc_share_ready;
 /* the host's game record as the joiner was given it (the join that began the download) */
 static char mcc_share_name[128];
-static unsigned char mcc_share_digest[32];
+static unsigned char mcc_share_digest[32], mcc_share_metadata[32];
+static boolean mcc_share_prompt_pending, mcc_share_prompt_visible;
+static boolean mcc_share_prompt_download;
+static struct widget_instance *mcc_share_prompt;
+static char mcc_share_prompt_message[512];
+static char mcc_share_installed[64];
 static char mcc_share_text[256];
+static unsigned long mcc_share_host_revision;
+void platform_translate_path(char const *, char *, unsigned long);
+void platform_open_url(char const *);
+void ui_widget_port_go_back(struct widget_instance *widget);
+static void mcc_share_offered(void *, uint64_t, char const *);
+static void mcc_share_host_lifecycle(void);
+struct network_game_server_client_machine *network_game_server_get_client_machine_at_index(struct network_game_server *,long);
+boolean network_game_server_client_machine_is_joined_to_game(struct network_game_server *,struct network_game_server_client_machine *);
 
 /* ---------- the engine's files and folders */
 
@@ -63,6 +83,19 @@ static int mcc_share_io_exists(char const *path)
 	unsigned long attributes = GetFileAttributesA(path);
 
 	return attributes != (unsigned long)-1 && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+static int mcc_share_io_safe(char const *path)
+{
+    char native[1024];
+    platform_translate_path(path,native,sizeof(native));
+    return posix_mcc_share_path_safe(native);
+}
+static int mcc_share_io_publish(char const *from,char const *to)
+{
+    char a[1024],b[1024];
+    platform_translate_path(from,a,sizeof(a)); platform_translate_path(to,b,sizeof(b));
+    return posix_mcc_share_publish(a,b);
 }
 
 /* ---------- messages */
@@ -79,7 +112,7 @@ static void mcc_share_fill_header(
 	header->game_time = game_in_progress() ? game_time_get() : 0;
 }
 
-static void mcc_share_send_request(void *user, struct mcc_share_request const *request)
+static int mcc_share_send_request(void *user, struct mcc_share_request const *request)
 {
 	struct
 	{
@@ -91,10 +124,10 @@ static void mcc_share_send_request(void *user, struct mcc_share_request const *r
 	csmemset(&message, 0, sizeof(message));
 	mcc_share_fill_header(&message.header, _distributed_message_mcc_share_request, (word)sizeof(message));
 	message.request = *request;
-	network_distributed_client_send_reliably(&message, (word)sizeof(message));
+	return network_distributed_client_send_reliably(&message, (word)sizeof(message));
 }
 
-static void mcc_share_send_response(void *user, long machine, void const *payload, unsigned bytes)
+static int mcc_share_send_response(void *user, long machine, void const *payload, unsigned bytes)
 {
 	static struct
 	{
@@ -105,11 +138,11 @@ static void mcc_share_send_response(void *user, long machine, void const *payloa
 
 	(void)user;
 	if (bytes > sizeof(message.payload))
-		return;
+		return 0;
 	csmemset(&message.header, 0, sizeof(message.header));
 	mcc_share_fill_header(&message.header, _distributed_message_mcc_share_response, size);
 	csmemcpy(message.payload, payload, bytes);
-	network_distributed_server_send_to_machine_reliably(machine, &message, size);
+	return network_distributed_server_send_to_machine_reliably(machine, &message, size);
 }
 
 boolean mcc_share_game_handles_message(
@@ -137,11 +170,17 @@ void mcc_share_game_handle_message(
 	if (!mcc_share_game_handles_message(message, size) || !from_stream || !mcc_share_ready)
 		return;
 	csmemcpy(&header, message, sizeof(header));
+    if (header.count!=1 || GET_MESSAGE_FLAGS(header.header) ||
+        GET_MESSAGE_TYPE(header.header)!=2 || GET_MESSAGE_SIZE(header.header)!=size) return;
+    mcc_share_host_lifecycle();
 	if (header.type == _distributed_message_mcc_share_request)
 	{
 		/* (the host takes requests from the machines of its game) */
-		if (machine_index != NONE && global_network_game_server_get())
-			mcc_share_host_request(&mcc_share_globals, machine_index, body, size - sizeof(header));
+        if (machine_index >= 0 && machine_index < MCC_SHARE_HOST_MACHINES && global_network_game_server_get() &&
+            network_game_get_game() && mcc_level_name(network_game_get_game()->map.name) &&
+            mcc_protocol_allows(network_game_get_game(),network_game_server_get_client_machine_at_index(
+                global_network_game_server_get(),machine_index)))
+            mcc_share_host_request(&mcc_share_globals, machine_index, body, size - sizeof(header));
 	}
 	else if (machine_index == NONE && !global_network_game_server_get())
 	{
@@ -151,120 +190,11 @@ void mcc_share_game_handle_message(
 
 /* ---------- the host's admission */
 
-static enum mcc_share_sidecar mcc_share_sidecar_state(
-	char const *folder)
+static void mcc_share_host_package_files(void *user, char const *level,
+    struct mcc_share_host_package *package)
 {
-	struct mcc_workshop_item item;
-	char path[160];
-	char text[128];
-	FILE *file;
-	size_t length;
-
-	snprintf(path, sizeof(path), "mcc_maps/%s/" MCC_WORKSHOP_SIDECAR, folder);
-	errno = 0;
-	file = fopen(path, "rb");
-	if (!file)
-		return errno == ENOENT ? MCC_SHARE_SIDECAR_ABSENT : MCC_SHARE_SIDECAR_UNREADABLE;
-	length = fread(text, 1, sizeof(text) - 1, file);
-	fclose(file);
-	text[length] = 0;
-	return mcc_workshop_parse_sidecar(text, &item) ? MCC_SHARE_SIDECAR_VALID : MCC_SHARE_SIDECAR_UNREADABLE;
-}
-
-/* a file's size, or 0 if it is not there (or not readable) */
-static unsigned long mcc_share_file_size(
-	char const *path)
-{
-	FILE *file = fopen(path, "rb");
-	long size = 0;
-
-	if (!file)
-		return 0;
-	if (!fseek(file, 0, SEEK_END))
-		size = ftell(file);
-	fclose(file);
-	return size > 0 ? (unsigned long)size : 0;
-}
-
-static void mcc_share_add_file(
-	struct mcc_share_host_package *package,
-	byte kind,
-	char const *folder,
-	char const *leaf)
-{
-	int index = package->count;
-	unsigned long size;
-
-	if (index >= MCC_SHARE_STAGE_FILES)
-		return;
-	package->files[index].kind = kind;
-	snprintf(package->files[index].leaf, sizeof(package->files[index].leaf), "%s", leaf);
-	snprintf(package->files[index].path, sizeof(package->files[index].path), "mcc_maps/%s/%s", folder, leaf);
-	/* (a file the package does not have is simply not offered) */
-	size = mcc_share_file_size(package->files[index].path);
-	if (!size || (kind == MCC_SHARE_FILE_CREDIT && size > MCC_SHARE_MAXIMUM_CREDIT_BYTES))
-		return;
-	package->count++;
-}
-
-/* The admission: the host's opt-in, the maintained rules, the host's list. The facts the
-rules want are established here, locally, from this host's own files; nothing a joiner
-sent is used except the level name it asks about, which must be the game's package. */
-static void mcc_share_host_package_files(
-	void *user,
-	char const *level,
-	struct mcc_share_host_package *package)
-{
-	static char list[MCC_SHARE_LIST_BYTES];
-	static char const credit_leaves[] = "ModInfo.json\0credits.txt\0readme.txt\0license.txt\0";
-	char canonical[64];
-	char folder[64];
-	char level_leaf[MCC_SHARE_LEAF_SIZE];
-	char map_leaf[MCC_SHARE_LEAF_SIZE + 8];
-	unsigned char digest[32];
-	char const *credit;
-	unsigned long list_length = 0;
-	FILE *file;
-
-	(void)user;
-	csmemset(package, 0, sizeof(*package));
-	package->refusal = MCC_SHARE_RESULT_NOT_SHAREABLE;
-	/* (only the package this host's game is on) */
-	if (!mcc_package_name(level, canonical) || !mcc_identity_host_package(canonical, digest) ||
-		!mcc_workshop_package_folder(canonical, folder) || strlen(strrchr(canonical, '\\') + 1) >= sizeof(level_leaf) - 4)
-	{
-		return;
-	}
-	strcpy(level_leaf, strrchr(canonical, '\\') + 1);
-	file = fopen(MCC_SHARE_LIST_FILE, "rb");
-	if (file)
-	{
-		list_length = (unsigned long)fread(list, 1, sizeof(list), file);
-		fclose(file);
-	}
-	package->refusal = mcc_share_admit(canonical, config_boolean("network.mcc_map_share"),
-		mcc_share_sidecar_state(folder), digest, TRUE, list, list_length, package->credit);
-	if (package->refusal != MCC_SHARE_RESULT_OK)
-	{
-		char fingerprint[65];
-
-		/* (the fingerprint to list in mcc_share.txt, when this host means to share the package) */
-		mcc_share_list_hex(digest, fingerprint);
-		error(_error_silent, "mcc share: not offering %s (%s); its fingerprint is %s", canonical,
-			package->refusal == MCC_SHARE_RESULT_OFF ? "network.mcc_map_share is off" :
-			package->refusal == MCC_SHARE_RESULT_NO_CREDIT ? "listed in mcc_share.txt without a maker" :
-			package->refusal == MCC_SHARE_RESULT_WORKSHOP ? "a Workshop item" : "not listed in mcc_share.txt or not shareable",
-			fingerprint);
-		return;
-	}
-	snprintf(map_leaf, sizeof(map_leaf), "%s.map", level_leaf);
-	mcc_share_add_file(package, MCC_SHARE_FILE_MAP, folder, map_leaf);
-	mcc_share_add_file(package, MCC_SHARE_FILE_BITMAPS, folder, "bitmaps.map");
-	mcc_share_add_file(package, MCC_SHARE_FILE_SOUNDS, folder, "sounds.map");
-	for (credit = credit_leaves; *credit; credit += strlen(credit) + 1)
-		mcc_share_add_file(package, MCC_SHARE_FILE_CREDIT, folder, credit);
-	if (package->count < 1 || package->files[0].kind != MCC_SHARE_FILE_MAP)
-		package->refusal = MCC_SHARE_RESULT_UNAVAILABLE;
+    (void)user;
+    mcc_share_package_build(level,package);
 }
 
 static uint32_t mcc_share_upload_limit(
@@ -300,52 +230,86 @@ static uint32_t mcc_share_now(
 
 /* whether an installed map has this package's folder (any level of it): a new package never
 goes beside or over it */
-static int mcc_share_package_taken(
-	void *user,
-	char const *level)
+static int mcc_share_package_taken(void *user, char const *level)
 {
-	char folder[64];
-	char other[64];
-	short count = mcc_maps_count(FALSE);
-	short index;
+    (void)user; (void)level;
+    /* A managed snapshot has its own destination, never the host's folder. */
+    return 0;
+}
 
-	(void)user;
-	if (!mcc_workshop_package_folder(level, folder))
-		return TRUE;
-	for (index = 0; index < count; index++)
-	{
-		if (mcc_workshop_package_folder(mcc_maps_level_name(index), other) && !csstrcasecmp(folder, other))
-			return TRUE;
-	}
-	return FALSE;
+static int mcc_share_destination(void *user, char const *level,
+    struct mcc_share_file const *files, int count, char folder[64])
+{
+    struct mcc_sha256 hash;
+    unsigned char digest[32];
+    char hex[65];
+    int i;
+    (void)user;
+    mcc_sha256_begin(&hash);
+    mcc_sha256_add(&hash,mcc_share_digest,32);
+    mcc_sha256_add(&hash,mcc_share_metadata,32);
+    for (i=0;i<count;i++) {
+        mcc_sha256_add(&hash,files[i].leaf,(int)strlen(files[i].leaf)+1);
+        mcc_sha256_add(&hash,files[i].sha256,32);
+    }
+    mcc_sha256_end(&hash,digest); mcc_share_list_hex(digest,hex);
+    snprintf(folder,64,"dl_%.20s",hex);
+    return snprintf(mcc_share_installed,sizeof(mcc_share_installed),"mcc_maps\\%s\\%s",
+        folder,strrchr(level,'\\')+1)<(int)sizeof(mcc_share_installed);
 }
 
 /* the staged files are the host's content: fingerprinted where they are, with the package's own
 files read from the staging folder, against the identity in the host's game record */
-static int mcc_share_identity_check(
-	void *user,
-	char const *stage_dir)
+static int mcc_share_identity_check(void *user, char const *stage_dir)
 {
-	unsigned char actual[32];
-	int ok;
-
-	(void)user;
-	mcc_package_stage_redirect(mcc_share_globals.level, stage_dir);
-	ok = mcc_content_probe(mcc_share_globals.level, actual) && !csmemcmp(actual, mcc_share_digest, 32);
-	mcc_package_stage_redirect(NULL, NULL);
-	return ok;
+    struct mcc_share_metadata_entry *entries;
+    unsigned char actual[32],keep[MCC_SHARE_METADATA_FILES];
+    int indices[MCC_SHARE_METADATA_FILES],count=0,i,ok=0;
+    char native[1024],reason[128];
+    char const *leaf=strrchr(mcc_share_globals.level,'\\')+1;
+    (void)user;
+    entries=malloc(MCC_SHARE_METADATA_FILES*sizeof(*entries));
+    if (!entries) return 0;
+    memset(entries,0,MCC_SHARE_METADATA_FILES*sizeof(*entries));
+    for (i=0;i<mcc_share_globals.stage.count;i++) {
+        struct mcc_share_file const *file=&mcc_share_globals.stage.files[i];
+        if (file->kind<MCC_SHARE_FILE_JSON) continue;
+        if (count>=MCC_SHARE_METADATA_FILES) goto done;
+        strcpy(entries[count].path,file->leaf);
+        entries[count].size=file->size;
+        entries[count].kind=file->kind==MCC_SHARE_FILE_JSON ? MCC_SHARE_METADATA_JSON :
+            file->kind==MCC_SHARE_FILE_PNG ? MCC_SHARE_METADATA_PNG : MCC_SHARE_METADATA_WORKSHOP;
+        indices[count++]=i;
+    }
+    platform_translate_path(stage_dir,native,sizeof(native));
+    if (!mcc_share_metadata_validate(native,-1,leaf,entries,count,keep,reason) ||
+        !mcc_share_metadata_digest(native,-1,leaf,actual,reason) || memcmp(actual,mcc_share_metadata,32)) goto done;
+    for (i=0;i<count;i++) if (!keep[i] &&
+        !mcc_share_stage_discard_preview(&mcc_share_globals.stage,indices[i])) goto done;
+    mcc_package_stage_redirect(mcc_share_globals.level,stage_dir);
+    ok=mcc_content_probe(mcc_share_globals.level,actual) && !memcmp(actual,mcc_share_digest,32);
+    mcc_package_stage_redirect(NULL,NULL);
+ done:
+    free(entries);
+    return ok;
 }
 
-static void mcc_share_fail_text(
-	char const *reason)
+static int mcc_share_prepare_install(void *user,struct mcc_share_stage *stage)
 {
-	wchar_t text[512];
-	short index;
+    struct mcc_workshop_item item;
+    (void)user;
+    return mcc_share_storage_record(stage,mcc_share_name,mcc_share_globals.credit,
+        mcc_workshop_wire_unpack(mcc_share_name,&item) ? &item : NULL);
+}
 
-	for (index = 0; reason[index] && index < NUMBEROF(text) - 1; index++)
-		text[index] = (wchar_t)(unsigned char)reason[index];
-	text[index] = 0;
-	display_error_text_when_main_menu_loaded(text);
+static int mcc_share_reuse_file(void *user,struct mcc_share_file const *file,char path[1024])
+{
+    char root[1024];
+    struct mcc_share_io io;
+    (void)user;
+    platform_translate_path("d:\\mcc_maps",root,sizeof(root));
+    mcc_share_storage_native_io(&io);
+    return mcc_share_storage_find_resource(root,&io,file,path);
 }
 
 static void mcc_share_finished(
@@ -357,44 +321,42 @@ static void mcc_share_finished(
 	if (!ok)
 	{
 		error(_error_silent, "mcc share: the download of %s failed: %s", mcc_share_globals.level, message);
-		mcc_share_fail_text(message);
-		network_game_abort();
-		return;
+        mcc_share_prompt_download=FALSE;
+        snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),"%s",message);
+        mcc_share_prompt_pending=TRUE;
+        return;
 	}
 	error(_error_silent, "mcc share: installed %s from the host (credit: %s)", mcc_share_globals.level,
 		message[0] ? message : "none given");
 	/* (the installed package is judged as any other: its content must match the host's) */
 	mcc_maps_rescan();
-	if (!mcc_identity_accept_installed(mcc_share_name, mcc_share_digest))
+    if (!mcc_identity_accept_installed(mcc_share_name, mcc_share_digest, mcc_share_metadata,mcc_share_installed))
 		network_game_abort();
 }
 
-/* The joiner's package matches nothing installed (mcc_identity.c): fetch it from the host, if
-this machine may and the package is not a Workshop item (those are subscribed to, not sent). */
-static int mcc_share_missing(
-	char const name[128],
-	unsigned char const digest[32])
+/* The joiner's package matches nothing installed. Ask for an offer when downloads
+ * are enabled; obtaining the manifest does not accept its files. */
+static int mcc_share_missing(char const name[128], unsigned char const digest[32],
+    unsigned char const metadata[32])
 {
-	struct mcc_workshop_item item;
-	char canonical[64];
-
-	if (!mcc_share_ready || global_network_game_server_get() || !global_network_game_client_get() ||
-		!config_boolean("network.map_download") || mcc_workshop_wire_unpack(name, &item) ||
-		!mcc_package_name(name, canonical))
-	{
-		return 0;
-	}
-	/* (the host changed the map during a download) */
-	if (mcc_share_client_busy(&mcc_share_globals) && !mcc_share_client_level(&mcc_share_globals, canonical))
-		mcc_share_client_cancel(&mcc_share_globals);
-	if (mcc_share_client_level(&mcc_share_globals, canonical))
-		return 1;
-	if (!mcc_share_client_begin(&mcc_share_globals, canonical, digest))
-		return 0;
-	csmemcpy(mcc_share_name, name, sizeof(mcc_share_name));
-	csmemcpy(mcc_share_digest, digest, 32);
-	error(_error_silent, "mcc share: asking the host for %s", canonical);
-	return 1;
+    char canonical[64];
+    if (!mcc_share_ready || global_network_game_server_get() || !global_network_game_client_get() ||
+        !mcc_package_name(name,canonical) || !strchr(canonical+9,'\\')) return 0;
+    if (mcc_share_client_busy(&mcc_share_globals)) {
+        if (mcc_share_client_level(&mcc_share_globals,canonical) &&
+            !memcmp(mcc_share_digest,digest,32) && !memcmp(mcc_share_metadata,metadata,32)) return 1;
+        mcc_share_client_cancel(&mcc_share_globals);
+    }
+    memcpy(mcc_share_name,name,sizeof(mcc_share_name));
+    memcpy(mcc_share_digest,digest,32); memcpy(mcc_share_metadata,metadata,32);
+    if (!config_boolean("network.map_download")) {
+        mcc_share_prompt_download=FALSE;
+        snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),
+            "The host's package is missing or differs. Download Maps is OFF. Install matching content manually.");
+        mcc_share_prompt_pending=TRUE;
+        return 1;
+    }
+    return mcc_share_client_begin(&mcc_share_globals,canonical,digest);
 }
 
 boolean mcc_share_game_downloading(
@@ -403,13 +365,15 @@ boolean mcc_share_game_downloading(
 	char canonical[64];
 
 	return mcc_share_ready && level_name && mcc_package_name(level_name, canonical) &&
-		mcc_share_client_level(&mcc_share_globals, canonical);
+		(mcc_share_client_level(&mcc_share_globals, canonical) ||
+        ((mcc_share_prompt_pending || mcc_share_prompt_visible) && !strcmp(canonical,mcc_share_name)));
 }
 
 boolean mcc_share_game_holds_players(
 	void)
 {
-	return mcc_share_ready && mcc_share_client_busy(&mcc_share_globals);
+	return mcc_share_ready && (mcc_share_client_busy(&mcc_share_globals) ||
+        mcc_share_prompt_pending || mcc_share_prompt_visible);
 }
 
 boolean mcc_share_game_machine_active(
@@ -417,6 +381,126 @@ boolean mcc_share_game_machine_active(
 {
 	return mcc_share_ready && machine_index >= 0 && machine_index < MCC_SHARE_HOST_MACHINES &&
 		mcc_share_host_active(&mcc_share_globals, machine_index);
+}
+
+static void mcc_share_offered(void *user,uint64_t bytes,char const *credit)
+{
+    (void)user;
+    mcc_share_prompt_download=TRUE;
+    snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),
+        "The host's package is missing or differs. Download up to %.1f MiB from the host?\n"
+        "Maps, required metadata/resources and supported previews are included.\n"
+        "Your existing installation will be kept.\nMaker: %s",
+        (double)bytes/(1024.0*1024.0),credit);
+    mcc_share_prompt_pending=TRUE;
+}
+
+static int mcc_share_client_current(void)
+{
+    struct network_game_client *client=global_network_game_client_get();
+    struct network_game *game=client ? network_game_client_get_game(client) : NULL;
+    char canonical[64];
+    return !global_network_game_server_get() && game && mcc_share_name[0] &&
+        mcc_package_name(game->map.name,canonical) && !strcmp(canonical,mcc_share_name) &&
+        !memcmp(game->mcc_content_sha256,mcc_share_digest,32) &&
+        !memcmp(game->mcc_metadata_sha256,mcc_share_metadata,32);
+}
+
+static void mcc_share_close_prompt(void)
+{
+    mcc_share_prompt_pending=FALSE;
+    /* Go-back deletes the owned prompt and reloads its previous lobby. Merely
+     * popping history discards that route without restoring the screen. */
+    if (mcc_share_prompt) ui_widget_port_go_back(mcc_share_prompt);
+    mcc_share_prompt_visible=FALSE;
+}
+
+int mcc_share_game_can_download(void)
+{
+    return mcc_share_client_current() && mcc_share_prompt_download && config_boolean("network.map_download") &&
+        mcc_share_globals.state==MCC_SHARE_CLIENT_WAITING;
+}
+int mcc_share_game_has_workshop(void)
+{
+    struct mcc_workshop_item item;
+    return mcc_workshop_wire_unpack(mcc_share_name,&item);
+}
+void mcc_share_game_prompt_text(wchar_t text[512])
+{
+    unsigned i;
+    for (i=0;mcc_share_prompt_message[i] && i<511;i++)
+        text[i]=mcc_share_prompt_message[i]=='|' ? '/' : (unsigned char)mcc_share_prompt_message[i];
+    text[i]=0;
+}
+void mcc_share_game_prompt_closed(void)
+{
+    mcc_share_prompt=NULL;
+    mcc_share_prompt_visible=FALSE;
+}
+void mcc_share_game_prompt_action(int action)
+{
+    struct mcc_workshop_item item;
+    char url[128];
+    mcc_share_close_prompt();
+    if (!mcc_share_client_current()) {
+        mcc_share_client_cancel(&mcc_share_globals);
+        return;
+    }
+    if (action==0 && mcc_share_game_can_download()) {
+        mcc_share_prompt_download=FALSE;
+        mcc_share_client_accept(&mcc_share_globals);
+        return;
+    }
+    if (action==1 && mcc_workshop_wire_unpack(mcc_share_name,&item)) {
+        snprintf(url,sizeof(url),"https://steamcommunity.com/sharedfiles/filedetails/?id=%s",item.id);
+        platform_open_url(url);
+    }
+    mcc_share_client_cancel(&mcc_share_globals);
+    network_game_abort();
+}
+
+void mcc_share_game_disconnect(void)
+{
+    mcc_share_close_prompt();
+    if (mcc_share_ready) {
+        mcc_share_client_disconnect(&mcc_share_globals);
+        mcc_share_host_stop(&mcc_share_globals);
+    }
+    mcc_share_prompt_pending=mcc_share_prompt_visible=mcc_share_prompt_download=FALSE;
+    mcc_share_name[0]=0;
+}
+
+void mcc_share_game_peer_left(struct network_game_server_client_machine *machine)
+{
+    struct network_game_server *server=global_network_game_server_get();
+    long index;
+    if (!mcc_share_ready || !server || !machine) return;
+    for (index=0;index<MCC_SHARE_HOST_MACHINES;index++)
+        if (network_game_server_get_client_machine_at_index(server,index)==machine)
+            mcc_share_host_forget(&mcc_share_globals,index);
+}
+
+static void mcc_share_host_lifecycle(void)
+{
+    struct network_game_server *server=global_network_game_server_get();
+    struct network_game *game=network_game_get_game();
+    int i;
+    unsigned long revision=mcc_identity_host_revision();
+    if (revision!=mcc_share_host_revision) {
+        mcc_share_host_stop(&mcc_share_globals);
+        mcc_share_host_revision=revision;
+    }
+    if (!server || !game || !config_boolean("network.mcc_map_share") || !mcc_level_name(game->map.name)) {
+        mcc_share_host_stop(&mcc_share_globals);
+        return;
+    }
+    for (i=0;i<MCC_SHARE_HOST_TRANSFERS;i++) {
+        struct mcc_share_host_transfer *transfer=&mcc_share_globals.transfers[i];
+        if (transfer->used && (strcmp(transfer->level,game->map.name) ||
+            !network_game_server_client_machine_is_joined_to_game(server,
+                network_game_server_get_client_machine_at_index(server,transfer->machine))))
+            mcc_share_host_forget(&mcc_share_globals,transfer->machine);
+    }
 }
 
 /* ---------- every frame */
@@ -433,36 +517,52 @@ void mcc_share_game_update(
 		env.send_request = mcc_share_send_request;
 		env.package_taken = mcc_share_package_taken;
 		env.identity_check = mcc_share_identity_check;
+        env.prepare_install = mcc_share_prepare_install;
+        env.reuse_file = mcc_share_reuse_file;
 		env.finished = mcc_share_finished;
 		env.send_response = mcc_share_send_response;
 		env.host_package = mcc_share_host_package_files;
 		env.upload_limit = mcc_share_upload_limit;
 		env.free_bytes = mcc_share_free_bytes;
+		env.offered = mcc_share_offered;
+		env.destination = mcc_share_destination;
 		env.io.make_directory = mcc_share_io_make;
 		env.io.remove_directory = mcc_share_io_remove;
 		env.io.directory_exists = mcc_share_io_exists;
 		env.io.move_file = mcc_share_io_move;
 		env.io.delete_file = mcc_share_io_delete;
+		env.io.path_safe = mcc_share_io_safe;
+		env.io.publish_directory = mcc_share_io_publish;
+        env.io.open_native_read = mcc_share_open_native;
 		mcc_share_init(&mcc_share_globals, &env);
 		mcc_share_ready = TRUE;
 		mcc_identity_set_missing(mcc_share_missing);
 	}
-	/* (the game left, its host went, or its map changed: nothing is kept) */
-	if (mcc_share_client_busy(&mcc_share_globals))
-	{
-		struct network_game_client *client = global_network_game_client_get();
-		struct network_game *game = client ? network_game_client_get_game(client) : NULL;
-		char canonical[64];
-
-		if (!game || !mcc_package_name(game->map.name, canonical) ||
-			!mcc_share_client_level(&mcc_share_globals, canonical))
-		{
-			mcc_share_client_cancel(&mcc_share_globals);
-		}
-	}
-	if (!global_network_game_server_get())
-		mcc_share_host_stop(&mcc_share_globals);
-	mcc_share_update(&mcc_share_globals);
+    /* Consent belongs to this host's exact settings, including the metadata. */
+    if (mcc_share_client_busy(&mcc_share_globals) || mcc_share_prompt_pending || mcc_share_prompt_visible) {
+        if (!mcc_share_client_current()) {
+            if (global_network_game_client_get()) mcc_share_client_cancel(&mcc_share_globals);
+            else mcc_share_client_disconnect(&mcc_share_globals);
+            mcc_share_close_prompt();
+            mcc_share_prompt_download=FALSE;
+            mcc_share_name[0]=0;
+        } else if (mcc_share_client_busy(&mcc_share_globals) && !config_boolean("network.map_download")) {
+            mcc_share_client_cancel(&mcc_share_globals);
+            mcc_share_prompt_download=FALSE;
+            snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),
+                "Download Maps is OFF. Install matching content manually or visit its Workshop page when available.");
+            mcc_share_prompt_pending=!mcc_share_prompt_visible;
+        }
+    }
+    mcc_share_host_lifecycle();
+    mcc_share_update(&mcc_share_globals);
+    if (mcc_share_prompt_pending && !mcc_share_prompt_visible && global_network_game_client_get()) {
+        /* Deferred until frame update: receiving a packet never opens a widget. */
+        mcc_share_prompt=ui_widget_load_by_name_or_tag(
+            "pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\mcc_download\\screen",
+            NONE,NULL,0,tag_loaded('DeLa',"pc\\main_menu\\multiplayer_type_select\\lobby\\lobby_screen"),NONE,NONE);
+        if (mcc_share_prompt) { mcc_share_prompt_pending=FALSE; mcc_share_prompt_visible=TRUE; }
+    }
 }
 
 void mcc_share_game_render(

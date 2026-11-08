@@ -142,88 +142,106 @@ The asset-free regressions in `test_steam_workshop.py` and `test_mcc_maps.py`
 check these paths, bounds, selection restoration and disabled settings; they
 do not establish gameplay compatibility for every discovered map.
 
-## Preliminary MCC sharing policy
+## MCC sharing policy
 
-PR #94 adds an unused, pure policy module, not a downloader. Read
-[`mcc_share_rules.h`](../../port/linux/game/mcc_share_rules.h) for the caller's
-contract, then `mcc_share_decide` and `mcc_share_file_allowed` in
-[`mcc_share_rules.c`](../../port/linux/game/mcc_share_rules.c).
-The current phase considers hand-placed packages only. Numeric package folders
-and valid Workshop sidecars are excluded; unreadable or invalid sidecar states,
-loose maps, `_shared`, stock content and unknown content classification are
-also refused. A missing sidecar is allowed, but does not prove the package's
-origin. This temporary scope restriction is not a security or licensing verdict.
+Read [`mcc_share_rules.h`](../../port/linux/game/mcc_share_rules.h), then
+`mcc_share_decide` in [`mcc_share_rules.c`](../../port/linux/game/mcc_share_rules.c).
+The policy accepts eligible local and Workshop packages under the same checks.
+It requires host opt-in, portable package/level names, a known gameplay
+fingerprint and a host-established custom-content classification. Loose maps,
+`_shared`, known stock content and unknown classification remain refused.
+Workshop IDs identify a source; they do not establish permission or content identity.
 
-For example, `mcc_maps\solar_flare\m0` passes only with locally established
-custom-content classification, a known fingerprint, an absent Workshop sidecar
-and host opt-in. A caller must classify the exact content independently of its
-name, for example using locally maintained evidence tied to its fingerprint.
-Merely calculating a hash, failing to match a stock name or reading an untrusted
-manifest cannot establish custom content. This phase supplies neither that
-classification provider nor a transfer caller (the next section does); unknown
-classification stays blocked. Known stock content remains blocked after a folder rename, while a
-custom package named `bloodgulch` is not rejected just for its name.
+The classification provider is the host's own `mcc_share.txt`, parsed by
+[`mcc_share_list.c`](../../port/linux/game/mcc_share_list.c): one line contains
+`<64 hexadecimal digits> <maker>`. The digest covers the map and its used
+resources, independent of installation name. Required JSON has a separate
+identity. A matching list entry is the host's explicit approval of those
+content bytes, not a signature from the maker or a substitute for receiver
+validation. A missing maker or an unlisted digest blocks the offer.
 
-Name buffers carry their readable byte lengths, excluding a terminator. Embedded
-NULs, oversized names, non-ASCII characters, device names and resource-name
-collisions are refused. Ordinary local discovery retains its existing rules.
-The resource helper matches only `bitmaps.map` and `sounds.map`; it does not
-inspect bytes, resolve paths or establish ownership. A future transfer must
-independently bound and validate messages, map/resource data and destinations,
-prevent link escapes and file replacement races, and stage installation without
-overwriting existing packages or saves. A matching hash does not make hostile
-bytes safe. This module adds no shared-engine hooks, session state or protocol
-changes; its caller, below, does.
-
-Android continues to use its importer; this helper neither requires Steam nor
-enables Workshop transfers there. Campaign metadata and subsequent missions are
-not covered by the resource allowlist. Their transfer needs a separate design.
-See [the restriction](../mcc_maps.md#preliminary-sharing-restriction) and
-[the transfer that uses it](#mcc-package-sharing-between-machines).
-[`test_mcc_share_rules.py`](../../tools/test_mcc_share_rules.py) exercises the real
-module with boundary cases, negative controls, and Linux ASan/UBSan and bounded
-libFuzzer runs. These are policy and memory-access checks, not end-to-end transfer
-validation or proof that arbitrary maps are safe to execute.
-
+[`mcc_share_package.c`](../../port/linux/game/mcc_share_package.c) owns file
+selection. `mcc_share_package_build` obtains the actual selected dependencies
+through `mcc_validation_resources` in
+[`mcc_validation.inl`](../../port/linux/game/mcc_validation.inl).
+That accessor rechecks the same file stamps as admission; it does not repeat
+map parsing or hash every resource on each request. The selection comes from
+`mcc_resources_check_paths` in
+[`mcc_resource_check.inl`](../../port/linux/game/mcc_resource_check.inl), after
+`mcc_resources_select` validated the map's external references.
+A self-contained map sends no unrelated resource siblings. A used package
+resource follows the platform's resolved path, including Workshop `halo1/maps`
+fallbacks. A required root/shared resource refuses the offer with its path in
+the host log; it is never silently copied as package content. An invalid
+present override fails validation rather than falling back to another file.
 
 ## MCC package sharing between machines
 
-A joiner without the host's hand-placed package can fetch it instead of being refused.
-Follow one join: a host on `mcc_maps\solar_flare\m0` with `network.mcc_map_share` on and
-the package's fingerprint listed in `mcc_share.txt`; a joiner with `network.map_download` on
-and no such package.
+This is Milestone 13 implementation in progress. Component tests are recorded
+in [the validation record](../mcc_refactor_validation.md#milestone-13-implementation-evidence).
+Storage-menu integration and final platform/runtime checks remain open.
 
-1. The joiner's settings update reaches `mcc_identity_accept` in
-   [`mcc_identity.c`](../../port/linux/game/mcc_identity.c). Nothing installed matches, so
-   where it used to refuse, `mcc_identity_resolve` asks the handler `mcc_share_missing`
-   in [`mcc_share.c`](../../port/linux/game/mcc_share.c). That handler declines (and the
-   refusal text appears as before) for a Workshop item, a name the rules do not accept, a
-   package folder already installed, or the setting off. Otherwise it asks the host and the join
-   waits, as a Custom Edition download does: `cache_files_map_present` takes the map as
-   present and `cache_files_give_time_to_precache` does not start before it is there.
-2. The host's `mcc_share_host_package_files` decides: `mcc_share_admit` in
-   [`mcc_share_session.c`](../../port/linux/game/mcc_share_session.c) applies
-   `mcc_share_decide` (unchanged) to facts the host gathered from its own files, with the list
-   in [`mcc_share_list.c`](../../port/linux/game/mcc_share_list.c) as the classification.
-   A refusal goes back as a reason, which `mcc_share_refusal_text` turns into the joiner's text.
-3. An admitted request is hashed a few MiB a frame (`host_hash`), answered with a manifest
-   (file names, sizes, SHA-256) and then served a chunk at a time (`host_serve`) at the
-   upload limit. The host does not drop a machine whose transfer moves (`mcc_share_game_machine_active`).
-4. The joiner writes the chunks through `mcc_share_stage_write` in
-   [`mcc_share_stage.c`](../../port/linux/game/mcc_share_stage.c): in order, to `.part`, SHA-256
-   running, renamed only when it matches. At the end `mcc_share_identity_check` fingerprints the
-   staged package, with `mcc_package_stage_redirect` pointing the package's own paths at
-   the staging folder, and compares it with the host's game record. `mcc_share_stage_install`
-   then makes the package folder (it must not exist) and moves the files, the map last.
-5. `mcc_share_finished` rescans the maps and runs the usual identity judgement once more
-   (`mcc_identity_accept_installed`), which now finds the package. A failure at any step
-   deletes the staging files, shows why and leaves the game, as a failed Custom Edition
-   download does.
+For example, a host plays `mcc_maps\solar_flare\m0` and a joiner has another
+version in a local folder of that name. The host enables `network.mcc_map_share`
+and lists its gameplay fingerprint and maker; the client enables the existing
+`network.map_download` preference. The original local package stays intact.
 
-Limits: the host is the only source (no swarm); one download at a time; at most 8 files and
-1 GiB; campaigns are not shared. The tests (`test_mcc_share.py`, `test_mcc_share_game.py`)
-run the real code over real files with a host and joiner in one process; a game on a real MCC
-map between two machines is not covered by them.
+1. Read `mcc_identity_accept` and `mcc_identity_resolve` in
+   [`mcc_identity.c`](../../port/linux/game/mcc_identity.c). Matching installed
+   gameplay and required-metadata identities need no transfer. Otherwise
+   `mcc_share_missing` in [`mcc_share.c`](../../port/linux/game/mcc_share.c)
+   requests an offer. Client downloads off means no request: show manual
+   installation and, when a valid Workshop ID exists, the Workshop page.
+2. `mcc_share_package_build` applies the local list/policy and builds a bounded
+   offer containing the current map, used package resources, recognized JSON,
+   referenced supported PNG previews and permitted attribution text. A local
+   map-only folder needs no JSON or thumbnail. `mcc_share_metadata_plan` in
+   [`mcc_share_metadata.c`](../../port/linux/src/mcc_share_metadata.c) includes
+   campaign and mission JSON upfront, but only the current mission's map and
+   selected previews. Later mission binaries are requested when needed.
+3. [`mcc_share_session.c`](../../port/linux/game/mcc_share_session.c) hashes
+   files and sends paged manifests on the host's reliable connection. The
+   client enters `MCC_SHARE_CLIENT_WAITING`: it has an offer, not permission
+   to create files. The frame update opens the generated prompt. Accepting
+   through `mcc_share_game_prompt_action` starts the download only while the
+   same session, map, gameplay digest and metadata digest remain current.
+   The prompt shows size and maker. Host sharing off or client downloads off
+   removes the download action; a Workshop page and cancellation remain
+   available when applicable. Differing content is not labelled older/newer.
+4. [`mcc_share_stage.c`](../../port/linux/game/mcc_share_stage.c) exclusively
+   creates an owned `mcc_staging/dl_<digest>` directory. Files arrive in order
+   through `mcc_share_stage_write`, with size and SHA-256 checks. Required JSON
+   is reparsed and its reference allowlist rebuilt; invalid optional PNGs are
+   discarded, while invalid required metadata refuses installation. The
+   gameplay probe uses `mcc_package_stage_redirect` only during verification.
+5. `mcc_share_stage_install` publishes the whole directory without replacing an
+   existing destination under `mcc_maps/dl_<digest>`. The identity layer checks
+   that specific installed snapshot before resuming the join. Cancel/failure
+   deletes only owned staging entries. Native filesystem checks reject links,
+   reparse points, devices and unsafe paths; they do not sandbox an adversarial
+   process already running with the same user's filesystem authority.
+
+The host is the only sender. CE sharing keeps its own messages and behavior;
+MCC borrows only the necessary lobby hold, per-frame and cache-admission hooks.
+Disconnects, changed identities, disabled downloads and host preparation
+revision changes cancel stale work. No stage or consent carries into Xbox/CE.
+The wire limits and protocol versions are in
+[NETCODE.md](../../port/linux/NETCODE.md#mcc-package-sharing).
+
+Managed-copy receipt, storage-use display and removal controls are being
+integrated through [`mcc_share_storage.c`](../../port/linux/game/mcc_share_storage.c).
+The ownership contract permits removal only of verified recorded files, keeps
+unrelated additions and saves, and requires the caller to exclude the active
+session package. This paragraph describes the integration contract, not a
+completed UI/runtime validation claim. Browser persistence and publication
+remain Milestone 14 work; a successful web compile does not establish sharing.
+
+The game harness compiles the real adapter, planner, session and stage over
+synthetic files. Engine/UI/identity and metadata-parser calls are stubs there;
+`test_mcc_resources.py`, `test_mcc_validation.py` and metadata tests separately
+exercise their production helpers. Neither category proves real-map network
+play or a complete campaign transition. See the
+[PR review and draft response](../mcc_refactor_validation.md#pr-95-review-and-draft-contributor-response).
 
 ## Explicit MCC campaigns and Android imports
 
@@ -250,6 +268,19 @@ map. Network clients do not choose; hosts use the existing co-op lobby/settings
 transition. No progression cursor survives unload: the current level and its
 own package identify the next mission. Standalone and final levels return to
 the menu or lobby. Xbox and CE still use their existing completion code.
+
+Managed downloads retain this package boundary. If mission `z10` is in one
+`dl_<digest>` folder and `a10` in another, matching campaign JSON or Workshop
+IDs do not authorize joining those folders: the metadata has no per-mission
+binary digests. `mcc_maps_next_mission` refuses a missing within-package next
+mission, even if another snapshot contains that leaf name. Each downloaded
+mission remains individually selectable. Connected clients instead follow
+the host's next-mission settings and exact gameplay/metadata identities; a
+complete Workshop/manual installation is needed for offline or rehosted
+campaign progression. `test_downloaded_campaign_does_not_splice_other_snapshots`
+in [`test_mcc_maps.py`](../../tools/test_mcc_maps.py) exercises this catalog
+boundary with one or multiple candidates sharing the same ordered metadata
+and Workshop ID; it does not test receipt validation or a network transition.
 
 For Android, follow
 [`MccImportActivity`](../../port/android/app/src/main/java/com/halo/decomp/MccImportActivity.java)
@@ -673,8 +704,9 @@ including the refusal of `ai_deselect` and `ai_select` in Xbox/CE maps.
 Quarantine's authored `life_lost_0` is a concrete example: its valid call was
 enough to disable the whole cooperative game-over script under native policy.
 The MCC adapter applies to any accepted MCC map. This script-admission change
-requires MCC protocol 65 despite adding no message fields; OpenCE 41 remains
-unchanged. [`test_mcc_ai_deselect.py`](../../tools/harness/tests/test_mcc_ai_deselect.py)
+originally required MCC protocol 65 despite adding no message fields; it left
+the then-current OpenCE 41 contract unchanged. Use the
+[current agreement](../../port/linux/NETCODE.md#gulchce-network-agreement) for present builds. [`test_mcc_ai_deselect.py`](../../tools/harness/tests/test_mcc_ai_deselect.py)
 extracts the actual native operation, adapter and policy functions, including
 deliberate-fault controls. [`test_mcc_scripts.py`](../../tools/test_mcc_scripts.py)
 checks name resolution, zero-argument validation and inactive registry guards.

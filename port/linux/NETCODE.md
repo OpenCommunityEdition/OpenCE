@@ -234,12 +234,16 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## GulchCE network agreement
 
-Standard Xbox/Custom Edition sessions require GulchCE agreement 32722; MCC
-requires 68. Camera sessions require 32724/32725 respectively. These revisions
+Standard Xbox/Custom Edition sessions require GulchCE agreement 32726; MCC
+requires version 69. Camera sessions require 32728/32729 respectively. This
+revision adds MCC host-only sharing messages 103/104 and a separate 32-byte
+required-metadata digest in MCC settings. Xbox/CE settings retain their prefix.
+The previous agreements are refused before admission. Earlier revisions
 require bounded client clock recovery through actual simulation ticks after
 small stalls. The previous agreements 32718/67/32720/32721 are refused before
 admission; their clients could retain a small clock deficit indefinitely.
-Packet layouts are unchanged from those revisions, which introduced initialized
+The clock-recovery revision kept the packet layouts of the earlier revision,
+which introduced initialized
 three-point boat controls in the shared controller. That earlier MCC correction
 produced the same controls, but legacy hosts and clients could simulate a driven
 boat using uninitialized friction values. MCC version 68 also requires the new
@@ -1031,46 +1035,78 @@ its name alone beside it, has its name given back as the map lists find it.
 
 ## MCC package sharing
 
-A joiner whose host plays a hand-placed MCC package it does not have can fetch the
-package from the host (`port/linux/game/mcc_share.c`, `mcc_share_session.c`,
-`mcc_share_stage.c`; the admission is `mcc_share_rules.c`, unchanged). This is a
-message pair of its own, not the Custom Edition map sharing (83-86) and not a kind
-byte in it. Both travel on the host's reliable connection, in the lobby too, and only
-from the sender's own stream.
+Milestone 13 is implementing host-only delivery for eligible local and Workshop
+packages. It uses MCC-owned messages **103** (request) and **104** (response),
+separate from CE sharing 83–86. The current agreements are base **32726**, MCC
+**69**, and camera **32728/32729**; old agreements are refused before admission.
+MCC settings add a 32-byte required-JSON digest beside the gameplay digest.
+Xbox/CE retain their existing settings prefix and sharing path. The distributed
+header remains 12 bytes, including its checkpoint epoch.
 
-- **Who may send what.** The host is off by default (`network.mcc_map_share`). It offers
-  only the package its own game is on, and only when `mcc_share_decide` allows it for the
-  facts the host established locally: a Steam Workshop item (numeric folder or a valid
-  `workshop_id.txt`), a stock or loose map, `_shared`, an unreadable sidecar or an
-  unclassified package is never sent, and a joiner is told which of those it was. The
-  content is classed custom only when the package's whole-content SHA-256 (the identity
-  in the game record) is listed with a maker in the host's `mcc_share.txt`
-  (`mcc_share_list.c`); a listing without a maker gives the joiner "get it from the
-  maker". Nothing a joiner sends changes this.
-- **The messages.** The request is message 102, the host's response 103. `MANIFEST` asks for the package's file
-  list; `CHUNK` asks for up to 3072 bytes of one file at an offset; `DONE` says the joiner
-  has installed it or given up. The manifest lists the files (the map, the package's own
-  bitmaps.map and sounds.map, and up to four credit files: ModInfo.json, credits.txt,
-  readme.txt, license.txt), each with its size and SHA-256, and the maker's credit. The
-  host hashes a few MiB a frame, keeps up to four transfers, queues at most 32 chunks a
-  joiner and serves them no faster than `network.map_share_upload`. A host that does not
-  hear from a joiner for 30 seconds drops the transfer; the host does not drop a machine
-  for adding no players while its transfer moves (the same hooks as Custom Edition
-  downloads).
-- **Staging.** The joiner (with `network.map_download` on) writes the files to
-  `mcc_staging/<package>/`, one at a time and in order, each checked against its manifest
-  size and SHA-256 and renamed from `.part` only when it matches. When all are there, the
-  package is fingerprinted where it is (the package's own files read from the staging
-  folder, everything else as usual) and must equal the game record's identity. Only then
-  are the files moved into `mcc_maps/<package>/`, the map last. A package folder that
-  already exists (any case) is never written to. Before the first byte the joiner checks
-  that the disk has room for the files and 64 MiB more. Cancel, failure, a host that goes quiet,
-  a game left or a map the host changes delete the staging files and nothing else.
-- **Names.** The package and level names are judged by the same name checks as the host's
-  (`mcc_share_decide`), so a name that is a device, has separators, a leading dot or space,
-  is numeric (a Workshop item) or is `_shared` is refused on the joiner.
-- **Not here.** Campaign transfers, multi-package maps, and fetching from other players
-  (the Custom Edition swarm): the host is the only source.
+- **Permission and admission.** `network.mcc_map_share` defaults off. The host
+  offers only its current map package, classified by its locally maintained
+  `mcc_share.txt`: `<gameplay SHA-256> <maker>`. Unknown content, missing credit,
+  known stock, loose maps and `_shared` are refused. Eligible Workshop and local
+  packages use the same policy. The client requires `network.map_download`
+  (existing default on) and explicit acceptance of the size/maker prompt.
+  Before acceptance it receives only an offer; it creates no stage and requests
+  no file chunks. If either setting is off, the download action is absent.
+  Valid Workshop IDs offer a Workshop page; other content requires manual
+  installation. A Workshop page alone does not install anything in a browser.
+- **Messages and bounds.** `MANIFEST` responses carry up to 16 file entries per
+  page. The full offer has at most 168 entries, each with kind, a 128-byte path
+  buffer, size and SHA-256. Exactly one map is required. `CHUNK` requests up to
+  3072 bytes; the client window is 16 and the host supports four transfers.
+  Reserved fields, counts, lengths, session IDs, offsets and sender roles are
+  checked. Only the sender's established reliable stream is accepted; datagrams
+  and responses from other peers cannot supply content. Backpressure retries
+  preserve pending responses, and manifest/data traffic consumes the shared
+  `network.map_share_upload` allowance.
+- **Selected files.** `mcc_share_package_build` uses the validated resource
+  selection cached by `mcc_validation_resources`; it does not scan arbitrary
+  siblings. Only used package `bitmaps.map`/`sounds.map` are eligible, including
+  their resolved Workshop fallback paths. A required root/shared resource
+  refuses the offer with a host diagnostic naming the dependency. Recognized
+  package/campaign/mission JSON and referenced supported PNG previews travel
+  with the map; `credits.txt`, `readme.txt`, `license.txt` and a valid bounded
+  Workshop sidecar preserve attribution. `ModInfo.json` is parsed metadata,
+  not an unchecked credit file. Map-only local packages are supported.
+- **Metadata and size checks.** JSON is limited to 256 KiB per file; PNG to
+  8 MiB and 2048 by 2048 pixels, using the existing supported decoder subset.
+  The metadata planner allows at most 160 entries and 24 MiB; the staging
+  envelope independently caps metadata at 32 MiB, each map/resource at 768 MiB
+  and the whole offer at 1 GiB. Credit text is capped at 64 KiB. The client
+  checks free space for the offer plus 64 MiB before writing. Nested paths are
+  allowed only for recognized JSON/PNG; devices, traversal, duplicate names
+  and file/directory collisions are refused. Required JSON is reparsed and
+  hashed separately from gameplay. Unreferenced files fail validation; invalid
+  optional PNGs are discarded before publication, retaining placeholder art.
+- **Staging and identity.** Files are exclusively created in an owned
+  `mcc_staging/dl_<digest>` directory and checked in order. The staged gameplay
+  and required-metadata identities must match the advertised values. Native
+  publication atomically moves the complete directory to a separate
+  `mcc_maps/dl_<digest>` without replacing any destination. The exact installed
+  snapshot is rechecked before joining resumes; existing local and Steam
+  packages remain untouched. Cleanup is limited to owned staging entries.
+  Native path checks refuse symlinks/reparse points and special files. These
+  checks address untrusted remote paths, not concurrent filesystem replacement
+  by another process with the same local user's authority.
+- **Lifecycle.** The offer expires after two minutes; a waiting client sends
+  bounded heartbeats. Initial unanswered requests time out after 30 seconds,
+  stalled downloads after 60 seconds. Leaving, map/identity changes, disabling
+  downloads and host preparation revision changes invalidate stale transfers
+  and consent. Requests remain bound to the host's current package. Required
+  campaign JSON is delivered upfront; subsequent mission maps/resources are
+  obtained before their own admission, under the same host-only policy.
+
+Implementation lives in `mcc_share.c`, `mcc_share_package.c`,
+`mcc_share_session.c`, `mcc_share_stage.c` and the MCC metadata helpers.
+Managed-copy receipt/removal UI integration and final platform, transport,
+real-map and follow-on-mission validation are still pending. Component checks
+and their limits are recorded in
+[Milestone 13](../../docs/mcc_refactor_validation.md#milestone-13-implementation-evidence).
+Browser filesystem publication currently fails closed; playable browser
+import/download and persistence are Milestone 14, not a result of native tests.
 
 ## Stages
 

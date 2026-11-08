@@ -1327,7 +1327,9 @@ boolean network_game_client_game_settings_updated(
 		if (csstrcmp(message_packet->map.name, client->game.map.name) ||
 			message_packet->map.version != client->game.map.version ||
 			/* port: the host's MCC content may change without changing its stored checksum */
-			memcmp(message_packet->mcc_content_sha256, client->game.mcc_content_sha256, 32))
+			memcmp(message_packet->mcc_content_sha256, client->game.mcc_content_sha256, 32) ||
+			/* port: a changed MCC campaign manifest also requires admission. */
+			memcmp(message_packet->mcc_metadata_sha256, client->game.mcc_metadata_sha256, 32))
 		{
 			char build[0x20];
 

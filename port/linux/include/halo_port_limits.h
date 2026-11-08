@@ -49,7 +49,7 @@ machines, 16 players) are 0x226 and 0x434. */
 /* (then the gametype's PC options, struct game_variant_options: 0x2C bytes) */
 #define HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0xA)
 #define HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x36)
-#define HALO_PORT_NETWORK_GAME_SIZE (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 32) /* MCC SHA-256 */
+#define HALO_PORT_NETWORK_GAME_SIZE (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 64) /* MCC content and metadata SHA-256 */
 
 /* ---------- system link protocol
 
@@ -70,7 +70,7 @@ Raise it with any change to what the machines send each other. */
 clock recovery require updated peers.
 This reserved version is not an OpenCE compatibility claim. Camera sessions
 use separate revisions declared in third_person_protocol.h. */
-#define HALO_PORT_NETWORK_VERSION 32722
+#define HALO_PORT_NETWORK_VERSION 32726
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags, then the game's kind (an OpenCE gametype's mode, and Hardcore:
 port/linux/game/game_modes.h's game_modes_kind), for the server browser */

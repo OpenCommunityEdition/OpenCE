@@ -8,6 +8,9 @@
  * never schedules work. Cancel releases readers but retains completed facts. */
 int mcc_validation_request(char const *name, uint32_t *checksum, unsigned char digest[32]);
 int mcc_validation_lookup(char const *name, uint32_t *checksum, unsigned char digest[32]);
+/* Exact resource selection from a successful check, with the same candidate
+ * stamp revalidation as lookup. Empty entries are unused, not missing. */
+int mcc_validation_resources(char const *name, char paths[2][128]);
 void mcc_validation_update(void);
 void mcc_validation_cancel(void);
 char const *mcc_validation_error(void);

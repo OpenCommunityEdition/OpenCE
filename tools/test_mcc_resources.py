@@ -197,6 +197,16 @@ int main(int argc,char **argv) {
         if(!strcmp(argv[1],"incremental_crc"))printf("%u ",sum);
         for(i=0;i<32;i++)printf("%02x",bytes[i]);return 0;
     }
+    if(argc==4 && !strcmp(argv[1],"selected")) {
+        struct mcc_cache_source source;struct mcc_resource_check *check;char paths[2][128],reason[320];
+        FILE *f=fopen(argv[2],"rb");if(!f)return 8;
+        fseek(f,0,SEEK_END);source.size=(uint64_t)ftell(f);source.context=f;source.read=read_map;
+        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));
+        if(!check){fprintf(stderr,"%s",reason);fclose(f);return 10;}
+        ok=mcc_resources_check_paths(check,paths);mcc_resources_check_end(check);fclose(f);
+        if(!ok)return 11;
+        printf("%s\n%s\n",paths[0],paths[1]);return 0;
+    }
     if(argc==4 && !strcmp(argv[1],"fingerprint")) {
         struct mcc_cache_source source;unsigned i;
         FILE *f=fopen(argv[2],"rb");if(!f)return 8;
@@ -515,3 +525,34 @@ def test_shared_set_selection(resource_tool, tmp_path, kind, case):
                                  cwd=tmp_path, capture_output=True, timeout=10)
         assert override.returncode == 0
         assert override.stdout == result.stdout
+
+
+@pytest.mark.parametrize("mask,location,invalid", [
+    (0, "package", True), (1, "package", False), (2, "package", False),
+    (3, "package", False), (1, "root", False), (2, "shared", False),
+    (1, "root", True),
+])
+def test_selected_resource_paths_follow_validated_references(resource_tool, tmp_path, mask, location, invalid):
+    data, resources = identity_fixture(mask, 80, 0)
+    package = tmp_path / "mcc_maps/package"
+    package.mkdir(parents=True)
+    path = package / "a10.map"
+    path.write_bytes(data)
+    selected = package if location == "package" else tmp_path / ("mcc_maps" if location == "root" else "mcc_maps/_shared/singleplayer")
+    selected.mkdir(parents=True, exist_ok=True)
+    expected = ["", ""]
+    for kind, resource in resources.items():
+        filename = "bitmaps.map" if kind == 1 else "sounds.map"
+        (selected / filename).write_bytes(resource)
+        expected[kind-1] = (selected / filename).relative_to(tmp_path).as_posix()
+    if invalid:
+        # An unused invalid sibling is irrelevant; a used override is authoritative.
+        (package / "bitmaps.map").write_bytes(b"invalid package override")
+    result = subprocess.run([str(resource_tool), "selected", str(path), "mcc_maps/package/a10"],
+                            cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    if invalid and mask:
+        assert result.returncode != 0
+        assert "invalid" in result.stderr.lower()
+    else:
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.splitlines() == expected

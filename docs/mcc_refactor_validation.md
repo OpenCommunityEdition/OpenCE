@@ -21,7 +21,9 @@ for both milestones; the 8 November request also supersedes the console deferral
 The stage evidence below records the changes, actual validation and limits.
 The subsequent delivery plan adds Milestone 13 for host sharing, Milestone 14
 for Custom Edition and MCC browser playability, and Milestone 15 for the
-upstream contribution. These are planned work, not completed validation.
+upstream contribution. Milestone 13 is now being implemented; its component
+evidence below is provisional, and storage/UI integration plus final runtime
+and platform checks remain open. Milestones 14 and 15 remain planned.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -36,7 +38,7 @@ upstream contribution. These are planned work, not completed validation.
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; recovery failure addressed in Milestone 10 |
 | 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
 | 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
-| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | Planned; review and contributor-response draft before implementation |
+| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | In progress; contribution reviewed/adapted, component tests pass; storage/UI integration and final validation pending |
 | 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Planned; explicit requirement, not satisfied by a web build alone |
 | 15 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestones 13 and 14; previously numbered 14 |
 
@@ -86,8 +88,23 @@ installation and failure cleanup. Campaign delivery must declare and validate
 mission dependencies and progression. The agreed policy is to obtain and verify
 the campaign manifest upfront, then download and verify each mission and its
 required resources before that mission starts. Reuse matching verified local
-content rather than downloading it again. This policy is approved for
-implementation; it is not yet implemented or runtime-validated.
+content rather than downloading it again. The planner now includes campaign/mission JSON upfront with only the current
+mission binary. Complete follow-on download/admission and runtime progression
+remain final integration checks; component parsing does not establish them.
+
+Offline/rehost limit: managed mission snapshots remain individually playable;
+they do not form a complete campaign by combining folders. The campaign
+contract in [`mcc_manifest.h`](../port/linux/src/mcc_manifest.h) contains ordered
+names/titles, not future mission gameplay digests. Locally generated receipts
+record the received current files and provenance, but cannot establish which
+other snapshot is the intended next-mission revision. Consequently
+`mcc_maps_next_mission` retains its missing-within-package refusal. Matching
+JSON, Workshop IDs or a unique leaf-name candidate are insufficient evidence
+to relax it. Connected clients follow each exact host-advertised identity;
+offline/rehosted progression needs the complete Workshop/manual package.
+Automatically linking downloaded snapshots would require an additional
+authoritative per-mission identity or recorded transition contract and is not
+implemented by M13.
 
 Keep host-delivered content separate from Steam-managed and manually installed
 packages. Identify the host's exact package/dependency snapshot by content
@@ -177,6 +194,177 @@ disabled settings, content changes, interrupted transfers, destination
 collisions, hostile input, resource ownership and follow-on missions.
 Preserve existing Xbox and CE behavior. Browser completion is an explicit
 Milestone 14 gate, not inferred from this PR's CI or native transfer tests.
+
+### PR #95 review and draft contributor response
+
+Review source: [PR #95](https://github.com/chestahh/GulchCE/pull/95), its current
+body/questions and issue discussion, inspected 8 November 2026. The PR targets
+`testing`, is still a draft, and reports six commits at
+`98130b623cc252f99ad063abf59b15040e438c9f`. Its author explicitly requests real
+two-PC testing; the reported green CI and synthetic tests do not establish
+that result. The issue discussion adds no technical question beyond the three
+in the body. No response has been posted and no PR description has been edited.
+
+Five contribution commits were cherry-picked with original attribution and
+`-x` provenance into the dedicated refactor branch:
+
+| Source commit | Refactor-branch commit | Contribution |
+| --- | --- | --- |
+| `9e74e1fe6be1ff8ad32dae779e373921e25e5637` | `46cba2bba` | Staging, explicit host list and transfer session |
+| `a1a5b12dd337ab939b62e9ebab70d1beb4c4fd8e` | `2d4defa7f` | MCC wire/game integration |
+| `1a12588c54e52d3e9d19086e19d122351aef6120` | `f041f08b0` | Documentation and CI |
+| `4585f73da25c7f208bf98475eed52ef78b344779` | `5fd155415` | Longer staging/data-root paths |
+| `686ba07a7ba9ccdd00e1ada7397026a98c87bddb` | `153c607fc` | Original Linux-only game-harness negative controls |
+
+The sixth PR commit, `98130b623`, merges the older `testing` branch into the
+contribution. It was not cherry-picked over the refactored baseline. The
+current adaptation is uncommitted work above `153c607fc`; the old commit
+messages describe the original contribution, not the resulting M13 contract.
+
+Review recommendations and their rationale:
+
+- Preserve the contribution's MCC-owned policy, list, transport/session and
+  staging separation. Its small shared hooks are needed because lobby holds,
+  cache admission and dispatch belong to existing engine call sites; keep CE
+  and Xbox implementations and message families intact.
+- Retain the explicit exact-content/maker list. A folder name, Workshop ID or
+  received manifest is not a custom-content classifier. List the gameplay
+  digest of each approved mission and its used resources; required JSON has
+  its own agreement digest. Do not imply that a hash grants rights or proves
+  arbitrary data safe.
+- Replace the older wire assignments, not the branch's newer join/camera
+  envelopes. The integrated agreement is base 32726, MCC 69, camera
+  32728/32729; MCC transfer messages are 103/104. The PR's proposed 65 and
+  102/103 are historical and conflict with subsequent branch work.
+- Add an explicit client waiting/acceptance state, bounded paged offers,
+  backpressure handling and upload accounting for manifests as well as chunks.
+  Reject hostile fields and messages from other peers; invalidate offers when
+  session identities or host preparation change. Component regressions and
+  selective fault controls exercise these guards.
+- Replace destination-by-host-name and file-by-file publication with exclusive
+  staging and atomic no-replace publication of a separate managed snapshot.
+  Same-name existing packages remain usable. Stage tests cover pre-existing
+  stages, path collisions, partial-file ownership and native junction refusal.
+- Select resources from the validated loader result rather than copying nearby
+  files. Actual resource-reader tests establish that self-contained maps ignore
+  unused invalid siblings, required overrides are authoritative, and root/shared
+  selection differs from package ownership. Transfer tests cover Workshop
+  fallback paths; shared stock dependencies refuse an incomplete offer.
+- Treat `ModInfo.json` as parsed metadata, not credit text. Use a bounded schema
+  and reference allowlist for JSON/PNG; compare required-JSON identity, discard
+  unsupported optional previews, and retain the gameplay probe before install.
+  Workshop packages and local map-only folders share this implementation.
+
+The user explicitly brought the PR's campaign manifests/follow-on missions,
+Workshop delivery and host menu switch into M13. Campaign metadata is planned
+upfront; mission binaries/resources are obtained as needed. Managed snapshot
+attribution, storage use and safe removal are also required. Fetching from
+other players remains excluded. Browser import/download/persistence is M14;
+the MCC-only upstream protocol merge is M15. Neither is implicitly completed
+by adapting this PR. Mac remains outside the requested platform scope.
+
+**Draft response, not posted:**
+
+> The host-local `mcc_share.txt` list is an appropriate explicit classification
+> source for this work. Keep exact gameplay fingerprints and maker credit,
+> refusing unknown content. Workshop origin alone will not qualify a package;
+> eligible Workshop and manually installed packages will use the same checks.
+>
+> We should raise the agreement for the new wire contract now. On the refactored
+> branch the current numbers are MCC 69, shared 32726 and camera 32728/32729,
+> with transfer messages 103/104. Your proposed MCC 65 and 102/103 belong to the
+> older base, so they cannot be copied directly into this branch.
+>
+> Include the host menu switch in Milestone 13. It stays off by default. Clients
+> keep Download Maps and additionally accept a size-labelled offer before MCC
+> file transfer. We are also handling the campaign/Workshop/metadata and managed
+> snapshot work you left out of scope, while preserving your contribution's
+> attribution and MCC-only boundaries.
+>
+> We have component evidence for consent, refusal, file integrity, cancellation,
+> resource selection and preservation of existing packages. We have not yet
+> completed the final real-map two-machine matrix, so we cannot report your
+> two-PC request as passed. The adapted expectations differ in three places:
+> a same-name different version installs separately; eligible listed Workshop
+> packages can transfer; and disabled downloads offer manual/Workshop choices.
+> We will report the tested builds, map identities, settings, logs and remaining
+> limits when that matrix is complete.
+
+### Milestone 13 implementation evidence
+
+Status at this documentation pass: **in progress, not complete**. The following
+observations are component results from the evolving working tree above
+`153c607fc`; they are not a final revision-wide validation claim. Required
+storage receipts/removal UI are integrated and component-tested. Final
+regenerated-menu runtime inspection, platform builds, native/browser
+transport controls, real MCC host/client gameplay and follow-on mission checks
+remain outstanding. Earlier stages' runtime passes do not validate the changed
+M13 transfer/identity implementation.
+
+The current implementation includes host-only opt-ins, client consent and
+manual/Workshop alternatives; paged bounded manifests; independent gameplay and
+required-JSON digests; JSON/PNG reference validation; local map-only packages;
+validated package-resource selection; and exclusive stage publication into a
+separate `dl_<digest>` snapshot. The ownership record/removal API in
+[`mcc_share_storage.h`](../port/linux/game/mcc_share_storage.h) is an integration
+contract: listing/removing user-visible managed copies and preventing removal
+of the active package are covered by native storage and menu fixtures; the
+completed in-game UI still requires runtime validation.
+No network manifest may supply a local ownership receipt.
+
+Recorded component runs:
+
+The native Ruby download exposed a real allocator-boundary defect before
+publication: the adapter used libc `calloc` with engine `debug_free`. The
+symbolized crash reached `mcc_share_identity_check` through `client_check`;
+the correction pairs engine `malloc`/`free` and explicitly zeros the entries.
+The adapter fixture now distinguishes these allocators, and a before-fix
+mutation reproduces the mismatch. Its 43 cases pass. This is an MCC adapter
+fix, not a change to the shared allocator. The corrected real-map rerun is
+still pending. Native consent inspection also caught clipped text and an
+incorrect lobby return; the existing MCC wrapping and engine go-back services
+now handle the prompt, with observable restoration covered in the adapter.
+
+The later integrated component selection passed 248 cases with five explicit
+platform/privilege skips; its one failure was sandbox denial of junction
+creation. Rerunning the complete staging and storage suites with junction
+creation available passed 70 cases with one unavailable file-symlink skip.
+These are overlapping selections, not additional totals. The current Windows
+release executable builds; required cross-platform CI and gameplay remain open.
+
+| Evidence | Actual result and limit |
+| --- | --- |
+| `build/m13-stage-results.txt` | 22 Windows native staging tests passed, including an actual junction refusal, no-replace publication, pre-existing stage preservation, nested cleanup and malformed/colliding paths. This predates the new local receipt-companion integration. |
+| `build/m13-game-results.txt` | 34 Windows game-adapter/planner cases and fault controls passed before the later resource-selection/revision changes. Real wire/session/stage code runs over synthetic files; engine/UI/identity and metadata parser are explicit stubs. |
+| `build/m13-resource-results.txt` | 183 Windows tests passed across `test_mcc_share_game.py`, `test_mcc_resources.py`, `test_mcc_validation.py` and `test_mcc_precache.py`, including actual resource selection/cache invalidation and two planner fault controls. This run includes the four-argument installed-snapshot callback and host revision cancellation; it predates final storage/menu integration. |
+| `build/m13-campaign-boundary-results.txt` | 69 Windows native catalog tests passed. Two new cases verify that identical campaign metadata and Workshop IDs do not splice separately downloaded mission folders, with either one or two candidates. The real catalog also retains individual mission selection and existing complete-package progression coverage; metadata decoding is stubbed. This establishes the offline catalog boundary, not receipt validation or online follow-on gameplay. |
+
+These runs are overlapping development snapshots, **not additive counts** or
+proof that the later combined implementation passes. The resource suite checks
+real bounded map/resource readers; the game fixture's metadata decoder/schema
+stubs do not validate actual PNG/JSON parsing. Their independent production
+helper suites and final combined runs must be recorded separately. Native
+fixtures also do not establish Android-device behavior or browser filesystem
+support. The current browser publication helper fails closed; M14 must supply
+and verify browser import/download, persistence and playable native/browser
+sessions for both CE and MCC.
+
+The resource planning correction retains successful validation's exact selected
+paths and restamps map/package/root/shared candidates through
+`mcc_validation_resources`. It introduces no new selection heuristics and no
+Xbox/CE reader changes. Required global dependencies are deliberately refused
+with an explicit host diagnostic instead of offering an incomplete package or
+redistributing stock resources. The detailed reading route and input limits
+are in [the sharing guide](reading/maps_and_resources.md#mcc-package-sharing-between-machines)
+and [NETCODE.md](../port/linux/NETCODE.md#mcc-package-sharing).
+
+Only verified task-owned fixture directories were removed after these runs:
+0.51 MB for the first staging run, 41.9 MB for the game harness, and 148.1 MB
+for the resource run (decimal sizes, rounded). Paths were resolved inside the
+worktree and checked for reparse points before cleanup. Small result logs are
+retained. These figures cover those component runs only, not the entire M13
+workspace or any final cleanup claim. Originals, saves and other agents' output
+were outside this cleanup.
 
 ### Milestone 14: Custom Edition and MCC browser playability
 

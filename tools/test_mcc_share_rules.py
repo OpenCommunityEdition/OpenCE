@@ -93,7 +93,7 @@ int LLVMFuzzerTestOneInput(uint8_t const *data,size_t size) {
  reason=mcc_share_decide(&p);
  if(mcc_share_eligible(&p)!=(reason==MCC_SHARE_ELIGIBLE))abort();
  if(reason==MCC_SHARE_ELIGIBLE &&
-    (p.sidecar!=MCC_SHARE_SIDECAR_ABSENT || p.content!=MCC_SHARE_CONTENT_CUSTOM ||
+    ((p.sidecar!=MCC_SHARE_SIDECAR_ABSENT && p.sidecar!=MCC_SHARE_SIDECAR_VALID) || p.content!=MCC_SHARE_CONTENT_CUSTOM ||
      !p.content_known || !p.host_opt_in || length>63 || memchr(name,0,length)))abort();
  if(!mcc_share_reason_word(reason))abort();
  if(mcc_share_file_allowed(name,length) && (length<10 || length>11 || memchr(name,0,length)))abort();
@@ -115,7 +115,8 @@ int LLVMFuzzerTestOneInput(uint8_t const *data,size_t size) {
              b"mcc_maps/BloodGulch/x", b"mcc_maps/_shared/x", b"mcc_maps/custom/bitmaps",
              b"mcc_maps/a/../b", b"mcc_maps/a/b\0suffix", b"bitmaps.map", b"SOUNDS.MAP"]
     for i, name in enumerate(seeds):
-        (corpus / str(i)).write_bytes(bytes([0, 1, 1, 1]) + name)
+        for sidecar in (0, 1):  # Missing and valid Workshop origins obey the same content policy.
+            (corpus / f"{i}-{sidecar}").write_bytes(bytes([sidecar, 1, 1, 1]) + name)
     result = subprocess.run([str(exe), "-runs=100000", "-seed=94", "-max_len=132",
                              "-timeout=5", "-rss_limit_mb=512", str(corpus)],
                             cwd=tmp_path, capture_output=True, text=True, timeout=90)

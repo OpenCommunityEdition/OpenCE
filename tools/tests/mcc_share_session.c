@@ -36,7 +36,17 @@ static int file_exists_any(char const *path) { struct stat s; return stat(path,&
 /* (MoveFileA does not replace, so nothing here may count on rename replacing either) */
 static int io_move(char const *from, char const *to) { return !file_exists_any(to) && rename(from,to)==0; }
 static int io_delete(char const *path) { return remove(path)==0; }
-static struct mcc_share_io const real_io={io_make,io_remove,io_exists,io_move,io_delete};
+static unsigned native_reads,native_cached_reads;
+static FILE *io_open_native(char const *path) {
+    native_reads++;
+    if (strstr(path,"/cached/")) native_cached_reads++;
+    return fopen(path,"rb");
+}
+int posix_mcc_share_path_safe(char const *path);
+int posix_mcc_share_publish(char const *from,char const *to);
+static struct mcc_share_io const real_io={io_make,io_remove,io_exists,io_move,io_delete,
+    posix_mcc_share_path_safe,posix_mcc_share_publish,io_open_native};
+static int stage_test_verified(void *user,char const *path) { (void)user;(void)path;return 1; }
 /* a folder check that misses a package folder made meanwhile (another process) */
 static int io_exists_late(char const *path)
 {
@@ -44,7 +54,8 @@ static int io_exists_late(char const *path)
     if (n>=13 && !strcmp(path+n-13,"mcc_maps/pack")) return 0;
     return io_exists(path);
 }
-static struct mcc_share_io const late_io={io_make,io_remove,io_exists_late,io_move,io_delete};
+static struct mcc_share_io const late_io={io_make,io_remove,io_exists_late,io_move,io_delete,
+    posix_mcc_share_path_safe,posix_mcc_share_publish,io_open_native};
 
 static int file_exists(char const *path) { struct stat s; return stat(path,&s)==0 && S_ISREG(s.st_mode); }
 
@@ -120,28 +131,57 @@ static struct {
     long last_machine;
     int responses;
     int identity_calls;
+    int prepare_calls, prepare_ok, prepare_order;
+    int reject_requests, reject_responses, reject_done, reject_have;
+    unsigned delivered_bytes, response_bytes;
+    unsigned reuse_mask, reuse_candidates, have_requests, file_requests[MCC_SHARE_STAGE_FILES];
+    int reuse_missing;
+    int offers;
+    uint64_t offer_bytes;
+    unsigned extra_metadata, manifest_pages;
+    int stop_after_page;
 } W;
 
 static uint32_t env_now(void *u) { (void)u; return W.clock; }
-static void env_request(void *u, struct mcc_share_request const *r)
+static int env_request(void *u, struct mcc_share_request const *r)
 {
     (void)u;
+    if (W.reject_requests || (W.reject_done && r->op==MCC_SHARE_OP_DONE) ||
+        (W.reject_have && r->op==MCC_SHARE_OP_HAVE)) return 0;
     if (W.host_count<600) {
+        if (r->op==MCC_SHARE_OP_CHUNK) W.file_requests[r->file]++;
+        if (r->op==MCC_SHARE_OP_HAVE) W.have_requests++;
         W.to_host[W.host_count].bytes=sizeof(*r);
         memcpy(W.to_host[W.host_count].data,r,sizeof(*r));
         W.host_count++;
+        return 1;
     }
+    return 0;
 }
-static void env_response(void *u, long machine, void const *m, unsigned bytes)
+static int env_response(void *u, long machine, void const *m, unsigned bytes)
 {
+    struct mcc_share_response head;
     (void)u;
+    if (W.reject_responses) return 0;
+    memcpy(&head,m,sizeof(head));
+    if (W.stop_after_page && head.op==MCC_SHARE_OP_MANIFEST && W.manifest_pages) return 0;
     W.last_machine=machine;
     W.responses++;
+    W.response_bytes+=bytes;
+    if (head.op==MCC_SHARE_OP_MANIFEST && head.result==MCC_SHARE_RESULT_OK) W.manifest_pages++;
+    if (head.op==MCC_SHARE_OP_CHUNK && head.result==MCC_SHARE_RESULT_OK) W.delivered_bytes+=head.length;
     if (W.join_count<600 && machine==MACHINE) {
         W.to_join[W.join_count].bytes=bytes;
         memcpy(W.to_join[W.join_count].data,m,bytes);
         W.join_count++;
     }
+    return 1;
+}
+static void env_offered(void *u, uint64_t bytes, char const *credit)
+{
+    (void)u;(void)credit;
+    W.offers++;
+    W.offer_bytes=bytes;
 }
 static int env_taken(void *u, char const *level) { (void)u;(void)level; return W.taken; }
 static void identity_digest(char const *dir, unsigned char out[32], int *ok)
@@ -171,6 +211,22 @@ static int env_identity(void *u, char const *dir)
     identity_digest(dir,got,&ok);
     return W.identity_ok && ok && !memcmp(got,W.digest,32);
 }
+static int env_prepare(void *u, struct mcc_share_stage *stage)
+{
+    (void)u;
+    W.prepare_calls++;
+    W.prepare_order=W.identity_calls==1 && stage->verified &&
+        stage->state==MCC_SHARE_STAGE_STAGED && !io_exists(stage->package_dir);
+    return W.prepare_ok;
+}
+static int env_reuse(void *u, struct mcc_share_file const *file, char path[1024])
+{
+    (void)u;
+    if (!(W.reuse_mask&(1u<<file->kind))) return 0;
+    W.reuse_candidates++;
+    snprintf(path,1024,"%scached/%s",J,W.reuse_missing ? "missing.map" : file->leaf);
+    return 1;
+}
 static void env_finished(void *u, int ok, char const *text)
 {
     (void)u;
@@ -190,6 +246,12 @@ static void env_package(void *u, char const *level, struct mcc_share_host_packag
         p->files[i].kind=(uint8_t)(i==3 ? MCC_SHARE_FILE_CREDIT : i);
         snprintf(p->files[i].leaf,sizeof(p->files[i].leaf),"%s",names[i]);
         snprintf(p->files[i].path,sizeof(p->files[i].path),"%smcc_maps/solar_flare/%s",H,names[i]);
+    }
+    for (i=0;i<W.extra_metadata;i++) {
+        unsigned at=(unsigned)p->count++;
+        p->files[at].kind=MCC_SHARE_FILE_JSON;
+        snprintf(p->files[at].leaf,sizeof(p->files[at].leaf),"metadata/mission%02u.json",i);
+        snprintf(p->files[at].path,sizeof(p->files[at].path),"%smetadata%02u.json",H,i);
     }
 }
 static uint32_t env_limit(void *u) { (void)u; return W.limit; }
@@ -286,6 +348,7 @@ static void install_hostile(struct mcc_share_entry *entries, unsigned count, int
     head.op=MCC_SHARE_OP_MANIFEST;
     head.session=77;
     head.count=(uint8_t)count;
+    head.length=count;
     snprintf(head.level,sizeof(head.level),"%s",LEVEL);
     memcpy(buffer,&head,sizeof(head));
     memcpy(buffer+sizeof(head),entries,count*sizeof(entries[0]));
@@ -360,10 +423,15 @@ int main(int argc,char **argv)
         /* listed without a maker: the joiner is pointed to the maker */
         snprintf(list,sizeof(list),"%s\n",hex);
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NO_CREDIT && !credit[0]);
+        CHECK(mcc_share_admit("mcc_maps/2915693904/a10",1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NO_CREDIT && !credit[0]);
         snprintf(list,sizeof(list),"%s Example Maker\n",hex);
-        /* the rules' own refusals still win over a listed fingerprint */
-        CHECK(mcc_share_admit("mcc_maps\\2915693904\\a10",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_WORKSHOP);
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_WORKSHOP);
+        /* Workshop origin permits an offer only with the same permission and credit. */
+        CHECK(mcc_share_admit("mcc_maps\\2915693904\\a10",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
+        CHECK(!strcmp(credit,"Example Maker"));
+        CHECK(mcc_share_admit(LEVEL,0,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OFF && !credit[0]);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,"",0,credit)==MCC_SHARE_RESULT_NOT_SHAREABLE && !credit[0]);
+        /* The remaining rules still refuse invalid origins/names and shared resources. */
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_UNREADABLE,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
         CHECK(mcc_share_admit("mcc_maps\\loose",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
         CHECK(mcc_share_admit("mcc_maps\\_shared\\multiplayer",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
@@ -380,6 +448,10 @@ int main(int argc,char **argv)
         f[1].kind=MCC_SHARE_FILE_BITMAPS;strcpy(f[1].leaf,"BITMAPS.MAP");f[1].size=5;
         f[2].kind=MCC_SHARE_FILE_SOUNDS;strcpy(f[2].leaf,"sounds.map");f[2].size=5;
         f[3].kind=MCC_SHARE_FILE_CREDIT;strcpy(f[3].leaf,"ModInfo.json");f[3].size=50;
+        CHECK(!mcc_share_manifest_valid(f,4,"m0")); /* JSON cannot bypass schema validation as a credit. */
+        f[3].kind=MCC_SHARE_FILE_JSON;
+        CHECK(mcc_share_manifest_valid(f,4,"m0"));
+        f[3].kind=MCC_SHARE_FILE_CREDIT;strcpy(f[3].leaf,"credits.txt");
         CHECK(mcc_share_manifest_valid(f,4,"m0"));
         CHECK(mcc_share_manifest_valid(f,1,"M0"));              /* the map's name matches without case */
         CHECK(!mcc_share_manifest_valid(f,0,"m0"));
@@ -545,6 +617,8 @@ int main(int argc,char **argv)
         CHECK(mcc_share_stage_write(&s,a,1000)==MCC_SHARE_STAGE_FILE_DONE);
         CHECK(mcc_share_stage_write(&s,b,500)==MCC_SHARE_STAGE_FILE_DONE);
         CHECK(mcc_share_stage_write(&s,c,40)==MCC_SHARE_STAGE_ALL_DONE);
+        CHECK(mcc_share_stage_install(&s)==MCC_SHARE_STAGE_BAD_STATE);
+        CHECK(mcc_share_stage_verify(&s,stage_test_verified,NULL)==MCC_SHARE_STAGE_OK);
         CHECK(mcc_share_stage_install(&s)==MCC_SHARE_STAGE_OK);
         snprintf(path,sizeof(path),"%s/mcc_maps/pack/m0.map",argv[2]);
         data=read_file(path,&size);
@@ -581,7 +655,8 @@ int main(int argc,char **argv)
         snprintf(path,sizeof(path),"%s/mcc_maps/pack",argv[2]);CHECK(mkdir(path,0755)==0);
         snprintf(path,sizeof(path),"%s/mcc_maps/pack/keep.txt",argv[2]);
         CHECK(write_file(path,c,40));
-        CHECK(mcc_share_stage_install(&s)==MCC_SHARE_STAGE_EXISTS);
+        CHECK(mcc_share_stage_verify(&s,stage_test_verified,NULL)==MCC_SHARE_STAGE_OK);
+        CHECK(mcc_share_stage_install(&s)==MCC_SHARE_STAGE_INSTALL_FAILED);
         CHECK(file_exists(path));
         snprintf(path,sizeof(path),"%s/mcc_maps/pack/m0.map",argv[2]);
         CHECK(!file_exists(path));
@@ -592,7 +667,7 @@ int main(int argc,char **argv)
     }
 
     CASE("stage_move_failure") {
-        /* a move that fails part way deletes what it moved, and no map appears */
+        /* A staged file removed before publication prevents any install. */
         struct mcc_share_stage s;
         struct mcc_share_file f[3];
         unsigned char *a=make_bytes(1000,1),*b=make_bytes(500,2),*c=make_bytes(40,3);
@@ -606,7 +681,8 @@ int main(int argc,char **argv)
         CHECK(mcc_share_stage_write(&s,a,1000)==MCC_SHARE_STAGE_FILE_DONE);
         CHECK(mcc_share_stage_write(&s,b,500)==MCC_SHARE_STAGE_FILE_DONE);
         CHECK(mcc_share_stage_write(&s,c,40)==MCC_SHARE_STAGE_ALL_DONE);
-        /* the staged credit file vanishes before the move: the second move fails */
+        CHECK(mcc_share_stage_verify(&s,stage_test_verified,NULL)==MCC_SHARE_STAGE_OK);
+        /* The staged credit file vanishes before publication. */
         snprintf(path,sizeof(path),"%s/mcc_staging/pack/readme.txt",argv[2]);
         CHECK(unlink(path)==0);
         CHECK(mcc_share_stage_install(&s)==MCC_SHARE_STAGE_INSTALL_FAILED);
@@ -643,6 +719,16 @@ int main(int argc,char **argv)
 
     if (!setup(argv[2])) {fprintf(stderr,"setup failed\n");return 2;}
 
+    if (!strcmp(argv[1],"clock_zero") || !strcmp(argv[1],"clock_wrap")) {
+        W.clock=!strcmp(argv[1],"clock_zero") ? 0 : UINT32_MAX-99;
+        W.host.budget_at=W.join.budget_at=W.clock;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        step();
+        CHECK(mcc_share_host_active(&W.host,MACHINE));
+        CHECK(run_until_finished(2000) && W.finished_ok);
+        return 0;
+    }
+
     CASE("transfer") {
         char a[400],b[400];
         CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
@@ -663,6 +749,7 @@ int main(int argc,char **argv)
         for (i=0;i<5;i++) step();
         CHECK(!mcc_share_host_active(&W.host,MACHINE));                 /* the joiner's done ended it */
         CHECK(W.identity_calls==1);
+        CHECK(native_reads==16 && !native_cached_reads); /* four hashes and twelve chunk reads */
         return 0;
     }
 
@@ -681,6 +768,461 @@ int main(int argc,char **argv)
         return 0;
     }
 
+    CASE("aggregate_rate") {
+        struct mcc_share_request request;
+        unsigned machine, chunk;
+        W.limit=8192;
+        memset(&request,0,sizeof(request));
+        request.op=MCC_SHARE_OP_MANIFEST;
+        strcpy(request.level,LEVEL);
+        for (machine=0;machine<MCC_SHARE_HOST_TRANSFERS;machine++)
+            mcc_share_host_request(&W.host,machine,&request,sizeof(request));
+        mcc_share_update(&W.host);
+        for (machine=0;machine<MCC_SHARE_HOST_TRANSFERS;machine++) {
+            request.op=MCC_SHARE_OP_CHUNK;
+            request.session=W.host.transfers[machine].session;
+            request.length=MCC_SHARE_CHUNK_BYTES;
+            for (chunk=0;chunk<4;chunk++) {
+                request.offset=chunk*MCC_SHARE_CHUNK_BYTES;
+                mcc_share_host_request(&W.host,machine,&request,sizeof(request));
+            }
+        }
+        for (i=0;i<50;i++) { W.clock+=20; mcc_share_update(&W.host); }
+        /* One second of initial credit plus one elapsed second and at most one
+         * chunk of debt, across all four transfers rather than per transfer. */
+        CHECK(W.delivered_bytes<=2*W.limit+MCC_SHARE_CHUNK_BYTES);
+        CHECK(W.delivered_bytes>W.limit);
+        return 0;
+    }
+
+    CASE("offer_accept") {
+        unsigned j;
+        W.join.env.offered=env_offered;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        for (i=0;i<5;i++) step();
+        CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING && W.offers==1);
+        CHECK(W.offer_bytes==sizes[0]+sizes[1]+sizes[2]+sizes[3]);
+        CHECK(W.delivered_bytes==0 && staging_gone() && package_absent());
+        for (j=0;j<4500;j++) step(); /* heartbeats hold the offer for a human decision */
+        CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING && W.offers==1);
+        CHECK(mcc_share_host_active(&W.host,MACHINE));
+        CHECK(W.delivered_bytes==0 && staging_gone());
+        CHECK(mcc_share_client_accept(&W.join));
+        CHECK(!mcc_share_client_accept(&W.join));
+        CHECK(run_until_finished(2000) && W.finished_ok);
+        return 0;
+    }
+
+    CASE("manifest_pages") {
+        char path[300];
+        unsigned char const json[]="{\"hello\":\"world\"}";
+        W.extra_metadata=20;
+        for (i=0;i<W.extra_metadata;i++) {
+            snprintf(path,sizeof(path),"%smetadata%02u.json",H,i);
+            CHECK(write_file(path,json,sizeof(json)-1));
+        }
+        W.join.env.offered=env_offered;W.stop_after_page=1;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        for (i=0;i<10;i++) step();
+        CHECK(W.manifest_pages==1 && W.join.offer_received==MCC_SHARE_MANIFEST_PAGE);
+        CHECK(W.join.state==MCC_SHARE_CLIENT_ASKING && !W.offers && staging_gone());
+        W.stop_after_page=0;
+        for (i=0;i<5;i++) step();
+        CHECK(W.manifest_pages==2 && W.offers==1 && W.join.offer_count==24);
+        CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING && W.delivered_bytes==0);
+        CHECK(W.offer_bytes==sizes[0]+sizes[1]+sizes[2]+sizes[3]+20*(sizeof(json)-1));
+        CHECK(mcc_share_client_accept(&W.join));
+        CHECK(run_until_finished(2000) && W.finished_ok);
+        snprintf(path,sizeof(path),"%smcc_maps/solar_flare/metadata/mission19.json",J);
+        CHECK(file_exists(path));
+        return 0;
+    }
+
+    CASE("offer_expiry") {
+        W.join.env.offered=env_offered;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        for (i=0;i<6100 && !W.finished;i++) step();
+        CHECK(W.finished==1 && !W.finished_ok && strstr(W.finished_text,"expired"));
+        CHECK(!mcc_share_client_accept(&W.join));
+        CHECK(W.delivered_bytes==0 && staging_gone() && package_absent());
+        return 0;
+    }
+
+    CASE("manifest_rate") {
+        struct mcc_share_request request;
+        char path[300];
+        unsigned machine,frame;
+        uint32_t start=W.clock;
+        W.limit=16384;W.extra_metadata=MCC_SHARE_STAGE_FILES-4;
+        for (i=0;i<W.extra_metadata;i++) {
+            snprintf(path,sizeof(path),"%smetadata%02u.json",H,i);
+            CHECK(write_file(path,(unsigned char const *)"{}",2));
+        }
+        memset(&request,0,sizeof(request));request.op=MCC_SHARE_OP_MANIFEST;strcpy(request.level,LEVEL);
+        for (frame=0;frame<500;frame++) {
+            if (!(frame%50)) for (machine=0;machine<MCC_SHARE_HOST_TRANSFERS;machine++)
+                mcc_share_host_request(&W.host,machine,&request,sizeof(request));
+            mcc_share_update(&W.host);
+            CHECK(W.response_bytes<=(uint64_t)W.limit*(1000+W.clock-start)/1000+MCC_SHARE_RESPONSE_MAXIMUM);
+            W.clock+=20;
+        }
+        CHECK(W.manifest_pages>40 && W.delivered_bytes==0);
+        return 0;
+    }
+
+    CASE("offer_delivery_deadline") {
+        char path[300];
+        struct mcc_share_host_transfer *transfer=&W.host.transfers[0];
+        uint32_t completed;
+        W.extra_metadata=20;
+        for (i=0;i<W.extra_metadata;i++) {
+            snprintf(path,sizeof(path),"%smetadata%02u.json",H,i);
+            CHECK(write_file(path,(unsigned char const *)"{}",2));
+        }
+        W.join.env.offered=env_offered;W.stop_after_page=1;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        for (i=0;i<1000;i++) step();
+        CHECK(!transfer->offer_complete && !W.offers && W.manifest_pages==1);
+        W.stop_after_page=0;
+        for (i=0;i<5;i++) step();
+        completed=transfer->offered_at;
+        CHECK(transfer->offer_complete && W.offers==1);
+        for (i=0;i<5250;i++) step();
+        CHECK(transfer->used && transfer->offered_at==completed && W.offers==1);
+        CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING && W.delivered_bytes==0);
+        CHECK(mcc_share_client_accept(&W.join));
+        CHECK(run_until_finished(2000) && W.finished_ok);
+        return 0;
+    }
+
+    CASE("progress_expiry") {
+        struct mcc_share_request request;
+        struct mcc_share_host_transfer *transfer=&W.host.transfers[0];
+        memset(&request,0,sizeof(request));request.op=MCC_SHARE_OP_MANIFEST;strcpy(request.level,LEVEL);
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));mcc_share_update(&W.host);
+        request.op=MCC_SHARE_OP_CHUNK;request.session=transfer->session;request.length=1;
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        W.clock+=20;mcc_share_update(&W.host);CHECK(transfer->sent_bytes==1);
+        request.op=MCC_SHARE_OP_MANIFEST;request.session=0;request.length=0;
+        for (i=0;i<7;i++) {
+            W.clock+=10000;
+            mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));mcc_share_update(&W.host);
+            CHECK(transfer->used);
+        }
+        W.clock+=10000;mcc_share_update(&W.host);
+        CHECK(!transfer->used);
+        return 0;
+    }
+
+    if (!strncmp(argv[1],"terminal_",9)) {
+        W.reject_done=1;
+        if (!strcmp(argv[1],"terminal_success") || !strcmp(argv[1],"terminal_failure")) {
+            W.identity_ok=!strcmp(argv[1],"terminal_success");
+            CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+            CHECK(run_until_finished(2000));
+            CHECK(W.finished_ok==W.identity_ok);
+            CHECK(W.join.terminal.flags==W.identity_ok);
+        } else {
+            W.join.env.offered=env_offered;
+            CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+            for (i=0;i<5;i++) step();
+            CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING);
+            mcc_share_client_cancel(&W.join);
+        }
+        CHECK(W.join.state==MCC_SHARE_CLIENT_IDLE && W.join.terminal_pending);
+        if (!strcmp(argv[1],"terminal_new_request")) {
+            uint32_t old_session=W.join.session;
+            struct mcc_share_request done,manifest;
+            CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+            /* A delayed old offer cannot satisfy an intent not yet sent. */
+            mcc_share_client_response(&W.join,W.to_join[0].data,W.to_join[0].bytes);
+            CHECK(W.join.state==MCC_SHARE_CLIENT_ASKING && W.offers==1);
+            for (i=0;i<100;i++) step();
+            CHECK(W.join.state==MCC_SHARE_CLIENT_ASKING && W.join.terminal_pending && !W.host_count);
+            W.reject_done=0;
+            mcc_share_update(&W.join);
+            CHECK(W.host_count==2);
+            memcpy(&done,W.to_host[0].data,sizeof(done));
+            memcpy(&manifest,W.to_host[1].data,sizeof(manifest));
+            CHECK(done.op==MCC_SHARE_OP_DONE && done.session==old_session && manifest.op==MCC_SHARE_OP_MANIFEST);
+            for (i=0;i<5;i++) step();
+            CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING && W.join.session!=old_session && W.offers==2);
+        } else if (!strcmp(argv[1],"terminal_disconnect")) {
+            mcc_share_client_disconnect(&W.join);
+            W.reject_done=0;
+            for (i=0;i<5;i++) step();
+            CHECK(W.host.transfers[0].used && !W.join.terminal_pending && !W.host_count);
+        } else if (!strcmp(argv[1],"terminal_expiry")) {
+            W.clock+=30000;mcc_share_update(&W.join);
+            CHECK(!W.join.terminal_pending);
+            /* An expired slot cannot be revived by a fresh manifest request. */
+            W.reject_done=0;
+            CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+            for (i=0;i<5;i++) step();
+            CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING && W.offers==2);
+        } else {
+            W.reject_done=0;
+            for (i=0;i<5;i++) step();
+            CHECK(!W.join.terminal_pending && !W.host.transfers[0].used);
+        }
+        return 0;
+    }
+
+    if (!strncmp(argv[1],"prepare_",8)) {
+        W.join.env.prepare_install=env_prepare;
+        W.prepare_ok=!strcmp(argv[1],"prepare_success");
+        W.identity_ok=strcmp(argv[1],"prepare_unverified")!=0;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        CHECK(run_until_finished(2000));
+        if (W.identity_ok) {
+            CHECK(W.prepare_calls==1 && W.prepare_order);
+            CHECK(W.finished_ok==W.prepare_ok);
+            if (!W.prepare_ok) CHECK(strstr(W.finished_text,"download metadata could not be saved"));
+        } else CHECK(W.prepare_calls==0 && !W.finished_ok);
+        CHECK(staging_gone() && (W.finished_ok || package_absent()));
+        step();
+        CHECK(!W.host.transfers[0].used);
+        return 0;
+    }
+
+    CASE("offer_cancel") {
+        W.join.env.offered=env_offered;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        for (i=0;i<5;i++) step();
+        CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING);
+        mcc_share_client_cancel(&W.join);
+        step();
+        CHECK(!mcc_share_host_active(&W.host,MACHINE));
+        CHECK(W.delivered_bytes==0 && staging_gone() && package_absent());
+        CHECK(!W.finished);
+        return 0;
+    }
+
+    if (!strncmp(argv[1],"reuse_",6)) {
+        char path[400],source[400];
+        unsigned char *data;
+        unsigned bytes;
+        int frames=0,identity_ok;
+        W.join.env.reuse_file=env_reuse;
+        W.reuse_mask=(1u<<MCC_SHARE_FILE_BITMAPS)|(1u<<MCC_SHARE_FILE_SOUNDS);
+        if (!strcmp(argv[1],"reuse_bounded") || !strcmp(argv[1],"reuse_cancel") ||
+            !strcmp(argv[1],"reuse_disconnect") || !strcmp(argv[1],"reuse_short_read")) {
+            bytes=3u*1024u*1024u+7;
+            data=make_bytes(bytes,99);
+            snprintf(path,sizeof(path),"%smcc_maps/solar_flare/bitmaps.map",H);
+            CHECK(write_file(path,data,bytes));free(data);
+            snprintf(path,sizeof(path),"%smcc_maps/solar_flare",H);
+            identity_digest(path,W.digest,&identity_ok);CHECK(identity_ok);
+        }
+        snprintf(path,sizeof(path),"%scached",J);CHECK(io_make(path));
+        for (i=1;i<=2;i++) {
+            snprintf(source,sizeof(source),"%smcc_maps/solar_flare/%s",H,names[i]);
+            data=read_file(source,&bytes);CHECK(data);
+            snprintf(path,sizeof(path),"%scached/%s",J,names[i]);
+            if (i==1 && !strcmp(argv[1],"reuse_bad_hash")) data[bytes-1]^=0x55;
+            CHECK(write_file(path,data,bytes));free(data);
+        }
+        if (!strcmp(argv[1],"reuse_missing")) W.reuse_missing=1;
+        if (!strcmp(argv[1],"reuse_absent")) W.reuse_mask=0;
+        if (!strcmp(argv[1],"reuse_backpressure")) W.reject_have=1;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        if (!strcmp(argv[1],"reuse_bounded") || !strcmp(argv[1],"reuse_cancel") ||
+            !strcmp(argv[1],"reuse_disconnect") || !strcmp(argv[1],"reuse_short_read")) {
+            for (i=0;i<100 && !W.join.reuse_stream;i++) step();
+            CHECK(W.join.reuse_stream && W.join.stage.written==1024u*1024u);
+            CHECK(!W.file_requests[1] && !W.have_requests);
+            snprintf(path,sizeof(path),"%scached/bitmaps.map",J);
+            if (!strcmp(argv[1],"reuse_cancel") || !strcmp(argv[1],"reuse_disconnect")) {
+                if (!strcmp(argv[1],"reuse_cancel")) mcc_share_client_cancel(&W.join);
+                else mcc_share_client_disconnect(&W.join);
+                CHECK(!W.join.reuse_stream && !W.join.have_pending && staging_gone() && package_absent());
+                /* On Windows this also proves the source handle was closed. */
+                CHECK(io_delete(path));
+                return 0;
+            }
+            if (!strcmp(argv[1],"reuse_short_read")) CHECK(write_file(path,(unsigned char const *)"x",1));
+            else while (W.join.reuse_stream) {
+                uint32_t before=W.join.stage.done;
+                W.clock+=10000;step();frames++;
+                CHECK(!W.finished && W.join.stage.done-before<=1024u*1024u);
+                CHECK(frames<10);
+            }
+        }
+        if (!strcmp(argv[1],"reuse_backpressure")) {
+            for (i=0;i<100 && !W.join.have_pending;i++) step();
+            CHECK(W.join.have_pending && !W.join.reuse_stream && W.join.stage.current==2);
+            for (i=0;i<10;i++) step();
+            CHECK(!W.have_requests && !W.file_requests[1] && !W.file_requests[2]);
+            CHECK(W.host.transfers[0].request_file==1 && !W.host.transfers[0].queued);
+            W.reject_have=0;
+        }
+        CHECK(run_until_finished(2000));
+        CHECK(!W.join.reuse_stream && !W.join.have_pending && staging_gone());
+        if (!strcmp(argv[1],"reuse_bad_hash") || !strcmp(argv[1],"reuse_missing") ||
+            !strcmp(argv[1],"reuse_short_read")) {
+            CHECK(!W.finished_ok && strstr(W.finished_text,"previously downloaded resource"));
+            CHECK(package_absent() && !W.have_requests && !W.file_requests[1]);
+        } else {
+            CHECK(W.finished_ok);
+            if (!strcmp(argv[1],"reuse_absent")) CHECK(W.have_requests==0 && W.file_requests[1] && W.file_requests[2]);
+            else {
+                CHECK(W.have_requests==2 && W.reuse_candidates==2);
+                CHECK(native_cached_reads==2); /* local reads must use the native-path bridge too */
+                CHECK(!W.file_requests[1] && !W.file_requests[2]);
+                CHECK(W.delivered_bytes==sizes[0]+sizes[3]);
+                for (i=1;i<=2;i++) {
+                    snprintf(source,sizeof(source),"%smcc_maps/solar_flare/%s",H,names[i]);
+                    snprintf(path,sizeof(path),"%smcc_maps/solar_flare/%s",J,names[i]);
+                    CHECK(same_file(source,path));
+                }
+            }
+        }
+        return 0;
+    }
+
+    CASE("have_fields") {
+        struct mcc_share_request request,bad;
+        struct mcc_share_host_transfer *transfer=&W.host.transfers[0];
+        uint32_t offset,advanced;
+        int32_t budget;
+        memset(&request,0,sizeof(request));request.op=MCC_SHARE_OP_MANIFEST;strcpy(request.level,LEVEL);
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));mcc_share_update(&W.host);
+        request.session=transfer->session;request.op=MCC_SHARE_OP_HAVE;
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));CHECK(transfer->request_file==0);
+        request.op=MCC_SHARE_OP_CHUNK;
+        for (offset=0;offset<sizes[0];offset+=request.length) {
+            request.offset=offset;request.length=sizes[0]-offset;
+            if (request.length>MCC_SHARE_CHUNK_BYTES) request.length=MCC_SHARE_CHUNK_BYTES;
+            mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        }
+        mcc_share_update(&W.host);CHECK(transfer->request_file==1 && !transfer->queued);
+        request.op=MCC_SHARE_OP_HAVE;request.file=1;request.length=request.offset=0;
+        for (i=0;i<8;i++) {
+            bad=request;
+            switch (i) {
+            case 0: bad.file=2;break;
+            case 1: bad.file=255;break;
+            case 2: bad.session++;break;
+            case 3: bad.flags=1;break;
+            case 4: bad.offset=1;break;
+            case 5: bad.length=1;break;
+            case 6: bad.reserved=1;break;
+            case 7: strcpy(bad.level,"mcc_maps\\other\\m0");break;
+            }
+            mcc_share_host_request(&W.host,MACHINE,&bad,sizeof(bad));
+            CHECK(transfer->request_file==1 && !transfer->reused_files);
+        }
+        bad=request;bad.op=MCC_SHARE_OP_CHUNK;bad.length=1;
+        mcc_share_host_request(&W.host,MACHINE,&bad,sizeof(bad));
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));CHECK(transfer->request_file==1);
+        for (offset=1;offset<sizes[1];offset+=bad.length) {
+            bad.offset=offset;bad.length=sizes[1]-offset;
+            if (bad.length>MCC_SHARE_CHUNK_BYTES) bad.length=MCC_SHARE_CHUNK_BYTES;
+            mcc_share_host_request(&W.host,MACHINE,&bad,sizeof(bad));
+        }
+        mcc_share_update(&W.host);CHECK(transfer->request_file==2 && !transfer->queued);
+        request.file=2;budget=W.host.budget;
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        advanced=transfer->advanced_at;
+        CHECK(transfer->request_file==3 && transfer->reused_files==1 && W.host.budget==budget);
+        W.clock+=500;
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        CHECK(transfer->request_file==3 && transfer->reused_files==1 && transfer->advanced_at==advanced);
+        request.file=3;mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        CHECK(transfer->request_file==3); /* credits are never locally asserted */
+        return 0;
+    }
+
+    CASE("backpressure") {
+        W.join.env.offered=env_offered;
+        W.reject_requests=1;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        for (i=0;i<5;i++) step();
+        CHECK(W.host_count==0 && W.join.state==MCC_SHARE_CLIENT_ASKING);
+        W.reject_requests=0;W.reject_responses=1;
+        for (i=0;i<5;i++) step();
+        CHECK(W.responses==0 && W.join.state==MCC_SHARE_CLIENT_ASKING);
+        W.reject_responses=0;
+        for (i=0;i<5;i++) step();
+        CHECK(W.join.state==MCC_SHARE_CLIENT_WAITING);
+        W.reject_requests=1;
+        CHECK(mcc_share_client_accept(&W.join));
+        for (i=0;i<5;i++) step();
+        CHECK(W.join.outstanding==0 && W.delivered_bytes==0);
+        W.reject_requests=0;W.reject_responses=1;
+        for (i=0;i<5;i++) step();
+        CHECK(W.delivered_bytes==0 && W.join.outstanding>0);
+        W.reject_responses=0;
+        CHECK(run_until_finished(2000) && W.finished_ok);
+        return 0;
+    }
+
+    CASE("response_fields") {
+        struct { struct mcc_share_response head; struct mcc_share_entry file; } packet;
+        struct mcc_share_response good;
+        unsigned j;
+        W.join.env.offered=env_offered;
+        memset(&packet,0,sizeof(packet));
+        packet.head.op=MCC_SHARE_OP_MANIFEST;packet.head.session=77;
+        packet.head.count=1;packet.head.length=1;strcpy(packet.head.level,LEVEL);
+        entry(&packet.file,MCC_SHARE_FILE_MAP,"m0.map",10);
+        good=packet.head;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        for (j=0;j<5;j++) {
+            packet.head=good;
+            switch (j) {
+            case 0: packet.head.session=0; break;
+            case 1: packet.head.file=1; break;
+            case 2: packet.head.result=255; break;
+            case 3: memset(packet.head.credit,'x',sizeof(packet.head.credit)); break;
+            case 4: packet.head.credit[0]=1; break;
+            }
+            mcc_share_client_response(&W.join,&packet,sizeof(packet));
+            CHECK(W.join.state==MCC_SHARE_CLIENT_ASKING && !W.finished && !W.offers);
+        }
+        packet.head=good;packet.file.reserved[1]=1;
+        mcc_share_client_response(&W.join,&packet,sizeof(packet));
+        CHECK(W.finished==1 && !W.finished_ok && !W.offers && staging_gone());
+        W.finished=0;packet.file.reserved[1]=0;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        packet.head.count=2;
+        mcc_share_client_response(&W.join,&packet,sizeof(packet));
+        CHECK(W.join.offer_received==1 && !W.offers);
+        /* A duplicate page must not overwrite accepted entries or change the snapshot. */
+        mcc_share_client_response(&W.join,&packet,sizeof(packet));
+        CHECK(W.finished==1 && !W.finished_ok && !W.offers && staging_gone());
+        return 0;
+    }
+
+    CASE("request_fields") {
+        struct mcc_share_request r;
+        struct mcc_share_host_transfer *transfer;
+        memset(&r,0,sizeof(r));r.op=MCC_SHARE_OP_MANIFEST;strcpy(r.level,LEVEL);
+        r.flags=1;mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));r.flags=0;
+        r.file=1;mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));r.file=0;
+        r.offset=1;mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));r.offset=0;
+        r.length=1;mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));r.length=0;
+        r.session=1;mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));r.session=0;
+        CHECK(!mcc_share_host_active(&W.host,MACHINE) && !W.responses);
+        mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));mcc_share_update(&W.host);
+        transfer=&W.host.transfers[0];CHECK(transfer->session);
+        r.op=MCC_SHARE_OP_DONE;r.session=transfer->session+1;
+        mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));CHECK(transfer->used);
+        r.session=transfer->session;r.flags=2;
+        mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));CHECK(transfer->used);
+        r.flags=1; /* a client cannot claim installation before receiving files */
+        mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));CHECK(transfer->used);
+        r.flags=0;r.length=1;
+        mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));CHECK(transfer->used);
+        r.length=0;r.op=MCC_SHARE_OP_CHUNK;r.length=100;
+        mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));CHECK(transfer->queued==1);
+        for (i=0;i<100;i++) mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));
+        CHECK(transfer->queued==1 && transfer->request_offset==100);
+        r.op=MCC_SHARE_OP_DONE;r.length=0;
+        mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));CHECK(!transfer->used);
+        return 0;
+    }
+
     CASE("cancel") {
         W.limit=3000;                                                  /* a slow host: the download takes seconds */
         char path[400];
@@ -696,12 +1238,10 @@ int main(int argc,char **argv)
         /* late messages from the host are ignored */
         for (i=0;i<10;i++) step();
         CHECK(staging_gone() && package_absent() && W.finished==0);
-        /* the host's transfer ends when it hears nothing for a while */
-        CHECK(mcc_share_host_active(&W.host,MACHINE) || 1);
-        W.clock+=31000;
-        step();
+        /* Cancellation notifies the host immediately; no timeout is needed. */
         CHECK(!mcc_share_host_active(&W.host,MACHINE));
         /* and the joiner can ask again */
+        W.clock+=1500;
         CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
         CHECK(run_until_finished(2000) && W.finished_ok);
         return 0;
@@ -807,9 +1347,9 @@ int main(int argc,char **argv)
     }
 
     CASE("refusals") {
-        static enum mcc_share_result const results[]={MCC_SHARE_RESULT_OFF,MCC_SHARE_RESULT_WORKSHOP,
+        static enum mcc_share_result const results[]={MCC_SHARE_RESULT_OFF,
             MCC_SHARE_RESULT_NOT_SHAREABLE,MCC_SHARE_RESULT_NO_CREDIT,MCC_SHARE_RESULT_UNAVAILABLE};
-        static char const *const words[]={"does not send","Steam Workshop","cannot send","maker credit","could not read"};
+        static char const *const words[]={"does not send","cannot send","maker credit","could not read"};
         for (i=0;i<sizeof(results)/sizeof(results[0]);i++) {
             W.finished=0;
             W.refusal=results[i];
@@ -829,7 +1369,7 @@ int main(int argc,char **argv)
         struct mcc_share_request r;
         long machine;
         memset(&r,0,sizeof(r));
-        r.op=MCC_SHARE_OP_MANIFEST;
+        r.op=MCC_SHARE_OP_MANIFEST;r.length=0;
         snprintf(r.level,sizeof(r.level),"%s",LEVEL);
         for (machine=0;machine<MCC_SHARE_HOST_TRANSFERS;machine++) {
             mcc_share_host_request(&W.host,machine,&r,sizeof(r));
@@ -870,7 +1410,7 @@ int main(int argc,char **argv)
         CHECK(W.responses==0 && !mcc_share_host_active(&W.host,MACHINE));
         W.join_count=0;
         /* another level than the game's is refused */
-        r.op=MCC_SHARE_OP_MANIFEST;
+        r.op=MCC_SHARE_OP_MANIFEST;r.length=0;
         snprintf(r.level,sizeof(r.level),"mcc_maps\\solar_flare\\m1");
         mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));
         CHECK(W.responses==1 && !mcc_share_host_active(&W.host,MACHINE));
@@ -921,8 +1461,9 @@ int main(int argc,char **argv)
         W.limit=1u<<20;
         for (i=0;i<10;i++) {W.clock+=100;mcc_share_update(&W.host);}
         CHECK(W.responses<=MCC_SHARE_WINDOW*2+2);                       /* the queue was capped */
-        /* done frees the slot */
+        /* done frees only its matching session and level, with reserved fields clear */
         r.op=MCC_SHARE_OP_DONE;
+        r.offset=0;r.length=0;r.file=0;
         mcc_share_host_request(&W.host,MACHINE,&r,sizeof(r));
         CHECK(!mcc_share_host_active(&W.host,MACHINE));
         return 0;
@@ -963,11 +1504,15 @@ int main(int argc,char **argv)
                 CHECK(!io_exists(path));                                /* nothing made for a refused list */
             }
         }
-        /* count 9, a short body, a body not matching the count */
+        /* An excessive total count and a short page body are ignored. */
         W.finished=0;
         CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
-        for (j=0;j<9;j++) entry(&e[j],3,"readme.txt",10);
-        install_hostile(e,9,0);
+        {
+            struct mcc_share_response head;
+            memset(&head,0,sizeof(head));head.op=MCC_SHARE_OP_MANIFEST;head.session=77;
+            head.count=MCC_SHARE_STAGE_FILES+1;head.length=1;strcpy(head.level,LEVEL);
+            mcc_share_client_response(&W.join,&head,sizeof(head));
+        }
         CHECK(W.finished==0 && mcc_share_client_busy(&W.join));        /* ignored as malformed, still asking */
         entry(&e[0],0,"m0.map",10);
         install_hostile(e,1,1);
@@ -1031,7 +1576,7 @@ int main(int argc,char **argv)
 
     CASE("names") {
         static char const *const bad[]={"mcc_maps\\loose","mcc_maps\\_shared\\multiplayer",
-            "mcc_maps\\2915693904\\a10","mcc_maps\\solar_flare\\CON","mcc_maps\\a\\..\\b","maps\\solar_flare\\m0",
+            "mcc_maps\\solar_flare\\CON","mcc_maps\\a\\..\\b","maps\\solar_flare\\m0",
             "custom_maps\\x","","mcc_maps\\solar_flare\\bitmaps","mcc_maps\\a:b\\c","mcc_maps\\solar_flare\\"};
         for (i=0;i<sizeof(bad)/sizeof(bad[0]);i++) {
             CHECK(!mcc_share_client_begin(&W.join,bad[i],W.digest));

@@ -405,6 +405,8 @@ static char const *const port_function_names[] =
 	Xbox's leaves to its own screens) */
 	"new campaign decision",
 	/* (the main menu's Mods: menu_functions.c) */
+	"port mcc share download", "port mcc share workshop", "port mcc share cancel", "port mcc share closed",
+	"port mcc downloads open", "port mcc downloads previous", "port mcc downloads next", "port mcc downloads remove",
 	"port mods init", "port mods close", "port mods toggle", "port mods move up", "port mods move down",
 	"port mods save",
 	"port changelog init", "port changelog up", "port changelog down",
@@ -442,6 +444,8 @@ static char const *const port_game_data_input_names[] =
 	"port gamepad layout preview",
 	"port controller update",
 	/* (the main menu's Mods) */
+	"port mcc share update", "port mcc share text",
+	"port mcc downloads update", "port mcc downloads text",
 	"port mods update",
 	"port changelog focus update",
 	/* (network co-op's pause menu's FRIENDLY FIRE: its text, ON or OFF) */
