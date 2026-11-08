@@ -96,8 +96,17 @@ loads as the disc's maps do, and plays on MCC's version. */
 #define MCC_IMPORTED_MAP_MARK_OFFSET 0x68
 boolean mcc_imported_level_name(
 	char const *level_name);
-/* Whether the map loaded is an MCC map (its HUD's digits are drawn at half
-the size others' are: hud_draw.c) */
+/* Every map the import writes, the disc's or not, has MCC's HUD (its
+bitmaps and layout, as mcc_import_hud_convert made them): its header holds
+MCC_IMPORTED_HUD_MARK at MCC_IMPORTED_HUD_MARK_OFFSET, so that the HUD is
+drawn as an MCC map's is (mcc_cache_loaded). Not simulation: the
+fingerprint does not see it. */
+#define MCC_IMPORTED_HUD_MARK_OFFSET 0x6C
+#define MCC_IMPORTED_HUD_MARK 0x4D485544UL
+/* Whether the map loaded is an MCC map, loaded as one or imported as an
+Xbox map with MCC's HUD (MCC_IMPORTED_HUD_MARK): its HUD's digits, message
+icons and scope masks are drawn smaller (hud_draw.c, hud_messaging.c,
+rasterizer_xbox_screen_effect.c) */
 boolean mcc_cache_loaded(
 	void);
 /* An MCC map's structure BSP the game has just read for `reference` (to

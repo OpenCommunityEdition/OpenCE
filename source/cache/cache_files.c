@@ -704,6 +704,19 @@ unsigned long cache_files_get_checksum(
 	return cache_file_globals.header.checksum;
 }
 
+/* port: whether the loaded map is one the MCC import wrote, whose HUD is
+MCC's (its header's mark: port/linux/game/custom_edition_cache.h,
+MCC_IMPORTED_HUD_MARK) */
+boolean cache_files_mcc_hud(
+	void)
+{
+	unsigned long mark;
+
+	csmemcpy(&mark, (byte const *)&cache_file_globals.header + MCC_IMPORTED_HUD_MARK_OFFSET, sizeof(mark));
+
+	return mark == MCC_IMPORTED_HUD_MARK;
+}
+
 unsigned long tag_groups_checksum(
 	void)
 {

@@ -984,10 +984,14 @@ unsigned long mcc_map_version(
 	return MCC_MAP_VERSION;
 }
 
+/* source/cache/cache_files.c */
+boolean cache_files_mcc_hud(void);
+
 boolean mcc_cache_loaded(
 	void)
 {
-	return custom_edition_cache_globals.tags_loaded && custom_edition_cache_globals.mcc;
+	/* (or an MCC map the import wrote as an Xbox map: its HUD is MCC's) */
+	return (custom_edition_cache_globals.tags_loaded && custom_edition_cache_globals.mcc) || cache_files_mcc_hud();
 }
 
 /* (cache_file_rebase_proc: its type exactly, which the web build's linker

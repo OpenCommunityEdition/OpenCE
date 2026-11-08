@@ -49,6 +49,13 @@ enum
 	MCC_PATCH_SCENARIO_TYPE_OFFSET = 0x3C,
 	MCC_PATCH_SCENARIO_SCRIPTS_OFFSET = 0x49C,
 	MCC_PATCH_SCENARIO_GLOBALS_OFFSET = 0x4A8,
+	/* the scenario's script syntax data, a data array of nodes */
+	MCC_PATCH_SCENARIO_SYNTAX_DATA_OFFSET = 0x474,
+	/* (struct data_array, data.h: first free index, count, actual count) */
+	MCC_PATCH_SCRIPT_FIRST_FREE_OFFSET = 0x2C,
+	MCC_PATCH_SCRIPT_COUNT_OFFSET = 0x2E,
+	MCC_PATCH_SCRIPT_ACTUAL_COUNT_OFFSET = 0x30,
+	MCC_PATCH_SCRIPT_NODES_OFFSET = 0x38,
 };
 
 /* ---------- structures */
@@ -953,6 +960,26 @@ void mcc_import_fixes_apply(
 			((struct tag_block *)(scenario + MCC_PATCH_SCENARIO_GLOBALS_OFFSET))->count);
 		((struct tag_block *)(scenario + MCC_PATCH_SCENARIO_SCRIPTS_OFFSET))->count = 0;
 		((struct tag_block *)(scenario + MCC_PATCH_SCENARIO_GLOBALS_OFFSET))->count = 0;
+		/* and their source and syntax nodes, as the disc's multiplayer
+		scenarios have none: the game resolves the nodes' names as it loads
+		them, and the globals they name are left out */
+		{
+			struct tag_schema_group const *scenario_schema = mcc_patch_schema('scnr');
+			struct tag_schema_field const *source_files = scenario_schema && scenario_schema->definition ?
+				mcc_patch_field(scenario_schema->definition, "hs_source_files") : NULL;
+			struct tag_data *syntax = (struct tag_data *)(scenario + MCC_PATCH_SCENARIO_SYNTAX_DATA_OFFSET);
+
+			if (source_files && source_files->type == _tag_schema_block)
+				((struct tag_block *)(scenario + source_files->offset))->count = 0;
+			/* (the node array's first free index, count and actual count:
+			an array with none in use, as the disc's) */
+			if (syntax->address && syntax->size >= MCC_PATCH_SCRIPT_NODES_OFFSET)
+			{
+				*(short *)((byte *)syntax->address + MCC_PATCH_SCRIPT_FIRST_FREE_OFFSET) = 0;
+				*(short *)((byte *)syntax->address + MCC_PATCH_SCRIPT_COUNT_OFFSET) = 0;
+				*(short *)((byte *)syntax->address + MCC_PATCH_SCRIPT_ACTUAL_COUNT_OFFSET) = 0;
+			}
+		}
 	}
 	for (index = 0; index < tags->count; index++)
 	{

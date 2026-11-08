@@ -214,6 +214,9 @@ static struct
 	/* the structure BSPs written (for the fingerprint) */
 	struct mcc_fingerprint_bsp bsps[MCC_IMPORT_MAXIMUM_BSPS];
 	long bsp_count;
+	/* the HUD bitmaps written at half their size (mcc_import_hud) */
+	boolean *hud_halved;
+	long hud_bitmaps_halved;
 	char *out_names_text;
 } mcc_import_globals;
 
@@ -991,6 +994,332 @@ static boolean mcc_import_structure_bsp(
 	return success;
 }
 
+/* ---------- private code: the HUD */
+
+/* the bytes a pixel takes in the uncompressed formats halved (A8, Y8, AY8: 1;
+A8Y8: 2; X8R8G8B8, A8R8G8B8: 4), else 0 */
+static short mcc_import_pixel_bytes(
+	short format)
+{
+	switch (format)
+	{
+	case 0:
+	case 1:
+	case 2:
+		return 1;
+	case 3:
+		return 2;
+	case 10:
+	case 11:
+		return 4;
+	default:
+		return 0;
+	}
+}
+
+/* whether a bitmap can be halved: two-dimensional, without mipmaps, of an
+uncompressed format, and at least 2 by 2 */
+static boolean mcc_import_bitmap_halvable(
+	struct bitmap_data const *bitmap)
+{
+	return bitmap->type == 0 && bitmap->mipmap_count >= 0 && bitmap->depth <= 1 &&
+		mcc_import_pixel_bytes(bitmap->format) && bitmap->width >= 2 && bitmap->height >= 2 &&
+		!(bitmap->width & 1) && !(bitmap->height & 1);
+}
+
+/* The bitmap's pixels (linear, as MCC's bitmaps.map holds them) at half its
+size, each pixel the average of four, its colour weighted by its alpha (so
+that the colour of what is not drawn does not run into what is): FALSE if it
+cannot be halved. */
+static boolean mcc_import_bitmap_halve(
+	struct bitmap_data *bitmap,
+	byte *pixels)
+{
+	short bytes = mcc_import_pixel_bytes(bitmap->format);
+	long width = bitmap->width / 2, height = bitmap->height / 2;
+	long x, y;
+
+	if (!mcc_import_bitmap_halvable(bitmap))
+		return FALSE;
+	/* (with mipmaps, its next level is the half: the first left out) */
+	if (bitmap->mipmap_count > 0)
+	{
+		long top = (long)bitmap->width * bitmap->height * bytes;
+
+		if (top >= bitmap->pixels_size)
+			return FALSE;
+		memmove(pixels, pixels + top, (size_t)(bitmap->pixels_size - top));
+		bitmap->width = (short)width;
+		bitmap->height = (short)height;
+		bitmap->registration_point.x /= 2;
+		bitmap->registration_point.y /= 2;
+		bitmap->pixels_size -= top;
+		bitmap->mipmap_count--;
+		return TRUE;
+	}
+	for (y = 0; y < height; y++)
+	{
+		for (x = 0; x < width; x++)
+		{
+			byte const *source[4];
+			byte *out = pixels + (y * width + x) * bytes;
+			short corner;
+
+			source[0] = pixels + ((2 * y) * bitmap->width + 2 * x) * bytes;
+			source[1] = source[0] + bytes;
+			source[2] = source[0] + bitmap->width * bytes;
+			source[3] = source[2] + bytes;
+			if (bytes == 1)
+			{
+				long sum = 0;
+
+				for (corner = 0; corner < 4; corner++)
+					sum += source[corner][0];
+				out[0] = (byte)((sum + 2) / 4);
+			}
+			else
+			{
+				/* the alpha is the last byte (A8Y8: Y, A; A8R8G8B8: B, G, R, A) */
+				short alpha_byte = bytes - 1, channel;
+				long alpha_sum = 0;
+				byte result[4];
+
+				for (corner = 0; corner < 4; corner++)
+					alpha_sum += source[corner][alpha_byte];
+				for (channel = 0; channel < alpha_byte; channel++)
+				{
+					long sum = 0, weighted = 0;
+
+					for (corner = 0; corner < 4; corner++)
+					{
+						sum += source[corner][channel];
+						weighted += source[corner][channel] * source[corner][alpha_byte];
+					}
+					result[channel] = (byte)(alpha_sum ? (weighted + alpha_sum / 2) / alpha_sum : (sum + 2) / 4);
+				}
+				result[alpha_byte] = (byte)((alpha_sum + 2) / 4);
+				/* (the four read before the first written over: out is never
+				past source[0]) */
+				csmemcpy(out, result, (unsigned long)bytes);
+			}
+		}
+	}
+	bitmap->width = (short)width;
+	bitmap->height = (short)height;
+	bitmap->registration_point.x /= 2;
+	bitmap->registration_point.y /= 2;
+	bitmap->pixels_size = width * height * bytes;
+
+	return TRUE;
+}
+
+/* (struct custom_edition_hud_walk's) a block's elements, in the loaded tags */
+static uint8_t *mcc_import_hud_block_elements(
+	void *context,
+	uint8_t const *block,
+	uint32_t element_bytes,
+	int32_t *count)
+{
+	struct tag_block const *tag_block = (struct tag_block const *)block;
+
+	(void)context;
+	(void)element_bytes;
+	*count = tag_block->count > 0 && tag_block->address ? tag_block->count : 0;
+
+	return *count ? tag_block->address : NULL;
+}
+
+/* the bitmap references HUD placements draw (pass 0), or those placements'
+scales doubled where their bitmap is halved (pass 1) */
+struct mcc_import_hud_context
+{
+	short pass;
+	void const **references;
+	long reference_count;
+	long maximum_references;
+};
+
+static void mcc_import_hud_placement(
+	void *context,
+	uint8_t *placement,
+	uint8_t const *bitmap,
+	int items)
+{
+	struct mcc_import_hud_context *hud = context;
+	struct tag_reference const *reference = (struct tag_reference const *)bitmap;
+	long tag_index;
+
+	(void)items;
+	if (!reference || reference->index == NONE)
+		return;
+	tag_index = reference->index & 0xFFFF;
+	if (tag_index >= mcc_import_globals.tag_count)
+		return;
+	if (hud->pass == 0)
+	{
+		if (hud->reference_count < hud->maximum_references)
+			hud->references[hud->reference_count++] = reference;
+	}
+	else if (mcc_import_globals.hud_halved[tag_index])
+	{
+		float scale;
+
+		csmemcpy(&scale, placement + 4, sizeof(scale));
+		scale *= 2.0f;
+		csmemcpy(placement + 4, &scale, sizeof(scale));
+		csmemcpy(&scale, placement + 8, sizeof(scale));
+		scale *= 2.0f;
+		csmemcpy(placement + 8, &scale, sizeof(scale));
+	}
+
+	return;
+}
+
+static void mcc_import_hud_walk(
+	struct mcc_import_hud_context *hud)
+{
+	static unsigned long const groups[] = { 'unhi', 'wphi', 'grhi', 'hudg' };
+	struct custom_edition_hud_walk walk;
+	short group_index;
+	long tag_index;
+
+	walk.block_elements = mcc_import_hud_block_elements;
+	walk.placement = mcc_import_hud_placement;
+	walk.context = hud;
+	for (group_index = 0; group_index < NUMBEROF(groups); group_index++)
+	{
+		for (tag_index = 0; tag_index < mcc_import_globals.tag_count; tag_index++)
+		{
+			struct mcc_import_tag_instance *instance = &mcc_import_globals.instances[tag_index];
+
+			if ((unsigned long)instance->group_tag == groups[group_index] && instance->base_address &&
+				custom_edition_hud_definition_bytes(groups[group_index]))
+			{
+				custom_edition_hud_placements_walk(instance->base_address, groups[group_index], &walk);
+			}
+		}
+	}
+
+	return;
+}
+
+/* marks every bitmap a reference names that HUD placements do not draw
+through (`hud` lists those they do) */
+static void mcc_import_hud_others(
+	struct mcc_import_hud_context const *hud,
+	struct tag_schema_definition const *definition,
+	byte const *element,
+	boolean *others)
+{
+	struct tag_schema_field const *field;
+
+	for (field = definition->fields; field->type != _tag_schema_terminator; field++)
+	{
+		short index;
+
+		for (index = 0; index < field->count; index++)
+		{
+			byte const *at = element + field->offset + index * field->size;
+
+			if (field->type == _tag_schema_reference)
+			{
+				struct tag_reference const *reference = (struct tag_reference const *)at;
+				long listed;
+
+				if (reference->index == NONE || reference->group_tag != 'bitm' ||
+					(reference->index & 0xFFFF) >= mcc_import_globals.tag_count)
+				{
+					continue;
+				}
+				for (listed = 0; listed < hud->reference_count; listed++)
+				{
+					if (hud->references[listed] == (void const *)reference)
+						break;
+				}
+				if (listed == hud->reference_count)
+					others[reference->index & 0xFFFF] = TRUE;
+			}
+			else if (field->type == _tag_schema_struct)
+			{
+				mcc_import_hud_others(hud, field->definition, at, others);
+			}
+			else if (field->type == _tag_schema_block)
+			{
+				struct tag_block const *block = (struct tag_block const *)at;
+				struct tag_schema_definition const *element_definition = field->definition;
+				long element_index;
+
+				for (element_index = 0; block->address && element_index < block->count; element_index++)
+				{
+					mcc_import_hud_others(hud, element_definition,
+						(byte const *)block->address + element_index * element_definition->size, others);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+/* MCC's HUD bitmaps are four times the Xbox's, and its placements draw them
+at a half or a quarter (mcc_import_hud_convert, custom_edition_cache_convert): a
+bitmap drawn through placements alone is written at half its size, and its
+placements' scales doubled, so that it draws at the same size in a quarter
+of the room (the multiplayer maps' cache files hold no more). */
+static void mcc_import_hud(
+	void)
+{
+	struct mcc_import_hud_context hud;
+	boolean *others;
+	long tag_index;
+
+	/* (HALO_MCC_IMPORT_NO_HUD: the HUD's bitmaps as MCC has them, to compare) */
+	if (getenv("HALO_MCC_IMPORT_NO_HUD"))
+		return;
+	mcc_import_globals.hud_halved = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(boolean));
+	others = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(boolean));
+	csmemset(&hud, 0, sizeof(hud));
+	hud.maximum_references = 8192;
+	hud.references = mcc_import_calloc((size_t)hud.maximum_references, sizeof(void const *));
+	if (!mcc_import_globals.hud_halved || !others || !hud.references)
+	{
+		mcc_import_free(others);
+		mcc_import_free((void *)hud.references);
+		return;
+	}
+	mcc_import_hud_walk(&hud);
+	for (tag_index = 0; tag_index < mcc_import_globals.tag_count; tag_index++)
+	{
+		struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[tag_index];
+		struct tag_schema_group const *schema = mcc_import_schema((unsigned long)instance->group_tag);
+
+		if (instance->base_address && schema && schema->definition)
+			mcc_import_hud_others(&hud, schema->definition, instance->base_address, others);
+	}
+	/* a bitmap the placements draw, and nothing else, each of whose images
+	can be halved */
+	for (tag_index = 0; tag_index < hud.reference_count; tag_index++)
+	{
+		long bitmap_tag = ((struct tag_reference const *)hud.references[tag_index])->index & 0xFFFF;
+		struct bitmap_group const *group = mcc_import_globals.instances[bitmap_tag].base_address;
+		long bitmap_index;
+		boolean halvable = group && !others[bitmap_tag] && group->bitmaps.count > 0;
+
+		for (bitmap_index = 0; halvable && bitmap_index < group->bitmaps.count; bitmap_index++)
+		{
+			halvable = mcc_import_bitmap_halvable(TAG_BLOCK_GET_ELEMENT(&group->bitmaps, bitmap_index,
+				struct bitmap_data));
+		}
+		mcc_import_globals.hud_halved[bitmap_tag] = halvable;
+	}
+	hud.pass = 1;
+	mcc_import_hud_walk(&hud);
+	mcc_import_free(others);
+	mcc_import_free((void *)hud.references);
+
+	return;
+}
+
 /* ---------- private code: the bitmaps */
 
 /* every bitmap's pixels as the Xbox's caches hold them, written to the body;
@@ -1025,6 +1354,14 @@ static boolean mcc_import_bitmaps(
 			if (!pixels)
 				return FALSE;
 			custom_edition_cache_read(tag_index, bitmap->pixels_offset, bitmap->pixels_size, pixels);
+			/* a HUD bitmap drawn by placements alone, at half its size
+			(mcc_import_hud) */
+			if (mcc_import_globals.hud_halved && mcc_import_globals.hud_halved[tag_index] &&
+				mcc_import_bitmap_halve(bitmap, pixels))
+			{
+				xbox_size = rasterizer_xbox_bitmap_get_pixel_data_size(bitmap);
+				mcc_import_globals.hud_bitmaps_halved++;
+			}
 			bitmap->base_address = pixels;
 			rasterizer_xbox_bitmap_rebuild_hardware_format(bitmap);
 			mcc_import_body_align(body, 0x200);
@@ -1511,6 +1848,7 @@ static boolean mcc_import_map(
 	}
 	if (getenv("HALO_MCC_IMPORT_TRACE"))
 		fprintf(stderr, "mcc import: %s: bitmaps (%d)\n", map_name, (int)success);
+	mcc_import_hud();
 	success = success && mcc_import_bitmaps(body);
 	if (getenv("HALO_MCC_IMPORT_TRACE"))
 		fprintf(stderr, "mcc import: %s: tags (%d)\n", map_name, (int)success);
@@ -1549,6 +1887,12 @@ static boolean mcc_import_map(
 		header.scenario_type = scenario_type;
 		header.checksum = body->crc;
 		header.footer_signature = 'foot';
+		/* MCC's HUD, which is drawn as an MCC map's (mcc_cache_loaded) */
+		{
+			unsigned long mark = MCC_IMPORTED_HUD_MARK;
+
+			csmemcpy(header.reserved68 + (MCC_IMPORTED_HUD_MARK_OFFSET - 0x68), &mark, sizeof(mark));
+		}
 		/* a map not shown to be the disc's plays on MCC's version
 		(mcc_imported_level_name) */
 		if (!stock)
@@ -1567,10 +1911,10 @@ static boolean mcc_import_map(
 		fseek(body->file, 0, SEEK_SET);
 		success = success && fwrite(&header, 1, sizeof(header), body->file) == sizeof(header);
 		fprintf(stdout, "mcc import: %s: %d structure bsps, %ld bitmaps, %ld tags (0x%lX bytes; %ld empty in the "
-			"disc's place, %ld of MCC's kept after the disc's, %ld without a schema; %ld references to tags left out), 0x%lX bytes before compression\n",
+			"disc's place, %ld of MCC's kept after the disc's, %ld without a schema; %ld references to tags left out; %ld HUD bitmaps halved), 0x%lX bytes before compression\n",
 			map_name, (int)references->count, mcc_import_globals.bitmaps, mcc_import_globals.out_count, tags.used,
 			mcc_import_globals.placeholders, mcc_import_globals.kept, mcc_import_globals.schemaless, mcc_import_globals.references_dropped,
-			(unsigned long)header.file_length);
+			mcc_import_globals.hud_bitmaps_halved, (unsigned long)header.file_length);
 	}
 	deflateEnd(&body->stream);
 	fclose(body->file);
@@ -1582,6 +1926,7 @@ static boolean mcc_import_map(
 	mcc_import_free(mcc_import_globals.old_to_new);
 	mcc_import_free(mcc_import_globals.out_names_text);
 	mcc_import_free(mcc_import_globals.table.instances);
+	mcc_import_free(mcc_import_globals.hud_halved);
 	for (bsp_index = 0; bsp_index < mcc_import_globals.bsp_count; bsp_index++)
 		mcc_import_free(mcc_import_globals.bsps[bsp_index].bytes);
 	mcc_import_operations_dispose();
