@@ -69,7 +69,13 @@ failed:
 int mcc_resources_check_step(struct mcc_resource_check *check, uint32_t *checksum,
     unsigned char digest[32])
 {
+#ifdef HALO_WEB
+    /* OPFS proxies each read to a worker. Larger bounded reads reduce that
+     * overhead without changing the identity bytes or the slice limits. */
+    unsigned char buffer[65536],marker;
+#else
     unsigned char buffer[16384],marker;
+#endif
     struct mcc_resource_file *resource;
     uint32_t bytes,spent=0;
     unsigned long began=system_milliseconds();

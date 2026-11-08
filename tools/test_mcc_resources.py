@@ -46,6 +46,8 @@ def identity_fixture(mask, resource_size, seed):
     (0, 0, 0), (0, 0xFFFFFFFF, 0), (0, 0x89ABCDEF, 0),
     (1, 0, 16383), (2, 0x80000000, 16384), (3, 0xFFFFFFFF, 16385),
     (1, 0x89ABCDEF, 32767), (2, 0, 32768), (3, 0x80000000, 32769),
+    (1, 0x89ABCDEF, 65535), (2, 0, 65536), (3, 0x80000000, 65537),
+    (1, 0xFFFFFFFF, 131071), (2, 0x89ABCDEF, 131072), (3, 0, 131073),
     # This seed produces CRC zero after the first complete resource. Only the
     # final published value is remapped, never a value chained into file two.
     (1, 0x9484ECB9, 32768), (3, 0x9484ECB9, 32768),
@@ -74,7 +76,7 @@ def test_crc_framing_seed_and_chunk_boundaries(resource_tool, tmp_path, mask, se
 
 def test_incremental_read_failure_does_not_publish_partial_identity(resource_tool, tmp_path):
     data, _ = identity_fixture(0, 0, 0x89ABCDEF)
-    data.extend(bytes(4*1024*1024))
+    data.extend(bytes(4*1024*1024+131075))
     struct.pack_into("<I", data, 8, len(data))
     folder = tmp_path / "mcc_maps/package"
     folder.mkdir(parents=True)
@@ -83,6 +85,8 @@ def test_incremental_read_failure_does_not_publish_partial_identity(resource_too
     result = subprocess.run([str(resource_tool), "incremental_failure", str(path), "mcc_maps/package/a10"],
                             cwd=tmp_path, capture_output=True, timeout=10)
     assert result.returncode == 0, result.stderr
+    framed = b"GulchCE MCC content v1" + struct.pack("<BQ", 0, len(data)) + data
+    assert result.stdout.decode() == hashlib.sha256(framed).hexdigest()
 
 
 @pytest.mark.parametrize("kind", [0, 1, 2])
@@ -132,8 +136,8 @@ def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_pa
         assert digest("client") == original
 
 
-@pytest.fixture(scope="module")
-def resource_tool(tmp_path_factory):
+@pytest.fixture(scope="module", params=["native", "web-reader"])
+def resource_tool(tmp_path_factory, request):
     clang = shutil.which("clang")
     if not clang:
         pytest.skip("clang required")
@@ -253,9 +257,19 @@ int main(int argc,char **argv) {
 ''')
     exe = work / "resources.exe"
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else []
+    # Select the production browser reader without substituting browser
+    # filesystem services into these native, asset-free fixtures.
+    reader = work / "resources.o"
+    compile_target = ["--target=i686-pc-windows-msvc"] if sys.platform == "win32" else []
+    web = ["-DHALO_WEB"] if request.param == "web-reader" else []
+    result = subprocess.run([clang] + compile_target + web + ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+        "-D_CRT_SECURE_NO_WARNINGS", "-DZ_PREFIX", "-I"+str(ZLIB), "-I"+str(ROOT / "port/linux/game"),
+        "-I"+str(work), "-c", str(ROOT / "port/linux/game/mcc_resources.c"), "-o", str(reader)],
+        capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
     # Match the game's GNU89 mode, including libc's snprintf declaration on Linux.
     result = subprocess.run([clang] + target + [str(ROOT / "tools/mcc_loading_stub.c"), "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-D_CRT_SECURE_NO_WARNINGS", "-DZ_PREFIX", "-I"+str(ZLIB), "-I"+str(ROOT / "port/linux/game"),
-                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ZLIB / "crc32.c"), "-o", str(exe)], capture_output=True, text=True)
+                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(reader), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ZLIB / "crc32.c"), "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
 
