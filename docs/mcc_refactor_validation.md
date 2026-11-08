@@ -31,7 +31,9 @@ that starved pending clients. The general MCC loading barrier at `a972f450a`
 passes both native reruns within the recorded limits, and that commit's CI
 passes. Final Xbox/CE native controls, all three native/browser networking
 controls, combined implementation review and verified cleanup are complete.
-Milestones 14 and 15 remain planned.
+Milestone 14's browser implementation and Stock-menu acceptance checks are
+complete within the recorded limits below. The separate shared cinematic-state
+finding remains an upstream-delivery follow-up. Milestone 15 remains planned.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -47,7 +49,7 @@ Milestones 14 and 15 remain planned.
 | 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
 | 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
 | 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | Complete; final review, native/transport controls, CI and cleanup pass within recorded limits |
-| 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Planned; explicit requirement, not satisfied by a web build alone |
+| 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Complete within recorded limits; Stock browser target validated |
 | 15 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestones 13 and 14; previously numbered 14 |
 
 The completed Milestone 10 gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
@@ -797,7 +799,8 @@ Chromium and Firefox runs and native Xbox/CE/MCC regression controls. Record
 tested maps, browser versions, resource limits and unsupported cases precisely.
 Run the required platform and networking checks after the combined review.
 
-Milestone 14 is **in progress**. The initial browser memory candidate keeps
+The following records development findings and their later resolution; failed
+attempts retain their original verdicts. The initial browser memory candidate keeps
 the existing 2,176 MiB linear memory and Xbox window, ends the ordinary heap
 at CE's linked tag address (`0x40440000`), and gives MCC one validated 64 MiB
 window in its existing accepted address range. CE initialization follows the
@@ -1208,7 +1211,67 @@ coverage, unavailable Windows file-symlink privilege, a POSIX socket harness
 and five POSIX/Linux launcher/process-lifecycle checks. This overlaps earlier
 batches and is not added to them. Independent review checks the final graphics
 and Web-only reader changes, ownership, bounds and documentation; combined
-platform builds and real paired gameplay remain pending.
+platform builds and paired gameplay results follow below.
+
+The combined native and Web builds at `5aff08a4d` pass. The
+[platform workflow](https://github.com/chestahh/GulchCE/actions/runs/42511946653)
+and [MCC workflow](https://github.com/chestahh/GulchCE/actions/runs/42511946635)
+are green: Linux, Windows, Android and Web, including Chromium/Firefox
+WebRTC transport and the MCC reader, adapter and rendered-HUD checks.
+`build/m14-combined-ci-results.json` records exact jobs and selected test
+summaries; overlapping platform suites are not added into a unique total.
+The local runtime receipt, `build/m14-runtime/final-combined-build.json`,
+binds that source revision to the native executable, SDL library and all
+29 site files. Runtime preflights and closing audits verify those files and
+the private helpers, including their transitive dependencies.
+
+`mcc_installed_aligned` passes the unchanged strict judge for **47 paired
+seconds**, with zero tick offset and no divergences under its existing
+tolerances (maximum position difference 0.536 units and aim difference
+7 degrees). Browser player one lives from ticks 570 through 1,500. Both
+download opt-ins are off; the existing snapshot is reused without a transfer.
+Native shutdown exits zero, original inputs remain unchanged, and 42 exported
+save/profile files (41,980,396 bytes) retain their hashes after reopening.
+The actual admission resource check takes 18 seconds versus the preceding
+59-second case. Conversion takes 97 seconds versus 89, including 61 seconds
+in its separate resource stage; this is not an aggregate loading-speed gain.
+The host safely waits 78 seconds for its client. The prior GL502 diagnostic
+remains, without upload506 or incomplete-framebuffer failures. See its
+`installed-aligned-audit.json` for exact settings, timings and limits.
+
+`mcc_falling_download_follow_on` exercises the actual consent prompt, then
+receives the missing Mercury Falling mission with metadata and previews.
+Its new verified snapshot contains 731,791,026 bytes; the bitmap/sound pair
+accounts for 686,853,355 bytes and is also present in the existing snapshot.
+Staged composite verification takes 15 seconds. The first mission passes
+**47 paired seconds**; after the host's normal `game_won` command, Mercury II
+passes **63 paired seconds**. Both windows include a living browser player
+and reviewed first-person screenshots. Mercury II resolves to its existing
+verified snapshot without a second mission download. Both snapshots, original
+inputs and all 42 exported save/profile files survive the closing/reopen audit.
+Native shutdown exits zero. Local resource reuse is established by the
+implemented receipt/hash path and observed installation; transport byte totals
+were not collected, so no measured wire-byte saving is claimed.
+
+The private helper's final result remains **failed**: it expected a separate
+Continue button, whereas the actual campaign returned to the correct lobby
+and used its normal countdown. After independently collecting the successful
+second comparison, the primary authorized an ordinary, owner-checked close;
+the obsolete helper gate reports that close as premature. No fictitious
+button press or modified comparison is used. `campaign-progression-audit.json`
+preserves this distinction and both mission results. This is a bounded
+campaign handoff, not completion of either campaign; GL502 remains recorded.
+
+The two closed paired runs remove 1,535,115,264 bytes of generated native
+caches and 3,735,053,104 logical bytes of redundant hardlink aliases (no
+physical-byte saving attributed to those aliases). Verified screenshot
+archives reclaim another 120,175,146 bytes. Separately, the completed combined
+regression fixtures retain all 2,711 files, including six synthetic saves,
+in a verified 61,399,082-byte archive before removing their 315,766,634 loose
+bytes. Lifecycle5–8 retain all twelve save exports and command screenshots
+in a verified 25,072,003-byte archive before removing 270,616,451 loose bytes.
+Active browser content and current builds remain for the remaining runtime
+matrix; their final cleanup is not claimed here.
 
 #### Browser identity-check read cost
 
@@ -1264,10 +1327,360 @@ earlier contention concern. All six closed synthetic profiles are removed
 (545,122,024 bytes); logs and fixtures remain reproducible from source.
 
 These are first-open/reopened reads after fixture creation, not guaranteed
-cold-cache measurements or full-game performance. Actual installed-package and
-post-download verification still require runtime validation with the combined
-browser build; no timing guarantee or completed multiplayer gate follows from
-this optimisation.
+cold-cache measurements or full-game performance. The combined installed-package
+and post-download runs above subsequently exercise this reader in actual games;
+their receipts own those results. No timing guarantee or completed multiplayer
+gate follows from the benchmark alone.
+
+#### Shared renderer diagnosis and final map-family controls
+
+The retained prior GL502 errors are now explained by a shared renderer defect,
+independently reproduced with CE Death Island as the first loaded map, without
+MCC content. A private instrumented copy observes four `glDrawArrays` failures
+while creating the water-ripple mip targets (128, 64, 32 and 16 pixels). On all
+four draws, active sampler three's texture ID exactly equals the framebuffer's
+color attachment: 5311, 5315, 5317 and 5319. These are forbidden sampling/output
+feedback loops, not an MCC texture format rule. The isolated diagnostic retains
+its source patch and receipts; all 919 recorded normal source/object/artifact
+hashes remain unchanged by instrumentation.
+
+`prepare_draw` deliberately selects sampled textures before render targets:
+resolving a sampled target can itself change the framebuffer. However, allocating
+a new target in `render_target_get` then overwrote the active texture binding
+with the output image. Invalidating the binding cache did not restore the actual
+sampler for that draw. Commit `4c7355ae1` saves and restores that unit's actual
+2D binding around allocation. Existing cached lookups, resolve ordering,
+intentional feedback copies and map-family routes remain unchanged. Callers
+consume returned IDs or bind explicitly; none requires the incidental binding.
+The two extra GL operations occur only on new target allocation. This fixes the
+shared renderer contract and changes neither simulation nor network agreement.
+
+The actual-function regression fails six cases and passes three before the fix;
+all nine pass afterward. The combined renderer/loading/texture/presentation and
+CI selection passes **157 tests**. Normal Windows and Web builds pass, recorded
+in `build/m14-binding-native-build.log` and `build/m14-binding-web-build.log`.
+The immutable `build/m14-runtime/combined-build-4c7355ae19e0.json` binds the
+production revision to all 29 site files, SDL and the native executable
+SHA-256 `33f0afc4daaf3104fc87ec95857dbc20e80dcaa4d5802f655345c423e58a1a16`.
+Private diagnostic builds are not used for final gameplay validation.
+
+The final normal browser run, `mcc_gl_final_4c7355_2`, passes Mercury 2 →
+CE Death Island → Xbox Blood Gulch → Mercury 2 in one worker with GL debug
+enabled. Living-player samples span ticks 1126–1290, 30–180, 30–180 and
+1126–1290 respectively. Each phase has its own current-map evidence and reviewed
+rendered scene. There are no GL502/506, upload or incomplete-framebuffer errors
+in either game or raw browser logs. The normal artifacts and original CE inputs
+retain their hashes. This is a graphics/lifecycle control, not a new checkpoint
+persistence assertion; `mcc_lifecycle_8` retains that evidence. Existing Bink and
+recorded-animation diagnostics and four intentionally blocked external requests
+remain recorded, so this is not an assertion that every warning disappeared.
+The preceding attempt's profile-menu observation timeout is retained separately.
+
+Three final hidden native controls use that same executable with GL debug:
+Xbox Blood Gulch, CE Death Island and MCC Mercury 2 each record twenty living
+samples through ticks 30–600, withdraw their public listing and exit zero, with
+no GL errors and unchanged originals. The Mercury screenshot was reviewed.
+The private launcher omitted creating Xbox/CE capture directories, so these two
+native controls establish simulation/shutdown, not new native visual evidence;
+their browser scenes are covered above. Receipts are under
+`build/m14-runtime/native_renderer_final`.
+
+#### Final Custom Edition sharing and browser storage checks
+
+On `5aff08a4d`, the browser-host/native-client Death Island run downloads all
+four files (183,811,669 bytes), preserves the trust record and passes separate
+strict comparisons of **61 and 47 paired seconds**. The first has one transient
+aim mismatch, no sustained divergence and maximum position difference 0.003;
+the cached round has no mismatches and maximum position difference zero.
+Screenshots, original hashes, reopening/persistence and native exit zero are
+verified. Its original helper verdict remains failed because it searched native
+stdout instead of the actual native debug log for the completion message.
+`ce_browser_host_download_cached_final/independent-audit.json` verifies both
+rounds and the completed transfer; offline negative controls reject the old
+log selection and a missing completion message.
+
+The separate CE host-sharing-off and client-download-off browser controls pass
+their actual prompts with zero CE arrivals before or after reopening. They retain
+normal native exits and unchanged inputs. Their evidence directories are
+`ce_share_off_final_2` and `ce_download_off_final`; the earlier negative-case
+observer failure remains recorded.
+
+The final `ce_browser_pair_4c7355ae19e0` uses two Chromium/Edge browser peers and
+the normal combined renderer. It receives the same complete four-file package
+and passes **59 paired seconds** after downloading, then **47 paired seconds**
+in the cached round. Both have zero position differences and no mismatches,
+problems or divergences under the unchanged judge; maximum aim differences are
+12 and 2 degrees. Actual data-channel counters record 195,921,200 bytes sent by
+the host and received by the client, including protocol/game traffic. Both
+rendered scenes are reviewed; there are no page or GL errors, and reopening,
+payload hashes, original inputs and all normal artifacts pass their audits.
+Both contexts close. Two-peer coverage does not establish a third peer's optional
+CE seeding behavior; the existing CE policy is preserved and MCC stays host-only.
+
+The separate final Firefox **153.0** CE Death Island control closes the
+remaining actual-rendering browser gap. It records 92 living-player samples
+through ticks 33–2760 over 90.903 seconds, with rendered frames advancing from
+7 to 2974. Reviewed first and final captures show the shoreline, water, sky,
+weapon and HUD. Thirty late audio observations have a running context and
+nonzero signal (peak 0.08303, RMS 0.02229). There are no GL, upload, framebuffer,
+page or fatal errors, and original inputs, helpers and normal build artifacts
+retain their hashes. The browser closes normally. This is solo gameplay,
+rendering and audio-activity evidence, not a full Firefox CE networking matrix
+or an exhaustive listening test. `ce_firefox_final_4c7355ae19e0/independent-audit.json`
+records the result. Verified cleanup removes 767,557,632 generated cache bytes
+and 240,744,021 duplicate imported bytes, preserves all 38 saves and 41 separate
+exports, and leaves 33,992,254 bytes of useful evidence.
+
+The `4c7355ae1` Web CI failure was in the fault-injection fixture, before the
+intended lost-COMMIT operation: its global one-second deadline expired during
+ordinary BEGIN. A deterministic 1.5-second BEGIN delay reproduces that failure.
+Commit `fa00317d5` changes only the two test files, retaining the production
+30-second allowance for ordinary operations and applying one second only around
+the deliberately lost/delayed BEGIN or COMMIT. The test also requires COMMIT
+actually to be reached. Production storage code, its deadlines and its uncertain
+completion fencing are unchanged. Independent review and all **35 actual browser
+cases**, **85 component checks**, and **21 wiring checks with one POSIX skip**
+pass. The slow ordinary BEGIN remains a regression. Before/after receipts are
+`build/m14-storage-timeout-before.json` and `-final.json`; the normal runtime
+artifacts remain those of `4c7355ae1` rather than being relabeled as rebuilt.
+
+The corrected [Build run 42517549228](https://github.com/chestahh/GulchCE/actions/runs/42517549228)
+passes Linux, Windows, Android and Web debug builds and their required checks.
+Linux's broad selection reports 2,678 passed, 27 skipped and seven subtests;
+subsequent selections also pass. Web runs all 35 storage scenarios on Chromium
+145.0.7632.6 and Firefox 146.0.1, plus the memory/import suites and native WebRTC
+controls. Both browsers return 320/320 ordinary messages; the deliberate
+ten-percent datagram-loss controls return 720/960 and 730/960 respectively.
+These transport controls are distinct from loaded-map gameplay. The
+[MCC run 42515942272](https://github.com/chestahh/GulchCE/actions/runs/42515942272)
+passes readers, Windows adapters and rendered HUD checks on the unchanged
+production revision. The fixture-only follow-up does not trigger that
+path-filtered workflow. Exact job metadata and full selected logs are retained
+in `build/m14-final-ci-results.json`, `build/m14-binding-ci-results.json` and
+`build/m14-final-ci-*.log`. Branch-skipped release jobs and asset-dependent skips
+are not runtime passes; overlapping suite totals are not added together.
+
+The first Firefox-host/native-client Ruby `a10` run,
+`mcc_ruby_browser_host_final`, presents the ordinary local-package consent
+prompt without an invented Workshop link. It transfers the complete
+275,753,385-byte map, locally generates its 393-byte receipt and loads both machines.
+The map-only fixture supplies no JSON or thumbnails. Original/build hashes,
+normal native exit and browser reopening pass. However, the 900-second private
+test limit expires after roughly 217 seconds of the authored opening cinematic,
+before player one becomes live. Its **overall failure is retained**; cinematic
+simulation is not substituted for the live-player requirement. A separate
+observer defect also searched native stdout instead of the actual debug log for
+the successful installation marker. The corrected observer keeps the strict
+judge's original network logs and thresholds. Subsequent cached gameplay uses
+the exact verified downloaded map/receipt and records its own result.
+
+The first cached attempt, `mcc_ruby_browser_host_cached_final`, exercises the
+normal two-peer Space skip vote and reaches living-player gameplay, but still
+fails the unchanged judge. It includes 43 compared cinematic samples with
+player zero's unit aim 90 degrees apart, and only ten paired live-player samples
+after the skip, yielding 291 drift observations against the required 300.
+The private helper had counted cinematic time toward its gameplay duration.
+This verdict remains failed, despite correct content reuse and native exit zero.
+The stored unit aim is distinct from the separately synchronized cinematic
+camera; the observed difference is not dismissed as an allowed camera offset.
+
+The strengthened control, `mcc_ruby_browser_host_gameplay_final`, starts its
+explicit gameplay interval at the first paired post-skip state where both
+players are alive and retains every subsequent state, including any deaths or
+mismatches. It requires at least 45 seconds of that interval and the unchanged
+strict judge, including at least 300 drift observations. Private regressions
+reject counting the intro, stale/repeated tick epochs or discarding bad rows.
+The actual interval spans ticks 1380–2820, **49 paired observations over 48
+seconds**, with zero position difference, maximum aim difference 10 degrees,
+1,163 drift observations (nine apart), and no problems or divergences. Both
+rendered local-player views are inspected. The full-log judge separately passes
+90 paired observations on this run, including the intro; its one transient
+alive mismatch and one riding mismatch remain recorded. The earlier failed
+cinematic comparison is not replaced by this later result.
+
+Both download opt-ins are off in the successful cached control. Its native
+client receives only the prior audited map and receipt as an explicitly recorded
+fixture seed, with no network retransfer or newly installed content. Original
+inputs, helpers and normal artifacts remain unchanged; browser reopening and
+native exit zero pass. The source review finds that inhibited controls preserve
+local desired aim while ordinary object corrections synchronize transforms,
+not that internal aim. The relevant shared implementations are unchanged from
+Milestone 13. The intermittent cinematic discrepancy therefore needs a separate
+scope investigation; this run establishes the measured gameplay result, not
+universal cinematic unit-state agreement.
+
+`mcc_ruby_browser_pair_final` then transfers the complete local Ruby package
+from Chromium/Edge to Firefox 153.0 after the observed consent prompt, with no
+package files written before acceptance. Its installed snapshot contains the
+275,753,385-byte map and a locally generated 393-byte receipt; local publication
+also writes the browser commit record. No JSON or thumbnails are invented for
+this map-only folder. Both machines use the
+normal two-peer skip vote. The explicit live-gameplay comparison passes
+**49 paired observations**, with maximum position difference 0.001414 units,
+maximum aim difference 2 degrees, 1,347 drift observations (six apart), and no
+mismatches, problems or divergences. Primary raw replay produces the same result.
+The separate full-log comparison passes 123 paired observations under the
+unchanged judge, retaining one transient position mismatch (8.971 units) rather
+than treating it as zero-error or bit-exact simulation.
+
+Its original overall verdict nevertheless remains **failed**: after gameplay
+and the first storage audit, Firefox's fresh `about:blank` profile launch times
+out at 180 seconds with `RenderCompositorSWGL failed mapping default framebuffer`.
+No game page or worker loaded in that failed startup. The owned startup processes
+terminate themselves; no user process is stopped. A separate normal same-profile,
+same-origin plain-HTML reopen succeeds and rehashes every previously
+hashed package, receipt, commit and save file unchanged. The independent
+`independent-firefox-reopen.json` supplies that persistence proof without rewriting
+`result.json`. Chromium's ordinary closing/reopening audit and all original/build
+hashes also pass. This separates actual transfer/gameplay and recovered storage
+verification from the browser-launch fixture failure; it is not a claim that
+the first launcher attempt succeeded.
+
+#### Separate shared cinematic-state finding
+
+A native-only, ownership-matched control reproduces the inhibited-player state
+discrepancy without any browser. The host first reaches a living player zero
+with local index zero and machine zero; only then does the native client launch.
+The client initially has neither unit at tick 602. Across 31 paired living-unit
+observations at ticks 630–1530, the host's player-zero aim is 0/0 degrees and
+the client's is 122/−86 degrees; body facing also differs (0 versus 36 degrees),
+while positions match exactly. The unchanged judge reports a sustained aim
+divergence. Zero client-on-foot drift is expected in this intro-only diagnostic,
+but is not waived into a gameplay pass. Both processes exit zero and the four
+original map inputs and frozen executable retain their hashes.
+
+An earlier native control has no such difference over 32 paired observations,
+but the client owns player zero in that run, so it does not reproduce the same
+ownership and creation ordering. The initial native fixture's missing carousel
+failure and original empty-log diagnostic are also retained, with the latter's
+actual stderr evidence judged separately. These are distinct observations, not
+retries selected to erase a failed result.
+
+Source inspection traces the shared gap: input-inhibited player controls keep
+their local desired facing/aim/look vectors with zero buttons, throttle and
+trigger. Ordinary object corrections replicate transforms, not those internal
+vectors, and actor aim replication excludes player-owned units. Co-op camera
+presentation is synchronized separately. The relevant `network_coop.c`,
+`network_objects.c`, `network_actors.c`, `players.c` and `units.c` are unchanged
+from Milestone 13 (`b26f35fd0`); no older binary was run in this investigation.
+The evidence establishes that browsers are not required to expose the problem.
+It does not establish harmlessness, full cinematic pose agreement or a safe
+correction based merely on copying body-forward into aim.
+
+This remains a separate shared co-op follow-up, outside the browser implementation
+delivered here. Before upstream delivery, investigate authoritative inhibited
+player state across creation, scripted changes, late joins and checkpoint
+restoration, then validate a focused fix against ordinary input and all affected
+map families with the required network-version review. Do not hide this finding
+with an MCC/map-name exception or a relaxed comparison. Evidence is under
+`build/stage11-fix/runtime/m14_ruby_native_cinematic_late/independent-audit.json`
+and the two preceding native diagnostic directories. Verified archival retains
+all saves and captures; the three directories total 3,980,721 bytes, separately
+from the `build/m14*` inventory.
+
+#### Final manual-download guidance and Stock-menu acceptance
+
+The final opt-out control exposed an MCC prompt-lifetime defect. With host
+sharing off, the Workshop-only guidance appeared correctly, but the host's
+ordinary 15-second playerless-client timeout replaced it with a generic closed
+game error. `mcc_host_off_prompt_before` retains both observed screenshots and
+its original failed observer verdict. The fix belongs to the MCC sharing
+adapter: when there is no download path, leave the unjoinable session normally
+and retain only copied guidance and Workshop origin until the main menu opens.
+No host timeout or shared admission behavior changes. New sessions, map loads,
+dismissal and repeated disconnect clear that detached state; stale acceptance
+and Workshop actions cannot act on another session.
+
+Eight initial adapter cases fail before the correction. The completed sharing,
+identity, admission and Workshop batch passes 198 tests with one POSIX-only
+skip on Windows. A further regression rejects forcing the PC main-menu root:
+detached guidance has no lobby history and dismissal now queues the engine's
+normal selected-menu transition. The final menu/sharing batch passes 311 tests.
+The Windows touch wrapper's POSIX `-lm` assumption fails separately; compiling
+and running the same production touch test for x86 MSVC passes. That launcher
+limitation is not presented as a product failure or a skipped runtime pass.
+
+`mcc_host_off_prompt_fixed` (Edge) and `mcc_client_off_prompt_fixed` (Firefox
+153.0), on `f819da8a2`, retain the correct Workshop-only prompt beyond the old
+timeout. Firefox's ordinary Escape dismissal returns to the main menu. Both
+cases leave MCC content absent, close the native process with exit zero,
+preserve source/build hashes and pass storage reopening. External-resource
+warnings remain recorded. These are opt-out and lifecycle controls, distinct
+from the completed transfer/gameplay evidence above.
+
+The menu audit also finds obsolete desktop/Android filters on Map Sharing in
+the Stock settings generator. Removing that filter exposes client downloads,
+host sharing, MCC package options and managed-download removal on web; Steam
+Workshop discovery remains desktop-only. The additive menu wiring uses the
+existing MCC services and does not depend on the optional Gulch frontend.
+Generated Stock main-menu and in-game routes are checked on desktop, Android
+and web. All three browser reachability cases fail before the correction and
+pass afterward; no XML is edited by hand.
+
+`mcc_menu_stock_host_off` explicitly sets `HALO_MENU_FRONTEND=off` and
+`HALO_MENUS=pc` on the normal `ad3cfe859` artifacts. The actual Edge/native-host
+pair verifies Workshop-only guidance, ordinary dismissal, and keyboard routes
+through Settings, Network Setup, Map Sharing, MCC Packages and MCC Downloads,
+then back to the main menu. Screenshots show campaign and collection controls,
+no desktop-only Steam discovery, and an empty download list without a removal
+action. The run passes WebRTC transport, no unintended download, reopened
+storage, unchanged input/artifact hashes and normal native exit. Exact artifacts
+are recorded in `build/m14-runtime/combined-build-menu-parity.json`; its native
+SHA-256 is `4fa2c6385196cbc3807ebdff9479f144b39b230e5b36ef3b4be086c690a73aa0`.
+This is Stock/OpenCE functionality in the refactored fork; the actual upstream
+branch still requires its own validation in Milestone 15.
+
+The user subsequently limits browser acceptance to Stock/OpenCE: Gulch does not
+host the browser build, and its Modern and styled menus are desktop features
+with prior desktop coverage. Unstarted Classic PC/Xbox browser runs are cancelled.
+The already-running Modern opt-out test closes normally after two navigation
+steps; its passing refusal/storage verdict is not a complete styled-menu audit.
+The separately committed `8325b12a4` restores Modern links to existing stick
+dead-zone and Discord editors, with 132 focused tests and local Windows/web
+builds passing. That Gulch-only change and its menu-specific tests are excluded
+from the MCC upstream contribution. No further styled-menu browser checks are
+required by this milestone's agreed scope.
+
+The final MCC/Stock revision has green
+[four-platform CI](https://github.com/chestahh/GulchCE/actions/runs/42525526884)
+and [MCC CI](https://github.com/chestahh/GulchCE/actions/runs/42525526813).
+Linux's broad batch passes 2,678 tests, skips 27 and passes seven subtests;
+separate batches remain separate rather than inflating a unique count.
+Web passes 70 and 30 Node tests, 24 Python checks, the real browser storage and
+memory/import checks, and Chromium/Firefox transport: 320/320 replies each,
+715/960 and 708/960 with deliberate ten-percent datagram loss. Branch-skipped
+release builds and asset-dependent skips remain limits. Full selected job logs
+are retained as `build/m14-stock-ci-128868283440.log` and
+`build/m14-stock-ci-128868283414.log`.
+
+Final primary-agent review covers the combined browser memory/import/storage
+implementation, admission/loading ownership, graphics corrections, prompt
+lifetime, menu wiring, protocol declarations, tests and documentation. Earlier
+independent reviews are recorded separately; no subagents are used for this
+final pass. The review retains separate CE/MCC implementations, bounded
+identity-specific waits, untrusted-input checks and failure evidence. It finds
+no additional justified production rewrite after the documented corrections.
+The cinematic finding above remains a separate shared-engine follow-up; this
+completion does not claim complete campaigns, every browser/device, or universal
+cinematic agreement.
+
+All final test games are closed. Each prompt/menu run removes its verified
+map aliases and generated native/browser caches, then verifies lossless archives
+before removing loose saves/captures. The formerly retained seed removes
+1,867,526,552 logical bytes of aliases, with all its saves preserved in a
+3,336,710-byte archive; alias removal is not claimed as physical-byte savings.
+Completed prompt/menu harness fixtures remove 770,535,876 bytes of temporary
+binaries and generated data, retaining diagnostics and synthetic saves in a
+verified 7,348,275-byte archive. Cleanup receipts remain beside their evidence;
+original Workshop packages, original maps and active user saves are untouched.
+Another 31 inactive save/export directories preserve all 1,112 files in a
+verified 14,622,564-byte archive before removing 847,804,268 loose bytes.
+`build/m14-runtime/final-inactive-saves.json` records the original paths and
+hashes for restoration. The final `build/m14*` inventory retains approximately
+2.86 GB, chiefly diagnostic archives/captures and the 128 MB current web build;
+the separate native cinematic evidence remains approximately 4 MB. Current
+native builds and installed toolchains remain usable. The final document review
+checks 567 local links across the milestone's changed Markdown with none missing.
 
 ### Milestone 15: MCC-only upstream contribution
 

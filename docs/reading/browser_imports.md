@@ -11,6 +11,8 @@ player's Steam Workshop folder. Imported files remain local; package sharing
 uses the game's existing host/client opt-ins. Different origins do not share
 files or locks. Browser storage can be evicted unless persistence is granted;
 the page requests it and reports the browser's decision.
+CE retains its existing optional peer seeding; MCC package transfers remain
+host-only.
 
 ## Prerequisites and reading order
 
