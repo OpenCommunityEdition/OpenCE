@@ -133,6 +133,16 @@ WasmFS `statvfs` estimate substitutes for browser storage availability.
 Shared root resource files are not duplicated by the manual CE importer;
 MCC package and downloaded-snapshot ownership stays explicit.
 
+Campaign resource reuse saves network transfer, not local storage. When a
+managed snapshot already contains matching bitmap or sound bytes,
+`client_reuse` copies them into the new mission snapshot through
+`mcc_share_stage_write`, verifies their SHA-256 and sends `HAVE` instead of
+requesting those bytes from the host. Each snapshot retains its own resource
+files and can be removed independently. Browser publication writes a commit
+marker over the completed, hidden target directory; it does not copy the whole
+snapshot again. Allow space for the new snapshot even when its resources can
+be reused locally.
+
 ## Bounds and evidence
 
 The [web README](../../port/web/README.md#custom-edition-and-mcc-imports)

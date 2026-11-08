@@ -1092,6 +1092,31 @@ under `build/m14-runtime/native_shutdown_fixed`; the tested executable SHA-256
 is `a0625660e6880e0b839d13b94e83d92f5fc490b257543f93777a5ff0ed426b51`.
 Final platform and paired native/browser checks remain required.
 
+The next installed-package pair, `mcc_installed_profile_loading`, uses the
+normal `mccprobe` browser profile with both download opt-ins off. It has no
+missing-`lastprof.txt` errors. Timestamped logs measure 59 seconds for the
+identity resource check and 89 seconds for conversion; the native host waits
+69 seconds after becoming ready, beyond its old sixty-second loading timeout,
+and both machines then enter the mission. The browser's own player becomes
+live at tick 579 and remains live through tick 1479 (31 samples). Reviewed
+`client-07.png` shows its first-person weapon, HUD and mission geometry. The
+native host withdraws its listing and exits zero. The installed snapshot is
+reused without a download, originals remain unchanged, and all 42 exported
+save/profile files (41,980,396 bytes) retain their hashes after browser reopening.
+
+This pair still **fails overall**: the unchanged strict judge finds zero paired
+state samples because host logs occur at ticks 30/60/... and browser logs at
+39/69/..., outside its two-tick pairing window. The source reporting cadence
+stores the first actual report tick and subsequently adds thirty, retaining
+that initial phase difference. No timestamps, states or judge tolerances are
+adjusted. The separate drift counters (652 samples, five apart) do not replace
+the missing state-field comparison. Loading also reports an incomplete
+framebuffer and prior GL errors 506/502, retained as a separate graphics issue.
+`installed-profile-audit.json` distinguishes these failures from admission,
+loading, save persistence and clean-exit successes. The next paired run needs
+real aligned observations and the graphics correction; this is not final
+multiplayer compatibility evidence.
+
 Cleanup removed the controls' eighteen generated caches (2,302,672,896 bytes)
 after each process exited, preserving all saves. The two closed installed-join
 failures lost only their twelve generated caches (1,535,115,264 bytes); their
@@ -1136,6 +1161,113 @@ unchanged, and saves, screenshots and the independent partial-evidence audit
 remain under `build/m14-runtime/mcc_lifecycle_6`. The graphics cause and corrected
 transition still require validation; checkpoint persistence alone does not
 complete Milestone 14.
+
+The MCC standalone loading controller inherited the preceding scene's color
+and depth attachments while drawing into a backbuffer-sized viewport. The
+existing loading effect then paired that inherited depth surface with its
+back/front buffers; the first resume log records an incomplete framebuffer
+immediately after MCC loading begins. The MCC controller now selects the
+backbuffer without a depth attachment before each draw. Its temporary surface
+reference is released, and the next ordinary scene installs its own matching
+targets. The Xbox/CE loading effect and shared renderer remain unchanged.
+An actual-controller regression fails on stale attachments before the change;
+the resulting loading/network/texture checks pass 72 tests, including disabled
+and headless paths, repeated draws and reference cleanup.
+
+`mcc_lifecycle_7` reaches the restored MCC checkpoint, CE and cached Xbox
+gameplay without the earlier framebuffer/upload diagnostics, but remains a
+failed fixture: its observer required a cold Xbox precaching message that a
+cache hit does not emit. The next observer accepts the exact current-map
+diagnostic from checkpoint validation as alternate identity evidence. It still
+requires fresh, increasing living-player samples after that identity, rejects
+duplicate epochs, and retains the original failed receipt.
+
+The corrected `mcc_lifecycle_8` passes on the graphics candidate WebAssembly
+SHA-256 `0a697221789f95db573082acf1f87d9603b93638eff18eee848ff334a5634cf5`.
+Both 20 MiB save exports are independently rehashed before and after complete
+browser closure/reopening; their bytes and timestamps match. Normal Profiles
+selection and Campaign Continue restore Mercury ticks 1,126–1,246 from the
+prior saved state. The same browser worker then runs CE Death Island at ticks
+30–181, cached Xbox Blood Gulch at 30–180, and returns to Mercury at 1,126–1,276
+after accepting its saved checkpoint. Independent screenshot review confirms
+the CE/Xbox weapon, HUD and environment and Mercury's Warthog, vehicle HUD and
+textured scene. All four original CE inputs retain their hashes; the browser
+closes normally. Evidence, including exact phase markers and save hashes, is
+`build/m14-runtime/mcc_lifecycle_8/independent-audit.json`.
+
+This run has no upload error `506` or incomplete-framebuffer diagnostic, but
+the final return still reports **prior GL error `502`** before an MCC upload.
+Its origin remains under investigation; the run is not described as entirely
+GL-clean. This is one Edge solo checkpoint/lifecycle control, not Firefox,
+multiplayer or complete-campaign evidence. It uses the graphics candidate
+before the subsequent combined sampler/resource-optimization rebuild.
+
+The combined current component suite passes **885 tests with eight skips**
+(`build/m14-candidate-combined.log` and `.xml`). Skips cover Linux sanitizer
+coverage, unavailable Windows file-symlink privilege, a POSIX socket harness
+and five POSIX/Linux launcher/process-lifecycle checks. This overlaps earlier
+batches and is not added to them. Independent review checks the final graphics
+and Web-only reader changes, ownership, bounds and documentation; combined
+platform builds and real paired gameplay remain pending.
+
+#### Browser identity-check read cost
+
+A private synthetic benchmark identifies OPFS read overhead in the incremental
+MCC checker. Emscripten 6.0.10 implements each read-only OPFS Blob read through a
+worker proxy and `Blob.slice(...).arrayBuffer()`. The stdio refill can issue two
+backend reads. This is source evidence for an I/O cost, not a reason to omit
+either CRC or SHA verification or extend admission deadlines.
+
+The controlled experiment compiles the actual resource checker, SHA and CRC
+implementations, changing only its read-buffer size and adding scoped counters.
+Two generated 32 MiB resources and a 5,632-byte generated MCC map have an
+independent Python CRC/SHA oracle. No retail assets are used. Each candidate
+runs on a 256 KiB fixture-worker stack. The production validation worker requests
+that size, but the platform thread wrapper enforces a 1 MiB minimum. The fixture
+retains the production 2 ms and 4 MiB thresholds checked between reads; a final
+read can cross the byte threshold by less than one chunk, as with the former
+16 KiB reader. Three rotated OPFS trials per size and browser, MEMFS
+controls, cancellation and injected read failures run serially in isolated
+profiles. All other task builds, games and heavy I/O are idle during the
+authoritative run, 2026-11-08 18:30:46–18:31:52 UTC.
+
+| Browser | 16 KiB median | 32 KiB median | 64 KiB median |
+| --- | ---: | ---: | ---: |
+| Edge 157.0.4341.42 | 4.730 s | 2.314 s | 1.394 s |
+| Firefox 153.0 | 3.714 s | 2.736 s | 2.254 s |
+
+Actual backend calls fall from 8,194 to 4,098 to 2,050. Edge's measured read
+time falls from 4.479 s to 1.156 s while SHA remains about 0.222 s and CRC about
+0.016 s. Firefox's read time falls from 1.940 s to 0.604 s; SHA remains its
+larger remaining cost. MEMFS controls show no meaningful improvement. All
+24 complete checks match the independent identity; all six cancellations and
+six read failures leave identity outputs unpublished. At 64 KiB, observed
+cancellation takes 2.85 ms in Edge and 1.24 ms in Firefox. The time budget is
+checked between reads, so an individual blocking read can exceed 2 ms.
+
+Accordingly, only `HALO_WEB` uses a 64 KiB buffer in
+[`mcc_resource_check.inl`](../port/linux/game/mcc_resource_check.inl); native
+builds retain 16 KiB. Byte framing, checksum algorithms, slice limits,
+cancellation ownership and all network deadlines remain unchanged. The real
+checker regression runs both native and browser reader branches against
+independent CRC/SHA values around 64 KiB and 128 KiB boundaries, odd tails,
+cancel/restart and failed-read recovery.
+
+Evidence is retained under `build/m14-check-bench`: `clock-fixed/results.json`,
+`clock-fixed/summary.json`, source/artifact receipts and `report.txt`. Earlier
+runs are explicitly superseded: the private fixture's direct floating-point
+clock cast saturated on an epoch-sized worker timer, exercising only the byte
+limit. The corrected fixture wraps through a 64-bit integer to match the
+production 32-bit clock. Production clock code is unchanged. The final timing
+run also occurs after a separate cleanup ended at 18:26:07 UTC, removing that
+earlier contention concern. All six closed synthetic profiles are removed
+(545,122,024 bytes); logs and fixtures remain reproducible from source.
+
+These are first-open/reopened reads after fixture creation, not guaranteed
+cold-cache measurements or full-game performance. Actual installed-package and
+post-download verification still require runtime validation with the combined
+browser build; no timing guarantee or completed multiplayer gate follows from
+this optimisation.
 
 ### Milestone 15: MCC-only upstream contribution
 
