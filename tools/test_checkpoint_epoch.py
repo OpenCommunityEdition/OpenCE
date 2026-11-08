@@ -73,12 +73,16 @@ static void error(int level,char const *fmt,...){(void)level;(void)fmt;}
 #define network_voice_handles_message(m,s) 0
 #define map_share_handles_message(m,s) 0
 #define mcc_share_game_handles_message(m,s) 0
+#define mcc_admission_handles_message(m,s) 0
+#define mcc_load_network_handles_message(m,s) 0
 #define network_map_vote_handles_message(m,s) 0
 #define network_aim_assist_handle_message(m,p,s) ((void)0)
 #define network_shield_effects_handle_message(m,p,s) ((void)0)
 #define network_voice_handle_message(m,p,s) ((void)0)
 #define map_share_handle_message(m,p,s,r) ((void)0)
 #define mcc_share_game_handle_message(m,p,s,r) ((void)0)
+#define mcc_admission_handle_message(m,p,s,r) ((void)0)
+#define mcc_load_network_handle_message(m,p,s,r) ((void)0)
 #define network_map_vote_handle_message(m,p,s,r) ((void)0)
 '''
     import re

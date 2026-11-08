@@ -550,6 +550,28 @@ retain their existing start policy; in-game late joining is unchanged.
 This protects downloads already admitted before loading, not a new request
 the host has not received when synchronous conversion begins.
 
+Once loading begins, [mcc_load_network.c](../../port/linux/game/mcc_load_network.c)
+and its [game adapter](../../port/linux/game/mcc_load_network_game.c) distinguish
+ongoing conversion work from a silent client. MCC conversion checkpoints send
+a small reliable progress message at most every five seconds, using only the
+existing transport write service. They never dispatch incoming messages or
+run game frames while tags are incomplete, and reporting works without a
+renderer. The exact advertised content identity and round bind each message.
+
+The ordinary host loading deadline remains sixty seconds after the first
+machine finishes. Only an MCC peer with advancing work can remain beyond it:
+its last advance must be under thirty seconds old, and the round has a fixed
+four-minute loading budget. Replayed progress cannot extend either limit.
+The budget allows twice the roughly two-minute browser conversion observed
+in testing; it does not promise support for arbitrarily slow clients. Only
+the existing loaded acknowledgment completes loading. The host also reports
+its own conversion work, keeping faster clients connected through their
+ordinary prestart transport timeout; clients enforce the same absolute budget.
+Disconnect, another map/round and departed peers retire the corresponding
+state. Xbox and CE retain their existing loading deadlines.
+`test_mcc_load_network.py` exercises the real adapter and server deadline,
+including the former removal of a progressing client, expiry and stale input.
+
 ## Loading and unloading must agree about ownership
 
 The MCC runtime owns its source stream, tag window, converted geometry,

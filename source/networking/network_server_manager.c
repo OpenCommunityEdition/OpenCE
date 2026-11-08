@@ -471,6 +471,7 @@ symbols in this file:
 #include "networking/network_server_message_handler.h"
 #include "mcc_protocol.h" /* port: capability lifetime belongs to the connection */
 #include "mcc_ui_network.h"
+#include "mcc_load_network.h" /* port: bounded MCC conversion progress */
 #include "network_link.h" /* port: port/linux/game/network_link.c */
 #include "saved games/player_profile.h"
 #include "text/unicode.h"
@@ -2021,6 +2022,7 @@ boolean network_game_server_start_network_game(
 			else
 				network_event("signalling client machines to begin loading for network game (some machines missed it)");
 			server->sent_start_game_message = TRUE;
+			mcc_load_network_start(&server->game); /* port: bind MCC progress before loading */
 			csmemcpy(network_game_server_start_players, server->game.players,
 				sizeof(network_game_server_start_players));
 			success = TRUE;
@@ -2482,6 +2484,7 @@ void network_game_server_all_machines_have_loaded(
 	long client_machine_index;
 
 	network_event("all machines have successfully loaded");
+	mcc_load_network_disconnect(); /* port: the MCC conversion wait is over */
 
 	server->state = _network_game_server_state_ingame;
 	server->time_of_first_client_loading_completion = 0;
@@ -2531,6 +2534,7 @@ void network_game_server_client_machine_game_loading_complete(
 	}
 
 	SET_FLAG(machine->flags, _network_client_machine_level_loaded_bit, TRUE);
+	mcc_load_network_peer_left(machine->machine_index); /* port: retire its MCC loading lease */
 	if (!server->time_of_first_client_loading_completion)
 		server->time_of_first_client_loading_completion = system_milliseconds();
 
@@ -5496,6 +5500,7 @@ static boolean network_game_server_idle_pregame_tasks(
 			NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING)
 		{
 			int i;
+			boolean mcc_loading_wait = FALSE; /* port: loaded bits still decide completion */
 
 			for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
 			{
@@ -5510,6 +5515,13 @@ static boolean network_game_server_idle_pregame_tasks(
 					char ascii_name[MAXIMUM_MACHINE_NAME_LENGTH];
 					boolean removed;
 
+					/* port: MCC conversion may progress beyond the ordinary wait.
+					 * This never marks a peer loaded or excludes it from readiness. */
+					if (mcc_load_network_host_waiting(server->client_machines[i].machine_index))
+					{
+						mcc_loading_wait = TRUE;
+						continue;
+					}
 					network_event(
 						"forcibly removing client system '%s' due to timeout while loading for game",
 						wide_to_ascii(
@@ -5527,7 +5539,7 @@ static boolean network_game_server_idle_pregame_tasks(
 			}
 
 			/* (the last removal may have started it) */
-			if (server->state == _network_game_server_state_pregame)
+			if (server->state == _network_game_server_state_pregame && !mcc_loading_wait)
 				network_game_server_all_machines_have_loaded(server);
 		}
 	}

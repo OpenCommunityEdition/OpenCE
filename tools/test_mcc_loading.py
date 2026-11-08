@@ -29,6 +29,11 @@ typedef struct {DWORD Width,Height;} D3DSURFACE_DESC;
 #define FALSE 0
 #define _error_silent 0
 static void error(int level,char const *format,...) {(void)level;(void)format;}
+static int network_begins,network_ends,network_work,network_pulses;
+static void mcc_load_network_begin(char const *name) {if(name && !strncmp(name,"mcc_maps/",9))network_begins++;}
+static void mcc_load_network_pulse(void) {network_work++;network_pulses++;}
+static void mcc_load_network_work(int stage,unsigned long done,unsigned long total) {(void)stage;(void)done;(void)total;network_work++;}
+static void mcc_load_network_end(void) {network_ends++;}
 static int device, surface, null_renderer, native_active, starts, ends, frames, releases;
 static int failure, reenter;
 static DWORD clock_ms;
@@ -69,7 +74,9 @@ int main(int argc,char **argv) {
         if(test==3)native_active=1;
         mcc_loading_begin(test==0 ? "maps/a10" : test==6 ? "custom_maps/a10" : test==7 ? NULL : "mcc_maps/a10");
         mcc_loading_pulse();mcc_loading_stage(MCC_LOADING_AUDIO);mcc_loading_end(1);
-        assert(!starts && !frames && !ends);assert(native_active==(test==3));return 0;
+        assert(!starts && !frames && !ends);assert(native_active==(test==3));
+        assert(network_begins==(test>=1 && test<=3));assert(network_ends==1);
+        if(test>=1 && test<=3)assert(network_work>0);return 0;
     }
     if(test==4)clock_ms=UINT32_MAX-20;
     if(test>=8 && test<=10)failure=test-7;
@@ -83,6 +90,9 @@ int main(int argc,char **argv) {
     before=frames;mcc_loading_pulse();assert(frames==before);
     clock_ms+=50;mcc_loading_stage(MCC_LOADING_AUDIO);assert(frames==before+1);
     clock_ms+=50;mcc_loading_update(MCC_LOADING_AUDIO,5,10);assert(drawn>0.3f && drawn<0.55f);
+    before=network_pulses;clock_ms+=5000;
+    mcc_loading_update(MCC_LOADING_AUDIO,5,10);mcc_loading_update(MCC_LOADING_AUDIO,4,10);
+    assert(network_pulses==before);
     before=frames;clock_ms+=50;
     mcc_loading_update(MCC_LOADING_AUDIO,11,10);
     mcc_loading_update(MCC_LOADING_AUDIO,0,0);

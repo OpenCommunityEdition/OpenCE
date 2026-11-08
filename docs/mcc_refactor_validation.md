@@ -1005,6 +1005,138 @@ late-join run remains failed overall because its diagnostic sample phases
 were not aligned; thresholds were not relaxed. Evidence is
 `build/m14-runtime/ce_native_host_download_cached/result.json`.
 
+#### Admission fixture portability and bounded conversion progress
+
+The subsequent `cdba` CI build compiles all four platforms, but its Linux
+reader job reports nine failures (2,222 passed, 21 skipped). One is a standalone
+fixture ABI error: Linux's 64-bit `long` enlarged the copied distributed header
+and padded its test envelope, so the real adapter correctly refused the packet
+size. The fixture now uses the production header's fixed 32-bit fields and
+asserts its 12-byte header and 216-byte envelope. A private wide-field negative
+control reproduces the exact missing-ACK assertion before this correction and
+passes afterward (`build/m14-lp64-fixture-proof.json`). The other eight failures
+come from checkpoint fixtures missing declarations/definitions for newly
+registered MCC handlers; those independent handlers now have explicit fixture
+stubs while the real checkpoint dispatcher and its assertions remain intact.
+
+The focused identity, admission, real outer ingress, checkpoint and agreement
+run then passes **52 tests** (`build/m14-load-contract-final.log`). Its ingress
+fixture also checks message 106 on the real server dispatcher: joined reliable
+pregame traffic reaches its handler; unjoined and datagram traffic do not, and
+ordinary data retains the ingame/loaded gate. These are overlapping component
+checks, not an additional unique total or a completed rerun of CI.
+
+The conversion-progress contract uses base **32734**, MCC **71**, and camera
+**32736/32737**, with message 106 independently bound to the admitted identity
+and game round. Review checked the five-second send/receive advancement limit,
+thirty-second host progress-idle bound, four-minute absolute bound, terminal
+peer retirement and map/session cleanup. The client's established 75-second
+pre-start transport-silence bound remains separate. Required shared additions
+only route authenticated MCC messages before the ordinary loaded-player gate
+and connect MCC-owned state to start/completion/timeout events. Headless
+conversion has the same network lifecycle; no pulse runs frame, widget,
+simulation or network-dispatch callbacks against incomplete tags. See
+[the protocol contract](../port/linux/NETCODE.md#mcc-package-sharing).
+Final platform and actual network/gameplay validation of this revision remain
+pending; these source and component findings do not complete Milestone 14.
+
+The actual installed-package rerun on `cdba8dc1a`
+(`build/m14-runtime/mcc_installed_optouts_off_fixed`) admits the browser with
+both sharing/download opt-ins disabled and no new download. Identity resolves
+about 85 seconds after joining. Both machines then load Mercury 2; the native
+host finishes first and removes the browser exactly sixty seconds later, while
+the browser is still converting valid content. The browser subsequently finishes
+conversion but cannot send its loaded acknowledgement to the disconnected host.
+This is an admission pass and an overall multiplayer failure, not synchronized
+gameplay evidence. The loading-progress extension above addresses this distinct
+failure; its actual paired rerun is still required.
+
+The same run's retained debugger trace establishes a separate shared shutdown
+defect. A detached `p2p_thread` calls `platform_log` through lobby withdrawal
+while the main thread is already in CRT exit; the fault occurs inside the
+runtime's stream lock. The MCC window destructor on the main thread's stack
+does not establish an MCC allocation defect. The focused platform correction
+owns both P2P workers through existing thread handles, requests stop under the
+service lock, waits outside that lock, and withdraws the listing and router
+mapping after worker completion. UPnP cancellation prevents subsequent owned
+router requests; a third-party HTTP operation already running still has to
+return. This is not a guarantee of bounded shutdown against a stalled router.
+Actual-source tests and independent ownership review cover this correction.
+See `shutdown-debugger.log` and
+`admission-loading-shutdown-audit.json` in that run's evidence directory.
+
+The final focused shutdown suite passes **20 tests**, including actual OS
+threads stopped during polling and UPnP completion, renewal-handle reaping,
+ordinary work before exit, allocation/exit-hook failures and retry after a
+failed start. Three isolated mutations removing either worker wait or the
+post-select stop check fail their regressions. Router tests exercise the real
+owned wrapper functions with cancellation during discovery, mapping scans,
+address lookup, conflict retry and permanent-lease fallback. A mapping created
+just as cancellation arrives remains owned and is removed. The actual static
+P2P initializer is included in the fixture: native compilation caught its old
+positional fields shifting when handles were added, so socket initialization
+now names its fields. The normal Android generator emits the cancellation
+import; the browser has a matching no-op. Standard Linux and Windows CI now
+invoke `tools/test_p2p_shutdown.py`.
+
+The resulting native build passes. Three sequential, isolated public-host
+controls then load the selected map, simulate and use the same owner-checked
+`WM_CLOSE` procedure as the failing run. Xbox Blood Gulch and CE Death Island
+each record ticks 30–840; MCC Mercury 2 records ticks 30–211. All three withdraw
+their listing and exit **0**, with original inputs and the executable hash
+unchanged. These are single-host exit controls, not paired-network validation,
+and UPnP is disabled during them. The private launcher initially counted an
+absent standalone tick log; `native_shutdown_fixed/shutdown-audit.json` counts
+the actual `native.log` records and explicitly corrects that field. Evidence is
+under `build/m14-runtime/native_shutdown_fixed`; the tested executable SHA-256
+is `a0625660e6880e0b839d13b94e83d92f5fc490b257543f93777a5ff0ed426b51`.
+Final platform and paired native/browser checks remain required.
+
+Cleanup removed the controls' eighteen generated caches (2,302,672,896 bytes)
+after each process exited, preserving all saves. The two closed installed-join
+failures lost only their twelve generated caches (1,535,115,264 bytes); their
+verified screenshot archives save a further 75,781,164 bytes while preserving
+every capture and one loose native frame per run. Logs, debugger evidence,
+original maps, active browser storage and future fixture seeds remain.
+
+Steam relocated the original MCC installation and Workshop packages from
+`C:\Steam` to `E:\SteamLibrary` during these tests. A separate relocation audit
+verifies all 39 recorded source files (1,238,151,561 bytes) against their original
+hashes. Future fixtures use the new source paths; historical receipts remain
+unchanged. This relocation was not test cleanup. The first installed-package
+run's premature `sourcesUnchanged` flag is superseded by the explicit audit,
+not accepted as proof after its old-path lookup failed.
+
+After the combined source/integration review, the local loading/shutdown
+regression set passes **663 unique tests**, with three explicit skips: Linux
+sanitizers, Windows file-symlink privilege and the POSIX socket harness.
+The initial sandbox run could not create three directory junction fixtures;
+their separately authorized reruns pass without weakening assertions. Merged
+per-case receipts are in `build/m14-loading-shutdown-summary.json`; overlapping
+component batches are not added to this total. The wire-format check and 262
+relative documentation links also pass.
+
+Browser checkpoint testing now uses an actual `mccprobe` player profile selected
+through Profiles and Campaign. In `mcc_lifecycle_5`, Mercury 2 saves at tick
+1,081, reverts from tick 1,441 to 1,126 and resumes simulation. The observed
+Save and Quit action reaches the main menu. That helper nevertheless fails
+because it waits for a network precaching message absent from this menu path;
+the failed receipt is retained. `mcc_lifecycle_6` explicitly continues from that
+closed run: both transient and profile-owned 20 MiB save files retain identical
+hashes and timestamps across browser closure/reopening. Normal Campaign Continue
+restores ticks 1,126 through 1,246, rather than starting a fresh map. In the same
+browser worker, CE Death Island then advances from ticks 31 to 182 and Xbox
+Blood Gulch from 30 to 180, with matching load markers and inspected rendering.
+
+The final Xbox-to-MCC return in that sequence is a **failure**: Mercury converts,
+loads and restores tick 1,126, then reports a texture-upload GL error `506`,
+preceded by a prior GL error `502`. It does not establish a successful final
+gameplay/visual transition. The browser is closed, all original CE inputs are
+unchanged, and saves, screenshots and the independent partial-evidence audit
+remain under `build/m14-runtime/mcc_lifecycle_6`. The graphics cause and corrected
+transition still require validation; checkpoint persistence alone does not
+complete Milestone 14.
+
 ### Milestone 15: MCC-only upstream contribution
 
 After Milestones 13 and 14, create `GET-YOUR-MCC-HERE` against the then-current

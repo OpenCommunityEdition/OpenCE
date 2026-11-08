@@ -138,8 +138,12 @@ def test_game_adapter_authenticates_transport_and_current_settings(tmp_path, mis
     path.parent.mkdir(parents=True)
     path.write_text((ROOT / "source/bungie_net/common/message_header.h").read_text())
     distributed = (ROOT / "port/linux/game/network_distributed.h").read_text()
+    # Production is ILP32 and asserts this header is12 bytes. Native Linux
+    # test compilers are LP64; preserve wire fields instead of adding tail
+    # padding to the adapter envelope and falsely rejecting valid packets.
     (tmp_path / "network_distributed.h").write_text(
-        '#include "bungie_net/common/message_header.h"\n' + structure(distributed, "distributed_message_header") +
+        '#include <stdint.h>\n#include "bungie_net/common/message_header.h"\n' + structure(distributed, "distributed_message_header").replace('unsigned long', 'uint32_t').replace('long', 'int32_t') +
+        '\ntypedef char wire_header_is_12[sizeof(struct distributed_message_header)==12 ? 1 : -1];' +
         '\nenum {_distributed_message_mcc_admission=105};\n')
     # Compile the complete production adapter with the same public APIs and a
     # controlled engine, not a second implementation of its packet checks.
@@ -199,7 +203,7 @@ static struct {void *connection;struct transport_address address;} network_distr
 #define network_game_server_get_remote_client_machine_at_address(...) (joined ? &peer : NULL)
 #define network_game_server_handle_client_update_packet(...) ((void)0)
 #define network_game_server_get_client_connection(...) NULL
-#define network_distributed_handle_message(i,m,n) mcc_admission_handle_message(i,m,n,0)
+#define network_distributed_handle_message(i,m,n) (mcc_load_network_handles_message(m,n) ? mcc_load_network_handle_message(i,m,n,0) : mcc_admission_handle_message(i,m,n,0))
 ''' + unrelated + enum_with((ROOT / "source/networking/network_messages.h").read_text(),
                            "_message_client_broadcast_game_search") + enum_with(server_source, "_message_type_error")
     source = tmp_path / "test.c"
@@ -216,9 +220,12 @@ static struct network_game game;
 static struct network_game_server server;
 static struct network_game_client client;
 static struct network_game_server_client_machine peer;
-static int hosting=1,joined=1,capable=1,connected=1,sends,ingame,loaded,ordinary,mapped=1;
+static int hosting=1,joined=1,capable=1,connected=1,sends,ingame,loaded,ordinary,mapped=1,progress;
 static unsigned long now=1000,revision=1;
 static struct {struct distributed_message_header header;struct mcc_admission_message body;} packet,last;
+typedef char wire_message_is_216[sizeof(packet)==216 ? 1 : -1];
+static int mcc_load_network_handles_message(void const *data,unsigned size){return size>=sizeof(struct distributed_message_header) && ((struct distributed_message_header const *)data)->type==106;}
+static void mcc_load_network_handle_message(long index,void const *data,unsigned size,int reliable){(void)index;(void)data;(void)size;if(reliable)progress++;}
 struct network_game_server *global_network_game_server_get(void){return hosting ? &server : NULL;}
 struct network_game_client *global_network_game_client_get(void){return connected ? &client : NULL;}
 struct network_game *network_game_get_game(void){return &game;}
@@ -249,6 +256,10 @@ int main(void){
  memcpy(packet.body.identity.name,game.map.name,128);packet.body.identity.checksum=123;
  memcpy(packet.body.identity.content,game.mcc_content_sha256,32);memcpy(packet.body.identity.metadata,game.mcc_metadata_sha256,32);
  CHECK(mcc_admission_handles_message(&packet,sizeof(packet)));
+ packet.header.type=106;receive(0);CHECK(!progress);
+ ingame=loaded=1;receive(0);CHECK(!progress);ingame=loaded=0;
+ joined=0;receive(1);CHECK(!progress);joined=1;
+ receive(1);CHECK(progress==1 && !ingame && !loaded);packet.header.type=105;
  receive(0);CHECK(!sends && !mcc_admission_host_active(2));
  ingame=loaded=1;receive(0);CHECK(!sends && !mcc_admission_host_active(2));ingame=loaded=0;
  mcc_admission_handle_message(3,&packet,sizeof(packet),1);CHECK(!sends);

@@ -85,6 +85,7 @@ static boolean network_game_server_send_message_to_all_machines(struct network_g
     struct network_message *message) {
     (void)s;(void)message;heartbeat_messages++;last_heartbeat=heartbeat_clock;return TRUE;
 }
+static void mcc_load_network_start(struct network_game const *game) {(void)game;}
 static int download_active[4],download_needs[4];
 static int mcc_share_game_machine_active(long i) {return download_active[i];}
 static int map_share_machine_needs_map(long i) {return download_needs[i];}

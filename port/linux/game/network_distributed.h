@@ -171,6 +171,8 @@ enum
 	_distributed_message_mcc_share_response = 104,
 	/* MCC file validation before player admission, even when sharing is off. */
 	_distributed_message_mcc_admission = 105,
+	/* MCC conversion progress without dispatching incomplete game state. */
+	_distributed_message_mcc_load_progress = 106,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

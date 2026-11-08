@@ -162,6 +162,11 @@ def items():
     add("enum mcc_admission_op", _hash(next(_blocks(admission, r"^enum mcc_admission_op\s*\{"))))
     for name, value in re.findall(r"^#define (MCC_ADMISSION_\w+) ([^\n]+)", admission, re.M):
         add(f"define {name}", value)
+    loading = re.sub(r"/\*.*?\*/", " ",
+                     (ROOT / "port/linux/game/mcc_load_network.h").read_text(), flags=re.S)
+    add("struct mcc_load_message", _hash(next(_blocks(loading, r"^struct mcc_load_message\s*\{"))))
+    for name, value in re.findall(r"^#define (MCC_LOAD_NETWORK_\w+) ([^\n]+)", loading, re.M):
+        add(f"define {name}", value)
     camera = (ROOT / "port/linux/game/third_person_protocol.h").read_text()
     for name, value in re.findall(r"^#define (THIRD_PERSON_PROTOCOL_\w+) ([^\n]+)", camera, re.M):
         add(f"define {name}", value)

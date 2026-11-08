@@ -234,10 +234,11 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## GulchCE network agreement
 
-Standard Xbox/Custom Edition sessions require GulchCE agreement 32730; MCC
-requires version 70. Camera sessions require 32732/32733 respectively. This
-revision adds reliable MCC validation message 105 so installed-file checks
-can finish without blocking network updates. It retains host-only sharing
+Standard Xbox/Custom Edition sessions require GulchCE agreement 32734; MCC
+requires version 71. Camera sessions require 32736/32737 respectively. This
+revision adds reliable MCC conversion-progress message 106 after admission.
+It retains validation message 105 so installed-file checks can finish without
+blocking network updates, host-only sharing
 messages 103/104 and the separate 32-byte required-metadata digest in MCC
 settings. Xbox/CE settings retain their prefix.
 The previous agreements are refused before admission. Earlier revisions
@@ -1039,8 +1040,8 @@ its name alone beside it, has its name given back as the map lists find it.
 
 MCC supports host-only delivery for eligible local and Workshop packages.
 It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. The current agreements are base **32730**, MCC
-**70**, and camera **32732/32733**; old agreements are refused before admission.
+separate from CE sharing 83-86. The current agreements are base **32734**, MCC
+**71**, and camera **32736/32737**; old agreements are refused before admission.
 MCC settings add a 32-byte required-JSON digest beside the gameplay digest.
 Xbox/CE retain their existing settings prefix and sharing path. The distributed
 header remains 12 bytes, including its checkpoint epoch.
@@ -1118,6 +1119,35 @@ or completed holds cannot be restarted by replaying `BEGIN` on the same
 connection and host revision. `READY` grants only the existing fifteen-second
 player-add grace; it does not prove that an untrusted client checked its files.
 Actual map loading still fingerprints content independently.
+
+After admission, synchronous MCC conversion has a separate bounded progress
+contract in `mcc_load_network.c` and `mcc_load_network_game.c`. Reliable message
+**106** carries the exact admitted name/origin, checksum and both digests,
+the game round, and an increasing work sequence (204 bytes after the unchanged
+12-byte distributed header). Both sending and accepted state advancement are
+limited to once per five seconds. A host waits for a progressing joined peer
+for at most thirty seconds without new progress and at most four minutes from
+the original round binding. Replays cannot restart either expired hold. The
+client also has the four-minute absolute bound; its existing 75-second
+pre-start transport-silence timeout remains unchanged. Progress never marks a
+machine loaded, bypasses file identity checks or reuses the missing-map state.
+
+The server's ordinary distributed-data gate requires an already loaded player,
+so minimal MCC-only routes in `network_server_message_handler.c` admit messages
+105/106 from joined reliable connections before that gate. Their MCC handlers
+still check capability, exact framing, identity and sender roles; datagrams
+cannot establish these holds. The small start, timeout and loaded-ack hooks in
+the server/client managers connect the MCC state to the existing lifecycle.
+Terminal loaded acknowledgement retires the peer, all-loaded clears the host
+binding, and the client's first game update clears its binding. Disconnect,
+peer departure, changed identity/revision and round changes invalidate stale
+state. Xbox/CE retain their established loading and timeout paths.
+
+`mcc_loading` feeds this contract independently of its visual feedback: null
+renderers and disabled loading presentation still begin/end the network work
+lifecycle. Conversion pulses only write bounded reliable transport messages.
+They never idle or dispatch the network, advance simulation, run widgets or
+invoke normal frame callbacks while tags are incomplete.
 
 Downloaded-file verification stays within its existing transfer. Manifest
 heartbeats keep the connection responsive while the bounded checker runs,

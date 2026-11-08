@@ -123,6 +123,8 @@ static char published_name[64];
 void mcc_identity_update(void) {}
 int mcc_identity_pending(char const *level)
 { return !role_host && validation_pending && (!level || !strcmp(level,LEVEL)); }
+void mcc_load_network_disconnect(void) {}
+void mcc_load_network_peer_left(long machine) {(void)machine;}
 void mcc_admission_update(void) {}
 void mcc_admission_client_finish(int ready) {(void)ready;admission_pending=0;}
 uint32_t mcc_admission_client_token(void) {return admission_pending ? admission_token : 0;}

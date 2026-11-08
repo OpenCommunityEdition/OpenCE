@@ -1,4 +1,4 @@
-version 70
+version 71
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -56,11 +56,14 @@ define MCC_ADMISSION_GRACE 15000u
 define MCC_ADMISSION_HEARD 20000u
 define MCC_ADMISSION_MACHINES 128
 define MCC_ADMISSION_PULSE 5000u
+define MCC_LOAD_NETWORK_IDLE 30000u
+define MCC_LOAD_NETWORK_LIMIT 240000u
+define MCC_LOAD_NETWORK_PULSE 5000u
 define MCC_PROTOCOL_ADVERTISED_FLAG 0x08
 define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 4
 define MCC_PROTOCOL_JOIN_KIND 101
 define MCC_PROTOCOL_JOIN_MAX 512
-define MCC_PROTOCOL_VERSION 70
+define MCC_PROTOCOL_VERSION 71
 define MCC_SHARE_CHUNK_BYTES 3072
 define MCC_SHARE_CREDIT_SIZE 64
 define MCC_SHARE_LEAF_SIZE 128
@@ -80,8 +83,8 @@ define MCC_WORKSHOP_WIRE_VERSION 1
 define THIRD_PERSON_PROTOCOL_JOIN_KIND 102
 define THIRD_PERSON_PROTOCOL_JOIN_MAX 520
 define THIRD_PERSON_PROTOCOL_JOIN_REVISION 1
-define THIRD_PERSON_PROTOCOL_MCC_VERSION 32733
-define THIRD_PERSON_PROTOCOL_VERSION 32732
+define THIRD_PERSON_PROTOCOL_MCC_VERSION 32737
+define THIRD_PERSON_PROTOCOL_VERSION 32736
 enum _distributed_actor_camouflaged_bit 4
 enum _distributed_actor_impulse_aligned_bit 6
 enum _distributed_actor_rides_bit 0
@@ -134,6 +137,7 @@ enum _distributed_message_mcc_admission 105
 enum _distributed_message_mcc_campaign 98
 enum _distributed_message_mcc_game_speed 100
 enum _distributed_message_mcc_grenades 97
+enum _distributed_message_mcc_load_progress 106
 enum _distributed_message_mcc_object_names 99
 enum _distributed_message_mcc_share_request 103
 enum _distributed_message_mcc_share_response 104
@@ -262,7 +266,7 @@ fields server_switch_to_pregame 678699dea271
 layout HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x36)
 layout HALO_PORT_NETWORK_GAME_SIZE (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 64) /* MCC content and metadata SHA-256 */
 layout HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0xA)
-protocol GulchCE 32730
+protocol GulchCE 32734
 size message_client_add_player_request_ingame 0x20
 size message_client_add_player_request_pregame 0x20
 size message_client_broadcast_game_search 0x0C
@@ -366,6 +370,7 @@ struct distributed_votekick_status b94458cdc180
 struct game_variant_options 0e258e4cf85b
 struct mcc_admission_identity ba88dfe0091d
 struct mcc_admission_message 0a2136c026a5
+struct mcc_load_message 587f305ba598
 struct mcc_share_entry 66c2657ada44
 struct mcc_share_request 327320bc7edb
 struct mcc_share_response 3c288efa85b1

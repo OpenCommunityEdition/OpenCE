@@ -383,6 +383,7 @@ symbols in this file:
 #include "main/main.h"
 #include "memory/data.h"
 #include "networking/network_client_manager.h"
+#include "mcc_load_network.h" /* port: bounded MCC conversion wait */
 #include "networking/network_client_message_handler.h"
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
@@ -3213,6 +3214,14 @@ static boolean network_game_client_idle_ingame(
 		client->connection_silent = connection_stale;
 	}
 
+	/* port: progressing MCC conversion has an absolute limit too, even when
+	 * the host keeps writing while its synchronous map conversion runs. */
+	if (success && mcc_load_network_client_expired())
+	{
+		network_event("MCC loading exceeded its bounded conversion window");
+		display_error_when_main_menu_loaded(_error_network_connection_lost);
+		success = FALSE;
+	}
 	if (success == TRUE)
 	{
 		success = network_connection_idle(client->connection, started ? 15000 : 75000, NULL);
