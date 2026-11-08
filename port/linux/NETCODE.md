@@ -227,9 +227,16 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## GulchCE network agreement
 
-Standard Xbox/Custom Edition sessions require GulchCE agreement 32714; MCC
-requires 66. Camera sessions require 32716/32717 respectively. The common
-distributed header grows from 8 to 12 bytes with its checkpoint epoch, and
+Standard Xbox/Custom Edition sessions require GulchCE agreement 32718; MCC
+requires 67. Camera sessions require 32720/32721 respectively. These revisions
+require initialized three-point boat controls in the shared controller. The
+earlier MCC correction produced the same controls, but legacy hosts and clients
+could simulate a driven boat using uninitialized friction values. Matching
+agreements exclude those older peers in both host directions. Packet layouts
+are unchanged from the preceding checkpoint agreement (32714/66/32716/32717).
+MCC version 67 also requires the updated ordinary join agreement inside its
+envelope; it does not change MCC-only boat semantics. The common
+distributed header retains its 12 bytes including the checkpoint epoch, and
 message 96 is the reliable host boundary. MCC gameplay uses 97–100 and its
 join envelope 101; the camera envelope is 102. The ordinary join request also
 appends a 16-bit shared agreement, checked before host admission. Discovery
@@ -1363,7 +1370,7 @@ so a legitimate shot from beside cover is not judged only from the head.
 Both the eye-to-muzzle and muzzle-to-impact routes must be clear; weapon
 ownership, rate, target history and damage limits still apply. Scoped, dead,
 seated, Forced Off and ordinary first-person paths do not add this history.
-The camera rules use agreement versions 32716/32717. Shared checkpoint recovery
+The camera rules use agreement versions 32720/32721. Shared checkpoint recovery
 also applies in Standard sessions and no longer depends on camera permission.
 Older camera builds are excluded from the new common header and recovery
 agreement too.
@@ -1443,13 +1450,13 @@ not.
 The host's Session Compatibility selector defaults to GulchCE Standard.
 The stored `opence_crossplay` value is retained for existing configuration files;
 its name no longer promises OpenCE 41 compatibility. Xbox/CE use agreement
-32714 and MCC uses 66. The optional shoulder camera, its input and muzzle
+32718 and MCC uses 67. The optional shoulder camera, its input and muzzle
 behavior remain disabled in Standard mode. GulchCE Third Person advertises
-camera agreement 32716 (Xbox/CE) or 32717 (MCC), requires a kind 102 envelope
+camera agreement 32720 (Xbox/CE) or 32721 (MCC), requires a kind 102 envelope
 before admission and adds the
 shoulder byte to relayed actions. The envelope's bound is 520 bytes, including
 MCC's optional 512-byte inner envelope and upstream account-link credentials.
-Its header carries revision 1, camera base version 32716 and zero reserved
+Its header carries revision 1, camera base version 32720 and zero reserved
 bytes. Ordinary authorization and map-family checks still apply.
 
 Session mode is selected before opening the lobby and locked until disposal,

@@ -4,8 +4,7 @@ from tools.harness import build, enum_with, function, inline, mutated, read, run
 
 
 def boat_code():
-    return (function(read("port/linux/game/mcc_objects.c"), "mcc_boat_controls_initialize") +
-            function(read("source/units/vehicles.c"), "update_human_boat_physics"))
+    return function(read("source/units/vehicles.c"), "update_human_boat_physics")
 
 
 def executable(code):
@@ -25,12 +24,13 @@ def executable(code):
         structure(read("source/physics/physics.h"), "physics_instance"),
     ])
     vectors = "\n".join(inline(read("source/math/real_math.h"), name) for name in (
-        "set_real_vector2d", "set_real_vector3d", "vector_from_points3d", "scale_vector3d",
-        "dot_product3d", "cross_product3d", "add_vectors3d", "magnitude_squared3d"))
+        "set_real_vector2d", "set_real_vector3d", "set_real_point3d", "point_from_line3d",
+        "vector_from_points3d", "scale_vector3d", "dot_product3d", "cross_product3d",
+        "add_vectors3d", "magnitude_squared3d"))
     consumer = "\n".join(function(physics, name) for name in (
         "pin_fraction", "physics_mass_point_count", "physics_powered_mass_point_count",
         "physics_powered_mass_point_index", "friction_evaluate", "physics_compute_new",
-        "physics_update_old"))
+        "physics_update_old", "physics_update_new"))
     # Rename only the entry point so the harness can observe the passed controls.
     dispatch = function(physics, "physics_update").replace(
         "void physics_update(", "void production_physics_update(", 1)
@@ -39,29 +39,14 @@ def executable(code):
                               ("consumer.inc", consumer), ("under_test.inc", code)))
 
 
-class UninitializedBoatForce(AssertionError):
-    """The real consumer used a stale inactive control after active checks passed."""
-
-
 def require_success(code, case):
     status, output = run(executable(code), case)
-    if status == 2:
-        raise UninitializedBoatForce(output)
     assert status == 0, output
-
-
-def legacy_failure(case):
-    # A shared fix changes simulation agreement with existing OpenCE peers.
-    # Keep the defect visible until a compatible upstream contract is available.
-    return pytest.param(case, marks=pytest.mark.xfail(
-        strict=True, raises=UninitializedBoatForce,
-        reason="Non-MCC boat controls remain uninitialized to preserve OpenCE crossplay"))
 
 
 @pytest.mark.parametrize("path", ["new", "old"])
 @pytest.mark.parametrize("case", [
-    (legacy_failure(f"{family}_{poison}_{flags}") if family == "legacy" and flags != "unpowered"
-     else f"{family}_{poison}_{flags}")
+    f"{family}_{poison}_{flags}"
     for family in ("mcc", "legacy") for poison in ("nan", "finite")
     for flags in ("water", "all", "unpowered")
 ])
@@ -71,8 +56,7 @@ def test_boat_controls_reach_finite_expected_forces(path, case):
 
 @pytest.mark.parametrize("path", ["new", "old"])
 @pytest.mark.parametrize("case", [
-    (legacy_failure(f"{family}_nan_{case}") if family == "legacy" and case in ("zero", "reverse")
-     else f"{family}_nan_{case}")
+    f"{family}_nan_{case}"
     for family in ("mcc", "legacy") for case in ("zero", "reverse", "count0", "count2", "count4", "count32")
 ])
 def test_propeller_values_and_other_point_counts(path, case):
@@ -81,21 +65,21 @@ def test_propeller_values_and_other_point_counts(path, case):
 
 @pytest.mark.parametrize("path", ["new", "old"])
 def test_uninitialized_hydrofoils_regression(path):
-    code = mutated(boat_code(), "memset(state, 0, 3 * sizeof(*state));", "(void)state;")
+    code = mutated(boat_code(), "csmemset(state, 0, 3 * sizeof(*state));", "(void)state;")
     status, output = run(executable(code), f"mcc_nan_water_{path}")
     assert status == 2 and "finite force" in output, output
 
 
 @pytest.mark.parametrize("path", ["new", "old"])
 def test_disabled_powered_flags_do_not_consume_poison(path):
-    code = mutated(boat_code(), "memset(state, 0, 3 * sizeof(*state));", "(void)state;")
+    code = mutated(boat_code(), "csmemset(state, 0, 3 * sizeof(*state));", "(void)state;")
     status, output = run(executable(code), f"mcc_nan_unpowered_consumer_only_{path}")
     assert status == 0, output
 
 
 @pytest.mark.parametrize("path", ["new", "old"])
 @pytest.mark.parametrize("fault", ["propeller", "bounds"])
-def test_unrelated_regressions_are_not_known_legacy_failures(path, fault):
+def test_active_control_and_scratch_bounds_regressions(path, fault):
     if fault == "propeller":
         code = mutated(boat_code(), "state[0].water_friction_velocity = vehicle->vehicle.speed;",
                        "state[0].water_friction_velocity = vehicle->vehicle.speed + 1.0f;")
@@ -110,9 +94,9 @@ def test_unrelated_regressions_are_not_known_legacy_failures(path, fault):
 @pytest.mark.parametrize("path", ["new", "old"])
 @pytest.mark.parametrize("poison", ["nan", "finite"])
 @pytest.mark.parametrize("flags", ["water", "all"])
-def test_isolated_shared_initialization_proof(path, poison, flags):
-    # Hypothetical correction in the extracted test copy only. Production must
-    # retain its MCC guard until the shared simulation/network contract changes.
-    code = mutated(boat_code(), "if (mcc_cache_tags_loaded()) memset", "memset")
+def test_initialization_must_not_depend_on_map_family(path, poison, flags):
+    # Reintroducing the former MCC-only correction must fail the legacy path.
+    code = mutated(boat_code(), "csmemset(state, 0, 3 * sizeof(*state));",
+                   "if (mcc_cache_tags_loaded()) csmemset(state, 0, 3 * sizeof(*state));")
     status, output = run(executable(code), f"legacy_{poison}_{flags}_{path}")
-    assert status == 0, output
+    assert status == 2, output

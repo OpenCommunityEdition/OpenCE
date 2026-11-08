@@ -21,7 +21,7 @@ This development branch requires matching GulchCE network builds.
 </h3>
 <br>
 <p align="center">
-Shared checkpoint recovery uses a new network agreement across all map families.
+Shared checkpoint recovery and boat controls require matching simulation agreements.
 </p>
 <br>
 <p align="center">
@@ -55,8 +55,9 @@ The Linux binary release is available on the [AUR](https://aur.archlinux.org/pac
 ## Can I play with OpenCE clients?
 
 This development branch requires matching GulchCE clients on Xbox, Custom
-Edition and MCC maps. Shared checkpoint recovery changes the network agreement
-so delayed messages cannot affect a restored player's earlier object handle.
+Edition and MCC maps. Shared checkpoint recovery separates delayed messages
+from a restored player's earlier object handle. Boat controls also require
+matching simulation so hosts and predicting clients use initialized forces.
 Existing OpenCE 41 clients cannot join these sessions.
 
 **GulchCE Standard** keeps the optional shoulder camera disabled. **GulchCE

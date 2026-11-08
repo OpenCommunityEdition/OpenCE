@@ -26,13 +26,13 @@ The stage evidence below records the changes, actual validation and limits.
 | 4 | Replace repeated per-texture stream scans with a local per-tag cursor. | Complete |
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
-| 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
+| 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; console correction reopened alongside Milestone 11 |
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; recovery failure addressed in Milestone 10 |
 | 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
-| 11 | Correct shared boat control initialization under a separated engine/network agreement. | Next; old-client crossplay constraint removed |
+| 11 | Correct shared boat control initialization under a separated engine/network agreement; complete the separately authorized console lifetime correction. | In progress; implementation and validation |
 
-The final gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
+The completed Milestone 10 gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
 with passing MCC and four-platform debug workflows and 87 focused local passes.
 The comment-only follow-up `7ed70168a` also passes both workflows.
 Its [validation record](#stage-10-shared-checkpoint-recovery-fix) distinguishes
@@ -41,8 +41,9 @@ pre-final checks from final checks, and passing transport from unmeasured
 cross-log state equivalence. The new agreements are base 32714, MCC 66 and
 camera 32716/32717; historical verification used OpenCE 41/MCC 65.
 All 21 structural HUD profiles remain with measured evidence and removal
-conditions. The shared console-syntax defect remains unfixed, as explicitly
-requested. Milestone counts are not an estimate of percentage effort remaining
+conditions. On 8 November the user explicitly authorized the shared console
+syntax correction alongside Milestone 11, superseding its earlier deferral.
+Milestone counts are not an estimate of percentage effort remaining
 and do not establish equal audit depth for every MCC module.
 
 All future changes remain evidence-backed, with general engine defects fixed
@@ -237,7 +238,7 @@ Convert the twelve strict legacy expected failures to ordinary passing
 regressions only when the authorized correction fixes those paths; preserve
 their behavioral coverage and historical failures. A compatibility-dependent
 deferral leaves this repair milestone open. This remains separate work after
-Milestone 10; its implementation has not begun.
+Milestone 10. Its implementation and validation are now in progress.
 
 #### Former deferral: unconditional shared boat fix
 
@@ -2681,3 +2682,65 @@ successful creation of every replica. MCC extra grenade/campaign sidecars
 remain separate periodic updates, so ordinary inventory coverage is not a
 claim about every MCC sidecar. Historical failures and archives under
 `build/stage10` remain unchanged.
+
+
+## Stage 11: shared boat and console lifetime corrections
+
+Implementation and validation are in progress. The 8 November request includes
+both Milestone 11's shared boat fix and the separately investigated console
+syntax lifetime defect. The earlier console deferral is historical. Work stays
+in the existing `mcc-code-refactor` worktree; original maps and saves are untouched.
+
+### Shared boat producer and agreement
+
+`update_human_boat_physics` now initializes exactly its three temporary powered
+point records before the existing assignments. The native accepted-input
+contract and both force consumers establish a shared producer defect. The
+former MCC helper, its declaration and sole call are removed; MCC receives the
+same initialized values. Other point counts, authored tags, arithmetic and seat
+rules are unchanged. No persistent state or save layout is added by this fix.
+
+The unchanged baseline `46f8792f5e5c7642a0f729af097467f56a323ccb` fails twelve
+unmasked boat cases. The expanded harness also runs the actual new-physics
+linear integration and position publication, in addition to the existing old
+path. It reports twelve legacy failures and twelve corresponding MCC passes
+against the frozen baseline producer. With the shared correction, all 64 boat
+checks pass. Guard-removal proof cases have become ordinary regressions and
+negative controls that reintroduce the former MCC guard; their finite/NaN,
+active-control, scratch-boundary and point-count coverage remains.
+
+The combined local boat and neighboring vehicle/seat/damage/color selection
+passes 116 tests. Updated admission, camera, codec and CI-selection checks pass
+87 tests. These are controlled real-source harness checks, not full game or
+upstream compatibility results. Shared agreement 32718, MCC 67 and camera
+32720/32721 exclude incompatible older peers; the wire manifest changes only
+these agreement values. The previous agreements are explicitly rejected by
+both discovery/session tests and the direct-join handler tests.
+
+Private evidence is under `build/stage11-fix/boat` and
+`build/stage11-fix/admission-neighbors.log`. The preserved M10 native executable
+has SHA-256 `66c6565fbe908a1b489389a0e68af968d26d76985a3ecec31cee60569744dc04`.
+It is the earlier local portable release built from the final M10 gameplay
+sources, not an exact-revision CI build. Its executable, PDB and SDL DLL were
+copied and verified before rebuilding.
+
+### Console baseline and affected map selection
+
+The preserved executable reproduces the console lifetime defect on Xbox Blood
+Gulch, Custom Edition Death Island and Workshop Ruby B40. Each saves inside a
+sleeping temporary expression, lets it finish, waits externally through at
+least two collection opportunities, compiles a replacement command and loads
+the unchanged core. All three accept the saved image and then report an expired
+script-node error, with abnormal exit. These are failing reproductions, not
+passing validation. Raw logs, exact commands and cores are retained separately.
+The corrected runtime probe will require replay of the captured marker, rather
+than accepting mere absence of an assertion.
+
+A bounded read-only survey of 152 installed MCC version-13 maps found the
+three-point friction case in Mercury2 (`3021510694`) and B30 (`3512468479`).
+Useful control boats in other packages have rear powered-point flags `0x08`
+(lift only), while these affected boats use `0x0a` (lift and friction) on all
+three points. Ruby's inspected maps contain no boat-controller tags. This
+survey selects runtime cases; it does not establish loading or gameplay success.
+The inspector, input hashes and authored tag/placement records are retained in
+`build/stage11-fix/validation`.

@@ -245,7 +245,7 @@ following packet details into those files.
 
 ## GulchCE compatibility and teardown
 
-GulchCE Standard uses shared agreement 32714 for Xbox/CE and MCC agreement 66
+GulchCE Standard uses shared agreement 32718 for Xbox/CE and MCC agreement 67
 for MCC maps. These require updated GulchCE peers, not OpenCE 41 or older
 GulchCE builds. Map-vote messages remain IDs 94-95; the shared checkpoint
 boundary is 96; MCC owns IDs 97-100 and join kind 101. The 512-byte MCC
@@ -278,7 +278,7 @@ do not make an MCC capability claim sufficient to pass normal admission.
 `online-third-person` selects its contract per session. GulchCE Standard
 disables shoulder-camera gameplay. Its stored `opence_crossplay` setting name
 is retained for configuration compatibility, not an OpenCE compatibility claim.
-GulchCE Third Person uses camera versions 32716/32717, the additional shoulder
+GulchCE Third Person uses camera versions 32720/32721, the additional shoulder
 relay byte, and a mandatory kind 102 join envelope. MCC retains its independent
 version 66 and kind 101 admission inside that envelope. Forced Off remains a camera
 session; it does not relax admission.

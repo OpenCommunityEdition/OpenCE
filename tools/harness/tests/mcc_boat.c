@@ -11,7 +11,8 @@ typedef union { struct { real i,j,k; }; struct { real x,y,z; }; real n[3]; } rea
 typedef real_vector3d real_point3d;
 typedef struct { real i,j; } real_vector2d;
 typedef struct { real i,j,k,w; } real_quaternion;
-typedef struct { real data[13]; } real_matrix4x3;
+typedef struct { real data[10]; real_point3d position; } real_matrix4x3;
+typedef struct { real data[9]; } real_matrix3x3;
 typedef struct { real_vector3d n; real d; } real_plane3d;
 struct tag_block { long count; void *address; void *definition; };
 #include "types.inc"
@@ -26,7 +27,11 @@ struct object_datum { struct object_state object; long definition_index; };
 struct object_definition { struct { struct { long index; } physics; } object; };
 struct vehicle_datum {
     struct object_state object;
-    struct { real speed, turn; real_vector3d collision_force, collision_torque; } vehicle;
+    struct {
+        real speed, turn;
+        real_vector3d collision_force, collision_torque;
+        unsigned long stuck_mass_point_flags;
+    } vehicle;
     long definition_index;
 };
 struct vehicle_definition { struct { struct { struct { long index; } physics; } object; } unit; };
@@ -47,8 +52,9 @@ static struct mass_point_definition mass_definitions[3];
 static real_vector3d up = {{0,0,1}}, down = {{0,0,-1}};
 static real_vector3d *global_up3d = &up, *global_down3d = &down;
 static real global_gravity = 0.0035651792f;
-static real_vector3d total_force, total_torque;
-static int loaded, calls, warned_about_physics_mass_points;
+static int loaded, calls, warned_about_physics_mass_points, warned_about_physics_inertial_matrix;
+static int debug_physics_disable_penetration_freeze;
+static real_matrix3x3 inertia[2];
 static struct powered_mass_point_datum *received;
 static int mcc_cache_tags_loaded(void) { return loaded; }
 
@@ -81,26 +87,38 @@ static int mcc_cache_tags_loaded(void) { return loaded; }
 #define angle_between_vectors3d(a,b) 0.0f
 #define vehicle_dot_product3d_target(a,b) 0.0f
 #define error(...) ((void)0)
+#define csmemset memset
+#define match_assert(a,b,c) ((void)0)
 #define match_vassert(a,b,c,d) ((void)0)
 #define match_assert_valid_real_vector3d(a,b,v) ((void)0)
 #define match_assert_valid_real_vector3d_axes2(a,b,c,d) ((void)0)
 #include "vectors.inc"
 
 /* Boat orientation, world queries and transforms are fixed for an axis-aligned
- * fixture. Powered flags, friction/lift and force sums are extracted from
- * physics.c. This is not a complete vehicle simulation. */
+ * fixture. Powered flags, friction/lift, force sums and linear integration
+ * are extracted from physics.c. This is not a complete vehicle simulation. */
 #define matrix4x3_transform_point(m,p,out) (*(out) = *(p))
 #define matrix4x3_transform_normal(m,v,out) (*(out) = *(v))
 #define matrix4x3_multiply(a,b,out) memset(out, 0, sizeof(*(out)))
 #define matrix4x3_from_point_and_vectors(m,p,f,u) memset(m, 0, sizeof(*(m)))
 #define matrix4x3_rotation_from_quaternion(m,q) memset(m, 0, sizeof(*(m)))
 #define matrix4x3_transpose(m) ((void)0)
+#define matrix3x3_from_forward_and_up(m,f,u) memset(m, 0, sizeof(*(m)))
+#define matrix3x3_multiply(a,b,out) memset(out, 0, sizeof(*(out)))
+#define matrix3x3_transpose(a,b) (b)
+#define matrix3x3_transform_vector(m,v,out) (*(out) = *(v))
+#define rotate_vectors3d_by_angular_velocity(f,u,v,out_f,out_u) (*(out_f) = *(f), *(out_u) = *(u))
+#define PHYSICS_POINT_FROM_LINE3D point_from_line3d
 #define scenario_location_from_point(l,p) ((void)0)
 #define scenario_location_from_line(l,o,p,n) ((void)0)
-#define object_translate(i,p,l) ((void)0)
+#define object_translate(i,p,l) (test_object.object.position = *(p))
+#define object_set_position(i,p,f,u) (test_vehicle.object.position = *(p), \
+    test_vehicle.object.forward = *(f), test_vehicle.object.up = *(u))
 #define physics_compute_unit_collisions(i) ((void)0)
 #define scenario_location_water_depth(l,p) 1.0f
 #define _collision_test_for_bipeds_dead_flags 0
+#define _collision_test_for_vehicles_flags 1
+#define _collision_test_front_facing_surfaces_bit 1
 #define _material_ice 1
 enum { _object_at_rest_bit, _object_on_ground_bit, _object_on_media_bit,
        _object_partially_under_media_bit, _object_wholly_under_media_bit };
@@ -114,6 +132,7 @@ static int collision_test_vector(int flags, real_point3d const *point,
                                 real_vector3d const *vector, long index,
                                 struct collision_result *collision)
 {
+    if (flags != _collision_test_for_bipeds_dead_flags) return FALSE;
     collision->t = 0.5f;
     collision->plane.n = up;
     return TRUE;
@@ -132,14 +151,6 @@ static int physics_instance_new(struct physics_instance *instance, long index)
     memset(instance, 0, sizeof(*instance));
     instance->physics = &test_physics;
     return TRUE;
-}
-static void physics_update_new(struct physics_instance const *instance,
-                               struct powered_mass_point_datum const *state,
-                               struct mass_point_datum const *points,
-                               real_vector3d const *force, real_vector3d const *torque)
-{
-    total_force = *force;
-    total_torque = *torque;
 }
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
@@ -165,6 +176,7 @@ int main(int argc, char **argv)
     struct powered_mass_point_datum state[MAXIMUM_POWERED_MASS_POINTS_PER_PHYSICS+1];
     struct powered_mass_point_datum before[MAXIMUM_POWERED_MASS_POINTS_PER_PHYSICS+1];
     struct mass_point_datum points[3];
+    struct object_state const *result;
     unsigned long flags;
     int i, j;
     char const *case_name = argv[1];
@@ -182,9 +194,14 @@ int main(int argc, char **argv)
     test_physics.water_depth = 1.0f;
     test_physics.ground_depth = 1.0f;
     test_physics.ground_normal_k1 = 1.0f;
+    test_physics.inertial_matrix.count = 2;
+    test_physics.inertial_matrix.address = inertia;
     test_vehicle.vehicle.speed = strstr(case_name, "reverse") ? -0.25f :
                                  strstr(case_name, "zero") ? 0.0f : 0.25f;
     test_object.object.translational_velocity.i = 1.0f;
+    test_object.object.forward.i = 1.0f;
+    test_object.object.up.k = 1.0f;
+    test_vehicle.object = test_object.object;
     flags = strstr(case_name, "unpowered") ? 0 : strstr(case_name, "all") ?
             (FLAG(NUMBER_OF_POWERED_MASS_POINT_FLAGS)-1) :
             FLAG(_powered_mass_point_water_friction_bit) | FLAG(_powered_mass_point_water_lift_bit);
@@ -221,8 +238,8 @@ int main(int argc, char **argv)
         return 0;
     }
     CHECK(received == state);
-    /* These checks precede expected force failures: a regression in the active
-     * channels or scratch bounds must not be hidden by a known legacy xfail. */
+    /* Separate active control/bounds failures from the poisoned force cases
+     * in the negative controls. */
     CHECK(state[0].water_friction_velocity == test_vehicle.vehicle.speed);
     for (i=0;i<3;++i) {
         CHECK(state[i].water_lift_ratio == (i==2 ? 0.005f : 0.003f));
@@ -241,16 +258,15 @@ int main(int argc, char **argv)
         FORCE_CHECK(NEAR(points[i].powered_force.k, flags ? (i==2 ? 0.060f : 0.036f) : 0.0f));
         FORCE_CHECK(NEAR(points[i].powered_force.i, 0.0f));
     }
-    if (test_physics.radius > 0.0f) {
-        FORCE_CHECK(NEAR(test_object.object.translational_velocity.i,
-                   1.0f + (-10.5f + (flags ? 2.0f*test_vehicle.vehicle.speed : 0.0f))/12.0f));
-    } else {
-        FORCE_CHECK(isfinite(total_force.i) && isfinite(total_force.j) && isfinite(total_force.k));
-        FORCE_CHECK(NEAR(total_force.i, -10.5f + (flags ? 2.0f*test_vehicle.vehicle.speed : 0.0f)));
-        FORCE_CHECK(total_torque.i == 0.0f && total_torque.j == 0.0f && total_torque.k == 0.0f);
-    }
+    result = test_physics.radius > 0.0f ? &test_object.object : &test_vehicle.object;
+    FORCE_CHECK(NEAR(result->translational_velocity.i,
+               1.0f + (-10.5f + (flags ? 2.0f*test_vehicle.vehicle.speed : 0.0f))/12.0f));
+    FORCE_CHECK(NEAR(result->position.x, result->translational_velocity.i));
+    FORCE_CHECK(isfinite(result->position.y) && isfinite(result->position.z));
+    FORCE_CHECK(result->angular_velocity.i == 0.0f && result->angular_velocity.j == 0.0f &&
+                result->angular_velocity.k == 0.0f);
     for (i=0;i<3;++i) {
-        if (loaded && !strstr(case_name, "consumer_only")) {
+        if (!strstr(case_name, "consumer_only")) {
             CHECK(i==0 || state[i].water_friction_velocity == 0.0f);
             CHECK(state[i].ground_friction_velocity == 0.0f && state[i].air_friction_velocity == 0.0f);
             CHECK(state[i].air_lift_ratio == 0.0f && state[i].thrust_fraction == 0.0f);

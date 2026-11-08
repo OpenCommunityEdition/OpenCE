@@ -100,7 +100,7 @@ font and full-size selection background. The compatibility selector defaults
 to **GulchCE Standard** (STANDARD in the menu). The stored configuration value
 `opence_crossplay` is retained so existing settings still select this mode;
 it no longer promises OpenCE interoperability. Xbox and Custom Edition maps
-require shared agreement 32714, and MCC maps require MCC agreement 66.
+require shared agreement 32718, and MCC maps require MCC agreement 67.
 The optional shoulder camera, its input bit and muzzle solver are disabled,
 regardless of the saved preference. Shared checkpoint recovery is active in
 both session modes.
@@ -109,7 +109,7 @@ All network peers need matching updated GulchCE contracts. The selector does
 not make MCC maps compatible with OpenCE or older GulchCE builds.
 
 **GulchCE Third Person** enables Player Choice / Forced On / Forced Off and
-requires camera agreement 32716 (Xbox/CE) or 32717 (MCC). It uses bounded join
+requires camera agreement 32720 (Xbox/CE) or 32721 (MCC). It uses bounded join
 kind 102 around the normal join, or around MCC's own kind 101 envelope. The
 larger bound includes OpenCE 41's account-link credentials. Camera policy uses
 bits 3-4, leaving OpenCE's co-op flags in bits 0-2. Forced Off is still a camera

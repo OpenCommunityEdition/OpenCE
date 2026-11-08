@@ -49,7 +49,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *s)
 boolean network_game_server_send_game_data_pregame(struct network_game_server *s){(void)s;sends++;return 1;}
 static short third_person_host_policy(void){return 1;}
 static void third_person_reset(void){resets++;}
-unsigned int mcc_protocol_version(char const *map){return !strncmp(map,"mcc_maps",8)?MCC_PROTOCOL_VERSION:32714;}
+unsigned int mcc_protocol_version(char const *map){return !strncmp(map,"mcc_maps",8)?MCC_PROTOCOL_VERSION:32718;}
 
 struct network_game_server_client_machine {int joined;};
 static int network_game_server_client_machine_is_joined_to_game(struct network_game_server *s,
@@ -86,27 +86,30 @@ int main(void) {
     word join[256]={0},outer[260],inner[260],size;
     byte saved;
     int i,bytes;
-    CHECK(HALO_PORT_NETWORK_VERSION==32714 && MCC_PROTOCOL_VERSION==66);
+    CHECK(HALO_PORT_NETWORK_VERSION==32718 && MCC_PROTOCOL_VERSION==67);
     host=&server;third_person_session_host_begin();CHECK(!third_person_session_active());
     network_game_server_open_game(&server);CHECK(!third_person_session_locked());
     CHECK(third_person_session_set(1));CHECK(third_person_session_set(0));
-    CHECK(third_person_session_version("bloodgulch")==32714);
-    CHECK(third_person_session_version("mcc_maps\\test")==66);
-    CHECK(third_person_session_compatible("mcc_maps\\test",66,9));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",65,9));
-    CHECK(third_person_session_compatible("bloodgulch",32714,1));
+    CHECK(third_person_session_version("bloodgulch")==32718);
+    CHECK(third_person_session_version("mcc_maps\\test")==67);
+    CHECK(third_person_session_compatible("mcc_maps\\test",67,9));
+    CHECK(!third_person_session_compatible("mcc_maps\\test",66,9));
+    CHECK(third_person_session_compatible("bloodgulch",32718,1));
     CHECK(!third_person_session_compatible("bloodgulch",41,1));
+    CHECK(!third_person_session_compatible("bloodgulch",32714,1));
+    CHECK(!third_person_session_compatible("bloodgulch",32716,1));
+    CHECK(!third_person_session_compatible("mcc_maps\\test",32717,9));
     CHECK(!third_person_session_compatible("bloodgulch",32712,1));
     CHECK(!third_person_session_compatible("mcc_maps\\test",32713,9));
-    CHECK(third_person_session_compatible("bloodgulch",32716,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32717,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32716,0));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",32717,1));
-    CHECK(third_person_session_compatible("mcc_maps\\test",32717,9));
+    CHECK(third_person_session_compatible("bloodgulch",32720,1));
+    CHECK(!third_person_session_compatible("bloodgulch",32721,1));
+    CHECK(!third_person_session_compatible("bloodgulch",32720,0));
+    CHECK(!third_person_session_compatible("mcc_maps\\test",32721,1));
+    CHECK(third_person_session_compatible("mcc_maps\\test",32721,9));
     CHECK(!third_person_session_compatible("bloodgulch",32708,1));
     CHECK(third_person_session_set(1));CHECK(server.game.cooperative_flags==8);
-    CHECK(third_person_session_version("bloodgulch")==32716);
-    CHECK(third_person_session_version("mcc_maps\\test")==32717);
+    CHECK(third_person_session_version("bloodgulch")==32720);
+    CHECK(third_person_session_version("mcc_maps\\test")==32721);
     CHECK(lobby_join_reset());CHECK(!third_person_session_set(0));
     CHECK(!lobby_join.adding && lobby_join.controller==NONE);
     CHECK(third_person_session_active() && third_person_session_locked());
@@ -143,19 +146,21 @@ int main(void) {
     machine.joined=1;CHECK(network_game_server_handle_client_message(&server,&machine,join,40));
     machine.joined=0;CHECK(!network_game_server_handle_client_message(&server,&machine,join,40));
     third_person_session_host_end();host=NULL;CHECK(!third_person_session_active());
-    third_person_session_client_begin(32716);CHECK(third_person_session_active());
+    third_person_session_client_begin(32720);CHECK(third_person_session_active());
     network_game_client_late_join_time=9;network_game_client_late_join_clock_pending=1;
     network_game_client_start_pending=1;network_game_client_incompatibility_told=1;
     network_game_client_reset(&client,0);CHECK(!third_person_session_active());
     CHECK(!network_game_client_late_join_time&&!network_game_client_late_join_clock_pending);
     CHECK(!network_game_client_start_pending&&!network_game_client_incompatibility_told);
     CHECK(resets>0&&sends>0);
-    third_person_session_client_begin(32717);client.connection=&client;
+    third_person_session_client_begin(32721);client.connection=&client;
     network_game_client_reset(&client,1);CHECK(!third_person_session_active());
     mode="gulchce_third_person";host=&server;third_person_session_host_begin();
     network_game_client_reset(&client,0);CHECK(third_person_session_active());
     third_person_session_host_end();host=NULL;
     third_person_session_client_begin(41);CHECK(!third_person_session_active());
+    third_person_session_client_begin(32716);CHECK(!third_person_session_active());
+    third_person_session_client_begin(32717);CHECK(!third_person_session_active());
     build_message_header(join,3,_message_type_packet,0);((byte *)join)[2]=_message_client_join_game_request;
     CHECK(network_game_server_handle_client_message(&server,&machine,join,3));
     third_person_session_client_begin(32708);CHECK(!third_person_session_active());
@@ -268,7 +273,7 @@ int main(void) {
     word plain[16]={0},mcc_join[MCC_PROTOCOL_JOIN_MAX/2],camera_join[THIRD_PERSON_PROTOCOL_JOIN_MAX/2];
     word *message;
     short bytes;
-    CHECK(MCC_PROTOCOL_VERSION==66);
+    CHECK(MCC_PROTOCOL_VERSION==67);
     build_message_header(plain,sizeof(plain),_message_type_packet,0);
     ((byte *)plain)[sizeof(plain)-1]=_message_client_join_game_request;
     strcpy(server.game.map.name,"mcc_maps\\test");

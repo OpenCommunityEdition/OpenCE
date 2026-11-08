@@ -2500,12 +2500,12 @@ A non-finite value can contaminate the boat's force, position and orientation;
 the issue reports precisely those invalid vectors. This also explains why a
 client's earlier visible copy cannot be boarded on the authoritative host.
 
-`mcc_boat_controls_initialize` in `mcc_objects.c` zeroes the three temporary
-controls before the existing boat routine assigns its rotations, lift and
-propeller speed. The only shared addition is a port-marked call inside the
-three-point boat branch (and its declaration include). Conversion alone
-cannot initialize this private per-tick stack storage. Non-MCC execution is a
-no-op; other vehicle controllers and boat point counts retain their paths.
+`update_human_boat_physics` in `source/units/vehicles.c` zeroes the three
+temporary controls before assigning its rotations, lift and propeller speed.
+This shared producer correction replaces the former MCC-only initializer.
+Conversion alone cannot initialize this private per-tick stack storage. The
+native engine accepts the same powered-point flags, so Xbox and Custom Edition
+boats need the correction too. Other vehicle controllers and boat point counts retain their paths.
 No authored tags, network permissions, packet fields or seat rules change.
 There is no persistent state to clean up across map-family transitions.
 
@@ -2515,7 +2515,7 @@ protocol was then 29. The current agreements are recorded in
 [NETCODE.md](../port/linux/NETCODE.md#gulchce-network-agreement).
 
 The [boat harness](../tools/harness/tests/test_mcc_boat.py) extracts the real
-controller, scratch structure, MCC initializer and force consumers. It uses
+controller, scratch structure, force consumers and linear integration. It uses
 non-finite and finite stale control values, checks observable forces, active
 controls, alternate point counts and adjacent storage, and removes the
 initializer in an isolated negative control. Its world queries and transforms
@@ -2564,21 +2564,23 @@ The current MCC initialization avoids both failures. This establishes a class
 of supported inputs, without a map name, checksum or asset selector; it does
 not establish that stock Xbox maps contain such boats.
 
-The minimal shared correction would initialize exactly three records inside
+The minimal shared correction initializes exactly three records inside
 the existing three-point branch, retaining its arithmetic and the other-count
-fallback, then retire the MCC helper. It is **deferred**: the pinned OpenCE 41
+fallback, and retires the MCC helper. It was initially **deferred**: the pinned OpenCE 41
 implementation has the same omission, and clients predict driven vehicles.
 Changing accepted Xbox/CE simulation requires agreement/version separation;
 keeping version 41 would falsely claim compatibility, while changing it would
-end the existing crossplay contract. The user chose to preserve that contract.
-Production code, the MCC workaround and all network versions remain unchanged.
-Do not attach this generic correction to an optional camera mode or map identity.
+end the existing crossplay contract. The user initially chose to preserve that
+contract, then explicitly removed the constraint for Milestone 11. The shared
+correction now requires updated peers through the agreements documented in
+[NETCODE.md](../port/linux/NETCODE.md#gulchce-network-agreement). It is independent
+of optional camera mode and map identity.
 
-Legacy force failures are explicit known failures in the harness, not passing
-compatibility results. The deferred correction can be reconsidered when an
-upstream agreement includes it, or when a separate compatibility policy is
-explicitly authorized. It then needs the shared fix's platform, map-family,
-vehicle-prediction and transport validation. See the
+The twelve historical legacy failures are now ordinary passing regressions.
+Isolated mutations reintroducing the MCC guard reproduce the defect; adjacent
+storage, active controls and alternate point-count checks remain. Source
+inspection also found the omission in upstream `fc9deb0b1`; no unmodified
+upstream compatibility is claimed. See the
 [refactor validation record](mcc_refactor_validation.md) for this investigation's
 actual checks and limits.
 
