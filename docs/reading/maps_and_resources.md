@@ -235,15 +235,27 @@ session/content changes clear the grace; replayed completion cannot renew it.
 The wire limits and protocol versions are in
 [NETCODE.md](../../port/linux/NETCODE.md#mcc-package-sharing).
 
+Before a pregame host starts synchronous map loading,
+`mcc_ui_network_download_pending` in
+[`mcc_ui_network.inl`](../../port/linux/game/mcc_ui_network.inl) checks joined
+machines for active MCC offers, transfers or completion-to-admission grace.
+The existing MCC start check holds loading while these are active. The update
+keeps an already running, unpaused countdown at least three seconds from
+expiry, allowing normal networking to service the joiners. It preserves longer,
+stopped and manually paused countdowns. Once download/admission activity ends,
+the ordinary exact-map readiness checks govern starting. This prevents a
+blocking host load from starving an admitted downloader; it does not provide
+network service for a new request arriving after that load has already begun.
+
 Managed-copy receipt, storage-use display and removal controls use
 [`mcc_share_storage.c`](../../port/linux/game/mcc_share_storage.c) and
 [`mcc_share_menu.c`](../../port/linux/game/mcc_share_menu.c).
 The ownership contract permits removal only of verified recorded files, keeps
 unrelated additions and saves, and requires the caller to exclude the active
-session package. The native UI inspection found and corrected a main-menu
-removal gate; the corrected confirmation/removal flow still needs runtime
-validation. Browser persistence and publication
-remain Milestone 14 work; a successful web compile does not establish sharing.
+session package. Native UI inspection verified the corrected main-menu gate,
+confirmation caption and removal while preserving the source snapshot.
+Browser persistence and publication remain Milestone 14 work; a successful
+web compile does not establish sharing.
 
 The game harness compiles the real adapter, planner, session and stage over
 synthetic files. Engine/UI/identity and metadata-parser calls are stubs there;
@@ -274,8 +286,13 @@ The small completion hook in `main_won_map_private` delegates to
 [`mcc_main_campaign_won`](../../port/linux/game/mcc_main.c), guarded by a loaded
 MCC campaign and the setting. Solo games retain difficulty and queue the next
 map. Network clients do not choose; hosts use the existing co-op lobby/settings
-transition. No progression cursor survives unload: the current level and its
-own package identify the next mission. Standalone and final levels return to
+transition. `mcc_ui_network_campaign_won` records a one-use request for that
+server, round and next mission, returning the host to the ready lobby with
+the intended selection. A different selection or session teardown cancels
+the request; ordinary same-selection identity validation does not. The download
+barrier described above lets missing clients acquire the next mission before
+the host loads it. No progression cursor survives unload: the current level
+and its own package identify the next mission. Standalone and final levels return to
 the menu or lobby. Xbox and CE still use their existing completion code.
 
 Managed downloads retain this package boundary. If mission `z10` is in one

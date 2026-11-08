@@ -551,10 +551,13 @@ existing manual and Steam copies. It rechecks that installed snapshot before
 joining. These filesystem checks protect against remote paths; they are not a
 sandbox against a malicious process with the same local filesystem authority.
 
-Managed snapshot storage/removal UI is integrated; a main-menu removal gate
-found during native inspection has been corrected and awaits its runtime
-rerun. A native Ruby host download, metadata/artwork byte comparison and late
-join passed; the final runtime/platform matrix remains pending. See the
+Managed snapshot storage/removal UI is integrated. Native checks verified the
+confirmation label, removal and preservation of the original package. Ruby
+host download, metadata/artwork byte comparison, late join and differing-version
+preservation passed. Mercury checks verified on-demand delivery and two-player
+gameplay in the following mission, plus initial hosting with a missing mission.
+The matching native/browser transport controls and four-platform CI checks
+also pass within their recorded limits. See the
 [implementation walkthrough](reading/maps_and_resources.md#mcc-package-sharing-between-machines)
 and [validation record](mcc_refactor_validation.md#milestone-13-implementation-evidence).
 The fixture suites exercise production modules over synthetic files; they do

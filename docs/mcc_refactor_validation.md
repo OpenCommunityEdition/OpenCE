@@ -21,13 +21,17 @@ for both milestones; the 8 November request also supersedes the console deferral
 The stage evidence below records the changes, actual validation and limits.
 The subsequent delivery plan adds Milestone 13 for host sharing, Milestone 14
 for Custom Edition and MCC browser playability, and Milestone 15 for the
-upstream contribution. Milestone 13 remains in progress. CI through `5682cbee3`,
+upstream contribution. Milestone 13 is complete within the validation limits
+recorded below. CI through `a972f450a`,
 native downloads, metadata-mismatch preservation, managed removal and Mercury
 follow-on gameplay have passed within the recorded limits. The dedicated
 map-only admission correction passes its native rerun at `f8432e2a3`.
-Further initial-download and on-demand transition runs expose host loading
-that starves pending clients; a general MCC loading barrier is under
-verification. Final validation remains open. Milestones 14 and 15 remain planned.
+Further initial-download and on-demand transition runs exposed host loading
+that starved pending clients. The general MCC loading barrier at `a972f450a`
+passes both native reruns within the recorded limits, and that commit's CI
+passes. Final Xbox/CE native controls, all three native/browser networking
+controls, combined implementation review and verified cleanup are complete.
+Milestones 14 and 15 remain planned.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -42,7 +46,7 @@ verification. Final validation remains open. Milestones 14 and 15 remain planned
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; recovery failure addressed in Milestone 10 |
 | 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
 | 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
-| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | In progress; bounded dedicated admission now passes; initial/on-demand loading barrier and final validation pending |
+| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | Complete; final review, native/transport controls, CI and cleanup pass within recorded limits |
 | 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Planned; explicit requirement, not satisfied by a web build alone |
 | 15 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestones 13 and 14; previously numbered 14 |
 
@@ -93,8 +97,9 @@ mission dependencies and progression. The agreed policy is to obtain and verify
 the campaign manifest upfront, then download and verify each mission and its
 required resources before that mission starts. Reuse matching verified local
 content rather than downloading it again. The planner now includes campaign/mission JSON upfront with only the current
-mission binary. Complete follow-on download/admission and runtime progression
-remain final integration checks; component parsing does not establish them.
+mission binary. The Mercury integration runs below verify follow-on download,
+admission and bounded gameplay progression; component parsing alone does not
+establish them.
 
 Offline/rehost limit: managed mission snapshots remain individually playable;
 they do not form a complete campaign by combining folders. The campaign
@@ -222,8 +227,10 @@ Five contribution commits were cherry-picked with original attribution and
 
 The sixth PR commit, `98130b623`, merges the older `testing` branch into the
 contribution. It was not cherry-picked over the refactored baseline. The
-current adaptation is uncommitted work above `153c607fc`; the old commit
-messages describe the original contribution, not the resulting M13 contract.
+adaptation is committed through `a972f450a`, including the later metadata,
+managed-storage, identity, UI and loading-barrier corrections. The original
+cherry-pick messages describe the contribution at import, not the resulting
+M13 contract; later commits and the evidence below record its adaptation.
 
 Review recommendations and their rationale:
 
@@ -286,28 +293,36 @@ by adapting this PR. Mac remains outside the requested platform scope.
 > attribution and MCC-only boundaries.
 >
 > We have component evidence for consent, refusal, file integrity, cancellation,
-> resource selection and preservation of existing packages. We have not yet
-> completed the final real-map two-machine matrix, so we cannot report your
-> two-PC request as passed. The adapted expectations differ in three places:
+> resource selection and preservation of existing packages. Native Ruby and
+> Mercury download, admission and campaign follow-on checks now include real
+> gameplay using two processes on one Windows PC. Those local loopback runs
+> do not satisfy your two-physical-PC request. The final local native/browser
+> networking controls and platform checks also pass, with their limits recorded.
+> The adapted expectations differ in three places:
 > a same-name different version installs separately; eligible listed Workshop
 > packages can transfer; and disabled downloads offer manual/Workshop choices.
-> We will report the tested builds, map identities, settings, logs and remaining
-> limits when that matrix is complete.
+> The validation record identifies the tested revisions, map identities,
+> settings, logs and remaining limits. Browser MCC playability is separate
+> Milestone 14 work, not a result claimed by these Xbox transport controls.
 
 ### Milestone 13 implementation evidence
 
-Status at this documentation pass: **in progress, not complete**. CI through
-`5682cbee3` is green. Native Ruby download/late-join, metadata-mismatch
+Status at this documentation pass: **complete within the recorded limits**.
+The final gameplay implementation is `a972f450a1da46c2dcdc15b3c30accd473f86941`;
+this closeout changes documentation only. CI through
+`a972f450a` is green. Native Ruby download/late-join, metadata-mismatch
 preservation, Mercury's download and follow-on gameplay, Xbox/CE controls and
 managed snapshot confirmation/removal have passed within the limits below.
 The later Mercury run includes the combined review's attribution/UI corrections.
 The first dedicated map-only run fails admission after verified installation;
 the completion-to-admission grace correction passes its native rerun at
 `f8432e2a3`. Subsequent initial-download and on-demand transition runs expose
-a separate host-loading timeout. A general MCC loading barrier is under
-verification, not a completed fix. Final runtime/platform checks and remaining
-admission/transport coverage remain outstanding. Earlier stages' runtime passes
-do not validate the changed M13 transfer/identity implementation.
+a separate host-loading timeout. The general MCC loading barrier at `a972f450a`
+passes the initial-download and on-demand reruns recorded below. Final Xbox/CE
+native controls, three native/browser Xbox networking cases and verified
+cleanup also pass. Earlier stages' runtime passes do not validate the changed M13
+transfer/identity implementation. All native pairs here are two isolated
+processes on the same Windows PC, not tests across two physical PCs.
 
 The current implementation includes host-only opt-ins, client consent and
 manual/Workshop alternatives; paged bounded manifests; independent gameplay and
@@ -317,8 +332,8 @@ separate `dl_<digest>` snapshot. The ownership record/removal API in
 [`mcc_share_storage.h`](../port/linux/game/mcc_share_storage.h) is an integration
 contract: listing/removing user-visible managed copies and preventing removal
 of the active package are covered by native storage and menu fixtures. Native
-managed removal is now observed; the later dynamic-label correction still
-requires its screenshot rerun.
+managed removal and the corrected dynamic confirmation label are both observed
+in the completed `ruby_storage_final` rerun below.
 No network manifest may supply a local ownership receipt.
 
 Recorded component runs:
@@ -339,8 +354,9 @@ platform/privilege skips; its one failure was sandbox denial of junction
 creation. Rerunning the complete staging and storage suites with junction
 creation available passed 70 cases with one unavailable file-symlink skip.
 These are overlapping selections, not additional totals. The Windows release
-executable builds and corrected-commit CI passes; the later follow-up changes
-still require final platform/runtime validation.
+executable builds and corrected-commit CI passes. The final platform/runtime
+results for the later corrections are recorded below rather than inferred
+from this earlier selection.
 
 | Evidence | Actual result and limit |
 | --- | --- |
@@ -410,6 +426,15 @@ Native runtime and platform evidence recorded on 8 November 2026:
   remains present. The confirmation question worked, but its button still
   displayed "REMOVE SELECTED": that separate dynamic-label defect is addressed
   in the later correction below. The initial failed inspection remains evidence.
+- `ruby_storage_final/storage-audit.json` and its retained frames verify the
+  corrected confirmation label and removal on executable SHA-256
+  `1b5ca52e683dcb6b544d21bde3da06cc1307fa247230cdb3f67467e3a3f7e3b9`.
+  Frame 01440 shows the snapshot still present after the first action and the
+  button correctly labelled "CONFIRM REMOVAL". Frame 02400 shows removal after
+  the second action, with no managed snapshots remaining and the removal
+  button hidden. The process exits with code 0 and all 17 original seed files
+  rehash unchanged. This is native menu confirmation/removal evidence, not
+  consent-overlay, campaign or active-session removal coverage.
 - CI at `17ce5d6e8` passed Windows, Android and web debug builds, Android package
   importer checks, web smoke/rooms in Chromium and Firefox, and MCC HUD render.
   Native WebRTC passed clean delivery at 320/320 in both browsers; the 10% loss
@@ -438,7 +463,7 @@ Native runtime and platform evidence recorded on 8 November 2026:
   in `build/m13-platform-final/logs/native-cdbe0460b.json`. This is a different
   binary from the Ruby run above; that older runtime result does not validate
   the complete current commit. The native cases below use this `cdbe0460b`
-  binary; none is relabeled as execution of the later uncommitted corrections.
+  binary; none is relabeled as execution of later corrections.
 - `mercury_campaign/content-audit.json` and `results.json` record Workshop
   item `3021510694`, `mercury_falling`, both opt-ins enabled and an initially
   empty client. The first download installs at 13:56:07 UTC, resolves its
@@ -567,9 +592,90 @@ Native runtime and platform evidence recorded on 8 November 2026:
   timeout comes from the real connection deadline; the runner neither creates
   that diagnostic nor injects a failure. These two reproductions justify an
   MCC-wide host loading barrier for pending consent, transfer and admission,
-  rather than a special case for returning campaign players. That correction
-  is being generalized and verified; Xbox/CE loading policy remains outside
-  the MCC fix's scope.
+  rather than a special case for returning campaign players. The generalized
+  correction is tested in the following reruns; Xbox/CE loading policy remains
+  outside the MCC fix's scope.
+- `mercury_on_demand_fixed/gameplay-audit.json` passes on
+  `a972f450a1da46c2dcdc15b3c30accd473f86941`, executable SHA-256
+  `03322a73077d667a32737d6d5ecd101715c82784a001865b07b85201749ca5e2`.
+  Only the ten-file Falling snapshot is seeded. After first-mission ticks
+  30–330 and the deliberate host `(game_won)`, the host waits while the client
+  considers the second offer. Frame 08160 shows the consent prompt. Results
+  record an owner-verified Return posting, but no exact wall-clock input time;
+  the observed prompt and new map creation bound acceptance. The new map is
+  created at 14:59:52.433684 UTC and its receipt at 15:00:24.732309, an interval
+  of 32.298625 seconds. Identity matches at 15:00:27, when the host first
+  signals second-mission loading; host/client loads finish at 15:00:46/47.
+  Both peers have a fresh second segment of 80 samples at ticks 30–2400,
+  including 62 samples with both players living at ticks 570–2400. Frame
+  23520 shows normal first-person gameplay and the other player marker without
+  the sharing overlay. All 20 snapshot files, including receipts, and ten
+  distinct original Workshop files match their audited hashes. The first
+  snapshot is unchanged, staging is empty and both processes exit with code 0.
+  Shared resource writes cover 686,853,355 bytes in approximately 5.457 seconds;
+  their hashes match both snapshots and the original. This supports local
+  reuse, without claiming measured network-byte savings. The bounded result
+  establishes download, consent, installation and follow-on co-op, not full
+  campaign completion or an independent state-divergence comparison.
+- `mercury_initial_fixed/gameplay-audit.json` passes on the same `a972f450a`
+  executable, starting directly with missing `mercury2`, without campaign
+  completion. The first-mission snapshot is seeded for resource reuse: this
+  differs from the entirely empty client in the failing initial-load fixture.
+  The new map is created at 15:04:02.482597 UTC and its receipt at
+  15:04:34.749666, an interval of 32.267069 seconds. Identity resolution and
+  the host's first load signal follow at 15:04:37; both peers load at 15:04:57.
+  Each records 96 monotonic samples at ticks 30–2880, including 78 samples
+  with both players living at ticks 570–2880. All 20 snapshot files/receipts
+  and ten original Workshop files match their audited hashes, the seeded
+  snapshot is unchanged, and staging is empty. Both processes exit with code
+  0; each removes six generated caches totaling 767,557,632 bytes without
+  cleanup errors. No timeout, sharing failure, assertion or access violation
+  is found. This verifies the barrier during initial admission with resource
+  reuse, not another full-resource download, complete mission or two-PC test.
+- Final barrier revision `a972f450a` passes
+  [Build run 42492469757](https://github.com/chestahh/GulchCE/actions/runs/42492469757)
+  and [MCC run 42492469720](https://github.com/chestahh/GulchCE/actions/runs/42492469720),
+  recorded in `build/m13-platform-final/logs/ci-a972f450a-summary.json`.
+  Windows, Linux, Android and web jobs and all three MCC jobs succeed; the
+  release job is skipped. Linux MCC reports 2,145 passed/21 skipped, Windows
+  MCC 2,079 passed/17 skipped. Separate preview sanitizers pass 38 cases;
+  metadata/storage sanitizers pass 87 with two skips. Linux's main build
+  selection reports 2,678 passed/27 skipped and seven subtests. These are
+  overlapping selections, not additive totals. Native/browser WebRTC clean
+  delivery is 320/320 in Chromium and Firefox; intentional loss delivers
+  717/960 and 719/960 respectively. The exact final web artifact is retained
+  for the browser runtime checks below. Build and transport success do
+  not establish MCC browser download/gameplay, which remains Milestone 14.
+- `legacy-final-audit.json` and the individual `xbox_final/gameplay-audit.json`
+  and `ce_final/gameplay-audit.json` record the final `a972f450a` native
+  controls, using the same executable as the corrected Mercury runs. Both
+  MCC opt-ins are enabled. Xbox Blood Gulch Slayer has 44 monotonic samples
+  per peer at ticks 30–1320; CE Death Island Slayer has 39 per peer at ticks
+  30–1170. All four processes exit with code 0. There are no MCC transfer or
+  identity events, connection timeouts, assertions or access violations.
+  Each client does log a reliable-endpoint failure, internal networking error
+  and host departure when its host ends the timed run; those shutdown
+  diagnostics are retained, not described as error-free logs. Each process
+  removes six generated caches totaling 767,557,632 bytes without cleanup
+  errors. These are bounded legacy-path controls on one PC, not complete
+  matches or independent state-divergence comparisons.
+- `build/m13-platform-final/logs/internet-a972f450a-summary.json` records all
+  three final native/browser cases on the exact `a972f450a` native executable
+  and CI web artifact: native host/browser client, browser host/native invite
+  join, and browser host/native server-browser join with look input. Their
+  run directories under `build/stage11-fix/internet/runs` are respectively
+  `native-host-final-a972f450a1da-v3`,
+  `browser-host-invite-final-a972f450a1da-v6` and
+  `browser-host-browse-look-final-a972f450a1da-v6`. Each records a cached second
+  round with 49 samples per peer and 47 paired seconds, WebRTC transport proof,
+  no comparator problems or divergences within its recorded tolerances,
+  native exit code 0, closed browser contexts and no cleanup errors. These
+  are Xbox Blood Gulch networking controls, not MCC browser transfer/play.
+  The browser client uses a null renderer; its evidence concerns state and
+  transport. Both browser-host cases render through real headless SDL/WebGL
+  and retain visual evidence of the observed command/round transition.
+  Local broker/loopback testing and tolerant comparison do not establish
+  two-physical-PC behavior, exact state equality or full-match compatibility.
 
 The final combined review then found a sidecar-only lifecycle defect:
 `mcc_identity_prepare_host` cached Workshop attribution with map/resource
@@ -590,13 +696,14 @@ overwriting "CONFIRM REMOVAL". The download progress overlay is suppressed
 while consent is pending/visible, resumes after acceptance and clears on
 disconnect; a faulty-guard control fails. These counts overlap the identity
 and earlier component selections. The later combined local selection records
-89 passes in `build/m13-final-identity-ui-results.txt`; none of these component
-results replaces the outstanding native confirmation-label screenshot or
-final checks after the loading-barrier correction. The `5682cbee3` CI and Mercury
-runtime results above validate their own committed candidate only.
+89 passes in `build/m13-final-identity-ui-results.txt`. The native confirmation
+label is verified separately by `ruby_storage_final`, and the later Mercury
+runs verify their visible consent/gameplay transitions. The final browser
+networking cases and cleanup are recorded separately. Each CI/runtime result
+above validates its own recorded candidate.
 Browser playability remains Milestone 14 work.
 
-Completed-run cleanup archived 266 BMP captures losslessly into
+Earlier completed-run cleanup archived 266 BMP captures losslessly into
 `build/m13-runtime/completed-screenshots.zip` (106,967,746 bytes). The adjacent
 JSON records each original path/size/SHA-256; all ZIP contents were reread and
 verified before removing 326,875,164 loose bytes. Four selected menu/lobby/game
@@ -605,6 +712,56 @@ incomplete stage was removed (15 files, 275,922,109 bytes), retaining its logs
 and cleanup inventory. No active Mercury output, saves, installed Ruby snapshot
 or original/hardlinked map inputs were removed. These bounded cleanup figures
 do not describe the entire worktree's disk use.
+
+The final native/component cleanup receipt is
+`build/m13-runtime/cleanup-final-summary.json`, linked to the per-file
+`completed-cleanup-4.json`, `completed-cleanup-5.json` and
+`component-cleanup-6.json` inventories. It removes 1,308 duplicate map paths
+representing 111,549,211,014 logical bytes, reclaiming 4,192,861,352 unique file
+bytes after accounting for hardlinks. It losslessly archives 1,404 save/capture
+files from 1,114,825,697 to 144,907,310 bytes, verifying CRC and every member's
+SHA-256 before removing loose copies. Four released component directories add
+1,347 removed files and 134,716,129 bytes, with useful result logs retained
+outside them. This pass's total net saving is 5,297,495,868 file bytes; these
+figures are not additional to the linked inventories or estimates of allocated
+filesystem clusters. Native runtime evidence retains approximately 410.6 MB,
+including 333.2 MB of verified archives and 29 selected screenshots totaling
+35.6 MB. Original Workshop/main-checkout maps, saved games, useful diagnostics,
+the current build and toolchains are preserved. Browser-run cleanup is recorded
+separately, rather than counted in these native totals.
+
+The final browser receipt,
+`build/m13-platform-final/logs/internet-a972f450a-summary.json`, records complete
+cleanup of all three owned runs: 2,554,260,480 bytes of disposable copies and
+caches removed, plus 56,932,352 bytes of restored map copies after rehashing
+their originals. Closed browser profiles retain their storage and saves in
+verified lossless archives: 2,697,247,651 loose bytes become 416,811,089 archive
+bytes, with each run's `profile-archive.json` preserving original paths and
+hashes. The three run directories retain 558,504,712 bytes of evidence, saves
+and archives; the final web ZIP/site and current build remain available.
+All owned native processes, browser contexts and helpers are stopped. These
+browser totals are separate from the native/component cleanup above.
+
+The final combined review covers the resulting PR adaptation, MCC modules,
+shared integration hooks, declarations/build/settings/menu wiring, documentation
+and regression fixtures across the milestone's commits. It includes independent
+module review and the final documentation-to-code check. Evidence justified
+corrections to native file/allocator boundaries, portable metadata identity,
+advisory-origin invalidation, confirmation/consent UI ownership, bounded
+completion admission and the general MCC loading barrier. The last two fixes
+address reproduced lifecycle failures without replacing Xbox/CE loading policy;
+their failing runs and successful reruns remain recorded. Required safety checks,
+meaningful fault controls and map-family boundaries were retained. No further
+unsubstantiated trimming was warranted. Final required checks run against
+`a972f450a` after those corrections; this documentation closeout requires only
+UTF-8, relative-link and evidence-consistency checks, which pass.
+
+The [PR review and unposted draft response](#pr-95-review-and-draft-contributor-response)
+remain available for the user. Completion means the agreed native M13 delivery
+and its bounded checks are complete, not proof of every map, full campaigns,
+two-physical-PC interoperability or Android-device play. MCC/CE browser
+playability, persistence and native/browser gameplay remain Milestone 14;
+the MCC-only upstream protocol contribution remains Milestone 15.
 
 ### Milestone 14: Custom Edition and MCC browser playability
 
