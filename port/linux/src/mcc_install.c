@@ -125,7 +125,15 @@ static void *mcc_install_reader(void *context)
 		char byte;
 
 		if (SDL_ReadIO(mcc_install.output, &byte, 1) != 1)
+		{
+			/* (the stream does not wait for the copy: nothing yet is no end) */
+			if (SDL_GetIOStatus(mcc_install.output) == SDL_IO_STATUS_NOT_READY)
+			{
+				SDL_Delay(10);
+				continue;
+			}
 			break;
+		}
 		if (byte == '\n' || used == (int)sizeof(line) - 1)
 		{
 			line[used] = 0;
@@ -150,7 +158,6 @@ BOOL mcc_install_import(const char *halo1, const char *destination, char *error,
 	char executable[1024], maps[1100];
 	const char *arguments[7];
 	SDL_Environment *environment;
-	char **variables;
 	SDL_PropertiesID properties;
 	SDL_Process *process;
 	SDL_Window *window;
@@ -176,20 +183,20 @@ BOOL mcc_install_import(const char *halo1, const char *destination, char *error,
 	environment = SDL_CreateEnvironment(true);
 	if (environment)
 		SDL_SetEnvironmentVariable(environment, "HALO_DATA_ROOT", destination, true);
-	variables = environment ? SDL_GetEnvironmentVariables(environment) : NULL;
 	properties = SDL_CreateProperties();
 	SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, (void *)arguments);
-	if (variables)
-		SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, variables);
+	/* (the environment itself, not its variables) */
+	if (environment)
+		SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, environment);
 	SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
 	SDL_SetBooleanProperty(properties, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);
 	process = SDL_CreateProcessWithProperties(properties);
 	SDL_DestroyProperties(properties);
-	SDL_free(variables);
 	if (environment)
 		SDL_DestroyEnvironment(environment);
 	if (!process)
 	{
+		SDL_RemovePath(maps);
 		snprintf(error, (size_t)error_size, "The import could not be started: %s", SDL_GetError());
 		return FALSE;
 	}
@@ -223,6 +230,10 @@ BOOL mcc_install_import(const char *halo1, const char *destination, char *error,
 			{
 				platform_log("import cancelled");
 				SDL_KillProcess(process, true);
+				SDL_WaitProcess(process, true, NULL);
+				/* (the maps folder, if nothing is written to it: the next
+				start offers the game data again) */
+				SDL_RemovePath(maps);
 				exit(EXIT_SUCCESS);
 			}
 		}
@@ -260,6 +271,8 @@ BOOL mcc_install_import(const char *halo1, const char *destination, char *error,
 		SDL_DestroyWindow(window);
 	if (exit_code != 0 || mcc_install.failed)
 	{
+		/* (removed only if empty) */
+		SDL_RemovePath(maps);
 		snprintf(error, (size_t)error_size, "%d of %d maps could not be imported (the log says why). %s",
 			mcc_install.failed ? mcc_install.failed : total - mcc_install.done, total, mcc_install.last_error);
 		return FALSE;
