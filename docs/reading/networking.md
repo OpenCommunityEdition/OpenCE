@@ -68,6 +68,33 @@ This diagram describes dependencies, not a promise that every message
 arrives or is sent to every peer at the same rate. Distance, visibility,
 batching and message type affect transmission frequency.
 
+When scripts disable player input, relayed actions no longer describe the
+player unit's pose. A late join can attach the unit before the input-disabled
+presentation arrives, leaving a locally changed aim that inhibition then keeps.
+Read `distributed_scripted_pose_from_unit`, `distributed_unit_state_write`,
+`distributed_unit_state_read`
+and `distributed_scripted_pose_apply` in `network_distributed.c`: the host sends
+desired facing/aim/look and current aim/look as separate directions while input
+is inhibited or the unit is suspended. A body's forward axis is not a substitute
+for any of those directions. Complete bounded decoding and direction validation
+precede application to the matching live unit. The host rejects client
+predictions carrying scripted pose or suspension fields; sharing a decoder
+does not grant clients authority over those fields.
+
+For example, during a cinematic the host can retain its current aim while a
+script has already requested a different direction. Both values must survive a
+late join. The suspension flag also follows the host. Scripted correction does
+not reuse ordinary input-prediction history, and it can reconcile orientation
+even when positions agree. The existing co-op BSP guard still protects a local
+player whose host has changed BSP. Normal controllable input omits the extra
+vectors and retains its prediction path. This shared engine contract applies
+independently of map family; it is not an MCC data conversion.
+
+[Scripted-pose tests](../../tools/test_scripted_player_pose.py) exercise the
+actual codec, malformed/truncated input, unchanged ordinary wire data and a
+stationary turn. The [milestone evidence](../mcc_refactor_validation.md#milestone-15-mcc-hud-corrections-and-shared-cinematic-aim)
+distinguishes the controlled tests from native/browser runtime observations.
+
 A client with a custom firing position, such as a VR hand, can send OpenCE's
 optional fire-origin message. In `network_damage_handle_fire_origins`, the host
 accepts positions only for players owned by that client and within a bounded
@@ -325,9 +352,9 @@ do not make an MCC capability claim sufficient to pass normal admission.
 `online-third-person` selects its contract per session. GulchCE Standard
 disables shoulder-camera gameplay. Its stored `opence_crossplay` setting name
 is retained for configuration compatibility, not an OpenCE compatibility claim.
-GulchCE Third Person uses camera versions 32724/32725, the additional shoulder
-relay byte, and a mandatory kind 102 join envelope. MCC retains its independent
-version 68 and kind 101 admission inside that envelope. Forced Off remains a camera
+GulchCE Third Person uses the versions declared in `third_person_protocol.h`,
+the additional shoulder relay byte, and a mandatory kind 102 join envelope.
+MCC retains its independent version and kind 101 admission inside that envelope. Forced Off remains a camera
 session; it does not relax admission.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c):

@@ -34,8 +34,9 @@ passes. Final Xbox/CE native controls, all three native/browser networking
 controls, combined implementation review and verified cleanup are complete.
 Milestone 14's browser implementation and Stock-menu acceptance checks are
 complete within the recorded limits below. The separate shared cinematic-state
-finding is now part of the planned Milestone 15, alongside the three reported
-HUD issues. Milestone 15 implementation has not started; Milestone 16 follows it.
+finding is corrected under Milestone 15, alongside the three reported HUD
+issues. Implementation, combined review, final validation and verified evidence
+cleanup are complete within the limits below. Milestone 16 has not started.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -52,7 +53,7 @@ HUD issues. Milestone 15 implementation has not started; Milestone 16 follows it
 | 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
 | 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | Complete; final review, native/transport controls, CI and cleanup pass within recorded limits |
 | 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Complete within recorded limits; Stock browser target validated |
-| 15 | Correct MCC HUD text placement, ballistic counters and scope-mask scaling, plus shared cinematic aim synchronization. | Planned; recommendations and acceptance criteria recorded, implementation not started |
+| 15 | Correct MCC HUD text placement, ballistic counters and scope-mask scaling, plus shared cinematic aim synchronization. | Complete within recorded runtime/platform limits; final review, CI and cleanup verified |
 | 16 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestone 15; previously numbered 15, originally 14 |
 
 The completed Milestone 10 gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
@@ -276,7 +277,7 @@ Workshop delivery and host menu switch into M13. Campaign metadata is planned
 upfront; mission binaries/resources are obtained as needed. Managed snapshot
 attribution, storage use and safe removal are also required. Fetching from
 other players remains excluded. Browser import/download/persistence is M14;
-the MCC-only upstream protocol merge is M15. Neither is implicitly completed
+the MCC-only upstream protocol merge is now Milestone 16. Neither is implicitly completed
 by adapting this PR. Mac remains outside the requested platform scope.
 
 **Draft response, not posted:**
@@ -1687,136 +1688,203 @@ checks 567 local links across the milestone's changed Markdown with none missing
 
 ### Milestone 15: MCC HUD corrections and shared cinematic aim
 
-Planning scope agreed on 8 November 2026; implementation and validation are in progress.
-Continue on `mcc-code-refactor` as the sole primary agent. This milestone has
-three MCC compatibility-engine corrections and one shared co-op correction.
-Fix data interpretation and responsible engine behavior, with no map-name,
-Workshop-ID, weapon-name or resolution-specific placement patches. Preserve
-authored custom layouts and the established Xbox/CE paths. Evidence must
-justify each change; the screenshots establish symptoms, not their causes.
+The final production implementation is `e818c391a1f0ce2f98706fbad13afee2e8aae692`.
+This milestone corrects three MCC compatibility-engine defects and one shared
+co-op state defect. No map-name, Workshop-ID, weapon-name or resolution-specific
+selector was added. The work remains on `mcc-code-refactor`, performed by the
+primary agent only. Milestone 16 has not started.
 
-#### 15A: Reproduce and trace the three HUD symptoms
+#### Causes and implementation
 
-The user supplied three local screenshots after the Discord image URLs could
-not be retrieved. Source inspection and those images establish the following
-starting points. The observations below extend them with bounded map-tag
-inspection and paired native captures; the completion gate remains open.
-
-The first implementation has three independently evidenced changes:
+The supplied screenshots establish symptoms. Bounded map-tag inspection,
+actual-source regression tests and paired native captures establish these causes:
 
 - Ruby's converted message offset is 65 rather than the existing recognized
-  stock value of 60; its weapon panels nevertheless select the native safe
+  stock value of 60. Its weapon panels nevertheless select the native safe
   frame. Infinite Evolved's custom ballistic parent rearranges numbers inside
-  an otherwise matching panel and therefore misses the complete-layout
-  fingerprint that recognizes its battery/grenade panels. The recognized active
-  **unit HUD** now supplies the common corner frame for its messages and weapon
-  panels during that player's draw. Authored offsets, center/edge anchors and
-  unknown custom unit HUDs retain their existing treatment. This extends the
-  existing explicit stock-layout compatibility exception without adding content
-  fingerprints. Private inventories are under `build/m15/inventory/`.
+  an otherwise matching panel and misses the complete-layout fingerprint that
+  recognizes its battery/grenade panels. The recognized active **unit HUD** now
+  supplies the common corner frame for messages and weapon panels during that
+  player's draw. Authored offsets, center/edge anchors and unknown custom unit
+  HUDs retain their existing treatment. This extends the existing explicit
+  stock-layout compatibility exception without adding fingerprints.
 - Scope screen effects bypass ordinary HUD placement. Their MCC bitmap group
-  declares half-size display, but the screen-effect renderer used raw bitmap
-  dimensions. An MCC-owned, scoped mask transform applies that flag once,
-  separately from the 2:1 MCC placement canvas. Ruby's 512-pixel pistol scope
-  changes from approximately 800 to 400 rendered pixels at 1280x800. Xbox/CE
-  rendering remains outside the MCC transform.
+  declares half-size display, but this renderer used raw bitmap dimensions.
+  An MCC-owned scoped transform applies that flag once, separately from the
+  2:1 MCC placement canvas. Size and texture-coordinate changes preserve the
+  complete mask. Untagged/generated fallback bitmaps remain in native units.
+  Xbox and CE rendering remain outside the MCC transform.
 - The native Ruby intro trace records a late client attaching the host's unit
   two ticks before input inhibition arrives. Relayed input changes its aim;
-  inhibition then preserves that local aim. The shared unit snapshot carried
-  body axes but no desired/current aim or look, and player units are excluded
-  from actor-control replication. The experimental shared fix sends five
-  distinct direction vectors while input is disabled or the unit is suspended,
-  plus the host suspension flag. Ordinary input snapshots omit the extension.
-  The first corrected run has 31 paired samples with zero position/aim error,
-  versus 31 aim mismatches in the baseline. It is **not** a complete strict
-  networking pass: the intro contains no living client player for drift checks.
-  The follow-up also corrects a scripted body's orientation when its position
-  already agrees, retaining normal prediction and the co-op BSP guard.
+  inhibition then preserves that local aim. Unit snapshots carried body axes
+  but no desired/current aim or look, and player units are excluded from actor
+  control replication. The shared snapshot now carries five distinct direction
+  vectors while input is inhibited or the unit is suspended, plus host suspension
+  state. Body-forward cannot substitute for these authored directions.
+  Correction reconciles orientation even at an already matching position and
+  bypasses ordinary input-prediction history for a scripted pose, retaining the
+  co-op BSP guard. Complete bounded decoding and direction validation precede
+  application. Client predictions carrying host-only pose/suspension fields
+  are rejected. Ordinary input snapshots omit the extension and retain their
+  tested byte representation.
 
-Matched private captures are `ruby-help-baseline`/`ruby-help-fixed`,
-`hie-ballistic-baseline`/`hie-ballistic-fixed-v2`, and
-`ruby-scope-baseline-v5`/`ruby-scope-fixed-v1` under `build/m15/runtime/`.
-These controlled HUD fixtures select equipment and display an authored help
-string; they do not establish multiplayer or campaign progression correctness.
-The read-only cinematic traces are `cinematic_trace_baseline` and
-`cinematic_fixed_trace_v1`. Original map hashes, executable hashes, commands,
-logs, captures and cleanup receipts remain private there. Broader map-family,
-platform, lifecycle and network validation is outstanding.
+The HUD logic lives in [mcc_hud_draw.c](../port/linux/game/mcc_hud_draw.c).
+Its minimal, `port:`-marked shared hooks supply the current player's unit and
+bracket the synchronous screen-effect draw. MCC modules alone cannot establish
+those draw boundaries. Borrowed pointers and frame selections are released at
+end-of-draw, with no tag mutation, allocation or persistent per-player cache.
+The pre-existing message/component fallbacks remain necessary for unknown unit
+HUDs; removing them would not be justified simplification. The HUD work changes
+rendering only.
 
-The production native pair `ruby_skip_revert_v1` subsequently passed its
-61-second post-skip comparison: 122 paired player samples, zero position error,
-maximum aim difference three degrees, 1,827 drift samples with none apart,
-and no strict-judge problems or divergences. Both normal skip votes were accepted.
-The host took a checkpoint and reverted 149 ticks while preserving the network
-clock at 3905; both peers then continued for 900 observed ticks. This is a bounded
-intro/recovery test, not full campaign completion. Xbox natural completion and
-browser/network controls are still being checked. CE validation uses multiplayer
-maps, as clarified by the user; an authored CE campaign is not a requirement.
+The cinematic fix belongs in the existing shared unit-state implementation,
+[network_distributed.c](../port/linux/game/network_distributed.c): suspension,
+input inhibition and authored unit aim already exist across Xbox/CE/MCC. This
+corrects missing replication of that contract, rather than introducing MCC
+semantics into legacy code. It adds 30 direction bytes only to scripted live
+unit snapshots. Bounds and maximum packer size include the extension. It adds
+no independent lifetime table. The shared network agreement changes from 32734
+to 32738, MCC from 71 to 72, and camera agreements from 32736/32737 to
+32740/32741. Admission tests reject the previous agreements. Milestone 16 must
+carry this contract into the unified upstream version.
 
-| Issue | Observed/reported evidence | Investigation and intended correction |
-| --- | --- | --- |
-| Ruby's Rebalanced HUD strings | At 1280x720, the objective text “Follow the Monitor to the Index” touches the ammunition display. | Trace this text's actual draw path, authored anchor, offsets, line bounds and chosen safe frame against adjacent HUD geometry. Correct the general MCC placement rule if their coordinate handling differs. Do not assume every HUD string uses the messaging path or shift every string by a constant. |
-| Halo: Infinite Evolved ballistic ammunition | At 1280x720, the ballistic counter is above/left of the grenade counter. The user reports battery counters already align correctly. | Compare ballistic numbers, their background, battery meters and grenade elements under the same weapon-HUD hierarchy. Trace parent/child anchors, frame ownership and number origins. Restore the intended alignment for this authored layout without forcing every custom HUD to align with grenades. |
-| MCC scope masks | At 1280x800, the attached 2x scope's circular mask nearly spans the image height; the user reports excessive sizing while Xbox/CE scopes are correct. | Inspect authored bitmap/sprite bounds, registration, high-resolution and half-HUD flags, placement scale and zoom-overlay handling. Establish expected geometry from the map data and, where available, a matching reference capture. Correct conversion/draw scaling once at the responsible MCC boundary; preserve zoom/FOV and reticle behavior. |
+#### Rendered checks
 
-Likely reading routes are `mcc_hud_convert`, `mcc_hud_offset` and
-`mcc_hud_message_frame` in [mcc_hud.c](../port/linux/game/mcc_hud.c), frame
-classification in [mcc_hud_layout.inl](../port/linux/game/mcc_hud_layout.inl),
-and `mcc_hud_weapon_frame_begin`, `mcc_hud_anchor_point` and
-`mcc_hud_anchor_number` in [mcc_hud_draw.c](../port/linux/game/mcc_hud_draw.c).
-Existing code distinguishes bitmap scaling, number placement, messaging and
-weapon hierarchy frame selection. That makes inconsistent treatment a useful
-hypothesis, not a confirmed diagnosis. Follow the actual callers in
-[hud_draw.c](../source/interface/hud_draw.c),
-[hud_weapon.c](../source/interface/hud_weapon.c) and
-[hud_messaging.c](../source/interface/hud_messaging.c); existing Xbox/CE paths
-are references and regression controls, not implementations to repurpose.
+Private evidence is under `build/m15/inventory/` and `build/m15/runtime/`.
+Each controlled HUD fixture records its executable hash, settings, map identity,
+commands, captures and cleanup. Test-only equipment selection is not a gameplay
+correctness test. Original Workshop maps and legacy map files remain unchanged.
 
-#### 15B: Correct and validate MCC layout and scope behavior
+| Check | Observed result |
+| --- | --- |
+| Ruby `c20`, objective and assault-rifle ammo, 1280x720 | The message moves from the inconsistent MCC corner frame to the panel's native frame, leaving clear separation below the bullet rows. Both normal and high-resolution HUD settings were reviewed. |
+| Infinite Evolved `a30`, ballistic and battery weapons | Ballistic panel moves from approximately (50,20) to (114,55), level with the grenade counter. The previously correct battery panel retains its position. Authored digit arrangement is preserved. |
+| Ruby pistol 2x, 1280x800 and 1024x768 | Circular mask changes from about 800 to 400 pixels high at 1280x800; it is centered and about 384 pixels high at 1024x768. |
+| Ruby sniper second zoom, 1280x720 | Rectangular mask is centered at about 580x360 pixels with the authored 10x indicator. |
+| Infinite Evolved sniper 2x, 1280x720 | Oversized near-screen-filling mask becomes about 580x360 pixels, aligned with the existing scope ticks. |
+| Xbox Blood Gulch and CE Death Island pistol scope | Before/after mask dimensions and HUD placement retain their established behavior. |
+| Descent custom HUD | Before/after captures with the authored letterbox cleared retain the custom top-center shield, right ammo, left grenades and radar placement. This controlled scene is not a campaign-progression test. |
+| One process: Ruby → CE Death Island → Xbox Blood Gulch → Ruby | Four independently observed map loads, equipped scoped weapons and reviewed captures; masks and frames remain correct after each transition. |
 
-Address text/counter placement together if evidence shows a common cause;
-keep independent defects in separately reviewable changes. Treat scope masks
-as a distinct scaling case until evidence demonstrates otherwise. Prefer an
-MCC-owned correction through the existing hooks. Any additional shared hook
-must be minimal, guarded and justified under the isolation rules.
+Matched labels include `ruby-help-baseline`/`ruby-help-fixed`,
+`hie-ballistic-baseline`/`hie-ballistic-grenades`,
+`hie-battery-before`/`hie-battery-after`,
+`ruby-scope-baseline-v5`/`ruby-scope-fixed-v1`, `hie-scope-before`/`hie-scope-after`,
+`descent-hud-before-v2`/`descent-hud-settled` and `hud_transitions_v3`.
+The old probe's grenade inventory differs from the later fixture; those
+counts are not attributed to the rendering fix.
 
-Add failing regressions against the real conversion/drawing implementation,
-covering both affected and deliberately different authored layouts. Extend the
-existing HUD layout/normalization tests rather than duplicating their model.
-Verify actual rendered output on Ruby's Rebalanced, Halo: Infinite Evolved and
-another affected MCC package, with Xbox/CE HUD and scope controls. Cover
-ballistic and battery weapons, weapon switching, pickup/objective messages,
-multiple supported zoom levels, and 4:3, 16:9 and 16:10 viewports. Check
-split-screen viewport ownership where supported and MCC-to-CE/Xbox transitions.
-Record exact maps, settings, revisions and matched before/after screenshots.
-Pure rendering corrections should not alter simulation or wire agreement;
-review that assumption against the actual changes.
+Earlier attempts remain failed: Mercury's first requested weapon was absent;
+the later vehicle-opening fixture rejected equipment insertion. Neither proves
+Mercury scope behavior. Initial Descent captures retained an animated letterbox;
+settled captures replace them for visual acceptance. An overlong transition
+console expression was split into bounded commands. No production accommodation
+was added for those test-fixture failures. Split-screen active-HUD selection,
+custom anchors and view reset are exercised by actual-source tests; no rendered
+split-screen session is claimed. Pickup text and every custom HUD are not
+exhaustively captured.
 
-#### 15C: Correct shared cinematic aim synchronization
+#### Cinematic and network evidence
 
-Use the existing [native reproduction](#separate-shared-cinematic-state-finding)
-as the starting regression. Instrument the first divergent player creation or
-update, including input inhibition, authored aim/look, late-join ordering and
-checkpoint restoration. Define the smallest authoritative shared state contract
-that fixes the demonstrated gap and preserves normal input prediction. Do not
-substitute body-forward for authored aim, special-case Ruby or relax the judge.
+Read-only instrumentation in `cinematic_trace_baseline` records 31 paired living
+host-player samples with matching positions but persistent aim mismatches,
+reaching 166 degrees. `cinematic_fixed_trace_v2` records 31 paired samples with
+zero position/aim mismatches and matching desired/current directions and body
+orientation. These intro-only observations lack a living client for the strict
+drift judge and are not themselves a full networking pass.
 
-Validate early/late joins, both host roles, cinematic skip and natural completion,
-checkpoint/revert and subsequent controllable gameplay. Include representative
-Xbox, supported CE and affected MCC cases, native pairs and native/browser
-pairs. Version any changed wire data or simulation agreement as required;
-Milestone 16 must incorporate that contract into its unified upstream agreement.
+Production native controls use the unchanged strict comparison thresholds:
 
-#### 15D: Combined review and completion gate
+| Case | Post-intro/gameplay result |
+| --- | --- |
+| Ruby late join, normal two-player skip vote, checkpoint/revert | 61 seconds, 122 player pairs, zero position error, maximum aim difference 3 degrees; 1,827 drift samples, none apart. No judge problems/divergences. Checkpoint taken and reverted; both peers continue for 900 ticks. |
+| Xbox `b30`, early join, natural intro, checkpoint/revert | 61 seconds, 122 player pairs, maximum position difference 0.003742 and aim difference 4 degrees; 1,830 drift samples, none apart. Both engine save/revert acknowledgements are required and observed. No judge problems/divergences. |
+| CE Death Island MP, 50 ms receive delay and 1% loss | 61 seconds, 122 player pairs, zero position error, maximum aim difference 8 degrees; 1,793 drift samples, none apart. No judge problems/divergences. |
+| Xbox Blood Gulch MP | 61 seconds, 122 player pairs, maximum position difference 0.001 and aim difference 2 degrees; 1,830 drift samples, none apart. No judge problems/divergences. |
 
-Complete a primary-agent review of implementation, integration, documentation
-and regression coverage before the final affected checks. Run the required
-Windows/Linux/Android/web builds and CI, plus relevant rendering and networking
-controls. Browser menu acceptance remains Stock/OpenCE; Gulch styled menus
-retain their desktop scope. Preserve failures and uncertainties, clean verified
-test outputs, and archive inactive saves losslessly. Completion requires
-evidence-backed correction of all four issues and documented validation limits;
-a build or successful map load alone is insufficient. Only then start Milestone 16.
+The full Xbox `b30` trace retains one transient position/riding mismatch at a
+transition; the strict judge reports no persistent divergence. It is not a
+bit-exact or zero-transient-error claim. CE validation uses multiplayer maps,
+as clarified by the user; an authored CE campaign is not a requirement.
+
+The Stock-menu Firefox host/native-client installed-content control at
+`9f3be1501` passed real local-broker WebRTC, both normal skip votes and 49 seconds
+of post-cinematic comparison: 98 player pairs, maximum position difference
+0.012042 and aim difference 6 degrees; 993 drift samples, 68 apart, mean
+0.00009916 and maximum 0.022914. The unchanged judge reports no problems or
+divergences. Existing content is reused, with sharing/download off; this is not
+a fresh-download test. A preceding transfer attempt was ended normally before
+completion and remains unsuccessful. The exact final-code rerun `m15_ruby_browser_final` also passes: 49 paired
+seconds, 98 player pairs, maximum position difference 0.041534 and aim difference
+6 degrees; 1,328 drift samples, 40 apart, mean 0.00006588 and maximum 0.022913.
+There are no judge problems, divergences or harness errors. Both skip votes,
+real WebRTC, normal native exit, browser storage reopen audit and unchanged
+original inputs are recorded. The combined artifact receipt binds the native
+binary and browser site to `e818c391a1`. Native `b30`/CE/Xbox MP controls ran on
+`206978e1e`; the final follow-up only rejects prohibited host-owned fields in
+client predictions, with ordinary predictions covered by actual-source tests
+and the final browser/native run. The earlier native Ruby skip run used
+`9f3be1501`. These are local-broker tests, not public-NAT tests.
+
+An early-join Xbox `a10` natural-intro control encounters an inherited
+`structure_bsp_get_cluster_pvs` cluster-index assertion at a scene/BSP transition.
+The retained pre-M15 binary reproduces the same assertion at the same transition
+(`xbox_natural_baseline_v1` versus `xbox_natural_revert_v1`). Neither counts as
+natural-completion coverage. The independent `b30` control supplies that check.
+The inherited BSP issue remains a separate follow-up; its diagnostic was not
+suppressed. This milestone does not claim complete campaigns, every map,
+physical Android-device play or public-NAT coverage.
+
+#### Combined review, regression checks and preservation
+
+The final primary-agent review covers both MCC draw scopes, legacy neutrality,
+shared pose ownership and bounds, protocol admission, fixtures and reader guides.
+It found two additional real edge cases: untagged screen-effect fallback bitmaps
+must retain native scale, and the shared prediction decoder must reject host-only
+pose fields. Each was reproduced by a failing regression before correction.
+Negative controls separately remove each authority guard and must fail. No new
+framework, tag fingerprint or broader engine refactoring was justified.
+
+The final focused run passes **617 tests** covering MCC HUD layout, normalization,
+view/mask ownership, wire/admission, pose codec and authority, checkpoint recovery,
+elevator correction and CI wiring. The browser JavaScript suite passes 70 tests.
+A broad Windows run records 4,296 passes, 653 failures and 21 skips; it is not
+reported as green. Two missing CI registrations and fourteen stale elevator
+fixture failures were corrected. Sandbox-dependent filesystem controls pass on
+rerun (123 passes, two skips). The remaining broad failures come from Linux-only
+harness assumptions on this Windows host. Linux CI supplies the supported run.
+An initial Linux fixture compilation failure for missing `<stddef.h>` was fixed;
+no production-code change was needed for it.
+
+Final native and web builds succeed with the preserved native configure options.
+[Final Build CI](https://github.com/chestahh/GulchCE/actions/runs/42534584182)
+passes Windows, Linux, Android and web, including its browser checks.
+[Final MCC CI](https://github.com/chestahh/GulchCE/actions/runs/42534584004)
+passes reader/validator, Windows adapter and software-GL HUD jobs. Both are for
+`e818c391a1`. Rendering captures use private observation builds;
+network acceptance uses production builds. Versioned receipts distinguish these
+and do not relabel earlier captures as executions of later binaries.
+
+The cleanup plan records original paths, sizes and SHA-256 values for every
+owned target. A verified lossless archive preserves **3,248 files** (6,428,696,350
+uncompressed bytes) in `build/m15/inactive-evidence.zip` (**1,016,091,936 bytes**).
+It retains inactive saves, browser profiles/exports, raw captures and the useful
+pre-fix observation binaries. Every archive member was rehashed before removal
+of its loose copy. Ten selected captures also remain as convenient lossless PNGs.
+Another **100 verified disposable files**, totaling 4,688,577,006 logical bytes,
+were removed: generated native map caches, fixture copies/hardlinks and temporary
+observation-build outputs. This logical total is not an allocated-space claim.
+Restored prior-milestone seed files were removed only after preservation/hash
+checks; original maps, prior archives, active builds and toolchains remain.
+No game or test Firefox process was active during cleanup. Exact target absence
+and protected original hashes are rechecked. `cleanup-plan.json`,
+`cleanup-result.json` and retained per-run receipts distinguish final cleanup
+from the additional caches already removed after each native run.
+
+Milestone 15 is complete within these stated limits. The inherited Xbox `a10`
+BSP assertion remains a separate follow-up; no broader campaign or every-map
+compatibility claim follows from these bounded checks. Milestone 16 remains
+planned and has not begun.
 
 ### Milestone 16: MCC-only upstream contribution
 

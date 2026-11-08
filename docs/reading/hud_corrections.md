@@ -153,8 +153,9 @@ placement. `mcc_hud_mask_begin` borrows that pointer across the synchronous
 screen-effect call; `mcc_hud_mask_transform` applies the bitmap group's half-size
 flag to both geometry and texture-coordinate units. It excludes the ordinary
 MCC placement-canvas factor, which would shrink the mask twice. The end call
-clears the pointer and scale. Render-target fallback and cinematic textures do
-not match the borrowed bitmap and remain unchanged. Both hooks are neutral
+clears the pointer and scale. Untagged generated bitmaps retain native units;
+other render-target and cinematic textures do not match the borrowed bitmap
+and remain unchanged. Both hooks are neutral
 outside MCC, preserving the existing Xbox/CE paths.
 
 [View-frame tests](../../tools/test_mcc_hud_view.py) cover player selection,
