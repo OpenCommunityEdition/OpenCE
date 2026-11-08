@@ -373,6 +373,25 @@ static const char shader_prologue[] =
 	"	else r = clamp(r, -1.884467e+19, -5.42101e-20);\n"
 	"	return vec4(r);\n"
 	"}\n"
+	/* rcp and rsq of zero are infinite on the NV2A, whose multiply takes
+	zero times infinity as zero: a program that scales a vector by the rsq of
+	its own length squared (the bumped lightmaps' incident radiosity,
+	nothing at a vertex of no one direction) gets the zero vector. In GLSL
+	that product is not a number, and so is every pixel of the triangles
+	that vertex is in, which each GPU draws as it will. The results are
+	kept as large as rcc's, and finite, so that zero times them is zero;
+	one gives exactly one, as on the NV2A. */
+	"vec4 nv2a_rcp(float x)\n"
+	"{\n"
+	"	if (x == 1.0) return vec4(1.0);\n"
+	"	return vec4(x != 0.0 ? clamp(1.0 / x, -1.884467e+19, 1.884467e+19) : 1.884467e+19);\n"
+	"}\n"
+	"vec4 nv2a_rsq(float x)\n"
+	"{\n"
+	"	float s = abs(x);\n"
+	"	if (s == 1.0) return vec4(1.0);\n"
+	"	return vec4(s > 0.0 ? min(inversesqrt(s), 1.884467e+19) : 1.884467e+19);\n"
+	"}\n"
 	"vec4 nv2a_exp(float x)\n"
 	"{\n"
 	"	return vec4(exp2(floor(x)), fract(x), exp2(x), 1.0);\n"
@@ -568,9 +587,9 @@ char *nv2a_vertex_shader_to_glsl(const DWORD *instructions, unsigned long instru
 		{
 		case _ilu_nop: break;
 		case _ilu_mov: xgpu_text_append(&text, "\tilu = C;\n"); break;
-		case _ilu_rcp: xgpu_text_append(&text, "\tilu = vec4(1.0 / C.x);\n"); break;
+		case _ilu_rcp: xgpu_text_append(&text, "\tilu = nv2a_rcp(C.x);\n"); break;
 		case _ilu_rcc: xgpu_text_append(&text, "\tilu = nv2a_rcc(C.x);\n"); break;
-		case _ilu_rsq: xgpu_text_append(&text, "\tilu = vec4(inversesqrt(abs(C.x)));\n"); break;
+		case _ilu_rsq: xgpu_text_append(&text, "\tilu = nv2a_rsq(C.x);\n"); break;
 		case _ilu_exp: xgpu_text_append(&text, "\tilu = nv2a_exp(C.x);\n"); break;
 		case _ilu_log: xgpu_text_append(&text, "\tilu = nv2a_log(C.x);\n"); break;
 		case _ilu_lit: xgpu_text_append(&text, "\tilu = nv2a_lit(C);\n"); break;
