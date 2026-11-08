@@ -148,7 +148,7 @@ jobs:
           python -m pytest -q tools/test_p2p_shutdown.py tools/test_network_test_sampling.py tools/test_network_test_startup.py
           python -m pytest -q tools/test_loading_widescreen.py tools/test_loading_chant.py tools/test_reversed_depth.py
           python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/test_bots_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_visibility_readback_contract.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
-          python -m pytest -q tools/test_shadow_setup.py tools/test_hud_shield_tick.py
+          python -m pytest -q tools/test_shadow_setup.py tools/test_hud_shield_tick.py tools/test_render_target_binding.py
           python -m pytest -q tools/test_android_mcc_memory.py tools/test_mcc_memory.py tools/test_android_dynamic_lighting.py tools/test_android_shader_logs.py
           python -m pytest -q tools/test_changelog_layout.py tools/test_changelog_menu.py tools/test_gulch_build_label.py tools/test_player_notes.py tools/test_changelog_release_base.py
           python -m pytest -q tools/test_third_person.py tools/test_camera_policy.py tools/test_camera_wire.py tools/test_camera_protocol.py tools/test_third_person_director.py tools/test_coop_checkpoint.py tools/test_coop_checkpoint_recovery.py tools/test_checkpoint_epoch.py tools/test_join_protocol.py
@@ -334,7 +334,7 @@ jobs:
       - name: Test light storage
         run: python tools/test_light_storage.py
 
-      - name: Test network shutdown and diagnostic sampling
+      - name: Test shared runtime regressions
         shell: cmd
         run: |
           python -m pip install pytest
@@ -343,7 +343,7 @@ jobs:
           if not defined SHUTDOWN_VS_INSTALL exit /b 1
           call "%SHUTDOWN_VS_INSTALL%\Common7\Tools\VsDevCmd.bat" -host_arch=x64 -arch=x86
           if errorlevel 1 exit /b 1
-          python -m pytest -q tools/test_p2p_shutdown.py tools/test_network_test_sampling.py tools/test_network_test_startup.py
+          python -m pytest -q tools/test_p2p_shutdown.py tools/test_network_test_sampling.py tools/test_network_test_startup.py tools/test_render_target_binding.py
 
       - name: Compile cache
         run: ccache --show-stats
