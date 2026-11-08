@@ -22,6 +22,8 @@ void clips_map_ended(void);
 int clips_replaying(void);
 /* the fullscreen free camera. the player panes are hidden while it is on */
 int clips_flying(void);
+/* the watched player's third person camera, rather than their eyes */
+int clips_third_person(void);
 /* the level is running forward to the tick a backward scrub will land on.
 the picture stays where it was until that tick is ready. */
 int clips_catching_up(void);

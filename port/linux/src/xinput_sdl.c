@@ -1813,6 +1813,14 @@ unsigned long halo_linux_theatre_keys(void)
 		mask |= 64UL;
 	if (input.keys[SDL_SCANCODE_C])
 		mask |= 128UL;
+	/* Q and E move between the recorded players. Z swaps that player's eyes
+	for the third person camera */
+	if (input.keys[SDL_SCANCODE_Q])
+		mask |= 1024UL;
+	if (input.keys[SDL_SCANCODE_E])
+		mask |= 2048UL;
+	if (input.keys[SDL_SCANCODE_Z])
+		mask |= 4096UL;
 	return mask;
 }
 
