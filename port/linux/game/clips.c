@@ -21,6 +21,7 @@ clip was recorded on this build. A clip from another build plays on. */
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
 #include "camera/director.h"
+#include "camera/observer.h"
 #include "cutscene/cinematics.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
@@ -57,8 +58,8 @@ extern void halo_linux_mouse_sample(short *x, short *y);
 extern void halo_linux_pad_sample(short port, short *lx, short *ly, short *rx, short *ry,
 	unsigned char *left_trigger, unsigned char *right_trigger, unsigned short *buttons,
 	unsigned char *face);
-/* space, left, right, [, ], V, escape, C, up, down:
-bits 1, 2, 4, 8, 16, 32, 64, 128, 256, 512 */
+/* space, left, right, [, ], V, escape, C, up, down, Q, E, Z:
+bits 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 */
 extern unsigned long halo_linux_theatre_keys(void);
 extern unsigned long system_milliseconds(void);
 extern int halo_linux_mouse_is_aim_device(short gamepad_index);
@@ -963,6 +964,97 @@ static int clips_watched_slot(void)
 	return fallback;
 }
 
+/* the seat the picture follows. a rewind keeps the one already chosen */
+static int clips_watch_index(void)
+{
+	int count;
+
+	count = clips.header.player_count;
+	if (count > CLIPS_PLAYERS)
+		count = CLIPS_PLAYERS;
+	if (clips.watch >= 0 && clips.watch < count)
+		return clips.watch;
+	return clips_watched_slot();
+}
+
+/* point the local camera, the weapon, and the facing at this recorded player */
+static void clips_watch_apply(void)
+{
+	long datum;
+	struct player_datum *player;
+	int count;
+
+	count = clips.header.player_count;
+	if (count > CLIPS_PLAYERS)
+		count = CLIPS_PLAYERS;
+	if (clips.watch < 0 || clips.watch >= count)
+		return;
+	datum = clips.slot_datum[clips.watch];
+	if (datum == NONE)
+		return;
+	if (local_player_get_player_index(0) != datum)
+		local_player_set_player_index(0, datum);
+	player = player_try_and_get(datum);
+	if (!player)
+		return;
+	player_control_new_unit(0, player->unit_index);
+	observer_obsolete_position(0);
+}
+
+static void clips_watch_step(int delta)
+{
+	int count;
+	int start;
+	int i;
+
+	count = clips.header.player_count;
+	if (count > CLIPS_PLAYERS)
+		count = CLIPS_PLAYERS;
+	if (count < 2 || delta == 0)
+		return;
+	delta = delta < 0 ? -1 : 1;
+	start = clips_watch_index();
+	for (i = 1; i <= count; i++)
+	{
+		int slot;
+		long datum;
+
+		slot = start + delta * i;
+		while (slot < 0)
+			slot += count;
+		while (slot >= count)
+			slot -= count;
+		if (slot == start)
+			continue;
+		datum = clips.slot_datum[slot];
+		if (datum == NONE)
+			continue;
+		clips.watch = slot;
+		clips_watch_apply();
+		return;
+	}
+}
+
+static void clips_watch_name(wchar_t *text, int length)
+{
+	int i;
+	int count;
+	unsigned short const *name;
+
+	if (!text || length < 1)
+		return;
+	text[0] = 0;
+	count = clips.header.player_count;
+	if (count > CLIPS_PLAYERS)
+		count = CLIPS_PLAYERS;
+	if (clips.watch < 0 || clips.watch >= count)
+		return;
+	name = clips.header.players[clips.watch].name;
+	for (i = 0; i < 11 && i < length - 1 && name[i]; i++)
+		text[i] = (wchar_t)name[i];
+	text[i] = 0;
+}
+
 static long clips_place_datum(unsigned short absolute)
 {
 	unsigned short salt;
@@ -992,7 +1084,7 @@ static void clips_spawn_roster(void)
 		clips.spawned = 1;
 		return;
 	}
-	watched = clips_watched_slot();
+	watched = clips_watch_index();
 	/* the game updates players in datum order. each seat comes back at the
 	index it had, or the positions diverge and the checkpoint stops the clip */
 	kept = NONE;
@@ -1177,9 +1269,9 @@ static void clips_begin_playback(void)
 	{
 		clips.flying = 0;
 		clips.show_feed = 0;
+		clips.camera_mode = 0;
+		clips.watch = clips_watched_slot();
 	}
-	clips.camera_mode = 0;
-	clips.watch = clips_watched_slot();
 	clips.seeking = 0;
 	clips.resume_speed = 1.0f;
 	clips.scrub_limit = 0;
@@ -1687,6 +1779,11 @@ int clips_flying(void)
 	return clips.replaying && clips.flying;
 }
 
+int clips_third_person(void)
+{
+	return clips.replaying && clips.camera_mode != 0;
+}
+
 int clips_catching_up(void)
 {
 	return clips.replaying && clips.seeking;
@@ -1865,6 +1962,7 @@ void clips_frame(void)
 {
 	static int was_pause, was_slow, was_fast;
 	static int was_hide, was_back, was_camera;
+	static int was_prev, was_next, was_person;
 	short lx, ly, rx, ry;
 	unsigned char lt, rt, face;
 	unsigned short buttons;
@@ -2054,6 +2152,24 @@ void clips_frame(void)
 	if (clips_edge((keys & 128UL) != 0 || (face & 0x08) != 0, &was_camera))
 	{
 		clips.flying = !clips.flying;
+		input_suppress();
+	}
+	/* Q and LB step back through the recorded players. E and X step forward */
+	if (clips_edge((keys & 1024UL) != 0 || (face & 0x20) != 0, &was_prev))
+	{
+		clips_watch_step(-1);
+		input_suppress();
+	}
+	if (clips_edge((keys & 2048UL) != 0 || (face & 0x04) != 0, &was_next))
+	{
+		clips_watch_step(1);
+		input_suppress();
+	}
+	/* Z and the left stick swap that player's eyes and third person camera */
+	if (clips_edge((keys & 4096UL) != 0 || (buttons & 0x0040) != 0, &was_person))
+	{
+		clips.camera_mode = clips.camera_mode ? 0 : 1;
+		observer_obsolete_position(0);
 		input_suppress();
 	}
 	back_down = (keys & 64UL) != 0 || (face & 0x02) != 0 || (buttons & 0x0020) != 0;
@@ -2304,6 +2420,8 @@ void clips_draw(short local_player_index, union rectangle2d const *window)
 	long filled;
 	char text[160];
 	char const *rate;
+	char const *view_name;
+	wchar_t who[16];
 	short pane_w;
 	short pane_h;
 	short bar_h;
@@ -2374,20 +2492,40 @@ void clips_draw(short local_player_index, union rectangle2d const *window)
 		clips.speed_index == 1 ? "1/2" :
 		clips.speed_index == 3 ? "2" :
 		clips.speed_index == 4 ? "4" : "1";
+	view_name = clips.flying ? (clips.camera_mode ? "FREE THIRD" : "FREE FIRST") :
+		clips.camera_mode ? "THIRD" : "FIRST";
 	if (clips.message[0])
 		snprintf(text, sizeof(text), "%s", clips.message);
 	else
-		snprintf(text, sizeof(text), "%ld / %ld   %ld:%02ld / %ld:%02ld   %s%s%s",
+		snprintf(text, sizeof(text), "%ld / %ld   %ld:%02ld / %ld:%02ld   %s   %s%s",
 			shown, total, seconds / 60, seconds % 60, length / 60, length % 60, rate,
-			clips.flying ? "   FREE" : "",
-			clips.ended ? "   END" : "");
+			view_name, clips.ended ? "   END" : "");
 	clips_widen(line, 160, text);
+	clips_watch_name(who, 16);
+	if (who[0])
+	{
+		int n;
+		int i;
+
+		n = 0;
+		while (line[n])
+			n++;
+		if (n < 156)
+		{
+			line[n++] = L' ';
+			line[n++] = L' ';
+			line[n++] = L' ';
+			for (i = 0; who[i] && n < 159; i++)
+				line[n++] = who[i];
+			line[n] = 0;
+		}
+	}
 	clips_widen(keys_help, 160, clips.flying ?
-		"KEYS   SPACE pause    LEFT RIGHT scrub    UP DOWN speed    [ ] height    V text    C camera    B ESC leave" :
-		"KEYS   SPACE pause    ARROWS scrub    [ ] speed    V picture    C camera    B ESC leave");
+		"KEYS   SPACE pause    LEFT RIGHT scrub    UP DOWN speed    [ ] height    Q E player    Z person    V text    C camera    B ESC leave" :
+		"KEYS   SPACE pause    ARROWS scrub    [ ] speed    Q E player    Z person    V picture    C camera    B ESC leave");
 	clips_widen(pad_help, 160, clips.flying ?
-		"PAD    START pause    LEFT RIGHT scrub    UP DOWN speed    LT RT height    RB text    Y camera    B / BACK leave" :
-		"PAD    START pause    DPAD scrub    LT RT speed    RB picture    Y camera    B / BACK leave");
+		"PAD    START pause    LEFT RIGHT scrub    UP DOWN speed    LT RT height    X LB player    LS person    RB text    Y camera    B / BACK leave" :
+		"PAD    START pause    DPAD scrub    LT RT speed    X LB player    LS person    RB picture    Y camera    B / BACK leave");
 	clips_feed_draw(font, scale, margin, top, pane_w);
 	clips_quad(0, top, pane_w, pane_h, 0xF0101824);
 	track_h = clips_px(scale, 4);

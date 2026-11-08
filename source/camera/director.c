@@ -832,7 +832,9 @@ static void director_choose_camera_game(
 		if (key && !network_game_distributed_client() &&
 			!(clips_replaying() && local_player_index == 0))
 			director_rotate_cameras(local_player_index, director_game_camera_modes, 3);
-		/* a clip's free camera stays up. the player view comes back when it leaves */
+		/* a clip's free camera stays up. otherwise the watched player is shown
+		in first person or third person, and a cutscene keeps its own camera.
+		a dead player stays on the body until that player is back */
 		if (clips_replaying() && local_player_index == 0)
 		{
 			if (clips_flying())
@@ -840,8 +842,14 @@ static void director_choose_camera_game(
 				director_clips_camera(local_player_index, 2, NONE);
 				return;
 			}
-			if (director->camera_proc == (director_camera_update_proc)flying_camera_update)
-				director_clips_camera(local_player_index, 0, NONE);
+			if (!*director_camera_scripted && !use_dead_camera)
+			{
+				if (clips_third_person())
+					director_clips_camera(local_player_index, 1, NONE);
+				else
+					director_clips_camera(local_player_index, 0, NONE);
+				return;
+			}
 		}
 		if (!*director_camera_scripted)
 		{

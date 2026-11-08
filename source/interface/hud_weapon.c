@@ -79,6 +79,8 @@ symbols in this file:
 #include "units/units.h"
 #include "custom_edition_hud.h" /* port: CE warning placement and reticle classification */
 #include "hud_hires_crosshairs.h" /* port: port/linux/game/hud_hires_tags.c */
+#include "camera/director.h"
+#include "clips.h" /* port: a clip's third person view has no crosshair */
 
 #include <math.h>
 #include <string.h>
@@ -2052,6 +2054,11 @@ void hud_render_weapon_interface(
 		player->unit_index,
 		unit_get(player->unit_index)->unit.current_weapon_index);
 	boolean seat_disallows_hud = FALSE;
+	/* a clip watched from behind the player keeps the weapon readouts and
+	drops the aim mark. a match, and a clip's first person view, keep it */
+	boolean show_crosshair = !(clips_replaying() &&
+		director_get_perspective(render.local_player_index) ==
+			_director_perspective_third_person);
 
 	if (weapon_index == NONE)
 	{
@@ -2097,11 +2104,12 @@ void hud_render_weapon_interface(
 		hud_index = definition->weapon.interface_definition.hud_interface.index;
 		if (hud_index != NONE)
 		{
-			crosshairs_draw(
-				player,
-				weapon_index,
-				hud_index,
-				&weapon_state);
+			if (show_crosshair)
+				crosshairs_draw(
+					player,
+					weapon_index,
+					hud_index,
+					&weapon_state);
 			render_weapon_hud(
 				hud_index,
 				player->local_player_index,
@@ -2120,11 +2128,12 @@ void hud_render_weapon_interface(
 	{
 		struct weapon_interface_state weapon_state = { 0 };
 
-		crosshairs_draw(
-			player,
-			NONE,
-			hud_globals->defaults.default_weapon_hud.index,
-			&weapon_state);
+		if (show_crosshair)
+			crosshairs_draw(
+				player,
+				NONE,
+				hud_globals->defaults.default_weapon_hud.index,
+				&weapon_state);
 	}
 
 	render_grenade_hud(
