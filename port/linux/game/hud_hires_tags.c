@@ -73,12 +73,15 @@ int hud_hires_ce_stock_matches(long index, unsigned long address, long width, lo
 /* (custom_edition_cache.c) */
 boolean custom_edition_cache_stock_tag(long tag_index);
 boolean custom_edition_cache_tags_loaded(void);
+/* (cache_files.c) a map the MCC import wrote */
+boolean cache_files_mcc_hud(void);
 
 void hud_hires_map_loaded(const long *assets, long count);
 void hud_hires_map_unloaded(void);
 void hud_hires_tags_loaded(long scenario_index);
 void hud_hires_tags_unloaded(void);
 long hud_hires_asset_at(unsigned long address, long width, long height);
+long hud_hires_asset_imported(unsigned long address, long width, long height, long asset);
 struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *bitmap, short sequence_index);
 
 #include "custom_edition_hud_buttons.h"
@@ -89,6 +92,8 @@ enum
 {
 	MAXIMUM_HIRES_BITMAPS = 128,
 	MAXIMUM_HIRES_SPRITE_BITMAPS = 8,
+	/* (a bitmap group's type: bitmap_extract.c) */
+	HIRES_SPRITES_GROUP_TYPE = 3,
 };
 
 /* ---------- globals */
@@ -100,6 +105,11 @@ static struct
 	/* A compatible CE resource sheet: checked against CE's pixel signature
 	in the platform layer, rather than the Xbox signature. */
 	boolean stock_custom_edition;
+	/* An imported MCC map's (cache_files_mcc_hud): MCC's pixels, resampled,
+	of the bitmap the texture redraws, which no signature matches. Only a
+	whole image (no sprite sheet, whose layout MCC changed in some) of the
+	texture's proportions. */
+	boolean imported;
 } hires_bitmaps[MAXIMUM_HIRES_BITMAPS];
 static long hires_bitmap_count = 0;
 
@@ -248,6 +258,11 @@ void hud_hires_tags_loaded(
 			/* (the main menu's map has only some of the HUD) */
 			missing++;
 		}
+		else if (cache_files_mcc_hud() && bitmap_group_get(group_index)->type == HIRES_SPRITES_GROUP_TYPE)
+		{
+			platform_log("high-res hud: %s bitmap %ld is a sprite sheet of an imported MCC map: drawn as it is",
+				hud_hires_asset_tag(asset), hud_hires_asset_bitmap(asset));
+		}
 		else if (!hud_hires_asset_fits(asset, bitmap->width, bitmap->height))
 		{
 			platform_log("high-res hud: %s bitmap %ld is %dx%d here, which its texture does not fit",
@@ -269,6 +284,7 @@ void hud_hires_tags_loaded(
 			hires_bitmaps[hires_bitmap_count].asset = asset;
 			hires_bitmaps[hires_bitmap_count].stock_custom_edition =
 				hud_hires_asset_custom_edition(asset) && custom_edition_cache_stock_tag(group_index);
+			hires_bitmaps[hires_bitmap_count].imported = cache_files_mcc_hud();
 			hires_bitmap_count++;
 		}
 	}
@@ -407,6 +423,28 @@ long hud_hires_asset_stock_custom_edition(
 			(unsigned long)bitmap->base_address == address && bitmap->width == width && bitmap->height == height)
 		{
 			return hires_bitmaps[index].stock_custom_edition;
+		}
+	}
+
+	return FALSE;
+}
+
+long hud_hires_asset_imported(
+	unsigned long address,
+	long width,
+	long height,
+	long asset)
+{
+	long index;
+
+	for (index = 0; index < hires_bitmap_count; index++)
+	{
+		struct bitmap_data *bitmap = hires_bitmaps[index].bitmap;
+
+		if (hires_bitmaps[index].asset == asset && hud_hires_bitmap_resident(bitmap) &&
+			(unsigned long)bitmap->base_address == address && bitmap->width == width && bitmap->height == height)
+		{
+			return hires_bitmaps[index].imported;
 		}
 	}
 

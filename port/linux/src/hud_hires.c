@@ -40,6 +40,7 @@ zlib (port/third_party/zlib).
 /* the game's (port/linux/game/hud_hires_tags.c) */
 long hud_hires_asset_at(unsigned long address, long width, long height);
 long hud_hires_asset_stock_custom_edition(unsigned long address, long width, long height, long asset);
+long hud_hires_asset_imported(unsigned long address, long width, long height, long asset);
 
 /* Include every embedded HUD and button style, including stick frames. */
 #define MAXIMUM_TEXTURES 256
@@ -195,6 +196,10 @@ long hud_hires_override_find(unsigned long address, unsigned long width, unsigne
 			level0_size == embedded->ce_size &&
 			crc32(0L, (const Bytef *)address, (uInt)level0_size) == embedded->ce_crc ? asset : -1;
 	}
+	/* (an imported MCC map's whole image: MCC's pixels of the bitmap the
+	texture redraws, resampled, which no signature matches) */
+	if (hud_hires_asset_imported(address, (long)width, (long)height, asset))
+		return asset;
 	if (crc32(0L, (const Bytef *)address, (uInt)level0_size) != hud_hires_embedded[asset].crc)
 	{
 		if (!textures[asset].other_pixels_logged)
