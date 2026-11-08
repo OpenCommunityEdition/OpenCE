@@ -9,7 +9,8 @@ directory when it has maps/, else assets/ in the current directory or two
 levels above the executable (the repository root for build/linux/halo).
 h:\ is the Halo Custom Edition install paths.custom_edition names, if any
 (its maps folder holds the resource maps Custom Edition maps need, and more
-maps).
+maps). m:\ is, while maps are imported from it, the Halo 1 folder of a Master
+Chief Collection install (halo --import-mcc ... --from <folder>), read only.
 Every other drive letter X:\ is the subdirectory X/ of the save root (z:\ holds the persistent cache and saves,
 u:\ user data, t:\ title data): paths.saves, else
 $XDG_DATA_HOME/halo-linux or ~/.local/share/halo-linux. Path components are
@@ -184,6 +185,19 @@ const char *platform_save_root(void)
 	return root;
 }
 
+static char mcc_source_root[1024];
+
+void platform_set_mcc_source_root(const char *path)
+{
+	snprintf(mcc_source_root, sizeof(mcc_source_root), "%s", path ? path : "");
+	trim_separators(mcc_source_root);
+}
+
+const char *platform_mcc_source_root(void)
+{
+	return mcc_source_root;
+}
+
 const char *platform_custom_edition_root(void)
 {
 	static char root[MAX_PATH];
@@ -318,6 +332,10 @@ void platform_translate_path(const char *xbox_path, char *host_path, unsigned lo
 		if (drive == 'h' && platform_custom_edition_root()[0])
 		{
 			snprintf(resolved, sizeof(resolved), "%s", platform_custom_edition_root());
+		}
+		else if (drive == 'm' && mcc_source_root[0])
+		{
+			snprintf(resolved, sizeof(resolved), "%s", mcc_source_root);
 		}
 		else if (drive == 'd' && translate_elsewhere(cursor + 2, resolved, sizeof(resolved), &cursor))
 		{

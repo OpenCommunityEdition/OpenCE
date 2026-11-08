@@ -32,6 +32,8 @@ without a display to wait for, and its exits.
 
 /* port/linux/game/mcc_import.c */
 int mcc_import_run(char const *output_folder, char const *const *map_names, int map_count);
+/* (port/linux/game/mcc_import_patch.c) the maps the game has the disc's values of */
+int mcc_import_default_maps(char names[][64], int maximum_count);
 #include <stdlib.h>
 #include <string.h>
 
@@ -196,23 +198,39 @@ static void answer_command_line(void)
 			exit(server_master_keygen() ? EXIT_SUCCESS : SERVER_EXIT_CONFIGURATION);
 		if (!strcmp(argument, "--import-mcc"))
 		{
-			/* halo --import-mcc <output folder> [<map>...]: the data root's
-			MCC maps written as the Xbox's (port/linux/game/mcc_import.c) */
-			static char names[16][64];
-			char const *maps[16];
-			char output[1024];
-			int count = 0;
+			/* halo --import-mcc <output folder> [--from <MCC's halo1 folder>]
+			[<map>...]: MCC's maps (the data root's, or those of the folder
+			--from names) written as the Xbox's (port/linux/game/mcc_import.c);
+			with no map named, every map the game has the disc's values of */
+			static char names[64][64];
+			char const *maps[64];
+			char output[1024], from[1024];
+			int count = 0, next = index + 2;
 
 			if (!posix_command_line_argument(index + 1, output, sizeof(output)))
 			{
 				fprintf(stderr, "--import-mcc: give the folder to write the maps to\n");
 				exit(SERVER_EXIT_CONFIGURATION);
 			}
-			while (count < 16 && posix_command_line_argument(index + 2 + count, names[count], sizeof(names[count])))
+			if (posix_command_line_argument(next, from, sizeof(from)) && !strcmp(from, "--from"))
+			{
+				if (!posix_command_line_argument(next + 1, from, sizeof(from)))
+				{
+					fprintf(stderr, "--import-mcc: --from names the Master Chief Collection's halo1 folder\n");
+					exit(SERVER_EXIT_CONFIGURATION);
+				}
+				platform_set_mcc_source_root(from);
+				next += 2;
+			}
+			while (count < 64 && posix_command_line_argument(next + count, names[count], sizeof(names[count])))
 			{
 				maps[count] = names[count];
 				count++;
 			}
+			if (!count)
+				count = mcc_import_default_maps(names, 64);
+			for (next = 0; next < count; next++)
+				maps[next] = names[next];
 			exit(mcc_import_run(output, maps, count));
 		}
 		if (!strcmp(argument, "--sign"))

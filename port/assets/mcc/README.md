@@ -21,8 +21,8 @@ What is not here:
   version.
 - No data of MCC's. A tag MCC has only in another map (the warthog, from
   a10; the ghost's gun, from b30) is named by a `donor` line, and the import
-  takes it from the user's own MCC map (into the data root's `mcc_import`
-  folder).
+  takes it from the user's own MCC map (into the save folder's
+  `z/mcc_import`).
 
 The files are made from the disc's maps and MCC's with the prototype tools
 (not yet in the repository): the comparison of each map's tags, field by

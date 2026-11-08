@@ -1233,6 +1233,34 @@ char *mcc_import_data_read(
 	return NULL;
 }
 
+int mcc_import_default_maps(
+	char names[][64],
+	int maximum_count)
+{
+	int count = 0;
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	unsigned int index;
+
+	for (index = 0; index < mcc_patches_embedded_count && count < maximum_count; index++)
+	{
+		char const *name = mcc_patches_embedded[index].name;
+		unsigned long length = name ? mcc_patch_length(name) : 0;
+
+		if (length > 3 && length - 3 < 64 && !strcmp(name + length - 3, ".p2"))
+		{
+			csmemcpy(names[count], name, length - 3);
+			names[count][length - 3] = 0;
+			count++;
+		}
+	}
+#else
+	(void)names;
+	(void)maximum_count;
+#endif
+
+	return count;
+}
+
 void mcc_import_data_free(
 	char *text)
 {
@@ -1243,9 +1271,10 @@ void mcc_import_data_free(
 }
 
 /* where the import of the MCC map `donor_map` writes its tag `tag` for other
-maps' donor lines (mcc_import_operations_export): the user's own data, never
-carried with the game */
-#define MCC_PATCH_DONOR_FOLDER "d:\\mcc_import"
+maps' donor lines (mcc_import_operations_export): the user's own data, in the
+save root (z:\), never carried with the game, nor written into the data root
+or the MCC install */
+#define MCC_PATCH_DONOR_FOLDER "z:\\mcc_import"
 
 static void mcc_patch_donor_path(
 	char *path,

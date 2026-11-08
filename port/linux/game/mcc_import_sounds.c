@@ -235,7 +235,7 @@ static boolean mcc_sounds_index_read(
 	long size, at = 8, entry_index;
 	byte *bytes;
 
-	snprintf(path, sizeof(path), "d:\\sound\\pc\\lst\\%s.lst.bin", bank_name);
+	snprintf(path, sizeof(path), "%ssound\\pc\\lst\\%s.lst.bin", mcc_source_directory(), bank_name);
 	bytes = mcc_sounds_read_file(path, &size);
 	if (!bytes || size < 8 || mcc_sounds_u32(bytes) != 1)
 	{
@@ -328,7 +328,7 @@ static boolean mcc_sounds_bank_read(
 	long sample_index;
 	long file_size;
 
-	snprintf(path, sizeof(path), "d:\\sound\\pc\\%s.fsb", bank_name);
+	snprintf(path, sizeof(path), "%ssound\\pc\\%s.fsb", mcc_source_directory(), bank_name);
 	bank->file = fopen(path, "rb");
 	if (!bank->file || fread(header, 1, sizeof(header), bank->file) != sizeof(header) || memcmp(header, "FSB5", 4))
 		return FALSE;
@@ -1050,7 +1050,7 @@ boolean mcc_import_sounds_open(
 	{
 		if (!mcc_sounds_bank_read(&mcc_sounds.banks[bank_index], mcc_sound_bank_names[bank_index]))
 		{
-			mcc_sounds_log("mcc import: MCC's sound bank %s cannot be read (d:\\sound\\pc): the maps' sounds are silent",
+			mcc_sounds_log("mcc import: MCC's sound bank %s cannot be read (sound\\pc): the maps' sounds are silent",
 				mcc_sound_bank_names[bank_index]);
 			mcc_import_sounds_close();
 			return FALSE;

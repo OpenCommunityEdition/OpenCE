@@ -81,6 +81,11 @@ map's) is, in its maps folder, a map of Halo: The Master Chief Collection
 Custom Edition map is, once its tags are moved (cache_file_formats.h). */
 boolean mcc_source_level_name(
 	char const *level_name);
+/* The folder MCC's maps and sound banks are read from: "m:\" while they are
+imported from an MCC install (platform_set_mcc_source_root), else the data
+root, "d:\". */
+char const *mcc_source_directory(
+	void);
 /* The version a network game on an MCC map is on (network_game_map's
 version): the same for every MCC map, and none of the game's own maps'
 (0), so that a machine with MCC's maps never plays one with the disc's,

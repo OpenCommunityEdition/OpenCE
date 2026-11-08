@@ -106,6 +106,10 @@ const char *platform_data_root(void);
 /* the Halo Custom Edition install the Xbox drive h:\ is (paths.custom_edition),
 or "" when none is set or it has no maps folder */
 const char *platform_custom_edition_root(void);
+/* the Halo 1 folder of a Master Chief Collection install that maps are
+imported from (m:\), or "" */
+void platform_set_mcc_source_root(const char *path);
+const char *platform_mcc_source_root(void);
 /* on the desktop, when the data root has no maps folder: offers to copy it
 out of an Xbox disc image into destination (sdl_platform.c), and quits if
 the player declines; nonzero once destination has one */

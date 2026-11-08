@@ -94,6 +94,12 @@ char *mcc_import_data_read(
 void mcc_import_data_free(
 	char *text);
 
+/* The maps the game has the disc's values of (port/assets/mcc), at most
+maximum_count of them: the maps an import writes when none is named. */
+int mcc_import_default_maps(
+	char names[][64],
+	int maximum_count);
+
 /* Writes the tag `tag` ("group:path") of the MCC map `donor_map`, as its
 fixes and operations leave it, for the maps whose donor lines name it. */
 boolean mcc_import_operations_export(

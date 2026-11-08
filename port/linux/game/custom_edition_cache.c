@@ -893,13 +893,25 @@ boolean custom_edition_level_name(
 		!_strnicmp(level_name, CUSTOM_EDITION_LEVEL_NAME_PREFIX, csstrlen(CUSTOM_EDITION_LEVEL_NAME_PREFIX));
 }
 
-/* the file of the game's own map `level_name` names, in its maps folder */
+/* port/linux/src/xbox_files.c */
+char const *platform_mcc_source_root(void);
+
+char const *mcc_source_directory(
+	void)
+{
+	/* (m:\ the Master Chief Collection's Halo 1 folder maps are imported
+	from, else the data root, whose maps folder may hold MCC's) */
+	return platform_mcc_source_root()[0] ? "m:\\" : "d:\\";
+}
+
+/* the file of the game's own map `level_name` names, in its maps folder (or
+the maps folder of the MCC install it is imported from) */
 static boolean mcc_map_path(
 	char const *level_name,
 	char *path)
 {
 	char const *name = tag_name_strip_path(level_name);
-	char const *directory = cache_files_map_directory();
+	char const *directory = platform_mcc_source_root()[0] ? "m:\\maps\\" : cache_files_map_directory();
 
 	if (csstrlen(directory) + csstrlen(name) + csstrlen(MAP_FILE_EXTENSION) >= MAP_PATH_SIZE)
 	{
