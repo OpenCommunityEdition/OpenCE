@@ -1,36 +1,55 @@
 # Halo: The Master Chief Collection's Halo 1 maps
 
 The Halo 1 maps of Halo: The Master Chief Collection (MCC) are cache files of
-version 13 (build string `01.03.43.0000`). Put in the data root's `maps`
-folder in place of the disc's, they run on the native builds: each loads as a
-Custom Edition map does (`docs/custom_edition_caches.md`), once its tags are
-moved to where a Custom Edition map's are. The MCC installation's folder is
-`Halo The Master Chief Collection/halo1`; its maps are in `halo1/maps`.
+version 13 (build string `01.03.43.0000`). The game does not play them: it
+imports them, once, as the Xbox disc's maps (cache version 5), and plays those
+as it plays the disc's. The MCC installation's folder is
+`Halo The Master Chief Collection/halo1`; its maps are in `halo1/maps`, its
+sounds in FMOD banks in `halo1/sound/pc`.
 
-What runs, and what does not yet:
+## The import
 
-- Every map's tags and structure BSPs load, are checked by the tag validator
-  and are converted: the 23 maps the disc has (campaign and multiplayer) and
-  `ui.map`. Halo PC's six multiplayer maps load too, but the menus do not
-  list them.
-- Their bitmaps are read from MCC's `bitmaps.map`, beside the maps.
-- Their sounds are silent: MCC keeps them in its FMOD sound banks
-  (`halo1/sound/pc`), which are not read yet.
-- MCC's `ui.map` holds Halo PC's menus, not the Xbox's: the game's own
-  menus that are not in it (the network pregame screen) do not open, and
-  Halo PC's list widgets stop the game. Until the menus run on it, a
-  temporary launcher takes the main menu's place
-  (`port/linux/game/mcc_launcher.c`): a list of the campaign's levels and
-  the multiplayer maps, each played as the console's `map_name` plays a
-  level or as a local slayer game for controller 1.
-- The HUD is drawn at the Xbox's size, from MCC's remastered bitmaps.
-- Not on the web build, which runs no Custom Edition map either (its tag
-  cache is not reserved there).
+On a first start without game data the desktop builds offer an Xbox disc
+image or MCC on Steam (`port/linux/src/mcc_install.c`, found through Steam's
+libraries, or a folder the player picks). The import itself is
+`halo --import-mcc <output folder> [--from <halo1 folder> | steam] [<map>...]`
+(`port/linux/game/mcc_import.c`), which a second copy of the game runs. MCC's
+folder is read as the drive `m:\` and nothing is written to it. For each map:
+
+1. It is loaded as below, as a Custom Edition map is, and its tags checked.
+2. The importer's own fixes undo what Halo PC and MCC changed and need no
+   data of the disc's (`mcc_import_patch.c`).
+3. The map's operations give its tags the disc's values where they differ,
+   and the disc's tag order (`port/assets/mcc/<map>.p2`, embedded in the game).
+   A tag MCC has only in another map (the warthog, the ghost's gun) is taken
+   from that map of the player's.
+4. The tags are written in the disc's order, with the structure BSPs, the
+   bitmaps (the HUD's brought to the disc's sizes), the sounds from MCC's
+   banks (Xbox ADPCM copied, CELT decoded and encoded as Xbox ADPCM, music
+   in the disc's 65,520-byte pieces) and the models' vertex buffers.
+5. The written map's simulation data is fingerprinted and compared with the
+   disc's (`port/assets/mcc/<map>.fp`). A map that matches is written as the
+   disc's and plays with players of the disc; any other is marked with
+   `MCC_MAP_VERSION` in its header and plays only with other such maps
+   (`cache_files_map_version`; network version 42,
+   `port/linux/NETCODE.md`). Halo PC's seven rebuilds of the multiplayer maps
+   (beavercreek, bloodgulch, boardingaction, carousel, damnation, hangemhigh,
+   sidewinder) have other collision, and are always MCC's.
+
+What does not import yet:
+
+- `ui.map`: MCC's is Halo PC's, too large for the menus' cache file, and
+  without the Xbox menus' network lobby. The disc's is needed.
+- Halo PC's six multiplayer maps.
+- A few tags of the disc's are assets MCC lacks or changed as geometry (the
+  flamethrower, `flag_base`, `teleporter_base`, `c_field_generator`, the
+  cyborg's passenger animations): without them a map is written as MCC's.
 
 ## Loading
 
-`custom_edition_cache_load` (`port/linux/game/cache_file_formats.c`) takes a
-version 13 cache as it takes a Custom Edition one, but for these:
+The import loads a map with `custom_edition_cache_load`
+(`port/linux/game/cache_file_formats.c`), which takes a version 13 cache as it
+takes a Custom Edition one, but for these:
 
 1. The tag data is at `0x50000000` (`MCC_TAG_DATA_ADDRESS`), where Custom
    Edition's is at `0x40440000`. The tag index (`0x28` bytes, ending in
@@ -56,9 +75,8 @@ version 13 cache as it takes a Custom Edition one, but for these:
    schema (`devc`, `tagc`: Halo PC's, which the game never reads) is left as
    it is.
 5. Each BSP reference is made to cover the BSP and room for its region after
-   it, at the top of the tag cache. As the BSP loads
-   (`custom_edition_structure_bsp_read`, from `scenario_structure_bsp_load`),
-   its region is read after it, its pointers are moved
+   it, at the top of the tag cache. As the BSP is read
+   (`custom_edition_structure_bsp_read`, from the import), its region is read after it, its pointers are moved
    (`tag_validate_rebase_structure_bsp`: its own, and its references' names,
    which are in the tags), and each material is given its vertices in the
    region (`mcc_structure_bsp_vertices_attach`): it is then a Custom Edition
@@ -96,17 +114,6 @@ version 13 cache as it takes a Custom Edition one, but for these:
 `port/tools/cache_file_report.c` checks a version 13 cache as far as the move
 of its tags, which needs the game's schemas.
 
-## In the game
-
-`mcc_source_level_name` (`port/linux/game/custom_edition_cache.c`) says whether the
-file of one of the game's own levels in its maps folder is a version 13
-cache. Such a level is never precached (it is read in place), is loaded as a
-Custom Edition map is (`cache_files.c`), and plays on any build's network
-games but with machines that have MCC's maps too: its version in a network
-game is `MCC_MAP_VERSION`, where the disc's maps' is 0
-(`cache_files_map_version`; network version 42, `port/linux/NETCODE.md`).
-Map sharing never sends one: it shares Custom Edition maps alone.
-
 ## Evidence
 
 Established on the maps of MCC's Steam release `2025.08.16.178512.1`,
@@ -137,6 +144,7 @@ compared with the maps of an NTSC Xbox disc (revision 2, build
   `sounds_music.fsb`, one sample for each of a tag's permutations, of the
   disc's lengths. Each bank's `lst/<bank>.lst.bin` gives each tag path's
   samples.
-- In the game (Windows build): MCC's `ui.map`, bloodgulch (a local game,
-  played) and a10 (its scripts ran its opening, switching its BSPs) load
-  and run.
+- Imported (Windows build): the ten campaign maps and chillout, longest,
+  prisoner, putput, ratrace and wizard match the disc's fingerprint with the
+  disc's assets; every imported map loads and runs, and a hosted game on an
+  imported multiplayer map places the disc's items.

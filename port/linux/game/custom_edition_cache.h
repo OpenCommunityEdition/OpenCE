@@ -76,9 +76,11 @@ boolean custom_edition_level_name(
 	char const *level_name);
 
 /* Whether the game's own level `level_name` names (not a Custom Edition
-map's) is, in its maps folder, a map of Halo: The Master Chief Collection
-(cache version 13), as an MCC import leaves them: it is then loaded as a
-Custom Edition map is, once its tags are moved (cache_file_formats.h). */
+map's) is, in the maps folder MCC's maps are read from (mcc_source_directory),
+a map of Halo: The Master Chief Collection (cache version 13): the import
+(mcc_import.c) loads it as a Custom Edition map is, once its tags are moved
+(cache_file_formats.h), to write it as an Xbox map. The game does not play
+MCC's own maps. */
 boolean mcc_source_level_name(
 	char const *level_name);
 /* The folder MCC's maps and sound banks are read from: "m:\" while they are

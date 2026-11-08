@@ -237,7 +237,7 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [port/web/README.md](port/web/README.md) | The web build, the page, the game data in the browser, limits, how it operates, hosting on GitHub Pages |
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |
-| [docs/mcc_caches.md](docs/mcc_caches.md) | Loading the Master Chief Collection's Halo 1 maps, and the evidence for each layout |
+| [docs/mcc_caches.md](docs/mcc_caches.md) | Importing the Master Chief Collection's Halo 1 maps as the disc's, and the evidence for each layout |
 | [docs/dedicated_server.md](docs/dedicated_server.md) | The dedicated server: its command line, exit codes, commands, HTTP API, RCON, events and files |
 | [docs/master_protocol.md](docs/master_protocol.md) | The master servers' protocol: publishing, the probe, the signed list |
 | [docs/mods.md](docs/mods.md) | Mods: folders of Halo PC tag files whose sounds, bitmaps, text and models play over a map's on one machine |
