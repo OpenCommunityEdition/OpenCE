@@ -2,13 +2,16 @@
 
 ## Milestones and current position
 
-Updated 7 November 2026. Milestones retain the existing stage numbers, so
+Updated 8 November 2026. Milestones retain the existing stage numbers, so
 "Stage 6" and "Milestone 6" refer to the same work. Stages 1–8 are complete;
 Stage 9's combined review, testing and cleanup are complete. Ruby co-op
-recovery failed on both original main and current, so its compatibility
-sign-off remains withheld. Milestone 10 has confirmed a shared co-op replica
-lifetime defect and added executable regressions. Its shared recovery repair
-is now in implementation and validation under an updated network agreement.
+recovery failed on both original main and the Stage 9 candidate; those failures
+remain recorded. Milestone 10 fixes the demonstrated shared replica-lifetime
+defect under a separated network agreement. Its final Ruby, Mercury and Xbox
+checkpoint checks, rejoin and native/browser transport controls pass within
+the limits below. Milestone 10's implementation, validation, combined review
+and verified cleanup are complete. This qualifies the demonstrated recovery
+repair without asserting full campaign or every-map compatibility.
 The shared boat correction is tracked separately as Milestone 11 and remains
 planned after Milestone 10. On 7 November the user explicitly removed the
 old-client crossplay constraint for both milestones. The console-syntax
@@ -18,34 +21,29 @@ The stage evidence below records the changes, actual validation and limits.
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
 | 1 | Establish executable regression coverage, CI and Workshop runtime baselines. | Complete |
-| 2 | Reproduce the shared boat defect and establish the crossplay constraint. | Investigation complete; shared fix deferred |
+| 2 | Reproduce the shared boat defect and establish the crossplay constraint. | Investigation complete; correction tracked in Milestone 11 |
 | 3 | Remove redundant MCC resource ordering and bitmap ownership lookup work. | Complete |
 | 4 | Replace repeated per-texture stream scans with a local per-tag cursor. | Complete |
 | 5 | Correct HUD ownership, remove bitmap-name dependence and trim duplicate normalization. | Complete |
 | 6 | Consolidate duplicate checksum work with exact compatibility and linkage proved. | Complete |
 | 7 | Consolidate script resolution, reject unused checkpoint object handles before restoration, and audit state ownership. | Complete; shared console lifetime fix deferred |
 | 8 | Retain justified HUD exceptions and support MCC-wide AI deselection through its real native service. | Complete |
-| 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; Ruby co-op recovery sign-off withheld |
-| 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Implementation and validation in progress |
-| 11 | Correct shared boat control initialization under a separated engine/network agreement. | Authorized policy change recorded; implementation follows Milestone 10 |
+| 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; recovery failure addressed in Milestone 10 |
+| 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
+| 11 | Correct shared boat control initialization under a separated engine/network agreement. | Next; old-client crossplay constraint removed |
 
-The latest completed verification is `f1a0d6e1b`, with passing MCC and
-four-platform debug workflows. That Stage 10 investigation added regression
-coverage without changing the game. The subsequent fix is being validated
-separately below. Stage 9 recorded 2,193 local passes,
-24 skips and twelve existing boat expected failures, four real-asset checks,
-64 successful matched loads, sixteen failed-load recoveries, standalone
-save/restore/reset checks, Mercury co-op and all four Xbox/CE mixed-build host
-directions. Ruby co-op recovery remains a failed observation, including an
-original-main reproduction; completion of the investigation does not fix it.
+The final gameplay implementation is `67968518222f3ee59361670323cfcd48486fa97e`,
+with passing MCC and four-platform debug workflows and 87 focused local passes.
+The comment-only follow-up `7ed70168a` also passes both workflows.
+Its [validation record](#stage-10-shared-checkpoint-recovery-fix) distinguishes
+the authenticated local native build from the exact-revision CI Web build,
+pre-final checks from final checks, and passing transport from unmeasured
+cross-log state equivalence. The new agreements are base 32714, MCC 66 and
+camera 32716/32717; historical verification used OpenCE 41/MCC 65.
 All 21 structural HUD profiles remain with measured evidence and removal
-conditions. The pending shared fix uses base agreement 32714, MCC 66 and camera
-agreements 32716/32717; the earlier verification used OpenCE 41/MCC 65.
-The shared console-syntax
-defect remains unfixed, as explicitly requested. The detailed sections
-distinguish these bounded checks from full compatibility. Milestone counts
-are not an estimate of percentage effort remaining, and do not establish
-that every MCC module has received the same depth of audit.
+conditions. The shared console-syntax defect remains unfixed, as explicitly
+requested. Milestone counts are not an estimate of percentage effort remaining
+and do not establish equal audit depth for every MCC module.
 
 All future changes remain evidence-backed, with general engine defects fixed
 in the responsible implementation and MCC format defects fixed systemically
@@ -2334,7 +2332,7 @@ joins. The default UI label is now GulchCE Standard; the stored
 `opence_crossplay` token is retained for configuration continuity. This does
 not claim compatibility with OpenCE 41 or an untested future upstream release.
 
-### Validation in progress
+### Implementation and preliminary evidence
 
 Historical failures and archives under `build/stage10` are unchanged. New
 private evidence is isolated under `build/stage10-fix`. The original executable,
@@ -2351,7 +2349,7 @@ in `build/stage10-fix/symbol-receipt-v3/layout.json`. It was built immediately
 before the commit from the same gameplay sources. CI builds the committed
 revision independently. Earlier candidate receipts remain historical evidence.
 
-The focused checkpoint, recovery, retried-inventory and epoch selection passes
+The first checkpoint, recovery, retried-inventory and epoch selection passed
 **82 tests**. Seven epoch tests extract the production dispatcher through its
 gameplay-handler switch, preserving framing, direction, batch recursion,
 simulation clocks and stale-message handling. Final gameplay handlers are
@@ -2467,15 +2465,219 @@ The rebuilt Windows candidate has PE/PDB GUID
 `FB4E538B-B88F-E0C9-4C4C-44205044422E`, authenticated in
 `build/stage10-fix/symbol-receipt-v4/layout.json`. The preceding executed
 candidate was frozen and hashed in `prior-candidate-6666464` before rebuilding;
-its earlier runtime and CI results remain pre-final evidence. Final real-map,
-platform and transport checks are being repeated on the corrected state.
+its earlier runtime and CI results remain pre-final evidence. The final native
+executable is a local pre-commit build from the final gameplay sources, SHA256
+`66c6565fbe908a1b489389a0e68af968d26d76985a3ecec31cee60569744dc04`;
+the PDB hash is
+`14a48f17ffc1437b05ed02b9c16db5fbff0ed1d9ea4b78863b79cad255f796bd`.
+This is not described as a clean-checkout CI native binary.
 
-Further runtime, platform and transport validation remains required before
-this milestone can be marked complete. Full campaigns, live split-screen and
-Android-device gameplay remain outside these bounded checks. Existing authored
-HUD, navigation-point and attachment caches are not comprehensively rebuilt
-from checkpoint state by this fix; complete authored campaign rollback remains
-a separate unverified limit. The ordered snapshot marker proves ordering, not
+### Final platform and runtime evidence
+
+Both exact-revision workflows for
+`67968518222f3ee59361670323cfcd48486fa97e` completed successfully:
+[Build 42427426028](https://github.com/chestahh/GulchCE/actions/runs/42427426028)
+and [MCC 42427426029](https://github.com/chestahh/GulchCE/actions/runs/42427426029).
+`build/stage10-fix/ci/final-6796851.json` and retained decoded job logs record
+Linux, Windows, Android and Web builds, named test selections and artifact
+digests. Linux reports **2,507 passed, 27 skipped, twelve existing boat expected
+failures and seven passing subtests**; its checkpoint/camera/join selection
+passes 107 and its sanitizer selection 38. MCC readers report 1,811 passes and
+19 skips, with 38 sanitizer passes and 36 meter GPU renders. The Windows
+adapter selections report 221 passes; 42 passes/one skip; 1,754 passes/16 skips;
+and 38 passes. These selections overlap and are not an additive distinct-test
+total. Android touch/gyro and importer checks, Windows COFF/LTO and corruption
+controls, and Web build checks also pass. Platform success is not device or
+full-campaign gameplay qualification.
+
+Final review corrected an obsolete actor-message comment promising upstream
+crossplay in `network_distributed.h`. Commit
+`7ed70168ac875ce28e115d5264e8036f55a22392` changes only that comment; the wire
+record and gameplay remain the implementation validated at `67968518222f`.
+The follow-up also passes
+[Build 42430388710](https://github.com/chestahh/GulchCE/actions/runs/42430388710)
+and [MCC 42430388612](https://github.com/chestahh/GulchCE/actions/runs/42430388612),
+including the same named Linux/MCC selections. Its WebRTC echoes return 320/320
+for each browser; the intentional-loss controls return 689/960 for Chromium
+and 714/960 for Firefox. `build/stage10-fix/ci/final-7ed7016.json` retains exact
+revision/job conclusions, eight decoded logs and six artifact digests/sizes
+matched to upload logs. No follow-up artifacts were downloaded or executed;
+runtime artifacts retain their original revision and build provenance.
+
+The final native candidate repeats default-profile checkpoint recovery on
+Ruby's Rebalanced B40, Mercury and Xbox B30. Each passes the unchanged strict
+judge, two controlled wipe/recovery sequences, normal owned-process shutdown
+and independent replay of authenticated process-memory reads. The final
+`ruby-default-v2`, `mercury-default-v2` and `xbox-b30-v2` receipts record:
+
+| Map | Paired state seconds / position pairs | Authoritative drift samples | Maximum drift | Observed checkpoint epochs |
+| --- | --- | --- | --- | --- |
+| Ruby B40 | 58 / 92 | 1,958 | 0 | 1–4 |
+| Mercury | 68 / 126 | 1,952 | 0 | 1–3 |
+| Xbox B30 | 70 / 126 | 2,019 | 0.000003 | 1–3 |
+
+Recovered player bindings and ordinary inventories are observed; none of the
+replays finds a qualifying same-epoch dead-client/live-host window. B30 logs
+two alive and two death sample mismatches within the unchanged judge's limits;
+passing does not mean every asynchronous sample is identical. Each controlled
+sequence requires a new revert and 300 recovered ticks. Ruby also performs
+authored recovery, so these observations do not assign every revert to its
+preceding command. Bounded double reads and asynchronous pairing cannot prove
+the absence of every transient state or reveal exact packet order.
+
+Mercury `rejoin-mercury-v2` additionally passes checkpoint capture, the first
+client leaving, a replacement joining, and restoration with the current roster.
+Its independent verifier pins the expected peer/name sets for all five stages,
+replays both guarded reads, checks full local player/unit reciprocity and
+compares shared player slots and full unit handles across peers. Player datum
+salts are local: before restore the same unit `0xe4da01ac` is bound to host
+player `0xec720001` and client player `0xec710001`. Restoring epoch 1 to 2
+retains the replacement `S10Rejoin`, with unit `0xe4d50001`. The captured and
+final 20 MiB checkpoint images match and independently pass the MCC CRC checks.
+The audit is retained in
+`build/stage10-fix/reviews/rejoin-mercury-v2-verification-v2.json`.
+
+The final Ruby camera-protocol control also passes one controlled wipe/recovery
+sequence, with 70 paired state seconds, 116 position pairs and 1,552
+authoritative-drift samples with zero measured drift. Maximum position
+difference is 0.033541 and aim difference five; one alive, death and round sample
+mismatch each remains within the unchanged judge's limits. Independent raw
+replay observes epochs 1–3, no qualifying stale-body window, at least 300
+recovered ticks after the controlled revert at clock 2,725, and normal exits.
+Both peers use `gulchce_third_person` with `forced_off` camera policy and
+`HALO_THIRD_PERSON=0`: this validates the protocol profile, not shoulder-camera
+rendering.
+
+Final Xbox BloodGulch and CE Death Island controls each pass two Slayer rounds.
+Every round supplies 31 paired state seconds, 62 position pairs and 930
+authoritative-drift samples, with zero measured drift and no judge problems or
+divergences; maximum aim difference is two within the existing tolerance.
+The standalone transition control also passes Mercury → Xbox BloodGulch → CE
+Death Island → invalid MCC refusal/menu → Ruby B40, with 150 fresh ticks per
+valid map; its exact private fixture is removed. Independent raw-evidence
+audits of both round controls and the transition control pass. This transition
+check does not establish network map switching or campaign completion.
+
+Two failed final-candidate collector attempts remain failed records. B30 v1
+used `game_is_cooperative` as a network co-op gate, although stock Xbox uses
+that predicate for local split-screen. Rejoin v1 incorrectly required peer-local
+player datum salts to match. Its failing post-join raw pair was not retained,
+so that exact failure cannot be reconstructed from raw memory. Source review
+establishes that the equality gate was invalid; the v2 reads demonstrate the
+valid differing salts. The narrow collector corrections pass subsequent runs
+without game-code or tolerance changes. Available earlier observations, raw
+reads, helpers and failed receipts are retained.
+
+Four old/new discovery-refusal controls also pass: Standard and camera profiles
+with each side hosting. These eight processes stopped normally. Their evidence
+is explicitly **pre-final**, bound to the `6666464c1` candidate; the subsequent
+marker correction does not alter admission code. The independent
+`admission-pre-final-verification.json` audits this attribution. These runtime
+checks demonstrate discovery refusal, not forced raw old-wire injection; the
+source-extracted codec/admission tests cover malformed and truncated requests.
+
+### Real-map native/browser transport
+
+The final Web artifact is the exact `67968518222f` CI build,
+`halo-web-debug` artifact **13596301952**: 14,159,156 ZIP bytes, SHA256
+`af1f3217caa982a8ea138969ec0f3fc23689ee1e244b2318e759163362f8cad6`.
+Its authoritative metadata, upload digest and all 24 extracted site files are
+verified. It is paired with the authenticated local native build above. The
+private Windows adapter uses isolated saves and browser profiles, a local MQTT
+broker, real Xbox BloodGulch and at most two game instances. Retail data remains
+local. Independent replay verifies raw judge inputs, source/build receipts,
+bidirectional WebRTC traffic, normal native exits and 41 exported browser
+save/support files per final case.
+
+| Final pairing | Two-player samples per peer | Drift samples / apart | Mean / maximum drift | Paired cross-log state seconds |
+| --- | --- | --- | --- | --- |
+| Native host, browser joins through discovery | 49 | 1,330 / 326 | 0.098554 / 109.070160 | 0 |
+| Browser host, native joins by supported direct invite | 49 | 1,396 / 257 | 0.125030 / 97.919212 | 0 |
+| Browser host, native discovery with look-only input | 49 | 1,330 / 21 | 0.083745 / 91.926247 | 0 |
+
+All three original judge results pass. The measured authoritative drift is
+nonzero; the apart counts remain below its unchanged limit. However, log sample
+phases fall outside the unchanged two-tick pairing bound in every case, leaving
+zero paired state seconds and zero position pairs. These runs establish bounded
+real-map transport and authoritative-drift coverage, **not cross-log state-field
+equivalence**. Logs were not shifted, tolerances were not relaxed and tests were
+not repeated to obtain favourable phase alignment. The native/native recovery
+checks above separately provide matched state observations.
+
+The two failed preliminary Internet attempts are preserved: native-host v1
+passed gameplay/transport but failed teardown on a disappearing window; its
+narrow owned-window fix was independently reviewed before v2 passed. The first
+browser-host discovery attempt exited normally before joining gameplay. Its
+exact quit trigger is unproved. Final direct-invite and look-only discovery
+controls pass, but they use the later candidate and do not isolate that earlier
+failure's cause. Their outcomes and hashes remain separate in
+`build/stage10-fix/internet/final-transport-summary.json` and the independent
+`reviews/internet-*-verification-v2.json` receipts.
+
+The `67968518222f` CI additionally passes native WebRTC echo with Chromium and
+Firefox at 320/320 messages each; intentional ten-percent datagram-loss controls
+return 714/960 and 698/960 respectively. Local-broker map gameplay and these echo
+controls do not qualify WAN/NAT behaviour or browser checkpoint rollback.
+
+### Completion, cleanup and remaining limits
+
+Primary and independent combined review covers the resulting recovery code,
+admission, integration, tests and reader documentation across the core fix and
+both follow-up commits. No implementation blocker remained after the
+first-marker producer correction. The obsolete interoperability comment was corrected in
+`7ed70168a`. No further simplification had a demonstrated benefit: per-slot
+eligibility, reliable empty inventories and the distinction between send-state
+and receive-history resets each prevent a separately covered regression.
+The review and raw-evidence audits are retained under
+`build/stage10-fix/reviews`; no map identity selects the recovery behavior.
+
+Milestone 10 is complete. Milestone 11 remains next under the authorized
+version-separation policy; its shared boat correction has not started and the
+twelve existing strict expected failures remain recorded. The separate
+console-syntax lifetime correction stays deferred.
+
+Verified cleanup is recorded in `build/stage10-fix/cleanup-plan-final-v6.json`,
+`cleanup-applied.json` and `cleanup-post-verification.log`. Across sixteen
+native sessions and six Internet attempts, per-run cleanup removed **234
+generated map-cache files, 29,934,747,648 logical bytes**. Final cleanup removed
+another **2,787 verified disposable files, 973,111,030 bytes**, covering private
+map/site copies, duplicate executables, dependencies and fixture binaries.
+A separately reviewed cleanup removed 270 dummy control fixtures (57,789 bytes),
+retaining their sources and logs. Original maps, Workshop resources, the active
+build, source and other worktrees remain unchanged.
+
+All **3,868 archived files, 6,585,303,596 uncompressed bytes**, are preserved in
+`build/stage10-fix/inactive-saves-and-support.zip`: **798,147,821 bytes**, SHA256
+`4f297443ccb8432f3ca57532bea49a959ff7f972d8bd91c5cd4ba2e35f334c7f`.
+This includes inactive saves and checkpoint captures, complete isolated browser
+profiles and exported saves, the two preceding executed native builds and
+supporting fixture evidence. Every member was verified before loose-file
+removal; the archive's exact bytes were checked again before removal and after
+cleanup. Diagnostics and raw observations remain available separately.
+`retained-size-census.json` records approximately **952 MB** of retained evidence,
+mostly this archive. No loose map copies, executables, DLLs or PDBs remain in
+`build/stage10-fix`; the required active build remains outside that folder.
+
+The final integrity pass verifies the original inputs, active build and all
+sixteen native evidence inventories. All seven raw recovery replays pass after
+archival; earlier incomplete or failed gameplay attempts remain failed records.
+The transport audits ran before cleanup, and their bound evidence is preserved
+by the separate integrity checks; no transport rerun is claimed after removing
+the private map copies. See `post-cleanup-replay-summary.json` for the replay
+results and their exact archive identity.
+
+Earlier cleanup refusals remain recorded. They exposed retained diagnostics
+outside duplicate manifests, changing unrelated PID-reuse observations and
+210 empty save/profile directories omitted by file-derived planning. The final
+cleanup controls pass **60 tests and 25 subtests**. Fresh process-identity proofs,
+exact file inventories, contained nonlink paths and late archive-integrity
+checks remain mandatory; the refused cleanup attempts removed no loose files.
+
+Full campaigns, live split-screen and Android-device gameplay remain outside
+these bounded checks. Existing authored HUD, navigation-point and attachment
+caches are not comprehensively rebuilt from checkpoint state; complete authored
+campaign rollback remains unverified. The ordered marker proves ordering, not
 successful creation of every replica. MCC extra grenade/campaign sidecars
 remain separate periodic updates, so ordinary inventory coverage is not a
-claim about every MCC sidecar.
+claim about every MCC sidecar. Historical failures and archives under
+`build/stage10` remain unchanged.

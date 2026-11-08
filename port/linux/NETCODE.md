@@ -279,8 +279,8 @@ Version 65 required the
 MCC-owned `ai_deselect` script operation. It performs the existing native debug
 selection clear, but admitting the call also enables authored gameplay scripts
 that older MCC builds disabled in full. Peers must agree on that execution;
-packet layouts and OpenCE version 41 remain unchanged. The MCC join envelope
-rejects older versions before admission.
+at version 65, packet layouts and the OpenCE version 41 agreement remained
+unchanged. The MCC join envelope rejected older versions before admission.
 
 Version 64 reserves bytes
 64-127 of the 128-byte MCC map name for advisory Workshop metadata. Valid MCC
@@ -293,7 +293,8 @@ never substitutes for the level filename or SHA-256 admission checks.
 Only `mcc_identity_host_settings` writes this tail in the outgoing MCC copy;
 the host's original settings and Xbox/CE settings are untouched. The record's
 size is unchanged, but its transmitted meaning is new, so MCC 63 peers are
-rejected by the existing version gates. Xbox/CE retain OpenCE protocol 41.
+rejected by the existing version gates. At version 64, Xbox/CE retained
+OpenCE protocol 41.
 `tools/test_mcc_workshop.py` checks the bounded record and sidecar reads;
 `tools/test_mcc_identity.py` checks host publication, refusal classification
 and lifecycle; `tools/test_mcc_protocol.py` checks admission and legacy layout.
@@ -302,13 +303,15 @@ These harness checks do not establish full runtime or browser compatibility.
 Version 63 extends campaign
 snapshots from 768 to 772 bytes (state version 6) to replicate the host's
 `rasterizer_model_lighting_ambient` value for Mission Z9. Older MCC peers are
-rejected. Xbox/Custom Edition retain the pinned upstream 41 contract and
-`HALO_PORT_NETWORK_VERSION`; the MCC-only version carries this agreement change.
+rejected. At version 63, Xbox/Custom Edition retained the pinned upstream 41
+contract and `HALO_PORT_NETWORK_VERSION`; the MCC-only version carried this
+agreement change.
 Version 62 retains OpenCE
 41 map-vote messages 94-95 and moves MCC gameplay messages to 96-99 and its
 join envelope to 100. Its bounded buffer grows to 512 bytes to carry upstream
-41 link credentials, including the local host connection. Older MCC peers are rejected; Xbox and Custom Edition
-keep the exact upstream 41 contract. The pinned upstream manifest covers the
+41 link credentials, including the local host connection. Older MCC peers are
+rejected; at version 62, Xbox and Custom Edition kept the exact upstream 41
+contract. The pinned upstream manifest covers the
 new voting fields and cooperative settings byte. Version 61 required the
 MCC-only equipment reset that removes the held weapon before assigning a
 scripted starting profile, fixing Meincrap's dummy-weapon selector. The host
