@@ -21,6 +21,8 @@ try {
   // Delay entry to the real decoder, not merely its completed service reply.
   // This wrapper is linked only into this disposable fixture.
   const delayedProxy = path.join(work, 'delayed-proxy.js');
+  const timeoutDeclaration = path.join(work, 'test-timeout.h');
+  await fs.writeFile(timeoutDeclaration, 'int mcc_storage_test_wait_ms(void);\n');
   await fs.writeFile(delayedProxy, `addToLibrary({
     web_mcc_test_storage: LibraryManager.library.web_js_mcc_storage,
     web_js_mcc_storage__deps: ['web_mcc_test_storage'],
@@ -36,7 +38,8 @@ try {
     'port/linux/game/mcc_share_stage.c', 'port/linux/game/mcc_share_rules.c',
     'port/linux/game/mcc_sha256.c', 'port/linux/src/posix_mcc_share.c',
     '-Iport/web/src', '-Iport/linux/game', '-Iport/linux/src', '-DHALO_WEB=1',
-    '-DWEB_MCC_STORAGE_WAIT_MS=1000', '-std=gnu89', '-O1', '-pthread', '-sPROXY_TO_PTHREAD=1', '-sPTHREAD_POOL_SIZE=5',
+    '-DWEB_MCC_STORAGE_WAIT_MS=mcc_storage_test_wait_ms()', '-include', timeoutDeclaration,
+    '-std=gnu89', '-O1', '-pthread', '-sPROXY_TO_PTHREAD=1', '-sPTHREAD_POOL_SIZE=5',
     '-sWASMFS=1', '-lopfs.js', '-sINITIAL_MEMORY=33554432', '-sEXIT_RUNTIME=1',
     '-sENVIRONMENT=web,worker', '--js-library', 'port/web/src/web_mcc_library.js',
     '--js-library', delayedProxy,
@@ -45,12 +48,17 @@ try {
   assert.equal(compile.status, 0, String(compile.error || '') + compile.stdout + compile.stderr);
   await fs.writeFile(path.join(work, 'index.html'), `<!doctype html><meta charset="utf-8">
 <script src="map-import-storage.js"></script><script>
-window.result={output:[],errors:[],exit:null};
+window.result={output:[],errors:[],actions:[],exit:null};
 const scenario=new URLSearchParams(location.search).get('case');
 var Module={arguments:[scenario],
  print:line=>result.output.push(String(line)),printErr:line=>result.errors.push(String(line)),
  onAbort:reason=>{result.errors.push(String(reason));result.exit=-1;},onExit:code=>{result.exit=code;},
  haloMccStorage:async(action,payload)=>{
+   result.actions.push(action);
+   // Reproduce an ordinary BEGIN exceeding the former global one-second
+   // fixture deadline, before testing the deliberately lost COMMIT reply.
+   if(scenario==='commit_reply_lost'&&action==='begin')
+     await new Promise(resolve=>setTimeout(resolve,1500));
    const answer=await HaloMapStorage.dispatch(action,payload);
    if((scenario==='begin_reply_lost'&&action==='begin')||(scenario==='commit_reply_lost'&&action==='commit'))
      return new Promise(()=>{});
@@ -104,6 +112,10 @@ HaloMapStorage.startGame().then(()=>{
         ['mcc browser storage: response unavailable; close this page and reopen it to recover the download.']);
       else assert.deepEqual(result.errors, [], JSON.stringify(reports.at(-1)));
       assert.deepEqual(pageErrors, []);
+      if (scenario === 'commit_reply_lost') {
+        assert(result.actions.includes('begin'));
+        assert(result.actions.includes('commit'), 'The lost reply must be COMMIT, not an earlier timeout');
+      }
       console.log(`${engine} ${browser.version()}: ${scenario} passed`);
       if (scenario === 'commit_reply_delayed' || scenario === 'begin_proxy_delayed') await page.waitForTimeout(700);
       await page.close();

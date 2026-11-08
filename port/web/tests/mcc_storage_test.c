@@ -20,6 +20,10 @@ static int exists(char const *p) { struct stat s;return !lstat(p,&s) && S_ISDIR(
 static int erase(char const *p) { return unlink(p)==0; }
 static int never_move(char const *a,char const *b) { (void)a;(void)b;abort();return 0; }
 static int (*normal_flush)(FILE *);
+/* Shorten only the operation whose response this case deliberately loses.
+ * Ordinary OPFS work retains the production deadline, including slow BEGIN. */
+static int storage_wait_ms=30000;
+int mcc_storage_test_wait_ms(void) { return storage_wait_ms; }
 static int failed_flush(FILE *file) {
     if (fflush(file) || close(fileno(file))) return 0;
     return normal_flush(file); /* Actual WasmFS fsync/close now see EBADF. */
@@ -74,7 +78,9 @@ int main(int argc,char **argv) {
         files[i].kind=(uint8_t)kinds[i];strcpy(files[i].leaf,names[i]);files[i].size=(uint32_t)strlen(contents[i]);
         mcc_sha256_begin(&hash);mcc_sha256_add(&hash,contents[i],(int)files[i].size);mcc_sha256_end(&hash,files[i].sha256);
     }
+    if (!strcmp(argv[1],"begin_reply_lost") || !strcmp(argv[1],"begin_proxy_delayed")) storage_wait_ms=1000;
     result=mcc_share_stage_begin(&stage,&io,"/data/",folder,"m0",files,count);
+    storage_wait_ms=30000;
     if (!strcmp(argv[1],"begin_proxy_delayed")) {
         CHECK(result==MCC_SHARE_STAGE_STORAGE_UNCERTAIN);mcc_share_stage_cancel(&stage);
         CHECK(!exists(directory));puts("PASS begin_proxy_delayed");return 0;
@@ -113,7 +119,9 @@ int main(int argc,char **argv) {
     CHECK(!web_mcc_package_visible(level));
     CHECK(mcc_share_stage_verify(&stage,verify,NULL)==MCC_SHARE_STAGE_OK);
     CHECK(mcc_share_stage_companion(&stage,"download.receipt","receipt",7));
+    if (!strcmp(argv[1],"commit_reply_lost") || !strcmp(argv[1],"commit_reply_delayed")) storage_wait_ms=1000;
     result=mcc_share_stage_install(&stage);
+    storage_wait_ms=30000;
     if (!strcmp(argv[1],"commit_reply_lost") || !strcmp(argv[1],"commit_reply_delayed")) {
         CHECK(result==MCC_SHARE_STAGE_STORAGE_UNCERTAIN);
         mcc_share_stage_cancel(&stage);mcc_share_stage_cancel(&stage);
