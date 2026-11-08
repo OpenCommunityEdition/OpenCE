@@ -373,6 +373,13 @@ long scripted_camera_object_relative_to(
 	return camera_script_globals.relative_object_index;
 }
 
+/* port: (camera_scripting.h) */
+boolean scripted_camera_moving_to_point(
+	void)
+{
+	return camera_script_globals.mode == _camera_script_mode_point;
+}
+
 short scripted_camera_time(
 	void)
 {

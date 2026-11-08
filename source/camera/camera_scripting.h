@@ -55,6 +55,10 @@ short scripted_camera_time(
 	void);
 long scripted_camera_object_relative_to(
 	void);
+/* port: whether it is set to a point (camera_set), which the observer moves
+to every frame (port/linux/game/render_interpolation.c) */
+boolean scripted_camera_moving_to_point(
+	void);
 void scripted_camera_update(
 	struct dead_camera *camera,
 	struct camera_control const *controls,
