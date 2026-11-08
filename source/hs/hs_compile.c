@@ -415,6 +415,7 @@ symbols in this file:
 #include "hs/hs_library_internal.h"
 /* Empty reconstructed header removed; no declarations to include. */
 #include "hs/hs_scenario_definitions.h"
+#include "hs_console_state.h" /* port: port/linux/game/hs_console_state.inl */
 #include "interface/hud_definitions.h"
 #include "interface/interface.h"
 #include "memory/data.h"
@@ -910,36 +911,15 @@ long hs_compile_expression(
 
 	if (source_size < HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES)
 	{
-		if (global_scenario_index != NONE)
+		/* port: a later command must not overwrite a sleeping command's
+		strings; this bounded storage is restored with its saved threads. */
+		source_offset = 0;
+		hs_compile_globals.compiled_source = hs_console_source_acquire(source_size);
+		if (!hs_compile_globals.compiled_source)
 		{
-			match_assert(
-				"c:\\halo\\SOURCE\\hs\\hs_compile.c",
-				0xA6,
-				global_scenario_get()->hs_string_constants.size>=HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES);
-			/* port: none is written before the scenario's strings (hs_allocate
-			lets go of strings that aren't sound) */
-			if (global_scenario_get()->hs_string_constants.size<HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES)
-			{
-				*error_message = "the scenario has no room for the expression's text.";
-				*error_source = source;
-
-				return NONE;
-			}
-			source_offset = global_scenario_get()->hs_string_constants.size - HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES;
-			hs_compile_globals.compiled_source = global_scenario_get()->hs_string_constants.address;
-		}
-		else
-		{
-			source_offset = 0;
-			hs_compile_globals.compiled_source = match_malloc(
-				"c:\\halo\\SOURCE\\hs\\hs_compile.c",
-				0xAF,
-				source_size + 1);
-			hs_compile_globals.malloced = TRUE;
-			match_assert(
-				"c:\\halo\\SOURCE\\hs\\hs_compile.c",
-				0xB2,
-				hs_compile_globals.compiled_source);
+			*error_message = "console text storage is full or unavailable; finish pending commands or release string globals.";
+			*error_source = source;
+			return NONE;
 		}
 
 		memcpy(hs_compile_globals.compiled_source + source_offset, source, source_size);
@@ -992,6 +972,8 @@ long hs_compile_expression(
 			}
 		}
 
+		/* port: the root keeps its text until the command and its values end. */
+		hs_console_source_finish(hs_compile_globals.compiled_source, result);
 	}
 
 	return result;

@@ -2785,6 +2785,8 @@ symbols in this file:
 #include "hs_library_internal.h"
 #include "object_lists.h"
 #include "hs_scenario_definitions.h"
+#include "hs_console_state.h" /* port: port/linux/game/hs_console_state.inl */
+#include "mcc_scripts.h" /* port: port/linux/game/mcc_scripts.c */
 #include "ai/ai.h"
 #include "ai/ai_debug.h"
 #include "cache/cache_files.h"
@@ -12889,9 +12891,8 @@ static boolean hs_scenario_syntax_data_valid(
 }
 
 /* port: the scenario's script strings as the map holds them (the names
-and strings its nodes point into): inside the tag cache, with the 0x400
-bytes at their end that the console's expressions are written to
-(hs_compile_expression). The shipped maps' all are */
+and strings its nodes point into): inside the tag cache, including the
+format's reserved 0x400-byte tail. Console text has separate saved storage. */
 static boolean hs_scenario_string_constants_valid(
 	struct scenario const *scenario)
 {
@@ -13001,9 +13002,12 @@ from the node as it is), or names an external global a map may not set
 Only a node with a value's type that is neither a constant nor a script's
 call is a function's call (hs_evaluate, hs_thread_main); its function's and
 its globals' indices are the ones hs_compile_postprocess found by name */
-static short hs_syntax_node_refusal(
+/* port: the same structural checks apply to saved console expressions;
+only maps have permanent-node and command-permission restrictions. */
+static short hs_syntax_node_check(
 	struct hs_syntax_node const *expression,
-	char const **name)
+	char const **name,
+	boolean from_map)
 {
 	struct hs_syntax_node const *predicate;
 	struct hs_syntax_node const *first_argument = NULL;
@@ -13015,7 +13019,7 @@ static short hs_syntax_node_refusal(
 	*name = NULL;
 	/* (a node that isn't permanent is a console expression's, which
 	hs_node_gc deletes from under the script) */
-	if (!TEST_FLAG(expression->flags, _hs_syntax_node_permanent_bit))
+	if (from_map && !TEST_FLAG(expression->flags, _hs_syntax_node_permanent_bit))
 		return _hs_node_refusal_damaged;
 	if (expression->next_node_index != NONE && !hs_syntax_try_get(expression->next_node_index))
 		return _hs_node_refusal_damaged;
@@ -13029,23 +13033,24 @@ static short hs_syntax_node_refusal(
 
 	function_index = expression->function_index;
 	{
-		extern struct hs_function_definition *mcc_script_function(short index);
-		extern boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax);
 		struct hs_function_definition *mcc_function = mcc_script_function(function_index);
 		if (mcc_function)
 		{
 			*name = mcc_function->name;
-			return mcc_script_call_valid(expression, hs_syntax_data) ? _hs_node_refusal_none : _hs_node_refusal_damaged;
+			/* port: saved console calls share MCC's grammar, not map ownership. */
+			return (from_map ? mcc_script_call_valid(expression, hs_syntax_data) :
+				mcc_script_call_arguments_valid(expression, hs_syntax_data)) ?
+				_hs_node_refusal_none : _hs_node_refusal_damaged;
 		}
 	}
 	if (function_index<0 || function_index>=(short)NUMBEROF(hs_function_allowed_in_maps))
 		return _hs_node_refusal_damaged;
 	function = hs_function_get(function_index);
 	*name = function->name;
-	if (!hs_function_allowed_in_maps[function_index])
+	if (from_map && !hs_function_allowed_in_maps[function_index])
 		return _hs_node_refusal_function;
 	/* port: a downloaded map's (hs_functions_denied_to_downloaded_maps) */
-	if (hs_scenario_downloaded && hs_name_listed(function->name, hs_functions_denied_to_downloaded_maps))
+	if (from_map && hs_scenario_downloaded && hs_name_listed(function->name, hs_functions_denied_to_downloaded_maps))
 		return _hs_node_refusal_downloaded_function;
 
 	if (function->parse == hs_macro_function_parse)
@@ -13117,13 +13122,13 @@ static short hs_syntax_node_refusal(
 			if (!value || value->type != hs_global_get_type(designator))
 				return _hs_node_refusal_damaged;
 		}
-		if ((designator & 0x8000) && !hs_external_global_settable_by_maps(designator & 0x7FFF))
+		if (from_map && (designator & 0x8000) && !hs_external_global_settable_by_maps(designator & 0x7FFF))
 		{
 			*name = hs_global_external_get(designator & 0x7FFF)->name;
 			return _hs_node_refusal_global;
 		}
 		/* port: a downloaded map's (hs_globals_denied_to_downloaded_maps) */
-		if ((designator & 0x8000) && hs_scenario_downloaded &&
+		if (from_map && (designator & 0x8000) && hs_scenario_downloaded &&
 			hs_name_listed(hs_global_external_get(designator & 0x7FFF)->name, hs_globals_denied_to_downloaded_maps))
 		{
 			*name = hs_global_external_get(designator & 0x7FFF)->name;
@@ -13140,6 +13145,21 @@ static short hs_syntax_node_refusal(
 	}
 
 	return _hs_node_refusal_none;
+}
+
+/* port: preserve map admission while checking saved console call arity. */
+static short hs_syntax_node_refusal(
+	struct hs_syntax_node const *expression,
+	char const **name)
+{
+	return hs_syntax_node_check(expression, name, TRUE);
+}
+
+boolean hs_console_syntax_node_valid(
+	struct hs_syntax_node const *node)
+{
+	char const *name;
+	return hs_syntax_node_check(node, &name, FALSE) == _hs_node_refusal_none;
 }
 
 /* port: whether a script's or global's root node is of the type the
@@ -13426,9 +13446,8 @@ static void hs_allocate(
 	if (scenario)
 	{
 		hs_scenario_scripts_disable(scenario);
-		/* port: strings that aren't sound aren't gone by either, the
-		console's expressions included (hs_compile_expression refuses a
-		scenario without room for them) */
+		/* port: damaged map strings are not used by scenario compilation.
+		Console expressions own separate text in hs_console_state.inl. */
 		if (!hs_scenario_string_constants_valid(scenario))
 			scenario->hs_string_constants.size = 0;
 		if (hs_syntax_data && hs_syntax_data_allocated)
@@ -13778,7 +13797,6 @@ struct hs_function_definition *hs_function_get(
 	short function_index)
 {
 	{
-		extern struct hs_function_definition *mcc_script_function(short index);
 		struct hs_function_definition *mcc_function = mcc_script_function(function_index);
 		if (mcc_function)
 			return mcc_function;
@@ -13919,7 +13937,6 @@ short hs_find_function_by_name(
 	short function_index;
 
 	{
-		extern short mcc_script_find(char const *name);
 		short mcc_index = mcc_script_find(name);
 		if (mcc_index != NONE)
 			return mcc_index;

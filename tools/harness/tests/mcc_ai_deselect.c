@@ -37,6 +37,7 @@ static struct hs_function_definition *hs_function_get(short index) {
 }
 static struct hs_function_definition *mcc_script_function(short index) { return NULL; }
 static boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax) { return FALSE; }
+static boolean mcc_script_call_arguments_valid(struct hs_syntax_node const *call, struct data_array *syntax) { return FALSE; }
 static struct data_array syntax_data;
 static struct data_array *hs_syntax_data=&syntax_data;
 static struct hs_syntax_node nodes[3];

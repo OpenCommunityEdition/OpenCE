@@ -230,13 +230,13 @@ short mcc_script_find(char const *name)
     return mcc_cache_tags_loaded() && name ? mcc_script_resolve(name, FALSE) : NONE;
 }
 
-boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax)
+boolean mcc_script_call_arguments_valid(struct hs_syntax_node const *call, struct data_array *syntax)
 {
     struct hs_function_definition *function = mcc_script_function(call->function_index);
     struct hs_syntax_node *node;
     long next;
     short argument;
-    if (!function || !(call->flags & 8) || (call->flags & 3) ||
+    if (!function || (call->flags & 3) ||
         !(node = datum_try_and_get(syntax, call->data))) return FALSE;
     next = node->next_node_index;
     if (call->function_index == MCC_HS_CAMPAIGN_FIRST + 2) {
@@ -250,6 +250,13 @@ boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_arr
         next = node->next_node_index;
     }
     return next == NONE;
+}
+
+/* Map admission still requires authored nodes. Saved console expressions use
+ * the same argument grammar while their temporary nodes have another owner. */
+boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax)
+{
+    return (call->flags & 8) && mcc_script_call_arguments_valid(call, syntax);
 }
 
 static char const *mcc_script_string(char const *strings, uint32_t bytes, long offset)

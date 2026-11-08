@@ -44,6 +44,7 @@ def generated(fault=None):
         policy = mutated(policy, 'FALSE, /* ai_deselect:', 'TRUE, /* ai_deselect:')
     code += policy
     code += function(hs, 'hs_syntax_try_get') + '\n'
+    code += function(hs, 'hs_syntax_node_check') + '\n'
     code += function(hs, 'hs_syntax_node_refusal') + '\n'
     code += function(hs, 'hs_expression_changes_no_game') + '\n'
     return (('types.inc', types), ('under_test.inc', code))

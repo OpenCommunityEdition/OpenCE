@@ -60,6 +60,11 @@ from a restored player's earlier object handle. Boat controls also require
 matching simulation so hosts and predicting clients use initialized forces.
 Existing OpenCE 41 clients cannot join these sessions.
 
+The shared console fix also changes the saved game allocation layout. Older
+cores and checkpoints are refused; start a new map or campaign session with
+this build. Original save files are not migrated. See the
+[console checkpoint walkthrough](docs/reading/console_checkpoints.md).
+
 **GulchCE Standard** keeps the optional shoulder camera disabled. **GulchCE
 Third Person** uses its own matching camera agreement. Recovery works in both
 modes; changing the camera setting does not restore old-client compatibility.

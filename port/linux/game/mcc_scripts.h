@@ -19,6 +19,7 @@ void mcc_kill_thread_evaluate(short function, long thread, boolean initialize);
 struct hs_function_definition *mcc_script_function(short index);
 short mcc_script_find(char const *name);
 boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax);
+boolean mcc_script_call_arguments_valid(struct hs_syntax_node const *call, struct data_array *syntax);
 int mcc_scripts_prepare(struct mcc_runtime *runtime);
 /* MCC permits an AI reference in an object/unit or object-list expression. */
 int mcc_script_parse_ai(struct hs_syntax_node *node, char const *text);

@@ -2744,3 +2744,33 @@ three points. Ruby's inspected maps contain no boat-controller tags. This
 survey selects runtime cases; it does not establish loading or gameplay success.
 The inspector, input hashes and authored tag/placement records are retained in
 `build/stage11-fix/validation`.
+
+### Shared console ownership
+
+The fix snapshots the existing syntax allocator with the saved threads and
+gives live commands bounded, separately owned source text. It does not discard
+restored console threads or retain temporary syntax forever. The saved block
+is 918,568 bytes on the supported ILP32 targets: 32,767 syntax records, allocator
+metadata, 256 root handles and 256 source slots of 1,024 bytes. Native maps keep
+their existing 19,001-node allocator limit. The block fits below MCC's separately
+reserved thread and checkpoint storage without enlarging the CPU or save image.
+The added allocation changes the existing allocation checksum, so old-layout
+saves are refused instead of being interpreted using incomplete ownership data.
+
+Before copying an image over live state, validation checks saved allocator
+bounds, live frame references, source ownership, terminated string storage and
+call structure. Permanent map syntax must match the loaded map. Inactive
+damaged scripts already disabled by map admission do not become a new reason
+to refuse a checkpoint. The existing map command permissions are retained.
+The [reader walkthrough](reading/console_checkpoints.md) documents the concrete
+flow, ownership, lifecycle and limits.
+
+Initial Windows runs now replay the saved marker and continue for 150 fresh
+ticks on Xbox Blood Gulch, CE Death Island and Ruby B40, all with normal exit.
+These initial runs precede the final malformed-source-owner validation guard;
+final validation must include that guard. One earlier Xbox probe falsely failed
+because the next console command's echo joined the replayed marker on the same
+line. The runner now checks the completed replay before sending that command;
+the strict marker predicate is unchanged and the failed receipt is retained.
+The current combined console, MCC checkpoint/deselect and shared recovery
+selection passes 235 tests. Platform CI and final runtime checks remain pending.

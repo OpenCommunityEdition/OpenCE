@@ -84,6 +84,11 @@ struct game_state_allocation {int kind;void *address;long maximum_count,element_
 static struct game_state_allocation game_state_allocations[1];
 static long game_state_allocation_count;
 static int native_valid=1,checkpoint_notifications;
+static int console_valid=1,console_captured=1,console_restores;
+static int hs_console_state_capture(void) {return console_captured;}
+static int hs_console_state_validate(void const *image,void const *base,unsigned long bytes)
+{(void)image;(void)base;(void)bytes;return console_valid;}
+static void hs_console_state_restore(void) {console_restores++;if(live[4095]!=saved[4095])abort();}
 ''' + '#include "' + (ROOT / "port/linux/game/mcc_checkpoint.c").as_posix() + '"\n' + r'''
 boolean mcc_cache_tags_loaded(void) {return loaded;}
 int mcc_script_threads_capture(void) {return 1;}
@@ -247,6 +252,21 @@ int main(int argc,char **argv) {
     {struct object_header_datum *unit=object_header_data->data;
      memset(unit,0,sizeof(*unit));unit->identifier=1;unit->datum=(void *)(live+768);}
     game_state_globals.base_address=live;game_state_globals.cpu_allocation_size=used;
+    if(!strncmp(argv[1],"console_",8)) {
+        if(!strcmp(argv[1],"console_capture") || !strcmp(argv[1],"console_core_capture")) {
+            console_captured=0;
+            if(!strcmp(argv[1],"console_core_capture"))game_state_save_core("test");else game_state_save();
+            return writes || captures || checkpoint_notifications || game_state_globals.saved_game_valid ? 40 : 0;
+        }
+        game_state_save();live[4095]=33;
+        if(!strcmp(argv[1],"console_validate")) {
+            console_valid=0;
+            if(game_state_image_accept(saved,sizeof(saved)) || live[4095]!=33 || console_restores || restores)return 41;
+        } else if(!strcmp(argv[1],"console_restore_order")) {
+            if(!game_state_image_accept(saved,sizeof(saved)) || console_restores!=1 || restores!=1)return 42;
+        } else return 43;
+        mcc_checkpoint_dispose();return 0;
+    }
     if(!strncmp(argv[1],"real_unit_",10))return check_unit_preflight(argv[1],used);
     if(!strncmp(argv[1],"snapshot",8)) {
         FILE *output;
@@ -391,6 +411,7 @@ int main(int argc,char **argv) {
 
 
 @pytest.mark.parametrize("case", ["stock", "capacity", "capture_fail", "maximum", "oversize",
+                                      "console_capture", "console_core_capture", "console_validate", "console_restore_order",
                                       "roundtrip", "core", "cleanup", "payload", "footer", "version",
                                       "reserved", "ambient_invalid", "footer_crc", "name", "checksum", "highwater", "native", "handles",
                                       "unit_salt", "unit_type", "unit_pointer", "unit_array", "v1", "campaign", "campaign_v1", "campaign_v4", "campaign_v5", "names_roundtrip", "names_maximum", "names_crc", "names_missing", "names_salt"])

@@ -744,6 +744,7 @@ boolean debug_trigger_volumes;
 
 #include "mcc_script_threads.inl" /* port: MCC-only bounded thread storage. */
 #include "mcc_script_runtime.inl"
+#include "hs_console_state.inl" /* port: port/linux/game/hs_console_state.inl */
 
 void hs_runtime_initialize(
 	void)
@@ -753,6 +754,7 @@ void hs_runtime_initialize(
 
 	hs_thread_data = game_state_data_new("hs thread", 0x100, 0x218);
 	hs_global_data = game_state_data_new("hs globals", 0x400, 8);
+	hs_console_state_initialize(); /* port: shares the threads' saved lifetime. */
 	if (hs_thread_data && hs_global_data)
 	{
 		match_vassert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0xa9,
@@ -783,6 +785,7 @@ void hs_runtime_initialize_for_new_map(
 
 	/* port: select the MCC-owned array only after its cache was accepted. */
 	mcc_hs_threads_activate();
+	hs_console_state_reset(); /* port: text and snapshots belong to this map. */
 	data_make_valid(hs_thread_data);
 	hs_runtime_globals.initialized = TRUE;
 	hs_runtime_globals.executing_thread_index = NONE;
@@ -900,6 +903,7 @@ void hs_runtime_dispose_from_old_map(
 			datum_delete(hs_global_data, global_index);
 	}
 	hs_runtime_globals.initialized = FALSE;
+	hs_console_state_reset(); /* port: release the old map's console ownership. */
 
 	return;
 }

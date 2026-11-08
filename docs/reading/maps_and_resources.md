@@ -704,15 +704,13 @@ must still be refused: matching zeroes do not identify a live unit. The
 lookup and grenade restore, checking refusal before live bytes or names change,
 alongside a valid saved-unit control.
 
-A separate shared syntax-lifetime defect remains unresolved. A core save made
-inside a sleeping temporary console expression can retain its thread after
-the expression finishes and its syntax nodes are collected. Loading that core
-then restores references to expired nodes. Baseline native runs reproduced the
-assertion on Xbox Blood Gulch, CE Death Island and MCC Ruby B40; an isolated
-proof using the actual interpreter and collector confirms the lifetime mismatch.
-Permanent scenario expressions and standalone-save controls remain distinct.
-No correction to this shared behavior or networking contract is included here;
-see the [investigation and limits](../mcc_refactor_validation.md).
+The shared console lifetime fix saves temporary syntax and owned source text
+with the threads that use them, then validates and restores them before those
+threads resume. It applies to Xbox, CE and MCC without changing authored-map
+permissions. The [console checkpoint walkthrough](console_checkpoints.md)
+explains ownership, collection, map lifecycle and old-save incompatibility;
+actual validation and limits remain in the
+[refactor evidence](../mcc_refactor_validation.md).
 
 Halo Kart also exposes seated passengers attempting to find a danger-avoidance
 destination, which the native position selector disallows. Follow
