@@ -206,6 +206,8 @@ static struct
 	char **out_names;
 	long *old_to_new;
 	long references_dropped;
+	/* the tag being copied (for the trace) */
+	char const *copying;
 	long placeholders;
 	/* loaded tags kept after the disc's (mcc_import_keep) */
 	long kept;
@@ -318,6 +320,12 @@ static long mcc_import_renumber(
 	old_index = handle & 0xFFFF;
 	if (old_index >= mcc_import_globals.tag_count || mcc_import_globals.old_to_new[old_index] == NONE)
 	{
+		if (getenv("HALO_MCC_IMPORT_TRACE") && old_index < mcc_import_globals.tag_count)
+		{
+			fprintf(stderr, "mcc import: a reference to '%s' (%.4s) left out, in '%s'\n",
+				mcc_import_globals.instances[old_index].name, (char const *)&mcc_import_globals.instances[old_index].group_tag,
+				mcc_import_globals.copying ? mcc_import_globals.copying : "a structure bsp, or the header");
+		}
 		mcc_import_globals.references_dropped++;
 		return NONE;
 	}
@@ -403,6 +411,28 @@ static boolean mcc_import_keep(
 {
 	long out_index;
 
+	/* the structure BSPs' first (they are read only to be written: read here
+	too, as they are then, for the tags they name) */
+	{
+		struct tag_schema_group const *bsp_schema = mcc_import_schema('sbsp');
+		byte const *scenario = mcc_import_globals.instances[mcc_import_globals.table.scenario_index].base_address;
+		struct tag_block const *references = scenario ?
+			(struct tag_block const *)(scenario + V5_SCENARIO_STRUCTURE_BSPS_OFFSET) : NULL;
+		long bsp_index;
+
+		for (bsp_index = 0; bsp_schema && references && bsp_index < references->count; bsp_index++)
+		{
+			struct scenario_structure_bsp_reference *reference =
+				(struct scenario_structure_bsp_reference *)references->address + bsp_index;
+
+			custom_edition_cache_read(NONE, reference->file_offset, reference->file_size, reference->base_address);
+			if (custom_edition_structure_bsp_read(reference))
+			{
+				mcc_import_keep_walk(bsp_schema->definition,
+					((struct mcc_import_structure_bsp_header const *)reference->base_address)->base_address);
+			}
+		}
+	}
 	/* (the list grows as it is walked: a kept tag's own are kept) */
 	for (out_index = 0; out_index < mcc_import_globals.out_count; out_index++)
 	{
@@ -1372,7 +1402,8 @@ static boolean mcc_import_bitmaps(
 			bitmap->base_address = NULL;
 			bitmap->hardware_format = NULL;
 			bitmap->cache_block_index = NONE;
-			bitmap->tag_index = mcc_import_new_handle(mcc_import_globals.old_to_new[tag_index]);
+			/* (its own: the copy gives it the written tag's index) */
+			bitmap->tag_index = instance->tag_index;
 			bitmap->flags |= FLAG(V5_BITMAP_CACHED_BIT);
 			mcc_import_globals.bitmaps++;
 		}
@@ -1632,7 +1663,9 @@ static boolean mcc_import_tags(
 		root = mcc_import_allocate(space, (unsigned long)schema->definition->size, 4);
 		if (!root)
 			return FALSE;
+		mcc_import_globals.copying = source->name;
 		mcc_import_copy_element(space, schema->definition, source->base_address, mcc_import_at(space, root));
+		mcc_import_globals.copying = NULL;
 		instances = mcc_import_at(space, instances_address);
 		instances[tag_index].base_address = (void *)root;
 		success = !space->overflowed;
