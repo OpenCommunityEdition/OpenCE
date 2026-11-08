@@ -2,10 +2,10 @@
 #ifndef THIRD_PERSON_PROTOCOL_H
 #define THIRD_PERSON_PROTOCOL_H
 
-/* Separate agreements include bounded MCC admission and conversion progress; never advertise
- * these as upstream compatibility. */
-#define THIRD_PERSON_PROTOCOL_VERSION 32736
-#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32737
+/* Separate agreements include host scripted player poses and bounded MCC
+ * admission/conversion progress; never advertise these as upstream compatibility. */
+#define THIRD_PERSON_PROTOCOL_VERSION 32740
+#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32741
 
 struct network_game;
 void third_person_session_host_begin(void);

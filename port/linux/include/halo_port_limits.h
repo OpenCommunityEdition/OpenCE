@@ -67,10 +67,11 @@ in its game's advertisement's reserved bytes (network_server_message_handler.c),
 which hosts built before there was a version send as zeros: version 0.
 Raise it with any change to what the machines send each other. */
 /* GulchCE checkpoint epochs, initialized boat controls and bounded client
-clock recovery and bounded MCC validation/loading progress require updated peers.
+clock recovery, bounded MCC validation/loading progress and authoritative scripted
+aim snapshots require updated peers.
 This reserved version is not an OpenCE compatibility claim. Camera sessions
 use separate revisions declared in third_person_protocol.h. */
-#define HALO_PORT_NETWORK_VERSION 32734
+#define HALO_PORT_NETWORK_VERSION 32738
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags, then the game's kind (an OpenCE gametype's mode, and Hardcore:
 port/linux/game/game_modes.h's game_modes_kind), for the server browser */

@@ -53,6 +53,7 @@ def generated(fault=None):
                   "DAMAGE_RATE_CACHE_SIZE", "MAXIMUM_HIT_REPORTS_PER_TICK")),
     ):
         config.extend(define_value(source, name) for name in names)
+    config.append(define_value(distributed_h, 'DISTRIBUTED_UNIT_SCALE'))
     types = "\n".join([
         enum_with(distributed_h, "_distributed_message_player_prediction ="),
         structure(distributed_h, "distributed_message_header"),
@@ -76,6 +77,7 @@ def generated(fault=None):
         enum_with(objects, "_distributed_object_carried_bit ="),
         enum_with(distributed, "_distributed_unit_alive_bit ="),
         enum_with(distributed, "_distributed_unit_camouflaged_bit ="),
+        enum_with(distributed, "_distributed_pose_facing,"),
         structure(distributed_h, "distributed_vector"),
         structure(objects, "distributed_object_change"),
         structure(objects, "distributed_inventory"),
@@ -114,7 +116,9 @@ def generated(fault=None):
         "distributed_client_reuses_object", "distributed_client_create",
         "network_objects_handle_changes", "network_objects_handle_synchronized",
         "network_objects_discard_client_effects"))
-    code += "\n" + function(distributed, "distributed_handle_unit_state")
+    code += "\n" + "\n".join(function(distributed, name) for name in (
+        "distributed_vector_unpack", "distributed_unit_vector_unpack",
+        "distributed_scripted_pose_apply", "distributed_handle_unit_state"))
     code += "\n" + "\n".join(function(objects, name) for name in (
         "distributed_client_note_own_inventory", "distributed_client_own_settled",
         "distributed_client_weapon_here", "distributed_client_inventory_whole",

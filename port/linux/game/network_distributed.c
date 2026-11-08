@@ -268,6 +268,7 @@ enum
 	/* (alive) camouflaged, and doubly so */
 	_distributed_unit_camouflaged_bit = 0,
 	_distributed_unit_super_camouflaged_bit,
+	_distributed_unit_suspended_bit,
 };
 
 /* a unit state's parts on the wire: which of those that are not always
@@ -286,6 +287,18 @@ enum
 	_distributed_unit_part_camouflage_bit,
 	/* (dead) who killed it, when anyone */
 	_distributed_unit_part_killer_bit,
+	/* (alive) host-controlled facing, aim and look while input is inhibited */
+	_distributed_unit_part_scripted_pose_bit,
+};
+
+enum
+{
+	_distributed_pose_facing,
+	_distributed_pose_aiming,
+	_distributed_pose_looking,
+	_distributed_pose_current_aiming,
+	_distributed_pose_current_looking,
+	NUMBER_OF_DISTRIBUTED_POSE_VECTORS
 };
 
 /* world units: how far apart the host's run of a client's player and the
@@ -374,6 +387,8 @@ struct distributed_unit_state
 	word recent_shield_damage;
 	/* the player's powerups: how long each has left */
 	short powerup_durations[NUMBER_OF_PLAYER_POWERUPS];
+	boolean scripted_pose;
+	struct distributed_vector pose[NUMBER_OF_DISTRIBUTED_POSE_VECTORS];
 };
 
 /* a client's player's input at one of its ticks, with the buttons of the
@@ -433,7 +448,7 @@ enum
 	first) */
 	DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE = 3,
 	DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE = 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 +
-		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1,
+		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1 + NUMBER_OF_DISTRIBUTED_POSE_VECTORS * 6,
 	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 14,
 	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
 };
@@ -1732,6 +1747,59 @@ boolean distributed_connection_problem(
 
 /* ---------- units */
 
+/* Relayed input does not describe a scripted pose. A late join can process
+input before the presentation disables it, and then retain that local aim
+indefinitely. Body orientation is not a substitute: the host's desired and
+current aim/look can differ from it and from each other. Ordinary input keeps
+its prediction path and sends none of these additional vectors. */
+static void distributed_scripted_pose_from_unit(struct unit_datum const *unit,
+	struct distributed_unit_state *state)
+{
+	if (game_connection() != _game_connection_network_server)
+		return;
+	SET_FLAG(state->unit_flags, _distributed_unit_suspended_bit,
+		TEST_FLAG(unit->unit.flags, _unit_suspended_bit));
+	state->scripted_pose = !player_input_enabled() || TEST_FLAG(unit->unit.flags, _unit_suspended_bit);
+	if (!state->scripted_pose)
+		return;
+	distributed_vector_pack(&unit->unit.desired_facing_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_facing]);
+	distributed_vector_pack(&unit->unit.desired_aiming_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_aiming]);
+	distributed_vector_pack(&unit->unit.desired_looking_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_looking]);
+	distributed_vector_pack(&unit->unit.aiming_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_current_aiming]);
+	distributed_vector_pack(&unit->unit.looking_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_current_looking]);
+}
+
+static boolean distributed_scripted_pose_valid(struct distributed_unit_state const *state)
+{
+	short index;
+	for (index = 0; index < NUMBER_OF_DISTRIBUTED_POSE_VECTORS; index++)
+	{
+		real_vector3d vector;
+		real length_squared;
+		distributed_vector_unpack(&state->pose[index], DISTRIBUTED_UNIT_SCALE, &vector);
+		length_squared = vector.i * vector.i + vector.j * vector.j + vector.k * vector.k;
+		/* Unit normals quantized to signed 16-bit components; reject zero
+		and non-unit data before any of the decoded state is applied. */
+		if (length_squared < 0.99f || length_squared > 1.01f)
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static void distributed_scripted_pose_apply(struct unit_datum *unit,
+	struct distributed_unit_state const *state)
+{
+	SET_FLAG(unit->unit.flags, _unit_suspended_bit,
+		TEST_FLAG(state->unit_flags, _distributed_unit_suspended_bit));
+	if (!state->scripted_pose)
+		return;
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_facing], &unit->unit.desired_facing_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_aiming], &unit->unit.desired_aiming_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_looking], &unit->unit.desired_looking_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_current_aiming], &unit->unit.aiming_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_current_looking], &unit->unit.looking_vector);
+}
+
 static void distributed_state_from_player(
 	short player_index,
 	struct distributed_unit_state *state)
@@ -1779,6 +1847,7 @@ static void distributed_state_from_player(
 			TEST_FLAG(unit->unit.flags, _unit_super_camouflaged_bit));
 		camouflage = camouflage > 1.0f ? 1.0f : camouflage < 0.0f ? 0.0f : camouflage;
 		state->active_camouflage = (byte)(long)floor(camouflage * 255.0f + 0.5f);
+		distributed_scripted_pose_from_unit(unit, state);
 		/* (the host) a client's player where the client had them: at which of
 		its ticks (with the ticks run since) */
 		if (game_connection() == _game_connection_network_server && player_index < MAXIMUM_TRACKED_PLAYERS &&
@@ -1873,6 +1942,11 @@ static word distributed_unit_state_write(
 			cursor = distributed_put(cursor, &state->unit_flags, sizeof(state->unit_flags));
 			cursor = distributed_put(cursor, &state->active_camouflage, sizeof(state->active_camouflage));
 		}
+		if (state->scripted_pose)
+		{
+			SET_FLAG(parts, _distributed_unit_part_scripted_pose_bit, TRUE);
+			cursor = distributed_put(cursor, state->pose, sizeof(state->pose));
+		}
 	}
 	else if (state->killing_player_index != NO_PLAYER)
 	{
@@ -1907,6 +1981,9 @@ static word distributed_unit_state_read(
 	{
 		return 0;
 	}
+	if (TEST_FLAG(parts, _distributed_unit_part_scripted_pose_bit) &&
+		!TEST_FLAG(state->flags, _distributed_unit_alive_bit))
+		return 0;
 	if (TEST_FLAG(state->flags, _distributed_unit_alive_bit))
 	{
 		if (!distributed_take(&cursor, end, &state->unit_index, sizeof(state->unit_index)))
@@ -1954,6 +2031,13 @@ static word distributed_unit_state_read(
 				!distributed_take(&cursor, end, &state->active_camouflage, sizeof(state->active_camouflage))))
 		{
 			return 0;
+		}
+		if (TEST_FLAG(parts, _distributed_unit_part_scripted_pose_bit))
+		{
+			if (!distributed_take(&cursor, end, state->pose, sizeof(state->pose)) ||
+				!distributed_scripted_pose_valid(state))
+				return 0;
+			state->scripted_pose = TRUE;
 		}
 	}
 	else if (TEST_FLAG(parts, _distributed_unit_part_killer_bit) &&
@@ -2006,7 +2090,9 @@ static boolean distributed_apply_state(
 	error.i = position->x - object->object.position.x;
 	error.j = position->y - object->object.position.y;
 	error.k = position->z - object->object.position.z;
-	if (error.i * error.i + error.j * error.j + error.k * error.k <= tolerance * tolerance)
+	/* A scripted player can turn without moving. Input prediction cannot
+	recover that orientation, even when position already agrees. */
+	if (!state->scripted_pose && error.i * error.i + error.j * error.j + error.k * error.k <= tolerance * tolerance)
 		return TRUE;
 	if (network_objects_reconcile(unit_index, position, &forward, &up, &velocity, NULL, blend_distance))
 		distributed_statistics.corrections++;
@@ -2090,7 +2176,7 @@ static void distributed_correct_own_unit(
 			return;
 		}
 	}
-	if (TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
+	if (!state->scripted_pose && TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
 		local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS)
 	{
 		long now = game_time_get();
@@ -2716,6 +2802,7 @@ static void distributed_handle_unit_state(
 			unit_kill(unit_index);
 	}
 	unit_index = state->unit_index;
+	distributed_scripted_pose_apply(unit_get(unit_index), state);
 	/* the seat it rides: a client's own player's, once it has ridden
 	otherwise for longer than its prediction takes to reach the host and
 	come back (a player within the tracked ones, as players.c's datums are) */

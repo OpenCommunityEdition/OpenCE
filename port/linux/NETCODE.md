@@ -234,9 +234,16 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## GulchCE network agreement
 
-Standard Xbox/Custom Edition sessions require GulchCE agreement 32734; MCC
-requires version 71. Camera sessions require 32736/32737 respectively. This
-revision adds reliable MCC conversion-progress message 106 after admission.
+Standard Xbox/Custom Edition sessions require GulchCE agreement 32738; MCC
+requires version 72. Camera sessions require 32740/32741 respectively. This
+revision adds optional host-authoritative scripted player poses to unit states:
+five signed-16-bit direction vectors (30 bytes) for desired facing/aim/look and
+current aim/look, plus the suspension bit in unit flags. They are sent while
+player input is inhibited or the unit is suspended. Clients validate the complete
+extension before applying it; ordinary input retains its prediction path and
+omits the vectors. Position agreement does not suppress scripted orientation
+correction. Body orientation cannot substitute for desired or current aim.
+The previous revision added reliable MCC conversion-progress message 106 after admission.
 It retains validation message 105 so installed-file checks can finish without
 blocking network updates, host-only sharing
 messages 103/104 and the separate 32-byte required-metadata digest in MCC
@@ -1040,8 +1047,8 @@ its name alone beside it, has its name given back as the map lists find it.
 
 MCC supports host-only delivery for eligible local and Workshop packages.
 It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. The current agreements are base **32734**, MCC
-**71**, and camera **32736/32737**; old agreements are refused before admission.
+separate from CE sharing 83-86. The current agreements are base **32738**, MCC
+**72**, and camera **32740/32741**; old agreements are refused before admission.
 MCC settings add a 32-byte required-JSON digest beside the gameplay digest.
 Xbox/CE retain their existing settings prefix and sharing path. The distributed
 header remains 12 bytes, including its checkpoint epoch.

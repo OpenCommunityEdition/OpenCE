@@ -3,8 +3,8 @@
 #define MCC_PROTOCOL_H
 
 /* Shared checkpoint epochs occupy message 96; MCC owns messages 97-100 and
- * 103-106. Version 71 adds bounded conversion progress after admission. */
-#define MCC_PROTOCOL_VERSION 71
+ * 103-106. Version 72 also requires shared scripted player pose snapshots. */
+#define MCC_PROTOCOL_VERSION 72
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x08
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 4
 #define MCC_PROTOCOL_JOIN_KIND 101

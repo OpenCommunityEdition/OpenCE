@@ -26,16 +26,17 @@ def test_audited_changes_from_opence_41_contract():
     # Compare the upstream size separately rather than accepting a fork size.
     assert actual["layout HALO_PORT_NETWORK_GAME_SIZE"] == "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 64) /* MCC content and metadata SHA-256 */"
     actual["layout HALO_PORT_NETWORK_GAME_SIZE"] = "(HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A)"
-    # The appended join agreement and distributed world epoch are the only
-    # changes to existing upstream wire items. New kinds are checked separately.
+    # Join agreement, world epoch and the optional host scripted pose extend
+    # existing upstream wire items. New kinds are checked separately.
     changed = {
         "fields client_join_game_request": "d7dd965724e6",
         "size message_client_join_game_request": "0x70 + 170 + 64 + 2",
         "struct distributed_message_header": "5bc35a4ad92a",
+        "bound DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE": "3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 + 2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1 + NUMBER_OF_DISTRIBUTED_POSE_VECTORS * 6",
     }
     assert {key: actual.get(key) for key in expected if actual.get(key) != expected[key]} == changed
     limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
-    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 32734\b", limits)
+    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 32738\b", limits)
     # All fields of the transmitted prefix match upstream, including names,
     # types and order. The Windows build also asserts the actual ABI offsets.
     header = (ROOT / "source/networking/network_game_manager.h").read_text()
@@ -62,7 +63,7 @@ typedef int boolean;
 #define TRUE 1
 #define FALSE 0
 #define HALO_PORT_NETWORK_GAME_PLAYERS_END 6
-#define HALO_PORT_NETWORK_VERSION 32734
+#define HALO_PORT_NETWORK_VERSION 32738
 #define HALO_PORT_MAXIMUM_NETWORK_MACHINES 4
 #define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))
 #define csmemcpy memcpy
@@ -101,7 +102,7 @@ int main(void) {
     byte saved;
     int i;
     memset(&game,0,sizeof(game));strcpy(game.map.name,"levels\\test\\bloodgulch\\bloodgulch");
-    CHECK(mcc_protocol_version(game.map.name)==32734);
+    CHECK(mcc_protocol_version(game.map.name)==32738);
     CHECK(mcc_protocol_settings_size(&game)==64);
     CHECK(mcc_protocol_settings_valid(&game,64));CHECK(!mcc_protocol_settings_valid(&game,96));
     CHECK(!mcc_protocol_settings_valid(&game,128));
@@ -113,8 +114,8 @@ int main(void) {
     CHECK(mcc_protocol_unwrap(outer,40,inner,&size));CHECK(size==32 && !memcmp(inner,original,32));
     /* Package transfer and required metadata identity need the updated join agreement.
      * Reject the previous MCC revision before interpreting settings. */
-    CHECK(MCC_PROTOCOL_VERSION==71);
-    for(i=67;i<=68;i++) {
+    CHECK(MCC_PROTOCOL_VERSION==72);
+    for(i=67;i<=71;i++) {
         ((byte *)outer)[4]=(byte)i;CHECK(!mcc_protocol_unwrap(outer,40,inner,&size));
     }
     ((byte *)outer)[4]=MCC_PROTOCOL_VERSION;
@@ -262,7 +263,7 @@ typedef unsigned short word;
 #define MAXIMUM_MACHINE_NAME_LENGTH 16
 #define JOIN_GAME_TOKEN_LENGTH 16
 #define NETWORK_GAME_MESSAGE_VERSION 1
-#define HALO_PORT_NETWORK_VERSION 32734
+#define HALO_PORT_NETWORK_VERSION 32738
 #define csmemcmp memcmp
 #define csmemcpy memcpy
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}} while(0)

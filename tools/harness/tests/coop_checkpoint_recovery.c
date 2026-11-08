@@ -68,6 +68,8 @@ struct object_datum {
         char grenade_counts[NUMBER_OF_UNIT_GRENADE_TYPES];
         unsigned flags;
         real active_camouflage;
+        real_vector3d desired_facing_vector,desired_aiming_vector,desired_looking_vector;
+        real_vector3d aiming_vector,looking_vector;
     } unit;
     struct {struct weapon_magazine magazines[2];real age;long game_time_last_fired;} weapon;
 };

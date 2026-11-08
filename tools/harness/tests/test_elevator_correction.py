@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run
 
 SOURCE = "port/linux/game/network_distributed.c"
-CASES = ["100ms", "200ms", "100ms-up", "200ms-up", "jump", "walk-off", "other-elevator", "teleport", "unpredicted", "no-history", "on-foot", "far"]
+CASES = ["100ms", "200ms", "100ms-up", "200ms-up", "jump", "walk-off", "other-elevator", "teleport", "unpredicted", "no-history", "on-foot", "far", "scripted"]
 
 
 # a fault in distributed_correct_own_unit and the case that must catch it

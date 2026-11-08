@@ -7,7 +7,7 @@ typedef unsigned short word;
 enum { _distributed_unit_predicted_bit = 0, MAXIMUM_LOCAL_PLAYERS = 1, OWN_POSITION_TICKS = 64,
     _object_mask_biped = 1, _object_mask_machine = 2, _biped_airborne_bit = 0 };
 struct player_datum { short local_player_index; };
-struct distributed_unit_state { real_point3d position; unsigned flags; word predicted_time; };
+struct distributed_unit_state { real_point3d position; unsigned flags; word predicted_time; boolean scripted_pose; };
 struct fake_object {
     long mask;
     struct { real_point3d position, bounding_sphere_center; } object;
@@ -50,6 +50,12 @@ int main(int argc, char **argv) {
     objects[1].biped.elevator_object_index = 2; objects[1].object.position.z = 10;
     own->time = 100; own->unit_index = 1; own->position.z = 13.2f; own->elevator_index = 2;
     now = 100 + delay;
+    if (!strcmp(case_name,"scripted")) {
+        s.scripted_pose=TRUE;s.position.z=14;
+        distributed_correct_own_unit(&p,1,&s);
+        CHECK(objects[1].object.position.z==14,"scripted pose incorrectly reused input prediction");
+        return 0;
+    }
     if (strstr(case_name,"-up")) {own->position.z=10; s.position.z=13.2f;}
     if (!strcmp(case_name,"jump")) objects[1].biped.flags = FLAG(_biped_airborne_bit);
     if (!strcmp(case_name,"walk-off")) objects[1].biped.elevator_ticks = 59;

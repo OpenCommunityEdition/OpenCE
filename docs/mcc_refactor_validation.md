@@ -1687,7 +1687,7 @@ checks 567 local links across the milestone's changed Markdown with none missing
 
 ### Milestone 15: MCC HUD corrections and shared cinematic aim
 
-Planning scope agreed on 8 November 2026; implementation has not started.
+Planning scope agreed on 8 November 2026; implementation and validation are in progress.
 Continue on `mcc-code-refactor` as the sole primary agent. This milestone has
 three MCC compatibility-engine corrections and one shared co-op correction.
 Fix data interpretation and responsible engine behavior, with no map-name,
@@ -1699,7 +1699,59 @@ justify each change; the screenshots establish symptoms, not their causes.
 
 The user supplied three local screenshots after the Discord image URLs could
 not be retrieved. Source inspection and those images establish the following
-starting points; no new game run or map-tag inspection has yet been performed.
+starting points. The observations below extend them with bounded map-tag
+inspection and paired native captures; the completion gate remains open.
+
+The first implementation has three independently evidenced changes:
+
+- Ruby's converted message offset is 65 rather than the existing recognized
+  stock value of 60; its weapon panels nevertheless select the native safe
+  frame. Infinite Evolved's custom ballistic parent rearranges numbers inside
+  an otherwise matching panel and therefore misses the complete-layout
+  fingerprint that recognizes its battery/grenade panels. The recognized active
+  **unit HUD** now supplies the common corner frame for its messages and weapon
+  panels during that player's draw. Authored offsets, center/edge anchors and
+  unknown custom unit HUDs retain their existing treatment. This extends the
+  existing explicit stock-layout compatibility exception without adding content
+  fingerprints. Private inventories are under `build/m15/inventory/`.
+- Scope screen effects bypass ordinary HUD placement. Their MCC bitmap group
+  declares half-size display, but the screen-effect renderer used raw bitmap
+  dimensions. An MCC-owned, scoped mask transform applies that flag once,
+  separately from the 2:1 MCC placement canvas. Ruby's 512-pixel pistol scope
+  changes from approximately 800 to 400 rendered pixels at 1280x800. Xbox/CE
+  rendering remains outside the MCC transform.
+- The native Ruby intro trace records a late client attaching the host's unit
+  two ticks before input inhibition arrives. Relayed input changes its aim;
+  inhibition then preserves that local aim. The shared unit snapshot carried
+  body axes but no desired/current aim or look, and player units are excluded
+  from actor-control replication. The experimental shared fix sends five
+  distinct direction vectors while input is disabled or the unit is suspended,
+  plus the host suspension flag. Ordinary input snapshots omit the extension.
+  The first corrected run has 31 paired samples with zero position/aim error,
+  versus 31 aim mismatches in the baseline. It is **not** a complete strict
+  networking pass: the intro contains no living client player for drift checks.
+  The follow-up also corrects a scripted body's orientation when its position
+  already agrees, retaining normal prediction and the co-op BSP guard.
+
+Matched private captures are `ruby-help-baseline`/`ruby-help-fixed`,
+`hie-ballistic-baseline`/`hie-ballistic-fixed-v2`, and
+`ruby-scope-baseline-v5`/`ruby-scope-fixed-v1` under `build/m15/runtime/`.
+These controlled HUD fixtures select equipment and display an authored help
+string; they do not establish multiplayer or campaign progression correctness.
+The read-only cinematic traces are `cinematic_trace_baseline` and
+`cinematic_fixed_trace_v1`. Original map hashes, executable hashes, commands,
+logs, captures and cleanup receipts remain private there. Broader map-family,
+platform, lifecycle and network validation is outstanding.
+
+The production native pair `ruby_skip_revert_v1` subsequently passed its
+61-second post-skip comparison: 122 paired player samples, zero position error,
+maximum aim difference three degrees, 1,827 drift samples with none apart,
+and no strict-judge problems or divergences. Both normal skip votes were accepted.
+The host took a checkpoint and reverted 149 ticks while preserving the network
+clock at 3905; both peers then continued for 900 observed ticks. This is a bounded
+intro/recovery test, not full campaign completion. Xbox natural completion and
+browser/network controls are still being checked. CE validation uses multiplayer
+maps, as clarified by the user; an authored CE campaign is not a requirement.
 
 | Issue | Observed/reported evidence | Investigation and intended correction |
 | --- | --- | --- |

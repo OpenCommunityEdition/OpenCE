@@ -81,7 +81,7 @@ int main(void) {
     struct {byte before[16];struct message_client_join_game_request value;byte after[16];} output;
     byte wire[512],copy[512];short size,version;int i,j;
     assert(sizeof(long)==4 && sizeof(input)==348);
-    memset(&input,0x39,sizeof(input));input.network_version=32734;
+    memset(&input,0x39,sizeof(input));input.network_version=32738;
     assert(data_packet_encode(&definition,1,&input,wire,&size,sizeof(wire)));
     assert(size==349);
     memcpy(copy,wire,size);memset(&output,0,sizeof(output));
