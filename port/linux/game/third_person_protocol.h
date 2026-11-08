@@ -2,10 +2,10 @@
 #ifndef THIRD_PERSON_PROTOCOL_H
 #define THIRD_PERSON_PROTOCOL_H
 
-/* Separate agreements include MCC sharing and metadata admission; never advertise
+/* Separate agreements include bounded asynchronous MCC admission; never advertise
  * these as upstream compatibility. */
-#define THIRD_PERSON_PROTOCOL_VERSION 32728
-#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32729
+#define THIRD_PERSON_PROTOCOL_VERSION 32732
+#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32733
 
 struct network_game;
 void third_person_session_host_begin(void);

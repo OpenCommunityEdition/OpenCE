@@ -115,6 +115,18 @@ The production bridge wait is 30 seconds. Reopening performs recovery before
 starting a new game. A storage timeout is never interpreted as permission
 to delete a possibly committed package.
 
+Verification also has a network lifetime. `mcc_share_identity_check` starts
+an owned asynchronous check, allowing the game's main loop to service the
+connection while map/resources are hashed. Its stage redirect is active only
+while opening files and taking snapshots; private readers belong to the
+checker. After publication, `mcc_share_installed_ready` promotes unchanged
+validated facts and establishes the local binding before successful `DONE`.
+Cleanup closes the checker before removing any owned stage files. The same
+MCC validator serves already-installed joins through a separate bounded
+admission hold, including when host downloads are disabled. See the
+[map-sharing walkthrough](maps_and_resources.md#mcc-package-sharing-between-machines)
+and [network limits](../../port/linux/NETCODE.md#mcc-package-sharing).
+
 Quota estimates are advisory: unknown quota differs from zero available
 bytes, and actual write/flush failures remain authoritative. No fixed
 WasmFS `statvfs` estimate substitutes for browser storage availability.

@@ -390,6 +390,7 @@ symbols in this file:
 #include "mcc_protocol.h" /* port: negotiate MCC only with an advertising host */
 #include "third_person_protocol.h" /* port: port/linux/game/third_person_protocol.c */
 void network_game_client_reset_settings_staging(void); /* port: discard partial settings across connections */
+#include "mcc_cache.h" /* port: MCC-only origin-change admission guard */
 #include "mcc_identity.h" /* port: MCC content admission and local package resolution */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
@@ -1325,6 +1326,9 @@ boolean network_game_client_game_settings_updated(
 			return FALSE;
 		}
 		if (csstrcmp(message_packet->map.name, client->game.map.name) ||
+			/* port: MCC validation also belongs to the advertised origin in the name tail. */
+			(mcc_level_name(message_packet->map.name) &&
+			 memcmp(message_packet->map.name, client->game.map.name, sizeof(message_packet->map.name))) ||
 			message_packet->map.version != client->game.map.version ||
 			/* port: the host's MCC content may change without changing its stored checksum */
 			memcmp(message_packet->mcc_content_sha256, client->game.mcc_content_sha256, 32) ||

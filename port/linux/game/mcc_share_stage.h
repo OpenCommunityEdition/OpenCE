@@ -100,7 +100,14 @@ enum mcc_share_stage_result {
     MCC_SHARE_STAGE_REFUSED,       /* the identity check failed */
     MCC_SHARE_STAGE_EXISTS,        /* the package folder or its name is already taken */
     MCC_SHARE_STAGE_INSTALL_FAILED,
-    MCC_SHARE_STAGE_STORAGE_UNCERTAIN
+    MCC_SHARE_STAGE_STORAGE_UNCERTAIN,
+    MCC_SHARE_STAGE_PENDING
+};
+
+enum mcc_share_check_result {
+    MCC_SHARE_CHECK_FAILED,
+    MCC_SHARE_CHECK_READY,
+    MCC_SHARE_CHECK_PENDING
 };
 
 struct mcc_share_stage {
@@ -118,6 +125,10 @@ struct mcc_share_stage {
     uint32_t total, done;             /* every file's bytes, and written so far */
     struct mcc_sha256 hash;
     FILE *stream;
+    /* Optional private identity job; release before any owned file cleanup.
+     * The session binds this after begin and retains it through publication. */
+    void (*cancel_check)(void *user);
+    void *check_user;
     int owns_directory, owns_partial, verified, direct_active;
     unsigned char owned[MCC_SHARE_STAGE_FILES];
     /* Locally generated only, after verification; never network manifest entries. */
@@ -150,8 +161,8 @@ enum mcc_share_stage_result mcc_share_stage_write(struct mcc_share_stage *stage,
     void const *data, uint32_t bytes);
 /* Bytes still wanted of the current file (0 when staged). */
 uint32_t mcc_share_stage_wanted(struct mcc_share_stage const *stage);
-/* Run the identity check on the staged files (the callback is given the staging
- * folder, without a trailing separator). Nothing moves out of the staging folder. */
+/* Poll the identity check on the staged files. The callback returns FAILED,
+ * READY or PENDING; pending does not grant permission to publish. */
 enum mcc_share_stage_result mcc_share_stage_verify(struct mcc_share_stage *stage,
     int (*check)(void *user, char const *stage_dir), void *user);
 /* After successful verification, publish the complete directory through the

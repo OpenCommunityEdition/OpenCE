@@ -234,10 +234,12 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## GulchCE network agreement
 
-Standard Xbox/Custom Edition sessions require GulchCE agreement 32726; MCC
-requires version 69. Camera sessions require 32728/32729 respectively. This
-revision adds MCC host-only sharing messages 103/104 and a separate 32-byte
-required-metadata digest in MCC settings. Xbox/CE settings retain their prefix.
+Standard Xbox/Custom Edition sessions require GulchCE agreement 32730; MCC
+requires version 70. Camera sessions require 32732/32733 respectively. This
+revision adds reliable MCC validation message 105 so installed-file checks
+can finish without blocking network updates. It retains host-only sharing
+messages 103/104 and the separate 32-byte required-metadata digest in MCC
+settings. Xbox/CE settings retain their prefix.
 The previous agreements are refused before admission. Earlier revisions
 require bounded client clock recovery through actual simulation ticks after
 small stalls. The previous agreements 32718/67/32720/32721 are refused before
@@ -1035,10 +1037,10 @@ its name alone beside it, has its name given back as the map lists find it.
 
 ## MCC package sharing
 
-Milestone 13 is implementing host-only delivery for eligible local and Workshop
-packages. It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. The current agreements are base **32726**, MCC
-**69**, and camera **32728/32729**; old agreements are refused before admission.
+MCC supports host-only delivery for eligible local and Workshop packages.
+It uses MCC-owned messages **103** (request) and **104** (response),
+separate from CE sharing 83-86. The current agreements are base **32730**, MCC
+**70**, and camera **32732/32733**; old agreements are refused before admission.
 MCC settings add a 32-byte required-JSON digest beside the gameplay digest.
 Xbox/CE retain their existing settings prefix and sharing path. The distributed
 header remains 12 bytes, including its checkpoint epoch.
@@ -1086,7 +1088,7 @@ header remains 12 bytes, including its checkpoint epoch.
   and required-metadata identities must match the advertised values. Native
   publication atomically moves the complete directory to a separate
   `mcc_maps/dl_<digest>` without replacing any destination. The exact installed
-  snapshot is rechecked before joining resumes; existing local and Steam
+  snapshot is rechecked before successful `DONE` and joining resumes; existing local and Steam
   packages remain untouched. Cleanup is limited to owned staging entries.
   Native path checks refuse symlinks/reparse points and special files. These
   checks address untrusted remote paths, not concurrent filesystem replacement
@@ -1106,14 +1108,36 @@ header remains 12 bytes, including its checkpoint epoch.
   or expiry clears it. Cancelled, expired, premature or replayed `DONE`
   messages cannot grant or renew the grace period.
 
+Installed packages use a separate bounded validation hold, even when both
+sharing preferences are off. Reliable MCC message **105** binds a client
+generation to the exact advertised map name/origin, checksum, gameplay digest
+and metadata digest. The host acknowledges before the client begins its
+asynchronous file checks. Five-second heartbeats keep a twenty-second liveness
+window, but never extend the absolute two-minute validation deadline. Expired
+or completed holds cannot be restarted by replaying `BEGIN` on the same
+connection and host revision. `READY` grants only the existing fifteen-second
+player-add grace; it does not prove that an untrusted client checked its files.
+Actual map loading still fingerprints content independently.
+
+Downloaded-file verification stays within its existing transfer. Manifest
+heartbeats keep the connection responsive while the bounded checker runs,
+without resetting the eighty-second last-data-progress bound. Publication
+promotes SHA, CRC and selected-resource facts only after the complete file
+snapshot remains unchanged. Local installed identity is established before
+successful `DONE`, avoiding a second full-content pass. Cancellation joins the
+owned checker and closes its readers before any stage cleanup. A package
+already published survives a subsequent admission failure.
+
 Implementation lives in `mcc_share.c`, `mcc_share_package.c`,
 `mcc_share_session.c`, `mcc_share_stage.c` and the MCC metadata helpers.
-Managed-copy receipt/removal UI integration and final platform, transport,
-real-map and follow-on-mission validation are still pending. Component checks
-and their limits are recorded in
+Managed-copy receipts and the removal UI preserve separate ownership of
+downloaded snapshots. Native platform, transport, real-map and follow-on-mission
+checks and their limits are recorded in
 [Milestone 13](../../docs/mcc_refactor_validation.md#milestone-13-implementation-evidence).
-Browser filesystem publication currently fails closed; playable browser
-import/download and persistence are Milestone 14, not a result of native tests.
+Browser publication uses an owned OPFS journal and commit record instead of a
+directory rename; see [browser storage](../../docs/reading/browser_imports.md).
+Browser gameplay, downloads and persistence have their own Milestone 14
+validation gates; native results do not establish browser compatibility.
 
 ## Stages
 

@@ -19,6 +19,7 @@ def restart_tool(tmp_path_factory):
     (directory / "mcc_cache.h").write_text("")
     (directory / "mcc_share.h").write_text("")
     (directory / "mcc_validation.h").write_text((ROOT / "port/linux/game/mcc_validation.h").read_text())
+    (directory / "mcc_precache.h").write_text((ROOT / "port/linux/game/mcc_precache.h").read_text())
     (directory / "mcc_identity.h").write_text((ROOT / "port/linux/game/mcc_identity.h").read_text())
     implementation = (ROOT / "port/linux/game/mcc_ui_network.inl").read_text()
     server_source = (ROOT / "source/networking/network_server_manager.c").read_text()

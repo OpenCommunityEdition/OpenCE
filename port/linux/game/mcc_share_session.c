@@ -702,6 +702,8 @@ int mcc_share_client_accept(struct mcc_share *share)
         return 0;
     }
     share->state=MCC_SHARE_CLIENT_TRANSFERRING;
+    share->stage.cancel_check=share->env.cancel_check;
+    share->stage.check_user=share->env.user;
     share->progress_at=share_now(share);
     client_pump(share);
     return 1;
@@ -827,6 +829,15 @@ static int client_check(void *user, char const *stage_dir)
     return share->env.identity_check(share->env.user,stage_dir);
 }
 
+static void client_cancel_check(struct mcc_share *share)
+{
+    if (share->stage.cancel_check) {
+        void (*cancel)(void *)=share->stage.cancel_check;
+        share->stage.cancel_check=NULL;
+        cancel(share->stage.check_user);
+    }
+}
+
 void mcc_share_client_cancel(struct mcc_share *share)
 {
     if (share->state==MCC_SHARE_CLIENT_IDLE) return;
@@ -857,6 +868,7 @@ int mcc_share_client_level(struct mcc_share const *share, char const *level)
 int mcc_share_client_percent(struct mcc_share const *share)
 {
     if (share->state==MCC_SHARE_CLIENT_IDLE) return -1;
+    if (share->state==MCC_SHARE_CLIENT_VERIFYING) return 100;
     if (share->state!=MCC_SHARE_CLIENT_TRANSFERRING || !share->stage.total) return 0;
     return (int)(((uint64_t)share->stage.done*100u)/share->stage.total);
 }
@@ -886,7 +898,17 @@ static void client_update(struct mcc_share *share)
         client_pump(share);
         if (share->state==MCC_SHARE_CLIENT_TRANSFERRING) client_reuse(share);
     } else if (share->state==MCC_SHARE_CLIENT_VERIFYING) {
-        enum mcc_share_stage_result result=mcc_share_stage_verify(&share->stage,client_check,share);
+        enum mcc_share_stage_result result;
+        if (share_elapsed(now,share->progress_at,MCC_SHARE_ACTIVE_ADVANCED)) {
+            client_fail(share,"The downloaded map could not be verified in time. Nothing was installed.");
+            return;
+        }
+        /* Polling is bounded by the last received/copied byte, not heartbeats.
+         * Keep the host's existing transfer alive while its identity is checked. */
+        if (share_elapsed(now,share->reported_at,MCC_SHARE_OFFER_HEARTBEAT) &&
+            client_send(share,MCC_SHARE_OP_MANIFEST,0,0,0,0)) share->reported_at=now;
+        result=mcc_share_stage_verify(&share->stage,client_check,share);
+        if (result==MCC_SHARE_STAGE_PENDING) return;
         if (result==MCC_SHARE_STAGE_REFUSED) {
             memset(&share->stage,0,sizeof(share->stage));
             client_terminal(share,0);
@@ -902,6 +924,7 @@ static void client_update(struct mcc_share *share)
         }
         if (result==MCC_SHARE_STAGE_OK) result=mcc_share_stage_install(&share->stage);
         if (result!=MCC_SHARE_STAGE_OK) {
+            client_cancel_check(share);
             memset(&share->stage,0,sizeof(share->stage));
             client_terminal(share,0);
             client_idle(share);
@@ -912,6 +935,12 @@ static void client_update(struct mcc_share *share)
                 "The package could not be installed. Nothing was installed.");
             return;
         }
+        if (share->env.installed_ready && !share->env.installed_ready(share->env.user)) {
+            client_cancel_check(share);
+            client_fail(share,"The map was installed, but its verified identity could not be bound to this game. Join again to retry.");
+            return;
+        }
+        client_cancel_check(share);
         client_terminal(share,1);
         memset(&share->stage,0,sizeof(share->stage));
         client_idle(share);

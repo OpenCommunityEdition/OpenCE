@@ -22,7 +22,8 @@ CASES = ["transfer", "only_listed_files", "off", "unlisted", "listed_without_mak
          "prompt_metadata_change", "stale_accept", "unused_resources", "bitmap_only",
          "workshop_resource_fallback", "shared_resource", "invalid_resource", "host_revision", "prompt_overlay",
          "admission_grace", "admission_player", "admission_peer_left", "admission_map", "admission_revision",
-         "admission_off", "admission_disconnect", "admission_wrap"]
+         "admission_off", "admission_disconnect", "admission_wrap", "local_validation_hold", "validation_pending_cancel",
+         "validation_handoff", "validation_stale_handoff"]
 RENAMED = ["mcc_share_game_update", "mcc_share_game_render", "mcc_share_game_downloading",
            "mcc_share_game_holds_players", "mcc_share_game_machine_active", "mcc_share_game_machine_needs_map", "mcc_share_game_handles_message",
            "mcc_share_game_handle_message", "mcc_identity_set_missing", "mcc_identity_host_package",
@@ -113,7 +114,8 @@ int DeleteFileA(char const *path);
 int mcc_identity_host_package(char const *level, unsigned char digest[32]);
 int mcc_identity_accept_installed(char const name[128], unsigned char const digest[32], unsigned char const metadata[32],char const *installed);
 unsigned long mcc_identity_host_revision(void);
-int mcc_content_probe(char const *name, unsigned char digest[32]);
+void mcc_identity_update(void);
+int mcc_identity_pending(char const *);
 """,
     "mcc_maps.h": """#define MCC_MAPS_DIRECTORY "d:\\\\mcc_maps\\\\"
 void mcc_maps_rescan(void);
@@ -228,7 +230,7 @@ def test_completed_download_needs_time_for_player_admission(tmp_path):
     (" || !from_stream ||", " ||", "handlers"),
     ('if (!config_boolean("network.map_download")) {', "if (0) {", "gate"),
     ("memcmp(actual,mcc_share_metadata,32)", "0", "metadata_mismatch"),
-    ("!memcmp(actual,mcc_share_digest,32)", "1", "identity_mismatch"),
+    ("!memcmp(mcc_share_proof.digest,mcc_share_digest,32)", "1", "identity_mismatch"),
     ("mcc_share_prompt_pending || mcc_share_prompt_visible)\n\t\treturn;", "0)\n\t\treturn;", "prompt_overlay"),
 ])
 def test_negative_controls(tmp_path, before, after, case):

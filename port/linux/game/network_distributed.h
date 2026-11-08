@@ -169,6 +169,8 @@ enum
 	/* MCC host-only package transfer; 101/102 remain join envelopes. */
 	_distributed_message_mcc_share_request = 103,
 	_distributed_message_mcc_share_response = 104,
+	/* MCC file validation before player admission, even when sharing is off. */
+	_distributed_message_mcc_admission = 105,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };

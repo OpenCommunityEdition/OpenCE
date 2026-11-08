@@ -33,6 +33,7 @@
 #include "mcc_workshop.h"
 #include "mcc_share_metadata.h"
 #include "mcc_share_storage.h"
+#include "mcc_validation.h"
 #include "cseries.h"
 #include "networking/network_client_manager.h"
 #include "network_distributed.h"
@@ -108,10 +109,29 @@ static unsigned char host_digest[32],host_metadata[32];
 static char snapshot[64],opened_url[128];
 static int role_host,peer_joined=1,peer_capable=1,prompts,lobby_restores;
 static int overlay_draws,allow_prompt=1;
+static char overlay_text[256];
 static unsigned resource_mask=3,host_revision=1;
 static int workshop_fallback,resource_shared,resource_invalid;
 FILE *fixture_fopen(char const *,char const *);
 static int join_in_game=1;
+static int validation_pending,admission_pending,validation_live,validation_delay=3,validation_steps;
+static uint32_t admission_token=1;
+static int block_request;
+static int published;
+static unsigned char published_digest[32];
+static char published_name[64];
+void mcc_identity_update(void) {}
+int mcc_identity_pending(char const *level)
+{ return !role_host && validation_pending && (!level || !strcmp(level,LEVEL)); }
+void mcc_admission_update(void) {}
+void mcc_admission_client_finish(int ready) {(void)ready;admission_pending=0;}
+uint32_t mcc_admission_client_token(void) {return admission_pending ? admission_token : 0;}
+void mcc_admission_client_release(uint32_t token) {if(token && token==admission_token)admission_pending=0;}
+int mcc_admission_client_pending(void) {return !role_host && admission_pending;}
+int mcc_admission_host_active(long machine) {return role_host && machine==MACHINE && admission_pending;}
+int mcc_admission_host_needs_map(long machine) {return mcc_admission_host_active(machine);}
+void mcc_admission_disconnect(void) {admission_pending=0;}
+void mcc_admission_peer_left(long machine) {if(machine==MACHINE)admission_pending=0;}
 FILE *mcc_share_open_native(char const *path) { return fopen(path,"rb"); }
 void mcc_share_storage_native_io(struct mcc_share_io *io)
 { memset(io,0,sizeof(*io)); io->open_native_read=mcc_share_open_native; }
@@ -159,7 +179,7 @@ int game_in_progress(void) { return 0; }
 long game_time_get(void) { return 0; }
 long interface_get_tag_index(int tag) { (void)tag; return 1; }
 void draw_string_set_draw_mode(long a, long b, short c, short d, void const *e) { (void)a;(void)b;(void)c;(void)d;(void)e; }
-void rasterizer_draw_string(void *a, void *b, void *c, short d, char const *e) { (void)a;(void)b;(void)c;(void)d;if (!e || !*e) exit(2);overlay_draws++; }
+void rasterizer_draw_string(void *a, void *b, void *c, short d, char const *e) { (void)a;(void)b;(void)c;(void)d;if (!e || !*e) exit(2);overlay_draws++;snprintf(overlay_text,sizeof(overlay_text),"%s",e); }
 struct { struct { rectangle2d window_bounds,viewport_bounds; } camera; } render;
 
 void mcc_maps_rescan(void) {}
@@ -212,7 +232,35 @@ static int package_digest(char const *level, unsigned char digest[32])
     mcc_sha256_end(&hash,digest);
     return 1;
 }
-int mcc_content_probe(char const *level, unsigned char digest[32]) { return package_digest(level,digest); }
+/* The real incremental backend has its own reader/stamp tests. This fixture
+ * makes completion take several frames and requires proof promotion before
+ * admission, so adapter ordering cannot hide a second synchronous probe. */
+struct mcc_validation_check {char name[64],directory[128];int remaining;};
+struct mcc_validation_check *mcc_validation_check_begin(char const *name,char const *directory)
+{
+    struct mcc_validation_check *check=calloc(1,sizeof(*check));
+    if (!check) return NULL;
+    strcpy(check->name,name);strcpy(check->directory,directory);check->remaining=validation_delay;
+    validation_live++;return check;
+}
+int mcc_validation_check_step(struct mcc_validation_check *check,struct mcc_validation_proof *proof,
+    char *reason,size_t reason_size)
+{
+    int ok;
+    (void)reason;(void)reason_size;validation_steps++;
+    if (--check->remaining>0) return 0;
+    memset(proof,0,sizeof(*proof));strcpy(proof->name,check->name);strcpy(proof->directory,check->directory);
+    mcc_package_stage_redirect(check->name,check->directory);
+    ok=package_digest(check->name,proof->digest);
+    mcc_package_stage_redirect(NULL,NULL);
+    return ok ? 1 : -1;
+}
+void mcc_validation_check_end(struct mcc_validation_check *check)
+{if(check){validation_live--;free(check);}}
+int mcc_validation_publish(char const *name,struct mcc_validation_proof const *proof)
+{
+    published++;strcpy(published_name,name);memcpy(published_digest,proof->digest,32);return 1;
+}
 int j_mcc_identity_host_package(char const *level, unsigned char digest[32]) { (void)level;(void)digest;return 0; }
 int h_mcc_identity_host_package(char const *level, unsigned char digest[32])
 {
@@ -244,13 +292,10 @@ void h_mcc_identity_set_missing(int (*handler)(char const[128],unsigned char con
 void j_mcc_identity_set_missing(int (*handler)(char const[128],unsigned char const[32],unsigned char const[32])) { join_missing=handler; }
 int j_mcc_identity_accept_installed(char const name[128], unsigned char const digest[32],unsigned char const metadata[32],char const *installed)
 {
-    unsigned char actual[32];
-    char level[128];
     (void)name;(void)metadata;
     accepts++;
     find_snapshot();
-    snprintf(level,sizeof(level),"%s",installed);
-    accept_result=package_digest(level,actual) && !memcmp(actual,digest,32);
+    accept_result=published && !strcmp(installed,published_name) && !memcmp(published_digest,digest,32);
     return accept_result;
 }
 int h_mcc_identity_accept_installed(char const name[128],unsigned char const digest[32],unsigned char const metadata[32],char const *installed)
@@ -415,6 +460,7 @@ int h_network_distributed_client_send_reliably(void *message, word size) { (void
 int j_network_distributed_server_send_to_machine_reliably(long machine, void *message, word size) { (void)machine;(void)message;(void)size;joiner_replies++;return 1; }
 int j_network_distributed_client_send_reliably(void *message, word size)
 {
+    if(block_request)return 0;
     if (to_host_count<400 && size<=sizeof(to_host[0].data)) {
         memcpy(to_host[to_host_count].data,message,size);
         to_host[to_host_count].bytes=size;
@@ -578,6 +624,39 @@ int main(int argc,char **argv)
     snprintf(join_game.map.name,sizeof(join_game.map.name),"%s",LEVEL);
     as_join();j_mcc_share_game_update(); as_host();h_mcc_share_game_update();
     CHECK(host_missing && join_missing);
+
+    if(!strcmp(argv[1],"validation_handoff") || !strcmp(argv[1],"validation_stale_handoff")) {
+        admission_pending=1;block_request=1;
+        CHECK(joiner_asks(LEVEL,host_digest));
+        for(i=0;i<10;i++)pump_once();
+        CHECK(admission_pending && j_mcc_share_game_holds_players() && !prompts);
+        if(!strcmp(argv[1],"validation_stale_handoff"))admission_token++;
+        block_request=0;CHECK(pump_prompt());
+        CHECK(admission_pending==!strcmp(argv[1],"validation_stale_handoff"));
+        as_join();j_mcc_share_game_disconnect();return 0;
+    }
+
+    CASE("local_validation_hold") {
+        map_share_on=map_download_on=0;
+        validation_pending=admission_pending=1;
+        as_join();CHECK(j_mcc_share_game_holds_players() && j_mcc_share_game_downloading(LEVEL));
+        CHECK(!j_mcc_share_game_downloading("maps\\bloodgulch"));
+        as_host();CHECK(h_mcc_share_game_machine_active(MACHINE) && h_mcc_share_game_machine_needs_map(MACHINE));
+        CHECK(!h_mcc_share_game_machine_active(-1));
+        h_mcc_share_game_peer_left(&peer);
+        CHECK(!admission_pending);
+        as_join();validation_pending=0;CHECK(!j_mcc_share_game_holds_players());return 0;
+    }
+    CASE("validation_pending_cancel") {
+        validation_delay=1000;
+        CHECK(joiner_asks(LEVEL,host_digest));CHECK(pump_prompt());as_join();j_mcc_share_game_prompt_action(0);
+        for(i=0;i<500 && !validation_live;i++)pump_once();
+        CHECK(validation_live==1 && !accepts && !published);
+        for(i=0;i<10;i++)pump_once();
+        CHECK(validation_steps>0 && validation_live==1 && !accepts);
+        as_join();j_mcc_share_game_render();CHECK(strstr(overlay_text,"Verifying the downloaded map"));
+        as_join();j_mcc_share_game_disconnect();CHECK(!validation_live && !accepts && !published);return 0;
+    }
 
     CASE("prompt_overlay") {
         as_join();j_mcc_share_game_render();CHECK(!overlay_draws);

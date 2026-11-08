@@ -305,7 +305,9 @@ multiply-adds). `tools/web_build.py` writes the graph.
   memory is made `0x88000000` bytes, so that the window is its top 128 MB;
   `port/web/src/web_memory.c` keeps the C heap below CE's fixed tag window
   at `0x40440000`, also leaving MCC's accepted fixed windows outside the
-  allocator. CE initialization follows loaded settings; its tag window is
+  allocator. Ordinary allocations share roughly 1 GiB with static data and
+  thread stacks; converted map resources must fit that bounded space.
+  CE initialization follows loaded settings; its tag window is
   unavailable when `game.custom_edition` is disabled. `xbox_memory.c`
   clears a block where it would map fresh pages, and only remembers
   protection.
@@ -484,7 +486,9 @@ jsDelivr).
 | --- | --- |
 | `tools/web_build.py` | The `ninja web` graph |
 | `port/web/halo_sdl3.py` | SDL 3.4.16 as an Emscripten port |
-| `port/web/src/web_main.c` | The entry point: the page's arguments, the storage, the heap's limit |
+| `port/web/src/web_main.c` | The entry point: the page's arguments, storage mount and memory initialization |
+| `port/web/src/web_memory.c` | The ordinary heap limit and CE tag-window initialization; MCC reservations remain in `port/linux/src/mcc_memory.c` |
+| `port/web/src/web_mcc_storage.c`, `web_mcc_library.js` | MCC download publication, visibility, quota and bounded page requests |
 | `port/web/src/web_net.c` | The sockets inside the page, the room's other browsers, and the brokers' WebSockets |
 | `port/web/src/web_p2p.c` | Internet play's WebRTC connections |
 | `port/web/src/web_memory_watch.c` | The memory watch by hashing |

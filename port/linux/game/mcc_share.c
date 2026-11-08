@@ -16,6 +16,8 @@
 #include "network_distributed.h"
 #include "mcc_cache.h"
 #include "mcc_identity.h"
+#include "mcc_validation.h"
+#include "mcc_admission.h"
 #include "mcc_maps.h"
 #include "mcc_package.h"
 #include "mcc_share.h"
@@ -66,6 +68,9 @@ static struct widget_instance *mcc_share_prompt;
 static char mcc_share_prompt_message[512];
 static char mcc_share_installed[64];
 static char mcc_share_text[256];
+static struct mcc_validation_check *mcc_share_check;
+static struct mcc_validation_proof mcc_share_proof;
+static uint32_t mcc_share_validation_token;
 static unsigned long mcc_share_host_revision;
 static uint32_t mcc_share_admission_at[MCC_SHARE_HOST_MACHINES];
 static byte mcc_share_admission_pending[MCC_SHARE_HOST_MACHINES];
@@ -90,7 +95,7 @@ static void mcc_share_host_finished(void *user,long machine)
     struct network_game *game=network_game_get_game();
     (void)user;
     if (!game || machine<0 || machine>=MCC_SHARE_HOST_MACHINES) return;
-    /* DONE precedes the joiner's identity resolution and AddPlayer. Its old
+    /* DONE precedes the joiner's AddPlayer. Its old
      * joining deadline may already have elapsed during an honest download. */
     mcc_share_admission_at[machine]=(uint32_t)system_milliseconds();
     mcc_share_admission_pending[machine]=1;
@@ -295,9 +300,15 @@ static int mcc_share_identity_check(void *user, char const *stage_dir)
     struct mcc_share_metadata_entry *entries;
     unsigned char actual[32],keep[MCC_SHARE_METADATA_FILES];
     int indices[MCC_SHARE_METADATA_FILES],count=0,i,ok=0;
-    char native[1024],reason[128];
+    char native[1024],reason[320];
     char const *leaf=strrchr(mcc_share_globals.level,'\\')+1;
     (void)user;
+    if (mcc_share_check) {
+        ok=mcc_validation_check_step(mcc_share_check,&mcc_share_proof,reason,sizeof(reason));
+        if (!ok) return MCC_SHARE_CHECK_PENDING;
+        return ok==1 && !memcmp(mcc_share_proof.digest,mcc_share_digest,32) ?
+            MCC_SHARE_CHECK_READY : MCC_SHARE_CHECK_FAILED;
+    }
     entries=malloc(MCC_SHARE_METADATA_FILES*sizeof(*entries));
     if (!entries) return 0;
     memset(entries,0,MCC_SHARE_METADATA_FILES*sizeof(*entries));
@@ -316,12 +327,29 @@ static int mcc_share_identity_check(void *user, char const *stage_dir)
         !mcc_share_metadata_digest(native,-1,leaf,actual,reason) || memcmp(actual,mcc_share_metadata,32)) goto done;
     for (i=0;i<count;i++) if (!keep[i] &&
         !mcc_share_stage_discard_preview(&mcc_share_globals.stage,indices[i])) goto done;
-    mcc_package_stage_redirect(mcc_share_globals.level,stage_dir);
-    ok=mcc_content_probe(mcc_share_globals.level,actual) && !memcmp(actual,mcc_share_digest,32);
-    mcc_package_stage_redirect(NULL,NULL);
+    mcc_share_check=mcc_validation_check_begin(mcc_share_globals.level,stage_dir);
+    if (mcc_share_check) ok=MCC_SHARE_CHECK_PENDING;
  done:
     free(entries);
     return ok;
+}
+
+static void mcc_share_cancel_check(void *user)
+{
+    (void)user;
+    mcc_validation_check_end(mcc_share_check);
+    mcc_share_check=NULL;
+    memset(&mcc_share_proof,0,sizeof(mcc_share_proof));
+}
+
+static int mcc_share_installed_ready(void *user)
+{
+    (void)user;
+    /* Publication preserves the validated file stamps. Promote those facts
+     * under the installed alias before DONE releases the host's preload hold. */
+    if (!mcc_validation_publish(mcc_share_installed,&mcc_share_proof)) return 0;
+    mcc_maps_rescan();
+    return mcc_identity_accept_installed(mcc_share_name,mcc_share_digest,mcc_share_metadata,mcc_share_installed);
 }
 
 static int mcc_share_prepare_install(void *user,struct mcc_share_stage *stage)
@@ -342,12 +370,19 @@ static int mcc_share_reuse_file(void *user,struct mcc_share_file const *file,cha
     return mcc_share_storage_find_resource(root,&io,file,path);
 }
 
+static void mcc_share_release_validation(void)
+{
+    mcc_admission_client_release(mcc_share_validation_token);
+    mcc_share_validation_token=0;
+}
+
 static void mcc_share_finished(
 	void *user,
 	int ok,
 	char const *message)
 {
 	(void)user;
+    mcc_share_release_validation();
 	if (!ok)
 	{
 		error(_error_silent, "mcc share: the download of %s failed: %s", mcc_share_globals.level, message);
@@ -358,10 +393,6 @@ static void mcc_share_finished(
 	}
 	error(_error_silent, "mcc share: installed %s from the host (credit: %s)", mcc_share_globals.level,
 		message[0] ? message : "none given");
-	/* (the installed package is judged as any other: its content must match the host's) */
-	mcc_maps_rescan();
-    if (!mcc_identity_accept_installed(mcc_share_name, mcc_share_digest, mcc_share_metadata,mcc_share_installed))
-		network_game_abort();
 }
 
 /* The joiner's package matches nothing installed. Ask for an offer when downloads
@@ -374,12 +405,17 @@ static int mcc_share_missing(char const name[128], unsigned char const digest[32
         !mcc_package_name(name,canonical) || !strchr(canonical+9,'\\')) return 0;
     if (mcc_share_client_busy(&mcc_share_globals)) {
         if (mcc_share_client_level(&mcc_share_globals,canonical) &&
-            !memcmp(mcc_share_digest,digest,32) && !memcmp(mcc_share_metadata,metadata,32)) return 1;
+            !memcmp(mcc_share_digest,digest,32) && !memcmp(mcc_share_metadata,metadata,32)) {
+            mcc_share_validation_token=mcc_admission_client_token();
+            return 1;
+        }
         mcc_share_client_cancel(&mcc_share_globals);
     }
     memcpy(mcc_share_name,name,sizeof(mcc_share_name));
     memcpy(mcc_share_digest,digest,32); memcpy(mcc_share_metadata,metadata,32);
+    mcc_share_validation_token=mcc_admission_client_token();
     if (!config_boolean("network.map_download")) {
+        mcc_share_release_validation();
         mcc_share_prompt_download=FALSE;
         snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),
             "The host's package is missing or differs. Download Maps is OFF. Install matching content manually.");
@@ -394,6 +430,7 @@ boolean mcc_share_game_downloading(
 {
 	char canonical[64];
 
+	if (mcc_identity_pending(level_name)) return TRUE;
 	return mcc_share_ready && level_name && mcc_package_name(level_name, canonical) &&
 		(mcc_share_client_level(&mcc_share_globals, canonical) ||
         ((mcc_share_prompt_pending || mcc_share_prompt_visible) && !strcmp(canonical,mcc_share_name)));
@@ -402,14 +439,16 @@ boolean mcc_share_game_downloading(
 boolean mcc_share_game_holds_players(
 	void)
 {
-	return mcc_share_ready && (mcc_share_client_busy(&mcc_share_globals) ||
-        mcc_share_prompt_pending || mcc_share_prompt_visible);
+	return mcc_identity_pending(NULL) || mcc_admission_client_pending() ||
+        (mcc_share_ready && (mcc_share_client_busy(&mcc_share_globals) ||
+        mcc_share_prompt_pending || mcc_share_prompt_visible));
 }
 
 boolean mcc_share_game_machine_active(
 	long machine_index)
 {
     struct network_game *game;
+    if (mcc_admission_host_active(machine_index)) return TRUE;
     if (mcc_share_game_machine_needs_map(machine_index)) return TRUE;
     if (!mcc_share_ready || machine_index<0 || machine_index>=MCC_SHARE_HOST_MACHINES ||
         !mcc_share_admission_pending[machine_index]) return FALSE;
@@ -422,13 +461,17 @@ boolean mcc_share_game_machine_active(
 
 boolean mcc_share_game_machine_needs_map(long machine_index)
 {
-    return mcc_share_ready && machine_index>=0 && machine_index<MCC_SHARE_HOST_MACHINES &&
-        mcc_share_host_active(&mcc_share_globals,machine_index);
+    return mcc_admission_host_needs_map(machine_index) ||
+        (mcc_share_ready && machine_index>=0 && machine_index<MCC_SHARE_HOST_MACHINES &&
+        mcc_share_host_active(&mcc_share_globals,machine_index));
 }
 
 static void mcc_share_offered(void *user,uint64_t bytes,char const *credit)
 {
     (void)user;
+    /* The host's complete offer proves that its transfer hold exists. Keep
+     * the validation lease until here, including request queue backpressure. */
+    mcc_share_release_validation();
     mcc_share_prompt_download=TRUE;
     snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),
         "The host's package is missing or differs. Download up to %.1f MiB from the host?\n"
@@ -504,6 +547,8 @@ void mcc_share_game_prompt_action(int action)
 
 void mcc_share_game_disconnect(void)
 {
+    mcc_admission_disconnect();
+    mcc_share_validation_token=0;
     mcc_share_close_prompt();
     if (mcc_share_ready) {
         mcc_share_client_disconnect(&mcc_share_globals);
@@ -517,10 +562,11 @@ void mcc_share_game_peer_left(struct network_game_server_client_machine *machine
 {
     struct network_game_server *server=global_network_game_server_get();
     long index;
-    if (!mcc_share_ready || !server || !machine) return;
+    if (!server || !machine) return;
     for (index=0;index<MCC_SHARE_HOST_MACHINES;index++)
         if (network_game_server_get_client_machine_at_index(server,index)==machine) {
-            mcc_share_host_forget(&mcc_share_globals,index);
+            mcc_admission_peer_left(index);
+            if (mcc_share_ready) mcc_share_host_forget(&mcc_share_globals,index);
             mcc_share_admission_pending[index]=0;
         }
 }
@@ -575,6 +621,8 @@ void mcc_share_game_update(
 		env.send_request = mcc_share_send_request;
 		env.package_taken = mcc_share_package_taken;
 		env.identity_check = mcc_share_identity_check;
+        env.cancel_check = mcc_share_cancel_check;
+        env.installed_ready = mcc_share_installed_ready;
         env.prepare_install = mcc_share_prepare_install;
         env.reuse_file = mcc_share_reuse_file;
 		env.finished = mcc_share_finished;
@@ -600,6 +648,8 @@ void mcc_share_game_update(
 		mcc_share_ready = TRUE;
 		mcc_identity_set_missing(mcc_share_missing);
 	}
+    mcc_admission_update();
+    mcc_identity_update();
     /* Consent belongs to this host's exact settings, including the metadata. */
     if (mcc_share_client_busy(&mcc_share_globals) || mcc_share_prompt_pending || mcc_share_prompt_visible) {
         if (!mcc_share_client_current()) {
@@ -610,6 +660,7 @@ void mcc_share_game_update(
             mcc_share_name[0]=0;
         } else if (mcc_share_client_busy(&mcc_share_globals) && !config_boolean("network.map_download")) {
             mcc_share_client_cancel(&mcc_share_globals);
+            mcc_share_release_validation();
             mcc_share_prompt_download=FALSE;
             snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),
                 "Download Maps is OFF. Install matching content manually or visit its Workshop page when available.");
@@ -646,7 +697,9 @@ void mcc_share_game_render(
 	name = strrchr(mcc_share_globals.level, '\\');
 	name = name ? name + 1 : mcc_share_globals.level;
 	percent = mcc_share_client_percent(&mcc_share_globals);
-	if (percent <= 0)
+	if (mcc_share_globals.state==MCC_SHARE_CLIENT_VERIFYING)
+        snprintf(mcc_share_text,sizeof(mcc_share_text),"Verifying the downloaded map %s...",name);
+	else if (percent <= 0)
 		snprintf(mcc_share_text, sizeof(mcc_share_text), "Asking the host for the map %s...", name);
 	else
 		snprintf(mcc_share_text, sizeof(mcc_share_text), "Getting the map %s from the host: %d%%", name, percent);

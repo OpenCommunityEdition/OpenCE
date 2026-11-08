@@ -21,7 +21,9 @@ DRIVER = r'''
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <errno.h>
 #ifdef _WIN32
+#include <windows.h>
 #include <direct.h>
 #define mkdir(p,m) _mkdir(p)
 #define rmdir _rmdir
@@ -35,10 +37,20 @@ int posix_mcc_share_remove(char const *,int);
 static int make(char const *p){return mkdir(p,0700)==0;}
 static int erase_directory(char const *p){return rmdir(p)==0;}
 static int exists(char const *p){struct stat s;return !stat(p,&s)&&S_ISDIR(s.st_mode);}
-static int move(char const *a,char const *b){return posix_mcc_share_publish(a,b);}
+static int move(char const *a,char const *b){
+ int result=posix_mcc_share_publish(a,b);
+ if(!result){
+#ifdef _WIN32
+  fprintf(stderr,"publish failed: Windows error %lu; %s -> %s\n",(unsigned long)GetLastError(),a,b);
+#else
+  fprintf(stderr,"publish failed: errno %d; %s -> %s\n",errno,a,b);
+#endif
+ }
+ return result;
+}
 static int erase(char const *p){return remove(p)==0;}
 static int refuse_publish(char const *a,char const *b){(void)a;(void)b;return 0;}
-static struct mcc_share_io io={make,erase_directory,exists,move,erase,posix_mcc_share_path_safe,posix_mcc_share_publish,mcc_share_open_native,NULL};
+static struct mcc_share_io io={make,erase_directory,exists,move,erase,posix_mcc_share_path_safe,move,mcc_share_open_native,NULL};
 static int native_attempts;
 static FILE *refuse_native(char const *p){(void)p;native_attempts++;return NULL;}
 /* Metadata/gameplay verification is covered by the identity suites. This unit
@@ -188,6 +200,8 @@ def run(tool, mode, root, *args):
     result = subprocess.run([str(tool), mode, str(root), *map(str, args)],
                             capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stderr
+    if result.stderr:
+        print(result.stderr, file=sys.stderr, end="")
     return result.stdout.strip()
 
 

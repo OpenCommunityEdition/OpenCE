@@ -29,13 +29,18 @@
 #define LEVEL "mcc_maps\\solar_flare\\m0"
 #define MACHINE 3
 
+static int pending_check_open, pending_delete_violation;
+
 static int io_make(char const *path) { return mkdir(path,0755)==0; }
 static int io_remove(char const *path) { return rmdir(path)==0; }
 static int io_exists(char const *path) { struct stat s; return stat(path,&s)==0 && S_ISDIR(s.st_mode); }
 static int file_exists_any(char const *path) { struct stat s; return stat(path,&s)==0; }
 /* (MoveFileA does not replace, so nothing here may count on rename replacing either) */
 static int io_move(char const *from, char const *to) { return !file_exists_any(to) && rename(from,to)==0; }
-static int io_delete(char const *path) { return remove(path)==0; }
+static int io_delete(char const *path) {
+    if (pending_check_open) pending_delete_violation++;
+    return remove(path)==0;
+}
 static unsigned native_reads,native_cached_reads;
 static FILE *io_open_native(char const *path) {
     native_reads++;
@@ -140,12 +145,16 @@ static struct {
     uint64_t offer_bytes;
     unsigned extra_metadata, manifest_pages;
     int stop_after_page;
+    int check_result,check_polls,check_cancels,install_calls,install_ok,prepare_mode;
+    int verify_heartbeats;
 } W;
 
 static uint32_t env_now(void *u) { (void)u; return W.clock; }
 static void env_host_finished(void *u,long machine) { (void)u; if(machine!=MACHINE)exit(91); W.host_completions++; }
 static int env_request(void *u, struct mcc_share_request const *r)
 {
+    if (r->op==MCC_SHARE_OP_MANIFEST && W.join.state==MCC_SHARE_CLIENT_VERIFYING)
+        W.verify_heartbeats++;
     (void)u;
     if (W.reject_requests || (W.reject_done && r->op==MCC_SHARE_OP_DONE) ||
         (W.reject_have && r->op==MCC_SHARE_OP_HAVE)) return 0;
@@ -219,6 +228,43 @@ static int env_prepare(void *u, struct mcc_share_stage *stage)
     W.prepare_order=W.identity_calls==1 && stage->verified &&
         stage->state==MCC_SHARE_STAGE_STAGED && !io_exists(stage->package_dir);
     return W.prepare_ok;
+}
+static int env_pending_check(void *u, char const *dir)
+{
+    (void)u;
+    if (!io_exists(dir)) exit(92);
+    pending_check_open=1;
+    W.check_polls++;
+    return W.check_result;
+}
+static void env_cancel_check(void *u)
+{
+    (void)u;
+    W.check_cancels++;
+    pending_check_open=0;
+}
+static int env_installed_ready(void *u)
+{
+    (void)u;
+    if (!pending_check_open || W.check_cancels || W.join.stage.state!=MCC_SHARE_STAGE_INSTALLED ||
+        !io_exists(W.join.stage.package_dir) || W.join.terminal_pending) exit(93);
+    W.install_calls++;
+    return W.install_ok;
+}
+static int fail_flush(FILE *file) { (void)file;return 0; }
+static int fail_publish(char const *from,char const *to) { (void)from;(void)to;return 0; }
+static int env_pending_prepare(void *u,struct mcc_share_stage *stage)
+{
+    static struct mcc_share_direct_io const failed_receipt={NULL,NULL,fail_flush};
+    (void)u;
+    if (!pending_check_open || !stage->verified) exit(94);
+    if (W.prepare_mode==1) return 0;
+    if (W.prepare_mode==2) {
+        stage->io.direct=&failed_receipt;
+        return mcc_share_stage_companion(stage,MCC_SHARE_STAGE_RECEIPT,"receipt",7);
+    }
+    if (W.prepare_mode==3) stage->io.publish_directory=fail_publish;
+    return 1;
 }
 static int env_reuse(void *u, struct mcc_share_file const *file, char path[1024])
 {
@@ -720,6 +766,69 @@ int main(int argc,char **argv)
     }
 
     if (!setup(argv[2])) {fprintf(stderr,"setup failed\n");return 2;}
+
+    if (!strncmp(argv[1],"verify_",7)) {
+        int frames=0,success=0,published=0;
+        uint32_t progress;
+        W.join.env.identity_check=env_pending_check;
+        W.join.env.cancel_check=env_cancel_check;
+        W.join.env.installed_ready=env_installed_ready;
+        W.join.env.prepare_install=env_pending_prepare;
+        W.check_result=MCC_SHARE_CHECK_PENDING;W.install_ok=1;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        while (!W.check_polls && frames++<2000) step();
+        CHECK(W.check_polls && W.join.state==MCC_SHARE_CLIENT_VERIFYING && pending_check_open);
+        CHECK(mcc_share_client_percent(&W.join)==100);
+        CHECK(!W.join.stage.verified && !W.finished && package_absent());
+        CHECK(mcc_share_stage_install(&W.join.stage)==MCC_SHARE_STAGE_BAD_STATE);
+        progress=W.join.progress_at;
+        if (!strcmp(argv[1],"verify_cancel") || !strcmp(argv[1],"verify_disconnect")) {
+            if (!strcmp(argv[1],"verify_cancel")) mcc_share_client_cancel(&W.join);
+            else mcc_share_client_disconnect(&W.join);
+            CHECK(!W.finished && !mcc_share_client_busy(&W.join));
+        } else if (!strcmp(argv[1],"verify_timeout")) {
+            W.clock=progress+80000u;
+            mcc_share_update(&W.join);
+            CHECK(W.finished && !W.finished_ok && strstr(W.finished_text,"verified in time"));
+        } else {
+            if (!strcmp(argv[1],"verify_recheck")) {
+                W.check_result=MCC_SHARE_CHECK_READY;
+                CHECK(mcc_share_stage_verify(&W.join.stage,env_pending_check,NULL)==MCC_SHARE_STAGE_OK);
+                CHECK(W.join.stage.verified);
+                W.check_result=MCC_SHARE_CHECK_PENDING;
+                CHECK(mcc_share_stage_verify(&W.join.stage,env_pending_check,NULL)==MCC_SHARE_STAGE_PENDING);
+                CHECK(!W.join.stage.verified && mcc_share_stage_install(&W.join.stage)==MCC_SHARE_STAGE_BAD_STATE);
+            }
+            if (!strcmp(argv[1],"verify_heartbeat")) {
+                uint32_t until=W.clock+45000u;
+                while (W.clock<until) {
+                    W.clock+=980;step();
+                    CHECK(W.join.state==MCC_SHARE_CLIENT_VERIFYING && !W.finished);
+                    CHECK(mcc_share_host_active(&W.host,MACHINE));
+                }
+                CHECK(W.verify_heartbeats>=4 && W.verify_heartbeats<=5);
+                CHECK(W.join.progress_at==progress && !W.check_cancels);
+            }
+            W.check_result=!strcmp(argv[1],"verify_refused") ? MCC_SHARE_CHECK_FAILED :
+                !strcmp(argv[1],"verify_invalid") ? 3 : MCC_SHARE_CHECK_READY;
+            W.prepare_mode=!strcmp(argv[1],"verify_metadata_failure") ? 1 :
+                !strcmp(argv[1],"verify_receipt_failure") ? 2 :
+                !strcmp(argv[1],"verify_install_failure") ? 3 : 0;
+            W.install_ok=strcmp(argv[1],"verify_bind_failure")!=0;
+            published=W.check_result==MCC_SHARE_CHECK_READY && !W.prepare_mode;
+            success=published && W.install_ok;
+            step();
+            CHECK(W.finished && W.finished_ok==success && W.install_calls==published);
+            if (published && !success) CHECK(strstr(W.finished_text,"installed, but"));
+            step();
+            CHECK(W.host_completions==success);
+        }
+        CHECK(W.check_cancels==1 && !pending_check_open && !pending_delete_violation);
+        CHECK(staging_gone() && package_absent()==!published);
+        mcc_share_client_cancel(&W.join);mcc_share_client_disconnect(&W.join);
+        CHECK(W.check_cancels==1);
+        return 0;
+    }
 
     if (!strcmp(argv[1],"clock_zero") || !strcmp(argv[1],"clock_wrap")) {
         W.clock=!strcmp(argv[1],"clock_zero") ? 0 : UINT32_MAX-99;

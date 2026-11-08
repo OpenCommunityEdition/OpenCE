@@ -117,11 +117,12 @@ def test_incremental_cache_cancellation_and_changed_files(tmp_path, threaded):
 #define INFINITE (~0u)
 static int worker_enabled,worker_quit,worker_done,worker_hold,event_handle,thread_handle;
 static unsigned long (__stdcall *worker_function)(void *);
+static void *worker_parameter;
 static void *CreateEventA(void *a,int b,int c,void *d) {
     (void)a;(void)b;(void)c;(void)d;worker_quit=0;return &event_handle;
 }
 static void *CreateThread(void *a,unsigned long b,unsigned long (__stdcall *fn)(void *),void *d,int e,void *f) {
-    (void)a;(void)b;(void)d;(void)e;(void)f;worker_function=fn;worker_done=0;
+    (void)a;(void)b;(void)e;(void)f;worker_function=fn;worker_parameter=d;worker_done=0;
     return worker_enabled ? &thread_handle : NULL;
 }
 static int SetEvent(void *h) {assert(h==&event_handle);worker_quit=1;return 1;}
@@ -130,7 +131,7 @@ static unsigned long WaitForSingleObject(void *h,unsigned long timeout) {
     if(h==&event_handle)return worker_quit ? WAIT_OBJECT_0 : 258;
     assert(h==&thread_handle);
     if(!timeout && worker_hold && !worker_quit)return 258;
-    if(!worker_done){worker_function(NULL);worker_done=1;}
+    if(!worker_done){worker_function(worker_parameter);worker_done=1;}
     return WAIT_OBJECT_0;
 }
 static int CloseHandle(void *h) {(void)h;return 1;}
@@ -144,14 +145,23 @@ static int CloseHandle(void *h) {(void)h;return 1;}
 #include <string.h>
 #include <assert.h>
 static struct mcc_precache_snapshot stamps;
+static int snapshots,change_at_snapshot;
+static char redirected[128];
+void mcc_package_stage_redirect(char const *name,char const *directory) {
+    (void)name;snprintf(redirected,sizeof(redirected),"%s",directory ? directory : "");
+}
 static int opened,closed,allocated,freed,steps,bad,unreadable,changes;
+static int allocation_failed;
+static void *check_allocate(size_t bytes) {return allocation_failed ? NULL : malloc(bytes);}
+#define malloc check_allocate
 struct mcc_resource_check {int step;};
 int mcc_package_name(char const *name,char *out) {
     if(strncmp(name,"mcc_maps/",9)||strlen(name)>=64)return 0;
     strcpy(out,name);return 1;
 }
 int mcc_precache_snapshot(char const *name,struct mcc_precache_snapshot *out) {
-    (void)name;*out=stamps;return !unreadable;
+    (void)name;if(++snapshots==change_at_snapshot)stamps.files[0].written_low++;
+    *out=stamps;return !unreadable;
 }
 static FILE *mcc_open_explain(char const *n,struct mcc_cache_source *s,struct mcc_cache_identity *i,
     char *reason,size_t size) {
@@ -169,7 +179,8 @@ static int mcc_resources_check_step(struct mcc_resource_check *c,uint32_t *sum,u
     *sum=123;memset(digest,42,32);if(changes)stamps.files[0].written_low++;return 1;
 }
 static int mcc_resources_check_paths(struct mcc_resource_check const *c,char paths[2][128]) {
-    (void)c;memset(paths,0,256);strcpy(paths[1],"mcc_maps/p/sounds.map");return 1;
+    (void)c;memset(paths,0,256);
+    snprintf(paths[1],128,"%s/sounds.map",redirected[0] ? redirected : "mcc_maps/p");return 1;
 }
 static void mcc_resources_check_end(struct mcc_resource_check *c) {if(c){freed++;free(c);}}
 ''' + (ROOT / "port/linux/game/mcc_validation.inl").read_text() + r'''
@@ -211,9 +222,67 @@ int main(void) {
     mcc_validation_cancel();bad=0;finish("mcc_maps/p/bad");
     unreadable=1;assert(!mcc_validation_lookup("mcc_maps/p/bad",NULL,NULL));unreadable=0;
     assert(mcc_validation_request("custom_maps/a",NULL,NULL)==-1);
+    assert(strstr(mcc_validation_error(),"invalid"));
+    allocation_failed=1;
+    assert(mcc_validation_request("mcc_maps/p/nomemory",NULL,NULL)==-1);
+    assert(strstr(mcc_validation_error(),"memory"));allocation_failed=0;
     finish("mcc_maps/p/d");finish("mcc_maps/p/e");finish("mcc_maps/p/f");finish("mcc_maps/p/g");
     assert(!mcc_validation_lookup("mcc_maps/p/bad",NULL,NULL));
     mcc_validation_cancel();assert(opened==closed && allocated==freed);
+    /* A change after the worker's final restamp but before cache publication
+     * terminates that proof, rather than leaving a completed job pending forever. */
+    assert(!mcc_validation_request("mcc_maps/p/publication_race",NULL,NULL));
+    snapshots=0;change_at_snapshot=3;
+    for(i=0;i<4;i++)mcc_validation_update();
+    assert(strstr(mcc_validation_error(),"changed before"));
+    old=steps;for(i=0;i<5;i++)mcc_validation_update();assert(steps==old);
+    change_at_snapshot=0;finish("mcc_maps/p/publication_race");
+    /* A stage and a normal admission own independent readers. Cancelling one
+     * cannot close the other, and global path routing never survives a step. */
+    {
+        struct mcc_validation_check *stage,*local;
+        struct mcc_validation_proof proof,local_proof;
+        int status,local_status,threaded=worker_enabled;
+        worker_enabled=0;
+        stage=mcc_validation_check_begin(name,"mcc_staging/dl_owned");
+        local=mcc_validation_check_begin("mcc_maps/q/a",NULL);
+        old=opened;assert(stage&&local&&opened==old);
+        assert(!mcc_validation_check_step(stage,&proof,NULL,0));assert(!redirected[0]);
+        assert(!mcc_validation_check_step(local,&local_proof,NULL,0));assert(!redirected[0]);
+        mcc_validation_check_end(local);
+        assert(opened==closed+1);
+        status=0;while(!status)status=mcc_validation_check_step(stage,&proof,NULL,0);
+        assert(status==1 && opened==closed && allocated==freed && !redirected[0]);
+        assert(!mcc_validation_lookup("mcc_maps/installed/a",NULL,NULL));
+        assert(!mcc_validation_publish("mcc_maps/installed/other",&proof));
+        for(i=0;i<MCC_PRECACHE_FILES;i++) {
+            stamps.files[i].written_low++;
+            assert(!mcc_validation_publish("mcc_maps/installed/a",&proof));
+            stamps.files[i].written_low--;
+        }
+        old=steps;
+        assert(mcc_validation_publish("mcc_maps/installed/a",&proof));
+        assert(mcc_validation_lookup("mcc_maps/installed/a",&sum,digest) && steps==old);
+        assert(sum==123 && digest[31]==42);
+        assert(mcc_validation_resources("mcc_maps/installed/a",paths));
+        assert(!strcmp(paths[1],"mcc_maps/installed/sounds.map"));
+        strcpy(proof.resources[1],"mcc_maps/_shared/singleplayer/sounds.map");
+        assert(!mcc_validation_publish("mcc_maps/borrowed/a",&proof));
+        mcc_validation_check_end(stage);
+        local=mcc_validation_check_begin("mcc_maps/q/a",NULL);
+        local_status=0;while(!local_status)local_status=mcc_validation_check_step(local,&local_proof,NULL,0);
+        assert(local_status==1);
+        assert(!mcc_validation_publish("mcc_maps/other/a",&local_proof));
+        assert(mcc_validation_publish("mcc_maps/q/a",&local_proof));
+        /* Replacing a completed fact must not leave an older same-name entry
+         * ahead of it, which could refuse admission immediately after publish. */
+        stamps.files[0].written_low++;local_proof.files=stamps;
+        assert(mcc_validation_publish("mcc_maps/q/a",&local_proof));
+        assert(mcc_validation_lookup("mcc_maps/q/a",NULL,NULL));
+        mcc_validation_check_end(local);
+        assert(opened==closed && allocated==freed);
+        worker_enabled=threaded;
+    }
     return 0;
 }
 '''

@@ -177,18 +177,24 @@ present override fails validation rather than falling back to another file.
 
 ## MCC package sharing between machines
 
-This is Milestone 13 implementation in progress. Component tests are recorded
-in [the validation record](../mcc_refactor_validation.md#milestone-13-implementation-evidence).
-Storage-menu integration and final platform/runtime checks remain open.
+Native sharing and its validation are recorded in
+[Milestone 13](../mcc_refactor_validation.md#milestone-13-implementation-evidence).
+Browser playability and asynchronous admission have separate Milestone 14
+checks; compilation or successful publication alone does not establish play.
 
 For example, a host plays `mcc_maps\solar_flare\m0` and a joiner has another
 version in a local folder of that name. The host enables `network.mcc_map_share`
 and lists its gameplay fingerprint and maker; the client enables the existing
 `network.map_download` preference. The original local package stays intact.
 
-1. Read `mcc_identity_accept` and `mcc_identity_resolve` in
+1. Read `mcc_identity_accept` and `mcc_identity_update` in
    [`mcc_identity.c`](../../port/linux/game/mcc_identity.c). Matching installed
-   gameplay and required-metadata identities need no transfer. Otherwise
+   gameplay and required-metadata identities need no transfer. Uncached checks
+   run asynchronously after the host acknowledges a bounded validation hold
+   in [`mcc_admission.c`](../../port/linux/game/mcc_admission.c), using the
+   authenticated transport adapter in
+   [`mcc_admission_game.c`](../../port/linux/game/mcc_admission_game.c).
+   This hold is independent of download permissions. Otherwise
    `mcc_share_missing` in [`mcc_share.c`](../../port/linux/game/mcc_share.c)
    requests an offer. Client downloads off means no request: show manual
    installation and, when a valid Workshop ID exists, the Workshop page.
@@ -209,14 +215,21 @@ and lists its gameplay fingerprint and maker; the client enables the existing
    removes the download action; a Workshop page and cancellation remain
    available when applicable. Differing content is not labelled older/newer.
 4. [`mcc_share_stage.c`](../../port/linux/game/mcc_share_stage.c) exclusively
-   creates an owned `mcc_staging/dl_<digest>` directory. Files arrive in order
+   creates an owned `mcc_staging/dl_<digest>` directory on native platforms.
+   The browser uses a hidden journaled destination instead, as explained in
+   [browser storage](browser_imports.md). Files arrive in order
    through `mcc_share_stage_write`, with size and SHA-256 checks. Required JSON
    is reparsed and its reference allowlist rebuilt; invalid optional PNGs are
    discarded, while invalid required metadata refuses installation. The
-   gameplay probe uses `mcc_package_stage_redirect` only during verification.
+   gameplay check owns its worker and readers. `mcc_package_stage_redirect`
+   is scoped to opening/selecting files and taking snapshots; the worker
+   never reads through mutable global routing. Verification continues to
+   service networking under the existing bounded transfer lifetime.
 5. `mcc_share_stage_install` publishes the whole directory without replacing an
    existing destination under `mcc_maps/dl_<digest>`. The identity layer checks
-   that specific installed snapshot before resuming the join. Cancel/failure
+   that specific installed snapshot before successful `DONE` and joining.
+   SHA/CRC/resource-selection facts are promoted only while all candidate
+   file stamps match, avoiding another full hash. Cancel/failure
    deletes only owned staging entries. Native filesystem checks reject links,
    reparse points, devices and unsafe paths; they do not sandbox an adversarial
    process already running with the same user's filesystem authority.
@@ -226,11 +239,11 @@ MCC borrows only the necessary lobby hold, per-frame and cache-admission hooks.
 Disconnects, changed identities, disabled downloads and host preparation
 revision changes cancel stale work. No stage or consent carries into Xbox/CE.
 Successful completion also crosses a small admission boundary: the client
-sends `DONE` before resolving the installed identity and adding its player.
+resolves the installed identity before sending `DONE` and adding its player.
 `mcc_share_host_finished` grants a maximum 15-second grace period for that
 following request. The existing timeout hook includes this grace, while
-`mcc_share_game_machine_needs_map` reports only an unfinished transfer, so
-completed downloads immediately release any held players. Admission or
+`mcc_share_game_machine_needs_map` reports unfinished transfers or installed-file
+validation, so completed checks release held players. Admission or
 session/content changes clear the grace; replayed completion cannot renew it.
 The wire limits and protocol versions are in
 [NETCODE.md](../../port/linux/NETCODE.md#mcc-package-sharing).
@@ -238,7 +251,8 @@ The wire limits and protocol versions are in
 Before a pregame host starts synchronous map loading,
 `mcc_ui_network_download_pending` in
 [`mcc_ui_network.inl`](../../port/linux/game/mcc_ui_network.inl) checks joined
-machines for active MCC offers, transfers or completion-to-admission grace.
+machines for active MCC offers, transfers, installed-file checks or
+completion-to-admission grace.
 The existing MCC start check holds loading while these are active. The update
 keeps an already running, unpaused countdown at least three seconds from
 expiry, allowing normal networking to service the joiners. It preserves longer,
@@ -254,8 +268,9 @@ The ownership contract permits removal only of verified recorded files, keeps
 unrelated additions and saves, and requires the caller to exclude the active
 session package. Native UI inspection verified the corrected main-menu gate,
 confirmation caption and removal while preserving the source snapshot.
-Browser persistence and publication remain Milestone 14 work; a successful
-web compile does not establish sharing.
+Browser persistence and publication use the independent OPFS transaction
+boundary described in [browser imports](browser_imports.md). Runtime results
+and remaining gates are recorded separately under Milestone 14.
 
 The game harness compiles the real adapter, planner, session and stage over
 synthetic files. Engine/UI/identity and metadata-parser calls are stubs there;

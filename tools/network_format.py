@@ -155,6 +155,13 @@ def items():
     for name, value in re.findall(r"^#define (MCC_SHARE_(?:LEVEL_SIZE|CHUNK_BYTES|MANIFEST_PAGE|LEAF_SIZE|CREDIT_SIZE|STAGE_FILES|"
                                   r"MAXIMUM_\w+)) ([^\n]+)", share, re.M):
         add(f"define {name}", value)
+    admission = re.sub(r"/\*.*?\*/", " ",
+                       (ROOT / "port/linux/game/mcc_admission.h").read_text(), flags=re.S)
+    for name in ("mcc_admission_identity", "mcc_admission_message"):
+        add(f"struct {name}", _hash(next(_blocks(admission, rf"^struct {name}\s*\{{"))))
+    add("enum mcc_admission_op", _hash(next(_blocks(admission, r"^enum mcc_admission_op\s*\{"))))
+    for name, value in re.findall(r"^#define (MCC_ADMISSION_\w+) ([^\n]+)", admission, re.M):
+        add(f"define {name}", value)
     camera = (ROOT / "port/linux/game/third_person_protocol.h").read_text()
     for name, value in re.findall(r"^#define (THIRD_PERSON_PROTOCOL_\w+) ([^\n]+)", camera, re.M):
         add(f"define {name}", value)

@@ -3,6 +3,7 @@
 #include "errors.h"
 #include "game/game.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_game_globals.h"
 #include "interface/ui_widget.h"
 #include "mcc_cache.h"
 #include "mcc_identity.h"
@@ -12,6 +13,7 @@
 #include "mcc_validation.h"
 #include "mcc_workshop.h"
 #include "mcc_share.h"
+#include "mcc_admission.h"
 #include "../src/mcc_manifest.h"
 #include "../src/mcc_share_metadata.h"
 #include <string.h>
@@ -30,6 +32,22 @@ static struct {
     struct mcc_precache_snapshot files;
 } mcc_client_identity;
 static unsigned long mcc_host_revision;
+static struct {
+    char wire[128],session[64],candidates[MCC_IDENTITY_MAX_CANDIDATES+1][64],selected[64];
+    unsigned char digest[32],metadata[32];
+    uint32_t checksum;
+    unsigned count,index,matches;
+    int active,scanned,finishing;
+    struct mcc_validation_check *check;
+    struct mcc_validation_proof selected_proof;
+} mcc_identity_job;
+
+static void mcc_identity_job_clear(void)
+{
+    mcc_validation_check_end(mcc_identity_job.check);
+    memset(&mcc_identity_job,0,sizeof(mcc_identity_job));
+}
+
 
 /* MCC package sharing (mcc_share.c) may offer to fetch a package that matches nothing
  * here, instead of the join being refused. It registers itself; the identity
@@ -73,6 +91,8 @@ static int mcc_identity_error(char const *message)
 
 void mcc_identity_disconnect(void)
 {
+    mcc_identity_job_clear();
+    mcc_admission_disconnect();
     mcc_share_game_disconnect();
     mcc_validation_cancel();
     mcc_cache_validation_clear();
@@ -213,7 +233,7 @@ static int mcc_identity_matches(char const *name,unsigned char const digest[32],
         if (validated) *validated=before;
         return 1;
     }
-    ok=mcc_content_probe(name,actual) &&
+    ok=mcc_validation_lookup(name,NULL,actual) &&
         !memcmp(actual,digest,32) && mcc_precache_snapshot(name,&after) &&
         !memcmp(&before,&after,sizeof(before));
     if (ok && validated) *validated=after;
@@ -241,84 +261,163 @@ static int mcc_identity_refusal(char const name[128],char const *session)
     return mcc_identity_error(text);
 }
 
-/* allow_offer: a package that matches nothing may be fetched from the host
- * (mcc_share.c); after a download it may not be fetched again. */
-static int mcc_identity_resolve(char const name[128],unsigned char const digest[32],
-    unsigned char const metadata[32],int allow_offer,char const *installed)
+/* Admission reads only completed facts in packet handlers. A separate owned
+ * check advances candidate fingerprints from the ordinary frame update. */
+static void mcc_identity_select(char const *session,char const *local,
+    unsigned char const digest[32],unsigned char const metadata[32],
+    struct mcc_precache_snapshot const *files)
 {
-    char session[64],selected[64];
-    char const *leaf,*candidate,*candidate_leaf;
-    unsigned char zero[32]={0};
-    short i,count;
-    unsigned candidates=0,matches=0;
-    struct mcc_precache_snapshot selected_files;
-    memset(&mcc_client_identity,0,sizeof(mcc_client_identity));
-    mcc_cache_precache_clear();
-    if (!mcc_level_name(name)) return !memcmp(digest,zero,32) && !memcmp(metadata,zero,32);
-    if (!mcc_package_name(name,session) || !memcmp(digest,zero,32))
-        return mcc_identity_error("The host did not supply a valid MCC content identity.");
-    /* Installation already chose an isolated destination. Recheck that exact
-     * snapshot instead of allowing unrelated duplicate aliases to shadow it. */
-    if (installed) {
-        if (!mcc_package_name(installed,selected) ||
-            csstrcasecmp(strrchr(selected,'\\'),strrchr(session,'\\')) ||
-            !mcc_identity_matches(selected,digest,metadata,&selected_files))
-            return mcc_identity_error("The downloaded MCC snapshot could not be verified after installation.");
-        matches=1;
-    } else if (mcc_identity_matches(session,digest,metadata,&selected_files)) {
-        strcpy(selected,session);
-        matches=1;
-    } else {
-        leaf=strrchr(session,'\\')+1;
-        mcc_maps_rescan();
-        count=mcc_maps_count(FALSE);
-        /* Discovery may have made the exact package available since the first
-         * probe. Prefer it before looking for aliases with the same leaf. */
-        if (mcc_identity_matches(session,digest,metadata,&selected_files)) {
-            strcpy(selected,session);
-            matches=1;
-        }
-        if (!matches) {
-            /* Bound work before hashing any fallback candidates. */
-            for (i=0;i<count;i++) {
-                candidate=mcc_maps_level_name(i);
-                candidate_leaf=strrchr(candidate,'\\')+1;
-                if (!csstrcasecmp(leaf,candidate_leaf) && ++candidates>MCC_IDENTITY_MAX_CANDIDATES)
-                    return mcc_identity_error("Too many MCC maps share this filename. Keep one matching package installed and retry.");
-            }
-            for (i=0;i<count;i++) {
-                candidate=mcc_maps_level_name(i);
-                candidate_leaf=strrchr(candidate,'\\')+1;
-                if (csstrcasecmp(leaf,candidate_leaf) || !csstrcasecmp(candidate,session)) continue;
-                if (mcc_identity_matches(candidate,digest,metadata,&selected_files)) {
-                    strcpy(selected,candidate);
-                    if (++matches>1) return mcc_identity_error("Several local MCC packages match the host. Keep one matching copy, or use the host's package folder name.");
-                }
-            }
-        }
-    }
-    if (!matches) {
-        if (allow_offer && mcc_identity_missing && mcc_identity_missing(name,digest,metadata)) return 1;
-        return mcc_identity_refusal(name,session);
-    }
-    mcc_client_identity.files=selected_files;
+    mcc_client_identity.files=*files;
     strcpy(mcc_client_identity.session,session);
-    strcpy(mcc_client_identity.local,selected);
+    strcpy(mcc_client_identity.local,local);
     memcpy(mcc_client_identity.digest,digest,32);
     memcpy(mcc_client_identity.metadata,metadata,32);
-    error(_error_silent,"mcc identity: %s resolved to %s (SHA-256 matched)",session,selected);
-    return 1;
+    error(_error_silent,"mcc identity: %s resolved to %s (SHA-256 matched)",session,local);
+}
+
+int mcc_identity_pending(char const *name)
+{
+    char canonical[64];
+    if (!mcc_identity_job.active && !mcc_admission_client_pending()) return 0;
+    return !name || (mcc_package_name(name,canonical) && !strcmp(canonical,mcc_identity_job.session));
 }
 
 int mcc_identity_accept(struct network_game const *game)
 {
-    return mcc_identity_resolve(game->map.name,game->mcc_content_sha256,game->mcc_metadata_sha256,1,NULL);
+    char session[64];
+    unsigned char zero[32]={0};
+    struct mcc_precache_snapshot files;
+    if (mcc_identity_job.active && !memcmp(game->map.name,mcc_identity_job.wire,128) &&
+        (uint32_t)game->map.version==mcc_identity_job.checksum &&
+        !memcmp(game->mcc_content_sha256,mcc_identity_job.digest,32) &&
+        !memcmp(game->mcc_metadata_sha256,mcc_identity_job.metadata,32)) return 1;
+    mcc_identity_job_clear();
+    mcc_admission_client_clear();
+    memset(&mcc_client_identity,0,sizeof(mcc_client_identity));
+    mcc_cache_precache_clear();
+    if (!mcc_level_name(game->map.name)) return !memcmp(game->mcc_content_sha256,zero,32) &&
+        !memcmp(game->mcc_metadata_sha256,zero,32);
+    if (!mcc_package_name(game->map.name,session) || !memcmp(game->mcc_content_sha256,zero,32))
+        return mcc_identity_error("The host did not supply a valid MCC content identity.");
+    /* The prepared host's loopback and unchanged previously validated exact
+     * files need no asynchronous work or hold. Actual loading still rehashes. */
+    if (mcc_identity_matches(session,game->mcc_content_sha256,game->mcc_metadata_sha256,&files)) {
+        mcc_identity_select(session,session,game->mcc_content_sha256,game->mcc_metadata_sha256,&files);
+        return 1;
+    }
+    memcpy(mcc_identity_job.wire,game->map.name,128);
+    strcpy(mcc_identity_job.session,session);
+    memcpy(mcc_identity_job.digest,game->mcc_content_sha256,32);
+    memcpy(mcc_identity_job.metadata,game->mcc_metadata_sha256,32);
+    mcc_identity_job.checksum=(uint32_t)game->map.version;
+    strcpy(mcc_identity_job.candidates[0],session);mcc_identity_job.count=1;
+    if (!mcc_admission_client_begin(game)) return mcc_identity_error("The MCC validation request could not be started.");
+    mcc_identity_job.active=1;
+    return 1;
+}
+
+static void mcc_identity_failed(char const *message)
+{
+    mcc_identity_error(message);
+    mcc_identity_job_clear();mcc_admission_client_finish(0);
+    memset(&mcc_client_identity,0,sizeof(mcc_client_identity));
+    network_game_abort();
+}
+
+/* Refresh discovery once, then count all same-leaf candidates before opening
+ * any fallback. A preferred exact path is retried after the rescan. */
+static int mcc_identity_candidates(void)
+{
+    char const *leaf=strrchr(mcc_identity_job.session,'\\')+1,*candidate;
+    short i,count;
+    unsigned matches=0;
+    mcc_maps_rescan();count=mcc_maps_count(FALSE);
+    for (i=0;i<count;i++) {
+        candidate=mcc_maps_level_name(i);
+        if (!csstrcasecmp(leaf,strrchr(candidate,'\\')+1) && ++matches>MCC_IDENTITY_MAX_CANDIDATES) return 0;
+    }
+    mcc_identity_job.count=1;mcc_identity_job.index=0;mcc_identity_job.scanned=1;
+    strcpy(mcc_identity_job.candidates[0],mcc_identity_job.session);
+    for (i=0;i<count;i++) {
+        candidate=mcc_maps_level_name(i);
+        if (csstrcasecmp(leaf,strrchr(candidate,'\\')+1) || !csstrcasecmp(candidate,mcc_identity_job.session)) continue;
+        /* The exact path is kept separately even when absent from discovery. */
+        if (mcc_identity_job.count>=MCC_IDENTITY_MAX_CANDIDATES+1u) return 0;
+        strcpy(mcc_identity_job.candidates[mcc_identity_job.count++],candidate);
+    }
+    return 1;
+}
+
+void mcc_identity_update(void)
+{
+    struct mcc_validation_proof proof;
+    struct mcc_precache_snapshot files;
+    unsigned char metadata[32];
+    char reason[320];
+    char const *candidate;
+    int status;
+    if (!mcc_identity_job.active && !mcc_identity_job.finishing) return;
+    status=mcc_admission_client_status();
+    if (status<0) {mcc_identity_failed("The host's MCC validation window expired or changed. Keep one matching package installed and rejoin.");return;}
+    if (mcc_identity_job.finishing) {
+        if (!mcc_admission_client_pending()) mcc_identity_job.finishing=0;
+        return;
+    }
+    if (!status) return;
+    if (mcc_identity_job.index<mcc_identity_job.count) {
+        candidate=mcc_identity_job.candidates[mcc_identity_job.index];
+        if (!mcc_identity_job.check) {
+            if (!mcc_identity_metadata(candidate,metadata) || memcmp(metadata,mcc_identity_job.metadata,32)) {
+                mcc_identity_job.index++;return;
+            }
+            mcc_identity_job.check=mcc_validation_check_begin(candidate,NULL);
+            if (!mcc_identity_job.check) {mcc_identity_failed("There is not enough memory to check the MCC package.");return;}
+        }
+        status=mcc_validation_check_step(mcc_identity_job.check,&proof,reason,sizeof(reason));
+        if (!status) return;
+        mcc_validation_check_end(mcc_identity_job.check);mcc_identity_job.check=NULL;
+        if (status>0 && !memcmp(proof.digest,mcc_identity_job.digest,32) &&
+            (!mcc_identity_job.checksum || proof.checksum==mcc_identity_job.checksum) &&
+            mcc_identity_metadata(candidate,metadata) && !memcmp(metadata,mcc_identity_job.metadata,32)) {
+            strcpy(mcc_identity_job.selected,candidate);mcc_identity_job.selected_proof=proof;
+            if (++mcc_identity_job.matches>1) {mcc_identity_failed("Several local MCC packages match the host. Keep one matching copy, or use the host's package folder name.");return;}
+            if (!strcmp(candidate,mcc_identity_job.session)) mcc_identity_job.index=mcc_identity_job.count;
+            else mcc_identity_job.index++;
+        } else mcc_identity_job.index++;
+        return;
+    }
+    if (!mcc_identity_job.matches && !mcc_identity_job.scanned) {
+        if (!mcc_identity_candidates()) mcc_identity_failed("Too many MCC maps share this filename. Keep one matching package installed and retry.");
+        return;
+    }
+    if (!mcc_identity_job.matches) {
+        /* The sharing adapter retains this lease until the host confirms its
+         * transfer hold. Queued intent alone is not proof a request was sent. */
+        if (!mcc_identity_missing || !mcc_identity_missing(mcc_identity_job.wire,mcc_identity_job.digest,mcc_identity_job.metadata)) {
+            mcc_identity_refusal(mcc_identity_job.wire,mcc_identity_job.session);
+            mcc_identity_job_clear();mcc_admission_client_finish(0);network_game_abort();return;
+        }
+        mcc_identity_job.active=0;return;
+    }
+    if (!mcc_validation_publish(mcc_identity_job.selected,&mcc_identity_job.selected_proof) ||
+        !mcc_identity_matches(mcc_identity_job.selected,mcc_identity_job.digest,mcc_identity_job.metadata,&files)) {
+        mcc_identity_failed("The MCC package changed during admission. Finish installing it and rejoin.");return;
+    }
+    mcc_identity_select(mcc_identity_job.session,mcc_identity_job.selected,mcc_identity_job.digest,mcc_identity_job.metadata,&files);
+    mcc_identity_job.active=0;mcc_identity_job.finishing=1;mcc_admission_client_finish(1);
 }
 
 int mcc_identity_accept_installed(char const name[128],unsigned char const digest[32],
     unsigned char const metadata[32],char const *installed)
 {
-    return mcc_identity_resolve(name,digest,metadata,0,installed);
+    char session[64],selected[64];
+    struct mcc_precache_snapshot files;
+    if (!installed || !mcc_package_name(name,session) || !mcc_package_name(installed,selected) ||
+        csstrcasecmp(strrchr(selected,'\\'),strrchr(session,'\\')) ||
+        !mcc_identity_matches(selected,digest,metadata,&files))
+        return mcc_identity_error("The downloaded MCC snapshot could not be verified after installation.");
+    mcc_identity_select(session,selected,digest,metadata,&files);
+    return 1;
 }
 
 int mcc_identity_check(char const *name)
@@ -326,6 +425,7 @@ int mcc_identity_check(char const *name)
     unsigned char const *expected=mcc_identity_expected(name);
     unsigned char metadata[32];
     struct mcc_precache_snapshot files;
+    if (mcc_identity_pending(name)) return 0;
     if (!expected) return 1;
     if (!mcc_precache_snapshot(mcc_client_identity.local,&files) ||
         !mcc_identity_metadata(mcc_client_identity.local,metadata) ||

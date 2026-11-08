@@ -874,7 +874,18 @@ focused run passes 89 tests. These tests use a recording GPU boundary. A separat
 asset-free Edge 157.0.4341.42 WebGL probe confirms the extension's shifted-level
 rule: a 12-pixel base with 6/3/1-pixel mips uploads, while 1/2/6-pixel level-zero
 bases are refused (`build/m14-web/s3tc-browser.json`). Its disposable browser
-context is closed. Actual MCC browser visual validation remains required.
+context is closed.
+
+The corrected Mercury 2 visual rerun reopens the same retained profile and
+OPFS origin in Edge 157.0.4341.42 (`build/m14-runtime/mercury_visual_reopen`).
+Over 180 seconds it records 106 player-state lines, frames reaching 4,340,
+nonzero audio activity, no page errors and no texture-upload failures. The
+primary's inspection of `frame-3.png` confirms the scene, vehicle, textures
+and HUD render. The browser closes normally; this is one solo map/reopen
+control, not campaign completion or multiplayer evidence. It reuses the
+previous isolated OPFS profile at its original origin after explicitly
+refreshing the test's code cache; this verifies retained imported content,
+not the service-worker update UI or checkpoint restoration.
 
 A separate pregame probe (`build/m14-runtime/mercury_memory_probe`) never
 reached MCC loading: validation left a temporary stock lobby map selected,
@@ -887,8 +898,10 @@ Regressions exercise the real countdown/start/heartbeat branch for forty
 seconds: four relevant cases failed at the existing fifteen-second silence
 limit before the correction; the resulting UI/network suite passes 81 tests.
 Cancellation, failure, changed revisions and inactive/session transitions are
-covered. A combined browser pregame rerun remains necessary; the solo load is
-not evidence that this separate network failure was resolved at runtime.
+covered. The combined pregame rerun reaches 43 player-state lines through tick
+1,454, confirming that the heartbeat correction gets beyond validation into
+the game. Its still-broken textures predate the upload correction and are not
+counted as a visual pass.
 
 The combined implementation subsequently passes 2,559 unique component checks
 with 19 explicit skips, plus 70 Node browser-site checks. The initial broad run
@@ -907,17 +920,90 @@ storage plus generation checks before decoding as well as completion. The
 tests reproduce rehosting and proxy execution delayed beyond the C deadline.
 These are component results, not network download gameplay results.
 
-The corrected Mercury visual/reopen probe passes in Edge 157.0.4341.42 on the
-combined candidate: 106 player-state lines, 4,340 final rendered frames, no
-texture-upload errors or page errors, and nonzero audio samples. The reviewed
-third screenshot shows the environment, vehicle, textures and HUD. It reuses
-the previous isolated OPFS profile at its original origin after explicitly
-refreshing the test's code cache; this verifies retained imported content, not
-the service-worker update UI or checkpoint restoration. Evidence is
-`build/m14-runtime/mercury_visual_reopen`. The prior combined pregame run reaches
-43 player-state lines through tick 1,454, confirming the heartbeat correction
-gets beyond validation into the game; its still-broken textures predate the
-upload correction and are not counted as a visual pass.
+A Firefox 153.0 Ruby's Rebalanced `a10` probe records 96 player-state lines
+and frames advancing from 5 to 3,871 in 180 seconds, with nonzero audio activity
+and no page or texture-upload errors. The reviewed screenshot shows Captain
+Keyes in the opening sequence. This establishes loading, rendered cinematic
+output and simulation, not complete controllable gameplay or campaign progress.
+Evidence is `build/m14-runtime/ruby_firefox_solo`. Separate hidden native
+controls load Ruby `a10` and Mercury 2, reach their 150-tick markers and exit
+zero (`native_mcc_controls/results.json`). These use read-only original
+Workshop inputs and isolated saves.
+
+The initial implementation and test portability follow-up are committed as
+`397aceefe` and `55fc7df9c`. On the latter, the
+[all-platform build](https://github.com/chestahh/GulchCE/actions/runs/42500292426)
+passes Windows, Linux, Android and Web, and the
+[MCC validation workflow](https://github.com/chestahh/GulchCE/actions/runs/42500292444)
+passes all three jobs. The first Web CI attempt exposed a standalone fixture
+using a Windows pthread stub on Linux; the follow-up uses the real POSIX
+header there. This CI result predates the admission correction below.
+
+The first complete large host-to-browser download exposes a separate MCC
+admission defect. `build/m14-runtime/mcc_native_host_final` receives Mercury 2
+and its package resources/metadata: ten files, 786,191,316 bytes. Every payload
+hash matches its source, the committed snapshot survives complete browser
+reopening, and all original inputs remain unchanged. Nevertheless, it **fails
+gameplay admission**. The staged content probe blocks browser game updates
+for about 26 seconds; the host's 20-second last-heard bound expires during it.
+An additional installed-identity probe then blocks for about 25 seconds,
+independently exceeding the 15-second post-download admission grace. The host
+starts alone. The retained `admission-audit.json` correlates both logs and
+does not count publication/persistence as a multiplayer pass.
+
+The same synchronous identity probe runs on ordinary installed-package joins,
+including when sharing is disabled. The correction therefore belongs to the
+MCC compatibility engine's validation/admission lifecycle. Independent owned
+checks now keep network updates running and publish SHA/CRC/resource-selection
+facts only while the complete candidate snapshot remains unchanged. Actual
+loading still fingerprints its opened content independently. Installed-file
+checks use a bounded validation hold independent of download permission;
+download verification retains the existing transfer lifetime. A successfully
+published snapshot is bound locally before successful `DONE`.
+
+The new reliable admission contract requires base agreement 32730, MCC 70 and
+camera agreements 32732/32733. Independent review corrected a stale-publication
+retry loop and a backpressure gap between validation and a download offer.
+The first cold installed-package run with both sharing settings off then found
+an outer integration omission: the server's pregame dispatcher dropped message
+105 before it reached the tested adapter. A minimal joined-machine stream
+route now handles that MCC message before the ordinary ingame/loaded gate.
+A regression compiles the real stream and datagram dispatchers; removing this
+hook reproduces the missing acknowledgement/hold. Unjoined, unmapped,
+incapable and datagram senders remain refused, and ordinary gameplay data
+retains its loaded-state gate. Client ingress already has the required route.
+
+This cold-join run also repeated native exit `0xC0000005` after the test's
+owner-checked close request. It remains under separate investigation and is
+not a clean-exit result. Steam moved the original Workshop packages from `C:`
+to `E:\SteamLibrary` during the run. A relocation audit verifies 39 recorded
+inputs (1,238,151,561 bytes) against their original hashes, including 36 moved
+Workshop files and three unchanged Xbox inputs. Historical path-check failure
+is preserved; future private configurations use the verified new paths.
+Runtime completion gates remain open.
+
+After combined primary and independent review, the corrected Windows release
+and isolated Web builds pass. The resulting admission/sharing/resource,
+protocol, storage, UI and build regression run reports **607 passed, 3 skipped**
+(`build/m14-ingress-combined.xml`). Skips are Linux sanitizer coverage, an
+unavailable Windows file-symlink privilege and a POSIX-only socket harness.
+All 204 relative links in the changed documents resolve. The preceding run's
+81 UI fixture errors were a missing newly required real header; the fixture
+now includes it. Two safely rolled-back storage fixture installations failed
+transiently with no established cause. Full and long-path reruns plus 100
+bounded repeat installations pass; added failure diagnostics retain native
+error codes without retrying operations or weakening assertions. Subsequent
+all-platform CI and real multiplayer results are separate completion gates.
+
+The CE native-host/browser-client download control passes on the initial
+browser candidate: four files totaling 183,811,669 bytes, including resources,
+match their original hashes and survive complete browser reopening. The
+download receipt remains present. A cached second round yields 47 paired
+seconds, zero tick offset and no comparison problems or divergences, with
+1,074 drift samples and none apart. Its native process exits zero. The earlier
+late-join run remains failed overall because its diagnostic sample phases
+were not aligned; thresholds were not relaxed. Evidence is
+`build/m14-runtime/ce_native_host_download_cached/result.json`.
 
 ### Milestone 15: MCC-only upstream contribution
 

@@ -22,7 +22,10 @@ CASES = ["list", "admit", "manifest", "redirect", "stage_cancel", "stage_hash_an
          "terminal_failure", "terminal_disconnect", "terminal_expiry", "terminal_new_request",
          "prepare_success", "prepare_failure", "prepare_unverified", "reuse_files", "reuse_absent",
          "reuse_bounded", "reuse_cancel", "reuse_disconnect", "reuse_short_read", "reuse_bad_hash",
-         "reuse_missing", "reuse_backpressure", "have_fields", "done_expired", "done_cancelled"]
+         "reuse_missing", "reuse_backpressure", "have_fields", "done_expired", "done_cancelled",
+         "verify_success", "verify_recheck", "verify_heartbeat", "verify_cancel", "verify_disconnect", "verify_timeout",
+         "verify_refused", "verify_invalid", "verify_metadata_failure", "verify_receipt_failure",
+         "verify_install_failure", "verify_bind_failure"]
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +49,7 @@ def test_share(share_tool, tmp_path, case):
     ("if (memcmp(digest,file->sha256,32)) return", "if (0 && memcmp(digest,file->sha256,32)) return", "bad_hash"),
     ("if (bytes>file->size-stage->written || (bytes && !data)) return", "if (bytes && !data) return", "stage_hash_and_size"),
     # the content identity is checked before anything moves into mcc_maps
-    ("if (!check(user,stage->stage_dir)) return", "if (0 && !check(user,stage->stage_dir)) return", "identity"),
+    ("if (result!=MCC_SHARE_CHECK_READY) return", "if (0 && result!=MCC_SHARE_CHECK_READY) return", "identity"),
     ("if (free_bytes && share->offer_total+(64u<<20)>free_bytes) {", "if (0 && free_bytes && share->offer_total+(64u<<20)>free_bytes) {", "disk_space"),
     # an existing package folder is never written to
     ("if (!io->path_safe(stage->package_dir) || io->directory_exists(stage->package_dir)) return", "if (!io->path_safe(stage->package_dir)) return", "stage_exists"),
@@ -70,6 +73,10 @@ def test_share(share_tool, tmp_path, case):
     ("client_retry_terminal(share);\n    client_update(share);", "client_update(share);", "terminal_cancel"),
     ("if (kind!=MCC_SHARE_FILE_BITMAPS && kind!=MCC_SHARE_FILE_SOUNDS) return;", "(void)kind;", "have_fields"),
     ("#define MCC_SHARE_REUSE_SLICE 0x100000u", "#define MCC_SHARE_REUSE_SLICE 0x800000u", "reuse_bounded"),
+    ("if (result==MCC_SHARE_CHECK_PENDING) return", "if (0 && result==MCC_SHARE_CHECK_PENDING) return", "verify_success"),
+    ("cancel(stage->check_user);", "(void)cancel;", "verify_refused"),
+    ("if (share->env.installed_ready && !share->env.installed_ready(share->env.user)) {",
+     "if (0) {", "verify_success"),
 ])
 def test_negative_controls(tmp_path, before, after, case):
     """Each selected check must detect its intended fault in the real code."""

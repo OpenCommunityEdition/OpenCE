@@ -69,7 +69,7 @@ def test_sharing_storage_and_metadata_run_on_both_native_platforms(job_name):
     inputs = set(pytest_inputs(step.get("run", "") for step in workflow["jobs"][job_name]["steps"]))
     assert {"tools/test_mcc_share.py", "tools/test_mcc_share_stage.py",
             "tools/test_mcc_share_metadata.py", "tools/test_mcc_share_storage.py",
-            "tools/test_mcc_share_menu.py"} <= inputs
+            "tools/test_mcc_share_menu.py", "tools/test_mcc_admission.py"} <= inputs
 
 
 @pytest.mark.parametrize("module", ["metadata", "storage"])

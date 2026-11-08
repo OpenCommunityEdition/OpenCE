@@ -166,6 +166,11 @@ static void stage_forget(struct mcc_share_stage *stage)
 {
     char path[512];
     int i;
+    if (stage->cancel_check) {
+        void (*cancel)(void *)=stage->cancel_check;
+        stage->cancel_check=NULL;
+        cancel(stage->check_user);
+    }
     if (stage->stream) { fclose(stage->stream); stage->stream=NULL; }
     if (!stage->owns_directory || !stage->stage_dir[0] || !stage->io.path_safe(stage->stage_dir)) goto finish;
     for (i=0;i<stage->count;i++) {
@@ -293,8 +298,12 @@ enum mcc_share_stage_result mcc_share_stage_write(struct mcc_share_stage *stage,
 enum mcc_share_stage_result mcc_share_stage_verify(struct mcc_share_stage *stage,
     int (*check)(void *user, char const *stage_dir), void *user)
 {
+    int result;
     if (stage->state!=MCC_SHARE_STAGE_STAGED || !check) return MCC_SHARE_STAGE_BAD_STATE;
-    if (!check(user,stage->stage_dir)) return stage_fail(stage,MCC_SHARE_STAGE_REFUSED);
+    stage->verified=0;
+    result=check(user,stage->stage_dir);
+    if (result==MCC_SHARE_CHECK_PENDING) return MCC_SHARE_STAGE_PENDING;
+    if (result!=MCC_SHARE_CHECK_READY) return stage_fail(stage,MCC_SHARE_STAGE_REFUSED);
     stage->verified=1;
     return MCC_SHARE_STAGE_OK;
 }

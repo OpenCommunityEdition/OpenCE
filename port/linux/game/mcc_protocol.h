@@ -2,9 +2,9 @@
 #ifndef MCC_PROTOCOL_H
 #define MCC_PROTOCOL_H
 
-/* Shared checkpoint epochs occupy message 96; MCC owns messages 97-100.
- * Version 69 adds host-only package sharing and required-metadata identity. */
-#define MCC_PROTOCOL_VERSION 69
+/* Shared checkpoint epochs occupy message 96; MCC owns messages 97-100 and
+ * 103-105. Version 70 adds bounded asynchronous package admission. */
+#define MCC_PROTOCOL_VERSION 70
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x08
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 4
 #define MCC_PROTOCOL_JOIN_KIND 101

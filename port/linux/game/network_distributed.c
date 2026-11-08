@@ -88,6 +88,7 @@ machine (their datum identifiers need not be).
 #include "network_shield_effects.h"
 #include "map_share.h"
 #include "mcc_share.h"
+#include "mcc_admission.h"
 #include "network_afk.h"
 #include "network_map_vote.h"
 #include "latency_meter.h"
@@ -4919,6 +4920,13 @@ void network_distributed_handle_message(
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);
+		return;
+	}
+	/* MCC validation has its own bounded hold, independent of file sharing. */
+	if (mcc_admission_handles_message(message, size))
+	{
+		mcc_admission_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
 	}
 	/* (MCC package sharing's, the same way: mcc_share.c) */

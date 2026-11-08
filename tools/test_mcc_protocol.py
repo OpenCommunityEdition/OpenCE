@@ -35,7 +35,7 @@ def test_audited_changes_from_opence_41_contract():
     }
     assert {key: actual.get(key) for key in expected if actual.get(key) != expected[key]} == changed
     limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
-    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 32726\b", limits)
+    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 32730\b", limits)
     # All fields of the transmitted prefix match upstream, including names,
     # types and order. The Windows build also asserts the actual ABI offsets.
     header = (ROOT / "source/networking/network_game_manager.h").read_text()
@@ -62,7 +62,7 @@ typedef int boolean;
 #define TRUE 1
 #define FALSE 0
 #define HALO_PORT_NETWORK_GAME_PLAYERS_END 6
-#define HALO_PORT_NETWORK_VERSION 32726
+#define HALO_PORT_NETWORK_VERSION 32730
 #define HALO_PORT_MAXIMUM_NETWORK_MACHINES 4
 #define NUMBEROF(a) (sizeof(a)/sizeof((a)[0]))
 #define csmemcpy memcpy
@@ -101,7 +101,7 @@ int main(void) {
     byte saved;
     int i;
     memset(&game,0,sizeof(game));strcpy(game.map.name,"levels\\test\\bloodgulch\\bloodgulch");
-    CHECK(mcc_protocol_version(game.map.name)==32726);
+    CHECK(mcc_protocol_version(game.map.name)==32730);
     CHECK(mcc_protocol_settings_size(&game)==64);
     CHECK(mcc_protocol_settings_valid(&game,64));CHECK(!mcc_protocol_settings_valid(&game,96));
     CHECK(!mcc_protocol_settings_valid(&game,128));
@@ -113,7 +113,7 @@ int main(void) {
     CHECK(mcc_protocol_unwrap(outer,40,inner,&size));CHECK(size==32 && !memcmp(inner,original,32));
     /* Package transfer and required metadata identity need the updated join agreement.
      * Reject the previous MCC revision before interpreting settings. */
-    CHECK(MCC_PROTOCOL_VERSION==69);
+    CHECK(MCC_PROTOCOL_VERSION==70);
     for(i=67;i<=68;i++) {
         ((byte *)outer)[4]=(byte)i;CHECK(!mcc_protocol_unwrap(outer,40,inner,&size));
     }
@@ -262,7 +262,7 @@ typedef unsigned short word;
 #define MAXIMUM_MACHINE_NAME_LENGTH 16
 #define JOIN_GAME_TOKEN_LENGTH 16
 #define NETWORK_GAME_MESSAGE_VERSION 1
-#define HALO_PORT_NETWORK_VERSION 32726
+#define HALO_PORT_NETWORK_VERSION 32730
 #define csmemcmp memcmp
 #define csmemcpy memcpy
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}} while(0)
@@ -340,7 +340,7 @@ static int try_join(int capability) {
 }
 int main(void) {
  int cap,mcc,i;
- word invalid_versions[]={0,41,42,65,66,67,68,69,32712,32713,32714,32716,32717,32718,32720,32721,32722,32724,32725,65535};
+ word invalid_versions[]={0,41,42,65,66,67,68,69,32712,32713,32714,32716,32717,32718,32720,32721,32722,32724,32725,32726,32728,32729,65535};
  for(mcc=0;mcc<2;mcc++) for(cap=0;cap<2;cap++) {
   for(i=0;i<(int)(sizeof(invalid_versions)/sizeof(invalid_versions[0]));i++) {
    reset();requires_mcc=mcc;join_version=invalid_versions[i];
