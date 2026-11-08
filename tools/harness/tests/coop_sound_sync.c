@@ -8,6 +8,7 @@ play, to a permutation of a linked chain and a block's start into it. */
 typedef unsigned short word;
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
+#define PIN(x,lo,hi) ((x)<(lo)?(lo):(x)>(hi)?(hi):(x))
 #define VALID_INDEX(i,c) ((i)>=0&&(i)<(c))
 #define SET_FLAG(f,b,v) ((f)=(v)?(f)|(1U<<(b)):(f)&~(1U<<(b)))
 #define TAG_BLOCK_GET_ELEMENT(b,i,t) (&((t *)(b)->address)[i])
@@ -17,7 +18,7 @@ typedef unsigned short word;
 
 /* the client's sound tags: one looping sound, the scripts' instance of it 7,
 its start and loop sounds */
-enum {LOOPING=3,START_SOUND=10,LOOP_SOUND=11,SCRIPTS_INSTANCE=7,PERMUTATIONS=4};
+enum {LOOPING=3,START_SOUND=10,LOOP_SOUND=11,SCRIPTS_INSTANCE=7,PERMUTATIONS=96};
 static struct looping_sound_definition looping;
 static struct looping_sound_track track;
 static struct sound_definition sounds[2];
@@ -71,7 +72,9 @@ static void sound(long index,short encoding,short compression,short sample_rate,
  SET_FLAG(definition->flags,_sound_definition_linked_permutations_bit,linked);
  definition->pitch_ranges.count=1;definition->pitch_ranges.address=range;
  range->permutations.count=count;range->permutations.address=permutations[index-START_SOUND];
- range->actual_permutation_count=1;
+ range->actual_permutation_count=1;range->playback_rate=1.f;
+ definition->random_pitch_bounds.lower=definition->random_pitch_bounds.upper=1.f;
+ definition->zero_pitch_modifier=definition->one_pitch_modifier=1.f;
  for(permutation=0;permutation<count;permutation++)
  {
   struct sound_permutation *p=&permutations[index-START_SOUND][permutation];
@@ -328,6 +331,60 @@ int main(int argc,char **argv)
   CHECK(result==_coop_sound_sync_play&&offset(100,LOOP_SOUND,0)==0,"no range was placed");
   result=coop_sound_sync_place(LOOPING,SCRIPTS_INSTANCE,9,_coop_sound_sync_loop_part,LOOP_SOUND,0,&permutation,1.f,100);
   CHECK(result==_coop_sound_sync_play&&offset(100,LOOP_SOUND,0)==0,"a track past the sound's was placed");
+ }
+ else if(!strcmp(name,"length"))
+ {
+  /* a cutscene's music: 86 linked permutations of 1.3 s and a last of 0.7 s, nearly two minutes (its
+  tag's longest_permutation_length, 1485, is one permutation's) */
+  static long parts[87];
+  int part;
+  long length;
+  for(part=0;part<86;part++)parts[part]=1321;
+  parts[86]=724;
+  sound(LOOP_SOUND,STEREO,XBOX_ADPCM,RATE_44,TRUE,87,parts);
+  sounds[1].longest_permutation_length=1485;
+  length=coop_sound_sync_sound_milliseconds(LOOP_SOUND);
+  CHECK(length>=113000&&length<=114400,"the music's time was %ld ms",length);
+  /* a loop not linked plays its longest permutation, picked at random */
+  {
+   static long const three[]={2000,5000,3000};
+   sound(LOOP_SOUND,MONO,XBOX_ADPCM,RATE_22,FALSE,3,three);
+   ranges[1].actual_permutation_count=3;
+   length=coop_sound_sync_sound_milliseconds(LOOP_SOUND);
+   CHECK(length>=4900&&length<=5000,"the longest of three not linked was %ld ms",length);
+  }
+  /* at its slowest pitch: the random pitch's lower bound, half, makes it twice as long */
+  sounds[1].random_pitch_bounds.lower=0.5f;
+  length=coop_sound_sync_sound_milliseconds(LOOP_SOUND);
+  CHECK(length>=9800&&length<=10000,"at half pitch it was %ld ms",length);
+  /* a compression whose time is not known here: the tag's longest permutation, for each linked one */
+  {
+   static long const two_seconds[]={2000,2000,2000};
+   sound(LOOP_SOUND,MONO,OGG,RATE_22,TRUE,3,two_seconds);
+   sounds[1].longest_permutation_length=2500;
+   length=coop_sound_sync_sound_milliseconds(LOOP_SOUND);
+   CHECK(length==7500,"three Ogg permutations were %ld ms",length);
+  }
+ }
+ else if(!strcmp(name,"length-hostile"))
+ {
+  /* a chain round on itself, a map's huge length and no sound end, an hour at most */
+  static long const two_seconds[]={2000,2000,2000};
+  long length;
+  sound(LOOP_SOUND,MONO,XBOX_ADPCM,RATE_22,TRUE,3,two_seconds);
+  permutations[1][2].next_permutation_index=0;
+  length=coop_sound_sync_sound_milliseconds(LOOP_SOUND);
+  CHECK(length>0&&length<=7000,"a chain round on itself was %ld ms",length);
+  sound(LOOP_SOUND,MONO,OGG,RATE_22,TRUE,3,two_seconds);
+  sounds[1].longest_permutation_length=0x7fffffffL;
+  length=coop_sound_sync_sound_milliseconds(LOOP_SOUND);
+  CHECK(length==60*60*1000,"a huge length was %ld ms",length);
+  sounds[1].random_pitch_bounds.lower=-3.f;sounds[1].zero_pitch_modifier=0.f;ranges[1].playback_rate=(real)NAN;
+  sound(LOOP_SOUND,MONO,XBOX_ADPCM,RATE_22,TRUE,3,two_seconds);
+  sounds[1].random_pitch_bounds.lower=-3.f;sounds[1].zero_pitch_modifier=0.f;ranges[1].playback_rate=(real)NAN;
+  length=coop_sound_sync_sound_milliseconds(LOOP_SOUND);
+  CHECK(length>0&&length<=60*60*1000,"pitches a map breaks gave %ld ms",length);
+  CHECK(coop_sound_sync_sound_milliseconds(NONE)==0,"no sound has a time");
  }
  else
  {

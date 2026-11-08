@@ -19,14 +19,15 @@ struct tag_block_definition;
 void network_coop_note_sound(short kind,long definition_index,long object_index,real scale);
 void scripted_looping_sound_stop(long sound_index);
 
-/* the map's sounds: each one's longest permutation in milliseconds */
+/* the map's sounds: how long each plays in milliseconds, its linked permutations together
+(coop_sound_sync.c's coop_sound_sync_sound_milliseconds, test_coop_sound_sync.py) */
 enum {SHORT_SOUND=0,LONG_SOUND=1,NO_LENGTH=2,HUGE_SOUND=3,SOUNDS=4};
-struct sound_definition {long longest_permutation_length;};
+struct sound_definition {long milliseconds;};
 static struct sound_definition sounds[SOUNDS];
-static struct sound_definition *sound_definition_get(long index)
+static long coop_sound_sync_sound_milliseconds(long index)
 {
  CHECK(index>=0&&index<SOUNDS,"no such sound %ld",index);
- return &sounds[index];
+ return sounds[index].milliseconds;
 }
 
 /* the map's looping sounds: 0 plays once (a cutscene's: a 10 s start and a
@@ -92,9 +93,9 @@ static void setup(void)
  int index;
  memset(sounds,0,sizeof(sounds));memset(definitions,0,sizeof(definitions));memset(tracks,0,sizeof(tracks));
  memset(playing,0,sizeof(playing));
- sounds[SHORT_SOUND].longest_permutation_length=10000;
- sounds[LONG_SOUND].longest_permutation_length=60000;
- sounds[HUGE_SOUND].longest_permutation_length=0x7fffffffL;
+ sounds[SHORT_SOUND].milliseconds=10000;
+ sounds[LONG_SOUND].milliseconds=60000;
+ sounds[HUGE_SOUND].milliseconds=0x7fffffffL;
  for(index=0;index<DEFINITIONS;index++)
  {
   definitions[index].runtime_scripting_sound_index=NONE;

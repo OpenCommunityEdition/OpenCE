@@ -1324,7 +1324,7 @@ enum
 {
 	MAXIMUM_LOOPING_SOUNDS = 32,
 	LOOPING_SOUND_END_MARGIN_TICKS = 2 * TICKS_PER_SECOND,
-	/* (a sound's longest permutation, as a map gives it, taken as an hour at most) */
+	/* (a sound's time, its linked permutations together, taken as an hour at most) */
 	MAXIMUM_LOOPING_SOUND_PART_MILLISECONDS = 60 * 60 * 1000,
 };
 
@@ -2573,8 +2573,10 @@ static short host_looping_sound_find(
 	return NONE;
 }
 
-/* a sound's longest permutation (its linked ones together, at its slowest
-pitch, as the tools measure it) in milliseconds, or 0 for none */
+/* the most a sound plays, its linked permutations together, in
+milliseconds, or 0 for none (coop_sound_sync.c: the tag's
+longest_permutation_length is a single permutation's, a little over a second
+of a cutscene's music of 86) */
 static long looping_sound_part_milliseconds(
 	long sound_index)
 {
@@ -2582,7 +2584,7 @@ static long looping_sound_part_milliseconds(
 
 	if (sound_index == NONE)
 		return 0;
-	length = sound_definition_get(sound_index)->longest_permutation_length;
+	length = coop_sound_sync_sound_milliseconds(sound_index);
 	return PIN(length, 0, MAXIMUM_LOOPING_SOUND_PART_MILLISECONDS);
 }
 

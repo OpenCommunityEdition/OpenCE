@@ -31,6 +31,10 @@ enum coop_sound_sync_placement
 /* the client (network_coop.c): the host's start of a looping sound that plays
 once, which it started elapsed_milliseconds before (0 or less: just now) */
 void coop_sound_sync_begin(long looping_definition_index, long elapsed_milliseconds);
+/* the most a sound plays, in milliseconds (the longest of its pitch ranges'
+first permutations, each with the linked ones that follow it, at its slowest
+pitch), an hour at most, or 0 for none */
+long coop_sound_sync_sound_milliseconds(long sound_index);
 /* the client: the host stopped it */
 void coop_sound_sync_end(long looping_definition_index);
 /* a new game */

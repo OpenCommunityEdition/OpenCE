@@ -10,7 +10,7 @@ from harness import CHECK_FAILED, build, constant, enum_with, mutated, read, run
 
 CASES = ['pcm', 'chain', 'stereo-blocks', 'pitch', 'start-skipped', 'start-playing', 'fade-in-at-start', 'finished',
          'repeat', 'late', 'just-started', 'ended', 'placed', 'other-instance', 'unknown-compression', 'taken-once',
-         'hostile']
+         'hostile', 'length', 'length-hostile']
 NEGATIVE_CONTROLS = {
     'no-start-time': ('\t\tinto -= sync->start_milliseconds[track_index];\n', '', 'start-skipped'),
     'start-always-before': ('COOP_SOUND_TRACK_FADE_IN_AT_START_BIT))', '31))', 'fade-in-at-start'),
@@ -25,6 +25,8 @@ NEGATIVE_CONTROLS = {
     'stop-after-finish': ('return sync->finished ? _coop_sound_sync_skip : _coop_sound_sync_play;',
                           'return _coop_sound_sync_play;', 'finished'),
     'no-wait': ('return elapsed + (long)since;', 'return elapsed;', 'late'),
+    'one-permutation': ('\t\t\t\tindex = permutation->next_permutation_index;\n', '\t\t\t\tbreak;\n', 'length'),
+    'nominal-pitch': ('coop_sound_pitch_or_one(definition->random_pitch_bounds.lower) *', '', 'length'),
     'offset-kept': ('\t\t\tcoop_sound_offsets[index].sound_index = NONE;\n', '', 'taken-once'),
 }
 

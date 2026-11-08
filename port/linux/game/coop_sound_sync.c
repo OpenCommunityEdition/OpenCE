@@ -228,6 +228,13 @@ static long coop_sound_permutation_byte_offset(
 	return offset > 0 && offset < permutation->samples.size ? offset : 0;
 }
 
+/* a pitch a sound's tag gives, or 1 for none */
+static real coop_sound_pitch_or_one(
+	real pitch)
+{
+	return pitch > 0.f ? pitch : 1.f;
+}
+
 static void coop_sound_offset_note(
 	long sound_index,
 	struct sound_permutation const *permutation,
@@ -291,6 +298,56 @@ void coop_sound_sync_begin(
 	sync->definition_index = looping_definition_index;
 	sync->elapsed_milliseconds = MIN(elapsed_milliseconds, MAXIMUM_COOP_SOUND_SYNC_MILLISECONDS);
 	sync->received = system_milliseconds();
+}
+
+long coop_sound_sync_sound_milliseconds(
+	long sound_index)
+{
+	struct sound_definition *definition;
+	real slowest;
+	long longest = 0;
+	short range_index;
+
+	if (sound_index == NONE)
+		return 0;
+	definition = sound_definition_get(sound_index);
+	/* (sound_manager.c: its random pitch's lower bound, by the smaller of the
+	scale's modifiers, by a range's playback rate) */
+	slowest = coop_sound_pitch_or_one(definition->random_pitch_bounds.lower) *
+		coop_sound_pitch_or_one(MIN(definition->zero_pitch_modifier, definition->one_pitch_modifier));
+	for (range_index = 0; range_index < definition->pitch_ranges.count; range_index++)
+	{
+		struct sound_pitch_range *range =
+			TAG_BLOCK_GET_ELEMENT(&definition->pitch_ranges, range_index, struct sound_pitch_range);
+		real played_pitch = slowest * coop_sound_pitch_or_one(range->playback_rate);
+		short first;
+
+		/* (sound_definition_next_permutation: the first is one of the
+		actual ones, and a linked one is followed by its next, till NONE) */
+		for (first = 0; first < MAX(range->actual_permutation_count, 1) && first < range->permutations.count; first++)
+		{
+			long length = 0;
+			short index = first;
+			short count;
+
+			for (count = 0; count < range->permutations.count && VALID_INDEX(index, range->permutations.count); count++)
+			{
+				struct sound_permutation *permutation =
+					TAG_BLOCK_GET_ELEMENT(&range->permutations, index, struct sound_permutation);
+				long part = coop_sound_permutation_milliseconds(definition, permutation, played_pitch);
+
+				/* (one whose time is not known here: the longest the tag says one is) */
+				if (part <= 0)
+					part = PIN(definition->longest_permutation_length, 0, MAXIMUM_COOP_SOUND_PERMUTATION_MILLISECONDS);
+				length = MIN(length + part, MAXIMUM_COOP_SOUND_PERMUTATION_MILLISECONDS);
+				if (!TEST_FLAG(definition->flags, _sound_definition_linked_permutations_bit))
+					break;
+				index = permutation->next_permutation_index;
+			}
+			longest = MAX(longest, length);
+		}
+	}
+	return longest;
 }
 
 void coop_sound_sync_end(
