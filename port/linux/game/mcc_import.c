@@ -488,35 +488,19 @@ static boolean mcc_import_keep(
 }
 
 /* The tags to write and their order: the disc's, from the map's operations
-(d:\mcc_patches\<map>.p2, the prototype's: .local/mcc_check/patch_make.c),
-whose `order` line names every tag of the disc's map as group:path (a group's
-spaces written as underscores); else the loaded tags as they are. */
+(mcc_import_data_read's <map>.p2), whose `order` line names every tag of the
+disc's map as group:path (a group's spaces written as underscores); else the
+loaded tags as they are. */
 static boolean mcc_import_order(
 	char const *map_name)
 {
-	char path[256];
-	char *text = NULL;
+	char name[80];
+	char *text;
 	char *order = NULL;
-	FILE *file;
-	long index, count;
+	long index, count, size;
 
-	snprintf(path, sizeof(path), "d:\\mcc_patches\\%s.p2", map_name);
-	file = fopen(path, "rb");
-	if (file)
-	{
-		long size;
-
-		fseek(file, 0, SEEK_END);
-		size = ftell(file);
-		fseek(file, 0, SEEK_SET);
-		text = size > 0 ? mcc_import_calloc((size_t)size + 1, 1) : NULL;
-		if (text && fread(text, 1, (size_t)size, file) != (size_t)size)
-		{
-			mcc_import_free(text);
-			text = NULL;
-		}
-		fclose(file);
-	}
+	snprintf(name, sizeof(name), "%s.p2", map_name);
+	text = mcc_import_data_read(name, &size);
 	if (text)
 	{
 		char *line = text;
@@ -534,6 +518,9 @@ static boolean mcc_import_order(
 		}
 		if (order && strchr(order, '\n'))
 			*strchr(order, '\n') = 0;
+		/* (a file written on Windows ends its lines with a carriage return) */
+		if (order && strchr(order, '\r'))
+			*strchr(order, '\r') = 0;
 	}
 
 	count = order ? 1 : mcc_import_globals.tag_count;
@@ -549,7 +536,7 @@ static boolean mcc_import_order(
 	if (!mcc_import_globals.out_sources || !mcc_import_globals.out_groups || !mcc_import_globals.out_names ||
 		!mcc_import_globals.old_to_new)
 	{
-		mcc_import_free(text);
+		mcc_import_data_free(text);
 		return FALSE;
 	}
 	for (index = 0; index < mcc_import_globals.tag_count; index++)
@@ -562,8 +549,8 @@ static boolean mcc_import_order(
 			mcc_import_globals.out_groups[index] = (unsigned long)mcc_import_globals.instances[index].group_tag;
 			mcc_import_globals.out_names[index] = mcc_import_globals.instances[index].name;
 		}
-		mcc_import_error("mcc import: %s: no tag order (%s): the loaded tags written as they are", map_name, path);
-		mcc_import_free(text);
+		mcc_import_error("mcc import: %s: no tag order (%s): the loaded tags written as they are", map_name, name);
+		mcc_import_data_free(text);
 		return TRUE;
 	}
 
@@ -1927,48 +1914,34 @@ static boolean mcc_import_stock(
 {
 	char const *lines = mcc_import_fingerprint(tags->bytes, tags->used, mcc_import_globals.disc_count,
 		mcc_import_globals.bsps, mcc_import_globals.bsp_count);
-	char path[256];
-	char *expected = NULL;
+	char name[80];
+	char *expected = NULL, *text;
 	char const *line;
-	FILE *file;
-	long differing = 0, parts = 0;
+	long differing = 0, parts = 0, size;
 
-	snprintf(path, sizeof(path), "d:\\mcc_patches\\%s.fp", map_name);
-	file = fopen(path, "rb");
-	if (file)
+	snprintf(name, sizeof(name), "%s.fp", map_name);
+	text = mcc_import_data_read(name, &size);
+	/* (a newline before the first line, so that every line is found between
+	two) */
+	expected = text && size > 0 ? mcc_import_calloc((size_t)size + 3, 1) : NULL;
+	if (expected)
 	{
-		long size;
+		long from, to = 1;
 
-		fseek(file, 0, SEEK_END);
-		size = ftell(file);
-		fseek(file, 0, SEEK_SET);
-		/* (a newline before the first line, so that every line is found
-		between two) */
-		expected = size > 0 ? mcc_import_calloc((size_t)size + 3, 1) : NULL;
-		if (expected && fread(expected + 1, 1, (size_t)size, file) != (size_t)size)
+		expected[0] = '\n';
+		/* (without carriage returns: a file written on Windows has them) */
+		for (from = 0; from < size; from++)
 		{
-			mcc_import_free(expected);
-			expected = NULL;
+			if (text[from] != '\r')
+				expected[to++] = text[from];
 		}
-		if (expected)
-		{
-			long from, to = 1;
-
-			expected[0] = '\n';
-			/* (without carriage returns: a file written on Windows has them) */
-			for (from = 1; from <= size; from++)
-			{
-				if (expected[from] != '\r')
-					expected[to++] = expected[from];
-			}
-			expected[to] = '\n';
-			expected[to + 1] = 0;
-		}
-		fclose(file);
+		expected[to] = '\n';
+		expected[to + 1] = 0;
 	}
+	mcc_import_data_free(text);
 	if (!expected)
 	{
-		mcc_import_error("mcc import: %s: no fingerprint of the disc's map (%s): an MCC map", map_name, path);
+		mcc_import_error("mcc import: %s: no fingerprint of the disc's map (%s): an MCC map", map_name, name);
 		return FALSE;
 	}
 	for (line = lines; *line; )
@@ -2148,7 +2121,7 @@ static boolean mcc_import_map(
 		mcc_import_models_complete(&mcc_import_globals.table);
 	}
 	else
-		mcc_import_error("mcc import: %s: no operations (d:\\mcc_patches\\%s.p2): MCC's values kept", map_name, map_name);
+		mcc_import_error("mcc import: %s: no operations (%s.p2): MCC's values kept", map_name, map_name);
 	mcc_import_globals.instances = mcc_import_globals.table.instances;
 	mcc_import_globals.tag_count = mcc_import_globals.table.count;
 	if (!mcc_import_order(map_name))
@@ -2283,7 +2256,7 @@ static boolean mcc_import_map(
 	mcc_import_free(mcc_import_globals.out_groups);
 	mcc_import_free(mcc_import_globals.out_names);
 	mcc_import_free(mcc_import_globals.old_to_new);
-	mcc_import_free(mcc_import_globals.out_names_text);
+	mcc_import_data_free(mcc_import_globals.out_names_text);
 	mcc_import_free(mcc_import_globals.table.instances);
 	mcc_import_free(mcc_import_globals.hud_factor);
 	mcc_import_free(mcc_import_globals.hud_scale);

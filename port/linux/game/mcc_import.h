@@ -83,6 +83,17 @@ boolean mcc_import_operations_bitmap_size(
 	short *width,
 	short *height);
 
+/* The import's file `file_name` ("<map>.p2", the disc's values as operations,
+or "<map>.fp", the fingerprint of the disc's map): the data root's
+mcc_patches folder's, or the game's (port/assets/mcc), NUL-terminated, its
+size in *size; NULL when neither has it. Released with mcc_import_data_free. */
+char *mcc_import_data_read(
+	char const *file_name,
+	long *size);
+
+void mcc_import_data_free(
+	char *text);
+
 /* Writes the tag `tag` ("group:path") of the MCC map `donor_map`, as its
 fixes and operations leave it, for the maps whose donor lines name it. */
 boolean mcc_import_operations_export(

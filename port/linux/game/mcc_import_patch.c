@@ -43,6 +43,7 @@ structure's own fields.
 #include "tag_files/tag_groups.h"
 #include "tag_schema.h"
 #include "mcc_import.h"
+#include "memory/zlib/zlib.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1155,6 +1156,92 @@ void mcc_import_fixes_apply(
 	return;
 }
 
+/* the files of port/assets/mcc, deflated (made by tools/mcc_patches_embed.py,
+which the desktop builds generate) */
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+struct mcc_patch_embedded
+{
+	const char *name;
+	const unsigned int *data;
+	unsigned int size;
+	unsigned int inflated_size;
+};
+
+extern const struct mcc_patch_embedded mcc_patches_embedded[];
+extern const unsigned int mcc_patches_embedded_count;
+#endif
+
+char *mcc_import_data_read(
+	char const *file_name,
+	long *size)
+{
+	char path[256];
+	char *text = NULL;
+	FILE *file;
+
+	*size = 0;
+	/* (a file of the data root's mcc_patches folder first: one being made) */
+	snprintf(path, sizeof(path), "d:\\mcc_patches\\%s", file_name);
+	file = fopen(path, "rb");
+	if (file)
+	{
+		long length;
+
+		fseek(file, 0, SEEK_END);
+		length = ftell(file);
+		fseek(file, 0, SEEK_SET);
+		text = length > 0 ? malloc((size_t)length + 1) : NULL;
+		if (text && fread(text, 1, (size_t)length, file) == (size_t)length)
+		{
+			text[length] = 0;
+			*size = length;
+		}
+		else
+		{
+			free(text);
+			text = NULL;
+		}
+		fclose(file);
+		return text;
+	}
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	{
+		unsigned int index;
+
+		for (index = 0; index < mcc_patches_embedded_count; index++)
+		{
+			struct mcc_patch_embedded const *embedded = &mcc_patches_embedded[index];
+			uLongf length = embedded->inflated_size;
+
+			if (!embedded->name || strcmp(embedded->name, file_name))
+				continue;
+			text = malloc((size_t)embedded->inflated_size + 1);
+			if (text && uncompress((Bytef *)text, &length, (Bytef const *)embedded->data, embedded->size) == Z_OK &&
+				length == embedded->inflated_size)
+			{
+				text[length] = 0;
+				*size = (long)length;
+				return text;
+			}
+			free(text);
+			mcc_patch_log("mcc import: the game's %s cannot be inflated", file_name);
+			return NULL;
+		}
+	}
+#endif
+
+	return NULL;
+}
+
+void mcc_import_data_free(
+	char *text)
+{
+	if (text)
+		free(text);
+
+	return;
+}
+
 /* where the import of the MCC map `donor_map` writes its tag `tag` for other
 maps' donor lines (mcc_import_operations_export): the user's own data, never
 carried with the game */
@@ -1234,28 +1321,15 @@ static void mcc_patch_donors_read(
 boolean mcc_import_operations_read(
 	char const *map_name)
 {
-	char path[256];
-	FILE *file;
+	char name[80];
 	long size, capacity = 0;
 	char *line;
 
 	mcc_import_operations_dispose();
-	snprintf(path, sizeof(path), "d:\\mcc_patches\\%s.p2", map_name);
-	file = fopen(path, "rb");
-	if (!file)
+	snprintf(name, sizeof(name), "%s.p2", map_name);
+	mcc_patch_globals.text = mcc_import_data_read(name, &size);
+	if (!mcc_patch_globals.text)
 		return FALSE;
-	fseek(file, 0, SEEK_END);
-	size = ftell(file);
-	fseek(file, 0, SEEK_SET);
-	mcc_patch_globals.text = size > 0 ? malloc((size_t)size + 1) : NULL;
-	if (!mcc_patch_globals.text || fread(mcc_patch_globals.text, 1, (size_t)size, file) != (size_t)size)
-	{
-		fclose(file);
-		mcc_import_operations_dispose();
-		return FALSE;
-	}
-	fclose(file);
-	mcc_patch_globals.text[size] = 0;
 
 	for (line = mcc_patch_globals.text; line && *line; )
 	{

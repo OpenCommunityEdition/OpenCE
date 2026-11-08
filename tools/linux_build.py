@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from .embed_assets import hud_assets_build, hud_configure_inputs, server_ui_build
+from .mcc_patches_embed import mcc_patches_build, mcc_patches_configure_inputs
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/linux")
@@ -450,7 +451,7 @@ def linux_configure_inputs() -> List[Path]:
     # re-runs it)
     game_folders = sorted({source.parent for source in game_sources(_load_port_config())})
     return [PORT_CONFIG, Path(__file__), PORT_DIR / "src", PORT_DIR / "game", XDK_INCLUDE, *game_folders,
-            *hud_configure_inputs()]
+            *hud_configure_inputs(), *mcc_patches_configure_inputs()]
 
 
 def _quote(path: Any) -> str:
@@ -538,6 +539,8 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     embedded_assets = hud_assets_build(n, "linux", build_dir / "generated" / "hud_hires_assets.c")
     # a dedicated server's admin page (port/assets/server_ui; port/linux/src/server_http.c)
     embedded_assets += server_ui_build(n, "linux", build_dir / "generated" / "server_ui_assets.c")
+    # the MCC import's data (port/assets/mcc; port/linux/game/mcc_import_patch.c)
+    embedded_assets += mcc_patches_build(n, "linux", build_dir / "generated" / "mcc_patches.c")
 
     # the portable build's system root and SDL3, or the build machine's
     if getattr(sln, "port_portable", False):

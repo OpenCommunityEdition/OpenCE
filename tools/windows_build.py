@@ -28,6 +28,7 @@ from .linux_build import (LINUX_PROFILE, MINIUPNPC_DIR, OPTIMISATION, STB_VORBIS
                           game_defines_and_includes, game_sources, musl_math_cflags, musl_math_sources, opus_cflags,
                           opus_sources, pgo_profile, profile_use_flags, xdk_headers, celt_cflags, celt_sources)
 from .embed_assets import hud_assets_build, hud_configure_inputs, server_ui_build
+from .mcc_patches_embed import mcc_patches_build, mcc_patches_configure_inputs
 from .ninja_syntax import Writer
 from .windows_cross_build import cross_toolchain_prefix
 
@@ -163,6 +164,7 @@ def windows_configure_inputs() -> List[Path]:
         LINUX_DIR / "src",
         LINUX_DIR / "game",
         *hud_configure_inputs(),
+        *mcc_patches_configure_inputs(),
     ]
 
 
@@ -350,6 +352,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
     # the high-res HUD's textures (port/assets/hud; port/linux/src/hud_hires.c)
     embedded_assets = hud_assets_build(n, "windows", BUILD / "generated" / "hud_hires_assets.c")
     embedded_assets += server_ui_build(n, "windows", BUILD / "generated" / "server_ui_assets.c")
+    embedded_assets += mcc_patches_build(n, "windows", BUILD / "generated" / "mcc_patches.c")
 
     # (a debug build checks its stack frames (/GS), and stops at the first
     # one overrun, as at the first failed assertion; a release build does
