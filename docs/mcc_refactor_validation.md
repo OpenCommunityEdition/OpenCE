@@ -21,10 +21,13 @@ for both milestones; the 8 November request also supersedes the console deferral
 The stage evidence below records the changes, actual validation and limits.
 The subsequent delivery plan adds Milestone 13 for host sharing, Milestone 14
 for Custom Edition and MCC browser playability, and Milestone 15 for the
-upstream contribution. Milestone 13 remains in progress. Corrected-commit CI,
-native downloads, metadata-mismatch preservation and managed removal have
-passed; follow-on gameplay and final validation of the later identity/UI
-corrections remain open. Milestones 14 and 15 remain planned.
+upstream contribution. Milestone 13 remains in progress. CI through `5682cbee3`,
+native downloads, metadata-mismatch preservation, managed removal and Mercury
+follow-on gameplay have passed within the recorded limits. The dedicated
+map-only admission correction passes its native rerun at `f8432e2a3`.
+Further initial-download and on-demand transition runs expose host loading
+that starves pending clients; a general MCC loading barrier is under
+verification. Final validation remains open. Milestones 14 and 15 remain planned.
 
 | Milestone | Scope and outcome | Status |
 | --- | --- | --- |
@@ -39,7 +42,7 @@ corrections remain open. Milestones 14 and 15 remain planned.
 | 9 | Review the combined branch and extend runtime, lifecycle and performance validation. | Review/testing/cleanup complete; recovery failure addressed in Milestone 10 |
 | 10 | Correct shared co-op checkpoint recovery with explicit lifetime and network agreement separation. | Complete; bounded recovery checks pass |
 | 11 | Correct shared boat controls, small client clock delays exposed by Mercury, and the separately authorized console lifetime defect. | Complete; bounded runtime, platform and network checks pass |
-| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | In progress; corrected CI and bounded native sharing/removal controls pass; follow-on gameplay and final validation pending |
+| 13 | Review PR #95, complete host-only MCC package sharing, campaign progression and host opt-in menus. | In progress; bounded dedicated admission now passes; initial/on-demand loading barrier and final validation pending |
 | 14 | Make Custom Edition and MCC maps playable in browsers, including import/download, persistence and native/browser multiplayer. | Planned; explicit requirement, not satisfied by a web build alone |
 | 15 | Prepare the complete MCC-only upstream contribution and unify its network agreement with OpenCE. | Planned after Milestones 13 and 14; previously numbered 14 |
 
@@ -293,16 +296,18 @@ by adapting this PR. Mac remains outside the requested platform scope.
 
 ### Milestone 13 implementation evidence
 
-Status at this documentation pass: **in progress, not complete**. CI for
-`cdbe0460b` is green. Native Ruby download/late-join, metadata-mismatch
-preservation, Mercury's first mission and safe second-mission installation,
-Xbox/CE controls and managed snapshot confirmation/removal have passed within
-the limits below. The combined review then corrected stale Workshop
-attribution and two UI defects. Their focused tests pass, but the later
-candidate's `mercury_follow_on` run is still active and has no completed
-verdict here. Final runtime/platform checks and remaining admission/transport
-coverage remain outstanding. Earlier stages' runtime passes do not validate
-the changed M13 transfer/identity implementation.
+Status at this documentation pass: **in progress, not complete**. CI through
+`5682cbee3` is green. Native Ruby download/late-join, metadata-mismatch
+preservation, Mercury's download and follow-on gameplay, Xbox/CE controls and
+managed snapshot confirmation/removal have passed within the limits below.
+The later Mercury run includes the combined review's attribution/UI corrections.
+The first dedicated map-only run fails admission after verified installation;
+the completion-to-admission grace correction passes its native rerun at
+`f8432e2a3`. Subsequent initial-download and on-demand transition runs expose
+a separate host-loading timeout. A general MCC loading barrier is under
+verification, not a completed fix. Final runtime/platform checks and remaining
+admission/transport coverage remain outstanding. Earlier stages' runtime passes
+do not validate the changed M13 transfer/identity implementation.
 
 The current implementation includes host-only opt-ins, client consent and
 manual/Workshop alternatives; paged bounded manifests; independent gameplay and
@@ -458,7 +463,8 @@ Native runtime and platform evidence recorded on 8 November 2026:
   fresh-profile/no-audio diagnostics, authored animation normalization,
   pregame-state messages and a client disconnect when the host exits; they are
   not zero-error logs. No sharing/identity failure, assertion or access violation
-  was found. The separate follow-on gameplay run remains unjudged here.
+  was found. The later fixed follow-on run below supplies separate gameplay
+  evidence; it does not change this earlier run's outcome.
 - `ruby_version_mismatch/content-audit.json` verifies a metadata-only mismatch:
   the client has identical map bytes in a separate manual package, with
   deliberate whitespace appended only to `campaign/a10.json`. The host's
@@ -474,6 +480,96 @@ Native runtime and platform evidence recorded on 8 November 2026:
   Each peer records 39 state samples spanning ticks 30–1170, with no MCC
   transfer and no fatal diagnostic matches. These are bounded legacy-path
   controls, not full matches or independent state-divergence comparisons.
+- `5682cbee3` passes
+  [Build run 42489773343](https://github.com/chestahh/GulchCE/actions/runs/42489773343)
+  and [MCC run 42489773377](https://github.com/chestahh/GulchCE/actions/runs/42489773377).
+  Both workflow conclusions were verified on GitHub. A detailed job-count
+  summary is not yet recorded; earlier revisions' counts are not reused.
+  This validates that committed candidate, not the later admission correction.
+- `mercury_follow_on_fixed/gameplay-audit.json` records the completed
+  180-second `5682cbee3` Windows pair, executable SHA-256
+  `54b697b50a6e78a95d91dbf00ba9906c6eddf6432014fac93cd8e865464a8ca0`.
+  The client starts with both previously verified Mercury snapshots, so this
+  checks matching-copy admission and progression, not another fresh download.
+  Both peers load `mercury_falling` at 14:25:43 UTC. The host invokes
+  `(game_won)` after 300 fresh ticks; the only console intervention is this
+  deliberate completion. Both resolve `mercury2` by SHA-256 and load it at
+  14:26:21 (client) / 14:26:22 (host), through the normal ready-lobby path.
+  Each peer records exactly one tick reset: Falling spans ticks 30–330,
+  then Mercury II spans ticks 30–3210. The second segment contains 107 samples,
+  with both players living naturally from tick 570 through 3210 in 89 samples
+  per peer. No cinematic skip or player-state injection is used. The short
+  first segment remains in its authored intro and is not a two-living-player
+  observation. Frame 14400 shows normal first-person gameplay and the other
+  player marker without the sharing overlay. Both processes exit with code 0;
+  all 20 retained snapshot files, including receipts, and ten distinct
+  original Workshop files retain their audited SHA-256 values. Staging is
+  empty. No sharing/identity failure, assertion or access violation was found;
+  existing profile/audio/Bink and pregame diagnostics remain. This establishes
+  bounded two-mission loading and second-mission co-op, not an independent
+  state-divergence comparison or complete campaign playthrough.
+- `dedicated_map_only/gameplay-audit.json` records the separate 240-second
+  pair on that same executable: a `--server` host with no local player and
+  only `mcc_maps/local_ruby/a10.map`, with no JSON, PNG or Workshop sidecar.
+  The downloaded map is 275,753,385 bytes, SHA-256
+  `71cf81a69ddda9f29b2128629b315a7a5d1aa49968db314817207da264e17c9b`,
+  matching the host and original Ruby Workshop file exactly. The client
+  installs only that map and a locally generated 393-byte receipt, with empty
+  Workshop attribution, into `dl_120b363a0811b190f08c`; staging is empty.
+  **Content verification passes, but admission/gameplay fails.** The machine
+  joined at 14:28:37 UTC. At installation completion, 14:31:02, the server
+  refuses it because no player can join; the client's identity match follows
+  at 14:31:03, after removal. There are no client simulation samples and the
+  server continues with zero players. The client exits with code 0; the host
+  exits with code 1 after the bounded runner kills it at its deadline, not
+  through normal shutdown. Source tracing identifies the completion race:
+  successful transfer completion clears the downloading exemption before
+  identity rebinding/player admission, exposing the original expired
+  15-second playerless-machine deadline. A bounded MCC completion-to-admission
+  grace correction is tested in the following rerun. This failed run is
+  retained and is not reported as successful dedicated gameplay.
+- `dedicated_map_only_fixed/gameplay-audit.json` verifies that correction at
+  `f8432e2a3528e10d2b1faaa4097d7ac89793128c`, executable SHA-256
+  `ac97e6f640fc2b4f4b8c9e6bb2b6fae9bd74231b2ca4c3be2a5d7c727a852889`.
+  The same map-only fixture installs and resolves at 14:42:11 UTC, when the
+  server adds its player, 128 seconds after machine admission. Both peers
+  load by 14:42:37. The client records 81 monotonic samples at ticks 30–2430,
+  with its player living throughout; the dedicated host records one player
+  in its health log. The original, host and downloaded map hashes match the
+  previous audit. Only the map and 393-byte local receipt are installed, with
+  empty Workshop attribution and empty staging. Both processes exit with
+  code 0: after the client finishes, the runner sends the server its ordinary
+  stdin `quit`, and it stops at 14:44:01. Each process removes six generated
+  caches totaling 767,557,632 bytes without cleanup errors. This passes bounded
+  dedicated admission/gameplay, not a full mission or independent divergence
+  comparison; it does not erase the earlier failing evidence.
+- `mercury_on_demand_final/gameplay-audit.json` records a **failed** follow-on
+  case on that `f8432e2a3` executable, with only the first Mercury snapshot
+  seeded. Both peers run Falling at ticks 30–330. After the host's deliberate
+  `(game_won)`, it selects Mercury II at 14:45:09 UTC, holds the pending client
+  out of loading, then begins its own load at 14:45:10. The client times out
+  in `network_connection_idle` at 14:45:25, before host loading completes at
+  14:45:29. No second snapshot or client second-mission tick segment appears;
+  the host's later ticks are solo, not co-op evidence. All ten seeded files,
+  including the receipt, retain their audited hashes. No offer acceptance is
+  recorded and no stage remains. Both normal exits do not make this a pass.
+- `mercury_initial_loading/gameplay-audit.json` reproduces the same failure
+  without campaign progression, on `f8432e2a3`, starting directly with missing
+  `mercury2`. Frame 02880 shows the real 749.8 MiB consent prompt; frames 03840
+  and 05280 show an accepted transfer at 3%. The host starts loading while
+  that client is pending at 14:50:18 UTC and reaches synchronous audio
+  conversion at 14:50:22. The client logs its genuine connection timeout at
+  14:50:33. The private runner observes that log and stops its owned processes;
+  both exit codes of 1 reflect this bounded failed-fixture cleanup, not normal
+  shutdown or separate crash evidence. No installation or gameplay is claimed,
+  and no incomplete map hash was needed to establish the failure. Staging and
+  installed-package directories are empty after disconnect cleanup. The
+  timeout comes from the real connection deadline; the runner neither creates
+  that diagnostic nor injects a failure. These two reproductions justify an
+  MCC-wide host loading barrier for pending consent, transfer and admission,
+  rather than a special case for returning campaign players. That correction
+  is being generalized and verified; Xbox/CE loading policy remains outside
+  the MCC fix's scope.
 
 The final combined review then found a sidecar-only lifecycle defect:
 `mcc_identity_prepare_host` cached Workshop attribution with map/resource
@@ -495,7 +591,9 @@ while consent is pending/visible, resumes after acceptance and clears on
 disconnect; a faulty-guard control fails. These counts overlap the identity
 and earlier component selections. The later combined local selection records
 89 passes in `build/m13-final-identity-ui-results.txt`; none of these component
-results replaces the outstanding native screenshot or final platform checks.
+results replaces the outstanding native confirmation-label screenshot or
+final checks after the loading-barrier correction. The `5682cbee3` CI and Mercury
+runtime results above validate their own committed candidate only.
 Browser playability remains Milestone 14 work.
 
 Completed-run cleanup archived 266 BMP captures losslessly into

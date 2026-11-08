@@ -4,6 +4,7 @@
 #include "mcc_cache.h"
 #include "mcc_validation.h"
 #include "mcc_identity.h"
+#include "mcc_share.h"
 
 static struct network_game_server *mcc_restart_server;
 static struct network_game mcc_restart_game;
@@ -17,6 +18,20 @@ static char mcc_pending_map[64];
 static boolean mcc_pending_local_client;
 static int mcc_pending_error_shown;
 static struct network_game_server *mcc_validation_server;
+
+static boolean mcc_ui_network_download_pending(struct network_game_server *server)
+{
+    long i;
+    if (!server || server != global_network_game_server_get() ||
+        server->state != _network_game_server_state_pregame || server->sent_start_game_message ||
+        !mcc_level_name(server->game.map.name)) return FALSE;
+    for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; ++i) {
+        struct network_game_server_client_machine *machine = &server->client_machines[i];
+        if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+            mcc_share_game_machine_active(machine->machine_index)) return TRUE;
+    }
+    return FALSE;
+}
 
 boolean mcc_ui_network_defer_map(struct network_game_server *server, char const *name)
 {
@@ -45,7 +60,8 @@ boolean mcc_ui_network_map_pending(struct network_game_server *server)
 {
     return server && (server==mcc_pending_map_server ||
         (mcc_level_name(server->game.map.name) &&
-         (!server->game.map.version || !mcc_validation_lookup(server->game.map.name,NULL,NULL))));
+         (!server->game.map.version || !mcc_validation_lookup(server->game.map.name,NULL,NULL))) ||
+        mcc_ui_network_download_pending(server));
 }
 
 void mcc_ui_network_update_map(struct network_game_server *server)
@@ -56,6 +72,14 @@ void mcc_ui_network_update_map(struct network_game_server *server)
     int status;
     wchar_t message[320];
     unsigned i;
+    /* Synchronous MCC conversion cannot service an offered download. Keep an
+     * already-running countdown alive until transfer/admission finishes; its
+     * ordinary updates also keep waiting clients connected. Never start a
+     * stopped timer, override a host pause or shorten a longer countdown. */
+    if (mcc_ui_network_download_pending(server) && server->countdown_state.active &&
+        !server->countdown_state.paused &&
+        countdown_timer_get_time_remaining(&server->countdown_state.timer) < 3000)
+        countdown_timer_set_time_remaining(&server->countdown_state.timer, 3000);
     if (server!=global_network_game_server_get() ||
         server->state!=_network_game_server_state_pregame || server->sent_start_game_message ||
         (server==mcc_pending_map_server && mcc_pending_local_client && !global_network_game_client_get())) {

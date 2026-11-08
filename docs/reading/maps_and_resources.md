@@ -495,14 +495,28 @@ mission to `mcc_ui_network_campaign_won` in
 ordinary reliable round transition succeeds, an MCC-owned token identifies
 the server, new round and selected mission. The existing pregame UI hook
 consumes it after the current map unloads and opens the ready lobby instead
-of the multiplayer map picker. Its countdown still waits for package
-validation and every machine's precache readiness. A same-name checksum
+of the multiplayer map picker. Its countdown waits for package validation,
+active downloads and ordinary precache readiness. A same-name checksum
 update during validation preserves the token; another selection, session
 disposal or mismatched round invalidates it. Campaign end and a missing next
 mission retain their existing postgame/error handling without automatically
 replaying the last mission. `test_mcc_ui_network.py` exercises the real UI
 dispatcher, including the former paused-map-picker failure;
 `test_mcc_lifecycle.py` covers the campaign completion adapter.
+
+Before any MCC network mission starts, `mcc_ui_network_download_pending`
+holds an already-running countdown at no less than three seconds while a
+joined machine has an active offer, download or the bounded post-install
+admission grace. Normal countdown messages keep those clients connected.
+The direct-start guard enforces the same barrier. A stopped/paused timer is
+left alone, and a longer countdown is never shortened. Once the download
+and admission finish, the normal precache acknowledgment gates the player's
+readiness. This is needed because MCC conversion runs synchronously: starting
+the host while another client waits for content can otherwise leave that
+client without messages long enough to lose its connection. Xbox and CE
+retain their existing start policy; in-game late joining is unchanged.
+This protects downloads already admitted before loading, not a new request
+the host has not received when synchronous conversion begins.
 
 ## Loading and unloading must agree about ownership
 
