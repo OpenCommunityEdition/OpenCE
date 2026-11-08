@@ -790,7 +790,7 @@ static const struct config_setting config_settings[] =
 		"The file of the master servers the server browser asks for dedicated\n"
 		"servers, beside this file unless a full path: an https:// URL and its\n"
 		"key (ed25519:<hex>) on each line, up to 4. None named (no file, or\n"
-		"comments alone): the official master, built in." },
+		"comments alone): the official masters, built in." },
 	{ "network.link_share", _config_string, "\"when_needed\"", "HALO_NET_LINK_SHARE", _environment_value,
 		_platform_all,
 		"When the game shows a server the Discord account linked to it\n"
@@ -979,7 +979,7 @@ static const struct config_setting config_settings[] =
 		_platform_server,
 		"The master servers published to, beside this file unless a full path:\n"
 		"an https:// URL and its key (ed25519:<hex>) on each line. None named:\n"
-		"the official master, built in." },
+		"the official masters, built in." },
 	{ "server.publisher_key_file", _config_string, "\"publisher.key\"", "HALO_SERVER_PUBLISHER_KEY_FILE",
 		_environment_value, _platform_server,
 		"The operator's Ed25519 key for the master servers (halo --server\n"
