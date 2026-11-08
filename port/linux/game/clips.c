@@ -9,7 +9,6 @@ clip was recorded on this build. A clip from another build plays on. */
 
 #include "cseries.h"
 #include "clips.h"
-#include "interface/progress_bar.h"
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "game/players.h"
@@ -1152,8 +1151,6 @@ void clips_feed_item(long player_index, long definition_index, short quantity, i
 
 static void clips_begin_playback(void)
 {
-	int fresh;
-
 	if (!clips.header_ok && !clips_read_header(clips.pending, &clips.header))
 	{
 		clips.pending[0] = 0;
@@ -1218,13 +1215,9 @@ static void clips_begin_playback(void)
 		clips.scrub_clock = 0;
 		game_time_set_speed(1.0f);
 	}
-	fresh = !clips.rewinding;
 	clips.rewinding = 0;
 	clips.rewind_to = 0;
 	clips_spawn_roster();
-	/* the loading screen stays up while the level is placed. a rewind keeps the picture it is catching up to */
-	if (fresh)
-		progress_bar_begin(TRUE);
 }
 
 static int clips_slot_for(long datum, struct player_datum *player)

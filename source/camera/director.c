@@ -1122,9 +1122,21 @@ static boolean director_update_controls(
 		unsigned long control_flags = 0;
 		real_vector2d throttle = player_control_port_debug_throttle[local_player_index];
 		real_euler_angles2d facing = player_control_port_debug_facing[local_player_index];
+		struct gamepad_state const *gamepad = NULL;
+		int rise;
+		int drop;
 
-		SET_FLAG(control_flags, _camera_control_up_bit, key_up);
-		SET_FLAG(control_flags, _camera_control_down_bit, key_down);
+		/* while the free camera is up, the triggers are not the speed controls */
+		rise = key_up;
+		drop = key_down;
+		if (player_index != NONE && input_has_gamepad((short)player_index))
+			gamepad = input_get_gamepad_state((short)player_index);
+		if (gamepad && gamepad->buttons[_gamepad_analog_button_right_trigger] != 0)
+			rise = 1;
+		if (gamepad && gamepad->buttons[_gamepad_analog_button_left_trigger] != 0)
+			drop = 1;
+		SET_FLAG(control_flags, _camera_control_up_bit, rise);
+		SET_FLAG(control_flags, _camera_control_down_bit, drop);
 		controls->wheel_delta = 0;
 		director_process_variables(
 			local_player_index,
