@@ -21,9 +21,10 @@ def bridge_tool(tmp_path_factory):
         "static int emscripten_futex_wait(void *p,int v,double t){(void)p;(void)v;(void)t;return 0;}\n")
     (work / "emscripten.h").write_text("static double emscripten_get_now(void){return 0;}\n")
     (work / "pthread.h").write_text(
+        "#ifndef _WIN32\n#include_next <pthread.h>\n#else\n"
         "typedef int pthread_mutex_t;\n#define PTHREAD_MUTEX_INITIALIZER 0\n"
         "static int pthread_mutex_lock(pthread_mutex_t *p){(void)p;return 0;}\n"
-        "static int pthread_mutex_unlock(pthread_mutex_t *p){(void)p;return 0;}\n")
+        "static int pthread_mutex_unlock(pthread_mutex_t *p){(void)p;return 0;}\n#endif\n")
     (work / "unistd.h").write_text(
         "#ifdef _WIN32\n#define lstat stat\n#define fileno _fileno\n#endif\n"
         "static int fsync(int fd){return fd<0 ? -1 : 0;}\n")
