@@ -225,6 +225,8 @@ static boolean network_game_server_client_machine_is_local(
 	return network_game_server_client_machine_is_joined_to_game(s, machine) && machine == &s->client_machines[0];
 }
 
+/* No MCC transfer is active in these legacy disconnection cases. */
+void mcc_share_game_peer_left(struct network_game_server_client_machine *client) { (void)client; }
 #include "under_test.inc"
 
 enum { GONE = 5, OTHER = 6 };

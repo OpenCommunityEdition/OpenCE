@@ -47,7 +47,13 @@ static long tick,main_loss_last_tick;
 static boolean paused,all_dead,save_succeeds;
 static int reverts,respawns;
 static struct {boolean lost_map,saving_map;short loss_timer;} main_globals;
-static struct {boolean saved_game_valid;} game_state_globals;
+static struct {boolean saved_game_valid;void *base_address;unsigned long cpu_allocation_size;} game_state_globals;
+/* These legacy checkpoints contain no temporary console or MCC state. */
+#define GAME_STATE_SIZE 1024
+#define GAME_STATE_CPU_SIZE 512
+static boolean hs_console_state_capture(void){return TRUE;}
+static int mcc_cache_tags_loaded(void){return FALSE;}
+static int mcc_checkpoint_capture(void *image,unsigned long bytes,unsigned long used,unsigned long capacity){return TRUE;}
 static long game_time_get(void){return tick;}
 static boolean game_time_get_paused(void){return paused;}
 static boolean players_are_all_dead(void){return all_dead;}

@@ -663,6 +663,7 @@ symbols in this file:
 #include "effects/effects.h"
 #include "effects/material_effect_definitions.h"
 #include "game/cheats.h"
+#include "mcc_script_effects.h" /* port: MCC host-approved jetpack prediction */
 #include "game/game.h" /* port: game_connection (unit_turns_with_aim) */
 #include "game/game_allegiance.h"
 #include "game/game_globals.h"
@@ -697,6 +698,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
+#include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -1033,6 +1035,7 @@ void units_initialize(
 void units_initialize_for_new_map(
 	void)
 {
+	if (mcc_grenades_active()) mcc_grenades_reset();
 	memset(unit_globals, 0, offsetof(struct unit_globals, used_time));
 
 	return;
@@ -1087,6 +1090,7 @@ void unit_kill_no_statistics(
 void unit_delete(
 	long unit_index)
 {
+	if (mcc_grenades_active()) mcc_grenades_clear(unit_index);
 	return;
 }
 
@@ -2031,7 +2035,11 @@ short unit_get_grenade_count(
 	long unit_index,
 	short grenade_type)
 {
-	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_datum *unit;
+
+	/* port: MCC owns its expanded grenade inventory. */
+	if (mcc_grenades_active()) return mcc_grenades_get(unit_index, grenade_type);
+	unit = unit_get(unit_index);
 
 	if (grenade_type!=NONE)
 	{
@@ -2052,6 +2060,13 @@ short unit_get_current_grenade_type(
 {
 	struct unit_datum *unit = unit_get(unit_index);
 
+	/* port: MCC validates against its own grenade capacity. */
+	if (mcc_grenades_active())
+	{
+		short mcc_type = unit->unit.current_grenade_index;
+		return mcc_type >= 0 && mcc_type < mcc_grenades_type_count() ? mcc_type : NONE;
+	}
+
 	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7864, unit->unit.current_grenade_index==NONE || (unit->unit.current_grenade_index>=0 && unit->unit.current_grenade_index<NUMBER_OF_UNIT_GRENADE_TYPES));
 
 	return unit->unit.current_grenade_index;
@@ -2062,9 +2077,13 @@ short unit_inventory_next_grenade(
 	short current_index,
 	short delta)
 {
-	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_datum *unit;
 	short next_index = NONE;
 	short index;
+
+	/* port: MCC owns its expanded grenade inventory. */
+	if (mcc_grenades_active()) return mcc_grenades_next(unit_index, current_index, delta);
+	unit = unit_get(unit_index);
 
 	if (current_index==NONE)
 	{
@@ -2128,7 +2147,11 @@ short unit_add_grenade_type_to_inventory(
 	short grenade_type,
 	short grenade_count)
 {
-	struct unit_datum *unit = unit_get(unit_index);
+	struct unit_datum *unit;
+
+	/* port: MCC owns its expanded grenade inventory. */
+	if (mcc_grenades_active()) return mcc_grenades_add(unit_index, grenade_type, grenade_count);
+	unit = unit_get(unit_index);
 
 	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7309, grenade_count>=0);
 	match_assert("c:\\halo\\SOURCE\\units\\units.c", 7310, (grenade_type >= 0) && (grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES));
@@ -2150,17 +2173,23 @@ boolean unit_add_grenade_to_inventory(
 	long unit_index,
 	long equipment_index)
 {
-	struct item_datum *equipment = equipment_get(equipment_index);
-	struct equipment_definition *equipment_definition =
-		equipment_definition_get(equipment->definition_index);
-	struct unit_datum *unit = unit_get(unit_index);
-	struct game_globals_grenade *grenade = TAG_BLOCK_GET_ELEMENT(
-		&scenario_get_game_globals()->grenades,
-		equipment_definition->equipment.grenade_type,
-		struct game_globals_grenade);
+	struct item_datum *equipment;
+	struct equipment_definition *equipment_definition;
+	struct unit_datum *unit;
+	struct game_globals_grenade *grenade;
 	long local_player_index;
 	boolean result = FALSE;
 	static boolean grenade_type_reported = FALSE;
+
+	/* port: expanded MCC types must bypass the legacy grenade table. */
+	if (mcc_grenades_active()) return mcc_grenades_pickup(unit_index, equipment_index);
+	equipment = equipment_get(equipment_index);
+	equipment_definition = equipment_definition_get(equipment->definition_index);
+	unit = unit_get(unit_index);
+	grenade = TAG_BLOCK_GET_ELEMENT(
+		&scenario_get_game_globals()->grenades,
+		equipment_definition->equipment.grenade_type,
+		struct game_globals_grenade);
 
 	/* port: an Infection zombie takes no grenades */
 	if (infection_unit_is_zombie(unit_index))
@@ -2664,6 +2693,7 @@ boolean unit_new(
 		result = TRUE;
 	}
 
+	if (result && mcc_grenades_active()) mcc_grenades_initialize_unit(unit_index);
 	return result;
 }
 
@@ -2874,6 +2904,7 @@ static void unit_drop_grenades(
 	long grenade_type_count;
 	struct game_globals_grenade *grenade;
 
+	if (mcc_grenades_active()) mcc_grenades_drop_extra(unit_index, unit_drop_item);
 	unit = unit_get(unit_index);
 	grenade_count = unit->unit.grenade_counts;
 	grenade_count_negative_base =
@@ -4807,6 +4838,7 @@ void unit_place(
 				unit->unit.grenade_counts,
 				0,
 				sizeof(unit->unit.grenade_counts));
+			if (mcc_grenades_active()) mcc_grenades_clear(unit_index);
 
 			if (unit->unit.equipment_object_index!=NONE)
 			{
@@ -5651,7 +5683,8 @@ boolean unit_update(
 		* Grenade throw button
 		* Primary weapon fire button
 		*/
-		if (cheat.jetpack &&
+		/* port: the MCC jetpack combination must suppress firing on clients too. */
+		if ((cheat.jetpack || mcc_script_effect_enabled(MCC_EFFECT_JETPACK)) &&
 			TEST_FLAG(unit->unit.control_flags, _unit_control_weapon_primary_trigger_bit) &&
 			TEST_FLAG(unit->unit.control_flags, _unit_control_throw_grenade_bit))
 		{
@@ -5804,6 +5837,12 @@ boolean unit_update(
 			if (cheat.infinite_ammo && unit->unit.player_index!=NONE)
 			{
 				short grenade_index;
+				if (mcc_grenades_active())
+				{
+					short mcc_type;
+					for (mcc_type = 2; mcc_type < mcc_grenades_type_count(); ++mcc_type)
+						if (!mcc_grenades_get(unit_index, mcc_type)) mcc_grenades_set(unit_index, mcc_type, 1);
+				}
 
 				for (grenade_index = 0; grenade_index<NUMBEROF(unit->unit.grenade_counts); ++grenade_index)
 				{
@@ -7937,9 +7976,19 @@ static void unit_throw_grenade_move_to_hand(
 	struct object_placement_data placement_data;
 	struct object_marker marker;
 
-	struct unit_datum *unit = unit_get(unit_index);
-	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
-	struct game_globals_grenade *grenades = TAG_BLOCK_GET_ELEMENT(
+	struct unit_datum *unit;
+	struct unit_definition *unit_definition;
+	struct game_globals_grenade *grenades;
+
+	/* port: expanded MCC types must bypass the legacy grenade table. */
+	if (mcc_grenades_active() && unit_get(unit_index)->unit.current_grenade_index >= 2)
+	{
+		mcc_grenades_move_to_hand(unit_index);
+		return;
+	}
+	unit = unit_get(unit_index);
+	unit_definition = unit_definition_get(unit->definition_index);
+	grenades = TAG_BLOCK_GET_ELEMENT(
 		&scenario_get_game_globals()->grenades,
 		unit->unit.current_grenade_index,
 		struct game_globals_grenade);
@@ -11832,6 +11881,12 @@ void unit_control(
 		control_data->weapon_index==NONE ||
 			(control_data->weapon_index>=0 &&
 			control_data->weapon_index<MAXIMUM_WEAPONS_PER_UNIT));
+	if (mcc_grenades_active())
+	{
+		match_assert("MCC unit control", 1, control_data->grenade_index == NONE ||
+			(control_data->grenade_index >= 0 && control_data->grenade_index < mcc_grenades_type_count()));
+	}
+	else
 	match_assert(
 		"c:\\halo\\SOURCE\\units\\units.c",
 		0x5e9,

@@ -218,6 +218,8 @@ symbols in this file:
 #include "effects/effect_definitions.h"
 #include "effects/effects.h"
 #include "game/cheats.h"
+#include "mcc_script_effects.h" /* port: MCC host-approved ammunition prediction */
+#include "mcc_campaign.h" /* port: MCC host-approved reserve/battery prediction */
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "infection.h" /* port: port/linux/game/infection.c */
@@ -915,6 +917,8 @@ void weapon_set_total_rounds(
 void weapon_delete(
 	long weapon_index)
 {
+	/* port: release MCC first-person references before the object disappears. */
+	mcc_first_person_weapon_deleted(weapon_index);
 	/* (port: but a flag or ball a client of the distributed netcode deletes,
 	on the host's word or as one the host has not told it of: objects.c's
 	object_delete_initial_recursive) */
@@ -1555,7 +1559,8 @@ static void weapon_magazine_finish_reload(
 	if (rounds_loaded>magazine_definition->rounds_loaded_maximum)
 		rounds_loaded = magazine_definition->rounds_loaded_maximum;
 
-	if (!cheat.infinite_ammo && TEST_FLAG(weapon->item.flags, 1))
+	/* port: MCC clients mirror the host's reserve ammunition rule. */
+	if (!(cheat.infinite_ammo || mcc_campaign_unlimited_ammo()) && TEST_FLAG(weapon->item.flags, 1))
 		magazine->rounds_total = magazine->rounds_total-rounds_loaded+magazine->rounds_loaded;
 
 	magazine->rounds_loaded = rounds_loaded;
@@ -2690,7 +2695,8 @@ static void weapon_trigger_fire(
 				!(TEST_FLAG(weapon_definition->weapon.flags, _weapon_cannot_fire_at_maximum_age_bit) && weapon->weapon.age>=1.0f) &&
 				(magazine->rounds_loaded>=trigger_definition->minimum_rounds_loaded_per_shot || !TEST_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit)))
 			{
-				if (!cheat.bottomless_clip && (magazine->rounds_loaded-= trigger_definition->rounds_per_shot)<=0)
+				/* port: keep MCC predicted ammunition consistent with the host. */
+				if (!(cheat.bottomless_clip || mcc_script_effect_enabled(MCC_EFFECT_BOTTOMLESS_CLIP)) && (magazine->rounds_loaded-= trigger_definition->rounds_per_shot)<=0)
 				{
 					magazine->rounds_loaded= 0;
 				}
@@ -2709,7 +2715,8 @@ static void weapon_trigger_fire(
 		fired= TRUE;
 	}
 
-	if (cheat.bottomless_clip)
+	/* port: MCC host-approved prediction, without enabling native client cheats. */
+	if (cheat.bottomless_clip || mcc_script_effect_enabled(MCC_EFFECT_BOTTOMLESS_CLIP))
 	{
 		fired= TRUE;
 	}
@@ -2833,7 +2840,8 @@ static void weapon_trigger_fire(
 			trigger->illumination= 1.0f;
 		}
 
-		if (!cheat.bottomless_clip)
+		/* port: MCC's replicated bottomless clip leaves heat unchanged too. */
+		if (!(cheat.bottomless_clip || mcc_script_effect_enabled(MCC_EFFECT_BOTTOMLESS_CLIP)))
 		{
 			weapon->weapon.heat+= trigger_definition->heat_generated_per_round;
 		}
@@ -2847,7 +2855,8 @@ static void weapon_trigger_fire(
 			weapon->weapon.heat= 1.0f;
 		}
 
-		if (TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && !cheat.infinite_ammo)
+		/* port: MCC clients mirror the host's battery consumption rule. */
+		if (TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && !(cheat.infinite_ammo || mcc_campaign_unlimited_ammo()))
 		{
 			weapon->weapon.age+= trigger_definition->age_generated_per_round;
 			if (weapon->weapon.age>1.0f)

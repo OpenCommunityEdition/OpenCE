@@ -13,13 +13,10 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/help">
 		<data input="port settings help"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_map_sharing" x="54" y="73" platform="desktop android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_multiplayer_hud" x="54" y="103" platform="desktop android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_multiplayer_hud" x="54" y="73" platform="web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_streamer_mode" x="54" y="133" platform="desktop android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_streamer_mode" x="54" y="103" platform="web"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_discord_account" x="54" y="163" platform="desktop android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_discord_account" x="54" y="133" platform="web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_map_sharing" x="54" y="73"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_multiplayer_hud" x="54" y="103"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_streamer_mode" x="54" y="133"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_discord_account" x="54" y="163"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -27,7 +24,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/button_ok" x="380" y="1"/>
 		<child widget="common_button_cancel" x="510" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_map_sharing" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/op_map_sharing" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_sharing_settings_screen"/>
 		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_sharing_settings_screen"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
@@ -77,7 +74,7 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/in_game/help_strings">
 		<string text=""/>
-		<string text="Downloading Custom Edition maps you do not have,\nand helping send them to other players."/>
+		<string text="Download CE maps or approved MCC packages.\nManage sharing and downloaded MCC copies."/>
 		<string text="Players' names above their heads, the\nscoreboard, the text chat and the match clock."/>
 		<string text="Hide offensive words in names and text from\nother players, maps and mods, as stars."/>
 		<string text="Link a Discord account, which lets you join\nservers that block VPNs while you use one."/>
