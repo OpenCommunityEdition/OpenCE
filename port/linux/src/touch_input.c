@@ -18,7 +18,7 @@ finger down (host_gesture_insets).
 #include <string.h>
 
 #if defined(HALO_ANDROID) || defined(HALO_WEB)
-/* port/android/guest/runtime/guest_host.h (in a browser,
+/* port/guest/runtime/guest_host.h (in a browser,
 port/web/src/web_touch.c) */
 void host_gesture_insets(int *insets);
 void host_touch_read(int *state);

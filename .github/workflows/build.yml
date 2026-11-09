@@ -89,9 +89,17 @@ jobs:
       - name: Release
         run: python tools/ci_build.py linux release
 
+      # Both builds started with no window, sound or game data: the log of
+      # their start-up (tools/ci_smoke.py) shows a program that does not load
+      # or crashes in a constructor, which no test of the build can
+      - name: Start the game
+        run: |
+          python tools/ci_smoke.py -- "$PWD/dist/halo-linux-release/halo"
+          python tools/ci_smoke.py -- "$PWD/dist/halo-linux-debug/halo"
+
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
+          python -m pytest -q tools/test_ci_smoke.py tools/test_linux_port.py tools/test_guest_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_halo_render_policy.py tools/test_host_boot.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
           # the dedicated server: --version, and --server without maps refused (exit code 2); its cases with
           # clients need the retail maps, and are skipped
           python -m pytest -q tools/test_dedicated_server.py
@@ -197,6 +205,41 @@ jobs:
           name: halo-android-release
           path: dist/halo-android-release
           retention-days: 3
+
+  linux-arm64:
+    # The Linux arm64 host and guest on an arm64 runner, then their tests.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - name: Install the toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm ninja-build cmake pkg-config python3 python3-pytest python3-yaml curl git libwayland-dev libxkbcommon-dev wayland-protocols libx11-dev libxext-dev libxi-dev libxcursor-dev libxrandr-dev libxtst-dev libxss-dev libdrm-dev libgbm-dev libegl-dev libgles-dev libgl-dev libpulse-dev libasound2-dev libpipewire-0.3-dev libdecor-0-dev libudev-dev libdbus-1-dev
+
+      - uses: actions/checkout@v5
+
+      - name: Build SDL 3
+        run: |
+          git clone --depth 1 --branch release-3.4.16 https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
+          cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/sdl-prefix"
+          cmake --build "$RUNNER_TEMP/SDL/build" -j"$(nproc)"
+          cmake --install "$RUNNER_TEMP/SDL/build"
+          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/sdl-prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+
+      - name: Build the game
+        run: |
+          python3 configure.py --guest-lld-bin /usr/bin
+          ninja linux_arm64_guest linux_arm64_host
+
+      # The host started with no window or game data: it quits at the missing
+      # data, after it has loaded its libraries (tools/ci_smoke.py)
+      - name: Start the game
+        run: |
+          HALO_GUEST_ELF="$PWD/build/linux-arm64/halo_guest.elf" LD_LIBRARY_PATH="$GITHUB_WORKSPACE/sdl-prefix/lib" \
+            python3 tools/ci_smoke.py --no-defaults --require "Halo for Linux starting" -- "$PWD/build/linux-arm64/halo_host"
+
+      - name: Test
+        run: python3 -m pytest -q tools/test_linux_arm64*.py tools/test_host_[bp]*.py
 
   windows:
     # The runner image has LLVM, Python and Visual Studio's x86 libraries and

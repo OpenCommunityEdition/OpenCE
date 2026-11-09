@@ -15,7 +15,12 @@ typedef long GLsizeiptr;
 #define TRUE 1
 #define FALSE 0
 #define HALO_ANDROID 1
-static int android_geometry_fixes = 1;
+static int halo_geometry_fixes = 1;
+/* debug.gpu_stats: the cache logs its map-sized events only with it */
+static struct
+{
+	int statistics;
+} debug_settings = { 1 };
 #define GL_NO_ERROR 0
 #define GL_OUT_OF_MEMORY 0x0505
 #define GL_ARRAY_BUFFER 0x8892
@@ -276,13 +281,134 @@ static int regions(void)
 	return 0;
 }
 
+static int stale_overlap(void)
+{
+	struct resource old_range = { 0, 0x20000, 0 }, new_range = { 0, 0x20800, 0 };
+
+	/* (a map's range left registered, and the next map's loaded across it: the
+	new one is the one that holds the memory's bytes) */
+	fill(window + 0x20000, 0x1000, 11);
+	xgpu_static_buffer_add(&old_range, 0x1000, 0);
+	CHECK(draw_reads((unsigned long)window + 0x20100, 0x40, FALSE));
+	fill(window + 0x20000, 0x2000, 12);
+	xgpu_static_buffer_add(&new_range, 0x1000, 0);
+	CHECK(static_buffer_lists[0].count == 1 && static_buffer_lists[0].entries[0].start == (unsigned long)window + 0x20800);
+	CHECK(static_buffers.doomed_count == 1);
+	CHECK(!draw_reads((unsigned long)window + 0x20100, 0x40, FALSE));
+	CHECK(draw_reads((unsigned long)window + 0x20900, 0x40, FALSE));
+	static_buffers_collect();
+	CHECK(deleted == 1);
+	return 0;
+}
+
+static int changed_bytes(void)
+{
+	struct resource range = { 0, 0x30000, 0 };
+	GLuint buffer;
+	unsigned long offset, first_serial, second_serial;
+
+	fill(window + 0x30000, 0x2000, 1);
+	xgpu_static_buffer_add(&range, 0x2000, 0);
+	CHECK(static_buffer_range((unsigned long)window + 0x30000, 0x2000, FALSE, &buffer, &offset, &first_serial));
+	/* (nothing changed: nothing happens) */
+	static_buffers_verify(10);
+	CHECK(uploads == 1 && static_buffers.doomed_count == 0 && logs == 0);
+	/* (a few words the game wrote: noted, the buffer stays) */
+	window[0x30000] ^= 0xff;
+	static_buffers_verify(11);
+	CHECK(uploads == 1 && static_buffers.doomed_count == 0 && logs == 1);
+	static_buffers_verify(12);
+	CHECK(static_buffers.doomed_count == 0 && logs == 1);
+	/* (another map's bytes in the same place: the buffer goes, and the next
+	draw makes one from what the memory holds now, under a new serial) */
+	fill(window + 0x30000, 0x2000, 2);
+	static_buffers_verify(13);
+	CHECK(static_buffers.doomed_count == 1 && logs == 2);
+	CHECK(static_buffer_range((unsigned long)window + 0x30000, 0x2000, FALSE, &buffer, &offset, &second_serial));
+	CHECK(second_serial != first_serial && uploads == 2);
+	CHECK(draw_reads((unsigned long)window + 0x30100, 0x40, FALSE));
+	static_buffers_verify(14);
+	CHECK(uploads == 2 && logs == 2);
+	return 0;
+}
+
+static int stale_cover(void)
+{
+	struct resource old_range = { 0, 0x40000, 0 }, new_range = { 0, 0x48000, 0 };
+	GLuint buffer;
+	unsigned long offset, serial;
+
+	/* (a bsp's range and a smaller one's, both running to the same end: the
+	older map's is not a cover for the newer one's) */
+	fill(window + 0x40000, 0x10000, 21);
+	xgpu_static_buffer_add(&old_range, 0x10000, 0);
+	CHECK(static_buffer_range((unsigned long)window + 0x40100, 0x40, FALSE, &buffer, &offset, &serial));
+	static_buffers_verify(5);
+	fill(window + 0x48000, 0x8000, 22);
+	xgpu_static_buffer_add(&new_range, 0x8000, 0);
+	CHECK(static_buffer_lists[0].count == 1 && static_buffer_lists[0].entries[0].start == (unsigned long)window + 0x48000);
+	CHECK(draw_reads((unsigned long)window + 0x48100, 0x40, FALSE));
+	CHECK(!draw_reads((unsigned long)window + 0x40100, 0x40, FALSE));
+	return 0;
+}
+
+static int partial_overwrite(void)
+{
+	struct resource range = { 0, 0x50000, 0 };
+	GLuint buffer;
+	unsigned long offset, serial;
+	int pass;
+
+	/* (a smaller map's bytes over the first third of a larger one's range) */
+	fill(window + 0x50000, 0x9000, 31);
+	xgpu_static_buffer_add(&range, 0x9000, 0);
+	CHECK(static_buffer_range((unsigned long)window + 0x50000, 0x9000, FALSE, &buffer, &offset, &serial));
+	fill(window + 0x50000, 0x3000, 32);
+	static_buffers_verify(7);
+	CHECK(static_buffers.doomed_count == 1);
+	CHECK(draw_reads((unsigned long)window + 0x50100, 0x40, FALSE));
+	/* (changed again and again: no more buffers for it, it streams) */
+	for (pass = 0; pass < 6; pass++)
+	{
+		fill(window + 0x50000, 0x9000, (unsigned char)(40 + pass));
+		static_buffers_verify(10 + (unsigned long)pass);
+		draw_reads((unsigned long)window + 0x50100, 0x40, FALSE);
+	}
+	CHECK(!draw_reads((unsigned long)window + 0x50100, 0x40, FALSE));
+	return 0;
+}
+
+static int quiet_logs(void)
+{
+	struct resource old_range = { 0, 0x60000, 0 }, new_range = { 0, 0x60800, 0 };
+
+	/* (without debug.gpu_stats nothing is logged: not a map-sized range
+	registered, replaced, changed under its buffer or released) */
+	debug_settings.statistics = 0;
+	fill(window + 0x60000, 0x80000, 51);
+	xgpu_static_buffer_add(&old_range, 0x80000, 0);
+	CHECK(draw_reads((unsigned long)window + 0x60100, 0x40, FALSE));
+	xgpu_static_buffer_add(&new_range, 0x40000, 0);
+	CHECK(draw_reads((unsigned long)window + 0x60900, 0x40, FALSE));
+	fill(window + 0x60800, 0x40000, 52);
+	static_buffers_verify(3);
+	xgpu_static_buffer_remove(&new_range, 0);
+	CHECK(logs == 0);
+	/* (with it, the same events are) */
+	debug_settings.statistics = 1;
+	xgpu_static_buffer_add(&new_range, 0x40000, 0);
+	xgpu_static_buffer_remove(&new_range, 0);
+	CHECK(logs == 2);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	if (argc != 2)
 		return 2;
 	if (!strcmp(argv[1], "disabled"))
 	{
-		android_geometry_fixes = 0;
+		halo_geometry_fixes = 0;
 		xgpu_static_range_add(window + 0x1000, 0x400, 0);
 		xgpu_static_range_add(window + 0x2000, 0x400, 1);
 		CHECK(!static_buffer_lists[0].count && !static_buffer_lists[1].count);
@@ -305,5 +431,15 @@ int main(int argc, char **argv)
 		return allocation_failure();
 	if (!strcmp(argv[1], "regions"))
 		return regions();
+	if (!strcmp(argv[1], "stale_overlap"))
+		return stale_overlap();
+	if (!strcmp(argv[1], "changed_bytes"))
+		return changed_bytes();
+	if (!strcmp(argv[1], "quiet_logs"))
+		return quiet_logs();
+	if (!strcmp(argv[1], "stale_cover"))
+		return stale_cover();
+	if (!strcmp(argv[1], "partial_overwrite"))
+		return partial_overwrite();
 	return 2;
 }

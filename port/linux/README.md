@@ -115,7 +115,7 @@ If the game finds no data, it asks for an Xbox disc image (`.xiso` or
 `.iso`). This occurs at the first start. First the game looks for a disc
 image in the folder of the executable (a name that ends in `.iso` or
 `.xiso`, in capitals or not). If it finds one, it names that image in its
-question:
+question (the arm64 build, `port/linux-arm64`, asks the same way):
 
 - Select "No" to stop the game.
 - Select "Yes" to copy `maps/` from the disc image. If the game found an

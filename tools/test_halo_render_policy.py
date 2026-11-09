@@ -1,11 +1,10 @@
 """Chip detection and startup policy, using the production host and guest code."""
-from pathlib import Path
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
-
 from harness import function
 from test_android_ce_texture_cache import run_c
 
@@ -19,13 +18,13 @@ def policy(tmp_path_factory):
         pytest.skip("clang required")
     work = tmp_path_factory.mktemp("android-render-policy")
     source = work / "policy.c"
-    header = ROOT / "port/android/include"
+    header = ROOT / "port/guest/include"
     host = (ROOT / "port/android/host/host_render_policy.c").read_text()
     code = r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "android_render_policy.h"
+#include "halo_render_policy.h"
 #define PROP_VALUE_MAX 92
 #define HOST_LOG_INFO 4
 static const char *properties[4];
@@ -44,7 +43,7 @@ static int __system_property_get(const char *key, char *value)
     abort();
 }
 '''
-    code += function(host, "host_android_chip_family")
+    code += function(host, "host_chip_family")
     code += r'''
 int main(int argc, char **argv)
 {
@@ -52,11 +51,11 @@ int main(int argc, char **argv)
     if (argc != 8) return 2;
     for (i = 0; i < 4; i++) properties[i] = argv[i + 1];
     expected = atoi(argv[5]);
-    android_render_policy_initialize();
-    if (queries != 15 || android_render_chip != expected ||
-        android_geometry_fixes != atoi(argv[6]) || android_texture_fixes != atoi(argv[7])) {
+    halo_render_policy_initialize();
+    if (queries != 15 || halo_render_chip != expected ||
+        halo_geometry_fixes != atoi(argv[6]) || halo_texture_fixes != atoi(argv[7])) {
         fprintf(stderr, "family=%d geometry=%d textures=%d queries=%u\n",
-            android_render_chip, android_geometry_fixes, android_texture_fixes, queries);
+            halo_render_chip, halo_geometry_fixes, halo_texture_fixes, queries);
         return 1;
     }
     return 0;
@@ -67,9 +66,9 @@ int main(int argc, char **argv)
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"] if os.name == "nt" else ["-m32"]
     result = subprocess.run([compiler, *target, "-std=gnu89", "-Wall", "-Wextra", "-Werror",
                              "-I", str(header), str(source),
-                             str(ROOT / "port/android/host/android_chip.c"),
-                             str(ROOT / "port/android/guest/runtime/guest_render_policy.c"),
-                             "-o", str(executable)], capture_output=True, text=True)
+                             str(ROOT / "port/android/host/host_chip.c"),
+                             str(ROOT / "port/guest/runtime/guest_render_policy.c"),
+                             "-o", str(executable)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
     return executable
 
@@ -106,26 +105,26 @@ int main(int argc, char **argv)
 ])
 def test_chip_policy(policy, manufacturer, model, hardware, platform, family, geometry, textures):
     result = subprocess.run([str(policy), manufacturer, model, hardware, platform,
-                             str(family), str(geometry), str(textures)], capture_output=True, text=True)
+                             str(family), str(geometry), str(textures)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("family", [-1, 4, 100])
 def test_invalid_host_result_keeps_fixes(tmp_path, family):
-    guest = (ROOT / "port/android/guest/runtime/guest_render_policy.c").read_text()
+    guest = (ROOT / "port/guest/runtime/guest_render_policy.c").read_text()
     guest = "\n".join(line for line in guest.splitlines() if not line.startswith("#include"))
-    code = (ROOT / "port/android/include/android_render_policy.h").read_text()
-    code += f"\nstatic int host_android_chip_family(void) {{ return {family}; }}\n" + guest
-    code += "\nint main(void) { android_render_policy_initialize(); return android_render_chip || !android_geometry_fixes || !android_texture_fixes; }\n"
+    code = (ROOT / "port/guest/include/halo_render_policy.h").read_text()
+    code += f"\nstatic int host_chip_family(void) {{ return {family}; }}\n" + guest
+    code += "\nint main(void) { halo_render_policy_initialize(); return halo_render_chip || !halo_geometry_fixes || !halo_texture_fixes; }\n"
     run_c(tmp_path, code)
 
 
 def test_policy_is_selected_before_game_resources():
-    start = function((ROOT / "port/android/guest/runtime/guest_start.c").read_text(), "__guest_start")
-    assert start.index("__guest_thread_initialize_main();") < start.index("android_render_policy_initialize();")
-    assert start.index("android_render_policy_initialize();") < start.index("(*constructor)();") < start.index("result = main(")
-    imports = (ROOT / "port/android/host_imports.list").read_text().splitlines()
-    assert imports.count("host_android_chip_family") == 1
+    start = function((ROOT / "port/guest/runtime/guest_start.c").read_text(), "__guest_start")
+    assert start.index("__guest_thread_initialize_main();") < start.index("halo_render_policy_initialize();")
+    assert start.index("halo_render_policy_initialize();") < start.index("(*constructor)();") < start.index("result = main(")
+    imports = (ROOT / "port/guest/host_imports.list").read_text().splitlines()
+    assert imports.count("host_chip_family") == 1
 
 
 @pytest.mark.parametrize("enabled,ce,cached,valid,loads,legacy", [
@@ -144,7 +143,7 @@ def test_texture_dispatch_boundaries(tmp_path, enabled, ce, cached, valid, loads
 #define _bitmap_cached_bit 0
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 struct bitmap_data { int flags, pixels_size; };
-static int ce, valid, android_texture_fixes, loads, legacy;
+static int ce, valid, halo_texture_fixes, loads, legacy;
 static int custom_edition_cache_tags_loaded(void) { return ce; }
 static int texture_cache_bitmap_valid(struct bitmap_data *b) { return valid; }
 static int rasterizer_xbox_bitmap_get_pixel_data_size(struct bitmap_data *b) { return 1024; }
@@ -155,6 +154,6 @@ static void dispatch(struct bitmap_data *bitmap) {
  int load = 1;
 '''
     code += block + "\n{ legacy++; }\n}\nint main(void) { struct bitmap_data bitmap={0};\n"
-    code += f"android_texture_fixes={enabled};ce={ce};valid={valid};bitmap.flags={cached};dispatch(&bitmap);\n"
+    code += f"halo_texture_fixes={enabled};ce={ce};valid={valid};bitmap.flags={cached};dispatch(&bitmap);\n"
     code += f"return loads!={loads} || legacy!={legacy}; }}\n"
     run_c(tmp_path, code)
