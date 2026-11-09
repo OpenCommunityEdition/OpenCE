@@ -36,10 +36,24 @@ folder is read as the drive `m:\` and nothing is written to it. For each map:
    (beavercreek, bloodgulch, boardingaction, carousel, damnation, hangemhigh,
    sidewinder) have other collision, and are always MCC's.
 
+A map larger than its cache file holds (the Xbox's: 0x11600000 bytes for a
+campaign level, 0x2F00000 for a multiplayer map, 0x2300000 for the menus' map)
+cannot be loaded: it is imported again with its largest level and effects
+textures halved (a compressed one by its next mipmap) until it fits, the HUD's
+and the menus' left as they are. ratrace and Halo PC's rebuilds need it.
+
+`ui.map`, the menus' map: MCC's is Halo PC's, with Halo PC's own menus. The port
+draws the PC menus from its own files (`port/assets/menus`), so the import
+writes only what the game reaches of it: the scenario, the globals and the
+tags the code and the menus name, but not Halo PC's main menu and the screens
+it leads to; its bitmaps at the disc's sizes. A picture the menus take from the
+Xbox's map is the PC version's frame of the same place, and one MCC lacks (the
+Xbox's four-player profile select, the controller picture) is not drawn
+(`menu_tags.c`). The Xbox's own menus (`display.menus = "xbox"`) need the
+disc's `ui.map`.
+
 What does not import yet:
 
-- `ui.map`: MCC's is Halo PC's, too large for the menus' cache file, and
-  without the Xbox menus' network lobby. The disc's is needed.
 - Halo PC's six multiplayer maps.
 - A few tags of the disc's are assets MCC lacks or changed as geometry (the
   flamethrower, `flag_base`, `teleporter_base`, `c_field_generator`, the

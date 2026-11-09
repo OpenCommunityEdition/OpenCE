@@ -539,9 +539,9 @@ static BOOL data_choose_mcc_folder(char *path, int size)
 
 /* the maps imported from a Master Chief Collection install the player has
 (found through Steam, else picked); TRUE once destination has every map the
-game needs, FALSE when the player goes back or it fails. MCC has no Xbox
-menus' map (ui.map): until the import makes one, it comes from the disc, and
-the game quits asking for it. */
+game needs, FALSE when the player goes back or it fails. The import writes
+the menus' map (ui.map) from MCC's; without it (a build whose data has none),
+the game quits asking for the disc's. */
 static BOOL data_import_mcc(const char *destination)
 {
 	char halo1[1024], ui[1100], message[2600], error[1024];

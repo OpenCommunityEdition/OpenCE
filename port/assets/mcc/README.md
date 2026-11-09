@@ -10,6 +10,7 @@ place of the game's copy, so that a changed file can be tried without a build.
 | File | Contents |
 | --- | --- |
 | `<map>.p2` | The disc's values as operations, one per line (`mcc_import_patch.c` describes each kind): numbers, flags, names, the order of the tags, and the HUD's placements and sizes. A Halo PC rebuild (beavercreek, bloodgulch, boardingaction, carousel, damnation, hangemhigh, sidewinder) has the tag order and the HUD alone. |
+| `ui.p2` | The menus' map's: the tags of MCC's (Halo PC's) the game reaches, in MCC's order, its preload list emptied, and the disc's sizes of its bitmaps. It has no fingerprint: it is never the disc's. |
 | `<map>.fp` | The fingerprint of the disc's map: an MD5 of each part of its simulation data (each tag, the order, the scenario, each BSP's collision). An imported map whose fingerprint is the same is written as the disc's map and plays with players of the disc; any other is written with MCC's map version. |
 
 What is not here:
