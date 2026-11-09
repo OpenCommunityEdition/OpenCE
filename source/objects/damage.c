@@ -1064,7 +1064,7 @@ static void object_damage_aftermath(
 		scale_vector3d(&direction, acceleration_scale, &acceleration);
 		/* port: MCC extension data cannot be represented by a scalar impulse. */
 		mcc_accelerate_unit = mcc_damage_acceleration(&damage_effect->damage,
-			object_definition->object.acceleration_scale, &acceleration);
+			object_definition->object.acceleration_scale, &direction, &acceleration);
 
 		switch (object->object.type)
 		{
@@ -1089,8 +1089,7 @@ static void object_damage_aftermath(
 			{
 				struct unit_datum const *unit = (struct unit_datum const *)object;
 
-				if ((damage_effect->damage.instantaneous_acceleration > _real_epsilon ||
-					mcc_accelerate_unit) && /* port: MCC also admits signed/vector impulses */
+				if (mcc_accelerate_unit && /* port: MCC admission, legacy scalar gate otherwise */
 					!TEST_FLAG(unit->unit.flags, _unit_impervious_bit))
 				{
 					if (object->object.type == _object_type_biped)

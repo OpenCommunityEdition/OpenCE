@@ -1,5 +1,57 @@
 # MCC damage acceleration
 
+## Native MCC verification, 9 November 2026
+
+The world-space interpretation in the historical record below is superseded.
+The shared MCC adapter now treats the three values as per-axis multipliers of
+the damage direction. There are no map or tag name checks.
+
+Read-only inspection of the installed Steam `halo1/halo1.dll` established the
+following behavior. SHA-256:
+`0a12dc561780f449d3f4d0df10bb8d3bc7be7840a5beb2b236f672eb6cd42e6c`.
+Addresses below use its preferred image base `0x180000000`; they identify this
+binary only. These are observations, not copied engine code or SDK declarations.
+
+- At RVA `0xBA0988`, damage direction is copied, 0.45 is added to Z, and the
+  vector is normalized through RVA `0xA9BD08`.
+- At RVA `0xBA09B8`, damage flag 16 selects three floats at tag offsets
+  `0x1F4`, `0x1F8`, `0x1FC`; otherwise the first float is used on all axes.
+- At RVA `0xBA0A09`, each value is multiplied by the object's acceleration
+  scale, optional native skull multipliers, and `0.033333335f`.
+- At RVA `0xBA0AA7`, each scaled value is multiplied by its corresponding
+  normalized direction component. The result is not normalized again.
+- Unit admission calls RVA `0xC49A5C`: the squared three-component tag
+  magnitude (or absolute scalar) must be at least `0.0001f`. Negative vector
+  components do not require flag 17. Flag 17 is passed separately to object
+  acceleration routines; it does not select world-space coordinates.
+- The biped routine at RVA `0xBAFA80` still halves all three components for
+  living bipeds. This change preserves that behavior.
+
+The port retains its legacy scalar calculation and admission outside MCC
+extension effects. Invalid or overflowing extension results are rejected.
+No native skull behavior is introduced. This testing branch retains network
+version 42 at the maintainer's request; release protocol versioning is deferred
+until the fix series is complete. It does not currently separate peers using
+the corrected simulation from older version 42 builds.
+
+Regression coverage extracts the production adapter and damage dispatch.
+It checks cardinal and opposite directions, signed and unequal components,
+zero direction, admission thresholds, object scale, immunity, object classes,
+invalid values, and map-family transitions. Aerial's melee, shotgun, pull and
+pad values and the previous Mercury2 vector are fixtures, not special cases.
+Negative controls restore world-space handling and the old admission gates.
+This verifies the calculation, not native MCC gameplay or full mod playthroughs.
+
+Local validation: 194 focused tests passed, including the damage dispatch,
+stale-player damage, player-indicator and MCC tag-validation suites. Windows
+and web builds passed. Both changed Android guest units compiled and assembled;
+the full Android build remains blocked by Windows-host compiler-launcher and
+POSIX-command incompatibilities. A hidden Windows run loaded Blood Covenant
+Mirrored with its bundled resources and advanced more than 500 simulation
+ticks. It was a direct map-load smoke test, not a multiplayer movement test.
+
+## Historical investigation (superseded coordinate interpretation)
+
 > Historical component evidence from the refactored source branch. Protocol
 > numbers and platform limitations below describe the original validation;
 > they are not the current upstream agreement. The MCC contribution uses

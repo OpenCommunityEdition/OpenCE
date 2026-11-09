@@ -756,6 +756,8 @@ static void mcc_fields(struct mcc_validation_context *context, byte *address,
                     mcc_validation_callbacks = &mcc_callbacks;
                     if (!strcmp(field->name, "bitmap_data_check"))
                         accepted = mcc_bitmaps_valid(mcc_validation.runtime, (struct bitmap_data *)address);
+                    else if (!strcmp(field->name, "model_geometry_part_check"))
+                        accepted = mcc_geometry_part_valid(mcc_validation.runtime, address);
                     else if (!strcmp(field->name, "bitmap_group_check"))
                         accepted = mcc_bitmaps_group_valid(mcc_validation.runtime, address);
                     else if (!strcmp(field->name, "collision_model_bsp_check"))

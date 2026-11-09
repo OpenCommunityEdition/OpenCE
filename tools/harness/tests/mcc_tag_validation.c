@@ -40,7 +40,7 @@ struct test_first_person { struct tag_block animations; };
 struct test_grenades {struct tag_block grenades;};
 struct test_equipment {short grenade_type;};
 static int callback_calls, callback_failures;
-static void *valid_bitmap;
+static void *valid_bitmap, *valid_model_part;
 static unsigned char external_vertices[32], external_indices[8];
 static int hardware;
 
@@ -96,6 +96,12 @@ static boolean animation_graph_check(struct tag_validation *validation, void *ba
 { (void)validation; (void)base; ++callback_failures; return FALSE; }
 static boolean bitmap_data_check(struct tag_validation *validation, void *base)
 { (void)validation; (void)base; ++callback_failures; return FALSE; }
+static boolean model_geometry_part_check(struct tag_validation *validation, void *base)
+{ (void)validation; (void)base; ++callback_failures; return FALSE; }
+static struct tag_schema_field const model_part_fields[] = {
+    TAG_SCHEMA_CHECK(model_geometry_part_check), TAG_SCHEMA_END
+};
+static struct tag_schema_definition const model_part_schema={"model_geometry_part",4,model_part_fields};
 static boolean bitmap_group_check(struct tag_validation *validation, void *base)
 { (void)validation; (void)base; ++callback_failures; return FALSE; }
 static struct tag_schema_field const graph_node_fields[] = {
@@ -227,6 +233,7 @@ static struct tag_schema_group const groups[] = {
     {'wphi',{NONE,NONE},&hud_test_schema},
     {'hsto',{NONE,NONE},&hud_storage_schema},
 #endif
+    {'mpck',{NONE,NONE},&model_part_schema},
     {'pctl',{NONE,NONE},&particle_schema},
     {'coll',{NONE,NONE},&collision_schema},
     {'dmg!',{NONE,NONE},&damage_schema},
@@ -265,6 +272,8 @@ int mcc_bitmaps_valid(struct mcc_runtime *runtime, struct bitmap_data *bitmap)
 { (void)runtime; return bitmap == valid_bitmap; }
 int mcc_bitmaps_group_valid(struct mcc_runtime *runtime, void *group)
 { (void)runtime; return group == valid_bitmap; }
+int mcc_geometry_part_valid(struct mcc_runtime *runtime, void const *part)
+{ (void)runtime; return part == valid_model_part; }
 void *mcc_geometry_buffer_data(struct mcc_runtime *runtime, void const *buffer, int indices, unsigned long *bytes)
 {
     (void)runtime; *bytes = indices ? sizeof(external_indices) : sizeof(external_vertices);
@@ -671,6 +680,11 @@ int main(int argc, char **argv)
         if(!strcmp(argv[1],"collision_bad_next")) {edges[2].next[0]=6;expected=0;}
         if(!strcmp(argv[1],"collision_bad_owner")) {edges[2].owners[0]=2;expected=0;}
         if(!strcmp(argv[1],"collision_outside")) {bsp->edges.address=runtime.tags+runtime.used-1;expected=0;}
+    }
+    if (!strncmp(argv[1],"model_part_",11)) {
+        header->count=2; instance[1]=instance[0]; instance[1].group='mpck'; instance[1].handle++;
+        instance[1].root=runtime.tags+0x700; valid_model_part=instance[1].root;
+        if(!strcmp(argv[1],"model_part_rejected")){valid_model_part=NULL;expected=0;}
     }
     if (!strncmp(argv[1],"bitmap",6)) {
         header->count=2; instance[1]=instance[0]; instance[1].group='bitm'; instance[1].handle++;
