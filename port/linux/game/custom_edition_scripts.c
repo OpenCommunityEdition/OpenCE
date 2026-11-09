@@ -60,6 +60,15 @@ designator (hs_find_global_by_name) */
 /* missing names are logged up to this many times */
 #define MAXIMUM_MISSING_NAME_MESSAGES 8
 
+/* Halo PC's names for this build's functions: the same function, with the
+same parameters (MCC's campaign scripts call the disc's
+player_effect_set_max_rumble player_effect_set_max_vibrate, with the disc's
+arguments) */
+static char const *const halo_pc_function_names[][2] =
+{
+	{ "player_effect_set_max_vibrate", "player_effect_set_max_rumble" },
+};
+
 /* ---------- structures */
 
 struct scripts_conversion
@@ -166,6 +175,24 @@ static boolean engine_global_missing(
 	return designator == NONE || !TEST_FLAG(designator, HS_EXTERNAL_GLOBAL_DESIGNATOR_BIT);
 }
 
+/* this build's function by its name, or by the name Halo PC gives it */
+static short function_find_by_name(
+	char const *name)
+{
+	short function_index = hs_find_function_by_name(name);
+	long name_index;
+
+	for (name_index = 0; function_index == NONE && name_index < (long)NUMBEROF(halo_pc_function_names); name_index++)
+	{
+		if (!strcmp(name, halo_pc_function_names[name_index][0]))
+		{
+			function_index = hs_find_function_by_name(halo_pc_function_names[name_index][1]);
+		}
+	}
+
+	return function_index;
+}
+
 /* A call names its function with its first child, which has the function's
 index too; FALSE when the call is not laid out so. */
 static boolean function_call_convert(
@@ -187,7 +214,7 @@ static boolean function_call_convert(
 	{
 		return FALSE;
 	}
-	function_index = hs_find_function_by_name(name);
+	function_index = function_find_by_name(name);
 	if (function_index == NONE)
 	{
 		node_make_inert(conversion, call, "function", name);
