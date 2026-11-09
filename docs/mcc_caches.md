@@ -60,6 +60,12 @@ What does not import yet:
 - A few tags of the disc's are assets MCC lacks or changed as geometry (the
   flamethrower, `flag_base`, `teleporter_base`, `c_field_generator`, the
   cyborg's passenger animations): without them a map is written as MCC's.
+- Halo PC's own model shaders (the flamethrower's screen in every map, and
+  in the rebuilds the fuel rod gun's and the rocket warthog's) keep Halo
+  PC's multipurpose channels, which the Xbox's renderer reads in another
+  order. Their shaders lack MCC's flag for the Xbox's order (bit 6 of the
+  flags), but so does the scorpion's, whose bitmap is the disc's byte for
+  byte, so the flag alone cannot say which to reorder.
 
 ## Loading
 
@@ -77,9 +83,11 @@ takes a Custom Edition one, but for these:
    are the size and file offset of its vertex region, which lies just before
    it in the file: each material's environment vertices (56 bytes each),
    then its lightmap vertices (20 bytes each), in turn. The materials' own
-   vertex data fields are empty. The loader checks that the region ends where
-   the BSP starts, that the materials' vertices fill it exactly, and that
-   every normal is a unit vector's.
+   vertex data fields are empty; the words at `0xB8` and `0xCC` of each
+   material give its two parts' offsets in the region, which are those of
+   this order (all 3,939 materials of a10, d40 and bloodgulch). The loader
+   checks that the region ends where the BSP starts, that the materials'
+   vertices fill it exactly, and that every normal is a unit vector's.
 3. The header's checksum is Custom Edition's (OpenSauce's CRC), but over
    each BSP's region and the BSP in turn, as they lie in the file.
 4. The tags are moved to `0x40440000` (`mcc_tags_rebase`): the tag index and
@@ -104,10 +112,13 @@ takes a Custom Edition one, but for these:
    free slot below it, and every reference to it (a node's next node and
    first argument, a script's and a global's root) follows it.
 7. A bitmap's pixels are in MCC's `bitmaps.map` when its flags have bit 8,
-   and in the map itself when they have bit 9 (its lightmaps), which the
-   game would refuse and is cleared (`mcc_import_bitmaps_prepare`).
-   `bitmaps.map` is a Custom Edition resource map of pixels alone, one entry per bitmap
-   (named `<tag>_<index>`), whose offsets the bitmaps give.
+   and in the map itself when they do not (the BSPs' lightmaps).
+   `bitmaps.map` is a Custom Edition resource map of pixels alone, one entry
+   per bitmap (named `<tag>_<index>`), whose offsets the bitmaps give. Bit 9
+   is MCC's own: every bitmap in the map has it, and so do a few in
+   `bitmaps.map` (a10: 30, among them environment textures), so it does not
+   say where the pixels are. The game would refuse it, and it is cleared
+   (`mcc_import_bitmaps_prepare`).
 8. A sound's samples name a `sounds.map` MCC does not ship (Halo PC's). Its
    sounds are made unplayable (`mcc_sounds_mute`) until they are taken from
    MCC's banks.

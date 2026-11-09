@@ -408,10 +408,12 @@ bitmaps' offsets are their own (timberland's waterfall has one) */
 #define BITMAP_DATA_TYPE_OFFSET 0x0A
 #define BITMAP_DATA_FORMAT_OFFSET 0x0C
 #define BITMAP_DATA_FLAGS_OFFSET 0x0E
-/* an MCC map's bitmaps whose pixels are in the map itself (its lightmaps)
-have this flag, which no other map's do (observed); the game takes no flag
-from bit 8 up */
-#define MCC_BITMAP_DATA_IN_MAP_BIT 9
+/* a flag of MCC's own, which no other map's bitmaps have (observed): on
+every bitmap whose pixels are in the map itself (the BSPs' lightmaps), and
+on a few whose pixels are in bitmaps.map (a10: 30, among them environment
+textures), so not where the pixels are; what MCC takes from it is not
+known. The game takes no flag from bit 8 up */
+#define MCC_BITMAP_DATA_MCC_BIT 9
 #define BITMAP_TYPE_2D 0
 /* the first of the formats a linear bitmap cannot have: DXT1, 3 and 5, and P8 */
 #define BITMAP_FORMAT_DXT1 14
@@ -2718,9 +2720,9 @@ int32_t mcc_import_bitmaps_prepare(
 			uint8_t *data = tag_cache + offset + (uint32_t)index * BITMAP_DATA_BYTES;
 			uint16_t flags = read_u16(data + BITMAP_DATA_FLAGS_OFFSET);
 
-			if (flag_is_set(flags, MCC_BITMAP_DATA_IN_MAP_BIT))
+			if (flag_is_set(flags, MCC_BITMAP_DATA_MCC_BIT))
 			{
-				write_u16(data + BITMAP_DATA_FLAGS_OFFSET, (uint16_t)(flags & ~(1u << MCC_BITMAP_DATA_IN_MAP_BIT)));
+				write_u16(data + BITMAP_DATA_FLAGS_OFFSET, (uint16_t)(flags & ~(1u << MCC_BITMAP_DATA_MCC_BIT)));
 				cleared++;
 			}
 		}

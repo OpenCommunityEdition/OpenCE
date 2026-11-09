@@ -609,8 +609,8 @@ placements. */
 int32_t mcc_import_hud_convert(
 	uint8_t *tag_cache,
 	uint32_t loaded_bytes);
-/* ... and clears the flag MCC gives the bitmaps whose pixels are in the map
-itself (its lightmaps), which the game would refuse; returns how many. */
+/* ... and clears the flag of MCC's own that its lightmaps and a few other
+bitmaps have, which the game would refuse; returns how many. */
 int32_t mcc_import_bitmaps_prepare(
 	uint8_t *tag_cache,
 	uint32_t loaded_bytes);
