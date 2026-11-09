@@ -231,6 +231,10 @@ static struct
 	short icon_factor;
 	short mask_factor;
 	long hud_bitmaps_halved;
+	/* (a second import of a map larger than its cache file: mcc_import_run)
+	the bytes its bitmaps are to give up, and the bitmaps halved for them */
+	long fit_budget;
+	long fitted;
 	/* the sounds written, from MCC's banks */
 	long sounds;
 	char *out_names_text;
@@ -1185,13 +1189,29 @@ static short mcc_import_pixel_bytes(
 	}
 }
 
-/* whether a bitmap can be halved: two-dimensional, without mipmaps, of an
-uncompressed format, and at least 2 by 2 */
+/* the bytes of a 4 by 4 block of a compressed format (DXT1, DXT3, DXT5), else 0 */
+static short mcc_import_block_bytes(
+	short format)
+{
+	return format == 14 ? 8 : format == 15 || format == 16 ? 16 : 0;
+}
+
+/* whether a bitmap can be halved: two-dimensional, of an uncompressed format
+and at least 2 by 2, or of a compressed one with mipmaps (once: its next
+level), at least 8 by 8 */
 static boolean mcc_import_bitmap_halvable(
 	struct bitmap_data const *bitmap)
 {
-	return bitmap->type == 0 && bitmap->mipmap_count >= 0 && bitmap->depth <= 1 &&
-		mcc_import_pixel_bytes(bitmap->format) && bitmap->width >= 2 && bitmap->height >= 2 &&
+	if (bitmap->type != 0 || bitmap->mipmap_count < 0 || bitmap->depth > 1)
+		return FALSE;
+	/* (a compressed one by its mipmaps alone: its next level is its half, of
+	whole blocks) */
+	if (mcc_import_block_bytes(bitmap->format))
+	{
+		return bitmap->mipmap_count > 0 && bitmap->width >= 8 && bitmap->height >= 8 &&
+			!(bitmap->width % 8) && !(bitmap->height % 8);
+	}
+	return mcc_import_pixel_bytes(bitmap->format) && bitmap->width >= 2 && bitmap->height >= 2 &&
 		!(bitmap->width & 1) && !(bitmap->height & 1);
 }
 
@@ -1212,7 +1232,9 @@ static boolean mcc_import_bitmap_halve(
 	/* (with mipmaps, its next level is the half: the first left out) */
 	if (bitmap->mipmap_count > 0)
 	{
-		long top = (long)bitmap->width * bitmap->height * bytes;
+		long top = mcc_import_block_bytes(bitmap->format) ?
+			(long)(bitmap->width / 4) * (bitmap->height / 4) * mcc_import_block_bytes(bitmap->format) :
+			(long)bitmap->width * bitmap->height * bytes;
 
 		if (top >= bitmap->pixels_size)
 			return FALSE;
@@ -1585,7 +1607,8 @@ static void mcc_import_hud(
 		{
 			struct bitmap_data const *bitmap = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, bitmap_index, struct bitmap_data);
 
-			if (!mcc_import_bitmap_halvable(bitmap) || bitmap->width % factor || bitmap->height % factor)
+			if (!mcc_import_bitmap_halvable(bitmap) || mcc_import_block_bytes(bitmap->format) ||
+				bitmap->width % factor || bitmap->height % factor)
 				factor = 1;
 		}
 		mcc_import_globals.hud_factor[tag_index] = factor;
@@ -1593,6 +1616,80 @@ static void mcc_import_hud(
 			mcc_import_globals.icon_factor = factor;
 		else if (candidates[tag_index] == MCC_IMPORT_HUD_MASK)
 			mcc_import_globals.mask_factor = factor;
+	}
+	/* every other bitmap too, where the operations say (bitmaps_to_disc_size:
+	the menus' map, whose MCC's bitmaps of the disc's are larger, to fit its
+	cache file) */
+	for (tag_index = 0; mcc_import_operations_flag("bitmaps_to_disc_size") && tag_index < mcc_import_globals.tag_count;
+		tag_index++)
+	{
+		struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[tag_index];
+		struct bitmap_group const *group = instance->group_tag == 'bitm' ? instance->base_address : NULL;
+		struct bitmap_data const *first;
+		short disc_width, disc_height, factor;
+		long bitmap_index;
+
+		if (!group || group->bitmaps.count <= 0 || mcc_import_globals.hud_factor[tag_index] > 1 ||
+			!mcc_import_operations_bitmap_size(instance->name, &disc_width, &disc_height))
+		{
+			continue;
+		}
+		first = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, 0, struct bitmap_data);
+		factor = first->width % disc_width == 0 ? (short)(first->width / disc_width) : 0;
+		if ((factor != 2 && factor != 4) || first->height != disc_height * factor)
+			continue;
+		for (bitmap_index = 0; factor > 1 && bitmap_index < group->bitmaps.count; bitmap_index++)
+		{
+			struct bitmap_data const *bitmap = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, bitmap_index, struct bitmap_data);
+
+			if (!mcc_import_bitmap_halvable(bitmap) || mcc_import_block_bytes(bitmap->format) ||
+				bitmap->width % factor || bitmap->height % factor)
+				factor = 1;
+		}
+		mcc_import_globals.hud_factor[tag_index] = factor;
+	}
+	/* and, where the map came out larger than its cache file holds (a second
+	import: mcc_import_run), the largest of the rest halved until it fits: the
+	level's and effects' textures (drawn by their coordinates, whatever their
+	size), not the HUD's or the menus' (drawn by their pixels) */
+	if (mcc_import_globals.fit_budget > 0)
+	{
+		long budget = mcc_import_globals.fit_budget;
+
+		while (budget > 0)
+		{
+			long best = NONE;
+			unsigned long best_bytes = 0;
+
+			for (tag_index = 0; tag_index < mcc_import_globals.tag_count; tag_index++)
+			{
+				struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[tag_index];
+				struct bitmap_group const *group = instance->group_tag == 'bitm' ? instance->base_address : NULL;
+				unsigned long bytes = 0;
+				long bitmap_index;
+				boolean halvable = group && group->bitmaps.count > 0 && mcc_import_globals.hud_factor[tag_index] <= 1 &&
+					!candidates[tag_index] && strncmp(instance->name, "ui\\", 3);
+
+				for (bitmap_index = 0; halvable && bitmap_index < group->bitmaps.count; bitmap_index++)
+				{
+					struct bitmap_data const *bitmap = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, bitmap_index, struct bitmap_data);
+
+					halvable = mcc_import_bitmap_halvable(bitmap) && bitmap->width >= 64 && bitmap->height >= 64 &&
+						!(bitmap->width % 2) && !(bitmap->height % 2);
+					bytes += (unsigned long)bitmap->pixels_size;
+				}
+				if (halvable && bytes > best_bytes)
+				{
+					best = tag_index;
+					best_bytes = bytes;
+				}
+			}
+			if (best == NONE)
+				break;
+			mcc_import_globals.hud_factor[best] = 2;
+			mcc_import_globals.fitted++;
+			budget -= (long)(best_bytes - best_bytes / 4);
+		}
 	}
 	/* the disc's placements: scaled by how much smaller or larger than the
 	disc's each bitmap they draw is written (one that cannot be halved), by
@@ -2158,9 +2255,23 @@ static boolean mcc_import_donors(
 	return success;
 }
 
+/* the most a map of the scenario type `scenario_type` can be, its cache
+file's size (cache_files_windows.c, cached_map_file_get_size) */
+static unsigned long mcc_import_cache_file_size(
+	short scenario_type)
+{
+	return scenario_type == _scenario_type_solo ? 0x11600000UL :
+		scenario_type == _scenario_type_main_menu ? 0x02300000UL : 0x02F00000UL;
+}
+
+/* the map imported into output_folder, its bitmaps giving up fit_budget
+bytes (mcc_import_hud); *overage the bytes it is larger than its cache file
+holds, if it is */
 static boolean mcc_import_map(
 	char const *map_name,
-	char const *output_folder)
+	char const *output_folder,
+	long fit_budget,
+	long *overage)
 {
 	static byte loaded_header[V5_HEADER_BYTES];
 	struct mcc_import_header header;
@@ -2179,6 +2290,8 @@ static boolean mcc_import_map(
 	if (!mcc_import_donors(map_name))
 		mcc_import_error("mcc import: %s: some tags of other maps it takes cannot be written: left out", map_name);
 	csmemset(&mcc_import_globals, 0, sizeof(mcc_import_globals));
+	mcc_import_globals.fit_budget = fit_budget;
+	*overage = 0;
 	loaded = (struct mcc_import_tag_header *)custom_edition_cache_tags_load(map_name, loaded_header);
 	if (!loaded)
 	{
@@ -2298,6 +2411,8 @@ static boolean mcc_import_map(
 		header.scenario_type = scenario_type;
 		header.checksum = body->crc;
 		header.footer_signature = 'foot';
+		if ((unsigned long)header.file_length > mcc_import_cache_file_size(scenario_type))
+			*overage = (long)((unsigned long)header.file_length - mcc_import_cache_file_size(scenario_type));
 		/* MCC's HUD, which is drawn as an MCC map's (mcc_cache_loaded), and
 		how much smaller its message icons and scopes' masks are written */
 		{
@@ -2328,11 +2443,11 @@ static boolean mcc_import_map(
 		success = success && fwrite(&header, 1, sizeof(header), body->file) == sizeof(header);
 		fprintf(stdout, "mcc import: %s: %d structure bsps, %ld bitmaps, %ld sounds (%ld silent), %ld tags (0x%lX bytes; "
 			"%ld empty in the disc's place, %ld of MCC's kept after the disc's, %ld without a schema; %ld references to "
-			"tags left out; %ld HUD bitmaps halved), 0x%lX bytes before compression\n",
+			"tags left out; %ld HUD bitmaps halved, %ld textures halved to fit), 0x%lX bytes before compression\n",
 			map_name, (int)references->count, mcc_import_globals.bitmaps, mcc_import_globals.sounds,
 			mcc_import_sounds_silent(), mcc_import_globals.out_count, tags.used, mcc_import_globals.placeholders,
 			mcc_import_globals.kept, mcc_import_globals.schemaless, mcc_import_globals.references_dropped,
-			mcc_import_globals.hud_bitmaps_halved, (unsigned long)header.file_length);
+			mcc_import_globals.hud_bitmaps_halved, mcc_import_globals.fitted, (unsigned long)header.file_length);
 	}
 	deflateEnd(&body->stream);
 	fclose(body->file);
@@ -2380,7 +2495,24 @@ int mcc_import_run(
 	mcc_sounds_muted_proc = mcc_import_sound_muted;
 	for (index = 0; index < map_count; index++)
 	{
-		if (!mcc_import_map(map_names[index], output_folder))
+		long overage = 0, budget = 0;
+		short attempt;
+		boolean success = mcc_import_map(map_names[index], output_folder, 0, &overage);
+
+		/* (larger than its cache file holds, so that the game cannot load it:
+		imported again, its largest textures halved; the room is reckoned
+		before compression, as the cache file's) */
+		for (attempt = 0; success && overage > 0 && attempt < 3; attempt++)
+		{
+			budget += overage + 0x10000;
+			fprintf(stdout, "mcc import: %s: 0x%lX bytes larger than its cache file: imported again, its largest "
+				"textures halved\n", map_names[index], (unsigned long)overage);
+			success = mcc_import_map(map_names[index], output_folder, budget, &overage);
+		}
+		if (success && overage > 0)
+			mcc_import_error("mcc import: %s: still 0x%lX bytes larger than its cache file: the game cannot load it",
+				map_names[index], (unsigned long)overage);
+		if (!success)
 			failures++;
 	}
 	mcc_sounds_muted_proc = NULL;

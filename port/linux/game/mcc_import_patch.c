@@ -25,6 +25,8 @@ tag's root ("root.unit_seats[3].weapon_classes[0]") and its values:
             the user's data (mcc_import_operations_export), never carried
 and, read by the import itself (mcc_import.c, mcc_import_hud):
   bitmap_size  the disc's width and height of a HUD bitmap's first image
+  bitmaps_to_disc_size  every bitmap, not only the HUD's, brought to its
+               bitmap_size (the menus' map, ui.map, to fit its cache file)
   sprite_sizes the disc's size of a HUD sprite sheet's sprites (the first
                of each sequence: "122x31,88x14,...")
   hud_values   a HUD interface whose placements the operations give as the
@@ -1502,7 +1504,7 @@ long mcc_import_operations_apply(
 			!strcmp(operation->kind, "element") || !strcmp(operation->kind, "missing") ||
 			!strcmp(operation->kind, "handle") || !strcmp(operation->kind, "bitmap_size") ||
 			!strcmp(operation->kind, "hud_values") || !strcmp(operation->kind, "sprite_sizes") ||
-			!strcmp(operation->kind, "donor"))
+			!strcmp(operation->kind, "donor") || !strcmp(operation->kind, "bitmaps_to_disc_size"))
 		{
 			continue;
 		}
@@ -1581,6 +1583,20 @@ char const *mcc_import_operations_sprite_sizes(
 	}
 
 	return NULL;
+}
+
+boolean mcc_import_operations_flag(
+	char const *kind)
+{
+	long index;
+
+	for (index = 0; index < mcc_patch_globals.operation_count; index++)
+	{
+		if (!strcmp(mcc_patch_globals.operations[index].kind, kind))
+			return TRUE;
+	}
+
+	return FALSE;
 }
 
 boolean mcc_import_operations_hud_values(

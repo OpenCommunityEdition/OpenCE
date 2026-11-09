@@ -120,6 +120,12 @@ line), or NULL. */
 char const *mcc_import_operations_sprite_sizes(
 	char const *name);
 
+/* Whether the operations have a line of the kind `kind` that is a flag alone
+(bitmaps_to_disc_size: every bitmap brought to its bitmap_size, not only the
+HUD's). */
+boolean mcc_import_operations_flag(
+	char const *kind);
+
 /* Whether the operations give the disc's HUD placements of the HUD interface
 `tag` ("group:path"), or of any when NULL (its hud_values line): their scales
 then stand for bitmaps of the disc's size. */
