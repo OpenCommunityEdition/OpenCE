@@ -23,7 +23,9 @@ def executable(code):
 
 @pytest.mark.parametrize("case", ["lift", "negative", "legacy", "unflagged", "immune",
                                   "scalar", "zero", "nan", "overflow", "projectile",
-                                  "item", "vehicle", "transition", "reverse", "vector_only", "negative_blocked"])
+                                  "item", "vehicle", "transition", "reverse", "vector_only", "negative_vector",
+                                  "north", "up", "down", "zero_direction", "melee", "shotgun", "pull",
+                                  "big_pad", "small_pad", "tiny", "threshold", "scaled"])
 def test_damage(case):
     status, output = run(executable(damage_code()), case)
     assert status == 0, output
@@ -36,7 +38,20 @@ def test_missing_vector_regression():
 
 
 def test_missing_unit_gate_regression():
-    code = damage_code().replace("||\n\t\t\t\t\tmcc_accelerate_unit", "||\n\t\t\t\t\t(mcc_accelerate_unit && 0)")
+    code = damage_code().replace("if (mcc_accelerate_unit &&", "if ((mcc_accelerate_unit && damage_effect->damage.instantaneous_acceleration > _real_epsilon) &&")
     assert code != damage_code()
     status, output = run(executable(code), "lift")
+    assert status == 1, output
+
+
+def test_world_space_regression():
+    code = damage_code().replace(" * direction->i", "").replace(" * direction->j", "").replace(" * direction->k", "")
+    status, output = run(executable(code), "shotgun")
+    assert status == 1, output
+
+
+def test_positive_component_gate_regression():
+    code = damage_code().replace("values[0]*values[0] + values[1]*values[1] + values[2]*values[2] >= _real_epsilon",
+                               "values[0] > _real_epsilon || values[1] > _real_epsilon || values[2] > _real_epsilon")
+    status, output = run(executable(code), "negative_vector")
     assert status == 1, output
