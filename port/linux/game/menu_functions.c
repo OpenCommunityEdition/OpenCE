@@ -6533,12 +6533,21 @@ short menu_functions_glyph_offset(struct widget_instance *widget)
     name = tag_get_name(widget->parent->definition_tag_index);
     leaf = name ? strrchr(name, '\\') : NULL;
     if (!leaf || (strcmp(leaf, "\\button_key") && strcmp(leaf, "\\button_key_options") &&
-        strcmp(leaf, "\\mp_button_key") && strcmp(leaf, "\\button_key_sm"))) return 0;
+        strcmp(leaf, "\\mp_button_key") && strcmp(leaf, "\\button_key_sm") &&
+        strcmp(leaf, "\\confirm_buttons"))) return 0;
     compact = !strcmp(leaf, "\\button_key_sm");
+    /* Confirmation legends use confirm_buttons while containing the same
+     * small face-button slots as the pause footer. Match their authored slots. */
+    for (sibling = widget->parent->child; sibling; sibling = sibling->next)
+    {
+        name = tag_get_name(sibling->definition_tag_index);
+        leaf = name ? strrchr(name, '\\') : NULL;
+        if (leaf && !strcmp(leaf, "\\a_butn_sm")) compact = TRUE;
+    }
     if (compact)
     {
-        /* These two groups have a wide authored inter-group gap. Recover that
-         * space before widening the caps, keeping eight units after CANCEL. */
+        /* These groups have varying authored gaps. Recover spare
+         * space or add missing space, keeping eight units after CANCEL. */
         for (sibling = widget->parent->child; sibling; sibling = sibling->next)
         {
             name = tag_get_name(sibling->definition_tag_index);
@@ -6553,7 +6562,7 @@ short menu_functions_glyph_offset(struct widget_instance *widget)
             pc_menu_widget_text_bounds(sibling->definition_tag_index, &bounds, &text_offset);
             label_end = MAX(label_end, sibling->horizontal_offset + bounds.x1);
         }
-        if (label_end) gap = MAX(0, accept_x - label_end - 8);
+        if (label_end) gap = accept_x - label_end - 8;
     }
     for (sibling = widget->parent->child; sibling; sibling = sibling->next)
     {

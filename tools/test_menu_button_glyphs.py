@@ -151,6 +151,7 @@ def test_legend_expansion_moves_text_and_hit_target_together(tmp_path):
 #include <string.h>
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define NONE -1
+#define TRUE 1
 typedef int boolean;
 typedef struct {short x0,y0,x1,y1;}rectangle2d;
 struct widget_instance {struct widget_instance *parent,*child,*next;short horizontal_offset;long definition_tag_index;};
@@ -188,6 +189,10 @@ int main(void){
  assert(25+16-22+menu_functions_glyph_offset(&b)>=0);
  assert(back.horizontal_offset+menu_functions_glyph_offset(&back)+63+8<=a.horizontal_offset+16+menu_functions_glyph_offset(&a)-30);
  assert(25+accept.horizontal_offset+menu_functions_glyph_offset(&accept)+63<=226);
+ /* Confirmation dialogs retain the unsuffixed parent name and small slots. */
+ names[0]="ui\\shell\\error\\confirm_buttons";
+ a.horizontal_offset=78;accept.horizontal_offset=94;
+ assert(back.horizontal_offset+menu_functions_glyph_offset(&back)+63+8<=a.horizontal_offset+16+menu_functions_glyph_offset(&a)-30);
  active=0;assert(!menu_functions_glyph_offset(&a));active=1;
  parent.definition_tag_index=6;assert(menu_functions_glyph_offset(&a)==9);
  assert(menu_functions_glyph_button(&a,NONE)==0);
