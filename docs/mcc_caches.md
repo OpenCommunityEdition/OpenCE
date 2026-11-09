@@ -105,15 +105,15 @@ takes a Custom Edition one, but for these:
    first argument, a script's and a global's root) follows it.
 7. A bitmap's pixels are in MCC's `bitmaps.map` when its flags have bit 8,
    and in the map itself when they have bit 9 (its lightmaps), which the
-   game would refuse and is cleared (`mcc_import_bitmaps_prepare`). `bitmaps.map` is
-   a Custom Edition resource map of pixels alone, one entry per bitmap
+   game would refuse and is cleared (`mcc_import_bitmaps_prepare`).
+   `bitmaps.map` is a Custom Edition resource map of pixels alone, one entry per bitmap
    (named `<tag>_<index>`), whose offsets the bitmaps give.
 8. A sound's samples name a `sounds.map` MCC does not ship (Halo PC's). Its
    sounds are made unplayable (`mcc_sounds_mute`) until they are taken from
    MCC's banks.
 9. The HUD is laid out at twice the Xbox's size, with bitmaps four times the
-   Xbox's (`mcc_import_hud_convert`): every placement's offset is doubled (but the
-   few with Halo PC's high resolution scale flag, all vehicles' health,
+   Xbox's (`mcc_import_hud_convert`): every placement's offset is doubled
+   (but the few with Halo PC's high resolution scale flag, all vehicles' health,
    whose offsets are the Xbox's), the digits' metrics and the damage
    indicators' offsets are doubled, and every bitmap a placement draws has
    the half HUD scale flag. Each placement's offset and scale is halved, the
