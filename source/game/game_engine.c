@@ -3140,6 +3140,13 @@ long game_engine_remap_equipment(
 			break;
 		}
 
+		/* port: none for an OpenCE mode without the map's grenades
+		(port/linux/game/game_modes.c) */
+		if (game_modes_map_grenades_off())
+		{
+			weapon_list_index = NONE;
+		}
+
 		/* (port: whatever the number of players, as
 		game_engine_infinite_grenades_internal) */
 		if (game_engine_infinite_grenades_internal())

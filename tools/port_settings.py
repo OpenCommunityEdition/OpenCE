@@ -946,19 +946,27 @@ SHIELD_EFFECTS_HELP = [
 # OpenCE's gametypes' options (port/linux/game/game_modes.c), a screen of the
 # gametype editor's (menu_functions.c's "mp profile init opence options"): the
 # mode and Hardcore, then the mode's own rows, which menu_functions.c's
-# gametype_option_help shows (op_inf_ for Infection, op_gg_ for Gun Game)
-# below them; a row's values are menu_functions.c's gametype_options'
+# gametype_option_help shows (op_inf_ for Infection, op_gg_ for Gun Game,
+# op_oitc_ for One in the Chamber, op_fn_ for Frag Nation) below them; a
+# row's values are menu_functions.c's gametype_options'
 PLAYLIST_EDIT = "main_menu/settings_select/multiplayer_setup/playlist_edit"
 OPENCE_EDIT = "main_menu/settings_select/multiplayer_setup/opence_options_edit"
 OPENCE_ROWS = [
-    ("oce_mode", "MODE:", ["NONE", "SWAT", "INFECTION", "GUN GAME"], [
+    ("oce_mode", "MODE:", ["NONE", "SWAT", "INFECTION", "GUN GAME", "ONE IN THE CHAMBER", "FRAG NATION",
+                           "SNOWBALL FIGHT"], [
         "The game type's own rules.",
         "No shields, and a shot to the head kills. Slayer only.",
         "Humans killed join the zombies, who win when\\nno human is left. Team Slayer only.",
-        "Each kill gives the next weapon; a kill with the\\nlast wins. Free for all Slayer only."]),
+        "Each kill gives the next weapon; a kill with the\\nlast wins. Free for all Slayer only.",
+        "A pistol with one round; a bullet kills, and a\\nkill gives a round. Free for all Slayer only.",
+        "No weapon, two frags and two plasmas; a grenade\\nkill gives grenades back. Slayer only.",
+        "No weapon, four plasmas and none on the map; a\\nplasma kill gives plasmas back. Slayer only."]),
     ("oce_hardcore", "HARDCORE:", ["OFF", "ON"], [
         "The motion sensor and aim assist as the game\\ntype has them.",
         "No motion sensor, no aim assist, and a kill\\nrestores the killer's health and shields."]),
+    ("oce_bottomless", "BOTTOMLESS:", ["OFF", "ON"], [
+        "Weapons run dry and reload as the game type\\nhas them.",
+        "Weapons never run dry: the host refills the\\nmagazine as it empties."]),
     ("inf_zombies", "FIRST ZOMBIES:", ["1", "2", "3", "4", "8", "16"],
      ["The zombies chosen when the round starts\\n(a human is always left)."] * 6),
     ("inf_speed", "ZOMBIE SPEED:", ["100%", "110%", "125%", "150%", "175%", "200%"],
@@ -978,6 +986,12 @@ OPENCE_ROWS = [
     ("gg_melee", "MELEE DEMOTES:", ["OFF", "ON"], [
         "A melee kill takes nothing from the victim.",
         "A melee kill takes the victim back a weapon."]),
+    ("oitc_kill", "A KILL:", ["ADDS A ROUND", "RESETS TO ONE"], [
+        "A kill adds a round to the killer's pistol.",
+        "A kill sets the killer's pistol back to one round."]),
+    ("fn_grenades", "MAP GRENADES:", ["ON", "OFF"], [
+        "Grenades lie on the map, as it places them.",
+        "No grenades on the map: only those kills give\\nback."]),
 ]
 OPENCE_ITEM = f"{PLAYLIST_EDIT}/playlist_edit_opence_item"
 
@@ -1043,7 +1057,7 @@ STRING_OVERRIDES.update({
     # gametype_options maps them to the engine's)
     "main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels": ["INFINITE GRENADES:", "WEAPON SET:", "VEHICLE SET:", "STARTING EQUIPMENT:",
                                   "VEHICLE RESPAWN TIME:", "LOADOUT:", "PRIMARY WEAPON:", "SECONDARY WEAPON:",
-                                  "MAP WEAPONS:"],
+                                  "MAP WEAPONS:", "BOTTOMLESS:"],
     # (the helps of each option's values in turn: menu_functions.c's
     # gametype_option_help)
     "main_menu/settings_select/multiplayer_setup/item_options_edit/cap_item_options": [
@@ -1069,6 +1083,8 @@ STRING_OVERRIDES.update({
         "No weapons appear on the map: with a loadout of\\nNONE and NONE, melee and grenades only.",
         "The weapons follow the weapon set above.",
         "Everyone starts with the primary and secondary\\nweapons below; the map's weapons are its own.",
+        "Weapons run dry and reload as the game type\\nhas them.",
+        "Weapons never run dry: the host refills the\\nmagazine as it empties.",
         *LOADOUT_HELPS("primary"),
         *LOADOUT_HELPS("secondary"),
     ],
@@ -1087,11 +1103,11 @@ OVERRIDE_ORIGINALS = {
     f"{MT}/multiplayer_options": [0, 1, 2, 3, None, 5, None, None],
     f"{MT}/multiplayer_option_descriptions": [0, 1, None, None, 4, None, 5],
     "main_menu/gametype_select/var_gametype_banks": [0, None, 2],
-    "main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels": [0, 1, 2, 3, 4] + [None] * 4,
+    "main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels": [0, 1, 2, 3, 4] + [None] * 5,
     # (the first's note that infinite grenades work only with 4 players or
     # fewer is left out: not so here)
     "main_menu/settings_select/multiplayer_setup/item_options_edit/cap_item_options":
-        [None] + list(range(1, 15)) + [None, 15, 16] + [None] * 24,
+        [None] + list(range(1, 15)) + [None, 15, 16] + [None] * 26,
     "main_menu/settings_select/multiplayer_setup/item_options_edit/var_weapon_set": list(range(13)) + [None],
 }
 
@@ -1221,8 +1237,9 @@ WIDGET_PATCHES = {
         "main_menu/settings_select/multiplayer_setup/item_options_edit/item_button_bar": [
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_map_weapons" x="54" y="163"/>',
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_loadout" x="54" y="193"/>',
-            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>',
-            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>',
+            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_bottomless" x="54" y="223"/>',
+            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="253"/>',
+            f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="283"/>',
         ]}},
     # (Teamplay Options' voice chat and vote kick rows, over its buttons:
     # Server Setup's only, _teamplay_options_extras)
@@ -2151,12 +2168,13 @@ def _coop() -> list:
 
 
 def _item_options_extras() -> list:
-    """Item Options' rows of the port's: the map's weapons (YES or NO), and
-    the loadout, CATEGORY (the weapon set) or CUSTOM (each player's primary
-    and secondary weapons)"""
+    """Item Options' rows of the port's: the map's weapons (YES or NO), the
+    loadout, CATEGORY (the weapon set) or CUSTOM (each player's primary and
+    secondary weapons), and BOTTOMLESS (OFF or ON) after the loadout"""
     base = "main_menu/settings_select/multiplayer_setup/item_options_edit"
     lines = []
     for key, strings, label in (("map_weapons", "var_map_weapons", 8), ("loadout", "var_loadout", 5),
+                                ("bottomless", "var_bottomless", 9),
                                 ("primary_weapon", "var_loadout_weapon", 6),
                                 ("secondary_weapon", "var_loadout_weapon", 7)):
         lines += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
@@ -2178,6 +2196,7 @@ def _item_options_extras() -> list:
                          ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     lines += _strings(f"{base}/var_map_weapons", ["YES", "NO"])
     lines += _strings(f"{base}/var_loadout", ["CATEGORY", "CUSTOM"])
+    lines += _strings(f"{base}/var_bottomless", ["OFF", "ON"])
     lines += _strings(f"{base}/var_loadout_weapon", LOADOUT_WEAPONS)
     return lines
 
