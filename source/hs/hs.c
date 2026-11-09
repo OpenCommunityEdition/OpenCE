@@ -2843,6 +2843,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
+#include "cryo_exit_foley.h" /* port: port/linux/game/cryo_exit_foley.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
@@ -15374,6 +15375,10 @@ boolean hs_scenario_postprocess(
 		/* port: before the console's expressions are compiled into the
 		same nodes */
 		hs_scenario_functions_check(scenario);
+		/* port: a10's short cryo scene (off Normal, and in co-op) starts the
+		foley of the Master Chief climbing out of his tube as far into his
+		climb as the tutorial on Normal does (cryo_exit_foley.c) */
+		cryo_exit_foley_scripts_loaded(scenario, hs_syntax_data);
 		if (scenario->hs_string_constants.size<0x400)
 		{
 			success = tag_data_resize(
