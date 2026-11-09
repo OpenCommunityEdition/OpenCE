@@ -3449,7 +3449,7 @@ boolean actor_action_try_to_evade(
 				short evade_direction = _actor_evade_random;
 				real_vector2d alignment_vector = *attractor_vector;
 				boolean is_ledge;
-				byte collision_result[0x1C];
+				real collision_result[0x1C / sizeof(real)]; /* port: a path_collision_result, aligned as words */
 
 				normalize2d(&alignment_vector);
 				if (actor_move_try_evasion_direction(
@@ -3503,7 +3503,7 @@ boolean actor_action_try_to_dive(
 	struct actor_debug_info *debug_info =
 		&actor_debug_array[DATUM_INDEX_TO_ABSOLUTE_INDEX(actor_index)];
 	boolean dive_off_ledge = FALSE;
-	byte collision_result[0x1C];
+	real collision_result[0x1C / sizeof(real)]; /* port: a path_collision_result, aligned as words */
 	real_vector2d evade_vector;
 	real_vector2d left_vector;
 	real animation_desire[4];
@@ -4028,7 +4028,7 @@ static boolean actor_action_find_escape_from_danger(
 		real_vector3d right_vector;
 		real_point3d left_position;
 		real_point3d right_position;
-		byte collision_result[0x1C];
+		real collision_result[0x1C / sizeof(real)]; /* port: a path_collision_result, aligned as words */
 		boolean left_is_ledge;
 		boolean right_is_ledge;
 		boolean left_found;

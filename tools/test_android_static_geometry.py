@@ -6,9 +6,9 @@ cache uploads each range once, drops it on release and address reuse, and
 streams a range whose GL storage cannot be had.
 """
 import os
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -32,7 +32,7 @@ def compile_test(directory, source, include, name, defines=()):
     result = subprocess.run(
         [compiler, *target, *defines, "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
          "-Wno-unused-parameter", "-O2", "-I", str(work), str(ROOT / source), "-o", str(executable)],
-        capture_output=True, text=True)
+        capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     return executable
 
@@ -55,14 +55,15 @@ def programs(tmp_path_factory):
     }
 
 
-@pytest.mark.parametrize("case", ["reuse", "reload", "address_reuse", "allocation_failure", "regions", "disabled"])
+@pytest.mark.parametrize("case", ["reuse", "reload", "address_reuse", "allocation_failure", "regions", "stale_overlap", "changed_bytes", "stale_cover", "partial_overwrite", "quiet_logs",
+                                  "disabled"])
 def test_static_geometry(programs, case):
-    result = subprocess.run([str(programs["static"]), case], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([str(programs["static"]), case], capture_output=True, text=True, timeout=15, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize("variant,case", [("pooled", "frames"), ("pooled", "large"),
                                           ("pooled", "disabled"), ("web", "frames"), ("web", "large")])
 def test_pooled_uploads(programs, variant, case):
-    result = subprocess.run([str(programs[variant]), case], capture_output=True, text=True, timeout=15)
+    result = subprocess.run([str(programs[variant]), case], capture_output=True, text=True, timeout=15, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
