@@ -1,20 +1,21 @@
 /*
 HOST.H
 
-Internals of the Android port's host library (libmain.so). See
-port/android/README.md for the overall design and
-port/android/include/halo_android_abi.h for the guest contract.
+Internals of the host library: libmain.so on Android,
+halo_host on Linux arm64 (port/linux-arm64). See port/android/README.md
+for the overall design and port/guest/include/halo_guest_abi.h for the
+guest contract.
 */
 
-#ifndef __HALO_ANDROID_HOST_H
-#define __HALO_ANDROID_HOST_H
+#ifndef __HALO_HOST_H
+#define __HALO_HOST_H
 
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 
-#include "halo_android_abi.h"
+#include "halo_guest_abi.h"
 
 /* ---------- logging (logcat tag "halo") */
 
@@ -41,6 +42,12 @@ the process allows: from JNI_OnLoad, before the Java side of the game's
 process allocates much (host_main.c); a failure is reported again by
 host_memory_initialize */
 void host_memory_reserve_early(void);
+/* sets the host's page size from the kernel's page size; called by
+host_memory_reserve_early and host_memory_initialize (and safe to call
+more than once) */
+void host_memory_page_size_init(void);
+/* the page size the host uses for its allocations */
+uint64_t host_page_size(void);
 /* takes the fixed ranges for the image; returns 0 on success */
 int host_memory_initialize(uint32_t image_base, uint32_t image_size);
 /* 1 if the fixed ranges could not be reserved (something else holds them) */
@@ -61,6 +68,33 @@ int host_low_owns(uintptr_t address, size_t size);
 long host_guest_mmap(uint64_t address, uint64_t size, int protection, int flags, int fd, int64_t offset);
 long host_guest_munmap(uint64_t address, uint64_t size);
 long host_guest_mprotect(uint64_t address, uint64_t size, int protection);
+
+/* ---------- the guest's boot (host_boot.c) */
+
+#define HOST_ENVIRONMENT_MAXIMUM 64
+
+struct host_environment
+{
+	char *entries[HOST_ENVIRONMENT_MAXIMUM];
+	int count;
+};
+
+/* whether root holds the game data (maps/ui.map) */
+int host_directory_has_maps(const char *root);
+/* sets name=value in the environment, replacing an entry of that name */
+void host_environment_set(struct host_environment *environment, const char *name, const char *value);
+/* debug.sample_seconds from config.toml, as text, or 0 if unset */
+int host_config_sample_seconds(const char *path, char *text, size_t size);
+/* a boolean setting of config.toml, or otherwise if it is missing */
+int host_config_boolean_or(const char *path, const char *name, int otherwise);
+/* POSIX TZ for the current local offset */
+void host_time_zone(char *buffer, size_t size);
+/* sets HALO_DISPLAY_WIDTH, _REFRESH and _DENSITY from the primary display */
+void host_environment_set_display(struct host_environment *environment);
+/* starts the debug sampler if config.toml sets debug.sample_seconds */
+void host_start_sampler_from_config(const char *config_path);
+/* copies argv and the environment into guest memory; returns the boot block */
+uint32_t host_make_boot(const struct host_environment *environment);
 
 /* ---------- the guest image (host_loader.c) */
 

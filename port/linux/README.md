@@ -92,6 +92,10 @@ To see the glibc version that a build needs, enter
 2. Enter `python configure.py`.
 3. Enter `ninja linux`.
 
+For 32-bit ARM Linux, `ninja linux_armv7` builds the same game with
+`python configure.py --linux-arch armv7 --linux-sysroot DIR`: refer to
+[port/linux-armv7/README.md](../linux-armv7/README.md).
+
 ## Start the game
 
 Enter `build/linux/halo`.
@@ -115,7 +119,7 @@ If the game finds no data, it asks for an Xbox disc image (`.xiso` or
 `.iso`). This occurs at the first start. First the game looks for a disc
 image in the folder of the executable (a name that ends in `.iso` or
 `.xiso`, in capitals or not). If it finds one, it names that image in its
-question:
+question (the arm64 build, `port/linux-arm64`, asks the same way):
 
 - Select "No" to stop the game.
 - Select "Yes" to copy `maps/` from the disc image. If the game found an
@@ -180,6 +184,165 @@ window through XWayland (X11), where the 32-bit driver draws, unless a
 32-bit `egl-wayland` is installed. The log says so ("video: NVIDIA's
 driver ..."). `SDL_VIDEO_DRIVER=wayland` or `SDL_VIDEO_DRIVER=x11` chooses
 the video driver yourself.
+
+## AppImage and Flatpak packages
+
+The Linux packages workflow (`.github/workflows/linux-packages.yml`, started by
+hand or by a version tag) builds the Linux game as packages as well as the
+zip. The artifacts of a run:
+
+| File | Game | Runs on |
+| --- | --- | --- |
+| `OpenCE-x86_64.AppImage`, `OpenCE-x86_64.flatpak` | the 32-bit x86 game (this port) | x86_64 computers, the Steam Deck |
+| `OpenCE-aarch64.AppImage`, `OpenCE-aarch64.flatpak` | the arm64 host and guest ([port/linux-arm64](../linux-arm64/README.md)) | 64-bit ARM Linux |
+| `OpenCE-armv7.AppImage` | the 32-bit ARM game ([port/linux-armv7](../linux-armv7/README.md)) | 32-bit ARM Linux; no Flatpak |
+
+There is no armv7 Flatpak because the Flatpak runtime that the packages use
+(`org.freedesktop.Platform` 25.08) has no 32-bit ARM version.
+
+Take the file for the architecture of the computer: `uname -m` says `x86_64`,
+`aarch64` (arm64) or `armv7l`. A computer cannot start the other files.
+
+The names of the two ARM builds:
+
+| Name here | What it is | `uname -m` | Debian, Flatpak | Built from |
+| --- | --- | --- | --- | --- |
+| arm64 | an AArch64 host with an ILP32 guest | `aarch64` | arm64, aarch64 | the Android port |
+| armv7 | the game as AArch32 code: ARMv7-A, hard float (VFPv3-D16) | `armv7l` | armhf | the x86 Linux port |
+
+AArch64 and AArch32 are the 64-bit and 32-bit execution states of an ARM CPU.
+armv7 names the instruction set the 32-bit build needs; a 64-bit CPU runs it
+in its AArch32 state.
+
+The armv7 AppImage is for 32-bit ARM systems. A 64-bit ARM computer can run
+32-bit programs only if its CPU has the 32-bit mode (a Snapdragon 8 Gen 2 has
+it on its Cortex-A510 and A710 cores; `/sys/devices/system/cpu/aarch32_el0`
+lists them) and has 32-bit libraries (glibc, SDL3, Mesa), which many 64-bit
+distributions do not ship: the Retroid Pocket Nova's Armada has none, so the
+AppImage runs there in an armhf container ([port/linux-armv7](../linux-armv7/README.md)).
+
+The AppImage's runtime is built from the AppImage project's source for
+ARMv7. The runtime that the project publishes for armhf is built for ARMv6
+and uses the old ARMv6 memory barrier (`mcr p15, 0, r0, c7, c10, 5`), which a
+64-bit kernel runs only with its CP15 barrier emulation
+(`/proc/sys/abi/cp15_barrier`): without it that AppImage stops with "Illegal
+instruction" before the game starts, as it did on the Retroid Pocket Nova.
+
+The game data is the same as for the zip: the folder that contains `maps/`,
+which the packages look for in `~/.local/share/halo` (refer to "Start the
+game" for the disc image that the game asks for at the first start).
+
+### AppImage
+
+1. Enter `chmod +x OpenCE-x86_64.AppImage` (a download does not keep the
+   execute permission).
+2. Start it.
+
+The AppImage brings its own SDL3 and uses the libraries and the glibc of the
+computer. The oldest glibc that each one needs (measured from the files):
+
+| AppImage | glibc |
+| --- | --- |
+| x86_64 | 2.29 (32-bit) |
+| arm64 | 2.38 |
+| armv7 | 2.38 (32-bit ARM) |
+
+The x86_64 AppImage also needs the 32-bit libraries of "Requirements". The
+arm64 AppImage needs the computer's OpenGL ES and EGL libraries
+(`libGLESv2.so.2` and `libEGL.so.1`, which Mesa provides); the others load
+theirs when they start.
+
+The AppImage is read-only, so the game keeps its files outside it:
+`~/.local/share/halo` is the data folder and has `config.toml` (`paths.data`
+and the environment variable `HALO_DATA_ROOT` name another folder;
+`HALO_CONFIG_FILE` names another settings file). The saved games are in
+`~/.local/share/halo-linux`.
+
+If AppImageLauncher is installed, it asks about every AppImage that you start,
+and it cannot start the AppImage of another architecture. Answer its
+question, or enter `APPIMAGELAUNCHER_DISABLE=1 ./OpenCE-x86_64.AppImage`.
+
+### Flatpak
+
+The runtime `org.freedesktop.Platform` 25.08 comes from Flathub:
+
+    flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+Installing a bundle file does not install the extensions that an app uses.
+The x86_64 package is a 32-bit game and needs two, so install them first:
+
+    flatpak install --user flathub org.freedesktop.Platform.Compat.i386//25.08 org.freedesktop.Platform.GL32.default//25.08
+    flatpak install --user OpenCE-x86_64.flatpak
+
+Without them the game stops with "cannot execute: required file not found".
+Removing the app removes these extensions with it. The arm64 package needs
+none:
+
+    flatpak install --user OpenCE-aarch64.flatpak
+
+Start it with `flatpak run io.github.opencommunityedition.OpenCE`. The game data
+folder is `~/.local/share/halo` here too (the package may read and write
+only that folder of your home); the saved games and the shader cache are in
+`~/.var/app/io.github.opencommunityedition.OpenCE/data/halo-linux`. The package has
+network access, for multiplayer and the game's other online features.
+
+`GL32.default` has the 32-bit Mesa drivers (AMD, Intel, software OpenGL). To
+draw with an NVIDIA GPU, install the 32-bit extension of the NVIDIA driver
+that is installed too. Its name has the version of the driver (`nvidia-smi`
+says it), for example:
+
+    flatpak install --user flathub org.freedesktop.Platform.GL32.nvidia-595-112-07//1.4
+
+On a computer with an integrated GPU as well, the game still draws on the
+integrated one. To use the NVIDIA GPU, start it with two environment
+variables:
+
+    flatpak run --env=__NV_PRIME_RENDER_OFFLOAD=1 --env=__GLX_VENDOR_LIBRARY_NAME=nvidia io.github.opencommunityedition.OpenCE
+
+The AppImage of an NVIDIA computer uses the 32-bit libraries of the NVIDIA
+driver that the computer has (the part of the driver for 32-bit programs; a
+64-bit driver alone is not enough) and the same two variables:
+
+    __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./OpenCE-x86_64.AppImage
+
+Both draw on a GeForce RTX 4090 Laptop GPU with driver 595.112.07 this way
+("OpenGL 4.5.0 NVIDIA 595.112.07").
+
+### Updates
+
+The packages do not look for updates (an AppImage cannot write to itself, and
+`flatpak update` updates a Flatpak). Set `HALO_UPDATE_AUTO=true` to turn the
+check on. Refer to "Updates".
+
+### Tested
+
+The packages were started on a Steam Deck OLED (SteamOS 3.9.5; the x86_64
+AppImage and Flatpak), a Retroid Pocket Nova (Armada; the arm64 AppImage and
+Flatpak) and a laptop with a Ryzen 9 7940HS (Nobara 44; the x86_64 AppImage
+and Flatpak), each for 30 seconds to the menus; the laptop's NVIDIA GPU too,
+as above. The armv7 AppImage was run on the Retroid Pocket's own CPU (32-bit
+mode, in an armhf Debian container) with Wayland and the Adreno GPU, to the
+menus, and CI starts it under qemu-user. It has not run on a 32-bit ARM
+computer.
+
+### Checks in CI
+
+What the workflows check, so that a package that does not start fails in CI
+and not for a user (`tools/ci_smoke.py`, `tools/check_glibc.py`):
+
+- The x86_64 (release and debug), arm64 and armv7 builds are started with no
+  window, sound, update check or game data, and their log of the start-up must
+  show that they loaded and reserved their memory (the armv7 build runs under
+  qemu-user).
+- The glibc that each AppImage's files need must not be newer than the table
+  above says.
+- Each AppImage is started itself (x86_64 in a 32-bit x86 container, armv7 in
+  an armhf container under qemu-user, arm64 on an arm64 runner): its runtime
+  unpacks it, `AppRun` starts the game, which finds its bundled libraries.
+- The armv7 runtime is checked to be ARMv7 code without the ARMv6 memory
+  barrier, and to start.
+- Each Flatpak is installed and its program run in the sandbox (`ldd`): the
+  loader, the extension mount points and the libraries are there.
 
 ## Files and folders
 

@@ -12,6 +12,10 @@ from types import SimpleNamespace
 
 from tools import ninja_syntax
 from tools.android_build import android_configure_inputs, generate_android_build
+from tools.linux_arm64_build import (
+    generate_linux_arm64_build,
+    linux_arm64_configure_inputs,
+)
 from tools.linux_build import check_profile_options, generate_linux_build, linux_configure_inputs
 from tools.web_build import generate_web_build, web_configure_inputs
 from tools.windows_build import generate_windows_build, windows_configure_inputs
@@ -27,6 +31,18 @@ parser.add_argument(
     "--linux-cc",
     metavar="BINARY",
     help="compiler for the native Linux build, `ninja linux` (default: clang)",
+)
+parser.add_argument(
+    "--linux-arch",
+    choices=["x86", "armv7"],
+    default="x86",
+    help="the native Linux build's CPU: x86 (the default) or armv7, 32-bit ARM hard-float (ninja linux_armv7)",
+)
+parser.add_argument(
+    "--linux-sysroot",
+    metavar="DIR",
+    help="the root of the armhf system (headers, libc, SDL 3, OpenGL ES) a --linux-arch armv7 build "
+    "compiles and links against (default: the build machine's own)",
 )
 parser.add_argument(
     "--compiler-launcher",
@@ -85,9 +101,19 @@ parser.add_argument(
     help="Android NDK for `ninja android` (default: ANDROID_NDK_HOME, or the newest under the Android SDK)",
 )
 parser.add_argument(
+    "--guest-lld-bin",
+    type=str,
+    help="directory with ld.lld and llvm-ar; builds the guest ELF for native Linux arm64 with `ninja linux_arm64_guest`, no Android NDK",
+)
+parser.add_argument(
     "--android-guest-cc",
     type=str,
     help="clang with the arm64_32 target for the Android guest (default: clang)",
+)
+parser.add_argument(
+    "--guest-cc",
+    type=str,
+    help="clang for the native Linux arm64 guest (default: --android-guest-cc, else clang)",
 )
 parser.add_argument(
     "--web-emcc",
@@ -131,11 +157,17 @@ try:
     check_profile_options(args.profile, args.pgo)
 except ValueError as error:
     parser.error(str(error))
+if args.linux_arch == "armv7" and args.portable:
+    parser.error("--linux-arch armv7 cannot be combined with --portable")
+if args.linux_arch == "armv7" and args.pgo == "train":
+    parser.error("--linux-arch armv7 cannot be combined with --pgo=train")
 
 # the settings the builds read
 sln = SimpleNamespace(
     build_dir=Path("build"),
     linux_cc=args.linux_cc,
+    linux_arch=args.linux_arch,
+    linux_sysroot=args.linux_sysroot,
     compiler_launcher=args.compiler_launcher,
     port_release=args.release,
     port_profile=args.profile,
@@ -145,7 +177,9 @@ sln = SimpleNamespace(
     port_pgo_profile=args.pgo_profile,
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
+    guest_cc=args.guest_cc,
     web_emcc=args.web_emcc,
+    guest_lld_bin=args.guest_lld_bin,
 )
 if not is_windows():
     sln.windows_cc = args.windows_cc
@@ -171,6 +205,7 @@ n.newline()
 
 generate_linux_build(n, sln)
 generate_android_build(n, sln)
+generate_linux_arm64_build(n, sln)
 generate_windows_build(n, sln)
 generate_web_build(n, sln)
 
@@ -189,6 +224,7 @@ n.build(
         Path("tools/ninja_syntax.py"),
         *linux_configure_inputs(),
         *android_configure_inputs(),
+        *linux_arm64_configure_inputs(),
         *windows_configure_inputs(),
         *web_configure_inputs(),
     ],
@@ -198,6 +234,8 @@ n.newline()
 # the build for this computer, where it could be generated (the Windows
 # build is left out when SDL cannot be fetched, for instance)
 default = "windows" if is_windows() or sln.windows_cross else "linux"
+if default == "linux" and sln.linux_arch == "armv7":
+    default = "linux_armv7"
 if f"\nbuild {default}: " in out.getvalue():
     n.comment("Default rule: the build for this computer")
     n.default(default)

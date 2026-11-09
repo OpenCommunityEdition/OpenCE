@@ -30,7 +30,11 @@ int host_load_image(const void *file, size_t size)
 	uint64_t *table;
 	const char *name;
 	uint32_t count, index;
+	uint64_t mask;
 	int missing = 0;
+
+	host_memory_page_size_init();
+	mask = host_page_size() - 1;
 
 	if (size < sizeof(*elf) || memcmp(elf->e_ident, ELFMAG, SELFMAG) || elf->e_ident[EI_CLASS] != ELFCLASS64 ||
 		elf->e_machine != EM_AARCH64 || elf->e_type != ET_EXEC)
@@ -48,8 +52,8 @@ int host_load_image(const void *file, size_t size)
 		if (segments[index].p_vaddr + segments[index].p_memsz > high)
 			high = segments[index].p_vaddr + segments[index].p_memsz;
 	}
-	low &= ~0xfffULL;
-	high = (high + 0xfff) & ~0xfffULL;
+	low &= ~mask;
+	high = (high + mask) & ~mask;
 	if (low != HALO_GUEST_IMAGE_BASE || high > 0x100000000ULL)
 	{
 		host_logf(HOST_LOG_ERROR, "the guest image spans %llx-%llx", (unsigned long long)low, (unsigned long long)high);
@@ -105,8 +109,8 @@ int host_load_image(const void *file, size_t size)
 	for (index = 0; index < elf->e_phnum; index++)
 	{
 		const Elf64_Phdr *segment = &segments[index];
-		uint64_t start = segment->p_vaddr & ~0xfffULL;
-		uint64_t end = (segment->p_vaddr + segment->p_memsz + 0xfff) & ~0xfffULL;
+		uint64_t start = segment->p_vaddr & ~mask;
+		uint64_t end = (segment->p_vaddr + segment->p_memsz + mask) & ~mask;
 
 		if (segment->p_type == PT_LOAD && (segment->p_flags & PF_X))
 			mprotect((void *)start, end - start, PROT_READ | PROT_EXEC);

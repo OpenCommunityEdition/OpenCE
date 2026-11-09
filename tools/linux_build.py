@@ -225,6 +225,63 @@ POSIX_FLAGS = [
 ]
 
 # Units compiled with a profile (-fprofile-use) that does not quite match
+# configure.py --linux-arch armv7: the game for 32-bit ARM Linux (hard float).
+# ARM's char is unsigned; the game assumes it is signed.
+ARMV7_TARGET = [
+    "--target=armv7-linux-gnueabihf",
+    "-march=armv7-a",
+    "-mfpu=vfpv3-d16",
+    "-mfloat-abi=hard",
+    "-fsigned-char",
+]
+_X86_ONLY_FLAGS = ("--target=i686-linux-gnu", "-m32", "-malign-double", "-freg-struct-return")
+
+
+# the Custom Edition tag cache's window, linked into the armv7 executable so
+# that no library is mapped into it (the script's own comment says why)
+ARMV7_TAG_CACHE_SCRIPT = "tools/linux_armv7_tag_cache.ld"
+
+
+def is_armv7(sln: Any) -> bool:
+    return getattr(sln, "linux_arch", "x86") == "armv7"
+
+
+def sysroot_flags(sln: Any) -> list[str]:
+    sysroot = getattr(sln, "linux_sysroot", None)
+    return [f"--sysroot={sysroot}"] if sysroot else []
+
+
+def abi_flags(sln: Any) -> list[str]:
+    """LINUX_ABI_FLAGS for the architecture being built"""
+    if not is_armv7(sln):
+        return list(LINUX_ABI_FLAGS)
+    return [
+        *(flag for flag in LINUX_ABI_FLAGS if flag not in _X86_ONLY_FLAGS),
+        *ARMV7_TARGET,
+        "-DHALO_LINUX_ARMV7=1",
+        "-DHALO_GLES=1",
+        *sysroot_flags(sln),
+    ]
+
+
+def posix_flags(sln: Any) -> list[str]:
+    """POSIX_FLAGS for the architecture being built"""
+    if not is_armv7(sln):
+        return list(POSIX_FLAGS)
+    return [
+        *(flag for flag in POSIX_FLAGS if flag not in _X86_ONLY_FLAGS),
+        *ARMV7_TARGET,
+        *sysroot_flags(sln),
+    ]
+
+
+def link_target_flags(sln: Any) -> list[str]:
+    """the target flags of the link commands"""
+    if not is_armv7(sln):
+        return ["--target=i686-linux-gnu", "-m32"]
+    return ["--target=armv7-linux-gnueabihf", "-mfloat-abi=hard", "-fuse-ld=lld", *sysroot_flags(sln)]
+
+
 # them: new or changed functions simply go without.
 PROFILE_USE_FLAGS = [
     "-Wno-profile-instr-unprofiled",
@@ -266,7 +323,10 @@ def march_flag(sln: Any) -> str:
     """The instruction set of the native x86 builds: this machine's
     (-march=native, the default), or with configure.py --portable the
     baseline every x86-64 processor has (SSE2), for builds that run on other
-    computers. The game stays 32-bit code either way."""
+    computers. The game stays 32-bit code either way. With configure.py
+    --linux-arch armv7 it is the ARMv7-A baseline."""
+    if is_armv7(sln):
+        return "-march=armv7-a"
     return "-march=x86-64" if getattr(sln, "port_portable", False) else "-march=native"
 
 
@@ -445,7 +505,10 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # a checkout without the port (or a test fixture): nothing to emit
         return
     config = _load_port_config()
-    build_dir: Path = sln.build_dir / "linux"
+    armv7 = is_armv7(sln)
+    if armv7 and getattr(sln, "port_portable", False):
+        raise ValueError("--portable is for x86 builds")
+    build_dir: Path = sln.build_dir / ("linux-armv7" if armv7 else "linux")
     obj_dir = build_dir / "obj"
     output = build_dir / "halo"
     cc = sln.linux_cc or "clang"
@@ -533,7 +596,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # (a debug build checks its stack frames, and stops at the first one
     # overrun, as it stops at the first failed assertion; a release build
     # does not, so that an overrun nobody has met cannot end a game)
-    abi = " ".join(LINUX_ABI_FLAGS + target + configuration_defines(sln)
+    abi = " ".join(abi_flags(sln) + target + configuration_defines(sln)
                    + ([] if getattr(sln, "port_release", False) else ["-fstack-protector-strong"]))
     port_include = PORT_DIR / "include"
     sdk_flags = f"-idirafter {XDK_INCLUDE}"
@@ -604,7 +667,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             "-Isource -Isource/cseries",
             sdk_flags,
         ])
-        posix_cflags = " ".join(POSIX_FLAGS + target + [f"-I{platform_dir}"])
+        posix_cflags = " ".join(posix_flags(sln) + target + [f"-I{platform_dir}"])
         # (with Mbed TLS's own locks, as built from its unchanged config by
         # these defines: on Linux the self-updater's thread (posix_update.c)
         # and internet play's (posix_dtls.c) both use it, and two threads
@@ -630,13 +693,13 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
         # wcslen, which linux_link_check.py rejects: the game's wchar_t is
         # 16-bit)
         for source in sorted((MBEDTLS_DIR / "library").glob("*.c")):
-            add_object(source, " ".join(POSIX_FLAGS + target + [mbedtls_include,
+            add_object(source, " ".join(posix_flags(sln) + target + [mbedtls_include,
                                                                 f"-I{MBEDTLS_DIR / 'library'}", "-fno-builtin-wcslen",
                                                                 "-w"]), posix=True)
         # internet play's UPnP (port/third_party/miniupnpc), with the host's
         # ABI as posix_upnp.c, which uses it
         for source in miniupnpc_sources():
-            add_object(source, " ".join(POSIX_FLAGS + target + [*MINIUPNPC_DEFINES,
+            add_object(source, " ".join(posix_flags(sln) + target + [*MINIUPNPC_DEFINES,
                                                                 f"-I{MINIUPNPC_DIR / 'include'}",
                                                                 f"-I{MINIUPNPC_DIR / 'src'}",
                                                                 "-fno-builtin-wcslen", "-w"]), posix=True)
@@ -668,14 +731,16 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
             rule="linux_link",
             inputs=objects,
             variables={
-                "ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *sysroot_ldflags,
+                "ldflags": " ".join([*link_target_flags(sln), "-no-pie", "-g", *sysroot_ldflags,
                                      *extra_ldflags,
                                      # (posix_trace_marker.c's, which the GPU driver's calls must reach)
+                                     *([f"-Wl,-T,{ARMV7_TAG_CACHE_SCRIPT}"] if armv7 else []),
                                      *(f"-Wl,--export-dynamic-symbol={name}"
                                        for name in ("open", "open64", "openat", "openat64"))]),
                 "libs": libs,
             },
-            implicit=[Path("tools/linux_link_check.py"), *([libsdl] if libsdl else [])],
+            implicit=[Path("tools/linux_link_check.py"), *([libsdl] if libsdl else []),
+                      *([Path(ARMV7_TAG_CACHE_SCRIPT)] if armv7 else [])],
         )
         # (the portable build's SDL3, beside the executable)
         if libsdl is not None:
@@ -704,7 +769,7 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
                 outputs=validator,
                 rule="linux_tool_link",
                 inputs=tool_objects,
-                variables={"ldflags": " ".join(["--target=i686-linux-gnu", "-m32", "-no-pie", "-g", *sysroot_ldflags,
+                variables={"ldflags": " ".join([*link_target_flags(sln), "-no-pie", "-g", *sysroot_ldflags,
                                                 *extra_ldflags])},
             )
 
@@ -712,7 +777,8 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # --pgo=train one that an instrumented build records while playing
     # (tools/pgo_train.py). A profile is trained once: code changed since
     # simply goes without, and deleting it trains a new one.
-    profile = pgo_profile(sln, LINUX_PROFILE, [], cc)
+    # (the committed profile is x86's: an armv7 build goes without)
+    profile = None if armv7 else pgo_profile(sln, LINUX_PROFILE, [], cc)
     if pgo_mode(sln) == "train" and profile == LINUX_PROFILE:
         instrumented = build_dir / "pgo-generate" / "halo"
         emit(build_dir / "pgo-generate" / "obj", instrumented, ["-fprofile-generate"], ["-fprofile-generate"], [])
@@ -737,6 +803,6 @@ def generate_linux_build(n: Writer, sln: Any) -> None:
     # (network.masters_file, server.masters_file)
     masters = build_dir / "masters.txt"
     n.build(outputs=masters, rule="linux_copy", inputs=Path("port/assets/network/masters.txt"))
-    n.build(outputs="linux", rule="phony",
+    n.build(outputs="linux_armv7" if armv7 else "linux", rule="phony",
             inputs=[output, brokers, masters, validator, *sdl_outputs])
     n.newline()
