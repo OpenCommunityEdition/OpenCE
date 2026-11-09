@@ -195,6 +195,7 @@ symbols in this file:
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
 #include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
+#include "atmospheric_fog_settle.h" /* port: port/linux/game/atmospheric_fog_settle.c */
 
 /* ---------- constants */
 
@@ -1530,6 +1531,9 @@ void scenario_get_atmospheric_fog(
 			interpolate_scalar(&fog_state->atmospheric_maximum_density, fog->maximum_density, distance);
 			interpolate_real_rgb_color(&fog_state->atmospheric_color, &fog->color, distance);
 			interpolate_scalar(&fog_state->indoor_fog_scale, indoor_fog_scale, distance);
+			/* port: and over time, so that a camera standing still gets the fog
+			where it is, not the one it was moving from (atmospheric_fog_settle.c) */
+			atmospheric_fog_settle(local_player_index, fog_state, fog, indoor_fog_scale);
 		}
 		else
 		{
@@ -1539,6 +1543,8 @@ void scenario_get_atmospheric_fog(
 			fog_state->atmospheric_color = fog->color;
 			fog_state->indoor_fog_scale = indoor_fog_scale;
 			fog_state->valid = TRUE;
+			/* port: (the time it settles from: atmospheric_fog_settle.c) */
+			atmospheric_fog_settle(local_player_index, fog_state, fog, indoor_fog_scale);
 		}
 		fog_state->camera_point = *camera_point;
 	}
