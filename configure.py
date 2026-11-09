@@ -29,6 +29,18 @@ parser.add_argument(
     help="compiler for the native Linux build, `ninja linux` (default: clang)",
 )
 parser.add_argument(
+    "--linux-arch",
+    choices=["x86", "armv7"],
+    default="x86",
+    help="the native Linux build's CPU: x86 (the default) or armv7, 32-bit ARM hard-float (ninja linux_armv7)",
+)
+parser.add_argument(
+    "--linux-sysroot",
+    metavar="DIR",
+    help="the root of the armhf system (headers, libc, SDL 3, OpenGL ES) a --linux-arch armv7 build "
+    "compiles and links against (default: the build machine's own)",
+)
+parser.add_argument(
     "--compiler-launcher",
     metavar="BINARY",
     help="a program that runs each compile, such as ccache "
@@ -131,11 +143,17 @@ try:
     check_profile_options(args.profile, args.pgo)
 except ValueError as error:
     parser.error(str(error))
+if args.linux_arch == "armv7" and args.portable:
+    parser.error("--linux-arch armv7 cannot be combined with --portable")
+if args.linux_arch == "armv7" and args.pgo == "train":
+    parser.error("--linux-arch armv7 cannot be combined with --pgo=train")
 
 # the settings the builds read
 sln = SimpleNamespace(
     build_dir=Path("build"),
     linux_cc=args.linux_cc,
+    linux_arch=args.linux_arch,
+    linux_sysroot=args.linux_sysroot,
     compiler_launcher=args.compiler_launcher,
     port_release=args.release,
     port_profile=args.profile,
@@ -198,6 +216,8 @@ n.newline()
 # the build for this computer, where it could be generated (the Windows
 # build is left out when SDL cannot be fetched, for instance)
 default = "windows" if is_windows() or sln.windows_cross else "linux"
+if default == "linux" and sln.linux_arch == "armv7":
+    default = "linux_armv7"
 if f"\nbuild {default}: " in out.getvalue():
     n.comment("Default rule: the build for this computer")
     n.default(default)
