@@ -7,7 +7,6 @@ from eltanschauung's #282 */
 struct model { real detail_cutoff_pixels[5]; };
 struct model_region_permutation { short geometry_indices[5]; };
 static struct { short debug_model_lod; } rasterizer_debug_options = {NONE};
-static struct { struct { real_point3d position; } camera; } render;
 static int stock;
 static int halo_model_detail_stock(void) { return stock; }
 #include "under_test.inc"
@@ -41,21 +40,20 @@ int main(int argc, char **argv)
         CHECK(level_of(&model, &permutation, 4, _model_detail_rules_outside) == NONE, "no outside geometry draws nothing");
         CHECK(level_of(&model, &permutation, 3, _model_detail_rules_stock) == 3, "stock draws the model's level");
     }
-    CASE("bounds") {
-        struct model model = {{0, 0, 0, 0, 3000}};
-        real_point3d center = {10, 20, 30}, camera = {10, 20, 30};
-        CHECK(model_detail_camera_inside(&model, &camera, &center, 2), "a sphere away from the origin");
-        camera.x = 11.999f; CHECK(model_detail_camera_inside(&model, &camera, &center, 2), "just inside");
-        camera.x = 12; CHECK(!model_detail_camera_inside(&model, &camera, &center, 2), "the sphere's surface is outside");
-        camera.x = 12.001f; CHECK(!model_detail_camera_inside(&model, &camera, &center, 2), "just outside");
-        CHECK(model_detail_camera_inside(&model, &camera, &center, 4), "a larger radius");
-        CHECK(!model_detail_camera_inside(&model, &camera, &center, 0), "zero radius");
-        CHECK(!model_detail_camera_inside(&model, &camera, &center, -1), "negative radius");
-        CHECK(!model_detail_camera_inside(&model, &camera, &center, INFINITY), "infinite radius");
-        CHECK(!model_detail_camera_inside(&model, &camera, &center, NAN), "radius not a number");
-        camera.x = NAN; CHECK(!model_detail_camera_inside(&model, &camera, &center, 2), "camera not a number");
-        model.detail_cutoff_pixels[4] = 500;
-        CHECK(!model_detail_camera_inside(&model, NULL, NULL, 2), "other models need no camera or sphere");
+    CASE("reached") {
+        /* a10's cryotube: its top level, at 3000, the tube with the Master Chief's armor in it */
+        struct model model = {{0, 0, 0, 0, 3000}}, rock = {{0, 1, 10, 50, 200}};
+        CHECK(model_detail_inside_reached(&model, 3000), "at its cutoff");
+        CHECK(model_detail_inside_reached(&model, 5520), "seated in it (its center 0.1 from the eyes)");
+        CHECK(model_detail_inside_reached(&model, REAL_MAX), "a cinematic's movie star");
+        CHECK(!model_detail_inside_reached(&model, 2999.9f), "just below its cutoff");
+        CHECK(!model_detail_inside_reached(&model, 1100), "standing by it, as one climbed out");
+        CHECK(!model_detail_inside_reached(&model, 0), "far off");
+        CHECK(!model_detail_inside_reached(&model, NAN), "a size not a number");
+        model.detail_cutoff_pixels[3] = 2000;
+        CHECK(model_detail_inside_reached(&model, 2000), "the first of several inside levels");
+        CHECK(!model_detail_inside_reached(&model, 1999), "below the first of several");
+        CHECK(!model_detail_inside_reached(&rock, REAL_MAX), "a model without an inside");
     }
     CASE("permutations") {
         struct model_region_permutation permutation;
@@ -77,19 +75,16 @@ int main(int argc, char **argv)
     }
     CASE("rules") {
         struct model cryotube = {{0, 0, 0, 0, 3000}}, rock = {{0, 1, 10, 50, 200}};
-        real_point3d center = {1, 2, 3};
-        render.camera.position = center;
         stock = TRUE;
-        CHECK(model_detail_rules(&cryotube, &center, 2) == _model_detail_rules_stock, "stock");
+        CHECK(model_detail_rules(&cryotube, 5520) == _model_detail_rules_stock, "stock");
         stock = FALSE;
-        CHECK(model_detail_rules(&cryotube, &center, 2) == _model_detail_rules_inside, "inside the cryotube");
-        CHECK(model_detail_rules(&rock, &center, 2) == _model_detail_rules_outside, "a model without an inside");
+        CHECK(model_detail_rules(&cryotube, 5520) == _model_detail_rules_inside, "inside the cryotube");
+        CHECK(model_detail_rules(&cryotube, 1100) == _model_detail_rules_outside, "standing by the cryotube");
+        CHECK(model_detail_rules(&rock, 5520) == _model_detail_rules_outside, "a model without an inside");
         rasterizer_debug_options.debug_model_lod = 4;
-        CHECK(model_detail_rules(&cryotube, &center, 2) == _model_detail_rules_stock,
+        CHECK(model_detail_rules(&cryotube, 1100) == _model_detail_rules_stock,
             "rasterizer_debug_model_lod draws the level it names");
         rasterizer_debug_options.debug_model_lod = NONE;
-        render.camera.position.z = 6;
-        CHECK(model_detail_rules(&cryotube, &center, 2) == _model_detail_rules_outside, "outside the cryotube");
     }
     return 0;
 }

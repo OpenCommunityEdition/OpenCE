@@ -25,12 +25,12 @@ enum
 	_model_detail_rules_inside,
 };
 
-/* the rules for a model drawn this frame, its bounding sphere in the world */
-short model_detail_rules(struct model const *model, real_point3d const *centroid, real radius);
-/* whether the camera is inside a model that has levels of its inside only:
-FALSE for any other model, and for a sphere that is not one */
-boolean model_detail_camera_inside(struct model const *model, real_point3d const *camera,
-	real_point3d const *centroid, real radius);
+/* the rules for a model drawn this frame, its size in the lines of the
+480-line screen given (the level of detail's pixels, as the Xbox measured) */
+short model_detail_rules(struct model const *model, real stock_pixels);
+/* whether a model that has levels of its inside is as large as the Xbox drew
+the first of them at (the camera inside it): FALSE for any other model */
+boolean model_detail_inside_reached(struct model const *model, real stock_pixels);
 /* the geometry a permutation draws for the model's level, NONE for none */
 short model_detail_geometry_index(struct model const *model,
 	struct model_region_permutation const *permutation, short level, short rules);
