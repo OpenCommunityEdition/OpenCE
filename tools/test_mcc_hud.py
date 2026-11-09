@@ -252,9 +252,10 @@ def test_icon_canvas_size_and_cursor_advance(hud_tool, players, menu, flags, ico
     handled, draws, scale, x, y, cursor, color, canvas = result.stdout.split()
     viewport = 0.75 if players > 1 and not menu else 1.0
     expected_scale = viewport * (0.25 if flags else 0.5)
-    offset_scale = viewport
-    expected_x = int(100 - 2 * offset_scale + int(menu))
-    expected_y = int(128 + 38 * expected_scale * 0.5) if menu else int(140 - 15 * offset_scale)
+    # Native gameplay offsets use bitmap units and truncate before cursor addition.
+    offset_scale = viewport if menu else expected_scale
+    expected_x = int(101 - 2 * viewport) if menu else 100 + int(-2 * offset_scale)
+    expected_y = int(128 + 38 * expected_scale * 0.5) if menu else 140 - int(15 * offset_scale)
     advance = -6 * offset_scale
     if not icon_flags & 4:
         advance += (30 if menu else 93) * expected_scale
@@ -278,12 +279,12 @@ def test_xbox_and_ce_dispatch_are_neutral(hud_tool, menu):
 @pytest.mark.parametrize("offset_y", [-5, 15])
 def test_messaging_offsets_preserve_stock_and_map_authored_values(hud_tool, players, offset_y):
     # Xbox/Mercury/Nitra use -5; Ruby changes only Y to +15. These text
-    # offsets must survive independently of the MCC bitmap canvas factor.
+    # offsets retain their signs and use the same bitmap units as the icon.
     result = subprocess.run([str(hud_tool), "1", str(players), "0", "16", "2", str(offset_y)],
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     viewport = 0.75 if players > 1 else 1.0
-    assert int(result.stdout.split()[4]) == int(140 - offset_y * viewport)
+    assert int(result.stdout.split()[4]) == 140 - int(offset_y * viewport * 0.25)
 
 
 @pytest.mark.parametrize("button", range(6))

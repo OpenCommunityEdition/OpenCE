@@ -29,10 +29,11 @@ binary only. These are observations, not copied engine code or SDK declarations.
 
 The port retains its legacy scalar calculation and admission outside MCC
 extension effects. Invalid or overflowing extension results are rejected.
-No native skull behavior is introduced. This testing branch retains network
-version 42 at the maintainer's request; release protocol versioning is deferred
-until the fix series is complete. It does not currently separate peers using
-the corrected simulation from older version 42 builds.
+No native skull behavior is introduced. Gulch testing retains network version
+41 and its separate MCC agreement at the maintainer's request. Xbox/CE packet
+layouts and scalar simulation remain unchanged. This testing update does not
+separate corrected MCC simulation from older builds using the same MCC agreement;
+MCC participants should use matching builds.
 
 Regression coverage extracts the production adapter and damage dispatch.
 It checks cardinal and opposite directions, signed and unequal components,
