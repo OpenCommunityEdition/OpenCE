@@ -195,6 +195,9 @@ BUILTINS = {
     "swat": ("slayer", True, "SWAT"), "infection": ("slayer", True, "Infection"), "gun_game": ("slayer", False, "Gun Game"),
     "hardcore": ("slayer", True, "Hardcore"), "hardcore_ctf": ("ctf", True, "HC CTF"),
     "hardcore_oddball": ("oddball", True, "HC Oddball"), "hardcore_king": ("king", True, "HC King"),
+    "one_in_the_chamber": ("slayer", False, "One Chamber"), "frag_nation": ("slayer", False, "Frag Nation"),
+    "snowball_fight": ("slayer", False, "Snowball"),
+    "melee_only": ("slayer", False, "Melee Only"), "needles": ("slayer", False, "Needles"),
 }
 GAMETYPE_ALIASES = {"ffa": "slayer", "ffa_slayer": "slayer", "teamslayer": "team_slayer", "tslayer": "team_slayer",
                     "koth": "king", "team_koth": "team_king", "iron_ctf": "ironctf", "teamrace": "team_race",

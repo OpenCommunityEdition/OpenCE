@@ -6870,9 +6870,11 @@ struct gametype_option
 static struct gametype_option const gametype_options[] =
 {
 	/* OPENCE OPTIONS (OpenCE's gametypes: game_modes.c) */
-	{ "oce_mode_spinner", _option_option_byte, OPTIONS_FIELD(mode), 0, 4,
-		{ _game_mode_none, _game_mode_swat, _game_mode_infection, _game_mode_gun_game } },
+	{ "oce_mode_spinner", _option_option_byte, OPTIONS_FIELD(mode), 0, 7,
+		{ _game_mode_none, _game_mode_swat, _game_mode_infection, _game_mode_gun_game, _game_mode_one_in_the_chamber,
+			_game_mode_frag_nation, _game_mode_snowball_fight } },
 	{ "oce_hardcore_spinner", _option_option_byte, OPTIONS_FIELD(hardcore), 0, 2, { FALSE, TRUE } },
+	{ "oce_bottomless_spinner", _option_option_byte, OPTIONS_FIELD(bottomless), 0, 2, { FALSE, TRUE } },
 	{ "inf_zombies_spinner", _option_option_byte, OPTIONS_FIELD(infection_initial_zombies), 0, 6, { 1, 2, 3, 4, 8, 16 } },
 	{ "inf_speed_spinner", _option_option_byte, OPTIONS_FIELD(infection_zombie_speed), 0, 6,
 		{ 100, 110, 125, 150, 175, 200 } },
@@ -6883,6 +6885,8 @@ static struct gametype_option const gametype_options[] =
 	{ "gg_order_spinner", _option_option_byte, OPTIONS_FIELD(gun_game_order), 0, 3,
 		{ _gun_game_order_strongest_first, _gun_game_order_weakest_first, _gun_game_order_random } },
 	{ "gg_melee_spinner", _option_option_byte, OPTIONS_FIELD(gun_game_melee_demotes), 0, 2, { FALSE, TRUE } },
+	{ "oitc_kill_spinner", _option_option_byte, OPTIONS_FIELD(chamber_kill_resets), 0, 2, { FALSE, TRUE } },
+	{ "fn_grenades_spinner", _option_option_byte, OPTIONS_FIELD(frag_nation_no_map_grenades), 0, 2, { FALSE, TRUE } },
 	/* player options */
 	{ "number_of_lives_spinner", _option_long, VARIANT_FIELD(universal_variant.lives), 0, 4, { 0, 1, 3, 5 } },
 	{ "maximum_health_spinner", _option_health, 0, 0, 6, { 5, 10, 15, 20, 30, 40 } },
@@ -6904,6 +6908,8 @@ static struct gametype_option const gametype_options[] =
 	{ "map_weapons_spinner", _option_option_byte, OPTIONS_FIELD(no_map_weapons), 0, 2, { 0, 1 } },
 	/* (the loadout: the weapon set's, or each player's two weapons) */
 	{ "loadout_spinner", _option_option_byte, OPTIONS_FIELD(loadout), 0, 2, { _loadout_category, _loadout_custom } },
+	/* (BOTTOMLESS, after the loadout: the same field as OPENCE OPTIONS' row) */
+	{ "bottomless_spinner", _option_option_byte, OPTIONS_FIELD(bottomless), 0, 2, { FALSE, TRUE } },
 	{ "primary_weapon_spinner", _option_option_byte, OPTIONS_FIELD(primary_weapon), 0, NUMBER_OF_LOADOUT_WEAPONS,
 		{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 } },
 	{ "secondary_weapon_spinner", _option_option_byte, OPTIONS_FIELD(secondary_weapon), 0, NUMBER_OF_LOADOUT_WEAPONS,
@@ -7370,13 +7376,13 @@ static boolean gametype_options_save(struct widget_instance *widget)
 	if (named(list, "op_team", 0))
 		vehicles_keep(list);
 	gametype_options_each(list, TRUE);
-	/* (OPENCE OPTIONS: Infection is played on teams, Gun Game free for all:
-	game_modes_variant_mode) */
+	/* (OPENCE OPTIONS: Infection is played on teams, Gun Game and One in the
+	Chamber free for all: game_modes_variant_mode) */
 	if (named(list, "oce_mode_spinner", 0) && edit_variant()->game_engine_index == game_engine_slayer)
 	{
 		if (edit_options()->mode == _game_mode_infection)
 			edit_variant()->universal_variant.teams = TRUE;
-		else if (edit_options()->mode == _game_mode_gun_game)
+		else if (edit_options()->mode == _game_mode_gun_game || edit_options()->mode == _game_mode_one_in_the_chamber)
 			edit_variant()->universal_variant.teams = FALSE;
 	}
 	return TRUE;
@@ -7590,20 +7596,23 @@ static void gametype_option_help(struct widget_instance *list)
 		visible_set(named(list, "op_primary_weapon", 0), custom);
 		visible_set(named(list, "op_secondary_weapon", 0), custom);
 	}
-	/* (OPENCE OPTIONS: the mode's own rows, Infection's or Gun Game's, below
-	MODE and HARDCORE) */
+	/* (OPENCE OPTIONS: the mode's own rows, Infection's, Gun Game's, One in
+	the Chamber's or Frag Nation's, below MODE, HARDCORE and BOTTOMLESS) */
 	if (named(list, "oce_mode_spinner", 0))
 	{
 		short mode = named(list, "oce_mode_spinner", 0)->parameters.list.selected_index;
-		short place = 73 + 2 * 30;
+		short place = 73 + 3 * 30;
 
 		for (row = list->child; row; row = row->next)
 		{
-			boolean infection = !strncmp(row->name, "op_inf_", 7);
+			short row_mode = !strncmp(row->name, "op_inf_", 7) ? _game_mode_infection :
+				!strncmp(row->name, "op_gg_", 6) ? _game_mode_gun_game :
+				!strncmp(row->name, "op_oitc_", 8) ? _game_mode_one_in_the_chamber :
+				!strncmp(row->name, "op_fn_", 6) ? _game_mode_frag_nation : NONE;
 
-			if (!infection && strncmp(row->name, "op_gg_", 6))
+			if (row_mode == NONE)
 				continue;
-			row->visible = infection ? mode == _game_mode_infection : mode == _game_mode_gun_game;
+			row->visible = mode == row_mode;
 			if (row->visible)
 			{
 				row->vertical_offset = place;

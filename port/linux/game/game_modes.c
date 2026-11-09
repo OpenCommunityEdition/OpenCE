@@ -1,12 +1,12 @@
 /*
 GAME_MODES.C
 
-OpenCE's gametypes: SWAT, Infection and Gun Game, modes of Slayer, and
-Hardcore, rules over any game engine's. Which a gametype plays is in its PC
-options (game_engine.h's struct game_variant_options, from mode on), which a
-saved gametype keeps (playlist_profile.c), the network game carries to every
-machine (network_game_manager.h) and the game plays by
-(game_variant_options_get).
+OpenCE's gametypes: SWAT, Infection, Gun Game, One in the Chamber, Frag
+Nation and Snowball Fight, modes of Slayer, and Hardcore, rules over any game
+engine's. Which a gametype plays is in its PC options (game_engine.h's struct
+game_variant_options, from mode on), which a saved gametype keeps
+(playlist_profile.c), the network game carries to every machine
+(network_game_manager.h) and the game plays by (game_variant_options_get).
 
 - SWAT: no shields, and a shot to the head of any weapon kills (damage.c).
   Its built-in gametype starts everyone with a pistol and an assault rifle,
@@ -16,8 +16,25 @@ machine (network_game_manager.h) and the game plays by
   the zombies win when no human is left, the humans when the time runs out.
 - Gun Game (gun_game.c): free for all. Each kill gives the killer the next
   weapon of a list; a kill with the last wins.
+- One in the Chamber (one_in_the_chamber.c): free for all. Everyone has a
+  pistol with one round and nothing else; another player's bullet kills at
+  once, and a kill gives the killer a round (or, chamber_kill_resets, sets
+  the pistol back to one). Its built-in gametype has 3 lives, so the last
+  player standing wins.
+- Frag Nation (frag_nation.c): no weapon (a blow with the bare hands), two
+  frag and two plasma grenades; a grenade kill gives the killer grenades
+  back. Its option leaves the map's grenades off it.
+- Snowball Fight (frag_nation.c): no weapon, four plasma grenades and none
+  on the map; a plasma kill gives the killer plasmas back.
 - Hardcore: no motion sensor, no aim assist, and a kill restores the
   killer's health and shields.
+
+The rules of One in the Chamber, Frag Nation and Snowball Fight are those of
+Chalwk's SPCLib scripts (MIT; their ideas and numbers, none of their code).
+Only the host gives the modes' weapons, rounds and grenades and decides
+their kills (a player's inventory goes to every machine with it:
+network_objects.c), so nothing new is sent: a machine that knows none of
+them plays them as the host has them, as Slayer.
 
 The built-in gametypes (game_modes_gametype) are written with the Xbox's
 default ones, after them, and the Select Gametype screen lists them in a bank
@@ -32,11 +49,15 @@ of their own (menu_functions.c's OPENCE).
 #include "networking/network_game_globals.h"
 #include "objects/objects.h"
 #include "units/units.h"
+#include "frag_nation.h"
 #include "game_modes.h"
 #include "gun_game.h"
 #include "infection.h"
+#include "one_in_the_chamber.h"
 
 #include <string.h>
+
+void platform_log(char const *format, ...);
 
 /* game_engine.c's values of the variant's (its enums goal_radar,
 game_engine_weapons and game_engine_vehicles) */
@@ -45,6 +66,13 @@ enum
 	GOAL_RADAR_NAV_POINT = 1,
 	WEAPON_SET_NO_GRENADES = 10,
 	VEHICLE_SET_NONE = 1
+};
+
+/* One in the Chamber's built-in gametype's lives (the last player standing
+wins: game_engine.c's multiple_teams_alive) */
+enum
+{
+	ONE_IN_THE_CHAMBER_DEFAULT_LIVES = 3
 };
 
 /* Infection's options when a gametype has none (game_modes_options_sanitize) */
@@ -66,6 +94,11 @@ enum
 	_gametype_hardcore_ctf,
 	_gametype_hardcore_oddball,
 	_gametype_hardcore_king,
+	_gametype_one_in_the_chamber,
+	_gametype_frag_nation,
+	_gametype_snowball_fight,
+	_gametype_melee_only,
+	_gametype_needles,
 	NUMBER_OF_GAMETYPES
 };
 
@@ -87,7 +120,15 @@ static struct
 	{ "hardcore_ctf", L"Hardcore CTF", L"HC CTF" },
 	{ "hardcore_oddball", L"Hardcore Oddball", L"HC Oddball" },
 	{ "hardcore_king", L"Hardcore King", L"HC King" },
+	{ "one_in_the_chamber", L"One in the Chamber", L"One Chamber" },
+	{ "frag_nation", L"Frag Nation", L"Frag Nation" },
+	{ "snowball_fight", L"Snowball Fight", L"Snowball" },
+	{ "melee_only", L"Melee Only", L"Melee Only" },
+	{ "needles", L"Needles", L"Needles" },
 };
+
+/* the kill being recorded's damage (game_modes_kill_damage) */
+static long game_modes_kill_damage_definition_index = NONE;
 
 /* the kill being recorded is a melee's (game_modes_kill_by_melee) */
 static boolean game_modes_melee_kill;
@@ -136,6 +177,11 @@ void game_modes_gametype(
 		*variant = *build_game_variant_team_king(&temporary);
 		break;
 	case _gametype_gun_game:
+	case _gametype_one_in_the_chamber:
+	case _gametype_frag_nation:
+	case _gametype_snowball_fight:
+	case _gametype_melee_only:
+	case _gametype_needles:
 		*variant = *build_game_variant_slayer(&temporary);
 		break;
 	default:
@@ -173,6 +219,36 @@ void game_modes_gametype(
 		variant->universal_variant.respawn_time = 90;
 		variant->universal_variant.suicide_penalty = 0;
 		options->no_map_weapons = TRUE;
+		break;
+	case _gametype_one_in_the_chamber:
+	case _gametype_frag_nation:
+	case _gametype_snowball_fight:
+		/* (the weapons, rounds and grenades are the mode's to give: a
+		loadout of none, and none on the map; the grenades the map has are
+		the mode's, game_modes_map_grenades_off) */
+		options->mode = index == _gametype_one_in_the_chamber ? _game_mode_one_in_the_chamber :
+			index == _gametype_frag_nation ? _game_mode_frag_nation : _game_mode_snowball_fight;
+		variant->universal_variant.vehicle_set = VEHICLE_SET_NONE;
+		if (index == _gametype_one_in_the_chamber)
+			variant->universal_variant.lives = ONE_IN_THE_CHAMBER_DEFAULT_LIVES;
+		options->loadout = _loadout_custom;
+		options->primary_weapon = _loadout_weapon_none;
+		options->secondary_weapon = _loadout_weapon_none;
+		options->no_map_weapons = TRUE;
+		break;
+	case _gametype_melee_only:
+	case _gametype_needles:
+		/* (made of the variant's own fields and Bottomless, with no mode of
+		their own: no weapons on the map, the weapon set that has no
+		grenades, the map's and the start's, and a loadout of none for Melee
+		Only, of the needler for Needles) */
+		variant->universal_variant.weapon_set = WEAPON_SET_NO_GRENADES;
+		variant->universal_variant.vehicle_set = VEHICLE_SET_NONE;
+		options->loadout = _loadout_custom;
+		options->primary_weapon = index == _gametype_needles ? _loadout_weapon_needler : _loadout_weapon_none;
+		options->secondary_weapon = _loadout_weapon_none;
+		options->no_map_weapons = TRUE;
+		options->bottomless = index == _gametype_needles;
 		break;
 	default:
 		options->hardcore = TRUE;
@@ -225,6 +301,9 @@ void game_modes_options_default(
 	options->infection_zombie_shields = TRUE;
 	options->gun_game_order = _gun_game_order_strongest_first;
 	options->gun_game_melee_demotes = TRUE;
+	options->chamber_kill_resets = FALSE;
+	options->frag_nation_no_map_grenades = FALSE;
+	options->bottomless = FALSE;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 
@@ -259,6 +338,10 @@ void game_modes_options_sanitize(
 		options->gun_game_order = _gun_game_order_strongest_first;
 	options->gun_game_melee_demotes = options->gun_game_melee_demotes != FALSE;
 	options->force_team_spawns = options->force_team_spawns != FALSE;
+	/* (taken from reserved: a value but 1 reads as off) */
+	options->chamber_kill_resets = options->chamber_kill_resets == TRUE;
+	options->frag_nation_no_map_grenades = options->frag_nation_no_map_grenades == TRUE;
+	options->bottomless = options->bottomless == TRUE;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 
@@ -276,6 +359,12 @@ short game_modes_variant_mode(
 		return variant->universal_variant.teams ? _game_mode_infection : _game_mode_none;
 	case _game_mode_gun_game:
 		return !variant->universal_variant.teams ? _game_mode_gun_game : _game_mode_none;
+	case _game_mode_one_in_the_chamber:
+		return !variant->universal_variant.teams ? _game_mode_one_in_the_chamber : _game_mode_none;
+	case _game_mode_frag_nation:
+		return _game_mode_frag_nation;
+	case _game_mode_snowball_fight:
+		return _game_mode_snowball_fight;
 	}
 	return _game_mode_none;
 }
@@ -300,6 +389,9 @@ wchar_t const *game_modes_kind_name(
 		{ { L"SWAT", L"SWAT" }, { L"HARDCORE SWAT", L"HC SWAT" } },
 		{ { L"INFECTION", L"INFECTION" }, { L"HARDCORE INFECTION", L"HC INFECTION" } },
 		{ { L"GUN GAME", L"GUN GAME" }, { L"HARDCORE GUN GAME", L"HC GUN GAME" } },
+		{ { L"ONE IN THE CHAMBER", L"1 CHAMBER" }, { L"HARDCORE ONE IN THE CHAMBER", L"HC 1 CHAMBER" } },
+		{ { L"FRAG NATION", L"FRAG NATION" }, { L"HARDCORE FRAG NATION", L"HC FRAG NATION" } },
+		{ { L"SNOWBALL FIGHT", L"SNOWBALL" }, { L"HARDCORE SNOWBALL FIGHT", L"HC SNOWBALL" } },
 	};
 	static wchar_t const *const hardcore_names[][2] =
 	{
@@ -333,7 +425,12 @@ boolean game_modes_variant_is_opence(
 	struct game_variant const *variant,
 	struct game_variant_options const *options)
 {
-	return options && (options->hardcore || game_modes_variant_mode(variant, options) != _game_mode_none);
+	/* (Bottomless, and Melee Only's loadout of none with no weapons on the
+	map, are the rules of the two built-ins that have no mode) */
+	return options && (options->hardcore || options->bottomless ||
+		(options->loadout == _loadout_custom && options->primary_weapon == _loadout_weapon_none &&
+			options->secondary_weapon == _loadout_weapon_none && options->no_map_weapons) ||
+		game_modes_variant_mode(variant, options) != _game_mode_none);
 }
 
 /* ---- the game being played */
@@ -365,6 +462,11 @@ struct game_engine *game_modes_engine(
 		return infection_engine_get(engine);
 	case _game_mode_gun_game:
 		return gun_game_engine_get(engine);
+	case _game_mode_one_in_the_chamber:
+		return one_in_the_chamber_engine_get(engine);
+	case _game_mode_frag_nation:
+	case _game_mode_snowball_fight:
+		return frag_nation_engine_get(engine);
 	}
 	return engine;
 }
@@ -380,6 +482,60 @@ void game_modes_postspawn(
 	case _game_mode_gun_game:
 		gun_game_postspawn(player_index);
 		break;
+	case _game_mode_one_in_the_chamber:
+		one_in_the_chamber_postspawn(player_index);
+		break;
+	case _game_mode_frag_nation:
+	case _game_mode_snowball_fight:
+		frag_nation_postspawn(player_index);
+		break;
+	}
+}
+
+struct unit_datum *game_modes_host_unit(
+	long player_index)
+{
+	struct player_datum *player;
+	struct unit_datum *unit;
+
+	if (network_game_distributed_client() || player_index == NONE)
+		return NULL;
+	player = player_try_and_get(player_index);
+	if (!player || player->quit_out_of_game || player->unit_index == NONE)
+		return NULL;
+	unit = unit_try_and_get(player->unit_index);
+	if (!unit || TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+		return NULL;
+	return unit;
+}
+
+void game_modes_delete_weapons(
+	long unit_index)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	short slot;
+	short other;
+
+	for (slot = 0; slot < MAXIMUM_WEAPONS_PER_UNIT; slot++)
+	{
+		long weapon_index = unit->unit.weapon_object_indices[slot];
+
+		if (weapon_index == NONE)
+			continue;
+		/* (each deleted once, should two slots hold it) */
+		for (other = slot; other < MAXIMUM_WEAPONS_PER_UNIT; other++)
+		{
+			if (unit->unit.weapon_object_indices[other] == weapon_index)
+			{
+				unit->unit.weapon_object_indices[other] = NONE;
+				if (unit->unit.current_weapon_index == other)
+					unit->unit.current_weapon_index = NONE;
+				if (unit->unit.desired_weapon_index == other)
+					unit->unit.desired_weapon_index = NONE;
+			}
+		}
+		if (object_try_and_get(weapon_index))
+			object_delete(weapon_index);
 	}
 }
 
@@ -425,6 +581,18 @@ boolean game_modes_killed_by_melee(
 	return game_modes_melee_kill;
 }
 
+void game_modes_kill_damage(
+	long damage_definition_index)
+{
+	game_modes_kill_damage_definition_index = damage_definition_index;
+}
+
+long game_modes_killing_damage(
+	void)
+{
+	return game_modes_kill_damage_definition_index;
+}
+
 boolean game_modes_headshot_kills(
 	long object_index,
 	boolean shot)
@@ -435,6 +603,50 @@ boolean game_modes_headshot_kills(
 		return FALSE;
 	unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index, _object_mask_biped);
 	return unit && unit->unit.player_index != NONE;
+}
+
+boolean game_modes_hit_kills(
+	long owner_player_index,
+	long object_index,
+	boolean bullet)
+{
+	struct unit_datum *unit;
+
+	/* (the host's: a client takes the kill from it) */
+	if (!bullet || owner_player_index == NONE || game_modes_mode() != _game_mode_one_in_the_chamber ||
+		network_game_distributed_client())
+	{
+		return FALSE;
+	}
+	unit = (struct unit_datum *)object_try_and_get_and_verify_type(object_index, _object_mask_biped);
+	if (!unit || unit->unit.player_index == NONE || unit->unit.player_index == owner_player_index)
+		return FALSE;
+	platform_log("one in the chamber: player %ld's bullet kills player %ld",
+		(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(owner_player_index),
+		(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(unit->unit.player_index));
+	return TRUE;
+}
+
+boolean game_modes_map_grenades_off(
+	void)
+{
+	switch (game_modes_mode())
+	{
+	case _game_mode_one_in_the_chamber:
+	case _game_mode_snowball_fight:
+		return TRUE;
+	case _game_mode_frag_nation:
+		return game_variant_options_get()->frag_nation_no_map_grenades;
+	}
+	return FALSE;
+}
+
+boolean game_modes_bottomless(
+	void)
+{
+	/* (the host's, and a local game's: a client's weapons are the host's
+	state, which it takes with the player's inventory) */
+	return !network_game_distributed_client() && game_engine_running() && game_variant_options_get()->bottomless;
 }
 
 boolean game_modes_motion_sensor_hidden(

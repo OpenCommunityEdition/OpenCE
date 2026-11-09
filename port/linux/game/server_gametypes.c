@@ -87,6 +87,7 @@ static struct
 static char const *const server_opence_gametypes[] =
 {
 	"swat", "infection", "gun_game", "hardcore", "hardcore_ctf", "hardcore_oddball", "hardcore_king",
+	"one_in_the_chamber", "frag_nation", "snowball_fight", "melee_only", "needles",
 };
 
 char const *server_gametype_builtin_name(
