@@ -5381,6 +5381,8 @@ static boolean ui_widget_port_text_wrap(
 
 /* port: port/linux/game/menu_functions.c; optional centered PC join legends. */
 boolean menu_functions_glyph_text(struct widget_instance *widget, rectangle2d const *bounds);
+/* port: MCC-owned keyboard legend identities, with native controller fallback. */
+short menu_functions_glyph_button(struct widget_instance *widget, short native);
 
 static void widget_instance_render_text_box(
 	struct widget_instance *widget,
@@ -7373,7 +7375,7 @@ static void widget_instance_render_recursive(
 				shown = bounds.x1 > bounds.x0 && bounds.y1 > bounds.y0;
 			}
 			/* port: retain native drawing unless a recognized PC-menu legend is replaced. */
-			if (shown && !menu_button_glyph_draw(ui_mouse_key_button(widget),
+			if (shown && !menu_button_glyph_draw(menu_functions_glyph_button(widget, ui_mouse_key_button(widget)),
 				widget->local_player_index >= 0 && widget->local_player_index < 4 ?
 				widget->local_player_index : 0, &bounds, clip, color))
 			{

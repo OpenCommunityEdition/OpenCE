@@ -231,7 +231,8 @@ static short observed_port;
 static int controller_button_style_for_port(short p){observed_port=p;return 4;}
 static char const *bumper_style="original";
 static char const *config_string(char const *s){assert(!strcmp(s,"display.hud_bumper_style"));return bumper_style;}
-static int players=1,allocations,live,draws,fail;static long ticks,last_asset;
+static int players=1,allocations,live,draws,fail,unbound;static long ticks,last_asset;
+static void unbind(unsigned long const *p){assert(p);unbound++;}
 static struct dynamic_screen_vertex drawn[4];
 static long game_time_get(void){return ticks;}
 static int local_player_count(void){return players;}
@@ -289,6 +290,20 @@ int main(void){
  fail=0;assert(controller_glyph_draw(4,0,&icon,&cursor,0));assert(drawn[0].color==0xffffff);
  for(style=-1;style<3;style++)assert(!controller_glyph_draw(style,0,&icon,&cursor,0));
  assert(!controller_glyph_draw(11,0,&icon,&cursor,0));controller_glyphs_dispose();assert(!live);
+ /* A menu can allocate first; MCC's later binding must survive ordinary draws
+  * until the shared cache unbinds it before deleting the bitmap. */
+ {real_rectangle2d uv;
+  assert(controller_glyph_bitmap(4,0,&uv));before=allocations;
+  assert(controller_glyph_draw_with_release(4,0,&icon,&cursor,0,unbind));
+  assert(controller_glyph_bitmap(4,0,&uv));
+  assert(controller_glyph_draw(4,0,&icon,&cursor,0));
+  assert(allocations==before&&!unbound);
+  controller_glyphs_dispose();assert(!live&&unbound==1);
+  controller_glyphs_dispose();assert(unbound==1);
+  assert(controller_glyph_bitmap(4,0,&uv));
+  controller_glyphs_dispose();assert(!live&&unbound==1);
+ }
+
  return 0;
 }
 '''

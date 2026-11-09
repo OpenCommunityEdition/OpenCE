@@ -137,7 +137,7 @@ static void rasterizer_draw_unicode_string_offset(rectangle2d const *r,wchar_t c
  assert(ink.x0+ink.x1+2*x==2*bx+bw);
  assert(ink.y0+ink.y1+2*y==2*by+bh);
 }
-''' + function(source,'keyboard_glyph_draw') + r'''
+''' + function(source,'keyboard_glyph_draw_padded') + function(source,'keyboard_glyph_draw') + r'''
 int main(void){
  rectangle2d r={10,20,600,100};short single;
  keyboard_glyph_draw("F",&r,0x80ffffff,0);single=r.x0-10;

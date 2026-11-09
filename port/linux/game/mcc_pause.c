@@ -258,6 +258,42 @@ static long mcc_pause_key(short layout, boolean confirm)
     return key;
 }
 
+/* Only owned button-key children expose these semantics. No map tag names or
+ * foreign widget layouts are interpreted by the keyboard menu adapter. */
+short mcc_pause_key_button(long parent, long child)
+{
+    struct mcc_pause_widget const *key = mcc_pause_definition(parent);
+    struct mcc_pause_child const *children;
+    if (!key || strcmp(key->name, "button_key") || key->children.count != 4) return NONE;
+    children = key->children.address;
+    if (children[0].widget.index == child) return 1;
+    if (children[2].widget.index == child) return 0;
+    return NONE;
+}
+
+short mcc_pause_key_offset(long parent, long child, short accept_width, short back_width)
+{
+    struct mcc_pause_widget const *key = mcc_pause_definition(parent), *accept, *back, *cancel;
+    struct mcc_pause_child const *children;
+    short accept_extra, back_extra, shift, gap;
+    if (accept_width <= 0 || back_width <= 0) return 0;
+    if (!key || strcmp(key->name, "button_key") || key->children.count != 4) return 0;
+    children = key->children.address;
+    if (children[0].widget.index != child && children[1].widget.index != child &&
+        children[2].widget.index != child && children[3].widget.index != child) return 0;
+    accept = mcc_pause_definition(children[2].widget.index);
+    back = mcc_pause_definition(children[0].widget.index);
+    cancel = mcc_pause_definition(children[1].widget.index);
+    if (!accept || !back || !cancel) return 0;
+    gap = MAX(0, children[2].x - children[1].x - cancel->bounds.right - 2);
+    accept_extra = MAX(0, accept_width - (accept->bounds.right - accept->bounds.left));
+    back_extra = MAX(0, back_width - (back->bounds.right - back->bounds.left));
+    accept_extra -= gap;
+    shift = -(accept_extra - back_extra) / 2;
+    if (children[2].widget.index == child || children[3].widget.index == child) shift += accept_extra;
+    return shift;
+}
+
 static long mcc_pause_dialog(short layout, boolean pauses, short kind)
 {
     static short const actions[CONFIRM_COUNT] = {MCC_PAUSE_ACTION_REVERT, MCC_PAUSE_ACTION_RESTART,

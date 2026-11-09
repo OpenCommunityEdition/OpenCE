@@ -11,7 +11,7 @@
 #include <string.h>
 #include <wchar.h>
 
-void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, int menu)
+static void keyboard_glyph_draw_padded(char const *label, rectangle2d *cursor, pixel32 color, int menu, real padding)
 {
     wchar_t text[64];
     rectangle2d measure = *cursor;
@@ -47,7 +47,7 @@ void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, 
     rasterizer_unicode_string_ink_bounds(&measure, text, &ink);
     middle = (capitals.y0 + capitals.y1) * .5f;
     height = MAX(20.0f, capitals.y1 - capitals.y0 + 10.0f);
-    width = symbol ? height : MAX(height, ink.x1 - ink.x0 + 12.0f);
+    width = symbol ? height : MAX(height, ink.x1 - ink.x0 + padding);
     /* HUD text retracts its cursor by three units after each text segment.
      * Recenter within that existing advance so gaps on either side match. */
     x = cursor->x0 + (menu ? 4.0f : 7.0f);
@@ -55,7 +55,7 @@ void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, 
     if (!keyboard_glyph_background(symbol, x, y, width, height, edge))
     {
         symbol = 0;
-        width = MAX(height, ink.x1 - ink.x0 + 12.0f);
+        width = MAX(height, ink.x1 - ink.x0 + padding);
     }
     if (!symbol)
         rasterizer_draw_unicode_string_offset(&measure, text,
@@ -64,6 +64,18 @@ void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, 
     draw_string_set_color(&old_color);
     draw_string_set_indents(initial_indent, paragraph_indent);
     cursor->x0 = (short)(x + width + (menu ? 4.5f : 1.5f));
+}
+
+/* Preserve GulchCE's original dimensions for gameplay and ordinary menus. */
+void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, int menu)
+{
+    keyboard_glyph_draw_padded(label, cursor, color, menu, 12.0f);
+}
+
+/* Compact pause slots keep the same font, height and complete outline. */
+void keyboard_glyph_draw_compact(char const *label, rectangle2d *cursor, pixel32 color)
+{
+    keyboard_glyph_draw_padded(label, cursor, color, TRUE, 8.0f);
 }
 
 /* HUD message element semantics precede controller/profile translation.

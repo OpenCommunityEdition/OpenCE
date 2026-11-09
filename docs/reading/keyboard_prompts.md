@@ -70,8 +70,14 @@ existing click targets and fixed menu controls. A uses Enter, B uses Esc, X uses
 Del and Y uses Tab. Keyboard caps extend left from the original icon
 slot to fit readable names while retaining the following label position. Inline
 tokens reserve their full cap width. Known bottom legend groups expand from
-right to left by each later keycap's extra width, preserving the gaps and moving
-click targets with their labels. The optional offset hook runs before target
+right to left by each later keycap's extra width. Compact pause footers instead
+recover spare space between CANCEL and SELECT, expand the accept group to the
+right, and balance the added width around the original center. This leaves room
+for both keycaps inside the narrow campaign and multiplayer panels. Their compact
+16-by-20 slots use four units of keycap padding per side instead of six, with the
+same text size and complete outline. Other menus and gameplay retain the imported
+GulchCE dimensions. Click targets
+move with their labels. The optional offset hook runs before target
 registration; tag definitions and saved state are unchanged. The join screen suppresses duplicate plain
 Enter/Esc hints in keyboard-glyph mode, retaining the independent Space-to-join
 hint and temporary notices. `menu_button_glyph_join_draw` measures both localized
@@ -88,6 +94,14 @@ These hooks are necessary because a feature module cannot intercept native bitma
 or inline draws through existing interfaces. The menu module owns selection and
 layout; the source hooks only offer the existing draw to it.
 
+MCC pause definitions remain owned by [mcc_pause.c](../../port/linux/game/mcc_pause.c).
+`mcc_pause_key_button` identifies only its own footer icons; `mcc_pause_key_offset`
+reads those owned child bounds to apply the compact keyboard layout. The context
+adapter calls these only in PC keyboard mode. MCC controller drawing, map tags,
+Xbox menu selection and disabled-feature behavior are unchanged. The bitmap hook
+is needed because MCC's generated key items do not have legacy button-tag names;
+foreign handles and handles from disposed/rebuilt menus are rejected.
+
 Controller artwork shares the existing gameplay caches through
 `controller_glyph_bitmap` and `hud_hires_button_bitmap`: the high-resolution
 registry permits only one placeholder per asset, so a separate menu cache would
@@ -99,9 +113,10 @@ private renderer state so the menu adapter can restore its caller after selectin
 the small UI font. Existing setters alone cannot restore unknown formatting.
 Both gameplay and menu keycaps use the imported `keyboard_glyph_draw` and
 `keyboard_glyph_art.c` directly, including GulchCE's blue menu outline, rounded
-geometry, padding and font-based dimensions. The only renderer adjustment restores
-the caller's indentation; the OpenCE adapter positions caps and measures space for
-the surrounding legend. Keyboard menu artwork works with High-Res HUD off.
+geometry and font-based dimensions. `keyboard_glyph_draw` retains the original
+12-unit horizontal padding; `keyboard_glyph_draw_compact` uses eight only for
+compact menu slots. Both restore the caller's indentation. The OpenCE adapter
+positions caps and measures space for the surrounding legend. Keyboard menu artwork works with High-Res HUD off.
 
 ## Provenance and checks
 
@@ -110,7 +125,8 @@ Adapted from [GulchCE](https://github.com/chestahh/GulchCE), commits
 `a0cebafba3da2b74bfaf0b54df80360087c9af3d`, under AGPL-3.0-or-later.
 The artwork is original procedural geometry with the active project font.
 The GulchCE mock-up was a visual reference; none of its generated pixels ship.
-This extraction excludes the modern frontend and MCC compatibility code.
+This extraction excludes the modern frontend. OpenCE testing now includes MCC
+support; its generated pause keys use the MCC-owned adapters described above.
 
 [test_keyboard_glyphs.py](../../tools/test_keyboard_glyphs.py) exercises production
 policy, semantic resolution, live labels, secondary/unbound bindings, custom-icon
@@ -118,6 +134,9 @@ fallback, ink metrics, padding, opacity, allocation failures and repeated cleanu
 [test_menu_button_glyphs.py](../../tools/test_menu_button_glyphs.py) exercises
 PC-only gating, complete-line centering, keycap spacing, original menu palette,
 legacy/controller families, formatting restoration and failure fallbacks.
+[test_mcc_keyboard_glyphs.py](../../tools/test_mcc_keyboard_glyphs.py) runs the
+complete MCC pause builder and checks footer identities, group spacing and stale
+handles across disposal/rebuild.
 [test_controller_buttons.py](../../tools/test_controller_buttons.py) covers pending
 opt-in/detection settings, family transitions, manual Keyboard, focus recovery,
 and generated screens. A mocked layout lookup verifies binding-reader delegation;

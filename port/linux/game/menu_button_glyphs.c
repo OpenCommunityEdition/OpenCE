@@ -33,8 +33,8 @@ static wchar_t const *menu_button_key(short button)
 }
 
 /* OpenCE supplies a menu font and positions the imported GulchCE renderer.
- * Its palette, rounded geometry, padding and text sizing are not reimplemented. */
-static real menu_button_key_layout(short button, rectangle2d const *box, pixel32 color)
+ * Compact slots reduce horizontal padding; palette, outline and font stay intact. */
+static real menu_button_key_layout(short button, rectangle2d const *box, pixel32 color, boolean compact)
 {
     long font = tag_loaded('font', "ui\\small_ui"), old_font;
     short style, justification, initial, paragraph;
@@ -59,7 +59,7 @@ static real menu_button_key_layout(short button, rectangle2d const *box, pixel32
     rasterizer_unicode_string_ink_bounds(&measure, L"H", &capitals);
     rasterizer_unicode_string_ink_bounds(&measure, key, &ink);
     height = MAX(20.0f, capitals.y1 - capitals.y0 + 10.0f);
-    width = MAX(height, ink.x1 - ink.x0 + 12.0f);
+    width = MAX(height, ink.x1 - ink.x0 + (compact ? 8.0f : 12.0f));
     middle = (capitals.y0 + capitals.y1) * .5f;
     if (box)
     {
@@ -67,7 +67,8 @@ static real menu_button_key_layout(short button, rectangle2d const *box, pixel32
         cursor.x1 = 2048;
         cursor.y0 = (short)((box->y0 + box->y1) * .5f - middle + .5f);
         cursor.y1 = 2048;
-        keyboard_glyph_draw(label, &cursor, color, TRUE);
+        if (compact) keyboard_glyph_draw_compact(label, &cursor, color);
+        else keyboard_glyph_draw(label, &cursor, color, TRUE);
     }
     draw_string_set_draw_mode(old_font, style, justification, flags, &old_color);
     draw_string_set_indents(initial, paragraph);
@@ -76,7 +77,12 @@ static real menu_button_key_layout(short button, rectangle2d const *box, pixel32
 
 short menu_button_glyph_key_width(short button)
 {
-    return (short)(menu_button_key_layout(button, NULL, 0) + .999f);
+    return (short)(menu_button_key_layout(button, NULL, 0, FALSE) + .999f);
+}
+
+short menu_button_glyph_compact_key_width(short button)
+{
+    return (short)(menu_button_key_layout(button, NULL, 0, TRUE) + .999f);
 }
 
 boolean menu_button_glyph_draw(short button, short port, rectangle2d const *bounds,
@@ -88,6 +94,7 @@ boolean menu_button_glyph_draw(short button, short port, rectangle2d const *boun
     real_rectangle2d uv;
     rectangle2d key_box;
     short style, i;
+    boolean compact;
     real width, height, fit, x, y, art_width, art_height;
     if (!menu_button_glyph_enabled(button, port)) return FALSE;
     width = bounds->x1 - bounds->x0; height = bounds->y1 - bounds->y0;
@@ -99,10 +106,12 @@ boolean menu_button_glyph_draw(short button, short port, rectangle2d const *boun
     {
         /* Keep the label-facing edge fixed. The original controller picture is
          * tall and narrow; key names need a wider cap with a horizontal baseline. */
+        compact = width <= 16.0f && height <= 20.0f;
         key_box = *bounds;
-        key_box.x0 = key_box.x1 - menu_button_glyph_key_width(button);
+        key_box.x0 = key_box.x1 - (compact ? menu_button_glyph_compact_key_width(button) :
+            menu_button_glyph_key_width(button));
         if (key_box.x0 < 0) return FALSE;
-        return menu_button_key_layout(button, &key_box, color) > 0.0f;
+        return menu_button_key_layout(button, &key_box, color, compact) > 0.0f;
     }
     style = (short)controller_button_style_for_port(port);
     if (style < 3)
