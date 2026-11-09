@@ -4,6 +4,7 @@ GPU allocation is mocked. These checks establish data/ownership behavior;
 they do not substitute for an in-game rendering test.
 """
 import os
+import re
 from pathlib import Path
 import shutil
 import struct
@@ -11,6 +12,8 @@ import subprocess
 import sys
 
 import pytest
+
+from harness import function, structure
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -72,6 +75,47 @@ def geometry_tool(tmp_path_factory):
     command += [str(ROOT/p) for p in ["port/tools/mcc_geometry_check.c",
                 "port/linux/game/mcc_geometry.c", "port/linux/game/mcc_cache_format.c",
                 "source/rasterizer/rasterizer_geometry.c"]]
+    # Exercise the real legacy callback with the same long strips. Its
+    # original 16-bit count limit must remain effective for Xbox/CE.
+    schema = (ROOT / "port/linux/game/tag_schema_models.c").read_text()
+    sizes = re.search(r"static short const model_vertex_type_sizes\[.*?\n};", schema, re.S).group()
+    legacy = output.parent / "legacy.c"
+    legacy.write_text("""
+#include "cseries.h"
+#include "tag_files/tag_groups.h"
+#include "rasterizer/rasterizer_geometry.h"
+#include "models/model_definitions.h"
+#include "tag_schema.h"
+#include <string.h>
+static byte vertex_data[96];
+static word index_data[70945];
+static int corrections;
+void tag_validate_correct(struct tag_validation *v,char const *f,...) {(void)v;(void)f;corrections++;}
+boolean tag_validate_contains(struct tag_validation *v,void const *p,unsigned long n)
+{(void)v;return (p==vertex_data && n<=sizeof(vertex_data)) || (p==index_data && n<=sizeof(index_data));}
+boolean tag_validate_any_claimed(void const *p,unsigned long n) {(void)p;(void)n;return FALSE;}
+void *tag_validate_vertex_buffer_data(struct tag_validation *v,void const *p) {(void)v;(void)p;return vertex_data;}
+void *tag_validate_index_buffer_data(struct tag_validation *v,void const *p) {(void)v;(void)p;return index_data;}
+""" + structure(schema, "model_geometry_part") + "\n" + sizes + "\n" +
+        function(schema, "model_geometry_part_check") + """
+int legacy_model_limits_check(void) {
+    struct model_geometry_part part;
+    long counts[]={65535,65536,70943};
+    int i;
+    for(i=0;i<3;i++) {
+        memset(&part,0,sizeof(part));corrections=0;
+        part.vertex_buffer.type=_rasterizer_vertex_type_model_compressed;
+        part.vertex_buffer.count=3;part.vertex_buffer.hardware_format=vertex_data;
+        part.triangle_buffer.type=_triangle_buffer_type_precompiled_strip;
+        part.triangle_buffer.count=counts[i];part.triangle_buffer.hardware_format=index_data;
+        if(!model_geometry_part_check(NULL,&part)) return 0;
+        if(i==0 ? (!part.triangle_buffer.hardware_format || corrections) :
+            (part.triangle_buffer.hardware_format || corrections!=1)) return 0;
+    }
+    return 1;
+}
+""")
+    command += [str(legacy)]
     command += ["-o", str(output), "-lkernel32"]
     result = subprocess.run(command, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -188,3 +232,93 @@ def test_missing_model_tangent_frames_are_reconstructed(geometry_tool, tmp_path,
     code, fields = run(geometry_tool, path)
     assert code == 0
     assert int(fields["created_buffers"]) > 0
+
+
+def large_strip_map(triangles, *, declared=None, repair=False, vertices=3):
+    data = geometry_map()
+    tag_offset = 0xC00
+    tags = data[tag_offset:]
+    vertex_data = bytearray(data[0xB00:0xB00+204] * (vertices // 3))
+    vertex_data.extend(data[0xB00:0xB00+(vertices % 3)*68])
+    if repair:
+        for vertex in range(vertices):
+            struct.pack_into("<6f", vertex_data, vertex*68+24, *([float("nan")]*6))
+    stream = struct.pack("<" + "H"*(triangles+2), *[i % vertices for i in range(triangles+2)])
+    tag_offset = (0xB00+len(vertex_data)+len(stream)+3) & ~3
+    result = data[:0xB00] + vertex_data + stream
+    result.extend(bytes(tag_offset-len(result)))
+    result.extend(tags)
+    struct.pack_into("<I", result, 8, len(result))
+    struct.pack_into("<I", result, 16, tag_offset)
+    struct.pack_into("<I", result, tag_offset+28, len(vertex_data))
+    struct.pack_into("<I", result, tag_offset+32, len(vertex_data)+len(stream))
+    struct.pack_into("<I", result, tag_offset+0x998, vertices)
+    struct.pack_into("<I", result, tag_offset+0x988, triangles if declared is None else declared)
+    return result
+
+
+@pytest.mark.parametrize("triangles", [65535, 65536, 70943, 1048576])
+def test_large_strip_preserves_count_and_validates_owned_buffers(geometry_tool, tmp_path, triangles):
+    path = tmp_path / "large.map"
+    path.write_bytes(large_strip_map(triangles))
+    code, fields = run(geometry_tool, path)
+    assert code == 0
+    assert int(fields["maximum_triangles"]) == triangles
+
+
+@pytest.mark.parametrize("count", [0, 1048577, 0x7fffffff, 0xfffffffe, 0xffffffff])
+def test_untrusted_strip_counts_are_rejected(geometry_tool, tmp_path, count):
+    path = tmp_path / "overflow.map"
+    path.write_bytes(large_strip_map(1, declared=count))
+    code, _ = run(geometry_tool, path)
+    assert code == 1
+
+
+@pytest.mark.parametrize("fault", ["short_stream", "last_index", "offset", "vertex_count"])
+def test_large_strip_bounds(geometry_tool, tmp_path, fault):
+    data = large_strip_map(70943)
+    tags = struct.unpack_from("<I", data, 16)[0]
+    if fault == "short_stream":
+        struct.pack_into("<I", data, tags+32, 204+70945*2-2)
+    elif fault == "last_index":
+        struct.pack_into("<H", data, 0xB00+204+70944*2, 3)
+    elif fault == "offset":
+        struct.pack_into("<I", data, tags+0x98C, 0xfffffffe)
+    else:
+        struct.pack_into("<I", data, tags+0x998, 65536)
+    path = tmp_path / "bad-large.map"
+    path.write_bytes(data)
+    code, _ = run(geometry_tool, path)
+    assert code == 1
+
+
+def test_large_strip_tangent_repair(geometry_tool, tmp_path):
+    path = tmp_path / "repair-large.map"
+    path.write_bytes(large_strip_map(70943, repair=True))
+    code, fields = run(geometry_tool, path)
+    assert code == 0
+    assert fields["maximum_triangles"] == "70943"
+
+
+@pytest.mark.parametrize("failure_at", [0, 1])
+def test_large_strip_failed_gpu_allocation_cleanup(geometry_tool, tmp_path, failure_at):
+    path = tmp_path / "large-failure.map"
+    path.write_bytes(large_strip_map(70943))
+    code, _ = run(geometry_tool, path, failure_at)
+    assert code == 1
+
+
+def test_maximum_strip_and_vertices_with_tangent_scratch(geometry_tool, tmp_path):
+    path = tmp_path / "maximum.map"
+    path.write_bytes(large_strip_map(1048576, vertices=65535, repair=True))
+    code, fields = run(geometry_tool, path)
+    assert code == 0
+    assert fields["maximum_triangles"] == "1048576"
+
+
+@pytest.mark.parametrize("allocation", range(9))
+def test_large_strip_cpu_allocation_failure_cleanup(geometry_tool, tmp_path, allocation):
+    path = tmp_path / "allocation.map"
+    path.write_bytes(large_strip_map(70943, repair=True))
+    code, _ = run(geometry_tool, path, -1, allocation)
+    assert code == 1

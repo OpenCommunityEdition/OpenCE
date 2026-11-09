@@ -259,6 +259,38 @@ This is a summary of stages, not the complete list of operations or failure
 sites. The `problem` string and `failed` label in `mcc_cache_tags_load` make
 the exact failure path especially readable.
 
+## MCC model strips
+
+A compiled model triangle strip is an ordered stream of vertex indices. Its
+triangle count is the number of indices minus two, including degenerate
+triangles used to join portions of the strip. The 16-bit indices limit the
+vertices they can reference, not the length of that stream.
+
+Read `mg_part` and `mcc_geometry_part_valid` in
+[mcc_geometry.c](../../port/linux/game/mcc_geometry.c), then the
+`model_geometry_part_check` dispatch in
+[mcc_tag_validate.c](../../port/linux/game/mcc_tag_validate.c).
+MCC accepts at most 1,048,576 strip triangles and 65,535 vertices per part.
+The strip cap is an OpenCE resource bound, not an established native MCC
+limit: it bounds each index allocation to 2 MiB plus four bytes and optional
+tangent-repair links to 12 MiB. The converter checks stream spans before
+allocation and validates every vertex index. The later MCC schema pass checks
+exact descriptor ownership, types, counts and allocation sizes without
+clearing valid large buffers. The Xbox/CE model validator and limits remain
+unchanged. Failed loads and unloads release the same MCC-owned buffers.
+
+For example, the inspected Antfarm `sky\vaporwave\vaporwave2` model has a
+70,943-triangle strip referencing 26,736 vertices. Its old 65,535-triangle
+check rejected that strip even though every index fits. This is format
+inspection evidence, not a claim about native MCC's maximum.
+
+[Geometry regressions](../../tools/test_mcc_geometry.py) cover the count
+boundary, malformed counts and ranges, final indices, tangent repair,
+ownership and cleanup, and exercise the original legacy validator.
+[Validation regressions](../../tools/test_mcc_tag_validation.py) check that
+only the MCC walker selects its model-part callback. Real-map testing still
+needs rendering and map-family transitions.
+
 ## MCC loading feedback
 
 [mcc_loading.c](../../port/linux/game/mcc_loading.c) owns a local progress

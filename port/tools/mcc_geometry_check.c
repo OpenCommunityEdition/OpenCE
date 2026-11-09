@@ -16,8 +16,11 @@
 #undef memset
 #undef memcpy
 #undef fopen
+static int allocation_count,allocation_fail_at=-1;
 void *debug_malloc(unsigned int bytes,boolean clear,char const *file,long line) {
-    void *p=malloc(bytes); (void)file; (void)line;
+    void *p; (void)file; (void)line;
+    if (allocation_count++==allocation_fail_at) return NULL;
+    p=malloc(bytes);
     if (p && clear) memset(p,0,bytes);
     return p;
 }
@@ -97,14 +100,19 @@ void *mcc_runtime_allocate(struct mcc_runtime *r,uint32_t bytes) {
     r->used=start+bytes; memset(r->tags+start,0,bytes); return r->tags+start;
 }
 
+int legacy_model_limits_check(void);
+
 int main(int argc,char **argv) {
     struct mcc_runtime r;
     FILE *file;
     long length;
     uint32_t i;
     int success, palette_parts=0, palette_sum=0, shader_sum=0;
-    if (argc<2 || argc>3) return 2;
-    if (argc==3) fail_at=atoi(argv[2]);
+    long maximum_triangles=0;
+    if (!legacy_model_limits_check()) return 13;
+    if (argc<2 || argc>4) return 2;
+    if (argc>=3) fail_at=atoi(argv[2]);
+    if (argc==4) allocation_fail_at=atoi(argv[3]);
     memset(&r,0,sizeof(r));
     file=fopen(argv[1],"rb"); if (!file) return 2;
     fseek(file,0,SEEK_END); length=ftell(file); if (length<0) return 2;
@@ -131,12 +139,46 @@ int main(int argc,char **argv) {
         unsigned char const *nodes=NULL;
         short n,j;
         short shader;
+        byte *part=(byte *)b-0x54;
+        struct triangle_buffer *triangles=(void *)(part+0x44);
+        struct triangle_buffer saved;
+        struct vertex_buffer saved_vertex;
+        unsigned short *stream,original;
+        byte clone[0x68];
         void *payload=mcc_geometry_buffer_data(&r,b->hardware_format,0,&bytes);
         /* Native model part: material at +4, vertex buffer at +0x54. */
         memcpy(&shader,(byte *)b-0x50,2);shader_sum+=shader;
         if (!payload || payload!=b->base_address || bytes!=(unsigned long)b->count*32 ||
             !mcc_geometry_contains(&r,payload,bytes) ||
             mcc_geometry_buffer_data(&r,b->hardware_format,1,NULL)) return 10;
+        if (!mcc_geometry_part_valid(&r,part)) return 11;
+        if (triangles->count>maximum_triangles) maximum_triangles=triangles->count;
+        saved=*triangles; saved_vertex=*b;
+        /* A copied descriptor may not borrow another part's allocations. */
+        memcpy(clone,part,sizeof(clone));
+        if (mcc_geometry_part_valid(&r,clone)) return 11;
+        triangles->count=-1;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        triangles->count=1048577;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        triangles->count=saved.count+1;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        *triangles=saved; triangles->type=0;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        *triangles=saved; triangles->base_address=r.tags;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        *triangles=saved; triangles->hardware_format=NULL;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        *triangles=saved; b->count++;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        *b=saved_vertex; b->offset=1;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        *b=saved_vertex;
+        stream=triangles->base_address; original=stream[triangles->count+1];
+        stream[triangles->count+1]=(unsigned short)b->count;
+        if (mcc_geometry_part_valid(&r,part)) return 11;
+        stream[triangles->count+1]=original;
+        if (!mcc_geometry_part_valid(&r,part)) return 11;
         n=mcc_geometry_part_palette(&r,b,&nodes);
         if (n) palette_parts++;
         for (j=0;j<n;j++) palette_sum+=nodes[j];
@@ -152,7 +194,8 @@ int main(int argc,char **argv) {
     mcc_geometry_dispose(&r);
     printf("converted=%d\ncreated_buffers=%d\nactive_buffers=%d\npalette_parts=%d\npalette_sum=%d\n",
         success,created_buffers,active_buffers,palette_parts,palette_sum);
-    printf("shader_sum=%d\n",shader_sum);
+    printf("shader_sum=%d\nmaximum_triangles=%ld\n",shader_sum,maximum_triangles);
+    if (mcc_geometry_part_valid(&r,r.tags)) return 11;
     if (active_buffers || r.geometry) return 8;
 #ifdef _WIN32
     VirtualFree(r.tags,0,0x8000);

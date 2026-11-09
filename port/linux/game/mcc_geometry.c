@@ -15,6 +15,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* A strip count is independent of its 16-bit vertex indices. Bound each
+ * part to a 2 MiB plus four-byte index stream and 12 MiB of tangent-repair links. This
+ * also keeps all count/byte arithmetic within signed 32-bit engine APIs. */
+#define MCC_MODEL_MAXIMUM_STRIP_TRIANGLES 1048576u
+
 struct mcc_render_part {
     unsigned long flags;
     short shader;
@@ -143,7 +148,11 @@ static int mg_model_tangents(struct model_vertex_uncompressed *vertices,
     }
     if (!needed) return 1;
     heads=malloc(count*sizeof(*heads));links=malloc(triangles*3*sizeof(*links));
-    if (!heads || !links) {free(heads);free(links);return 0;}
+    if (!heads || !links) {
+        if (heads) free(heads);
+        if (links) free(links);
+        return 0;
+    }
     for (i=0;i<count;i++) heads[i]=-1;
     for (k=0;k<triangles;k++) for (j=0;j<3;j++) {
         i=indices[k+j];links[k*3+j]=heads[i];heads[i]=(long)(k*3+j);
@@ -201,7 +210,12 @@ static int mg_part(struct mcc_runtime *r,struct model const *model,unsigned char
     struct mcc_geometry_buffer *record;
     (void)part_index;
     memset(part,0,sizeof(*part));
-    if (!count || count>65535 || !triangles || triangles>65535 || mg_u16(wire+0x44)!=1 ||
+    if (!triangles || triangles>MCC_MODEL_MAXIMUM_STRIP_TRIANGLES) {
+        error(_error_silent,"MCC geometry: model strip has %lu triangles (supported range 1..%lu)",
+            (unsigned long)triangles,(unsigned long)MCC_MODEL_MAXIMUM_STRIP_TRIANGLES);
+        return 0;
+    }
+    if (!count || count>65535 || mg_u16(wire+0x44)!=1 ||
         mg_u16(wire+0x54)!=4 || model->nodes.count<1 || model->nodes.count>64 ||
         model->shaders.count<0 ||
         (mg_u16(wire+4)!=0xFFFFu && !model->shaders.count) ||
@@ -209,7 +223,9 @@ static int mg_part(struct mcc_runtime *r,struct model const *model,unsigned char
         ((signed char)wire[7]!=-1 && (unsigned char)wire[7]>=part_count))
         return mg_error("invalid model part descriptor");
     raw_bytes=count*68; vertex_bytes=count*32; index_bytes=(triangles+2)*2;
-    if (!mg_range(vertex_offset,raw_bytes,r->report.model_vertex_bytes) ||
+    if (r->report.model_vertex_bytes>r->report.model_bytes ||
+        (uint64_t)r->report.model_file_offset+r->report.model_bytes>r->source.size ||
+        !mg_range(vertex_offset,raw_bytes,r->report.model_vertex_bytes) ||
         !mg_range(index_offset,index_bytes,r->report.model_bytes-r->report.model_vertex_bytes))
         return mg_error("model stream exceeds its declared range");
     if (local) {
@@ -270,6 +286,39 @@ fail:
     if (compressed) free(compressed);
     if (indices) free(indices);
     return mg_error("model vertices, node indices or hardware buffers could not be converted");
+}
+
+/* Converted model parts use only the MCC-owned compressed vertices and strip
+ * buffers. Validate exact descriptor ownership as well as their byte spans;
+ * the legacy schema callback intentionally retains its Xbox/CE count limit. */
+int mcc_geometry_part_valid(struct mcc_runtime *r,void const *address) {
+    struct mcc_render_part const *part=address;
+    struct mcc_geometry_state *state=r ? r->geometry : NULL;
+    struct mcc_geometry_buffer const *b,*vertices=NULL,*indices=NULL;
+    uint32_t count,triangles,i;
+    unsigned short const *stream;
+    if (!state || !part) return 0;
+    if (part->uncompressed.count || part->compressed.count || part->triangles.count ||
+        part->uncompressed.address || part->compressed.address || part->triangles.address ||
+        part->vertices.type!=_rasterizer_vertex_type_model_compressed || part->vertices.offset ||
+        part->indices.type!=_triangle_buffer_type_precompiled_strip ||
+        !part->vertices.hardware_format || !part->indices.hardware_format ||
+        part->vertices.count<1 || part->vertices.count>65535 || part->indices.count<1 ||
+        (uint32_t)part->indices.count>MCC_MODEL_MAXIMUM_STRIP_TRIANGLES) return 0;
+    count=(uint32_t)part->vertices.count; triangles=(uint32_t)part->indices.count;
+    for (b=state->buffers;b;b=b->next) {
+        if (b->is_bsp) continue;
+        if (!b->is_index && b->descriptor==&part->vertices) vertices=b;
+        if (b->is_index && b->descriptor==&part->indices) indices=b;
+    }
+    if (!vertices || !indices || vertices->bytes!=count*32 || indices->bytes!=(triangles+2)*2 ||
+        vertices->payload!=vertices->allocation || indices->payload!=indices->allocation ||
+        vertices->allocation_bytes!=vertices->bytes || indices->allocation_bytes!=indices->bytes ||
+        part->vertices.base_address!=vertices->payload || part->indices.base_address!=indices->payload)
+        return 0;
+    stream=indices->payload;
+    for (i=0;i<triangles+2;i++) if (stream[i]>=count) return 0;
+    return 1;
 }
 
 int mcc_geometry_prepare(struct mcc_runtime *r) {
