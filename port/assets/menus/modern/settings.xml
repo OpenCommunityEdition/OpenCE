@@ -863,14 +863,15 @@
 		<child widget="modern/interface/row_display_high_res_text1" x="28" y="167" />
 		<child widget="modern/interface/row_display_high_res_hud2" x="28" y="197" />
 		<child widget="modern/interface/row_input_auto_button_detection3" x="28" y="227" />
-		<child widget="modern/interface/row_display_hud_button_style4" x="28" y="257" />
-		<child widget="modern/interface/row_display_hud_button_style_xbox5" x="28" y="287" />
-		<child widget="modern/interface/row_display_hud_button_style_ps6" x="28" y="317" />
-		<child widget="modern/interface/row_display_hud_button_style_switch7" x="28" y="347" />
-		<child widget="modern/interface/row_detected_button_style" x="28" y="377" />
-		<child widget="modern/interface/row_display_hud_bumper_style9" x="28" y="407" />
-		<child widget="modern/interface/row_link_12" x="28" y="437" />
-		<child widget="modern/interface/row_link_13" x="28" y="467" />
+		<child widget="modern/interface/row_display_menu_button_glyphs4" x="28" y="257" />
+		<child widget="modern/interface/row_display_hud_button_style5" x="28" y="287" />
+		<child widget="modern/interface/row_display_hud_button_style_xbox6" x="28" y="317" />
+		<child widget="modern/interface/row_display_hud_button_style_ps7" x="28" y="347" />
+		<child widget="modern/interface/row_display_hud_button_style_switch8" x="28" y="377" />
+		<child widget="modern/interface/row_detected_button_style" x="28" y="407" />
+		<child widget="modern/interface/row_display_hud_bumper_style10" x="28" y="437" />
+		<child widget="modern/interface/row_link_12" x="28" y="467" />
+		<child widget="modern/interface/row_link_13" x="28" y="497" />
 		<child widget="modern/interface/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/interface/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -943,50 +944,58 @@
 	<widget name="modern/interface/spinner_input_auto_button_detection3" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="input.auto_button_detection" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/interface/row_display_hud_button_style4" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_hud_button_style4" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_hud_button_style4" x="180" y="3" />
+	<widget name="modern/interface/row_display_menu_button_glyphs4" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_display_menu_button_glyphs4" x="12" y="3" />
+		<child widget="modern/interface/spinner_display_menu_button_glyphs4" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/label_display_hud_button_style4" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_hud_button_style4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="XBOX CLASSIC|XBOX GEMS|XBOX DARK GEMS|XBOX MODERN|PS CLASSIC|PS GEMS|PS DARK GEMS|PS MODERN|SWITCH CLASSIC|SWITCH GEMS|SWITCH MODERN|KEYBOARD" values="classic|gems|menu_gems|xbox_modern|ps_classic|ps_gems|ps_dark_gems|ps_modern|switch_classic|switch_gems|switch_modern|keyboard" setting="display.hud_button_style" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/interface/label_display_menu_button_glyphs4" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/spinner_display_menu_button_glyphs4" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="display.menu_button_glyphs" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/interface/row_display_hud_button_style_xbox5" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_hud_button_style_xbox5" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_hud_button_style_xbox5" x="180" y="3" />
+	<widget name="modern/interface/row_display_hud_button_style5" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_display_hud_button_style5" x="12" y="3" />
+		<child widget="modern/interface/spinner_display_hud_button_style5" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/label_display_hud_button_style_xbox5" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_hud_button_style_xbox5" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="XBOX CLASSIC|XBOX GEMS|XBOX DARK GEMS|XBOX MODERN" values="classic|gems|menu_gems|xbox_modern" setting="display.hud_button_style_xbox" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/interface/label_display_hud_button_style5" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/spinner_display_hud_button_style5" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="XBOX CLASSIC|XBOX GEMS|XBOX DARK GEMS|XBOX MODERN|PS CLASSIC|PS GEMS|PS DARK GEMS|PS MODERN|SWITCH CLASSIC|SWITCH GEMS|SWITCH MODERN|KEYBOARD" values="classic|gems|menu_gems|xbox_modern|ps_classic|ps_gems|ps_dark_gems|ps_modern|switch_classic|switch_gems|switch_modern|keyboard" setting="display.hud_button_style" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/interface/row_display_hud_button_style_ps6" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_hud_button_style_ps6" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_hud_button_style_ps6" x="180" y="3" />
+	<widget name="modern/interface/row_display_hud_button_style_xbox6" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_display_hud_button_style_xbox6" x="12" y="3" />
+		<child widget="modern/interface/spinner_display_hud_button_style_xbox6" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/label_display_hud_button_style_ps6" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_hud_button_style_ps6" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="PS CLASSIC|PS GEMS|PS DARK GEMS|PS MODERN" values="ps_classic|ps_gems|ps_dark_gems|ps_modern" setting="display.hud_button_style_ps" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/interface/label_display_hud_button_style_xbox6" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/spinner_display_hud_button_style_xbox6" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="XBOX CLASSIC|XBOX GEMS|XBOX DARK GEMS|XBOX MODERN" values="classic|gems|menu_gems|xbox_modern" setting="display.hud_button_style_xbox" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/interface/row_display_hud_button_style_switch7" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_hud_button_style_switch7" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_hud_button_style_switch7" x="180" y="3" />
+	<widget name="modern/interface/row_display_hud_button_style_ps7" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_display_hud_button_style_ps7" x="12" y="3" />
+		<child widget="modern/interface/spinner_display_hud_button_style_ps7" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/label_display_hud_button_style_switch7" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_hud_button_style_switch7" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SWITCH CLASSIC|SWITCH GEMS|SWITCH MODERN" values="switch_classic|switch_gems|switch_modern" setting="display.hud_button_style_switch" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/interface/label_display_hud_button_style_ps7" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/spinner_display_hud_button_style_ps7" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="PS CLASSIC|PS GEMS|PS DARK GEMS|PS MODERN" values="ps_classic|ps_gems|ps_dark_gems|ps_modern" setting="display.hud_button_style_ps" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/interface/row_display_hud_button_style_switch8" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_display_hud_button_style_switch8" x="12" y="3" />
+		<child widget="modern/interface/spinner_display_hud_button_style_switch8" x="180" y="3" />
+	</widget>
+	<widget name="modern/interface/label_display_hud_button_style_switch8" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/spinner_display_hud_button_style_switch8" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SWITCH CLASSIC|SWITCH GEMS|SWITCH MODERN" values="switch_classic|switch_gems|switch_modern" setting="display.hud_button_style_switch" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/interface/row_detected_button_style" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
 		<child widget="modern/interface/label_detected_button_style" x="12" y="3" />
 		<child widget="modern/interface/detected_button_style_value" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/label_detected_button_style" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/label_detected_button_style" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/interface/detected_button_style_value" type="text" text="KEYBOARD" controller="1" width="140" height="20" font="ui\large_ui" color="#FFDDDDDD" align="center" />
-	<widget name="modern/interface/row_display_hud_bumper_style9" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/interface/label_display_hud_bumper_style9" x="12" y="3" />
-		<child widget="modern/interface/spinner_display_hud_bumper_style9" x="180" y="3" />
+	<widget name="modern/interface/row_display_hud_bumper_style10" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/interface/label_display_hud_bumper_style10" x="12" y="3" />
+		<child widget="modern/interface/spinner_display_hud_bumper_style10" x="180" y="3" />
 	</widget>
-	<widget name="modern/interface/label_display_hud_bumper_style9" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/interface/spinner_display_hud_bumper_style9" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ORIGINAL XBOX|MODERN XBOX" values="original|modern" setting="display.hud_bumper_style" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/interface/label_display_hud_bumper_style10" type="text" controller="1" width="152" height="24" string_list="modern/interface/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/spinner_display_hud_bumper_style10" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ORIGINAL XBOX|MODERN XBOX" values="original|modern" setting="display.hud_bumper_style" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<widget name="modern/interface/row_link_12" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
@@ -995,19 +1004,20 @@
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/interface/label_link_12" x="12" y="3" />
 	</widget>
-	<widget name="modern/interface/label_link_12" type="text" controller="1" width="312" height="24" string_list="modern/interface/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/label_link_12" type="text" controller="1" width="312" height="24" string_list="modern/interface/labels" string_index="11" font="ui\large_ui" color="#FF2896FF" />
 	<widget name="modern/interface/row_link_13" width="336" height="26" bitmap="modern/row" flags="nifty_fx">
 		<on event="a" run="port frontend page" />
 		<on event="start" run="port frontend page" />
 		<on event="left_mouse" run="mouse emit accept event" />
 		<child widget="modern/interface/label_link_13" x="12" y="3" />
 	</widget>
-	<widget name="modern/interface/label_link_13" type="text" controller="1" width="312" height="24" string_list="modern/interface/labels" string_index="11" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/interface/label_link_13" type="text" controller="1" width="312" height="24" string_list="modern/interface/labels" string_index="12" font="ui\large_ui" color="#FF2896FF" />
 	<strings name="modern/interface/labels">
 		<string text="MENU STYLE" />
 		<string text="HIGH-RES TEXT" />
 		<string text="HIGH-RES HUD" />
 		<string text="AUTO DETECTION" />
+		<string text="STOCK MENU GLYPHS" />
 		<string text="MANUAL STYLE" />
 		<string text="XBOX STYLE" />
 		<string text="PLAYSTATION STYLE" />
@@ -1023,10 +1033,11 @@
 		<string text="Draw text and titles with high-res fonts; off draws the game's own." />
 		<string text="Draw the HUD from the high-res redraws; off draws the game's own pictures." />
 		<string text="Follow keyboard/mouse or controller activity. Controllers use their family's saved artwork." />
-		<string text="Manual style when auto detection is off. Keyboard uses current bindings; controllers need High-Res HUD." />
-		<string text="Preferred Xbox artwork for automatic detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
-		<string text="Preferred PlayStation artwork for auto detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
-		<string text="Preferred Switch artwork for automatic detection. Gameplay artwork requires High-Res HUD; menu glyphs work independently." />
+		<string text="Use glyphs in stock PC menus and pause legends. Requires High-Res HUD; modern prompts are separate." />
+		<string text="Manual style when auto detection is off. Keyboard uses current bindings. Keyboard and controller glyphs require High-Res HUD." />
+		<string text="Preferred Xbox artwork for automatic detection. Keyboard and controller glyphs require High-Res HUD." />
+		<string text="Preferred PlayStation artwork for auto detection. Keyboard and controller glyphs require High-Res HUD." />
+		<string text="Preferred Switch artwork for automatic detection. Keyboard and controller glyphs require High-Res HUD." />
 		<string text="Keyboard/mouse is active. Prompts use your current bindings. Turn detection off to choose a fixed style." />
 		<string text="Original: black/white buttons. Modern: LB/RB. Kept when automatic detection is on." />
 		<string text="Open multiplayer hud settings. Pending changes stay until OK or Cancel." />

@@ -98,7 +98,6 @@ static char const *tag_get_name(long tag){(void)tag;return name;}
 static int csstrcasecmp(char const *a,char const *b){return strcmp(a,b);}
 static long tag_loaded(long g,char const *n){(void)g;(void)n;return tags?91:NONE;}
 void frontend_input_enable(int x){(void)x;}
-void frontend_glyphs_dispose(void){}
 void keyboard_glyphs_dispose(void){}
 void frontend_menu_text_end(void){}
 void frontend_panel_end(void){}

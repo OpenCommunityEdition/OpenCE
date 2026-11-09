@@ -24,22 +24,23 @@ PlayStation player keeps PlayStation artwork. The option changes no bindings.
 
 Controller artwork choices can be saved while High-Res HUD is off, but affect
 gameplay only when it is enabled in Graphics. The selectable KEYBOARD style
-works independently; see [keyboard/mouse prompts](keyboard_prompts.md).
+also requires High-Res HUD; see [keyboard/mouse prompts](keyboard_prompts.md).
 Automatic detection includes keyboard/mouse activity without a second toggle.
 The detected Keyboard row is read-only and never overwrites the saved manual
 choice. With detection off, manual KEYBOARD stays selected.
 
 The [modern frontend](menu_redesign.md) also uses these saved styles.
 Its Interface page starts with Menu Style, High-Res Text and High-Res HUD.
-Auto Detection and glyph appearance controls populate below High-Res HUD only
-while its pending value is enabled. Detection follows the active menu input: a
+Stock Menu Glyphs enables optional artwork in classic PC and pause-menu legends.
+Auto Detection and glyph appearance controls, including Stock Menu Glyphs, are
+shown only while High-Res HUD is pending on. Detection follows the active menu input: a
 read-only Keyboard row or the active physical controller's family preference,
 falling back to Manual Style for an unknown controller; turning
 detection off restores Manual Style. Hiding controls preserves their pending and
 saved choices. These visibility rules do not change the legacy submenu above.
 Its navigation prompts follow the most recently used physical controller port,
-with keyboard/mouse and touch alternatives. These menu glyphs work even when
-High-Res HUD is off; controller gameplay artwork retains the requirement above.
+with keyboard/mouse and touch alternatives. Keyboard and controller artwork in menus and
+gameplay requires High-Res HUD; menus use text or native prompts when it is off.
 
 ## Reading route and boundaries
 

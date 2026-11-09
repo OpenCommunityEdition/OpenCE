@@ -46,7 +46,8 @@ static void frontend_prompt_action(rectangle2d *cursor, int device, int action, 
     }
     else if (device >= 0)
     {
-        if (!frontend_glyph_draw((short)device, (short)frontend_prompt_button(action), cursor, color))
+        if (!config_boolean("display.high_res_hud") ||
+            !frontend_glyph_draw((short)device, (short)frontend_prompt_button(action), cursor, color))
             frontend_prompt_text(cursor, action == FRONTEND_SELECT ? "[South]" : action == FRONTEND_CANCEL ? "[East]" : "[North]");
     }
     else if (device == -1)
@@ -92,7 +93,8 @@ void frontend_prompts_draw(long tag, rectangle2d const *bounds)
             keyboard_glyph_draw("Right", &cursor, packed, TRUE);
             frontend_prompt_text(&cursor, "MOVE");
         }
-        else if (device >= 0 && frontend_glyph_draw((short)device, 16, &cursor, packed))
+        else if (device >= 0 && config_boolean("display.high_res_hud") &&
+            frontend_glyph_draw((short)device, 16, &cursor, packed))
             frontend_prompt_text(&cursor, "MOVE");
         else frontend_prompt_text(&cursor, device >= 0 ? "D-pad: MOVE" : "Arrows: MOVE");
         cursor.x0 = (short)(bounds->x0 + 180);

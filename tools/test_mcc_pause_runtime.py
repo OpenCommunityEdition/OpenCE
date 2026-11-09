@@ -62,6 +62,7 @@ union point2d {struct {short x,y;} point;long value;};
 #define FALSE 0
 #define NONE (-1)
 #define NUMBEROF(a) (sizeof(a)/sizeof(*(a)))
+#define MAX(a,b) ((a)>(b)?(a):(b))
 #include "mcc_pause.h"
 #include "mcc_ui.h"
 #include "mcc_pause_runtime.h"
@@ -73,8 +74,8 @@ static struct {void *textures[D3DTSS_MAXSTAGES];} device;
 struct allocation {struct allocation *next;size_t bytes;unsigned long pad[2];};
 static struct allocation *allocations;
 static unsigned malloc_calls,live_allocations,fail_malloc;
-static unsigned gpu_calls,gpu_live,gpu_changed,gpu_deleted,fail_gpu;
-static unsigned published,restored,logs;
+static unsigned gpu_calls,gpu_live,fail_gpu;
+static unsigned published;
 static boolean active=TRUE,null_renderer;
 static int connection;
 static int borrowed_failure;
@@ -133,12 +134,11 @@ void hud_hires_register_placeholder(long a,unsigned long const *p){
 }
 int config_boolean(char const *name){assert(!strcmp(name,"network.coop_own_friendly_fire"));return TRUE;}
 char const *config_string(char const *name){assert(!strcmp(name,"display.menus"));return "pc";}
-void platform_log(char const *format,...){assert(format);logs++;}
+void platform_log(char const *format,...){assert(format);}
 void *cache_files_tag_instances(long *count){*count=live_count;return live_table;}
 void cache_files_set_tag_instances(void *instances,long count) {
     assert(instances&&count>=2);
-    if(instances==original_table)restored++;
-    else {assert(live_table==original_table&&mcc_pause_tag_count()>24);published++;}
+    if(instances!=original_table){assert(live_table==original_table&&mcc_pause_tag_count()>24);published++;}
     live_table=instances;live_count=count;
 }
 static boolean rasterizer_bitmap_new(struct bitmap_data *bitmap) {
@@ -154,7 +154,7 @@ static boolean rasterizer_bitmap_new(struct bitmap_data *bitmap) {
     gpu_live++;return TRUE;
 }
 static void rasterizer_bitmap_changed(struct bitmap_data *bitmap) {
-    assert(bitmap->base_address&&(bitmap->hardware_format||null_renderer));check_guards();gpu_changed++;
+    assert(bitmap->base_address&&(bitmap->hardware_format||null_renderer));check_guards();
 }
 static void rasterizer_bitmap_delete(struct bitmap_data *bitmap) {
     unsigned stage;
@@ -162,7 +162,7 @@ static void rasterizer_bitmap_delete(struct bitmap_data *bitmap) {
     for(stage=0;stage<D3DTSS_MAXSTAGES;stage++)if(device.textures[stage]==bitmap->hardware_format) {
         fputs("texture header released while still bound\n",stderr);exit(88);
     }
-    test_free(bitmap->hardware_format);bitmap->hardware_format=NULL;gpu_live--;gpu_deleted++;
+    test_free(bitmap->hardware_format);bitmap->hardware_format=NULL;gpu_live--;
 }
 #define malloc test_malloc
 #define free test_free

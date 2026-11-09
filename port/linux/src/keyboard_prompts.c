@@ -53,7 +53,7 @@ int keyboard_prompt_active(short port)
 
 int keyboard_prompt_enabled(short port)
 {
-    if (port < 0 || port >= 4) return 0;
+    if (port < 0 || port >= 4 || !config_boolean("display.high_res_hud")) return 0;
     if (!config_boolean("input.auto_button_detection"))
         return !strcmp(config_string("display.hud_button_style"), "keyboard");
     return keyboard_prompt_active(port);
@@ -61,6 +61,7 @@ int keyboard_prompt_enabled(short port)
 
 int keyboard_prompt_menu_enabled(int device)
 {
+    if (!config_boolean("display.high_res_hud")) return 0;
     if (!config_boolean("input.auto_button_detection"))
         return !strcmp(config_string("display.hud_button_style"), "keyboard");
     return device == -1;

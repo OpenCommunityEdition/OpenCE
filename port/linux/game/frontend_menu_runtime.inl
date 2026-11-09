@@ -547,6 +547,7 @@ static void frontend_button_rows_show(struct widget_instance *list)
 	static char const *styles[] = {"display.hud_button_style", "display.hud_button_style_xbox",
 		"display.hud_button_style_ps", "display.hud_button_style_switch"};
 	struct widget_instance *hud = frontend_setting_row(list, "display.high_res_hud");
+	struct widget_instance *menu_glyphs = frontend_setting_row(list, "display.menu_button_glyphs");
 	struct widget_instance *automatic = frontend_setting_row(list, "input.auto_button_detection");
 	struct widget_instance *keyboard = named(list, "row_detected_button_style", 0);
 	struct widget_instance *bumper = frontend_setting_row(list, "display.hud_bumper_style");
@@ -557,6 +558,7 @@ static void frontend_button_rows_show(struct widget_instance *list)
 	int active;
 	if (!hud || !automatic) return;
 	enabled = !strcmp(frontend_row_value(hud), "true");
+	if (menu_glyphs) menu_glyphs->visible = enabled;
 	detect = !strcmp(frontend_row_value(automatic), "true");
 	active = frontend_input_device();
 	port = active >= 0 && active < 4 ? (short)active : controller_of(list);

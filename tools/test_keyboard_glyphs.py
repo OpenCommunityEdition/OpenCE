@@ -18,9 +18,9 @@ def test_manual_auto_activity_disconnect_and_split_screen(tmp_path, android):
     run_c(tmp_path, ("#define HALO_ANDROID 1\n" if android else "") + r'''
 #include <assert.h>
 #include <string.h>
-static int automatic=1;
+static int automatic=1,hud=1;
 static char const *manual="classic";
-int config_boolean(char const *n){assert(!strcmp(n,"input.auto_button_detection"));return automatic;}
+int config_boolean(char const *n){if(!strcmp(n,"display.high_res_hud"))return hud;assert(!strcmp(n,"input.auto_button_detection"));return automatic;}
 char const *config_string(char const *n){(void)n;return manual;}
 ''' + code('port/linux/src/keyboard_prompts.c') + r'''
 int main(void){
@@ -55,7 +55,11 @@ int main(void){
  assert(keyboard_prompt_menu_enabled(0)&&keyboard_prompt_menu_enabled(-1));
  keyboard_prompt_pad(0,1,1,1);assert(keyboard_prompt_enabled(0));
  assert(!keyboard_prompt_enabled(-1)&&!keyboard_prompt_enabled(4));
- manual="ps_modern";assert(!keyboard_prompt_enabled(0));return 0;
+ hud=0;assert(!keyboard_prompt_enabled(0)&&!keyboard_prompt_menu_enabled(-1));
+ automatic=1;keyboard_prompt_keys(keys,512,0x100);
+ assert(keyboard_prompt_active(0)&&!keyboard_prompt_enabled(0)&&!keyboard_prompt_menu_enabled(-1));
+ hud=1;assert(keyboard_prompt_enabled(0)&&keyboard_prompt_menu_enabled(-1));
+ automatic=0;manual="ps_modern";assert(!keyboard_prompt_enabled(0));return 0;
 }
 ''')
 
@@ -112,38 +116,41 @@ def test_keycap_visible_ink_centering_padding_and_state(tmp_path):
 #include <wchar.h>
 #define NUMBEROF(a) (sizeof(a)/sizeof(*(a)))
 #define MAX(a,b) ((a)>(b)?(a):(b))
-typedef float real;typedef unsigned long pixel32;
+typedef float real;typedef unsigned int pixel32;
 typedef struct {short x0,y0,x1,y1;}rectangle2d;
 typedef struct {float x0,y0,x1,y1;}real_rectangle2d;
 typedef struct {float alpha,red,green,blue;}real_argb_color;
 static real_argb_color current={.5f,.3f,.4f,.5f};static int texts,symbol;
-static float bx,by,bw,bh;
+static float bx,by,bw,bh;static pixel32 drawn_edge;
 static void draw_string_get_color(real_argb_color *c){*c=current;}
 static void draw_string_set_color(real_argb_color const *c){current=*c;}
-static void draw_string_set_indents(short a,short b){assert(!a&&!b);}
+static short initial_indent=2,paragraph_indent=3;
+static void draw_string_get_indents(short *a,short *b){*a=initial_indent;*b=paragraph_indent;}
+static void draw_string_set_indents(short a,short b){initial_indent=a;paragraph_indent=b;}
 static void rasterizer_unicode_string_ink_bounds(rectangle2d const *r,wchar_t const *s,real_rectangle2d *ink){
  ink->x0=r->x0+2.25f;ink->x1=ink->x0+(float)wcslen(s)*7;
  ink->y0=r->y0+3.5f;ink->y1=r->y0+16.5f;
  if(wcslen(s)>1)ink->y1+=2; /* descender still centers inside its cap */
 }
-static int keyboard_glyph_background(int s,float x,float y,float w,float h,pixel32 c){symbol=s;bx=x;by=y;bw=w;bh=h;assert((c>>24)==128);return 1;}
+static int keyboard_glyph_background(int s,float x,float y,float w,float h,pixel32 c){symbol=s;bx=x;by=y;bw=w;bh=h;drawn_edge=c;assert((c>>24)==128);return 1;}
 static void rasterizer_draw_unicode_string_offset(rectangle2d const *r,wchar_t const *s,float x,float y){
  real_rectangle2d ink;rasterizer_unicode_string_ink_bounds(r,s,&ink);texts++;
  assert(ink.x0+x-bx>=5.9f&&bx+bw-ink.x1-x>=5.9f);
  assert(ink.x0+ink.x1+2*x==2*bx+bw);
  assert(ink.y0+ink.y1+2*y==2*by+bh);
 }
-''' + function(source,'keyboard_glyph_draw') + r'''
+static void rasterizer_draw_unicode_string_scaled_offset(rectangle2d const *r,wchar_t const *s,float scale,float x,float y){assert(0);}
+''' + function(source,'keyboard_glyph_draw_padded') + function(source,'keyboard_glyph_draw') + r'''
 int main(void){
  rectangle2d r={10,20,600,100};short single;
  keyboard_glyph_draw("F",&r,0x80ffffff,0);single=r.x0-10;
- assert(single>=28&&texts==1&&by+bh*.5f==30.0f);
- assert(current.alpha==.5f&&current.red==.3f);
- r.x0=10;keyboard_glyph_draw("Space",&r,0x80ffffff,1);assert(r.x0-10>single);
+ assert(single>=28&&texts==1&&by+bh*.5f==30.0f&&drawn_edge==0x80a8d9ff);
+ assert(current.alpha==.5f&&current.red==.3f&&initial_indent==2&&paragraph_indent==3);
+ r.x0=10;keyboard_glyph_draw("Space",&r,0x80ffffff,0);assert(r.x0-10>single);
  texts=0;keyboard_glyph_draw("Mouse Left",&r,0x80ffffff,0);assert(symbol==7);
  keyboard_glyph_draw("Wheel Up",&r,0x80ffffff,0);assert(symbol==10);
- keyboard_glyph_draw("Right",&r,0x80ffffff,1);assert(symbol==5&&!texts);
- keyboard_glyph_draw("Mouse 4",&r,0x80ffffff,0);assert(texts==1);return 0;
+ keyboard_glyph_draw("Right",&r,0x80ffffff,0);assert(symbol==5&&!texts);
+ keyboard_glyph_draw("Mouse 4",&r,0x80ffffff,0);assert(texts==1);keyboard_glyph_draw("Enter",&r,0x80ffffff,1);assert(drawn_edge==0x802896ff);return 0;
 }
 ''')
 
@@ -225,7 +232,7 @@ def test_renderer_ink_metrics_and_scoped_subpixel_offset(tmp_path):
 #define TRUE 1
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #define MIN(a,b) ((a)<(b)?(a):(b))
-typedef float real;typedef int boolean;typedef unsigned char byte;typedef unsigned short word;typedef unsigned long pixel32;
+typedef float real;typedef int boolean;typedef unsigned char byte;typedef unsigned short word;typedef unsigned int pixel32;
 typedef struct {short x0,y0,x1,y1;}rectangle2d;
 typedef struct {float x0,y0,x1,y1;}real_rectangle2d;
 struct parse_string_state{int dummy;};
@@ -234,6 +241,8 @@ struct font_character {short character,bitmap_origin_x,bitmap_origin_y,character
 struct text_hires_glyph {float left,top,right,bottom,u0,v0,u1,v1,advance;};
 static real_rectangle2d measured_ink;static long measured_hires_font;static boolean measured_has_ink;
 static void *hires_text_atlas=(void *)1;static real text_scale=1,text_offset_x=2,text_offset_y=3;
+static real text_scale_origin_x=17,text_scale_origin_y=23;
+static int scaled;
 static int covered=1;
 static long draw_string_get_font(void){return 1;}
 static long hires_text_font_get(long f,real s){assert(f==1&&s==1);return 9;}
@@ -244,11 +253,17 @@ static void draw_unicode_string(void (*callback)(struct parse_string_state*,stru
  byte pixels[6]={0,1,0,0,0,1};struct font_header f={{pixels}};struct font_character c={72,2,10,10,3,0};
  (void)r;(void)p;(void)clip;(void)h;if(*text)callback(0,&f,&c,0,100,200,0,0,3,2);}
 static void rasterizer_draw_unicode_string(rectangle2d const *r,void *a,void *b,int c,wchar_t const *t){
- (void)r;(void)a;(void)b;(void)c;(void)t;assert(text_offset_x==2.25f&&text_offset_y==2.5f);}
-''' + ''.join(function(source,n) for n in ('rasterizer_measure_ink_character','rasterizer_unicode_string_ink_bounds','rasterizer_draw_unicode_string_offset')) + r'''
+ (void)r;(void)a;(void)b;(void)c;(void)t;assert(text_offset_x==2.25f&&text_offset_y==2.5f);
+ if(scaled)assert(text_scale==.85f&&text_scale_origin_x==0&&text_scale_origin_y==0);}
+''' + ''.join(function(source,n) for n in ('rasterizer_measure_ink_character','rasterizer_unicode_string_ink_bounds','rasterizer_draw_unicode_string_offset','rasterizer_draw_unicode_string_scaled_offset')) + r'''
 int main(void){rectangle2d r={0};real_rectangle2d ink;
  rasterizer_unicode_string_ink_bounds(&r,L"H",&ink);assert(ink.x0==104.25f&&ink.x1==110.75f&&ink.y0==201.5f&&ink.y1==210.5f);
  covered=0;rasterizer_unicode_string_ink_bounds(&r,L"H",&ink);assert(ink.x0==101&&ink.x1==103&&ink.y0==200&&ink.y1==202);
  rasterizer_unicode_string_ink_bounds(&r,L"",&ink);assert(ink.x0==0&&ink.x1==0);
- rasterizer_draw_unicode_string_offset(&r,L"H",.25f,-.5f);assert(text_offset_x==2&&text_offset_y==3);return 0;}
+ rasterizer_draw_unicode_string_offset(&r,L"H",.25f,-.5f);assert(text_offset_x==2&&text_offset_y==3);
+ scaled=1;text_scale=1.5f;
+ rasterizer_draw_unicode_string_scaled_offset(&r,L"H",.85f,.25f,-.5f);
+ assert(text_scale==1.5f&&text_scale_origin_x==17&&text_scale_origin_y==23&&text_offset_x==2&&text_offset_y==3);
+ rasterizer_draw_unicode_string_scaled_offset(&r,L"",.85f,.25f,-.5f);
+ assert(text_scale==1.5f&&text_scale_origin_x==17&&text_scale_origin_y==23&&text_offset_x==2&&text_offset_y==3);return 0;}
 ''')

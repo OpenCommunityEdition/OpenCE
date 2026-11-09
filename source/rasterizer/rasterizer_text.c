@@ -1305,3 +1305,16 @@ void rasterizer_draw_unicode_string_offset(rectangle2d const *bounds, wchar_t co
     rasterizer_draw_unicode_string(bounds,NULL,NULL,0,text);
     text_offset_x=previous_x;text_offset_y=previous_y;
 }
+
+/* port: scoped local text scaling for compact keyboard keycaps. */
+void rasterizer_draw_unicode_string_scaled_offset(rectangle2d const *bounds, wchar_t const *text,
+    real scale, real x, real y)
+{
+    real previous_scale = text_scale;
+    real previous_origin_x = text_scale_origin_x, previous_origin_y = text_scale_origin_y;
+    text_scale = scale;
+    text_scale_origin_x = text_scale_origin_y = 0.0f;
+    rasterizer_draw_unicode_string_offset(bounds, text, x, y);
+    text_scale = previous_scale;
+    text_scale_origin_x = previous_origin_x; text_scale_origin_y = previous_origin_y;
+}

@@ -58,7 +58,6 @@ void frontend_menu_unloaded(void)
 	frontend_input_enable(0);
 	frontend_menu_text_end();
 	frontend_panel_end();
-	frontend_glyphs_dispose();
 	keyboard_glyphs_dispose();
 }
 

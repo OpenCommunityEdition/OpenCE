@@ -45,7 +45,6 @@ static int csstrcasecmp(char const *a,char const *b) {
 static char const *config_string(char const *key) {return !strcmp(key,"display.menus")?legacy_choice:choice;}
 static long tag_loaded(long group,char const *name) {(void)group;(void)name;return tags ? 1 : NONE;}
 void frontend_input_enable(int enabled) {(void)enabled;}
-void frontend_glyphs_dispose(void) {}
 static int keyboard_disposals;
 void keyboard_glyphs_dispose(void) {keyboard_disposals++;}
 void frontend_menu_text_end(void) {}
@@ -322,24 +321,25 @@ def test_interface_pending_hud_gate_family_changes_and_focus(tmp_path):
     source = (ROOT / 'port/linux/game/frontend_menu_runtime.inl').read_text()
     stubs = RUNTIME_STUBS.replace('d->family=0;', 'd->family=test_family;')
     stubs = 'static int test_family;\n' + stubs.replace(
-        'return id==5?&setting:0;', 'return id>=10&&id<18?&options[id-10]:id==5?&setting:0;')
-    stubs = stubs.replace('static int available=1', 'static struct pc_menu_setting options[8];\nstatic int available=1')
+        'return id==5?&setting:0;', 'return id>=10&&id<19?&options[id-10]:id==5?&setting:0;')
+    stubs = stubs.replace('static int available=1', 'static struct pc_menu_setting options[9];\nstatic int available=1')
     run_c(tmp_path, stubs + ''.join(function(source, name) for name in
           ('frontend_setting_row', 'frontend_row_value', 'frontend_button_rows_show')) + r'''
 int main(void) {
-    struct widget_instance list={0},rows[8]={{0}},spinners[8]={{0}};
+    struct widget_instance list={0},rows[9]={{0}},spinners[9]={{0}};
     char const *keys[]={"display.high_res_hud","input.auto_button_detection",
         "display.hud_button_style","display.hud_button_style_xbox","display.hud_button_style_ps",
-        "display.hud_button_style_switch","display.hud_bumper_style","unused"};
+        "display.hud_button_style_switch","display.hud_bumper_style","unused","display.menu_button_glyphs"};
     int i,family,repeat;
     list.child=rows;
-    for(i=0;i<8;i++) {
-        rows[i].child=&spinners[i];rows[i].visible=1;rows[i].next=i<7?&rows[i+1]:0;
+    for(i=0;i<9;i++) {
+        rows[i].child=&spinners[i];rows[i].visible=1;rows[i].next=i<8?&rows[i+1]:0;
         spinners[i].type=2;spinners[i].definition_tag_index=10+i;
         options[i].setting=keys[i];options[i].value_count=2;
         options[i].values[0]=i<2?"true":"classic";
         options[i].values[1]=i<2?"false":"keyboard";
     }
+    options[8].values[0]="false";options[8].values[1]="true";
     rows[7].name="row_detected_button_style";spinners[7].type=1;
     for(repeat=0;repeat<10;repeat++) for(family=-1;family<5;family++) {
         int selected=family>0&&family<=3?family:0;
@@ -367,12 +367,19 @@ int main(void) {
         spinners[0].parameters.list.selected_index=1;
         frontend_button_rows_show(&list);
         for(i=1;i<8;i++) assert(!rows[i].visible);
+        assert(!rows[8].visible);
         assert(list.focused_child==rows&&!list.parameters.list.selected_index);
         assert(spinners[2].parameters.list.selected_index==1&&!writes);
+        /* A saved menu preference cannot bypass the pending High-Res HUD gate. */
+        spinners[8].parameters.list.selected_index=1;
+        frontend_button_rows_show(&list);
+        assert(!rows[8].visible&&!rows[1].visible&&!rows[2].visible&&!writes);
+        spinners[8].parameters.list.selected_index=0;
         /* Restoring HUD does not discard the pending manual choice. */
         spinners[0].parameters.list.selected_index=0;
         frontend_button_rows_show(&list);
         assert(rows[1].visible&&rows[2].visible&&!rows[6].visible);
+        assert(rows[8].visible);
         spinners[2].parameters.list.selected_index=0;
     }
     return 0;
@@ -384,6 +391,7 @@ def test_interface_rendering_order_and_unique_placement():
     doc = ET.fromstring(frontend_menu.document())
     settings = [w.get('setting') for w in doc.findall('widget')
                 if w.get('name', '').startswith('modern/interface/') and w.get('setting')]
+    assert settings.count('display.menu_button_glyphs') == 1
     assert 'display.keyboard_glyphs' not in settings
     assert 'display.detected_button_style' not in settings
     detected = next(w for w in doc.findall('widget') if w.get('name') == 'modern/interface/detected_button_style_value')

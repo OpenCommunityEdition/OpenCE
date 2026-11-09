@@ -903,6 +903,9 @@ void rasterizer_unicode_string_ink_bounds(rectangle2d const *bounds,
     wchar_t const *text, real_rectangle2d *ink);
 void rasterizer_draw_unicode_string_offset(rectangle2d const *bounds,
     wchar_t const *text, real offset_x, real offset_y);
+/* port: scoped local text scaling for compact keyboard keycaps. */
+void rasterizer_draw_unicode_string_scaled_offset(rectangle2d const *bounds,
+    wchar_t const *text, real scale, real offset_x, real offset_y);
 /* port: text drawn scale times larger about a point, until set back to 1 */
 void rasterizer_text_set_scale(
 	real scale,

@@ -211,7 +211,7 @@ def test_real_glyph_geometry_opacity_cache_and_teardown(tmp_path):
 #define NONE (-1)
 #define TRUE 1
 #define FALSE 0
-typedef int boolean;typedef float real;typedef unsigned long pixel32;
+typedef int boolean;typedef float real;typedef struct {real x0,y0,x1,y1;}real_rectangle2d;typedef unsigned long pixel32;
 typedef struct {short x0,y0,x1,y1;}rectangle2d;
 struct bitmap_data {unsigned long *hardware_format;};
 struct icon_hud_element_definition {short frame_rate;unsigned flags;pixel32 color;};
@@ -298,6 +298,18 @@ int main(void){
  fail=0;assert(controller_glyph_draw(4,0,&icon,&cursor,0,unbind));assert(drawn[0].color==0xffffff);
  for(style=-1;style<3;style++)assert(!controller_glyph_draw(style,0,&icon,&cursor,0,unbind));
  assert(!controller_glyph_draw(11,0,&icon,&cursor,0,unbind));controller_glyphs_dispose();assert(!live);
+ /* A PC-menu allocation is reused by modern menus and later MCC gameplay;
+  * the late binding must still be released at map teardown. */
+ {
+  real_rectangle2d uv;struct bitmap_data *shared;int saved_unbound=unbound;
+  shared=controller_glyph_bitmap(4,0,&uv);assert(shared&&live==1);
+  before=allocations;assert(controller_glyph_draw_menu(4,0,&cursor,0));
+  assert(controller_glyph_draw(4,0,&icon,&cursor,0,unbind));
+  assert(controller_glyph_bitmap(4,0,&uv)==shared&&allocations==before);
+  assert(uv.x0>=0&&uv.x1<=1&&uv.x1>uv.x0);
+  controller_glyphs_dispose();assert(!live&&unbound==saved_unbound+1);
+ }
+
  return 0;
 }
 '''

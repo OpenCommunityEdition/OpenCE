@@ -297,8 +297,10 @@ SCREENS = {
         "rows": [
             ("AUTO BUTTON DETECTION:", "input.auto_button_detection", ON_OFF,
              "Follow keyboard/mouse or controller activity.\nControllers use their family's saved artwork.", None),
+            ("MENU GLYPHS:", "display.menu_button_glyphs", ON_OFF,
+             "Use glyphs in stock PC menus and pause legends.\nRequires High-Res HUD; modern prompts are separate.", None),
             ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES + [("KEYBOARD", "keyboard")],
-             "Manual style when auto detection is off. Keyboard\nuses current bindings; controllers need High-Res HUD.", None),
+             "Manual style when auto detection is off. Keyboard\nuses current bindings. Requires High-Res HUD.", None),
             ("BUTTON STYLE:", "display.hud_button_style_xbox", XBOX_BUTTON_STYLES,
              "Preferred Xbox artwork for automatic detection.\nRequires High-Res HUD in Graphics.", None),
             ("BUTTON STYLE:", "display.hud_button_style_ps", PS_BUTTON_STYLES,

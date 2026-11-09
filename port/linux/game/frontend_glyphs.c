@@ -1,6 +1,5 @@
-/* Modern frontend prompts reuse the player's existing glyph preferences and
- * embedded art. Classic Xbox faces need an independent cache: the HUD's cache
- * requires map-owned messaging icons and its high-res HUD setting. */
+/* Modern and stock PC menus share the existing artwork owner with gameplay;
+ * the prompt dispatcher gates their use on High-Res HUD. */
 #include "cseries.h"
 #include "frontend_menu.h"
 #include "frontend_prompts.h"
@@ -15,28 +14,7 @@
 #include "hud_button_layout.h"
 #include <string.h>
 
-long hud_hires_asset_count(void);
-char const *hud_hires_asset_tag(long asset);
-void hud_hires_register_placeholder(long asset, unsigned long const *texture);
-
-static struct { struct bitmap_data *bitmap; long asset; boolean attempted; } frontend_faces[3][4];
-static char const *frontend_face_names[3][4] = {
-    {"ui\\hud\\buttons\\classic_a", "ui\\hud\\buttons\\classic_b", "ui\\hud\\buttons\\classic_x", "ui\\hud\\buttons\\classic_y"},
-    {"ui\\hud\\buttons\\gem_a", "ui\\hud\\buttons\\gem_b", "ui\\hud\\buttons\\gem_x", "ui\\hud\\buttons\\gem_y"},
-    {"ui\\shell\\bitmaps\\a_butn", "ui\\shell\\bitmaps\\b_butn", "ui\\shell\\bitmaps\\x_butn", "ui\\shell\\bitmaps\\y_butn"}
-};
-
-void frontend_glyphs_dispose(void)
-{
-    int style, button;
-    for (style = 0; style < 3; style++) for (button = 0; button < 4; button++)
-        if (frontend_faces[style][button].bitmap)
-        {
-            hud_hires_register_placeholder(frontend_faces[style][button].asset, NULL);
-            bitmap_delete(frontend_faces[style][button].bitmap);
-        }
-    memset(frontend_faces, 0, sizeof(frontend_faces));
-}
+struct bitmap_data *hud_hires_button_bitmap(short style, short slot);
 
 boolean frontend_glyph_draw(short port, short button, rectangle2d *cursor, pixel32 color)
 {
@@ -44,29 +22,13 @@ boolean frontend_glyph_draw(short port, short button, rectangle2d *cursor, pixel
     struct dynamic_screen_vertex vertices[4];
     struct bitmap_data *bitmap;
     short style, i;
-    long asset;
     real x, y, width = 16.0f, height = 20.0f;
     if (button < 0 || (button > 3 && button != 16) || port < 0 || port > 3) return FALSE;
     style = (short)controller_button_style_for_port(port);
     if (button == 16) return controller_glyph_draw_menu(style < 3 ? 3 : style, button, cursor, color);
     if (style >= 3) return controller_glyph_draw_menu(style, button, cursor, color);
     if (style < 0) return FALSE;
-    if (!frontend_faces[style][button].attempted)
-    {
-        frontend_faces[style][button].attempted = TRUE;
-        for (asset = 0; asset < hud_hires_asset_count(); asset++)
-        {
-            if (strcmp(hud_hires_asset_tag(asset), frontend_face_names[style][button])) continue;
-            bitmap = bitmap_2d_new(32, 32, 0, 11);
-            if (!bitmap) break;
-            if (!rasterizer_bitmap_new(bitmap)) {bitmap_delete(bitmap); break;}
-            hud_hires_register_placeholder(asset, bitmap->hardware_format);
-            frontend_faces[style][button].asset = asset;
-            frontend_faces[style][button].bitmap = bitmap;
-            break;
-        }
-    }
-    bitmap = frontend_faces[style][button].bitmap;
+    bitmap = hud_hires_button_bitmap(style, button);
     if (!bitmap) return FALSE;
     x = cursor->x0 + 4.0f;
     y = draw_unicode_string_capital_middle(cursor, L"") - height * 0.5f;

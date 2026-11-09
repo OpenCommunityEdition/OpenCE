@@ -299,6 +299,8 @@ def test_frontend_glyph_preferences_cache_failure_and_cleanup(tmp_path):
 #define FALSE 0
 typedef int boolean;typedef float real;typedef unsigned long pixel32;
 typedef struct {short x0,y0,x1,y1;}rectangle2d;
+#define csmemset memset
+static void ce_hud_buttons_forget(void){}
 struct bitmap_data {unsigned long *hardware_format;};
 struct icon_hud_element_definition {int unused;};
 struct dynamic_screen_vertex {struct {real x,y;}position,texture_coordinates;pixel32 color;};
@@ -324,25 +326,34 @@ static void rasterizer_psuedo_dynamic_screen_quad_draw(struct rasterizer_dynamic
 }
 '''
     code += (ROOT / 'port/linux/game/hud_button_layout.h').read_text()
+    hud = (ROOT/'port/linux/game/hud_hires_tags.c').read_text()
+    start = hud.index('static struct\n{\n\tstruct bitmap_data *bitmap;', hud.index('/* Original Xbox controller faces'))
+    state = hud[start:hud.index('/* ---------- private code */', start)]
+    code += 'long hud_hires_asset_count(void);\nchar const *hud_hires_asset_tag(long);\nvoid hud_hires_register_placeholder(long,unsigned long const *);\n'
+    code += state + function(hud, 'hud_hires_button_bitmap')
     code += source('port/linux/game/frontend_glyphs.c') + r'''
 long hud_hires_asset_count(void){return 12;}
-char const *hud_hires_asset_tag(long a){return frontend_face_names[a/4][a%4];}
+char const *hud_hires_asset_tag(long a){static char const *names[]={
+ "ui\\hud\\buttons\\classic_a","ui\\hud\\buttons\\classic_b","ui\\hud\\buttons\\classic_x","ui\\hud\\buttons\\classic_y",
+ "ui\\hud\\buttons\\gem_a","ui\\hud\\buttons\\gem_b","ui\\hud\\buttons\\gem_x","ui\\hud\\buttons\\gem_y",
+ "ui\\shell\\bitmaps\\a_butn","ui\\shell\\bitmaps\\b_butn","ui\\shell\\bitmaps\\x_butn","ui\\shell\\bitmaps\\y_butn"};return names[a];}
 void hud_hires_register_placeholder(long a,unsigned long const *p){registered+=p?1:-1;}
 int main(void){
  rectangle2d cursor={100,50,500,150};int repeat,before,button;
  for(repeat=0;repeat<10;repeat++)for(style=0;style<11;style++)for(button=0;button<4;button++) {
   cursor.x0=100;assert(frontend_glyph_draw(2,button,&cursor,0x40112233));assert(observed_port==2&&cursor.x0==126);
+  if(style<3){before=created;assert(hud_hires_button_bitmap(style,button));assert(created==before);}
  }
- assert(live==12&&created==12&&registered==12&&draws==120&&new_draws==320);
- frontend_glyphs_dispose();assert(!live&&!registered);frontend_glyphs_dispose();assert(!live&&!registered);
+ assert(live==4&&created==120&&registered==4&&draws==120&&new_draws==320);
+ hud_buttons_forget();assert(!live&&!registered);hud_buttons_forget();assert(!live&&!registered);
  style=0;
  for(fail=1;fail<=2;fail++){
   before=created;assert(!frontend_glyph_draw(0,0,&cursor,0x40112233));assert(!live&&!registered);
-  assert(!frontend_glyph_draw(0,0,&cursor,0x40112233));assert(created==before+(fail==2));frontend_glyphs_dispose();
+  assert(!frontend_glyph_draw(0,0,&cursor,0x40112233));assert(created==before+(fail==2));hud_buttons_forget();
  }
  fail=0;assert(frontend_glyph_draw(0,0,&cursor,0x40112233));assert(live==1&&registered==1);
  assert(!frontend_glyph_draw(-1,0,&cursor,0));assert(!frontend_glyph_draw(4,0,&cursor,0));assert(!frontend_glyph_draw(0,4,&cursor,0));
- frontend_glyphs_dispose();assert(!live&&!registered);return 0;
+ hud_buttons_forget();assert(!live&&!registered);return 0;
 }
 '''
     run_c(tmp_path, code)
@@ -417,13 +428,13 @@ int main(void){
  rectangle2d bounds={0,0,640,22};int i;
  for(hud=0;hud<2;hud++) {
   automatic=1;device=-1;manual="classic";keycaps=pads=plain_keys=0;
-  frontend_prompts_draw(1,&bounds);assert(keycaps==7&&!pads&&!plain_keys);
+  frontend_prompts_draw(1,&bounds);assert(keycaps==(hud?7:0)&&!pads);if(hud)assert(!plain_keys);
   automatic=0;manual="keyboard";
   for(i=-2;i<4;i++) {device=i;keycaps=pads=plain_keys=0;
-   frontend_prompts_draw(1,&bounds);assert(keycaps==7&&!pads&&!plain_keys);
+   frontend_prompts_draw(1,&bounds);assert(keycaps==(hud?7:0)&&!pads);if(hud)assert(!plain_keys);
   }
   automatic=1;device=2;keycaps=pads=0;
-  frontend_prompts_draw(1,&bounds);assert(!keycaps&&pads==4);
+  frontend_prompts_draw(1,&bounds);assert(!keycaps&&pads==(hud?4:0));
   device=-2;keycaps=pads=touch_text=0;
   frontend_prompts_draw(1,&bounds);assert(!keycaps&&!pads&&touch_text==1);
  }

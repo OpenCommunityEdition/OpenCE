@@ -208,12 +208,15 @@ static const struct config_setting config_settings[] =
 		"Manual high-res gameplay button style, preserved while automatic detection\n"
 		"is on. Xbox: classic, gems, menu_gems (dark gems), xbox_modern.\n"
 		"PlayStation: ps_classic, ps_gems, ps_dark_gems, ps_modern.\n"
-		"Switch: switch_classic, switch_gems, switch_modern. Controllers require high_res_hud.\n"
-		"keyboard selects binding-aware keyboard/mouse glyphs without that requirement." },
+		"Switch: switch_classic, switch_gems, switch_modern. Glyphs require high_res_hud.\n"
+		"keyboard selects binding-aware keyboard/mouse glyphs within the same requirement." },
 	{ "display.hud_bumper_style", _config_string, "\"original\"", "HALO_HUD_BUMPER_STYLE", _environment_value, _platform_all,
 		"Xbox Classic, Gems and Dark Gems bumpers: original (black/white) or modern\n"
 		"(LB/RB). Shared by local players, including automatic button detection.\n"
 		"Requires high_res_hud; other button styles keep their own artwork." },
+	{ "display.menu_button_glyphs", _config_boolean, "false", "HALO_MENU_BUTTON_GLYPHS", _environment_value, _platform_all,
+		"Use the selected keyboard or controller artwork in stock PC menus and pause legends.\n"
+		"Requires high_res_hud. Modern prompts are separate; Xbox menus are unchanged." },
 	{ "input.auto_button_detection", _config_boolean, "true", "HALO_AUTO_BUTTON_DETECTION", _environment_value, _platform_all,
 		"Follow active keyboard/mouse or controller input for button prompts.\n"
 		"Controllers use their family's saved artwork; unknown controllers keep\n"

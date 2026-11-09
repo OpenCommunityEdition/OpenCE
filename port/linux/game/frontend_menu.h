@@ -38,7 +38,6 @@ void frontend_panel_begin(long tag);
 void frontend_panel_end(void);
 int frontend_panel_draw(struct rasterizer_dynamic_screen_geometry_parameters *parameters,
     struct dynamic_screen_vertex *vertices, long source_width);
-void frontend_glyphs_dispose(void);
 struct halo_menus const *frontend_menu_files_load(void);
 
 #define FRONTEND_MENU_SCREEN "pc\\modern\\settings"

@@ -2831,3 +2831,11 @@ struct pc_menu_setting *pc_menu_setting_get(
 	}
 	return NULL;
 }
+
+/* Share the existing widget definition with read-only legend layout. */
+void pc_menu_widget_text_bounds(long tag, rectangle2d *bounds, short *text_offset)
+{
+    struct ui_widget_definition const *definition = tag_get(UI_WIDGET_DEFINITION_TAG, tag);
+    *bounds = definition->bounds;
+    *text_offset = definition->horizontal_offset;
+}

@@ -632,7 +632,8 @@ struct widget_instance;
 #include "mcc_menu_text.h" /* port: port/linux/game/mcc_menu_text.c */
 #include "cseries.h"
 #include "frontend_menu.h" /* port: port/linux/game/frontend_menu.c and frontend_menu_runtime.inl */
-#include "keyboard_glyphs.h" /* port: optional semantic HUD prompts, not widget/menu icons */
+#include "keyboard_glyphs.h" /* port: port/linux/game/keyboard_glyphs.c */
+#include "menu_button_glyphs.h" /* port: port/linux/game/menu_button_glyphs.c */
 #include "frontend_input.h" /* port: modern frontend input-source observation */
 #include "errors.h"
 #include "bitmaps/bitmap_group.h"
@@ -4301,6 +4302,10 @@ void draw_string_and_hack_in_icons(
 			/* port: HUD/scoreboard callers pass TRUE; authored menu icons stay native. */
 			if (ignore_icon_color && keyboard_hud_inline(icon_type, &cursor_bounds))
 				continue;
+			/* port: optional PC-menu artwork preserves literal button meaning. */
+			if (!ignore_icon_color && menu_button_glyph_inline(icon_type,
+				local_player_index_for_draw_string_and_hack_in_icons, &cursor_bounds))
+				continue;
 			remapped_icon_type = remap_sticks_for_local_player(
 				icon_type,
 				local_player_index_for_draw_string_and_hack_in_icons);
@@ -5404,6 +5409,10 @@ static boolean ui_widget_port_text_wrap(
 	return fits;
 }
 
+/* port: port/linux/game/menu_button_widgets.inl, included by menu_functions.c. */
+boolean menu_functions_glyph_text(struct widget_instance *widget, rectangle2d const *bounds);
+short menu_functions_glyph_button(struct widget_instance *widget, short native);
+
 static void widget_instance_render_text_box(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -5609,6 +5618,9 @@ static void widget_instance_render_text_box(
 	 * frontend. The MCC module owns formatting and clips to this text box. */
 	if (mcc_menu_text_draw(widget->definition_tag_index, widget->parameters.text_box.string_list_index,
 		*text, font_index, justification, &color, &bounds, &clip))
+		return;
+	/* port: center the identified PC join line as one unit. */
+	if (menu_functions_glyph_text(widget, &bounds))
 		return;
 	if (string_has_icons_to_draw(*text))
 		draw_string_and_hack_in_icons(&bounds, &clip, NULL, 0, *text, FALSE);
@@ -7239,6 +7251,9 @@ static void ui_widgets_process_mouse(
 	return;
 }
 
+/* port: port/linux/game/menu_button_widgets.inl; PC legend and mouse-target spacing. */
+short menu_functions_glyph_offset(struct widget_instance *widget);
+
 static void widget_instance_render_recursive(
 	struct widget_instance *widget,
 	rectangle2d *clip_rect,
@@ -7297,6 +7312,8 @@ static void widget_instance_render_recursive(
 		use_nifty_plasma_fx = TRUE;
 	}
 	offset.x += widget->horizontal_offset;
+	/* port: move the complete PC legend group and its mouse target. */
+	offset.x += menu_functions_glyph_offset(widget);
 	offset.y += widget->vertical_offset;
 	for (input_index = 0;
 		input_index < definition->game_data_inputs.count;
@@ -7441,7 +7458,10 @@ static void widget_instance_render_recursive(
 				texels.y1 = (short)((long)(bounds.y1 - bounds.y0) * bitmap->height / frame_height);
 				shown = bounds.x1 > bounds.x0 && bounds.y1 > bounds.y0;
 			}
-			if (shown)
+			/* port: native drawing remains the fallback for optional PC glyphs. */
+			if (shown && !menu_button_glyph_draw(menu_functions_glyph_button(widget, ui_mouse_key_button(widget)),
+				widget->local_player_index >= 0 && widget->local_player_index < 4 ?
+				widget->local_player_index : 0, &bounds, clip, color))
 			{
 				/* port: scaled modern difficulty icons exclude the native bitmap's
 				 * power-of-two padding, keeping their visible art centered. */

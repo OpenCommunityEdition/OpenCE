@@ -443,11 +443,19 @@ optional legacy entry use the existing post-text-draw menu adapter.
 [frontend_glyphs.c](../../port/linux/game/frontend_glyphs.c) resolves the active
 physical port through `controller_button_style_for_port`. Automatic detection
 remains on by default and saved manual/family choices are preserved. Modern
-Xbox, PlayStation and Switch art uses `controller_glyph_draw`; classic Xbox
-faces use a small independent cache because the HUD cache requires map-owned
-messaging icons. Modern menu glyphs work independently of High-Res HUD. Caches
+Xbox, PlayStation and Switch art uses `controller_glyph_draw_menu`; classic Xbox
+faces use the shared `hud_hires_button_bitmap` allocator. Modern, stock PC and
+gameplay draws share each registered artwork texture, while retaining their own
+layout. Keyboard and controller menu glyphs require High-Res HUD. Caches
 are bounded and disposed at map teardown. Missing artwork gets a physical
 button-position label instead of an incorrect family glyph.
+
+Interface also exposes Stock Menu Glyphs for existing PC navigation and pause
+legends. It defaults off and follows the same automatic/manual style selection.
+Pending High-Res HUD enables the glyph controls, including Stock Menu Glyphs.
+With High-Res HUD off, the modern footer uses text prompts. See the
+[keyboard prompt guide](keyboard_prompts.md) for compact pause key sizing and
+MCC-owned layout handling.
 
 For binding-aware gameplay keyboard prompts, `halo_keyboard_binding_label` in
 [xinput_sdl.c](../../port/linux/src/xinput_sdl.c), declared in

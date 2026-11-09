@@ -84,6 +84,7 @@ SHORT_LABELS = {
     "display.passenger_third_person": "PASSENGER VIEW", "display.muzzle_lighting": "MUZZLE LIGHTS",
     "network.browser_show_empty": "EMPTY SERVERS", "display.scoreboard_team_layout": "SCOREBOARD STYLE",
     "input.gyro_sensitivity_horizontal": "HORIZONTAL SENS.", "input.gyro_sensitivity_vertical": "VERTICAL SENS.",
+    "display.menu_button_glyphs": "STOCK MENU GLYPHS",
     "display.hud_button_style": "MANUAL STYLE", "display.hud_button_style_xbox": "XBOX STYLE",
     "display.hud_button_style_ps": "PLAYSTATION STYLE", "display.hud_button_style_switch": "SWITCH STYLE",
 }
@@ -163,7 +164,7 @@ def document():
             if setting == "display.detected_button_style": key = "detected_button_style"
             label = SHORT_LABELS.get(setting, label).rstrip(":")
             if setting == "input.auto_button_detection" or setting.startswith("display.hud_button_style"):
-                help_text = help_text.replace("Requires High-Res HUD in Graphics.", "Gameplay artwork requires High-Res HUD; menu glyphs work independently.").replace("Requires High-Res HUD.", "Gameplay artwork requires High-Res HUD; menu glyphs work independently.")
+                help_text = help_text.replace("Requires High-Res HUD in Graphics.", "Keyboard and controller glyphs require High-Res HUD.").replace("Requires High-Res HUD.", "Keyboard and controller glyphs require High-Res HUD.")
             labels.append(label.rstrip(":")); helps.append(help_text)
             c(options,f"row_{key}",28,137+index*30,platform=platform)
             row=w(f"row_{key}",width=336,height=26,bitmap="modern/row",platform=platform,flags="pass_unhandled_to_focused_child nifty_fx")

@@ -11,13 +11,14 @@
 #include <string.h>
 #include <wchar.h>
 
-void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, int menu)
+static void keyboard_glyph_draw_padded(char const *label, rectangle2d *cursor, pixel32 color, int menu, real padding, real text_scale)
 {
     wchar_t text[64];
     rectangle2d measure = *cursor;
     real_rectangle2d ink, capitals;
     real_argb_color old_color, text_color;
     unsigned int i;
+    short initial_indent, paragraph_indent;
     real width, height, x, y, middle;
     int symbol = !strcmp(label,"Up") ? 2 : !strcmp(label,"Down") ? 3 :
         !strcmp(label,"Left") ? 4 : !strcmp(label,"Right") ? 5 :
@@ -39,13 +40,14 @@ void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, 
     text_color.alpha = (real)(alpha >> 24) / 255.0f;
     text_color.red = 0.92f; text_color.green = 0.97f; text_color.blue = 1.0f;
     draw_string_set_color(&text_color);
+    draw_string_get_indents(&initial_indent, &paragraph_indent);
     draw_string_set_indents(0, 0);
     measure.x0 = 0; measure.x1 = 2048;
     rasterizer_unicode_string_ink_bounds(&measure, L"H", &capitals);
     rasterizer_unicode_string_ink_bounds(&measure, text, &ink);
     middle = (capitals.y0 + capitals.y1) * .5f;
     height = MAX(20.0f, capitals.y1 - capitals.y0 + 10.0f);
-    width = symbol ? height : MAX(height, ink.x1 - ink.x0 + 12.0f);
+    width = symbol ? height : MAX(height, (ink.x1 - ink.x0) * text_scale + padding);
     /* HUD text retracts its cursor by three units after each text segment.
      * Recenter within that existing advance so gaps on either side match. */
     x = cursor->x0 + (menu ? 4.0f : 7.0f);
@@ -53,14 +55,35 @@ void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, 
     if (!keyboard_glyph_background(symbol, x, y, width, height, edge))
     {
         symbol = 0;
-        width = MAX(height, ink.x1 - ink.x0 + 12.0f);
+        width = MAX(height, (ink.x1 - ink.x0) * text_scale + padding);
     }
     if (!symbol)
-        rasterizer_draw_unicode_string_offset(&measure, text,
-            x + (width - (ink.x1 - ink.x0)) * .5f - ink.x0,
-            middle - (ink.y0 + ink.y1) * .5f);
+    {
+        if (text_scale != 1.0f)
+            rasterizer_draw_unicode_string_scaled_offset(&measure, text, text_scale,
+                x + (width - (ink.x1 - ink.x0) * text_scale) * .5f - ink.x0 * text_scale,
+                middle - (ink.y0 + ink.y1) * .5f * text_scale);
+        else
+            rasterizer_draw_unicode_string_offset(&measure, text,
+                x + (width - (ink.x1 - ink.x0)) * .5f - ink.x0,
+                middle - (ink.y0 + ink.y1) * .5f);
+    }
     draw_string_set_color(&old_color);
+    draw_string_set_indents(initial_indent, paragraph_indent);
     cursor->x0 = (short)(x + width + (menu ? 4.5f : 1.5f));
+}
+
+/* Preserve GulchCE's original dimensions for gameplay and ordinary menus. */
+void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, int menu)
+{
+    keyboard_glyph_draw_padded(label, cursor, color, menu, 12.0f, 1.0f);
+}
+
+/* Smaller pause labels leave padding inside the complete, full-height outline. */
+void keyboard_glyph_draw_compact(char const *label, rectangle2d *cursor, pixel32 color)
+{
+    keyboard_glyph_draw_padded(label, cursor, color, TRUE,
+        KEYBOARD_GLYPH_COMPACT_PADDING, KEYBOARD_GLYPH_COMPACT_TEXT_SCALE);
 }
 
 /* HUD message element semantics precede controller/profile translation.

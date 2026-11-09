@@ -2040,6 +2040,7 @@ The remaining options close the gap; the help and bottom buttons stay put. */
 /* Button Appearance filters its rows in the controller feature module. */
 #include "controller_buttons.h"
 #include "keyboard_prompts.h"
+#include "menu_button_glyphs.h"
 #include "frontend_input.h"
 #include "controller_button_menu.inl"
 
@@ -6614,6 +6615,8 @@ static struct
 	unsigned long updated_at;
 } lobby_icons;
 
+#include "menu_button_widgets.inl"
+
 /* ui_widget.c's: a text box drawn, at the bounds its text was drawn in
 (its font and justification still set): a lobby row's player talking in
 voice chat (or muted) has a speaker just left of their name
@@ -7300,8 +7303,7 @@ static void join4_update(struct widget_instance *widget)
 	join4_keyboard();
 	text_set(named(screen, "join4_hint", 0),
 		system_milliseconds() < join4.notice_until ? join4.notice :
-		halo_keyboard_shares_gamepad() && halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS ?
-			L"SPACE: join    ENTER: select    ESC: back" : L"ENTER: select    ESC: back");
+		menu_button_glyph_join_hint(halo_keyboard_shares_gamepad() && halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS, 0));
 }
 
 static long join4_tag(void)
