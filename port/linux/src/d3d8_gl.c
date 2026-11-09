@@ -973,6 +973,9 @@ struct framebuffer_entry
 	GLuint framebuffer;
 };
 
+/* Intel's Windows driver. Set once the renderer string is known. */
+static int clear_scissor_lower_left;
+
 static struct render_target_entry *render_targets;
 static struct framebuffer_entry *framebuffers;
 
@@ -2555,6 +2558,14 @@ static void gl_initialize(void)
 
 		if (every < 0)
 			every = renderer && strstr(renderer, "Mesa Intel") ? 3 : 0;
+		/* this driver's glClear reads the scissor from the lower left, while
+		draws use the upper-left origin glClipControl set. A split pane's
+		clear then lands in the other half and covers that half's picture. */
+		if (renderer && strstr(renderer, "Intel") && !strstr(renderer, "Mesa"))
+		{
+			clear_scissor_lower_left = 1;
+			platform_log("GPU: Intel clears use a lower-left scissor; split panes are matched to their draws");
+		}
 		if (every > 0)
 		{
 			device.flush_every = (unsigned long)every;
@@ -4642,12 +4653,17 @@ static void apply_raster_state(BOOL has_depth)
 	what keeps a split-screen window's geometry from bleeding across the divider */
 	/* (glScissor takes the corner and the size, as glViewport does) */
 	memcpy(scissor, viewport, sizeof(scissor));
+	/* Intel's Windows driver drops glScissor while the test is disabled when
+	the rectangle starts at y 0. That is the top pane of a split: the clear
+	set its scissor with the test on, so the fog color shows, and every draw
+	after the clear is clipped away. The lower pane's rectangle does not
+	start at 0, so its draws land. Enable first. */
+	state_enable(&gl_state.scissor_test, GL_SCISSOR_TEST, scissor[2] > 0 && scissor[3] > 0);
 	if (memcmp(gl_state.scissor, scissor, sizeof(scissor)))
 	{
 		memcpy(gl_state.scissor, scissor, sizeof(scissor));
 		glScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 	}
-	state_enable(&gl_state.scissor_test, GL_SCISSOR_TEST, scissor[2] > 0 && scissor[3] > 0);
 	/* (display.reversed_depth: Direct3D's MinZ to MaxZ as 1 - MinZ to
 	1 - MaxZ, which glDepthRange takes nearest first) */
 	depth_range[0] = xgpu_reversed_depth ? 1.0f - device.viewport.MaxZ : device.viewport.MinZ;
@@ -7157,6 +7173,26 @@ static void clear_state_forget(void)
 	memset(gl_state.scissor, 0xff, sizeof(gl_state.scissor));
 }
 
+/* glClear on Intel's Windows driver takes a lower-left scissor. Draws take
+the upper-left one, so a pane clear is moved onto the other pane. */
+static GLint clear_scissor_y(GLint y, GLint height)
+{
+	struct render_target_entry *target;
+	GLint framebuffer_height;
+
+	if (!clear_scissor_lower_left || height <= 0)
+		return y;
+	target = device.render_target ? render_target_get(device.render_target) : NULL;
+	if (!target && device.depth_stencil)
+		target = render_target_get(device.depth_stencil);
+	if (!target)
+		return y;
+	framebuffer_height = (GLint)target->target.gl_height;
+	if (y < 0 || y > framebuffer_height - height)
+		return y;
+	return framebuffer_height - (y + height);
+}
+
 void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags, D3DCOLOR color, float z, DWORD stencil)
 {
 	float rgba[4];
@@ -7202,10 +7238,11 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 		keeps a split-screen window's clear from wiping the other window */
 		GLint x0 = target_pixel((float)device.viewport.X, 0);
 		GLint y0 = target_pixel((float)device.viewport.Y, 1);
+		GLint width = target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - x0;
+		GLint height = target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - y0;
 
 		glEnable(GL_SCISSOR_TEST);
-		glScissor(x0, y0, target_pixel((float)(device.viewport.X + device.viewport.Width), 0) - x0,
-			target_pixel((float)(device.viewport.Y + device.viewport.Height), 1) - y0);
+		glScissor(x0, clear_scissor_y(y0, height), width, height);
 		glClear(mask);
 		glDisable(GL_SCISSOR_TEST);
 		clear_state_forget();
@@ -7220,14 +7257,15 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 			rectangles[index].x2 : device.viewport.X + device.viewport.Width;
 		INT bottom = rectangles[index].y2 < device.viewport.Y + device.viewport.Height ?
 			rectangles[index].y2 : device.viewport.Y + device.viewport.Height;
-		GLint x0, y0;
+		GLint x0, y0, width, height;
 
 		if (left >= right || top >= bottom)
 			continue;
 		x0 = target_pixel((float)(left + UI_OFFSET), 0);
 		y0 = target_pixel((float)top, 1);
-		glScissor(x0, y0, target_pixel((float)(right + UI_OFFSET), 0) - x0,
-			target_pixel((float)bottom, 1) - y0);
+		width = target_pixel((float)(right + UI_OFFSET), 0) - x0;
+		height = target_pixel((float)bottom, 1) - y0;
+		glScissor(x0, clear_scissor_y(y0, height), width, height);
 		glClear(mask);
 	}
 	glDisable(GL_SCISSOR_TEST);
