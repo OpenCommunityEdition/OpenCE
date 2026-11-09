@@ -6538,7 +6538,7 @@ short menu_functions_glyph_offset(struct widget_instance *widget)
     if (compact)
     {
         /* These two groups have a wide authored inter-group gap. Recover that
-         * space before widening the caps, keeping two units after CANCEL. */
+         * space before widening the caps, keeping eight units after CANCEL. */
         for (sibling = widget->parent->child; sibling; sibling = sibling->next)
         {
             name = tag_get_name(sibling->definition_tag_index);
@@ -6553,7 +6553,7 @@ short menu_functions_glyph_offset(struct widget_instance *widget)
             pc_menu_widget_text_bounds(sibling->definition_tag_index, &bounds, &text_offset);
             label_end = MAX(label_end, sibling->horizontal_offset + bounds.x1);
         }
-        if (label_end) gap = MAX(0, accept_x - label_end - 2);
+        if (label_end) gap = MAX(0, accept_x - label_end - 8);
     }
     for (sibling = widget->parent->child; sibling; sibling = sibling->next)
     {

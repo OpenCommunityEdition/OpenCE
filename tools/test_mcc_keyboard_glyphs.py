@@ -47,7 +47,7 @@ int main(void){
   assert(mcc_pause_key_button(parent,children[1].widget.index)==NONE);
   assert(mcc_pause_key_button(parent,children[3].widget.index)==NONE);
   for(k=0;k<4;k++){
-   short gap=children[2].x-children[1].x-63-2;
+   short gap=children[2].x-children[1].x-63-8;
    short a=mcc_pause_key_offset(parent,children[2].widget.index,widths[k],30);
    short b=mcc_pause_key_offset(parent,children[0].widget.index,widths[k],30);
    assert(a==mcc_pause_key_offset(parent,children[3].widget.index,widths[k],30));
@@ -55,7 +55,7 @@ int main(void){
    /* Preserve the original visible center and the gap before the accept cap. */
    assert(a-b==widths[k]-16-gap);
    assert(abs((b-(30-16))+a)<=1);
-   assert(children[2].x+16+a-widths[k]>=children[1].x+63+b+2);
+   assert(children[2].x+16+a-widths[k]>=children[1].x+63+b+8);
   }
   assert(!mcc_pause_key_offset(parent,children[2].widget.index,0,30));
   assert(!mcc_pause_key_offset(parent,NONE,42,30));

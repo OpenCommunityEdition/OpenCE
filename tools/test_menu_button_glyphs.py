@@ -98,7 +98,7 @@ int main(void){
  box.y1=96;assert(menu_button_glyph_draw(0,0,&box,&clip,0x80ffffff));assert(bh==20);restored();
  box.x1=116;box.y1=100;
  assert(menu_button_glyph_draw(0,0,&box,&clip,0x80ffffff));
- assert(bw==38&&bh==20);restored();
+ assert(bw==34&&bh==20);restored();
  box.x1=120;
  box.y1=106;clip.x0=105;before=backgrounds;assert(!menu_button_glyph_draw(0,0,&box,&clip,0x80ffffff));assert(backgrounds==before);
  clip.x0=0;fail=1;assert(!menu_button_glyph_draw(1,0,&box,&clip,0x80ffffff));restored();
@@ -152,10 +152,10 @@ static char const *tag_get_name(long t){return names[t];}
 static short controller_of(struct widget_instance *w){return 0;}
 static int menu_button_glyph_keyboard_active(short p){assert(!p);return active;}
 static short menu_button_glyph_key_width(short b){return b?30:38;}
-static short menu_button_glyph_compact_key_width(short b){return b?26:34;}
+static short menu_button_glyph_compact_key_width(short b){return b?22:30;}
 static void pc_menu_widget_text_bounds(long t,rectangle2d *b,short *o){assert(t>=1&&t<=3);b->x0=0;b->x1=t==2?63:small?16:21;*o=0;}
 static int mcc_pause_owns(long t){return t==6;}
-static short mcc_pause_key_offset(long parent,long child,short width,short back){assert(parent==6&&width==34&&back==26);return child>=3?9:0;}
+static short mcc_pause_key_offset(long parent,long child,short width,short back){assert(parent==6&&width==30&&back==22);return child>=3?9:-2;}
 static short mcc_pause_key_button(long parent,long child){assert(parent==6);return child==1?1:child==3?0:NONE;}
 """+function(source,'menu_functions_glyph_button')+function(source,'menu_functions_glyph_offset')+r"""
 int main(void){
@@ -172,12 +172,12 @@ int main(void){
  names[0]="ui\\shell\\main_menu\\button_key_sm";
  names[1]="ui\\shell\\main_menu\\b_butn_sm";names[3]="ui\\shell\\main_menu\\a_butn_sm";
  b.horizontal_offset=0;back.horizontal_offset=16;a.horizontal_offset=90;accept.horizontal_offset=107;
- assert(menu_functions_glyph_offset(&b)==0&&menu_functions_glyph_offset(&back)==0);
+ assert(menu_functions_glyph_offset(&b)==-2&&menu_functions_glyph_offset(&back)==-2);
  assert(menu_functions_glyph_offset(&a)==9&&menu_functions_glyph_offset(&accept)==9);
  /* The imported caps remain inside the 226-wide panel, whose key starts at 25.
     The 63-wide CANCEL label ends before Enter; SELECT remains inside the box. */
- assert(25+16-26+menu_functions_glyph_offset(&b)>=0);
- assert(back.horizontal_offset+menu_functions_glyph_offset(&back)+63<=a.horizontal_offset+16+menu_functions_glyph_offset(&a)-34);
+ assert(25+16-22+menu_functions_glyph_offset(&b)>=0);
+ assert(back.horizontal_offset+menu_functions_glyph_offset(&back)+63+8<=a.horizontal_offset+16+menu_functions_glyph_offset(&a)-30);
  assert(25+accept.horizontal_offset+menu_functions_glyph_offset(&accept)+63<=226);
  active=0;assert(!menu_functions_glyph_offset(&a));active=1;
  parent.definition_tag_index=6;assert(menu_functions_glyph_offset(&a)==9);

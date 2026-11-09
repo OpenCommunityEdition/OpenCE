@@ -285,7 +285,7 @@ short mcc_pause_key_offset(long parent, long child, short accept_width, short ba
     back = mcc_pause_definition(children[0].widget.index);
     cancel = mcc_pause_definition(children[1].widget.index);
     if (!accept || !back || !cancel) return 0;
-    gap = MAX(0, children[2].x - children[1].x - cancel->bounds.right - 2);
+    gap = MAX(0, children[2].x - children[1].x - cancel->bounds.right - 8);
     accept_extra = MAX(0, accept_width - (accept->bounds.right - accept->bounds.left));
     back_extra = MAX(0, back_width - (back->bounds.right - back->bounds.left));
     accept_extra -= gap;

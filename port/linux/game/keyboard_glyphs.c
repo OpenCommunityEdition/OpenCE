@@ -75,7 +75,7 @@ void keyboard_glyph_draw(char const *label, rectangle2d *cursor, pixel32 color, 
 /* Compact pause slots keep the same font, height and complete outline. */
 void keyboard_glyph_draw_compact(char const *label, rectangle2d *cursor, pixel32 color)
 {
-    keyboard_glyph_draw_padded(label, cursor, color, TRUE, 8.0f);
+    keyboard_glyph_draw_padded(label, cursor, color, TRUE, 4.0f);
 }
 
 /* HUD message element semantics precede controller/profile translation.
