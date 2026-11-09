@@ -791,6 +791,7 @@ static boolean render_object_shadow_begin(
 	real_point3d center;
 	real radius;
 	real_vector3d shadow_right;
+	real_vector3d shadow_vector;
 	union real_rgb_color shadow_color;
 	struct object_datum *object;
 	real shadow_intensity = level_of_detail;
@@ -804,13 +805,17 @@ static boolean render_object_shadow_begin(
 	frame's blend, flickering */
 	render_interpolation_object_point(data->object_index, &center);
 
-	perpendicular3d(&data->lighting->shadow_vector, &shadow_right);
+	/* port: cast along the lighting's shadow vector as this frame draws it,
+	gliding between the steps the lighting turns it by, not holding between
+	them and hopping (render_interpolation.c) */
+	render_interpolation_shadow_vector(data->object_index, &data->lighting->shadow_vector, &shadow_vector);
+	perpendicular3d(&shadow_vector, &shadow_right);
 	normalize3d(&shadow_right);
 	matrix4x3_from_point_and_vectors(
 		&data->shadow_matrix,
 		&center,
 		&shadow_right,
-		&data->lighting->shadow_vector);
+		&shadow_vector);
 
 	shadow_color = data->lighting->shadow_color;
 
