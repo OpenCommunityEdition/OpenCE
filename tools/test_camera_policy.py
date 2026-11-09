@@ -135,7 +135,9 @@ def test_host_camera_menu_layout():
     rows = {node.attrib["widget"].removeprefix(base): int(node.attrib["y"]) for node in menu.findall("child")}
     help_box = root.find(f"widget[@name='{base}help']")
     assert int(help_box.attrib["left"]) == 54 + 13
+    assert help_box.attrib["font"] == "ui\\small_ui"
     assert int(help_box.attrib["height"]) >= 40
+    assert min(rows.values()) >= 49
     assert int(help_box.attrib["top"]) + int(help_box.attrib["height"]) <= rows["button_bar"]
     common = ["op_server_name", "op_max_players", "op_listing", "op_password", "op_session_options", "op_map_share_options"]
     for mode in (["op_coop_options", "op_voice_options"], ["op_game_type", "op_player_options", "op_item_options", "op_vehicle_options", "op_indicator_options", "op_team_options"]):
@@ -187,3 +189,42 @@ def test_host_help_is_generated():
     root = ET.fromstring("\n".join(port_settings.settings_files()[name]))
     strings = next(node for node in root.findall("strings") if node.attrib["name"].endswith("/help_strings"))
     assert strings[10].attrib["text"].startswith("CONTROLLED BY HOST")
+
+def test_host_hidden_rows_reflow(tmp_path):
+    from harness import function
+    compiler = shutil.which("clang") or shutil.which("cc")
+    if not compiler:
+        pytest.skip("a C compiler is required")
+    layout = function((ROOT / "port/linux/game/menu_functions.c").read_text(), "server_settings_layout")
+    source = tmp_path / "layout.c"
+    source.write_text('''#include <string.h>
+struct widget_instance { char *name; int visible; short vertical_offset; struct widget_instance *child, *next; };
+''' + layout + '''
+int main(void) {
+    struct widget_instance rows[13], list;
+    int mask, i, y;
+    memset(rows, 0, sizeof(rows)); memset(&list, 0, sizeof(list));
+    list.child = rows;
+    for (i = 0; i < 13; i++) {
+        rows[i].name = i == 12 ? "button_bar" : "op_setting";
+        rows[i].next = i == 12 ? 0 : &rows[i + 1];
+    }
+    rows[12].vertical_offset = 448; rows[12].visible = 1;
+    /* Repeated updates also restore positions when rows become visible. */
+    for (mask = 0; mask < 4096; mask++) {
+        for (i = 0; i < 12; i++) rows[i].visible = !!(mask & (1 << i));
+        server_settings_layout(&list); y = 49;
+        for (i = 0; i < 12; i++) if (rows[i].visible) {
+            if (rows[i].vertical_offset != y || y + 28 > 392) return 1;
+            y += 28;
+        }
+        if (rows[12].vertical_offset != 448) return 2;
+    }
+    return 0;
+}
+''')
+    exe = tmp_path / ("layout.exe" if sys.platform == "win32" else "layout")
+    flags = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else []
+    result = subprocess.run([compiler, str(source), *flags, "-o", str(exe)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    subprocess.run([str(exe)], check=True, timeout=10)

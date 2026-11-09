@@ -38,5 +38,3 @@ The validation record distinguishes compilation, automated checks and bounded
 runtime observations; it does not claim complete campaign playthroughs.
 
 - [Third-person camera](third_person.md): optional shoulder view, controls, host policy, cover-aware firing and lifecycle.
-
-- [Third-person camera](third_person.md): optional shoulder view, controls, host policy, cover-aware firing and lifecycle.

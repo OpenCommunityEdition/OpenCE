@@ -364,17 +364,16 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Draw first-person weapons, hands and attached\nvisuals. Gameplay and sound continue when off.", None),
         ("PASSENGER THIRD PERSON:", "display.passenger_third_person", ON_OFF,
          "Third-person Warthog and Scorpion passengers in\nthe campaign and co-op. Weapon zoom is disabled.", None),
-        ("SHIELD LOOK:", "display.shield_look", [("DEFAULT", "classic"), ("CLASSIC WITH SPRINKLES", "classic_with_sprinkles"), ("MARK VI", "enhanced"), ("INFINITE HONEYCOMB", "classic_honeycomb2")],
-         "Classic keeps map shields. Other looks keep custom colour.\nSprinkles adds layers, arcs and recharge to the classic surface.", None),
         ("ARM SHIELDS:", "display.viewmodel_shield", ON_OFF,
          "The energy shield's flare on your first-person\narms too, as on your body.", None),
-        ("THIRD PERSON:", "display.third_person", ON_OFF,
-         "Right-shoulder view on foot. Zoom uses first\nperson. The reticle follows your aim point.", None),
         ("LEGS:", "display.first_person_legs", ON_OFF,
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
+        ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
+         "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
+        ("THIRD PERSON:", "display.third_person", ON_OFF,
+         "Right-shoulder view on foot. Zoom uses first\nperson. The reticle follows your aim point.", None),
     ],
 }
-
 SCREENS["video_settings/fov_viewmodels"]["spacing"] = 26
 SCREENS["video_settings/fov_viewmodels"]["categories"] = [
     ("SHOULDER CAMERA:", "video_settings/shoulder_camera",
@@ -686,7 +685,7 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
     lines = []
     lines += _widget(f"{base}/{spec['screen']}",
                      [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child pause_game"),
-                      ("bitmap", "bitmaps/gradient")],
+                      ("bitmap", spec.get("background_bitmap", "bitmaps/gradient"))],
                      ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
                       f'<child{attributes([("widget", f"{base}/{header}")])}/>',
                       f'<child{attributes([("widget", f"{base}/options_menu")])}/>'])
@@ -1613,7 +1612,7 @@ def _server_settings() -> list:
     # (twelve rows: closer together, the help lower)
     spec = {"screen": "server_settings_screen", "spacing": 28, "rows_top": 49,
             "help_top": 392, "help_height": 40, "help_left": 67, "help_width": 486,
-            "help_font": "ui\\small_ui", "button_top": 448, "header_top": -10,
+            "help_font": "ui\\small_ui", "button_top": 448, "header_top": -10, "background_bitmap": "bitmaps/gradient_big",
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
     extra += _value_row(base, "server_name", 0, "ss edit server name")

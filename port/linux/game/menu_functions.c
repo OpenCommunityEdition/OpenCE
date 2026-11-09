@@ -1780,8 +1780,6 @@ static struct widget_instance *screen_of(struct widget_instance *widget)
 }
 
 /* "port settings save" (OK): those changed written, and applied */
-boolean network_game_is_active(void);
-
 static boolean setting_changed_save(struct widget_instance *spinner, struct pc_menu_setting *setting)
 {
 	short index = spinner->parameters.list.selected_index;
@@ -4297,6 +4295,20 @@ static void wide_to_text(wchar_t const *wide, char *text, short size)
 	text[index] = 0;
 }
 
+/* Hidden internet and mode-specific rows must not leave gaps. Moving the
+row also moves its labels, spinners and pointer targets. */
+static void server_settings_layout(struct widget_instance *list)
+{
+	struct widget_instance *row;
+	short y = 49;
+	for (row = list->child; row; row = row->next)
+		if (row->visible && !strncmp(row->name, "op_", 3))
+		{
+			row->vertical_offset = y;
+			y += 28;
+		}
+}
+
 /* "server settings update" */
 static void server_settings_update(struct widget_instance *list)
 {
@@ -4385,6 +4397,7 @@ static void server_settings_update(struct widget_instance *list)
 		if (help && list->focused_child == row)
 			help->parameters.text_box.string_list_index = SERVER_PASSWORD_HELP;
 	}
+	server_settings_layout(list);
 }
 
 static void server_password_done(char const *text)
