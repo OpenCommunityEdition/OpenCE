@@ -493,6 +493,8 @@
 		<string text="No weapons appear on the map: with a loadout of\nNONE and NONE, melee and grenades only."/>
 		<string text="The weapons follow the weapon set above."/>
 		<string text="Everyone starts with the primary and secondary\nweapons below; the map's weapons are its own."/>
+		<string text="Weapons run dry and reload as the game type\nhas them."/>
+		<string text="Weapons never run dry: the host refills the\nmagazine as it empties."/>
 		<string text="No primary weapon."/>
 		<string text="A random primary weapon, of those the map has,\neach time you spawn."/>
 		<string text="Everyone spawns with a assault rifle as their primary\nweapon (where the map has one)."/>
@@ -524,6 +526,7 @@
 		<string text="PRIMARY WEAPON:"/>
 		<string text="SECONDARY WEAPON:"/>
 		<string text="MAP WEAPONS:"/>
+		<string text="BOTTOMLESS:"/>
 	</strings>
 	<strings name="main_menu/settings_select/multiplayer_setup/item_options_edit/var_infinite_grenades" map="ui\shell\main_menu\settings_select\multiplayer_setup\item_options_edit\var_infinite_grenades">
 		<string text="YES" map="0"/>

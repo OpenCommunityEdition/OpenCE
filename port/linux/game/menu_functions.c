@@ -6908,6 +6908,8 @@ static struct gametype_option const gametype_options[] =
 	{ "map_weapons_spinner", _option_option_byte, OPTIONS_FIELD(no_map_weapons), 0, 2, { 0, 1 } },
 	/* (the loadout: the weapon set's, or each player's two weapons) */
 	{ "loadout_spinner", _option_option_byte, OPTIONS_FIELD(loadout), 0, 2, { _loadout_category, _loadout_custom } },
+	/* (BOTTOMLESS, after the loadout: the same field as OPENCE OPTIONS' row) */
+	{ "bottomless_spinner", _option_option_byte, OPTIONS_FIELD(bottomless), 0, 2, { FALSE, TRUE } },
 	{ "primary_weapon_spinner", _option_option_byte, OPTIONS_FIELD(primary_weapon), 0, NUMBER_OF_LOADOUT_WEAPONS,
 		{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 } },
 	{ "secondary_weapon_spinner", _option_option_byte, OPTIONS_FIELD(secondary_weapon), 0, NUMBER_OF_LOADOUT_WEAPONS,

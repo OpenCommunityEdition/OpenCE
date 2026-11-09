@@ -450,7 +450,8 @@ SWAT, INFECTION, GUN GAME, ONE IN THE CHAMBER, FRAG NATION or SNOWBALL
 FIGHT: Slayer only; Infection is played on teams, Gun Game and One in the
 Chamber free for all, which the screen's OK sets), HARDCORE (any game
 type), BOTTOMLESS (any game type: weapons never run dry, as the host
-refills the magazine as it empties, and a battery does not drain), and the
+refills the magazine as it empties, and a battery does not drain; ITEM
+OPTIONS has it too, after LOADOUT), and the
 mode's own options: Infection's first zombies, zombie speed,
 skull damage, zombie respawn time, countdown and zombie shields, Gun
 Game's weapon order (strongest first, weakest first, or random, drawn by
