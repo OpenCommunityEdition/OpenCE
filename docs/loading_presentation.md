@@ -4,7 +4,7 @@
 provides the Widescreen Loading toggle, also accessible through the PC-style
 pause menu's Settings. Xbox menus retain their existing controls; the setting
 can also be changed in config.toml or with HALO_WIDESCREEN_LOADING.
-Both Xbox and Custom Edition maps use it.
+Xbox, Custom Edition and MCC maps use it.
 
 The installation's original loading picture, mask, sweep, feedback blur,
 glow trails, wobble and fade remain. Widescreen expands the entire composition
@@ -22,6 +22,14 @@ region when disabled. The feedback texture remains 640x480 in both modes.
 These small engine hooks are necessary because projection and front-buffer
 capture are private to their respective implementations. Map loading and
 simulation contracts are unchanged.
+
+MCC conversion keeps its own stage tracking and draw scheduling in
+[mcc_loading.c](../port/linux/game/mcc_loading.c). `mcc_loading_begin` starts
+the same stock loading renderer, `mcc_loading_pulse` displays its progress,
+and `mcc_loading_end` closes it on success or failure. Consequently the same
+framing choice, mask, feedback and chant apply without a second MCC effect.
+The MCC pulse draws only this standalone effect while tags are incomplete;
+it does not run ordinary gameplay or menu rendering during conversion.
 
 The game already supplies the chant's samples, four voices, pitches and volume
 envelopes. `mix_buffers` and the DirectSound buffer functions in

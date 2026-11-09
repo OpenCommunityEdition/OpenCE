@@ -529,6 +529,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.anisotropic_filtering` | `0` | `HALO_ANISOTROPIC_FILTERING` | Textures seen at a grazing angle (floors, walls, terrain) are sampled along the angle from finer mip levels, so they stay sharp; the Xbox game asks for none. `0` or `1`: as on the Xbox. `2`, `4`, `8` or `16`: at most that many samples (at most the GPU's); `4` keeps most of `16`'s sharpness at less cost on slower GPUs. TEXTURE FILTERING in Video Setup > Graphics. It applies to the textures of the map that have mip levels and are filtered linearly (base, detail, bump and environment maps; lightmaps have no mip levels), not to what the game renders, such as the water's ripples. On Android and the web, only where the GPU has `GL_EXT_texture_filter_anisotropic`. |
 | `display.latency_meter` | `false` | `HALO_LATENCY_METER` | `true`: in a network game, your round trip to the host in milliseconds at the top right of the screen, "Ping 45 ms" with four bars: green below 80 ms, yellow below 150, red from 150. The host shows "Max ping", its slowest player's. A player's machine that has heard nothing from the host for two seconds shows "Connection problem". The round trip includes each machine's wait for its next tick, so a LAN reads 15 to 35 ms. Not shown in the menus, after the game, in a co-op cutscene or when the host plays alone. The scoreboard's pings take the same colours, and show the round trips this machine times itself (the host: each player's; a player: their own), so they agree with the meter. Nothing more is sent. Only in config.toml, not in the menus. |
 | `display.shader_cache` | `true` | `HALO_SHADER_CACHE` | Windows and Linux: keep the GPU programs that the game links in `shader_cache/` in the save root, and load each from there the next time instead of linking it again, which stops the game for a frame on some drivers. `false`: link each program every time. Refer to "Files and folders". |
+| `display.mcc_texture_prepare_mb` | `0` | `HALO_MCC_TEXTURE_PREPARE_MB` | Windows and Linux, MCC only: prepare large non-paletted textures during loading within this estimated GPU-storage budget in MiB, capped at 512. Zero disables it. Quality, palette behavior, and Xbox/CE texture caches are unchanged. Prepared textures remain owned by the MCC texture bridge until map unload. |
 | `display.stats_log` | `false` | `HALO_STATS_LOG` | `true`: a line a second in the log with the frame rate, the mode, the map, the renderer and the size of the 3D view (`STATS fps=120.2 mode=Slayer map=bloodgulch gpu="Adreno (TM) 735" res=1068x480`), so a graphics bug's report or two builds compared say which of them was running and at what frame rate. Nothing is drawn and nothing is sent. |
 | `display.per_pixel_lighting` | `false` | `HALO_PER_PIXEL_LIGHTING` | `false`: the models (characters, weapons, vehicles, scenery) are lit at each vertex and the light is blended between them, as on the Xbox. The light across a curved surface then shows facets, and a point light that passes close lights only the vertices it reaches. `true`: the models are lit at each pixel by the same lights (the ambient light, two distant lights and two point lights), which changes their look. |
 | `display.structure_culling` | `31` | `HALO_STRUCTURE_CULLING` | Which tests skip the triangles of the level (its walls, floors and terrain) that the camera cannot see before they are drawn, as bits added together: `1`, triangles outside the view; `2`, groups of triangles that all face away from the camera; `4`, single triangles that face away; `8`, smaller groups, so that more of them are skipped whole; `16`, the rooms nearest the camera first. Each test is conservative: the picture is the same, with fewer triangles drawn. `0`: the original walk, which draws every triangle of each visible room. The console's `structure_culling <bits>` changes it until the game quits, and `debug_structure_culling true` shows what was skipped (red: outside the view, blue: facing away). |
@@ -574,6 +575,10 @@ the setting for one start of the game. It has priority over the file.
 | `paths.saves` | `""` | `HALO_SAVE_ROOT` | The save root. Refer to "Files and folders". |
 | `paths.logs` | `""` | `HALO_LOG_ROOT` | The folder of `debug.txt`, `bans.txt` and `cheaters.txt`. Empty: the data root. With it, the data root can be read-only (a dedicated server's maps mounted so). |
 | `paths.custom_maps` | `""` | `HALO_CUSTOM_MAPS_ROOT` | The `custom_maps` folder (Custom Edition maps, with their `bitmaps.map`, `sounds.map` and `loc.map`). Empty: the one in the data root. |
+| `game.mcc_campaigns` | `false` | `HALO_MCC_CAMPAIGNS` | Use explicit MCC campaign metadata for discovery, mission titles, authored ordering and progression. In co-op only the host chooses the next mission. Reopen the map list after changing this. |
+| `game.mcc_collections` | `false` | `HALO_MCC_COLLECTIONS` | Group MCC packages by the bundled Workshop collection list, including imported packages identified by a sidecar. Reopen the map list after changing this. |
+| `game.workshop_maps` | `false` | `HALO_WORKSHOP_MAPS` | Discover installed Halo CE Steam Workshop maps on desktop. Local MCC packages take precedence. Android and web use local packages. |
+| `paths.steam` | `""` | `HALO_STEAM_ROOT` | A Steam folder or library to check first for subscribed Halo CE Workshop items. Automatic discovery also checks Windows registry installations; Linux's `STEAM_COMPAT_CLIENT_INSTALL_PATH`, `$XDG_DATA_HOME/Steam` and home-folder locations; and their library lists. Empty: automatic discovery only. |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | IPv4 addresses, with commas between them, that get the broadcasts of the game. Empty: 255.255.255.255. |
 | `network.online` | `true` | `HALO_NET_ONLINE` | `true`: internet play. `false`: system link on the local network only. |
@@ -606,10 +611,11 @@ the setting for one start of the game. It has priority over the file.
 | `network.fire_origins` | `true` | `HALO_NET_FIRE_ORIGINS` | Host: whether a client's reported hit that the shooter's camera had no line of sight to may still count from where the client says its player's shots leave, when that is not the camera (distributed message 93: a VR build's weapon hand, which may be past a corner the camera is behind). The hand must be within 0.4 world units of the camera, no more than 0.05 behind the eye along the line to the target, 0.2 to its side and 0.1 above it, with the line from the eye to it clear; the host logs how many hits counted only that way. `false`: from the camera and vehicles' guns only (`network_damage.c`). |
 | `network.block_mouse_aim_assist` | `false` | `HALO_NET_BLOCK_MOUSE_AIM_ASSIST` | Host: Player Options > Aim Assist, Allowed or Block M+KB. Block overrides optional mouse magnetism while mouse/keyboard aims, including on the host, without changing the saved preference. Controllers and touch retain their existing behavior; bullet autoaim is unchanged. |
 | `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: send a player who joins without the game's Custom Edition map the map, and the resource maps that it needs and that the player does not have. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
+| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | SHARE MCC PACKAGES in Settings > Network Setup > Map Sharing. Host-only, explicit-list sharing of eligible local or Workshop packages; requires a gameplay fingerprint and maker in `mcc_share.txt`. Includes used package resources and recognized metadata/previews. The joiner needs Download Maps enabled and must accept the offer. See "MCC package sharing" for implementation status and limits. |
 | `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `20480`, 20 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `10240`, 10 MB/s). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
-| `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | When you join a game on a Custom Edition map that you do not have: download it from the players of the game. `false`: leave the game and show which map is missing. DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. |
+| `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. CE downloads from players as before; MCC permits a host offer and asks before transferring files. Off: CE leaves a missing-map game; MCC offers manual/Workshop installation and cancellation. |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
 | `network.coop_team_wipe` | `"auto"` | `HALO_NET_COOP_TEAM_WIPE` | TEAM WIPE in Server Setup > Co-op Options: `"auto"` reverts the checkpoint in a PRIVATE game and only respawns the team in a PUBLIC game (a dedicated server's: `server.public` with internet play). `"revert"` or `"respawn"` overrides visibility; a password does not make a PUBLIC game private. Changed players/machine assignments fall back to position-only respawn with a host diagnostic. A missing checkpoint also uses position-only respawn. Scripted mission failures keep their existing revert behavior. |
 | `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
@@ -710,6 +716,21 @@ the setting for one start of the game. It has priority over the file.
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
 Mesa. To stop this, set the environment variable `mesa_glthread=false`.
+
+## MCC maps
+
+Halo 1 MCC packages use a separate `mcc_maps` folder and MCC-owned readers,
+conversion, rendering and script adapters. Desktop builds can discover installed
+Steam Workshop packages when **WORKSHOP MAPS** is enabled; Android and browsers
+import local packages. **CAMPAIGN MISSIONS** enables explicit campaign manifests,
+mission ordering and host-controlled progression. These options default off.
+See [MCC maps](../../docs/mcc_maps.md) for supported formats, resources and limits,
+[MCC previews](../../docs/reading/mcc_level_previews.md) for menu discovery, and
+[browser imports](../../docs/reading/browser_imports.md) for browser storage.
+
+All map families use OpenCE network version 42. MCC content identity, sharing
+consent and load-progress checks remain separate from the existing Xbox/CE paths;
+see [the network agreement](NETCODE.md#opence-network-agreement).
 
 ## Updates
 
@@ -1263,6 +1284,47 @@ same broker to see each other's games. The game uses
 MQTT 5 if the broker has it, else MQTT 3.1.1. A broker that does not keep
 retained messages, or does not let clients subscribe with wildcards, carries
 only invites, not listings.
+
+### MCC package sharing
+
+MCC delivery is host-only and separate from Custom Edition sharing. The host enables **SHARE MCC PACKAGES** in Settings > Network Setup > Map
+Sharing (`network.mcc_map_share`, off by default; also
+`HALO_NET_MCC_MAP_SHARE`). It must list the exact map/used-resource SHA-256 and
+maker in the data root's `mcc_share.txt`, one line per approved identity:
+`<64 hexadecimal digits> <maker>`. The host log reports an unlisted fingerprint.
+This explicit approval does not come from a package name or a Workshop ID.
+Stock, unclassified, loose and shared-root packages are not offered.
+
+The joiner uses **DOWNLOAD MAPS** (`network.map_download`, on by default).
+Missing or differing content opens an offer showing size and maker; accepting
+starts the host download. Matching installed content is reused. If host sharing
+or client downloads is off, no host-download action is offered: use the
+Workshop page when available, or install matching content manually, or cancel.
+The latest Workshop package may still differ from the host's copy; installation
+must be checked again. The prompt does not infer which version is newer.
+
+The offer includes the current map and its actually used package resources,
+required recognized JSON, eligible referenced PNG previews and attribution
+files. Campaign metadata is obtained upfront; mission binaries/resources are
+obtained as needed. Unrelated resource files are omitted. A package depending
+on root/shared stock resources is refused with a host diagnostic, rather than
+silently redistributing those resources. A local dedicated-server folder needs
+no invented Workshop metadata or artwork to qualify.
+
+Each accepted download is checked in an exclusively owned staging directory,
+then published as a separate `mcc_maps/dl_<digest>` snapshot. Existing local
+packages, Steam installations and saves are not overwritten. Required metadata
+and gameplay identities must match the host; invalid optional art uses the
+placeholder. Cancelled or failed transfers remove only their owned staging
+files. A host-delivered snapshot is not a Steam subscription or an automatic
+Workshop update. Receipt-based storage controls remove only verified host-download files;
+installed packages are preserved.
+
+The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
+not seed MCC downloads. Android requires no Steam for these files, but device
+runtime validation remains a separate requirement. Browser imports and host downloads use origin-private storage with
+transaction recovery and cross-tab locking. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
+for bounds, lifecycle and OpenCE network version **42**.
 
 ### Map sharing
 

@@ -85,6 +85,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "interface/hud.h"
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "interface/hud_definitions.h"
 #include "interface/interface.h"
 #include "interface/hud_messaging.h"
@@ -720,7 +721,9 @@ void interface_draw_screen(
 				}
 			}
 
+			mcc_hud_mask_begin(parameters.convolution_mask); /* port: MCC screen-effect bitmap units */
 			rasterizer_screen_effect(&parameters);
+			mcc_hud_mask_end(); /* port: release the current view's borrowed mask */
 		}
 		else
 		{

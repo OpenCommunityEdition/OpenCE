@@ -127,6 +127,32 @@ def items():
         add(f"size {name}", " ".join(size.split()))
     for fields, name in re.findall(r"\t\{\n((?:\t\t.*\n)*?)\t\},\n\tNETWORK_GAME_MESSAGE_DEFINITION\((\w+),", messages):
         add(f"fields {name}", _hash(fields))
+    workshop = (ROOT / "port/linux/game/mcc_workshop.h").read_text()
+    for name, value in re.findall(r"^#define (MCC_WORKSHOP_WIRE_\w+) ([^\n]+)", workshop, re.M):
+        add(f"define {name}", value)
+    # MCC package sharing's request, response and manifest entry (messages 103 and 104).
+    share = ""
+    for header in ("mcc_share_session.h", "mcc_share_stage.h", "mcc_share_list.h"):
+        share += re.sub(r"/\*.*?\*/", " ", (ROOT / "port/linux/game" / header).read_text(), flags=re.S)
+    for name in ("mcc_share_request", "mcc_share_response", "mcc_share_entry"):
+        add(f"struct {name}", _hash(next(_blocks(share, rf"^struct {name}\s*\{{"))))
+    for name in ("mcc_share_op", "mcc_share_result", "mcc_share_file_kind"):
+        add(f"enum {name}", _hash(next(_blocks(share, rf"^enum {name}\s*\{{"))))
+    for name, value in re.findall(r"^#define (MCC_SHARE_(?:LEVEL_SIZE|CHUNK_BYTES|MANIFEST_PAGE|LEAF_SIZE|CREDIT_SIZE|STAGE_FILES|"
+                                  r"MAXIMUM_\w+)) ([^\n]+)", share, re.M):
+        add(f"define {name}", value)
+    admission = re.sub(r"/\*.*?\*/", " ",
+                       (ROOT / "port/linux/game/mcc_admission.h").read_text(), flags=re.S)
+    for name in ("mcc_admission_identity", "mcc_admission_message"):
+        add(f"struct {name}", _hash(next(_blocks(admission, rf"^struct {name}\s*\{{"))))
+    add("enum mcc_admission_op", _hash(next(_blocks(admission, r"^enum mcc_admission_op\s*\{"))))
+    for name, value in re.findall(r"^#define (MCC_ADMISSION_\w+) ([^\n]+)", admission, re.M):
+        add(f"define {name}", value)
+    loading = re.sub(r"/\*.*?\*/", " ",
+                     (ROOT / "port/linux/game/mcc_load_network.h").read_text(), flags=re.S)
+    add("struct mcc_load_message", _hash(next(_blocks(loading, r"^struct mcc_load_message\s*\{"))))
+    for name, value in re.findall(r"^#define (MCC_LOAD_NETWORK_\w+) ([^\n]+)", loading, re.M):
+        add(f"define {name}", value)
     return result
 
 
