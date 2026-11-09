@@ -539,6 +539,10 @@ static const struct config_setting config_settings[] =
 		"plays on an Elite's shield. Only what is drawn and heard changes.\n"
 		"In a network game, the host's network.shield_effects decides, unless\n"
 		"it is \"players\" (each player's own) or the game is co-op." },
+	{ "display.plasma_pistol_heat", _config_boolean, "false", "HALO_PLASMA_PISTOL_HEAT", _environment_value, _platform_all,
+		"The gauge on the plasma pistol fills as the pistol heats, from green to\n"
+		"red, as the plasma rifle's does, as well as when an overcharged shot\n"
+		"charges; false: the stock gauge, which fills only as a shot charges." },
 	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
 		"Energy shields light what is around them as they flare, as plasma\n"
 		"does, in the shield's own color. In a network game, the host's\n"

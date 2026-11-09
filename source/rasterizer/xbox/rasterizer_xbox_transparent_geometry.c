@@ -170,6 +170,7 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_plasma_energy.h"
 #include "rasterizer/xbox/rasterizer_xbox_water.h"
 #include "rasterizer/xbox/shader_transparent_chicago_preprocessor.h"
+#include "plasma_pistol_heat.h" /* port: port/linux/game/plasma_pistol_heat.c */
 
 /* ---------- constants */
 
@@ -3327,6 +3328,9 @@ void rasterizer_transparent_geometry_group_draw(
 									flash_extension = group->animation->values[
 										meter->flash_extension_source-1];
 							}
+							/* port: the plasma pistol's gauge, its heat as well as its
+							charge (display.plasma_pistol_heat, plasma_pistol_heat.c) */
+							meter_value = plasma_pistol_heat_meter_value(group->object_index, meter_value);
 
 							if (rasterizer_debug_options.debug_meter_shader_enabled)
 							{
