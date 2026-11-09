@@ -325,3 +325,12 @@ version (`AGPL-3.0-or-later`). It comes with no warranty. The full text is in
 ## Disclaimer
 OpenCE (Open Community Edition) is an unofficial fan project. It is not endorsed by or affiliated with Microsoft, Xbox Game Studios, Halo Studios, Activision or Bungie. Halo and Halo: Combat Evolved are trademarks of Microsoft Corporation; Halo © Microsoft Corporation.
 No game data is included. You must provide your own copy of the game.
+
+## MCC map support
+
+Halo 1 MCC version-13 packages use an independent loader and `mcc_maps` root.
+The stock menus support package selection, optional campaign missions, previews
+and host-only downloads when both host and client opt in. Desktop Workshop
+discovery, Android package imports and browser imports keep package resources
+separate from Xbox and Custom Edition data. Retail game data is not distributed.
+See the [MCC reading guide](docs/reading/README.md) for setup, limits and evidence.
