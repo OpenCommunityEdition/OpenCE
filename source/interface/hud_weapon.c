@@ -1791,7 +1791,7 @@ static void render_weapon_hud(
 			state_index = element->header.state_type;
 			hud_draw_static_element(
 				local_player_index,
-				placement,
+				placement, /* port: honor the resolved MCC child anchor */
 				&element->static_element,
 				state_flags[state_index],
 				hud_state->last_weapon_flash_time[state_index]);
@@ -1828,7 +1828,7 @@ static void render_weapon_hud(
 			value = (byte)number_values[state_index];
 			hud_draw_meter(
 				local_player_index,
-				placement,
+				placement, /* port: honor the resolved MCC child anchor */
 				&element->meter_element,
 				value,
 				value,
@@ -1910,7 +1910,7 @@ static void render_weapon_hud(
 				hud_zoomed_layout_begin(&window_bounds);
 			hud_draw_numbers(
 				local_player_index,
-				placement,
+				placement, /* port: honor the resolved MCC child anchor */
 				&element->number_element,
 				value,
 				decimal_value,
@@ -1942,7 +1942,7 @@ static void render_weapon_hud(
 			state_index = element->state_type;
 			hud_draw_weapon_overlays(
 				local_player_index,
-				placement,
+				placement, /* port: honor the resolved MCC child anchor */
 				&element->overlays,
 				overlay_flags[state_index],
 				hud_state->last_weapon_flash_time[state_index],
