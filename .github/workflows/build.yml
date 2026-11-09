@@ -96,6 +96,12 @@ jobs:
           # clients need the retail maps, and are skipped
           python -m pytest -q tools/test_dedicated_server.py
           python tools/test_light_storage.py
+          python -m pytest -q \
+            tools/test_mcc_cache_format.py tools/test_mcc_tag_validation.py \
+            tools/test_mcc_share.py tools/test_mcc_share_rules.py tools/test_mcc_share_stage.py \
+            tools/test_mcc_share_storage.py tools/test_mcc_share_metadata.py \
+            tools/test_checkpoint_epoch.py tools/test_coop_checkpoint.py tools/test_coop_checkpoint_recovery.py \
+            tools/test_mcc_checkpoint.py
           python -m pytest -q tools/test_controller_buttons.py tools/test_controller_remap.py tools/test_controller_remap_context.py tools/test_hud_button_style.py tools/test_hud_corrections.py
 
       - name: Compile cache
@@ -333,6 +339,8 @@ jobs:
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/rooms.mjs dist/halo-web-release
           # (the native builds' WebRTC, port/linux/src/p2p_webrtc.c, with both)
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/webrtc_native.mjs chromium firefox
+          source ~/emsdk/emsdk_env.sh
+          NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/mcc_storage.mjs chromium firefox
 
       - name: Compile cache
         run: ccache --show-stats
