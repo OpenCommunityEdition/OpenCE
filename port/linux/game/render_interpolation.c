@@ -90,6 +90,12 @@ vehicle is corrected by (3 and 4 world units), short of a snap */
 /* a camera cut: a jump or turn no player or scripted camera makes in 33 ms */
 #define CAMERA_CUT_DISTANCE 3.0f
 #define CAMERA_CUT_COSINE 0.5f
+/* the most ticks between the steps of an object's shadow vector (its
+lighting is refreshed every 11 ticks when it is small on the screen:
+render_objects.c), and a turn no step makes (a step is 1.2 degrees at most:
+the lighting rebuilt, or many steps while the shadow was not drawn) */
+#define SHADOW_STEP_MAXIMUM_INTERVAL 11.0f
+#define SHADOW_JUMP_COSINE 0.985f
 
 /* ---------- structures */
 
@@ -139,6 +145,16 @@ struct interpolated_camera
 	real_vector3d correction_pending;
 };
 
+struct interpolated_shadow
+{
+	long object_index; /* NONE when unused */
+	real_vector3d from; /* the direction drawn when the latest step came */
+	real_vector3d to; /* the latest step: the lighting's */
+	real changed_at; /* when the latest step came (in ticks) */
+	real interval; /* ... and the ticks between it and the step before */
+	real drawn_at; /* when it was last drawn */
+};
+
 struct interpolated_first_person
 {
 	long tick;
@@ -154,6 +170,7 @@ struct interpolated_first_person
 /* ---------- globals */
 
 static struct interpolated_object *interpolated_objects;
+static struct interpolated_shadow *interpolated_shadows;
 static struct interpolated_camera interpolated_cameras[MAXIMUM_LOCAL_PLAYERS];
 static struct interpolated_first_person interpolated_first_person[MAXIMUM_LOCAL_PLAYERS];
 static long interpolation_tick;
@@ -499,6 +516,11 @@ void render_interpolation_reset(void)
 	{
 		for (index = 0; index < MAXIMUM_INTERPOLATED_OBJECTS; index++)
 			interpolated_objects[index].object_index = NONE;
+	}
+	if (interpolated_shadows)
+	{
+		for (index = 0; index < MAXIMUM_INTERPOLATED_OBJECTS; index++)
+			interpolated_shadows[index].object_index = NONE;
 	}
 	memset(interpolated_cameras, 0, sizeof(interpolated_cameras));
 	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
@@ -895,6 +917,76 @@ static struct observer_result const *render_interpolation_blended_camera(
 		camera->blended.position.z += drawn.k;
 	}
 	return &camera->blended;
+}
+
+/* ---------- shadows */
+
+/* An object's shadow is cast along its lighting's shadow vector, which the
+renderer turns toward the light it finds where the object is by a step (up
+to 0.012 a component, 1.2 degrees) each time it refreshes the object's
+lighting: every tick for an object large on the screen, every 4 or 11 ticks
+for smaller ones (render_objects.c, as the Xbox did every frame or 4 or 11).
+In between it holds still, and a shadow cast from high up hopped at each
+step while the object glided: a dropship's, 15 world units over the ground,
+a third of a world unit every 4 ticks. The direction is drawn gliding from
+where it was drawn when a step came to that step, over the ticks between
+the last two steps, so that it turns as steadily as the steps come. A new
+object's, one not drawn for longer than steps come, and a turn no step
+makes are drawn as the lighting has them. */
+static void shadow_vector_drawn(
+	struct interpolated_shadow *shadow,
+	long object_index,
+	real_vector3d const *lighting,
+	real now,
+	real_vector3d *drawn)
+{
+	real_vector3d from;
+
+	if (shadow->object_index != object_index ||
+		!(now - shadow->drawn_at >= 0.0f && now - shadow->drawn_at <= SHADOW_STEP_MAXIMUM_INTERVAL))
+	{
+		shadow->object_index = object_index;
+		shadow->from = *lighting;
+		shadow->to = *lighting;
+		shadow->changed_at = now;
+		shadow->interval = 1.0f;
+	}
+	else if (lighting->i != shadow->to.i || lighting->j != shadow->to.j || lighting->k != shadow->to.k)
+	{
+		vector_nlerp(&shadow->from, &shadow->to, PIN((now - shadow->changed_at) / shadow->interval, 0.0f, 1.0f), &from);
+		if (!(from.i * lighting->i + from.j * lighting->j + from.k * lighting->k >= SHADOW_JUMP_COSINE))
+			from = *lighting;
+		shadow->from = from;
+		shadow->to = *lighting;
+		shadow->interval = PIN(now - shadow->changed_at, 1.0f, SHADOW_STEP_MAXIMUM_INTERVAL);
+		shadow->changed_at = now;
+	}
+	shadow->drawn_at = now;
+	vector_nlerp(&shadow->from, &shadow->to, PIN((now - shadow->changed_at) / shadow->interval, 0.0f, 1.0f), drawn);
+}
+
+void render_interpolation_shadow_vector(long object_index, real_vector3d const *lighting, real_vector3d *drawn)
+{
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
+
+	*drawn = *lighting;
+	if (!interpolation_rendering || object_index == NONE ||
+		absolute_index < 0 || absolute_index >= MAXIMUM_INTERPOLATED_OBJECTS)
+	{
+		return;
+	}
+	if (!interpolated_shadows)
+	{
+		long index;
+
+		interpolated_shadows = calloc(MAXIMUM_INTERPOLATED_OBJECTS, sizeof(*interpolated_shadows));
+		if (!interpolated_shadows)
+			return;
+		for (index = 0; index < MAXIMUM_INTERPOLATED_OBJECTS; index++)
+			interpolated_shadows[index].object_index = NONE;
+	}
+	shadow_vector_drawn(&interpolated_shadows[absolute_index], object_index, lighting,
+		(real)interpolation_tick + interpolation_fraction, drawn);
 }
 
 /* ---------- first-person weapon */
