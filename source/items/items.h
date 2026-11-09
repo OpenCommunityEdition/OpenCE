@@ -39,7 +39,9 @@ struct _item_datum
 	short detonation_ticks;
 	short rested_surface_index;
 	short bsp_index;
-	short pad;
+	/* port: the ticks in a row a falling item has hit the ground without
+	getting anywhere (port/linux/game/item_stuck.c; was pad) */
+	short stuck_ticks;
 	long ignore_object_index;
 	long last_owned_time;
 	long item_on_rest_object_index;
