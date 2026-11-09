@@ -1123,14 +1123,17 @@ static void object_damage_aftermath(
 				being_damaged_flags,
 				_object_being_damaged_body_depleted_bit))
 		{
-			/* port: whether it is a melee's (Gun Game's demotion: game_modes.c) */
+			/* port: whether it is a melee's (Gun Game's demotion), and its
+			damage (Frag Nation's grenades back: game_modes.c) */
 			game_modes_kill_by_melee(damage_effect->damage.category == _damage_category_melee);
+			game_modes_kill_damage(damage->definition_index);
 			game_statistics_record_kill(
 				object_index,
 				damage->owner_player_index,
 				damage->owner_object_index,
 				damage->owner_team_index);
 			game_modes_kill_by_melee(FALSE);
+			game_modes_kill_damage(NONE);
 		}
 	}
 	else if (game_engine_can_score())
@@ -1778,6 +1781,18 @@ void object_cause_damage(
 
 				if (cheat.omnipotent && damage->owner_player_index != NONE)
 					force_kill = TRUE;
+
+				/* port: One in the Chamber's bullets kill at once, body or
+				head (the host's: game_modes.c) */
+				if (current_object->object.type == _object_type_biped &&
+					!TEST_FLAG(current_object->object.damage_flags, _object_cannot_take_damage_bit) &&
+					game_engine_running() &&
+					game_modes_hit_kills(damage->owner_player_index, current_object_index,
+						damage_definition->category == _damage_category_bullet ||
+						damage_definition->category == _damage_category_sniper))
+				{
+					force_kill = TRUE;
+				}
 
 				if (damage_definition->side_effect ==
 						_damage_side_effect_lethal_to_the_unsuspecting &&
