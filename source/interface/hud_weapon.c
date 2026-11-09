@@ -411,6 +411,10 @@ static void render_weapon_hud(
 static boolean weapon_hud_state_index_valid(
 	short state_index,
 	short state_count);
+static void rocket_launcher_warning_placement(
+	long hud_index,
+	short state_index,
+	struct hud_placement_definition *placement);
 
 /* ---------- globals */
 
@@ -1323,6 +1327,8 @@ static void crosshairs_draw(
 												(short)(render.camera.window_bounds.x1 - render.camera.window_bounds.x0),
 												(short)(render.camera.window_bounds.y1 - render.camera.window_bounds.y0),
 												&placement);
+											/* port: clear of the rocket launcher's reticle */
+											rocket_launcher_warning_placement(definition_indices[0], state_index, &placement);
 											hud_draw_bitmap(
 												bitmap,
 												&absolute_placement,
@@ -1380,6 +1386,30 @@ static boolean weapon_hud_state_index_valid(
 	}
 
 	return FALSE;
+}
+
+/* port: the rocket launcher's reticle, a ring reaching 31 HUD units from its
+middle (hud_reticles' sequence 9), reaches below where its warnings are:
+"Reload", the flash of its last rocket and its click when empty, which it
+takes from ui\hud\master rounds, 30 units left of and below the reticle's
+middle. They were drawn over the ring's lower left, on the Xbox too. They are
+drawn 7 units lower for it, a unit clear of the ring; every other weapon's
+reticle is clear of its warnings. */
+static void rocket_launcher_warning_placement(
+	long hud_index,
+	short state_index,
+	struct hud_placement_definition *placement)
+{
+	if ((state_index == _crosshair_state_flash_ammo ||
+		state_index == _crosshair_state_fired_with_no_ammo ||
+		state_index == _crosshair_state_flash_ammo_none_for_reload) &&
+		placement->offset.y > 0 &&
+		!csstrcmp(tag_get_name(hud_index), "weapons\\rocket launcher\\rocket_launcher"))
+	{
+		placement->offset.y = (short)(placement->offset.y + 7);
+	}
+
+	return;
 }
 
 static void render_weapon_hud(
