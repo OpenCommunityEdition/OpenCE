@@ -11,7 +11,11 @@ Overshield, display.overshield_effect; off, the game's own):
   nothing); from any other shield, 2. Meanwhile the shield's own flares
   (its hits, its recharge) are not drawn over it.
 - The flare's energy moves at 30% of its speed, in the overshield's own
-  color (the powerup's), whatever shield color its player chose.
+  colors, whatever shield color its player chose: green as it charges and
+  while the shield is over 2 (the shield meter's green, its second
+  overcharge), then the powerup's red when it is down to 2 or less (the
+  meter's red, its first), turning from one to the other in a quarter of a
+  second.
 - On the first-person arms (with display.viewmodel_shield) it comes up as
   the rise reaches them, and stays.
 - A hit on it plays what a hit on an Elite's shield plays (the hitting
@@ -74,8 +78,16 @@ from a down one (the charge's own times: 2 and 3 of shield a second) */
 definition's flags (its enum is effects.c's own) */
 #define EFFECT_MUST_BE_DETERMINISTIC_BIT 1
 
-/* the overshield's color: the powerup's */
+/* the overshield's colors: the powerup's, while the shield is in the shield
+meter's first overcharge (from 1 to 2, drawn red), and the meter's green, as
+the high-res HUD draws its second overcharge (from 2 to 3: 110, 204, 79), as
+bright as the powerup's, while it charges or is over 2 */
 static real_rgb_color const overshield_effect_rgb = { 0.992f, 0.306f, 0.455f }; /* (253, 78, 116) */
+static real_rgb_color const overshield_effect_green_rgb = { 0.533f, 0.992f, 0.384f }; /* (136, 253, 98) */
+/* the shield over which the overshield is green (the meter's second
+overcharge), and the seconds its color takes to turn */
+#define OVERSHIELD_EFFECT_GREEN_SHIELD 2.f
+#define OVERSHIELD_EFFECT_COLOR_TURN 0.25f
 
 /* the plasma shader's fields after its header (rasterizer_xbox_plasma_energy.c's) */
 struct overshield_effect_plasma
@@ -98,6 +110,9 @@ struct overshield_effect
 	real progress;
 	real bottom;
 	real top;
+	/* how green (0: the powerup's color, 1: green), and when it was */
+	real green;
+	real green_time;
 };
 
 static struct overshield_effect overshield_effects[OVERSHIELD_EFFECT_MAXIMUM];
@@ -216,6 +231,37 @@ static short overshield_effect_intensity_source(
 	return source >= 1 && source <= 4 ? (short)(source - 1) : NONE;
 }
 
+/* how green an overshield is: green as it charges and over the shield
+meter's second overcharge, the powerup's color down to the first */
+static real overshield_effect_green_target(
+	boolean charging,
+	real shield_vitality)
+{
+	return charging || shield_vitality > OVERSHIELD_EFFECT_GREEN_SHIELD ? 1.f : 0.f;
+}
+
+/* how green it is after seconds more, turning toward the target in
+OVERSHIELD_EFFECT_COLOR_TURN (none for a time gone backward) */
+static real overshield_effect_green_turn(
+	real green,
+	real target,
+	real seconds)
+{
+	real step = MAX(seconds, 0.f) / OVERSHIELD_EFFECT_COLOR_TURN;
+
+	return PIN(green + PIN(target - green, -step, step), 0.f, 1.f);
+}
+
+/* an overshield's color, as green as it is */
+static void overshield_effect_mix_color(
+	real green,
+	real_rgb_color *color)
+{
+	color->red = overshield_effect_rgb.red + (overshield_effect_green_rgb.red - overshield_effect_rgb.red) * green;
+	color->green = overshield_effect_rgb.green + (overshield_effect_green_rgb.green - overshield_effect_rgb.green) * green;
+	color->blue = overshield_effect_rgb.blue + (overshield_effect_green_rgb.blue - overshield_effect_rgb.blue) * green;
+}
+
 /* a unit's overshield, while it has one and lives (its shield over 1, or
 charging past it); NULL for none */
 static struct overshield_effect *overshield_effect_get(
@@ -276,6 +322,8 @@ static struct overshield_effect *overshield_effect_get(
 			effect->start = now - effect->rise;
 		else if (shield > 1.f)
 			effect->start = now - MIN(shield - 1.f, effect->rise);
+		effect->green = overshield_effect_green_target(charging, shield);
+		effect->green_time = now;
 	}
 	effect->last_seen = now;
 	{
@@ -284,6 +332,9 @@ static struct overshield_effect *overshield_effect_get(
 		/* (smooth at both ends) */
 		effect->progress = t * t * (3.f - 2.f * t);
 	}
+	effect->green = overshield_effect_green_turn(effect->green,
+		overshield_effect_green_target(charging, unit->object.shield_vitality), now - effect->green_time);
+	effect->green_time = now;
 	return effect;
 }
 
@@ -427,17 +478,29 @@ boolean overshield_effect_color(
 	real const *values,
 	real_rgb_color *color)
 {
-	real energy_speed, inverse_softness, height;
+	short index;
 
-	if (!overshield_effect_draw(values, &energy_speed, &inverse_softness, &height))
+	if (!values)
 		return FALSE;
-	*color = overshield_effect_rgb;
-	return TRUE;
+	for (index = 0; index < OVERSHIELD_EFFECT_MAXIMUM; index++)
+	{
+		struct overshield_effect const *effect = &overshield_effects[index];
+
+		if (effect->unit_index != NONE && (values == effect->body_values || values == effect->arms_values))
+		{
+			overshield_effect_mix_color(effect->green, color);
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
 
-/* the overshield's color, for its glow */
-real_rgb_color const *overshield_effect_glow_color(
-	void)
+/* the unit's overshield's color, for its glow (the powerup's for none) */
+void overshield_effect_glow_color(
+	long unit_index,
+	real_rgb_color *color)
 {
-	return &overshield_effect_rgb;
+	struct overshield_effect *effect = overshield_effect_get(unit_index);
+
+	overshield_effect_mix_color(effect ? effect->green : 0.f, color);
 }

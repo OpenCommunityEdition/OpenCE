@@ -534,9 +534,11 @@ static const struct config_setting config_settings[] =
 	{ "display.overshield_effect", _config_boolean, "false", "HALO_OVERSHIELD_EFFECT", _environment_value, _platform_all,
 		"The overshield as this machine draws it: its flare rising up the body as\n"
 		"it charges (2 seconds, 3 from a shield that was down) and staying lit,\n"
-		"its energy slower, in its own color (the powerup's), on the first-person\n"
-		"arms too with viewmodel_shield; a hit on it plays what the projectile\n"
-		"plays on an Elite's shield. Only what is drawn and heard changes.\n"
+		"its energy slower, in its own colors (green, as the shield meter's\n"
+		"overcharge is over 2 shields; the powerup's red at 2 or less), on the\n"
+		"first-person arms too with viewmodel_shield; a hit on it plays what the\n"
+		"projectile plays on an Elite's shield. Only what is drawn and heard\n"
+		"changes.\n"
 		"In a network game, the host's network.shield_effects decides, unless\n"
 		"it is \"players\" (each player's own) or the game is co-op." },
 	{ "display.shield_glow", _config_boolean, "false", "HALO_SHIELD_GLOW", _environment_value, _platform_all,
