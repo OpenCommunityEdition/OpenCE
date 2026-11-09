@@ -11,15 +11,15 @@ The router is looked for (an SSDP search on the local network, two seconds)
 until one is found, and then kept; each forwarding asks for a lease of an
 hour, which p2p.c renews (asking for the port it had), and falls back to a
 permanent one where the router supports no other. p2p.c removes it when
-the game exits normally (not after a crash, nor if a request to the
-router is still under way three seconds after the game starts to exit); so once the router is found, the forwardings to this machine
+the game exits normally, after its request worker finishes; so once the
+router is found, the forwardings to this machine
 that an earlier copy of the game left (to a port no socket here has now)
 are removed. A router whose own internet address is a private one (behind
 another NAT, such as a carrier's) cannot help, and is not asked.
 
 Built with the host's ABI, as the other posix_*.c (and, on Windows, with
-the Windows SDK: port/windows/src/win32_upnp.c). One thread calls these at a
-time.
+the Windows SDK: port/windows/src/win32_upnp.c). One thread performs router
+operations at a time; exit can set the atomic cancellation latch concurrently.
 */
 
 #include <stddef.h>
@@ -65,6 +65,20 @@ static struct
 	int permanent_only;
 } upnp;
 
+/* Exit can request cancellation from another thread. The library's active
+HTTP request must still finish; its read timeout is not an overall deadline. */
+static int upnp_cancel_requested;
+
+void posix_upnp_cancel(void)
+{
+	__atomic_store_n(&upnp_cancel_requested, 1, __ATOMIC_RELAXED);
+}
+
+static int upnp_cancelled(void)
+{
+	return __atomic_load_n(&upnp_cancel_requested, __ATOMIC_RELAXED);
+}
+
 static unsigned short swap_short(unsigned short value)
 {
 	return (unsigned short)(value << 8 | value >> 8);
@@ -96,7 +110,7 @@ static void upnp_remove_left_forwardings(void)
 	int index = 0;
 	int checked;
 
-	for (checked = 0; checked < MAXIMUM_CHECKED_FORWARDINGS; checked++)
+	for (checked = 0; checked < MAXIMUM_CHECKED_FORWARDINGS && !upnp_cancelled(); checked++)
 	{
 		char index_text[16], external_port[8], client[64], internal_port[8], protocol[8], description[96];
 		char enabled[8], remote_host[72], duration[20];
@@ -111,7 +125,7 @@ static void upnp_remove_left_forwardings(void)
 			/* (713 SpecifiedArrayIndexInvalid: the last was the end) */
 			break;
 		}
-		if (!strcmp(description, FORWARDING_DESCRIPTION) && !strcmp(protocol, "UDP") &&
+		if (!upnp_cancelled() && !strcmp(description, FORWARDING_DESCRIPTION) && !strcmp(protocol, "UDP") &&
 			!strcmp(client, upnp.lan_address) && sscanf(internal_port, "%u", &port) == 1 && port > 0 &&
 			port < 65536 && port_unused(swap_short((unsigned short)port)) &&
 			UPNP_DeletePortMapping(upnp.urls.controlURL, upnp.data.first.servicetype, external_port, "UDP",
@@ -136,9 +150,11 @@ static int upnp_find_router(char *error, int error_size)
 	if (upnp.found)
 		return 1;
 	devices = upnpDiscover(DISCOVERY_DELAY, NULL, NULL, 0, 0, 2, &discover_error);
-	if (!devices)
+	if (!devices || upnp_cancelled())
 	{
-		snprintf(error, (size_t)error_size, "no UPnP router on this network");
+		freeUPNPDevlist(devices);
+		snprintf(error, (size_t)error_size, "%s", upnp_cancelled() ?
+			"the game is exiting" : "no UPnP router on this network");
 		return 0;
 	}
 	result = UPNP_GetValidIGD(devices, &upnp.urls, &upnp.data, upnp.lan_address, sizeof(upnp.lan_address),
@@ -171,12 +187,14 @@ static int upnp_add(const char *external_port, const char *internal_port)
 {
 	int result;
 
+	if (upnp_cancelled())
+		return -1;
 	if (!upnp.permanent_only)
 	{
 		result = UPNP_AddPortMapping(upnp.urls.controlURL, upnp.data.first.servicetype, external_port,
 			internal_port, upnp.lan_address, FORWARDING_DESCRIPTION, "UDP", NULL, LEASE_SECONDS);
 		/* 725 OnlyPermanentLeasesSupported */
-		if (result != 725)
+		if (result != 725 || upnp_cancelled())
 			return result;
 		upnp.permanent_only = 1;
 	}
@@ -200,8 +218,18 @@ int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, p
 	that closes one as it is written to must not end the game */
 	signal(SIGPIPE, SIG_IGN);
 #endif
+	if (upnp_cancelled())
+	{
+		snprintf(error, (size_t)error_size, "the game is exiting");
+		return 0;
+	}
 	if (!upnp_find_router(error, error_size))
 		return 0;
+	if (upnp_cancelled())
+	{
+		snprintf(error, (size_t)error_size, "the game is exiting");
+		return 0;
+	}
 	address_text[0] = 0;
 	if (UPNP_GetExternalIPAddress(upnp.urls.controlURL, upnp.data.first.servicetype, address_text) != UPNPCOMMAND_SUCCESS ||
 		sscanf(address_text, "%u.%u.%u.%u", &parts[0], &parts[1], &parts[2], &parts[3]) != 4 ||
@@ -213,6 +241,11 @@ int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, p
 	snprintf(internal_text, sizeof(internal_text), "%u", (unsigned int)swap_short(port));
 	for (attempt = 0; attempt < PORT_ATTEMPTS; attempt++)
 	{
+		if (upnp_cancelled())
+		{
+			snprintf(error, (size_t)error_size, "the game is exiting");
+			return 0;
+		}
 		snprintf(external_text, sizeof(external_text), "%u", (unsigned int)try_port);
 		result = upnp_add(external_text, internal_text);
 		/* 718 ConflictInMappingEntry: another machine has that port; 724

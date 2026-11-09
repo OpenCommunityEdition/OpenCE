@@ -45,6 +45,8 @@ enum
 /* whether this is a network co-op game (not its lobby, whose menu scene also
 has no game engine) */
 boolean network_coop_active(void);
+/* Host: retain the current session roster when loading a checkpoint. */
+void network_coop_restore_players(void);
 /* game_state.c: remember the team only after a checkpoint write succeeds. */
 void network_coop_checkpoint_saved(void);
 /* main.c: host team-wipe policy, including checkpoint roster compatibility. */
@@ -144,6 +146,7 @@ boolean network_coop_vote_skip(void);
 cinematic, or because the mission failed); now is the game time before the
 revert */
 void network_coop_reverted(long now);
+void network_coop_reset_recovery(void);
 /* main.c: the skip vote is over once the skip has reverted */
 void network_coop_skip_done(void);
 /* the vote count to show, if a skippable cinematic is playing */

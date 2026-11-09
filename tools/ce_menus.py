@@ -614,9 +614,11 @@ def pause_art(art):
 
 def regenerate_settings():
     """Write port-owned settings and register any new screens for embedding."""
-    screens = port_settings.settings_files()
+    screens = {**port_settings.settings_files(), **port_settings.multiplayer_files()}
     for name, lines in screens.items():
         (CE / name).write_text("\n".join(lines))
+    from mcc_menu_patches import regenerate
+    regenerate(CE)
     manifest = MENUS / "menus.json"
     data = json.loads(manifest.read_text())
     files = set(data["files"]) | {"ce/" + name for name in screens}

@@ -469,6 +469,8 @@ symbols in this file:
 #include "networking/network_server_manager.h"
 #include "networking/network_server_manager_internal.h"
 #include "networking/network_server_message_handler.h"
+#include "mcc_ui_network.h" /* port: port/linux/game/mcc_ui_network.h */
+#include "mcc_load_network.h" /* port: bounded MCC conversion progress */
 #include "network_link.h" /* port: port/linux/game/network_link.c */
 #include "saved games/player_profile.h"
 #include "text/unicode.h"
@@ -1380,7 +1382,6 @@ struct network_game_server *network_game_server_create(
 				network_game_server_reject_connection_game_is_full);
 
 			network_game_invalidate(&server->game);
-
 			server->game.difficulty = main_get_difficulty();
 			server->game.number_of_games_played = -1;
 
@@ -1428,6 +1429,7 @@ struct network_game_server *network_game_server_create(
 void network_game_server_dispose(
 	struct network_game_server *server)
 {
+	mcc_ui_network_server_dispose(server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
 
 	/* port: a won co-op round's next level belongs to this server alone */
@@ -1730,6 +1732,7 @@ boolean network_game_server_idle(
 		}
 	}
 
+	mcc_ui_network_update_map(server); /* port: apply pending MCC selection after local admission */
 	/* port: the bots of a local game (port/linux/game/bots.c) */
 	network_game_server_port_bots(server);
 	/* (what Discord shows of a game hosted for internet play, and the
@@ -1995,6 +1998,9 @@ boolean network_game_server_start_network_game(
 	boolean success = TRUE;
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x2DE, server);
+	/* port: an MCC check still in progress is a successful idle, not a failed
+	connection. Keep the countdown pending until its validated settings are sent. */
+	if (mcc_ui_network_map_pending(server)) return TRUE;
 
 	if (server->sent_start_game_message == FALSE)
 	{
@@ -2048,6 +2054,7 @@ boolean network_game_server_start_network_game(
 			else
 				network_event("signalling client machines to begin loading for network game (some machines missed it)");
 			server->sent_start_game_message = TRUE;
+			mcc_load_network_start(&server->game); /* port: bind MCC progress before loading */
 			csmemcpy(network_game_server_start_players, server->game.players,
 				sizeof(network_game_server_start_players));
 			success = TRUE;
@@ -2509,6 +2516,7 @@ void network_game_server_all_machines_have_loaded(
 	long client_machine_index;
 
 	network_event("all machines have successfully loaded");
+	mcc_load_network_disconnect(); /* port: the MCC conversion wait is over */
 
 	server->state = _network_game_server_state_ingame;
 	server->time_of_first_client_loading_completion = 0;
@@ -2558,6 +2566,7 @@ void network_game_server_client_machine_game_loading_complete(
 	}
 
 	SET_FLAG(machine->flags, _network_client_machine_level_loaded_bit, TRUE);
+	mcc_load_network_peer_left(machine->machine_index); /* port: retire its MCC loading lease */
 	if (!server->time_of_first_client_loading_completion)
 		server->time_of_first_client_loading_completion = system_milliseconds();
 
@@ -3866,6 +3875,8 @@ void network_game_server_change_map_name(
 		server && map_name && map_name[0]);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x79C,
 		server->state == _network_game_server_state_pregame);
+	/* port: MCC package work waits for local admission; legacy selections remain immediate. */
+	if (mcc_ui_network_defer_map(server, map_name)) return;
 
 	for (client_machine_index = 0;
 		client_machine_index < MAXIMUM_NETWORK_MACHINE_COUNT;
@@ -3932,6 +3943,10 @@ boolean network_game_server_remove_client_machine_from_game(
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x22F, server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x230, client);
+	{ /* port: release MCC transfers before this connection slot is reused. */
+		extern void mcc_share_game_peer_left(struct network_game_server_client_machine *);
+		mcc_share_game_peer_left(client);
+	}
 
 	if (_network_game_server_state_ingame == server->state)
 	{
@@ -4864,6 +4879,8 @@ static boolean network_game_server_setup_game_from_playlist(
 {
 	boolean success = FALSE;
 
+	if (mcc_ui_network_restart_settings(server)) return TRUE;
+
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x961, server);
 
 	network_event("setting up a net game");
@@ -5504,6 +5521,7 @@ static boolean network_game_server_idle_pregame_tasks(
 			NETWORK_GAME_SERVER_MAXIMUM_WAIT_TIME_FOR_LEVEL_LOADING)
 		{
 			int i;
+			boolean mcc_loading_wait = FALSE; /* port: loaded bits still decide completion */
 
 			for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
 			{
@@ -5518,6 +5536,13 @@ static boolean network_game_server_idle_pregame_tasks(
 					char ascii_name[MAXIMUM_MACHINE_NAME_LENGTH];
 					boolean removed;
 
+					/* port: MCC conversion may progress beyond the ordinary wait.
+					 * This never marks a peer loaded or excludes it from readiness. */
+					if (mcc_load_network_host_waiting(server->client_machines[i].machine_index))
+					{
+						mcc_loading_wait = TRUE;
+						continue;
+					}
 					network_event(
 						"forcibly removing client system '%s' due to timeout while loading for game",
 						wide_to_ascii(
@@ -5535,7 +5560,7 @@ static boolean network_game_server_idle_pregame_tasks(
 			}
 
 			/* (the last removal may have started it) */
-			if (server->state == _network_game_server_state_pregame)
+			if (server->state == _network_game_server_state_pregame && !mcc_loading_wait)
 				network_game_server_all_machines_have_loaded(server);
 		}
 	}
@@ -5702,3 +5727,6 @@ boolean network_game_server_reset_to_pregame(
 
 	return success;
 }
+
+/* port: Independent MCC pause-menu round restart. */
+#include "mcc_ui_network.inl" /* port: port/linux/game/mcc_ui_network.inl */

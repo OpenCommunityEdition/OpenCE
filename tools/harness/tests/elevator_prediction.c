@@ -19,6 +19,9 @@ unit there.
 
 #include "harness.h"
 
+/* Legacy movement: the MCC authority hook is inactive. */
+static boolean mcc_script_effects_host_movement(void) { return FALSE; }
+
 #include <limits.h>
 #include <math.h>
 

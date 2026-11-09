@@ -101,7 +101,7 @@ symbols in this file:
 #include "console.h"
 #include "game_state.h"
 #include "coop_vehicles.h" /* port: preserve replacement-vehicle homes across reverts */
-#include "network_coop.h" /* port: checkpoint membership for host team-wipe reverts */
+#include "network_coop.h" /* port: checkpoint roster restoration and host team-wipe policy */
 #include "game.h"
 #include "tag_files.h"
 #include "cache_files.h"
@@ -124,6 +124,9 @@ symbols in this file:
 #include "lruv_cache.h"
 #include "memory_pool.h"
 #include "cluster_partitions.h"
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
+#include "mcc_checkpoint.h" /* port: port/linux/game/mcc_checkpoint.h */
+#include "hs_console_state.h" /* port: port/linux/game/hs_console_state.inl */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_invalidate(void);
 
@@ -203,6 +206,8 @@ static game_state_before_load_proc before_load_procs[] =
 static game_state_after_load_proc after_load_procs[] =
 {
 	scenario_reload_structure_bsp_if_necessary,
+	/* port: the session roster is not part of a gameplay checkpoint. */
+	network_coop_restore_players,
 	sound_stop_all,
 	game_sound_restore,
 	observer_initialize_for_new_map,
@@ -335,6 +340,19 @@ void game_state_save(
 	void)
 {
 	game_state_call_before_save_procs();
+	/* port: syntax outside the CPU image must accompany saved threads. */
+	if (!hs_console_state_capture())
+	{
+		game_state_globals.saved_game_valid = FALSE;
+		return;
+	}
+	/* port: MCC extra slots occupy only proven-unused CPU bytes in this image. */
+	if (mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
+		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
+	{
+		game_state_globals.saved_game_valid = FALSE;
+		return;
+	}
 
 	main_stop_time();
 	game_state_globals.saved_game_valid = (game_state_write_to_file()!=FALSE);
@@ -441,6 +459,12 @@ boolean game_state_test_persistent_storage(
 void game_state_save_core(
 	const char *name)
 {
+	/* port: cores share the checkpoint's console syntax ownership. */
+	if (!hs_console_state_capture())
+		return;
+	if (mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
+		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
+		return;
 	/* the whole of the native builds' larger game state */
 	if (game_state_write_core(name, game_state_globals.base_address, GAME_STATE_SIZE))
 	{
@@ -479,14 +503,8 @@ static boolean game_state_header_valid(
 	}
 	else if (header->allocation_size_checksum != game_state_globals.allocation_size_checksum)
 	{
-		if (halt_on_error)
-		{
-			match_vassert(
-				"c:\\halo\\SOURCE\\saved games\\game_state.c",
-				413,
-				FALSE,
-				csprintf(temporary, "allocation checksum mismatch"));
-		}
+		/* port: a different build's saved allocation layout is an expected
+		refusal (including images without saved console syntax), not a crash. */
 	}
 	else if (header->player_count != player_spawn_count)
 	{
@@ -559,6 +577,14 @@ static void game_state_set_revert_time(
 	game_time_set_paused(FALSE);
 
 	return;
+}
+
+/* port: read-only arena bounds for MCC-owned state; no allocator changes. */
+void *game_state_port_cpu_region(unsigned long *used, unsigned long *capacity)
+{
+	*used=game_state_globals.cpu_allocation_size;
+	*capacity=GAME_STATE_CPU_SIZE;
+	return game_state_globals.base_address;
 }
 
 void *game_state_malloc(
@@ -865,7 +891,17 @@ boolean game_state_image_accept(
 		if (!valid)
 			return FALSE;
 	}
+	if (mcc_cache_tags_loaded() && !mcc_checkpoint_validate(image, size,
+		game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE, game_state_globals.base_address))
+		return FALSE;
+	/* port: validate console references before publishing any saved state. */
+	if (!hs_console_state_validate(image, game_state_globals.base_address, size))
+		return FALSE;
 	csmemcpy(game_state_globals.base_address, image, size);
+	hs_console_state_restore(); /* port: restore the syntax before threads run. */
+	if (mcc_cache_tags_loaded() && !mcc_checkpoint_restore(game_state_globals.base_address, size,
+		game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
+		return FALSE;
 	error(_error_silent, "the saved game is taken");
 
 	return TRUE;

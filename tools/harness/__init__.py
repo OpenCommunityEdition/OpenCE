@@ -86,10 +86,15 @@ def build(test, generated):
     work.mkdir(parents=True, exist_ok=True)
     for name, text in generated:
         (work / name).write_text(text)
-    executable = work / test
+    executable = work / (test + (".exe" if os.name == "nt" else ""))
     command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function",
                "-Wno-unused-variable", "-I", str(HARNESS / "include"), "-I", str(work),
-               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable), "-lm"]
+               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable)]
+    # MSVC's runtime includes maths; there is no separate m.lib on Windows.
+    if os.name == "nt":
+        command.append("-D_CRT_SECURE_NO_WARNINGS=")
+    else:
+        command.append("-lm")
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{test}.c does not compile:\n{result.stderr}")
