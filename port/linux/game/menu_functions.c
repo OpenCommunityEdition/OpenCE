@@ -1743,6 +1743,8 @@ static void discord_account_show(struct widget_instance *list)
 The remaining options close the gap; the help and bottom buttons stay put. */
 /* Button Appearance filters its rows in the controller feature module. */
 #include "controller_buttons.h"
+#include "keyboard_prompts.h"
+#include "menu_button_glyphs.h"
 #include "controller_button_menu.inl"
 
 static void hud_button_style_row_show(struct widget_instance *list)
@@ -6078,6 +6080,60 @@ static struct
 (its font and justification still set): a lobby row's player talking in
 voice chat (or muted) has a speaker just left of their name
 (port/linux/game/network_voice.c) */
+/* Only the PC join screen reuses this Xbox-authored label in a wider panel.
+ * Supply its parent's horizontal bounds; the feature owns mixed-run layout. */
+void pc_menu_widget_text_bounds(long tag, rectangle2d *bounds, short *text_offset);
+
+/* Expand the known menu legend groups from right to left. Moving each whole
+ * earlier group by the later keycaps' extra width preserves gaps and hit targets. */
+short menu_functions_glyph_offset(struct widget_instance *widget)
+{
+    struct widget_instance *sibling;
+    char const *name, *leaf;
+    rectangle2d bounds;
+    short text_offset, extra = 0, width;
+    if (!widget->parent || !menu_button_glyph_keyboard_active(controller_of(widget))) return 0;
+    name = tag_get_name(widget->parent->definition_tag_index);
+    leaf = name ? strrchr(name, '\\') : NULL;
+    if (!leaf || (strcmp(leaf, "\\button_key") && strcmp(leaf, "\\button_key_options") &&
+        strcmp(leaf, "\\mp_button_key"))) return 0;
+    for (sibling = widget->parent->child; sibling; sibling = sibling->next)
+    {
+        if (sibling->horizontal_offset <= widget->horizontal_offset) continue;
+        name = tag_get_name(sibling->definition_tag_index);
+        leaf = name ? strrchr(name, '\\') : NULL;
+        if (!leaf) continue;
+        width = !strcmp(leaf, "\\a_butn") ? menu_button_glyph_key_width(0) :
+            !strcmp(leaf, "\\b_butn") ? menu_button_glyph_key_width(1) :
+            !strcmp(leaf, "\\x_butn") ? menu_button_glyph_key_width(2) :
+            !strcmp(leaf, "\\y_butn") ? menu_button_glyph_key_width(3) : 0;
+        if (!width) continue;
+        pc_menu_widget_text_bounds(sibling->definition_tag_index, &bounds, &text_offset);
+        extra += MAX(0, width - (bounds.x1 - bounds.x0));
+    }
+    return -extra;
+}
+
+boolean menu_functions_glyph_text(struct widget_instance *widget, rectangle2d const *bounds)
+{
+    rectangle2d definition, parent;
+    short text_offset, ignored;
+    rectangle2d panel = *bounds;
+    char const *name, *parent_name;
+    if (!widget->parent) return FALSE;
+    name = tag_get_name(widget->definition_tag_index);
+    parent_name = tag_get_name(widget->parent->definition_tag_index);
+    if (!name || !parent_name ||
+        !strstr(name, "\\press_start_to_join") ||
+        !strstr(parent_name, "\\lobby\\join4_qtr_join")) return FALSE;
+    pc_menu_widget_text_bounds(widget->definition_tag_index, &definition, &text_offset);
+    pc_menu_widget_text_bounds(widget->parent->definition_tag_index, &parent, &ignored);
+    panel.x0 = bounds->x0 - definition.x0 - text_offset -
+        widget->horizontal_offset + parent.x0;
+    panel.x1 = panel.x0 + parent.x1 - parent.x0;
+    return menu_button_glyph_join_draw(widget->parameters.text_box.text, controller_of(widget), &panel);
+}
+
 void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d const *bounds)
 {
 	short row;
@@ -6758,8 +6814,8 @@ static void join4_update(struct widget_instance *widget)
 	join4_keyboard();
 	text_set(named(screen, "join4_hint", 0),
 		system_milliseconds() < join4.notice_until ? join4.notice :
-		halo_keyboard_shares_gamepad() && halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS ?
-			L"SPACE: join    ENTER: select    ESC: back" : L"ENTER: select    ESC: back");
+		menu_button_glyph_join_hint(halo_keyboard_shares_gamepad() &&
+			halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS, controller_of(screen)));
 }
 
 static long join4_tag(void)
