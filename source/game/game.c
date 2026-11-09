@@ -183,6 +183,7 @@ struct game_options;
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "mcc_loading.h" /* port: port/linux/game/mcc_loading.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
@@ -633,12 +634,14 @@ boolean game_load(
 		game_options_verify(options));
 
 	random_seed_debug_log(TRUE);
+	mcc_loading_begin(options->map_name); /* port: no-op for Xbox/CE loads */
 	csmemcpy(&game_globals->options, options, sizeof(*options));
 	if (scenario_load(options->map_name))
 	{
 		game_globals->map_loaded = TRUE;
 	}
 
+	mcc_loading_end(game_globals->map_loaded); /* port: includes failed MCC loads */
 	return game_globals->map_loaded;
 }
 

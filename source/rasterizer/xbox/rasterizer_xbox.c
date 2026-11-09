@@ -1310,6 +1310,12 @@ void rasterizer_model_part_skinning(
 	if (!many_node_matrices)
 		return;
 	node_count = custom_edition_part_palette(vertex_buffer, &nodes);
+	{
+		extern short mcc_cache_part_palette(void const *buffer, byte const **nodes);
+		short mcc_count = mcc_cache_part_palette(vertex_buffer, &nodes);
+		if (mcc_count)
+			node_count = mcc_count;
+	}
 	for (node_index = 0; node_index < node_count && node_index < RASTERIZER_MAXIMUM_NODES_PER_MODEL - 1; node_index++)
 	{
 		node_matrix_constants(vsh_constants__nodematrices[node_index],

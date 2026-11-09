@@ -24,6 +24,7 @@ symbols in this file:
 #include "actions.h"
 
 #include "actors.h"
+#include "mcc_seats.h" /* port: port/linux/game/mcc_seats.c */
 
 /* ---------- constants */
 
@@ -49,6 +50,9 @@ boolean action_avoid_setup(
 	struct avoid_state_data *state_data)
 {
 	match_assert("c:\\halo\\SOURCE\\ai\\action_avoid.c", 30, state_data);
+	/* port: MCC passengers cannot select independent movement destinations. */
+	if (mcc_seat_blocks_avoidance(actor_index))
+		return FALSE;
 	memset(state_data, 0, sizeof(*state_data));
 	return TRUE;
 }
@@ -78,6 +82,9 @@ boolean action_avoid_perform(
 	struct path_state workspace;
 	struct actor_datum *actor = actor_get(actor_index);
 
+	/* port: a script may have seated this MCC actor since avoidance began. */
+	if (mcc_seat_blocks_avoidance(actor_index))
+		return TRUE;
 	match_assert("c:\\halo\\SOURCE\\ai\\action_avoid.c", 55, !actor->meta.swarm);
 	if (actor->meta.timeslice)
 	{

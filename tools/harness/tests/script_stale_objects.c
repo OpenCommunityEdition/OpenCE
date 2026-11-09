@@ -177,6 +177,23 @@ boolean hs_trigger_volume_test_objects(short trigger_volume_index, long object_l
 boolean hs_trigger_volume_test_objects_any(short trigger_volume_index, long object_list_index);
 boolean hs_trigger_volume_test_objects_all(short trigger_volume_index, long object_list_index);
 
+/* This fixture exercises Xbox/CE scripting. MCC-owned extension hooks keep
+   their inactive behavior in this world. */
+static byte *mcc_hs_stack_end(struct hs_thread_datum *thread)
+{
+    return thread->stack_data + HS_THREAD_STACK_SIZE;
+}
+static boolean mcc_hs_parameter_evaluate(long thread_index, struct hs_syntax_node *node, long *destination)
+{
+    return FALSE;
+}
+boolean mcc_script_can_cast(short actual_type, short desired_type) { return FALSE; }
+long mcc_script_cast(short actual_type, short desired_type, long value)
+{
+    CHECK(FALSE, "inactive MCC cast must not run");
+    return value;
+}
+
 #include "under_test.inc"
 
 /* ---------- the fake world's objects, arrays and script nodes */

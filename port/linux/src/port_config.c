@@ -264,6 +264,10 @@ static const struct config_setting config_settings[] =
 		"Keep the GPU programs the game links under the save root (shader_cache),\n"
 		"and load them from there next time instead of linking them again, which\n"
 		"stalls a frame on some drivers; false links each every run." },
+	{ "display.mcc_texture_prepare_mb", _config_integer, "0", "HALO_MCC_TEXTURE_PREPARE_MB", _environment_value, _platform_desktop,
+		"MCC only: prepare large non-paletted textures during loading, within\n"
+		"this estimated GPU memory budget in MiB (0 disables, maximum 512).\n"
+		"Does not change texture quality or the Xbox/Custom Edition caches." },
 	{ "display.stats_log", _config_boolean, "false", "HALO_STATS_LOG", _environment_value, _platform_all,
 		"A line a second in the log with the frame rate, the mode, the map, the\n"
 		"renderer and the size of the 3D view, so a graphics bug's report or two\n"
@@ -587,6 +591,20 @@ static const struct config_setting config_settings[] =
 	{ "paths.custom_maps", _config_string, "\"\"", "HALO_CUSTOM_MAPS_ROOT", _environment_value, _platform_desktop,
 		"The custom_maps folder (Custom Edition maps, and their bitmaps.map,\n"
 		"sounds.map and loc.map); empty for the one in the data folder." },
+	{ "paths.steam", _config_string, "\"\"", "HALO_STEAM_ROOT", _environment_value, _platform_desktop,
+		"A Steam folder (or Steam library) to check first for subscribed Halo CE\n"
+		"Workshop items. Empty uses automatic discovery: Windows registry, Linux\n"
+		"Steam/XDG hints, usual folders and their libraries. Windows paths use single\n"
+		"quotes: 'D:\\Steam'." },
+	{ "game.mcc_campaigns", _config_boolean, "false", "HALO_MCC_CAMPAIGNS", _environment_value, _platform_all,
+		"Use explicit MCC campaign manifests for mission discovery, ordering and\n"
+		"progression. Reopen the map list after changing this." },
+	{ "game.workshop_maps", _config_boolean, "false", "HALO_WORKSHOP_MAPS", _environment_value, _platform_desktop,
+		"Discover installed Halo CE Steam Workshop maps. Read-only desktop\n"
+		"discovery; manually installed mcc_maps packages always remain available." },
+	{ "game.mcc_collections", _config_boolean, "false", "HALO_MCC_COLLECTIONS", _environment_value, _platform_all,
+		"Group identified MCC packages into the bundled Workshop collections.\n"
+		"Works with imported packages without Steam; reopen the map list after changing." },
 
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
@@ -697,10 +715,18 @@ static const struct config_setting config_settings[] =
 		"Playing in another's game: the most kilobytes a second this machine\n"
 		"sends of maps to other players (16 to 10240: 10 MB/s)." },
 	{ "network.map_download", _config_boolean, "true", "HALO_NET_MAP_DOWNLOAD", _environment_value, _platform_all,
-		"Joining a game on a Custom Edition map this machine does not have:\n"
+		"Allow map downloads when joining. MCC asks before downloading from\n"
+		"the host; Custom Edition downloads from the game's players.\n"
+		"For a Custom Edition map this machine does not have:\n"
 		"download it (and the resource maps it needs) from the game's players\n"
 		"into custom_maps, if its host shares it (network.map_share); false\n"
 		"leaves the game, saying which map is missing." },
+	{ "network.mcc_map_share", _config_boolean, "false", "HALO_NET_MCC_MAP_SHARE", _environment_value, _platform_all,
+        "Hosting: offer eligible local or Workshop MCC packages to joiners.\n"
+        "Off by default. List each map/resource fingerprint with its maker in\n"
+        "mcc_share.txt. Includes required package metadata and supported previews;\n"
+        "never shares stock/global resources. Joiners need network.map_download\n"
+        "and must accept the download prompt before files are transferred." },
 	{ "network.coop_public", _config_boolean, "false", "HALO_NET_COOP_PUBLIC", _environment_value, _platform_all,
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"

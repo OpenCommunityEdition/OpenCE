@@ -405,6 +405,8 @@ symbols in this file:
 #include "text/font_group.h"
 #include "tag_files/files.h"
 #include "custom_edition_cache.h" /* port: custom_edition_level_name */
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
+#include "mcc_main.h" /* port: port/linux/game/mcc_main.h */
 #include "view_fov.h" /* port: display.fov, before the projection and culling */
 
 #if defined(HALO_WINDOWS) || defined(HALO_ANDROID) || defined(__linux__)
@@ -1276,6 +1278,9 @@ short main_get_solo_level_from_name(
 	char lower_name[128] = { 0 };
 	short level;
 
+	if (mcc_level_name(name))
+		return NONE;
+
 	/* port: a Custom Edition map (custom_maps\a30) is never one of the
 	campaign's levels, whatever its name holds
 	(port/linux/game/custom_edition_cache.c) */
@@ -1478,6 +1483,8 @@ static void main_new_map(
 	}
 	else
 	{
+		if (mcc_main_load_failed(options->map_name))
+			return;
 		error(_error_immediate, "game_load() failed.");
 	}
 
@@ -1934,6 +1941,9 @@ void main_load_ui_scenario(
 void main_roll_credits(
 	void)
 {
+	/* port: standalone MCC scenarios finish through their own menu transition. */
+	if (mcc_main_map_completed())
+		return;
 	error(_error_silent, "congratulations, you won the game!");
 	main_menu_load();
 	game_end_credits_start();
@@ -2386,6 +2396,14 @@ static void main_won_map_private(
 {
 	short level;
 	short local_player_index;
+
+	/* port: explicit MCC campaigns own their mission order and host decision.
+	 * The Xbox/CE level table below cannot represent package mission identities. */
+	if (mcc_main_campaign_won())
+	{
+		main_globals.won_map = FALSE;
+		return;
+	}
 
 	/* port: when a network co-op level is won, the round ends for everyone as
 	in multiplayer, back to the lobby, and the next round is the campaign's

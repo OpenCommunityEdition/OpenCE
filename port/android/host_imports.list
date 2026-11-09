@@ -7,6 +7,8 @@ host_exit
 host_get_tp
 host_set_tp
 host_thread_create
+host_mcc_memory_reserve
+host_mcc_memory_release
 host_memory_watch_initialize
 host_memory_watch_protect
 host_memory_watch_generation

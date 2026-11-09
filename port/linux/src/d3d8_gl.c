@@ -22,6 +22,7 @@ Conventions carried over from the Xbox:
 */
 
 #include "xgpu.h"
+#include "mcc_environment_shader.h"
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
@@ -1902,6 +1903,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	unsigned long width, height, slot;
 	long screen;
 	BOOL depth;
+	GLint previous_texture;
 
 	if (!surface || !surface->Data)
 		return NULL;
@@ -1961,10 +1963,14 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
 	entry->target.format = depth ? (xgpu_reversed_depth ? GL_DEPTH32F_STENCIL8 : GL_DEPTH24_STENCIL8) :
 		entry->screen_buffer && hdr.active ? GL_RGBA16F : GL_RGBA8;
+	/* Textures may already be selected for this draw. Allocating its target
+	 * must not replace the active sampler's input with the output image. */
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous_texture);
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	render_target_storage(&entry->target);
+	glBindTexture(GL_TEXTURE_2D, (GLuint)previous_texture);
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
 	render_targets = entry;
@@ -3511,6 +3517,15 @@ void android_ce_texture_unbind(const void *resource)
 }
 #endif
 
+/* Unload can happen before a later draw replaces every texture stage. */
+void xgpu_mcc_texture_unbind(DWORD const *resource)
+{
+	unsigned long stage;
+	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
+		if ((DWORD const *)device.textures[stage] == resource)
+			device.textures[stage] = NULL;
+}
+
 void WINAPI D3DDevice_SetPalette(DWORD stage, D3DPalette *palette)
 {
 	if (stage < D3DTSS_MAXSTAGES)
@@ -4969,6 +4984,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	key.combiner_state[D3DRS_PSFINALCOMBINERCONSTANT0] = 0;
 	key.combiner_state[D3DRS_PSFINALCOMBINERCONSTANT1] = 0;
 	key.texture_modes = D3D__RenderState[D3DRS_PSTEXTUREMODES];
+	key.mcc_bump_attenuation = mcc_environment_shader_active();
 	/* the textures before the targets: a render target the draw samples
 	has its multisampled pixels resolved by a blit (render_target_resolve),
 	which binds framebuffers of its own, and the back buffer can be both
