@@ -952,8 +952,9 @@ static void hud_draw_friendly_indicator(
 				bitmap,
 				&position,
 				&clip,
-				/* port: the CE teammate marker's authored bitmap scale. */
-				custom_edition_hud_bitmap_scale(interface_get_tag_index(_interface_bitmap_multiplayer_hud)),
+				(mcc_cache_tags_loaded() ?
+				 mcc_hud_bitmap_scale(interface_get_tag_index(_interface_bitmap_multiplayer_hud)) :
+				 custom_edition_hud_bitmap_scale(interface_get_tag_index(_interface_bitmap_multiplayer_hud))), /* port: MCC bitmap units */
 				0.0f,
 				1.0f);
 		}
@@ -1176,9 +1177,10 @@ static void hud_draw_player_name(
 			interface_get_tag_index(_interface_bitmap_multiplayer_hud), 0, 0);
 
 		if (bitmap)
-			/* port: keep the name above a scaled CE teammate marker. */
 			y -= (short)(bitmap->registration_point.y *
-				custom_edition_hud_bitmap_scale(interface_get_tag_index(_interface_bitmap_multiplayer_hud)));
+				(mcc_cache_tags_loaded() ?
+				 mcc_hud_bitmap_scale(interface_get_tag_index(_interface_bitmap_multiplayer_hud)) :
+				 custom_edition_hud_bitmap_scale(interface_get_tag_index(_interface_bitmap_multiplayer_hud)))); /* port: match the MCC arrow's scale */
 	}
 	y -= 2;
 	font = font_definition_get(font_index);
