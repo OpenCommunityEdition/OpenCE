@@ -29,8 +29,10 @@ binary only. These are observations, not copied engine code or SDK declarations.
 
 The port retains its legacy scalar calculation and admission outside MCC
 extension effects. Invalid or overflowing extension results are rejected.
-No native skull behavior is introduced. Network version 43 separates peers
-using the corrected MCC simulation from version 42 peers.
+No native skull behavior is introduced. This testing branch retains network
+version 42 at the maintainer's request; release protocol versioning is deferred
+until the fix series is complete. It does not currently separate peers using
+the corrected simulation from older version 42 builds.
 
 Regression coverage extracts the production adapter and damage dispatch.
 It checks cardinal and opposite directions, signed and unequal components,
