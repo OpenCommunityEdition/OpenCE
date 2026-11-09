@@ -87,6 +87,8 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/hud.h"
 #include "custom_edition_hud_draw.h" /* port: port/linux/game/custom_edition_hud_draw.c */
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.c */
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "interface/hud_definitions.h"
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
