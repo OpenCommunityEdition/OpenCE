@@ -11,7 +11,8 @@ def test_menu_glyph_policy_fitting_and_state(tmp_path):
     source = (ROOT/'port/linux/game/menu_button_glyphs.c').read_text()
     source = re.sub(r'^#include .*$', '', source, flags=re.M)
     renderer = (ROOT/'port/linux/game/keyboard_glyphs.c').read_text()
-    source = ''.join(function(renderer, name) for name in ('keyboard_glyph_draw_padded', 'keyboard_glyph_draw', 'keyboard_glyph_draw_compact')) + source
+    constants = '\n'.join(re.findall(r'^#define KEYBOARD_GLYPH_COMPACT_.*$', (ROOT/'port/linux/game/keyboard_glyphs.h').read_text(), re.M))
+    source = constants + '\n' + ''.join(function(renderer, name) for name in ('keyboard_glyph_draw_padded', 'keyboard_glyph_draw', 'keyboard_glyph_draw_compact')) + source
     run_c(tmp_path, r"""
 #include <assert.h>
 #include <string.h>
@@ -60,6 +61,8 @@ static real text_left,text_right;static int text_runs;
 static void rasterizer_draw_unicode_string_offset(rectangle2d const *r,wchar_t const *s,real x,real y){
  if(current_font==9){labels++;wcscpy(last_text,s);tx=x;ty=y+r->y0;ts=1;}
  else {if(!text_runs)text_left=x+2.5f;text_right=x+2.5f+(real)wcslen(s)*6;text_runs++;assert(!y);}}
+static void rasterizer_draw_unicode_string_scaled_offset(rectangle2d const *r,wchar_t const *s,real scale,real x,real y){
+ assert(current_font==9);labels++;wcscpy(last_text,s);tx=x;ty=y+r->y0*scale;ts=scale;}
 
 static void rasterizer_unicode_string_ink_bounds(rectangle2d const *r,wchar_t const *s,real_rectangle2d *ink){
  assert((current_font==9||current_font==20)&&current_style==NONE&&!current_justification&&!current_flags&&!initial_indent&&!paragraph_indent);
@@ -98,7 +101,13 @@ int main(void){
  box.y1=96;assert(menu_button_glyph_draw(0,0,&box,&clip,0x80ffffff));assert(bh==20);restored();
  box.x1=116;box.y1=100;
  assert(menu_button_glyph_draw(0,0,&box,&clip,0x80ffffff));
- assert(bw==34&&bh==20);restored();
+ assert(bw==33.5f&&bh==20&&ts==.85f);restored();
+ assert(tx+2.5f*ts>=bx+3.99f&&tx+32.5f*ts<=bx+bw-3.99f);
+ assert(ty+4*ts>=by+5&&ty+14*ts<=by+bh-5);
+ assert(menu_button_glyph_compact_key_width(0)==34);
+ assert(menu_button_glyph_draw(1,0,&box,&clip,0x80ffffff));restored();
+ assert(ts==.85f&&bw>23.29f&&bw<23.31f);
+ assert(tx+2.5f*ts>=bx+3.99f&&tx+20.5f*ts<=bx+bw-3.99f);
  box.x1=120;
  box.y1=106;clip.x0=105;before=backgrounds;assert(!menu_button_glyph_draw(0,0,&box,&clip,0x80ffffff));assert(backgrounds==before);
  clip.x0=0;fail=1;assert(!menu_button_glyph_draw(1,0,&box,&clip,0x80ffffff));restored();

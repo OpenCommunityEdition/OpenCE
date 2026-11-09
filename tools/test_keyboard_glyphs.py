@@ -137,6 +137,7 @@ static void rasterizer_draw_unicode_string_offset(rectangle2d const *r,wchar_t c
  assert(ink.x0+ink.x1+2*x==2*bx+bw);
  assert(ink.y0+ink.y1+2*y==2*by+bh);
 }
+static void rasterizer_draw_unicode_string_scaled_offset(rectangle2d const *r,wchar_t const *s,float scale,float x,float y){assert(0);}
 ''' + function(source,'keyboard_glyph_draw_padded') + function(source,'keyboard_glyph_draw') + r'''
 int main(void){
  rectangle2d r={10,20,600,100};short single;
@@ -237,6 +238,8 @@ struct font_character {short character,bitmap_origin_x,bitmap_origin_y,character
 struct text_hires_glyph {float left,top,right,bottom,u0,v0,u1,v1,advance;};
 static real_rectangle2d measured_ink;static long measured_hires_font;static boolean measured_has_ink;
 static void *hires_text_atlas=(void *)1;static real text_scale=1,text_offset_x=2,text_offset_y=3;
+static real text_scale_origin_x=17,text_scale_origin_y=23;
+static int scaled;
 static int covered=1;
 static long draw_string_get_font(void){return 1;}
 static long hires_text_font_get(long f,real s){assert(f==1&&s==1);return 9;}
@@ -247,13 +250,19 @@ static void draw_unicode_string(void (*callback)(struct parse_string_state*,stru
  byte pixels[6]={0,1,0,0,0,1};struct font_header f={{pixels}};struct font_character c={72,2,10,10,3,0};
  (void)r;(void)p;(void)clip;(void)h;if(*text)callback(0,&f,&c,0,100,200,0,0,3,2);}
 static void rasterizer_draw_unicode_string(rectangle2d const *r,void *a,void *b,int c,wchar_t const *t){
- (void)r;(void)a;(void)b;(void)c;(void)t;assert(text_offset_x==2.25f&&text_offset_y==2.5f);}
-''' + ''.join(function(source,n) for n in ('rasterizer_measure_ink_character','rasterizer_unicode_string_ink_bounds','rasterizer_draw_unicode_string_offset')) + r'''
+ (void)r;(void)a;(void)b;(void)c;(void)t;assert(text_offset_x==2.25f&&text_offset_y==2.5f);
+ if(scaled)assert(text_scale==.85f&&text_scale_origin_x==0&&text_scale_origin_y==0);}
+''' + ''.join(function(source,n) for n in ('rasterizer_measure_ink_character','rasterizer_unicode_string_ink_bounds','rasterizer_draw_unicode_string_offset','rasterizer_draw_unicode_string_scaled_offset')) + r'''
 int main(void){rectangle2d r={0};real_rectangle2d ink;
  rasterizer_unicode_string_ink_bounds(&r,L"H",&ink);assert(ink.x0==104.25f&&ink.x1==110.75f&&ink.y0==201.5f&&ink.y1==210.5f);
  covered=0;rasterizer_unicode_string_ink_bounds(&r,L"H",&ink);assert(ink.x0==101&&ink.x1==103&&ink.y0==200&&ink.y1==202);
  rasterizer_unicode_string_ink_bounds(&r,L"",&ink);assert(ink.x0==0&&ink.x1==0);
- rasterizer_draw_unicode_string_offset(&r,L"H",.25f,-.5f);assert(text_offset_x==2&&text_offset_y==3);return 0;}
+ rasterizer_draw_unicode_string_offset(&r,L"H",.25f,-.5f);assert(text_offset_x==2&&text_offset_y==3);
+ scaled=1;text_scale=1.5f;
+ rasterizer_draw_unicode_string_scaled_offset(&r,L"H",.85f,.25f,-.5f);
+ assert(text_scale==1.5f&&text_scale_origin_x==17&&text_scale_origin_y==23&&text_offset_x==2&&text_offset_y==3);
+ rasterizer_draw_unicode_string_scaled_offset(&r,L"",.85f,.25f,-.5f);
+ assert(text_scale==1.5f&&text_scale_origin_x==17&&text_scale_origin_y==23&&text_offset_x==2&&text_offset_y==3);return 0;}
 ''')
 
 

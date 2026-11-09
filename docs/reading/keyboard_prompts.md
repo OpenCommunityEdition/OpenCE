@@ -74,8 +74,8 @@ right to left by each later keycap's extra width. Compact pause footers instead
 retain eight units between CANCEL and SELECT, expand the accept group to the
 right, and balance the added width around the original center. This leaves room
 for both keycaps inside the narrow campaign and multiplayer panels. Their compact
-16-by-20 slots use two units of keycap padding per side instead of six, with the
-same text size and complete outline. Other menus and gameplay retain the imported
+16-by-20 slots draw key names at 85% size with four units of padding per side
+and a complete, full-height outline. Other menus and gameplay retain the imported
 GulchCE dimensions. Click targets
 move with their labels. The optional offset hook runs before target
 registration; tag definitions and saved state are unchanged. The join screen suppresses duplicate plain
@@ -114,8 +114,9 @@ the small UI font. Existing setters alone cannot restore unknown formatting.
 Both gameplay and menu keycaps use the imported `keyboard_glyph_draw` and
 `keyboard_glyph_art.c` directly, including GulchCE's blue menu outline, rounded
 geometry and font-based dimensions. `keyboard_glyph_draw` retains the original
-12-unit horizontal padding; `keyboard_glyph_draw_compact` uses four only for
-compact menu slots. Both restore the caller's indentation. The OpenCE adapter
+12-unit horizontal padding; `keyboard_glyph_draw_compact` uses eight with smaller
+lettering only for compact menu slots. Both restore the caller's indentation,
+and scoped text scaling restores the caller's transform. The OpenCE adapter
 positions caps and measures space for the surrounding legend. Keyboard menu artwork works with High-Res HUD off.
 
 ## Provenance and checks

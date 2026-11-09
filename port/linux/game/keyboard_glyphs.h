@@ -2,6 +2,9 @@
 #define KEYBOARD_GLYPHS_H
 #include <stddef.h>
 
+#define KEYBOARD_GLYPH_COMPACT_TEXT_SCALE 0.85f
+#define KEYBOARD_GLYPH_COMPACT_PADDING 8.0f
+
 /* Uses the caller's font and baseline, advances its cursor, owns no map assets. */
 union rectangle2d;
 void keyboard_glyph_draw(char const *label, union rectangle2d *cursor, unsigned long color, int menu);

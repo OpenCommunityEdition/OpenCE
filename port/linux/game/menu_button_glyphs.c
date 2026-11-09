@@ -33,7 +33,7 @@ static wchar_t const *menu_button_key(short button)
 }
 
 /* OpenCE supplies a menu font and positions the imported GulchCE renderer.
- * Compact slots reduce horizontal padding; palette, outline and font stay intact. */
+ * Compact slots use smaller lettering with comfortable padding inside the outline. */
 static real menu_button_key_layout(short button, rectangle2d const *box, pixel32 color, boolean compact)
 {
     long font = tag_loaded('font', "ui\\small_ui"), old_font;
@@ -59,7 +59,8 @@ static real menu_button_key_layout(short button, rectangle2d const *box, pixel32
     rasterizer_unicode_string_ink_bounds(&measure, L"H", &capitals);
     rasterizer_unicode_string_ink_bounds(&measure, key, &ink);
     height = MAX(20.0f, capitals.y1 - capitals.y0 + 10.0f);
-    width = MAX(height, ink.x1 - ink.x0 + (compact ? 4.0f : 12.0f));
+    width = MAX(height, (ink.x1 - ink.x0) * (compact ? KEYBOARD_GLYPH_COMPACT_TEXT_SCALE : 1.0f) +
+        (compact ? KEYBOARD_GLYPH_COMPACT_PADDING : 12.0f));
     middle = (capitals.y0 + capitals.y1) * .5f;
     if (box)
     {
