@@ -68,6 +68,7 @@ symbols in this file:
 #include "game/game_engine.h"
 #include "items/item_definitions.h"
 #include "items.h"
+#include "item_stuck.h" /* port: port/linux/game/item_stuck.c */
 #include "physics/breakable_surfaces.h"
 #include "physics/collision_bsp_definitions.h"
 #include "physics/collision_usage.h"
@@ -639,6 +640,10 @@ boolean item_update(
 			{
 				long impulse_sound_index;
 				real impact_scale;
+				/* port: (below) */
+				boolean hit_ground;
+				boolean rests;
+				boolean stuck;
 
 				point_from_line3d(
 					&new_position,
@@ -685,27 +690,48 @@ boolean item_update(
 						impact_scale);
 				}
 
-				if ((collision.type == _collision_result_structure ||
+				hit_ground = collision.type == _collision_result_structure ||
 					(collision.type == _collision_result_object &&
 						TEST_FLAG(
 							_object_mask_scenery | _object_mask_device,
-							object_get_type(collision.object_index)))) &&
+							object_get_type(collision.object_index)));
+				rests = hit_ground &&
 					collision.plane.n.k > 0.7071f &&
-					-dot_product3d(&collision.plane.n, &new_velocity) < 0.05f)
+					-dot_product3d(&collision.plane.n, &new_velocity) < 0.05f;
+				/* port: or wedged where it cannot rest, hitting the ground
+				each tick without getting anywhere (spinning, its collision
+				sound playing with each hit, until picked up), it is put at
+				rest where it is, as it is (item_stuck.c) */
+				stuck = !rests && item_stuck_count(
+					&item->item.stuck_ticks,
+					hit_ground,
+					distance3d(&item->object.position, &collision.point));
+				if (rests || stuck)
 				{
+					item->item.stuck_ticks = 0;
 					new_position = collision.point;
-					item_align_to_normal_and_point(
-						item_index,
-						&collision.plane.n,
-						&collision.point,
-						&new_position);
+					if (rests)
+					{
+						item_align_to_normal_and_point(
+							item_index,
+							&collision.plane.n,
+							&collision.point,
+							&new_position);
+					}
 					new_velocity.i = new_velocity.j = new_velocity.k = 0.f;
-					scale_vector3d(
-						&collision.plane.n,
-						dot_product3d(
-							&item->object.angular_velocity,
-							&collision.plane.n),
-						&item->object.angular_velocity);
+					if (rests)
+					{
+						scale_vector3d(
+							&collision.plane.n,
+							dot_product3d(
+								&item->object.angular_velocity,
+								&collision.plane.n),
+							&item->object.angular_velocity);
+					}
+					else
+					{
+						item->object.angular_velocity = *global_zero_vector3d;
+					}
 
 					if (!game_engine_running() &&
 						item->object.owner_player_index == NONE)
@@ -783,6 +809,11 @@ boolean item_update(
 						&new_position,
 						item_index);
 				}
+			}
+			/* port: a tick in the air starts the count again (item_stuck.c) */
+			else
+			{
+				item->item.stuck_ticks = 0;
 			}
 
 			item->object.translational_velocity = new_velocity;
