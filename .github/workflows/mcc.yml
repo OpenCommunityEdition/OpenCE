@@ -98,6 +98,7 @@ jobs:
           tools/test_frontend_multiplayer.py
           tools/test_frontend_navigation.py
           tools/test_frontend_presentation.py
+          tools/test_mcc_metadata_importer.py
           tools/test_mcc_loading.py
           tools/test_mcc_load_network.py
           tools/test_mcc_precache.py
