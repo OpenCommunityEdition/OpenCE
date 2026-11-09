@@ -62,6 +62,12 @@ enum
 	V5_SCENARIO_STRUCTURE_BSPS_OFFSET = 0x5A4,
 	V5_SCENARIO_TYPE_OFFSET = 0x3C,
 	V5_BITMAP_CACHED_BIT = 7,
+	/* a model shader's flags, and its multipurpose map's tag index
+	(custom_edition_bitmaps.c's shader_model_maps); MCC's flag for a
+	multipurpose map in the Xbox's channel order (observed) */
+	V5_SHADER_MODEL_FLAGS_OFFSET = 0x28,
+	V5_SHADER_MODEL_MULTIPURPOSE_MAP_INDEX_OFFSET = 0xC8,
+	MCC_SHADER_MODEL_XBOX_MULTIPURPOSE_BIT = 6,
 	/* what draws a HUD bitmap (mcc_import_hud) */
 	MCC_IMPORT_HUD_PLACEMENT = 1,
 	MCC_IMPORT_HUD_ICONS,
@@ -201,6 +207,9 @@ static struct
 	unsigned long empty_name_address;
 	long schemaless;
 	long bitmaps;
+	/* the bitmap tags marked as holding Halo PC's multipurpose masks
+	(mcc_import_halo_pc_channels) */
+	long halo_pc_channel_bitmaps;
 	long sounds_silenced;
 	/* the tags written, in the disc's order (mcc_import_order): each the
 	loaded tag it is (NONE: a tag of the disc's MCC has none of, written
@@ -1737,11 +1746,56 @@ static void mcc_import_hud(
 
 /* every bitmap's pixels as the Xbox's caches hold them, written to the body;
 its tag then names them there */
+/* The loaded bitmaps that hold Halo PC's multipurpose masks, each TRUE in
+`halo_pc_channels`: a model shader without MCC's flag for the Xbox's order
+draws it as its multipurpose map, and the disc's map does not have it (it is
+written after the disc's tags). MCC's flag alone cannot say: the scorpion's
+shader lacks it too, and its bitmap is the disc's, byte for byte. Without
+the disc's order no bitmap is known not to be the disc's. */
+static long mcc_import_halo_pc_channels(
+	boolean *halo_pc_channels)
+{
+	long count = 0;
+	long tag_index;
+
+	for (tag_index = 0; tag_index < mcc_import_globals.tag_count; tag_index++)
+	{
+		struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[tag_index];
+		byte const *shader = (byte const *)instance->base_address;
+		long bitmap_index;
+
+		if (instance->group_tag != 'soso' || !shader || mcc_import_globals.old_to_new[tag_index] == NONE ||
+			TEST_FLAG(*(unsigned short const *)(shader + V5_SHADER_MODEL_FLAGS_OFFSET),
+				MCC_SHADER_MODEL_XBOX_MULTIPURPOSE_BIT))
+		{
+			continue;
+		}
+		bitmap_index = *(long const *)(shader + V5_SHADER_MODEL_MULTIPURPOSE_MAP_INDEX_OFFSET);
+		if (bitmap_index == NONE)
+			continue;
+		bitmap_index &= 0xFFFF;
+		if (bitmap_index < mcc_import_globals.tag_count &&
+			mcc_import_globals.instances[bitmap_index].group_tag == 'bitm' &&
+			mcc_import_globals.old_to_new[bitmap_index] >= mcc_import_globals.disc_count &&
+			!halo_pc_channels[bitmap_index])
+		{
+			halo_pc_channels[bitmap_index] = TRUE;
+			count++;
+		}
+	}
+
+	return count;
+}
+
 static boolean mcc_import_bitmaps(
 	struct mcc_import_body *body)
 {
+	boolean *halo_pc_channels = mcc_import_calloc((size_t)mcc_import_globals.tag_count, sizeof(boolean));
 	long tag_index;
 
+	if (!halo_pc_channels)
+		return FALSE;
+	mcc_import_globals.halo_pc_channel_bitmaps = mcc_import_halo_pc_channels(halo_pc_channels);
 	for (tag_index = 0; tag_index < mcc_import_globals.tag_count; tag_index++)
 	{
 		struct mcc_import_tag_instance *instance = &mcc_import_globals.instances[tag_index];
@@ -1765,7 +1819,10 @@ static boolean mcc_import_bitmaps(
 				continue;
 			pixels = mcc_import_calloc(1, (size_t)buffer_size);
 			if (!pixels)
+			{
+				mcc_import_free(halo_pc_channels);
 				return FALSE;
+			}
 			custom_edition_cache_read(tag_index, bitmap->pixels_offset, bitmap->pixels_size, pixels);
 			/* a HUD bitmap at the disc's size (mcc_import_hud) */
 			if (mcc_import_globals.hud_factor && mcc_import_globals.hud_factor[tag_index] > 1)
@@ -1790,9 +1847,12 @@ static boolean mcc_import_bitmaps(
 			/* (its own: the copy gives it the written tag's index) */
 			bitmap->tag_index = instance->tag_index;
 			bitmap->flags |= FLAG(V5_BITMAP_CACHED_BIT);
+			/* (drawn in Halo PC's order: mcc_imported_bitmap_arriving) */
+			bitmap->mipmap_pad = halo_pc_channels[tag_index] ? MCC_IMPORTED_BITMAP_HALO_PC_CHANNELS : 0;
 			mcc_import_globals.bitmaps++;
 		}
 	}
+	mcc_import_free(halo_pc_channels);
 
 	return !body->failed;
 }
@@ -2443,11 +2503,13 @@ static boolean mcc_import_map(
 		success = success && fwrite(&header, 1, sizeof(header), body->file) == sizeof(header);
 		fprintf(stdout, "mcc import: %s: %d structure bsps, %ld bitmaps, %ld sounds (%ld silent), %ld tags (0x%lX bytes; "
 			"%ld empty in the disc's place, %ld of MCC's kept after the disc's, %ld without a schema; %ld references to "
-			"tags left out; %ld HUD bitmaps halved, %ld textures halved to fit), 0x%lX bytes before compression\n",
+			"tags left out; %ld HUD bitmaps halved, %ld textures halved to fit, %ld in Halo PC's channels), "
+			"0x%lX bytes before compression\n",
 			map_name, (int)references->count, mcc_import_globals.bitmaps, mcc_import_globals.sounds,
 			mcc_import_sounds_silent(), mcc_import_globals.out_count, tags.used, mcc_import_globals.placeholders,
 			mcc_import_globals.kept, mcc_import_globals.schemaless, mcc_import_globals.references_dropped,
-			mcc_import_globals.hud_bitmaps_halved, mcc_import_globals.fitted, (unsigned long)header.file_length);
+			mcc_import_globals.hud_bitmaps_halved, mcc_import_globals.fitted,
+			mcc_import_globals.halo_pc_channel_bitmaps, (unsigned long)header.file_length);
 	}
 	deflateEnd(&body->stream);
 	fclose(body->file);

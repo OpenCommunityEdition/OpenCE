@@ -907,3 +907,25 @@ void custom_edition_bitmap_pixels_arrived(
 
 	return;
 }
+
+void mcc_imported_bitmap_arriving(
+	struct bitmap_data const *bitmap,
+	void *pixels)
+{
+	/* source/cache/cache_files.c */
+	extern boolean cache_files_mcc_hud(void);
+
+	if (custom_edition_cache_tags_loaded())
+	{
+		return;
+	}
+	/* (told of every bitmap of every Xbox map, so that pixels arriving where
+	a marked bitmap's were, this map's or an earlier one's, are this build's) */
+	halo_custom_edition_texels_channels(
+		pixels,
+		cache_files_mcc_hud() && bitmap->mipmap_pad == MCC_IMPORTED_BITMAP_HALO_PC_CHANNELS ?
+			_custom_edition_channels_multipurpose :
+			_custom_edition_channels_xbox);
+
+	return;
+}

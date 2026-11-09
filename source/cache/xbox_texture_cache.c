@@ -898,6 +898,10 @@ static boolean texture_cache_start_loading_bitmap(
 			}
 			else
 			{
+				/* port: the channel order of the pixels read here, Halo PC's
+				for a bitmap the MCC import marked (port/linux/game/
+				custom_edition_bitmaps.c) */
+				mcc_imported_bitmap_arriving(bitmap, base_address);
 				texture->read_request_handle = cache_file_read(
 					bitmap->tag_index,
 					bitmap->pixels_offset,
