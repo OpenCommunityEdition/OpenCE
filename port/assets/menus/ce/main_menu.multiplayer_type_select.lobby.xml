@@ -298,53 +298,123 @@
 		<on event="b" run="port join4 back" back="true"/>
 		<on event="back" run="port join4 back" back="true"/>
 		<data input="port join4 update"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\header_select_profile"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\header_select_profile" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/header_add_player" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/join4_qtr_join" controller="1" x="70" y="76"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/join4_qtr_join" controller="2" x="328" y="76"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/join4_qtr_join" controller="3" x="70" y="242"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/join4_qtr_join" controller="4" x="328" y="242"/>
-		<child widget="ui\shell\main_menu\button_key"/>
+		<child widget="ui\shell\main_menu\button_key" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_button_key" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
 		<child widget="main_menu/multiplayer_type_select/lobby/join4_hint" x="30" y="419"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_join" width="255" height="165" bitmap="ui\shell\bitmaps\split_screen_bkd" flags="pass_unhandled_to_focused_child">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_join" width="255" height="165" flags="pass_unhandled_to_focused_child">
 		<on event="black" run="port join4 playing" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_playing"/>
 		<on event="white" run="port join4 opener" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_select"/>
 		<on event="a" run="port join4 join" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_select"/>
 		<on event="start" run="port join4 join" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_select"/>
 		<on event="b"/>
 		<on event="back"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\connected\4way_profile_select\press_start_to_join" x="54" y="20"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\connected\4way_profile_select\press_start_to_join_controller"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_xbox_background" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\connected\4way_profile_select\press_start_to_join" x="54" y="20" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\connected\4way_profile_select\press_start_to_join_controller" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_panel" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_press_to_join" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_controller" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_select" width="254" height="164" bitmap="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\4way_profile_border" flags="pass_unhandled_to_focused_child">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_select" width="254" height="164" flags="pass_unhandled_to_focused_child">
 		<on event="created" run="port join4 choosing"/>
 		<on event="a" run="port join4 select" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_ready"/>
 		<on event="start" run="port join4 select" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_ready"/>
 		<on event="b" run="port join4 leave" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_join"/>
 		<on event="back"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_desc"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_spinner"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_xbox_border" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_desc" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_spinner" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_panel" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/connected/4way_profile_select/qtr_screen_profile_color_pic" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_choose" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_spinner" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_ready" width="254" height="164" bitmap="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\4way_profile_border">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_ready" width="254" height="164">
 		<on event="created" run="port join4 ready"/>
 		<on event="a" run="port join4 done" back="true"/>
 		<on event="start" run="port join4 done" back="true"/>
 		<on event="b" run="port join4 unready" replace="main_menu/multiplayer_type_select/lobby/join4_qtr_select"/>
 		<on event="back"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic_selected"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_text"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_name"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_xbox_border" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic_selected" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_text" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_name" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_panel" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_color" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_selected" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_name" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_playing" width="254" height="164" bitmap="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\4way_profile_border">
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_qtr_playing" width="254" height="164">
 		<on event="a" run="port join4 done" back="true"/>
 		<on event="start" run="port join4 done" back="true"/>
 		<on event="b"/>
 		<on event="back"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic_selected"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_text"/>
-		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_name"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_xbox_border" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_color_pic_selected" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_text" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_selected_name" map_has="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_panel" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_color" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_selected" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_name" map_lacks="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\qtr_screen_profile_select"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/lobby/join4_hint" type="text" width="345" height="24" font="ui\small_ui" color="#FF2896FF" text_flags="no_focus_test">
+	</widget>
+	<bitmap name="main_menu/multiplayer_type_select/lobby/join4_xbox_background">
+		<frame map="ui\shell\bitmaps\split_screen_bkd" index="0"/>
+	</bitmap>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_xbox_background" width="255" height="165" bitmap="main_menu/multiplayer_type_select/lobby/join4_xbox_background">
+	</widget>
+	<bitmap name="main_menu/multiplayer_type_select/lobby/join4_xbox_border">
+		<frame map="ui\shell\main_menu\multiplayer_type_select\split_screen\4way_profile_select\4way_profile_border" index="0"/>
+	</bitmap>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_xbox_border" width="254" height="164" bitmap="main_menu/multiplayer_type_select/lobby/join4_xbox_border">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_panel" width="254" height="164" bitmap="bitmaps/semi_transparent_grey">
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_panel_edge_across"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_panel_edge_across" y="162"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_panel_edge_down" y="2"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_panel_edge_down" x="252" y="2"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_panel_edge_across" width="254" height="2" bitmap="bitmaps/blue">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_panel_edge_down" width="2" height="160" bitmap="bitmaps/blue">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_press_to_join" type="text" left="54" top="20" width="200" height="60" text="Press %a-button to Join" font="ui\large_ui" color="#FF2896FF" text_flags="flashing">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_controller" left="96" top="80" width="63" height="64" flags="flash_bitmap" bitmap="ui\shell\bitmaps\controller_graphix">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_choose" type="text" left="98" top="45" width="147" height="111" text="Choose a Profile\n\nPress %a-button to select" font="ui\small_ui" color="#FF2896FF" text_flags="flashing">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_spinner" type="spinner" left="47" top="2" width="160" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" list_flags="items_in_code">
+		<on event="created" run="player profile list initialize"/>
+		<on event="deleted" run="player profile list dispose"/>
+		<data input="player profile small menu update"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_color" left="18" top="22" width="112" height="136" bitmap="ui\shell\bitmaps\colors_sm">
+		<data input="get active plyr profile color"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_selected" type="text" left="98" top="45" width="147" height="111" text="Profile Selected\n\nPress %a-button when all\nplayers have\nselected profiles" font="ui\small_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_name" type="text" left="47" top="2" width="160" height="24" font="ui\large_ui" color="#FFFFFFFF" align="center" list_flags="items_in_code">
+		<data input="get active plyr profile name"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_button_key" left="371" top="414" width="206" height="26">
+		<child widget="ui\shell\main_menu\b_butn" x="371" y="414"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_key_back" x="392" y="414"/>
+		<child widget="ui\shell\main_menu\a_butn" x="471" y="414"/>
+		<child widget="main_menu/multiplayer_type_select/lobby/join4_key_select" x="492" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_key_back" type="text" width="63" height="22" string_list="ui\shell\main_menu\button_key" string_index="0" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/lobby/join4_key_select" type="text" width="95" height="22" string_list="ui\shell\main_menu\button_key" string_index="1" font="ui\large_ui" color="#FF2896FF" text_flags="no_focus_test">
 	</widget>
 </menus>

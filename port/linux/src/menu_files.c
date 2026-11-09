@@ -682,17 +682,26 @@ static void read_widget(struct reader *reader, const XML_Char **attributes, long
 
 static void read_child(struct reader *reader, const XML_Char **attributes, long owner)
 {
-	const char *widget = NULL, *controller = NULL;
+	const char *widget = NULL, *controller = NULL, *map_has = NULL, *map_lacks = NULL;
 	long x = 0, y = 0;
+	long index = reader->menus.child_count;
 	struct attribute table[] =
 	{
 		{ "widget", &widget }, { "controller", &controller }, { "x", NULL, &x }, { "y", NULL, &y },
+		{ "map_has", &map_has }, { "map_lacks", &map_lacks },
 	};
 
 	read_attributes(reader, "child", attributes, table, sizeof(table) / sizeof(*table));
 	if (!reader->failed && !widget)
 		reader_error(reader, "a <child> needs a widget");
+	if (!reader->failed && ((map_has && !strchr(map_has, '\\')) || (map_lacks && !strchr(map_lacks, '\\'))))
+		reader_error(reader, "map_has and map_lacks name a widget tag of the map (a path with backslashes)");
 	child_add(reader, owner, HALO_MENU_NONE, widget, x, y, controller);
+	if (!reader->failed && reader->menus.child_count > index)
+	{
+		reader->menus.children[index].map_has = map_has;
+		reader->menus.children[index].map_lacks = map_lacks;
+	}
 }
 
 static void read_handler(struct reader *reader, const XML_Char **attributes, long owner)

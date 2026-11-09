@@ -645,6 +645,16 @@ static long tag_named(long group_tag, char const *name, char const *file, long l
 	return index;
 }
 
+/* whether a child is there with this map: map_has a widget tag the map has,
+map_lacks one it has not (a screen whose Xbox widgets a menus' map imported
+from the Master Chief Collection, Halo PC's, has not got, drawn with the
+port's own instead) */
+static boolean child_for_map(struct halo_menu_child const *child)
+{
+	return (!child->map_has || tag_loaded(UI_WIDGET_DEFINITION_TAG, child->map_has) != NONE) &&
+		(!child->map_lacks || tag_loaded(UI_WIDGET_DEFINITION_TAG, child->map_lacks) == NONE);
+}
+
 /* "unwired <name>": a function the PC version has for these widgets, not
 yet written for this engine (port/assets/menus/UNWIRED.md), which does
 nothing */
@@ -1315,9 +1325,9 @@ static void *widget_build(long widget_index)
 		reference_set(&definition->extended_description_widget, UI_WIDGET_DEFINITION_TAG,
 			tag_named(UI_WIDGET_DEFINITION_TAG, source->description, source->file, source->line));
 	}
-	/* the children */
+	/* the children (those for this map) */
 	for (count = 0, child = source->first_child; child != HALO_MENU_NONE; child = menus->children[child].next)
-		count++;
+		count += child_for_map(&menus->children[child]);
 	if (definition->type == _widget_type_spinner_list && count != 0 && count != 1 && count != 3)
 		problem(source->file, source->line, "a spinner has 0, 1 or 3 children:", source->name);
 	if (count)
@@ -1329,11 +1339,16 @@ static void *widget_build(long widget_index)
 		for (count = 0, child = source->first_child; children && child != HALO_MENU_NONE; child = menus->children[child].next)
 		{
 			struct halo_menu_child const *entry = &menus->children[child];
-			long tag_index = entry->nested != HALO_MENU_NONE ? build.widget_tags[entry->nested] :
-				tag_named(UI_WIDGET_DEFINITION_TAG, entry->widget, entry->file, entry->line);
-			char const *name = entry->nested != HALO_MENU_NONE ? menus->widgets[entry->nested].name : entry->widget;
-			char const *child_leaf = strrchr(name, '/') ? strrchr(name, '/') + 1 : name;
+			long tag_index;
+			char const *name;
+			char const *child_leaf;
 
+			if (!child_for_map(entry))
+				continue;
+			tag_index = entry->nested != HALO_MENU_NONE ? build.widget_tags[entry->nested] :
+				tag_named(UI_WIDGET_DEFINITION_TAG, entry->widget, entry->file, entry->line);
+			name = entry->nested != HALO_MENU_NONE ? menus->widgets[entry->nested].name : entry->widget;
+			child_leaf = strrchr(name, '/') ? strrchr(name, '/') + 1 : name;
 			reference_set(&children[count].widget_tag, UI_WIDGET_DEFINITION_TAG, tag_index);
 			strncpy(children[count].name, child_leaf, sizeof(children[count].name) - 1);
 			children[count].horizontal_offset = (short)entry->x;

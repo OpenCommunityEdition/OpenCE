@@ -187,7 +187,7 @@ MENU_ATTRIBUTES = {
                "color", "align", "description", "string_list", "list_flags", "text_flags", "header_bitmap",
                "footer_bitmap", "header_bounds", "footer_bounds", "child_controller", "x", "y", "left", "top",
                "width", "height", "text_x", "text_y", "auto_close", "auto_close_fade", "string_index", "platform"},
-    "child": {"widget", "controller", "x", "y", "platform"},
+    "child": {"widget", "controller", "x", "y", "map_has", "map_lacks", "platform"},
     "on": {"event", "run", "script", "open", "replace", "close", "widget", "focus", "reload", "sound", "otherwise",
            "label", "back", "branch", "platform"},
     "data": {"input", "platform"},
@@ -286,6 +286,9 @@ def test_menus_are_well_formed():
                 references.append((where, widgets, element.get("description")))
             elif element.tag == "child" or element.tag == "conditional":
                 references.append((where, widgets, element.get("widget")))
+                # (a widget tag of the map: menu_files.c's read_child)
+                for attribute in ("map_has", "map_lacks"):
+                    assert element.get(attribute) is None or "\\" in element.get(attribute), f"{where} {attribute}"
             elif element.tag == "on":
                 assert set(element.get("event").split()) <= set(events), where
                 run = element.get("run")

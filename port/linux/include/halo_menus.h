@@ -75,13 +75,16 @@ struct halo_menu_input
 	long line;
 };
 
-/* a child: a <widget> inside its parent (nested), or one named (<child>) */
+/* a child: a <widget> inside its parent (nested), or one named (<child>),
+there only if the menus' map has the widget tag map_has, and has not
+map_lacks (NULL: either way) */
 struct halo_menu_child
 {
 	long nested;
 	char const *widget;
 	long x, y;
 	char const *controller;
+	char const *map_has, *map_lacks;
 	long next;
 	char const *file;
 	long line;

@@ -48,9 +48,11 @@ writes only what the game reaches of it: the scenario, the globals and the
 tags the code and the menus name, but not Halo PC's main menu and the screens
 it leads to; its bitmaps at the disc's sizes. A picture the menus take from the
 Xbox's map is the PC version's frame of the same place, and one MCC lacks (the
-Xbox's four-player profile select, the controller picture) is not drawn
-(`menu_tags.c`). The Xbox's own menus (`display.menus = "xbox"`) need the
-disc's `ui.map`.
+controller picture of the profile's settings) is not drawn (`menu_tags.c`).
+ADD PLAYER's screen, the Xbox's four-player profile select, whose widgets MCC
+lacks, is the port's own in their places (the menus' `map_lacks`): the same
+texts, functions and layout on the PC menus' flat panel. The Xbox's own menus
+(`display.menus = "xbox"`) need the disc's `ui.map`.
 
 What does not import yet:
 
