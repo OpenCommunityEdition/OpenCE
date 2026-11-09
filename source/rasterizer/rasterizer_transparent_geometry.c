@@ -99,6 +99,7 @@ symbols in this file:
 enum
 {
 	_shader_type_transparent_water = 7,
+	_shader_type_transparent_glass = 8, /* port: (transparent_object_glass_first) */
 	_rasterizer_geometry_first_person_bit = 7,
 	_rasterizer_target_render_primary = 0,
 };
@@ -417,6 +418,31 @@ static void rasterizer_sort_internal(
 	return;
 }
 
+/* port: two transparent groups at the same depth and of the same source:
+those of different objects by their objects (an order, where qsort's was
+any), and of one object, its glass first. A model's transparent parts all
+sort at its object's centroid, so that qsort, which keeps no order, drew a
+powerup's glass box (over shield's, active camouflage's, needler ammo's)
+before or after the glow inside it as the rest of the view fell, frame by
+frame: after it, the glass's tint dimmed the glow from bright red to a dull
+purple from some places. Drawn first, the glass tints what is behind it and
+the glow shines through, as the powerup was made to look. */
+static long transparent_object_glass_first(
+	struct transparent_geometry_group const *group1,
+	struct transparent_geometry_group const *group2)
+{
+	boolean glass1;
+	boolean glass2;
+
+	if (group1->object_index != group2->object_index)
+		return group1->object_index > group2->object_index ? 1 : -1;
+	glass1 = group1->shader && group1->shader->base.type == _shader_type_transparent_glass;
+	glass2 = group2->shader && group2->shader->base.type == _shader_type_transparent_glass;
+	if (glass1 == glass2)
+		return 0;
+	return glass1 ? -1 : 1;
+}
+
 static int __cdecl group_sorted_indices_cmpfn(
 	void const *group_index1_pointer,
 	void const *group_index2_pointer)
@@ -482,6 +508,8 @@ static int __cdecl group_sorted_indices_cmpfn(
 				}
 				if (group1->source_object_index>=group2->source_object_index)
 				{
+					/* port: of one object, its glass first (transparent_object_glass_first) */
+					comparison = transparent_object_glass_first(group1, group2);
 					goto cortana_tiebreak;
 				}
 			}
