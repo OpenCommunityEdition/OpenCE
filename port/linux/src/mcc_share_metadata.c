@@ -114,7 +114,7 @@ static int map(const char *root, const char *path, int campaign, char *text,
         relative_path(scenario,canonical,sizeof(canonical));
     token=server_json_member(&document,0,"CampaignMapKind");
     if (campaign && token>=0)
-        valid=valid && server_json_get_string(&document,token,kind,sizeof(kind)) && !strcmp(kind,"Default");
+        valid=valid && server_json_get_string(&document,token,kind,sizeof(kind)) && mcc_manifest_default_kind(kind);
     server_json_document_free(&document);
     if (!valid || !steam_workshop_read_map(text,length,result)) return 0;
     return length;

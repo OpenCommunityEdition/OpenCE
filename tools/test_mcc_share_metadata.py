@@ -8,7 +8,6 @@ import subprocess
 import sys
 
 import pytest
-from harness import function
 from test_mcc_previews import png
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +18,7 @@ DRIVER = r'''
 #include "mcc_share_metadata.h"
 #include "mcc_preview_image.h"
 #include "mcc_manifest.h"
+#include "mcc_menu_metadata.h"
 #include "server_json.h"
 #include <ctype.h>
 #include <stdio.h>
@@ -27,15 +27,39 @@ DRIVER = r'''
 void platform_translate_path(const char *in,char *out,unsigned long size) {
  (void)in; if(size) out[0]=0;
 }
-int steam_workshop_package_folder(const char *id,char *out,unsigned long size) {
- (void)id; if(size) out[0]=0; return 0;
+static const char *test_library = "";
+static int test_campaigns;
+int config_boolean(const char *name) {
+ return !strcmp(name,"game.mcc_campaigns") ? test_campaigns : 1;
 }
+const char *config_string(const char *name) {
+ return !strcmp(name,"paths.steam") ? test_library : "";
+}
+#ifdef _WIN32
+int steam_workshop_windows_roots(char (*paths)[STEAM_WORKSHOP_PATH_SIZE], int maximum) {
+ (void)paths; (void)maximum; return 0;
+}
+#endif
 int main(int argc,char **argv) {
  static struct mcc_share_metadata_plan plan;
  static struct mcc_share_metadata_entry received[MCC_SHARE_METADATA_FILES];
  unsigned char keep[MCC_SHARE_METADATA_FILES],digest[32]; char reason[128]; int i,ok,count;
  if(argc<5) return 2;
- if(!strcmp(argv[1],"digest")) {
+ if(!strcmp(argv[1],"scan")) {
+  test_library=argv[2]; test_campaigns=atoi(argv[3]);
+  printf("%d\n",steam_workshop_scan());
+  for(i=0;i<steam_workshop_count();i++) printf("%s\n",steam_workshop_map(i)->name);
+ } else if(!strcmp(argv[1],"manifest")) {
+  static struct mcc_manifest manifest;
+  ok=mcc_manifest_load(argv[2],&manifest,reason);
+  printf("%d %d\n%s\n",ok,manifest.count,reason);
+  for(i=0;i<manifest.count;i++) printf("%s\n",manifest.missions[i].name);
+ } else if(!strcmp(argv[1],"menu")) {
+  static struct mcc_menu_metadata metadata;
+  ok=mcc_menu_metadata_load(argv[2],atoi(argv[3]),&metadata);
+  printf("%d %d\n",ok,metadata.count);
+  for(i=0;i<metadata.count;i++) printf("%s\n",metadata.maps[i].name);
+ } else if(!strcmp(argv[1],"digest")) {
   ok=mcc_share_metadata_digest(argv[2],atoi(argv[3]),argv[4],digest,reason);
   printf("%d\n",ok);for(i=0;i<32;i++)printf("%02x",digest[i]);printf("\n%s\n",reason);
  } else if(!strcmp(argv[1],"plan")) {
@@ -62,11 +86,7 @@ def metadata_tool(tmp_path_factory):
     compiler = os.environ.get("CC") or shutil.which("clang") or shutil.which("cc")
     assert compiler, "C compiler required"
     work = tmp_path_factory.mktemp("mcc-share-metadata")
-    steam = (SRC / "steam_workshop.c").read_text()
-    parser = '\n'.join(function(steam, name) for name in (
-        "copy_text", "parse", "path_is_plain", "slashes", "neutral_title",
-        "steam_workshop_read_item", "steam_workshop_read_map"))
-    (work / "driver.c").write_text(DRIVER + '\n' + parser)
+    (work / "driver.c").write_text(DRIVER)
     windows = sys.platform == "win32"
     flags = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"] if windows else ["-D_GNU_SOURCE"]
     if os.environ.get("MCC_SHARE_METADATA_SANITIZE"):
@@ -75,7 +95,8 @@ def metadata_tool(tmp_path_factory):
     files = ROOT / "port/windows/src/win32_files.c" if windows else SRC / "posix_files.c"
     sources = [work / "driver.c", SRC / "mcc_share_metadata.c", SRC / "mcc_preview_image.c",
                SRC / "mcc_menu_metadata.c", SRC / "posix_mcc_preview.c", SRC / "mcc_manifest.c",
-               SRC / "server_json.c", ROOT / "port/linux/game/mcc_sha256.c", files, *sorted(ZLIB.glob("*.c"))]
+               SRC / "server_json.c", SRC / "steam_workshop.c",
+               ROOT / "port/linux/game/mcc_sha256.c", files, *sorted(ZLIB.glob("*.c"))]
     result = subprocess.run([compiler, *flags, "-std=gnu11", "-DZ_PREFIX", "-I", str(SRC), "-I", str(ZLIB),
                              *map(str, sources), "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -339,3 +360,52 @@ def test_bounded_json_and_png_mutations(metadata_tool, tmp_path):
             # A mutation may still be valid; the reader must finish without a fault.
             plan(metadata_tool, tmp_path, True)
         target.write_bytes(good)
+
+
+@pytest.mark.parametrize("kind", ["Default", "default", "DEFAULT", "dEfAuLt", None])
+def test_campaign_kind_across_native_metadata_paths(metadata_tool, tmp_path, monkeypatch, kind):
+    # A later mission must not hide the whole campaign due to capitalization.
+    monkeypatch.setenv("HOME", str(tmp_path / "no-home"))
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.delenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", raising=False)
+    root = tmp_path / "steamapps/workshop/content/976730/111"
+    package(root, True)
+    (root / "maps").mkdir()
+    for name in ("first", "second"):
+        (root / "maps" / (name + ".map")).write_bytes(b"catalog fixture, not playable")
+    second = root / "meta/second.json"
+    data = json.loads(second.read_text())
+    if kind is not None:
+        data["CampaignMapKind"] = kind
+    second.write_text(json.dumps(data))
+    original = second.read_bytes()
+    assert run(metadata_tool, "manifest", root, True)[0] == "1 2"
+    assert run(metadata_tool, "menu", root, True) == ["1 2", "first", "second"]
+    assert run(metadata_tool, "scan", tmp_path, True) == ["2", "first", "second"]
+    assert run(metadata_tool, "scan", tmp_path, False) == ["0"]
+    ok, entries = plan(metadata_tool, root, True)
+    assert ok and validate(metadata_tool, root, entries, True)[0] == 1
+    before = run(metadata_tool, "digest", root, True)
+    assert before[0] == "1" and second.read_bytes() == original
+    data["CampaignMapKind"] = "DeFaUlT"
+    second.write_text(json.dumps(data))
+    after = run(metadata_tool, "digest", root, True)
+    assert after[0] == "1" and after[1] != before[1]  # identity still hashes original JSON bytes
+
+
+@pytest.mark.parametrize("kind", ["Hub", "hub", "Flashback", "Cutscene", "", " Default", "Default ",
+                                   "Default/", "defau\u0131t", 0, True, None, [], {}])
+def test_unsupported_campaign_kind_stays_refused(metadata_tool, tmp_path, kind):
+    root = tmp_path / "steamapps/workshop/content/976730/111"
+    package(root, True)
+    (root / "maps").mkdir()
+    second = root / "meta/second.json"
+    data = json.loads(second.read_text()); data["CampaignMapKind"] = kind
+    second.write_text(json.dumps(data))
+    assert run(metadata_tool, "manifest", root, True)[0] == "-1 0"
+    assert run(metadata_tool, "menu", root, True) == ["1 1", "first"]
+    assert plan(metadata_tool, root, True)[0] == 0
+    result = subprocess.run([str(metadata_tool), "scan", str(tmp_path), "1", "first"],
+                            capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0 and result.stdout.splitlines() == ["0"]
+    assert "111" in result.stderr and "Unsupported campaign mission kind" in result.stderr
