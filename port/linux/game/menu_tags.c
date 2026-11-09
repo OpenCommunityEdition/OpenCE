@@ -608,8 +608,12 @@ static long map_tag(long group_tag, char const *name, char const *file, long lin
 {
 	long index = tag_loaded(group_tag, name);
 
-	/* (a game map has few of ui.map's: those are none) */
-	if (index == NONE && !build.game_map)
+	/* (a game map has few of ui.map's: those are none; so are the Xbox's own
+	that a menus' map imported from the Master Chief Collection, Halo PC's,
+	has not got, logged) */
+	if (index == NONE && !build.game_map && mcc_cache_loaded())
+		platform_log("menus: %s:%ld: the menus' map has no tag %s: drawn without it", file, line, name);
+	else if (index == NONE && !build.game_map)
 		problem(file, line, "the map has no tag", name);
 	return index;
 }
@@ -903,8 +907,14 @@ static void *bitmap_build(struct halo_menu_bitmap const *source, long tag_index)
 
 		/* (a frame of the map's: a copy of its bitmap, which the texture cache
 		loads from the map as its own; in a game map that has not got it,
-		nothing) */
-		if (data->map && build.game_map && tag_loaded(BITMAP_GROUP_TAG, data->map) == NONE)
+		nothing. A menus' map imported from the Master Chief Collection is
+		Halo PC's: the frame is the PC version's own, the frame's place in the
+		file, where the file names the Xbox's, and one it has not got (the
+		Xbox's alone) is nothing too.) */
+		boolean halo_pc_map = !build.game_map && mcc_cache_loaded();
+		long map_index = halo_pc_map ? frame : data->index;
+
+		if (data->map && (build.game_map || halo_pc_map) && tag_loaded(BITMAP_GROUP_TAG, data->map) == NONE)
 		{
 			png = BLANK_PNG;
 			width = height = PLACEHOLDER_SIZE;
@@ -917,12 +927,12 @@ static void *bitmap_build(struct halo_menu_bitmap const *source, long tag_index)
 			if (group_index == NONE)
 				return group;
 			group_source = bitmap_group_get(group_index);
-			if (data->index < 0 || data->index >= group_source->bitmaps.count)
+			if (map_index < 0 || map_index >= group_source->bitmaps.count)
 			{
 				problem(source->file, source->line, "the map's bitmap has no such frame:", data->map);
 				return group;
 			}
-			memcpy(bitmap, (struct bitmap_data *)group_source->bitmaps.address + data->index, sizeof(*bitmap));
+			memcpy(bitmap, (struct bitmap_data *)group_source->bitmaps.address + map_index, sizeof(*bitmap));
 			bitmap->cache_block_index = NONE;
 			bitmap->base_address = NULL;
 			/* (scaled to a size of the file's: the texture stays the map's,
