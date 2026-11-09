@@ -26,6 +26,9 @@ footer prompts remain separate from this toggle; Xbox menu selection stays nativ
 Compact pause keys use 85% lettering and four units of side padding, retaining
 their blue, full-height outline. The layout keeps eight units between CANCEL
 and the Enter keycap. Gameplay and ordinary modern keycaps keep their dimensions.
+Confirmation legends with small button slots use the same compact layout even
+under `confirm_buttons` as well as `button_key` and `button_key_sm`. A short
+authored gap is expanded as needed, including Revert and Restart confirmations.
 PC join prompts are centered as complete text-and-glyph lines, and duplicate
 Enter/Esc text is hidden while keyboard menu glyphs are active.
 
