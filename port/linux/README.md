@@ -495,10 +495,22 @@ the setting for one start of the game. It has priority over the file.
 | `display.menu_cursor` | `"large"` | `HALO_MENU_CURSOR` | Windows, Linux and the web: the menus' pointer for the mouse, the game's blue arrow, sized to the window as Halo PC's was: `"small"`, `"medium"`, `"large"` or `"extra_large"` (18, 24, 32 or 40 of the menus' 480 lines tall), or `"off"` for the system's pointer. MENU CURSOR in Settings > Mouse writes its choice here. |
 | `display.show_fps` | `false` | `HALO_SHOW_FPS=1` sets `true` | `true`: the frame rate at the bottom right of a game, counted over half a second and green from 30 frames each second, red below. The game's own counter, which the Xbox version's `display_framerate` console variable showed. Refer to "Frame rate". |
 | `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
-| `display.third_person` | `false` | `HALO_THIRD_PERSON` | Right-shoulder view on foot. Toggle in Settings > Video Setup > FOV And Viewmodels, then select OK; no restart needed. Zoom, vehicles, death and cinematics use their stock cameras. The reticle shows the nominal stock aim point, without predicting spread, gravity or target movement. Camera collision pulls the view in near walls. |
 | `display.fov` | `0.0` | `HALO_FOV` | The first-person view's field of view on foot, in degrees across at 16:9, from 20 to 150. `0`: the stock view. Refer to "Field of view". |
 | `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | The first-person weapon's and hands' field of view, in degrees across at 16:9, from 20 to 150. `0`: the weapon's stock view, also when `display.fov` widens the world. Refer to "Field of view". |
 | `display.viewmodel_visible` | `true` | `HALO_VIEWMODEL_VISIBLE` | `true`: the first-person weapon, hands and what is attached to them are drawn. `false`: they are not; firing, animation, sound and lights go on, and other players' models are drawn. |
+| `display.third_person` | `false` | `HALO_THIRD_PERSON` | Right-shoulder view on foot. Toggle in Settings > Video Setup > FOV And Viewmodels, then select OK; no restart needed. Zoom, vehicles, death and cinematics use their stock cameras. Unscoping restores the shoulder view immediately at its unscoped FOV, subject to camera collision. Free look must be released and pressed again after scoping or another forced camera change. The reticle shows the nominal aim point; it traces the weapon offset and muzzle-to-target path, including nearby cover and the fully charged secondary muzzle. It does not predict spread, gravity, homing or target movement. Camera collision pulls the view in near walls, with gradual recovery. In offline and network games, aimed shoulder shots originate at the world weapon muzzle and converge on the aim point, with checks for cover between eye, firing origin and muzzle. Alternating firing effects select their authored trigger muzzle. Targets behind the barrel never turn shots backwards. This changes close-range shot geometry. Network peers replicate the firing perspective and solve the same muzzle and cover checks. Third person uses the stock FOV; returning to first person restores `display.fov`. |
+| `display.third_person_smooth` | `true` | `HALO_THIRD_PERSON_SMOOTH` | Smooth recovery and shoulder changes, with frame-rate-independent settling and bounded damping for small vertical steps; false selects Sharp. Free-look return finishes in 0.25 seconds in Smooth and immediately in Sharp. Collision-forced first person requires 0.10 seconds of continuous clearance before recovery in either mode. Set Camera Motion in FOV And Viewmodels > Shoulder Camera. Collision remains enabled in either mode. |
+| `display.third_person_left_shoulder` | `false` | `HALO_THIRD_PERSON_LEFT_SHOULDER` | Use the left shoulder. Press B to swap during play, or choose the shoulder in FOV And Viewmodels > Shoulder Camera. |
+| `display.third_person_distance` | `0.85` | `HALO_THIRD_PERSON_DISTANCE` | Distance behind the eye, 0.3�2.0 world units. |
+| `display.third_person_height` | `0.12` | `HALO_THIRD_PERSON_HEIGHT` | Height along camera up, -0.2�0.6 world units. |
+| `display.third_person_offset` | `0.24` | `HALO_THIRD_PERSON_OFFSET` | Lateral distance toward the selected shoulder, 0�0.6 world units. |
+| `controls.swap_shoulder` | `"B"` | `HALO_KEY_SWAP_SHOULDER` | Swap shoulders in third person; remappable in Controls Setup > Camera. |
+| `controls.free_look` | `"Left Alt"` | `HALO_KEY_FREE_LOOK` | Hold to orbit the shoulder camera with mouse or right stick while aim stays fixed. Release to return; follows Camera Motion Smooth/Sharp. Remappable in Controls Setup > Camera. |
+| `controls.toggle_perspective` | `"N"` | `HALO_KEY_TOGGLE_PERSPECTIVE` | Press once to toggle first/third person. Remappable in Controls Setup > Camera. Scoping and collision still force first person. |
+| `network.camera_policy` | `"player_choice"` | `HALO_CAMERA_POLICY` | Host rule for new matches: Create Game > Server Setup > Session Options > CAMERA POLICY offers PLAYER CHOICE, FORCED ON and FORCED OFF. Applies to local matches, LAN/system link, internet multiplayer and co-op, including late joiners. Forced On retains scoping, collision and stock vehicle/death/cinematic overrides. Locked matches block N and show CONTROLLED BY HOST in Video Setup; personal preferences return after leaving. The policy stays fixed during play and carries across rounds and co-op levels. |
+| `controls.camera_height` | `"Left Shift, Right Shift"` | `HALO_KEY_CAMERA_HEIGHT` | Hold either Shift and scroll to adjust camera height during shoulder view; up raises it. |
+| `controls.camera_offset` | `"CapsLock"` | `HALO_KEY_CAMERA_OFFSET` | Hold Caps Lock and scroll to move left or right across either shoulder; up moves right. Uses the physical key, not its typing-toggle state. |
+| `controls.camera_distance` | `"Left Alt"` | `HALO_KEY_CAMERA_DISTANCE` | Hold with the wheel to change `display.third_person_distance` during shoulder view. In first person, scopes, menus, text chat and the console the wheel keeps its existing behavior. |
 | `display.passenger_third_person` | `false` | `HALO_PASSENGER_THIRD_PERSON` | Third-person view for the Warthog's passenger and the Scorpion's four passengers. Uses the gunner's camera on the Warthog and the driver's on the Scorpion, within the passenger's firing arc. Smooth entry and exit; weapon zoom is disabled while riding. The reticle follows the shot's centre ray. Local view only. In the campaign and co-op only: not in multiplayer, where seeing around the vehicle would be an advantage. |
 | `display.viewmodel_shield` | `false` | `HALO_VIEWMODEL_SHIELD` | `true`: the energy shield's flare (its hits, its charging, its fall) is drawn on the first-person arms too, as on the body, with the unit's own shield shader, kept closer to the arms than to the body. The stock game draws it on the body only. |
 | `display.first_person_legs` | `false` | `HALO_FIRST_PERSON_LEGS` | `true`: your own body is drawn from the waist down in first person, so you see your legs when you look down, moving as the body's animation moves them. Refer to "Field of view". |
@@ -1971,3 +1983,19 @@ each of the browser's frames, the cache thread starts at a function of
 `CreateThread`'s type, `debug.txt`'s lines go to the page's log) and the
 declarations given their definitions' types, which WebAssembly needs, are
 listed in "Game source changes" in [../web/README.md](../web/README.md).
+
+## Third-person camera
+
+Settings > Video Setup > FOV And Viewmodels enables the optional shoulder
+camera; Shoulder Camera adjusts smoothing, shoulder, distance, height and
+lateral offset. It defaults to off. Controls Setup > Camera rebinds N (view),
+B (shoulder), held Left Alt (free look), Alt+wheel (distance), Shift+wheel
+(height), and held Caps Lock+wheel (lateral position). Camera controller
+bindings are not added by this feature.
+
+Create Game > Server Setup > Session Options sets Player Choice, Forced On
+or Forced Off and contains the invite link. Host policy never overwrites a
+player's saved preference. All OpenCE map families share network version 42;
+there is no compatibility selector or separate camera admission protocol.
+See [the implementation guide](../../docs/reading/third_person.md) for
+camera priority, cover-aware firing, lifecycle and validation details.

@@ -216,6 +216,7 @@ The game retains the original look and feel as it did on the Xbox by default. Th
 | SHIELD GLOW, GLOW INTENSITY | Energy shields light up what is around them as they flare | Off |
 | SHIELD COLOR | Your own shield in a multiplayer armor color, as your machine draws it | Default |
 | OVERSHIELD | The overshield's own color, rising up the body as it charges | Off |
+| THIRD PERSON | Optional on-foot shoulder camera, with rebindable controls and host policy | Off |
 | PASSENGER THIRD PERSON | Third-person view for Warthog and Scorpion passengers (Campaign-only) | Off |
 
 

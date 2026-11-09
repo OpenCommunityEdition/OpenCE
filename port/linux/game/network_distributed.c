@@ -100,6 +100,7 @@ machine (their datum identifiers need not be).
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include "third_person.h"
 
 /* network_game_globals.c's and network_server_message_handler.c's */
 boolean network_distributed_client_send(void *message, word size);
@@ -420,6 +421,7 @@ the tick after (distributed_relayed_action_write) */
 struct distributed_relayed_action
 {
 	byte player_index;
+	byte shoulder;
 	signed char desired_weapon_index;
 	signed char desired_grenade_index;
 	signed char desired_zoom_level;
@@ -446,8 +448,8 @@ enum
 	DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE = 3,
 	DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE = 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 +
 		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1 + NUMBER_OF_DISTRIBUTED_POSE_VECTORS * 6,
-	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 14,
-	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
+	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 15,
+	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 15 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
 };
 
 struct distributed_pickup
@@ -2991,6 +2993,8 @@ static void distributed_handle_inputs(
 		action = input->action;
 		/* Only the defined input bits are accepted; forced-off wins. */
 		action.control_flags &= 0x1FFFFUL;
+		if (third_person_policy() == _third_person_forced_off)
+			SET_FLAG(action.control_flags, THIRD_PERSON_INPUT_BIT, FALSE);
 		action.throttle.i = PIN(action.throttle.i, -1.0f, 1.0f);
 		action.throttle.j = PIN(action.throttle.j, -1.0f, 1.0f);
 		action.primary_trigger = PIN(action.primary_trigger, 0.0f, 1.0f);
@@ -3084,6 +3088,7 @@ static boolean distributed_relayed_action_from(
 
 	csmemset(relayed, 0, sizeof(*relayed));
 	relayed->player_index = (byte)player_index;
+	relayed->shoulder = TEST_FLAG(action->control_flags, THIRD_PERSON_INPUT_BIT) != 0;
 	relayed->desired_weapon_index = (signed char)action->desired_weapon_index;
 	relayed->desired_grenade_index = (signed char)action->desired_grenade_index;
 	relayed->desired_zoom_level = (signed char)MIN(action->desired_zoom_level, 127);
@@ -3094,6 +3099,7 @@ static boolean distributed_relayed_action_from(
 
 		relayed->control_flags[history] = past ? (unsigned short)past->control_flags : 0;
 		if (history > 0 && (!past || relayed->control_flags[history] != relayed->control_flags[history - 1] ||
+			TEST_FLAG(past->control_flags ^ action->control_flags, THIRD_PERSON_INPUT_BIT) ||
 			past->desired_weapon_index != action->desired_weapon_index ||
 			past->desired_grenade_index != action->desired_grenade_index ||
 			past->desired_zoom_level != action->desired_zoom_level))
@@ -3122,6 +3128,7 @@ static word distributed_relayed_action_write(
 	byte *cursor = buffer + 2;
 	short history;
 
+	cursor = distributed_put(cursor, &relayed->shoulder, sizeof(relayed->shoulder));
 	cursor = distributed_put(cursor, &relayed->desired_weapon_index, sizeof(relayed->desired_weapon_index));
 	cursor = distributed_put(cursor, &relayed->desired_grenade_index, sizeof(relayed->desired_grenade_index));
 	cursor = distributed_put(cursor, &relayed->desired_zoom_level, sizeof(relayed->desired_zoom_level));
@@ -3158,6 +3165,8 @@ static word distributed_relayed_action_read(
 	csmemset(relayed, 0, sizeof(*relayed));
 	if (!distributed_take(&cursor, end, &relayed->player_index, sizeof(relayed->player_index)) ||
 		!distributed_take(&cursor, end, &parts, sizeof(parts)) ||
+		(!distributed_take(&cursor, end, &relayed->shoulder, sizeof(relayed->shoulder)) ||
+			relayed->shoulder > 1) ||
 		!distributed_take(&cursor, end, &relayed->desired_weapon_index, sizeof(relayed->desired_weapon_index)) ||
 		!distributed_take(&cursor, end, &relayed->desired_grenade_index, sizeof(relayed->desired_grenade_index)) ||
 		!distributed_take(&cursor, end, &relayed->desired_zoom_level, sizeof(relayed->desired_zoom_level)) ||
@@ -3429,7 +3438,7 @@ static void distributed_host_send_players(
 			&distributed_host_update_number, sizeof(distributed_host_update_number));
 		for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 		{
-			byte entry[DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE + 1]; /* optional camera byte */
+			byte entry[DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE];
 
 			if (TEST_FLAG(distributed_sends[machine_index][player_index], _distributed_send_action_bit))
 			{
@@ -3477,6 +3486,7 @@ static void distributed_handle_actions(
 		data += size;
 		csmemset(&action, 0, sizeof(action));
 		action.control_flags = relayed.control_flags[0];
+		SET_FLAG(action.control_flags, THIRD_PERSON_INPUT_BIT, relayed.shoulder);
 		action.desired_facing.yaw = distributed_angle_unpack(relayed.yaw, FALSE);
 		action.desired_facing.pitch = distributed_angle_unpack(relayed.pitch, TRUE);
 		action.throttle.i = PIN((real)relayed.throttle_i / 127.0f, -1.0f, 1.0f);

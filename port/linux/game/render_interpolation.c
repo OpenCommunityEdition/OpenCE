@@ -47,6 +47,7 @@ tick, such as a nav marker, is moved as far as the object is drawn from there
 #include "game/players.h"
 #include "render/render_cameras.h"
 #include "units/units.h"
+#include "third_person.h"
 
 /* port/linux/src/port_config.c */
 int config_boolean(const char *name);
@@ -731,7 +732,8 @@ static struct observer_result const *render_interpolation_direct_camera(
 		enabled = config_boolean("display.direct_camera");
 	}
 	if (!enabled || !observer ||
-		director_get_perspective(local_player_index) != _director_perspective_first_person ||
+		(director_get_perspective(local_player_index) != _director_perspective_first_person &&
+		 !third_person_director_active(local_player_index)) ||
 		director_inhibited_facing(local_player_index) ||
 		cinematic_in_progress())
 	{

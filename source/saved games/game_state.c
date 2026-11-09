@@ -125,6 +125,7 @@ symbols in this file:
 #include "memory_pool.h"
 #include "cluster_partitions.h"
 #include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
+#include "third_person.h" /* port: port/linux/game/third_person.c */
 #include "mcc_checkpoint.h" /* port: port/linux/game/mcc_checkpoint.h */
 #include "hs_console_state.h" /* port: port/linux/game/hs_console_state.inl */
 /* port: object_bounds_cache.c's */
@@ -211,6 +212,7 @@ static game_state_after_load_proc after_load_procs[] =
 	sound_stop_all,
 	game_sound_restore,
 	observer_initialize_for_new_map,
+	third_person_reset, /* port: discard camera smoothing and free look on restore */
 	update_queues_reset_and_fill_with_lies,
 	rasterizer_decals_update_function_pointers,
 	recorded_animations_clear_debug_storage,

@@ -445,6 +445,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "third_person.h" /* port: host camera policy */
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
@@ -1384,6 +1385,8 @@ struct network_game_server *network_game_server_create(
 			network_game_invalidate(&server->game);
 			server->game.difficulty = main_get_difficulty();
 			server->game.number_of_games_played = -1;
+			/* port: the host owns camera policy for this session. */
+			server->game.cooperative_flags |= third_person_host_policy() << THIRD_PERSON_POLICY_SHIFT;
 
 			for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
 			{
@@ -5730,3 +5733,16 @@ boolean network_game_server_reset_to_pregame(
 
 /* port: Independent MCC pause-menu round restart. */
 #include "mcc_ui_network.inl" /* port: port/linux/game/mcc_ui_network.inl */
+
+/* port: update the authoritative pregame record, including late joiners. */
+void network_game_server_port_set_camera_policy(short policy)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	if (!server || server->state != _network_game_server_state_pregame ||
+		policy < _third_person_player_choice || policy > _third_person_forced_off)
+		return;
+	server->game.cooperative_flags = (server->game.cooperative_flags & ~THIRD_PERSON_POLICY_MASK) |
+		(policy << THIRD_PERSON_POLICY_SHIFT);
+	if (!network_game_server_send_game_data_pregame(server))
+		network_event("failed to send updated camera policy to clients");
+}

@@ -125,6 +125,7 @@ symbols in this file:
 #include "sound/game_sound.h"
 #include "sound/sound_manager.h"
 #include "units/units.h"
+#include "third_person.h" /* port: port/linux/game/third_person_director.c */
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
 #include "shaders/shader_definitions.h" /* port: (the shield's flare on the arms) */
 #include "shaders/shaders.h"
@@ -635,7 +636,9 @@ short first_person_weapon_get_marker_by_name(
 		short local_player_index= first_person_weapon_index_from_weapon_index(weapon_index);
 
 		if (local_player_index!=NONE &&
-			director_get_perspective(local_player_index)==_director_perspective_first_person)
+			(director_get_perspective(local_player_index)==_director_perspective_first_person ||
+			 /* port: retain live markers and weapon sounds through shoulder transitions. */
+			 third_person_director_active(local_player_index)))
 		{
 			struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
 			struct weapon_definition *weapon_definition= weapon_definition_get(weapon->definition_index);
@@ -672,7 +675,9 @@ void first_person_weapon_render_update(
 		if (first_person_weapon->unit_index!=NONE &&
 			first_person_weapon->weapon_index!=NONE)
 		{
-			boolean visible= director_get_perspective(render.local_player_index)==_director_perspective_first_person &&
+			/* port: keep viewmodel poses ready for collision fallback; view_fov.c hides the draw. */
+			boolean visible= (director_get_perspective(render.local_player_index)==_director_perspective_first_person ||
+				third_person_director_active(render.local_player_index)) &&
 				player_control_get_zoom_level(render.local_player_index)==NONE;
 
 			first_person_weapon_set_visibility(render.local_player_index, visible);
@@ -1903,7 +1908,9 @@ static void first_person_weapon_update(
 		}
 
 		if (sound_definition_index!=NONE &&
-			director_get_perspective(local_player_index)==_director_perspective_first_person)
+			(director_get_perspective(local_player_index)==_director_perspective_first_person ||
+			 /* port: retain live markers and weapon sounds through shoulder transitions. */
+			 third_person_director_active(local_player_index)))
 		{
 			first_person_weapon->current_sound_index= object_impulse_sound_new(
 				first_person_weapon->weapon_index,

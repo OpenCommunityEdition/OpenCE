@@ -84,7 +84,6 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
-#include "third_person.h" /* port: port/linux/game/third_person.c */
 #include "cseries/errors.h"
 #include "cseries/profile.h"
 #include "memory/data.h"
@@ -413,7 +412,7 @@ static boolean object_is_first_person_camera(
 		: player_get(local_player_get_player_index(render.local_player_index))->unit_index;
 
 	/* port: draw the complete local body in the shoulder view. */
-	return (unit_index == object_index && !third_person_active(render.local_player_index) &&
+	return (unit_index == object_index &&
 		director_get_perspective(render.local_player_index) ==
 			_director_perspective_first_person) ||
 		scripted_camera_object_is_first_person_camera(object_index);

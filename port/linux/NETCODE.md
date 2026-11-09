@@ -189,6 +189,16 @@ envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
 102 remain unused. The historical version-41 record is retained as a test fixture,
 not a crossplay promise.
 
+The integrated shoulder-camera feature remains part of version 42. Host
+camera policy occupies bits 3-4 of `cooperative_flags` (Player Choice,
+Forced On, Forced Off; value 3 is rejected). Input bit 16 carries resolved
+shoulder view. The compact action relay includes one validated 0/1 shoulder
+byte, with 15-byte minimum and 21-byte maximum entries. All peers must use
+the integrated format; version 42 alone does not distinguish earlier
+pre-feature testing builds. There is no alternative legacy relay or camera
+capability envelope. Host validation derives muzzle origins from host poses,
+never client-provided camera coordinates.
+
 Every settings transfer sends the complete shared `network_game` record, including
 the two 32-byte MCC digests (zero for Xbox/CE). The reassembler pins its total size,
 checks offsets and the terminated map name, and clears interrupted staging before

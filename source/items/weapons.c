@@ -201,6 +201,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "third_person.h" /* port: port/linux/game/third_person_weapon.c */
 #include "weapons.h"
 
 #include "equipment.h"
@@ -2474,6 +2475,7 @@ static void trigger_create_projectiles(
 		long target_object_index= NONE;
 		long projectile_definition_index;
 		short projectile_count;
+		boolean muzzle_origin = FALSE; /* port: exclude shooter from muzzle repair */
 
 		if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit) &&
 			unit &&
@@ -2547,6 +2549,12 @@ static void trigger_create_projectiles(
 		{
 			origin= markers[marker_index].matrix.position;
 		}
+
+		/* port: shoulder shots leave the world muzzle. Custom
+		   triggers that explicitly choose an origin or forbid aiming keep it. */
+		if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_uses_weapon_origin_bit) &&
+			!TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit))
+			muzzle_origin = third_person_muzzle_shot(weapon_index, owner_object_index, trigger_index, &origin, &forward);
 
 		if (trigger_index==0 && weapon->weapon.alternate_shots_loaded>0)
 		{
@@ -2632,7 +2640,9 @@ static void trigger_create_projectiles(
 						real_point3d camera_position;
 
 						unit_get_camera_position(owner_object_index, &camera_position);
-						object_force_inside_bsp(projectile_object_index, &camera_position);
+						/* port: a validated shoulder shot must not collide with its owner. */
+						object_force_inside_bsp_ignoring(projectile_object_index, &camera_position,
+							muzzle_origin ? owner_object_index : NONE);
 					}
 					if (target_object_index!=NONE)
 					{
