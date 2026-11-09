@@ -63,6 +63,11 @@ static void report(int ok,struct mcc_preview_image *image) {
 int main(int argc,char **argv) {
  struct mcc_preview_image image; unsigned char *data; FILE *file; unsigned length; int ok,w,h;
  if(argc<3) return 2;
+ if(!strcmp(argv[1],"campaign-labels")) {
+  static struct mcc_menu_metadata metadata;
+  if(!mcc_menu_metadata_load(argv[2],1,&metadata))return 4;
+  printf("%d\n",metadata.count);return 0;
+ }
  if(!strcmp(argv[1],"labels")) {
   struct mcc_menu_metadata metadata;const struct steam_workshop_map_text *map;
   if(!mcc_menu_metadata_load(argv[2],0,&metadata))return 4;
@@ -256,3 +261,16 @@ def test_fit(preview_tool,shape,expected):
 def test_bad_fit(preview_tool):
     for values in [(0,1,140,114),(1,0,140,114),(2049,1,140,114),(1,1,0,114),(1,1,140,-1),(1,1,40000,114)]:
         assert run(preview_tool,"fit",*values)[0] == 0
+
+
+@pytest.mark.parametrize("kind,expected", [("Default",1),("default",1),("DEFAULT",1),("dEfAuLt",1),
+    ("Hub",0),("Default ",0),(None,0),(0,0),(True,0),([],0),({},0)])
+def test_campaign_labels_use_supported_kind_case(preview_tool, tmp_path, kind, expected):
+    package(tmp_path, campaign=True)
+    path = tmp_path / "meta/level.json"
+    data = json.loads(path.read_text()); data["CampaignMapKind"] = kind
+    path.write_text(json.dumps(data)); original = path.read_bytes()
+    result = subprocess.run([str(preview_tool), "campaign-labels", str(tmp_path)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == str(expected)
+    assert path.read_bytes() == original

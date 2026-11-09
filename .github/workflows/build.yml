@@ -250,8 +250,10 @@ jobs:
         run: python3 tools/ci_build.py android release
 
       # the touch controls' layout and gyroscope maths (the runner's JDK)
-      - name: Test the touch layout
-        run: python3 tools/test_touch_layout.py
+      - name: Test the touch layout and MCC importer
+        run: |
+          python3 tools/test_touch_layout.py
+          python3 tools/test_mcc_metadata_importer.py
 
       - name: Test the MCC package importer
         run: |

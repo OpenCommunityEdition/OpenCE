@@ -687,3 +687,17 @@ Mission Z9's lighting state and checkpoint compatibility.
 
 Continue with [platforms and testing](platforms_and_testing.md), or return
 to the [guide](README.md).
+
+
+## Campaign mission kinds
+
+`mcc_manifest_default_kind` in [mcc_manifest.c](../../port/linux/src/mcc_manifest.c)
+accepts the supported `Default` mission kind regardless of ASCII capitalization.
+The manifest and menu metadata readers share this rule; Android imports apply
+it too. Missing kinds retain the default, while unsupported names and non-string
+values remain invalid. A rejected campaign now logs its package and reason during
+Workshop discovery instead of disappearing without a diagnostic.
+
+Combat Revolved's credits entry uses `default`. Rejecting that single spelling
+previously hid all eleven missions. Regression fixtures use unrelated package
+names, preserve authored order and original JSON bytes, and retain refusal cases.

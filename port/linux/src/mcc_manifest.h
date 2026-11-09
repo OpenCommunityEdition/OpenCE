@@ -4,6 +4,10 @@
 
 #include "steam_workshop.h"
 
+/* The supported mission kind is an ASCII enum, independent of capitalization.
+ * Callers still reject non-string values and preserve the original JSON bytes. */
+int mcc_manifest_default_kind(const char *kind);
+
 struct mcc_manifest
 {
 	char title[STEAM_WORKSHOP_TITLE_SIZE];

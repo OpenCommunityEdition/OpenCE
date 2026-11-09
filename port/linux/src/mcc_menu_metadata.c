@@ -1,4 +1,5 @@
 #include "mcc_menu_metadata.h"
+#include "mcc_manifest.h"
 #include "posix.h"
 #include "server_json.h"
 #include <stdlib.h>
@@ -58,7 +59,7 @@ int mcc_menu_metadata_load(const char *root, int campaign, struct mcc_menu_metad
             int token, supported; char kind[32];
             if (!server_json_parse(&document,text,length,16)) continue;
             token=server_json_member(&document,0,"CampaignMapKind");
-            supported=token<0 || (server_json_get_string(&document,token,kind,sizeof(kind)) && !strcmp(kind,"Default"));
+            supported=token<0 || (server_json_get_string(&document,token,kind,sizeof(kind)) && mcc_manifest_default_kind(kind));
             server_json_document_free(&document);
             if (!supported) continue;
         }

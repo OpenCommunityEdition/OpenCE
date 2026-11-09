@@ -702,3 +702,38 @@ def test_shared_discovery_checks_other_steam_libraries_and_types_independently(t
     assert Path(run(tool, "translate", "mcc_maps/222/bitmaps.map", **args)[0]["path"]) == package.parent / "222/Maps/bitmaps.map"
     for folder in ("maps", "custom_maps"):
         assert Path(run(tool, "translate", folder + "/sounds.map", **args)[0]["path"]) == data / folder / "sounds.map"
+
+
+@pytest.mark.parametrize("kind", ["Default", "default", "DEFAULT", "dEfAuLt"])
+def test_campaign_kind_case_does_not_hide_other_missions(tool, tmp_path, monkeypatch, kind):
+    root = tmp_path / "steamapps/workshop/content/976730/111"
+    make_campaign(root)
+    path = root / "campaign/a10.json"
+    data = json.loads(path.read_text()); data["CampaignMapKind"] = kind
+    path.write_text(json.dumps(data)); original = path.read_bytes()
+    monkeypatch.setenv("TEST_MCC_CAMPAIGNS", "1")
+    fields, rows = run(tool, "manifest", root)
+    assert fields["result"] == "1" and fields["count"] == "2"
+    assert [row.split("|")[0] for row in rows["mission"]] == ["z10", "a10"]
+    fields, rows = run(tool, "scan", setting=str(tmp_path))
+    assert fields["count"] == "2"
+    assert [row.split("|")[2] for row in rows["map"]] == ["z10", "a10"]
+    assert path.read_bytes() == original
+    monkeypatch.delenv("TEST_MCC_CAMPAIGNS")
+    assert run(tool, "scan", setting=str(tmp_path))[0]["count"] == "0"
+
+
+@pytest.mark.parametrize("kind", ["Hub", "hub", "Flashback", "", " Default", "Default ", "Default/", 0, True, None, [], {}])
+def test_campaign_kind_refusal_is_reported(tool, tmp_path, kind):
+    root = tmp_path / "steamapps/workshop/content/976730/111"
+    make_campaign(root)
+    path = root / "campaign/a10.json"
+    data = json.loads(path.read_text()); data["CampaignMapKind"] = kind
+    path.write_text(json.dumps(data))
+    fields, _ = run(tool, "manifest", root)
+    assert fields["result"] == "-1" and fields["count"] == "0"
+    env = dict(os.environ, TEST_STEAM_SETTING=str(tmp_path), TEST_MCC_CAMPAIGNS="1", HOME=str(tmp_path / "none"),
+               XDG_DATA_HOME="", STEAM_COMPAT_CLIENT_INSTALL_PATH="")
+    result = subprocess.run([str(tool), "scan"], env=env, capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0 and "count=0" in result.stdout
+    assert "111" in result.stderr and "Unsupported campaign mission kind" in result.stderr

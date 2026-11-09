@@ -361,8 +361,10 @@ static void scan_item(const char *item_folder, const char *item_id)
 		!is_directory(maps_folder))
 		return;
 	campaign.count = 0;
-	if (item.has_campaign && config_boolean("game.mcc_campaigns"))
-		mcc_manifest_load(item_folder, &campaign, reason);
+	if (item.has_campaign && config_boolean("game.mcc_campaigns") &&
+		mcc_manifest_load(item_folder, &campaign, reason) < 0)
+		fprintf(stderr, "MCC package '%s' (%s): campaign metadata rejected: %s\n",
+			item.title, item_id, reason);
 	count = item.map_count + campaign.count;
 	for (index = 0; index < count && catalog.count < STEAM_WORKSHOP_MAXIMUM_MAPS; index++)
 	{
