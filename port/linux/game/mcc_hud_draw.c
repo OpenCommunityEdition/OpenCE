@@ -303,11 +303,16 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
         }
     }
     pixel_scale=viewport_scale*mcc_hud_bitmap_scale(bitmap_group_index);
-    /* Icon offsets and extra text advances are font-relative, unlike the
-     * HUD placement anchors. MCC tags retain the native values here. */
-    offset_scale=viewport_scale;
-    point.x=(short)(cursor->x0+icon->offset.x*offset_scale+(menu ? 1.0f : 0.0f));
-    point.y=(short)(cursor->y1-icon->offset.y*offset_scale-(menu ? 2.0f : 0.0f));
+    /* Native gameplay icons use bitmap units for offsets and text advance,
+     * truncating each scaled offset before adding it to the text cursor. */
+    offset_scale=menu ? viewport_scale : pixel_scale;
+    if (menu) {
+        point.x=(short)(cursor->x0+icon->offset.x*offset_scale+1.0f);
+        point.y=(short)(cursor->y1-icon->offset.y*offset_scale-2.0f);
+    } else {
+        point.x=cursor->x0+(short)(icon->offset.x*offset_scale);
+        point.y=cursor->y1-(short)(icon->offset.y*offset_scale);
+    }
     if (menu) {
         /* A map's HUD icon baseline may be custom-authored for its messages.
          * Native pause labels use the selected UI font instead. Align their
@@ -319,7 +324,10 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
     hud_draw_bitmap_direct(bitmap,_hud_anchor_bottom_left,&point,clip,pixel_scale,0.0f,
         icon->flags&2 ? icon->color : color,FALSE);
     advance=icon->width_offset*offset_scale;
-    if (!(icon->flags&4)) advance+=(clip ? clip->x1-clip->x0 : 1.0f)*bitmap->width*pixel_scale;
+    if (!(icon->flags&4)) {
+        real width=(clip ? clip->x1-clip->x0 : 1.0f)*bitmap->width;
+        advance=menu ? advance+width*pixel_scale : (width+icon->width_offset)*pixel_scale;
+    }
     cursor->x0=(short)(point.x+advance);
     return TRUE;
 }
