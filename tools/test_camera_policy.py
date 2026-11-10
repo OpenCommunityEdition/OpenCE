@@ -72,7 +72,7 @@ int main(void){int i,p,saved;struct network_game remote;
  struct pc_menu_setting setting={"display.third_person",0,2,{"false","true"}};
  struct widget_instance spinner={{{0}}};
  CHECK(third_person_host_policy()==0);
- host_setting="forced_on";CHECK(third_person_host_policy()==1);
+ host_setting="forced_on";CHECK(third_person_host_policy()==0);
  host_setting="forced_off";CHECK(third_person_host_policy()==2);
  host_setting="bad";CHECK(third_person_host_policy()==0);
  for(i=0;i<256;i++)CHECK(!!third_person_match_flags_valid(i)==(i<=23));
@@ -89,13 +89,13 @@ int main(void){int i,p,saved;struct network_game remote;
   current=NULL;CHECK(third_person_policy()==0&&third_person_enabled()==preference);
  }
  server_pointer=&host;host.game.cooperative_flags=3;host.state=0;
- third_person_set_match_policy(1);CHECK(host.game.cooperative_flags==11&&sends==1);
- third_person_set_match_policy(2);CHECK(host.game.cooperative_flags==19&&sends==2);
+ third_person_set_match_policy(1);CHECK(host.game.cooperative_flags==3&&sends==0);
+ third_person_set_match_policy(2);CHECK(host.game.cooperative_flags==19&&sends==1);
  third_person_set_match_policy(-1);third_person_set_match_policy(3);
- CHECK(host.game.cooperative_flags==19&&sends==2);
- host.state=1;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==19&&sends==2);
- host.state=0;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==3&&sends==3);
- server_pointer=NULL;third_person_set_match_policy(1);CHECK(sends==3);
+ CHECK(host.game.cooperative_flags==19&&sends==1);
+ host.state=1;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==19&&sends==1);
+ host.state=0;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==3&&sends==2);
+ server_pointer=NULL;third_person_set_match_policy(1);CHECK(sends==2);
  /* A lobby unlock just before OK must not save the forced display value. */
  current=&remote;remote.cooperative_flags=8;preference=0;saved=writes;
  camera_setting_show(&spinner,&setting);CHECK(spinner.parameters.list.selected_index==1&&setting.loaded_index==NONE);
@@ -127,6 +127,62 @@ def test_camera_policy_integration():
         assert "third_person_policy() != _third_person_player_choice" in function(menus, name)
     assert "third_person_input_update();" in (ROOT / "source/main/main.c").read_text()
     assert 'config_write_boolean("display.third_person"' not in (ROOT / "port/linux/src/xinput_sdl.c").read_text()
+
+
+def test_host_camera_selector(tmp_path):
+    from harness import function
+    compiler = shutil.which("clang") or shutil.which("cc")
+    if not compiler:
+        pytest.skip("a C compiler is required")
+    menus = (ROOT / "port/linux/game/menu_functions.c").read_text()
+    actual = function(menus, "session_options_initialize") + function(menus, "session_options_update")
+    source = tmp_path / "selector.c"
+    source.write_text(r'''
+#include <stdio.h>
+#include <string.h>
+typedef int boolean;
+#define TRUE 1
+#define FALSE 0
+#define TEXT_FIELD_LENGTH 256
+#define PIN(v,a,b) ((v)<(a)?(a):(v)>(b)?(b):(v))
+enum {_third_person_player_choice=0,_third_person_forced_off=2,_multiplayer_mode_host_internet=1};
+struct widget_instance {
+ struct {struct {short selected_index;struct widget_instance *extended_description;} list;
+ struct {short string_list_index;} text_box;} parameters;
+ struct widget_instance *focused_child;
+};
+static struct widget_instance spinner,help,invite;
+static struct {int mode;} multiplayer;
+static int policy,writes,locked;
+static char saved[32];
+static struct widget_instance *named(struct widget_instance *w,char const *n,int i){
+ (void)w;(void)i;return !strcmp(n,"camera_policy_spinner")?&spinner:&invite;
+}
+static short third_person_policy(void){return policy;}
+static void third_person_set_match_policy(short p){if(!locked)policy=p;}
+static int config_write(char const *k,char const *v){(void)k;strcpy(saved,v);writes++;return 1;}
+static int config_boolean(char const *k){(void)k;return 0;}
+static int p2p_invite_link(char *s,int n){(void)s;(void)n;return 0;}
+static void text_field_show(struct widget_instance *w,char *s,int b){(void)w;(void)s;(void)b;}
+''' + actual + r'''
+#define CHECK(c) do{if(!(c))return __LINE__;}while(0)
+int main(void){struct widget_instance list={0};list.parameters.list.extended_description=&help;
+ CHECK(session_options_initialize(&list));CHECK(spinner.parameters.list.selected_index==0);
+ spinner.parameters.list.selected_index=1;CHECK(session_options_update(&list));
+ CHECK(policy==2&&writes==1&&!strcmp(saved,"forced_off")&&help.parameters.text_box.string_list_index==1);
+ CHECK(session_options_initialize(&list));CHECK(spinner.parameters.list.selected_index==1);
+ locked=1;spinner.parameters.list.selected_index=0;session_options_update(&list);
+ CHECK(policy==2&&writes==1&&spinner.parameters.list.selected_index==1);
+ locked=0;spinner.parameters.list.selected_index=0;session_options_update(&list);
+ CHECK(policy==0&&writes==2&&!strcmp(saved,"player_choice")&&help.parameters.text_box.string_list_index==0);
+ list.focused_child=&invite;session_options_update(&list);CHECK(help.parameters.text_box.string_list_index==2);
+ return 0;
+}
+''')
+    exe = tmp_path / ("selector.exe" if sys.platform == "win32" else "selector")
+    flags = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else []
+    subprocess.run([compiler, str(source), *flags, "-o", str(exe)], check=True, capture_output=True)
+    subprocess.run([str(exe)], check=True, timeout=10)
 
 def test_host_camera_menu_layout():
     import xml.etree.ElementTree as ET
@@ -167,7 +223,7 @@ def test_host_camera_menu_layout():
             assert 0 <= left < right <= int(spinner.attrib["width"])
             assert 0 <= top < bottom <= int(spinner.attrib["height"])
         assert spinner.find('on[@event="left_mouse"]').attrib["run"] == "mouse spinner 1wide click"
-    assert root.find(f"widget[@name='{sub}camera_policy_spinner']").attrib["strings"] == "PLAYER CHOICE|FORCED ON|FORCED OFF"
+    assert root.find(f"widget[@name='{sub}camera_policy_spinner']").attrib["strings"] == "PLAYER CHOICE|FORCED OFF"
     # Camera help adds three entries before map sharing and publisher help.
     import re
     menus = (ROOT / "port/linux/game/menu_functions.c").read_text()

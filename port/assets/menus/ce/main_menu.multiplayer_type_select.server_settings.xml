@@ -90,7 +90,7 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/camera_policy_label" type="text" controller="1" width="260" height="22" text="CAMERA POLICY:" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/camera_policy_spinner" type="spinner" top="3" width="237" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="PLAYER CHOICE|FORCED ON|FORCED OFF" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 0 19 6" footer_bounds="7 231 19 237">
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/camera_policy_spinner" type="spinner" top="3" width="237" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="PLAYER CHOICE|FORCED OFF" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 0 19 6" footer_bounds="7 231 19 237">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/op_invite" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -112,7 +112,6 @@
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/session_options/help_strings">
 		<string text="Each player chooses first or third person.\nTheir camera toggle remains available."/>
-		<string text="Everyone uses third person on foot. Scoping and\ntight spaces still use first person."/>
 		<string text="Third person is disabled for everyone.\nNormal vehicle and cinematic cameras remain."/>
 		<string text="Players join by this invite link. Enter copies it.\nLAN games use the server browser instead."/>
 	</strings>

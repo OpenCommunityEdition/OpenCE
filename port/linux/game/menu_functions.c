@@ -4235,26 +4235,27 @@ static boolean session_options_initialize(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "camera_policy_spinner", 0);
 	if (!spinner) return FALSE;
-	spinner->parameters.list.selected_index = third_person_policy();
+	spinner->parameters.list.selected_index = third_person_policy() == _third_person_forced_off;
 	return TRUE;
 }
 
 static boolean session_options_update(struct widget_instance *list)
 {
-	static char const *const policies[] = { "player_choice", "forced_on", "forced_off" };
+	static char const *const policies[] = { "player_choice", "forced_off" };
 	struct widget_instance *spinner = named(list, "camera_policy_spinner", 0);
 	struct widget_instance *help = list->parameters.list.extended_description;
 	char text[TEXT_FIELD_LENGTH];
-	short selected;
+	short selected, policy;
 	if (!spinner) return FALSE;
-	selected = (short)PIN(spinner->parameters.list.selected_index, 0, 2);
-	if (selected != third_person_policy())
+	selected = (short)PIN(spinner->parameters.list.selected_index, 0, 1);
+	policy = selected ? _third_person_forced_off : _third_person_player_choice;
+	if (policy != third_person_policy())
 	{
-		third_person_set_match_policy(selected);
-		if (selected == third_person_policy()) config_write("network.camera_policy", policies[selected]);
+		third_person_set_match_policy(policy);
+		if (policy == third_person_policy()) config_write("network.camera_policy", policies[selected]);
 	}
-	spinner->parameters.list.selected_index = third_person_policy();
-	if (help) help->parameters.text_box.string_list_index = third_person_policy();
+	spinner->parameters.list.selected_index = third_person_policy() == _third_person_forced_off;
+	if (help) help->parameters.text_box.string_list_index = spinner->parameters.list.selected_index;
 	if (multiplayer.mode != _multiplayer_mode_host_internet)
 		snprintf(text, sizeof(text), "NONE: A LAN GAME");
 	else if (!config_boolean("network.online"))
@@ -4265,7 +4266,7 @@ static boolean session_options_update(struct widget_instance *list)
 		snprintf(text, sizeof(text), "SELECT TO COPY LINK");
 	text_field_show(named(list, "invite_value", 0), text, FALSE);
 	if (help && list->focused_child == named(list, "op_invite", 0))
-		help->parameters.text_box.string_list_index = 3;
+		help->parameters.text_box.string_list_index = 2;
 	return TRUE;
 }
 

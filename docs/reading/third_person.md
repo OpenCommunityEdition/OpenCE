@@ -9,8 +9,10 @@ physical held state, not its typing toggle. Distance takes precedence over
 height, then lateral offset when modifiers overlap.
 
 Server Setup > Session Options contains camera policy and the invite link.
-Player Choice is the host default. Forced On and Forced Off override the
-rendered choice without overwriting a player's saved preference. Camera
+Player Choice is the host default; Forced Off disables the shoulder camera
+without overwriting a player's saved preference. Old forced_on host settings
+fall back to Player Choice. Version-42 received Forced On policies remain
+supported for compatibility, but hosts cannot select them. Camera
 controller bindings and stencil shadows are outside this feature.
 
 ## Reading order and ownership

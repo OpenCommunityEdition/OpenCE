@@ -20,7 +20,6 @@ boolean third_person_match_flags_valid(unsigned long flags)
 short third_person_host_policy(void)
 {
 	char const *setting = config_string("network.camera_policy");
-	if (setting && !strcmp(setting, "forced_on")) return _third_person_forced_on;
 	if (setting && !strcmp(setting, "forced_off")) return _third_person_forced_off;
 	return _third_person_player_choice;
 }
@@ -47,7 +46,7 @@ void third_person_set_match_policy(short policy)
 	struct network_game *game;
 	/* The server manager's pregame state is zero; keep its record private. */
 	if (!server || network_game_server_get_state(server, NULL) != 0 ||
-		policy < _third_person_player_choice || policy > _third_person_forced_off)
+		(policy != _third_person_player_choice && policy != _third_person_forced_off))
 		return;
 	game = network_game_server_get_game(server);
 	game->cooperative_flags = (game->cooperative_flags & ~THIRD_PERSON_POLICY_MASK) |

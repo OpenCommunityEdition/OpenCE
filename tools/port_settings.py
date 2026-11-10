@@ -1571,7 +1571,7 @@ def _password_screen() -> list:
 def _session_options(base: str, host: str) -> list:
     rows, extra = [], []
     for key, label, values in [
-        ("camera_policy", "CAMERA POLICY:", "PLAYER CHOICE|FORCED ON|FORCED OFF"),
+        ("camera_policy", "CAMERA POLICY:", "PLAYER CHOICE|FORCED OFF"),
     ]:
         extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
             ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
@@ -1592,7 +1592,6 @@ def _session_options(base: str, host: str) -> list:
     rows.append((f"{base}/op_invite", None))
     extra += _strings(f"{base}/help_strings", [
         "Each player chooses first or third person.\\nTheir camera toggle remains available.",
-        "Everyone uses third person on foot. Scoping and\\ntight spaces still use first person.",
         "Third person is disabled for everyone.\\nNormal vehicle and cinematic cameras remain.",
         "Players join by this invite link. Enter copies it.\\nLAN games use the server browser instead.",
     ])
