@@ -1989,3 +1989,6 @@ each of the browser's frames, the cache thread starts at a function of
 `CreateThread`'s type, `debug.txt`'s lines go to the page's log) and the
 declarations given their definitions' types, which WebAssembly needs, are
 listed in "Game source changes" in [../web/README.md](../web/README.md).
+
+The [Doppler audio walkthrough](../../docs/reading/audio_doppler.md) explains
+listener motion, camera-cut resets and pitch limits.

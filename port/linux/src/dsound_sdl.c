@@ -19,7 +19,8 @@ resampling) and applies:
 	  and occlusion levels, their high frequency levels a low pass at the
 	  environment's HF reference: a sound behind a wall is muffled,
 	- for 3D voices, the Doppler shift of the voice's and the listener's
-	  velocities, which moves the resampling step (doppler_ratio).
+	  velocities, which moves the resampling step (doppler_ratio). Positioned
+	  stereo sources also shift when audio.stereo_doppler is enabled.
 3D voices also send to an I3DL2 reverb of the environment the listener is in
 (reverb). Cones are not modelled. A look-ahead limiter keeps the sum under
 full scale (limit). A voice the game cuts off while it plays fades out over
@@ -980,6 +981,12 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	else if (base_step * target_doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)
 		target_doppler = (float)(VOICE_FREQUENCY_MINIMUM / OUTPUT_RATE / base_step);
 	doppler = stream->doppler > 0.0f ? stream->doppler : target_doppler;
+	/* The saved ratio belongs to the previous authored pitch. Bound both
+	ends of the ramp against the current pitch, including after SetFrequency. */
+	if (base_step * doppler * OUTPUT_RATE > VOICE_FREQUENCY_MAXIMUM)
+		doppler = (float)(VOICE_FREQUENCY_MAXIMUM / OUTPUT_RATE / base_step);
+	else if (base_step * doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)
+		doppler = (float)(VOICE_FREQUENCY_MINIMUM / OUTPUT_RATE / base_step);
 	step = base_step * doppler;
 	ramp_step = base_step * (target_doppler - doppler) / (double)frames;
 	/* the low pass narrowed for a voice taking frames faster than the output
@@ -2067,7 +2074,14 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	struct sdl_stream *stream = stream_from_interface(object);
 
 	pthread_mutex_lock(&mixer_lock);
+	if (stream->flushing)
+	{
+		pthread_mutex_unlock(&mixer_lock);
+		return S_OK;
+	}
 	voice_cut(stream);
+	/* Completion callbacks release the lock. Only the captured fade may
+	play then, not the packets still awaiting cancellation. */
 	stream->flushing = TRUE;
 	while (stream->packet_count)
 	{
@@ -2153,15 +2167,21 @@ VOID WINAPI DirectSoundDoWork(void)
 {
 	static unsigned long volume_read_at = (unsigned long)-1;
 
-	/* (audio.volume, audio.reverb, audio.stereo_doppler and audio.resampler
-	read again when the settings change: on the game's thread, not the
-	mixer's, whose lock the config's file I/O would hold) */
+	/* (audio settings read again when the
+	settings change: on the game's thread, not the mixer's, whose lock the
+	config's file I/O would hold) */
 	if (volume_read_at != config_changes())
 	{
 		volume_read_at = config_changes();
 		master_volume = (float)config_real("audio.volume");
 		reverb_enabled = config_boolean("audio.reverb");
-		stereo_doppler_enabled = config_boolean("audio.stereo_doppler");
+		{
+			BOOL enabled = config_boolean("audio.stereo_doppler");
+
+			pthread_mutex_lock(&mixer_lock);
+			stereo_doppler_enabled = enabled;
+			pthread_mutex_unlock(&mixer_lock);
+		}
 		resampler_mode = resampler_mode_read();
 	}
 	streams_complete_finished();
