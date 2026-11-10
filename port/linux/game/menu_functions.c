@@ -5979,6 +5979,15 @@ static boolean password_screen_edit(struct widget_instance *row, boolean *widget
 	return TRUE;
 }
 
+/* indices into port_settings.py's MATCHMAKING_HELP: keep the order */
+enum
+{
+	_matchmaking_help_size,
+	_matchmaking_help_no_ffa = _matchmaking_help_size + NUMBER_OF_P2P_MM_SIZES,
+	_matchmaking_help_playlist,
+	_matchmaking_help_none = _matchmaking_help_playlist + NUMBER_OF_P2P_MM_PLAYLISTS,
+};
+
 static struct
 {
 	unsigned playlists;
@@ -6033,8 +6042,9 @@ static boolean matchmaking_screen_load(struct widget_instance *widget, boolean d
 static void matchmaking_screen_update(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "size_spinner", 0);
+	struct widget_instance *description = list->parameters.list.extended_description;
 	unsigned playlists = 0;
-	short index, shown, size;
+	short index, shown, size, help;
 
 	if (!spinner)
 		return;
@@ -6055,6 +6065,16 @@ static void matchmaking_screen_update(struct widget_instance *list)
 	spinner->alpha_modifier = mm_playlist_has_size(playlists, shown) ? 1.0f : TAB_UNFOCUSED_ALPHA;
 	matchmaking_screen.playlists = playlists;
 	matchmaking_screen.size = size;
+	index = list->focused_child ? sibling_index(list->focused_child) : NONE;
+	if (index == 0)
+		help = (short)(mm_playlist_has_size(playlists, shown) ? _matchmaking_help_size + shown :
+			_matchmaking_help_no_ffa);
+	else if (index > 0 && index <= NUMBER_OF_P2P_MM_PLAYLISTS)
+		help = (short)(_matchmaking_help_playlist + index - 1);
+	else
+		help = _matchmaking_help_none;
+	if (description)
+		description->parameters.text_box.string_list_index = help;
 }
 
 static boolean matchmaking_screen_back(struct widget_instance *widget, boolean *widget_deleted)

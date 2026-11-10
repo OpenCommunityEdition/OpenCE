@@ -2173,9 +2173,18 @@ def _join4(base: str) -> list:
     return lines
 
 
-# in p2p.h's P2P_MM_* order
+# in p2p.h's P2P_MM_* order; MATCHMAKING_HELP in menu_functions.c's _matchmaking_help_* order
 MATCHMAKING_SIZES = ["1V1", "2V2", "3V3", "4V4", "FFA 6"]
 MATCHMAKING_PLAYLISTS = ["SLAYER", "CTF", "KING OF THE HILL", "ODDBALL", "RACE"]
+MATCHMAKING_HELP = [
+    *(f"Players a side. {size} is two teams\\nof {count}. Required."
+      for size, count in zip(MATCHMAKING_SIZES, ["one", "two", "three", "four"])),
+    "Six players, every one for\\nthemselves. Required.",
+    "CTF has no free for all. Set another\\nplaylist to YES for this size.",
+    "Slayer games: the most kills wins.", "Capture the Flag games.", "King of the Hill games.", "Oddball games.",
+    "Race games.",
+    "",
+]
 TITLES[f"{MT}/matchmaking/header_matchmaking"] = "MATCHMAKING"
 
 
@@ -2195,10 +2204,14 @@ def _matchmaking() -> list:
                       f'<child widget="{base}/header_matchmaking"/>',
                       f'<child widget="{base}/options_menu"/>'])
     lines += _header(f"{base}/header_matchmaking", f"{base}/header_matchmaking")
+    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 373), ("top", 357), ("width", 232),
+                                      ("height", 40), ("string_list", f"{base}/help_strings"), ("font", "ui\\small_ui"),
+                                      ("color", "#FFFFFFFF")], [])
     rows = [("size", 104)] + [(f"playlist_{index}", 136 + 23 * index) for index in range(len(MATCHMAKING_PLAYLISTS))]
     lines += _widget(f"{base}/options_menu",
                      [("type", "column_list"), ("width", 640), ("height", 480),
-                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_children")],
+                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                      ("description", f"{base}/help")],
                      ['<data input="port matchmaking update"/>', '<on event="created" run="port matchmaking init"/>',
                       *(f'<child widget="{base}/op_{key}" x="35" y="{y}"/>' for key, y in rows),
                       f'<child widget="{base}/button_bar" y="414"/>'])
@@ -2228,6 +2241,7 @@ def _matchmaking() -> list:
     lines += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port matchmaking defaults"/>',
                                                     '<on event="start" run="port matchmaking defaults"/>'])
     lines += _strings(f"{base}/labels", ["GAME SIZE:", *(f"{name}:" for name in MATCHMAKING_PLAYLISTS)])
+    lines += _strings(f"{base}/help_strings", MATCHMAKING_HELP)
     return lines
 
 

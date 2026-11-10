@@ -14,7 +14,9 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/matchmaking/header_matchmaking" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/matchmaking/header_matchmaking">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/matchmaking/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+	<widget name="main_menu/multiplayer_type_select/matchmaking/help" type="text" controller="1" left="373" top="357" width="232" height="40" string_list="main_menu/multiplayer_type_select/matchmaking/help_strings" font="ui\small_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/multiplayer_type_select/matchmaking/help">
 		<data input="port matchmaking update"/>
 		<on event="created" run="port matchmaking init"/>
 		<child widget="main_menu/multiplayer_type_select/matchmaking/op_size" x="35" y="104"/>
@@ -83,5 +85,19 @@
 		<string text="KING OF THE HILL:"/>
 		<string text="ODDBALL:"/>
 		<string text="RACE:"/>
+	</strings>
+	<strings name="main_menu/multiplayer_type_select/matchmaking/help_strings">
+		<string text="Players a side. 1V1 is two teams\nof one. Required."/>
+		<string text="Players a side. 2V2 is two teams\nof two. Required."/>
+		<string text="Players a side. 3V3 is two teams\nof three. Required."/>
+		<string text="Players a side. 4V4 is two teams\nof four. Required."/>
+		<string text="Six players, every one for\nthemselves. Required."/>
+		<string text="CTF has no free for all. Set another\nplaylist to YES for this size."/>
+		<string text="Slayer games: the most kills wins."/>
+		<string text="Capture the Flag games."/>
+		<string text="King of the Hill games."/>
+		<string text="Oddball games."/>
+		<string text="Race games."/>
+		<string text=""/>
 	</strings>
 </menus>
