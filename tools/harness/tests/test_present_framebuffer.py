@@ -27,7 +27,7 @@ def present_framebuffer(tmp_path_factory):
                        present.index("\t\t/* (the HDR calibration screen")]
     work = tmp_path_factory.mktemp("present-framebuffer")
     (work / "cache.inc").write_text("\n".join(
-        function(renderer, name) for name in ("framebuffer_find", "framebuffer_get")))
+        function(renderer, name) for name in ("device_record_new", "framebuffer_find", "framebuffer_get")))
     (work / "present.inc").write_text(commands)
     executable = work / ("test.exe" if os.name == "nt" else "test")
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if os.name == "nt" else ["-m32"]
