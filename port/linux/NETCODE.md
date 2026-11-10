@@ -329,6 +329,13 @@ game's flags also tell its clients whether the host is a dedicated server
 (`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
 most of the living players).
 
+Then version 42 leaves a second weapon in a multiplayer game to the action
+button, as the Xbox game did (`unit_should_autopick_weapon`,
+`game/players.c`): walking over one with a weapon in hand shows "Hold X to
+pick up", where it was picked up at once (campaign still picks it up). The
+host decides pickups and each client shows its own players' prompts, so a
+build before it would show none in this one's games.
+
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
 sources' messages, kinds, bits, structs sent whole or the sizes of their
