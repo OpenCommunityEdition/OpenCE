@@ -7,6 +7,20 @@ double config_real(char const *name);
 int config_boolean(char const *name);
 int config_write(char const *name, char const *value);
 
+void third_person_input_update(void)
+{
+	static unsigned long previous;
+	unsigned long held = halo_keyboard_actions(0);
+	unsigned long pressed = held & ~previous;
+	previous = held;
+	/* Actions are cleared while menus or the console own keyboard input. */
+	if ((pressed & (1UL << HALO_KEYBOARD_TOGGLE_PERSPECTIVE)) &&
+		third_person_policy() == _third_person_player_choice)
+		config_write("display.third_person", config_boolean("display.third_person") ? "false" : "true");
+	if ((pressed & (1UL << HALO_KEYBOARD_SWAP_SHOULDER)) && third_person_enabled())
+		config_write("display.third_person_left_shoulder", config_boolean("display.third_person_left_shoulder") ? "false" : "true");
+}
+
 int third_person_camera_scroll(float notches, unsigned long actions)
 {
 	char const *setting;

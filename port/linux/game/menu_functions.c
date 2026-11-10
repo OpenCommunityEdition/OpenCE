@@ -1811,7 +1811,7 @@ static boolean setting_default_show(struct widget_instance *spinner, struct pc_m
 	return TRUE;
 }
 
-static boolean camera_setting_show(struct widget_instance *spinner, struct pc_menu_setting *setting)
+static void camera_setting_show(struct widget_instance *spinner, struct pc_menu_setting *setting)
 {
 	if (!strcmp(setting->setting, "display.third_person"))
 	{
@@ -1826,7 +1826,22 @@ static boolean camera_setting_show(struct widget_instance *spinner, struct pc_me
 			spinner->parameters.list.selected_index = setting->loaded_index;
 		}
 	}
-	return TRUE;
+}
+
+static void camera_settings_show(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "third_person_spinner", 0);
+	struct pc_menu_setting *setting;
+	if (!spinner)
+		return;
+	setting = pc_menu_setting_get(spinner->definition_tag_index);
+	if (!setting)
+		return;
+	camera_setting_show(spinner, setting);
+	if (third_person_policy() != _third_person_player_choice &&
+		list->parameters.list.extended_description &&
+		list->focused_child == named(list, "op_third_person", 0))
+		list->parameters.list.extended_description->parameters.text_box.string_list_index = 10;
 }
 
 /* "port settings help": the line of the row chosen (by its label's string:
@@ -4323,13 +4338,7 @@ static void server_settings_update(struct widget_instance *list)
 			NUMBEROF(maximum_players) - 1);
 	wide_to_text(multiplayer.game_name, text, sizeof(text));
 	text_field_show(named(list, "server_name_value", 0), text, text_field_editing(row));
-	if (multiplayer.mode != _multiplayer_mode_host_internet)
-		snprintf(text, sizeof(text), "NONE: A LAN GAME");
-	else if (!config_boolean("network.online"))
-		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
-	else if (!p2p_invite_link(text, sizeof(text)))
-		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
-	text_field_show(named(list, "invite_value", 0), text, FALSE);
+
 	{
 		wchar_t type[ROW_TEXT_LENGTH];
 
@@ -8791,11 +8800,7 @@ void pc_menu_game_data_function_invoke(
 		discord_account_show(widget);
 		hdr_calibration_row_show(widget);
 		settings_help(widget);
-		settings_each(widget, camera_setting_show);
-		if (third_person_policy() != _third_person_player_choice &&
-			widget->parameters.list.extended_description &&
-			widget->focused_child == named(widget, "op_third_person", 0))
-			widget->parameters.list.extended_description->parameters.text_box.string_list_index = 10;
+		camera_settings_show(widget);
 	}
 	else if (!strcmp(name, "port hdr calibration"))
 		hdr_calibration_update(widget);

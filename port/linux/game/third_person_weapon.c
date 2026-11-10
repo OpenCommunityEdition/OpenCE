@@ -122,35 +122,40 @@ static boolean muzzle_position(long weapon_index, long unit_index, short trigger
 static boolean muzzle_aim(long weapon_index, long unit_index, short trigger_index,
 	real_point3d *origin, real_vector3d *forward, real_point3d *target)
 {
-	real_point3d muzzle, eye, obstruction;
+	real_point3d muzzle, eye, obstruction, aim;
 	real_vector3d ray;
 	boolean blocked;
 	struct collision_result collision;
 	if (!muzzle_position(weapon_index, unit_index, trigger_index, &muzzle, &obstruction, &blocked))
 		return FALSE;
 	scale_vector3d(forward, 1000.0f, &ray);
-	point_from_line3d(origin, &ray, 1.0f, target);
+	point_from_line3d(origin, &ray, 1.0f, &aim);
 	if (collision_test_vector(_collision_test_for_projectiles_flags, origin, &ray, unit_index, &collision))
-		*target = collision.point;
+		aim = collision.point;
 	/* The stock offset can start beyond nearby cover. Check the segment
 	   leading to that origin as well, rather than aiming through the wall. */
 	unit_get_camera_position(unit_index, &eye);
 	vector_from_points3d(&eye, origin, &ray);
 	if (magnitude3d(&ray) > 0.001f && collision_test_vector(_collision_test_for_projectiles_flags,
 		&eye, &ray, unit_index, &collision))
-		*target = collision.point;
+		aim = collision.point;
 	if (blocked)
-		*target = obstruction;
-	vector_from_points3d(&muzzle, target, &ray);
+		aim = obstruction;
+	vector_from_points3d(&muzzle, &aim, &ray);
 	/* A target behind the barrel must not turn the shot backwards. Keep
 	   its original direction; the preview traces that same forward path. */
 	if ((blocked || dot_product3d(&ray, forward) > 0.001f) && normalize3d(&ray) > 0.001f)
 		*forward = ray;
 	*origin = muzzle;
-	scale_vector3d(forward, 1000.0f, &ray);
-	point_from_line3d(origin, &ray, 1.0f, target);
-	if (collision_test_vector(_collision_test_for_projectiles_flags, origin, &ray, unit_index, &collision))
-		*target = collision.point;
+	/* The projectile uses only origin and forward. Its simulation does the
+	   next collision test; this extra ray is solely for reticle placement. */
+	if (target)
+	{
+		scale_vector3d(forward, 1000.0f, &ray);
+		point_from_line3d(origin, &ray, 1.0f, target);
+		if (collision_test_vector(_collision_test_for_projectiles_flags, origin, &ray, unit_index, &collision))
+			*target = collision.point;
+	}
 	return TRUE;
 }
 
@@ -158,12 +163,11 @@ boolean third_person_muzzle_shot(long weapon_index, long unit_index, short trigg
 	real_point3d *origin, real_vector3d *forward)
 {
 	short player;
-	real_point3d target;
 	if (game_connection() != _game_connection_local)
 	{
 		if (!muzzle_network_player(unit_index))
 			return FALSE;
-		if (!muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, &target))
+		if (!muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, NULL))
 			return FALSE;
 		if (config_string("debug.network_test")[0])
 			platform_log("network muzzle: player %ld trigger %d origin %.4f %.4f %.4f",
@@ -173,8 +177,31 @@ boolean third_person_muzzle_shot(long weapon_index, long unit_index, short trigg
 	}
 	for (player = 0; player < MAXIMUM_LOCAL_PLAYERS; player++)
 		if (muzzle_player(player, unit_index))
-			return muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, &target);
+			return muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, NULL);
 	return FALSE;
+}
+
+/* Preview and host visibility history use the same held weapon, trigger
+   and authored-origin exclusions. Actual shots retain their supplied trigger. */
+static struct weapon_trigger_definition *muzzle_preview_weapon(struct unit_datum *unit,
+	long unit_index, long *weapon_index, short *trigger_index)
+{
+	struct weapon_datum *weapon;
+	struct weapon_definition *definition;
+	struct weapon_trigger_definition *trigger;
+	*weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
+	if (*weapon_index == NONE)
+		return NULL;
+	weapon = weapon_get(*weapon_index);
+	definition = weapon_definition_get(weapon->definition_index);
+	*trigger_index = muzzle_preview_trigger(weapon, definition);
+	if (definition->weapon.triggers.count <= *trigger_index)
+		return NULL;
+	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, *trigger_index, struct weapon_trigger_definition);
+	if (TEST_FLAG(trigger->flags, _weapon_trigger_uses_weapon_origin_bit) ||
+		TEST_FLAG(trigger->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit))
+		return NULL;
+	return trigger;
 }
 
 /* The host's visibility history needs the same cover-clamped muzzle as
@@ -182,9 +209,6 @@ boolean third_person_muzzle_shot(long weapon_index, long unit_index, short trigg
 boolean third_person_muzzle_history(long unit_index, real_point3d *position)
 {
 	struct unit_datum *unit;
-	struct weapon_datum *weapon;
-	struct weapon_definition *definition;
-	struct weapon_trigger_definition *trigger;
 	long weapon_index;
 	short trigger_index;
 	real_point3d obstruction;
@@ -192,28 +216,16 @@ boolean third_person_muzzle_history(long unit_index, real_point3d *position)
 	if (game_connection() != _game_connection_network_server || !muzzle_network_player(unit_index))
 		return FALSE;
 	unit = unit_get(unit_index);
-	weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
-	if (weapon_index == NONE)
-		return FALSE;
-	weapon = weapon_get(weapon_index);
-	definition = weapon_definition_get(weapon->definition_index);
-	trigger_index = muzzle_preview_trigger(weapon, definition);
-	if (definition->weapon.triggers.count <= trigger_index)
-		return FALSE;
-	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
-	if (TEST_FLAG(trigger->flags, _weapon_trigger_uses_weapon_origin_bit) ||
-		TEST_FLAG(trigger->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit))
+	if (!muzzle_preview_weapon(unit, unit_index, &weapon_index, &trigger_index))
 		return FALSE;
 	return muzzle_position(weapon_index, unit_index, trigger_index, position, &obstruction, &blocked);
 }
 
-void third_person_muzzle_target(short player, real_point3d *target)
+boolean third_person_muzzle_target(short player, real_point3d *target)
 {
 	long unit_index, weapon_index;
 	short trigger_index = 0;
 	struct unit_datum *unit;
-	struct weapon_datum *weapon;
-	struct weapon_definition *definition;
 	struct weapon_trigger_definition *trigger;
 	struct object_marker marker;
 	real_point3d origin;
@@ -221,24 +233,14 @@ void third_person_muzzle_target(short player, real_point3d *target)
 	real velocity;
 	unit_index = player_control_get_unit_index(player);
 	if (!muzzle_player(player, unit_index))
-		return;
+		return FALSE;
 	unit = unit_get(unit_index);
-	weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
-	if (weapon_index == NONE)
-		return;
-	weapon = weapon_get(weapon_index);
-	definition = weapon_definition_get(weapon->definition_index);
-	trigger_index = muzzle_preview_trigger(weapon, definition);
-	if (definition->weapon.triggers.count <= trigger_index)
-		return;
-	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
-	/* Preserve explicit custom firing rules, as the actual shot does. */
-	if (TEST_FLAG(trigger->flags, _weapon_trigger_uses_weapon_origin_bit) ||
-		TEST_FLAG(trigger->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit))
-		return;
+	trigger = muzzle_preview_weapon(unit, unit_index, &weapon_index, &trigger_index);
+	if (!trigger)
+		return FALSE;
 	if (!object_get_marker_by_name(weapon_index,
 		trigger_index ? "secondary trigger" : "primary trigger", &marker, 1))
-		return;
+		return FALSE;
 	origin = marker.matrix.position;
 	forward = unit->unit.aiming_vector;
 	unit_adjust_projectile_ray(unit_index, &origin, &forward, &velocity,
@@ -251,5 +253,5 @@ void third_person_muzzle_target(short player, real_point3d *target)
 	point_from_line3d(&origin, &forward, trigger->first_person_weapon_offset.x, &origin);
 	point_from_line3d(&origin, &right, trigger->first_person_weapon_offset.y, &origin);
 	point_from_line3d(&origin, &up, trigger->first_person_weapon_offset.z, &origin);
-	muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target);
+	return muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target);
 }

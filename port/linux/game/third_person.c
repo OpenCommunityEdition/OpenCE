@@ -59,16 +59,26 @@ static real camera_setting(char const *name, double low, double high, real fallb
 	return value >= low && value <= high ? (real)value : fallback;
 }
 
+static void reset_look(struct shoulder_camera_state *state, short local_player_index)
+{
+	state->looking = FALSE;
+	state->look_requires_release = (halo_keyboard_actions(local_player_index) & (1UL << HALO_KEYBOARD_FREE_LOOK)) != 0;
+	state->return_time = 0.0f;
+	state->look_yaw = state->look_pitch = 0.0f;
+}
+
+static boolean camera_orbiting(struct shoulder_camera_state const *state)
+{
+	return state->looking || state->look_yaw != 0.0f || state->look_pitch != 0.0f;
+}
+
 void third_person_reset(void)
 {
 	short index;
 	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
 	{
 		cameras[index].initialized = FALSE;
-		cameras[index].looking = FALSE;
-		cameras[index].look_requires_release = (halo_keyboard_actions(index) & (1UL << HALO_KEYBOARD_FREE_LOOK)) != 0;
-		cameras[index].return_time = 0.0f;
-		cameras[index].look_yaw = cameras[index].look_pitch = 0.0f;
+		reset_look(&cameras[index], index);
 		active[index] = FALSE;
 	}
 }
@@ -81,15 +91,13 @@ boolean third_person_active(short local_player_index)
 		active[local_player_index];
 }
 
-boolean third_person_available(short local_player_index)
+static void camera_settings_update(void)
 {
 	static unsigned long read_at = (unsigned long)-1;
-	long unit_index;
-	struct unit_datum *unit;
-
-	if (read_at != config_changes())
+	unsigned long changes = config_changes();
+	if (read_at != changes)
 	{
-		read_at = config_changes();
+		read_at = changes;
 		smooth_camera = config_boolean("display.third_person_smooth") != 0;
 		requested_distance = camera_setting("display.third_person_distance", 0.3, 2.0, 0.85f);
 		requested_height = camera_setting("display.third_person_height", -0.2, 0.6, 0.12f);
@@ -97,6 +105,13 @@ boolean third_person_available(short local_player_index)
 		if (config_boolean("display.third_person_left_shoulder"))
 			requested_side = -requested_side;
 	}
+}
+
+boolean third_person_available(short local_player_index)
+{
+	long unit_index;
+	struct unit_datum *unit;
+
 	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
 		!third_person_enabled() || cinematic_in_progress() || *director_camera_scripted ||
 		director_inhibited_facing(local_player_index))
@@ -131,10 +146,7 @@ boolean third_person_free_look_input(short local_player_index, real yaw, real pi
 	if (!third_person_wanted(local_player_index) || !state->initialized ||
 		state->unit_index != player_control_get_unit_index(local_player_index))
 	{
-		state->looking = FALSE;
-		state->look_requires_release = held;
-		state->return_time = 0.0f;
-		state->look_yaw = state->look_pitch = 0.0f;
+		reset_look(state, local_player_index);
 		return FALSE;
 	}
 	if (!held)
@@ -151,105 +163,38 @@ boolean third_person_free_look_input(short local_player_index, real yaw, real pi
 	return TRUE;
 }
 
-void third_person_camera(short local_player_index, struct render_camera *camera)
+static void camera_target_update(short local_player_index, long unit_index)
 {
-	long unit_index;
 	struct unit_datum *unit;
-	real_vector3d right, offset, ray, saved_forward, saved_up;
-	real_euler_angles2d look_angles;
 	real_point3d origin;
+	real_vector3d ray;
 	struct collision_result collision;
-	real fraction, length;
-	real hard_fraction, blend, dt, wanted_boom, vertical_step, remaining;
-	boolean was_active;
-	struct shoulder_camera_state *state;
-	unsigned long flags;
 
-	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+	/* Orbit and its return hide the reticle, so neither target ray is used. */
+	if (camera_orbiting(&cameras[local_player_index]) ||
+		third_person_muzzle_target(local_player_index, &targets[local_player_index]))
 		return;
-	was_active = active[local_player_index];
-	active[local_player_index] = FALSE;
-	state = &cameras[local_player_index];
-	if (!camera || !third_person_wanted(local_player_index))
-	{
-		state->initialized = FALSE;
-		state->look_requires_release = (halo_keyboard_actions(local_player_index) & (1UL << HALO_KEYBOARD_FREE_LOOK)) != 0;
-		state->return_time = 0.0f;
-		state->looking = FALSE;
-		state->look_yaw = state->look_pitch = 0.0f;
-		return;
-	}
-	unit_index = player_control_get_unit_index(local_player_index);
 	unit = unit_get(unit_index);
-	dt = PIN(main_get_seconds_elapsed(), 0.0f, 0.1f);
+	/* Project the stock firing line, not a ray from the displaced camera.
+	   This indicates the nominal aim point; spread and projectile gravity
+	   remain the weapon's own, just as in first person. */
+	unit_get_camera_position(unit_index, &origin);
+	scale_vector3d(&unit->unit.aiming_vector, 1000.0f, &ray);
+	point_from_line3d(&origin, &ray, 1.0f, &targets[local_player_index]);
+	if (collision_test_vector(_collision_test_for_projectiles_flags, &origin, &ray,
+		unit_index, &collision))
+		targets[local_player_index] = collision.point;
+}
 
-	vector_from_points3d(&state->eye, &camera->position, &offset);
-	if (!state->initialized || state->unit_index != unit_index || magnitude3d(&offset) > 2.0f)
-	{
-		state->looking = FALSE;
-		/* A respawn or teleport must not restart a held orbit key. */
-		state->look_requires_release = (halo_keyboard_actions(local_player_index) & (1UL << HALO_KEYBOARD_FREE_LOOK)) != 0;
-		state->look_yaw = state->look_pitch = 0.0f;
-		state->distance = requested_distance;
-		state->height = requested_height;
-		state->side = requested_side;
-		state->boom = 0.0f;
-		state->vertical_lag = 0.0f;
-		state->eye = camera->position;
-		state->collision_blocked = FALSE;
-		state->clear_time = state->recovery_delay = state->return_time = 0.0f;
-		state->unit_index = unit_index;
-		state->initialized = TRUE;
-		was_active = FALSE;
-	}
-	vertical_step = camera->position.z - state->eye.z;
-	/* Dampen small stair/slope changes only. Keep the real eye as the
-	   collision pivot; the bounded lag is part of the swept camera offset. */
-	if (smooth_camera && vertical_step > -0.2f && vertical_step < 0.2f)
-		state->vertical_lag = PIN((state->vertical_lag - vertical_step) *
-			(1.0f - camera_blend(dt, 0.08f)), -0.06f, 0.06f);
-	else
-		state->vertical_lag = 0.0f;
-	state->eye = camera->position;
-	/* Input releases immediately even if gameplay is paused by a menu. */
-	if (!(halo_keyboard_actions(local_player_index) & (1UL << HALO_KEYBOARD_FREE_LOOK)))
-	{
-		state->look_requires_release = FALSE;
-		release_look(state);
-	}
-	if (!state->looking)
-	{
-		state->return_time = smooth_camera ? MAX(0.0f, state->return_time - dt) : 0.0f;
-		if (state->return_time < 0.000001f)
-			state->return_time = 0.0f;
-		remaining = state->return_time / 0.25f;
-		blend = remaining * remaining * (3.0f - 2.0f * remaining);
-		state->look_yaw = state->return_yaw * blend;
-		state->look_pitch = state->return_pitch * blend;
-	}
-
-	saved_forward = camera->forward;
-	saved_up = camera->up;
-	if (state->looking || state->look_yaw != 0.0f || state->look_pitch != 0.0f)
-	{
-		euler_angles2d_from_vector3d(&look_angles, &camera->forward);
-		/* Retain steep gameplay aim on release; an 80-degree orbit limit
-		   must not leave a permanent pitch offset when aiming higher. */
-		if (state->looking)
-			state->look_pitch = PIN(state->look_pitch,
-				MIN(-DEGREES_TO_RADIANS(80.0f), look_angles.pitch) - look_angles.pitch,
-				MAX(DEGREES_TO_RADIANS(80.0f), look_angles.pitch) - look_angles.pitch);
-		look_angles.yaw += state->look_yaw;
-		look_angles.pitch = PIN(look_angles.pitch + state->look_pitch,
-			MIN(-DEGREES_TO_RADIANS(80.0f), look_angles.pitch),
-			MAX(DEGREES_TO_RADIANS(80.0f), look_angles.pitch));
-		vector3d_from_euler_angles2d(&camera->forward, &look_angles);
-		observer_up_from_forward(&camera->forward, &camera->up);
-	}
-	blend = camera_blend(dt, 0.12f);
-	state->distance += (requested_distance - state->distance) * blend;
-	state->height += (requested_height - state->height) * blend;
-	state->side += (requested_side - state->side) * blend;
+/* Sweep the whole boom and resolve recovery before moving the render eye.
+   FALSE leaves position unchanged so the caller can restore first-person aim. */
+static boolean camera_collision(struct shoulder_camera_state *state, long unit_index,
+	struct render_camera *camera, real dt, boolean was_active)
+{
+	real_vector3d right, offset;
+	struct collision_result collision;
+	real fraction, length, hard_fraction, blend, wanted_boom;
+	unsigned long flags;
 	/* Halo world units are about three metres. Sweep the whole diagonal
 	   from the eye so the shoulder cannot pass through a corner. */
 	cross_product3d(&camera->forward, &camera->up, &right);
@@ -307,13 +252,109 @@ void third_person_camera(short local_player_index, struct render_camera *camera)
 	if (state->collision_blocked)
 	{
 		state->boom = 0.0f;
+		return FALSE;
+	}
+	state->boom = MAX(state->boom, MIN(0.14f, hard_fraction * length));
+	point_from_line3d(&camera->position, &offset, state->boom / length, &camera->position);
+	return TRUE;
+}
+
+void third_person_camera(short local_player_index, struct render_camera *camera)
+{
+	long unit_index;
+	real_vector3d offset, saved_forward, saved_up;
+	real_euler_angles2d look_angles;
+	real blend, dt, vertical_step, remaining;
+	boolean was_active;
+	struct shoulder_camera_state *state;
+
+	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+		return;
+	was_active = active[local_player_index];
+	active[local_player_index] = FALSE;
+	state = &cameras[local_player_index];
+	if (!camera || !third_person_wanted(local_player_index))
+	{
+		state->initialized = FALSE;
+		reset_look(state, local_player_index);
+		return;
+	}
+	unit_index = player_control_get_unit_index(local_player_index);
+	camera_settings_update();
+	dt = PIN(main_get_seconds_elapsed(), 0.0f, 0.1f);
+
+	vector_from_points3d(&state->eye, &camera->position, &offset);
+	if (!state->initialized || state->unit_index != unit_index || magnitude3d(&offset) > 2.0f)
+	{
+		/* A respawn or teleport must not restart a held orbit key. */
+		reset_look(state, local_player_index);
+		state->distance = requested_distance;
+		state->height = requested_height;
+		state->side = requested_side;
+		state->boom = 0.0f;
+		state->vertical_lag = 0.0f;
+		state->eye = camera->position;
+		state->collision_blocked = FALSE;
+		state->clear_time = state->recovery_delay = state->return_time = 0.0f;
+		state->unit_index = unit_index;
+		state->initialized = TRUE;
+		was_active = FALSE;
+	}
+	vertical_step = camera->position.z - state->eye.z;
+	/* Dampen small stair/slope changes only. Keep the real eye as the
+	   collision pivot; the bounded lag is part of the swept camera offset. */
+	if (smooth_camera && vertical_step > -0.2f && vertical_step < 0.2f)
+		state->vertical_lag = PIN((state->vertical_lag - vertical_step) *
+			(1.0f - camera_blend(dt, 0.08f)), -0.06f, 0.06f);
+	else
+		state->vertical_lag = 0.0f;
+	state->eye = camera->position;
+	/* Input releases immediately even if gameplay is paused by a menu. */
+	if (!(halo_keyboard_actions(local_player_index) & (1UL << HALO_KEYBOARD_FREE_LOOK)))
+	{
+		state->look_requires_release = FALSE;
+		release_look(state);
+	}
+	if (!state->looking)
+	{
+		state->return_time = smooth_camera ? MAX(0.0f, state->return_time - dt) : 0.0f;
+		if (state->return_time < 0.000001f)
+			state->return_time = 0.0f;
+		remaining = state->return_time / 0.25f;
+		blend = remaining * remaining * (3.0f - 2.0f * remaining);
+		state->look_yaw = state->return_yaw * blend;
+		state->look_pitch = state->return_pitch * blend;
+	}
+
+	saved_forward = camera->forward;
+	saved_up = camera->up;
+	if (camera_orbiting(state))
+	{
+		euler_angles2d_from_vector3d(&look_angles, &camera->forward);
+		/* Retain steep gameplay aim on release; an 80-degree orbit limit
+		   must not leave a permanent pitch offset when aiming higher. */
+		if (state->looking)
+			state->look_pitch = PIN(state->look_pitch,
+				MIN(-DEGREES_TO_RADIANS(80.0f), look_angles.pitch) - look_angles.pitch,
+				MAX(DEGREES_TO_RADIANS(80.0f), look_angles.pitch) - look_angles.pitch);
+		look_angles.yaw += state->look_yaw;
+		look_angles.pitch = PIN(look_angles.pitch + state->look_pitch,
+			MIN(-DEGREES_TO_RADIANS(80.0f), look_angles.pitch),
+			MAX(DEGREES_TO_RADIANS(80.0f), look_angles.pitch));
+		vector3d_from_euler_angles2d(&camera->forward, &look_angles);
+		observer_up_from_forward(&camera->forward, &camera->up);
+	}
+	blend = camera_blend(dt, 0.12f);
+	state->distance += (requested_distance - state->distance) * blend;
+	state->height += (requested_height - state->height) * blend;
+	state->side += (requested_side - state->side) * blend;
+	if (!camera_collision(state, unit_index, camera, dt, was_active))
+	{
 		/* Collision fallback must retain the player's first-person aim. */
 		camera->forward = saved_forward;
 		camera->up = saved_up;
 		return;
 	}
-	state->boom = MAX(state->boom, MIN(0.14f, hard_fraction * length));
-	point_from_line3d(&camera->position, &offset, state->boom / length, &camera->position);
 	active[local_player_index] = TRUE;
 	/* Use the current unscoped target FOV, not the observer's remaining
 	   zoom interpolation. Collision fallback retains the stock camera. */
@@ -321,16 +362,7 @@ void third_person_camera(short local_player_index, struct render_camera *camera)
 		0.75f * render_camera_get_adjusted_field_of_view_tangent(
 			player_control_get_field_of_view(local_player_index)), 1.0f);
 
-	/* Project the stock firing line, not a ray from the displaced camera.
-	   This indicates the nominal aim point; spread and projectile gravity
-	   remain the weapon's own, just as in first person. */
-	unit_get_camera_position(unit_index, &origin);
-	scale_vector3d(&unit->unit.aiming_vector, 1000.0f, &ray);
-	point_from_line3d(&origin, &ray, 1.0f, &targets[local_player_index]);
-	if (collision_test_vector(_collision_test_for_projectiles_flags, &origin, &ray,
-		unit_index, &collision))
-		targets[local_player_index] = collision.point;
-	third_person_muzzle_target(local_player_index, &targets[local_player_index]);
+	camera_target_update(local_player_index, unit_index);
 }
 
 boolean third_person_reticle(point2d *point, real reticle_scale)
@@ -340,9 +372,7 @@ boolean third_person_reticle(point2d *point, real reticle_scale)
 
 	if (!third_person_active(render.local_player_index))
 		return TRUE;
-	if (cameras[render.local_player_index].looking ||
-		cameras[render.local_player_index].look_yaw != 0.0f ||
-		cameras[render.local_player_index].look_pitch != 0.0f)
+	if (camera_orbiting(&cameras[render.local_player_index]))
 		return FALSE;
 	if (!render_camera_world_to_screen(&render.camera, &render.frustum,
 		&targets[render.local_player_index], &screen))

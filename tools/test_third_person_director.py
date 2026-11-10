@@ -151,7 +151,7 @@ static void bindings_read(void){}
 static void pthread_mutex_lock(int *m){(void)m;}
 static void pthread_mutex_unlock(int *m){(void)m;}
 """
-    code += re.sub(r"^#include[^\n]*", "", feature, flags=re.M)
+    code += function(feature, "third_person_camera_scroll")
     for name in ['input_held', 'keyboard_bound_actions', 'camera_scroll_capture']:
         code += function(platform, name)
     code += r"""

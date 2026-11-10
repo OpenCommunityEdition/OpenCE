@@ -158,7 +158,10 @@ static int *director_camera_scripted=&scripted;
 static real wall=1, prop=1, soft_wall=1;
 static int smooth=1;
 static real_point3d eye={0,0,0};
-static void third_person_muzzle_target(short p,real_point3d *t){(void)p;(void)t;}
+static int muzzle_preview_succeeds, preview_calls, target_traces;
+static boolean third_person_muzzle_target(short p,real_point3d *t){
+ (void)p;preview_calls++;if(muzzle_preview_succeeds)*t=(real_point3d){10,0,0};return muzzle_preview_succeeds;
+}
 static int on_screen=1,left_shoulder;
 static double setting_distance=.85,setting_height=.12,setting_offset=.24;
 static real frame_dt=1.0f/60;
@@ -196,7 +199,7 @@ static int collision_test_pill_new(unsigned long f,real_point3d const *p,real_ve
  (void)f;(void)p;(void)v;(void)i;c->t=r>.08f?MIN(wall,soft_wall):wall;return c->t<1;
 }
 static int collision_test_vector(unsigned long f,real_point3d const *p,real_vector3d const *v,long i,struct collision_result *c){
- (void)i;c->t=f==1024?.01f:prop;point_from_line3d(p,v,c->t,&c->point);return c->t<1;
+ (void)i;if(f==1024)target_traces++;c->t=f==1024?.01f:prop;point_from_line3d(p,v,c->t,&c->point);return c->t<1;
 }
 static int render_camera_world_to_screen(struct render_camera const *c,int const *f,real_point3d const *p,real_point2d *s){
  (void)c;(void)f;s->x=350+p->y;s->y=260;return on_screen && p->x==10;
@@ -383,6 +386,18 @@ int main(void){
   second_zoom=NONE;second_body.object.damage_flags=0;second_body.object.parent_object_index=NONE;
   c=settle(1);CHECK(third_person_active(1));
  }
+ /* A valid muzzle preview replaces the eye trace; orbit hides the target entirely. */
+ held=0;smooth=0;changes++;c=settle(0);muzzle_preview_succeeds=1;
+ target_traces=preview_calls=0;c=fresh();third_person_camera(0,&c);
+ CHECK(preview_calls==1&&target_traces==0);
+ held=1UL<<HALO_KEYBOARD_FREE_LOOK;CHECK(third_person_free_look_input(0,1,0));
+ target_traces=preview_calls=0;c=fresh();third_person_camera(0,&c);
+ CHECK(preview_calls==0&&target_traces==0);
+ held=0;CHECK(!third_person_free_look_input(0,0,0));
+ target_traces=preview_calls=0;c=fresh();third_person_camera(0,&c);
+ CHECK(preview_calls==1&&target_traces==0);
+ muzzle_preview_succeeds=0;target_traces=preview_calls=0;c=fresh();third_person_camera(0,&c);
+ CHECK(preview_calls==1&&target_traces==1);
  held=0;third_person_reset();CHECK(!third_person_active(0)&&!third_person_active(1));
  enabled=0;changes++;c=fresh();third_person_camera(1,&c);CHECK(!third_person_active(1));
  return 0;
@@ -541,7 +556,7 @@ struct collision_result {real t;real_point3d point;};
 static struct unit_datum unit={{NONE,0},{0,{1,0,0}},0};
 static int connection,active=1,zoom=NONE,has_marker=1,blocked;
 static real target_distance=10, muzzle_side;
-static int scene;
+static int scene, trace_calls;
 static real_point3d last_long_origin;
 static int marker_trigger;
 static short game_connection(void){return connection;}
@@ -561,7 +576,7 @@ static real normalize3d(real_vector3d *v){real l=magnitude3d(v);if(l){v->i/=l;v-
 static void scale_vector3d(real_vector3d const *v,real s,real_vector3d *o){*o=(real_vector3d){v->i*s,v->j*s,v->k*s};}
 static void point_from_line3d(real_point3d const *p,real_vector3d const *v,real t,real_point3d *o){*o=(real_point3d){p->x+v->i*t,p->y+v->j*t,p->z+v->k*t};}
 static int collision_test_vector(unsigned long f,real_point3d const *p,real_vector3d const *v,long u,struct collision_result *c){
- (void)f;(void)u;
+ (void)f;(void)u;trace_calls++;
  if(scene && v->i>0){
   real plane=scene==2?.5f:1.5f;
   real t=(plane-p->x)/v->i;
@@ -580,6 +595,7 @@ static int collision_test_vector(unsigned long f,real_point3d const *p,real_vect
 int main(void){
  real_point3d origin={0,0,0},target={10,0,0};real_vector3d forward={1,0,0};
  third_person_muzzle_shot(2,1,0,&origin,&forward);
+ CHECK(trace_calls==2); /* No reticle-only trace for a simulated shot. */
  CHECK(origin.x==1&&origin.z==-.2f&&forward.k>0);
  CHECK(fabsf(origin.z+forward.k*(9/forward.i))<.0001f);
  connection=1;origin=(real_point3d){0,0,0};forward=(real_vector3d){1,0,0};
@@ -654,6 +670,24 @@ int main(void){
  strcpy(effect_marker,"primary trigger1");
  CHECK(third_person_muzzle_history(1,&target));CHECK(target.z==-.3f);
  blocked=1;CHECK(third_person_muzzle_history(1,&target));CHECK(target.x>.48f&&target.x<.5f);
+ /* Omitting the reticle query must not change a simulated origin or direction. */
+ {
+  int geometry,side,barrel,shot_traces;
+  real_point3d shot_origin,preview_origin;
+  real_vector3d shot_forward,preview_forward;
+  blocked=0;trigger_defs[0].firing_effects.count=0;
+  for(geometry=0;geometry<3;geometry++)for(side=-1;side<=1;side++)for(barrel=0;barrel<2;barrel++){
+   scene=geometry;muzzle_side=side*.25f;
+   shot_origin=preview_origin=(real_point3d){1,0,0};
+   shot_forward=preview_forward=(real_vector3d){1,0,0};
+   trace_calls=0;CHECK(muzzle_aim(2,1,barrel,&shot_origin,&shot_forward,NULL));shot_traces=trace_calls;
+   trace_calls=0;CHECK(muzzle_aim(2,1,barrel,&preview_origin,&preview_forward,&target));
+   CHECK(trace_calls==shot_traces+1);
+   CHECK(memcmp(&shot_origin,&preview_origin,sizeof(shot_origin))==0);
+   CHECK(memcmp(&shot_forward,&preview_forward,sizeof(shot_forward))==0);
+  }
+ }
+
  return 0;
 }
 '''

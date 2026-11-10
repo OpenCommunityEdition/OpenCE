@@ -1,13 +1,11 @@
 /* Match camera rules never overwrite a player's saved camera preference. */
 #include "cseries.h"
 #include "third_person.h"
-#include "halo_keyboard.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 
 char const *config_string(char const *name);
 int config_boolean(char const *name);
-int config_write(char const *name, char const *value);
 
 boolean third_person_match_flags_valid(unsigned long flags)
 {
@@ -37,18 +35,4 @@ boolean third_person_enabled(void)
 	short policy = third_person_policy();
 	return policy == _third_person_forced_on ||
 		(policy == _third_person_player_choice && config_boolean("display.third_person"));
-}
-
-void third_person_input_update(void)
-{
-	static unsigned long previous;
-	unsigned long held = halo_keyboard_actions(0);
-	unsigned long pressed = held & ~previous;
-	previous = held;
-	/* Actions are cleared while menus or the console own keyboard input. */
-	if ((pressed & (1UL << HALO_KEYBOARD_TOGGLE_PERSPECTIVE)) &&
-		third_person_policy() == _third_person_player_choice)
-		config_write("display.third_person", config_boolean("display.third_person") ? "false" : "true");
-	if ((pressed & (1UL << HALO_KEYBOARD_SWAP_SHOULDER)) && third_person_enabled())
-		config_write("display.third_person_left_shoulder", config_boolean("display.third_person_left_shoulder") ? "false" : "true");
 }

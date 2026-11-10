@@ -18,6 +18,7 @@ def test_camera_policy(tmp_path, fault):
     enums = re.search(r"enum third_person_match_policy\s*\{.*?\};", header, re.S).group(0)
     defines = "\n".join(re.findall(r"^#define THIRD_PERSON_POLICY_.*", header, re.M))
     policy = re.sub(r"^#include[^\n]*", "", (ROOT / "port/linux/game/third_person_policy.c").read_text(), flags=re.M)
+    policy += function((ROOT / "port/linux/game/third_person_input.c").read_text(), "third_person_input_update")
     setter = function((ROOT / "source/networking/network_server_manager.c").read_text(), "network_game_server_port_set_camera_policy")
     menus = (ROOT / "port/linux/game/menu_functions.c").read_text()
     menu_functions = function(menus, "camera_setting_show") + function(menus, "setting_changed_save")

@@ -17,7 +17,8 @@ controller bindings and stencil shadows are outside this feature.
 
 1. [third_person_policy.c](../../port/linux/game/third_person_policy.c)
    combines the authoritative game policy with the personal preference.
-   `third_person_input_update` consumes binding-aware keyboard actions.
+   [third_person_input.c](../../port/linux/game/third_person_input.c) owns
+   `third_person_input_update`, its keyboard edge state, and wheel adjustments.
 2. [director.c](../../source/camera/director.c)'s
    `director_choose_game_perspective` selects the feature callback only for
    eligible on-foot views. Seats, MCC weapon-authored following cameras,
@@ -30,13 +31,17 @@ controller bindings and stencil shadows are outside this feature.
 4. [third_person.c](../../port/linux/game/third_person.c)'s
    `third_person_camera` resolves collision, smoothing and free look after
    interpolation. [main.c](../../source/main/main.c)'s render hook runs it
-   before applying the configured FOV. The director reports the resolved
-   perspective, so body and particle rendering follow collision fallback.
+   before applying the configured FOV. `camera_collision` owns the boom sweep
+   and recovery; `reset_look` shares orbit cleanup across lifecycle paths.
+   Settings refresh only when an eligible camera is rendered. The director
+   reports the resolved perspective, so body and particle rendering follow
+   collision fallback.
 5. [third_person_weapon.c](../../port/linux/game/third_person_weapon.c)
    shares the cover-aware muzzle solver between shots, reticle and the
    host's hit visibility history. Alternating barrels and secondary
    triggers use their authored markers; explicitly custom origins retain
-   their existing rules.
+   their existing rules. `muzzle_preview_weapon` shares preview selection
+   with host visibility history, while actual shots keep their supplied trigger.
 
 The existing first-person weapon update continues producing poses, markers
 and sounds while shoulder view hides the draw. This avoids reconstructing
@@ -52,6 +57,14 @@ reachable target into the displaced reticle. A barrel beyond a wall cannot
 spawn a projectile beyond that wall. Spread, gravity and aim assistance
 remain the weapon's own. Free look holds gameplay aim fixed and hides the
 reticle until the camera returns.
+
+`camera_target_update` asks for the muzzle target first, using the stock eye
+ray only if that preview is unavailable. Free look and its return hide the
+reticle, so target calculations wait until it is visible again. Camera wall
+collision still runs on every rendered shoulder view. Actual shots request
+only origin and direction from `muzzle_aim`; the final muzzle-to-target ray
+is needed only by reticle previews. These remove unused work without changing
+projectile origins, aim, collision thresholds or the network format.
 
 The projectile creation hook is necessary because
 [weapons.c](../../source/items/weapons.c) owns the final origin after aim
@@ -96,8 +109,9 @@ older recovery or capability-envelope code.
 ## Checks and limits
 
 `tools/test_third_person.py` exercises the production solver with controlled
-collision worlds. `tools/test_third_person_director.py` covers director
-transitions, FOV ordering and wheel routing. `tools/test_camera_policy.py`
+collision worlds, including trace-count checks for unused preview work.
+`tools/test_third_person_director.py` covers director transitions, FOV ordering
+and wheel routing. `tools/test_camera_policy.py`
 checks authority, saved preferences, invalid flags and generated menu layout.
 `tools/test_camera_wire.py` checks relay bounds, round trips and truncation.
 `tools/camera_policy_sessions.py` runs at most two hidden Windows peers for
