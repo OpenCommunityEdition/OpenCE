@@ -1243,6 +1243,47 @@ void p2p_lobby_shown(const struct p2p_listing *games, int count)
 	pthread_mutex_unlock(&p2p_lock);
 }
 
+static int pick_fits(const struct p2p_listing *game, const struct p2p_lobby_wanted *wanted)
+{
+	if (game->network_version != HALO_PORT_NETWORK_VERSION || game->failed || game->locked || !game->open ||
+		!game->invite[0])
+	{
+		return 0;
+	}
+	if (!(wanted->engines & 1u << game->engine_type) || game->maximum_player_count != wanted->players ||
+		!game->has_teams != !wanted->teams)
+	{
+		return 0;
+	}
+	if (!game->player_count || game->player_count >= game->maximum_player_count)
+		return 0;
+	/* a dedicated server plays its operator's game, not the one searched for */
+	if (game->dedicated)
+		return 0;
+	if (game->ping < 0 || game->ping >= P2P_LOBBY_PICK_PING)
+		return 0;
+	return 1;
+}
+
+int p2p_lobby_pick(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted)
+{
+	int index, best = -1;
+
+	for (index = 0; index < count; index++)
+	{
+		const struct p2p_listing *game = &games[index];
+
+		if (!pick_fits(game, wanted))
+			continue;
+		if (best < 0 || game->player_count > games[best].player_count ||
+			(game->player_count == games[best].player_count && game->ping < games[best].ping))
+		{
+			best = index;
+		}
+	}
+	return best;
+}
+
 int p2p_listing_unlock(struct p2p_listing *listing, const char *password)
 {
 	unsigned char key[P2P_PASSWORD_KEY_SIZE];

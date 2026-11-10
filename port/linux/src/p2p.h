@@ -210,6 +210,19 @@ int p2p_lobby_games(struct p2p_listing *games, int maximum_count);
 tab and Filters): their hosts are probed in that order, those not shown
 last */
 void p2p_lobby_shown(const struct p2p_listing *games, int count);
+
+enum
+{
+	P2P_LOBBY_PICK_PING = 200,
+};
+/* engines: a bit per engine_type, not per playlist */
+struct p2p_lobby_wanted
+{
+	unsigned engines;
+	int players;
+	int teams;
+};
+int p2p_lobby_pick(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted);
 /* the master servers' (port/linux/src/master_list.c, server_master.c): a
 fresh signed listing of the game this machine hosts for the internet, as
 the brokers get it (0 if it hosts none, or none public); a master's entry's
