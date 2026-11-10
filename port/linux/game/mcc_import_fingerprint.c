@@ -4,8 +4,9 @@ MCC_IMPORT_FINGERPRINT.C
 The fingerprint of what the simulation reads in an Xbox map, made from the
 map the MCC import writes (mcc_import.c), to compare with the disc's: equal,
 the map is the disc's and plays with the disc's players (version 0); else it
-is an MCC map (MCC_MAP_VERSION). A prototype's code (.local/mcc_check/
-sim_fingerprint.c, which makes the disc's), brought over as it is.
+is an MCC map (MCC_MAP_VERSION). halo --fingerprint <map> prints a map's,
+the disc's or an imported one's, as port/assets/mcc/<map>.fp has the disc's
+(mcc_import_fingerprint_print).
 
 A canonical stream of the map's simulation data is hashed (SHA-256), in
 sections, each with its own hash so that a difference can be found:
@@ -23,7 +24,11 @@ sections, each with its own hash so that a difference can be found:
 In an element, the bytes of blocks, data, references and the like are zeroed
 and written after it, a tag handle as the tag's group and path; strings are
 cut at their terminator, and fields the game never reads are zeroed
-(mcc_fingerprint_fields.h, generated from the structures' layouts).
+(mcc_fingerprint_fields.h, which tools/mcc_fingerprint_fields.py writes from
+the structures' layouts).
+
+A map given to --fingerprint is any file: every count, offset and name of
+it is checked before it is followed.
 */
 
 /* ---------- headers */
@@ -34,6 +39,7 @@ cut at their terminator, and fields the game never reads are zeroed
 #include "tag_schema.h"
 #include "mcc_import.h"
 #include "mcc_sha256.h"
+#include "memory/zlib/zlib.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,7 +47,7 @@ cut at their terminator, and fields the game never reads are zeroed
 
 #include "mcc_fingerprint_fields.h"
 
-/* ---------- the schemas, by the prototype's names */
+/* ---------- the schemas, by the names this code was first written with */
 
 #define schema_definition tag_schema_definition
 #define schema_field tag_schema_field
@@ -228,6 +234,24 @@ static struct schema_group const *schema_get(unsigned long group)
 	return NULL;
 }
 
+/* `count` elements of `size` bytes at `address`, or NULL (as translate), also
+when their size does not fit in 32 bits: a count of a map's is untrusted */
+static unsigned char *translate_array(unsigned long address, unsigned long count, unsigned long size)
+{
+	if (size && count > 0xFFFFFFFFUL / size)
+		return NULL;
+	return translate(address, count * size);
+}
+
+/* the hex of the first `count` bytes of `digest` into `hex` (2 * count + 1) */
+static void digest_hex(unsigned char const *digest, int count, char *hex)
+{
+	int i;
+
+	for (i = 0; i < count; i++)
+		snprintf(hex + i * 2, 3, "%02x", digest[i]);
+}
+
 /* ---------- the stream */
 
 static struct mcc_sha256 section;
@@ -271,13 +295,11 @@ static void section_begin(char const *kind, char const *name)
 static void section_end(char const *kind, char const *name)
 {
 	unsigned char digest[32];
-	char line[600];
-	int i, n;
+	char line[600], hex[33];
 
 	mcc_sha256_end(&section, digest);
-	n = snprintf(line, sizeof(line), "%s\t%s\t", kind, name ? name : "");
-	for (i = 0; i < 16; i++)
-		n += snprintf(line + n, sizeof(line) - (size_t)n, "%02x", digest[i]);
+	digest_hex(digest, 16, hex);
+	snprintf(line, sizeof(line), "%s\t%s\t%s", kind, name ? name : "", hex);
 	mcc_fingerprint_line(line);
 	mcc_sha256_add(&whole, line, (int)strlen(line));
 }
@@ -313,7 +335,7 @@ static void walk_fields(struct schema_definition const *d, unsigned char *elemen
 				put(&count, 4);
 				if (count <= 0)
 					break;
-				elements = translate(u32(p + 4), (unsigned long)(count * e->size));
+				elements = translate_array(u32(p + 4), (unsigned long)count, (unsigned long)e->size);
 				if (!elements)
 				{
 					put_text("OUTSIDE");
@@ -357,13 +379,33 @@ static void walk_fields(struct schema_definition const *d, unsigned char *elemen
 	}
 }
 
+/* how deep the walk is in blocks and structures: the schemas nest a few
+levels, a map's blocks that name themselves for ever */
+static int walk_depth;
+
+enum
+{
+	MAXIMUM_WALK_DEPTH = 64
+};
+
 static void walk_element(struct schema_definition const *d, unsigned char *element, char const *const *only_fields)
 {
-	unsigned char *bytes = malloc((size_t)d->size + 4);
+	unsigned char *bytes;
 	struct schema_field const *f;
 	long o;
 	short n;
 
+	if (walk_depth >= MAXIMUM_WALK_DEPTH)
+	{
+		put_text("TOO DEEP");
+		return;
+	}
+	bytes = malloc((size_t)d->size + 4);
+	if (!bytes)
+	{
+		put_text("NO MEMORY");
+		return;
+	}
 	memcpy(bytes, element, (size_t)d->size);
 	for (f = d->fields; f->type != _schema_terminator; f++)
 	{
@@ -462,10 +504,12 @@ static void walk_element(struct schema_definition const *d, unsigned char *eleme
 		}
 	}
 	free(bytes);
+	walk_depth++;
 	walk_fields(d, element, only_fields);
+	walk_depth--;
 }
 
-/* ---------- the scripts: trees of tokens (as .local/mcc_check/mcc_scripts_compare.py) */
+/* ---------- the scripts: trees of tokens */
 
 static unsigned char *hs_nodes;
 static long hs_node_count;
@@ -551,7 +595,8 @@ static void hs_tree(unsigned long index, int depth)
 
 static void scripts(unsigned char *scenario)
 {
-	unsigned char *syntax = translate(u32(scenario + 0x474 + 12), u32(scenario + 0x474));
+	unsigned long syntax_size = u32(scenario + 0x474);
+	unsigned char *syntax = syntax_size >= 0x38 ? translate(u32(scenario + 0x474 + 12), syntax_size) : NULL;
 	unsigned long count, i;
 	unsigned char *elements;
 
@@ -566,9 +611,11 @@ static void scripts(unsigned char *scenario)
 		hs_strings_size = 0;
 	hs_nodes = syntax ? syntax + 0x38 : NULL;
 	hs_node_count = syntax ? (short)(u32(syntax + 0x2C) >> 16) : 0;
+	/* (no more than the data has room for) */
+	hs_node_count = MIN(hs_node_count, syntax ? (long)((syntax_size - 0x38) / 0x14) : 0);
 	section_begin("SCRIPTS", NULL);
 	count = u32(scenario + 0x49C);
-	elements = count ? translate(u32(scenario + 0x49C + 4), count * 0x5C) : NULL;
+	elements = count ? translate_array(u32(scenario + 0x49C + 4), count, 0x5C) : NULL;
 	for (i = 0; elements && i < count; i++)
 	{
 		unsigned char *script = elements + i * 0x5C;
@@ -580,7 +627,7 @@ static void scripts(unsigned char *scenario)
 		hs_tree(u32(script + 0x24), 0);
 	}
 	count = u32(scenario + 0x4A8);
-	elements = count ? translate(u32(scenario + 0x4A8 + 4), count * 0x5C) : NULL;
+	elements = count ? translate_array(u32(scenario + 0x4A8 + 4), count, 0x5C) : NULL;
 	for (i = 0; elements && i < count; i++)
 	{
 		unsigned char *global = elements + i * 0x5C;
@@ -596,12 +643,13 @@ static void scripts(unsigned char *scenario)
 
 /* ---------- a map */
 
-/* the structure BSPs the import wrote, in the scenario's order */
+/* the structure BSPs, in the scenario's order (the import's, or a map file's:
+mcc_import_fingerprint_print) */
 static struct mcc_fingerprint_bsp const *mcc_fingerprint_bsps;
 static long mcc_fingerprint_bsp_count;
 
 /* BSP `b` of the scenario's structure_bsps into `space` (its address, bytes
-and size): nonzero when the import wrote it */
+and size): nonzero when it was given */
 static int mcc_fingerprint_bsp_get(
 	unsigned long b,
 	struct space *space)
@@ -625,8 +673,12 @@ static void fingerprint_map(void)
 	long i;
 	unsigned char digest[32];
 	char line[200];
-	int n;
 
+	if (!map.table)
+	{
+		fprintf(stderr, "mcc import: %s: the tags' index is not in the tags\n", fingerprint_map_name);
+		return;
+	}
 	mcc_sha256_begin(&whole);
 	section_begin("ORDER", NULL);
 	/* the disc's tags (order_limit of them, when the map has more): an
@@ -678,7 +730,13 @@ static void fingerprint_map(void)
 	}
 
 	scenario_schema = schema_get('scnr');
-	scenario = translate(map.table[map.scenario].address, (unsigned long)scenario_schema->definition->size);
+	scenario = scenario_schema && scenario_schema->definition ?
+		translate(map.table[map.scenario].address, (unsigned long)scenario_schema->definition->size) : NULL;
+	if (!scenario)
+	{
+		fprintf(stderr, "mcc import: %s: the scenario is not in the tags\n", fingerprint_map_name);
+		return;
+	}
 	section_begin("SCENARIO", map.table[map.scenario].name);
 	walk_element(scenario_schema->definition, scenario, NULL);
 	section_end("SCENARIO", map.table[map.scenario].name);
@@ -687,7 +745,7 @@ static void fingerprint_map(void)
 	bsp_schema = schema_get('sbsp');
 	{
 		unsigned long count = u32(scenario + 0x5A4);
-		unsigned char *references = translate(u32(scenario + 0x5A8), count * 0x20);
+		unsigned char *references = translate_array(u32(scenario + 0x5A8), count, 0x20);
 		unsigned long b;
 
 		for (b = 0; references && b < count; b++)
@@ -713,9 +771,12 @@ static void fingerprint_map(void)
 	}
 
 	mcc_sha256_end(&whole, digest);
-	n = snprintf(line, sizeof(line), "MAP	%s	", map.table[map.scenario].name);
-	for (i = 0; i < 32; i++)
-		n += snprintf(line + n, sizeof(line) - (size_t)n, "%02x", digest[i]);
+	{
+		char hex[65];
+
+		digest_hex(digest, 32, hex);
+		snprintf(line, sizeof(line), "MAP	%s	%s", map.table[map.scenario].name, hex);
+	}
 	mcc_fingerprint_line(line);
 }
 
@@ -726,24 +787,42 @@ static void map_table_read(void)
 	long i;
 
 	map.in_bsp = 0;
-	map.count = (long)u32(map.tags.bytes + 12);
-	map.scenario = (long)(u32(map.tags.bytes + 4) & 0xFFFF);
-	rows = translate(u32(map.tags.bytes), (unsigned long)map.count * 0x20);
 	/* (the game's free does not take NULL) */
 	if (map.table)
 		free(map.table);
+	map.table = NULL;
+	if (map.tags.size < 16)
+	{
+		map.count = 0;
+		return;
+	}
+	map.count = (long)u32(map.tags.bytes + 12);
+	map.scenario = (long)(u32(map.tags.bytes + 4) & 0xFFFF);
+	/* (a map's tags are at most 65,535, and its rows in its tags) */
+	rows = map.count > 0 && map.count <= 0xFFFF ? translate(u32(map.tags.bytes), (unsigned long)map.count * 0x20) : NULL;
+	if (!rows || map.scenario >= map.count)
+	{
+		map.count = 0;
+		return;
+	}
 	/* (the game's malloc, which the game's free takes: calloc is the C
 	library's) */
 	map.table = malloc((size_t)map.count * sizeof(struct tag) + 1);
-	if (map.table)
-		csmemset(map.table, 0, (unsigned long)map.count * sizeof(struct tag));
+	if (!map.table)
+	{
+		map.count = 0;
+		return;
+	}
+	csmemset(map.table, 0, (unsigned long)map.count * sizeof(struct tag));
 	for (i = 0; i < map.count; i++)
 	{
 		unsigned char *row = rows + i * 0x20;
 		unsigned char *name = translate(u32(row + 0x10), 1);
 		map.table[i].group = u32(row);
 		map.table[i].handle = u32(row + 0x0C);
-		map.table[i].name = name ? (char const *)name : "?";
+		/* (a name ends in the tags) */
+		map.table[i].name = name && memchr(name, 0, map.tags.size - (unsigned long)(name - map.tags.bytes)) ?
+			(char const *)name : "?";
 		map.table[i].address = u32(row + 0x14);
 	}
 }
@@ -776,4 +855,198 @@ char const *mcc_import_fingerprint(
 	map.table = NULL;
 
 	return mcc_fingerprint_lines.text ? mcc_fingerprint_lines.text : "";
+}
+
+/* a part of a map file as the game reads it (its body inflated): `size`
+bytes from `offset`, into `bytes` */
+struct fingerprint_range
+{
+	unsigned long offset;
+	unsigned long size;
+	unsigned char *bytes;
+};
+
+enum
+{
+	FINGERPRINT_HEADER_BYTES = 0x800,
+	/* (the largest of the Xbox's cache files, a campaign level's) */
+	FINGERPRINT_MAXIMUM_MAP_BYTES = 0x11600000,
+	FINGERPRINT_MAXIMUM_BSPS = 32,
+	FINGERPRINT_CHUNK_BYTES = 0x10000
+};
+
+/* the ranges of the map file `file` (`length` bytes as the game reads it;
+its body deflated when `deflated`) copied out, reading it once, never whole:
+a campaign level is 275 MB, more than a 32-bit process may have in one
+piece. TRUE when every range was in it */
+static boolean fingerprint_ranges_read(
+	FILE *file,
+	unsigned long length,
+	boolean deflated,
+	struct fingerprint_range *ranges,
+	short count)
+{
+	static unsigned char input[FINGERPRINT_CHUNK_BYTES], output[FINGERPRINT_CHUNK_BYTES];
+	z_stream stream;
+	unsigned long position = FINGERPRINT_HEADER_BYTES, end = 0;
+	short index;
+	int status = Z_OK;
+
+	for (index = 0; index < count; index++)
+	{
+		if (ranges[index].offset < FINGERPRINT_HEADER_BYTES || ranges[index].offset > length ||
+			ranges[index].size > length - ranges[index].offset)
+		{
+			return FALSE;
+		}
+		end = MAX(end, ranges[index].offset + ranges[index].size);
+	}
+	if (!deflated)
+	{
+		for (index = 0; index < count; index++)
+		{
+			if (fseek(file, (long)ranges[index].offset, SEEK_SET) ||
+				fread(ranges[index].bytes, 1, ranges[index].size, file) != ranges[index].size)
+			{
+				return FALSE;
+			}
+		}
+		return TRUE;
+	}
+	csmemset(&stream, 0, sizeof(stream));
+	if (fseek(file, FINGERPRINT_HEADER_BYTES, SEEK_SET) || inflateInit(&stream) != Z_OK)
+		return FALSE;
+	while (position < end && status == Z_OK)
+	{
+		unsigned long produced;
+
+		if (!stream.avail_in)
+		{
+			stream.avail_in = (uInt)fread(input, 1, sizeof(input), file);
+			stream.next_in = input;
+			if (!stream.avail_in)
+				break;
+		}
+		stream.next_out = output;
+		stream.avail_out = sizeof(output);
+		status = inflate(&stream, Z_NO_FLUSH);
+		if (status != Z_OK && status != Z_STREAM_END)
+			break;
+		produced = sizeof(output) - stream.avail_out;
+		/* (each range's part of what this chunk holds) */
+		for (index = 0; index < count; index++)
+		{
+			struct fingerprint_range *range = &ranges[index];
+			unsigned long from = MAX(position, range->offset);
+			unsigned long to = MIN(position + produced, range->offset + range->size);
+
+			if (from < to)
+				csmemcpy(range->bytes + (from - range->offset), output + (from - position), to - from);
+		}
+		position += produced;
+	}
+	inflateEnd(&stream);
+
+	return position >= end;
+}
+
+int mcc_import_fingerprint_print(
+	char const *map_name)
+{
+	char path[256];
+	unsigned char header[FINGERPRINT_HEADER_BYTES];
+	struct fingerprint_range tags = { 0, 0, NULL };
+	struct fingerprint_range bsp_ranges[FINGERPRINT_MAXIMUM_BSPS];
+	struct mcc_fingerprint_bsp bsps[FINGERPRINT_MAXIMUM_BSPS];
+	short bsp_count = 0, index;
+	unsigned long length, file_size;
+	boolean deflated;
+	FILE *file;
+	int success = 0;
+
+	csmemset(bsp_ranges, 0, sizeof(bsp_ranges));
+	csmemset(bsps, 0, sizeof(bsps));
+	snprintf(path, sizeof(path), "d:\\maps\\%s.map", map_name);
+	file = fopen(path, "rb");
+	if (!file || fread(header, 1, sizeof(header), file) != sizeof(header) || u32(header + 4) != 5)
+	{
+		fprintf(stderr, "--fingerprint: %s is not an Xbox map (cache version 5)\n", path);
+		if (file)
+			fclose(file);
+		return 1;
+	}
+	fseek(file, 0, SEEK_END);
+	file_size = (unsigned long)ftell(file);
+	/* (the body deflated after the header, as the disc's and the import's
+	maps are, or not) */
+	length = u32(header + 8);
+	deflated = file_size != length;
+	tags.offset = u32(header + 0x10);
+	tags.size = u32(header + 0x14);
+	if (length < FINGERPRINT_HEADER_BYTES || length > FINGERPRINT_MAXIMUM_MAP_BYTES || tags.size < 16 ||
+		tags.offset > length || tags.size > length - tags.offset ||
+		(tags.bytes = malloc(tags.size + 1)) == NULL || !fingerprint_ranges_read(file, length, deflated, &tags, 1))
+	{
+		fprintf(stderr, "--fingerprint: %s's tags cannot be read from it\n", path);
+		goto done;
+	}
+	/* the BSPs its scenario names, where its references say */
+	csmemset(&map, 0, sizeof(map));
+	map.tags.address = XBOX_TAG_ADDRESS;
+	map.tags.bytes = tags.bytes;
+	map.tags.size = tags.size;
+	map_table_read();
+	if (map.table)
+	{
+		struct schema_group const *scenario_schema = schema_get('scnr');
+		unsigned char *scenario = scenario_schema && scenario_schema->definition ?
+			translate(map.table[map.scenario].address, (unsigned long)scenario_schema->definition->size) : NULL;
+		unsigned long count = scenario ? u32(scenario + 0x5A4) : 0;
+		unsigned char *references = count && count <= FINGERPRINT_MAXIMUM_BSPS ?
+			translate(u32(scenario + 0x5A8), count * 0x20) : NULL;
+
+		for (index = 0; references && index < (short)count; index++)
+		{
+			unsigned char *reference = references + index * 0x20;
+
+			bsp_ranges[index].offset = u32(reference);
+			bsp_ranges[index].size = u32(reference + 4);
+			bsps[index].address = u32(reference + 8);
+			bsps[index].size = bsp_ranges[index].size;
+			if (bsp_ranges[index].size && bsp_ranges[index].size < FINGERPRINT_MAXIMUM_MAP_BYTES)
+				bsp_ranges[index].bytes = malloc(bsp_ranges[index].size + 1);
+			if (!bsp_ranges[index].bytes)
+				break;
+			bsps[index].bytes = bsp_ranges[index].bytes;
+			bsp_count = index + 1;
+		}
+		/* (read again by mcc_import_fingerprint) */
+		free(map.table);
+		map.table = NULL;
+	}
+	if (bsp_count && !fingerprint_ranges_read(file, length, deflated, bsp_ranges, bsp_count))
+	{
+		fprintf(stderr, "--fingerprint: %s's structure bsps cannot be read from it\n", path);
+		goto done;
+	}
+	{
+		/* (every tag the disc's, a disc's map's) */
+		char const *lines = mcc_import_fingerprint(map_name, tags.bytes, tags.size, 0, bsps, bsp_count);
+
+		success = lines[0] != 0;
+		fputs(lines, stdout);
+		if (!success)
+			fprintf(stderr, "--fingerprint: %s has no fingerprint (the messages above say why)\n", path);
+	}
+done:
+	fclose(file);
+	if (tags.bytes)
+		free(tags.bytes);
+	for (index = 0; index < bsp_count; index++)
+	{
+		if (bsp_ranges[index].bytes)
+			free(bsp_ranges[index].bytes);
+	}
+
+	return success ? 0 : 1;
 }

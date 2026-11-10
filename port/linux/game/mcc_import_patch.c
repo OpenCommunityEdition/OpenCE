@@ -5,9 +5,8 @@ What the MCC import changes in an MCC map's tags before it writes them as
 the disc's (mcc_import.c): the importer's own fixes of what Halo PC and MCC
 changed, which need no data of the disc's, and the operations of the map's
 patch, which give its tags the disc's values where they differ
-(.local/step2_fingerprint.md; the prototype that writes them is
-.local/mcc_check/patch_make.c). Both walk the tags by the checks' schemas
-(tag_schema.h).
+(port/assets/mcc/README.md says how they were made). Both walk the tags by
+the checks' schemas (tag_schema.h).
 
 An operation is a line of tab-separated fields: its kind, the tag
 ("group:path", a group's spaces written as underscores), a path from the
@@ -193,8 +192,8 @@ static void mcc_patch_visit(
 	return;
 }
 
-/* Kind A (.local/mcc_vs_xbox.md): what MCC holds otherwise than the disc
-where the disc's value follows from MCC's. */
+/* What MCC holds otherwise than the disc where the disc's value follows from
+MCC's. */
 static void mcc_patch_fix(
 	struct tag_schema_definition const *definition,
 	byte *element)

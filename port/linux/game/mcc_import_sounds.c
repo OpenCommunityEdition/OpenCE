@@ -3,8 +3,8 @@ MCC_IMPORT_SOUNDS.C
 
 The sounds of a map the MCC import writes (mcc_import.c), taken from Halo:
 The Master Chief Collection's FMOD banks as the Xbox disc's maps hold them
-(.local/step4_sounds.md: the rules below were found there, on every sound of
-the 24 maps).
+(the rules below were found on every sound of the 24 maps, against the
+disc's: docs/mcc_caches.md, "Evidence").
 
 MCC keeps Halo 1's sounds in banks (the data root's sound\pc\<bank>.fsb,
 FSB5), each with an index of tag paths (sound\pc\lst\<bank>.lst.bin). Its

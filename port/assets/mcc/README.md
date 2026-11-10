@@ -11,7 +11,7 @@ place of the game's copy, so that a changed file can be tried without a build.
 | --- | --- |
 | `<map>.p2` | The disc's values as operations, one per line (`mcc_import_patch.c` describes each kind): numbers, flags, names, the order of the tags, and the HUD's placements and sizes. A Halo PC rebuild (beavercreek, bloodgulch, boardingaction, carousel, damnation, hangemhigh, sidewinder) has the tag order and the HUD alone. |
 | `ui.p2` | The menus' map's: the tags of MCC's (Halo PC's) the game reaches, in MCC's order, its preload list emptied, and the disc's sizes of its bitmaps. It has no fingerprint: it is never the disc's. |
-| `<map>.fp` | The fingerprint of the disc's map: an MD5 of each part of its simulation data (each tag, the order, the scenario, each BSP's collision). An imported map whose fingerprint is the same is written as the disc's map and plays with players of the disc; any other is written with MCC's map version. |
+| `<map>.fp` | The fingerprint of the disc's map: a SHA-256 of each part of its simulation data (each tag, the order, the scenario, each BSP's collision; the first 16 bytes of each, all 32 of the whole map's). An imported map whose fingerprint is the same is written as the disc's map and plays with players of the disc; any other is written with MCC's map version. |
 
 What is not here:
 
@@ -25,7 +25,20 @@ What is not here:
   takes it from the user's own MCC map (into the save folder's
   `z/mcc_import`).
 
-The files are made from the disc's maps and MCC's with the prototype tools
-(not yet in the repository): the comparison of each map's tags, field by
-field, writes the operations; the fingerprint is computed from the disc's map
-by the same code as `mcc_import_fingerprint.c`.
+How they are made:
+
+- A fingerprint is the game's (`mcc_import_fingerprint.c`), of the disc's
+  map. Anyone with the disc can make it again and compare it with the file:
+
+  ```sh
+  HALO_DATA_ROOT=<the disc's game data> halo --fingerprint a10 > a10.fp
+  ```
+
+  `halo --fingerprint <map>` prints the fingerprint of the data root's
+  `maps/<map>.map` (the disc's, or one the import wrote). The fields it
+  takes as text or leaves out are `port/linux/game/mcc_fingerprint_fields.h`,
+  which `python tools/mcc_fingerprint_fields.py` writes from the game's
+  structures (`--check` tells whether it is what it would write).
+- The operations come from a comparison of each map's tags with the disc's,
+  field by field, made with tools that are not in the repository: what they
+  hold is data of the disc's (see the pull request's question on it).

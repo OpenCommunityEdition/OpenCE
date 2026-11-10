@@ -29,13 +29,15 @@ without a display to wait for, and its exits.
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* port/linux/game/mcc_import.c */
 int mcc_import_run(char const *output_folder, char const *const *map_names, int map_count);
 /* (port/linux/game/mcc_import_patch.c) the maps the game has the disc's values of */
 int mcc_import_default_maps(char names[][64], int maximum_count);
-#include <stdlib.h>
-#include <string.h>
+/* (port/linux/game/mcc_import_fingerprint.c) */
+int mcc_import_fingerprint_print(char const *map_name);
 
 #ifndef HALO_BUILD_NUMBER
 #define HALO_BUILD_NUMBER 0
@@ -196,6 +198,21 @@ static void answer_command_line(void)
 		}
 		if (!strcmp(argument, "--keygen"))
 			exit(server_master_keygen() ? EXIT_SUCCESS : SERVER_EXIT_CONFIGURATION);
+		if (!strcmp(argument, "--fingerprint"))
+		{
+			/* halo --fingerprint <map>: the fingerprint of the data root's
+			maps\<map>.map, as port/assets/mcc/<map>.fp has the disc's
+			(port/linux/game/mcc_import_fingerprint.c) */
+			char name[64];
+
+			if (!posix_command_line_argument(index + 1, name, sizeof(name)) || !name[0] ||
+				strpbrk(name, "\\/:"))
+			{
+				fprintf(stderr, "--fingerprint: give a map's name, as in the maps folder (bloodgulch)\n");
+				exit(SERVER_EXIT_CONFIGURATION);
+			}
+			exit(mcc_import_fingerprint_print(name));
+		}
 		if (!strcmp(argument, "--import-mcc"))
 		{
 			/* halo --import-mcc <output folder> [--from <MCC's halo1 folder> |

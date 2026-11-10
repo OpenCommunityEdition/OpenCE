@@ -189,4 +189,10 @@ char const *mcc_import_fingerprint(
 	struct mcc_fingerprint_bsp const *bsps,
 	long bsp_count);
 
+/* halo --fingerprint <map>: the fingerprint of the data root's maps\<map>.map (an
+Xbox map: the disc's, or one the import wrote), every tag taken for the disc's,
+printed as port/assets/mcc/<map>.fp has it; 0 when it could be made */
+int mcc_import_fingerprint_print(
+	char const *map_name);
+
 #endif // __MCC_IMPORT_H

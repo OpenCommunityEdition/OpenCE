@@ -2349,7 +2349,7 @@ static void config_load(void)
 	settings: the file read is left as it is) */
 	config_answer_only = config_argument("--help", NULL, 0) || config_argument("--version", NULL, 0) ||
 		config_argument("--keygen", NULL, 0) || config_argument("--sign", NULL, 0) ||
-		config_argument("--import-mcc", NULL, 0) || config_probe_mode;
+		config_argument("--import-mcc", NULL, 0) || config_argument("--fingerprint", NULL, 0) || config_probe_mode;
 #endif
 	text = config_read_file(path, &size);
 	if (text)
