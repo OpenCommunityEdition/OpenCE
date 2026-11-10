@@ -103,7 +103,6 @@ enum
 		P2P_SIGNATURE_SIZE,
 	MINIMUM_LISTING_SIZE = 2 + 1 + 2 + 1 + 4 + 4 + P2P_KEY_SIZE + P2P_TOKEN_SIZE + 3 + 3 + STAMP_SIZE +
 		P2P_SIGNATURE_SIZE,
-	MAXIMUM_GAMES = 256,
 	MAXIMUM_TOMBSTONES = 256,
 	MAXIMUM_QUEUED = 128,
 
@@ -1205,12 +1204,11 @@ static int listing_order(const void *first, const void *second)
 	return strcmp(a->name, b->name);
 }
 
-int p2p_lobby_games(struct p2p_listing *games, int maximum_count)
+int lobby_games_unlocked(struct p2p_listing *games, int maximum_count)
 {
 	int count = 0;
 	int index;
 
-	pthread_mutex_lock(&p2p_lock);
 	for (index = 0; index < MAXIMUM_GAMES && count < maximum_count; index++)
 	{
 		if (!lobby.games[index].used)
@@ -1218,7 +1216,6 @@ int p2p_lobby_games(struct p2p_listing *games, int maximum_count)
 		game_listed(&lobby.games[index], &games[count]);
 		count++;
 	}
-	pthread_mutex_unlock(&p2p_lock);
 	qsort(games, (size_t)count, sizeof(*games), listing_order);
 	return count;
 }
@@ -1241,6 +1238,16 @@ void p2p_lobby_shown(const struct p2p_listing *games, int count)
 		}
 	}
 	pthread_mutex_unlock(&p2p_lock);
+}
+
+int p2p_lobby_games(struct p2p_listing *games, int maximum_count)
+{
+	int count;
+
+	pthread_mutex_lock(&p2p_lock);
+	count = lobby_games_unlocked(games, maximum_count);
+	pthread_mutex_unlock(&p2p_lock);
+	return count;
 }
 
 static int pick_fits(const struct p2p_listing *game, const struct p2p_lobby_wanted *wanted)
@@ -1282,6 +1289,23 @@ int p2p_lobby_pick(const struct p2p_listing *games, int count, const struct p2p_
 		}
 	}
 	return best;
+}
+
+int p2p_lobby_pick_unpinged(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted)
+{
+	int index, waiting = 0;
+
+	for (index = 0; index < count; index++)
+	{
+		struct p2p_listing timed;
+
+		if (games[index].ping >= 0)
+			continue;
+		timed = games[index];
+		timed.ping = 0;
+		waiting += pick_fits(&timed, wanted);
+	}
+	return waiting;
 }
 
 int p2p_listing_unlock(struct p2p_listing *listing, const char *password)

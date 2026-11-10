@@ -360,6 +360,10 @@ void p2p_lobby_update(const unsigned char *token, int player_count, int maximum_
 /* whether the game hosted is listed now, and whether the browser is open */
 int p2p_lobby_listed(void);
 int p2p_lobby_browsing(void);
+enum { MAXIMUM_GAMES = 256 };
+/* caller holds p2p_lock */
+int lobby_games_unlocked(struct p2p_listing *games, int maximum_count);
+int p2p_lobby_pick_unpinged(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted);
 /* a message on a slot (its key hash in hex) through a broker; retained: the
 slot's retained copy, sent on subscribing */
 void p2p_lobby_slot_heard(const char *hash_text, const unsigned char *payload, int size, int retained);

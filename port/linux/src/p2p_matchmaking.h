@@ -144,6 +144,7 @@ struct mm_search
 	unsigned long joining_since;
 	struct p2p_mm_decision decision;
 	int decided;
+	int games_checked;
 };
 
 void mm_wanted(const struct mm_search *search, struct p2p_lobby_wanted *wanted);

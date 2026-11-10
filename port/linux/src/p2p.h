@@ -451,6 +451,7 @@ struct p2p_mm_decision
 {
 	int kind;
 	int playlist, size;
+	int public_game;
 	char invite[P2P_LISTING_INVITE_SIZE];
 };
 

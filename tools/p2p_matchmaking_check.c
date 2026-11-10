@@ -51,6 +51,10 @@ const unsigned char *p2p_signing_key(void)
 }
 void p2p_signal_mm_topics(const char topics[][P2P_MM_TOPIC_SIZE], int count) { (void)topics; (void)count; }
 
+int lobby_games_unlocked(struct p2p_listing *games, int maximum_count) { return 0; }
+int p2p_lobby_pick(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted) { return -1; }
+int p2p_lobby_pick_unpinged(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted) { return 0; }
+
 static unsigned char published[MM_MAXIMUM_RECORD_SIZE];
 static int published_size;
 
@@ -534,6 +538,7 @@ static void start_searching(int index, unsigned playlists, int size, int can_hos
 	choice.size = size;
 	seed_of(100 + index, seed);
 	mm_start(&machines[index].search, seed, &choice, now_ms, now_unix);
+	machines[index].search.state = P2P_MM_QUEUED;
 	machines[index].search.can_host = can_host;
 }
 
