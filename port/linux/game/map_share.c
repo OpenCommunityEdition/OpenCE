@@ -116,6 +116,9 @@ enum
 	INPUT_BYTES = 0x6000,
 	OUTPUT_BYTES = 0xC000,
 	MAXIMUM_FRAME_BYTES = INPUT_BYTES - 4,
+	/* reads of a connection a call at most, while it has more (64 input
+	buffers: 1.5 MB) */
+	MAXIMUM_READS_PER_CALL = 64,
 	/* pieces asked of one connection at once, and of all of them; pieces
 	another machine may ask of this one at once */
 	REQUESTS_PER_CONNECTION = 2,
@@ -2501,9 +2504,11 @@ static void frame_hashes(
 static void connection_read(
 	struct connection *connection)
 {
+	long reads = 0;
+
 	for (;;)
 	{
-		long result;
+		long result = 0;
 		long offset = 0;
 
 		if (connection->input_size < INPUT_BYTES)
@@ -2565,8 +2570,10 @@ static void connection_read(
 			csmemmove(connection->input, connection->input + offset, connection->input_size - offset);
 			connection->input_size -= offset;
 		}
-		/* (nothing more to read, or a frame not whole yet) */
-		if (connection->input_size < INPUT_BYTES)
+		/* (nothing more to read, or a frame not whole yet; while the last
+		read brought bytes, on: one buffer a call held a download to about a
+		block a frame, whatever the host sent) */
+		if (connection->input_size < INPUT_BYTES && (result <= 0 || ++reads >= MAXIMUM_READS_PER_CALL))
 			return;
 	}
 }
