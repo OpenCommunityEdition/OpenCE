@@ -4102,11 +4102,29 @@ void sound_idle(
 	return;
 }
 
-/* port: a followed unit supplies rigid-body point velocity for both the
-listener and its attached sounds, so rotation cancels along the line between
-them. Measuring a chase camera instead would add orbit motion and network
-corrections. Other cameras use focus displacement per game tick: observer
-velocity is frame-rate dependent in the port and absent on scripted tracks.
+/* port: the listener's velocity, for the Doppler effect: how fast the
+camera's focus moves through the world (the head in first person, the
+vehicle a chase camera circles, as the game's own velocity was). Where the
+camera follows a unit, the game's velocity for the camera's point as if it
+were fixed to that unit (object_get_point_velocity), as the sounds on it are
+given theirs: the Doppler effect takes the velocities along the line from a
+sound to the camera, and two points on one turning body move alike along the
+line between them, so they cancel exactly, from a chase camera behind the
+vehicle too, and swinging that camera round adds nothing. Measured, a
+network client's corrections of a vehicle it rides jerked the focus and the
+vehicle's own engine with it, and a Warthog's turret swung the gunner round.
+Otherwise (a cinematic's camera, a flying one) measured from one game tick
+to the next. Not the camera's position: swinging a chase camera round a
+Warthog sweeps it through the air, and the engine rose and fell. The
+observer's own velocity is no use for this on the native ports:
+the observer runs every frame (port/linux/game/render_interpolation.c) and
+divides a tick's motion by a frame's time, so riding a Pelican at 144 frames
+a second the camera claimed nearly five times its speed. It also reads zero
+while a cinematic's camera is forced along its track. Either way a sound
+moving with the camera seemed to come at it, and rose in pitch. A camera
+that jumps further in a tick than any vehicle moves (a cut, a teleport) has
+no velocity for that tick.
+
 Explicit cuts and lifecycle changes reset this history; the distance limit
 below is a fallback for other teleports. See docs/reading/audio_doppler.md. */
 #define LISTENER_SNAP_DISTANCE 10.f
