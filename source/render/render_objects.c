@@ -375,6 +375,7 @@ void render_objects(
 /* port: port/linux/game/first_person_legs.c */
 boolean first_person_legs_wanted(long object_index);
 real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
+real_matrix4x3 const *first_person_legs_mirror_node_matrices(long object_index, real_matrix4x3 const *nodes);
 /* port: port/linux/game/shield_color.c */
 real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
 /* port: port/linux/game/overshield_effect.c */
@@ -480,12 +481,16 @@ static void render_object_list(
 		struct object_datum *object = object_get(object_index);
 		/* port: the player's own legs, seen looking down in first person
 		(port/linux/game/first_person_legs.c): its body drawn from the waist
-		down, nothing it carries */
+		down, nothing it carries; in a mirror, that body whole and what it
+		carries, set back as far as the legs, so that the legs meet their
+		reflection */
 		boolean legs = !data->shadow && !render.camera.mirrored &&
 			object_is_first_person_camera(object_index) && first_person_legs_wanted(object_index);
 		real_matrix4x3 const *node_matrices = legs ?
 			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
-			object_get_node_matrices(object_index);
+			!data->shadow && render.camera.mirrored ?
+				first_person_legs_mirror_node_matrices(object_index, object_get_node_matrices(object_index)) :
+				object_get_node_matrices(object_index);
 		/* port: the function values the picture shows
 		(object_function_values_for_render), kept in the rasterizer's memory
 		for the frame: a modifier's group, a queued transparent part and a
