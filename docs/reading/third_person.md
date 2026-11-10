@@ -12,8 +12,11 @@ Server Setup > Session Options contains camera policy and the invite link.
 Player Choice is the host default; Forced Off disables the shoulder camera
 without overwriting a player's saved preference. Old forced_on host settings
 fall back to Player Choice. Version-42 received Forced On policies remain
-supported for compatibility, but hosts cannot select them. Camera
-controller bindings and stencil shadows are outside this feature.
+supported for compatibility, but hosts cannot select them.
+
+Gamepad Setup > Button Remapping > Camera Perspective binds Third Person
+On / Off and Swap Shoulder. Both start unbound, use the keyboard camera
+preferences, and respect host policy. Stencil shadows are outside this feature.
 
 ## Reading order and ownership
 

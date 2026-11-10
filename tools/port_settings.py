@@ -893,7 +893,7 @@ def _controller_screen() -> list:
     base = f"{PE}/{folder}"
     rows, extra = [], []
     for key, label, choices in [("player", "PLAYER:", "P1|P2|P3|P4"),
-                                ("group", "SHOW:", "MOVEMENT|COMBAT|GENERAL|COMMUNICATION|DEBUG")]:
+                                ("group", "SHOW:", "MOVEMENT|COMBAT|GENERAL|COMMUNICATION|DEBUG|CAMERA PERSPECTIVE")]:
         row = f"{base}/op_{key}"
         rows.append((row, None))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),

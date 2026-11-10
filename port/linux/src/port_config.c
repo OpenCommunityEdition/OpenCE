@@ -203,7 +203,7 @@ static const struct config_setting config_settings[] =
 		"keep the manual choice. Device detection itself is always available." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
 		"P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
-		"Button Remapping. v3: stores 26 physical-button names, including unbound.\n"
+		"Button Remapping. v4: stores 28 physical-button names, including unbound.\n"
 		"Gameplay and debug camera have separate bindings. Old ten-action and v2 layouts\n"
 		"are accepted. See docs/reading/controller_remapping.md for the full order." },
 	{ "input.controller_p2", _config_string, "\"\"", "HALO_CONTROLLER_P2", _environment_value, _platform_all,

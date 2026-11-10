@@ -82,12 +82,15 @@ int main(void) {
  unsigned char a[CONTROLLER_REMAP_ACTIONS],b[CONTROLLER_REMAP_ACTIONS];
  char old[512],text[512];char *last;int port;
  controller_remap_defaults(a);controller_remap_format(a,text,sizeof(text));
- assert(!strncmp(text,"v3:",3));assert(controller_remap_parse(text,b) && b[PAD_CAMERA_CYCLE]==4);
- strcpy(old,text);old[1]='2';last=strrchr(old,',');assert(last);*last=0;
+ assert(!strncmp(text,"v4:",3));assert(controller_remap_parse(text,b) && b[PAD_CAMERA_CYCLE]==4);
+ strcpy(old,text);old[1]='3';*strrchr(old,',')=0;*strrchr(old,',')=0;
+ assert(controller_remap_parse(old,b) && !memcmp(a,b,sizeof(a)));
+ old[1]='2';last=strrchr(old,',');assert(last);*last=0;
  assert(controller_remap_parse(old,b) && !memcmp(a,b,sizeof(a)));
  /* Existing debug RB bindings win over the newly introduced default. */
  controller_remap_assign(a,PAD_CAMERA_UP,4);assert(a[PAD_CAMERA_CYCLE]==255);
- controller_remap_format(a,text,sizeof(text));text[1]='2';*strrchr(text,',')=0;
+ controller_remap_format(a,text,sizeof(text));text[1]='2';
+ *strrchr(text,',')=0;*strrchr(text,',')=0;*strrchr(text,',')=0;
  assert(controller_remap_parse(text,b) && b[PAD_CAMERA_UP]==4 && b[PAD_CAMERA_CYCLE]==255);
  assert(!memcmp(a,b,sizeof(a)));
  /* Modern layouts must not receive the ten-action P2-P4 movement migration. */
@@ -170,6 +173,66 @@ int main(void) {
  config_write("input.controller_p2",text);memset(&pad,0,sizeof(pad));controller_remap_input(1,&pad,1);
  pad.bAnalogButtons[1]=255;controller_remap_input(1,&pad,1);assert(pad.bAnalogButtons[5]==255);
  config_write("input.controller_p1","");pad=stock;controller_remap_input(0,&pad,1);assert(!memcmp(&pad,&stock,sizeof(pad)));
+ return 0;
+}
+''')
+
+
+def test_camera_perspective_physical_input_and_host_policy(tmp_path):
+    common = COMMON.replace('config_string(', 'layout_string(').replace('config_write(', 'layout_write(')
+    update = function((ROOT / 'port/linux/game/third_person_input.c').read_text(), 'third_person_input_update')
+    run_c(tmp_path, common + r'''
+static int perspective,shoulder,policy,writes;
+static char const *config_string(char const *name){return layout_string(name);}
+static int config_write(char const *name,char const *value){
+ if(!strcmp(name,"display.third_person"))perspective=!strcmp(value,"true");
+ else if(!strcmp(name,"display.third_person_left_shoulder"))shoulder=!strcmp(value,"true");
+ else return layout_write(name,value);
+ writes++;return 1;
+}
+static int config_boolean(char const *name){return !strcmp(name,"display.third_person")?perspective:shoulder;}
+enum {_third_person_player_choice=0};
+static int third_person_policy(void){return policy;}
+static int third_person_enabled(void){return policy==1 || (!policy && perspective);}
+static unsigned long keys;
+static unsigned long halo_keyboard_actions(short p){return keys;}
+''' + POLICY + INPUT + source('port/linux/src/controller_remap_input.c') +
+          source('port/linux/include/halo_keyboard.h') + update + r'''
+static void poll(short port,int button,int connected){
+ XINPUT_GAMEPAD pad={0};
+ if(button>=0){if(button<8)pad.bAnalogButtons[button]=255;else pad.wButtons=digital_masks[button-8];}
+ controller_remap_input(port,&pad,connected);third_person_input_update();
+}
+int main(void){
+ unsigned char b[CONTROLLER_REMAP_ACTIONS];char text[512];int port,saved;
+ for(port=0;port<4;port++){
+  controller_remap_defaults(b);
+  assert(b[PAD_TOGGLE_PERSPECTIVE]==255 && b[PAD_SWAP_SHOULDER]==255);
+  controller_remap_assign(b,PAD_TOGGLE_PERSPECTIVE,0);
+  controller_remap_assign(b,PAD_SWAP_SHOULDER,1);
+  assert(b[PAD_JUMP]==255 && b[PAD_MELEE]==255);
+  controller_remap_assign(b,PAD_CAMERA_SWITCH,0); /* Debug may share the physical button. */
+  assert(b[PAD_TOGGLE_PERSPECTIVE]==0);
+  controller_remap_format(b,text,sizeof(text));config_write(controller_remap_setting(port),text);
+  perspective=shoulder=0;poll(port,-1,1);
+  poll(port,0,1);assert(perspective==1);saved=writes;
+  poll(port,0,1);third_person_input_update();assert(writes==saved);
+  poll(port,-1,1);poll(port,1,1);assert(shoulder==1);
+  poll(port,-1,1);policy=2;saved=writes;poll(port,0,1);poll(port,1,1);assert(writes==saved);
+  policy=0;poll(port,-1,1);poll(port,0,1);assert(!perspective);
+  poll(port,-1,1);saved=writes;poll(port,1,1);assert(writes==saved); /* No shoulder swap in first person. */
+  menu[port]=1;poll(port,0,1);assert(writes==saved);
+  menu[port]=0;poll(port,0,1);assert(writes==saved); /* Release after menus. */
+  poll(port,-1,1);poll(port,0,1);assert(perspective);
+  poll(port,-1,1);camera[port]=2;poll(port,-1,1);saved=writes;
+  poll(port,0,1);poll(port,1,1);assert(writes==saved); /* Debug controls cannot change perspective. */
+  camera[port]=1;poll(port,-1,1);poll(port,0,1);assert(writes==saved); /* Debug switch takes priority. */
+  camera[port]=0;poll(port,-1,1);poll(port,0,0);poll(port,0,1);assert(writes==saved);
+  poll(port,-1,1);poll(port,0,1);assert(!perspective);
+  poll(port,-1,1);
+ }
+ /* Simultaneous keyboard/controller presses toggle once, not twice. */
+ keys=1UL<<HALO_KEYBOARD_TOGGLE_PERSPECTIVE;poll(0,0,1);assert(perspective);
  return 0;
 }
 ''')
@@ -392,6 +455,17 @@ int main(void) {
  pad_editor_event(&row,"port controller bind");capture_button=13;capture_result=1;
  pad_editor_update(&screen);pad_editor_event(&screen,"port controller save");
  assert(controller_remap_read(1,b) && b[PAD_CAMERA_CYCLE]==13);
+ group_spinner.parameters.list.selected_index=5;row.name="op_pad_1";
+ assert(pad_editor_action(&row)==PAD_TOGGLE_PERSPECTIVE);
+ pad_editor_event(&row,"port controller bind");capture_button=10;capture_result=1;
+ pad_editor_update(&screen);assert(pad_editor.proposed==PAD_TOGGLE_PERSPECTIVE);
+ pad_editor_event(&row,"port controller bind");
+ row.name="op_pad_2";assert(pad_editor_action(&row)==PAD_SWAP_SHOULDER);
+ pad_editor_event(&row,"port controller bind");capture_button=11;capture_result=1;
+ pad_editor_update(&screen);pad_editor_event(&row,"port controller bind");
+ pad_editor_event(&screen,"port controller save");
+ assert(controller_remap_read(1,b) && b[PAD_TOGGLE_PERSPECTIVE]==10 && b[PAD_SWAP_SHOULDER]==11);
+ assert(b[PAD_LEFT]==255 && b[PAD_RIGHT]==255);
  return 0;
 }
 ''')
