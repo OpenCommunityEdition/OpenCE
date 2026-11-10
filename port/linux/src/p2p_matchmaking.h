@@ -84,9 +84,16 @@ int mm_elect(const struct mm_unit *units, const int *pool, int pool_count);
 enum
 {
 	/* milliseconds */
+	MM_SETTLE = 4000,
 	MM_EXPIRY_INTERVALS = 3,
 	MM_LOOK_TIME = 6000,
 	MM_MAXIMUM_OUT = 32,
+};
+
+enum
+{
+	MM_FAILED_NONE,
+	MM_FAILED_GAME_UNJOINABLE
 };
 
 struct mm_peer
@@ -97,6 +104,7 @@ struct mm_peer
 	/* this machine's milliseconds, not the sender's clock */
 	unsigned long heard;
 	int refreshes;
+	int failed;
 };
 
 struct mm_out
@@ -122,6 +130,14 @@ struct mm_search
 	int next_queue;
 	unsigned long next_record;
 	struct mm_peer peers[MM_MAXIMUM_UNITS];
+	unsigned char pool[MM_MAXIMUM_POOL][P2P_KEY_HASH_SIZE];
+	int pool_count, pool_playlist, pool_size;
+	unsigned long pool_since;
+	int hosting_playlist, hosting_size;
+	unsigned char joining[P2P_KEY_HASH_SIZE];
+	unsigned long joining_since;
+	struct p2p_mm_decision decision;
+	int decided;
 };
 
 int mm_counted(const struct mm_peer *peer);

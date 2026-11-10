@@ -246,7 +246,7 @@ static void check_election(void)
 struct machine
 {
 	struct mm_search search;
-	int quit;
+	int hosting, players, most, quit;
 };
 
 static struct machine machines[8];
@@ -334,6 +334,20 @@ static void replay_captured(int to)
 	}
 }
 
+static void game_side(int index)
+{
+	struct machine *machine = &machines[index];
+	struct p2p_mm_decision decision = machine->search.decision;
+
+	machine->search.decision.kind = P2P_MM_DECIDE_NONE;
+	if (decision.kind == P2P_MM_DECIDE_HOST)
+	{
+		machine->hosting = 1;
+		machine->players = 1;
+		machine->most = p2p_mm_size_players(decision.size);
+	}
+}
+
 static void run(double seconds)
 {
 	unsigned long until = now_ms + (unsigned long)(seconds * 1000);
@@ -351,6 +365,7 @@ static void run(double seconds)
 				continue;
 			publish(index, out,
 				mm_step(&machines[index].search, now_ms, out, MM_MAXIMUM_OUT));
+			game_side(index);
 		}
 	}
 }
