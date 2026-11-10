@@ -91,6 +91,10 @@ symbols in this file:
 #include "models/models.h"
 #include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
 
+/* port: port/linux/game/first_person_legs.c */
+void first_person_legs_mirror_view(short local_player_index, struct render_camera const *camera,
+	struct render_frustum const *frustum);
+
 /* ---------- constants */
 
 enum
@@ -576,6 +580,9 @@ static void render_player_frame(
 
 			rasterizer_profile_enable(FALSE);
 			render.cluster_index = mirror.cluster_index;
+			/* port: the window's own view, which sets its first-person legs
+			back, for its body in the mirror (port/linux/game/first_person_legs.c) */
+			first_person_legs_mirror_view(window->local_player_index, &window->rasterizer_camera, &rasterizer_frustum);
 			render_window(
 				NONE,
 				&mirror_camera,
@@ -584,6 +591,7 @@ static void render_player_frame(
 				&mirror_frustum,
 				_render_target_secondary,
 				FALSE);
+			first_person_legs_mirror_view(NONE, NULL, NULL);
 			render.cluster_index = saved_cluster_index;
 			rasterizer_profile_enable(TRUE);
 			has_mirror = TRUE;
