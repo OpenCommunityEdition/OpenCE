@@ -329,6 +329,13 @@ game's flags also tell its clients whether the host is a dedicated server
 (`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
 most of the living players).
 
+Then version 42 makes the overshield's collision material an engineer's
+force field (`port/linux/game/overshield_material.c`), as the active
+camouflage's is; its type was left dirt. A projectile responds to what it
+hits by the material's type (needles stuck in an overshield, and bounce off
+it now), and the host's copy of a client's projectile and the client's own
+would respond otherwise in builds before it.
+
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
 sources' messages, kinds, bits, structs sent whole or the sizes of their

@@ -1353,6 +1353,13 @@ long scenario_tags_load(
 
 				powerup_render_bounds_tags_loaded();
 			}
+			/* port: the overshield's force field an engineer's, not dirt, as
+			the active camouflage's is (port/linux/game/overshield_material.c) */
+			{
+				extern void overshield_material_tags_loaded(void);
+
+				overshield_material_tags_loaded();
+			}
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{
 				extern void menu_tags_loaded(char const *map_name);
