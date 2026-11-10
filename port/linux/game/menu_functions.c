@@ -3316,6 +3316,7 @@ void network_game_client_tell_version(unsigned int theirs, boolean distributed);
 boolean ui_widget_port_join(struct widget_instance *widget, void *advertised_game, char const *lobby_name,
 	boolean *widget_deleted);
 boolean ui_widget_port_multiplayer_player(short controller_index, long profile_index);
+boolean ui_widget_port_multiplayer_name_valid(short controller_index, struct player_profile const *profile);
 boolean ui_widget_port_unjoin_player(struct widget_instance *widget, struct event_record *event,
 	boolean *widget_deleted);
 void network_game_server_port_set_settings(wchar_t const *name, long maximum_players);
@@ -6110,21 +6111,22 @@ static void matchmaking_screen_update(struct widget_instance *list)
 		description->parameters.text_box.string_list_index = help;
 }
 
-/* "port matchmaking search" (SEARCH): the search begins, else the error
-sound and the line that refuses it */
+/* a join refuses this profile, and each refused join marks a good host failed */
 static boolean matchmaking_screen_search(void)
 {
 	struct p2p_mm_choice choice;
+	struct player_profile profile;
 	short controller, local_players = 0;
 
 	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
 		local_players += player_ui_local_player_wants_to_play_multiplayer(controller) ? 1 : 0;
 	matchmaking_screen.refusal = matchmaking_search_allowed(matchmaking_screen.playlists, local_players);
 	if (matchmaking_screen.refusal != MATCHMAKING_SEARCH)
-	{
-		ui_play_audio_feedback_sound(SOUND_ERROR);
-		return TRUE;
-	}
+		return campaign_fail();
+	if (!campaign_profile(0, &profile))
+		return campaign_fail();
+	if (!ui_widget_port_multiplayer_name_valid(0, &profile))
+		return FALSE;
 	choice.playlists = matchmaking_screen.playlists;
 	choice.size = matchmaking_screen.size;
 	p2p_mm_search(&choice);
