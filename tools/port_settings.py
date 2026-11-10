@@ -2247,10 +2247,48 @@ def _matchmaking() -> list:
                                                ("bitmap", "bitmaps/text_button_background"), ("text", "SEARCH"),
                                                ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"),
                                                ("text_y", 2)],
-                     ['<on event="a" run="port matchmaking search"/>', '<on event="start" run="port matchmaking search"/>',
+                     [f'<on event="a" run="port matchmaking search" open="{base}/search_screen"/>',
+                      f'<on event="start" run="port matchmaking search" open="{base}/search_screen"/>',
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
     lines += _strings(f"{base}/labels", ["GAME SIZE:", *(f"{name}:" for name in MATCHMAKING_PLAYLISTS)])
     lines += _strings(f"{base}/help_strings", MATCHMAKING_HELP)
+    return lines + _matchmaking_search(base)
+
+
+MATCHMAKING_GOLD = "#e6c66e"
+
+
+def _matchmaking_search(base: str) -> list:
+    screen = f"{base}/search_screen"
+    texts = [("notice", 35, 74, 570, 16, "ui\\small_ui", f"#FF{MATCHMAKING_GOLD[1:].upper()}", None),
+             ("title", 35, 92, 230, 20, "ui\\large_ui", "#FF2896FF", None),
+             ("help", 35, 114, 285, 40, "ui\\small_ui", "#FFFFFFFF", None),
+             ("count", 340, 92, 265, 18, "ui\\small_ui", "#FFFFFFFF", None)]
+    lines = _widget(screen, [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child pause_game"),
+                             ("bitmap", "bitmaps/gradient")],
+                    ['<on event="b" run="port matchmaking search back"/>',
+                     '<on event="back" run="port matchmaking search back"/>',
+                     f'<child widget="{base}/header_matchmaking"/>',
+                     *(f'<child widget="{base}/search_{key}"/>' for key, *_ in texts),
+                     f'<child widget="{base}/search_card_text" x="35" y="370"/>',
+                     f'<child widget="{base}/search_list"/>'])
+    for key, left, top, width, height, font, color, align in texts:
+        lines += _widget(f"{base}/search_{key}", [("type", "text"), ("controller", 1), ("left", left), ("top", top),
+                                                  ("width", width), ("height", height), ("font", font),
+                                                  ("color", color), ("align", align)], [])
+    lines += _widget(f"{base}/search_card_text", [("type", "text"), ("controller", 1), ("width", 265), ("height", 24),
+                                                  ("font", "ui\\small_ui"),
+                                                  ("color", "#FFFFFFFF"), ("text_x", 10), ("text_y", 4)], [])
+    lines += _widget(f"{base}/search_list", [("type", "column_list"), ("width", 640), ("height", 480),
+                                             ("flags", "pass_unhandled_to_focused_child up_down_tabs_children")],
+                     ['<data input="port matchmaking search update"/>',
+                      f'<child widget="{base}/search_button_bar" y="414"/>'])
+    lines += _widget(f"{base}/search_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
+                                                   ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
+                     [f'<child widget="{base}/search_button_cancel" x="477" y="1"/>'])
+    run = "port matchmaking search back"
+    lines += _text_button(f"{base}/search_button_cancel", "CANCEL",
+                          [f'<on event="a" run="{run}"/>', f'<on event="start" run="{run}"/>'])
     return lines
 
 

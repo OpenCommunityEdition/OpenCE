@@ -6200,6 +6200,51 @@ static void matchmaking_lines(const struct p2p_mm_status *status, wchar_t *title
 	title[size - 1] = count[size - 1] = help[size - 1] = notice[size - 1] = 0;
 }
 
+#define MATCHMAKING_TEXT_LENGTH 96
+static void matchmaking_search_update(struct widget_instance *list)
+{
+	struct widget_instance *screen = screen_of(list);
+	struct p2p_mm_status status;
+	wchar_t title[MATCHMAKING_TEXT_LENGTH], count[MATCHMAKING_TEXT_LENGTH], help[MATCHMAKING_TEXT_LENGTH];
+	wchar_t notice[MATCHMAKING_TEXT_LENGTH], text[MATCHMAKING_TEXT_LENGTH];
+	short index;
+
+	p2p_mm_get_status(&status);
+	matchmaking_lines(&status, title, count, help, notice, MATCHMAKING_TEXT_LENGTH);
+	text_set_length(named(screen, "search_title", 0), title, MATCHMAKING_TEXT_LENGTH);
+	text_set_length(named(screen, "search_count", 0), count, MATCHMAKING_TEXT_LENGTH);
+	text_set_length(named(screen, "search_help", 0), help, MATCHMAKING_TEXT_LENGTH);
+	text_set_length(named(screen, "search_notice", 0), notice, MATCHMAKING_TEXT_LENGTH);
+	text[0] = 0;
+	for (index = 0; index < NUMBER_OF_P2P_MM_PLAYLISTS; index++)
+	{
+		if ((matchmaking_screen.playlists >> index) & 1)
+		{
+			text_append(text, NUMBEROF(text), text[0] ? TICKER_SEPARATOR : L"");
+			text_append(text, NUMBEROF(text), matchmaking_playlist_words[index]);
+		}
+	}
+	text_append(text, NUMBEROF(text), TICKER_SEPARATOR);
+	text_append(text, NUMBEROF(text), matchmaking_size_words[matchmaking_screen.size]);
+	text_set_length(named(screen, "search_card_text", 0), text, MATCHMAKING_TEXT_LENGTH);
+}
+
+static boolean matchmaking_search_back(struct widget_instance *widget, boolean *widget_deleted)
+{
+	struct p2p_mm_status status;
+
+	p2p_mm_get_status(&status);
+	if (status.state != P2P_MM_OFF)
+	{
+		p2p_mm_cancel();
+		ui_play_audio_feedback_sound(SOUND_BACK);
+		return TRUE;
+	}
+	ui_widget_port_go_back(widget);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
 /* "gamespy screen update": the games' rows (name, map, gametype, players),
 the one chosen's line, the counts over the titles (the PC version's: its
 players, page, servers) */
@@ -8790,6 +8835,10 @@ boolean pc_menu_event_function_invoke(
 		{
 			return matchmaking_screen_back(widget, widget_deleted);
 		}
+		else if (!strcmp(name, "port matchmaking search back"))
+		{
+			return matchmaking_search_back(widget, widget_deleted);
+		}
 		else if (!strcmp(name, "ss copy invite"))
 		{
 			return invite_copy();
@@ -9063,6 +9112,8 @@ void pc_menu_game_data_function_invoke(
 		password_screen_update(widget);
 	else if (!strcmp(name, "port matchmaking update"))
 		matchmaking_screen_update(widget);
+	else if (!strcmp(name, "port matchmaking search update"))
+		matchmaking_search_update(widget);
 	else if (!strcmp(name, "gamespy screen update"))
 		browser_update(widget);
 	else if (!strcmp(name, "gt edit list update"))

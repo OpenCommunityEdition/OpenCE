@@ -80,8 +80,8 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/matchmaking/button_search" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="SEARCH" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
-		<on event="a" run="port matchmaking search"/>
-		<on event="start" run="port matchmaking search"/>
+		<on event="a" run="port matchmaking search" open="main_menu/multiplayer_type_select/matchmaking/search_screen"/>
+		<on event="start" run="port matchmaking search" open="main_menu/multiplayer_type_select/matchmaking/search_screen"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<strings name="main_menu/multiplayer_type_select/matchmaking/labels">
@@ -109,4 +109,37 @@
 		<string text="ONE PLAYER A MACHINE FOR\nMATCHMAKING."/>
 		<string text=""/>
 	</strings>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" run="port matchmaking search back"/>
+		<on event="back" run="port matchmaking search back"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/header_matchmaking"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_notice"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_title"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_help"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_count"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_card_text" x="35" y="370"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_list"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_notice" type="text" controller="1" left="35" top="74" width="570" height="16" font="ui\small_ui" color="#FFE6C66E">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_title" type="text" controller="1" left="35" top="92" width="230" height="20" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_help" type="text" controller="1" left="35" top="114" width="285" height="40" font="ui\small_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_count" type="text" controller="1" left="340" top="92" width="265" height="18" font="ui\small_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_card_text" type="text" controller="1" width="265" height="24" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+		<data input="port matchmaking search update"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_button_cancel" x="477" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_button_cancel" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="CANCEL" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port matchmaking search back"/>
+		<on event="start" run="port matchmaking search back"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
 </menus>
