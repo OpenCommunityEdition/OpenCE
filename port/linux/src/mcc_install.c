@@ -87,6 +87,9 @@ static struct
 	int done;
 	int failed;
 	char current[64];
+	/* the map counted last: one too large for its cache file is written
+	again, its line printed again, and counted once */
+	char counted[64];
 	char last_error[512];
 	BOOL finished;
 } mcc_install;
@@ -103,13 +106,18 @@ static void mcc_install_line(const char *line)
 	pthread_mutex_lock(&mcc_install.lock);
 	memcpy(mcc_install.current, name, (size_t)(colon - name));
 	mcc_install.current[colon - name] = 0;
-	if (strstr(colon, " structure bsps, "))
-		mcc_install.done++;
-	else if (!strcmp(colon, ": failed"))
+	if (strstr(colon, " structure bsps, ") || !strcmp(colon, ": failed"))
 	{
-		mcc_install.done++;
-		mcc_install.failed++;
-		snprintf(mcc_install.last_error, sizeof(mcc_install.last_error), "%s", line);
+		if (strcmp(mcc_install.current, mcc_install.counted))
+		{
+			mcc_install.done++;
+			snprintf(mcc_install.counted, sizeof(mcc_install.counted), "%s", mcc_install.current);
+		}
+		if (!strcmp(colon, ": failed"))
+		{
+			mcc_install.failed++;
+			snprintf(mcc_install.last_error, sizeof(mcc_install.last_error), "%s", line);
+		}
 	}
 	pthread_mutex_unlock(&mcc_install.lock);
 }

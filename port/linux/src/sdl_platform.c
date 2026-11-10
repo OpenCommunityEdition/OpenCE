@@ -540,8 +540,8 @@ static BOOL data_choose_mcc_folder(char *path, int size)
 /* the maps imported from a Master Chief Collection install the player has
 (found through Steam, else picked); TRUE once destination has every map the
 game needs, FALSE when the player goes back or it fails. The import writes
-the menus' map (ui.map) from MCC's; without it (a build whose data has none),
-the game quits asking for the disc's. */
+the menus' map (ui.map) from MCC's; when it has not (a build whose import
+data has no ui.p2), the game quits asking for the disc's. */
 static BOOL data_import_mcc(const char *destination)
 {
 	char halo1[1024], ui[1100], message[2600], error[1024];
@@ -582,7 +582,7 @@ static BOOL data_import_mcc(const char *destination)
 	if (SDL_GetPathInfo(ui, &information) && information.type == SDL_PATHTYPE_FILE)
 		return TRUE;
 	snprintf(message, sizeof(message),
-		"The maps are imported. The menus' map (ui.map) cannot be made from the Master Chief Collection yet: "
+		"The maps are imported, but not the menus' map (ui.map): "
 		"put the ui.map of an Xbox disc image of Halo: Combat Evolved in %s/maps, then start Halo again.",
 		destination);
 	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Halo", message, NULL);

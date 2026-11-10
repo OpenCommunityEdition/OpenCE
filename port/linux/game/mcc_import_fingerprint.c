@@ -735,6 +735,9 @@ static void scripts(unsigned char *scenario)
 into `space` (its address, bytes and size): nonzero when it could */
 typedef int (*bsp_get_proc)(unsigned long b, unsigned char *reference, struct space *space);
 
+/* the map fingerprinted, for the log */
+static char const *fingerprint_map_name = "";
+
 /* the fingerprint of the map in `map` (its tags, table and scenario filled) */
 static void fingerprint_map(bsp_get_proc bsp_get)
 {
@@ -758,7 +761,7 @@ static void fingerprint_map(bsp_get_proc bsp_get)
 		{
 			if (simulation_group(t->group))
 			{
-				printf("# order: a simulated tag after the disc's: %s\n", t->name);
+				fprintf(stderr, "mcc import: %s: a simulated tag after the disc's: %s\n", fingerprint_map_name, t->name);
 				put_text("SIMULATED TAG AFTER THE DISC'S");
 			}
 			continue;
@@ -784,7 +787,7 @@ static void fingerprint_map(bsp_get_proc bsp_get)
 			(int)(t->group >> 8 & 0xFF), (int)(t->group & 0xFF), t->name);
 		if (!schema || !schema->definition)
 		{
-			printf("# no schema: %s\n", name);
+			fprintf(stderr, "mcc import: %s: no schema for %s\n", fingerprint_map_name, name);
 			continue;
 		}
 		root = translate(t->address, (unsigned long)schema->definition->size);
@@ -817,7 +820,7 @@ static void fingerprint_map(bsp_get_proc bsp_get)
 
 			if (!bsp_get(b, reference, &map.bsp))
 			{
-				printf("# bsp %s unreadable\n", name);
+				fprintf(stderr, "mcc import: %s: structure bsp %s unreadable\n", fingerprint_map_name, name);
 				continue;
 			}
 			map.in_bsp = 1;
@@ -887,6 +890,7 @@ static int mcc_fingerprint_bsp_get(
 }
 
 char const *mcc_import_fingerprint(
+	char const *map_name,
 	void *tag_data,
 	unsigned long tag_data_size,
 	long disc_tag_count,
@@ -901,6 +905,7 @@ char const *mcc_import_fingerprint(
 	map.tags.bytes = tag_data;
 	map.tags.size = tag_data_size;
 	map_table_read();
+	fingerprint_map_name = map_name;
 	order_limit = disc_tag_count;
 	order_table = NULL;
 	order_count = 0;

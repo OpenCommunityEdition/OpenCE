@@ -1,25 +1,28 @@
 /*
 MCC_IMPORT.C
 
-halo --import-mcc <output folder> [<map>...]: writes the Master Chief
-Collection's Halo 1 maps, in the data root's maps folder, as the Xbox's
+halo --import-mcc <output folder> [--from <halo1 folder> | steam] [<map>...]:
+writes the Master Chief Collection's Halo 1 maps (the data root's maps
+folder's, or those of the folder --from names, read as m:\) as the Xbox's
 cache files (version 5) in the output folder, so that the game loads them as
-it loads the disc's maps (.local/step3_writer_design.md; a prototype, not yet
-the importer the menus run).
+it loads the disc's maps (docs/mcc_caches.md). The first start's import
+(port/linux/src/mcc_install.c) runs it in a second copy of the game.
 
-Each map is loaded as the game loads an MCC map to play it
-(custom_edition_cache_tags_load: its tags moved and converted, its models'
-vertices compressed), with custom_edition_geometry_import set, so that its
-geometry is kept for the file instead of being given to the renderer. Then
-the map's file is written as the disc's are: the structure BSPs, each made the
-Xbox's (moved to the top of the tag cache, a header and buffer arrays before
-it); each bitmap's pixels, made the Xbox's by the texture cache's own
-rasterizer_xbox_bitmap_rebuild_hardware_format; and the tags last, copied by
-their schemas into the Xbox's tag cache at 0x803A6000 with the models' vertex
-and index buffers before them, then checked by tag_validate_tags as the game
-checks a map's. The body is deflated by the game's own zlib after the
-header, as the disc's maps are. Sounds are silent: their samples are in MCC's
-sound banks, which are not read yet.
+Each map is loaded as a Custom Edition map is (custom_edition_cache_tags_load:
+its tags moved and converted, its models' vertices compressed), with
+custom_edition_geometry_import set, so that its geometry is kept for the file
+instead of being given to the renderer, and given the disc's values and tag
+order (mcc_import_patch.c). Then the map's file is written as the disc's are:
+the structure BSPs, each made the Xbox's (moved to the top of the tag cache,
+a header and buffer arrays before it); each bitmap's pixels, made the Xbox's
+by the texture cache's own rasterizer_xbox_bitmap_rebuild_hardware_format;
+the sounds, from MCC's banks (mcc_import_sounds.c); and the tags last, copied
+by their schemas into the Xbox's tag cache at 0x803A6000 with the models'
+vertex and index buffers before them, then checked by tag_validate_tags as
+the game checks a map's. The written map's simulation data is fingerprinted
+and compared with the disc's (mcc_import_fingerprint.c), which decides
+whether it is written as the disc's map or as MCC's. The body is deflated by
+the game's own zlib after the header, as the disc's maps are.
 */
 
 /* ---------- headers */
@@ -815,9 +818,9 @@ static void mcc_import_copy_pointers(
 			}
 			case _tag_schema_file_data:
 			{
-				/* a bitmap's pixels are in the body already (their offset
-				set in the tag); a sound's samples are in MCC's sound banks,
-				which are not read yet: silent */
+				/* a bitmap's pixels and a sound's samples are in the body
+				already (their offsets set in the tag: mcc_import_bitmaps,
+				mcc_import_sounds_write) */
 				struct tag_data *copied = (struct tag_data *)copy_field;
 
 				copied->address = NULL;
@@ -2087,15 +2090,15 @@ static boolean mcc_import_tags(
 /* ---------- private code: the fingerprint */
 
 /* Whether the written map is the disc's: its fingerprint
-(mcc_import_fingerprint.c) the disc map's, every part of it, from
-d:\mcc_patches\<map>.fp (the disc's maps', made by the prototype's
-sim_fingerprint). Without that file it cannot be shown. Logs the parts that
-differ. */
+(mcc_import_fingerprint.c) the disc map's, every part of it, from <map>.fp
+(mcc_import_data_read: the data root's mcc_patches folder's, else
+port/assets/mcc's, embedded in the build). Without that file it cannot be
+shown. Logs the parts that differ. */
 static boolean mcc_import_stock(
 	char const *map_name,
 	struct mcc_import_space const *tags)
 {
-	char const *lines = mcc_import_fingerprint(tags->bytes, tags->used, mcc_import_globals.disc_count,
+	char const *lines = mcc_import_fingerprint(map_name, tags->bytes, tags->used, mcc_import_globals.disc_count,
 		mcc_import_globals.bsps, mcc_import_globals.bsp_count);
 	char name[80];
 	char *expected = NULL, *text;

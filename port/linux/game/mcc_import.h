@@ -173,8 +173,9 @@ void mcc_import_sounds_map_done(
 at 0x803A6000), the disc's being its first disc_tag_count tags, and whose
 structure BSPs are bsps (in the scenario's order): its lines, one per part,
 the last the whole map's ("MAP\t<scenario>\t<hash>"). Valid until the next
-call. */
+call. map_name names the map in the log. */
 char const *mcc_import_fingerprint(
+	char const *map_name,
 	void *tag_data,
 	unsigned long tag_data_size,
 	long disc_tag_count,

@@ -965,6 +965,9 @@ static boolean mcc_sounds_sound(
 
 					made_maximum = made_count + pieces + 64;
 					grown = realloc(made, (size_t)made_maximum * PERMUTATION_BYTES);
+					/* (a failed realloc leaves the old block, freed below) */
+					if (!grown)
+						free(made);
 					made = grown;
 				}
 				if (!made || head_index >= heads || made_count + pieces > 0x7FFF)
