@@ -445,6 +445,7 @@ void p2p_mm_cancel(void);
 /* each is ignored unless it answers its decision: p2p_mm_game a HOST, p2p_mm_joined a JOIN */
 void p2p_mm_game(int players, int most_players, int under_way);
 void p2p_mm_joined(int ok);
+void p2p_mm_game_lost(void);
 int p2p_mm_take_decision(struct p2p_mm_decision *decision);
 struct p2p_mm_status
 {
@@ -453,7 +454,9 @@ struct p2p_mm_status
 	/* counts include this machine */
 	int playlist, size, count, needed;
 	int games_checked;
+	int notice;
 };
+enum { P2P_MM_NOTICE_NONE, P2P_MM_NOTICE_HOST_LEFT, P2P_MM_NOTICE_HOST_UNREACHED };
 void p2p_mm_get_status(struct p2p_mm_status *status);
 
 #endif
