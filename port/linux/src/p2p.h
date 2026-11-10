@@ -478,7 +478,9 @@ struct p2p_mm_status
 	int hosts, players, most_players, ping;
 	int notice;
 };
-enum { P2P_MM_NOTICE_NONE, P2P_MM_NOTICE_HOST_LEFT, P2P_MM_NOTICE_HOST_UNREACHED };
+enum { P2P_MM_NOTICE_NONE, P2P_MM_NOTICE_HOST_LEFT, P2P_MM_NOTICE_HOST_UNREACHED, P2P_MM_NOTICE_HOST_FAILED };
+enum { P2P_MM_HOST_WAIT_SECONDS = 20 };
 void p2p_mm_get_status(struct p2p_mm_status *status);
+void p2p_mm_host_gave_up(void);
 
 #endif

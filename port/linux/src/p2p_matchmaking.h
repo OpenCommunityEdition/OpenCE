@@ -85,7 +85,7 @@ enum
 	/* milliseconds */
 	MM_SETTLE = 4000,
 	MM_HOLD = 20000,
-	MM_HOST_WAIT = 20000,
+	MM_HOST_WAIT = P2P_MM_HOST_WAIT_SECONDS * 1000,
 	MM_EXPIRY_INTERVALS = 3,
 	MM_RUNNING_INTERVAL = 25000,
 	MM_LOOK_TIME = 6000,
@@ -165,5 +165,6 @@ void mm_hosted(struct mm_search *search, const unsigned char *token, int players
 void mm_joined(struct mm_search *search, int ok, unsigned long now);
 int mm_cancel(struct mm_search *search, struct mm_out *out, int out_size);
 void mm_game_lost(struct mm_search *search, unsigned long now);
+void mm_host_gave_up(struct mm_search *search, unsigned long now);
 
 #endif

@@ -741,6 +741,14 @@ static int join(struct mm_search *search, unsigned long now, struct mm_out *out,
 	return cancel_except(search, best->playlist, best->size, out, out_size);
 }
 
+void mm_host_gave_up(struct mm_search *search, unsigned long now)
+{
+	if (search->state != P2P_MM_FOUND || search->decided != P2P_MM_DECIDE_HOST)
+		return;
+	search->state = P2P_MM_QUEUED;
+	set_queues(search);
+}
+
 void mm_joined(struct mm_search *search, int ok, unsigned long now)
 {
 	struct mm_peer *host;
@@ -1116,6 +1124,17 @@ void p2p_mm_joined(int ok)
 	pthread_mutex_unlock(&p2p_lock);
 	if (was >= 0)
 		p2p_lobby_browse(was);
+}
+
+void p2p_mm_host_gave_up(void)
+{
+	pthread_mutex_lock(&p2p_lock);
+	if (mm.search.state == P2P_MM_FOUND && mm.search.decided == P2P_MM_DECIDE_HOST)
+	{
+		mm_host_gave_up(&mm.search, p2p_now());
+		mm.notice = P2P_MM_NOTICE_HOST_FAILED;
+	}
+	pthread_mutex_unlock(&p2p_lock);
 }
 
 void p2p_mm_game_lost(void)

@@ -6197,6 +6197,8 @@ static void matchmaking_lines(const struct p2p_mm_status *status, wchar_t *title
 		usnprintf(notice, size - 1, L"THE HOST LEFT. BACK IN THE QUEUE, YOUR PLACE KEPT.");
 	else if (status->notice == P2P_MM_NOTICE_HOST_UNREACHED)
 		usnprintf(notice, size - 1, L"COULD NOT REACH THE HOST. BACK IN THE QUEUE.");
+	else if (status->notice == P2P_MM_NOTICE_HOST_FAILED)
+		usnprintf(notice, size - 1, L"COULD NOT HOST THE GAME. BACK IN THE QUEUE.");
 	title[size - 1] = count[size - 1] = help[size - 1] = notice[size - 1] = 0;
 }
 

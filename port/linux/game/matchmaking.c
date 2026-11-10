@@ -152,6 +152,11 @@ static void matchmaking_begin_host(struct p2p_mm_decision const *decision)
 	matchmaking.map_set = matchmaking.player_added = FALSE;
 }
 
+static boolean matchmaking_host_gave_up(float seconds, short players)
+{
+	return !players && seconds >= MATCHMAKING_PLAYER_SECONDS + P2P_MM_HOST_WAIT_SECONDS;
+}
+
 static void matchmaking_end_host(void)
 {
 	network_game_server_port_set_settings(NULL, 0);
@@ -195,11 +200,20 @@ static void matchmaking_update_host(float seconds)
 		if (!matchmaking.player_added && client && matchmaking.seconds >= MATCHMAKING_PLAYER_SECONDS)
 			matchmaking.player_added = network_game_client_add_player(client, 0);
 	}
-	/* (from the host's own player on: no hosting record says 0 players) */
+	/* (a joiner would read "0 of 4 players" in a record before it) */
 	if (game->player_count)
 		/* a machine joining a game that is over waits out the whole join */
 		p2p_mm_game(game_engine_running() && !game_engine_can_score() ? game->maximum_players : game->player_count,
 			game->maximum_players, state != SERVER_PREGAME);
+	else if (matchmaking_host_gave_up(matchmaking.seconds, game->player_count))
+	{
+		p2p_mm_host_gave_up();
+		matchmaking_end_host();
+		dispose_global_network_game_client();
+		dispose_global_network_game_server();
+		matchmaking.reopen = TRUE;
+		return;
+	}
 	if (state != SERVER_PREGAME)
 		matchmaking.map_set = FALSE;
 	else if (matchmaking.player_added)
