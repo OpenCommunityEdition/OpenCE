@@ -5979,6 +5979,62 @@ static boolean password_screen_edit(struct widget_instance *row, boolean *widget
 	return TRUE;
 }
 
+static struct
+{
+	unsigned playlists;
+	short size;
+	boolean loaded;
+} matchmaking_screen;
+
+static struct widget_instance *matchmaking_playlist_spinner(struct widget_instance *widget, short index)
+{
+	char row[16];
+
+	snprintf(row, sizeof(row), "op_playlist_%d", index);
+	return named(named(screen_of(widget), row, 0), "playlist_spinner", 0);
+}
+
+static void matchmaking_screen_show(struct widget_instance *widget, unsigned playlists, short size)
+{
+	struct widget_instance *spinner = named(screen_of(widget), "size_spinner", 0);
+	short index;
+
+	if (spinner)
+		spinner->parameters.list.selected_index = size;
+	for (index = 0; index < NUMBER_OF_P2P_MM_PLAYLISTS; index++)
+	{
+		spinner = matchmaking_playlist_spinner(widget, index);
+		if (spinner)
+			spinner->parameters.list.selected_index = (playlists >> index) & 1;
+	}
+}
+
+static boolean matchmaking_screen_load(struct widget_instance *widget, boolean defaults)
+{
+	unsigned playlists = 1u << P2P_MM_SLAYER;
+	short size = P2P_MM_2V2;
+
+	matchmaking_screen_show(widget, playlists, size);
+	if (!defaults)
+	{
+		matchmaking_screen.playlists = playlists;
+		matchmaking_screen.size = size;
+	}
+	matchmaking_screen.loaded = TRUE;
+	return TRUE;
+}
+
+/* the spinners are not under the list yet at "port matchmaking init", so the rows load at the first update */
+static void matchmaking_screen_update(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "size_spinner", 0);
+
+	if (!spinner)
+		return;
+	if (!matchmaking_screen.loaded)
+		matchmaking_screen_load(list, FALSE);
+}
+
 static boolean matchmaking_screen_back(struct widget_instance *widget, boolean *widget_deleted)
 {
 	p2p_mm_cancel();
@@ -8556,6 +8612,14 @@ boolean pc_menu_event_function_invoke(
 		{
 			return password_screen_back(widget, widget_deleted);
 		}
+		else if (!strcmp(name, "port matchmaking init"))
+		{
+			matchmaking_screen.loaded = FALSE;
+		}
+		else if (!strcmp(name, "port matchmaking defaults"))
+		{
+			return matchmaking_screen_load(widget, TRUE);
+		}
 		else if (!strcmp(name, "port matchmaking back"))
 		{
 			return matchmaking_screen_back(widget, widget_deleted);
@@ -8831,6 +8895,8 @@ void pc_menu_game_data_function_invoke(
 		server_settings_update(widget);
 	else if (!strcmp(name, "port password update"))
 		password_screen_update(widget);
+	else if (!strcmp(name, "port matchmaking update"))
+		matchmaking_screen_update(widget);
 	else if (!strcmp(name, "gamespy screen update"))
 		browser_update(widget);
 	else if (!strcmp(name, "gt edit list update"))

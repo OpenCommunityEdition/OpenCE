@@ -2199,7 +2199,8 @@ def _matchmaking() -> list:
     lines += _widget(f"{base}/options_menu",
                      [("type", "column_list"), ("width", 640), ("height", 480),
                       ("flags", "pass_unhandled_to_focused_child up_down_tabs_children")],
-                     [*(f'<child widget="{base}/op_{key}" x="35" y="{y}"/>' for key, y in rows),
+                     ['<data input="port matchmaking update"/>', '<on event="created" run="port matchmaking init"/>',
+                      *(f'<child widget="{base}/op_{key}" x="35" y="{y}"/>' for key, y in rows),
                       f'<child widget="{base}/button_bar" y="414"/>'])
     for index, (key, _) in enumerate(rows):
         spinner = "size_spinner" if key == "size" else "playlist_spinner"
@@ -2222,7 +2223,10 @@ def _matchmaking() -> list:
                          ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
     lines += _widget(f"{base}/button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
                                             ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
-                     ['<child widget="common_button_cancel" x="477" y="1"/>'])
+                     [f'<child widget="{base}/button_defaults" x="35" y="1"/>',
+                      '<child widget="common_button_cancel" x="477" y="1"/>'])
+    lines += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port matchmaking defaults"/>',
+                                                    '<on event="start" run="port matchmaking defaults"/>'])
     lines += _strings(f"{base}/labels", ["GAME SIZE:", *(f"{name}:" for name in MATCHMAKING_PLAYLISTS)])
     return lines
 
