@@ -131,5 +131,6 @@ void mm_start(struct mm_search *search, const unsigned char *seed, const struct 
 /* the record must already be verified (mm_record_read) */
 void mm_heard(struct mm_search *search, const struct mm_record *record, unsigned long now);
 int mm_step(struct mm_search *search, unsigned long now, struct mm_out *out, int out_size);
+int mm_cancel(struct mm_search *search, struct mm_out *out, int out_size);
 
 #endif

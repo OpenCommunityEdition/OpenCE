@@ -253,6 +253,8 @@ static struct machine machines[8];
 static int machine_count;
 static unsigned long now_ms, now_unix;
 static int drop_percent;
+static int capture_from = -1, captured_count;
+static struct mm_out captured[256], quit_out[MM_MAXIMUM_OUT];
 
 struct in_flight
 {
@@ -263,6 +265,146 @@ struct in_flight
 static struct in_flight flight[1024];
 static int flight_count;
 
+static int subscribed(const struct mm_search *search, const char *topic)
+{
+	char own[P2P_MM_TOPIC_SIZE];
+	int index;
+
+	for (index = 0; search->state != P2P_MM_OFF && index < search->queue_count; index++)
+	{
+		mm_topic(search->queues[index][0], search->queues[index][1], own, sizeof(own));
+		if (!strcmp(own, topic))
+			return 1;
+	}
+	return 0;
+}
+
+static void publish(int from, const struct mm_out *out, int count)
+{
+	int index, to;
+
+	for (index = 0; index < count; index++)
+	{
+		if (from == capture_from && captured_count < 256)
+			captured[captured_count++] = out[index];
+		for (to = 0; to < machine_count; to++)
+		{
+			if (to == from || !subscribed(&machines[to].search, out[index].topic) || rand() % 100 < drop_percent ||
+				flight_count == 1024)
+			{
+				continue;
+			}
+			flight[flight_count].to = to;
+			flight[flight_count].at = now_ms + 100;
+			flight[flight_count++].out = out[index];
+		}
+	}
+}
+
+static void deliver(void)
+{
+	struct mm_record record;
+	int index = 0;
+
+	while (index < flight_count)
+	{
+		if (flight[index].at > now_ms)
+		{
+			index++;
+			continue;
+		}
+		if (!machines[flight[index].to].quit &&
+			mm_record_read(flight[index].out.bytes, flight[index].out.size, &record))
+		{
+			mm_heard(&machines[flight[index].to].search, &record, now_ms);
+		}
+		flight[index] = flight[--flight_count];
+	}
+}
+
+static void replay_captured(int to)
+{
+	int index;
+
+	for (index = 0; index < captured_count && flight_count < 1024; index++)
+	{
+		flight[flight_count].to = to;
+		flight[flight_count].at = now_ms + 100;
+		flight[flight_count++].out = captured[index];
+	}
+}
+
+static void run(double seconds)
+{
+	unsigned long until = now_ms + (unsigned long)(seconds * 1000);
+	struct mm_out out[MM_MAXIMUM_OUT];
+	int index;
+
+	for (; now_ms < until; now_ms += 100)
+	{
+		if (now_ms % 1000 == 0)
+			now_unix++;
+		deliver();
+		for (index = 0; index < machine_count; index++)
+		{
+			if (machines[index].quit)
+				continue;
+			publish(index, out,
+				mm_step(&machines[index].search, now_ms, out, MM_MAXIMUM_OUT));
+		}
+	}
+}
+
+static void world(int count)
+{
+	memset(machines, 0, sizeof(machines));
+	machine_count = count;
+	now_ms = 1000;
+	now_unix = 1800000000UL;
+	drop_percent = flight_count = captured_count = 0;
+	capture_from = -1;
+	srand(1);
+}
+
+static void start_searching(int index, unsigned playlists, int size, int can_host)
+{
+	struct p2p_mm_choice choice;
+	unsigned char seed[P2P_SEED_SIZE];
+
+	choice.playlists = playlists;
+	choice.size = size;
+	seed_of(100 + index, seed);
+	mm_start(&machines[index].search, seed, &choice, now_ms, now_unix);
+	machines[index].search.can_host = can_host;
+}
+
+static int peer_count(const struct mm_search *search)
+{
+	int index, count = 0;
+
+	for (index = 0; index < MM_MAXIMUM_UNITS; index++)
+		count += search->peers[index].used && mm_counted(&search->peers[index]);
+	return count;
+}
+
+static void check_replay(void)
+{
+	case_name = "e43_replay";
+	world(2);
+	start_searching(0, 1u << P2P_MM_SLAYER, P2P_MM_2V2, 1);
+	start_searching(1, 1u << P2P_MM_SLAYER, P2P_MM_2V2, 1);
+	capture_from = 0;
+	run(8.0);
+	capture_from = -1;
+	publish(0, quit_out, mm_cancel(&machines[0].search, quit_out, MM_MAXIMUM_OUT));
+	machines[0].quit = 1;
+	run(1.0);
+	CHECK(peer_count(&machines[1].search) == 0, "a cancel drops a searcher at once");
+	replay_captured(1);
+	run(7.0);
+	CHECK(peer_count(&machines[1].search) == 0, "E43: a replayed searcher is never counted again");
+}
+
 int main(void)
 {
 	check_pool();
@@ -271,6 +413,7 @@ int main(void)
 	check_hosting();
 	check_playlists();
 	check_topics();
+	check_replay();
 	printf(failures ? "FAILED %d\n" : "PASS\n", failures);
 	return failures != 0;
 }

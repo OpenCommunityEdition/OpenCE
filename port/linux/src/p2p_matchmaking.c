@@ -395,7 +395,11 @@ void mm_heard(struct mm_search *search, const struct mm_record *record, unsigned
 	}
 	peer->record = *record;
 	peer->heard = now;
-	peer->refreshes++;
+	/* a cancelled entry stays as a tombstone, so older records of its key are dropped */
+	if (record->kind == MM_KIND_CANCEL)
+		peer->refreshes = -1;
+	else
+		peer->refreshes++;
 }
 
 static void expire(struct mm_search *search, unsigned long now)
@@ -432,6 +436,39 @@ static int emit(const struct mm_search *search, const struct mm_record *record, 
 	mm_topic(record->playlist, record->size, out->topic, sizeof(out->topic));
 	out->size = mm_record_write(record, search->seed, out->bytes, sizeof(out->bytes));
 	return out->size > 0;
+}
+
+static int cancel_except(struct mm_search *search, int keep_playlist, int keep_size, struct mm_out *out, int out_size)
+{
+	int interval = mm_interval(search->queue_count), index, kept = 0, count = 0;
+
+	for (index = 0; index < search->queue_count; index++)
+	{
+		struct mm_record record;
+
+		if (search->queues[index][0] == keep_playlist && search->queues[index][1] == keep_size)
+		{
+			search->queues[kept][0] = keep_playlist;
+			search->queues[kept++][1] = keep_size;
+		}
+		else if (count < out_size)
+		{
+			record = base_record(search, MM_KIND_CANCEL, search->queues[index][0], search->queues[index][1],
+				interval);
+			count += emit(search, &record, &out[count]);
+		}
+	}
+	search->queue_count = kept;
+	search->next_queue = 0;
+	return count;
+}
+
+int mm_cancel(struct mm_search *search, struct mm_out *out, int out_size)
+{
+	int count = cancel_except(search, -1, -1, out, out_size);
+
+	search->state = P2P_MM_OFF;
+	return count;
 }
 
 int mm_step(struct mm_search *search, unsigned long now, struct mm_out *out, int out_size)
