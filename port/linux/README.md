@@ -1876,6 +1876,18 @@ definition. Without this check, the linker gives the reference the address
   `HALO_GPU_TRACE_MARKERS=1` lets the driver write them, to capture with
   gpuvis.
 
+Before its presentation blit, `D3DDevice_Present` in
+[`src/d3d8_gl.c`](src/d3d8_gl.c) restores the window's draw framebuffer after
+looking up the source framebuffer. Creating a source entry binds both read
+and draw targets; without restoring the draw target, the first presentation
+can blit the back buffer onto itself. Loading-screen draws can create that
+entry earlier and mask the defect when saved map caches are absent.
+The [presentation regression](../../tools/harness/tests/test_present_framebuffer.py)
+covers new, reused and changed source framebuffers, HDR presentation and its
+blit fallback. This fixes the binding defect found during
+[GulchCE issue #80](https://github.com/chestahh/GulchCE/issues/80), but does not
+establish the cause of the reported persistent Android geometry loss.
+
 ### Game source changes
 
 Five files of the game have changes for clang. These changes do not change
