@@ -31,7 +31,7 @@ folder is read as the drive `m:\` and nothing is written to it. For each map:
    disc's (`port/assets/mcc/<map>.fp`). A map that matches is written as the
    disc's and plays with players of the disc; any other is marked with
    `MCC_MAP_VERSION` in its header and plays only with other such maps
-   (`cache_files_map_version`; network version 42,
+   (`cache_files_map_version`; network version 43,
    `port/linux/NETCODE.md`). Halo PC's seven rebuilds of the multiplayer maps
    (beavercreek, bloodgulch, boardingaction, carousel, damnation, hangemhigh,
    sidewinder) have other collision, and are always MCC's.

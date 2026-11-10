@@ -68,8 +68,8 @@ which hosts built before there was a version send as zeros: version 0.
 Raise it with any change to what the machines send each other. */
 /* Version 42 integrates MCC admission/sharing and shared checkpoint, boat,
 clock and scripted-pose agreement. Every map family uses the same version.
-Version 43 gives the game's own maps MCC's map version when they are MCC's
-(MCC_MAP_VERSION). */
+Version 43 gives the game's own maps MCC's map version when the MCC import
+could not show them to be the disc's (MCC_MAP_VERSION). */
 #define HALO_PORT_NETWORK_VERSION 43
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags, then the game's kind (an OpenCE gametype's mode, and Hardcore:

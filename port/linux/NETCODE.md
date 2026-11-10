@@ -386,14 +386,15 @@ settings carry a zero MCC identity for Xbox/CE. Checkpoint epochs, recovery,
 scripted poses and shared boat/console fixes require matching peers.
 
 Then version 43 gives the game's own maps a version when they are MCC's
-(Halo: The Master Chief Collection's maps, cache version 13, loaded in place
-of the disc's: `cache_files_map_version`, `MCC_MAP_VERSION` in
-`port/linux/game/custom_edition_cache.h`), where every stock map's was 0.
-Seven of MCC's multiplayer maps are Halo PC's rebuilds, with other collision
-than the disc's, so a machine with MCC's maps and one with the disc's never
-play together: a client whose map is of the other kind is told so and does
-not join. A build before it would take the version as nothing to check and
-join with the other kind's map.
+(Halo: The Master Chief Collection's maps, which `halo --import-mcc` writes
+as the disc's maps: `cache_files_map_version`, `MCC_MAP_VERSION` in
+`port/linux/game/custom_edition_cache.h`), where every stock map's was 0. An
+imported map the import could not show to be the disc's has MCC's version,
+among them Halo PC's seven rebuilds of the multiplayer maps, whose collision
+is not the disc's. Such a map and the disc's never meet in a game: a client
+whose map is of the other kind is told so and does not join. A build before
+it would take the version as nothing to check and join with the other kind's
+map.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
