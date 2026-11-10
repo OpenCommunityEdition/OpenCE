@@ -325,6 +325,29 @@ def test_menu_settings_exist():
     assert controls == set(re.findall(r'\{ "(controls\.[a-z_]+)", L"', functions))
 
 
+def test_add_player_quarters_have_three_children():
+    """ADD PLAYER's quarters (tools/port_settings.py's _join4) have three
+    children with either menus' map: the Xbox's split screen widgets
+    (map_has) or the port's (map_lacks). The game's update of a choosing
+    quarter's spinner (player_profile_1wide_list_update) halts on any other
+    count, or on a spinner not third; a quarter's background is its own
+    bitmap."""
+    import xml.etree.ElementTree as ElementTree
+
+    tree = ElementTree.parse(MENUS / "ce" / "main_menu.multiplayer_type_select.lobby.xml")
+    widgets = {widget.get("name"): widget for widget in tree.iter("widget")}
+    base = "main_menu/multiplayer_type_select/lobby"
+    for quarter in ("join4_qtr_select", "join4_qtr_ready", "join4_qtr_playing"):
+        children = widgets[f"{base}/{quarter}"].findall("child")
+        assert all(child.get("map_has") or child.get("map_lacks") for child in children), quarter
+        for attribute in ("map_has", "map_lacks"):
+            for_map = [child.get("widget") for child in children if child.get(attribute)]
+            assert len(for_map) == 3, (quarter, attribute, for_map)
+            if quarter == "join4_qtr_select":
+                assert "spinner" in for_map[2], (quarter, attribute, for_map)
+        assert widgets[f"{base}/{quarter}"].get("bitmap"), quarter
+
+
 def test_default_brokers_are_brokers_txt():
     """The brokers a game uses with no brokers.txt beside its config.toml
     (p2p_signal.c's DEFAULT_BROKERS) are port/assets/network/brokers.txt's."""

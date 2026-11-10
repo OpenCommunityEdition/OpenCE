@@ -2078,7 +2078,15 @@ def _join4(base: str) -> list:
     Xbox's is there only if the map has them (map_has), and with any other
     map the port's own stand in (map_lacks), in the same places, doing the
     same, drawn with the PC menus' flat panel and the pictures and fonts both
-    maps have (_join4_port)"""
+    maps have (_join4_port).
+
+    A choosing quarter has three children, the profile's picture, its
+    description and the spinner, in that order, with either map: the game's
+    update of the spinner (player_profile_1wide_list_update, the "player
+    profile small menu update") halts on any other. So a quarter's
+    background is its own bitmap (the Xbox's picture, a frame of the map,
+    nothing with a map that has not got it), and the port's panel is the
+    screen's, under each quarter"""
     xbox = "ui\\shell\\main_menu\\multiplayer_type_select\\split_screen\\4way_profile_select\\"
     connected = "ui\\shell\\main_menu\\multiplayer_type_select\\connected\\4way_profile_select\\"
     has = f' map_has="{xbox}qtr_screen_profile_select"'
@@ -2098,6 +2106,7 @@ def _join4(base: str) -> list:
                      '<data input="port join4 update"/>',
                      f'<child widget="{xbox}header_select_profile"{has}/>',
                      f'<child widget="{base}/header_add_player"{lacks}/>',
+                     *[f'<child widget="{base}/join4_panel" x="{x}" y="{y}"{lacks}/>' for x, y in quarters],
                      *[f'<child widget="{base}/join4_qtr_join" controller="{index + 1}" x="{x}" y="{y}"/>'
                        for index, (x, y) in enumerate(quarters)],
                      f'<child widget="ui\\shell\\main_menu\\button_key"{has}/>',
@@ -2107,44 +2116,40 @@ def _join4(base: str) -> list:
     # sends a player's quarter "black" (their profile) and the quarter of the
     # controller whose START opened it "white" (its spinner): join4_open)
     lines += _widget(f"{base}/join4_qtr_join",
-                     [("width", 255), ("height", 165), ("flags", "pass_unhandled_to_focused_child")],
+                     [("width", 255), ("height", 165), ("bitmap", f"{base}/join4_xbox_background"),
+                      ("flags", "pass_unhandled_to_focused_child")],
                      [f'<on event="black" run="port join4 playing" replace="{base}/join4_qtr_playing"/>',
                       f'<on event="white" run="port join4 opener" replace="{base}/join4_qtr_select"/>',
                       f'<on event="a" run="port join4 join" replace="{base}/join4_qtr_select"/>',
                       f'<on event="start" run="port join4 join" replace="{base}/join4_qtr_select"/>',
                       # (a widget with no B of its own goes back at it)
                       '<on event="b"/>', '<on event="back"/>',
-                      f'<child widget="{base}/join4_xbox_background"{has}/>',
                       f'<child widget="{connected}press_start_to_join" x="54" y="20"{has}/>',
                       f'<child widget="{connected}press_start_to_join_controller"{has}/>',
-                      f'<child widget="{base}/join4_panel"{lacks}/>',
                       f'<child widget="{base}/join4_press_to_join"{lacks}/>',
                       f'<child widget="{base}/join4_controller"{lacks}/>'])
     lines += _widget(f"{base}/join4_qtr_select",
-                     [("width", 254), ("height", 164), ("flags", "pass_unhandled_to_focused_child")],
+                     [("width", 254), ("height", 164), ("bitmap", f"{base}/join4_xbox_border"),
+                      ("flags", "pass_unhandled_to_focused_child")],
                      ['<on event="created" run="port join4 choosing"/>',
                       f'<on event="a" run="port join4 select" replace="{base}/join4_qtr_ready"/>',
                       f'<on event="start" run="port join4 select" replace="{base}/join4_qtr_ready"/>',
                       f'<on event="b" run="port join4 leave" replace="{base}/join4_qtr_join"/>',
                       '<on event="back"/>',
-                      f'<child widget="{base}/join4_xbox_border"{has}/>',
                       f'<child widget="{xbox}qtr_screen_profile_color_pic"{has}/>',
                       f'<child widget="{xbox}qtr_screen_profile_desc"{has}/>',
                       f'<child widget="{xbox}qtr_screen_profile_spinner"{has}/>',
-                      f'<child widget="{base}/join4_panel"{lacks}/>',
                       f'<child widget="{MT}/connected/4way_profile_select/qtr_screen_profile_color_pic"{lacks}/>',
                       f'<child widget="{base}/join4_choose"{lacks}/>',
                       f'<child widget="{base}/join4_spinner"{lacks}/>'])
-    selected = [f'<child widget="{base}/join4_xbox_border"{has}/>',
-                f'<child widget="{xbox}qtr_screen_profile_color_pic_selected"{has}/>',
+    selected = [f'<child widget="{xbox}qtr_screen_profile_color_pic_selected"{has}/>',
                 f'<child widget="{xbox}qtr_screen_profile_selected_text"{has}/>',
                 f'<child widget="{xbox}qtr_screen_profile_selected_name"{has}/>',
-                f'<child widget="{base}/join4_panel"{lacks}/>',
                 f'<child widget="{base}/join4_color"{lacks}/>',
                 f'<child widget="{base}/join4_selected"{lacks}/>',
                 f'<child widget="{base}/join4_name"{lacks}/>']
     lines += _widget(f"{base}/join4_qtr_ready",
-                     [("width", 254), ("height", 164)],
+                     [("width", 254), ("height", 164), ("bitmap", f"{base}/join4_xbox_border")],
                      ['<on event="created" run="port join4 ready"/>',
                       '<on event="a" run="port join4 done" back="true"/>',
                       '<on event="start" run="port join4 done" back="true"/>',
@@ -2153,7 +2158,7 @@ def _join4(base: str) -> list:
                       *selected])
     # (a player in the game already)
     lines += _widget(f"{base}/join4_qtr_playing",
-                     [("width", 254), ("height", 164)],
+                     [("width", 254), ("height", 164), ("bitmap", f"{base}/join4_xbox_border")],
                      ['<on event="a" run="port join4 done" back="true"/>',
                       '<on event="start" run="port join4 done" back="true"/>',
                       '<on event="b"/>', '<on event="back"/>',
@@ -2161,14 +2166,13 @@ def _join4(base: str) -> list:
     lines += _widget(f"{base}/join4_hint", [("type", "text"), ("width", 345), ("height", 24),
                                             ("font", "ui\\small_ui"), ("color", "#FF2896FF"),
                                             ("text_flags", "no_focus_test")], [])
-    # (the Xbox's quarters' pictures, under their widgets: frames of the map,
-    # which one that has not got them draws as nothing, menu_tags.c's
+    # (the Xbox's quarters' pictures, the quarters' own bitmaps: frames of
+    # the map, which one that has not got them draws as nothing, menu_tags.c's
     # bitmap_build)
-    for name, size, picture in (("join4_xbox_background", (255, 165), "ui\\shell\\bitmaps\\split_screen_bkd"),
-                                ("join4_xbox_border", (254, 164), f"{xbox}4way_profile_border")):
+    for name, picture in (("join4_xbox_background", "ui\\shell\\bitmaps\\split_screen_bkd"),
+                          ("join4_xbox_border", f"{xbox}4way_profile_border")):
         lines += [f"\t<bitmap{attributes([('name', f'{base}/{name}')])}>",
                   f"\t\t<frame{attributes([('map', picture), ('index', 0)])}/>", "\t</bitmap>"]
-        lines += _widget(f"{base}/{name}", [("width", size[0]), ("height", size[1]), ("bitmap", f"{base}/{name}")], [])
     return lines + _join4_port(base)
 
 
