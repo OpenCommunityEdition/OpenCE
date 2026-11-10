@@ -2641,8 +2641,10 @@ static void trigger_create_projectiles(
 
 						unit_get_camera_position(owner_object_index, &camera_position);
 						/* port: a validated shoulder shot must not collide with its owner. */
-						object_force_inside_bsp_ignoring(projectile_object_index, &camera_position,
-							muzzle_origin ? owner_object_index : NONE);
+						if (muzzle_origin)
+							third_person_projectile_repair(projectile_object_index, &camera_position, owner_object_index);
+						else
+							object_force_inside_bsp(projectile_object_index, &camera_position);
 					}
 					if (target_object_index!=NONE)
 					{

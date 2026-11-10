@@ -3,6 +3,9 @@
 #include "third_person.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "networking/network_server_manager_internal.h"
+#include "networking/network_server_message_handler.h"
+#include "networking/network_messages.h"
 
 char const *config_string(char const *name);
 int config_boolean(char const *name);
@@ -35,4 +38,20 @@ boolean third_person_enabled(void)
 	short policy = third_person_policy();
 	return policy == _third_person_forced_on ||
 		(policy == _third_person_player_choice && config_boolean("display.third_person"));
+}
+
+/* Update the authoritative pregame record, including late joiners. */
+void third_person_set_match_policy(short policy)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct network_game *game;
+	/* The server manager's pregame state is zero; keep its record private. */
+	if (!server || network_game_server_get_state(server, NULL) != 0 ||
+		policy < _third_person_player_choice || policy > _third_person_forced_off)
+		return;
+	game = network_game_server_get_game(server);
+	game->cooperative_flags = (game->cooperative_flags & ~THIRD_PERSON_POLICY_MASK) |
+		(policy << THIRD_PERSON_POLICY_SHIFT);
+	if (!network_game_server_send_game_data_pregame(server))
+		network_event("failed to send updated camera policy to clients");
 }

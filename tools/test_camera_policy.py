@@ -19,7 +19,6 @@ def test_camera_policy(tmp_path, fault):
     defines = "\n".join(re.findall(r"^#define THIRD_PERSON_POLICY_.*", header, re.M))
     policy = re.sub(r"^#include[^\n]*", "", (ROOT / "port/linux/game/third_person_policy.c").read_text(), flags=re.M)
     policy += function((ROOT / "port/linux/game/third_person_input.c").read_text(), "third_person_input_update")
-    setter = function((ROOT / "source/networking/network_server_manager.c").read_text(), "network_game_server_port_set_camera_policy")
     menus = (ROOT / "port/linux/game/menu_functions.c").read_text()
     menu_functions = function(menus, "camera_setting_show") + function(menus, "setting_changed_save")
     if fault == "local_override":
@@ -29,7 +28,7 @@ def test_camera_policy(tmp_path, fault):
     elif fault == "invalid_flags":
         policy = policy.replace("<= _third_person_forced_off;", "<= 3;")
     elif fault == "ingame_change":
-        setter = setter.replace("server->state != _network_game_server_state_pregame ||", "")
+        policy = policy.replace("network_game_server_get_state(server, NULL) != 0 ||", "")
     stub = r'''
 #include <string.h>
 #include <stddef.h>
@@ -53,6 +52,8 @@ static int network_game_is_splitscreen_local(void){return 0;}
 static unsigned long held;
 static struct network_game *network_game_get_game(void){return current;}
 static struct network_game_server *global_network_game_server_get(void){return server_pointer;}
+static int network_game_server_get_state(struct network_game_server *s,short *substate){(void)substate;return s->state;}
+static struct network_game *network_game_server_get_game(struct network_game_server *s){return &s->game;}
 static int network_game_server_send_game_data_pregame(struct network_game_server *s){(void)s;sends++;return 1;}
 static void network_event(char const *s){(void)s;}
 char const *config_string(char const *s){(void)s;return host_setting;}
@@ -64,7 +65,7 @@ struct widget_instance {struct {struct {short selected_index;} list;} parameters
 static short setting_value_index(struct pc_menu_setting const *s,char const *v){int i;for(i=0;i<s->value_count;i++)if(!strcmp(s->values[i],v))return i;return NONE;}
 static int setting_write(char const *s,char const *v){return config_write(s,v);}
 #define platform_log(...) ((void)0)
-''' + enums + "\n" + defines + "\n" + policy + setter + menu_functions + r'''
+''' + enums + "\n" + defines + "\n" + policy + menu_functions + r'''
 #define CHECK(c) do{if(!(c))return __LINE__;}while(0)
 static void press(unsigned long key){held=0;third_person_input_update();held=key;third_person_input_update();}
 int main(void){int i,p,saved;struct network_game remote;
@@ -88,13 +89,13 @@ int main(void){int i,p,saved;struct network_game remote;
   current=NULL;CHECK(third_person_policy()==0&&third_person_enabled()==preference);
  }
  server_pointer=&host;host.game.cooperative_flags=3;host.state=0;
- network_game_server_port_set_camera_policy(1);CHECK(host.game.cooperative_flags==11&&sends==1);
- network_game_server_port_set_camera_policy(2);CHECK(host.game.cooperative_flags==19&&sends==2);
- network_game_server_port_set_camera_policy(-1);network_game_server_port_set_camera_policy(3);
+ third_person_set_match_policy(1);CHECK(host.game.cooperative_flags==11&&sends==1);
+ third_person_set_match_policy(2);CHECK(host.game.cooperative_flags==19&&sends==2);
+ third_person_set_match_policy(-1);third_person_set_match_policy(3);
  CHECK(host.game.cooperative_flags==19&&sends==2);
- host.state=1;network_game_server_port_set_camera_policy(0);CHECK(host.game.cooperative_flags==19&&sends==2);
- host.state=0;network_game_server_port_set_camera_policy(0);CHECK(host.game.cooperative_flags==3&&sends==3);
- server_pointer=NULL;network_game_server_port_set_camera_policy(1);CHECK(sends==3);
+ host.state=1;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==19&&sends==2);
+ host.state=0;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==3&&sends==3);
+ server_pointer=NULL;third_person_set_match_policy(1);CHECK(sends==3);
  /* A lobby unlock just before OK must not save the forced display value. */
  current=&remote;remote.cooperative_flags=8;preference=0;saved=writes;
  camera_setting_show(&spinner,&setting);CHECK(spinner.parameters.list.selected_index==1&&setting.loaded_index==NONE);

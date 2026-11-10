@@ -411,7 +411,6 @@ static boolean object_is_first_person_camera(
 		? NONE
 		: player_get(local_player_get_player_index(render.local_player_index))->unit_index;
 
-	/* port: draw the complete local body in the shoulder view. */
 	return (unit_index == object_index &&
 		director_get_perspective(render.local_player_index) ==
 			_director_perspective_first_person) ||

@@ -3359,7 +3359,6 @@ boolean ui_widget_port_multiplayer_player(short controller_index, long profile_i
 boolean ui_widget_port_unjoin_player(struct widget_instance *widget, struct event_record *event,
 	boolean *widget_deleted);
 void network_game_server_port_set_settings(wchar_t const *name, long maximum_players);
-void network_game_server_port_set_camera_policy(short policy);
 void network_game_server_port_set_cooperative_friendly_fire(short friendly_fire);
 void network_game_server_port_set_cooperative_player_collisions(boolean player_collisions);
 void network_game_server_port_set_cooperative_ally_friendly_fire(boolean ally_friendly_fire);
@@ -4251,7 +4250,7 @@ static boolean session_options_update(struct widget_instance *list)
 	selected = (short)PIN(spinner->parameters.list.selected_index, 0, 2);
 	if (selected != third_person_policy())
 	{
-		network_game_server_port_set_camera_policy(selected);
+		third_person_set_match_policy(selected);
 		if (selected == third_person_policy()) config_write("network.camera_policy", policies[selected]);
 	}
 	spinner->parameters.list.selected_index = third_person_policy();

@@ -13,6 +13,7 @@ enum third_person_match_policy
 /* Replicated with each input tick, not latched like a button press. */
 #define THIRD_PERSON_INPUT_BIT 16
 short third_person_host_policy(void);
+void third_person_set_match_policy(short policy);
 short third_person_policy(void);
 boolean third_person_enabled(void);
 boolean third_person_match_flags_valid(unsigned long flags);
@@ -24,6 +25,7 @@ union real_point3d;
 union real_vector3d;
 boolean third_person_muzzle_shot(long weapon_index, long unit_index, short trigger_index,
 	union real_point3d *origin, union real_vector3d *forward);
+boolean third_person_projectile_repair(long object_index, union real_point3d const *known_good_point, long ignore_object_index);
 boolean third_person_muzzle_history(long unit_index, union real_point3d *position);
 boolean third_person_muzzle_target(short local_player_index, union real_point3d *target);
 boolean third_person_free_look_input(short local_player_index, real yaw, real pitch);

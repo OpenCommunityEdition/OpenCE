@@ -98,8 +98,6 @@ void network_game_server_port_set_cooperative(
 	short difficulty);
 /* port: co-op's friendly fire between its players (a _friendly_fire_ mode:
 Server Setup's FRIENDLY FIRE), kept for the levels after */
-/* port: host-owned shoulder camera policy. */
-void network_game_server_port_set_camera_policy(short policy);
 void network_game_server_port_set_cooperative_friendly_fire(
 	short friendly_fire);
 /* port: whether co-op's players collide with each other (Server Setup's

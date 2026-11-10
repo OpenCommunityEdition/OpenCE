@@ -68,11 +68,10 @@ projectile origins, aim, collision thresholds or the network format.
 
 The projectile creation hook is necessary because
 [weapons.c](../../source/items/weapons.c) owns the final origin after aim
-assistance. The additive `object_force_inside_bsp_ignoring` helper excludes
-the shooter from that final safety check; existing callers retain the
-original `object_force_inside_bsp` behavior with no ignored object.
-The shared firing-effect declaration exposes the already accepted tag layout
-without moving or replacing the original weapon implementation.
+assistance. `third_person_projectile_repair` excludes the shooter from that
+final safety check using the existing collision and object APIs. Stock shots
+still call the unchanged `object_force_inside_bsp`. The firing-effect tag
+declaration stays private to `third_person_weapon.c`.
 
 [network_damage.c](../../port/linux/game/network_damage.c) owns hit history,
 so its small hook asks `third_person_muzzle_history` for a host-computed
@@ -91,8 +90,9 @@ relay despite also using version 42.
 Only the host sets policy, during pregame. Invalid values and unknown settings
 bits are rejected. Forced Off clears shoulder input before simulation. The
 host also independently checks authored camera priority when solving shots.
-The host create/setter and client settings hooks are necessary because those
-engine paths own session settings and their transmission.
+The host-creation and client-validation hooks sit where session settings are
+initialized and received. `third_person_set_match_policy` lives in the policy
+module and uses the existing public server lookup and pregame broadcast APIs.
 
 Each local viewport owns its collision, orbit and target state. Map loads
 and checkpoint restores call `third_person_reset`. Changed units, death,

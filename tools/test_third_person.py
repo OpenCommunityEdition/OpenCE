@@ -495,7 +495,11 @@ def test_muzzle_origin_and_host_history(tmp_path):
     compiler = shutil.which("clang") or shutil.which("cc")
     if not compiler:
         pytest.skip("a C compiler is required")
+    from harness import function
     actual = (ROOT / "port/linux/game/third_person_weapon.c").read_text()
+    actual = actual.replace(function(actual, "third_person_projectile_repair"), "")
+    declaration = re.search(r"struct weapon_firing_effect_definition\s*\{.*?\};", actual, re.S).group(0)
+    actual = actual.replace(declaration, "")
     actual = re.sub(r'^#include[^\n]*', '', actual, flags=re.M)
     code = r'''
 #include <math.h>
@@ -528,12 +532,13 @@ char const *config_string(char const *n){(void)n;return "";}
 void platform_log(char const *n,...){(void)n;}
 struct tag_block {long count;void *address;};
 struct weapon_trigger_definition {unsigned flags;real_point3d first_person_weapon_offset;struct tag_block firing_effects;real spew_time;};
-struct weapon_firing_effect_definition {struct {long index;} effects[3];};
+struct tag_reference {long index;};
+''' + declaration + r'''
 struct effect_definition {struct tag_block locations;};
 #define EFFECT_DEFINITION_TAG 1
 static char effect_marker[32]="primary trigger1";
 static struct effect_definition effect={{1,effect_marker}};
-static struct weapon_firing_effect_definition firing={{{0},{-1},{-1}}};
+static struct weapon_firing_effect_definition firing={0,0,{0},{{0},{-1},{-1}},{{0}}};
 static void *tag_get(int group,long n){(void)group;(void)n;return &effect;}
 struct weapon_definition {struct {struct tag_block triggers;} weapon;};
 struct weapon_datum {long definition_index;struct {struct {int state;short firing_effect_index;} triggers[2];} weapon;};
@@ -705,7 +710,8 @@ def test_muzzle_bsp_repair_excludes_shooter(tmp_path, fault):
     compiler = shutil.which("clang") or shutil.which("cc")
     if not compiler:
         pytest.skip("a C compiler is required")
-    actual = function((ROOT / "source/objects/objects.c").read_text(), "object_force_inside_bsp_ignoring")
+    actual = function((ROOT / "port/linux/game/third_person_weapon.c").read_text(), "third_person_projectile_repair")
+    actual += function((ROOT / "source/objects/objects.c").read_text(), "object_force_inside_bsp")
     if fault:
         actual = actual.replace("&object->object.position, ignore_object_index,", "&object->object.position, NONE,")
     code = r'''
@@ -722,11 +728,11 @@ struct location {short cluster_index;};
 struct object_datum {struct {real_point3d position;struct location location;} object;};
 struct collision_result {real_point3d point;struct location location;};
 static struct object_datum projectile={{{1,0,-.2f},{0}}};
-static int global_current_collision_user_depth=1,global_current_collision_users[8],wall,translated;
+static int global_current_collision_user_depth=1,global_current_collision_users[8],wall,translated,destination_cluster;
 static struct object_datum *object_get(long i){(void)i;return &projectile;}
 static int collision_test_line(int flags,real_point3d const *a,real_point3d const *b,long ignore,struct collision_result *c){
  (void)flags;(void)a;(void)b;
- c->location.cluster_index=0;c->point=(real_point3d){.1f,0,0};
+ c->location.cluster_index=destination_cluster;c->point=(real_point3d){.1f,0,0};
  if(ignore!=7)return 1; /* the eye-to-barrel line crosses the shooter */
  if(wall){c->point=(real_point3d){.5f,0,-.1f};return 1;}return 0;
 }
@@ -734,13 +740,28 @@ static void object_translate(long i,real_point3d const *p,struct location const 
 static void object_compute_node_matrices(long i){(void)i;}
 ''' + actual + r'''
 #define CHECK(c) do{if(!(c))return __LINE__;}while(0)
-int main(void){real_point3d eye={0,0,0};
- CHECK(object_force_inside_bsp_ignoring(2,&eye,7));
+int main(void){real_point3d eye={0,0,0};int destination,initial,blocked,result,moved;struct object_datum saved;
+ CHECK(third_person_projectile_repair(2,&eye,7));
  CHECK(translated==0&&projectile.object.position.x==1);
- wall=1;CHECK(object_force_inside_bsp_ignoring(2,&eye,7));
+ wall=1;CHECK(third_person_projectile_repair(2,&eye,7));
  CHECK(translated==1&&projectile.object.position.x==.5f);
- wall=0;CHECK(object_force_inside_bsp_ignoring(2,&eye,NONE));
+ wall=0;CHECK(third_person_projectile_repair(2,&eye,NONE));
  CHECK(translated==2&&projectile.object.position.x==.1f);
+ destination_cluster=NONE;CHECK(!third_person_projectile_repair(2,&eye,NONE));
+ CHECK(translated==2); /* No repair may translate into an invalid cluster. */
+ destination_cluster=0;projectile.object.location.cluster_index=NONE;
+ CHECK(third_person_projectile_repair(2,&eye,7));CHECK(translated==3);
+ /* Without an excluded owner, preserve the stock repair's results and side effects. */
+ for(destination=-1;destination<=0;destination++)for(initial=-1;initial<=0;initial++)for(blocked=0;blocked<=1;blocked++){
+  destination_cluster=destination;wall=blocked;translated=0;
+  projectile=(struct object_datum){{{1,0,-.2f},{initial}}};
+  result=object_force_inside_bsp(2,&eye);saved=projectile;moved=translated;
+  translated=0;projectile=(struct object_datum){{{1,0,-.2f},{initial}}};
+  CHECK(third_person_projectile_repair(2,&eye,NONE)==result);
+  CHECK(translated==moved&&projectile.object.position.x==saved.object.position.x&&
+   projectile.object.position.y==saved.object.position.y&&projectile.object.position.z==saved.object.position.z&&
+   projectile.object.location.cluster_index==saved.object.location.cluster_index);
+ }
  CHECK(global_current_collision_user_depth==1);return 0;
 }
 '''

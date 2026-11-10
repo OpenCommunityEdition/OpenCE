@@ -6,6 +6,8 @@
 #include "game/players.h"
 #include "units/units.h"
 #include "physics/collisions.h"
+#include "physics/collision_usage.h"
+#include "objects/objects.h"
 #include "items/weapons.h"
 #include "items/weapon_definitions.h"
 #include "units/unit_definitions.h"
@@ -13,6 +15,16 @@
 
 char const *config_string(char const *name);
 void platform_log(char const *format, ...);
+
+/* The existing firing-effect tag layout; only this feature needs its declaration. */
+struct weapon_firing_effect_definition
+{
+	short shots_lower_bound;
+	short shots_upper_bound;
+	long unused[8];
+	struct tag_reference effects[3];
+	struct tag_reference damage_effects[3];
+};
 
 static boolean muzzle_player(short player, long unit_index)
 {
@@ -254,4 +266,35 @@ boolean third_person_muzzle_target(short player, real_point3d *target)
 	point_from_line3d(&origin, &right, trigger->first_person_weapon_offset.y, &origin);
 	point_from_line3d(&origin, &up, trigger->first_person_weapon_offset.z, &origin);
 	return muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target);
+}
+
+/* Shoulder projectiles exclude their owner during the existing BSP repair.
+   Keep this path separate so stock projectile repair remains unchanged. */
+boolean third_person_projectile_repair(
+	long object_index,
+	real_point3d const *known_good_point,
+	long ignore_object_index)
+{
+	struct collision_result collision;
+	struct object_datum *object = object_get(object_index);
+	boolean result = TRUE;
+
+	match_assert(__FILE__, __LINE__, global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] = 19;
+
+	if (collision_test_line(_collision_test_for_projectiles_flags, known_good_point, &object->object.position, ignore_object_index, &collision) ||
+		object->object.location.cluster_index==NONE)
+	{
+		result = collision.location.cluster_index != NONE;
+		if (result)
+		{
+			object_translate(object_index, &collision.point, &collision.location);
+			object_compute_node_matrices(object_index);
+		}
+	}
+
+	match_assert(__FILE__, __LINE__, global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	return result;
 }
