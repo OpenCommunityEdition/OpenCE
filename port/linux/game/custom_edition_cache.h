@@ -128,15 +128,6 @@ real mcc_imported_icon_factor(
 	void);
 real mcc_imported_mask_factor(
 	void);
-/* A bitmap of a map the import wrote that holds Halo PC's channels for a
-model shader's multipurpose masks (_custom_edition_channels_multipurpose:
-one of Halo PC's own tags, which the disc's map does not have) has this in
-its pad word after the mipmap count (`mipmap_pad`, which the game never
-reads; its flags cannot carry it, as bitmap_verify refuses any bit past the
-game's), and every other bitmap the import wrote has 0 there (MCC's own
-bitmaps have small numbers there, which this is not);
-mcc_imported_bitmap_arriving has the renderer sample it in Halo PC's order. */
-#define MCC_IMPORTED_BITMAP_HALO_PC_CHANNELS 0x5043
 /* An MCC map's structure BSP the game has just read for `reference` (to
 its base address, the reference's size of bytes): its vertex region read
 after it, its pointers moved and its materials given their vertices, so
@@ -384,15 +375,6 @@ void custom_edition_bitmap_pixels_arrived(
 	unsigned long loaded_bytes,
 	long tag_index,
 	long offset,
-	void *pixels);
-
-/* Called as the texture cache reads an Xbox map's bitmap into `pixels`: the
-renderer is told the channel order of the pixels arriving there, Halo PC's
-for a bitmap the MCC import marked (MCC_IMPORTED_BITMAP_HALO_PC_CHANNELS)
-in a map it wrote, and this build's for any other, as the texture cache
-reuses its memory. Nothing for a Custom Edition map, whose own reads say. */
-void mcc_imported_bitmap_arriving(
-	struct bitmap_data const *bitmap,
 	void *pixels);
 
 /* ---------- prototypes/CUSTOM_EDITION_SCRIPTS.C */

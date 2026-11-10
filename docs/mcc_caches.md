@@ -42,21 +42,6 @@ cannot be loaded: it is imported again with its largest level and effects
 textures halved (a compressed one by its next mipmap) until it fits, the HUD's
 and the menus' left as they are. ratrace and Halo PC's rebuilds need it.
 
-Halo PC's own model shaders (the flamethrower's screen in every map, and in
-the rebuilds the fuel rod gun's and the rocket warthog's) draw multipurpose
-maps that keep Halo PC's channels, which this build's model shaders read in
-another order (`docs/custom_edition_caches.md`). They are DXT1, whose one bit
-of alpha cannot hold a mask, so the import does not move the channels: it
-marks each such bitmap (`MCC_IMPORTED_BITMAP_HALO_PC_CHANNELS`, in the pad
-word after its mipmap count, which the game never reads: a flag the game
-lacks would fail its checks of a bitmap), and as the texture cache reads a
-marked bitmap of a map the import wrote the renderer is told to sample it in
-Halo PC's order (`mcc_imported_bitmap_arriving`), as it samples a Custom
-Edition map's. A bitmap is marked when a model shader without MCC's flag for
-the Xbox's order (bit 6 of its flags) draws it and the disc's map does not
-have it. The flag alone cannot say: the scorpion's shader lacks it too, and
-its bitmap is the disc's byte for byte.
-
 `ui.map`, the menus' map: MCC's is Halo PC's, with Halo PC's own menus. The port
 draws the PC menus from its own files (`port/assets/menus`), so the import
 writes only what the game reaches of it: the scenario, the globals and the
@@ -75,6 +60,13 @@ What does not import yet:
 - A few tags of the disc's are assets MCC lacks or changed as geometry (the
   flamethrower, `flag_base`, `teleporter_base`, `c_field_generator`, the
   cyborg's passenger animations): without them a map is written as MCC's.
+- Every multipurpose map is drawn in the Xbox's channel order. MCC's flag
+  for the Xbox's order (bit 6 of a model shader's flags) does not say which
+  are Halo PC's: the scorpion's and Halo PC's fuel rod gun's
+  (`weapons\plasma_cannon`) shaders lack it, and their bitmaps draw right in
+  the Xbox's order (the scorpion's is the disc's, byte for byte). The
+  flamethrower's screen (`flamethrower_screen`, Halo PC's alone) may hold
+  Halo PC's order.
 
 ## Loading
 
