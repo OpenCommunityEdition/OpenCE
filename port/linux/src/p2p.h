@@ -442,6 +442,10 @@ struct p2p_mm_decision
 /* these take p2p_lock: call from the game's thread, never the p2p thread */
 void p2p_mm_search(const struct p2p_mm_choice *choice);
 void p2p_mm_cancel(void);
+/* each is ignored unless it answers its decision: p2p_mm_game a HOST, p2p_mm_joined a JOIN */
+void p2p_mm_game(int players, int most_players, int under_way);
+void p2p_mm_joined(int ok);
+int p2p_mm_take_decision(struct p2p_mm_decision *decision);
 struct p2p_mm_status
 {
 	int state;

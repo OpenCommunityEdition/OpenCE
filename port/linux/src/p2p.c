@@ -3928,7 +3928,7 @@ static DWORD WINAPI p2p_thread(void *unused)
 			p2p.stun_started = 1;
 			p2p_signal_start();
 		}
-		p2p_mm_update(p2p_now(), nat_known() ? !nat_strict() : -1);
+		p2p_mm_update(p2p_now(), nat_known() ? !nat_strict() : -1, p2p.hosting && p2p.has_token ? p2p.token : NULL);
 		update_joining();
 		update_answering();
 		update_reaching();

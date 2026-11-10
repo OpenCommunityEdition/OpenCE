@@ -800,7 +800,10 @@ static struct
 	struct mm_search search;
 	struct queued queue[MAXIMUM_QUEUED];
 	int queue_count;
+	struct p2p_mm_decision pending;
 	int subscribed[P2P_MM_MAXIMUM_TOPICS][2], subscribed_count;
+	int has_token;
+	unsigned char token[P2P_TOKEN_SIZE];
 } mm;
 
 static unsigned long monotonic_us(void)
@@ -901,20 +904,30 @@ int p2p_mm_active(void)
 	return mm.search.state != P2P_MM_OFF;
 }
 
-void p2p_mm_update(unsigned long now, int can_host)
+void p2p_mm_update(unsigned long now, int can_host, const unsigned char *token)
 {
 	struct mm_out out[MM_MAXIMUM_OUT];
 	int count;
 
 	if (mm.search.state == P2P_MM_OFF)
 	{
+		/* still stepped while joined, so its queue's cancel goes out */
+		publish_out(out, mm_step(&mm.search, now, out, MM_MAXIMUM_OUT));
 		sync_topics();
 		return;
 	}
 	mm.search.can_host = can_host;
+	mm.has_token = token != NULL;
+	if (token)
+		memcpy(mm.token, token, P2P_TOKEN_SIZE);
 	p2p_mm_verify_pass(now);
 	count = mm_step(&mm.search, now, out, MM_MAXIMUM_OUT);
 	publish_out(out, count);
+	if (mm.search.decision.kind != P2P_MM_DECIDE_NONE)
+	{
+		mm.pending = mm.search.decision;
+		mm.search.decision.kind = P2P_MM_DECIDE_NONE;
+	}
 	sync_topics();
 }
 
@@ -923,6 +936,7 @@ static void cancel_search(void)
 	struct mm_out out[MM_MAXIMUM_OUT];
 
 	publish_out(out, mm_cancel(&mm.search, out, MM_MAXIMUM_OUT));
+	mm.pending.kind = P2P_MM_DECIDE_NONE;
 	mm.queue_count = 0;
 }
 
@@ -941,6 +955,37 @@ void p2p_mm_cancel(void)
 	if (mm.search.state != P2P_MM_OFF)
 		cancel_search();
 	pthread_mutex_unlock(&p2p_lock);
+}
+
+void p2p_mm_game(int players, int most_players, int under_way)
+{
+	pthread_mutex_lock(&p2p_lock);
+	if (mm.search.state != P2P_MM_OFF && mm.search.decided == P2P_MM_DECIDE_HOST)
+	{
+		if (mm.has_token)
+			mm_hosted(&mm.search, mm.token, players, most_players, under_way, p2p_now());
+	}
+	pthread_mutex_unlock(&p2p_lock);
+}
+
+void p2p_mm_joined(int ok)
+{
+	pthread_mutex_lock(&p2p_lock);
+	if (mm.search.state == P2P_MM_FOUND && mm.search.decided == P2P_MM_DECIDE_JOIN)
+		mm_joined(&mm.search, ok, p2p_now());
+	pthread_mutex_unlock(&p2p_lock);
+}
+
+int p2p_mm_take_decision(struct p2p_mm_decision *decision)
+{
+	int kind;
+
+	pthread_mutex_lock(&p2p_lock);
+	*decision = mm.pending;
+	kind = mm.pending.kind;
+	mm.pending.kind = P2P_MM_DECIDE_NONE;
+	pthread_mutex_unlock(&p2p_lock);
+	return kind;
 }
 
 static int searchers_counted(int playlist, int size)

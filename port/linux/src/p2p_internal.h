@@ -378,7 +378,7 @@ void p2p_mm_heard(const unsigned char *payload, int size);
 int p2p_mm_active(void);
 /* call under p2p_lock; it drops the lock around each signature check */
 int p2p_mm_verify_pass(unsigned long now);
-void p2p_mm_update(unsigned long now, int can_host);
+void p2p_mm_update(unsigned long now, int can_host, const unsigned char *token);
 /* a probe of a host (its identifier) ended: its ping in milliseconds, -1 if
 it was not reached; under p2p_lock */
 void p2p_lobby_probed(const unsigned char *identifier, int ping);
