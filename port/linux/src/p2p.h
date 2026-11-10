@@ -390,4 +390,26 @@ int p2p_nat_strict(void);
 (map_share.c) */
 void p2p_blake2b_256(const void *data, unsigned long size, unsigned char *digest);
 
+enum
+{
+	P2P_MM_SLAYER,
+	P2P_MM_CTF,
+	P2P_MM_KING,
+	P2P_MM_ODDBALL,
+	P2P_MM_RACE,
+	NUMBER_OF_P2P_MM_PLAYLISTS
+};
+enum
+{
+	P2P_MM_1V1,
+	P2P_MM_2V2,
+	P2P_MM_3V3,
+	P2P_MM_4V4,
+	P2P_MM_FFA_6,
+	NUMBER_OF_P2P_MM_SMALL_SIZES,
+	NUMBER_OF_P2P_MM_SIZES = NUMBER_OF_P2P_MM_SMALL_SIZES
+};
+/* CTF has no free-for-all variant; playlists has a bit per playlist */
+int mm_playlist_has_size(unsigned playlists, int size);
+
 #endif

@@ -361,11 +361,7 @@ def test_default_brokers_are_brokers_txt():
     assert default.split(",") == [line for line in listed if line]
 
 
-@linux_host_only
-def test_p2p_signatures_and_listings(tmp_path):
-    """internet play's Ed25519 (RFC 8032), the X25519 key of a seed, and the
-    server browser's listings from host to browser (tools/p2p_lobby_check.c),
-    built with the flags ninja gives the platform layer"""
+def platform_flags():
     import shlex
 
     if not shutil.which("clang") or not shutil.which("ninja") or not Path("build.ninja").is_file():
@@ -387,6 +383,15 @@ def test_p2p_signatures_and_listings(tmp_path):
             continue
         else:
             flags.append(word)
+    return flags
+
+
+@linux_host_only
+def test_p2p_signatures_and_listings(tmp_path):
+    """internet play's Ed25519 (RFC 8032), the X25519 key of a seed, and the
+    server browser's listings from host to browser (tools/p2p_lobby_check.c),
+    built with the flags ninja gives the platform layer"""
+    flags = platform_flags()
     program = tmp_path / "p2p_lobby_check"
     built = subprocess.run(["clang", *flags, "-O1", "-no-pie", "-Wl,--unresolved-symbols=ignore-all", "-o",
                             str(program), "tools/p2p_lobby_check.c", "port/linux/src/p2p_crypto.c",
@@ -398,6 +403,31 @@ def test_p2p_signatures_and_listings(tmp_path):
     assert result.returncode == 0, result.stdout
     assert "PASS" in result.stdout
 
+
+MATCHMAKING_SOURCES = ["port/linux/src/p2p_crypto.c", "port/third_party/monocypher/monocypher.c",
+                       "port/third_party/monocypher/monocypher-ed25519.c"]
+
+
+def matchmaking_check(tmp_path, fault=None):
+    source = Path("port/linux/src/p2p_matchmaking.c").read_text()
+    if fault:
+        assert source.count(fault[0]) == 1, fault[0]
+        source = source.replace(*fault)
+    copy = tmp_path / "p2p_matchmaking.c"
+    copy.write_text(source)
+    program = tmp_path / "p2p_matchmaking_check"
+    built = subprocess.run(["clang", *platform_flags(), "-Iport/linux/src", "-O1", "-no-pie",
+                            "-Wl,--unresolved-symbols=ignore-all", "-o", str(program),
+                            "tools/p2p_matchmaking_check.c", str(copy), *MATCHMAKING_SOURCES],
+                           capture_output=True, text=True)
+    assert built.returncode == 0, built.stderr[-4000:]
+    return subprocess.run([str(program)], capture_output=True, text=True, timeout=120).stdout
+
+
+@linux_host_only
+def test_p2p_matchmaking(tmp_path):
+    output = matchmaking_check(tmp_path)
+    assert output.strip().endswith("PASS"), output
 
 
 # port_config.c on its own, with the app's file paths (HALO_DATA_ROOT) and C
