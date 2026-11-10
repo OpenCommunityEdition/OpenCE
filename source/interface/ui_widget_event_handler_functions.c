@@ -4082,6 +4082,20 @@ static boolean playlist_profile_change_slayer_rules(
 	return FALSE;
 }
 
+/* port: the name check, shared with MATCHMAKING */
+boolean ui_widget_port_multiplayer_name_valid(
+	short controller_index,
+	struct player_profile const *profile)
+{
+	if (player_name_valid(profile->player_name, NUMBEROF(profile->player_name)))
+		return TRUE;
+	display_error_text_deferred(
+		L"Sorry, this profile's\r\nname can't be used in\r\nmultiplayer. Please\r\nrename the profile.",
+		controller_index);
+	ui_play_audio_feedback_sound(4);
+	return FALSE;
+}
+
 static boolean player_profile_set_for_game_1wide(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -4113,14 +4127,8 @@ static boolean player_profile_set_for_game_1wide(
 	{
 		/* port: not a profile whose name the host's ban command could not
 		name (one made before names were checked: player_name_valid) */
-		if (!player_name_valid(profile.player_name, NUMBEROF(profile.player_name)))
-		{
-			display_error_text_deferred(
-				L"Sorry, this profile's\r\nname can't be used in\r\nmultiplayer. Please\r\nrename the profile.",
-				controller_index);
-			ui_play_audio_feedback_sound(4);
+		if (!ui_widget_port_multiplayer_name_valid(controller_index, &profile))
 			return FALSE;
-		}
 		player_ui_set_active_player_profile(controller_index, available_profiles[spinner_list->data3C.selected_index], &profile);
 		return TRUE;
 	}
@@ -6190,14 +6198,8 @@ boolean ui_widget_port_multiplayer_player(
 
 	if (controller_index < 0 || controller_index >= 4 || !player_profile_get(profile_index, &profile))
 		return FALSE;
-	if (!player_name_valid(profile.player_name, NUMBEROF(profile.player_name)))
-	{
-		display_error_text_deferred(
-			L"Sorry, this profile's\r\nname can't be used in\r\nmultiplayer. Please\r\nrename the profile.",
-			controller_index);
-		ui_play_audio_feedback_sound(4);
+	if (!ui_widget_port_multiplayer_name_valid(controller_index, &profile))
 		return FALSE;
-	}
 	player_ui_set_active_player_profile(controller_index, profile_index, &profile);
 	player_ui_local_player_joined_multiplayer_game(controller_index);
 	return TRUE;
