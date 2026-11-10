@@ -52,7 +52,7 @@ STYLE = ("MENU STYLE", "display.menu_frontend",
 INTERFACE_RENDERING = ("display.high_res_text", "display.high_res_hud")
 EDITORS = {
     2: [("keyboard", "KEYBOARD BINDINGS", "Set the base game's keyboard and mouse bindings in its existing editor. That editor's OK saves bindings independently of these Settings."),
-        ("gamepad", "CONTROLLER REMAPPING", "Remap each player's controller in the existing editor. That editor's OK saves bindings independently of these Settings.")],
+        ("gamepad", "CONTROLLER REMAPPING", "Remap each player's controller. Camera Perspective binds third-person toggling and shoulder swapping. The editor's OK saves bindings independently of these Settings.")],
     5: [("profiles", "SELECT PROFILE", "Select or create a player profile using the existing profile manager. Save or cancel any profile edits before changing profiles."),
         ("name", "PLAYER NAME", "Edit the selected profile's name. Settings OK saves the profile; Cancel discards its pending changes."),
         ("color", "PLAYER COLOR", "Edit the selected profile's multiplayer color. Settings OK saves the profile; Cancel discards its pending changes.")],

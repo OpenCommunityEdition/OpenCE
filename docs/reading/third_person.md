@@ -22,7 +22,11 @@ At the centre the shoulder selection is retained. Ordinary scrolling switches
 weapons. First person (including scope and collision fallback), menus, console,
 text chat and released mouse capture do not consume the wheel for adjustments.
 Host policy and session compatibility still gate camera availability.
-Saved custom bindings are retained. Camera controller bindings are deferred.
+Saved custom bindings are retained. Gamepad Setup > Button Remapping >
+Camera Perspective offers Third Person On / Off and Swap Shoulder, both
+unbound by default. The Modern frontend exposes the same editor through
+Settings > Controls > Controller Remapping. Both actions share the keyboard
+camera preferences and obey the existing host/session policy.
 No stencil shadows or cosmetic head tracking are part of this consolidation.
 
 With the optional Modern frontend, Settings > Video > First Person exposes

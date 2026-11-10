@@ -15,6 +15,8 @@ def test_camera_policy(tmp_path, fault):
     if not compiler:
         pytest.skip("a C compiler is required")
     header = (ROOT / "port/linux/game/third_person.h").read_text()
+    pad_header = (ROOT / "port/linux/include/controller_remap.h").read_text()
+    pad_enums = re.search(r"enum controller_remap_action\s*\{.*?\};", pad_header, re.S).group(0)
     enums = re.search(r"enum third_person_match_policy\s*\{.*?\};", header, re.S).group(0)
     defines = "\n".join(re.findall(r"^#define THIRD_PERSON_POLICY_.*", header, re.M))
     policy = re.sub(r"^#include[^\n]*", "", (ROOT / "port/linux/game/third_person_policy.c").read_text(), flags=re.M)
@@ -65,7 +67,8 @@ struct widget_instance {struct {struct {short selected_index;} list;} parameters
 static short setting_value_index(struct pc_menu_setting const *s,char const *v){int i;for(i=0;i<s->value_count;i++)if(!strcmp(s->values[i],v))return i;return NONE;}
 static int setting_write(char const *s,char const *v){return config_write(s,v);}
 #define platform_log(...) ((void)0)
-''' + enums + "\n" + defines + "\n" + policy + setter + menu_functions + r'''
+unsigned int controller_remap_pressed(short port,unsigned int mask){(void)port;(void)mask;return 0;}
+''' + pad_enums + enums + "\n" + defines + "\n" + policy + setter + menu_functions + r'''
 #define CHECK(c) do{if(!(c))return __LINE__;}while(0)
 static void press(unsigned long key){held=0;third_person_input_update();held=key;third_person_input_update();}
 int main(void){int i,p,saved;struct network_game remote;

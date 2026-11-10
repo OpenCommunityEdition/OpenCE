@@ -612,7 +612,7 @@
 		<string text="The menus' blue arrow for the mouse, and its size; Off shows the system's pointer." />
 		<string text="Open touch controls settings. Pending changes stay until OK or Cancel." />
 		<string text="Set the base game's keyboard and mouse bindings in its existing editor. That editor's OK saves bindings independently of these Settings." />
-		<string text="Remap each player's controller in the existing editor. That editor's OK saves bindings independently of these Settings." />
+		<string text="Remap each player's controller. Camera Perspective binds third-person toggling and shoulder swapping. The editor's OK saves bindings independently of these Settings." />
 	</strings>
 	<widget name="modern/controls/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		<child widget="modern/controls/button_defaults" x="0" y="0" />

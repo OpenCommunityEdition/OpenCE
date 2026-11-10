@@ -11,8 +11,8 @@ remapping remains independent of these axis settings.
 Optional [DualSense feedback](dualsense.md) follows these physical L2/R2 assignments;
 actions on buttons without actuators do not produce adaptive-trigger effects.
 
-Choose Movement, Combat, General, Communication or Debug. Select an action, release
-the opening press, then press the desired button on that player's controller.
+Choose Movement, Combat, General, Communication, Debug or Camera Perspective.
+Select an action, release the opening press, then press the desired button on that player's controller.
 All four D-pad directions and Back/Select are available. Start/Options and Escape
 cancel capture. Button names follow the detected controller family independently
 of Button Style. Stick axes, sensitivity and menu navigation keep their settings.
@@ -38,6 +38,13 @@ Chat remains subject to the game's existing multiplayer and host chat settings.
 Voice uses the existing shared microphone and first player's voice routing; any
 slot can hold its assigned Push to Talk button. Enable push-to-talk in voice settings.
 Keyboard and touch retain their own bindings.
+
+Camera Perspective contains Third Person On / Off and Swap Shoulder, both unbound
+by default. These are gameplay actions and use the normal replacement confirmation
+when assigned an occupied gameplay button. They use the same installation-wide
+camera preferences as N and B, respect host policy, and are inactive while menus,
+chat, binding capture or the debug camera own that controller's input. Simultaneous
+keyboard and controller presses toggle once. Debug actions remain a separate group.
 
 Debug includes Camera Speed Up/Down, Camera / Player Switch, Camera Raise/Lower
 and Cycle Camera. These reuse buttons independently of gameplay. Hold Cycle Camera
@@ -103,22 +110,23 @@ Xbox, CE and MCC retain their existing glyph renderers, sizes and anchoring.
 ## Persistence and lifecycle
 
 `input.controller_p1` through `input.controller_p4` default to empty strings.
-New custom layouts use `v3:` followed by 26 comma-separated entries in this order:
+New custom layouts use `v4:` followed by 28 comma-separated entries in this order:
 
 ```
 jump, grenade type, use/reload, weapon, melee, flashlight, grenade, fire, crouch,
 zoom, scoreboard, screenshot, forward, backward, left, right, all chat, team chat,
 vehicle chat, push to talk, camera faster, camera slower, camera/player switch,
-camera raise, camera lower, cycle camera
+camera raise, camera lower, cycle camera, toggle perspective, swap shoulder
 ```
 
 Entries are physical tokens: `south,east,west,north,rb,lb,lt,rt,ls,rs,dpad_up,
 dpad_down,dpad_left,dpad_right,back`, or `unbound`. South means A on Xbox, Cross on
-PlayStation and B on Switch. Tokens must be unique within gameplay/communication
-and separately within Debug; `unbound` may repeat. Unbound saves remain distinct
+PlayStation and B on Switch. Tokens must be unique within gameplay, communication and
+camera perspective, and separately within Debug; `unbound` may repeat. Unbound saves remain distinct
 from an empty setting (profile defaults).
 
-Old ten-action and 25-action `v2:` strings remain readable. The appended Cycle
+Old ten-action, 25-action `v2:` and 26-action `v3:` strings remain readable.
+The two Camera Perspective actions start unbound in every older layout. Cycle
 Camera defaults to RB unless an old debug action already owns RB, in which case
 Cycle Camera starts unbound and can be assigned in the Debug group. Existing
 assignments are preserved. Ten-action strings' original actions take priority over

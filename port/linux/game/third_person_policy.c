@@ -3,6 +3,7 @@
 #include "third_person.h"
 #include "third_person_protocol.h"
 #include "halo_keyboard.h"
+#include "controller_remap.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
 
@@ -48,8 +49,15 @@ void third_person_input_update(void)
 	static unsigned long previous;
 	unsigned long held = halo_keyboard_actions(0);
 	unsigned long pressed = held & ~previous;
+	unsigned int pad_pressed = 0;
+	short port;
 	previous = held;
-	/* Actions are cleared while menus or the console own keyboard input. */
+	/* The remapper owns controller context, capture and release guards. */
+	for (port = 0; port < 4; port++)
+		pad_pressed |= controller_remap_pressed(port, (1u << PAD_TOGGLE_PERSPECTIVE) | (1u << PAD_SWAP_SHOULDER));
+	if (pad_pressed & (1u << PAD_TOGGLE_PERSPECTIVE)) pressed |= 1UL << HALO_KEYBOARD_TOGGLE_PERSPECTIVE;
+	if (pad_pressed & (1u << PAD_SWAP_SHOULDER)) pressed |= 1UL << HALO_KEYBOARD_SWAP_SHOULDER;
+	/* Keyboard and controller share one camera preference and host policy. */
 	if ((pressed & (1UL << HALO_KEYBOARD_TOGGLE_PERSPECTIVE)) &&
 		third_person_policy() == _third_person_player_choice)
 		config_write("display.third_person", config_boolean("display.third_person") ? "false" : "true");

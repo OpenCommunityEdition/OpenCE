@@ -998,56 +998,7 @@ def _controller_screen() -> list:
     base = f"{PE}/{folder}"
     rows, extra = [], []
     for key, label, choices in [("player", "PLAYER:", "P1|P2|P3|P4"),
-                                ("group", "SHOW:", "MOVEMENT|COMBAT|GENERAL|COMMUNICATION|DEBUG")]:
-        row = f"{base}/op_{key}"
-        rows.append((row, None))
-        extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
-                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                         [f'<child widget="{base}/{key}_label"/>', f'<child widget="{base}/pad_{key}" x="200" y="1"/>'])
-        extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 200),
-                         ("height", 22), ("text", label), ("font", "ui\\large_ui"),
-                         ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
-        extra += _widget(f"{base}/pad_{key}", [("type", "spinner"), ("left", 3), ("top", 2),
-                         ("width", 297), ("height", 20), ("strings", choices),
-                         ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
-                         ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"), ("text_y", 1),
-                         ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
-                         ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 300 19 306")], [])
-    for index in range(6):
-        row = f"{base}/op_pad_{index + 1}"
-        rows.append((row, None))
-        extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
-                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
-                         ['<on event="a start" run="port controller bind"/>',
-                          '<on event="x" run="port controller clear"/>',
-                          '<on event="left_mouse" run="mouse emit accept event"/>',
-                          '<on event="left" run="port controller left"/>',
-                          '<on event="right" run="port controller right"/>',
-                          f'<child widget="{base}/pad_action"/>',
-                          f'<child widget="{base}/pad_binding" x="220"/>'])
-    extra += _widget(f"{base}/pad_action", [("type", "text"), ("controller", 1), ("width", 220),
-                     ("height", 22), ("font", "ui\\small_ui"), ("color", "#FF2896FF"),
-                     ("text_x", 13), ("text_y", 4)], [])
-    extra += _widget(f"{base}/pad_binding", [("type", "text"), ("controller", 1), ("width", 280),
-                     ("height", 22), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
-                     ("align", "center"), ("text_y", 4), ("text_flags", "no_focus_test")], [])
-    extra += _button(f"{base}/button_defaults", 3, ['<on event="a start" run="port controller defaults"/>'])
-    extra += _button(f"{base}/button_ok", 1, ['<on event="a start" run="port controller save" back="true"/>'])
-    lines = _screen(folder, SCREENS[folder], rows, ["port controller update"],
-                   ['<on event="created" run="port controller init"/>',
-                    '<on event="deleted" run="port controller close"/>'], extra)
-
-    return [line.replace('<on event="b" back="true"/>', '<on event="b" run="port controller cancel" back="true"/>')
-            .replace('<on event="back" back="true"/>', '<on event="back" run="port controller cancel" back="true"/>')
-            for line in lines]
-
-
-def _controller_screen() -> list:
-    folder = "controller_remapping"
-    base = f"{PE}/{folder}"
-    rows, extra = [], []
-    for key, label, choices in [("player", "PLAYER:", "P1|P2|P3|P4"),
-                                ("group", "SHOW:", "MOVEMENT|COMBAT|GENERAL|COMMUNICATION|DEBUG")]:
+                                ("group", "SHOW:", "MOVEMENT|COMBAT|GENERAL|COMMUNICATION|DEBUG|CAMERA PERSPECTIVE")]:
         row = f"{base}/op_{key}"
         rows.append((row, None))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),

@@ -100,6 +100,7 @@ int controller_remap_input(short port, XINPUT_GAMEPAD *pad, int connected)
     struct controller_device device;
     struct platform_input_state input;
     unsigned int actions = 0, allowed;
+    unsigned int debug = (1u << (PAD_CAMERA_CYCLE + 1)) - (1u << PAD_CAMERA_FASTER);
     int i, context, custom;
     if (port < 0 || port >= 4) return 0;
     /* Check from any polled port, including while the selected one is absent. */
@@ -163,8 +164,7 @@ int controller_remap_input(short port, XINPUT_GAMEPAD *pad, int connected)
         if (!connected) memset(pad, 0, sizeof(*pad));
         return 0; /* Menus and the on-screen keyboard use physical buttons. */
     }
-    allowed = context == 3 ? ((1u << CONTROLLER_REMAP_ACTIONS) - (1u << PAD_CAMERA_FASTER)) :
-        (1u << PAD_CAMERA_FASTER) - 1;
+    allowed = context == 3 ? debug : ((1u << CONTROLLER_REMAP_ACTIONS) - 1) & ~debug;
     if (context == 2) allowed |= 1u << PAD_CAMERA_SWITCH;
     allowed |= 1u << PAD_CAMERA_CYCLE;
     if (!custom) allowed = 0; /* Stock input retains its original shortcuts. */
@@ -174,7 +174,7 @@ int controller_remap_input(short port, XINPUT_GAMEPAD *pad, int connected)
         if (!(allowed & (1u << i)) || button == CONTROLLER_REMAP_UNBOUND) continue;
         /* While the player controls an available free camera, its switch
          * owns its button. The rest of the debug layout is inactive. */
-        if (context == 2 && i < PAD_CAMERA_FASTER && button == layout[PAD_CAMERA_SWITCH]) continue;
+        if (context == 2 && !(debug & (1u << i)) && button == layout[PAD_CAMERA_SWITCH]) continue;
         if ((held & ~remap_ports[port].blocked) & (1u << button)) actions |= 1u << i;
     }
     if ((actions & (1u << PAD_CAMERA_CYCLE)) && !(remap_ports[port].held & (1u << PAD_CAMERA_CYCLE)))
