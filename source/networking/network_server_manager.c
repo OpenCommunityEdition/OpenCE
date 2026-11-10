@@ -4809,6 +4809,26 @@ void network_game_server_port_countdown_begin(
 	server->countdown_state.last_countdown_message_time = 0;
 }
 
+/* port: ... the countdown stopped with every machine told: a stop sends
+them nothing itself, and their lobbies would keep its last number */
+void network_game_server_port_countdown_stop(
+	struct network_game_server *server)
+{
+	struct message_server_pregame_countdown message_packet;
+	struct network_message *message;
+
+	if (!server || server->state != _network_game_server_state_pregame || server->sent_start_game_message ||
+		!server->countdown_state.active)
+	{
+		return;
+	}
+	csmemset(&server->countdown_state, 0, sizeof(server->countdown_state));
+	message_packet.seconds_to_start = NONE;
+	message = create_network_game_message(_message_server_pregame_countdown, &message_packet, sizeof(message_packet));
+	if (message != NULL)
+		network_game_server_send_message_to_all_machines(server, message);
+}
+
 /* port: ... whether the game's start was sent (its machines load it) */
 boolean network_game_server_port_start_sent(
 	struct network_game_server *server)

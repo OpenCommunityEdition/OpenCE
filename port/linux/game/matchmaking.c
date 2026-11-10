@@ -22,6 +22,9 @@ The game side of a MATCHMAKING search, carried out each frame.
 
 #include <stdlib.h>
 
+/* one under 5000: a countdown message rounds down, so 4999 reads 4 and the lobby's line adds 1 */
+#define MATCHMAKING_START_MILLISECONDS 4999
+
 /* the server's setup clears a map set sooner */
 #define MATCHMAKING_MAP_SECONDS 1.0f
 #define MATCHMAKING_PLAYER_SECONDS 2.0f
@@ -68,6 +71,14 @@ static struct
 	char map[64];
 	boolean map_set, player_added;
 } matchmaking;
+
+static void matchmaking_start_countdown(struct network_game_server *server, short players, short most_players)
+{
+	if (players < most_players)
+		network_game_server_port_countdown_stop(server);
+	else if (network_game_server_port_ok_to_countdown(server) && !network_game_server_port_countdown_paused(server))
+		network_game_server_port_countdown_begin(server, MATCHMAKING_START_MILLISECONDS);
+}
 
 /* copies of network_server_manager.c's and network_client_manager.c's private state enums: keep the values in step */
 enum { SERVER_PREGAME };
@@ -171,6 +182,8 @@ static void matchmaking_update_host(float seconds)
 			game->maximum_players, state != SERVER_PREGAME);
 	if (state != SERVER_PREGAME)
 		matchmaking.map_set = FALSE;
+	else if (matchmaking.player_added)
+		matchmaking_start_countdown(server, game->player_count, game->maximum_players);
 }
 
 void matchmaking_update(float seconds)
