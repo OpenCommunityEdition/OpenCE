@@ -482,6 +482,7 @@ symbols in this file:
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "server_director.h" /* port: port/linux/game/server_director.c */
 #include "bots.h" /* port: port/linux/game/bots.c */
+#include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* port: internet play's Discord presence (port/linux/src/p2p.c), and the
 server browser's listing of a public game (p2p_lobby.c) */
@@ -2013,6 +2014,8 @@ boolean network_game_server_start_network_game(
 		struct message_server_begin_game begin_game = { 0 };
 		void *message;
 
+		/* port: the riding decision for this game, made as it starts and sent with its settings (network_coop.c) */
+		network_game_port_vehicle_riding_start(&server->game);
 		/* the settings record goes out in pieces */
 		/* port: once the settings are out, the start is sent once: a machine
 		that missed it (its connection failed, and is closed) is dropped, and

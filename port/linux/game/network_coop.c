@@ -123,6 +123,7 @@ index and tag, since the map placed them at the same index everywhere.
 #include "coop_spectate.h"
 #include "coop_sound_sync.h"
 #include "network_coop.h"
+#include "vehicle_riding.h"
 #include "network_distributed.h"
 #include "../src/server_events.h" /* port: port/linux/src/server_events.c */
 #include "../src/server_json.h" /* port: port/linux/src/server_json.c */
@@ -2470,6 +2471,43 @@ void network_coop_note_bsp_switch(
 	distributed_send_notice(notice);
 }
 
+/* a dedicated server's co-op entry's riding rule (NONE: the entry gives
+none), set for every entry it applies so the next cannot inherit it */
+static short riding_entry_rule = NONE;
+
+void network_game_port_vehicle_riding_entry(
+	short rule)
+{
+	riding_entry_rule = rule == NONE || rule == FALSE ? rule : TRUE;
+}
+
+/* the host's decision for the game about to start, the only writer of the
+riding bit: it is made from this game alone, so nothing of an earlier game
+(a co-op game's option, a gametype's flag) is carried over */
+void network_game_port_vehicle_riding_start(
+	struct network_game *game)
+{
+	boolean riding = vehicle_riding_decide(
+		game->variant.game_engine_index != game_engine_none,
+		TEST_FLAG(game->variant.universal_variant.flags, _game_variant_vehicle_riding_bit),
+		config_boolean("network.vehicle_riding") != 0,
+		riding_entry_rule,
+		halo_server_mode() != 0,
+		config_boolean("server.vehicle_riding_override_gametype") != 0);
+
+	SET_FLAG(game->cooperative_flags, _network_game_cooperative_vehicle_riding_bit, riding);
+}
+
+/* whether the host's decision for the running game is to carry players standing on a vehicle (bit 3 of the
+cooperative_flags, which travel with every settings send: vehicle_riding.c) */
+boolean network_game_port_vehicle_riding(
+	void)
+{
+	struct network_game *game = network_game_get_game();
+
+	return game && TEST_FLAG(game->cooperative_flags, _network_game_cooperative_vehicle_riding_bit);
+}
+
 boolean network_coop_devices_remote(
 	void)
 {
@@ -3423,7 +3461,14 @@ void network_coop_handle_object_transforms(
 		distributed_vector_unpack(&transform->forward, DISTRIBUTED_UNIT_SCALE, &forward);
 		distributed_vector_unpack(&transform->up, DISTRIBUTED_UNIT_SCALE, &up);
 		if (distributed_point_valid(&transform->position, UNIT_WORLD_BOUND) && distributed_axes_make_valid(&forward, &up))
+		{
+			real_point3d before = object_get(object_index)->object.position;
+			real_vector3d before_forward = object_get(object_index)->object.forward;
+			real_vector3d before_up = object_get(object_index)->object.up;
+
 			object_set_position(object_index, &transform->position, &forward, &up);
+			network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, _network_vehicle_write_coop);
+		}
 	}
 }
 

@@ -11,6 +11,7 @@ header included in hcex build.
 /* ---------- headers */
 
 #include "units.h"
+#include "vehicle_riding_bipeds.h" /* port: port/linux/game/vehicle_riding_bipeds.c */
 
 /* ---------- constants */
 
@@ -66,6 +67,27 @@ struct _biped_datum
 	real_plane3d ground_plane;
 	byte limp_body_current_relaxation_iterations;
 	byte limp_body_max_relaxation_iterations;
+	/* port: the vehicle the biped stands on, and where it and the biped
+	were at the end of the biped's last tick, for its carry
+	(vehicle_riding.c; the two bytes sit in the padding after the limp body
+	counts) */
+	char riding_ticks;
+	char riding_falling;
+	long riding_object_index;
+	long riding_vehicle_updates;
+	real_point3d riding_vehicle_position;
+	real_vector3d riding_vehicle_forward;
+	real_vector3d riding_vehicle_up;
+	real_vector3d riding_velocity;
+	/* (where it last stood, in the frame of the vehicle's node it stood on) */
+	real_point3d riding_local_point;
+	short riding_node_index;
+	short riding_pad;
+	/* (the vehicle's own pose then, to tell a node that moves with the body
+	from one that moves on its own) */
+	real_point3d riding_body_position;
+	real_vector3d riding_body_forward;
+	real_vector3d riding_body_up;
 };
 
 struct biped_datum
@@ -75,6 +97,11 @@ struct biped_datum
 	struct _unit_datum unit;
 	struct _biped_datum biped;
 };
+
+/* port: a biped's game datum, riding fields included (object_types.c's
+biped row; game_state.c refuses saved games of another size) */
+#define BIPED_DATUM_SIZE 0x4EC
+typedef char biped_datum_size_assert[sizeof(struct biped_datum) == BIPED_DATUM_SIZE ? 1 : -1];
 
 /* ---------- prototypes/BIPEDS.C */
 

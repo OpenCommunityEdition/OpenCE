@@ -230,7 +230,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `server.update_game_minutes`, `server.max_machines_per_address`,
 `server.afk_kick_minutes`, `server.afk_kick_when_full`,
 `server.afk_kick_full_minutes`, `server.coop_bsp_switch`,
-`server.coop_bsp_switch_cooldown_seconds`, `server.map_vote`,
+`server.coop_bsp_switch_cooldown_seconds`,
+`server.vehicle_riding_override_gametype`, `server.map_vote`,
 `server.map_vote_choices`, `server.map_vote_seconds`, and
 `network.text_chat`,
 `network.voice_lobby`, `network.voice_mode`, `network.voice_kbps`,
@@ -239,8 +240,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `network.votekick_ban_minutes`, `network.map_share`,
 `network.map_share_upload`, `network.public_address`,
 `network.coop_friendly_fire`, `network.coop_player_collisions`,
-`network.coop_ally_friendly_fire`, `network.coop_team_wipe`, `network.shield_effects` and
-`network.fire_origins`. Of them,
+`network.coop_ally_friendly_fire`, `network.coop_team_wipe`, `network.shield_effects`,
+`network.fire_origins` and `network.vehicle_riding`. Of them,
 `server.status_file`, `server.auto_update` and `server.log_addresses` need
 the owner role: from the web's admin, `sv_set` of one of them (`POST
 /api/command`) answers `403 forbidden`, and `PUT /api/settings` leaves it
@@ -289,6 +290,7 @@ in either case, and is kept as the table spells it:
 | `network.coop_friendly_fire` | `off`, `on`, `shields_only`, `explosives_only` |
 | `network.coop_team_wipe` | `auto`, `revert`, `respawn` (`auto`: a public server, `server.public` with internet play, only respawns the team) |
 | `network.shield_effects` | `stock`, `glow`, `light_show`, `overshield`, `glow_overshield`, `light_show_overshield`, `players` |
+| `network.vehicle_riding`, `server.vehicle_riding_override_gametype` | `true`, `false` (from the next map) |
 
 A dedicated server may also keep words out of its chat and its players'
 names (`server.chat_filter`, off by default): the words of streamer mode's
@@ -352,6 +354,25 @@ who are not away stand in zones to the same part (`server.coop_bsp_switch`
 held. After a switch the zones wait `server.coop_bsp_switch_cooldown_seconds`
 (15) before another, the players told when they open; each switch is told
 to everyone, logged and a `coop_bsp_switch` event names who crossed.
+
+### Vehicle riding
+
+`network.vehicle_riding` is the base setting. In multiplayer the
+gametype's `vehicle_riding` rule ("Gametype files", below) overrides it:
+a gametype without the rule is off, whatever the base says. In co-op a
+rotation entry's own `riding` rule overrides it.
+`server.vehicle_riding_override_gametype = true` turns the gametype's
+override off, so multiplayer uses the base setting.
+Both settings default to `false`; changes through `sv_set` or the web
+page count from the next map. A map's own choice still wins.
+
+For example (a co-op entry's own rule and a map's choice still win):
+
+| `network.vehicle_riding` | `server.vehicle_riding_override_gametype` | Riding |
+| --- | --- | --- |
+| `true` | `false` | On in co-op; multiplayer follows each gametype |
+| `false` | `true` | Off in multiplayer (unless a map turns it on) |
+| `true` | `true` | On in co-op and multiplayer (unless a map turns it off) |
 
 ### Updates
 
@@ -821,6 +842,10 @@ a rotation that long is saved whole and read back after a restart.
   value it takes; a rule of another game engine than the gametype's is
   refused. 48 rules at most; a rule given twice is the last.
 
+A co-op entry's `riding` rule (`a10:coop+riding=true` or `=false`)
+overrides `network.vehicle_riding` for that entry only. An entry without
+it uses the setting; a map's own choice still wins over both.
+
 An entry that cannot be played (a map that is not there, a bad gametype
 file, a rule out of range) is left out with a warning, at the start and at
 `sv_reload`; `sv_rotation_set` and `PUT /api/rotation` change nothing when
@@ -874,6 +899,12 @@ web page's files to it.
 A gametype a player's game saved is played with `file=<name>`: copy the
 saved gametype, as `<name>.gametype`, into the same `gametypes` folder
 (beside `config.toml` if there is one, else the data root's).
+
+`vehicle_riding` under `[universal]` is a boolean: `true` lets players
+standing on a moving vehicle ride along with it; no rule means off.
+Stock gametypes and older saved ones have it off. In rotation entries its
+short name is `riding` (`bloodgulch:ctf+riding=true`). The dedicated
+override and a map's own choice take precedence ("Vehicle riding", above).
 
 ## The listing
 

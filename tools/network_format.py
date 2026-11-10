@@ -5,7 +5,8 @@ Taken from the sources: the game's message numbers, sizes and fields
 (network_messages.c, .h), the distributed netcode's (network_*.c, .h,
 map_share*.c, .h), and the gametype's PC options (game_engine.h's struct
 game_variant_options) and where the game settings record has them: the enums
-with _distributed_ members, the DISTRIBUTED_ constants, the structs sent
+with _distributed_ members and the one of the riding deck part's flags
+(vehicle_riding.h), the DISTRIBUTED_ constants, the structs sent
 whole (the _message structs, those whose size is taken, and the structs in
 them) as hashes, and the constants their arrays are sized by, as their
 definitions. An entry the netcode packs itself (a unit's state, a relayed
@@ -46,6 +47,7 @@ def items():
     """the wire format's items, name to value"""
     paths = sorted((ROOT / "port/linux/game").glob("network_*.[ch]"))
     paths += sorted((ROOT / "port/linux/game").glob("map_share*.[ch]"))
+    paths += [ROOT / "port/linux/game/vehicle_riding.h"]
     paths += [ROOT / "source/networking/network_messages.c", ROOT / "source/networking/network_messages.h"]
     texts = [re.sub(r"/\*.*?\*/|//[^\n]*", " ", path.read_text(encoding="latin-1"), flags=re.S) for path in paths]
     everything = "\n".join(texts)
@@ -59,7 +61,8 @@ def items():
         for block in _blocks(text, r"^struct distributed_\w+\s*\{"):
             structs[re.match(r"struct (\w+)", block).group(1)] = block
         for block in _blocks(text, r"^enum\b[^;{]*\{"):
-            if "_distributed_" not in block and "network_game_message_type" not in block:
+            if ("_distributed_" not in block and "network_game_message_type" not in block and
+                    "_vehicle_riding_deck_falling_bit" not in block):
                 continue
             value = -1
             for member in filter(None, map(str.strip, block[block.index("{") + 1:block.rindex("}")].split(","))):
