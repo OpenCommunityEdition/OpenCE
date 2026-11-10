@@ -1423,6 +1423,13 @@ long scenario_tags_load(
 
 				powerup_render_bounds_tags_loaded();
 			}
+			/* port: the devices' render spheres, grown to hold their models
+			wherever their animations carry them (port/linux/game/device_render_bounds.c) */
+			{
+				extern void device_render_bounds_tags_loaded(void);
+
+				device_render_bounds_tags_loaded();
+			}
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{
 				extern void menu_tags_loaded(char const *map_name);
