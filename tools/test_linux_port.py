@@ -434,6 +434,8 @@ def test_p2p_matchmaking(tmp_path):
 @pytest.mark.parametrize("fault,case", [
     (("if (!p2p_ed25519_verify(", "if (0 && !p2p_ed25519_verify("), "records"),
     (("bytes[2] != MM_FORMAT)", "0)"), "records"),
+    (("if (!record->held)\n\t\t{\n\t\t\tmemcpy(bytes + at, record->token",
+      "if (1)\n\t\t{\n\t\t\tmemcpy(bytes + at, record->token"), "hosting"),
 ])
 def test_p2p_matchmaking_negative_control(tmp_path, fault, case):
     output = matchmaking_check(tmp_path, fault)

@@ -96,9 +96,51 @@ static void check_playlists(void)
 		"every other pair is a queue");
 }
 
+static int contains(const unsigned char *bytes, int size, const unsigned char *part, int part_size)
+{
+	int at;
+
+	for (at = 0; at + part_size <= size; at++)
+		if (!memcmp(bytes + at, part, (size_t)part_size))
+			return 1;
+	return 0;
+}
+
+static void check_hosting(void)
+{
+	unsigned char host_seed[P2P_SEED_SIZE], member_seed[P2P_SEED_SIZE], other_seed[P2P_SEED_SIZE];
+	unsigned char bytes[MM_MAXIMUM_RECORD_SIZE], token[P2P_TOKEN_SIZE], opened[P2P_TOKEN_SIZE];
+	struct mm_record record = searching(0, 1), member = searching(1, 1), read_back;
+	int size;
+
+	case_name = "hosting";
+	seed_of(0, host_seed);
+	seed_of(1, member_seed);
+	seed_of(2, other_seed);
+	memset(token, 0xa5, sizeof(token));
+	size = mm_record_write(&member, member_seed, bytes, sizeof(bytes));
+	CHECK(mm_record_read(bytes, size, &member), "the member's own record");
+	record.kind = MM_KIND_HOSTING;
+	record.players = 1;
+	record.most_players = 4;
+	record.held = 1;
+	record.pool_count = 1;
+	memcpy(record.pool[0], member.key_hash, P2P_KEY_HASH_SIZE);
+	memcpy(record.token, token, P2P_TOKEN_SIZE);
+	CHECK(mm_seal_token(host_seed, member.key, token, record.sealed[0]), "sealed");
+	size = mm_record_write(&record, host_seed, bytes, sizeof(bytes));
+	CHECK(mm_record_read(bytes, size, &read_back), "a held hosting record read back");
+	CHECK(read_back.held && read_back.pool_count == 1 && read_back.most_players == 4, "held, one member, 4 most");
+	CHECK(mm_open_token(member_seed, read_back.key, read_back.sealed[0], opened) &&
+		!memcmp(opened, token, P2P_TOKEN_SIZE), "the member opens the token");
+	CHECK(!mm_open_token(other_seed, read_back.key, read_back.sealed[0], opened), "no one else opens it");
+	CHECK(!contains(bytes, size, token, P2P_TOKEN_SIZE), "a held game's token is nowhere in clear");
+}
+
 int main(void)
 {
 	check_records();
+	check_hosting();
 	check_playlists();
 	printf(failures ? "FAILED %d\n" : "PASS\n", failures);
 	return failures != 0;

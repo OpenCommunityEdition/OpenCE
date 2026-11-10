@@ -21,8 +21,11 @@ enum
 	MM_FLAG_CAN_HOST = 1,
 	MM_FLAG_UNDER_WAY = 2,
 	MM_FLAG_HELD = 4,
+	MM_MAXIMUM_POOL = 8,
+	MM_SEALED_TOKEN_SIZE = P2P_TOKEN_SIZE + P2P_SEAL_OVERHEAD,
 	MM_HEADER_SIZE = 2 + 1 + 2 + 1 + 4 + 1 + 1 + 1 + 1 + P2P_KEY_SIZE,
-	MM_MAXIMUM_RECORD_SIZE = MM_HEADER_SIZE + P2P_SIGNATURE_SIZE,
+	MM_MAXIMUM_RECORD_SIZE = MM_HEADER_SIZE + 3 + MM_MAXIMUM_POOL * (P2P_KEY_HASH_SIZE + MM_SEALED_TOKEN_SIZE) +
+		P2P_TOKEN_SIZE + P2P_SIGNATURE_SIZE,
 	/* tenths of a second */
 	MM_INTERVAL = 30,
 	MM_MINIMUM_INTERVAL = 10,
@@ -41,10 +44,19 @@ struct mm_record
 	unsigned char key[P2P_KEY_SIZE];
 	/* the hash of the key's X25519 form: an invite's host part */
 	unsigned char key_hash[P2P_KEY_HASH_SIZE];
+	int players, most_players;
+	int pool_count;
+	unsigned char pool[MM_MAXIMUM_POOL][P2P_KEY_HASH_SIZE];
+	unsigned char sealed[MM_MAXIMUM_POOL][MM_SEALED_TOKEN_SIZE];
+	unsigned char token[P2P_TOKEN_SIZE];
 };
 
 int mm_record_write(const struct mm_record *record, const unsigned char *seed, unsigned char *bytes, int size);
 /* checks the signature: 1 only if whole and signed by its key */
 int mm_record_read(const unsigned char *bytes, int size, struct mm_record *record);
+int mm_seal_token(const unsigned char *seed, const unsigned char *member_key, const unsigned char *token,
+	unsigned char *sealed);
+int mm_open_token(const unsigned char *seed, const unsigned char *host_key, const unsigned char *sealed,
+	unsigned char *token);
 
 #endif

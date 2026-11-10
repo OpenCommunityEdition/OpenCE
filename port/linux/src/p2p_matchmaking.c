@@ -50,9 +50,9 @@ int mm_playlist_has_size(unsigned playlists, int size)
 int mm_record_write(const struct mm_record *record, const unsigned char *seed, unsigned char *bytes, int size)
 {
 	unsigned char message[sizeof(record_label) + MM_MAXIMUM_RECORD_SIZE];
-	int at = 0;
+	int at = 0, index;
 
-	if (size < MM_MAXIMUM_RECORD_SIZE)
+	if (size < MM_MAXIMUM_RECORD_SIZE || record->pool_count < 0 || record->pool_count > MM_MAXIMUM_POOL)
 		return 0;
 	bytes[at++] = 'H';
 	bytes[at++] = 'M';
@@ -69,6 +69,27 @@ int mm_record_write(const struct mm_record *record, const unsigned char *seed, u
 	bytes[at++] = (unsigned char)record->size;
 	memcpy(bytes + at, record->key, P2P_KEY_SIZE);
 	at += P2P_KEY_SIZE;
+	if (record->kind == MM_KIND_HOSTING)
+	{
+		bytes[at++] = (unsigned char)record->players;
+		bytes[at++] = (unsigned char)record->most_players;
+		bytes[at++] = (unsigned char)record->pool_count;
+		for (index = 0; index < record->pool_count; index++)
+		{
+			memcpy(bytes + at, record->pool[index], P2P_KEY_HASH_SIZE);
+			at += P2P_KEY_HASH_SIZE;
+			if (record->held)
+			{
+				memcpy(bytes + at, record->sealed[index], MM_SEALED_TOKEN_SIZE);
+				at += MM_SEALED_TOKEN_SIZE;
+			}
+		}
+		if (!record->held)
+		{
+			memcpy(bytes + at, record->token, P2P_TOKEN_SIZE);
+			at += P2P_TOKEN_SIZE;
+		}
+	}
 	p2p_ed25519_sign(seed, record->key, message, signed_message(bytes, at, message), bytes + at);
 	return at + P2P_SIGNATURE_SIZE;
 }
@@ -76,7 +97,7 @@ int mm_record_write(const struct mm_record *record, const unsigned char *seed, u
 int mm_record_read(const unsigned char *bytes, int size, struct mm_record *record)
 {
 	unsigned char message[sizeof(record_label) + MM_MAXIMUM_RECORD_SIZE];
-	int at = MM_HEADER_SIZE;
+	int at = MM_HEADER_SIZE, index, entry;
 
 	if (size < MM_HEADER_SIZE + P2P_SIGNATURE_SIZE || size > MM_MAXIMUM_RECORD_SIZE ||
 		bytes[0] != 'H' || bytes[1] != 'M' || bytes[2] != MM_FORMAT)
@@ -100,9 +121,67 @@ int mm_record_read(const unsigned char *bytes, int size, struct mm_record *recor
 	{
 		return 0;
 	}
+	if (record->kind == MM_KIND_HOSTING)
+	{
+		if (size < at + 3 + P2P_SIGNATURE_SIZE)
+			return 0;
+		record->players = bytes[at++];
+		record->most_players = bytes[at++];
+		record->pool_count = bytes[at++];
+		entry = P2P_KEY_HASH_SIZE + (record->held ? MM_SEALED_TOKEN_SIZE : 0);
+		if (record->pool_count > MM_MAXIMUM_POOL ||
+			size < at + record->pool_count * entry + (record->held ? 0 : P2P_TOKEN_SIZE) + P2P_SIGNATURE_SIZE)
+		{
+			return 0;
+		}
+		for (index = 0; index < record->pool_count; index++)
+		{
+			memcpy(record->pool[index], bytes + at, P2P_KEY_HASH_SIZE);
+			at += P2P_KEY_HASH_SIZE;
+			if (record->held)
+			{
+				memcpy(record->sealed[index], bytes + at, MM_SEALED_TOKEN_SIZE);
+				at += MM_SEALED_TOKEN_SIZE;
+			}
+		}
+		if (!record->held)
+		{
+			memcpy(record->token, bytes + at, P2P_TOKEN_SIZE);
+			at += P2P_TOKEN_SIZE;
+		}
+	}
 	if (size != at + P2P_SIGNATURE_SIZE)
 		return 0;
 	if (!p2p_ed25519_verify(record->key, message, signed_message(bytes, at, message), bytes + at))
 		return 0;
 	return key_hash_of(record->key, record->key_hash);
+}
+
+static int token_key(const unsigned char *seed, const unsigned char *other_key, unsigned char *key)
+{
+	unsigned char public_key[P2P_KEY_SIZE], secret[P2P_KEY_SIZE], other[P2P_KEY_SIZE], shared[P2P_KEY_SIZE];
+
+	p2p_ed25519_public(seed, public_key, secret);
+	if (!p2p_ed25519_to_x25519(other_key, other))
+		return 0;
+	p2p_x25519(shared, secret, other);
+	p2p_sha256(shared, P2P_KEY_SIZE, key);
+	return 1;
+}
+
+int mm_seal_token(const unsigned char *seed, const unsigned char *member_key, const unsigned char *token,
+	unsigned char *sealed)
+{
+	unsigned char key[P2P_KEY_SIZE];
+
+	return token_key(seed, member_key, key) &&
+		p2p_seal(key, token, P2P_TOKEN_SIZE, sealed) == MM_SEALED_TOKEN_SIZE;
+}
+
+int mm_open_token(const unsigned char *seed, const unsigned char *host_key, const unsigned char *sealed,
+	unsigned char *token)
+{
+	unsigned char key[P2P_KEY_SIZE];
+
+	return token_key(seed, host_key, key) && p2p_open(key, sealed, MM_SEALED_TOKEN_SIZE, token) == P2P_TOKEN_SIZE;
 }
