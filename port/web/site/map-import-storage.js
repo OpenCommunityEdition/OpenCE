@@ -142,7 +142,10 @@
       if (ce) {
         for (const entry of journal.files) if (!await absent(parent, entry.path)) throw new Error('Already installed; existing files are kept: ' + entry.path);
       } else if (!await absent(parent, journal.folder)) throw new Error('That package folder already exists. Choose a different name.');
-      if (!ce && !await absent(journalDir, key + '.commit')) throw new Error('This package name already has a storage receipt. Choose a different name.');
+      // A receipt with no package folder (checked above) and no journal was
+      // left by a removal cut off before removeEnd. Download folders are named
+      // after the package's contents, so it would block that package for good.
+      if (!ce && !await absent(journalDir, key + '.commit')) await removeEntry(journalDir, key + '.commit');
       const estimate = await space();
       if (estimate.known && estimate.available < total + JOURNAL_LIMIT) throw new Error('Not enough browser storage for this import.');
       const text = JSON.stringify(journal);

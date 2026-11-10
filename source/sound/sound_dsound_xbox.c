@@ -1944,7 +1944,7 @@ void dsound_port_set_channel_stereo_position(
 	real occlusion,
 	real obstruction,
 	boolean attenuate_direct_path,
-	real approach)
+	real approach) /* port: the speed toward the listener, for Doppler (dsound_sdl.c) */
 {
 	extern void dsound_sdl_stream_set_stereo_position(IDirectSoundStream *stream, BOOL positioned, float pan,
 		float distance, float minimum_distance, float distance_fade, float approach);
@@ -1967,6 +1967,7 @@ void dsound_port_set_channel_stereo_position(
 				channel->attenuate_direct_path= attenuate_direct_path;
 				dsound_channel_set_I3DL2_properties(channel_index);
 			}
+			/* port: with the approach, for Doppler */
 			dsound_sdl_stream_set_stereo_position(channel->stream, positioned, pan,
 				distance, minimum_distance, distance_fade, approach);
 		}

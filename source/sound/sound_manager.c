@@ -1647,6 +1647,7 @@ static long update_potentially_audible_looping_sound(
 			sound_definition_get(definition_index);
 		real maximum_distance =
 			sound_definition_get_maximum_distance(definition_index);
+		/* port: the looping sound keeps its obstruction result for the tick */
 		short listener_index = source_audible(
 			&looping_sound->source,
 			maximum_distance,
@@ -1659,7 +1660,7 @@ static long update_potentially_audible_looping_sound(
 			if (sound_index != NONE)
 			{
 				struct sound_datum *sound = sound_get(sound_index);
-				short placement;
+				short placement; /* port: where a co-op client starts the sound (coop_sound_sync.c) */
 
 				sound->listener_index = listener_index;
 				sound->definition_index = definition_index;
@@ -2591,6 +2592,7 @@ long sound_new_impulse(
 
 					if (sound_definition_is_playable(definition_index))
 					{
+						/* port: a new impulse has no datum to keep its obstruction result yet */
 						short listener_index = source_audible(
 							source,
 							maximum_distance,
@@ -3406,8 +3408,8 @@ void sound_dispose_from_old_map(
 	return;
 }
 
-/* port: a sound's obstruction result for a tick, for its listener and
-position (source_audible) */
+/* port: a sound's obstruction result for a tick, for its listener
+(source_audible) */
 struct sound_obstruction_cache_entry
 {
 	boolean valid;
@@ -3416,7 +3418,6 @@ struct sound_obstruction_cache_entry
 	short local_player_index;
 	real obstruction;
 	real occlusion;
-	real_point3d position;
 };
 
 static struct sound_obstruction_cache_entry sound_obstruction_cache[MAXIMUM_SOUND_DATUMS];
@@ -3445,8 +3446,10 @@ static struct sound_obstruction_cache_entry *sound_obstruction_cache_entry(
 }
 
 /* port: the wall test is remembered for the sound for this tick. Another
-sound cannot take its slot. The position is part of the key, so a sound that
-moved is tested again. */
+sound cannot take its slot. The position is not part of the key: between
+ticks a sound on a moving object follows its object's interpolated pose
+(render_interpolation.c), which differs every frame. The tick's first test
+stands for the tick, as it does for a listener that moves. */
 static boolean sound_obstruction_cache_recall(
 	short kind,
 	long datum_index,
@@ -3461,10 +3464,7 @@ static boolean sound_obstruction_cache_recall(
 	if (!entry || !entry->valid ||
 		entry->datum_index != datum_index ||
 		entry->game_time != now ||
-		entry->local_player_index != local_player_index ||
-		entry->position.x != source->location.position.x ||
-		entry->position.y != source->location.position.y ||
-		entry->position.z != source->location.position.z)
+		entry->local_player_index != local_player_index)
 	{
 		return FALSE;
 	}
@@ -3490,7 +3490,6 @@ static void sound_obstruction_cache_store(
 	entry->datum_index = datum_index;
 	entry->game_time = game_time_get();
 	entry->local_player_index = local_player_index;
-	entry->position = source->location.position;
 	entry->obstruction = source->obstruction;
 	entry->occlusion = source->occlusion;
 }
@@ -3604,6 +3603,7 @@ static void refresh_sounds(
 
 		if (!stop_sound)
 		{
+			/* port: the sound keeps its obstruction result for the tick */
 			short listener_index = source_audible(
 				&sound->source,
 				sound_definition_get_maximum_distance(
@@ -4099,13 +4099,13 @@ were fixed to that unit (object_get_point_velocity), as the sounds on it are
 given theirs: the Doppler effect takes the velocities along the line from a
 sound to the camera, and two points on one turning body move alike along the
 line between them, so they cancel exactly, from a chase camera behind the
-vehicle too, and swinging that camera round adds nothing. Measured, a network client's corrections of a vehicle
-it rides jerked the focus and the vehicle's own engine with it, and a
-Warthog's turret swung the gunner round. Otherwise (a cinematic's camera, a
-flying one) measured from one game tick to the next. Not the camera's
-position: swinging a chase
-camera round a Warthog sweeps it through the air, and the engine rose and
-fell. The observer's own velocity is no use for this on the native ports:
+vehicle too, and swinging that camera round adds nothing. Measured, a
+network client's corrections of a vehicle it rides jerked the focus and the
+vehicle's own engine with it, and a Warthog's turret swung the gunner round.
+Otherwise (a cinematic's camera, a flying one) measured from one game tick
+to the next. Not the camera's position: swinging a chase camera round a
+Warthog sweeps it through the air, and the engine rose and fell. The
+observer's own velocity is no use for this on the native ports:
 the observer runs every frame (port/linux/game/render_interpolation.c) and
 divides a tick's motion by a frame's time, so riding a Pelican at 144 frames
 a second the camera claimed nearly five times its speed. It also reads zero

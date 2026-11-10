@@ -165,11 +165,6 @@ no overwrite, reload persistence, cancellation and concurrent shared games.
 C stage, bridge, flush failures and crash/uncertain-outcome recovery in both
 browsers. Their synthetic bytes are not playable maps.
 
-The full source archive records component and browser import checks alongside
-bounded MCC/CE/Xbox gameplay and networking observations. The smaller upstream
-contribution includes the focused storage subset, not every archived test.
-Consult the [upstream validation record](../mcc_upstream_validation.md) and
-[historical ledger](../mcc_refactor_validation.md) for tested revisions and
-limits. An imported map or successful storage transaction
+The repository includes the focused storage tests. An imported map or successful storage transaction
 does not prove rendering, simulation, campaign progression or cross-platform
 network compatibility.

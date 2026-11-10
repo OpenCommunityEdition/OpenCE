@@ -1,11 +1,9 @@
 # Authored MCC biped seats
 
-> Historical component evidence from the refactored source branch. Protocol
-> numbers and platform limitations below describe the original validation;
-> they are not the current upstream agreement. The MCC contribution uses
-> OpenCE protocol **42**. See the [upstream validation record](mcc_upstream_validation.md)
-> for the testing-based contribution and the [reading guide](reading/README.md#scope-and-provenance)
-> for source and test availability.
+> Component evidence from the source branch the MCC support came from.
+> Protocol numbers below are that branch's; MCC maps now play with OpenCE's
+> network version (`HALO_PORT_NETWORK_VERSION`, [NETCODE.md](../port/linux/NETCODE.md)).
+> The [reading guide](reading/README.md#scope-and-provenance) follows the sources.
 
 FloodSlayer (`c10_flood.map`, Workshop 3629556661) gives several bipeds a
 `stand` seat and gives its playable infection form matching entry/exit

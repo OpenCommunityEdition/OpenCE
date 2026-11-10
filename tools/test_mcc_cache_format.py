@@ -123,6 +123,41 @@ def test_resource_dependencies_are_taken_from_checked_tags(report_tool, tmp_path
     assert int(report["external_sounds" if kind == "snd!" else "external_bitmaps"]) == count
 
 
+def aliased_bitmaps_map(count):
+    """Two tag entries share one bitmap group of `count` bitmaps, which fills
+    the end of the tag data; the group's bitmaps are counted for each."""
+    data = resource_dependency_map("bitm", 0, 4)
+    tag_bytes = 0x3000
+    data.extend(bytes(tag_bytes - 0x900))
+    put32(data, 8, len(data))
+    put32(data, 20, tag_bytes)
+    put32(data, TAG_OFFSET+12, 4)
+    struct.pack_into("<8I", data, TAG_OFFSET+136, fourcc("bitm"), 0xFFFFFFFF, 0xFFFFFFFF,
+                     0xE1770003, BASE+0xA9, BASE+0x740, 0, 0)
+    struct.pack_into("<3I", data, TAG_OFFSET+0x740+0x60, count, BASE+0x900, 0)
+    for i in range(count):
+        element = TAG_OFFSET+0x900+i*0x30
+        struct.pack_into("<6H", data, element+4, 1, 1, 1, 0, 11, 0)
+        struct.pack_into("<2I", data, element+0x18, 0x800, 4)
+    return data
+
+
+@pytest.mark.parametrize("count,accepted", [(64, True), ((0x3000-0x900)//0x30, False)])
+def test_shared_bitmap_groups_are_bounded_by_the_tag_data(report_tool, tmp_path, count, accepted):
+    # Each counted bitmap takes three entries of the texture table
+    # (mcc_bitmaps.c); a count larger than the tag data holds is refused
+    # before the table's size can wrap.
+    path = tmp_path / "aliased.map"
+    path.write_bytes(aliased_bitmaps_map(count))
+    code, report = audit(report_tool, path)
+    if accepted:
+        assert code == 0, report
+        assert int(report["bitmaps"]) == 2 * count
+    else:
+        assert code == 1
+        assert report["status"] == "invalid MCC bitmap data"
+
+
 @pytest.mark.parametrize("offset,value,error", [
     (4, 609, "not a Halo 1 MCC version-13 cache"),
     (4, 5, "not a Halo 1 MCC version-13 cache"),

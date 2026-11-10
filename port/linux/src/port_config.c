@@ -355,6 +355,10 @@ static const struct config_setting config_settings[] =
 		"How sounds are converted to the output's rate: \"sinc\" with a\n"
 		"band-limited low pass; \"linear\" between neighbouring samples,\n"
 		"brighter for the aliasing it lets through." },
+	{ "audio.stereo_doppler", _config_boolean, "false", "HALO_STEREO_DOPPLER", _environment_value, _platform_all,
+		"Shift the pitch of a stereo sound placed in the world (an engine, a\n"
+		"rocket's flight) as it comes towards or goes away from the player, as\n"
+		"3D sounds are; false plays them at their own pitch, as the Xbox did." },
 	{ "audio.voice_chat", _config_string, "\"push_to_talk\"", "HALO_VOICE_CHAT", _environment_value, _platform_all,
 		"Talking in network games' voice chat: \"push_to_talk\" (while\n"
 		"controls.push_to_talk is held; the microphone opens the first time),\n"

@@ -56,8 +56,9 @@ void mcc_script_effects_begin(void)
 
 void mcc_script_effects_dispose(void)
 {
-    if (mcc_effects_owned) mcc_effects_set_native(
-        game_connection()==_game_connection_network_client ? 0 : mcc_effects_original);
+    /* Every machine gets back the cheat flags it had before the MCC game:
+     * a client's own were set aside at the start, not the host's. */
+    if (mcc_effects_owned) mcc_effects_set_native(mcc_effects_original);
     mcc_effects_owned=FALSE;
     mcc_effects_remote=0;
 }

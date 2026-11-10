@@ -903,19 +903,28 @@ int main(int argc, char **argv)
 			voice_delete(stream);
 		}
 		listener.velocity[2] = 0.0f;
-		/* a positioned stereo voice (2D), shifted as one would be by how
-		fast the game says it comes towards the listener: 10 units a second */
+		/* a positioned stereo voice (2D), with audio.stereo_doppler, shifted
+		as one would be by how fast the game says it comes towards the
+		listener: 10 units a second; without it, at its own pitch, as the
+		Xbox played it */
 		{
-			struct sdl_stream *stream = voice_ahead(10.0f);
-			double hertz, level, room_level, wanted = 1000.0 * 343.3 / (343.3 - 30.48);
+			int enabled;
 
-			stream->has_3d = FALSE;
-			stream->stereo_positioned = TRUE;
-			stream->stereo_approach = 10.0f;
-			voice_figures(stream, &hertz, &level, &room_level);
-			CHECK(fabs(hertz / wanted - 1.0) < 1.0e-4, "a positioned stereo voice: %.2f Hz, %.2f Hz wanted", hertz,
-				wanted);
-			voice_delete(stream);
+			for (enabled = 0; enabled < 2; enabled++)
+			{
+				struct sdl_stream *stream = voice_ahead(10.0f);
+				double hertz, level, room_level, wanted = enabled ? 1000.0 * 343.3 / (343.3 - 30.48) : 1000.0;
+
+				stereo_doppler_enabled = enabled;
+				stream->has_3d = FALSE;
+				stream->stereo_positioned = TRUE;
+				stream->stereo_approach = 10.0f;
+				voice_figures(stream, &hertz, &level, &room_level);
+				CHECK(fabs(hertz / wanted - 1.0) < 1.0e-4, "a positioned stereo voice (stereo Doppler %s): %.2f Hz, "
+					"%.2f Hz wanted", enabled ? "on" : "off", hertz, wanted);
+				voice_delete(stream);
+			}
+			stereo_doppler_enabled = FALSE;
 		}
 		/* a change of velocity glides across the next mix: the pitch of
 		each stretch of it between the two */

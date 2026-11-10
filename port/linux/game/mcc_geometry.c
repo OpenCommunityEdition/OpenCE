@@ -431,12 +431,23 @@ static int mg_bsp_material(struct mcc_runtime *r,struct mcc_cache_bsp const *b,
     return 1;
 }
 
+/* a lightmap's materials, sorted by address so that two lightmaps naming the
+ * same materials convert them once */
+struct mg_material_run { struct structure_material *materials; long count; };
+
+static int mg_material_run_compare(void const *a,void const *b) {
+    uintptr_t x=(uintptr_t)((struct mg_material_run const *)a)->materials;
+    uintptr_t y=(uintptr_t)((struct mg_material_run const *)b)->materials;
+    return x<y ? -1 : x>y;
+}
+
 int mcc_geometry_bsp_load(struct mcc_runtime *r,uint32_t handle,uint32_t offset,
     uint32_t size,void *address,void **result) {
     struct mcc_cache_bsp const *b=NULL;
     struct structure_bsp *structure;
     struct structure_lightmap *lightmaps;
-    uint32_t i;
+    struct mg_material_run *runs=NULL;
+    uint32_t i,run_count=0;
     long l;
     if (!r || !r->geometry || !result) return 0;
     *result=NULL;
@@ -453,21 +464,33 @@ int mcc_geometry_bsp_load(struct mcc_runtime *r,uint32_t handle,uint32_t offset,
     lightmaps=mg_bsp_pointer(address,size,(uint32_t)(uintptr_t)structure->lightmaps.address,
         (uint32_t)structure->lightmaps.count*0x20);
     if (structure->lightmaps.count && !lightmaps) return mg_error("BSP lightmaps point outside BSP");
+    if (structure->lightmaps.count &&
+        !(runs=malloc((uint32_t)structure->lightmaps.count*sizeof(*runs)))) return 0;
     for (l=0;l<structure->lightmaps.count;l++) {
         struct tag_block const *block=&lightmaps[l].materials;
         struct structure_material *materials;
-        long m;
         if (block->count<0 || (uint32_t)block->count>size/sizeof(*materials)) goto fail;
         materials=mg_bsp_pointer(address,size,(uint32_t)(uintptr_t)block->address,
             (uint32_t)block->count*sizeof(*materials));
         if (block->count && !materials) goto fail;
-        for (m=0;m<block->count;m++) if (!mg_bsp_material(r,b,&materials[m])) goto fail;
+        if (block->count) { runs[run_count].materials=materials; runs[run_count++].count=block->count; }
     }
+    if (run_count) qsort(runs,run_count,sizeof(*runs),mg_material_run_compare);
+    for (i=0;i<run_count;i++) {
+        long m;
+        if (i && runs[i].materials==runs[i-1].materials && runs[i].count==runs[i-1].count) continue;
+        /* converting a material rewrites its descriptors, so a material
+         * reached by two different runs would be read again as file data */
+        if (i && runs[i].materials<runs[i-1].materials+runs[i-1].count) goto fail;
+        for (m=0;m<runs[i].count;m++) if (!mg_bsp_material(r,b,&runs[i].materials[m])) goto fail;
+    }
+    free(runs);
     /* The MCC file stream descriptors are not Xbox vertex-buffer tables. */
     memset((unsigned char *)address+4,0,16);
     *result=structure;
     return 1;
 fail:
+    if (runs) free(runs);
     mcc_geometry_bsp_unload(r);
     return mg_error("BSP material conversion failed");
 }

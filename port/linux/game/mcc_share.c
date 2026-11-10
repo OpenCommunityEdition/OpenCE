@@ -595,7 +595,7 @@ void mcc_share_game_peer_left(struct network_game_server_client_machine *machine
     for (index=0;index<MCC_SHARE_HOST_MACHINES;index++)
         if (network_game_server_get_client_machine_at_index(server,index)==machine) {
             mcc_admission_peer_left(index);
-            mcc_load_network_peer_left(index);
+            mcc_load_network_machine_left(index);
             if (mcc_share_ready) mcc_share_host_forget(&mcc_share_globals,index);
             mcc_share_admission_pending[index]=0;
         }

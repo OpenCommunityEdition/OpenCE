@@ -654,6 +654,7 @@ void hud_render_damage_indicators(
 		byte damage_indicators[NUMBER_OF_HUD_DAMAGE_INDICATOR_DIRECTIONS];
 		short direction;
 
+		/* port: an MCC map's indicator bitmap's own scale (mcc_hud.c) */
 		scale *= mcc_hud_bitmap_scale(definition->indicator_bitmap.index);
 
 		player_effect_get_damage_indicators(
