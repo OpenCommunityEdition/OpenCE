@@ -57,6 +57,17 @@ static struct
 	real field_of_view, timer;
 } camera_script_globals;
 
+struct scenario_cutscene_camera_point
+{
+	real_point3d position;
+	real_vector3d orientation;
+	real field_of_view;
+};
+static struct scenario_cutscene_camera_point test_camera_point;
+#define TAG_BLOCK_GET_ELEMENT(block, index, type) (&test_camera_point)
+static void vectors3d_from_euler_angles3d(real_vector3d *forward, real_vector3d *up,
+	const real_vector3d *orientation) { *forward = zero; *up = zero; }
+
 #include "under_test.inc"
 
 int main(int argc, char **argv)
@@ -88,11 +99,32 @@ int main(int argc, char **argv)
 		CHECK(v.i == 0, "teleport produced velocity");
 		return 0;
 	}
+	CASE("coop-camera-motion")
+	{
+		unsigned tick;
+
+		/* Co-op applies the host camera with no interpolation every tick.
+		Zero transition time here describes an update, not a camera cut. */
+		for (tick = 0; tick < 6; tick++)
+		{
+			now++;
+			p.x += 1;
+			scripted_camera_set_camera_point_relative(&p, &zero, &zero, 1, 0, NONE);
+			listener_measure_velocity(0, &camera_script_globals.point, &v);
+			CHECK(v.i == 30, "co-op camera update discarded listener motion");
+			/* Reapplying the same snapshot within a tick also preserves it. */
+			scripted_camera_set_camera_point_relative(&p, &zero, &zero, 1, 0, NONE);
+			listener_measure_velocity(0, &camera_script_globals.point, &v);
+			CHECK(v.i == 30, "same-tick co-op camera update discarded motion");
+		}
+		return 0;
+	}
 	CASE("cuts")
 	{
 		/* A five-unit instant cut, including multiple changes in one tick. */
 		p.x += 5;
-		scripted_camera_set_camera_point_relative(&p, &zero, &zero, 1, 0, NONE);
+		test_camera_point.position = p;
+		scripted_camera_set(0, 0, NONE);
 		listener_measure_velocity(0, &p, &v);
 		CHECK(v.i == 0, "short same-tick cut retained velocity");
 		now++;
@@ -104,7 +136,8 @@ int main(int argc, char **argv)
 		CHECK(v.i == 0, "script camera selection retained motion");
 		now++;
 		p.x += 1;
-		scripted_camera_set_camera_point_relative(&p, &zero, &zero, 1, 30, NONE);
+		test_camera_point.position = p;
+		scripted_camera_set(0, 30, NONE);
 		listener_measure_velocity(0, &p, &v);
 		CHECK(v.i == 30, "smooth transition was incorrectly treated as a cut");
 		director_set_camera(0, flying_camera_update, FALSE);
