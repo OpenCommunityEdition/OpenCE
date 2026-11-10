@@ -442,5 +442,14 @@ struct p2p_mm_decision
 /* these take p2p_lock: call from the game's thread, never the p2p thread */
 void p2p_mm_search(const struct p2p_mm_choice *choice);
 void p2p_mm_cancel(void);
+struct p2p_mm_status
+{
+	int state;
+	int can_host;
+	/* counts include this machine */
+	int playlist, size, count, needed;
+	int games_checked;
+};
+void p2p_mm_get_status(struct p2p_mm_status *status);
 
 #endif

@@ -942,3 +942,54 @@ void p2p_mm_cancel(void)
 		cancel_search();
 	pthread_mutex_unlock(&p2p_lock);
 }
+
+static int searchers_counted(int playlist, int size)
+{
+	int index, other, count = 1;
+
+	for (index = 0; index < MM_MAXIMUM_UNITS; index++)
+	{
+		const struct mm_peer *peer = &mm.search.peers[index];
+		int seen = 0;
+
+		if (!peer->used || peer->record.kind != MM_KIND_SEARCHING || !mm_counted(peer) ||
+			peer->playlist != playlist || peer->size != size)
+		{
+			continue;
+		}
+		for (other = 0; other < index && !seen; other++)
+			seen = mm.search.peers[other].used && mm.search.peers[other].record.kind == MM_KIND_SEARCHING &&
+				mm_counted(&mm.search.peers[other]) &&
+				mm.search.peers[other].playlist == playlist && mm.search.peers[other].size == size &&
+				!memcmp(mm.search.peers[other].record.key, peer->record.key, P2P_KEY_SIZE);
+		count += !seen;
+	}
+	return count;
+}
+
+void p2p_mm_get_status(struct p2p_mm_status *status)
+{
+	const struct mm_search *search = &mm.search;
+	int index;
+
+	memset(status, 0, sizeof(*status));
+	pthread_mutex_lock(&p2p_lock);
+	status->state = search->state;
+	if (search->state != P2P_MM_OFF)
+	{
+		status->can_host = search->can_host;
+		for (index = 0; index < search->queue_count; index++)
+		{
+			int count = searchers_counted(search->queues[index][0], search->queues[index][1]);
+
+			if (count > status->count)
+			{
+				status->count = count;
+				status->playlist = search->queues[index][0];
+				status->size = search->queues[index][1];
+				status->needed = p2p_mm_size_players(status->size);
+			}
+		}
+	}
+	pthread_mutex_unlock(&p2p_lock);
+}

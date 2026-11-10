@@ -148,6 +148,7 @@ static void check_verify_budget(void)
 {
 	struct p2p_mm_choice choice = { 1u << P2P_MM_SLAYER, P2P_MM_2V2 };
 	unsigned char seed[P2P_SEED_SIZE], bytes[MM_MAXIMUM_RECORD_SIZE];
+	struct p2p_mm_status status;
 	struct timespec before, after;
 	int index, size, passes, left;
 	double first_pass_ms;
@@ -176,6 +177,8 @@ static void check_verify_budget(void)
 	CHECK(first_pass_ms < 4.0, "one pass took %.1f ms", first_pass_ms);
 	CHECK(passes > 1 || first_pass_ms < 2.5, "a pass of %.1f ms past the budget stopped early: %d passes", first_pass_ms, passes);
 	CHECK(!left, "the queue drains over later passes: %d left", left);
+	p2p_mm_get_status(&status);
+	CHECK(status.count == 22, "64 kept, all verified into the search: %d searchers counted, 21 and this machine", status.count);
 	p2p_mm_cancel();
 }
 
