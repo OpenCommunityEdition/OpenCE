@@ -207,6 +207,7 @@ static void matchmaking_begin_join(struct p2p_mm_decision const *decision)
 {
 	dispose_global_network_game_client();
 	dispose_global_network_game_server();
+	network_game_client_port_connection_ended();
 	if (!create_global_network_game_client())
 	{
 		p2p_mm_joined(0);
@@ -247,6 +248,17 @@ static void matchmaking_update_join(float seconds)
 	}
 }
 
+static void matchmaking_update_joined(void)
+{
+	if (network_game_client_port_connection_ended())
+		p2p_mm_game_lost();
+	else if (global_network_game_client_get())
+		return;
+	else
+		p2p_mm_cancel();
+	matchmaking.role = _matchmaking_idle;
+}
+
 void matchmaking_update(float seconds)
 {
 	struct p2p_mm_status status;
@@ -269,6 +281,9 @@ void matchmaking_update(float seconds)
 		break;
 	case _matchmaking_joining:
 		matchmaking_update_join(seconds);
+		break;
+	case _matchmaking_joined:
+		matchmaking_update_joined();
 		break;
 	}
 	if ((matchmaking.role == _matchmaking_idle || matchmaking.role == _matchmaking_hosting) &&
