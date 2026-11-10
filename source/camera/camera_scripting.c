@@ -324,9 +324,8 @@ void scripted_camera_set_camera_point_relative(
 	word transition_time,
 	long relative_object_index)
 {
-	/* port: use the same effective transition duration as the camera below */
-	if ((short)transition_time / TICKS_PER_SECOND <= 0)
-		sound_listener_motion_reset(NONE);
+	/* port: co-op applies this point every tick with zero transition time;
+	keep listener motion history until an actual camera or lifecycle change */
 	camera_script_globals.mode = _camera_script_mode_point;
 	camera_script_globals.camera_point_index = NONE;
 	camera_script_globals.point = *position;
