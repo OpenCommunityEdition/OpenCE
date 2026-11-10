@@ -430,6 +430,16 @@ def test_p2p_matchmaking(tmp_path):
     assert output.strip().endswith("PASS"), output
 
 
+@linux_host_only
+@pytest.mark.parametrize("fault,case", [
+    (("if (!p2p_ed25519_verify(", "if (0 && !p2p_ed25519_verify("), "records"),
+    (("bytes[2] != MM_FORMAT)", "0)"), "records"),
+])
+def test_p2p_matchmaking_negative_control(tmp_path, fault, case):
+    output = matchmaking_check(tmp_path, fault)
+    assert f"FAIL {case}:" in output, output
+
+
 # port_config.c on its own, with the app's file paths (HALO_DATA_ROOT) and C
 # library calls: "get <setting>" prints it, "write <setting> <value>" sets it
 CONFIG_PROGRAM = r"""
