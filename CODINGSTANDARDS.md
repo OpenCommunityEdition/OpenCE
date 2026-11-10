@@ -301,3 +301,5 @@ delegation or additional agents.
   is at most 2,000 changed lines per PR, ideally under 1,000, unless the
   maintainers agree otherwise. Keep each phase reviewable and verifiable
   on its own; the size target never overrides correctness or isolation.
+
+Camera-relative MCC projectile rays are owned by `mcc_projectiles`.

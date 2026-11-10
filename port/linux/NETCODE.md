@@ -1755,3 +1755,6 @@ changes only the ticks in the air, as gravity does, is within what
 identical builds show, and not caught. Positions agree to 0.04 world units
 on average, 0.24 at most, in every game, perturbed or not: the netcode
 corrects them.
+
+MCC camera-relative projectile rays now require agreement 73 (shoulder 32742).
+Xbox/CE agreement versions are unchanged. Firing and preview share `mcc_projectiles.c`.

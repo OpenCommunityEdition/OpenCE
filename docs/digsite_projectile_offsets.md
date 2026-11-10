@@ -1,146 +1,179 @@
-# Digsite multiplayer projectile-offset investigation
+# MCC camera-relative projectile rays
 
-Investigated 10 November 2026 on GulchCE main `9d8aa9411`, in branch
-`investigate-digsite-projectile-offsets`. This is an investigation, not a
-production fix. Temporary instrumentation and experimental behavior changes
-were removed after collecting evidence.
+Digsite multiplayer exposed a mismatch between the original Xbox firing
+calculation and MCC camera-relative triggers. This fix follows trigger semantics,
+not map names, weapon names, tag paths or checksums. Original map files are unchanged.
 
-## Findings
+## Observed behavior and intended result
 
-The reported Sentinel Beam separation reproduces at stock world and viewmodel
-FOV while standing still and looking down. Custom FOV is not required.
-Two distinct mechanisms were observed; adjusting map-specific offsets would
-not address them both.
+At stock FOV, the Sentinel Beam fired above the crosshair when looking down,
+with a visible gap between the muzzle and beam. The Rocket Launcher also had
+an offset spawn. The intended result is an offset projectile converging on
+the surface under the crosshair, with authored spread and aim assistance
+retained and nearby cover still blocking shots.
 
-### Sentinel firing direction stops before the camera does
+The initial investigation on main `9d8aa9411` found:
 
-Digsite's Sentinel weapon uses label `ft`, selecting the player's support
-weapon animation class. In the inspected Albatross map, that class has pitch
-bounds of +/-70 degrees. The player's requested view can reach 85.5 degrees.
-The runtime probe measured desired pitch -85.5 degrees and actual unit aim
--70 degrees, with bounds `[-1.221730, 1.221730]` radians.
+- In Digsite Albatross, the support animation class limits unit aim to 70
+  degrees, while the player view reaches 85.5 degrees. The Sentinel uses
+  that class. The Rocket reaches the requested angle and does not share
+  the Sentinel clamp.
+- The original ray projects the animated world muzzle onto unit aim, then
+  applies the trigger offset. The subsequent spawn-safety trace includes
+  the player, pulling the resulting spawn back towards the eye.
+- Original aim assistance limits the final adjustment to its deviation cone.
+  That also limits close-range convergence from an offset spawn; a weapon
+  with zero autoaim can retain an off-centre parallel firing line.
 
-The source route is:
-
-1. [units.c](../source/units/units.c), `unit_preprocess_node_orientations`: computes aiming
-   bounds from the selected weapon class's animation data.
-2. The same file, `unit_update` and `unit_euler_aiming_update`: limit
-   the unit's aiming vector to those bounds.
-3. [first_person_camera.c](../source/camera/first_person_camera.c),
-   `first_person_camera_update`: uses player-control facing for the view.
-4. [weapons.c](../source/items/weapons.c), `trigger_create_projectiles`, and
-   `unit_adjust_projectile_ray` in units.c: use the unit's aiming vector for
-   the shot, then apply the authored offset and aim assist.
-
-An isolated diagnostic control substituted the desired aiming vector after
-`unit_adjust_projectile_ray`, leaving spawn collision behavior intact. The
-impact moved back close to the crosshair. It did **not** eliminate the visible
-muzzle-to-beam gap. This establishes an angular contributor, not a finished
-or network-safe implementation.
-
-The Rocket Launcher uses label `rl`; the inspected player's missile animation
-class has +/-90-degree pitch bounds. Its captured shot's actual and desired
-pitch both reached -85.5 degrees. Do not attribute the rocket report to the
-Sentinel's 70-degree clamp.
-
-### Spawn safety checks collide with the shooter
-
-After creation, `trigger_create_projectiles` calls
-[objects.c](../source/objects/objects.c), `object_force_inside_bsp_ignoring`.
-For ordinary first-person shots it passes `NONE`, so the trace from camera to
-spawn point includes the shooter. The existing shoulder-camera path excludes
-its shooter.
-
-The diagnostic trace returned a hit on the owning player's own object. A
-parallel read-only trace excluding that owner returned no hit. This is
-separate from the authored offset calculation:
-
-- Sentinel, stationary downward aim, stock FOV: 231 measured shots moved
-  approximately 0.528-0.529 world units during the safety check.
-- Sentinel, wide FOV: 230 measured shots showed the same relocation range.
-- Sentinel owner-exclusion control: all 227 measured shots retained their
-  intended spawn position. The angular mismatch still remained.
-- Rocket, first shot after explicit equip: intended position
-  `(11.88155, 1.67590, -3.94644)` became
-  `(11.91253, 1.58656, -3.54717)`, a displacement of about 0.410 world units.
-  The normal trace hit its owner; the owner-excluding trace did not.
-
-[projectiles.c](../source/items/projectiles.c), `projectile_new`, already
-assigns the ultimate owner as the projectile's collision-ignore object for
-flight. The spawn-safety check therefore differs from subsequent flight
-collision handling. Broader legacy impact must be tested before changing
-shared behavior.
-
-### Authored data is consistent across the pack
-
-A read-only audit of all 75 installed maps in Steam Workshop package
-`3477809506` found the same two weapon configurations in each (150 triggers):
-
-| Weapon | First-person offset, world units | Trigger flags |
-| --- | --- | --- |
-| Sentinel Beam | `(0.15, -0.15, -0.15)` | `0x2000` |
-| Rocket Launcher | `(0, -0.10, 0)` | `0x2008` |
-
-Neither uses the weapon-origin flag (`0x20`) nor MCC's original-Halo-ray
-selection flag (`0x4000`). [mcc_tags.c](../port/linux/game/mcc_tags.c),
-`mcc_tags_prepare`, preserves these trigger offsets. The inspection identified
-weapons by their referenced first-person models because some weapon tag names
-in this package are shared by unrelated weapons.
+A read-only audit of all 75 installed Digsite MP maps (Workshop package
+`3477809506`) found the same offsets and trigger flags in all 150 relevant
+triggers. Sentinel uses `(0.15, -0.15, -0.15)` and `0x2000`; Rocket uses
+`(0, -0.10, 0)` and `0x2008`. The animation-class audit was of Albatross,
+not all 75 maps. Neither trigger selects weapon origin (`0x20`) or the
+MCC original-ray flag (`0x4000`).
 
 The public [c20 weapon reference](https://c20.reclaimers.net/h1/tags/object/item/weapon/)
-documents the offset axes and MCC's `0x4000` flag: MCC normally uses newer
-projectile-ray logic, with the flag selecting original Halo behavior. This is
-supporting format evidence, not proof of the exact replacement algorithm.
-No proprietary source or SDK headers were used.
+documents that MCC normally uses newer ray handling, with bit 14 selecting
+original Halo behavior. It does not specify the replacement algorithm.
+This implementation independently meets the player aiming contract; it is
+not a claim of exact native MCC algorithm equivalence. No proprietary
+source or SDK headers were used. The user supplied a native MCC screenshot
+and video as visual references; no separate native MCC test session was run.
+The user confirmed that beam instability during erratic aim is native behavior.
+The fix must preserve that behavior and is limited to alignment and offsets.
 
-## Recommended implementation boundary
+## Controlled follow-up
 
-Investigate an MCC-owned player projectile-ray adapter which respects the
-authored original-ray flag, player/AI distinction, vehicles and the existing
-cannot-aim/weapon-origin flags. Preserve Xbox and Custom Edition behavior.
-Do not globally remove animation limits: those limits also govern body posing
-and non-player aiming. Do not replace the authored offsets with per-weapon or
-per-map corrections.
+The earlier desired-direction substitution was not a direction-only control:
+it also changed the offset basis and left other calculations inconsistent.
+Shooter collision established relocation, but did not alone prove the cause
+of the visible gap. Those limitations motivated a fixed-position follow-up.
 
-Treat owner exclusion in spawn safety as a separate change. The existing
-extension point may be reusable, but the appropriate owning object, vehicles,
-wall obstruction and legacy behavior need regression coverage. Both direction
-and spawn-position changes affect simulation; any implementation needs a
-protocol/version review and the required host/client, platform and map-family
-checks. This investigation makes no protocol change.
+Hidden Windows tests fixed player position and facing, equipped the named
+weapon, and recorded ray stages. Original firing, coherent aim adjustment,
+owner exclusion and their combination were checked separately. Neither aim
+nor owner exclusion alone produced the complete correction. Camera-relative
+placement with crosshair convergence corrected the impact position.
+Six equipped Rocket shots were measured per run; deathless test setup kept
+the weapon available instead of attributing respawn shots to it.
 
-Matching the visible muzzle exactly is still unresolved. The two individual
-controls isolate contributors, but neither is a validated complete fix.
-A comparison with the same content in native MCC, and controlled shots across
-pitch, distance, movement, zoom and FOV, remain necessary before claiming
-matching behavior.
+The implemented ray was exercised on Albatross at level, -45-degree and
+-85.5-degree aim: 227, 227 and 218 Sentinel shots respectively, and six Rocket
+shots at each angle. A further 227 Sentinel shots used world/viewmodel FOV
+110/90. Selected 2560x1440 captures establish crosshair convergence. These are
+controlled local tests, not complete map playthroughs.
 
-## Validation, evidence and exclusions
+Review of the muzzle alignment rejected an experimental render-time trail
+warp. The bare first-person trigger marker is not the flash centre: Albatross's
+Sentinel firing effect authors a first-person particle offset of
+`(-0.01, 0.004, 0.03)` in marker space (the third-person particle uses a different
+offset). Forcing the trail through the bare marker therefore lacked a valid
+alignment reference. The experiment and its renderer hooks were removed.
 
-- Windows portable release diagnostic builds, PGO and LTO off, based on the
-  revision above. Temporary probes equipped the weapon and drove test input;
-  baseline captures retained the original firing calculation.
-- Hidden 2560x1440 rendering on Digsite Albatross (`1.map`), stock FOV and
-  world/viewmodel FOV 110/90. Stationary downward tests and separate owner-only
-  and desired-aim-only controls. Selected captures were visually inspected.
-- No full map playthrough, native MCC reference run, Xbox/CE runtime regression,
-  Linux/Android/web build, networking compatibility claim or CI run.
-- Two exploratory runs crashed in the temporary equipment probe after the
-  player died before setup; they were excluded and the probe was guarded.
-- One overlapping control discovered the other local test session and never
-  equipped its target; it was excluded. The final Sentinel aim control ran
-  alone on isolated loopback addresses. Only the Rocket's first equipped shot,
-  before death or discovery of the other session, supports the rocket finding.
-- Marker coordinates with a zero marker-count result are invalid and were not
-  used. Later shots after a respawn were not attributed to the target weapon.
-- Self-review checked the data offsets against native definitions, traced the
-  two mechanisms independently, and separated experimental controls from a
-  production fix. No gameplay implementation is retained.
+A further stock-FOV capture from an elevated, unobstructed position shows the
+camera-offset beam reaching the reticle and overlapping the muzzle flash.
+The native reference likewise shows connection to the flash, with transient
+motion while aiming. This is visual evidence, not proof of exact native
+frame-by-frame alignment: camera motion, shot age and reference FOV are not
+matched. The implementation uses the authored trigger offset; it does not
+derive a projectile origin from flash particles, retune content offsets,
+attach trails to later weapon poses, or alter trail timing and fading.
 
-Local evidence is retained under `build/digsite-evidence/`: four losslessly
-compressed native-resolution captures and `investigation.zip` containing
-logs, settings, map audit, temporary probe patch, runners and archived test
-saves. The archive records original worktree-relative paths and is verified
-against per-file SHA-256 hashes before loose copies are removed. Source map
-copies, generated map caches and diagnostic build binaries are disposable;
-original maps, user saves, toolchains and the original checkout are preserved.
+## Implementation and reading route
+
+1. [mcc_projectiles.c](../port/linux/game/mcc_projectiles.c),
+   `mcc_projectile_ray`, owns activation, offset placement, cover checks,
+   aim assistance and convergence. It uses the unit's simulation-owned
+   desired aim, never local rendering matrices or viewmodel FOV.
+2. [aim_assist.c](../source/game/aim_assist.c),
+   `player_get_aim_assist_target`, exposes existing target selection and
+   authored zoom rules without invoking the original ray adjustment.
+3. [weapons.c](../source/items/weapons.c), `trigger_create_projectiles`,
+   calls the MCC ray before spread, distribution and projectile creation.
+   `weapon_get_projectile_ray` queries the same calculation without recording
+   aim-assist state. The original implementations remain the fallback.
+4. [third_person_weapon.c](../port/linux/game/third_person_weapon.c),
+   `third_person_muzzle_target`, queries the same nominal MCC ray before
+   applying its existing shoulder muzzle/cover calculation.
+
+The authored offset is relative to the camera's aim basis. The camera-to-spawn
+segment is checked against cover, excluding the on-foot shooter. A blocked
+spawn remains just on the camera side of the surface, before attachments emit
+their first point. Aim assistance acts in camera space; the shot then converges
+from that checked spawn to the first surface on the camera ray. A target
+behind the spawn cannot reverse the shot. The post-creation safety check
+continues to exclude the owner for this validated MCC path.
+
+The shared hooks are necessary because the engine owns firing, preview and
+object creation; no existing hook can replace this complete pre-spread ray.
+The small aim-assist query avoids duplicating target selection or altering
+legacy aim-assist calculations. All compatibility decisions stay in the MCC
+module. There is no retained ray state, allocation or cached tag pointer:
+unload, failed-load and family transitions use the existing MCC loaded guard.
+
+The original-ray flag, cannot-aim/weapon-origin triggers, non-player units,
+seated units, gunners, dead units, units without camera firing and authored
+following cameras retain the existing path. Xbox and Custom Edition return
+before any ray output or shot bookkeeping changes. Animation limits remain
+unchanged. This is required content interpretation, not an optional FOV fix.
+
+## Networking
+
+The calculation changes simulation agreement, without adding packet fields
+or accepting client-provided origins. MCC protocol advances from 64 to 65;
+MCC shoulder sessions advance from 32713 to 32714. Ordinary Xbox/CE protocol
+41 and their shoulder agreement 32712 remain unchanged. Admission tests
+reject older MCC versions. See [NETCODE.md](../port/linux/NETCODE.md).
+
+## Validation and limits
+
+The asset-free tests in [test_mcc_projectiles.py](../tools/test_mcc_projectiles.py)
+compile the actual module and target-query functions. They cover pitch/yaw,
+vertical aim, offset placement, close cover, owner exclusion, no reversed
+shots, aim assistance, zoom rules, inherited velocity, preview bookkeeping,
+activation exclusions and loaded/unloaded transitions. They require no
+content identity or retail assets.
+
+Checks on the camera-relative implementation (the discarded render experiment
+is excluded):
+
+- Windows release build passed. Temporary runtime probes were removed, the
+  affected objects rebuilt, and the executable checked for probe strings.
+- Full web compilation and linking passed using equivalent Python copy/SDL
+  preparation steps for generated recipes that require a POSIX shell.
+- All six affected C translation units compiled for Android's ILP32 guest.
+  Full Android building stopped at POSIX shell recipes unavailable on this
+  Windows host; full Android linking and device behavior remain unverified.
+- 74 focused regression tests passed; the POSIX socket harness was skipped
+  on Windows. All 36 web JavaScript tests passed. Coverage includes admission
+  rejection of old MCC protocols and the third-person MCC preview route.
+- Xbox Blood Gulch and MCC Albatross host/client runs passed the existing
+  `net_compare` tolerances with both host assignments. Final runs repeated
+  both families on the clean executable, comparing 28 seconds each. Xbox had
+  zero divergent simulation ticks; MCC had 13/840, maximum 0.045020 world
+  units, within the comparison tolerances. This is not perfect determinism.
+- The browser/native WebRTC harness failed before compilation because its
+  URL-to-path handling produces `C:\C:\...` on Windows. Browser internet
+  gameplay also requires unavailable POSIX tooling; neither is claimed as
+  validated. Linux execution and real Custom Edition gameplay were unavailable.
+
+Self-review covered the complete implementation, shared hook boundaries,
+protocol isolation, documentation and tests. It added coverage for the
+third-person preview integration and removed all test probes and the unproven
+trail warp. The final alignment-only pass repeated the 74-test selection,
+Windows and web builds, and six affected Android guest object compilations.
+The simulation module differs from the previously network-tested candidate
+only in its introductory comment. No retained state or content-specific
+selector was needed. Full map playthroughs, matched native MCC comparison and
+real map-family transition playtests are not claimed;
+automated guards and lifecycle tests are distinct from those runtime checks.
+
+Local evidence lives under `build/digsite-evidence` and
+`build/projectile-validation`: original and follow-up logs, settings, captures,
+probe patches and runners. Temporary probes are removed from delivered code.
+Only this assignment's copied maps, generated caches and disposable test
+outputs are cleaned; originals, user saves and toolchains are preserved.
+Inactive test saves were archived with original paths and verified SHA-256
+hashes before removing loose copies. The retained validation evidence is
+approximately 183 MiB, including selected lossless captures; copied map packages,
+generated map caches and repeated BMP captures were removed.

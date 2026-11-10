@@ -1,6 +1,7 @@
 /* The host and predicting clients solve shots from the same world markers. */
 #include "cseries.h"
 #include "third_person.h"
+#include "mcc_projectiles.h"
 #include "camera/director.h"
 #include "game/game.h"
 #include "game/players.h"
@@ -210,6 +211,7 @@ boolean third_person_muzzle_history(long unit_index, real_point3d *position)
 void third_person_muzzle_target(short player, real_point3d *target)
 {
 	long unit_index, weapon_index;
+	long aim_target;
 	short trigger_index = 0;
 	struct unit_datum *unit;
 	struct weapon_datum *weapon;
@@ -236,6 +238,13 @@ void third_person_muzzle_target(short player, real_point3d *target)
 	if (TEST_FLAG(trigger->flags, _weapon_trigger_uses_weapon_origin_bit) ||
 		TEST_FLAG(trigger->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit))
 		return;
+	/* MCC's reticle must preview the same nominal ray as the actual shot. */
+	if (mcc_projectile_ray(weapon_index, unit_index, trigger_index, FALSE,
+		&origin, &forward, &velocity, &aim_target))
+	{
+		muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target);
+		return;
+	}
 	if (!object_get_marker_by_name(weapon_index,
 		trigger_index ? "secondary trigger" : "primary trigger", &marker, 1))
 		return;

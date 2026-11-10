@@ -114,7 +114,7 @@ int main(void) {
     CHECK(mcc_protocol_unwrap(outer,40,inner,&size));CHECK(size==32 && !memcmp(inner,original,32));
     /* Package transfer and required metadata identity need the updated join agreement.
      * Reject the previous MCC revision before interpreting settings. */
-    CHECK(MCC_PROTOCOL_VERSION==72);
+    CHECK(MCC_PROTOCOL_VERSION==73);
     for(i=67;i<=71;i++) {
         ((byte *)outer)[4]=(byte)i;CHECK(!mcc_protocol_unwrap(outer,40,inner,&size));
     }

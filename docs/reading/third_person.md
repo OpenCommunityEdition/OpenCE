@@ -213,3 +213,6 @@ split-screen interaction need their own runtime evidence.
 The [28 October qualification record](third_person_qualification.md) records
 the completed Windows/browser, checkpoint and rendered split-screen checks,
 the fixes they exposed, and their remaining coverage limits.
+
+MCC camera-relative projectile rays now require agreement 73 (shoulder 32742).
+Xbox/CE agreement versions are unchanged. Firing and preview share `mcc_projectiles.c`.
