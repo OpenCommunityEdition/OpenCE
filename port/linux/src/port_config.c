@@ -725,6 +725,11 @@ static const struct config_setting config_settings[] =
 		"download it (and the resource maps it needs) from the game's players\n"
 		"into custom_maps, if its host shares it (network.map_share); false\n"
 		"leaves the game, saying which map is missing." },
+	{ "network.forge_tag_download", _config_boolean, "true", "HALO_NET_FORGE_TAG_DOWNLOAD", _environment_value,
+		_platform_all,
+		"Playing in a Forge game: stream custom tags this machine does not\n"
+		"have from the host into session memory (never written to disk, freed\n"
+		"when the map unloads); false shows a 3D proxy marker instead." },
 	{ "network.mcc_map_share", _config_boolean, "false", "HALO_NET_MCC_MAP_SHARE", _environment_value, _platform_all,
         "Hosting: offer eligible local or Workshop MCC packages to joiners.\n"
         "Off by default. List each map/resource fingerprint with its maker in\n"

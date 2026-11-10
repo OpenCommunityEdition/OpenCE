@@ -112,6 +112,9 @@ short network_distributed_server_machines(long *machine_indices, short maximum);
 void network_player_attach_unit(long player_index, long unit_index);
 void network_player_detach_unit(long player_index);
 void network_player_show_pickup(long player_index, short kind, long definition_index, short count);
+/* forge_network.c's */
+unsigned char forge_tag_stream_handles_message(void const *message, unsigned short size);
+void forge_tag_stream_handle_message(long machine_index, void const *message, unsigned short size, unsigned char from_stream);
 /* game_engine.c's */
 long game_engine_write_network_state(byte *buffer, long size);
 void game_engine_read_network_state(byte const *buffer, long size);
@@ -5126,6 +5129,14 @@ void network_distributed_handle_message(
 	if (map_share_handles_message(message, size))
 	{
 		map_share_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
+		return;
+	}
+	/* (Forge's session-RAM custom tag streaming, over the reliable stream:
+	forge_network.c) */
+	if (forge_tag_stream_handles_message(message, size))
+	{
+		forge_tag_stream_handle_message(machine_index, message, size, machine_index != NONE ?
 			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
 	}

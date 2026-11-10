@@ -2488,6 +2488,46 @@ static long forge_create_configured_engine_object(
 	return obj_idx;
 }
 
+long forge_create_engine_object_for_instance(int32_t live_idx, long def_idx, int is_held)
+{
+	struct forge_live_instance *inst;
+	long obj_idx;
+
+	if (live_idx < 0 || live_idx >= g_forge.live_instance_count || def_idx == NONE)
+		return NONE;
+	inst = &g_forge.live_instances[live_idx];
+	if (!inst->active)
+		return NONE;
+
+	if (inst->object_index != NONE)
+	{
+		if (forge_valid_object_get(inst->object_index))
+			object_delete(inst->object_index);
+		inst->object_index = NONE;
+	}
+
+	obj_idx = forge_create_configured_engine_object(
+		def_idx,
+		inst->group_tag,
+		inst->x, inst->y, inst->z,
+		inst->yaw, inst->pitch, inst->roll);
+	inst->object_index = obj_idx;
+	inst->pad_inst &= (uint8_t)~0x40u;
+	if (g_forge.grabbed_live_index == live_idx)
+		g_forge.grabbed_object_index = obj_idx;
+
+	if (obj_idx != NONE)
+	{
+		forge_3d_move_instance_ext(
+			live_idx,
+			inst->x, inst->y, inst->z,
+			inst->yaw, inst->pitch, inst->roll,
+			is_held,
+			0);
+	}
+	return obj_idx;
+}
+
 int32_t forge_3d_spawn_object_at_slot(
 	int32_t forced_live_idx,
 	uint32_t group_tag,
@@ -7145,11 +7185,23 @@ void forge_3d_draw_hud(
 		}
 
 		/* Status Toast Banner dynamically sized to fit text pixel width */
-		if (g_forge.status_message[0] && (uint32_t)system_milliseconds() < g_forge.status_message_until_ms)
 		{
-			draw_sized_bottom_pill_bar(
-				font_index, window_x0, window_x1, (short)(bar_top_y - 4),
-				g_forge.status_message, NULL, 1, _forge_ui_area_toast_bar, 0xFFFFFFFFu, NULL);
+			char dl_status[128];
+			int has_toast = (g_forge.status_message[0] && (uint32_t)system_milliseconds() < g_forge.status_message_until_ms) ? 1 : 0;
+			int has_dl = forge_network_get_tag_download_status(dl_status, sizeof(dl_status));
+			if (has_toast)
+			{
+				draw_sized_bottom_pill_bar(
+					font_index, window_x0, window_x1, (short)(bar_top_y - 4),
+					g_forge.status_message, NULL, 1, _forge_ui_area_toast_bar, 0xFFFFFFFFu, NULL);
+			}
+			if (has_dl && dl_status[0])
+			{
+				short dl_bottom_y = (short)(bar_top_y - (has_toast ? 34 : 4));
+				draw_sized_bottom_pill_bar(
+					font_index, window_x0, window_x1, dl_bottom_y,
+					dl_status, NULL, 1, _forge_ui_area_toast_bar, 0xFF50B8FFu, NULL);
+			}
 		}
 	}
 

@@ -13,12 +13,12 @@
 extern "C" {
 #endif
 
-/* ---------- Forge Release Version & Network Protocol Isolation (v2.3.13, 0x4628) */
+/* ---------- Forge Release Version & Network Protocol Isolation (v2.4.0, 0x4629) */
 
 #include "halo_port_limits.h"
 
-#define FORGE_VERSION_STRING "2.3.19"
-#define FORGE_NETWORK_VERSION 0x4628
+#define FORGE_VERSION_STRING "2.4.0"
+#define FORGE_NETWORK_VERSION 0x4629
 #define FORGE_GAME_KIND 0x46
 #ifndef HALO_PORT_NETWORK_VERSION_STOCK
 #define HALO_PORT_NETWORK_VERSION_STOCK HALO_PORT_NETWORK_VERSION
@@ -138,7 +138,7 @@ struct forge_catalog_entry
 {
 	uint32_t group_tag;
 	uint8_t category;
-	uint8_t source_cache_id; /* 0 = xbox_catalog, 1 = customforgeasset, 2 = custom cached [C], 3 = map-local [MAP] */
+	uint8_t source_cache_id; /* 0 = xbox_catalog, 1 = customforgeasset, 2 = custom cached [C], 3 = map-local [MAP], 4 = session-streamed [C] */
 	uint16_t pad;
 	char tag_path[FORGE_TAG_PATH_MAX];
 	char display_name[64];
@@ -402,6 +402,35 @@ void forge_normalize_mcc_hud_tags(void);
 int forge_is_mcc_hud_active(void);
 int forge_window_is_focused(void);
 short forge_key_state(int vk);
+
+/* ---------- Session-RAM-Only Custom Tag Streaming (Zero Disk Writes) */
+uint32_t forge_compute_catalog_hash(uint32_t group_tag, char const *tag_path);
+int forge_zlib_compress_buffer(uint8_t const *src, uint32_t src_len, uint8_t **out_dst, uint32_t *out_dst_len);
+int forge_zlib_uncompress_exact(uint8_t const *src, uint32_t src_len, uint8_t *dst, uint32_t exact_dst_len);
+int forge_export_custom_tag_bundle(
+	uint32_t hash,
+	uint8_t *out_format,
+	uint32_t *out_group_tag,
+	char *out_tag_path,
+	size_t path_sz,
+	char *out_display_name,
+	size_t disp_sz,
+	uint8_t **out_raw_bytes,
+	uint32_t *out_raw_size);
+uint32_t forge_get_streamed_tag_ram_used(void);
+long forge_install_ephemeral_tag_bundle(
+	uint32_t expected_hash,
+	uint8_t bundle_format,
+	uint32_t root_group,
+	char const *root_tag_path,
+	char const *display_name,
+	uint8_t const *uncomp_bytes,
+	uint32_t uncomp_size,
+	uint32_t *out_actual_group);
+long forge_create_engine_object_for_instance(int32_t live_idx, long def_idx, int is_held);
+unsigned char forge_tag_stream_handles_message(void const *message, unsigned short size);
+void forge_tag_stream_handle_message(long machine_index, void const *message, unsigned short size, unsigned char from_stream);
+int forge_network_get_tag_download_status(char *out_text, size_t out_sz);
 
 #undef GetAsyncKeyState
 #define GetAsyncKeyState(vk) forge_key_state(vk)

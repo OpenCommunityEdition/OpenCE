@@ -174,6 +174,10 @@ enum
 	/* MCC conversion progress without dispatching incomplete game state. */
 	_distributed_message_mcc_load_progress = 106,
 
+	/* Forge session-RAM-only custom tag streaming over the reliable stream. */
+	_distributed_message_forge_tag_request = 107,
+	_distributed_message_forge_tag_stream = 108,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 
