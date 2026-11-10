@@ -3495,6 +3495,30 @@ static void sound_obstruction_cache_store(
 	entry->occlusion = source->occlusion;
 }
 
+/* port: a source that is not tested keeps the last result its sound had, or
+none. Its caller fills it again each tick without one (game_sound.c's looping
+sounds leave both unset), and a sound that fades out after leaving its range
+still gives them to its channel (update_channels), where they are gains. */
+static void sound_obstruction_cache_last(
+	short kind,
+	long datum_index,
+	struct sound_source *source)
+{
+	struct sound_obstruction_cache_entry *entry;
+
+	entry = sound_obstruction_cache_entry(kind, datum_index);
+	if (entry && entry->valid && entry->datum_index == datum_index)
+	{
+		source->obstruction = entry->obstruction;
+		source->occlusion = entry->occlusion;
+	}
+	else
+	{
+		source->obstruction = 0.f;
+		source->occlusion = 0.f;
+	}
+}
+
 static short source_audible(
 	struct sound_source *source,
 	real maximum_distance,
@@ -3563,6 +3587,13 @@ static short source_audible(
 					nearest_listener_index,
 					source);
 			}
+		}
+		else
+		{
+			sound_obstruction_cache_last(
+				cache_kind,
+				cache_datum_index,
+				source);
 		}
 
 		if (nearest_distance_squared > maximum_distance * maximum_distance ||
