@@ -252,6 +252,7 @@ struct machine
 static struct machine machines[8];
 static int machine_count;
 static unsigned long now_ms, now_unix;
+static int drop_percent;
 
 struct in_flight
 {

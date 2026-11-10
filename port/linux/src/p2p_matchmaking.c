@@ -398,6 +398,19 @@ void mm_heard(struct mm_search *search, const struct mm_record *record, unsigned
 	peer->refreshes++;
 }
 
+static void expire(struct mm_search *search, unsigned long now)
+{
+	int index;
+
+	for (index = 0; index < MM_MAXIMUM_UNITS; index++)
+	{
+		struct mm_peer *peer = &search->peers[index];
+
+		if (peer->used && now - peer->heard >= (unsigned long)MM_EXPIRY_INTERVALS * peer->record.interval * 100)
+			peer->used = 0;
+	}
+}
+
 static struct mm_record base_record(struct mm_search *search, int kind, int playlist, int size, int interval)
 {
 	struct mm_record record;
@@ -425,6 +438,7 @@ int mm_step(struct mm_search *search, unsigned long now, struct mm_out *out, int
 {
 	int count = 0;
 
+	expire(search, now);
 	if (search->queue_count && (long)(now - search->next_record) >= 0 && count < out_size)
 	{
 		int interval = mm_interval(search->queue_count);

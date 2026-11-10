@@ -84,6 +84,7 @@ int mm_elect(const struct mm_unit *units, const int *pool, int pool_count);
 enum
 {
 	/* milliseconds */
+	MM_EXPIRY_INTERVALS = 3,
 	MM_LOOK_TIME = 6000,
 	MM_MAXIMUM_OUT = 32,
 };
