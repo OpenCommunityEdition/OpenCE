@@ -688,6 +688,7 @@ typedef char screenshot_and_framerate_globals_size_assert[
 
 void network_test_update(boolean main_menu_loaded, real seconds);
 #include "server_director.h" /* port: port/linux/game/server_director.c */
+#include "matchmaking.h" /* port: port/linux/game/matchmaking.c */
 
 /* ---------- prototypes */
 
@@ -1464,15 +1465,12 @@ short main_get_window_count(
 	return single_window ? 1 : PIN(local_player_count(), 1, MAXIMUM_WINDOWS);
 }
 
-#ifdef HALO_PROFILE
-/* port: whether the main menu's map is the one loaded (profile_console.c: a
-recording of debug.profile_record_when = "game" waits for another) */
+/* port: whether the main menu's map is the one loaded */
 boolean main_menu_is_loaded(
 	void)
 {
 	return main_globals.main_menu_scenario_loaded;
 }
-#endif
 
 static void main_new_map(
 	struct game_options *options)
@@ -3603,6 +3601,8 @@ static boolean main_loop_iteration(
 
 			/* automated system link tests (port/linux/game/network_test.c) */
 			network_test_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
+			/* port: MATCHMAKING (port/linux/game/matchmaking.c) */
+			matchmaking_update(main_globals.seconds_elapsed);
 			/* port: a dedicated server's hosting, rotation and commands
 			(port/linux/game/server_director.c) */
 			server_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);

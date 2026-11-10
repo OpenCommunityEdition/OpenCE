@@ -1,0 +1,14 @@
+/*
+MATCHMAKING.H
+
+The game side of a MATCHMAKING search (matchmaking.c).
+*/
+
+#ifndef __MATCHMAKING_H
+#define __MATCHMAKING_H
+
+#include "cseries.h"
+
+void matchmaking_update(float seconds);
+
+#endif
