@@ -26,6 +26,7 @@ inventory when an authorized change makes it inaccurate.
 | Checkpoints and campaign state | `mcc_checkpoint`, `mcc_campaign`, `mcc_script_effects`, `mcc_progress` |
 | Explicit campaign packages and progression | `mcc_maps`, `mcc_main`, with `port/linux/src/mcc_manifest.c`; Android imports in `MccPackageImporter` and `MccImportActivity` |
 | Weapon-authored camera selection | `mcc_camera` |
+| Camera-relative player projectile rays | `mcc_projectiles` |
 | Networking and named-object synchronization | `mcc_network`, `mcc_object_names_network`, `mcc_protocol`, `mcc_workshop` |
 | Player inventory, objects, movement penalties, damage impulses, boat controls, seats and recordings | `mcc_player`, `mcc_first_person.inl`, `mcc_grenades`, `mcc_objects`, `mcc_movement`, `mcc_damage`, `mcc_seats`, `mcc_recordings` |
 | Rendering, HUD and audio conversion | `mcc_geometry`, `mcc_bitmaps`, `mcc_texture_cache`, `mcc_environment_shader` (with `port/linux/src/mcc_environment_shader_gl.c`), `mcc_chicago.inl`, `mcc_hud`, `mcc_hud_draw`, `mcc_sprites`, `mcc_particles`, `mcc_audio`, `mcc_vorbis` |

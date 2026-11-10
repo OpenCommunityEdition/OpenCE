@@ -541,6 +541,15 @@ struct collision_result {real t;real_point3d point;};
 static struct unit_datum unit={{NONE,0},{0,{1,0,0}},0};
 static int connection,active=1,zoom=NONE,has_marker=1,blocked;
 static real target_distance=10, muzzle_side;
+static int mcc_ray_enabled, mcc_preview_calls;
+static boolean mcc_projectile_ray(long w,long u,short t,boolean firing,
+ real_point3d *p,real_vector3d *v,real *speed,long *target){
+ (void)w;(void)u;(void)t;
+ if(!mcc_ray_enabled)return FALSE;
+ if(firing)return FALSE;
+ mcc_preview_calls++;*p=(real_point3d){0,.2f,0};*v=(real_vector3d){1,0,0};
+ *speed=0;*target=NONE;return TRUE;
+}
 static int scene;
 static real_point3d last_long_origin;
 static int marker_trigger;
@@ -600,6 +609,9 @@ int main(void){
  blocked=1;third_person_muzzle_shot(2,1,0,&origin,&forward);CHECK(origin.x>.48f&&origin.x<.5f);
  blocked=0;third_person_muzzle_target(0,&target);CHECK(target.x==10);
  CHECK(last_long_origin.z==-.2f&&marker_trigger==0);
+ mcc_ray_enabled=1;third_person_muzzle_target(0,&target);
+ CHECK(mcc_preview_calls==1&&fabsf(target.y-.2f)<.0001f);
+ mcc_ray_enabled=0;third_person_muzzle_target(0,&target);CHECK(fabsf(target.y)<.0001f);
  weapon.weapon.triggers[0].state=_trigger_charged;third_person_muzzle_target(0,&target);
  CHECK(last_long_origin.z==-.4f&&marker_trigger==1);
  weapon.weapon.triggers[0].state=_trigger_charging;third_person_muzzle_target(0,&target);CHECK(marker_trigger==0);

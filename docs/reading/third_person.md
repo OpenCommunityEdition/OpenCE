@@ -79,6 +79,12 @@ projects the reachable target into the displaced camera's reticle. A barrel
 inside a wall cannot spawn a projectile beyond it. Free look holds gameplay
 aim fixed and hides the reticle until the camera returns.
 
+For MCC camera-relative triggers, `third_person_muzzle_target` obtains the
+nominal ray from [mcc_projectiles.c](../../port/linux/game/mcc_projectiles.c),
+as actual firing and `weapon_get_projectile_ray` do, before applying the
+shoulder muzzle and cover correction. See the
+[projectile investigation and fix](../digsite_projectile_offsets.md).
+
 On the host, `third_person_muzzle_history` supplies a muzzle computed from
 the host's weapon pose to `distributed_note_targets` in
 [network_damage.c](../../port/linux/game/network_damage.c). This small hook
@@ -103,11 +109,11 @@ Edition maps this uses the pinned OpenCE 41 wire format and simulation paths.
 The optional shoulder camera, its input bit, muzzle solver and checkpoint
 recovery extensions are disabled, regardless of the saved preference.
 Normal vehicles, scripted cameras and MCC weapon-authored cameras are unchanged.
-MCC maps still require the separate MCC 63 capability; the crossplay selector
+MCC maps still require the separate MCC 65 capability; the crossplay selector
 does not make MCC maps compatible with OpenCE.
 
 **GulchCE Third Person** enables Player Choice / Forced On / Forced Off and
-requires camera agreement 32712 (Xbox/CE) or 32713 (MCC). It uses bounded join
+requires camera agreement 32712 (Xbox/CE) or 32714 (MCC). It uses bounded join
 kind 101 around the normal join, or around MCC's own kind 100 envelope. The
 larger bound includes OpenCE 41's account-link credentials. Camera policy uses
 bits 3-4, leaving OpenCE's co-op flags in bits 0-2. Forced Off is still a camera

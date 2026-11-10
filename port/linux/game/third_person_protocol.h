@@ -4,7 +4,8 @@
 
 /* Separate agreement versions; never advertise these as upstream compatibility. */
 #define THIRD_PERSON_PROTOCOL_VERSION 32712
-#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32713
+/* MCC projectile agreement changes independently of Xbox/CE camera sessions. */
+#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32714
 
 struct network_game;
 void third_person_session_host_begin(void);
