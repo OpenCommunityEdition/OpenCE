@@ -5986,6 +5986,11 @@ static struct
 	boolean loaded;
 } matchmaking_screen;
 
+static short matchmaking_size_after(unsigned playlists, short size)
+{
+	return mm_playlist_has_size(playlists, size) ? size : P2P_MM_2V2;
+}
+
 static struct widget_instance *matchmaking_playlist_spinner(struct widget_instance *widget, short index)
 {
 	char row[16];
@@ -6028,11 +6033,28 @@ static boolean matchmaking_screen_load(struct widget_instance *widget, boolean d
 static void matchmaking_screen_update(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "size_spinner", 0);
+	unsigned playlists = 0;
+	short index, shown, size;
 
 	if (!spinner)
 		return;
 	if (!matchmaking_screen.loaded)
 		matchmaking_screen_load(list, FALSE);
+	for (index = 0; index < NUMBER_OF_P2P_MM_PLAYLISTS; index++)
+	{
+		struct widget_instance *playlist = matchmaking_playlist_spinner(list, index);
+
+		if (playlist && playlist->parameters.list.selected_index)
+			playlists |= 1u << index;
+	}
+	shown = (short)PIN(spinner->parameters.list.selected_index, 0, NUMBER_OF_P2P_MM_SIZES - 1);
+	size = mm_playlist_has_size(playlists, shown) ? shown :
+		matchmaking_size_after(playlists, matchmaking_screen.size);
+	if (list->focused_child != spinner->parent)
+		spinner->parameters.list.selected_index = shown = size;
+	spinner->alpha_modifier = mm_playlist_has_size(playlists, shown) ? 1.0f : TAB_UNFOCUSED_ALPHA;
+	matchmaking_screen.playlists = playlists;
+	matchmaking_screen.size = size;
 }
 
 static boolean matchmaking_screen_back(struct widget_instance *widget, boolean *widget_deleted)
