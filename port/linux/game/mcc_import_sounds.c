@@ -198,33 +198,6 @@ static unsigned long mcc_sounds_length(
 	return length;
 }
 
-/* a whole file, or NULL; *size its bytes */
-static byte *mcc_sounds_read_file(
-	char const *path,
-	long *size)
-{
-	FILE *file = fopen(path, "rb");
-	byte *bytes = NULL;
-
-	if (!file)
-		return NULL;
-	fseek(file, 0, SEEK_END);
-	*size = ftell(file);
-	fseek(file, 0, SEEK_SET);
-	if (*size > 0 && *size < 0x10000000)
-	{
-		bytes = malloc((size_t)*size + 1);
-		if (bytes && fread(bytes, 1, (size_t)*size, file) != (size_t)*size)
-		{
-			free(bytes);
-			bytes = NULL;
-		}
-	}
-	fclose(file);
-
-	return bytes;
-}
-
 /* the bank's index (sound\pc\lst\<bank>.lst.bin): u32 1, u32 count, then
 each entry's length, its tag path and its first sample and sample count */
 static boolean mcc_sounds_index_read(
@@ -236,7 +209,7 @@ static boolean mcc_sounds_index_read(
 	byte *bytes;
 
 	snprintf(path, sizeof(path), "%ssound\\pc\\lst\\%s.lst.bin", mcc_source_directory(), bank_name);
-	bytes = mcc_sounds_read_file(path, &size);
+	bytes = (byte *)mcc_import_file_read(path, &size);
 	if (!bytes || size < 8 || mcc_sounds_u32(bytes) != 1)
 	{
 		if (bytes)

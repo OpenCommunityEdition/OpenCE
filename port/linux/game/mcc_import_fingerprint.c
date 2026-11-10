@@ -33,6 +33,7 @@ cut at their terminator, and fields the game never reads are zeroed
 #include "errors.h"
 #include "tag_schema.h"
 #include "mcc_import.h"
+#include "mcc_sha256.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,122 +98,6 @@ static void mcc_fingerprint_line(
 	return;
 }
 
-/* ---------- SHA-256 (as port/linux/src/p2p_crypto.c) */
-
-struct sha256
-{
-	unsigned int state[8];
-	unsigned char block[64];
-	unsigned long long length;
-	int used;
-};
-
-static const unsigned int sha256_constants[64] =
-{
-	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-	0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-	0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-	0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-	0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-	0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-	0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-	0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-};
-
-#define ROTATE_RIGHT(value, count) (((value) >> (count)) | ((value) << (32 - (count))))
-
-static void sha256_block(struct sha256 *context, const unsigned char *block)
-{
-	unsigned int words[64];
-	unsigned int a, b, c, d, e, f, g, h;
-	int index;
-
-	for (index = 0; index < 16; index++)
-	{
-		words[index] = (unsigned int)block[index * 4] << 24 | (unsigned int)block[index * 4 + 1] << 16 |
-			(unsigned int)block[index * 4 + 2] << 8 | (unsigned int)block[index * 4 + 3];
-	}
-	for (index = 16; index < 64; index++)
-	{
-		unsigned int s0 = ROTATE_RIGHT(words[index - 15], 7) ^ ROTATE_RIGHT(words[index - 15], 18) ^
-			(words[index - 15] >> 3);
-		unsigned int s1 = ROTATE_RIGHT(words[index - 2], 17) ^ ROTATE_RIGHT(words[index - 2], 19) ^
-			(words[index - 2] >> 10);
-
-		words[index] = words[index - 16] + s0 + words[index - 7] + s1;
-	}
-	a = context->state[0]; b = context->state[1]; c = context->state[2]; d = context->state[3];
-	e = context->state[4]; f = context->state[5]; g = context->state[6]; h = context->state[7];
-	for (index = 0; index < 64; index++)
-	{
-		unsigned int s1 = ROTATE_RIGHT(e, 6) ^ ROTATE_RIGHT(e, 11) ^ ROTATE_RIGHT(e, 25);
-		unsigned int choice = (e & f) ^ (~e & g);
-		unsigned int first = h + s1 + choice + sha256_constants[index] + words[index];
-		unsigned int s0 = ROTATE_RIGHT(a, 2) ^ ROTATE_RIGHT(a, 13) ^ ROTATE_RIGHT(a, 22);
-		unsigned int majority = (a & b) ^ (a & c) ^ (b & c);
-		unsigned int second = s0 + majority;
-
-		h = g; g = f; f = e; e = d + first;
-		d = c; c = b; b = a; a = first + second;
-	}
-	context->state[0] += a; context->state[1] += b; context->state[2] += c; context->state[3] += d;
-	context->state[4] += e; context->state[5] += f; context->state[6] += g; context->state[7] += h;
-}
-
-static void sha256_begin(struct sha256 *context)
-{
-	static const unsigned int initial[8] =
-	{
-		0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-	};
-
-	memcpy(context->state, initial, sizeof(initial));
-	context->length = 0;
-	context->used = 0;
-}
-
-static void sha256_add(struct sha256 *context, const void *data, int size)
-{
-	const unsigned char *bytes = data;
-
-	context->length += (unsigned long long)size;
-	while (size > 0)
-	{
-		int count = 64 - context->used < size ? 64 - context->used : size;
-
-		memcpy(context->block + context->used, bytes, (size_t)count);
-		context->used += count;
-		bytes += count;
-		size -= count;
-		if (context->used == 64)
-		{
-			sha256_block(context, context->block);
-			context->used = 0;
-		}
-	}
-}
-
-static void sha256_end(struct sha256 *context, unsigned char *digest)
-{
-	unsigned long long bits = context->length * 8;
-	unsigned char length[8];
-	int index;
-
-	for (index = 0; index < 8; index++)
-		length[index] = (unsigned char)(bits >> (56 - index * 8));
-	sha256_add(context, "\x80", 1);
-	while (context->used != 56)
-		sha256_add(context, "", 1);
-	sha256_add(context, length, 8);
-	for (index = 0; index < 8; index++)
-	{
-		digest[index * 4] = (unsigned char)(context->state[index] >> 24);
-		digest[index * 4 + 1] = (unsigned char)(context->state[index] >> 16);
-		digest[index * 4 + 2] = (unsigned char)(context->state[index] >> 8);
-		digest[index * 4 + 3] = (unsigned char)context->state[index];
-	}
-}
-
 /* ---------- the scope */
 
 static unsigned long const SIMULATION_GROUPS[] =
@@ -245,13 +130,8 @@ static char const *const MODEL_FIELDS[] =
 	"markers", "nodes", "regions", NULL
 };
 
-/* the tag order to fingerprint, when not the table's (an importer's: the
-disc's order, its tags taken by group and path) */
-static int v5_size_only;
-/* the disc's tag count (--order-count): ORDER hashes that many */
+/* the disc's tag count: ORDER hashes that many */
 static long order_limit;
-static struct tag *order_table;
-static long order_count;
 
 static char const *const BSP_FIELDS[] =
 {
@@ -350,27 +230,17 @@ static struct schema_group const *schema_get(unsigned long group)
 
 /* ---------- the stream */
 
-static struct sha256 section;
-static struct sha256 whole;
-static char const *dump_prefix;
-static int dumping;
+static struct mcc_sha256 section;
+static struct mcc_sha256 whole;
 
 static void put(void const *bytes, long size)
 {
-	sha256_add(&section, bytes, (int)size);
-	if (dumping)
-	{
-		long i;
-		for (i = 0; i < size; i++)
-			printf("%02x", ((unsigned char const *)bytes)[i]);
-	}
+	mcc_sha256_add(&section, bytes, (int)size);
 }
 
 static void put_text(char const *text)
 {
 	put(text, (long)strlen(text) + 1);
-	if (dumping)
-		printf(" [%s]\n", text);
 }
 
 static void put_tag(unsigned long handle)
@@ -393,11 +263,9 @@ static void put_tag(unsigned long handle)
 
 static void section_begin(char const *kind, char const *name)
 {
-	dumping = dump_prefix && !strncmp(dump_prefix, kind, strlen(kind)) &&
-		(!name || strstr(name, dump_prefix + strlen(kind)) || strlen(dump_prefix) == strlen(kind));
-	sha256_begin(&section);
-	if (dumping)
-		printf("--- %s %s\n", kind, name ? name : "");
+	(void)kind;
+	(void)name;
+	mcc_sha256_begin(&section);
 }
 
 static void section_end(char const *kind, char const *name)
@@ -406,13 +274,12 @@ static void section_end(char const *kind, char const *name)
 	char line[600];
 	int i, n;
 
-	sha256_end(&section, digest);
+	mcc_sha256_end(&section, digest);
 	n = snprintf(line, sizeof(line), "%s\t%s\t", kind, name ? name : "");
 	for (i = 0; i < 16; i++)
 		n += snprintf(line + n, sizeof(line) - (size_t)n, "%02x", digest[i]);
 	mcc_fingerprint_line(line);
-	sha256_add(&whole, line, (int)strlen(line));
-	dumping = 0;
+	mcc_sha256_add(&whole, line, (int)strlen(line));
 }
 
 /* ---------- the walk */
@@ -575,8 +442,6 @@ static void walk_element(struct schema_definition const *d, unsigned char *eleme
 		if (handle_index(w) >= 0)
 			memset(bytes + o, 0, 4);
 	}
-	if (dumping)
-		printf("\n{%s}", d->name);
 	if (!only_fields)
 		put(bytes, d->size);
 	for (o = 0; o + 4 <= d->size; o += 4)
@@ -731,15 +596,29 @@ static void scripts(unsigned char *scenario)
 
 /* ---------- a map */
 
-/* gets BSP `b` of the scenario's structure_bsps (`reference`, its element)
-into `space` (its address, bytes and size): nonzero when it could */
-typedef int (*bsp_get_proc)(unsigned long b, unsigned char *reference, struct space *space);
+/* the structure BSPs the import wrote, in the scenario's order */
+static struct mcc_fingerprint_bsp const *mcc_fingerprint_bsps;
+static long mcc_fingerprint_bsp_count;
+
+/* BSP `b` of the scenario's structure_bsps into `space` (its address, bytes
+and size): nonzero when the import wrote it */
+static int mcc_fingerprint_bsp_get(
+	unsigned long b,
+	struct space *space)
+{
+	if ((long)b >= mcc_fingerprint_bsp_count || !mcc_fingerprint_bsps[b].bytes)
+		return 0;
+	space->address = mcc_fingerprint_bsps[b].address;
+	space->size = mcc_fingerprint_bsps[b].size;
+	space->bytes = mcc_fingerprint_bsps[b].bytes;
+	return 1;
+}
 
 /* the map fingerprinted, for the log */
 static char const *fingerprint_map_name = "";
 
 /* the fingerprint of the map in `map` (its tags, table and scenario filled) */
-static void fingerprint_map(bsp_get_proc bsp_get)
+static void fingerprint_map(void)
 {
 	unsigned char *scenario;
 	struct schema_group const *scenario_schema, *bsp_schema;
@@ -748,15 +627,15 @@ static void fingerprint_map(bsp_get_proc bsp_get)
 	char line[200];
 	int n;
 
-	sha256_begin(&whole);
+	mcc_sha256_begin(&whole);
 	section_begin("ORDER", NULL);
 	/* the disc's tags (order_limit of them, when the map has more): an
 	import writes after them tags of its own that something not simulated
 	still names (bitmaps, shaders, widgets), which the network never names;
 	a simulated one there fails the order */
-	for (i = 0; i < (order_table ? order_count : map.count); i++)
+	for (i = 0; i < map.count; i++)
 	{
-		struct tag *t = order_table ? &order_table[i] : &map.table[i];
+		struct tag *t = &map.table[i];
 		if (order_limit && i >= order_limit)
 		{
 			if (simulation_group(t->group))
@@ -773,9 +652,9 @@ static void fingerprint_map(bsp_get_proc bsp_get)
 
 	/* in the disc's order where there is one: the importer writes only those
 	tags, so a tag MCC added (not in the order) is not in the map */
-	for (i = 0; i < (order_table ? order_count : map.count); i++)
+	for (i = 0; i < map.count; i++)
 	{
-		struct tag *t = order_table ? &order_table[i] : &map.table[i];
+		struct tag *t = &map.table[i];
 		struct schema_group const *schema;
 		unsigned char *root;
 		char name[300];
@@ -818,7 +697,7 @@ static void fingerprint_map(bsp_get_proc bsp_get)
 			unsigned char *root;
 			char const *name = index >= 0 ? map.table[index].name : "?";
 
-			if (!bsp_get(b, reference, &map.bsp))
+			if (!mcc_fingerprint_bsp_get(b, &map.bsp))
 			{
 				fprintf(stderr, "mcc import: %s: structure bsp %s unreadable\n", fingerprint_map_name, name);
 				continue;
@@ -833,7 +712,7 @@ static void fingerprint_map(bsp_get_proc bsp_get)
 		}
 	}
 
-	sha256_end(&whole, digest);
+	mcc_sha256_end(&whole, digest);
 	n = snprintf(line, sizeof(line), "MAP	%s	", map.table[map.scenario].name);
 	for (i = 0; i < 32; i++)
 		n += snprintf(line + n, sizeof(line) - (size_t)n, "%02x", digest[i]);
@@ -871,24 +750,6 @@ static void map_table_read(void)
 
 /* ---------- public code */
 
-static struct mcc_fingerprint_bsp const *mcc_fingerprint_bsps;
-static long mcc_fingerprint_bsp_count;
-
-/* (bsp_get_proc) the BSP the import wrote for the scenario's reference `b` */
-static int mcc_fingerprint_bsp_get(
-	unsigned long b,
-	unsigned char *reference,
-	struct space *space)
-{
-	(void)reference;
-	if ((long)b >= mcc_fingerprint_bsp_count || !mcc_fingerprint_bsps[b].bytes)
-		return 0;
-	space->address = mcc_fingerprint_bsps[b].address;
-	space->size = mcc_fingerprint_bsps[b].size;
-	space->bytes = mcc_fingerprint_bsps[b].bytes;
-	return 1;
-}
-
 char const *mcc_import_fingerprint(
 	char const *map_name,
 	void *tag_data,
@@ -907,11 +768,9 @@ char const *mcc_import_fingerprint(
 	map_table_read();
 	fingerprint_map_name = map_name;
 	order_limit = disc_tag_count;
-	order_table = NULL;
-	order_count = 0;
 	mcc_fingerprint_bsps = bsps;
 	mcc_fingerprint_bsp_count = bsp_count;
-	fingerprint_map(mcc_fingerprint_bsp_get);
+	fingerprint_map();
 	if (map.table)
 		free(map.table);
 	map.table = NULL;

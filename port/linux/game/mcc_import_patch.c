@@ -1173,12 +1173,44 @@ extern const struct mcc_patch_embedded mcc_patches_embedded[];
 extern const unsigned int mcc_patches_embedded_count;
 #endif
 
+char *mcc_import_file_read(
+	char const *path,
+	long *size)
+{
+	FILE *file = fopen(path, "rb");
+	char *bytes = NULL;
+	long length;
+
+	*size = 0;
+	if (!file)
+		return NULL;
+	fseek(file, 0, SEEK_END);
+	length = ftell(file);
+	fseek(file, 0, SEEK_SET);
+	if (length > 0 && length < MCC_IMPORT_MAXIMUM_FILE_BYTES)
+	{
+		bytes = malloc((size_t)length + 1);
+		if (bytes && fread(bytes, 1, (size_t)length, file) == (size_t)length)
+		{
+			bytes[length] = 0;
+			*size = length;
+		}
+		else if (bytes)
+		{
+			free(bytes);
+			bytes = NULL;
+		}
+	}
+	fclose(file);
+
+	return bytes;
+}
+
 char *mcc_import_data_read(
 	char const *file_name,
 	long *size)
 {
 	char path[256];
-	char *text = NULL;
 	FILE *file;
 
 	*size = 0;
@@ -1187,28 +1219,13 @@ char *mcc_import_data_read(
 	file = fopen(path, "rb");
 	if (file)
 	{
-		long length;
-
-		fseek(file, 0, SEEK_END);
-		length = ftell(file);
-		fseek(file, 0, SEEK_SET);
-		text = length > 0 ? malloc((size_t)length + 1) : NULL;
-		if (text && fread(text, 1, (size_t)length, file) == (size_t)length)
-		{
-			text[length] = 0;
-			*size = length;
-		}
-		else
-		{
-			free(text);
-			text = NULL;
-		}
 		fclose(file);
-		return text;
+		return mcc_import_file_read(path, size);
 	}
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
 	{
 		unsigned int index;
+		char *text;
 
 		for (index = 0; index < mcc_patches_embedded_count; index++)
 		{
@@ -1307,28 +1324,15 @@ static void mcc_patch_donors_read(
 	{
 		struct mcc_patch_operation *operation = &mcc_patch_globals.operations[index];
 		char path[512];
-		FILE *file;
 		long size;
 		char *text, *end, *hex;
 
 		if (strcmp(operation->kind, "donor") || mcc_patch_globals.donor_text_count >= MCC_PATCH_MAXIMUM_DONORS)
 			continue;
 		mcc_patch_donor_path(path, sizeof(path), operation->a, operation->tag);
-		file = fopen(path, "rb");
-		if (!file)
+		text = mcc_import_file_read(path, &size);
+		if (!text)
 			continue;
-		fseek(file, 0, SEEK_END);
-		size = ftell(file);
-		fseek(file, 0, SEEK_SET);
-		text = size > 0 ? malloc((size_t)size + 1) : NULL;
-		if (!text || fread(text, 1, (size_t)size, file) != (size_t)size)
-		{
-			free(text);
-			fclose(file);
-			continue;
-		}
-		fclose(file);
-		text[size] = 0;
 		/* (one line: tag, the tag, "-", its bytes) */
 		end = strchr(text, '\n');
 		if (end)

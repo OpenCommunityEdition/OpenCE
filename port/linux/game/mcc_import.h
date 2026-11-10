@@ -83,6 +83,13 @@ boolean mcc_import_operations_bitmap_size(
 	short *width,
 	short *height);
 
+/* A whole file (of fewer than MCC_IMPORT_MAXIMUM_FILE_BYTES), NUL-terminated,
+its size in *size; NULL when it cannot be read. Released with free. */
+#define MCC_IMPORT_MAXIMUM_FILE_BYTES 0x10000000
+char *mcc_import_file_read(
+	char const *path,
+	long *size);
+
 /* The import's file `file_name` ("<map>.p2", the disc's values as operations,
 or "<map>.fp", the fingerprint of the disc's map): the data root's
 mcc_patches folder's, or the game's (port/assets/mcc), NUL-terminated, its
