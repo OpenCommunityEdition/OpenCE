@@ -2183,6 +2183,8 @@ MATCHMAKING_HELP = [
     "CTF has no free for all. Set another\\nplaylist to YES for this size.",
     "Slayer games: the most kills wins.", "Capture the Flag games.", "King of the Hill games.", "Oddball games.",
     "Race games.",
+    "Search for a game of a playlist at\\nYES, at this game size.",
+    "CHOOSE A PLAYLIST: SET ONE\\nTO YES.", "ONE PLAYER A MACHINE FOR\\nMATCHMAKING.",
     "",
 ]
 TITLES[f"{MT}/matchmaking/header_matchmaking"] = "MATCHMAKING"
@@ -2237,9 +2239,16 @@ def _matchmaking() -> list:
     lines += _widget(f"{base}/button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
                                             ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
                      [f'<child widget="{base}/button_defaults" x="35" y="1"/>',
+                      f'<child widget="{base}/button_search" x="341" y="1"/>',
                       '<child widget="common_button_cancel" x="477" y="1"/>'])
     lines += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port matchmaking defaults"/>',
                                                     '<on event="start" run="port matchmaking defaults"/>'])
+    lines += _widget(f"{base}/button_search", [("type", "text"), ("width", 128), ("height", 24),
+                                               ("bitmap", "bitmaps/text_button_background"), ("text", "SEARCH"),
+                                               ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"),
+                                               ("text_y", 2)],
+                     ['<on event="a" run="port matchmaking search"/>', '<on event="start" run="port matchmaking search"/>',
+                      '<on event="left_mouse" run="mouse emit accept event"/>'])
     lines += _strings(f"{base}/labels", ["GAME SIZE:", *(f"{name}:" for name in MATCHMAKING_PLAYLISTS)])
     lines += _strings(f"{base}/help_strings", MATCHMAKING_HELP)
     return lines

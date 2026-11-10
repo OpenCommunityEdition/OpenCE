@@ -71,11 +71,17 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/matchmaking/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		<child widget="main_menu/multiplayer_type_select/matchmaking/button_defaults" x="35" y="1"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/button_search" x="341" y="1"/>
 		<child widget="common_button_cancel" x="477" y="1"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/matchmaking/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port matchmaking defaults"/>
 		<on event="start" run="port matchmaking defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/button_search" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="SEARCH" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port matchmaking search"/>
+		<on event="start" run="port matchmaking search"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<strings name="main_menu/multiplayer_type_select/matchmaking/labels">
@@ -98,6 +104,9 @@
 		<string text="King of the Hill games."/>
 		<string text="Oddball games."/>
 		<string text="Race games."/>
+		<string text="Search for a game of a playlist at\nYES, at this game size."/>
+		<string text="CHOOSE A PLAYLIST: SET ONE\nTO YES."/>
+		<string text="ONE PLAYER A MACHINE FOR\nMATCHMAKING."/>
 		<string text=""/>
 	</strings>
 </menus>

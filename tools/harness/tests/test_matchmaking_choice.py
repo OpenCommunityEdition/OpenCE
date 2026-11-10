@@ -9,9 +9,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run  # noqa: E402
 
-CASES = ["ctf_only"]
+CASES = ["no_playlist", "one_playlist", "split_screen", "ctf_only"]
 
 NEGATIVE_CONTROLS = {
+    "no-playlist-searches": (("if (!playlists)", "if (0)"), "no_playlist"),
+    "two-players-search": (("if (local_players > 1)", "if (0)"), "split_screen"),
     "ffa-always-allowed": (("size != P2P_MM_FFA_6 ||", "1 ||"), "ctf_only"),
     "ctf-has-ffa": (("playlists != 1u << P2P_MM_CTF", "1"), "ctf_only"),
     "greyed-without-a-playlist": (("playlists != 1u << P2P_MM_CTF", "(playlists & ~(1u << P2P_MM_CTF))"), "ctf_only"),
@@ -24,11 +26,12 @@ def generated(fault=None):
     names = re.search(r"^const char \*const p2p_mm_playlist_names\[.*$", read("port/linux/src/p2p_matchmaking.c"),
                       re.M).group(0)
     code = "\n".join([function(read("port/linux/src/p2p_matchmaking.c"), "mm_playlist_has_size")] +
-                     [function(source, "matchmaking_size_after")])
+                     [function(source, name) for name in
+                      ("matchmaking_size_after", "matchmaking_search_allowed")])
     if fault:
         code = mutated(code, *fault)
     return (("under_test.inc", "\n".join([enum_with(header, "P2P_MM_SLAYER"), enum_with(header, "P2P_MM_1V1"),
-                                          names, code]) + "\n"),)
+                                          enum_with(source, "MATCHMAKING_SEARCH"), names, code]) + "\n"),)
 
 
 @pytest.mark.parametrize("case", CASES)

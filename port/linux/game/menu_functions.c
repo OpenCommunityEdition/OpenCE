@@ -5979,25 +5979,44 @@ static boolean password_screen_edit(struct widget_instance *row, boolean *widget
 	return TRUE;
 }
 
+enum
+{
+	MATCHMAKING_SEARCH,
+	MATCHMAKING_NO_PLAYLIST,
+	MATCHMAKING_ONE_PLAYER,
+};
+
 /* indices into port_settings.py's MATCHMAKING_HELP: keep the order */
 enum
 {
 	_matchmaking_help_size,
 	_matchmaking_help_no_ffa = _matchmaking_help_size + NUMBER_OF_P2P_MM_SIZES,
 	_matchmaking_help_playlist,
-	_matchmaking_help_none = _matchmaking_help_playlist + NUMBER_OF_P2P_MM_PLAYLISTS,
+	_matchmaking_help_search = _matchmaking_help_playlist + NUMBER_OF_P2P_MM_PLAYLISTS,
+	_matchmaking_help_none = _matchmaking_help_search + MATCHMAKING_ONE_PLAYER + 1,
 };
 
 static struct
 {
 	unsigned playlists;
 	short size;
+	short refusal;
+	struct widget_instance *focused;
 	boolean loaded;
 } matchmaking_screen;
 
 static short matchmaking_size_after(unsigned playlists, short size)
 {
 	return mm_playlist_has_size(playlists, size) ? size : P2P_MM_2V2;
+}
+
+static short matchmaking_search_allowed(unsigned playlists, short local_players)
+{
+	if (!playlists)
+		return MATCHMAKING_NO_PLAYLIST;
+	if (local_players > 1)
+		return MATCHMAKING_ONE_PLAYER;
+	return MATCHMAKING_SEARCH;
 }
 
 static struct widget_instance *matchmaking_playlist_spinner(struct widget_instance *widget, short index)
@@ -6034,6 +6053,7 @@ static boolean matchmaking_screen_load(struct widget_instance *widget, boolean d
 		matchmaking_screen.playlists = playlists;
 		matchmaking_screen.size = size;
 	}
+	matchmaking_screen.refusal = MATCHMAKING_SEARCH;
 	matchmaking_screen.loaded = TRUE;
 	return TRUE;
 }
@@ -6043,6 +6063,7 @@ static void matchmaking_screen_update(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "size_spinner", 0);
 	struct widget_instance *description = list->parameters.list.extended_description;
+	struct widget_instance *focused = list;
 	unsigned playlists = 0;
 	short index, shown, size, help;
 
@@ -6063,18 +6084,52 @@ static void matchmaking_screen_update(struct widget_instance *list)
 	if (list->focused_child != spinner->parent)
 		spinner->parameters.list.selected_index = shown = size;
 	spinner->alpha_modifier = mm_playlist_has_size(playlists, shown) ? 1.0f : TAB_UNFOCUSED_ALPHA;
+	while (focused->focused_child)
+		focused = focused->focused_child;
+	if (focused != matchmaking_screen.focused || playlists != matchmaking_screen.playlists ||
+		size != matchmaking_screen.size)
+	{
+		matchmaking_screen.refusal = MATCHMAKING_SEARCH;
+	}
 	matchmaking_screen.playlists = playlists;
 	matchmaking_screen.size = size;
+	matchmaking_screen.focused = focused;
 	index = list->focused_child ? sibling_index(list->focused_child) : NONE;
-	if (index == 0)
+	if (matchmaking_screen.refusal != MATCHMAKING_SEARCH)
+		help = (short)(_matchmaking_help_search + matchmaking_screen.refusal);
+	else if (index == 0)
 		help = (short)(mm_playlist_has_size(playlists, shown) ? _matchmaking_help_size + shown :
 			_matchmaking_help_no_ffa);
 	else if (index > 0 && index <= NUMBER_OF_P2P_MM_PLAYLISTS)
 		help = (short)(_matchmaking_help_playlist + index - 1);
+	else if (!strcmp(focused->name, "button_search"))
+		help = _matchmaking_help_search;
 	else
 		help = _matchmaking_help_none;
 	if (description)
 		description->parameters.text_box.string_list_index = help;
+}
+
+/* "port matchmaking search" (SEARCH): the search begins, else the error
+sound and the line that refuses it */
+static boolean matchmaking_screen_search(void)
+{
+	struct p2p_mm_choice choice;
+	short controller, local_players = 0;
+
+	for (controller = 0; controller < MAXIMUM_LOCAL_PLAYERS; controller++)
+		local_players += player_ui_local_player_wants_to_play_multiplayer(controller) ? 1 : 0;
+	matchmaking_screen.refusal = matchmaking_search_allowed(matchmaking_screen.playlists, local_players);
+	if (matchmaking_screen.refusal != MATCHMAKING_SEARCH)
+	{
+		ui_play_audio_feedback_sound(SOUND_ERROR);
+		return TRUE;
+	}
+	choice.playlists = matchmaking_screen.playlists;
+	choice.size = matchmaking_screen.size;
+	p2p_mm_search(&choice);
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	return TRUE;
 }
 
 static boolean matchmaking_screen_back(struct widget_instance *widget, boolean *widget_deleted)
@@ -8661,6 +8716,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port matchmaking defaults"))
 		{
 			return matchmaking_screen_load(widget, TRUE);
+		}
+		else if (!strcmp(name, "port matchmaking search"))
+		{
+			return matchmaking_screen_search();
 		}
 		else if (!strcmp(name, "port matchmaking back"))
 		{
