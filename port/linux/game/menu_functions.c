@@ -5979,6 +5979,14 @@ static boolean password_screen_edit(struct widget_instance *row, boolean *widget
 	return TRUE;
 }
 
+static boolean matchmaking_screen_back(struct widget_instance *widget, boolean *widget_deleted)
+{
+	p2p_mm_cancel();
+	ui_widget_port_go_back(widget);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
 /* "gamespy screen update": the games' rows (name, map, gametype, players),
 the one chosen's line, the counts over the titles (the PC version's: its
 players, page, servers) */
@@ -8547,6 +8555,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port password back"))
 		{
 			return password_screen_back(widget, widget_deleted);
+		}
+		else if (!strcmp(name, "port matchmaking back"))
+		{
+			return matchmaking_screen_back(widget, widget_deleted);
 		}
 		else if (!strcmp(name, "ss copy invite"))
 		{
