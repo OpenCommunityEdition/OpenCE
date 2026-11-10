@@ -2843,6 +2843,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
+#include "x10_warthogs.h" /* port: port/linux/game/x10_warthogs.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
@@ -15374,6 +15375,11 @@ boolean hs_scenario_postprocess(
 		/* port: before the console's expressions are compiled into the
 		same nodes */
 		hs_scenario_functions_check(scenario);
+		/* port: a10's hangar scene has its warthog behind Johnson on
+		Legendary too, destroyed out of sight before it crashes into the
+		hangar's far wall, and no other Johnson at a warthog's wheel
+		(x10_warthogs.c) */
+		x10_warthogs_scripts_loaded(scenario, hs_syntax_data);
 		if (scenario->hs_string_constants.size<0x400)
 		{
 			success = tag_data_resize(
