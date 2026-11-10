@@ -782,11 +782,58 @@ int mm_step(struct mm_search *search, unsigned long now, struct mm_out *out, int
 
 /* ---------- the p2p thread's search: mm is guarded by p2p_lock */
 
+enum
+{
+	MAXIMUM_QUEUED = 64,
+	/* milliseconds of signature checks a pass */
+	VERIFY_BUDGET = 2,
+};
+
+struct queued
+{
+	unsigned char bytes[MM_MAXIMUM_RECORD_SIZE];
+	int size;
+};
+
 static struct
 {
 	struct mm_search search;
+	struct queued queue[MAXIMUM_QUEUED];
+	int queue_count;
 	int subscribed[P2P_MM_MAXIMUM_TOPICS][2], subscribed_count;
 } mm;
+
+static unsigned long monotonic_us(void)
+{
+	struct timespec time_now;
+
+	clock_gettime(CLOCK_MONOTONIC, &time_now);
+	return (unsigned long)time_now.tv_sec * 1000000UL + (unsigned long)time_now.tv_nsec / 1000;
+}
+
+static unsigned long elapsed_ms(unsigned long started)
+{
+	return (monotonic_us() - started) / 1000;
+}
+
+static int record_stale(const struct queued *queued)
+{
+	int index;
+
+	if (queued->size < MM_HEADER_SIZE || (unsigned)(queued->bytes[3] << 8 | queued->bytes[4]) != HALO_PORT_NETWORK_VERSION)
+		return 1;
+	for (index = 0; index < MM_MAXIMUM_UNITS; index++)
+	{
+		const struct mm_peer *peer = &mm.search.peers[index];
+
+		if (peer->used && peer->playlist == queued->bytes[12] && peer->size == queued->bytes[13] &&
+			!memcmp(peer->record.key, queued->bytes + 14, P2P_KEY_SIZE))
+		{
+			return get_long(queued->bytes + 6) <= peer->record.sequence;
+		}
+	}
+	return 0;
+}
 
 static void publish_out(const struct mm_out *out, int count)
 {
@@ -798,8 +845,40 @@ static void publish_out(const struct mm_out *out, int count)
 
 void p2p_mm_heard(const unsigned char *payload, int size)
 {
-	(void)payload;
-	(void)size;
+	if (mm.search.state == P2P_MM_OFF || mm.queue_count == MAXIMUM_QUEUED || size <= 0 ||
+		size > MM_MAXIMUM_RECORD_SIZE)
+	{
+		return;
+	}
+	memcpy(mm.queue[mm.queue_count].bytes, payload, (size_t)size);
+	mm.queue[mm.queue_count++].size = size;
+}
+
+int p2p_mm_verify_pass(unsigned long now)
+{
+	unsigned long started = monotonic_us();
+
+	for (;;)
+	{
+		struct queued queued;
+		struct mm_record record;
+		int good;
+
+		if (!mm.queue_count)
+			break;
+		queued = mm.queue[0];
+		memmove(mm.queue, mm.queue + 1, sizeof(*mm.queue) * (size_t)(--mm.queue_count));
+		if (record_stale(&queued))
+			continue;
+		pthread_mutex_unlock(&p2p_lock);
+		good = mm_record_read(queued.bytes, queued.size, &record);
+		pthread_mutex_lock(&p2p_lock);
+		if (good)
+			mm_heard(&mm.search, &record, now);
+		if (elapsed_ms(started) >= VERIFY_BUDGET)
+			break;
+	}
+	return mm.queue_count;
 }
 
 static void sync_topics(void)
@@ -833,6 +912,7 @@ void p2p_mm_update(unsigned long now, int can_host)
 		return;
 	}
 	mm.search.can_host = can_host;
+	p2p_mm_verify_pass(now);
 	count = mm_step(&mm.search, now, out, MM_MAXIMUM_OUT);
 	publish_out(out, count);
 	sync_topics();
@@ -843,6 +923,7 @@ static void cancel_search(void)
 	struct mm_out out[MM_MAXIMUM_OUT];
 
 	publish_out(out, mm_cancel(&mm.search, out, MM_MAXIMUM_OUT));
+	mm.queue_count = 0;
 }
 
 void p2p_mm_search(const struct p2p_mm_choice *choice)

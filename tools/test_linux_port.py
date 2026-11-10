@@ -441,6 +441,7 @@ def test_p2p_matchmaking(tmp_path):
       "memcpy(material, units[unit].key, P2P_KEY_SIZE);\n\t\tp2p_sha256(material, P2P_KEY_SIZE"), "election"),
     (("if (record->kind == MM_KIND_CANCEL)", "if (0)"), "e43_replay"),
     (("record->sequence <= peer->record.sequence", "0"), "e43_replay"),
+    (("elapsed_ms(started) >= VERIFY_BUDGET", "0"), "verify_budget"),
 ])
 def test_p2p_matchmaking_negative_control(tmp_path, fault, case):
     output = matchmaking_check(tmp_path, fault)

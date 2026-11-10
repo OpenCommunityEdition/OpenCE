@@ -10,6 +10,7 @@ Matchmaking's records, and machines searching through a stand-in broker.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define TEXT_OF_(x) #x
 #define TEXT_OF(x) TEXT_OF_(x)
@@ -141,6 +142,41 @@ static void check_topics(void)
 	CHECK(mm_interval(1) == 30 && mm_interval(12) == 30, "up to 12 queues: 3 s");
 	CHECK(mm_interval(25) >= 62 && mm_interval(25) <= 63, "E44: 25 queues: about 6.3 s: %d", mm_interval(25));
 	CHECK(mm_interval(25) * MM_RECORDS_PER_SECOND >= 25 * 10, "E44: at most 4 a second");
+}
+
+static void check_verify_budget(void)
+{
+	struct p2p_mm_choice choice = { 1u << P2P_MM_SLAYER, P2P_MM_2V2 };
+	unsigned char seed[P2P_SEED_SIZE], bytes[MM_MAXIMUM_RECORD_SIZE];
+	struct timespec before, after;
+	int index, size, passes, left;
+	double first_pass_ms;
+
+	case_name = "verify_budget";
+	p2p_mm_search(&choice);
+	/* MAXIMUM_QUEUED (64) are kept: 21 keys of three records, and one more */
+	for (index = 0; index < 300; index++)
+	{
+		struct mm_record record = searching(index / 3 + 10, (unsigned long)(index % 3 + 1));
+
+		seed_of(index / 3 + 10, seed);
+		size = mm_record_write(&record, seed, bytes, sizeof(bytes));
+		pthread_mutex_lock(&p2p_lock);
+		p2p_mm_heard(bytes, size);
+		pthread_mutex_unlock(&p2p_lock);
+	}
+	pthread_mutex_lock(&p2p_lock);
+	clock_gettime(CLOCK_MONOTONIC, &before);
+	left = p2p_mm_verify_pass(clock_now);
+	clock_gettime(CLOCK_MONOTONIC, &after);
+	first_pass_ms = (double)(after.tv_sec - before.tv_sec) * 1000.0 + (double)(after.tv_nsec - before.tv_nsec) / 1e6;
+	for (passes = 1; left && passes < 100; passes++)
+		left = p2p_mm_verify_pass(clock_now);
+	pthread_mutex_unlock(&p2p_lock);
+	CHECK(first_pass_ms < 4.0, "one pass took %.1f ms", first_pass_ms);
+	CHECK(passes > 1 || first_pass_ms < 2.5, "a pass of %.1f ms past the budget stopped early: %d passes", first_pass_ms, passes);
+	CHECK(!left, "the queue drains over later passes: %d left", left);
+	p2p_mm_cancel();
 }
 
 static int contains(const unsigned char *bytes, int size, const unsigned char *part, int part_size)
@@ -609,6 +645,7 @@ int main(void)
 	check_hosting();
 	check_playlists();
 	check_topics();
+	check_verify_budget();
 	check_four();
 	check_replay();
 	check_return();
