@@ -63,7 +63,9 @@ designator (hs_find_global_by_name) */
 /* Halo PC's names for this build's functions: the same function, with the
 same parameters (MCC's campaign scripts call the disc's
 player_effect_set_max_rumble player_effect_set_max_vibrate, with the disc's
-arguments) */
+arguments). A call's name in the string data is given this build's (which
+must be no longer: it is written in its place), as the game finds a map's
+calls by their names when it loads them (hs_compile.c). */
 static char const *const halo_pc_function_names[][2] =
 {
 	{ "player_effect_set_max_vibrate", "player_effect_set_max_rumble" },
@@ -75,7 +77,7 @@ struct scripts_conversion
 {
 	struct hs_syntax_node *nodes;
 	long node_count;
-	char const *strings;
+	char *strings;
 	unsigned long string_bytes;
 	/* where the empty string at the end of the string data is (an Xbox
 	address, as a string constant's value is), or 0 */
@@ -175,18 +177,25 @@ static boolean engine_global_missing(
 	return designator == NONE || !TEST_FLAG(designator, HS_EXTERNAL_GLOBAL_DESIGNATOR_BIT);
 }
 
-/* this build's function by its name, or by the name Halo PC gives it */
+/* this build's function by its name, or by the name Halo PC gives it (then
+*build_name is this build's name for it, else NULL) */
 static short function_find_by_name(
-	char const *name)
+	char const *name,
+	char const **build_name)
 {
 	short function_index = hs_find_function_by_name(name);
 	long name_index;
 
+	*build_name = NULL;
 	for (name_index = 0; function_index == NONE && name_index < (long)NUMBEROF(halo_pc_function_names); name_index++)
 	{
-		if (!strcmp(name, halo_pc_function_names[name_index][0]))
+		/* (this build's name written in the place of Halo PC's) */
+		if (!strcmp(name, halo_pc_function_names[name_index][0]) &&
+			strlen(halo_pc_function_names[name_index][1]) <= strlen(name))
 		{
 			function_index = hs_find_function_by_name(halo_pc_function_names[name_index][1]);
+			if (function_index != NONE)
+				*build_name = halo_pc_function_names[name_index][1];
 		}
 	}
 
@@ -202,6 +211,7 @@ static boolean function_call_convert(
 	long name_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(call->data);
 	struct hs_syntax_node *name_node;
 	char const *name;
+	char const *build_name;
 	short function_index;
 
 	if (name_index >= conversion->node_count)
@@ -214,7 +224,14 @@ static boolean function_call_convert(
 	{
 		return FALSE;
 	}
-	function_index = function_find_by_name(name);
+	function_index = function_find_by_name(name, &build_name);
+	/* (Halo PC's name: this build's in its place, no longer than it, which
+	every call that shares the string then finds) */
+	if (build_name)
+	{
+		strcpy(conversion->strings + name_node->string_offset, build_name);
+		name = build_name;
+	}
 	if (function_index == NONE)
 	{
 		node_make_inert(conversion, call, "function", name);
