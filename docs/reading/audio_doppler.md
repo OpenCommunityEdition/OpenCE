@@ -65,6 +65,13 @@ transitions retain measurement. Listener loss, player-slot reuse and
 backwards ticks also invalidate the history; the large-displacement check
 remains a fallback for teleports.
 
+`scripted_camera_set_camera_point_relative` updates a camera position without
+resetting listener history. The co-op client's `client_presentation_apply`
+uses it with zero transition time on successive ticks while following the
+host camera. Those updates must retain measured motion, or a client riding
+alongside a vehicle in a cinematic would treat its listener as stationary.
+Authored cuts through `scripted_camera_set` still reset the history.
+
 This is shared audio correction, with the optional stereo extension owned
 by the existing SDL audio module. Xbox, Custom Edition and MCC retain their
 loading and conversion paths. No map-family guard or network packet changes;
@@ -79,7 +86,8 @@ sources with the setting off, on, then off, using sinc/linear resampling and
 stereo/5.1 output. Fault injection checks that the regressions are detected.
 [Listener tests](../../tools/harness/tests/test_listener_motion.py) exercise
 the actual measurement and camera functions, including short same-tick
-cuts, smooth motion, slot reuse, reset and shoulder-camera selection.
+cuts, smooth motion, repeated zero-transition co-op camera updates, slot
+reuse, reset and shoulder-camera selection.
 
 These checks establish calculation behavior. They do not establish perceptual
 equivalence to retail Xbox hardware. Map transitions, checkpoints and moving

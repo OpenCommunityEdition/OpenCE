@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run
 
-CASES = ["motion", "cuts", "lifecycle", "followed-unit", "rigid-body"]
+CASES = ["motion", "coop-camera-motion", "cuts", "lifecycle", "followed-unit", "rigid-body"]
 
 
 def generated(fault=None):
@@ -19,6 +19,7 @@ def generated(fault=None):
     code = manager[start:end] + function(manager, "sound_initialize_for_new_map")
     code += function(scripting, "scripted_camera_set_camera_point_relative")
     code += function(scripting, "scripted_camera_enable")
+    code += function(scripting, "scripted_camera_set")
     code += function(director, "director_set_camera")
     code += function(director, "director_get_followed_unit")
     code += function(read("source/objects/objects.c"), "object_get_point_velocity")
@@ -48,3 +49,10 @@ def test_lifecycle_wiring():
     for name in ("scripted_camera_set", "scripted_camera_set_animation",
                  "scripted_camera_set_first_person", "scripted_camera_set_dead"):
         assert "sound_listener_motion_reset(NONE)" in function(scripting, name)
+
+
+def test_coop_camera_updates_must_preserve_motion():
+    fault = ("camera_script_globals.camera_point_index = NONE;",
+             "camera_script_globals.camera_point_index = NONE; sound_listener_motion_reset(NONE);")
+    status, output = run(build("listener_motion", generated(fault)), "coop-camera-motion")
+    assert status == CHECK_FAILED, f"per-update listener reset escaped detection: {output}"
