@@ -22,6 +22,7 @@ CASES = [
     "base-map-shadow-and-ram-cap",
     "three-strikes-cutoff-and-reset",
     "opt-out-and-stall-timeout",
+    "backlog-pacing-and-timeout-retry",
 ]
 
 RUNTIME_FUNCTIONS = (
@@ -113,6 +114,21 @@ NEGATIVE_CONTROLS = {
         ('!config_boolean("network.forge_tag_download") ||', "0 ||"),
         "forge_tag_stream_tick",
         "opt-out-and-stall-timeout",
+    ),
+    "backlog-ignored": (
+        ("if (backlog > FORGE_TAG_STREAM_MAX_BACKLOG)", "if (0)"),
+        "forge_tag_stream_tick",
+        "backlog-pacing-and-timeout-retry",
+    ),
+    "rate-budget-ignored": (
+        ("backlog <= FORGE_TAG_STREAM_MAX_BACKLOG &&\n\t\t\t\t   tx->byte_budget > 0", "1"),
+        "forge_tag_stream_tick",
+        "backlog-pacing-and-timeout-retry",
+    ),
+    "timeout-never-retries": (
+        ("prev_attempts < FORGE_TAG_STREAM_MAX_ATTEMPTS", "0"),
+        "forge_client_abort_rx",
+        "backlog-pacing-and-timeout-retry",
     ),
 }
 

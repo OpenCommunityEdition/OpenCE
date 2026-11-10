@@ -2011,3 +2011,15 @@ static long network_connection_datagram_size(
 
 	return GET_MESSAGE_SIZE(header);
 }
+
+/* port: the bytes the reliable stream has not sent yet (what a stream write
+could not send at once). OpenCE Forge's custom tag streaming
+(port/linux/game/forge_network.c) pauses while a machine has much waiting, so
+its 256 KB outgoing queue never overflows and drops the connection. */
+long network_connection_reliable_backlog(
+	struct network_connection *connection)
+{
+	if (!connection || !connection->reliable_outgoing_queue)
+		return 0;
+	return circular_queue_size(connection->reliable_outgoing_queue);
+}

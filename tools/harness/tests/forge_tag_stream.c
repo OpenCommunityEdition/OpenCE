@@ -118,6 +118,7 @@ static int c2h_backpressure = 0;
 static struct wire_packet h2c_queue[MAX_WIRE_QUEUE];
 static int h2c_count = 0;
 static int h2c_backpressure = 0;
+static long fake_host_backlog = 0;
 
 /* Fake host custom tag vault */
 static uint32_t fake_host_hash = 0;
@@ -125,7 +126,7 @@ static uint8_t fake_host_format = 1;
 static uint32_t fake_host_group = 0;
 static char fake_host_path[256];
 static char fake_host_disp[64];
-static uint8_t fake_host_raw[8192];
+static uint8_t fake_host_raw[32768];
 static uint32_t fake_host_raw_len = 0;
 static int fake_export_calls = 0;
 
@@ -190,6 +191,12 @@ static boolean network_distributed_server_send_to_machine_reliably(long machine_
 	memcpy(h2c_queue[h2c_count].bytes, message, size);
 	h2c_count++;
 	return TRUE;
+}
+
+static long network_distributed_server_machine_reliable_backlog(long machine_index)
+{
+	(void)machine_index;
+	return fake_host_backlog;
 }
 
 /* Deterministic 32-byte digest over every byte + length for wire integrity checks */
@@ -446,6 +453,7 @@ static void reset_world(void)
 	c2h_backpressure = 0;
 	h2c_count = 0;
 	h2c_backpressure = 0;
+	fake_host_backlog = 0;
 
 	fake_host_hash = 0;
 	fake_host_format = 1;
@@ -985,6 +993,72 @@ int main(int argc, char **argv)
 		pump_client_to_host_stream(0);
 		pump_host_to_client_stream();
 		CHECK(g_client_tag_rx.downloaded_count == 1, "h2 completed after h1 stall");
+		return 0;
+	}
+
+	/* 11. Reliable backlog cap, high-FPS wall-clock byte-rate budget, and bounded stall-timeout retry */
+	CASE("backlog-pacing-and-timeout-retry")
+	{
+		uint32_t h, h_retry, tid1, tid2, tid3;
+		int f;
+
+		/* 11a: Host pauses streaming completely when per-client reliable backlog exceeds 16 KB */
+		reset_world();
+		h = stage_host_bundle(1, 'scen', "custom\\paced\\large_mesh", "Large Mesh", 24000u);
+		forge_client_upsert_stream_proxy_instance(0, h, -1, -1, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1);
+		forge_client_enqueue_tag_download(h);
+		forge_tag_stream_tick(fake_now_ms);
+		CHECK(c2h_count == 1, "client sent FTRQ");
+
+		fake_host_backlog = FORGE_TAG_STREAM_MAX_BACKLOG + 1L;
+		pump_client_to_host_stream(0);
+		CHECK(g_host_tag_tx[0].active == 1, "host registered transfer");
+		CHECK(h2c_count == 0, "host paused streaming while reliable backlog > 16 KB");
+
+		/* 11b: High-FPS render loop (20 ticks with 0 ms elapsed) is strictly bounded by 16 KB byte_budget */
+		fake_host_backlog = 0;
+		fake_connection = _game_connection_network_server;
+		for (f = 0; f < 20; f++)
+			forge_tag_stream_tick(fake_now_ms);
+		CHECK(h2c_count > 0 && h2c_count < 20, "high-FPS 0ms loop stopped at 16 KB burst budget (%d pkts)", h2c_count);
+		CHECK(g_host_tag_tx[0].active == 1, "remaining chunks still pending budget replenishment");
+
+		/* Advancing wall clock by 100 ms replenishes budget so remaining chunks finish cleanly */
+		fake_now_ms += 100u;
+		forge_tag_stream_tick(fake_now_ms);
+		fake_connection = _game_connection_network_client;
+		CHECK(g_host_tag_tx[0].active == 0 && h2c_count == 20, "all 1 offer + 19 chunks sent after 100 ms replenishment");
+		pump_host_to_client_stream();
+		CHECK(g_client_tag_rx.downloaded_count == 1, "24 KB multi-burst bundle installed cleanly");
+
+		/* 11c: Bounded stall-timeout retries (up to 3 total attempts with fresh transfer_ids before settling) */
+		reset_world();
+		h_retry = forge_compute_catalog_hash('scen', "custom\\retry\\flaky");
+		forge_client_enqueue_tag_download(h_retry);
+
+		forge_tag_stream_tick(fake_now_ms);
+		CHECK(c2h_count == 1 && g_client_tag_rx.active_attempts == 1, "attempt 1 sent");
+		tid1 = g_client_tag_rx.transfer_id;
+		c2h_count = 0;
+
+		fake_now_ms += FORGE_TAG_STREAM_STALL_TIMEOUT_MS + 100u;
+		forge_tag_stream_tick(fake_now_ms);
+		CHECK(c2h_count == 1 && g_client_tag_rx.active_attempts == 2, "attempt 2 sent after 1st stall");
+		tid2 = g_client_tag_rx.transfer_id;
+		CHECK(tid2 != tid1, "attempt 2 uses fresh transfer_id");
+		c2h_count = 0;
+
+		fake_now_ms += FORGE_TAG_STREAM_STALL_TIMEOUT_MS + 100u;
+		forge_tag_stream_tick(fake_now_ms);
+		CHECK(c2h_count == 1 && g_client_tag_rx.active_attempts == 3, "attempt 3 sent after 2nd stall");
+		tid3 = g_client_tag_rx.transfer_id;
+		CHECK(tid3 != tid2, "attempt 3 uses fresh transfer_id");
+		c2h_count = 0;
+
+		fake_now_ms += FORGE_TAG_STREAM_STALL_TIMEOUT_MS + 100u;
+		forge_tag_stream_tick(fake_now_ms);
+		CHECK(c2h_count == 0 && g_client_tag_rx.state == _forge_tag_rx_idle, "settled permanently after 3rd stall");
+		CHECK(forge_client_is_hash_settled(h_retry) == 1 && g_client_tag_rx.strikes == 0, "marked settled with 0 strikes");
 		return 0;
 	}
 

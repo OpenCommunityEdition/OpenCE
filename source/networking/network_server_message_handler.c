@@ -950,6 +950,27 @@ boolean network_distributed_server_send_to_machine_reliably(
 	return network_game_server_write(connection, buffer, size, NULL, 1);
 }
 
+/* port: the bytes the reliable stream to a machine in the game has not sent
+yet; NONE for no such machine (OpenCE Forge's custom tag streaming paces
+itself by it: port/linux/game/forge_network.c) */
+long network_distributed_server_machine_reliable_backlog(
+	long machine_index)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct network_game_server_client_machine *machine;
+	struct network_connection *connection;
+
+	if (!server)
+		return NONE;
+	machine = network_game_server_client_machine_in_game(server, machine_index);
+	if (!machine)
+		return NONE;
+	connection = network_game_server_get_client_connection(machine);
+	if (!connection || !network_connection_active(connection))
+		return NONE;
+	return network_connection_reliable_backlog(connection);
+}
+
 /* to every machine, reliably (the netcode's objects appearing and going
 must not be lost) */
 boolean network_distributed_server_send_to_all_reliably(

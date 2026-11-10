@@ -39,6 +39,7 @@
 extern int config_boolean(const char *name);
 extern boolean network_distributed_client_send_reliably(void *message, word size);
 extern boolean network_distributed_server_send_to_machine_reliably(long machine_index, void *message, word size);
+extern long network_distributed_server_machine_reliable_backlog(long machine_index);
 extern unsigned long system_milliseconds(void);
 extern void orig_network_objects_handle_changes(void const *entries, short count);
 extern void *cache_files_tag_instances(long *count);
@@ -125,7 +126,11 @@ static int g_host_machine_mon_synced[FORGE_MAX_CLIENT_MACHINES];
 #define FORGE_TAG_STREAM_MAX_UNCOMP_BYTES     (14u * 1024u * 1024u)
 #define FORGE_TAG_STREAM_MAX_CHUNKS           ((FORGE_TAG_STREAM_MAX_COMP_BYTES + FORGE_TAG_STREAM_CHUNK_BYTES - 1u) / FORGE_TAG_STREAM_CHUNK_BYTES)
 #define FORGE_TAG_STREAM_CHUNKS_PER_TICK      6
+#define FORGE_TAG_STREAM_BYTES_PER_SEC        (128u * 1024u)
+#define FORGE_TAG_STREAM_MAX_BURST_BYTES      (16u * 1024u)
+#define FORGE_TAG_STREAM_MAX_BACKLOG          (16L * 1024L)
 #define FORGE_TAG_STREAM_STALL_TIMEOUT_MS     15000u
+#define FORGE_TAG_STREAM_MAX_ATTEMPTS         3
 #define FORGE_TAG_STREAM_MAX_SESSION_TAGS     32
 #define FORGE_TAG_STREAM_MAX_STRIKES          3
 #define FORGE_TAG_STREAM_MAX_CLIENT_REQS      64
@@ -204,6 +209,8 @@ struct forge_host_client_tag_tx
 	uint32_t transfer_id;
 	uint16_t next_chunk;
 	int req_count;
+	unsigned long last_send_ms;
+	int32_t byte_budget;
 };
 
 enum forge_client_tag_rx_state
@@ -245,7 +252,9 @@ static struct
 	uint8_t *comp_buf;
 	uint32_t chunk_seen[(FORGE_TAG_STREAM_MAX_CHUNKS + 31u) / 32u];
 	uint32_t queue[FORGE_TAG_STREAM_MAX_SESSION_TAGS];
+	uint8_t queue_attempts[FORGE_TAG_STREAM_MAX_SESSION_TAGS];
 	int queue_count;
+	uint8_t active_attempts;
 	uint32_t settled_hashes[FORGE_TAG_STREAM_MAX_SESSION_TAGS * 2];
 	int settled_count;
 	int downloaded_count;
@@ -1767,25 +1776,44 @@ static void forge_client_mark_hash_settled(uint32_t hash)
 		g_client_tag_rx.settled_hashes[g_client_tag_rx.settled_count++] = hash;
 }
 
-static void forge_client_abort_rx(int add_strike)
+/* mode: 0 = settle cleanly (OP_MISS / cap / opt-out), 1 = protocol strike + settle, 2 = stall timeout retry */
+static void forge_client_abort_rx(int mode)
 {
+	uint32_t prev_hash = g_client_tag_rx.hash;
+	uint8_t prev_attempts = g_client_tag_rx.active_attempts;
+
 	if (g_client_tag_rx.comp_buf)
 	{
 		free(g_client_tag_rx.comp_buf);
 		g_client_tag_rx.comp_buf = NULL;
 	}
-	if (g_client_tag_rx.hash)
-		forge_client_mark_hash_settled(g_client_tag_rx.hash);
 	g_client_tag_rx.state = _forge_tag_rx_idle;
 	g_client_tag_rx.hash = 0;
 	g_client_tag_rx.transfer_id = 0;
+	g_client_tag_rx.active_attempts = 0;
 	g_client_tag_rx.chunk_count = 0;
 	g_client_tag_rx.chunks_received = 0;
 	g_client_tag_rx.compressed_size = 0;
 	g_client_tag_rx.uncompressed_size = 0;
 	memset(g_client_tag_rx.chunk_seen, 0, sizeof(g_client_tag_rx.chunk_seen));
 
-	if (add_strike)
+	if (prev_hash)
+	{
+		if (mode == 2 &&
+			prev_attempts < FORGE_TAG_STREAM_MAX_ATTEMPTS &&
+			g_client_tag_rx.queue_count < FORGE_TAG_STREAM_MAX_SESSION_TAGS)
+		{
+			g_client_tag_rx.queue[g_client_tag_rx.queue_count] = prev_hash;
+			g_client_tag_rx.queue_attempts[g_client_tag_rx.queue_count] = prev_attempts;
+			g_client_tag_rx.queue_count++;
+		}
+		else
+		{
+			forge_client_mark_hash_settled(prev_hash);
+		}
+	}
+
+	if (mode == 1)
 	{
 		g_client_tag_rx.strikes++;
 		if (g_client_tag_rx.strikes >= FORGE_TAG_STREAM_MAX_STRIKES)
@@ -1815,7 +1843,11 @@ static void forge_client_enqueue_tag_download(uint32_t hash)
 			return;
 	}
 	if (g_client_tag_rx.queue_count < FORGE_TAG_STREAM_MAX_SESSION_TAGS)
-		g_client_tag_rx.queue[g_client_tag_rx.queue_count++] = hash;
+	{
+		g_client_tag_rx.queue[g_client_tag_rx.queue_count] = hash;
+		g_client_tag_rx.queue_attempts[g_client_tag_rx.queue_count] = 0;
+		g_client_tag_rx.queue_count++;
+	}
 }
 
 static int32_t forge_client_upsert_stream_proxy_instance(
@@ -2261,6 +2293,8 @@ void forge_tag_stream_handle_message(
 		tx->hash = req.hash;
 		tx->transfer_id = req.transfer_id;
 		tx->next_chunk = 0;
+		tx->last_send_ms = system_milliseconds();
+		tx->byte_budget = (int32_t)FORGE_TAG_STREAM_MAX_BURST_BYTES;
 		return;
 	}
 
@@ -2464,6 +2498,7 @@ void forge_tag_stream_handle_message(
 				g_client_tag_rx.state = _forge_tag_rx_idle;
 				g_client_tag_rx.hash = 0;
 				g_client_tag_rx.transfer_id = 0;
+				g_client_tag_rx.active_attempts = 0;
 
 				installed_def = forge_install_ephemeral_tag_bundle(
 					fin_hash,
@@ -2513,7 +2548,7 @@ static void forge_tag_stream_tick(unsigned long now)
 		if (g_client_tag_rx.state != _forge_tag_rx_idle)
 		{
 			if (now - g_client_tag_rx.last_progress_ms > FORGE_TAG_STREAM_STALL_TIMEOUT_MS)
-				forge_client_abort_rx(0);
+				forge_client_abort_rx(2);
 			else
 				return;
 		}
@@ -2522,12 +2557,16 @@ static void forge_tag_stream_tick(unsigned long now)
 			   g_client_tag_rx.downloaded_count < FORGE_TAG_STREAM_MAX_SESSION_TAGS)
 		{
 			uint32_t next_hash = g_client_tag_rx.queue[0];
+			uint8_t next_attempts = g_client_tag_rx.queue_attempts[0];
 			struct forge_tag_request_packet req;
 			uint32_t tid;
 			int q;
 
 			for (q = 1; q < g_client_tag_rx.queue_count; q++)
+			{
 				g_client_tag_rx.queue[q - 1] = g_client_tag_rx.queue[q];
+				g_client_tag_rx.queue_attempts[q - 1] = g_client_tag_rx.queue_attempts[q];
+			}
 			g_client_tag_rx.queue_count--;
 
 			if (forge_client_is_hash_settled(next_hash))
@@ -2548,8 +2587,12 @@ static void forge_tag_stream_tick(unsigned long now)
 			{
 				/* Reliable stream busy: put back at head of queue and retry next tick */
 				for (q = g_client_tag_rx.queue_count; q > 0; q--)
+				{
 					g_client_tag_rx.queue[q] = g_client_tag_rx.queue[q - 1];
+					g_client_tag_rx.queue_attempts[q] = g_client_tag_rx.queue_attempts[q - 1];
+				}
 				g_client_tag_rx.queue[0] = next_hash;
+				g_client_tag_rx.queue_attempts[0] = next_attempts;
 				g_client_tag_rx.queue_count++;
 				break;
 			}
@@ -2557,6 +2600,7 @@ static void forge_tag_stream_tick(unsigned long now)
 			g_client_tag_rx.state = _forge_tag_rx_wait_offer;
 			g_client_tag_rx.hash = next_hash;
 			g_client_tag_rx.transfer_id = tid;
+			g_client_tag_rx.active_attempts = (uint8_t)(next_attempts + 1u);
 			g_client_tag_rx.last_progress_ms = now;
 			break;
 		}
@@ -2568,6 +2612,8 @@ static void forge_tag_stream_tick(unsigned long now)
 		{
 			struct forge_host_client_tag_tx *tx = &g_host_tag_tx[m];
 			struct forge_host_cached_tag_bundle const *cb;
+			long backlog;
+			unsigned long elapsed;
 			int sent_this_tick = 0;
 
 			if (!tx->active)
@@ -2584,9 +2630,34 @@ static void forge_tag_stream_tick(unsigned long now)
 				continue;
 			}
 
+			/* Check per-client outgoing reliable queue so streaming never overflows the 256 KB engine buffer */
+			backlog = network_distributed_server_machine_reliable_backlog(m);
+			if (backlog == NONE)
+			{
+				tx->active = 0;
+				continue;
+			}
+
+			elapsed = now - tx->last_send_ms;
+			tx->last_send_ms = now;
+			if (elapsed > 250ul)
+				elapsed = 250ul;
+			if (elapsed > 0ul)
+			{
+				tx->byte_budget += (int32_t)((elapsed * FORGE_TAG_STREAM_BYTES_PER_SEC) / 1000ul);
+				if (tx->byte_budget > (int32_t)FORGE_TAG_STREAM_MAX_BURST_BYTES)
+					tx->byte_budget = (int32_t)FORGE_TAG_STREAM_MAX_BURST_BYTES;
+			}
+
+			if (backlog > FORGE_TAG_STREAM_MAX_BACKLOG)
+				continue;
+
 			if (!tx->offer_sent)
 			{
 				struct forge_tag_stream_offer_packet offer;
+
+				if (tx->byte_budget <= 0)
+					continue;
 				memset(&offer, 0, sizeof(offer));
 				forge_tag_stream_fill_header(&offer.header, _distributed_message_forge_tag_stream, (word)sizeof(offer));
 				offer.magic = FORGE_TAG_STREAM_MAGIC;
@@ -2605,9 +2676,14 @@ static void forge_tag_stream_tick(unsigned long now)
 				if (!network_distributed_server_send_to_machine_reliably(m, &offer, (word)sizeof(offer)))
 					continue;
 				tx->offer_sent = 1;
+				tx->byte_budget -= (int32_t)sizeof(offer);
+				backlog += (long)sizeof(offer);
 			}
 
-			while (tx->next_chunk < cb->chunk_count && sent_this_tick < FORGE_TAG_STREAM_CHUNKS_PER_TICK)
+			while (tx->next_chunk < cb->chunk_count &&
+				   sent_this_tick < FORGE_TAG_STREAM_CHUNKS_PER_TICK &&
+				   backlog <= FORGE_TAG_STREAM_MAX_BACKLOG &&
+				   tx->byte_budget > 0)
 			{
 				struct forge_tag_stream_chunk_packet chunk;
 				uint32_t src_off = (uint32_t)tx->next_chunk * FORGE_TAG_STREAM_CHUNK_BYTES;
@@ -2629,6 +2705,8 @@ static void forge_tag_stream_tick(unsigned long now)
 					break;
 				tx->next_chunk++;
 				sent_this_tick++;
+				tx->byte_budget -= (int32_t)wire_sz;
+				backlog += (long)wire_sz;
 			}
 
 			if (tx->next_chunk >= cb->chunk_count)
