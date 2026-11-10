@@ -184,6 +184,8 @@ struct p2p_listing
 	unsigned char master_key_ids[P2P_LISTING_MAXIMUM_MASTERS][P2P_LISTING_MASTER_KEY_ID_SIZE];
 	unsigned char master_key_id_count;
 };
+/* writes the invite's host identifier (6 bytes); 0 if text is no invite */
+int p2p_invite_host(const char *text, unsigned char *identifier);
 /* joins a public game the server browser found (p2p_join_invite with its
 invite), remembering its host: nonzero if it held an invite */
 int p2p_join_listing(const struct p2p_listing *listing);

@@ -10,5 +10,6 @@ The game side of a MATCHMAKING search (matchmaking.c).
 #include "cseries.h"
 
 void matchmaking_update(float seconds);
+boolean matchmaking_game_locked(void);
 
 #endif

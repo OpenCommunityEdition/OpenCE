@@ -3547,6 +3547,11 @@ static boolean multiplayer_player(short controller)
 	return ui_widget_port_multiplayer_player(controller, player_ui_get_active_player_profile_index(0));
 }
 
+boolean pc_menu_multiplayer_player(short controller)
+{
+	return multiplayer_player(controller);
+}
+
 /* Create Game's ("join controller to mp game", first): player 1 in, and
 the server made: an internet one (an invite, Discord) or a LAN one */
 static boolean multiplayer_host(struct widget_instance *widget, struct event_record *event, short controller,

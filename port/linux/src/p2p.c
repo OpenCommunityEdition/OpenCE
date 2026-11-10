@@ -2897,6 +2897,19 @@ int p2p_join_invite(const char *text)
 	return result > 0;
 }
 
+int p2p_invite_host(const char *text, unsigned char *identifier)
+{
+	unsigned char hash[P2P_KEY_HASH_SIZE], token[P2P_TOKEN_SIZE];
+	int held;
+
+	pthread_mutex_lock(&p2p_lock);
+	held = parse_invite(text, hash, token) > 0;
+	if (held)
+		p2p_identifier_from_hash(hash, identifier);
+	pthread_mutex_unlock(&p2p_lock);
+	return held;
+}
+
 int p2p_join_listing(const struct p2p_listing *listing)
 {
 	unsigned char hash[P2P_KEY_HASH_SIZE], token[P2P_TOKEN_SIZE];
