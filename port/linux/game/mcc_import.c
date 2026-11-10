@@ -700,7 +700,9 @@ static unsigned long mcc_import_allocate(
 		space->overflowed = TRUE;
 		return 0;
 	}
-	csmemset(space->bytes + offset, 0, size);
+	/* (the alignment's gap too: the space is reused from map to map, and
+	what an earlier map left there would be written) */
+	csmemset(space->bytes + space->used, 0, offset + size - space->used);
 	space->used = offset + size;
 
 	return space->address + offset;
@@ -714,6 +716,41 @@ static void *mcc_import_at(
 }
 
 /* ---------- private code: the copy */
+
+/* a stand-in's references (zeros: mcc_import_tags), named as the copy names
+a reference to no tag, with the map's empty name; else tag_validate_tags
+gives them its own, an address of the game that imports, which the map
+would keep */
+static void mcc_import_empty_references(
+	struct tag_schema_definition const *definition,
+	byte *element)
+{
+	struct tag_schema_field const *field;
+
+	for (field = definition->fields; field->type != _tag_schema_terminator; field++)
+	{
+		short element_index;
+
+		for (element_index = 0; element_index < field->count; element_index++)
+		{
+			byte *address = element + field->offset + element_index * field->size;
+
+			if (field->type == _tag_schema_reference)
+			{
+				struct tag_reference *reference = (struct tag_reference *)address;
+
+				reference->name = (char *)mcc_import_globals.empty_name_address;
+				reference->index = NONE;
+			}
+			else if (field->type == _tag_schema_struct)
+			{
+				mcc_import_empty_references(field->definition, address);
+			}
+		}
+	}
+
+	return;
+}
 
 static void mcc_import_copy_pointers(
 	struct mcc_import_space *space,
@@ -2033,6 +2070,8 @@ static boolean mcc_import_tags(
 					(unsigned long)schema->definition->size : 0x100, 4);
 				if (!root)
 					return FALSE;
+				if (schema && schema->definition)
+					mcc_import_empty_references(schema->definition, mcc_import_at(space, root));
 				instances = mcc_import_at(space, instances_address);
 				instances[tag_index].base_address = (void *)root;
 			}
