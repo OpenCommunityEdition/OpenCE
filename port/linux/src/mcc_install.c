@@ -277,7 +277,9 @@ BOOL mcc_install_import(const char *halo1, const char *destination, char *error,
 		SDL_DestroyRenderer(renderer);
 	if (window)
 		SDL_DestroyWindow(window);
-	if (exit_code != 0 || mcc_install.failed)
+	/* (and when fewer maps were written than asked for: an import that
+	stops without a word, as a fatal error can, is not one that succeeded) */
+	if (exit_code != 0 || mcc_install.failed || mcc_install.done < total)
 	{
 		/* (removed only if empty) */
 		SDL_RemovePath(maps);
