@@ -89,6 +89,8 @@ struct controller
 };
 
 static struct controller controllers[PORT_COUNT];
+/* the pad last read, so a clip can draw it without reading the device again */
+static XINPUT_GAMEPAD clips_pad[PORT_COUNT];
 static struct controller keyboard_device;
 static DWORD reported_gamepads = 0;
 static BOOL reported_keyboard = FALSE;
@@ -104,6 +106,10 @@ static BOOL keyboard_join_down, virtual_keyboard_join, virtual_keyboard_done;
 
 static pthread_mutex_t mouse_lock = PTHREAD_MUTEX_INITIALIZER;
 static float mouse_pending_x, mouse_pending_y;
+/* the look halo_linux_mouse_look just took. halo_linux_mouse_sample reads it
+once, so a clip can record it without taking the look away from the player */
+static short mouse_sample_x;
+static short mouse_sample_y;
 static unsigned long mouse_polls_unconsumed = 0;
 static float mouse_wheel_accumulated = 0.0f;
 /* the wheel's notches turned while a chat line is typed, not yet taken
@@ -209,6 +215,16 @@ int halo_linux_mouse_look(short gamepad_index, float *yaw, float *pitch)
 	mouse_pending_y = 0.0f;
 	mouse_polls_unconsumed = 0;
 	pthread_mutex_unlock(&mouse_lock);
+	if (x > 32767.0f)
+		x = 32767.0f;
+	if (x < -32767.0f)
+		x = -32767.0f;
+	if (y > 32767.0f)
+		y = 32767.0f;
+	if (y < -32767.0f)
+		y = -32767.0f;
+	mouse_sample_x = (short)x;
+	mouse_sample_y = (short)y;
 	if (x == 0.0f && y == 0.0f)
 		return FALSE;
 	*yaw = -x * scale * mouse_sensitivity();
@@ -1745,7 +1761,115 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		controllers[port].previous = state->Gamepad;
 	}
 	state->dwPacketNumber = controllers[port].packet_number;
+	if (port >= 0 && port < PORT_COUNT)
+		clips_pad[port] = state->Gamepad;
 	return ERROR_SUCCESS;
+}
+
+/* the look stored by halo_linux_mouse_look, taken once */
+void halo_linux_mouse_sample(short *x, short *y)
+{
+	if (x)
+		*x = mouse_sample_x;
+	if (y)
+		*y = mouse_sample_y;
+	mouse_sample_x = 0;
+	mouse_sample_y = 0;
+}
+
+int halo_linux_mouse_is_aim_device(short gamepad_index)
+{
+	return mouse_is_aim_device(gamepad_index);
+}
+
+/* the clip viewer's keys, read beside the controller rather than through it.
+the debug keyboard is quiet during a match, and a plugged-in pad is what
+the game's own key poll then sees */
+unsigned long halo_linux_theatre_keys(void)
+{
+	struct platform_input_state input;
+	unsigned long mask = 0;
+
+	platform_input_read(&input, FALSE);
+	if (input.keys[SDL_SCANCODE_SPACE])
+		mask |= 1UL;
+	if (input.keys[SDL_SCANCODE_LEFT])
+		mask |= 2UL;
+	if (input.keys[SDL_SCANCODE_RIGHT])
+		mask |= 4UL;
+	if (input.keys[SDL_SCANCODE_UP])
+		mask |= 256UL;
+	if (input.keys[SDL_SCANCODE_DOWN])
+		mask |= 512UL;
+	if (input.keys[SDL_SCANCODE_LEFTBRACKET])
+		mask |= 8UL;
+	if (input.keys[SDL_SCANCODE_RIGHTBRACKET])
+		mask |= 16UL;
+	if (input.keys[SDL_SCANCODE_V])
+		mask |= 32UL;
+	if (input.keys[SDL_SCANCODE_ESCAPE])
+		mask |= 64UL;
+	if (!console_is_active() && !network_chat_typing() && input.keys[SDL_SCANCODE_B])
+		mask |= 64UL;
+	if (input.keys[SDL_SCANCODE_C])
+		mask |= 128UL;
+	/* Q and E move between the recorded players. Z swaps that player's eyes
+	for the third person camera */
+	if (input.keys[SDL_SCANCODE_Q])
+		mask |= 1024UL;
+	if (input.keys[SDL_SCANCODE_E])
+		mask |= 2048UL;
+	if (input.keys[SDL_SCANCODE_Z])
+		mask |= 4096UL;
+	return mask;
+}
+
+void halo_linux_pad_sample(short port, short *lx, short *ly, short *rx, short *ry,
+	unsigned char *left_trigger, unsigned char *right_trigger, unsigned short *buttons,
+	unsigned char *face)
+{
+	XINPUT_GAMEPAD *pad;
+	unsigned char mask = 0;
+	int i;
+
+	if (lx)
+		*lx = 0;
+	if (ly)
+		*ly = 0;
+	if (rx)
+		*rx = 0;
+	if (ry)
+		*ry = 0;
+	if (left_trigger)
+		*left_trigger = 0;
+	if (right_trigger)
+		*right_trigger = 0;
+	if (buttons)
+		*buttons = 0;
+	if (face)
+		*face = 0;
+	if (port < 0 || port >= PORT_COUNT)
+		return;
+	pad = &clips_pad[port];
+	if (lx)
+		*lx = pad->sThumbLX;
+	if (ly)
+		*ly = pad->sThumbLY;
+	if (rx)
+		*rx = pad->sThumbRX;
+	if (ry)
+		*ry = pad->sThumbRY;
+	if (left_trigger)
+		*left_trigger = pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER];
+	if (right_trigger)
+		*right_trigger = pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER];
+	if (buttons)
+		*buttons = pad->wButtons;
+	for (i = 0; i < 6; i++)
+		if (pad->bAnalogButtons[i] >= 0x80)
+			mask = (unsigned char)(mask | (1 << i));
+	if (face)
+		*face = mask;
 }
 
 DWORD WINAPI XInputSetState(HANDLE device, PXINPUT_FEEDBACK feedback)

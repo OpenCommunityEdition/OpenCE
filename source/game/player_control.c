@@ -186,6 +186,7 @@ symbols in this file:
 #undef limit2d
 #include "game/player_control_runtime.h"
 #include "players.h"
+#include "clips.h"
 #include "player_queues_new.h"
 
 #include "game/aim_assist.h"
@@ -755,7 +756,9 @@ static void handle_one_player_input(
 			if (unit->unit.current_zoom_level != NONE || unit->unit.desired_zoom_level != NONE)
 				unit_unzoom(player->unit_index);
 		}
-		else if (TEST_FLAG(input.player_control_flags, _player_control_input_zoom_bit) &&
+		/* a clip plays the zoom it recorded. the button does not change it */
+		else if (!clips_replaying() &&
+			TEST_FLAG(input.player_control_flags, _player_control_input_zoom_bit) &&
 			player_control_camera_control_is_active() &&
 			current_weapon_index != NONE &&
 			!cinematic_in_progress())
@@ -765,7 +768,8 @@ static void handle_one_player_input(
 				player->zoom_level);
 		}
 
-		if (!director_inhibited_facing(local_player_index))
+		/* a clip plays the facing it recorded. the mouse and the sticks do not turn it */
+		if (!clips_replaying() && !director_inhibited_facing(local_player_index))
 		{
 			player_control_angle_step_ticks = time_delta_sec * TICKS_PER_SECOND;
 			player_control_modify_desired_angles(
@@ -1021,6 +1025,31 @@ boolean limit2d(
 	}
 
 	return FALSE;
+}
+
+void player_control_port_set_zoom_level(
+	short local_player_index,
+	short zoom_level)
+{
+	if (local_player_index >= 0 && local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		player_control_get(local_player_index)->zoom_level = zoom_level;
+}
+
+void player_control_set_facing_angles(
+	short local_player_index,
+	real_euler_angles2d const *angles)
+{
+	struct player_control *player_control;
+
+	if (local_player_index < 0 ||
+		local_player_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS ||
+		!angles)
+		return;
+	player_control = player_control_get(local_player_index);
+	player_control->desired_angles = *angles;
+	if (player_control->desired_angles.yaw < 0.f)
+		player_control->desired_angles.yaw += _pi * 2.f;
+	return;
 }
 
 void player_control_set_facing(

@@ -41,6 +41,7 @@ symbols in this file:
 #include "game/player_rumble.h"
 
 #include "game/players.h"
+#include "clips.h"
 #include "input/input.h"
 #include "interface/player_ui.h"
 #include "math/periodic_functions.h"
@@ -147,6 +148,8 @@ void rumble_player_impulse(
 	real motor_scale;
 	long impulse_index;
 
+	if (clips_flying())
+		return;
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\player_rumble.c",
 		0xa4,
@@ -242,6 +245,8 @@ void rumble_player_continuous(
 {
 	struct rumble_player *player = &rumble_globals->players[local_player_index];
 
+	if (clips_flying())
+		return;
 	player->continuous_left = left_motor;
 	player->continuous_right = right_motor;
 
@@ -279,6 +284,18 @@ void rumble_update(
 {
 	short local_player_index;
 	long impulse_index;
+
+	if (clips_flying())
+	{
+		for (local_player_index = 0;
+			local_player_index < MAXIMUM_LOCAL_PLAYERS;
+			local_player_index++)
+		{
+			rumble_player_clear(local_player_index);
+			input_set_gamepad_rumbler_state(local_player_index, 0, 0);
+		}
+		return;
+	}
 
 	for (local_player_index = 0;
 		local_player_index < MAXIMUM_LOCAL_PLAYERS;

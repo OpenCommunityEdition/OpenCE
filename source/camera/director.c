@@ -119,6 +119,7 @@ symbols in this file:
 
 #include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
 #include "director.h"
+#include "clips.h"
 
 #include "camera_scripting.h"
 #include "dead_camera.h"
@@ -459,6 +460,76 @@ static void director_set_camera(
 	return;
 }
 
+void director_clips_hold(
+	boolean hold)
+{
+	*director_camera_scripted = hold;
+}
+
+void director_clips_camera(
+	short local_player_index,
+	short mode,
+	long unit_index)
+{
+	struct director *director = director_get(local_player_index);
+
+	if (unit_index != NONE)
+	{
+		struct dead_camera *dead = (struct dead_camera *)director->camera_data;
+
+		if (director->camera_proc == (director_camera_update_proc)dead_camera_update &&
+			dead->unit_index == unit_index)
+			return;
+		dead_camera_new(dead, local_player_index, unit_index);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)dead_camera_update,
+			FALSE);
+		return;
+	}
+	if (mode == 1)
+	{
+		if (director->camera_proc == (director_camera_update_proc)following_camera_update)
+			return;
+		following_camera_new((struct following_camera *)director->camera_data);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)following_camera_update,
+			FALSE);
+		return;
+	}
+	if (mode == 2)
+	{
+		real_point3d position;
+		real_vector3d forward;
+		long eyes;
+
+		if (director->camera_proc == (director_camera_update_proc)flying_camera_update)
+			return;
+		position = director->command.focus_position;
+		forward = director->command.forward;
+		eyes = player_control_get_unit_index(local_player_index);
+		if (!TEST_FLAG(director->command.flags, _observer_command_valid_bit) && eyes != NONE)
+			first_person_camera_deterministic(eyes, &position, &forward);
+		flying_camera_new_from_point_and_vector(
+			(struct flying_camera *)director->camera_data,
+			&position,
+			&forward);
+		director_set_camera(
+			local_player_index,
+			(director_camera_update_proc)flying_camera_update,
+			FALSE);
+		return;
+	}
+	if (director->camera_proc == (director_camera_update_proc)first_person_camera_update)
+		return;
+	first_person_camera_new((struct first_person_camera *)director->camera_data);
+	director_set_camera(
+		local_player_index,
+		(director_camera_update_proc)first_person_camera_update,
+		FALSE);
+}
+
 void director_load_camera(
 	void)
 {
@@ -758,8 +829,28 @@ static void director_choose_camera_game(
 		/* (port: not a client in another's game, the host's rules: a flying
 		camera would see all of it, and one behind the player round its
 		corners) */
-		if (key && !network_game_distributed_client())
+		if (key && !network_game_distributed_client() &&
+			!(clips_replaying() && local_player_index == 0))
 			director_rotate_cameras(local_player_index, director_game_camera_modes, 3);
+		/* a clip's free camera stays up. otherwise the watched player is shown
+		in first person or third person, and a cutscene keeps its own camera.
+		a dead player stays on the body until that player is back */
+		if (clips_replaying() && local_player_index == 0)
+		{
+			if (clips_flying())
+			{
+				director_clips_camera(local_player_index, 2, NONE);
+				return;
+			}
+			if (!*director_camera_scripted && !use_dead_camera)
+			{
+				if (clips_third_person())
+					director_clips_camera(local_player_index, 1, NONE);
+				else
+					director_clips_camera(local_player_index, 0, NONE);
+				return;
+			}
+		}
 		if (!*director_camera_scripted)
 		{
 			director_choose_game_perspective(local_player_index, initialize);
@@ -1027,6 +1118,54 @@ static boolean director_update_controls(
 			throttle.j * director->debug_input_scale * director_globals.dtime * 1.638f;
 		controls->position_delta.k +=
 			director->debug_variables[_variable_height].delta;
+		controls->active = TRUE;
+		director_inhibit_input(local_player_index);
+		director_inhibit_facing(local_player_index);
+	}
+	/* a clip's free camera flies on the viewer's sticks, keys, and mouse.
+	the recorded player does not steer it */
+	if (!controls->active && clips_flying() && local_player_index == 0 &&
+		director->camera_proc == (director_camera_update_proc)flying_camera_update)
+	{
+		extern unsigned long halo_linux_theatre_keys(void);
+		unsigned long keys;
+		unsigned long control_flags = 0;
+		real_vector2d throttle = player_control_port_debug_throttle[local_player_index];
+		real_euler_angles2d facing = player_control_port_debug_facing[local_player_index];
+		struct gamepad_state const *gamepad = NULL;
+		int rise;
+		int drop;
+
+		/* while the free camera is up, the triggers and the brackets are not
+		the speed controls. R and F rise and drop, and so do ] and [ */
+		rise = key_up;
+		drop = key_down;
+		keys = halo_linux_theatre_keys();
+		if ((keys & 16UL) != 0)
+			rise = 1;
+		if ((keys & 8UL) != 0)
+			drop = 1;
+		if (player_index != NONE && input_has_gamepad((short)player_index))
+			gamepad = input_get_gamepad_state((short)player_index);
+		if (gamepad && gamepad->buttons[_gamepad_analog_button_right_trigger] != 0)
+			rise = 1;
+		if (gamepad && gamepad->buttons[_gamepad_analog_button_left_trigger] != 0)
+			drop = 1;
+		SET_FLAG(control_flags, _camera_control_up_bit, rise);
+		SET_FLAG(control_flags, _camera_control_down_bit, drop);
+		controls->wheel_delta = 0;
+		director_process_variables(
+			local_player_index,
+			control_flags,
+			controls->wheel_delta);
+		controls->facing_delta.yaw = facing.yaw;
+		controls->facing_delta.pitch = facing.pitch;
+		controls->position_delta.i =
+			throttle.i * director->debug_input_scale * director_globals.dtime * 1.638f * 8.f;
+		controls->position_delta.j =
+			throttle.j * director->debug_input_scale * director_globals.dtime * 1.638f * 8.f;
+		controls->position_delta.k +=
+			director->debug_variables[_variable_height].delta * 8.f;
 		controls->active = TRUE;
 		director_inhibit_input(local_player_index);
 		director_inhibit_facing(local_player_index);

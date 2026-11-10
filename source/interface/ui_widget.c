@@ -628,6 +628,7 @@ symbols in this file:
 struct widget_instance;
 
 #include "cseries.h"
+#include "clips.h"
 #include "errors.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
@@ -5041,6 +5042,25 @@ void main_screen_shell_load(
 		if (!widget_globals.main_menu_music_active)
 			ui_start_main_menu_music();
 		reset_last_player1_profile_index();
+		/* a clip's BACK opens that profile's list, then the clips screen on top.
+		the second load waits until the profile screen has finished loading */
+		if (clips_return_pending())
+		{
+			extern char const *pc_menus_root_name(void);
+			long root = tag_loaded(UI_WIDGET_DEFINITION_TAG, pc_menus_root_name());
+			long profile_tag = tag_loaded(UI_WIDGET_DEFINITION_TAG,
+				"pc\\main_menu\\profile_manager\\player_profile_manager_screen");
+
+			if (ui_widget_load_by_name_or_tag(
+				"pc\\main_menu\\profile_manager\\player_profile_manager_screen",
+				NONE, NULL, 0, root, NONE, 0))
+			{
+				clips_take_return();
+				ui_widget_load_by_name_or_tag(
+					"pc\\main_menu\\clips\\clips_screen",
+					NONE, NULL, 0, profile_tag, NONE, 0);
+			}
+		}
 	}
 	if (!virtual_keyboard_initialize())
 		error(_error_silent, "failed to initialize the virtual keyboard");
@@ -5307,7 +5327,8 @@ static void widget_instance_render_text_box(
 	rectangle2d bounds;
 	rectangle2d clip;
 
-	if (definition->text_label_string_list.index != NONE)
+	if (definition->text_label_string_list.index != NONE &&
+		widget->parameters.text_box.string_list_index != CLIPS_OWN_TEXT)
 	{
 		short string_list_index;
 		wchar_t *string;
@@ -8334,6 +8355,10 @@ static boolean ui_check_for_pause_game(
 	boolean network_game = network_game_is_active();
 	short controller_index = NONE;
 
+	/* a clip's Start pauses the playback. the match pause screen would take B
+	as resume, and that screen's leave is not the clip's */
+	if (clips_replaying())
+		return FALSE;
 	if (game_in_progress() &&
 		!cinematic_in_progress() &&
 		game_connection() != _game_connection_film_playback &&

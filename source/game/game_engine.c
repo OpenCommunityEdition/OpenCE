@@ -543,6 +543,7 @@ symbols in this file:
 #include "errors.h"
 #include "aim_assist.h"
 #include "game_engine.h"
+#include "clips.h"
 #include "game_engine_list.h"
 #include "game_engine_place.h"
 
@@ -3302,6 +3303,8 @@ static void multiplayer_message(
 			NUMBEROF(buffer)))
 		{
 			buffer[NUMBEROF(buffer) - 1] = 0;
+			if (clips_replaying())
+				clips_feed_note(buffer);
 			hud_print_message(player->local_player_index, buffer);
 		}
 	}
