@@ -398,6 +398,46 @@ void mm_heard(struct mm_search *search, const struct mm_record *record, unsigned
 	peer->refreshes++;
 }
 
+static struct mm_record base_record(struct mm_search *search, int kind, int playlist, int size, int interval)
+{
+	struct mm_record record;
+
+	memset(&record, 0, sizeof(record));
+	record.kind = kind;
+	record.network_version = HALO_PORT_NETWORK_VERSION;
+	record.sequence = ++search->sequence;
+	record.interval = interval;
+	record.can_host = search->can_host > 0;
+	record.playlist = playlist;
+	record.size = size;
+	memcpy(record.key, search->key, P2P_KEY_SIZE);
+	return record;
+}
+
+static int emit(const struct mm_search *search, const struct mm_record *record, struct mm_out *out)
+{
+	mm_topic(record->playlist, record->size, out->topic, sizeof(out->topic));
+	out->size = mm_record_write(record, search->seed, out->bytes, sizeof(out->bytes));
+	return out->size > 0;
+}
+
+int mm_step(struct mm_search *search, unsigned long now, struct mm_out *out, int out_size)
+{
+	int count = 0;
+
+	if (search->queue_count && (long)(now - search->next_record) >= 0 && count < out_size)
+	{
+		int interval = mm_interval(search->queue_count);
+		struct mm_record record = base_record(search, MM_KIND_SEARCHING, search->queues[search->next_queue][0],
+			search->queues[search->next_queue][1], interval);
+
+		search->next_queue = (search->next_queue + 1) % search->queue_count;
+		search->next_record = now + interval * 100 / search->queue_count;
+		count += emit(search, &record, &out[count]);
+	}
+	return count;
+}
+
 void p2p_mm_heard(const unsigned char *payload, int size)
 {
 	(void)payload;

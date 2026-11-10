@@ -253,6 +253,15 @@ static struct machine machines[8];
 static int machine_count;
 static unsigned long now_ms, now_unix;
 
+struct in_flight
+{
+	int to;
+	unsigned long at;
+	struct mm_out out;
+};
+static struct in_flight flight[1024];
+static int flight_count;
+
 int main(void)
 {
 	check_pool();

@@ -81,6 +81,13 @@ struct mm_unit
 int mm_pool(const struct mm_unit *units, int count, int players, int *pool);
 int mm_elect(const struct mm_unit *units, const int *pool, int pool_count);
 
+enum
+{
+	/* milliseconds */
+	MM_LOOK_TIME = 6000,
+	MM_MAXIMUM_OUT = 32,
+};
+
 struct mm_peer
 {
 	int used;
@@ -89,6 +96,13 @@ struct mm_peer
 	/* this machine's milliseconds, not the sender's clock */
 	unsigned long heard;
 	int refreshes;
+};
+
+struct mm_out
+{
+	char topic[P2P_MM_TOPIC_SIZE];
+	unsigned char bytes[MM_MAXIMUM_RECORD_SIZE];
+	int size;
 };
 
 struct mm_search
@@ -115,5 +129,6 @@ void mm_start(struct mm_search *search, const unsigned char *seed, const struct 
 	unsigned long now, unsigned long unix_now);
 /* the record must already be verified (mm_record_read) */
 void mm_heard(struct mm_search *search, const struct mm_record *record, unsigned long now);
+int mm_step(struct mm_search *search, unsigned long now, struct mm_out *out, int out_size);
 
 #endif
