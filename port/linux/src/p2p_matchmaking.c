@@ -7,8 +7,10 @@ MATCHMAKING's signed records, queues and search.
 #include "p2p_matchmaking.h"
 #include "halo_port_limits.h"
 
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 static const char record_label[] = "hceu-mm-1";
 
@@ -778,8 +780,84 @@ int mm_step(struct mm_search *search, unsigned long now, struct mm_out *out, int
 	return count;
 }
 
+/* ---------- the p2p thread's search: mm is guarded by p2p_lock */
+
+static struct
+{
+	struct mm_search search;
+	int subscribed[P2P_MM_MAXIMUM_TOPICS][2], subscribed_count;
+} mm;
+
+static void publish_out(const struct mm_out *out, int count)
+{
+	int index;
+
+	for (index = 0; index < count; index++)
+		p2p_signal_mm_publish(out[index].topic, out[index].bytes, out[index].size);
+}
+
 void p2p_mm_heard(const unsigned char *payload, int size)
 {
 	(void)payload;
 	(void)size;
+}
+
+static void sync_topics(void)
+{
+	int count = mm.search.state == P2P_MM_OFF ? 0 : mm.search.queue_count;
+	char topics[P2P_MM_MAXIMUM_TOPICS][P2P_MM_TOPIC_SIZE];
+	int index;
+
+	if (count == mm.subscribed_count && !memcmp(mm.subscribed, mm.search.queues, sizeof(int) * 2 * (size_t)count))
+		return;
+	for (index = 0; index < count; index++)
+		mm_topic(mm.search.queues[index][0], mm.search.queues[index][1], topics[index], P2P_MM_TOPIC_SIZE);
+	memcpy(mm.subscribed, mm.search.queues, sizeof(int) * 2 * (size_t)count);
+	mm.subscribed_count = count;
+	p2p_signal_mm_topics(topics, count);
+}
+
+int p2p_mm_active(void)
+{
+	return mm.search.state != P2P_MM_OFF;
+}
+
+void p2p_mm_update(unsigned long now, int can_host)
+{
+	struct mm_out out[MM_MAXIMUM_OUT];
+	int count;
+
+	if (mm.search.state == P2P_MM_OFF)
+	{
+		sync_topics();
+		return;
+	}
+	mm.search.can_host = can_host;
+	count = mm_step(&mm.search, now, out, MM_MAXIMUM_OUT);
+	publish_out(out, count);
+	sync_topics();
+}
+
+static void cancel_search(void)
+{
+	struct mm_out out[MM_MAXIMUM_OUT];
+
+	publish_out(out, mm_cancel(&mm.search, out, MM_MAXIMUM_OUT));
+}
+
+void p2p_mm_search(const struct p2p_mm_choice *choice)
+{
+	pthread_mutex_lock(&p2p_lock);
+	if (mm.search.state != P2P_MM_OFF)
+		cancel_search();
+	mm_start(&mm.search, p2p_signing_seed(), choice, p2p_now(), (unsigned long)time(NULL));
+	pthread_mutex_unlock(&p2p_lock);
+}
+
+void p2p_mm_cancel(void)
+{
+	pthread_mutex_lock(&p2p_lock);
+	if (mm.search.state != P2P_MM_OFF)
+		cancel_search();
+	pthread_mutex_unlock(&p2p_lock);
 }

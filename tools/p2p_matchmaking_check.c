@@ -40,6 +40,26 @@ void p2p_key_hash(const unsigned char *key, unsigned char *hash)
 	memcpy(hash, digest, P2P_KEY_HASH_SIZE);
 }
 
+static unsigned char run_seed[P2P_SEED_SIZE] = { 0x77, 0x13 }, run_key[P2P_KEY_SIZE];
+
+const unsigned char *p2p_signing_seed(void) { return run_seed; }
+const unsigned char *p2p_signing_key(void)
+{
+	p2p_ed25519_public(run_seed, run_key, NULL);
+	return run_key;
+}
+void p2p_signal_mm_topics(const char topics[][P2P_MM_TOPIC_SIZE], int count) { (void)topics; (void)count; }
+
+static unsigned char published[MM_MAXIMUM_RECORD_SIZE];
+static int published_size;
+
+void p2p_signal_mm_publish(const char *topic, const unsigned char *payload, int size)
+{
+	(void)topic;
+	memcpy(published, payload, (size_t)size);
+	published_size = size;
+}
+
 static int failures;
 
 #define CHECK(condition, ...) do { if (!(condition)) { failures++; printf("FAIL %s: ", case_name); \

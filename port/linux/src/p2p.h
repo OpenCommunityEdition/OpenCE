@@ -439,4 +439,8 @@ struct p2p_mm_decision
 	char invite[P2P_LISTING_INVITE_SIZE];
 };
 
+/* these take p2p_lock: call from the game's thread, never the p2p thread */
+void p2p_mm_search(const struct p2p_mm_choice *choice);
+void p2p_mm_cancel(void);
+
 #endif

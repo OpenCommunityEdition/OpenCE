@@ -649,6 +649,12 @@ const unsigned char *p2p_signing_key(void)
 	return signing_key;
 }
 
+const unsigned char *p2p_signing_seed(void)
+{
+	p2p_identifier();
+	return seed;
+}
+
 void p2p_sign(const void *message, int size, unsigned char *signature)
 {
 	p2p_identifier();
@@ -3298,6 +3304,21 @@ int p2p_reach_player(const unsigned char *key_hash)
 	return result;
 }
 
+/* (strictness shows only between two servers' mappings) */
+static int nat_known(void)
+{
+	int known = 0, index;
+
+	for (index = 0; index < p2p.stun_count; index++)
+		known += p2p.stun[index].has_mapped;
+	return known >= 2 || p2p.upnp_forwarded;
+}
+
+static int nat_strict(void)
+{
+	return p2p.reported_symmetric && !p2p.upnp_forwarded;
+}
+
 int p2p_nat_strict(void)
 {
 	int strict;
@@ -3305,7 +3326,7 @@ int p2p_nat_strict(void)
 	if (!p2p.running)
 		return 0;
 	pthread_mutex_lock(&p2p_lock);
-	strict = p2p.reported_symmetric && !p2p.upnp_forwarded;
+	strict = nat_strict();
 	pthread_mutex_unlock(&p2p_lock);
 	return strict;
 }
@@ -3902,6 +3923,12 @@ static DWORD WINAPI p2p_thread(void *unused)
 				p2p.token_listed = 1;
 			}
 		}
+		if (p2p_mm_active())
+		{
+			p2p.stun_started = 1;
+			p2p_signal_start();
+		}
+		p2p_mm_update(p2p_now(), nat_known() ? !nat_strict() : -1);
 		update_joining();
 		update_answering();
 		update_reaching();
