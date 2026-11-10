@@ -293,6 +293,26 @@ int p2p_mm_size_players(int size)
 	return players[size];
 }
 
+/* each playlist's game engine (a listing's engine_type) */
+static const int engines[NUMBER_OF_P2P_MM_PLAYLISTS] = { 2, 1, 4, 3, 5 };
+
+void mm_wanted(const struct mm_search *search, struct p2p_lobby_wanted *wanted)
+{
+	int playlist;
+
+	memset(wanted, 0, sizeof(*wanted));
+	for (playlist = 0; playlist < NUMBER_OF_P2P_MM_PLAYLISTS; playlist++)
+	{
+		if (!(search->choice.playlists & 1u << playlist))
+			continue;
+		if (!mm_playlist_has_size(1u << playlist, search->choice.size))
+			continue;
+		wanted->engines |= 1u << engines[playlist];
+	}
+	wanted->players = p2p_mm_size_players(search->choice.size);
+	wanted->teams = search->choice.size != P2P_MM_FFA_6;
+}
+
 int mm_counted(const struct mm_peer *peer)
 {
 	return peer->refreshes >= MM_REFRESHES_COUNTED;

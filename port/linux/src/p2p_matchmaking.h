@@ -146,6 +146,7 @@ struct mm_search
 	int decided;
 };
 
+void mm_wanted(const struct mm_search *search, struct p2p_lobby_wanted *wanted);
 int mm_counted(const struct mm_peer *peer);
 
 void mm_start(struct mm_search *search, const unsigned char *seed, const struct p2p_mm_choice *choice,
