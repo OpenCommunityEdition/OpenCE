@@ -68,6 +68,7 @@ static void network_damage_new_game(void){}
 static void distributed_note_client_clock(long m,long t){(void)m;(void)t;clock_notes++;}
 static int distributed_machine_clock_fast(long m){(void)m;return 0;}
 static void error(int level,char const *fmt,...){(void)level;(void)fmt;}
+#define network_riding_map_handles_message(m,s) 0
 #define network_aim_assist_handles_message(m,s) 0
 #define network_shield_effects_handles_message(m,s) 0
 #define network_voice_handles_message(m,s) 0
@@ -76,6 +77,7 @@ static void error(int level,char const *fmt,...){(void)level;(void)fmt;}
 #define mcc_admission_handles_message(m,s) 0
 #define mcc_load_network_handles_message(m,s) 0
 #define network_map_vote_handles_message(m,s) 0
+#define network_riding_map_handle_message(m,p,s) ((void)0)
 #define network_aim_assist_handle_message(m,p,s) ((void)0)
 #define network_shield_effects_handle_message(m,p,s) ((void)0)
 #define network_voice_handle_message(m,p,s) ((void)0)
@@ -296,7 +298,8 @@ def test_snapshot_completion_retires_predictions_but_keeps_receive_history(tmp_p
 #define OWN_POSITION_TICKS 4
 static long distributed_last_sent_time;
 static struct {boolean valid;long dead_since;} distributed_deaths[2];
-static int distributed_seat_disagreements[2],distributed_accepted[2];
+static int distributed_seat_disagreements[2];
+static struct {boolean valid;long taken_air_unit_index,taken_air_vehicle;} distributed_accepted[2];
 static struct {boolean valid;long taken_host_time;} distributed_predictions[2];
 static struct {long unit_index;} distributed_host_speeds[2];
 static int distributed_input_facings[2],distributed_seen[2],distributed_viewers[2];
@@ -321,7 +324,8 @@ static void provisional(void){
  distributed_machines.valid=TRUE;
  for(i=0;i<2;i++){
   distributed_predictions[i].valid=TRUE;distributed_predictions[i].taken_host_time=111;
-  distributed_host_states[i]=9;distributed_accepted[i]=9;distributed_sends[i]=9;
+  distributed_host_states[i]=9;distributed_accepted[i].valid=TRUE;distributed_sends[i]=9;
+  distributed_accepted[i].taken_air_unit_index=77;distributed_accepted[i].taken_air_vehicle=88;
   distributed_divergence.input_time[i]=111;distributed_sent_units[i].unit_index=77;
   for(j=0;j<4;j++){distributed_own_positions[i][j].time=111;distributed_own_positions[i][j].unit_index=77;}
  }
@@ -342,7 +346,8 @@ int main(void){
  assert(distributed_last_sent_time==NONE && !distributed_machines.valid);
  for(i=0;i<2;i++){
   assert(!distributed_predictions[i].valid && distributed_predictions[i].taken_host_time==NONE);
-  assert(!distributed_host_states[i] && !distributed_accepted[i] && !distributed_sends[i]);
+  assert(!distributed_host_states[i] && !distributed_accepted[i].valid && !distributed_sends[i]);
+  assert(distributed_accepted[i].taken_air_unit_index==NONE && distributed_accepted[i].taken_air_vehicle==NONE);
   assert(distributed_divergence.input_time[i]==NONE && distributed_sent_units[i].unit_index==NONE);
   for(j=0;j<4;j++)assert(distributed_own_positions[i][j].time==NONE && distributed_own_positions[i][j].unit_index==NONE);
  }
