@@ -235,7 +235,8 @@ lockstep netcode was removed, set to play it): it tells the player why.
 ## GulchCE network agreement
 
 Standard Xbox/Custom Edition sessions require GulchCE agreement 32738; MCC
-requires version 72. Camera sessions require 32740/32741 respectively. This
+requires version 73. Camera sessions require 32740/32742 respectively. MCC
+projectile rays now use camera-relative offsets and the requested aim. The previous
 revision adds optional host-authoritative scripted player poses to unit states:
 five signed-16-bit direction vectors (30 bytes) for desired facing/aim/look and
 current aim/look, plus the suspension bit in unit flags. They are sent while
