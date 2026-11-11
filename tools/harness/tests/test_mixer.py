@@ -18,57 +18,65 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from harness import CHECK_FAILED, function, mutated, read, run  # noqa: E402
+from harness import CHECK_FAILED, function, mutated, run  # noqa: E402
+from harness.audio import mixer_source  # noqa: E402
 
-SOURCE = "port/linux/src/dsound_sdl.c"
-CASES = ["reference", "impulse", "sines", "aliases", "silent-voice", "mono", "linear",
-         "cut", "cuts", "cut-overlap", "flush", "cut-lifecycle", "doppler",
-         "doppler-limits", "doppler-stereo"]
+CASES = ['reference',
+ 'impulse',
+ 'sines',
+ 'aliases',
+ 'silent-voice',
+ 'mono',
+ 'linear',
+ 'doppler-limits',
+ 'doppler-stereo',
+ 'cut',
+ 'cuts',
+ 'cut-overlap',
+ 'flush',
+ 'cut-lifecycle',
+ 'hrtf-restart']
 
 # a fault in the mixer, and the case that must catch it
 NEGATIVE_CONTROLS = {
-    "doppler-old-pitch-below-minimum": (("else if (base_step * doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)",
-                                        "else if (0)"), "doppler-limits"),
-    "doppler-old-pitch-unbounded": (("if (base_step * doppler * OUTPUT_RATE > VOICE_FREQUENCY_MAXIMUM)",
-                                    "if (0)"), "doppler-limits"),
-    "taps-off-by-one": (("(stream->center + 1 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY",
-                         "(stream->center + 2 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY"), "reference"),
-    "phase-not-blended": (("for (phase = 0; phase <= RESAMPLER_TABLE_STEPS; phase++)",
-                           "for (phase = 0; phase <= RESAMPLER_TABLE_STEPS; phase += 2)"), "impulse"),
-    "no-stretch": (("#define RESAMPLER_MAXIMUM_STRETCH 4", "#define RESAMPLER_MAXIMUM_STRETCH 1"), "aliases"),
-    "stereo-doppler-always": (("if (!stereo_doppler_enabled)\n\t\t\treturn 1.0f;\n", ""), "doppler"),
-    "cut-dead": (("mix_voice(stream, output, send, CUT_FADE_FRAMES);", "return;"), "cut"),
-    "cut-not-faded": (("float fade = 0.5f + 0.5f * (float)cos(3.14159265358979 * (double)(frame + 1) / CUT_FADE_FRAMES);",
-                       "float fade = 1.0f;"), "cut"),
-    "cut-past-the-earlier": (("(frame < left ? stream->cut_send[stream->cut_played + frame] : 0.0f)",
-                              "(frame < left ? 1.0f : 0.0f) * stream->cut_send[(stream->cut_played + frame) % CUT_FADE_FRAMES]"),
-                             "cuts"),
-    "cut-discard-earlier": (("left = CUT_FADE_FRAMES - stream->cut_played", "left = 0"), "cut-overlap"),
-    "flush-live-voice": (("stream->paused || stream->flushing", "stream->paused"), "flush"),
-    "linear-nearest": (("left_frames[0] + (left_frames[1] - left_frames[0]) * fraction", "left_frames[0]"), "linear"),
-    "doppler-listener-backwards": (("ratio = (SPEED_OF_SOUND - away) / (SPEED_OF_SOUND - towards);",
-                                    "ratio = (SPEED_OF_SOUND + away) / (SPEED_OF_SOUND - towards);"), "doppler"),
-    "doppler-in-units": (("scale = listener.distance_factor * listener.doppler_factor / distance;",
-                          "scale = listener.doppler_factor / distance;"), "doppler"),
-    "doppler-held-to-an-octave": (("return ratio > 0.0f ? ratio : 0.0f;",
-                                   "return ratio > 2.0f ? 2.0f : ratio < 0.5f ? 0.5f : ratio;"), "doppler"),
-    "doppler-unlimited": (("#define VOICE_FREQUENCY_MAXIMUM 191983.0", "#define VOICE_FREQUENCY_MAXIMUM 1.0e9"),
-                          "doppler"),
-    "doppler-stereo-still": (("towards = stream->stereo_approach * listener.distance_factor",
-                              "towards = 0.0f * listener.distance_factor"), "doppler"),
-    "doppler-not-glided": (("\t\tstep += ramp_step;\n", "\t\tstep += 0.0 * ramp_step;\n"), "doppler"),
-}
+ 'hrtf-history-not-reset': (('memset(stream->hrtf_frames, 0, sizeof(stream->hrtf_frames));', ''), 'hrtf-restart'),
+ 'taps-off-by-one': (('(stream->center + 1 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY',
+                      '(stream->center + 2 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY'),
+                     'reference'),
+ 'phase-not-blended': (('for (phase = 0; phase <= RESAMPLER_TABLE_STEPS; phase++)',
+                        'for (phase = 0; phase <= RESAMPLER_TABLE_STEPS; phase += 2)'),
+                       'impulse'),
+ 'no-stretch': (('#define RESAMPLER_MAXIMUM_STRETCH 4', '#define RESAMPLER_MAXIMUM_STRETCH 1'), 'aliases'),
+ 'cut-dead': (('mix_voice(stream, output, send, CUT_FADE_FRAMES);', 'return;'), 'cut'),
+ 'cut-not-faded': (('float fade = 0.5f + 0.5f * (float)cos(3.14159265358979 * (double)(frame + 1) / CUT_FADE_FRAMES);',
+                    'float fade = 1.0f;'),
+                   'cut'),
+ 'cut-past-the-earlier': (('(frame < left ? stream->cut_send[stream->cut_played + frame] : 0.0f)',
+                           '(frame < left ? 1.0f : 0.0f) * stream->cut_send[(stream->cut_played + frame) % '
+                           'CUT_FADE_FRAMES]'),
+                          'cuts'),
+ 'cut-discard-earlier': (('left = CUT_FADE_FRAMES - stream->cut_played', 'left = 0'), 'cut-overlap'),
+ 'flush-live-voice': (('stream->paused || stream->flushing', 'stream->paused'), 'flush'),
+ 'linear-nearest': (('left_frames[0] + (left_frames[1] - left_frames[0]) * fraction', 'left_frames[0]'),
+                    'linear'),
+ 'doppler-stereo-always-on': (('stereo_doppler_enabled && !stream->has_3d', '!stream->has_3d'),
+                              'doppler-stereo'),
+ 'frequency-upper-unbounded': (('if (target_step * OUTPUT_RATE > VOICE_FREQUENCY_MAXIMUM)', 'if (0)'),
+                               'doppler-limits'),
+ 'frequency-lower-unbounded': (('if (target_step * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)', 'if (0)'),
+                               'doppler-limits')}
 
 
 def generated(source=None, fault=None, scalar=False):
     """the mixer: dsound_sdl.c from its constants to the end of the mixing (before the output), its resampler adding
     tap by tap if scalar"""
-    text = source if source is not None else read(SOURCE)
+    text = mixer_source(source)
     code = text[text.index("#define OUTPUT_RATE"):text.index("/* ---------- output")]
     code += "\n" + text[text.index("#define STREAM_SETTER"):text.index("\n\n", text.index("#define STREAM_SETTER"))] + "\n"
     code += "\n" + "\n".join(function(text, name) for name in (
         "packet_release", "stream_complete_head", "stream_from_interface",
         "stream_flush", "stream_release", "stream_process", "IDirectSoundStream_Pause"))
+    code += "\n#ifdef UNDER_TEST_I3DL2_SOURCE\n" + function(text, "IDirectSoundStream_SetI3DL2Source") + "\n#endif\n"
     if fault:
         code = mutated(code, *fault)
     return (("under_test.inc", ("#define RESAMPLER_SCALAR\n" if scalar else "") + code),)
@@ -79,17 +87,17 @@ _mixer_builds = tempfile.TemporaryDirectory(prefix="halo-mixer-")
 
 
 @functools.lru_cache(maxsize=None)
-def build_mixer(generated_code):
+def build_mixer(generated_code, fixture="mixer"):
     root = Path(__file__).resolve().parents[3]
     work = Path(_mixer_builds.name) / str(abs(hash(generated_code)))
     work.mkdir(parents=True, exist_ok=True)
     for name, text in generated_code:
         (work / name).write_text(text)
-    executable = work / "mixer.exe"
+    executable = work / (fixture + ".exe")
     command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", "-Wall", "-Werror",
                "-Wno-unused-function", "-Wno-unused-variable",
                "-I", str(root / "tools/harness/include"), "-I", str(work),
-               str(root / "tools/harness/tests/mixer.c"), "-o", str(executable)]
+               str(root / "tools/harness/tests" / (fixture + ".c")), "-o", str(executable)]
     if sys.platform == "win32":
         command += ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS",
                     "-I", str(root / "port/windows/include/posix"),

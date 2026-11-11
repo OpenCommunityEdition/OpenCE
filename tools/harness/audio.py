@@ -45,8 +45,16 @@ def manager_types():
     return text
 
 
+def mixer_source(source=None):
+    """The shared backend with its private DSP includes, for source-based tests."""
+    text = source if source is not None else read("port/linux/src/dsound_sdl.c")
+    for name in ("dsound_xbox_types.h", "dsound_xbox_hrtf.inl", "dsound_xbox_reverb.inl", "dsound_xbox_lfe.inl"):
+        text = text.replace(f'#include "{name}"', read("port/linux/src/" + name))
+    return text
+
+
 def stream_types():
-    backend = read("port/linux/src/dsound_sdl.c")
+    backend = mixer_source()
     game = read("source/sound/sound_dsound_xbox.c")
     xdk = read("port/include/xdk/xdk_pdb.h")
     text = """typedef unsigned long DWORD, ULONG;
@@ -81,6 +89,9 @@ typedef struct _DSCAPS DSCAPS;
     text += structure(read("source/sound/sound_environment_definitions.h"), "sound_environment_definition") + "\n"
     for name in ["sound_virtual_channel", "sound_channel", "dsound_globals"]:
         text += structure(game, name) + "\n"
+    for name in ["HRTF_FRAMES", "HRTF_BANDS"]:
+        text += f"#define {name} {constant(backend, name)}\n"
+    text += structure(backend, "hrtf_parameters") + "\n"
     for name in ["voice_packet", "sdl_stream"]:
         text += structure(backend, name) + "\n"
     return text
