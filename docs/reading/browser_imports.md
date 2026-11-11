@@ -19,7 +19,7 @@ Xbox base/menu data must already be imported. CE and MCC imports do not
 replace it. A supported desktop browser must provide OPFS and Web Locks,
 which coordinate access between tabs of the same origin. The launcher's
 existing browser checks include that requirement. Imports do not change
-the default-off `game.mcc_campaigns` setting.
+the default-on `game.mcc_campaigns` setting.
 
 | Read | Follow |
 | --- | --- |

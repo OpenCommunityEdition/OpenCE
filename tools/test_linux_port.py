@@ -632,6 +632,12 @@ def test_config_has_each_section_once(tmp_path):
     run("write", "display.first_person_legs", "true")
     assert run("get", "display.first_person_legs")[0] == "true"
 
+    # MCC discovery starts enabled; an explicit later opt-out stays saved.
+    for key in ("game.workshop_maps", "game.mcc_campaigns", "game.mcc_collections"):
+        assert run("get", key)[0] == "true"
+        run("write", key, "false")
+        assert run("get", key)[0] == "false"
+
     # an older version's
     config.write_text("[display]\nvsync = false\n\n[game]\nconsole_log = \"all\"\n\n"
                       "[display]\nfirst_person_legs = true\n")
