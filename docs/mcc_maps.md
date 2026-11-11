@@ -30,6 +30,12 @@ disc image. If that file is missing, the original renderer has no loading
 picture to show. Lobby/catalog checks before loading are unchanged. The effect
 does not run gameplay or alter network readiness, authority or map validation.
 
+The [loading presentation setting](loading_presentation.md) also applies to
+MCC conversion: widescreen is on by default, and turning it off restores the
+central 4:3 framing. The original mask and effects remain, and the Xbox chant
+stops when loading finishes or fails. PC Settings > Video > Graphics exposes
+the toggle, including through the PC pause menu; Xbox menus are unchanged.
+
 ## Installation and menus
 
 OpenCE's stock selector offers MCC singleplayer and multiplayer categories,
