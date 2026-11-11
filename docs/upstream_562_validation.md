@@ -1,7 +1,7 @@
 # OpenCE release 562 integration review
 
 Reviewed 6-7 November 2026. This record covers the authorized merge into
-GulchCE testing; it does not approve promotion to main.
+GulchCE testing. The subsequent user-authorized promotion is recorded below.
 
 ## Inputs and boundaries
 
@@ -148,7 +148,8 @@ judge/tolerances. Original maps, Workshop packages and user saves were untouched
 ## Promotion limits
 
 The MCC resource-loading failure recorded above is resolved by the follow-up
-below. Keep main unchanged while campaign co-op qualification remains open.
+below. At the end of that review, main was left unchanged while campaign co-op
+qualification remained open. The later promotion does not close that limitation.
 Green asset-free tests and builds do not establish full MCC or campaign compatibility. No visual A/B captures were added in this merge;
 the prior contrail captures documented in `contrail_timing.md` cover the earlier
 aging fix, not this exact integrated binary.
@@ -230,4 +231,51 @@ These checks establish the repaired discovery paths and representative gameplay,
 not complete MCC campaign compatibility. Shared sound discovery/selection is
 covered synthetically; the installed shared-resource runtime example required
 external bitmaps only. The pre-existing b40 co-op comparison issue remains a
-separate qualification limit. Main was not promoted.
+separate qualification limit. Main was not promoted at that point.
+
+## Subsequent promotion to main
+
+On 7 November 2026, the user explicitly requested merging current testing into
+main and monitoring CI. The initial merge inputs were testing
+`9bf9554aa86dbeba9fa49f5d8ff1b99f2ba82c1b` and main
+`c5ae133ff69701ca9d48d32808969c13afe00d9f`. That testing revision's
+[platform builds and regression checks](https://github.com/chestahh/GulchCE/actions/runs/42324288419)
+and [MCC validation](https://github.com/chestahh/GulchCE/actions/runs/42324288332)
+passed before the conflict-free merge.
+
+Before release publication, the user clarified that the CPU mask-conversion and
+collision-continuation optimization is still being developed and must be left
+out. The initial Build/release run was cancelled. A focused revert on main
+removes all changes from `9bf9554aa`; testing and its ongoing work are untouched.
+The corrected engine, platform and build configuration exactly match
+the previously reviewed testing revision
+`045cb99bce3fba18a3ddb61f88e327ba4544d09e`. Main's existing README and agent/coding
+guidance remain intact, and the Workshop diagnostic branch is excluded.
+
+The release-note collector additionally suppresses the withdrawn optimization's
+original annotation only in histories containing its withdrawal, as documented
+in [the changelog guide](changelog.md). A real Git-history regression reproduces
+the stale note before correction and checks retained testing previews and later
+restoration notes. This bookkeeping change does not alter game code.
+
+The optimization commit remains in Git ancestry because main was already pushed;
+when that work is ready, its full intended change must be deliberately restored
+and validated. Merging later descendants alone will not restore reverted lines.
+Fresh CI on corrected main builds debug and release configurations before
+publication. The b40 co-op comparison discrepancy remains an explicitly recorded
+pre-existing qualification limit, not a resolved defect or a clean network pass.
+
+## Validated lighting follow-up
+
+Later on 7 November, eight controlled combat runs supported retaining only the
+CPU mask conversion. Testing `e96be13db711ad305cd812a8211d7894d13135ae` restored
+the previous recursive collision traversal and passed its
+[Build workflow](https://github.com/chestahh/GulchCE/actions/runs/42328462980)
+and [MCC validation](https://github.com/chestahh/GulchCE/actions/runs/42328462944).
+The user then authorised promotion of that validated work. This later promotion
+deliberately restores the mask conversion, its tests and documentation; it does
+not restore the discarded shared collision rewrite or alter the preceding MCC
+resource work. The original withdrawn release note stays suppressed, while the
+follow-up supplies its own reviewed annotation. See the
+[controlled comparison](dynamic_emitter_expansion_acceptance.md#controlled-comparison-and-retained-change-7-november-2026)
+for all eight results and the remaining sustained-FPS limit.

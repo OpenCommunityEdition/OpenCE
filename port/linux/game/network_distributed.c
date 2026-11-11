@@ -87,6 +87,9 @@ machine (their datum identifiers need not be).
 #include "network_aim_assist.h"
 #include "network_shield_effects.h"
 #include "map_share.h"
+#include "mcc_share.h"
+#include "mcc_admission.h"
+#include "mcc_load_network.h"
 #include "network_afk.h"
 #include "network_map_vote.h"
 #include "latency_meter.h"
@@ -138,7 +141,7 @@ void console_warning(const char *format, ...);
 speeds up the machine's own clock: nothing on it can tell), found by its
 ticks, which its messages are stamped with, going by faster than the
 host's own clock's time, and ahead of the host's (a client's clock never
-is: it starts at the host's, and only ever jumps forward to it, when it is
+is: it starts at the host's, and recovers toward reliable host time only when
 behind; a host that stalled has every client ahead, their ticks going by as
 fast as time). Measured over each window this long (milliseconds)... */
 #define CLIENT_CLOCK_WINDOW_MILLISECONDS 2000
@@ -265,6 +268,7 @@ enum
 	/* (alive) camouflaged, and doubly so */
 	_distributed_unit_camouflaged_bit = 0,
 	_distributed_unit_super_camouflaged_bit,
+	_distributed_unit_suspended_bit,
 };
 
 /* a unit state's parts on the wire: which of those that are not always
@@ -283,6 +287,18 @@ enum
 	_distributed_unit_part_camouflage_bit,
 	/* (dead) who killed it, when anyone */
 	_distributed_unit_part_killer_bit,
+	/* (alive) host-controlled facing, aim and look while input is inhibited */
+	_distributed_unit_part_scripted_pose_bit,
+};
+
+enum
+{
+	_distributed_pose_facing,
+	_distributed_pose_aiming,
+	_distributed_pose_looking,
+	_distributed_pose_current_aiming,
+	_distributed_pose_current_looking,
+	NUMBER_OF_DISTRIBUTED_POSE_VECTORS
 };
 
 /* world units: how far apart the host's run of a client's player and the
@@ -371,6 +387,8 @@ struct distributed_unit_state
 	word recent_shield_damage;
 	/* the player's powerups: how long each has left */
 	short powerup_durations[NUMBER_OF_PLAYER_POWERUPS];
+	boolean scripted_pose;
+	struct distributed_vector pose[NUMBER_OF_DISTRIBUTED_POSE_VECTORS];
 };
 
 /* a client's player's input at one of its ticks, with the buttons of the
@@ -430,7 +448,7 @@ enum
 	first) */
 	DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE = 3,
 	DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE = 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 +
-		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1,
+		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1 + NUMBER_OF_DISTRIBUTED_POSE_VECTORS * 6,
 	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 14,
 	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
 };
@@ -682,6 +700,12 @@ its clock for fast); a message over the sender's stream, which only it can
 send, is taken whatever its tick, and moves it
 (distributed_message_time_bounded) */
 static long distributed_sender_times[MAXIMUM_SENDERS];
+/* Outside saved game state. A restored handle may name a new life; packets
+from the world before the restore must not act on it. Zero means that a
+client is still waiting for the host's ordered boundary. */
+static unsigned long distributed_checkpoint_epoch;
+static unsigned long distributed_host_epoch;
+static boolean distributed_checkpoint_synchronized;
 /* the host: each client machine's clock, measured (CLIENT_CLOCK_WINDOW_MILLISECONDS):
 its latest tick, and its tick and the host's time as the window began
 (NONE: none begun); how many windows in a row it went fast, and whether
@@ -1019,6 +1043,7 @@ static void distributed_batch_flush(
 	header->type = _distributed_message_batch;
 	header->count = 0;
 	header->game_time = game_time_get();
+	header->checkpoint_epoch = distributed_checkpoint_epoch;
 	header->header = 0;
 	build_message_header(&header->header, batch->size, 2, 0);
 	if (sender == HOST_SENDER)
@@ -1128,7 +1153,7 @@ static void distributed_batches_flush(
 		distributed_batch_flush((short)((first + step) % MAXIMUM_SENDERS));
 }
 
-static void distributed_fill_header(
+static boolean distributed_fill_header(
 	void *message,
 	byte type,
 	short count,
@@ -1136,12 +1161,19 @@ static void distributed_fill_header(
 {
 	struct distributed_message_header *header = (struct distributed_message_header *)message;
 
+	/* Until the ordered snapshot finishes, surviving local replicas are
+	still being replaced. They cannot supply new-world input or hit reports. */
+	if (game_in_progress() && game_connection() == _game_connection_network_client &&
+		!distributed_checkpoint_synchronized && type != _distributed_message_client_ready)
+		return FALSE;
 	header->type = type;
 	header->count = (byte)count;
 	header->game_time = game_time_get();
+	header->checkpoint_epoch = distributed_checkpoint_epoch;
 	header->header = 0;
 	build_message_header(&header->header, size, 2, 0);
 	distributed_statistics.sent++;
+	return TRUE;
 }
 
 /* the size of each of a message's entries, when they are alike, else 0 */
@@ -1163,7 +1195,8 @@ void distributed_send(
 	word size,
 	short destination)
 {
-	distributed_fill_header(message, type, count, size);
+	if (!distributed_fill_header(message, type, count, size))
+		return;
 	switch (destination)
 	{
 	case _distributed_to_clients:
@@ -1193,7 +1226,8 @@ void distributed_send_to_machine(
 {
 	if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 		return;
-	distributed_fill_header(message, type, count, size);
+	if (!distributed_fill_header(message, type, count, size))
+		return;
 	distributed_batch_add((short)machine_index, message, size, distributed_entry_size(count, size));
 }
 
@@ -1204,8 +1238,24 @@ void distributed_send_to_machine_reliably(
 	short count,
 	word size)
 {
-	distributed_fill_header(message, type, count, size);
+	if (!distributed_fill_header(message, type, count, size))
+		return;
 	network_distributed_server_send_to_machine_reliably(machine_index, message, size);
+}
+
+void distributed_checkpoint_to_machine(long machine_index)
+{
+	struct distributed_message_header message;
+
+	if (game_connection() != _game_connection_network_server ||
+		machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		return;
+	distributed_send_to_machine_reliably(machine_index, &message, _distributed_message_checkpoint, 0, sizeof(message));
+}
+
+boolean distributed_checkpoint_ready(void)
+{
+	return distributed_checkpoint_synchronized;
 }
 
 /* a packer's messages of the type, to the machine (or the host), each
@@ -1235,8 +1285,8 @@ static void distributed_packer_flush(
 
 	if (!packer->count)
 		return;
-	distributed_fill_header(&packer->message, packer->type, packer->count, size);
-	distributed_batch_add(packer->sender, &packer->message, size, 0);
+	if (distributed_fill_header(&packer->message, packer->type, packer->count, size))
+		distributed_batch_add(packer->sender, &packer->message, size, 0);
 	packer->count = 0;
 	packer->size = packer->prefix_size;
 }
@@ -1697,6 +1747,59 @@ boolean distributed_connection_problem(
 
 /* ---------- units */
 
+/* Relayed input does not describe a scripted pose. A late join can process
+input before the presentation disables it, and then retain that local aim
+indefinitely. Body orientation is not a substitute: the host's desired and
+current aim/look can differ from it and from each other. Ordinary input keeps
+its prediction path and sends none of these additional vectors. */
+static void distributed_scripted_pose_from_unit(struct unit_datum const *unit,
+	struct distributed_unit_state *state)
+{
+	if (game_connection() != _game_connection_network_server)
+		return;
+	SET_FLAG(state->unit_flags, _distributed_unit_suspended_bit,
+		TEST_FLAG(unit->unit.flags, _unit_suspended_bit));
+	state->scripted_pose = !player_input_enabled() || TEST_FLAG(unit->unit.flags, _unit_suspended_bit);
+	if (!state->scripted_pose)
+		return;
+	distributed_vector_pack(&unit->unit.desired_facing_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_facing]);
+	distributed_vector_pack(&unit->unit.desired_aiming_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_aiming]);
+	distributed_vector_pack(&unit->unit.desired_looking_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_looking]);
+	distributed_vector_pack(&unit->unit.aiming_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_current_aiming]);
+	distributed_vector_pack(&unit->unit.looking_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_current_looking]);
+}
+
+static boolean distributed_scripted_pose_valid(struct distributed_unit_state const *state)
+{
+	short index;
+	for (index = 0; index < NUMBER_OF_DISTRIBUTED_POSE_VECTORS; index++)
+	{
+		real_vector3d vector;
+		real length_squared;
+		distributed_vector_unpack(&state->pose[index], DISTRIBUTED_UNIT_SCALE, &vector);
+		length_squared = vector.i * vector.i + vector.j * vector.j + vector.k * vector.k;
+		/* Unit normals quantized to signed 16-bit components; reject zero
+		and non-unit data before any of the decoded state is applied. */
+		if (length_squared < 0.99f || length_squared > 1.01f)
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static void distributed_scripted_pose_apply(struct unit_datum *unit,
+	struct distributed_unit_state const *state)
+{
+	SET_FLAG(unit->unit.flags, _unit_suspended_bit,
+		TEST_FLAG(state->unit_flags, _distributed_unit_suspended_bit));
+	if (!state->scripted_pose)
+		return;
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_facing], &unit->unit.desired_facing_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_aiming], &unit->unit.desired_aiming_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_looking], &unit->unit.desired_looking_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_current_aiming], &unit->unit.aiming_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_current_looking], &unit->unit.looking_vector);
+}
+
 static void distributed_state_from_player(
 	short player_index,
 	struct distributed_unit_state *state)
@@ -1744,6 +1847,7 @@ static void distributed_state_from_player(
 			TEST_FLAG(unit->unit.flags, _unit_super_camouflaged_bit));
 		camouflage = camouflage > 1.0f ? 1.0f : camouflage < 0.0f ? 0.0f : camouflage;
 		state->active_camouflage = (byte)(long)floor(camouflage * 255.0f + 0.5f);
+		distributed_scripted_pose_from_unit(unit, state);
 		/* (the host) a client's player where the client had them: at which of
 		its ticks (with the ticks run since) */
 		if (game_connection() == _game_connection_network_server && player_index < MAXIMUM_TRACKED_PLAYERS &&
@@ -1838,6 +1942,11 @@ static word distributed_unit_state_write(
 			cursor = distributed_put(cursor, &state->unit_flags, sizeof(state->unit_flags));
 			cursor = distributed_put(cursor, &state->active_camouflage, sizeof(state->active_camouflage));
 		}
+		if (state->scripted_pose)
+		{
+			SET_FLAG(parts, _distributed_unit_part_scripted_pose_bit, TRUE);
+			cursor = distributed_put(cursor, state->pose, sizeof(state->pose));
+		}
 	}
 	else if (state->killing_player_index != NO_PLAYER)
 	{
@@ -1872,6 +1981,9 @@ static word distributed_unit_state_read(
 	{
 		return 0;
 	}
+	if (TEST_FLAG(parts, _distributed_unit_part_scripted_pose_bit) &&
+		!TEST_FLAG(state->flags, _distributed_unit_alive_bit))
+		return 0;
 	if (TEST_FLAG(state->flags, _distributed_unit_alive_bit))
 	{
 		if (!distributed_take(&cursor, end, &state->unit_index, sizeof(state->unit_index)))
@@ -1919,6 +2031,13 @@ static word distributed_unit_state_read(
 				!distributed_take(&cursor, end, &state->active_camouflage, sizeof(state->active_camouflage))))
 		{
 			return 0;
+		}
+		if (TEST_FLAG(parts, _distributed_unit_part_scripted_pose_bit))
+		{
+			if (!distributed_take(&cursor, end, state->pose, sizeof(state->pose)) ||
+				!distributed_scripted_pose_valid(state))
+				return 0;
+			state->scripted_pose = TRUE;
 		}
 	}
 	else if (TEST_FLAG(parts, _distributed_unit_part_killer_bit) &&
@@ -1971,7 +2090,9 @@ static boolean distributed_apply_state(
 	error.i = position->x - object->object.position.x;
 	error.j = position->y - object->object.position.y;
 	error.k = position->z - object->object.position.z;
-	if (error.i * error.i + error.j * error.j + error.k * error.k <= tolerance * tolerance)
+	/* A scripted player can turn without moving. Input prediction cannot
+	recover that orientation, even when position already agrees. */
+	if (!state->scripted_pose && error.i * error.i + error.j * error.j + error.k * error.k <= tolerance * tolerance)
 		return TRUE;
 	if (network_objects_reconcile(unit_index, position, &forward, &up, &velocity, NULL, blend_distance))
 		distributed_statistics.corrections++;
@@ -2055,7 +2176,7 @@ static void distributed_correct_own_unit(
 			return;
 		}
 	}
-	if (TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
+	if (!state->scripted_pose && TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
 		local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS)
 	{
 		long now = game_time_get();
@@ -2170,8 +2291,11 @@ static void distributed_handle_predictions(
 		if (!size)
 			break;
 		data += size;
+		/* Scripted poses and suspension belong to the host, never predictions. */
 		if (state.player_index >= MAXIMUM_TRACKED_PLAYERS ||
 			!distributed_machine_has_player(machine_index, state.player_index) ||
+			state.scripted_pose ||
+			TEST_FLAG(state.unit_flags, _distributed_unit_suspended_bit) ||
 			!TEST_FLAG(state.flags, _distributed_unit_alive_bit) ||
 			!TEST_FLAG(state.flags, _distributed_unit_placed_bit))
 		{
@@ -2681,6 +2805,7 @@ static void distributed_handle_unit_state(
 			unit_kill(unit_index);
 	}
 	unit_index = state->unit_index;
+	distributed_scripted_pose_apply(unit_get(unit_index), state);
 	/* the seat it rides: a client's own player's, once it has ridden
 	otherwise for longer than its prediction takes to reach the host and
 	come back (a player within the tracked ones, as players.c's datums are) */
@@ -3756,14 +3881,12 @@ static void distributed_send_game_state(
 
 /* ---------- the game */
 
-/* a new map loading (game.c), before any of the new game's messages can
-apply: nothing sent or had yet */
-void network_distributed_new_game(
-	void)
+/* Predictions, delayed effects and send caches belong to one world, even
+when a checkpoint restores the same object handles. Connection identity,
+permissions, round trips and the host's current roster do not. */
+static void distributed_reset_checkpoint_state(boolean reset_received_times)
 {
-	short sender;
-	short type;
-	short player_index;
+	short sender, type, player_index;
 
 	distributed_last_sent_time = NONE;
 	csmemset(distributed_deaths, 0, sizeof(distributed_deaths));
@@ -3771,8 +3894,108 @@ void network_distributed_new_game(
 	csmemset(distributed_predictions, 0, sizeof(distributed_predictions));
 	csmemset(distributed_accepted, 0, sizeof(distributed_accepted));
 	csmemset(distributed_host_speeds, 0, sizeof(distributed_host_speeds));
-	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
 	csmemset(distributed_input_facings, 0, sizeof(distributed_input_facings));
+	csmemset(distributed_seen, 0, sizeof(distributed_seen));
+	csmemset(distributed_viewers, 0, sizeof(distributed_viewers));
+	csmemset(distributed_sends, 0, sizeof(distributed_sends));
+	csmemset(distributed_host_states, 0, sizeof(distributed_host_states));
+	csmemset(distributed_host_actions, 0, sizeof(distributed_host_actions));
+	csmemset(distributed_sent_statistics, 0, sizeof(distributed_sent_statistics));
+	distributed_statistics_cursor = 0;
+	distributed_statistics_due = TRUE;
+	distributed_game_state_checksum = 0;
+	distributed_game_state_time = NONE;
+	distributed_host_update_number = NONE;
+	distributed_sent_structure_bsp_index = NONE;
+	distributed_pickup_count = 0;
+	distributed_machines.valid = FALSE;
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		distributed_deaths[player_index].dead_since = NONE;
+		distributed_sent_units[player_index].flags = 0;
+		distributed_sent_units[player_index].unit_index = NONE;
+		distributed_sent_units[player_index].vehicle_index = NONE;
+		distributed_sent_units[player_index].seat_index = NONE;
+		distributed_predictions[player_index].taken_host_time = NONE;
+		distributed_host_speeds[player_index].unit_index = NONE;
+		distributed_player_machines[player_index] = NONE;
+		distributed_divergence.taken_time[player_index] = NONE;
+		distributed_divergence.taken_host_time[player_index] = NONE;
+		distributed_divergence.input_time[player_index] = NONE;
+	}
+	for (sender = 0; sender < MAXIMUM_SENDERS; sender++)
+	{
+		distributed_batches[sender].size = 0;
+		if (reset_received_times)
+		{
+			distributed_sender_times[sender] = NONE;
+			for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
+				distributed_received_times[sender][type] = NONE;
+		}
+	}
+	for (sender = 0; sender < MAXIMUM_LOCAL_PLAYERS; sender++)
+	{
+		for (type = 0; type < OWN_POSITION_TICKS; type++)
+		{
+			distributed_own_positions[sender][type].time = NONE;
+			distributed_own_positions[sender][type].unit_index = NONE;
+		}
+	}
+	update_queues_distributed_reset();
+}
+
+static void distributed_advance_checkpoint(void)
+{
+	/* Unsigned rollover is defined; zero remains the unbound client state. */
+	if (++distributed_host_epoch == 0)
+		++distributed_host_epoch;
+	distributed_checkpoint_epoch = distributed_host_epoch;
+}
+
+static void distributed_restore_checkpoint(void)
+{
+	distributed_reset_checkpoint_state(TRUE);
+	network_objects_discard_client_effects();
+	network_objects_reverted();
+	network_damage_new_game();
+	network_actors_new_game();
+	network_coop_reset_recovery();
+}
+
+void network_distributed_reverted(void)
+{
+	long machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	short count, index;
+
+	if (game_connection() != _game_connection_network_server || !network_coop_active())
+		return;
+	distributed_advance_checkpoint();
+	distributed_restore_checkpoint();
+	count = distributed_client_machines(machines, NUMBEROF(machines));
+	/* A snapshot may also broadcast creates/deletes. Every loaded client
+	must receive the boundary before the first snapshot is constructed. */
+	for (index = 0; index < count; index++)
+		distributed_checkpoint_to_machine(machines[index]);
+	network_objects_host_reverted();
+}
+
+/* a new map loading (game.c), before any of the new game's messages can
+apply: nothing sent or had yet */
+void network_distributed_new_game(
+	void)
+{
+	short type;
+	short player_index;
+
+	if (game_connection() == _game_connection_network_server)
+		distributed_advance_checkpoint();
+	else
+		distributed_checkpoint_epoch = 0;
+	distributed_checkpoint_synchronized = FALSE;
+
+	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
+	distributed_reset_checkpoint_state(TRUE);
+	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
 	csmemset(distributed_client_clocks, 0, sizeof(distributed_client_clocks));
 	csmemset(distributed_client_identities, 0, sizeof(distributed_client_identities));
 	distributed_identity_sent = FALSE;
@@ -3785,45 +4008,7 @@ void network_distributed_new_game(
 		for (machine_index = 0; machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; machine_index++)
 			distributed_client_clocks[machine_index].window_tick = NONE;
 	}
-	csmemset(distributed_seen, 0, sizeof(distributed_seen));
-	csmemset(distributed_viewers, 0, sizeof(distributed_viewers));
-	csmemset(distributed_sends, 0, sizeof(distributed_sends));
-	/* (none sent: every player's the first time) */
-	csmemset(distributed_sent_statistics, 0, sizeof(distributed_sent_statistics));
-	distributed_statistics_cursor = 0;
-	distributed_game_state_checksum = 0;
 	distributed_game_state_postgame = 0;
-	distributed_game_state_time = NONE;
-	distributed_host_update_number = NONE;
-	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
-	{
-		distributed_deaths[player_index].dead_since = NONE;
-		distributed_sent_units[player_index].flags = 0;
-		distributed_sent_units[player_index].unit_index = NONE;
-		distributed_sent_units[player_index].vehicle_index = NONE;
-		distributed_sent_units[player_index].seat_index = NONE;
-	}
-	for (sender = 0; sender < MAXIMUM_SENDERS; sender++)
-	{
-		distributed_batches[sender].size = 0;
-		for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
-			distributed_received_times[sender][type] = NONE;
-		distributed_sender_times[sender] = NONE;
-	}
-	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
-	{
-		distributed_predictions[player_index].taken_host_time = NONE;
-		distributed_host_speeds[player_index].unit_index = NONE;
-		distributed_player_machines[player_index] = NONE;
-	}
-	for (sender = 0; sender < MAXIMUM_LOCAL_PLAYERS; sender++)
-	{
-		for (type = 0; type < OWN_POSITION_TICKS; type++)
-		{
-			distributed_own_positions[sender][type].time = NONE;
-			distributed_own_positions[sender][type].unit_index = NONE;
-		}
-	}
 	distributed_own_round_trip = 0.0f;
 	csmemset(distributed_player_pings, 0xFF, sizeof(distributed_player_pings));
 	distributed_own_ping_valid = FALSE;
@@ -3837,20 +4022,8 @@ void network_distributed_new_game(
 		distributed_tick_sent_times[type].time = NONE;
 	csmemset(distributed_machine_players, 0xFF, sizeof(distributed_machine_players));
 	distributed_machines.in_tick = FALSE;
-	distributed_machines.valid = FALSE;
 	distributed_host_time = NONE;
 	distributed_statistics_due = FALSE;
-	distributed_pickup_count = 0;
-	/* (the tests' drift figures: none taken, no input had, of this game) */
-	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
-	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
-	{
-		distributed_divergence.taken_time[player_index] = NONE;
-		distributed_divergence.taken_host_time[player_index] = NONE;
-		distributed_divergence.input_time[player_index] = NONE;
-	}
-	/* (each player's latest input: player_queues_new.c) */
-	update_queues_distributed_reset();
 	network_objects_new_game();
 	network_damage_new_game();
 	network_actors_new_game();
@@ -4737,6 +4910,81 @@ not overtaken by the newer damage sent with the ticks since
 (distributed_message_stale) */
 static boolean distributed_handling_batch;
 
+/* Only the host's ordered boundary can change worlds. A new datagram may
+overtake it, and an old reliable kill may trail newer state in its old
+world: neither is authority to adopt a different epoch. */
+static boolean distributed_message_epoch_valid(
+	long machine_index,
+	struct distributed_message_header const *header,
+	word size)
+{
+	if (header->type == _distributed_message_checkpoint)
+	{
+		if (machine_index != NONE || game_connection() != _game_connection_network_client ||
+			network_connection_last_read_was_unreliable() || distributed_handling_batch ||
+			size != sizeof(*header) || header->count != 0 || header->checkpoint_epoch == 0)
+			return FALSE;
+		if (distributed_checkpoint_epoch != 0 &&
+			(long)(header->checkpoint_epoch - distributed_checkpoint_epoch) <= 0)
+			return FALSE;
+		distributed_checkpoint_epoch = header->checkpoint_epoch;
+		distributed_checkpoint_synchronized = FALSE;
+		distributed_restore_checkpoint();
+		/* Initial ready can precede the boundary. Its identity/build may
+		have gone with epoch zero and been refused by the host. */
+		distributed_identity_sent = FALSE;
+		distributed_build_sent = FALSE;
+		return FALSE;
+	}
+	/* A late joiner does not yet know the epoch. Readiness may request the
+	current boundary/snapshot, within the existing host resend rate limit;
+	it cannot change the epoch or authorize predictions and hit reports. */
+	if (header->type == _distributed_message_client_ready)
+		return game_connection() == _game_connection_network_server &&
+			machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
+			distributed_handling_stream_message && !distributed_handling_batch &&
+			size == sizeof(*header) && header->count <= 1;
+	if (distributed_checkpoint_epoch == 0 || header->checkpoint_epoch != distributed_checkpoint_epoch)
+		return FALSE;
+	if (game_connection() == _game_connection_network_client)
+	{
+		if (machine_index != NONE)
+			return FALSE;
+		if (header->type == _distributed_message_object_changes &&
+			(network_connection_last_read_was_unreliable() || distributed_handling_batch))
+			return FALSE;
+		if (header->type == _distributed_message_objects_synchronized)
+		{
+			if (network_connection_last_read_was_unreliable() || distributed_handling_batch ||
+				size != sizeof(*header) || header->count != 0)
+				return FALSE;
+			if (!distributed_checkpoint_synchronized)
+			{
+				/* The client still simulates during transfer. Retire hits,
+				projectiles and delayed effects produced by those provisional
+				replicas before gameplay resumes. Keep the ordered snapshot's
+				receive times: older same-epoch datagrams must remain stale. */
+				network_objects_discard_client_effects();
+				network_damage_new_game();
+				distributed_reset_checkpoint_state(FALSE);
+				/* These producers remember a send before the common sender
+				can suppress it during an incomplete snapshot. */
+				distributed_identity_sent = FALSE;
+				distributed_build_sent = FALSE;
+			}
+			distributed_checkpoint_synchronized = TRUE;
+		}
+		/* A current-world kill may overtake the live description in the
+		initial snapshot. Apply gameplay only after its ordered end marker;
+		otherwise that description could resurrect the newly killed copy. */
+		if (!distributed_checkpoint_synchronized)
+			return header->type == _distributed_message_object_changes ||
+				(header->type == _distributed_message_inventories &&
+					!network_connection_last_read_was_unreliable() && !distributed_handling_batch);
+	}
+	return TRUE;
+}
+
 /* a message of the distributed kind; machine_index is the sender's on the
 host, NONE on a client */
 void network_distributed_handle_message(
@@ -4763,6 +5011,26 @@ void network_distributed_handle_message(
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);
+		return;
+	}
+	if (mcc_load_network_handles_message(message, size))
+	{
+		mcc_load_network_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
+		return;
+	}
+	/* MCC validation has its own bounded hold, independent of file sharing. */
+	if (mcc_admission_handles_message(message, size))
+	{
+		mcc_admission_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
+		return;
+	}
+	/* (MCC package sharing's, the same way: mcc_share.c) */
+	if (mcc_share_game_handles_message(message, size))
+	{
+		mcc_share_game_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
 	}
 	/* (map sharing's, in the lobby too, over the host's connection alone:
@@ -4857,6 +5125,7 @@ void network_distributed_handle_message(
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
 	case _distributed_message_game_state:
+	case _distributed_message_checkpoint:
 	case _distributed_message_objects_synchronized:
 	case _distributed_message_notice:
 	case _distributed_message_client_ready: entry_size = 0; break;
@@ -4927,7 +5196,12 @@ void network_distributed_handle_message(
 			return;
 		break;
 	}
-	if (!distributed_message_time_bounded(machine_index, header.game_time,
+	if (!distributed_message_epoch_valid(machine_index, &header, size))
+		return;
+	/* Readiness can name an earlier world; it requests the current boundary
+	but supplies no clock or simulation evidence for that world. */
+	if (header.type != _distributed_message_client_ready &&
+		!distributed_message_time_bounded(machine_index, header.game_time,
 		machine_index == NONE ? !network_connection_last_read_was_unreliable() : distributed_handling_stream_message))
 	{
 		return;
@@ -4947,7 +5221,7 @@ void network_distributed_handle_message(
 	}
 	/* (the host: a client's clock, by its messages' ticks; and its players'
 	predictions not taken while its game runs fast) */
-	if (machine_index != NONE)
+	if (machine_index != NONE && header.type != _distributed_message_client_ready)
 	{
 		distributed_note_client_clock(machine_index, header.game_time);
 		if ((header.type == _distributed_message_player_prediction ||

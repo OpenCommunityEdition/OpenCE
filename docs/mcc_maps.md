@@ -6,6 +6,11 @@ menus. It is an experimental
 runtime adapter, with explicit format limits below. A successful menu
 probe or file audit is not proof that a map plays correctly.
 
+The [MCC refactor milestones and validation record](mcc_refactor_validation.md) covers
+the completed Stages 1–5, planned follow-up milestones, baseline builds and
+installed-Workshop checks. Its bounded results supplement the historical
+evidence here; they do not establish full campaign compatibility.
+
 ## Loading feedback
 
 MCC map conversion displays OpenCE's original animated loading effect. Its
@@ -96,9 +101,10 @@ cannot match the host's map is told what to do. The item is the package folder
 when Steam's own name (the item id, all digits) is kept, or a `workshop_id.txt`
 in the folder: the id on the first line and, optionally, the title on the
 second. The host sends the id and title in the map name's reserved tail
-(`mcc_workshop.c`). MCC protocol 64 versions this extension without changing
-the settings record's size; older MCC peers are refused. Xbox/CE retain
-OpenCE protocol 41. See the [wire contract](../port/linux/NETCODE.md#gulchce-crossplay-boundary).
+(`mcc_workshop.c`). MCC protocol 64 introduced this extension without changing
+the settings record's size. The current MCC and shared GulchCE agreements
+also require checkpoint lifetime fencing; see the
+[wire contract](../port/linux/NETCODE.md#gulchce-network-agreement).
 
 The item is advisory: the level filename and content fingerprint still decide
 admission. A known local item is recognized even if its older package lacks
@@ -377,9 +383,13 @@ time to validate; this does not make synchronous I/O immune to stalls.
 The previous 32-bit checksum
 remains for checkpoint identity and engine bookkeeping; it is no longer the
 MCC network content proof. Existing save identities are unchanged by SHA-256.
+The MCC checksum consumers share the port's prefixed zlib CRC implementation;
+resource selection/framing, saved checksum bytes and zero-identity handling
+remain unchanged. See the [checksum reading route](reading/maps_and_resources.md)
+and [Milestone 6 evidence](mcc_refactor_validation.md#stage-6-checksum-consolidation).
 MCC peers need matching GulchCE MCC protocols. Xbox and Custom Edition retain
-their original matching/loading behavior and the OpenCE protocol baseline
-specified in [the crossplay boundary](../port/linux/NETCODE.md#gulchce-crossplay-boundary). Network
+their original matching/loading behavior and require the shared GulchCE agreement
+specified in [the network boundary](../port/linux/NETCODE.md#gulchce-network-agreement). Network
 support uses OpenCE's host-authoritative engine, not official MCC clients.
 
 The shared identity integration uses the settings record's appended digest,
@@ -483,34 +493,80 @@ widgets can still use the MCC callback adapter described below. The new
 pause labels and confirmation text are currently English; localization of
 these generated strings is not implemented.
 
-## Preliminary sharing restriction
+## MCC sharing eligibility
 
-PR #94 supplies an MCC-owned eligibility helper only. MCC peer downloads are
-not enabled by it. The temporary policy covers hand-placed packages and excludes
-recognized Workshop content (numeric package folders or a valid
-`workshop_id.txt`), stock content, loose maps and `_shared`. Desktop players
-continue installing Workshop content through Steam or manually; Android players
-continue using the [package importer](../port/android/README.md#importing-mcc-packages).
-Steam is not required on Android. This is a scope restriction, not a claim that
-Workshop maps are unsafe or that manually copied maps are safe.
+The MCC-owned policy in `mcc_share_rules.c` applies to local and Workshop
+packages. Host opt-in, a known gameplay SHA-256 and a host-local list entry
+with maker credit are required. Unknown/stock content, loose maps, `_shared`,
+unsafe names and invalid origin states are refused. A Workshop ID is advisory;
+it neither grants redistribution permission nor proves which bytes are present.
+The host's `mcc_share.txt` classifies exact map/used-resource content, not a
+filename. Required JSON is separately identified and validated.
 
-The helper requires host opt-in, a known SHA-256 content identity and an explicit
-local classification of that exact content as custom. Unknown classification,
-unreadable sidecars and invalid enum values are refused. Folder names do not
-classify stock content: renaming a stock package cannot change an established
-stock classification, and a custom package may use a stock-looking name. A
-missing sidecar remains allowed under the original policy, but is not proof of
-origin or redistribution permission. Removing metadata is not a supported way
-to establish eligibility. The classification provider and transfer integration
-are future work; this phase does not automatically classify installed files.
+The planner uses the loader's validated resource selection. Self-contained maps
+do not transfer unrelated resources; used package dependencies follow their
+actual resolved paths, including Workshop `halo1/maps`. A used root/shared
+resource refuses the offer and is named in the host log. An invalid package
+override cannot be silently skipped in favor of another resource.
 
-The additional-resource allowlist contains only `bitmaps.map` and `sounds.map`.
-It neither validates their contents nor authorizes reading global fallback
-resources. Campaign metadata and later mission files need a separate transfer
-contract. Eligibility and a matching hash must never bypass receiver-side map
-validation, path containment, bounded transfers or safe installation. See the
-[reader's guide](reading/maps_and_resources.md#preliminary-mcc-sharing-policy)
-for the API, trust boundaries and regression checks.
+## Sharing a package with a joiner
+
+Milestone 13 extends [PR #95](https://github.com/chestahh/GulchCE/pull/95)
+through MCC-owned host-only delivery, explicit consent, eligible Workshop
+packages, recognized JSON/PNG assets and separate managed snapshots. Current
+wire requirements are MCC **69**, request **103**, response **104**; see
+[NETCODE.md](../port/linux/NETCODE.md#mcc-package-sharing).
+Custom Edition sharing and its messages remain independent.
+
+Enable host `network.mcc_map_share` (default off), list
+`<gameplay SHA-256> <maker>` in `mcc_share.txt`, and have the joiner enable
+`network.map_download` (existing default on). A missing/differing package
+prompts before any chunk download or stage creation. When either permission
+is off, only manual installation or a valid Workshop page is offered as a
+content-acquisition action, plus cancellation. Matching installed content
+needs no download; content is not assumed newer/older solely from a mismatch.
+
+The current mission's map and selected resources travel with required package,
+campaign and mission JSON, supported referenced PNGs and attribution text.
+Local map-only folders are valid; no JSON, artwork or Steam identifier is
+invented as a prerequisite. Campaign metadata is delivered upfront and later
+mission binaries are obtained as needed. Received metadata cannot introduce
+arbitrary paths or remote downloads; invalid optional artwork is discarded,
+while invalid required metadata blocks installation.
+
+On-demand campaign progression uses the connected host's exact identity for
+each next mission. A downloaded mission remains individually selectable, but
+separate downloaded snapshots do not assemble an offline or rehosted campaign.
+Campaign JSON specifies names/order, not every mission's binary digest; even
+identical JSON and Workshop provenance cannot prove that another snapshot is
+the intended revision. If the current snapshot lacks its next mission, the
+existing progression handler refuses that transition. Install the complete
+campaign from Workshop or a manual package for offline/rehosted progression,
+or rejoin the original host for its next mission.
+
+The receiver verifies files, metadata references and both advertised identities
+inside its owned `mcc_staging/dl_<digest>` directory. Native publication moves
+the whole directory without replacement into `mcc_maps/dl_<digest>`, preserving
+existing manual and Steam copies. It rechecks that installed snapshot before
+joining. These filesystem checks protect against remote paths; they are not a
+sandbox against a malicious process with the same local filesystem authority.
+
+Managed snapshot storage/removal UI is integrated. Native checks verified the
+confirmation label, removal and preservation of the original package. Ruby
+host download, metadata/artwork byte comparison, late join and differing-version
+preservation passed. Mercury checks verified on-demand delivery and two-player
+gameplay in the following mission, plus initial hosting with a missing mission.
+The matching native/browser transport controls and four-platform CI checks
+also pass within their recorded limits. See the
+[implementation walkthrough](reading/maps_and_resources.md#mcc-package-sharing-between-machines)
+and [validation record](mcc_refactor_validation.md#milestone-13-implementation-evidence).
+The fixture suites exercise production modules over synthetic files; they do
+not establish real-map two-machine gameplay, campaign completion, Android
+runtime behavior or browser playability. Milestone 14 owns the browser work.
+Its separate [browser import and storage walkthrough](reading/browser_imports.md)
+describes manual CE/MCC imports and OPFS download publication. The
+[Milestone 14 record](mcc_refactor_validation.md#milestone-14-custom-edition-and-mcc-browser-playability)
+distinguishes component checks from actual browser gameplay and networking.
 
 ## Repository architecture and isolation
 
@@ -697,10 +753,29 @@ Each draw resolves a temporary placement without changing the parent tag.
 This places A50_Revisited's visor at the screen edges; invalid child anchors
 retain the parent placement. Xbox/CE returns the original parent untouched.
 
+HUD normalization first plans ownership from pristine loaded bytes in
+`mcc_hud_ownership.inl`. Same-group aliases of a root are converted once.
+Shared mutable blocks receive separate consumer storage before any placement
+or pointer is written. Pointer-free crosshair and overlay items are always
+snapshotted: an MCC cache can intern them within storage used outside the HUD
+tree. This prevents one consumer's scaling or frame marker from changing the
+authored input seen by another. It also makes supported scalar interning
+independent of the later validator's traversal order. This is a correction
+within the MCC compatibility engine, not a map-specific exception.
+
+Pointer-bearing aliases retain their largest original extent so the later
+validator still rejects conflicting owners, cross-schema roots and partial
+overlaps. Planning is bounded by the validator's four-million-visit budget.
+All copies precede pointer publication; allocation failure refuses the load.
+Planning records are freed on every exit, and copied blocks belong to the
+runtime tag arena, released by normal unload or failed-load cleanup. Neither
+original map files nor Xbox/CE conversion paths are changed.
+
 Stock corner HUDs use the native safe frame instead of the wider MCC frame.
 `mcc_hud_layout.inl` recognizes component layouts before conversion from their
 anchors, placements, number layout and overlay counts. Unit HUD recognition
-also includes bitmap names/dimensions/registration points and sprite geometry.
+also includes bitmap dimensions/registration points and sprite geometry.
+Bitmap names remain bounded and validated but do not select the frame.
 Weapon and grenade counter panels deliberately exclude artwork identity and
 sprite choices: a custom replacement bitmap does not relocate a stock counter.
 Grenade icons retain their own authored size and offset within the counter's
@@ -711,8 +786,21 @@ b30, b40, d40, bloodgulch, deathisland and carousel caches. No map assets are
 embedded. Unknown layouts retain the authored MCC frame; this is deliberately
 conservative and is not a security or content-identity check.
 
-Recognition writes a marker into runtime-owned MCC placement padding, clearing
-map-supplied values first. A weapon and its inherited parent HUDs share one
+These structural profiles remain a compatibility exception: the supported
+anchor and scale fields do not establish whether an author intended the native
+or wider safe margin. Removing the profiles requires evidence of a reliable
+format or usage rule that preserves both stock and custom layouts, with
+near-miss coverage. The Stage 5 inventory found the same classification for all
+487 component HUDs in ten installed Workshop maps after removing bitmap-name
+dependence; changing only names also preserved classification. This bounded
+result does not establish that the profiles recognize every stock derivative.
+One load diagnostic reports native/authored frame counts and ownership copies;
+no diagnostic runs per draw. See [the refactor validation record](mcc_refactor_validation.md)
+for map identities, regression evidence and runtime limits.
+
+Recognition is read-only and runs once on each distinct pristine root.
+Conversion then writes the chosen marker into runtime-owned MCC placement
+padding, replacing map-supplied values. A weapon and its inherited parent HUDs share one
 frame: `mcc_hud_weapon_frame_begin` follows the outermost populated parent
 layout in the bounded chain, ignoring empty/crosshair-only parents. A chain
 with distinct authored anchors retains the MCC frame. This lets a custom ammo
@@ -732,7 +820,12 @@ retain their existing geometry. Mercury Falling's pistol, ability counters
 and vehicle prompts exposed these separate cases; the rules do not depend
 on map or weapon names. Descent's custom layouts remain separate.
 
-The asset-free layout, channel and texture-ownership tests are in
+The asset-free ownership and normalization cases in
+`tools/test_mcc_hud_normalization.py` exercise the whole converter, including
+shared roots/blocks, order independence, separate frames and allocation failure.
+`tools/test_mcc_tag_validation.py` combines conversion with the actual validator
+to check supported scalar interning and malformed pointer-bearing overlaps.
+The layout, channel and texture-ownership tests are in
 `tools/test_mcc_hud_layout.py`, `tools/test_mcc_shader_channels.py` and
 `tools/test_mcc_texture_bridge.py`. `tools/test_mcc_hud_meter_render.py` renders
 synthetic converted meters through the production GPU shader, checking full,
@@ -825,6 +918,32 @@ it does not implement the MCC telemetry service. The boolean result retains
 the conditional `sleep` calls used in shipped and Ruby campaign scripts.
 It does not call `core_save_name`: that Xbox function writes a raw debug
 save, and remains unchanged and unavailable to map scripts.
+
+MCC scenarios may call the zero-argument, void `ai_deselect` operation through
+the MCC registry in [`mcc_scripts.c`](../port/linux/game/mcc_scripts.c).
+Its evaluator calls the existing `ai_scripting_deselect` service in
+[`ai_script.c`](../source/ai/ai_script.c). When AI is initialized for the map,
+that service clears the selected encounter and actor through the native debug
+selection routines, retaining their evaluation-record and idle-look cleanup.
+The adapter adds no persistent state or checkpoint fields. Registry lookup
+requires loaded MCC tags, so unloading removes access through the existing
+lifecycle. Xbox/CE keep their original map-function allowlist; `ai_select`
+and other debug operations receive no new permission. Client console authority
+checks also remain unchanged.
+
+The installed Quarantine Workshop map has one valid `(ai_deselect)` call in
+its continuous `life_lost_0` script. The previous native map-policy refusal
+disabled that entire script, including its cooperative game-over sequence.
+The fix admits the operation for every accepted MCC map, without selecting a
+map name or replacing it with a no-op. Enabling previously refused authored
+gameplay originally raised MCC to protocol 65, while that change left message
+layouts and Xbox/CE's then-current OpenCE 41 contract unchanged. Current
+agreements are listed in [NETCODE.md](../port/linux/NETCODE.md#gulchce-network-agreement). Source-derived tests exercise native selection
+clearing, inactive-AI behavior, native map refusal and client console policy;
+the MCC script harness covers linking, malformed arguments and unload guards.
+These checks establish the operation and its boundaries, not a complete
+Quarantine playthrough. See the [refactor validation record](mcc_refactor_validation.md)
+for separately recorded runtime evidence and limits.
 
 Additional MCC campaign operations include `local_players`,
 `game_is_authoritative`, `objects_distance_to_position`, `sleep_forever`
@@ -2428,25 +2547,28 @@ A non-finite value can contaminate the boat's force, position and orientation;
 the issue reports precisely those invalid vectors. This also explains why a
 client's earlier visible copy cannot be boarded on the authoritative host.
 
-`mcc_boat_controls_initialize` in `mcc_objects.c` zeroes the three temporary
-controls before the existing boat routine assigns its rotations, lift and
-propeller speed. The only shared addition is a port-marked call inside the
-three-point boat branch (and its declaration include). Conversion alone
-cannot initialize this private per-tick stack storage. Non-MCC execution is a
-no-op; other vehicle controllers and boat point counts retain their paths.
+`update_human_boat_physics` in `source/units/vehicles.c` zeroes the three
+temporary controls before assigning its rotations, lift and propeller speed.
+This shared producer correction replaces the former MCC-only initializer.
+Conversion alone cannot initialize this private per-tick stack storage. The
+native engine accepts the same powered-point flags, so Xbox and Custom Edition
+boats need the correction too. Other vehicle controllers and boat point counts retain their paths.
 No authored tags, network permissions, packet fields or seat rules change.
 There is no persistent state to clean up across map-family transitions.
 
-MCC protocol 47 requires this initialization on every peer, including a
-client predicting a boat it drives. The separate OpenCE protocol stays 29.
-The regression harness extracts the real boat routine, real scratch structure
-and MCC initializer, starts the scratch storage with NaNs, and checks the
-controls delivered to physics. Removing the hook reproduces the failure.
-It also checks the inactive MCC guard, unchanged alternate point-count path,
-rotations/lift/propeller outputs and the adjacent scratch-array canary. This
-is a control-initialization test, not a simulation of the complete physics.
+The original fix introduced MCC protocol 47 to require this initialization on
+every peer, including a client predicting a boat it drives; OpenCE's separate
+protocol was then 29. The current agreements are recorded in
+[NETCODE.md](../port/linux/NETCODE.md#gulchce-network-agreement).
 
-Validation: the Windows release builds, 78 focused boat/script/protocol/network
+The [boat harness](../tools/harness/tests/test_mcc_boat.py) extracts the real
+controller, scratch structure, force consumers and linear integration. It uses
+non-finite and finite stale control values, checks observable forces, active
+controls, alternate point counts and adjacent storage, and removes the
+initializer in an isolated negative control. Its world queries and transforms
+are controlled fixtures; this is not a complete vehicle simulation.
+
+Original validation: the Windows release builds, 78 focused boat/script/protocol/network
 tests pass, and the recorded network-format check passes. A hidden two-instance
 Mercury2 co-op check switched to the plains BSP and created the authored `d1`
 boat at its original position. Host-authorized script calls seated the client
@@ -2467,6 +2589,47 @@ Linux was not executed. Browser/native transport testing could not start
 because Playwright is absent. Those platform checks remain for CI. Temporary
 map copies and generated caches were removed; logs and verified compressed
 private test saves were retained.
+
+#### Shared-engine investigation, 7 November 2026
+
+The refactor audit confirmed that this is a general controller defect, rather
+than an MCC layout difference. `vehicle_update` in
+[vehicles.c](../source/units/vehicles.c) allocates the powered-point array on
+each call. Its boat branch assigns all rotations and lift ratios but only
+point zero's water-friction velocity. Native vehicle validation accepts boat
+type 2, and native physics validation accepts three powered points with these
+flags. The unchanged functions in
+[physics.c](../source/physics/physics.c) consume those controls independently
+of map family. They clear the separate mass-point output array and derive
+rotation matrices; neither action initializes the control scalars. No prior
+tick's state belongs in this local array.
+
+The new reproduction feeds identical accepted content through the controller
+and force consumer with MCC inactive and active. With MCC inactive, poisoned
+hydrofoil controls produce non-finite forces or incorrect finite friction.
+The current MCC initialization avoids both failures. This establishes a class
+of supported inputs, without a map name, checksum or asset selector; it does
+not establish that stock Xbox maps contain such boats.
+
+The minimal shared correction initializes exactly three records inside
+the existing three-point branch, retaining its arithmetic and the other-count
+fallback, and retires the MCC helper. It was initially **deferred**: the pinned OpenCE 41
+implementation has the same omission, and clients predict driven vehicles.
+Changing accepted Xbox/CE simulation requires agreement/version separation;
+keeping version 41 would falsely claim compatibility, while changing it would
+end the existing crossplay contract. The user initially chose to preserve that
+contract, then explicitly removed the constraint for Milestone 11. The shared
+correction now requires updated peers through the agreements documented in
+[NETCODE.md](../port/linux/NETCODE.md#gulchce-network-agreement). It is independent
+of optional camera mode and map identity.
+
+The twelve historical legacy failures are now ordinary passing regressions.
+Isolated mutations reintroducing the MCC guard reproduce the defect; adjacent
+storage, active controls and alternate point-count checks remain. Source
+inspection also found the omission in upstream `fc9deb0b1`; no unmodified
+upstream compatibility is claimed. See the
+[refactor validation record](mcc_refactor_validation.md) for this investigation's
+actual checks and limits.
 
 ## Cutscene title layout
 
@@ -2662,9 +2825,11 @@ loading paths are unchanged.
 Campaign state version 6 is 772 bytes, with the new real after the previous
 768-byte version 5. Older checkpoint states default the absent lighting value
 to the captured pre-load value. Snapshot validation rejects nonfinite and
-out-of-range values. MCC protocol 63 requires the larger snapshot on both peers;
-OpenCE's `HALO_PORT_NETWORK_VERSION` remains 41 because Xbox/CE retain the pinned
-upstream wire contract. This is an MCC-only peer-agreement change.
+out-of-range values. MCC protocol 63 introduced the larger snapshot on both peers
+while the shared agreement remained OpenCE 41. That was an MCC-only agreement
+change. The current shared checkpoint lifetime fix separately requires updated
+GulchCE peers for every map family; see the
+[current protocol boundary](../port/linux/NETCODE.md#gulchce-network-agreement).
 
 `mcc_checkpoint.c` keeps the existing 768-byte campaign reservation and all
 thread/object-name arena addresses. Checkpoint footer version 3 uses four of

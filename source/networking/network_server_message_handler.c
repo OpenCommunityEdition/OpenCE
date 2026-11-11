@@ -279,6 +279,11 @@ boolean network_voice_handles_message(word const *message, word size);
 void network_voice_handle_message(long machine_index, word const *message, word size);
 /* port/linux/game/map_share.c's: map sharing, in the lobby too */
 boolean map_share_handles_message(word const *message, word size);
+/* port/linux/game/mcc_share.c's: MCC package sharing, in the lobby too */
+boolean mcc_share_game_handles_message(word const *message, word size);
+void mcc_share_game_handle_message(long machine_index, word const *message, word size, boolean from_stream);
+#include "mcc_load_network.h" /* port: MCC send-only loading progress */
+#include "mcc_admission.h" /* port: MCC validation before players and precaching */
 boolean network_map_vote_handles_message(word const *message, word size);
 void network_map_vote_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void map_share_handle_message(long machine_index, word const *message, word size, boolean from_stream);
@@ -453,6 +458,7 @@ struct message_client_join_game_request
 	refused the machine for its VPN asks for it) */
 	byte link_pass[170];
 	byte link_proof[64];
+	word network_version; /* port: shared agreement before host admission */
 };
 
 struct message_client_settings_request
@@ -1245,7 +1251,7 @@ boolean network_game_server_handle_client_message(
 								server,
 								machine,
 								message,
-								message_buffer_size, FALSE); /* port: ordinary OpenCE join */
+								message_buffer_size, FALSE); /* port: ordinary shared join */
 							if (!result)
 							{
 								network_event("network_game_server_handle_message_client_join_game_request() failed");
@@ -1449,6 +1455,43 @@ boolean network_game_server_handle_client_message(
 						network_game_server_get_client_machine(server, machine, &machine_index))
 					{
 						network_voice_handle_message(machine_index, message, message_buffer_size);
+					}
+					break;
+				}
+				/* port: receive MCC loading work on the joined reliable stream,
+				 * including while the loaded host still waits in pregame. */
+				if (mcc_load_network_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+						mcc_load_network_handle_message(machine_index, message, message_buffer_size, TRUE);
+					break;
+				}
+				/* port: MCC validation must precede player addition and loading;
+				 * only an already joined machine's reliable stream can hold it. */
+				if (mcc_admission_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						mcc_admission_handle_message(machine_index, message, message_buffer_size, TRUE);
+					}
+					break;
+				}
+				/* (port: MCC package sharing's, the same way: mcc_share.c) */
+				if (mcc_share_game_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						mcc_share_game_handle_message(machine_index, message, message_buffer_size, TRUE);
 					}
 					break;
 				}
@@ -1855,7 +1898,7 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			older builds had: network_client_manager.c) */
 			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(third_person_session_version(game->map.name) & 0xFF);
 			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(third_person_session_version(game->map.name) >> 8);
-			/* port: capability version is separate even in an OpenCE lobby. */
+			/* port: MCC capability version is separate in either session profile. */
 			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET] = MCC_PROTOCOL_VERSION & 255;
 			advertisement.reserved[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET + 1] = MCC_PROTOCOL_VERSION >> 8;
 			advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] =
@@ -2038,6 +2081,15 @@ static boolean network_game_server_handle_message_client_join_game_request(
 			boolean full = network_game_server_get_state(server, NULL) == _network_game_server_state_pregame &&
 				!network_game_has_free_player_slot(network_game_server_get_game(server)) &&
 				!bots_population_can_join(server); /* port: validated humans can replace lobby bots */
+
+			/* port: discovery is advisory; direct joins must prove the same
+			shared recovery agreement before capability or ordinary admission. */
+			if (join_game_request.network_version != HALO_PORT_NETWORK_VERSION)
+			{
+				network_event("join requires GulchCE network version %u (client %u)",
+					HALO_PORT_NETWORK_VERSION, join_game_request.network_version);
+				return FALSE;
+			}
 
 			/* port: bind capability to this connection before the normal admission.
 			 * A failed join is removed through the same lifecycle as any other peer. */

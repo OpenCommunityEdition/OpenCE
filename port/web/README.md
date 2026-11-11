@@ -9,12 +9,14 @@ for your own server).
 
 The site serves no game data. The page copies the `maps/` folder out of your
 own Xbox disc image of Halo: Combat Evolved into the browser's storage for
-the site. Nothing is uploaded.
+the site. **Custom maps** separately imports your Custom Edition files and
+Halo 1 MCC package folders. Importing uploads nothing.
 
 ## What it needs
 
 - A desktop browser: Chrome or Edge, or Firefox. Safari 17 or later may
-  work. The page checks what it needs and says what is missing.
+  work. The page checks what it needs and says what is missing, including
+  Web Locks for coordinating storage between tabs.
 - A 64-bit browser that gives the page 2.1 GB of memory (the Xbox's memory
   window is at its top: "How it operates"). Desktop browsers do; a phone's
   may not (the page says so), and iPhones are untried.
@@ -39,6 +41,50 @@ Every map is checked as the game checks it before it is copied (its `head`
 and `foot` signatures, the Xbox cache version and the build of a retail disc,
 `01.10.12.2276`, or of the decompilation, `01.01.14.2342`). A disc image is
 untrusted input: the reader checks every offset and size in it.
+
+### Custom Edition and MCC imports
+
+Under **Custom maps**, **Add CE files…** or **Add a CE folder…** accepts
+Custom Edition `.map` files, including `bitmaps.map`, `sounds.map` and
+`loc.map` from your CE installation. Files go into `custom_maps/`, separate
+from the Xbox `maps/` directory. Maps requiring OpenSauce features are refused;
+an inert OpenSauce header remains acceptable as in the native CE reader.
+
+**Add an MCC package folder…** accepts one Halo 1 package, including its
+required JSON metadata and supported referenced PNG previews. Map files
+under `maps/` or `halo1/maps/` are flattened into
+`mcc_maps/<package>/`; metadata keeps its relative paths. Local map-only
+folders are valid without JSON, previews or Workshop attribution. The folder
+name defaults to a valid Workshop ID from `ModInfo.json`, otherwise the
+selected folder's name; you can supply a different portable name. Generated
+`dl_<hash>` download names are reserved.
+
+Manual imports never replace existing files or package folders. Choose a
+new MCC package name for a different version. **Cancel import** waits for
+the worker to remove its unfinished files. After an interrupted import,
+recovery runs before the next import or game; malformed records or unrelated
+files are retained and reported instead of recursively deleted. Close games
+in other tabs before importing or deleting data. Multiple game tabs can
+coexist; each holds a shared storage guard, while page imports require it
+exclusively. The existing Xbox and mod importers retain their own copy
+policies behind that same guard.
+
+Selections are bounded to 4,096 files and 16 GiB in total; each file must
+fit within 2 GiB minus one byte. MCC packages contain at most 1,024 maps
+and 64 campaign missions. Required JSON is at most 256 KiB per file; missing
+or malformed required metadata refuses the import. Optional PNGs outside
+the supported 8-bit RGB/RGBA, non-interlaced, 2,048-by-2,048 and 8 MiB
+limits use the game's placeholder. Header checks precede copying; the game
+still validates tags and resources when loading. Import success alone does
+not establish map compatibility.
+
+Find maps through the existing CE/MCC menus. MCC campaign progression keeps
+the existing `game.mcc_campaigns` opt-in. Importing does not enable it.
+Host downloads retain the host/client sharing opt-ins and version prompts;
+browser MCC publication uses a local journal because OPFS cannot rename a
+package directory atomically. See the
+[browser import and storage walkthrough](../../docs/reading/browser_imports.md)
+for ownership, recovery, quota and download details.
 
 Mods (`docs/mods.md`): under **Mods**, **Add a mod folder…** copies a mod's
 `mod.toml` and `tags` folder into the browser's storage (`mods/`, which the
@@ -148,9 +194,11 @@ reloads.
 - Internet play has no relay, as on the native builds: two machines whose
   networks let no direct connection through (some company and school
   networks block WebRTC) cannot play together.
-- No Custom Edition maps (their tag data's address is in the C heap there),
-  so a browser neither downloads nor sends one (map sharing,
-  `port/linux/NETCODE.md`).
+- Custom Edition and MCC maps retain their native format limits and
+  unsupported-feature checks. Import storage tests do not substitute for
+  gameplay and networking validation; current Milestone 14 runtime evidence
+  and outstanding checks are recorded in
+  [the validation ledger](../../docs/mcc_refactor_validation.md).
 - No Bink videos (as on the other ports).
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
   the visibility tests (lens flares) report whether anything was drawn, a
@@ -192,7 +240,9 @@ serves another site (a `halo-web-*.zip` from a release, say).
 ### Tests
 
 ```sh
-node --test "port/web/tests/*.test.js"   # the disc image reader, the service worker
+node --test "port/web/tests/*.test.js"   # importers, storage, launcher, service worker
+node port/web/tests/map_import.mjs chromium firefox  # real manual import workers/OPFS, synthetic headers
+node port/web/tests/mcc_storage.mjs chromium firefox # real WasmFS MCC staging, synthetic bytes (needs emcc)
 python -m pytest -q tools/test_web_build.py  # the build's graph, version.json, the sockets, the menus
 node port/web/tests/smoke.mjs dist/halo-web-release  # the site in a headless Chromium (Playwright)
 node port/web/tests/rooms.mjs dist/halo-web-release  # two browsers in a room (and mosquitto)
@@ -204,6 +254,15 @@ The smoke, rooms and internet browser tests answer the optional public
 analytics script with empty JavaScript. Their local page checks therefore
 do not depend on the analytics service responding. The site's normal
 analytics and the tests' service-worker isolation checks are unchanged.
+
+`map_import.mjs` checks raw imported bytes, campaign metadata, optional
+preview omission, no overwrite, persistence across reload, cancellation and
+same-origin game/import guards. `mcc_storage.mjs` exercises journal visibility,
+flush failures, interrupted writes, uncertain callback outcomes and recovery
+through the actual WasmFS backend. Both use isolated browser contexts and
+remove their synthetic fixtures; neither launches a playable map. Set
+`WEB_MAP_IMPORT_RESULTS` or `WEB_MCC_STORAGE_RESULTS` to retain their JSON
+reports.
 
 The smoke test serves the site as GitHub Pages does, checks that the page
 isolates itself and passes its checks, and starts the game with an empty
@@ -244,7 +303,12 @@ multiply-adds). `tools/web_build.py` writes the graph.
 - **Memory.** The game expects the Xbox's memory window at `0x80000000`
   (`port/linux/src/platform.h`), 128 MB as on Android. The WebAssembly
   memory is made `0x88000000` bytes, so that the window is its top 128 MB;
-  `port/web/src/web_main.c` keeps the C heap below it. `xbox_memory.c`
+  `port/web/src/web_memory.c` keeps the C heap below CE's fixed tag window
+  at `0x40440000`, also leaving MCC's accepted fixed windows outside the
+  allocator. Ordinary allocations share roughly 1 GiB with static data and
+  thread stacks; converted map resources must fit that bounded space.
+  CE initialization follows loaded settings; its tag window is
+  unavailable when `game.custom_edition` is disabled. `xbox_memory.c`
   clears a block where it would map fresh pages, and only remembers
   protection.
 - **Threads.** Emscripten's pthreads, with `PROXY_TO_PTHREAD`: the game's
@@ -422,7 +486,9 @@ jsDelivr).
 | --- | --- |
 | `tools/web_build.py` | The `ninja web` graph |
 | `port/web/halo_sdl3.py` | SDL 3.4.16 as an Emscripten port |
-| `port/web/src/web_main.c` | The entry point: the page's arguments, the storage, the heap's limit |
+| `port/web/src/web_main.c` | The entry point: the page's arguments, storage mount and memory initialization |
+| `port/web/src/web_memory.c` | The ordinary heap limit and CE tag-window initialization; MCC reservations remain in `port/linux/src/mcc_memory.c` |
+| `port/web/src/web_mcc_storage.c`, `web_mcc_library.js` | MCC download publication, visibility, quota and bounded page requests |
 | `port/web/src/web_net.c` | The sockets inside the page, the room's other browsers, and the brokers' WebSockets |
 | `port/web/src/web_p2p.c` | Internet play's WebRTC connections |
 | `port/web/src/web_memory_watch.c` | The memory watch by hashing |
@@ -430,7 +496,7 @@ jsDelivr).
 | `port/web/src/web_stubs.c` | UPnP and an MSVC intrinsic |
 | `port/web/src/web_shared.h`, `web_touch.c` | The words of memory the page reads and writes: frames shown, the touch controls' state |
 | `port/web/src/web_library.js`, `web_pre.js` | The JavaScript halves: messages to the page, the brokers' WebSockets, the workers' errors |
-| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), internet play's WebRTC (`p2p.js`), its service worker (`sw.js`), the importers (`xiso-worker.js`, the maps; `mods-worker.js`, the mods), the web app's manifest and icons |
+| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), touch controls, rooms and WebRTC; separate Xbox, CE, MCC and mod importers; `map-import-storage.js` and `map-storage-worker.js` own browser transactions; service worker, manifest and icons |
 | `port/web/stamp_version.py`, `licenses.py` | `version.json` and `licenses.txt` |
 | `port/web/tests/` | The tests above |
 | `tools/web_serve.py` | A local server for the site |

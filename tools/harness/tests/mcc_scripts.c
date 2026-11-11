@@ -9,6 +9,7 @@
 #include "scenario/scenario_definitions.h"
 #include "mcc_runtime.h"
 #include "mcc_scripts.h"
+#include "mcc_campaign.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +30,8 @@ void mcc_executing_thread_evaluate(short f,long t,boolean i) {(void)f;(void)t;(v
 void mcc_kill_thread_evaluate(short f,long t,boolean i) {(void)f;(void)t;(void)i;}
 short const hs_external_global_count=443;
 static boolean loaded;
+static boolean resolver_case, alias_target_missing;
+static unsigned native_lookups, campaign_lookups, parameter_prepares;
 static struct data_array list_data;
 struct data_array *object_list_header_data = &list_data;
 static long arguments[3], returned;
@@ -36,6 +39,8 @@ static long equipment_unit;
 static short equipment_profile;
 static boolean equipment_reset;
 static unsigned equipment_calls;
+static unsigned deselect_calls;
+void ai_scripting_deselect(void) { ++deselect_calls; }
 void mcc_player_add_equipment(long unit, short profile, boolean reset) {
     equipment_unit=unit;equipment_profile=profile;equipment_reset=reset;++equipment_calls;
 }
@@ -45,7 +50,13 @@ static struct object_datum mock_object;
 static int deleted_lists;
 word const hs_object_type_masks[6] = {0xFFFF, 3, 2, 4, 0x380, 0x40};
 struct hs_function_definition *mcc_campaign_function(short index) { (void)index;return NULL; }
-short mcc_campaign_find(char const *name) { (void)name;return NONE; }
+short mcc_campaign_find(char const *name) {
+    if (resolver_case) {
+        ++campaign_lookups;
+        if (!_stricmp(name,"physics_set_gravity")) return MCC_HS_CAMPAIGN_FIRST;
+    }
+    return NONE;
+}
 struct scenario *global_scenario_get(void) { return NULL; }
 boolean ai_index_from_string(struct scenario *scenario, char const *name, long *result) {
     (void)scenario;
@@ -71,7 +82,7 @@ void error(short priority, char const *format, ...) {
 boolean mcc_cache_tags_loaded(void) { return loaded; }
 boolean mcc_cache_contains(void const *data, unsigned long bytes) { (void)data; (void)bytes; return loaded; }
 int mcc_parameters_prepare(struct mcc_runtime *runtime, struct scenario *scenario, struct data_array *syntax) {
-    (void)runtime; (void)scenario; (void)syntax; return 1;
+    (void)runtime; (void)scenario; (void)syntax; ++parameter_prepares; return 1;
 }
 boolean hs_macro_function_parse(short index, long expression) { (void)index; (void)expression; return TRUE; }
 long *hs_macro_function_evaluate(short function, long thread, boolean initialize) {
@@ -79,6 +90,20 @@ long *hs_macro_function_evaluate(short function, long thread, boolean initialize
 }
 void hs_return(long thread, long value) { (void)thread; returned = value; }
 short hs_find_function_by_name(char const *name) {
+    if (resolver_case) {
+        /* The real native lookup consults the guarded MCC hook first. */
+        short index=mcc_script_find(name);
+        if (index!=NONE) return index;
+        ++native_lookups;
+        if (!_stricmp(name,"sleep")) return 321;
+        if (!_stricmp(name,"player_effect_set_max_rumble")) return alias_target_missing ? NONE : 322;
+        /* Deliberate legacy collisions check MCC precedence and alias misses. */
+        if (!_stricmp(name,"core_save_name")) return 323;
+        if (!_stricmp(name,"player_effect_set_max_vibrate")) return 324;
+        if (!_stricmp(name,"ai_select")) return 200;
+        if (!_stricmp(name,"ai_deselect")) return 201;
+        return NONE;
+    }
     if (!strcmp(name, "sleep") || !strcmp(name,"set")) return 321;
     if (!strcmp(name, "player_effect_set_max_rumble")) return 322;
     return NONE;
@@ -112,6 +137,47 @@ void *mcc_runtime_allocate(struct mcc_runtime *runtime,uint32_t bytes) {
     {void *p=runtime->tags+runtime->used;runtime->used+=bytes;return p;}
 }
 #define CHECK(value) do { if (!(value)) { fprintf(stderr, "check failed at line %d\n", __LINE__); return 1; } } while (0)
+
+static int check_resolver(struct mcc_runtime *runtime, struct data_array *syntax,
+    struct hs_syntax_node *nodes, char *strings, char const *name, short expected, boolean missing)
+{
+    short prepared_index=!_stricmp(name,"sleep") ? 321 : expected;
+    short resolved;
+    unsigned preparation_native,preparation_campaign;
+    boolean prepared;
+    resolver_case=TRUE;alias_target_missing=missing;
+    strcpy(strings,name);
+    nodes[1].function_index=778;
+    CHECK(!loaded && mcc_script_find(name)==NONE && mcc_script_find(NULL)==NONE);
+    CHECK(!native_lookups && !campaign_lookups && !parameter_prepares);
+    prepared=mcc_scripts_prepare(runtime);
+    CHECK(prepared==(prepared_index!=NONE));
+    CHECK(parameter_prepares==(unsigned)prepared);
+    CHECK(nodes[0].function_index==(prepared ? prepared_index : 777));
+    CHECK(nodes[1].function_index==(prepared ? prepared_index : 778));
+    CHECK(syntax->count==4 && syntax->actual_count==4 && syntax->maximum_count==32767);
+    CHECK(prepared ? !runtime->failure[0] : strstr(runtime->failure,"Unsupported script name:")!=NULL);
+    preparation_native=native_lookups;preparation_campaign=campaign_lookups;
+    native_lookups=campaign_lookups=0;loaded=TRUE;
+    CHECK(mcc_script_find(NULL)==NONE && !native_lookups && !campaign_lookups);
+    resolved=mcc_script_find(name);
+    CHECK(resolved==expected);
+    if (!_stricmp(name,"player_effect_set_max_vibrate")) CHECK(native_lookups==1);
+    else CHECK(!native_lookups);
+    printf("%s prepare=%d call=%d predicate=%d runtime=%d native=%u/%u campaign=%u/%u\n",
+        name,prepared,nodes[0].function_index,nodes[1].function_index,resolved,
+        preparation_native,native_lookups,preparation_campaign,campaign_lookups);
+    native_lookups=campaign_lookups=0;loaded=FALSE;
+    CHECK(mcc_script_find(name)==NONE && mcc_script_find(NULL)==NONE);
+    CHECK(!native_lookups && !campaign_lookups);
+    /* A later legacy lookup retains the native implementation. */
+    CHECK(hs_find_function_by_name("core_save_name")==323);
+    CHECK(hs_find_function_by_name("player_effect_set_max_vibrate")==324);
+    CHECK(hs_find_function_by_name("ai_deselect")==201);
+    free(runtime->tags);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     struct mcc_runtime runtime = {0};
     struct scenario *scenario;
@@ -186,6 +252,39 @@ int main(int argc, char **argv) {
     nodes[3].flags = 1;
     nodes[3].next_node_index = NONE;
     strcpy(strings, "sleep");
+    if (!strcmp(argv[1],"resolver") || !strcmp(argv[1],"resolver_missing_alias")) {
+        CHECK(argc==4);
+        return check_resolver(&runtime,syntax,nodes,strings,argv[2],(short)strtol(argv[3],NULL,10),
+            !strcmp(argv[1],"resolver_missing_alias"));
+    }
+    if (!strcmp(argv[1],"ai_deselect")) {
+        strcpy(strings,"ai_deselect");resolver_case=TRUE;
+        nodes[0].type=_hs_type_void;nodes[1].next_node_index=NONE;
+        CHECK(!loaded && !mcc_script_function(0x7007));
+        CHECK(mcc_scripts_prepare(&runtime));
+        CHECK(nodes[0].function_index==0x7007 && nodes[1].function_index==0x7007);
+        loaded=TRUE;extension=mcc_script_function(0x7007);CHECK(extension);
+        CHECK(extension->return_type==_hs_type_void && extension->parameter_count==0);
+        CHECK(mcc_script_find("ai_select")==NONE && hs_find_function_by_name("ai_select")==200);
+        CHECK(mcc_script_call_valid(nodes,syntax));
+        returned=123;extension->evaluate(0x7007,0,TRUE);
+        CHECK(deselect_calls==1 && returned==0);
+        /* Like native zero-argument evaluators, completion does not depend on
+         * an argument frame or the initialize flag. */
+        returned=123;extension->evaluate(0x7007,0,FALSE);
+        CHECK(deselect_calls==2 && returned==0);
+        nodes[1].next_node_index=0x10002;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[1].next_node_index=NONE;
+        nodes[0].data=0x20001;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[0].data=0x10001;
+        nodes[0].flags=0;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[0].flags=9;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[0].flags=10;CHECK(!mcc_script_call_valid(nodes,syntax));
+        nodes[0].flags=8;loaded=FALSE;
+        CHECK(!mcc_script_call_valid(nodes,syntax) && !mcc_script_function(0x7007));
+        CHECK(mcc_script_find("ai_deselect")==NONE && hs_find_function_by_name("ai_deselect")==201);
+        free(runtime.tags);return 0;
+    }
     if (!strncmp(argv[1], "issue89_link_", 13)) {
         strcpy(strings,argv[1]+13);
         nodes[0].type=!strcmp(strings,"kill_thread") ? _hs_type_void : _hs_type_long_integer;

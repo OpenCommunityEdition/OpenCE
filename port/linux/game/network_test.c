@@ -171,6 +171,7 @@ static struct
 	short chat_lines_said;
 	long score_to_win;
 	long logged_time;
+	long sample_time;
 	boolean public_game;
 	boolean browsing;
 	boolean browse_listed;
@@ -1175,10 +1176,22 @@ void network_test_update(
 	}
 	if (game_in_progress() && !main_menu_loaded)
 		network_test_run_cues();
+	/* Observe the first frame in each absolute simulation second. A late join
+	 * must not permanently offset the sample cadence; report the actual tick,
+	 * never backfill missed states. Scripted actions retain their old cadence. */
+	if (game_in_progress() && !main_menu_loaded)
+	{
+		if (game_time_get() < network_test.sample_time)
+			network_test.sample_time = 0;
+		if (game_time_get() / TICKS_PER_SECOND > network_test.sample_time / TICKS_PER_SECOND)
+		{
+			network_test.sample_time = game_time_get();
+			network_test_log_players();
+		}
+	}
 	if (game_in_progress() && !main_menu_loaded && game_time_get() - network_test.logged_time >= TICKS_PER_SECOND)
 	{
 		network_test.logged_time = game_time_get();
-		network_test_log_players();
 		if (network_test.shoot_interval > 0.0f &&
 			game_time_get() % MAX(1, (long)(network_test.shoot_interval * TICKS_PER_SECOND)) < TICKS_PER_SECOND)
 		{

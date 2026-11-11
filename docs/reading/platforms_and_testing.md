@@ -140,6 +140,38 @@ stands on the floor, moves and jumps using positions sampled from the run.
 Those samples are not every physics step. Stagekit is Linux-only and needs
 the build/runtime prerequisites described in its README.
 
+## MCC refactor baseline
+
+For the MCC refactor's current milestones and concrete baseline, see
+[MCC refactor milestones and validation](../mcc_refactor_validation.md). Its
+overview separates completed work, deferred fixes and retained compatibility
+limits, including the shared co-op recovery finding. The evidence sections
+record the starting revision, the installed-Workshop smoke runner, the
+distinction between pytest coverage and direct GPU execution, and actual
+validation limits. Read `parse_args`, `case_environment`, `run_case` and `check_result`
+in [mcc_native_smoke.py](../../tools/mcc_native_smoke.py) to follow a virtual
+Workshop level name through an isolated hidden game run and its evidence.
+The verdict checks debug, console, stdout and stderr diagnostics. Cache and
+executable cleanup require observed child exit; uncertain shutdown retains
+the outputs and stops subsequent cases so they can be investigated safely.
+
+[Milestone 10](../mcc_refactor_validation.md#milestone-10-shared-co-op-checkpoint-recovery)
+tracks shared co-op recovery, and
+[Milestone 11](../mcc_refactor_validation.md#milestone-11-shared-boat-control-initialization)
+tracks shared boat initialization, recovery from small client clock delays
+exposed by Mercury, and the separately authorized console lifetime repair.
+Read `update_human_boat_physics` in
+[vehicles.c](../../source/units/vehicles.c), `game_time_update` in
+[game_time.c](../../source/game/game_time.c), and the console state helpers
+included by [hs_runtime.c](../../source/hs/hs_runtime.c). These correct existing
+engine contracts across map families; none selects a fix by map name.
+The Stage 11 evidence separates the original failures, focused source tests,
+native runtime checks and three actual-map Internet cases. Mercury driving
+passes the unchanged comparison thresholds; the other affected Workshop B30
+check establishes static boat presence only. Network agreements are separated,
+and old-layout console saves are refused. Consult the recorded limits before
+inferring full campaign, every-map or old-peer compatibility.
+
 ## Work through a suspected movement regression
 
 Suppose a player unexpectedly falls through an elevator. First record the
@@ -180,10 +212,8 @@ Name skipped tests and missing prerequisites. For rendering, include the
 backend and a real image check; for maps, distinguish loading from campaign
 completion; for networking, name roles, transports and relevant transitions.
 
-This documentation pass inspected the cited code and test contracts and
-checked documentation consistency. It did not launch games, run these
-gameplay suites, measure performance or produce new compatibility results.
-Existing test and design documents remain the source for their own recorded
-evidence. The reader's guide explains how to interpret that evidence.
+The linked test, design and baseline documents record their own validation.
+Example commands in this chapter are not claims that those checks ran.
+The reader's guide explains how to interpret the evidence and its limits.
 
 Return to the [guide](README.md) for the full reading route.

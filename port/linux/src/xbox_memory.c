@@ -21,8 +21,8 @@ The web build (HALO_WEB) has no pages to map or protect: WebAssembly's
 memory is one block, made large enough that the window is its top 128 MB
 (tools/web_build.py), and the C heap stays below it (port/web/src/web_main.c).
 A block is cleared when it is allocated, as fresh pages would be, and
-protection is only remembered. Custom Edition maps, whose window lies in the
-C heap there, do not run.
+protection is only remembered. web_memory.c keeps the heap below the separate
+Custom Edition tag window and initializes it after the page's settings.
 */
 
 #include "platform.h"
@@ -35,6 +35,7 @@ C heap there, do not run.
 #include <unistd.h>
 
 #ifdef HALO_WEB
+#include "../../web/src/web_memory.h"
 /* the memory's size: whether it covers the window */
 #define web_memory_bytes() ((unsigned long long)__builtin_wasm_memory_size(0) << 16)
 #endif
@@ -127,7 +128,11 @@ static void custom_edition_tag_cache_reserve(void)
 
 void *halo_custom_edition_tag_cache(void)
 {
+#ifdef HALO_WEB
+	return web_custom_edition_tag_cache();
+#else
 	return custom_edition_tag_cache;
+#endif
 }
 
 BOOL platform_is_contiguous(const void *address)

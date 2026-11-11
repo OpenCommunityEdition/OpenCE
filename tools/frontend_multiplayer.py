@@ -123,7 +123,7 @@ def append(doc):
                                     if item_name == "session_compatibility_spinner":
                                         # The native service reads indices; short captions fit
                                         # the modern value column even at 4:3.
-                                        put(item, strings="CROSSPLAY|GULCHCE")
+                                        put(item, strings="STANDARD|THIRD PERSON")
                                     if item_name == "voice_mode_spinner":
                                         item.attrib.pop("string_list", None)
                                         put(item, strings="OFF|TEAM NEAR|ANYONE NEAR|TEAM|TEAM + NEARBY")

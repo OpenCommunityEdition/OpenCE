@@ -22,11 +22,10 @@ typedef float real;
 #define _object_mask_unit 3
 #define _game_connection_network_server 1
 #define _game_connection_network_client 2
-#define _distributed_message_mcc_grenades 83
-#define _distributed_message_mcc_campaign 84
 /* MCC_CAMPAIGN_SIZE */
 #define _distributed_to_clients 0
-struct distributed_message_header {word header;byte type,count;long time;};
+typedef word message_header;
+/* DISTRIBUTED_HEADER */
 struct object_iterator {long index;int done;};
 struct unit_datum {struct {long player_index;} unit;};
 struct player_datum {long unit;};
@@ -69,8 +68,8 @@ long local_player_get_player_index(short index){return index==0?0:NONE;}
 struct player_datum *player_try_and_get(long index){return index==0?&player:NULL;}
 long distributed_living_unit(struct player_datum const *p){return p?p->unit:NONE;}
 void distributed_send(void *message,byte type,short count,word size,short destination){
-    if(type==84) { if(count==1&&size==sizeof(struct distributed_message_header)+MCC_CAMPAIGN_SNAPSHOT_BYTES)campaign_sends++;return; }
-    (void)destination;if(type!=83||size>sizeof(sent))return;
+    if(type==_distributed_message_mcc_campaign) { if(count==1&&size==sizeof(struct distributed_message_header)+MCC_CAMPAIGN_SNAPSHOT_BYTES)campaign_sends++;return; }
+    (void)destination;if(type!=_distributed_message_mcc_grenades||size>sizeof(sent))return;
     memcpy(sent,message,size);sent_count=count;sent_size=size;sends++;
 }
 /* MCC_INVENTORY_IMPLEMENTATION */
@@ -99,8 +98,8 @@ int main(int argc,char **argv){
     CHECK(argc==2);player.unit=live_unit;mcc_network_new_game();
     memset(&packet,0,sizeof(packet));packet.unit=live_unit;packet.counts[0]=7;packet.counts[1]=8;
     if(!strcmp(argv[1],"host")){
-        mcc_network_host_tick();CHECK(sends==1&&sent_count==1&&sent_size==16);
-        CHECK(((struct mcc_network_inventory *)(sent+8))->counts[0]==3);
+        mcc_network_host_tick();CHECK(sends==1&&sent_count==1&&sent_size==sizeof(struct distributed_message_header)+sizeof(packet));
+        CHECK(((struct mcc_network_inventory *)(sent+sizeof(struct distributed_message_header)))->counts[0]==3);
         now=6;mcc_network_host_tick();CHECK(sends==1);
         counts[2]=2;mcc_network_host_tick();CHECK(sends==2);
         now=36;mcc_network_host_tick();CHECK(sends==3);

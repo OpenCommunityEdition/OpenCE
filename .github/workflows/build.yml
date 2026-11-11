@@ -145,12 +145,14 @@ jobs:
       - name: Test
         run: |
           python -m pytest -q tools/test_dualsense.py
+          python -m pytest -q tools/test_p2p_shutdown.py tools/test_network_test_sampling.py tools/test_network_test_startup.py
           python -m pytest -q tools/test_loading_widescreen.py tools/test_loading_chant.py tools/test_reversed_depth.py
           python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/test_bots_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_visibility_readback_contract.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
-          python -m pytest -q tools/test_shadow_setup.py tools/test_hud_shield_tick.py
+          python -m pytest -q tools/test_shadow_setup.py tools/test_hud_shield_tick.py tools/test_render_target_binding.py
           python -m pytest -q tools/test_android_mcc_memory.py tools/test_mcc_memory.py tools/test_android_dynamic_lighting.py tools/test_android_shader_logs.py tools/test_android_frame_fences.py
           python -m pytest -q tools/test_changelog_layout.py tools/test_changelog_menu.py tools/test_gulch_build_label.py tools/test_player_notes.py tools/test_changelog_release_base.py
-          python -m pytest -q tools/test_third_person.py tools/test_camera_policy.py tools/test_camera_wire.py tools/test_camera_protocol.py tools/test_third_person_director.py tools/test_coop_checkpoint.py
+          python -m pytest -q tools/test_third_person.py tools/test_camera_policy.py tools/test_camera_wire.py tools/test_camera_protocol.py tools/test_third_person_director.py tools/test_coop_checkpoint.py tools/test_coop_checkpoint_recovery.py tools/test_scripted_player_pose.py tools/test_checkpoint_epoch.py tools/test_join_protocol.py
+          python tools/test_checkpoint_timing.py
           # the dedicated server: --version, and --server without maps refused (exit code 2); its cases with
           # clients need the retail maps, and are skipped
           python -m pytest -q tools/test_dedicated_server.py tools/test_king_network_state.py
@@ -341,6 +343,17 @@ jobs:
       - name: Test light storage
         run: python tools/test_light_storage.py
 
+      - name: Test shared runtime regressions
+        shell: cmd
+        run: |
+          python -m pip install pytest
+          if errorlevel 1 exit /b 1
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "SHUTDOWN_VS_INSTALL=%%i"
+          if not defined SHUTDOWN_VS_INSTALL exit /b 1
+          call "%SHUTDOWN_VS_INSTALL%\Common7\Tools\VsDevCmd.bat" -host_arch=x64 -arch=x86
+          if errorlevel 1 exit /b 1
+          python -m pytest -q tools/test_p2p_shutdown.py tools/test_network_test_sampling.py tools/test_network_test_startup.py tools/test_render_target_binding.py
+
       - name: Compile cache
         run: ccache --show-stats
 
@@ -409,7 +422,7 @@ jobs:
           fi
           ~/emsdk/emsdk activate "$EMSDK_VERSION"
           sudo apt-get update -q
-          sudo apt-get install -y -q ninja-build ccache python3-pytest mosquitto
+          sudo apt-get install -y -q ninja-build ccache clang python3-pytest mosquitto
 
       - uses: actions/cache@v4
         with:
@@ -434,14 +447,18 @@ jobs:
           node --test "port/web/tests/*.test.js"
           # (the dedicated server's admin page, port/assets/server_ui, against tools/server_sim.py)
           node --test tools/server_ui_tests/
-          python3 -m pytest -q tools/test_web_build.py
+          python3 -m pytest -q tools/test_web_build.py tools/test_web_map_memory.py tools/test_mcc_web_storage.py
 
       - name: Test in Chromium and Firefox
         env:
           WEB_BUILD: ${{ github.ref == 'refs/heads/main' && 'dist/halo-web-release' || 'dist/halo-web-debug' }}
         run: |
+          source ~/emsdk/emsdk_env.sh
           npm install --no-save --prefix "$RUNNER_TEMP/playwright" playwright@1.58
           "$RUNNER_TEMP/playwright/node_modules/.bin/playwright" install --with-deps chromium firefox
+          NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/map_memory.mjs chromium firefox
+          NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/map_import.mjs chromium firefox
+          NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/mcc_storage.mjs chromium firefox
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/smoke.mjs "$WEB_BUILD"
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/rooms.mjs "$WEB_BUILD"
           # (the native builds' WebRTC, port/linux/src/p2p_webrtc.c, with both)

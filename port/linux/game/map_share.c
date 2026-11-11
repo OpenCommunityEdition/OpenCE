@@ -66,6 +66,7 @@ what it says it has grows.
 #include "custom_edition_cache.h"
 #include "custom_edition_maps.h"
 #include "map_share.h"
+#include "mcc_share.h"
 #include "server_director.h"
 #include "../src/p2p.h"
 
@@ -697,6 +698,7 @@ static void map_share_fill_header(
 	header->type = type;
 	header->count = 1;
 	header->game_time = game_in_progress() ? game_time_get() : 0;
+	header->checkpoint_epoch = 0; /* Transfers belong to the connection, not a checkpoint. */
 }
 
 /* a level name copied into a message's field, ended within it */
@@ -1499,6 +1501,9 @@ boolean map_share_downloading(
 {
 	struct download *download = &map_share_globals.download;
 
+	/* (MCC package sharing's download, a map of mcc_maps: mcc_share.c) */
+	if (mcc_share_game_downloading(level_name))
+		return TRUE;
 	return (download->state == _download_asking || download->state == _download_transferring) &&
 		level_name && !csstrcmp(download->level_name, level_name);
 }
@@ -1509,6 +1514,9 @@ boolean map_share_holds_players(
 	struct download *download = &map_share_globals.download;
 	struct network_game *game = map_share_network_game();
 
+	/* (MCC package sharing's download: mcc_share.c) */
+	if (mcc_share_game_holds_players())
+		return TRUE;
 	/* (a client whose host has not named the game's map yet: whether this
 	machine has it is not known, and a game in progress would start it at
 	once. Asking: whether the game is in progress is not known yet) */
@@ -3056,6 +3064,9 @@ boolean map_share_machine_downloading(
 	struct host_machine const *machine = host_machine_valid(machine_index) ?
 		&map_share_globals.machines[machine_index] : NULL;
 
+	/* (a machine fetching the game's MCC package: mcc_share.c) */
+	if (mcc_share_game_machine_active(machine_index))
+		return TRUE;
 	return machine && host_machine_downloading(machine);
 }
 
@@ -3065,6 +3076,9 @@ boolean map_share_machine_needs_map(
 	struct host_machine const *machine = host_machine_valid(machine_index) ?
 		&map_share_globals.machines[machine_index] : NULL;
 
+	/* (a machine fetching the game's MCC package: mcc_share.c) */
+	if (mcc_share_game_machine_needs_map(machine_index))
+		return TRUE;
 	return machine && !machine->downloaded && host_machine_downloading(machine);
 }
 
@@ -3499,6 +3513,8 @@ void map_share_update(
 	unsigned long host_address = map_share_host_address();
 	short index;
 
+	/* (MCC package sharing, a map of mcc_maps: mcc_share.c, whatever the Custom Edition maps do) */
+	mcc_share_game_update();
 	map_share_files_update();
 	/* (internet play: a player that shares answers the others, who reach it
 	by its key hash) */
@@ -3542,6 +3558,7 @@ void map_share_render(
 	short base_length;
 	long percent;
 
+	mcc_share_game_render();
 	if (download->state != _download_asking && download->state != _download_transferring)
 		return;
 	font_tag_index = interface_get_tag_index(_interface_font_terminal);

@@ -4,19 +4,41 @@
 #include "mcc_cache.h"
 #include "mcc_validation.h"
 #include "mcc_identity.h"
+#include "mcc_share.h"
 
 static struct network_game_server *mcc_restart_server;
 static struct network_game mcc_restart_game;
 static struct network_game_server *mcc_restart_ui_server;
 static long mcc_restart_ui_round;
+static struct network_game_server *mcc_campaign_ui_server;
+static long mcc_campaign_ui_round;
+static char mcc_campaign_ui_map[64];
 static struct network_game_server *mcc_pending_map_server;
 static char mcc_pending_map[64];
 static boolean mcc_pending_local_client;
 static int mcc_pending_error_shown;
 static struct network_game_server *mcc_validation_server;
 
+static boolean mcc_ui_network_download_pending(struct network_game_server *server)
+{
+    long i;
+    if (!server || server != global_network_game_server_get() ||
+        server->state != _network_game_server_state_pregame || server->sent_start_game_message ||
+        !mcc_level_name(server->game.map.name)) return FALSE;
+    for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; ++i) {
+        struct network_game_server_client_machine *machine = &server->client_machines[i];
+        if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+            mcc_share_game_machine_active(machine->machine_index)) return TRUE;
+    }
+    return FALSE;
+}
+
 boolean mcc_ui_network_defer_map(struct network_game_server *server, char const *name)
 {
+    /* Choosing another map ends the handoff; same-name validation updates
+     * may legitimately arrive before the local pregame UI. */
+    if (server == mcc_campaign_ui_server && strcmp(name, mcc_campaign_ui_map))
+        mcc_campaign_ui_server = NULL;
     /* Fast host setup can choose MCC while its loopback client is joining.
      * Leave the temporary lobby usable until that admission completes;
      * synchronous package checks must not occupy its five-second window. */
@@ -38,7 +60,8 @@ boolean mcc_ui_network_map_pending(struct network_game_server *server)
 {
     return server && (server==mcc_pending_map_server ||
         (mcc_level_name(server->game.map.name) &&
-         (!server->game.map.version || !mcc_validation_lookup(server->game.map.name,NULL,NULL))));
+         (!server->game.map.version || !mcc_validation_lookup(server->game.map.name,NULL,NULL))) ||
+        mcc_ui_network_download_pending(server));
 }
 
 void mcc_ui_network_update_map(struct network_game_server *server)
@@ -59,6 +82,15 @@ void mcc_ui_network_update_map(struct network_game_server *server)
         }
         return;
     }
+    /* Validation and offered downloads must finish before synchronous load.
+     * A deferred start at zero otherwise skips the ordinary countdown's
+     * heartbeat branch on every frame. Keep that timer alive, including a
+     * pending MCC selection still showing the temporary stock lobby map.
+     * Never start a stopped timer, override a pause or shorten a longer one. */
+    if (server->countdown_state.active && !server->countdown_state.paused &&
+        countdown_timer_get_time_remaining(&server->countdown_state.timer) < 3000 &&
+        mcc_ui_network_map_pending(server))
+        countdown_timer_set_time_remaining(&server->countdown_state.timer, 3000);
     selected=server==mcc_pending_map_server ? mcc_pending_map : server->game.map.name;
     if (!mcc_level_name(selected)) return;
     status=mcc_validation_request(selected,&checksum,NULL);
@@ -92,11 +124,26 @@ void mcc_ui_network_server_dispose(struct network_game_server *server)
     if (server == mcc_pending_map_server) mcc_pending_map_server = NULL;
     if (server == mcc_restart_server) mcc_restart_server = NULL;
     if (server == mcc_restart_ui_server) mcc_restart_ui_server = NULL;
+    if (server == mcc_campaign_ui_server) mcc_campaign_ui_server = NULL;
 }
 
 boolean mcc_ui_network_restart_pregame(void)
 {
     struct network_game_server *server = global_network_game_server_get();
+    if (mcc_campaign_ui_server) {
+        boolean owned = server && server == mcc_campaign_ui_server &&
+            server->state == _network_game_server_state_pregame &&
+            server->game.number_of_games_played == mcc_campaign_ui_round &&
+            !strcmp(server->game.map.name, mcc_campaign_ui_map);
+        mcc_campaign_ui_server = NULL;
+        if (owned) {
+            /* Package validation may replace a provisional checksum before
+             * the local UI arrives. Readiness still gates the actual start. */
+            network_game_server_pause_countdown(server, FALSE);
+            network_game_server_begin_game_start_countdown(server, 3000);
+            return TRUE;
+        }
+    }
     if (!mcc_restart_ui_server) return FALSE;
     if (!server || server != mcc_restart_ui_server) {
         mcc_restart_ui_server = NULL;
@@ -114,6 +161,30 @@ boolean mcc_ui_network_restart_pregame(void)
     network_game_server_pause_countdown(server, FALSE);
     network_game_server_begin_game_start_countdown(server, 3000);
     return TRUE;
+}
+
+void mcc_ui_network_campaign_won(char const *next)
+{
+    struct network_game_server *server = global_network_game_server_get();
+    long round;
+    mcc_campaign_ui_server = NULL;
+    if (!server || !mcc_cache_tags_loaded() ||
+        !mcc_level_name(server->game.map.name) ||
+        server->state != _network_game_server_state_ingame) return;
+    if (next && (!mcc_level_name(next) || strlen(next) >= sizeof(mcc_campaign_ui_map))) return;
+    round = server->game.number_of_games_played;
+    network_game_server_port_cooperative_won(next);
+    /* A manifest has already selected this mission. Ordinary postgame UI
+     * opens multiplayer selection and pauses the countdown.
+     * Preserve end-of-campaign and failure handling without replaying a level. */
+    if (next && server == global_network_game_server_get() &&
+        server->state == _network_game_server_state_pregame &&
+        server->game.number_of_games_played != round &&
+        !strcmp(server->game.map.name, next)) {
+        strcpy(mcc_campaign_ui_map, next);
+        mcc_campaign_ui_round = server->game.number_of_games_played;
+        mcc_campaign_ui_server = server;
+    }
 }
 
 boolean mcc_ui_network_restart_settings(struct network_game_server *server)

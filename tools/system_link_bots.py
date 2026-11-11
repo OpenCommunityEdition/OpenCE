@@ -29,11 +29,18 @@ import argparse
 import errno
 import ipaddress
 import math
+import re
 import selectors
 import socket
 import struct
 import sys
 import time
+from pathlib import Path
+
+# Join admission uses the shared agreement even for stand-in machines that
+# send only system-link messages, not distributed gameplay messages.
+NETWORK_VERSION = int(re.search(r"^#define HALO_PORT_NETWORK_VERSION (\d+)$",
+    (Path(__file__).resolve().parents[1] / "port/linux/include/halo_port_limits.h").read_text(), re.M)[1])
 
 SERVER_PORT = 0x141E
 CLIENT_PORT = 0x141F
@@ -192,7 +199,8 @@ class Machine:
         # one of its own so bans and kick votes tell the machines apart
         hardware_id = b"%032x" % self.index
         # (and no Discord account's pass and proof: 170 and 64 zero bytes, player_link.c)
-        self.send(message(CLIENT_JOIN_GAME_REQUEST, wide(self.name, 32) + JOIN_TOKEN + hardware_id + bytes(170 + 64)))
+        self.send(message(CLIENT_JOIN_GAME_REQUEST, wide(self.name, 32) + JOIN_TOKEN + hardware_id +
+                          bytes(170 + 64) + struct.pack(">H", NETWORK_VERSION)))
         self.state = "joining"
 
     def receive(self):

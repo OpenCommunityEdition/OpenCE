@@ -47,7 +47,7 @@ static int mcc_maps_next_mission(char const *name,char next[64]) {
 static void error(int severity,char const *message,...){(void)severity;(void)message;}
 static void mcc_error_text(char const *name,char const *reason,wchar_t *text,int size){(void)name;(void)reason;(void)size;text[0]=0;}
 static void display_error_text_deferred(wchar_t const *text,int controller){(void)text;(void)controller;errors++;}
-static void network_game_server_port_cooperative_won(char const *next){rounds++;strcpy(selected,next ? next : "lobby");}
+static void mcc_ui_network_campaign_won(char const *next){rounds++;strcpy(selected,next ? next : "lobby");}
 static void main_set_map_name(char const *next){strcpy(selected,next);}
 static void main_disallow_persistent_storage(void){persistent++;}
 static void main_goto_main_menu(void){queued++;}

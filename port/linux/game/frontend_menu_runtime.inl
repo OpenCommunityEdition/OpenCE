@@ -402,6 +402,9 @@ static boolean frontend_editor(struct widget_instance *widget, boolean *deleted)
 		return ui_widget_port_open(widget, "pc\\main_menu\\profile_manager\\player_profile_manager_screen", deleted);
 	}
 	if (!strcmp(key, "row_keyboard")) target = "controls_setup\\controls_settings_screen";
+	else if (!strcmp(key, "row_dead_zones")) target = "gamepad_setup\\dead_zones\\dead_zone_settings_screen";
+	else if (!strcmp(key, "row_discord")) target = "network_setup\\discord_account\\discord_account_settings_screen";
+	else if (!strcmp(key, "row_mcc_downloads")) target = "network_setup\\mcc_downloads\\screen";
 	else if (!strcmp(key, "row_gamepad")) target = "controller_remapping\\controller_remapping_screen";
 	else
 	{

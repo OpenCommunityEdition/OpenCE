@@ -427,7 +427,8 @@ static void mcc_bitmap_complete_mips(struct bitmap_data *bitmap)
     if (packed==(uint32_t)bitmap->pixels_size) bitmap->mipmap_count=(short)complete;
 }
 
-static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *textures,struct mcc_texture *texture)
+static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *textures,struct mcc_texture *texture,
+    uint32_t stream_offset)
 {
     struct bitmap_data *bitmap=texture->bitmap, normalized=*bitmap;
     unsigned level,faces=bitmap->type==2 ? 6 : 1;
@@ -437,7 +438,7 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
         ((bitmap->flags&16) && bitmap->format>=14 && bitmap->format<=17);
     int bytes_per_pixel=mcc_bitmap_bytes(bitmap->format);
     int non_power_two=bitmap->type==0 && ((bitmap->width&(bitmap->width-1)) || (bitmap->height&(bitmap->height-1)));
-    uint32_t input_offset=0,output_offset=0,hardware_size,allocation,stream_offset=0,i;
+    uint32_t input_offset=0,output_offset=0,hardware_size,allocation;
     if (bitmap->width<=0 || bitmap->height<=0 || bitmap->depth<=0 || bitmap->type<0 || bitmap->type>2 ||
         bitmap->width>16384 || bitmap->height>16384 || bitmap->depth>512 || bitmap->mipmap_count<0 || bitmap->mipmap_count>13 ||
         bitmap->pixels_size<=0 || (!bytes_per_pixel && (bitmap->format<14 || bitmap->format>18))) return 0;
@@ -498,11 +499,6 @@ static int mcc_texture_prepare(struct mcc_runtime *runtime,struct mcc_textures *
      * its own bounded virtual stream; the aggregate decoded storage can then
      * exceed the old 512 MiB offset window without signed offsets or aliases
      * between descriptors within one tag. Reads still require exact handles. */
-    for (i=0;i<textures->count;i++) {
-        struct mcc_texture const *previous=&textures->items[i];
-        if (previous->pixels && previous->handle==texture->handle)
-            stream_offset=MAX(stream_offset,previous->offset-MCC_BITMAP_BASE+previous->size);
-    }
     if (!hardware_size || allocation>MCC_BITMAP_ALLOCATION_LIMIT ||
         stream_offset>MCC_BITMAP_LIMIT || textures->end>MCC_BITMAP_STORAGE_LIMIT ||
         allocation>MCC_BITMAP_LIMIT-stream_offset || allocation>MCC_BITMAP_STORAGE_LIMIT-textures->end) {
@@ -574,7 +570,7 @@ failed:
 int mcc_bitmaps_prepare(struct mcc_runtime *runtime)
 {
     struct mcc_textures *textures;
-    uint32_t index,original_count=runtime->report.tag_count;
+    uint32_t index,original_count=runtime->report.tag_count,stream_offset=0;
     unsigned char *new_index;
     textures=malloc(sizeof(*textures));
     if (!textures) return 0;
@@ -611,11 +607,16 @@ int mcc_bitmaps_prepare(struct mcc_runtime *runtime)
     if (!mcc_bitmap_usages(runtime,textures)) {
         error(_error_silent,"mcc bitmaps: invalid bitmap reference in shader or HUD"); return 0;
     }
+    /* Original groups and fresh-handle clones are appended as complete runs.
+     * Each runtime handle has its own stream, including clones that share a
+     * resource handle. Only successful conversions advance its cursor. */
     for (index=0;index<textures->count;index++) {
-        if (!mcc_texture_prepare(runtime,textures,&textures->items[index])) {
+        if (!index || textures->items[index].handle!=textures->items[index-1].handle) stream_offset=0;
+        if (!mcc_texture_prepare(runtime,textures,&textures->items[index],stream_offset)) {
             error(_error_silent,"mcc bitmaps: cannot convert texture %lu of tag %08lx; map refused",index,textures->items[index].handle);
             return 0;
         }
+        stream_offset+=textures->items[index].size;
         mcc_loading_update(MCC_LOADING_BITMAPS, index + 1, textures->count);
     }
     error(_error_silent,"mcc bitmaps: %lu textures converted to %lu bytes",textures->count,textures->end);
@@ -655,18 +656,24 @@ int mcc_bitmaps_contains(struct mcc_runtime *runtime,uint32_t offset,uint32_t by
     return 0;
 }
 
-int mcc_bitmaps_valid(struct mcc_runtime *runtime,struct bitmap_data *bitmap)
+static struct mcc_texture const *mcc_bitmap_valid_texture(struct mcc_textures const *textures,
+    struct bitmap_data const *bitmap)
 {
-    struct mcc_textures *textures=runtime->bitmaps;
     uint32_t index;
     for (index=0;textures && index<textures->count;index++) {
         struct mcc_texture const *texture=&textures->items[index];
         if (texture->bitmap!=bitmap) continue;
         return texture->pixels && (uint32_t)bitmap->tag_index==texture->handle &&
             (uint32_t)bitmap->pixels_offset==texture->offset && (uint32_t)bitmap->pixels_size==texture->size &&
-            bitmap_verify(bitmap,FALSE) && rasterizer_xbox_bitmap_get_pixel_data_size(bitmap)<=(long)texture->size;
+            bitmap_verify(texture->bitmap,FALSE) &&
+            rasterizer_xbox_bitmap_get_pixel_data_size(texture->bitmap)<=(long)texture->size ? texture : NULL;
     }
-    return 0;
+    return NULL;
+}
+
+int mcc_bitmaps_valid(struct mcc_runtime *runtime,struct bitmap_data *bitmap)
+{
+    return mcc_bitmap_valid_texture(runtime->bitmaps,bitmap)!=NULL;
 }
 
 /* MCC pixels are owned allocations, not the legacy file stream (whose
@@ -695,19 +702,16 @@ int mcc_bitmaps_group_valid(struct mcc_runtime *runtime,void *address)
  * this storage. The caller receives bytes only after ownership validation. */
 void const *mcc_bitmaps_pixels(struct mcc_runtime *runtime,struct bitmap_data const *bitmap,uint32_t *bytes,int *coverage)
 {
-    struct mcc_textures *textures=runtime ? runtime->bitmaps : NULL;
-    uint32_t index;
+    struct mcc_textures const *textures=runtime ? runtime->bitmaps : NULL;
+    struct mcc_texture const *texture;
     if (bytes) *bytes=0;
     if (coverage) *coverage=0;
-    if (!textures || !bitmap || !mcc_bitmaps_valid(runtime,(struct bitmap_data *)bitmap)) return NULL;
-    for (index=0;index<textures->count;index++) {
-        struct mcc_texture const *texture=&textures->items[index];
-        if (texture->bitmap!=bitmap) continue;
-        if (bytes) *bytes=texture->size;
-        if (coverage) *coverage=texture->channels==4;
-        return texture->pixels;
-    }
-    return NULL;
+    if (!textures || !bitmap) return NULL;
+    texture=mcc_bitmap_valid_texture(textures,bitmap);
+    if (!texture) return NULL;
+    if (bytes) *bytes=texture->size;
+    if (coverage) *coverage=texture->channels==4;
+    return texture->pixels;
 }
 
 #ifndef HALO_GLES

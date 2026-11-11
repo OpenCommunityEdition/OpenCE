@@ -24,6 +24,13 @@ HISTORICAL_NOTE_PREFIXES = {
     "4f3eec76a1165a111bff83047b064a55c156f3bc":
         ("Player-Note: [Android] ", "Player-Note: [ANDROID] "),
 }
+# A published main promotion was corrected before release. Suppress its withdrawn
+# note only where the explicit withdrawal is in history; testing keeps its note.
+# A future restoration must carry its own reviewed Player-Note annotation.
+HISTORICAL_NOTE_WITHDRAWALS = {
+    "192ba0b5c0c1549b76bc7b21de786c9fd7202711":
+        "9bf9554aa86dbeba9fa49f5d8ff1b99f2ba82c1b",
+}
 
 
 class NotesError(ValueError):
@@ -170,6 +177,9 @@ def read_commits(repo, baseline, head):
                                 for line in message.split("\n"))
         notes, omitted = parse_notes(message, f"commit {sha}")
         commits[sha] = Commit(sha, parents.split(), notes, omitted)
+    for withdrawal, original in HISTORICAL_NOTE_WITHDRAWALS.items():
+        if withdrawal in commits and original in commits:
+            commits[original].omitted = True
     return commits
 
 

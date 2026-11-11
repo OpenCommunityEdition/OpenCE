@@ -2,10 +2,10 @@
 #ifndef THIRD_PERSON_PROTOCOL_H
 #define THIRD_PERSON_PROTOCOL_H
 
-/* Separate agreement versions; never advertise these as upstream compatibility. */
-#define THIRD_PERSON_PROTOCOL_VERSION 32712
-/* MCC projectile agreement changes independently of Xbox/CE camera sessions. */
-#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32714
+/* Separate agreements include host scripted player poses and bounded MCC
+ * admission/conversion progress; never advertise these as upstream compatibility. */
+#define THIRD_PERSON_PROTOCOL_VERSION 32740
+#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32742
 
 struct network_game;
 void third_person_session_host_begin(void);
@@ -19,7 +19,7 @@ void third_person_session_client_clear(void);
 unsigned int third_person_session_version(char const *map);
 int third_person_session_compatible(char const *map, unsigned int version, unsigned int flags);
 
-#define THIRD_PERSON_PROTOCOL_JOIN_KIND 101
+#define THIRD_PERSON_PROTOCOL_JOIN_KIND 102
 #define THIRD_PERSON_PROTOCOL_JOIN_REVISION 1
 #define THIRD_PERSON_PROTOCOL_JOIN_MAX 520
 

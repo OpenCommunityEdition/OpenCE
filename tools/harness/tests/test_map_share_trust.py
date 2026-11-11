@@ -78,7 +78,8 @@ def generated(fault=None, faulty_function=None):
         if fault and name == faulty_function:
             code = mutated(code, *fault)
         text += code + "\n"
-    return (("config.inc", config), ("under_test.inc", text))
+    return (("config.inc", config), ("under_test.inc", text),
+            ("message_header.inc", structure(read("port/linux/game/network_distributed.h"), "distributed_message_header")))
 
 
 @pytest.mark.parametrize("case", CASES)

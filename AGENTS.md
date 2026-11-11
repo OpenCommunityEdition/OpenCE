@@ -235,12 +235,10 @@ review guidance. Those standards do not relax the isolation rules.
 - Briefly report the review outcome, improvements made or why none were
   needed, actual validation and unresolved limitations. Scale review effort
   to the change; documentation-only work needs document checks, not game
-  regression runs. Review requirements do not authorize spawning subagents.
+  regression runs.
 
 ### Project preferences
 
-- Work directly as the primary agent. Do not use subagents unless the user
-  explicitly requests them for the assignment.
 - Use descriptive branch names without a `codex/` prefix.
 - Do not write or update PR descriptions unless the user explicitly asks;
   the user handles them. This does not remove the requirement to record

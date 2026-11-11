@@ -9,7 +9,7 @@ from harness import build, run
 from harness.coop_wipe import generated
 
 
-@pytest.mark.parametrize('case', ['policy', 'authority', 'roster', 'save', 'new-map', 'mcc-save', 'delay', 'failure'])
+@pytest.mark.parametrize('case', ['policy', 'authority', 'roster', 'save', 'new-map', 'mcc-save', 'console-save', 'delay', 'failure'])
 def test_team_wipe(case):
     status, output = run(build('coop_wipe', generated()), case)
     assert status == 0, output

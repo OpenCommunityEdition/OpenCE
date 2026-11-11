@@ -10,6 +10,7 @@
 #include "mcc_errors.h"
 #include "mcc_maps.h"
 #include "mcc_progress.h"
+#include "mcc_ui.h"
 #include "game/game.h"
 #include "networking/network_server_manager.h"
 #include "networking/network_game_manager.h"
@@ -40,7 +41,7 @@ boolean mcc_main_campaign_won(void)
     if (server) {
         /* Ending a campaign returns to the lobby on its last selection;
          * it never wraps to the first mission or chooses an Xbox level. */
-        network_game_server_port_cooperative_won(state == 1 ? next : NULL);
+        mcc_ui_network_campaign_won(state == 1 ? next : NULL);
     } else if (state == 1) {
         error(_error_silent, "mcc campaign: advancing from %s to %s", current, next);
         main_set_map_name(next);

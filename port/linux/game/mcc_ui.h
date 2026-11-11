@@ -35,5 +35,8 @@ void mcc_ui_settings_close(short controller);
  * finish dispatch immediately when handled, including a host-only denial.
  * A successful transition synchronously deletes the active widget tree. */
 boolean mcc_ui_new_game(struct widget_instance *widget, boolean *deleted);
+/* The manifest-selected next mission enters the existing ready lobby;
+ * NULL retains ordinary campaign-end handling without replaying a mission. */
+void mcc_ui_network_campaign_won(char const *next);
 
 #endif

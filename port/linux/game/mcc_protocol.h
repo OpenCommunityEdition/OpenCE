@@ -1,14 +1,14 @@
-/* MCC admission surrounds OpenCE's unchanged join request. It grants no authority. */
+/* MCC admission surrounds the shared join request. It grants no authority. */
 #ifndef MCC_PROTOCOL_H
 #define MCC_PROTOCOL_H
 
-/* OpenCE 41 owns messages through 95. MCC 65 agrees on camera-relative
- * projectile rays; the MCC 64 Workshop metadata framing is unchanged. */
-#define MCC_PROTOCOL_VERSION 65
+/* Shared checkpoint epochs occupy message 96; MCC owns messages 97-100 and
+ * 103-106. Version 72 also requires shared scripted player pose snapshots. */
+#define MCC_PROTOCOL_VERSION 73
 #define MCC_PROTOCOL_ADVERTISED_FLAG 0x08
 #define MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET 4
-#define MCC_PROTOCOL_JOIN_KIND 100
-/* The upstream 41 join carries a 170-byte pass and a 64-byte proof. */
+#define MCC_PROTOCOL_JOIN_KIND 101
+/* The shared join carries its agreement, a 170-byte pass and a 64-byte proof. */
 #define MCC_PROTOCOL_JOIN_MAX 512
 
 struct network_game;

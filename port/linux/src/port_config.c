@@ -760,7 +760,7 @@ static const struct config_setting config_settings[] =
 		"This machine's IPv4 address for system link, for a machine on several\n"
 		"networks; empty chooses one." },
 	{ "network.session_compatibility", _config_string, "\"opence_crossplay\"", "HALO_SESSION_COMPATIBILITY", _environment_value, _platform_all,
-        "Host session: opence_crossplay disables shoulder cameras; gulchce_third_person requires matching camera clients. Fixed once the lobby opens. MCC maps always require GulchCE." },
+        "Host session: opence_crossplay is the retained configuration name for GulchCE Standard (shoulder cameras off); gulchce_third_person enables camera sessions. Both require matching GulchCE clients. Fixed once the lobby opens." },
 	{ "network.camera_policy", _config_string, "\"player_choice\"", "HALO_CAMERA_POLICY", _environment_value, _platform_all,
 		"Host camera rule for new matches: player_choice, forced_on, or forced_off.\n"
 		"Applies to LAN, internet and co-op matches; scope and collision overrides remain." },
@@ -870,10 +870,18 @@ static const struct config_setting config_settings[] =
 		"Playing in another's game: the most kilobytes a second this machine\n"
 		"sends of maps to other players (16 to 10240: 10 MB/s)." },
 	{ "network.map_download", _config_boolean, "true", "HALO_NET_MAP_DOWNLOAD", _environment_value, _platform_all,
-		"Joining a game on a Custom Edition map this machine does not have:\n"
+		"Allow map downloads when joining. MCC asks before downloading from\n"
+		"the host; Custom Edition downloads from the game's players.\n"
+		"For a Custom Edition map this machine does not have:\n"
 		"download it (and the resource maps it needs) from the game's players\n"
 		"into custom_maps, if its host shares it (network.map_share); false\n"
 		"leaves the game, saying which map is missing." },
+	{ "network.mcc_map_share", _config_boolean, "false", "HALO_NET_MCC_MAP_SHARE", _environment_value, _platform_all,
+        "Hosting: offer eligible local or Workshop MCC packages to joiners.\n"
+        "Off by default. List each map/resource fingerprint with its maker in\n"
+        "mcc_share.txt. Includes required package metadata and supported previews;\n"
+        "never shares stock/global resources. Joiners need network.map_download\n"
+        "and must accept the download prompt before files are transferred." },
 	{ "network.coop_public", _config_boolean, "false", "HALO_NET_COOP_PUBLIC", _environment_value, _platform_all,
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"

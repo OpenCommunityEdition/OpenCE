@@ -1,6 +1,3 @@
-> **`online-third-person` branch:** OpenCE Crossplay is the default host mode and disables the optional shoulder camera. GulchCE Third Person sessions require matching camera builds. MCC maps always require compatible GulchCE clients.
-
-
 <p align="center">
   <img width="420" height="420" alt="gulchceopencelogo" src="https://github.com/user-attachments/assets/1787aa2f-3305-4353-8dd4-27d08661f6d4" />
 </p>
@@ -15,16 +12,16 @@
   <a href="https://www.youtube.com/channel/UC9Hn6j6BdKwoyu_hGXdfzvw">check out the youtube</a>
   <br>
   <br>
-  forever <strong>compatible</strong>, for <strong>everyone</strong>
+  built for <strong>Windows, Linux, Android and the web</strong>
 </p>
 <hr>
 
 <h3 align="center">
-GulchCE will always be compatible with OpenCE, so everyone can play together.
+This development branch requires matching GulchCE network builds.
 </h3>
 <br>
 <p align="center">
-Any fork compatible with OpenCE is also compatible with GulchCE. Crossplay galore!
+Shared checkpoint recovery, boat controls and clock recovery require matching simulation agreements.
 </p>
 <br>
 <p align="center">
@@ -55,19 +52,26 @@ release signing is configured, `SHA256SUMS.sig` carries the Ed25519 signature;
 
 The Linux binary release is available on the [AUR](https://aur.archlinux.org/packages/gulchce-bin).
 
-## Will you always stay compatible with OpenCE?
+## Can I play with OpenCE clients?
 
-GulchCE and OpenCE players can play together on Xbox and Custom Edition maps
-in **OpenCE Crossplay** sessions. This branch also offers **GulchCE Third
-Person** sessions, which require matching camera builds. MCC maps require
-compatible GulchCE clients in either session mode.
+This development branch requires matching GulchCE clients on Xbox, Custom
+Edition and MCC maps. Shared checkpoint recovery separates delayed messages
+from a restored player's earlier object handle. Boat controls also require
+matching simulation so hosts and predicting clients use initialized forces.
+Clients also recover small clock delays by running the missing simulation ticks.
+Existing OpenCE 41 clients cannot join these sessions.
 
-This is due to MCC-specific netcode additions that only function when an
-MCC map is being played online. OpenCE clients wouldn't recognise the
-network messages.
+The shared console fix also changes the saved game allocation layout. Older
+cores and checkpoints are refused; start a new map or campaign session with
+this build. Original save files are not migrated. See the
+[console checkpoint walkthrough](docs/reading/console_checkpoints.md).
 
-Once MCC map support is fully ironed out on GulchCE, OpenCE will be asked
-if they would like the MCC map support feature on their own, main repo.
+**GulchCE Standard** keeps the optional shoulder camera disabled. **GulchCE
+Third Person** uses its own matching camera agreement. Recovery works in both
+modes; changing the camera setting does not restore old-client compatibility.
+
+An upstream contribution is planned. Compatibility with a future OpenCE
+release depends on the agreement it adopts and must be validated separately.
 
 ## How do I install MCC maps?
 
@@ -162,6 +166,11 @@ maps need neither set. If a required resource is missing or incompatible,
 GulchCE refuses to load the map and reports what needs attention.
 
 ### Choose a map and play
+
+In the browser build, import Xbox base data first, then use **Custom maps**
+to add CE files or an MCC package folder to the site's private storage.
+See the [browser import guide](port/web/README.md#custom-edition-and-mcc-imports)
+for supported metadata, storage limits and recovery behavior.
 
 - **Modern, Stock and Classic PC:** choose **MCC SINGLEPLAYER** or
   **MCC MULTIPLAYER** in the map selector, then open the package folder and

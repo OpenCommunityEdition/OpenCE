@@ -176,6 +176,22 @@ static struct hs_function_definition mcc_kill_thread_definition = {
     NULL, 1, { _hs_type_long_integer }
 };
 
+/* MCC scenarios may clear the debug selection. Use the existing operation;
+ * the Xbox/CE map allowlist still excludes it and other debug controls. */
+static void mcc_ai_deselect_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;
+    (void)initialize;
+    ai_scripting_deselect();
+    hs_return(thread, 0);
+}
+
+static struct hs_function_definition mcc_ai_deselect_definition = {
+    _hs_type_void, 0, "ai_deselect", hs_macro_function_parse,
+    mcc_ai_deselect_evaluate, "Clears the selected AI encounter.",
+    NULL, 0, { 0 }
+};
+
 struct hs_function_definition *mcc_script_function(short index)
 {
     if (!mcc_cache_tags_loaded()) return NULL;
@@ -186,12 +202,15 @@ struct hs_function_definition *mcc_script_function(short index)
     if (index == MCC_HS_ABS_INTEGER) return &mcc_abs_integer_definition;
     if (index == MCC_HS_EXECUTING_THREAD) return &mcc_executing_thread_definition;
     if (index == MCC_HS_KILL_THREAD) return &mcc_kill_thread_definition;
+    if (index == MCC_HS_AI_DESELECT) return &mcc_ai_deselect_definition;
     return mcc_campaign_function(index);
 }
 
-short mcc_script_find(char const *name)
+/* Preparation runs before MCC activation; runtime lookup stays guarded below.
+ * A recognized alias returns its target result even when that target is absent. */
+static short mcc_script_resolve(char const *name, boolean native_fallback)
 {
-    if (!mcc_cache_tags_loaded() || !name) return NONE;
+    short index;
     if (!csstrcasecmp(name, "player_add_equipment")) return MCC_HS_PLAYER_EQUIPMENT;
     if (!csstrcasecmp(name, "objects_distance_to_object")) return MCC_HS_DISTANCE_TO_OBJECT;
     if (!csstrcasecmp(name, "mcc_mission_segment")) return MCC_HS_MISSION_SEGMENT;
@@ -201,16 +220,23 @@ short mcc_script_find(char const *name)
     if (!csstrcasecmp(name, "abs_integer")) return MCC_HS_ABS_INTEGER;
     if (!csstrcasecmp(name, "get_executing_running_thread")) return MCC_HS_EXECUTING_THREAD;
     if (!csstrcasecmp(name, "kill_thread")) return MCC_HS_KILL_THREAD;
-    return mcc_campaign_find(name);
+    if (!csstrcasecmp(name, "ai_deselect")) return MCC_HS_AI_DESELECT;
+    index = mcc_campaign_find(name);
+    return index == NONE && native_fallback ? hs_find_function_by_name(name) : index;
 }
 
-boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax)
+short mcc_script_find(char const *name)
+{
+    return mcc_cache_tags_loaded() && name ? mcc_script_resolve(name, FALSE) : NONE;
+}
+
+boolean mcc_script_call_arguments_valid(struct hs_syntax_node const *call, struct data_array *syntax)
 {
     struct hs_function_definition *function = mcc_script_function(call->function_index);
     struct hs_syntax_node *node;
     long next;
     short argument;
-    if (!function || !(call->flags & 8) || (call->flags & 3) ||
+    if (!function || (call->flags & 3) ||
         !(node = datum_try_and_get(syntax, call->data))) return FALSE;
     next = node->next_node_index;
     if (call->function_index == MCC_HS_CAMPAIGN_FIRST + 2) {
@@ -224,6 +250,13 @@ boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_arr
         next = node->next_node_index;
     }
     return next == NONE;
+}
+
+/* Map admission still requires authored nodes. Saved console expressions use
+ * the same argument grammar while their temporary nodes have another owner. */
+boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax)
+{
+    return (call->flags & 8) && mcc_script_call_arguments_valid(call, syntax);
 }
 
 static char const *mcc_script_string(char const *strings, uint32_t bytes, long offset)
@@ -372,19 +405,7 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
                     return FALSE;
                 }
             }
-            if (!csstrcasecmp(name, "objects_distance_to_object")) index = MCC_HS_DISTANCE_TO_OBJECT;
-            else if (!csstrcasecmp(name, "mcc_mission_segment")) index = MCC_HS_MISSION_SEGMENT;
-            else if (!csstrcasecmp(name, "core_save_name")) index = MCC_HS_CORE_SEGMENT;
-            else if (!csstrcasecmp(name, "player_add_equipment")) index = MCC_HS_PLAYER_EQUIPMENT;
-            else if (!csstrcasecmp(name, "abs_integer")) index = MCC_HS_ABS_INTEGER;
-            else if (!csstrcasecmp(name, "get_executing_running_thread")) index = MCC_HS_EXECUTING_THREAD;
-            else if (!csstrcasecmp(name, "kill_thread")) index = MCC_HS_KILL_THREAD;
-            else if (!csstrcasecmp(name, "player_effect_set_max_vibrate"))
-                index = hs_find_function_by_name("player_effect_set_max_rumble");
-            else {
-                index = mcc_campaign_find(name);
-                if (index == NONE) index = hs_find_function_by_name(name);
-            }
+            index = mcc_script_resolve(name, TRUE);
             if (index != NONE) node->function_index = nodes[child].function_index = index;
         } else if ((node->flags & 5) == 5 && ((uint16_t)node->data & 0x8000)) {
             name = mcc_script_string(strings, scenario->hs_string_constants.size, node->string_offset);

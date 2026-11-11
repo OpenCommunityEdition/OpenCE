@@ -466,7 +466,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         for source in sorted(linux_platform.glob("*.c")):
             if source.name in replaced:
                 continue
-            if source.name == "posix_mcc_preview.c":
+            if source.name in ("posix_mcc_preview.c", "posix_mcc_share.c"):
                 add_object(source, win32_cflags)
             elif source.name == "posix_dtls.c":
                 # (Mbed TLS sees the Windows SDK, as the win32_*.c do)

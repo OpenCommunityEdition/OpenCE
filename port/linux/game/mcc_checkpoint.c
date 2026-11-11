@@ -13,6 +13,7 @@
 #include "mcc_campaign.h"
 #include "mcc_object_names.h"
 #include "mcc_script_threads.h"
+#include "../../third_party/zlib/zlib_prefixed.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,13 +60,7 @@ static void mcc_checkpoint_put(void *data, uint32_t value)
 
 static uint32_t mcc_checkpoint_checksum(unsigned char const *data, uint32_t bytes)
 {
-    uint32_t result = 0xFFFFFFFFu, i, bit;
-    for (i = 0; i < bytes; ++i) {
-        result ^= data[i];
-        for (bit = 0; bit < 8; ++bit)
-            result = (result >> 1) ^ (0xEDB88320u & (0u - (result & 1u)));
-    }
-    return ~result;
+    return (uint32_t)crc32(0, data, (uInt)bytes);
 }
 
 static unsigned char *mcc_checkpoint_tail(void const *image, unsigned long total,
@@ -121,7 +116,7 @@ static int mcc_checkpoint_units(void const *image, void const *current,
         struct object_header_datum const *object;
         if (index >= (unsigned)array->count) return 0;
         object = headers + index;
-        if ((uint16_t)object->identifier != (uint16_t)(handle >> 16) ||
+        if (!(uint16_t)object->identifier || (uint16_t)object->identifier != (uint16_t)(handle >> 16) ||
             object->type >= 32 || !(_object_mask_unit & (1u << object->type)) ||
             !mcc_checkpoint_incoming(image, current, used, object->datum, sizeof(struct object_datum)) ||
             (record[4] && mcc_grenades_type_count() < 3) ||

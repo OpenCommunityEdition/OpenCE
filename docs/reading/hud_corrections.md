@@ -132,3 +132,34 @@ geometry, split-screen scaling, controller/MCC ownership and mask scope through
 map-family transitions. They do not establish visual compatibility for every
 custom map; runtime checks must include authored HD assets and stock Xbox/CE/MCC
 maps, with the artwork setting both disabled and enabled.
+
+## MCC corner frames and screen-effect masks
+
+MCC compatibility belongs to [mcc_hud_draw.c](../../port/linux/game/mcc_hud_draw.c).
+Within `hud_draw_screen`, `mcc_hud_view_begin` reads the active unit HUD for the
+current player, including its split-screen selection. When conversion has
+recognized that HUD's native layout, messages and corner-anchored weapon panels
+use its common safe frame. For example, customizing the numbers inside an ammo
+panel must not move the entire panel to a different margin from the grenade
+counter. Authored offsets stay intact. Center and edge anchors retain their
+separate meanings; an unknown custom unit HUD retains the existing component
+classification. `mcc_hud_view_end` clears the selection before the next view.
+The existing stock-layout fingerprints are still a compatibility exception,
+not a general description of every custom HUD; this change adds no fingerprints.
+
+Screen-effect masks take a different route: `interface_draw_screen` supplies
+the selected bitmap directly to the rasterizer. They do not pass through HUD
+placement. `mcc_hud_mask_begin` borrows that pointer across the synchronous
+screen-effect call; `mcc_hud_mask_transform` applies the bitmap group's half-size
+flag to both geometry and texture-coordinate units. It excludes the ordinary
+MCC placement-canvas factor, which would shrink the mask twice. The end call
+clears the pointer and scale. Untagged generated bitmaps retain native units;
+other render-target and cinematic textures do not match the borrowed bitmap
+and remain unchanged. Both hooks are neutral
+outside MCC, preserving the existing Xbox/CE paths.
+
+[View-frame tests](../../tools/test_mcc_hud_view.py) cover player selection,
+authored offsets, custom anchors and view reset. [Mask tests](../../tools/test_mcc_hud_mask.py)
+cover flag composition, linear/normalized coordinates, borrowed-pointer
+ownership and the shared call sites. Actual rendered comparisons and their
+limits are recorded in [Milestone 15](../mcc_refactor_validation.md#milestone-15-mcc-hud-corrections-and-shared-cinematic-aim).

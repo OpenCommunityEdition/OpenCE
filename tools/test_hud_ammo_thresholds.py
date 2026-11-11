@@ -38,7 +38,12 @@ PRELUDE = r'''
 #include <string.h>
 #include <math.h>
 #include <stdarg.h>
+#include <stdint.h>
+#ifdef _WIN32
 typedef unsigned long DWORD, D3DCOLOR;
+#else
+typedef uint32_t DWORD, D3DCOLOR;
+#endif
 typedef int BOOL;
 #define TRUE 1
 #define FALSE 0
@@ -51,6 +56,7 @@ HARNESS = r'''
 #define GL_DEFINE(name) __typeof__(name) name;
 GL_FUNCTIONS(GL_DEFINE)
 #undef GL_DEFINE
+BOOL xgpu_reversed_depth;
 int config_boolean(const char *name) {return 0;}
 const char *config_string(const char *name) {return "";}
 static DWORD real_alpha_to_pixel32(float a) {return (DWORD)(a*255.0f+0.5f)<<24;}
@@ -203,7 +209,8 @@ def main():
     unit += HARNESS.replace('METER_SETUP', setup).replace('HEALTH_RECTS', ','.join('{' + ','.join(map(str, r)) + '}' for r in rects))
     # Compile the production translator and string builder with only platform/config stubs.
     unit += '\n' + (ROOT / 'port/linux/src/xgpu_text.c').read_text()
-    unit += '\nvoid mcc_environment_shader_emit(struct xgpu_text *text) {}\n' + (ROOT / 'port/linux/src/nv2a_psh.c').read_text()
+    for name in ('mcc_environment_shader_gl.c', 'plasma_model_shader.c', 'nv2a_psh.c'):
+        unit += '\n' + (ROOT / 'port/linux/src' / name).read_text()
     compiler = [args.cc, '-std=gnu11', '-O2', '-fuse-ld=lld', '-I' + str(ROOT / 'port/linux/src'), '-I' + str(ROOT / 'port/linux/game'), '-iquote' + str(ROOT / 'port/linux/include')]
     env = dict(os.environ)
     if sys.platform == 'win32':

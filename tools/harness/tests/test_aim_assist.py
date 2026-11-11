@@ -3,7 +3,7 @@ import re,sys
 from pathlib import Path
 import pytest
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
-from harness import build,read,function,mutated,run,CHECK_FAILED
+from harness import build,read,function,mutated,run,structure,CHECK_FAILED
 
 def generated(fault=None):
     policy=re.sub(r'^#include "[^"\n]+"\n','',read('port/linux/game/network_aim_assist.c'),flags=re.M)
@@ -12,7 +12,8 @@ def generated(fault=None):
     if fault=='authority': policy=mutated(policy,'machine_index != NONE ||','FALSE ||')
     if fault=='override': inp=mutated(inp,'network_aim_assist_block_mouse() &&','FALSE &&')
     if fault=='controller': inp=mutated(inp,'if (gamepad_index != 0) return FALSE;','if (FALSE) return FALSE;')
-    return (('policy.inc',policy),('input.inc',inp),('message_ids.inc',message_ids()))
+    return (('policy.inc',policy),('input.inc',inp),('message_ids.inc',message_ids()),
+            ('message_header.inc',structure(read('port/linux/game/network_distributed.h'),'distributed_message_header')))
 
 @pytest.mark.parametrize('case',['allowed','devices','scope','replication','admission','reset'])
 def test_case(case):

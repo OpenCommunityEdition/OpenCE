@@ -9,6 +9,9 @@
 #include "interface/hud_definitions.h"
 #include "interface/hud_draw.h"
 #include "interface/weapon_hud_interface_definition.h"
+#include "interface/unit_hud_interface_definition.h"
+#include "units/units.h"
+#include "units/unit_definitions.h"
 #include "tag_files/tag_groups.h"
 #include "text/draw_string.h"
 #include "rasterizer/rasterizer.h"
@@ -33,6 +36,37 @@ static struct {
 } mcc_buttons[14];
 static short mcc_buttons_style;
 static short mcc_weapon_frame=NONE;
+static boolean mcc_native_view;
+static struct bitmap_data const *mcc_hud_mask;
+static real mcc_hud_mask_scale=1.0f;
+
+/* A recognized unit HUD establishes the safe frame of this player's view.
+ * Its messages and ammunition panels share that origin even when their
+ * contents/offsets have been customized. Keep every authored offset and
+ * child anchor; unknown unit layouts retain the existing component policy.
+ * This is per draw, since players and vehicle occupants can use different HUDs. */
+void mcc_hud_view_begin(long unit_index)
+{
+    struct unit_datum const *unit;
+    struct unit_definition const *definition;
+    struct unit_hud_interface_definition const *hud;
+    long index;
+    mcc_native_view=FALSE;
+    if (!mcc_cache_tags_loaded()) return;
+    unit=unit_try_and_get(unit_index);
+    if (!unit) return;
+    definition=unit_definition_get(unit->definition_index);
+    index=unit_definition_get_active_hud_index(definition,local_player_count()>1);
+    if (index==NONE) return;
+    hud=tag_get('unhi',index);
+    if (mcc_cache_contains(hud,sizeof(*hud)))
+        mcc_native_view=hud->absolute_placement.pad==MCC_HUD_NATIVE_FRAME;
+}
+
+void mcc_hud_view_end(void)
+{
+    mcc_native_view=FALSE;
+}
 
 /* The outermost populated parent owns the inherited layout. A weapon can
  * replace its ammunition artwork without relocating that parent's counter.
@@ -197,6 +231,35 @@ real mcc_hud_bitmap_scale(long bitmap_group_index)
     return group->flags&(0x10|0x80) ? 0.25f : 0.5f;
 }
 
+/* Screen-effect masks have no HUD placement: their coordinates are native
+ * screen pixels. Apply the bitmap's half-size flag, not the placement canvas
+ * factor. Borrow the mask only during this view's synchronous HUD effect;
+ * cinematic masks and the renderer's viewport fallback retain their units. */
+void mcc_hud_mask_begin(struct bitmap_data const *bitmap)
+{
+    mcc_hud_mask=mcc_cache_tags_loaded() && bitmap && bitmap->tag_index!=NONE ? bitmap : NULL;
+    mcc_hud_mask_scale=mcc_hud_mask ?
+        mcc_hud_bitmap_scale(bitmap->tag_index)/mcc_hud_canvas_scale() : 1.0f;
+}
+
+void mcc_hud_mask_end(void)
+{
+    mcc_hud_mask=NULL;
+    mcc_hud_mask_scale=1.0f;
+}
+
+void mcc_hud_mask_transform(struct bitmap_data const *bitmap,
+    real_vector2d *size,real_vector2d *texture_scale)
+{
+    if (!mcc_cache_tags_loaded() || !bitmap || bitmap!=mcc_hud_mask) return;
+    size->i*=mcc_hud_mask_scale;
+    size->j*=mcc_hud_mask_scale;
+    /* Both linear pixel coordinates and normalized texture coordinates
+     * already have their base transform; preserve it while changing units. */
+    texture_scale->i/=mcc_hud_mask_scale;
+    texture_scale->j/=mcc_hud_mask_scale;
+}
+
 boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bitmap,
     real_rectangle2d const *clip, rectangle2d *cursor, pixel32 color,
     struct icon_hud_element_definition const *icon, boolean menu)
@@ -289,8 +352,8 @@ boolean mcc_hud_anchor_point(short anchor, struct hud_placement_definition const
     rectangle2d frame;
     long horizontal_inset;
     if (!mcc_cache_tags_loaded() || anchor<0 || anchor>8 || anchor==4) return FALSE;
-    if (anchor<4 && (mcc_weapon_frame!=NONE ? mcc_weapon_frame :
-        placement->pad==MCC_HUD_NATIVE_FRAME)) return FALSE;
+    if (anchor<4 && (mcc_native_view || (mcc_weapon_frame!=NONE ? mcc_weapon_frame :
+        placement->pad==MCC_HUD_NATIVE_FRAME))) return FALSE;
     horizontal_inset=halo_screen_width()/20;
     /* MCC's 2.5% title-safe frame versus the Xbox's 7.5%. Derive each
      * player's frame from its viewport; leave the small split-screen seam

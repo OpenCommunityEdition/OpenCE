@@ -122,7 +122,6 @@ index and tag, since the map placed them at the same index everywhere.
 #include "coop_vehicles.h"
 #include "coop_spectate.h"
 #include "network_coop.h"
-#include "third_person_protocol.h"
 #include "network_distributed.h"
 #include "../src/server_events.h" /* port: port/linux/src/server_events.c */
 #include "../src/server_json.h" /* port: port/linux/src/server_json.c */
@@ -2980,7 +2979,7 @@ void network_coop_restore_players(void)
 	short machine, local;
 	long slot;
 
-	if (!third_person_session_active() || !coop_host())
+	if (!coop_host())
 		return;
 	game = network_game_get_game();
 	if (!game || !player_data || !player_data->valid)
@@ -3043,6 +3042,26 @@ void network_coop_restore_players(void)
 	}
 }
 
+/* Retire queued actions and client playback from the discarded world. Keep
+the host's comparison baselines: treating a restored device as newly loaded
+would suppress the state clients need. Checkpoint and session metadata stay. */
+void network_coop_reset_recovery(void)
+{
+	if (coop_client())
+	{
+		client_stop_script_sounds();
+		client_cinematic_end();
+		client_host_camera_set(FALSE);
+	}
+	csmemset(&coop_presentation, 0, sizeof(coop_presentation));
+	csmemset(&coop_events, 0, sizeof(coop_events));
+	csmemset(&client_devices, 0, sizeof(client_devices));
+	csmemset(client_names_differing, 0, sizeof(client_names_differing));
+	csmemset(&host_resend, 0, sizeof(host_resend));
+	csmemset(host_player_structure_bsps, NONE, sizeof(host_player_structure_bsps));
+	skip_vote_clear();
+}
+
 /* The host reverted its game state, clock included. The clock is
 put back, since clients and the netcode expect it to only go forward, and
 the script threads' wake times move by the same amount so they still wake
@@ -3069,7 +3088,7 @@ void network_coop_reverted(
 	}
 	/* (the dropships' riders kept are of the game state reverted from) */
 	coop_enemies_reset();
-	network_objects_host_reverted();
+	network_distributed_reverted();
 	error(_error_silent, "co-op: reverted %ld ticks, clock kept at %ld", ticks, now);
 	event_new(_coop_event_reverted);
 }

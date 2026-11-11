@@ -86,4 +86,5 @@ def test_wired():
     # Each client tick applies the kept ones; a new game keeps none.
     network = read('port/linux/game/network_objects.c')
     assert 'distributed_client_apply_retried_inventories();' in function(network, 'network_objects_client_tick')
-    assert 'objects_client_retried_inventory_count = 0;' in function(network, 'network_objects_new_game')
+    assert 'network_objects_reverted();' in function(network, 'network_objects_new_game')
+    assert 'objects_client_retried_inventory_count = 0;' in function(network, 'network_objects_reverted')

@@ -109,7 +109,7 @@ void const *third_person_protocol_join(void const *message, unsigned short bytes
 }
 
 /* Camera sessions require this proof before admission, even Forced Off.
- * OpenCE crossplay does not send or accept a camera envelope. */
+ * GulchCE Standard does not send or accept a camera envelope. */
 int third_person_protocol_unwrap(void const *message, unsigned short bytes,
     void *inner, unsigned short *inner_bytes)
 {

@@ -140,7 +140,7 @@ def test_session_options_keep_host_callbacks_and_fit_narrow_columns():
             assert text_width(caption, 10) <= int(spinner.get('width'))
         assert spinner.find("on[@event='left_mouse']").get('run') == 'mouse spinner 1wide click'
     compatibility = next(w for w in session if w.get('name').endswith('/session_compatibility_spinner'))
-    assert compatibility.get('strings') == 'CROSSPLAY|GULCHCE'
+    assert compatibility.get('strings') == 'STANDARD|THIRD PERSON'
 
 
 def test_added_options_keep_help_inside_panel_and_voice_modes_in_order():

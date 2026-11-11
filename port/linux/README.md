@@ -654,8 +654,8 @@ the setting for one start of the game. It has priority over the file.
 | `game.workshop_maps` | `false` | `HALO_WORKSHOP_MAPS` | Discover installed Halo CE Steam Workshop maps on desktop. Local MCC packages take precedence. Android and web use local packages. |
 | `game.mcc_collections` | `false` | `HALO_MCC_COLLECTIONS` | Group MCC packages by the bundled Workshop collection list, including imported packages identified by a sidecar. Reopen the map list after changing this. |
 | `game.mcc_campaigns` | `false` | `HALO_MCC_CAMPAIGNS` | Use explicit MCC campaign metadata for discovery, mission titles, authored ordering and progression. In co-op only the host chooses the next mission. Reopen the map list after changing this. |
-| `network.session_compatibility` | `"opence_crossplay"` | `HALO_SESSION_COMPATIBILITY` | Host mode: OpenCE Crossplay disables shoulder cameras; `gulchce_third_person` requires matching camera clients. Fixed when the lobby opens. MCC always requires GulchCE. |
-| `network.camera_policy` | `"player_choice"` | `HALO_CAMERA_POLICY` | Host rule for new matches: Create Game > Server Setup > Session Options > CAMERA POLICY offers PLAYER CHOICE, FORCED ON and FORCED OFF. Applies to local matches, LAN/system link, internet multiplayer and co-op, including late joiners. Forced On retains scoping, collision and stock vehicle/death/cinematic overrides. Locked matches block N and show CONTROLLED BY HOST in Video Setup; personal preferences return after leaving. The policy stays fixed during play and carries across rounds and co-op levels. Available in GulchCE Third Person sessions (camera protocol 32712/32713); OpenCE Crossplay forces this feature off. |
+| `network.session_compatibility` | `"opence_crossplay"` | `HALO_SESSION_COMPATIBILITY` | Host mode: the retained `opence_crossplay` configuration name selects GulchCE Standard (STANDARD), with shoulder cameras off; `gulchce_third_person` selects THIRD PERSON. Both require updated matching GulchCE clients; neither interoperates with OpenCE 41 or older GulchCE builds. Shared checkpoint and bounded client clock recovery apply to both. Fixed when the lobby opens. |
+| `network.camera_policy` | `"player_choice"` | `HALO_CAMERA_POLICY` | Host rule for new matches: Create Game > Server Setup > Session Options > CAMERA POLICY offers PLAYER CHOICE, FORCED ON and FORCED OFF. Applies to local matches, LAN/system link, internet multiplayer and co-op, including late joiners. Forced On retains scoping, collision and stock vehicle/death/cinematic overrides. Locked matches block N and show CONTROLLED BY HOST in Video Setup; personal preferences return after leaving. The policy stays fixed during play and carries across rounds and co-op levels. Available in GulchCE Third Person sessions (camera protocol 32724/32725); GulchCE Standard forces this feature off. |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | IPv4 addresses, with commas between them, that get the broadcasts of the game. Empty: 255.255.255.255. |
 | `network.online` | `true` | `HALO_NET_ONLINE` | `true`: internet play. `false`: system link on the local network only. |
@@ -691,7 +691,8 @@ the setting for one start of the game. It has priority over the file.
 | `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `20480`, 20 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `10240`, 10 MB/s). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
-| `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | When you join a game on a Custom Edition map that you do not have: download it from the players of the game. `false`: leave the game and show which map is missing. DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. |
+| `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. CE downloads from players as before; MCC permits a host offer and asks before transferring files. Off: CE leaves a missing-map game; MCC offers manual/Workshop installation and cancellation. |
+| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | SHARE MCC PACKAGES in Settings > Network Setup > Map Sharing. Host-only, explicit-list sharing of eligible local or Workshop packages; requires a gameplay fingerprint and maker in `mcc_share.txt`. Includes used package resources and recognized metadata/previews. The joiner needs Download Maps enabled and must accept the offer. See "MCC package sharing" for implementation status and limits. |
 | `network.coop_public` | `false` | `HALO_NET_COOP_PUBLIC` | `true`: an online co-op game (Create Game > Internet, a SINGLEPLAYER map) starts as PUBLIC. `false`: it starts as PRIVATE. LISTING in co-op's Server Setup writes its choice here. Refer to "Server browser". |
 | `network.coop_team_wipe` | `"auto"` | `HALO_NET_COOP_TEAM_WIPE` | TEAM WIPE in Server Setup > Co-op Options: `"auto"` reverts the checkpoint in a PRIVATE game and only respawns the team in a PUBLIC game (a dedicated server's: `server.public` with internet play). `"revert"` or `"respawn"` overrides visibility; a password does not make a PUBLIC game private. Changed players/machine assignments fall back to position-only respawn with a host diagnostic. A missing checkpoint also uses position-only respawn. Scripted mission failures keep their existing revert behavior. |
 | `network.brokers_file` | `"brokers.txt"` | `HALO_NET_BROKERS_FILE` | The file of the public MQTT brokers that let the machines of an invite find each other, and that carry the listings of the server browser: next to `config.toml`, unless a full path. One `host:port` on each line, up to 4; `#` starts a comment. |
@@ -795,7 +796,7 @@ Mesa. To stop this, set the environment variable `mesa_glthread=false`.
 
 ## Updates
 
-The builds from GitHub Actions (refer to the main [README](../../README.md#download))
+The builds from GitHub Actions (refer to the main [README](../../README.md#how-do-i-download-a-build))
 can update themselves. GulchCE checks only releases from
 [`chestahh/GulchCE`](https://github.com/chestahh/GulchCE/releases), using its
 own Build workflow run numbers and `build-<number>` tags. OpenCE release
@@ -1355,6 +1356,52 @@ MQTT 5 if the broker has it, else MQTT 3.1.1. A broker that does not keep
 retained messages, or does not let clients subscribe with wildcards, carries
 only invites, not listings.
 
+### MCC package sharing
+
+MCC delivery is host-only and separate from Custom Edition sharing. The current
+Milestone 13 implementation supports eligible Workshop packages and local
+folders in `mcc_maps`, including map-only folders without JSON or thumbnails.
+Final storage/UI integration and runtime/platform validation are still in
+progress; see [the evidence record](../../docs/mcc_refactor_validation.md#milestone-13-implementation-evidence).
+
+The host enables **SHARE MCC PACKAGES** in Settings > Network Setup > Map
+Sharing (`network.mcc_map_share`, off by default; also
+`HALO_NET_MCC_MAP_SHARE`). It must list the exact map/used-resource SHA-256 and
+maker in the data root's `mcc_share.txt`, one line per approved identity:
+`<64 hexadecimal digits> <maker>`. The host log reports an unlisted fingerprint.
+This explicit approval does not come from a package name or a Workshop ID.
+Stock, unclassified, loose and shared-root packages are not offered.
+
+The joiner uses **DOWNLOAD MAPS** (`network.map_download`, on by default).
+Missing or differing content opens an offer showing size and maker; accepting
+starts the host download. Matching installed content is reused. If host sharing
+or client downloads is off, no host-download action is offered: use the
+Workshop page when available, or install matching content manually, or cancel.
+The latest Workshop package may still differ from the host's copy; installation
+must be checked again. The prompt does not infer which version is newer.
+
+The offer includes the current map and its actually used package resources,
+required recognized JSON, eligible referenced PNG previews and attribution
+files. Campaign metadata is obtained upfront; mission binaries/resources are
+obtained as needed. Unrelated resource files are omitted. A package depending
+on root/shared stock resources is refused with a host diagnostic, rather than
+silently redistributing those resources. A local dedicated-server folder needs
+no invented Workshop metadata or artwork to qualify.
+
+Each accepted download is checked in an exclusively owned staging directory,
+then published as a separate `mcc_maps/dl_<digest>` snapshot. Existing local
+packages, Steam installations and saves are not overwritten. Required metadata
+and gameplay identities must match the host; invalid optional art uses the
+placeholder. Cancelled or failed transfers remove only their owned staging
+files. A host-delivered snapshot is not a Steam subscription or an automatic
+Workshop update. Receipt-based storage/removal controls remain under integration.
+
+The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
+not seed MCC downloads. Android requires no Steam for these files, but device
+runtime validation remains a separate requirement. Browser import/download and
+persistence are Milestone 14 work. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
+for bounds, lifecycle and current MCC protocol **69**.
+
 ### Map sharing
 
 When you join a game on a Custom Edition map that you do not have, the game
@@ -1535,8 +1582,9 @@ The game can ask the router to forward the port (UPnP,
   other machine.
 - The forward has a duration of one hour. The game makes it longer while
   it operates. When the game stops normally, it removes the forward. It
-  does not remove the forward after a crash, or if a request to the router
-  is still under way 3 seconds after the game starts to stop. Some routers only make forwards without a duration.
+  waits for its request worker before removing the forward; a router request
+  already in progress can delay exit. It does not remove the forward after
+  a crash. Some routers only make forwards without a duration.
 - When the game finds the router, it removes the forwards to this machine
   that have the description "Halo internet play" and that no copy of the
   game uses now (forwards that a copy of the game did not remove).
@@ -1969,6 +2017,7 @@ Other changes:
 | `objects/object_lights.c` | A flashlight not on a first-person weapon (your own with no weapon in hand, as another player's in a match) shines from the marker on the pose the frame draws (`render_interpolation.c`), not from where the tick left it, which stepped at 30 a second. |
 | `structures/structure_render.c` | The structure's visible surfaces are put in order by a radix sort, not `qsort_4byte`: the same order. |
 | `cache/cache_files.c`, `networking/network_client_manager.c`, `networking/network_server_manager.c`, `networking/network_server_message_handler.c`, `main/main.c`, `interface/interface.c` | Map sharing (`game/map_share.c`): a client that does not have the game's Custom Edition map asks the host for it instead of leaving, is not given time to precache it until it has it, and adds its players to a game in progress only then; the host gives the game's map its own name and its version (its hash's start), takes the requests from any machine in the game, lobby too, and does not drop a machine that downloads; the transfers run each frame, and their progress is drawn over the screen. |
+| `cache/cache_files.c`, `cache/cache_files_windows.c`, `networking/network_server_message_handler.c` | MCC package sharing (`game/mcc_share.c`): a package being fetched from the host is taken as present and not precached until it is there, and the host's lobby takes the sharing requests of the machines that joined (from their streams alone, as map sharing's). Everything else of it is in the MCC modules and in four one-line hooks in `game/map_share.c`'s counters (the players held, the machine downloading) and per-frame and render calls, so that the existing holds apply. |
 | `cutscene/cinematics.c` | A scenario's titles (some Custom Edition maps show their name for the whole game) are not drawn over a menu, as the letterbox is not: the screen's overlays are drawn after the players' menus. On a screen wider than 640 columns, a title is moved so the edge it is justified to (its middle, if centered) keeps its place relative to the screen's sides, as on the Xbox's 4:3 screen: a right-justified chapter title ends near the right side, not short of it. |
 | `tag_files/tag_groups.h` | `TAG_BLOCK_GET_ELEMENT` returns an element in the block without a call, and calls `tag_block_get_element_with_size` for anything else. |
 | `game/players.c`, `networking/network_server_manager.c` | Bots (`game/bots.c`, `bots.count`): the lobby of a local Slayer game takes the bot players, each the one player of a machine of its own that no real machine is, and every tick their actions come from `game/bots.c` instead of their empty queues. System link and internet bots remain off unless explicitly enabled before host creation; live controls use the same ordinary player messages. |

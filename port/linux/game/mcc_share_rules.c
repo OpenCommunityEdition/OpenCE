@@ -39,13 +39,6 @@ static int mcc_share_component(char const *name)
     return 1;
 }
 
-static int mcc_share_digits(char const *text)
-{
-    unsigned i;
-    for (i=0;text[i];i++) if (text[i]<'0' || text[i]>'9') return 0;
-    return i>0;
-}
-
 enum mcc_share_reason mcc_share_decide(struct mcc_share_package const *package)
 {
     char input[64],canonical[64];
@@ -65,8 +58,8 @@ enum mcc_share_reason mcc_share_decide(struct mcc_share_package const *package)
         mcc_share_same(level,"loc")) return MCC_SHARE_BAD_NAME;
     if (mcc_share_same(folder,"_shared")) return MCC_SHARE_SHARED_RESOURCES;
     if (package->content==MCC_SHARE_CONTENT_STOCK) return MCC_SHARE_STOCK;
-    if (mcc_share_digits(folder) || package->sidecar==MCC_SHARE_SIDECAR_VALID) return MCC_SHARE_WORKSHOP;
-    if (package->sidecar!=MCC_SHARE_SIDECAR_ABSENT) return MCC_SHARE_UNKNOWN_ORIGIN;
+    if (package->sidecar!=MCC_SHARE_SIDECAR_ABSENT &&
+        package->sidecar!=MCC_SHARE_SIDECAR_VALID) return MCC_SHARE_UNKNOWN_ORIGIN;
     if (package->content!=MCC_SHARE_CONTENT_CUSTOM || !package->content_known) return MCC_SHARE_UNKNOWN_CONTENT;
     if (!package->host_opt_in) return MCC_SHARE_NOT_OPTED_IN;
     return MCC_SHARE_ELIGIBLE;
@@ -86,7 +79,6 @@ char const *mcc_share_reason_word(enum mcc_share_reason reason)
     case MCC_SHARE_NOT_A_PACKAGE: return "not-a-package";
     case MCC_SHARE_SHARED_RESOURCES: return "shared-resources";
     case MCC_SHARE_STOCK: return "stock";
-    case MCC_SHARE_WORKSHOP: return "workshop";
     case MCC_SHARE_UNKNOWN_ORIGIN: return "unknown-origin";
     case MCC_SHARE_UNKNOWN_CONTENT: return "unknown-content";
     }

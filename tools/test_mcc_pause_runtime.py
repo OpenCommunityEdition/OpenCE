@@ -187,7 +187,11 @@ static void setup(void) {
     device.textures[3]=&scenario; /* An unrelated texture identity must survive. */
 }
 static int clean(void) {
+    unsigned textures=gpu_live,deletions=gpu_deleted,restores=restored;
+    boolean table_published=live_table!=original_table;
     mcc_pause_runtime_unload();
+    CHECK(gpu_deleted==deletions+textures&&restored==restores+table_published);
+    CHECK(null_renderer ? !gpu_deleted : gpu_changed==gpu_deleted);
     CHECK(live_table==original_table&&live_count==2&&!live_allocations&&!gpu_live&&!mcc_pause_tag_count());
     CHECK(!device.textures[0]&&!device.textures[1]&&!device.textures[2]&&device.textures[3]==&scenario);
     CHECK(!placeholders[0]&&!placeholders[1]);
@@ -280,7 +284,7 @@ int main(int argc,char **argv) {
     }
     if(!strcmp(argv[1],"inactive")) {
         active=FALSE;CHECK(!mcc_pause_runtime_load());
-        CHECK(!malloc_calls&&!gpu_calls&&!published&&!mcc_pause_runtime_active());
+        CHECK(!malloc_calls&&!gpu_calls&&!published&&!logs&&!mcc_pause_runtime_active());
         CHECK(mcc_pause_runtime_screen(1,TRUE)==NONE);CHECK(!clean());return 0;
     }
     if(!strcmp(argv[1],"fonts")) {
@@ -296,6 +300,7 @@ int main(int argc,char **argv) {
         live_count=-1;CHECK(!mcc_pause_runtime_load()&&!published&&!live_allocations);setup();
         live_count=63001;CHECK(!mcc_pause_runtime_load()&&!published&&!live_allocations);setup();
         live_table=NULL;CHECK(!mcc_pause_runtime_load()&&!published&&!live_allocations);setup();
+        CHECK(logs==3);
         CHECK(!clean());return 0;
     }
     if(!strcmp(argv[1],"art-bounds")) {
@@ -314,9 +319,11 @@ int main(int argc,char **argv) {
     }
     if(!strcmp(argv[1],"null-renderer"))null_renderer=TRUE;
     CHECK(mcc_pause_runtime_load());calls=malloc_calls;textures=gpu_calls;
+    CHECK(gpu_changed==textures&&logs==1);
     CHECK(!inventory());
     if(!strcmp(argv[1],"publish")) {
         CHECK(mcc_pause_runtime_load()&&published==1&&malloc_calls==calls&&gpu_calls==textures);
+        CHECK(gpu_changed==textures&&logs==1);
         CHECK(mcc_pause_runtime_screen(1,TRUE)!=NONE);
     } else if(!strcmp(argv[1],"pixels")||!strcmp(argv[1],"null-renderer")) {
         CHECK(!pixel_check());
