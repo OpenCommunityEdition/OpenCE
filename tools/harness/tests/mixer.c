@@ -22,77 +22,7 @@ adding tap by tap), "metrics" prints the figures and "bench" times a game's
 worth of voices.
 */
 
-#include "harness.h"
-
-#include <math.h>
-#include <pthread.h>
-#ifdef _WIN32
-#include <io.h>
-#include <fcntl.h>
-/* The platform startup's crash reporter check; this executable only tests audio. */
-int crash_reporter_process(void) { return 1; }
-void mcc_memory_log_startup(void) { }
-#endif
-
-typedef int BOOL;
-typedef unsigned long DWORD;
-typedef long LONG;
-typedef unsigned long ULONG;
-typedef void *LPVOID;
-typedef void (*LPFNXMEDIAOBJECTCALLBACK)(void *, void *, DWORD);
-typedef struct { void *lpVtbl; } IDirectSoundStream;
-typedef long HRESULT;
-typedef IDirectSoundStream *LPDIRECTSOUNDSTREAM;
-typedef struct
-{
-	void *pvBuffer;
-	DWORD dwMaxSize;
-	DWORD *pdwCompletedSize, *pdwStatus;
-	void *pContext, *hCompletionEvent;
-} XMEDIAPACKET;
-typedef const XMEDIAPACKET *LPCXMEDIAPACKET;
-#define STDMETHODCALLTYPE
-#define WINAPI
-#define S_OK 0
-#define DS_OK 0
-#define E_INVALIDARG (-1)
-#define E_OUTOFMEMORY ((HRESULT)0x8007000eL)
-#define XMEDIAPACKET_STATUS_PENDING 1
-#define XMEDIAPACKET_STATUS_FLUSHED 2
-#define DSSTREAMPAUSE_PAUSE 1
-#define DSSTREAMPAUSE_RESUME 0
-#define SetEvent(event) ((void)(event))
-static HRESULT stream_flush(IDirectSoundStream *object);
-typedef struct
-{
-	LONG lRoom, lRoomHF;
-	float flRoomRolloffFactor, flDecayTime, flDecayHFRatio;
-	LONG lReflections;
-	float flReflectionsDelay;
-	LONG lReverb;
-	float flReverbDelay, flDiffusion, flDensity, flHFReference;
-} DSI3DL2LISTENER;
-#define DSBVOLUME_MIN (-10000)
-#define DS3DMODE_NORMAL 0x00000000
-#define DS3DMODE_HEADRELATIVE 0x00000001
-#define DS3DMODE_DISABLE 0x00000002
-
-/* the settings (port_config.c): audio.resampler, which a case sets */
-static const char *resampler_setting;
-
-static const char *config_string(const char *name)
-{
-	return !strcmp(name, "audio.resampler") ? resampler_setting : NULL;
-}
-
-/* the players' voices (voice_audio.c): none */
-static void voice_audio_mix(float *output, unsigned long frames)
-{
-	(void)output;
-	(void)frames;
-}
-
-#include "under_test.inc"
+#include "mixer_fixture.h"
 
 #define PI 3.14159265358979323846
 #define CHUNK 512 /* frames a mix, as SDL asks on Linux */
@@ -124,40 +54,7 @@ static struct sdl_stream *voice_new(const short *samples, unsigned long frames, 
 	return stream;
 }
 
-static void voice_delete(struct sdl_stream *stream)
-{
-	free(stream->packets[0].samples);
-	free(stream);
-}
-
-/* frames of the voice mixed alone, CHUNK at a time: the left channel, or
-both (stereo: interleaved) */
-static void render(struct sdl_stream *stream, float *output, unsigned long frames, BOOL stereo)
-{
-	static float buffer[CHUNK * 2], send[CHUNK];
-	unsigned long done, frame;
-
-	for (done = 0; done < frames; done += CHUNK)
-	{
-		unsigned long count = frames - done < CHUNK ? frames - done : CHUNK;
-
-		memset(buffer, 0, sizeof(buffer));
-		memset(send, 0, sizeof(send));
-		mix_voice(stream, buffer, send, count);
-		for (frame = 0; frame < count; frame++)
-		{
-			if (stereo)
-			{
-				output[(done + frame) * 2] = buffer[frame * 2];
-				output[(done + frame) * 2 + 1] = buffer[frame * 2 + 1];
-			}
-			else
-			{
-				output[done + frame] = buffer[frame * 2];
-			}
-		}
-	}
-}
+#include "mixer_signals.h"
 
 /* ---------- the reference: the same low pass in double precision */
 
@@ -193,67 +90,6 @@ static double reference_frame(const double *source, long frames, double step, un
 }
 
 /* ---------- signals */
-
-static unsigned long random_state = 1;
-
-static double random_uniform(void)
-{
-	random_state = random_state * 1103515245UL + 12345UL;
-	return (double)((random_state >> 8) & 0xffffff) / 16777216.0 * 2.0 - 1.0;
-}
-
-/* frames of a signal as 16-bit samples (and as the doubles they are) */
-static void quantize(const double *signal, short *samples, double *exact, unsigned long frames)
-{
-	unsigned long frame;
-
-	for (frame = 0; frame < frames; frame++)
-	{
-		long value = lround(signal[frame] * 32767.0);
-
-		samples[frame] = (short)(value > 32767 ? 32767 : value < -32768 ? -32768 : value);
-		exact[frame] = samples[frame] / 32768.0;
-	}
-}
-
-/* ---------- figures */
-
-/* the amplitude of a sine of frequency cycles a frame in signal[first, last),
-and the power of the rest relative to the sine's, in dB */
-static void tone_fit(const float *signal, unsigned long first, unsigned long last, double frequency,
-	double *amplitude, double *rest_db)
-{
-	double ss = 0, sc = 0, cc = 0, ys = 0, yc = 0, a, b, determinant, rest = 0, tone = 0;
-	unsigned long n;
-
-	for (n = first; n < last; n++)
-	{
-		double s = sin(2.0 * PI * frequency * n), c = cos(2.0 * PI * frequency * n);
-
-		ss += s * s;
-		sc += s * c;
-		cc += c * c;
-		ys += signal[n] * s;
-		yc += signal[n] * c;
-	}
-	determinant = ss * cc - sc * sc;
-	a = (ys * cc - yc * sc) / determinant;
-	b = (yc * ss - ys * sc) / determinant;
-	for (n = first; n < last; n++)
-	{
-		double fit = a * sin(2.0 * PI * frequency * n) + b * cos(2.0 * PI * frequency * n);
-
-		rest += (signal[n] - fit) * (signal[n] - fit);
-		tone += fit * fit;
-	}
-	*amplitude = sqrt(a * a + b * b);
-	*rest_db = 10.0 * log10(rest / tone + 1e-30);
-}
-
-static double decibels(double ratio)
-{
-	return 20.0 * log10(ratio + 1e-30);
-}
 
 /* the mixer's output against the reference's for a signal at rate played at
 frequency: the error's power relative to the reference's, in dB, and its
@@ -366,17 +202,6 @@ static double sweep_figure(unsigned long rate, double top)
 	return 10.0 * log10(error / power + 1e-30);
 }
 
-static double *noise(unsigned long frames)
-{
-	double *signal = malloc(frames * sizeof(double));
-	unsigned long n;
-
-	random_state = 1;
-	for (n = 0; n < frames; n++)
-		signal[n] = 0.5 * random_uniform();
-	return signal;
-}
-
 /* ---------- a scene: a game's worth of voices, for "render" and "bench" */
 
 /* voices: mono 22 kHz sounds in the world (indoors sending to the reverb,
@@ -436,21 +261,6 @@ static void scene(unsigned long voices, unsigned long silent, BOOL indoor, doubl
 	}
 	free(mono);
 	free(stereo);
-}
-
-/* the scene's voices out of earshot come into it */
-static void scene_approach(void)
-{
-	struct sdl_stream *stream;
-
-	for (stream = streams; stream; stream = stream->next)
-	{
-		if (stream->direct == DSBVOLUME_MIN)
-		{
-			stream->position[2] = 3.0f;
-			stream->direct = stream->room = 0;
-		}
-	}
 }
 
 /* ---------- 3D voices: Doppler */
@@ -551,7 +361,6 @@ static void bench(unsigned long voices, unsigned long silent, BOOL indoor, doubl
 	printf("%lu voices (%lu out of earshot)%s: %.2f%% of a core, %.1f ns a frame\n", voices, silent,
 		indoor ? " indoors" : "", 100.0 * elapsed / seconds, elapsed * 1e9 / ((double)chunks * CHUNK));
 }
-
 
 /* Run the audio worker while a real flush completion callback has dropped
 the mixer lock. The handshake makes the problematic interleaving repeatable. */
