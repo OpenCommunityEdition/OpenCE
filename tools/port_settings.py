@@ -2258,8 +2258,50 @@ def _matchmaking() -> list:
 MATCHMAKING_GOLD = "#e6c66e"
 
 
+# SEARCH_SLOT_SPINNER_FRAMES must equal menu_functions.c's
+SEARCH_SLOT_SIZE = (265, 18)
+SEARCH_SLOT_SPINNER_FRAMES = 8
+
+
+def search_slot_frames() -> list:
+    """frames: you, matched, then looking with its spinner (menu_functions.c's _search_slot_*)"""
+    width, height = SEARCH_SLOT_SIZE
+
+    def slot(mark):
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+                f'viewBox="0 0 {width} {height}">\n{mark}</svg>\n', width, height)
+
+    frames = [slot(f'  <rect x="6" y="4" width="10" height="10" fill="{MATCHMAKING_GOLD}"/>\n'),
+              slot('  <rect x="6" y="4" width="10" height="10" fill="#2896ff"/>\n')]
+    for turn in range(SEARCH_SLOT_SPINNER_FRAMES):
+        spinner = ('  <circle cx="11" cy="9" r="4.5" fill="none" stroke="#2896ff" stroke-opacity="0.3" '
+                   'stroke-width="1.6"/>\n'
+                   f'  <path d="M11,4.5 A4.5,4.5 0 0 1 15.5,9" fill="none" stroke="#2896ff" stroke-width="1.6" '
+                   f'transform="rotate({turn * 360 // SEARCH_SLOT_SPINNER_FRAMES} 11 9)"/>\n')
+        frames.append(slot(spinner))
+    return frames
+
+
+def _search_slots(base: str) -> tuple:
+    children = [f'<child widget="{base}/search_slot_you" x="340" y="112"/>',
+                *(f'<child widget="{base}/search_slot" x="340" y="{112 + 21 * index}"/>' for index in range(1, 8))]
+    # menu_functions.c's profile_name_show fills current_profile_name
+    lines = _widget(f"{base}/search_slot_you", [("width", SEARCH_SLOT_SIZE[0]), ("height", SEARCH_SLOT_SIZE[1]),
+                                                ("bitmap", f"{base}/search_slot")],
+                    [f'<child widget="{base}/current_profile_name" x="24"/>'])
+    lines += _widget(f"{base}/search_slot", [("width", SEARCH_SLOT_SIZE[0]), ("height", SEARCH_SLOT_SIZE[1]),
+                                             ("bitmap", f"{base}/search_slot")],
+                     [f'<child widget="{base}/search_slot_name" x="24"/>'])
+    for key in ("current_profile_name", "search_slot_name"):
+        lines += _widget(f"{base}/{key}", [("type", "text"), ("controller", 1), ("width", SEARCH_SLOT_SIZE[0] - 24),
+                                           ("height", SEARCH_SLOT_SIZE[1]), ("font", "ui\\small_ui"),
+                                           ("color", "#FFFFFFFF"), ("text_y", 1)], [])
+    return children, lines
+
+
 def _matchmaking_search(base: str) -> list:
     screen = f"{base}/search_screen"
+    slots, slot_widgets = _search_slots(base)
     texts = [("notice", 35, 74, 570, 16, "ui\\small_ui", f"#FF{MATCHMAKING_GOLD[1:].upper()}", None),
              ("title", 35, 92, 230, 20, "ui\\large_ui", "#FF2896FF", None),
              ("help", 35, 114, 285, 40, "ui\\small_ui", "#FFFFFFFF", None),
@@ -2270,12 +2312,14 @@ def _matchmaking_search(base: str) -> list:
                      '<on event="back" run="port matchmaking search back"/>',
                      f'<child widget="{base}/header_matchmaking"/>',
                      *(f'<child widget="{base}/search_{key}"/>' for key, *_ in texts),
+                     *slots,
                      f'<child widget="{base}/search_card_text" x="35" y="370"/>',
                      f'<child widget="{base}/search_list"/>'])
     for key, left, top, width, height, font, color, align in texts:
         lines += _widget(f"{base}/search_{key}", [("type", "text"), ("controller", 1), ("left", left), ("top", top),
                                                   ("width", width), ("height", height), ("font", font),
                                                   ("color", color), ("align", align)], [])
+    lines += slot_widgets
     lines += _widget(f"{base}/search_card_text", [("type", "text"), ("controller", 1), ("width", 265), ("height", 24),
                                                   ("font", "ui\\small_ui"),
                                                   ("color", "#FFFFFFFF"), ("text_x", 10), ("text_y", 4)], [])

@@ -718,6 +718,7 @@ def main() -> None:
     lines.append(art.port_picture("mods/status", port_settings.mod_status_frames(ROOT / "port/assets/icons/lucide")))
     lines.append(art.port_picture("mods/status_small",
                                   port_settings.mod_status_frames(ROOT / "port/assets/icons/lucide", 16)))
+    lines.append(art.port_picture(f"{port_settings.MT}/matchmaking/search_slot", port_settings.search_slot_frames()))
     # (nothing: what a game map draws for a frame of ui.map's it has not,
     # menu_tags.c)
     lines.append(art.port_picture("blank", [

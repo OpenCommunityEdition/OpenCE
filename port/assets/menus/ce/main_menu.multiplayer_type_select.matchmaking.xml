@@ -117,6 +117,14 @@
 		<child widget="main_menu/multiplayer_type_select/matchmaking/search_title"/>
 		<child widget="main_menu/multiplayer_type_select/matchmaking/search_help"/>
 		<child widget="main_menu/multiplayer_type_select/matchmaking/search_count"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot_you" x="340" y="112"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="133"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="154"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="175"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="196"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="217"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="238"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="259"/>
 		<child widget="main_menu/multiplayer_type_select/matchmaking/search_card_text" x="35" y="370"/>
 		<child widget="main_menu/multiplayer_type_select/matchmaking/search_list"/>
 	</widget>
@@ -127,6 +135,16 @@
 	<widget name="main_menu/multiplayer_type_select/matchmaking/search_help" type="text" controller="1" left="35" top="114" width="285" height="40" font="ui\small_ui" color="#FFFFFFFF">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/matchmaking/search_count" type="text" controller="1" left="340" top="92" width="265" height="18" font="ui\small_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_slot_you" width="265" height="18" bitmap="main_menu/multiplayer_type_select/matchmaking/search_slot">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/current_profile_name" x="24"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_slot" width="265" height="18" bitmap="main_menu/multiplayer_type_select/matchmaking/search_slot">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot_name" x="24"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/current_profile_name" type="text" controller="1" width="241" height="18" font="ui\small_ui" color="#FFFFFFFF" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_slot_name" type="text" controller="1" width="241" height="18" font="ui\small_ui" color="#FFFFFFFF" text_y="1">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/matchmaking/search_card_text" type="text" controller="1" width="265" height="24" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="4">
 	</widget>
