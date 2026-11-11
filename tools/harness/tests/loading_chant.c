@@ -10,7 +10,6 @@
 #define FALSE 0
 #define WINAPI
 typedef unsigned char byte;
-typedef long HRESULT;
 typedef void *LPDIRECTSOUND, *LPDIRECTSOUNDBUFFER, *LPUNKNOWN;
 typedef struct {
     unsigned short wFormatTag, nChannels;
