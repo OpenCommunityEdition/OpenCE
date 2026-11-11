@@ -159,7 +159,7 @@ static const struct config_setting config_settings[] =
 		"In first person, point the view where the player aims now instead of\n"
 		"where the last tick left it: the view turns the frame the mouse moves,\n"
 		"not up to two ticks (66 ms) later." },
-	{ "display.third_person_crosshair_smooth", _config_boolean, "false", "HALO_THIRD_PERSON_CROSSHAIR_SMOOTH", _environment_value, _platform_all,
+	{ "display.third_person_crosshair_smooth", _config_boolean, "true", "HALO_THIRD_PERSON_CROSSHAIR_SMOOTH", _environment_value, _platform_all,
 		"Match the shoulder crosshair to the rendered view without changing weapon aim." },
 	{ "display.third_person_crosshair_size", _config_real, "1.0", "HALO_THIRD_PERSON_CROSSHAIR_SIZE", _environment_value, _platform_all,
 		"Shoulder crosshair size (0.75 to 1.0); 1.0 preserves its normal size." },

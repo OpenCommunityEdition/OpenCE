@@ -504,7 +504,7 @@ boolean third_person_reticle(point2d *point, real reticle_scale)
 	offset.y = screen.y - center_y;
 	if (smooth_reticle || reticle_size != 1.0f)
 		reticle_prepare(&offset, reticle_scale);
-	/* Preserve the established draw exactly with both options at default. */
+	/* Preserve the established draw with smoothing off and size at 100%. */
 	point->x += (short)(offset.x / reticle_scale);
 	point->y += (short)(offset.y / reticle_scale);
 	return TRUE;

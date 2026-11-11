@@ -130,7 +130,7 @@ additional behaviors or full campaign compatibility.
 
 ## Optional crosshair presentation
 
-Shoulder Camera offers **Smooth Crosshair** (off by default) and independent
+Shoulder Camera offers **Smooth Crosshair** (on by default) and independent
 **Crosshair Size** (75-100%, default 100%). These affect only this machine's
 centre-anchored shoulder reticle. First-person views, scopes, passenger cameras
 and weapon-authored cameras retain their existing paths. Simulated firing,
@@ -172,9 +172,9 @@ hook in [hud_draw.c](../../source/interface/hud_draw.c) supplies the final
 floating-point vertices, because the older HUD placement interface accepts
 integer points. `third_person_reticle_vertex` applies fractional displacement
 and scales the artwork and its authored component offsets about the projected
-aim point. With both options at their defaults, the original placement remains
-unchanged. With size alone at 80%, the original preview timing remains, while
-its artwork and spacing shrink around that target. Feature state stays in the
+aim point. With Smooth Crosshair disabled and size at 100%, the original
+placement remains unchanged. With size alone at 80%, the original preview
+timing remains, while its artwork and spacing shrink around that target. Feature state stays in the
 shoulder module; no map loader or MCC adapter changes are needed.
 
 Relative-aim history belongs to each local viewport. Settings changes,
