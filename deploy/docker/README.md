@@ -88,6 +88,14 @@ characters; `docker run --rm -v halo-state:/state <image> --keygen` makes one
 into the volume instead), `HALO_SERVER_INSTANCE`, `HALO_SERVER_REGION`,
 `HALO_SERVER_LOG_FORMAT=json`.
 
+`HALO_NET_VEHICLE_RIDING` is the base setting; in multiplayer each
+gametype's riding rule overrides it (a gametype
+without the rule is off), and
+`HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE=true` turns that override off.
+Both default to `false` when unset;
+Compose passes them only when given. A co-op entry's `+riding` rule or a
+map's own choice takes precedence (docs/dedicated_server.md, "Vehicle riding").
+
 A tunnel port other than 2302 is published as the same number on both sides
 (`-e HALO_NET_TUNNEL_PORT=2303 -p 2303:2303/udp`), as the server offers its
 own port to joiners. Behind a NAT that STUN cannot see through, give the

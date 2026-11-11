@@ -162,6 +162,7 @@ symbols in this file:
 #include "main/main.h"
 #include "tag_files/tag_groups.h"
 #include "player_ui.h"
+#include "mcc_ui.h" /* port: port/linux/game/mcc_ui.c */
 
 /* ---------- constants */
 
@@ -786,6 +787,8 @@ void player_ui_begin_editing_profile(
 	long type;
 
 	player_ui_globals.edit_profile_index = NONE;
+	/* port: a profile editor opened here is no longer MCC's pause menu's */
+	mcc_ui_settings_profile_released();
 	type = saved_game_file_get_type(profile_index);
 
 	switch (type)
@@ -1377,5 +1380,7 @@ static void clear_profile_edit_data(
 	void)
 {
 	player_ui_globals.edit_profile_index = NONE;
+	/* port: saving or cancelling also ends the editor MCC's pause menu opened */
+	mcc_ui_settings_profile_released();
 	return;
 }

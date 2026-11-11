@@ -1,4 +1,4 @@
-version 41
+version 43
 bound CHAT_TEXT_SIZE 64
 bound DISCORD_ID_SIZE 24
 bound DISCORD_NAME_SIZE 40
@@ -7,10 +7,11 @@ bound DISTRIBUTED_CLIENT_BUILD_MODS_SIZE 512
 bound DISTRIBUTED_CLIENT_BUILD_NUMBER_SIZE 12
 bound DISTRIBUTED_CLIENT_BUILD_REPOSITORY_SIZE 144
 bound DISTRIBUTED_CLIENT_BUILD_VERSION_SIZE 64
+bound DISTRIBUTED_DECK_SIZE 4 + 2 + 12 + 6 + 1 + 1 + 2
 bound DISTRIBUTED_INPUT_HISTORY 4
 bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)
 bound DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE 14
-bound DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 + 2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1
+bound DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE 3 + 4 + (4 + 2) + (12 + 3 * 6) + DISTRIBUTED_DECK_SIZE + 2 + 2 * 2 + 4 * 2 + 2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1 + NUMBER_OF_DISTRIBUTED_POSE_VECTORS * 6
 bound DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE 3
 bound GAME_ALLEGIANCE_BITVECTOR_LONGS 4
 bound HALO_PORT_MAXIMUM_NETWORK_PLAYERS 128
@@ -33,6 +34,7 @@ bound NETWORK_MAP_VOTE_GAMETYPE_SIZE 24
 bound NETWORK_MAP_VOTE_MAP_SIZE 32
 bound NETWORK_MAP_VOTE_MAXIMUM_CHOICES 8
 bound NUMBER_OF_ANGLES enum f0ce7d0319b6
+bound NUMBER_OF_DISTRIBUTED_POSE_VECTORS enum 5538f02632fd
 bound NUMBER_OF_OBJECT_CHANGE_COLORS enum b00724872e2d
 bound NUMBER_OF_PLAYER_POWERUPS enum 43075f42087c
 bound NUMBER_OF_UNIT_GRENADE_TYPES enum a0462dbcbdd9
@@ -42,6 +44,33 @@ define DISTRIBUTED_ANGULAR_VELOCITY_SCALE 4096.0f
 define DISTRIBUTED_TIME_WINDOW_TICKS (15 * TICKS_PER_SECOND)
 define DISTRIBUTED_UNIT_SCALE 32767.0f
 define DISTRIBUTED_VELOCITY_SCALE 1024.0f
+define MCC_ADMISSION_DEADLINE 120000u
+define MCC_ADMISSION_GRACE 15000u
+define MCC_ADMISSION_HEARD 20000u
+define MCC_ADMISSION_MACHINES 128
+define MCC_ADMISSION_PULSE 5000u
+define MCC_LOAD_NETWORK_EARN 3u
+define MCC_LOAD_NETWORK_HOLD_GAP 1000u
+define MCC_LOAD_NETWORK_IDLE 30000u
+define MCC_LOAD_NETWORK_LIMIT 240000u
+define MCC_LOAD_NETWORK_PULSE 5000u
+define MCC_SHARE_CHUNK_BYTES 3072
+define MCC_SHARE_CREDIT_SIZE 64
+define MCC_SHARE_LEAF_SIZE 128
+define MCC_SHARE_LEVEL_SIZE 64
+define MCC_SHARE_MANIFEST_PAGE 16
+define MCC_SHARE_MAXIMUM_CREDITS 4
+define MCC_SHARE_MAXIMUM_CREDIT_BYTES 0x10000u
+define MCC_SHARE_MAXIMUM_FILE_BYTES 0x30000000u
+define MCC_SHARE_MAXIMUM_JSON_BYTES (256u * 1024u)
+define MCC_SHARE_MAXIMUM_METADATA_BYTES (32u * 1024u * 1024u)
+define MCC_SHARE_MAXIMUM_PNG_BYTES (8u * 1024u * 1024u)
+define MCC_SHARE_MAXIMUM_TOTAL_BYTES 0x40000000u
+define MCC_SHARE_STAGE_FILES 168
+define MCC_WORKSHOP_WIRE_OFFSET 64
+define MCC_WORKSHOP_WIRE_SIZE 64
+define MCC_WORKSHOP_WIRE_VERSION 1
+enum VEHICLE_RIDING_DECK_VERDICT_SHIFT 1
 enum _distributed_actor_camouflaged_bit 4
 enum _distributed_actor_impulse_aligned_bit 6
 enum _distributed_actor_rides_bit 0
@@ -64,6 +93,7 @@ enum _distributed_message_batch 16
 enum _distributed_message_chat_config 89
 enum _distributed_message_chat_down 88
 enum _distributed_message_chat_up 87
+enum _distributed_message_checkpoint 96
 enum _distributed_message_client_build 92
 enum _distributed_message_client_identity 18
 enum _distributed_message_client_ready 9
@@ -89,6 +119,14 @@ enum _distributed_message_map_share_request 83
 enum _distributed_message_map_share_sources 85
 enum _distributed_message_map_vote 94
 enum _distributed_message_map_vote_choice 95
+enum _distributed_message_mcc_admission 105
+enum _distributed_message_mcc_campaign 98
+enum _distributed_message_mcc_game_speed 100
+enum _distributed_message_mcc_grenades 97
+enum _distributed_message_mcc_load_progress 106
+enum _distributed_message_mcc_object_names 99
+enum _distributed_message_mcc_share_request 103
+enum _distributed_message_mcc_share_response 104
 enum _distributed_message_notice 17
 enum _distributed_message_object_changes 5
 enum _distributed_message_object_states 6
@@ -103,6 +141,7 @@ enum _distributed_message_shield_effects 91
 enum _distributed_message_structure_bsp 65
 enum _distributed_message_unit_states 2
 enum _distributed_message_vehicle_prediction 12
+enum _distributed_message_vehicle_riding_map 107
 enum _distributed_message_voice_config 82
 enum _distributed_message_voice_down 81
 enum _distributed_message_voice_up 80
@@ -114,6 +153,11 @@ enum _distributed_object_dead_bit 2
 enum _distributed_object_light_on_bit 5
 enum _distributed_object_light_sent_bit 4
 enum _distributed_object_predicted_bit 3
+enum _distributed_pose_aiming 1
+enum _distributed_pose_current_aiming 3
+enum _distributed_pose_current_looking 4
+enum _distributed_pose_facing 0
+enum _distributed_pose_looking 2
 enum _distributed_send_action_bit 1
 enum _distributed_send_sees_bit 2
 enum _distributed_send_state_bit 0
@@ -127,9 +171,11 @@ enum _distributed_unit_friendly_fire_bit 2
 enum _distributed_unit_killed_by_vehicle_bit 3
 enum _distributed_unit_part_camouflage_bit 4
 enum _distributed_unit_part_damage_bit 2
+enum _distributed_unit_part_deck_bit 7
 enum _distributed_unit_part_killer_bit 5
 enum _distributed_unit_part_powerups_bit 3
 enum _distributed_unit_part_riding_bit 0
+enum _distributed_unit_part_scripted_pose_bit 6
 enum _distributed_unit_part_up_bit 1
 enum _distributed_unit_placed_bit 1
 enum _distributed_unit_predicted_bit 7
@@ -137,6 +183,7 @@ enum _distributed_unit_shield_charging_bit 5
 enum _distributed_unit_shield_depleted_bit 4
 enum _distributed_unit_shield_over_charging_bit 6
 enum _distributed_unit_super_camouflaged_bit 1
+enum _distributed_unit_suspended_bit 2
 enum _message_client_add_player_request_ingame 26
 enum _message_client_add_player_request_pregame 13
 enum _message_client_broadcast_game_search 0
@@ -172,6 +219,12 @@ enum _message_server_pregame_countdown 7
 enum _message_server_pregame_keep_alive 10
 enum _message_server_remove_player_ingame 22
 enum _message_server_switch_to_pregame 30
+enum _vehicle_riding_deck_cabin_bit 3
+enum _vehicle_riding_deck_falling_bit 0
+enum mcc_admission_op 8a8312ea736e
+enum mcc_share_file_kind 0ae653ab8b6d
+enum mcc_share_op ae61837ba751
+enum mcc_share_result c8f57489625d
 fields client_add_player_request_ingame 06ff007a9b35
 fields client_add_player_request_pregame 06ff007a9b35
 fields client_broadcast_game_search f31a5fac9a46
@@ -180,7 +233,7 @@ fields client_game_update 1134bf6a029b
 fields client_graceful_game_exit_postgame 678699dea271
 fields client_graceful_game_exit_pregame 678699dea271
 fields client_host_crashed_cry_for_help 52eb2291ec03
-fields client_join_game_request 20da8c4f815f
+fields client_join_game_request d7dd965724e6
 fields client_join_new_host 52eb2291ec03
 fields client_loaded 678699dea271
 fields client_map_is_precached_pregame 0073b9d65051
@@ -208,7 +261,7 @@ fields server_pregame_keep_alive 678699dea271
 fields server_remove_player_ingame 1718d4189972
 fields server_switch_to_pregame 678699dea271
 layout HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x36)
-layout HALO_PORT_NETWORK_GAME_SIZE (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A)
+layout HALO_PORT_NETWORK_GAME_SIZE (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0x3A + 64) /* MCC content and metadata SHA-256 */
 layout HALO_PORT_NETWORK_GAME_VARIANT_OPTIONS_OFFSET (HALO_PORT_NETWORK_GAME_PLAYERS_END + 0xA)
 size message_client_add_player_request_ingame 0x20
 size message_client_add_player_request_pregame 0x20
@@ -218,7 +271,7 @@ size message_client_game_update 0x88
 size message_client_graceful_game_exit_postgame 0x04
 size message_client_graceful_game_exit_pregame 0x04
 size message_client_host_crashed_cry_for_help 0x10
-size message_client_join_game_request 0x70 + 170 + 64
+size message_client_join_game_request 0x70 + 170 + 64 + 2
 size message_client_join_new_host 0x10
 size message_client_loaded 0x04
 size message_client_map_is_precached_pregame 0x100
@@ -291,7 +344,7 @@ struct distributed_map_share_source 940f8a4c9849
 struct distributed_map_vote_choice e0aa3fb40224
 struct distributed_map_vote_choice_entry b8e5a595dbad
 struct distributed_map_vote_status 524c63fc37e2
-struct distributed_message_header 0e026a4933a1
+struct distributed_message_header 5bc35a4ad92a
 struct distributed_object_change 343e570cfa1d
 struct distributed_object_change_message 4c3679cd4dae
 struct distributed_object_state 1b656bbda892
@@ -301,6 +354,8 @@ struct distributed_pings_message 35c6009dee29
 struct distributed_player_input a0cf65a1197c
 struct distributed_player_ping 377e0e3045f4
 struct distributed_player_statistics 2a44afb8f96c
+struct distributed_riding_latched 3d13fb412582
+struct distributed_riding_map_message 01a360e89e36
 struct distributed_statistics_message 79134e6e9811
 struct distributed_structure_bsp 53f7d5067cc9
 struct distributed_structure_bsp_message 096278a05681
@@ -311,3 +366,9 @@ struct distributed_voice_up 3d74ee44e4cb
 struct distributed_votekick_request 7e29ffd54bd1
 struct distributed_votekick_status b94458cdc180
 struct game_variant_options 0e258e4cf85b
+struct mcc_admission_identity ba88dfe0091d
+struct mcc_admission_message 0a2136c026a5
+struct mcc_load_message 587f305ba598
+struct mcc_share_entry 66c2657ada44
+struct mcc_share_request 327320bc7edb
+struct mcc_share_response 3c288efa85b1

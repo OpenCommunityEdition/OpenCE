@@ -190,6 +190,12 @@ long hs_runtime_evaluate(
 is a sleep_until's condition (hs_runtime.c) */
 boolean hs_runtime_waiting_on_call(
 	void);
+/* port: the map's riding call counts only from a startup script (vehicle_riding.c) */
+short hs_runtime_port_executing_script_type(
+	void);
+/* port: the map's declared boolean, not a disabled initializer's default */
+short hs_runtime_port_scenario_boolean(
+	char const *name);
 char const *hs_runtime_get_executing_thread_name(
 	void);
 boolean hs_wake_by_name(

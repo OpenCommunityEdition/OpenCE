@@ -15,7 +15,9 @@ def manager_types():
                            (manager, "_fade_in_at_start_bit"), (manager, "_sound_spatialization_mode_none"),
                            (definitions, "_sound_definition_linked_permutations_bit"),
                            (definitions, "_looping_sound_fake_impulse_sound_bit"),
-                           (read("source/sound/sound_manager.h"), "_looping_sound_refresh_start")]:
+                           (read("source/sound/sound_manager.h"), "_looping_sound_refresh_start"),
+                           (read("port/linux/game/coop_sound_sync.h"), "_coop_sound_sync_start_part"),
+                           (read("port/linux/game/coop_sound_sync.h"), "_coop_sound_sync_play")]:
         text += enum_with(source, member) + "\n"
     for source, names in [(classes, ["MAXIMUM_SOUND_INSTANCES_PER_DEFINITION",
                                      "MAXIMUM_SOUND_INSTANCES_PER_OBJECT_PER_DEFINITION"]),
@@ -51,7 +53,9 @@ def stream_types():
 typedef long LONG, HRESULT;
 typedef int BOOL;
 typedef void *LPVOID, *LPDIRECTSOUND, *LPDIRECTSOUNDBUFFER;
+#ifndef _WIN32
 typedef long long __int64;
+#endif
 typedef void (*LPFNXMEDIAOBJECTCALLBACK)(void *, void *, unsigned long);
 #define CALLBACK
 #define STDMETHODCALLTYPE

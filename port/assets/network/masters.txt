@@ -8,5 +8,6 @@
 # of your own under another name.)
 #
 # A file that names no master, as this one, leaves the game the official
-# master, built in: https://master.opencommunityedition.com. A file that
-# names one or more is asked instead of it.
+# masters, built in: https://master.opencommunityedition.com,
+# https://ocemaster.halobase.net and https://masterce.unicade.io. A file that
+# names one or more is asked instead of them.
