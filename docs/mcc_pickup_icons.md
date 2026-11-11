@@ -37,8 +37,6 @@ negative fractional offsets, clipping, absolute width, pause-menu behavior,
 replacement buttons and MCC/legacy transitions. Negative controls restore
 the old offset scale, rounding and width behavior and must fail.
 
-Network version remains 42 for this testing fix series, as requested.
-
 Local validation: 65 selected HUD and damage tests passed (14 new icon tests).
 Windows and web builds passed. The changed Android guest unit compiled and
 assembled; the full Android target remains blocked by Windows-host tooling.

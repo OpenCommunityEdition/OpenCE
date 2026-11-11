@@ -182,7 +182,8 @@ lockstep netcode was removed, set to play it): it tells the player why.
 
 ## OpenCE network agreement
 
-OpenCE network version 42 replaces version 41 for Xbox, Custom Edition and MCC sessions.
+OpenCE network version 42 replaced version 41 for Xbox, Custom Edition and MCC sessions;
+versions 43 and 44 (below, "Versions") follow it.
 Advertisements and ordinary join requests carry this one version; mismatched
 versions are rejected before admission. There is no separate MCC capability
 envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
@@ -203,8 +204,10 @@ Small client-clock deficits recover through bounded actual simulation ticks.
 Scripted player poses carry five signed-16-bit direction vectors (30 bytes) for
 desired facing/aim/look and current aim/look, plus suspension in the unit flags.
 The host sends this extension when input is inhibited or a unit is suspended.
-Clients validate the entire extension; normal input keeps local prediction and
-omits the vectors. Matching position does not suppress orientation correction.
+Clients validate the entire extension (a pose that is not unit vectors is
+left out, the unit's other state and the message's other units kept); normal
+input keeps local prediction and omits the vectors. Matching position does
+not suppress orientation correction.
 
 Version 42 also requires initialized three-point boat controls and the corrected
 shared console-syntax/checkpoint lifetime. MCC snapshots include extra grenades,
@@ -385,7 +388,24 @@ sharing to the shared agreement. Join requests carry this version explicitly;
 settings carry a zero MCC identity for Xbox/CE. Checkpoint epochs, recovery,
 scripted poses and shared boat/console fixes require matching peers.
 
-Then version 43 gives the game's own maps a version when they are MCC's
+Then version 43 changes what the machines simulate and send, without a new
+message: on an MCC map a vector damage impulse follows the damage's
+direction (`mcc_damage.c`), and on every map a vehicle on its side
+(`vehicle_is_flipped`: its up below 0.2) throws its riders, as the retail
+game does, not only one upside down. Chat lines carry
+`_chat_line_host_bit`, and the chat settings the host's machine
+(`_chat_config_host_machine_bit`, `network_chat.c`), so every machine draws
+the host's name white; a co-op cutscene's sound event carries in `target`
+the milliseconds the host has played of it, so a machine that joins during
+it starts it there (`coop_sound_sync.c`). A host now waits for a machine's
+MCC conversion (message 106) out of that machine's allowance: holding a
+round's start beyond the ordinary wait spends it, time not holding earns it
+back at a third of the rate, up to the round's limit (`mcc_load_network.h`),
+so a machine that pulses without converting cannot hold every round's start.
+A version 42 build computes MCC impulses the other way, and its scripted
+poses' validation drops the message's other units with a bad pose.
+
+Then version 44 gives the game's own maps a version when they are MCC's
 (Halo: The Master Chief Collection's maps, which `halo --import-mcc` writes
 as the disc's maps: `cache_files_map_version`, `MCC_MAP_VERSION` in
 `port/linux/game/custom_edition_cache.h`), where every stock map's was 0. An
@@ -771,7 +791,7 @@ its name alone beside it, has its name given back as the map lists find it.
 
 MCC supports host-only delivery for eligible local and Workshop packages.
 It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. Every map family uses OpenCE version **42**.
+separate from CE sharing 83-86. Every map family uses OpenCE version **44**.
 The shared settings record includes two 32-byte MCC digests, zero for Xbox/CE:
 the gameplay/resource identity and the required-JSON identity. The distributed
 header is 12 bytes, including its checkpoint epoch.
@@ -896,9 +916,7 @@ already published survives a subsequent admission failure.
 Implementation lives in `mcc_share.c`, `mcc_share_package.c`,
 `mcc_share_session.c`, `mcc_share_stage.c` and the MCC metadata helpers.
 Managed-copy receipts and the removal UI preserve separate ownership of
-downloaded snapshots. Native platform, transport, real-map and follow-on-mission
-checks and their limits are recorded in
-[Milestone 13](../../docs/mcc_refactor_validation.md#milestone-13-implementation-evidence).
+downloaded snapshots.
 Browser publication uses an owned OPFS journal and commit record instead of a
 directory rename; see [browser storage](../../docs/reading/browser_imports.md).
 Browser gameplay, downloads and persistence have their own Milestone 14

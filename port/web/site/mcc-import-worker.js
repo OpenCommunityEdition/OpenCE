@@ -188,7 +188,8 @@ if (typeof importScripts === 'function') importScripts('map-import-files.js', 'm
       const file = available.get(relative), metadata = await json(file);
       const scenario = files.path(metadata.ScenarioFile, 256).split('/').pop().replace(/\.map$/, '');
       if (maps.get(scenario) !== (campaign ? 0 : 1)) throw new Error('Missing map or wrong mission type: ' + scenario);
-      if (campaign && Object.hasOwn(metadata, 'CampaignMapKind') && metadata.CampaignMapKind !== 'Default') throw new Error('Unsupported campaign mission kind.');
+      if (campaign && Object.hasOwn(metadata, 'CampaignMapKind') &&
+          (typeof metadata.CampaignMapKind !== 'string' || metadata.CampaignMapKind.toLowerCase() !== 'default')) throw new Error('Unsupported campaign mission kind.');
       add(relative, file); images(metadata);
       return scenario;
     }

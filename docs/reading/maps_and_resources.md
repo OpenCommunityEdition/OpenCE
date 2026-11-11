@@ -100,5 +100,4 @@ The `test_mcc_cache_format`, `test_mcc_resources`, `test_mcc_tag_validation`,
 [tools](../../tools/) exercise production readers and state machines with
 synthetic data. Real package validation also needs rendering, scripts, gameplay,
 networking, unload/reload and campaign transitions. A successful conversion is
-not a completed playthrough. The [upstream validation record](../mcc_upstream_validation.md)
-distinguishes those checks from earlier source-branch evidence.
+not a completed playthrough.

@@ -19,7 +19,8 @@ resampling) and applies:
 	  and occlusion levels, their high frequency levels a low pass at the
 	  environment's HF reference: a sound behind a wall is muffled,
 	- for 3D voices, the Doppler shift of the voice's and the listener's
-	  velocities, which moves the resampling step (doppler_ratio).
+	  velocities, which moves the resampling step (doppler_ratio). Positioned
+	  stereo sources also shift when audio.stereo_doppler is enabled.
 3D voices also send to an I3DL2 reverb of the environment the listener is in
 (reverb). Cones are not modelled. A look-ahead limiter keeps the sum under
 full scale (limit). A voice the game cuts off while it plays fades out over
@@ -184,6 +185,10 @@ struct sdl_stream
 	float cut[CUT_FADE_FRAMES * MAXIMUM_OUTPUT_CHANNELS];
 	float cut_send[CUT_FADE_FRAMES];
 	unsigned long cut_played;
+	/* being flushed (stream_flush): the mixer leaves the packets not yet
+	given back, which the cut has played already, while the game's callback
+	runs without the lock */
+	BOOL flushing;
 };
 
 static pthread_mutex_t mixer_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -223,6 +228,9 @@ static DSI3DL2LISTENER environment =
 static unsigned long environment_serial;
 /* audio.reverb */
 static BOOL reverb_enabled = TRUE;
+/* audio.stereo_doppler: positioned stereo voices shift as 3D ones do
+(doppler_ratio); the Xbox played stereo sounds at their own pitch */
+static BOOL stereo_doppler_enabled = FALSE;
 
 static float gain_from_millibels(LONG millibels)
 {
@@ -418,6 +426,8 @@ static float doppler_ratio(const struct sdl_stream *stream)
 	the listener, which is still) */
 	if (!stream->has_3d && stream->stereo_positioned)
 	{
+		if (!stereo_doppler_enabled)
+			return 1.0f;
 		towards = stream->stereo_approach * listener.distance_factor * listener.doppler_factor;
 		if (towards >= SPEED_OF_SOUND)
 			return 1.0e6f;
@@ -959,7 +969,7 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	float ramp_surround[2][MAXIMUM_OUTPUT_CHANNELS];
 	unsigned long speaker;
 
-	if (stream->paused || !stream->packet_count || !stream->sample_rate)
+	if (stream->paused || stream->flushing || !stream->packet_count || !stream->sample_rate)
 		return;
 	base_step = (double)(stream->frequency ? stream->frequency : stream->sample_rate) / OUTPUT_RATE;
 	/* the Doppler shift moves the step, from the ratio of the last mix to
@@ -971,6 +981,12 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	else if (base_step * target_doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)
 		target_doppler = (float)(VOICE_FREQUENCY_MINIMUM / OUTPUT_RATE / base_step);
 	doppler = stream->doppler > 0.0f ? stream->doppler : target_doppler;
+	/* The saved ratio belongs to the previous authored pitch. Bound both
+	ends of the ramp against the current pitch, including after SetFrequency. */
+	if (base_step * doppler * OUTPUT_RATE > VOICE_FREQUENCY_MAXIMUM)
+		doppler = (float)(VOICE_FREQUENCY_MAXIMUM / OUTPUT_RATE / base_step);
+	else if (base_step * doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)
+		doppler = (float)(VOICE_FREQUENCY_MINIMUM / OUTPUT_RATE / base_step);
 	step = base_step * doppler;
 	ramp_step = base_step * (target_doppler - doppler) / (double)frames;
 	/* the low pass narrowed for a voice taking frames faster than the output
@@ -1220,7 +1236,7 @@ static void voice_cut(struct sdl_stream *stream)
 	mix_voice(stream, output, send, CUT_FADE_FRAMES);
 	for (frame = 0; frame < CUT_FADE_FRAMES; frame++)
 	{
-		float fade = 0.5f + 0.5f * cosf(3.14159265f * (float)(frame + 1) / CUT_FADE_FRAMES);
+		float fade = 0.5f + 0.5f * (float)cos(3.14159265358979 * (double)(frame + 1) / CUT_FADE_FRAMES);
 
 		/* (what is left of the earlier cut is read only where it is: past
 		it is whatever it was, a NaN perhaps, which no factor of 0 hides) */
@@ -1789,6 +1805,7 @@ static void audio_start(void)
 	audio_started = TRUE;
 	master_volume = (float)config_real("audio.volume");
 	reverb_enabled = config_boolean("audio.reverb");
+	stereo_doppler_enabled = config_boolean("audio.stereo_doppler");
 	resampler_mode = resampler_mode_read();
 	resampler_initialize();
 	resampler_phases_initialize();
@@ -2057,7 +2074,15 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	struct sdl_stream *stream = stream_from_interface(object);
 
 	pthread_mutex_lock(&mixer_lock);
+	if (stream->flushing)
+	{
+		pthread_mutex_unlock(&mixer_lock);
+		return S_OK;
+	}
 	voice_cut(stream);
+	/* Completion callbacks release the lock. Only the captured fade may
+	play then, not the packets still awaiting cancellation. */
+	stream->flushing = TRUE;
 	while (stream->packet_count)
 	{
 		struct voice_packet *head = &stream->packets[stream->packet_head];
@@ -2067,6 +2092,7 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 		stream_complete_head(stream, XMEDIAPACKET_STATUS_FLUSHED,
 			head->finished ? head->packet.dwMaxSize : 0);
 	}
+	stream->flushing = FALSE;
 	stream->cursor = 0;
 	resampler_reset(stream);
 	/* (the next sound on the channel says where it is) */
@@ -2141,7 +2167,7 @@ VOID WINAPI DirectSoundDoWork(void)
 {
 	static unsigned long volume_read_at = (unsigned long)-1;
 
-	/* (audio.volume, audio.reverb and audio.resampler read again when the
+	/* (audio settings read again when the
 	settings change: on the game's thread, not the mixer's, whose lock the
 	config's file I/O would hold) */
 	if (volume_read_at != config_changes())
@@ -2149,6 +2175,13 @@ VOID WINAPI DirectSoundDoWork(void)
 		volume_read_at = config_changes();
 		master_volume = (float)config_real("audio.volume");
 		reverb_enabled = config_boolean("audio.reverb");
+		{
+			BOOL enabled = config_boolean("audio.stereo_doppler");
+
+			pthread_mutex_lock(&mixer_lock);
+			stereo_doppler_enabled = enabled;
+			pthread_mutex_unlock(&mixer_lock);
+		}
 		resampler_mode = resampler_mode_read();
 	}
 	streams_complete_finished();

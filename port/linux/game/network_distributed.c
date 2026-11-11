@@ -2031,10 +2031,12 @@ static word distributed_unit_state_read(
 		}
 		if (TEST_FLAG(parts, _distributed_unit_part_scripted_pose_bit))
 		{
-			if (!distributed_take(&cursor, end, state->pose, sizeof(state->pose)) ||
-				!distributed_scripted_pose_valid(state))
+			if (!distributed_take(&cursor, end, state->pose, sizeof(state->pose)))
 				return 0;
-			state->scripted_pose = TRUE;
+			/* a pose that is not unit vectors (a unit's desired vectors are
+			not normalized, and may be zero) is left out: the unit's other
+			state, and the message's other units, are still taken */
+			state->scripted_pose = distributed_scripted_pose_valid(state);
 		}
 	}
 	else if (TEST_FLAG(parts, _distributed_unit_part_killer_bit) &&
@@ -3429,7 +3431,7 @@ static void distributed_host_send_players(
 			&distributed_host_update_number, sizeof(distributed_host_update_number));
 		for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 		{
-			byte entry[DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE + 1]; /* optional camera byte */
+			byte entry[DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE];
 
 			if (TEST_FLAG(distributed_sends[machine_index][player_index], _distributed_send_action_bit))
 			{

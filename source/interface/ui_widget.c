@@ -3055,10 +3055,8 @@ void ui_widgets_close_all_for_local_player(
 				dispose_widget_stack(&widget_globals.widget_stack[widget_index]);
 		}
 	}
-	{
-
-		mcc_ui_settings_close(local_player_index);
-	}
+	/* port: and MCC's pause menu's settings (mcc_ui.c) */
+	mcc_ui_settings_close(local_player_index);
 
 	return;
 }
@@ -3498,17 +3496,14 @@ static void event_handler_dispatch(
 		/* port: not from a widget its function deleted (it went back:
 		menu_functions.c's profile_save_changes), which the Xbox's opened
 		from regardless */
-		/* MCC New Game can synchronously close every widget. Finish the event
-		with its deletion result before any navigation can reuse that tree. */
+		/* port: MCC's New Game can close every widget at once. The event ends
+		with that deletion, before anything can open from the deleted tree */
+		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
+			!widget_deleted && handler->widget_tag.index != NONE &&
+			mcc_ui_new_game(widget, &widget_deleted))
 		{
-
-			if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
-				!widget_deleted && handler->widget_tag.index != NONE &&
-				mcc_ui_new_game(widget, &widget_deleted))
-			{
-				*calling_widget_deleted = widget_deleted;
-				return;
-			}
+			*calling_widget_deleted = widget_deleted;
+			return;
 		}
 		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
 			!widget_deleted &&
@@ -4218,6 +4213,7 @@ static void render_state_bitmap(
 	if (bitmap && _texture_cache_bitmap_get_hardware_format(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
+		/* port: an MCC map's icon is drawn as its HUD's are (mcc_hud_draw.c) */
 		if (mcc_hud_icon_draw(bitmap_group_index, bitmap, clip, cursor_bounds, color, icon, TRUE))
 			return;
 		/* port: the sprite from a high-res texture, if it has one */
@@ -7353,8 +7349,6 @@ static void widget_instance_render_recursive(
 			boolean shown = TRUE;
 			boolean stretched = custom_edition_picture &&
 				custom_edition_maps_campaign_level(widget->animation.current_frame_index) == NONE;
-			/* port: modern art follows its responsive bounds; inherited map and
-			 * gametype previews retain their native padded-bitmap texel placement. */
 
 			/* port: MCC art fits and clips to this style's authored thumbnail
 			 * rectangle; only the MCC module decodes or owns its texture. */

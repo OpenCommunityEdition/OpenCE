@@ -3368,6 +3368,7 @@ void actor_died(
 			grenade_roll < actor_variant_definition->items.dont_drop_grenades_chance)
 		{
 			csmemset(unit->unit.grenade_counts, 0, sizeof(unit->unit.grenade_counts));
+			/* port: and MCC's expanded grenade inventory */
 			if (mcc_grenades_active())
 				mcc_grenades_clear(actor->meta.unit_index);
 		}

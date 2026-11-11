@@ -580,6 +580,8 @@ int mcc_bitmaps_prepare(struct mcc_runtime *runtime)
     if (!textures) return 0;
     memset(textures,0,sizeof(*textures));
     runtime->bitmaps=textures;
+    /* three entries a bitmap: its own and its channel clones' */
+    if (runtime->report.bitmap_count>SIZE_MAX/3/sizeof(*textures->items)) return 0;
     textures->capacity=runtime->report.bitmap_count*3;
     textures->tag_capacity=MIN(original_count*3,0xFFFFu);
     new_index=mcc_runtime_allocate(runtime,textures->tag_capacity*32);

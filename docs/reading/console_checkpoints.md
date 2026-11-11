@@ -156,7 +156,5 @@ These controls do not establish a complete game session or cross-platform
 compatibility. Required runtime checks include replay on Xbox, CE and
 affected MCC maps, ordinary checkpoint/revert, same-build cross-process
 core loading, old-layout refusal and map-family transitions. Platform
-builds and native/browser networking need separate validation. Actual runs,
-binary identities and remaining limits belong to the
-[refactor validation record](../mcc_refactor_validation.md); this walkthrough
+builds and native/browser networking need separate testing; this walkthrough
 does not claim those checks have all passed.

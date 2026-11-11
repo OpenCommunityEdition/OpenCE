@@ -85,8 +85,10 @@ int posix_steam_root(char *path, posix_ulong size);
 /* MCC-owned bounded package reads (posix_mcc_preview.c). Returns bytes read,
  * or zero; metadata paths cannot escape root or traverse links. */
 int posix_mcc_preview_read(const char *root, const char *relative, void *buffer, posix_ulong capacity);
-/* Managed MCC downloads: native paths only, no links/special files, and an
- * atomic directory publication that never replaces an existing destination. */
+/* Managed MCC downloads: native paths only, no links/special files from the
+ * first mcc_maps, mcc_staging or steamapps folder down (the folders above it
+ * are the user's own), and an atomic directory publication that never
+ * replaces an existing destination. */
 int posix_mcc_share_path_safe(const char *path);
 int posix_mcc_share_publish(const char *from, const char *to);
 /* Native path reads return an OS descriptor, never a host FILE across Android's

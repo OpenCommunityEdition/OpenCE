@@ -20,6 +20,8 @@ boolean
 network_game_server_client_machine_is_joined_to_game(struct network_game_server *,
                                                      struct network_game_server_client_machine *);
 static struct mcc_load_network loading;
+/* (kept across rounds: a disconnect ends one round's wait, not the allowance) */
+static struct mcc_load_allowance allowances[MCC_ADMISSION_MACHINES];
 static uint32_t local_sequence, local_sent, host_revision;
 static int local_active, local_stage;
 static unsigned long local_done, local_total;
@@ -155,10 +157,23 @@ void mcc_load_network_peer_left(long index)
 {
     mcc_load_network_forget(&loading, index);
 }
+void mcc_load_network_machine_left(long index)
+{
+    mcc_load_network_forget(&loading, index);
+    if (index >= 0 && index < MCC_ADMISSION_MACHINES)
+        mcc_load_allowance_forget(&allowances[index]);
+}
 int mcc_load_network_host_waiting(long index)
 {
-    return peer_valid(index) &&
-           mcc_load_network_active(&loading, index, (uint32_t)system_milliseconds());
+    uint32_t now = (uint32_t)system_milliseconds();
+    if (!peer_valid(index) || !mcc_load_network_active(&loading, index, now))
+        return 0;
+    /* (the server asks only once the ordinary wait is over, every update) */
+    if (!mcc_load_allowance_hold(&allowances[index], now)) {
+        mcc_load_network_forget(&loading, index);
+        return 0;
+    }
+    return 1;
 }
 int mcc_load_network_client_expired(void)
 {

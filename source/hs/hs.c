@@ -12858,16 +12858,18 @@ script nodes it has room for. The shipped maps' all are, of 19001 nodes
 static boolean hs_scenario_syntax_data_valid(
 	struct scenario const *scenario)
 {
-	{
-
-		int mcc_valid = mcc_syntax_scenario_valid(scenario);
-		if (mcc_valid >= 0)
-			return mcc_valid != 0;
-	}
 	long const syntax_data_size =
 		sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
 	byte const *address = (byte const *)scenario->hs_syntax_data.address;
 	struct data_array const *data = (struct data_array const *)address;
+
+	/* port: an MCC map's syntax has its own layout and limits (mcc_syntax.c) */
+	{
+		int mcc_valid = mcc_syntax_scenario_valid(scenario);
+
+		if (mcc_valid >= 0)
+			return mcc_valid != 0;
+	}
 
 	/* (in the loaded map's tag cache: this build's, or a Custom Edition
 	map's, cache_file_tag_cache_contains) */
@@ -13101,8 +13103,9 @@ static short hs_syntax_node_check(
 	if (function_index == _hs_function_set)
 	{
 		short designator = (short)first_argument->data;
-		{
 
+		/* port: a set of an MCC script's parameter (mcc_script_parameters.c) */
+		{
 			int mcc_parameter = mcc_parameter_set_valid(first_argument,
 				hs_syntax_try_get(first_argument->next_node_index));
 			if (mcc_parameter >= 0)
@@ -13286,11 +13289,6 @@ console's expressions, compiled later, may call and set anything */
 static void hs_scenario_functions_check(
 	struct scenario *scenario)
 {
-	{
-		if (mcc_syntax_functions_check(scenario, hs_syntax_data, hs_syntax_node_refusal,
-			hs_scenario_disabled_scripts, hs_scenario_disabled_globals))
-			return;
-	}
 	long expression_index;
 	short script_index;
 	short global_index;
@@ -13306,6 +13304,10 @@ static void hs_scenario_functions_check(
 	short disabled_global_count = 0;
 	char reason[128];
 
+	/* port: an MCC map's functions are checked by mcc_syntax.c */
+	if (mcc_syntax_functions_check(scenario, hs_syntax_data, hs_syntax_node_refusal,
+		hs_scenario_disabled_scripts, hs_scenario_disabled_globals))
+		return;
 	/* port: a downloaded map's are held to tighter rules (map_share.c's
 	map_share_map_downloaded) */
 	hs_scenario_downloaded = map_share_map_downloaded(cache_file_loaded_map_name());
@@ -13836,8 +13838,10 @@ void hs_recompile(
 struct hs_function_definition *hs_function_get(
 	short function_index)
 {
+	/* port: MCC's additional functions (mcc_scripts.c) */
 	{
 		struct hs_function_definition *mcc_function = mcc_script_function(function_index);
+
 		if (mcc_function)
 			return mcc_function;
 	}
@@ -13976,8 +13980,10 @@ short hs_find_function_by_name(
 {
 	short function_index;
 
+	/* port: MCC's additional functions (mcc_scripts.c) */
 	{
 		short mcc_index = mcc_script_find(name);
+
 		if (mcc_index != NONE)
 			return mcc_index;
 	}

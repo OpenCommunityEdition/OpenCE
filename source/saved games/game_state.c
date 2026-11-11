@@ -340,17 +340,14 @@ void game_state_save(
 	void)
 {
 	game_state_call_before_save_procs();
-	/* port: syntax outside the CPU image must accompany saved threads. */
-	if (!hs_console_state_capture())
+	/* port: syntax outside the CPU image must accompany saved threads, and
+	MCC's extra slots occupy only proven-unused CPU bytes in this image. A
+	state that cannot be taken is not saved: the previous checkpoint, if
+	there is one, stays the one a revert goes back to */
+	if (!hs_console_state_capture() ||
+		(mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
+		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE)))
 	{
-		game_state_globals.saved_game_valid = FALSE;
-		return;
-	}
-	/* port: MCC extra slots occupy only proven-unused CPU bytes in this image. */
-	if (mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
-		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
-	{
-		game_state_globals.saved_game_valid = FALSE;
 		return;
 	}
 

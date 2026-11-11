@@ -1483,6 +1483,7 @@ static void main_new_map(
 	}
 	else
 	{
+		/* port: an MCC map that fails to load goes back to the menus (mcc_main.c) */
 		if (mcc_main_load_failed(options->map_name))
 			return;
 		error(_error_immediate, "game_load() failed.");

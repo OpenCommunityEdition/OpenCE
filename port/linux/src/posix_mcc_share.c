@@ -25,10 +25,31 @@
 #endif
 #endif
 
+/* The folders the MCC code manages or reads packages from: links and special
+ * files are refused from the first of them down. The folders above it (the
+ * data root, the home folder, a Steam root such as ~/.steam/steam, which is a
+ * link on Linux) are the user's own layout and are not checked. A path that
+ * names none of them is checked from its root. */
+static int managed_folder(const char *component, size_t length)
+{
+    static const char *const names[]={ "mcc_maps", "mcc_staging", "steamapps" };
+    size_t i,j;
+    for (i=0;i<sizeof(names)/sizeof(names[0]);i++) {
+        if (strlen(names[i])!=length) continue;
+        for (j=0;j<length;j++) {
+            char c=component[j];
+            if (c>='A' && c<='Z') c=(char)(c-'A'+'a');
+            if (c!=names[i][j]) break;
+        }
+        if (j==length) return 1;
+    }
+    return 0;
+}
+
 int posix_mcc_share_path_safe(const char *name)
 {
     char path[2048];
-    size_t i,start,length;
+    size_t i,start,length,checked;
     int missing=0;
     if (!name || !*name || strlen(name)>=sizeof(path)) return 0;
 #ifdef _WIN32
@@ -41,6 +62,14 @@ int posix_mcc_share_path_safe(const char *name)
 #else
     strcpy(path,name); length=strlen(path); start=path[0]=='/' ? 1 : 0;
 #endif
+    /* the first managed folder's offset, or the path's first component */
+    checked=start;
+    for (i=start;i<=length;i++) {
+        if (path[i] && path[i]!='/' && path[i]!='\\') continue;
+        if (i>checked && managed_folder(path+checked,i-checked)) break;
+        checked=i+1;
+    }
+    if (i>length) checked=start;
     for (i=start;i<=length;i++) {
         char saved;
         if (path[i] && path[i]!='/' && path[i]!='\\') continue;
@@ -48,7 +77,7 @@ int posix_mcc_share_path_safe(const char *name)
         if ((i-start==1 && path[start]=='.') ||
             (i-start==2 && path[start]=='.' && path[start+1]=='.')) return 0;
         saved=path[i]; path[i]=0;
-        if (!missing) {
+        if (!missing && start>=checked) {
 #ifdef _WIN32
             DWORD attributes=GetFileAttributesA(path);
             if (attributes==INVALID_FILE_ATTRIBUTES) {
