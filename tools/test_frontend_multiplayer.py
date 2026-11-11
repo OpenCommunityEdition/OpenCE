@@ -140,7 +140,7 @@ def test_session_options_keep_host_callbacks_and_fit_narrow_columns():
             assert text_width(caption, 10) <= int(spinner.get('width'))
         assert spinner.find("on[@event='left_mouse']").get('run') == 'mouse spinner 1wide click'
     compatibility = next(w for w in session if w.get('name').endswith('/session_compatibility_spinner'))
-    assert compatibility.get('strings') == 'STANDARD|THIRD PERSON'
+    assert compatibility.get('strings') == 'CROSSPLAY|GULCHCE ONLY'
 
 
 def test_added_options_keep_help_inside_panel_and_voice_modes_in_order():
@@ -241,3 +241,18 @@ def test_difficulty_native_order_and_background_layer():
     desc = next(w for n,w in widgets.items() if n.startswith('modern/network/difficulty/') and n.endswith('/difficulty_extended_description'))
     assert desc.get('align') == 'center'
     assert desc.get('text_x') == desc.get('text_y') == '0'
+
+
+def test_campaign_list_keeps_modern_layout_without_legacy_update_callback():
+    doc = ET.Element('menus')
+    roles, _ = frontend_multiplayer.append(doc)
+    widgets = {w.get('name'): w for w in doc.findall('widget')}
+    campaign = next(w for name, w in widgets.items()
+                    if name.startswith('modern/network/campaign/') and name.endswith('/solo_level_select_list'))
+    assert campaign.find("on[@event='created']").get('run') == 'initialize sp level list solo'
+    assert campaign.find("data[@input='port frontend multiplayer update']") is not None
+    rows = [widgets[c.get('widget')] for c in campaign.findall('child')
+            if '/list_item_' in c.get('widget')]
+    assert len(rows) == 11
+    assert all(dict(roles)[row.get('name')] == 'row' for row in rows)
+    assert all(row.get('width') == '336' for row in rows)

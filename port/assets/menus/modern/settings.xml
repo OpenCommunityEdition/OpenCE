@@ -277,6 +277,7 @@
 		<child widget="modern/audio/row_audio_reverb8" x="28" y="377" />
 		<child widget="modern/audio/row_audio_hrtf9" x="28" y="407" />
 		<child widget="modern/audio/row_audio_resampler10" x="28" y="437" />
+		<child widget="modern/audio/row_audio_stereo_doppler11" x="28" y="467" />
 		<child widget="modern/audio/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/audio/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -405,6 +406,14 @@
 	<widget name="modern/audio/spinner_audio_resampler10" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="XBOX|SINC|LINEAR" values="xbox|sinc|linear" setting="audio.resampler" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
+	<widget name="modern/audio/row_audio_stereo_doppler11" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/audio/label_audio_stereo_doppler11" x="12" y="3" />
+		<child widget="modern/audio/spinner_audio_stereo_doppler11" x="180" y="3" />
+	</widget>
+	<widget name="modern/audio/label_audio_stereo_doppler11" type="text" controller="1" width="152" height="24" string_list="modern/audio/labels" string_index="11" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/audio/spinner_audio_stereo_doppler11" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="audio.stereo_doppler" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
 	<strings name="modern/audio/labels">
 		<string text="OUTPUT DEVICE" />
 		<string text="INPUT DEVICE" />
@@ -417,6 +426,7 @@
 		<string text="REVERB" />
 		<string text="3D HRTF" />
 		<string text="RESAMPLER" />
+		<string text="STEREO DOPPLER" />
 	</strings>
 	<strings name="modern/audio/help_strings">
 		<string text="OK saves pending settings across pages. Defaults resets this page. Cancel discards pending settings. Tab or Y changes tabs." />
@@ -431,6 +441,7 @@
 		<string text="Echo sounds as the place you are in does, and muffle those behind walls, as the Xbox did." />
 		<string text="Xbox-style directional sound for headphones and speakers. On by default." />
 		<string text="Xbox models the original sound. Sinc reduces aliasing; linear gives a brighter sound." />
+		<string text="Shift stereo sounds' pitch as they come and go, as 3D sounds' is. The Xbox played them flat." />
 	</strings>
 	<widget name="modern/audio/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		<child widget="modern/audio/button_defaults" x="0" y="0" />
@@ -4431,12 +4442,12 @@
 		<child widget="modern/network/maps/status" />
 	</widget>
 	<widget name="modern/network/maps/3/mp_map_select_list_2" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/maps/27/mp_map_extended_desc">
-		<data input="mp map list update" />
 		<on event="created" run="mp level list initialize" />
 		<on event="deleted" run="mp level list dispose" />
 		<on event="custom_activation" run="mp level select" open="main_menu/multiplayer_type_select/connected/gametype_select_screen_wrapper" />
 		<on event="b" run="port map list back" />
 		<on event="back" run="port map list back" />
+		<data input="mp map list update" />
 		<child widget="modern/network/maps/4/list_item_0_map_kind" x="28" y="110" />
 		<child widget="modern/network/maps/6/list_item_1" x="28" y="140" />
 		<child widget="modern/network/maps/15/list_item_2" x="28" y="170" />
@@ -4944,7 +4955,7 @@
 	</widget>
 	<widget name="modern/network/session/4/session_compatibility_label" type="text" controller="1" width="152" height="24" text="COMPATIBILITY" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
 	</widget>
-	<widget name="modern/network/session/5/session_compatibility_spinner" type="spinner" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STANDARD|THIRD PERSON" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" left="0" text_x="0" text_y="0">
+	<widget name="modern/network/session/5/session_compatibility_spinner" type="spinner" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="CROSSPLAY|GULCHCE ONLY" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" left="0" text_x="0" text_y="0">
 		<on event="left_mouse" run="mouse spinner 1wide click" />
 	</widget>
 	<widget name="modern/network/session/6/op_camera_policy" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
@@ -5516,7 +5527,7 @@
 		<child widget="modern/network/coop/prompts" />
 		<child widget="modern/network/coop/status" />
 	</widget>
-	<widget name="modern/network/coop/2/coop_options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/coop/33/coop_options_help">
+	<widget name="modern/network/coop/2/coop_options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/coop/36/coop_options_help">
 		<data input="game settings lists text update" />
 		<on event="created" run="port setup options init" />
 		<child widget="modern/network/coop/3/op_coop_friendly_fire" x="28" y="110" />
@@ -5528,7 +5539,8 @@
 		<child widget="modern/network/coop/21/op_coop_player_collisions" x="28" y="290" />
 		<child widget="modern/network/coop/24/op_coop_ally_friendly_fire" x="28" y="320" />
 		<child widget="modern/network/coop/27/op_coop_team_wipe" x="28" y="350" />
-		<child widget="modern/network/coop/30/coop_options_button_bar" y="414" x="26" />
+		<child widget="modern/network/coop/30/op_coop_vehicle_riding" x="28" y="380" />
+		<child widget="modern/network/coop/33/coop_options_button_bar" y="414" x="26" />
 		<data input="port frontend multiplayer update" />
 	</widget>
 	<widget name="modern/network/coop/3/op_coop_friendly_fire" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
@@ -5612,22 +5624,31 @@
 	<widget name="modern/network/coop/29/coop_team_wipe_spinner" type="spinner" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_team_wipe" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" left="0" text_x="0">
 		<on event="left_mouse" run="mouse spinner 1wide click" />
 	</widget>
-	<widget name="modern/network/coop/30/coop_options_button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items" left="0" top="0">
-		<data input="common button bar update" />
-		<child widget="modern/network/coop/31/coop_options_button_ok" x="328" y="0" />
-		<child widget="modern/network/coop/32/common_button_cancel" x="458" y="0" />
+	<widget name="modern/network/coop/30/op_coop_vehicle_riding" width="336" height="26" flags="pass_unhandled_to_focused_child nifty_fx" bitmap="modern/row" color="#FF2896FF" left="0" top="0">
+		<child widget="modern/network/coop/31/coop_vehicle_riding_label" x="12" y="3" />
+		<child widget="modern/network/coop/32/coop_vehicle_riding_spinner" x="180" y="3" />
 	</widget>
-	<widget name="modern/network/coop/31/coop_options_button_ok" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+	<widget name="modern/network/coop/31/coop_vehicle_riding_label" type="text" controller="1" width="152" height="24" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="0" text_y="0" flags="" left="0" top="0" align="left">
+	</widget>
+	<widget name="modern/network/coop/32/coop_vehicle_riding_spinner" type="spinner" top="0" width="140" height="24" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_vehicle_riding" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="5 -12 17 -6" footer_bounds="5 140 17 146" left="0" text_x="0">
+		<on event="left_mouse" run="mouse spinner 1wide click" />
+	</widget>
+	<widget name="modern/network/coop/33/coop_options_button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items" left="0" top="0">
+		<data input="common button bar update" />
+		<child widget="modern/network/coop/34/coop_options_button_ok" x="328" y="0" />
+		<child widget="modern/network/coop/35/common_button_cancel" x="458" y="0" />
+	</widget>
+	<widget name="modern/network/coop/34/coop_options_button_ok" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
 		<on event="a" run="port setup options save" back="true" />
 		<on event="start" run="port setup options save" back="true" />
 		<on event="left_mouse" run="mouse emit accept event" />
 	</widget>
-	<widget name="modern/network/coop/32/common_button_cancel" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
+	<widget name="modern/network/coop/35/common_button_cancel" type="text" width="124" height="26" bitmap="modern/button" string_list="strings/common_button_captions" string_index="2" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="3" flags=" nifty_fx" left="0" top="0">
 		<on event="a" run="mouse emit back event" />
 		<on event="start" run="mouse emit back event" />
 		<on event="left_mouse" run="mouse emit back event" />
 	</widget>
-	<widget name="modern/network/coop/33/coop_options_help" type="text" controller="1" left="396" top="108" width="200" height="278" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/cap_coop_options" font="ui\large_ui" color="#FF2896FF" flags="">
+	<widget name="modern/network/coop/36/coop_options_help" type="text" controller="1" left="396" top="108" width="200" height="278" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/cap_coop_options" font="ui\large_ui" color="#FF2896FF" flags="">
 	</widget>
 	<widget name="modern/network/coop/title" left="70" top="40" width="300" height="28" controller="1" bitmap="modern/title_coop" flags="" />
 	<widget name="modern/network/coop/help_panel" left="380" top="82" width="232" height="318" controller="1" bitmap="modern/help_panel" flags="nifty_fx" />
@@ -5745,7 +5766,6 @@
 		<child widget="modern/network/campaign/status" />
 	</widget>
 	<widget name="modern/network/campaign/2/solo_level_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="modern/network/campaign/26/solo_level_extended_desc">
-		<data input="solo map list update" />
 		<on event="created" run="initialize sp level list solo" />
 		<on event="deleted" run="dispose sp level list" />
 		<on event="custom_activation" run="solo level set map" open="main_menu/difficulty_select/difficulty_select_list_screen" />

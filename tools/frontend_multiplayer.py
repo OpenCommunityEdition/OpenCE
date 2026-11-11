@@ -93,6 +93,8 @@ def append(doc):
             # Lists keep child order: existing services address rows by index.
             data = {c.get("input") for c in w.findall("data")}
             scroll = bool(data & {"mp map list update", "solo map list update", "difficulty menu update desc", "gt select list update", "server settings update", "port lobby update", "game settings lists text update", "port settings help"})
+            # Upstream campaign lists initialize once and no longer have a data callback.
+            scroll = scroll or (page == "campaign" and name == "solo_level_select_list")
             if scroll:
                 ET.SubElement(w, "data", input="port frontend multiplayer update")
                 index = 0
@@ -123,7 +125,7 @@ def append(doc):
                                     if item_name == "session_compatibility_spinner":
                                         # The native service reads indices; short captions fit
                                         # the modern value column even at 4:3.
-                                        put(item, strings="STANDARD|THIRD PERSON")
+                                        put(item, strings="CROSSPLAY|GULCHCE ONLY")
                                     if item_name == "voice_mode_spinner":
                                         item.attrib.pop("string_list", None)
                                         put(item, strings="OFF|TEAM NEAR|ANYONE NEAR|TEAM|TEAM + NEARBY")
