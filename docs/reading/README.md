@@ -32,3 +32,8 @@ runtime observations; it does not claim complete campaign playthroughs.
 [Keyboard prompts and PC-menu glyphs](keyboard_prompts.md) describes the opt-in
 renderer and its MCC-owned pause footer adapters. It also records the unchanged
 controller, Xbox-menu and disabled-feature paths.
+
+## Shared audio processing
+
+[Xbox audio processing](xbox_audio.md) covers measured HRTF, reverb, resampling,
+levels and their limitations across all map families.

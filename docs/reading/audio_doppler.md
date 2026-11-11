@@ -33,7 +33,7 @@ to `false`; `HALO_STEREO_DOPPLER=true` enables it. Normal mono 3D Doppler
 does not depend on this setting. Disabling it preserves stereo panning,
 distance fade, occlusion, reverb and authored pitch. A changed setting is
 read by `DirectSoundDoWork`; a playing voice glides to its new pitch over
-the next mixer block.
+64 output frames (about 1.3 ms at 48 kHz), independently of mixer block size.
 
 ## Reading route
 
@@ -52,7 +52,9 @@ the next mixer block.
    to `mix_voice`. Relative radial motion changes the resampling step. Both
    ends of the pitch ramp are bounded against the current authored playback
    frequency, so `SetFrequency` cannot leave the previous ratio outside the
-   supported range. Sinc and linear modes use the same step.
+   supported range. Xbox, sinc and linear modes use the same step. The measured
+   Xbox first-order Doppler law replaces the earlier reciprocal approximation; see
+   [Xbox audio processing](xbox_audio.md) for hardware evidence.
 
 ## State and integration boundaries
 
