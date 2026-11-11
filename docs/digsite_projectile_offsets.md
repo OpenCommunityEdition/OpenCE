@@ -200,3 +200,10 @@ passed, and all six affected wasm translation units compiled. Earlier Android
 object and host/client results apply to the identical retained engine sources;
 full Android, Linux and browser/native internet validation remain limited as
 described above. No new CI run or upstream publication was performed.
+
+## Refactor branch integration
+
+This branch retains shared protocol 32738 and Xbox/CE shoulder agreement 32740.
+MCC agreement advances 72 to 73, and MCC shoulder agreement 32741 to 32742.
+The older agreement numbers above describe the original testing-branch validation.
+The integrated projectile, protocol and shoulder regression selection passes 36 tests.
