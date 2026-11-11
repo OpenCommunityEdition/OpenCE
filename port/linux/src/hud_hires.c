@@ -129,6 +129,30 @@ long hud_hires_asset_bitmap(long asset)
 	return hud_hires_embedded[asset].bitmap;
 }
 
+/* whether the sprite rectangles of a bitmap (count of them, each left, top,
+right and bottom in texels, sorted and each once) are those the texture was
+drawn for: an imported MCC map's sprite sheet in the disc's layout */
+int hud_hires_asset_cells_match(long asset, const long *rects, long count)
+{
+	uLong crc = crc32(0L, Z_NULL, 0);
+	long index;
+
+	if (asset < 0 || asset >= hud_hires_asset_count() || !hud_hires_embedded[asset].cells_crc || count <= 0)
+		return 0;
+	for (index = 0; index < count * 4; index++)
+	{
+		unsigned long value = (unsigned long)rects[index];
+		unsigned char bytes[4];
+
+		bytes[0] = (unsigned char)value;
+		bytes[1] = (unsigned char)(value >> 8);
+		bytes[2] = (unsigned char)(value >> 16);
+		bytes[3] = (unsigned char)(value >> 24);
+		crc = crc32(crc, bytes, 4);
+	}
+	return (unsigned int)crc == hud_hires_embedded[asset].cells_crc;
+}
+
 /* whether the texture can stand for a bitmap of this size: a whole multiple
 of it, the same both ways */
 long hud_hires_asset_fits(long asset, long width, long height)

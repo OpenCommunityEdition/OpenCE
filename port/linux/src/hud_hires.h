@@ -33,7 +33,9 @@ title: a menu title (port/assets/titles, made by tools/title_assets.py) or a
 button icon (port/assets/buttons, made by tools/button_assets.py), drawn with
 display.high_res_text rather than display.high_res_hud; sprites: the sequences
 of its bitmap's group (a bit each) whose sprites it is drawn for, through a
-placeholder, or 0: the whole bitmap, in its place */
+placeholder, or 0: the whole bitmap, in its place; cells_crc: the CRC-32 of
+the sprite rectangles the texture was drawn for on its bitmap, in texels
+(hud_hires_asset_cells_match), or 0 */
 struct hud_hires_embedded
 {
 	const char *tag;
@@ -44,6 +46,7 @@ struct hud_hires_embedded
 	int point_threshold; /* red: exact discrete meter thresholds, zero elsewhere */
 	int title;
 	unsigned int sprites;
+	unsigned int cells_crc;
 	/* drawn for a Custom Edition map's stock bitmap of its name too, whose
 	layout is its own (port/assets/hud/custom_edition.json) */
 	int custom_edition;

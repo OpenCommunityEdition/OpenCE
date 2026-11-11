@@ -65,6 +65,7 @@ int hud_hires_sprites_drawable(long asset, unsigned long address, unsigned long 
 void hud_hires_register_placeholder(long asset, unsigned long const *texture);
 int hud_hires_asset_custom_edition(long asset);
 int hud_hires_asset_ce_only(long asset);
+int hud_hires_asset_cells_match(long asset, const long *rects, long count);
 long hud_hires_ce_stock_count_get(void);
 long hud_hires_ce_stock_find(char const *tag, long bitmap);
 char const *hud_hires_ce_stock_tag(long index);
@@ -94,6 +95,9 @@ enum
 	MAXIMUM_HIRES_SPRITE_BITMAPS = 8,
 	/* (a bitmap group's type: bitmap_extract.c) */
 	HIRES_SPRITES_GROUP_TYPE = 3,
+	/* the sprites of one bitmap compared with a texture's cells
+	(hud_hires_sprite_sheet_matches); the disc's sheets have at most 15 */
+	MAXIMUM_HIRES_SHEET_SPRITES = 64,
 };
 
 /* ---------- globals */
@@ -107,7 +111,8 @@ static struct
 	boolean stock_custom_edition;
 	/* An imported MCC map's (cache_files_mcc_hud): MCC's pixels, resampled,
 	of the bitmap the texture redraws, which no signature matches. Only a
-	whole image (no sprite sheet, whose layout MCC changed in some) of the
+	whole image, or a sprite sheet with the sprites the texture was drawn for
+	(MCC changed the layout of some: hud_hires_sprite_sheet_matches), of the
 	texture's proportions. */
 	boolean imported;
 } hires_bitmaps[MAXIMUM_HIRES_BITMAPS];
@@ -179,6 +184,72 @@ static void hud_hires_sprite_bitmaps_forget(
 	controller_glyphs_dispose();
 
 	return;
+}
+
+/* whether an imported MCC map's sprite sheet has, on the bitmap, the sprites
+the texture was drawn for and no others: MCC keeps the disc's layout in some
+sheets (hud_reticles, with sequences of its own on bitmaps of its own) and
+changed it in others (the meters, the numbers, the waypoints) */
+static boolean hud_hires_sprite_sheet_matches(
+	long group_index,
+	short bitmap_index,
+	struct bitmap_data const *bitmap,
+	long asset)
+{
+	struct bitmap_group *group = bitmap_group_get(group_index);
+	long rects[MAXIMUM_HIRES_SHEET_SPRITES][4];
+	long count = 0;
+	long sequence_index;
+
+	for (sequence_index = 0; sequence_index < group->sequences.count; sequence_index++)
+	{
+		struct bitmap_group_sequence *sequence = TAG_BLOCK_GET_ELEMENT(&group->sequences, sequence_index,
+			struct bitmap_group_sequence);
+		long sprite_index;
+
+		for (sprite_index = 0; sprite_index < sequence->sprites.count; sprite_index++)
+		{
+			struct bitmap_group_sprite *sprite = TAG_BLOCK_GET_ELEMENT(&sequence->sprites, sprite_index,
+				struct bitmap_group_sprite);
+			long rect[4];
+			long at;
+			long field = 0;
+
+			if (sprite->bitmap_index != bitmap_index)
+				continue;
+			/* (bounds outside the bitmap, or not numbers, are no sprite of
+			the texture's, and are not converted) */
+			if (!(sprite->bounds.x0 >= 0.0f && sprite->bounds.x0 <= 1.0f &&
+				sprite->bounds.x1 >= 0.0f && sprite->bounds.x1 <= 1.0f &&
+				sprite->bounds.y0 >= 0.0f && sprite->bounds.y0 <= 1.0f &&
+				sprite->bounds.y1 >= 0.0f && sprite->bounds.y1 <= 1.0f))
+			{
+				return FALSE;
+			}
+			rect[0] = (long)(sprite->bounds.x0 * bitmap->width + 0.5f);
+			rect[1] = (long)(sprite->bounds.y0 * bitmap->height + 0.5f);
+			rect[2] = (long)(sprite->bounds.x1 * bitmap->width + 0.5f);
+			rect[3] = (long)(sprite->bounds.y1 * bitmap->height + 0.5f);
+			/* (kept sorted and each once, as tools/embed_assets.py sorts the
+			cells) */
+			for (at = 0; at < count; at++)
+			{
+				for (field = 0; field < 4 && rects[at][field] == rect[field]; field++)
+					;
+				if (field == 4 || rects[at][field] > rect[field])
+					break;
+			}
+			if (at < count && field == 4)
+				continue;
+			if (count == MAXIMUM_HIRES_SHEET_SPRITES)
+				return FALSE;
+			csmemmove(rects[at + 1], rects[at], (count - at) * sizeof(rects[0]));
+			csmemcpy(rects[at], rect, sizeof(rect));
+			count++;
+		}
+	}
+
+	return hud_hires_asset_cells_match(asset, &rects[0][0], count) != 0;
 }
 
 /* ---------- public code */
@@ -258,9 +329,11 @@ void hud_hires_tags_loaded(
 			/* (the main menu's map has only some of the HUD) */
 			missing++;
 		}
-		else if (cache_files_mcc_hud() && bitmap_group_get(group_index)->type == HIRES_SPRITES_GROUP_TYPE)
+		else if (cache_files_mcc_hud() && bitmap_group_get(group_index)->type == HIRES_SPRITES_GROUP_TYPE &&
+			!hud_hires_sprite_sheet_matches(group_index, (short)hud_hires_asset_bitmap(asset), bitmap, asset))
 		{
-			platform_log("high-res hud: %s bitmap %ld is a sprite sheet of an imported MCC map: drawn as it is",
+			platform_log("high-res hud: %s bitmap %ld is a sprite sheet of an imported MCC map, not laid out "
+				"as the disc's: drawn as it is",
 				hud_hires_asset_tag(asset), hud_hires_asset_bitmap(asset));
 		}
 		else if (!hud_hires_asset_fits(asset, bitmap->width, bitmap->height))
