@@ -22,7 +22,8 @@ vertex and index buffers before them, then checked by tag_validate_tags as
 the game checks a map's. The written map's simulation data is fingerprinted
 and compared with the disc's (mcc_import_fingerprint.c), which decides
 whether it is written as the disc's map or as MCC's. The body is deflated by
-the game's own zlib after the header, as the disc's maps are.
+the game's own zlib after the header, as the disc's maps are (at its fastest
+level).
 */
 
 /* ---------- headers */
@@ -2393,7 +2394,9 @@ static boolean mcc_import_map(
 	csmemset(&header, 0, sizeof(header));
 	fwrite(&header, 1, sizeof(header), body->file);
 	body->crc = crc32(0L, Z_NULL, 0);
-	if (deflateInit(&body->stream, Z_DEFAULT_COMPRESSION) != Z_OK)
+	/* (the fastest level: as small within a few percent, in half the time,
+	the samples and pixels compressing little at any level) */
+	if (deflateInit(&body->stream, Z_BEST_SPEED) != Z_OK)
 		body->failed = TRUE;
 
 	instances_address = mcc_import_names(&tags, loaded);
@@ -2493,7 +2496,13 @@ static boolean mcc_import_map(
 			mcc_import_globals.hud_bitmaps_halved, mcc_import_globals.fitted, (unsigned long)header.file_length);
 	}
 	deflateEnd(&body->stream);
-	fclose(body->file);
+	/* (a write that failed, as on a full disk, said: nothing else says it;
+	the last bytes are written as the file is closed) */
+	if (fclose(body->file) != 0 || body->failed)
+	{
+		mcc_import_error("mcc import: %s: %s cannot be written (is the disk full?)", map_name, path);
+		success = FALSE;
+	}
 	mcc_import_free(body);
 	mcc_import_free(mcc_import_globals.name_addresses);
 	mcc_import_free(mcc_import_globals.out_sources);
