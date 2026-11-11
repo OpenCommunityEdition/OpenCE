@@ -28,6 +28,7 @@ the menu to the camera, reticle and first-person weapon.
 | Branch feature | [Shoulder camera](third_person.md) | Director selection, cover-aware aiming, controls and host-owned hit validation. |
 | Worked detail | [Loading presentation](loading_presentation.md) | Fill the screen with the original loading artwork while preserving map-family ownership and the Xbox chant. |
 | Worked detail | [MCC level previews](mcc_level_previews.md) | Resolve installed package images, fit them inside existing menu thumbnails, and wrap package text. |
+| Worked detail | [Xbox audio processing](xbox_audio.md) | Follow measured HRTF, reverb and voice processing through the shared mixer. |
 | Reference | [Glossary](glossary.md) | Engine concepts and recurring C conventions, with source examples. |
 
 The chapters form a guide to the major systems, not an inventory of every
