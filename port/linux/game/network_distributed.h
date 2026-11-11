@@ -66,9 +66,8 @@ enum
 	the scoreboard (unreliable) */
 	_distributed_message_pings,
 	/* the host's actors' units: their control and state (network_actors.c).
-	A number of its own, clear of the kinds upstream adds: a build without
-	it drops the message as a kind it does not know, so the network version
-	stays upstream's and its players join as before */
+	Retain its established number, separate from upstream's base kinds.
+	The shared checkpoint agreement now requires matching session versions. */
 	_distributed_message_actor_states = 64,
 	/* co-op (a campaign map, no game engine): the host's structure BSP,
 	twice a second, for a client to switch to; numbered as actor_states */
@@ -133,7 +132,6 @@ enum
 	/* the host's text chat settings (network_chat.c): whether its players
 	may chat and send links, to every client, reliably */
 	_distributed_message_chat_config = 89,
-
 	/* the host's mouse aim assist policy (network_aim_assist.c), to every
 	client, reliably, when it is ready and when the policy changes */
 	_distributed_message_aim_assist_policy = 90,
@@ -156,6 +154,30 @@ enum
 	stream */
 	_distributed_message_map_vote = 94,
 	_distributed_message_map_vote_choice = 95,
+	/* Ordered host boundary for a new world or restored checkpoint. */
+	_distributed_message_checkpoint = 96,
+
+	/* MCC-only extra grenade slots; ordinary inventory packets stay exact. */
+	_distributed_message_mcc_grenades = 97,
+	/* MCC-only campaign gravity and breadcrumb state. */
+	_distributed_message_mcc_campaign = 98,
+	/* Expanded MCC scenario-name presence, in bounded chunks. */
+	_distributed_message_mcc_object_names = 99,
+	/* MCC host-authorized speed, ordered on the reliable stream, even paused. */
+	_distributed_message_mcc_game_speed = 100,
+
+	/* MCC host-only package transfer; retired fork envelope IDs 101/102 are unused. */
+	_distributed_message_mcc_share_request = 103,
+	_distributed_message_mcc_share_response = 104,
+	/* MCC file validation before player admission, even when sharing is off. */
+	_distributed_message_mcc_admission = 105,
+	/* MCC conversion progress without dispatching incomplete game state. */
+	_distributed_message_mcc_load_progress = 106,
+
+	/* the map's riding choice and the host's riding values (network_riding_map.c), reliably from the host.
+	It must stay dispatched before the MCC-only id filter (network_distributed_handle_message), which drops
+	ids from _distributed_message_mcc_grenades up outside MCC games */
+	_distributed_message_vehicle_riding_map = 107,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -219,6 +241,7 @@ struct distributed_message_header
 	byte type;
 	byte count;
 	long game_time;
+	unsigned long checkpoint_epoch;
 };
 
 /* a vector in 16-bit parts: a unit vector's of 1/32767, a velocity's of
@@ -232,9 +255,11 @@ struct distributed_vector
 
 /* (what goes on the wire, as it is on every machine) */
 typedef char distributed_message_header_size_assert[
-	sizeof(struct distributed_message_header) == 8 ? 1 : -1];
+	sizeof(struct distributed_message_header) == 12 ? 1 : -1];
 typedef char distributed_message_header_game_time_offset_assert[
 	offsetof(struct distributed_message_header, game_time) == 4 ? 1 : -1];
+typedef char distributed_message_header_epoch_offset_assert[
+	offsetof(struct distributed_message_header, checkpoint_epoch) == 8 ? 1 : -1];
 typedef char distributed_vector_size_assert[sizeof(struct distributed_vector) == 6 ? 1 : -1];
 
 /* ---------- macros */
@@ -261,6 +286,11 @@ void distributed_client_send_build(void);
 void distributed_send_to_machine(long machine_index, void *message, byte type, short count, word size);
 /* ... reliably to one client (the host) */
 void distributed_send_to_machine_reliably(long machine_index, void *message, byte type, short count, word size);
+/* The host's ordered world boundary, before a full object snapshot. */
+void distributed_checkpoint_to_machine(long machine_index);
+void network_distributed_reverted(void);
+/* A client has received this epoch's ordered snapshot end (creation may retry). */
+boolean distributed_checkpoint_ready(void);
 /* the player at an absolute index, or NULL */
 struct player_datum *distributed_player(short player_index);
 /* a player's absolute index for a message, NO_PLAYER for none; and back */
@@ -448,6 +478,8 @@ void network_coop_note_sound(short kind, long definition_index, long object_inde
 /* ---------- prototypes/NETWORK_OBJECTS.C */
 
 void network_objects_new_game(void);
+void network_objects_reverted(void);
+void network_objects_discard_client_effects(void);
 /* after each tick */
 void network_objects_host_tick(void);
 word network_objects_damage_animation_entry_size(void);
@@ -456,6 +488,7 @@ void network_objects_client_tick(void);
 /* (the host) a client has loaded the game and asks for the host's objects:
 again, having failed to make one of them */
 void network_objects_client_asked(long machine_index, boolean again);
+void network_objects_host_reverted(void);
 void network_objects_handle_changes(void const *entries, short count);
 void network_objects_handle_synchronized(void);
 /* (host_time: the message's, the host's tick its states are of) */
@@ -469,14 +502,29 @@ void network_objects_apply_vehicle_predictions(void);
 word network_objects_entry_size(byte type);
 /* whether this client has the host's object at this index */
 boolean network_objects_client_has(long object_index);
+/* Host says alive: recover a dead client copy after a co-op restore. */
+void network_objects_expect_live_unit(long object_index);
 /* moves the object where the host has it, drawn gliding from where it was */
 void network_objects_correct(long object_index, real_point3d const *position, real_vector3d const *forward,
-	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity);
+	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity, short kind);
 /* ... or, within blend_distance of it, half of the way there (drawn as it
 moves); TRUE when it was put there */
 boolean network_objects_reconcile(long object_index, real_point3d const *position, real_vector3d const *forward,
 	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity,
-	real blend_distance);
+	real blend_distance, short kind);
+/* a vehicle's pose the netcode wrote (from before), not its own motion:
+every such write calls it */
+enum network_vehicle_write
+{
+	_network_vehicle_write_state,
+	_network_vehicle_write_change,
+	_network_vehicle_write_carry,
+	_network_vehicle_write_prediction,
+	_network_vehicle_write_own,
+	_network_vehicle_write_coop,
+};
+void network_objects_vehicle_written(long object_index, real_point3d const *before_position,
+	real_vector3d const *before_forward, real_vector3d const *before_up, short kind);
 /* a unit in the vehicle's seat as the host has it (NONE: in none) */
 void network_objects_set_seat(long unit_index, long vehicle_index, short seat_index);
 /* (the host) the ticks between sends to a machine of a unit at position, by

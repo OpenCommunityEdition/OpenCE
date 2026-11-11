@@ -40,7 +40,7 @@ def graph(release=False, emcc="/opt/emsdk/upstream/emscripten/emcc"):
     sln = SimpleNamespace(build_dir=Path("build"), web_emcc=emcc, port_release=release, port_profile=False,
                           compiler_launcher=None)
     web_build.generate_web_build(ninja_syntax.Writer(out), sln)
-    return re.sub(r" \$\n +", " ", out.getvalue())
+    return re.sub(r" \$\n +", " ", out.getvalue()).replace("\\", "/")
 
 
 def compile_flags(text, source):
@@ -131,8 +131,11 @@ def test_the_memory_layout_agrees_with_the_sources():
                       r"(0x[0-9A-Fa-f]+)", platform, re.S)
     assert sizes, "platform.h gives the web build the 128 MB window"
     assert web_build.WEB_MEMORY_BYTES == base + int(sizes.group(1), 16)
-    main = (ROOT / "port/web/src/web_main.c").read_text()
-    assert int(re.search(r"#define WEB_HEAP_LIMIT (0x[0-9A-Fa-f]+)", main).group(1), 16) == base
+    memory = (ROOT / "port/web/src/web_memory.h").read_text()
+    assert "#define WEB_HEAP_LIMIT CUSTOM_EDITION_TAG_CACHE_ADDRESS" in memory
+    formats = (ROOT / "port/linux/game/cache_file_formats.h").read_text()
+    ce = int(re.search(r"#define CUSTOM_EDITION_TAG_CACHE_ADDRESS (0x[0-9A-Fa-f]+)", formats).group(1), 16)
+    assert ce < 0x42000000 < 0x74000000 < base
     app = (ROOT / "port/web/site/app.js").read_text()
     assert int(re.search(r"const WEB_MEMORY_BYTES = (0x[0-9A-Fa-f]+)", app).group(1), 16) == web_build.WEB_MEMORY_BYTES
 

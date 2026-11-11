@@ -71,6 +71,9 @@ server:
   # server.master_publish: publish the server to the official master servers (needs a publisher
   # key, below; default true).
   masterPublish: null
+  # server.vehicle_riding_override_gametype: true turns the gametype's riding override off,
+  # so multiplayer uses network.vehicle_riding (default false; a map's own choice still wins).
+  vehicleRidingOverrideGametype: null
   # server.password: the password the server browser asks for. value, or a key of an existing
   # Secret; empty for none.
   password:
@@ -108,6 +111,10 @@ web:
     annotations: {}
 
 network:
+  # network.vehicle_riding: the base setting; each gametype's riding rule overrides it in
+  # multiplayer, and a gametype without the rule is off (default false).
+  # A co-op entry's +riding rule or a map's own choice takes precedence.
+  vehicleRiding: null
   # network.tunnel_port: the UDP port of internet play, which the Service exposes.
   tunnelPort: 2302
   # network.public_address: host[:port] players reach the tunnel port at, when the cluster is behind

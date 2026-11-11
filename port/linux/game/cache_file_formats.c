@@ -3524,40 +3524,18 @@ static void multiplayer_score_hint_convert(
 }
 
 /* Halo PC's widgets run its own functions besides the Xbox's, numbered past
-them: this build has none of those (its menus' own are other numbers, from
-PC_MENU_FUNCTION_BASE), and a handler running one would only log an invalid
-function. Those handlers run none. */
+them. This build has none of those, but the port runs or ignores them at
+dispatch (ui_widget_event_handler_function_invoke: the ones it implements run,
+the rest succeed and do nothing), so the handlers keep their run-function flag.
+Nothing is cleared, and report->widget_functions_cleared stays 0. */
 static void widget_pc_functions_clear(
 	struct load_state const *state,
 	uint32_t widget_offset,
 	struct custom_edition_conversion_report *report)
 {
-	int32_t handler_count;
-	uint32_t handlers_offset;
-	int32_t handler_index;
-
-	if (!loaded_block_get(
-			state->tag_cache + widget_offset + UI_WIDGET_EVENT_HANDLERS_OFFSET,
-			CUSTOM_EDITION_TAG_CACHE_ADDRESS,
-			state->used_bytes,
-			UI_WIDGET_EVENT_HANDLER_BYTES,
-			&handler_count,
-			&handlers_offset))
-	{
-		return;
-	}
-	for (handler_index = 0; handler_index < handler_count; handler_index++)
-	{
-		uint8_t *handler = state->tag_cache + handlers_offset + (uint32_t)handler_index * UI_WIDGET_EVENT_HANDLER_BYTES;
-		uint32_t flags = read_u32(handler + UI_WIDGET_EVENT_HANDLER_FLAGS_OFFSET);
-
-		if ((flags & UI_WIDGET_EVENT_HANDLER_RUN_FUNCTION_FLAG) &&
-			read_s16(handler + UI_WIDGET_EVENT_HANDLER_FUNCTION_OFFSET) >= XBOX_WIDGET_FUNCTION_COUNT)
-		{
-			write_u32(handler + UI_WIDGET_EVENT_HANDLER_FLAGS_OFFSET, flags & ~UI_WIDGET_EVENT_HANDLER_RUN_FUNCTION_FLAG);
-			report->widget_functions_cleared++;
-		}
-	}
+	(void)state;
+	(void)widget_offset;
+	(void)report;
 
 	return;
 }

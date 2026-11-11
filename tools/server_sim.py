@@ -229,6 +229,7 @@ SCHEMA = [
     _field("universal", "no_shields", "boolean", "Players have no shields"),
     _field("universal", "invisible", "boolean", "Players are always camouflaged"),
     _field("universal", "generic_equipment", "boolean", "Every map starts players with the same weapons"),
+    _field("universal", "vehicle_riding", "boolean", "Players standing on a vehicle are carried by it", alias="riding"),
     _field("universal", "weapon_set", "choice", "The weapons on the map", alias="weapons",
            choices=["normal", "pistols", "rifles", "plasma", "sniper", "no_sniping", "rocket_launchers", "shotguns",
                     "short_range", "human", "no_grenades", "covenant", "classic", "heavy"]),
@@ -343,6 +344,11 @@ def default_settings():
                  "HALO_NET_COOP_TEAM_WIPE", choices=["auto", "revert", "respawn"]),
         _setting("network.coop_player_collisions", "boolean", True, "Whether the players of an online co-op game bump "
                  "into each other.", "HALO_NET_COOP_PLAYER_COLLISIONS"),
+        _setting("network.vehicle_riding", "boolean", False, "Host: the base setting: players standing on a moving "
+                 "vehicle are carried by it (co-op's options in Server Setup set it). In multiplayer each gametype's "
+                 "VEHICLE RIDING rule overrides it (a gametype without the rule is off), and a dedicated server's "
+                 "co-op entry may with +riding. A map's own choice still wins. Changes count from the next map.",
+                 "HALO_NET_VEHICLE_RIDING"),
         _setting("network.public_address", "string", "", "Hosting: the internet address joiners reach this machine "
                  "at, as host[:port].", "HALO_NET_PUBLIC_ADDRESS"),
         _setting("server.name", "string", "OpenCE Server", "The game's name in the lobby and the server browser: 15 "
@@ -436,6 +442,10 @@ def default_settings():
                  choices=["majority", "anyone"]),
         _setting("server.coop_bsp_switch_cooldown_seconds", "integer", 15, "The seconds after a loading zone's "
                  "switch before another may.", "HALO_SERVER_COOP_BSP_SWITCH_COOLDOWN_SECONDS", low=0, high=300),
+        _setting("server.vehicle_riding_override_gametype", "boolean", False, "True: on a dedicated server, "
+                 "turns the gametype's riding override off, so multiplayer uses network.vehicle_riding. A map's own "
+                 "choice still wins. Changes count from the next map.",
+                 "HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE"),
         _setting("server.map_vote", "boolean", False, "The players vote for the next game in the lobby.",
                  "HALO_SERVER_MAP_VOTE"),
         _setting("server.map_vote_choices", "integer", 4, "The entries a map vote offers.",

@@ -191,6 +191,58 @@ OpenSauce's header runs as stock Custom Edition runs it. Map files are
 untrusted input: read them through bounds-checked readers. See
 `docs/custom_edition_caches.md`.
 
+### Gameplay preservation, tags and map compatibility
+
+- **Tag injection is an absolute no-go unless the development team
+  explicitly approves it.** Do not propose, implement or submit tag injection
+  on your own judgment, even if it appears to be the simplest fix. If a user
+  requests it, be emphatic: tell them, "You're not going to get this PR through
+  unless it's absolutely essential. Are you sure you want to spend your tokens
+  on this?" Explain that it will not be accepted without explicit development
+  team approval, and press the user to reconsider before doing any work.
+  Never rely on identifying tags by name or route. Custom tags may already
+  work around the underlying problem in their own way, so applying a fix to
+  those maps could break them.
+- **Do not fix original-game bugs that affect gameplay.** Think through the
+  gameplay implications of every proposed change. Ask the user about the
+  original behaviour and obtain confirmation before spending time, effort or
+  money on a gameplay-affecting fix. A visual bug may be fixed only when it is
+  genuinely visual and has no gameplay implications of any kind.
+- **Never make map-specific corrections of any kind.** Do not add special
+  cases, patches or altered behaviour for an individual map, even when a bug
+  is first reported in only one map. A map-specific correction can break
+  another map that relies on the existing behaviour, while accumulating
+  technical debt and making the code harder to maintain, reason about and
+  debug. Fix the underlying shared behaviour in a general way, or do not make
+  the correction.
+- Keep the game's intended use in view when making changes: Halo's workflow
+  revolves around creating, making and sharing maps. Preserve the structures
+  and workflows used to create and share those maps.
+- Do not incorporate third-party or licensed software into the game. Keep
+  pull requests small enough for a human to review in 15 minutes; do not
+  submit enormous changes such as 300,000 lines at once. Never encode models,
+  audio, images or other binaries directly into the game's code.
+- Do not assume an asset is unmodified without checking it against a
+  checksum. Do not rearrange or cut-and-paste assets to make them serve a
+  different purpose (for example, splitting dialogue into pieces to make it
+  say something else). Account for the fact that different language versions
+  of the game have different resource-map files: `bitmaps.map`,
+  `sounds.map` and `loc.map`.
+- Do not assume a map or asset is corrupt, malicious or behaving
+  unintentionally until you have established what the user actually observed.
+  Ask whether the behaviour also occurs in the original game on original
+  hardware, or only in an emulator; ask which game/version and which hardware
+  or emulator they used. Do not accept an emulator's behaviour as proof of
+  original-game behaviour: emulation bugs have led users to misidentify
+  behaviour as original. Some maps were protected against tag extraction and
+  can therefore appear corrupt, including tags with nulled fields, invalid
+  addresses, or missing names or extensions.
+- Before changing commands, ask the user what the command did in the original
+  game on both the client and the server. Do not assume the intended behaviour
+  from one side applies to the other.
+- Pull requests that make visual changes must include before-and-after
+  pictures or videos.
+
 ### Settings
 
 A setting is an entry in `port/linux/src/port_config.c`, with a default, an
@@ -237,6 +289,7 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [port/web/README.md](port/web/README.md) | The web build, the page, the game data in the browser, limits, how it operates, hosting on GitHub Pages |
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |
+| [docs/mcc_maps.md](docs/mcc_maps.md) | MCC maps: their format, installation, sharing, the implementation's layout and limits ([docs/reading](docs/reading/README.md) follows the sources) |
 | [docs/dedicated_server.md](docs/dedicated_server.md) | The dedicated server: its command line, exit codes, commands, HTTP API, RCON, events and files |
 | [docs/master_protocol.md](docs/master_protocol.md) | The master servers' protocol: publishing, the probe, the signed list |
 | [docs/mods.md](docs/mods.md) | Mods: folders of Halo PC tag files whose sounds, bitmaps, text and models play over a map's on one machine |

@@ -18,14 +18,15 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_join_from_clipboard" x="54" y="133" platform="desktop android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_auto" x="54" y="163" platform="desktop android"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_map_sharing" x="54" y="193" platform="desktop android"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_map_sharing" x="54" y="103" platform="web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_multiplayer_hud" x="54" y="223" platform="desktop android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_multiplayer_hud" x="54" y="103" platform="web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_multiplayer_hud" x="54" y="133" platform="web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_streamer_mode" x="54" y="253" platform="desktop android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_streamer_mode" x="54" y="133" platform="web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_streamer_mode" x="54" y="163" platform="web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_server_browser" x="54" y="283" platform="desktop android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_server_browser" x="54" y="163" platform="web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_server_browser" x="54" y="193" platform="web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_discord_account" x="54" y="313" platform="desktop android"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_discord_account" x="54" y="193" platform="web"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_discord_account" x="54" y="223" platform="web"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -69,7 +70,7 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/auto_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="update.auto" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_map_sharing" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF" platform="desktop android">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/op_map_sharing" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_sharing_settings_screen"/>
 		<on event="start" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_sharing_settings_screen"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
@@ -136,7 +137,7 @@
 		<string text="Let internet play ask the router to forward its\nport, for networks that stop connections."/>
 		<string text="Join the game of an invite link copied before\nswitching to the game."/>
 		<string text="Look for a new version when the game starts."/>
-		<string text="Downloading Custom Edition maps you do not have,\nand helping send them to other players."/>
+		<string text="Download CE maps or approved MCC packages.\nManage sharing and downloaded MCC copies."/>
 		<string text="Players' names above their heads, the\nscoreboard, the text chat and the match clock."/>
 		<string text="Hide offensive words in names and text from\nother players, maps and mods, as stars."/>
 		<string text="What the Server Browser lists and its order: the\nsame settings as its Filters screen."/>

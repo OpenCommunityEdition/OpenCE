@@ -29,6 +29,41 @@ def function(source, name):
     return source[match.start():end]
 
 
+def biped_riding_sources():
+    """The native movement with its port hooks expanded for existing slice tests.
+
+    No code is copied: undo only the tick-context and physics-pointer spelling,
+    so the same cases and mutations still compile the actual hook statements.
+    Assert the calls before expanding them; a disconnected hook must fail too.
+    """
+    native = read("source/units/bipeds.c")
+    header = read("port/linux/game/vehicle_riding_bipeds.h")
+    port = read("port/linux/game/vehicle_riding_bipeds.c")
+    fields = structure(header, "biped_riding_tick").split("{\n", 1)[1].rsplit("};", 1)[0]
+    bodies = {}
+    for name in ("prepare", "finish"):
+        definition = function(port, "biped_riding_" + name)
+        body = definition.split("\n{\n", 1)[1].rsplit("\n}", 1)[0]
+        body = re.sub(r"\btick->(\w+)", r"\1", body).replace("physics->", "physics.")
+        body = body.replace("biped_riding_turn(biped, physics,", "biped_riding_turn(biped, &physics,")
+        if name == "prepare":
+            initializers, body = body.split("\n\n", 1)
+            for field, value in re.findall(r"\t(\w+) = ([^;]+);", initializers):
+                fields = re.sub(r"\b" + field + ";", field + " = " + value + ";", fields)
+        # (a body that returns early is one pass of a do/while, so its break leaves it and nothing more: a loop or a
+        # switch of its own would take the break)
+        assert not re.search(r"\b(for|while|switch|do)\b", re.sub(r"/\*.*?\*/", "", body, flags=re.S)), name
+        body = "\tdo\n\t{\n" + re.sub(r"\breturn;", "break;", body).rstrip("\n") + "\n\t} while (0);\n"
+        bodies[name] = body
+        call = "\tbiped_riding_" + name + "(biped_index, biped, definition, &physics, &riding_tick);\n"
+        assert native.count(call) == 1, call
+        native = native.replace(call, body)
+    declaration = "\tstruct biped_riding_tick riding_tick;\n"
+    assert native.count(declaration) == 1
+    native = native.replace(declaration, fields)
+    return header + "\n" + native + "\n" + port
+
+
 def inline(source, name):
     """An __inline header function, as a static one."""
     return function(source, name).replace("__inline", "static", 1)
@@ -86,10 +121,15 @@ def build(test, generated):
     work.mkdir(parents=True, exist_ok=True)
     for name, text in generated:
         (work / name).write_text(text)
-    executable = work / test
+    executable = work / (test + (".exe" if os.name == "nt" else ""))
     command = [os.environ.get("CC", "clang"), "-m32", "-std=gnu99", "-O2", "-Wall", "-Werror", "-Wno-unused-function",
                "-Wno-unused-variable", "-I", str(HARNESS / "include"), "-I", str(work),
-               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable), "-lm"]
+               str(HARNESS / "tests" / f"{test}.c"), "-o", str(executable)]
+    # MSVC's runtime includes maths; there is no separate m.lib on Windows.
+    if os.name == "nt":
+        command.append("-D_CRT_SECURE_NO_WARNINGS=")
+    else:
+        command.append("-lm")
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{test}.c does not compile:\n{result.stderr}")
