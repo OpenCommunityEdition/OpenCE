@@ -5,9 +5,23 @@ import subprocess
 import pytest
 
 from harness import function
-from test_mcc_identity import compile_tool
+import shutil
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def compile_tool(work, sources):
+    clang = shutil.which("clang")
+    if not clang:
+        pytest.skip("clang required")
+    exe = work / ("test.exe" if sys.platform == "win32" else "test")
+    flags = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"] if sys.platform == "win32" else []
+    result = subprocess.run([clang, *flags, "-std=gnu89", "-Wall", "-Wextra", "-Werror",
+                             "-I", str(work), "-I", str(ROOT / "port/linux/game"),
+                             *map(str, sources), *([] if sys.platform == "win32" else ["-lm"]), "-o", str(exe)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    return exe
 
 
 @pytest.fixture(scope="module")
