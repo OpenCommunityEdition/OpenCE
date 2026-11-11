@@ -73,7 +73,9 @@ vehicle on its side throws its riders, chat marks the host's lines, a co-op
 cutscene's sound carries how far the host has played it, and a machine's
 MCC conversion holds a round's start out of an allowance; a player standing
 on a vehicle rides it (a unit's state carries the deck it stands on, the map's
-riding choice has its own message: port/linux/NETCODE.md). */
+riding choice has its own message: port/linux/NETCODE.md).
+Version 44 adds the shoulder action byte and camera policy in session bits
+four and five, leaving the vehicle-riding flag in bit three. */
 #define HALO_PORT_NETWORK_VERSION 44
 /* ... the advertisement's reserved bytes: the version (a little-endian word),
 then flags, then the game's kind (an OpenCE gametype's mode, and Hardcore:

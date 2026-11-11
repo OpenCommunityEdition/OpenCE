@@ -12,8 +12,8 @@ int config_boolean(char const *name);
 
 boolean third_person_match_flags_valid(unsigned long flags)
 {
-	/* Bits zero through two are upstream co-op flags; policy value three is reserved. */
-	return !(flags & ~(7UL | THIRD_PERSON_POLICY_MASK)) &&
+	/* Bits zero through three are upstream co-op flags; policy value three is reserved. */
+	return !(flags & ~(15UL | THIRD_PERSON_POLICY_MASK)) &&
 		((flags & THIRD_PERSON_POLICY_MASK) >> THIRD_PERSON_POLICY_SHIFT) <= _third_person_forced_off;
 }
 

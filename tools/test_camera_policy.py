@@ -8,7 +8,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
-@pytest.mark.parametrize("fault", [None, "local_override", "locked_toggle", "invalid_flags", "ingame_change"])
+@pytest.mark.parametrize("fault", [None, "local_override", "locked_toggle", "invalid_flags", "ingame_change", "riding_overlap"])
 def test_camera_policy(tmp_path, fault):
     from harness import function
     compiler = shutil.which("clang") or shutil.which("cc")
@@ -19,6 +19,10 @@ def test_camera_policy(tmp_path, fault):
     pad_enums = re.search(r"enum controller_remap_action\s*\{.*?\};", pad_header, re.S).group(0)
     enums = re.search(r"enum third_person_match_policy\s*\{.*?\};", header, re.S).group(0)
     defines = "\n".join(re.findall(r"^#define THIRD_PERSON_POLICY_.*", header, re.M))
+    network_header = (ROOT / "source/networking/network_game_manager.h").read_text()
+    coop_enums = re.search(r"enum\s*\{[^}]*_network_game_cooperative_vehicle_riding_bit[^}]*\};", network_header, re.S).group(0)
+    if fault == "riding_overlap":
+        defines = defines.replace("POLICY_SHIFT 4", "POLICY_SHIFT 3").replace("POLICY_MASK 48", "POLICY_MASK 24")
     policy = re.sub(r"^#include[^\n]*", "", (ROOT / "port/linux/game/third_person_policy.c").read_text(), flags=re.M)
     policy += function((ROOT / "port/linux/game/third_person_input.c").read_text(), "third_person_input_update")
     menus = (ROOT / "port/linux/game/menu_functions.c").read_text()
@@ -68,20 +72,21 @@ static short setting_value_index(struct pc_menu_setting const *s,char const *v){
 static int setting_write(char const *s,char const *v){return config_write(s,v);}
 #define platform_log(...) ((void)0)
 unsigned int controller_remap_pressed(short port, unsigned int mask){(void)port;(void)mask;return 0;}
-''' + pad_enums + enums + "\n" + defines + "\n" + policy + menu_functions + r'''
+''' + pad_enums + enums + coop_enums + "\n" + defines + "\n" + policy + menu_functions + r'''
 #define CHECK(c) do{if(!(c))return __LINE__;}while(0)
 static void press(unsigned long key){held=0;third_person_input_update();held=key;third_person_input_update();}
 int main(void){int i,p,saved;struct network_game remote;
  struct pc_menu_setting setting={"display.third_person",0,2,{"false","true"}};
  struct widget_instance spinner={{{0}}};
+ CHECK(!(THIRD_PERSON_POLICY_MASK & (1UL<<_network_game_cooperative_vehicle_riding_bit)));
  CHECK(third_person_host_policy()==0);
  host_setting="forced_on";CHECK(third_person_host_policy()==0);
  host_setting="forced_off";CHECK(third_person_host_policy()==2);
  host_setting="bad";CHECK(third_person_host_policy()==0);
- for(i=0;i<256;i++)CHECK(!!third_person_match_flags_valid(i)==(i<=23));
+ for(i=0;i<256;i++)CHECK(!!third_person_match_flags_valid(i)==(i<=47));
  CHECK(!third_person_match_flags_valid(256));
  for(p=0;p<3;p++)for(i=0;i<2;i++){
-  remote.cooperative_flags=(p<<THIRD_PERSON_POLICY_SHIFT)|1;current=&remote;
+  remote.cooperative_flags=(p<<THIRD_PERSON_POLICY_SHIFT)|15;current=&remote;
   preference=i;host_setting="forced_off";CHECK(third_person_policy()==p);
   CHECK(!!third_person_enabled()==(p==1||(p==0&&i)));
   saved=writes;press(1UL<<HALO_KEYBOARD_TOGGLE_PERSPECTIVE);
@@ -91,16 +96,16 @@ int main(void){int i,p,saved;struct network_game remote;
   CHECK(shoulder==(third_person_enabled()?!saved:saved));
   current=NULL;CHECK(third_person_policy()==0&&third_person_enabled()==preference);
  }
- server_pointer=&host;host.game.cooperative_flags=3;host.state=0;
- third_person_set_match_policy(1);CHECK(host.game.cooperative_flags==3&&sends==0);
- third_person_set_match_policy(2);CHECK(host.game.cooperative_flags==19&&sends==1);
+ server_pointer=&host;host.game.cooperative_flags=11;host.state=0;
+ third_person_set_match_policy(1);CHECK(host.game.cooperative_flags==11&&sends==0);
+ third_person_set_match_policy(2);CHECK(host.game.cooperative_flags==43&&sends==1);
  third_person_set_match_policy(-1);third_person_set_match_policy(3);
- CHECK(host.game.cooperative_flags==19&&sends==1);
- host.state=1;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==19&&sends==1);
- host.state=0;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==3&&sends==2);
+ CHECK(host.game.cooperative_flags==43&&sends==1);
+ host.state=1;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==43&&sends==1);
+ host.state=0;third_person_set_match_policy(0);CHECK(host.game.cooperative_flags==11&&sends==2);
  server_pointer=NULL;third_person_set_match_policy(1);CHECK(sends==2);
  /* A lobby unlock just before OK must not save the forced display value. */
- current=&remote;remote.cooperative_flags=8;preference=0;saved=writes;
+ current=&remote;remote.cooperative_flags=16;preference=0;saved=writes;
  camera_setting_show(&spinner,&setting);CHECK(spinner.parameters.list.selected_index==1&&setting.loaded_index==NONE);
  setting_changed_save(&spinner,&setting);CHECK(writes==saved&&preference==0);
  remote.cooperative_flags=0;setting_changed_save(&spinner,&setting);CHECK(writes==saved&&preference==0);

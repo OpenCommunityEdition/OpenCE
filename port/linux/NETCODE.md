@@ -191,7 +191,7 @@ envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
 not a crossplay promise.
 
 The integrated shoulder-camera feature raises the protocol to version 44. Host
-camera policy occupies bits 3-4 of `cooperative_flags` (Player Choice,
+camera policy occupies bits 4-5 of `cooperative_flags` (Player Choice,
 Forced On, Forced Off; value 3 is rejected). Input bit 16 carries resolved
 shoulder view. The compact action relay includes one validated 0/1 shoulder
 byte, with 15-byte minimum and 21-byte maximum entries. All peers must use
@@ -454,7 +454,7 @@ vehicle a client follows (the host's word is its place, not its updates) is
 measured by the time elapsed since the rider's last tick, and a change of the
 vehicle's role (simulated or followed) takes no correction across it.
 None of this adds a byte: the cabin bit (bit 3 of the flags) is the only change to the deck part,
-which stays 28 bytes, and the version stays 43.
+which stays 28 bytes, as introduced in version 43.
 
 Message 107 carries the host's riding rules: the map's choice (its boolean
 `vehicle_riding` global or startup call; none when the map makes none) and
@@ -468,7 +468,7 @@ next game; before the message it keeps its own. The values are the latched
 ones, so a config change on the host waits for the next map; a co-op host's
 revert or saved-game load reads the config again, and the new values are
 sent again then. It ships with
-the rest of version 43, which stays 43.
+the rest of version 43; the integrated camera feature now uses version 44.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
