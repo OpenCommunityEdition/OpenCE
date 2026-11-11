@@ -19,7 +19,7 @@ def compile_tool(work, sources):
     flags = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"] if sys.platform == "win32" else []
     result = subprocess.run([clang, *flags, "-std=gnu89", "-Wall", "-Wextra", "-Werror",
                              "-I", str(work), "-I", str(ROOT / "port/linux/game"),
-                             *map(str, sources), "-o", str(exe)], capture_output=True, text=True)
+                             *map(str, sources), *([] if sys.platform == "win32" else ["-lm"]), "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
 
