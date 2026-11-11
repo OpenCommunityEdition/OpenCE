@@ -104,7 +104,6 @@ typedef struct
 	DSI3DL2OCCLUSION Occlusion;
 } DSI3DL2BUFFER;
 typedef const DSI3DL2BUFFER *LPCDSI3DL2BUFFER;
-typedef IDirectSoundStream *LPDIRECTSOUNDSTREAM;
 #include "under_test.inc"
 
 #define PI 3.14159265358979323846
