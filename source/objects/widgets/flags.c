@@ -219,17 +219,13 @@ struct data_array *flag_data;
 static long flag_last_step_game_time = NONE;
 static real flag_pending_delta = 0.0f;
 
-/* port: cloth timing is render state, outside the saved flag pool. */
-static long last_step_game_time = NONE;
-static real pending_delta = 0.0f;
-
 /* ---------- public code */
 
 /* port: discard partial frame time across maps and checkpoint restores. */
 void flags_reset_render_state(void)
 {
-	last_step_game_time = NONE;
-	pending_delta = 0.0f;
+	flag_last_step_game_time = NONE;
+	flag_pending_delta = 0.0f;
 }
 
 void flags_initialize(
@@ -245,7 +241,6 @@ void flags_initialize(
 void flags_initialize_for_new_map(
 	void)
 {
-	flags_reset_render_state(); /* port: reset the render clock */
 	data_make_valid(flag_data);
 	/* port: the new map's game time starts again (flags_update) */
 	flag_last_step_game_time = NONE;

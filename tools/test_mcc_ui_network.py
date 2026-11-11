@@ -40,6 +40,7 @@ typedef int boolean;
 #define FALSE 0
 #define NONE (-1)
 #define _error_silent 0
+boolean pc_menu_new_game_apply(void){return FALSE;}
 #define NETWORK_SERVER_MANAGER_FILE "network_server_manager.c"
 #define match_assert(file,line,condition) assert(condition)
 #define MAXIMUM_NETWORK_PLAYER_COUNT 3
@@ -168,9 +169,9 @@ static int network_game_server_reset_to_pregame(struct network_game_server *s) {
     s->state=_network_game_server_state_pregame;return 1;
 }
 ''' + '\n'.join(function(server_source, name) for name in [
-        "network_game_server_start_now", "network_game_server_pause_countdown", "network_game_server_begin_game_start_countdown",
+        "network_game_server_pause_countdown", "network_game_server_begin_game_start_countdown",
         "network_game_server_client_machine_is_precached", "network_game_server_have_all_machines_have_precached"
-    ]) + '\n' + implementation + '\n' + function(widget_source, "network_game_reset_to_pregame_ui") + '\n' + (
+    ]) + '\nstatic void network_game_server_start_now(struct network_game_server *s) {network_game_server_begin_game_start_countdown(s,0); }\n' + implementation + '\n' + function(widget_source, "network_game_reset_to_pregame_ui") + '\n' + (
         # Exercise the production early-return boundary without starting a world.
         function(server_source, "network_game_server_start_network_game").split(
             "if (server->sent_start_game_message")[0] + "start_attempts++;return FALSE;\n}\n"

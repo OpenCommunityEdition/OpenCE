@@ -1,9 +1,9 @@
-"""Actual P2P lifecycle code must finish its workers before exit returns."""
+"""Actual P2P lifecycle code requests stop and waits for workers within upstream bounds."""
 from pathlib import Path
 import re
 import subprocess
 import pytest
-from harness import function
+from harness import constant, function
 from test_mcc_identity import compile_tool
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +18,7 @@ def build(tmp_path, mutation=None):
         source = source.replace(before, after, 1)
     code = (ROOT / "tools/tests/p2p_shutdown.c").read_text()
     code = code.replace("/* ACTUAL INITIALIZER */", re.search(r"\} p2p = (\{[^;]+\});", source)[1])
+    code = "\n".join(f"#define {name} {constant(source,name)}" for name in ("P2P_STOP_WAIT","UPNP_RELEASE_WAIT")) + "\n" + code
     code = code.replace("/* ACTUAL FUNCTIONS */", "\n".join(function(source, name) for name in NAMES))
     path = tmp_path / "shutdown.c"
     path.write_text(code)
@@ -35,8 +36,8 @@ def test_workers_end_before_cleanup(binary, case):
 
 
 @pytest.mark.parametrize("mutation,case", [
-    (("WaitForSingleObject(p2p.thread, INFINITE);", "/* detached: no wait */"), "poll"),
-    (("WaitForSingleObject(p2p.upnp_thread, INFINITE);", "/* detached: no wait */"), "upnp"),
+    (("WaitForSingleObject(p2p.thread, P2P_STOP_WAIT);", "/* detached: no wait */"), "poll"),
+    (("WaitForSingleObject(p2p.upnp_thread, UPNP_RELEASE_WAIT);", "/* detached: no wait */"), "upnp"),
     (("if (p2p.stopping)\n\t\t\tbreak;", "/* process one more pass after stop */"), "poll"),
 ])
 def test_regressions_reject_detached_or_post_stop_work(tmp_path, mutation, case):

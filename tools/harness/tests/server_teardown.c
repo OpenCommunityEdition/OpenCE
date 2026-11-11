@@ -45,7 +45,6 @@ static void third_person_session_host_end(void) { } /* Session contract: test_ca
 static void mcc_ui_network_server_dispose(struct network_game_server *server) { (void)server; }
 
 /* These legacy teardown cases have no pending MCC restart. */
-static void mcc_ui_network_server_dispose(struct network_game_server *server) { (void)server; }
 
 static void note(char event)
 {

@@ -27,7 +27,7 @@ def generated():
     history = constant((ROOT/'source/game/player_queues_new.h').read_text(), 'DISTRIBUTED_INPUT_HISTORY')
     routines = '\n'.join(function(source, name) for name in (
         'distributed_vector_pack', 'distributed_vector_unpack', 'distributed_unit_vector_unpack',
-        'distributed_put', 'distributed_take', 'distributed_scripted_pose_from_unit',
+        'distributed_put', 'distributed_take', 'distributed_deck_put', 'distributed_deck_take', 'distributed_scripted_pose_from_unit',
         'distributed_scripted_pose_valid', 'distributed_scripted_pose_apply',
         'distributed_unit_state_write', 'distributed_unit_state_read', 'distributed_handle_predictions'))
     return r'''
@@ -50,6 +50,11 @@ typedef struct {real x,y,z;} real_point3d;
 #define csmemcpy memcpy
 #define csmemset memset
 #define DISTRIBUTED_UNIT_SCALE 32767.f
+#define DISTRIBUTED_VELOCITY_SCALE 1024.f
+#define vehicle_riding_deck_vehicle_named(...) 0
+#define vehicle_riding_deck_valid(...) 0
+#define vehicle_riding_deck_values_valid(...) 0
+#define biped_riding_vehicle_node_count(...) 0
 #define DISTRIBUTED_INPUT_HISTORY HISTORY_COUNT
 enum {_game_connection_local, _game_connection_network_server, _game_connection_network_client};
 enum {_unit_suspended_bit=24};
@@ -105,10 +110,11 @@ int main(void) {
         near_vector(client.unit.looking_vector,host.unit.looking_vector);
         assert(client.unit.flags==(1u|host.unit.flags));
         for(i=0;i<count;i++) assert(!distributed_unit_state_read(packet,packet+i,&received));
+        /* Invalid optional pose vectors are omitted without discarding other unit state. */
         memcpy(bad,packet,count);memset(bad+count-6,0,6);
-        assert(!distributed_unit_state_read(bad,bad+count,&received));
+        assert(distributed_unit_state_read(bad,bad+count,&received)==count && !received.scripted_pose);
         memcpy(bad,packet,count);memset(bad+count-6,127,6);
-        assert(!distributed_unit_state_read(bad,bad+count,&received));
+        assert(distributed_unit_state_read(bad,bad+count,&received)==count && !received.scripted_pose);
         memcpy(bad,packet,count);bad[1]=0;
         assert(!distributed_unit_state_read(bad,bad+count,&received));
         /* All optional live fields fit the packer's declared bound. */

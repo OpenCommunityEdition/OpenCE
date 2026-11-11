@@ -11,7 +11,7 @@ import shutil
 import subprocess
 
 import pytest
-from harness import function, structure
+from harness import enum_with, function, structure
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,12 +27,18 @@ def ui_tool(tmp_path_factory):
     events = (ROOT / "source/interface/ui_widget_event_handler_functions.c").read_text()
     tags = (ROOT / "port/linux/game/mcc_tags.c").read_text()
     profiles = (ROOT / "source/interface/player_ui.c").read_text()
-    actions = re.search(r"enum\s*\{.*?\};", ui_header, re.S).group()
+    actions = re.search(r"enum\s*\{.*?\};", ui_header, re.S).group() + enum_with(events, "_halo_pc_function_back =")
     names = ["mcc_ui_settings_profile_released", "mcc_ui_settings_profile_reopen", "mcc_ui_settings_close", "mcc_ui_settings_begin",
              "mcc_ui_owns_widget", "mcc_ui_trusted_action", "mcc_ui_settings_needed", "mcc_ui_settings_pause_game", "mcc_ui_scenario_type", "mcc_ui_controller",
              "mcc_ui_failure", "mcc_ui_host_required", "mcc_ui_restart", "mcc_ui_end_round", "mcc_ui_new_game",
              "mcc_ui_request_team", "mcc_ui_choose_team", "mcc_ui_close_for_controller",
              "mcc_ui_event_function"]
+    # These CE settings services must never be invoked by MCC-owned widgets.
+    dispatcher = function(events, "ui_widget_event_handler_function_invoke")
+    pc_stubs = "\n".join(
+        match.group(1) + " {abort();}" for match in re.finditer(
+            r"extern\s+((?:boolean|short|void)\s+(?:pc_menu_(?:network_back|color_row_click|map_row_click|activate_screen|restart_game|controls_load|controls_begin_binding|controls_save|controls_defaults|color_initialize|color_choose|network_function|video_function|audio_function|mouse_function)|ui_widget_port_go_back)\([^;]*\));",
+            dispatcher))
     source = r'''
 #include <assert.h>
 #include <float.h>
@@ -57,8 +63,7 @@ typedef unsigned short word;
 #define csmemcpy memcpy
 #define MAXIMUM_NUMBER_OF_LOCAL_PLAYERS 4
 #define PC_MENU_FUNCTION_BASE 256
-enum {_halo_pc_function_back=0,_halo_pc_function_map_row=1,_halo_pc_function_map_ok=2,_halo_pc_function_restart=3,_halo_pc_function_change_settings=4};
-#define pc_menu_profile_edit_begin(...) ((void)0)
+#define pc_menu_profile_edit_begin(...) TRUE
 #define TEST_FLAG(value,bit) ((value)&(1u<<(bit)))
 #define _error_silent 0
 #define match_assert(file,line,condition) assert(condition)
@@ -204,7 +209,7 @@ static void dispose_widget_stack(void **stack){assert(*stack);stack_disposed++;*
 static boolean virtual_keyboard_active(void){return FALSE;}
 static void virtual_keyboard_close(void){}
 static void ui_play_audio_feedback_sound(long sound){(void)sound;}
-''' + actions + '\n' + '\n'.join(function(profiles, name) for name in [
+''' + actions + '\n' + pc_stubs + '\n' + '\n'.join(function(profiles, name) for name in [
         "player_ui_get_edit_profile_index", "player_ui_get_active_player_profile_index", "player_ui_get_edit_player_profile", "player_ui_get_edit_playlist_profile",
         "player_ui_begin_editing_profile", "clear_profile_edit_data", "player_ui_end_editing_profile"
     ]) + '\n' + function(native, "ui_widgets_close_all_for_local_player") + '\n' + \

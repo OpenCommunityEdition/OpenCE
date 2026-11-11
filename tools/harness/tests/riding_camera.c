@@ -28,6 +28,7 @@ static long turn_calls;
 #define director_get_perspective(index) _director_perspective_first_person
 #define director_inhibited_facing(index) FALSE
 #define cinematic_in_progress() FALSE
+#define third_person_director_active(index) FALSE
 #define player_control_get_unit_index(index) 7
 #define object_get(index) (&unit)
 #define player_control_get_facing_direction(index, output) (*(output) = facing)

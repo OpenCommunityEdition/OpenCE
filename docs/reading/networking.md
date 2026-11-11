@@ -303,9 +303,10 @@ The transport also owns its worker lifetimes. In
 [p2p.c](../../port/linux/src/p2p.c), `p2p_initialize` registers `p2p_shutdown`
 before creating the worker. Shutdown requests a stop under `p2p_lock`, waits
 outside that lock for both the tunnel and UPnP workers, then withdraws the
-public listing and router mapping. This prevents worker logging after the C
-runtime starts closing its streams; it applies to every map family without
-changing packets or simulation. Completed UPnP workers are also reaped before
+public listing and any idle router mapping. Upstream bounds each exit wait
+to three seconds; a worker that exceeds it may still be running as the C runtime
+closes its streams. This applies to every map family without changing packets
+or simulation. Completed UPnP workers are also reaped before
 renewal. [Lifecycle regressions](../../tools/test_p2p_shutdown.py) execute the
 actual functions with controlled OS threads and failure injection.
 
@@ -314,8 +315,8 @@ process-exit latch, checked between discovery, mapping scans and port retries.
 It cannot interrupt an active miniupnpc request. Discovery asks for two
 seconds, connection waits use three seconds and HTTP reads use five seconds
 per read; repeated reads and multiple devices mean these are not a total
-shutdown deadline. A slow router can therefore delay a safe exit. Browser
-UPnP remains disabled, with a no-op cancellation stub.
+request deadline. The bounded exit wait does not guarantee an active request
+has finished. Browser UPnP remains disabled, with a no-op cancellation stub.
 
 ## GulchCE compatibility and teardown
 

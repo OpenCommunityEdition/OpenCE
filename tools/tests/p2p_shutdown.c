@@ -57,7 +57,7 @@ static HANDLE create_thread(void *a,DWORD size,DWORD (WINAPI *start)(void*),void
 }
 static void wait_thread(HANDLE h,DWORD timeout) {
     int i;
-    assert(!lock_depth && timeout==INFINITE);__atomic_fetch_add(&waits,1,__ATOMIC_SEQ_CST);
+    assert(!lock_depth && (timeout==INFINITE || timeout==P2P_STOP_WAIT || timeout==UPNP_RELEASE_WAIT));__atomic_fetch_add(&waits,1,__ATOMIC_SEQ_CST);
 #ifdef _WIN32
     assert(WaitForSingleObject(h,timeout)==WAIT_OBJECT_0);
 #else

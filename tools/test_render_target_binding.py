@@ -85,6 +85,7 @@ static void glTexImage2D(GLenum target,int level,GLenum format,GLsizei width,GLs
     stored_texture=bindings[active_unit];stored_format=format;storage_calls++;
 }
 static void xgpu_gl_state_invalidate(void) { invalidations++; }
+static void *device_record_new(size_t size) {return calloc(1,size);}
 #include "under_test.inc"
 
 static D3DSurface surface(unsigned long data,int depth)

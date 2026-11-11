@@ -153,6 +153,7 @@ static void level_description(struct widget_instance *widget,char const *prefix,
 int main(int argc,char **argv) {
     boolean deleted=FALSE;
     if(argc<2)return 99;
+    list.name="fixture_list";
     list.parameters.list.extended_description=&description;
     {int i;for(i=0;i<2;i++){mcc_map_browser_open(&mcc_solo_browsers[i],i);mcc_map_browser_open(&mcc_host_browsers[i],i);}}
     if(!strcmp(argv[1],"kinds")) {
