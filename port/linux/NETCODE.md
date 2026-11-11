@@ -219,7 +219,8 @@ names and synchronized its opening sequence; the short run did not provide
 enough on-foot samples for the comparator's full drift verdict. These checks
 do not establish full campaign or public internet transport compatibility.
 
-MCC sessions use separate MCC protocol version 64. Version 64 reserves bytes
+MCC sessions use separate MCC protocol version 65 for camera-relative projectile
+simulation. Version 64 reserves bytes
 64-127 of the 128-byte MCC map name for advisory Workshop metadata. Valid MCC
 paths occupy at most 63 characters plus their NUL. The tail contains `WS`,
 record version 1, a 1-20 digit item id and NUL, then an ASCII title and NUL;
