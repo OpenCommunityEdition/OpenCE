@@ -12,7 +12,6 @@ it exists, so that the player's edits and comments stay.
 
 #include "platform.h"
 #include "port_config.h"
-#include "mcc_config.h"
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
 /* (the command line: --config, --server, --probe...) */
 #include "posix.h"
@@ -620,10 +619,6 @@ static const struct config_setting config_settings[] =
 	{ "game.mcc_collections", _config_boolean, "true", "HALO_MCC_COLLECTIONS", _environment_value, _platform_all,
 		"Group identified MCC packages into the bundled Workshop collections.\n"
 		"Works with imported packages without Steam; reopen the map list after changing." },
-
-	{ "game.mcc_discovery_defaults", _config_boolean, "true", "HALO_MCC_DISCOVERY_DEFAULTS", _environment_value, _platform_all,
-		"Records the one-time upgrade to enabled MCC discovery defaults. Keep this\n"
-		"entry so later changes to the three discovery settings are preserved." },
 
 	{ "network.address", _config_string, "\"\"", "HALO_NET_ADDRESS", _environment_value, _platform_all,
 		"This machine's IPv4 address for system link, for a machine on several\n"
@@ -2432,13 +2427,6 @@ static void config_load(void)
 			toml_free(result);
 			result = toml_parse(text, (int)strlen(text));
 			skipped++;
-		}
-		/* MCC discovery was opt-in in older configs. Upgrade before reading
-		the values; config_add_missing records completion in the same write. */
-		if (result.ok && !skipped && !config_answer_only && mcc_config_upgrade(text, result.toptab))
-		{
-			toml_free(result);
-			result = toml_parse(text, (int)strlen(text));
 		}
 		if (result.ok)
 		{

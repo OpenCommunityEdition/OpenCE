@@ -308,14 +308,8 @@ Without campaign metadata enabled, each selected MCC campaign map remains an
 independent scenario. **CAMPAIGN MISSIONS** under Settings > Network Setup >
 MCC Packages (`game.mcc_campaigns`) is enabled by default to discover Workshop
 campaigns and use their authored mission order. The same screen exposes desktop
-Steam discovery and collection folders, also enabled by default.
-
-On the first normal launch after upgrading from an older build, all three
-options are enabled once, including saved `false` values. The config entry
-`game.mcc_discovery_defaults` records the upgrade; keep it so later opt-outs
-remain saved. Environment overrides still apply for the current run. Configs
-with parse errors and read-only command modes such as `--version` are left
-untouched; their upgrade waits for a normal launch with a valid config.
+Steam discovery and collection folders, also enabled by default. Players can
+turn each option off; saved choices and environment overrides are respected.
 
 `ModInfo.json` must identify `Halo1` and `GameModContents.HasCampaign = true`.
 `CampaignInfo.json` supplies an explicit `CampaignMaps` list; each referenced

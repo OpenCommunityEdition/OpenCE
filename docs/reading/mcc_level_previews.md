@@ -156,8 +156,3 @@ Android device testing.
 and writes, profile/mission isolation, duplicate awards, corruption, capacity
 and profile-rename copying. The existing MCC lifecycle test checks that awards
 are gated by MCC campaign activation and host/local authority.
-
-The three MCC discovery controls default to on. On upgrade,
-[`mcc_config_upgrade()`](../../port/linux/src/mcc_config.c) updates old saved
-booleans before `config_load()` reads them. The saved completion entry preserves
-later opt-outs; the environment is applied afterwards.
