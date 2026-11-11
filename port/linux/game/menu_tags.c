@@ -87,8 +87,9 @@ adds to */
 /* the campaign's full screen pause screen, which pause_campaign_patch adds to */
 #define CAMPAIGN_PAUSE_SCREEN "ui\\shell\\solo_game\\pause_game\\pause_game"
 /* the tags pause_patch or pause_campaign_patch adds: two buttons and their
-texts (SETTINGS, and END GAME or FRIENDLY FIRE) */
-#define PAUSE_PATCH_TAGS 4
+texts (SETTINGS, and END GAME or FRIENDLY FIRE), and the texts of Halo PC's
+campaign rows made the Xbox's (pause_campaign_pc_convert) */
+#define PAUSE_PATCH_TAGS 5
 /* what a frame of ui.map's is drawn as in a game map, which has not got it */
 #define BLANK_PNG "ce/port/blank__0.png"
 #define UI_WIDGET_DEFINITION_TAG 'DeLa'
@@ -2194,6 +2195,20 @@ static char const *pause_campaign_box_bitmap(long tag_index)
 		return "pause/objectives_left";
 	if (tag_name_ends(tag_index, "\\pausebox_right"))
 		return "pause/objectives_right";
+	/* Halo PC's pieces (an imported MCC map's), made the Xbox's sizes by
+	pause_campaign_pc_convert */
+	if (tag_name_ends(tag_index, "\\pausebox4_left_center"))
+		return "pause/pausebox_center";
+	if (tag_name_ends(tag_index, "\\pausebox4_left"))
+		return "pause/pausebox_left";
+	if (tag_name_ends(tag_index, "\\pausebox4_right"))
+		return "pause/pausebox_right";
+	if (tag_name_ends(tag_index, "\\pausebox3_right_center"))
+		return "pause/objectives_center";
+	if (tag_name_ends(tag_index, "\\pausebox3_left"))
+		return "pause/objectives_left";
+	if (tag_name_ends(tag_index, "\\pausebox3_right"))
+		return "pause/objectives_right";
 	return NULL;
 }
 
@@ -2392,6 +2407,178 @@ static void pause_settings_patch(void)
 	}
 }
 
+/* ---------- Halo PC's campaign pause menu (an imported MCC map's)
+
+A map imported from MCC (mcc_import.c) has Halo PC's campaign pause screen:
+six rows in the small font, of which SAVE LAST CHECKPOINT and CHANGE
+SETTINGS run Halo PC's functions (none here) and QUIT leaves without the
+saving screen, in a box made for them, with no prompts. Before SETTINGS is
+added (pause_campaign_patch) it is made the disc's: the Xbox's four rows
+(RESUME GAME, REVERT TO SAVED, RESTART LEVEL, SAVE AND QUIT) in the large
+font at the Xbox's pitch, SAVE AND QUIT opening the saving screen as the
+Xbox's does, the box of the Xbox's height (its port frames then, as the
+disc's: pause_campaign_box_bitmap) and the B and A prompts of the map's own
+button_key_sm. */
+
+#define PAUSE_PC_PROMPTS "ui\\shell\\main_menu\\button_key_sm"
+#define PAUSE_PC_FONT "ui\\large_ui"
+/* the Xbox's: its rows' pitch and text offset, its list's and box's
+heights, its box's centre piece's width (over the right cap) and its
+prompts' place */
+#define PAUSE_XBOX_ROW_PITCH 28
+#define PAUSE_XBOX_TEXT_OFFSET 3
+#define PAUSE_XBOX_LIST_HEIGHT 150
+#define PAUSE_XBOX_BOX_HEIGHT 159
+#define PAUSE_XBOX_CENTER_WIDTH 194
+#define PAUSE_XBOX_PROMPTS_X 87
+#define PAUSE_XBOX_PROMPTS_Y 296
+/* Halo PC's mouse events (left_mouse to double_click): this engine posts a
+click as an A press */
+#define PAUSE_PC_FIRST_MOUSE_EVENT 28
+#define PAUSE_PC_LAST_MOUSE_EVENT 31
+
+/* the Xbox's rows, by their tags' names, and their texts where Halo PC's
+differ (else NULL) */
+static char const *const pause_pc_rows[][2] =
+{
+	{ "\\resume_game_button", NULL },
+	{ "\\restart_at_save_point_button", "REVERT TO SAVED" },
+	{ "\\restart_level_button", NULL },
+	{ "\\quit_to_main_menu_button", "SAVE AND QUIT" },
+};
+
+/* a row as the Xbox's: the font, the text's place, no mouse handlers, and
+the text (the string list's index, else NONE) */
+static void pause_pc_row_convert(struct ui_widget_definition *button, long font, long text_tag, short text,
+	long quit_function)
+{
+	struct ui_widget_event_handler_reference *handlers = button->event_handlers.address;
+	long handler, kept = 0;
+
+	reference_set(&button->text_font, FONT_TAG, font);
+	button->vertical_offset = PAUSE_XBOX_TEXT_OFFSET;
+	if (text != NONE)
+	{
+		reference_set(&button->text_label_string_list, UNICODE_STRING_LIST_TAG, text_tag);
+		button->string_list_index = text;
+	}
+	for (handler = 0; handler < button->event_handlers.count; handler++)
+	{
+		struct ui_widget_event_handler_reference *each = &handlers[handler];
+
+		if (each->event_type >= PAUSE_PC_FIRST_MOUSE_EVENT && each->event_type <= PAUSE_PC_LAST_MOUSE_EVENT)
+			continue;
+		/* (QUIT: the saving screen it names, which goes to the main menu
+		when it closes) */
+		if (each->function == quit_function && TEST_FLAG(each->flags, _event_handler_run_function_bit) &&
+			each->widget_tag.index != NONE)
+		{
+			each->flags = FLAG(_event_handler_open_widget_bit);
+			each->function = 0;
+		}
+		if (kept != handler)
+			handlers[kept] = *each;
+		kept++;
+	}
+	button->event_handlers.count = kept;
+}
+
+/* the box's pieces (the menu's, and the mission objectives') of the Xbox's
+height, its centre piece of the Xbox's width */
+static void pause_pc_box_convert(struct ui_widget_definition *widget)
+{
+	struct ui_widget_child_reference *children = widget->child_widgets.address;
+	long child;
+
+	for (child = 0; child < widget->child_widgets.count; child++)
+	{
+		struct ui_widget_definition *piece;
+
+		if (children[child].widget_tag.index == NONE || !pause_campaign_box_bitmap(children[child].widget_tag.index))
+			continue;
+		piece = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		piece->bounds.y1 = (short)(piece->bounds.y0 + PAUSE_XBOX_BOX_HEIGHT);
+		if (tag_name_ends(children[child].widget_tag.index, "\\pausebox4_left_center"))
+			piece->bounds.x1 = (short)(piece->bounds.x0 + PAUSE_XBOX_CENTER_WIDTH);
+	}
+}
+
+static void pause_campaign_pc_convert(struct cache_file_tag_instance *instances, struct ui_widget_definition *screen)
+{
+	struct ui_widget_child_reference *children = screen->child_widgets.address;
+	struct ui_widget_child_reference *rows, *kept, *grown;
+	struct ui_widget_definition *list = NULL;
+	long prompts = tag_loaded(UI_WIDGET_DEFINITION_TAG, PAUSE_PC_PROMPTS);
+	long font = tag_loaded(FONT_TAG, PAUSE_PC_FONT);
+	long quit_function = ui_function_named("pause game return to main menu");
+	long found[NUMBEROF(pause_pc_rows)];
+	char const *texts[2];
+	long child, row, text_tag;
+	short text_count = 0;
+
+	/* (the disc's has its prompts already) */
+	if (prompts == NONE || font == NONE || pause_campaign_prompts(screen) != NONE)
+		return;
+	for (child = 0; child < screen->child_widgets.count && !list; child++)
+	{
+		struct ui_widget_definition *each;
+
+		if (children[child].widget_tag.index == NONE)
+			continue;
+		each = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		if (each->type == _widget_type_column_list)
+			list = each;
+	}
+	/* (Halo PC's has more rows than the Xbox's, and all of them) */
+	if (!list || list->child_widgets.count <= (long)NUMBEROF(pause_pc_rows))
+		return;
+	rows = list->child_widgets.address;
+	for (row = 0; row < (long)NUMBEROF(pause_pc_rows); row++)
+	{
+		found[row] = NONE;
+		for (child = 0; child < list->child_widgets.count && found[row] == NONE; child++)
+		{
+			if (tag_name_ends(rows[child].widget_tag.index, pause_pc_rows[row][0]))
+				found[row] = child;
+		}
+		if (found[row] == NONE)
+			return;
+		if (pause_pc_rows[row][1])
+			texts[text_count++] = pause_pc_rows[row][1];
+	}
+	kept = allocate(NUMBEROF(pause_pc_rows) * sizeof(*kept));
+	grown = allocate((screen->child_widgets.count + 1) * sizeof(*grown));
+	text_tag = next_tag();
+	instance_set(instances, UNICODE_STRING_LIST_TAG, text_tag, "pause/campaign_rows", " text",
+		string_list_build(texts, NULL, text_count, NULL));
+	if (!kept || !grown || build.failed)
+		return;
+	text_count = 0;
+	for (row = 0; row < (long)NUMBEROF(pause_pc_rows); row++)
+	{
+		kept[row] = rows[found[row]];
+		kept[row].vertical_offset = (short)(row * PAUSE_XBOX_ROW_PITCH);
+		pause_pc_row_convert(tag_get(UI_WIDGET_DEFINITION_TAG, kept[row].widget_tag.index), font, text_tag,
+			(short)(pause_pc_rows[row][1] ? text_count++ : NONE), quit_function);
+	}
+	list->child_widgets.address = kept;
+	list->child_widgets.count = NUMBEROF(pause_pc_rows);
+	list->bounds.y1 = (short)(list->bounds.y0 + PAUSE_XBOX_LIST_HEIGHT);
+	for (child = 0; child < screen->child_widgets.count; child++)
+	{
+		if (children[child].widget_tag.index != NONE)
+			pause_pc_box_convert(tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index));
+	}
+	memcpy(grown, children, screen->child_widgets.count * sizeof(*grown));
+	reference_set(&grown[screen->child_widgets.count].widget_tag, UI_WIDGET_DEFINITION_TAG, prompts);
+	strcpy(grown[screen->child_widgets.count].name, "button_key_sm");
+	grown[screen->child_widgets.count].horizontal_offset = PAUSE_XBOX_PROMPTS_X;
+	grown[screen->child_widgets.count].vertical_offset = PAUSE_XBOX_PROMPTS_Y;
+	screen->child_widgets.address = grown;
+	screen->child_widgets.count++;
+	platform_log("menus: the campaign's pause menu is Halo PC's, made the Xbox's");
+}
+
 static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 {
 	long screen = tag_loaded(UI_WIDGET_DEFINITION_TAG, CAMPAIGN_PAUSE_SCREEN);
@@ -2402,6 +2589,7 @@ static void pause_campaign_patch(struct cache_file_tag_instance *instances)
 	if (screen == NONE)
 		return;
 	definition = tag_get(UI_WIDGET_DEFINITION_TAG, screen);
+	pause_campaign_pc_convert(instances, definition);
 	children = definition->child_widgets.address;
 	for (child = 0; child < definition->child_widgets.count; child++)
 	{

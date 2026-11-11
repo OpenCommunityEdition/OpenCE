@@ -61,6 +61,14 @@ lacks, is the port's own in their places (the menus' `map_lacks`): the same
 texts, functions and layout on the PC menus' flat panel. The Xbox's own menus
 (`display.menus = "xbox"`) need the disc's `ui.map`.
 
+A campaign level's pause screen is Halo PC's too: six rows in the small
+font, two of them (SAVE LAST CHECKPOINT, CHANGE SETTINGS) running Halo PC's
+functions, and no B and A prompts. With the PC menus it is made the disc's
+when the level loads (`pause_campaign_pc_convert`, `menu_tags.c`): the
+Xbox's four rows in the large font (QUIT becomes SAVE AND QUIT and opens the
+saving screen, as the disc's does), the Xbox's box and the prompts of the
+level's own `button_key_sm`, then SETTINGS as on the disc's.
+
 What does not import yet:
 
 - Halo PC's six multiplayer maps.
