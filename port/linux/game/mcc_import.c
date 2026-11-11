@@ -2207,7 +2207,8 @@ leave them, written for the maps whose donor lines name them */
 static boolean mcc_import_donor_export(
 	char const *donor_map,
 	char const *const *tags,
-	long tag_count)
+	long tag_count,
+	char const *for_map)
 {
 	static byte loaded_header[V5_HEADER_BYTES];
 	struct mcc_import_tag_header *loaded;
@@ -2238,7 +2239,7 @@ static boolean mcc_import_donor_export(
 		}
 		for (index = 0; index < tag_count; index++)
 		{
-			success = mcc_import_operations_export(&mcc_import_globals.table, donor_map, tags[index]) && success;
+			success = mcc_import_operations_export(&mcc_import_globals.table, donor_map, tags[index], for_map) && success;
 			fprintf(stdout, "mcc import: %s: gave %s\n", donor_map, tags[index]);
 		}
 	}
@@ -2290,7 +2291,7 @@ static boolean mcc_import_donors(
 					donor_maps[other][0] = 0;
 			}
 		}
-		success = mcc_import_donor_export(donor_maps[index], given, given_count) && success;
+		success = mcc_import_donor_export(donor_maps[index], given, given_count, map_name) && success;
 		donor_maps[index][0] = 0;
 	}
 
@@ -2556,6 +2557,9 @@ int mcc_import_run(
 				map_names[index], (unsigned long)overage);
 		if (!success)
 			failures++;
+		/* (each map's lines as it is done: stdout into a pipe, as the first
+		start's progress reads it, is otherwise written only when full) */
+		fflush(stdout);
 	}
 	mcc_sounds_muted_proc = NULL;
 	mcc_import_sounds_close();

@@ -1420,13 +1420,15 @@ boolean mcc_import_operations_read(
 boolean mcc_import_operations_export(
 	struct mcc_import_tags const *tags,
 	char const *donor_map,
-	char const *tag)
+	char const *tag,
+	char const *for_map)
 {
-	char path[512];
+	char path[512], written[600];
 	long index = mcc_patch_tag(tags, tag);
 	struct tag_schema_group const *schema = index >= 0 ?
 		mcc_patch_schema((unsigned long)tags->instances[index].group_tag) : NULL;
 	FILE *file;
+	boolean success;
 
 	if (!schema || !schema->definition || !tags->instances[index].base_address)
 	{
@@ -1435,17 +1437,31 @@ boolean mcc_import_operations_export(
 	}
 	CreateDirectoryA(MCC_PATCH_DONOR_FOLDER, NULL);
 	mcc_patch_donor_path(path, sizeof(path), donor_map, tag);
-	file = fopen(path, "wb");
+	/* written under another name, then given its own: the first start's
+	imports run side by side, each of a map of its own, and one may need the
+	file while another writes it */
+	snprintf(written, sizeof(written), "%s.%s", path, for_map);
+	file = fopen(written, "wb");
 	if (!file)
 	{
-		mcc_patch_log("mcc import: cannot write %s", path);
+		mcc_patch_log("mcc import: cannot write %s", written);
 		return FALSE;
 	}
 	fprintf(file, "tag\t%s\t-\t", tag);
 	mcc_patch_write_element(tags, file, schema->definition, tags->instances[index].base_address);
 	fputc('\n', file);
+	success = fclose(file) == 0;
+	/* (another import may have given it its name first: the same bytes) */
+	if (!success || rename(written, path) != 0)
+	{
+		remove(written);
+		file = success ? fopen(path, "rb") : NULL;
+		success = file != NULL;
+		if (file)
+			fclose(file);
+	}
 
-	return fclose(file) == 0;
+	return success;
 }
 
 long mcc_import_operations_donors_missing(

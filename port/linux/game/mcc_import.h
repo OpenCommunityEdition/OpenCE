@@ -108,11 +108,13 @@ int mcc_import_default_maps(
 	int maximum_count);
 
 /* Writes the tag `tag` ("group:path") of the MCC map `donor_map`, as its
-fixes and operations leave it, for the maps whose donor lines name it. */
+fixes and operations leave it, for the maps whose donor lines name it (for
+the import of the map `for_map`, which names the file while it is written). */
 boolean mcc_import_operations_export(
 	struct mcc_import_tags const *tags,
 	char const *donor_map,
-	char const *tag);
+	char const *tag,
+	char const *for_map);
 
 /* The donor lines of the operations read whose tags are not written yet:
 each one's map (donor_maps) and tag (tags), at most maximum_count. */

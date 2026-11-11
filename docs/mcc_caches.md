@@ -13,8 +13,13 @@ On a first start without game data the desktop builds offer an Xbox disc
 image or MCC on Steam (`port/linux/src/mcc_install.c`, found through Steam's
 libraries, or a folder the player picks). The import itself is
 `halo --import-mcc <output folder> [--from <halo1 folder> | steam] [<map>...]`
-(`port/linux/game/mcc_import.c`), which a second copy of the game runs. MCC's
-folder is read as the drive `m:\` and nothing is written to it. For each map:
+(`port/linux/game/mcc_import.c`). The first start runs it in other copies of
+the game, one map each and up to twelve at once (a core and about 0.5 GB of
+memory each), the largest maps first: a campaign map takes about half a
+minute, most of it its sounds, and a multiplayer map a few seconds (all 24
+maps, on a 24-core computer: 266 s one at a time, 75 to 85 s four at once,
+35 to 40 s twelve at once). MCC's folder is read as the drive `m:\` and
+nothing is written to it. For each map:
 
 1. It is loaded as below, as a Custom Edition map is, and its tags checked.
 2. The importer's own fixes undo what Halo PC and MCC changed and need no
