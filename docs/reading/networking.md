@@ -15,7 +15,7 @@ through its implementation rather than reproducing its protocol catalogue.
 | 3 | [network_distributed.c](../../port/linux/game/network_distributed.c): `network_distributed_tick`, `distributed_client_send_inputs`, `distributed_client_send_predictions` | What the client sends after advancing its player. |
 | 4 | The same file: `distributed_take_prediction`, `distributed_correct_own_unit`, `network_distributed_handle_message` | Validation, host acceptance and local correction. |
 | 5 | [network_objects.c](../../port/linux/game/network_objects.c), [network_damage.c](../../port/linux/game/network_damage.c) | Object lifetime, inventories, damage and hit reports. |
-| 6 | [mcc_protocol.c](../../port/linux/game/mcc_protocol.c), [mcc_protocol.h](../../port/linux/game/mcc_protocol.h) | GulchCE's separate MCC admission boundary. |
+| 6 | [third_person_protocol.c](../../port/linux/game/third_person_protocol.c), [third_person_protocol.h](../../port/linux/game/third_person_protocol.h) | GulchCE-only camera admission; Xbox, CE and MCC share OpenCE admission in Crossplay mode. |
 
 ## Joining creates a session, not just a socket
 

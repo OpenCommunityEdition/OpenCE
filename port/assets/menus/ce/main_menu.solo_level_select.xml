@@ -44,6 +44,7 @@
 		<on event="custom_activation" run="solo level set map" open="main_menu/difficulty_select/difficulty_select_list_screen"/>
 		<on event="b" run="port mcc solo folder back"/>
 		<on event="back" run="port mcc solo folder back"/>
+		<data input="solo map list update"/>
 		<child widget="main_menu/new_select/list_item_0_map_kind" x="82" y="73"/>
 		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
 		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>

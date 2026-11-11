@@ -243,14 +243,14 @@ def test_difficulty_native_order_and_background_layer():
     assert desc.get('text_x') == desc.get('text_y') == '0'
 
 
-def test_campaign_list_keeps_modern_layout_without_legacy_update_callback():
+def test_campaign_list_keeps_native_updates_and_modern_layout():
     doc = ET.Element('menus')
     roles, _ = frontend_multiplayer.append(doc)
     widgets = {w.get('name'): w for w in doc.findall('widget')}
     campaign = next(w for name, w in widgets.items()
                     if name.startswith('modern/network/campaign/') and name.endswith('/solo_level_select_list'))
     assert campaign.find("on[@event='created']").get('run') == 'initialize sp level list solo'
-    assert campaign.find("data[@input='port frontend multiplayer update']") is not None
+    assert [n.get("input") for n in campaign.findall("data")] == ["solo map list update", "port frontend multiplayer update"]
     rows = [widgets[c.get('widget')] for c in campaign.findall('child')
             if '/list_item_' in c.get('widget')]
     assert len(rows) == 11

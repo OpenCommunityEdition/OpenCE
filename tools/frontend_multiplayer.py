@@ -93,8 +93,6 @@ def append(doc):
             # Lists keep child order: existing services address rows by index.
             data = {c.get("input") for c in w.findall("data")}
             scroll = bool(data & {"mp map list update", "solo map list update", "difficulty menu update desc", "gt select list update", "server settings update", "port lobby update", "game settings lists text update", "port settings help"})
-            # Upstream campaign lists initialize once and no longer have a data callback.
-            scroll = scroll or (page == "campaign" and name == "solo_level_select_list")
             if scroll:
                 ET.SubElement(w, "data", input="port frontend multiplayer update")
                 index = 0
