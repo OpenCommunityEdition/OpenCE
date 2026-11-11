@@ -865,18 +865,19 @@ def riding_menu_layout(files):
     assert base + "/op_vehicle_riding" not in widgets
     assert base + "/var_vehicle_riding" not in strings
     assert "VEHICLE RIDING:" not in [s.get("text") for s in strings[base + "/labels"]]
-    assert len(strings[base + "/help_strings"]) == 17
+    # GulchCE keeps its Session Options entries and full-height host rows.
+    assert len(strings[base + "/help_strings"]) == 20
     help_widget = widgets[base + "/help"]
-    assert help_widget.get("font") == "ui\\small_ui" and int(help_widget.get("top")) == 366
-    assert int(help_widget.get("top")) + int(help_widget.get("height")) <= 414
+    assert help_widget.get("font") == "ui\\small_ui" and int(help_widget.get("top")) == 392
+    assert int(help_widget.get("top")) + int(help_widget.get("height")) <= 448
     for child in children:
         name = child.get("widget")
         if not name.endswith("/button_bar"):
-            assert int(child.get("y")) + int(widgets[name].get("height")) <= 366, name
+            assert int(child.get("y")) + int(widgets[name].get("height")) <= 392, name
 
     # (no empty row slot where a row left, and no row over the next one's)
     rows_y = sorted({int(c.get("y")) for c in children if not c.get("widget").endswith("/button_bar")})
-    assert {b - a for a, b in zip(rows_y, rows_y[1:])} == {22}, rows_y
+    assert {b - a for a, b in zip(rows_y, rows_y[1:])} == {28}, rows_y
     coop = base + "/coop_options"
     coop_rows = widgets[coop + "/coop_options_menu"].findall("child")[:-1]
     for above, below in zip(coop_rows, coop_rows[1:]):
