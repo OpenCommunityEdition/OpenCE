@@ -408,10 +408,6 @@ jobs:
             ~/emsdk/emsdk install "$EMSDK_VERSION"
           fi
           ~/emsdk/emsdk activate "$EMSDK_VERSION"
-          # Avoid the Azure mirror DNS stalls seen during dependency setup.
-          if [ -f /etc/apt/apt-mirrors.txt ]; then
-            sudo sed -i '\|^http://azure\.archive\.ubuntu\.com/ubuntu/|d' /etc/apt/apt-mirrors.txt
-          fi
           sudo apt-get update -q
           sudo apt-get install -y -q ninja-build ccache python3-pytest mosquitto
 
