@@ -1,5 +1,12 @@
 # MCC camera-relative projectile rays
 
+The user-provided native MCC screenshot and video establish the required muzzle
+alignment. The user accepted the grounded Prisoner control capture on 11 November
+2026. That run used commit `075043861`'s camera-relative firing calculation with
+the experimental trail adjustment explicitly disabled. The delivered implementation
+retains that calculation and removes the visual experiment and runtime probes.
+Passing builds alone were not used to accept the alignment.
+
 Digsite multiplayer exposed a mismatch between the original Xbox firing
 calculation and MCC camera-relative triggers. This fix follows trigger semantics,
 not map names, weapon names, tag paths or checksums. Original map files are unchanged.
@@ -63,21 +70,26 @@ shots at each angle. A further 227 Sentinel shots used world/viewmodel FOV
 110/90. Selected 2560x1440 captures establish crosshair convergence. These are
 controlled local tests, not complete map playthroughs.
 
-Review of the muzzle alignment rejected an experimental render-time trail
-warp. The bare first-person trigger marker is not the flash centre: Albatross's
-Sentinel firing effect authors a first-person particle offset of
-`(-0.01, 0.004, 0.03)` in marker space (the third-person particle uses a different
-offset). Forcing the trail through the bare marker therefore lacked a valid
-alignment reference. The experiment and its renderer hooks were removed.
+Muzzle review rejected the earlier Albatross captures and bare-marker trail warp.
+A read-only firing-effect audit found an authored first-person particle offset of
+`(-0.01, 0.004, 0.03)` from the trigger marker. An additional experiment aligned
+initial trail points to that emitter, but the controlled comparison did not justify
+retaining this new rendering behavior.
 
-A further stock-FOV capture from an elevated, unobstructed position shows the
-camera-offset beam reaching the reticle and overlapping the muzzle flash.
-The native reference likewise shows connection to the flash, with transient
-motion while aiming. This is visual evidence, not proof of exact native
-frame-by-frame alignment: camera motion, shot age and reference FOV are not
-matched. The implementation uses the authored trigger offset; it does not
-derive a projectile origin from flash particles, retune content offsets,
-attach trails to later weapon poses, or alter trail timing and fading.
+The accepted capture is
+`build/projectile-validation/sentinel-prisoner-control/captures/frame01034.png`
+(lossless PNG; the user-reviewed original BMP is also retained). It was captured at 2560x1440,
+stock world/viewmodel FOV, with the player grounded at `(7.586, -2.646, -0.408)`,
+facing 180 degrees at level pitch. The fixture placed the player once and then
+allowed normal physics. `DIGSITE_PROBE_DISABLE_VISUAL=1` bypassed the experimental
+trail adjustment. The user explicitly confirmed this control looked correct.
+That establishes acceptance of this visible case; it does not establish why each
+earlier Albatross frame looked wrong or prove every map/pose combination.
+
+All visual experiments were removed. The fix uses the authored trigger offset;
+it does not derive a projectile origin from flash particles, retune content
+offsets, attach trails to later weapon poses, or alter trail timing and fading.
+Native beam instability during erratic aim is preserved.
 
 ## Implementation and reading route
 
@@ -164,8 +176,7 @@ trail warp. The final alignment-only pass repeated the 74-test selection,
 Windows and web builds, and six affected Android guest object compilations.
 The simulation module differs from the previously network-tested candidate
 only in its introductory comment. No retained state or content-specific
-selector was needed. Full map playthroughs, matched native MCC comparison and
-real map-family transition playtests are not claimed;
+selector was needed. Full map playthroughs and real map-family transition playtests are not claimed;
 automated guards and lifecycle tests are distinct from those runtime checks.
 
 Local evidence lives under `build/digsite-evidence` and
@@ -174,6 +185,18 @@ probe patches and runners. Temporary probes are removed from delivered code.
 Only this assignment's copied maps, generated caches and disposable test
 outputs are cleaned; originals, user saves and toolchains are preserved.
 Inactive test saves were archived with original paths and verified SHA-256
-hashes before removing loose copies. The retained validation evidence is
-approximately 183 MiB, including selected lossless captures; copied map packages,
-generated map caches and repeated BMP captures were removed.
+hashes before removing loose copies. The follow-up removed approximately 9.7 GiB of disposable captures, map caches
+and verified staged map copies. Approximately 226 MiB of validation evidence
+remains, including the accepted capture, settings, logs, experimental source
+snapshots and verified archives of inactive test saves. Original assets and
+user saves were not changed.
+
+The final follow-up reviewed the combined engine change and removed the second
+visual experiment and all runtime probes. Source files match `075043861`; the
+remaining follow-up change records the accepted control and validation. The
+clean Windows executable was checked for probe strings. The 74-test selection
+passed again (one POSIX-dependent test skipped), Windows and full web builds
+passed, and all six affected wasm translation units compiled. Earlier Android
+object and host/client results apply to the identical retained engine sources;
+full Android, Linux and browser/native internet validation remain limited as
+described above. No new CI run or upstream publication was performed.
