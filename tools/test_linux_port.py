@@ -604,13 +604,13 @@ def test_config_has_each_section_once(tmp_path):
     (stubs / "SDL3" / "SDL.h").write_text("")
     (stubs / "platform.h").write_text("void platform_log(const char *format, ...);\n")
     # (beside the stubs, which it then includes instead of the platform layer's)
-    for name in ("port_config.c", "port_config.h"):
+    for name in ("port_config.c", "port_config.h", "mcc_config.c", "mcc_config.h"):
         shutil.copy(root / "port/linux/src" / name, stubs / name)
     (tmp_path / "main.c").write_text(CONFIG_PROGRAM)
     program = tmp_path / "config_program"
     subprocess.run([compiler, "-DHALO_ANDROID=1", "-DHALO_ARM64_GUEST=1", f"-I{stubs}",
                     f"-I{root}/port/third_party/tomlc17", "-o", str(program),
-                    str(tmp_path / "main.c"), str(stubs / "port_config.c"),
+                    str(tmp_path / "main.c"), str(stubs / "port_config.c"), str(stubs / "mcc_config.c"),
                     str(root / "port/third_party/tomlc17/tomlc17.c"), "-lpthread"], check=True)
     data = tmp_path / "data"
     data.mkdir()

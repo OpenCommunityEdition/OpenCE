@@ -85,8 +85,8 @@ dedicated MCC folder fields. Neither hook repurposes the Xbox/CE providers.
 ## Stock campaign and multiplayer flow
 
 The stock selector offers separate MCC singleplayer and multiplayer categories.
-Campaigns require `game.mcc_campaigns = true`. Package folders open into mission
-lists; Back leaves the difficulty step, then the package, then the selector.
+Campaigns require `game.mcc_campaigns = true` (the default). Package folders open
+into mission lists; Back leaves the difficulty step, then the package, then the selector.
 The host selects a mission and difficulty through the existing hosting flow.
 The MCC catalog owns these identities; no MCC mission becomes an Xbox level index.
 The same generated menu and callbacks run on native and browser builds.
@@ -156,3 +156,8 @@ Android device testing.
 and writes, profile/mission isolation, duplicate awards, corruption, capacity
 and profile-rename copying. The existing MCC lifecycle test checks that awards
 are gated by MCC campaign activation and host/local authority.
+
+The three MCC discovery controls default to on. On upgrade,
+[`mcc_config_upgrade()`](../../port/linux/src/mcc_config.c) updates old saved
+booleans before `config_load()` reads them. The saved completion entry preserves
+later opt-outs; the environment is applied afterwards.
