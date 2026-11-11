@@ -882,11 +882,6 @@ short cache_file_read(
 	}
 	/* port: the reads of a Halo Custom Edition map are served in place, at
 	once; the request stays free (port/linux/game/custom_edition_cache.c) */
-	if (mcc_cache_tags_loaded())
-	{
-		*completion_flag_reference = mcc_cache_read(tag_index, offset, size, buffer) ? TRUE : (boolean)-1;
-		return request_index;
-	}
 	if (custom_edition_cache_tags_loaded())
 	{
 		custom_edition_cache_read(tag_index, offset, size, buffer);

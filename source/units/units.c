@@ -2060,11 +2060,6 @@ short unit_get_grenade_count(
 short unit_get_current_grenade_type(
 	long unit_index)
 {
-	if (mcc_grenades_active())
-	{
-		short mcc_type = unit_get(unit_index)->unit.current_grenade_index;
-		return mcc_type >= 0 && mcc_type < mcc_grenades_type_count() ? mcc_type : NONE;
-	}
 	struct unit_datum *unit = unit_get(unit_index);
 
 	/* port: MCC validates against its own grenade capacity. */
@@ -5850,12 +5845,6 @@ boolean unit_update(
 			if (cheat.infinite_ammo && unit->unit.player_index!=NONE)
 			{
 				short grenade_index;
-				if (mcc_grenades_active())
-				{
-					short mcc_type;
-					for (mcc_type = 2; mcc_type < mcc_grenades_type_count(); ++mcc_type)
-						if (!mcc_grenades_get(unit_index, mcc_type)) mcc_grenades_set(unit_index, mcc_type, 1);
-				}
 
 				/* port: bottomless grenades for MCC's expanded grenade types */
 				if (mcc_grenades_active())
@@ -7992,11 +7981,6 @@ static short unit_weapon_next_index(
 static void unit_throw_grenade_move_to_hand(
 	long unit_index)
 {
-	if (mcc_grenades_active() && unit_get(unit_index)->unit.current_grenade_index >= 2)
-	{
-		mcc_grenades_move_to_hand(unit_index);
-		return;
-	}
 	long object_index;
 
 	struct object_placement_data placement_data;

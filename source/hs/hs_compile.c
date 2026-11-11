@@ -2544,19 +2544,6 @@ boolean hs_compile_postprocess(
 		expression_index = data_next_index(hs_syntax_data, expression_index))
 	{
 		struct hs_syntax_node *expression = hs_syntax_get(expression_index);
-		{
-			extern int mcc_parameter_compile(struct hs_syntax_node const *node);
-			int mcc_parameter = mcc_parameter_compile(expression);
-			if (mcc_parameter >= 0)
-			{
-				if (!mcc_parameter)
-				{
-					hs_compile_globals.error = "invalid MCC script parameter.";
-					success = FALSE;
-				}
-				continue;
-			}
-		}
 
 		/* port: an MCC script's parameters (mcc_script_parameters.c) */
 		{

@@ -2249,8 +2249,6 @@ void hs_evaluate_set(
 		NULL;
 	short type;
 	long global_index;
-	if (mcc_hs_parameter_set(thread_index, variable, initialize))
-		return;
 
 	/* port: a set of an MCC script's parameter (mcc_script_runtime.inl) */
 	if (mcc_hs_parameter_set(thread_index, variable, initialize))

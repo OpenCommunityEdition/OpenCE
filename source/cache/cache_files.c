@@ -656,14 +656,6 @@ void scenario_tags_unload(
 	}
 	/* port: a Halo Custom Edition map has no Xbox vertex or index buffers
 	(port/linux/game/custom_edition_cache.c) */
-	if (mcc_cache_tags_loaded())
-	{
-		mcc_cache_tags_unload();
-		cache_file_globals.tags_loaded = FALSE;
-		global_tag_instances = NULL;
-		global_tag_count = 0;
-		return;
-	}
 	if (custom_edition_cache_tags_loaded())
 		custom_edition_cache_tags_unload();
 	else

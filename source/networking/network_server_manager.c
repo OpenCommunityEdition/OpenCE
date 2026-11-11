@@ -1444,7 +1444,6 @@ void network_game_server_dispose(
 {
 	third_person_session_host_end(); /* port: discard the prior camera contract */
 	bots_network_session_end(); /* port: bot policy belongs to this host alone */
-	mcc_ui_network_server_dispose(server);
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x120, server);
 
 	/* port: this server's MCC validation, pending map and restarts end with it */
@@ -4937,8 +4936,6 @@ static boolean network_game_server_setup_game_from_playlist(
 	struct network_game_server *server)
 {
 	boolean success = FALSE;
-
-	if (mcc_ui_network_restart_settings(server)) return TRUE;
 
 	match_assert(NETWORK_SERVER_MANAGER_FILE, 0x961, server);
 

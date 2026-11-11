@@ -560,11 +560,6 @@ static void render_grenade_hud(
 	short local_player_index,
 	long unit_index)
 {
-	if (mcc_grenades_active())
-	{
-		mcc_grenades_hud(local_player_index, unit_index);
-		return;
-	}
 	long return_eip = get_return_eip();
 	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct unit_datum *unit;

@@ -12884,12 +12884,6 @@ script nodes it has room for. The shipped maps' all are, of 19001 nodes
 static boolean hs_scenario_syntax_data_valid(
 	struct scenario const *scenario)
 {
-	{
-		extern int mcc_syntax_scenario_valid(struct scenario const *scenario);
-		int mcc_valid = mcc_syntax_scenario_valid(scenario);
-		if (mcc_valid >= 0)
-			return mcc_valid != 0;
-	}
 	long const syntax_data_size =
 		sizeof(struct data_array)+MAXIMUM_HS_SYNTAX_NODES_PER_SCENARIO*sizeof(struct hs_syntax_node);
 	byte const *address = (byte const *)scenario->hs_syntax_data.address;
@@ -13135,13 +13129,6 @@ static short hs_syntax_node_check(
 	if (function_index == _hs_function_set)
 	{
 		short designator = (short)first_argument->data;
-		{
-			extern int mcc_parameter_set_valid(struct hs_syntax_node const *node, struct hs_syntax_node const *value);
-			int mcc_parameter = mcc_parameter_set_valid(first_argument,
-				hs_syntax_try_get(first_argument->next_node_index));
-			if (mcc_parameter >= 0)
-				return mcc_parameter ? _hs_node_refusal_none : _hs_node_refusal_damaged;
-		}
 
 		/* port: a set of an MCC script's parameter (mcc_script_parameters.c) */
 		{
@@ -13328,14 +13315,6 @@ console's expressions, compiled later, may call and set anything */
 static void hs_scenario_functions_check(
 	struct scenario *scenario)
 {
-	{
-		extern boolean mcc_syntax_functions_check(struct scenario *scenario, struct data_array *syntax,
-			short (*node_refusal)(struct hs_syntax_node const *, char const **),
-			unsigned long *disabled_scripts, unsigned long *disabled_globals);
-		if (mcc_syntax_functions_check(scenario, hs_syntax_data, hs_syntax_node_refusal,
-			hs_scenario_disabled_scripts, hs_scenario_disabled_globals))
-			return;
-	}
 	long expression_index;
 	short script_index;
 	short global_index;
