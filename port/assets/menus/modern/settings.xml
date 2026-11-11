@@ -275,7 +275,8 @@
 		<child widget="modern/audio/row_audio_voice_chat6" x="28" y="317" />
 		<child widget="modern/audio/row_audio_voice_volume7" x="28" y="347" />
 		<child widget="modern/audio/row_audio_reverb8" x="28" y="377" />
-		<child widget="modern/audio/row_audio_resampler9" x="28" y="407" />
+		<child widget="modern/audio/row_audio_hrtf9" x="28" y="407" />
+		<child widget="modern/audio/row_audio_resampler10" x="28" y="437" />
 		<child widget="modern/audio/button_bar" x="26" y="414" />
 	</widget>
 	<widget name="modern/audio/tabs" type="column_list" width="584" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -388,12 +389,20 @@
 	<widget name="modern/audio/spinner_audio_reverb8" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="audio.reverb" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
-	<widget name="modern/audio/row_audio_resampler9" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
-		<child widget="modern/audio/label_audio_resampler9" x="12" y="3" />
-		<child widget="modern/audio/spinner_audio_resampler9" x="180" y="3" />
+	<widget name="modern/audio/row_audio_hrtf9" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/audio/label_audio_hrtf9" x="12" y="3" />
+		<child widget="modern/audio/spinner_audio_hrtf9" x="180" y="3" />
 	</widget>
-	<widget name="modern/audio/label_audio_resampler9" type="text" controller="1" width="152" height="24" string_list="modern/audio/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
-	<widget name="modern/audio/spinner_audio_resampler9" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SINC|LINEAR" values="sinc|linear" setting="audio.resampler" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+	<widget name="modern/audio/label_audio_hrtf9" type="text" controller="1" width="152" height="24" string_list="modern/audio/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/audio/spinner_audio_hrtf9" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" values="true|false" setting="audio.hrtf" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
+		<on event="created" run="port setting load" />
+	</widget>
+	<widget name="modern/audio/row_audio_resampler10" width="336" height="26" bitmap="modern/row" flags="pass_unhandled_to_focused_child nifty_fx">
+		<child widget="modern/audio/label_audio_resampler10" x="12" y="3" />
+		<child widget="modern/audio/spinner_audio_resampler10" x="180" y="3" />
+	</widget>
+	<widget name="modern/audio/label_audio_resampler10" type="text" controller="1" width="152" height="24" string_list="modern/audio/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" />
+	<widget name="modern/audio/spinner_audio_resampler10" type="spinner" width="140" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="XBOX|SINC|LINEAR" values="xbox|sinc|linear" setting="audio.resampler" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="4 -10 16 -4" footer_bounds="4 144 16 150">
 		<on event="created" run="port setting load" />
 	</widget>
 	<strings name="modern/audio/labels">
@@ -406,6 +415,7 @@
 		<string text="VOICE CHAT" />
 		<string text="VOICE VOLUME" />
 		<string text="REVERB" />
+		<string text="3D HRTF" />
 		<string text="RESAMPLER" />
 	</strings>
 	<strings name="modern/audio/help_strings">
@@ -419,7 +429,8 @@
 		<string text="Talk in network games: while PUSH TO TALK is held (Controls), whenever you speak, or never." />
 		<string text="The other players' voices." />
 		<string text="Echo sounds as the place you are in does, and muffle those behind walls, as the Xbox did." />
-		<string text="How sounds are converted to the output's rate: sinc is clean; linear is brighter, with aliasing." />
+		<string text="Xbox-style directional sound for headphones and speakers. On by default." />
+		<string text="Xbox models the original sound. Sinc reduces aliasing; linear gives a brighter sound." />
 	</strings>
 	<widget name="modern/audio/button_bar" type="column_list" width="588" height="26" flags="pass_unhandled_to_focused_child left_right_tabs_items">
 		<child widget="modern/audio/button_defaults" x="0" y="0" />
