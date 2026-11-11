@@ -469,12 +469,11 @@ int mcc_maps_workshop_title(char const *id,char *title,unsigned size) {
 #define csmemcpy memcpy
 #define csmemset memset
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
-struct network_game {byte previous[1030];byte mcc_content_sha256[32];byte mcc_metadata_sha256[32];};
+struct network_game {union {byte previous[1030];struct {char name[128];} map;};byte mcc_content_sha256[32];byte mcc_metadata_sha256[32];};
 struct network_game_client {int dummy;};struct transport_address {int host;};
 static int applies,decodes,state=3;static struct network_game received;
 static struct network_game network_game_client_settings_staging;
 static long network_game_client_settings_staging_size,network_game_client_settings_staging_total;
-static int mcc_protocol_settings_valid(struct network_game const *game,long bytes){(void)game;return bytes==sizeof(*game);}
 static boolean network_game_client_game_settings_updated(struct network_game_client *c,struct network_game *g){(void)c;received=*g;applies++;return 1;}
 static boolean network_game_client_address_matches_server(struct network_game_client *c,struct transport_address *a){(void)c;return a->host;}
 static int network_game_client_get_state(struct network_game_client *c,void *unused){(void)c;(void)unused;return state;}

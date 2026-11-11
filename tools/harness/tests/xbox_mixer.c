@@ -1,110 +1,13 @@
 /* OpenH1 6750db5a6c9716857bd1e63d9ec188a20c49f1d3; AGPL-3.0-or-later.
- * Adapted queue setup only; measured DSP expectations retained. */
-/*
-MIXER.C (test)
-
-The real mixer of port/linux/src/dsound_sdl.c (its resampler, voices,
-reverb and limiter; test_mixer.py takes them as under_test.inc) on known
-signals:
-	- the resampler against the same Kaiser-windowed sinc worked out in
-	  double precision, tap by tap: noise, sines and an impulse at the
-	  game's rates (22 and 44 kHz voices, others pitched up and down, a 48
-	  kHz one), so a faster resampler is still the same low pass;
-	- sines through it measured as the ear would hear them: the gain across
-	  the band, and what else comes out (images and aliases) under the tone;
-	- a voice out of earshot, which is not resampled, moves on as one heard
-	  does, and is heard the same once it comes into earshot;
-	- mono voices heard as stereo ones with both channels the same are;
-	- audio.resampler = "linear": each frame between the two around it;
-	- overlapping cut fades in stereo and 5.1, and cancellation while the
-	  audio thread mixes during a packet completion callback.
-"render" writes voices at each rate and a scene's whole mix as raw floats
-(test_mixer.py compares the resampler adding four taps at a time with it
-adding tap by tap), "metrics" prints the figures and "bench" times a game's
-worth of voices.
-*/
-
-#include "harness.h"
-
-#include <math.h>
-#include <pthread.h>
-#ifdef _WIN32
-#include <io.h>
-#include <fcntl.h>
-/* Startup services are unused by this audio-only executable. */
-int crash_reporter_process(void) { return 1; }
-void mcc_memory_log_startup(void) { }
-#endif
-
-typedef int BOOL;
-typedef unsigned long DWORD;
-typedef long LONG;
-typedef unsigned long ULONG;
-typedef void *LPVOID;
-typedef void (*LPFNXMEDIAOBJECTCALLBACK)(void *, void *, DWORD);
-typedef struct { void *lpVtbl; } IDirectSoundStream;
-typedef long HRESULT;
-typedef IDirectSoundStream *LPDIRECTSOUNDSTREAM;
-typedef struct
-{
-	void *pvBuffer;
-	DWORD dwMaxSize;
-	DWORD *pdwCompletedSize, *pdwStatus;
-	void *pContext, *hCompletionEvent;
-} XMEDIAPACKET;
-typedef const XMEDIAPACKET *LPCXMEDIAPACKET;
-#define STDMETHODCALLTYPE
-#define WINAPI
-#define S_OK 0
-#define DS_OK 0
-#define E_INVALIDARG (-1)
-#define E_OUTOFMEMORY ((HRESULT)0x8007000eL)
-#define XMEDIAPACKET_STATUS_PENDING 1
-#define XMEDIAPACKET_STATUS_FLUSHED 2
-#define DSSTREAMPAUSE_PAUSE 1
-#define DSSTREAMPAUSE_RESUME 0
-#define SetEvent(event) ((void)(event))
-static HRESULT stream_flush(IDirectSoundStream *object);
-typedef struct
-{
-	LONG lRoom, lRoomHF;
-	float flRoomRolloffFactor, flDecayTime, flDecayHFRatio;
-	LONG lReflections;
-	float flReflectionsDelay;
-	LONG lReverb;
-	float flReverbDelay, flDiffusion, flDensity, flHFReference;
-} DSI3DL2LISTENER;
-#define DSBVOLUME_MIN (-10000)
-#define DS3DMODE_NORMAL 0x00000000
-#define DS3DMODE_HEADRELATIVE 0x00000001
-#define DS3DMODE_DISABLE 0x00000002
-
-/* the settings (port_config.c): audio.resampler, which a case sets */
-static const char *resampler_setting;
-
-static const char *config_string(const char *name)
-{
-	return !strcmp(name, "audio.resampler") ? resampler_setting : NULL;
-}
-
-/* the players' voices (voice_audio.c): none */
-static void voice_audio_mix(float *output, unsigned long frames)
-{
-	(void)output;
-	(void)frames;
-}
+ * Copyright OpenH1 contributors; measured DSP expectations retained. */
+/* Xbox mixer integration tests: measured resampling, Doppler, levels,
+ * obstruction, room sends, HRTF routing, surround and callback-sized ramps.
+ * The existing mixer.c owns the sinc reference and render diagnostics.
+ * "circle" renders a directional listening sample; "bench" times the
+ * Xbox path with optional HRTF and surround output. */
 
 #define UNDER_TEST_I3DL2_SOURCE
-typedef struct { LONG lHFLevel; float flLFRatio; } DSI3DL2OBSTRUCTION, DSI3DL2OCCLUSION;
-typedef struct
-{
-	LONG lDirect, lDirectHF, lRoom, lRoomHF;
-	float flRoomRolloffFactor;
-	DSI3DL2OBSTRUCTION Obstruction;
-	DSI3DL2OCCLUSION Occlusion;
-} DSI3DL2BUFFER;
-typedef const DSI3DL2BUFFER *LPCDSI3DL2BUFFER;
-#include "under_test.inc"
+#include "mixer_fixture.h"
 
 #define PI 3.14159265358979323846
 #define CHUNK 512 /* frames a mix, as SDL asks on Linux */
@@ -136,260 +39,9 @@ static struct sdl_stream *voice_new(const short *samples, unsigned long frames, 
 	return stream;
 }
 
-static void voice_delete(struct sdl_stream *stream)
-{
-	free(stream->packets[0].samples);
-	free(stream);
-}
+#include "mixer_signals.h"
 
-/* frames of the voice mixed alone, CHUNK at a time: the left channel, or
-both (stereo: interleaved) */
-static void render(struct sdl_stream *stream, float *output, unsigned long frames, BOOL stereo)
-{
-	static float buffer[CHUNK * 2], send[CHUNK];
-	unsigned long done, frame;
-
-	for (done = 0; done < frames; done += CHUNK)
-	{
-		unsigned long count = frames - done < CHUNK ? frames - done : CHUNK;
-
-		memset(buffer, 0, sizeof(buffer));
-		memset(send, 0, sizeof(send));
-		mix_voice(stream, buffer, send, count);
-		for (frame = 0; frame < count; frame++)
-		{
-			if (stereo)
-			{
-				output[(done + frame) * 2] = buffer[frame * 2];
-				output[(done + frame) * 2 + 1] = buffer[frame * 2 + 1];
-			}
-			else
-			{
-				output[done + frame] = buffer[frame * 2];
-			}
-		}
-	}
-}
-
-/* ---------- the reference: the same low pass in double precision */
-
-static double reference_kernel(double distance)
-{
-	double edge, angle, sinc;
-
-	distance = fabs(distance);
-	if (distance >= RESAMPLER_ZERO_CROSSINGS)
-		return 0.0;
-	edge = distance / RESAMPLER_ZERO_CROSSINGS;
-	angle = PI * RESAMPLER_CUTOFF * distance;
-	sinc = distance > 0.0 ? sin(angle) / angle : 1.0;
-	return RESAMPLER_CUTOFF * sinc * bessel_i0(RESAMPLER_KAISER_BETA * sqrt(1.0 - edge * edge)) /
-		bessel_i0(RESAMPLER_KAISER_BETA);
-}
-
-/* output frame n of source (frames, mono, full scale 1) resampled at step:
-the frames around source time n step, weighted by the low pass (narrowed for a
-step over 1, as the mixer's) */
-static double reference_frame(const double *source, long frames, double step, unsigned long n)
-{
-	double scale = step > 1.0 ? 1.0 / (step < RESAMPLER_MAXIMUM_STRETCH ? step : RESAMPLER_MAXIMUM_STRETCH) : 1.0;
-	double time = (double)n * step, sum = 0.0;
-	long center = (long)floor(time), width = (long)ceil(RESAMPLER_ZERO_CROSSINGS / scale), k;
-
-	for (k = center + 1 - width; k <= center + width; k++)
-	{
-		if (k >= 0 && k < frames)
-			sum += source[k] * scale * reference_kernel((time - (double)k) * scale);
-	}
-	return sum;
-}
-
-/* ---------- signals */
-
-static unsigned long random_state = 1;
-
-static double random_uniform(void)
-{
-	random_state = random_state * 1103515245UL + 12345UL;
-	return (double)((random_state >> 8) & 0xffffff) / 16777216.0 * 2.0 - 1.0;
-}
-
-/* frames of a signal as 16-bit samples (and as the doubles they are) */
-static void quantize(const double *signal, short *samples, double *exact, unsigned long frames)
-{
-	unsigned long frame;
-
-	for (frame = 0; frame < frames; frame++)
-	{
-		long value = lround(signal[frame] * 32767.0);
-
-		samples[frame] = (short)(value > 32767 ? 32767 : value < -32768 ? -32768 : value);
-		exact[frame] = samples[frame] / 32768.0;
-	}
-}
-
-/* ---------- figures */
-
-/* the amplitude of a sine of frequency cycles a frame in signal[first, last),
-and the power of the rest relative to the sine's, in dB */
-static void tone_fit(const float *signal, unsigned long first, unsigned long last, double frequency,
-	double *amplitude, double *rest_db)
-{
-	double ss = 0, sc = 0, cc = 0, ys = 0, yc = 0, a, b, determinant, rest = 0, tone = 0;
-	unsigned long n;
-
-	for (n = first; n < last; n++)
-	{
-		double s = sin(2.0 * PI * frequency * n), c = cos(2.0 * PI * frequency * n);
-
-		ss += s * s;
-		sc += s * c;
-		cc += c * c;
-		ys += signal[n] * s;
-		yc += signal[n] * c;
-	}
-	determinant = ss * cc - sc * sc;
-	a = (ys * cc - yc * sc) / determinant;
-	b = (yc * ss - ys * sc) / determinant;
-	for (n = first; n < last; n++)
-	{
-		double fit = a * sin(2.0 * PI * frequency * n) + b * cos(2.0 * PI * frequency * n);
-
-		rest += (signal[n] - fit) * (signal[n] - fit);
-		tone += fit * fit;
-	}
-	*amplitude = sqrt(a * a + b * b);
-	*rest_db = 10.0 * log10(rest / tone + 1e-30);
-}
-
-static double decibels(double ratio)
-{
-	return 20.0 * log10(ratio + 1e-30);
-}
-
-/* the mixer's output against the reference's for a signal at rate played at
-frequency: the error's power relative to the reference's, in dB, and its
-largest relative to the largest sample */
-static void against_reference(const double *signal, unsigned long frames, unsigned long rate, unsigned long frequency,
-	double *error_db, double *peak_error_db)
-{
-	short *samples = malloc(frames * sizeof(short));
-	double *exact = malloc(frames * sizeof(double));
-	double step = (double)(frequency ? frequency : rate) / OUTPUT_RATE, error = 0, power = 0, peak = 0, worst = 0;
-	unsigned long outputs = (unsigned long)(frames / step), n;
-	float *output = calloc(outputs, sizeof(float));
-	struct sdl_stream *stream;
-
-	quantize(signal, samples, exact, frames);
-	stream = voice_new(samples, frames, 1, rate, frequency);
-	render(stream, output, outputs, FALSE);
-	for (n = 0; n < outputs; n++)
-	{
-		double expected = reference_frame(exact, (long)frames, step, n);
-		double difference = output[n] - expected;
-
-		error += difference * difference;
-		power += expected * expected;
-		peak = fabs(expected) > peak ? fabs(expected) : peak;
-		worst = fabs(difference) > worst ? fabs(difference) : worst;
-	}
-	*error_db = 10.0 * log10(error / power + 1e-30);
-	*peak_error_db = decibels(worst / peak);
-	voice_delete(stream);
-	free(output);
-	free(exact);
-	free(samples);
-}
-
-/* a sine of hertz at rate, played at frequency: its gain through the mixer
-(dB) and the power of everything else that comes out, relative to it (dB); a
-sine the voice plays above the output's band is all "else", relative to the
-sine put in */
-static void sine_figures(double hertz, unsigned long rate, unsigned long frequency, double *gain_db, double *rest_db)
-{
-	unsigned long frames = rate, outputs, n;
-	double step = (double)(frequency ? frequency : rate) / OUTPUT_RATE, played = hertz * step * OUTPUT_RATE / rate;
-	double *signal = malloc(frames * sizeof(double)), *exact = malloc(frames * sizeof(double)), amplitude;
-	short *samples = malloc(frames * sizeof(short));
-	float *output;
-	struct sdl_stream *stream;
-
-	for (n = 0; n < frames; n++)
-		signal[n] = 0.5 * sin(2.0 * PI * hertz * n / rate);
-	quantize(signal, samples, exact, frames);
-	outputs = (unsigned long)(frames / step);
-	output = calloc(outputs, sizeof(float));
-	stream = voice_new(samples, frames, 1, rate, frequency);
-	render(stream, output, outputs, FALSE);
-	if (played < 0.5 * OUTPUT_RATE)
-	{
-		tone_fit(output, outputs / 4, outputs * 3 / 4, played / OUTPUT_RATE, &amplitude, rest_db);
-		*gain_db = decibels(amplitude / 0.5);
-	}
-	else
-	{
-		double power = 0;
-
-		for (n = outputs / 4; n < outputs * 3 / 4; n++)
-			power += (double)output[n] * output[n];
-		*gain_db = -999.0;
-		*rest_db = 10.0 * log10(power / (outputs / 2) / (0.5 * 0.5 / 2) + 1e-30);
-	}
-	voice_delete(stream);
-	free(output);
-	free(samples);
-	free(exact);
-	free(signal);
-}
-
-/* a logarithmic sweep from 20 Hz to top at rate over the voice: what comes out
-against the sweep itself at the output's times (an ideal resampler), in dB */
-static double sweep_figure(unsigned long rate, double top)
-{
-	unsigned long frames = 2 * rate, outputs = (unsigned long)((double)frames * OUTPUT_RATE / rate), n;
-	double *signal = malloc(frames * sizeof(double)), *exact = malloc(frames * sizeof(double));
-	double duration = (double)frames / rate, k = log(top / 20.0), error = 0, power = 0;
-	short *samples = malloc(frames * sizeof(short));
-	float *output = calloc(outputs, sizeof(float));
-	struct sdl_stream *stream;
-
-	for (n = 0; n < frames; n++)
-	{
-		double t = (double)n / rate;
-
-		signal[n] = 0.5 * sin(2.0 * PI * 20.0 * duration / k * (exp(t / duration * k) - 1.0));
-	}
-	quantize(signal, samples, exact, frames);
-	stream = voice_new(samples, frames, 1, rate, 0);
-	render(stream, output, outputs, FALSE);
-	for (n = OUTPUT_RATE / 10; n + OUTPUT_RATE / 10 < outputs; n++)
-	{
-		double t = (double)n / OUTPUT_RATE;
-		double ideal = 0.5 * sin(2.0 * PI * 20.0 * duration / k * (exp(t / duration * k) - 1.0));
-
-		error += (output[n] - ideal) * (output[n] - ideal);
-		power += ideal * ideal;
-	}
-	voice_delete(stream);
-	free(output);
-	free(samples);
-	free(exact);
-	free(signal);
-	return 10.0 * log10(error / power + 1e-30);
-}
-
-static double *noise(unsigned long frames)
-{
-	double *signal = malloc(frames * sizeof(double));
-	unsigned long n;
-
-	random_state = 1;
-	for (n = 0; n < frames; n++)
-		signal[n] = 0.5 * random_uniform();
-	return signal;
-}
-
-/* ---------- a scene: a game's worth of voices, for "render" and "bench" */
+/* ---------- a scene for the Xbox-path benchmark */
 
 /* voices: mono 22 kHz sounds in the world (indoors sending to the reverb,
 half muffled, silent ones out of earshot), stereo 44 kHz music, a few
@@ -449,21 +101,6 @@ static void scene(unsigned long voices, unsigned long silent, BOOL indoor, doubl
 	}
 	free(mono);
 	free(stereo);
-}
-
-/* the scene's voices out of earshot come into it */
-static void scene_approach(void)
-{
-	struct sdl_stream *stream;
-
-	for (stream = streams; stream; stream = stream->next)
-	{
-		if (stream->direct == DSBVOLUME_MIN)
-		{
-			stream->position[2] = 3.0f;
-			stream->direct = stream->room = 0;
-		}
-	}
 }
 
 static void bench(unsigned long voices, unsigned long silent, BOOL indoor, double seconds)
@@ -1141,10 +778,6 @@ static void block_figures(double differences[BLOCK_SCENES][BLOCK_PARTITIONS][2])
 int main(int argc, char **argv)
 {
 	char const *case_name = argc > 1 ? argv[1] : "";
-	static const unsigned long rates[][2] = {
-		{ 22050, 0 }, { 44100, 0 }, { 48000, 0 }, { 22050, 17000 }, { 22050, 30000 }, { 44100, 60000 },
-		{ 44100, 96000 }, { 32000, 0 },
-	};
 	unsigned long index;
 
 	hrtf_enabled = FALSE;
@@ -1152,12 +785,6 @@ int main(int argc, char **argv)
 	resampler_phases_initialize();
 	/* (the cases are of the mixer's own low pass but where they say) */
 	resampler_mode = RESAMPLER_SINC;
-
-
-
-
-
-
 
 	/* audio.resampler = "xbox", the default: the direct path through the
 	Xbox's low pass, as recorded (issue 714's seventh run): a click at 32 kHz
@@ -2599,10 +2226,6 @@ int main(int argc, char **argv)
 		free(output);
 		return 0;
 	}
-	/* the game's buffers (the loading screen's chant): a looped buffer plays
-	at its rate and gain, under the master volume, coming in without a
-	click; stopped, it fades out and stops; one played once stops at its
-	end */
 
 	/* "circle <file.wav> hrtf|pan": a sound going round the listener, to
 	listen to (circle) */
@@ -2614,73 +2237,6 @@ int main(int argc, char **argv)
 			return 2;
 		}
 		return circle(argv[2], !strcmp(argv[3], "hrtf"));
-	}
-	CASE("metrics")
-	{
-		static const double tones[] = { 100, 1000, 5000, 8000, 10000, 10500, 15000, 18000, 20000, 21000 };
-		double *signal = noise(30000), *impulse = calloc(4000, sizeof(double));
-
-		impulse[2000] = 1.0;
-		for (index = 0; index < sizeof(rates) / sizeof(rates[0]); index++)
-		{
-			unsigned long rate = rates[index][0], frequency = rates[index][1], tone;
-			double error_db, peak_db, impulse_db, impulse_peak_db;
-
-			against_reference(signal, 30000, rate, frequency, &error_db, &peak_db);
-			against_reference(impulse, 4000, rate, frequency, &impulse_db, &impulse_peak_db);
-			printf("%lu Hz played at %lu: against the exact low pass, noise %.1f dB (peak %.1f), impulse peak %.1f dB\n",
-				rate, frequency ? frequency : rate, error_db, peak_db, impulse_peak_db);
-			for (tone = 0; tone < sizeof(tones) / sizeof(tones[0]); tone++)
-			{
-				double gain_db, rest_db;
-
-				if (tones[tone] >= 0.5 * rate)
-					continue;
-				sine_figures(tones[tone], rate, frequency, &gain_db, &rest_db);
-				printf("  %6.0f Hz: gain %+.3f dB, the rest %.1f dB\n", tones[tone], gain_db, rest_db);
-			}
-			if (!frequency)
-				printf("  sweep to 0.9 of its band: %.1f dB from ideal\n", sweep_figure(rate, 0.45 * rate));
-		}
-		free(signal);
-		free(impulse);
-		return 0;
-	}
-	/* noise, mono and stereo, at each rate through the mixer: the output as
-	raw floats on stdout, to compare one mixer with another */
-	CASE("render")
-	{
-		static float mixed[CHUNK * 2];
-		double *signal = noise(60000);
-		short *samples = malloc(30000 * 2 * sizeof(short));
-		double *exact = malloc(60000 * sizeof(double));
-		float *output = calloc(40000 * 2, sizeof(float));
-
-		quantize(signal, samples, exact, 60000);
-		for (index = 0; index < sizeof(rates) / sizeof(rates[0]); index++)
-		{
-			unsigned long channels;
-
-			for (channels = 1; channels <= 2; channels++)
-			{
-				struct sdl_stream *stream = voice_new(samples, 30000, channels, rates[index][0], rates[index][1]);
-
-				render(stream, output, 40000, TRUE);
-				fwrite(output, sizeof(float), 40000 * 2, stdout);
-				voice_delete(stream);
-			}
-		}
-		/* and a scene's whole mix, reverb and limiter, its voices out of
-		earshot coming into it halfway */
-		scene(24, 8, TRUE, 3.0);
-		for (index = 0; index < 2 * OUTPUT_RATE / CHUNK; index++)
-		{
-			if (index == OUTPUT_RATE / CHUNK)
-				scene_approach();
-			mix(mixed, CHUNK);
-			fwrite(mixed, sizeof(float), CHUNK * 2, stdout);
-		}
-		return 0;
 	}
 
 	/* a voice's changes take the same frames however many a mix has (an

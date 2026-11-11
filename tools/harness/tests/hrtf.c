@@ -43,77 +43,7 @@ elevation by elevation from below and round from ahead to the right, 512
 of the left ear then 512 of the right) in the form of xbox_figures.
 */
 
-#include "harness.h"
-
-#include <math.h>
-#include <pthread.h>
-#ifdef _WIN32
-#include <io.h>
-#include <fcntl.h>
-/* Startup services are unused by this audio-only executable. */
-int crash_reporter_process(void) { return 1; }
-void mcc_memory_log_startup(void) { }
-#endif
-
-typedef int BOOL;
-typedef unsigned long DWORD;
-typedef long LONG;
-typedef unsigned long ULONG;
-typedef void *LPVOID;
-typedef void (*LPFNXMEDIAOBJECTCALLBACK)(void *, void *, DWORD);
-typedef struct { void *lpVtbl; } IDirectSoundStream;
-typedef long HRESULT;
-typedef IDirectSoundStream *LPDIRECTSOUNDSTREAM;
-typedef struct
-{
-	void *pvBuffer;
-	DWORD dwMaxSize;
-	DWORD *pdwCompletedSize, *pdwStatus;
-	void *pContext, *hCompletionEvent;
-} XMEDIAPACKET;
-typedef const XMEDIAPACKET *LPCXMEDIAPACKET;
-#define STDMETHODCALLTYPE
-#define WINAPI
-#define S_OK 0
-#define DS_OK 0
-#define E_INVALIDARG (-1)
-#define E_OUTOFMEMORY ((HRESULT)0x8007000eL)
-#define XMEDIAPACKET_STATUS_PENDING 1
-#define XMEDIAPACKET_STATUS_FLUSHED 2
-#define DSSTREAMPAUSE_PAUSE 1
-#define DSSTREAMPAUSE_RESUME 0
-#define SetEvent(event) ((void)(event))
-static HRESULT stream_flush(IDirectSoundStream *object);
-typedef struct
-{
-	LONG lRoom, lRoomHF;
-	float flRoomRolloffFactor, flDecayTime, flDecayHFRatio;
-	LONG lReflections;
-	float flReflectionsDelay;
-	LONG lReverb;
-	float flReverbDelay, flDiffusion, flDensity, flHFReference;
-} DSI3DL2LISTENER;
-#define DSBVOLUME_MIN (-10000)
-#define DS3DMODE_NORMAL 0x00000000
-#define DS3DMODE_HEADRELATIVE 0x00000001
-#define DS3DMODE_DISABLE 0x00000002
-
-/* the settings (port_config.c): audio.resampler, which a case sets */
-static const char *resampler_setting;
-
-static const char *config_string(const char *name)
-{
-	return !strcmp(name, "audio.resampler") ? resampler_setting : NULL;
-}
-
-/* the players' voices (voice_audio.c): none */
-static void voice_audio_mix(float *output, unsigned long frames)
-{
-	(void)output;
-	(void)frames;
-}
-
-#include "under_test.inc"
+#include "mixer_fixture.h"
 
 #define PI 3.14159265358979323846
 

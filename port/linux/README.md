@@ -611,7 +611,7 @@ the setting for one start of the game. It has priority over the file.
 | `audio.channels` | `"stereo"` | `HALO_AUDIO_CHANNELS` | `"stereo"`, or `"5.1"` for surround sound as with Dolby Digital on the Xbox. `"auto"`: 5.1 if the sound device has 6 or more channels. Linux and Windows only. |
 | `audio.hrtf` | `true` | `HALO_HRTF` | Measured Xbox directional filtering and ear delays for mono 3D voices on stereo headphones, speakers and 5.1. Enabled on every platform. `false` crossfades to panning; authored 2D music/UI remain dry in both modes. |
 | `audio.reverb` | `true` | `HALO_REVERB` | `true`: the sounds of the world reverberate as the place the player is in does: the sound environments of the maps (a corridor, a cave, a large hall, outdoors) set the reverberation, as the I3DL2 reverb of the Xbox did. A sound behind a wall or a door is muffled in it too. `false`: no reverberation (sounds behind a wall are still muffled). |
-| `audio.stereo_doppler` | `false` | `HALO_STEREO_DOPPLER` | Apply Doppler pitch changes to positioned stereo source sounds, an extension to Xbox behavior. Mono 3D Doppler stays enabled independently. |
+| `audio.stereo_doppler` | `false` | `HALO_STEREO_DOPPLER` | `true`: a stereo sound placed in the world (an engine, a rocket in flight) rises in pitch as it comes towards the player and falls as it goes away, as the 3D sounds do. `false`: stereo sounds play at their own pitch, as the Xbox played them. Audio Setup's SOUND PROCESSING screen sets it. |
 | `audio.resampler` | `"xbox"` | `HALO_AUDIO_RESAMPLER` | Convert sounds to 48 kHz with the measured Xbox direct-path kernel (`"xbox"`, default), a band-limited low pass (`"sinc"`), or interpolation between neighbouring samples (`"linear"`). The room send has its own Xbox kernel. Audio Setup's SOUND PROCESSING screen also sets HRTF and reverb. |
 | `audio.voice_chat` | `"push_to_talk"` | `HALO_VOICE_CHAT` | How you talk in voice chat: `"push_to_talk"` (while `controls.push_to_talk` is held; the microphone opens when you first press it), `"open_mic"` (when the microphone hears speech), or `"off"`. You hear the other players in every case. Refer to "Voice chat". |
 | `audio.voice_volume` | `1.0` | `HALO_VOICE_VOLUME` | The volume of the voices of the other players, `0` to `2`. |
@@ -654,8 +654,8 @@ the setting for one start of the game. It has priority over the file.
 | `game.workshop_maps` | `false` | `HALO_WORKSHOP_MAPS` | Discover installed Halo CE Steam Workshop maps on desktop. Local MCC packages take precedence. Android and web use local packages. |
 | `game.mcc_collections` | `false` | `HALO_MCC_COLLECTIONS` | Group MCC packages by the bundled Workshop collection list, including imported packages identified by a sidecar. Reopen the map list after changing this. |
 | `game.mcc_campaigns` | `false` | `HALO_MCC_CAMPAIGNS` | Use explicit MCC campaign metadata for discovery, mission titles, authored ordering and progression. In co-op only the host chooses the next mission. Reopen the map list after changing this. |
-| `network.session_compatibility` | `"opence_crossplay"` | `HALO_SESSION_COMPATIBILITY` | Host mode: the retained `opence_crossplay` configuration name selects GulchCE Standard (STANDARD), with shoulder cameras off; `gulchce_third_person` selects THIRD PERSON. Both require updated matching GulchCE clients; neither interoperates with OpenCE 41 or older GulchCE builds. Shared checkpoint and bounded client clock recovery apply to both. Fixed when the lobby opens. |
-| `network.camera_policy` | `"player_choice"` | `HALO_CAMERA_POLICY` | Host rule for new matches: Create Game > Server Setup > Session Options > CAMERA POLICY offers PLAYER CHOICE, FORCED ON and FORCED OFF. Applies to local matches, LAN/system link, internet multiplayer and co-op, including late joiners. Forced On retains scoping, collision and stock vehicle/death/cinematic overrides. Locked matches block N and show CONTROLLED BY HOST in Video Setup; personal preferences return after leaving. The policy stays fixed during play and carries across rounds and co-op levels. Available in GulchCE Third Person sessions (camera protocol 32724/32725); GulchCE Standard forces this feature off. |
+| `network.session_compatibility` | `"opence_crossplay"` | `HALO_SESSION_COMPATIBILITY` | Host mode: CROSSPLAY uses OpenCE protocol 43 for Xbox, Custom Edition and MCC maps, with multiplayer third-person disabled. GULCHCE ONLY (`gulchce_third_person`) enables the camera policy and requires GulchCE camera protocol 32744. Fixed when the lobby opens. |
+| `network.camera_policy` | `"player_choice"` | `HALO_CAMERA_POLICY` | Host rule for new matches: Create Game > Server Setup > Session Options > CAMERA POLICY offers PLAYER CHOICE, FORCED ON and FORCED OFF. Applies to local matches, LAN/system link, internet multiplayer and co-op, including late joiners. Forced On retains scoping, collision and stock vehicle/death/cinematic overrides. Locked matches block N and show CONTROLLED BY HOST in Video Setup; personal preferences return after leaving. The policy stays fixed during play and carries across rounds and co-op levels. Available in GulchCE-only sessions (camera protocol 32744); Crossplay forces this feature off. |
 | `network.address` | `""` | `HALO_NET_ADDRESS` | The IPv4 address of this machine for system link. Refer to "Play on one computer". |
 | `network.broadcast` | `""` | `HALO_NET_BROADCAST` | IPv4 addresses, with commas between them, that get the broadcasts of the game. Empty: 255.255.255.255. |
 | `network.online` | `true` | `HALO_NET_ONLINE` | `true`: internet play. `false`: system link on the local network only. |
@@ -686,8 +686,10 @@ the setting for one start of the game. It has priority over the file.
 | `network.votekick_ban_minutes` | `30` | `HALO_NET_VOTEKICK_BAN_MINUTES` | When you host: the minutes that a player who is kicked by a vote cannot join again (`1` to `1440`). |
 | `network.shield_effects` | `stock` | `HALO_NET_SHIELD_EFFECTS` | Host: the shield effects every player of a network game sees, whatever their own settings, so that none sees what another does not: `stock`, `glow` (`display.shield_glow`), `light_show` (its Light Show intensity), `overshield` (`display.overshield_effect`), `glow_overshield` or `light_show_overshield`; or `players`, not synced: each player sees their own settings' (PLAYERS' OWN). Sent to each client when it is ready and when it changes (`network_shield_effects.c`); a client draws stock until it has it. An online co-op game is always each player's own, whatever the host chose: the players play together. SHIELD EFFECTS in Server Setup > Player Options writes its choice here. |
 | `network.fire_origins` | `true` | `HALO_NET_FIRE_ORIGINS` | Host: whether a client's reported hit that the shooter's camera had no line of sight to may still count from where the client says its player's shots leave, when that is not the camera (distributed message 93: a VR build's weapon hand, which may be past a corner the camera is behind). The hand must be within 0.4 world units of the camera, no more than 0.05 behind the eye along the line to the target, 0.2 to its side and 0.1 above it, with the line from the eye to it clear; the host logs how many hits counted only that way. `false`: from the camera and vehicles' guns only (`network_damage.c`). |
+| `network.vehicle_riding` | `false` | `HALO_NET_VEHICLE_RIDING` | Host: with `true`, a player standing on a moving vehicle is carried by it, turns with it, lands back on it after a jump and keeps its motion when stepping or jumping off; the vehicle it stands on does not hurt it. The base setting (co-op's options in Server Setup write it). In multiplayer (online, system link, split screen) the gametype's VEHICLE RIDING rule under Vehicle Options, saved with the gametype, overrides it; a gametype without the rule is off, whatever this setting says (stock gametypes and older saved ones have none). A co-op rotation entry's `riding` rule overrides it for that entry. Changes count from the next map; clients use the host's decision, including when joining mid-map, and its `debug.riding_` values. Film playback and the editor never ride. Saved games of builds before this setting are not offered or loaded. No row in the Settings menu. A map can choose for itself, winning over the base setting, the gametype and the dedicated override until the next map: with `(global boolean vehicle_riding true)` (or `false`; its value at the map's start counts, a later `set` does not), or with `(vehicle_riding true)` or `(vehicle_riding false)` in a startup script, which counts only on the map's first tick and wins over the global. The old `game.vehicle_riding` name is not read. |
 | `network.block_mouse_aim_assist` | `false` | `HALO_NET_BLOCK_MOUSE_AIM_ASSIST` | Host: Player Options > Aim Assist, Allowed or Block M+KB. Block overrides optional mouse magnetism while mouse/keyboard aims, including on the host, without changing the saved preference. Controllers and touch retain their existing behavior; bullet autoaim is unchanged. |
 | `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: send a player who joins without the game's Custom Edition map the map, and the resource maps that it needs and that the player does not have. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
+| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | SHARE MCC PACKAGES in Settings > Network Setup > Map Sharing. Host-only, explicit-list sharing of eligible local or Workshop packages; requires a gameplay fingerprint and maker in `mcc_share.txt`. Includes used package resources and recognized metadata/previews. The joiner needs Download Maps enabled and must accept the offer. See "MCC package sharing" for implementation status and limits. |
 | `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `20480`, 20 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `10240`, 10 MB/s). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
@@ -701,7 +703,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.public_address` | `""` | `HALO_NET_PUBLIC_ADDRESS` | Hosting: the internet address the joiners reach this machine at, `host[:port]` (the port forwarded to `network.tunnel_port`), for a server behind a NAT with one forwarded port. It is offered first, and its name is looked up again every 5 minutes. Empty: what STUN and UPnP find. |
 | `network.listings` | `"both"` | `HALO_NET_LISTINGS` | What the server browser lists. `"both"`: the dedicated servers of the master servers first, then the games players host (from the brokers). `"masters"`: the master servers' only. `"brokers"`: the brokers' only. Refer to "Server browser". |
 | `network.link_share` | `"when_needed"` | `HALO_NET_LINK_SHARE` | When the game shows a server the Discord account linked to it (Settings > Network Setup > Discord Account): `"when_needed"` (a server that asks, to let you in from a VPN), `"always"` or `"never"`. Refer to "Discord account". |
-| `network.masters_file` | `"masters.txt"` | `HALO_NET_MASTERS_FILE` | The file of the master servers the server browser asks for dedicated servers, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`), 4 at most. A file that names none (missing, or comments alone, as the release's) leaves the official master, built in (`https://master.opencommunityedition.com`). Refer to "Dedicated server". |
+| `network.masters_file` | `"masters.txt"` | `HALO_NET_MASTERS_FILE` | The file of the master servers the server browser asks for dedicated servers, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`), 4 at most. A file that names none (missing, or comments alone, as the release's) leaves the official masters, built in (`https://master.opencommunityedition.com`, `https://ocemaster.halobase.net` and `https://masterce.unicade.io`). Refer to "Dedicated server". |
 | `network.browser_source` | `"all"` | `HALO_NET_BROWSER_SOURCE` | The server browser's games. `"all"` (ALL GAMES): the dedicated servers first, then the games players host; `"dedicated"`: the dedicated servers of the master servers; `"players"` (P2P GAMES): the games players host. The tab at the top left of the server browser changes it. |
 | `network.browser_show_empty`, `network.browser_show_full` | `true` | `HALO_NET_BROWSER_SHOW_EMPTY`, `HALO_NET_BROWSER_SHOW_FULL` | `false`: the server browser does not list the games with no player, the full games. The server browser's Filters screen sets them. |
 | `network.browser_maps` | `"yes"` | `HALO_NET_BROWSER_MAPS` | `"yes"`: the server browser lists the games on maps this computer does not have. `"no"`: it does not. `"downloadable"`: only those of a Custom Edition map that the host shares. |
@@ -742,7 +744,7 @@ the setting for one start of the game. It has priority over the file.
 | `server.coop_difficulty` | `"normal"` | `HALO_SERVER_COOP_DIFFICULTY` | The difficulty of co-op entries of the rotation (`<level>:coop`): `"easy"`, `"normal"`, `"hard"` or `"impossible"`. |
 | `server.list_on_brokers` | `false` | `HALO_SERVER_LIST_ON_BROKERS` | `true`: the server is also listed with the games players host (through the brokers), for server browsers without master servers. |
 | `server.master_publish` | `true` | `HALO_SERVER_MASTER_PUBLISH` | `true`: a public server is published to the master servers, signed with the publisher key. |
-| `server.masters_file` | `"masters.txt"` | `HALO_SERVER_MASTERS_FILE` | The master servers the server is published to, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`). None named: the official master, built in. |
+| `server.masters_file` | `"masters.txt"` | `HALO_SERVER_MASTERS_FILE` | The master servers the server is published to, next to `config.toml` unless a full path: on each line an `https://` URL and the master's key (`ed25519:<hex>`). None named: the official masters, built in. |
 | `server.publisher_key_file` | `"publisher.key"` | `HALO_SERVER_PUBLISHER_KEY_FILE` | The operator's Ed25519 key for the master servers (`halo --server --keygen` makes it), next to `config.toml` unless a full path. In a container, `HALO_SERVER_PUBLISHER_KEY` can hold the key itself. |
 | `server.instance` | `""` | `HALO_SERVER_INSTANCE` | A short name that tells this server from the operator's other servers on the master servers (letters, digits, `-` and `_`). Empty: made from `server.name`. |
 | `server.region` | `""` | `HALO_SERVER_REGION` | A region the server browser shows (`eu`, `na-east`...): 16 characters. Empty: none. |
@@ -760,6 +762,7 @@ the setting for one start of the game. It has priority over the file.
 | `server.afk_kick_full_minutes` | `3` | `HALO_SERVER_AFK_KICK_FULL_MINUTES` | With `server.afk_kick_when_full`, the minutes away before a kick (`2` to `60`). |
 | `server.coop_bsp_switch` | `"majority"` | `HALO_SERVER_COOP_BSP_SWITCH` | A co-op loading zone: `"majority"`, it switches the level's part once more than half of the living players who are not away stand in zones to it (the others are told how many more must cross); `"anyone"`, the first player in one. A mission script's switch is not held. |
 | `server.coop_bsp_switch_cooldown_seconds` | `15` | `HALO_SERVER_COOP_BSP_SWITCH_COOLDOWN_SECONDS` | The seconds after a loading zone switched the level's part before another may (`0` to `300`). Each switch is told, logged and a `coop_bsp_switch` event. |
+| `server.vehicle_riding_override_gametype` | `false` | `HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE` | `true`: turns the gametype's override off on a dedicated server, so multiplayer uses the base setting, `network.vehicle_riding`; a map's own choice still wins. Counts from the next map. Ignored by a listen host. |
 | `server.map_vote` | `false` | `HALO_SERVER_MAP_VOTE` | `true`: as the lobby opens after a game, the players vote for the next game among `server.map_vote_choices` entries of the rotation at random, on a screen of their lobby; the rotation goes on after the winner. |
 | `server.map_vote_choices` | `4` | `HALO_SERVER_MAP_VOTE_CHOICES` | The entries a map vote offers (`2` to `8`). |
 | `server.map_vote_seconds` | `20` | `HALO_SERVER_MAP_VOTE_SECONDS` | How long a map vote runs (`5` to `120`); it ends sooner once every player has voted. |
@@ -786,6 +789,8 @@ the setting for one start of the game. It has priority over the file.
 | `debug.touch_targets` | `false` | `HALO_TOUCH_TARGETS` | Outlines the tap targets of the menus (item green, value blue, list slot yellow, legend button red, the band beside the slots of a list orange, keys of the on-screen keyboard white), marks where the last finger went down and the last tap landed for 3 seconds, and logs each tap with the target that it hit (for a value, also where it splits into previous and next): to judge the accuracy of touch. |
 | `debug.log_addresses` | `false` | `HALO_LOG_ADDRESSES=1` sets `true` | `true`: other machines' internet addresses are written whole in `debug.txt` and the console, for debugging your own network. `false`: a public address is written as a tag (`addr#3f2a9c`) that matches up only within one run; local network addresses are always whole. Do not post a `debug.txt` written with this on. |
 | `debug.network_latency`, `debug.network_loss`, `debug.network_corrupt`, `debug.network_corrupt_stream`, `debug.network_corrupt_after` | `0` | `HALO_NETWORK_LATENCY`, `HALO_NETWORK_LOSS`, `HALO_NETWORK_CORRUPT`, `HALO_NETWORK_CORRUPT_STREAM`, `HALO_NETWORK_CORRUPT_AFTER` | The game holds all the data that it receives for this number of milliseconds, ignores this percentage of the datagrams, and damages this percentage of the datagrams it receives, and this percentage of its reads of streams, at random (bytes changed, cut short, stretched or replaced), from this many seconds after the start. Use the first two to test the netcode as on the internet, and the others to test that nothing another machine sends can crash the game (a damaged stream is closed, so a little goes a long way; a host's messages to its own client are damaged too, so start damaging once the game has started). |
+| `debug.riding_damage_speed`, `debug.riding_teleport_step`, `debug.riding_moved_alone`, `debug.riding_transition_leash`, `debug.riding_look_carry`, `debug.riding_air_grip` | `0`, `4`, `0.25`, `0.25`, `true`, `0.045` | `HALO_RIDING_DAMAGE_SPEED`, `HALO_RIDING_TELEPORT_STEP`, `HALO_RIDING_MOVED_ALONE`, `HALO_RIDING_TRANSITION_LEASH`, `HALO_RIDING_LOOK_CARRY`, `HALO_RIDING_AIR_GRIP` | Calibration of `network.vehicle_riding`: the closing speed in world units a tick above which a vehicle still hurts a player who just left it (`0`: twice the player's run and jump speed); the move in one vehicle update taken for a teleport, whose riders are put in the air from the vehicle with their motion kept; how far a rider may have been moved by something else before it is put in the air the same way; the host-only position allowance in world units during takeoff and landing disagreement, never a velocity allowance or an extension of accumulated movement (non-finite or negative: `0`); whether the vehicle turns the rider's view; how much, each tick, the motion of a player in the air over the vehicle they left may change to follow its turns and its speed back up to the speed they jumped with (inside a vehicle that encloses them, any speeding up), in world units a tick (`0`: none); a slowing vehicle is followed at once, so it never carries them ahead of it, and on an open deck one that speeds up leaves them behind. The riding tunables stay settings because they may still be tuned. A negative or non-finite damage speed, teleport step or moved-alone distance falls back to `0`, `4` or `0.25`, respectively. Taken when a map or a saved game loads; in a network game a client uses the host's values, all but the transition leash, once the host has sent them. |
+| `debug.riding_enclosure_grace_ticks` | `4` | `HALO_RIDING_ENCLOSURE_GRACE_TICKS` | Calibration of `network.vehicle_riding`: how many player ticks in a row a player standing inside an enclosed vehicle (a ceiling within a jump and the vehicle's own floor under them) may miss that test while sliding about before the vehicle counts as open again, `0` to `30`; a fraction is cut off, a value that is not a number is `4`. Taken when a map or a saved game loads; in a network game a client uses the host's value. |
 | `debug.voice_test` | `false` | `HALO_VOICE_TEST` | Automatic tests of voice chat: a tone replaces the microphone, and each voice that the game hears is written to the log once each second. |
 | `debug.telnet_console`, `debug.telnet_console_port` | `false`, `2323` | `HALO_TELNET_CONSOLE`, `HALO_TELNET_CONSOLE_PORT` | The game listens on 127.0.0.1, on this port, for a script console (connect with telnet). The console has no password, so only this computer can reach it. |
 | `debug.profile_record`, `debug.profile_record_when`, `debug.profile_memory` | `false`, `"start"`, `256` | `HALO_PROFILE_RECORD`, `HALO_PROFILE_RECORD_WHEN`, `HALO_PROFILE_MEMORY` | Profiling builds only (`configure.py --profile`). Record without a command; `"start"` records from the first frame until the first map change, `"game"` records each game outside the main menu. Memory is 4â€“1024 MB. Numbered `profile_<stamp>_<role>.part<n>.json` files remain in `profiles/` after recording. Refer to "Profiling builds" in the main README. |
@@ -793,6 +798,21 @@ the setting for one start of the game. It has priority over the file.
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
 Mesa. To stop this, set the environment variable `mesa_glthread=false`.
+
+## MCC maps
+
+Halo 1 MCC packages use a separate `mcc_maps` folder and MCC-owned readers,
+conversion, rendering and script adapters. Desktop builds can discover installed
+Steam Workshop packages when **WORKSHOP MAPS** is enabled; Android and browsers
+import local packages. **CAMPAIGN MISSIONS** enables explicit campaign manifests,
+mission ordering and host-controlled progression. These options default off.
+See [MCC maps](../../docs/mcc_maps.md) for supported formats, resources and limits,
+[MCC previews](../../docs/reading/mcc_level_previews.md) for menu discovery, and
+[browser imports](../../docs/reading/browser_imports.md) for browser storage.
+
+All map families use OpenCE network version 43. MCC content identity, sharing
+consent and load-progress checks remain separate from the existing Xbox/CE paths;
+see [the network agreement](NETCODE.md#opence-network-agreement).
 
 ## Updates
 
@@ -1244,8 +1264,9 @@ preview of a game before joining it, name it the same way.
 
 The browser lists two kinds of games: the dedicated servers that the
 master servers list (`masters.txt`, `network.masters_file`; the official
-master, `https://master.opencommunityedition.com`, built in, when the file
-names none), and the games
+masters, `https://master.opencommunityedition.com`,
+`https://ocemaster.halobase.net` and `https://masterce.unicade.io`, built
+in, when the file names none), and the games
 that players host, which come through the brokers. `network.listings`
 chooses the kinds that the browser asks for: both (the default), only the
 master servers, or only the brokers.
@@ -1358,13 +1379,7 @@ only invites, not listings.
 
 ### MCC package sharing
 
-MCC delivery is host-only and separate from Custom Edition sharing. The current
-Milestone 13 implementation supports eligible Workshop packages and local
-folders in `mcc_maps`, including map-only folders without JSON or thumbnails.
-Final storage/UI integration and runtime/platform validation are still in
-progress; see [the evidence record](../../docs/mcc_refactor_validation.md#milestone-13-implementation-evidence).
-
-The host enables **SHARE MCC PACKAGES** in Settings > Network Setup > Map
+MCC delivery is host-only and separate from Custom Edition sharing. The host enables **SHARE MCC PACKAGES** in Settings > Network Setup > Map
 Sharing (`network.mcc_map_share`, off by default; also
 `HALO_NET_MCC_MAP_SHARE`). It must list the exact map/used-resource SHA-256 and
 maker in the data root's `mcc_share.txt`, one line per approved identity:
@@ -1394,13 +1409,14 @@ packages, Steam installations and saves are not overwritten. Required metadata
 and gameplay identities must match the host; invalid optional art uses the
 placeholder. Cancelled or failed transfers remove only their owned staging
 files. A host-delivered snapshot is not a Steam subscription or an automatic
-Workshop update. Receipt-based storage/removal controls remain under integration.
+Workshop update. Receipt-based storage controls remove only verified host-download files;
+installed packages are preserved.
 
 The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
 not seed MCC downloads. Android requires no Steam for these files, but device
-runtime validation remains a separate requirement. Browser import/download and
-persistence are Milestone 14 work. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
-for bounds, lifecycle and current MCC protocol **69**.
+runtime validation remains a separate requirement. Browser imports and host downloads use origin-private storage with
+transaction recovery and cross-tab locking. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
+for bounds, lifecycle and OpenCE network version **43**.
 
 ### Map sharing
 
@@ -1727,6 +1743,16 @@ lines), and the game's own log to `debug.txt` as the game does
   list site, and exits: the game of the invite's host alone. It never
   starts a server, whatever the settings say, and writes nothing to
   `config.toml`.
+- **Vehicle riding.** `network.vehicle_riding` is the base setting. In
+  multiplayer each gametype file's `[universal]` `vehicle_riding` rule
+  overrides it, and a gametype without the rule is off (`+riding=true` in a
+  rotation entry turns it on); in co-op an
+  entry's own rule does (`a10:coop+riding=true` or `=false`).
+  `server.vehicle_riding_override_gametype = true` turns the gametype's
+  override off, so multiplayer uses the base setting. Both settings default
+  to `false`; `sv_set` (or the web page's settings) changes them from the
+  next map. A map's own choice still wins. Every player's game uses the
+  server's `debug.riding_*` values.
 
 `deploy/` has a systemd unit (`deploy/systemd`), a Docker image and compose
 file (`deploy/docker`), a Pterodactyl and Pelican egg (`deploy/pterodactyl`),
@@ -1872,6 +1898,12 @@ against what the game made at startup (`game_state_image_accept` in
 `saved games/game_state.c`): an image that does not match (a damaged or
 crafted file) is refused, and the level starts over.
 
+The game state also holds the console's syntax and text, which the threads a
+checkpoint saves can still use (about 900 KB, `hs_console_state.inl`, added
+with the MCC maps): the checkpoints and cores of the builds before it have
+another layout and are refused. A checkpoint whose script threads cannot be
+saved with their syntax is not taken; the one before it is kept.
+
 ## What operates
 
 | Area | Status |
@@ -1946,6 +1978,18 @@ definition. Without this check, the linker gives the reference the address
   changes nothing (measured: the same frame times and power either way).
   `HALO_GPU_TRACE_MARKERS=1` lets the driver write them, to capture with
   gpuvis.
+
+Before its presentation blit, `D3DDevice_Present` in
+[`src/d3d8_gl.c`](src/d3d8_gl.c) restores the window's draw framebuffer after
+looking up the source framebuffer. Creating a source entry binds both read
+and draw targets; without restoring the draw target, the first presentation
+can blit the back buffer onto itself. Loading-screen draws can create that
+entry earlier and mask the defect when saved map caches are absent.
+The [presentation regression](../../tools/harness/tests/test_present_framebuffer.py)
+covers new, reused and changed source framebuffers, HDR presentation and its
+blit fallback. This fixes the binding defect found during
+[GulchCE issue #80](https://github.com/chestahh/GulchCE/issues/80), but does not
+establish the cause of the reported persistent Android geometry loss.
 
 ### Game source changes
 
@@ -2062,3 +2106,5 @@ bindings are preserved; choose Reset or rebind them to use the new defaults.
 | `controls.camera_height` | `"Left Shift, Right Shift"` | `HALO_KEY_CAMERA_HEIGHT` | Hold either Shift and scroll to adjust camera height during shoulder view; up raises it. |
 | `controls.camera_offset` | `"CapsLock"` | `HALO_KEY_CAMERA_OFFSET` | Hold Caps Lock and scroll to move left or right across either shoulder; up moves right. Uses the physical key, not its typing-toggle state. |
 | `controls.camera_distance` | `"Left Alt"` | `HALO_KEY_CAMERA_DISTANCE` | Hold with the wheel to change `display.third_person_distance` during shoulder view. In first person, scopes, menus, text chat and the console the wheel keeps its existing behavior. |
+The [Doppler audio walkthrough](../../docs/reading/audio_doppler.md) explains
+listener motion, camera-cut resets and pitch limits.

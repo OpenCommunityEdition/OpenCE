@@ -21,6 +21,7 @@ def generated():
         '_distributed_unit_alive_bit =', '_distributed_unit_camouflaged_bit =',
         '_distributed_unit_part_riding_bit =', '_distributed_pose_facing,'))
     types += structure(header, 'distributed_vector')
+    types += structure((ROOT/'port/linux/game/vehicle_riding.h').read_text(), 'vehicle_riding_deck')
     types += structure(source, 'distributed_unit_state')
     types += enum_with(source, 'DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE =')
     history = constant((ROOT/'source/game/player_queues_new.h').read_text(), 'DISTRIBUTED_INPUT_HISTORY')
@@ -193,7 +194,8 @@ typedef float real;
 typedef struct {real i,j,k;} real_vector3d;
 typedef struct {real x,y,z;} real_point3d;
 struct distributed_unit_state {real_vector3d velocity,forward,up;int scripted_pose;};
-struct object_datum {struct {real_point3d position;} object;};
+struct object_datum {struct {real_point3d position;real_vector3d translational_velocity;} object;};
+#define _network_vehicle_write_state 0
 static struct object_datum object;
 static struct {int corrections;} distributed_statistics;
 static int reconciles;
@@ -207,22 +209,22 @@ static void distributed_vector_unpack(real_vector3d const *a,real scale,real_vec
 static int distributed_point_valid(real_point3d const *p,real limit) {return p->x<limit;}
 static int distributed_axes_make_valid(real_vector3d *a,real_vector3d *b) {return a->i==1 && b->k==1;}
 static int network_objects_reconcile(long index,real_point3d const *p,real_vector3d const *f,
- real_vector3d const *u,real_vector3d const *v,void *angular,real blend) {
+ real_vector3d const *u,real_vector3d const *v,void *angular,real blend,int flags) {
  assert(index==3 && f->i==1 && u->k==1);reconciles++;return 0;
 }
 ''' + body + r'''
 int main(void) {
  struct distributed_unit_state state={{0,0,0},{1,0,0},{0,0,1},0};
  real_point3d p={0,0,0};
- assert(distributed_apply_state(3,&state,&p,1,1,0,0) && reconciles==0);
+ assert(distributed_apply_state(3,&state,&p,NULL,1,1,0,0) && reconciles==0);
  state.scripted_pose=1;
- assert(distributed_apply_state(3,&state,&p,1,1,0,0) && reconciles==1);
+ assert(distributed_apply_state(3,&state,&p,NULL,1,1,0,0) && reconciles==1);
  state.forward.i=0;
- assert(!distributed_apply_state(3,&state,&p,1,1,0,0) && reconciles==1);
+ assert(!distributed_apply_state(3,&state,&p,NULL,1,1,0,0) && reconciles==1);
  state.forward.i=1;p.x=40000;
- assert(!distributed_apply_state(3,&state,&p,1,1,0,0) && reconciles==1);
+ assert(!distributed_apply_state(3,&state,&p,NULL,1,1,0,0) && reconciles==1);
  state.scripted_pose=0;p.x=2;
- assert(distributed_apply_state(3,&state,&p,1,1,0,0) && reconciles==2);
+ assert(distributed_apply_state(3,&state,&p,NULL,1,1,0,0) && reconciles==2);
  return 0;
 }
 ''', link_math=True)

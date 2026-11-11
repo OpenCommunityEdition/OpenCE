@@ -73,6 +73,8 @@ their handlers open opens.
 #include "third_person.h"
 #include "lighting_menu.h"
 #include "third_person_protocol.h"
+#include "cseries/errors.h"
+
 #include "input/input.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
@@ -90,8 +92,10 @@ their handlers open opens.
 #include "controller_remap.h"
 #include "custom_edition_cache.h"
 #include "mcc_ui.h"
+#include "mcc_pause.h"
 #include "custom_edition_maps.h"
 #include "mcc_maps.h"
+#include "mcc_progress.h"
 #include "mcc_menu_text.h"
 #include "mcc_share.h"
 #include "mcc_share_menu.h"
@@ -1083,7 +1087,12 @@ static short map_kind_shown(struct widget_instance *list, boolean singleplayer, 
 	short kind;
 
 	if (!spinner)
+	{
+		/* port: a map's own screen has no chooser row: the multiplayer maps */
+		if (!strcmp(list->name, "select_screen_list_template"))
+			return MAP_KIND_MULTIPLAYER;
 		return singleplayer ? MAP_KIND_SINGLEPLAYER : MAP_KIND_MULTIPLAYER;
+	}
 	kind = (short)PIN(spinner->parameters.list.selected_index, 0, NUMBER_OF_MAP_KINDS - 1);
 	if (!singleplayer && map_kind_singleplayer(kind))
 	{
@@ -1124,7 +1133,8 @@ focus */
 static short map_kind_rows_update(struct widget_instance *list, short *first, short count,
 	void (*entry_text)(short entry, wchar_t *text))
 {
-	short shown = (short)MIN(count, MAP_KIND_ROWS);
+	short rows = !strcmp(list->name, "select_screen_list_template") ? 9 : MAP_KIND_ROWS;
+	short shown = (short)MIN(count, rows);
 	short row = focused_row(list), index = 0;
 	struct widget_instance *child;
 
@@ -1152,7 +1162,8 @@ static short map_kind_rows_update(struct widget_instance *list, short *first, sh
 			entry_text((short)(*first + index - 1), text);
 			text_set(named(child, "list_item_text", 0), text);
 		}
-		visible_set(named(child, "list_item_arrows", 0), child == list->focused_child);
+		visible_set(named(child, "list_item_arrows", 0),
+			child == list->focused_child && strcmp(list->name, "select_screen_list_template"));
 		visible_set(named(child, "scroll_up_button", 0), FALSE);
 		visible_set(named(child, "scroll_down_button", 0), FALSE);
 	}
@@ -1248,12 +1259,28 @@ static void mcc_browser_focus(struct widget_instance *list, struct mcc_map_brows
 
 static void mcc_map_description_show(struct widget_instance *description, short index)
 {
-	struct widget_instance *picture;
+	struct widget_instance *picture, *badge;
+	short marker;
+	long profile = player_ui_get_active_player_profile_index(0);
+	unsigned flags = 0;
 
 	map_description_show(description, NONE, index == NONE ? NONE : (short)(MCC_MAPS_FIRST_DISPLAY_INDEX + index));
 	picture = named(description, "mp_map_right_pic", 0);
 	if (picture)
 		picture->animation.current_frame_index = index == NONE ? 13 : MCC_MAPS_FIRST_DISPLAY_INDEX + index;
+	if (profile == NONE)
+		profile = player_ui_get_player1_last_used_profile_index();
+	if (index != NONE && mcc_maps_campaign(index))
+		flags = mcc_progress_menu_flags(profile, mcc_maps_level_name(index), system_milliseconds());
+	for (marker = 0; marker < 3; marker++)
+	{
+		badge = named(description, "difficulty_indicator", marker);
+		if (badge)
+		{
+			badge->visible = (flags & (1u << (marker + 1))) != 0;
+			badge->animation.current_frame_index = marker + 1;
+		}
+	}
 }
 
 static void mcc_solo_map_text(short row, wchar_t *text)
@@ -2151,10 +2178,19 @@ static struct
 	short color;
 } color_list;
 
+/* port: a Custom Edition map has not the port's string list: the game's 18 primary colours by name */
+static wchar_t const *const color_names[COLOR_COUNT] =
+{
+	L"White", L"Black", L"Red", L"Blue", L"Gray", L"Yellow", L"Green", L"Pink", L"Purple",
+	L"Cyan", L"Cobalt", L"Orange", L"Teal", L"Sage", L"Brown", L"Tan", L"Maroon", L"Salmon"
+};
+
 static void color_row_text(short row, wchar_t *text)
 {
-	string_get("pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\color_edit\\colors_list",
-		(short)(color_list.first + row), text);
+	short color = (short)(color_list.first + row);
+
+	ustrncpy(text, color >= 0 && color < COLOR_COUNT ? color_names[color] : L"", ROW_TEXT_LENGTH - 1);
+	text[ROW_TEXT_LENGTH - 1] = 0;
 }
 
 /* "color picker menu initialize": on the profile's colour */
@@ -2166,6 +2202,13 @@ static boolean color_list_initialize(struct widget_instance *list)
 		return FALSE;
 	color_list.color = (short)PIN(profile->primary_color_index, 0, COLOR_COUNT - 1);
 	color_list.first = (short)PIN(color_list.color - COLOR_ROWS / 2, 0, COLOR_COUNT - COLOR_ROWS);
+	if (list->name && !strcmp(list->name, "color_select_list"))
+	{
+		/* port: rows 1 to 9 hold the colours */
+		color_list.first = (short)PIN(color_list.color - 4, 0, COLOR_COUNT - 9);
+		focus_row(list, (short)(color_list.color - color_list.first + 1));
+		return TRUE;
+	}
 	focus_row(list, (short)(color_list.color - color_list.first));
 	return TRUE;
 }
@@ -2202,14 +2245,1222 @@ static short list_scroll(struct widget_instance *list, short *first, short count
 	return row == NONE || row >= rows ? NONE : (short)(*first + row);
 }
 
+static boolean color_list_initialize(struct widget_instance *list);
+static boolean color_choose(void);
+static void color_list_update(struct widget_instance *list);
+static void hide_row_arrows(struct widget_instance *list);
+
+/* port: a Custom Edition map's colour screen runs Halo PC's own functions
+(61 on creation, 63 on OK, and the Xbox's game data update), which the
+port's colour screen's functions stand in for */
+boolean pc_menu_color_initialize(struct widget_instance *list)
+{
+	return color_list_initialize(list);
+}
+
+boolean pc_menu_color_choose(void)
+{
+	return color_choose();
+}
+
+void pc_menu_color_update(struct widget_instance *list)
+{
+	color_list_update(list);
+	hide_row_arrows(list);
+}
+
+/* port: a Custom Edition map's colour screen is laid out as its map lists are: row 0 pages up, row 10 pages
+down, rows 1 to 9 hold the colours (nine a page) */
+#define COLOR_OWN_ROWS 9
+
+/* the row clicked (ui_widget_event_handler_functions.c, Halo PC's 160): FALSE if it paged, TRUE if it is a colour */
+static boolean color_row_click_paging(struct widget_instance *row);
+
+boolean pc_menu_color_row_click(struct widget_instance *row)
+{
+	if (color_row_click_paging(row))
+	{
+		short color = (short)(color_list.first + sibling_index(row) - 1);
+
+		if (color >= 0 && color < COLOR_COUNT)
+		{
+			color_list.color = color;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static boolean color_row_click_paging(struct widget_instance *row)
+{
+	if (!strcmp(row->name, "list_item_0"))
+		color_list.first = (short)MAX(0, color_list.first - COLOR_OWN_ROWS);
+	else if (!strcmp(row->name, "list_item_10"))
+		color_list.first = (short)MIN(COLOR_COUNT - COLOR_OWN_ROWS, color_list.first + COLOR_OWN_ROWS);
+	else
+		return TRUE;
+	return FALSE;
+}
+
+static void color_own_list_update(struct widget_instance *list)
+{
+	struct widget_instance *description = list->parameters.list.extended_description;
+	struct widget_instance *widget;
+	struct widget_instance *row;
+	short focused = focused_row(list);
+	short index = 0;
+
+	if (focused == COLOR_OWN_ROWS && color_list.first + COLOR_OWN_ROWS < COLOR_COUNT && list_scrolls_at_end())
+	{
+		color_list.first++;
+		focus_row(list, --focused);
+	}
+	else if (focused == 1 && color_list.first > 0 && list_scrolls_at_end())
+	{
+		color_list.first--;
+		focus_row(list, ++focused);
+	}
+	if ((widget = named(description, "awards_right_pic", 0)) != NULL)
+		widget->animation.current_frame_index = color_list.color;
+	if (focused >= 1 && focused <= COLOR_OWN_ROWS && !ui_widget_port_hover_focused())
+		color_list.color = (short)(color_list.first + focused - 1);
+	for (row = list->child; row; row = row->next, index++)
+	{
+		short color = (short)(color_list.first + index - 1);
+		boolean is_color = index >= 1 && index <= COLOR_OWN_ROWS;
+
+		if (strncmp(row->name, "list_item_", 10))
+			break;
+		row->visible = !is_color || color < COLOR_COUNT;
+		if (is_color && color < COLOR_COUNT)
+			text_set(named(row, "list_item_text", 0), color_names[color]);
+		visible_set(named(row, "list_item_text", 0), is_color);
+		visible_set(named(row, "list_item_arrows", 0), FALSE);
+		visible_set(named(row, "scroll_up_button", 0), index == 0 && color_list.first > 0);
+		visible_set(named(row, "scroll_down_button", 0),
+			index == COLOR_OWN_ROWS + 1 && color_list.first + COLOR_OWN_ROWS < COLOR_COUNT);
+		/* the bitmap shows only the colour the profile has (the third frame); passing the focus over a row
+		changes its text's colour alone */
+		if (row->animation.number_of_sprite_frames == 2)
+			row->animation.current_frame_index = (row == list->focused_child) ? 1 : 0;
+	}
+	if ((widget = named(description, "color_right_name", 0)) != NULL)
+		widget->parameters.text_box.string_list_index = color_list.color;
+	if ((widget = named(description, "color_right_pic", 0)) != NULL)
+		widget->animation.current_frame_index = color_list.color;
+	profile_name_show(description);
+}
+
+/* port: a Custom Edition map's mouse screen is Halo PC's own: created 121, OK 122, Defaults 133. Its
+spinners' ten steps are these sensitivities (the port's own list has more) */
+#define MOUSE_STEPS 10
+static double const mouse_step_values[MOUSE_STEPS] = { 0.25, 0.4, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0 };
+
+static struct
+{
+	short horizontal;
+	short vertical;
+	short invert;
+} mouse_loaded;
+
+static short mouse_step_nearest(double value)
+{
+	short index, best = 0;
+	double best_gap = 1000.0;
+
+	for (index = 0; index < MOUSE_STEPS; index++)
+	{
+		double gap = mouse_step_values[index] > value ? mouse_step_values[index] - value :
+			value - mouse_step_values[index];
+
+		if (gap < best_gap)
+		{
+			best_gap = gap;
+			best = index;
+		}
+	}
+	return best;
+}
+
+static struct widget_instance *mouse_list_of(struct widget_instance *widget)
+{
+	struct widget_instance *top;
+
+	/* (its created event runs before the screen has the list among its children) */
+	if (!strcmp(widget->name, "mouse_options_menu"))
+		return widget;
+	top = screen_of(widget);
+	return !strcmp(top->name, "mouse_settings_screen") ? named(top, "mouse_options_menu", 0) : NULL;
+}
+
+extern struct widget_instance *ui_widget_port_inject_row(struct widget_instance *source,
+	struct widget_instance *before, short vertical_offset, wchar_t const *label, wchar_t const *description,
+	wchar_t const *const *values, short value_count);
+
+/* port: the mouse screen's added rows: AIM ASSIST (a copy of the invert row: NO, YES) and MENU CURSOR (a copy
+of the horizontal row, with its five values' names) */
+static wchar_t const *const mouse_cursor_names[5] = { L"OFF", L"SMALL", L"MEDIUM", L"LARGE", L"EXTRA LARGE" };
+static char const *const mouse_cursor_values[5] = { "off", "small", "medium", "large", "extra_large" };
+
+static struct
+{
+	short aim;
+	short cursor;
+} mouse_extra_loaded;
+
+static struct widget_instance *row_spinner(struct widget_instance *row)
+{
+	struct widget_instance *child;
+
+	for (child = row ? row->child : NULL; child && child->type != 2; child = child->next)
+		;
+	return child;
+}
+
+static void mouse_inject(struct widget_instance *list)
+{
+	struct widget_instance *invert = named(list, "op_invert_vertical", 0);
+	struct widget_instance *horizontal = named(list, "op_horizontal_sensitivity", 0);
+	struct widget_instance *bar = named(list, "mouse_button_bar", 0);
+
+	if (!invert || !horizontal || !bar || named(list, "op_invert_vertical", 1))
+		return;
+	ui_widget_port_inject_row(invert, bar, (short)(invert->vertical_offset + 30), L"AIM ASSIST:",
+		L"Slow and drag the view along with a target\r\nwhile aiming with the mouse.", NULL, 0);
+	ui_widget_port_inject_row(horizontal, bar, (short)(invert->vertical_offset + 60), L"MENU CURSOR:",
+		L"The menus' blue arrow for the mouse, and its\r\nsize. Off shows the system's pointer.",
+		mouse_cursor_names, 5);
+}
+
+static void mouse_extra_show(struct widget_instance *list, boolean defaults)
+{
+	struct widget_instance *spinner;
+	char text[64];
+	short aim = 0, cursor = 0, index;
+
+	if (setting_text("input.mouse_aim_assist", text, sizeof(text), defaults))
+		aim = !strcmp(text, "true") ? 1 : 0;
+	if (setting_text("display.menu_cursor", text, sizeof(text), defaults))
+	{
+		for (index = 0; index < 5; index++)
+		{
+			if (!strcmp(text, mouse_cursor_values[index]))
+				cursor = index;
+		}
+	}
+	spinner = row_spinner(named(list, "op_invert_vertical", 1));
+	if (spinner)
+		spinner->parameters.list.selected_index = aim;
+	spinner = row_spinner(named(list, "op_horizontal_sensitivity", 1));
+	if (spinner)
+		spinner->parameters.list.selected_index = cursor;
+	if (!defaults)
+	{
+		mouse_extra_loaded.aim = aim;
+		mouse_extra_loaded.cursor = cursor;
+	}
+}
+
+static void mouse_extra_save(struct widget_instance *list)
+{
+	struct widget_instance *spinner = row_spinner(named(list, "op_invert_vertical", 1));
+	short cursor;
+
+	if (spinner && spinner->parameters.list.selected_index != mouse_extra_loaded.aim)
+	{
+		mouse_extra_loaded.aim = spinner->parameters.list.selected_index;
+		setting_write("input.mouse_aim_assist", mouse_extra_loaded.aim ? "true" : "false");
+	}
+	spinner = row_spinner(named(list, "op_horizontal_sensitivity", 1));
+	if (spinner)
+	{
+		cursor = (short)PIN(spinner->parameters.list.selected_index, 0, 4);
+		if (cursor != mouse_extra_loaded.cursor)
+		{
+			mouse_extra_loaded.cursor = cursor;
+			setting_write("display.menu_cursor", mouse_cursor_values[cursor]);
+			platform_display_apply();
+		}
+	}
+}
+
+static void mouse_show(struct widget_instance *list, boolean defaults)
+{
+	struct widget_instance *spinner;
+	char text[64];
+	double horizontal = 1.0, vertical = 0.0;
+	short horizontal_step, vertical_step, invert = 0;
+
+	if (setting_text("input.mouse_sensitivity", text, sizeof(text), defaults))
+		horizontal = atof(text);
+	if (setting_text("input.mouse_vertical_sensitivity", text, sizeof(text), defaults))
+		vertical = atof(text);
+	if (setting_text("input.invert_mouse", text, sizeof(text), defaults))
+		invert = !strcmp(text, "true") ? 1 : 0;
+	mouse_extra_show(list, defaults);
+	horizontal_step = mouse_step_nearest(horizontal);
+	vertical_step = vertical > 0.0 ? mouse_step_nearest(vertical) : horizontal_step;
+	if ((spinner = named(list, "effects_volume_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = horizontal_step;
+	if ((spinner = named(list, "vertical_sensitivity_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = vertical_step;
+	if ((spinner = named(list, "invert_vertical_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = invert;
+	if (!defaults)
+	{
+		mouse_loaded.horizontal = horizontal_step;
+		mouse_loaded.vertical = vertical_step;
+		mouse_loaded.invert = invert;
+	}
+}
+
+static void mouse_save(struct widget_instance *list)
+{
+	struct widget_instance *horizontal = named(list, "effects_volume_spinner", 0);
+	struct widget_instance *vertical = named(list, "vertical_sensitivity_spinner", 0);
+	struct widget_instance *invert = named(list, "invert_vertical_spinner", 0);
+	short horizontal_step, vertical_step;
+	char text[32];
+
+	if (!horizontal || !vertical || !invert)
+		return;
+	horizontal_step = (short)PIN(horizontal->parameters.list.selected_index, 0, MOUSE_STEPS - 1);
+	vertical_step = (short)PIN(vertical->parameters.list.selected_index, 0, MOUSE_STEPS - 1);
+	if (horizontal_step != mouse_loaded.horizontal)
+	{
+		snprintf(text, sizeof(text), "%g", mouse_step_values[horizontal_step]);
+		setting_write("input.mouse_sensitivity", text);
+	}
+	if (vertical_step != mouse_loaded.vertical)
+	{
+		/* (the same as horizontal: 0, which the port reads as "same") */
+		snprintf(text, sizeof(text), "%g", mouse_step_values[vertical_step]);
+		setting_write("input.mouse_vertical_sensitivity", text);
+	}
+	if (invert->parameters.list.selected_index != mouse_loaded.invert)
+		setting_write("input.invert_mouse", invert->parameters.list.selected_index ? "true" : "false");
+	mouse_loaded.horizontal = horizontal_step;
+	mouse_loaded.vertical = vertical_step;
+	mouse_loaded.invert = invert->parameters.list.selected_index;
+	mouse_extra_save(list);
+}
+
+/* NONE if the function is not this screen's, else its result */
+short pc_menu_mouse_function(struct widget_instance *widget, word function)
+{
+	struct widget_instance *list = mouse_list_of(widget);
+
+	if (!list)
+		return NONE;
+	if (function == 121)
+		mouse_inject(list);
+	if (function == 121)
+		mouse_show(list, FALSE);
+	else if (function == 122)
+		mouse_save(list);
+	else if (function == 133)
+		mouse_show(list, TRUE);
+	else
+		return NONE;
+	return TRUE;
+}
+
+/* port: a Custom Edition map's audio screen is Halo PC's own: created 123, OK 124, Defaults 134. Its volume
+spinners' eleven steps are 0 to 10 tenths; its environmental sound (OFF, EAX) is the port's reverb */
+static struct
+{
+	short master;
+	short effects;
+	short music;
+	short reverb;
+} audio_loaded;
+
+static struct widget_instance *audio_list_of(struct widget_instance *widget)
+{
+	struct widget_instance *top;
+
+	if (!strcmp(widget->name, "audio_options_menu"))
+		return widget;
+	top = screen_of(widget);
+	return !strcmp(top->name, "audio_settings_screen") ? named(top, "audio_options_menu", 0) : NULL;
+}
+
+static short audio_step_read(char const *name, boolean defaults)
+{
+	char text[64];
+
+	if (!setting_text(name, text, sizeof(text), defaults))
+		return 10;
+	return (short)PIN((long)(atof(text) * 10.0 + 0.5), 0, 10);
+}
+
+/* port: the audio screen's added rows: SOUND, VOICE CHAT, VOICE VOLUME and RESAMPLER */
+static wchar_t const *const audio_on_off_names[2] = { L"OFF", L"ON" };
+static wchar_t const *const audio_voice_names[3] = { L"PUSH TO TALK", L"OPEN MIC", L"OFF" };
+static wchar_t const *const audio_resampler_names[2] = { L"SINC", L"LINEAR" };
+static char const *const audio_voice_values[3] = { "push_to_talk", "open_mic", "off" };
+
+static struct
+{
+	short sound;
+	short voice_chat;
+	short voice_volume;
+	short resampler;
+} audio_extra_loaded;
+
+/* port: the audio screen's OUTPUT DEVICE and INPUT DEVICE rows: SYSTEM DEFAULT, then the devices SDL finds */
+int platform_audio_devices(int recording, char (*names)[128], int maximum);
+
+#define AUDIO_DEVICE_MAX 16
+
+static char audio_device_real[2][AUDIO_DEVICE_MAX][128];
+static wchar_t audio_device_shown[2][AUDIO_DEVICE_MAX][32];
+static wchar_t const *audio_device_pointers[2][AUDIO_DEVICE_MAX];
+static short audio_device_count[2];
+static short audio_device_loaded[2];
+
+static void audio_device_read(short recording)
+{
+	short added, index, at;
+
+	strcpy(audio_device_real[recording][0], "default");
+	ustrncpy(audio_device_shown[recording][0], L"SYSTEM DEFAULT", 31);
+	audio_device_shown[recording][0][31] = 0;
+	added = (short)platform_audio_devices(recording, audio_device_real[recording] + 1, AUDIO_DEVICE_MAX - 1);
+	if (added < 0)
+		added = 0;
+	if (added > AUDIO_DEVICE_MAX - 1)
+		added = AUDIO_DEVICE_MAX - 1;
+	for (index = 1; index <= added; index++)
+	{
+		char const *name = audio_device_real[recording][index];
+
+		for (at = 0; name[at] && at < 30; at++)
+		{
+			char character = name[at];
+
+			audio_device_shown[recording][index][at] = (wchar_t)(unsigned char)(character >= 'a' &&
+				character <= 'z' ? character - 'a' + 'A' : character);
+		}
+		audio_device_shown[recording][index][at] = 0;
+		if (strlen(name) > 18)
+			ustrncpy(audio_device_shown[recording][index] + 15, L"...", 4);
+	}
+	for (index = 0; index <= added; index++)
+		audio_device_pointers[recording][index] = audio_device_shown[recording][index];
+	audio_device_count[recording] = (short)(added + 1);
+}
+
+static void audio_device_show(struct widget_instance *list, boolean defaults)
+{
+	short recording;
+
+	for (recording = 0; recording < 2; recording++)
+	{
+		struct widget_instance *spinner = row_spinner(named(list, "op_master_volume", 3 + recording));
+		char text[128];
+		short index, found = 0;
+
+		if (!spinner)
+			continue;
+		if (setting_text(recording ? "audio.input_device" : "audio.output_device", text, sizeof(text), defaults))
+		{
+			for (index = 0; index < audio_device_count[recording]; index++)
+			{
+				if (!strcmp(text, audio_device_real[recording][index]))
+					found = index;
+			}
+		}
+		spinner->parameters.list.selected_index = found;
+		if (!defaults)
+			audio_device_loaded[recording] = found;
+	}
+}
+
+static void audio_device_save(struct widget_instance *list)
+{
+	short recording;
+
+	for (recording = 0; recording < 2; recording++)
+	{
+		struct widget_instance *spinner = row_spinner(named(list, "op_master_volume", 3 + recording));
+		short index;
+
+		if (!spinner)
+			continue;
+		index = spinner->parameters.list.selected_index;
+		if (index < 0 || index >= audio_device_count[recording] || index == audio_device_loaded[recording])
+			continue;
+		audio_device_loaded[recording] = index;
+		setting_write(recording ? "audio.input_device" : "audio.output_device",
+			audio_device_real[recording][index]);
+	}
+}
+
+static void audio_inject(struct widget_instance *list)
+{
+	struct widget_instance *master = named(list, "op_master_volume", 0);
+	struct widget_instance *reverb = named(list, "op_environmental_sound", 0);
+	struct widget_instance *bar = named(list, "audio_button_bar", 0);
+
+	if (!master || !reverb || !bar || named(list, "op_master_volume", 1))
+		return;
+	ui_widget_port_inject_row(reverb, bar, 193, L"SOUND:",
+		L"Play sound at all; from the next time the\r\ngame starts.", audio_on_off_names, 2);
+	ui_widget_port_inject_row(master, bar, 223, L"VOICE CHAT:",
+		L"Talk in network games: while push to talk is\r\nheld, whenever you speak, or never.",
+		audio_voice_names, 3);
+	ui_widget_port_inject_row(master, bar, 253, L"VOICE VOLUME:",
+		L"The volume of the other players' voices.", NULL, 0);
+	ui_widget_port_inject_row(reverb, bar, 283, L"RESAMPLER:",
+		L"How sounds are converted to the output's rate.\r\nSinc is cleaner, linear is brighter.",
+		audio_resampler_names, 2);
+	audio_device_read(0);
+	audio_device_read(1);
+	ui_widget_port_inject_row(master, bar, 313, L"OUTPUT DEVICE:",
+		L"Where the game's sound and the voices play.", audio_device_pointers[0], audio_device_count[0]);
+	ui_widget_port_inject_row(master, bar, 343, L"INPUT DEVICE:",
+		L"The microphone voice chat listens to.", audio_device_pointers[1], audio_device_count[1]);
+}
+
+static void audio_extra_show(struct widget_instance *list, boolean defaults)
+{
+	struct widget_instance *spinner;
+	char text[64];
+	short sound = 1, chat = 0, resampler = 0, index;
+	short voice = audio_step_read("audio.voice_volume", defaults);
+
+	audio_device_show(list, defaults);
+	if (setting_text("audio.enabled", text, sizeof(text), defaults))
+		sound = !strcmp(text, "true") ? 1 : 0;
+	if (setting_text("audio.voice_chat", text, sizeof(text), defaults))
+	{
+		for (index = 0; index < 3; index++)
+		{
+			if (!strcmp(text, audio_voice_values[index]))
+				chat = index;
+		}
+	}
+	if (setting_text("audio.resampler", text, sizeof(text), defaults))
+		resampler = !strcmp(text, "linear") ? 1 : 0;
+	if ((spinner = row_spinner(named(list, "op_environmental_sound", 1))) != NULL)
+		spinner->parameters.list.selected_index = sound;
+	if ((spinner = row_spinner(named(list, "op_master_volume", 1))) != NULL)
+		spinner->parameters.list.selected_index = chat;
+	if ((spinner = row_spinner(named(list, "op_master_volume", 2))) != NULL)
+		spinner->parameters.list.selected_index = voice;
+	if ((spinner = row_spinner(named(list, "op_environmental_sound", 2))) != NULL)
+		spinner->parameters.list.selected_index = resampler;
+	if (!defaults)
+	{
+		audio_extra_loaded.sound = sound;
+		audio_extra_loaded.voice_chat = chat;
+		audio_extra_loaded.voice_volume = voice;
+		audio_extra_loaded.resampler = resampler;
+	}
+}
+
+static void audio_extra_save(struct widget_instance *list)
+{
+	struct widget_instance *spinner;
+	char text[16];
+	short value;
+
+	if ((spinner = row_spinner(named(list, "op_environmental_sound", 1))) != NULL &&
+		spinner->parameters.list.selected_index != audio_extra_loaded.sound)
+	{
+		audio_extra_loaded.sound = spinner->parameters.list.selected_index;
+		setting_write("audio.enabled", audio_extra_loaded.sound ? "true" : "false");
+	}
+	if ((spinner = row_spinner(named(list, "op_master_volume", 1))) != NULL)
+	{
+		value = (short)PIN(spinner->parameters.list.selected_index, 0, 2);
+		if (value != audio_extra_loaded.voice_chat)
+		{
+			audio_extra_loaded.voice_chat = value;
+			setting_write("audio.voice_chat", audio_voice_values[value]);
+		}
+	}
+	if ((spinner = row_spinner(named(list, "op_master_volume", 2))) != NULL)
+	{
+		value = (short)PIN(spinner->parameters.list.selected_index, 0, 10);
+		if (value != audio_extra_loaded.voice_volume)
+		{
+			audio_extra_loaded.voice_volume = value;
+			snprintf(text, sizeof(text), "%g", value / 10.0);
+			setting_write("audio.voice_volume", text);
+		}
+	}
+	if ((spinner = row_spinner(named(list, "op_environmental_sound", 2))) != NULL &&
+		spinner->parameters.list.selected_index != audio_extra_loaded.resampler)
+	{
+		audio_extra_loaded.resampler = spinner->parameters.list.selected_index;
+		setting_write("audio.resampler", audio_extra_loaded.resampler ? "linear" : "sinc");
+	}
+}
+
+static void audio_show(struct widget_instance *list, boolean defaults)
+{
+	struct widget_instance *spinner;
+	char text[64];
+	short master = audio_step_read("audio.volume", defaults);
+	short effects = audio_step_read("audio.effects_volume", defaults);
+	short music = audio_step_read("audio.music_volume", defaults);
+	short reverb = 1;
+
+	if (setting_text("audio.reverb", text, sizeof(text), defaults))
+		reverb = !strcmp(text, "true") ? 1 : 0;
+	audio_extra_show(list, defaults);
+	if ((spinner = named(list, "master_volume_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = master;
+	if ((spinner = named(list, "effects_volume_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = effects;
+	if ((spinner = named(list, "music_volume_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = music;
+	if ((spinner = named(list, "environmental_sound_spinner", 0)) != NULL)
+		spinner->parameters.list.selected_index = reverb;
+	if (!defaults)
+	{
+		audio_loaded.master = master;
+		audio_loaded.effects = effects;
+		audio_loaded.music = music;
+		audio_loaded.reverb = reverb;
+	}
+}
+
+static void audio_step_save(struct widget_instance *spinner, short *loaded, char const *name)
+{
+	short step;
+	char text[16];
+
+	if (!spinner)
+		return;
+	step = (short)PIN(spinner->parameters.list.selected_index, 0, 10);
+	if (step == *loaded)
+		return;
+	snprintf(text, sizeof(text), "%g", step / 10.0);
+	setting_write(name, text);
+	*loaded = step;
+}
+
+/* port: the rows with no port setting behind them are removed (hardware acceleration, sound quality, sound
+variety), and environmental sound takes the first free place */
+static void audio_trim(struct widget_instance *list)
+{
+	static char const *const unused_rows[] =
+	{
+		"op_software_buffers", "op_supplementary_buffers", "op_sound_variety"
+	};
+	struct widget_instance *row;
+	short index;
+
+	for (index = 0; index < (short)NUMBEROF(unused_rows); index++)
+	{
+		row = named(list, unused_rows[index], 0);
+		if (row)
+			ui_widget_delete(row);
+	}
+	row = named(list, "op_environmental_sound", 0);
+	if (row)
+		row->vertical_offset = 163;
+}
+
+static void audio_save(struct widget_instance *list)
+{
+	struct widget_instance *reverb = named(list, "environmental_sound_spinner", 0);
+
+	audio_extra_save(list);
+	audio_device_save(list);
+	audio_step_save(named(list, "master_volume_spinner", 0), &audio_loaded.master, "audio.volume");
+	audio_step_save(named(list, "effects_volume_spinner", 0), &audio_loaded.effects, "audio.effects_volume");
+	audio_step_save(named(list, "music_volume_spinner", 0), &audio_loaded.music, "audio.music_volume");
+	if (reverb && reverb->parameters.list.selected_index != audio_loaded.reverb)
+	{
+		audio_loaded.reverb = reverb->parameters.list.selected_index;
+		setting_write("audio.reverb", audio_loaded.reverb ? "true" : "false");
+	}
+}
+
+/* NONE if the function is not this screen's, else its result */
+short pc_menu_audio_function(struct widget_instance *widget, word function)
+{
+	struct widget_instance *list = audio_list_of(widget);
+
+	if (!list)
+		return NONE;
+	if (function == 123)
+	{
+		audio_trim(list);
+		audio_inject(list);
+		audio_show(list, FALSE);
+	}
+	else if (function == 124)
+		audio_save(list);
+	else if (function == 134)
+		audio_show(list, TRUE);
+	else
+		return NONE;
+	return TRUE;
+}
+
+/* port: a Custom Edition map's video screen is Halo PC's own: created 114, OK 125, Defaults 135. Its rows
+(resolution, refresh rate, frame rate, specular, shadows, decals, particles, texture quality, gamma) have no
+port setting behind them, so they are replaced by the port's own: display mode, resolution, window size,
+V-Sync and frame rate limit (copies of the specular row, which has a string list) */
+int platform_display_resolutions(long *widths, long *heights, int maximum);
+int platform_window_sizes(long *widths, long *heights, int maximum);
+
+#define VIDEO_MAX 64
+#define VIDEO_CHOICES 5
+
+struct video_choice
+{
+	wchar_t shown[VIDEO_MAX][24];
+	wchar_t const *pointers[VIDEO_MAX];
+	char real[VIDEO_MAX][24];
+	short count;
+	short loaded;
+};
+
+static struct video_choice video_choices[VIDEO_CHOICES];
+static char const *const video_keys[VIDEO_CHOICES] =
+{
+	"display.mode", "display.resolution", "display.window_size", "display.vsync", "display.max_fps"
+};
+
+static void video_choice_add(struct video_choice *choice, char const *shown, char const *real)
+{
+	short at;
+
+	if (choice->count >= VIDEO_MAX)
+		return;
+	for (at = 0; shown[at] && at < 23; at++)
+		choice->shown[choice->count][at] = (wchar_t)(unsigned char)shown[at];
+	choice->shown[choice->count][at] = 0;
+	snprintf(choice->real[choice->count], sizeof(choice->real[0]), "%s", real);
+	choice->pointers[choice->count] = choice->shown[choice->count];
+	choice->count++;
+}
+
+/* the sizes from the smallest to the largest */
+static void video_sizes_sort(long *widths, long *heights, short count)
+{
+	short index, other;
+
+	for (index = 1; index < count; index++)
+	{
+		long width = widths[index];
+		long height = heights[index];
+
+		for (other = index - 1; other >= 0 && (widths[other] * heights[other] > width * height ||
+			(widths[other] * heights[other] == width * height && widths[other] > width)); other--)
+		{
+			widths[other + 1] = widths[other];
+			heights[other + 1] = heights[other];
+		}
+		widths[other + 1] = width;
+		heights[other + 1] = height;
+	}
+}
+
+static void video_choices_read(void)
+{
+	long widths[VIDEO_MAX], heights[VIDEO_MAX];
+	char shown[32], real[32];
+	short index, added;
+
+	memset(video_choices, 0, sizeof(video_choices));
+	video_choice_add(&video_choices[0], "FULLSCREEN", "fullscreen");
+	video_choice_add(&video_choices[0], "BORDERLESS", "borderless");
+	video_choice_add(&video_choices[0], "WINDOWED", "windowed");
+	added = (short)platform_display_resolutions(widths, heights, VIDEO_MAX - 2);
+	if (added < 0)
+		added = 0;
+	if (added > VIDEO_MAX - 2)
+		added = VIDEO_MAX - 2;
+	video_sizes_sort(widths, heights, added);
+	for (index = 0; index < added; index++)
+	{
+		snprintf(shown, sizeof(shown), "%ld x %ld", widths[index], heights[index]);
+		snprintf(real, sizeof(real), "%ldx%ld", widths[index], heights[index]);
+		video_choice_add(&video_choices[1], shown, real);
+	}
+	video_choice_add(&video_choices[1], "NATIVE", "native");
+	added = (short)platform_window_sizes(widths, heights, VIDEO_MAX);
+	if (added < 0)
+		added = 0;
+	if (added > VIDEO_MAX)
+		added = VIDEO_MAX;
+	video_sizes_sort(widths, heights, added);
+	for (index = 0; index < added; index++)
+	{
+		snprintf(shown, sizeof(shown), "%ld x %ld", widths[index], heights[index]);
+		snprintf(real, sizeof(real), "%ldx%ld", widths[index], heights[index]);
+		video_choice_add(&video_choices[2], shown, real);
+	}
+	if (!video_choices[2].count)
+		video_choice_add(&video_choices[2], "1280 x 960", "1280x960");
+	video_choice_add(&video_choices[3], "OFF", "false");
+	video_choice_add(&video_choices[3], "ON", "true");
+	video_choice_add(&video_choices[4], "AUTO", "0");
+	video_choice_add(&video_choices[4], "30", "30");
+	video_choice_add(&video_choices[4], "60", "60");
+	video_choice_add(&video_choices[4], "120", "120");
+	video_choice_add(&video_choices[4], "144", "144");
+	video_choice_add(&video_choices[4], "165", "165");
+	video_choice_add(&video_choices[4], "240", "240");
+	video_choice_add(&video_choices[4], "NONE", "-1");
+}
+
+static struct widget_instance *video_list_of(struct widget_instance *widget)
+{
+	struct widget_instance *top;
+
+	if (!strcmp(widget->name, "video_options_menu"))
+		return widget;
+	top = screen_of(widget);
+	return !strcmp(top->name, "video_settings_screen") ? named(top, "video_options_menu", 0) : NULL;
+}
+
+static void video_inject(struct widget_instance *list)
+{
+	struct widget_instance *source = named(list, "op_specular", 0);
+	struct widget_instance *bar = named(list, "video_button_bar", 0);
+	struct widget_instance *last_old;
+	struct widget_instance *row;
+	struct widget_instance *next;
+
+	if (!named(list, "op_resolution", 0) || !source || !bar || !bar->previous)
+		return;
+	last_old = bar->previous;
+	video_choices_read();
+	ui_widget_port_inject_row(source, bar, 73, L"DISPLAY MODE:",
+		L"Fullscreen takes the display; borderless covers\r\nit with a window. F11 switches to the window.",
+		video_choices[0].pointers, video_choices[0].count);
+	ui_widget_port_inject_row(source, bar, 99, L"RESOLUTION:",
+		L"What fullscreen and borderless draw at. Native\r\nis the display's own.",
+		video_choices[1].pointers, video_choices[1].count);
+	ui_widget_port_inject_row(source, bar, 125, L"WINDOW SIZE:",
+		L"The size of the window, for the windowed mode.",
+		video_choices[2].pointers, video_choices[2].count);
+	ui_widget_port_inject_row(source, bar, 151, L"V-SYNC:",
+		L"Wait for the display between frames, so that\r\nthe picture never tears.",
+		video_choices[3].pointers, video_choices[3].count);
+	ui_widget_port_inject_row(source, bar, 177, L"FRAME RATE LIMIT:",
+		L"With V-Sync off, the most frames a second.\r\nAuto: twice the display's refresh rate.",
+		video_choices[4].pointers, video_choices[4].count);
+	/* the map's own rows go (the list's focus is on the first of them: it moves to the first new row,
+	as deleting a widget leaves the focus pointing at it) */
+	for (row = list->child; row; row = next)
+	{
+		next = row->next;
+		ui_widget_delete(row);
+		if (row == last_old)
+			break;
+	}
+	list->focused_child = list->child;
+	list->parameters.list.selected_index = 0;
+}
+
+static void video_show(struct widget_instance *list, boolean defaults)
+{
+	short choice, index;
+
+	for (choice = 0; choice < VIDEO_CHOICES; choice++)
+	{
+		struct widget_instance *spinner = row_spinner(named(list, "op_specular", choice));
+		char text[128];
+		short found = 0;
+
+		if (!spinner)
+			continue;
+		if (setting_text(video_keys[choice], text, sizeof(text), defaults))
+		{
+			for (index = 0; index < video_choices[choice].count; index++)
+			{
+				if (!strcmp(text, video_choices[choice].real[index]))
+					found = index;
+			}
+		}
+		spinner->parameters.list.selected_index = found;
+		if (!defaults)
+			video_choices[choice].loaded = found;
+	}
+}
+
+static void video_save(struct widget_instance *list)
+{
+	short choice;
+	boolean changed = FALSE;
+
+	for (choice = 0; choice < VIDEO_CHOICES; choice++)
+	{
+		struct widget_instance *spinner = row_spinner(named(list, "op_specular", choice));
+		short index;
+
+		if (!spinner)
+			continue;
+		index = spinner->parameters.list.selected_index;
+		if (index < 0 || index >= video_choices[choice].count || index == video_choices[choice].loaded)
+			continue;
+		video_choices[choice].loaded = index;
+		setting_write(video_keys[choice], video_choices[choice].real[index]);
+		changed = TRUE;
+	}
+	if (changed)
+		platform_display_apply();
+}
+
+/* NONE if the function is not this screen's, else its result */
+short pc_menu_video_function(struct widget_instance *widget, word function, boolean *widget_deleted)
+{
+	struct widget_instance *list = video_list_of(widget);
+
+	if (!list)
+		return NONE;
+	if (function == 114)
+	{
+		video_inject(list);
+		video_show(list, FALSE);
+	}
+	else if (function == 125)
+	{
+		/* (saved, then back, as the audio screen's OK does: its own opens another widget) */
+		video_save(list);
+		ui_widget_port_go_back(widget);
+		*widget_deleted = TRUE;
+	}
+	else if (function == 135)
+		video_show(list, TRUE);
+	else
+		return NONE;
+	return TRUE;
+}
+
+/* port: a Custom Edition map's network screen is Halo PC's own: created 166, OK 167, Defaults 187. Its rows
+(connection type, server port, client port) are all removed, and the port's own are made as copies of the
+connection type row (it has a string list): internet play, join from clipboard, the multiplayer HUD's four,
+and an entry row that opens a second page of the same screen (streamer mode's four). A page is built by
+deleting the rows of the other (a hidden row of a map's own list would still take the focus). */
+struct net_row
+{
+	char const *key;
+	wchar_t const *label;
+	wchar_t const *help;
+	wchar_t const *const *shown;
+	char const *const *real;
+	short count;
+	short page;
+	short value;
+	short loaded;
+};
+
+static wchar_t const *const net_on_off_names[2] = { L"OFF", L"ON" };
+static char const *const net_on_off_values[2] = { "false", "true" };
+static wchar_t const *const net_players_names[4] = { L"ALL", L"ALLIES", L"ENEMIES", L"NONE" };
+static char const *const net_players_values[4] = { "all", "allies", "enemies", "none" };
+static wchar_t const *const net_size_names[6] = { L"0.5x", L"0.75x", L"1x", L"1.25x", L"1.5x", L"2x" };
+static char const *const net_size_values[6] = { "0.5", "0.75", "1", "1.25", "1.5", "2" };
+static wchar_t const *const net_layout_names[2] = { L"TEAMS", L"BY SCORE" };
+static char const *const net_layout_values[2] = { "teams", "score" };
+static wchar_t const *const net_open_names[2] = { L"OPEN", L"OPEN" };
+static char const *const net_open_values[2] = { "", "" };
+static wchar_t const *const net_level_names[4] = { L"OFF", L"SEVERE", L"STRONG+", L"MILD+" };
+static char const *const net_level_values[4] = { "off", "severe", "strong", "mild" };
+
+#define NET_ENTRY 6
+
+static struct net_row net_rows[] =
+{
+	{ "network.online", L"INTERNET PLAY:",
+		L"Host and join games over the internet by invite\r\nlinks; off keeps to the local network.",
+		net_on_off_names, net_on_off_values, 2, 0, 0, 0 },
+	{ "network.join_from_clipboard", L"JOIN FROM CLIPBOARD:",
+		L"Join the game of an invite link copied before\r\nswitching to the game.",
+		net_on_off_names, net_on_off_values, 2, 0, 0, 0 },
+	{ "display.player_names", L"PLAYER NAMES:",
+		L"In multiplayer, whose names are drawn above\r\ntheir heads.",
+		net_players_names, net_players_values, 4, 0, 0, 0 },
+	{ "display.player_name_scale", L"PLAYER NAME SIZE:", L"How large the players' names are drawn.",
+		net_size_names, net_size_values, 6, 0, 0, 0 },
+	{ "display.scoreboard_team_layout", L"SCOREBOARD LAYOUT:",
+		L"A team game's scoreboard: a column for each\r\nteam, or every player in order of score.",
+		net_layout_names, net_layout_values, 2, 0, 0, 0 },
+	{ "display.scoreboard_background", L"SCOREBOARD PANEL:",
+		L"Draw a panel behind the scoreboard, for clearer\r\ntext.",
+		net_on_off_names, net_on_off_values, 2, 0, 0, 0 },
+	/* (the entry row: stepping it opens the second page) */
+	{ NULL, L"STREAMER MODE:",
+		L"Hide offensive words in names and text from\r\nother players, maps and mods, as stars.\r\nStep it left or right to open.",
+		net_open_names, net_open_values, 2, 0, 0, 0 },
+	{ "streamer.enabled", L"STREAMER MODE:",
+		L"Hide offensive words in names and text from\r\nother players, maps and mods, as stars.",
+		net_on_off_names, net_on_off_values, 2, 1, 0, 0 },
+	{ "streamer.slurs", L"CENSOR SLURS:",
+		L"Slurs about race, sexuality, gender and\r\ndisability. STRONG+ and MILD+ include the\r\nlevels above them.",
+		net_level_names, net_level_values, 4, 1, 0, 0 },
+	{ "streamer.swearing", L"CENSOR SWEARING:",
+		L"Swearing and sexual words (STRONG+ leaves the\r\nmildest showing).",
+		net_level_names, net_level_values, 4, 1, 0, 0 },
+	{ "streamer.insults", L"CENSOR INSULTS:",
+		L"Name-calling and insults that are not slurs.",
+		net_level_names, net_level_values, 4, 1, 0, 0 },
+};
+
+void pc_menu_video_description(struct widget_instance *list);
+
+/* the row the injected rows are copies of, kept: the first page's rows are deleted when the second is built */
+static struct widget_instance net_template;
+static short net_page;
+
+static struct widget_instance *net_list_of(struct widget_instance *widget)
+{
+	struct widget_instance *top = screen_of(widget);
+
+	if (!strcmp(widget->name, "network_options_menu"))
+		return widget;
+	return !strcmp(top->name, "network_settings_screen") ? named(top, "network_options_menu", 0) : NULL;
+}
+
+/* a row's place among the rows of its page */
+static short net_nth(short row)
+{
+	short index, nth = 0;
+
+	for (index = 0; index < row; index++)
+	{
+		if (net_rows[index].page == net_rows[row].page)
+			nth++;
+	}
+	return nth;
+}
+
+static struct widget_instance *net_row_spinner(struct widget_instance *list, short row)
+{
+	return net_rows[row].page == net_page ? row_spinner(named(list, "op_connection_type", net_nth(row))) : NULL;
+}
+
+/* the values the settings have (or, with defaults, their defaults), by the place of each among its row's */
+static void net_values_read(boolean defaults)
+{
+	short row, index;
+
+	for (row = 0; row < (short)NUMBEROF(net_rows); row++)
+	{
+		char text[64];
+		short found = 0;
+
+		if (!net_rows[row].key)
+			continue;
+		if (setting_text(net_rows[row].key, text, sizeof(text), defaults))
+		{
+			for (index = 0; index < net_rows[row].count; index++)
+			{
+				if (!strcmp(text, net_rows[row].real[index]) ||
+					(atof(text) > 0.0 && atof(text) == atof(net_rows[row].real[index])))
+				{
+					found = index;
+				}
+			}
+		}
+		net_rows[row].value = found;
+		if (!defaults)
+			net_rows[row].loaded = found;
+	}
+}
+
+/* the spinners of the page shown set to the values held */
+static void net_apply(struct widget_instance *list)
+{
+	short row;
+
+	for (row = 0; row < (short)NUMBEROF(net_rows); row++)
+	{
+		struct widget_instance *spinner = net_row_spinner(list, row);
+
+		if (spinner && net_rows[row].key)
+			spinner->parameters.list.selected_index = net_rows[row].value;
+	}
+}
+
+/* the values the spinners of the page shown have, held (before the page changes, or OK) */
+static void net_capture(struct widget_instance *list)
+{
+	short row;
+
+	for (row = 0; row < (short)NUMBEROF(net_rows); row++)
+	{
+		struct widget_instance *spinner = net_row_spinner(list, row);
+
+		if (spinner && net_rows[row].key)
+			net_rows[row].value = (short)PIN(spinner->parameters.list.selected_index, 0, net_rows[row].count - 1);
+	}
+}
+
+/* the rows of a page made (those there deleted, with the map's own), the focus on its row `focus` */
+static void net_build(struct widget_instance *list, short page, short focus)
+{
+	struct widget_instance *source = named(list, "op_connection_type", 0);
+	struct widget_instance *bar = named(list, "network_button_bar", 0);
+	struct widget_instance *row;
+	short index, nth = 0;
+
+	if (!source || !bar)
+		return;
+	net_template = *source;
+	while ((row = named(list, "op_server_port", 0)) != NULL)
+		ui_widget_delete(row);
+	while ((row = named(list, "op_client_port", 0)) != NULL)
+		ui_widget_delete(row);
+	while ((row = named(list, "op_connection_type", 0)) != NULL)
+		ui_widget_delete(row);
+	net_page = page;
+	for (index = 0; index < (short)NUMBEROF(net_rows); index++)
+	{
+		if (net_rows[index].page != page)
+			continue;
+		ui_widget_port_inject_row(&net_template, bar, (short)(73 + 30 * nth), net_rows[index].label,
+			net_rows[index].help, net_rows[index].shown, net_rows[index].count);
+		nth++;
+	}
+	/* (deleting a widget leaves the focus pointing at it) */
+	row = list->child;
+	for (index = 0; row && row->next && index < focus; index++)
+		row = row->next;
+	list->focused_child = row;
+	list->parameters.list.selected_index = index;
+	net_apply(list);
+}
+
+/* back (the button, and B: ui_widget.c): from the second page to the first; FALSE on the first, which the
+screen then leaves as usual */
+boolean pc_menu_network_back(struct widget_instance *widget)
+{
+	struct widget_instance *list;
+
+	if (!widget || !widget->name || net_page == 0 || strcmp(screen_of(widget)->name, "network_settings_screen"))
+		return FALSE;
+	list = net_list_of(widget);
+	if (!list)
+		return FALSE;
+	net_capture(list);
+	net_build(list, 0, NET_ENTRY);
+	return TRUE;
+}
+
+/* NONE if the function is not this screen's, else its result */
+short pc_menu_network_function(struct widget_instance *widget, word function)
+{
+	struct widget_instance *list = net_list_of(widget);
+	short row;
+
+	if (!list)
+		return NONE;
+	if (function == 166)
+	{
+		net_page = 0;
+		net_values_read(FALSE);
+		net_build(list, 0, 0);
+	}
+	else if (function == 167)
+	{
+		net_capture(list);
+		for (row = 0; row < (short)NUMBEROF(net_rows); row++)
+		{
+			if (net_rows[row].key && net_rows[row].value != net_rows[row].loaded)
+			{
+				net_rows[row].loaded = net_rows[row].value;
+				setting_write(net_rows[row].key, net_rows[row].real[net_rows[row].value]);
+			}
+		}
+	}
+	else if (function == 187)
+	{
+		net_values_read(TRUE);
+		net_apply(list);
+	}
+	else
+		return NONE;
+	return TRUE;
+}
+
+/* port: the network screen's side text (Halo PC's game data function 58, each frame): the entry row stepped
+opens the second page; the text is the video screen's, moved below the rows added
+(ui_widget_port_description_clear) */
+void pc_menu_network_description(struct widget_instance *list)
+{
+	extern void ui_widget_port_description_clear(struct widget_instance *list);
+	struct widget_instance *entry = net_row_spinner(list, NET_ENTRY);
+
+	if (entry && entry->parameters.list.selected_index != 0)
+	{
+		net_capture(list);
+		net_build(list, 1, 0);
+	}
+	ui_widget_port_description_clear(list);
+	pc_menu_video_description(list);
+}
+
+/* port: the video screen's side text for the row with the focus (Halo PC's game data function 44) */
+void pc_menu_video_description(struct widget_instance *list)
+{
+	extern short ui_widget_port_row_description(struct widget_instance *row);
+	struct widget_instance *description = list->parameters.list.extended_description;
+	short index;
+
+	if (!description || description->type != 1 || !list->focused_child)
+		return;
+	index = ui_widget_port_row_description(list->focused_child);
+	if (index != NONE)
+		description->parameters.text_box.string_list_index = index;
+}
+
+/* port: the audio screen's side text for the row with the focus (Halo PC's game data function 49) */
+void pc_menu_audio_description(struct widget_instance *list)
+{
+	extern short ui_widget_port_row_description(struct widget_instance *row);
+	struct widget_instance *description = list->parameters.list.extended_description;
+	struct widget_instance *row = list->focused_child;
+	short index;
+
+	{
+		extern void ui_widget_port_description_clear(struct widget_instance *list);
+
+		ui_widget_port_description_clear(list);
+	}
+	if (!description || description->type != 1 || !row)
+		return;
+	index = ui_widget_port_row_description(row);
+	if (index == NONE)
+	{
+		if (!strcmp(row->name, "op_master_volume"))
+			index = 0;
+		else if (!strcmp(row->name, "op_effects_volume"))
+			index = 1;
+		else if (!strcmp(row->name, "op_music_volume"))
+			index = 2;
+		else if (!strcmp(row->name, "op_environmental_sound"))
+			index = 5;
+		else
+			return;
+	}
+	description->parameters.text_box.string_list_index = index;
+}
+
 /* "color picker update": the list scrolled on at its ends, the colour's
 name and picture */
 static void color_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
 	struct widget_instance *widget;
-	short color = list_scroll(list, &color_list.first, COLOR_COUNT, COLOR_ROWS);
+	short color;
 
+	if (list->name && !strcmp(list->name, "color_select_list"))
+	{
+		color_own_list_update(list);
+		return;
+	}
+	color = list_scroll(list, &color_list.first, COLOR_COUNT, COLOR_ROWS);
 	if (color != NONE)
 		color_list.color = color;
 	rows_update(list, COLOR_ROWS, color_row_text);
@@ -2687,6 +3938,20 @@ static short controls_group(struct widget_instance *screen)
 {
 	struct widget_instance *spinner = named(screen, "group_spinner", 0);
 
+	/* port: a Custom Edition map's controls screen has its command groups'
+	spinner beside the "command_group_label" of its second row */
+	if (!spinner)
+	{
+		struct widget_instance *label = named(screen, "command_group_label", 0);
+
+		if (label && label->parent)
+		{
+			spinner = label->parent->child;
+			/* (2 is a spinner list: the type's name is not visible here) */
+			while (spinner && spinner->type != 2)
+				spinner = spinner->next;
+		}
+	}
 	return spinner ? spinner->parameters.list.selected_index : 0;
 }
 
@@ -2753,6 +4018,30 @@ static boolean controls_back(struct widget_instance *widget, boolean *widget_del
 	return TRUE;
 }
 
+/* port: "controls screen init" and "controls screen change set" for a map's
+own controls screen (ui_widget_event_handler_functions.c: Halo PC's 113 and 127) */
+boolean pc_menu_controls_load(void)
+{
+	return controls_load(FALSE);
+}
+
+boolean pc_menu_controls_save(void)
+{
+	return controls_save();
+}
+
+boolean pc_menu_controls_defaults(void)
+{
+	return controls_load(TRUE);
+}
+
+/* port: the string of a map's own action label (its list, in the map's
+tag) for each of controls[], in order; NONE where it has none */
+static short const control_label_strings[] =
+{
+	1, 2, 3, 4, 16, 17, 9, 10, 14, 13, 19, 12, 11, 20, 18, 26, 0x7000, 27, 23, 23, 24, 0x7001, 0x7002
+};
+
 /* "controls update menu": the group's rows, their bindings (the one left
 and right choose marked on the row chosen), and the help */
 static void controls_update(struct widget_instance *list)
@@ -2766,6 +4055,7 @@ static void controls_update(struct widget_instance *list)
 	{
 		short control = control_of_row(row, group);
 		short slot;
+		struct widget_instance *label;
 
 		if (strncmp(row->name, "op_command_", 11))
 			continue;
@@ -2776,7 +4066,17 @@ static void controls_update(struct widget_instance *list)
 				focus_row(list, 0);
 			continue;
 		}
-		text_set(named(row, "command_label", 0), controls[control].label);
+		label = named(row, "command_label", 0);
+		if (label)
+			text_set(label, controls[control].label);
+		else
+		{
+			/* port: a map's own label draws from its string list */
+			label = named(row, "command_1_label", 0);
+			if (label)
+				label->parameters.text_box.string_list_index =
+					control < (short)NUMBEROF(control_label_strings) ? control_label_strings[control] : NONE;
+		}
 		for (slot = 0; slot < CONTROL_BINDINGS; slot++)
 		{
 			char const *binding = controls_screen.bindings[control][slot];
@@ -2784,6 +4084,7 @@ static void controls_update(struct widget_instance *list)
 			char name[CONTROL_NAME_LENGTH];
 			char shown[64];
 			short index;
+			struct widget_instance *field;
 
 			/* (the key as the keyboard's layout labels it: xinput_sdl.c) */
 			if (*binding)
@@ -2799,7 +4100,11 @@ static void controls_update(struct widget_instance *list)
 			for (index = 0; shown[index] && index < ROW_TEXT_LENGTH - 1; index++)
 				text[index] = (wchar_t)(unsigned char)shown[index];
 			text[index] = 0;
-			text_set(named(row, "command_binding", slot), text);
+			field = named(row, "command_binding", slot);
+			if (!field)
+				field = named(row, "command_mk_button_text", slot);
+			if (field)
+				text_set(field, text);
 		}
 	}
 	if (list->parameters.list.extended_description)
@@ -2807,6 +4112,18 @@ static void controls_update(struct widget_instance *list)
 		list->parameters.list.extended_description->parameters.text_box.string_list_index =
 			controls_screen.capturing_control != NONE ? 2 : focused_row ? 1 : 0;
 	}
+}
+
+/* port: "controls update menu" and "controls begin binding" for a map's own
+controls screen (ui_widget_event_handler_functions.c: Halo PC's 43 and 115) */
+void pc_menu_controls_update(struct widget_instance *list)
+{
+	controls_update(list);
+}
+
+boolean pc_menu_controls_begin_binding(struct widget_instance *widget)
+{
+	return control_capture_begin(widget);
 }
 
 #include "controller_remap_menu.inl"
@@ -3773,14 +5090,57 @@ static boolean map_list_initialize(struct widget_instance *list)
 	return TRUE;
 }
 
-/* "mp map list update": the chooser's kind, the step's rows, and beside
-them the level or map chosen: its picture, name and words */
+/* the menus' names for the stock maps, in the order of ui.map's mp_map_list
+(0 to 18): the Xbox's 13, then Halo PC's six */
+static wchar_t const *const stock_map_names[19] =
+{
+	L"Battle Creek", L"Sidewinder", L"Damnation", L"Rat Race", L"Prisoner", L"Hang 'Em High",
+	L"Chill Out", L"Derelict", L"Boarding Action", L"Blood Gulch", L"Wizard", L"Chiron TL34",
+	L"Longest", L"Ice Fields", L"Death Island", L"Danger Canyon", L"Infinity", L"Timberland",
+	L"Gephyrophobia"
+};
+
+/* port: a map's own screen has no port string list: the names the
+multiplayer maps list gives (the leaf of the level path) */
+static void map_screen_row_text(short entry, wchar_t *text)
+{
+	char const *const *names;
+	short last_used;
+	short count = ui_widget_port_multiplayer_maps(&names, &last_used);
+	char const *name;
+	char const *leaf;
+	short index;
+
+	text[0] = 0;
+	if (entry < 0 || entry >= count)
+		return;
+	if (entry < 19)
+	{
+		ustrncpy(text, stock_map_names[entry], ROW_TEXT_LENGTH - 1);
+		text[ROW_TEXT_LENGTH - 1] = 0;
+		return;
+	}
+	name = names[entry];
+	leaf = strrchr(name, '\\');
+	leaf = leaf ? leaf + 1 : name;
+	for (index = 0; leaf[index] && index < ROW_TEXT_LENGTH - 1; index++)
+		text[index] = (wchar_t)(unsigned char)leaf[index];
+	text[index] = 0;
+}
+
+/* port: the row clicked on a map's own New Game screen (not just hovered) */
 static void map_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
 	short kind = map_kind_shown(list, map_list.hosting, map_list.kind), count, entry;
 	short shown;
+	boolean own_screen = !strcmp(list->name, "select_screen_list_template");
 
+	if (own_screen)
+	{
+		/* port: a map's own screen has no chooser, so its kind never changes */
+		kind = map_list.kind;
+	}
 	if (kind != map_list.kind)
 	{
 		if (map_kind_mcc(kind))
@@ -3806,6 +5166,15 @@ static void map_list_update(struct widget_instance *list)
 		return;
 	}
 	count = map_step_count();
+	if (own_screen)
+	{
+		char const *const *screen_names;
+		short screen_last_used;
+
+		count = ui_widget_port_multiplayer_maps(&screen_names, &screen_last_used);
+		entry = map_kind_rows_update(list, &map_list.first, count, map_screen_row_text);
+	}
+	else
 	entry = map_kind_rows_update(list, &map_list.first, count, map_list.step == MAP_STEP_DIFFICULTIES ?
 		map_difficulty_text : kind == MAP_KIND_SINGLEPLAYER ? map_level_text :
 		kind == MAP_KIND_MULTIPLAYER ? multiplayer_map_text :
@@ -3813,6 +5182,13 @@ static void map_list_update(struct widget_instance *list)
 	if (entry != NONE)
 		map_list.chosen = entry;
 	visible_set(named(description, "mp_map_right_item", 0), map_list.chosen < count);
+	if (own_screen)
+	{
+		/* port: entries 0 to 18 are the stock maps, in the strings' order; any other map is "Unknown Level" (19) */
+		map_description_show(description, NONE, map_list.chosen < 19 ? map_list.chosen : 19);
+		profile_name_show(description);
+		return;
+	}
 	/* (the map whose difficulties are listed, else the one chosen) */
 	shown = map_list.step == MAP_STEP_DIFFICULTIES ? map_list.level : map_list.chosen;
 	if (kind == MAP_KIND_SINGLEPLAYER)
@@ -4161,7 +5537,8 @@ static char const *const server_settings_gametype_rows[] =
 /* the most players a co-op game hosted starts with (maximum_players') */
 #define COOPERATIVE_DEFAULT_PLAYERS 16
 /* Server Setup's help for co-op's options' rows (CO-OP OPTIONS, VOICE AND
-VOTING), PASSWORD's and MAP SHARING's (its help_strings, tools/port_settings.py) */
+VOTING), PASSWORD's and MAP SHARING's (its help_strings,
+tools/port_settings.py) */
 #define COOPERATIVE_OPTIONS_HELP 12
 #define COOPERATIVE_VOICE_OPTIONS_HELP 13
 #define SERVER_PASSWORD_HELP 14
@@ -4230,6 +5607,8 @@ static void server_settings_private_set(boolean private_game)
 		platform_log("menus: could not write network.coop_public to config.toml");
 	}
 }
+
+static void setting_options_each(struct widget_instance *list, boolean save);
 
 /* "server settings init": the game's name (player 1's, else the one given
 last), the most players, the gametype's copy (once: the screen is made
@@ -7305,7 +8684,8 @@ static void join4_update(struct widget_instance *widget)
 	join4_keyboard();
 	text_set(named(screen, "join4_hint", 0),
 		system_milliseconds() < join4.notice_until ? join4.notice :
-		menu_button_glyph_join_hint(halo_keyboard_shares_gamepad() && halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS, 0));
+		menu_button_glyph_join_hint(halo_keyboard_shares_gamepad() &&
+			halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS, controller_of(screen)));
 }
 
 static long join4_tag(void)
@@ -7559,11 +8939,14 @@ static struct gametype_option const gametype_options[] =
 		{ "true", "false" } },
 	{ "coop_ally_friendly_fire_spinner", _option_setting, 0, 0, 2, { 0 }, "network.coop_ally_friendly_fire",
 		{ "true", "false" } },
+	{ "coop_vehicle_riding_spinner", _option_setting, 0, 0, 2, { 0 }, "network.vehicle_riding", { "true", "false" } },
 	/* map sharing's (Server Setup's MAP SHARING: tools/port_settings.py's
 	MAP_SHARE_SETUP; map_share.c) */
 	{ "map_share_spinner", _option_setting, 0, 0, 2, { 0 }, "network.map_share", { "true", "false" } },
 	{ "map_share_upload_spinner", _option_setting, 0, 0, 8, { 0 }, "network.map_share_upload",
 		{ "256", "512", "1024", "2048", "4096", "8192", "16384", "20480" } },
+	/* the vehicle options' VEHICLE RIDING, the gametype's (vehicle_riding.c) */
+	{ "vehicle_riding_spinner", _option_flag, 0, FLAG(_game_variant_vehicle_riding_bit), 2, { 1, 0 } },
 	/* vehicle options (the side's set and counts: vehicles_update) */
 	{ "vehicles_respawn_spinner", _option_short, OPTIONS_FIELD(vehicle_respawn_time), 0, 7,
 		{ 0, 30, 60, 90, 120, 180, 300 } },
@@ -8183,12 +9566,20 @@ static void gametype_option_help(struct widget_instance *list)
 		with it when widget_instance_render_recursive draws and notes targets. */
 		{
 			short y = 73;
+			short visible = 0;
+			short spacing = 30;
+
+			for (row = list->child; row; row = row->next)
+				if (row->visible && !strncmp(row->name, "op_coop_", 8))
+					visible++;
+			if (visible > 1)
+				spacing = MIN(30, (341 - 1 - 73 - 28) / (visible - 1));
 
 			for (row = list->child; row; row = row->next)
 				if (row->visible && !strncmp(row->name, "op_coop_", 8))
 				{
 					row->vertical_offset = y;
-					y += 30;
+					y += spacing;
 				}
 		}
 	}
@@ -8269,6 +9660,15 @@ static void gametype_engine_name(struct widget_instance *text_box)
 
 	if (variant)
 		text_box->parameters.text_box.string_list_index = strings[PIN(variant->game_engine_index, 0, 5)];
+}
+
+/* port: a map's own lists mark no row with the menus' arrows */
+static void hide_row_arrows(struct widget_instance *list)
+{
+	struct widget_instance *child;
+
+	for (child = list->child; child; child = child->next)
+		visible_set(named(child, "list_item_arrows", 0), FALSE);
 }
 
 /* ---------- public code */
@@ -8896,4 +10296,145 @@ void pc_menu_game_data_function_invoke(
 		coop_friendly_fire_text(widget);
 	else if (!strcmp(name, "port playlist edit desc"))
 		playlist_edit_description(widget);
+}
+/* port: a Custom Edition map's own New Game screen names Halo PC's functions
+26 (the list's start) and 46 or 52 (its update): the menus' map list runs for it */
+boolean pc_menu_map_list_initialize(struct widget_instance *widget)
+{
+	return map_list_initialize(widget);
+}
+/* port: the map list's update for a map's own screen, with its arrows placed and the menus' row marks hidden */
+void pc_menu_map_list_update(struct widget_instance *widget)
+{
+	char const *const *names;
+	map_list_update(widget);
+	short last;
+
+	{
+		struct widget_instance *row_top = named(widget, "list_item_0", 0);
+		struct widget_instance *row_end = named(widget, "list_item_10", 0);
+		short total = ui_widget_port_multiplayer_maps(&names, &last);
+
+		if (row_top)
+		{
+			visible_set(named(row_top, "scroll_up_button", 0), map_list.first > 0);
+			visible_set(named(row_top, "scroll_down_button", 0), FALSE);
+		}
+		if (row_end)
+		{
+			/* port: the last row is the down arrow's, not a map's */
+			row_end->visible = TRUE;
+			visible_set(named(row_end, "list_item_text", 0), FALSE);
+			visible_set(named(row_end, "list_item_arrows", 0), FALSE);
+			visible_set(named(row_end, "scroll_up_button", 0), FALSE);
+			visible_set(named(row_end, "scroll_down_button", 0), map_list.first + 9 < total);
+		}
+	}
+	hide_row_arrows(widget);
+}
+
+/* port: a map's own New Game screen: the map chosen is kept until the game
+ends, when the server is in pregame to take it */
+static short pending_map_index = -1;
+/* port: keeps the map chosen for the next game (applied by pc_menu_new_game_apply) */
+boolean pc_menu_map_stash(struct widget_instance *list)
+{
+	char const *const *names;
+	short last_used;
+	short index;
+	short count;
+
+	count = ui_widget_port_multiplayer_maps(&names, &last_used);
+	map_list_update(list);
+	index = map_list.chosen;
+	if (index < 0 || index >= count)
+		return FALSE;
+	pending_map_index = index;
+	return TRUE;
+}
+/* port: the menus' gametype list, for a map's own gametype screen */
+boolean pc_menu_gametype_list_initialize(struct widget_instance *list)
+{
+	boolean result;
+	result = gametype_list_initialize(list);
+	return result;
+}
+/* port: the menus' gametype list, for a map's own gametype screen */
+void pc_menu_gametype_list_update(struct widget_instance *list)
+{
+	gametype_list_update(list);
+	hide_row_arrows(list);
+}
+/* port: a map's own list's first and last rows are its scroll arrows: a page up or down */
+void pc_menu_map_row_click(struct widget_instance *row)
+{
+	char const *const *names;
+	short last_used;
+	short total;
+
+	if (!strcmp(row->name, "list_item_0"))
+		map_list.first = (short)MAX(0, map_list.first - 9);
+	else if (!strcmp(row->name, "list_item_10"))
+	{
+		total = ui_widget_port_multiplayer_maps(&names, &last_used);
+		map_list.first = (short)MIN(MAX(0, total - 9), map_list.first + 9);
+	}
+}
+
+static boolean restart_pending = FALSE;
+static long pending_gametype = NONE;
+/* port: the gametype chosen is kept and the game ends as its time limit would */
+boolean pc_menu_new_game_begin(struct widget_instance *list, boolean *widget_deleted)
+{
+	gametype_list_update(list);
+	if (multiplayer.gametype_chosen >= multiplayer.bank_count || pending_map_index < 0 ||
+		!global_network_game_server_get() || !game_engine_running())
+		return FALSE;
+	pending_gametype = multiplayer.gametypes[multiplayer.bank[multiplayer.gametype_chosen]];
+	game_engine_end_game();
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+/* port: the match is restarted: the game ends as for a new game, with nothing chosen, so the server returns to pregame with its map and gametype and starts at once */
+boolean pc_menu_restart_game(boolean *widget_deleted)
+{
+	if (!global_network_game_server_get() || !game_engine_running())
+		return FALSE;
+	restart_pending = TRUE;
+	game_engine_end_game();
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+/* port: the kept map and gametype are given to the server once it is in pregame; TRUE if there were any */
+boolean pc_menu_new_game_apply(void)
+{
+	boolean applied = restart_pending || (pending_map_index >= 0 && pending_gametype != NONE);
+
+	if (pending_map_index >= 0)
+		ui_widget_port_multiplayer_map_choose(pending_map_index);
+	if (pending_gametype != NONE)
+		ui_widget_port_gametype_choose(pending_gametype);
+	pending_map_index = -1;
+	pending_gametype = NONE;
+	restart_pending = FALSE;
+	return applied;
+}
+
+/* port: a map's own OK button (Halo PC's function 164) runs the handlers its
+screen's list has for the custom activation event */
+boolean pc_menu_activate_screen(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	struct widget_instance *top = widget;
+	boolean deleted = FALSE;
+	boolean found;
+
+	while (top->parent)
+		top = top->parent;
+	found = ui_widget_port_dispatch_event(top, EVENT_CUSTOM_ACTIVATION, event_controller(widget, event), &deleted);
+	if (deleted)
+		*widget_deleted = TRUE;
+	return found;
 }

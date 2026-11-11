@@ -14,7 +14,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.
 const engines = process.argv.slice(2);
 if (!engines.length) engines.push('chromium', 'firefox');
 assert(engines.every(name => ['chromium', 'firefox'].includes(name)));
-const work = await fs.mkdtemp(path.join(os.tmpdir(), 'halo-mcc-storage-'));
+const work = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'halo-mcc-storage-')));
 const reports = [];
 let server, browser;
 try {

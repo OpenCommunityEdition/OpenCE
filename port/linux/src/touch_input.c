@@ -11,6 +11,7 @@ finger down (host_gesture_insets).
 
 #include "touch_input.h"
 #include "touch_gyro.h"
+#include "keyboard_prompts.h"
 #include "touch_menu.h"
 #include "port_config.h"
 #include "keyboard_prompts.h"
@@ -41,6 +42,8 @@ int touch_game_playing(void);
 void touch_game_button_controls(int *controls);
 /* port/linux/game/android_cheats.c, called on the game thread. */
 void android_cheats_update(void);
+/* ... and its skip button during a cinematic (port/linux/game/touch_cinematic.c) */
+int touch_cinematic_tap(float x, float y);
 
 /* the gamepad's buttons (input.h), which the touch controls are named by */
 #define TOUCH_BUTTONS 16
@@ -201,24 +204,31 @@ int touch_input_chat_taps(float *x, float *y)
 void touch_input_gamepad(XINPUT_GAMEPAD *pad)
 {
 	/* outside the menus the touchscreen only skips a cinematic that can be
-	skipped: a tap there presses A */
+	skipped (or votes to, in network co-op): a tap there presses A, on its
+	skip button where one shows (touch_cinematic_tap) */
 	if (!menu_active)
 	{
 		struct touch_menu_output output;
+		int width = 0, height = 0;
+		float x = 0.0f, y = 0.0f;
 
 		menu_setup();
 		touch_menu_read(&menu, &output);
+		/* (the tap's place, 0 to 1 of the window) */
+		if (output.clicks)
+		{
+			platform_video_drawable_size(&width, &height);
+			x = width > 0 ? output.click_x / (float)width : 0.0f;
+			y = height > 0 ? output.click_y / (float)height : 0.0f;
+		}
 		/* (or, while the text chat's on-screen keyboard is up, its keys) */
 		if (output.clicks && (network_chat_controller() == 0))
 		{
-			int width = 0, height = 0;
-
-			platform_video_drawable_size(&width, &height);
 			chat_taps += output.clicks;
-			chat_tap_x = width > 0 ? output.click_x / (float)width : 0.0f;
-			chat_tap_y = height > 0 ? output.click_y / (float)height : 0.0f;
+			chat_tap_x = x;
+			chat_tap_y = y;
 		}
-		else if (output.clicks && touch_game_cinematic_skippable())
+		else if (output.clicks && touch_game_cinematic_skippable() && touch_cinematic_tap(x, y))
 		{
 			skip_polls = TOUCH_PRESS_POLLS;
 			platform_log("touch: A pressed to skip a cinematic");
@@ -332,7 +342,7 @@ void touch_input_controls(XINPUT_GAMEPAD *pad, int menus)
 		host_touch_bindings(bindings);
 	}
 	host_touch_read(state);
-	/* Touch controls keep the native HUD prompts, even with automatic detection. */
+	/* Touch retains native prompts while automatic detection is enabled. */
 	for (index = 0; index < 7; index++)
 		if (state[index]) { keyboard_prompt_touch(); break; }
 	/* the stick moves the player through the game's input state, whatever

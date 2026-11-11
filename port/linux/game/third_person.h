@@ -8,8 +8,8 @@ enum third_person_match_policy
 	_third_person_forced_off
 };
 /* Bits in network_game.cooperative_flags, shared by all match types. */
-#define THIRD_PERSON_POLICY_SHIFT 3
-#define THIRD_PERSON_POLICY_MASK 24
+#define THIRD_PERSON_POLICY_SHIFT 4
+#define THIRD_PERSON_POLICY_MASK 48
 /* Replicated with each input tick, not latched like a button press. */
 #define THIRD_PERSON_INPUT_BIT 16
 short third_person_host_policy(void);

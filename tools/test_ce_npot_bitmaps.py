@@ -47,7 +47,7 @@ def implementation():
         "bitmap_mipmap_get_row_pitch")]
     parts += [function(ce, name) for name in (
         "power_of_two", "bitmap_format_drawable", "bitmap_readable", "bitmap_swizzle_possible",
-        "custom_edition_bitmap_drawable", "custom_edition_bitmap_raw_2d")]
+        "custom_edition_bitmap_drawable")]
     parts += [WORLD, function(ce, "custom_edition_bitmaps_verify"),
               function(ce, "custom_edition_bitmap_pixels_arrived"),
               function(read("port/linux/game/custom_edition_cache.c"), "custom_edition_cache_contains")]
@@ -175,33 +175,34 @@ int main(int argc, char **argv)
     } else if (mode == 'r') {
         bitmap.pixels_size--; assert(!admitted(&bitmap));
         bitmap = fixture(_bitmap_format_dxt1); bitmap.mipmap_count = 1;
-        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(!admitted(&bitmap));
+        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(admitted(&bitmap));
+        desc = describe(&bitmap); assert(desc.levels == 1); /* upstream draws only the first NPOT level */
         bitmap = fixture(_bitmap_format_dxt1); bitmap.width = 201; assert(!admitted(&bitmap));
-        bitmap = fixture(_bitmap_format_dxt1); bitmap.height = 111; assert(!admitted(&bitmap));
-        bitmap = fixture(_bitmap_format_dxt1); bitmap.width = 4100;
-        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(!admitted(&bitmap));
+        bitmap = fixture(_bitmap_format_dxt1); bitmap.height = 111; assert(admitted(&bitmap));
+        bitmap = fixture(_bitmap_format_dxt1); bitmap.width = MAXIMUM_BITMAP_WIDTH + 1;
+        assert(!admitted(&bitmap));
         bitmap = fixture(_bitmap_format_dxt1); bitmap.flags |= FLAG(_bitmap_linear_bit);
         assert(!admitted(&bitmap));
         bitmap = fixture(_bitmap_format_dxt1); bitmap.flags = 0; assert(!admitted(&bitmap));
         bitmap = fixture(_bitmap_format_p8_bump); bitmap.flags = 0;
-        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(!admitted(&bitmap));
+        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(admitted(&bitmap));
         bitmap = fixture(_bitmap_format_dxt1); bitmap.type = _bitmap_type_cube_map;
         bitmap.width = bitmap.height = 96;
-        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(!admitted(&bitmap));
+        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(admitted(&bitmap));
         bitmap.type = _bitmap_type_3d; bitmap.depth = 4;
-        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(!admitted(&bitmap));
+        bitmap.pixels_size = bitmap_get_pixel_data_size(&bitmap); assert(admitted(&bitmap));
     } else if (mode == 'o') {
         assert(custom_edition_cache_contains(&bitmap, sizeof(bitmap)));
         assert(!custom_edition_cache_contains(&bitmap, sizeof(bitmap) + 1));
         assert(!custom_edition_cache_contains((char *)&bitmap + sizeof(bitmap), 1));
         assert(!custom_edition_cache_contains((void *)~0UL, 2));
         other = bitmap; assert(!custom_edition_cache_contains(&other, sizeof(other)));
-        desc = describe(&other); assert(desc.width == 128 && desc.height == 64);
+        desc = describe(&other); assert(desc.width == 200 && desc.height == 112);
         mcc_loaded = TRUE; desc = describe(&bitmap);
-        assert(desc.width == 128 && desc.height == 64);
+        assert(desc.width == 200 && desc.height == 112);
         mcc_loaded = FALSE; custom_edition_cache_globals.tags_loaded = FALSE;
         assert(!custom_edition_cache_contains(&bitmap, sizeof(bitmap)));
-        desc = describe(&bitmap); assert(desc.width == 128 && desc.height == 64);
+        desc = describe(&bitmap); assert(desc.width == 200 && desc.height == 112);
         custom_edition_cache_globals.tags_loaded = TRUE;
         desc = describe(&bitmap); assert(desc.width == 200 && desc.height == 112);
     } else if (mode == 'p') {

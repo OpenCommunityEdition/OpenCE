@@ -26,7 +26,6 @@ def test_camera_admission(tmp_path):
 #include <stdio.h>
 #include <string.h>
 #include "third_person_protocol.h"
-#include "mcc_protocol.h"
 typedef unsigned char byte;
 typedef unsigned short word;
 typedef int boolean;
@@ -35,8 +34,8 @@ typedef int boolean;
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);return 1;}}while(0)
 #define match_assert(...) ((void)0)
 #define HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG 1
-#define THIRD_PERSON_POLICY_MASK 24
-#define THIRD_PERSON_POLICY_SHIFT 3
+#define THIRD_PERSON_POLICY_MASK 48
+#define THIRD_PERSON_POLICY_SHIFT 4
 struct network_game {int machine_count;unsigned char cooperative_flags;};
 struct network_game_server {struct network_game game;int flags;void *connection;};
 static struct network_game_server *host;
@@ -49,7 +48,6 @@ struct network_game *network_game_server_get_game(struct network_game_server *s)
 boolean network_game_server_send_game_data_pregame(struct network_game_server *s){(void)s;sends++;return 1;}
 static short third_person_host_policy(void){return 1;}
 static void third_person_reset(void){resets++;}
-unsigned int mcc_protocol_version(char const *map){return !strncmp(map,"mcc_maps",8)?MCC_PROTOCOL_VERSION:32738;}
 
 struct network_game_server_client_machine {int joined;};
 static int network_game_server_client_machine_is_joined_to_game(struct network_game_server *s,
@@ -86,50 +84,33 @@ int main(void) {
     word join[256]={0},outer[260],inner[260],size;
     byte saved;
     int i,bytes;
-    CHECK(HALO_PORT_NETWORK_VERSION==32738 && MCC_PROTOCOL_VERSION==73);
-    CHECK(!third_person_session_compatible("bloodgulch",32730,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32732,1));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",32733,9));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",70,9));
-    CHECK(!third_person_session_compatible("bloodgulch",32726,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32728,1));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",32729,9));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",69,9));
+
+    CHECK(HALO_PORT_NETWORK_VERSION==43);
     host=&server;third_person_session_host_begin();CHECK(!third_person_session_active());
     network_game_server_open_game(&server);CHECK(!third_person_session_locked());
-    CHECK(third_person_session_set(1));CHECK(third_person_session_set(0));
-    CHECK(third_person_session_version("bloodgulch")==32738);
-    CHECK(third_person_session_version("mcc_maps\\test")==73);
-    CHECK(third_person_session_compatible("mcc_maps\\test",73,9));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",66,9));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",67,9));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",68,9));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",32725,9));
-    CHECK(third_person_session_compatible("bloodgulch",32738,1));
-    CHECK(!third_person_session_compatible("bloodgulch",41,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32718,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32720,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32722,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32724,1));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",32721,9));
-    CHECK(!third_person_session_compatible("bloodgulch",32714,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32716,1));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",32717,9));
-    CHECK(!third_person_session_compatible("bloodgulch",32712,1));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",32713,9));
-    CHECK(third_person_session_compatible("bloodgulch",32740,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32742,1));
-    CHECK(!third_person_session_compatible("bloodgulch",32740,0));
-    CHECK(!third_person_session_compatible("mcc_maps\\test",32742,1));
-    CHECK(third_person_session_compatible("mcc_maps\\test",32742,9));
-    CHECK(!third_person_session_compatible("bloodgulch",32708,1));
-    CHECK(third_person_session_set(1));CHECK(server.game.cooperative_flags==8);
-    CHECK(third_person_session_version("bloodgulch")==32740);
-    CHECK(third_person_session_version("mcc_maps\\test")==32742);
+    server.game.cooperative_flags=8; /* upstream vehicle riding survives camera policy changes */
+    CHECK(third_person_session_set(1));CHECK(server.game.cooperative_flags==24);
+    CHECK(third_person_session_set(0));CHECK(server.game.cooperative_flags==8);
+    {
+        char const *maps[]={"maps\\bloodgulch","custom_maps\\test","mcc_maps\\test"};
+        int family;
+        for(family=0;family<3;family++) {
+            CHECK(third_person_session_version(maps[family])==43);
+            CHECK(third_person_session_compatible(maps[family],43,1));
+            CHECK(!third_person_session_compatible(maps[family],43,0));
+            CHECK(third_person_session_compatible(maps[family],THIRD_PERSON_PROTOCOL_VERSION,1));
+            CHECK(!third_person_session_compatible(maps[family],73,9));
+            CHECK(!third_person_session_compatible(maps[family],32738,1));
+            CHECK(!third_person_session_compatible(maps[family],32740,1));
+            CHECK(!third_person_session_compatible(maps[family],32742,9));
+        }
+    }
+    CHECK(third_person_session_set(1));CHECK(server.game.cooperative_flags==24);
+    CHECK(third_person_session_version("bloodgulch")==THIRD_PERSON_PROTOCOL_VERSION);
+    CHECK(third_person_session_version("mcc_maps\\test")==THIRD_PERSON_PROTOCOL_VERSION);
     CHECK(lobby_join_reset());CHECK(!third_person_session_set(0));
     CHECK(!lobby_join.adding && lobby_join.controller==NONE);
     CHECK(third_person_session_active() && third_person_session_locked());
-    CHECK(THIRD_PERSON_PROTOCOL_JOIN_KIND!=MCC_PROTOCOL_JOIN_KIND);
     for(bytes=3;bytes<=512;bytes++) {
         build_message_header(join,(word)bytes,_message_type_packet,0);
         ((byte *)join)[bytes-1]=_message_client_join_game_request;
@@ -157,27 +138,24 @@ int main(void) {
     }
     ((byte *)outer)[519]=_message_client_game_start_request;
     CHECK(!third_person_protocol_unwrap(outer,520,inner,&size));
-    /* A matching MCC envelope passes to the existing MCC validator unchanged. */
-    build_message_header(join,40,2,0);((byte *)join)[2]=MCC_PROTOCOL_JOIN_KIND;
-    CHECK(third_person_protocol_join(join,40,outer)==outer);
-    CHECK(third_person_protocol_unwrap(outer,48,inner,&size));
-    CHECK(size==40 && !memcmp(join,inner,40));
-    CHECK(network_game_server_handle_client_message(&server,&machine,outer,48));
-    CHECK(!network_game_server_handle_client_message(&server,&machine,join,40));
-    CHECK(!third_person_protocol_join(outer,48,inner)); /* no recursive envelopes */
-    ((byte *)join)[2]=93;CHECK(!third_person_protocol_join(join,40,outer));
+
+    /* Retired MCC and nested camera envelopes cannot pass as ordinary joins. */
+    build_message_header(join,40,2,0);((byte *)join)[2]=101;
+    CHECK(!third_person_protocol_join(join,40,outer));
+    ((byte *)join)[2]=THIRD_PERSON_PROTOCOL_JOIN_KIND;
+    CHECK(!third_person_protocol_join(join,40,outer));
     /* Established connections keep the ordinary dispatcher and its direction checks. */
     machine.joined=1;CHECK(network_game_server_handle_client_message(&server,&machine,join,40));
     machine.joined=0;CHECK(!network_game_server_handle_client_message(&server,&machine,join,40));
     third_person_session_host_end();host=NULL;CHECK(!third_person_session_active());
-    third_person_session_client_begin(32740);CHECK(third_person_session_active());
+    third_person_session_client_begin(THIRD_PERSON_PROTOCOL_VERSION);CHECK(third_person_session_active());
     network_game_client_late_join_time=9;network_game_client_late_join_clock_pending=1;
     network_game_client_start_pending=1;network_game_client_incompatibility_told=1;
     network_game_client_reset(&client,0);CHECK(!third_person_session_active());
     CHECK(!network_game_client_late_join_time&&!network_game_client_late_join_clock_pending);
     CHECK(!network_game_client_start_pending&&!network_game_client_incompatibility_told);
     CHECK(resets>0&&sends>0);
-    third_person_session_client_begin(32742);client.connection=&client;
+    third_person_session_client_begin(THIRD_PERSON_PROTOCOL_VERSION);client.connection=&client;
     network_game_client_reset(&client,1);CHECK(!third_person_session_active());
     mode="gulchce_third_person";host=&server;third_person_session_host_begin();
     network_game_client_reset(&client,0);CHECK(third_person_session_active());
@@ -209,27 +187,20 @@ int main(void) {
 def test_camera_join_kind_is_reserved():
     import network_format
     items = network_format.items()
-    kind = items["define THIRD_PERSON_PROTOCOL_JOIN_KIND"]
+    kind = re.search(r"#define THIRD_PERSON_PROTOCOL_JOIN_KIND (\d+)",
+                     (ROOT / "port/linux/game/third_person_protocol.h").read_text()).group(1)
     assert kind not in [value for key, value in items.items()
                         if key.startswith("enum _distributed_message_")]
-    assert kind != items["define MCC_PROTOCOL_JOIN_KIND"]
+    assert kind == "102"
 
 
-def test_camera_mcc_inner_version_reaches_admission_only_when_current(tmp_path):
+def test_camera_and_crossplay_dispatch_admit_all_map_families(tmp_path):
     """Run both envelopes through the complete dispatcher, not only its camera gate."""
     camera = (ROOT / "port/linux/game/third_person_protocol.c").read_text()
-    mcc = (ROOT / "port/linux/game/mcc_protocol.c").read_text()
     server = (ROOT / "source/networking/network_server_message_handler.c").read_text()
     implementation = "\n".join(function(camera, name) for name in (
         "third_person_protocol_inner_valid", "third_person_protocol_join",
         "third_person_protocol_unwrap"))
-    implementation += "\n" + "\n".join(function(mcc, name) for name in (
-        "mcc_protocol_client_begin", "mcc_protocol_client_clear", "mcc_protocol_join",
-        "mcc_protocol_unwrap", "mcc_protocol_forget", "mcc_protocol_peer",
-        "mcc_protocol_reset", "mcc_protocol_allows"))
-    # The sink below observes admission routing and runs the real MCC capability
-    # check. The separate test_mcc_protocol join-handler harness covers native
-    # packet decoding, tokens, bans, slots and session-state authorization.
     unrelated_handlers = (
         "client_add_player_request_ingame", "client_add_player_request_pregame",
         "client_game_start_request", "client_graceful_game_exit_postgame",
@@ -246,7 +217,6 @@ def test_camera_mcc_inner_version_reaches_admission_only_when_current(tmp_path):
 #include <stdio.h>
 #include <string.h>
 #include "third_person_protocol.h"
-#include "mcc_protocol.h"
 typedef unsigned char byte;
 typedef unsigned short word;
 typedef int boolean;
@@ -262,12 +232,9 @@ typedef int boolean;
 struct network_game {struct {char name[64];} map;};
 struct network_game_server {struct network_game game;};
 struct network_game_server_client_machine {int joined;};
-static struct network_game_server_client_machine *mcc_protocol_peers[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
-static int mcc_protocol_client_capable;
-static int camera_active,join_calls,join_capable,unexpected_calls;
+static int camera_active,join_calls,unexpected_calls;
 static int unexpected(void) {unexpected_calls++;return FALSE;}
 int third_person_session_active(void) {return camera_active;}
-static int mcc_level_name(char const *map) {return !strncmp(map,"mcc_maps\\",9);}
 static int network_game_server_client_machine_is_joined_to_game(struct network_game_server *server,
     struct network_game_server_client_machine *machine) {(void)server;return machine->joined;}
 static void network_event(char const *format,...) {(void)format;}
@@ -297,62 +264,38 @@ void build_message_header(word *out,word bytes,byte type,byte flags) {*out=(word
 ''' + implementation + r'''
 static boolean network_game_server_handle_message_client_join_game_request(
     struct network_game_server *server,struct network_game_server_client_machine *machine,
-    word *message,short bytes,boolean capable) {
-    join_calls++;join_capable=capable;
+    word *message,short bytes) {
+    (void)server;(void)machine;
+    join_calls++;
     if(bytes!=32 || GET_MESSAGE_TYPE(*message)!=_message_type_packet ||
         ((byte *)message)[bytes-1]!=_message_client_join_game_request)return FALSE;
-    return mcc_protocol_peer(machine,capable) && mcc_protocol_allows(&server->game,machine);
+    return TRUE;
 }
 ''' + function(server, "network_game_server_handle_client_message") + r'''
 int main(void) {
     struct network_game_server server;
     struct network_game_server_client_machine machine={0};
-    word plain[16]={0},mcc_join[MCC_PROTOCOL_JOIN_MAX/2],camera_join[THIRD_PERSON_PROTOCOL_JOIN_MAX/2];
-    word *message;
-    short bytes,rejected;
-    CHECK(MCC_PROTOCOL_VERSION==73);
+
+    word plain[16]={0},camera_join[THIRD_PERSON_PROTOCOL_JOIN_MAX/2];
+    char const *maps[]={"maps\\bloodgulch","custom_maps\\test","mcc_maps\\test"};
+    int family;
     build_message_header(plain,sizeof(plain),_message_type_packet,0);
     ((byte *)plain)[sizeof(plain)-1]=_message_client_join_game_request;
-    strcpy(server.game.map.name,"mcc_maps\\test");
-    mcc_protocol_client_begin(MCC_PROTOCOL_ADVERTISED_FLAG);
-    /* The matching camera discovery version still requires its inner MCC revision.
-     * Check the composed route before the direct one. */
-    for(camera_active=1;camera_active>=0;camera_active--) {
-      for(rejected=65;rejected<=68;rejected++) {
-        CHECK(mcc_protocol_join(plain,sizeof(plain),mcc_join)==mcc_join);
-        ((byte *)mcc_join)[4]=(byte)rejected;
-        ((byte *)mcc_join)[5]=0;
-        message=mcc_join;bytes=40;
-        if(camera_active) {
-            CHECK(third_person_protocol_join(mcc_join,40,camera_join)==camera_join);
-            message=camera_join;bytes=48;
-        }
-        mcc_protocol_reset();join_calls=join_capable=0;
-        if(network_game_server_handle_client_message(&server,&machine,message,bytes)) {
-            fprintf(stderr,"old MCC version reached admission\n");return 64;
-        }
-        CHECK(join_calls==0 && !mcc_protocol_allows(&server.game,&machine));
-      }
-        CHECK(mcc_protocol_join(plain,sizeof(plain),mcc_join)==mcc_join);
-        if(camera_active)CHECK(third_person_protocol_join(mcc_join,40,camera_join)==camera_join);
-        CHECK(network_game_server_handle_client_message(&server,&machine,message,bytes));
-        CHECK(join_calls==1 && join_capable && mcc_protocol_allows(&server.game,&machine));
-        CHECK(!unexpected_calls);
+    for(family=0;family<3;family++) {
+        strcpy(server.game.map.name,maps[family]);
+        camera_active=0;join_calls=unexpected_calls=0;
+        CHECK(network_game_server_handle_client_message(&server,&machine,plain,sizeof(plain)));
+        CHECK(join_calls==1 && !unexpected_calls);
+        camera_active=1;join_calls=0;
+        CHECK(!network_game_server_handle_client_message(&server,&machine,plain,sizeof(plain)));
+        CHECK(!join_calls);
+        CHECK(third_person_protocol_join(plain,sizeof(plain),camera_join)==camera_join);
+        CHECK(network_game_server_handle_client_message(&server,&machine,camera_join,sizeof(plain)+8));
+        CHECK(join_calls==1 && !unexpected_calls);
+        ((byte *)camera_join)[4]^=1;join_calls=0;
+        CHECK(!network_game_server_handle_client_message(&server,&machine,camera_join,sizeof(plain)+8));
+        CHECK(!join_calls);
     }
-    /* Camera proof without an MCC envelope never grants MCC capability. */
-    camera_active=1;mcc_protocol_reset();join_calls=join_capable=0;
-    CHECK(third_person_protocol_join(plain,sizeof(plain),camera_join)==camera_join);
-    CHECK(!network_game_server_handle_client_message(&server,&machine,camera_join,40));
-    CHECK(join_calls==1 && !join_capable && !mcc_protocol_allows(&server.game,&machine));
-    /* Legacy camera and ordinary sessions do not require MCC capability. */
-    strcpy(server.game.map.name,"levels\\test\\bloodgulch\\bloodgulch");
-    join_calls=join_capable=0;
-    CHECK(network_game_server_handle_client_message(&server,&machine,camera_join,40));
-    CHECK(join_calls==1 && !join_capable);
-    camera_active=0;join_calls=join_capable=0;mcc_protocol_client_clear();
-    CHECK(mcc_protocol_join(plain,sizeof(plain),mcc_join)==plain);
-    CHECK(network_game_server_handle_client_message(&server,&machine,plain,sizeof(plain)));
-    CHECK(join_calls==1 && !join_capable && !unexpected_calls);
     return 0;
 }
 '''
@@ -361,13 +304,3 @@ int main(void) {
     exe = compile_tool(tmp_path, [source])
     run = subprocess.run([str(exe)], capture_output=True, text=True)
     assert run.returncode == 0, run.stdout + run.stderr
-
-    # If the production MCC revision check is removed, the unchanged camera
-    # envelope cannot hide the missing gate: the old revision must reach our sink
-    # and fail the very first (nested) rejection check.
-    check = "in[4] != (MCC_PROTOCOL_VERSION & 255)"
-    assert code.count(check) == 1
-    source.write_text(code.replace(check, "0"))
-    exe = compile_tool(tmp_path, [source])
-    run = subprocess.run([str(exe)], capture_output=True, text=True)
-    assert run.returncode == 64 and "old MCC version reached admission" in run.stderr, run.stdout + run.stderr

@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 import pytest
-from test_mcc_previews import png
+from mcc_test_support import png
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "port/linux/src"

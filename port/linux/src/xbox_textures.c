@@ -1387,6 +1387,15 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 {
 	*target = entry->target;
 	*description = entry->description;
+
+	/* port: a Custom Edition bitmap whose Size word gives sides that are
+	any uncompressed linear bitmap: sampled with normalized
+	coordinates like any other texture, not in texels as an Xbox's linear
+	texture is. Decoding keeps the entry's own description (its pitch). */
+	if (entry->description.linear && !entry->description.compressed)
+	{
+		description->linear = FALSE;
+	}
 	/* (the high-res text's atlas, for its placeholder bitmap: text_hires.h) */
 	{
 		GLuint atlas = text_hires_atlas_texture(entry->data);
@@ -1477,25 +1486,36 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	struct xgpu_texture_description *description)
 {
 	GLuint mcc_texture;
-	if (xgpu_mcc_texture_get(resource, palette, &mcc_texture, target, description))
-		return mcc_texture;
-
-	DWORD data = resource[1], format_word = resource[3], size_word = resource[4];
-	struct texture_entry **bucket = &texture_buckets[bucket_index(data, format_word, size_word)];
+	DWORD data, format_word, size_word;
+	struct texture_entry **bucket;
 	struct texture_entry *entry;
 	unsigned long generation;
-	BOOL palettized = ((format_word & D3DFORMAT_FORMAT_MASK) >> D3DFORMAT_FORMAT_SHIFT) == 0x0b;
-	unsigned long hash = palettized ? palette_hash(palette) : 0;
+	BOOL palettized;
+	unsigned long hash;
 
 	struct texture_entry *oldest_variant = NULL;
 	unsigned long variant_count = 0;
 	static int no_cache = -1;
-	unsigned long recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
-	unsigned long watch_serial = memory_watch_serial();
+	unsigned long recent;
+	unsigned long watch_serial;
 #ifdef HALO_ANDROID
 	unsigned long ce_bytes;
-	const void *ce_pixels = android_texture_fixes ? android_ce_texture_pixels(resource, &ce_bytes) : NULL;
-	const void *ce_resource = ce_pixels ? resource : NULL;
+	const void *ce_pixels;
+	const void *ce_resource;
+#endif
+
+	/* Registered MCC headers bypass the native texture and memory-watch caches. */
+	if (xgpu_mcc_texture_get(resource, palette, &mcc_texture, target, description))
+		return mcc_texture;
+	data = resource[1]; format_word = resource[3]; size_word = resource[4];
+	bucket = &texture_buckets[bucket_index(data, format_word, size_word)];
+	palettized = ((format_word & D3DFORMAT_FORMAT_MASK) >> D3DFORMAT_FORMAT_SHIFT) == 0x0b;
+	hash = palettized ? palette_hash(palette) : 0;
+	recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
+	watch_serial = memory_watch_serial();
+#ifdef HALO_ANDROID
+	ce_pixels = android_texture_fixes ? android_ce_texture_pixels(resource, &ce_bytes) : NULL;
+	ce_resource = ce_pixels ? resource : NULL;
 #endif
 
 	/* (a texture that is not palettized has the one entry, until one is

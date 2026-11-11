@@ -113,6 +113,7 @@ symbols in this file:
 #include "objects/widgets/flags.h" /* port: reset cloth timing after a load */
 #include "effects/contrails.h" /* port: reset point timing after a load */
 #include "effects/player_effects.h" /* port: reset camera shake after a load */
+#include "objects/object_types.h" /* port: object_type_definitions (the saved game's layout checksum) */
 #include "game_sound.h"
 #include "sound_manager.h"
 #include "observer.h"
@@ -135,6 +136,12 @@ symbols in this file:
 #include "third_person.h" /* port: port/linux/game/third_person.c */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_invalidate(void);
+
+/* port: riding taken from the settings after every load (bipeds.c) */
+void bipeds_riding_latch(void);
+
+/* port: (object_types.c) */
+extern struct object_type_definition *object_type_definitions[NUMBER_OF_OBJECT_TYPES];
 
 void platform_log(const char *format, ...);
 
@@ -236,7 +243,9 @@ static game_state_after_load_proc after_load_procs[] =
 	director_initialize_for_saved_game,
 	scripted_hud_messages_clear,
 	/* port: restore matching homes or forget an unrelated disk/core load. */
-	coop_vehicles_after_load
+	coop_vehicles_after_load,
+	/* port: (vehicle_riding.c: also for a revert in the same structure) */
+	bipeds_riding_latch
 };
 
 /* ---------- public code */
@@ -355,17 +364,14 @@ void game_state_save(
 	void)
 {
 	game_state_call_before_save_procs();
-	/* port: syntax outside the CPU image must accompany saved threads. */
-	if (!hs_console_state_capture())
+	/* port: syntax outside the CPU image must accompany saved threads, and
+	MCC's extra slots occupy only proven-unused CPU bytes in this image. A
+	state that cannot be taken is not saved: the previous checkpoint, if
+	there is one, stays the one a revert goes back to */
+	if (!hs_console_state_capture() ||
+		(mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
+		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE)))
 	{
-		game_state_globals.saved_game_valid = FALSE;
-		return;
-	}
-	/* port: MCC extra slots occupy only proven-unused CPU bytes in this image. */
-	if (mcc_cache_tags_loaded() && !mcc_checkpoint_capture(game_state_globals.base_address,
-		GAME_STATE_SIZE, game_state_globals.cpu_allocation_size, GAME_STATE_CPU_SIZE))
-	{
-		game_state_globals.saved_game_valid = FALSE;
 		return;
 	}
 
@@ -452,7 +458,10 @@ boolean game_state_test_persistent_storage(
 		sizeof(*game_state_globals.header),
 		/* the whole of the native builds' larger game state */
 		GAME_STATE_SIZE,
-		corrupted))
+		corrupted) &&
+		/* port: a saved game of another build's layout is not offered (the
+		level would refuse it and start from its beginning) */
+		header.allocation_size_checksum == (unsigned long)game_state_globals.allocation_size_checksum)
 	{
 		*difficulty = header.difficulty;
 		csstrncpy(map_name, header.map_name, sizeof(header.map_name));
@@ -1109,7 +1118,22 @@ void game_state_load_core(
 void game_state_initialize(
 	void)
 {
+	short object_type;
+
 	crc_new(&game_state_globals.allocation_size_checksum);
+	/* port: a saved game holds each object's datum in the layout of the
+	build that wrote it: one of another layout is refused, never read into
+	this one's (vehicle_riding.c grew the biped's) */
+	for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
+	{
+		if (object_type_definitions[object_type])
+		{
+			long datum_size = object_type_definitions[object_type]->game_datum_size;
+
+			crc_checksum_buffer((unsigned long *)&game_state_globals.allocation_size_checksum, &datum_size,
+				sizeof(datum_size));
+		}
+	}
 	/* the native builds place their larger game state above the tag cache
 	(halo_port_capacity.h, cache/physical_memory_map.c) */
 	game_state_globals.base_address = game_state_allocate_buffer(HALO_PORT_GAME_STATE_BASE_ADDRESS, GAME_STATE_CPU_SIZE, GAME_STATE_GPU_SIZE);

@@ -168,7 +168,7 @@ static int network_game_server_reset_to_pregame(struct network_game_server *s) {
     s->state=_network_game_server_state_pregame;return 1;
 }
 ''' + '\n'.join(function(server_source, name) for name in [
-        "network_game_server_pause_countdown", "network_game_server_begin_game_start_countdown",
+        "network_game_server_start_now", "network_game_server_pause_countdown", "network_game_server_begin_game_start_countdown",
         "network_game_server_client_machine_is_precached", "network_game_server_have_all_machines_have_precached"
     ]) + '\n' + implementation + '\n' + function(widget_source, "network_game_reset_to_pregame_ui") + '\n' + (
         # Exercise the production early-return boundary without starting a world.

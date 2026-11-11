@@ -2402,7 +2402,7 @@ boolean weapon_get_projectile_ray(long weapon_index, short trigger_index, real_p
 	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
 	if (trigger->projectile.index == NONE)
 		return FALSE;
-	/* port: query the same H1A ray used by firing, without recording a shot. */
+	/* port: use the same pre-spread MCC ray as firing. */
 	if (mcc_projectile_ray(weapon_index, owner_index, trigger_index, FALSE, origin, forward, &velocity, &target_index))
 		return TRUE;
 	object_get_marker_by_name(weapon_get_effect_object_index(weapon_index),
@@ -2643,9 +2643,10 @@ static void trigger_create_projectiles(
 						real_point3d camera_position;
 
 						unit_get_camera_position(owner_object_index, &camera_position);
-						/* port: keep validated shoulder and MCC spawns off their owner. */
-						object_force_inside_bsp_ignoring(projectile_object_index, &camera_position,
-							(muzzle_origin || mcc_ray) ? owner_object_index : NONE);
+						/* port: MCC cover is checked before creation; shoulder rays exclude their owner. */
+						if (!mcc_ray || muzzle_origin)
+							object_force_inside_bsp_ignoring(projectile_object_index, &camera_position,
+								muzzle_origin ? owner_object_index : NONE);
 					}
 					if (target_object_index!=NONE)
 					{

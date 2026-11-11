@@ -421,6 +421,8 @@ symbols in this file:
 #include "memory/data.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "mcc_script_parameters.h" /* port: port/linux/game/mcc_script_parameters.h */
+#include "mcc_scripts.h" /* port: port/linux/game/mcc_scripts.h */
 
 /* ---------- constants */
 
@@ -2233,8 +2235,8 @@ static boolean hs_parse_primitive(
 	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	boolean result = FALSE;
 
+	/* port: an MCC map's AI encounters and squads (mcc_scripts.c) */
 	{
-		extern int mcc_script_parse_ai(struct hs_syntax_node *node, char const *text);
 		int mcc_result = mcc_script_parse_ai(expression,
 			hs_compile_globals.compiled_source);
 		if (mcc_result >= 0)
@@ -2544,6 +2546,20 @@ boolean hs_compile_postprocess(
 		struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 		{
 			extern int mcc_parameter_compile(struct hs_syntax_node const *node);
+			int mcc_parameter = mcc_parameter_compile(expression);
+			if (mcc_parameter >= 0)
+			{
+				if (!mcc_parameter)
+				{
+					hs_compile_globals.error = "invalid MCC script parameter.";
+					success = FALSE;
+				}
+				continue;
+			}
+		}
+
+		/* port: an MCC script's parameters (mcc_script_parameters.c) */
+		{
 			int mcc_parameter = mcc_parameter_compile(expression);
 			if (mcc_parameter >= 0)
 			{

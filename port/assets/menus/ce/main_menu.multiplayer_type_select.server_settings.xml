@@ -113,7 +113,7 @@
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_label" type="text" controller="1" width="260" height="22" text="SESSION COMPATIBILITY:" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_spinner" type="spinner" top="3" width="237" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STANDARD|THIRD PERSON" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 0 19 6" footer_bounds="7 231 19 237">
+	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/session_compatibility_spinner" type="spinner" top="3" width="237" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="CROSSPLAY|GULCHCE ONLY" font="ui\large_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 0 19 6" footer_bounds="7 231 19 237">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/session_options/op_camera_policy" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -144,7 +144,7 @@
 		<string text="INVITE LINK:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/session_options/help_strings">
-		<string text="OpenCE and GulchCE can join; third person is off.\nMCC maps still require GulchCE."/>
+		<string text="OpenCE and GulchCE can join; third person is off.\nXbox, CE and MCC maps use the shared protocol."/>
 		<string text="Compatible GulchCE hosts and clients only.\nEnables GulchCE session features, including third person."/>
 		<string text="Compatibility is locked for this session.\nClose the lobby to choose another mode."/>
 		<string text="Each player chooses first or third person.\nTheir camera toggle remains available."/>
@@ -306,14 +306,15 @@
 		<data input="game settings lists text update"/>
 		<on event="created" run="port setup options init"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_friendly_fire" x="54" y="73"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_enemies" x="54" y="102"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_pickups" x="54" y="131"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_vehicles" x="54" y="160"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" x="54" y="189"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" x="54" y="218"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" x="54" y="247"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_ally_friendly_fire" x="54" y="276"/>
-		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_team_wipe" x="54" y="305"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_enemies" x="54" y="99"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_pickups" x="54" y="125"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_vehicles" x="54" y="151"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" x="54" y="177"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" x="54" y="203"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" x="54" y="229"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_ally_friendly_fire" x="54" y="255"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_team_wipe" x="54" y="281"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_vehicle_riding" x="54" y="307"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -326,7 +327,7 @@
 		<on event="start" run="port setup options save" back="true"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_friendly_fire" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_friendly_fire" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_friendly_fire_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_friendly_fire_spinner" x="286" y="1"/>
 	</widget>
@@ -341,7 +342,7 @@
 		<string text="SHIELD ONLY"/>
 		<string text="EXPLOSIVES ONLY"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_enemies" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_enemies" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_enemies_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_enemies_spinner" x="286" y="1"/>
 	</widget>
@@ -355,7 +356,7 @@
 		<string text="STATIC MULTIPLIER"/>
 		<string text="NONE"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_pickups" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_pickups" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_pickups_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_pickups_spinner" x="286" y="1"/>
 	</widget>
@@ -369,7 +370,7 @@
 		<string text="STATIC MULTIPLIER"/>
 		<string text="NONE"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_vehicles" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_extra_vehicles" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_vehicles_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_extra_vehicles_spinner" x="286" y="1"/>
 	</widget>
@@ -383,7 +384,7 @@
 		<string text="STATIC MULTIPLIER"/>
 		<string text="NONE"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_multiplier" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_multiplier_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_multiplier_spinner" x="286" y="1"/>
 	</widget>
@@ -399,7 +400,7 @@
 		<string text="16X"/>
 		<string text="32X"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_enemies_per_player" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_enemies_per_player_spinner" x="286" y="1"/>
 	</widget>
@@ -415,7 +416,7 @@
 		<string text="150%"/>
 		<string text="200%"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_player_collisions" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_player_collisions_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_player_collisions_spinner" x="286" y="1"/>
 	</widget>
@@ -428,7 +429,7 @@
 		<string text="ON"/>
 		<string text="OFF"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_ally_friendly_fire" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_ally_friendly_fire" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_ally_friendly_fire_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_ally_friendly_fire_spinner" x="286" y="1"/>
 	</widget>
@@ -441,7 +442,7 @@
 		<string text="ON"/>
 		<string text="OFF"/>
 	</strings>
-	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_team_wipe" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_team_wipe" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_team_wipe_label"/>
 		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_team_wipe_spinner" x="286" y="1"/>
 	</widget>
@@ -455,6 +456,19 @@
 		<string text="REVERT CHECKPOINT"/>
 		<string text="RESPAWN ONLY"/>
 	</strings>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/op_coop_vehicle_riding" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_vehicle_riding_label"/>
+		<child widget="main_menu/multiplayer_type_select/server_settings/coop_options/coop_vehicle_riding_spinner" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_vehicle_riding_label" type="text" controller="1" width="300" height="22" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_vehicle_riding_spinner" type="spinner" top="2" width="206" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_vehicle_riding" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 208 19 214">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/var_coop_vehicle_riding">
+		<string text="ON"/>
+		<string text="OFF"/>
+	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/coop_options_labels">
 		<string text="FRIENDLY FIRE:"/>
 		<string text="EXTRA ENEMIES:"/>
@@ -465,6 +479,7 @@
 		<string text="PLAYER COLLISIONS:"/>
 		<string text="ALLY FRIENDLY FIRE:"/>
 		<string text="TEAM WIPE:"/>
+		<string text="VEHICLE RIDING:"/>
 	</strings>
 	<strings name="main_menu/multiplayer_type_select/server_settings/coop_options/cap_coop_options">
 		<string text="Players can not be hurt by weapons and explosives\nfired by the other players."/>
@@ -497,6 +512,8 @@
 		<string text="Private games revert the checkpoint; public games\nonly respawn. A changed team or missing save\nalways uses respawn only."/>
 		<string text="Revert the checkpoint after everyone dies. A changed\nteam or missing save uses respawn only."/>
 		<string text="Respawn at checkpoint positions after everyone dies.\nThe world keeps its progress."/>
+		<string text="Players standing on a vehicle are carried by it.\nOff: as the original game, riders slide off."/>
+		<string text="Players standing on a vehicle are carried by it.\nOff: as the original game, riders slide off."/>
 	</strings>
 	<widget name="main_menu/multiplayer_type_select/server_settings/voice_options/voice_options_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<child widget="main_menu/multiplayer_type_select/server_settings/voice_options/header_voice_options"/>

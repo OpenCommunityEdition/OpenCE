@@ -10,7 +10,7 @@ from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run
 from harness.audio import manager_types
 
 CASES = ["fresh-loop", "fresh-impulse", "pending", "restart", "intro-loop",
-         "rapid", "other-owner", "other-track", "stop-cue", "fake-impulse", "repeated-stop", "four-tracks"]
+         "rapid", "other-owner", "other-track", "stop-cue", "fake-impulse", "repeated-stop", "four-tracks", "own-obstruction"]
 NEGATIVE_CONTROLS = {
     "keeps-replaced-voice": (("sound_index != except_sound_index &&", "FALSE &&"), "restart"),
     "cancels-other-owner": (("sound->source_identifier == looping_sound_index &&", "TRUE &&"), "other-owner"),

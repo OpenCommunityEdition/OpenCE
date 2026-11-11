@@ -191,7 +191,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "rasterizer/rasterizer.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
-#include "mcc_cache.h" /* independent MCC reads and namespace */
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.c */
 #include "mcc_share.h" /* port: port/linux/game/mcc_share.c */
 
 #include <xtl.h>
@@ -584,6 +584,7 @@ boolean cache_files_precache_is_copying_map(
 boolean cache_files_precache_map_loaded(
 	const char *map_name)
 {
+	/* port: an MCC map (mcc_maps\<name>) is read in place (mcc_cache.c) */
 	if (mcc_level_name(map_name))
 		return mcc_cache_available(map_name);
 	/* port: a Halo Custom Edition map (custom_maps\<name>) is read in place
@@ -871,6 +872,14 @@ short cache_file_read(
 	short request_index = cache_request_next_free_index();
 	struct cache_file_request *request = cache_request_get(request_index);
 
+	/* port: the reads of an MCC map are served in place, at once
+	(port/linux/game/mcc_cache.c) */
+	if (mcc_cache_tags_loaded())
+	{
+		*completion_flag_reference = mcc_cache_read(tag_index, offset, size, buffer) ?
+			TRUE : _cache_file_read_failed;
+		return request_index;
+	}
 	/* port: the reads of a Halo Custom Edition map are served in place, at
 	once; the request stays free (port/linux/game/custom_edition_cache.c) */
 	if (mcc_cache_tags_loaded())

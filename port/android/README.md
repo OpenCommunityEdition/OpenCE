@@ -227,9 +227,18 @@ value. Touches that start in the edge-gesture zones of Android do not tap
 or scroll at the sides, and do not scroll at the top and bottom, because the
 first swipe from an edge in full screen only shows the system bars.
 
-A tap during a cinematic that can be skipped skips it, as A does. On the
-game's on-screen keyboard (a player profile's name), tap a key to press it,
-"B =BACK" to cancel and "A =ENTER" to accept the name.
+During a cinematic that can be skipped, a SKIP button shows at the top
+right, in the black bar: tap it to skip the cinematic, as A does. Taps
+elsewhere do nothing, so a stray tap does not skip it. In network co-op,
+SKIP votes to skip, the line at the bottom counts the votes, and the button
+reads VOTED once you have voted; the cinematic is skipped once more than
+half the players have voted. The button follows the touch controls
+(`input.touch_controls`): while a controller is connected, or with `off`,
+there is no button and any tap skips, or votes to skip, as A does
+(`port/linux/game/touch_cinematic.c`).
+
+On the game's on-screen keyboard (a player profile's name), tap a key to
+press it, "B =BACK" to cancel and "A =ENTER" to accept the name.
 
 While a name is typed, on the game's on-screen keyboard or in a menu's text
 field (Server Setup's server name and password, a game's password when
@@ -395,7 +404,7 @@ These settings are only for Android:
 | Setting | Function |
 | --- | --- |
 | `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
-| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The carnage report's CONTINUE and LEAVE buttons follow the same rule (otherwise it shows its A and B prompt). The menus take taps in any case. |
+| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The carnage report's CONTINUE and LEAVE buttons follow the same rule (otherwise it shows its A and B prompt), and so does a cinematic's SKIP button (otherwise any tap skips it). The menus take taps in any case. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
 | `display.stats_log` | `false` (the default): `true` writes a line a second to the log with the frame rate, the mode, the map, the renderer and the size of the 3D view, for a bug report or to compare two builds. |
 | `display.resolution_scaling` | Also Linux's, with another default on Android. `"original"` (the default): the game draws the 480 lines of the Xbox, which the display scales up. `"native"`: the game draws at the display's resolution (1080 lines on a 1080p phone). `"75%"`, `"50%"` or `"25%"`: that part of the display's resolution each way, scaled up: less for the GPU to draw, for more frames a second and less heat. Video Setup's Resolution Scaling sets it, from the next frame. |

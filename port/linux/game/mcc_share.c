@@ -26,7 +26,6 @@
 #include "mcc_share_session.h"
 #include "mcc_share_package.h"
 #include "mcc_share_storage.h"
-#include "mcc_protocol.h"
 #include "../src/mcc_share_metadata.h"
 #include "../src/posix.h"
 #include "tag_files/tag_groups.h"
@@ -216,8 +215,8 @@ void mcc_share_game_handle_message(
 		/* (the host takes requests from the machines of its game) */
         if (machine_index >= 0 && machine_index < MCC_SHARE_HOST_MACHINES && global_network_game_server_get() &&
             network_game_get_game() && mcc_level_name(network_game_get_game()->map.name) &&
-            mcc_protocol_allows(network_game_get_game(),network_game_server_get_client_machine_at_index(
-                global_network_game_server_get(),machine_index)))
+            network_game_server_client_machine_is_joined_to_game(global_network_game_server_get(),
+                network_game_server_get_client_machine_at_index(global_network_game_server_get(),machine_index)))
             mcc_share_host_request(&mcc_share_globals, machine_index, body, size - sizeof(header));
 	}
 	else if (machine_index == NONE && !global_network_game_server_get())
@@ -596,7 +595,7 @@ void mcc_share_game_peer_left(struct network_game_server_client_machine *machine
     for (index=0;index<MCC_SHARE_HOST_MACHINES;index++)
         if (network_game_server_get_client_machine_at_index(server,index)==machine) {
             mcc_admission_peer_left(index);
-            mcc_load_network_peer_left(index);
+            mcc_load_network_machine_left(index);
             if (mcc_share_ready) mcc_share_host_forget(&mcc_share_globals,index);
             mcc_share_admission_pending[index]=0;
         }

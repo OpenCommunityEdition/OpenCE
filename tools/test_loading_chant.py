@@ -25,7 +25,7 @@ class LoadingChantTests(unittest.TestCase):
         cls.addClassCleanup(cls.work.cleanup)
         work = Path(cls.work.name)
         backend = mixer_source()
-        fixture = (ROOT / "tools/harness/tests/mixer.c").read_text()
+        fixture = (ROOT / "tools/harness/tests/mixer_fixture.h").read_text()
         types = fixture[fixture.index("typedef int BOOL;"):fixture.index('#include "under_test.inc"')]
         implementation = backend[backend.index("#define OUTPUT_RATE"):backend.index("/* ---------- output")]
         buffers = backend[backend.index("/* ---------- buffers"):]

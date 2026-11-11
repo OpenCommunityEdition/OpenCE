@@ -278,7 +278,7 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
             short entry;
             struct icon_hud_element_definition const *buttons=hud_globals->messaging.button_icons.address;
             for (entry=0;entry<18 && entry<hud_globals->messaging.button_icons.count;entry++)
-                if (icon==buttons+entry && controller_glyph_draw(controller_glyph_style(),entry,icon,cursor,color,xgpu_mcc_texture_unbind))
+                if (icon==buttons+entry && controller_glyph_draw_with_release(controller_glyph_style(),entry,icon,cursor,color,xgpu_mcc_texture_unbind))
                     return TRUE;
         }
         button_index=mcc_hud_button_index(icon);

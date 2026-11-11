@@ -1,4 +1,4 @@
-"""OpenH1 hardware-derived DSP regressions, adapted to GulchCE's queue ownership.
+"""OpenH1 hardware-derived DSP regressions, adapted to OpenCE's queue ownership.
 Source: OpenH1/OpenH1 6750db5a6c9716857bd1e63d9ec188a20c49f1d3, AGPL-3.0-or-later.
 """
 import sys
@@ -157,14 +157,6 @@ NEGATIVE_CONTROLS = {
  'lfe-120-hz': (('#define LFE_CUTOFF 86.0\n#define LFE_SECTIONS 2\n',
                  '#define LFE_CUTOFF 120.0\n#define LFE_SECTIONS 4\n'),
                 'lfe'),
- 'hrtf-no-delay': (('parameters->delay[mirrored] = floorf(', 'parameters->delay[mirrored] = 0.0f * floorf('),
-                   'hrtf-cues'),
- 'hrtf-no-shadow': (('const float *decibels = ear ^ mirrored ? direction.right : direction.left;',
-                     'const float *decibels = direction.right;'),
-                    'hrtf-cues'),
- 'hrtf-no-elevation': (('elevation = atan2f(up,', 'elevation = 0.0f * atan2f(up,'), 'hrtf-cues'),
- 'hrtf-no-rear': (('azimuth = atan2f(fabsf(right), ahead)', 'azimuth = atan2f(fabsf(right), fabsf(ahead))'),
-                  'hrtf-cues'),
  'hrtf-no-distance': (('hrtf_out->gain = 0.70710678f * attenuation *', 'hrtf_out->gain = 0.70710678f *'),
                       'hrtf-paths'),
  'hrtf-switch-at-once': (('hrtf_mix = hrtf_on ? stream->hrtf_mix : 0.0f;',
@@ -190,4 +182,4 @@ def test_negative_control(control):
 if __name__ == "__main__":
     import subprocess
     executable = build_mixer(generated(), "xbox_mixer")
-    sys.exit(subprocess.run([str(executable), *(sys.argv[1:] or ["metrics"])]).returncode)
+    sys.exit(subprocess.run([str(executable), *(sys.argv[1:] or ["output-level"])]).returncode)

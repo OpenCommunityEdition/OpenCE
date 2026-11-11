@@ -107,7 +107,7 @@ static int (*host_missing)(char const[128],unsigned char const[32],unsigned char
 static int (*join_missing)(char const[128],unsigned char const[32],unsigned char const[32]);
 static unsigned char host_digest[32],host_metadata[32];
 static char snapshot[64],opened_url[128];
-static int role_host,peer_joined=1,peer_capable=1,prompts,lobby_restores;
+static int role_host,peer_joined=1,prompts,lobby_restores;
 static int overlay_draws,allow_prompt=1;
 static int abort_pending,menu_loaded=1,manual_return,menu_returns;
 static char overlay_text[256];
@@ -125,7 +125,7 @@ void mcc_identity_update(void) {}
 int mcc_identity_pending(char const *level)
 { return !role_host && validation_pending && (!level || !strcmp(level,LEVEL)); }
 void mcc_load_network_disconnect(void) {}
-void mcc_load_network_peer_left(long machine) {(void)machine;}
+void mcc_load_network_machine_left(long machine) {(void)machine;}
 void mcc_admission_update(void) {}
 void mcc_admission_client_finish(int ready) {(void)ready;admission_pending=0;}
 uint32_t mcc_admission_client_token(void) {return admission_pending ? admission_token : 0;}
@@ -361,8 +361,6 @@ struct network_game_server_client_machine *network_game_server_get_client_machin
 { return index==MACHINE ? &peer : NULL; }
 int network_game_server_client_machine_is_joined_to_game(struct network_game_server *s,struct network_game_server_client_machine *p)
 { return p==&peer && peer_joined; }
-int mcc_protocol_allows(struct network_game const *g,struct network_game_server_client_machine const *p)
-{ return g && p==&peer && peer_capable; }
 int mcc_level_name(char const *name) { return !strncmp(name,"mcc_maps",8); }
 int network_connection_last_read_was_unreliable(void) { return 0; }
 static int joiner_replies;
@@ -860,10 +858,11 @@ int main(int argc,char **argv)
             CHECK(response.result==MCC_SHARE_RESULT_NOT_SHAREABLE);return 0;
         }
         h_mcc_share_game_handle_message(MACHINE,(word *)&m,sizeof(m),0);
+        h_mcc_share_game_update();CHECK(to_join_count==0 && !h_mcc_share_game_machine_active(MACHINE));
         h_mcc_share_game_handle_message(-1,(word *)&m,sizeof(m),1);
         h_mcc_share_game_handle_message(MACHINE+1,(word *)&m,sizeof(m),1);
         h_mcc_share_game_handle_message(MACHINE,(word *)&m,sizeof(m)-1,1);
-        peer_capable=0;h_mcc_share_game_handle_message(MACHINE,(word *)&m,sizeof(m),1);peer_capable=1;
+        peer_joined=0;h_mcc_share_game_handle_message(MACHINE,(word *)&m,sizeof(m),1);peer_joined=1;
         m.h.count=2;h_mcc_share_game_handle_message(MACHINE,(word *)&m,sizeof(m),1);m.h.count=1;
         m.h.header|=1;h_mcc_share_game_handle_message(MACHINE,(word *)&m,sizeof(m),1);m.h.header&=~1;
         h_mcc_share_game_update();CHECK(to_join_count==0 && !h_mcc_share_game_machine_active(MACHINE));

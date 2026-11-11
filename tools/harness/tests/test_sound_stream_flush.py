@@ -15,6 +15,8 @@ NEGATIVE_CONTROLS = {
         "stream_complete_head(stream, head->finished ? XMEDIAPACKET_STATUS_SUCCESS : XMEDIAPACKET_STATUS_FLUSHED,"), "mixed-head"),
     "does-not-unlock-cache": (("sound_cache_sound_hardware_unlock(packet_context);", ""), "mixed-head"),
     "does-not-reset-resampler": (("resampler_reset(stream);", ""), "repeat"),
+    "mixed-while-flushed": (("stream->flushing = TRUE;", ""), "mixed-head"),
+    "left-flushing": (("stream->flushing = FALSE;", ""), "mixed-head"),
 }
 
 

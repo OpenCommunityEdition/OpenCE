@@ -7,7 +7,6 @@
 #include "network_distributed.h"
 #include "mcc_admission.h"
 #include "mcc_identity.h"
-#include "mcc_protocol.h"
 #include "mcc_cache.h"
 #include <string.h>
 
@@ -40,7 +39,7 @@ static int peer_valid(void *unused,long index)
     (void)unused;
     if (!server || !game || index<0 || index>=MCC_ADMISSION_MACHINES || !mcc_level_name(game->map.name)) return 0;
     machine=network_game_server_get_client_machine_at_index(server,index);
-    return network_game_server_client_machine_is_joined_to_game(server,machine) && mcc_protocol_allows(game,machine);
+    return network_game_server_client_machine_is_joined_to_game(server,machine);
 }
 
 static int peer_has_players(void *unused,long index)

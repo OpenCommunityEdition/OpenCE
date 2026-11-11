@@ -76,7 +76,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
-#include "mcc_grenades.h"
+#include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
 #include "bitmaps/bitmap_group.h"
 #include "camera/director.h"
 #include "cache/texture_cache.h"

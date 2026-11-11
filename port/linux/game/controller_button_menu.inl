@@ -41,7 +41,8 @@ static void controller_button_rows_show(struct widget_instance *list)
         setting = spinner ? pc_menu_setting_get(spinner->definition_tag_index) : NULL;
         index = spinner ? spinner->parameters.list.selected_index : -1;
         if (setting && index >= 0 && index < setting->value_count)
-            bumper_visible = controller_button_style_index(setting->values[index]) < 3;
+            bumper_visible = strcmp(setting->values[index], "keyboard") &&
+                controller_button_style_index(setting->values[index]) < 3;
         /* Last option in Button Appearance; help and bottom buttons stay put. */
         bumper->visible = bumper_visible;
         if (!bumper_visible && list->focused_child == bumper) list->focused_child = shown;

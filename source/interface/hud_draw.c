@@ -92,8 +92,8 @@ symbols in this file:
 #include "bitmaps/bitmaps_inlines.h"
 #include "bitmaps/bitmap_utilities.h"
 #include "cache/texture_cache.h"
-#include "mcc_cache.h"
-#include "mcc_hud_draw.h"
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.h */
 #include "effects/particles.h"
 #include "game/game.h"
 #include "game/players.h"
@@ -734,6 +734,7 @@ static void hud_draw_multitexture_overlay(
 			}
 
 			parameters.map_offset[map_index] = &texture_offset[map_index];
+			/* port: an MCC map's linear bitmaps are addressed in texels */
 			if (mcc_cache_tags_loaded())
 			{
 				boolean mcc_linear = TEST_FLAG(parameters.map[map_index]->flags, _bitmap_linear_bit);
@@ -793,6 +794,7 @@ static void hud_draw_multitexture_overlay(
 	reticle added its whole square) */
 	parameters.alpha_weighted = custom_edition_cache_tags_loaded() &&
 		parameters.framebuffer_blend_function == _shader_framebuffer_blend_function_add;
+	/* port: and an MCC map's, as Custom Edition's */
 	if (mcc_cache_tags_loaded())
 		parameters.alpha_weighted = parameters.framebuffer_blend_function == _shader_framebuffer_blend_function_add;
 
@@ -2127,6 +2129,7 @@ void hud_draw_numbers(
 				digit_scale = scale * custom_edition_hud_number_scale(hud_number->number_bitmap.index,
 					numbers->placement.multiplayer_scaling_flags);
 
+			/* port: an MCC map's HUD canvas (mcc_hud.c) */
 			if (mcc_cache_tags_loaded())
 				digit_scale *= mcc_hud_canvas_scale();
 

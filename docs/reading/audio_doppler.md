@@ -52,8 +52,8 @@ read by `DirectSoundDoWork`; a playing voice glides to its new pitch over
    to `mix_voice`. Relative radial motion changes the resampling step. Both
    ends of the pitch ramp are bounded against the current authored playback
    frequency, so `SetFrequency` cannot leave the previous ratio outside the
-   supported range. Xbox, sinc and linear modes use the same step. The measured Xbox first-order
-   Doppler law replaces the earlier reciprocal approximation; see
+   supported range. Xbox, sinc and linear modes use the same step. The measured
+   Xbox first-order Doppler law replaces the earlier reciprocal approximation; see
    [Xbox audio processing](xbox_audio.md) for hardware evidence.
 
 ## State and integration boundaries
@@ -95,3 +95,18 @@ These checks establish calculation behavior. They do not establish perceptual
 equivalence to retail Xbox hardware. Map transitions, checkpoints and moving
 vehicles still warrant runtime listening on the supported platforms; a
 successful build or map load alone cannot establish full audio compatibility.
+
+## Interrupted voices and packet cancellation
+
+OpenCE PR #551 captures the next 5 ms of an interrupted voice in `voice_cut`
+and fades that copy through `mix_cut`, while returning packet ownership to
+the game synchronously. `stream_flush` drops the mixer lock during completion
+callbacks. Its `flushing` guard prevents remaining live packets from mixing
+over the captured fade; a nested flush leaves cancellation to the outer call.
+After cancellation the guard clears, so the channel can play a new sound.
+
+The mixer harness interleaves a real audio worker with completion callbacks,
+checks overlapping output and reverb tails, and covers pause, restart and
+release. The random cut test interrupts again before the first fade drains.
+The separate stream-flush fixture checks packet and cache ownership. These
+checks exercise the shared mixer without changing any map-family loader.

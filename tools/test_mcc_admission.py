@@ -160,7 +160,6 @@ def test_game_adapter_authenticates_transport_and_current_settings(tmp_path, mis
         __import__("re").findall(r"\b(network_game_server_handle_message_\w+)\(", ingress + datagram))))
     declarations = r'''
 #include "third_person_protocol.h"
-#include "mcc_protocol.h"
 #define MINIMUM_TRANSPORT_ERROR_MESSAGE_SIZE 4
 #define TRANSPORT_ERROR_MESSAGE_TEXT_LENGTH 1
 #define _network_game_server_state_ingame 1
@@ -168,7 +167,6 @@ def test_game_adapter_authenticates_transport_and_current_settings(tmp_path, mis
 static void network_event(char const *format,...){(void)format;}
 #define third_person_session_active() 0
 #define third_person_protocol_unwrap(a,b,c,d) ((void)(a),(void)(b),(void)(c),(void)(d),0)
-#define mcc_protocol_unwrap(a,b,c,d) ((void)(a),(void)(b),(void)(c),(void)(d),0)
 #define network_game_server_get_state(...) ingame
 #define network_game_server_client_machine_is_loaded(...) loaded
 static int network_game_server_get_client_machine(struct network_game_server *s,struct network_game_server_client_machine *m,long *index){(void)s;(void)m;*index=2;return mapped;}
@@ -220,7 +218,7 @@ static struct network_game game;
 static struct network_game_server server;
 static struct network_game_client client;
 static struct network_game_server_client_machine peer;
-static int hosting=1,joined=1,capable=1,connected=1,sends,ingame,loaded,ordinary,mapped=1,progress;
+static int hosting=1,joined=1,connected=1,sends,ingame,loaded,ordinary,mapped=1,progress;
 static unsigned long now=1000,revision=1;
 static struct {struct distributed_message_header header;struct mcc_admission_message body;} packet,last;
 typedef char wire_message_is_216[sizeof(packet)==216 ? 1 : -1];
@@ -232,7 +230,6 @@ struct network_game *network_game_get_game(void){return &game;}
 struct network_game *network_game_client_get_game(struct network_game_client *c){(void)c;return &game;}
 struct network_game_server_client_machine *network_game_server_get_client_machine_at_index(struct network_game_server *s,long n){(void)s;return n==2 ? &peer : NULL;}
 boolean network_game_server_client_machine_is_joined_to_game(struct network_game_server *s,struct network_game_server_client_machine *p){(void)s;return joined && p==&peer;}
-int mcc_protocol_allows(struct network_game const *g,struct network_game_server_client_machine *p){(void)g;(void)p;return capable;}
 boolean network_player_is_valid(struct network_player *p){return p->valid;}
 boolean mcc_level_name(char const *name){return !strncmp(name,"mcc_maps\\",9);}
 unsigned long mcc_identity_host_revision(void){return revision;}
@@ -266,7 +263,7 @@ int main(void){
  mcc_admission_handle_message(2,&packet,sizeof(packet)-1,1);CHECK(!sends);
  packet.header.count=2;receive(1);CHECK(!sends);packet.header.count=1;
  packet.header.header|=1;receive(1);CHECK(!sends);packet.header.header&=~1;
- capable=0;receive(1);CHECK(!sends);capable=1;joined=0;receive(1);CHECK(!sends);joined=1;
+ joined=0;receive(1);CHECK(!sends);joined=1;
  mapped=0;receive(1);CHECK(!sends);mapped=1;
  receive(1);CHECK(sends==1 && last.body.op==MCC_ADMISSION_ACK && mcc_admission_host_needs_map(2));
  CHECK(!ingame && !loaded && !ordinary);

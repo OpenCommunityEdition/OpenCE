@@ -1,6 +1,5 @@
 #include "cseries.h"
 #include "third_person_protocol.h"
-#include "mcc_protocol.h"
 #include "networking/network_messages.h"
 #include "bungie_net/common/message_header.h"
 #include "third_person.h"
@@ -54,7 +53,7 @@ int third_person_session_set(int enabled)
 
 void third_person_session_client_begin(unsigned int version)
 {
-    camera_client = version == THIRD_PERSON_PROTOCOL_VERSION || version == THIRD_PERSON_PROTOCOL_MCC_VERSION;
+    camera_client = version == THIRD_PERSON_PROTOCOL_VERSION;
     third_person_reset();
 }
 
@@ -66,22 +65,18 @@ void third_person_session_client_clear(void)
 
 unsigned int third_person_session_version(char const *map)
 {
-    unsigned int base = mcc_protocol_version(map);
-    if (!third_person_session_active()) return base;
-    return base == MCC_PROTOCOL_VERSION ? THIRD_PERSON_PROTOCOL_MCC_VERSION : THIRD_PERSON_PROTOCOL_VERSION;
+    (void)map;
+    return third_person_session_active() ? THIRD_PERSON_PROTOCOL_VERSION : HALO_PORT_NETWORK_VERSION;
 }
 
 int third_person_session_compatible(char const *map, unsigned int version, unsigned int flags)
 {
-    unsigned int base = mcc_protocol_version(map);
+    (void)map;
     if (!(flags & HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG)) return 0;
-    if (base == MCC_PROTOCOL_VERSION && !(flags & MCC_PROTOCOL_ADVERTISED_FLAG)) return 0;
-    return version == base || version == (base == MCC_PROTOCOL_VERSION ?
-        THIRD_PERSON_PROTOCOL_MCC_VERSION : THIRD_PERSON_PROTOCOL_VERSION);
+    return version == HALO_PORT_NETWORK_VERSION || version == THIRD_PERSON_PROTOCOL_VERSION;
 }
 
-/* MCC retains ownership of its optional inner envelope and capability checks.
- * This outer envelope only establishes the camera branch's wire contract. */
+/* The camera envelope carries only the ordinary OpenCE join. */
 static int third_person_protocol_inner_valid(byte const *message, unsigned short bytes)
 {
     word header;
@@ -90,8 +85,7 @@ static int third_person_protocol_inner_valid(byte const *message, unsigned short
     if (GET_MESSAGE_FLAGS(header) || GET_MESSAGE_SIZE(header) != bytes) return 0;
     if (GET_MESSAGE_TYPE(header) == _message_type_packet)
         return message[bytes - 1] == _message_client_join_game_request;
-    return GET_MESSAGE_TYPE(header) == 2 && bytes > 10 &&
-        bytes <= MCC_PROTOCOL_JOIN_MAX && message[2] == MCC_PROTOCOL_JOIN_KIND;
+    return 0;
 }
 
 void const *third_person_protocol_join(void const *message, unsigned short bytes, void *buffer)
@@ -109,7 +103,7 @@ void const *third_person_protocol_join(void const *message, unsigned short bytes
 }
 
 /* Camera sessions require this proof before admission, even Forced Off.
- * GulchCE Standard does not send or accept a camera envelope. */
+ * OpenCE Crossplay does not send or accept a camera envelope. */
 int third_person_protocol_unwrap(void const *message, unsigned short bytes,
     void *inner, unsigned short *inner_bytes)
 {

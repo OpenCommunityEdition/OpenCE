@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 import pytest
-from test_mcc_identity import compile_tool
+from mcc_test_support import compile_tool
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -110,11 +110,22 @@ def test_cancel_only_owned_nested_files(stage_tool, tmp_path):
 
 
 def test_existing_stage_is_not_reused_or_cleaned(stage_tool, tmp_path):
-    keep = tmp_path / "mcc_staging/snapshot/m0.map.part"
+    keep = tmp_path / "mcc_staging/snapshot/notes.txt"
     keep.parent.mkdir(parents=True)
     keep.write_bytes(b"not ours")
     assert run(stage_tool, "install", tmp_path).startswith("begin ")
     assert keep.read_bytes() == b"not ours"
+
+
+def test_stage_left_by_a_cut_off_download_is_cleared(stage_tool, tmp_path):
+    # the folder's name comes from the offer: a crash must not block it for good
+    stage = tmp_path / "mcc_staging/snapshot"
+    (stage / "metadata").mkdir(parents=True)
+    (stage / "m0.map").write_bytes(b"x")
+    (stage / "metadata/m0.json.part").write_bytes(b"partial")
+    assert run(stage_tool, "install", tmp_path) == "install 0"
+    assert not stage.exists()
+    assert (tmp_path / "mcc_maps/snapshot/m0.map").read_bytes() == b"x"
 
 
 def test_existing_destination_is_preserved(stage_tool, tmp_path):
@@ -167,3 +178,47 @@ def test_staging_link_refused(stage_tool, tmp_path):
             os.rmdir(link)
         else:
             link.unlink()
+
+
+def make_link(link, target):
+    if sys.platform == "win32":
+        result = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+    else:
+        link.symlink_to(target, target_is_directory=True)
+
+
+def remove_link(link):
+    if sys.platform == "win32":
+        os.rmdir(link)
+    else:
+        link.unlink()
+
+
+def test_link_above_the_managed_folders_is_the_users_own(stage_tool, tmp_path):
+    # ~/.steam/steam is a link to ~/.local/share/Steam; a data root may be too
+    real = tmp_path / "real"
+    (real / "steamapps/workshop/content/1695791/1").mkdir(parents=True)
+    (real / "mcc_staging").mkdir()
+    link = tmp_path / "root"
+    make_link(link, real)
+    try:
+        assert run(stage_tool, "safe", link / "steamapps/workshop/content/1695791/1") == "1"
+        assert run(stage_tool, "safe", link / "mcc_staging/snapshot") == "1"
+        assert run(stage_tool, "install", link) == "install 0"
+    finally:
+        remove_link(link)
+
+
+def test_link_below_the_managed_folders_is_refused(stage_tool, tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "steamapps/workshop/content").mkdir(parents=True)
+    link = tmp_path / "steamapps/workshop/content/1695791"
+    make_link(link, outside)
+    try:
+        assert run(stage_tool, "safe", link / "1") == "0"
+        # a later folder of the same name does not move the boundary down
+        assert run(stage_tool, "safe", tmp_path / "steamapps/workshop/content/1695791/mcc_maps") == "0"
+    finally:
+        remove_link(link)

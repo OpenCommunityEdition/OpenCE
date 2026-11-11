@@ -229,11 +229,11 @@ static struct tag_schema_definition const hud_storage_schema=
     TAG_SCHEMA_DEFINITION(hud_storage,struct test_root,hud_storage_fields);
 #endif
 static struct tag_schema_group const groups[] = {
-    {'mpck',{NONE,NONE},&model_part_schema},
 #ifdef MCC_HUD_VALIDATION
     {'wphi',{NONE,NONE},&hud_test_schema},
     {'hsto',{NONE,NONE},&hud_storage_schema},
 #endif
+    {'mpck',{NONE,NONE},&model_part_schema},
     {'pctl',{NONE,NONE},&particle_schema},
     {'coll',{NONE,NONE},&collision_schema},
     {'dmg!',{NONE,NONE},&damage_schema},

@@ -39,7 +39,6 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<widget name="main_menu/solo_level_select/solo_level_select_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/solo_level_select/solo_level_extended_desc">
-		<data input="solo map list update"/>
 		<on event="created" run="initialize sp level list solo"/>
 		<on event="deleted" run="dispose sp level list"/>
 		<on event="custom_activation" run="solo level set map" open="main_menu/difficulty_select/difficulty_select_list_screen"/>

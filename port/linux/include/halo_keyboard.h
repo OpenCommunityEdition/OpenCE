@@ -59,8 +59,7 @@ enum halo_keyboard_action
 (a bit for each halo_keyboard_action): theirs is the first's; none while a
 menu or the console is up, or a chat line is typed */
 unsigned long halo_keyboard_actions(short controller_index);
-/* Binding-aware prompt groundwork: slot 0/1, layout-aware key/mouse label.
- * Returns zero (and an empty label) for an invalid or unbound action/slot. */
+/* Current binding label, slot 0/1; zero and empty for unbound or invalid inputs. */
 int halo_keyboard_binding_label(int action, int slot, char *shown, unsigned int size);
 /* whether voice chat's push to talk is held (controls.push_to_talk), in the
 game and in the menus alike */

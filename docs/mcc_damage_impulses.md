@@ -29,11 +29,9 @@ binary only. These are observations, not copied engine code or SDK declarations.
 
 The port retains its legacy scalar calculation and admission outside MCC
 extension effects. Invalid or overflowing extension results are rejected.
-No native skull behavior is introduced. Gulch testing retains network version
-41 and its separate MCC agreement at the maintainer's request. Xbox/CE packet
-layouts and scalar simulation remain unchanged. This testing update does not
-separate corrected MCC simulation from older builds using the same MCC agreement;
-MCC participants should use matching builds.
+No native skull behavior is introduced. Peers must agree on the impulses:
+network version 43 separates builds with this calculation from version 42
+builds, which had the inferred world-space vector.
 
 Regression coverage extracts the production adapter and damage dispatch.
 It checks cardinal and opposite directions, signed and unequal components,
@@ -53,12 +51,10 @@ ticks. It was a direct map-load smoke test, not a multiplayer movement test.
 
 ## Historical investigation (superseded coordinate interpretation)
 
-> Historical component evidence from the refactored source branch. Protocol
-> numbers and platform limitations below describe the original validation;
-> they are not the current upstream agreement. The MCC contribution uses
-> OpenCE protocol **42**. See the [upstream validation record](mcc_upstream_validation.md)
-> for the testing-based contribution and the [reading guide](reading/README.md#scope-and-provenance)
-> for source and test availability.
+> Component evidence from the source branch the MCC support came from.
+> Protocol numbers below are that branch's; MCC maps now play with OpenCE's
+> network version (`HALO_PORT_NETWORK_VERSION`, [NETCODE.md](../port/linux/NETCODE.md)).
+> The [reading guide](reading/README.md#scope-and-provenance) follows the sources.
 
 Issue #27 concerns Mercury2's gravity wrench. The supplied version-13 map's
 `weapons\gravity_wrench\projectile\beam` damage effect has flags `0x30000`

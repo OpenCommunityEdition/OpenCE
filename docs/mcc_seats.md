@@ -1,5 +1,10 @@
 # Authored MCC biped seats
 
+> Component evidence from the source branch the MCC support came from.
+> Protocol numbers below are that branch's; MCC maps now play with OpenCE's
+> network version (`HALO_PORT_NETWORK_VERSION`, [NETCODE.md](../port/linux/NETCODE.md)).
+> The [reading guide](reading/README.md#scope-and-provenance) follows the sources.
+
 FloodSlayer (`c10_flood.map`, Workshop 3629556661) gives several bipeds a
 `stand` seat and gives its playable infection form matching entry/exit
 animations. This is authored unit data, rather than a missing script function.

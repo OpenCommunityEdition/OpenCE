@@ -2,10 +2,9 @@
 #ifndef THIRD_PERSON_PROTOCOL_H
 #define THIRD_PERSON_PROTOCOL_H
 
-/* Separate agreements include host scripted player poses and bounded MCC
- * admission/conversion progress; never advertise these as upstream compatibility. */
-#define THIRD_PERSON_PROTOCOL_VERSION 32740
-#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32742
+/* OpenCE 43 plus shoulder-camera input and policy in cooperative flag bits 4-5.
+ * All map families share this agreement; older camera sessions are incompatible. */
+#define THIRD_PERSON_PROTOCOL_VERSION 32744
 
 struct network_game;
 void third_person_session_host_begin(void);

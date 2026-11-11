@@ -362,26 +362,14 @@ static boolean bitmap_swizzle_possible(
 		power_of_two(bitmap->width) && power_of_two(bitmap->height) && power_of_two(bitmap->depth);
 }
 
-/* Whether the existing Xbox rebuild can safely swizzle or pad this bitmap.
-Raw NPOT DXT is admitted separately by custom_edition_bitmap_raw_2d. */
+/* Whether the texture cache can draw `bitmap` after the swizzle: what
+bitmap_readable checks, and bitmap_swizzle_possible. One that is readable
+and not swizzle-able (Halo PC draws bitmaps of any sides, its HUD's among
+them) is drawn from its pixels as the tag lays them out. */
 boolean custom_edition_bitmap_drawable(
 	struct bitmap_data *bitmap)
 {
 	return bitmap_readable(bitmap) && bitmap_swizzle_possible(bitmap);
-}
-
-/* Only single-level, block-aligned 2D DXT can use the Size-word descriptor.
-Other NPOT layouts still need a representation, not just relaxed admission. */
-boolean custom_edition_bitmap_raw_2d(struct bitmap_data const *bitmap)
-{
-	return bitmap->type == _bitmap_type_2d &&
-		bitmap->format >= _bitmap_format_dxt1 && bitmap->format <= _bitmap_format_dxt5 &&
-		TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) &&
-		!TEST_FLAG(bitmap->flags, _bitmap_linear_bit) &&
-		bitmap->width > 0 && bitmap->width <= 4096 &&
-		bitmap->height > 0 && bitmap->height <= 4096 && bitmap->depth == 1 &&
-		!(bitmap->width & 3) && !(bitmap->height & 3) && bitmap->mipmap_count == 0 &&
-		(!power_of_two(bitmap->width) || !power_of_two(bitmap->height));
 }
 
 /* where bitmap `bitmap_index` of the tag `handle` names is in the list of
@@ -785,12 +773,11 @@ boolean custom_edition_bitmaps_verify(
 		{
 			struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, bitmap_index, struct bitmap_data);
 
-			if (!custom_edition_bitmap_drawable(bitmap) &&
-				!(bitmap_readable(bitmap) && custom_edition_bitmap_raw_2d(bitmap)))
+			if (!bitmap_readable(bitmap))
 			{
 				error(
 					_error_silent,
-					"custom edition: bitmap %ld of '%s' (type %d, format %d, %dx%dx%d, flags 0x%X) cannot be drawn (invalid pixels or unsupported layout, mip levels or dimensions)",
+					"custom edition: bitmap %ld of '%s' (type %d, format %d, %dx%dx%d, flags 0x%X) cannot be read by this build",
 					bitmap_index,
 					custom_edition_cache_tag_name(tag_cache, loaded_bytes, tag_index),
 					bitmap->type,
@@ -803,7 +790,7 @@ boolean custom_edition_bitmaps_verify(
 			}
 			if (!bitmap_swizzle_possible(bitmap))
 			{
-				/* Accepted raw DXT keeps its block layout and exact dimensions. */
+				/* port: sides only Halo PC draws are not a reason to refuse a map */
 				if (unswizzled_count++ < 16)
 				{
 					error(

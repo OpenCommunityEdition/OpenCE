@@ -8,7 +8,7 @@ import sys
 
 import pytest
 from harness import function
-from test_mcc_identity import compile_tool
+from mcc_test_support import compile_tool
 
 ROOT = Path(__file__).resolve().parents[1]
 GAME = ROOT / "port/linux/game"

@@ -362,7 +362,7 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
             (unsigned long)(runtime->capacity >> 20), strerror(errno));
         problem = memory_problem;
         snprintf(runtime->failure,sizeof(runtime->failure),
-            "The memory address range needed by this MCC map is unavailable. Restart GulchCE and try again.");
+            "The memory address range needed by this MCC map is unavailable. Restart OpenCE and try again.");
         goto failed;
     }
     memcpy(runtime->tags, raw, identity.tag_data_size);

@@ -319,43 +319,31 @@ UPnP remains disabled, with a no-op cancellation stub.
 
 ## GulchCE compatibility and teardown
 
-GulchCE Standard uses shared agreement 32722 for Xbox/CE and MCC agreement 68
-for MCC maps. These require updated GulchCE peers, not OpenCE 41 or older
-GulchCE builds. Map-vote messages remain IDs 94-95; the shared checkpoint
-boundary is 96; MCC owns IDs 97-100 and join kind 101. The 512-byte MCC
-admission envelope fits account-link credentials and the shared join version. This bound
-applies to the host's local join as well as remote MCC clients.
-`mcc_protocol.c` handles capability negotiation, settings sizing and
-connection-scoped admission. Its checks supplement ordinary host authority;
-a capability claim is not trusted identity. After decoding the ordinary join,
-the host checks its appended shared version before granting capability or
-performing ordinary admission. The [join codec test](../../tools/test_join_protocol.py)
-checks that old and truncated requests cannot omit this field. MCC-only gameplay messages must
-not execute on Xbox or CE maps. See the
-[network agreement](../../port/linux/NETCODE.md#gulchce-network-agreement)
-and the current version constants rather than hard-coding a number from
-this guide.
+Crossplay uses upstream OpenCE protocol 43 for Xbox, Custom Edition and MCC
+maps. Map-vote messages remain IDs 94-95; checkpoint recovery is 96; MCC owns
+its upstream gameplay, sharing, admission and loading message IDs. MCC content
+identity and loading checks remain active, but there is no GulchCE-specific MCC
+capability, network version or join envelope.
 
-OpenCE's dedicated-server update adds a separate advertisement flag and a
-client-build report. MCC reserves different values for its capability and
-messages, including its pre-admission join envelope. The envelope is checked
-before ordinary distributed messages, so sharing its number with the build
-report would reject that report before dispatch. `test_mcc_protocol.py`
-checks these assignments, dedicated/MCC flag independence, and admission
-with the server's player-name filter enabled.
+After decoding an ordinary join, the host checks its appended shared version
+before token, ban and player-slot admission. The
+[join codec test](../../tools/test_join_protocol.py) checks that old and truncated
+requests cannot omit this field. `test_mcc_protocol.py` pins the complete
+upstream protocol 43 manifest and exercises host admission. MCC-only gameplay
+messages must still not execute on Xbox or CE maps; map-family isolation is
+independent of protocol compatibility.
 
 For dedicated hosting, start at [dedicated_server.md](../dedicated_server.md),
 then read `server_director.c` for rotation and session ownership and
-`server_commands.c` for administration. These are upstream additions; they
-do not make an MCC capability claim sufficient to pass normal admission.
+`server_commands.c` for administration. These upstream paths retain the same
+ordinary host authority and admission checks.
 
-`online-third-person` selects its contract per session. GulchCE Standard
-disables shoulder-camera gameplay. Its stored `opence_crossplay` setting name
-is retained for configuration compatibility, not an OpenCE compatibility claim.
-GulchCE Third Person uses the versions declared in `third_person_protocol.h`,
-the additional shoulder relay byte, and a mandatory kind 102 join envelope.
-MCC retains its independent version and kind 101 admission inside that envelope. Forced Off remains a camera
-session; it does not relax admission.
+The Session Options selector chooses Crossplay (`opence_crossplay`) or GulchCE
+Only (`gulchce_third_person`). Crossplay disables multiplayer shoulder-camera
+behavior. GulchCE Only uses camera protocol 32744, an additional shoulder relay
+byte and a mandatory kind 102 join envelope around the ordinary join. It is the
+same contract for all map families. Forced Off remains a camera session and
+does not relax admission.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c):
 `third_person_protocol_join` and `third_person_protocol_unwrap` bound and
@@ -363,7 +351,7 @@ validate camera admission. The shared join send/dispatch hooks are necessary
 because the engine owns those boundaries. Host create/open/dispose hooks own
 the session lifetime; client join/disconnect hooks clear prior permissions.
 A camera server requires the envelope before the ordinary token, bans, slots
-and MCC checks. A Standard server uses the ordinary shared-version admission path.
+and map-content checks. A Crossplay server uses the ordinary shared-version admission path.
 The selected mode cannot change after the lobby opens. See the
 [camera walkthrough](third_person.md#session-compatibility) for behavior,
 state ownership and tests. Public listings retain the common discovery

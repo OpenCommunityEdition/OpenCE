@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 import pytest
-from test_mcc_identity import compile_tool
+from mcc_test_support import compile_tool
 
 ROOT = Path(__file__).resolve().parents[1]
 GAME = ROOT / "port/linux/game"
@@ -16,7 +16,7 @@ SOURCES = [ROOT / "tools/tests/mcc_share_session.c", GAME / "mcc_share_stage.c",
 CASES = ["list", "admit", "manifest", "redirect", "stage_cancel", "stage_hash_and_size", "stage_exists",
          "stage_install", "stage_race", "stage_move_failure", "stage_names", "transfer", "rate", "cancel",
          "bad_hash", "changed_size", "identity", "disk_space", "taken", "exists", "refusals", "busy", "host_requests",
-         "hostile_manifest", "hostile_chunk", "names", "timeouts", "aggregate_rate", "offer_accept",
+         "hostile_manifest", "hostile_chunk", "hashed_once", "names", "timeouts", "aggregate_rate", "offer_accept",
          "offer_expiry", "offer_cancel", "backpressure", "request_fields", "response_fields", "manifest_pages", "clock_zero", "clock_wrap",
          "manifest_rate", "offer_delivery_deadline", "progress_expiry", "terminal_cancel", "terminal_success",
          "terminal_failure", "terminal_disconnect", "terminal_expiry", "terminal_new_request",
@@ -63,6 +63,9 @@ def test_share(share_tool, tmp_path, case):
     # the joiner takes only what it asked for
     ("head->offset!=share->stage.written ||", "", "hostile_chunk"),
     ("head->session!=share->session ||", "", "hostile_chunk"),
+    # a package is hashed once, and again when a file's size changes
+    ("if (host_hashed(share,transfer)) host_offer(share,transfer,0);", "if (0 && host_hashed(share,transfer)) host_offer(share,transfer,0);", "hashed_once"),
+    ("if (size<=0 || (uint32_t)size!=share->hashed.files[i].size) return 0;", "if (size<=0) return 0;", "hashed_once"),
     # Offer traffic shares the cap, heartbeats cannot reserve slots or extend consent,
     # and reliable-stream backpressure must not lose the terminal notification.
     ("share->budget-=(int32_t)(sizeof(struct mcc_share_response)+count*sizeof(entries[0]));", "", "manifest_rate"),

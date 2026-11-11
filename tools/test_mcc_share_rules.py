@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 import pytest
-from test_mcc_identity import compile_tool
+from mcc_test_support import compile_tool
 
 ROOT = Path(__file__).resolve().parents[1]
 RULES = ROOT / "port/linux/game/mcc_share_rules.c"

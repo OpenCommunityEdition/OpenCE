@@ -597,9 +597,10 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
-#include "mcc_cache.h"
-#include "mcc_objects.h"
-#include "mcc_player.h"
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
+#include "mcc_objects.h" /* port: port/linux/game/mcc_objects.h */
+#include "mcc_player.h" /* port: port/linux/game/mcc_player.h */
+#include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 #include "touch_postgame.h" /* port: port/linux/game/touch_postgame.c */
 
@@ -5110,11 +5111,8 @@ void game_engine_player_killed(
 	if (!game_engine)
 		return;
 
-	/* MCC team-change respawns carry neutral attribution to the netcode. */
-	{
-		extern void mcc_ui_team_respawn_death(long *, long *, long, boolean *);
-		mcc_ui_team_respawn_death(&killing_player_index, &killing_object_index, dead_player_index, &friendly_fire);
-	}
+	/* port: the death of an MCC team change is no one's kill (mcc_ui_teams.c) */
+	mcc_ui_team_respawn_death(&killing_player_index, &killing_object_index, dead_player_index, &friendly_fire);
 
 	/* the distributed netcode: a client's copy of a death has the host's
 	killer (port/linux/game/network_distributed.c) */
@@ -9412,6 +9410,7 @@ void game_engine_postspawn_player_update(
 			unit->unit.grenade_counts[
 				_unit_grenade_covenant_plasma] =
 				(char)starting_plasma_grenade_count;
+			/* port: and MCC's expanded grenade types (mcc_player.c) */
 			mcc_player_postspawn_grenades(unit_index,
 				global_variant.universal_variant.weapon_set == _game_engine_weapons_no_grenades &&
 				!game_engine_infinite_grenades_internal());

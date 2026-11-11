@@ -239,6 +239,13 @@ serves another site (a `halo-web-*.zip` from a release, say).
 
 ### Tests
 
+MCC-specific commands below apply to the companion implementation, not this
+documentation-only branch. `mcc_storage.mjs` is in its focused regression subset;
+`map_import.mjs` is retained in the
+[full source archive](https://github.com/chestahh/GulchCE/blob/1db929c5e34101a45f644436e031016b5584c7bf/port/web/tests/map_import.mjs).
+See the [reading guide](../../docs/reading/README.md#scope-and-provenance) for
+the tested revisions and which coverage was submitted upstream.
+
 ```sh
 node --test "port/web/tests/*.test.js"   # importers, storage, launcher, service worker
 node port/web/tests/map_import.mjs chromium firefox  # real manual import workers/OPFS, synthetic headers
@@ -307,6 +314,12 @@ multiply-adds). `tools/web_build.py` writes the graph.
   at `0x40440000`, also leaving MCC's accepted fixed windows outside the
   allocator. Ordinary allocations share roughly 1 GiB with static data and
   thread stacks; converted map resources must fit that bounded space.
+  When the heap is full, `malloc` gives `NULL` rather than aborting
+  (`-sABORTING_MALLOC=0`, so that a map too large to convert is refused
+  rather than ending the page). WebAssembly does not trap a write through
+  `NULL` (address 0 is memory), so each allocation's result is checked:
+  the renderer's own records (`d3d8_gl.c`'s `device_record_new`) stop the
+  game with a message, and its buffers drop the draw.
   CE initialization follows loaded settings; its tag window is
   unavailable when `game.custom_edition` is disabled. `xbox_memory.c`
   clears a block where it would map fresh pages, and only remembers

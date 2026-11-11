@@ -142,7 +142,7 @@ static struct {struct bitmap_data *bitmap;long asset;boolean attempted;} mcc_but
 static short mcc_buttons_style;
 static int high_res,style;
 static short controller_glyph_style(void) {return (short)style;}
-#define controller_glyph_draw(style,index,icon,cursor,color,unbind) 0
+#define controller_glyph_draw_with_release(style,index,icon,cursor,color,unbind) 0
 #define controller_glyphs_dispose() ((void)0)
 static int config_boolean(char const *name) {(void)name;return high_res;}
 static struct {struct {struct {long count;void *address;} button_icons;} messaging;} globals,*hud_globals;

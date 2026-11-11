@@ -39,7 +39,8 @@ CASES = ['reference',
 
 # a fault in the mixer, and the case that must catch it
 NEGATIVE_CONTROLS = {
- 'hrtf-history-not-reset': (('memset(stream->hrtf_frames, 0, sizeof(stream->hrtf_frames));', ''), 'hrtf-restart'),'taps-off-by-one': (('(stream->center + 1 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY',
+ 'hrtf-history-not-reset': (('memset(stream->hrtf_frames, 0, sizeof(stream->hrtf_frames));', ''), 'hrtf-restart'),
+ 'taps-off-by-one': (('(stream->center + 1 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY',
                       '(stream->center + 2 - RESAMPLER_ZERO_CROSSINGS) % RESAMPLER_HISTORY'),
                      'reference'),
  'phase-not-blended': (('for (phase = 0; phase <= RESAMPLER_TABLE_STEPS; phase++)',
@@ -47,7 +48,7 @@ NEGATIVE_CONTROLS = {
                        'impulse'),
  'no-stretch': (('#define RESAMPLER_MAXIMUM_STRETCH 4', '#define RESAMPLER_MAXIMUM_STRETCH 1'), 'aliases'),
  'cut-dead': (('mix_voice(stream, output, send, CUT_FADE_FRAMES);', 'return;'), 'cut'),
- 'cut-not-faded': (('float fade = 0.5f + 0.5f * cosf(3.14159265f * (float)(frame + 1) / CUT_FADE_FRAMES);',
+ 'cut-not-faded': (('float fade = 0.5f + 0.5f * (float)cos(3.14159265358979 * (double)(frame + 1) / CUT_FADE_FRAMES);',
                     'float fade = 1.0f;'),
                    'cut'),
  'cut-past-the-earlier': (('(frame < left ? stream->cut_send[stream->cut_played + frame] : 0.0f)',
@@ -55,7 +56,7 @@ NEGATIVE_CONTROLS = {
                            'CUT_FADE_FRAMES]'),
                           'cuts'),
  'cut-discard-earlier': (('left = CUT_FADE_FRAMES - stream->cut_played', 'left = 0'), 'cut-overlap'),
- 'flush-live-voice': (('stream->flushing || stream->paused', 'stream->paused'), 'flush'),
+ 'flush-live-voice': (('stream->paused || stream->flushing', 'stream->paused'), 'flush'),
  'linear-nearest': (('left_frames[0] + (left_frames[1] - left_frames[0]) * fraction', 'left_frames[0]'),
                     'linear'),
  'doppler-stereo-always-on': (('stereo_doppler_enabled && !stream->has_3d', '!stream->has_3d'),

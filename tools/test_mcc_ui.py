@@ -57,6 +57,8 @@ typedef unsigned short word;
 #define csmemcpy memcpy
 #define MAXIMUM_NUMBER_OF_LOCAL_PLAYERS 4
 #define PC_MENU_FUNCTION_BASE 256
+enum {_halo_pc_function_back=0,_halo_pc_function_map_row=1,_halo_pc_function_map_ok=2,_halo_pc_function_restart=3,_halo_pc_function_change_settings=4};
+#define pc_menu_profile_edit_begin(...) ((void)0)
 #define TEST_FLAG(value,bit) ((value)&(1u<<(bit)))
 #define _error_silent 0
 #define match_assert(file,line,condition) assert(condition)
@@ -69,7 +71,7 @@ _event_handler_replace_with_other_widget_bit,_event_handler_go_back_to_previous_
 _event_handler_run_scenario_script_bit,_event_handler_look_for_conditional_widget_on_failure_bit};
 enum {_conditional_widget_load_if_event_handler_function_fails_bit};
 enum {_ui_audio_feedback_none,_ui_audio_feedback_cursor,_ui_audio_feedback_forward,_ui_audio_feedback_back};
-struct widget_instance {long definition_tag_index;char const *name;short local_player_index;
+struct widget_instance {long definition_tag_index;char const *name;short local_player_index;boolean visible,disabled;
 short horizontal_offset,vertical_offset;struct widget_instance *parent,*next,*previous,*child,*focused_child;};
 struct event_record {short type,controller_index;};
 struct tag_reference {long index;};

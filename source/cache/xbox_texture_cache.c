@@ -121,8 +121,8 @@ symbols in this file:
 #include "text/draw_string.h"
 #include <xtl.h>
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
-#include "mcc_cache.h"
-#include "mcc_texture_cache.h"
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
+#include "mcc_texture_cache.h" /* port: port/linux/game/mcc_texture_cache.h */
 
 #ifdef HALO_ANDROID
 #include "android_ce_texture_cache.h" /* port: port/linux/game/android_ce_texture_cache.c */
@@ -653,16 +653,14 @@ static void texture_cache_initialize_hardware_format(
 			((bitmap->height - 1) << D3DSIZE_HEIGHT_SHIFT) |
 			(bitmap->width - 1);
 	}
-	/* port: only CE-owned raw DXT uses this extension to the Xbox header.
-	MCC resources retain their independent descriptor and uploader. */
-	else if (!mcc_cache_tags_loaded() &&
-		custom_edition_cache_contains(bitmap, sizeof(*bitmap)) &&
-		custom_edition_bitmap_raw_2d(bitmap))
+	else if (bitmap->type == _bitmap_type_2d &&
+		bitmap->format >= _bitmap_format_dxt1 && bitmap->format <= _bitmap_format_dxt5 &&
+		((bitmap->width & (bitmap->width - 1)) || (bitmap->height & (bitmap->height - 1))))
 	{
 		/* port: a compressed 2D bitmap of sides only Halo PC draws (a HUD
 		icon, 200 by 112) can't be described by power-of-two sizes, which
 		would make it 128 by 64; its true sides go in the Size word, as a
-		linear texture's. Admission requires exactly one level. */
+		linear texture's. It has its first level only. */
 		long block_bytes = bitmap->format == _bitmap_format_dxt1 ? 8 : 16;
 		long row_bytes = ((bitmap->width + 3) / 4) * block_bytes;
 
@@ -673,7 +671,7 @@ static void texture_cache_initialize_hardware_format(
 			D3DFORMAT_BORDERSOURCE_COLOR |
 			D3DFORMAT_DMACHANNEL_A;
 		texture->Size =
-			(((unsigned long)(row_bytes + D3DTEXTURE_PITCH_ALIGNMENT - 1) / D3DTEXTURE_PITCH_ALIGNMENT - 1)
+			(((row_bytes + D3DTEXTURE_PITCH_ALIGNMENT - 1) / D3DTEXTURE_PITCH_ALIGNMENT - 1)
 				<< D3DSIZE_PITCH_SHIFT) |
 			((bitmap->height - 1) << D3DSIZE_HEIGHT_SHIFT) |
 			(bitmap->width - 1);
@@ -815,7 +813,7 @@ static boolean texture_cache_bitmap_valid(
 		bitmap->mipmap_count<=floor_log2(MAX(bitmap->width, MAX(bitmap->height, bitmap->depth))) &&
 		bitmap->pixels_size>=0;
 
-	/* Only MCC-owned normalized resources take this admission path. Their
+	/* port: Only MCC-owned normalized resources take this admission path. Their
 	linear rows have already been padded by the MCC bitmap adapter. */
 	if (mcc_cache_tags_loaded() && mcc_cache_bitmap_valid(bitmap))
 		return TRUE;
@@ -1088,7 +1086,8 @@ void *_texture_cache_bitmap_get_hardware_format(
 {
 	void *hardware_format = NULL;
 
-	/* MCC owns immutable pixels and independent hardware headers. */
+	/* port: an MCC map's textures have hardware headers of their own
+	(port/linux/game/mcc_texture_cache.c) */
 	if (mcc_cache_tags_loaded())
 	{
 		hardware_format = mcc_texture_cache_get(bitmap, load);

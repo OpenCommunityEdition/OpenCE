@@ -182,6 +182,7 @@ struct game_options;
 #include "structures/structures.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "units/bipeds.h" /* port: bipeds_riding_latch */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "mcc_loading.h" /* port: port/linux/game/mcc_loading.c */
 #ifdef HALO_PROFILE
@@ -427,6 +428,11 @@ void game_initial_pulse(
 	void)
 {
 	struct data_iterator iterator;
+
+	/* port: the map's declared value before scripts run; a load must not read
+	it again (vehicle_riding.c) */
+	vehicle_riding_map_start();
+	bipeds_riding_latch();
 
 	data_iterator_new(&iterator, player_data);
 	while (data_iterator_next(&iterator))

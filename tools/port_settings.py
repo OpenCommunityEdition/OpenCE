@@ -484,6 +484,8 @@ SCREENS["audio_settings/sound_processing"] = {
         ("RESAMPLER:", "audio.resampler", [("XBOX", "xbox"), ("SINC", "sinc"), ("LINEAR", "linear")],
          "Xbox models the original sound. Sinc reduces\naliasing; linear gives a brighter sound.",
          None),
+        ("STEREO DOPPLER:", "audio.stereo_doppler", ON_OFF,
+         "Shift stereo sounds' pitch as they come and go,\nas 3D sounds' is. The Xbox played them flat.", None),
     ],
 }
 _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
@@ -1114,6 +1116,7 @@ PLAYER_OPTIONS_ROWS = ['number_of_lives', 'maximum_health', 'shields', 'respawn_
 # GUN TURRETS and CUSTOM (menu_functions.c's VEHICLE_PRESET_PC), and its help
 # among the sets' (its rows' values' in turn: gametype_option_help)
 VEHICLE_EDIT = "main_menu/settings_select/multiplayer_setup/vehicle_options_edit"
+VEHICLE_RIDING_HELP = "Players standing on a vehicle are carried by it.\\nOff: as the original game, riders slide off."
 AIM_ASSIST_HELP = [
     "Players keep their current mouse aim assist setting.",
     "Disable mouse aim assist for mouse/keyboard players.\\nController and touch aim assist are unchanged.",
@@ -1187,9 +1190,10 @@ STRING_INSERTS = {
     f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in TEAMPLAY_EXTRA_ROWS for text in helps])],
     f"{SLAYER_EDIT}/var_kills_to_win": [(5, ["75", "100", "150", "200", "250", "500"])],
     f"{VEHICLE_EDIT}/var_vehicle_set": [(8, ["PC"])],
+    f"{VEHICLE_EDIT}/vehicle_options_labels": [(9, ["VEHICLE RIDING:"])],
     f"{VEHICLE_EDIT}/cap_vehicle_options": [(17, [
         "Every vehicle the map places will spawn, as in\\nHalo PC.",
-    ])],
+    ]), (7, [VEHICLE_RIDING_HELP] * 2)],
     f"{SLAYER_EDIT}/cap_slayer": [(11, [
         "Seventy-five kills to win. Settle in for a long\\nfight.",
         "A hundred kills to win. Made for big games.",
@@ -1291,6 +1295,9 @@ MAP_KIND_CHOOSER = "main_menu/new_select/list_item_0_map_kind"
 # changes to the PC version's widgets (by our names): attributes set, all
 # their handlers replaced, children added, game data inputs added
 WIDGET_PATCHES = {
+    f"{VEHICLE_EDIT}/vehicle_options_menu": {"insert_before": {
+        f"{VEHICLE_EDIT}/op_team": [
+            f'<child widget="{VEHICLE_EDIT}/op_vehicle_riding" x="54" y="100"/>']}},
     # (the main menu's MODS, before Quit: _mods)
     "main_menu/main_menu_select_list": {"insert_before": {"main_menu/main_menu_item_quit_game": [
         f'<child widget="main_menu/main_menu_item_mods" x="{MODS_ITEM_PLACE[0]}" y="{MODS_ITEM_PLACE[1]}"/>']}},
@@ -1717,7 +1724,7 @@ def _bots_link(base, name, host_only=False):
 def _session_options(base: str, host: str) -> list:
     rows, extra = [], []
     for key, label, values in [
-        ("session_compatibility", "SESSION COMPATIBILITY:", "STANDARD|THIRD PERSON"),
+        ("session_compatibility", "SESSION COMPATIBILITY:", "CROSSPLAY|GULCHCE ONLY"),
         ("camera_policy", "CAMERA POLICY:", "PLAYER CHOICE|FORCED ON|FORCED OFF"),
     ]:
         extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
@@ -1738,7 +1745,7 @@ def _session_options(base: str, host: str) -> list:
     extra += _strings(f"{base}/labels", ["", "", "INVITE LINK:"])
     rows.append((f"{base}/op_invite", None))
     extra += _strings(f"{base}/help_strings", [
-        "OpenCE and GulchCE can join; third person is off.\\nMCC maps still require GulchCE.",
+        "OpenCE and GulchCE can join; third person is off.\\nXbox, CE and MCC maps use the shared protocol.",
         "Compatible GulchCE hosts and clients only.\\nEnables GulchCE session features, including third person.",
         "Compatibility is locked for this session.\\nClose the lobby to choose another mode.",
         "Each player chooses first or third person.\\nTheir camera toggle remains available.",
@@ -1984,6 +1991,7 @@ COOP_SETUP_SCREENS = [
             "Revert the checkpoint after everyone dies. A changed\\nteam or missing save uses respawn only.",
             "Respawn at checkpoint positions after everyone dies.\\nThe world keeps its progress.",
         ]),
+        ("coop_vehicle_riding", "VEHICLE RIDING:", ["ON", "OFF"], [VEHICLE_RIDING_HELP] * 2),
     ]),
     ("voice_options", "VOICE AND VOTING", "Voice chat, text chat and votes to kick a player,\\nfor this game.",
      TEAMPLAY_ROWS),
@@ -2029,8 +2037,8 @@ def _setup_option_screen(base: str, key: str, rows: list, fit: bool = False) -> 
                                            ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
     children = ['<data input="game settings lists text update"/>',
                 '<on event="created" run="port setup options init"/>']
-    # (30 apart; with fit, closer for more rows than eight, the last 28 tall
-    # clear of the help at 341: Server Setup's, whose rows are all shown, as
+    # (30 apart; with fit, closer for more rows than eight, the last clear of the help at 341
+    # and the rows no taller than their spacing: Server Setup's, whose rows are all shown, as
     # OpenCE Options' are not)
     places = len([row_key for row_key, *_ in rows if row_key not in SETUP_OPTION_SAME_PLACE])
     spacing = min(30, (341 - 1 - 73 - 28) // max(1, places - 1)) if fit else 30
@@ -2050,7 +2058,7 @@ def _setup_option_screen(base: str, key: str, rows: list, fit: bool = False) -> 
     lines += _button(f"{base}/{key}_button_ok", 1, ['<on event="a" run="port setup options save" back="true"/>',
                                                      '<on event="start" run="port setup options save" back="true"/>'])
     for index, (row_key, label, strings, _) in enumerate(rows):
-        lines += _widget(f"{base}/op_{row_key}", [("width", 512), ("height", 28),
+        lines += _widget(f"{base}/op_{row_key}", [("width", 512), ("height", min(28, spacing)),
                                                  ("flags", "pass_unhandled_to_focused_child"),
                                                  ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
                          [f'<child widget="{base}/{row_key}_label"/>',
@@ -2467,6 +2475,30 @@ def _item_options_extras() -> list:
     return lines
 
 
+def _vehicle_options_extras() -> list:
+    """the gametype's riding rule, a row of the vehicle options"""
+    base = VEHICLE_EDIT
+    lines = []
+    key, label_index, words = "vehicle_riding", 9, ["ON", "OFF"]
+    lines += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
+        ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"),
+        ("color", "#FF2896FF")], [f'<child widget="{base}/{key}_label"/>',
+        f'<child widget="{base}/{key}_spinner" x="286" y="1"/>'])
+    lines += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1),
+        ("width", 280), ("height", 22), ("string_list", f"{base}/vehicle_options_labels"),
+        ("string_index", label_index), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
+        ("text_x", 13), ("text_y", 4)], [])
+    lines += _widget(f"{base}/{key}_spinner", [("type", "spinner"), ("top", 2),
+        ("width", 206), ("height", 20), ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+        ("string_list", f"{base}/var_{key}"), ("font", "ui\\large_ui"),
+        ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
+        ("list_flags", "items_from_strings"), ("header_bitmap", "bitmaps/arrow_sm_left"),
+        ("footer_bitmap", "bitmaps/arrow_sm_right"), ("header_bounds", "7 -13 19 -7"),
+        ("footer_bounds", "7 208 19 214")], ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    lines += _strings(f"{base}/var_{key}", words)
+    return lines
+
+
 def _player_options_extras() -> list:
     """The host's aim-assist policy and shield effects, hidden while editing
     saved gametypes."""
@@ -2586,6 +2618,7 @@ def multiplayer_files() -> dict:
         "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
         PLAYER_EDIT.replace("/", ".") + ".port.xml": head + _player_options_extras() + ["</menus>", ""],
+        VEHICLE_EDIT.replace("/", ".") + ".port.xml": head + _vehicle_options_extras() + ["</menus>", ""],
         TEAMPLAY_EDIT.replace("/", ".") + ".port.xml": head + _teamplay_options_extras() + ["</menus>", ""],
         OPENCE_EDIT.replace("/", ".") + ".port.xml": head + _opence_options() + ["</menus>", ""],
         MODS.replace("/", ".") + ".xml": [head[0], "<!-- The port's Mods screen, in the PC version's style "

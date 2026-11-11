@@ -113,8 +113,6 @@ struct sdl_stream
 	DWORD frequency;
 
 	BOOL paused;
-	/* live packets cannot mix while Flush releases the lock for callbacks */
-	BOOL flushing;
 
 	/* 2D gains */
 	float volume;             /* SetVolume */
@@ -180,6 +178,10 @@ struct sdl_stream
 	float cut[CUT_FADE_FRAMES * MAXIMUM_OUTPUT_CHANNELS];
 	float cut_send[CUT_FADE_FRAMES];
 	unsigned long cut_played;
+	/* being flushed (stream_flush): the mixer leaves the packets not yet
+	given back, which the cut has played already, while the game's callback
+	runs without the lock */
+	BOOL flushing;
 	double current_step;
 	float current_doppler;
 	float target_left, target_right, target_room;
@@ -236,7 +238,6 @@ static struct sdl_buffer *buffers;
 /* 2 or 6 (audio.channels), chosen when the device first opens; the game
 sets its mix bins by it, so it holds while the game runs */
 static unsigned long output_channels = 2;
-static BOOL stereo_doppler_enabled;
 static BOOL hrtf_enabled = TRUE;
 
 /* the I3DL2 listener properties (SetI3DL2Listener), which the reverb models:
@@ -249,6 +250,9 @@ static DSI3DL2LISTENER environment =
 static unsigned long environment_serial;
 /* audio.reverb */
 static BOOL reverb_enabled = TRUE;
+/* audio.stereo_doppler: positioned stereo voices shift as 3D ones do
+(doppler_ratio); the Xbox played stereo sounds at their own pitch */
+static BOOL stereo_doppler_enabled = FALSE;
 
 static float gain_from_millibels(LONG millibels)
 {
@@ -1294,7 +1298,7 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	float ramp_surround[2][MAXIMUM_OUTPUT_CHANNELS], pair[2];
 	unsigned long speaker;
 
-	if (stream->flushing || stream->paused || !stream->packet_count || !stream->sample_rate)
+	if (stream->paused || stream->flushing || !stream->packet_count || !stream->sample_rate)
 		return;
 	/* (at most MIX_CHUNK_FRAMES at a time: the HRTF's direct path) */
 	if (frames > MIX_CHUNK_FRAMES)
@@ -1678,7 +1682,7 @@ static void voice_cut(struct sdl_stream *stream)
 	mix_voice(stream, output, send, CUT_FADE_FRAMES);
 	for (frame = 0; frame < CUT_FADE_FRAMES; frame++)
 	{
-		float fade = 0.5f + 0.5f * cosf(3.14159265f * (float)(frame + 1) / CUT_FADE_FRAMES);
+		float fade = 0.5f + 0.5f * (float)cos(3.14159265358979 * (double)(frame + 1) / CUT_FADE_FRAMES);
 
 		/* (what is left of the earlier cut is read only where it is: past
 		it is whatever it was, a NaN perhaps, which no factor of 0 hides) */
@@ -2298,11 +2302,11 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 		stream_complete_head(stream, XMEDIAPACKET_STATUS_FLUSHED,
 			head->finished ? head->packet.dwMaxSize : 0);
 	}
+	stream->flushing = FALSE;
 	stream->cursor = 0;
 	resampler_reset(stream);
 	/* (the next sound on the channel says where it is) */
 	stream->stereo_positioned = FALSE;
-	stream->flushing = FALSE;
 	pthread_mutex_unlock(&mixer_lock);
 	return S_OK;
 }

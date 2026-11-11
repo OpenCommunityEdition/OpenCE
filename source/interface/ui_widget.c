@@ -688,6 +688,14 @@ struct widget_instance;
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "ui_widget.h"
+#include "mcc_pause_runtime.h" /* port: port/linux/game/mcc_pause_runtime.h */
+#include "mcc_pause.h" /* port: port/linux/game/mcc_pause.h */
+#include "mcc_ui_network.h" /* port: port/linux/game/mcc_ui_network.h */
+#include "mcc_ui.h" /* port: port/linux/game/mcc_ui.h */
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.h */
+#include "mcc_menu_preview.h" /* port: port/linux/game/mcc_menu_preview.c */
+#include "mcc_menu_text.h" /* port: port/linux/game/mcc_menu_text.c */
+#include "mcc_maps.h" /* port: port/linux/game/mcc_maps.h */
 /* port: port/linux/game/menu_functions.c: a text's colour in place of its
 own (the server browser's pings) */
 boolean pc_menu_text_color(struct widget_instance *widget, real_argb_color *color);
@@ -1474,6 +1482,129 @@ Edition maps' display indices (custom_edition_maps.c keeps them below 0x7000) */
 /* ... and the pixels a spinner with extra items is wider (for three digits) */
 #define SPINNER_EXTRA_WIDTH 12
 
+/* port: rows added to a map's own list at run time (ui_widget_port_inject_row), up to 16 at once. A row's
+label and description are text of the port's own, drawn through string list indices from PORT_ROW_TEXT_BASE
+up (two each: the label's, then the description's); its spinner may have values of the port's own too */
+#define PORT_ROW_TEXT_BASE 0x7100
+#define PORT_MAXIMUM_ROWS 16
+
+static struct
+{
+	struct widget_instance *row;
+	struct widget_instance *spinner;
+	wchar_t const *label;
+	wchar_t const *description;
+	wchar_t const *const *values;
+	short value_count;
+} ui_widget_port_rows[PORT_MAXIMUM_ROWS];
+
+wchar_t const *ui_widget_port_row_text(short string_list_index)
+{
+	short slot = (short)((string_list_index - PORT_ROW_TEXT_BASE) / 2);
+
+	if (string_list_index < PORT_ROW_TEXT_BASE || slot >= PORT_MAXIMUM_ROWS || !ui_widget_port_rows[slot].row)
+		return NULL;
+	return ((string_list_index - PORT_ROW_TEXT_BASE) % 2) ? ui_widget_port_rows[slot].description :
+		ui_widget_port_rows[slot].label;
+}
+
+short ui_widget_port_row_description(struct widget_instance *row)
+{
+	short slot;
+
+	for (slot = 0; slot < PORT_MAXIMUM_ROWS; slot++)
+	{
+		if (ui_widget_port_rows[slot].row == row)
+			return (short)(PORT_ROW_TEXT_BASE + 2 * slot + 1);
+	}
+	return NONE;
+}
+
+wchar_t const *ui_widget_port_spinner_string(struct widget_instance *spinner, short index)
+{
+	short slot;
+
+	for (slot = 0; slot < PORT_MAXIMUM_ROWS; slot++)
+	{
+		if (ui_widget_port_rows[slot].row && ui_widget_port_rows[slot].spinner == spinner &&
+			ui_widget_port_rows[slot].values && index >= 0 && index < ui_widget_port_rows[slot].value_count)
+		{
+			return ui_widget_port_rows[slot].values[index];
+		}
+	}
+	return NULL;
+}
+
+static void ui_widget_port_row_forget(struct widget_instance *widget)
+{
+	short slot;
+
+	for (slot = 0; slot < PORT_MAXIMUM_ROWS; slot++)
+	{
+		if (ui_widget_port_rows[slot].row == widget)
+			memset(&ui_widget_port_rows[slot], 0, sizeof(ui_widget_port_rows[slot]));
+	}
+}
+
+/* a copy of the row `source` (a child of a list), put in the list before `before` (NULL: last) at the
+vertical offset given, its label and description the text given; values: the names of its spinner's values
+(NULL: the source's own), value_count of them. NULL if it could not be made. */
+struct widget_instance *ui_widget_port_inject_row(
+	struct widget_instance *source,
+	struct widget_instance *before,
+	short vertical_offset,
+	wchar_t const *label,
+	wchar_t const *description,
+	wchar_t const *const *values,
+	short value_count)
+{
+	struct widget_instance *row;
+	struct widget_instance *child;
+	struct widget_instance *label_box = NULL;
+	short slot;
+
+	for (slot = 0; slot < PORT_MAXIMUM_ROWS && ui_widget_port_rows[slot].row; slot++)
+		;
+	if (slot == PORT_MAXIMUM_ROWS || !source->parent)
+		return NULL;
+	row = ui_widget_load_by_name_or_tag(NULL, source->definition_tag_index, source->parent,
+		source->local_player_index, NONE, NONE, NONE);
+	if (!row)
+		return NULL;
+	row->horizontal_offset = source->horizontal_offset;
+	row->vertical_offset = vertical_offset;
+	if (before && before->parent == source->parent)
+	{
+		row->previous = before->previous;
+		row->next = before;
+		if (before->previous)
+			before->previous->next = row;
+		else
+			source->parent->child = row;
+		before->previous = row;
+	}
+	else
+		ui_widget_add_child(source->parent, row);
+	ui_widget_port_rows[slot].row = row;
+	ui_widget_port_rows[slot].spinner = NULL;
+	ui_widget_port_rows[slot].label = label;
+	ui_widget_port_rows[slot].description = description;
+	ui_widget_port_rows[slot].values = values;
+	ui_widget_port_rows[slot].value_count = values ? value_count : 0;
+	for (child = row->child; child; child = child->next)
+	{
+		if (child->type == _ui_widget_type_text_box && !label_box)
+			label_box = child;
+		else if (child->type == _ui_widget_type_spinner_list && !ui_widget_port_rows[slot].spinner)
+			ui_widget_port_rows[slot].spinner = child;
+	}
+	if (label_box)
+		label_box->parameters.text_box.string_list_index = (short)(PORT_ROW_TEXT_BASE + 2 * slot);
+	if (values && ui_widget_port_rows[slot].spinner)
+		ui_widget_port_rows[slot].spinner->parameters.list.number_of_items = (word)value_count;
+	return row;
+}
+
 /* port: the strings a spinner's string list has past the tag's own, as more
 items: the higher kills to win of the Slayer game type editor
 (ui_widget_event_handler_functions.c saves and loads them) */
@@ -1945,7 +2076,7 @@ void *ui_widget_realloc(
 		line);
 }
 
-/* MCC maps are selected by their full namespaced path. They do not enter
+/* port: MCC maps are selected by their full namespaced path. They do not enter
 the Xbox/CE multiplayer level-index list. */
 boolean ui_widget_port_mcc_multiplayer_map_choose(char const *level_name)
 {
@@ -2380,6 +2511,7 @@ void ui_widget_delete(
 			}
 		}
 	}
+	ui_widget_port_row_forget(widget);
 	ui_widget_delete_children_recursive(widget);
 	if (widget->previous)
 		widget->previous->next = widget->next;
@@ -2960,6 +3092,16 @@ boolean widget_event_function_list_widget_goto_previous_item(
 			{
 				child = widget->child;
 				item_index = 0;
+				/* port: a list with no items (a Custom Edition map's spinner
+				that nothing has filled) has nothing to step to, as in
+				goto_next_item */
+				if (!child)
+				{
+					error(
+						_error_silent,
+						"failed to set focus to the previous list item of a list widget");
+					return FALSE;
+				}
 				while (child->next)
 				{
 					child = child->next;
@@ -3019,9 +3161,9 @@ void ui_widgets_close_all(
 		if (widget_globals.widget_stack[local_player_index])
 			dispose_widget_stack(&widget_globals.widget_stack[local_player_index]);
 	}
-	/* Release only an editor opened by MCC after its widgets are gone. */
+	/* port: Release only an editor opened by MCC after its widgets are gone. */
 	{
-		extern void mcc_ui_settings_close(short);
+
 		mcc_ui_settings_close(NONE);
 	}
 
@@ -3051,10 +3193,8 @@ void ui_widgets_close_all_for_local_player(
 				dispose_widget_stack(&widget_globals.widget_stack[widget_index]);
 		}
 	}
-	{
-		extern void mcc_ui_settings_close(short);
-		mcc_ui_settings_close(local_player_index);
-	}
+	/* port: and MCC's pause menu's settings (mcc_ui.c) */
+	mcc_ui_settings_close(local_player_index);
 
 	return;
 }
@@ -3494,17 +3634,14 @@ static void event_handler_dispatch(
 		/* port: not from a widget its function deleted (it went back:
 		menu_functions.c's profile_save_changes), which the Xbox's opened
 		from regardless */
-		/* MCC New Game can synchronously close every widget. Finish the event
-		with its deletion result before any navigation can reuse that tree. */
+		/* port: MCC's New Game can close every widget at once. The event ends
+		with that deletion, before anything can open from the deleted tree */
+		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
+			!widget_deleted && handler->widget_tag.index != NONE &&
+			mcc_ui_new_game(widget, &widget_deleted))
 		{
-			extern boolean mcc_ui_new_game(struct widget_instance *, boolean *);
-			if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
-				!widget_deleted && handler->widget_tag.index != NONE &&
-				mcc_ui_new_game(widget, &widget_deleted))
-			{
-				*calling_widget_deleted = widget_deleted;
-				return;
-			}
+			*calling_widget_deleted = widget_deleted;
+			return;
 		}
 		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
 			!widget_deleted &&
@@ -3871,7 +4008,7 @@ static void widget_instance_initialize(
 	/* port: a network co-op game never pauses (it opens the campaign's pause
 	screen, which would) */
 	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
-		!network_coop_active();
+	!network_coop_active() && !network_game_is_active();
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -3909,6 +4046,36 @@ static void widget_instance_initialize(
 
 			event.controller_index = widget->local_player_index;
 			event_handler_dispatch(widget, definition, &event, handler, &widget_deleted);
+		}
+	}
+	/* port: a button of a map's whose handler runs a function the map may
+	not run (ui_widget_function_denied) does nothing when pressed: it is
+	disabled, so it takes no focus, and drawn dimmed */
+	{
+		extern boolean ui_widget_port_function_denied(struct widget_instance *widget, word function_index);
+		extern boolean pc_menu_tag(long tag_index);
+		long denied_index;
+
+		for (denied_index = 0; denied_index < definition->event_handlers.count; denied_index++)
+		{
+			struct ui_widget_event_handler_reference *denied_handler =
+				(struct ui_widget_event_handler_reference *)definition->event_handlers.address + denied_index;
+
+			/* port: a Custom Edition map's Gamepads item opens its own Halo PC
+			screen (device lists this build does not have), and the port's
+			screen is not on such a map: the item is disabled, as Custom
+			Edition has it */
+			if (widget->parent && denied_handler->event_type != _widget_event_created &&
+				(((denied_handler->flags & 0x80) &&
+				ui_widget_port_function_denied(widget, (word)denied_handler->function)) ||
+				((denied_handler->flags & 0x08) && denied_handler->widget_tag.index != NONE &&
+				!pc_menu_tag(denied_handler->widget_tag.index) &&
+				!strcmp(widget->name, "gamepads_profile_item"))))
+			{
+				widget->disabled = TRUE;
+				widget->alpha_modifier = 0.5f;
+				break;
+			}
 		}
 	}
 	if (!widget->focused_child)
@@ -4038,6 +4205,80 @@ short ui_widget_port_list_index(
 			index++;
 	}
 	return index;
+}
+
+/* port: the top and bottom, on screen, of the visible widgets with a size under a widget (as
+widget_instance_render_recursive places them: each widget's offset is added on the way down) */
+static void ui_widget_port_description_extent(
+	struct widget_instance *widget,
+	long y,
+	long *top,
+	long *bottom)
+{
+	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
+	struct widget_instance *child;
+
+	if (!widget->visible)
+		return;
+	y += widget->vertical_offset;
+	if (!widget->child && definition->bounds.y1 > definition->bounds.y0)
+	{
+		long y0 = y + definition->bounds.y0 + definition->vertical_offset;
+		long y1 = y + definition->bounds.y1 + definition->vertical_offset;
+
+		if (y0 < *top)
+			*top = y0;
+		if (y1 > *bottom)
+			*bottom = y1;
+	}
+	for (child = widget->child; child; child = child->next)
+		ui_widget_port_description_extent(child, y, top, bottom);
+}
+
+/* port: a map's own list that has had rows injected into it (ui_widget_port_inject_row) is taller than its
+screen was made for, so its side description (the extended description, which the map placed below the rows
+it had) is drawn over the new rows. Each frame, while the list has injected rows, the description is moved
+down to just below the lowest row if it would overlap them. Lists with none are left as the map made them. */
+void ui_widget_port_description_clear(
+	struct widget_instance *list)
+{
+	struct widget_instance *description = list->parameters.list.extended_description;
+	struct widget_instance *row;
+	struct widget_instance *ancestor;
+	long base = 0;
+	long rows_bottom = NONE;
+	long top = 10000;
+	long bottom = -10000;
+	boolean injected = FALSE;
+	short slot;
+	static boolean logged = FALSE;
+
+	if (!description)
+		return;
+	for (slot = 0; slot < PORT_MAXIMUM_ROWS; slot++)
+	{
+		if (ui_widget_port_rows[slot].row && ui_widget_port_rows[slot].row->parent == list)
+			injected = TRUE;
+	}
+	if (!injected)
+		return;
+	for (ancestor = list; ancestor; ancestor = ancestor->parent)
+		base += ancestor->vertical_offset;
+	for (row = list->child; row; row = row->next)
+	{
+		if (row->visible && row->type == _ui_widget_type_container)
+		{
+			long row_bottom = base + row->vertical_offset +
+				ui_widget_definition_get(row->definition_tag_index)->bounds.y1;
+
+			if (row_bottom > rows_bottom)
+				rows_bottom = row_bottom;
+		}
+	}
+	description->vertical_offset = 0;
+	ui_widget_port_description_extent(description, base, &top, &bottom);
+	if (rows_bottom != NONE && top < rows_bottom + 8)
+		description->vertical_offset = (short)(rows_bottom + 8 - top);
 }
 
 /* port: back to the screen before, for the menus' functions */
@@ -4219,6 +4460,7 @@ static void render_state_bitmap(
 	if (bitmap && _texture_cache_bitmap_get_hardware_format(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
+		/* port: an MCC map's icon is drawn as its HUD's are (mcc_hud_draw.c) */
 		if (mcc_hud_icon_draw(bitmap_group_index, bitmap, clip, cursor_bounds, color, icon, TRUE))
 			return;
 		/* port: the sprite from a high-res texture, if it has one */
@@ -4299,10 +4541,10 @@ void draw_string_and_hack_in_icons(
 			short icon_index;
 
 			current = icon_spec + wcslen(icon_names[icon_type]);
-			/* port: HUD/scoreboard callers pass TRUE; authored menu icons stay native. */
+			/* port: HUD/scoreboard callers pass TRUE; menu styling has its own opt-in. */
 			if (ignore_icon_color && keyboard_hud_inline(icon_type, &cursor_bounds))
 				continue;
-			/* port: optional PC-menu artwork preserves literal button meaning. */
+			/* port: optional PC-menu artwork preserves the literal button meaning. */
 			if (!ignore_icon_color && menu_button_glyph_inline(icon_type,
 				local_player_index_for_draw_string_and_hack_in_icons, &cursor_bounds))
 				continue;
@@ -4838,14 +5080,16 @@ void display_error_damaged_media(
 	return;
 }
 
+void network_game_server_start_now(struct network_game_server *server);
+
 void network_game_reset_to_pregame_ui(
 	void)
 {
 	ui_widgets_close_all();
-	/* An MCC restart retains this round's settings and returns directly to
+	/* port: An MCC restart retains this round's settings and returns directly to
 	 * the ready lobby. The ordinary host map picker pauses its countdown. */
 	{
-		extern boolean mcc_ui_network_restart_pregame(void);
+
 		if (mcc_ui_network_restart_pregame())
 		{
 			char const *screen = network_game_is_splitscreen_local() ?
@@ -4881,13 +5125,24 @@ void network_game_reset_to_pregame_ui(
 	{
 		if (global_network_game_server_get())
 		{
-			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
-			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
-			if (!ui_widget_load_by_name_or_tag(
-				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
-				NONE, NULL, NONE, NONE, NONE, NONE))
+			extern boolean pc_menu_new_game_apply(void);
+
+			if (pc_menu_new_game_apply())
 			{
-				error(_error_silent, "failed to load map select postgame screen");
+				/* port: a game set up from the pause menu starts at once */
+				network_game_server_pause_countdown(global_network_game_server_get(), FALSE);
+				network_game_server_start_now(global_network_game_server_get());
+			}
+			else
+			{
+				network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
+				/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
+				if (!ui_widget_load_by_name_or_tag(
+					pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
+					NONE, NULL, NONE, NONE, NONE, NONE))
+				{
+					error(_error_silent, "failed to load map select postgame screen");
+				}
 			}
 		}
 		else
@@ -5409,8 +5664,17 @@ static boolean ui_widget_port_text_wrap(
 	return fits;
 }
 
-/* port: port/linux/game/menu_button_widgets.inl, included by menu_functions.c. */
+/* port: labels a map's own screens have no string for (the controls screen's
+PAUSE MENU and votes), chosen by a string list index from 0x7000 up
+(menu_functions.c, control_label_strings) */
+#define CONTROL_LABEL_BASE 0x7000
+static wchar_t const *const control_labels[] =
+{
+	L"PAUSE MENU", L"VOTE YES", L"VOTE NO"
+};
+/* port: port/linux/game/menu_functions.c; optional centered PC join legends. */
 boolean menu_functions_glyph_text(struct widget_instance *widget, rectangle2d const *bounds);
+/* port: MCC-owned keyboard legend identities, with native controller fallback. */
 short menu_functions_glyph_button(struct widget_instance *widget, short native);
 
 static void widget_instance_render_text_box(
@@ -5448,6 +5712,21 @@ static void widget_instance_render_text_box(
 			string_list_index < SPINNER_EXTRA_DESCRIPTION_BASE + (short)NUMBEROF(kills_to_win_extra_descriptions))
 		{
 			string = (wchar_t *)kills_to_win_extra_descriptions[string_list_index - SPINNER_EXTRA_DESCRIPTION_BASE];
+		}
+		if (string_list_index >= PORT_ROW_TEXT_BASE && ui_widget_port_row_text(string_list_index))
+			string = (wchar_t *)ui_widget_port_row_text(string_list_index);
+		if (string_list_index >= CONTROL_LABEL_BASE &&
+			string_list_index < CONTROL_LABEL_BASE + (short)NUMBEROF(control_labels))
+		{
+			string = (wchar_t *)control_labels[string_list_index - CONTROL_LABEL_BASE];
+		}
+		/* port: a string list index past its strings gives no string: shown
+		empty (named in the log, to find what sets the index) */
+		if (!string || string == (wchar_t *)-1)
+		{
+			error(_error_silent, "text box '%s': no string at index %d of its list",
+				widget->name ? widget->name : "?", (long)string_list_index);
+			string = (wchar_t *)L"";
 		}
 		length = ustrlen(string);
 		widget->parameters.text_box.text = pool_resize_pointer(
@@ -5588,10 +5867,9 @@ static void widget_instance_render_text_box(
 		}
 		ui_widget_port_text_wrap(*text, &bounds, width);
 	}
-	/* MCC owns these text boxes; wrap their instance copies to the panel
+	/* port: MCC owns these text boxes; wrap their instance copies to the panel
 	 * width without changing the map's objective strings or other menus. */
 	{
-		extern boolean mcc_pause_text_wrap_needed(long);
 		if (mcc_pause_text_wrap_needed(widget->definition_tag_index))
 		{
 			ui_widget_port_text_wrap(*text, &bounds, (short)(bounds.x1 - bounds.x0));
@@ -5619,7 +5897,7 @@ static void widget_instance_render_text_box(
 	if (mcc_menu_text_draw(widget->definition_tag_index, widget->parameters.text_box.string_list_index,
 		*text, font_index, justification, &color, &bounds, &clip))
 		return;
-	/* port: center the identified PC join line as one unit. */
+	/* port: the feature may center the identified PC join line as one unit. */
 	if (menu_functions_glyph_text(widget, &bounds))
 		return;
 	if (string_has_icons_to_draw(*text))
@@ -5726,7 +6004,8 @@ static void widget_instance_render_spinner_list(
 		if (definition->text_label_string_list.index != NONE)
 		{
 			short string_index = widget->parameters.list.selected_index;
-			wchar_t *string = spinner_string_list_get_string(
+			wchar_t *string = ui_widget_port_spinner_string(widget, string_index) ?
+				(wchar_t *)ui_widget_port_spinner_string(widget, string_index) : spinner_string_list_get_string(
 				definition->text_label_string_list.index,
 				string_index);
 			unsigned long length = ustrlen(string);
@@ -5912,6 +6191,13 @@ struct ui_mouse_target
 
 static struct ui_mouse_target ui_mouse_targets[UI_MOUSE_MAXIMUM_TARGETS];
 static long ui_mouse_target_count = 0;
+/* port: the bounds of the disabled widgets with handlers noted this frame, and
+how many targets had been noted before each (those after it are drawn on top of
+it): a click on one does nothing, not what is under it */
+static rectangle2d ui_mouse_dead_bounds[16];
+static long ui_mouse_dead_after[16];
+static long ui_mouse_dead_count = 0;
+
 static boolean ui_mouse_noting_targets = FALSE;
 /* the frame's targets are noted and settled (ui_mouse_fit_button_targets,
 ui_mouse_merge_setting_rows, ui_mouse_widen_values) by one render only:
@@ -6310,9 +6596,19 @@ static void ui_mouse_note_target(
 	short kind;
 
 	if (!ui_mouse_noting_targets ||
-		ui_mouse_target_count >= UI_MOUSE_MAXIMUM_TARGETS ||
-		widget->disabled)
+		ui_mouse_target_count >= UI_MOUSE_MAXIMUM_TARGETS)
 	{
+		return;
+	}
+	if (widget->disabled)
+	{
+		if (ui_mouse_dead_count < 16)
+		{
+			ui_mouse_dead_bounds[ui_mouse_dead_count] = definition->bounds;
+			offset_rectangle2d(&ui_mouse_dead_bounds[ui_mouse_dead_count], offset.x, offset.y);
+			ui_mouse_dead_after[ui_mouse_dead_count] = ui_mouse_target_count;
+			ui_mouse_dead_count++;
+		}
 		return;
 	}
 	bounds.x0 += offset.x;
@@ -6650,7 +6946,8 @@ static void ui_mouse_fit_button_targets(
 	return;
 }
 
-/* the target drawn last (so on top, and the innermost) under a point */
+/* the target drawn last (so on top, and the innermost) under a point; none if
+a disabled widget is drawn over it */
 static struct ui_mouse_target *ui_mouse_target_at(
 	short x,
 	short y)
@@ -6662,7 +6959,21 @@ static struct ui_mouse_target *ui_mouse_target_at(
 		rectangle2d const *bounds = &ui_mouse_targets[index].bounds;
 
 		if (x >= bounds->x0 && x < bounds->x1 && y >= bounds->y0 && y < bounds->y1)
+		{
+			long dead;
+
+			for (dead = 0; dead < ui_mouse_dead_count; dead++)
+			{
+				rectangle2d const *dead_bounds = &ui_mouse_dead_bounds[dead];
+
+				if (ui_mouse_dead_after[dead] > index &&
+					x >= dead_bounds->x0 && x < dead_bounds->x1 && y >= dead_bounds->y0 && y < dead_bounds->y1)
+				{
+					return NULL;
+				}
+			}
 			return &ui_mouse_targets[index];
+		}
 	}
 
 	return NULL;
@@ -6925,8 +7236,13 @@ port/assets/menus) */
 static boolean ui_mouse_selection_row(
 	struct widget_instance *widget)
 {
-	return widget && widget->parent && pc_menu_tag(widget->parent->definition_tag_index) &&
-		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
+	if (widget && widget->parent && !strcmp(widget->parent->name, "select_screen_list_template") &&
+		(!strcmp(widget->name, "list_item_0") || !strcmp(widget->name, "list_item_10")))
+		return FALSE;
+	return widget && widget->parent &&
+		(pc_menu_tag(widget->parent->definition_tag_index) ||
+		!strcmp(widget->parent->name, "select_screen_list_template") ||
+		!strcmp(widget->parent->name, "gametype_select_list")) &&		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
 			!strncmp(widget->name, "op_mod_", 7));
 }
 
@@ -7174,6 +7490,11 @@ static void ui_widgets_process_mouse(
 				switch (target->kind)
 				{
 				case _ui_mouse_target_item:
+					/* port: a click on a column list itself, not on one of its
+					items (a map's label drawn over the list, which is no
+					target), does nothing: A would press the item last focused */
+					if (target->widget->type == _ui_widget_type_column_list && target->widget->focused_child)
+						break;
 					/* (a selection list's row: chosen by a click, used by
 					a click on it chosen) */
 					if (ui_mouse_selection_row(target->widget) && target->widget->parent &&
@@ -7246,12 +7567,13 @@ static void ui_widgets_process_mouse(
 		}
 	}
 	ui_mouse_target_count = 0;
+	ui_mouse_dead_count = 0;
 	ui_mouse_targets_settled = FALSE;
 
 	return;
 }
 
-/* port: port/linux/game/menu_button_widgets.inl; PC legend and mouse-target spacing. */
+/* port: port/linux/game/menu_functions.c; optional PC legend spacing. */
 short menu_functions_glyph_offset(struct widget_instance *widget);
 
 static void widget_instance_render_recursive(
@@ -7306,13 +7628,14 @@ static void widget_instance_render_recursive(
 		}
 	}
 
+
 	if (!use_nifty_plasma_fx &&
 		TEST_FLAG(definition->flags, _widget_always_render_with_nifty_fx_bit))
 	{
 		use_nifty_plasma_fx = TRUE;
 	}
 	offset.x += widget->horizontal_offset;
-	/* port: move the complete PC legend group and its mouse target. */
+	/* port: move the complete PC legend group, including its mouse target. */
 	offset.x += menu_functions_glyph_offset(widget);
 	offset.y += widget->vertical_offset;
 	for (input_index = 0;
@@ -7458,7 +7781,7 @@ static void widget_instance_render_recursive(
 				texels.y1 = (short)((long)(bounds.y1 - bounds.y0) * bitmap->height / frame_height);
 				shown = bounds.x1 > bounds.x0 && bounds.y1 > bounds.y0;
 			}
-			/* port: native drawing remains the fallback for optional PC glyphs. */
+			/* port: retain native drawing unless a recognized PC-menu legend is replaced. */
 			if (shown && !menu_button_glyph_draw(menu_functions_glyph_button(widget, ui_mouse_key_button(widget)),
 				widget->local_player_index >= 0 && widget->local_player_index < 4 ?
 				widget->local_player_index : 0, &bounds, clip, color))
@@ -7479,7 +7802,7 @@ static void widget_instance_render_recursive(
 					clip,
 					color,
 					&multitexture_params,
-					FALSE);
+					widget->disabled);
 				frontend_panel_end();
 			}
 		}
@@ -7911,17 +8234,17 @@ static void column_list_update(
 {
 	struct widget_instance *child;
 
+	/* port: a map's own lists have rows of three frames */
+	boolean own_list = !strcmp(widget->name, "select_screen_list_template") ||
+		!strcmp(widget->name, "gametype_select_list");
 	for (child = widget->child; child; child = child->next)
 	{
-		if (child == widget->focused_child)
-		{
-			if (child->animation.number_of_sprite_frames == 2)
-				child->animation.current_frame_index = 1;
-		}
-		else if (child->animation.number_of_sprite_frames == 2)
-		{
-			child->animation.current_frame_index = 0;
-		}
+		boolean has_frames = child->animation.number_of_sprite_frames == 2 ||
+			(own_list && child->animation.number_of_sprite_frames == 3);
+
+		if (!has_frames)
+			continue;
+		child->animation.current_frame_index = child == widget->focused_child ? 1 : 0;
 	}
 
 	return;
@@ -8182,6 +8505,16 @@ static void widget_instance_process_one_event_recursive(
 			else
 			{
 				handled_by_event_handler = TRUE;
+			}
+			if (!handled_by_event_handler && event->data.button.index == _widget_event_b_button)
+			{
+				extern boolean pc_menu_network_back(struct widget_instance *widget);
+
+				if (pc_menu_network_back(widget))
+				{
+					handled_by_event_handler = TRUE;
+					event_handled = TRUE;
+				}
 			}
 			if (!handled_by_event_handler)
 			{
@@ -8618,11 +8951,11 @@ static boolean ui_check_for_pause_game(
 			}
 			local_player_count++;
 		}
-		/* MCC selects its owned stock-style pause tree; embedded map menus
+		/* port: MCC selects its owned stock-style pause tree; embedded map menus
 		 * remain available to custom scripts but are never the pause entry. */
 		{
-			extern boolean mcc_pause_runtime_active(void);
-			extern long mcc_pause_runtime_screen(short, boolean);
+
+
 			if (mcc_pause_runtime_active())
 			{
 				if ((!network_game || game_engine_allow_pause()) &&

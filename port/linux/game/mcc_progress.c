@@ -120,6 +120,26 @@ unsigned mcc_progress_flags(long profile, char const *level)
     return flags;
 }
 
+/* The stock selector updates every frame. Cache one selected mission for a
+ * second, keyed by the full profile and level identity, including failed reads.
+ * No widget or catalog pointer survives a selection or map change. */
+unsigned mcc_progress_menu_flags(long profile, char const *level, unsigned long now)
+{
+    static char selected[64];
+    static long selected_profile = NONE;
+    static unsigned long read_time;
+    static unsigned flags;
+    if (profile == NONE || !mcc_progress_level(level)) return 0;
+    if (profile != selected_profile || strcmp(level, selected) || now - read_time >= 1000)
+    {
+        flags = mcc_progress_flags(profile, level);
+        strcpy(selected, level);
+        selected_profile = profile;
+        read_time = now;
+    }
+    return flags;
+}
+
 static boolean mcc_progress_save(long profile, char const *level, short difficulty)
 {
     char path[300];

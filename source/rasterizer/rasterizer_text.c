@@ -794,6 +794,7 @@ static void rasterizer_text_draw_scaled_character(
 	struct dynamic_screen_vertex scaled[NUMBER_OF_VERTICES_PER_QUADRILATERAL];
 	short vertex_index;
 
+	/* port: bypass the transform only when both scale and offset are neutral. */
 	if (text_scale == 1.0f && text_offset_x == 0.0f && text_offset_y == 0.0f)
 	{
 		rasterizer_text_draw_character(vertices);
@@ -1306,7 +1307,8 @@ void rasterizer_draw_unicode_string_offset(rectangle2d const *bounds, wchar_t co
     text_offset_x=previous_x;text_offset_y=previous_y;
 }
 
-/* port: scoped local text scaling for compact keyboard keycaps. */
+/* port: scale only this string's coordinates before adding its placement offset.
+ * Restore all transform state, including when the renderer cannot draw text. */
 void rasterizer_draw_unicode_string_scaled_offset(rectangle2d const *bounds, wchar_t const *text,
     real scale, real x, real y)
 {

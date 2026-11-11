@@ -31,6 +31,18 @@ variables, one a line (port/linux/README.md, "Dedicated server"). A
 variable set there wins over `config.toml`, and `sv_set` and the web page
 cannot change it; leave out what you want to change from the web page.
 
+The riding settings both default to `false`; to pin them in `server.env`:
+
+```sh
+HALO_NET_VEHICLE_RIDING=false
+HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE=false
+```
+
+The first is the base setting; in multiplayer each gametype's riding rule
+overrides it (a gametype
+without the rule is off), and the second, set to `true`, turns that override off. A co-op entry's `+riding` rule or a map's own
+choice takes precedence (docs/dedicated_server.md, "Vehicle riding").
+
 A second instance on the machine needs ports of its own, and its own
 loopback address for system link:
 

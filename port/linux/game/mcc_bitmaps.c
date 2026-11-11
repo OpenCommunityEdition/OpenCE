@@ -15,6 +15,10 @@
 #include "../src/port_config.h"
 #include <stdlib.h>
 #include <string.h>
+/* Unmodified iOrange/bcdec, MIT option (see third_party/bcdec/LICENSE).
+ * Revision 80859ed3b7afb1c527a2a99d70c61457bea72d0c.
+ * https://github.com/iOrange/bcdec
+ * Header SHA-256: 134520764d96f70a27db814173616c89ad85db95fbd3328417c7a8c77e7ca189. */
 #define BCDEC_STATIC
 #define BCDEC_IMPLEMENTATION
 #include "../../third_party/bcdec/bcdec.h"
@@ -576,6 +580,8 @@ int mcc_bitmaps_prepare(struct mcc_runtime *runtime)
     if (!textures) return 0;
     memset(textures,0,sizeof(*textures));
     runtime->bitmaps=textures;
+    /* three entries a bitmap: its own and its channel clones' */
+    if (runtime->report.bitmap_count>SIZE_MAX/3/sizeof(*textures->items)) return 0;
     textures->capacity=runtime->report.bitmap_count*3;
     textures->tag_capacity=MIN(original_count*3,0xFFFFu);
     new_index=mcc_runtime_allocate(runtime,textures->tag_capacity*32);

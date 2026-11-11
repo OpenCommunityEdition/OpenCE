@@ -388,7 +388,6 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
-#include "mcc_protocol.h" /* port: negotiate MCC only with an advertising host */
 #include "third_person_protocol.h" /* port: port/linux/game/third_person_protocol.c */
 void network_game_client_reset_settings_staging(void); /* port: discard partial settings across connections */
 #include "mcc_cache.h" /* port: MCC-only origin-change admission guard */
@@ -937,7 +936,6 @@ void network_game_client_dispose(
 	if (client)
 	{
 		network_game_client_reset_settings_staging(); /* port: discard partial old-host settings */
-		mcc_protocol_client_clear(); /* port: no capability survives a connection */
 		third_person_session_client_clear(); /* port: discard camera permission too */
 		mcc_identity_disconnect(); /* port: discard the MCC session's local binding */
 		if (client->connection)
@@ -1051,6 +1049,7 @@ boolean network_game_client_switch_to_pregame(
 		network_game_reset_for_next_round(&client->game, TRUE);
 		network_connection_keep_alive(client->connection);
 		client->next_update_number = 0;
+		network_game_client_reset_settings_staging(); /* port: discard the previous host's partial record */
 		client->join_in_progress = TRUE;
 		client->connection_silent = FALSE;
 		client->state = _network_game_client_state_pregame;
@@ -1891,6 +1890,26 @@ boolean network_game_client_remove_player(
 				}
 			}
 
+			/* port: a local player who leaves while another remains no longer has
+			its slot: its entry in the local players is cleared here, as the datum
+			stays until a joiner takes the slot (network_game_spawn_player), which
+			then deletes it and makes another with a new identifier, and the entry
+			would name a player that no longer exists (player_get halts on it). The
+			last to leave ends the game, whose sounds and views still name it until
+			then, so its entry stays */
+			if (network_player_index != MAXIMUM_NUMBER_OF_PLAYERS &&
+				player->machine_index == client->machine_index &&
+				player->controller_index >= 0 && player->controller_index < MAXIMUM_LOCAL_PLAYERS &&
+				local_player_get_player_index(player->controller_index) == player_index)
+			{
+				local_player_set_player_index(player->controller_index, NONE);
+				/* (and its control, which names its unit: the datum no longer has a
+				local player index, so the host deleting the unit does not reset it
+				(network_player_detach_unit), and player_control_update would get a
+				unit that is gone) */
+				player_control_new_unit(player->controller_index, NONE);
+			}
+
 			/* port: a dedicated server's own machine never has a player
 			(port/linux/game/server_director.c): it leaves only when a player
 			of its own goes, which none is */
@@ -2124,21 +2143,19 @@ boolean network_game_client_initiate_join_game(
 	/* port: bind the capability to the selected advertisement, not a prior host. */
 	network_game_client_reset_settings_staging(); /* port: a new host starts a new record */
 	{
-		unsigned int mcc_flags = 0, camera_version = 0;
+		unsigned int camera_version = 0;
 		long advertised_index;
 		/* port: the host joins its own loopback server using a temporary
 		 * advertisement, which is not an entry in available_games. */
 		if (global_network_game_server_get() &&
 			address->address.long_words[0] == IPV4_LOOPBACK_ADDRESS)
-			mcc_flags = MCC_PROTOCOL_ADVERTISED_FLAG;
+			camera_version = third_person_session_version(game->map.name);
 		else for (advertised_index = 0; advertised_index < MAXIMUM_NETWORK_ADVERTISED_GAMES; advertised_index++)
 			if (game == &client->available_games[advertised_index])
 			{
-				mcc_flags = network_game_client_advertised_versions[advertised_index].flags;
 				camera_version = network_game_client_advertised_versions[advertised_index].version;
 				break;
 			}
-		mcc_protocol_client_begin(mcc_flags);
 		third_person_session_client_begin(camera_version); /* port: host state owns loopback mode */
 	}
 	client->join_in_progress = TRUE;
@@ -2675,10 +2692,6 @@ static boolean add_advertised_game(
 				(advertisement->__unknown5A[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] << 8));
 			network_game_client_advertised_versions[game_index].flags =
 				advertisement->__unknown5A[HALO_PORT_ADVERTISED_FLAGS_OFFSET];
-			/* port: another MCC revision can still use the ordinary OpenCE join. */
-			if (advertisement->__unknown5A[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET] != (MCC_PROTOCOL_VERSION & 255) ||
-				advertisement->__unknown5A[MCC_PROTOCOL_ADVERTISED_VERSION_OFFSET + 1] != (MCC_PROTOCOL_VERSION >> 8))
-				network_game_client_advertised_versions[game_index].flags &= ~MCC_PROTOCOL_ADVERTISED_FLAG;
 			network_game_client_advertised_versions[game_index].kind =
 				advertisement->__unknown5A[HALO_PORT_ADVERTISED_KIND_OFFSET];
 		}
@@ -2991,7 +3004,6 @@ static boolean network_game_client_idle_joining(
 			{
 				struct message_client_join_game_request join_game_request;
 				message_header *message;
-				word mcc_join[MCC_PROTOCOL_JOIN_MAX / sizeof(word)]; /* port: bounded optional envelope */
 				word camera_join[THIRD_PERSON_PROTOCOL_JOIN_MAX / sizeof(word)]; /* port: required camera admission */
 
 				csmemset(&join_game_request, 0, sizeof(join_game_request));
@@ -3029,8 +3041,6 @@ static boolean network_game_client_idle_joining(
 					_message_client_join_game_request,
 					&join_game_request,
 					sizeof(join_game_request));
-				if (message)
-					message = (message_header *)mcc_protocol_join(message, GET_MESSAGE_SIZE(*message), mcc_join); /* port */
 				if (message && third_person_session_active()) /* port: only negotiated camera sessions */
 					message = (message_header *)third_person_protocol_join(message, GET_MESSAGE_SIZE(*message), camera_join);
 				if (message)
@@ -3329,13 +3339,11 @@ boolean network_game_client_advertised_game_compatible(
 	boolean tell)
 {
 	long game_index = client ? game - client->available_games : NONE;
-	unsigned int ours = HALO_PORT_NETWORK_VERSION;
 	unsigned int theirs;
 	boolean distributed;
 
 	if (game_index < 0 || game_index >= MAXIMUM_NETWORK_ADVERTISED_GAMES)
 		return FALSE;
-	ours = mcc_protocol_version(game->map.name); /* port: distinct MCC protocol */
 	theirs = network_game_client_advertised_versions[game_index].version;
 	distributed = (network_game_client_advertised_versions[game_index].flags &
 		HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG) != 0;
@@ -3345,15 +3353,7 @@ boolean network_game_client_advertised_game_compatible(
 		network_event("joining a host of network version %u", theirs);
 		return TRUE;
 	}
-	/* port: preserve MCC-specific admission diagnostics before the shared browser helper. */
-	if (tell && ours == MCC_PROTOCOL_VERSION)
-	{
-		char message[400];
-		csprintf(message, "This MCC game requires GulchCE with MCC network version %u.\n\n"
-			"Use a matching GulchCE MCC build. Camera sessions additionally require third-person support.", MCC_PROTOCOL_VERSION); /* port: experimental branch */
-		platform_show_message("Halo: cannot join this game", message);
-	}
-	else if (tell)
+	if (tell)
 		network_game_client_tell_version(theirs, distributed);
 	return FALSE;
 }
@@ -3391,7 +3391,7 @@ void network_game_client_tell_version(
 	}
 	/* port: numeric ordering alone cannot explain this branch's reserved versions. */
 	csstrcat(message, "\n\nGulchCE Third Person sessions require a matching camera build. "
-		"GulchCE Standard sessions also require a matching GulchCE build; OpenCE clients are not compatible.");
+		"OpenCE Crossplay sessions use the shared OpenCE protocol with multiplayer third person disabled.");
 	network_event("not joining a host of network version %u%s (this machine's is %u)", theirs,
 		distributed ? "" : " with the lockstep netcode", ours);
 	platform_show_message("Halo: cannot join this game", message);

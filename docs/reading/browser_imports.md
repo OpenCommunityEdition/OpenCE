@@ -1,8 +1,7 @@
 # Browser map imports and download storage
 
 The launcher imports player-supplied Custom Edition files and Halo 1 MCC
-package folders without replacing the Xbox importer. This is a GulchCE MCC
-branch addition to OpenCE's browser platform. The game still uses three
+package folders without replacing the Xbox importer. This extends OpenCE's browser platform. The game still uses three
 separate roots: `maps`, `custom_maps` and `mcc_maps`.
 
 The browser's **Origin Private File System (OPFS)** stores files privately
@@ -20,7 +19,7 @@ Xbox base/menu data must already be imported. CE and MCC imports do not
 replace it. A supported desktop browser must provide OPFS and Web Locks,
 which coordinate access between tabs of the same origin. The launcher's
 existing browser checks include that requirement. Imports do not change
-the default-off `game.mcc_campaigns` setting.
+the default-on `game.mcc_campaigns` setting.
 
 | Read | Follow |
 | --- | --- |

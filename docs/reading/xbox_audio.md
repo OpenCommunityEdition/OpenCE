@@ -1,6 +1,6 @@
 # Xbox audio processing
 
-GulchCE implements the game's DirectSound calls in a shared software mixer.
+OpenCE implements the game's DirectSound calls in a shared software mixer.
 The Xbox's MCPX audio processing unit (APU) is absent on a PC, phone or browser;
 SDL delivers samples but does not supply the Xbox's spatial filters or DSP
 program. Previously the port supplied distance attenuation, left/right panning,
@@ -32,7 +32,7 @@ The sources have different evidentiary roles:
 | --- | --- |
 | [XboxDevWiki APU research](https://xboxdevwiki.net/APU) and [MCPX overview](https://xboxdevwiki.net/MCPX) | Hardware organization: voice processor (VP), global processor (GP), encode processor (EP), mix bins and per-voice head-related impulse responses. The VP processes 32-sample frames at 48 kHz. These notes describe hardware; they do not alone specify Halo's final sound. |
 | [NVIDIA's public GDC 2002 presentation](https://developer.download.nvidia.com/assets/gamedev/docs/gdc2002_what_comes_after_4.pdf) | Contemporary context for the Xbox audio architecture and programmable processing. |
-| [OpenH1 issue 714](https://github.com/OpenH1/OpenH1/issues/714) and [issue 792](https://github.com/OpenH1/OpenH1/issues/792) | Iterative comparisons with real Xbox output, including decoded AC-3 channels, and remaining differences. These are upstream reports, not hardware recordings independently made for GulchCE. |
+| [OpenH1 issue 714](https://github.com/OpenH1/OpenH1/issues/714) and [issue 792](https://github.com/OpenH1/OpenH1/issues/792) | Iterative comparisons with real Xbox output, including decoded AC-3 channels, and remaining differences. These are upstream reports, not hardware recordings independently made for OpenCE. |
 | [OpenH1 HRTF calibration](https://github.com/OpenH1/OpenH1/commit/e6e9be902c31) | Directional levels/delays fitted to recordings, including steep elevations and poles, rather than a generic spherical-head approximation. |
 | [OpenH1 reverb reconstruction](https://github.com/OpenH1/OpenH1/commit/0aa13af19994) | A floating-point reconstruction of the retail effects image and parameter conversion routines linked into the retail game, subsequently refined against hardware recordings. This part is not solely a black-box measurement. |
 
@@ -41,7 +41,7 @@ or DSP program image are included in this adaptation. The HRTF tables contain
 fitted band levels and delays; the tests contain response measurements. This
 investigation did not acquire or independently execute OpenH1's hardware capture
 tool. A tool's existence and upstream measurements are not proof of complete
-GulchCE parity. Emulator output is also not an unquestioned reference: see
+OpenCE parity. Emulator output is also not an unquestioned reference: see
 [xemu's reported HRTF differences](https://github.com/xemu-project/xemu/issues/2526).
 
 ## Processing and settings
@@ -62,12 +62,12 @@ The Audio Setup sound-processing screen exposes HRTF, reverb and resampling.
 Android/web retain their stereo output interfaces and run the same HRTF and DSP.
 Stereo speakers, headphones, Bluetooth/USB outputs and surround receivers do not
 select separate DSP implementations. Device drivers or external spatializers can
-add processing after GulchCE; compare with those effects disabled to hear this
+add processing after OpenCE; compare with those effects disabled to hear this
 mixer alone. The game emits PCM, not a new Dolby Digital encoder or bitstream.
 
 "Stereo output" is different from a stereo source asset. The original game sends
 music, UI and other 2D voices down a dry path; HRTF does not spatialize those
-voices. GulchCE's existing positioned-stereo extension retains its routing, with
+voices. OpenCE's existing positioned-stereo extension retains its routing, with
 optional stereo Doppler still off by default. See [Doppler audio](audio_doppler.md).
 These distinctions preserve authored sound rather than applying a headphone
 filter indiscriminately to every asset.
@@ -109,7 +109,7 @@ The included DSP modules share the backend's private stream/listener state. They
 are split by processing responsibility without exposing a second public audio
 API. HRTF history and ramps belong to each stream. Restarting a voice resets its
 history when gains are invalidated; releasing the stream frees that state.
-GulchCE's packet queue, synchronous completion callbacks and flushing guard are
+OpenCE's packet queue, synchronous completion callbacks and flushing guard are
 retained. Its existing five-millisecond cut fade also retains the processed tail.
 Settings are read on the game thread and published together under the mixer lock;
 HRTF changes crossfade on voices already playing.

@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
-"""The combined GulchCE/MCC wire manifest (port/linux/network_format.txt).
-
-OpenCE protocol 41 remains a historical baseline in test_mcc_protocol.py, with
-explicit audited shared differences. The combined manifest is versioned with
-MCC_PROTOCOL_VERSION; shared wire changes also require a new
-HALO_PORT_NETWORK_VERSION and both camera agreements, not merely an MCC bump.
+"""The wire format of HALO_PORT_NETWORK_VERSION (port/linux/network_format.txt).
 
 Taken from the sources: the game's message numbers, sizes and fields
 (network_messages.c, .h), the distributed netcode's (network_*.c, .h,
 map_share*.c, .h), and the gametype's PC options (game_engine.h's struct
 game_variant_options) and where the game settings record has them: the enums
-with _distributed_ members, the DISTRIBUTED_ constants, the structs sent
+with _distributed_ members and the one of the riding deck part's flags
+(vehicle_riding.h), the DISTRIBUTED_ constants, the structs sent
 whole (the _message structs, those whose size is taken, and the structs in
 them) as hashes, and the constants their arrays are sized by, as their
 definitions. An entry the netcode packs itself (a unit's state, a relayed
@@ -51,6 +47,7 @@ def items():
     """the wire format's items, name to value"""
     paths = sorted((ROOT / "port/linux/game").glob("network_*.[ch]"))
     paths += sorted((ROOT / "port/linux/game").glob("map_share*.[ch]"))
+    paths += [ROOT / "port/linux/game/vehicle_riding.h"]
     paths += [ROOT / "source/networking/network_messages.c", ROOT / "source/networking/network_messages.h"]
     texts = [re.sub(r"/\*.*?\*/|//[^\n]*", " ", path.read_text(encoding="latin-1"), flags=re.S) for path in paths]
     everything = "\n".join(texts)
@@ -60,17 +57,12 @@ def items():
         assert name not in result, f"{name} is declared twice"
         result[name] = str(value)
 
-    # Settings travel as the complete network_game record, in fragments.
-    game_header = re.sub(r"/\*.*?\*/|//[^\n]*", " ",
-                         (ROOT / "source/networking/network_game_manager.h").read_text(), flags=re.S)
-    for block in _blocks(game_header, r"^struct network_game\s*\{"):
-        add("struct network_game", _hash(block))
-
     for text in texts:
         for block in _blocks(text, r"^struct distributed_\w+\s*\{"):
             structs[re.match(r"struct (\w+)", block).group(1)] = block
         for block in _blocks(text, r"^enum\b[^;{]*\{"):
-            if "_distributed_" not in block and "network_game_message_type" not in block:
+            if ("_distributed_" not in block and "network_game_message_type" not in block and
+                    "_vehicle_riding_deck_falling_bit" not in block):
                 continue
             value = -1
             for member in filter(None, map(str.strip, block[block.index("{") + 1:block.rindex("}")].split(","))):
@@ -92,7 +84,7 @@ def items():
     # the constants the structs' arrays are sized by, and the netcode's
     # DISTRIBUTED_ sizes in enums of no name, as their definitions' text, with
     # the names those use in turn
-    bounds = {"HALO_PORT_NETWORK_GAME_SIZE", "HALO_PORT_NETWORK_GAME_LOCAL_DATA_OFFSET"}
+    bounds = set()
     for name in sent:
         for size in re.findall(r"\[([^\]]+)\]", structs[name].split("{", 1)[1]):
             bounds |= set(re.findall(r"\b[A-Z_][A-Z0-9_]*\b", size))
@@ -138,9 +130,6 @@ def items():
         add(f"size {name}", " ".join(size.split()))
     for fields, name in re.findall(r"\t\{\n((?:\t\t.*\n)*?)\t\},\n\tNETWORK_GAME_MESSAGE_DEFINITION\((\w+),", messages):
         add(f"fields {name}", _hash(fields))
-    protocol = (ROOT / "port/linux/game/mcc_protocol.h").read_text()
-    for name, value in re.findall(r"^#define (MCC_PROTOCOL_\w+) ([^\n]+)", protocol, re.M):
-        add(f"define {name}", value)
     workshop = (ROOT / "port/linux/game/mcc_workshop.h").read_text()
     for name, value in re.findall(r"^#define (MCC_WORKSHOP_WIRE_\w+) ([^\n]+)", workshop, re.M):
         add(f"define {name}", value)
@@ -167,17 +156,12 @@ def items():
     add("struct mcc_load_message", _hash(next(_blocks(loading, r"^struct mcc_load_message\s*\{"))))
     for name, value in re.findall(r"^#define (MCC_LOAD_NETWORK_\w+) ([^\n]+)", loading, re.M):
         add(f"define {name}", value)
-    camera = (ROOT / "port/linux/game/third_person_protocol.h").read_text()
-    for name, value in re.findall(r"^#define (THIRD_PERSON_PROTOCOL_\w+) ([^\n]+)", camera, re.M):
-        add(f"define {name}", value)
-    add("protocol GulchCE", re.search(r"#define HALO_PORT_NETWORK_VERSION (\d+)",
-        (ROOT / "port/linux/include/halo_port_limits.h").read_text()).group(1))
     return result
 
 
 def version():
-    limits = (ROOT / "port/linux/game/mcc_protocol.h").read_text()
-    return int(re.search(r"#define MCC_PROTOCOL_VERSION (\d+)", limits).group(1))
+    limits = (ROOT / "port/linux/include/halo_port_limits.h").read_text()
+    return int(re.search(r"#define HALO_PORT_NETWORK_VERSION (\d+)", limits).group(1))
 
 
 def recorded():
@@ -213,7 +197,7 @@ def record():
     recorded_version, old = recorded()
     breaking = changes(old, new)[0]
     if breaking and recorded_version == version():
-        sys.exit("changed or removed: " + ", ".join(breaking) + "\nraise MCC_PROTOCOL_VERSION first (and every affected shared/camera agreement)")
+        sys.exit("changed or removed: " + ", ".join(breaking) + "\nraise HALO_PORT_NETWORK_VERSION first")
     RECORD.write_text(f"version {version()}\n" + "".join(f"{name} {new[name]}\n" for name in sorted(new)))
 
 

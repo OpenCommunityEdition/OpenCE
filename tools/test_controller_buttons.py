@@ -91,10 +91,10 @@ struct widget_instance {
  struct widget_instance *child,*next,*parent,*focused_child;
  struct {struct {short selected_index;}list;}parameters;
 };
-struct pc_menu_setting {int value_count;char const *values[11];};
+struct pc_menu_setting {int value_count;char const *values[12];};
 static struct pc_menu_setting settings[]={
  {2,{"true","false"}},
- {11,{"classic","gems","menu_gems","xbox_modern","ps_classic","ps_gems","ps_dark_gems","ps_modern","switch_classic","switch_gems","switch_modern"}},
+ {12,{"classic","gems","menu_gems","xbox_modern","ps_classic","ps_gems","ps_dark_gems","ps_modern","switch_classic","switch_gems","switch_modern","keyboard"}},
  {4,{"classic","gems","menu_gems","xbox_modern"}},
  {4,{"ps_classic","ps_gems","ps_dark_gems","ps_modern"}},
  {3,{"switch_classic","switch_gems","switch_modern"}}};
@@ -140,7 +140,7 @@ int main(void){
   assert(a.visible && bumper.vertical_offset==133 && bar.vertical_offset==414);
  }
  styles[0].parameters.list.selected_index=-1;controller_button_rows_show(&list);assert(!bumper.visible);
- styles[0].parameters.list.selected_index=11;controller_button_rows_show(&list);assert(!bumper.visible);
+ styles[0].parameters.list.selected_index=12;controller_button_rows_show(&list);assert(!bumper.visible);
  automatic.parameters.list.selected_index=0;family=99;controller_button_rows_show(&list);assert(r[0].visible);
  keyboard=1;list.focused_child=&r[0];controller_button_rows_show(&list);
  assert(detected.visible&&!bumper.visible&&list.focused_child==&detected);
@@ -255,8 +255,8 @@ int main(void){
  bumper_style="modern";
  for(players=1;players<=2;players++)for(style=0;style<11;style++)for(index=0;index<18;index++)for(frame=0;frame<3;frame++){
   cursor.x0=100;cursor.y0=50;cursor.x1=500;cursor.y1=150;ticks=frame*10;
-  if((style<3 && index!=4 && index!=5) || (index>=8 && index<14)){before=draws;assert(!controller_glyph_draw(style,index,&icon,&cursor,0x7fffffff,unbind));assert(draws==before&&cursor.x0==100);continue;}
-  assert(controller_glyph_draw(style,index,&icon,&cursor,0x7fffffff,unbind));assert(drawn[0].color==0x7fffffff);
+  if((style<3 && index!=4 && index!=5) || (index>=8 && index<14)){before=draws;assert(!controller_glyph_draw_with_release(style,index,&icon,&cursor,0x7fffffff,unbind));assert(draws==before&&cursor.x0==100);continue;}
+  assert(controller_glyph_draw_with_release(style,index,&icon,&cursor,0x7fffffff,unbind));assert(drawn[0].color==0x7fffffff);
   scale=players==1?1:.75f;
   bounds=controller_glyph_assets[controller_glyph_asset_index(style,index<6?index:hud_button_control_slot(index,frame))].bounds;
   w=drawn[2].position.x-drawn[0].position.x;h=drawn[2].position.y-drawn[0].position.y;
@@ -267,7 +267,7 @@ int main(void){
   assert((bounds[2]-bounds[0])*w/512<=cellw+.001f && (bounds[3]-bounds[1])*h/512<=cellh+.001f);
   assert(cursor.x0==100+(short)((index<4?22:index<6?20:index<8?45:33)*scale));
   before=allocations;icon.flags=2;icon.color=0x40123456;
-  assert(controller_glyph_draw(style,index,&icon,&cursor,0xffffffff,unbind));assert(drawn[0].color==0x40ffffff&&before==allocations);icon.flags=0;
+  assert(controller_glyph_draw_with_release(style,index,&icon,&cursor,0xffffffff,unbind));assert(drawn[0].color==0x40ffffff&&before==allocations);icon.flags=0;
  }
  /* Menu layout uses the same assets but a smaller footer cell, independent
   * of split-screen HUD scale, with at least six units before its caption. */
@@ -286,25 +286,25 @@ int main(void){
  /* Only black/RB and white/LB change. All three styles share the modern
   * artwork cache, including after preference changes and map teardown. */
  for(i=0;i<10;i++)for(style=0;style<3;style++)for(index=0;index<18;index++){
-  bumper_style="original";assert(!controller_glyph_draw(style,index,&icon,&cursor,0,unbind));
+  bumper_style="original";assert(!controller_glyph_draw_with_release(style,index,&icon,&cursor,0,unbind));
   bumper_style="modern";before=draws;
-  assert(controller_glyph_draw(style,index,&icon,&cursor,0,unbind)==(index==4||index==5));
+  assert(controller_glyph_draw_with_release(style,index,&icon,&cursor,0,unbind)==(index==4||index==5));
   if(index==4||index==5){assert(draws==before+1);assert(controller_glyph_asset_index(style,index)==32+index-4);}
  }
  assert(live==2);controller_glyphs_dispose();assert(!live);
- bumper_style="invalid";assert(!controller_glyph_draw(0,4,&icon,&cursor,0,unbind));
+ bumper_style="invalid";assert(!controller_glyph_draw_with_release(0,4,&icon,&cursor,0,unbind));
  bumper_style="original";
- for(i=1;i<=2;i++){fail=i;assert(!controller_glyph_draw(4,0,&icon,&cursor,0,unbind));assert(!live);controller_glyphs_dispose();}
- fail=0;assert(controller_glyph_draw(4,0,&icon,&cursor,0,unbind));assert(drawn[0].color==0xffffff);
- for(style=-1;style<3;style++)assert(!controller_glyph_draw(style,0,&icon,&cursor,0,unbind));
- assert(!controller_glyph_draw(11,0,&icon,&cursor,0,unbind));controller_glyphs_dispose();assert(!live);
+ for(i=1;i<=2;i++){fail=i;assert(!controller_glyph_draw_with_release(4,0,&icon,&cursor,0,unbind));assert(!live);controller_glyphs_dispose();}
+ fail=0;assert(controller_glyph_draw_with_release(4,0,&icon,&cursor,0,unbind));assert(drawn[0].color==0xffffff);
+ for(style=-1;style<3;style++)assert(!controller_glyph_draw_with_release(style,0,&icon,&cursor,0,unbind));
+ assert(!controller_glyph_draw_with_release(11,0,&icon,&cursor,0,unbind));controller_glyphs_dispose();assert(!live);
  /* A PC-menu allocation is reused by modern menus and later MCC gameplay;
   * the late binding must still be released at map teardown. */
  {
   real_rectangle2d uv;struct bitmap_data *shared;int saved_unbound=unbound;
   shared=controller_glyph_bitmap(4,0,&uv);assert(shared&&live==1);
   before=allocations;assert(controller_glyph_draw_menu(4,0,&cursor,0));
-  assert(controller_glyph_draw(4,0,&icon,&cursor,0,unbind));
+  assert(controller_glyph_draw_with_release(4,0,&icon,&cursor,0,unbind));
   assert(controller_glyph_bitmap(4,0,&uv)==shared&&allocations==before);
   assert(uv.x0>=0&&uv.x1<=1&&uv.x1>uv.x0);
   controller_glyphs_dispose();assert(!live&&unbound==saved_unbound+1);

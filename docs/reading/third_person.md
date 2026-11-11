@@ -107,25 +107,21 @@ compatibility and camera-policy controls plus the invite link. Moving that
 link leaves room for two lines of host-menu help without shrinking the rows.
 Both camera rows use the standard menu
 font and full-size selection background. The compatibility selector defaults
-to **GulchCE Standard** (STANDARD in the menu). The stored configuration value
-`opence_crossplay` is retained so existing settings still select this mode;
-it no longer promises OpenCE interoperability. Xbox and Custom Edition maps
-require shared agreement 32722, and MCC maps require MCC agreement 68.
-The optional shoulder camera, its input bit and muzzle solver are disabled,
-regardless of the saved preference. Shared checkpoint and bounded client clock
-recovery are active in both session modes. The clock correction runs actual
-ticks toward validated reliable host time; it does not depend on camera
-permission. See [network clock recovery](networking.md#compare-states-from-the-same-time).
-Normal vehicles, scripted cameras and MCC weapon-authored cameras are unchanged.
-All network peers need matching updated GulchCE contracts. The selector does
-not make MCC maps compatible with OpenCE or older GulchCE builds.
+to Crossplay.
 
-**GulchCE Third Person** enables Player Choice / Forced On / Forced Off and
-requires camera agreement 32724 (Xbox/CE) or 32725 (MCC). It uses bounded join
-kind 102 around the normal join, or around MCC's own kind 101 envelope. The
-larger bound includes OpenCE 41's account-link credentials. Camera policy uses
-bits 3-4, leaving OpenCE's co-op flags in bits 0-2. Forced Off is still a camera
-session and requires the same admission proof and relay format.
+**Crossplay** (`opence_crossplay`) uses upstream protocol 43 for Xbox, Custom
+Edition and MCC maps. The optional shoulder camera, its input bit and muzzle
+solver are disabled, regardless of the saved preference. Shared checkpoint
+and bounded clock recovery use the upstream agreement in both session modes.
+Normal vehicles, scripted cameras and MCC weapon-authored cameras are unchanged.
+No additional MCC capability guard or join envelope is needed.
+
+**GulchCE Only** (`gulchce_third_person`) enables Player Choice / Forced On /
+Forced Off and requires camera protocol 32744 for all map families. It uses
+bounded join kind 102 around the ordinary join, including account-link
+credentials. Nested envelopes are rejected. Camera policy uses bits 4-5,
+leaving upstream co-op and vehicle-riding flags in bits 0-3. Forced Off remains
+a camera session and requires the same admission proof and relay format.
 
 Read [third_person_protocol.c](../../port/linux/game/third_person_protocol.c)
 next to the policy module. `third_person_session_host_begin` initializes host
@@ -139,7 +135,7 @@ and teardown hooks bind permission to the selected host and clear it at the
 connection boundary. Settings validate policy bits against that permission;
 settings and personal preferences cannot enable a camera extension themselves.
 
-For example, a player with third person saved as on joins a GulchCE Standard host:
+For example, a player with third person saved as on joins a Crossplay host:
 the ordinary join and relay are used, N cannot enable the shoulder camera,
 and the saved preference remains on. Disconnecting clears the session state;
 offline play can use that preference again. A matching GulchCE camera host
@@ -224,5 +220,5 @@ The [28 October qualification record](third_person_qualification.md) records
 the completed Windows/browser, checkpoint and rendered split-screen checks,
 the fixes they exposed, and their remaining coverage limits.
 
-MCC camera-relative projectile rays now require agreement 73 (shoulder 32742).
+MCC camera-relative projectile rays use upstream agreement 43 (camera mode 32744).
 Xbox/CE agreement versions are unchanged. Firing and preview share `mcc_projectiles.c`.

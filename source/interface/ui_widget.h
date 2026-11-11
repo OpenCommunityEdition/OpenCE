@@ -66,7 +66,7 @@ enum
 
 /* ---------- prototypes/UI_WIDGET.C */
 
-/* MCC menu actions use level names from their independent catalog. */
+/* port: MCC's menu actions name levels of its own catalog (mcc_maps.c) */
 boolean ui_widget_port_mcc_multiplayer_map_choose(char const *level_name);
 boolean ui_widget_port_mcc_cooperative_level_choose(char const *level_name, short difficulty);
 
