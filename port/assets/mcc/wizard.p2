@@ -600,6 +600,7 @@ bitmap_size	bitm:ui\hud\bitmaps\combined\hud_reticles	-	128	128
 sprite_sizes	bitm:ui\hud\bitmaps\combined\hud_reticles	-	66x66,64x64,64x64,64x64,64x64,64x64,64x64,28x28,28x28,64x64,64x64,64x64,64x64,64x64,18x10
 bitmap_size	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	64	64
 sprite_sizes	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	18x18,31x24
+sprite_layout	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	64x64	0,32,0,50,18,9,11|0,0,0,31,24,15,63;0,0,24,43,48,21,63
 bitmap_size	bitm:ui\hud\bitmaps\pistol\pistol_scope_mask	-	256	256
 bitmap_size	bitm:ui\hud\bitmaps\pistol\pistol_scope_mask split	-	256	256
 bitmap_size	bitm:ui\shell\bitmaps\postgame_carnage_report	-	1024	512

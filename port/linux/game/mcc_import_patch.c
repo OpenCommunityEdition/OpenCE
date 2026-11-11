@@ -28,8 +28,9 @@ and, read by the import itself (mcc_import.c, mcc_import_hud):
                bitmap_size (the menus' map, ui.map, to fit its cache file)
   sprite_sizes the disc's size of a HUD sprite sheet's sprites (the first
                of each sequence: "122x31,88x14,...")
-  sprite_layout the disc's layout of a HUD sprite sheet (the meters'), which
-               the import writes it in: its bitmaps ("256x256", by commas),
+  sprite_layout the disc's layout of a HUD sprite sheet (the meters', the
+               zoom reticles'), which the import writes it in: its
+               bitmaps ("256x256", by commas),
                and its sequences' sprites (by "|", a sequence's by ";", each
                "<bitmap>,<left>,<top>,<right>,<bottom>,<registration x>,
                <registration y>" in pixels)

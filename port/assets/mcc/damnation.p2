@@ -14,6 +14,7 @@ sprite_sizes	bitm:ui\hud\bitmaps\combined\hud_ammo_meters	-	105x16,114x27,109x18
 sprite_layout	bitm:ui\hud\bitmaps\combined\hud_ammo_meters	-	256x256	0,0,62.0001,105,78.0001,52,7|0,0,0,114,27,57,17|0,130,27,239,45,54,11|0,105,62,210,75,52,8|0,108,45,219,62,55,10|0,0,45,108,62,54,15|0,114,0,221,22,53,4|0,0,27,130,45,65,2|0,0,78,130,88,65,4
 bitmap_size	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	64	64
 sprite_sizes	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	18x18,31x24
+sprite_layout	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	64x64	0,32,0,50,18,9,11|0,0,0,31,24,15,63;0,0,24,43,48,21,63
 bitmap_size	bitm:ui\hud\bitmaps\sniper\sniper_scope_crosshairs2	-	64	256
 bitmap_size	bitm:ui\hud\bitmaps\sniper\sniper_scope_crosshairs_sm	-	32	128
 bitmap_size	bitm:ui\hud\bitmaps\sniper\caption	-	128	128

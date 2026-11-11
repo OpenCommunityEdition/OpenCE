@@ -7,6 +7,7 @@ ladder, which its weapon's folder holds), laid out as the Xbox maps' sheets:
         --hek ../halo-pc-restored/halopc-restored --svg ../halo-pc-restored/ui-svg-handmade
     python tools/hud_assets.py build
     python tools/hud_assets.py thresholds  # update only discrete segment data
+    python tools/hud_assets.py sprites --map assets/maps/bloodgulch.map  # update only the sheets' sprites
     python tools/hud_assets.py check --map assets/maps/bloodgulch.map --out /tmp/hud_check
 
 The game draws a HUD bitmap at its tag's size and samples it with normalised
@@ -34,6 +35,9 @@ reticles: puts the reticle redraws that match the Xbox's exactly (RETICLES,
 
         python tools/hud_assets.py reticles --map assets/maps/bloodgulch.map \\
             --reticles ../halo-pc-restored/HUD2_left_reticles
+sprites: writes only each sprite sheet's entry's sheet_sprites (the map's
+    sprite rectangles on its bitmap), which an imported MCC map's sheet must have
+    for the texture to stand for it; layout and reticles write them too.
 build: renders port/assets/hud/svg with layout.json into port/assets/hud/*.png
     (committed; the builds embed them).
 check: compares each PNG, reduced to the tag's size, with the map's bitmap
@@ -63,6 +67,8 @@ LAYOUT = ASSETS / "layout.json"
 # OpenGL ES 3 device can take
 SCALE = 8
 MAXIMUM_SIZE = 2048
+# (a bitmap group's type: a sheet of sprites)
+SPRITES_GROUP_TYPE = 3
 
 # the Xbox maps' tag data is loaded here (cache_files.c)
 XBOX_TAG_BASE = 0x803A6000
@@ -188,7 +194,7 @@ class XboxMap:
         header = self.read(address, 0x6C)
         sequence_count, sequences = struct.unpack_from("<II", header, 0x54)
         bitmap_count, bitmaps = struct.unpack_from("<II", header, 0x60)
-        group = {"bitmaps": [], "sequences": []}
+        group = {"type": struct.unpack_from("<h", header, 0)[0], "bitmaps": [], "sequences": []}
         for index in range(bitmap_count):
             bitmap = self.read(bitmaps + index * 0x30, 0x30)
             width, height, _, _, format, flags = struct.unpack_from("<hhhhhH", bitmap, 4)
@@ -345,6 +351,19 @@ def render_svg(svg: Path, zoom: float = 1) -> np.ndarray:
 def pixel_rectangle(sprite: tuple, width: int, height: int) -> list:
     _, left, top, right, bottom = sprite
     return [round(left * width), round(top * height), round(right * width), round(bottom * height)]
+
+
+def sheet_sprites(group: dict, index: int) -> list:
+    """The rectangles (in pixels, each once, sorted) of a sprite sheet's sprites
+    on its bitmap `index`; [] for a group of another type. An imported MCC
+    map's sheet with these sprites takes the texture of the bitmap
+    (port/linux/game/hud_hires_tags.c, by tools/embed_assets.py's cells_crc)."""
+    if group["type"] != SPRITES_GROUP_TYPE:
+        return []
+    bitmap = group["bitmaps"][index]
+    return [list(cell) for cell in sorted({tuple(pixel_rectangle(sprite, bitmap["width"], bitmap["height"]))
+                                           for sequence in group["sequences"] for sprite in sequence
+                                           if sprite[0] == index})]
 
 
 def window(image: np.ndarray, left: int, top: int, width: int, height: int) -> np.ndarray:
@@ -531,6 +550,8 @@ def layout(arguments) -> None:
                 "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]),
                 "cells": matched,
             })
+            if sheet_sprites(group, index):
+                entries[-1]["sheet_sprites"] = sheet_sprites(group, index)
             print(f"{name}: {width}x{height} {FORMATS[bitmap['format']]} at {scale}x, {len(matched)} cells, "
                   f"worst match {min(cell['score'] for cell in matched):.2f}")
     if (ASSETS / "svg").exists():
@@ -695,6 +716,8 @@ def reticles(arguments) -> None:
             entry = {"name": name, "tag": tag, "bitmap": index, "width": width, "height": height,
                      "format": FORMATS[bitmap["format"]], "scale": SCALE,
                      "crc": zlib.crc32(bitmap["pixels"][:level0_size(bitmap)]), "cells": laid}
+            if sheet_sprites(group, index):
+                entry["sheet_sprites"] = sheet_sprites(group, index)
             if old is not None:
                 entries[entries.index(old)] = entry
             else:
@@ -869,6 +892,22 @@ def build_asset(entry: dict, renders: dict) -> np.ndarray:
     return add_meter_thresholds(image, entry)
 
 
+def sprites(arguments) -> None:
+    """Write only each entry's sprites (sheet_sprites), from the map, keeping
+    the rest of layout.json."""
+    xbox_map = XboxMap(Path(arguments.map))
+    description = json.loads(LAYOUT.read_text())
+    for entry in description["assets"]:
+        if ("bitm", entry["tag"]) not in xbox_map.tags:
+            continue
+        entry.pop("sheet_sprites", None)
+        cells = sheet_sprites(xbox_map.bitmap_group(entry["tag"]), entry["bitmap"])
+        if cells:
+            entry["sheet_sprites"] = cells
+            print(f"{entry['name']}: {len(cells)} sprites")
+    LAYOUT.write_text(json.dumps(description, indent=1) + "\n")
+
+
 def thresholds(arguments) -> None:
     """Rebuild only categorical data in committed PNGs, retaining their art."""
     for entry in json.loads(LAYOUT.read_text())["assets"]:
@@ -938,12 +977,14 @@ def main() -> None:
     command.add_argument("--reticles", required=True)
     commands.add_parser("build")
     commands.add_parser("thresholds")
+    command = commands.add_parser("sprites")
+    command.add_argument("--map", required=True)
     command = commands.add_parser("check")
     command.add_argument("--map", required=True)
     command.add_argument("--out", required=True)
     arguments = parser.parse_args()
     {"layout": layout, "reticles": reticles, "build": build, "thresholds": thresholds,
-     "check": check}[arguments.command](arguments)
+     "sprites": sprites, "check": check}[arguments.command](arguments)
 
 
 if __name__ == "__main__":

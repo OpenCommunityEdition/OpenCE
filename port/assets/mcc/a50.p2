@@ -618,6 +618,7 @@ sprite_sizes	bitm:ui\hud\bitmaps\combined\hud_unit_meters	-	122x31,122x31,88x14,
 sprite_layout	bitm:ui\hud\bitmaps\combined\hud_unit_meters	-	256x256	0,0,34,122,65,61,20|0,130,0,252,31,61,20|0,88,65,176,79,44,11|0,0,65,88,79,44,11|0,0,79,130,89,65,2|0,122,48,252,58,65,11|0,0,0,130,34,65,20|0,122,34,210,48,44,11
 bitmap_size	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	64	64
 sprite_sizes	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	18x18,31x24
+sprite_layout	bitm:ui\hud\bitmaps\sniper\hud_reticles_scope	-	64x64	0,32,0,50,18,9,11|0,0,0,31,24,15,63;0,0,24,43,48,21,63
 bitmap_size	bitm:ui\hud\bitmaps\pistol\pistol_scope_mask	-	256	256
 bitmap_size	bitm:ui\hud\bitmaps\pistol\pistol_scope_mask split	-	256	256
 bitmap_size	bitm:weapons\sniper rifle\bitmaps\angle_ticks_black	-	8	256

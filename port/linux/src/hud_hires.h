@@ -34,8 +34,8 @@ button icon (port/assets/buttons, made by tools/button_assets.py), drawn with
 display.high_res_text rather than display.high_res_hud; sprites: the sequences
 of its bitmap's group (a bit each) whose sprites it is drawn for, through a
 placeholder, or 0: the whole bitmap, in its place; cells_crc: the CRC-32 of
-the sprite rectangles the texture was drawn for on its bitmap, in texels
-(hud_hires_asset_cells_match), or 0 */
+the sprite rectangles the texture was drawn for on its bitmap (its sheet's
+sprites in the disc's maps), in texels (hud_hires_asset_cells_match), or 0 */
 struct hud_hires_embedded
 {
 	const char *tag;

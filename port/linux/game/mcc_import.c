@@ -72,7 +72,8 @@ enum
 	MCC_IMPORT_HUD_MASK,
 	MCC_IMPORT_MAXIMUM_BSPS = 32,
 	/* the HUD sprite sheets written in the disc's layout (the operations'
-	sprite_layout: the meters'), and each one's bitmaps and sprites */
+	sprite_layout: the meters' and the zoom reticles'), and each one's bitmaps
+	and sprites */
 	MCC_IMPORT_MAXIMUM_SPRITE_LAYOUTS = 4,
 	MCC_IMPORT_MAXIMUM_LAYOUT_BITMAPS = 8,
 	MCC_IMPORT_MAXIMUM_LAYOUT_SPRITES = 64,
@@ -1384,8 +1385,9 @@ static boolean mcc_import_bitmap_halve(
 
 /* ---------- private code: HUD sprite sheets in the disc's layout
 
-MCC drew the meters again, at about twice the disc's size, in sheets of its
-own layout (more bitmaps, the sprites elsewhere). Where the operations give
+MCC drew the meters and the zoom reticles again, three or four times the
+disc's size, in sheets of their own layout (more bitmaps, the sprites
+elsewhere). Where the operations give
 the disc's layout of such a sheet (sprite_layout), it is written in it: the
 disc's bitmaps, each sprite where the disc has it, its pixels MCC's,
 resampled into the disc's rectangle. The disc's placements then draw it at

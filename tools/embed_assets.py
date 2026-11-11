@@ -205,9 +205,11 @@ def main() -> None:
         sprites = sum(1 << sequence for sequence in sequences)
         # (the sprite rectangles it was drawn for, in its bitmap's texels: an
         # imported MCC map's sprite sheet of that layout takes it, as
-        # hud_hires_asset_cells_match finds; 0 for none, or for cells that are
-        # not whole texels, which no sprite is: the sniper scopes')
-        cells = sorted({tuple(cell.get("xbox", ())) for cell in asset.get("cells", [])})
+        # hud_hires_asset_cells_match finds. Its sheet's sprites, where
+        # hud_assets.py gives them, else its cells; 0 for none, or for cells
+        # that are not whole texels, which no sprite is)
+        cells = sorted({tuple(cell) for cell in asset["sheet_sprites"]} if asset.get("sheet_sprites") else
+                       {tuple(cell.get("xbox", ())) for cell in asset.get("cells", [])})
         cells_crc = (zlib.crc32(b"".join(struct.pack("<4i", *cell) for cell in cells))
                      if cells and all(len(cell) == 4 and all(isinstance(value, int) for value in cell)
                                       for cell in cells) else 0)
