@@ -54,7 +54,7 @@ jobs:
     # 32-bit glibc is for the tests.
     runs-on: ubuntu-24.04
     container: archlinux:latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - name: Install the toolchain
         run: |
