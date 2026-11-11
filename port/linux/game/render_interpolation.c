@@ -47,6 +47,7 @@ tick, such as a nav marker, is moved as far as the object is drawn from there
 #include "game/players.h"
 #include "render/render_cameras.h"
 #include "units/units.h"
+#include "third_person.h"
 #include "vehicle_riding.h"
 
 /* port/linux/src/port_config.c */
@@ -732,7 +733,8 @@ static struct observer_result const *render_interpolation_direct_camera(
 		enabled = config_boolean("display.direct_camera");
 	}
 	if (!enabled || !observer ||
-		director_get_perspective(local_player_index) != _director_perspective_first_person ||
+		(director_get_perspective(local_player_index) != _director_perspective_first_person &&
+		 !third_person_director_active(local_player_index)) ||
 		director_inhibited_facing(local_player_index) ||
 		cinematic_in_progress())
 	{
@@ -766,10 +768,14 @@ struct observer_result const *render_interpolation_camera(
 	short local_player_index,
 	struct observer_result const *observer)
 {
+	struct observer_result const *view;
 	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
 		return observer;
-	return render_interpolation_direct_camera(local_player_index,
+	view = render_interpolation_direct_camera(local_player_index,
 		render_interpolation_blended_camera(local_player_index, observer));
+	/* The shoulder preview needs this same view before shake and displacement. */
+	third_person_reticle_view(local_player_index, view);
+	return view;
 }
 
 /* between two of the observer's results: the position, the axes (up kept

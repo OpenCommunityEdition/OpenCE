@@ -70,6 +70,7 @@ their handlers open opens.
 */
 
 #include "cseries.h"
+#include "third_person.h"
 #include "cseries/errors.h"
 
 #include "input/input.h"
@@ -425,6 +426,9 @@ static boolean setting_write(char const *name, char const *value)
 {
 	short index;
 
+	if (!strcmp(name, "display.third_person") && third_person_policy() != _third_person_player_choice)
+		return TRUE;
+
 	/* (DISCORD ACCOUNT's LINK: done, not written: the master's page opened
 	in the browser, or the account forgotten, player_link.c) */
 	if (!strcmp(name, "link.action"))
@@ -485,6 +489,9 @@ static boolean setting_save(struct widget_instance *widget)
 	if (!setting || setting->loaded_index == NONE || widget->parameters.list.selected_index < 0 ||
 		widget->parameters.list.selected_index >= setting->value_count)
 		return FALSE;
+	if (!strcmp(setting->setting, "display.third_person") && third_person_policy() != _third_person_player_choice)
+		return TRUE;
+
 	if (widget->parameters.list.selected_index == setting->loaded_index)
 		return TRUE;
 	if (!config_write(setting->setting, setting->values[widget->parameters.list.selected_index]))
@@ -1787,6 +1794,11 @@ static boolean setting_changed_save(struct widget_instance *spinner, struct pc_m
 {
 	short index = spinner->parameters.list.selected_index;
 
+	/* A locked display value is never a change to the personal preference,
+	   even if the host unlocks the lobby just before this menu closes. */
+	if (!strcmp(setting->setting, "display.third_person") &&
+		(third_person_policy() != _third_person_player_choice || setting->loaded_index == NONE))
+		return TRUE;
 	if (index < 0 || index >= setting->value_count || index == setting->loaded_index)
 		return TRUE;
 	if (!setting_write(setting->setting, setting->values[index]))
@@ -1807,6 +1819,39 @@ static boolean setting_default_show(struct widget_instance *spinner, struct pc_m
 	if (setting_text(setting->setting, text, sizeof(text), TRUE))
 		spinner->parameters.list.selected_index = setting_value_index(setting, text);
 	return TRUE;
+}
+
+static void camera_setting_show(struct widget_instance *spinner, struct pc_menu_setting *setting)
+{
+	if (!strcmp(setting->setting, "display.third_person"))
+	{
+		if (third_person_policy() != _third_person_player_choice)
+		{
+			spinner->parameters.list.selected_index = setting_value_index(setting, third_person_enabled() ? "true" : "false");
+			setting->loaded_index = NONE;
+		}
+		else if (setting->loaded_index == NONE)
+		{
+			setting->loaded_index = setting_value_index(setting, config_boolean("display.third_person") ? "true" : "false");
+			spinner->parameters.list.selected_index = setting->loaded_index;
+		}
+	}
+}
+
+static void camera_settings_show(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "third_person_spinner", 0);
+	struct pc_menu_setting *setting;
+	if (!spinner)
+		return;
+	setting = pc_menu_setting_get(spinner->definition_tag_index);
+	if (!setting)
+		return;
+	camera_setting_show(spinner, setting);
+	if (third_person_policy() != _third_person_player_choice &&
+		list->parameters.list.extended_description &&
+		list->focused_child == named(list, "op_third_person", 0))
+		list->parameters.list.extended_description->parameters.text_box.string_list_index = 10;
 }
 
 /* "port settings help": the line of the row chosen (by its label's string:
@@ -3756,9 +3801,15 @@ static struct
 	{ "controls.scoreboard", L"SHOW SCORES", 2 },
 	{ "controls.pause", L"PAUSE MENU", 2 },
 	{ "controls.screenshot", L"SCREENSHOT", 2 },
+	{ "controls.swap_shoulder", L"SWAP SHOULDER", 4 },
+	{ "controls.free_look", L"HOLD FREE LOOK", 4 },
+	{ "controls.toggle_perspective", L"TOGGLE PERSPECTIVE", 4 },
 	{ "controls.push_to_talk", L"PUSH TO TALK", 3 },
 	{ "controls.chat", L"CHAT", 3 },
 	{ "controls.team_chat", L"TEAM CHAT", 3 },
+	{ "controls.camera_distance", L"CAMERA DISTANCE", 4 },
+	{ "controls.camera_height", L"CAMERA HEIGHT", 4 },
+	{ "controls.camera_offset", L"CAMERA OFFSET", 4 },
 	{ "controls.vote_yes", L"VOTE YES", 3 },
 	{ "controls.vote_no", L"VOTE NO", 3 },
 };
@@ -5544,10 +5595,50 @@ static void setting_options_each(struct widget_instance *list, boolean save);
 /* "server settings init": the game's name (player 1's, else the one given
 last), the most players, the gametype's copy (once: the screen is made
 again on coming back from an option's screen) */
+static boolean session_options_initialize(struct widget_instance *list)
+{
+	struct widget_instance *spinner = named(list, "camera_policy_spinner", 0);
+	if (!spinner) return FALSE;
+	spinner->parameters.list.selected_index = third_person_policy() == _third_person_forced_off;
+	return TRUE;
+}
+
+static boolean session_options_update(struct widget_instance *list)
+{
+	static char const *const policies[] = { "player_choice", "forced_off" };
+	struct widget_instance *spinner = named(list, "camera_policy_spinner", 0);
+	struct widget_instance *help = list->parameters.list.extended_description;
+	char text[TEXT_FIELD_LENGTH];
+	short selected, policy;
+	if (!spinner) return FALSE;
+	selected = (short)PIN(spinner->parameters.list.selected_index, 0, 1);
+	policy = selected ? _third_person_forced_off : _third_person_player_choice;
+	if (policy != third_person_policy())
+	{
+		third_person_set_match_policy(policy);
+		if (policy == third_person_policy()) config_write("network.camera_policy", policies[selected]);
+	}
+	spinner->parameters.list.selected_index = third_person_policy() == _third_person_forced_off;
+	if (help) help->parameters.text_box.string_list_index = spinner->parameters.list.selected_index;
+	if (multiplayer.mode != _multiplayer_mode_host_internet)
+		snprintf(text, sizeof(text), "NONE: A LAN GAME");
+	else if (!config_boolean("network.online"))
+		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
+	else if (!p2p_invite_link(text, sizeof(text)))
+		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
+	else
+		snprintf(text, sizeof(text), "SELECT TO COPY LINK");
+	text_field_show(named(list, "invite_value", 0), text, FALSE);
+	if (help && list->focused_child == named(list, "op_invite", 0))
+		help->parameters.text_box.string_list_index = 2;
+	return TRUE;
+}
+
 static boolean server_settings_initialize(struct widget_instance *list)
 {
 	struct widget_instance *spinner = named(list, "max_players_spinner", 0);
 
+	if (session_options_initialize(list)) return TRUE;
 	/* (co-op has no gametype to edit) */
 	if (!hosting_cooperative())
 		gametype_setup_begin();
@@ -5583,6 +5674,20 @@ static void wide_to_text(wchar_t const *wide, char *text, short size)
 	text[index] = 0;
 }
 
+/* Hidden internet and mode-specific rows must not leave gaps. Moving the
+row also moves its labels, spinners and pointer targets. */
+static void server_settings_layout(struct widget_instance *list)
+{
+	struct widget_instance *row;
+	short y = 49;
+	for (row = list->child; row; row = row->next)
+		if (row->visible && !strncmp(row->name, "op_", 3))
+		{
+			row->vertical_offset = y;
+			y += 28;
+		}
+}
+
 /* "server settings update" */
 static void server_settings_update(struct widget_instance *list)
 {
@@ -5590,18 +5695,14 @@ static void server_settings_update(struct widget_instance *list)
 	struct widget_instance *row = named(list, "op_server_name", 0);
 	char text[TEXT_FIELD_LENGTH];
 
+	if (session_options_update(list)) return;
+
 	if (spinner)
 		*server_settings_maximum_players_index() = (short)PIN(spinner->parameters.list.selected_index, 0,
 			NUMBEROF(maximum_players) - 1);
 	wide_to_text(multiplayer.game_name, text, sizeof(text));
 	text_field_show(named(list, "server_name_value", 0), text, text_field_editing(row));
-	if (multiplayer.mode != _multiplayer_mode_host_internet)
-		snprintf(text, sizeof(text), "NONE: A LAN GAME");
-	else if (!config_boolean("network.online"))
-		snprintf(text, sizeof(text), "INTERNET PLAY IS OFF (SETTINGS)");
-	else if (!p2p_invite_link(text, sizeof(text)))
-		snprintf(text, sizeof(text), "MADE WHEN THE GAME STARTS");
-	text_field_show(named(list, "invite_value", 0), text, FALSE);
+
 	{
 		wchar_t type[ROW_TEXT_LENGTH];
 
@@ -5669,6 +5770,7 @@ static void server_settings_update(struct widget_instance *list)
 		if (help && list->focused_child == row)
 			help->parameters.text_box.string_list_index = SERVER_PASSWORD_HELP;
 	}
+	server_settings_layout(list);
 }
 
 static void server_password_done(char const *text)
@@ -10190,6 +10292,7 @@ void pc_menu_game_data_function_invoke(
 		discord_account_show(widget);
 		hdr_calibration_row_show(widget);
 		settings_help(widget);
+		camera_settings_show(widget);
 	}
 	else if (!strcmp(name, "port hdr calibration"))
 		hdr_calibration_update(widget);

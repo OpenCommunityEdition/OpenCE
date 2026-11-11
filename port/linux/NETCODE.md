@@ -183,12 +183,22 @@ lockstep netcode was removed, set to play it): it tells the player why.
 ## OpenCE network agreement
 
 OpenCE network version 42 replaced version 41 for Xbox, Custom Edition and MCC sessions;
-version 43 (below, "Versions") replaces it.
+versions 43 and 44 (below, "Versions") replace it.
 Advertisements and ordinary join requests carry this one version; mismatched
 versions are rejected before admission. There is no separate MCC capability
 envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
 102 remain unused. The historical version-41 record is retained as a test fixture,
 not a crossplay promise.
+
+The integrated shoulder-camera feature raises the protocol to version 44. Host
+camera policy occupies bits 4-5 of `cooperative_flags` (Player Choice,
+Forced On, Forced Off; value 3 is rejected). Input bit 16 carries resolved
+shoulder view. The compact action relay includes one validated 0/1 shoulder
+byte, with 15-byte minimum and 21-byte maximum entries. All peers must use
+the integrated format; version 44 distinguishes it from earlier
+pre-feature testing builds. There is no alternative legacy relay or camera
+capability envelope. Host validation derives muzzle origins from host poses,
+never client-provided camera coordinates.
 
 Every settings transfer sends the complete shared `network_game` record, including
 the two 32-byte MCC digests (zero for Xbox/CE). The reassembler pins its total size,
@@ -404,6 +414,11 @@ machine that pulses without converting cannot hold every round's start. A
 version 42 build computes MCC impulses the other way, and its scripted poses'
 validation drops the message's other units with a bad pose.
 
+Version 44 adds the integrated shoulder-camera state byte to the relayed
+player action and host camera policy to the shared session flags. Both native
+and Web peers require the same format; version-43 clients are refused before
+admission. The version-43 rider state and MCC agreements remain intact.
+
 Version 43 also carries a rider standing on a vehicle: the deck part of a unit's
 state and the host's riding decision for the game, made at its start and
 kept until the map ends, a co-op flag of the game's settings
@@ -439,7 +454,7 @@ vehicle a client follows (the host's word is its place, not its updates) is
 measured by the time elapsed since the rider's last tick, and a change of the
 vehicle's role (simulated or followed) takes no correction across it.
 None of this adds a byte: the cabin bit (bit 3 of the flags) is the only change to the deck part,
-which stays 28 bytes, and the version stays 43.
+which stays 28 bytes, as introduced in version 43.
 
 Message 107 carries the host's riding rules: the map's choice (its boolean
 `vehicle_riding` global or startup call; none when the map makes none) and
@@ -453,7 +468,7 @@ next game; before the message it keeps its own. The values are the latched
 ones, so a config change on the host waits for the next map; a co-op host's
 revert or saved-game load reads the config again, and the new values are
 sent again then. It ships with
-the rest of version 43, which stays 43.
+the rest of version 43; the integrated camera feature now uses version 44.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -830,7 +845,7 @@ its name alone beside it, has its name given back as the map lists find it.
 
 MCC supports host-only delivery for eligible local and Workshop packages.
 It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. Every map family uses OpenCE version **43**.
+separate from CE sharing 83-86. Every map family uses OpenCE version **44**.
 The shared settings record includes two 32-byte MCC digests, zero for Xbox/CE:
 the gameplay/resource identity and the required-JSON identity. The distributed
 header is 12 bytes, including its checkpoint epoch.

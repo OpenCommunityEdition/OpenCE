@@ -445,6 +445,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "third_person.h" /* port: host camera policy */
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
@@ -1389,6 +1390,8 @@ struct network_game_server *network_game_server_create(
 
 			server->game.difficulty = main_get_difficulty();
 			server->game.number_of_games_played = -1;
+			/* port: the host owns camera policy for this session. */
+			server->game.cooperative_flags |= third_person_host_policy() << THIRD_PERSON_POLICY_SHIFT;
 
 			for (i = 0; i < MAXIMUM_NETWORK_MACHINE_COUNT; i++)
 			{

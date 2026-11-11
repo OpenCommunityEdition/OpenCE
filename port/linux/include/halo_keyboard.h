@@ -38,14 +38,20 @@ enum halo_keyboard_action
 	/* (voice chat's, which the game itself does not read:
 	halo_push_to_talk_held) */
 	HALO_KEYBOARD_PUSH_TO_TALK,
+	HALO_KEYBOARD_SWAP_SHOULDER,
+	HALO_KEYBOARD_FREE_LOOK,
+	HALO_KEYBOARD_TOGGLE_PERSPECTIVE,
 	/* (the text chat's, which the game itself does not read: a line to
 	everyone, or to the team: port/linux/game/network_chat.c) */
 	HALO_KEYBOARD_CHAT,
 	HALO_KEYBOARD_TEAM_CHAT,
+	HALO_KEYBOARD_CAMERA_DISTANCE,
 	/* (the players' votes', yes and no in the vote running: port/linux/game/
 	network_votekick.c, read with the chat's keys) */
 	HALO_KEYBOARD_VOTE_YES,
 	HALO_KEYBOARD_VOTE_NO,
+	HALO_KEYBOARD_CAMERA_HEIGHT,
+	HALO_KEYBOARD_CAMERA_OFFSET,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 

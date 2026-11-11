@@ -54,6 +54,7 @@ struct weapon_datum {long definition_index;};
 struct weapon_trigger_definition {unsigned long flags; real_point3d first_person_weapon_offset;};
 struct block {int count; void *address;};
 struct weapon_definition {struct {struct block triggers;} weapon;};
+struct observer_result {real_point3d position;real_vector3d forward,up;};
 struct unit_datum {long definition_index; struct {long parent_object_index;unsigned long damage_flags;} object;
     struct {long player_index,gunner_object_index;real_vector3d desired_aiming_vector;} unit;};
 struct unit_definition {struct {unsigned long flags;} unit;};
@@ -157,6 +158,21 @@ int main(int argc,char **argv) {
  } else if(!strcmp(argv[1],"transition")) {
   CHECK(mcc_projectile_ray(2,1,0,FALSE,&p,&d,&v,&target));loaded=0;calls=0;rejected(0,1);
   loaded=1;CHECK(mcc_projectile_ray(2,1,0,FALSE,&p,&d,&v,&target)); /* no retained ray or tag pointers */
+ } else if(!strcmp(argv[1],"rendered preview")) {
+  struct observer_result view={{7,0,1},{0,0,1},{-1,0,0}};
+  real_point3d before_p,after_p;real_vector3d before_d,after_d;real before_v,after_v;long before_t,after_t;
+  plane_normal=view.forward;plane_distance=3;
+  CHECK(mcc_projectile_ray(2,1,0,FALSE,&before_p,&before_d,&before_v,&before_t));
+  CHECK(mcc_projectile_preview(2,1,0,&view,&p,&d));
+  point_from_line3d(&view.position,&view.forward,2,&hit);vector_from_points3d(&p,&hit,&delta);normalize3d(&delta);
+  CHECK(dot_product3d(&d,&delta)>0.99999f && fabs(p.z-1.15f)<.00001f && fabs(p.x-7.15f)<.00001f);
+  CHECK(player.aim_assist_unit_index==99 && player.aim_assist_timestamp==98);
+  CHECK(mcc_projectile_ray(2,1,0,FALSE,&after_p,&after_d,&after_v,&after_t));
+  CHECK(memcmp(&before_p,&after_p,sizeof(before_p))==0 && memcmp(&before_d,&after_d,sizeof(before_d))==0);
+  CHECK(before_v==after_v && before_t==after_t);
+  CHECK(mcc_projectile_preview(2,1,0,NULL,&p,&d));
+  CHECK(memcmp(&p,&before_p,sizeof(p))==0 && memcmp(&d,&before_d,sizeof(d))==0);
+  loaded=0;CHECK(!mcc_projectile_preview(2,1,0,&view,&p,&d));
  } else return 2;
  return 0;
 }
@@ -164,7 +180,7 @@ int main(int argc,char **argv) {
     return compile_tool(work, [source])
 
 
-@pytest.mark.parametrize("case", ["guards", "aim", "cover", "assist", "transition"])
+@pytest.mark.parametrize("case", ["guards", "aim", "cover", "assist", "transition", "rendered preview"])
 def test_mcc_projectile_ray(ray_tool, case):
     subprocess.run([str(ray_tool), case], check=True)
 
@@ -216,6 +232,29 @@ int main(void) {
  zoom=0;magnification=2;
  CHECK(player_get_aim_assist_target(3,&pos,&dir,&target,&level)==9 && level==0.75f && target.x==11 && calls==1);
  return 0;
+}
+''')
+    exe = compile_tool(tmp_path, [source])
+    subprocess.run([str(exe)], check=True)
+
+def test_projectile_repair_keeps_mcc_precreation_ownership(tmp_path):
+    text = function((ROOT / "source/items/weapons.c").read_text(), "trigger_create_projectiles")
+    start = text.index("\t\t\t\t\t\t/* port: MCC validates spawns")
+    end = text.index("\n\t\t\t\t\t}\n\t\t\t\t\tif (target_object_index", start)
+    source = tmp_path / "repair.c"
+    source.write_text(r'''
+#include <assert.h>
+typedef struct {float x,y,z;} real_point3d;
+static int stock,shoulder;
+static void object_force_inside_bsp(long p,real_point3d const *v){assert(p==2&&v->x==3);stock++;}
+static void third_person_projectile_repair(long p,real_point3d const *v,long owner){assert(p==2&&v->x==3&&owner==1);shoulder++;}
+int main(void){int mcc_ray,muzzle_origin;long projectile_object_index=2,owner_object_index=1;real_point3d camera_position={3,0,0};
+for(mcc_ray=0;mcc_ray<2;mcc_ray++)for(muzzle_origin=0;muzzle_origin<2;muzzle_origin++){
+stock=shoulder=0;
+''' + text[start:end] + r'''
+assert(stock==(!mcc_ray&&!muzzle_origin));assert(shoulder==(!mcc_ray&&muzzle_origin));
+}
+return 0;
 }
 ''')
     exe = compile_tool(tmp_path, [source])

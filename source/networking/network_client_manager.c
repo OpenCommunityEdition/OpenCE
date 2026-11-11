@@ -366,6 +366,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "third_person.h" /* port: camera policy validation */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_address_constants.h"
@@ -1307,6 +1308,8 @@ boolean network_game_client_game_settings_updated(
 		added (network_game_add_player) */
 		message_packet->maximum_players > 0 &&
 		message_packet->maximum_players <= MAXIMUM_NUMBER_OF_PLAYERS &&
+		/* port: reject unknown flags and the reserved camera policy. */
+		third_person_match_flags_valid(message_packet->cooperative_flags) &&
 		network_game_client_map_name_is_valid(message_packet->map.name, sizeof(message_packet->map.name)) &&
 		VALID_INDEX(message_packet->difficulty, NUMBER_OF_GAME_DIFFICULTY_LEVELS))
 	{

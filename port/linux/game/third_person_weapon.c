@@ -1,0 +1,328 @@
+/* The host and predicting clients solve shots from the same world markers. */
+#include "cseries.h"
+#include "third_person.h"
+#include "camera/director.h"
+#include "camera/observer.h"
+#include "mcc_projectiles.h"
+#include "game/game.h"
+#include "game/players.h"
+#include "units/units.h"
+#include "physics/collisions.h"
+#include "physics/collision_usage.h"
+#include "objects/objects.h"
+#include "items/weapons.h"
+#include "items/weapon_definitions.h"
+#include "units/unit_definitions.h"
+#include "effects/effect_definitions.h"
+
+char const *config_string(char const *name);
+void platform_log(char const *format, ...);
+
+/* The existing firing-effect tag layout; only this feature needs its declaration. */
+struct weapon_firing_effect_definition
+{
+	short shots_lower_bound;
+	short shots_upper_bound;
+	long unused[8];
+	struct tag_reference effects[3];
+	struct tag_reference damage_effects[3];
+};
+
+static boolean muzzle_player(short player, long unit_index)
+{
+	struct unit_datum *unit;
+	director_perspective perspective;
+	if (!third_person_active(player) ||
+		unit_index == NONE || player_control_get_unit_index(player) != unit_index ||
+		player_control_get_zoom_level(player) != NONE)
+		return FALSE;
+	unit = unit_try_and_get(unit_index);
+	return unit && unit->object.parent_object_index == NONE &&
+		!TEST_FLAG(unit->object.damage_flags, _object_dead_bit) &&
+		!director_desired_perspective(unit_index, &perspective);
+}
+
+static boolean muzzle_network_player(long unit_index)
+{
+	struct unit_datum *unit = unit_index != NONE ? unit_try_and_get(unit_index) : NULL;
+	director_perspective perspective;
+	return unit && unit->unit.player_index != NONE &&
+		unit->object.parent_object_index == NONE &&
+		!TEST_FLAG(unit->object.damage_flags, _object_dead_bit) &&
+		unit->unit.current_zoom_level == NONE &&
+		third_person_policy() != _third_person_forced_off &&
+		TEST_FLAG(unit->unit.control_flags, THIRD_PERSON_INPUT_BIT) &&
+		/* A stale or forged input bit cannot override an authored camera. */
+		!director_desired_perspective(unit_index, &perspective);
+}
+
+static short muzzle_preview_trigger(struct weapon_datum *weapon, struct weapon_definition *definition)
+{
+	/* A charged secondary shot leaves a different muzzle on the pistol. */
+	return definition->weapon.triggers.count > 1 &&
+		((weapon->weapon.triggers[0].state == _trigger_charged &&
+		  TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, 0, struct weapon_trigger_definition)->spew_time <= 0.0f) ||
+		 weapon->weapon.triggers[1].state == _trigger_charging ||
+		 weapon->weapon.triggers[1].state == _trigger_charged ||
+		 weapon->weapon.triggers[1].state == _trigger_spewing) ? 1 : 0;
+}
+
+/* Authored alternating firing effects can name a different barrel, as
+   the Plasma Rifle does. Only accept trigger markers, never smoke/ejection
+   locations; missing or custom names retain the ordinary trigger marker. */
+static char const *muzzle_marker(long weapon_index, short trigger_index)
+{
+	struct weapon_datum *weapon = weapon_get(weapon_index);
+	struct weapon_definition *definition = weapon_definition_get(weapon->definition_index);
+	struct weapon_trigger_definition *trigger;
+	struct weapon_firing_effect_definition *firing;
+	struct effect_definition *effect;
+	char const *name;
+	char const *fallback = trigger_index ? "secondary trigger" : "primary trigger";
+	short index = weapon->weapon.triggers[trigger_index].firing_effect_index;
+	if (definition->weapon.triggers.count <= trigger_index)
+		return fallback;
+	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
+	if (index < 0 || index >= trigger->firing_effects.count)
+		return fallback;
+	firing = TAG_BLOCK_GET_ELEMENT(&trigger->firing_effects, index, struct weapon_firing_effect_definition);
+	if (firing->effects[0].index == NONE)
+		return fallback;
+	effect = (struct effect_definition *)tag_get(EFFECT_DEFINITION_TAG, firing->effects[0].index);
+	if (!effect->locations.count)
+		return fallback;
+	/* Effect locations are 32-byte marker names. The tag loader validates
+	   this block, and object_get_marker_by_name still verifies the marker. */
+	name = (char const *)effect->locations.address;
+	if (!strncmp(name, fallback, strlen(fallback)) &&
+		(name[strlen(fallback)] == '\0' ||
+		 (name[strlen(fallback)] >= '0' && name[strlen(fallback)] <= '9')))
+		return name;
+	return fallback;
+}
+
+static boolean muzzle_position(long weapon_index, long unit_index, short trigger_index,
+	real_point3d *position, real_point3d *obstruction, boolean *blocked, real_point3d const *view_eye)
+{
+	struct object_marker marker;
+	real_point3d eye;
+	real_vector3d delta;
+	real length;
+	struct collision_result collision;
+	*blocked = FALSE;
+	if (weapon_index == NONE || trigger_index < 0 || trigger_index > 1)
+		return FALSE;
+	if (!object_get_marker_by_name(weapon_index, muzzle_marker(weapon_index, trigger_index), &marker, 1) &&
+		!object_get_marker_by_name(weapon_index,
+			trigger_index ? "secondary trigger" : "primary trigger", &marker, 1))
+		return FALSE;
+	if (view_eye)
+		eye = *view_eye;
+	else
+		unit_get_camera_position(unit_index, &eye);
+	*position = marker.matrix.position;
+	vector_from_points3d(&eye, position, &delta);
+	length = magnitude3d(&delta);
+	/* Do not let a barrel through a wall spawn a shot beyond that wall. */
+	if (length > 0.001f && collision_test_vector(_collision_test_for_projectiles_flags,
+		&eye, &delta, unit_index, &collision))
+	{
+		point_from_line3d(&eye, &delta, MAX(0.0f, collision.t - 0.01f / length), position);
+		*obstruction = collision.point;
+		*blocked = TRUE;
+	}
+	return TRUE;
+}
+
+/* Both the preview and actual shot use this solver. The input ray is the
+   stock weapon ray (aim assistance has already run for a real shot). */
+static boolean muzzle_aim(long weapon_index, long unit_index, short trigger_index,
+	real_point3d *origin, real_vector3d *forward, real_point3d *target, real_point3d const *view_eye)
+{
+	real_point3d muzzle, eye, obstruction, aim;
+	real_vector3d ray;
+	boolean blocked;
+	struct collision_result collision;
+	if (!muzzle_position(weapon_index, unit_index, trigger_index, &muzzle, &obstruction, &blocked, view_eye))
+		return FALSE;
+	scale_vector3d(forward, 1000.0f, &ray);
+	point_from_line3d(origin, &ray, 1.0f, &aim);
+	if (collision_test_vector(_collision_test_for_projectiles_flags, origin, &ray, unit_index, &collision))
+		aim = collision.point;
+	/* The stock offset can start beyond nearby cover. Check the segment
+	   leading to that origin as well, rather than aiming through the wall. */
+	if (view_eye)
+		eye = *view_eye;
+	else
+		unit_get_camera_position(unit_index, &eye);
+	vector_from_points3d(&eye, origin, &ray);
+	if (magnitude3d(&ray) > 0.001f && collision_test_vector(_collision_test_for_projectiles_flags,
+		&eye, &ray, unit_index, &collision))
+		aim = collision.point;
+	if (blocked)
+		aim = obstruction;
+	vector_from_points3d(&muzzle, &aim, &ray);
+	/* A target behind the barrel must not turn the shot backwards. Keep
+	   its original direction; the preview traces that same forward path. */
+	if ((blocked || dot_product3d(&ray, forward) > 0.001f) && normalize3d(&ray) > 0.001f)
+		*forward = ray;
+	*origin = muzzle;
+	/* The projectile uses only origin and forward. Its simulation does the
+	   next collision test; this extra ray is solely for reticle placement. */
+	if (target)
+	{
+		scale_vector3d(forward, 1000.0f, &ray);
+		point_from_line3d(origin, &ray, 1.0f, target);
+		if (collision_test_vector(_collision_test_for_projectiles_flags, origin, &ray, unit_index, &collision))
+			*target = collision.point;
+	}
+	return TRUE;
+}
+
+boolean third_person_muzzle_shot(long weapon_index, long unit_index, short trigger_index,
+	real_point3d *origin, real_vector3d *forward)
+{
+	short player;
+	if (game_connection() != _game_connection_local)
+	{
+		if (!muzzle_network_player(unit_index))
+			return FALSE;
+		if (!muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, NULL, NULL))
+			return FALSE;
+		if (config_string("debug.network_test")[0])
+			platform_log("network muzzle: player %ld trigger %d origin %.4f %.4f %.4f",
+				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(unit_get(unit_index)->unit.player_index), (int)trigger_index,
+				origin->x, origin->y, origin->z);
+		return TRUE;
+	}
+	for (player = 0; player < MAXIMUM_LOCAL_PLAYERS; player++)
+		if (muzzle_player(player, unit_index))
+			return muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, NULL, NULL);
+	return FALSE;
+}
+
+/* Preview and host visibility history use the same held weapon, trigger
+   and authored-origin exclusions. Actual shots retain their supplied trigger. */
+static struct weapon_trigger_definition *muzzle_preview_weapon(struct unit_datum *unit,
+	long unit_index, long *weapon_index, short *trigger_index)
+{
+	struct weapon_datum *weapon;
+	struct weapon_definition *definition;
+	struct weapon_trigger_definition *trigger;
+	*weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
+	if (*weapon_index == NONE)
+		return NULL;
+	weapon = weapon_get(*weapon_index);
+	definition = weapon_definition_get(weapon->definition_index);
+	*trigger_index = muzzle_preview_trigger(weapon, definition);
+	if (definition->weapon.triggers.count <= *trigger_index)
+		return NULL;
+	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, *trigger_index, struct weapon_trigger_definition);
+	if (TEST_FLAG(trigger->flags, _weapon_trigger_uses_weapon_origin_bit) ||
+		TEST_FLAG(trigger->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit))
+		return NULL;
+	return trigger;
+}
+
+/* The host's visibility history needs the same cover-clamped muzzle as
+   shoulder shots. No client position is accepted or retained here. */
+boolean third_person_muzzle_history(long unit_index, real_point3d *position)
+{
+	struct unit_datum *unit;
+	long weapon_index;
+	short trigger_index;
+	real_point3d obstruction;
+	boolean blocked;
+	if (game_connection() != _game_connection_network_server || !muzzle_network_player(unit_index))
+		return FALSE;
+	unit = unit_get(unit_index);
+	if (!muzzle_preview_weapon(unit, unit_index, &weapon_index, &trigger_index))
+		return FALSE;
+	return muzzle_position(weapon_index, unit_index, trigger_index, position, &obstruction, &blocked, NULL);
+}
+
+boolean third_person_muzzle_target(short player, real_point3d *target,
+	struct observer_result const *view, real_vector3d const *view_aim)
+{
+	long unit_index, weapon_index;
+	short trigger_index = 0;
+	struct unit_datum *unit;
+	struct weapon_trigger_definition *trigger;
+	struct object_marker marker;
+	real_point3d origin;
+	real_vector3d forward, right, up;
+	real velocity;
+	real_vector3d relative;
+	real_point3d const *view_eye = view ? &view->position : NULL;
+	unit_index = player_control_get_unit_index(player);
+	if (!muzzle_player(player, unit_index))
+		return FALSE;
+	unit = unit_get(unit_index);
+	trigger = muzzle_preview_weapon(unit, unit_index, &weapon_index, &trigger_index);
+	if (!trigger)
+		return FALSE;
+	/* MCC owns its camera-relative offsets and requested-aim semantics. */
+	if (mcc_projectile_preview(weapon_index, unit_index, trigger_index, view, &origin, &forward))
+		return muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target, view_eye);
+	if (!object_get_marker_by_name(weapon_index,
+		trigger_index ? "secondary trigger" : "primary trigger", &marker, 1))
+		return FALSE;
+	origin = marker.matrix.position;
+	if (view_eye && view_aim)
+	{
+		/* Display-only equivalent of unit_adjust_projectile_ray, using the
+		   rendered eye/aim with rendered markers. Never write unit state. */
+		forward = *view_aim;
+		if (TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_fires_from_camera_bit))
+		{
+			vector_from_points3d(view_eye, &origin, &relative);
+			point_from_line3d(view_eye, &forward, dot_product3d(&relative, &forward), &origin);
+		}
+	}
+	else
+	{
+		forward = unit->unit.aiming_vector;
+		unit_adjust_projectile_ray(unit_index, &origin, &forward, &velocity,
+			TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_fires_from_camera_bit), TRUE);
+	}
+	cross_product3d(global_up3d, &forward, &right);
+	if (normalize3d(&right) == 0.0f)
+		right = *global_left3d;
+	cross_product3d(&forward, &right, &up);
+	normalize3d(&up);
+	point_from_line3d(&origin, &forward, trigger->first_person_weapon_offset.x, &origin);
+	point_from_line3d(&origin, &right, trigger->first_person_weapon_offset.y, &origin);
+	point_from_line3d(&origin, &up, trigger->first_person_weapon_offset.z, &origin);
+	return muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target, view_eye);
+}
+
+/* Shoulder projectiles exclude their owner during the existing BSP repair.
+   Keep this path separate so stock projectile repair remains unchanged. */
+boolean third_person_projectile_repair(
+	long object_index,
+	real_point3d const *known_good_point,
+	long ignore_object_index)
+{
+	struct collision_result collision;
+	struct object_datum *object = object_get(object_index);
+	boolean result = TRUE;
+
+	match_assert(__FILE__, __LINE__, global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH);
+	global_current_collision_users[global_current_collision_user_depth++] = 19;
+
+	if (collision_test_line(_collision_test_for_projectiles_flags, known_good_point, &object->object.position, ignore_object_index, &collision) ||
+		object->object.location.cluster_index==NONE)
+	{
+		result = collision.location.cluster_index != NONE;
+		if (result)
+		{
+			object_translate(object_index, &collision.point, &collision.location);
+			object_compute_node_matrices(object_index);
+		}
+	}
+
+	match_assert(__FILE__, __LINE__, global_current_collision_user_depth > 1);
+	--global_current_collision_user_depth;
+
+	return result;
+}

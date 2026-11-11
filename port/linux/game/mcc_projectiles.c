@@ -4,6 +4,7 @@
 #include "mcc_projectiles.h"
 #include "mcc_cache.h"
 #include "mcc_camera.h"
+#include "camera/observer.h"
 #include "game/aim_assist.h"
 #include "game/players.h"
 #include "game/game.h"
@@ -17,8 +18,9 @@
  * projected world-muzzle origin (c20's weapon format reference). */
 #define MCC_TRIGGER_ORIGINAL_PROJECTILE_RAY 0x4000UL
 
-boolean mcc_projectile_ray(long weapon_index, long owner, short trigger_index, boolean firing,
-    real_point3d *origin, real_vector3d *forward, real *velocity, long *target_index)
+static boolean projectile_ray(long weapon_index, long owner, short trigger_index, boolean firing,
+    struct observer_result const *view, real_point3d *origin, real_vector3d *forward,
+    real *velocity, long *target_index)
 {
     struct weapon_datum *weapon;
     struct weapon_definition *definition;
@@ -49,9 +51,10 @@ boolean mcc_projectile_ray(long weapon_index, long owner, short trigger_index, b
         !TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_fires_from_camera_bit) ||
         mcc_camera_weapon_following(owner)) return FALSE;
 
-    aim = unit->unit.desired_aiming_vector;
+    aim = view ? view->forward : unit->unit.desired_aiming_vector;
     if (normalize3d(&aim) == 0.0f) return FALSE;
-    unit_get_camera_position(owner, &camera);
+    if (view) camera = view->position;
+    else unit_get_camera_position(owner, &camera);
     cross_product3d(global_up3d, &aim, &right);
     if (normalize3d(&right) == 0.0f) right = *global_left3d;
     cross_product3d(&aim, &right, &up);
@@ -105,4 +108,22 @@ boolean mcc_projectile_ray(long weapon_index, long owner, short trigger_index, b
         player->aim_assist_timestamp = game_time_get();
     }
     return TRUE;
+}
+
+boolean mcc_projectile_ray(long weapon_index, long owner, short trigger_index, boolean firing,
+    real_point3d *origin, real_vector3d *forward, real *velocity, long *target_index)
+{
+    return projectile_ray(weapon_index, owner, trigger_index, firing, NULL,
+        origin, forward, velocity, target_index);
+}
+
+/* A shoulder preview follows the same MCC camera-relative rules. Rendered
+ * view overrides are read-only and cannot reach the simulation's entry point. */
+boolean mcc_projectile_preview(long weapon_index, long owner, short trigger_index,
+    struct observer_result const *view, real_point3d *origin, real_vector3d *forward)
+{
+    real velocity;
+    long target;
+    return projectile_ray(weapon_index, owner, trigger_index, FALSE, view,
+        origin, forward, &velocity, &target);
 }

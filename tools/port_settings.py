@@ -378,6 +378,39 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
         ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
          "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
+        ("THIRD PERSON:", "display.third_person", ON_OFF,
+         "Right-shoulder view on foot. Zoom uses first\nperson. The reticle follows your aim point.", None),
+    ],
+}
+SCREENS["video_settings/fov_viewmodels"]["spacing"] = 26
+SCREENS["video_settings/fov_viewmodels"]["categories"] = [
+    ("SHOULDER CAMERA:", "video_settings/shoulder_camera",
+     "Choose the shoulder and camera position.\nB swaps shoulders while playing."),
+]
+SCREENS["video_settings/fov_viewmodels"]["extra_help"] = [
+    "CONTROLLED BY HOST. Your personal camera\\npreference returns after leaving the match.",
+]
+SCREENS["video_settings/shoulder_camera"] = {
+    "screen": "shoulder_camera_settings_screen", "header": _video["header"], "spacing": 30,
+    "rows": [
+        ("CAMERA MOTION:", "display.third_person_smooth", [("SMOOTH", "true"), ("SHARP", "false")],
+         "Smooth eases recovery and shoulder changes.\nSharp moves immediately; collision stays active.", None),
+        ("SMOOTH CROSSHAIR:", "display.third_person_crosshair_smooth", ON_OFF,
+         "Reduce crosshair jitter in shoulder view.\nDoes not change aim or weapon accuracy.", None),
+        ("CROSSHAIR SIZE:", "display.third_person_crosshair_size",
+         [(f"{n}%", f"{n / 100:.2f}") for n in [75, 80, 85, 90, 95, 100]],
+         "Shoulder crosshair size. Default 100%.\nDoes not change aim or weapon accuracy.", None),
+        ("LEFT SHOULDER:", "display.third_person_left_shoulder", ON_OFF,
+         "Off uses the right shoulder. B swaps in game.\nRemap it under Controls Setup > Camera.", None),
+        ("DISTANCE:", "display.third_person_distance",
+         [(f"{n / 100:.2f}", f"{n / 100:.2f}") for n in [30, 45, 60, 70, 85, 100, 125, 150, 175, 200]],
+         "Distance behind the eye, in world units.\nAlt + wheel adjusts in game. Default 0.85.", None),
+        ("HEIGHT:", "display.third_person_height",
+         [(f"{n / 100:.2f}", f"{n / 100:.2f}") for n in [-20, -10, 0, 6, 12, 18, 24, 36, 48, 60]],
+         "Shift + wheel adjusts height in game.\nDefault 0.12 world units.", None),
+        ("LATERAL OFFSET:", "display.third_person_offset",
+         [(f"{n / 100:.2f}", f"{n / 100:.2f}") for n in [0, 6, 12, 18, 24, 30, 36, 48, 60]],
+         "Hold Caps Lock + wheel to move left or right.\nDefault 0.24 world units to the right.", None),
     ],
 }
 
@@ -569,7 +602,7 @@ SCREENS["network_setup/in_game"] = {
 
 # Controls Setup: the keyboard and mouse's actions, in groups (the order of
 # port/linux/game/menu_functions.c's table of them)
-CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS", "COMMUNICATION"]
+CONTROL_GROUPS = ["MOVEMENT", "WEAPONS", "ACTIONS", "COMMUNICATION", "CAMERA"]
 CONTROL_ROWS = 7
 
 # the settings whose rows have the wider spinner (a device's name)
@@ -670,22 +703,22 @@ def _screen(folder: str, spec: dict, rows: list, list_inputs: list, list_handler
     lines = []
     lines += _widget(f"{base}/{spec['screen']}",
                      [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child pause_game"),
-                      ("bitmap", "bitmaps/gradient")],
+                      ("bitmap", spec.get("background_bitmap", "bitmaps/gradient"))],
                      ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
                       f'<child{attributes([("widget", f"{base}/{header}")])}/>',
                       f'<child{attributes([("widget", f"{base}/options_menu")])}/>'])
-    lines += _widget(f"{base}/{header}", [("controller", 1), ("left", 35), ("top", 11), ("width", 605), ("height", 59),
+    lines += _widget(f"{base}/{header}", [("controller", 1), ("left", 35), ("top", spec.get("header_top", 11)), ("width", 605), ("height", 59),
                                           ("bitmap", header_bitmap)], [])
-    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 68),
-                                      ("top", spec.get("help_top", 350)), ("width", 482),
+    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", spec.get("help_left", 68)),
+                                      ("top", spec.get("help_top", 350)), ("width", spec.get("help_width", 482)),
                                       ("height", spec.get("help_height", 60)), ("string_list", None if spec.get("dynamic_help") else f"{base}/help_strings"),
                                       ("font", spec.get("help_font", "ui\\large_ui")), ("color", "#FFFFFFFF")], [])
     children = [f'<data input="{name}"/>' for name in list_inputs] + list_handlers
     # (each row: its widget, platform, and the place it is in, else the next)
     for index, (row, platform, *place) in enumerate(rows):
-        y = 73 + (place[0] if place else index) * spec["spacing"]
+        y = spec.get("rows_top", 73) + (place[0] if place else index) * spec["spacing"]
         children.append(f'<child{attributes([("widget", row), ("x", 54), ("y", y), ("platform", platform)])}/>')
-    children.append(f'<child{attributes([("widget", f"{base}/button_bar"), ("y", 414)])}/>')
+    children.append(f'<child{attributes([("widget", f"{base}/button_bar"), ("y", spec.get("button_top", 414))])}/>')
     lines += _widget(f"{base}/options_menu",
                      [("type", "column_list"), ("width", 640), ("height", 480),
                       ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
@@ -814,7 +847,8 @@ def _setting_screen(folder: str, spec: dict) -> list:
     # (the help of the row whose label is string n is n + 1: the buttons' is 0)
     extra += _strings(f"{base}/help_strings",
                       [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]] +
-                      [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())])
+                      [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())] +
+                      spec.get("extra_help", []))
     return _screen(folder, spec, rows, ["port settings help", *spec.get("inputs", ())], [], extra)
 
 
@@ -878,7 +912,7 @@ def _controller_screen() -> list:
     base = f"{PE}/{folder}"
     rows, extra = [], []
     for key, label, choices in [("player", "PLAYER:", "P1|P2|P3|P4"),
-                                ("group", "SHOW:", "MOVEMENT|COMBAT|GENERAL|COMMUNICATION|DEBUG")]:
+                                ("group", "SHOW:", "MOVEMENT|COMBAT|GENERAL|COMMUNICATION|DEBUG|CAMERA PERSPECTIVE")]:
         row = f"{base}/op_{key}"
         rows.append((row, None))
         extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
@@ -1558,16 +1592,50 @@ def _password_screen() -> list:
     return lines
 
 
+def _session_options(base: str, host: str) -> list:
+    rows, extra = [], []
+    for key, label, values in [
+        ("camera_policy", "CAMERA POLICY:", "PLAYER CHOICE|FORCED OFF"),
+    ]:
+        extra += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
+            ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+            [f'<child widget="{base}/{key}_label"/>', f'<child widget="{base}/{key}_spinner" x="264" y="1"/>'])
+        extra += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 260), ("height", 22),
+            ("text", label), ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        # Generated spinners draw at their bounds, ignoring text_y. Top 3 +
+        # child y 1 matches the label's text_y 4; arrows centre on the 28px row.
+        extra += _widget(f"{base}/{key}_spinner", [("type", "spinner"), ("top", 3), ("width", 237), ("height", 20),
+            ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"), ("strings", values),
+            ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center"),
+            ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+            ("header_bounds", "7 0 19 6"), ("footer_bounds", "7 231 19 237")],
+            ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+        rows.append((f"{base}/op_{key}", None))
+    extra += _value_row(base, "invite", 1, "ss copy invite")
+    extra += _strings(f"{base}/labels", ["", "INVITE LINK:"])
+    rows.append((f"{base}/op_invite", None))
+    extra += _strings(f"{base}/help_strings", [
+        "Each player chooses first or third person.\\nTheir camera toggle remains available.",
+        "Third person is disabled for everyone.\\nNormal vehicle and cinematic cameras remain.",
+        "Players join by this invite link. Enter copies it.\\nLAN games use the server browser instead.",
+    ])
+    lines = _screen(base, {"screen": "session_options_screen", "spacing": 30,
+        "header": ("header", f"{host}/header_server_settings")}, rows,
+        ["server settings update"], ['<on event="created" run="server settings init"/>'], extra)
+    return [line for line in lines if f'<child widget="{base}/button_defaults"' not in line
+            and f'<child widget="{base}/button_ok"' not in line]
+
+
 def _server_settings() -> list:
     """Create Game's server settings (in the PC version's place): the game's
     name, the most players (up to the port's 128), its invite link, and
     whether the server browser lists it (PUBLIC or PRIVATE: an internet
     game's)"""
     base = f"{MT}/server_settings"
-    # (thirteen places: the main rows 22 high and as far apart, as their
-    # spinners and values already are, the help lower and smaller)
-    spec = {"screen": "server_settings_screen", "spacing": 22, "help_top": 366,
-            "help_height": 48, "help_font": "ui\\small_ui",
+    # (twelve rows: closer together, the help lower)
+    spec = {"screen": "server_settings_screen", "spacing": 28, "rows_top": 49,
+            "help_top": 392, "help_height": 40, "help_left": 67, "help_width": 486,
+            "help_font": "ui\\small_ui", "button_top": 448, "header_top": -10, "background_bitmap": "bitmaps/gradient_big",
             "header": ("header_server_settings", f"{base}/header_server_settings")}
     rows, extra = [], []
     extra += _value_row(base, "server_name", 0, "ss edit server name")
@@ -1589,8 +1657,19 @@ def _server_settings() -> list:
                       ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
                       ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")], [])
     rows.append((f"{base}/op_max_players", None))
-    extra += _value_row(base, "invite", 2, "ss copy invite")
-    rows.append((f"{base}/op_invite", None))
+    session = f"{base}/session_options"
+    extra += _widget(f"{base}/op_session_options", [("width", 512), ("height", 28),
+        ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+        [f'<on event="a" open="{session}/session_options_screen"/>',
+         f'<on event="start" open="{session}/session_options_screen"/>',
+         '<on event="left_mouse" run="mouse emit accept event"/>',
+         f'<child widget="{base}/session_options_label"/>'])
+    extra += _widget(f"{base}/session_options_label", [("type", "text"), ("controller", 1),
+        ("width", 480), ("height", 22), ("string_list", f"{base}/labels"), ("string_index", 2),
+        ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+    rows.append((f"{base}/op_session_options", None))
+    extra += _session_options(session, base)
+
     # (PUBLIC or PRIVATE: menu_functions.c's server_settings_update)
     extra += _widget(f"{base}/op_listing", [("width", 512), ("height", 28),
                                             ("flags", "pass_unhandled_to_focused_child"),
@@ -1674,7 +1753,7 @@ def _server_settings() -> list:
                      [f'<on event="a" run="ss start game" open="{MT}/lobby/lobby_screen"/>',
                       f'<on event="start" run="ss start game" open="{MT}/lobby/lobby_screen"/>',
                       '<on event="left_mouse" run="mouse emit accept event"/>'])
-    extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "INVITE LINK:", "GAME TYPE:",
+    extra += _strings(f"{base}/labels", ["GAME NAME:", "MAXIMUM PLAYERS:", "SESSION OPTIONS:", "GAME TYPE:",
                                          "PLAYER OPTIONS:", "ITEM OPTIONS:", "VEHICLE OPTIONS:", "INDICATOR OPTIONS:",
                                          "TEAMPLAY OPTIONS:", "LISTING:",
                                          *(f"{title}:" for _, title, _, _ in COOP_SETUP_SCREENS), "PASSWORD:",
@@ -1703,12 +1782,6 @@ def _server_settings() -> list:
         # server_settings_update)
         "Listed for everyone through the brokers, and on\\nthe master servers with your publisher key.",
     ])
-    # (the main rows 22 high, their containers only: their spinners and
-    # values are 22 or less already, and the other screens' rows stay 28)
-    main_rows = {row for row, *_ in rows}
-    extra = [line.replace('height="28"', 'height="22"', 1)
-             if any(line.startswith(f'\t<widget name="{row}" ') for row in main_rows) else line
-             for line in extra]
     lines = _screen(base, spec, rows, ["server settings update"],
                     ['<on event="created" run="server settings init"/>'], extra)
     # (co-op's options' screens, and map sharing's)

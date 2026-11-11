@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/shoulder_camera_settings_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/header_profile_video_settings"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/header_profile_video_settings" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/video_settings/header_profile_video_settings">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/help" type="text" controller="1" left="68" top="350" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/help">
+		<data input="port settings help"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_smooth" x="54" y="73"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_crosshair_smooth" x="54" y="103"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_crosshair_size" x="54" y="133"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_left_shoulder" x="54" y="163"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_distance" x="54" y="193"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_height" x="54" y="223"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_offset" x="54" y="253"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/button_defaults" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_smooth" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_smooth_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_smooth_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_smooth_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_smooth_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SMOOTH|SHARP" setting="display.third_person_smooth" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_crosshair_smooth" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_crosshair_smooth_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_crosshair_smooth_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_crosshair_smooth_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_crosshair_smooth_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="display.third_person_crosshair_smooth" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_crosshair_size" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_crosshair_size_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_crosshair_size_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_crosshair_size_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_crosshair_size_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="75%|80%|85%|90%|95%|100%" setting="display.third_person_crosshair_size" values="0.75|0.80|0.85|0.90|0.95|1.00" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_left_shoulder" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_left_shoulder_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_left_shoulder_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_left_shoulder_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_left_shoulder_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="display.third_person_left_shoulder" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_distance" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_distance_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_distance_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_distance_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_distance_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="0.30|0.45|0.60|0.70|0.85|1.00|1.25|1.50|1.75|2.00" setting="display.third_person_distance" values="0.30|0.45|0.60|0.70|0.85|1.00|1.25|1.50|1.75|2.00" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_height" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_height_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_height_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_height_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_height_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="-0.20|-0.10|0.00|0.06|0.12|0.18|0.24|0.36|0.48|0.60" setting="display.third_person_height" values="-0.20|-0.10|0.00|0.06|0.12|0.18|0.24|0.36|0.48|0.60" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/op_third_person_offset" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_offset_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_offset_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_offset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/third_person_offset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="0.00|0.06|0.12|0.18|0.24|0.30|0.36|0.48|0.60" setting="display.third_person_offset" values="0.00|0.06|0.12|0.18|0.24|0.30|0.36|0.48|0.60" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port settings defaults"/>
+		<on event="start" run="port settings defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port settings save" back="true"/>
+		<on event="start" run="port settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/labels">
+		<string text="CAMERA MOTION:"/>
+		<string text="SMOOTH CROSSHAIR:"/>
+		<string text="CROSSHAIR SIZE:"/>
+		<string text="LEFT SHOULDER:"/>
+		<string text="DISTANCE:"/>
+		<string text="HEIGHT:"/>
+		<string text="LATERAL OFFSET:"/>
+	</strings>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/video_settings/shoulder_camera/help_strings">
+		<string text=""/>
+		<string text="Smooth eases recovery and shoulder changes.\nSharp moves immediately; collision stays active."/>
+		<string text="Reduce crosshair jitter in shoulder view.\nDoes not change aim or weapon accuracy."/>
+		<string text="Shoulder crosshair size. Default 100%.\nDoes not change aim or weapon accuracy."/>
+		<string text="Off uses the right shoulder. B swaps in game.\nRemap it under Controls Setup &gt; Camera."/>
+		<string text="Distance behind the eye, in world units.\nAlt + wheel adjusts in game. Default 0.85."/>
+		<string text="Shift + wheel adjusts height in game.\nDefault 0.12 world units."/>
+		<string text="Hold Caps Lock + wheel to move left or right.\nDefault 0.24 world units to the right."/>
+	</strings>
+</menus>

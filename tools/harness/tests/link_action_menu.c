@@ -1,8 +1,13 @@
 #include "harness.h"
+#include "../../../port/linux/game/third_person.h"
+/* Account linking runs without a host camera override. */
+short third_person_policy(void){return _third_person_player_choice;}
+#ifndef _WIN32
 #include <strings.h>
+#define _stricmp strcasecmp
+#endif
 #define MAXIMUM_STRINGS 32
 #define NUMBEROF(a) ((short)(sizeof(a)/sizeof((a)[0])))
-#define _stricmp strcasecmp
 struct widget_instance {
  long definition_tag_index; short type;
  struct widget_instance *parent,*child,*next;

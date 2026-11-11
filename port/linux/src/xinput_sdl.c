@@ -650,7 +650,10 @@ static const char *const binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.jump", "controls.crouch", "controls.fire", "controls.throw_grenade", "controls.melee",
 	"controls.reload", "controls.zoom", "controls.switch_weapon", "controls.switch_grenade", "controls.action",
 	"controls.flashlight", "controls.scoreboard", "controls.pause", "controls.screenshot",
-	"controls.push_to_talk", "controls.chat", "controls.team_chat", "controls.vote_yes", "controls.vote_no",
+	"controls.push_to_talk", "controls.swap_shoulder",
+	"controls.free_look", "controls.toggle_perspective", "controls.chat", "controls.team_chat", "controls.camera_distance",
+	"controls.vote_yes", "controls.vote_no",
+	"controls.camera_height", "controls.camera_offset",
 };
 
 static const struct
@@ -852,6 +855,25 @@ static unsigned long keyboard_bound_actions(const struct platform_input_state *i
 		}
 	}
 	return held;
+}
+
+/* Game-side camera eligibility and settings live in third_person_input.c. */
+int third_person_camera_scroll(float notches, unsigned long actions);
+
+static void camera_scroll_capture(struct platform_input_state *input)
+{
+	if (!input->menus && !input->mouse_released && !console_is_active() && !network_chat_typing() &&
+		third_person_camera_scroll(input->mouse_wheel, keyboard_bound_actions(input)))
+	{
+		input->mouse_wheel = 0.0f;
+		/* A captured scroll cannot feed the wheel's synthetic weapon button. */
+		pthread_mutex_lock(&mouse_lock);
+		mouse_wheel_accumulated = 0.0f;
+		wheel_press_until_ms = wheel_moved_ms = 0;
+		wheel_scrolling = FALSE;
+		wheel_direction = 0;
+		pthread_mutex_unlock(&mouse_lock);
+	}
 }
 
 /* One capture per press, regardless of how long the binding is held. */
@@ -1701,6 +1723,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		short aiming_deflection;
 
 		platform_input_read(&input, TRUE);
+		keys_held_over_switch(&input);
 		if (input.focused)
 		{
 			unsigned int mouse = 0;
@@ -1709,10 +1732,11 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			if (input.mouse_dx || input.mouse_dy || input.mouse_wheel) mouse |= 0x100;
 			keyboard_prompt_keys(input.keys, sizeof(input.keys), mouse);
 		}
+		/* Prompt ownership sees the wheel before the camera consumes it. */
+		camera_scroll_capture(&input);
 		mouse_poll(&input);
 		wheel_update();
 		keyboard_actions_held = 0;
-		keys_held_over_switch(&input);
 		/* (a chat line typed takes the keyboard as the console does) */
 		console_active = console_is_active() || network_chat_typing();
 		debug_camera_update(&input, console_active);

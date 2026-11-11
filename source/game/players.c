@@ -282,6 +282,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
+#include "third_person.h" /* port: replicated shoulder firing state */
 #include "mcc_seats.h" /* port: port/linux/game/mcc_seats.c */
 
 /* network_game_globals.c's */
@@ -5077,6 +5078,10 @@ void players_update_before_game(
 						0x2E5,
 						(NONE == control_data.zoom_level) || ((control_data.zoom_level >= 0)));
 					unit_control(player->unit_index, &control_data);
+					/* port: keep camera state out of the stock unit input flags. */
+					SET_FLAG(unit->unit.control_flags, THIRD_PERSON_INPUT_BIT,
+						TEST_FLAG(action->control_flags, THIRD_PERSON_INPUT_BIT) &&
+						third_person_policy() != _third_person_forced_off);
 				}
 				else if (unit->unit.swarm_actor_index == NONE &&
 					unit->unit.actor_index == NONE)
