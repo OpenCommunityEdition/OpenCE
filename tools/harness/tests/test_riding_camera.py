@@ -8,8 +8,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run
 
-CASES = ["smooth", "dead", "players", "parented", "no-turn", "render-turn-zero-skipped"]
+CASES = ["smooth", "shoulder", "other-camera", "dead", "players", "parented", "no-turn", "render-turn-zero-skipped"]
 NEGATIVE_CONTROLS = {
+    "shoulder-excluded": ("!third_person_director_active(local_player_index)", "third_person_director_active(local_player_index)", "shoulder"),
     "wrong-sign": ("-(1.0f - render_interpolation_fraction())", "(1.0f - render_interpolation_fraction())", "smooth"),
     "dead-turn": ("if (!TEST_FLAG(object_get(unit_index)->object.damage_flags, _object_dead_bit))", "if (TRUE)", "dead"),
     "wrong-player": ("vehicle_riding_kept_dyaw(local_player_index)", "vehicle_riding_kept_dyaw(0)", "players"),

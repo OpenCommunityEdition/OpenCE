@@ -821,16 +821,16 @@ def riding_menu_layout(files):
     assert "VEHICLE RIDING:" not in [s.get("text") for s in strings[base + "/labels"]]
     assert len(strings[base + "/help_strings"]) == 17
     help_widget = widgets[base + "/help"]
-    assert help_widget.get("font") == "ui\\small_ui" and int(help_widget.get("top")) == 366
-    assert int(help_widget.get("top")) + int(help_widget.get("height")) <= 414
+    assert help_widget.get("font") == "ui\\small_ui" and int(help_widget.get("top")) == 392
+    assert int(help_widget.get("top")) + int(help_widget.get("height")) <= 448
     for child in children:
         name = child.get("widget")
         if not name.endswith("/button_bar"):
-            assert int(child.get("y")) + int(widgets[name].get("height")) <= 366, name
+            assert int(child.get("y")) + int(widgets[name].get("height")) <= 392, name
 
     # (no empty row slot where a row left, and no row over the next one's)
     rows_y = sorted({int(c.get("y")) for c in children if not c.get("widget").endswith("/button_bar")})
-    assert {b - a for a, b in zip(rows_y, rows_y[1:])} == {22}, rows_y
+    assert {b - a for a, b in zip(rows_y, rows_y[1:])} == {28}, rows_y
     coop = base + "/coop_options"
     coop_rows = widgets[coop + "/coop_options_menu"].findall("child")[:-1]
     for above, below in zip(coop_rows, coop_rows[1:]):
@@ -977,7 +977,7 @@ def riding_function(text, name):
 
 
 def riding_version_check(text):
-    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 43\b", text["limits"])
+    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 44\b", text["limits"])
     netcode = " ".join(text["netcode"].split())
     assert ("Version 43 also carries a rider standing on a vehicle: the deck part of a unit's state and the host's "
             "riding decision for the game, made at its start and kept until the map ends, a co-op flag") in netcode
@@ -1000,8 +1000,8 @@ def riding_mcc_guard_check(text):
 
 RIDING_CHECKS["mcc-guard-first"] = riding_mcc_guard_check
 RIDING_CONTROLS["riding-before-mcc-guard"] = ("network", "distributed_take_prediction", RIDING_MCC_GUARD, "", "mcc-guard-first")
-RIDING_CONTROLS["version-lowered"] = ("limits", None, "#define HALO_PORT_NETWORK_VERSION 43",
-                                      "#define HALO_PORT_NETWORK_VERSION 42", "version")
+RIDING_CONTROLS["version-lowered"] = ("limits", None, "#define HALO_PORT_NETWORK_VERSION 44",
+                                      "#define HALO_PORT_NETWORK_VERSION 43", "version")
 RIDING_CONTROLS["versions-without-the-rider"] = ("netcode", None, "Version 43 also carries a rider",
                                                  "Version 43 also carries a car", "version")
 RIDING_CONTROLS["versions-without-the-cabin"] = ("netcode", None, "It also carries a rider's cabin",

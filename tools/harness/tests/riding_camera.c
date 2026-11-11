@@ -21,11 +21,13 @@ static struct object_datum unit;
 static struct observer_result direct_cameras[MAXIMUM_LOCAL_PLAYERS];
 static real fraction, kept[2];
 static real_vector3d facing;
-static boolean direct_enabled = TRUE;
+static boolean direct_enabled = TRUE, shoulder;
+static short perspective = _director_perspective_first_person;
 static long turn_calls;
 #define config_changes() 0UL
 #define config_boolean(name) direct_enabled
-#define director_get_perspective(index) _director_perspective_first_person
+#define director_get_perspective(index) perspective
+#define third_person_director_active(index) shoulder
 #define director_inhibited_facing(index) FALSE
 #define cinematic_in_progress() FALSE
 #define player_control_get_unit_index(index) 7
@@ -56,7 +58,12 @@ int main(int argc, char **argv)
 	facing.k = 0.6f;
 	kept[0] = 1.5707963267948966f;
 	kept[1] = -1.5707963267948966f;
-	CASE("smooth")
+	if (!strcmp(case_name, "shoulder"))
+	{
+		perspective = 1;
+		shoulder = TRUE;
+	}
+	if (!strcmp(case_name, "smooth") || !strcmp(case_name, "shoulder"))
 	{
 		for (index = 0; index <= 4; index++)
 		{
@@ -70,6 +77,13 @@ int main(int argc, char **argv)
 				"wrong drawn y at fraction %g: %g", fraction, drawn->forward.j);
 			CHECK(drawn->forward.k == 0.6f, "vehicle changed pitch");
 		}
+		return 0;
+	}
+	CASE("other-camera")
+	{
+		perspective = 1;
+		CHECK(render_interpolation_direct_camera(0, &observer) == &observer,
+			"changed an unrelated camera");
 		return 0;
 	}
 	CASE("dead")

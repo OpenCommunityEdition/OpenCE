@@ -29,6 +29,7 @@ static struct object_datum *object_get(long index)
 
 typedef void (*director_camera_update_proc)(void);
 static void first_person_camera_update(void) {}
+static void third_person_camera_update(void) {}
 static void following_camera_update(void) {}
 static void dead_camera_update(void) {}
 static void flying_camera_update(void) {}
@@ -172,9 +173,9 @@ int main(int argc, char **argv)
 	{
 		struct dead_camera dead = { 77 };
 		director_camera_update_proc cameras[] = { first_person_camera_update, following_camera_update,
-			dead_camera_update, flying_camera_update };
-		long expected[] = { 100, 100, 77, NONE };
-		for (player = 0; player < 4; player++)
+			dead_camera_update, flying_camera_update, third_person_camera_update };
+		long expected[] = { 100, 100, 77, NONE, 100 };
+		for (player = 0; player < 5; player++)
 		{
 			directors[0].camera_proc = cameras[player];
 			directors[0].camera_data = &dead;
