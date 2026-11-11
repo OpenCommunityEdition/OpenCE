@@ -26,3 +26,9 @@ network version (`HALO_PORT_NETWORK_VERSION`).
 The format reference separates inspected structures from inferred behavior.
 The validation record distinguishes compilation, automated checks and bounded
 runtime observations; it does not claim complete campaign playthroughs.
+
+## Optional input prompts
+
+[Keyboard prompts and PC-menu glyphs](keyboard_prompts.md) describes the opt-in
+renderer and its MCC-owned pause footer adapters. It also records the unchanged
+controller, Xbox-menu and disabled-feature paths.
