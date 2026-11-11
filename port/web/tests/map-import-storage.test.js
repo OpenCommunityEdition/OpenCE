@@ -210,3 +210,12 @@ test('unknown quota differs from zero; unsupported locks fail promptly',async()=
   await assert.rejects(api.dispatchLocal('begin',payload()),/Not enough/);
   e.navigator.locks=null;await assert.rejects(api.startGame(),/cannot safely coordinate/);
 });
+test('a receipt left by a cut-off removal does not block the package again',async()=>{
+  const e=environment(),api=e.load();
+  await e.put('mcc_transactions/'+folder+'.commit','MCC-COMMIT-1\n'+folder+'\n');
+  await api.dispatchLocal('begin',payload());
+  assert.equal(await e.get('mcc_transactions/'+folder+'.commit'),undefined);
+  await e.put('mcc_maps/'+folder+'/first.map','map');
+  await api.dispatchLocal('commit',{folder});
+  assert.equal(await e.get('mcc_transactions/'+folder+'.commit'),'MCC-COMMIT-1\n'+folder+'\n');
+});

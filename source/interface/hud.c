@@ -952,7 +952,7 @@ static void hud_draw_friendly_indicator(
 				bitmap,
 				&position,
 				&clip,
-				1.0f,
+				mcc_hud_bitmap_scale(interface_get_tag_index(_interface_bitmap_multiplayer_hud)), /* port: MCC bitmap units */
 				0.0f,
 				1.0f);
 		}
@@ -1175,7 +1175,8 @@ static void hud_draw_player_name(
 			interface_get_tag_index(_interface_bitmap_multiplayer_hud), 0, 0);
 
 		if (bitmap)
-			y -= bitmap->registration_point.y;
+			y -= (short)(bitmap->registration_point.y *
+				mcc_hud_bitmap_scale(interface_get_tag_index(_interface_bitmap_multiplayer_hud))); /* port: match the MCC arrow's scale */
 	}
 	y -= 2;
 	font = font_definition_get(font_index);

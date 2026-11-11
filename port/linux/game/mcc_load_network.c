@@ -48,3 +48,25 @@ void mcc_load_network_forget(struct mcc_load_network *state, long index)
     if (index >= 0 && index < MCC_ADMISSION_MACHINES)
         state->peers[index].state = 2;
 }
+int mcc_load_allowance_hold(struct mcc_load_allowance *allowance, uint32_t now)
+{
+    uint32_t elapsed;
+    if (!allowance->known) {
+        allowance->known = 1;
+        allowance->left = MCC_LOAD_NETWORK_LIMIT;
+        allowance->at = now;
+    }
+    elapsed = (uint32_t)(now - allowance->at);
+    allowance->at = now;
+    if (elapsed > MCC_LOAD_NETWORK_HOLD_GAP) {
+        elapsed /= MCC_LOAD_NETWORK_EARN;
+        allowance->left = elapsed >= MCC_LOAD_NETWORK_LIMIT - allowance->left ?
+            MCC_LOAD_NETWORK_LIMIT : allowance->left + elapsed;
+    } else
+        allowance->left = elapsed >= allowance->left ? 0 : allowance->left - elapsed;
+    return allowance->left != 0;
+}
+void mcc_load_allowance_forget(struct mcc_load_allowance *allowance)
+{
+    memset(allowance, 0, sizeof(*allowance));
+}

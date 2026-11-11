@@ -1054,7 +1054,8 @@ void *_texture_cache_bitmap_get_hardware_format(
 {
 	void *hardware_format = NULL;
 
-	/* MCC owns immutable pixels and independent hardware headers. */
+	/* port: an MCC map's textures have hardware headers of their own
+	(port/linux/game/mcc_texture_cache.c) */
 	if (mcc_cache_tags_loaded())
 	{
 		hardware_format = mcc_texture_cache_get(bitmap, load);

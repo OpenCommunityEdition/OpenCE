@@ -552,6 +552,7 @@ the setting for one start of the game. It has priority over the file.
 | `audio.channels` | `"stereo"` | `HALO_AUDIO_CHANNELS` | `"stereo"`, or `"5.1"` for surround sound as with Dolby Digital on the Xbox. `"auto"`: 5.1 if the sound device has 6 or more channels. Linux and Windows only. |
 | `audio.reverb` | `true` | `HALO_REVERB` | `true`: the sounds of the world reverberate as the place the player is in does: the sound environments of the maps (a corridor, a cave, a large hall, outdoors) set the reverberation, as the I3DL2 reverb of the Xbox did. A sound behind a wall or a door is muffled in it too. `false`: no reverberation (sounds behind a wall are still muffled). |
 | `audio.resampler` | `"sinc"` | `HALO_AUDIO_RESAMPLER` | How the sounds are converted to the output's rate (48 kHz): `"sinc"` with a band-limited low pass, which keeps out the images above the sound's own rate; `"linear"` between neighbouring samples, which lets some of them through and sounds brighter for it. Audio Setup's SOUND PROCESSING screen sets it, with `audio.reverb`. |
+| `audio.stereo_doppler` | `false` | `HALO_STEREO_DOPPLER` | `true`: a stereo sound placed in the world (an engine, a rocket in flight) rises in pitch as it comes towards the player and falls as it goes away, as the 3D sounds do. `false`: stereo sounds play at their own pitch, as the Xbox played them. Audio Setup's SOUND PROCESSING screen sets it. |
 | `audio.voice_chat` | `"push_to_talk"` | `HALO_VOICE_CHAT` | How you talk in voice chat: `"push_to_talk"` (while `controls.push_to_talk` is held; the microphone opens when you first press it), `"open_mic"` (when the microphone hears speech), or `"off"`. You hear the other players in every case. Refer to "Voice chat". |
 | `audio.voice_volume` | `1.0` | `HALO_VOICE_VOLUME` | The volume of the voices of the other players, `0` to `2`. |
 | `audio.output_device`, `audio.input_device` | `"default"` | `HALO_AUDIO_OUTPUT_DEVICE`, `HALO_AUDIO_INPUT_DEVICE` | The speakers and the microphone, by the name that Settings > Audio shows, or `"default"` for the device of the system. If the device is not found, the game uses the device of the system. Not on Android. |
@@ -728,7 +729,7 @@ See [MCC maps](../../docs/mcc_maps.md) for supported formats, resources and limi
 [MCC previews](../../docs/reading/mcc_level_previews.md) for menu discovery, and
 [browser imports](../../docs/reading/browser_imports.md) for browser storage.
 
-All map families use OpenCE network version 42. MCC content identity, sharing
+All map families use OpenCE network version 43. MCC content identity, sharing
 consent and load-progress checks remain separate from the existing Xbox/CE paths;
 see [the network agreement](NETCODE.md#opence-network-agreement).
 
@@ -1324,7 +1325,7 @@ The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
 not seed MCC downloads. Android requires no Steam for these files, but device
 runtime validation remains a separate requirement. Browser imports and host downloads use origin-private storage with
 transaction recovery and cross-tab locking. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
-for bounds, lifecycle and OpenCE network version **42**.
+for bounds, lifecycle and OpenCE network version **43**.
 
 ### Map sharing
 
@@ -1795,6 +1796,12 @@ against what the game made at startup (`game_state_image_accept` in
 `saved games/game_state.c`): an image that does not match (a damaged or
 crafted file) is refused, and the level starts over.
 
+The game state also holds the console's syntax and text, which the threads a
+checkpoint saves can still use (about 900 KB, `hs_console_state.inl`, added
+with the MCC maps): the checkpoints and cores of the builds before it have
+another layout and are refused. A checkpoint whose script threads cannot be
+saved with their syntax is not taken; the one before it is kept.
+
 ## What operates
 
 | Area | Status |
@@ -1805,7 +1812,7 @@ crafted file) is refused, and the level starts over.
 | High-res text | The menus' and HUD's text is drawn with Overpass (`port/assets/fonts`, SIL Open Font License) in place of the maps' bitmap fonts, which are Interstate. `src/text_hires.c` rasterizes each glyph with stb_truetype (`port/third_party/stb`) at the resolution the game draws at, into an atlas that a placeholder bitmap of the game stands for. The game lays the text out from its font tags as before: each font is as tall as its tag's capitals, and narrowed where the tag's letters are narrower than the Xbox maps' (the fonts of a Custom Edition `loc.map`), so that its letters do not run into each other. The menus' titles (the screens' headers and the main menu's items) are pictures of text in the maps, so they are drawn as the high-res HUD is: `tools/title_assets.py` sets each one again in OpenCE, Roger White's public-domain Newtown respaced to match the maps' commercial title typeface (`tools/title_font.py`), at 4x the bitmap's size over its own plate or glow, each letter placed where the map's letter is, in `port/assets/titles`. The postgame carnage report's title is set over a hand-made SVG redraw of its panel (`port/assets/titles/svg`) instead. The A, B, X and Y button icons beside the menus' key labels and in their text ("Press A to Join") are drawn from hand-made SVG redraws at 8x the size of the maps' bitmaps (`port/assets/buttons`, made by `tools/button_assets.py`), in the same sizes and places. `display.high_res_text = false` turns it off. |
 | Anti-aliasing | Off unless `display.anti_aliasing` is set (`src/d3d8_gl.c`, `src/xgpu_post.c`). FXAA (written in the port) and SMAA (`port/third_party/smaa`, MIT licensed, at its HIGH preset, compiled as GLSL) are passes over the 3D view of each window, after the lens flares and before the HUD and the menus (`render/render.c`). Their programs are built when the setting is chosen. Supersampling draws the render targets the size of the screen at two times the resolution in each direction, and the display blit scales them down. Multisampling draws the back buffer and its depth buffer into multisampled renderbuffers, and with them any target that is drawn together with one of them (a mirror's view, in the secondary target with the back buffer's depth buffer), so that the attachments of a framebuffer are all multisampled or none is. A target's pixels are resolved into its texture before something reads the texture (as a texture, or at the display blit). Visibility tests count samples, divided by the samples of a pixel. An alpha-tested surface (foliage, grates) covers the samples of a pixel in proportion to its alpha past the reference (`gl_SampleMask`, not on Android). |
 | HDR | Off unless `display.hdr` is set (`src/d3d8_gl.c`, `src/xgpu_post.c`). The back buffer's texture, and its multisampled renderbuffer, is `GL_RGBA16F` (`GL_HALF_FLOAT` on Android), with the same `GL_DEPTH24_STENCIL8` depth buffer. The game's pixel shaders give colours from 0 to 1, as the NV2A's register combiners did, so the light past white comes from blending, which a floating-point target does not clamp. The tone mapping pass is a pass over the 3D view of each window, before the anti-aliasing (`render/render.c`): it takes each pixel from gamma 2.2 to linear light, multiplies it by `display.hdr_exposure`, applies the curve, and returns to gamma 2.2. It writes the colour only, since the game keeps its own data in the alpha. The display blit becomes a draw that clamps to 1, or, in a floating-point window, gives scRGB (linear light, 1 at the display's SDR white, which SDL reports with the headroom). The settings are read between frames; a change of `display.hdr` makes the back buffer again in the other format. Extra Effects' HDR CALIBRATION, there with a floating-point window on an HDR display, sets the peak and paper white by eye (`game/menu_functions.c`'s "port hdr calibration"): while its screen is drawn, the display takes the values its rows show, and after the display blit a program fills rectangles and rings of the window in scRGB, over its menus. For the peak, a square at the peak shown with a ring in it at 10000 nits, which disappears into the square once the square is as bright as the display goes; for paper white, a grey scale up to white, beside a white square with a ring at the peak. OK writes the values, Cancel goes back to the settings' own. |
-| Sound | Xbox DirectSound on SDL3 audio (`src/dsound_sdl.c`): PCM and Xbox ADPCM, mixed at 48 kHz in stereo or 5.1, with volume, pitch, mix bins, distance, pan, occlusion and obstruction, and the Doppler effect of the velocities that the game gives the sounds (a Banshee's pitch falls as it passes), a stereo sound in the world's too (a Pelican's wind as its engines). A sound the game cuts off (each shot of a rapid-fire weapon cuts off the last) fades out over 5 ms rather than stopping dead, which clicked. There are no cones. On 5.1 the game gets the AC-3 speaker setting of the Xbox and sends its 2D sounds to the center and back speakers, 3D sounds pan across the five speakers, and the reverb plays from the front and back pairs. The game sends nothing to the LFE channel. |
+| Sound | Xbox DirectSound on SDL3 audio (`src/dsound_sdl.c`): PCM and Xbox ADPCM, mixed at 48 kHz in stereo or 5.1, with volume, pitch, mix bins, distance, pan, occlusion and obstruction, and the Doppler effect of the velocities that the game gives the sounds (a Banshee's pitch falls as it passes), and with `audio.stereo_doppler` a stereo sound in the world's too (a Pelican's wind as its engines). A sound the game cuts off (each shot of a rapid-fire weapon cuts off the last) fades out over 5 ms rather than stopping dead, which clicked. There are no cones. On 5.1 the game gets the AC-3 speaker setting of the Xbox and sends its 2D sounds to the center and back speakers, 3D sounds pan across the five speakers, and the reverb plays from the front and back pairs. The game sends nothing to the LFE channel. |
 | Input | XInput on SDL3 (`src/xinput_sdl.c`): keyboard, mouse, gamepads with rumble, and the debug keyboard for the console. |
 | Files | The Win32 file functions and the MSVC file functions on POSIX, with the translation of Xbox paths. |
 | Threads | Threads, events, mutexes, critical sections, interlocked operations and alertable waits. |
@@ -1870,6 +1877,18 @@ definition. Without this check, the linker gives the reference the address
   `HALO_GPU_TRACE_MARKERS=1` lets the driver write them, to capture with
   gpuvis.
 
+Before its presentation blit, `D3DDevice_Present` in
+[`src/d3d8_gl.c`](src/d3d8_gl.c) restores the window's draw framebuffer after
+looking up the source framebuffer. Creating a source entry binds both read
+and draw targets; without restoring the draw target, the first presentation
+can blit the back buffer onto itself. Loading-screen draws can create that
+entry earlier and mask the defect when saved map caches are absent.
+The [presentation regression](../../tools/harness/tests/test_present_framebuffer.py)
+covers new, reused and changed source framebuffers, HDR presentation and its
+blit fallback. This fixes the binding defect found during
+[GulchCE issue #80](https://github.com/chestahh/GulchCE/issues/80), but does not
+establish the cause of the reported persistent Android geometry loss.
+
 ### Game source changes
 
 Five files of the game have changes for clang. These changes do not change
@@ -1898,7 +1917,7 @@ Other changes:
 | `sound/game_sound.c` | The game calculates the obstruction of each sound one time for each tick, not for each frame. |
 | `effects/player_effects.c` | A camera shake or impulse is drawn as the first frame after a tick made it by every frame until the next tick, as the Xbox drew it for the tick: its full scale showed only on that first frame, an eighth of the tick at 240 frames a second, so firing shook the view a fraction as much, and the assault rifle's short kick hardly at all. |
 | `sound/sound_manager.c`, `camera/observer.c`, `camera/director.c` | The listener's velocity, which the Doppler effect takes, is the game's velocity for the camera's position as if it were fixed to the unit the camera follows (`director_get_followed_unit`, `object_get_point_velocity`), as the sounds on that unit get theirs, so that they cancel exactly, from a chase camera too, even through a network client's corrections and a turret's swing, and swinging the camera round adds nothing. With no such unit (a cinematic's camera, a flying one) it is measured from how far the focus moves from one tick to the next (`listener_measure_velocity`, `observer_get_focus_position`), and none across a jump of more than 10 world units a tick. The observer's velocity, which the game gave, is a tick's motion divided by a frame's time on the native ports, several times too fast at a high frame rate, and zero while a cinematic forces the camera, so that sounds moving with the camera rose in pitch. |
-| `sound/sound_manager.c`, `sound/sound_dsound_xbox.c` | A stereo sound in the world, panned towards where it is, is shifted by the Doppler effect as a mono one is: the game gives the mixer how fast it comes towards the listener (`dsound_port_set_channel_stereo_position`). The Xbox played stereo sounds flat; panned, without it, a Pelican's wind held its pitch while its engines' changed. |
+| `sound/sound_manager.c`, `sound/sound_dsound_xbox.c` | A stereo sound in the world, panned towards where it is, is shifted by the Doppler effect as a mono one is: the game gives the mixer how fast it comes towards the listener (`dsound_port_set_channel_stereo_position`). The Xbox played stereo sounds flat; panned, without it, a Pelican's wind held its pitch while its engines' changed. The mixer applies it only with `audio.stereo_doppler`, off by default. |
 | `sound/game_sound.c`, `objects/objects.c` | A sound on an object moves as the point it is attached to does, with the spin of the object it rides (`object_get_point_velocity`), not only as the object's centre does, for the Doppler effect. The listener's velocity has the spin in it: without the sounds' too, a vehicle's own engine rose and fell in pitch for whoever rode it as it turned. |
 | `sound/sound_manager.c` | A track of a looping sound that is gone stops, even in the millisecond it started (`refresh_sound`). The Xbox never drew three frames in one millisecond; the port can (the null renderer, no frame limit), and then read the deleted looping sound and crashed. |
 | `cseries/errors.c` | `debug.txt` stays open between lines. A line that is the same as the line before it is counted, not written again (`last line repeated N times`). At 64 MB, `debug.txt` becomes `debug.old.txt` and a new `debug.txt` starts. |
@@ -1971,3 +1990,6 @@ each of the browser's frames, the cache thread starts at a function of
 `CreateThread`'s type, `debug.txt`'s lines go to the page's log) and the
 declarations given their definitions' types, which WebAssembly needs, are
 listed in "Game source changes" in [../web/README.md](../web/README.md).
+
+The [Doppler audio walkthrough](../../docs/reading/audio_doppler.md) explains
+listener motion, camera-cut resets and pitch limits.

@@ -193,6 +193,29 @@ finish:
     }
 }
 
+/* A staging folder of this name left by a download that was cut off (the game
+ * crashed or was closed): its name comes from the offer, so every retry of
+ * the offer meets it. Delete the files this manifest names and their folders,
+ * never through a link; a folder holding anything else stays, and the stage
+ * fails as before. */
+static int stage_clear_leftover(struct mcc_share_stage *stage)
+{
+    char path[512];
+    int i;
+    if (!stage->io.path_safe(stage->stage_dir) || !stage->io.directory_exists(stage->stage_dir)) return 0;
+    for (i=0;i<stage->count;i++) {
+        if (stage_path(path,sizeof(path),stage->stage_dir,stage->files[i].leaf,".part") && stage->io.path_safe(path))
+            stage->io.delete_file(path);
+        if (stage_path(path,sizeof(path),stage->stage_dir,stage->files[i].leaf,"") && stage->io.path_safe(path))
+            stage->io.delete_file(path);
+    }
+    for (i=stage->count-1;i>=0;i--) stage_remove_parents(stage,stage->files[i].leaf);
+    for (i=0;i<MCC_SHARE_STAGE_COMPANIONS;i++)
+        if (stage_path(path,sizeof(path),stage->stage_dir,stage_companions[i],"") && stage->io.path_safe(path))
+            stage->io.delete_file(path);
+    return stage->io.remove_directory(stage->stage_dir);
+}
+
 static enum mcc_share_stage_result stage_fail(struct mcc_share_stage *stage, enum mcc_share_stage_result result)
 {
     stage_forget(stage); stage->state=MCC_SHARE_STAGE_FAILED; return result;
@@ -241,7 +264,9 @@ enum mcc_share_stage_result mcc_share_stage_begin(struct mcc_share_stage *stage,
         length=snprintf(stage->stage_dir,sizeof(stage->stage_dir),"%s/%s",staging,folder);
         if (length<=0 || (unsigned)length>=sizeof(stage->stage_dir)) return stage_fail(stage,MCC_SHARE_STAGE_BAD_MANIFEST);
         if (!io->path_safe(staging) || (!io->directory_exists(staging) && !io->make_directory(staging)) ||
-            !io->path_safe(stage->stage_dir) || !io->make_directory(stage->stage_dir))
+            !io->path_safe(stage->stage_dir) ||
+            (!io->make_directory(stage->stage_dir) &&
+            (!stage_clear_leftover(stage) || !io->make_directory(stage->stage_dir))))
             return stage_fail(stage,MCC_SHARE_STAGE_WRITE_FAILED);
     }
     stage->owns_directory=1;

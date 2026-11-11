@@ -213,6 +213,8 @@ short unit_scripting_get_grenade_count(
 	struct unit_datum const *unit;
 	short grenade_count;
 	short grenade_index;
+
+	/* port: MCC owns its expanded grenade inventory */
 	if (mcc_grenades_active())
 		return mcc_grenades_total(unit_index);
 	unit = unit_try_and_get(unit_index);

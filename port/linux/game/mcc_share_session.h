@@ -174,6 +174,16 @@ struct mcc_share {
     unsigned serve_first;
     uint32_t manifest_at[MCC_SHARE_HOST_MACHINES];  /* the last manifest request, per machine */
     uint8_t manifest_seen[MCC_SHARE_HOST_MACHINES];
+    /* The last package hashed, so that new transfers of it (another machine,
+     * or one that asks again) do not read it all again: the SHA-256 of its
+     * level, kinds, leaves and paths, and its files' sizes and digests. */
+    struct {
+        int valid;
+        uint32_t at;
+        uint8_t key[32];
+        int count;
+        struct mcc_share_file files[MCC_SHARE_STAGE_FILES];
+    } hashed;
     /* the joiner's download */
     enum mcc_share_client_state state;
     char level[MCC_SHARE_LEVEL_SIZE];

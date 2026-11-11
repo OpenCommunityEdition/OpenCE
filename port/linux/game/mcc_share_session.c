@@ -14,6 +14,8 @@
 #define MCC_SHARE_OFFER_TIMEOUT 120000u
 #define MCC_SHARE_OFFER_HEARTBEAT 10000u
 #define MCC_SHARE_REUSE_SLICE 0x100000u
+/* how long the last package's digests stand in for hashing it again */
+#define MCC_SHARE_HASHED_LIFETIME 600000u
 
 static int share_elapsed(uint32_t now, uint32_t since, uint32_t span)
 {
@@ -216,6 +218,7 @@ void mcc_share_host_stop(struct mcc_share *share)
     int i;
     for (i=0;i<MCC_SHARE_HOST_TRANSFERS;i++) if (share->transfers[i].used) host_free(&share->transfers[i]);
     memset(share->manifest_seen,0,sizeof(share->manifest_seen));
+    share->hashed.valid=0;
     share->budget=0;
     share->budget_fraction=0;
     share->budget_at=share_now(share);
@@ -245,6 +248,56 @@ static void host_send_manifest(struct mcc_share *share, struct mcc_share_host_tr
         transfer->offer_complete=1;
         transfer->offered_at=transfer->heard_at=share_now(share);
     }
+}
+
+static void host_offer(struct mcc_share *share, struct mcc_share_host_transfer *transfer, int hashed);
+
+static void hash_text(struct mcc_sha256 *hash, char const *text, unsigned size)
+{
+    char const *end=memchr(text,0,size);
+    mcc_sha256_add(hash,text,end ? (int)(end-text)+1 : (int)size);
+}
+
+/* What the package is made of: its level and its files' kinds, leaves and paths. */
+static void host_package_key(struct mcc_share_host_transfer const *transfer, uint8_t key[32])
+{
+    struct mcc_sha256 hash;
+    int i;
+    mcc_sha256_begin(&hash);
+    hash_text(&hash,transfer->level,sizeof(transfer->level));
+    for (i=0;i<transfer->package.count;i++) {
+        mcc_sha256_add(&hash,&transfer->package.files[i].kind,1);
+        hash_text(&hash,transfer->package.files[i].leaf,sizeof(transfer->package.files[i].leaf));
+        hash_text(&hash,transfer->package.files[i].path,sizeof(transfer->package.files[i].path));
+    }
+    mcc_sha256_end(&hash,key);
+}
+
+/* Take the digests of the package hashed last if it is the same package and its
+ * files are still their sizes. (A file changed in place to the same size is
+ * caught by the joiner, which checks every file's digest as it arrives.) */
+static int host_hashed(struct mcc_share *share, struct mcc_share_host_transfer *transfer)
+{
+    uint8_t key[32];
+    int i;
+    if (!share->hashed.valid || share_elapsed(share_now(share),share->hashed.at,MCC_SHARE_HASHED_LIFETIME) ||
+        share->hashed.count!=transfer->package.count) return 0;
+    host_package_key(transfer,key);
+    if (memcmp(key,share->hashed.key,32)) return 0;
+    for (i=0;i<transfer->package.count;i++) {
+        FILE *stream=share_open_native(share,transfer->package.files[i].path);
+        long size=-1;
+        if (stream) {
+            if (!fseek(stream,0,SEEK_END)) size=ftell(stream);
+            fclose(stream);
+        }
+        if (size<=0 || (uint32_t)size!=share->hashed.files[i].size) return 0;
+    }
+    for (i=0;i<transfer->package.count;i++) {
+        transfer->files[i].size=share->hashed.files[i].size;
+        memcpy(transfer->files[i].sha256,share->hashed.files[i].sha256,32);
+    }
+    return 1;
 }
 
 static void host_request_manifest(struct mcc_share *share, long machine, struct mcc_share_request const *request)
@@ -300,6 +353,7 @@ static void host_request_manifest(struct mcc_share *share, long machine, struct 
         memcpy(transfer->files[i].leaf,transfer->package.files[i].leaf,MCC_SHARE_LEAF_SIZE);
         transfer->files[i].leaf[MCC_SHARE_LEAF_SIZE-1]=0;
     }
+    if (host_hashed(share,transfer)) host_offer(share,transfer,0);
 }
 
 static void host_fail(struct mcc_share *share, struct mcc_share_host_transfer *transfer,
@@ -314,7 +368,6 @@ static void host_hash(struct mcc_share *share, struct mcc_share_host_transfer *t
 {
     uint32_t budget=MCC_SHARE_HASH_SLICE;
     static uint8_t block[16384];                       /* (static: this runs in the game's frame, on its stack) */
-    char level_leaf[MCC_SHARE_LEAF_SIZE],folder[64];
     while (budget && transfer->hash_file<transfer->package.count) {
         struct mcc_share_file *file=&transfer->files[transfer->hash_file];
         if (!transfer->hash_stream) {
@@ -351,10 +404,24 @@ static void host_hash(struct mcc_share *share, struct mcc_share_host_transfer *t
         }
     }
     if (transfer->hash_file<transfer->package.count) return;
+    host_offer(share,transfer,1);
+}
+
+/* Every file hashed (or its digest known): offer the package. */
+static void host_offer(struct mcc_share *share, struct mcc_share_host_transfer *transfer, int hashed)
+{
+    char level_leaf[MCC_SHARE_LEAF_SIZE],folder[64];
     if (!share_level_split(transfer->level,folder,level_leaf) ||
         !mcc_share_manifest_valid(transfer->files,transfer->package.count,level_leaf)) {
         host_fail(share,transfer,MCC_SHARE_RESULT_UNAVAILABLE);
         return;
+    }
+    if (hashed) {
+        share->hashed.valid=1;
+        share->hashed.at=share_now(share);
+        host_package_key(transfer,share->hashed.key);
+        share->hashed.count=transfer->package.count;
+        memcpy(share->hashed.files,transfer->files,sizeof(transfer->files[0])*transfer->package.count);
     }
     transfer->hashing=0;
     share->next_session+=0x9E3779B1u;

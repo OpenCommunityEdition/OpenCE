@@ -146,6 +146,11 @@ enum
 	UPNP_JOIN_DELAY = 5000,
 	UPNP_RENEW_INTERVAL = 30 * 60 * 1000,
 	UPNP_RETRY_INTERVAL = 5 * 60 * 1000,
+	/* how long the game's exit waits for a request under way (a router's
+	request has no deadline of its own), and for the thread's last pass (it
+	may be waiting for a program at its start, p2p_register_url_scheme) */
+	UPNP_RELEASE_WAIT = 3000,
+	P2P_STOP_WAIT = 3000,
 
 	/* where a running copy of the game takes invites from another one
 	started to open a link (127.0.0.1), sealed with a key of the user's */
@@ -3403,8 +3408,9 @@ static DWORD WINAPI upnp_thread(void *unused)
 	return 0;
 }
 
-/* Both workers must finish before exit closes stdio and the platform's
-services. Waiting with p2p_lock held would prevent their final pass. */
+/* Both workers should finish before exit closes stdio and the platform's
+services, but the exit waits for each a few seconds at most. Waiting with
+p2p_lock held would prevent their final pass. */
 static void p2p_shutdown(void)
 {
 	unsigned short external_port = 0;
@@ -3415,19 +3421,20 @@ static void p2p_shutdown(void)
 	posix_upnp_cancel();
 	if (p2p.thread)
 	{
-		WaitForSingleObject(p2p.thread, INFINITE);
+		WaitForSingleObject(p2p.thread, P2P_STOP_WAIT);
 		CloseHandle(p2p.thread);
 		p2p.thread = NULL;
 	}
 	if (p2p.upnp_thread)
 	{
-		WaitForSingleObject(p2p.upnp_thread, INFINITE);
+		WaitForSingleObject(p2p.upnp_thread, UPNP_RELEASE_WAIT);
 		CloseHandle(p2p.upnp_thread);
 		p2p.upnp_thread = NULL;
 	}
 	pthread_mutex_lock(&p2p_lock);
 	p2p_lobby_quit();
-	if (p2p.upnp_forwarded)
+	/* (still under way: posix_upnp.c takes one caller at a time) */
+	if (p2p.upnp_forwarded && !p2p.upnp_working)
 	{
 		external_port = p2p.upnp_candidate.port;
 		p2p.upnp_forwarded = 0;

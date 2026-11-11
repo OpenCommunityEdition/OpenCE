@@ -559,11 +559,6 @@ static void render_grenade_hud(
 	short local_player_index,
 	long unit_index)
 {
-	if (mcc_grenades_active())
-	{
-		mcc_grenades_hud(local_player_index, unit_index);
-		return;
-	}
 	long return_eip = get_return_eip();
 	long stack_buffer[STACK_BUFFER_LENGTH];
 	struct unit_datum *unit;
@@ -577,6 +572,12 @@ static void render_grenade_hud(
 	struct grenade_hud_interface_definition *definition;
 	short draw_flags;
 
+	/* port: MCC's expanded grenade types have their own HUD (mcc_grenades.c) */
+	if (mcc_grenades_active())
+	{
+		mcc_grenades_hud(local_player_index, unit_index);
+		return;
+	}
 	csmemset(
 		stack_buffer,
 		0x62,
@@ -857,6 +858,7 @@ static void hud_update_weapon_local_player(
 					{
 						no_grenades = no_grenades && !unit->unit.grenade_counts[grenade_type];
 					}
+					/* port: and MCC's expanded grenade types */
 					if (mcc_grenades_active() && mcc_grenades_total(unit_index)) no_grenades = FALSE;
 					result = (no_grenades &&
 							!unit->unit.grenade_throw_state &&
@@ -1162,6 +1164,7 @@ static void crosshairs_draw(
 										{
 											no_grenades = no_grenades && !unit->unit.grenade_counts[grenade_type];
 										}
+										/* port: and MCC's expanded grenade types */
 										if (mcc_grenades_active() && mcc_grenades_total(unit_index)) no_grenades = FALSE;
 										firing_active = no_grenades &&
 											!unit->unit.grenade_throw_state &&
@@ -1788,7 +1791,7 @@ static void render_weapon_hud(
 			state_index = element->header.state_type;
 			hud_draw_static_element(
 				local_player_index,
-				&definition->absolute_placement,
+				placement, /* port: honor the resolved MCC child anchor */
 				&element->static_element,
 				state_flags[state_index],
 				hud_state->last_weapon_flash_time[state_index]);
@@ -1825,7 +1828,7 @@ static void render_weapon_hud(
 			value = (byte)number_values[state_index];
 			hud_draw_meter(
 				local_player_index,
-				&definition->absolute_placement,
+				placement, /* port: honor the resolved MCC child anchor */
 				&element->meter_element,
 				value,
 				value,
@@ -1907,7 +1910,7 @@ static void render_weapon_hud(
 				hud_zoomed_layout_begin(&window_bounds);
 			hud_draw_numbers(
 				local_player_index,
-				&definition->absolute_placement,
+				placement, /* port: honor the resolved MCC child anchor */
 				&element->number_element,
 				value,
 				decimal_value,
@@ -1939,7 +1942,7 @@ static void render_weapon_hud(
 			state_index = element->state_type;
 			hud_draw_weapon_overlays(
 				local_player_index,
-				&definition->absolute_placement,
+				placement, /* port: honor the resolved MCC child anchor */
 				&element->overlays,
 				overlay_flags[state_index],
 				hud_state->last_weapon_flash_time[state_index],

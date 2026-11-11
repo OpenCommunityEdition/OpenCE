@@ -79,6 +79,13 @@ https://ocemaster.halobase.net ed25519:1d018c4d1e182585948cd807f19133122c1a1484a
 https://masterce.unicade.io ed25519:22aa04b7cf041af39c2e9765b5da10989254ed49fa23b730cd90e6d36a0a411a
 ```
 
+A server that names none in its masters file trusts every one of these as
+it trusts a master it names: it publishes its game to each, checks a
+joining machine's address against the union of their netlists (below, "The
+netlist: VPN, Tor and datacenter addresses"), and takes a pass any of them
+signed (below, "The pass at the door"), whose Discord account its bans then
+name. An operator who trusts fewer names them in `masters.txt`.
+
 The web build reads its site's `masters.json` before the official masters. The URL is an origin with no path, or a path
 the master is served under as it is (a proxy must not rewrite paths, since
 the path is signed).
@@ -284,7 +291,7 @@ signature as `listing_signed` does.
 | --- | --- | --- |
 | 0 | 2 | `"HL"` |
 | 2 | 1 | Format: 1 |
-| 3 | 2 | Network version (`HALO_PORT_NETWORK_VERSION`, 40 now) |
+| 3 | 2 | Network version (`HALO_PORT_NETWORK_VERSION`, 43 now) |
 | 5 | 1 | Flags (below) |
 | 6 | 4 | Sequence: the host's count of its listings (the newest wins) |
 | 10 | 4 | The host's Unix time when it made the listing |

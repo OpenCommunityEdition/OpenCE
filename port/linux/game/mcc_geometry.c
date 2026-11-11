@@ -15,6 +15,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* A strip count is independent of its 16-bit vertex indices. Bound each
+ * part to a 2 MiB plus four-byte index stream and 12 MiB of tangent-repair links. This
+ * also keeps all count/byte arithmetic within signed 32-bit engine APIs. */
+#define MCC_MODEL_MAXIMUM_STRIP_TRIANGLES 1048576u
+
 struct mcc_render_part {
     unsigned long flags;
     short shader;
@@ -143,7 +148,11 @@ static int mg_model_tangents(struct model_vertex_uncompressed *vertices,
     }
     if (!needed) return 1;
     heads=malloc(count*sizeof(*heads));links=malloc(triangles*3*sizeof(*links));
-    if (!heads || !links) {free(heads);free(links);return 0;}
+    if (!heads || !links) {
+        if (heads) free(heads);
+        if (links) free(links);
+        return 0;
+    }
     for (i=0;i<count;i++) heads[i]=-1;
     for (k=0;k<triangles;k++) for (j=0;j<3;j++) {
         i=indices[k+j];links[k*3+j]=heads[i];heads[i]=(long)(k*3+j);
@@ -201,7 +210,12 @@ static int mg_part(struct mcc_runtime *r,struct model const *model,unsigned char
     struct mcc_geometry_buffer *record;
     (void)part_index;
     memset(part,0,sizeof(*part));
-    if (!count || count>65535 || !triangles || triangles>65535 || mg_u16(wire+0x44)!=1 ||
+    if (!triangles || triangles>MCC_MODEL_MAXIMUM_STRIP_TRIANGLES) {
+        error(_error_silent,"MCC geometry: model strip has %lu triangles (supported range 1..%lu)",
+            (unsigned long)triangles,(unsigned long)MCC_MODEL_MAXIMUM_STRIP_TRIANGLES);
+        return 0;
+    }
+    if (!count || count>65535 || mg_u16(wire+0x44)!=1 ||
         mg_u16(wire+0x54)!=4 || model->nodes.count<1 || model->nodes.count>64 ||
         model->shaders.count<0 ||
         (mg_u16(wire+4)!=0xFFFFu && !model->shaders.count) ||
@@ -209,7 +223,9 @@ static int mg_part(struct mcc_runtime *r,struct model const *model,unsigned char
         ((signed char)wire[7]!=-1 && (unsigned char)wire[7]>=part_count))
         return mg_error("invalid model part descriptor");
     raw_bytes=count*68; vertex_bytes=count*32; index_bytes=(triangles+2)*2;
-    if (!mg_range(vertex_offset,raw_bytes,r->report.model_vertex_bytes) ||
+    if (r->report.model_vertex_bytes>r->report.model_bytes ||
+        (uint64_t)r->report.model_file_offset+r->report.model_bytes>r->source.size ||
+        !mg_range(vertex_offset,raw_bytes,r->report.model_vertex_bytes) ||
         !mg_range(index_offset,index_bytes,r->report.model_bytes-r->report.model_vertex_bytes))
         return mg_error("model stream exceeds its declared range");
     if (local) {
@@ -270,6 +286,39 @@ fail:
     if (compressed) free(compressed);
     if (indices) free(indices);
     return mg_error("model vertices, node indices or hardware buffers could not be converted");
+}
+
+/* Converted model parts use only the MCC-owned compressed vertices and strip
+ * buffers. Validate exact descriptor ownership as well as their byte spans;
+ * the legacy schema callback intentionally retains its Xbox/CE count limit. */
+int mcc_geometry_part_valid(struct mcc_runtime *r,void const *address) {
+    struct mcc_render_part const *part=address;
+    struct mcc_geometry_state *state=r ? r->geometry : NULL;
+    struct mcc_geometry_buffer const *b,*vertices=NULL,*indices=NULL;
+    uint32_t count,triangles,i;
+    unsigned short const *stream;
+    if (!state || !part) return 0;
+    if (part->uncompressed.count || part->compressed.count || part->triangles.count ||
+        part->uncompressed.address || part->compressed.address || part->triangles.address ||
+        part->vertices.type!=_rasterizer_vertex_type_model_compressed || part->vertices.offset ||
+        part->indices.type!=_triangle_buffer_type_precompiled_strip ||
+        !part->vertices.hardware_format || !part->indices.hardware_format ||
+        part->vertices.count<1 || part->vertices.count>65535 || part->indices.count<1 ||
+        (uint32_t)part->indices.count>MCC_MODEL_MAXIMUM_STRIP_TRIANGLES) return 0;
+    count=(uint32_t)part->vertices.count; triangles=(uint32_t)part->indices.count;
+    for (b=state->buffers;b;b=b->next) {
+        if (b->is_bsp) continue;
+        if (!b->is_index && b->descriptor==&part->vertices) vertices=b;
+        if (b->is_index && b->descriptor==&part->indices) indices=b;
+    }
+    if (!vertices || !indices || vertices->bytes!=count*32 || indices->bytes!=(triangles+2)*2 ||
+        vertices->payload!=vertices->allocation || indices->payload!=indices->allocation ||
+        vertices->allocation_bytes!=vertices->bytes || indices->allocation_bytes!=indices->bytes ||
+        part->vertices.base_address!=vertices->payload || part->indices.base_address!=indices->payload)
+        return 0;
+    stream=indices->payload;
+    for (i=0;i<triangles+2;i++) if (stream[i]>=count) return 0;
+    return 1;
 }
 
 int mcc_geometry_prepare(struct mcc_runtime *r) {
@@ -382,12 +431,23 @@ static int mg_bsp_material(struct mcc_runtime *r,struct mcc_cache_bsp const *b,
     return 1;
 }
 
+/* a lightmap's materials, sorted by address so that two lightmaps naming the
+ * same materials convert them once */
+struct mg_material_run { struct structure_material *materials; long count; };
+
+static int mg_material_run_compare(void const *a,void const *b) {
+    uintptr_t x=(uintptr_t)((struct mg_material_run const *)a)->materials;
+    uintptr_t y=(uintptr_t)((struct mg_material_run const *)b)->materials;
+    return x<y ? -1 : x>y;
+}
+
 int mcc_geometry_bsp_load(struct mcc_runtime *r,uint32_t handle,uint32_t offset,
     uint32_t size,void *address,void **result) {
     struct mcc_cache_bsp const *b=NULL;
     struct structure_bsp *structure;
     struct structure_lightmap *lightmaps;
-    uint32_t i;
+    struct mg_material_run *runs=NULL;
+    uint32_t i,run_count=0;
     long l;
     if (!r || !r->geometry || !result) return 0;
     *result=NULL;
@@ -404,21 +464,34 @@ int mcc_geometry_bsp_load(struct mcc_runtime *r,uint32_t handle,uint32_t offset,
     lightmaps=mg_bsp_pointer(address,size,(uint32_t)(uintptr_t)structure->lightmaps.address,
         (uint32_t)structure->lightmaps.count*0x20);
     if (structure->lightmaps.count && !lightmaps) return mg_error("BSP lightmaps point outside BSP");
+    if (structure->lightmaps.count &&
+        !(runs=malloc((uint32_t)structure->lightmaps.count*sizeof(*runs)))) return 0;
     for (l=0;l<structure->lightmaps.count;l++) {
         struct tag_block const *block=&lightmaps[l].materials;
         struct structure_material *materials;
-        long m;
         if (block->count<0 || (uint32_t)block->count>size/sizeof(*materials)) goto fail;
         materials=mg_bsp_pointer(address,size,(uint32_t)(uintptr_t)block->address,
             (uint32_t)block->count*sizeof(*materials));
         if (block->count && !materials) goto fail;
-        for (m=0;m<block->count;m++) if (!mg_bsp_material(r,b,&materials[m])) goto fail;
+        if (block->count) { runs[run_count].materials=materials; runs[run_count++].count=block->count; }
     }
+    if (run_count) qsort(runs,run_count,sizeof(*runs),mg_material_run_compare);
+    for (i=0;i<run_count;i++) {
+        long m;
+        if (i && runs[i].materials==runs[i-1].materials && runs[i].count==runs[i-1].count) continue;
+        /* converting a material rewrites its descriptors, so a material
+         * reached by two different runs would be read again as file data */
+        if (i && runs[i].materials<runs[i-1].materials+runs[i-1].count) goto fail;
+        for (m=0;m<runs[i].count;m++) if (!mg_bsp_material(r,b,&runs[i].materials[m])) goto fail;
+    }
+    /* Empty lightmap tables allocate no runs; debug_free rejects NULL. */
+    if (runs) free(runs);
     /* The MCC file stream descriptors are not Xbox vertex-buffer tables. */
     memset((unsigned char *)address+4,0,16);
     *result=structure;
     return 1;
 fail:
+    if (runs) free(runs);
     mcc_geometry_bsp_unload(r);
     return mg_error("BSP material conversion failed");
 }

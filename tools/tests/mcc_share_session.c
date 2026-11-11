@@ -1654,6 +1654,38 @@ int main(int argc,char **argv)
         return 0;
     }
 
+    CASE("hashed_once") {
+        struct mcc_share_request request;
+        char path[400];
+        unsigned char *data;
+        unsigned frame,size;
+        memset(&request,0,sizeof(request));request.op=MCC_SHARE_OP_MANIFEST;strcpy(request.level,LEVEL);
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        for (frame=0;frame<100 && !W.manifest_pages;frame++) { mcc_share_update(&W.host);W.clock+=20; }
+        CHECK(W.manifest_pages==1 && native_reads==4);                 /* four files hashed */
+        /* asked again (a new transfer for the machine, then another machine):
+         * offered at once, the files only opened for their sizes */
+        mcc_share_host_forget(&W.host,MACHINE);W.clock+=2000;
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        CHECK(W.manifest_pages==2 && native_reads==8);
+        mcc_share_host_request(&W.host,MACHINE+1,&request,sizeof(request));
+        CHECK(W.manifest_pages==3 && native_reads==12);
+        /* a file of another size is hashed again */
+        snprintf(path,sizeof(path),"%smcc_maps/solar_flare/sounds.map",H);
+        data=read_file(path,&size);
+        CHECK(write_file(path,data,size-1));
+        free(data);
+        mcc_share_host_forget(&W.host,MACHINE);W.clock+=2000;
+        mcc_share_host_request(&W.host,MACHINE,&request,sizeof(request));
+        CHECK(W.manifest_pages==3);
+        for (frame=0;frame<100 && W.manifest_pages==3;frame++) { mcc_share_update(&W.host);W.clock+=20; }
+        CHECK(W.manifest_pages==4);
+        /* and none is kept once the host stops */
+        mcc_share_host_stop(&W.host);
+        CHECK(!W.host.hashed.valid);
+        return 0;
+    }
+
     CASE("hostile_chunk") {
         unsigned char buffer[MCC_SHARE_RESPONSE_MAXIMUM];
         struct mcc_share_response head;
@@ -1663,6 +1695,7 @@ int main(int argc,char **argv)
             W.finished=0;W.join_count=0;W.host_count=0;
             W.clock+=2000;
             mcc_share_host_forget(&W.host,MACHINE);
+            W.host.hashed.valid=0;                                      /* hashed again: each round at the same step */
             CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
             for (i=0;i<3;i++) step();                                   /* manifest in, first chunks out */
             CHECK(mcc_share_client_busy(&W.join));

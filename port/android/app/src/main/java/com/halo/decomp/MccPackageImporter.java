@@ -281,7 +281,8 @@ final class MccPackageImporter {
                     String leaf = lower(scenario.substring(scenario.lastIndexOf('/') + 1));
                     if (leaf.endsWith(".map")) leaf = leaf.substring(0, leaf.length() - 4);
                     Object kind = MccJson.member(metadata, "CampaignMapKind");
-                    if (metadata instanceof Map && ((Map<?,?>)metadata).containsKey("CampaignMapKind") && !"Default".equals(kind))
+                    if (metadata instanceof Map && ((Map<?,?>)metadata).containsKey("CampaignMapKind") &&
+                            (!(kind instanceof String) || !"Default".equalsIgnoreCase((String)kind)))
                         throw new IOException("Unsupported campaign mission kind");
                     if (!seen.add(leaf) || !Integer.valueOf(0).equals(maps.get(leaf)))
                         throw new IOException("Missing, duplicate or non-campaign mission: " + leaf);

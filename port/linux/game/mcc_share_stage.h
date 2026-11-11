@@ -148,8 +148,10 @@ int mcc_share_credit_allowed(char const *leaf, unsigned length);
 int mcc_share_manifest_valid(struct mcc_share_file const *files, int count, char const *level);
 
 /* Exclusively create <root>mcc_staging/<folder>, or an undiscoverable final
- * destination through io.direct. Existing paths are never
- * reused or cleaned. The caller supplies a managed snapshot destination
+ * destination through io.direct. A staging folder of that name left by a
+ * download cut off by a crash is cleared of the files the manifest names and
+ * created again; one holding anything else is left, and the stage fails.
+ * Existing destinations are never reused or cleaned. The caller supplies a managed snapshot destination
  * distinct from original installations. The IO table and strings are copied. */
 enum mcc_share_stage_result mcc_share_stage_begin(struct mcc_share_stage *stage,
     struct mcc_share_io const *io, char const *root, char const *folder, char const *level,

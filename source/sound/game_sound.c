@@ -920,7 +920,7 @@ void game_sound_set_mouth_aperture(
 	return;
 }
 
-/* The native ports draw several frames per game tick (port/linux/game/
+/* port: the native ports draw several frames per game tick (port/linux/game/
 render_interpolation.c), and the sound manager refreshes every sound each
 frame; on the Xbox, frames and ticks were one. Sounds whose positions share
 a slot share one collision test for the tick. Each sound's own result for

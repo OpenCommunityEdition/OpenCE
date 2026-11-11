@@ -33,6 +33,7 @@ int mcc_runtime_read(struct mcc_runtime *runtime, uint32_t offset, uint32_t byte
 void *mcc_runtime_allocate(struct mcc_runtime *runtime, uint32_t bytes);
 
 int mcc_geometry_prepare(struct mcc_runtime *runtime);
+int mcc_geometry_part_valid(struct mcc_runtime *runtime, void const *part);
 void mcc_geometry_dispose(struct mcc_runtime *runtime);
 int mcc_geometry_bsp_load(struct mcc_runtime *runtime, uint32_t handle,
     uint32_t offset, uint32_t size, void *address, void **structure);
