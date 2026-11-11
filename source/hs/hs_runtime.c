@@ -977,6 +977,41 @@ boolean hs_runtime_waiting_on_call(
 	return !TEST_FLAG(caller->flags, _hs_syntax_node_script_bit) && caller->function_index == _hs_function_sleep_until;
 }
 
+/* port: the map's riding call counts only from a startup script (vehicle_riding.c) */
+short hs_runtime_port_executing_script_type(
+	void)
+{
+	struct hs_thread_datum *thread;
+	struct hs_script *script;
+
+	if (!hs_runtime_globals.initialized || hs_runtime_globals.executing_thread_index==NONE)
+		return NONE;
+	thread = hs_thread_get(hs_runtime_globals.executing_thread_index);
+	if (thread->type!=_hs_thread_type_script)
+		return NONE;
+	script = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->hs_scripts,
+		thread->script_index,
+		struct hs_script);
+
+	return script->script_type;
+}
+
+/* port: a disabled initializer holds its type's default, not the map's word */
+short hs_runtime_port_scenario_boolean(
+	char const *name)
+{
+	short designator;
+
+	designator = hs_find_global_by_name(name);
+	if (designator==NONE || ((word)designator & 0x8000) ||
+		hs_global_get_type(designator)!=_hs_type_boolean || hs_scenario_global_initializer_disabled(designator))
+		return NONE;
+
+	/* (a boolean is its low byte, as the engine reads it: the global's value is a whole long) */
+	return (boolean)hs_global_evaluate(designator)!=FALSE;
+}
+
 char const *hs_runtime_get_executing_thread_name(
 	void)
 {

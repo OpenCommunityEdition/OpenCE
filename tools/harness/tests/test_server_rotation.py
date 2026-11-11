@@ -19,6 +19,8 @@ CASES = [
     "rotation-cut-entry",
     "resolve-version",
     "resolve-case",
+    "riding-rule",
+    "riding-coop-entry",
 ]
 
 # a fault in server_rotation.c and the case that must catch it
@@ -54,6 +56,8 @@ NEGATIVE_CONTROLS = {
     "missing-unflagged": (("entry->map_name, entry->map_name, entry->map_name);\n\t\tentry->map_missing = 1;",
                            "entry->map_name, entry->map_name, entry->map_name);"), "resolve"),
     "campaign-listed": (("type != 1 ||", ""), "maps-each"),
+    "riding-alias-dropped": (('RULE_BOOLEAN("vehicle_riding", "riding",', 'RULE_BOOLEAN("vehicle_riding", NULL,'),
+                             "riding-rule"),
     "custom-maps-case-sensitive": (("posix_find_entry_case_insensitive(folder, file_name, on_disk, sizeof(on_disk))",
                                     "0"), "resolve-case"),
 }

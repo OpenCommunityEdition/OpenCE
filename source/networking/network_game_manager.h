@@ -54,6 +54,10 @@ enum
 	/* the host is a dedicated server: its loading zones ask for most of the
 	players, not the host's (network_coop_host_dedicated) */
 	_network_game_cooperative_dedicated_bit = 2,
+	/* port: players standing on a vehicle are carried by it: the host's
+	decision for the running game, made as it starts (network_coop.c's
+	network_game_port_vehicle_riding_start) */
+	_network_game_cooperative_vehicle_riding_bit = 3,
 };
 
 struct network_game
@@ -61,7 +65,7 @@ struct network_game
 	wchar_t name[16];
 	struct network_game_map map;
 	struct game_variant variant;
-	/* port: co-op's switches (_network_game_cooperative_*_bit), in a byte the
+	/* port: the game's switches (_network_game_cooperative_*_bit), in a byte the
 	Xbox's game left as padding, which builds before them send as 0 */
 	byte cooperative_flags;
 	char minimum_players;
