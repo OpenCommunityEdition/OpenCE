@@ -87,6 +87,7 @@ machine (their datum identifiers need not be).
 #include "latency_meter.h"
 #include "profile_sections.h"
 #include "server_director.h"
+#include "abilities.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -408,6 +409,9 @@ struct distributed_relayed_action
 	signed char throttle_i;
 	signed char throttle_j;
 	byte primary_trigger;
+	/* the latest tick's sprint and armour lock controls, above its buttons'
+	word (units.h's UNIT_CONTROL_PORT_ABILITIES_SHIFT: abilities.c) */
+	byte abilities;
 };
 
 /* a relayed action's parts on the wire: which of the ticks' buttons before
@@ -423,8 +427,8 @@ enum
 	DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE = 3,
 	DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE = 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 +
 		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1,
-	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 14,
-	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
+	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 15,
+	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 15 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
 };
 
 struct distributed_pickup
@@ -2278,6 +2282,8 @@ static void distributed_on_foot_bound(
 	}
 	if (player && player->speed_multiplier > 1.0f)
 		run_speed *= player->speed_multiplier;
+	/* (and a sprint's: abilities.c) */
+	run_speed *= abilities_maximum_speed_scale();
 	if (biped)
 	{
 		struct biped_definition *definition = biped_definition_get(biped->definition_index);
@@ -2929,6 +2935,13 @@ static short distributed_object_cluster(
 	return object->object.location.cluster_index;
 }
 
+/* an action's sprint and armour lock controls (abilities.c), in a byte */
+static byte distributed_action_abilities(
+	struct player_action const *action)
+{
+	return (byte)((action->control_flags >> UNIT_CONTROL_PORT_ABILITIES_SHIFT) & UNIT_CONTROL_PORT_ABILITIES_MASK);
+}
+
 /* the player's input as the host's tick ran it, in fewer bytes; whether
 their buttons or choices changed in the ticks it carries */
 static boolean distributed_relayed_action_from(
@@ -2950,6 +2963,7 @@ static boolean distributed_relayed_action_from(
 	relayed->desired_weapon_index = (signed char)action->desired_weapon_index;
 	relayed->desired_grenade_index = (signed char)action->desired_grenade_index;
 	relayed->desired_zoom_level = (signed char)MIN(action->desired_zoom_level, 127);
+	relayed->abilities = distributed_action_abilities(action);
 	for (history = 0; history < DISTRIBUTED_INPUT_HISTORY; history++)
 	{
 		struct player_action const *past = recent[history] && player_index < recent_counts[history] ?
@@ -2957,6 +2971,7 @@ static boolean distributed_relayed_action_from(
 
 		relayed->control_flags[history] = past ? (unsigned short)past->control_flags : 0;
 		if (history > 0 && (!past || relayed->control_flags[history] != relayed->control_flags[history - 1] ||
+			distributed_action_abilities(past) != relayed->abilities ||
 			past->desired_weapon_index != action->desired_weapon_index ||
 			past->desired_grenade_index != action->desired_grenade_index ||
 			past->desired_zoom_level != action->desired_zoom_level))
@@ -2974,7 +2989,7 @@ static boolean distributed_relayed_action_from(
 
 /* the action's bytes on the wire (at most
 DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE): its player and parts, the
-choices, facing, sticks and trigger, the latest tick's buttons, and those of
+choices, facing, sticks and trigger, its abilities' controls, the latest tick's buttons, and those of
 the ticks before only where they differ from the tick after's
 (distributed_relayed_action_read) */
 static word distributed_relayed_action_write(
@@ -2993,6 +3008,7 @@ static word distributed_relayed_action_write(
 	cursor = distributed_put(cursor, &relayed->throttle_i, sizeof(relayed->throttle_i));
 	cursor = distributed_put(cursor, &relayed->throttle_j, sizeof(relayed->throttle_j));
 	cursor = distributed_put(cursor, &relayed->primary_trigger, sizeof(relayed->primary_trigger));
+	cursor = distributed_put(cursor, &relayed->abilities, sizeof(relayed->abilities));
 	cursor = distributed_put(cursor, &relayed->control_flags[0], sizeof(relayed->control_flags[0]));
 	for (history = 1; history < DISTRIBUTED_INPUT_HISTORY; history++)
 	{
@@ -3029,6 +3045,7 @@ static word distributed_relayed_action_read(
 		!distributed_take(&cursor, end, &relayed->throttle_i, sizeof(relayed->throttle_i)) ||
 		!distributed_take(&cursor, end, &relayed->throttle_j, sizeof(relayed->throttle_j)) ||
 		!distributed_take(&cursor, end, &relayed->primary_trigger, sizeof(relayed->primary_trigger)) ||
+		!distributed_take(&cursor, end, &relayed->abilities, sizeof(relayed->abilities)) ||
 		!distributed_take(&cursor, end, &relayed->control_flags[0], sizeof(relayed->control_flags[0])))
 	{
 		return 0;
@@ -3339,7 +3356,9 @@ static void distributed_handle_actions(
 			break;
 		data += size;
 		csmemset(&action, 0, sizeof(action));
-		action.control_flags = relayed.control_flags[0];
+		/* (the abilities' controls above the buttons', none but theirs) */
+		action.control_flags = relayed.control_flags[0] |
+			((relayed.abilities & UNIT_CONTROL_PORT_ABILITIES_MASK) << UNIT_CONTROL_PORT_ABILITIES_SHIFT);
 		action.desired_facing.yaw = distributed_angle_unpack(relayed.yaw, FALSE);
 		action.desired_facing.pitch = distributed_angle_unpack(relayed.pitch, TRUE);
 		action.throttle.i = PIN((real)relayed.throttle_i / 127.0f, -1.0f, 1.0f);

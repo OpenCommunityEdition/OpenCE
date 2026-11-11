@@ -307,6 +307,19 @@ boolean input_abstraction_port_action_only(
 		keyboard_controls[controller_index].ticks[_game_control_action] != 0;
 }
 
+unsigned long input_abstraction_port_abilities(
+	short controller_index)
+{
+	unsigned long held = halo_ability_controls(controller_index);
+	unsigned long flags = 0;
+
+	if (held & HALO_ABILITY_CONTROL_SPRINT)
+		flags |= FLAG(UNIT_CONTROL_PORT_SPRINT_BIT);
+	if (held & HALO_ABILITY_CONTROL_ARMOR_LOCK)
+		flags |= FLAG(UNIT_CONTROL_PORT_ARMOR_LOCK_BIT);
+	return flags;
+}
+
 byte input_abstraction_port_accept(
 	short controller_index)
 {

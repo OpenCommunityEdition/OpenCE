@@ -46,6 +46,10 @@ enum halo_keyboard_action
 	network_votekick.c, read with the chat's keys) */
 	HALO_KEYBOARD_VOTE_YES,
 	HALO_KEYBOARD_VOTE_NO,
+	/* (the abilities a gametype may give: port/linux/game/abilities.c,
+	read with halo_ability_controls) */
+	HALO_KEYBOARD_SPRINT,
+	HALO_KEYBOARD_ARMOR_LOCK,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 
@@ -53,6 +57,13 @@ enum halo_keyboard_action
 (a bit for each halo_keyboard_action): theirs is the first's; none while a
 menu or the console is up, or a chat line is typed */
 unsigned long halo_keyboard_actions(short controller_index);
+/* the abilities' controls the player on the controller holds, the keyboard's
+(theirs is the first's) with the controller's own buttons for them
+(controller_remap.h's PAD_SPRINT and PAD_ARMOR_LOCK): a bit for each of
+HALO_ABILITY_CONTROL_SPRINT and HALO_ABILITY_CONTROL_ARMOR_LOCK */
+#define HALO_ABILITY_CONTROL_SPRINT 0x1UL
+#define HALO_ABILITY_CONTROL_ARMOR_LOCK 0x2UL
+unsigned long halo_ability_controls(short controller_index);
 /* whether voice chat's push to talk is held (controls.push_to_talk), in the
 game and in the menus alike */
 int halo_push_to_talk_held(void);

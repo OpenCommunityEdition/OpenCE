@@ -2260,6 +2260,8 @@ static struct
 	{ "controls.switch_grenade", L"SWITCH GRENADE", 1 },
 	{ "controls.action", L"ACTION", 2 },
 	{ "controls.flashlight", L"FLASHLIGHT", 2 },
+	{ "controls.sprint", L"SPRINT", 2 },
+	{ "controls.armor_lock", L"ARMOR LOCK", 2 },
 	{ "controls.scoreboard", L"SHOW SCORES", 2 },
 	{ "controls.pause", L"PAUSE MENU", 2 },
 	{ "controls.screenshot", L"SCREENSHOT", 2 },
@@ -6873,6 +6875,9 @@ static struct gametype_option const gametype_options[] =
 	{ "oce_mode_spinner", _option_option_byte, OPTIONS_FIELD(mode), 0, 4,
 		{ _game_mode_none, _game_mode_swat, _game_mode_infection, _game_mode_gun_game } },
 	{ "oce_hardcore_spinner", _option_option_byte, OPTIONS_FIELD(hardcore), 0, 2, { FALSE, TRUE } },
+	{ "oce_abilities_spinner", _option_option_byte, OPTIONS_FIELD(abilities), 0, 4,
+		{ 0, FLAG(_game_ability_sprint_bit), FLAG(_game_ability_armor_lock_bit),
+			FLAG(_game_ability_sprint_bit) | FLAG(_game_ability_armor_lock_bit) } },
 	{ "inf_zombies_spinner", _option_option_byte, OPTIONS_FIELD(infection_initial_zombies), 0, 6, { 1, 2, 3, 4, 8, 16 } },
 	{ "inf_speed_spinner", _option_option_byte, OPTIONS_FIELD(infection_zombie_speed), 0, 6,
 		{ 100, 110, 125, 150, 175, 200 } },
@@ -7591,11 +7596,11 @@ static void gametype_option_help(struct widget_instance *list)
 		visible_set(named(list, "op_secondary_weapon", 0), custom);
 	}
 	/* (OPENCE OPTIONS: the mode's own rows, Infection's or Gun Game's, below
-	MODE and HARDCORE) */
+	MODE, HARDCORE and ABILITIES) */
 	if (named(list, "oce_mode_spinner", 0))
 	{
 		short mode = named(list, "oce_mode_spinner", 0)->parameters.list.selected_index;
-		short place = 73 + 2 * 30;
+		short place = 73 + 3 * 30;
 
 		for (row = list->child; row; row = row->next)
 		{

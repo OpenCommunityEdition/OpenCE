@@ -257,6 +257,8 @@ grenades switched with the left bumper (the flashlight moves to X).
 | change the weapon | mouse wheel, 1 |
 | change the grenade | X |
 | flashlight | Q |
+| sprint (hold; a gametype with ABILITIES) | left shift |
+| armour lock (hold; a gametype with ABILITIES) | H |
 | zoom | Z, middle mouse button |
 | show the scores (hold) | tab |
 | pause menu | escape |
@@ -445,7 +447,7 @@ Edit Gametypes edits them as any gametype, and its OPENCE OPTIONS screen
 (after TEAMPLAY OPTIONS) gives any gametype these rules: its MODE (NONE,
 SWAT, INFECTION or GUN GAME: Slayer only; Infection is played on teams and
 Gun Game free for all, which the screen's OK sets), HARDCORE (any game
-type), and the mode's own options: Infection's first zombies, zombie speed,
+type), ABILITIES (any gametype: below), and the mode's own options: Infection's first zombies, zombie speed,
 skull damage, zombie respawn time, countdown and zombie shields, and Gun
 Game's weapon order (strongest first, weakest first, or random, drawn by
 the host for each game) and whether a melee kill demotes. A saved gametype
@@ -458,6 +460,29 @@ the rest of the game. The lobby and Server Setup name the gametype's mode.
 `debug.network_test` hosts them by name: `swat`, `infection`, `gun_game`,
 `hardcore`, `hardcore_ctf`, `hardcore_oddball` and `hardcore_king`
 (`host:bloodgulch:infection`).
+
+ABILITIES (NONE, SPRINT, ARMOR LOCK or BOTH; a dedicated server's gametype
+rules `sprint` and `armor_lock`) gives the players of any multiplayer
+gametype sprint, armour lock or both (`port/linux/game/abilities.c`):
+
+- Sprint (`controls.sprint`, Left Shift): held while moving forward on
+  foot, standing, the player runs 1.5 times as fast with the weapon lowered
+  (it does not fire, throw grenades, reload or zoom). It lasts 5 seconds
+  from full and recharges in 4, a second after it ends. Firing or throwing
+  a grenade ends it, and the weapon comes up in a fifth of a second; out of
+  energy, or ended by firing, it starts again only once its control is let
+  go and pressed again.
+- Armour lock (`controls.armor_lock`, H): held on the ground, the player
+  crouches locked in place, takes no damage (but a kill zone's or a
+  script's instant kill) and can do nothing else but look around. It lasts
+  4 seconds from full and at least half a second, and recharges in 8, a
+  second after it ends. It starts with a quarter of its energy or more.
+
+Controllers have no button for them until one is chosen in Gamepads >
+Button Remapping (SPRINT and ARMOR LOCK, in the group with the flashlight).
+Each machine runs a player's abilities from their input; only the host's
+armour lock keeps a player from damage (network version 42, `NETCODE.md`).
+There is no animation or HUD meter for them yet.
 
 ## Settings
 
@@ -560,7 +585,7 @@ the setting for one start of the game. It has priority over the file.
 | `input.right_stick_dead_zone` | `-1` | `HALO_RIGHT_STICK_DEAD_ZONE` | The same for the right stick, which turns the view. |
 | `input.invert_mouse` | `false` | `HALO_MOUSE_INVERT=1` sets `true` | `true`: the vertical mouse aim is inverted. |
 | `input.mouse_aim_assist` | `false` | `HALO_MOUSE_AIM_ASSIST` | `true`: the magnetism of the controller also operates for the mouse. `false`: when the mouse moved after the right stick, the view is not slowed or dragged by a target. The autoaim of the bullets operates in both cases. |
-| `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `scoreboard`, `pause`, `screenshot`, `push_to_talk`, `chat`, `team_chat`, `vote_yes`, `vote_no`. Keys by their names on a US keyboard (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`): a key is the one in that place on any keyboard, which Controls Setup shows by its own label (the US name on Android). Buttons: `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
+| `controls.<action>` | (the table in "Controls") | `HALO_KEY_<ACTION>` | The keys and mouse buttons of an action, up to two, separated by a comma: `move_forward`, `move_backward`, `strafe_left`, `strafe_right`, `jump`, `crouch`, `fire`, `throw_grenade`, `melee`, `reload`, `zoom`, `switch_weapon`, `switch_grenade`, `action`, `flashlight`, `sprint`, `armor_lock`, `scoreboard`, `pause`, `screenshot`, `push_to_talk`, `chat`, `team_chat`, `vote_yes`, `vote_no`. Keys by their names on a US keyboard (`"W"`, `"Space"`, `"Left Ctrl"`, `"F1"`): a key is the one in that place on any keyboard, which Controls Setup shows by its own label (the US name on Android). Buttons: `"Mouse Left"`, `"Mouse Right"`, `"Mouse Middle"`, `"Mouse 4"`, `"Mouse 5"`, `"Wheel"` (either way), `"Wheel Up"`, `"Wheel Down"`. |
 | `game.downloaded_maps` | `""` | `HALO_DOWNLOADED_MAPS` | Maps to play as downloaded maps, besides the maps that map sharing downloaded (it names them in `downloaded_maps.txt` in `custom_maps`): their names (`bloodgulch`, `hugeass`), separated by commas, or `"*"` for all the maps. The scripts of a downloaded map cannot change the settings of the player or the games of other players. `debug.txt` names what the game refused. |
 | `game.console_log` | `"none"` | `HALO_CONSOLE_LOG` | What the console shows on the screen. `"none"`: only the asserts that stop the game. `"important"`: bans, players that the host drops for cheating, the reasons that the game refuses a command, and the asserts that stop the game. `"all"`: all the lines. The output of a command always shows. `debug.txt` gets all the lines. |
 | `game.language` | `""` | `HALO_LANGUAGE` | The language of the menus: `ja`, `de`, `fr`, `es` or `it`. Empty: English. |

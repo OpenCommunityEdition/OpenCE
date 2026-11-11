@@ -13,8 +13,13 @@ enum controller_remap_action
     PAD_CHAT, PAD_TEAM_CHAT, PAD_VEHICLE_CHAT, PAD_TALK,
     PAD_CAMERA_FASTER, PAD_CAMERA_SLOWER, PAD_CAMERA_SWITCH, PAD_CAMERA_UP, PAD_CAMERA_DOWN,
     PAD_CAMERA_CYCLE,
+    /* Gameplay again (appended in v4): a gametype's abilities, port/linux/game/abilities.c. */
+    PAD_SPRINT, PAD_ARMOR_LOCK,
     CONTROLLER_REMAP_ACTIONS
 };
+
+/* Debug camera actions bind apart from the rest: a button may serve both. */
+#define CONTROLLER_REMAP_CAMERA_ACTION(action) ((action) >= PAD_CAMERA_FASTER && (action) <= PAD_CAMERA_CYCLE)
 
 /* Game control indices: jump, grenade type, use/reload, weapon, melee,
  * flashlight, grenade, fire, crouch, zoom. Start and stick axes stay stock. */

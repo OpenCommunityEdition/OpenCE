@@ -275,6 +275,7 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "structures/structure_bsp_definitions.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "abilities.h" /* port: port/linux/game/abilities.c */
 
 /* port: port/linux/game/network_objects.c's (a client deletes the host's
 objects on the host's word alone) */
@@ -3796,6 +3797,8 @@ static void biped_update_moving(
 				{
 					body_stun_scale =
 						player_get(biped->unit.player_index)->speed_multiplier;
+					/* port: and faster sprinting (port/linux/game/abilities.c) */
+					body_stun_scale *= abilities_speed_scale(biped_index);
 				}
 
 				crouch = biped->biped.crouch;

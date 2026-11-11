@@ -144,6 +144,14 @@ typedef char verify_unit_control_port_action_only_bit[
 	UNIT_CONTROL_PORT_ACTION_ONLY_BIT >= NUMBER_OF_UNIT_CONTROL_FLAGS &&
 	UNIT_CONTROL_PORT_ACTION_ONLY_BIT < 16 ? 1 : -1];
 
+/* port: the sprint and armour lock controls (port/linux/game/abilities.c),
+held above the unit's own word of the player's action (and over the
+network: a byte of its own in a relayed action), never given to the unit */
+#define UNIT_CONTROL_PORT_ABILITIES_SHIFT 16
+#define UNIT_CONTROL_PORT_SPRINT_BIT (UNIT_CONTROL_PORT_ABILITIES_SHIFT + 0)
+#define UNIT_CONTROL_PORT_ARMOR_LOCK_BIT (UNIT_CONTROL_PORT_ABILITIES_SHIFT + 1)
+#define UNIT_CONTROL_PORT_ABILITIES_MASK 0x3UL
+
 enum
 {
 	_unit_state_idle = 0,

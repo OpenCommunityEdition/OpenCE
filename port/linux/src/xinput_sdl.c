@@ -650,6 +650,7 @@ static const char *const binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.reload", "controls.zoom", "controls.switch_weapon", "controls.switch_grenade", "controls.action",
 	"controls.flashlight", "controls.scoreboard", "controls.pause", "controls.screenshot",
 	"controls.push_to_talk", "controls.chat", "controls.team_chat", "controls.vote_yes", "controls.vote_no",
+	"controls.sprint", "controls.armor_lock",
 };
 
 static const struct
@@ -861,6 +862,20 @@ static void keyboard_controls(unsigned long held, XINPUT_GAMEPAD *pad)
 unsigned long halo_keyboard_actions(short controller_index)
 {
 	return controller_index == 0 ? keyboard_actions_held : 0;
+}
+
+unsigned long halo_ability_controls(short controller_index)
+{
+	unsigned long keys = halo_keyboard_actions(controller_index);
+	unsigned int buttons = controller_index >= 0 && controller_index < 4 ?
+		controller_remap_held(controller_index) : 0;
+	unsigned long held = 0;
+
+	if ((keys & (1UL << HALO_KEYBOARD_SPRINT)) || (buttons & (1u << PAD_SPRINT)))
+		held |= HALO_ABILITY_CONTROL_SPRINT;
+	if ((keys & (1UL << HALO_KEYBOARD_ARMOR_LOCK)) || (buttons & (1u << PAD_ARMOR_LOCK)))
+		held |= HALO_ABILITY_CONTROL_ARMOR_LOCK;
+	return held;
 }
 
 int halo_push_to_talk_held(void)

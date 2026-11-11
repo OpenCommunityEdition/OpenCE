@@ -261,6 +261,9 @@ SCHEMA = [
     _field("options", "gun_turrets", "integer", "Gun turrets of each team, with team_vehicles custom", low=0, high=4),
     _field("options", "hardcore", "boolean", "Hardcore: no motion sensor, no aim assist, a kill restores the "
            "killer's health and shields"),
+    _field("options", "sprint", "boolean", "Players sprint (controls.sprint): faster, the weapon lowered"),
+    _field("options", "armor_lock", "boolean",
+           "Players armour lock (controls.armor_lock): locked in place, they take no damage"),
     _field("ctf", "assault", "boolean", "One team defends the flag, the other attacks", engine="ctf"),
     _field("ctf", "reset_on_capture", "boolean", "Both flags go home at a capture", engine="ctf"),
     _field("ctf", "flag_must_reset", "boolean", "A dropped flag goes home only by its timer", engine="ctf"),

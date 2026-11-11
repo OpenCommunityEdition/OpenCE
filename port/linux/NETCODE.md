@@ -329,6 +329,18 @@ game's flags also tell its clients whether the host is a dedicated server
 (`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
 most of the living players).
 
+Then version 42 gives a gametype sprint and armour lock
+(`port/linux/game/abilities.c`): their bits are the gametype's PC options'
+`abilities` byte, taken from their reserved bytes, which every machine plays
+by. Their controls ride in a player's action above the unit's word of
+buttons (`UNIT_CONTROL_PORT_SPRINT_BIT` and
+`UNIT_CONTROL_PORT_ARMOR_LOCK_BIT`, `source/units/units.h`): a client's input
+already sends the action's whole 32 bits, and a relayed action has a byte for
+them after its trigger (`DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE` 15, from
+14), so a client runs the other players' sprints and locks as the host
+does. Only the host's copy of a player's armour lock blocks damage. The
+host's check of a client's moves allows a sprint's speed.
+
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
 sources' messages, kinds, bits, structs sent whole or the sizes of their

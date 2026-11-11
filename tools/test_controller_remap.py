@@ -82,7 +82,7 @@ int main(void) {
  unsigned char a[CONTROLLER_REMAP_ACTIONS],b[CONTROLLER_REMAP_ACTIONS];
  char old[512],text[512];char *last;int port;
  controller_remap_defaults(a);controller_remap_format(a,text,sizeof(text));
- assert(!strncmp(text,"v3:",3));assert(controller_remap_parse(text,b) && b[PAD_CAMERA_CYCLE]==4);
+ assert(!strncmp(text,"v4:",3));assert(controller_remap_parse(text,b) && b[PAD_CAMERA_CYCLE]==4);
  strcpy(old,text);old[1]='2';last=strrchr(old,',');assert(last);*last=0;
  assert(controller_remap_parse(old,b) && !memcmp(a,b,sizeof(a)));
  /* Existing debug RB bindings win over the newly introduced default. */

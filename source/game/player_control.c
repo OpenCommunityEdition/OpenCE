@@ -1470,6 +1470,9 @@ static void get_local_player_input_blob(
 				{
 					SET_FLAG(input->unit_control_flags, UNIT_CONTROL_PORT_ACTION_ONLY_BIT, TRUE);
 				}
+				/* port: sprint and armour lock, above the unit's own controls
+				(port/linux/game/abilities.c) */
+				input->unit_control_flags |= input_abstraction_port_abilities(gamepad_index);
 				SET_FLAG(
 					input->unit_control_flags,
 					_unit_control_swap_weapons_bit,

@@ -104,6 +104,7 @@ symbols in this file:
 #include "cseries.h"
 #include "damage.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "abilities.h" /* port: port/linux/game/abilities.c */
 #include "ai/ai.h"
 #include "cseries/errors.h"
 #include "effects/effects.h"
@@ -1465,6 +1466,11 @@ void object_cause_damage(
 	{
 		return;
 	}
+
+	/* port: a player in armour lock takes no damage, but an instant kill's
+	(port/linux/game/abilities.c) */
+	if (!TEST_FLAG(damage->flags, _damage_kill_instantly_bit) && abilities_blocks_damage(object_index))
+		return;
 
 	/* port: a player who is gone is credited with nothing */
 	damage_data_validate_owner(damage);

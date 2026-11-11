@@ -14,7 +14,7 @@ static char const *const remap_names[] = {"south","east","west","north","rb","lb
 void controller_remap_defaults(unsigned char *buttons)
 {
     static unsigned char const defaults[CONTROLLER_REMAP_ACTIONS] = {
-        0,4,2,3,1,5,6,7,14,15, 13,255,255,9,10,11, 8,255,255,255, 8,9,15,7,6,4
+        0,4,2,3,1,5,6,7,14,15, 13,255,255,9,10,11, 8,255,255,255, 8,9,15,7,6,4, 255,255
     };
     memcpy(buttons, defaults, sizeof(defaults));
 }
@@ -24,19 +24,20 @@ void controller_remap_defaults(unsigned char *buttons)
 void controller_remap_complete(unsigned char *buttons)
 {
     int i, j;
-    for (i = CONTROLLER_REMAP_GAME_ACTIONS; i < PAD_CAMERA_FASTER; i++)
-        if (buttons[i] != CONTROLLER_REMAP_UNBOUND)
+    for (i = CONTROLLER_REMAP_GAME_ACTIONS; i < CONTROLLER_REMAP_ACTIONS; i++)
+        if (!CONTROLLER_REMAP_CAMERA_ACTION(i) && buttons[i] != CONTROLLER_REMAP_UNBOUND)
             for (j = 0; j < i; j++)
-                if (buttons[i] == buttons[j]) { buttons[i] = CONTROLLER_REMAP_UNBOUND; break; }
+                if (!CONTROLLER_REMAP_CAMERA_ACTION(j) && buttons[i] == buttons[j])
+                { buttons[i] = CONTROLLER_REMAP_UNBOUND; break; }
 }
 
 int controller_remap_conflict(unsigned char const *buttons, int action, int button)
 {
-    int i, first, end;
+    int i;
     if (action < 0 || action >= CONTROLLER_REMAP_ACTIONS || button == CONTROLLER_REMAP_UNBOUND) return -1;
-    first = action >= PAD_CAMERA_FASTER ? PAD_CAMERA_FASTER : 0;
-    end = action >= PAD_CAMERA_FASTER ? CONTROLLER_REMAP_ACTIONS : PAD_CAMERA_FASTER;
-    for (i = first; i < end; i++) if (i != action && buttons[i] == button) return i;
+    for (i = 0; i < CONTROLLER_REMAP_ACTIONS; i++)
+        if (i != action && CONTROLLER_REMAP_CAMERA_ACTION(i) == CONTROLLER_REMAP_CAMERA_ACTION(action) &&
+            buttons[i] == button) return i;
     return -1;
 }
 
@@ -60,7 +61,9 @@ int controller_remap_parse(char const *text, unsigned char *buttons)
     unsigned char parsed[CONTROLLER_REMAP_ACTIONS];
     int action, i, count;
     if (!text || !*text) return 0;
-    count = !strncmp(text, "v3:", 3) ? CONTROLLER_REMAP_ACTIONS :
+    /* v3 ends at Cycle Camera; v4 appends Sprint and Armor Lock. */
+    count = !strncmp(text, "v4:", 3) ? CONTROLLER_REMAP_ACTIONS :
+        !strncmp(text, "v3:", 3) ? PAD_CAMERA_CYCLE + 1 :
         !strncmp(text, "v2:", 3) ? 25 : CONTROLLER_REMAP_GAME_ACTIONS;
     if (count != CONTROLLER_REMAP_GAME_ACTIONS) text += 3;
     controller_remap_defaults(parsed);
@@ -75,8 +78,9 @@ int controller_remap_parse(char const *text, unsigned char *buttons)
             if (i == CONTROLLER_REMAP_BUTTONS) return 0;
             button = remap_buttons[i];
         }
-        for (i = action >= PAD_CAMERA_FASTER ? PAD_CAMERA_FASTER : 0; i < action; i++)
-            if (button != CONTROLLER_REMAP_UNBOUND && parsed[i] == button) return 0;
+        for (i = 0; i < action; i++)
+            if (button != CONTROLLER_REMAP_UNBOUND && parsed[i] == button &&
+                CONTROLLER_REMAP_CAMERA_ACTION(i) == CONTROLLER_REMAP_CAMERA_ACTION(action)) return 0;
         parsed[action] = (unsigned char)button;
         text += length;
         if (action < count - 1) { if (*text++ != ',') return 0; }
@@ -84,7 +88,7 @@ int controller_remap_parse(char const *text, unsigned char *buttons)
     }
     if (count == CONTROLLER_REMAP_GAME_ACTIONS) controller_remap_complete(parsed);
     /* Older debug layouts keep their buttons if RB is already assigned. */
-    if (count < CONTROLLER_REMAP_ACTIONS &&
+    if (count <= PAD_CAMERA_CYCLE &&
         controller_remap_conflict(parsed, PAD_CAMERA_CYCLE, parsed[PAD_CAMERA_CYCLE]) >= 0)
         parsed[PAD_CAMERA_CYCLE] = CONTROLLER_REMAP_UNBOUND;
     memcpy(buttons, parsed, sizeof(parsed));
@@ -98,7 +102,7 @@ void controller_remap_format(unsigned char const *buttons, char *text, unsigned 
     if (!size) return;
     *text = 0;
     if (size < 4) return;
-    strcpy(text, "v3:");
+    strcpy(text, "v4:");
     for (action = 0; action < CONTROLLER_REMAP_ACTIONS; action++)
     {
         char const *name = "unbound";
@@ -124,7 +128,7 @@ int controller_remap_read(short port, unsigned char *buttons)
         {
             char const *text = config_string(controller_remap_setting((short)i));
             valid[i] = controller_remap_parse(text, layouts[i]);
-            if (valid[i] && i && strncmp(text, "v2:", 3) && strncmp(text, "v3:", 3))
+            if (valid[i] && i && strncmp(text, "v2:", 3) && strncmp(text, "v3:", 3) && strncmp(text, "v4:", 3))
             {
                 layouts[i][PAD_CHAT] = CONTROLLER_REMAP_UNBOUND;
                 layouts[i][PAD_FORWARD] = 8;

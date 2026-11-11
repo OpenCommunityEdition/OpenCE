@@ -190,8 +190,8 @@ static const struct config_setting config_settings[] =
 		"keep the manual choice. Device detection itself is always available." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
 		"P1 custom controller layout; empty uses the profile. Edit in Gamepads >\n"
-		"Button Remapping. v3: stores 26 physical-button names, including unbound.\n"
-		"Gameplay and debug camera have separate bindings. Old ten-action and v2 layouts\n"
+		"Button Remapping. v4: stores 28 physical-button names, including unbound.\n"
+		"Gameplay and debug camera have separate bindings. Old ten-action, v2 and v3 layouts\n"
 		"are accepted. See docs/reading/controller_remapping.md for the full order." },
 	{ "input.controller_p2", _config_string, "\"\"", "HALO_CONTROLLER_P2", _environment_value, _platform_all,
 		"P2 custom controller buttons, same format as controller_p1. Empty uses the profile." },
@@ -463,6 +463,12 @@ static const struct config_setting config_settings[] =
 		"when there is nothing to act on)." },
 	{ "controls.flashlight", _config_string, "\"Q\"", "HALO_KEY_FLASHLIGHT", _environment_value, _platform_all,
 		"The flashlight." },
+	{ "controls.sprint", _config_string, "\"Left Shift\"", "HALO_KEY_SPRINT", _environment_value, _platform_all,
+		"Sprinting, held, in a gametype that gives it (OpenCE Options'\n"
+		"ABILITIES)." },
+	{ "controls.armor_lock", _config_string, "\"H\"", "HALO_KEY_ARMOR_LOCK", _environment_value, _platform_all,
+		"Armour lock, held, in a gametype that gives it (OpenCE Options'\n"
+		"ABILITIES)." },
 	{ "controls.scoreboard", _config_string, "\"Tab\"", "HALO_KEY_SCOREBOARD", _environment_value, _platform_all,
 		"Showing the scores (the controller's Back)." },
 	{ "controls.pause", _config_string, "\"Escape\"", "HALO_KEY_PAUSE", _environment_value, _platform_all,

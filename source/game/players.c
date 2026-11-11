@@ -239,6 +239,7 @@ symbols in this file:
 #include "devices/devices.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "bots.h" /* port: port/linux/game/bots.c */
+#include "abilities.h" /* port: port/linux/game/abilities.c */
 #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
 #include "effects/effects.h"
@@ -4981,7 +4982,13 @@ void players_update_before_game(
 				unit = unit_get(player->unit_index);
 				if (!players_globals->input_disabled)
 				{
+					/* port: sprint and armour lock (port/linux/game/abilities.c)
+					take what they block from the action, and their controls,
+					which never reach the unit */
+					boolean armor_locked;
+
 					network_player_log_idle_action(iterator.datum_index, action->control_flags);
+					armor_locked = abilities_player_action(iterator.datum_index, player->unit_index, action);
 					/* port: not for the keyboard's action key, which only acts
 					(units.h, UNIT_CONTROL_PORT_ACTION_ONLY_BIT) */
 					if (TEST_FLAG(action->control_flags, _unit_control_action_bit) &&
@@ -5035,6 +5042,10 @@ void players_update_before_game(
 						&action->desired_facing);
 					control_data.facing_vector =
 						control_data.looking_vector = control_data.aiming_vector;
+					/* port: (armour lock: the body keeps facing where it faced;
+					the player still looks around) */
+					if (armor_locked)
+						control_data.facing_vector = unit->unit.desired_facing_vector;
 					control_data.throttle.i = action->throttle.i;
 					control_data.throttle.j = action->throttle.j;
 					control_data.throttle.k = 0.f;

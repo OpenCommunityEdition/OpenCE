@@ -96,14 +96,18 @@ Xbox and CE retain their existing glyph renderers, sizes and anchoring.
 ## Persistence and lifecycle
 
 `input.controller_p1` through `input.controller_p4` default to empty strings.
-New custom layouts use `v3:` followed by 26 comma-separated entries in this order:
+New custom layouts use `v4:` followed by 28 comma-separated entries in this order:
 
 ```
 jump, grenade type, use/reload, weapon, melee, flashlight, grenade, fire, crouch,
 zoom, scoreboard, screenshot, forward, backward, left, right, all chat, team chat,
 vehicle chat, push to talk, camera faster, camera slower, camera/player switch,
-camera raise, camera lower, cycle camera
+camera raise, camera lower, cycle camera, sprint, armor lock
 ```
+
+Sprint and armor lock are gameplay actions (in the same group as flashlight and
+zoom), used only in a gametype that gives them (OpenCE Options' ABILITIES). They
+start unbound.
 
 Entries are physical tokens: `south,east,west,north,rb,lb,lt,rt,ls,rs,dpad_up,
 dpad_down,dpad_left,dpad_right,back`, or `unbound`. South means A on Xbox, Cross on
@@ -111,7 +115,8 @@ PlayStation and B on Switch. Tokens must be unique within gameplay/communication
 and separately within Debug; `unbound` may repeat. Unbound saves remain distinct
 from an empty setting (profile defaults).
 
-Old ten-action and 25-action `v2:` strings remain readable. The appended Cycle
+Old ten-action, 25-action `v2:` and 26-action `v3:` strings remain readable
+(`v3:` layouts get sprint and armor lock unbound). The appended Cycle
 Camera defaults to RB unless an old debug action already owns RB, in which case
 Cycle Camera starts unbound and can be assigned in the Debug group. Existing
 assignments are preserved. Ten-action strings' original actions take priority over
