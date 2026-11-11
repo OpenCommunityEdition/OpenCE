@@ -28,9 +28,9 @@ boolean third_person_muzzle_shot(long weapon_index, long unit_index, short trigg
 	union real_point3d *origin, union real_vector3d *forward);
 boolean third_person_projectile_repair(long object_index, union real_point3d const *known_good_point, long ignore_object_index);
 boolean third_person_muzzle_history(long unit_index, union real_point3d *position);
-/* Supply both rendered eye/aim for a smooth preview, or neither for stock timing. */
+/* Supply both rendered view/aim for a smooth preview, or neither for stock timing. */
 boolean third_person_muzzle_target(short local_player_index, union real_point3d *target,
-	union real_point3d const *view_eye, union real_vector3d const *view_aim);
+	struct observer_result const *view, union real_vector3d const *view_aim);
 void third_person_reticle_view(short local_player_index, struct observer_result const *view);
 boolean third_person_free_look_input(short local_player_index, real yaw, real pitch);
 void third_person_reset(void);

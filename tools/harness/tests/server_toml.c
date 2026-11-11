@@ -263,6 +263,16 @@ int main(int argc, char **argv)
 		CHECK(server_gametype_file_parse(text, 13, &file), "read past the length: %s", file.error);
 		return 0;
 	}
+	CASE("riding-key")
+	{
+		CHECK(parse("base = \"ctf\"\n[universal]\nvehicle_riding = true\n"), "vehicle_riding was refused: %s", file.error);
+		CHECK(rule_of("vehicle_riding") == 1, "vehicle_riding is %ld", rule_of("vehicle_riding"));
+		CHECK(refused("base = \"ctf\"\n[universal]\nriding = true\n", "no rule is named riding", 3),
+			"the alias was taken for the key: %s", file.error);
+		CHECK(refused("base = \"ctf\"\n[options]\nvehicle_riding = true\n",
+			"vehicle_riding goes in [universal], not [options]", 3), "riding in [options] was taken: %s", file.error);
+		return 0;
+	}
 	/* every rule of universal, options and each engine's table in one file:
 	at their least and their most */
 	CASE("every-rule")

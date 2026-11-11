@@ -85,8 +85,8 @@ dedicated MCC folder fields. Neither hook repurposes the Xbox/CE providers.
 ## Stock campaign and multiplayer flow
 
 The stock selector offers separate MCC singleplayer and multiplayer categories.
-Campaigns require `game.mcc_campaigns = true`. Package folders open into mission
-lists; Back leaves the difficulty step, then the package, then the selector.
+Campaigns require `game.mcc_campaigns = true` (the default). Package folders open
+into mission lists; Back leaves the difficulty step, then the package, then the selector.
 The host selects a mission and difficulty through the existing hosting flow.
 The MCC catalog owns these identities; no MCC mission becomes an Xbox level index.
 The same generated menu and callbacks run on native and browser builds.

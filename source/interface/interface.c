@@ -110,6 +110,7 @@ symbols in this file:
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 #include "stats_log.h" /* port: port/linux/game/stats_log.c */
 #include "frame_rate_display.h" /* port: port/linux/game/frame_rate_display.c */
+#include "touch_cinematic.h" /* port: port/linux/game/touch_cinematic.c */
 
 /* ---------- constants */
 
@@ -389,6 +390,9 @@ void interface_draw_fullscreen_overlays(
 	void)
 {
 	cinematic_render();
+	/* port: the touchscreen's skip button, in the letterbox's bar
+	(port/linux/game/touch_cinematic.c) */
+	touch_cinematic_draw();
 	interface_splitscreen_render();
 	hud_render_timer();
 	/* port: a map's download (port/linux/game/map_share.c) */

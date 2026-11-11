@@ -2,6 +2,8 @@
 #include "cseries.h"
 #include "third_person.h"
 #include "camera/director.h"
+#include "camera/observer.h"
+#include "mcc_projectiles.h"
 #include "game/game.h"
 #include "game/players.h"
 #include "units/units.h"
@@ -240,7 +242,7 @@ boolean third_person_muzzle_history(long unit_index, real_point3d *position)
 }
 
 boolean third_person_muzzle_target(short player, real_point3d *target,
-	real_point3d const *view_eye, real_vector3d const *view_aim)
+	struct observer_result const *view, real_vector3d const *view_aim)
 {
 	long unit_index, weapon_index;
 	short trigger_index = 0;
@@ -251,6 +253,7 @@ boolean third_person_muzzle_target(short player, real_point3d *target,
 	real_vector3d forward, right, up;
 	real velocity;
 	real_vector3d relative;
+	real_point3d const *view_eye = view ? &view->position : NULL;
 	unit_index = player_control_get_unit_index(player);
 	if (!muzzle_player(player, unit_index))
 		return FALSE;
@@ -258,6 +261,9 @@ boolean third_person_muzzle_target(short player, real_point3d *target,
 	trigger = muzzle_preview_weapon(unit, unit_index, &weapon_index, &trigger_index);
 	if (!trigger)
 		return FALSE;
+	/* MCC owns its camera-relative offsets and requested-aim semantics. */
+	if (mcc_projectile_preview(weapon_index, unit_index, trigger_index, view, &origin, &forward))
+		return muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target, view_eye);
 	if (!object_get_marker_by_name(weapon_index,
 		trigger_index ? "secondary trigger" : "primary trigger", &marker, 1))
 		return FALSE;

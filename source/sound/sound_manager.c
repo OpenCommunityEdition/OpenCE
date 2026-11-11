@@ -900,6 +900,7 @@ boolean sound_scripted_dialog_is_playing(
 void sound_initialize_for_new_map(
 	void)
 {
+	sound_listener_motion_reset(NONE); /* port: no motion from the previous map */
 	return;
 }
 
@@ -1647,6 +1648,7 @@ static long update_potentially_audible_looping_sound(
 			sound_definition_get(definition_index);
 		real maximum_distance =
 			sound_definition_get_maximum_distance(definition_index);
+		/* port: the looping sound keeps its obstruction result for the tick */
 		short listener_index = source_audible(
 			&looping_sound->source,
 			maximum_distance,
@@ -1659,7 +1661,7 @@ static long update_potentially_audible_looping_sound(
 			if (sound_index != NONE)
 			{
 				struct sound_datum *sound = sound_get(sound_index);
-				short placement;
+				short placement; /* port: where a co-op client starts the sound (coop_sound_sync.c) */
 
 				sound->listener_index = listener_index;
 				sound->definition_index = definition_index;
@@ -2591,6 +2593,7 @@ long sound_new_impulse(
 
 					if (sound_definition_is_playable(definition_index))
 					{
+						/* port: a new impulse has no datum to keep its obstruction result yet */
 						short listener_index = source_audible(
 							source,
 							maximum_distance,
@@ -2755,7 +2758,17 @@ boolean sound_refresh_looping(
 				0x30E,
 				loop->definition_index==definition_index);
 
-			loop->source = *source;
+			{
+				/* port: the owner's source leaves obstruction and occlusion unset
+				(source_audible works them out, and only in range), so a loop taking
+				the owner's would hand a voice fading out of range garbage gains */
+				real obstruction = new_looping_sound ? 0.f : loop->source.obstruction;
+				real occlusion = new_looping_sound ? 0.f : loop->source.occlusion;
+
+				loop->source = *source;
+				loop->source.obstruction = obstruction;
+				loop->source.occlusion = occlusion;
+			}
 			loop->flip_flop = sound_manager_globals.flip_flop;
 
 			if ((refresh_state == _looping_sound_refresh_stop ||
@@ -3406,8 +3419,8 @@ void sound_dispose_from_old_map(
 	return;
 }
 
-/* port: a sound's obstruction result for a tick, for its listener and
-position (source_audible) */
+/* port: a sound's obstruction result for a tick, for its listener
+(source_audible) */
 struct sound_obstruction_cache_entry
 {
 	boolean valid;
@@ -3416,7 +3429,6 @@ struct sound_obstruction_cache_entry
 	short local_player_index;
 	real obstruction;
 	real occlusion;
-	real_point3d position;
 };
 
 static struct sound_obstruction_cache_entry sound_obstruction_cache[MAXIMUM_SOUND_DATUMS];
@@ -3445,8 +3457,10 @@ static struct sound_obstruction_cache_entry *sound_obstruction_cache_entry(
 }
 
 /* port: the wall test is remembered for the sound for this tick. Another
-sound cannot take its slot. The position is part of the key, so a sound that
-moved is tested again. */
+sound cannot take its slot. The position is not part of the key: between
+ticks a sound on a moving object follows its object's interpolated pose
+(render_interpolation.c), which differs every frame. The tick's first test
+stands for the tick, as it does for a listener that moves. */
 static boolean sound_obstruction_cache_recall(
 	short kind,
 	long datum_index,
@@ -3461,10 +3475,7 @@ static boolean sound_obstruction_cache_recall(
 	if (!entry || !entry->valid ||
 		entry->datum_index != datum_index ||
 		entry->game_time != now ||
-		entry->local_player_index != local_player_index ||
-		entry->position.x != source->location.position.x ||
-		entry->position.y != source->location.position.y ||
-		entry->position.z != source->location.position.z)
+		entry->local_player_index != local_player_index)
 	{
 		return FALSE;
 	}
@@ -3490,7 +3501,6 @@ static void sound_obstruction_cache_store(
 	entry->datum_index = datum_index;
 	entry->game_time = game_time_get();
 	entry->local_player_index = local_player_index;
-	entry->position = source->location.position;
 	entry->obstruction = source->obstruction;
 	entry->occlusion = source->occlusion;
 }
@@ -3604,6 +3614,7 @@ static void refresh_sounds(
 
 		if (!stop_sound)
 		{
+			/* port: the sound keeps its obstruction result for the tick */
 			short listener_index = source_audible(
 				&sound->source,
 				sound_definition_get_maximum_distance(
@@ -4099,29 +4110,43 @@ were fixed to that unit (object_get_point_velocity), as the sounds on it are
 given theirs: the Doppler effect takes the velocities along the line from a
 sound to the camera, and two points on one turning body move alike along the
 line between them, so they cancel exactly, from a chase camera behind the
-vehicle too, and swinging that camera round adds nothing. Measured, a network client's corrections of a vehicle
-it rides jerked the focus and the vehicle's own engine with it, and a
-Warthog's turret swung the gunner round. Otherwise (a cinematic's camera, a
-flying one) measured from one game tick to the next. Not the camera's
-position: swinging a chase
-camera round a Warthog sweeps it through the air, and the engine rose and
-fell. The observer's own velocity is no use for this on the native ports:
+vehicle too, and swinging that camera round adds nothing. Measured, a
+network client's corrections of a vehicle it rides jerked the focus and the
+vehicle's own engine with it, and a Warthog's turret swung the gunner round.
+Otherwise (a cinematic's camera, a flying one) measured from one game tick
+to the next. Not the camera's position: swinging a chase camera round a
+Warthog sweeps it through the air, and the engine rose and fell. The
+observer's own velocity is no use for this on the native ports:
 the observer runs every frame (port/linux/game/render_interpolation.c) and
 divides a tick's motion by a frame's time, so riding a Pelican at 144 frames
 a second the camera claimed nearly five times its speed. It also reads zero
 while a cinematic's camera is forced along its track. Either way a sound
 moving with the camera seemed to come at it, and rose in pitch. A camera
 that jumps further in a tick than any vehicle moves (a cut, a teleport) has
-no velocity for that tick. */
+no velocity for that tick.
+
+Explicit cuts and lifecycle changes reset this history; the distance limit
+below is a fallback for other teleports. See docs/reading/audio_doppler.md. */
 #define LISTENER_SNAP_DISTANCE 10.f
 
 static struct
 {
 	boolean valid;
 	long game_time;
+	long player_index; /* port: a reused listener slot starts a fresh measurement */
 	real_point3d position;
 	real_vector3d velocity;
 } listener_motion[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+
+/* port: explicit cuts can be shorter than the displacement safety limit,
+and restored game ticks need not run backwards. */
+void sound_listener_motion_reset(short local_player_index)
+{
+	if (local_player_index == NONE)
+		memset(listener_motion, 0, sizeof(listener_motion));
+	else if (local_player_index >= 0 && local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		memset(&listener_motion[local_player_index], 0, sizeof(listener_motion[local_player_index]));
+}
 
 static void listener_measure_velocity(
 	short local_player_index,
@@ -4130,10 +4155,13 @@ static void listener_measure_velocity(
 {
 	long game_time = game_time_get();
 	long ticks = game_time - listener_motion[local_player_index].game_time;
+	long player_index = local_player_get_player_index(local_player_index); /* port: listener ownership */
 
-	if (!listener_motion[local_player_index].valid || ticks < 0)
+	if (!listener_motion[local_player_index].valid || ticks < 0 ||
+		listener_motion[local_player_index].player_index != player_index) /* port: listener ownership */
 	{
 		listener_motion[local_player_index].valid = TRUE;
+		listener_motion[local_player_index].player_index = player_index; /* port: listener ownership */
 		listener_motion[local_player_index].game_time = game_time;
 		listener_motion[local_player_index].position = *position;
 		listener_motion[local_player_index].velocity = *global_zero_vector3d;
@@ -4177,6 +4205,7 @@ static void refresh_listener(
 
 	if (!game_in_progress())
 	{
+		sound_listener_motion_reset(NONE); /* port: do not carry motion through a session gap */
 		return;
 	}
 

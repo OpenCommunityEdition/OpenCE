@@ -1048,7 +1048,7 @@ boolean network_game_client_switch_to_pregame(
 		network_connection_keep_alive(client->connection);
 		client->next_update_number = 0;
 		network_game_client_reset_settings_staging(); /* port: discard the previous host's partial record */
-	client->join_in_progress = TRUE;
+		client->join_in_progress = TRUE;
 		client->connection_silent = FALSE;
 		client->state = _network_game_client_state_pregame;
 		network_game_client_late_join_time = 0;

@@ -111,7 +111,7 @@ def test_shoulder_camera(tmp_path, fault):
     elif fault == "reticle_offset":
         code = code.replace("right.i * blended.j", "0")
     elif fault == "reticle_eye":
-        code = code.replace("reticle->eye = view->position;", "reticle->eye = eye;")
+        code = code.replace("reticle->view = *view;", "reticle->view.position = eye;")
     elif fault == "reticle_size":
         code = code.replace("state->size = reticle_size;", "state->size = 1.0f;")
     elif fault == "held_respawn":
@@ -176,7 +176,7 @@ static long held_weapon=2;
 static long unit_inventory_get_weapon(long u,int w){(void)u;(void)w;return held_weapon;}
 static real_point3d eye={0,0,0};
 static int muzzle_preview_succeeds, preview_calls, target_traces;
-static boolean third_person_muzzle_target(short p,real_point3d *t,real_point3d const *e,real_vector3d const *a){
+static boolean third_person_muzzle_target(short p,real_point3d *t,struct observer_result const *e,real_vector3d const *a){
  (void)e;(void)a;
  (void)p;preview_calls++;if(muzzle_preview_succeeds)*t=(real_point3d){10,0,0};return muzzle_preview_succeeds;
 }
@@ -458,7 +458,7 @@ int main(void){
   body.unit.aiming_vector=(real_vector3d){1,0,0};saved=body;
   third_person_reticle_view(0,&view);
   CHECK(reticles[0].view_valid&&fabsf(reticles[0].aim.i)<.0001f&&reticles[0].aim.j==1);
-  CHECK(reticles[0].eye.x==4&&reticles[0].eye.y==5&&reticles[0].eye.z==6);
+  CHECK(reticles[0].view.position.x==4&&reticles[0].view.position.y==5&&reticles[0].view.position.z==6);
   CHECK(memcmp(&saved,&body,sizeof(body))==0);
   tick++;tick_fraction=.5f;body.unit.aiming_vector=(real_vector3d){.8f,-.6f,0};
   third_person_reticle_view(0,&view);result=reticles[0].aim;
@@ -639,6 +639,12 @@ static real dot_product3d(real_vector3d const *a,real_vector3d const *b){return 
 static void unit_adjust_projectile_ray(long u,real_point3d *p,real_vector3d *v,real *speed,int adjust,int aim){(void)u;(void)aim;(void)v;*speed=0;if(adjust){p->y=0;p->z=0;}}
 struct object_marker {struct {real_point3d position;} matrix;};
 struct collision_result {real t;real_point3d point;};
+struct observer_result {real_point3d position;real_vector3d forward,up;};
+static int mcc_preview;
+static boolean mcc_projectile_preview(long w,long u,short t,struct observer_result const *v,real_point3d *p,real_vector3d *f){
+ (void)w;(void)u;(void)t;(void)v;if(!mcc_preview)return FALSE;
+ *p=(real_point3d){1,.5f,0};*f=(real_vector3d){1,0,0};return TRUE;
+}
 static struct unit_datum unit={{NONE,0},{0,{1,0,0}},0};
 static int connection,active=1,zoom=NONE,has_marker=1,blocked;
 static real target_distance=10, muzzle_side;
@@ -734,16 +740,20 @@ int main(void){
  connection=1;target=(real_point3d){10,0,0};third_person_muzzle_target(0,&target,NULL,NULL);CHECK(target.x==10);
  /* Smooth preview retains cover checks, but its rendered ray never changes simulation. */
  {
-  real_point3d rendered_eye={0,.25f,0},before_origin,after_origin;
+  struct observer_result rendered_view={{0,.25f,0},{1,0,0},{0,0,1}};
+  real_point3d before_origin,after_origin;
   real_vector3d rendered_aim={1,0,0},before_direction,after_direction;
   connection=0;origin=(real_point3d){1,0,0};forward=(real_vector3d){1,0,0};
   CHECK(third_person_muzzle_shot(2,1,0,&origin,&forward));before_origin=origin;before_direction=forward;
-  CHECK(third_person_muzzle_target(0,&target,&rendered_eye,&rendered_aim));CHECK(fabsf(target.y-.25f)<.0001f);
+  CHECK(third_person_muzzle_target(0,&target,&rendered_view,&rendered_aim));CHECK(fabsf(target.y-.25f)<.0001f);
   origin=(real_point3d){1,0,0};forward=(real_vector3d){1,0,0};
   CHECK(third_person_muzzle_shot(2,1,0,&origin,&forward));after_origin=origin;after_direction=forward;
   CHECK(memcmp(&before_origin,&after_origin,sizeof(origin))==0&&memcmp(&before_direction,&after_direction,sizeof(forward))==0);
-  scene=2;CHECK(third_person_muzzle_target(0,&target,&rendered_eye,&rendered_aim));CHECK(fabsf(target.x-.5f)<.0001f);
-  scene=0;connection=1;
+  scene=2;CHECK(third_person_muzzle_target(0,&target,&rendered_view,&rendered_aim));CHECK(fabsf(target.x-.5f)<.0001f);
+  scene=0;
+  mcc_preview=1;trigger_defs[0].first_person_weapon_offset.y=2;
+  CHECK(third_person_muzzle_target(0,&target,&rendered_view,&rendered_aim));CHECK(fabsf(target.y-.5f)<.0001f);
+  mcc_preview=0;trigger_defs[0].first_person_weapon_offset.y=0;connection=1;
  }
  /* Host-owned history follows the same eligibility, barrels and cover clamp. */
  unit.unit.control_flags=1u<<THIRD_PERSON_INPUT_BIT;unit.unit.current_zoom_level=NONE;

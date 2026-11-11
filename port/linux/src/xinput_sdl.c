@@ -44,6 +44,7 @@ drive the controller.
 /* port/linux/game/network_aim_assist.c */
 extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
+#include "keyboard_prompts.h"
 #include "controller_buttons.h"
 #include "controller_remap.h"
 
@@ -805,6 +806,22 @@ static void bindings_read(void)
 			text += length;
 		}
 	}
+}
+
+/* Prompt readers use the same parsed bindings and refresh generation as play.
+ * No parallel setting table: a rebind is visible on the next lookup. */
+int halo_keyboard_binding_label(int action, int slot, char *shown, unsigned int size)
+{
+	char name[64];
+	if (!shown || !size) return 0;
+	shown[0] = 0;
+	if (action < 0 || action >= NUMBER_OF_HALO_KEYBOARD_ACTIONS || slot < 0 || slot >= MAXIMUM_BINDINGS)
+		return 0;
+	bindings_read();
+	if (bindings[action][slot] < 0) return 0;
+	halo_input_name(bindings[action][slot], name, sizeof(name));
+	halo_input_shown_name(name, shown, size);
+	return shown[0] != 0;
 }
 
 static BOOL input_held(const struct platform_input_state *input, int code)
@@ -1671,6 +1688,8 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	int count;
 	XINPUT_GAMEPAD physical;
 	int captured;
+	unsigned long prompt_buttons;
+	int prompt_index;
 
 	memset(state, 0, sizeof(*state));
 	if (port < 0)
@@ -1687,6 +1706,14 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	/* Keep the opening chat press so even B can open it without immediately closing it. */
 	chat_pad_record((short)port, &physical);
 	chat_physical_pad[port] = chat_pad[port];
+	/* Observe physical input before keyboard/touch merging or remapping. */
+	prompt_buttons = physical.wButtons;
+	for (prompt_index = 0; prompt_index < 8; prompt_index++)
+		if (physical.bAnalogButtons[prompt_index] > 30) prompt_buttons |= 1UL << (16 + prompt_index);
+	keyboard_prompt_pad((short)port, prompt_buttons,
+		abs(physical.sThumbLX) > 12000 || abs(physical.sThumbLY) > 12000 ||
+		abs(physical.sThumbRX) > 12000 || abs(physical.sThumbRY) > 12000,
+		port_gamepad(gamepads, count, port) != NULL);
 	captured = controller_remap_input((short)port, &physical, port_gamepad(gamepads, count, port) != NULL);
 	if (port == 0)
 	{
@@ -1697,6 +1724,15 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 
 		platform_input_read(&input, TRUE);
 		keys_held_over_switch(&input);
+		if (input.focused)
+		{
+			unsigned int mouse = 0;
+			for (prompt_index = 0; prompt_index < PLATFORM_MOUSE_BUTTON_COUNT; prompt_index++)
+				if (input.mouse_buttons[prompt_index]) mouse |= 1U << prompt_index;
+			if (input.mouse_dx || input.mouse_dy || input.mouse_wheel) mouse |= 0x100;
+			keyboard_prompt_keys(input.keys, sizeof(input.keys), mouse);
+		}
+		/* Prompt ownership sees the wheel before the camera consumes it. */
 		camera_scroll_capture(&input);
 		mouse_poll(&input);
 		wheel_update();

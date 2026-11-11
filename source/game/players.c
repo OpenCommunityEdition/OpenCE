@@ -4767,6 +4767,7 @@ void player_add_equipment(
 				starting_profile->starting_shield_modifier;
 			unit->object.body_vitality +=
 				starting_profile->starting_health_modifier;
+			/* port: MCC's expanded grenade types of the starting profile */
 			mcc_player_profile_grenades(unit_index, starting_profile, reset_equipment);
 			unit = (struct unit_datum *)unit->unit.grenade_counts;
 			starting_profile =
@@ -4925,6 +4926,7 @@ void players_update_before_game(
 				(NONE == action->desired_weapon_index) ||
 				((action->desired_weapon_index >= 0) &&
 				(action->desired_weapon_index <= MAXIMUM_WEAPONS_PER_UNIT)));
+			/* port: MCC's grenade types go beyond the legacy table's */
 			if (!mcc_player_choice_supported(action->desired_grenade_index))
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\players.c",
@@ -5063,6 +5065,7 @@ void players_update_before_game(
 						(NONE == control_data.weapon_index) ||
 						((control_data.weapon_index >= 0) &&
 						(control_data.weapon_index <= MAXIMUM_WEAPONS_PER_UNIT)));
+					/* port: MCC's grenade types go beyond the legacy table's */
 					if (!mcc_player_choice_supported(control_data.grenade_index))
 					match_assert(
 						"c:\\halo\\SOURCE\\game\\players.c",

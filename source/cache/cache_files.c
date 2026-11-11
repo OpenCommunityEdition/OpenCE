@@ -136,7 +136,8 @@ symbols in this file:
 #include "sound/sound_manager.h"
 #include "tag_schema.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
-#include "mcc_cache.h" /* independent MCC dispatch */
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.c */
+#include "mcc_pause_runtime.h" /* port: port/linux/game/mcc_pause_runtime.c */
 #include "cache_file_formats.h" /* port: CUSTOM_EDITION_TAG_CACHE_BYTES */
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "mcc_share.h" /* port: port/linux/game/mcc_share.c */
@@ -384,6 +385,7 @@ boolean cache_file_tag_cache_contains(
 	void const *tag_cache = physical_memory_get_tag_cache_base_address();
 	unsigned long tag_cache_size = TAG_CACHE_SIZE;
 
+	/* port: an MCC map's tags are in a window of their own (mcc_cache.c) */
 	if (mcc_cache_tags_loaded())
 		return mcc_cache_contains(address, size);
 
@@ -623,10 +625,7 @@ void scenario_tags_unload(
 		mods_tags_unloaded();
 	}
 	/* port: MCC's appended pause table unwinds before the native menu table. */
-	{
-		extern void mcc_pause_runtime_unload(void);
-		mcc_pause_runtime_unload();
-	}
+	mcc_pause_runtime_unload();
 	/* port: the menus' tags go, and the map's own table comes back
 	(port/linux/game/menu_tags.c): after the texture cache, which writes to
 	the bitmaps it has loaded as it closes, theirs among them */
@@ -636,8 +635,7 @@ void scenario_tags_unload(
 		menu_tags_unloaded();
 	}
 	cache_file_close();
-	/* port: a Halo Custom Edition map has no Xbox vertex or index buffers
-	(port/linux/game/custom_edition_cache.c) */
+	/* port: an MCC map's tags and buffers are its own (mcc_cache.c) */
 	if (mcc_cache_tags_loaded())
 	{
 		mcc_cache_tags_unload();
@@ -646,6 +644,8 @@ void scenario_tags_unload(
 		global_tag_count = 0;
 		return;
 	}
+	/* port: a Halo Custom Edition map has no Xbox vertex or index buffers
+	(port/linux/game/custom_edition_cache.c) */
 	if (custom_edition_cache_tags_loaded())
 		custom_edition_cache_tags_unload();
 	else
@@ -1029,6 +1029,7 @@ boolean cache_files_map_plays_multiplayer(
 	build[0] = 0;
 	if (!map_name || !map_name[0])
 		return TRUE;
+	/* port: an MCC map's build is MCC's, not one to check (mcc_cache.c) */
 	if (mcc_level_name(map_name))
 		return TRUE;
 	/* port: a Halo Custom Edition map (custom_maps\<name>) is converted for
@@ -1099,6 +1100,7 @@ game's own maps, whose builds of other regions play together. */
 unsigned long cache_files_map_version(
 	char const *map_name)
 {
+	/* port: an MCC map's version is its checksum (mcc_cache.c) */
 	if (mcc_level_name(map_name))
 		return mcc_cache_checksum(map_name);
 	return custom_edition_level_name(map_name) ? custom_edition_map_version(map_name) : 0;
@@ -1254,6 +1256,8 @@ long scenario_tags_load(
 	cache_file_loaded_name[sizeof(cache_file_loaded_name) - 1] = 0;
 	texture_cache_open();
 	sound_cache_open();
+	/* port: an MCC map (mcc_maps\<name>) is read and converted by
+	port/linux/game/mcc_cache.c */
 	if (mcc_level_name(scenario_name))
 	{
 		cache_file_globals.tag_header = mcc_cache_tags_load(scenario_name, &cache_file_globals.header);
@@ -1265,13 +1269,10 @@ long scenario_tags_load(
 			global_tag_count = cache_file_globals.tag_header->tag_count;
 			cache_file_globals.tags_loaded = TRUE;
 			menu_tags_loaded(scenario_name);
+			if (!mcc_pause_runtime_load())
 			{
-				extern boolean mcc_pause_runtime_load(void);
-				if (!mcc_pause_runtime_load())
-				{
-					scenario_tags_unload();
-					return NONE;
-				}
+				scenario_tags_unload();
+				return NONE;
 			}
 			/* port: clear prior mods; MCC resources remain authored. */
 			mods_tags_loaded(scenario_name);
@@ -1281,9 +1282,6 @@ long scenario_tags_load(
 		{
 			sound_cache_close();
 			texture_cache_close();
-			/* port: shield sprite assets unwind before other appended tag tables. */
-			{
-			}
 		}
 		return result;
 	}
@@ -1466,6 +1464,7 @@ boolean scenario_structure_bsp_load(
 	/* port: the bsp's header, once read and checked */
 	struct cache_file_structure_bsp_header *structure_bsp_header;
 
+	/* port: an MCC map's bsp is read and converted by mcc_cache.c */
 	if (mcc_cache_tags_loaded())
 	{
 		void *mcc_header, *mcc_structure;
@@ -1615,6 +1614,7 @@ void scenario_structure_bsp_unload(
 {
 	struct cache_file_tag_instance *tag_instance;
 
+	/* port: an MCC map's bsp (mcc_cache.c) */
 	if (mcc_cache_tags_loaded())
 	{
 		mcc_cache_bsp_unload();

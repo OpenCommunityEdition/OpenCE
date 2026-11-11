@@ -85,12 +85,12 @@ Clients do not submit camera or muzzle coordinates through this feature.
 
 ## Network and lifecycle
 
-This is an integrated OpenCE feature on network version 42, without a
+This is an integrated OpenCE feature on network version 44, without a
 crossplay selector or separate camera capability negotiation. The shared
 relay carries the resolved shoulder bit and the host's game settings carry
 camera policy. See [NETCODE.md](../../port/linux/NETCODE.md#opence-network-agreement)
 for the wire contract. Pre-feature testing builds do not implement the new
-relay despite also using version 42.
+relay. Version 44 distinguishes this integrated format from earlier builds.
 
 Only the host sets policy, during pregame. Invalid values and unknown settings
 bits are rejected. Forced Off clears shoulder input before simulation. The
@@ -150,8 +150,12 @@ the same rendered observer as the camera, including Instant Aim where enabled,
 before shake, free look and shoulder displacement. It expresses the unit's
 actual aim relative to its desired aim, interpolates that relative offset using
 the renderer's tick fraction, and reconstructs the preview direction in the
-rendered view. This preserves a real aiming offset instead of assuming that
-all weapons point along the camera's forward axis.
+rendered view. This preserves a real aiming offset for the inherited firing
+path instead of assuming every weapon follows camera forward. MCC camera-relative
+triggers instead use `mcc_projectile_preview` in
+[mcc_projectiles.c](../../port/linux/game/mcc_projectiles.c), matching their
+requested-camera aim and authored offsets. Its rendered-view override is
+read-only; the simulation entry point cannot receive it.
 
 The preview supplies the rendered eye and direction to the existing muzzle
 solver. Rendered markers, authored trigger offsets, near-cover checks and the
@@ -163,8 +167,9 @@ these display values back into a unit, player controls or projectile.
 There is no additional screen-position easing: the current preview target is
 projected every frame, including target-depth changes and nearby cover. The
 ordinary renderer's interpolation still has its existing latency. A reticle
-remains a nominal aiming guide, not a prediction of spread, gravity, aim
-assistance or the next simulation tick's exact impact.
+remains a nominal aiming guide, not a prediction of spread, gravity or the
+next simulation tick's exact impact. MCC previews retain their authored
+aim-assistance query without recording simulation state.
 
 The small interpolation hook is necessary to obtain the actual view chosen by
 Smooth Motion and Instant Aim before camera effects. The `hud_draw_bitmap_internal`
@@ -174,8 +179,9 @@ integer points. `third_person_reticle_vertex` applies fractional displacement
 and scales the artwork and its authored component offsets about the projected
 aim point. With Smooth Crosshair disabled and size at 100%, the original
 placement remains unchanged. With size alone at 80%, the original preview
-timing remains, while its artwork and spacing shrink around that target. Feature state stays in the
-shoulder module; no map loader or MCC adapter changes are needed.
+timing remains, while its artwork and spacing shrink around that target.
+Feature state stays in the shoulder module; MCC ray semantics remain in the
+MCC-owned adapter. No map-loader changes are needed.
 
 Relative-aim history belongs to each local viewport. Settings changes,
 map/checkpoint reset, loss of eligible shoulder view, unit/weapon changes,

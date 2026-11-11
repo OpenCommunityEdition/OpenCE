@@ -337,13 +337,9 @@ static boolean bitmap_format_drawable(
 	}
 }
 
-/* Whether the texture cache can draw `bitmap` from pixels laid out as its
-tag lays them out, as rasterizer_xbox_bitmap_rebuild_hardware_format and
-the texture cache assume without checking: the game's own bitmap_verify, a
-format with a hardware texture, a compressed flag that says whether the
-format is compressed, power-of-two dimensions for the swizzle (or else a
-linear 2D bitmap), square cube maps, and every pixel its levels need. */
-boolean custom_edition_bitmap_drawable(
+/* what every bitmap must satisfy for the texture cache to read it at all
+(see below): everything but the swizzle's requirement on its sides */
+static boolean bitmap_readable(
 	struct bitmap_data *bitmap)
 {
 	boolean linear = TEST_FLAG(bitmap->flags, _bitmap_linear_bit);
@@ -352,11 +348,28 @@ boolean custom_edition_bitmap_drawable(
 	return bitmap_verify(bitmap, FALSE) &&
 		bitmap_format_drawable(bitmap->format, linear) &&
 		(TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) != 0) == compressed_format &&
-		(linear ?
-			bitmap->type == _bitmap_type_2d :
-			power_of_two(bitmap->width) && power_of_two(bitmap->height) && power_of_two(bitmap->depth)) &&
 		(bitmap->type != _bitmap_type_cube_map || bitmap->width == bitmap->height) &&
 		bitmap->pixels_size >= bitmap_get_pixel_data_size(bitmap);
+}
+
+/* whether the swizzle of rasterizer_xbox_bitmap_rebuild_hardware_format can
+be done on the bitmap's pixels: power-of-two sides, or else a linear 2D one */
+static boolean bitmap_swizzle_possible(
+	struct bitmap_data *bitmap)
+{
+	return TEST_FLAG(bitmap->flags, _bitmap_linear_bit) ?
+		bitmap->type == _bitmap_type_2d :
+		power_of_two(bitmap->width) && power_of_two(bitmap->height) && power_of_two(bitmap->depth);
+}
+
+/* Whether the texture cache can draw `bitmap` after the swizzle: what
+bitmap_readable checks, and bitmap_swizzle_possible. One that is readable
+and not swizzle-able (Halo PC draws bitmaps of any sides, its HUD's among
+them) is drawn from its pixels as the tag lays them out. */
+boolean custom_edition_bitmap_drawable(
+	struct bitmap_data *bitmap)
+{
+	return bitmap_readable(bitmap) && bitmap_swizzle_possible(bitmap);
 }
 
 /* where bitmap `bitmap_index` of the tag `handle` names is in the list of
@@ -750,6 +763,7 @@ boolean custom_edition_bitmaps_verify(
 	struct bitmap_group *group;
 	int32_t tag_index = NONE;
 	long bitmap_count = 0;
+	long unswizzled_count = 0;
 
 	while ((group = custom_edition_cache_tag_next(tag_cache, loaded_bytes, BITMAP_GROUP_TAG, sizeof(*group), &tag_index)) != NULL)
 	{
@@ -759,11 +773,11 @@ boolean custom_edition_bitmaps_verify(
 		{
 			struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, bitmap_index, struct bitmap_data);
 
-			if (!custom_edition_bitmap_drawable(bitmap))
+			if (!bitmap_readable(bitmap))
 			{
 				error(
 					_error_silent,
-					"custom edition: bitmap %ld of '%s' (type %d, format %d, %dx%dx%d, flags 0x%X) cannot be drawn by this build",
+					"custom edition: bitmap %ld of '%s' (type %d, format %d, %dx%dx%d, flags 0x%X) cannot be read by this build",
 					bitmap_index,
 					custom_edition_cache_tag_name(tag_cache, loaded_bytes, tag_index),
 					bitmap->type,
@@ -774,8 +788,30 @@ boolean custom_edition_bitmaps_verify(
 					bitmap->flags);
 				return FALSE;
 			}
+			if (!bitmap_swizzle_possible(bitmap))
+			{
+				/* port: sides only Halo PC draws are not a reason to refuse a map */
+				if (unswizzled_count++ < 16)
+				{
+					error(
+						_error_silent,
+						"custom edition: bitmap %ld of '%s' (type %d, format %d, %dx%dx%d, flags 0x%X) is drawn from its pixels as the tag stores them",
+						bitmap_index,
+						custom_edition_cache_tag_name(tag_cache, loaded_bytes, tag_index),
+						bitmap->type,
+						bitmap->format,
+						bitmap->width,
+						bitmap->height,
+						bitmap->depth,
+						bitmap->flags);
+				}
+			}
 			bitmap_count++;
 		}
+	}
+	if (unswizzled_count)
+	{
+		error(_error_silent, "custom edition: %ld bitmaps are drawn from their pixels as the tag stores them", unswizzled_count);
 	}
 	error(
 		_error_silent,
@@ -881,7 +917,8 @@ void custom_edition_bitmap_pixels_arrived(
 					custom_edition_bitmaps_globals.reordered_bitmaps[reordered_index].channel_order :
 					_custom_edition_channels_xbox);
 			/* on failure it logs, and the texture shows the pixels as read */
-			rasterizer_xbox_bitmap_rebuild_hardware_format(bitmap);
+			if (custom_edition_bitmap_drawable(bitmap))
+				rasterizer_xbox_bitmap_rebuild_hardware_format(bitmap);
 			return;
 		}
 	}

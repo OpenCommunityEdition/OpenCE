@@ -2235,8 +2235,8 @@ static boolean hs_parse_primitive(
 	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	boolean result = FALSE;
 
+	/* port: an MCC map's AI encounters and squads (mcc_scripts.c) */
 	{
-
 		int mcc_result = mcc_script_parse_ai(expression,
 			hs_compile_globals.compiled_source);
 		if (mcc_result >= 0)
@@ -2544,8 +2544,9 @@ boolean hs_compile_postprocess(
 		expression_index = data_next_index(hs_syntax_data, expression_index))
 	{
 		struct hs_syntax_node *expression = hs_syntax_get(expression_index);
-		{
 
+		/* port: an MCC script's parameters (mcc_script_parameters.c) */
+		{
 			int mcc_parameter = mcc_parameter_compile(expression);
 			if (mcc_parameter >= 0)
 			{

@@ -237,3 +237,24 @@ def test_render_fov_follows_resolved_camera():
     camera = function(main, "set_window_camera_values")
     assert camera.index("third_person_camera(") < camera.index("render_fov_vertical(")
     assert camera.count("render_fov_vertical(") == 1
+
+def test_camera_scroll_preserves_keyboard_prompt_activity(tmp_path):
+    source = (ROOT / "port/linux/src/xinput_sdl.c").read_text()
+    start = source.index("\t\tplatform_input_read(&input, TRUE);")
+    end = source.index("\n\t\twheel_update();", start)
+    run_c(tmp_path, r'''
+#include <assert.h>
+#include <string.h>
+#define TRUE 1
+#define PLATFORM_MOUSE_BUTTON_COUNT 3
+struct platform_input_state {int focused;unsigned char keys[2],mouse_buttons[3];float mouse_dx,mouse_dy,mouse_wheel;};
+static int activity,captured;
+static void platform_input_read(struct platform_input_state *s,int consume){memset(s,0,sizeof(*s));s->focused=1;s->mouse_wheel=1;(void)consume;}
+static void keys_held_over_switch(struct platform_input_state *s){(void)s;}
+static void keyboard_prompt_keys(unsigned char const *k,unsigned int n,int m){(void)k;(void)n;activity=m;}
+static void camera_scroll_capture(struct platform_input_state *s){assert(activity&0x100);s->mouse_wheel=0;captured++;}
+static void mouse_poll(struct platform_input_state *s){assert(captured==1&&s->mouse_wheel==0);}
+int main(void){struct platform_input_state input;int prompt_index;
+''' + source[start:end] + r'''
+assert(activity&0x100);return 0;}
+''')

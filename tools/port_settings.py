@@ -110,6 +110,8 @@ SCREENS = {
              "Draw the HUD from the high-res redraws; off\ndraws the game's own pictures.", None),
             ("HIGH-RES TEXT:", "display.high_res_text", ON_OFF,
              "Draw text and titles with high-res fonts; off\ndraws the game's own.", None),
+            ("WIDESCREEN LOADING:", "display.widescreen_loading", ON_OFF,
+             "Widen the original loading screen, keeping its\nstock sweep and glow trails.", None),
             ("ANTI-ALIASING:", "display.anti_aliasing",
              [("OFF", "off"), ("FXAA", "fxaa"), ("SMAA", "smaa"), ("SSAA 2X", "ssaa2x"), ("MSAA 2X", "msaa2x"),
               ("MSAA 4X", "msaa4x"), ("MSAA 8X", "msaa8x")],
@@ -252,23 +254,29 @@ SCREENS = {
         "categories": [("BUTTON REMAPPING", "controller_remapping",
                         "Custom button layouts for P1-P4.\nUse / Reload stays combined."),
                        ("BUTTON APPEARANCE", "controller_appearance",
-                        "Controller artwork and bumper style.\nRequires High-Res HUD in Graphics.")],
+                        "Keyboard/controller glyphs and PC-menu legends.\nGameplay controller art needs High-Res HUD.")],
     },
     "controller_appearance": {
         "screen": "controller_appearance_screen", "spacing": 30,
         "header": ("header_profile_controller_setting", f"{PE}/controller_edit/header_profile_controller_setting"),
-        "same_place": ["hud_button_style_xbox", "hud_button_style_ps", "hud_button_style_switch"],
+        "same_place": ["hud_button_style_xbox", "hud_button_style_ps", "hud_button_style_switch", "detected_button_style"],
         "rows": [
+            ("MENU GLYPHS:", "display.menu_button_glyphs", ON_OFF,
+             "Use the selected keyboard/controller style in\nexisting PC-menu face-button legends.", None),
+            ("KEYBOARD GLYPHS:", "display.keyboard_glyphs", ON_OFF,
+             "Opt in to automatic keyboard/mouse keycaps.\nRequires Auto Button Detection.", None),
             ("AUTO BUTTON DETECTION:", "input.auto_button_detection", ON_OFF,
-             "Show styles for your controller's family.\nRequires High-Res HUD in Graphics.", None),
-            ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES,
-             "Manual gameplay button artwork, kept when auto\ndetection is on. Requires High-Res HUD.", None),
+             "Detect controller artwork and, with Keyboard\nGlyphs enabled, follow keyboard/mouse activity.", None),
+            ("BUTTON STYLE:", "display.hud_button_style", XBOX_BUTTON_STYLES + PS_BUTTON_STYLES + SWITCH_BUTTON_STYLES + [("KEYBOARD", "keyboard")],
+             "Manual style when auto detection is off. Keyboard\nuses current bindings; controllers need High-Res HUD.", None),
             ("BUTTON STYLE:", "display.hud_button_style_xbox", XBOX_BUTTON_STYLES,
              "Preferred Xbox artwork for automatic detection.\nRequires High-Res HUD in Graphics.", None),
             ("BUTTON STYLE:", "display.hud_button_style_ps", PS_BUTTON_STYLES,
              "Preferred PlayStation artwork for auto detection.\nRequires High-Res HUD in Graphics.", None),
             ("BUTTON STYLE:", "display.hud_button_style_switch", SWITCH_BUTTON_STYLES,
              "Preferred Switch artwork for automatic detection.\nRequires High-Res HUD in Graphics.", None),
+            ("BUTTON STYLE:", "display.detected_button_style", None,
+             "Keyboard/mouse is active. Prompts use your current\nbindings. Turn detection off to choose a fixed style.", None),
             ("BUMPER STYLE:", "display.hud_bumper_style",
              [("ORIGINAL XBOX", "original"), ("MODERN XBOX", "modern")],
              "Original: black/white buttons. Modern: LB/RB.\nKept when automatic detection is on.", None),
@@ -308,7 +316,7 @@ SCREENS["gamepad_setup/dead_zones"] = {
 # Video Setup's categories open ordinary settings screens. Each has the same
 # pending edits, Defaults, OK and Cancel as the other settings screens.
 _video = SCREENS["video_settings"]
-_graphics = {"display.show_fps", "display.high_res_hud",
+_graphics = {"display.widescreen_loading", "display.show_fps", "display.high_res_hud",
              "display.high_res_text", "display.anti_aliasing",
              "display.anisotropic_filtering", "display.shadow_resolution", "display.per_pixel_lighting",
              "display.model_detail"}
@@ -405,17 +413,22 @@ SCREENS["video_settings/shoulder_camera"] = {
          "Hold Caps Lock + wheel to move left or right.\nDefault 0.24 world units to the right.", None),
     ],
 }
-# Audio Setup's sound processing (port/linux/src/dsound_sdl.c): the reverb
-# and the resampler, a screen of their own (a category, as Video Setup's);
+
+# Audio Setup's sound processing (port/linux/src/dsound_sdl.c): reverb,
+# HRTF and the resampler, a screen of their own (a category, as Video Setup's);
 # the devices and the volumes stay on Audio Setup
 _audio = SCREENS["audio_settings"]
 _processing = {"audio.reverb"}
 SCREENS["audio_settings/sound_processing"] = {
     "screen": "sound_processing_settings_screen", "header": _audio["header"], "spacing": 30,
     "rows": [row for row in _audio["rows"] if row[1] in _processing] + [
-        ("RESAMPLER:", "audio.resampler", [("SINC", "sinc"), ("LINEAR", "linear")],
-         "How sounds are converted to the output's rate:\nsinc is clean; linear is brighter, with aliasing.",
+        ("3D HRTF:", "audio.hrtf", ON_OFF,
+         "Xbox-style directional sound for headphones\nand speakers. On by default.", None),
+        ("RESAMPLER:", "audio.resampler", [("XBOX", "xbox"), ("SINC", "sinc"), ("LINEAR", "linear")],
+         "Xbox models the original sound. Sinc reduces\naliasing; linear gives a brighter sound.",
          None),
+        ("STEREO DOPPLER:", "audio.stereo_doppler", ON_OFF,
+         "Shift stereo sounds' pitch as they come and go,\nas 3D sounds' is. The Xbox played them flat.", None),
     ],
 }
 _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
@@ -424,7 +437,7 @@ _audio["rows"] = [row for row in _audio["rows"] if row[1] not in _processing]
 # HUD's, on Network Setup)
 _audio["categories"] = [
     ("SOUND PROCESSING:", "audio_settings/sound_processing",
-     "The reverb, and how sounds are converted to the\noutput's rate."),
+     "Directional sound, reverb and how sounds are\nconverted to the output's rate."),
 ]
 
 # Network Setup's map sharing (port/linux/game/map_share.c): this machine's
@@ -769,6 +782,7 @@ def _setting_screen(folder: str, spec: dict) -> list:
                               ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
             extra += _widget(f"{base}/{key}_value",
                              [("type", "text"), ("controller", 1), ("width", value_width), ("height", 22),
+                              ("text", "KEYBOARD" if key == "detected_button_style" else None),
                               ("font", "ui\\small_ui" if wide_value else "ui\\large_ui"), ("color", "#FF2896FF"),
                               ("align", "left" if wide_value else "center"), ("text_y", 5 if wide_value else 1),
                               ("text_flags", "no_focus_test")], [])
@@ -983,6 +997,7 @@ PLAYER_OPTIONS_ROWS = ['number_of_lives', 'maximum_health', 'shields', 'respawn_
 # GUN TURRETS and CUSTOM (menu_functions.c's VEHICLE_PRESET_PC), and its help
 # among the sets' (its rows' values' in turn: gametype_option_help)
 VEHICLE_EDIT = "main_menu/settings_select/multiplayer_setup/vehicle_options_edit"
+VEHICLE_RIDING_HELP = "Players standing on a vehicle are carried by it.\\nOff: as the original game, riders slide off."
 AIM_ASSIST_HELP = [
     "Players keep their current mouse aim assist setting.",
     "Disable mouse aim assist for mouse/keyboard players.\\nController and touch aim assist are unchanged.",
@@ -1056,9 +1071,10 @@ STRING_INSERTS = {
     f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in TEAMPLAY_EXTRA_ROWS for text in helps])],
     f"{SLAYER_EDIT}/var_kills_to_win": [(5, ["75", "100", "150", "200", "250", "500"])],
     f"{VEHICLE_EDIT}/var_vehicle_set": [(8, ["PC"])],
+    f"{VEHICLE_EDIT}/vehicle_options_labels": [(9, ["VEHICLE RIDING:"])],
     f"{VEHICLE_EDIT}/cap_vehicle_options": [(17, [
         "Every vehicle the map places will spawn, as in\\nHalo PC.",
-    ])],
+    ]), (7, [VEHICLE_RIDING_HELP] * 2)],
     f"{SLAYER_EDIT}/cap_slayer": [(11, [
         "Seventy-five kills to win. Settle in for a long\\nfight.",
         "A hundred kills to win. Made for big games.",
@@ -1160,6 +1176,9 @@ MAP_KIND_CHOOSER = "main_menu/new_select/list_item_0_map_kind"
 # changes to the PC version's widgets (by our names): attributes set, all
 # their handlers replaced, children added, game data inputs added
 WIDGET_PATCHES = {
+    f"{VEHICLE_EDIT}/vehicle_options_menu": {"insert_before": {
+        f"{VEHICLE_EDIT}/op_team": [
+            f'<child widget="{VEHICLE_EDIT}/op_vehicle_riding" x="54" y="100"/>']}},
     # (the main menu's MODS, before Quit: _mods)
     "main_menu/main_menu_select_list": {"insert_before": {"main_menu/main_menu_item_quit_game": [
         f'<child widget="main_menu/main_menu_item_mods" x="{MODS_ITEM_PLACE[0]}" y="{MODS_ITEM_PLACE[1]}"/>']}},
@@ -1830,6 +1849,7 @@ COOP_SETUP_SCREENS = [
             "Revert the checkpoint after everyone dies. A changed\\nteam or missing save uses respawn only.",
             "Respawn at checkpoint positions after everyone dies.\\nThe world keeps its progress.",
         ]),
+        ("coop_vehicle_riding", "VEHICLE RIDING:", ["ON", "OFF"], [VEHICLE_RIDING_HELP] * 2),
     ]),
     ("voice_options", "VOICE AND VOTING", "Voice chat, text chat and votes to kick a player,\\nfor this game.",
      TEAMPLAY_ROWS),
@@ -1875,8 +1895,8 @@ def _setup_option_screen(base: str, key: str, rows: list, fit: bool = False) -> 
                                            ("font", "ui\\large_ui"), ("color", "#FFFFFFFF")], [])
     children = ['<data input="game settings lists text update"/>',
                 '<on event="created" run="port setup options init"/>']
-    # (30 apart; with fit, closer for more rows than eight, the last 28 tall
-    # clear of the help at 341: Server Setup's, whose rows are all shown, as
+    # (30 apart; with fit, closer for more rows than eight, the last clear of the help at 341
+    # and the rows no taller than their spacing: Server Setup's, whose rows are all shown, as
     # OpenCE Options' are not)
     places = len([row_key for row_key, *_ in rows if row_key not in SETUP_OPTION_SAME_PLACE])
     spacing = min(30, (341 - 1 - 73 - 28) // max(1, places - 1)) if fit else 30
@@ -1896,7 +1916,7 @@ def _setup_option_screen(base: str, key: str, rows: list, fit: bool = False) -> 
     lines += _button(f"{base}/{key}_button_ok", 1, ['<on event="a" run="port setup options save" back="true"/>',
                                                      '<on event="start" run="port setup options save" back="true"/>'])
     for index, (row_key, label, strings, _) in enumerate(rows):
-        lines += _widget(f"{base}/op_{row_key}", [("width", 512), ("height", 28),
+        lines += _widget(f"{base}/op_{row_key}", [("width", 512), ("height", min(28, spacing)),
                                                  ("flags", "pass_unhandled_to_focused_child"),
                                                  ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
                          [f'<child widget="{base}/{row_key}_label"/>',
@@ -2310,6 +2330,30 @@ def _item_options_extras() -> list:
     return lines
 
 
+def _vehicle_options_extras() -> list:
+    """the gametype's riding rule, a row of the vehicle options"""
+    base = VEHICLE_EDIT
+    lines = []
+    key, label_index, words = "vehicle_riding", 9, ["ON", "OFF"]
+    lines += _widget(f"{base}/op_{key}", [("width", 512), ("height", 28),
+        ("flags", "pass_unhandled_to_focused_child"), ("bitmap", "bitmaps/option_bkds"),
+        ("color", "#FF2896FF")], [f'<child widget="{base}/{key}_label"/>',
+        f'<child widget="{base}/{key}_spinner" x="286" y="1"/>'])
+    lines += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1),
+        ("width", 280), ("height", 22), ("string_list", f"{base}/vehicle_options_labels"),
+        ("string_index", label_index), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
+        ("text_x", 13), ("text_y", 4)], [])
+    lines += _widget(f"{base}/{key}_spinner", [("type", "spinner"), ("top", 2),
+        ("width", 206), ("height", 20), ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+        ("string_list", f"{base}/var_{key}"), ("font", "ui\\large_ui"),
+        ("color", "#FF2896FF"), ("align", "center"), ("text_y", 4),
+        ("list_flags", "items_from_strings"), ("header_bitmap", "bitmaps/arrow_sm_left"),
+        ("footer_bitmap", "bitmaps/arrow_sm_right"), ("header_bounds", "7 -13 19 -7"),
+        ("footer_bounds", "7 208 19 214")], ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    lines += _strings(f"{base}/var_{key}", words)
+    return lines
+
+
 def _player_options_extras() -> list:
     """The host's aim-assist policy and shield effects, hidden while editing
     saved gametypes."""
@@ -2429,6 +2473,7 @@ def multiplayer_files() -> dict:
         "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
         PLAYER_EDIT.replace("/", ".") + ".port.xml": head + _player_options_extras() + ["</menus>", ""],
+        VEHICLE_EDIT.replace("/", ".") + ".port.xml": head + _vehicle_options_extras() + ["</menus>", ""],
         TEAMPLAY_EDIT.replace("/", ".") + ".port.xml": head + _teamplay_options_extras() + ["</menus>", ""],
         OPENCE_EDIT.replace("/", ".") + ".port.xml": head + _opence_options() + ["</menus>", ""],
         MODS.replace("/", ".") + ".xml": [head[0], "<!-- The port's Mods screen, in the PC version's style "

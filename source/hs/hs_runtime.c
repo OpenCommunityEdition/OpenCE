@@ -488,6 +488,7 @@ static long hs_object_to_object_list(
 static boolean hs_object_type_can_cast(
 	short actual_type,
 	short desired_type);
+/* port: an object, unit or list a value names that no longer exists */
 static long hs_value_still_exists(
 	short type,
 	long value);
@@ -976,6 +977,41 @@ boolean hs_runtime_waiting_on_call(
 	return !TEST_FLAG(caller->flags, _hs_syntax_node_script_bit) && caller->function_index == _hs_function_sleep_until;
 }
 
+/* port: the map's riding call counts only from a startup script (vehicle_riding.c) */
+short hs_runtime_port_executing_script_type(
+	void)
+{
+	struct hs_thread_datum *thread;
+	struct hs_script *script;
+
+	if (!hs_runtime_globals.initialized || hs_runtime_globals.executing_thread_index==NONE)
+		return NONE;
+	thread = hs_thread_get(hs_runtime_globals.executing_thread_index);
+	if (thread->type!=_hs_thread_type_script)
+		return NONE;
+	script = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->hs_scripts,
+		thread->script_index,
+		struct hs_script);
+
+	return script->script_type;
+}
+
+/* port: a disabled initializer holds its type's default, not the map's word */
+short hs_runtime_port_scenario_boolean(
+	char const *name)
+{
+	short designator;
+
+	designator = hs_find_global_by_name(name);
+	if (designator==NONE || ((word)designator & 0x8000) ||
+		hs_global_get_type(designator)!=_hs_type_boolean || hs_scenario_global_initializer_disabled(designator))
+		return NONE;
+
+	/* (a boolean is its low byte, as the engine reads it: the global's value is a whole long) */
+	return (boolean)hs_global_evaluate(designator)!=FALSE;
+}
+
 char const *hs_runtime_get_executing_thread_name(
 	void)
 {
@@ -1370,6 +1406,7 @@ static long hs_thread_new(
 static void hs_thread_delete(
 	long thread_index)
 {
+	/* port: an MCC thread's own storage (mcc_script_threads.inl) */
 	mcc_hs_release_thread(thread_index);
 	match_assert("c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x290,
 		hs_thread_get(thread_index)->type!=_hs_thread_type_script);
@@ -2212,6 +2249,8 @@ void hs_evaluate_set(
 		NULL;
 	short type;
 	long global_index;
+
+	/* port: a set of an MCC script's parameter (mcc_script_runtime.inl) */
 	if (mcc_hs_parameter_set(thread_index, variable, initialize))
 		return;
 
@@ -2521,11 +2560,12 @@ void hs_evaluate_debug_string(
 
 	if (*expression_index!=NONE && *argument_count<MAXIMUM_HS_DEBUG_STRING_ARGUMENTS)
 	{
-		long argument;
-
-		hs_evaluate(thread_index, *expression_index, &argument);
+		/* port: BUG (original): the argument was evaluated into a local of
+		this function, which a call's result reaches only after it has
+		returned. It goes to its place on the thread's stack instead (a
+		pointer is a long on every port), where a checkpoint can keep it */
+		hs_evaluate(thread_index, *expression_index, (long *)&arguments[*argument_count]);
 		*expression_index = hs_syntax_get(*expression_index)->next_node_index;
-		arguments[*argument_count] = (char const *)argument;
 		*argument_count += 1;
 	}
 	else
@@ -2781,11 +2821,9 @@ static void hs_thread_main(
 		index_count = TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) ?
 			global_scenario_get()->hs_scripts.count :
 			hs_function_table_count;
-		{
-
-			if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) && mcc_script_function(expression->index))
-				index_count = expression->index + 1;
-		}
+		/* port: MCC's additional functions are past the table's (mcc_scripts.c) */
+		if (!TEST_FLAG(expression->flags, _hs_syntax_node_script_bit) && mcc_script_function(expression->index))
+			index_count = expression->index + 1;
 		if (expression->index<0 || expression->index>=index_count)
 		{
 			hs_syntax_error(thread_index);
@@ -2813,6 +2851,7 @@ static void hs_thread_main(
 		frames are let go, and a script's thread doesn't run again */
 		if (TEST_FLAG(thread->flags, _hs_thread_stack_overflow_bit))
 		{
+			/* port: an MCC thread's own storage (mcc_script_threads.inl) */
 			mcc_hs_release_thread(thread_index);
 			thread->stack = (struct hs_stack_frame *)thread->stack_data;
 			thread->flags = 0;
@@ -2846,14 +2885,19 @@ static void hs_script_evaluate(
 	long thread_index,
 	boolean initialize)
 {
+	struct hs_script *script;
+	struct hs_thread_datum *thread;
+	long *result;
+
+	/* port: an MCC map's scripts with parameters (mcc_script_runtime.inl) */
 	if (mcc_hs_script_evaluate(script_index, thread_index, initialize))
 		return;
-	struct hs_script *script = TAG_BLOCK_GET_ELEMENT(
+	script = TAG_BLOCK_GET_ELEMENT(
 		&global_scenario_get()->hs_scripts,
 		script_index,
 		struct hs_script);
-	struct hs_thread_datum *thread = hs_thread_get(thread_index);
-	long *result = hs_stack_allocate(thread_index, sizeof(long));
+	thread = hs_thread_get(thread_index);
+	result = hs_stack_allocate(thread_index, sizeof(long));
 
 	/* port: none on a stack overflow (hs_stack_overflow) */
 	if (!result)
@@ -2959,6 +3003,7 @@ static void hs_evaluate(
 
 		return;
 	}
+	/* port: an MCC script's parameter (mcc_script_runtime.inl) */
 	if (mcc_hs_parameter_evaluate(thread_index, expression, destination))
 		return;
 

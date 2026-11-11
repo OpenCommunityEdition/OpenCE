@@ -156,7 +156,10 @@ static enum mcc_cache_status mcc_check_assets(void *data, struct mcc_cache_repor
             }
             else if (!mcc_range(mcc_u32(b+0x18),mcc_u32(b+0x1C),r->identity.file_length))
                 return MCC_CACHE_BAD_BITMAP;
-            r->bitmap_count++;
+            /* Tags that share one bitmap group count its bitmaps again; a map
+             * can hold no more distinct ones than its tag data has room for,
+             * which also bounds the texture table built from this count. */
+            if (++r->bitmap_count>r->identity.tag_data_size/0x30) return MCC_CACHE_BAD_BITMAP;
             if (format==18) r->bc7_bitmap_count++;
         }
     }

@@ -21,6 +21,8 @@
 # Any setting the server lists in sv_settings:
 # sv_set server.lobby_seconds 20
 # sv_set server.empty_seconds 60
+# sv_set network.vehicle_riding false
+# sv_set server.vehicle_riding_override_gametype false
 
 # A first game other than the rotation's, which goes on after it:
 # sv_map bloodgulch ctf_classic

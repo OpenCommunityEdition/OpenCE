@@ -24,7 +24,7 @@ struct shoulder_reticle_state
 	boolean valid, prepared, view_valid;
 	real_point2d shown, raw;
 	real size;
-	real_point3d eye;
+	struct observer_result view;
 	real_vector3d aim;
 };
 struct shoulder_aim_state
@@ -228,7 +228,7 @@ void third_person_reticle_view(short player, struct observer_result const *view)
 	relative.i = dot_product3d(&unit->unit.aiming_vector, &requested);
 	relative.j = dot_product3d(&unit->unit.aiming_vector, &right);
 	relative.k = dot_product3d(&unit->unit.aiming_vector, &up);
-	vector_from_points3d(&reticle->eye, &view->position, &eye_delta);
+	vector_from_points3d(&reticle->view.position, &view->position, &eye_delta);
 	if (!sample->valid || magnitude3d(&eye_delta) > 2.0f || sample->unit_index != unit_index || sample->weapon_index != weapon_index ||
 		tick < sample->tick || tick > sample->tick + 1 ||
 		dot_product3d(&relative, &sample->latest) < 0.5f)
@@ -252,7 +252,7 @@ void third_person_reticle_view(short player, struct observer_result const *view)
 	reticle->aim.i = view->forward.i * blended.i + right.i * blended.j + view->up.i * blended.k;
 	reticle->aim.j = view->forward.j * blended.i + right.j * blended.j + view->up.j * blended.k;
 	reticle->aim.k = view->forward.k * blended.i + right.k * blended.j + view->up.k * blended.k;
-	reticle->eye = view->position;
+	reticle->view = *view;
 	reticle->view_valid = normalize3d(&reticle->aim) > 0.0001f;
 }
 
@@ -266,7 +266,7 @@ static void camera_target_update(short local_player_index, long unit_index)
 	/* Orbit and its return hide the reticle, so neither target ray is used. */
 	if (camera_orbiting(&cameras[local_player_index]) ||
 		third_person_muzzle_target(local_player_index, &targets[local_player_index],
-			reticles[local_player_index].view_valid ? &reticles[local_player_index].eye : NULL,
+			reticles[local_player_index].view_valid ? &reticles[local_player_index].view : NULL,
 			reticles[local_player_index].view_valid ? &reticles[local_player_index].aim : NULL))
 		return;
 	unit = unit_get(unit_index);
@@ -275,7 +275,7 @@ static void camera_target_update(short local_player_index, long unit_index)
 	   remain the weapon's own, just as in first person. */
 	if (reticles[local_player_index].view_valid)
 	{
-		origin = reticles[local_player_index].eye;
+		origin = reticles[local_player_index].view.position;
 		scale_vector3d(&reticles[local_player_index].aim, 1000.0f, &ray);
 	}
 	else

@@ -1115,8 +1115,8 @@ boolean scenario_switch_structure_bsp(
 		checked. (A map's first bsp refused refuses the map: scenario_load) */
 		if (!loaded)
 		{
-			/* MCC admission failures must reach scenario_load's cleanup and
-			main_new_map's menu recovery without entering the modal error loop. */
+			/* port: an MCC map's first bsp that is refused goes back to
+			scenario_load, and the menus, without the error's modal loop */
 			if (mcc_cache_tags_loaded() && old_structure_bsp_index == NONE)
 			{
 				error(_error_silent, "mcc: failed to load initial structure bsp #%d", structure_bsp_index);
@@ -1257,8 +1257,8 @@ missing_tag_loop:
 			goto missing_tag_loop;
 	}
 
-	/* A rejected initial MCC BSP never reaches game_load's map_loaded state.
-	Release its tags here so the following menu or map has its own I/O owner. */
+	/* port: an MCC map whose first bsp was refused is never loaded: its tags
+	are let go here, for the menus or the next map */
 	if (!result && mcc_cache_tags_loaded())
 		scenario_unload();
 

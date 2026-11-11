@@ -1035,6 +1035,7 @@ void units_initialize(
 void units_initialize_for_new_map(
 	void)
 {
+	/* port: MCC's expanded grenade inventory starts empty on each map */
 	if (mcc_grenades_active()) mcc_grenades_reset();
 	memset(unit_globals, 0, offsetof(struct unit_globals, used_time));
 
@@ -1090,6 +1091,7 @@ void unit_kill_no_statistics(
 void unit_delete(
 	long unit_index)
 {
+	/* port: a deleted unit leaves no MCC grenade inventory behind */
 	if (mcc_grenades_active()) mcc_grenades_clear(unit_index);
 	return;
 }
@@ -2181,8 +2183,11 @@ boolean unit_add_grenade_to_inventory(
 	boolean result = FALSE;
 	static boolean grenade_type_reported = FALSE;
 
-	/* port: expanded MCC types must bypass the legacy grenade table. */
-	if (mcc_grenades_active()) return mcc_grenades_pickup(unit_index, equipment_index);
+	/* port: expanded MCC types must bypass the legacy grenade table, and
+	an Infection zombie takes none of them either. */
+	if (mcc_grenades_active())
+		return !infection_unit_is_zombie(unit_index) &&
+			mcc_grenades_pickup(unit_index, equipment_index);
 	equipment = equipment_get(equipment_index);
 	equipment_definition = equipment_definition_get(equipment->definition_index);
 	unit = unit_get(unit_index);
@@ -2693,6 +2698,7 @@ boolean unit_new(
 		result = TRUE;
 	}
 
+	/* port: a new unit's MCC grenade inventory */
 	if (result && mcc_grenades_active()) mcc_grenades_initialize_unit(unit_index);
 	return result;
 }
@@ -2904,6 +2910,7 @@ static void unit_drop_grenades(
 	long grenade_type_count;
 	struct game_globals_grenade *grenade;
 
+	/* port: MCC's expanded grenade types drop as well */
 	if (mcc_grenades_active()) mcc_grenades_drop_extra(unit_index, unit_drop_item);
 	unit = unit_get(unit_index);
 	grenade_count = unit->unit.grenade_counts;
@@ -4838,6 +4845,7 @@ void unit_place(
 				unit->unit.grenade_counts,
 				0,
 				sizeof(unit->unit.grenade_counts));
+			/* port: and MCC's expanded grenade inventory */
 			if (mcc_grenades_active()) mcc_grenades_clear(unit_index);
 
 			if (unit->unit.equipment_object_index!=NONE)
@@ -5837,6 +5845,8 @@ boolean unit_update(
 			if (cheat.infinite_ammo && unit->unit.player_index!=NONE)
 			{
 				short grenade_index;
+
+				/* port: bottomless grenades for MCC's expanded grenade types */
 				if (mcc_grenades_active())
 				{
 					short mcc_type;
@@ -11236,6 +11246,8 @@ static void unit_grenade_throw_keep_legs_moving(
 	struct real_orientation air_orientations[MAXIMUM_NODES_PER_MODEL];
 	struct real_orientation *legs;
 	real_vector3d left;
+	/* port: (vehicle_riding.c) */
+	real_vector3d relative_velocity;
 	real forward_speed;
 	real left_speed;
 	real target_weight;
@@ -11312,10 +11324,12 @@ static void unit_grenade_throw_keep_legs_moving(
 		unit_index,
 		airborne ? 1.f : 0.f);
 
-	/* the unit's real speed along its facing and to its left, per second */
+	/* the unit's real speed along its facing and to its left, per second
+	(port: relative to the deck it rides, vehicle_riding.c) */
+	biped_riding_relative_velocity(unit_index, &relative_velocity);
 	cross_product3d(&unit->object.up, &unit->object.forward, &left);
-	forward_speed = dot_product3d(&unit->object.translational_velocity, &unit->object.forward) * TICKS_PER_SECOND;
-	left_speed = dot_product3d(&unit->object.translational_velocity, &left) * TICKS_PER_SECOND;
+	forward_speed = dot_product3d(&relative_velocity, &unit->object.forward) * TICKS_PER_SECOND;
+	left_speed = dot_product3d(&relative_velocity, &left) * TICKS_PER_SECOND;
 	target_weight = square_root(forward_speed * forward_speed + left_speed * left_speed) / GRENADE_THROW_FULL_MOVE_SPEED;
 	target_weight = airborne ? 0.f : PIN(target_weight, 0.f, 1.f);
 	move_weight = unit_grenade_throw_ease(
@@ -11881,6 +11895,7 @@ void unit_control(
 		control_data->weapon_index==NONE ||
 			(control_data->weapon_index>=0 &&
 			control_data->weapon_index<MAXIMUM_WEAPONS_PER_UNIT));
+	/* port: MCC's grenade types go beyond the legacy table's */
 	if (mcc_grenades_active())
 	{
 		match_assert("MCC unit control", 1, control_data->grenade_index == NONE ||

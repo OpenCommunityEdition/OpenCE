@@ -235,6 +235,7 @@ symbols in this file:
 #include "sound/sound_definitions.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
+#include "mcc_projectiles.h" /* port: port/linux/game/mcc_projectiles.c */
 
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 #include "bitmaps/bitmap_group.h"
@@ -2399,6 +2400,7 @@ boolean weapon_get_projectile_ray(long weapon_index, short trigger_index, real_p
 	struct weapon_trigger_definition *trigger;
 	struct object_marker marker;
 	real velocity = 0.0f;
+	long target_index; /* port: read-only MCC ray query */
 
 	if (!unit || unit->unit.player_index == NONE || trigger_index < 0 ||
 		trigger_index >= definition->weapon.triggers.count)
@@ -2406,6 +2408,9 @@ boolean weapon_get_projectile_ray(long weapon_index, short trigger_index, real_p
 	trigger = TAG_BLOCK_GET_ELEMENT(&definition->weapon.triggers, trigger_index, struct weapon_trigger_definition);
 	if (trigger->projectile.index == NONE)
 		return FALSE;
+	/* port: use the same pre-spread MCC ray as firing. */
+	if (mcc_projectile_ray(weapon_index, owner_index, trigger_index, FALSE, origin, forward, &velocity, &target_index))
+		return TRUE;
 	object_get_marker_by_name(weapon_get_effect_object_index(weapon_index),
 		trigger_index == 0 ? "primary trigger" : "secondary trigger", &marker, 1);
 	*origin = marker.matrix.position;
@@ -2477,7 +2482,11 @@ static void trigger_create_projectiles(
 		short projectile_count;
 		boolean muzzle_origin = FALSE; /* port: exclude shooter from muzzle repair */
 
-		if (!TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit) &&
+		/* port: MCC owns camera-relative placement and the pre-creation cover check. */
+		boolean mcc_ray = mcc_projectile_ray(weapon_index, owner_object_index, trigger_index, TRUE,
+			&origin, &forward, &velocity, &target_object_index);
+
+		if (!mcc_ray && !TEST_FLAG(trigger_definition->flags, _weapon_trigger_projectiles_cannot_be_aimed_bit) &&
 			unit &&
 			!TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
 		{
@@ -2640,11 +2649,15 @@ static void trigger_create_projectiles(
 						real_point3d camera_position;
 
 						unit_get_camera_position(owner_object_index, &camera_position);
-						/* port: a validated shoulder shot must not collide with its owner. */
-						if (muzzle_origin)
-							third_person_projectile_repair(projectile_object_index, &camera_position, owner_object_index);
-						else
-							object_force_inside_bsp(projectile_object_index, &camera_position);
+						/* port: MCC validates spawns before attachments emit. Other shoulder
+						   shots exclude their owner during the existing BSP repair. */
+						if (!mcc_ray)
+						{
+							if (muzzle_origin)
+								third_person_projectile_repair(projectile_object_index, &camera_position, owner_object_index);
+							else
+								object_force_inside_bsp(projectile_object_index, &camera_position);
+						}
 					}
 					if (target_object_index!=NONE)
 					{

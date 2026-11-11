@@ -269,6 +269,7 @@ void director_dispose_from_old_map(
 
 	controller_remap_reset(); /* port: release held actions and camera context between maps */
 	third_person_reset(); /* port: discard orbit and collision state on unload */
+	sound_listener_motion_reset(NONE); /* port: discard motion across map unload */
 
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
@@ -477,6 +478,7 @@ static void director_set_camera(
 	struct director *director = director_get(local_player_index);
 
 	director->camera_proc = camera_proc;
+	sound_listener_motion_reset(local_player_index); /* port: camera selection is not listener motion */
 	director->debug_input_scale = 1.f;
 	director->debug_controls = FALSE;
 	if (interpolate)
@@ -1113,6 +1115,7 @@ void director_initialize_for_new_map(
 {
 	short local_player_index;
 
+	sound_listener_motion_reset(NONE); /* port: also called when restoring a saved game */
 	controller_remap_reset(); /* port: release held actions and camera context between maps */
 
 	director_globals.game_mode = game_in_editor() ? _director_mode_editor : _director_mode_game;

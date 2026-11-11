@@ -196,9 +196,7 @@ reloads.
   networks block WebRTC) cannot play together.
 - Custom Edition and MCC maps retain their native format limits and
   unsupported-feature checks. Import storage tests do not substitute for
-  gameplay and networking validation; current Milestone 14 runtime evidence
-  and outstanding checks are recorded in
-  [the validation ledger](../../docs/mcc_refactor_validation.md).
+  gameplay and networking tests.
 - No Bink videos (as on the other ports).
 - The browser's WebGL 2 is OpenGL ES 3.0 without its 3.1 and 3.2 additions:
   the visibility tests (lens flares) report whether anything was drawn, a
@@ -314,6 +312,12 @@ multiply-adds). `tools/web_build.py` writes the graph.
   at `0x40440000`, also leaving MCC's accepted fixed windows outside the
   allocator. Ordinary allocations share roughly 1 GiB with static data and
   thread stacks; converted map resources must fit that bounded space.
+  When the heap is full, `malloc` gives `NULL` rather than aborting
+  (`-sABORTING_MALLOC=0`, so that a map too large to convert is refused
+  rather than ending the page). WebAssembly does not trap a write through
+  `NULL` (address 0 is memory), so each allocation's result is checked:
+  the renderer's own records (`d3d8_gl.c`'s `device_record_new`) stop the
+  game with a message, and its buffers drop the draw.
   CE initialization follows loaded settings; its tag window is
   unavailable when `game.custom_edition` is disabled. `xbox_memory.c`
   clears a block where it would map fresh pages, and only remembers
