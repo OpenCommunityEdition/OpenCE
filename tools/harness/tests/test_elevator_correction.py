@@ -8,8 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_vehicle_riding import engine, without_includes
+from harness.riding import engine, without_includes  # noqa: E402
 
 SOURCE = "port/linux/game/network_distributed.c"
 CASES = ["100ms", "200ms", "100ms-up", "200ms-up", "jump", "walk-off", "other-elevator", "teleport", "unpredicted", "no-history", "on-foot", "far"]

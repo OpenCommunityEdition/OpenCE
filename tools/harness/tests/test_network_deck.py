@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure  # noqa: E402
-from test_vehicle_riding import engine, without_includes  # noqa: E402
+from harness.riding import engine, without_includes  # noqa: E402
 
 NETWORK = "port/linux/game/network_distributed.c"
 RIDING = "port/linux/game/vehicle_riding.c"
