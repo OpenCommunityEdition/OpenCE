@@ -71,6 +71,13 @@ enum
 	MCC_IMPORT_HUD_ICONS,
 	MCC_IMPORT_HUD_MASK,
 	MCC_IMPORT_MAXIMUM_BSPS = 32,
+	/* the HUD sprite sheets written in the disc's layout (the operations'
+	sprite_layout: the meters'), and each one's bitmaps and sprites */
+	MCC_IMPORT_MAXIMUM_SPRITE_LAYOUTS = 4,
+	MCC_IMPORT_MAXIMUM_LAYOUT_BITMAPS = 8,
+	MCC_IMPORT_MAXIMUM_LAYOUT_SPRITES = 64,
+	/* (bitmap_group's flags) the digits drawn at half their size */
+	V5_BITMAP_GROUP_HALF_HUD_SCALE_BIT = 4,
 	/* the scenario's script syntax data: a data array of nodes */
 	V5_SCENARIO_SCRIPT_SYNTAX_DATA_OFFSET = 0x474,
 	V5_SCRIPT_NODE_COUNT_OFFSET = 0x2E,
@@ -189,6 +196,34 @@ struct mcc_import_body
 	byte output[V5_IO_BYTES];
 };
 
+/* a HUD sprite sheet written in the disc's layout (mcc_import_sprite_layout_plan):
+where MCC's pixels of each sprite are, and where the disc has the sprite */
+struct mcc_import_sprite_layout
+{
+	long tag_index;
+	/* MCC's bitmaps, as loaded */
+	short source_count;
+	struct
+	{
+		short width;
+		short height;
+		long pixels_offset;
+		long pixels_size;
+	} sources[MCC_IMPORT_MAXIMUM_LAYOUT_BITMAPS];
+	/* every sprite, in the order of the sequences: MCC's rectangle and the
+	disc's (left, top, right, bottom, in pixels of their bitmaps) */
+	short sprite_count;
+	struct
+	{
+		short source;
+		short target;
+		real source_rectangle[4];
+		long target_rectangle[4];
+	} sprites[MCC_IMPORT_MAXIMUM_LAYOUT_SPRITES];
+	/* how much larger MCC's sprites are than the disc's */
+	real ratio;
+};
+
 /* ---------- globals */
 
 static struct
@@ -235,6 +270,9 @@ static struct
 	short icon_factor;
 	short mask_factor;
 	long hud_bitmaps_halved;
+	/* the HUD sprite sheets written in the disc's layout */
+	struct mcc_import_sprite_layout sprite_layouts[MCC_IMPORT_MAXIMUM_SPRITE_LAYOUTS];
+	short sprite_layout_count;
 	/* (a second import of a map larger than its cache file: mcc_import_run)
 	the bytes its bitmaps are to give up, and the bitmaps halved for them */
 	long fit_budget;
@@ -1344,6 +1382,367 @@ static boolean mcc_import_bitmap_halve(
 	return TRUE;
 }
 
+/* ---------- private code: HUD sprite sheets in the disc's layout
+
+MCC drew the meters again, at about twice the disc's size, in sheets of its
+own layout (more bitmaps, the sprites elsewhere). Where the operations give
+the disc's layout of such a sheet (sprite_layout), it is written in it: the
+disc's bitmaps, each sprite where the disc has it, its pixels MCC's,
+resampled into the disc's rectangle. The disc's placements then draw it at
+their own scale, and the high-res HUD's texture, drawn for that layout
+(port/linux/game/hud_hires_tags.c), stands for it. */
+
+/* the sheet `tag_index` written in the disc's layout, or NULL */
+static struct mcc_import_sprite_layout const *mcc_import_sprite_layout_find(
+	long tag_index)
+{
+	short index;
+
+	for (index = 0; index < mcc_import_globals.sprite_layout_count; index++)
+	{
+		if (mcc_import_globals.sprite_layouts[index].tag_index == tag_index)
+			return &mcc_import_globals.sprite_layouts[index];
+	}
+
+	return NULL;
+}
+
+/* how much larger MCC's sprites of the sheet `tag_index` are than those it is
+written with: 1 for any sheet not written in the disc's layout */
+static real mcc_import_sprite_layout_ratio(
+	long tag_index)
+{
+	struct mcc_import_sprite_layout const *layout = mcc_import_sprite_layout_find(tag_index);
+
+	return layout ? layout->ratio : 1.0f;
+}
+
+/* the next number of a layout's text, and the character after it in *end
+(FALSE if there is none) */
+static boolean mcc_import_sprite_layout_number(
+	char const **cursor,
+	real *value)
+{
+	char *end;
+	double number = strtod(*cursor, &end);
+
+	if (end == *cursor || !(number >= -65536.0 && number <= 65536.0))
+		return FALSE;
+	*value = (real)number;
+	*cursor = end;
+
+	return TRUE;
+}
+
+/* The sheet `tag_index` (a sprite sheet only the HUD's placements draw) planned
+to be written in the disc's layout, from the operations' sprite_layout line,
+and its tag given that layout: its bitmaps the disc's (their pixels made by
+mcc_import_sprite_layout_pixels), its sprites where the disc has them. Not
+where the sheet already has the disc's layout, or where it does not have the
+disc's sequences and sprites, in uncompressed bitmaps without mipmaps. */
+static void mcc_import_sprite_layout_plan(
+	long tag_index)
+{
+	struct mcc_import_tag_instance const *instance = &mcc_import_globals.instances[tag_index];
+	struct bitmap_group *group = (struct bitmap_group *)instance->base_address;
+	struct mcc_import_sprite_layout layout;
+	short target_widths[MCC_IMPORT_MAXIMUM_LAYOUT_BITMAPS], target_heights[MCC_IMPORT_MAXIMUM_LAYOUT_BITMAPS];
+	real target_registrations[MCC_IMPORT_MAXIMUM_LAYOUT_SPRITES][2];
+	real ratios[MCC_IMPORT_MAXIMUM_LAYOUT_SPRITES * 2];
+	char const *bitmaps_text, *sequences_text, *cursor;
+	short target_count = 0, ratio_count = 0, format;
+	boolean same = TRUE;
+	long index, sequence_index;
+
+	if (mcc_import_globals.sprite_layout_count >= MCC_IMPORT_MAXIMUM_SPRITE_LAYOUTS || !group ||
+		!mcc_import_operations_sprite_layout(instance->name, &bitmaps_text, &sequences_text))
+	{
+		return;
+	}
+	if (group->type != 3 || group->bitmaps.count <= 0 || group->bitmaps.count > MCC_IMPORT_MAXIMUM_LAYOUT_BITMAPS)
+		return;
+	csmemset(&layout, 0, sizeof(layout));
+	layout.tag_index = tag_index;
+	format = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, 0, struct bitmap_data)->format;
+	for (index = 0; index < group->bitmaps.count; index++)
+	{
+		struct bitmap_data const *bitmap = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, index, struct bitmap_data);
+
+		if (bitmap->type != 0 || bitmap->depth > 1 || bitmap->mipmap_count != 0 || bitmap->format != format ||
+			!mcc_import_pixel_bytes(bitmap->format) || bitmap->width <= 0 || bitmap->height <= 0 ||
+			bitmap->pixels_size < (long)bitmap->width * bitmap->height * mcc_import_pixel_bytes(bitmap->format))
+		{
+			return;
+		}
+		layout.sources[index].width = bitmap->width;
+		layout.sources[index].height = bitmap->height;
+		layout.sources[index].pixels_offset = bitmap->pixels_offset;
+		layout.sources[index].pixels_size = bitmap->pixels_size;
+	}
+	layout.source_count = (short)group->bitmaps.count;
+	/* the disc's bitmaps: "<width>x<height>", by commas (powers of two, as the
+	Xbox's swizzled textures are) */
+	for (cursor = bitmaps_text; *cursor; )
+	{
+		real width, height;
+
+		if (target_count >= layout.source_count || !mcc_import_sprite_layout_number(&cursor, &width) ||
+			*cursor++ != 'x' || !mcc_import_sprite_layout_number(&cursor, &height) ||
+			width < 1.0f || width > 2048.0f || height < 1.0f || height > 2048.0f ||
+			((long)width & ((long)width - 1)) || ((long)height & ((long)height - 1)))
+		{
+			return;
+		}
+		target_widths[target_count] = (short)width;
+		target_heights[target_count] = (short)height;
+		target_count++;
+		if (*cursor == ',')
+			cursor++;
+		else if (*cursor)
+			return;
+	}
+	if (!target_count)
+		return;
+	if (target_count != layout.source_count)
+		same = FALSE;
+	for (index = 0; index < target_count; index++)
+	{
+		if (target_widths[index] != layout.sources[index].width || target_heights[index] != layout.sources[index].height)
+			same = FALSE;
+	}
+	/* the disc's sprites: the sequences by "|", their sprites by ";", each
+	"<bitmap>,<left>,<top>,<right>,<bottom>,<registration x>,<registration y>"
+	in pixels; as many as MCC's, sequence by sequence */
+	cursor = sequences_text;
+	for (sequence_index = 0; sequence_index < group->sequences.count; sequence_index++)
+	{
+		struct bitmap_group_sequence const *sequence =
+			TAG_BLOCK_GET_ELEMENT(&group->sequences, sequence_index, struct bitmap_group_sequence);
+		long sprite_index;
+
+		if (sequence_index > 0 && *cursor++ != '|')
+			return;
+		for (sprite_index = 0; sprite_index < sequence->sprites.count; sprite_index++)
+		{
+			struct bitmap_group_sprite const *sprite =
+				TAG_BLOCK_GET_ELEMENT(&sequence->sprites, sprite_index, struct bitmap_group_sprite);
+			real values[7];
+			short value_index, target;
+
+			if (layout.sprite_count >= MCC_IMPORT_MAXIMUM_LAYOUT_SPRITES || (sprite_index > 0 && *cursor++ != ';'))
+				return;
+			for (value_index = 0; value_index < 7; value_index++)
+			{
+				if ((value_index > 0 && *cursor++ != ',') || !mcc_import_sprite_layout_number(&cursor, &values[value_index]))
+					return;
+			}
+			target = (short)values[0];
+			if (values[0] != (real)target || target < 0 || target >= target_count ||
+				!(values[1] >= 0.0f && values[1] < values[3] && values[3] <= (real)target_widths[target] + 0.01f) ||
+				!(values[2] >= 0.0f && values[2] < values[4] && values[4] <= (real)target_heights[target] + 0.01f))
+			{
+				return;
+			}
+			/* (MCC's, in its bitmap) */
+			if (sprite->bitmap_index < 0 || sprite->bitmap_index >= layout.source_count ||
+				!(sprite->bounds.x0 >= 0.0f && sprite->bounds.x0 < sprite->bounds.x1 && sprite->bounds.x1 <= 1.0f) ||
+				!(sprite->bounds.y0 >= 0.0f && sprite->bounds.y0 < sprite->bounds.y1 && sprite->bounds.y1 <= 1.0f))
+			{
+				return;
+			}
+			layout.sprites[layout.sprite_count].source = sprite->bitmap_index;
+			layout.sprites[layout.sprite_count].target = target;
+			layout.sprites[layout.sprite_count].source_rectangle[0] =
+				sprite->bounds.x0 * layout.sources[sprite->bitmap_index].width;
+			layout.sprites[layout.sprite_count].source_rectangle[1] =
+				sprite->bounds.y0 * layout.sources[sprite->bitmap_index].height;
+			layout.sprites[layout.sprite_count].source_rectangle[2] =
+				sprite->bounds.x1 * layout.sources[sprite->bitmap_index].width;
+			layout.sprites[layout.sprite_count].source_rectangle[3] =
+				sprite->bounds.y1 * layout.sources[sprite->bitmap_index].height;
+			for (value_index = 0; value_index < 4; value_index++)
+			{
+				long pixel = (long)(values[1 + value_index] + 0.5f);
+
+				layout.sprites[layout.sprite_count].target_rectangle[value_index] = pixel;
+				if (sprite->bitmap_index != target ||
+					(long)(layout.sprites[layout.sprite_count].source_rectangle[value_index] + 0.5f) != pixel)
+				{
+					same = FALSE;
+				}
+			}
+			target_registrations[layout.sprite_count][0] = values[5] / (real)target_widths[target];
+			target_registrations[layout.sprite_count][1] = values[6] / (real)target_heights[target];
+			ratios[ratio_count++] = (layout.sprites[layout.sprite_count].source_rectangle[2] -
+				layout.sprites[layout.sprite_count].source_rectangle[0]) / (values[3] - values[1]);
+			ratios[ratio_count++] = (layout.sprites[layout.sprite_count].source_rectangle[3] -
+				layout.sprites[layout.sprite_count].source_rectangle[1]) / (values[4] - values[2]);
+			layout.sprite_count++;
+		}
+	}
+	if (*cursor || same || !layout.sprite_count)
+		return;
+	/* (the median of the widths' and heights' ratios: MCC drew some a little
+	larger or smaller) */
+	{
+		short i, j;
+
+		for (i = 1; i < ratio_count; i++)
+		{
+			for (j = i; j > 0 && ratios[j - 1] > ratios[j]; j--)
+			{
+				real swap = ratios[j];
+
+				ratios[j] = ratios[j - 1];
+				ratios[j - 1] = swap;
+			}
+		}
+		layout.ratio = ratio_count % 2 ? ratios[ratio_count / 2] :
+			0.5f * (ratios[ratio_count / 2 - 1] + ratios[ratio_count / 2]);
+	}
+	if (!(layout.ratio > 0.0f))
+		return;
+
+	/* the tag given the disc's layout */
+	group->bitmaps.count = target_count;
+	for (index = 0; index < target_count; index++)
+	{
+		struct bitmap_data *bitmap = TAG_BLOCK_GET_ELEMENT(&group->bitmaps, index, struct bitmap_data);
+
+		bitmap->width = target_widths[index];
+		bitmap->height = target_heights[index];
+		bitmap->registration_point.x = 0;
+		bitmap->registration_point.y = 0;
+		bitmap->pixels_size = (long)bitmap->width * bitmap->height * mcc_import_pixel_bytes(bitmap->format);
+	}
+	index = 0;
+	for (sequence_index = 0; sequence_index < group->sequences.count; sequence_index++)
+	{
+		struct bitmap_group_sequence *sequence =
+			TAG_BLOCK_GET_ELEMENT(&group->sequences, sequence_index, struct bitmap_group_sequence);
+		long sprite_index;
+
+		for (sprite_index = 0; sprite_index < sequence->sprites.count; sprite_index++, index++)
+		{
+			struct bitmap_group_sprite *sprite =
+				TAG_BLOCK_GET_ELEMENT(&sequence->sprites, sprite_index, struct bitmap_group_sprite);
+			short target = layout.sprites[index].target;
+
+			sprite->bitmap_index = target;
+			sprite->bounds.x0 = (real)layout.sprites[index].target_rectangle[0] / (real)target_widths[target];
+			sprite->bounds.y0 = (real)layout.sprites[index].target_rectangle[1] / (real)target_heights[target];
+			sprite->bounds.x1 = (real)layout.sprites[index].target_rectangle[2] / (real)target_widths[target];
+			sprite->bounds.y1 = (real)layout.sprites[index].target_rectangle[3] / (real)target_heights[target];
+			sprite->registration_point.x = target_registrations[index][0];
+			sprite->registration_point.y = target_registrations[index][1];
+		}
+	}
+	/* (the disc's meters have no half HUD scale, which only the digits read) */
+	group->flags &= ~FLAG(V5_BITMAP_GROUP_HALF_HUD_SCALE_BIT);
+	mcc_import_globals.sprite_layouts[mcc_import_globals.sprite_layout_count++] = layout;
+	if (getenv("HALO_MCC_IMPORT_TRACE"))
+	{
+		fprintf(stderr, "mcc import: hud %s: written in the disc's layout, %d sprites, MCC's %g times as large\n",
+			instance->name, (int)layout.sprite_count, (double)layout.ratio);
+	}
+
+	return;
+}
+
+/* The pixels (linear, as MCC's bitmaps.map holds them) of the bitmap
+`bitmap_index` of a sheet written in the disc's layout: each of its sprites
+MCC's, resampled into the disc's rectangle, each pixel the average of what
+it covers, its colour weighted by its alpha (as mcc_import_bitmap_halve
+does); clear elsewhere. FALSE if MCC's pixels cannot be read. */
+static boolean mcc_import_sprite_layout_pixels(
+	struct mcc_import_sprite_layout const *layout,
+	struct bitmap_data const *bitmap,
+	short bitmap_index,
+	byte *pixels)
+{
+	short bytes = mcc_import_pixel_bytes(bitmap->format);
+	short source_index;
+
+	csmemset(pixels, 0, (unsigned long)bitmap->width * bitmap->height * bytes);
+	for (source_index = 0; source_index < layout->source_count; source_index++)
+	{
+		long source_width = layout->sources[source_index].width, source_height = layout->sources[source_index].height;
+		byte *source = NULL;
+		short sprite_index;
+
+		for (sprite_index = 0; sprite_index < layout->sprite_count; sprite_index++)
+		{
+			real const *from = layout->sprites[sprite_index].source_rectangle;
+			long const *to = layout->sprites[sprite_index].target_rectangle;
+			real step_x, step_y;
+			long x, y;
+
+			if (layout->sprites[sprite_index].source != source_index ||
+				layout->sprites[sprite_index].target != bitmap_index)
+			{
+				continue;
+			}
+			if (!source)
+			{
+				source = mcc_import_calloc(1, (size_t)layout->sources[source_index].pixels_size);
+				if (!source)
+					return FALSE;
+				custom_edition_cache_read(layout->tag_index, layout->sources[source_index].pixels_offset,
+					layout->sources[source_index].pixels_size, source);
+			}
+			step_x = (from[2] - from[0]) / (real)(to[2] - to[0]);
+			step_y = (from[3] - from[1]) / (real)(to[3] - to[1]);
+			for (y = to[1]; y < to[3] && y < bitmap->height; y++)
+			{
+				real top = from[1] + (real)(y - to[1]) * step_y, bottom = top + step_y;
+
+				for (x = to[0]; x < to[2] && x < bitmap->width; x++)
+				{
+					real left = from[0] + (real)(x - to[0]) * step_x, right = left + step_x;
+					real weights = 0.0f, alpha_sum = 0.0f, sums[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+					real weighted[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+					byte *out = pixels + (y * bitmap->width + x) * bytes;
+					short alpha_byte = bytes - 1, channel;
+					long sx, sy;
+
+					for (sy = (long)top; sy < source_height && (real)sy < bottom; sy++)
+					{
+						real cover_y = MIN(bottom, (real)(sy + 1)) - MAX(top, (real)sy);
+
+						for (sx = (long)left; sx < source_width && (real)sx < right; sx++)
+						{
+							real weight = cover_y * (MIN(right, (real)(sx + 1)) - MAX(left, (real)sx));
+							byte const *in = source + (sy * source_width + sx) * bytes;
+
+							if (weight <= 0.0f)
+								continue;
+							weights += weight;
+							alpha_sum += weight * in[alpha_byte];
+							for (channel = 0; channel < bytes; channel++)
+							{
+								sums[channel] += weight * in[channel];
+								weighted[channel] += weight * in[channel] * in[alpha_byte];
+							}
+						}
+					}
+					if (weights <= 0.0f)
+						continue;
+					for (channel = 0; channel < bytes; channel++)
+					{
+						real value = channel == alpha_byte || bytes == 1 ? sums[channel] / weights :
+							alpha_sum > 0.0f ? weighted[channel] / alpha_sum : sums[channel] / weights;
+
+						out[channel] = (byte)MIN(255.0f, value + 0.5f);
+					}
+				}
+			}
+		}
+		mcc_import_free(source);
+	}
+
+	return TRUE;
+}
+
 /* (struct custom_edition_hud_walk's) a block's elements, in the loaded tags */
 static uint8_t *mcc_import_hud_block_elements(
 	void *context,
@@ -1394,13 +1793,17 @@ static void mcc_import_hud_placement(
 		if (hud->reference_count < hud->maximum_references)
 			hud->references[hud->reference_count++] = reference;
 	}
-	else if (hud->disc_values ? mcc_import_globals.hud_scale[tag_index] != 1.0f :
-		mcc_import_globals.hud_factor[tag_index] > 1)
+	else
 	{
+		/* (MCC's own placements, of an interface the disc has not, drawing a
+		sheet written in the disc's layout: by how much smaller its sprites
+		are written) */
 		float factor = hud->disc_values ? mcc_import_globals.hud_scale[tag_index] :
-			(float)mcc_import_globals.hud_factor[tag_index];
+			(float)mcc_import_globals.hud_factor[tag_index] * mcc_import_sprite_layout_ratio(tag_index);
 		float scale;
 
+		if (factor == 1.0f)
+			return;
 		csmemcpy(&scale, placement + 4, sizeof(scale));
 		scale *= factor;
 		csmemcpy(placement + 4, &scale, sizeof(scale));
@@ -1623,6 +2026,18 @@ static void mcc_import_hud(
 		if (!candidates[bitmap_tag])
 			candidates[bitmap_tag] = MCC_IMPORT_HUD_PLACEMENT;
 	}
+	/* a sprite sheet only placements draw, in the disc's layout where the
+	operations give it, and the disc's placements, which draw it at their
+	own scale (mcc_import_sprite_layout_plan) */
+	mcc_import_globals.sprite_layout_count = 0;
+	for (tag_index = 0; mcc_import_operations_hud_values(NULL) && tag_index < mcc_import_globals.tag_count; tag_index++)
+	{
+		if (candidates[tag_index] == MCC_IMPORT_HUD_PLACEMENT && !others[tag_index] &&
+			mcc_import_globals.instances[tag_index].group_tag == 'bitm')
+		{
+			mcc_import_sprite_layout_plan(tag_index);
+		}
+	}
 	/* a bitmap the placements (or the icons and masks) draw, and nothing
 	else: brought to the disc's size (the operations' bitmap_size), or half
 	MCC's where they do not give it, if each of its images can be */
@@ -1748,7 +2163,8 @@ static void mcc_import_hud(
 		real sprite_scale;
 
 		mcc_import_globals.hud_scale[tag_index] = 1.0f;
-		if (!group || group->bitmaps.count <= 0 ||
+		/* (a sheet written in the disc's layout: its sprites the disc's) */
+		if (!group || group->bitmaps.count <= 0 || mcc_import_sprite_layout_find(tag_index) ||
 			!mcc_import_operations_bitmap_size(instance->name, &disc_width, &disc_height))
 		{
 			continue;
@@ -1807,7 +2223,19 @@ static boolean mcc_import_bitmaps(
 			pixels = mcc_import_calloc(1, (size_t)buffer_size);
 			if (!pixels)
 				return FALSE;
-			custom_edition_cache_read(tag_index, bitmap->pixels_offset, bitmap->pixels_size, pixels);
+			/* (a HUD sprite sheet in the disc's layout: MCC's sprites moved
+			into it, mcc_import_sprite_layout_plan) */
+			if (mcc_import_sprite_layout_find(tag_index))
+			{
+				if (!mcc_import_sprite_layout_pixels(mcc_import_sprite_layout_find(tag_index), bitmap,
+					(short)bitmap_index, pixels))
+				{
+					mcc_import_free(pixels);
+					return FALSE;
+				}
+			}
+			else
+				custom_edition_cache_read(tag_index, bitmap->pixels_offset, bitmap->pixels_size, pixels);
 			/* a HUD bitmap at the disc's size (mcc_import_hud) */
 			if (mcc_import_globals.hud_factor && mcc_import_globals.hud_factor[tag_index] > 1)
 			{

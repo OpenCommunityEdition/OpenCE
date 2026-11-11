@@ -28,6 +28,11 @@ and, read by the import itself (mcc_import.c, mcc_import_hud):
                bitmap_size (the menus' map, ui.map, to fit its cache file)
   sprite_sizes the disc's size of a HUD sprite sheet's sprites (the first
                of each sequence: "122x31,88x14,...")
+  sprite_layout the disc's layout of a HUD sprite sheet (the meters'), which
+               the import writes it in: its bitmaps ("256x256", by commas),
+               and its sequences' sprites (by "|", a sequence's by ";", each
+               "<bitmap>,<left>,<top>,<right>,<bottom>,<registration x>,
+               <registration y>" in pixels)
   hud_values   a HUD interface whose placements the operations give as the
                disc's (only how the HUD looks: the fingerprint has none)
 An element is serialized as its bytes, then for each of its pointer fields
@@ -1523,7 +1528,8 @@ long mcc_import_operations_apply(
 			!strcmp(operation->kind, "element") || !strcmp(operation->kind, "missing") ||
 			!strcmp(operation->kind, "handle") || !strcmp(operation->kind, "bitmap_size") ||
 			!strcmp(operation->kind, "hud_values") || !strcmp(operation->kind, "sprite_sizes") ||
-			!strcmp(operation->kind, "donor") || !strcmp(operation->kind, "bitmaps_to_disc_size"))
+			!strcmp(operation->kind, "sprite_layout") || !strcmp(operation->kind, "donor") ||
+			!strcmp(operation->kind, "bitmaps_to_disc_size"))
 		{
 			continue;
 		}
@@ -1602,6 +1608,29 @@ char const *mcc_import_operations_sprite_sizes(
 	}
 
 	return NULL;
+}
+
+boolean mcc_import_operations_sprite_layout(
+	char const *name,
+	char const **bitmaps,
+	char const **sequences)
+{
+	long index;
+
+	for (index = 0; index < mcc_patch_globals.operation_count; index++)
+	{
+		struct mcc_patch_operation const *operation = &mcc_patch_globals.operations[index];
+
+		if (!strcmp(operation->kind, "sprite_layout") && !strncmp(operation->tag, "bitm:", 5) &&
+			!strcmp(operation->tag + 5, name) && operation->a && operation->b)
+		{
+			*bitmaps = operation->a;
+			*sequences = operation->b;
+			return TRUE;
+		}
+	}
+
+	return FALSE;
 }
 
 boolean mcc_import_operations_flag(

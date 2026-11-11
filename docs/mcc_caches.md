@@ -29,9 +29,13 @@ nothing is written to it. For each map:
    A tag MCC has only in another map (the warthog, the ghost's gun) is taken
    from that map of the player's.
 4. The tags are written in the disc's order, with the structure BSPs, the
-   bitmaps (the HUD's brought to the disc's sizes), the sounds from MCC's
-   banks (Xbox ADPCM copied, CELT decoded and encoded as Xbox ADPCM, music
-   in the disc's 65,520-byte pieces) and the models' vertex buffers.
+   bitmaps (the HUD's brought to the disc's sizes, and the meters' sprite
+   sheets, which MCC laid out again with sprites four times the disc's, in
+   the disc's layout, each sprite resampled into the disc's place: the
+   disc's placements draw them at their own scale, and the high-res HUD's
+   textures stand for them), the sounds from MCC's banks (Xbox ADPCM copied,
+   CELT decoded and encoded as Xbox ADPCM, music in the disc's 65,520-byte
+   pieces) and the models' vertex buffers.
 5. The written map's simulation data is fingerprinted and compared with the
    disc's (`port/assets/mcc/<map>.fp`). A map that matches is written as the
    disc's and plays with players of the disc; any other is marked with

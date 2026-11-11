@@ -1311,12 +1311,14 @@ set	sbsp:levels\c40\c40_c	root.cluster_portals[0].vertices[0]	0x0	541c9b438f502a
 bitmap_size	bitm:ui\hud\bitmaps\combined\hud_unit_backgrounds	-	128	32
 bitmap_size	bitm:ui\hud\bitmaps\combined\hud_unit_meters	-	256	256
 sprite_sizes	bitm:ui\hud\bitmaps\combined\hud_unit_meters	-	122x31,122x31,88x14,88x14,130x10,130x10,130x34,88x14
+sprite_layout	bitm:ui\hud\bitmaps\combined\hud_unit_meters	-	256x256	0,0,34,122,65,61,20|0,130,0,252,31,61,20|0,88,65,176,79,44,11|0,0,65,88,79,44,11|0,0,79,130,89,65,2|0,122,48,252,58,65,11|0,0,0,130,34,65,20|0,122,34,210,48,44,11
 bitmap_size	bitm:ui\hud\bitmaps\combined\hud_weapon_backgrounds	-	128	32
 bitmap_size	bitm:ui\hud\bitmaps\combined\hud_reticle_warnings	-	128	128
 sprite_sizes	bitm:ui\hud\bitmaps\combined\hud_reticle_warnings	-	49x27,44x15,42x25,28x25,28x25,60x24,50x27,42x24,11x7,30x6,56x27
 bitmap_size	bitm:ui\hud\bitmaps\combined\hud_ammo_outlines	-	128	32
 bitmap_size	bitm:ui\hud\bitmaps\combined\hud_ammo_meters	-	256	256
 sprite_sizes	bitm:ui\hud\bitmaps\combined\hud_ammo_meters	-	105x16,114x27,109x18,105x13,111x17,108x17,107x22,130x18,130x10
+sprite_layout	bitm:ui\hud\bitmaps\combined\hud_ammo_meters	-	256x256	0,0,62.0001,105,78.0001,52,7|0,0,0,114,27,57,17|0,130,27,239,45,54,11|0,105,62,210,75,52,8|0,108,45,219,62,55,10|0,0,45,108,62,54,15|0,114,0,221,22,53,4|0,0,27,130,45,65,2|0,0,78,130,88,65,4
 bitmap_size	bitm:ui\hud\bitmaps\combined\hud_ammo_type_icons	-	32	16
 bitmap_size	bitm:ui\hud\bitmaps\combined\hud_reticles	-	128	128
 sprite_sizes	bitm:ui\hud\bitmaps\combined\hud_reticles	-	66x66,64x64,64x64,64x64,64x64,64x64,64x64,28x28,28x28,64x64,64x64,64x64,64x64,64x64,18x10

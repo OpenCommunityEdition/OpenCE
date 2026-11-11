@@ -129,6 +129,14 @@ line), or NULL. */
 char const *mcc_import_operations_sprite_sizes(
 	char const *name);
 
+/* The disc's layout of the HUD sprite sheet `name` (the operations'
+sprite_layout line: mcc_import_patch.c has its form): its bitmaps' sizes
+(*bitmaps) and its sequences' sprites (*sequences). FALSE if it has none. */
+boolean mcc_import_operations_sprite_layout(
+	char const *name,
+	char const **bitmaps,
+	char const **sequences);
+
 /* Whether the operations have a line of the kind `kind` that is a flag alone
 (bitmaps_to_disc_size: every bitmap brought to its bitmap_size, not only the
 HUD's). */
