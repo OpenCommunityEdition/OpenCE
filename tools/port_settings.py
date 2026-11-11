@@ -387,6 +387,11 @@ SCREENS["video_settings/shoulder_camera"] = {
     "rows": [
         ("CAMERA MOTION:", "display.third_person_smooth", [("SMOOTH", "true"), ("SHARP", "false")],
          "Smooth eases recovery and shoulder changes.\nSharp moves immediately; collision stays active.", None),
+        ("SMOOTH CROSSHAIR:", "display.third_person_crosshair_smooth", ON_OFF,
+         "Reduce crosshair jitter in shoulder view.\nDoes not change aim or weapon accuracy.", None),
+        ("CROSSHAIR SIZE:", "display.third_person_crosshair_size",
+         [(f"{n}%", f"{n / 100:.2f}") for n in [75, 80, 85, 90, 95, 100]],
+         "Shoulder crosshair size. Default 100%.\nDoes not change aim or weapon accuracy.", None),
         ("LEFT SHOULDER:", "display.third_person_left_shoulder", ON_OFF,
          "Off uses the right shoulder. B swaps in game.\nRemap it under Controls Setup > Camera.", None),
         ("DISTANCE:", "display.third_person_distance",

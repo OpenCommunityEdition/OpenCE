@@ -83,7 +83,7 @@ def test_camera_reset_load_hooks():
     assert "third_person_reset();" in function(objects, "objects_initialize_for_new_map")
 
 
-@pytest.mark.parametrize("fault", [None, "zoom", "collision", "shoulder", "reticle", "doorway", "return", "frame_rate", "stairs", "held_respawn"])
+@pytest.mark.parametrize("fault", [None, "zoom", "collision", "shoulder", "reticle", "doorway", "return", "frame_rate", "stairs", "held_respawn", "reticle_basis", "reticle_size", "reticle_offset", "reticle_eye"])
 def test_shoulder_camera(tmp_path, fault):
     compiler = shutil.which("clang") or shutil.which("cc")
     if not compiler:
@@ -106,12 +106,21 @@ def test_shoulder_camera(tmp_path, fault):
         code = code.replace("(real)(1.0 - exp(-dt / seconds))", "dt / (seconds + dt)")
     elif fault == "stairs":
         code = code.replace("state->vertical_lag - vertical_step", "state->vertical_lag")
+    elif fault == "reticle_basis":
+        code = code.replace("view->forward.i * blended.i", "requested.i * blended.i")
+    elif fault == "reticle_offset":
+        code = code.replace("right.i * blended.j", "0")
+    elif fault == "reticle_eye":
+        code = code.replace("reticle->eye = view->position;", "reticle->eye = eye;")
+    elif fault == "reticle_size":
+        code = code.replace("state->size = reticle_size;", "state->size = 1.0f;")
     elif fault == "held_respawn":
         code = code.replace("state->look_requires_release = (halo_keyboard_actions(local_player_index) & (1UL << HALO_KEYBOARD_FREE_LOOK)) != 0;", "state->look_requires_release = FALSE;")
     stub = r'''
 #include <math.h>
 #include <stddef.h>
 #include <string.h>
+#define csmemset memset
 typedef int boolean;
 typedef float real;
 typedef struct {real i,j,k;} real_vector3d;
@@ -143,9 +152,14 @@ _collision_test_structure_bit, _collision_test_objects_bit,
 _collision_test_objects_sight_blocking_flags=64, _collision_test_for_projectiles_flags=1024};
 struct unit_datum {
  struct {long parent_object_index; unsigned damage_flags;} object;
- struct {int current_zoom_level, desired_zoom_level; real_vector3d aiming_vector;} unit;
+ struct {int current_zoom_level, desired_zoom_level; real_vector3d aiming_vector; int current_weapon_index; real_vector3d desired_aiming_vector;} unit;
 };
-struct render_camera {real_point3d position; real_vector3d forward,up; rectangle2d window_bounds;real vertical_field_of_view;};
+struct render_camera {real_point3d position; real_vector3d forward,up; rectangle2d window_bounds;real vertical_field_of_view;rectangle2d viewport_bounds;};
+struct observer_result {real_point3d position;real_vector3d forward,up;};
+static long tick;static real tick_fraction=1;
+static long game_time_get(void){return tick;}
+static real render_interpolation_fraction(void){return tick_fraction;}
+static real dot_product3d(real_vector3d const *a,real_vector3d const *b){return a->i*b->i+a->j*b->j+a->k*b->k;}
 struct collision_result {real t; real_point3d point;};
 static struct {short local_player_index; struct render_camera camera; int frustum;} render;
 static struct unit_datum body={{NONE,0},{NONE,NONE,{1,0,0}}};
@@ -156,10 +170,14 @@ static int enabled, cinematic, scripted, perspective, inhibited, zoom=NONE, unit
 static int third_person_enabled(void){return enabled;}
 static int *director_camera_scripted=&scripted;
 static real wall=1, prop=1, soft_wall=1;
-static int smooth=1;
+static int smooth=1, crosshair_smooth=0;
+static double crosshair_size=1;
+static long held_weapon=2;
+static long unit_inventory_get_weapon(long u,int w){(void)u;(void)w;return held_weapon;}
 static real_point3d eye={0,0,0};
 static int muzzle_preview_succeeds, preview_calls, target_traces;
-static boolean third_person_muzzle_target(short p,real_point3d *t){
+static boolean third_person_muzzle_target(short p,real_point3d *t,real_point3d const *e,real_vector3d const *a){
+ (void)e;(void)a;
  (void)p;preview_calls++;if(muzzle_preview_succeeds)*t=(real_point3d){10,0,0};return muzzle_preview_succeeds;
 }
 static int on_screen=1,left_shoulder;
@@ -167,13 +185,14 @@ static double setting_distance=.85,setting_height=.12,setting_offset=.24;
 static real frame_dt=1.0f/60;
 static real main_get_seconds_elapsed(void){return frame_dt;}
 double config_real(char const *name){
+ if(strstr(name,"crosshair_size"))return crosshair_size;
  if(strstr(name,"distance"))return setting_distance;
  if(strstr(name,"height"))return setting_height;
  return setting_offset;
 }
 static void vector_from_points3d(real_point3d const *a,real_point3d const *b,real_vector3d *v){v->i=b->x-a->x;v->j=b->y-a->y;v->k=b->z-a->z;}
 
-int config_boolean(char const *name){return strstr(name,"smooth")?smooth:(strstr(name,"left_shoulder")?left_shoulder:enabled);}
+int config_boolean(char const *name){return strstr(name,"crosshair_smooth")?crosshair_smooth:strstr(name,"smooth")?smooth:(strstr(name,"left_shoulder")?left_shoulder:enabled);}
 unsigned long config_changes(void){return changes;}
 static int cinematic_in_progress(void){return cinematic;}
 static int third_person_director_active(short p){(void)p;return perspective==0;}
@@ -190,7 +209,7 @@ static void cross_product3d(real_vector3d const *a,real_vector3d const *b,real_v
  v->i=a->j*b->k-a->k*b->j;v->j=a->k*b->i-a->i*b->k;v->k=a->i*b->j-a->j*b->i;
 }
 static real magnitude3d(real_vector3d const *v){return sqrtf(v->i*v->i+v->j*v->j+v->k*v->k);}
-static void normalize3d(real_vector3d *v){real l=magnitude3d(v);v->i/=l;v->j/=l;v->k/=l;}
+static real normalize3d(real_vector3d *v){real l=magnitude3d(v);if(l){v->i/=l;v->j/=l;v->k/=l;}return l;}
 static void scale_vector3d(real_vector3d const *v,real s,real_vector3d *o){o->i=v->i*s;o->j=v->j*s;o->k=v->k*s;}
 static void point_from_line3d(real_point3d const *p,real_vector3d const *v,real s,real_point3d *o){
  o->x=p->x+v->i*s;o->y=p->y+v->j*s;o->z=p->z+v->k*s;
@@ -398,6 +417,68 @@ int main(void){
  CHECK(preview_calls==1&&target_traces==0);
  muzzle_preview_succeeds=0;target_traces=preview_calls=0;c=fresh();third_person_camera(0,&c);
  CHECK(preview_calls==1&&target_traces==1);
+ /* Optional display state cannot feed back into the target or aiming vector. */
+ held=0;c=settle(0);render.local_player_index=0;render.camera=c;
+ {
+  real x,y,first;real_point3d target;real_vector3d aim;
+  crosshair_smooth=1;crosshair_size=.8;changes++;c=settle(0);render.camera=c;
+  targets[0]=(real_point3d){10,.25f,0};target=targets[0];aim=body.unit.aiming_vector;
+  p=(point2d){320,240};CHECK(third_person_reticle(&p,1));
+  x=p.x+10;y=p.y;third_person_reticle_vertex(&x,&y);
+  CHECK(fabsf(x-358.25f)<.001f&&fabsf(y-260)<.001f);
+  CHECK(memcmp(&target,&targets[0],sizeof(target))==0&&memcmp(&aim,&body.unit.aiming_vector,sizeof(aim))==0);
+  targets[0].y=5;reticles[0].prepared=FALSE;p=(point2d){320,240};CHECK(third_person_reticle(&p,1));first=reticles[0].shown.x;
+  CHECK(first==35); /* No display catch-up, even after a discontinuous target change. */
+  p=(point2d){320,240};CHECK(third_person_reticle(&p,1));CHECK(reticles[0].shown.x==first);
+  on_screen=0;CHECK(!third_person_reticle(&p,1)&&!reticles[0].valid);on_screen=1;
+  /* Size alone preserves the target centre, including FOV compensation. */
+  crosshair_smooth=0;crosshair_size=.8;changes++;c=settle(0);render.camera=c;
+  targets[0]=(real_point3d){10,.25f,0};p=(point2d){320,240};CHECK(third_person_reticle(&p,.5f));
+  x=320+(p.x-320)*.5f;y=240+(p.y-240)*.5f;third_person_reticle_vertex(&x,&y);
+  CHECK(fabsf(x-350.25f)<.001f&&fabsf(y-260)<.001f);
+  /* FOV, viewport and long-frame changes snap rather than trailing old layout. */
+  crosshair_smooth=1;changes++;c=settle(0);render.camera=c;
+  targets[0]=(real_point3d){10,0,0};p=(point2d){320,240};CHECK(third_person_reticle(&p,1));
+  targets[0].y=5;render.camera.vertical_field_of_view+=.1f;reticles[0].prepared=FALSE;
+  CHECK(third_person_reticle(&p,1)&&reticles[0].shown.x==35);
+  targets[0].y=0;render.camera.window_bounds.x1+=100;reticles[0].prepared=FALSE;
+  CHECK(third_person_reticle(&p,1)&&reticles[0].shown.x==-20);
+  targets[0].y=5;frame_dt=.5f;reticles[0].prepared=FALSE;
+  CHECK(third_person_reticle(&p,1)&&reticles[0].shown.x==-15);frame_dt=1.0f/60;
+  crosshair_smooth=0;crosshair_size=1;changes++;c=settle(0);
+  x=123.25f;y=66.5f;third_person_reticle_vertex(&x,&y);CHECK(x==123.25f&&y==66.5f);
+  crosshair_size=0.0/0.0;changes++;c=settle(0);CHECK(reticle_size==1);
+ }
+ /* Match the rendered view while retaining a genuine unit-relative aiming offset. */
+ {
+  struct observer_result view={{4,5,6},{0,1,0},{0,0,1}};
+  struct unit_datum saved;
+  real_vector3d result;
+  crosshair_smooth=1;changes++;body.unit.desired_aiming_vector=(real_vector3d){1,0,0};
+  body.unit.aiming_vector=(real_vector3d){1,0,0};saved=body;
+  third_person_reticle_view(0,&view);
+  CHECK(reticles[0].view_valid&&fabsf(reticles[0].aim.i)<.0001f&&reticles[0].aim.j==1);
+  CHECK(reticles[0].eye.x==4&&reticles[0].eye.y==5&&reticles[0].eye.z==6);
+  CHECK(memcmp(&saved,&body,sizeof(body))==0);
+  tick++;tick_fraction=.5f;body.unit.aiming_vector=(real_vector3d){.8f,-.6f,0};
+  third_person_reticle_view(0,&view);result=reticles[0].aim;
+  CHECK(fabsf(result.i-.3162278f)<.0001f&&fabsf(result.j-.9486833f)<.0001f);
+  third_person_reticle_view(0,&view);CHECK(memcmp(&result,&reticles[0].aim,sizeof(result))==0);
+  tick_fraction=1;third_person_reticle_view(0,&view);
+  CHECK(fabsf(reticles[0].aim.i-.6f)<.0001f&&fabsf(reticles[0].aim.j-.8f)<.0001f);
+  /* Settings, weapon changes, skipped ticks, local units and resets cannot reuse stale offsets. */
+  held_weapon++;tick_fraction=0;third_person_reticle_view(0,&view);
+  CHECK(fabsf(reticles[0].aim.i-.6f)<.0001f);
+  tick++;body.unit.aiming_vector=(real_vector3d){1,0,0};view.position.x+=3;
+  third_person_reticle_view(0,&view);CHECK(fabsf(reticles[0].aim.i)<.0001f); /* camera cut */
+  tick+=3;body.unit.aiming_vector=(real_vector3d){1,0,0};third_person_reticle_view(0,&view);
+  CHECK(fabsf(reticles[0].aim.i)<.0001f);
+  second_body.unit.desired_aiming_vector=second_body.unit.aiming_vector=(real_vector3d){1,0,0};
+  third_person_reticle_view(1,&view);CHECK(reticles[1].view_valid);
+  zoom=0;third_person_reticle_view(0,&view);CHECK(!reticles[0].view_valid&&!aim_samples[0].valid&&reticles[1].view_valid);zoom=NONE;
+  third_person_reticle_view(0,&view);third_person_reset();CHECK(!reticles[0].view_valid&&!aim_samples[0].valid);
+  crosshair_smooth=0;changes++;third_person_reticle_view(0,&view);CHECK(!reticles[0].view_valid);
+ }
  held=0;third_person_reset();CHECK(!third_person_active(0)&&!third_person_active(1));
  enabled=0;changes++;c=fresh();third_person_camera(1,&c);CHECK(!third_person_active(1));
  return 0;
@@ -619,13 +700,13 @@ int main(void){
  zoom=NONE;has_marker=0;third_person_muzzle_shot(2,1,0,&origin,&forward);CHECK(origin.x==0);
  has_marker=1;third_person_muzzle_shot(2,1,5,&origin,&forward);CHECK(origin.x==0);
  blocked=1;third_person_muzzle_shot(2,1,0,&origin,&forward);CHECK(origin.x>.48f&&origin.x<.5f);
- blocked=0;third_person_muzzle_target(0,&target);CHECK(target.x==10);
+ blocked=0;third_person_muzzle_target(0,&target,NULL,NULL);CHECK(target.x==10);
  CHECK(last_long_origin.z==-.2f&&marker_trigger==0);
- weapon.weapon.triggers[0].state=_trigger_charged;third_person_muzzle_target(0,&target);
+ weapon.weapon.triggers[0].state=_trigger_charged;third_person_muzzle_target(0,&target,NULL,NULL);
  CHECK(last_long_origin.z==-.4f&&marker_trigger==1);
- weapon.weapon.triggers[0].state=_trigger_charging;third_person_muzzle_target(0,&target);CHECK(marker_trigger==0);
+ weapon.weapon.triggers[0].state=_trigger_charging;third_person_muzzle_target(0,&target,NULL,NULL);CHECK(marker_trigger==0);
  weapon.weapon.triggers[0].state=0;
- trigger_defs[0].first_person_weapon_offset.y=-.1f;third_person_muzzle_target(0,&target);
+ trigger_defs[0].first_person_weapon_offset.y=-.1f;third_person_muzzle_target(0,&target,NULL,NULL);
  CHECK(fabsf(target.y+.1f)<.0001f);trigger_defs[0].first_person_weapon_offset.y=0;
  target_distance=.5f;origin=(real_point3d){0,0,0};forward=(real_vector3d){1,0,0};
  CHECK(third_person_muzzle_shot(2,1,0,&origin,&forward));CHECK(forward.i==1&&forward.k==0);
@@ -636,28 +717,41 @@ int main(void){
  strcpy(effect_marker,"smoke");origin=(real_point3d){1,0,0};forward=(real_vector3d){1,0,0};
  CHECK(third_person_muzzle_shot(2,1,0,&origin,&forward));CHECK(origin.z==-.2f);
  weapon.weapon.triggers[0].firing_effect_index=9;
- third_person_muzzle_target(0,&target);CHECK(last_long_origin.z==-.2f);
+ third_person_muzzle_target(0,&target,NULL,NULL);CHECK(last_long_origin.z==-.2f);
  weapon.weapon.triggers[0].firing_effect_index=0;trigger_defs[0].firing_effects.count=0;
  scene=1;muzzle_side=.25f;
  origin=(real_point3d){1,0,0};forward=(real_vector3d){1,0,0};
  CHECK(third_person_muzzle_shot(2,1,0,&origin,&forward));
  CHECK(origin.x==1&&origin.y==.25f);
- third_person_muzzle_target(0,&target);CHECK(target.x==1.5f&&target.z<-.1f);
+ third_person_muzzle_target(0,&target,NULL,NULL);CHECK(target.x==1.5f&&target.z<-.1f);
  CHECK(fabsf((target.y-origin.y)*forward.i-(target.x-origin.x)*forward.j)<.0001f);
- muzzle_side=-.25f;third_person_muzzle_target(0,&target);CHECK(target.x==1.5f&&target.y<0);
+ muzzle_side=-.25f;third_person_muzzle_target(0,&target,NULL,NULL);CHECK(target.x==1.5f&&target.y<0);
  scene=2;origin=(real_point3d){1,0,0};forward=(real_vector3d){1,0,0};
  CHECK(third_person_muzzle_shot(2,1,0,&origin,&forward));
  CHECK(origin.x<.5f&&origin.x>.48f&&forward.i>0);
- third_person_muzzle_target(0,&target);CHECK(fabsf(target.x-.5f)<.0001f);
+ third_person_muzzle_target(0,&target,NULL,NULL);CHECK(fabsf(target.x-.5f)<.0001f);
  scene=0;muzzle_side=0;
- connection=1;target=(real_point3d){10,0,0};third_person_muzzle_target(0,&target);CHECK(target.x==10);
+ connection=1;target=(real_point3d){10,0,0};third_person_muzzle_target(0,&target,NULL,NULL);CHECK(target.x==10);
+ /* Smooth preview retains cover checks, but its rendered ray never changes simulation. */
+ {
+  real_point3d rendered_eye={0,.25f,0},before_origin,after_origin;
+  real_vector3d rendered_aim={1,0,0},before_direction,after_direction;
+  connection=0;origin=(real_point3d){1,0,0};forward=(real_vector3d){1,0,0};
+  CHECK(third_person_muzzle_shot(2,1,0,&origin,&forward));before_origin=origin;before_direction=forward;
+  CHECK(third_person_muzzle_target(0,&target,&rendered_eye,&rendered_aim));CHECK(fabsf(target.y-.25f)<.0001f);
+  origin=(real_point3d){1,0,0};forward=(real_vector3d){1,0,0};
+  CHECK(third_person_muzzle_shot(2,1,0,&origin,&forward));after_origin=origin;after_direction=forward;
+  CHECK(memcmp(&before_origin,&after_origin,sizeof(origin))==0&&memcmp(&before_direction,&after_direction,sizeof(forward))==0);
+  scene=2;CHECK(third_person_muzzle_target(0,&target,&rendered_eye,&rendered_aim));CHECK(fabsf(target.x-.5f)<.0001f);
+  scene=0;connection=1;
+ }
  /* Host-owned history follows the same eligibility, barrels and cover clamp. */
  unit.unit.control_flags=1u<<THIRD_PERSON_INPUT_BIT;unit.unit.current_zoom_level=NONE;
  CHECK(third_person_muzzle_history(1,&target));CHECK(target.x==1&&target.z==-.2f);
  authored_following=1;CHECK(!third_person_muzzle_history(1,&target));
  CHECK(!third_person_muzzle_shot(2,1,0,&origin,&forward));
  connection=0;CHECK(!third_person_muzzle_shot(2,1,0,&origin,&forward));
- target=(real_point3d){7,8,9};third_person_muzzle_target(0,&target);CHECK(target.x==7&&target.y==8&&target.z==9);
+ target=(real_point3d){7,8,9};third_person_muzzle_target(0,&target,NULL,NULL);CHECK(target.x==7&&target.y==8&&target.z==9);
  connection=1;authored_following=0;
  connection=2;CHECK(!third_person_muzzle_history(1,&target));connection=1;
  policy=2;CHECK(!third_person_muzzle_history(1,&target));policy=0;
@@ -685,8 +779,8 @@ int main(void){
    scene=geometry;muzzle_side=side*.25f;
    shot_origin=preview_origin=(real_point3d){1,0,0};
    shot_forward=preview_forward=(real_vector3d){1,0,0};
-   trace_calls=0;CHECK(muzzle_aim(2,1,barrel,&shot_origin,&shot_forward,NULL));shot_traces=trace_calls;
-   trace_calls=0;CHECK(muzzle_aim(2,1,barrel,&preview_origin,&preview_forward,&target));
+   trace_calls=0;CHECK(muzzle_aim(2,1,barrel,&shot_origin,&shot_forward,NULL,NULL));shot_traces=trace_calls;
+   trace_calls=0;CHECK(muzzle_aim(2,1,barrel,&preview_origin,&preview_forward,&target,NULL));
    CHECK(trace_calls==shot_traces+1);
    CHECK(memcmp(&shot_origin,&preview_origin,sizeof(shot_origin))==0);
    CHECK(memcmp(&shot_forward,&preview_forward,sizeof(shot_forward))==0);

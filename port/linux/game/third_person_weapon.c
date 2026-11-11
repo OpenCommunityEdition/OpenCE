@@ -100,7 +100,7 @@ static char const *muzzle_marker(long weapon_index, short trigger_index)
 }
 
 static boolean muzzle_position(long weapon_index, long unit_index, short trigger_index,
-	real_point3d *position, real_point3d *obstruction, boolean *blocked)
+	real_point3d *position, real_point3d *obstruction, boolean *blocked, real_point3d const *view_eye)
 {
 	struct object_marker marker;
 	real_point3d eye;
@@ -114,7 +114,10 @@ static boolean muzzle_position(long weapon_index, long unit_index, short trigger
 		!object_get_marker_by_name(weapon_index,
 			trigger_index ? "secondary trigger" : "primary trigger", &marker, 1))
 		return FALSE;
-	unit_get_camera_position(unit_index, &eye);
+	if (view_eye)
+		eye = *view_eye;
+	else
+		unit_get_camera_position(unit_index, &eye);
 	*position = marker.matrix.position;
 	vector_from_points3d(&eye, position, &delta);
 	length = magnitude3d(&delta);
@@ -132,13 +135,13 @@ static boolean muzzle_position(long weapon_index, long unit_index, short trigger
 /* Both the preview and actual shot use this solver. The input ray is the
    stock weapon ray (aim assistance has already run for a real shot). */
 static boolean muzzle_aim(long weapon_index, long unit_index, short trigger_index,
-	real_point3d *origin, real_vector3d *forward, real_point3d *target)
+	real_point3d *origin, real_vector3d *forward, real_point3d *target, real_point3d const *view_eye)
 {
 	real_point3d muzzle, eye, obstruction, aim;
 	real_vector3d ray;
 	boolean blocked;
 	struct collision_result collision;
-	if (!muzzle_position(weapon_index, unit_index, trigger_index, &muzzle, &obstruction, &blocked))
+	if (!muzzle_position(weapon_index, unit_index, trigger_index, &muzzle, &obstruction, &blocked, view_eye))
 		return FALSE;
 	scale_vector3d(forward, 1000.0f, &ray);
 	point_from_line3d(origin, &ray, 1.0f, &aim);
@@ -146,7 +149,10 @@ static boolean muzzle_aim(long weapon_index, long unit_index, short trigger_inde
 		aim = collision.point;
 	/* The stock offset can start beyond nearby cover. Check the segment
 	   leading to that origin as well, rather than aiming through the wall. */
-	unit_get_camera_position(unit_index, &eye);
+	if (view_eye)
+		eye = *view_eye;
+	else
+		unit_get_camera_position(unit_index, &eye);
 	vector_from_points3d(&eye, origin, &ray);
 	if (magnitude3d(&ray) > 0.001f && collision_test_vector(_collision_test_for_projectiles_flags,
 		&eye, &ray, unit_index, &collision))
@@ -179,7 +185,7 @@ boolean third_person_muzzle_shot(long weapon_index, long unit_index, short trigg
 	{
 		if (!muzzle_network_player(unit_index))
 			return FALSE;
-		if (!muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, NULL))
+		if (!muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, NULL, NULL))
 			return FALSE;
 		if (config_string("debug.network_test")[0])
 			platform_log("network muzzle: player %ld trigger %d origin %.4f %.4f %.4f",
@@ -189,7 +195,7 @@ boolean third_person_muzzle_shot(long weapon_index, long unit_index, short trigg
 	}
 	for (player = 0; player < MAXIMUM_LOCAL_PLAYERS; player++)
 		if (muzzle_player(player, unit_index))
-			return muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, NULL);
+			return muzzle_aim(weapon_index, unit_index, trigger_index, origin, forward, NULL, NULL);
 	return FALSE;
 }
 
@@ -230,10 +236,11 @@ boolean third_person_muzzle_history(long unit_index, real_point3d *position)
 	unit = unit_get(unit_index);
 	if (!muzzle_preview_weapon(unit, unit_index, &weapon_index, &trigger_index))
 		return FALSE;
-	return muzzle_position(weapon_index, unit_index, trigger_index, position, &obstruction, &blocked);
+	return muzzle_position(weapon_index, unit_index, trigger_index, position, &obstruction, &blocked, NULL);
 }
 
-boolean third_person_muzzle_target(short player, real_point3d *target)
+boolean third_person_muzzle_target(short player, real_point3d *target,
+	real_point3d const *view_eye, real_vector3d const *view_aim)
 {
 	long unit_index, weapon_index;
 	short trigger_index = 0;
@@ -243,6 +250,7 @@ boolean third_person_muzzle_target(short player, real_point3d *target)
 	real_point3d origin;
 	real_vector3d forward, right, up;
 	real velocity;
+	real_vector3d relative;
 	unit_index = player_control_get_unit_index(player);
 	if (!muzzle_player(player, unit_index))
 		return FALSE;
@@ -254,9 +262,23 @@ boolean third_person_muzzle_target(short player, real_point3d *target)
 		trigger_index ? "secondary trigger" : "primary trigger", &marker, 1))
 		return FALSE;
 	origin = marker.matrix.position;
-	forward = unit->unit.aiming_vector;
-	unit_adjust_projectile_ray(unit_index, &origin, &forward, &velocity,
-		TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_fires_from_camera_bit), TRUE);
+	if (view_eye && view_aim)
+	{
+		/* Display-only equivalent of unit_adjust_projectile_ray, using the
+		   rendered eye/aim with rendered markers. Never write unit state. */
+		forward = *view_aim;
+		if (TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_fires_from_camera_bit))
+		{
+			vector_from_points3d(view_eye, &origin, &relative);
+			point_from_line3d(view_eye, &forward, dot_product3d(&relative, &forward), &origin);
+		}
+	}
+	else
+	{
+		forward = unit->unit.aiming_vector;
+		unit_adjust_projectile_ray(unit_index, &origin, &forward, &velocity,
+			TEST_FLAG(unit_definition_get(unit->definition_index)->unit.flags, _unit_fires_from_camera_bit), TRUE);
+	}
 	cross_product3d(global_up3d, &forward, &right);
 	if (normalize3d(&right) == 0.0f)
 		right = *global_left3d;
@@ -265,7 +287,7 @@ boolean third_person_muzzle_target(short player, real_point3d *target)
 	point_from_line3d(&origin, &forward, trigger->first_person_weapon_offset.x, &origin);
 	point_from_line3d(&origin, &right, trigger->first_person_weapon_offset.y, &origin);
 	point_from_line3d(&origin, &up, trigger->first_person_weapon_offset.z, &origin);
-	return muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target);
+	return muzzle_aim(weapon_index, unit_index, trigger_index, &origin, &forward, target, view_eye);
 }
 
 /* Shoulder projectiles exclude their owner during the existing BSP repair.

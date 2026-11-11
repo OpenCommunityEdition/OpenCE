@@ -5,6 +5,7 @@
 #include "camera/director.h"
 #include "cutscene/cinematics.h"
 #include "game/players.h"
+#include "game/game.h"
 #include "units/units.h"
 #include "physics/collisions.h"
 #include "render/render.h"
@@ -17,6 +18,25 @@
 int config_boolean(char const *name);
 unsigned long config_changes(void);
 double config_real(char const *name);
+
+struct shoulder_reticle_state
+{
+	boolean valid, prepared, view_valid;
+	real_point2d shown, raw;
+	real size;
+	real_point3d eye;
+	real_vector3d aim;
+};
+struct shoulder_aim_state
+{
+	boolean valid;
+	long tick, unit_index, weapon_index;
+	real_vector3d previous, latest;
+};
+static struct shoulder_reticle_state reticles[MAXIMUM_LOCAL_PLAYERS];
+static struct shoulder_aim_state aim_samples[MAXIMUM_LOCAL_PLAYERS];
+static boolean smooth_reticle;
+static real reticle_size = 1.0f;
 
 struct shoulder_camera_state
 {
@@ -78,6 +98,9 @@ void third_person_reset(void)
 	for (index = 0; index < MAXIMUM_LOCAL_PLAYERS; index++)
 	{
 		cameras[index].initialized = FALSE;
+		reticles[index].valid = FALSE;
+		reticles[index].view_valid = FALSE;
+		aim_samples[index].valid = FALSE;
 		reset_look(&cameras[index], index);
 		active[index] = FALSE;
 	}
@@ -98,6 +121,11 @@ static void camera_settings_update(void)
 	if (read_at != changes)
 	{
 		read_at = changes;
+		smooth_reticle = config_boolean("display.third_person_crosshair_smooth") != 0;
+		reticle_size = camera_setting("display.third_person_crosshair_size", 0.75, 1.0, 1.0f);
+		/* Settings changes must not reuse an earlier view or aim sample. */
+		csmemset(reticles, 0, sizeof(reticles));
+		csmemset(aim_samples, 0, sizeof(aim_samples));
 		smooth_camera = config_boolean("display.third_person_smooth") != 0;
 		requested_distance = camera_setting("display.third_person_distance", 0.3, 2.0, 0.85f);
 		requested_height = camera_setting("display.third_person_height", -0.2, 0.6, 0.12f);
@@ -163,6 +191,71 @@ boolean third_person_free_look_input(short local_player_index, real yaw, real pi
 	return TRUE;
 }
 
+/* The renderer supplies its unshaken, interpolated/instant view before the
+   shoulder displacement. Carry the simulated aim offset into that view's
+   basis; do not project a tick-old world direction through a newer camera. */
+void third_person_reticle_view(short player, struct observer_result const *view)
+{
+	struct shoulder_reticle_state *reticle;
+	struct shoulder_aim_state *sample;
+	struct unit_datum *unit;
+	real_vector3d requested, up, right, relative, blended, eye_delta;
+	long unit_index, weapon_index, tick;
+	real fraction;
+	if (player < 0 || player >= MAXIMUM_LOCAL_PLAYERS)
+		return;
+	camera_settings_update();
+	reticle = &reticles[player];
+	sample = &aim_samples[player];
+	reticle->view_valid = FALSE;
+	if (!view || !smooth_reticle || !third_person_wanted(player))
+	{
+		sample->valid = FALSE;
+		return;
+	}
+	unit_index = player_control_get_unit_index(player);
+	unit = unit_get(unit_index);
+	weapon_index = unit_inventory_get_weapon(unit_index, unit->unit.current_weapon_index);
+	tick = game_time_get();
+	requested = unit->unit.desired_aiming_vector;
+	if (normalize3d(&requested) < 0.0001f)
+	{
+		sample->valid = FALSE;
+		return;
+	}
+	observer_up_from_forward(&requested, &up);
+	cross_product3d(&requested, &up, &right);
+	relative.i = dot_product3d(&unit->unit.aiming_vector, &requested);
+	relative.j = dot_product3d(&unit->unit.aiming_vector, &right);
+	relative.k = dot_product3d(&unit->unit.aiming_vector, &up);
+	vector_from_points3d(&reticle->eye, &view->position, &eye_delta);
+	if (!sample->valid || magnitude3d(&eye_delta) > 2.0f || sample->unit_index != unit_index || sample->weapon_index != weapon_index ||
+		tick < sample->tick || tick > sample->tick + 1 ||
+		dot_product3d(&relative, &sample->latest) < 0.5f)
+	{
+		sample->previous = sample->latest = relative;
+	}
+	else if (tick != sample->tick)
+	{
+		sample->previous = sample->latest;
+		sample->latest = relative;
+	}
+	sample->unit_index = unit_index;
+	sample->weapon_index = weapon_index;
+	sample->tick = tick;
+	sample->valid = TRUE;
+	fraction = render_interpolation_fraction();
+	blended.i = sample->previous.i + (sample->latest.i - sample->previous.i) * fraction;
+	blended.j = sample->previous.j + (sample->latest.j - sample->previous.j) * fraction;
+	blended.k = sample->previous.k + (sample->latest.k - sample->previous.k) * fraction;
+	cross_product3d(&view->forward, &view->up, &right);
+	reticle->aim.i = view->forward.i * blended.i + right.i * blended.j + view->up.i * blended.k;
+	reticle->aim.j = view->forward.j * blended.i + right.j * blended.j + view->up.j * blended.k;
+	reticle->aim.k = view->forward.k * blended.i + right.k * blended.j + view->up.k * blended.k;
+	reticle->eye = view->position;
+	reticle->view_valid = normalize3d(&reticle->aim) > 0.0001f;
+}
+
 static void camera_target_update(short local_player_index, long unit_index)
 {
 	struct unit_datum *unit;
@@ -172,14 +265,24 @@ static void camera_target_update(short local_player_index, long unit_index)
 
 	/* Orbit and its return hide the reticle, so neither target ray is used. */
 	if (camera_orbiting(&cameras[local_player_index]) ||
-		third_person_muzzle_target(local_player_index, &targets[local_player_index]))
+		third_person_muzzle_target(local_player_index, &targets[local_player_index],
+			reticles[local_player_index].view_valid ? &reticles[local_player_index].eye : NULL,
+			reticles[local_player_index].view_valid ? &reticles[local_player_index].aim : NULL))
 		return;
 	unit = unit_get(unit_index);
 	/* Project the stock firing line, not a ray from the displaced camera.
 	   This indicates the nominal aim point; spread and projectile gravity
 	   remain the weapon's own, just as in first person. */
-	unit_get_camera_position(unit_index, &origin);
-	scale_vector3d(&unit->unit.aiming_vector, 1000.0f, &ray);
+	if (reticles[local_player_index].view_valid)
+	{
+		origin = reticles[local_player_index].eye;
+		scale_vector3d(&reticles[local_player_index].aim, 1000.0f, &ray);
+	}
+	else
+	{
+		unit_get_camera_position(unit_index, &origin);
+		scale_vector3d(&unit->unit.aiming_vector, 1000.0f, &ray);
+	}
 	point_from_line3d(&origin, &ray, 1.0f, &targets[local_player_index]);
 	if (collision_test_vector(_collision_test_for_projectiles_flags, &origin, &ray,
 		unit_index, &collision))
@@ -270,12 +373,14 @@ void third_person_camera(short local_player_index, struct render_camera *camera)
 
 	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
 		return;
+	reticles[local_player_index].prepared = FALSE;
 	was_active = active[local_player_index];
 	active[local_player_index] = FALSE;
 	state = &cameras[local_player_index];
 	if (!camera || !third_person_wanted(local_player_index))
 	{
 		state->initialized = FALSE;
+		reticles[local_player_index].valid = FALSE;
 		reset_look(state, local_player_index);
 		return;
 	}
@@ -299,6 +404,7 @@ void third_person_camera(short local_player_index, struct render_camera *camera)
 		state->unit_index = unit_index;
 		state->initialized = TRUE;
 		was_active = FALSE;
+		reticles[local_player_index].valid = FALSE;
 	}
 	vertical_step = camera->position.z - state->eye.z;
 	/* Dampen small stair/slope changes only. Keep the real eye as the
@@ -350,6 +456,7 @@ void third_person_camera(short local_player_index, struct render_camera *camera)
 	state->side += (requested_side - state->side) * blend;
 	if (!camera_collision(state, unit_index, camera, dt, was_active))
 	{
+		reticles[local_player_index].valid = FALSE;
 		/* Collision fallback must retain the player's first-person aim. */
 		camera->forward = saved_forward;
 		camera->up = saved_up;
@@ -365,22 +472,59 @@ void third_person_camera(short local_player_index, struct render_camera *camera)
 	camera_target_update(local_player_index, unit_index);
 }
 
+/* Every bitmap piece uses the current projected target without a catch-up
+   filter. Fractional placement is applied after the integer HUD layout. */
+static void reticle_prepare(real_point2d const *offset, real scale)
+{
+	struct shoulder_reticle_state *state = &reticles[render.local_player_index];
+	state->shown = *offset;
+	state->raw.x = (short)(offset->x / scale) * scale;
+	state->raw.y = (short)(offset->y / scale) * scale;
+	state->size = reticle_size;
+	state->prepared = state->valid = TRUE;
+}
+
 boolean third_person_reticle(point2d *point, real reticle_scale)
 {
-	real_point2d screen;
+	real_point2d screen, offset;
 	real center_x, center_y;
+	short player = render.local_player_index;
 
-	if (!third_person_active(render.local_player_index))
+	if (!third_person_active(player))
 		return TRUE;
-	if (camera_orbiting(&cameras[render.local_player_index]))
+	if (camera_orbiting(&cameras[player]) ||
+		!render_camera_world_to_screen(&render.camera, &render.frustum, &targets[player], &screen))
+	{
+		reticles[player].valid = FALSE;
 		return FALSE;
-	if (!render_camera_world_to_screen(&render.camera, &render.frustum,
-		&targets[render.local_player_index], &screen))
-		return FALSE;
+	}
 	center_x = (render.camera.window_bounds.x0 + render.camera.window_bounds.x1) * 0.5f;
 	center_y = (render.camera.window_bounds.y0 + render.camera.window_bounds.y1) * 0.5f;
-	/* hud_draw_bitmap_internal scales about the original screen centre. */
-	point->x += (short)((screen.x - center_x) / reticle_scale);
-	point->y += (short)((screen.y - center_y) / reticle_scale);
+	offset.x = screen.x - center_x;
+	offset.y = screen.y - center_y;
+	if (smooth_reticle || reticle_size != 1.0f)
+		reticle_prepare(&offset, reticle_scale);
+	/* Preserve the established draw exactly with both options at default. */
+	point->x += (short)(offset.x / reticle_scale);
+	point->y += (short)(offset.y / reticle_scale);
 	return TRUE;
+}
+
+/* Called only for centre-anchored weapon reticles, after ordinary HUD/FOV
+   scaling. Move fractional coordinates here, after the integer HUD layout;
+   scale all artwork and authored offsets about the same projected aim point. */
+void third_person_reticle_vertex(real *x, real *y)
+{
+	short player = render.local_player_index;
+	struct shoulder_reticle_state const *state;
+	real center_x, center_y;
+	if (!third_person_active(player) || (!smooth_reticle && reticle_size == 1.0f))
+		return;
+	state = &reticles[player];
+	if (!state->prepared || !state->valid)
+		return;
+	center_x = (render.camera.window_bounds.x0 + render.camera.window_bounds.x1) * 0.5f - render.camera.viewport_bounds.x0;
+	center_y = (render.camera.window_bounds.y0 + render.camera.window_bounds.y1) * 0.5f - render.camera.viewport_bounds.y0;
+	*x = center_x + state->shown.x + (*x - center_x - state->raw.x) * state->size;
+	*y = center_y + state->shown.y + (*y - center_y - state->raw.y) * state->size;
 }

@@ -755,10 +755,14 @@ struct observer_result const *render_interpolation_camera(
 	short local_player_index,
 	struct observer_result const *observer)
 {
+	struct observer_result const *view;
 	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
 		return observer;
-	return render_interpolation_direct_camera(local_player_index,
+	view = render_interpolation_direct_camera(local_player_index,
 		render_interpolation_blended_camera(local_player_index, observer));
+	/* The shoulder preview needs this same view before shake and displacement. */
+	third_person_reticle_view(local_player_index, view);
+	return view;
 }
 
 /* between two of the observer's results: the position, the axes (up kept

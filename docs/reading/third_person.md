@@ -127,3 +127,87 @@ These are distinct from rendered map-family checks, physical controller
 interaction, same-process split-screen input and public internet testing.
 Passing a fake-world test or a loopback session does not establish those
 additional behaviors or full campaign compatibility.
+
+## Optional crosshair presentation
+
+Shoulder Camera offers **Smooth Crosshair** (off by default) and independent
+**Crosshair Size** (75-100%, default 100%). These affect only this machine's
+centre-anchored shoulder reticle. First-person views, scopes, passenger cameras
+and weapon-authored cameras retain their existing paths. Simulated firing,
+spread, aim assistance, host decisions and the network protocol are unchanged.
+
+Start with `render_interpolation_camera` in
+[render_interpolation.c](../../port/linux/game/render_interpolation.c), then
+`third_person_reticle_view` and `camera_target_update` in
+[third_person.c](../../port/linux/game/third_person.c), and
+`third_person_muzzle_target` in
+[third_person_weapon.c](../../port/linux/game/third_person_weapon.c).
+
+The original preview combines tick-updated aim with interpolated weapon markers
+and camera positions. During a turn, a fixed direction from one tick projects
+to different screen positions as the camera moves between ticks. Smooth uses
+the same rendered observer as the camera, including Instant Aim where enabled,
+before shake, free look and shoulder displacement. It expresses the unit's
+actual aim relative to its desired aim, interpolates that relative offset using
+the renderer's tick fraction, and reconstructs the preview direction in the
+rendered view. This preserves a real aiming offset instead of assuming that
+all weapons point along the camera's forward axis.
+
+The preview supplies the rendered eye and direction to the existing muzzle
+solver. Rendered markers, authored trigger offsets, near-cover checks and the
+final barrel trace remain in use. Actual shots and host visibility history pass
+no rendered-eye override and retain their simulation paths. An unarmed preview
+uses the same rendered eye/direction for its fallback trace. Nothing writes
+these display values back into a unit, player controls or projectile.
+
+There is no additional screen-position easing: the current preview target is
+projected every frame, including target-depth changes and nearby cover. The
+ordinary renderer's interpolation still has its existing latency. A reticle
+remains a nominal aiming guide, not a prediction of spread, gravity, aim
+assistance or the next simulation tick's exact impact.
+
+The small interpolation hook is necessary to obtain the actual view chosen by
+Smooth Motion and Instant Aim before camera effects. The `hud_draw_bitmap_internal`
+hook in [hud_draw.c](../../source/interface/hud_draw.c) supplies the final
+floating-point vertices, because the older HUD placement interface accepts
+integer points. `third_person_reticle_vertex` applies fractional displacement
+and scales the artwork and its authored component offsets about the projected
+aim point. With both options at their defaults, the original placement remains
+unchanged. With size alone at 80%, the original preview timing remains, while
+its artwork and spacing shrink around that target. Feature state stays in the
+shoulder module; no map loader or MCC adapter changes are needed.
+
+Relative-aim history belongs to each local viewport. Settings changes,
+map/checkpoint reset, loss of eligible shoulder view, unit/weapon changes,
+large camera-position jumps, skipped/reversed ticks and large aiming-offset
+changes discard it. A missing projection hides the reticle. Free look retains
+its existing hide-and-return behavior. HUD/FOV/viewport changes use the current
+projection directly, so they cannot inherit an old screen position.
+
+### November 11 runtime investigation
+
+Windows portable release, PGO/LTO off, based on `300c92029`, was tested in hidden
+2560x1440 windows on Xbox Blood Gulch with isolated saves. Existing `look:0` and
+`bot:0` scripted inputs supplied turning and moving/firing scenarios. The HUD
+uses approximately 852x480 coordinates. Temporary frame logging was used only
+for measurement and is absent from the delivered code.
+
+Stationary aim was stable; disabling Smooth Motion greatly reduced the original
+turning steps. The initial 25 ms screen filter reduced jitter but added visible
+trailing. The final implementation removes that filter and corrects the preview's
+timing basis instead. In separate 120 FPS-cap runs, the turning frame-step 95th
+percentile fell from 3.41 to 0.005 HUD units; moving/firing fell from 1.14 to
+0.025. Maximum steps were 10.34 versus 2.83 for turning and 5.89 versus 4.72 for
+moving/firing: legitimate changes in projected targets are not eased away.
+The correction also worked with Instant Aim disabled. These are short local
+measurements, not a universal quality or latency guarantee.
+
+[The camera tests](../../tools/test_third_person.py) exercise the production
+view basis, preserved aiming offsets, tick interpolation, reset and split-view
+ownership, immediate projection, fractional placement and independent size.
+Muzzle tests cover near obstacles and verify that a smooth preview cannot
+change a subsequent shot. Map-family transitions and native-resolution HUD
+captures complement those synthetic checks; retained assignment logs record
+actual outcomes and limits. Comparison videos show independent real-time runs
+with identical scripted input and timestamp-based playback, not frame-locked
+simulation replays. Capture overhead affects frame cadence.
