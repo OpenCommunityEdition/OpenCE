@@ -257,8 +257,8 @@ grenades switched with the left bumper (the flashlight moves to X).
 | change the weapon | mouse wheel, 1 |
 | change the grenade | X |
 | flashlight | Q |
-| sprint (hold; a gametype with ABILITIES) | left shift |
-| armour lock (hold; a gametype with ABILITIES) | H |
+| sprint (hold) | left shift |
+| armour lock (hold; a gametype with ARMOR LOCK) | H |
 | zoom | Z, middle mouse button |
 | show the scores (hold) | tab |
 | pause menu | escape |
@@ -447,7 +447,7 @@ Edit Gametypes edits them as any gametype, and its OPENCE OPTIONS screen
 (after TEAMPLAY OPTIONS) gives any gametype these rules: its MODE (NONE,
 SWAT, INFECTION or GUN GAME: Slayer only; Infection is played on teams and
 Gun Game free for all, which the screen's OK sets), HARDCORE (any game
-type), ABILITIES (any gametype: below), and the mode's own options: Infection's first zombies, zombie speed,
+type), ARMOR LOCK (any gametype: below), and the mode's own options: Infection's first zombies, zombie speed,
 skull damage, zombie respawn time, countdown and zombie shields, and Gun
 Game's weapon order (strongest first, weakest first, or random, drawn by
 the host for each game) and whether a melee kill demotes. A saved gametype
@@ -461,9 +461,10 @@ the rest of the game. The lobby and Server Setup name the gametype's mode.
 `hardcore`, `hardcore_ctf`, `hardcore_oddball` and `hardcore_king`
 (`host:bloodgulch:infection`).
 
-ABILITIES (NONE, SPRINT, ARMOR LOCK or BOTH; a dedicated server's gametype
-rules `sprint` and `armor_lock`) gives the players of any multiplayer
-gametype sprint, armour lock or both (`port/linux/game/abilities.c`):
+Every player sprints, in every game (multiplayer, the campaign and co-op).
+ARMOR LOCK (OFF or ON; a dedicated server's gametype rule `armor_lock`)
+gives the players of any multiplayer gametype armour lock too
+(`port/linux/game/abilities.c`):
 
 - Sprint (`controls.sprint`, Left Shift): held while moving forward on
   foot, standing, the player runs 1.5 times as fast with the weapon lowered

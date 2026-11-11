@@ -945,7 +945,7 @@ SHIELD_EFFECTS_HELP = [
 
 # OpenCE's gametypes' options (port/linux/game/game_modes.c), a screen of the
 # gametype editor's (menu_functions.c's "mp profile init opence options"): the
-# mode, Hardcore and the abilities (port/linux/game/abilities.c), then the
+# mode, Hardcore and armour lock (port/linux/game/abilities.c), then the
 # mode's own rows, which menu_functions.c's
 # gametype_option_help shows (op_inf_ for Infection, op_gg_ for Gun Game)
 # below them; a row's values are menu_functions.c's gametype_options'
@@ -960,11 +960,9 @@ OPENCE_ROWS = [
     ("oce_hardcore", "HARDCORE:", ["OFF", "ON"], [
         "The motion sensor and aim assist as the game\\ntype has them.",
         "No motion sensor, no aim assist, and a kill\\nrestores the killer's health and shields."]),
-    ("oce_abilities", "ABILITIES:", ["NONE", "SPRINT", "ARMOR LOCK", "BOTH"], [
-        "Players have no abilities.",
-        "Hold SPRINT to run faster with the weapon\\nlowered, until its energy runs out.",
-        "Hold ARMOR LOCK to stand locked in place,\\ntaking no damage, until its energy runs out.",
-        "Players can both sprint and armor lock\\n(Controls Setup binds them)."]),
+    ("oce_armor_lock", "ARMOR LOCK:", ["OFF", "ON"], [
+        "Players have no armor lock (every player\\ncan sprint).",
+        "Hold ARMOR LOCK to stand locked in place,\\ntaking no damage, until its energy runs out."]),
     ("inf_zombies", "FIRST ZOMBIES:", ["1", "2", "3", "4", "8", "16"],
      ["The zombies chosen when the round starts\\n(a human is always left)."] * 6),
     ("inf_speed", "ZOMBIE SPEED:", ["100%", "110%", "125%", "150%", "175%", "200%"],

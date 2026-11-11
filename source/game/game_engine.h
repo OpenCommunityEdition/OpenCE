@@ -242,16 +242,6 @@ enum
 	NUMBER_OF_GUN_GAME_ORDERS
 };
 
-enum
-{
-	/* port: the abilities a gametype gives its players (port/linux/game/
-	abilities.c): sprint, held to run faster with the weapon lowered, and
-	armour lock, held to stand locked in place and take no damage */
-	_game_ability_sprint_bit = 0,
-	_game_ability_armor_lock_bit,
-	NUMBER_OF_GAME_ABILITIES
-};
-
 /* (the starting equipment, generic or the map's, is the variant's own:
 _game_variant_generic_starting_equipment_bit) */
 struct game_variant_options
@@ -299,10 +289,11 @@ struct game_variant_options
 	of their own team (game_engine_get_starting_location_rating). Taken from
 	reserved, which older builds zero and ignore: the host alone picks spawns */
 	boolean force_team_spawns;
-	/* port: OPENCE OPTIONS' ABILITIES: sprint and armour lock, a bit each
-	(_game_ability_*_bit: port/linux/game/abilities.c). Taken from reserved,
-	which older builds zero and ignore */
-	byte abilities;
+	/* port: OPENCE OPTIONS' ARMOR LOCK: the players armour lock, held to
+	stand locked in place and take no damage (port/linux/game/abilities.c;
+	every player sprints, whatever the gametype). Taken from reserved, which
+	older builds zero and ignore */
+	boolean armor_lock;
 	byte reserved[4];
 };
 

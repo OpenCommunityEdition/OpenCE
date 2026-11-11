@@ -6875,9 +6875,7 @@ static struct gametype_option const gametype_options[] =
 	{ "oce_mode_spinner", _option_option_byte, OPTIONS_FIELD(mode), 0, 4,
 		{ _game_mode_none, _game_mode_swat, _game_mode_infection, _game_mode_gun_game } },
 	{ "oce_hardcore_spinner", _option_option_byte, OPTIONS_FIELD(hardcore), 0, 2, { FALSE, TRUE } },
-	{ "oce_abilities_spinner", _option_option_byte, OPTIONS_FIELD(abilities), 0, 4,
-		{ 0, FLAG(_game_ability_sprint_bit), FLAG(_game_ability_armor_lock_bit),
-			FLAG(_game_ability_sprint_bit) | FLAG(_game_ability_armor_lock_bit) } },
+	{ "oce_armor_lock_spinner", _option_option_byte, OPTIONS_FIELD(armor_lock), 0, 2, { FALSE, TRUE } },
 	{ "inf_zombies_spinner", _option_option_byte, OPTIONS_FIELD(infection_initial_zombies), 0, 6, { 1, 2, 3, 4, 8, 16 } },
 	{ "inf_speed_spinner", _option_option_byte, OPTIONS_FIELD(infection_zombie_speed), 0, 6,
 		{ 100, 110, 125, 150, 175, 200 } },
@@ -7596,7 +7594,7 @@ static void gametype_option_help(struct widget_instance *list)
 		visible_set(named(list, "op_secondary_weapon", 0), custom);
 	}
 	/* (OPENCE OPTIONS: the mode's own rows, Infection's or Gun Game's, below
-	MODE, HARDCORE and ABILITIES) */
+	MODE, HARDCORE and ARMOR LOCK) */
 	if (named(list, "oce_mode_spinner", 0))
 	{
 		short mode = named(list, "oce_mode_spinner", 0)->parameters.list.selected_index;

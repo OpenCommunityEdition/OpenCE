@@ -1,9 +1,10 @@
 /*
 ABILITIES.C
 
-Sprint and armour lock, abilities a gametype may give its players (OPENCE
-OPTIONS' ABILITIES: game_engine.h's game_variant_options.abilities, a bit
-for each of _game_ability_sprint_bit and _game_ability_armor_lock_bit).
+Sprint, which every player has, in every game (multiplayer, the campaign
+and co-op), and armour lock, which a multiplayer gametype may give its
+players (OPENCE OPTIONS' ARMOR LOCK: game_engine.h's
+game_variant_options.armor_lock).
 
 - Sprint (controls.sprint): held while moving forward on foot, standing, the
   player runs SPRINT_SPEED_SCALE times as fast with the weapon lowered (no
@@ -51,6 +52,13 @@ armour lock is the one that counts.
 #define ARMOR_LOCK_RECHARGE_DELAY_TICKS (TICKS_PER_SECOND)
 #define ARMOR_LOCK_MINIMUM_ENERGY 0.25f
 
+/* the abilities a game gives, a bit each */
+enum
+{
+	_ability_sprint_bit = 0,
+	_ability_armor_lock_bit
+};
+
 /* what a sprint lowers the weapon for */
 #define SPRINT_BLOCKED_CONTROL_FLAGS ( \
 	FLAG(_unit_control_weapon_primary_trigger_bit) | \
@@ -79,13 +87,16 @@ struct ability_state
 /* by absolute player index */
 static struct ability_state abilities_states[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 
-/* the abilities the game gives (_game_ability_*_bit) */
+/* the abilities the game gives (_ability_*_bit): sprint always, armour
+lock in a gametype that gives it */
 static byte abilities_enabled(
 	void)
 {
-	if (!game_engine_running())
-		return 0;
-	return (byte)(game_variant_options_get()->abilities & (FLAG(NUMBER_OF_GAME_ABILITIES) - 1));
+	byte enabled = FLAG(_ability_sprint_bit);
+
+	if (game_engine_running() && game_variant_options_get()->armor_lock)
+		enabled |= FLAG(_ability_armor_lock_bit);
+	return enabled;
 }
 
 static struct ability_state *abilities_player_state(
@@ -166,9 +177,9 @@ static void abilities_update(
 	struct biped_datum *biped,
 	struct player_action const *action)
 {
-	boolean sprint_held = TEST_FLAG(enabled, _game_ability_sprint_bit) &&
+	boolean sprint_held = TEST_FLAG(enabled, _ability_sprint_bit) &&
 		TEST_FLAG(action->control_flags, UNIT_CONTROL_PORT_SPRINT_BIT);
-	boolean armor_lock_held = TEST_FLAG(enabled, _game_ability_armor_lock_bit) &&
+	boolean armor_lock_held = TEST_FLAG(enabled, _ability_armor_lock_bit) &&
 		TEST_FLAG(action->control_flags, UNIT_CONTROL_PORT_ARMOR_LOCK_BIT);
 	boolean crouching = TEST_FLAG(action->control_flags, _unit_control_crouch_modifier_bit);
 	boolean attacking = (action->control_flags & (FLAG(_unit_control_weapon_primary_trigger_bit) |
@@ -301,7 +312,7 @@ real abilities_speed_scale(
 real abilities_maximum_speed_scale(
 	void)
 {
-	return TEST_FLAG(abilities_enabled(), _game_ability_sprint_bit) ? SPRINT_SPEED_SCALE : 1.0f;
+	return SPRINT_SPEED_SCALE;
 }
 
 boolean abilities_blocks_damage(

@@ -106,8 +106,8 @@ camera raise, camera lower, cycle camera, sprint, armor lock
 ```
 
 Sprint and armor lock are gameplay actions (in the same group as flashlight and
-zoom), used only in a gametype that gives them (OpenCE Options' ABILITIES). They
-start unbound.
+zoom). Sprint works in every game; armor lock only in a gametype that gives it
+(OpenCE Options' ARMOR LOCK). They start unbound.
 
 Entries are physical tokens: `south,east,west,north,rb,lb,lt,rt,ls,rs,dpad_up,
 dpad_down,dpad_left,dpad_right,back`, or `unbound`. South means A on Xbox, Cross on

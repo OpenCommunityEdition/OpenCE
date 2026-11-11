@@ -98,7 +98,6 @@ const struct server_rule_definition server_rule_definitions[] =
 	RULE_INTEGER("gun_turrets", NULL, "options", ALL, 0, 4, "Gun turrets of each team, with team_vehicles custom"),
 	RULE_BOOLEAN("hardcore", NULL, "options", ALL,
 		"Hardcore: no motion sensor, no aim assist, a kill restores the killer's health and shields"),
-	RULE_BOOLEAN("sprint", NULL, "options", ALL, "Players sprint (controls.sprint): faster, the weapon lowered"),
 	RULE_BOOLEAN("armor_lock", NULL, "options", ALL,
 		"Players armour lock (controls.armor_lock): locked in place, they take no damage"),
 

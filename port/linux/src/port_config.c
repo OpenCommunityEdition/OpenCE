@@ -464,11 +464,10 @@ static const struct config_setting config_settings[] =
 	{ "controls.flashlight", _config_string, "\"Q\"", "HALO_KEY_FLASHLIGHT", _environment_value, _platform_all,
 		"The flashlight." },
 	{ "controls.sprint", _config_string, "\"Left Shift\"", "HALO_KEY_SPRINT", _environment_value, _platform_all,
-		"Sprinting, held, in a gametype that gives it (OpenCE Options'\n"
-		"ABILITIES)." },
+		"Sprinting, held: faster, the weapon lowered, while its energy lasts." },
 	{ "controls.armor_lock", _config_string, "\"H\"", "HALO_KEY_ARMOR_LOCK", _environment_value, _platform_all,
 		"Armour lock, held, in a gametype that gives it (OpenCE Options'\n"
-		"ABILITIES)." },
+		"ARMOR LOCK)." },
 	{ "controls.scoreboard", _config_string, "\"Tab\"", "HALO_KEY_SCOREBOARD", _environment_value, _platform_all,
 		"Showing the scores (the controller's Back)." },
 	{ "controls.pause", _config_string, "\"Escape\"", "HALO_KEY_PAUSE", _environment_value, _platform_all,

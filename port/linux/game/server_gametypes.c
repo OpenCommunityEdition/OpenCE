@@ -196,8 +196,7 @@ static void server_gametype_rule(
 	else if (!strcmp(key, "secondary_weapon")) options->secondary_weapon = (byte)value;
 	else if (!strcmp(key, "no_map_weapons")) options->no_map_weapons = (boolean)(value != 0);
 	else if (!strcmp(key, "hardcore")) options->hardcore = (boolean)(value != 0);
-	else if (!strcmp(key, "sprint")) SET_FLAG(options->abilities, _game_ability_sprint_bit, value != 0);
-	else if (!strcmp(key, "armor_lock")) SET_FLAG(options->abilities, _game_ability_armor_lock_bit, value != 0);
+	else if (!strcmp(key, "armor_lock")) options->armor_lock = (boolean)(value != 0);
 	else if (!strcmp(key, "team_vehicles"))
 	{
 		byte set = value == 1 ? VARIANT_VEHICLE_SET_PC : value == 2 ? VARIANT_VEHICLE_SET_CUSTOM :

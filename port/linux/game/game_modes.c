@@ -19,8 +19,8 @@ machine (network_game_manager.h) and the game plays by
 - Hardcore: no motion sensor, no aim assist, and a kill restores the
   killer's health and shields.
 
-Any gametype may also give its players sprint and armour lock (ABILITIES:
-abilities.c).
+Any gametype may also give its players armour lock (ARMOR LOCK:
+abilities.c); every player sprints, whatever the gametype.
 
 The built-in gametypes (game_modes_gametype) are written with the Xbox's
 default ones, after them, and the Select Gametype screen lists them in a bank
@@ -228,7 +228,7 @@ void game_modes_options_default(
 	options->infection_zombie_shields = TRUE;
 	options->gun_game_order = _gun_game_order_strongest_first;
 	options->gun_game_melee_demotes = TRUE;
-	options->abilities = 0;
+	options->armor_lock = FALSE;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 
@@ -263,7 +263,7 @@ void game_modes_options_sanitize(
 		options->gun_game_order = _gun_game_order_strongest_first;
 	options->gun_game_melee_demotes = options->gun_game_melee_demotes != FALSE;
 	options->force_team_spawns = options->force_team_spawns != FALSE;
-	options->abilities &= (byte)(FLAG(NUMBER_OF_GAME_ABILITIES) - 1);
+	options->armor_lock = options->armor_lock != FALSE;
 	csmemset(options->reserved, 0, sizeof(options->reserved));
 }
 
