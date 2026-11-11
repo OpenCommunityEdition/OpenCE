@@ -15,8 +15,9 @@ The small query in `source/game/aim_assist.c` retains existing target selection.
 Xbox and Custom Edition, original-ray triggers, weapon-origin/cannot-aim triggers,
 AI, seated players and following cameras retain their existing paths. No map
 names or weapon tag identities select the fix. No rendering, trail timing,
-fading or aim-motion smoothing is changed. Network version 44 is required
-because peers must agree on projectile simulation.
+fading or aim-motion smoothing is changed. Network version remains 43 at the project owner's request. MCC peers still
+need matching projectile behavior; the unchanged version does not reject
+older builds with different simulation.
 
 The original-ray flag is documented by the public c20 weapon reference:
 https://c20.reclaimers.net/h1/tags/object/item/weapon/
