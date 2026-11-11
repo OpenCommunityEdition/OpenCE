@@ -1281,13 +1281,18 @@ int main(int argc, char **argv)
 	}
 	CASE("correction-since-same")
 	{
-		struct vehicle_riding_vehicle before = vehicle_at(VEHICLE, 71.3f, -42.9f, 18.6f, 0.f, 0);
-		struct vehicle_riding_vehicle after = vehicle_at(VEHICLE, 71.9f, -42.1f, 18.4f, .37f, 0);
+		struct vehicle_riding_correction correction;
 		real_matrix4x3 since;
 
-		/* (a correction against itself is no motion, to the bit: M * M^-1 in single precision is not the identity) */
-		correction_write(&before, &after);
-		vehicle_riding_correction_since(vehicle_riding_vehicle_correction(VEHICLE), vehicle_riding_vehicle_correction(VEHICLE), &since);
+		/* A rotation on all three axes exposes the inverse multiplication's round-off;
+		a yaw alone can happen to multiply back to an exact identity. */
+		vehicle_riding_correction_identity(&correction, VEHICLE);
+		set_real_quaternion(&correction.rotation, .1f, .2f, .3f, .9f);
+		quaternion_normalize(&correction.rotation);
+		correction.translation.i = 71.3f;
+		correction.translation.j = -42.9f;
+		correction.translation.k = 18.6f;
+		vehicle_riding_correction_since(&correction, &correction, &since);
 		CHECK(since.position.x == 0.f && since.position.y == 0.f && since.position.z == 0.f &&
 			since.forward.i == 1.f && since.forward.j == 0.f && since.forward.k == 0.f &&
 			since.left.i == 0.f && since.left.j == 1.f && since.left.k == 0.f &&

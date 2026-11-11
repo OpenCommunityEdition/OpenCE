@@ -95,7 +95,9 @@ NEGATIVE_CONTROLS = {
     "whole-baseline-ignored": ("network", [("\t\t\t\t\t\town->air_baseline_valid &&\n", "")], "own-air-whole-up"),
     "air-whole-always": ("network", [(
         "if (own->deck_present && own->deck.ticks > 0 && own->deck.ticks < RIDING_TICKS &&",
-        "if (FALSE && own->deck_present && own->deck.ticks > 0 && own->deck.ticks < RIDING_TICKS &&")],
+        "if (FALSE && own->deck_present && own->deck.ticks > 0 && own->deck.ticks < RIDING_TICKS &&"),
+        # The mutant removes the only assignment; keep it compilable so the runtime check judges the fault.
+        ("real_vector3d air_difference;", "real_vector3d air_difference = {0};")],
         "own-air-difference"),
     "air-history-not-rebased": ("network", [(
         "add_vectors3d(&noted->deck.velocity, &air_difference, &noted->deck.velocity);", ";")], "own-air-twice"),
