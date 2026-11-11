@@ -728,9 +728,6 @@ void ui_widget_game_data_function_invoke(
 	once, with the number */
 	if (function < PC_MENU_FUNCTION_BASE)
 	{
-		static boolean pc_function_reported = FALSE;
-		static unsigned char dbg_seen[256];
-
 		if (function == 43 && widget->name && !strcmp(widget->name, "controls_options_menu"))
 		{
 			extern void pc_menu_controls_update(struct widget_instance *list);
@@ -739,22 +736,43 @@ void ui_widget_game_data_function_invoke(
 			pc_menu_controls_update(widget);
 			return;
 		}
+		if (function == 58 && widget->name && !strcmp(widget->name, "network_options_menu"))
+		{
+			extern void pc_menu_network_description(struct widget_instance *list);
+
+			pc_menu_network_description(widget);
+			return;
+		}
+		if (function == 44 && widget->name && !strcmp(widget->name, "video_options_menu"))
+		{
+			extern void pc_menu_video_description(struct widget_instance *list);
+
+			pc_menu_video_description(widget);
+			return;
+		}
+		if (function == 49 && widget->name && !strcmp(widget->name, "audio_options_menu"))
+		{
+			extern void pc_menu_audio_description(struct widget_instance *list);
+
+			pc_menu_audio_description(widget);
+			return;
+		}
 		if (function == 52)
 		{
 			extern void pc_menu_map_list_update(struct widget_instance *widget);
-			pc_menu_map_list_update(widget); /* DBG experiment */
+			pc_menu_map_list_update(widget);
 			return;
 		}
 		if (function == 53)
 		{
 			extern void pc_menu_gametype_list_update(struct widget_instance *list);
-			pc_menu_gametype_list_update(widget); /* DBG experiment */
+			pc_menu_gametype_list_update(widget);
 			return;
 		}
 		if (function == 46 && widget->parent)
 		{
 			extern void pc_menu_map_list_update(struct widget_instance *list);
-			pc_menu_map_list_update(widget->parent); /* DBG experiment: the list, from its button bar */
+			pc_menu_map_list_update(widget->parent);
 			return;
 		}
 		return;
@@ -2369,6 +2387,16 @@ static void game_options_menu_update_text_desc(
 					widget->parameters.list.extended_description->parameters.text_box.string_list_index =
 						extra_description;
 					return;
+				}
+				{
+					extern short ui_widget_port_row_description(struct widget_instance *row);
+					short injected = ui_widget_port_row_description(column);
+
+					if (injected != NONE)
+					{
+						widget->parameters.list.extended_description->parameters.text_box.string_list_index = injected;
+						return;
+					}
 				}
 				description_index += spinner_list->parameters.list.selected_list_item_index;
 				break;

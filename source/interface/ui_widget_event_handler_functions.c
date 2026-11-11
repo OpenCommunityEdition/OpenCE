@@ -3500,6 +3500,13 @@ boolean ui_widget_event_handler_function_invoke(
 	their handlers open opens */
 	if (function_index == _halo_pc_function_back)
 	{
+		extern boolean pc_menu_network_back(struct widget_instance *widget);
+
+		if (pc_menu_network_back(widget))
+			return TRUE;
+	}
+	if (function_index == _halo_pc_function_back)
+	{
 		extern void ui_widget_port_go_back(struct widget_instance *widget);
 
 		ui_widget_port_go_back(widget);
@@ -3518,15 +3525,6 @@ boolean ui_widget_event_handler_function_invoke(
 
 			pc_menu_color_row_click(widget);
 			return TRUE;
-			if (0)
-				return TRUE;
-		}
-		if (widget->parent && widget->parent->name && !strcmp(widget->parent->name, "color_select_list"))
-		{
-			extern boolean pc_menu_activate_screen(struct widget_instance *widget,
-				struct event_record *event, boolean *widget_deleted);
-
-			return pc_menu_activate_screen(widget, event, widget_deleted);
 		}
 		pc_menu_map_row_click(widget);
 		return TRUE;
@@ -3609,6 +3607,39 @@ boolean ui_widget_event_handler_function_invoke(
 		extern boolean pc_menu_color_choose(void);
 
 		return function_index == 61 ? pc_menu_color_initialize(widget) : pc_menu_color_choose();
+	}
+	if (function_index == 166 || function_index == 167 || function_index == 187)
+	{
+		extern short pc_menu_network_function(struct widget_instance *widget, word function);
+		short network_result = pc_menu_network_function(widget, function_index);
+
+		if (network_result != NONE)
+			return network_result;
+	}
+	if (function_index == 114 || function_index == 125 || function_index == 135)
+	{
+		extern short pc_menu_video_function(struct widget_instance *widget, word function,
+			boolean *widget_deleted);
+		short video_result = pc_menu_video_function(widget, function_index, widget_deleted);
+
+		if (video_result != NONE)
+			return video_result;
+	}
+	if (function_index == 123 || function_index == 124 || function_index == 134)
+	{
+		extern short pc_menu_audio_function(struct widget_instance *widget, word function);
+		short audio_result = pc_menu_audio_function(widget, function_index);
+
+		if (audio_result != NONE)
+			return audio_result;
+	}
+	if (function_index == 121 || function_index == 122 || function_index == 133)
+	{
+		extern short pc_menu_mouse_function(struct widget_instance *widget, word function);
+		short mouse_result = pc_menu_mouse_function(widget, function_index);
+
+		if (mouse_result != NONE)
+			return mouse_result;
 	}
 	if (function_index >= 102 && function_index < PC_MENU_FUNCTION_BASE)
 		return TRUE;
