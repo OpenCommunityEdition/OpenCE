@@ -245,8 +245,14 @@ int main(int argc, char **argv)
 	{
 		slot = teams_of(3, 1);
 		people[slot].team_index = NONE;
+		/* (a switch of theirs a second ago is held, so that code which does not
+		look at the team stops at the cooldown, with its notice, and reads no
+		counts or names by a team of NONE: what those hold is no one's) */
+		team_switch_records[slot].player_index = player_index_of(slot);
+		team_switch_records[slot].milliseconds = now_ms - 1000;
 		CHECK(!ask(slot), "a player without a team");
 		CHECK(people[slot].team_index == NONE && kills == 0, "left as they were");
+		CHECK(!strcmp(notice, "You can't switch teams now"), "\"%s\"", notice);
 		return 0;
 	}
 	CASE("cooldown")
