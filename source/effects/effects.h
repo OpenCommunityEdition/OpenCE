@@ -39,6 +39,8 @@ void effects_dispose(
 	void);
 void effect_delete(
 	long effect_index);
+/* port: discard delayed gameplay producers at a client checkpoint boundary. */
+void effects_discard_gameplay(void);
 void effects_stop_on_first_person_weapon(
 	short local_player_index);
 void effects_information_get(

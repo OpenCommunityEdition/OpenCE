@@ -38,6 +38,11 @@ void host_set_tp(unsigned int thread);
 __guest_thread_start(thread); returns 0 or an errno value */
 int host_thread_create(unsigned int thread, unsigned int stack_size);
 
+/* MCC tag address space (host_mcc_memory.c), independent of the guest pools.
+Reserve returns the address or negative errno; release returns zero or negative errno. */
+long long host_mcc_memory_reserve(unsigned int address, unsigned int size);
+int host_mcc_memory_release(unsigned int address, unsigned int size);
+
 /* ---------- memory write tracking (port/linux/src/memory_watch.c) */
 
 void host_memory_watch_initialize(void);

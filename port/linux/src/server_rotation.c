@@ -67,6 +67,7 @@ const struct server_rule_definition server_rule_definitions[] =
 	RULE_BOOLEAN("no_shields", NULL, "universal", ALL, "Players have no shields"),
 	RULE_BOOLEAN("invisible", NULL, "universal", ALL, "Players are always camouflaged"),
 	RULE_BOOLEAN("generic_equipment", NULL, "universal", ALL, "Every map starts players with the same weapons"),
+	RULE_BOOLEAN("vehicle_riding", "riding", "universal", ALL, "Players standing on a vehicle are carried by it"),
 	RULE_CHOICE("weapon_set", "weapons", "universal", ALL, weapon_set_words, "The weapons on the map"),
 	RULE_CHOICE("vehicle_set", "vehicles", "universal", ALL, vehicle_set_words, "The vehicles on the map"),
 	RULE_CHOICE("goal_radar", NULL, "universal", ALL, goal_radar_words,

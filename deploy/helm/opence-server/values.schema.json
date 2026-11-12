@@ -201,6 +201,12 @@
             "null"
           ]
         },
+        "vehicleRidingOverrideGametype": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "password": {
           "$ref": "#/definitions/secretValue"
         }
@@ -256,6 +262,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "vehicleRiding": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "tunnelPort": {
           "$ref": "#/definitions/port"
         },

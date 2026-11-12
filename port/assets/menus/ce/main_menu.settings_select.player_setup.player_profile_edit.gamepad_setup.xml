@@ -161,7 +161,7 @@
 		<string text="Rumble the controller."/>
 		<string text="Show the game's hints about its controls."/>
 		<string text="Custom button layouts for P1-P4.\nUse / Reload stays combined."/>
-		<string text="Controller artwork and bumper style.\nRequires High-Res HUD in Graphics."/>
+		<string text="Keyboard/controller glyphs and PC-menu legends.\nGameplay controller art needs High-Res HUD."/>
 		<string text="How far each stick moves before it does\nanything."/>
 	</strings>
 </menus>

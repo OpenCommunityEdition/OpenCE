@@ -628,6 +628,8 @@ symbols in this file:
 struct widget_instance;
 
 #include "cseries.h"
+#include "keyboard_glyphs.h" /* port: port/linux/game/keyboard_glyphs.c; HUD prompts only */
+#include "menu_button_glyphs.h" /* port: port/linux/game/menu_button_glyphs.c */
 #include "errors.h"
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
@@ -680,6 +682,14 @@ struct widget_instance;
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "ui_widget.h"
+#include "mcc_pause_runtime.h" /* port: port/linux/game/mcc_pause_runtime.h */
+#include "mcc_pause.h" /* port: port/linux/game/mcc_pause.h */
+#include "mcc_ui_network.h" /* port: port/linux/game/mcc_ui_network.h */
+#include "mcc_ui.h" /* port: port/linux/game/mcc_ui.h */
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.h */
+#include "mcc_menu_preview.h" /* port: port/linux/game/mcc_menu_preview.c */
+#include "mcc_menu_text.h" /* port: port/linux/game/mcc_menu_text.c */
+#include "mcc_maps.h" /* port: port/linux/game/mcc_maps.h */
 /* port: port/linux/game/menu_functions.c: a text's colour in place of its
 own (the server browser's pings) */
 boolean pc_menu_text_color(struct widget_instance *widget, real_argb_color *color);
@@ -1933,6 +1943,41 @@ void *ui_widget_realloc(
 		line);
 }
 
+/* port: MCC maps are selected by their full namespaced path. They do not enter
+the Xbox/CE multiplayer level-index list. */
+boolean ui_widget_port_mcc_multiplayer_map_choose(char const *level_name)
+{
+	short index = mcc_maps_find(level_name);
+	struct network_game_server *server = global_network_game_server_get();
+
+	if (index == NONE || mcc_maps_campaign(index))
+		return FALSE;
+	main_set_multiplayer_map_name(level_name);
+	game_engine_override_map_name(level_name);
+	if (server)
+		network_game_server_change_map_name(server, level_name);
+	saved_game_file_remember_last_used_multiplayer_map(level_name);
+	return TRUE;
+}
+
+boolean ui_widget_port_mcc_cooperative_level_choose(char const *level_name, short difficulty)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct game_variant variant;
+
+	if (!server || !mcc_maps_level_campaign(level_name) ||
+		difficulty < 0 || difficulty >= NUMBER_OF_GAME_DIFFICULTY_LEVELS)
+		return FALSE;
+	csmemset(&variant, 0, sizeof(variant));
+	ustrcpy(variant.human_readable_game_description, L"Co-op");
+	main_set_difficulty(difficulty);
+	main_set_multiplayer_map_name(level_name);
+	network_game_server_port_set_cooperative(server, difficulty);
+	network_game_server_change_map_name(server, level_name);
+	network_game_server_change_game_variant(server, &variant);
+	return TRUE;
+}
+
 void widget_free(
 	void *ptr)
 {
@@ -2972,6 +3017,11 @@ void ui_widgets_close_all(
 		if (widget_globals.widget_stack[local_player_index])
 			dispose_widget_stack(&widget_globals.widget_stack[local_player_index]);
 	}
+	/* port: Release only an editor opened by MCC after its widgets are gone. */
+	{
+
+		mcc_ui_settings_close(NONE);
+	}
 
 	return;
 }
@@ -2999,6 +3049,8 @@ void ui_widgets_close_all_for_local_player(
 				dispose_widget_stack(&widget_globals.widget_stack[widget_index]);
 		}
 	}
+	/* port: and MCC's pause menu's settings (mcc_ui.c) */
+	mcc_ui_settings_close(local_player_index);
 
 	return;
 }
@@ -3438,6 +3490,15 @@ static void event_handler_dispatch(
 		/* port: not from a widget its function deleted (it went back:
 		menu_functions.c's profile_save_changes), which the Xbox's opened
 		from regardless */
+		/* port: MCC's New Game can close every widget at once. The event ends
+		with that deletion, before anything can open from the deleted tree */
+		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
+			!widget_deleted && handler->widget_tag.index != NONE &&
+			mcc_ui_new_game(widget, &widget_deleted))
+		{
+			*calling_widget_deleted = widget_deleted;
+			return;
+		}
 		if (TEST_FLAG(handler->flags, _event_handler_open_widget_bit) &&
 			!widget_deleted &&
 			handler->widget_tag.index != NONE)
@@ -4146,6 +4207,9 @@ static void render_state_bitmap(
 	if (bitmap && _texture_cache_bitmap_get_hardware_format(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
+		/* port: an MCC map's icon is drawn as its HUD's are (mcc_hud_draw.c) */
+		if (mcc_hud_icon_draw(bitmap_group_index, bitmap, clip, cursor_bounds, color, icon, TRUE))
+			return;
 		/* port: the sprite from a high-res texture, if it has one */
 		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
 		scale = hud_globals_get_scale(local_player_count() > 1);
@@ -4224,6 +4288,13 @@ void draw_string_and_hack_in_icons(
 			short icon_index;
 
 			current = icon_spec + wcslen(icon_names[icon_type]);
+			/* port: HUD/scoreboard callers pass TRUE; menu styling has its own opt-in. */
+			if (ignore_icon_color && keyboard_hud_inline(icon_type, &cursor_bounds))
+				continue;
+			/* port: optional PC-menu artwork preserves the literal button meaning. */
+			if (!ignore_icon_color && menu_button_glyph_inline(icon_type,
+				local_player_index_for_draw_string_and_hack_in_icons, &cursor_bounds))
+				continue;
 			remapped_icon_type = remap_sticks_for_local_player(
 				icon_type,
 				local_player_index_for_draw_string_and_hack_in_icons);
@@ -4738,6 +4809,20 @@ void network_game_reset_to_pregame_ui(
 	void)
 {
 	ui_widgets_close_all();
+	/* port: An MCC restart retains this round's settings and returns directly to
+	 * the ready lobby. The ordinary host map picker pauses its countdown. */
+	{
+
+		if (mcc_ui_network_restart_pregame())
+		{
+			char const *screen = network_game_is_splitscreen_local() ?
+				"ui\\shell\\main_menu\\multiplayer_type_select\\split_screen\\pregame\\splitscreen_pregame_wrapper_normal" :
+				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\pregame\\connected_pregame_screen");
+			if (!ui_widget_load_by_name_or_tag(screen, NONE, NULL, NONE, NONE, NONE, NONE))
+				error(_error_silent, "mcc: failed to load restart pregame screen");
+			return;
+		}
+	}
 	if (network_game_is_splitscreen_local())
 	{
 		if (network_game_is_quickstart_local())
@@ -5290,6 +5375,11 @@ static boolean ui_widget_port_text_wrap(
 	return fits;
 }
 
+/* port: port/linux/game/menu_functions.c; optional centered PC join legends. */
+boolean menu_functions_glyph_text(struct widget_instance *widget, rectangle2d const *bounds);
+/* port: MCC-owned keyboard legend identities, with native controller fallback. */
+short menu_functions_glyph_button(struct widget_instance *widget, short native);
+
 static void widget_instance_render_text_box(
 	struct widget_instance *widget,
 	struct ui_widget_definition *definition,
@@ -5463,6 +5553,26 @@ static void widget_instance_render_text_box(
 		}
 		ui_widget_port_text_wrap(*text, &bounds, width);
 	}
+	/* port: MCC owns these text boxes; wrap their instance copies to the panel
+	 * width without changing the map's objective strings or other menus. */
+	{
+		if (mcc_pause_text_wrap_needed(widget->definition_tag_index))
+		{
+			ui_widget_port_text_wrap(*text, &bounds, (short)(bounds.x1 - bounds.x0));
+			clip.x0 = MAX(clip.x0, bounds.x0);
+			clip.y0 = MAX(clip.y0, bounds.y0);
+			clip.x1 = MIN(clip.x1, bounds.x1);
+			clip.y1 = MIN(clip.y1, bounds.y1);
+		}
+	}
+	/* port: authored MCC catalog text needs measured wrapping in every
+	 * frontend. The MCC module owns formatting and clips to this text box. */
+	if (mcc_menu_text_draw(widget->definition_tag_index, widget->parameters.text_box.string_list_index,
+		*text, font_index, justification, &color, &bounds, &clip))
+		return;
+	/* port: the feature may center the identified PC join line as one unit. */
+	if (menu_functions_glyph_text(widget, &bounds))
+		return;
 	if (string_has_icons_to_draw(*text))
 		draw_string_and_hack_in_icons(&bounds, &clip, NULL, 0, *text, FALSE);
 	else
@@ -7088,6 +7198,9 @@ static void ui_widgets_process_mouse(
 	return;
 }
 
+/* port: port/linux/game/menu_functions.c; optional PC legend spacing. */
+short menu_functions_glyph_offset(struct widget_instance *widget);
+
 static void widget_instance_render_recursive(
 	struct widget_instance *widget,
 	rectangle2d *clip_rect,
@@ -7106,12 +7219,16 @@ static void widget_instance_render_recursive(
 	struct bitmap_data *custom_edition_picture;
 	short frame_index;
 
+	short mcc_picture_index; /* port: MCC owns its preview cache. */
+
 	if (!use_nifty_plasma_fx &&
 		TEST_FLAG(definition->flags, _widget_always_render_with_nifty_fx_bit))
 	{
 		use_nifty_plasma_fx = TRUE;
 	}
 	offset.x += widget->horizontal_offset;
+	/* port: move the complete PC legend group, including its mouse target. */
+	offset.x += menu_functions_glyph_offset(widget);
 	offset.y += widget->vertical_offset;
 	for (input_index = 0;
 		input_index < definition->game_data_inputs.count;
@@ -7131,7 +7248,16 @@ static void widget_instance_render_recursive(
 	the unknown level's frame for a map without one
 	(port/linux/game/custom_edition_maps.c) */
 	frame_index = widget->animation.current_frame_index;
-	custom_edition_picture = custom_edition_maps_picture(definition->background_bitmap.index, &frame_index);
+	/* port: MCC display indices never enter the CE provider. A failed MCC
+	 * preview retains the existing unknown frame in every menu style. */
+	mcc_picture_index = mcc_menu_preview_index(definition->background_bitmap.index, frame_index);
+	if (mcc_picture_index != NONE)
+	{
+		frame_index = 13;
+		custom_edition_picture = NULL;
+	}
+	else
+		custom_edition_picture = custom_edition_maps_picture(definition->background_bitmap.index, &frame_index);
 	bitmap = custom_edition_picture ? custom_edition_picture : bitmap_group_get_bitmap_from_sequence(
 		definition->background_bitmap.index,
 		0,
@@ -7228,7 +7354,11 @@ static void widget_instance_render_recursive(
 			boolean stretched = custom_edition_picture &&
 				custom_edition_maps_campaign_level(widget->animation.current_frame_index) == NONE;
 
-			if (pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
+			/* port: MCC art fits and clips to this style's authored thumbnail
+			 * rectangle; only the MCC module decodes or owns its texture. */
+			if (mcc_picture_index != NONE && mcc_menu_preview_draw(mcc_picture_index, &bounds, clip, color, &multitexture_params))
+				shown = FALSE;
+			if (shown && pc_menu_frame_placement(bitmap, &frame_x, &frame_y, &frame_width, &frame_height))
 			{
 				bounds.x0 += frame_x;
 				bounds.y0 += frame_y;
@@ -7238,7 +7368,10 @@ static void widget_instance_render_recursive(
 				texels.y1 = (short)((long)(bounds.y1 - bounds.y0) * bitmap->height / frame_height);
 				shown = bounds.x1 > bounds.x0 && bounds.y1 > bounds.y0;
 			}
-			if (shown)
+			/* port: retain native drawing unless a recognized PC-menu legend is replaced. */
+			if (shown && !menu_button_glyph_draw(menu_functions_glyph_button(widget, ui_mouse_key_button(widget)),
+				widget->local_player_index >= 0 && widget->local_player_index < 4 ?
+				widget->local_player_index : 0, &bounds, clip, color))
 			{
 				draw_bitmap_in_rect(
 					bitmap,
@@ -8375,6 +8508,29 @@ static boolean ui_check_for_pause_game(
 					pressed_by_first_local_player = FALSE;
 			}
 			local_player_count++;
+		}
+		/* port: MCC selects its owned stock-style pause tree; embedded map menus
+		 * remain available to custom scripts but are never the pause entry. */
+		{
+
+
+			if (mcc_pause_runtime_active())
+			{
+				if ((!network_game || game_engine_allow_pause()) &&
+					pressing_local_player_index == controller_index)
+				{
+					if (widget_globals.active_widgets[controller_index])
+						ui_widgets_close_all_for_local_player(controller_index);
+					else if (network_game || local_player_count <= 1 || !game_time_get_paused())
+					{
+						long screen = mcc_pause_runtime_screen(local_player_count, pressed_by_first_local_player);
+						if (screen == NONE || !ui_widget_load_by_name_or_tag(NULL, screen, NULL,
+							controller_index, NONE, NONE, NONE))
+							error(_error_silent, "mcc: failed to open native pause menu");
+					}
+				}
+				return pause_pressed;
+			}
 		}
 		if (network_game)
 		{
