@@ -10,7 +10,8 @@ typedef int BOOL;
 #define pthread_mutex_unlock(lock) ((void)0)
 static Uint64 SDL_GetTicks(void){return 0;}
 struct widget_instance {
- char const *name; struct widget_instance *parent;
+ char const *name; struct widget_instance *parent, *child, *next;
+ short type;
  union {struct {short selected_index;} list;} parameters;
 };
 static struct widget_instance screen,spinner,row;

@@ -1944,7 +1944,7 @@ void dsound_port_set_channel_stereo_position(
 	real occlusion,
 	real obstruction,
 	boolean attenuate_direct_path,
-	real approach)
+	real approach) /* port: the speed toward the listener, for Doppler (dsound_sdl.c) */
 {
 	extern void dsound_sdl_stream_set_stereo_position(IDirectSoundStream *stream, BOOL positioned, float pan,
 		float distance, float minimum_distance, float distance_fade, float approach);
@@ -1967,6 +1967,7 @@ void dsound_port_set_channel_stereo_position(
 				channel->attenuate_direct_path= attenuate_direct_path;
 				dsound_channel_set_I3DL2_properties(channel_index);
 			}
+			/* port: with the approach, for Doppler */
 			dsound_sdl_stream_set_stereo_position(channel->stream, positioned, pan,
 				distance, minimum_distance, distance_fade, approach);
 		}
@@ -2000,6 +2001,25 @@ static void dsound_virtual_queue_sound(
 	{
 		dsound_channel_queue_sound(channel_index, sound);
 	}
+
+	return;
+}
+
+/* port: the byte an idle channel starts its sound from (0: its beginning),
+for dsound_port_queue_sound_from's one call alone */
+static long dsound_queue_sample_offset= 0;
+
+/* port: dsound_virtual_queue_sound, a channel that is idle starting
+byte_offset into the sound's samples, at the start of its block (a co-op
+client that joins during a cutscene's sound: port/linux/game/coop_sound_sync.c) */
+void dsound_port_queue_sound_from(
+	short virtual_channel_index,
+	struct sound_permutation *sound,
+	long byte_offset)
+{
+	dsound_queue_sample_offset= byte_offset;
+	dsound_virtual_queue_sound(virtual_channel_index, sound);
+	dsound_queue_sample_offset= 0;
 
 	return;
 }
@@ -2750,6 +2770,18 @@ static void dsound_channel_queue_sound(
 			channel->state= _sound_channel_playing;
 			channel->playing_permutation= sound;
 			channel->sample_offset= 0;
+			/* port: or from dsound_port_queue_sound_from's byte, at its block's
+			start (an uncompressed channel's is a 16-bit stereo sample) and
+			within the sound */
+			if (dsound_queue_sample_offset>0 &&
+				dsound_queue_sample_offset<sound->samples.size)
+			{
+				long block_size= TEST_FLAG(channel->type_flags, _sound_channel_compressed_bit) ?
+					SOUND_COMPRESSED_BLOCK_SIZE*(TEST_FLAG(channel->type_flags, _sound_channel_stereo_bit) ? 2 : 1) :
+					4;
+
+				channel->sample_offset= dsound_queue_sample_offset-dsound_queue_sample_offset%block_size;
+			}
 			channel->packet_count= 0;
 
 			result= IDirectSound_CommitDeferredSettings(dsound_globals.direct_sound);

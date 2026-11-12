@@ -538,6 +538,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "keyboard_glyphs.h" /* port: port/linux/game/keyboard_glyphs.c */
 #include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries_windows.h"
 #include "errors.h"
@@ -596,6 +597,10 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
+#include "mcc_objects.h" /* port: port/linux/game/mcc_objects.h */
+#include "mcc_player.h" /* port: port/linux/game/mcc_player.h */
+#include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 #include "touch_postgame.h" /* port: port/linux/game/touch_postgame.c */
 
@@ -5106,6 +5111,9 @@ void game_engine_player_killed(
 	if (!game_engine)
 		return;
 
+	/* port: the death of an MCC team change is no one's kill (mcc_ui_teams.c) */
+	mcc_ui_team_respawn_death(&killing_player_index, &killing_object_index, dead_player_index, &friendly_fire);
+
 	/* the distributed netcode: a client's copy of a death has the host's
 	killer (port/linux/game/network_distributed.c) */
 	network_distributed_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
@@ -7935,6 +7943,9 @@ long game_engine_remap_vehicle(
 {
 	long result = vehicle_definition_index;
 
+	if (mcc_vehicle_placement_rules())
+		return result;
+
 	/* port: a Halo Custom Edition map's vehicles are chosen by their
 	placements, and its scripts may create any
 	(port/linux/game/custom_edition_objects.c) */
@@ -8289,8 +8300,10 @@ static void game_engine_update_weapons(
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\game_engine.c",
 				0x83E,
-				(item->object.scale >= 0.5f) &&
-					(item->object.scale <= 3.f));
+				((item->object.scale >= 0.5f) &&
+					(item->object.scale <= 3.f)) ||
+				/* port: MCC-authored miniature items retain their tag scale. */
+				mcc_item_small_scale(item->object.scale));
 		}
 
 		/*
@@ -8955,6 +8968,10 @@ static boolean internal_rasterize_score(
 			buffer,
 			format,
 			buffer_size);
+		/* port: preserve the identified hint's wording and offer its score key
+		 * to the optional keyboard prompt feature before semantic context is lost. */
+		buffer[buffer_size - 1] = 0;
+		keyboard_score_hint(player_index, buffer, buffer_size);
 		break;
 	default:
 		result = FALSE;
@@ -9107,6 +9124,8 @@ static void game_engine_update_item_spawn(
 					definition_index,
 					NONE);
 				placement_data.position = equipment->position;
+				if (mcc_cache_tags_loaded())
+					vector3d_from_angle(&placement_data.forward, equipment->facing);
 				/* port: Halo PC faces a Custom Edition map's items the way
 				their placements do, where the Xbox copied only the position */
 				if (custom_edition_cache_tags_loaded())
@@ -9391,6 +9410,10 @@ void game_engine_postspawn_player_update(
 			unit->unit.grenade_counts[
 				_unit_grenade_covenant_plasma] =
 				(char)starting_plasma_grenade_count;
+			/* port: and MCC's expanded grenade types (mcc_player.c) */
+			mcc_player_postspawn_grenades(unit_index,
+				global_variant.universal_variant.weapon_set == _game_engine_weapons_no_grenades &&
+				!game_engine_infinite_grenades_internal());
 		}
 	}
 	/* port: an OpenCE gametype's mode's equipment (Gun Game's weapon,

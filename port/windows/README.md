@@ -83,6 +83,14 @@ Thus the Windows build needs fewer changes than the Linux build.
 The executable is large-address-aware, because the platform layer reserves
 the Xbox memory at `0x80000000`.
 
+`SDL3.dll` is delay-loaded with the MSVC `delayimp` helper. This lets
+`mcc_window_initialize` reserve MCC's `0x50000000` tag window before the
+first SDL call, including the early settings read for Custom Edition.
+The shipped SDL DLL keeps ASLR enabled. A reservation failure is reported
+once logging is connected, and map loading retries without replacing other
+allocations. See [MCC map limits](../../docs/mcc_maps.md) for the remaining
+address-space constraints.
+
 ### Headers
 
 - The game and the platform layer use the Xbox SDK declarations of

@@ -18,6 +18,7 @@ game (shell_xbox.c's main, renamed halo_game_main by tools/web_build.py).
 #include <sys/stat.h>
 
 #include "web_shared.h"
+#include "web_memory.h"
 
 int halo_game_main(void);
 /* web_net.c: the arguments, for posix_command_line_argument */
@@ -25,22 +26,6 @@ void web_net_arguments(int count, char **values);
 /* web_library.js: a line for the page (kind 0 a status, 2 an invite link, 3 a
 fatal error) */
 void web_js_post(int kind, const char *text);
-
-/* ---------- memory
-
-The Xbox window (port/linux/src/platform.h) is the top 128 MB of the
-WebAssembly memory, 0x80000000 to 0x88000000 (tools/web_build.py makes the
-memory that size). sbrk grows the C heap up to the heap size this reports,
-so reporting the window's start keeps the heap below it. */
-
-#define WEB_HEAP_LIMIT 0x80000000UL
-
-size_t emscripten_get_heap_size(void)
-{
-	size_t size = (size_t)__builtin_wasm_memory_size(0) << 16;
-
-	return size > WEB_HEAP_LIMIT ? WEB_HEAP_LIMIT : size;
-}
 
 /* ---------- what the page reads and writes (web_shared.h) */
 
@@ -100,9 +85,7 @@ int main(int argc, char **argv)
 	/* the canvas fills the page, which the page's own button takes
 	fullscreen (a page may only do so from a click) */
 	set_default("HALO_DISPLAY_MODE", "windowed");
-	/* (Custom Edition maps' window would be the C heap's here:
-	port/linux/src/xbox_memory.c) */
-	set_default("HALO_CUSTOM_EDITION", "false");
+	web_memory_initialize();
 	/* (an invite link among them is joined: port/linux/src/p2p.c) */
 	web_net_arguments(argc, argv);
 	web_js_post(0, "starting");
