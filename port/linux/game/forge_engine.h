@@ -13,11 +13,11 @@
 extern "C" {
 #endif
 
-/* ---------- Forge Release Version & Network Protocol Isolation (v2.10.0, 0x462A) */
+/* ---------- Forge Release Version & Network Protocol Isolation (v2.10.1, 0x462A) */
 
 #include "halo_port_limits.h"
 
-#define FORGE_VERSION_STRING "2.10.0"
+#define FORGE_VERSION_STRING "2.10.1"
 #define FORGE_NETWORK_VERSION 0x462A
 #define FORGE_GAME_KIND 0x46
 #ifndef HALO_PORT_NETWORK_VERSION_STOCK

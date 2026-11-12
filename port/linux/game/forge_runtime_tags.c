@@ -1666,38 +1666,6 @@ static int ensure_xbox_map_decompressed_cache(
 		return 0;
 	}
 
-	/* 0. Check if OpenCE Forge/cached_tags/xbox_cache/<map_internal_name>.map already holds this decompressed map */
-	if (map_internal_name[0])
-	{
-		char xcache_path[512];
-		FILE *xf;
-		snprintf(xcache_path, sizeof(xcache_path), "OpenCE Forge/cached_tags/xbox_cache/%s.map", map_internal_name);
-		xf = fopen(xcache_path, "rb");
-		if (xf)
-		{
-			uint8_t xhdr[2048];
-			long xsz = 0;
-			fseek(xf, 0, SEEK_END);
-			xsz = ftell(xf);
-			fseek(xf, 0, SEEK_SET);
-			if (xsz >= (long)(tag_off + tag_sz) && fread(xhdr, 1, sizeof(xhdr), xf) == sizeof(xhdr))
-			{
-				if (*(uint32_t const *)(xhdr + 0x00) == 0x68656164u &&
-					*(uint32_t const *)(xhdr + 0x04) == 5u &&
-					*(uint32_t const *)(xhdr + 0x10) == tag_off &&
-					*(uint32_t const *)(xhdr + 0x14) == tag_sz &&
-					_strnicmp((char const *)(xhdr + 0x20), map_internal_name, 31) == 0)
-				{
-					fclose(xf);
-					fclose(in_fp);
-					snprintf(out_cache_path, out_cache_sz, "%s", xcache_path);
-					return 1;
-				}
-			}
-			fclose(xf);
-		}
-	}
-
 	/* 1. Check if OpenCE's Xbox hard-drive cache (z:\cache000.map .. z:\cache005.map or z:\cache_donor.map)
 	 * already holds this decompressed Xbox map; if so, use it directly without duplicating! */
 	for (slot = 0; slot <= 6; slot++)
@@ -1756,20 +1724,10 @@ static int ensure_xbox_map_decompressed_cache(
 		fseek(in_fp, 2048L, SEEK_SET);
 	}
 
-	/* 3. Stream-decompress Xbox v5 map into persistent OpenCE Forge/cached_tags/xbox_cache/<name>.map file */
-	if (map_internal_name[0])
-	{
-		CreateDirectoryA("OpenCE Forge", NULL);
-		CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
-		CreateDirectoryA("OpenCE Forge/cached_tags/xbox_cache", NULL);
-		snprintf(out_cache_path, out_cache_sz, "OpenCE Forge/cached_tags/xbox_cache/%s.map", map_internal_name);
-	}
-	else
-	{
-		platform_translate_path("z:\\cache_donor.map", out_cache_path, out_cache_sz);
-		close_runtime_xbox_donor();
-		close_preview_xbox_donor();
-	}
+	/* 3. Stream-decompress Xbox v5 map into single transient z:\cache_donor.map slot on demand */
+	platform_translate_path("z:\\cache_donor.map", out_cache_path, out_cache_sz);
+	close_runtime_xbox_donor();
+	close_preview_xbox_donor();
 	{
 		FILE *tmp_out = fopen(out_cache_path, "wb");
 		z_stream strm;
@@ -1922,22 +1880,80 @@ static int forge_index_xbox_map_file_to_catalog(
 
 	fclose(f);
 
-	/* Otherwise stream-decompress to OpenCE Forge/cached_tags/xbox_cache/<name>.map and read [tag_off .. tag_off + tag_sz) */
+	/* Otherwise stream-inflate directly in RAM up to [tag_off .. tag_off + tag_sz) without writing duplicate .map files to disk */
 	if (!read_ok)
 	{
-		char decomp_cache_path[512];
-		if (ensure_xbox_map_decompressed_cache(map_path, decomp_cache_path, sizeof(decomp_cache_path)))
+		FILE *zf = fopen(map_path, "rb");
+		if (zf)
 		{
-			FILE *df = fopen(decomp_cache_path, "rb");
-			if (df)
+			if (fseek(zf, 2048L, SEEK_SET) == 0)
 			{
-				if (fseek(df, (long)tag_off, SEEK_SET) == 0 &&
-					fread(tag_buf, 1, tag_sz, df) == tag_sz)
+				z_stream strm;
+				uint8_t *in_chunk = (uint8_t *)malloc(262144u);
+				uint8_t *out_chunk = (uint8_t *)malloc(262144u);
+				uint32_t cur_decomp_off = 2048u;
+				uint32_t target_end = tag_off + tag_sz;
+				int zret = Z_OK;
+
+				memset(&strm, 0, sizeof(strm));
+				if (in_chunk && out_chunk && inflateInit(&strm) == Z_OK)
 				{
-					read_ok = 1;
+					while (cur_decomp_off < target_end && zret != Z_STREAM_END)
+					{
+						strm.avail_in = (uInt)fread(in_chunk, 1, 262144u, zf);
+						if (ferror(zf) || strm.avail_in == 0)
+							break;
+						strm.next_in = in_chunk;
+						do
+						{
+							size_t have;
+							uint32_t chunk_start, chunk_end;
+							strm.avail_out = 262144u;
+							strm.next_out = out_chunk;
+							zret = inflate(&strm, Z_NO_FLUSH);
+							if (zret == Z_NEED_DICT || zret == Z_DATA_ERROR || zret == Z_MEM_ERROR)
+								break;
+							have = 262144u - (size_t)strm.avail_out;
+							chunk_start = cur_decomp_off;
+							chunk_end = cur_decomp_off + (uint32_t)have;
+							if (chunk_end > tag_off && chunk_start < target_end)
+							{
+								uint32_t copy_start = (chunk_start > tag_off) ? chunk_start : tag_off;
+								uint32_t copy_end = (chunk_end < target_end) ? chunk_end : target_end;
+								memcpy(
+									tag_buf + (copy_start - tag_off),
+									out_chunk + (copy_start - chunk_start),
+									copy_end - copy_start);
+							}
+							cur_decomp_off = chunk_end;
+							if (s_forge_loading_active && s_forge_loading_map_span > 0.0f)
+							{
+								unsigned long now_ms = system_milliseconds();
+								if (now_ms - s_forge_loading_last_ms >= 15u)
+								{
+									float map_frac = (target_end > 2048u)
+										? ((float)(cur_decomp_off - 2048u) / (float)(target_end - 2048u))
+										: 0.5f;
+									if (map_frac < 0.0f) map_frac = 0.0f;
+									if (map_frac > 0.99f) map_frac = 0.99f;
+									forge_xbox_loading_screen_render_frame(
+										s_forge_loading_map_base + map_frac * s_forge_loading_map_span);
+								}
+							}
+							if (cur_decomp_off >= target_end)
+								break;
+						} while (strm.avail_out == 0);
+						if (zret == Z_NEED_DICT || zret == Z_DATA_ERROR || zret == Z_MEM_ERROR)
+							break;
+					}
+					if (cur_decomp_off >= target_end)
+						read_ok = 1;
+					inflateEnd(&strm);
 				}
-				fclose(df);
+				free(in_chunk);
+				free(out_chunk);
 			}
+			fclose(zf);
 		}
 	}
 
@@ -2173,7 +2189,6 @@ int forge_reset_stock_tag_cache(void)
 
 	CreateDirectoryA("OpenCE Forge", NULL);
 	CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
-	CreateDirectoryA("OpenCE Forge/cached_tags/xbox_cache", NULL);
 	forge_ensure_local_tag_cache_built();
 	forge_runtime_reload_catalogs();
 	forge_set_status("Stock Tag Cache Rebuilt!");
@@ -2200,6 +2215,10 @@ int forge_clear_custom_tag_cache(void)
 
 static void forge_ensure_local_tag_cache_built(void)
 {
+	/* Clean up any legacy duplicate Xbox .map cache folder from older versions */
+	forge_delete_files_matching("OpenCE Forge/cached_tags/xbox_cache", "*.map");
+	RemoveDirectoryA("OpenCE Forge/cached_tags/xbox_cache");
+
 	{
 		FILE *f = fopen("OpenCE Forge/cached_tags/xbox_catalog.txt", "r");
 		if (f)
@@ -2220,10 +2239,10 @@ static void forge_ensure_local_tag_cache_built(void)
 			fclose(f);
 			if (has_base_tags && has_lights_and_door && has_wraith)
 			{
-				FILE *xc = fopen("OpenCE Forge/cached_tags/xbox_cache/a30.map", "rb");
-				if (xc)
+				FILE *cr = fopen("OpenCE Forge/credits.md", "r");
+				if (cr)
 				{
-					fclose(xc);
+					fclose(cr);
 					return;
 				}
 			}
@@ -2274,7 +2293,8 @@ void forge_runtime_init(void)
 
 	CreateDirectoryA("OpenCE Forge", NULL);
 	CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
-	CreateDirectoryA("OpenCE Forge/cached_tags/xbox_cache", NULL);
+	forge_delete_files_matching("OpenCE Forge/cached_tags/xbox_cache", "*.map");
+	RemoveDirectoryA("OpenCE Forge/cached_tags/xbox_cache");
 	RemoveDirectoryA("OpenCE Forge/custom_tags");
 	RemoveDirectoryA("custom_tags");
 	forge_ensure_local_tag_cache_built();
@@ -2469,6 +2489,7 @@ static unsigned long s_runtime_xbox_donor_seq = 0;
 static void close_runtime_xbox_donor(void)
 {
 	int i;
+	char z_donor[512];
 	for (i = 0; i < FORGE_MAX_DONOR_CACHE_SLOTS; i++)
 	{
 		if (s_runtime_xbox_donors[i].fp)
@@ -2478,6 +2499,8 @@ static void close_runtime_xbox_donor(void)
 	}
 	memset(s_runtime_xbox_donors, 0, sizeof(s_runtime_xbox_donors));
 	s_runtime_xbox_donor_seq = 0;
+	platform_translate_path("z:\\cache_donor.map", z_donor, sizeof(z_donor));
+	remove(z_donor);
 }
 
 static void forge_ui_close_map_tag_browser(void);
@@ -4815,13 +4838,6 @@ static long load_native_xbox_tag_runtime(
 	stem_count = find_donor_map_stems_from_credits(req_group, req_path, candidate_stems, 8);
 	for (s = 0; s < stem_count; s++)
 	{
-		char xcache_path[512];
-		long xhdl;
-		snprintf(xcache_path, sizeof(xcache_path), "OpenCE Forge/cached_tags/xbox_cache/%s.map", candidate_stems[s]);
-		xhdl = load_native_xbox_tag_from_decompressed_map(xcache_path, req_group, req_path, out_actual_group);
-		if (xhdl != NONE)
-			return xhdl;
-
 		for (d = 0; d < (int)(sizeof(s_xbox_map_dirs) / sizeof(s_xbox_map_dirs[0])); d++)
 		{
 			char full_path[512];
