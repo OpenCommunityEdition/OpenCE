@@ -736,7 +736,7 @@ See [MCC maps](../../docs/mcc_maps.md) for supported formats, resources and limi
 [MCC previews](../../docs/reading/mcc_level_previews.md) for menu discovery, and
 [browser imports](../../docs/reading/browser_imports.md) for browser storage.
 
-All map families use OpenCE network version 43. MCC content identity, sharing
+All map families use OpenCE network version 44. MCC content identity, sharing
 consent and load-progress checks remain separate from the existing Xbox/CE paths;
 see [the network agreement](NETCODE.md#opence-network-agreement).
 
@@ -1332,7 +1332,7 @@ The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
 not seed MCC downloads. Android requires no Steam for these files, but device
 runtime validation remains a separate requirement. Browser imports and host downloads use origin-private storage with
 transaction recovery and cross-tab locking. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
-for bounds, lifecycle and OpenCE network version **43**.
+for bounds, lifecycle and OpenCE network version **44**.
 
 ### Map sharing
 
