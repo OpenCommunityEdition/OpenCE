@@ -164,8 +164,10 @@ def generated(fault=None, faulty_function=None):
         "forge_host_cached_tag_bundle",
         "forge_host_client_tag_tx",
         "forge_client_pending_instance",
+        "forge_pending_slot_props",
     ):
         config += structure(net_src, name) + "\n"
+    config += "static struct forge_pending_slot_props g_pending_slot_props[FORGE_MAX_LIVE_INSTANCES];\n"
     config += enum_with(net_src, "_forge_tag_rx_idle") + "\n"
     config += net_src[
         net_src.index("static struct forge_host_cached_tag_bundle g_host_tag_cache"):

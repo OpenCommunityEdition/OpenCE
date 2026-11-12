@@ -26,6 +26,9 @@
 #include "text/unicode.h"
 #include "network_chat.h"
 #include "custom_edition_maps.h"
+#include "mcc_maps.h"
+#include "mcc_package.h"
+#include "mcc_pause.h"
 #include "tag_preview.h"
 #include "text/text_group.h"
 #include "tag_files/tag_groups.h"
@@ -51,6 +54,9 @@
 #include "../src/p2p.h"
 #include "game_modes.h"
 
+extern int halo_server_mode(void);
+extern boolean mcc_cache_tags_loaded(void);
+extern void platform_translate_path(char const *xbox_path, char *out, unsigned long out_size);
 extern unsigned long system_milliseconds(void);
 extern long hud_get_font_index(void);
 extern void *cache_files_tag_instances(long *count);
@@ -79,6 +85,8 @@ extern void game_variant_options_default(struct game_variant const *variant, str
 extern boolean ui_widget_port_pointer_focused(void);
 extern long player_ui_get_player1_last_used_profile_index(void);
 extern short forge_key_state(int vk);
+extern boolean ui_widget_port_mcc_multiplayer_map_choose(char const *level_name);
+extern boolean ui_widget_port_mcc_cooperative_level_choose(char const *level_name, short difficulty);
 
 #define FORGE_MAP_KIND_FORGE_MAPS 6 /* 1 = MAP_KIND_MULTIPLAYER, 3 = MAP_KIND_CUSTOM_MULTIPLAYER, 4/5 = MCC, 6 = MAP_KIND_FORGE_MAPS */
 static short s_forge_last_map_kind = 1;
@@ -86,6 +94,8 @@ static short s_forge_active_map_kind = 1;
 static int s_is_forge_map_cache_valid = 0;
 static short s_forge_only_ce_indices[4096];
 static short s_forge_only_ce_count = 0;
+static short s_non_forge_ce_indices[4096];
+static short s_non_forge_ce_count = 0;
 static long s_save_forge_btn_tag = NONE;
 
 /* Original engine symbols wrapped by Forge hooks */
@@ -245,7 +255,10 @@ static struct
 	int first;
 	int chosen;
 	char map_leaves[FORGE_MAX_EDIT_MAPS][64];
+	char base_maps[FORGE_MAX_EDIT_MAPS][128]; /* Non-empty for MCC Forge saves stored as custom_maps/<leaf>.txt */
 } s_forge_menu;
+
+static int forge_resolve_mcc_sidecar_base_map(char const *level_name, char *out_base_map, size_t out_base_sz, char *out_leaf, size_t out_leaf_sz);
 
 #ifdef HALO_WINDOWS
 extern FILE *halo_windows_fopen(char const *filename, char const *mode);
@@ -370,6 +383,7 @@ static void ensure_forge_ce_map_partition_built(void)
 		return;
 	s_is_forge_map_cache_valid = 1;
 	s_forge_only_ce_count = 0;
+	s_non_forge_ce_count = 0;
 
 	total_ce = custom_edition_maps_count(FALSE);
 	for (i = 0; i < total_ce; i++)
@@ -391,6 +405,11 @@ static void ensure_forge_ce_map_partition_built(void)
 			if (s_forge_only_ce_count < 4096)
 				s_forge_only_ce_indices[s_forge_only_ce_count++] = i;
 		}
+		else
+		{
+			if (s_non_forge_ce_count < 4096)
+				s_non_forge_ce_indices[s_non_forge_ce_count++] = i;
+		}
 	}
 }
 
@@ -404,26 +423,26 @@ short forge_menu_custom_edition_maps_count(boolean campaign)
 {
 	if (campaign)
 		return custom_edition_maps_count(campaign);
+	ensure_forge_ce_map_partition_built();
 	if (s_forge_active_map_kind == FORGE_MAP_KIND_FORGE_MAPS)
-	{
-		ensure_forge_ce_map_partition_built();
 		return s_forge_only_ce_count;
-	}
-	return custom_edition_maps_count(FALSE);
+	return s_non_forge_ce_count;
 }
 
 short forge_menu_custom_edition_maps_display_index_of(boolean campaign, short index)
 {
 	if (campaign)
 		return custom_edition_maps_display_index_of(campaign, index);
+	ensure_forge_ce_map_partition_built();
 	if (s_forge_active_map_kind == FORGE_MAP_KIND_FORGE_MAPS)
 	{
-		ensure_forge_ce_map_partition_built();
 		if (index < 0 || index >= s_forge_only_ce_count)
 			return NONE;
 		return custom_edition_maps_display_index_of(FALSE, s_forge_only_ce_indices[index]);
 	}
-	return custom_edition_maps_display_index_of(FALSE, index);
+	if (index < 0 || index >= s_non_forge_ce_count)
+		return NONE;
+	return custom_edition_maps_display_index_of(FALSE, s_non_forge_ce_indices[index]);
 }
 
 extern short ui_widget_port_multiplayer_maps(char const *const **names, short *last_used);
@@ -448,6 +467,127 @@ short forge_menu_multiplayer_maps(char const *const **names, short *last_used)
 	return s_last_mp_maps_returned;
 }
 
+static short find_mp_level_index_for_base_map(
+	char const *const *names,
+	short total,
+	short xbox_cnt,
+	short skip_index,
+	char const *base_map)
+{
+	char const *bm_leaf = base_map;
+	int prefer_ce = 0;
+	short k;
+
+	if (!names || total <= 0 || !base_map || !base_map[0])
+		return -1;
+
+	if (_strnicmp(base_map, "custom_maps\\", 12) == 0 || _strnicmp(base_map, "custom_maps/", 12) == 0)
+		prefer_ce = 1;
+
+	{
+		char const *bs = strrchr(base_map, '\\');
+		char const *fs = strrchr(base_map, '/');
+		if (bs && (!fs || bs > fs))
+			bm_leaf = bs + 1;
+		else if (fs)
+			bm_leaf = fs + 1;
+	}
+
+	for (k = 0; k < total; k++)
+	{
+		if (k == skip_index || !names[k])
+			continue;
+		if (_stricmp(names[k], base_map) == 0)
+			return k;
+	}
+
+	if (!prefer_ce)
+	{
+		for (k = 0; k < xbox_cnt && k < total; k++)
+		{
+			char const *nl;
+			if (k == skip_index || !names[k])
+				continue;
+			nl = strrchr(names[k], '\\');
+			if (!nl)
+				nl = strrchr(names[k], '/');
+			nl = nl ? (nl + 1) : names[k];
+			if (_stricmp(nl, bm_leaf) == 0)
+				return k;
+		}
+	}
+
+	for (k = 0; k < total; k++)
+	{
+		char const *nl;
+		if (k == skip_index || !names[k])
+			continue;
+		nl = strrchr(names[k], '\\');
+		if (!nl)
+			nl = strrchr(names[k], '/');
+		nl = nl ? (nl + 1) : names[k];
+		if (_stricmp(nl, bm_leaf) == 0)
+			return k;
+	}
+
+	return -1;
+}
+
+static void normalize_sidecar_base_for_main_set_map(char const *sidecar_base, char *out_level_path, size_t out_sz)
+{
+	char const *const *names = NULL;
+	short last_used = 0;
+	short total, all_ce, xbox_cnt, idx;
+
+	if (!out_level_path || out_sz == 0)
+		return;
+	if (!sidecar_base || !sidecar_base[0])
+	{
+		snprintf(out_level_path, out_sz, "levels\\test\\bloodgulch\\bloodgulch");
+		return;
+	}
+	if (_strnicmp(sidecar_base, "mcc_maps\\", 9) == 0 ||
+		_strnicmp(sidecar_base, "mcc_maps/", 9) == 0 ||
+		_strnicmp(sidecar_base, "custom_maps\\", 12) == 0 ||
+		_strnicmp(sidecar_base, "custom_maps/", 12) == 0 ||
+		_strnicmp(sidecar_base, "levels\\", 7) == 0 ||
+		_strnicmp(sidecar_base, "levels/", 7) == 0)
+	{
+		size_t i;
+		snprintf(out_level_path, out_sz, "%s", sidecar_base);
+		for (i = 0; out_level_path[i]; i++)
+		{
+			if (out_level_path[i] == '/')
+				out_level_path[i] = '\\';
+		}
+		return;
+	}
+
+	total = ui_widget_port_multiplayer_maps(&names, &last_used);
+	all_ce = custom_edition_maps_count(FALSE);
+	xbox_cnt = (short)(total > all_ce ? (total - all_ce) : 13);
+	idx = find_mp_level_index_for_base_map(names, total, xbox_cnt, -1, sidecar_base);
+	if (idx >= 0 && names && names[idx])
+	{
+		snprintf(out_level_path, out_sz, "%s", names[idx]);
+		return;
+	}
+
+	{
+		char check_ce[256];
+		FILE *f;
+		snprintf(check_ce, sizeof(check_ce), "custom_maps/%s.map", sidecar_base);
+		f = forge_open_data_file_rb(check_ce);
+		if (f)
+		{
+			fclose(f);
+			snprintf(out_level_path, out_sz, "custom_maps\\%s", sidecar_base);
+			return;
+		}
+	}
+	snprintf(out_level_path, out_sz, "levels\\test\\%s\\%s", sidecar_base, sidecar_base);
+}
+
 boolean forge_menu_multiplayer_map_choose(short level_index)
 {
 	char const *const *names = NULL;
@@ -465,7 +605,7 @@ boolean forge_menu_multiplayer_map_choose(short level_index)
 	if (s_forge_active_map_kind == FORGE_MAP_KIND_FORGE_MAPS || s_forge_active_map_kind == 3)
 	{
 		short active_ce = forge_menu_custom_edition_maps_count(FALSE);
-		short mp_count = (s_last_mp_maps_returned > 0) ? s_last_mp_maps_returned : (short)(xbox_cnt + all_ce);
+		short mp_count = (s_last_mp_maps_returned > 0) ? s_last_mp_maps_returned : (short)(xbox_cnt + active_ce);
 		short base = (short)((mp_count > active_ce) ? (mp_count - active_ce) : 0);
 		short chosen = (short)(level_index - base);
 
@@ -477,12 +617,98 @@ boolean forge_menu_multiplayer_map_choose(short level_index)
 		}
 		else
 		{
-			if (chosen < 0 || chosen >= all_ce)
+			if (chosen < 0 || chosen >= s_non_forge_ce_count)
 				return FALSE;
-			level_index = (short)(xbox_cnt + chosen);
+			level_index = (short)(xbox_cnt + s_non_forge_ce_indices[chosen]);
 		}
 	}
+	if (names && level_index >= 0 && level_index < total && names[level_index])
+	{
+		char sidecar_base[128];
+		char sidecar_leaf[64];
+		int sidecar_kind = forge_resolve_mcc_sidecar_base_map(
+			names[level_index],
+			sidecar_base, sizeof(sidecar_base),
+			sidecar_leaf, sizeof(sidecar_leaf));
+		if (sidecar_kind == 1)
+		{
+			forge_set_pending_sidecar_leaf(sidecar_leaf);
+			return ui_widget_port_mcc_multiplayer_map_choose(sidecar_base);
+		}
+		if (sidecar_kind == 2)
+		{
+			short base_idx = find_mp_level_index_for_base_map(names, total, xbox_cnt, level_index, sidecar_base);
+			if (base_idx >= 0)
+			{
+				forge_set_pending_sidecar_leaf(sidecar_leaf);
+				return ui_widget_port_multiplayer_map_choose(base_idx);
+			}
+		}
+	}
+	forge_set_pending_sidecar_leaf(NULL);
 	return ui_widget_port_multiplayer_map_choose(level_index);
+}
+
+static int forge_resolve_mcc_sidecar_base_map(char const *level_name, char *out_base_map, size_t out_base_sz, char *out_leaf, size_t out_leaf_sz)
+{
+	char const *leaf = level_name;
+	char map_check_path[512];
+	char txt_path[512];
+	FILE *mf;
+	FILE *tf;
+
+	if (!level_name || !level_name[0] ||
+		(_strnicmp(level_name, "custom_maps\\", 12) != 0 && _strnicmp(level_name, "custom_maps/", 12) != 0))
+		return 0;
+	leaf = level_name + 12;
+	if (!leaf[0])
+		return 0;
+
+	if (out_leaf && out_leaf_sz > 0)
+		snprintf(out_leaf, out_leaf_sz, "%s", leaf);
+
+	/* If a standalone custom_maps/<leaf>.map exists on disk, it is not a sidecar-only overlay */
+	snprintf(map_check_path, sizeof(map_check_path), "custom_maps/%s.map", leaf);
+	mf = forge_open_data_file_rb(map_check_path);
+	if (mf)
+	{
+		fclose(mf);
+		return 0;
+	}
+
+	snprintf(txt_path, sizeof(txt_path), "custom_maps/%s.txt", leaf);
+	tf = forge_open_data_file_rb(txt_path);
+	if (!tf)
+		return 0;
+	{
+		char buf[1024];
+		size_t n = fread(buf, 1, sizeof(buf) - 1, tf);
+		char const *bp;
+		buf[n] = 0;
+		fclose(tf);
+		if (!strstr(buf, "[OpenCE Forge Map]"))
+			return 0;
+		bp = strstr(buf, "Base Map:");
+		if (bp)
+		{
+			char bm[128];
+			size_t bi = 0;
+			bp += 9;
+			while (*bp == ' ' || *bp == '\t')
+				bp++;
+			while (*bp && *bp != '\r' && *bp != '\n' && bi + 1 < sizeof(bm))
+				bm[bi++] = *bp++;
+			bm[bi] = 0;
+			if (!bm[0])
+				return 0;
+			if (out_base_map && out_base_sz > 0)
+				snprintf(out_base_map, out_base_sz, "%s", bm);
+			if (_strnicmp(bm, "mcc_maps\\", 9) == 0 || _strnicmp(bm, "mcc_maps/", 9) == 0)
+				return 1;
+			return 2;
+		}
+	}
+	return 0;
 }
 
 static void scan_forge_edit_maps(int wanted_tab)
@@ -537,10 +763,104 @@ static void scan_forge_edit_maps(int wanted_tab)
 					if (s_forge_menu.count < FORGE_MAX_EDIT_MAPS)
 					{
 						int idx = s_forge_menu.count++;
+						char sidecar_base[128];
 						snprintf(s_forge_menu.map_leaves[idx], sizeof(s_forge_menu.map_leaves[0]), "%s", leaf);
+						s_forge_menu.base_maps[idx][0] = 0;
+						if (forge_resolve_mcc_sidecar_base_map(lvl, sidecar_base, sizeof(sidecar_base), NULL, 0))
+							snprintf(s_forge_menu.base_maps[idx], sizeof(s_forge_menu.base_maps[0]), "%s", sidecar_base);
 					}
 				}
 			}
+		}
+	}
+
+	/* Also scan custom_maps\*.txt sidecar files for MCC Forge saves (which have no .map copy in custom_maps\) */
+	{
+		WIN32_FIND_DATAA fd;
+		char pat[512];
+		HANDLE h = FindFirstFileA("d:\\custom_maps\\*.txt", &fd);
+		if (h == INVALID_HANDLE_VALUE)
+		{
+			pat[0] = 0;
+			platform_translate_path("d:\\custom_maps\\*.txt", pat, sizeof(pat));
+			if (pat[0])
+				h = FindFirstFileA(pat, &fd);
+		}
+		if (h == INVALID_HANDLE_VALUE)
+			h = FindFirstFileA("custom_maps\\*.txt", &fd);
+		if (h != INVALID_HANDLE_VALUE)
+		{
+			do
+			{
+				char leaf[64];
+				char txt_path[512];
+				char base_map[128];
+				char *dot;
+				FILE *tf;
+				int is_user = 0;
+				int has_flg1 = 0;
+				int k, already_listed = 0;
+
+				if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+					continue;
+				snprintf(leaf, sizeof(leaf), "%s", fd.cFileName);
+				dot = strrchr(leaf, '.');
+				if (dot)
+					*dot = 0;
+				if (!leaf[0])
+					continue;
+
+				for (k = 0; k < s_forge_menu.count; k++)
+				{
+					if (_stricmp(s_forge_menu.map_leaves[k], leaf) == 0)
+					{
+						already_listed = 1;
+						break;
+					}
+				}
+				if (already_listed)
+					continue;
+
+				base_map[0] = 0;
+				snprintf(txt_path, sizeof(txt_path), "custom_maps/%s.txt", leaf);
+				tf = forge_open_data_file_rb(txt_path);
+				if (tf)
+				{
+					char buf[1024];
+					size_t n = fread(buf, 1, sizeof(buf) - 1, tf);
+					char const *bp;
+					buf[n] = 0;
+					fclose(tf);
+					if (strstr(buf, "[OpenCE Forge Map]") != NULL)
+						has_flg1 = 1;
+					if (strstr(buf, "ForgeSource=UserCreated") != NULL)
+						is_user = 1;
+					bp = strstr(buf, "Base Map:");
+					if (bp)
+					{
+						size_t bi = 0;
+						bp += 9;
+						while (*bp == ' ' || *bp == '\t')
+							bp++;
+						while (*bp && *bp != '\r' && *bp != '\n' && bi + 1 < sizeof(base_map))
+							base_map[bi++] = *bp++;
+						base_map[bi] = 0;
+					}
+				}
+				if (has_flg1 && base_map[0] != 0)
+				{
+					if ((wanted_tab == 0 && is_user) || (wanted_tab == 1 && !is_user))
+					{
+						if (s_forge_menu.count < FORGE_MAX_EDIT_MAPS)
+						{
+							int idx = s_forge_menu.count++;
+							snprintf(s_forge_menu.map_leaves[idx], sizeof(s_forge_menu.map_leaves[0]), "%s", leaf);
+							snprintf(s_forge_menu.base_maps[idx], sizeof(s_forge_menu.base_maps[0]), "%s", base_map);
+						}
+					}
+				}
+			} while (FindNextFileA(h, &fd));
+			CloseHandle(h);
 		}
 	}
 }
@@ -584,7 +904,18 @@ static void update_forge_edit_maps_widget(struct forge_widget_instance *list)
 			child->visible = (item_slot < s_forge_menu.count) ? TRUE : FALSE;
 			if (item_slot < s_forge_menu.count)
 			{
-				fw_text_set_ascii(fw_named(child, "list_item_text", 0), s_forge_menu.map_leaves[item_slot]);
+				if (s_forge_menu.base_maps[item_slot][0] != '\0' &&
+					(_strnicmp(s_forge_menu.base_maps[item_slot], "mcc_maps\\", 9) == 0 ||
+					 _strnicmp(s_forge_menu.base_maps[item_slot], "mcc_maps/", 9) == 0))
+				{
+					char mcc_label[128];
+					snprintf(mcc_label, sizeof(mcc_label), "[MCC] %s", s_forge_menu.map_leaves[item_slot]);
+					fw_text_set_ascii(fw_named(child, "list_item_text", 0), mcc_label);
+				}
+				else
+				{
+					fw_text_set_ascii(fw_named(child, "list_item_text", 0), s_forge_menu.map_leaves[item_slot]);
+				}
 				if (child == list->focused_child)
 					focused_entry = item_slot;
 			}
@@ -622,15 +953,27 @@ static void update_forge_edit_maps_widget(struct forge_widget_instance *list)
 
 		if (s_forge_menu.count > 0 && s_forge_menu.chosen >= 0 && s_forge_menu.chosen < s_forge_menu.count)
 		{
+			char const *leaf = s_forge_menu.map_leaves[s_forge_menu.chosen];
 			char level_name[128];
-			char info[192];
+			char forge_meta[192];
+			char info[255];
 			short disp_idx;
 
-			snprintf(level_name, sizeof(level_name), "custom_maps\\%s", s_forge_menu.map_leaves[s_forge_menu.chosen]);
+			snprintf(level_name, sizeof(level_name), "custom_maps\\%s", leaf);
 			disp_idx = custom_edition_maps_display_index(level_name);
-			snprintf(info, sizeof(info), "%s\r\n\r\nMap: %.16s\r\n\r\nPress OK to edit\r\nin Forge.",
-				s_forge_menu.tab == 0 ? "User Created Map" : "Downloaded Map",
-				s_forge_menu.map_leaves[s_forge_menu.chosen]);
+			if (custom_edition_map_format_forge_summary("custom_maps\\", leaf, forge_meta, sizeof(forge_meta)) ||
+				custom_edition_map_format_forge_summary("OpenCE Forge\\maps\\", leaf, forge_meta, sizeof(forge_meta)))
+			{
+				snprintf(info, sizeof(info), "%s\r\n%s\r\n\r\nPress OK to edit.",
+					s_forge_menu.tab == 0 ? "User Created Map" : "Downloaded Map",
+					forge_meta);
+			}
+			else
+			{
+				snprintf(info, sizeof(info), "%s\r\nBase Map: %.24s\r\n\r\nPress OK to edit\r\nin Forge.",
+					s_forge_menu.tab == 0 ? "User Created Map" : "Downloaded Map",
+					leaf);
+			}
 
 			if (disp_idx != NONE)
 			{
@@ -660,9 +1003,17 @@ static void update_forge_edit_maps_widget(struct forge_widget_instance *list)
 			}
 			else
 			{
-				if (mp_name) mp_name->visible = FALSE;
+				if (mp_name)
+				{
+					mp_name->visible = TRUE;
+					fw_text_set_ascii(mp_name, s_forge_menu.map_leaves[s_forge_menu.chosen]);
+				}
 				if (mp_pic) mp_pic->visible = FALSE;
-				if (mp_data) mp_data->visible = FALSE;
+				if (mp_data)
+				{
+					mp_data->visible = TRUE;
+					fw_text_set_ascii(mp_data, info);
+				}
 			}
 		}
 		else
@@ -678,7 +1029,7 @@ static void update_forge_edit_maps_widget(struct forge_widget_instance *list)
 
 static struct
 {
-	int kind; /* 0 = Custom SP, 1 = Custom MP */
+	int kind; /* 0 = SP, 1 = MP, 2 = Custom SP, 3 = Custom MP, 4 = MCC SP, 5 = MCC MP */
 	int first;
 	int chosen;
 	int preserve_on_return;
@@ -887,47 +1238,281 @@ static void fw_wrap_label(char const *src, int max_cols, int max_lines, char *ou
 	out[oi] = 0;
 }
 
+#define FORGE_MAX_TAG_SRC_MAPS 128
+
+struct forge_tag_src_map
+{
+	char path[512];
+	wchar_t title[64];
+	short disp_idx; /* For MP/Custom maps: mp_map_list index; for SP maps: solo level index (0..9) or NONE */
+	int is_sp_stock;
+};
+
+static struct forge_tag_src_map s_tag_src_maps[FORGE_MAX_TAG_SRC_MAPS];
+static int s_tag_src_map_count = 0;
+static int s_tag_src_map_kind = -1;
+
+static void ascii_to_wide_title(char const *src, wchar_t *dst, size_t max_chars)
+{
+	size_t i = 0;
+	if (!dst || max_chars == 0)
+		return;
+	if (!src)
+	{
+		dst[0] = 0;
+		return;
+	}
+	while (src[i] && i + 1 < max_chars)
+	{
+		dst[i] = (wchar_t)(unsigned char)src[i];
+		i++;
+	}
+	dst[i] = 0;
+}
+
+static int file_exists_readable(char const *path)
+{
+	FILE *f;
+	if (!path || !path[0])
+		return 0;
+	f = fopen(path, "rb");
+	if (f)
+	{
+		fclose(f);
+		return 1;
+	}
+	return 0;
+}
+
+static int resolve_map_file_in_dir(char const *dir_prefix, char const *leaf, char *out_path, size_t out_sz)
+{
+	char xbox_path[512];
+	char host_path[512];
+
+	if (!leaf || !leaf[0] || !out_path || out_sz == 0)
+		return 0;
+
+	snprintf(out_path, out_sz, "%s\\%s.map", dir_prefix, leaf);
+	if (file_exists_readable(out_path))
+		return 1;
+
+	snprintf(xbox_path, sizeof(xbox_path), "d:\\%s\\%s.map", dir_prefix, leaf);
+	host_path[0] = 0;
+	platform_translate_path(xbox_path, host_path, sizeof(host_path));
+	if (host_path[0] && file_exists_readable(host_path))
+	{
+		snprintf(out_path, out_sz, "%s", host_path);
+		return 1;
+	}
+	return 0;
+}
+
+static void scan_tag_source_maps(int kind)
+{
+	static struct
+	{
+		char const *leaf;
+		char const *title;
+		short solo_idx;
+	} const s_sp_Stock[] = {
+		{ "a10", "The Pillar of Autumn", 0 },
+		{ "a30", "Halo", 1 },
+		{ "a50", "The Truth and Reconciliation", 2 },
+		{ "b30", "The Silent Cartographer", 3 },
+		{ "b40", "Assault on the Control Room", 4 },
+		{ "c10", "343 Guilty Spark", 5 },
+		{ "c20", "The Library", 6 },
+		{ "c40", "Two Betrayals", 7 },
+		{ "d20", "Keyes", 8 },
+		{ "d40", "The Maw", 9 }
+	};
+	static struct
+	{
+		char const *leaf;
+		char const *title;
+		short disp_idx;
+	} const s_mp_Stock[] = {
+		{ "beavercreek", "Battle Creek", 0 },
+		{ "sidewinder", "Sidewinder", 1 },
+		{ "damnation", "Damnation", 2 },
+		{ "ratrace", "Rat Race", 3 },
+		{ "prisoner", "Prisoner", 4 },
+		{ "hangemhigh", "Hang 'Em High", 5 },
+		{ "chillout", "Chill Out", 6 },
+		{ "carousel", "Derelict", 7 },
+		{ "boardingaction", "Boarding Action", 8 },
+		{ "bloodgulch", "Blood Gulch", 9 },
+		{ "wizard", "Wizard", 10 },
+		{ "putput", "Chiron TL34", 11 },
+		{ "longest", "Longest", 12 },
+		{ "icefields", "Ice Fields", 13 },
+		{ "deathisland", "Death Island", 14 },
+		{ "dangercanyon", "Danger Canyon", 15 },
+		{ "infinity", "Infinity", 16 },
+		{ "timberland", "Timberland", 17 },
+		{ "gephyrophobia", "Gephyrophobia", 18 }
+	};
+
+	s_tag_src_map_kind = kind;
+	s_tag_src_map_count = 0;
+
+	if (kind == 0) /* SINGLEPLAYER (retail maps\ campaign maps) */
+	{
+		size_t i;
+		for (i = 0; i < sizeof(s_sp_Stock) / sizeof(s_sp_Stock[0]); i++)
+		{
+			char resolved[512];
+			if (resolve_map_file_in_dir("maps", s_sp_Stock[i].leaf, resolved, sizeof(resolved)) &&
+				s_tag_src_map_count < FORGE_MAX_TAG_SRC_MAPS)
+			{
+				struct forge_tag_src_map *m = &s_tag_src_maps[s_tag_src_map_count++];
+				snprintf(m->path, sizeof(m->path), "%s", resolved);
+				ascii_to_wide_title(s_sp_Stock[i].title, m->title, 64);
+				m->disp_idx = s_sp_Stock[i].solo_idx;
+				m->is_sp_stock = 1;
+			}
+		}
+	}
+	else if (kind == 1) /* MULTIPLAYER (retail maps\ multiplayer maps) */
+	{
+		size_t i;
+		for (i = 0; i < sizeof(s_mp_Stock) / sizeof(s_mp_Stock[0]); i++)
+		{
+			char resolved[512];
+			if (resolve_map_file_in_dir("maps", s_mp_Stock[i].leaf, resolved, sizeof(resolved)) &&
+				s_tag_src_map_count < FORGE_MAX_TAG_SRC_MAPS)
+			{
+				struct forge_tag_src_map *m = &s_tag_src_maps[s_tag_src_map_count++];
+				snprintf(m->path, sizeof(m->path), "%s", resolved);
+				ascii_to_wide_title(s_mp_Stock[i].title, m->title, 64);
+				m->disp_idx = s_mp_Stock[i].disp_idx;
+				m->is_sp_stock = 0;
+			}
+		}
+	}
+	else if (kind == 2 || kind == 3) /* CUSTOM SINGLEPLAYER (2) or CUSTOM MULTIPLAYER (3) */
+	{
+		boolean is_camp = (kind == 2) ? TRUE : FALSE;
+		short total_ce = custom_edition_maps_count(is_camp);
+		short i;
+		for (i = 0; i < total_ce && s_tag_src_map_count < FORGE_MAX_TAG_SRC_MAPS; i++)
+		{
+			short disp = custom_edition_maps_display_index_of(is_camp, i);
+			char const *lvl = custom_edition_maps_level_name(disp);
+			wchar_t const *nm = custom_edition_maps_name(disp);
+			char const *leaf;
+			char resolved[512];
+
+			if (!lvl || !lvl[0])
+				continue;
+			leaf = strrchr(lvl, '\\');
+			if (!leaf)
+				leaf = strrchr(lvl, '/');
+			leaf = leaf ? (leaf + 1) : lvl;
+			if (kind == 3 && is_custom_map_leaf_forge_made(leaf))
+				continue;
+
+			resolved[0] = 0;
+			snprintf(resolved, sizeof(resolved), "%s.map", lvl);
+			if (!file_exists_readable(resolved))
+			{
+				if (!resolve_map_file_in_dir("custom_maps", leaf, resolved, sizeof(resolved)))
+					continue;
+			}
+
+			{
+				struct forge_tag_src_map *m = &s_tag_src_maps[s_tag_src_map_count++];
+				snprintf(m->path, sizeof(m->path), "%s", resolved);
+				if (nm && nm[0])
+				{
+					ustrncpy(m->title, nm, 63);
+					m->title[63] = 0;
+				}
+				else
+				{
+					ascii_to_wide_title(leaf, m->title, 64);
+				}
+				m->disp_idx = disp;
+				m->is_sp_stock = 0;
+			}
+		}
+	}
+	else if (kind == 4 || kind == 5) /* MCC SINGLEPLAYER (4) or MCC MULTIPLAYER (5) */
+	{
+		boolean want_camp = (kind == 4) ? TRUE : FALSE;
+		short total_mcc;
+		short i;
+
+		mcc_maps_rescan();
+		total_mcc = mcc_maps_count(FALSE);
+		for (i = 0; i < total_mcc && s_tag_src_map_count < FORGE_MAX_TAG_SRC_MAPS; i++)
+		{
+			char const *lvl;
+			char const *leaf;
+			wchar_t const *nm;
+			char xbox_path[128];
+			char resolved[512];
+
+			if ((mcc_maps_campaign(i) ? TRUE : FALSE) != want_camp)
+				continue;
+			lvl = mcc_maps_level_name(i);
+			if (!lvl || !lvl[0])
+				continue;
+			leaf = strrchr(lvl, '\\');
+			if (!leaf)
+				leaf = strrchr(lvl, '/');
+			leaf = leaf ? (leaf + 1) : lvl;
+			if (kind == 3 && is_custom_map_leaf_forge_made(leaf))
+				continue;
+
+			resolved[0] = 0;
+			if (mcc_package_map_path(lvl, xbox_path))
+				platform_translate_path(xbox_path, resolved, sizeof(resolved));
+			if ((!resolved[0] || !file_exists_readable(resolved)) &&
+				!resolve_map_file_in_dir("mcc_maps", leaf, resolved, sizeof(resolved)))
+			{
+				continue;
+			}
+			if (!file_exists_readable(resolved))
+				continue;
+
+			{
+				struct forge_tag_src_map *m = &s_tag_src_maps[s_tag_src_map_count++];
+				snprintf(m->path, sizeof(m->path), "%s", resolved);
+				nm = mcc_maps_name(i);
+				if (nm && nm[0])
+				{
+					ustrncpy(m->title, nm, 63);
+					m->title[63] = 0;
+				}
+				else
+				{
+					ascii_to_wide_title(leaf, m->title, 64);
+				}
+				m->disp_idx = (short)(MCC_MAPS_FIRST_DISPLAY_INDEX + i);
+				m->is_sp_stock = 0;
+			}
+		}
+	}
+}
+
 static int add_tags_map_kind_count(int kind)
 {
-	return (int)custom_edition_maps_count(kind == 0 ? TRUE : FALSE);
+	if (s_tag_src_map_kind != kind)
+		scan_tag_source_maps(kind);
+	return s_tag_src_map_count;
 }
 
 static int resolve_add_tags_map_path(int kind, int entry, char *out_path, size_t out_sz)
 {
-	short disp;
-	char const *lvl = NULL;
-	char const *leaf = NULL;
-	FILE *tf;
-
-	if (!out_path || out_sz == 0 || entry < 0 || entry >= add_tags_map_kind_count(kind))
+	if (!out_path || out_sz == 0)
 		return 0;
-	out_path[0] = 0;
-
-	disp = custom_edition_maps_display_index_of(kind == 0 ? TRUE : FALSE, (short)entry);
-	lvl = custom_edition_maps_level_name(disp);
-	if (!lvl || !lvl[0])
+	if (s_tag_src_map_kind != kind)
+		scan_tag_source_maps(kind);
+	if (entry < 0 || entry >= s_tag_src_map_count)
 		return 0;
-
-	leaf = strrchr(lvl, '\\');
-	if (!leaf)
-		leaf = strrchr(lvl, '/');
-	leaf = leaf ? (leaf + 1) : lvl;
-
-	snprintf(out_path, out_sz, "%s.map", lvl);
-	tf = fopen(out_path, "rb");
-	if (tf)
-	{
-		fclose(tf);
-		return 1;
-	}
-	snprintf(out_path, out_sz, "custom_maps\\%s.map", leaf);
-	tf = fopen(out_path, "rb");
-	if (tf)
-	{
-		fclose(tf);
-		return 1;
-	}
-	return 0;
+	snprintf(out_path, out_sz, "%s", s_tag_src_maps[entry].path);
+	return 1;
 }
 
 static void update_forge_add_tags_map_widget(struct forge_widget_instance *list)
@@ -941,17 +1526,22 @@ static void update_forge_add_tags_map_widget(struct forge_widget_instance *list)
 	int focused_entry = -1;
 
 	if (kind < 0) kind = 0;
-	if (kind > 1) kind = 1;
-	if (kind != s_add_tags_map.kind)
+	if (kind > 5) kind = 5;
+	if (kind != s_add_tags_map.kind || s_tag_src_map_kind != kind)
 	{
+		int changed = (kind != s_add_tags_map.kind);
 		s_add_tags_map.kind = kind;
-		s_add_tags_map.first = 0;
-		s_add_tags_map.chosen = 0;
-		if (fw_focused_row(list) >= 1)
-			fw_focus_row(list, 1);
+		scan_tag_source_maps(kind);
+		if (changed)
+		{
+			s_add_tags_map.first = 0;
+			s_add_tags_map.chosen = 0;
+			if (fw_focused_row(list) >= 1)
+				fw_focus_row(list, 1);
+		}
 	}
 
-	count = add_tags_map_kind_count(kind);
+	count = s_tag_src_map_count;
 	if (s_add_tags_map.chosen >= count)
 		s_add_tags_map.chosen = (count > 0) ? (count - 1) : 0;
 	if (s_add_tags_map.chosen < 0)
@@ -980,16 +1570,7 @@ static void update_forge_add_tags_map_widget(struct forge_widget_instance *list)
 			child->visible = (item_slot < count) ? TRUE : FALSE;
 			if (item_slot < count)
 			{
-				wchar_t wtext[64];
-				short disp = custom_edition_maps_display_index_of(kind == 0 ? TRUE : FALSE, (short)item_slot);
-				wchar_t const *nm = custom_edition_maps_name(disp);
-				wtext[0] = 0;
-				if (nm)
-				{
-					ustrncpy(wtext, nm, 63);
-					wtext[63] = 0;
-				}
-				fw_text_set_wide(fw_named(child, "list_item_text", 0), wtext);
+				fw_text_set_wide(fw_named(child, "list_item_text", 0), s_tag_src_maps[item_slot].title);
 				if (child == list->focused_child)
 					focused_entry = item_slot;
 			}
@@ -1030,13 +1611,26 @@ static void update_forge_add_tags_map_widget(struct forge_widget_instance *list)
 
 		if (count > 0 && s_add_tags_map.chosen >= 0 && s_add_tags_map.chosen < count)
 		{
-			short disp = custom_edition_maps_display_index_of(kind == 0 ? TRUE : FALSE, (short)s_add_tags_map.chosen);
-			if (sp_name) sp_name->visible = FALSE;
-			if (sp_pic) sp_pic->visible = FALSE;
-			if (sp_data) sp_data->visible = FALSE;
-			if (mp_name) { mp_name->visible = (disp != NONE); mp_name->parameters.text_box.string_list_index = disp; }
-			if (mp_pic) { mp_pic->visible = (disp != NONE); mp_pic->animation.current_frame_index = disp; }
-			if (mp_data) { mp_data->visible = (disp != NONE); mp_data->parameters.text_box.string_list_index = disp; }
+			struct forge_tag_src_map const *m = &s_tag_src_maps[s_add_tags_map.chosen];
+			short disp = m->disp_idx;
+			if (m->is_sp_stock)
+			{
+				if (mp_name) mp_name->visible = FALSE;
+				if (mp_pic) mp_pic->visible = FALSE;
+				if (mp_data) mp_data->visible = FALSE;
+				if (sp_name) { sp_name->visible = TRUE; sp_name->parameters.text_box.string_list_index = disp; }
+				if (sp_pic) { sp_pic->visible = TRUE; sp_pic->animation.current_frame_index = disp; }
+				if (sp_data) { sp_data->visible = TRUE; sp_data->parameters.text_box.string_list_index = disp; }
+			}
+			else
+			{
+				if (sp_name) sp_name->visible = FALSE;
+				if (sp_pic) sp_pic->visible = FALSE;
+				if (sp_data) sp_data->visible = FALSE;
+				if (mp_name) { mp_name->visible = (disp != NONE); mp_name->parameters.text_box.string_list_index = disp; }
+				if (mp_pic) { mp_pic->visible = (disp != NONE); mp_pic->animation.current_frame_index = disp; }
+				if (mp_data) { mp_data->visible = (disp != NONE); mp_data->parameters.text_box.string_list_index = disp; }
+			}
 		}
 		else
 		{
@@ -1483,7 +2077,7 @@ boolean forge_player_profile_get(long player_profile_index, struct player_profil
 	return ok;
 }
 
-static static boolean forge_controls_menu_event(
+static boolean forge_controls_menu_event(
 	struct forge_widget_instance *widget,
 	void *event_ptr,
 	char const *fn_name,
@@ -1531,6 +2125,7 @@ boolean pc_menu_event_function_invoke(
 			int cnt;
 			g_forge_session_enabled = 1;
 			forge_menu_custom_edition_maps_look_again();
+			mcc_maps_rescan();
 			if (!s_add_tags_map.preserve_on_return)
 			{
 				s_add_tags_map.kind = 1;
@@ -1538,6 +2133,7 @@ boolean pc_menu_event_function_invoke(
 				s_add_tags_map.chosen = 0;
 			}
 			s_add_tags_map.preserve_on_return = 0;
+			s_tag_src_map_kind = -1;
 			sp = fw_named(widget, "forge_add_tags_map_kind_spinner", 0);
 			if (sp)
 				sp->parameters.list.selected_index = (short)s_add_tags_map.kind;
@@ -1709,7 +2305,19 @@ boolean pc_menu_event_function_invoke(
 			dispose_global_network_game_server();
 			network_game_accept_remote_connections(FALSE);
 			forge_menu_custom_edition_maps_look_again();
-			snprintf(level_path, sizeof(level_path), "custom_maps\\%s", s_forge_menu.map_leaves[s_forge_menu.chosen]);
+			if (s_forge_menu.base_maps[s_forge_menu.chosen][0] != 0)
+			{
+				forge_set_pending_sidecar_leaf(s_forge_menu.map_leaves[s_forge_menu.chosen]);
+				normalize_sidecar_base_for_main_set_map(
+					s_forge_menu.base_maps[s_forge_menu.chosen],
+					level_path,
+					sizeof(level_path));
+			}
+			else
+			{
+				forge_set_pending_sidecar_leaf(NULL);
+				snprintf(level_path, sizeof(level_path), "custom_maps\\%s", s_forge_menu.map_leaves[s_forge_menu.chosen]);
+			}
 			player_ui_set_single_player_local_player_controller(0, 0);
 			main_set_map_name(level_path);
 			main_set_difficulty(1);
@@ -1838,6 +2446,22 @@ boolean pc_menu_event_function_invoke(
 			res = orig_pc_menu_event_function_invoke(widget_ptr, event_ptr, function_index, widget_deleted);
 			if (spinner && sel == FORGE_MAP_KIND_FORGE_MAPS)
 				spinner->parameters.list.selected_index = FORGE_MAP_KIND_FORGE_MAPS;
+			{
+				char sidecar_base[128];
+				char sidecar_leaf[64];
+				char norm_base[128];
+				char const *cur = main_get_map_name();
+				if (cur && forge_resolve_mcc_sidecar_base_map(cur, sidecar_base, sizeof(sidecar_base), sidecar_leaf, sizeof(sidecar_leaf)))
+				{
+					forge_set_pending_sidecar_leaf(sidecar_leaf);
+					normalize_sidecar_base_for_main_set_map(sidecar_base, norm_base, sizeof(norm_base));
+					main_set_map_name(norm_base);
+				}
+				else
+				{
+					forge_set_pending_sidecar_leaf(NULL);
+				}
+			}
 			return res;
 		}
 		if (spinner && s_forge_last_map_kind == FORGE_MAP_KIND_FORGE_MAPS)
@@ -1846,6 +2470,22 @@ boolean pc_menu_event_function_invoke(
 		res = orig_pc_menu_event_function_invoke(widget_ptr, event_ptr, function_index, widget_deleted);
 		if (spinner && s_forge_last_map_kind == FORGE_MAP_KIND_FORGE_MAPS)
 			spinner->parameters.list.selected_index = FORGE_MAP_KIND_FORGE_MAPS;
+		{
+			char sidecar_base[128];
+			char sidecar_leaf[64];
+			char norm_base[128];
+			char const *cur = main_get_map_name();
+			if (cur && forge_resolve_mcc_sidecar_base_map(cur, sidecar_base, sizeof(sidecar_base), sidecar_leaf, sizeof(sidecar_leaf)))
+			{
+				forge_set_pending_sidecar_leaf(sidecar_leaf);
+				normalize_sidecar_base_for_main_set_map(sidecar_base, norm_base, sizeof(norm_base));
+				main_set_map_name(norm_base);
+			}
+			else
+			{
+				forge_set_pending_sidecar_leaf(NULL);
+			}
+		}
 		if (g_forge_session_enabled && res)
 		{
 			char cur_map_copy[128];
@@ -1873,6 +2513,8 @@ boolean pc_menu_event_function_invoke(
 		struct forge_widget_instance *spinner = fw_named(widget, "list_item_0_map_kind_spinner", 0);
 		short sel = spinner ? spinner->parameters.list.selected_index : s_forge_last_map_kind;
 		int is_forge_tab = (sel == FORGE_MAP_KIND_FORGE_MAPS || (g_forge_session_enabled && s_forge_last_map_kind == FORGE_MAP_KIND_FORGE_MAPS));
+		if (!is_forge_tab)
+			forge_set_pending_sidecar_leaf(NULL);
 		if (spinner && is_forge_tab)
 			spinner->parameters.list.selected_index = 3;
 		s_forge_active_map_kind = is_forge_tab ? FORGE_MAP_KIND_FORGE_MAPS : sel;
@@ -2448,10 +3090,13 @@ void pc_menu_game_data_function_invoke(
 		return;
 	}
 
-	/* Point 5: Cycle Forge map chooser across 3 tabs when in Forge mode:
+	/* Point 5: Cycle Forge map chooser across 4 multiplayer tabs when in Forge mode:
 	 *   1 = MULTIPLAYER
 	 *   3 = CUSTOM MULTIPLAYER (non-Forge custom maps only)
+	 *   5 = MCC MULTIPLAYER
 	 *   6 = FORGE MAPS (Forge-made/edited maps only)
+	 * Single-player map tabs (0 = SINGLEPLAYER, 2 = CUSTOM SINGLEPLAYER, 4 = MCC SINGLEPLAYER)
+	 * are hidden in Forge mode.
 	 */
 	if (g_forge_session_enabled && fn_name &&
 		(strcmp(fn_name, "mp map list update") == 0 ||
@@ -2471,13 +3116,15 @@ void pc_menu_game_data_function_invoke(
 				if (s_forge_last_map_kind == 1)
 					kind = (kind == 0) ? FORGE_MAP_KIND_FORGE_MAPS : 3;
 				else if (s_forge_last_map_kind == 3)
-					kind = (kind == 2) ? 1 : FORGE_MAP_KIND_FORGE_MAPS;
+					kind = (kind == 2) ? 1 : 5;
+				else if (s_forge_last_map_kind == 5)
+					kind = (kind == 4) ? 3 : FORGE_MAP_KIND_FORGE_MAPS;
 				else if (s_forge_last_map_kind == FORGE_MAP_KIND_FORGE_MAPS)
-					kind = (kind == (FORGE_MAP_KIND_FORGE_MAPS - 1)) ? 3 : 1;
+					kind = (kind == 5) ? 5 : 1;
 				else
 					kind = 1;
 			}
-			else if (kind != 1 && kind != 3 && kind != FORGE_MAP_KIND_FORGE_MAPS)
+			else if (kind != 1 && kind != 3 && kind != 5 && kind != FORGE_MAP_KIND_FORGE_MAPS)
 			{
 				kind = 1;
 			}
@@ -2494,6 +3141,39 @@ void pc_menu_game_data_function_invoke(
 			s_forge_active_map_kind = kind;
 			spinner->parameters.list.selected_index = (kind == FORGE_MAP_KIND_FORGE_MAPS) ? 3 : kind;
 			orig_pc_menu_game_data_function_invoke(widget_ptr, function);
+			if (kind == FORGE_MAP_KIND_FORGE_MAPS)
+			{
+				struct forge_widget_instance *level_list = fw_named(widget, "level_select_list", 0);
+				int r;
+				for (r = 1; level_list && r <= 10; r++)
+				{
+					char row_name[32];
+					struct forge_widget_instance *row_w, *txt_w;
+					snprintf(row_name, sizeof(row_name), "list_item_%d", r);
+					row_w = fw_named(level_list, row_name, 0);
+					txt_w = row_w ? fw_named(row_w, "list_item_text", 0) : NULL;
+					if (row_w && row_w->visible && txt_w && txt_w->parameters.text_box.text)
+					{
+						wchar_t const *ws = txt_w->parameters.text_box.text;
+						char ascii_leaf[64];
+						char mcc_base[128];
+						size_t k = 0;
+						while (ws[k] && k + 1 < sizeof(ascii_leaf))
+						{
+							ascii_leaf[k] = (char)(ws[k] & 0xFF);
+							k++;
+						}
+						ascii_leaf[k] = '\0';
+						if (strncmp(ascii_leaf, "[MCC] ", 6) != 0 &&
+							forge_resolve_mcc_sidecar_base_map(ascii_leaf, mcc_base, sizeof(mcc_base), NULL, 0))
+						{
+							char mcc_label[128];
+							snprintf(mcc_label, sizeof(mcc_label), "[MCC] %s", ascii_leaf);
+							fw_text_set_ascii(txt_w, mcc_label);
+						}
+					}
+				}
+			}
 			spinner->parameters.list.selected_index = kind;
 			return;
 		}
@@ -2521,7 +3201,39 @@ void pc_menu_game_data_function_invoke(
 			spinner->parameters.list.selected_index = (kind == FORGE_MAP_KIND_FORGE_MAPS) ? 3 : kind;
 			orig_pc_menu_game_data_function_invoke(widget_ptr, function);
 			if (kind == FORGE_MAP_KIND_FORGE_MAPS)
+			{
+				struct forge_widget_instance *level_list = fw_named(widget, "level_select_list", 0);
+				int r;
 				spinner->parameters.list.selected_index = FORGE_MAP_KIND_FORGE_MAPS;
+				for (r = 1; level_list && r <= 10; r++)
+				{
+					char row_name[32];
+					struct forge_widget_instance *row_w, *txt_w;
+					snprintf(row_name, sizeof(row_name), "list_item_%d", r);
+					row_w = fw_named(level_list, row_name, 0);
+					txt_w = row_w ? fw_named(row_w, "list_item_text", 0) : NULL;
+					if (row_w && row_w->visible && txt_w && txt_w->parameters.text_box.text)
+					{
+						wchar_t const *ws = txt_w->parameters.text_box.text;
+						char ascii_leaf[64];
+						char mcc_base[128];
+						size_t k = 0;
+						while (ws[k] && k + 1 < sizeof(ascii_leaf))
+						{
+							ascii_leaf[k] = (char)(ws[k] & 0xFF);
+							k++;
+						}
+						ascii_leaf[k] = '\0';
+						if (strncmp(ascii_leaf, "[MCC] ", 6) != 0 &&
+							forge_resolve_mcc_sidecar_base_map(ascii_leaf, mcc_base, sizeof(mcc_base), NULL, 0))
+						{
+							char mcc_label[128];
+							snprintf(mcc_label, sizeof(mcc_label), "[MCC] %s", ascii_leaf);
+							fw_text_set_ascii(txt_w, mcc_label);
+						}
+					}
+				}
+			}
 			s_forge_last_map_kind = spinner->parameters.list.selected_index;
 			return;
 		}
@@ -2775,7 +3487,8 @@ void game_engine_post_rasterize_objects(void)
 	}
 	orig_game_engine_post_rasterize_objects();
 
-	if (g_forge_session_enabled && g_forge.initialized && !forge_is_main_menu_active())
+	if (g_forge.initialized && !forge_is_main_menu_active() &&
+		(g_forge_session_enabled || g_forge.live_instance_count > 0))
 	{
 		/* Render 3D Translucent Objective/Spawn/Teleporter Markers and 3D Spawn Menu Preview
 		 * AFTER sky, opaque objects, BSP lightmaps, BSP diffuse textures, and fog have been drawn!
@@ -2923,6 +3636,69 @@ boolean hs_compile_and_evaluate(char const *source)
 				g_forge.mode == _forge_mode_3d_monitor ? "Forge Mode" : "Spartan Play");
 			return TRUE;
 		}
+		if (_strnicmp(s, "forge_export_tag ", 17) == 0)
+		{
+			char const *arg = s + 17;
+			char map_path[512];
+			char tag_query[128];
+			char custom_name[64];
+			size_t mi = 0, ti = 0, ci = 0;
+
+			while (*arg == ' ' || *arg == '\t') arg++;
+			if (*arg == '"')
+			{
+				arg++;
+				while (*arg && *arg != '"' && mi + 1 < sizeof(map_path))
+					map_path[mi++] = *arg++;
+				if (*arg == '"') arg++;
+			}
+			else
+			{
+				while (*arg && *arg != ' ' && *arg != '\t' && mi + 1 < sizeof(map_path))
+					map_path[mi++] = *arg++;
+			}
+			map_path[mi] = 0;
+
+			while (*arg == ' ' || *arg == '\t') arg++;
+			while (*arg && *arg != ' ' && *arg != '\t' && ti + 1 < sizeof(tag_query))
+				tag_query[ti++] = *arg++;
+			tag_query[ti] = 0;
+
+			while (*arg == ' ' || *arg == '\t') arg++;
+			while (*arg && ci + 1 < sizeof(custom_name))
+				custom_name[ci++] = *arg++;
+			custom_name[ci] = 0;
+
+			if (map_path[0] && forge_ui_open_map_for_tag_browser(map_path))
+			{
+				int cat, idx, found = 0;
+				for (cat = 0; cat < 5 && !found; cat++)
+				{
+					int cnt = forge_ui_map_tag_count(cat);
+					for (idx = 0; idx < cnt; idx++)
+					{
+						char sn[64], fp[256];
+						sn[0] = 0;
+						fp[0] = 0;
+						forge_ui_map_tag_get_info(cat, idx, sn, sizeof(sn), fp, sizeof(fp), NULL, 0, NULL, 0);
+						if (!tag_query[0] || _stricmp(sn, tag_query) == 0 || strstr(fp, tag_query) != NULL)
+						{
+							int ok = forge_ui_extract_selected_map_tag(cat, idx, custom_name[0] ? custom_name : sn);
+							console_printf(FALSE, "forge_export_tag: %s -> %s (%s)", fp, custom_name[0] ? custom_name : sn, ok ? "OK" : "FAILED");
+							found = 1;
+							break;
+						}
+					}
+				}
+				if (!found)
+					console_printf(FALSE, "forge_export_tag: tag '%s' not found in '%s'", tag_query, map_path);
+			}
+			else
+			{
+				console_printf(FALSE, "forge_export_tag: could not open '%s'", map_path);
+			}
+			return TRUE;
+		}
 	}
 	return orig_hs_compile_and_evaluate(source);
 }
@@ -2961,10 +3737,12 @@ boolean scenario_trigger_volume_test_object(short trigger_volume_index, long obj
 /* ---------- Point 5: Bypass Multiplayer Gametype Vehicle/Weapon Remapping in Forge Mode */
 
 extern boolean custom_edition_cache_tags_loaded(void);
+extern int forge_has_pending_or_active_sidecar(void);
 
 long game_engine_remap_object_definition(long definition_index)
 {
-	if (g_forge_session_enabled || g_forge.has_saved_map_once || custom_edition_cache_tags_loaded())
+	if (g_forge_session_enabled || g_forge.has_saved_map_once || g_forge.save_map_name[0] != 0 ||
+		forge_has_pending_or_active_sidecar() || custom_edition_cache_tags_loaded())
 	{
 		/* Never remap or reject Scorpion, Banshee, Rocket Warthog, Shade Turret, or custom Forge vehicles! */
 		return definition_index;
@@ -2973,6 +3751,11 @@ long game_engine_remap_object_definition(long definition_index)
 }
 
 /* ---------- Point 2 & 6: In-Game Escape Pause Menu "SAVE FORGE MAP" Patch & Map Unload Cleanup */
+
+static boolean forge_mcc_pause_save_enabled(void)
+{
+	return g_forge_session_enabled ? TRUE : FALSE;
+}
 
 struct forge_pause_tag_instance
 {
@@ -3012,6 +3795,8 @@ void menu_tags_unloaded(void)
 
 void menu_tags_loaded(char const *map_name)
 {
+	mcc_pause_set_forge_save_callbacks(forge_mcc_pause_save_enabled, forge_trigger_save_map_action);
+
 	/* Clean up any leftover LAN/Internet browser client or server when loading a solo map so LEAVE GAME returns to the main menu */
 	if (map_name && _stricmp(map_name, "ui") != 0 && _stricmp(map_name, "levels\\ui\\ui") != 0 &&
 		(game_connection() == _game_connection_local || !network_game_is_active()))
@@ -3030,6 +3815,7 @@ void menu_tags_loaded(char const *map_name)
 	if (map_name && (_stricmp(map_name, "ui") == 0 || _stricmp(map_name, "levels\\ui\\ui") == 0))
 	{
 		forge_reset_transient_session_state(0);
+		forge_set_pending_sidecar_leaf(NULL);
 		g_forge_session_enabled = 0;
 		g_forge.mode = _forge_mode_play;
 		g_forge.active_modal = _forge_modal_none;
@@ -3051,7 +3837,7 @@ void menu_tags_loaded(char const *map_name)
 	forge_normalize_mcc_hud_tags();
 
 	/* Patch "SAVE FORGE MAP" button into the in-game Escape Pause Menu when in a Forge session */
-	if (g_forge_session_enabled && map_name && strcmp(map_name, "ui") != 0)
+	if (g_forge_session_enabled && map_name && strcmp(map_name, "ui") != 0 && !mcc_cache_tags_loaded())
 	{
 		long settings_btn_tag = tag_loaded('DeLa', "pc\\pause\\settings_button");
 		long existing_count = 0;

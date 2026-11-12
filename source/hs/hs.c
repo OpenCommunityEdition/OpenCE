@@ -3389,7 +3389,7 @@ typedef void (*hs_token_enumerator)(
 
 struct hs_function_table_storage
 {
-	struct hs_function_definition const *functions[418 + 7];
+	struct hs_function_definition const *functions[418 + 8]; /* port: append the map's riding call */
 	struct profile_section profile;
 	hs_token_enumerator token_enumerators[18];
 };
@@ -11797,7 +11797,27 @@ static struct hs_function_definition_with_1_parameter const debug_structure_cull
 	},
 };
 
-long const hs_function_table_count= 418 + 7;
+/* port: a map's own riding choice (port/linux/game/vehicle_riding.c), at the end of the table as the port's others are */
+void vehicle_riding_map_script(boolean on);
+
+HS_EVALUATE_VOID_BOOLEAN(hs_vehicle_riding_evaluate, vehicle_riding_map_script)
+
+static struct hs_function_definition_with_1_parameter const vehicle_riding_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"vehicle_riding",
+		hs_macro_function_parse,
+		hs_vehicle_riding_evaluate,
+		"sets whether players standing on a moving vehicle are carried by it for this map, over the players' and host's setting; only a startup script's call, on the map's first tick, counts.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+long const hs_function_table_count= 418 + 8; /* port: append the map's riding call */
 
 struct hs_enum_definition const hs_enum_table[]=
 {
@@ -12236,6 +12256,8 @@ struct hs_function_table_storage hs_function_table=
 		&mods_list_definition,
 		&structure_culling_definition.definition, /* port: local structure culling switch */
 		&debug_structure_culling_definition.definition, /* port: local culling debug view */
+		/* port: the map's riding call follows all existing indices */
+		&vehicle_riding_definition.definition,
 	},
 	{
 		"hs_update",
@@ -12746,6 +12768,9 @@ static boolean const hs_function_allowed_in_maps[]=
 	/* port: local structure rendering */
 	FALSE, /* structure_culling: this machine's rendering */
 	FALSE, /* debug_structure_culling: this machine's rendering */
+
+	/* port: the map's vehicle riding */
+	TRUE, /* vehicle_riding */
 };
 typedef char verify_hs_function_allowed_in_maps_size[
 	NUMBEROF(hs_function_allowed_in_maps) == NUMBEROF(hs_function_table.functions) ? 1 : -1];

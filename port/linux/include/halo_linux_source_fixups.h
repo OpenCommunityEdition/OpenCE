@@ -7,6 +7,10 @@ The port's functions that the game's sources call, declared for them.
 #ifndef __HALO_LINUX_SOURCE_FIXUPS_H
 #define __HALO_LINUX_SOURCE_FIXUPS_H
 
+/* Discard measured listener motion at camera cuts and lifecycle boundaries
+(source/sound/sound_manager.c). NONE resets every local listener. */
+void sound_listener_motion_reset(short local_player_index);
+
 /* MCC weapon-deletion notification (port/linux/game/mcc_first_person.inl). */
 void mcc_first_person_weapon_deleted(long weapon_index);
 
@@ -136,5 +140,10 @@ short halo_stick_dead_range(short stick);
 middle button, R and F are held, and the wheel's notches since the last call
 (port/linux/src/xinput_sdl.c) */
 int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel);
+/* OpenCE Forge session and Monitor state (port/linux/game/forge_runtime_tags.c,
+port/linux/game/forge_3d_mode.c, port/linux/game/custom_edition_cache.c) */
+extern int g_forge_session_enabled;
+int forge_is_unit_in_monitor_mode(long unit_index);
+void custom_edition_map_paths_forget(void);
 
 #endif

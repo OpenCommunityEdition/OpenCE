@@ -59,6 +59,7 @@ OBJECTS.C
 #include "sound/game_sound.h"
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
+#include "units/bipeds.h" /* port: vehicle riding */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
 /* port: port/linux/game/first_person_legs.c's */
@@ -1087,6 +1088,8 @@ void objects_initialize(
 	{
 		object_header_data = game_state_data_new("object", MAXIMUM_OBJECTS_PER_MAP, sizeof(struct object_header_datum));
 		object_memory_pool = game_state_memory_pool_new("objects", OBJECT_MEMORY_POOL_SIZE);
+		/* port: (none in the editor, where riding never runs) */
+		vehicle_riding_objects_initialize();
 	}
 	else
 	{
@@ -1119,6 +1122,8 @@ void objects_initialize_for_new_map(
 	first_person_legs_reset();
 	
 	data_make_valid(object_header_data);
+	/* port: (zeroed for a new map only: a revert or a load brings them back with the bipeds' snapshots) */
+	vehicle_riding_objects_reset();
 	object_name_list_clear();
 
 	cluster_partition_make_valid(&collideable_object_cluster_partition);
@@ -4134,6 +4139,9 @@ static boolean object_update(
 	boolean result = TRUE;
 	if (!TEST_FLAG(header->flags, _object_header_do_not_update_bit))
 	{
+		/* port: (vehicle_riding.c) */
+		object_count_update(object_index);
+
 		if (TEST_FLAG(object->object.flags, _object_garbage_bit))
 		{
 			++object_globals->active_garbage_object_count;
@@ -4815,28 +4823,12 @@ void objects_update(
 			cluster_count);
 	}
 
-	object_header = (struct object_header_datum *)object_header_data->data;
-	for (i = 0; i<object_header_data->count; ++object_header)
-	{
-		if (object_header->identifier)
-		{
-			if (TEST_FLAG(object_header->flags, _object_header_active_bit) &&
-				!TEST_FLAG(object_header->flags, _object_header_being_created_bit))
-			{
-				long object_index = DATUM_INDEX_NEW(i, object_header->identifier);
-				match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 416, object_get(object_index)->object.parent_object_index==NONE);
-				match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 417, object_get(object_index)->object.next_object_index==NONE);
-			
-				if (!dont_update_object ||
-					TEST_FLAG(_object_mask_unit, object_header->type) &&
-					unit_get(object_index)->unit.player_index!=NONE)
-				{
-					object_update(object_index);
-				}
-			}
-		}
-		++i;
-	}
+	/* port: the vehicles' touches of riders are kept for this tick's riders
+	alone (vehicle_riding.c): one whose own tick never comes takes none into
+	the next */
+	vehicle_riding_contacts_clear();
+	/* port: the main loop, riders last (objects_update_passes) */
+	objects_update_passes(dont_update_object, object_update_deferred, object_update);
 
 	object_header = (struct object_header_datum *)object_header_data->data;
 	for (i = 0; i<object_header_data->count; ++object_header)

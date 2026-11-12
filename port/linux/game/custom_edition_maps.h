@@ -95,6 +95,15 @@ wchar_t *custom_edition_maps_name(
 wchar_t *custom_edition_maps_description(
 	short display_index);
 
+/* Formats a summary with base map, placed object/AI counts, and gametype
+compatibility badges if `<folder><name>` is an OpenCE Forge map (.txt sidecar
+or embedded FLG1 trailer). Returns TRUE when populated. */
+boolean custom_edition_map_format_forge_summary(
+	char const *folder,
+	char const *name,
+	char *out_summary,
+	unsigned int out_summary_size);
+
 /* Called by ui_widget.c when a bitmap widget draws frame *frame_index of a
 bitmap tag. If the tag is the level pictures and the frame is a display
 index of ours, returns the picture to draw over the whole widget, and sets

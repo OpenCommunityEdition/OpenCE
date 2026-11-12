@@ -900,6 +900,7 @@ boolean sound_scripted_dialog_is_playing(
 void sound_initialize_for_new_map(
 	void)
 {
+	sound_listener_motion_reset(NONE); /* port: no motion from the previous map */
 	return;
 }
 
@@ -2757,7 +2758,17 @@ boolean sound_refresh_looping(
 				0x30E,
 				loop->definition_index==definition_index);
 
-			loop->source = *source;
+			{
+				/* port: the owner's source leaves obstruction and occlusion unset
+				(source_audible works them out, and only in range), so a loop taking
+				the owner's would hand a voice fading out of range garbage gains */
+				real obstruction = new_looping_sound ? 0.f : loop->source.obstruction;
+				real occlusion = new_looping_sound ? 0.f : loop->source.occlusion;
+
+				loop->source = *source;
+				loop->source.obstruction = obstruction;
+				loop->source.occlusion = occlusion;
+			}
 			loop->flip_flop = sound_manager_globals.flip_flop;
 
 			if ((refresh_state == _looping_sound_refresh_stop ||
@@ -3625,6 +3636,27 @@ static void refresh_sounds(
 
 			if (listener_index == NONE)
 			{
+				/* port: no listener hears it, and the one it had may have gone (a
+				local player who left the game: its listener is no longer valid, and
+				the channels' update asserts on a sound's): another's stands in */
+				if (!listener_get(sound->listener_index)->valid)
+				{
+					short other_listener_index;
+
+					for (
+						other_listener_index = 0;
+						other_listener_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS &&
+							!listener_get(other_listener_index)->valid;
+						other_listener_index++)
+					{
+					}
+
+					if (other_listener_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+					{
+						sound->listener_index = other_listener_index;
+					}
+				}
+
 				if (!TEST_FLAG(sound->flags, _sound_inaudible_bit))
 				{
 					sound_start_fade(
@@ -4112,16 +4144,30 @@ a second the camera claimed nearly five times its speed. It also reads zero
 while a cinematic's camera is forced along its track. Either way a sound
 moving with the camera seemed to come at it, and rose in pitch. A camera
 that jumps further in a tick than any vehicle moves (a cut, a teleport) has
-no velocity for that tick. */
+no velocity for that tick.
+
+Explicit cuts and lifecycle changes reset this history; the distance limit
+below is a fallback for other teleports. See docs/reading/audio_doppler.md. */
 #define LISTENER_SNAP_DISTANCE 10.f
 
 static struct
 {
 	boolean valid;
 	long game_time;
+	long player_index; /* port: a reused listener slot starts a fresh measurement */
 	real_point3d position;
 	real_vector3d velocity;
 } listener_motion[MAXIMUM_NUMBER_OF_LOCAL_PLAYERS];
+
+/* port: explicit cuts can be shorter than the displacement safety limit,
+and restored game ticks need not run backwards. */
+void sound_listener_motion_reset(short local_player_index)
+{
+	if (local_player_index == NONE)
+		memset(listener_motion, 0, sizeof(listener_motion));
+	else if (local_player_index >= 0 && local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)
+		memset(&listener_motion[local_player_index], 0, sizeof(listener_motion[local_player_index]));
+}
 
 static void listener_measure_velocity(
 	short local_player_index,
@@ -4130,10 +4176,13 @@ static void listener_measure_velocity(
 {
 	long game_time = game_time_get();
 	long ticks = game_time - listener_motion[local_player_index].game_time;
+	long player_index = local_player_get_player_index(local_player_index); /* port: listener ownership */
 
-	if (!listener_motion[local_player_index].valid || ticks < 0)
+	if (!listener_motion[local_player_index].valid || ticks < 0 ||
+		listener_motion[local_player_index].player_index != player_index) /* port: listener ownership */
 	{
 		listener_motion[local_player_index].valid = TRUE;
+		listener_motion[local_player_index].player_index = player_index; /* port: listener ownership */
 		listener_motion[local_player_index].game_time = game_time;
 		listener_motion[local_player_index].position = *position;
 		listener_motion[local_player_index].velocity = *global_zero_vector3d;
@@ -4177,6 +4226,7 @@ static void refresh_listener(
 
 	if (!game_in_progress())
 	{
+		sound_listener_motion_reset(NONE); /* port: do not carry motion through a session gap */
 		return;
 	}
 

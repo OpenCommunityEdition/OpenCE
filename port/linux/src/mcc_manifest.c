@@ -89,6 +89,18 @@ static int document_read(const char *root, const char *relative, struct server_j
 	return 1;
 }
 
+int mcc_manifest_default_kind(const char *kind)
+{
+	const char *expected = "default";
+	while (*kind && *expected)
+	{
+		unsigned char c = (unsigned char)*kind++;
+		if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+		if (c != (unsigned char)*expected++) return 0;
+	}
+	return !*kind && !*expected;
+}
+
 int mcc_manifest_load(const char *folder, struct mcc_manifest *manifest, char reason[128])
 {
 	struct server_json_document document;
@@ -127,7 +139,7 @@ int mcc_manifest_load(const char *folder, struct mcc_manifest *manifest, char re
 		valid = steam_workshop_read_map(text, length, &manifest->missions[index]);
 		if (!valid || !server_json_parse(&document, text, length, 16)) { free(text); break; }
 		token = server_json_member(&document, 0, "CampaignMapKind");
-		valid = token < 0 || (server_json_get_string(&document, token, kind, sizeof(kind)) && !strcmp(kind, "Default"));
+		valid = token < 0 || (server_json_get_string(&document, token, kind, sizeof(kind)) && mcc_manifest_default_kind(kind));
 		valid = valid && server_json_get_string(&document, server_json_member(&document, 0, "ScenarioFile"), scenario, sizeof(scenario)) &&
 			relative_path(scenario);
 		server_json_document_free(&document); free(text);

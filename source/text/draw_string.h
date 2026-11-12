@@ -110,6 +110,10 @@ void bitmap_draw_string(
 	rectangle2d const *clip,
 	char const *string);
 
+/* port: readback for scoped adornment drawing. */
+void draw_string_get_format(short *style, short *justification, unsigned long *flags);
+void draw_string_get_indents(short *initial, short *paragraph);
+
 /* ---------- globals */
 
 /* ---------- public code */

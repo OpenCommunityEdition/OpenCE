@@ -332,6 +332,40 @@ static struct forge_catalog_entry const *forge_find_catalog_entry_by_hash(uint32
 			return &s_fallback_entry;
 		}
 	}
+	/* Fallback 1b: check all built-in virtual marker paths (spawns, teleporters, objectives) */
+	{
+		static struct { uint32_t group_tag; char const *tag_path; } const k_virtual_markers[] = {
+			{ 'spwn', "spawn\\player_red" },
+			{ 'spwn', "spawn\\player_blue" },
+			{ 'spwn', "spawn\\player_ffa" },
+			{ 'tele', "teleporter\\origin" },
+			{ 'tele', "teleporter\\destination" },
+			{ 'flag', "objective\\ctf_flag_red" },
+			{ 'flag', "objective\\ctf_flag_blue" },
+			{ 'flag', "objective\\ctf_vehicle_red" },
+			{ 'flag', "objective\\ctf_vehicle_blue" },
+			{ 'flag', "objective\\oddball_spawn" },
+			{ 'flag', "objective\\koth_hill" },
+			{ 'flag', "objective\\race_track" },
+			{ 'flag', "objective\\race_checkpoint" },
+			{ 'flag', "objective\\race_vehicle" },
+			{ 'flag', "objective\\vegas_bank" },
+			{ 'flag', "objective\\netgame_flag" }
+		};
+		for (i = 0; i < (int)(sizeof(k_virtual_markers) / sizeof(k_virtual_markers[0])); i++)
+		{
+			if (forge_catalog_entry_hash(k_virtual_markers[i].group_tag, k_virtual_markers[i].tag_path) == hash)
+			{
+				memset(&s_fallback_entry, 0, sizeof(s_fallback_entry));
+				s_fallback_entry.group_tag = k_virtual_markers[i].group_tag;
+				snprintf(s_fallback_entry.tag_path, sizeof(s_fallback_entry.tag_path), "%s",
+					strcmp(k_virtual_markers[i].tag_path, "objective\\race_checkpoint") == 0 ?
+						"objective\\race_track" : k_virtual_markers[i].tag_path);
+				s_fallback_entry.source_cache_id = 0;
+				return &s_fallback_entry;
+			}
+		}
+	}
 	/* Fallback 2: check all loaded map tag instances (e.g. map-local mp_warthog/ghost_mp when stock catalog deduplicated them) */
 	instances = (struct forge_net_tag_instance const *)cache_files_tag_instances(&tag_count);
 	if (instances && tag_count > 0)
@@ -404,6 +438,110 @@ static void forge_broadcast_packet_to_clients(char const *text, long exclude_mac
 	}
 }
 
+struct forge_pending_slot_props
+{
+	uint8_t valid;
+	uint8_t physics_mode;
+	uint8_t ai_order;
+	uint8_t group_id;
+	uint8_t light_color_preset;
+	uint8_t light_intensity_preset;
+	uint8_t light_radius_preset;
+	int16_t team_designator;
+	uint16_t gametype_flags;
+	int16_t respawn_timer_sec;
+};
+
+static struct forge_pending_slot_props g_pending_slot_props[FORGE_MAX_LIVE_INSTANCES];
+
+static int forge_instance_has_extended_props(struct forge_live_instance const *inst)
+{
+	if (!inst || !inst->active)
+		return 0;
+	if (inst->is_default_scenario_object && inst->edit_entry_index >= 0)
+		return 1;
+	if (inst->gametype_flags != 0 && inst->gametype_flags != 0x0FFFu)
+		return 1;
+	if (inst->physics_mode != 0 || inst->respawn_timer_sec > 0 ||
+		inst->ai_order != 0 || inst->group_id != 0 ||
+		inst->light_color_preset != 0 || inst->light_intensity_preset != 0 ||
+		inst->light_radius_preset != 0)
+		return 1;
+	return 0;
+}
+
+static void forge_format_props_packet(char *out_buf, size_t out_sz, int32_t live_idx, struct forge_live_instance const *inst)
+{
+	snprintf(
+		out_buf,
+		out_sz,
+		"!FP:%X:%d:%X:%u:%d:%u:%u:%u:%u:%u",
+		(unsigned int)live_idx,
+		(int)inst->team_designator,
+		(unsigned int)inst->gametype_flags,
+		(unsigned int)inst->physics_mode,
+		(int)inst->respawn_timer_sec,
+		(unsigned int)inst->ai_order,
+		(unsigned int)inst->group_id,
+		(unsigned int)inst->light_color_preset,
+		(unsigned int)inst->light_intensity_preset,
+		(unsigned int)inst->light_radius_preset);
+}
+
+static void forge_apply_props_to_live_slot(
+	int32_t live_idx,
+	int16_t team_designator,
+	uint16_t gametype_flags,
+	uint8_t physics_mode,
+	int16_t respawn_timer_sec,
+	uint8_t ai_order,
+	uint8_t group_id,
+	uint8_t light_color_preset,
+	uint8_t light_intensity_preset,
+	uint8_t light_radius_preset)
+{
+	struct forge_live_instance *inst;
+	int16_t prev_team;
+
+	if (live_idx < 0 || live_idx >= g_forge.live_instance_count)
+		return;
+	inst = &g_forge.live_instances[live_idx];
+	if (!inst->active)
+		return;
+
+	prev_team = inst->team_designator;
+	inst->team_designator = team_designator;
+	inst->gametype_flags = gametype_flags;
+	inst->physics_mode = physics_mode;
+	inst->respawn_timer_sec = respawn_timer_sec;
+	inst->ai_order = ai_order;
+	inst->group_id = group_id;
+	inst->light_color_preset = light_color_preset;
+	inst->light_intensity_preset = light_intensity_preset;
+	inst->light_radius_preset = light_radius_preset;
+
+	/* If still a stream proxy awaiting custom tag download, defer materialization sync */
+	if ((inst->pad_inst & 0x40u) != 0)
+		return;
+
+	if (inst->is_ai_unit && inst->team_designator != prev_team)
+		forge_ai_update_unit_team(inst->actor_index, inst->object_index, inst->team_designator);
+
+	forge_sync_instance_extended_props_to_edit_state(live_idx);
+	forge_apply_instance_light_settings(live_idx);
+
+	if (inst->is_ai_unit && game_connection() != _game_connection_network_client)
+	{
+		forge_ai_apply_order(inst->actor_index, inst->object_index, inst->ai_order,
+			inst->x, inst->y, inst->z, game_time_get());
+	}
+	else if (inst->object_index != NONE && live_idx != g_forge.grabbed_live_index)
+	{
+		forge_3d_move_instance_ext(live_idx, inst->x, inst->y, inst->z,
+			inst->yaw, inst->pitch, inst->roll, 0, 0);
+	}
+}
+
 void forge_network_reset_session(void)
 {
 	int i;
@@ -440,6 +578,7 @@ void forge_network_reset_session(void)
 		g_host_machine_sync_cursor[i] = -1;
 		g_host_machine_mon_synced[i] = 0;
 	}
+	memset(g_pending_slot_props, 0, sizeof(g_pending_slot_props));
 	forge_tag_stream_reset_state();
 }
 
@@ -575,7 +714,9 @@ void forge_network_sync_tick(void)
 
 	if (game_connection() == _game_connection_network_client)
 	{
-		if (!g_client_requested_full_sync && g_forge.monitor_cam_initialized && (now - g_client_join_ms >= 250))
+		if (!g_client_requested_full_sync &&
+			(g_forge.monitor_cam_initialized || !g_forge_session_enabled) &&
+			(now - g_client_join_ms >= 250))
 		{
 			g_client_requested_full_sync = 1;
 			forge_send_packet_to_host("!FQ");
@@ -646,6 +787,9 @@ void forge_network_sync_tick(void)
 			}
 
 			/* Step 2: Drip-feed up to 6 live_instances per tick to newly joined client machine */
+			if (g_forge.live_instance_count == 0)
+				forge_init_map_scenario_entities();
+
 			while (g_host_machine_sync_cursor[m] >= 0 &&
 				   g_host_machine_sync_cursor[m] < g_forge.live_instance_count &&
 				   packets_sent < 6)
@@ -653,6 +797,24 @@ void forge_network_sync_tick(void)
 				int32_t idx = g_host_machine_sync_cursor[m]++;
 				struct forge_live_instance const *inst = &g_forge.live_instances[idx];
 				char msg[64];
+
+				if (inst->is_default_scenario_object &&
+					(!inst->active || inst->edit_entry_index >= 0) &&
+					inst->group_tag != 'spwn' && inst->group_tag != 'tele' && inst->group_tag != 'flag')
+				{
+					uint32_t d_hash = forge_catalog_entry_hash(inst->group_tag, inst->tag_path);
+					snprintf(
+						msg,
+						sizeof(msg),
+						"!FXA:%X:%08X:%.2f:%.2f:%.2f",
+						(unsigned int)idx,
+						(unsigned int)d_hash,
+						inst->orig_x,
+						inst->orig_y,
+						inst->orig_z);
+					forge_send_packet_to_machine(m, msg);
+					packets_sent++;
+				}
 
 				if (!inst->active)
 				{
@@ -698,6 +860,13 @@ void forge_network_sync_tick(void)
 					forge_send_packet_to_machine(m, msg);
 					packets_sent++;
 				}
+
+				if (inst->active && forge_instance_has_extended_props(inst))
+				{
+					forge_format_props_packet(msg, sizeof(msg), idx, inst);
+					forge_send_packet_to_machine(m, msg);
+					packets_sent++;
+				}
 			}
 
 			if (g_host_machine_sync_cursor[m] >= g_forge.live_instance_count)
@@ -706,6 +875,7 @@ void forge_network_sync_tick(void)
 	}
 
 	forge_tag_stream_tick(now);
+	forge_deferred_client_save_tick();
 	forge_server_autosave_tick();
 }
 
@@ -815,6 +985,30 @@ void forge_network_send_transform_ext(
 		g_net_obj_is_held[obj_abs] = is_held ? 1 : 0;
 	}
 
+	if (immediate && obj_abs < 0 && live_idx >= 0 && live_idx < g_forge.live_instance_count)
+	{
+		struct forge_live_instance const *inst = &g_forge.live_instances[live_idx];
+		if (inst->is_default_scenario_object &&
+			inst->group_tag != 'spwn' && inst->group_tag != 'tele' && inst->group_tag != 'flag')
+		{
+			char adopt_msg[64];
+			uint32_t d_hash = forge_catalog_entry_hash(inst->group_tag, inst->tag_path);
+			snprintf(
+				adopt_msg,
+				sizeof(adopt_msg),
+				"!FXA:%X:%08X:%.2f:%.2f:%.2f",
+				(unsigned int)live_idx,
+				(unsigned int)d_hash,
+				inst->orig_x,
+				inst->orig_y,
+				inst->orig_z);
+			if (game_connection() == _game_connection_network_client)
+				forge_send_packet_to_host(adopt_msg);
+			else if (game_connection() == _game_connection_network_server)
+				forge_broadcast_packet_to_clients(adopt_msg, -1);
+		}
+	}
+
 	snprintf(
 		msg,
 		sizeof(msg),
@@ -835,6 +1029,46 @@ void forge_network_send_transform_ext(
 	{
 		forge_broadcast_packet_to_clients(msg, -1);
 	}
+}
+
+void forge_network_send_object_props(int32_t live_idx)
+{
+	char msg[64];
+	struct forge_live_instance const *inst;
+
+	if (!forge_is_multiplayer_session())
+		return;
+	if (live_idx < 0 || live_idx >= g_forge.live_instance_count)
+		return;
+	inst = &g_forge.live_instances[live_idx];
+	if (!inst->active)
+		return;
+
+	if (inst->is_default_scenario_object &&
+		inst->group_tag != 'spwn' && inst->group_tag != 'tele' && inst->group_tag != 'flag')
+	{
+		char adopt_msg[64];
+		uint32_t d_hash = forge_catalog_entry_hash(inst->group_tag, inst->tag_path);
+		snprintf(
+			adopt_msg,
+			sizeof(adopt_msg),
+			"!FXA:%X:%08X:%.2f:%.2f:%.2f",
+			(unsigned int)live_idx,
+			(unsigned int)d_hash,
+			inst->orig_x,
+			inst->orig_y,
+			inst->orig_z);
+		if (game_connection() == _game_connection_network_client)
+			forge_send_packet_to_host(adopt_msg);
+		else if (game_connection() == _game_connection_network_server)
+			forge_broadcast_packet_to_clients(adopt_msg, -1);
+	}
+
+	forge_format_props_packet(msg, sizeof(msg), live_idx, inst);
+	if (game_connection() == _game_connection_network_client)
+		forge_send_packet_to_host(msg);
+	else if (game_connection() == _game_connection_network_server)
+		forge_broadcast_packet_to_clients(msg, -1);
 }
 
 void forge_network_send_delete_ext(int32_t live_idx, long obj_idx)
@@ -863,6 +1097,29 @@ void forge_network_send_delete_ext(int32_t live_idx, long obj_idx)
 	{
 		g_net_obj_live_index[obj_abs] = -1;
 		g_net_obj_is_held[obj_abs] = 0;
+	}
+	if (obj_abs < 0 && live_idx >= 0 && live_idx < g_forge.live_instance_count)
+	{
+		struct forge_live_instance const *inst = &g_forge.live_instances[live_idx];
+		if (inst->is_default_scenario_object &&
+			inst->group_tag != 'spwn' && inst->group_tag != 'tele' && inst->group_tag != 'flag')
+		{
+			char adopt_msg[64];
+			uint32_t d_hash = forge_catalog_entry_hash(inst->group_tag, inst->tag_path);
+			snprintf(
+				adopt_msg,
+				sizeof(adopt_msg),
+				"!FXA:%X:%08X:%.2f:%.2f:%.2f",
+				(unsigned int)live_idx,
+				(unsigned int)d_hash,
+				inst->orig_x,
+				inst->orig_y,
+				inst->orig_z);
+			if (game_connection() == _game_connection_network_client)
+				forge_send_packet_to_host(adopt_msg);
+			else if (game_connection() == _game_connection_network_server)
+				forge_broadcast_packet_to_clients(adopt_msg, -1);
+		}
 	}
 	snprintf(msg, sizeof(msg), "!FD:%d:%d", (int)live_idx, obj_abs);
 
@@ -1234,6 +1491,24 @@ static void forge_client_handle_host_spawn(
 			0);
 	}
 
+	if (match_idx >= 0 && host_live_idx >= 0 && host_live_idx < FORGE_MAX_LIVE_INSTANCES &&
+		g_pending_slot_props[host_live_idx].valid)
+	{
+		struct forge_pending_slot_props const *pp = &g_pending_slot_props[host_live_idx];
+		forge_apply_props_to_live_slot(
+			match_idx,
+			pp->team_designator,
+			pp->gametype_flags,
+			pp->physics_mode,
+			pp->respawn_timer_sec,
+			pp->ai_order,
+			pp->group_id,
+			pp->light_color_preset,
+			pp->light_intensity_preset,
+			pp->light_radius_preset);
+		g_pending_slot_props[host_live_idx].valid = 0;
+	}
+
 	if (is_net_obj && obj_abs >= 0 && obj_abs < FORGE_MAX_TRACKED_NET_OBJECTS)
 	{
 		long existing_obj;
@@ -1330,11 +1605,14 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 	if (!text || text[0] != '!' || text[1] != 'F')
 		return 0;
 
-	if (!g_forge_session_enabled)
-	{
-		g_forge_session_enabled = 1;
+	if (!g_forge.initialized)
 		forge_runtime_init();
-	}
+
+	/* In Standard Mode (!g_forge_session_enabled), only allow initial map state sync (!FQ from client,
+	 * and host-to-client state sync packets). Never enable g_forge_session_enabled from network packets,
+	 * and ignore client-to-host Forge edit commands when the server is not in Forge Mode. */
+	if (!g_forge_session_enabled && is_from_client_to_host && strcmp(text, "!FQ") != 0)
+		return 1;
 
 	/* 1. Per-Player Monitor Mode & 3D Flight State (!FT:) */
 	if (strncmp(text, "!FT:", 4) == 0)
@@ -1411,6 +1689,90 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 		return 1;
 	}
 
+	/* 2b. Default Scenario Object Adoption by Original Coordinates (!FXA:) */
+	if (strncmp(text, "!FXA:", 5) == 0)
+	{
+		unsigned int live_idx_u = 0, hash = 0;
+		float ox = 0.0f, oy = 0.0f, oz = 0.0f;
+		if (sscanf(text + 5, "%X:%X:%f:%f:%f", &live_idx_u, &hash, &ox, &oy, &oz) == 5 &&
+			(int)live_idx_u >= 0 && (int)live_idx_u < FORGE_MAX_LIVE_INSTANCES &&
+			forge_net_coords_valid(ox, oy, oz, 0, 0, 0))
+		{
+			struct forge_catalog_entry const *ce = forge_find_catalog_entry_by_hash((uint32_t)hash);
+			forge_3d_adopt_default_object_at_slot(
+				(int32_t)live_idx_u,
+				ce ? ce->group_tag : 0,
+				ce ? ce->tag_path : NULL,
+				ox, oy, oz);
+			if (is_from_client_to_host && game_connection() == _game_connection_network_server)
+			{
+				forge_server_mark_dirty();
+				forge_broadcast_packet_to_clients(text, machine_index);
+			}
+		}
+		return 1;
+	}
+
+	/* 2c. Extended Object Properties Sync (!FP:<slot>:<team>:<gflags>:<phys>:<respawn>:<ai_order>:<group>:<lcol>:<lint>:<lrad>) */
+	if (strncmp(text, "!FP:", 4) == 0)
+	{
+		unsigned int live_idx_u = 0, gflags = 0, pmode = 0, aorder = 0, gid = 0, lcol = 0, lint = 0, lrad = 0;
+		int team = 0, rsec = 0;
+		if (sscanf(text + 4, "%X:%d:%X:%u:%d:%u:%u:%u:%u:%u",
+				&live_idx_u, &team, &gflags, &pmode, &rsec, &aorder, &gid, &lcol, &lint, &lrad) == 10 &&
+			(int)live_idx_u >= 0 && (int)live_idx_u < FORGE_MAX_LIVE_INSTANCES)
+		{
+			if (team < -1) team = -1;
+			if (team > 31) team = 31;
+			if (pmode >= NUMBER_OF_FORGE_PHYSICS_MODES) pmode = 0;
+			if (aorder >= NUMBER_OF_FORGE_AI_ORDERS) aorder = 0;
+			if (gid > FORGE_MAX_WELD_GROUPS) gid = 0;
+			if (lcol >= NUMBER_OF_FORGE_LIGHT_COLORS) lcol = 0;
+			if (lint >= NUMBER_OF_FORGE_LIGHT_INTENSITIES) lint = 0;
+			if (lrad >= NUMBER_OF_FORGE_LIGHT_RADII) lrad = 0;
+			if (rsec < 0 || rsec > 3600) rsec = 0;
+
+			if ((int)live_idx_u < g_forge.live_instance_count &&
+				g_forge.live_instances[live_idx_u].active)
+			{
+				forge_apply_props_to_live_slot(
+					(int32_t)live_idx_u,
+					(int16_t)team,
+					(uint16_t)gflags,
+					(uint8_t)pmode,
+					(int16_t)rsec,
+					(uint8_t)aorder,
+					(uint8_t)gid,
+					(uint8_t)lcol,
+					(uint8_t)lint,
+					(uint8_t)lrad);
+				if (is_from_client_to_host && game_connection() == _game_connection_network_server)
+				{
+					char relay[64];
+					forge_server_mark_dirty();
+					forge_format_props_packet(relay, sizeof(relay), (int32_t)live_idx_u, &g_forge.live_instances[live_idx_u]);
+					forge_broadcast_packet_to_clients(relay, machine_index);
+				}
+			}
+			else
+			{
+				/* Buffer early !FP: packet if it arrives before !FS: / !FH: creates the live slot */
+				struct forge_pending_slot_props *pp = &g_pending_slot_props[live_idx_u];
+				pp->valid = 1;
+				pp->team_designator = (int16_t)team;
+				pp->gametype_flags = (uint16_t)gflags;
+				pp->physics_mode = (uint8_t)pmode;
+				pp->respawn_timer_sec = (int16_t)rsec;
+				pp->ai_order = (uint8_t)aorder;
+				pp->group_id = (uint8_t)gid;
+				pp->light_color_preset = (uint8_t)lcol;
+				pp->light_intensity_preset = (uint8_t)lint;
+				pp->light_radius_preset = (uint8_t)lrad;
+			}
+		}
+		return 1;
+	}
+
 	/* 3. Client -> Host Packets (!FS:, !FM:, !FD:, !FW) */
 	if (is_from_client_to_host && game_connection() == _game_connection_network_server)
 	{
@@ -1431,8 +1793,9 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 				struct forge_catalog_entry const *ce = forge_find_catalog_entry_by_hash(hash);
 				if (ce)
 				{
+					int32_t spawned_idx;
 					/* Host spawns authoritatively and broadcasts !FH: to all Clients (broadcast_net = 1) */
-					forge_3d_spawn_object_at(
+					spawned_idx = forge_3d_spawn_object_at(
 						ce->group_tag,
 						ce->tag_path,
 						ce->source_cache_id,
@@ -1440,8 +1803,28 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 						(float)yaw_cr / 100.0f,
 						(float)pitch_cr / 100.0f,
 						(float)roll_cr / 100.0f,
-						(int16_t)(team < -1 ? -1 : (team > 8 ? 8 : team)),
+						(int16_t)(team < -1 ? -1 : (team > 31 ? 31 : team)),
 						1);
+					if (spawned_idx >= 0 && spawned_idx < FORGE_MAX_LIVE_INSTANCES &&
+						g_pending_slot_props[spawned_idx].valid)
+					{
+						struct forge_pending_slot_props const *pp = &g_pending_slot_props[spawned_idx];
+						char relay_props[64];
+						forge_apply_props_to_live_slot(
+							spawned_idx,
+							pp->team_designator,
+							pp->gametype_flags,
+							pp->physics_mode,
+							pp->respawn_timer_sec,
+							pp->ai_order,
+							pp->group_id,
+							pp->light_color_preset,
+							pp->light_intensity_preset,
+							pp->light_radius_preset);
+						g_pending_slot_props[spawned_idx].valid = 0;
+						forge_format_props_packet(relay_props, sizeof(relay_props), spawned_idx, &g_forge.live_instances[spawned_idx]);
+						forge_broadcast_packet_to_clients(relay_props, -1);
+					}
 					forge_server_mark_dirty();
 				}
 			}
@@ -1526,6 +1909,8 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 						g_net_obj_live_index[host_obj_abs] = -1;
 						g_net_obj_is_held[host_obj_abs] = 0;
 					}
+					if (target_idx < FORGE_MAX_LIVE_INSTANCES)
+						g_pending_slot_props[target_idx].valid = 0;
 					forge_3d_delete_instance(target_idx, 0);
 					forge_server_mark_dirty();
 					snprintf(relay, sizeof(relay), "!FD:%d:%d", (int)target_idx, host_obj_abs);
@@ -1570,7 +1955,7 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 					(float)yaw_cr / 100.0f,
 					(float)pitch_cr / 100.0f,
 					(float)roll_cr / 100.0f,
-					(int16_t)(team < -1 ? -1 : (team > 8 ? 8 : team)));
+					(int16_t)(team < -1 ? -1 : (team > 31 ? 31 : team)));
 			}
 			return 1;
 		}
@@ -1629,7 +2014,10 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 						g_net_obj_is_held[obj_abs] = 0;
 					}
 					if (target_idx < FORGE_MAX_LIVE_INSTANCES)
+					{
 						memset(&g_pending_inst_stream[target_idx], 0, sizeof(g_pending_inst_stream[target_idx]));
+						g_pending_slot_props[target_idx].valid = 0;
+					}
 					forge_3d_delete_instance(target_idx, 0);
 				}
 			}
@@ -1930,6 +2318,21 @@ static int32_t forge_client_upsert_stream_proxy_instance(
 	inst->pitch = pitch;
 	inst->roll = roll;
 
+	if (g_pending_slot_props[slot].valid)
+	{
+		struct forge_pending_slot_props const *pp = &g_pending_slot_props[slot];
+		inst->team_designator = pp->team_designator;
+		inst->gametype_flags = pp->gametype_flags;
+		inst->physics_mode = pp->physics_mode;
+		inst->respawn_timer_sec = pp->respawn_timer_sec;
+		inst->ai_order = pp->ai_order;
+		inst->group_id = pp->group_id;
+		inst->light_color_preset = pp->light_color_preset;
+		inst->light_intensity_preset = pp->light_intensity_preset;
+		inst->light_radius_preset = pp->light_radius_preset;
+		g_pending_slot_props[slot].valid = 0;
+	}
+
 	g_pending_inst_stream[slot].active = 1u;
 	g_pending_inst_stream[slot].is_held = host_is_held ? 1u : 0u;
 	g_pending_inst_stream[slot].team_designator = team_designator;
@@ -2070,6 +2473,9 @@ static void forge_client_materialize_streamed_hash(
 		{
 			forge_create_engine_object_for_instance(idx, def_idx, pend.is_held ? 1 : 0);
 		}
+
+		forge_sync_instance_extended_props_to_edit_state(idx);
+		forge_apply_instance_light_settings(idx);
 	}
 }
 
@@ -2244,8 +2650,11 @@ void forge_tag_stream_handle_message(
 	struct distributed_message_header hdr;
 
 	/* Reject any datagram / batch spoof: tag streaming runs strictly on the reliable stream */
-	if (!from_stream || !message || size < sizeof(hdr) || !game_in_progress() || !g_forge_session_enabled)
+	if (!from_stream || !message || size < sizeof(hdr) || !game_in_progress())
 		return;
+
+	if (!g_forge.initialized)
+		forge_runtime_init();
 
 	memcpy(&hdr, message, sizeof(hdr));
 

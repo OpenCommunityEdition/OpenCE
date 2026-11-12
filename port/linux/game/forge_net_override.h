@@ -26,7 +26,7 @@ extern unsigned char forge_game_modes_kind(struct game_variant const *variant, s
 
 enum { HALO_PORT_NETWORK_VERSION_STOCK = HALO_PORT_NETWORK_VERSION };
 #undef HALO_PORT_NETWORK_VERSION
-#define FORGE_NETWORK_VERSION 0x4629
+#define FORGE_NETWORK_VERSION 0x462A
 #define FORGE_GAME_KIND 0x46
 #define HALO_PORT_NETWORK_VERSION (forge_get_network_version())
 #define game_modes_kind forge_game_modes_kind

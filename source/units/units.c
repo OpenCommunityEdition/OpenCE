@@ -11246,6 +11246,8 @@ static void unit_grenade_throw_keep_legs_moving(
 	struct real_orientation air_orientations[MAXIMUM_NODES_PER_MODEL];
 	struct real_orientation *legs;
 	real_vector3d left;
+	/* port: (vehicle_riding.c) */
+	real_vector3d relative_velocity;
 	real forward_speed;
 	real left_speed;
 	real target_weight;
@@ -11322,10 +11324,12 @@ static void unit_grenade_throw_keep_legs_moving(
 		unit_index,
 		airborne ? 1.f : 0.f);
 
-	/* the unit's real speed along its facing and to its left, per second */
+	/* the unit's real speed along its facing and to its left, per second
+	(port: relative to the deck it rides, vehicle_riding.c) */
+	biped_riding_relative_velocity(unit_index, &relative_velocity);
 	cross_product3d(&unit->object.up, &unit->object.forward, &left);
-	forward_speed = dot_product3d(&unit->object.translational_velocity, &unit->object.forward) * TICKS_PER_SECOND;
-	left_speed = dot_product3d(&unit->object.translational_velocity, &left) * TICKS_PER_SECOND;
+	forward_speed = dot_product3d(&relative_velocity, &unit->object.forward) * TICKS_PER_SECOND;
+	left_speed = dot_product3d(&relative_velocity, &left) * TICKS_PER_SECOND;
 	target_weight = square_root(forward_speed * forward_speed + left_speed * left_speed) / GRENADE_THROW_FULL_MOVE_SPEED;
 	target_weight = airborne ? 0.f : PIN(target_weight, 0.f, 1.f);
 	move_weight = unit_grenade_throw_ease(

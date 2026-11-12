@@ -1,9 +1,8 @@
 /*
 FORGE_CACHE_BUILDER.H
 
-Standalone and runtime Custom Edition (v609) and Halo PC (v7) cache parser,
-schema-driven tag cloner, PC-to-CE bitmap/sound internalizer, gbxmodel
-geometry packer, scenario modifier, and "Save Copy As..." exporter.
+Shared Forge scenario placement, player spawn, objective marker, AI encounter,
+and default map-object override structures.
 */
 
 #ifndef __FORGE_CACHE_BUILDER_H
@@ -60,8 +59,15 @@ struct forge_placed_object_entry
 	int16_t bsp_index;
 	uint16_t placement_flags;
 	uint16_t gametype_flags; /* 0 = All Modes, bit0=CTF, bit1=Slayer, bit2=Oddball, bit3=KOTH, bit4=Race */
+	int16_t respawn_timer_sec; /* 0 = Default/Never, >0 = Respawn delay in seconds */
 	uint8_t source_cache_id;
 	uint8_t active;
+	uint8_t physics_mode; /* 0 = Normal, 1 = Fixed, 2 = Phased */
+	uint8_t group_id; /* 0 = None, 1..16 = Weld Group */
+	uint8_t light_color_preset;
+	uint8_t light_intensity_preset;
+	uint8_t light_radius_preset;
+	uint8_t pad_po;
 };
 
 struct forge_default_object_edit
@@ -70,6 +76,13 @@ struct forge_default_object_edit
 	uint8_t deleted;
 	uint8_t active;
 	uint16_t gametype_flags; /* 0 = All Modes, bit0=CTF, bit1=Slayer, bit2=Oddball, bit3=KOTH, bit4=Race */
+	int16_t respawn_timer_sec;
+	uint8_t physics_mode;
+	uint8_t group_id;
+	uint8_t light_color_preset;
+	uint8_t light_intensity_preset;
+	uint8_t light_radius_preset;
+	uint8_t pad_de;
 	char tag_path[FORGE_TAG_PATH_MAX];
 	float orig_x, orig_y, orig_z;
 	float new_x, new_y, new_z;
@@ -102,6 +115,10 @@ struct forge_ai_spawn_entry
 	float x, y, z;
 	float yaw;
 	int16_t team_designator; /* enum forge_ai_team_designator (0=Friendly, 1=Enemy Covenant, 2=Enemy Flood, etc.) */
+	int16_t respawn_timer_sec; /* 0 = Never, >0 = Respawn delay in seconds after death */
+	uint8_t ai_order; /* 0=Default, 1=Guard, 2=Patrol, 3=Charge, 4=Enter Vehicle */
+	uint8_t group_id; /* 0=None, 1..16=Weld Group */
+	uint16_t pad_ai;
 };
 
 struct forge_scenario_edit_state
@@ -126,14 +143,6 @@ struct forge_scenario_edit_state
 	int32_t default_edit_count;
 	struct forge_default_object_edit default_edits[FORGE_MAX_DEFAULT_OBJECT_EDITS];
 };
-
-/* ---------- prototypes */
-
-/* Exports a modified scenario map to custom_maps/<output_map_name>.map ("Save Copy As..." UI action) */
-int forge_export_scenario_map(
-	char const *base_map_path,
-	struct forge_scenario_edit_state const *edits,
-	char const *output_map_name);
 
 #ifdef __cplusplus
 }

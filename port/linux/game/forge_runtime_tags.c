@@ -13,6 +13,7 @@
 #include "game/game.h"
 #include "objects/objects.h"
 #include "objects/object_definitions.h"
+#include "objects/object_lights.h"
 #include "units/units.h"
 #include "units/unit_definitions.h"
 #include "models/models.h"
@@ -44,7 +45,6 @@
 #include "tag_names.h"
 #include "tag_preview.h"
 #include "../src/port_tag_profiles.h"
-#include "forge_marker_ftags_embed.h"
 extern int compress2(unsigned char *dest, unsigned long *destLen, const unsigned char *source, unsigned long sourceLen, int level);
 #include <xtl.h>
 #include "rasterizer/xbox/rasterizer_xbox.h"
@@ -84,6 +84,12 @@ extern void main_present_frame(void);
 extern long halo_screen_width(void);
 extern void platform_translate_path(const char *xbox_path, char *host_path, unsigned long host_path_size);
 extern char *main_get_multiplayer_map_name(void);
+extern boolean game_engine_has_teams(void);
+
+static int forge_float_is_finite(float x)
+{
+	return (x == x && x > -3.4e38f && x < 3.4e38f) ? 1 : 0;
+}
 
 static void forge_resolve_host_path(char const *path, char *out_host_path, size_t out_sz);
 
@@ -183,6 +189,17 @@ char const *forge_get_active_map_name(void)
 	if (!scen || scen->type == 2 /* _scenario_type_main_menu */)
 		return "levels\\ui\\ui";
 
+	{
+		extern boolean mcc_cache_tags_loaded(void);
+		extern char const *mcc_cache_loaded_level_name(void);
+		if (mcc_cache_tags_loaded())
+		{
+			char const *mcc_level = mcc_cache_loaded_level_name();
+			if (mcc_level && mcc_level[0])
+				return mcc_level;
+		}
+	}
+
 	ce_loaded = custom_edition_cache_tags_loaded() ? custom_edition_cache_loaded_path() : NULL;
 	if (ce_loaded && ce_loaded[0])
 	{
@@ -242,12 +259,120 @@ char const *forge_get_active_map_name(void)
 	return (sp_map && sp_map[0]) ? sp_map : "levels\\ui\\ui";
 }
 
+void forge_snap_to_scenario_placement_origin(
+	uint32_t group_tag,
+	char const *tag_path,
+	float *io_x,
+	float *io_y,
+	float *io_z)
+{
+	struct scenario *scen;
+	short object_type;
+	float best_d2 = 0.0625f; /* Within 0.25 world units */
+	float best_x = 0.0f, best_y = 0.0f, best_z = 0.0f;
+	int found = 0;
+
+	if (!tag_path || !tag_path[0] || !io_x || !io_y || !io_z)
+		return;
+	scen = global_scenario_try_and_get();
+	if (!scen)
+		return;
+
+	for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
+	{
+		struct object_type_definition *def = object_type_definition_get(object_type);
+		struct tag_block *datums;
+		struct tag_block *palette;
+		long elem_size = 0;
+		long i;
+
+		if (!def || def->placement_tag_block_offset == NONE || def->palette_tag_block_offset == NONE)
+			continue;
+		if ((uint32_t)def->group_tag != group_tag)
+			continue;
+
+		datums = scenario_get_object_type_scenario_datums(scen, object_type, &elem_size);
+		palette = scenario_get_object_type_scenario_palette(scen, object_type);
+		if (!datums || !palette || datums->count <= 0 || palette->count <= 0 ||
+			elem_size < (long)sizeof(struct scenario_object_datum))
+			continue;
+
+		for (i = 0; i < datums->count; i++)
+		{
+			struct scenario_object_datum const *sobj =
+				(struct scenario_object_datum const *)tag_block_get_element_fast(datums, i, elem_size);
+			struct scenario_object_palette_entry const *pal_entry;
+			long ref_idx;
+			char const *ref_name;
+			float dx, dy, dz, d2;
+
+			if (!sobj || sobj->palette_entry_index < 0 || sobj->palette_entry_index >= palette->count)
+				continue;
+			pal_entry = TAG_BLOCK_GET_ELEMENT(
+				palette, sobj->palette_entry_index, struct scenario_object_palette_entry);
+			if (!pal_entry)
+				continue;
+			ref_idx = pal_entry->reference.index;
+			if (ref_idx == NONE || (uint32_t)tag_get_group_tag(ref_idx) != group_tag)
+				continue;
+			ref_name = tag_get_name(ref_idx);
+			if (!ref_name || _stricmp(ref_name, tag_path) != 0)
+				continue;
+
+			dx = sobj->position.x - *io_x;
+			dy = sobj->position.y - *io_y;
+			dz = sobj->position.z - *io_z;
+			d2 = dx * dx + dy * dy + dz * dz;
+			if (d2 < best_d2)
+			{
+				best_d2 = d2;
+				best_x = sobj->position.x;
+				best_y = sobj->position.y;
+				best_z = sobj->position.z;
+				found = 1;
+			}
+		}
+	}
+
+	if (found)
+	{
+		*io_x = best_x;
+		*io_y = best_y;
+		*io_z = best_z;
+	}
+}
+
 #define fopen(p, m) ((FILE *)forge_host_fopen((p), (m)))
 #define remove(p) forge_host_remove((p))
 extern long bitmap_format_to_d3d_format(short format, word flags);
 extern long bitmap_format_to_d3d_linear_format(short format, word flags);
 extern void models_fix_transparent_part_links(void);
 extern boolean custom_edition_cache_tags_loaded(void);
+extern boolean mcc_cache_tags_loaded(void);
+extern char const *mcc_cache_loaded_level_name(void);
+extern boolean mcc_package_map_path(char const *level_name, char *out_path);
+struct mcc_runtime;
+extern struct mcc_runtime *mcc_forge_browser_open(FILE *map_file, char const *map_path, void *tag_buf, unsigned long tag_size);
+extern void mcc_forge_browser_close(struct mcc_runtime *rt);
+extern boolean mcc_forge_convert_single_bitmap(
+	struct mcc_runtime *rt,
+	char const *tag_name,
+	unsigned int bitmap_index,
+	unsigned int channel_mode,
+	struct bitmap_data *inout_bmp,
+	unsigned char **out_pixels,
+	unsigned int *out_size);
+extern boolean mcc_forge_convert_single_permutation(
+	struct mcc_runtime *rt,
+	char const *tag_name,
+	int sound_channels,
+	unsigned int sample_rate,
+	unsigned int sound_rate,
+	unsigned int pitch_range_index,
+	unsigned int permutation_index,
+	struct sound_permutation *inout_perm,
+	unsigned char **out_samples,
+	unsigned int *out_size);
 extern long port_tag_profiles_scan(void);
 extern long port_tag_profiles_count(void);
 extern long port_tag_profiles_find(const char *folder);
@@ -360,9 +485,38 @@ static void forge_ensure_xbox_loading_tga(void)
 		long zsz = 0;
 		fseek(zf, 0, SEEK_END);
 		zsz = ftell(zf);
-		fclose(zf);
 		if (zsz == 230418L)
-			return;
+		{
+			uint8_t *check_buf = (uint8_t *)malloc(230418u);
+			int has_logo_brightness = 0;
+			if (check_buf)
+			{
+				fseek(zf, 0, SEEK_SET);
+				if (fread(check_buf, 1, 230418u, zf) == 230418u)
+				{
+					for (y = 75; y < 165 && !has_logo_brightness; y++)
+					{
+						for (x = 40; x < 280; x++)
+						{
+							uint8_t const *px = check_buf + 18u + ((size_t)(239 - y) * 320u + (size_t)x) * 3u;
+							if (px[0] > 140 || px[1] > 140 || px[2] > 140)
+							{
+								has_logo_brightness = 1;
+								break;
+							}
+						}
+					}
+				}
+				free(check_buf);
+			}
+			fclose(zf);
+			if (has_logo_brightness)
+				return;
+		}
+		else
+		{
+			fclose(zf);
+		}
 	}
 
 	mf = fopen("maps/loading.tga", "rb");
@@ -435,6 +589,38 @@ static void forge_ensure_xbox_loading_tga(void)
 				fclose(cf);
 			}
 		}
+
+		if (!have_ui_logo)
+		{
+			static char const * const s_bmap_paths[] = {
+				"maps/bitmaps.map",
+				"d:\\maps\\bitmaps.map",
+				"assets/maps/bitmaps.map",
+				"../assets/maps/bitmaps.map"
+			};
+			int bp;
+			for (bp = 0; bp < 4 && !have_ui_logo; bp++)
+			{
+				char bmap_host[1024];
+				FILE *bf;
+				if (bp == 1)
+					platform_translate_path(s_bmap_paths[bp], bmap_host, sizeof(bmap_host));
+				else
+					snprintf(bmap_host, sizeof(bmap_host), "%s", s_bmap_paths[bp]);
+				bf = fopen(bmap_host, "rb");
+				if (bf)
+				{
+					if (!dxt5_raw)
+						dxt5_raw = (uint8_t *)malloc(262144u);
+					if (dxt5_raw && fseek(bf, pix_off, SEEK_SET) == 0 &&
+						fread(dxt5_raw, 1, 262144u, bf) == 262144u)
+					{
+						have_ui_logo = 1;
+					}
+					fclose(bf);
+				}
+			}
+		}
 	}
 
 	tga_buf = (uint8_t *)calloc(1, 230418u);
@@ -472,11 +658,30 @@ static void forge_ensure_xbox_loading_tga(void)
 				if (v3 > vmax) vmax = v3;
 				grey = vmax;
 			}
+			else if (!have_ui_logo && y >= 68 && y <= 172)
+			{
+				/* Procedural Halo ring & horizontal banner fallback so loading.tga is never blank black */
+				float dx = ((float)x - 160.0f) / 36.0f;
+				float dy = ((float)y - 120.0f) / 36.0f;
+				float r2 = dx * dx + dy * dy;
+				if (r2 >= 0.72f && r2 <= 1.24f)
+				{
+					float dist = (r2 < 0.96f) ? (0.96f - r2) / 0.24f : (r2 - 0.96f) / 0.28f;
+					int ring_lum = (int)((1.0f - dist) * 235.0f);
+					if (ring_lum > (int)grey)
+						grey = (uint8_t)(ring_lum > 255 ? 255 : ring_lum);
+				}
+				if (y >= 114 && y <= 126 && x >= 44 && x < 276)
+				{
+					if (grey < 195)
+						grey = 195;
+				}
+			}
 			/* Subtle horizontal progress track beneath the Halo logo so the sweeping glow bar is always visible */
 			if (y >= 190 && y <= 194 && x >= 32 && x < 288)
 			{
-				if (grey < 110)
-					grey = 110;
+				if (grey < 140)
+					grey = 140;
 			}
 			dst[0] = grey;
 			dst[1] = grey;
@@ -565,7 +770,7 @@ static void forge_xbox_loading_screen_begin(void)
 	}
 	last_t = 0.0f;
 	s_forge_loading_active = 1;
-	progress_bar_begin(TRUE);
+	progress_bar_begin(FALSE);
 	forge_xbox_loading_screen_render_frame(0.001f);
 }
 
@@ -580,7 +785,7 @@ static void forge_xbox_loading_screen_update(float progress)
 		progress = 1.0f;
 
 	forge_xbox_loading_screen_render_frame(progress);
-	while (last_t + 0.09f < progress && catchup < 3)
+	while (last_t + 0.04f < progress && catchup < 5)
 	{
 		Sleep(10);
 		forge_xbox_loading_screen_render_frame(progress);
@@ -1402,6 +1607,21 @@ static int is_xbox_version5_map_file(char const *map_path)
 	return (hdr[0] == 0x68656164u /* 'head' */ && hdr[1] == 5u) ? 1 : 0;
 }
 
+static int is_mcc_version13_map_file(char const *map_path)
+{
+	FILE *fp = fopen(map_path, "rb");
+	uint32_t hdr[2];
+	if (!fp)
+		return 0;
+	if (fread(hdr, 1, sizeof(hdr), fp) != sizeof(hdr))
+	{
+		fclose(fp);
+		return 0;
+	}
+	fclose(fp);
+	return (hdr[0] == 0x68656164u /* 'head' */ && hdr[1] == 13u) ? 1 : 0;
+}
+
 /*
  * Checks if a pre-existing decompressed Xbox cache file already exists for `map_path`
  * in OpenCE's Xbox hard-drive cache (z:\cache000.map..z:\cache005.map or z:\cache_donor.map)
@@ -1934,10 +2154,11 @@ static void forge_delete_files_matching(char const *dir_path, char const *patter
 }
 
 static void close_runtime_xbox_donor(void);
+static void forge_ensure_local_tag_cache_built(void);
 
 int forge_reset_stock_tag_cache(void)
 {
-	int slot;
+	char z_path[512];
 
 	close_runtime_xbox_donor();
 	remove("OpenCE Forge/cached_tags/xbox_catalog.txt");
@@ -1947,20 +2168,16 @@ int forge_reset_stock_tag_cache(void)
 	RemoveDirectoryA("OpenCE Forge/cached_tags/xbox_cache");
 	forge_delete_files_matching("OpenCE Forge/cached_tags/markers", "m_*.*");
 
-	for (slot = 0; slot <= 6; slot++)
-	{
-		char z_xbox[64];
-		char z_path[512];
-		if (slot < 6)
-			snprintf(z_xbox, sizeof(z_xbox), "z:\\cache00%d.map", slot);
-		else
-			snprintf(z_xbox, sizeof(z_xbox), "z:\\cache_donor.map");
-		platform_translate_path(z_xbox, z_path, sizeof(z_path));
-		remove(z_path);
-	}
+	/* Remove only z:\cache_donor.map; preserve z:\cache000..005.map (active ui.map / engine caches) */
+	platform_translate_path("z:\\cache_donor.map", z_path, sizeof(z_path));
+	remove(z_path);
 
+	CreateDirectoryA("OpenCE Forge", NULL);
+	CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
+	CreateDirectoryA("OpenCE Forge/cached_tags/xbox_cache", NULL);
+	forge_ensure_local_tag_cache_built();
 	forge_runtime_reload_catalogs();
-	forge_set_status("Stock Tag Cache Cleared!");
+	forge_set_status("Stock Tag Cache Rebuilt!");
 	return 1;
 }
 
@@ -2040,12 +2257,16 @@ static void forge_ensure_local_tag_cache_built(void)
 void forge_runtime_init(void)
 {
 	if (g_forge.initialized)
+	{
+		forge_ensure_local_tag_cache_built();
 		return;
+	}
 	memset(&g_forge, 0, sizeof(g_forge));
 	g_forge.initialized = 1;
 	g_forge.mode = _forge_mode_play;
 	g_forge.active_modal = _forge_modal_none;
 	g_forge.current_category = _forge_cat_vehicles;
+	g_forge.active_weld_group = 1;
 	g_forge.snap_mode = _forge_snap_15_deg;
 	g_forge.cam_speed = 12.0f;
 	g_forge.grabbed_object_index = NONE;
@@ -2123,6 +2344,20 @@ static struct
 } s_forge_heap_allocs;
 
 #define FORGE_TAG_STREAM_MAX_SESSION_BYTES (24u * 1024u * 1024u)
+struct forge_staged_ephemeral_tag
+{
+	uint8_t active;
+	uint8_t committed;
+	uint8_t bundle_format;
+	uint8_t cat_id;
+	uint32_t expected_hash;
+	uint32_t root_group;
+	char tag_path[256];
+	char clean_disp[64];
+	uint8_t *raw_bytes;
+	uint32_t raw_size;
+};
+static struct forge_staged_ephemeral_tag s_staged_ephemeral_tags[32];
 static uint32_t s_streamed_phys_bytes = 0;
 
 static void *forge_session_calloc(size_t bytes)
@@ -2208,6 +2443,20 @@ static int s_local_monitor_drawn_this_frame = 0;
 static int s_last_preview_chosen_idx = -1;
 static unsigned long s_last_preview_cursor_ms = 0;
 
+struct forge_light_preset_cache_entry
+{
+	long base_ligh_idx;
+	uint8_t color_preset;
+	uint8_t intensity_preset;
+	uint8_t radius_preset;
+	uint8_t pad;
+	long cloned_ligh_idx;
+};
+
+static struct forge_light_preset_cache_entry s_light_preset_cache[128];
+static int s_light_preset_cache_count = 0;
+static void const *s_light_preset_cache_scen = NULL;
+
 #define FORGE_MAX_DONOR_CACHE_SLOTS 12
 
 static struct
@@ -2264,6 +2513,12 @@ void forge_runtime_on_map_unload(void)
 	s_forge_heap_allocs.ptrs = NULL;
 	s_forge_heap_allocs.count = 0;
 	s_forge_heap_allocs.cap = 0;
+	for (i = 0; i < 32; i++)
+	{
+		if (s_staged_ephemeral_tags[i].raw_bytes)
+			free(s_staged_ephemeral_tags[i].raw_bytes);
+	}
+	memset(s_staged_ephemeral_tags, 0, sizeof(s_staged_ephemeral_tags));
 	s_streamed_phys_bytes = 0;
 	s_dyn_sound_perms.count = 0;
 	s_monitor_bipd_handle = NONE;
@@ -2271,6 +2526,8 @@ void forge_runtime_on_map_unload(void)
 	s_local_monitor_drawn_this_frame = 0;
 	s_last_preview_chosen_idx = -1;
 	s_last_preview_cursor_ms = 0;
+	s_light_preset_cache_count = 0;
+	s_light_preset_cache_scen = NULL;
 
 	if (s_dyn_tags.saved_base_instances)
 	{
@@ -2418,72 +2675,6 @@ static void build_hw_part_from_arrays(
 		_triangle_buffer_type_precompiled_strip,
 		tri_count,
 		hw_tris);
-}
-
-static int load_hw_parts_from_ftag_memory(
-	uint8_t const *buf,
-	size_t buf_len,
-	struct forge_hw_part *out_parts,
-	int max_parts,
-	int *out_part_count,
-	float *out_radius,
-	float scale_factor,
-	float z_offset)
-{
-	uint32_t version, part_count, p;
-	float radius;
-	size_t pos = 276u;
-
-	if (!buf || buf_len < 276u || memcmp(buf, "FTAG", 4) != 0)
-		return 0;
-	version = *(uint32_t const *)(buf + 4u);
-	radius = *(float const *)(buf + 12u);
-	part_count = *(uint32_t const *)(buf + 272u);
-	if (version != 1u)
-		return 0;
-
-	*out_part_count = 0;
-	if (out_radius)
-		*out_radius = (radius > 0.1f && radius < 100.0f) ? radius : 1.5f;
-
-	for (p = 0; p < part_count && *out_part_count < max_parts; p++)
-	{
-		int32_t vtx_count, tri_count;
-		char shader_hint[128];
-		uint32_t uncomp_sz, idx_sz;
-		uint8_t *uncomp_verts;
-
-		if (pos + 136u > buf_len)
-			break;
-		vtx_count = *(int32_t const *)(buf + pos + 0u);
-		tri_count = *(int32_t const *)(buf + pos + 4u);
-		memcpy(shader_hint, buf + pos + 8u, 128u);
-		shader_hint[127] = '\0';
-		pos += 136u;
-		if (vtx_count <= 0 || tri_count <= 0 || vtx_count > 32768 || tri_count > 65536)
-			break;
-
-		uncomp_sz = (uint32_t)vtx_count * 68u;
-		idx_sz = ((uint32_t)tri_count + 2u) * 2u;
-		if (pos + uncomp_sz + idx_sz > buf_len)
-			break;
-		uncomp_verts = (uint8_t *)malloc(uncomp_sz);
-		if (!uncomp_verts)
-			break;
-		memcpy(uncomp_verts, buf + pos, uncomp_sz);
-		build_hw_part_from_arrays(
-			&out_parts[(*out_part_count)++],
-			uncomp_verts,
-			vtx_count,
-			buf + pos + uncomp_sz,
-			tri_count,
-			shader_hint,
-			scale_factor,
-			z_offset);
-		free(uncomp_verts);
-		pos += uncomp_sz + idx_sz;
-	}
-	return (*out_part_count > 0) ? 1 : 0;
 }
 
 static long append_runtime_tag_instance(
@@ -2673,6 +2864,450 @@ static void patch_light_definition_buffer(uint8_t *lbuf)
 		*(float *)(lbuf + 0x4C) = 1.0f;
 		*(float *)(lbuf + 0x50) = 1.0f;
 		*(float *)(lbuf + 0x54) = 1.0f;
+	}
+}
+
+extern struct data_array *light_data;
+
+struct forge_engine_light_datum_view
+{
+	struct datum_header header;
+	uint16_t flags;
+	long definition_index;
+	long rasterizer_light_index;
+	long marker;
+	long cluster_reference;
+	real_rgb_color color;
+	uint8_t reserved20[0xC];
+	long object_index;
+	real_point3d position;
+	real_vector3d forward;
+	real_vector3d up;
+	real radius;
+	long parent_light_index;
+	short attachment_marker_index;
+	short function_index;
+	short color_function_index;
+};
+
+static float forge_clamp01(float v)
+{
+	if (v < 0.0f)
+		return 0.0f;
+	if (v > 1.0f)
+		return 1.0f;
+	return v;
+}
+
+static void forge_get_light_preset_rgb(uint8_t preset, float *r, float *g, float *b)
+{
+	switch (preset)
+	{
+	case 1: *r = 1.00f; *g = 1.00f; *b = 1.00f; break; /* White */
+	case 2: *r = 1.00f; *g = 0.16f; *b = 0.12f; break; /* Red */
+	case 3: *r = 0.18f; *g = 0.48f; *b = 1.00f; break; /* Blue */
+	case 4: *r = 0.18f; *g = 1.00f; *b = 0.28f; break; /* Green */
+	case 5: *r = 1.00f; *g = 0.68f; *b = 0.14f; break; /* Amber */
+	case 6: *r = 0.76f; *g = 0.22f; *b = 1.00f; break; /* Purple */
+	case 7: *r = 0.15f; *g = 0.92f; *b = 1.00f; break; /* Cyan */
+	default: *r = 1.00f; *g = 0.96f; *b = 0.88f; break;
+	}
+}
+
+static float forge_get_light_intensity_mult(uint8_t preset)
+{
+	switch (preset)
+	{
+	case 1: return 0.25f;
+	case 2: return 0.50f;
+	case 3: return 1.50f;
+	case 4: return 2.00f;
+	case 5: return 3.00f;
+	default: return 1.00f;
+	}
+}
+
+static float forge_get_light_radius_override(uint8_t preset)
+{
+	switch (preset)
+	{
+	case 1: return 2.0f;
+	case 2: return 4.0f;
+	case 3: return 8.0f;
+	case 4: return 12.0f;
+	case 5: return 20.0f;
+	default: return 0.0f;
+	}
+}
+
+static long forge_get_or_clone_light_preset_tag(
+	long base_ligh_idx,
+	uint8_t color_preset,
+	uint8_t intensity_preset,
+	uint8_t radius_preset)
+{
+	void const *cur_scen = global_scenario_try_and_get();
+	uint8_t const *src_lbuf = NULL;
+	uint8_t *dst_lbuf;
+	char clone_name[128];
+	float r = 1.0f, g = 0.96f, b = 0.88f;
+	float mult = forge_get_light_intensity_mult(intensity_preset);
+	float rad = forge_get_light_radius_override(radius_preset);
+	long new_idx;
+	int i;
+
+	if (cur_scen != s_light_preset_cache_scen)
+	{
+		s_light_preset_cache_scen = cur_scen;
+		s_light_preset_cache_count = 0;
+	}
+
+	for (i = 0; i < s_light_preset_cache_count; i++)
+	{
+		if (s_light_preset_cache[i].base_ligh_idx == base_ligh_idx &&
+			s_light_preset_cache[i].color_preset == color_preset &&
+			s_light_preset_cache[i].intensity_preset == intensity_preset &&
+			s_light_preset_cache[i].radius_preset == radius_preset)
+		{
+			return s_light_preset_cache[i].cloned_ligh_idx;
+		}
+	}
+
+	if (base_ligh_idx != NONE)
+		src_lbuf = (uint8_t const *)tag_get('ligh', base_ligh_idx);
+
+	dst_lbuf = (uint8_t *)forge_session_calloc(0x104u);
+	if (!dst_lbuf)
+		return base_ligh_idx;
+
+	if (src_lbuf)
+	{
+		memcpy(dst_lbuf, src_lbuf, 0x104u);
+		patch_light_definition_buffer(dst_lbuf);
+	}
+	else
+	{
+		*(uint32_t *)(dst_lbuf + 0x00u) = 1u; /* _light_definition_dynamic_bit */
+		*(float *)(dst_lbuf + 0x04u) = 6.0f;  /* radius */
+		*(float *)(dst_lbuf + 0x08u) = 1.0f;  /* radius_modifier_lower_bound */
+		*(float *)(dst_lbuf + 0x0Cu) = 1.0f;  /* radius_modifier_upper_bound */
+		*(float *)(dst_lbuf + 0x10u) = 3.14159265f; /* falloff_angle */
+		*(float *)(dst_lbuf + 0x14u) = 3.14159265f; /* cutoff_angle */
+		*(float *)(dst_lbuf + 0x1Cu) = -1.0f; /* runtime_cosine_falloff_angle */
+		*(float *)(dst_lbuf + 0x20u) = -1.0f; /* runtime_cosine_cutoff_angle */
+		*(float *)(dst_lbuf + 0x24u) = 1.0f;  /* specular_radius_multiplier */
+		*(float *)(dst_lbuf + 0x28u) = 0.0f;  /* runtime_sine_cutoff_angle */
+		*(float *)(dst_lbuf + 0x38u) = 1.0f;
+		*(float *)(dst_lbuf + 0x3Cu) = 1.0f;
+		*(float *)(dst_lbuf + 0x40u) = 0.96f;
+		*(float *)(dst_lbuf + 0x44u) = 0.88f;
+		*(float *)(dst_lbuf + 0x48u) = 1.0f;
+		*(float *)(dst_lbuf + 0x4Cu) = 1.0f;
+		*(float *)(dst_lbuf + 0x50u) = 0.96f;
+		*(float *)(dst_lbuf + 0x54u) = 0.88f;
+		*(int32_t *)(dst_lbuf + 0xB8u) = NONE; /* lens_flare.index */
+	}
+
+	*(uint32_t *)(dst_lbuf + 0x00u) |= 1u;
+	*(float *)(dst_lbuf + 0x08u) = 1.0f;
+	*(float *)(dst_lbuf + 0x0Cu) = 1.0f;
+
+	if (color_preset != 0)
+	{
+		forge_get_light_preset_rgb(color_preset, &r, &g, &b);
+	}
+	else
+	{
+		r = *(float const *)(dst_lbuf + 0x4Cu);
+		g = *(float const *)(dst_lbuf + 0x50u);
+		b = *(float const *)(dst_lbuf + 0x54u);
+		if (r <= 0.0f && g <= 0.0f && b <= 0.0f)
+		{
+			r = 1.0f; g = 0.96f; b = 0.88f;
+		}
+	}
+
+	if (mult <= 1.0f)
+	{
+		r = forge_clamp01(r * mult);
+		g = forge_clamp01(g * mult);
+		b = forge_clamp01(b * mult);
+	}
+	else
+	{
+		float lift = (mult - 1.0f) * 0.12f;
+		r = forge_clamp01(r * mult + lift);
+		g = forge_clamp01(g * mult + lift);
+		b = forge_clamp01(b * mult + lift);
+		*(float *)(dst_lbuf + 0x24u) = mult;
+	}
+
+	*(float *)(dst_lbuf + 0x38u) = 1.0f;
+	*(float *)(dst_lbuf + 0x3Cu) = r;
+	*(float *)(dst_lbuf + 0x40u) = g;
+	*(float *)(dst_lbuf + 0x44u) = b;
+	*(float *)(dst_lbuf + 0x48u) = 1.0f;
+	*(float *)(dst_lbuf + 0x4Cu) = r;
+	*(float *)(dst_lbuf + 0x50u) = g;
+	*(float *)(dst_lbuf + 0x54u) = b;
+
+	if (rad > 0.0f)
+	{
+		*(float *)(dst_lbuf + 0x04u) = rad;
+	}
+	else if (mult > 1.0f)
+	{
+		*(float *)(dst_lbuf + 0x04u) = *(float const *)(dst_lbuf + 0x04u) * (1.0f + (mult - 1.0f) * 0.25f);
+	}
+
+	snprintf(clone_name, sizeof(clone_name), "forge\\lights\\preset_%ld_%u_%u_%u",
+		base_ligh_idx, (unsigned)color_preset, (unsigned)intensity_preset, (unsigned)radius_preset);
+	new_idx = append_runtime_tag_instance('ligh', NONE, NONE, clone_name, dst_lbuf);
+	if (new_idx == NONE)
+		return base_ligh_idx;
+
+	if (s_light_preset_cache_count < 128)
+	{
+		struct forge_light_preset_cache_entry *ce = &s_light_preset_cache[s_light_preset_cache_count++];
+		ce->base_ligh_idx = base_ligh_idx;
+		ce->color_preset = color_preset;
+		ce->intensity_preset = intensity_preset;
+		ce->radius_preset = radius_preset;
+		ce->cloned_ligh_idx = new_idx;
+	}
+	return new_idx;
+}
+
+int forge_instance_supports_light_props(int32_t live_idx)
+{
+	struct forge_live_instance const *inst;
+	struct object_datum const *obj;
+	int i, a;
+
+	if (live_idx < 0 || live_idx >= g_forge.live_instance_count)
+		return 0;
+	inst = &g_forge.live_instances[live_idx];
+	if (!inst->active || inst->is_ai_unit)
+		return 0;
+	if (inst->group_tag != 'lifi' && inst->group_tag != 'scen' &&
+		inst->group_tag != 'mach' && inst->group_tag != 'ctrl')
+		return 0;
+	if (inst->group_tag == 'lifi')
+		return 1;
+	if (inst->light_color_preset != 0 || inst->light_intensity_preset != 0 || inst->light_radius_preset != 0)
+		return 1;
+
+	if (inst->object_index != NONE)
+	{
+		obj = (struct object_datum const *)object_try_and_get_and_verify_type(inst->object_index, (unsigned long)-1);
+		if (obj)
+		{
+			if (TEST_FLAG(obj->object.flags, _object_has_attached_lights_bit))
+				return 1;
+			for (a = 0; a < 8; a++)
+			{
+				if (obj->object.attachment_types[a] == 0 && obj->object.attachment_indices[a] != NONE)
+					return 1;
+			}
+			if (obj->definition_index != NONE)
+			{
+				uint8_t const *obuf = (uint8_t const *)tag_get((long)inst->group_tag, obj->definition_index);
+				if (obuf)
+				{
+					int32_t att_cnt = *(int32_t const *)(obuf + 0x140u);
+					uint8_t const *att_base = *(uint8_t const *const *)(obuf + 0x144u);
+					for (a = 0; a < att_cnt && att_base; a++)
+					{
+						if (*(uint32_t const *)(att_base + (size_t)a * 72u) == 'ligh')
+							return 1;
+					}
+				}
+			}
+		}
+	}
+
+	for (i = 0; i < g_forge.catalog_count; i++)
+	{
+		if (g_forge.catalog[i].category == _forge_cat_lights &&
+			g_forge.catalog[i].group_tag == inst->group_tag &&
+			_stricmp(g_forge.catalog[i].tag_path, inst->tag_path) == 0)
+		{
+			return 1;
+		}
+	}
+
+	if (strstr(inst->tag_path, "light") != NULL || strstr(inst->tag_path, "Light") != NULL ||
+		strstr(inst->tag_path, "lamp") != NULL || strstr(inst->tag_path, "beacon") != NULL ||
+		strstr(inst->tag_path, "torch") != NULL || strstr(inst->tag_path, "emitter") != NULL)
+	{
+		return 1;
+	}
+	return 0;
+}
+
+void forge_apply_instance_light_settings(int32_t live_idx)
+{
+	struct forge_live_instance const *inst;
+	struct object_datum *obj;
+	uint8_t *obuf = NULL;
+	int32_t att_cnt = 0;
+	uint8_t *att_base = NULL;
+	int a, found_attached = 0;
+	int has_override;
+
+	if (live_idx < 0 || live_idx >= g_forge.live_instance_count)
+		return;
+	inst = &g_forge.live_instances[live_idx];
+	if (!inst->active || inst->object_index == NONE || !light_data)
+		return;
+
+	has_override = (inst->light_color_preset != 0 ||
+		inst->light_intensity_preset != 0 ||
+		inst->light_radius_preset != 0);
+
+	obj = (struct object_datum *)object_try_and_get_and_verify_type(inst->object_index, (unsigned long)-1);
+	if (!obj)
+		return;
+
+	if (obj->definition_index != NONE)
+	{
+		obuf = (uint8_t *)tag_get((long)inst->group_tag, obj->definition_index);
+		if (!obuf)
+			obuf = (uint8_t *)object_definition_get(obj->definition_index);
+		if (obuf)
+		{
+			att_cnt = *(int32_t const *)(obuf + 0x140u);
+			att_base = *(uint8_t *const *)(obuf + 0x144u);
+		}
+	}
+
+	if (inst->light_color_preset != 0)
+	{
+		float cr, cg, cb;
+		int c;
+		forge_get_light_preset_rgb(inst->light_color_preset, &cr, &cg, &cb);
+		for (c = 0; c < 4; c++)
+		{
+			obj->object.base_change_colors[c].red = cr;
+			obj->object.base_change_colors[c].green = cg;
+			obj->object.base_change_colors[c].blue = cb;
+			obj->object.outgoing_change_colors[c] = obj->object.base_change_colors[c];
+		}
+	}
+	else if (forge_instance_supports_light_props(live_idx))
+	{
+		int c;
+		for (c = 0; c < 4; c++)
+		{
+			obj->object.base_change_colors[c].red = 1.0f;
+			obj->object.base_change_colors[c].green = 1.0f;
+			obj->object.base_change_colors[c].blue = 1.0f;
+			obj->object.outgoing_change_colors[c] = obj->object.base_change_colors[c];
+		}
+	}
+
+	for (a = 0; a < 8; a++)
+	{
+		if (obj->object.attachment_types[a] == 0 && obj->object.attachment_indices[a] != NONE)
+		{
+			long l_idx = obj->object.attachment_indices[a];
+			struct forge_engine_light_datum_view *ld =
+				(struct forge_engine_light_datum_view *)datum_try_and_get(light_data, l_idx);
+			if (ld)
+			{
+				long orig_def_idx = ld->definition_index;
+				short orig_color_fn = ld->color_function_index;
+				found_attached = 1;
+
+				if (att_base && ld->attachment_marker_index >= 0 && ld->attachment_marker_index < att_cnt)
+				{
+					uint8_t const *att = att_base + (size_t)ld->attachment_marker_index * 72u;
+					if (*(uint32_t const *)(att + 0x00u) == 'ligh' && *(int32_t const *)(att + 0x0Cu) != NONE)
+					{
+						orig_def_idx = *(int32_t const *)(att + 0x0Cu);
+						orig_color_fn = *(int16_t const *)(att + 0x34u);
+						if (orig_color_fn < 0 || orig_color_fn >= 4)
+							orig_color_fn = NONE;
+					}
+				}
+
+				if (has_override)
+				{
+					long custom_def = forge_get_or_clone_light_preset_tag(
+						orig_def_idx,
+						inst->light_color_preset,
+						inst->light_intensity_preset,
+						inst->light_radius_preset);
+					if (custom_def != NONE)
+						ld->definition_index = custom_def;
+					if (inst->light_color_preset != 0)
+						ld->color_function_index = NONE;
+					ld->flags |= 3u; /* _point_light_dynamic_bit | _point_light_connects_to_map_bit */
+				}
+				else if (orig_def_idx != NONE)
+				{
+					ld->definition_index = orig_def_idx;
+					ld->color_function_index = orig_color_fn;
+				}
+				light_disconnect_from_map(l_idx);
+				light_reconnect_to_map(l_idx);
+			}
+		}
+	}
+
+	if (!found_attached && has_override && obuf && forge_instance_supports_light_props(live_idx))
+	{
+		long synth_def = forge_get_or_clone_light_preset_tag(
+			NONE,
+			inst->light_color_preset,
+			inst->light_intensity_preset,
+			inst->light_radius_preset);
+		if (synth_def != NONE)
+		{
+			int slot = -1;
+			short marker_att_idx = 0;
+
+			for (a = 0; a < 8; a++)
+			{
+				if (obj->object.attachment_types[a] == NONE)
+				{
+					slot = a;
+					break;
+				}
+			}
+			if (slot >= 0)
+			{
+				if (att_cnt <= 0 || !att_base)
+				{
+					uint8_t *new_att = (uint8_t *)forge_session_calloc(72u);
+					if (new_att)
+					{
+						*(uint32_t *)(new_att + 0x00u) = 'ligh';
+						*(int32_t *)(new_att + 0x0Cu) = synth_def;
+						*(int16_t *)(new_att + 0x30u) = NONE;
+						*(int16_t *)(new_att + 0x32u) = NONE;
+						*(int16_t *)(new_att + 0x34u) = NONE;
+						*(int32_t *)(obuf + 0x140u) = 1;
+						*(uint8_t **)(obuf + 0x144u) = new_att;
+						marker_att_idx = 0;
+					}
+					else
+					{
+						slot = -1;
+					}
+				}
+				if (slot >= 0)
+				{
+					long new_lidx = light_new(synth_def, inst->object_index, marker_att_idx, NONE, NONE);
+					if (new_lidx != NONE)
+					{
+						obj->object.attachment_types[slot] = 0;
+						obj->object.attachment_indices[slot] = new_lidx;
+						SET_FLAG(obj->object.flags, _object_has_attached_lights_bit, TRUE);
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -2898,6 +3533,7 @@ struct xbox_runtime_closure
 	long *runtime_handles;
 	uint8_t **cloned_roots;
 	int is_red_beam_variant;
+	int include_all_dependencies;
 };
 
 static void xbox_collect_schema_dependencies(
@@ -2937,7 +3573,7 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 
 	/* Reuse any dependency tag that was already dynamically injected during this session,
 	 * or reuse shared base-map dependencies (including sounds) on stock Xbox maps. */
-	if (cl->order_count > 0 && !cl->is_red_beam_variant)
+	if (cl->order_count > 0 && !cl->is_red_beam_variant && !cl->include_all_dependencies)
 	{
 		char donor_name[256];
 		long ex;
@@ -2953,8 +3589,8 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 		{
 			long base_cnt = (long)forge_get_base_map_tag_count();
 			if ((base_cnt > 0 && (ex & 0xFFFF) >= base_cnt) ||
-				(!custom_edition_cache_tags_loaded() &&
-				 grp != 'bitm' && grp != 'mode' &&
+				(!custom_edition_cache_tags_loaded() && !mcc_cache_tags_loaded() &&
+				 grp != 'bitm' && grp != 'mode' && grp != 'snd!' && grp != 'lsnd' &&
 				 grp != 'shdr' && grp != 'senv' && grp != 'soso' && grp != 'sotr' &&
 				 grp != 'schi' && grp != 'scex' && grp != 'swat' && grp != 'sgla' &&
 				 grp != 'smet' && grp != 'spla'))
@@ -3694,6 +4330,15 @@ static long load_native_xbox_tag_from_source(
 		{
 			struct sound_definition *sdef = (struct sound_definition *)root_buf;
 			int pr_i, pm_i;
+			sdef->compression = 1; /* _sound_compression_xbox_adpcm */
+			if (sdef->encoding != 1)
+				sdef->sample_rate = 0; /* mono Xbox ADPCM plays at 22050 Hz */
+			if (*(uint16_t const *)((uint8_t const *)sdef + 0x0Au) == 1u)
+			{
+				sdef->minimum_distance = (sdef->sound_class == 22 || sdef->sound_class == 23) ? 2.0f : 1.0f;
+				if (!(sdef->maximum_distance > sdef->minimum_distance))
+					sdef->maximum_distance = 25.0f;
+			}
 			sdef->promotion_sound.index = NONE;
 			sdef->promotion_count = 0;
 			for (pr_i = 0; pr_i < sdef->pitch_ranges.count && sdef->pitch_ranges.address; pr_i++)
@@ -4527,7 +5172,7 @@ static long install_faber_bundle_from_source(
 		if (grp == 'scnr' || grp == 'sbsp' || grp == 'matg' || grp == 'udlg')
 			continue;
 
-		if (ti > 0 && custom_edition_cache_tags_loaded() &&
+		if (ti > 0 && (custom_edition_cache_tags_loaded() || mcc_cache_tags_loaded()) &&
 			grp != 'bitm' && grp != 'mod2' && grp != 'mode' && grp != 'snd!' && grp != 'lsnd' &&
 			grp != 'shdr' && grp != 'senv' && grp != 'soso' && grp != 'sotr' &&
 			grp != 'schi' && grp != 'scex' && grp != 'swat' && grp != 'sgla' &&
@@ -4702,6 +5347,15 @@ static long install_faber_bundle_from_source(
 		{
 			struct sound_definition *sdef = (struct sound_definition *)root_buf;
 			int pr_i, pm_i;
+			sdef->compression = 1; /* _sound_compression_xbox_adpcm */
+			if (sdef->encoding != 1)
+				sdef->sample_rate = 0; /* mono Xbox ADPCM plays at 22050 Hz */
+			if (*(uint16_t const *)((uint8_t const *)sdef + 0x0Au) == 1u)
+			{
+				sdef->minimum_distance = (sdef->sound_class == 22 || sdef->sound_class == 23) ? 2.0f : 1.0f;
+				if (!(sdef->maximum_distance > sdef->minimum_distance))
+					sdef->maximum_distance = 25.0f;
+			}
 			sdef->promotion_sound.index = NONE;
 			sdef->promotion_count = 0;
 			for (pr_i = 0; pr_i < sdef->pitch_ranges.count && sdef->pitch_ranges.address; pr_i++)
@@ -5337,12 +5991,87 @@ static int s_forge_server_dirty_txt = 0;
 static int s_forge_server_dirty_map = 0;
 static unsigned long s_forge_server_last_edit_ms = 0;
 static int s_forge_server_prev_player_count = 0;
+static char s_pending_sidecar_leaf[64] = "";
+static char s_active_sidecar_base_map[128] = "";
+static char s_deferred_client_save_name[64] = "";
+
+static void forge_commit_session_ephemeral_tags_to_disk(void);
+
+void forge_set_pending_sidecar_leaf(char const *leaf)
+{
+	if (leaf && leaf[0])
+	{
+		snprintf(s_pending_sidecar_leaf, sizeof(s_pending_sidecar_leaf), "%s", leaf);
+	}
+	else
+	{
+		s_pending_sidecar_leaf[0] = '\0';
+		s_active_sidecar_base_map[0] = '\0';
+	}
+}
+
+int forge_has_pending_or_active_sidecar(void)
+{
+	return (s_pending_sidecar_leaf[0] != '\0' || g_forge.live_instance_count > 0) ? 1 : 0;
+}
+
+static int forge_write_sidecar_state_file(char const *leaf);
+
+static int is_existing_custom_map_file_flg1(char const *leaf, int *out_file_exists)
+{
+	char d_map[160], host_map[512];
+	FILE *f;
+	uint8_t hdr[0x200];
+	uint32_t sig = 0;
+
+	if (out_file_exists)
+		*out_file_exists = 0;
+	if (!leaf || !leaf[0])
+		return 0;
+
+	snprintf(d_map, sizeof(d_map), "d:\\custom_maps\\%s.map", leaf);
+	host_map[0] = '\0';
+	platform_translate_path(d_map, host_map, sizeof(host_map));
+	f = host_map[0] ? fopen(host_map, "rb") : NULL;
+	if (!f)
+	{
+		snprintf(host_map, sizeof(host_map), "custom_maps/%s.map", leaf);
+		f = fopen(host_map, "rb");
+	}
+	if (!f)
+		return 0;
+
+	if (out_file_exists)
+		*out_file_exists = 1;
+	if (fread(hdr, 1, sizeof(hdr), f) == sizeof(hdr))
+		memcpy(&sig, hdr + 0x1FCu, 4);
+	fclose(f);
+	return (sig == 0x464C4731u) ? 1 : 0;
+}
+
+void forge_deferred_client_save_tick(void)
+{
+	char dl_status[128];
+	char pending_name[64];
+
+	if (!s_deferred_client_save_name[0])
+		return;
+	if (forge_network_get_tag_download_status(dl_status, sizeof(dl_status)))
+		return;
+
+	snprintf(pending_name, sizeof(pending_name), "%s", s_deferred_client_save_name);
+	s_deferred_client_save_name[0] = '\0';
+	forge_ui_save_copy_as(pending_name);
+}
 
 int forge_ui_save_copy_as(char const *new_map_name)
 {
 	char base_map_path[512];
 	char clean_name[64];
 	int was_already_saved = g_forge.has_saved_map_once;
+	int map_exists = 0;
+	int is_legacy_flg1_map = 0;
+	int use_sidecar_only = 1;
 	int ok;
 
 	if (!new_map_name || !new_map_name[0])
@@ -5362,18 +6091,86 @@ int forge_ui_save_copy_as(char const *new_map_name)
 		snprintf(clean_name, sizeof(clean_name), "%s", new_map_name);
 	}
 
+	{
+		char dl_status[128];
+		if (forge_network_get_tag_download_status(dl_status, sizeof(dl_status)))
+		{
+			snprintf(s_deferred_client_save_name, sizeof(s_deferred_client_save_name), "%s", clean_name);
+			forge_set_status("Waiting for custom tags to finish streaming before saving '%s'...", clean_name);
+			return 1;
+		}
+	}
+	s_deferred_client_save_name[0] = '\0';
+	forge_commit_session_ephemeral_tags_to_disk();
+
 	resolve_current_base_map_path(base_map_path, sizeof(base_map_path));
 
+	{
+		char d_dir[512];
+		d_dir[0] = '\0';
+		platform_translate_path("d:\\custom_maps", d_dir, sizeof(d_dir));
+		if (d_dir[0])
+			CreateDirectoryA(d_dir, NULL);
+	}
 	CreateDirectoryA("d:\\custom_maps", NULL);
 	CreateDirectoryA("custom_maps", NULL);
 
-	ok = forge_export_scenario_map(
-		base_map_path,
-		&g_forge.edit_state,
-		clean_name);
+	is_legacy_flg1_map = is_existing_custom_map_file_flg1(clean_name, &map_exists);
+	if (map_exists && !is_legacy_flg1_map && !halo_server_mode())
+	{
+		/* Never overwrite or shadow a base non-Forge Custom Edition .map in custom_maps/ */
+		char suffixed[64];
+		snprintf(suffixed, sizeof(suffixed), "%s_forge", clean_name);
+		snprintf(clean_name, sizeof(clean_name), "%s", suffixed);
+	}
+	(void)use_sidecar_only;
+
+	{
+		char const *cur = forge_get_active_map_name();
+		char const *slash = cur ? strrchr(cur, '\\') : NULL;
+		char const *slash2 = cur ? strrchr(cur, '/') : NULL;
+		char const *active_leaf;
+		if (slash2 && (!slash || slash2 > slash))
+			slash = slash2;
+		active_leaf = slash ? (slash + 1) : (cur && cur[0] ? cur : "");
+		ok = forge_write_sidecar_state_file(clean_name);
+		if (ok)
+			snprintf(s_pending_sidecar_leaf, sizeof(s_pending_sidecar_leaf), "%s", clean_name);
+		if (ok && active_leaf[0] && _stricmp(active_leaf, clean_name) != 0)
+		{
+			/* Remove any leftover default-named sidecar save (e.g. custom_maps/<active_leaf>.txt)
+			 * so saving with a custom name never leaves two saves or pollutes the stock base map. */
+			char d_map[160], d_txt[160], host_map[512], host_txt[512];
+			FILE *f_check;
+			snprintf(d_map, sizeof(d_map), "d:\\custom_maps\\%s.map", active_leaf);
+			host_map[0] = '\0';
+			platform_translate_path(d_map, host_map, sizeof(host_map));
+			f_check = host_map[0] ? fopen(host_map, "rb") : NULL;
+			if (!f_check)
+			{
+				snprintf(host_map, sizeof(host_map), "custom_maps/%s.map", active_leaf);
+				f_check = fopen(host_map, "rb");
+			}
+			if (f_check)
+			{
+				fclose(f_check);
+			}
+			else
+			{
+				snprintf(d_txt, sizeof(d_txt), "d:\\custom_maps\\%s.txt", active_leaf);
+				host_txt[0] = '\0';
+				platform_translate_path(d_txt, host_txt, sizeof(host_txt));
+				if (host_txt[0])
+					remove(host_txt);
+				snprintf(host_txt, sizeof(host_txt), "custom_maps/%s.txt", active_leaf);
+				remove(host_txt);
+			}
+		}
+	}
 
 	if (ok)
 	{
+		char const *saved_ext = "txt";
 		s_forge_server_dirty_txt = 0;
 		s_forge_server_dirty_map = 0;
 		forge_menu_custom_edition_maps_look_again();
@@ -5384,19 +6181,21 @@ int forge_ui_save_copy_as(char const *new_map_name)
 
 		if (was_already_saved)
 		{
-			forge_set_status("Updated saved map 'custom_maps/%s.map' (%d placed, %d default edits)!",
+			forge_set_status("Updated saved map 'custom_maps/%s.%s' (%d placed, %d default edits)!",
 				clean_name,
+				saved_ext,
 				(int)g_forge.edit_state.placed_object_count,
 				(int)g_forge.edit_state.default_edit_count);
 		}
 		else
 		{
-			forge_set_status("Initial save complete: 'custom_maps/%s.map'! Press F5 anytime to quick-update.",
-				clean_name);
+			forge_set_status("Initial save complete: 'custom_maps/%s.%s'! Press F5 anytime to quick-update.",
+				clean_name,
+				saved_ext);
 		}
 		return 1;
 	}
-	forge_set_status("ERROR: Failed to export custom_maps/%s.map", clean_name);
+	forge_set_status("ERROR: Failed to export custom_maps/%s.txt", clean_name);
 	return 0;
 }
 
@@ -5441,9 +6240,26 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 	int in_forge_state = 0;
 	int cleared_default_spawns = 0;
 	int cleared_default_flags = 0;
+	int32_t last_object_li = -1;
+	int32_t last_object_po = -1;
+	int32_t last_default_li = -1;
+	int32_t last_default_de = -1;
+	int32_t last_ai_li = -1;
+	int32_t last_ai_idx = -1;
+	int16_t placed_to_li[FORGE_MAX_PLACED_OBJECTS];
+	int16_t def_to_li[FORGE_MAX_DEFAULT_OBJECT_EDITS];
+	int16_t ai_to_li[FORGE_MAX_AI_SPAWNS];
+	int map_i;
 
 	if (!cur)
 		return;
+
+	for (map_i = 0; map_i < FORGE_MAX_PLACED_OBJECTS; map_i++)
+		placed_to_li[map_i] = -1;
+	for (map_i = 0; map_i < FORGE_MAX_DEFAULT_OBJECT_EDITS; map_i++)
+		def_to_li[map_i] = -1;
+	for (map_i = 0; map_i < FORGE_MAX_AI_SPAWNS; map_i++)
+		ai_to_li[map_i] = -1;
 
 	while (*cur)
 	{
@@ -5482,7 +6298,10 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 				if (!baked)
 				{
 					/* Cached tag object not baked into base_map: spawn live now! */
-					forge_3d_spawn_object_at((uint32_t)grp, tpath, (uint8_t)src_cache, x, y, z, yaw, pitch, roll, (int16_t)team, 0);
+					last_object_li = forge_3d_spawn_object_at((uint32_t)grp, tpath, (uint8_t)src_cache, x, y, z, yaw, pitch, roll, (int16_t)team, 0);
+					last_object_po = (last_object_li >= 0) ? g_forge.live_instances[last_object_li].edit_entry_index : -1;
+					if (last_object_po >= 0 && last_object_po < FORGE_MAX_PLACED_OBJECTS)
+						placed_to_li[last_object_po] = (int16_t)last_object_li;
 				}
 				else
 				{
@@ -5550,7 +6369,10 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 					if (found_oidx == NONE)
 					{
 						/* Not yet spawned by scenario: spawn live and record in placed_objects */
-						forge_3d_spawn_object_at((uint32_t)grp, tpath, (uint8_t)src_cache, x, y, z, yaw, pitch, roll, (int16_t)team, 0);
+						last_object_li = forge_3d_spawn_object_at((uint32_t)grp, tpath, (uint8_t)src_cache, x, y, z, yaw, pitch, roll, (int16_t)team, 0);
+						last_object_po = (last_object_li >= 0) ? g_forge.live_instances[last_object_li].edit_entry_index : -1;
+						if (last_object_po >= 0 && last_object_po < FORGE_MAX_PLACED_OBJECTS)
+							placed_to_li[last_object_po] = (int16_t)last_object_li;
 					}
 					else if (g_forge.edit_state.placed_object_count < FORGE_MAX_PLACED_OBJECTS)
 					{
@@ -5558,6 +6380,9 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 						int32_t po_idx = g_forge.edit_state.placed_object_count++;
 						struct forge_placed_object_entry *po = &g_forge.edit_state.placed_objects[po_idx];
 						struct object_datum *fobj = (struct object_datum *)object_try_and_get_and_verify_type(found_oidx, (unsigned long)-1);
+
+						last_object_po = po_idx;
+						last_object_li = -1;
 
 						memset(po, 0, sizeof(*po));
 						po->active = 1;
@@ -5592,11 +6417,15 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 							inst->group_tag = (uint32_t)grp;
 							inst->source_cache_id = (uint8_t)src_cache;
 							inst->is_default_scenario_object = 0;
+							inst->spawned_once = 1;
+							inst->death_tick = -1;
 							inst->team_designator = (int16_t)team;
 							inst->x = x; inst->y = y; inst->z = z;
 							inst->yaw = yaw; inst->pitch = pitch; inst->roll = roll;
 							snprintf(inst->tag_path, sizeof(inst->tag_path), "%s", tpath);
 							forge_3d_move_instance(li_idx, x, y, z, yaw, pitch, roll, 0);
+							last_object_li = li_idx;
+							placed_to_li[po_idx] = (int16_t)li_idx;
 						}
 					}
 				}
@@ -5610,7 +6439,77 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 			tpath[0] = 0;
 			if (sscanf(line + 3, "%f|%f|%f|%f|%d|%255[^\r\n]", &x, &y, &z, &yaw, &team, tpath) == 6 && tpath[0])
 			{
-				forge_3d_spawn_object_at('actv', tpath, 0, x, y, z, yaw, 0.0f, 0.0f, (int16_t)team, 0);
+				last_ai_li = forge_3d_spawn_object_at('actv', tpath, 0, x, y, z, yaw, 0.0f, 0.0f, (int16_t)team, 0);
+				last_ai_idx = (last_ai_li >= 0) ? g_forge.live_instances[last_ai_li].edit_entry_index : (g_forge.edit_state.ai_spawn_count - 1);
+				if (last_ai_idx >= 0 && last_ai_idx < FORGE_MAX_AI_SPAWNS)
+					ai_to_li[last_ai_idx] = (int16_t)last_ai_li;
+			}
+		}
+		else if (in_forge_state && strncmp(line, "AI_RESPAWN|", 11) == 0)
+		{
+			int aidx = -1, rsec = 0;
+			int nread = sscanf(line + 11, "%d|%d", &aidx, &rsec);
+			if (nread == 1)
+			{
+				rsec = aidx;
+				aidx = last_ai_idx;
+			}
+			if (nread >= 1 && rsec >= 0)
+			{
+				int32_t target_li = (aidx >= 0 && aidx < FORGE_MAX_AI_SPAWNS && ai_to_li[aidx] >= 0) ? ai_to_li[aidx] : last_ai_li;
+				if (aidx >= 0 && aidx < g_forge.edit_state.ai_spawn_count)
+					g_forge.edit_state.ai_spawns[aidx].respawn_timer_sec = (int16_t)rsec;
+				else if (g_forge.edit_state.ai_spawn_count > 0)
+					g_forge.edit_state.ai_spawns[g_forge.edit_state.ai_spawn_count - 1].respawn_timer_sec = (int16_t)rsec;
+				if (target_li >= 0 && target_li < g_forge.live_instance_count && g_forge.live_instances[target_li].is_ai_unit)
+					g_forge.live_instances[target_li].respawn_timer_sec = (int16_t)rsec;
+			}
+		}
+		else if (in_forge_state && strncmp(line, "AI_ORDER|", 9) == 0)
+		{
+			int aidx = -1;
+			unsigned int aorder = 0, agroup = 0;
+			int nread = sscanf(line + 9, "%d|%u|%u", &aidx, &aorder, &agroup);
+			if (nread == 1)
+			{
+				aorder = (unsigned int)aidx;
+				aidx = last_ai_idx;
+			}
+			if (nread >= 1)
+			{
+				int32_t target_li = (aidx >= 0 && aidx < FORGE_MAX_AI_SPAWNS && ai_to_li[aidx] >= 0) ? ai_to_li[aidx] : last_ai_li;
+				if (aorder >= NUMBER_OF_FORGE_AI_ORDERS)
+					aorder = 0;
+				if (agroup > FORGE_MAX_WELD_GROUPS)
+					agroup = 0;
+				if (aidx >= 0 && aidx < g_forge.edit_state.ai_spawn_count)
+				{
+					g_forge.edit_state.ai_spawns[aidx].ai_order = (uint8_t)aorder;
+					if (nread == 3)
+						g_forge.edit_state.ai_spawns[aidx].group_id = (uint8_t)agroup;
+				}
+				if (target_li >= 0 && target_li < g_forge.live_instance_count && g_forge.live_instances[target_li].is_ai_unit)
+				{
+					struct forge_live_instance *ainst = &g_forge.live_instances[target_li];
+					ainst->ai_order = (uint8_t)aorder;
+					if (nread == 3)
+						ainst->group_id = (uint8_t)agroup;
+					forge_ai_apply_order(ainst->actor_index, ainst->object_index, ainst->ai_order,
+						ainst->x, ainst->y, ainst->z, game_time_get());
+				}
+			}
+		}
+		else if (in_forge_state && strncmp(line, "AI_GROUP|", 9) == 0)
+		{
+			int aidx = -1;
+			unsigned int agroup = 0;
+			if (sscanf(line + 9, "%d|%u", &aidx, &agroup) == 2 && agroup <= FORGE_MAX_WELD_GROUPS)
+			{
+				int32_t target_li = (aidx >= 0 && aidx < FORGE_MAX_AI_SPAWNS && ai_to_li[aidx] >= 0) ? ai_to_li[aidx] : last_ai_li;
+				if (aidx >= 0 && aidx < g_forge.edit_state.ai_spawn_count)
+					g_forge.edit_state.ai_spawns[aidx].group_id = (uint8_t)agroup;
+				if (target_li >= 0 && target_li < g_forge.live_instance_count && g_forge.live_instances[target_li].is_ai_unit)
+					g_forge.live_instances[target_li].group_id = (uint8_t)agroup;
 			}
 		}
 		else if (in_forge_state && strncmp(line, "DEFAULT_EDIT|", 13) == 0)
@@ -5707,29 +6606,80 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 				}
 
 				/* Apply default edit live if the scenario object is still at its unedited origin (e.g. Xbox v5 FLG1 container) */
-				object_iterator_new(&iter, (unsigned long)-1, 0);
-				while ((obj = object_iterator_next(&iter)) != NULL)
 				{
-					float dx = obj->object.position.x - ox;
-					float dy = obj->object.position.y - oy;
-					float dz = obj->object.position.z - oz;
-					float d2 = dx * dx + dy * dy + dz * dz * 0.25f;
-					if (obj->object.parent_object_index != NONE)
-						continue;
-					if (obj->object.type == _object_type_biped &&
-						((struct unit_datum *)obj)->unit.player_index != NONE)
-						continue;
-					if (dx * dx + dy * dy <= 16.0f && (float)fabs((double)dz) <= 12.0f && d2 < best_d2)
+					int li;
+					int32_t matched_li = -1;
+					float max_xy_d2 = (grp == 'scen' || grp == 'mach' || grp == 'lifi' || grp == 'ctrl') ? 0.04f : 16.0f;
+					float best_li_d2 = max_xy_d2;
+
+					for (li = 0; li < g_forge.live_instance_count; li++)
 					{
-						best_d2 = d2;
-						found_oidx = iter.index;
+						struct forge_live_instance *inst = &g_forge.live_instances[li];
+						float dx, dy, dz, d2;
+						if (!inst->active || !inst->is_default_scenario_object || inst->edit_entry_index >= 0)
+							continue;
+						if (inst->group_tag != (uint32_t)grp || _stricmp(inst->tag_path, tpath) != 0)
+							continue;
+						dx = inst->orig_x - ox;
+						dy = inst->orig_y - oy;
+						dz = inst->orig_z - oz;
+						d2 = dx * dx + dy * dy + dz * dz * 0.25f;
+						if (dx * dx + dy * dy <= max_xy_d2 && (float)fabs((double)dz) <= 12.0f && d2 < best_li_d2)
+						{
+							best_li_d2 = d2;
+							matched_li = li;
+							found_oidx = inst->object_index;
+						}
+					}
+
+					if (matched_li < 0)
+					{
+						best_d2 = max_xy_d2;
+						object_iterator_new(&iter, (unsigned long)-1, 0);
+						while ((obj = object_iterator_next(&iter)) != NULL)
+						{
+							float dx = obj->object.position.x - ox;
+							float dy = obj->object.position.y - oy;
+							float dz = obj->object.position.z - oz;
+							float d2 = dx * dx + dy * dy + dz * dz * 0.25f;
+							int claimed = 0;
+							if (obj->object.parent_object_index != NONE)
+								continue;
+							if (obj->object.type == _object_type_biped &&
+								((struct unit_datum *)obj)->unit.player_index != NONE)
+								continue;
+							if (obj->definition_index != NONE)
+							{
+								char const *oname = tag_get_name(obj->definition_index);
+								if (oname && oname[0] && _stricmp(oname, tpath) != 0)
+									continue;
+							}
+							for (li = 0; li < g_forge.live_instance_count; li++)
+							{
+								if (g_forge.live_instances[li].active &&
+									g_forge.live_instances[li].object_index == iter.index &&
+									(!g_forge.live_instances[li].is_default_scenario_object ||
+									 g_forge.live_instances[li].edit_entry_index >= 0))
+								{
+									claimed = 1;
+									break;
+								}
+							}
+							if (claimed)
+								continue;
+							if (dx * dx + dy * dy <= max_xy_d2 && (float)fabs((double)dz) <= 12.0f && d2 < best_d2)
+							{
+								best_d2 = d2;
+								found_oidx = iter.index;
+							}
+						}
 					}
 				}
 				if (found_oidx != NONE)
 				{
 					if (deleted)
 					{
-						int li;
+						int li, recorded_del = 0;
 						for (li = 0; li < g_forge.live_instance_count; li++)
 						{
 							if (g_forge.live_instances[li].active &&
@@ -5738,13 +6688,34 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 								g_forge.live_instances[li].active = 0;
 								g_forge.live_instances[li].object_index = NONE;
 								g_forge.live_instances[li].edit_entry_index = de_idx;
+								recorded_del = 1;
 							}
+						}
+						if (!recorded_del && g_forge.live_instance_count < FORGE_MAX_LIVE_INSTANCES)
+						{
+							struct forge_live_instance *dinst = &g_forge.live_instances[g_forge.live_instance_count++];
+							memset(dinst, 0, sizeof(*dinst));
+							dinst->active = 0;
+							dinst->object_index = NONE;
+							dinst->actor_index = NONE;
+							dinst->edit_entry_index = de_idx;
+							dinst->group_tag = (uint32_t)grp;
+							dinst->is_default_scenario_object = 1;
+							dinst->death_tick = -1;
+							dinst->orig_x = ox;
+							dinst->orig_y = oy;
+							dinst->orig_z = oz;
+							snprintf(dinst->tag_path, sizeof(dinst->tag_path), "%s", tpath);
 						}
 						object_delete(found_oidx);
 					}
 					else
 					{
 						int32_t li_idx = forge_3d_adopt_or_find_object_instance(found_oidx);
+						last_default_de = de_idx;
+						last_default_li = li_idx;
+						if (de_idx >= 0 && de_idx < FORGE_MAX_DEFAULT_OBJECT_EDITS)
+							def_to_li[de_idx] = (int16_t)li_idx;
 						if (li_idx >= 0)
 						{
 							g_forge.live_instances[li_idx].edit_entry_index = de_idx;
@@ -5754,18 +6725,134 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 				}
 			}
 		}
+		else if (in_forge_state && strncmp(line, "DEFAULT_GAMETYPE|", 17) == 0)
+		{
+			int didx = -1;
+			unsigned int gflags = 0;
+			int nread = sscanf(line + 17, "%d|%u", &didx, &gflags);
+			if (nread == 1)
+			{
+				gflags = (unsigned int)didx;
+				didx = last_default_de;
+			}
+			if (nread >= 1)
+			{
+				int32_t target_li = (didx >= 0 && didx < FORGE_MAX_DEFAULT_OBJECT_EDITS && def_to_li[didx] >= 0) ? def_to_li[didx] : last_default_li;
+				if (didx >= 0 && didx < g_forge.edit_state.default_edit_count)
+					g_forge.edit_state.default_edits[didx].gametype_flags = (uint16_t)gflags;
+				if (target_li >= 0 && target_li < g_forge.live_instance_count)
+					g_forge.live_instances[target_li].gametype_flags = (uint16_t)gflags;
+			}
+		}
+		else if (in_forge_state && strncmp(line, "DEFAULT_PROPS|", 14) == 0)
+		{
+			int didx = -1, rsec = 0;
+			unsigned int pmode = 0, gid = 0, lcol = 0, lint = 0, lrad = 0;
+			if (sscanf(line + 14, "%d|%u|%d|%u|%u|%u|%u",
+					&didx, &pmode, &rsec, &gid, &lcol, &lint, &lrad) >= 4)
+			{
+				int32_t target_de = (didx >= 0 && didx < g_forge.edit_state.default_edit_count) ? didx : last_default_de;
+				int32_t target_li = (target_de >= 0 && target_de < FORGE_MAX_DEFAULT_OBJECT_EDITS && def_to_li[target_de] >= 0)
+					? def_to_li[target_de] : last_default_li;
+
+				if (pmode >= NUMBER_OF_FORGE_PHYSICS_MODES) pmode = 0;
+				if (gid > FORGE_MAX_WELD_GROUPS) gid = 0;
+				if (lcol >= NUMBER_OF_FORGE_LIGHT_COLORS) lcol = 0;
+				if (lint >= NUMBER_OF_FORGE_LIGHT_INTENSITIES) lint = 0;
+				if (lrad >= NUMBER_OF_FORGE_LIGHT_RADII) lrad = 0;
+				if (rsec < 0) rsec = 0;
+
+				if (target_de >= 0 && target_de < g_forge.edit_state.default_edit_count)
+				{
+					struct forge_default_object_edit *de = &g_forge.edit_state.default_edits[target_de];
+					de->physics_mode = (uint8_t)pmode;
+					de->respawn_timer_sec = (int16_t)rsec;
+					de->group_id = (uint8_t)gid;
+					de->light_color_preset = (uint8_t)lcol;
+					de->light_intensity_preset = (uint8_t)lint;
+					de->light_radius_preset = (uint8_t)lrad;
+				}
+				if (target_li >= 0 && target_li < g_forge.live_instance_count)
+				{
+					struct forge_live_instance *inst = &g_forge.live_instances[target_li];
+					inst->physics_mode = (uint8_t)pmode;
+					inst->respawn_timer_sec = (int16_t)rsec;
+					inst->group_id = (uint8_t)gid;
+					inst->light_color_preset = (uint8_t)lcol;
+					inst->light_intensity_preset = (uint8_t)lint;
+					inst->light_radius_preset = (uint8_t)lrad;
+					forge_apply_instance_light_settings(target_li);
+					forge_3d_move_instance_ext(target_li, inst->x, inst->y, inst->z,
+						inst->yaw, inst->pitch, inst->roll, 0, 0);
+				}
+			}
+		}
 		else if (in_forge_state && strncmp(line, "OBJECT_GAMETYPE|", 16) == 0)
 		{
 			unsigned int gflags = 0;
 			if (sscanf(line + 16, "%u", &gflags) == 1)
 			{
-				if (g_forge.edit_state.placed_object_count > 0)
-				{
+				if (last_object_po >= 0 && last_object_po < g_forge.edit_state.placed_object_count)
+					g_forge.edit_state.placed_objects[last_object_po].gametype_flags = (uint16_t)gflags;
+				else if (g_forge.edit_state.placed_object_count > 0)
 					g_forge.edit_state.placed_objects[g_forge.edit_state.placed_object_count - 1].gametype_flags = (uint16_t)gflags;
-				}
-				if (g_forge.live_instance_count > 0)
-				{
+				if (last_object_li >= 0 && last_object_li < g_forge.live_instance_count)
+					g_forge.live_instances[last_object_li].gametype_flags = (uint16_t)gflags;
+				else if (g_forge.live_instance_count > 0)
 					g_forge.live_instances[g_forge.live_instance_count - 1].gametype_flags = (uint16_t)gflags;
+			}
+		}
+		else if (in_forge_state && strncmp(line, "OBJECT_PROPS|", 13) == 0)
+		{
+			int pidx = -1, rsec = 0;
+			unsigned int pmode = 0, gid = 0, lcol = 0, lint = 0, lrad = 0;
+			int parsed = 0;
+			if (sscanf(line + 13, "%d|%u|%d|%u|%u|%u|%u",
+					&pidx, &pmode, &rsec, &gid, &lcol, &lint, &lrad) == 7)
+			{
+				parsed = 1;
+			}
+			else if (sscanf(line + 13, "%u|%d|%u|%u|%u|%u",
+					&pmode, &rsec, &gid, &lcol, &lint, &lrad) >= 3)
+			{
+				pidx = last_object_po;
+				parsed = 1;
+			}
+			if (parsed)
+			{
+				int32_t target_po = (pidx >= 0 && pidx < g_forge.edit_state.placed_object_count) ? pidx : last_object_po;
+				int32_t target_li = (target_po >= 0 && target_po < FORGE_MAX_PLACED_OBJECTS && placed_to_li[target_po] >= 0)
+					? placed_to_li[target_po] : last_object_li;
+
+				if (pmode >= NUMBER_OF_FORGE_PHYSICS_MODES) pmode = 0;
+				if (gid > FORGE_MAX_WELD_GROUPS) gid = 0;
+				if (lcol >= NUMBER_OF_FORGE_LIGHT_COLORS) lcol = 0;
+				if (lint >= NUMBER_OF_FORGE_LIGHT_INTENSITIES) lint = 0;
+				if (lrad >= NUMBER_OF_FORGE_LIGHT_RADII) lrad = 0;
+				if (rsec < 0) rsec = 0;
+
+				if (target_po >= 0 && target_po < g_forge.edit_state.placed_object_count)
+				{
+					struct forge_placed_object_entry *po = &g_forge.edit_state.placed_objects[target_po];
+					po->physics_mode = (uint8_t)pmode;
+					po->respawn_timer_sec = (int16_t)rsec;
+					po->group_id = (uint8_t)gid;
+					po->light_color_preset = (uint8_t)lcol;
+					po->light_intensity_preset = (uint8_t)lint;
+					po->light_radius_preset = (uint8_t)lrad;
+				}
+				if (target_li >= 0 && target_li < g_forge.live_instance_count)
+				{
+					struct forge_live_instance *inst = &g_forge.live_instances[target_li];
+					inst->physics_mode = (uint8_t)pmode;
+					inst->respawn_timer_sec = (int16_t)rsec;
+					inst->group_id = (uint8_t)gid;
+					inst->light_color_preset = (uint8_t)lcol;
+					inst->light_intensity_preset = (uint8_t)lint;
+					inst->light_radius_preset = (uint8_t)lrad;
+					forge_apply_instance_light_settings(target_li);
+					forge_3d_move_instance_ext(target_li, inst->x, inst->y, inst->z,
+						inst->yaw, inst->pitch, inst->roll, 0, 0);
 				}
 			}
 		}
@@ -5850,9 +6937,16 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 					else if (ftype == 2)
 						snprintf(inst->tag_path, sizeof(inst->tag_path), "objective\\oddball_spawn");
 					else if (ftype == 3)
-						snprintf(inst->tag_path, sizeof(inst->tag_path), "objective\\race_checkpoint");
+						snprintf(inst->tag_path, sizeof(inst->tag_path), "objective\\race_track");
+					else if (ftype == 4)
+						snprintf(inst->tag_path, sizeof(inst->tag_path), "objective\\race_vehicle");
+					else if (ftype == 5)
+						snprintf(inst->tag_path, sizeof(inst->tag_path), "objective\\vegas_bank");
 					else if (ftype == 8)
 						snprintf(inst->tag_path, sizeof(inst->tag_path), "objective\\koth_hill");
+					else if (ftype == 1)
+						snprintf(inst->tag_path, sizeof(inst->tag_path), "%s",
+							fusage == 1 ? "objective\\ctf_vehicle_blue" : "objective\\ctf_vehicle_red");
 					else
 						snprintf(inst->tag_path, sizeof(inst->tag_path), "%s",
 							fusage == 1 ? "objective\\ctf_flag_blue" : "objective\\ctf_flag_red");
@@ -5861,7 +6955,55 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 		}
 	}
 	if (cleared_default_spawns)
+	{
 		sync_live_player_spawns_to_scenario();
+		if (game_connection() != _game_connection_network_client &&
+			g_forge.edit_state.player_spawn_count > 0 && player_data)
+		{
+			long p_idx;
+			int sp_cursor = 0;
+			boolean teams = game_engine_has_teams();
+			for (p_idx = data_next_index(player_data, NONE);
+				 p_idx != NONE;
+				 p_idx = data_next_index(player_data, p_idx))
+			{
+				struct player_datum *player = (struct player_datum *)datum_get(player_data, p_idx);
+				if (player && player->unit_index != NONE)
+				{
+					int chosen_sp = -1;
+					int s;
+					for (s = 0; s < g_forge.edit_state.player_spawn_count; s++)
+					{
+						int idx = (sp_cursor + s) % g_forge.edit_state.player_spawn_count;
+						int16_t td = g_forge.edit_state.player_spawns[idx].team_index;
+						if (!teams || td < 0 || td == player->team_index)
+						{
+							chosen_sp = idx;
+							break;
+						}
+					}
+					if (chosen_sp < 0)
+						chosen_sp = sp_cursor % g_forge.edit_state.player_spawn_count;
+					sp_cursor++;
+					{
+						struct forge_player_spawn_entry const *sp = &g_forge.edit_state.player_spawns[chosen_sp];
+						real_point3d pos;
+						real_vector3d fwd, up;
+						pos.x = sp->x;
+						pos.y = sp->y;
+						pos.z = sp->z + 0.05f;
+						fwd.i = (float)cosine(sp->yaw);
+						fwd.j = (float)sine(sp->yaw);
+						fwd.k = 0.0f;
+						up.i = 0.0f;
+						up.j = 0.0f;
+						up.k = 1.0f;
+						object_set_position(player->unit_index, &pos, &fwd, &up);
+					}
+				}
+			}
+		}
+	}
 	if (cleared_default_flags)
 		sync_live_netgame_flags_to_scenario();
 }
@@ -5877,6 +7019,7 @@ void forge_load_saved_map_state_if_present(char const *map_name)
 	if (!map_name || !map_name[0])
 		return;
 
+	forge_undo_clear();
 	forge_ui_close_map_tag_browser();
 
 	/* Patch any baked vehicles and custom scenery/devices/lights in the loaded map so vehicle seats and long-distance LOD rendering work */
@@ -5933,60 +7076,84 @@ void forge_load_saved_map_state_if_present(char const *map_name)
 	slash = strrchr(map_name, '\\');
 	if (!slash)
 		slash = strrchr(map_name, '/');
-	snprintf(leaf, sizeof(leaf), "%s", slash ? (slash + 1) : map_name);
-
-	s_forge_server_dirty_txt = 0;
-	s_forge_server_dirty_map = 0;
-	s_forge_server_prev_player_count = 0;
-
-	if (halo_server_mode())
+	if (_stricmp(slash ? (slash + 1) : map_name, "ui") == 0)
 	{
-		forge_runtime_init();
-		snprintf(g_forge.save_map_name, sizeof(g_forge.save_map_name), "%s", leaf);
-		g_forge.save_map_name_len = (int)strlen(g_forge.save_map_name);
-		g_forge.has_saved_map_once = 1;
+		s_pending_sidecar_leaf[0] = '\0';
+		s_active_sidecar_base_map[0] = '\0';
+		return;
 	}
-
-	/* 0. If a crash-recovery sidecar custom_maps/<leaf>.txt exists (written while players were online before an unexpected exit),
-	 *    prefer it over the older embedded .map trailer and flush it into custom_maps/<leaf>.map immediately! */
 	{
-		char d_txt[160];
-		snprintf(d_txt, sizeof(d_txt), "d:\\custom_maps\\%s.txt", leaf);
-		txt_path[0] = '\0';
-		platform_translate_path(d_txt, txt_path, sizeof(txt_path));
-		f = txt_path[0] ? fopen(txt_path, "rb") : NULL;
-		if (!f)
+		int has_pending_sidecar = (s_pending_sidecar_leaf[0] != '\0');
+		int is_flg1_map = 0;
+		if (has_pending_sidecar)
 		{
-			snprintf(txt_path, sizeof(txt_path), "custom_maps/%s.txt", leaf);
-			f = fopen(txt_path, "rb");
+			snprintf(leaf, sizeof(leaf), "%s", s_pending_sidecar_leaf);
+			snprintf(s_active_sidecar_base_map, sizeof(s_active_sidecar_base_map), "%s", forge_get_active_map_name());
 		}
-	}
-	if (f)
-	{
-		long sz;
-		fseek(f, 0, SEEK_END);
-		sz = ftell(f);
-		fseek(f, 0, SEEK_SET);
-		if (sz > 0 && sz < 4 * 1024 * 1024)
+		else
 		{
-			char *buf = (char *)malloc((size_t)sz + 1u);
-			if (buf)
+			snprintf(leaf, sizeof(leaf), "%s", slash ? (slash + 1) : map_name);
+			s_active_sidecar_base_map[0] = '\0';
+			is_flg1_map = is_existing_custom_map_file_flg1(leaf, NULL);
+		}
+
+		s_forge_server_dirty_txt = 0;
+		s_forge_server_dirty_map = 0;
+		s_forge_server_prev_player_count = 0;
+
+		if (halo_server_mode())
+		{
+			forge_runtime_init();
+			snprintf(g_forge.save_map_name, sizeof(g_forge.save_map_name), "%s", leaf);
+			g_forge.save_map_name_len = (int)strlen(g_forge.save_map_name);
+			g_forge.has_saved_map_once = 1;
+		}
+
+		/* 0. If a sidecar custom_maps/<leaf>.txt exists (either explicitly selected via Edit Maps / Forge Maps
+		 *    or crash-recovery sidecar for a custom FLG1 .map), load it now.
+		 *    When launching a stock Xbox, CE, or MCC map directly without selecting a custom sidecar, do NOT auto-load a sidecar. */
+		f = NULL;
+		if (has_pending_sidecar || is_flg1_map || halo_server_mode())
+		{
+			char d_txt[160];
+			snprintf(d_txt, sizeof(d_txt), "d:\\custom_maps\\%s.txt", leaf);
+			txt_path[0] = '\0';
+			platform_translate_path(d_txt, txt_path, sizeof(txt_path));
+			f = txt_path[0] ? fopen(txt_path, "rb") : NULL;
+			if (!f)
 			{
-				size_t rd = fread(buf, 1, (size_t)sz, f);
-				buf[rd] = 0;
-				fclose(f);
-				forge_runtime_init();
-				snprintf(g_forge.save_map_name, sizeof(g_forge.save_map_name), "%s", leaf);
-				g_forge.save_map_name_len = (int)strlen(g_forge.save_map_name);
-				g_forge.has_saved_map_once = 1;
-				parse_forge_state_text_buffer(buf, leaf);
-				free(buf);
-				if (halo_server_mode())
-					forge_ui_save_copy_as(leaf);
-				return;
+				snprintf(txt_path, sizeof(txt_path), "custom_maps/%s.txt", leaf);
+				f = fopen(txt_path, "rb");
 			}
 		}
-		fclose(f);
+		if (f)
+		{
+			long sz;
+			fseek(f, 0, SEEK_END);
+			sz = ftell(f);
+			fseek(f, 0, SEEK_SET);
+			if (sz > 0 && sz < 4 * 1024 * 1024)
+			{
+				char *buf = (char *)malloc((size_t)sz + 1u);
+				if (buf)
+				{
+					size_t rd = fread(buf, 1, (size_t)sz, f);
+					buf[rd] = 0;
+					fclose(f);
+					forge_runtime_init();
+					snprintf(g_forge.save_map_name, sizeof(g_forge.save_map_name), "%s", leaf);
+					g_forge.save_map_name_len = (int)strlen(g_forge.save_map_name);
+					if (halo_server_mode() || has_pending_sidecar || is_flg1_map)
+						g_forge.has_saved_map_once = 1;
+					parse_forge_state_text_buffer(buf, leaf);
+					free(buf);
+					if (halo_server_mode())
+						forge_ui_save_copy_as(leaf);
+					return;
+				}
+			}
+			fclose(f);
+		}
 	}
 
 	/* 1. Read embedded [OpenCE Forge Map] / [ForgeState] directly from custom_maps/<leaf>.map header (0x1E4 / 0x1E8) */
@@ -6065,10 +7232,20 @@ static int forge_write_sidecar_state_file(char const *leaf)
 	char tmp_path[520];
 	FILE *f;
 	int i;
+	int def_emit_idx = 0;
+	int placed_emit_idx = 0;
+	int ai_emit_idx = 0;
 
 	if (!leaf || !leaf[0])
 		return 0;
 
+	{
+		char d_dir[512];
+		d_dir[0] = '\0';
+		platform_translate_path("d:\\custom_maps", d_dir, sizeof(d_dir));
+		if (d_dir[0])
+			CreateDirectoryA(d_dir, NULL);
+	}
 	CreateDirectoryA("d:\\custom_maps", NULL);
 	CreateDirectoryA("custom_maps", NULL);
 
@@ -6091,50 +7268,111 @@ static int forge_write_sidecar_state_file(char const *leaf)
 	if (!f)
 		return 0;
 
-	fprintf(f,
-		"[OpenCE Forge Map]\r\n"
-		"ForgeSource=UserCreated\r\n"
-		"Map Name: %s\r\n"
-		"Base Map: %s\r\n"
-		"Author: OpenCE : Forge Creator\r\n"
-		"Objects Placed: %d\r\n"
-		"AI Squads: %d\r\n"
-		"[ForgeState]\r\n",
-		leaf,
-		leaf,
-		(int)g_forge.edit_state.placed_object_count,
-		(int)g_forge.edit_state.ai_spawn_count);
+	{
+		char base_map_str[128];
+		int has_flg1_map = is_existing_custom_map_file_flg1(leaf, NULL);
+		int is_baked_val = (!mcc_cache_tags_loaded() && has_flg1_map) ? 1 : 0;
 
-	for (i = 0; i < g_forge.edit_state.default_edit_count; i++)
-	{
-		struct forge_default_object_edit const *de = &g_forge.edit_state.default_edits[i];
-		if (!de->active)
-			continue;
+		if (s_active_sidecar_base_map[0] != '\0')
+		{
+			snprintf(base_map_str, sizeof(base_map_str), "%s", s_active_sidecar_base_map);
+		}
+		else if (custom_edition_cache_tags_loaded())
+		{
+			char const *ce_loaded = custom_edition_cache_loaded_path();
+			char const *rel_ce = ce_loaded ? ce_loaded : "";
+			char base_stem[64];
+			if ((rel_ce[0] == 'd' || rel_ce[0] == 'D') && rel_ce[1] == ':' && (rel_ce[2] == '\\' || rel_ce[2] == '/'))
+				rel_ce += 3;
+			if (rel_ce[0] && extract_embedded_forge_base_map_stem(rel_ce, base_stem, sizeof(base_stem)) && base_stem[0])
+				snprintf(base_map_str, sizeof(base_map_str), "custom_maps\\%s", base_stem);
+			else
+				snprintf(base_map_str, sizeof(base_map_str), "%s", forge_get_active_map_name());
+		}
+		else
+		{
+			snprintf(base_map_str, sizeof(base_map_str), "%s", forge_get_active_map_name());
+		}
+
 		fprintf(f,
-			"DEFAULT_EDIT|%u|%d|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%s\r\n",
-			(unsigned)de->group_tag, (int)de->deleted,
-			de->orig_x, de->orig_y, de->orig_z,
-			de->new_x, de->new_y, de->new_z,
-			de->new_yaw, de->new_pitch, de->new_roll,
-			de->tag_path);
-	}
-	for (i = 0; i < g_forge.edit_state.placed_object_count; i++)
-	{
-		struct forge_placed_object_entry const *po = &g_forge.edit_state.placed_objects[i];
-		if (!po->active || !po->tag_path[0] || po->x < -90000.0f)
-			continue;
-		fprintf(f,
-			"OBJECT|%u|%d|1|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%d|%s\r\n",
-			(unsigned)po->group_tag,
-			(int)po->source_cache_id,
-			po->x, po->y, po->z,
-			po->yaw, po->pitch, po->roll,
-			(int)po->team_index,
-			po->tag_path);
+			"[OpenCE Forge Map]\r\n"
+			"ForgeSource=UserCreated\r\n"
+			"Map Name: %s\r\n"
+			"Base Map: %s\r\n"
+			"Author: OpenCE : Forge Creator\r\n"
+			"Objects Placed: %d\r\n"
+			"AI Squads: %d\r\n"
+			"[ForgeState]\r\n",
+			leaf,
+			base_map_str,
+			(int)g_forge.edit_state.placed_object_count,
+			(int)g_forge.edit_state.ai_spawn_count);
+
+		for (i = 0; i < g_forge.edit_state.default_edit_count; i++)
+		{
+			struct forge_default_object_edit const *de = &g_forge.edit_state.default_edits[i];
+			if (!de->active)
+				continue;
+			fprintf(f,
+				"DEFAULT_EDIT|%u|%d|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%s\r\n",
+				(unsigned)de->group_tag, (int)de->deleted,
+				de->orig_x, de->orig_y, de->orig_z,
+				de->new_x, de->new_y, de->new_z,
+				de->new_yaw, de->new_pitch, de->new_roll,
+				de->tag_path);
+			if (!de->deleted && de->gametype_flags != 0 && de->gametype_flags != 0x0FFFu)
+			{
+				fprintf(f, "DEFAULT_GAMETYPE|%d|%u\r\n", def_emit_idx, (unsigned)de->gametype_flags);
+			}
+			if (!de->deleted &&
+				(de->physics_mode != 0 || de->respawn_timer_sec > 0 || de->group_id != 0 ||
+				 de->light_color_preset != 0 || de->light_intensity_preset != 0 || de->light_radius_preset != 0))
+			{
+				fprintf(f,
+					"DEFAULT_PROPS|%d|%u|%d|%u|%u|%u|%u\r\n",
+					def_emit_idx,
+					(unsigned)de->physics_mode,
+					(int)de->respawn_timer_sec,
+					(unsigned)de->group_id,
+					(unsigned)de->light_color_preset,
+					(unsigned)de->light_intensity_preset,
+					(unsigned)de->light_radius_preset);
+			}
+			def_emit_idx++;
+		}
+		for (i = 0; i < g_forge.edit_state.placed_object_count; i++)
+		{
+			struct forge_placed_object_entry const *po = &g_forge.edit_state.placed_objects[i];
+			if (!po->active || !po->tag_path[0] || po->x < -90000.0f)
+				continue;
+			fprintf(f,
+				"OBJECT|%u|%d|%d|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%d|%s\r\n",
+				(unsigned)po->group_tag,
+				(int)po->source_cache_id,
+				is_baked_val,
+				po->x, po->y, po->z,
+				po->yaw, po->pitch, po->roll,
+				(int)po->team_index,
+				po->tag_path);
 		if (po->gametype_flags != 0 && po->gametype_flags != 0x0FFFu)
 		{
 			fprintf(f, "OBJECT_GAMETYPE|%u\r\n", (unsigned)po->gametype_flags);
 		}
+		if (po->physics_mode != 0 || po->respawn_timer_sec > 0 || po->group_id != 0 ||
+			po->light_color_preset != 0 || po->light_intensity_preset != 0 || po->light_radius_preset != 0)
+		{
+			fprintf(f,
+				"OBJECT_PROPS|%d|%u|%d|%u|%u|%u|%u\r\n",
+				placed_emit_idx,
+				(unsigned)po->physics_mode,
+				(int)po->respawn_timer_sec,
+				(unsigned)po->group_id,
+				(unsigned)po->light_color_preset,
+				(unsigned)po->light_intensity_preset,
+				(unsigned)po->light_radius_preset);
+		}
+		placed_emit_idx++;
+	}
 	}
 	if (g_forge.edit_state.replace_player_spawns)
 	{
@@ -6178,6 +7416,19 @@ static int forge_write_sidecar_state_file(char const *leaf)
 			ai->x, ai->y, ai->z, ai->yaw,
 			(int)ai->team_designator,
 			ai->actor_variant_path);
+		if (ai->respawn_timer_sec > 0)
+		{
+			fprintf(f, "AI_RESPAWN|%d|%d\r\n", ai_emit_idx, (int)ai->respawn_timer_sec);
+		}
+		if (ai->ai_order != 0)
+		{
+			fprintf(f, "AI_ORDER|%d|%u\r\n", ai_emit_idx, (unsigned)ai->ai_order);
+		}
+		if (ai->group_id != 0)
+		{
+			fprintf(f, "AI_GROUP|%d|%u\r\n", ai_emit_idx, (unsigned)ai->group_id);
+		}
+		ai_emit_idx++;
 	}
 
 	fclose(f);
@@ -6201,6 +7452,8 @@ int forge_server_save_map_if_dirty(int force_full_export)
 	char leaf[64];
 
 	if (!g_forge_session_enabled || game_connection() == _game_connection_network_client)
+		return 0;
+	if (!halo_server_mode() && !g_forge.has_saved_map_once)
 		return 0;
 
 	if (g_forge.save_map_name[0])
@@ -6574,6 +7827,243 @@ static long get_or_create_translucent_marker_shader(int color_preset, int is_hig
 	return append_runtime_tag_instance('soso', 'shdr', NONE, shdr_name, soso_def);
 }
 
+struct forge_proc_mesh_builder
+{
+	uint8_t *verts;
+	int32_t vtx_count;
+	int32_t vtx_cap;
+	uint16_t *strip;
+	int32_t idx_count;
+	int32_t idx_cap;
+};
+
+static uint16_t proc_mesh_add_vtx(
+	struct forge_proc_mesh_builder *b,
+	float x, float y, float z,
+	float nx, float ny, float nz)
+{
+	uint8_t *vp;
+	uint16_t idx;
+
+	if (!b || b->vtx_count >= b->vtx_cap)
+		return 0;
+	idx = (uint16_t)b->vtx_count++;
+	vp = b->verts + (uint32_t)idx * 68u;
+	memset(vp, 0, 68u);
+	*(float *)(vp + 0) = x;
+	*(float *)(vp + 4) = y;
+	*(float *)(vp + 8) = z;
+	*(float *)(vp + 12) = nx;
+	*(float *)(vp + 16) = ny;
+	*(float *)(vp + 20) = nz;
+	*(float *)(vp + 24) = 0.0f;
+	*(float *)(vp + 28) = 1.0f;
+	*(float *)(vp + 32) = 0.0f;
+	*(float *)(vp + 36) = 1.0f;
+	*(float *)(vp + 40) = 0.0f;
+	*(float *)(vp + 44) = 0.0f;
+	*(float *)(vp + 48) = 0.5f;
+	*(float *)(vp + 52) = 0.5f;
+	*(int16_t *)(vp + 56) = 0;
+	*(int16_t *)(vp + 58) = 0;
+	*(float *)(vp + 60) = 1.0f;
+	*(float *)(vp + 64) = 0.0f;
+	return idx;
+}
+
+static void proc_mesh_add_tri(
+	struct forge_proc_mesh_builder *b,
+	uint16_t i0, uint16_t i1, uint16_t i2)
+{
+	if (!b || b->idx_count + 6 > b->idx_cap)
+		return;
+	if (b->idx_count == 0)
+	{
+		b->strip[b->idx_count++] = i0;
+		b->strip[b->idx_count++] = i1;
+		b->strip[b->idx_count++] = i2;
+	}
+	else
+	{
+		uint16_t last = b->strip[b->idx_count - 1];
+		b->strip[b->idx_count++] = last;
+		b->strip[b->idx_count++] = last;
+		b->strip[b->idx_count++] = i0;
+		b->strip[b->idx_count++] = i0;
+		b->strip[b->idx_count++] = i1;
+		b->strip[b->idx_count++] = i2;
+	}
+}
+
+static void proc_mesh_add_quad(
+	struct forge_proc_mesh_builder *b,
+	uint16_t i0, uint16_t i1, uint16_t i2, uint16_t i3)
+{
+	proc_mesh_add_tri(b, i0, i1, i2);
+	proc_mesh_add_tri(b, i0, i2, i3);
+}
+
+static void proc_mesh_add_box(
+	struct forge_proc_mesh_builder *b,
+	float x0, float y0, float z0,
+	float x1, float y1, float z1)
+{
+	uint16_t v0, v1, v2, v3;
+
+	/* Top (+Z) */
+	v0 = proc_mesh_add_vtx(b, x0, y0, z1, 0.0f, 0.0f, 1.0f);
+	v1 = proc_mesh_add_vtx(b, x1, y0, z1, 0.0f, 0.0f, 1.0f);
+	v2 = proc_mesh_add_vtx(b, x1, y1, z1, 0.0f, 0.0f, 1.0f);
+	v3 = proc_mesh_add_vtx(b, x0, y1, z1, 0.0f, 0.0f, 1.0f);
+	proc_mesh_add_quad(b, v0, v1, v2, v3);
+
+	/* Bottom (-Z) */
+	v0 = proc_mesh_add_vtx(b, x0, y1, z0, 0.0f, 0.0f, -1.0f);
+	v1 = proc_mesh_add_vtx(b, x1, y1, z0, 0.0f, 0.0f, -1.0f);
+	v2 = proc_mesh_add_vtx(b, x1, y0, z0, 0.0f, 0.0f, -1.0f);
+	v3 = proc_mesh_add_vtx(b, x0, y0, z0, 0.0f, 0.0f, -1.0f);
+	proc_mesh_add_quad(b, v0, v1, v2, v3);
+
+	/* Front (+X) */
+	v0 = proc_mesh_add_vtx(b, x1, y0, z0, 1.0f, 0.0f, 0.0f);
+	v1 = proc_mesh_add_vtx(b, x1, y1, z0, 1.0f, 0.0f, 0.0f);
+	v2 = proc_mesh_add_vtx(b, x1, y1, z1, 1.0f, 0.0f, 0.0f);
+	v3 = proc_mesh_add_vtx(b, x1, y0, z1, 1.0f, 0.0f, 0.0f);
+	proc_mesh_add_quad(b, v0, v1, v2, v3);
+
+	/* Back (-X) */
+	v0 = proc_mesh_add_vtx(b, x0, y1, z0, -1.0f, 0.0f, 0.0f);
+	v1 = proc_mesh_add_vtx(b, x0, y0, z0, -1.0f, 0.0f, 0.0f);
+	v2 = proc_mesh_add_vtx(b, x0, y0, z1, -1.0f, 0.0f, 0.0f);
+	v3 = proc_mesh_add_vtx(b, x0, y1, z1, -1.0f, 0.0f, 0.0f);
+	proc_mesh_add_quad(b, v0, v1, v2, v3);
+
+	/* Left (+Y) */
+	v0 = proc_mesh_add_vtx(b, x1, y1, z0, 0.0f, 1.0f, 0.0f);
+	v1 = proc_mesh_add_vtx(b, x0, y1, z0, 0.0f, 1.0f, 0.0f);
+	v2 = proc_mesh_add_vtx(b, x0, y1, z1, 0.0f, 1.0f, 0.0f);
+	v3 = proc_mesh_add_vtx(b, x1, y1, z1, 0.0f, 1.0f, 0.0f);
+	proc_mesh_add_quad(b, v0, v1, v2, v3);
+
+	/* Right (-Y) */
+	v0 = proc_mesh_add_vtx(b, x0, y0, z0, 0.0f, -1.0f, 0.0f);
+	v1 = proc_mesh_add_vtx(b, x1, y0, z0, 0.0f, -1.0f, 0.0f);
+	v2 = proc_mesh_add_vtx(b, x1, y0, z1, 0.0f, -1.0f, 0.0f);
+	v3 = proc_mesh_add_vtx(b, x0, y0, z1, 0.0f, -1.0f, 0.0f);
+	proc_mesh_add_quad(b, v0, v1, v2, v3);
+}
+
+static void proc_mesh_add_frustum_z(
+	struct forge_proc_mesh_builder *b,
+	float cx, float cy,
+	float z0, float r0,
+	float z1, float r1,
+	int segs,
+	int cap_bottom,
+	int cap_top)
+{
+	int s;
+	uint16_t bot_center = 0, top_center = 0;
+
+	if (segs < 3)
+		segs = 3;
+	if (cap_bottom && r0 > 0.001f)
+		bot_center = proc_mesh_add_vtx(b, cx, cy, z0, 0.0f, 0.0f, -1.0f);
+	if (cap_top && r1 > 0.001f)
+		top_center = proc_mesh_add_vtx(b, cx, cy, z1, 0.0f, 0.0f, 1.0f);
+
+	for (s = 0; s < segs; s++)
+	{
+		float a0 = (2.0f * _pi * (float)s) / (float)segs;
+		float a1 = (2.0f * _pi * (float)(s + 1)) / (float)segs;
+		float c0 = cosine(a0), s0 = sine(a0);
+		float c1 = cosine(a1), s1 = sine(a1);
+		uint16_t b0 = proc_mesh_add_vtx(b, cx + r0 * c0, cy + r0 * s0, z0, c0, s0, 0.25f);
+		uint16_t b1 = proc_mesh_add_vtx(b, cx + r0 * c1, cy + r0 * s1, z0, c1, s1, 0.25f);
+		uint16_t t1 = proc_mesh_add_vtx(b, cx + r1 * c1, cy + r1 * s1, z1, c1, s1, 0.25f);
+		uint16_t t0 = proc_mesh_add_vtx(b, cx + r1 * c0, cy + r1 * s0, z1, c0, s0, 0.25f);
+		proc_mesh_add_quad(b, b0, b1, t1, t0);
+		if (cap_bottom && r0 > 0.001f)
+			proc_mesh_add_tri(b, bot_center, b1, b0);
+		if (cap_top && r1 > 0.001f)
+			proc_mesh_add_tri(b, top_center, t0, t1);
+	}
+}
+
+static void proc_mesh_add_arrow_x(
+	struct forge_proc_mesh_builder *b,
+	float x_tail, float x_neck, float x_tip,
+	float half_shaft_w, float half_head_w,
+	float z0, float z1)
+{
+	uint16_t t_tip, t_hl, t_hr, b_tip, b_hl, b_hr;
+
+	proc_mesh_add_box(b, x_tail, -half_shaft_w, z0, x_neck, half_shaft_w, z1);
+
+	t_tip = proc_mesh_add_vtx(b, x_tip, 0.0f, z1, 0.0f, 0.0f, 1.0f);
+	t_hl  = proc_mesh_add_vtx(b, x_neck, half_head_w, z1, 0.0f, 0.0f, 1.0f);
+	t_hr  = proc_mesh_add_vtx(b, x_neck, -half_head_w, z1, 0.0f, 0.0f, 1.0f);
+	proc_mesh_add_tri(b, t_hr, t_tip, t_hl);
+
+	b_tip = proc_mesh_add_vtx(b, x_tip, 0.0f, z0, 0.0f, 0.0f, -1.0f);
+	b_hl  = proc_mesh_add_vtx(b, x_neck, half_head_w, z0, 0.0f, 0.0f, -1.0f);
+	b_hr  = proc_mesh_add_vtx(b, x_neck, -half_head_w, z0, 0.0f, 0.0f, -1.0f);
+	proc_mesh_add_tri(b, b_hl, b_tip, b_hr);
+
+	proc_mesh_add_quad(b, b_hr, b_tip, t_tip, t_hr);
+	proc_mesh_add_quad(b, b_tip, b_hl, t_hl, t_tip);
+	proc_mesh_add_quad(b, b_hl, b_hr, t_hr, t_hl);
+}
+
+static void proc_mesh_add_torus_yz(
+	struct forge_proc_mesh_builder *b,
+	float cx, float cy, float cz,
+	float major_r, float minor_r,
+	int maj_segs, int min_segs,
+	int half_arch_only)
+{
+	int i, j;
+	float max_angle = half_arch_only ? _pi : (2.0f * _pi);
+
+	for (i = 0; i < maj_segs; i++)
+	{
+		float u0 = (max_angle * (float)i) / (float)maj_segs;
+		float u1 = (max_angle * (float)(i + 1)) / (float)maj_segs;
+		float cu0 = cosine(u0), su0 = sine(u0);
+		float cu1 = cosine(u1), su1 = sine(u1);
+
+		for (j = 0; j < min_segs; j++)
+		{
+			float v0 = (2.0f * _pi * (float)j) / (float)min_segs;
+			float v1 = (2.0f * _pi * (float)(j + 1)) / (float)min_segs;
+			float cv0 = cosine(v0), sv0 = sine(v0);
+			float cv1 = cosine(v1), sv1 = sine(v1);
+
+			uint16_t p00 = proc_mesh_add_vtx(b,
+				cx + minor_r * sv0,
+				cy + (major_r + minor_r * cv0) * cu0,
+				cz + (major_r + minor_r * cv0) * su0,
+				sv0, cv0 * cu0, cv0 * su0);
+			uint16_t p10 = proc_mesh_add_vtx(b,
+				cx + minor_r * sv0,
+				cy + (major_r + minor_r * cv0) * cu1,
+				cz + (major_r + minor_r * cv0) * su1,
+				sv0, cv0 * cu1, cv0 * su1);
+			uint16_t p11 = proc_mesh_add_vtx(b,
+				cx + minor_r * sv1,
+				cy + (major_r + minor_r * cv1) * cu1,
+				cz + (major_r + minor_r * cv1) * su1,
+				sv1, cv1 * cu1, cv1 * su1);
+			uint16_t p01 = proc_mesh_add_vtx(b,
+				cx + minor_r * sv1,
+				cy + (major_r + minor_r * cv1) * cu0,
+				cz + (major_r + minor_r * cv1) * su0,
+				sv1, cv1 * cu0, cv1 * su0);
+			proc_mesh_add_quad(b, p00, p10, p11, p01);
+		}
+	}
+}
+
 static void ensure_objective_marker_meshes_loaded(void)
 {
 	int k, all_valid = 1;
@@ -6589,8 +8079,7 @@ static void ensure_objective_marker_meshes_loaded(void)
 
 	for (k = 0; k < NUMBER_OF_MARKER_MESH_KINDS; k++)
 	{
-		unsigned long raw_len;
-		uint8_t *raw_buf;
+		struct forge_proc_mesh_builder mb;
 
 		if (s_marker_meshes.meshes[k].valid && s_marker_meshes.meshes[k].part_count > 0)
 			continue;
@@ -6598,23 +8087,105 @@ static void ensure_objective_marker_meshes_loaded(void)
 		s_marker_meshes.meshes[k].part_count = 0;
 		s_marker_meshes.meshes[k].radius = 0.45f;
 
-		if (k < 8 && s_embedded_marker_ftags[k].comp_data && s_embedded_marker_ftags[k].uncomp_size > 0)
+		memset(&mb, 0, sizeof(mb));
+		mb.vtx_cap = 2048;
+		mb.idx_cap = 16384;
+		mb.verts = (uint8_t *)malloc((size_t)mb.vtx_cap * 68u);
+		mb.strip = (uint16_t *)malloc((size_t)mb.idx_cap * sizeof(uint16_t));
+		if (!mb.verts || !mb.strip)
 		{
-			raw_len = (unsigned long)s_embedded_marker_ftags[k].uncomp_size;
-			raw_buf = (uint8_t *)malloc((size_t)raw_len);
-			if (raw_buf)
-			{
-				if (z_uncompress(raw_buf, &raw_len, s_embedded_marker_ftags[k].comp_data, (unsigned long)s_embedded_marker_ftags[k].comp_size) == 0 &&
-					load_hw_parts_from_ftag_memory(
-						raw_buf, (size_t)raw_len,
-						s_marker_meshes.meshes[k].parts, FORGE_MAX_HW_PARTS,
-						&s_marker_meshes.meshes[k].part_count, &s_marker_meshes.meshes[k].radius, 1.0f, 0.0f))
-				{
-					s_marker_meshes.meshes[k].valid = (s_marker_meshes.meshes[k].part_count > 0) ? 1 : 0;
-				}
-				free(raw_buf);
-			}
+			free(mb.verts);
+			free(mb.strip);
+			continue;
 		}
+
+		switch (k)
+		{
+		case _marker_mesh_player_spawn:
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.012f, 0.164f, 0.032f, 0.156f, 20, 1, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.032f, 0.122f, 0.042f, 0.114f, 20, 0, 1);
+			proc_mesh_add_arrow_x(&mb, -0.07f, 0.11f, 0.234f, 0.034f, 0.076f, 0.032f, 0.059f);
+			s_marker_meshes.meshes[k].radius = 0.45f;
+			break;
+
+		case _marker_mesh_tele_origin:
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.012f, 0.164f, 0.034f, 0.156f, 20, 1, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, -0.115f, 0.034f, 0.022f, 0.084f, 0.020f, 10, 0, 0);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.115f, 0.034f, 0.022f, 0.084f, 0.020f, 10, 0, 0);
+			proc_mesh_add_torus_yz(&mb, 0.0f, 0.0f, 0.084f, 0.115f, 0.020f, 14, 8, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.068f, 0.004f, 0.110f, 0.036f, 8, 0, 0);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.110f, 0.036f, 0.152f, 0.004f, 8, 0, 0);
+			proc_mesh_add_arrow_x(&mb, -0.04f, 0.09f, 0.180f, 0.028f, 0.064f, 0.034f, 0.056f);
+			s_marker_meshes.meshes[k].radius = 0.45f;
+			break;
+
+		case _marker_mesh_tele_dest:
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.012f, 0.164f, 0.034f, 0.156f, 20, 1, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, -0.115f, 0.034f, 0.022f, 0.084f, 0.020f, 10, 0, 0);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.115f, 0.034f, 0.022f, 0.084f, 0.020f, 10, 0, 0);
+			proc_mesh_add_torus_yz(&mb, 0.0f, 0.0f, 0.084f, 0.115f, 0.020f, 14, 8, 1);
+			proc_mesh_add_arrow_x(&mb, -0.02f, 0.11f, 0.220f, 0.034f, 0.076f, 0.034f, 0.060f);
+			s_marker_meshes.meshes[k].radius = 0.45f;
+			break;
+
+		case _marker_mesh_race:
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.012f, 0.164f, 0.034f, 0.156f, 20, 1, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.034f, 0.028f, 0.082f, 0.022f, 10, 0, 0);
+			proc_mesh_add_torus_yz(&mb, 0.0f, 0.0f, 0.195f, 0.102f, 0.022f, 18, 8, 0);
+			proc_mesh_add_arrow_x(&mb, -0.05f, 0.09f, 0.195f, 0.028f, 0.064f, 0.034f, 0.055f);
+			s_marker_meshes.meshes[k].radius = 0.45f;
+			break;
+
+		case _marker_mesh_oddball:
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.012f, 0.164f, 0.034f, 0.156f, 20, 1, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.034f, 0.064f, 0.130f, 0.026f, 12, 0, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.165f, 0.025f, 0.210f, 0.075f, 14, 1, 0);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.210f, 0.075f, 0.265f, 0.086f, 14, 0, 0);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.265f, 0.086f, 0.315f, 0.062f, 14, 0, 0);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.315f, 0.062f, 0.339f, 0.020f, 14, 0, 1);
+			s_marker_meshes.meshes[k].radius = 0.45f;
+			break;
+
+		case _marker_mesh_ctf_flag:
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.012f, 0.164f, 0.034f, 0.156f, 20, 1, 1);
+			proc_mesh_add_arrow_x(&mb, 0.0f, 0.11f, 0.234f, 0.032f, 0.072f, 0.034f, 0.056f);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.034f, 0.016f, 0.545f, 0.014f, 10, 0, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.545f, 0.024f, 0.565f, 0.006f, 10, 1, 1);
+			proc_mesh_add_box(&mb, -0.220f, -0.008f, 0.385f, 0.0f, 0.008f, 0.535f);
+			s_marker_meshes.meshes[k].radius = 0.60f;
+			break;
+
+		case _marker_mesh_koth:
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.012f, 0.164f, 0.034f, 0.156f, 20, 1, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.034f, 0.044f, 0.215f, 0.028f, 12, 0, 1);
+			proc_mesh_add_frustum_z(&mb, 0.0f, 0.0f, 0.195f, 0.078f, 0.263f, 0.108f, 12, 1, 1);
+			s_marker_meshes.meshes[k].radius = 0.45f;
+			break;
+
+		case _marker_mesh_koth_beam:
+		default:
+			proc_mesh_add_box(&mb, 0.0f, -0.014f, 0.025f, 1.0f, 0.014f, 0.053f);
+			s_marker_meshes.meshes[k].radius = 1.00f;
+			break;
+		}
+
+		if (mb.vtx_count >= 3 && mb.idx_count >= 3)
+		{
+			build_hw_part_from_arrays(
+				&s_marker_meshes.meshes[k].parts[0],
+				mb.verts,
+				mb.vtx_count,
+				(uint8_t const *)mb.strip,
+				mb.idx_count - 2,
+				"",
+				1.0f,
+				0.0f);
+			s_marker_meshes.meshes[k].part_count = 1;
+			s_marker_meshes.meshes[k].valid = 1;
+		}
+
+		free(mb.verts);
+		free(mb.strip);
 	}
 }
 
@@ -6922,9 +8493,10 @@ static void render_world_objective_and_spawn_markers(void)
 			!s_marker_meshes.meshes[mesh_kind].valid)
 			continue;
 
-		/* Player spawns, KOTH, Oddball, and Race markers are only visible while Forge Mode is active */
+		/* Player spawns, CTF flags, KOTH, Oddball, and Race markers are only visible while Forge Mode is active */
 		if (!is_stream_proxy && g_forge.mode != _forge_mode_3d_monitor &&
 			(mesh_kind == _marker_mesh_player_spawn ||
+			 mesh_kind == _marker_mesh_ctf_flag ||
 			 mesh_kind == _marker_mesh_koth ||
 			 mesh_kind == _marker_mesh_oddball ||
 			 mesh_kind == _marker_mesh_race))
@@ -7170,9 +8742,9 @@ static void render_spawn_palette_3d_preview(long object_index, void const *light
 
 void forge_render_world_3d_overlays(void const *lighting_ptr)
 {
-	if (!g_forge_session_enabled || !g_forge.initialized)
+	if (!g_forge.initialized || (!g_forge_session_enabled && g_forge.live_instance_count <= 0))
 		return;
-	if (g_forge.mode == _forge_mode_3d_monitor && g_forge.third_person_view && !s_local_monitor_drawn_this_frame)
+	if (g_forge_session_enabled && g_forge.mode == _forge_mode_3d_monitor && g_forge.third_person_view && !s_local_monitor_drawn_this_frame)
 	{
 		long local_unit = player_control_get_unit_index(0);
 		if (local_unit != NONE)
@@ -7180,7 +8752,8 @@ void forge_render_world_3d_overlays(void const *lighting_ptr)
 	}
 	s_local_monitor_drawn_this_frame = 0;
 	render_world_objective_and_spawn_markers();
-	render_spawn_palette_3d_preview(NONE, lighting_ptr);
+	if (g_forge_session_enabled)
+		render_spawn_palette_3d_preview(NONE, lighting_ptr);
 }
 
 int forge_monitor_render_player_unit(long object_index, void const *lighting_ptr, unsigned long flags)
@@ -7336,6 +8909,7 @@ static struct
 	int is_open;
 	int is_ce_map;
 	int is_xbox_map;
+	int is_mcc_map;
 	char map_path[512];
 	char decomp_xbox_path[512];
 	char map_name[64];
@@ -7347,6 +8921,7 @@ static struct
 	uint32_t xbox_tag_base;
 	uint32_t xbox_inst_off;
 	int32_t xbox_tag_count;
+	struct mcc_runtime *mcc_rt;
 	int32_t *cat_tags[FORGE_BROWSER_NUM_CATS];
 	int32_t *cat_sizes[FORGE_BROWSER_NUM_CATS];
 	int cat_counts[FORGE_BROWSER_NUM_CATS];
@@ -7586,6 +9161,8 @@ static void forge_ui_close_map_tag_browser(void)
 	tag_names_dispose();
 	if (s_map_browser.names_made)
 		free(s_map_browser.names_made);
+	if (s_map_browser.mcc_rt)
+		mcc_forge_browser_close(s_map_browser.mcc_rt);
 	if (s_map_browser.xbox_fp)
 		fclose(s_map_browser.xbox_fp);
 	if (s_map_browser.xbox_tag_buf)
@@ -7617,7 +9194,7 @@ int forge_ui_open_map_for_tag_browser(char const *map_path)
 		*dot = '\0';
 
 	/* 1. Try opening as a Custom Edition / PC cache map first */
-	ce_hdr = is_xbox_version5_map_file(map_path) ? NULL : (struct browser_ce_map_header *)custom_edition_cache_bundle_open(map_path, NULL, 0);
+	ce_hdr = (is_xbox_version5_map_file(map_path) || is_mcc_version13_map_file(map_path)) ? NULL : (struct browser_ce_map_header *)custom_edition_cache_bundle_open(map_path, NULL, 0);
 	if (ce_hdr && ce_hdr->tag_count > 0 && ce_hdr->instances)
 	{
 		int32_t i;
@@ -7755,6 +9332,97 @@ int forge_ui_open_map_for_tag_browser(char const *map_path)
 		}
 		return 1;
 	}
+	else if (is_mcc_version13_map_file(map_path))
+	{
+		FILE *fp;
+		uint8_t hdr[2048];
+		uint32_t tag_off, tag_sz, inst_addr;
+		int32_t tag_count, i;
+		uint8_t *tbuf;
+
+		CreateDirectoryA("OpenCE Forge", NULL);
+		CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
+
+		fp = fopen(map_path, "rb");
+		if (!fp)
+			return 0;
+		if (fread(hdr, 1, sizeof(hdr), fp) != sizeof(hdr) ||
+			*(uint32_t const *)(hdr + 0x00) != 0x68656164u ||
+			*(uint32_t const *)(hdr + 0x04) != 13u)
+		{
+			fclose(fp);
+			return 0;
+		}
+		tag_off = *(uint32_t const *)(hdr + 0x10);
+		tag_sz = *(uint32_t const *)(hdr + 0x14);
+		if (tag_off < 2048u || tag_sz < 64u || tag_sz > 64u * 1024u * 1024u)
+		{
+			fclose(fp);
+			return 0;
+		}
+		tbuf = (uint8_t *)malloc(tag_sz);
+		if (!tbuf || fseek(fp, (long)tag_off, SEEK_SET) != 0 || fread(tbuf, 1, tag_sz, fp) != tag_sz)
+		{
+			free(tbuf);
+			fclose(fp);
+			return 0;
+		}
+		inst_addr = *(uint32_t const *)(tbuf + 0x00);
+		tag_count = *(int32_t const *)(tbuf + 0x0C);
+		if (tag_count <= 0 || tag_count > 16384 || 0x28u + (uint32_t)tag_count * 32u > tag_sz)
+		{
+			free(tbuf);
+			fclose(fp);
+			return 0;
+		}
+
+		s_map_browser.is_open = 1;
+		s_map_browser.is_xbox_map = 1;
+		s_map_browser.is_mcc_map = 1;
+		snprintf(s_map_browser.decomp_xbox_path, sizeof(s_map_browser.decomp_xbox_path), "%s", map_path);
+		s_map_browser.xbox_fp = fp;
+		s_map_browser.xbox_tag_buf = tbuf;
+		s_map_browser.xbox_tag_sz = tag_sz;
+		s_map_browser.xbox_tag_base = inst_addr - 0x28u;
+		s_map_browser.xbox_inst_off = 0x28u;
+		s_map_browser.xbox_tag_count = tag_count;
+		s_map_browser.mcc_rt = mcc_forge_browser_open(fp, map_path, tbuf, tag_sz);
+
+		for (c = 0; c < FORGE_BROWSER_NUM_CATS; c++)
+		{
+			int cnt = 0;
+			for (i = 0; i < tag_count; i++)
+			{
+				uint32_t io = s_map_browser.xbox_inst_off + (uint32_t)i * 32u;
+				uint32_t grp = *(uint32_t const *)(tbuf + io + 0x00);
+				if (browser_group_matches_category(grp, c))
+					cnt++;
+			}
+			if (cnt > 0)
+			{
+				int idx = 0;
+				s_map_browser.cat_tags[c] = (int32_t *)malloc((size_t)cnt * sizeof(int32_t));
+				s_map_browser.cat_sizes[c] = (int32_t *)malloc((size_t)cnt * sizeof(int32_t));
+				if (s_map_browser.cat_tags[c] && s_map_browser.cat_sizes[c])
+				{
+					for (i = 0; i < tag_count; i++)
+					{
+						uint32_t io = s_map_browser.xbox_inst_off + (uint32_t)i * 32u;
+						uint32_t grp = *(uint32_t const *)(tbuf + io + 0x00);
+						if (browser_group_matches_category(grp, c))
+						{
+							s_map_browser.cat_tags[c][idx] = i;
+							s_map_browser.cat_sizes[c][idx] = -1;
+							idx++;
+						}
+					}
+					s_map_browser.cat_counts[c] = idx;
+					qsort(s_map_browser.cat_tags[c], (size_t)idx, sizeof(int32_t), browser_sort_cmp);
+				}
+			}
+		}
+		return 1;
+	}
 
 	return 0;
 }
@@ -7794,6 +9462,7 @@ static int32_t compute_xbox_tag_closure_bytes(
 	cl.tag_base = tag_base;
 	cl.inst_off = inst_off;
 	cl.tag_count = tag_count;
+	cl.include_all_dependencies = 1;
 	cl.visited = (uint8_t *)calloc((size_t)tag_count, 1);
 	cl.order = (int32_t *)calloc((size_t)tag_count, sizeof(int32_t));
 	cl.runtime_handles = (long *)malloc((size_t)tag_count * sizeof(long));
@@ -7819,11 +9488,11 @@ static int32_t compute_xbox_tag_closure_bytes(
 		total += 64u;
 		if (schema && schema->definition && schema->definition->size > 0)
 			total += (uint32_t)schema->definition->size * 2u;
-		if (grp == 'bitm' && data_addr >= tag_base && (data_addr - tag_base) + 0x60u <= tag_sz)
+		if (grp == 'bitm' && data_addr >= tag_base && (data_addr - tag_base) + 0x6Cu <= tag_sz)
 		{
 			uint32_t b_off = data_addr - tag_base;
-			int32_t b_cnt = *(int32_t const *)(tag_buf + b_off + 0x54u);
-			uint32_t b_addr = *(uint32_t const *)(tag_buf + b_off + 0x58u);
+			int32_t b_cnt = *(int32_t const *)(tag_buf + b_off + 0x60u);
+			uint32_t b_addr = *(uint32_t const *)(tag_buf + b_off + 0x64u);
 			int b_i;
 			if (b_cnt > 0 && b_cnt <= 256 && b_addr >= tag_base &&
 				(b_addr - tag_base) + (uint32_t)b_cnt * 48u <= tag_sz)
@@ -7836,11 +9505,12 @@ static int32_t compute_xbox_tag_closure_bytes(
 				}
 			}
 		}
-		else if (grp == 'mode' && data_addr >= tag_base && (data_addr - tag_base) + 0xE8u <= tag_sz)
+		else if ((grp == 'mode' || grp == 'mod2') && data_addr >= tag_base && (data_addr - tag_base) + 0xE8u <= tag_sz)
 		{
 			uint32_t m_off = data_addr - tag_base;
 			int32_t g_cnt = *(int32_t const *)(tag_buf + m_off + 0xD0u);
 			uint32_t g_addr = *(uint32_t const *)(tag_buf + m_off + 0xD4u);
+			uint32_t part_stride = (grp == 'mod2') ? 132u : 104u;
 			int g_i;
 			if (g_cnt > 0 && g_cnt <= 64 && g_addr >= tag_base &&
 				(g_addr - tag_base) + (uint32_t)g_cnt * 48u <= tag_sz)
@@ -7852,11 +9522,11 @@ static int32_t compute_xbox_tag_closure_bytes(
 					uint32_t p_addr = *(uint32_t const *)(tag_buf + go + 40u);
 					int p_i;
 					if (p_cnt > 0 && p_cnt <= 128 && p_addr >= tag_base &&
-						(p_addr - tag_base) + (uint32_t)p_cnt * 104u <= tag_sz)
+						(p_addr - tag_base) + (uint32_t)p_cnt * part_stride <= tag_sz)
 					{
 						for (p_i = 0; p_i < p_cnt; p_i++)
 						{
-							uint32_t po = (p_addr - tag_base) + (uint32_t)p_i * 104u;
+							uint32_t po = (p_addr - tag_base) + (uint32_t)p_i * part_stride;
 							int32_t t_cnt = *(int32_t const *)(tag_buf + po + 72u);
 							int32_t v_cnt = *(int32_t const *)(tag_buf + po + 88u);
 							if (v_cnt > 0 && v_cnt <= 65536)
@@ -8154,7 +9824,8 @@ static int extract_compressed_xbox_map_tag(
 	uint8_t *used_mask = NULL;
 	uint8_t *masked_tag_buf = NULL;
 	struct forge_grow_buf ext_buf = { NULL, 0, 0 };
-	uint32_t uncomp_size, new_tag_off;
+	struct forge_grow_buf model_hw_buf = { NULL, 0, 0 };
+	uint32_t final_tag_sz, uncomp_size, new_tag_off;
 	uint8_t *uncomp_img = NULL;
 	unsigned long comp_bound, comp_len;
 	uint8_t *comp_img = NULL;
@@ -8176,6 +9847,7 @@ static int extract_compressed_xbox_map_tag(
 	cl.tag_base = s_map_browser.xbox_tag_base;
 	cl.inst_off = s_map_browser.xbox_inst_off;
 	cl.tag_count = s_map_browser.xbox_tag_count;
+	cl.include_all_dependencies = 1;
 	cl.visited = (uint8_t *)calloc((size_t)cl.tag_count, 1);
 	cl.order = (int32_t *)calloc((size_t)cl.tag_count, sizeof(int32_t));
 	cl.runtime_handles = (long *)malloc((size_t)cl.tag_count * sizeof(long));
@@ -8196,8 +9868,8 @@ static int extract_compressed_xbox_map_tag(
 	/* Visit ALL dependencies of root_abs_idx */
 	xbox_visit_tag_index(&cl, root_abs_idx);
 
-	/* Mark the tag table header (0x24 bytes) */
-	memset(used_mask, 1, 0x24u);
+	/* Mark the tag table header (0x24 or 0x28 bytes) */
+	memset(used_mask, 1, s_map_browser.is_mcc_map ? 0x28u : 0x24u);
 
 	for (i = 0; i < cl.order_count; i++)
 	{
@@ -8278,20 +9950,49 @@ static int extract_compressed_xbox_map_tag(
 			masked_tag_buf[c_idx] = cl.tag_buf[c_idx];
 	}
 
-	/* Pack external 'bitm' pixels and 'snd!' samples contiguously starting at file offset 2048 */
+	/* Pack external 'bitm' pixels and 'snd!' samples contiguously starting at file offset 2048,
+	 * and convert MCC 'mod2'/'scex'/'weap' tags into native Xbox v5 layout when extracting from MCC v13 maps. */
 	for (i = 0; i < cl.order_count; i++)
 	{
 		int32_t abs_idx = cl.order[i];
 		uint32_t io = cl.inst_off + (uint32_t)abs_idx * 32u;
 		uint32_t t_grp = *(uint32_t const *)(masked_tag_buf + io + 0x00);
+		uint32_t name_addr = *(uint32_t const *)(masked_tag_buf + io + 0x10);
 		uint32_t data_addr = *(uint32_t const *)(masked_tag_buf + io + 0x14);
+		char const *t_name = (name_addr >= cl.tag_base && (name_addr - cl.tag_base) < cl.tag_sz)
+			? (char const *)(masked_tag_buf + (name_addr - cl.tag_base))
+			: "";
 
-		if (t_grp == 'bitm' && data_addr >= cl.tag_base && (data_addr - cl.tag_base) + 0x60u <= cl.tag_sz)
+		if (t_grp == 'bitm' && data_addr >= cl.tag_base && (data_addr - cl.tag_base) + 0x6Cu <= cl.tag_sz)
 		{
 			uint32_t b_off = data_addr - cl.tag_base;
-			int32_t b_cnt = *(int32_t const *)(masked_tag_buf + b_off + 0x54u);
-			uint32_t b_addr = *(uint32_t const *)(masked_tag_buf + b_off + 0x58u);
+			int32_t b_cnt = *(int32_t const *)(masked_tag_buf + b_off + 0x60u);
+			uint32_t b_addr = *(uint32_t const *)(masked_tag_buf + b_off + 0x64u);
 			int b_i;
+			unsigned chan_mode = 1u;
+
+			if (s_map_browser.is_mcc_map)
+			{
+				int32_t s_k;
+				for (s_k = 0; s_k < cl.order_count; s_k++)
+				{
+					int32_t s_abs = cl.order[s_k];
+					uint32_t s_io = cl.inst_off + (uint32_t)s_abs * 32u;
+					uint32_t s_grp = *(uint32_t const *)(masked_tag_buf + s_io + 0x00);
+					uint32_t s_data = *(uint32_t const *)(masked_tag_buf + s_io + 0x14);
+					if (s_grp == 'soso' && s_data >= cl.tag_base && (s_data - cl.tag_base) + 0xDCu <= cl.tag_sz)
+					{
+						uint16_t s_flags = *(uint16_t const *)(masked_tag_buf + (s_data - cl.tag_base) + 0x28u);
+						int32_t multi_ref = *(int32_t const *)(masked_tag_buf + (s_data - cl.tag_base) + 0xC8u + 12u);
+						if (!(s_flags & 0x40u) && multi_ref != -1 && (multi_ref & 0xFFFF) == abs_idx)
+						{
+							chan_mode = 2u;
+							break;
+						}
+					}
+				}
+			}
+
 			if (b_cnt > 0 && b_cnt <= 256 && b_addr >= cl.tag_base &&
 				(b_addr - cl.tag_base) + (uint32_t)b_cnt * 48u <= cl.tag_sz)
 			{
@@ -8299,38 +10000,75 @@ static int extract_compressed_xbox_map_tag(
 				{
 					uint8_t *bmp_raw = masked_tag_buf + (b_addr - cl.tag_base) + (uint32_t)b_i * 48u;
 					struct bitmap_data tmp_bmp;
-					long req_bytes;
-					uint32_t orig_off, p_sz, read_bytes;
-					uint8_t *pix_tmp;
 
 					memcpy(&tmp_bmp, bmp_raw, sizeof(tmp_bmp));
-					orig_off = (uint32_t)tmp_bmp.pixels_offset;
-					p_sz = (tmp_bmp.pixels_size > 0) ? (uint32_t)tmp_bmp.pixels_size : 0u;
-					if (tmp_bmp.width <= 0 || tmp_bmp.height <= 0 || tmp_bmp.depth <= 0 || orig_off < 2048u)
-						continue;
-					req_bytes = rasterizer_xbox_bitmap_get_pixel_data_size(&tmp_bmp);
-					if (req_bytes <= 0)
-						continue;
-					read_bytes = (p_sz > 0 && p_sz < (uint32_t)req_bytes) ? p_sz : (uint32_t)req_bytes;
-					pix_tmp = (uint8_t *)malloc(read_bytes);
-					if (pix_tmp &&
-						fseek(s_map_browser.xbox_fp, (long)orig_off, SEEK_SET) == 0 &&
-						fread(pix_tmp, 1, read_bytes, s_map_browser.xbox_fp) == read_bytes)
+					if (s_map_browser.is_mcc_map && s_map_browser.mcc_rt)
 					{
-						uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
-						if (forge_grow_buf_write(&ext_buf, pix_tmp, read_bytes))
-							*(int32_t *)(bmp_raw + 24u) = (int32_t)new_off;
+						unsigned char *conv_pix = NULL;
+						uint32_t conv_sz = 0;
+						if (mcc_forge_convert_single_bitmap(
+								s_map_browser.mcc_rt,
+								t_name,
+								(uint32_t)b_i,
+								chan_mode,
+								&tmp_bmp,
+								&conv_pix,
+								&conv_sz) && conv_pix && conv_sz > 0)
+						{
+							uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
+							if (forge_grow_buf_write(&ext_buf, conv_pix, conv_sz))
+							{
+								tmp_bmp.pixels_offset = (long)new_off;
+								memcpy(bmp_raw, &tmp_bmp, sizeof(tmp_bmp));
+							}
+						}
+						free(conv_pix);
 					}
-					free(pix_tmp);
+					else
+					{
+						long req_bytes;
+						uint32_t orig_off = (uint32_t)tmp_bmp.pixels_offset;
+						uint32_t p_sz = (tmp_bmp.pixels_size > 0) ? (uint32_t)tmp_bmp.pixels_size : 0u;
+						uint32_t read_bytes;
+						uint8_t *pix_tmp;
+
+						if (tmp_bmp.width <= 0 || tmp_bmp.height <= 0 || tmp_bmp.depth <= 0 || orig_off < 2048u)
+							continue;
+						req_bytes = rasterizer_xbox_bitmap_get_pixel_data_size(&tmp_bmp);
+						if (req_bytes <= 0)
+							continue;
+						read_bytes = (p_sz > 0 && p_sz < (uint32_t)req_bytes) ? p_sz : (uint32_t)req_bytes;
+						pix_tmp = (uint8_t *)malloc(read_bytes);
+						if (pix_tmp &&
+							fseek(s_map_browser.xbox_fp, (long)orig_off, SEEK_SET) == 0 &&
+							fread(pix_tmp, 1, read_bytes, s_map_browser.xbox_fp) == read_bytes)
+						{
+							uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
+							if (forge_grow_buf_write(&ext_buf, pix_tmp, read_bytes))
+								*(int32_t *)(bmp_raw + 24u) = (int32_t)new_off;
+						}
+						free(pix_tmp);
+					}
 				}
 			}
 		}
 		else if (t_grp == 'snd!' && data_addr >= cl.tag_base && (data_addr - cl.tag_base) + 0xA4u <= cl.tag_sz)
 		{
 			uint32_t s_off = data_addr - cl.tag_base;
+			struct sound_definition *sdef_raw = (struct sound_definition *)(masked_tag_buf + s_off);
 			int32_t pr_cnt = *(int32_t const *)(masked_tag_buf + s_off + 0x98u);
 			uint32_t pr_addr = *(uint32_t const *)(masked_tag_buf + s_off + 0x9Cu);
+			int s_channels = (sdef_raw->encoding == 1) ? 2 : 1;
+			uint32_t s_rate = (sdef_raw->sample_rate == 1) ? 44100u : 22050u;
+			uint32_t s_out_rate = (s_channels == 1) ? 22050u : s_rate;
 			int pr_i, pm_i;
+
+			if (s_map_browser.is_mcc_map)
+			{
+				sdef_raw->compression = 1; /* _sound_compression_xbox_adpcm */
+				sdef_raw->sample_rate = (s_out_rate == 44100u) ? 1 : 0;
+			}
+
 			if (pr_cnt > 0 && pr_cnt <= 64 && pr_addr >= cl.tag_base &&
 				(pr_addr - cl.tag_base) + (uint32_t)pr_cnt * 72u <= cl.tag_sz)
 			{
@@ -8345,34 +10083,269 @@ static int extract_compressed_xbox_map_tag(
 						for (pm_i = 0; pm_i < pm_cnt; pm_i++)
 						{
 							uint8_t *perm_raw = masked_tag_buf + (pm_addr - cl.tag_base) + (uint32_t)pm_i * 124u;
-							int32_t s_sz = *(int32_t const *)(perm_raw + 64u);
-							uint32_t s_foff = *(uint32_t const *)(perm_raw + 72u);
-							if (s_sz > 0 && s_sz <= MAXIMUM_SOUND_DATA_SIZE && s_foff >= 2048u)
+							if (s_map_browser.is_mcc_map && s_map_browser.mcc_rt)
 							{
-								uint8_t *stmp = (uint8_t *)malloc((size_t)s_sz);
-								if (stmp &&
-									fseek(s_map_browser.xbox_fp, (long)s_foff, SEEK_SET) == 0 &&
-									fread(stmp, 1, (size_t)s_sz, s_map_browser.xbox_fp) == (size_t)s_sz)
+								struct sound_permutation tmp_perm;
+								unsigned char *conv_snd = NULL;
+								uint32_t conv_sz = 0;
+								memcpy(&tmp_perm, perm_raw, sizeof(tmp_perm));
+								if (mcc_forge_convert_single_permutation(
+										s_map_browser.mcc_rt,
+										t_name,
+										s_channels,
+										s_rate,
+										s_out_rate,
+										(uint32_t)pr_i,
+										(uint32_t)pm_i,
+										&tmp_perm,
+										&conv_snd,
+										&conv_sz) && conv_snd && conv_sz > 0)
 								{
 									uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
-									if (forge_grow_buf_write(&ext_buf, stmp, (unsigned long)s_sz))
-										*(uint32_t *)(perm_raw + 72u) = new_off;
+									if (forge_grow_buf_write(&ext_buf, conv_snd, conv_sz))
+									{
+										tmp_perm.samples.file_offset = (long)new_off;
+										memcpy(perm_raw, &tmp_perm, sizeof(tmp_perm));
+									}
 								}
-								free(stmp);
+								free(conv_snd);
+							}
+							else
+							{
+								int32_t s_sz = *(int32_t const *)(perm_raw + 64u);
+								uint32_t s_foff = *(uint32_t const *)(perm_raw + 72u);
+								if (s_sz > 0 && s_sz <= MAXIMUM_SOUND_DATA_SIZE && s_foff >= 2048u)
+								{
+									uint8_t *stmp = (uint8_t *)malloc((size_t)s_sz);
+									if (stmp &&
+										fseek(s_map_browser.xbox_fp, (long)s_foff, SEEK_SET) == 0 &&
+										fread(stmp, 1, (size_t)s_sz, s_map_browser.xbox_fp) == (size_t)s_sz)
+									{
+										uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
+										if (forge_grow_buf_write(&ext_buf, stmp, (unsigned long)s_sz))
+											*(uint32_t *)(perm_raw + 72u) = new_off;
+									}
+									free(stmp);
+								}
 							}
 						}
 					}
 				}
 			}
 		}
+		else if (s_map_browser.is_mcc_map && t_grp == 'mod2' &&
+				 data_addr >= cl.tag_base && (data_addr - cl.tag_base) + 0xE8u <= cl.tag_sz)
+		{
+			uint32_t model_file_off = *(uint32_t const *)(cl.tag_buf + 0x14u);
+			uint32_t model_vtx_bytes = *(uint32_t const *)(cl.tag_buf + 0x1Cu);
+			uint32_t m_off = data_addr - cl.tag_base;
+			uint32_t m_flags = *(uint32_t const *)(masked_tag_buf + m_off);
+			int local_nodes = (m_flags & 2u) != 0;
+			int32_t node_cnt = *(int32_t const *)(masked_tag_buf + m_off + 0xB8u);
+			int32_t g_cnt = *(int32_t const *)(masked_tag_buf + m_off + 0xD0u);
+			uint32_t g_addr = *(uint32_t const *)(masked_tag_buf + m_off + 0xD4u);
+			int32_t shdr_cnt = *(int32_t const *)(masked_tag_buf + m_off + 0xDCu);
+			int g_i;
+
+			*(uint32_t *)(masked_tag_buf + io + 0x00u) = 'mode';
+			*(uint32_t *)(masked_tag_buf + m_off) = m_flags & ~2u;
+
+			if (g_cnt > 0 && g_cnt <= 256 && g_addr >= cl.tag_base &&
+				(g_addr - cl.tag_base) + (uint32_t)g_cnt * 48u <= cl.tag_sz)
+			{
+				for (g_i = 0; g_i < g_cnt; g_i++)
+				{
+					uint32_t go = (g_addr - cl.tag_base) + (uint32_t)g_i * 48u;
+					int32_t p_cnt = *(int32_t const *)(masked_tag_buf + go + 36u);
+					uint32_t p_addr = *(uint32_t const *)(masked_tag_buf + go + 40u);
+					int p_i;
+					if (p_cnt <= 0 || p_cnt > 128 || p_addr < cl.tag_base ||
+						(p_addr - cl.tag_base) + (uint32_t)p_cnt * 132u > cl.tag_sz)
+						continue;
+
+					for (p_i = 0; p_i < p_cnt; p_i++)
+					{
+						uint8_t const *wire = cl.tag_buf + (p_addr - cl.tag_base) + (uint32_t)p_i * 132u;
+						uint8_t *dst_part = masked_tag_buf + (p_addr - cl.tag_base) + (uint32_t)p_i * 104u;
+						uint32_t vtx_cnt = *(uint32_t const *)(wire + 0x58u);
+						uint32_t tri_cnt = *(uint32_t const *)(wire + 0x48u);
+						uint32_t vtx_off = *(uint32_t const *)(wire + 0x64u);
+						uint32_t idx_off = *(uint32_t const *)(wire + 0x4Cu);
+						uint8_t pal_cnt = wire[0x6Bu];
+						uint8_t const *pal = wire + 0x6Cu;
+						uint32_t raw_vtx_sz = vtx_cnt * 68u;
+						uint32_t comp_vtx_sz = vtx_cnt * 32u;
+						uint32_t idx_sz = (tri_cnt + 2u) * 2u;
+						struct model_vertex_uncompressed *verts68 = NULL;
+						uint8_t *comp32 = NULL;
+						uint16_t *indices = NULL;
+						uint8_t part_prefix[0x20];
+
+						memcpy(part_prefix, wire, 0x20u);
+						memset(dst_part, 0, 104u);
+						memcpy(dst_part, part_prefix, 0x20u);
+						*(uint32_t *)dst_part &= ~2u;
+						if (*(uint16_t const *)(dst_part + 4u) != 0xFFFFu &&
+							shdr_cnt > 0 && *(uint16_t const *)(dst_part + 4u) >= (uint16_t)shdr_cnt)
+						{
+							*(uint16_t *)(dst_part + 4u) = 0;
+						}
+						if (local_nodes && pal_cnt > 0 && pal_cnt <= 22)
+						{
+							int c_n;
+							for (c_n = 0; c_n < 2; c_n++)
+							{
+								int16_t cn = *(int16_t const *)(dst_part + 8u + c_n * 2);
+								if (cn >= 0 && cn < (int16_t)pal_cnt)
+									*(int16_t *)(dst_part + 8u + c_n * 2) = (int16_t)pal[cn];
+							}
+						}
+
+						if (vtx_cnt == 0 || vtx_cnt > 65535 || tri_cnt == 0 || tri_cnt > 65535)
+							continue;
+
+						verts68 = (struct model_vertex_uncompressed *)malloc(raw_vtx_sz);
+						comp32 = (uint8_t *)calloc(1, comp_vtx_sz);
+						indices = (uint16_t *)malloc(idx_sz);
+						if (verts68 && comp32 && indices &&
+							fseek(s_map_browser.xbox_fp, (long)(model_file_off + vtx_off), SEEK_SET) == 0 &&
+							fread(verts68, 1, raw_vtx_sz, s_map_browser.xbox_fp) == raw_vtx_sz &&
+							fseek(s_map_browser.xbox_fp, (long)(model_file_off + model_vtx_bytes + idx_off), SEEK_SET) == 0 &&
+							fread(indices, 1, idx_sz, s_map_browser.xbox_fp) == idx_sz)
+						{
+							uint32_t v_i;
+							uint32_t tb_hw_vaddr, ib_data_vaddr, vb_hw_vaddr, vb_data_vaddr;
+							uint32_t hw_hdr[3];
+							uint8_t pad_zero[4] = { 0, 0, 0, 0 };
+
+							for (v_i = 0; v_i < vtx_cnt; v_i++)
+							{
+								float *fv = (float *)&verts68[v_i];
+								int f_j;
+								for (f_j = 0; f_j < 14; f_j++)
+								{
+									if (!forge_float_is_finite(fv[f_j]))
+										fv[f_j] = (f_j == 3 || f_j == 7 || f_j == 11) ? 1.0f : 0.0f;
+									else if (f_j >= 3 && f_j < 12)
+									{
+										if (fv[f_j] > 1.0f) fv[f_j] = 1.0f;
+										else if (fv[f_j] < -1.0f) fv[f_j] = -1.0f;
+									}
+								}
+								for (f_j = 0; f_j < 2; f_j++)
+								{
+									int16_t nd = verts68[v_i].nodes[f_j];
+									if (local_nodes && pal_cnt > 0 && pal_cnt <= 22)
+										nd = (nd >= 0 && nd < (int16_t)pal_cnt) ? (int16_t)pal[nd] : 0;
+									if (nd < 0 || (node_cnt > 0 && nd >= (int16_t)node_cnt))
+										nd = 0;
+									verts68[v_i].nodes[f_j] = nd;
+									if (!forge_float_is_finite(verts68[v_i].node_weights[f_j]))
+										verts68[v_i].node_weights[f_j] = (f_j == 0) ? 1.0f : 0.0f;
+								}
+							}
+
+							rasterizer_geometry_compress_vertices(
+								_rasterizer_vertex_type_model_uncompressed,
+								(long)vtx_cnt,
+								comp32,
+								(long)comp_vtx_sz,
+								verts68,
+								(long)raw_vtx_sz);
+
+							if (model_hw_buf.size & 3u)
+								forge_grow_buf_write(&model_hw_buf, pad_zero, 4u - (model_hw_buf.size & 3u));
+							tb_hw_vaddr = cl.tag_base + cl.tag_sz + (uint32_t)model_hw_buf.size;
+							ib_data_vaddr = tb_hw_vaddr + 12u;
+							hw_hdr[0] = 0;
+							hw_hdr[1] = ib_data_vaddr;
+							hw_hdr[2] = 0;
+							forge_grow_buf_write(&model_hw_buf, hw_hdr, 12u);
+							forge_grow_buf_write(&model_hw_buf, indices, idx_sz);
+
+							if (model_hw_buf.size & 3u)
+								forge_grow_buf_write(&model_hw_buf, pad_zero, 4u - (model_hw_buf.size & 3u));
+							vb_hw_vaddr = cl.tag_base + cl.tag_sz + (uint32_t)model_hw_buf.size;
+							vb_data_vaddr = vb_hw_vaddr + 12u;
+							hw_hdr[0] = 0;
+							hw_hdr[1] = vb_data_vaddr;
+							hw_hdr[2] = 0;
+							forge_grow_buf_write(&model_hw_buf, hw_hdr, 12u);
+							forge_grow_buf_write(&model_hw_buf, comp32, comp_vtx_sz);
+
+							*(int16_t *)(dst_part + 68u) = _triangle_buffer_type_precompiled_strip;
+							*(int32_t *)(dst_part + 72u) = (int32_t)tri_cnt;
+							*(uint32_t *)(dst_part + 80u) = tb_hw_vaddr;
+							*(int16_t *)(dst_part + 84u) = _rasterizer_vertex_type_model_compressed;
+							*(int32_t *)(dst_part + 88u) = (int32_t)vtx_cnt;
+							*(uint32_t *)(dst_part + 100u) = vb_hw_vaddr;
+						}
+						free(verts68);
+						free(comp32);
+						free(indices);
+					}
+					if ((uint32_t)p_cnt * 132u > (uint32_t)p_cnt * 104u)
+					{
+						memset(
+							masked_tag_buf + (p_addr - cl.tag_base) + (uint32_t)p_cnt * 104u,
+							0,
+							(size_t)p_cnt * (132u - 104u));
+					}
+				}
+			}
+		}
+		else if (s_map_browser.is_mcc_map && t_grp == 'scex' &&
+				 data_addr >= cl.tag_base && (data_addr - cl.tag_base) + 0x78u <= cl.tag_sz)
+		{
+			uint8_t *p = masked_tag_buf + (data_addr - cl.tag_base);
+			uint32_t flags = *(uint32_t const *)(p + 0x6Cu);
+			if (!*(uint32_t const *)(p + 0x54u))
+				memcpy(p + 0x54u, p + 0x60u, 12u);
+			memset(p + 0x60u, 0, 12u);
+			memcpy(p + 0x60u, &flags, 4u);
+			*(uint32_t *)(masked_tag_buf + io + 0x00u) = 'schi';
+			*(uint32_t *)(masked_tag_buf + io + 0x04u) = 'shdr';
+		}
+		else if (s_map_browser.is_mcc_map && t_grp == 'weap' &&
+				 data_addr >= cl.tag_base && (data_addr - cl.tag_base) + 0x508u <= cl.tag_sz)
+		{
+			uint8_t *p = masked_tag_buf + (data_addr - cl.tag_base);
+			unsigned w_j;
+			for (w_j = 0; w_j < 4u; w_j++)
+			{
+				uint16_t val = *(uint16_t const *)(p + 0x330u + w_j * 2u);
+				if (val == 17u || val == 18u)
+					*(uint16_t *)(p + 0x330u + w_j * 2u) = (uint16_t)(val - 2u);
+			}
+		}
 	}
 
+	if (s_map_browser.is_mcc_map)
+	{
+		size_t scan_off;
+		for (scan_off = 0x28u + (size_t)cl.tag_count * 32u; scan_off + 16u <= cl.tag_sz; scan_off += 4u)
+		{
+			if (!used_mask[scan_off])
+				continue;
+			if (*(uint32_t const *)(masked_tag_buf + scan_off) == 'mod2')
+				*(uint32_t *)(masked_tag_buf + scan_off) = 'mode';
+			else if (*(uint32_t const *)(masked_tag_buf + scan_off) == 'scex')
+				*(uint32_t *)(masked_tag_buf + scan_off) = 'schi';
+		}
+		memmove(masked_tag_buf + 0x24u, masked_tag_buf + 0x28u, (size_t)cl.tag_count * 32u);
+		memset(masked_tag_buf + 0x24u + (size_t)cl.tag_count * 32u, 0, 4u);
+		*(uint32_t *)(masked_tag_buf + 0x00u) = cl.tag_base + 0x24u;
+		*(uint32_t *)(masked_tag_buf + 0x20u) = 0x74616773u; /* 'tags' */
+	}
+
+	final_tag_sz = cl.tag_sz + (uint32_t)model_hw_buf.size;
 	new_tag_off = 2048u + (uint32_t)((ext_buf.size + 31u) & ~31u);
-	uncomp_size = new_tag_off + cl.tag_sz;
+	uncomp_size = new_tag_off + final_tag_sz;
 	uncomp_img = (uint8_t *)calloc(1, uncomp_size);
 	if (!uncomp_img)
 	{
 		free(ext_buf.bytes);
+		free(model_hw_buf.bytes);
 		free(cl.visited);
 		free(cl.order);
 		free(cl.runtime_handles);
@@ -8385,13 +10358,16 @@ static int extract_compressed_xbox_map_tag(
 	*(uint32_t *)(uncomp_img + 0x04) = 5u;          /* Xbox v5 */
 	*(uint32_t *)(uncomp_img + 0x08) = uncomp_size;
 	*(uint32_t *)(uncomp_img + 0x10) = new_tag_off;
-	*(uint32_t *)(uncomp_img + 0x14) = cl.tag_sz;
+	*(uint32_t *)(uncomp_img + 0x14) = final_tag_sz;
 	*(uint32_t *)(uncomp_img + 0x7FC) = 0x666F6F74u; /* 'foot' */
 	if (ext_buf.bytes && ext_buf.size > 0)
 		memcpy(uncomp_img + 2048u, ext_buf.bytes, ext_buf.size);
 	memcpy(uncomp_img + new_tag_off, masked_tag_buf, cl.tag_sz);
+	if (model_hw_buf.bytes && model_hw_buf.size > 0)
+		memcpy(uncomp_img + new_tag_off + cl.tag_sz, model_hw_buf.bytes, model_hw_buf.size);
 
 	free(ext_buf.bytes);
+	free(model_hw_buf.bytes);
 	free(cl.visited);
 	free(cl.order);
 	free(cl.runtime_handles);
@@ -8933,7 +10909,32 @@ int forge_cache_active_map_tag(uint32_t group_tag, char const *tag_path)
 			m_slash = strrchr(cur_map, '/');
 		snprintf(map_leaf, sizeof(map_leaf), "%s", m_slash ? (m_slash + 1) : cur_map);
 
-		for (d = 0; d < 4; d++)
+		/* If the active map is an MCC map, resolve its MCC package path FIRST so we don't
+		 * accidentally open a retail/Xbox map with the same leaf stem (e.g. bloodgulch.map). */
+		if (_strnicmp(cur_map, "mcc_maps\\", 9) == 0 ||
+			_strnicmp(cur_map, "mcc_maps/", 9) == 0 ||
+			mcc_cache_tags_loaded())
+		{
+			char mcc_rel[128];
+			if (mcc_package_map_path(cur_map, mcc_rel) && mcc_rel[0])
+			{
+				if (is_mcc_version13_map_file(mcc_rel))
+				{
+					snprintf(resolved_map, sizeof(resolved_map), "%s", mcc_rel);
+					found_map = 1;
+				}
+				else
+				{
+					char xbox_vpath[160];
+					snprintf(xbox_vpath, sizeof(xbox_vpath), "d:\\%s", mcc_rel);
+					platform_translate_path(xbox_vpath, resolved_map, sizeof(resolved_map));
+					if (is_mcc_version13_map_file(resolved_map))
+						found_map = 1;
+				}
+			}
+		}
+
+		for (d = 0; !found_map && d < 4; d++)
 		{
 			snprintf(resolved_map, sizeof(resolved_map), "%s/%s.map", s_dirs[d], map_leaf);
 			if (is_xbox_version5_map_file(resolved_map))
@@ -8957,6 +10958,26 @@ int forge_cache_active_map_tag(uint32_t group_tag, char const *tag_path)
 			platform_translate_path(xbox_vpath, resolved_map, sizeof(resolved_map));
 			if (is_xbox_version5_map_file(resolved_map))
 				found_map = 1;
+		}
+		if (!found_map)
+		{
+			char mcc_rel[128];
+			if (mcc_package_map_path(cur_map, mcc_rel) && mcc_rel[0])
+			{
+				if (is_mcc_version13_map_file(mcc_rel))
+				{
+					snprintf(resolved_map, sizeof(resolved_map), "%s", mcc_rel);
+					found_map = 1;
+				}
+				else
+				{
+					char xbox_vpath[160];
+					snprintf(xbox_vpath, sizeof(xbox_vpath), "d:\\%s", mcc_rel);
+					platform_translate_path(xbox_vpath, resolved_map, sizeof(resolved_map));
+					if (is_mcc_version13_map_file(resolved_map))
+						found_map = 1;
+				}
+			}
 		}
 		if (!found_map)
 			return 0;
@@ -9559,6 +11580,21 @@ static boolean preview_xbox_file_read_cb(void *ctx, unsigned long offset, unsign
 	return (fseek(fp, (long)offset, SEEK_SET) == 0 && fread(buf, 1, size, fp) == size) ? TRUE : FALSE;
 }
 
+struct preview_mem_slice
+{
+	unsigned char const *bytes;
+	unsigned long size;
+};
+
+static boolean preview_mem_read_cb(void *ctx, unsigned long offset, unsigned long size, void *buf)
+{
+	struct preview_mem_slice const *slice = (struct preview_mem_slice const *)ctx;
+	if (!slice || !slice->bytes || offset > slice->size || size > slice->size - offset)
+		return FALSE;
+	memcpy(buf, slice->bytes + offset, size);
+	return TRUE;
+}
+
 static int preview_mesh_alloc_buffers(struct tag_injector_mesh *mesh, short *shader_to_mat)
 {
 	int i;
@@ -9594,7 +11630,9 @@ static int build_preview_mesh_from_xbox_map_data(
 {
 	uint32_t obj_io, obj_data_addr, obj_off;
 	int32_t mod_ref_idx, mod_abs_idx;
-	uint32_t mod_io, mod_data_addr, mod_off;
+	uint32_t mod_io, mod_grp, mod_data_addr, mod_off;
+	uint32_t part_stride;
+	int has_local_nodes = 0;
 	float u_scale, v_scale;
 	int32_t node_cnt, reg_cnt, geom_cnt, shdr_cnt;
 	uint32_t node_addr, reg_addr, geom_addr, shdr_addr;
@@ -9620,12 +11658,16 @@ static int build_preview_mesh_from_xbox_map_data(
 		return 0;
 
 	mod_io = inst_off + (uint32_t)mod_abs_idx * 32u;
-	if (*(uint32_t const *)(tag_buf + mod_io + 0x00) != 'mode')
+	mod_grp = *(uint32_t const *)(tag_buf + mod_io + 0x00);
+	if (mod_grp != 'mode' && mod_grp != 'mod2')
 		return 0;
+	part_stride = (mod_grp == 'mod2') ? 132u : 104u;
 	mod_data_addr = *(uint32_t const *)(tag_buf + mod_io + 0x14);
 	if (mod_data_addr < tag_base || (mod_data_addr - tag_base) + 0xE8u > tag_sz)
 		return 0;
 	mod_off = mod_data_addr - tag_base;
+	if (mod_grp == 'mod2' && (*(uint32_t const *)(tag_buf + mod_off) & 2u))
+		has_local_nodes = 1;
 
 	u_scale = *(float const *)(tag_buf + mod_off + 0x30u);
 	v_scale = *(float const *)(tag_buf + mod_off + 0x34u);
@@ -9696,18 +11738,13 @@ static int build_preview_mesh_from_xbox_map_data(
 		go = (geom_addr - tag_base) + (uint32_t)geom_idx * 48u;
 		part_cnt = *(int32_t const *)(tag_buf + go + 36u);
 		part_addr = *(uint32_t const *)(tag_buf + go + 40u);
-		if (part_cnt <= 0 || part_addr < tag_base || (part_addr - tag_base) + (uint32_t)part_cnt * 104u > tag_sz)
+		if (part_cnt <= 0 || part_addr < tag_base || (part_addr - tag_base) + (uint32_t)part_cnt * part_stride > tag_sz)
 			continue;
 
 		for (p_i = 0; p_i < part_cnt; p_i++)
 		{
-			uint32_t po = (part_addr - tag_base) + (uint32_t)p_i * 104u;
+			uint32_t po = (part_addr - tag_base) + (uint32_t)p_i * part_stride;
 			int16_t shdr_idx = *(int16_t const *)(tag_buf + po + 4u);
-			int16_t tri_type = *(int16_t const *)(tag_buf + po + 68u);
-			int32_t tri_cnt = *(int32_t const *)(tag_buf + po + 72u);
-			uint32_t tb_hw = *(uint32_t const *)(tag_buf + po + 80u);
-			int32_t vtx_cnt = *(int32_t const *)(tag_buf + po + 88u);
-			uint32_t vb_hw = *(uint32_t const *)(tag_buf + po + 100u);
 			short mat_idx = -1;
 
 			if (shdr_idx >= 0 && shdr_idx < shdr_cnt && shdr_idx < FORGE_PREVIEW_MAX_SHADERS &&
@@ -9740,21 +11777,57 @@ static int build_preview_mesh_from_xbox_map_data(
 						{
 							int32_t b_abs = bitm_ref & 0xFFFF;
 							uint32_t bio = inst_off + (uint32_t)b_abs * 32u;
+							uint32_t bname_addr = *(uint32_t const *)(tag_buf + bio + 0x10);
 							uint32_t bdata = *(uint32_t const *)(tag_buf + bio + 0x14);
+							char const *b_tname = (bname_addr >= tag_base && (bname_addr - tag_base) < tag_sz)
+								? (char const *)(tag_buf + (bname_addr - tag_base))
+								: "";
 							if (*(uint32_t const *)(tag_buf + bio + 0x00) == 'bitm' &&
-								bdata >= tag_base && (bdata - tag_base) + 0x60u <= tag_sz)
+								bdata >= tag_base && (bdata - tag_base) + 0x6Cu <= tag_sz)
 							{
-								int32_t b_cnt = *(int32_t const *)(tag_buf + (bdata - tag_base) + 0x54u);
-								uint32_t b_addr = *(uint32_t const *)(tag_buf + (bdata - tag_base) + 0x58u);
+								int32_t b_cnt = *(int32_t const *)(tag_buf + (bdata - tag_base) + 0x60u);
+								uint32_t b_addr = *(uint32_t const *)(tag_buf + (bdata - tag_base) + 0x64u);
 								if (b_cnt > 0 && b_addr >= tag_base && (b_addr - tag_base) + 48u <= tag_sz)
 								{
 									struct bitmap_data b_elem;
+									int tex_ok = 0;
 									memcpy(&b_elem, tag_buf + (b_addr - tag_base), sizeof(b_elem));
-									if (preview_decode_bitmap_texture(
+									if (mod_grp == 'mod2' && s_map_browser.is_mcc_map && s_map_browser.mcc_rt)
+									{
+										unsigned char *conv_pix = NULL;
+										uint32_t conv_sz = 0;
+										b_elem.flags |= 16u;
+										if (mcc_forge_convert_single_bitmap(
+												s_map_browser.mcc_rt,
+												b_tname,
+												0,
+												1,
+												&b_elem,
+												&conv_pix,
+												&conv_sz) && conv_pix && conv_sz > 0)
+										{
+											struct preview_mem_slice slice;
+											slice.bytes = conv_pix;
+											slice.size = conv_sz;
+											b_elem.pixels_offset = 0;
+											b_elem.pixels_size = (long)conv_sz;
+											tex_ok = preview_decode_bitmap_texture(
+												&b_elem,
+												preview_mem_read_cb,
+												&slice,
+												&mesh->textures[mesh->texture_count]);
+										}
+										free(conv_pix);
+									}
+									else
+									{
+										tex_ok = preview_decode_bitmap_texture(
 											&b_elem,
 											preview_xbox_file_read_cb,
 											fp,
-											&mesh->textures[mesh->texture_count]))
+											&mesh->textures[mesh->texture_count]);
+									}
+									if (tex_ok)
 									{
 										short m_slot = (short)mesh->material_count++;
 										short t_slot = (short)mesh->texture_count++;
@@ -9773,43 +11846,95 @@ static int build_preview_mesh_from_xbox_map_data(
 				mat_idx = shader_to_mat[shdr_idx];
 			}
 
-			if (tri_type == _triangle_buffer_type_precompiled_strip &&
-				tri_cnt > 0 && tri_cnt <= 65536 && vtx_cnt > 0 && vtx_cnt <= 16384 &&
-				tb_hw >= tag_base && (tb_hw - tag_base) + 12u <= tag_sz &&
-				vb_hw >= tag_base && (vb_hw - tag_base) + 12u <= tag_sz)
+			if (mod_grp == 'mod2')
 			{
-				uint32_t ib_addr = *(uint32_t const *)(tag_buf + (tb_hw - tag_base) + 4u);
-				uint32_t vb_addr = *(uint32_t const *)(tag_buf + (vb_hw - tag_base) + 4u);
-				uint32_t comp_sz = (uint32_t)vtx_cnt * 32u;
-				uint32_t idx_sz = ((uint32_t)tri_cnt + 2u) * 2u;
-				if (ib_addr >= tag_base && (ib_addr - tag_base) + idx_sz <= tag_sz &&
-					vb_addr >= tag_base && (vb_addr - tag_base) + comp_sz <= tag_sz)
+				uint32_t model_file_off = *(uint32_t const *)(tag_buf + 0x14u);
+				uint32_t model_vtx_bytes = *(uint32_t const *)(tag_buf + 0x1Cu);
+				int32_t tri_cnt = *(int32_t const *)(tag_buf + po + 0x48u);
+				uint32_t strip_off = *(uint32_t const *)(tag_buf + po + 0x4Cu);
+				int32_t vtx_cnt = *(int32_t const *)(tag_buf + po + 0x58u);
+				uint32_t vtx_off = *(uint32_t const *)(tag_buf + po + 0x64u);
+				int16_t loc_node_cnt = (int16_t)tag_buf[po + 0x6Bu];
+				uint8_t const *loc_nodes = tag_buf + po + 0x6Cu;
+
+				if (fp && tri_cnt > 0 && tri_cnt <= 65536 && vtx_cnt > 0 && vtx_cnt <= 16384 &&
+					model_file_off >= 2048u)
 				{
-					uint8_t *verts68 = (uint8_t *)malloc((size_t)vtx_cnt * 68u);
-					if (verts68)
+					uint32_t vtx_bytes = (uint32_t)vtx_cnt * 68u;
+					uint32_t idx_bytes = ((uint32_t)tri_cnt + 2u) * 2u;
+					uint8_t *verts68 = (uint8_t *)malloc(vtx_bytes);
+					uint16_t *strip_idx = (uint16_t *)malloc(idx_bytes);
+					if (verts68 && strip_idx &&
+						fseek(fp, (long)(model_file_off + vtx_off), SEEK_SET) == 0 &&
+						fread(verts68, 1, vtx_bytes, fp) == vtx_bytes &&
+						fseek(fp, (long)(model_file_off + model_vtx_bytes + strip_off), SEEK_SET) == 0 &&
+						fread(strip_idx, 1, idx_bytes, fp) == idx_bytes)
 					{
-						rasterizer_geometry_uncompress_vertices(
-							_rasterizer_vertex_type_model_compressed,
-							vtx_cnt,
-							verts68,
-							(int)vtx_cnt * 68,
-							(void *)(tag_buf + (vb_addr - tag_base)),
-							(int)comp_sz);
 						preview_append_part_vertices_and_strip(
 							mesh,
 							verts68,
 							vtx_cnt,
-							(uint16_t const *)(tag_buf + (ib_addr - tag_base)),
+							strip_idx,
 							tri_cnt,
 							world_nodes,
 							node_cnt,
-							0,
-							0,
-							NULL,
+							has_local_nodes,
+							loc_node_cnt,
+							loc_nodes,
 							mat_idx,
 							u_scale,
 							v_scale);
-						free(verts68);
+					}
+					free(verts68);
+					free(strip_idx);
+				}
+			}
+			else
+			{
+				int16_t tri_type = *(int16_t const *)(tag_buf + po + 68u);
+				int32_t tri_cnt = *(int32_t const *)(tag_buf + po + 72u);
+				uint32_t tb_hw = *(uint32_t const *)(tag_buf + po + 80u);
+				int32_t vtx_cnt = *(int32_t const *)(tag_buf + po + 88u);
+				uint32_t vb_hw = *(uint32_t const *)(tag_buf + po + 100u);
+
+				if (tri_type == _triangle_buffer_type_precompiled_strip &&
+					tri_cnt > 0 && tri_cnt <= 65536 && vtx_cnt > 0 && vtx_cnt <= 16384 &&
+					tb_hw >= tag_base && (tb_hw - tag_base) + 12u <= tag_sz &&
+					vb_hw >= tag_base && (vb_hw - tag_base) + 12u <= tag_sz)
+				{
+					uint32_t ib_addr = *(uint32_t const *)(tag_buf + (tb_hw - tag_base) + 4u);
+					uint32_t vb_addr = *(uint32_t const *)(tag_buf + (vb_hw - tag_base) + 4u);
+					uint32_t comp_sz = (uint32_t)vtx_cnt * 32u;
+					uint32_t idx_sz = ((uint32_t)tri_cnt + 2u) * 2u;
+					if (ib_addr >= tag_base && (ib_addr - tag_base) + idx_sz <= tag_sz &&
+						vb_addr >= tag_base && (vb_addr - tag_base) + comp_sz <= tag_sz)
+					{
+						uint8_t *verts68 = (uint8_t *)malloc((size_t)vtx_cnt * 68u);
+						if (verts68)
+						{
+							rasterizer_geometry_uncompress_vertices(
+								_rasterizer_vertex_type_model_compressed,
+								vtx_cnt,
+								verts68,
+								(int)vtx_cnt * 68,
+								(void *)(tag_buf + (vb_addr - tag_base)),
+								(int)comp_sz);
+							preview_append_part_vertices_and_strip(
+								mesh,
+								verts68,
+								vtx_cnt,
+								(uint16_t const *)(tag_buf + (ib_addr - tag_base)),
+								tri_cnt,
+								world_nodes,
+								node_cnt,
+								0,
+								0,
+								NULL,
+								mat_idx,
+								u_scale,
+								v_scale);
+							free(verts68);
+						}
 					}
 				}
 			}
@@ -10965,7 +13090,186 @@ int forge_export_custom_tag_bundle(
 		return 1;
 	}
 
+	/* 3. Also check session-staged ephemeral tags received in this session */
+	for (i = 0; i < 32; i++)
+	{
+		struct forge_staged_ephemeral_tag const *st = &s_staged_ephemeral_tags[i];
+		uint8_t *raw_copy;
+		if (!st->active || st->expected_hash != hash || !st->raw_bytes || st->raw_size == 0)
+			continue;
+		raw_copy = (uint8_t *)malloc(st->raw_size);
+		if (!raw_copy)
+			continue;
+		memcpy(raw_copy, st->raw_bytes, st->raw_size);
+		*out_format = st->bundle_format;
+		*out_group_tag = st->root_group;
+		snprintf(out_tag_path, path_sz, "%s", st->tag_path);
+		snprintf(out_display_name, disp_sz, "%s", st->clean_disp[0] ? st->clean_disp : st->tag_path);
+		*out_raw_bytes = raw_copy;
+		*out_raw_size = st->raw_size;
+		return 1;
+	}
+
 	return 0;
+}
+
+static void forge_commit_session_ephemeral_tags_to_disk(void)
+{
+	int i, k;
+	int any_committed = 0;
+
+	for (i = 0; i < 32; i++)
+	{
+		struct forge_staged_ephemeral_tag *st = &s_staged_ephemeral_tags[i];
+		int committed_ok = 0;
+
+		if (!st->active || st->committed || !st->raw_bytes || st->raw_size < TAG_BUNDLE_HEADER_BYTES)
+			continue;
+
+		if (st->bundle_format == 2u)
+		{
+			uint8_t *comp_img = NULL;
+			uint32_t comp_len = 0;
+			if (forge_zlib_compress_buffer(st->raw_bytes, st->raw_size, &comp_img, &comp_len) &&
+				comp_img && comp_len > 0)
+			{
+				struct fxtg_bundle_header fhdr;
+				char safe_file[128];
+				char fxtg_path[512];
+				FILE *out_fp;
+				size_t c_idx, w_idx = 0;
+
+				for (c_idx = 0; st->tag_path[c_idx] && w_idx + 1 < sizeof(safe_file); c_idx++)
+				{
+					char ch = st->tag_path[c_idx];
+					if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
+						(ch >= '0' && ch <= '9') || ch == '_' || ch == '-')
+						safe_file[w_idx++] = ch;
+					else
+						safe_file[w_idx++] = '_';
+				}
+				safe_file[w_idx] = '\0';
+
+				CreateDirectoryA("OpenCE Forge", NULL);
+				CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
+				snprintf(fxtg_path, sizeof(fxtg_path), "OpenCE Forge/cached_tags/%s_%08X.fxtg",
+					safe_file, (unsigned int)st->root_group);
+				memset(&fhdr, 0, sizeof(fhdr));
+				fhdr.magic = 0x31545846u; /* 'FXT1' */
+				fhdr.group_tag = st->root_group;
+				fhdr.uncompressed_size = st->raw_size;
+				fhdr.compressed_size = comp_len;
+				snprintf(fhdr.tag_path, sizeof(fhdr.tag_path), "%s", st->tag_path);
+				snprintf(fhdr.custom_name, sizeof(fhdr.custom_name), "%s", st->clean_disp);
+				snprintf(fhdr.source_map, sizeof(fhdr.source_map), "network_stream");
+
+				out_fp = fopen(fxtg_path, "wb");
+				if (out_fp)
+				{
+					fwrite(&fhdr, 1, sizeof(fhdr), out_fp);
+					fwrite(comp_img, 1, comp_len, out_fp);
+					fclose(out_fp);
+					upsert_custom_catalog_manifest_line(st->root_group, st->cat_id, st->tag_path, st->clean_disp);
+					s_fxtg_loaded = 0;
+					committed_ok = 1;
+				}
+				free(comp_img);
+			}
+		}
+		else if (st->bundle_format == 1u)
+		{
+			unsigned long tags_size = tag_bundle_file_data_offset(st->raw_bytes);
+			if (tags_size >= TAG_BUNDLE_HEADER_BYTES && tags_size <= st->raw_size)
+			{
+				byte *copy_tags = (byte *)malloc(tags_size);
+				if (copy_tags)
+				{
+					long prof = 0;
+					struct tag_bundle_loaded loaded;
+					struct tag_bundle_file_region *regions = NULL;
+					long region_count = 0;
+					static struct tag_bundle_file_region const no_region = { 0, 0 };
+
+					port_tag_profiles_scan();
+					if (port_tag_profiles_count() <= 0)
+						prof = port_tag_profiles_create("Forge Custom Tags");
+					else
+						prof = 0;
+
+					memcpy(copy_tags, st->raw_bytes, tags_size);
+					if (prof >= 0 &&
+						tag_bundle_load_tags_regions(
+							copy_tags,
+							tags_size,
+							st->raw_size,
+							&loaded,
+							&regions,
+							&region_count) == _tag_bundle_status_ok)
+					{
+						if (port_tag_profiles_tag_add(
+								prof,
+								"network_stream",
+								(unsigned long)st->root_group,
+								st->tag_path,
+								st->raw_bytes,
+								st->raw_size,
+								tags_size,
+								(struct port_tag_store_region const *)(regions ? regions : &no_region),
+								region_count))
+						{
+							long t_slot = port_tag_profiles_tag_find(prof, (unsigned long)st->root_group, st->tag_path);
+							if (t_slot >= 0)
+							{
+								port_tag_profiles_tag_set_enabled(prof, t_slot, 1);
+								port_tag_profiles_tag_set_option(prof, t_slot, "name", st->clean_disp);
+							}
+							committed_ok = 1;
+						}
+					}
+					free(copy_tags);
+					free(regions);
+				}
+			}
+		}
+
+		if (committed_ok)
+		{
+			st->committed = 1;
+			any_committed = 1;
+			for (k = 0; k < g_forge.catalog_count; k++)
+			{
+				if (g_forge.catalog[k].group_tag == st->root_group &&
+					_stricmp(g_forge.catalog[k].tag_path, st->tag_path) == 0 &&
+					g_forge.catalog[k].source_cache_id == 4)
+				{
+					g_forge.catalog[k].source_cache_id = 2;
+				}
+			}
+			for (k = 0; k < g_forge.live_instance_count; k++)
+			{
+				if (g_forge.live_instances[k].active &&
+					g_forge.live_instances[k].group_tag == st->root_group &&
+					_stricmp(g_forge.live_instances[k].tag_path, st->tag_path) == 0 &&
+					g_forge.live_instances[k].source_cache_id == 4)
+				{
+					g_forge.live_instances[k].source_cache_id = 2;
+				}
+			}
+			for (k = 0; k < g_forge.edit_state.placed_object_count; k++)
+			{
+				if (g_forge.edit_state.placed_objects[k].active &&
+					g_forge.edit_state.placed_objects[k].group_tag == st->root_group &&
+					_stricmp(g_forge.edit_state.placed_objects[k].tag_path, st->tag_path) == 0 &&
+					g_forge.edit_state.placed_objects[k].source_cache_id == 4)
+				{
+					g_forge.edit_state.placed_objects[k].source_cache_id = 2;
+				}
+			}
+		}
+	}
+
+	if (any_committed)
+		ensure_fxtg_cache_loaded();
 }
 
 long forge_install_ephemeral_tag_bundle(
@@ -11090,6 +13394,41 @@ long forge_install_ephemeral_tag_bundle(
 
 	snprintf(prefix_buf, sizeof(prefix_buf), "[C] %s", clean_disp);
 	add_catalog_entry(root_group, cat_id, 4, root_tag_path, prefix_buf);
+
+	{
+		int st_i, st_slot = -1;
+		for (st_i = 0; st_i < 32; st_i++)
+		{
+			if (s_staged_ephemeral_tags[st_i].active &&
+				s_staged_ephemeral_tags[st_i].expected_hash == expected_hash)
+			{
+				st_slot = st_i;
+				break;
+			}
+			if (!s_staged_ephemeral_tags[st_i].active && st_slot < 0)
+				st_slot = st_i;
+		}
+		if (st_slot >= 0)
+		{
+			uint8_t *raw_copy = (uint8_t *)malloc(uncomp_size);
+			if (raw_copy)
+			{
+				memcpy(raw_copy, uncomp_bytes, uncomp_size);
+				if (s_staged_ephemeral_tags[st_slot].raw_bytes)
+					free(s_staged_ephemeral_tags[st_slot].raw_bytes);
+				s_staged_ephemeral_tags[st_slot].active = 1;
+				s_staged_ephemeral_tags[st_slot].committed = 0;
+				s_staged_ephemeral_tags[st_slot].bundle_format = bundle_format;
+				s_staged_ephemeral_tags[st_slot].cat_id = cat_id;
+				s_staged_ephemeral_tags[st_slot].expected_hash = expected_hash;
+				s_staged_ephemeral_tags[st_slot].root_group = root_group;
+				snprintf(s_staged_ephemeral_tags[st_slot].tag_path, sizeof(s_staged_ephemeral_tags[st_slot].tag_path), "%s", root_tag_path);
+				snprintf(s_staged_ephemeral_tags[st_slot].clean_disp, sizeof(s_staged_ephemeral_tags[st_slot].clean_disp), "%s", clean_disp);
+				s_staged_ephemeral_tags[st_slot].raw_bytes = raw_copy;
+				s_staged_ephemeral_tags[st_slot].raw_size = uncomp_size;
+			}
+		}
+	}
 
 	if (out_actual_group)
 		*out_actual_group = actual_grp;

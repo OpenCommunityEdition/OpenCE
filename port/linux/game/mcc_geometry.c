@@ -484,7 +484,8 @@ int mcc_geometry_bsp_load(struct mcc_runtime *r,uint32_t handle,uint32_t offset,
         if (i && runs[i].materials<runs[i-1].materials+runs[i-1].count) goto fail;
         for (m=0;m<runs[i].count;m++) if (!mg_bsp_material(r,b,&runs[i].materials[m])) goto fail;
     }
-    free(runs);
+    /* Empty lightmap tables allocate no runs; debug_free rejects NULL. */
+    if (runs) free(runs);
     /* The MCC file stream descriptors are not Xbox vertex-buffer tables. */
     memset((unsigned char *)address+4,0,16);
     *result=structure;

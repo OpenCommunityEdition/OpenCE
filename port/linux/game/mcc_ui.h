@@ -15,7 +15,8 @@ enum {
     MCC_PAUSE_ACTION_RED_TEAM,
     MCC_PAUSE_ACTION_BLUE_TEAM,
     MCC_PAUSE_ACTION_SETTINGS,
-    MCC_PAUSE_ACTION_FRIENDLY_FIRE
+    MCC_PAUSE_ACTION_FRIENDLY_FIRE,
+    MCC_PAUSE_ACTION_SAVE_MAP
 };
 
 boolean mcc_ui_trusted_action(struct widget_instance *widget, word function);

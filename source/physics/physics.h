@@ -69,6 +69,13 @@ void physics_update(
 	real_vector3d const *magic_torque);
 
 void render_debug_physics(struct physics_instance *instance);
+/* port: the push a vehicle gives a biped it collides with, and the
+original vehicle collision damage it deals along it: the vehicle's own
+update, and a rider's tick when a vehicle's touch pins it
+(biped_riding_contacts in vehicle_riding_bipeds.c) */
+void physics_biped_vehicle_collision_push(long vehicle_index, long biped_index, real_vector3d *acceleration);
+void physics_biped_vehicle_collision_damage(long vehicle_index, long biped_index,
+	real_vector3d const *acceleration);
 
 
 /* ---------- globals */

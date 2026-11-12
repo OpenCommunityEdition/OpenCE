@@ -14,7 +14,7 @@ static unsigned long status[8],completed[8];
 #define interrupt_time_error(...) CHECK(FALSE,"invalid completion")
 #define SetEvent(...) ((void)events++)
 #define resampler_reset(...) ((void)resets++)
-/* (the fade of what the voice would have played next: the mixer's, test_mixer.py) */
+/* The mixer harness checks fade samples; this fixture checks game/cache ownership. */
 #define voice_cut(...) ((void)0)
 static void dsound_channel_fill(short i) {
  (void)i; refills++;

@@ -197,6 +197,7 @@ static void server_gametype_rule(
 	else if (!strcmp(key, "no_shields")) server_gametype_flag(variant, _game_variant_no_shields_bit, value);
 	else if (!strcmp(key, "invisible")) server_gametype_flag(variant, _game_variant_always_invisible_bit, value);
 	else if (!strcmp(key, "generic_equipment")) server_gametype_flag(variant, _game_variant_generic_starting_equipment_bit, value);
+	else if (!strcmp(key, "vehicle_riding")) server_gametype_flag(variant, _game_variant_vehicle_riding_bit, value);
 	else if (!strcmp(key, "weapon_set")) universal->weapon_set = value;
 	else if (!strcmp(key, "vehicle_set")) universal->vehicle_set = value;
 	else if (!strcmp(key, "goal_radar")) universal->goal_radar = value;

@@ -50,6 +50,7 @@ Each map can have, beside it in its folder:
 #include "map_share.h"
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <xtl.h>
@@ -102,7 +103,7 @@ the lobby's is 139x113), and the unknown level's frame
 #define DESCRIPTION_EXTENSION ".txt"
 /* descriptions are a few short lines */
 #define MAXIMUM_DESCRIPTION_FILE_BYTES 1024
-#define MAXIMUM_DESCRIPTION_LENGTH 127
+#define MAXIMUM_DESCRIPTION_LENGTH 255
 
 /* bitmaps.c's format of 32-bit color with alpha */
 enum
@@ -127,8 +128,8 @@ struct custom_edition_map
 	/* saved_game_file_remember_last_used_multiplayer_map writes
 	MAXIMUM_FILENAME_LENGTH+1 characters of a level name */
 	char level_name[MAXIMUM_FILENAME_LENGTH + 1];
-	/* (and room for a version's number, " (2)") */
-	wchar_t display_name[MAXIMUM_MAP_NAME_LENGTH + 8];
+	/* (and room for "[MCC] " and a version's number, " (2)") */
+	wchar_t display_name[MAXIMUM_MAP_NAME_LENGTH + 16];
 	wchar_t description[MAXIMUM_DESCRIPTION_LENGTH + 1];
 	boolean picture_read;
 	struct bitmap_data *picture;
@@ -242,6 +243,332 @@ static void display_name_make(
 	return;
 }
 
+boolean custom_edition_map_format_forge_summary(
+	char const *folder,
+	char const *name,
+	char *out_summary,
+	unsigned int out_summary_size)
+{
+	static char const *const sp_stems[10] = {
+		"a10", "a30", "a50", "b30", "b40", "c10", "c20", "c40", "d20", "d40"
+	};
+	char path[MAXIMUM_FILENAME_LENGTH + 1];
+	char *buf = NULL;
+	FILE *stream;
+	char const *bm;
+	char const *op;
+	char const *ap;
+	char const *ln;
+	char base_short[40];
+	char modes_str[64];
+	int is_sp_base = 0;
+	int header_obj_cnt = 0;
+	int header_ai_cnt = 0;
+	int placed_obj_cnt = 0;
+	int ai_cnt = 0;
+	int has_replace_flags = 0;
+	int has_ctf_red = 0, has_ctf_blue = 0, has_koth = 0, has_oddball = 0, has_race = 0;
+	int has_ctf_obj = 0, has_koth_obj = 0, has_oddball_obj = 0, has_race_obj = 0;
+	int sup_slayer = 1, sup_ctf = 0, sup_koth = 0, sup_oddball = 0, sup_race = 0;
+	int si;
+
+	if (!folder || !name || !out_summary || out_summary_size == 0)
+		return FALSE;
+	out_summary[0] = 0;
+
+	/* 1. Try <folder><name>.txt sidecar first (up to 128 KB) */
+	csprintf(path, "%s%s%s", folder, name, DESCRIPTION_EXTENSION);
+	stream = fopen(path, "rb");
+	if (!stream && map_share_name_hashed(name))
+	{
+		csprintf(path, "%s%.*s%s", folder, (int)map_share_name_base_length(name), name, DESCRIPTION_EXTENSION);
+		stream = fopen(path, "rb");
+	}
+	if (stream)
+	{
+		long f_sz = 0;
+		if (fseek(stream, 0, SEEK_END) == 0)
+			f_sz = ftell(stream);
+		if (f_sz > 0 && fseek(stream, 0, SEEK_SET) == 0)
+		{
+			long rd_sz = (f_sz > 131072L) ? 131072L : f_sz;
+			buf = (char *)malloc((size_t)rd_sz + 1u);
+			if (buf)
+			{
+				size_t got = fread(buf, 1, (size_t)rd_sz, stream);
+				buf[got] = 0;
+				if (strstr(buf, "[OpenCE Forge Map]") == NULL && strstr(buf, "[ForgeState]") == NULL)
+				{
+					free(buf);
+					buf = NULL;
+				}
+			}
+		}
+		fclose(stream);
+	}
+
+	/* 2. Fallback: Check <folder><name>.map embedded FLG1 Forge metadata trailer */
+	if (!buf)
+	{
+		csprintf(path, "%s%s.map", folder, name);
+		stream = fopen(path, "rb");
+		if (!stream && map_share_name_hashed(name))
+		{
+			csprintf(path, "%s%.*s.map", folder, (int)map_share_name_base_length(name), name);
+			stream = fopen(path, "rb");
+		}
+		if (stream)
+		{
+			uint8_t hdr[0x800];
+			if (fread(hdr, 1, sizeof(hdr), stream) == sizeof(hdr) &&
+				*(uint32_t const *)(hdr + 0x1FC) == 0x464C4731u)
+			{
+				uint32_t state_off = *(uint32_t const *)(hdr + 0x1E4);
+				uint32_t state_sz = *(uint32_t const *)(hdr + 0x1E8);
+				long file_sz = 0;
+				if (state_off >= 0x800u && state_sz > 0u && state_sz <= 262144u &&
+					fseek(stream, 0, SEEK_END) == 0)
+				{
+					file_sz = ftell(stream);
+					if (file_sz > 0 && (uint64_t)state_off + (uint64_t)state_sz <= (uint64_t)file_sz &&
+						fseek(stream, (long)state_off, SEEK_SET) == 0)
+					{
+						buf = (char *)malloc((size_t)state_sz + 1u);
+						if (buf)
+						{
+							size_t got = fread(buf, 1, (size_t)state_sz, stream);
+							buf[got] = 0;
+							if (strstr(buf, "[OpenCE Forge Map]") == NULL && strstr(buf, "[ForgeState]") == NULL)
+							{
+								free(buf);
+								buf = NULL;
+							}
+						}
+					}
+				}
+			}
+			fclose(stream);
+		}
+	}
+
+	if (!buf)
+		return FALSE;
+
+	/* 3. Extract clean Base Map stem */
+	csstrcpy(base_short, name);
+	bm = strstr(buf, "Base Map:");
+	if (bm)
+	{
+		char const *p = bm + 9;
+		char const *end;
+		char const *last_sep = NULL;
+		char const *q;
+		size_t len;
+
+		while (*p == ' ' || *p == '\t')
+			p++;
+		for (q = p; *q && *q != '\r' && *q != '\n'; q++)
+		{
+			if (*q == '\\' || *q == '/')
+				last_sep = q;
+		}
+		if (last_sep)
+			p = last_sep + 1;
+		end = p;
+		while (*end && *end != '\r' && *end != '\n')
+			end++;
+		len = (size_t)(end - p);
+		if (len > 4 && _strnicmp(p + len - 4, ".map", 4) == 0)
+			len -= 4;
+		if (len > 0)
+		{
+			if (len >= sizeof(base_short))
+				len = sizeof(base_short) - 1;
+			csmemcpy(base_short, p, len);
+			base_short[len] = 0;
+		}
+	}
+	for (si = 0; si < 10; si++)
+	{
+		if (_stricmp(base_short, sp_stems[si]) == 0)
+		{
+			is_sp_base = 1;
+			break;
+		}
+	}
+
+	op = strstr(buf, "Objects Placed:");
+	if (op)
+		header_obj_cnt = atoi(op + 15);
+	ap = strstr(buf, "AI Squads:");
+	if (ap)
+		header_ai_cnt = atoi(ap + 10);
+
+	/* 4. Scan [ForgeState] entries for Objects, AI Squads, and Objective/Gametype compatibility */
+	ln = buf;
+	while (*ln)
+	{
+		char const *eol = ln;
+		while (*eol && *eol != '\n')
+			eol++;
+		while (ln < eol && (*ln == ' ' || *ln == '\t' || *ln == '\r'))
+			ln++;
+
+		if ((size_t)(eol - ln) >= 23 && strncmp(ln, "REPLACE_NETGAME_FLAGS|1", 23) == 0)
+		{
+			has_replace_flags = 1;
+		}
+		else if ((size_t)(eol - ln) >= 7 && strncmp(ln, "OBJECT|", 7) == 0)
+		{
+			char const *p = ln + 7;
+			int pipes = 0;
+			placed_obj_cnt++;
+			/* Support legacy inline 9th-pipe gametype_flags if present */
+			while (p < eol && pipes < 8)
+			{
+				if (*p == '|')
+					pipes++;
+				p++;
+			}
+			if (pipes == 8 && p < eol)
+			{
+				char const *p2 = p;
+				while (p2 < eol && *p2 != '|')
+					p2++;
+				if (p2 < eol)
+				{
+					int gflags = atoi(p2 + 1);
+					if (gflags == 0x0001) has_ctf_obj = 1;
+					else if (gflags == 0x0004) has_oddball_obj = 1;
+					else if (gflags == 0x0008) has_koth_obj = 1;
+					else if (gflags == 0x0010) has_race_obj = 1;
+				}
+			}
+		}
+		else if ((size_t)(eol - ln) >= 16 && strncmp(ln, "OBJECT_GAMETYPE|", 16) == 0)
+		{
+			int gflags = atoi(ln + 16);
+			if (gflags == 0x0001) has_ctf_obj = 1;
+			else if (gflags == 0x0004) has_oddball_obj = 1;
+			else if (gflags == 0x0008) has_koth_obj = 1;
+			else if (gflags == 0x0010) has_race_obj = 1;
+		}
+		else if ((size_t)(eol - ln) >= 17 && strncmp(ln, "DEFAULT_GAMETYPE|", 17) == 0)
+		{
+			char const *bar = (char const *)memchr(ln + 17, '|', (size_t)(eol - (ln + 17)));
+			int gflags = bar ? atoi(bar + 1) : atoi(ln + 17);
+			if (gflags == 0x0001) has_ctf_obj = 1;
+			else if (gflags == 0x0004) has_oddball_obj = 1;
+			else if (gflags == 0x0008) has_koth_obj = 1;
+			else if (gflags == 0x0010) has_race_obj = 1;
+		}
+		else if (((size_t)(eol - ln) >= 3 && strncmp(ln, "AI|", 3) == 0) ||
+			((size_t)(eol - ln) >= 9 && strncmp(ln, "AI_SPAWN|", 9) == 0))
+		{
+			ai_cnt++;
+		}
+		else if ((size_t)(eol - ln) >= 13 && strncmp(ln, "NETGAME_FLAG|", 13) == 0)
+		{
+			int nf_type = -1;
+			int nf_usage = 0;
+			if (sscanf(ln + 13, "%*f|%*f|%*f|%*f|%d|%d", &nf_type, &nf_usage) == 2 ||
+				sscanf(ln + 13, "%d|%d", &nf_type, &nf_usage) == 2)
+			{
+				has_replace_flags = 1;
+				if (nf_type == 0)
+				{
+					if (nf_usage == 0) has_ctf_red = 1;
+					else if (nf_usage == 1) has_ctf_blue = 1;
+				}
+				else if (nf_type == 1)
+				{
+					has_ctf_blue = 1;
+				}
+				else if (nf_type == 2)
+				{
+					has_oddball = 1;
+				}
+				else if (nf_type == 3 || nf_type == 4)
+				{
+					has_race = 1;
+				}
+				else if (nf_type == 8)
+				{
+					has_koth = 1;
+				}
+			}
+		}
+
+		ln = (*eol == '\n') ? (eol + 1) : eol;
+	}
+
+	if (placed_obj_cnt == 0 && header_obj_cnt > 0 && strstr(buf, "[ForgeState]") == NULL)
+		placed_obj_cnt = header_obj_cnt;
+	if (ai_cnt == 0 && header_ai_cnt > 0 && strstr(buf, "[ForgeState]") == NULL)
+		ai_cnt = header_ai_cnt;
+
+	if (has_replace_flags || is_sp_base)
+	{
+		sup_ctf = ((has_ctf_red && has_ctf_blue) || has_ctf_obj) ? 1 : 0;
+		sup_koth = (has_koth || has_koth_obj) ? 1 : 0;
+		sup_oddball = (has_oddball || has_oddball_obj) ? 1 : 0;
+		sup_race = (has_race || has_race_obj) ? 1 : 0;
+	}
+	else
+	{
+		sup_ctf = 1;
+		sup_koth = 1;
+		sup_oddball = 1;
+		sup_race = 1;
+	}
+
+	if (sup_slayer && sup_ctf && sup_koth && sup_oddball && sup_race)
+	{
+		csstrcpy(modes_str, "All Modes");
+	}
+	else
+	{
+		modes_str[0] = 0;
+		if (sup_slayer)
+			snprintf(modes_str + strlen(modes_str), sizeof(modes_str) - strlen(modes_str), "%sSlayer", modes_str[0] ? ", " : "");
+		if (sup_ctf)
+			snprintf(modes_str + strlen(modes_str), sizeof(modes_str) - strlen(modes_str), "%sCTF", modes_str[0] ? ", " : "");
+		if (sup_koth)
+			snprintf(modes_str + strlen(modes_str), sizeof(modes_str) - strlen(modes_str), "%sKOTH", modes_str[0] ? ", " : "");
+		if (sup_oddball)
+			snprintf(modes_str + strlen(modes_str), sizeof(modes_str) - strlen(modes_str), "%sOddball", modes_str[0] ? ", " : "");
+		if (sup_race)
+			snprintf(modes_str + strlen(modes_str), sizeof(modes_str) - strlen(modes_str), "%sRace", modes_str[0] ? ", " : "");
+		if (!modes_str[0])
+			csstrcpy(modes_str, "Slayer");
+	}
+
+	if (ai_cnt > 0)
+	{
+		snprintf(
+			out_summary,
+			out_summary_size,
+			"Forge (Base: %s)\r\nObjects: %d | AI: %d\r\nModes: %s",
+			base_short,
+			placed_obj_cnt,
+			ai_cnt,
+			modes_str);
+	}
+	else
+	{
+		snprintf(
+			out_summary,
+			out_summary_size,
+			"Forge (Base: %s)\r\nObjects Placed: %d\r\nModes: %s",
+			base_short,
+			placed_obj_cnt,
+			modes_str);
+	}
+
+	free(buf);
+	return TRUE;
+}
+
 /* Reads <name>.txt into map->description: line ends become \r\n (as in the
 menus' strings), tabs become spaces, and non-ASCII characters become '?'.
 A missing or empty file gives the default description. */
@@ -249,11 +576,22 @@ static void custom_edition_map_description_read(
 	struct custom_edition_map *map)
 {
 	char path[MAXIMUM_FILENAME_LENGTH + 1];
+	char forge_summary[192];
 	byte text[MAXIMUM_DESCRIPTION_FILE_BYTES];
 	FILE *stream;
 	long text_size = 0;
 	long text_index = 0;
 	short length = 0;
+
+	/* Format rich metadata & gametype compatibility badges for OpenCE Forge maps (.txt sidecar OR embedded .map trailer) */
+	if (custom_edition_map_format_forge_summary(map->folder, map->name, forge_summary, sizeof(forge_summary)))
+	{
+		int s_i;
+		for (s_i = 0; forge_summary[s_i] && length < MAXIMUM_DESCRIPTION_LENGTH; s_i++)
+			map->description[length++] = (wchar_t)(unsigned char)forge_summary[s_i];
+		map->description[length] = 0;
+		return;
+	}
 
 	csprintf(path, "%s%s%s", map->folder, map->name, DESCRIPTION_EXTENSION);
 	stream = fopen(path, "rb");
@@ -266,9 +604,10 @@ static void custom_edition_map_description_read(
 	}
 	if (stream)
 	{
-		text_size = (long)fread(text, 1, sizeof(text), stream);
+		text_size = (long)fread(text, 1, sizeof(text) - 1, stream);
 		fclose(stream);
 	}
+	text[text_size] = 0;
 	/* the byte order mark of UTF-8 text */
 	if (text_size >= 3 && text[0] == 0xEF && text[1] == 0xBB && text[2] == 0xBF)
 	{
@@ -318,6 +657,52 @@ static void custom_edition_map_description_read(
 	return;
 }
 
+static boolean custom_edition_forge_sidecar(
+	char const *folder,
+	char const *name,
+	boolean *out_is_mcc_base)
+{
+	char path[MAXIMUM_FILENAME_LENGTH + 1];
+	char buf[1024];
+	FILE *stream;
+	size_t n;
+	char const *bm;
+
+	if (out_is_mcc_base)
+		*out_is_mcc_base = FALSE;
+
+	csprintf(path, "%s%s.map", folder, name);
+	stream = fopen(path, "rb");
+	if (stream)
+	{
+		fclose(stream);
+		return FALSE;
+	}
+	csprintf(path, "%s%s.txt", folder, name);
+	stream = fopen(path, "rb");
+	if (!stream)
+		return FALSE;
+	n = fread(buf, 1, sizeof(buf) - 1, stream);
+	buf[n] = 0;
+	fclose(stream);
+	if (!strstr(buf, "[OpenCE Forge Map]"))
+		return FALSE;
+	bm = strstr(buf, "Base Map:");
+	if (!bm)
+		return FALSE;
+	bm += 9;
+	while (*bm == ' ' || *bm == '\t')
+		bm++;
+	if (!*bm || *bm == '\r' || *bm == '\n')
+		return FALSE;
+	if (out_is_mcc_base &&
+		(_strnicmp(bm, "mcc_maps\\", 9) == 0 || _strnicmp(bm, "mcc_maps/", 9) == 0))
+	{
+		*out_is_mcc_base = TRUE;
+	}
+	return TRUE;
+}
+
 /* Adds the file `name`.`extension` from `folder` if it is a CE map that
 isn't listed yet. */
 static void custom_edition_map_add(
@@ -328,9 +713,17 @@ static void custom_edition_map_add(
 	struct custom_edition_maps_globals *globals = &custom_edition_maps_globals;
 	struct custom_edition_map *map;
 	boolean campaign;
+	boolean is_sidecar_only = FALSE;
+	boolean is_mcc_base = FALSE;
 	short map_index;
 
-	if (csstrcasecmp(extension, "map"))
+	if (!csstrcasecmp(extension, "txt"))
+	{
+		if (!custom_edition_forge_sidecar(folder, name, &is_mcc_base))
+			return;
+		is_sidecar_only = TRUE;
+	}
+	else if (csstrcasecmp(extension, "map"))
 	{
 		return;
 	}
@@ -348,11 +741,20 @@ static void custom_edition_map_add(
 			return;
 		}
 	}
-	/* campaign maps go to co-op; anything that isn't multiplayer either is skipped */
-	campaign = custom_edition_cache_campaign(name);
-	if (!campaign && !custom_edition_cache_multiplayer(name))
+	if (is_sidecar_only)
 	{
-		return;
+		campaign = FALSE;
+	}
+	else
+	{
+		if (!halo_custom_edition_tag_cache())
+			return;
+		/* campaign maps go to co-op; anything that isn't multiplayer either is skipped */
+		campaign = custom_edition_cache_campaign(name);
+		if (!campaign && !custom_edition_cache_multiplayer(name))
+		{
+			return;
+		}
 	}
 	if (campaign)
 	{
@@ -391,10 +793,29 @@ static void custom_edition_map_add(
 	csstrncpy(map->folder, folder, sizeof(map->folder) - 1);
 	csprintf(map->level_name, "%s%s", CUSTOM_EDITION_LEVEL_NAME_PREFIX, name);
 	display_name_make(name, map->display_name);
+	if (is_mcc_base)
+	{
+		wchar_t tmp_name[NUMBEROF(map->display_name)];
+		short i = 0;
+		csmemcpy(tmp_name, map->display_name, sizeof(tmp_name));
+		map->display_name[0] = L'[';
+		map->display_name[1] = L'M';
+		map->display_name[2] = L'C';
+		map->display_name[3] = L'C';
+		map->display_name[4] = L']';
+		map->display_name[5] = L' ';
+		while (tmp_name[i] && 6 + i + 1 < (short)NUMBEROF(map->display_name))
+		{
+			map->display_name[6 + i] = tmp_name[i];
+			i++;
+		}
+		map->display_name[6 + i] = 0;
+	}
 	custom_edition_map_description_read(map);
 	/* (named for its hash by a build of before: its name given back,
 	map_share_files.c) */
-	map_share_map_found(folder, name);
+	if (!is_sidecar_only)
+		map_share_map_found(folder, name);
 
 	return;
 }
@@ -464,10 +885,6 @@ static void custom_edition_maps_look_for(
 
 	custom_edition_maps_forget();
 	globals->looked_for = TRUE;
-	if (!halo_custom_edition_tag_cache())
-	{
-		return;
-	}
 
 	/* the game's custom_maps first, so its copy wins */
 	for (folder_index = 0; folder_index < NUMBEROF(folders); folder_index++)
@@ -477,7 +894,7 @@ static void custom_edition_maps_look_for(
 		HANDLE find;
 
 		/* (the install's only when there is one) */
-		if (folder_index && !custom_edition_install_present())
+		if (folder_index && (!custom_edition_install_present() || !halo_custom_edition_tag_cache()))
 			continue;
 		/* A folder is listed through a handle of its own, never with
 		find_files_start and find_files_next: those keep their place in one

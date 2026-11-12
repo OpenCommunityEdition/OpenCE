@@ -174,9 +174,14 @@ enum
 	/* MCC conversion progress without dispatching incomplete game state. */
 	_distributed_message_mcc_load_progress = 106,
 
+	/* the map's riding choice and the host's riding values (network_riding_map.c), reliably from the host.
+	It must stay dispatched before the MCC-only id filter (network_distributed_handle_message), which drops
+	ids from _distributed_message_mcc_grenades up outside MCC games */
+	_distributed_message_vehicle_riding_map = 107,
+
 	/* Forge session-RAM-only custom tag streaming over the reliable stream. */
-	_distributed_message_forge_tag_request = 107,
-	_distributed_message_forge_tag_stream = 108,
+	_distributed_message_forge_tag_request = 108,
+	_distributed_message_forge_tag_stream = 109,
 
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
@@ -505,12 +510,25 @@ boolean network_objects_client_has(long object_index);
 void network_objects_expect_live_unit(long object_index);
 /* moves the object where the host has it, drawn gliding from where it was */
 void network_objects_correct(long object_index, real_point3d const *position, real_vector3d const *forward,
-	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity);
+	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity, short kind);
 /* ... or, within blend_distance of it, half of the way there (drawn as it
 moves); TRUE when it was put there */
 boolean network_objects_reconcile(long object_index, real_point3d const *position, real_vector3d const *forward,
 	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity,
-	real blend_distance);
+	real blend_distance, short kind);
+/* a vehicle's pose the netcode wrote (from before), not its own motion:
+every such write calls it */
+enum network_vehicle_write
+{
+	_network_vehicle_write_state,
+	_network_vehicle_write_change,
+	_network_vehicle_write_carry,
+	_network_vehicle_write_prediction,
+	_network_vehicle_write_own,
+	_network_vehicle_write_coop,
+};
+void network_objects_vehicle_written(long object_index, real_point3d const *before_position,
+	real_vector3d const *before_forward, real_vector3d const *before_up, short kind);
 /* a unit in the vehicle's seat as the host has it (NONE: in none) */
 void network_objects_set_seat(long unit_index, long vehicle_index, short seat_index);
 /* (the host) the ticks between sends to a machine of a unit at position, by

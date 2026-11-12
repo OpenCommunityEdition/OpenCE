@@ -372,7 +372,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         # the Xbox memory window is at 0x80000000, in the upper half of the
         # 32-bit address space
         "-Wl,/LARGEADDRESSAWARE",
-        "-Wl,/STACK:0x1000000",
+        "-Wl,/STACK:0x800000",
     ]
     if getattr(sln, "port_release", False):
         # no console window (the port's log goes to halo.log instead,

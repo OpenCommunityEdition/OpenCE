@@ -52,7 +52,12 @@ boolean mcc_pause_owns(long handle);
 boolean mcc_pause_text_wrap_needed(long handle);
 long mcc_pause_select(boolean campaign, boolean network, boolean host, boolean teams,
     short local_count, boolean first_player);
+/* Read-only layout adapters; callers gate the optional PC keyboard mode. */
+short mcc_pause_key_button(long parent, long child);
+short mcc_pause_key_offset(long parent, long child, short accept_width, short back_width);
 void mcc_pause_dispose(void);
 void mcc_pause_friendly_fire(boolean enabled);
+void mcc_pause_set_forge_save_callbacks(boolean (*enabled_fn)(void), void (*trigger_fn)(void));
+void mcc_pause_trigger_forge_save(void);
 
 #endif

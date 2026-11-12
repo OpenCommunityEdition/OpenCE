@@ -30,6 +30,12 @@ disc image. If that file is missing, the original renderer has no loading
 picture to show. Lobby/catalog checks before loading are unchanged. The effect
 does not run gameplay or alter network readiness, authority or map validation.
 
+The [loading presentation setting](loading_presentation.md) also applies to
+MCC conversion: widescreen is on by default, and turning it off restores the
+central 4:3 framing. The original mask and effects remain, and the Xbox chant
+stops when loading finishes or fails. PC Settings > Video > Graphics exposes
+the toggle, including through the PC pause menu; Xbox menus are unchanged.
+
 ## Installation and menus
 
 OpenCE's stock selector offers MCC singleplayer and multiplayer categories,
@@ -133,8 +139,8 @@ the question mark as fallback. Pictures fit and clip to the existing thumbnail
 rectangle, and MCC titles/descriptions wrap within their text boxes. This also
 works for complete Android imports without Steam and does not enable sharing.
 
-With `game.workshop_maps = true` (`HALO_WORKSHOP_MAPS=1`), desktop builds list
-Halo CE maps from the Workshop items a player is subscribed to
+With `game.workshop_maps = true` (the default; `HALO_WORKSHOP_MAPS=1`), desktop
+builds list Halo CE maps from the Workshop items a player is subscribed to
 without copying anything into the data root. `steam_workshop.c` looks in Steam's
 libraries for `steamapps/workshop/content/976730/<item id>/`: the usual Steam
 folders (on Windows `%ProgramFiles(x86)%\Steam`; on Linux `~/.steam/steam`,
@@ -255,10 +261,10 @@ nothing else.
 Several Workshop items belong to a collection that their makers published as a
 set (a competitive pack, a social pack, a 2v2 set). `workshop_collections.c`
 holds a fixed, curated set of Halo CE collections as data: a name and the ids of
-its items. It does not query current Steam collection membership. Enable
-`game.mcc_collections` (`HALO_MCC_COLLECTIONS=1`, default off) and reopen the
-map list to use these groups. Imported packages can identify their collection
-through `workshop_id.txt`, without Steam. At the
+its items. It does not query current Steam collection membership.
+`game.mcc_collections` (`HALO_MCC_COLLECTIONS=1`) enables these groups by
+default. Reopen the map list after changing it. Imported packages can identify
+their collection through `workshop_id.txt`, without Steam. At the
 top of the MCC map menus a collection the player has an item of is a folder
 (`[PRO EDITION]`), before the package folders; it holds the maps of the
 player's items that are in it, by their Workshop titles. An item that is in two
@@ -299,10 +305,11 @@ it skips the existing singleplayer categories. These
 are menu routes in the implementation; multiplayer interoperability and
 complete campaigns require gameplay testing.
 Without campaign metadata enabled, each selected MCC campaign map remains an
-independent scenario. Enable **CAMPAIGN MISSIONS** under Settings > Network
-Setup > Map Sharing > MCC Packages (`game.mcc_campaigns`, default false) to
-discover Workshop campaigns and use their authored mission order. The same
-screen exposes desktop Steam discovery and optional collection folders.
+independent scenario. **CAMPAIGN MISSIONS** under Settings > Network Setup >
+MCC Packages (`game.mcc_campaigns`) is enabled by default to discover Workshop
+campaigns and use their authored mission order. The same screen exposes desktop
+Steam discovery and collection folders, also enabled by default. Players can
+turn each option off; saved choices and environment overrides are respected.
 
 `ModInfo.json` must identify `Halo1` and `GameModContents.HasCampaign = true`.
 `CampaignInfo.json` supplies an explicit `CampaignMaps` list; each referenced

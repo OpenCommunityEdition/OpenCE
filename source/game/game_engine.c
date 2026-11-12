@@ -538,6 +538,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "keyboard_glyphs.h" /* port: port/linux/game/keyboard_glyphs.c */
 #include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries_windows.h"
 #include "errors.h"
@@ -3741,7 +3742,6 @@ static boolean find_closest_player_callback(
 static void game_engine_update_purge(
 	void)
 {
-	extern int g_forge_session_enabled; /* port: Forge session check */
 	long cutoff_time = game_time_get() - 900;
 
 	/* (a client of the distributed netcode removes items when the host does,
@@ -4842,7 +4842,6 @@ static long game_engine_vehicle_home_current(
 static void game_engine_update_vehicle_respawn(
 	void)
 {
-	extern int g_forge_session_enabled; /* port: Forge session check */
 	long respawn_ticks = game_variant_options_get()->vehicle_respawn_time * TICKS_PER_SECOND;
 	long now = game_time_get();
 	short index;
@@ -5734,7 +5733,6 @@ void game_engine_playlist_next(
 boolean game_engine_should_end_game(
 	void)
 {
-	extern int g_forge_session_enabled; /* port: port/linux/game/forge_runtime_tags.c */
 	boolean should_end_game = FALSE;
 
 	/* port: Forge sessions continue indefinitely until ended from the menu */
@@ -7100,10 +7098,9 @@ long game_engine_did_player_win(
 boolean multiple_teams_alive(
 	void)
 {
-	extern int g_forge_session_enabled; /* port: port/linux/game/forge_runtime_tags.c */
 	boolean result = FALSE;
 
-	if (g_forge_session_enabled || players_in_game() <= 1)
+	if (g_forge_session_enabled || players_in_game() <= 1) /* port: Forge sessions stay active */
 		return TRUE;
 	else
 	{
@@ -8989,6 +8986,10 @@ static boolean internal_rasterize_score(
 			buffer,
 			format,
 			buffer_size);
+		/* port: preserve the identified hint's wording and offer its score key
+		 * to the optional keyboard prompt feature before semantic context is lost. */
+		buffer[buffer_size - 1] = 0;
+		keyboard_score_hint(player_index, buffer, buffer_size);
 		break;
 	default:
 		result = FALSE;

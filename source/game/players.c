@@ -3887,6 +3887,9 @@ static boolean player_handle_weapon_swap(
 	result = FALSE;
 	if (!players_decide_pickups())
 		return result;
+	/* port: do not swap or pick up weapons/powerups while in Forge Monitor mode */
+	if (player->unit_index != NONE && forge_is_unit_in_monitor_mode(player->unit_index))
+		return result;
 	switch (player->action_result)
 	{
 	case _player_action_result_swap_for_weapon:
@@ -4300,6 +4303,11 @@ static void player_examine_nearby_item(
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
 	item = item_get(item_index);
+	/* port: do not pick up ammo, grenades, weapons, or equipment or show pickup prompts while in Forge Monitor mode */
+	if (player->unit_index != NONE && forge_is_unit_in_monitor_mode(player->unit_index))
+	{
+		return;
+	}
 	if (item->object.parent_object_index != NONE ||
 		item->item.ignore_object_index == player->unit_index)
 	{

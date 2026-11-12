@@ -10,6 +10,9 @@
 #include "mcc_loading.h"
 #include <stdlib.h>
 #include <string.h>
+#undef malloc
+#undef free
+#undef realloc
 
 #define MCC_AUDIO_BASE 0x50000000u
 #define MCC_AUDIO_LIMIT 0x10000000u
@@ -351,4 +354,69 @@ void mcc_audio_dispose(struct mcc_runtime *runtime)
         if (audio->items) free(audio->items);
         free(audio);runtime->audio=NULL;
     }
+}
+
+int mcc_forge_convert_single_permutation(
+    struct mcc_runtime *runtime,
+    char const *tag_name,
+    int channels,
+    uint32_t rate,
+    uint32_t output_rate,
+    uint32_t range_index,
+    uint32_t permutation_index,
+    struct sound_permutation *permutation,
+    unsigned char **out_bytes,
+    uint32_t *out_size)
+{
+    struct mcc_audio_storage storage;
+    unsigned char *data;
+    struct mcc_pcm pcm;
+    char resource_name[288],group_name[288];
+    int ok,external;
+
+    if (!runtime || !tag_name || !permutation || !out_bytes || !out_size) return 0;
+    *out_bytes=NULL;
+    *out_size=0;
+    if (permutation->samples.size<=0 || permutation->samples.size>0x4000000) return 0;
+
+    external=(permutation->samples.pad&1)!=0;
+    permutation->unknown0=NONE;
+    permutation->unknown1=0;
+    permutation->samples.address=NULL;
+    permutation->sample_buffer_size=0;
+
+    data=malloc((size_t)permutation->samples.size);
+    if (!data) return 0;
+    if (external) {
+        snprintf(resource_name,sizeof(resource_name),"%s__%lu__%lu",
+            tag_name,(unsigned long)range_index,(unsigned long)permutation_index);
+        snprintf(group_name,sizeof(group_name),"%s__permutations",tag_name);
+        ok=mcc_resources_read(runtime,2,resource_name,permutation->samples.file_offset,permutation->samples.size,data,group_name);
+    } else {
+        ok=mcc_runtime_read(runtime,permutation->samples.file_offset,permutation->samples.size,data);
+    }
+    if (!ok) {
+        free(data);
+        return 0;
+    }
+
+    memset(&storage,0,sizeof(storage));
+    storage.limit=MCC_AUDIO_LIMIT-1u;
+    memset(&pcm,0,sizeof(pcm));
+    ok=mcc_pcm_open(data,permutation->samples.size,permutation->compression,channels,rate,&pcm);
+    if (ok && (permutation->compression!=1 || rate!=output_rate)) {
+        ok=mcc_audio_store(&storage,&pcm,channels,output_rate,permutation);
+    } else if (ok) {
+        ok=mcc_audio_store_raw(&storage,data,permutation);
+    }
+    free(data);
+    mcc_pcm_close(&pcm);
+    if (!ok || !storage.bytes || !storage.used) {
+        free(storage.bytes);
+        return 0;
+    }
+    permutation->samples.pad&=~1;
+    *out_bytes=storage.bytes;
+    *out_size=storage.used;
+    return 1;
 }

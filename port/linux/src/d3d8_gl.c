@@ -26,6 +26,7 @@ Conventions carried over from the Xbox:
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
 #include "port_config.h"
+#include "loading_widescreen.h"
 #include "posix.h"
 #include "main/console.h"
 #ifdef HALO_ANDROID
@@ -7846,6 +7847,13 @@ static void front_buffer_take(void)
 		left = 0;
 		width = (GLint)back_buffer->target.gl_width;
 	}
+	/* The loading feature expands the original effect across this width.
+	Capture all of it back into the stock feedback texture, not its centre. */
+	if (loading_widescreen_active())
+	{
+		left = 0;
+		width = (GLint)back_buffer->target.gl_width;
+	}
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, read);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, draw);
 	glDisable(GL_SCISSOR_TEST);
@@ -7937,6 +7945,9 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 					hdr.float_window ? hdr.sdr_white : 0.0f)))
 			{
 				glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
+				/* Creating the source framebuffer binds both targets. A cached
+				map can reach this first blit without a loading-screen draw. */
+				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 				/* row 0 of the render target is the top of the picture */
 				glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
 					x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);

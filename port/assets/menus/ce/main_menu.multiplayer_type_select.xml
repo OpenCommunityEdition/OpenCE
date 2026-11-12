@@ -214,7 +214,7 @@
 		<child widget="main_menu/current_profile_name"/>
 		<child widget="main_menu/forge_select/forge_tag_right_item" x="22" y="2"/>
 	</widget>
-	<widget name="main_menu/forge_select/forge_add_tags_map_kind_spinner" type="spinner" width="238" height="22" flags="left_right_tabs_items" strings="CUSTOM SINGLEPLAYER|CUSTOM MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 238 19 244">
+	<widget name="main_menu/forge_select/forge_add_tags_map_kind_spinner" type="spinner" width="238" height="22" flags="left_right_tabs_items" strings="SINGLEPLAYER|MULTIPLAYER|CUSTOM SINGLEPLAYER|CUSTOM MULTIPLAYER|MCC SINGLEPLAYER|MCC MULTIPLAYER" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 238 19 244">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/forge_select/forge_add_tags_map_kind_row" width="256" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">

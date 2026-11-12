@@ -2819,3 +2819,12 @@ struct pc_menu_setting *pc_menu_setting_get(
 	}
 	return NULL;
 }
+
+/* Menu layout readers use this module's existing tag definition, not a second
+ * private structure or hard-coded field offsets in the glyph feature. */
+void pc_menu_widget_text_bounds(long tag, rectangle2d *bounds, short *text_offset)
+{
+    struct ui_widget_definition const *definition = tag_get(UI_WIDGET_DEFINITION_TAG, tag);
+    *bounds = definition->bounds;
+    *text_offset = definition->horizontal_offset;
+}

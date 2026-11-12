@@ -56,6 +56,7 @@ def generated(fault=None):
     config.append(define_value(distributed_h, 'DISTRIBUTED_UNIT_SCALE'))
     types = "\n".join([
         enum_with(distributed_h, "_distributed_message_player_prediction ="),
+        enum_with(distributed_h, "_network_vehicle_write_change,"),
         structure(distributed_h, "distributed_message_header"),
         enum_with(read("source/objects/object_types.h"), "_object_mask_all ="),
         enum_with(objects_h, "_object_dead_bit,"),
@@ -85,6 +86,7 @@ def generated(fault=None):
         structure(objects, "distributed_inventory_message"),
         structure(objects.replace("static struct", "struct"), "distributed_own_inventory"),
         structure(objects.replace("static struct", "struct"), "distributed_retried_inventory"),
+        structure(read("port/linux/game/vehicle_riding.h"), "vehicle_riding_deck"),
         structure(distributed, "distributed_unit_state"),
         enum_with(damage, "_damage_event_player_effect,"),
         enum_with(damage, "_damage_event_friendly_fire_bit ="),

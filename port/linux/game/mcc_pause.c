@@ -55,12 +55,12 @@ typedef char mcc_pause_event_size[sizeof(struct mcc_pause_event) == 0x48 ? 1 : -
 typedef char mcc_pause_child_size[sizeof(struct mcc_pause_child) == 0x50 ? 1 : -1];
 typedef char mcc_pause_child_offset[offsetof(struct mcc_pause_widget, children) == 0x3E0 ? 1 : -1];
 
-enum { MCC_PAUSE_MAX_TAGS = 512, MCC_PAUSE_ARENA_BYTES = 2 * 1024 * 1024 };
+enum { MCC_PAUSE_MAX_TAGS = 1024, MCC_PAUSE_ARENA_BYTES = 2 * 1024 * 1024 };
 enum { SOLO, COOP_HOST, COOP_CLIENT, MP_LOCAL, MP_HOST, MP_CLIENT, MODE_COUNT };
 enum { LABEL_RESUME, LABEL_REVERT, LABEL_SAVE_QUIT, LABEL_LEAVE, LABEL_SETTINGS,
     LABEL_END, LABEL_OBJECTIVES, LABEL_CONFIRM_REVERT, LABEL_CONFIRM_RESTART,
     LABEL_CONFIRM_SAVE_QUIT, LABEL_ATTENTION, LABEL_RESTART_LEVEL, LABEL_FOOTER,
-    LABEL_SELECT, LABEL_ACCEPT, LABEL_SAVING, LABEL_FRIENDLY_ON, LABEL_FRIENDLY_OFF, LABEL_COUNT };
+    LABEL_SELECT, LABEL_ACCEPT, LABEL_SAVING, LABEL_FRIENDLY_ON, LABEL_FRIENDLY_OFF, LABEL_SAVE_MAP, LABEL_COUNT };
 
 enum { CONFIRM_REVERT, CONFIRM_RESTART, CONFIRM_SAVE_QUIT, CONFIRM_COUNT };
 static char const *const mcc_pause_labels[LABEL_COUNT] = {
@@ -70,8 +70,23 @@ static char const *const mcc_pause_labels[LABEL_COUNT] = {
     "All progress on this \r\nlevel will be lost.",
     "Saving last checkpoint...\r\nplease don't turn off\r\nyour Xbox console.",
     "ATTENTION", "RESTART LEVEL", "=CANCEL", "=SELECT", "=OK", "SAVING...",
-    "FRIENDLY FIRE ON", "FRIENDLY FIRE OFF"
+    "FRIENDLY FIRE ON", "FRIENDLY FIRE OFF", "SAVE MAP.."
 };
+
+static boolean (*s_forge_save_enabled_fn)(void) = NULL;
+static void (*s_forge_save_trigger_fn)(void) = NULL;
+
+void mcc_pause_set_forge_save_callbacks(boolean (*enabled_fn)(void), void (*trigger_fn)(void))
+{
+    s_forge_save_enabled_fn = enabled_fn;
+    s_forge_save_trigger_fn = trigger_fn;
+}
+
+void mcc_pause_trigger_forge_save(void)
+{
+    if (s_forge_save_trigger_fn)
+        s_forge_save_trigger_fn();
+}
 
 static struct {
     unsigned char *arena;
@@ -258,6 +273,42 @@ static long mcc_pause_key(short layout, boolean confirm)
     return key;
 }
 
+/* Only owned button-key children expose these semantics. No map tag names or
+ * foreign widget layouts are interpreted by the keyboard menu adapter. */
+short mcc_pause_key_button(long parent, long child)
+{
+    struct mcc_pause_widget const *key = mcc_pause_definition(parent);
+    struct mcc_pause_child const *children;
+    if (!key || strcmp(key->name, "button_key") || key->children.count != 4) return NONE;
+    children = key->children.address;
+    if (children[0].widget.index == child) return 1;
+    if (children[2].widget.index == child) return 0;
+    return NONE;
+}
+
+short mcc_pause_key_offset(long parent, long child, short accept_width, short back_width)
+{
+    struct mcc_pause_widget const *key = mcc_pause_definition(parent), *accept, *back, *cancel;
+    struct mcc_pause_child const *children;
+    short accept_extra, back_extra, shift, gap;
+    if (accept_width <= 0 || back_width <= 0) return 0;
+    if (!key || strcmp(key->name, "button_key") || key->children.count != 4) return 0;
+    children = key->children.address;
+    if (children[0].widget.index != child && children[1].widget.index != child &&
+        children[2].widget.index != child && children[3].widget.index != child) return 0;
+    accept = mcc_pause_definition(children[2].widget.index);
+    back = mcc_pause_definition(children[0].widget.index);
+    cancel = mcc_pause_definition(children[1].widget.index);
+    if (!accept || !back || !cancel) return 0;
+    gap = children[2].x - children[1].x - cancel->bounds.right - 8;
+    accept_extra = MAX(0, accept_width - (accept->bounds.right - accept->bounds.left));
+    back_extra = MAX(0, back_width - (back->bounds.right - back->bounds.left));
+    accept_extra -= gap;
+    shift = -(accept_extra - back_extra) / 2;
+    if (children[2].widget.index == child || children[3].widget.index == child) shift += accept_extra;
+    return shift;
+}
+
 static long mcc_pause_dialog(short layout, boolean pauses, short kind)
 {
     static short const actions[CONFIRM_COUNT] = {MCC_PAUSE_ACTION_REVERT, MCC_PAUSE_ACTION_RESTART,
@@ -310,16 +361,21 @@ static long mcc_pause_screen(short mode, short layout)
 {
     boolean campaign = mode <= COOP_CLIENT, pauses = mode == SOLO;
     boolean host = mode == COOP_HOST || mode == MP_HOST;
-    long root, list, children[6], buttons[6];
+    boolean forge_save = s_forge_save_enabled_fn && s_forge_save_enabled_fn() && layout == MCC_PAUSE_FULL;
+    boolean campaign_settings = campaign && mcc_pause.assets.settings && layout == MCC_PAUSE_FULL;
+    long root, list, children[7], buttons[7];
     short width = layout == MCC_PAUSE_QUARTER ? 320 : 640, height = layout == MCC_PAUSE_FULL ? 480 : 240;
-    short count = 0, child_count = 0, xs[6] = {0}, ys[6] = {0}, bx[6] = {0}, by[6] = {0};
+    short count = 0, child_count = 0, xs[7] = {0}, ys[7] = {0}, bx[7] = {0}, by[7] = {0};
     short row = campaign ? (layout == MCC_PAUSE_QUARTER ? 24 : 28) : (layout == MCC_PAUSE_FULL ? 35 : 27);
-    short campaign_growth = campaign && mcc_pause.assets.settings && layout == MCC_PAUSE_FULL ?
-        (mode == SOLO ? 36 : 66) : 0;
+    short campaign_growth = campaign_settings ? (mode == SOLO ? 36 : 66) : 0;
     short button_width = campaign && layout == MCC_PAUSE_QUARTER ? 264 : 202;
     short button_height = row < 28 ? row - 1 : 27, x, y, panel_height, i;
     struct mcc_pause_widget *widget;
     if (campaign_growth) row = 30;
+    if (campaign && forge_save) {
+        if (!campaign_growth) row = 30;
+        campaign_growth += 30;
+    }
     root = mcc_pause_widget("pause", 0, width, height, layout, NONE);
     widget = mcc_pause_definition(root); if (!widget) return NONE;
     widget->flags = 1 | (pauses ? 2 : 0);
@@ -328,9 +384,11 @@ static long mcc_pause_screen(short mode, short layout)
      * flags would also dismiss other split-screen players' menus. */
     mcc_pause_events(root, MCC_PAUSE_ACTION_RESUME, NONE, 128, TRUE);
     buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_RESUME, MCC_PAUSE_ACTION_RESUME, NONE, 128);
-    if (campaign_growth)
+    if (forge_save)
+        buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_SAVE_MAP, MCC_PAUSE_ACTION_SAVE_MAP, NONE, 128);
+    if (campaign_settings)
         buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_SETTINGS, MCC_PAUSE_ACTION_SETTINGS, NONE, 128);
-    if (campaign_growth && mode != SOLO)
+    if (campaign_settings && mode != SOLO)
         buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_FRIENDLY_ON, MCC_PAUSE_ACTION_FRIENDLY_FIRE, NONE, 128 | 16);
     if (campaign) {
         buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_REVERT, 0,

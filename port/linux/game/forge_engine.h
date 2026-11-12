@@ -13,12 +13,12 @@
 extern "C" {
 #endif
 
-/* ---------- Forge Release Version & Network Protocol Isolation (v2.4.1, 0x4629) */
+/* ---------- Forge Release Version & Network Protocol Isolation (v2.9.3, 0x462A) */
 
 #include "halo_port_limits.h"
 
-#define FORGE_VERSION_STRING "2.4.1"
-#define FORGE_NETWORK_VERSION 0x4629
+#define FORGE_VERSION_STRING "2.9.3"
+#define FORGE_NETWORK_VERSION 0x462A
 #define FORGE_GAME_KIND 0x46
 #ifndef HALO_PORT_NETWORK_VERSION_STOCK
 #define HALO_PORT_NETWORK_VERSION_STOCK HALO_PORT_NETWORK_VERSION
@@ -38,6 +38,7 @@ int forge_host_remove(char const *path);
 int forge_host_rename(char const *old_path, char const *new_path);
 void forge_server_mark_dirty(void);
 void forge_server_autosave_tick(void);
+void forge_deferred_client_save_tick(void);
 int forge_server_save_map_if_dirty(int force_full_export);
 
 #ifndef _WIN32
@@ -132,6 +133,29 @@ enum forge_snap_angle_mode
 	NUMBER_OF_FORGE_SNAP_MODES
 };
 
+enum forge_physics_mode
+{
+	_forge_physics_normal = 0,
+	_forge_physics_fixed = 1,
+	_forge_physics_phased = 2,
+	NUMBER_OF_FORGE_PHYSICS_MODES = 3
+};
+
+enum forge_ai_order_mode
+{
+	_forge_ai_order_default = 0,
+	_forge_ai_order_guard = 1,
+	_forge_ai_order_patrol = 2,
+	_forge_ai_order_charge = 3,
+	_forge_ai_order_vehicle = 4,
+	NUMBER_OF_FORGE_AI_ORDERS = 5
+};
+
+#define FORGE_MAX_WELD_GROUPS 16
+#define NUMBER_OF_FORGE_LIGHT_COLORS 8
+#define NUMBER_OF_FORGE_LIGHT_INTENSITIES 6
+#define NUMBER_OF_FORGE_LIGHT_RADII 6
+
 /* ---------- Runtime Palette Catalog Entry */
 
 struct forge_catalog_entry
@@ -158,10 +182,21 @@ struct forge_live_instance
 	uint8_t source_cache_id;
 	uint8_t is_ai_unit;
 	uint8_t is_default_scenario_object; /* 1 if adopted from the base map's default scenario objects */
-	uint8_t pad_inst;
+	uint8_t pad_inst;          /* 0x40 = awaiting streamed tag, 0x80 = client unlinked spawn flag, or structure_bsp_reference_index for spawns */
+	uint8_t physics_mode;      /* 0 = Normal, 1 = Fixed, 2 = Phased */
+	uint8_t ai_order;          /* 0 = Default, 1 = Guard, 2 = Patrol, 3 = Charge, 4 = Enter Vehicle */
+	uint8_t group_id;          /* 0 = None, 1..16 = Weld Group */
+	uint8_t light_color_preset;     /* 0=Default, 1=White, 2=Red, 3=Blue, 4=Green, 5=Amber, 6=Purple, 7=Cyan */
+	uint8_t light_intensity_preset; /* 0=100%, 1=25%, 2=50%, 3=150%, 4=200%, 5=300% */
+	uint8_t light_radius_preset;    /* 0=Default, 1=2u, 2=4u, 3=8u, 5=20u */
+	uint8_t spawned_once;      /* 1 after initial runtime spawn (tracks weapon/eqip/vehi respawns) */
+	uint8_t pad_inst2;
 	uint16_t gametype_flags;   /* 0 = All Modes, bit0=CTF, bit1=Slayer, bit2=Oddball, bit3=KOTH, bit4=Race */
 	int16_t netgame_flag_type; /* Scenario netgame_flag type (6=tele_from, 7=tele_to, 8=hill, 2=oddball, 0=ctf) or -1 */
 	int16_t team_designator;   /* Reference/Channel ID or Team Index */
+	int16_t respawn_timer_sec; /* Respawn timer in seconds (0 = Default/Never) */
+	int16_t pad_respawn;
+	long death_tick;           /* Engine game_time_get() tick when item picked up / unit died, or -1 */
 	float orig_x, orig_y, orig_z; /* Original scenario position if is_default_scenario_object == 1 */
 	float x, y, z;
 	float yaw, pitch, roll;
@@ -183,6 +218,8 @@ struct forge_runtime_state
 	int palette_cursor;
 	int palette_scroll;
 	int props_cursor;
+	int props_scroll;
+	int active_weld_group; /* 1..16 quick weld target for Ctrl+G */
 	enum forge_snap_angle_mode snap_mode;
 	int third_person_view; /* Toggleable via console `third_person` or F4 to inspect 343 Guilty Spark */
 
@@ -318,11 +355,16 @@ struct tag_injector_mesh;
 int forge_ui_build_tag_preview_mesh(int is_installed_mode, int category_tab, int list_index, struct tag_injector_mesh *mesh);
 int forge_ui_save_copy_as(char const *new_map_name);
 void forge_trigger_save_map_action(void);
+void forge_set_pending_sidecar_leaf(char const *leaf);
+int forge_has_pending_or_active_sidecar(void);
 void forge_load_saved_map_state_if_present(char const *map_name);
+void forge_snap_to_scenario_placement_origin(uint32_t group_tag, char const *tag_path, float *io_x, float *io_y, float *io_z);
 void forge_set_status(char const *fmt, ...);
 void forge_draw_screen_rect(short x0, short y0, short x1, short y1, uint32_t argb);
 int forge_monitor_render_player_unit(long object_index, void const *lighting, unsigned long flags);
 void forge_render_world_3d_overlays(void const *lighting);
+int forge_instance_supports_light_props(int32_t live_idx);
+void forge_apply_instance_light_settings(int32_t live_idx);
 
 /* ---------- Prototypes: forge_ai.c */
 
@@ -331,6 +373,18 @@ int32_t forge_ai_spawn_unit_live(
 	float x, float y, float z, float yaw,
 	int16_t team_designator,
 	int32_t *out_unit_index);
+void forge_ai_update_unit_team(
+	long actor_index,
+	long unit_index,
+	int16_t team_designator);
+void forge_ai_apply_order(
+	long actor_index,
+	long unit_index,
+	uint8_t ai_order,
+	float home_x,
+	float home_y,
+	float home_z,
+	long cur_tick);
 
 /* ---------- Prototypes: forge_3d_mode.c */
 
@@ -365,14 +419,25 @@ void forge_render_begin_monitor_visibility(void);
 void forge_render_end_monitor_visibility(void);
 void forge_apply_host_player_monitor_state(int player_abs_idx, int is_monitor, float x, float y, float z, float yaw, float pitch);
 int32_t forge_3d_adopt_or_find_object_instance(long object_index);
+int32_t forge_3d_adopt_default_object_at_slot(
+	int32_t forced_live_idx,
+	uint32_t group_tag,
+	char const *tag_path,
+	float orig_x,
+	float orig_y,
+	float orig_z);
 void forge_init_map_scenario_entities(void);
 void forge_3d_reset_session_tracking(void);
+void forge_sync_instance_extended_props_to_edit_state(int32_t live_idx);
+void forge_sync_live_markers_to_scenario(uint32_t group_tag);
+void forge_undo_clear(void);
 
 /* ---------- Prototypes: forge_network.c */
 
 void forge_network_reset_session(void);
 void forge_network_sync_tick(void);
 void forge_network_send_monitor_mode(int is_monitor, float x, float y, float z, float yaw, float pitch);
+void forge_network_send_object_props(int32_t live_idx);
 void forge_network_send_spawn_ext(
 	int32_t live_idx,
 	uint32_t group_tag,

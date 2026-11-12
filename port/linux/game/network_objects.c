@@ -48,6 +48,7 @@ same datum index (identifier and all), so that any message can name one:
 #include "game/players.h"
 #include "networking/network_game_globals.h"
 #include "objects/objects.h"
+#include "vehicle_riding.h"
 #include "objects/damage.h"
 #include "objects/object_definitions.h"
 #include "effects/effects.h"
@@ -745,6 +746,15 @@ static boolean distributed_vehicle_unsteered(
 		unit_get(vehicle->unit.driver_object_index)->unit.player_index == NONE;
 }
 
+/* whether a client keeps the vehicle only where the host has it (the riding
+code measures its rider by elapsed time, not by its updates). Not the host's
+copy of a co-op vehicle, which is simulated there as in any game */
+boolean network_objects_vehicle_followed(
+	long vehicle_index)
+{
+	return game_connection() == _game_connection_network_client && distributed_vehicle_unsteered(vehicle_index);
+}
+
 /* the object if it is a body (a dead biped), else NULL */
 static struct biped_datum *distributed_body_get(
 	long object_index)
@@ -808,6 +818,28 @@ static boolean distributed_object_follows_host(
 	return (network_coop_active() && cinematic_in_progress()) || distributed_vehicle_unsteered(object_index);
 }
 
+/* whether a write of a vehicle copy is a host state correction a client makes of a copy it does not follow
+(the host's own copy, its driving prediction, an own, co-op or changed vehicle and a carry are other writes). A
+correction is no motion of the vehicle: what the written hull newly touches moves with it, as a rider is carried,
+rather than being pushed or crushed as if the vehicle had driven into it */
+static boolean network_objects_vehicle_carries(
+	long object_index,
+	short kind)
+{
+	return kind == _network_vehicle_write_state && game_connection() == _game_connection_network_client &&
+		!network_objects_vehicle_followed(object_index) && vehicle_riding_enabled() &&
+		object_get(object_index)->object.type == _object_type_vehicle;
+}
+
+/* before the write, while the hull is still where it was (what it touches is measured against that) */
+static void network_objects_vehicle_writing(
+	long object_index,
+	short kind)
+{
+	if (network_objects_vehicle_carries(object_index, kind))
+		biped_riding_vehicle_writing(object_index);
+}
+
 /* (the transform checked) */
 static void distributed_object_move(
 	long object_index,
@@ -815,9 +847,13 @@ static void distributed_object_move(
 	real_vector3d const *forward,
 	real_vector3d const *up,
 	real_vector3d const *velocity,
-	real_vector3d const *angular_velocity)
+	real_vector3d const *angular_velocity,
+	short kind)
 {
 	struct object_datum *object = object_get(object_index);
+	real_point3d before = object->object.position;
+	real_vector3d before_forward = object->object.forward;
+	real_vector3d before_up = object->object.up;
 	real_vector3d offset;
 
 	/* (drawn from where it was, the difference fading over a few ticks) */
@@ -825,7 +861,9 @@ static void distributed_object_move(
 	offset.j = object->object.position.y - position->y;
 	offset.k = object->object.position.z - position->z;
 	distributed_body_unfix_pose(object_index);
+	network_objects_vehicle_writing(object_index, kind);
 	object_set_position(object_index, position, forward, up);
+	network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, kind);
 	if (velocity)
 		object->object.translational_velocity = *velocity;
 	if (angular_velocity)
@@ -842,13 +880,14 @@ void network_objects_correct(
 	real_vector3d const *forward,
 	real_vector3d const *up,
 	real_vector3d const *velocity,
-	real_vector3d const *angular_velocity)
+	real_vector3d const *angular_velocity,
+	short kind)
 {
 	real_vector3d valid_forward, valid_up;
 
 	/* (what cannot be, from a message: not taken) */
 	if (distributed_transform_valid(position, forward, up, velocity, angular_velocity, &valid_forward, &valid_up))
-		distributed_object_move(object_index, position, &valid_forward, &valid_up, velocity, angular_velocity);
+		distributed_object_move(object_index, position, &valid_forward, &valid_up, velocity, angular_velocity, kind);
 }
 
 boolean network_objects_reconcile(
@@ -858,7 +897,8 @@ boolean network_objects_reconcile(
 	real_vector3d const *up,
 	real_vector3d const *velocity,
 	real_vector3d const *angular_velocity,
-	real blend_distance)
+	real blend_distance,
+	short kind)
 {
 	struct object_datum *object = object_get(object_index);
 	real_vector3d valid_forward, valid_up;
@@ -875,7 +915,7 @@ boolean network_objects_reconcile(
 	right) */
 	if (!(dx * dx + dy * dy + dz * dz <= blend_distance * blend_distance))
 	{
-		distributed_object_move(object_index, position, &valid_forward, &valid_up, velocity, angular_velocity);
+		distributed_object_move(object_index, position, &valid_forward, &valid_up, velocity, angular_velocity, kind);
 		return TRUE;
 	}
 	/* Move halfway, and draw the move as a glide over the next few frames,
@@ -890,13 +930,18 @@ boolean network_objects_reconcile(
 		blended.z = object->object.position.z + dz * 0.5f;
 	}
 	{
+		real_point3d before = object->object.position;
+		real_vector3d before_forward = object->object.forward;
+		real_vector3d before_up = object->object.up;
 		real_vector3d offset;
 
 		offset.i = object->object.position.x - blended.x;
 		offset.j = object->object.position.y - blended.y;
 		offset.k = object->object.position.z - blended.z;
 		distributed_body_unfix_pose(object_index);
+		network_objects_vehicle_writing(object_index, kind);
 		object_set_position(object_index, &blended, &valid_forward, &valid_up);
+		network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, kind);
 		if (!distributed_object_follows_host(object_index))
 			render_interpolation_correct_object(object_index, &offset);
 	}
@@ -907,6 +952,25 @@ boolean network_objects_reconcile(
 	if (distributed_vehicle_unsteered(object_index))
 		SET_FLAG(object->object.flags, _object_at_rest_bit, TRUE);
 	return FALSE;
+}
+
+void network_objects_vehicle_written(
+	long object_index,
+	real_point3d const *before_position,
+	real_vector3d const *before_forward,
+	real_vector3d const *before_up,
+	short kind)
+{
+	struct object_datum *object = object_get(object_index);
+
+	if (object->object.type == _object_type_vehicle)
+	{
+		if (!network_objects_vehicle_followed(object_index))
+			vehicle_riding_vehicle_corrected(object_index, before_position, before_forward, before_up,
+				&object->object.position, &object->object.forward, &object->object.up);
+		if (network_objects_vehicle_carries(object_index, kind))
+			biped_riding_vehicle_written(object_index, before_position, before_forward, before_up);
+	}
 }
 
 /* an object's state as the host sent it, in full */
@@ -1550,6 +1614,7 @@ static void distributed_host_send_states(
 	short limit = MIN(MAXIMUM_ENTRIES_PER_MESSAGE, DATAGRAM_ENTRIES(struct distributed_object_state));
 	short resting = 0;
 	long told_count = objects_host_told_count;
+	long resting_start = objects_host_resting_cursor;
 	long state_count = 0;
 	long absolute_index;
 	long step;
@@ -1579,7 +1644,9 @@ static void distributed_host_send_states(
 	{
 		long object_index;
 
-		absolute_index = (objects_host_resting_cursor + step) % told_count;
+		/* (the scan counts steps from where it began: from the cursor it moves, it skips rested objects, and a
+		rested hull a rider stands on goes unrefreshed; riding off keeps the original scan) */
+		absolute_index = ((vehicle_riding_enabled() ? resting_start : objects_host_resting_cursor) + step) % told_count;
 		object_index = distributed_host_placed_object(absolute_index);
 		if (object_index == NONE || !TEST_FLAG(object_get(object_index)->object.flags, _object_at_rest_bit))
 			continue;
@@ -2129,7 +2196,7 @@ void network_objects_apply_vehicle_predictions(
 			real_point3d previous_position = vehicle->object.position;
 
 			network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity,
-				&angular_velocity, HOST_VEHICLE_BLEND_DISTANCE);
+				&angular_velocity, HOST_VEHICLE_BLEND_DISTANCE, _network_vehicle_write_prediction);
 			/* (a copy at rest runs no physics, and so neither falls nor
 			counts its ticks in the air: one the client moved from where it
 			came to rest (a little at a time too), or says moves, wakes, and
@@ -2518,7 +2585,7 @@ static void distributed_client_create(
 				!distributed_client_own_object(existing_index))
 			{
 				distributed_object_move(existing_index, &change->position, &forward, &up,
-					&change->translational_velocity, &change->angular_velocity);
+					&change->translational_velocity, &change->angular_velocity, _network_vehicle_write_change);
 			}
 			distributed_client_apply_change(existing_index, change);
 			return;
@@ -2663,7 +2730,7 @@ static boolean distributed_client_correct_own_vehicle(
 	position.z = before.z + error.k;
 	forward = object->object.forward;
 	up = object->object.up;
-	network_objects_correct(vehicle_index, &position, &forward, &up, NULL, NULL);
+	network_objects_correct(vehicle_index, &position, &forward, &up, NULL, NULL, _network_vehicle_write_own);
 	distributed_count_correction();
 	/* (the ticks noted since moved as it was, not corrected again) */
 	error.i = object->object.position.x - before.x;
@@ -2814,7 +2881,14 @@ static void distributed_client_note_unsteered_path(
 		objects_client_unsteered_path[absolute_index].latest_up = *host_up;
 		object->object.translational_velocity = *global_zero_vector3d;
 		object->object.angular_velocity = *global_zero_vector3d;
-		object_set_position(object_index, host_position, host_forward, host_up);
+		{
+			real_point3d before = object->object.position;
+			real_vector3d before_forward = object->object.forward;
+			real_vector3d before_up = object->object.up;
+
+			object_set_position(object_index, host_position, host_forward, host_up);
+			network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, _network_vehicle_write_state);
+		}
 		return;
 	}
 	/* the path's velocity, sample to sample on the host's clock */
@@ -2965,10 +3039,18 @@ void network_objects_handle_states(
 				forward.k * object->object.forward.k >= angle_tolerance &&
 			up.i * object->object.up.i + up.j * object->object.up.j + up.k * object->object.up.k >= angle_tolerance)
 		{
+			/* (a copy kept where it is still takes the host's velocities: left to its own physics they decay
+			between corrections, and a rider's frame, the vehicle's motion, goes wrong with them) */
+			if (vehicle_riding_enabled() && object->object.type == _object_type_vehicle && !own_vehicle &&
+				!distributed_vehicle_unsteered(state->object_index))
+			{
+				object->object.translational_velocity = velocity;
+				object->object.angular_velocity = angular_velocity;
+			}
 			continue;
 		}
 		if (network_objects_reconcile(state->object_index, &state->position, &forward, &up, &velocity,
-			&angular_velocity, blend_distance))
+			&angular_velocity, blend_distance, _network_vehicle_write_state))
 		{
 			distributed_count_correction();
 		}
@@ -3644,7 +3726,14 @@ static void distributed_client_carry_unsteered_vehicles(
 		else
 			object->object.translational_velocity = *global_zero_vector3d;
 		object->object.angular_velocity = *global_zero_vector3d;
-		object_set_position(iterator.index, &position, &forward, &up);
+		{
+			real_point3d before = object->object.position;
+			real_vector3d before_forward = object->object.forward;
+			real_vector3d before_up = object->object.up;
+
+			object_set_position(iterator.index, &position, &forward, &up);
+			network_objects_vehicle_written(iterator.index, &before, &before_forward, &before_up, _network_vehicle_write_carry);
+		}
 	}
 }
 

@@ -420,6 +420,21 @@ long forge_create_engine_object_for_instance(int32_t live_idx, long def_idx, int
 	return (long)0x80020010UL;
 }
 
+void forge_runtime_init(void)
+{
+	g_forge.initialized = 1;
+}
+
+void forge_sync_instance_extended_props_to_edit_state(int32_t live_idx)
+{
+	(void)live_idx;
+}
+
+void forge_apply_instance_light_settings(int32_t live_idx)
+{
+	(void)live_idx;
+}
+
 #include "under_test.inc"
 
 /* ---------- Test helpers */

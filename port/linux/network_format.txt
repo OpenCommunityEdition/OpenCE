@@ -7,10 +7,11 @@ bound DISTRIBUTED_CLIENT_BUILD_MODS_SIZE 512
 bound DISTRIBUTED_CLIENT_BUILD_NUMBER_SIZE 12
 bound DISTRIBUTED_CLIENT_BUILD_REPOSITORY_SIZE 144
 bound DISTRIBUTED_CLIENT_BUILD_VERSION_SIZE 64
+bound DISTRIBUTED_DECK_SIZE 4 + 2 + 12 + 6 + 1 + 1 + 2
 bound DISTRIBUTED_INPUT_HISTORY 4
 bound DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1)
 bound DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE 14
-bound DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 + 2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1 + NUMBER_OF_DISTRIBUTED_POSE_VECTORS * 6
+bound DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE 3 + 4 + (4 + 2) + (12 + 3 * 6) + DISTRIBUTED_DECK_SIZE + 2 + 2 * 2 + 4 * 2 + 2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1 + NUMBER_OF_DISTRIBUTED_POSE_VECTORS * 6
 bound DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE 3
 bound GAME_ALLEGIANCE_BITVECTOR_LONGS 4
 bound HALO_PORT_MAXIMUM_NETWORK_PLAYERS 128
@@ -69,6 +70,7 @@ define MCC_SHARE_STAGE_FILES 168
 define MCC_WORKSHOP_WIRE_OFFSET 64
 define MCC_WORKSHOP_WIRE_SIZE 64
 define MCC_WORKSHOP_WIRE_VERSION 1
+enum VEHICLE_RIDING_DECK_VERDICT_SHIFT 1
 enum _distributed_actor_camouflaged_bit 4
 enum _distributed_actor_impulse_aligned_bit 6
 enum _distributed_actor_rides_bit 0
@@ -108,6 +110,8 @@ enum _distributed_message_coop_sounds_retired 67
 enum _distributed_message_damage_animations 75
 enum _distributed_message_damage_events 10
 enum _distributed_message_fire_origins 93
+enum _distributed_message_forge_tag_request 108
+enum _distributed_message_forge_tag_stream 109
 enum _distributed_message_game_state 7
 enum _distributed_message_hit_reports 11
 enum _distributed_message_inventories 4
@@ -139,6 +143,7 @@ enum _distributed_message_shield_effects 91
 enum _distributed_message_structure_bsp 65
 enum _distributed_message_unit_states 2
 enum _distributed_message_vehicle_prediction 12
+enum _distributed_message_vehicle_riding_map 107
 enum _distributed_message_voice_config 82
 enum _distributed_message_voice_down 81
 enum _distributed_message_voice_up 80
@@ -168,6 +173,7 @@ enum _distributed_unit_friendly_fire_bit 2
 enum _distributed_unit_killed_by_vehicle_bit 3
 enum _distributed_unit_part_camouflage_bit 4
 enum _distributed_unit_part_damage_bit 2
+enum _distributed_unit_part_deck_bit 7
 enum _distributed_unit_part_killer_bit 5
 enum _distributed_unit_part_powerups_bit 3
 enum _distributed_unit_part_riding_bit 0
@@ -215,6 +221,8 @@ enum _message_server_pregame_countdown 7
 enum _message_server_pregame_keep_alive 10
 enum _message_server_remove_player_ingame 22
 enum _message_server_switch_to_pregame 30
+enum _vehicle_riding_deck_cabin_bit 3
+enum _vehicle_riding_deck_falling_bit 0
 enum mcc_admission_op 8a8312ea736e
 enum mcc_share_file_kind 0ae653ab8b6d
 enum mcc_share_op ae61837ba751
@@ -348,6 +356,8 @@ struct distributed_pings_message 35c6009dee29
 struct distributed_player_input a0cf65a1197c
 struct distributed_player_ping 377e0e3045f4
 struct distributed_player_statistics 2a44afb8f96c
+struct distributed_riding_latched 3d13fb412582
+struct distributed_riding_map_message 01a360e89e36
 struct distributed_statistics_message 79134e6e9811
 struct distributed_structure_bsp 53f7d5067cc9
 struct distributed_structure_bsp_message 096278a05681

@@ -589,10 +589,9 @@ boolean cache_files_precache_map_loaded(
 		return mcc_cache_available(map_name);
 	/* port: a Halo Custom Edition map (custom_maps\<name>) is read in place
 	and never copied to the cache partition; it is never the game's own map
-	of that file name (port/linux/game/custom_edition_cache.c). A Forge-saved
-	Xbox cache in custom_maps uses the standard Xbox cache partition path. */
-	if (custom_edition_level_name(map_name) && custom_edition_cache_playable(map_name))
-		return TRUE;
+	of that file name (port/linux/game/custom_edition_cache.c) */
+	if (custom_edition_level_name(map_name))
+		return custom_edition_cache_playable(map_name);
 	return cached_map_files_find_map(tag_name_strip_path(map_name)) != NONE;
 }
 
@@ -619,17 +618,13 @@ boolean cache_files_precache_map_begin(
 	its file name (port/linux/game/custom_edition_cache.c) */
 	if (custom_edition_level_name(map_name) && !custom_edition_cache_playable(map_name))
 	{
-		struct cache_file_header probe_header;
-		if (!cache_file_read_header_from_dvd(cache_map_name, &probe_header))
+		error(_error_silent, "couldn't find the Custom Edition map '%s' in custom_maps", map_name);
+		if (copy_map)
 		{
-			error(_error_silent, "couldn't find the Custom Edition map '%s' in custom_maps", map_name);
-			if (copy_map)
-			{
-				display_error_damaged_media();
-			}
-
-			return FALSE;
+			display_error_damaged_media();
 		}
+
+		return FALSE;
 	}
 	if (!cache_files_precache_map_loaded(map_name))
 	{
@@ -1300,19 +1295,6 @@ static void cache_file_get_map_path(
 	{
 		error(_error_silent, "map path for '%.64s' is too long", map_name);
 		path[0] = 0;
-		return;
-	}
-
-	/* port: also check d:\custom_maps\<map_name>.map for Forge-saved Xbox v5 maps */
-	if (GetFileAttributesA(path) == (DWORD)-1)
-	{
-		char custom_path[MAXIMUM_MAP_PATH_LENGTH];
-		int custom_len = snprintf(custom_path, MAXIMUM_MAP_PATH_LENGTH, "d:\\custom_maps\\%s.map", map_name);
-		if (custom_len > 0 && custom_len < MAXIMUM_MAP_PATH_LENGTH &&
-			GetFileAttributesA(custom_path) != (DWORD)-1)
-		{
-			strcpy(path, custom_path);
-		}
 	}
 
 	return;
