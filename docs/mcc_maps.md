@@ -57,6 +57,25 @@ mcc_maps/sounds.map    Matching MCC resources, when required by the package
 mcc_maps/bitmaps.map   Matching MCC resources, when required by the package
 ```
 
+You can also copy an entire downloaded Halo 1 Workshop folder from
+`steamapps/workshop/content/976730/<item id>` into `mcc_maps/<item id>`.
+Leave its `maps`, metadata, images and `halo1/maps` resource folders intact.
+Local discovery does not require Steam or the Steam Discovery setting.
+The menu reads the package title from `ModInfo.json` and level names and PNG
+previews from the referenced metadata. Missing metadata retains the normal
+filename labels and placeholder image; a numeric package without a title
+shows "MCC package". Unsupported or damaged images also use the placeholder.
+
+Both disk layouts use `mcc_maps\<package>\<level>` internally. Local lookup
+prefers a file directly in the package, then the same file in `maps`; for
+`bitmaps.map` and `sounds.map`, it also checks the package's `halo1/maps`.
+A present invalid direct file is not replaced by a nested or Steam copy.
+Nested lookup rejects linked paths and special files. It searches only these
+fixed locations, never arbitrary subdirectories or other packages. Manual
+folders containing only level files remain valid. Copying a package does
+not supply missing shared base resources; the existing resource requirements
+and automatic sharing policy still apply.
+
 The level identity is `mcc_maps\a10`. The filename is retained even when
 the internal scenario name differs. The supplied Mercury Rising file is
 an example: its filename is `a10.map`, while its header names
@@ -323,8 +342,9 @@ The bounded reader supports 1-64 missions, rejects duplicate paths or filenames,
 and accepts the default mission kind. Hub/flashback semantics and insertion-point
 selection are not implemented; missions start normally at their beginning.
 
-For local packages, keep `ModInfo.json`, `CampaignInfo.json` and the referenced
-mission metadata beside the flattened maps, retaining the metadata subfolders.
+For local packages, keep `ModInfo.json` and `CampaignInfo.json` at the package
+root and the referenced mission metadata in its original subfolders.
+The maps may remain in the Workshop `maps` folder or sit directly in the root.
 The Android importer performs this layout conversion and preserves the Workshop
 ID in `workshop_id.txt`. Metadata never redirects loading to another package,
 Xbox or CE. A local override never borrows metadata from its Steam counterpart.
@@ -348,14 +368,16 @@ identity, including when the original tag names an Xbox campaign level.
 Continue and Load Game have MCC-specific routes with separate saved-name
 storage; they do not turn an MCC checkpoint into a stock campaign level.
 
-The catalog scans only `mcc_maps` and one package directory level, reads each candidate's 2,048-byte header,
+The catalog scans `mcc_maps`, one package directory level and each package's
+fixed `maps` subfolder. It reads each candidate's 2,048-byte header,
 and refreshes when a map menu opens. It accepts at most 1,024 entries, with
 relative level paths of at most 54 characters before `.map`, including the
-package name and separator. Deeper nesting, traversal and invalid names are
+package name and separator; the physical `maps` subfolder adds no identity
+characters. Other deeper nesting, traversal and invalid names are
 rejected. Moving an existing loose map into a package changes its saved-game
 identity; keep it at its old location to continue an existing checkpoint. A description is optional;
-the default identifies the scenario type. MCC thumbnail sidecars, Workshop
-downloads and network transfer manifests are not implemented. There is no
+the default identifies the scenario type. Previews use explicit package metadata,
+not guessed image sidecars. There is no
 dependency on the Custom Edition setting or its resource directories.
 
 The loader opens source maps read-only. A rejected map reports the failing

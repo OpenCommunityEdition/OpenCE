@@ -141,6 +141,13 @@ Steam is not needed on Android. See the [Android import guide](port/android/READ
 
 ### Manual installation
 
+You can copy a complete downloaded Workshop folder from
+`steamapps/workshop/content/976730/<workshop ID>` into `mcc_maps` unchanged.
+GulchCE reads its nested `maps` folder, authored titles and referenced PNG
+previews locally, without Steam Discovery. Keep all package files together.
+
+The existing map-only layout also remains supported:
+
 Create a folder such as `mcc_maps/MercuryRising` beside your existing `maps` and `custom_maps` folders.
 
 - Place the package’s level `.map` files directly inside it.

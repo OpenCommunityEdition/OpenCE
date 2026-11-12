@@ -317,13 +317,15 @@ static boolean mcc_map_workshop_title(struct mcc_menu_map *map)
 	return FALSE;
 }
 
-/* Exactly one package level; directory entries never become arbitrary paths. */
-static void mcc_maps_scan_directory(char const *package)
+/* One package level, plus its fixed Workshop maps directory. The nested disk
+ * layout never becomes part of a saved or network level identity. */
+static void mcc_maps_scan_directory(char const *package, boolean nested)
 {
     WIN32_FIND_DATAA data;
     HANDLE find;
     char pattern[128];
-    snprintf(pattern,sizeof(pattern),"%s%s%s*.*",MCC_MAPS_DIRECTORY,package,package[0] ? "\\" : "");
+    snprintf(pattern,sizeof(pattern),"%s%s%s%s*.*",MCC_MAPS_DIRECTORY,package,
+        package[0] ? "\\" : "",nested ? "maps\\" : "");
     find=FindFirstFileA(pattern,&data);
     if (find==INVALID_HANDLE_VALUE) return;
     do {
@@ -335,9 +337,13 @@ static void mcc_maps_scan_directory(char const *package)
         length=strlen(name);
         if (!length || strpbrk(name,"/\\") || length>58) continue;
         if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            if (package[0] || !csstrcasecmp(name,"_shared")) continue;
+            if (package[0]) {
+                if (!nested && !csstrcasecmp(name,"maps")) mcc_maps_scan_directory(package,TRUE);
+                continue;
+            }
+            if (!csstrcasecmp(name,"_shared")) continue;
             snprintf(candidate,sizeof(candidate),"%s%s\\x",MCC_MAPS_LEVEL_PREFIX,name);
-            if (mcc_package_name(candidate,canonical)) mcc_maps_scan_directory(name);
+            if (mcc_package_name(candidate,canonical)) mcc_maps_scan_directory(name,FALSE);
             continue;
         }
         extension=strrchr(name,'.');
@@ -362,7 +368,7 @@ static void mcc_maps_scan(void)
     mcc_menu_catalog.campaigns_enabled = campaigns;
     mcc_menu_catalog.scanned=TRUE;
     mcc_menu_catalog.count=0;
-    mcc_maps_scan_directory("");
+    mcc_maps_scan_directory("",FALSE);
     /* The subscribed Steam Workshop items: each map is the level mcc_maps\<item id>\<map name>. */
     for (i=0;i<steam_workshop_count();i++) {
         struct steam_workshop_map const *item=steam_workshop_map(i);

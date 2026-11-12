@@ -77,6 +77,11 @@ rotation_fallback = false
 
 Install local maps/packages under the data root's `mcc_maps`, or enable
 `game.workshop_maps` to discover this machine's installed MCC Workshop items.
+An intact copied Workshop folder (`mcc_maps/<id>/maps/<level>.map`) and a
+manual package (`mcc_maps/<package>/<level>.map`) both use the rotation name
+`mcc_maps\<package>\<level>`: do not add the physical `maps` subfolder.
+Local packages work with Steam discovery disabled. Keep their metadata and
+authored resources together; the server resolves the same layout as clients.
 Campaign maps require `coop`; multiplayer maps require a multiplayer gametype.
 The MCC adapter checks version-13 headers without routing them through Xbox
 or CE loaders. Resource/content validation still occurs before gameplay.
