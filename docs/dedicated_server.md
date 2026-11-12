@@ -217,7 +217,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `server.name`, `server.max_players`, `server.min_players`,
 `server.password`, `server.public`, `server.rotation_fallback`,
 `server.lobby_seconds`, `server.postgame_seconds`, `server.empty_seconds`,
-`server.idle_minutes`, `server.team_start`, `server.motd`,
+`server.idle_minutes`, `server.team_start`, `server.team_switch`,
+`server.team_switch_cooldown_seconds`, `server.motd`,
 `server.frame_rate`, `server.web_password`,
 `server.web_moderator_password`, `server.log_format`,
 `server.log_addresses`, `server.status_file`, `server.auto_update`,
@@ -262,6 +263,7 @@ in either case, and is kept as the table spells it:
 | `server.empty_seconds`, `server.idle_minutes` | 0 or more |
 | `server.frame_rate` | 30 to 120 |
 | `server.team_start` | `one`, `both`, `skip` |
+| `server.team_switch_cooldown_seconds` | 0 to 3600 |
 | `server.log_format` | `text`, `json` |
 | `server.auto_update` | `off`, `check`, `install` |
 | `server.coop_difficulty` | `easy`, `normal`, `hard`, `impossible` |
@@ -373,6 +375,44 @@ For example (a co-op entry's own rule and a map's choice still win):
 | `true` | `false` | On in co-op; multiplayer follows each gametype |
 | `false` | `true` | Off in multiplayer (unless a map turns it on) |
 | `true` | `true` | On in co-op and multiplayer (unless a map turns it off) |
+
+### Changing teams
+
+In a team game a player changes their own team by saying `!switch` (or
+`!team`) in the chat, the whole line, in either case. The line goes to no
+one, not even when the player is muted: the server moves them, and everyone
+sees "Guven switched to the Blue team", or tells them alone why not. The
+server decides, and moves a player only
+
+- with `server.team_switch` on (the default);
+- while a team game is played: not in the postgame, nor in a game without
+  teams ("!switch works only in team games"), nor in co-op, nor in
+  Infection, whose teams are its roles ("Infection decides the teams");
+- once in `server.team_switch_cooldown_seconds` (30; 0: no wait), each player
+  ("You can switch teams again in 12 seconds");
+- with the gametype's auto team balance on (`balance` in a gametype file),
+  to a team that has fewer players than theirs, them counted: the new team
+  is then one player bigger than the old at most. 5 against 4 may become 4
+  against 5, but 4 against 4 stays ("Blue has 4 players, Red 4: that would
+  unbalance the teams"). With the balance off, a player may switch whatever
+  the numbers.
+
+A living player dies as they switch, a death no one is credited with: no
+suicide is scored and no kill counted, what they carry (a flag, the ball)
+drops, and they respawn on the new team after the gametype's respawn time
+(and its suicide penalty). They join the new team as they die, once what
+they carried has dropped, never while they still hold it; if another
+player kills them first, the kill is that player's and the switch is made
+all the same. While a switch waits for its death, the auto team balance's
+rule counts the player in the new team. A dead player changes team at once,
+and their respawn goes on as it was. The cooldowns start again with each
+map. The team scores stay as they were, the points a player scored staying with the
+team they scored them for, and the player's own score goes with them.
+Every machine sees the new team with the player's next life, as it does the
+auto team balance's moves, so a client of any network version takes it.
+Each switch is logged (`player`: `Guven switched to the Blue team
+(!switch)`); there is no event for it, as there is none for the auto team
+balance's moves.
 
 ### Updates
 
