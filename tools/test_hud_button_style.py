@@ -126,7 +126,12 @@ struct rasterizer_dynamic_screen_geometry_parameters {
 };
 static int enabled=1,gems,live,last_asset=-1,draws;
 static short controller_glyph_style(void) {return (short)gems;}
-#define controller_glyph_draw(style,index,icon,cursor,color,unbind) 0
+static boolean controller_glyph_draw(short style, short index,
+    struct icon_hud_element_definition const *icon, rectangle2d *cursor, pixel32 color)
+{
+    (void)style; (void)index; (void)icon; (void)cursor; (void)color;
+    return FALSE;
+}
 #define controller_glyphs_dispose() ((void)0)
 static pixel32 drawn_color;
 static int drawn_blend;
