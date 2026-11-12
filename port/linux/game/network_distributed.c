@@ -3727,24 +3727,6 @@ static void distributed_apply_predictions(
 		}
 		if (distributed_accepted[player_index].valid && distributed_accepted[player_index].unit_index != unit_index)
 			distributed_accepted[player_index].valid = FALSE;
-		if (unit_index != NONE &&
-			(forge_is_unit_in_monitor_mode(unit_index) ||
-				game_time_get() < distributed_monitor_grace_until_tick[player_index]))
-		{
-			struct object_datum *mon_obj = object_get(unit_index);
-
-			distributed_accepted[player_index].valid = FALSE;
-			if (distributed_predictions[player_index].valid && unit_index == state->unit_index &&
-				scenario_leaf_index_from_point(&state->position) != NONE)
-			{
-				object_set_position(unit_index, &state->position, NULL, NULL);
-			}
-			distributed_host_speeds[player_index].unit_index = unit_index;
-			distributed_host_speeds[player_index].grounded = TRUE;
-			distributed_host_speeds[player_index].ground_height = mon_obj->object.position.z;
-			distributed_host_speeds[player_index].top_height = mon_obj->object.position.z;
-			distributed_host_speeds[player_index].ground_time = game_time_get();
-		}
 		/* (how fast it may go, a tick, what the host's tick did to its own
 		copy noted before the client's word is taken; riding or dead, noted
 		afresh on foot) */
@@ -3783,7 +3765,30 @@ static void distributed_apply_predictions(
 	}
 }
 
+static void distributed_correct_own_unit_forge(
+	struct player_datum const *player,
+	long unit_index,
+	struct distributed_unit_state const *state)
+{
+	real_point3d before = object_get(unit_index)->object.position;
+	boolean skip_monitor_correction = forge_is_unit_in_monitor_mode(unit_index) != 0;
+
+	if (!skip_monitor_correction &&
+		player->local_player_index >= 0 &&
+		player->local_player_index < MAXIMUM_LOCAL_PLAYERS &&
+		game_time_get() < distributed_client_monitor_grace_until_tick[player->local_player_index])
+	{
+		if (distance_squared3d(&before, &state->position) <= 4.0f)
+			distributed_client_monitor_grace_until_tick[player->local_player_index] = 0;
+		else
+			skip_monitor_correction = TRUE;
+	}
+	if (!skip_monitor_correction)
+		distributed_correct_own_unit(player, unit_index, state);
+}
+
 /* (a client) the host's word on a player's unit */
+#define distributed_correct_own_unit distributed_correct_own_unit_forge
 static void distributed_handle_unit_state(
 	long host_time,
 	struct distributed_unit_state const *state)
@@ -3902,22 +3907,7 @@ static void distributed_handle_unit_state(
 		real_point3d before = object_get(unit_index)->object.position;
 
 		if (local)
-		{
-			boolean skip_monitor_correction = forge_is_unit_in_monitor_mode(unit_index) != 0;
-
-			if (!skip_monitor_correction &&
-				player->local_player_index >= 0 &&
-				player->local_player_index < MAXIMUM_LOCAL_PLAYERS &&
-				game_time_get() < distributed_client_monitor_grace_until_tick[player->local_player_index])
-			{
-				if (distance_squared3d(&before, &state->position) <= 4.0f)
-					distributed_client_monitor_grace_until_tick[player->local_player_index] = 0;
-				else
-					skip_monitor_correction = TRUE;
-			}
-			if (!skip_monitor_correction)
-				distributed_correct_own_unit(player, unit_index, state);
-		}
+			distributed_correct_own_unit(player, unit_index, state);
 		else
 		{
 			distributed_apply_remote_unit(unit_index, state);
@@ -3934,6 +3924,7 @@ static void distributed_handle_unit_state(
 		}
 	}
 }
+#undef distributed_correct_own_unit
 
 /* (a client) the host's word on every player's unit */
 static void distributed_handle_unit_states(
@@ -5128,8 +5119,28 @@ void network_distributed_tick(
 
 			for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 			{
-				distributed_rider_pass[player_index] = distributed_prediction_rides(player_index,
-					distributed_living_unit(distributed_player(player_index)));
+				long unit_index = distributed_living_unit(distributed_player(player_index));
+
+				distributed_rider_pass[player_index] = distributed_prediction_rides(player_index, unit_index);
+				if (unit_index != NONE && object_get(unit_index)->object.parent_object_index == NONE &&
+					(forge_is_unit_in_monitor_mode(unit_index) ||
+						game_time_get() < distributed_monitor_grace_until_tick[player_index]))
+				{
+					struct distributed_unit_state const *state = &distributed_predictions[player_index].state;
+					struct object_datum *mon_obj = object_get(unit_index);
+
+					distributed_accepted[player_index].valid = FALSE;
+					if (distributed_predictions[player_index].valid && unit_index == state->unit_index &&
+						scenario_leaf_index_from_point(&state->position) != NONE)
+					{
+						object_set_position(unit_index, &state->position, NULL, NULL);
+					}
+					distributed_host_speeds[player_index].unit_index = unit_index;
+					distributed_host_speeds[player_index].grounded = TRUE;
+					distributed_host_speeds[player_index].ground_height = mon_obj->object.position.z;
+					distributed_host_speeds[player_index].top_height = mon_obj->object.position.z;
+					distributed_host_speeds[player_index].ground_time = game_time_get();
+				}
 			}
 		}
 		profile_scope(distributed_tick_apply_predictions_section, distributed_apply_predictions(FALSE);)

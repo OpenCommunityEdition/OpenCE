@@ -1249,7 +1249,8 @@ void hs_runtime_port_shift_sleep_times(
 }
 
 /* port: wrapped by hs_runtime_update in forge_hooks.c */
-void orig_hs_runtime_update(
+#define hs_runtime_update orig_hs_runtime_update
+void hs_runtime_update(
 	void)
 {
 	if (hs_runtime_globals.initialized)
@@ -1277,6 +1278,7 @@ void orig_hs_runtime_update(
 
 	return;
 }
+#undef hs_runtime_update
 
 long hs_runtime_evaluate(
 	long expression_index)
